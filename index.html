@@ -58,8 +58,29 @@
 <!-- 字重只要真的用得到的那幾個。Noto Sans TC 每多一個字重就多約 30 KB 的 CSS
      （它被切成一百多個 unicode-range 片段），所以只要 900，而且只給標題。
      Iansui 是 Alumni 引言用的，那一頁還沒做，這裡先不要載。 -->
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<!-- 這一行**不擋渲染**。media="print" 讓瀏覽器先不套用這份樣式表，
+     載完之後 onload 再把它切回 all —— 這是不擋渲染載 CSS 的標準寫法。
+     為什麼要這樣：Lighthouse 實測，這份 Google Fonts 的 CSS 是首頁最大的
+     渲染阻塞來源（手機版擋住約 1.2 秒）。它有三萬多位元組，其中大部分是
+     這一頁根本用不到的 unicode-range 片段，卻要等它下載完字才開始畫。
+     代價是字體一定會先用系統字再換過來（FOUT）。那本來就會發生 ——
+     font-display:swap 就是這個意思 —— 只是現在換得更早，而且文字更早出現。
+     沒有 JavaScript 的瀏覽器走 noscript 那一行，照舊擋渲染但一定載得到。 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap"></noscript>
 <link rel="stylesheet" href="./shared/brand.css">
+
+<!-- 語言的判斷要在這裡，**不能等到頁尾那段 script**。
+     這一頁的中英兩版都在 HTML 裡（沒有 JavaScript 時兩版都要讀得到），
+     所以在瀏覽器套上 data-lang 之前，畫面上是「中文全文接著英文全文」。
+     判斷寫在頁尾的話，畫面已經畫完才把其中一版藏起來，下面所有東西跳一次 ——
+     Lighthouse 實測那一跳就是首頁全部的 CLS 0.179，而且是唯一的位移來源。
+     放在這裡，屬性在第一次繪製之前就掛好了，什麼都不會跳。
+     這一小段刻意不寫成外部檔案：多一個來回就失去意義了。 -->
+<script>
+  document.documentElement.setAttribute(
+    "data-lang", /^zh/i.test(navigator.language || "") ? "zh" : "en");
+</script>
 
 <style>
 /* 色票與字體家族全部來自 ./shared/brand.css，這裡沒有任何寫死的色碼
@@ -616,10 +637,13 @@ footer a{color:var(--ink);font-weight:600}
   var links = document.getElementById("navlinks");
   var burger = document.getElementById("burger");
 
-  /* 第一次進來給哪一種語言：看瀏覽器的設定，不存任何東西在使用者的裝置上。
+  /* 語言在 <head> 就決定好了（見那裡的註解，是為了不讓畫面跳）。
+     這裡只是把按鈕文字與錨點補上，**不要在這裡再判斷一次** ——
+     判斷兩次的話，哪天改了規則就會有一個地方沒改到。
+     第一次進來看的是瀏覽器的語言設定，不存任何東西在使用者的裝置上：
      這一頁沒有 cookie 也沒有 localStorage，footer 那句「不使用任何追蹤工具」
      要站得住腳，就不能為了記住語言而開始存東西。 */
-  setLang(/^zh/i.test(navigator.language || "") ? "zh" : "en");
+  setLang(html.getAttribute("data-lang") === "en" ? "en" : "zh");
 
   function setLang(l) {
     html.setAttribute("data-lang", l);

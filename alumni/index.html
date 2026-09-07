@@ -56,7 +56,16 @@
      的繁中手寫體，前端從來沒用過。學長姐的每一句話都用它，看起來像手寫的紙條，
      不像網頁文字 —— 這是整個網站最有記憶點的一個決定。
      首頁沒有引言所以不載，多載一種字體就多幾十 KB。 -->
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap" rel="stylesheet">
+<!-- 這一行**不擋渲染**。media="print" 讓瀏覽器先不套用這份樣式表，
+     載完之後 onload 再把它切回 all —— 這是不擋渲染載 CSS 的標準寫法。
+     為什麼要這樣：Lighthouse 實測，這份 Google Fonts 的 CSS 是首頁最大的
+     渲染阻塞來源（手機版擋住約 1.2 秒）。它有三萬多位元組，其中大部分是
+     這一頁根本用不到的 unicode-range 片段，卻要等它下載完字才開始畫。
+     代價是字體一定會先用系統字再換過來（FOUT）。那本來就會發生 ——
+     font-display:swap 就是這個意思 —— 只是現在換得更早，而且文字更早出現。
+     沒有 JavaScript 的瀏覽器走 noscript 那一行，照舊擋渲染但一定載得到。 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
 <link rel="stylesheet" href="../shared/brand.css">
 
 <style>
@@ -241,7 +250,8 @@ img.avatar{object-fit:cover}
 /* 這一句是整頁的重點。Iansui 是 Brand Book 指定給「故事分享與引言」的手寫體。 */
 .card .quote{font-family:var(--hand);font-size:clamp(20px,2.3vw,30px);line-height:1.6;
   margin:0;color:var(--ink)}
-.card .hint{font-size:15px;color:rgba(16,42,134,.55);margin:0;line-height:1.7}
+/* 同一個理由：.55 的深藍過不了 4.5:1，提到 .75。 */
+.card .hint{font-size:15px;color:rgba(16,42,134,.75);margin:0;line-height:1.7}
 .tag{display:inline-block;margin-top:16px;font-size:11.5px;letter-spacing:.08em;
   color:rgba(16,42,134,.5);border:1px solid rgba(16,42,134,.22);border-radius:999px;padding:3px 11px}
 
@@ -256,8 +266,11 @@ img.avatar{object-fit:cover}
   width:100%;min-height:52px;padding:12px 2px;
   background:none;border:0;border-bottom:1px solid rgba(16,42,134,.16);
   font:500 16px/1.4 var(--body);color:var(--ink);text-align:left;cursor:pointer}
+/* 透明度 .6 的深藍在米白上只有約 3.6:1，過不了 WCAG AA 的 4.5:1
+   （Lighthouse 實測抓到，無障礙分數 96 就是卡在這裡）。提到 .82 之後約 7:1。
+   ⚠ 用 rgba 調淡的文字要記得算對比，「看起來還讀得到」不等於過得了。 */
 .picker button .to{font-family:var(--display);font-weight:700;font-size:15px;
-  letter-spacing:.06em;color:rgba(16,42,134,.6);white-space:nowrap}
+  letter-spacing:.06em;color:rgba(16,42,134,.82);white-space:nowrap}
 .picker button[aria-pressed="true"]{color:var(--bt-navy)}
 .picker button[aria-pressed="true"] .to{color:var(--bt-navy)}
 
