@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alumni 航線圖 / Beyond Taiwan</title>
+
+<!-- /alumni/ 航線圖（官網改版批 3，2026-09-07）
+
+     Paul 的原話：「比如我是新竹人現在在休士頓，點一下我就會像飛機導航圖一樣飛到休士頓。」
+
+     ── 這一頁在做什麼 ──
+     島在左邊，目的地在右邊。點島上的高中，一條弧線畫過去，落點浮出城市與學校，
+     下面出現那個人的卡片。反過來也可以：點右邊的落點，看他從台灣哪裡出發。
+     community 是雙向的，不是單向離開，所以兩邊都要點得動。
+
+     **刻意不畫世界地圖。** 情緒重點是「他們走得很遠」，不是麥卡托投影。
+     一條弧線加上一個有名字的落點，就是一張導航圖，而且比塞一張世界地圖乾淨得多。
+     弧線是 SVG path 加 stroke-dasharray 自己畫的，沒有用任何地圖套件。
+
+     ── 這一頁不碰登入 ──
+     不載入 supabase、不讀 profiles 表、不判斷登入狀態。
+     資料只有 community.json 一個來源。學長姐的名字是公開資訊（本人同意過的），
+     跟護照裡那些只有本人看得到的心得完全是兩回事，不要把兩者接在一起。
+
+     ── 加一位學長姐要改哪裡 ──
+     只有 community.json。這一頁一行都不用動。
+     那份 JSON 的開頭有 _readme 欄位寫著每個欄位怎麼填（JSON 不能寫註解）。
+     縣市只能填 16 個縣市名，島上的位置是由 COUNTY 那張表算出來的，
+     不用自己填座標 —— 要人挑座標的話，換屆的人第一次就會放棄。
+
+     ⚠ COUNTY 那張表必須跟 scripts/taiwan/cities.json 一模一樣，check.sh 會比對。
+     島的座標也一樣，來源是 scripts/taiwan/coastline.txt，不要手改。
+
+     ── 沒有 JavaScript 的時候 ──
+     這一頁的人是從 JSON 讀進來畫的，所以關掉 JavaScript 會看不到人。
+     那是刻意的取捨：把名單同時寫死在 HTML 裡就變成兩份資料，
+     而兩份資料遲早會不一樣。取而代之的是一段 noscript 說明加上聯絡方式。 -->
+
+<meta name="description" content="Beyond Taiwan 的學長姐從台灣哪一所公立高中出發，現在在世界的哪裡。">
+<meta property="og:title" content="Alumni 航線圖 / Beyond Taiwan">
+<meta property="og:description" content="他們從這裡出發。然後回來。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://beyondtaiwannpo.com/alumni/">
+<meta name="theme-color" content="#EDE5D8">
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Iansui 芫荽只有這一頁載。它是 Brand Book 列為 Primary、用途寫明「故事分享與引言」
+     的繁中手寫體，前端從來沒用過。學長姐的每一句話都用它，看起來像手寫的紙條，
+     不像網頁文字 —— 這是整個網站最有記憶點的一個決定。
+     首頁沒有引言所以不載，多載一種字體就多幾十 KB。 -->
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/brand.css">
+
+<style>
+/* 色票與字體家族全部來自 ../shared/brand.css，這裡沒有寫死的色碼。 */
+*{box-sizing:border-box}
+:root{--gut:clamp(20px,5vw,88px)}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+main,.topbar{position:relative;z-index:1}
+.skip{position:absolute;left:-9999px;top:0;z-index:80;
+  background:var(--bt-navy);color:var(--bt-cream);padding:12px 18px;text-decoration:none}
+.skip:focus{left:0}
+:focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
+/* 島上的點與落點是 SVG 群組，瀏覽器預設的 outline 會框出一個**長方形**，
+   而且把旁邊的學校名字一起框進去，看起來像選到了一格表格。
+   ⚠ 要連 :focus 一起擋，不能只擋 :focus-visible ——
+   `<g tabindex="0">` 不是原生可聚焦的元素，用滑鼠點它時 Chrome 走的是 :focus，
+   只擋 :focus-visible 的話點下去照樣跳出那個藍色方框（2026-09-07 Paul 回報）。
+   改成一圈跟著點走的環，形狀對了，鍵盤使用者一樣看得見焦點在哪。 */
+.node:focus,.dest:focus,.node:focus-visible,.dest:focus-visible{outline:none}
+.node .ring,.dest .ring{fill:none;stroke:var(--bt-navy);stroke-width:1.5;opacity:0;
+  vector-effect:non-scaling-stroke}
+.node:focus-visible .ring,.dest:focus-visible .ring{opacity:1}
+
+/* ── 頂欄。跟首頁同一條，樣式刻意各自寫一份 ──
+   搬進 shared/ 的話 shared/ 就開始長版面了，而規格說它要保持極小。
+   兩頁各寫一次幾十行 CSS，比讓 shared/ 變成一個沒有人敢動的全站樣式表好。 */
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:clamp(12px,2.2vw,32px);
+  padding:12px var(--gut);background:rgba(237,229,216,.82);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(16,42,134,.12)}
+.topbar .home{display:flex;align-items:center;margin-right:auto;flex:0 0 auto;position:relative}
+.topbar .home img{height:30px;width:auto;display:block}
+.navlinks{display:flex;align-items:center;gap:clamp(12px,1.8vw,28px)}
+.navlinks a{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;
+  padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;opacity:.74}
+.navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+.navlinks a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
+.login{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+  font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px;white-space:nowrap;
+  line-height:1;position:relative}
+.login:hover{background:var(--bt-orange);color:var(--bt-navy)}
+.burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;position:relative;
+  padding:6px 8px;font-family:var(--display);font-size:14px;font-weight:700;letter-spacing:.1em}
+/* 可點區域 44x44，視覺大小不變。跟首頁同一個做法。 */
+.topbar .home::after,.login::after,.burger::after{
+  content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+
+/* ── 版面 ── */
+.head{padding:clamp(34px,6vh,80px) var(--gut) clamp(18px,3vh,34px);
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:clamp(18px,4vw,64px);align-items:end}
+/* 行寬用 em 不用 ch。ch 是「0」這個字的寬度，中文字體裡它不等於一個中文字寬，
+   所以 9ch 實際上只排得下五六個字，標題就斷在「出／發」中間。
+   8em 剛好是八個中文字 =「他們從這裡出發。」，第二行是「然後回來。」。 */
+h1{font-family:var(--han);font-weight:900;font-size:clamp(30px,4.6vw,68px);
+  line-height:1.04;letter-spacing:-.02em;margin:0;max-width:8em}
+.sub{font-size:clamp(15px,1.2vw,18px);line-height:1.62;max-width:32em;margin:0;
+  color:rgba(16,42,134,.78)}
+
+.chart{padding:0 var(--gut);position:relative}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+
+/* 島與離島：跟首頁同一組樣式，只是這裡小得多。
+   non-scaling-stroke 讓線寬在兩頁看起來一樣粗。 */
+.isle{fill:var(--bt-sand);stroke:var(--bt-navy);stroke-width:1.4;
+  vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
+.islet{fill:var(--bt-sand);stroke:var(--bt-navy);stroke-width:1.1;
+  vector-effect:non-scaling-stroke;stroke-linejoin:round}
+
+/* 出發點：島上的高中 */
+.node{cursor:pointer}
+.node .hit{fill:transparent;stroke:none}      /* 看不見的 44x44 可點區域 */
+.node .core{fill:var(--bt-orange);stroke:var(--bt-navy);stroke-width:1;
+  vector-effect:non-scaling-stroke}
+.node:hover .core,.node.on .core{fill:var(--bt-navy)}
+/* 學校名字會落在島上或壓到海岸線上。paint-order 先描一圈米白再填字，
+   等於給每個字一層紙色的外框，不管底下是海、是島還是那條線都讀得到。
+   （做法是 SVG 的 paint-order，不是加一塊底色方塊 —— 方塊會把島擋掉一片。） */
+.node .lbl{font-family:var(--body);font-size:13px;font-weight:500;
+  fill:rgba(16,42,134,.62);pointer-events:none;
+  paint-order:stroke;stroke:var(--bt-cream);stroke-width:3.5px;stroke-linejoin:round}
+.node.on .lbl{fill:var(--bt-navy);font-weight:600}
+
+/* 落點：現在在世界的哪裡。
+   **一開始整排都是空的。** 選了一個人，航線先飛過去，飛到了那個落點才現身。
+   已經飛過的會留在圖上（.seen），點它可以反過來看那個人從台灣哪裡出發 ——
+   所以圖是隨著你點而長出來的，不是一開始就把答案全部攤在那裡。 */
+.dest{cursor:pointer;opacity:0;pointer-events:none}
+.dest.seen{opacity:1;pointer-events:auto}
+.dest .hit{fill:transparent;stroke:none}
+.dest .core{fill:var(--bt-orange);stroke:var(--bt-navy);stroke-width:1;
+  vector-effect:non-scaling-stroke}
+.dest:hover .core,.dest.on .core{fill:var(--bt-navy)}
+.dest .city{font-family:var(--display);font-weight:700;font-size:19px;
+  letter-spacing:.06em;fill:rgba(16,42,134,.6);pointer-events:none}
+.dest .place{font-family:var(--body);font-size:12.5px;fill:rgba(16,42,134,.5);pointer-events:none}
+/* 國家。放在城市與學校下面 —— 這一頁沒有世界地圖，
+   國名就是「他走了多遠」唯一的地理座標。 */
+.dest .country{font-family:var(--han);font-size:12.5px;fill:rgba(16,42,134,.5);pointer-events:none}
+.dest.on .country{fill:rgba(16,42,134,.75)}
+.dest.on .city{fill:var(--bt-navy)}
+.dest.on .place{fill:rgba(16,42,134,.75)}
+
+/* 環繞島的那條線就是 BT logo 上的箭頭，首頁第一屏也有同一條。
+   **線本身不轉，轉的是線上那顆點。** 橢圓轉起來形狀會跟著變，
+   飛行線就沒辦法貼在上面；讓一顆點沿著線跑，線是靜止的，
+   飛行路徑才有一條固定的軌道可以貼。看起來一樣是活的。 */
+/* 整圈（線加上跑點）慢慢左右擺。**刻意不是整圈轉。**
+   這個橢圓很扁（232 比 386），整圈轉的話它會週期性變成一個橫躺的寬橢圓，
+   看起來像形狀在晃，不像在繞。小角度來回擺才讀得出是「環繞著」。
+   擺動的時候飛行路徑會跟著算 —— 見下面的 currentRingAngle()。 */
+#ring{transform-origin:351px 386px;transform-box:view-box;
+  animation:ringsway 26s ease-in-out infinite}
+@keyframes ringsway{0%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}100%{transform:rotate(-4deg)}}
+
+/* 環繞線提亮到 .38：它跟航線**不會同時出現**（點下去環繞線就退場了），
+   所以不需要為了讓航線跳出來而把它壓得很暗。 */
+.orbit{fill:none;stroke:var(--bt-orange);stroke-width:1.4;opacity:.38;
+  vector-effect:non-scaling-stroke}
+/* 箭頭的顏色要自己指定：marker 的內容不會繼承那條線的 stroke。
+   ⚠ 但**會**吃到那條線的 opacity —— 兩邊都調暗的話會相乘，
+   第一版環繞線 .26 乘上箭頭 .55 只剩 .14，幾乎看不見。
+   所以箭頭本身不再另外調暗，讓它跟線一樣亮就好。 */
+.arw-head{fill:var(--bt-orange)}
+
+/* 一直繞著島跑的那顆點。dasharray 只留一個點，讓它沿著同一個橢圓前進。
+   周長由程式量出來寫進 --len，不寫死 —— 改了橢圓大小也不用回來改這裡。
+   減少動態效果時，頁尾那條 *{animation:none} 會把它整個關掉，
+   點就靜靜停在起點，畫面上什麼都不缺。 */
+.orbiter{fill:none;stroke:var(--bt-orange);stroke-width:5;stroke-linecap:round;
+  vector-effect:non-scaling-stroke;
+  stroke-dasharray:0.1 var(--len);
+  animation:orbitrun 16s linear infinite;
+  transition:opacity .3s ease}
+@keyframes orbitrun{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+/* 點下去的那一刻整條環繞線退場，畫面讓給這一趟飛行。
+   淡出比飛行快一點（.45 秒對 1.3 秒），所以線先不見、人才起飛。 */
+#ring{transition:opacity .45s ease}
+.flying #ring{opacity:0}
+
+/* 航線。平常看不見，選了誰才飛那一條。
+   同色，但比環繞線亮也比它粗一點 —— 沿著環繞線走的那一段如果跟它一模一樣，
+   飛完之後就看不出剛剛走過哪裡了（2026-09-07 實測）。 */
+.route{fill:none;stroke:var(--bt-orange);stroke-width:2.4;opacity:0;
+  vector-effect:non-scaling-stroke;stroke-linecap:round}
+.route.on{opacity:1}
+
+/* 在飛的那個亮點。它跟航線是同一條 path，只是 dasharray 設成一個「點」，
+   然後讓那個點沿著線走 —— 所以它一定飛在線上，不會有兩份座標對不齊的問題。
+   圓形筆帽讓那一小段變成一顆圓點，不是一小截線。 */
+.spark{fill:none;stroke:var(--bt-orange);stroke-width:5;stroke-linecap:round;opacity:0;
+  vector-effect:non-scaling-stroke}
+
+/* 大頭照。JSON 裡沒給照片就顯示姓氏的單字圖示 —— 畫面一樣完整，
+   而且不會為了「補一張圖」去放一張沒有取得同意的照片。 */
+.who{display:flex;align-items:center;gap:16px;margin:0 0 clamp(16px,2.4vh,26px)}
+.avatar{flex:0 0 auto;width:72px;height:72px;border-radius:50%;
+  background:var(--bt-sand);border:1px solid rgba(16,42,134,.18);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  font-family:var(--han);font-weight:900;font-size:30px;color:var(--bt-navy)}
+img.avatar{object-fit:cover}
+.who .meta{margin:0}
+.who .meta b{display:block;font-size:19px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.who .meta span{display:block;font-size:14px;color:rgba(16,42,134,.62)}
+
+/* 一段介紹。放在引言下面 —— 先聽他自己說，再看他是誰。 */
+.note{font-size:15.5px;line-height:1.75;color:rgba(16,42,134,.78);
+  margin:clamp(14px,2.2vh,22px) 0 0;max-width:34em}
+
+/* ── 學長姐自己的一句話 ──
+   刻意**沒有**底色、框線、圓角與陰影。整頁只有這一句話是重點，
+   把它裝進一個方格裡，它就從「一句話」變成「一張卡片」，
+   跟其他到處都是的網頁一模一樣（見 docs/2026-09-07-官網視覺方向.md 要避開的套路）。
+   它現在直接坐在紙上。 */
+.card{margin:clamp(22px,4vh,44px) var(--gut) 0;max-width:660px;min-height:184px}
+.card .meta{font-size:13.5px;letter-spacing:.02em;color:rgba(16,42,134,.62);margin:0 0 14px}
+.card .meta b{color:var(--ink);font-weight:600}
+/* 這一句是整頁的重點。Iansui 是 Brand Book 指定給「故事分享與引言」的手寫體。 */
+.card .quote{font-family:var(--hand);font-size:clamp(20px,2.3vw,30px);line-height:1.6;
+  margin:0;color:var(--ink)}
+.card .hint{font-size:15px;color:rgba(16,42,134,.55);margin:0;line-height:1.7}
+.tag{display:inline-block;margin-top:16px;font-size:11.5px;letter-spacing:.08em;
+  color:rgba(16,42,134,.5);border:1px solid rgba(16,42,134,.22);border-radius:999px;padding:3px 11px}
+
+/* ── 手機上的選單 ──
+   島縮到手機寬度之後，島上的點只有幾 px，手指按不到。
+   所以窄螢幕另外給一排真的按鈕，每一顆至少 44px 高。
+   桌機上不顯示，因為那時島上的點本來就夠大。 */
+.picker{display:none;margin:clamp(20px,3vh,32px) var(--gut) 0;padding:0;list-style:none}
+.picker li{margin:0}
+.picker button{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  width:100%;min-height:52px;padding:12px 2px;
+  background:none;border:0;border-bottom:1px solid rgba(16,42,134,.16);
+  font:500 16px/1.4 var(--body);color:var(--ink);text-align:left;cursor:pointer}
+.picker button .to{font-family:var(--display);font-weight:700;font-size:15px;
+  letter-spacing:.06em;color:rgba(16,42,134,.6);white-space:nowrap}
+.picker button[aria-pressed="true"]{color:var(--bt-navy)}
+.picker button[aria-pressed="true"] .to{color:var(--bt-navy)}
+
+.foot{margin:clamp(44px,7vh,90px) 0 0;padding:22px var(--gut) clamp(44px,7vh,80px);
+  border-top:1px solid rgba(16,42,134,.15);font-size:14.5px;color:rgba(16,42,134,.75)}
+.foot p{margin:0 0 8px;max-width:44em}
+.foot a{color:var(--ink);font-weight:600}
+
+@media (max-width:900px){
+  .head{grid-template-columns:1fr;gap:14px;align-items:start}
+  .picker{display:block}
+  /* SVG 裡的文字是跟著 viewBox 一起縮的：圖縮到 375px 寬時，
+     圖上那些字只剩六七個 px，看不清楚反而髒。
+     所以窄螢幕把圖上的文字全部收起來，圖只留島、點與航線，
+     資訊交給下面那排按鈕 —— 那裡的字是真正的 HTML，會照使用者的字級走。 */
+  .node .lbl,.dest .city,.dest .place,.dest .country{display:none}
+}
+@media (max-width:700px){
+  .navlinks{display:none;position:absolute;left:0;right:0;top:100%;
+    flex-direction:column;align-items:flex-start;gap:0;padding:6px var(--gut) 16px;
+    background:var(--bt-cream);border-bottom:1px solid rgba(16,42,134,.12)}
+  .navlinks.open{display:flex}
+  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0}
+  .burger{display:block}
+}
+@media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main">跳到主要內容 / Skip to content</a>
+
+<nav class="topbar" aria-label="網站導覽">
+  <a class="home" href="../" aria-label="Beyond Taiwan 首頁">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <div class="navlinks" id="navlinks">
+    <a href="../#about">關於我們</a>
+    <a href="../#what">我們做什麼</a>
+    <a href="./" aria-current="page">Alumni</a>
+    <a href="../#join">加入我們</a>
+  </div>
+  <a class="login" href="../app/">登入 / Sign in</a>
+  <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
+</nav>
+
+<main id="main">
+
+<header class="head">
+  <h1>他們從這裡出發。然後回來。</h1>
+  <p class="sub">島上每一個亮點，是一所公立高中。點一個，看他飛去了哪裡。飛過的落點會留在圖上，點它可以反過來看那個人從台灣哪裡出發。</p>
+</header>
+
+<div class="chart">
+  <svg id="chart" viewBox="0 0 1200 780" role="img"
+       aria-label="台灣與 Beyond Taiwan 學長姐現在所在城市之間的航線圖">
+    <!-- 環繞島的軌跡。橢圓的中心與半徑是島的中心 (303,350) 與首頁那組
+         乘上下面那個 translate/scale 換算來的，改島的位置就要一起改。 -->
+    <defs>
+      <!-- 箭頭。BT 的 logo 就是「島加一個繞著它的箭頭」，所以環繞線末端要有一個；
+           飛到目的地之後，航線的末端也給一個。
+           markerUnits 用 userSpaceOnUse：線是 non-scaling-stroke，
+           若讓箭頭跟著線寬縮放，兩者的大小關係會在不同螢幕上跑掉。 -->
+      <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="15" markerHeight="15" orient="auto" markerUnits="userSpaceOnUse">
+        <path class="arw-head" d="M0 0 L10 5 L0 10 Z"/>
+      </marker>
+      <marker id="arw-dim" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="14" markerHeight="14" orient="auto" markerUnits="userSpaceOnUse">
+        <path class="arw-head" d="M0 0 L10 5 L0 10 Z"/>
+      </marker>
+    </defs>
+    <g id="ring" aria-hidden="true">
+      <!-- 環繞線是 path 不是 ellipse，因為只有 path 掛得上 marker（也就是箭頭）。
+           d 由 JavaScript 取樣那個橢圓產生，見下面的 ringPath()。 -->
+      <path class="orbit" id="orbitpath" marker-end="url(#arw-dim)"/>
+      <ellipse class="orbiter" id="orbiter" cx="351" cy="386" rx="232" ry="386" transform="rotate(-9 351 386)"/>
+    </g>
+    <!-- 島的座標來自 scripts/taiwan/coastline.txt，跟首頁是同一份。不要手改，改腳本重跑。 -->
+    <g id="isleg" transform="translate(62,52) scale(0.955)" aria-hidden="true"></g>
+    <!-- ⚠ 航線一定要畫在島**後面**（也就是疊在島上面）。
+         SVG 沒有 z-index，先寫的先畫、後寫的蓋在上面。
+         放在島前面的話，從島上的學校起飛的那一段會被島的填色整個蓋掉，
+         看起來像航線是從海岸線上憑空冒出來的（2026-09-07 實測踩過）。 -->
+    <g class="routes"></g>
+    <g class="nodes"></g>
+    <g class="dests"></g>
+  </svg>
+</div>
+
+<ul class="picker" id="picker" aria-label="選一位學長姐"></ul>
+
+<div class="card" id="card" role="region" aria-live="polite" aria-label="學長姐的話">
+  <p class="hint">點島上的任一個亮點。<br>那個人會從他的高中飛到現在所在的城市，這裡會出現他是誰、去了哪個國家，還有他自己的一句話。</p>
+</div>
+
+<noscript>
+  <div class="card">
+    <p class="hint">這一頁的航線圖需要 JavaScript 才畫得出來。<br>
+      想知道 Beyond Taiwan 的學長姐現在在哪裡，歡迎直接寫信問我們：
+      <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
+  </div>
+</noscript>
+
+<div class="foot">
+  <p id="demonote"></p>
+  <p><a href="../">回 Beyond Taiwan 首頁</a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
+  <p>本網站不使用任何追蹤或廣告工具。</p>
+</div>
+
+</main>
+
+<script>
+/* 頂欄的手機選單。跟首頁同一段，這一頁沒有中英切換（航線圖上就是人名與城市）。 */
+(function () {
+  var links = document.getElementById("navlinks"), burger = document.getElementById("burger");
+  burger.addEventListener("click", function () {
+    var open = links.classList.toggle("open");
+    burger.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  links.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") { links.classList.remove("open"); burger.setAttribute("aria-expanded", "false"); }
+  });
+})();
+</script>
+
+<script>
+/* ═══════════ 航線圖 ═══════════
+
+   ── 資料與畫面是分開的 ──
+   人名、學校、縣市、城市、引言全部在 community.json，下面一個都沒寫死。
+   加一位學長姐就是在那份 JSON 加一個物件，這個檔案一行都不用動。
+
+   ── 座標從哪裡來 ──
+   JSON 裡填的是縣市名，不是座標。下面 COUNTY 這張表把縣市換成島上的位置。
+   要人自己填座標的話，換屆的人第一次就會放棄。
+   ⚠ 這張表必須跟 scripts/taiwan/cities.json 一模一樣，check.sh 會逐筆比對。
+
+   ── 會動的東西都在 draw() 之後、且只在沒開「減少動態效果」時才跑 ──
+   跟首頁同一個原則：關掉動畫之後功能完整，只是航線直接出現而不是畫出來。 */
+(function () {
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* 16 個縣市在島上的位置。與 scripts/taiwan/cities.json 同一份資料。 */
+  var COUNTY = {
+    "台北":[406.5,54.6], "新竹":[293.9,101.2], "台中":[238.3,236.8], "彰化":[208.6,250.5],
+    "嘉義":[196.0,374.2], "台南":[154.1,473.0], "高雄":[168.1,549.7], "屏東":[203.3,541.1],
+    "花蓮":[413.3,269.8], "宜蘭":[442.0,122.7], "台東":[327.1,522.7], "桃園":[356.6,62.7],
+    "苗栗":[266.2,151.9], "雲林":[210.3,327.0], "南投":[240.2,275.2], "基隆":[439.7,35.1]
+  };
+
+  /* 島在圖上的位置。跟 <g id="isleg"> 的 transform 一致，改一邊就要改另一邊。 */
+  var OX = 62, OY = 52, S = 0.955;
+
+  /* 飛行路徑：從學校直接飛到目的地，一條往上拱的弧。
+     環繞線在飛之前就消失了（見 select()），所以路徑不需要貼著它走 ——
+     早一版讓路徑沿著環繞線繞一段，結果從東北部的學校出發時會拐出一個尖角，
+     而且看起來還是像兩條線（Paul 2026-09-07 的回饋）。
+
+     ⚠ 弧線**用直線段取樣，不要用 Q 或 A 指令**。
+     原因不是好看與否，是長度算不準：Chrome 的 getTotalLength() 對曲線指令
+     是近似算的，回報的值比它自己畫虛線時用的短（實測差約 9%）。
+     軌跡的動畫是靠 stroke-dasharray 用那個長度畫的，於是最後一段永遠畫不出來 ——
+     線接不到落點，而且完全不會報錯。SVG 的 pathLength 也救不了，
+     它的換算基準就是同一個被低估的值。折線每個引擎都算得一樣準。
+     2026-09-07 實測抓到並修掉（判準是放大截圖，不是 isPointInStroke，
+     那個 API 在折線修好之後仍然給假警報）。
+     切 48 段，看不出是折線。 */
+  function flightPath(fx, fy, tx, ty) {
+    var cxq = fx + (tx - fx) * 0.52, cyq = Math.min(fy, ty) - 210, M = 48;
+    var out = "M" + fx.toFixed(1) + " " + fy.toFixed(1);
+    /* 少畫最後一段（M-1 而不是 M）：那一小段空出來給箭頭。
+       畫到底的話箭頭會整個蓋在落點的圓點上，兩個東西疊在一起。 */
+    for (var j = 1; j <= M - 1; j++) {
+      var u = j / M, w = 1 - u;
+      out += " L" + (w * w * fx + 2 * w * u * cxq + u * u * tx).toFixed(1) +
+             " " + (w * w * fy + 2 * w * u * cyq + u * u * ty).toFixed(1);
+    }
+    return out;
+  }
+  var DEST_X = 946;                 /* 右邊那一排落點的 x */
+  /* 環繞線的幾何。跟原本 <ellipse> 的屬性一致，只是改用 path 畫，才掛得上箭頭。
+     起點就是終點，箭頭落在起點上，所以起點的角度決定箭頭在哪裡。
+     用 20 度：那個位置在島的右邊、外海的空白處。
+     試過 -60 度，箭頭剛好壓在島的北端，很擠。 */
+  function ringPath() {
+    var cx = 351, cy = 386, rx = 232, ry = 386, rot = -9 * Math.PI / 180;
+    var c = Math.cos(rot), sn = Math.sin(rot), start = 20 * Math.PI / 180, out = "";
+    for (var i = 0; i <= 180; i++) {
+      var t = start + (i / 180) * 2 * Math.PI;
+      var x = rx * Math.cos(t), y = ry * Math.sin(t);
+      out += (i ? " L" : "M") + (cx + x * c - y * sn).toFixed(1) +
+             " " + (cy + x * sn + y * c).toFixed(1);
+    }
+    return out;
+  }
+  document.getElementById("orbitpath").setAttribute("d", ringPath());
+
+  var NS = "http://www.w3.org/2000/svg";
+
+  var svg = document.getElementById("chart");
+  var gRoutes = svg.querySelector(".routes");
+  var gNodes  = svg.querySelector(".nodes");
+  var gDests  = svg.querySelector(".dests");
+  var card    = document.getElementById("card");
+  var picker  = document.getElementById("picker");
+
+  function el(name, attrs) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  fetch("./community.json")
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(draw)
+    .catch(function (e) {
+      /* 資料讀不到就明說，不要留一張空白的圖讓人以為是自己網路的問題。 */
+      card.innerHTML = '<p class="hint">名單一時讀不到，請重新整理看看。' +
+        '如果一直這樣，寫信給我們：<a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>';
+      if (window.console) console.error("community.json 讀取失敗", e);
+    });
+
+  function draw(data) {
+    var people = (data && data.people) || [];
+    if (!people.length) return;
+
+    /* 島先畫。座標跟首頁同一份，從 coastline.txt 來。 */
+    var isleg = document.getElementById("isleg");
+    ISLAND.forEach(function (d, i) {
+      isleg.appendChild(el("path", { "class": i === 0 ? "isle" : "islet", d: d }));
+    });
+
+    /* 右邊那一排落點的 y 是算出來的，不是填的 —— 所以 JSON 裡不需要座標，
+       加一個人、刪一個人，整排會自己重新排開。 */
+    var top = 92, bottom = 700;
+    var step = people.length > 1 ? (bottom - top) / (people.length - 1) : 0;
+
+    people.forEach(function (p, i) {
+      var c = COUNTY[p.county];
+      if (!c) { if (window.console) console.warn("community.json 裡的縣市不在表上：" + p.county); return; }
+      var fx = OX + c[0] * S, fy = OY + c[1] * S;
+      var tx = DEST_X, ty = people.length > 1 ? top + step * i : (top + bottom) / 2;
+
+      /* d 留到按下去才算 —— 環繞線在擺，路徑要照「按下去那一刻」的角度算。
+         這裡先放一條照基準角度的，沒有 JavaScript 或還沒點過時它也是合法的圖形。 */
+      var dstr = flightPath(fx, fy, tx, ty);
+      p._from = [fx, fy]; p._to = [tx, ty];
+      gRoutes.appendChild(el("path", { "class": "route", id: "r-" + p.id, d: dstr }));
+      /* 亮點畫在航線後面（也就是疊在上面），兩者共用同一段 d。 */
+      gRoutes.appendChild(el("path", { "class": "spark", id: "s-" + p.id, d: dstr }));
+
+      gNodes.appendChild(hotspot("node", p, fx, fy, function (g) {
+        g.appendChild(el("circle", { "class": "hit", cx: fx, cy: fy, r: 22 }));
+        g.appendChild(el("circle", { "class": "ring", cx: fx, cy: fy, r: 13 }));
+        g.appendChild(el("circle", { "class": "core", cx: fx, cy: fy, r: 5.5 }));
+        var t = el("text", { "class": "lbl", x: fx - 13, y: fy + 4, "text-anchor": "end" });
+        t.textContent = p.school; g.appendChild(t);
+      }, p.school + "，現在在 " + p.country + p.city));
+
+      /* 還沒飛到的落點是看不見的，所以先不給鍵盤 Tab 到、也不報給讀螢幕的人。
+         飛到之後才把 tabindex 換成 0（見 arrive()）—— 讓焦點停在一個看不見的
+         東西上，是鍵盤使用者最容易迷路的地方。 */
+      gDests.appendChild(hotspot("dest", p, tx, ty, function (g) {
+        g.appendChild(el("circle", { "class": "hit", cx: tx, cy: ty, r: 22 }));
+        g.appendChild(el("circle", { "class": "ring", cx: tx, cy: ty, r: 13 }));
+        g.appendChild(el("circle", { "class": "core", cx: tx, cy: ty, r: 5 }));
+        var a = el("text", { "class": "city", x: tx + 18, y: ty - 4 });
+        a.textContent = p.city;
+        var b = el("text", { "class": "place", x: tx + 18, y: ty + 15 });
+        b.textContent = p.place;
+        var cty = el("text", { "class": "country", x: tx + 18, y: ty + 33 });
+        cty.textContent = p.country;
+        g.appendChild(a); g.appendChild(b); g.appendChild(cty);
+      }, p.city + "，" + p.country + "，" + p.place + "，來自 " + p.school));
+
+      var li = document.createElement("li");
+      li.innerHTML = '<button type="button" aria-pressed="false" data-id="' + esc(p.id) + '">' +
+        '<span>' + esc(p.school) + '</span><span class="to">' + esc(p.country) + ' ' + esc(p.city) + '</span></button>';
+      li.querySelector("button").addEventListener("click", function () { select(p); });
+      picker.appendChild(li);
+    });
+
+    /* 繞行的那顆點需要知道環繞線有多長才跑得完一圈。量出來寫進 CSS 變數，
+       這樣改了橢圓的大小也不用回來改 CSS。 */
+    var orbiter = document.getElementById("orbiter");
+    orbiter.style.setProperty("--len", orbiter.getTotalLength());
+
+    if (data.demo) {
+      document.getElementById("demonote").textContent =
+        "這一頁目前顯示的是示範資料，不是真實學員。換成真人之前，每一位公開的姓名與學校都會先取得本人同意。";
+    }
+
+    /* 一個可以點、也可以用鍵盤按 Enter 的熱點。
+       看不見的 hit 圓半徑 22，在桌機上就是 44x44 的可點區域。
+       手機上島縮得很小，那時候靠下面那排按鈕，不靠這裡。 */
+    function hotspot(cls, p, x, y, build, label) {
+      var g = el("g", { "class": cls, id: cls[0] + "-" + p.id, role: "button",
+                        tabindex: cls === "dest" ? "-1" : "0" });
+      g.setAttribute("aria-label", label);
+      if (cls === "dest") g.setAttribute("aria-hidden", "true");
+      build(g);
+      g.addEventListener("click", function () { select(p); });
+      g.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(p); }
+      });
+      return g;
+    }
+
+    /* 落點現身。已經現身過的就一直留在圖上，這樣反向點得回去。 */
+    function arrive(dest) {
+      dest.classList.add("seen");
+      dest.setAttribute("tabindex", "0");
+      dest.removeAttribute("aria-hidden");
+    }
+
+    function select(p) {
+      svg.querySelectorAll(".node,.dest").forEach(function (n) { n.classList.remove("on"); });
+      svg.querySelectorAll(".route,.spark").forEach(function (r) {
+        r.classList.remove("on");
+        r.style.opacity = 0; r.style.strokeDasharray = ""; r.style.strokeDashoffset = "";
+        r.removeAttribute("marker-end");
+      });
+      picker.querySelectorAll("button").forEach(function (b) {
+        b.setAttribute("aria-pressed", b.dataset.id === p.id ? "true" : "false");
+      });
+      document.getElementById("n-" + p.id).classList.add("on");
+      document.getElementById("d-" + p.id).classList.add("on");
+
+      var route = document.getElementById("r-" + p.id);
+      var spark = document.getElementById("s-" + p.id);
+      var dest = document.getElementById("d-" + p.id);
+      route.classList.add("on");
+      route.style.opacity = 1;
+
+      /* 使用者按了才動，而且動的是「剛剛發生了什麼」：
+         一個亮點從島上沿著線飛出去，後面留下走過的軌跡，
+         飛到了那個落點才現身。關掉動畫的話三者直接就位，資訊一點都沒有少。 */
+      /* 卡片的內容先組好，但**飛到了才放上去** ——
+         點下去就出現的話，人還在飛、資料已經到了，那趟飛行就沒有意義。
+         （Paul 2026-09-07 指定的順序：點 → 環線消失 → 飛到 → 跳出那個人。）
+         有照片就放照片，沒有就放姓氏的單字圖示；照片一律要 alt、width、height，
+         沒有的話手機上圖一載入整頁會往下跳。 */
+      var face = p.photo
+        ? '<img class="avatar" src="' + esc(p.photo) + '" alt="' + esc(p.name) +
+          '" width="72" height="72">'
+        : '<span class="avatar" aria-hidden="true">' + esc(p.name.trim().charAt(0)) + '</span>';
+      var html =
+        '<div class="who">' + face +
+          '<p class="meta"><b>' + esc(p.name) + '</b>' +
+          '<span>' + esc(p.school) + ' → ' + esc(p.country) + ' ' + esc(p.city) +
+            '，' + esc(p.place) + '</span></p>' +
+        '</div>' +
+        '<p class="quote">「' + esc(p.quote) + '」</p>' +
+        (p.note ? '<p class="note">' + esc(p.note) + '</p>' : '') +
+        (data.demo ? '<span class="tag">示範資料，非真實學員</span>' : '');
+
+      arrive(dest);
+      if (reduce) { route.setAttribute("marker-end", "url(#arw)"); card.innerHTML = html; return; }
+      if (!reduce) {
+        /* 環繞線退場，卡片先讓出畫面，都讓給這一趟飛行。 */
+        svg.classList.add("flying");
+        card.style.opacity = 0;
+        dest.style.opacity = 0;                 /* 先藏起來，等飛到再現身 */
+
+        /* 路徑全是直線段，所以 getTotalLength() 跟瀏覽器畫虛線用的長度一致，
+           虛線可以直接用它。**曲線指令不行**，理由寫在 flightPath 上面。 */
+        var UNIT = route.getTotalLength();
+
+        /* 軌跡：從出發地一路長到落點。 */
+        route.style.strokeDasharray = UNIT;
+        route.style.strokeDashoffset = UNIT;
+        var fly = route.animate([{ strokeDashoffset: UNIT }, { strokeDashoffset: 0 }],
+          { duration: 1500, easing: "cubic-bezier(.35,0,.25,1)", fill: "forwards" });
+
+        /* 亮點：dasharray 只留一個點，讓它跟軌跡的前緣同步往前。
+           終點停在 0.6 不是 0 —— 停在 0 的話虛線圖樣會繞回去，
+           最後一格那顆點會瞬間跳回起點。 */
+        spark.style.opacity = 1;
+        spark.style.strokeDasharray = "0.6 " + UNIT;
+        spark.style.strokeDashoffset = UNIT;
+        spark.animate([{ strokeDashoffset: UNIT }, { strokeDashoffset: 0.6 }],
+          { duration: 1500, easing: "cubic-bezier(.35,0,.25,1)", fill: "forwards" });
+
+        fly.onfinish = function () {
+          /* 飛到了：亮點收掉，落點現身，環繞線上那顆點回來繼續跑。 */
+          /* 環繞線**不再淡回來**。選了一個人之後畫面就是那個人的：
+             島、他的航線、他的落點、他的話。這是 Paul 2026-09-07 指定的
+             （「點按鈕環線消失」）。要讓它飛完之後回來，在這裡加一行
+             setTimeout(function(){ svg.classList.remove("flying"); }, 900) 就好。 */
+          spark.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: "ease-out" })
+            .onfinish = function () { spark.style.opacity = 0; };
+          dest.style.opacity = "";
+          dest.animate([{ opacity: 0, transform: "translateX(-9px)" }, { opacity: 1, transform: "none" }],
+            { duration: 420, easing: "ease-out" });
+
+          /* 到了才把箭頭放上去 —— 一開始就放的話，人還沒飛到箭頭已經插在終點了。 */
+          route.setAttribute("marker-end", "url(#arw)");
+
+          /* 人到了，卡片才跳出來。 */
+          card.innerHTML = html;
+          card.style.opacity = "";
+          card.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }],
+            { duration: 420, easing: "ease-out" });
+        };
+      }
+
+    }
+  }
+
+  /* 島的座標。第一條是本島，其餘七條是澎湖、蘭嶼、綠島那些離島。
+     來源 scripts/taiwan/coastline.txt，跟首頁同一份，check.sh 會比對。
+     ⚠ 不要手改這些數字。要調精細度就改 scripts/taiwan/build-coastline.py 的 eps 重跑。 */
+  var ISLAND = [
+    "M138.8 365.8 139.6 363.5 137.6 359.8 137.6 345.1 138.7 338.8 145.0 328.5 143.3 327.3 145.4 316.9 143.2 316.9 142.5 314.4 143.5 314.0 145.6 308.6 144.5 307.2 151.4 303.6 153.3 301.0 152.5 299.9 154.1 298.7 157.0 299.6 160.4 295.6 162.2 294.2 163.3 294.6 165.5 292.8 171.4 280.4 168.7 279.4 171.8 274.2 173.5 269.5 177.1 269.1 177.2 266.7 181.3 258.9 186.0 256.5 186.4 255.1 182.5 255.2 182.5 251.4 186.1 249.5 191.6 249.8 193.6 242.2 190.0 242.2 189.0 245.9 185.6 245.3 187.4 241.3 194.1 234.5 197.9 234.4 198.4 232.6 202.9 226.5 203.4 224.8 199.6 223.4 207.6 207.0 210.9 202.6 213.5 204.2 214.9 202.2 216.7 194.3 223.5 182.9 228.4 176.4 237.0 167.5 240.8 159.5 245.4 146.6 248.2 142.0 254.5 140.8 254.9 135.5 258.4 131.1 267.5 129.4 268.5 127.1 273.2 123.0 274.5 118.2 280.9 110.7 279.6 108.8 279.6 104.9 281.7 98.9 287.3 91.7 287.4 89.6 289.6 87.1 293.4 78.5 296.2 73.9 297.2 73.8 300.3 69.9 302.2 66.7 301.8 64.0 309.2 53.1 315.6 50.6 317.1 48.7 322.5 46.0 332.5 43.7 339.9 39.0 349.0 36.3 353.3 37.2 357.3 35.4 362.6 35.7 372.7 31.4 377.7 26.8 376.5 25.6 377.0 22.7 382.7 16.3 384.2 10.7 389.0 9.0 390.2 6.2 396.5 2.6 399.3 2.6 401.7 0.7 405.5 1.3 407.0 0.1 409.0 0.0 416.3 4.2 419.2 7.9 419.4 12.1 421.1 13.9 422.6 13.9 423.1 16.9 426.4 19.7 430.6 18.6 430.9 19.6 429.2 22.4 430.4 24.3 433.5 25.3 433.2 27.4 436.6 27.4 440.9 29.2 443.8 27.7 451.3 33.4 454.7 33.8 454.4 36.1 455.5 36.4 458.6 34.9 463.6 36.2 470.7 36.3 472.9 37.3 473.9 39.7 472.1 43.8 475.4 48.2 474.8 51.9 475.6 54.6 478.1 57.0 484.4 56.1 489.7 59.2 489.3 60.7 487.7 61.0 485.4 63.0 474.6 67.7 473.3 70.5 468.4 73.6 466.8 75.5 466.7 78.3 457.4 88.2 455.3 96.5 454.3 103.0 454.3 111.2 455.5 116.2 457.6 120.2 458.9 133.4 463.3 142.6 461.9 142.9 463.1 147.0 464.3 146.9 463.8 149.8 464.6 157.1 463.9 158.4 458.6 160.1 458.2 164.6 459.5 164.9 460.4 167.6 454.5 172.2 454.8 173.2 450.9 177.8 449.4 181.4 448.3 190.3 445.2 198.5 445.7 202.4 444.9 204.8 442.6 207.1 440.7 210.2 440.2 213.2 437.2 216.6 435.2 217.1 432.9 220.7 427.1 224.3 425.0 227.0 424.1 230.3 425.5 236.6 424.9 239.5 423.0 242.4 419.2 245.1 416.3 249.8 415.9 252.6 416.9 257.4 421.9 265.4 421.0 267.3 419.7 266.8 419.5 269.5 416.7 271.6 414.1 276.4 415.1 280.7 412.6 295.9 407.9 307.7 407.9 316.5 403.3 326.3 404.2 329.2 402.0 338.6 401.1 339.1 399.8 343.9 399.1 354.1 396.3 359.0 394.7 366.6 395.4 371.8 396.7 373.6 394.6 377.0 393.3 383.5 390.0 391.5 387.1 408.3 384.4 409.0 382.5 411.4 380.5 415.6 377.9 425.2 379.0 426.3 377.2 429.0 374.8 430.2 374.8 434.6 376.7 438.8 375.1 442.6 375.5 446.1 377.4 447.8 375.4 449.5 374.6 448.9 372.7 451.7 368.9 453.2 365.5 458.9 363.3 468.9 361.6 469.9 359.6 476.6 356.4 481.2 354.0 482.7 350.3 491.3 346.5 497.4 345.2 497.7 343.9 500.7 342.6 500.1 338.9 500.9 335.6 504.0 335.2 508.1 336.1 508.9 337.7 515.0 334.4 516.7 332.5 523.3 329.4 524.9 324.0 530.6 314.5 535.6 310.4 539.4 306.4 541.5 304.0 545.1 302.2 551.3 301.6 557.5 297.0 561.7 295.1 565.9 289.7 584.7 283.8 599.5 282.6 604.8 280.0 609.9 279.5 621.8 280.9 630.6 279.8 633.9 280.3 636.9 279.2 638.4 279.8 642.3 279.3 648.3 280.4 649.2 278.3 651.4 279.7 656.5 281.0 657.0 280.7 659.4 279.4 661.0 279.8 668.9 281.1 671.7 278.7 673.3 278.6 675.2 276.6 676.4 276.2 678.8 270.8 681.2 269.9 689.2 273.7 695.8 274.7 699.1 273.6 700.0 271.3 699.1 271.0 696.7 268.6 695.5 266.3 692.2 264.5 692.4 261.8 690.7 258.8 690.2 255.8 687.2 253.5 687.7 251.5 690.2 252.1 692.3 250.7 695.2 248.4 695.5 245.4 692.3 246.3 684.4 244.5 679.6 243.1 679.1 240.9 674.5 240.9 672.0 242.4 670.1 242.8 667.4 244.6 666.0 243.5 661.0 246.4 659.6 245.1 653.3 242.9 649.1 243.4 648.1 242.0 642.1 240.2 637.9 240.7 636.2 237.7 630.2 234.0 626.7 234.3 623.6 232.5 616.5 225.5 608.6 223.0 603.7 220.2 601.1 196.5 586.5 194.0 583.3 194.9 582.6 191.2 580.6 189.2 580.9 186.7 579.9 179.2 574.3 170.6 566.1 171.0 565.3 160.7 552.4 160.9 550.3 158.7 545.9 159.0 541.8 163.0 538.0 161.9 532.9 160.6 534.7 151.3 512.5 144.3 491.1 143.7 483.8 140.8 477.4 132.2 469.2 121.4 463.1 120.6 461.0 117.2 457.8 117.9 452.1 122.9 443.4 124.3 435.0 126.8 429.7 126.7 424.6 127.7 424.0 129.7 412.3 130.6 412.0 133.1 406.5 134.4 400.0 137.5 395.9 138.5 396.3 139.0 393.8 141.0 394.1 142.1 392.1 141.4 389.4 140.3 389.8 139.2 387.5 139.8 385.3 138.9 382.9 140.4 380.8 138.5 378.4 138.4 376.2 140.6 373.3 140.5 371.9 134.8 372.4 133.8 371.0 133.7 366.9 135.3 365.9 138.1 366.5 138.8 365.8Z",
+    "M32.2 336.8 30.4 336.6 29.1 338.6 27.2 337.7 24.7 341.1 24.5 342.5 20.2 344.0 21.0 345.2 21.3 349.1 19.3 351.0 19.8 356.9 16.6 356.0 15.0 357.2 10.9 357.0 13.8 354.5 15.4 355.7 17.6 353.8 17.6 351.7 15.4 349.9 17.4 348.7 18.6 346.7 17.0 345.7 17.4 343.1 19.2 339.7 22.8 341.5 24.6 341.2 27.2 337.6 27.4 335.4 30.2 334.8 32.5 333.5 34.4 334.7 35.4 334.1 37.4 336.5 38.1 339.2 36.0 339.6 36.3 343.6 38.3 345.3 38.1 348.9 42.0 350.4 44.6 349.3 46.1 349.6 47.3 351.5 51.0 352.5 51.5 356.5 53.5 358.7 50.6 359.5 49.9 357.5 44.6 357.6 37.0 364.0 37.0 368.4 35.3 367.4 30.5 368.3 30.9 366.0 36.4 361.8 35.7 359.8 34.3 359.1 30.7 360.5 32.0 357.0 29.7 354.6 28.7 352.5 31.0 352.6 33.1 354.9 35.3 355.8 35.5 353.0 37.1 352.5 36.4 349.4 36.8 347.6 35.3 346.2 35.7 344.9 33.8 344.3 35.0 342.3 32.5 338.6 32.2 336.8Z",
+    "M395.9 664.5 394.1 662.3 395.2 661.0 396.5 662.1 407.0 661.2 407.1 664.8 408.1 666.2 406.2 668.2 407.3 670.5 413.1 674.5 411.7 678.2 407.4 678.1 407.2 677.0 404.2 673.6 400.5 673.2 395.5 666.9 395.9 664.5Z",
+    "M122.5 372.2 120.1 374.6 116.9 374.3 115.6 376.0 115.9 378.2 112.1 378.2 110.7 377.1 114.3 373.3 126.6 365.1 128.4 365.9 128.9 367.9 126.7 367.6 124.4 369.3 122.5 372.2Z",
+    "M394.2 545.7 395.2 548.4 393.2 548.4 392.6 547.1 388.9 545.6 389.3 543.0 387.4 540.8 387.4 539.1 393.0 539.6 395.9 539.0 396.1 541.9 394.2 545.7Z",
+    "M178.9 612.5 177.8 611.9 180.5 606.4 183.1 605.6 184.6 606.7 184.3 608.3 178.9 612.5Z",
+    "M1.9 431.0 0.0 429.0 5.6 427.4 6.4 428.8 6.2 431.7 4.8 431.4 2.3 433.3 1.9 431.0Z",
+    "M15.5 394.5 16.6 392.3 18.5 392.5 17.9 399.8 14.4 399.7 16.0 397.8 15.5 394.5Z"
+  ];
+})();
+</script>
+
+</body>
+</html>

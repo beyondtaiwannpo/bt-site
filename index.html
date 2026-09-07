@@ -111,16 +111,12 @@ main,footer,.topbar{position:relative;z-index:1}
 /* logo 不可改色、拉伸、旋轉、調透明度（Brand Book 硬規則） */
 
 .navlinks{display:flex;align-items:center;gap:clamp(12px,1.8vw,28px)}
-.navlinks a,.navlinks span.soon{
+.navlinks a{
   font-size:14.5px;font-weight:500;line-height:1;
-  color:var(--ink);text-decoration:none;
+  color:var(--ink);text-decoration:none;opacity:.74;
   padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;
 }
-.navlinks a{opacity:.74}
 .navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
-/* Alumni 那一頁還沒做（改版批 3）。先放著、但不做成連結 ——
-   點得下去卻沒有東西，比先不給點更糟。 */
-.navlinks span.soon{opacity:.4;cursor:default}
 
 .lang{
   min-width:44px;   /* 可點區域的寬度也要有 44，墊片只撐得了高度 */
@@ -199,6 +195,13 @@ main{padding:0}
    HTML 裡的 <h1> 永遠是一整句，換了文案或換了字級都不用回來改。 */
 h1 .ln{display:block}
 
+/* max-width 決定標題斷成幾行，而開場是一行一行落下的，所以這個值有畫面意義。
+   2026-09-07 實測：13ch 在 1600px 寬會排成三行
+   「還有別條路，／只是沒有人／跟你說過。」，正是設計方向要的三行。
+   ⚠ ch 是「0」這個字的寬度，中文字體裡它**不等於**一個中文字寬，所以這個數字
+   不能照字數推算，改了要實際看一次。要精確控制中文字數的地方請改用 em
+   （alumni 的標題就是這樣，那裡有寫原因）。
+   排成幾行都不會壞 —— 開場的拆行是量實際渲染結果的，不是寫死三行。 */
 h1{
   font-family:var(--han);font-weight:900;
   font-size:clamp(38px,7.4vw,116px);line-height:.98;letter-spacing:-.02em;
@@ -309,7 +312,7 @@ footer a{color:var(--ink);font-weight:600}
     background:var(--bt-cream);border-bottom:1px solid rgba(16,42,134,.12);
   }
   .navlinks.open{display:flex}
-  .navlinks a,.navlinks span.soon{padding:15px 1px;font-size:16px;border-bottom:0}
+  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0}
   .burger{display:block}
 }
 @media (max-width:420px){
@@ -336,7 +339,7 @@ footer a{color:var(--ink);font-weight:600}
   <div class="navlinks" id="navlinks">
     <a href="#about" data-sec="about">關於我們</a>
     <a href="#what" data-sec="what">我們做什麼</a>
-    <span class="soon">Alumni</span>
+    <a href="./alumni/">Alumni</a>
     <a href="#join" data-sec="join">加入我們</a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>

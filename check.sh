@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
+FILES="index.html alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -93,7 +93,7 @@ fi
 # 這件事把 grep 的錯誤結束碼跟「沒掃到東西」混在一起，害這支檢查誤判成通過）。
 # 不掃 docs/、.superpowers/、vendor/（vendor 之後會放 supabase-js，原始碼裡
 # service_role 是 API 的一部分）。
-service_scope="index.html privacy reset shared passport/index.html passport/src passport/activities.json"
+service_scope="index.html alumni privacy reset shared passport/index.html passport/src passport/activities.json"
 [ -d .github ] && service_scope="$service_scope .github"
 if grep -rIq service_role $service_scope 2>/dev/null; then
   bad "§11-6 repo 裡出現 service_role"
@@ -118,7 +118,7 @@ BRAND_HEX="#EDE5D8 #FFE8C5 #FFC46C #C6C6C6 #102A86 #6BC6BB #FFF789"
 hexfilter=$(printf '%s\n' $BRAND_HEX | tr 'a-f' 'A-F' | sed 's/^/^/;s/$/$/' | paste -sd'|' -)
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html privacy reset shared passport/src passport/activities.json 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html alumni privacy reset shared passport/src passport/activities.json 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -vE "$hexfilter")
@@ -173,7 +173,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then
@@ -233,7 +233,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html"
+FONT_CJK_PAGES="index.html alumni/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -324,14 +324,72 @@ while IFS= read -r d; do
   # 第一版寫 M* 就把它一起數進去，變成 9 條。
   case "$d" in M[0-9]*) ;; *) continue ;; esac
   n_path=$((n_path+1))
-  grep -qF "$d" index.html || missing_path="${missing_path} 第${n_path}條"
+  grep -qF "$d" index.html          || missing_path="${missing_path} 首頁第${n_path}條"
+  grep -qF "$d" alumni/index.html   || missing_path="${missing_path} alumni第${n_path}條"
 done < scripts/taiwan/coastline.txt
 if [ "$n_path" != "8" ]; then
   bad "coastline.txt 的路徑不是 8 條（本島 1 + 離島 7），現在是 ${n_path} 條 —— 腳本改過就要回來改這個數字"
 elif [ -n "$missing_path" ]; then
-  bad "index.html 的島跟 scripts/taiwan/coastline.txt 對不上：${missing_path}（不要手改座標，改腳本重跑）"
+  bad "島的座標跟 scripts/taiwan/coastline.txt 對不上：${missing_path}（不要手改座標，改腳本重跑）"
 else
-  ok "首頁的島跟 coastline.txt 完全一致（本島 1 條 + 離島 7 條）"
+  ok "首頁與 alumni 的島都跟 coastline.txt 完全一致（本島 1 條 + 離島 7 條）"
+fi
+
+# ════════ /alumni/ 航線圖（官網改版批 3，2026-09-07）════════
+
+# community.json 與縣市對照表
+#
+# 這一頁的北極星是「加一位學長姐＝在 JSON 加一個物件」。要讓那句話成立，
+# JSON 裡填的必須是縣市名而不是座標 —— 於是就多了一張縣市對照表，
+# 而多一份資料就會有兩份慢慢不一樣的風險。這條守門就是在守那件事。
+#
+# 三個方向一起守：
+#   1. 頁面裡的 COUNTY 表必須跟 scripts/taiwan/cities.json 完全相同。
+#   2. JSON 裡每一個人的 county 都要在表上 —— 填錯的話那個人只會**安靜地不出現**，
+#      畫面上少一個點，沒有任何錯誤訊息，這種壞法最貴。
+#   3. 必填欄位不可缺、id 不可重複（id 重複會讓兩個人共用同一條航線）。
+alumniOut=$(node -e '
+  const fs = require("fs");
+  const bad = [];
+  const html = fs.readFileSync("alumni/index.html", "utf8");
+  const cities = JSON.parse(fs.readFileSync("scripts/taiwan/cities.json", "utf8"));
+
+  const m = html.match(/var COUNTY = (\{[\s\S]*?\});/);
+  if (!m) { console.log("  alumni/index.html 裡找不到 COUNTY 那張表"); process.exit(2); }
+  let table;
+  try { table = JSON.parse(m[1]); }
+  catch (e) { console.log("  COUNTY 那張表不是合法的 JSON：" + e.message); process.exit(2); }
+
+  const a = Object.keys(table).sort(), b = Object.keys(cities).sort();
+  if (a.join(",") !== b.join(","))
+    bad.push("COUNTY 的縣市跟 cities.json 對不上（頁面 " + a.length + " 個、資料 " + b.length + " 個）");
+  else for (const k of a)
+    if (table[k][0] !== cities[k][0] || table[k][1] !== cities[k][1])
+      bad.push(k + " 的座標對不上：頁面 " + table[k] + "、cities.json " + cities[k]);
+
+  const data = JSON.parse(fs.readFileSync("alumni/community.json", "utf8"));
+  if (!Array.isArray(data._readme) || !data._readme.length)
+    bad.push("community.json 少了 _readme（JSON 不能寫註解，格式說明只能放在那裡）");
+  const people = data.people || [];
+  if (!people.length) bad.push("community.json 裡一個人都沒有");
+  const seen = new Set();
+  for (const p of people) {
+    for (const f of ["id", "name", "school", "county", "city", "country", "place", "quote", "note"])
+      if (!p[f]) bad.push("有一筆缺了 " + f + "（id=" + (p.id || "?") + "）");
+    if (p.county && !(p.county in table))
+      bad.push(p.id + " 的縣市「" + p.county + "」不在對照表上，那個人會安靜地不出現在圖上");
+    if (seen.has(p.id)) bad.push("id 重複：" + p.id);
+    seen.add(p.id);
+  }
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+  console.log(people.length + " 位" + (data.demo ? "（示範資料）" : "（真實名單）"));
+' 2>&1)
+alumniCode=$?
+if [ $alumniCode -eq 0 ]; then
+  ok "alumni 的 community.json 與縣市對照表都對得上：${alumniOut}"
+else
+  bad "alumni 的資料有問題："
+  printf '%s\n' "$alumniOut"
 fi
 
 # GSAP 從 cdnjs 載，一定要有 SRI
@@ -989,6 +1047,15 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。", "This site uses no tracking or advertising tools."],
       mustHide: ["之後要改文案", "scripts/check-photos.mjs", "三種人"]
     },
+    // /alumni/ 是改版批 3 加的對外頁。mustShow 橫跨頁首、本文、頁尾；
+    // mustHide 取檔頭那段註解的**最後一句** —— 取中間那句的話，
+    // 破壞點在它後面時它仍然被關在註解裡（隱私頁 2026-09-01 就這樣漏掉過）。
+    "alumni/index.html": {
+      mustShow: ["跳到主要內容 / Skip to content", "他們從這裡出發。然後回來。",
+                 "登入 / Sign in", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["取而代之的是一段 noscript 說明加上聯絡方式"]
+    },
     "privacy/index.html": {
       mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],
       mustHide: ["因為手機上會有人真的從頭讀到尾"]
@@ -1050,7 +1117,7 @@ leakOut=$(node -e '
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html privacy/index.html reset/index.html 2>&1)
+' index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -1082,12 +1149,78 @@ fi
 #
 # ⚠ 這是「必須不存在」型的守門，所以**上面這段說明裡不能寫出那個標記本身**，
 #   不然它會抓到自己而變成常紅（同一個坑在連線字串那條守門上踩過一次）。
-placeholder_scope="index.html privacy reset passport/index.html passport/src passport/activities.json"
+# 2026-09-07：補上 app 與 availability。它們一直不在範圍內，是新加的
+# 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
+# app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
+# 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
+placeholder_scope="index.html alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
 else
   ok "passport/ 裡沒有佔位文案"
+fi
+
+# alumni 的航線動畫也要關在 reduce 判斷裡
+#
+# 跟首頁那條同一個道理，只是這一頁用的是瀏覽器內建的 element.animate()
+# 而不是 GSAP。CSS 的檢查一樣看不到它，所以一樣守結構：
+# 每一個 .animate( 都必須在 `if (!reduce) {` 那個區塊裡面。
+alReduce=$(node -e '
+  const fs = require("fs");
+  const html = fs.readFileSync("alumni/index.html", "utf8");
+  const code = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("\n")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const bad = [];
+  if (!code.includes(`matchMedia("(prefers-reduced-motion: reduce)")`))
+    bad.push("找不到 prefers-reduced-motion 的判斷");
+  const head = code.indexOf("if (!reduce) {");
+  let from = -1, to = -1;
+  if (head < 0) bad.push("找不到 if (!reduce) { 這個區塊");
+  else {
+    let i = code.indexOf("{", head), depth = 0; from = i;
+    for (; i < code.length; i++) {
+      if (code[i] === "{") depth++;
+      else if (code[i] === "}") { depth--; if (depth === 0) { to = i; break; } }
+    }
+    if (to < 0) bad.push("if (!reduce) 的大括號沒有收尾");
+  }
+  for (const m of code.matchAll(/\.animate\(/g))
+    if (!(from >= 0 && to > from && m.index > from && m.index < to))
+      bad.push("有 .animate( 在 if (!reduce) 區塊外面（內嵌 script 第 " +
+               (code.slice(0, m.index).split("\n").length) + " 行）");
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "alumni 的航線動畫關在 reduce 判斷裡"
+else
+  bad "alumni 有動畫沒有被 reduce 判斷關住："
+  printf '%s\n' "$alReduce"
+fi
+
+# 對外頁面不可以漏掉任何一份清單
+#
+# 這個 repo 有好幾份「頁面清單」散在不同地方（$FILES、佔位文案的範圍、
+# check-icons 的 PAGES、外洩註解檢查的 ANCHORS）。加一個新頁面要一份一份補，
+# 漏掉的那一份**不會壞，只會少守一件事** —— 而少守的守門沒有人會發現。
+# 2026-09-07 加 /alumni/ 時要改八個地方，所以順手加了這一條後設守門：
+# 只要 repo 裡多一個 index.html，沒補進清單就會紅。
+pages="index.html"
+for d in */ ; do
+  d="${d%/}"
+  [ -f "${d}/index.html" ] && pages="${pages} ${d}/index.html"
+done
+listbad=""
+for pg in $pages; do
+  dir="${pg%/index.html}"
+  case " $FILES " in *"$pg"*|*" $dir "*) ;; *) listbad="${listbad} ${pg}不在 FILES" ;; esac
+  case " $placeholder_scope " in *"$pg"*|*" $dir "*) ;; *) listbad="${listbad} ${pg}不在佔位文案範圍" ;; esac
+  grep -qF "\"${pg}\"" scripts/check-icons.mjs || listbad="${listbad} ${pg}不在 check-icons 的 PAGES"
+done
+if [ -n "$listbad" ]; then
+  bad "有對外頁面漏掉某一份清單（加了頁面就要一份一份補）：${listbad}"
+else
+  ok "每一個 index.html 都在 FILES、佔位文案範圍與 check-icons 的清單裡（共 $(printf '%s\n' $pages | wc -l | tr -d ' ') 頁）"
 fi
 
 # CNAME 不可掉，而且內容要對
