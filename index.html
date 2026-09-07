@@ -127,18 +127,46 @@ main,footer,.topbar{position:relative;z-index:1}
 .skip:focus{left:0}
 :focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
 
-/* ═════════ 頂欄 ═════════ */
+/* ═════════ 頂欄：liquid glass ═════════ */
 /* 這條頂欄跟 shared/nav.js 是兩回事，不要混。
    nav.js 是**登入後**的功能清單（護照、時間看板），只有幹部看得到；
    這一條是給還沒登入、甚至還不認識 BT 的人看的。兩者混在一起的後果是
-   路人會看到他點不進去的功能。 */
+   路人會看到他點不進去的功能。
+
+   ── 玻璃是怎麼堆出來的（2026-09-07，Paul 指定 liquid glass）──
+   玻璃不是「半透明」而已，它有四層，缺一層就會變成一塊灰灰的塑膠：
+     1. 底：由亮到暗的漸層。光從上面來，所以上緣比下緣亮。
+     2. 折射：backdrop-filter 的 blur 加 saturate。**saturate 是關鍵** ——
+        只有 blur 的話後面的顏色會被洗掉，玻璃看起來像毛玻璃不像玻璃。
+     3. 高光：上緣一條 inset 的白線，那是光打在玻璃邊緣的反光。
+     4. 影子：往下的柔影，讓它浮在紙上面而不是貼在紙上。
+   顏色全部是米白與白的不同透明度，沒有新色（Brand Book 硬規則）。
+
+   ⚠ 它是**浮起來**的（左右留白、圓角、離頂端一段距離），不是鋪滿的一條。
+   鋪滿的話玻璃沒有邊，看不出它是一塊材質。 */
 .topbar{
-  position:sticky;top:0;z-index:50;
+  position:sticky;top:12px;z-index:50;
   display:flex;align-items:center;gap:clamp(12px,2.2vw,32px);
-  padding:12px var(--gut);
-  background:rgba(237,229,216,.82);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  border-bottom:1px solid rgba(16,42,134,.12);
+  margin:12px var(--gut) 0;
+  padding:9px 10px 9px 16px;
+  border-radius:999px;
+  /* 不透明度不能再低了。玻璃是浮在內容上面的，底下可能是一張深色照片，
+     太透的話 logo 與導覽文字會糊掉 —— 玻璃再漂亮，讀不到就是壞的。
+     .78 到 .6 這一組實測在最深的那張照片上仍然讀得清楚。 */
+  background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(237,229,216,.6));
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),
+             inset 0 -1px 0 rgba(16,42,134,.05),
+             0 10px 30px rgba(16,42,134,.10),
+             0 2px 6px rgba(16,42,134,.06);
+}
+/* 不支援 backdrop-filter 的瀏覽器（舊 Safari、部分 Android）
+   會看到一塊幾乎透明的東西壓在文字上，那比沒有玻璃難看得多。
+   偵測不到就退回不透明的紙色，該讀得到的照樣讀得到。 */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .topbar{background:var(--bt-cream);border-color:rgba(16,42,134,.14)}
 }
 .topbar .home{display:flex;align-items:center;margin-right:auto;flex:0 0 auto}
 .topbar .home img{height:30px;width:auto;display:block}
@@ -189,7 +217,7 @@ main{padding:0}
    置中放一座完整的島會變成插圖，切出去它才是地形。 */
 .hero{
   position:relative;
-  min-height:calc(100svh - 58px);   /* 58px 是頂欄的高度 */
+  min-height:calc(100svh - 76px);   /* 頂欄現在是浮起來的：離頂端 12px + 本身約 52px + 下面留一點 */
   display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);
   align-items:center;
   padding:0 var(--gut);
@@ -338,15 +366,27 @@ footer a{color:var(--ink);font-weight:600}
   .isle-wrap{right:-26%;height:74svh;top:0;transform:none}
 }
 @media (max-width:700px){
-  /* 手機：導覽收進漢堡選單。展開時是一疊直的連結，不是抽屜。 */
+  /* 手機：導覽收進漢堡選單。展開時是一疊直的連結，不是抽屜。
+     面板用跟頂欄同一塊玻璃，只是更厚一點（後面是內容，要壓得住）。 */
   .navlinks{
-    display:none;position:absolute;left:0;right:0;top:100%;
+    display:none;position:absolute;left:0;right:0;top:calc(100% + 8px);
     flex-direction:column;align-items:flex-start;gap:0;
-    padding:6px var(--gut) 16px;
-    background:var(--bt-cream);border-bottom:1px solid rgba(16,42,134,.12);
+    padding:6px 18px 10px;
+    border-radius:20px;
+    /* 面板比頂欄更不透明。頂欄底下通常是紙色或島，面板展開時底下是內容
+       （可能是一整張照片），.7 那一組實測字會糊在照片上讀不到。 */
+    background:linear-gradient(180deg,rgba(255,255,255,.93),rgba(237,229,216,.88));
+    backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.75),
+               0 14px 34px rgba(16,42,134,.14);
+  }
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .navlinks{background:var(--bt-cream)}
   }
   .navlinks.open{display:flex}
-  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0}
+  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
   .burger{display:block}
 }
 @media (max-width:420px){
