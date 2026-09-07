@@ -1,4 +1,8 @@
 // /app/ 的畫面。登入、註冊、忘記密碼、以及「你還不是幹部」那一頁。
+// 2026-09-07：卡片裡不再放 logo。頁面本身（app/index.html）在 #bt-root 外面
+// 有一個 logo，那個同時是「回 Beyond Taiwan 首頁」的連結 ——
+// 外人從對外頁按「登入」進來，得有辦法回去。
+// 兩個一模一樣的 logo 上下相隔一百多 px，看起來像出錯，不像設計。
 //
 // 2026-09-02（階段 7 前置）：這幾支從 passport/src/ui.js 原樣搬過來。
 // 搬的理由是規格 §2-1 的分工：`/app/` 是登入後的入口，`/passport/` 只剩護照本身。
@@ -27,7 +31,6 @@ export function authHTML(mode, msg, email) {
 
   // ── 忘記密碼：輸入 email ──
   if (mode === "forgot") return `<div class="card">
-    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>忘記密碼</h2>
     <div class="sub">輸入你註冊時用的 email，我們寄一封重設連結給你。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
@@ -48,7 +51,6 @@ export function authHTML(mode, msg, email) {
   // 前端的文案要跟那個事實一致 —— 寫「如果這個信箱有帳號」，不要寫「已寄出」。
   // test/ui-pages.test.mjs 有一條在守這件事。
   if (mode === "sent") return `<div class="card">
-    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>信寄出去了</h2>
     <div class="sub">如果 <b>${esc(email || "那個信箱")}</b> 有帳號，我們寄了一封重設連結給它。</div>
     <div class="note" style="margin-top:0">沒收到的話，先看一下垃圾郵件匣。連結大約一小時內有效，過期了再回來要一次就好。</div>
@@ -57,7 +59,6 @@ export function authHTML(mode, msg, email) {
   </div>`;
 
   return `<div class="card">
-    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>${up ? "註冊" : "登入"}</h2>
     <!-- 註冊不再需要邀請碼（2026-09-01，階段 5-7 把門搬到角色升級）。
          **那格輸入已經移除，不是留著不讀。** 留著的話它是一句謊：使用者會以為
@@ -134,7 +135,6 @@ export function authHTML(mode, msg, email) {
 // 換成別的字 —— 那是使用者看不見的竄改，資料庫救不了。
 export function notCadreHTML(msg) {
   return `<div class="card">
-    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>你還不是 BT 幹部</h2>
     <div class="sub">護照目前只開放給幹部。你已經登入了，但還沒有升級。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
@@ -152,7 +152,6 @@ export function notCadreHTML(msg) {
 // 灰掉的「敬請期待」看起來像壞掉的功能，而且會有人來問什麼時候好。
 export function menuHTML(who) {
   return `<div class="card">
-    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>Beyond Taiwan</h2>
     <div class="sub">${who ? esc(who) : ""}</div>
     <div class="menu">${featuresFor("cadre").map(f => `
@@ -172,7 +171,6 @@ export function menuHTML(who) {
 // 文案不同，所以是不同的東西，不要為了少一份檔案硬合起來。
 export function downHTML() {
   return `<div class="card">
-    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>資料庫休眠中</h2>
     <div class="wnote" style="margin:16px 0 0">
       現在連不上資料庫，所以沒有辦法登入。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。

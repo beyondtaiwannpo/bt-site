@@ -9,9 +9,11 @@ import fs from "node:fs";
 
 // 2026-09-07：加上 alumni/index.html（官網改版批 3）。
 // 新增對外頁面時這一行要跟著加 —— check.sh 有一條後設守門會檢查有沒有漏。
-export const PAGES = ["index.html", "alumni/index.html", "app/index.html",
-                      "availability/index.html", "passport/index.html",
-                      "privacy/index.html", "reset/index.html"];
+// 2026-09-07 再加四個對外內容頁。
+export const PAGES = ["index.html", "about/index.html", "programs/index.html",
+                      "team/index.html", "join/index.html", "alumni/index.html",
+                      "app/index.html", "availability/index.html",
+                      "passport/index.html", "privacy/index.html", "reset/index.html"];
 export const NEEDED = ["favicon-32.png", "apple-touch-icon.png", "site.webmanifest"];
 
 export function scan() {

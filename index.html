@@ -407,14 +407,15 @@ footer a{color:var(--ink);font-weight:600}
   <a class="home" href="#top" aria-label="Beyond Taiwan 首頁">
     <img src="./shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
-  <!-- data-sec 是給下面那段 JS 用的：切成英文時，錨點要指到英文那一份的
-       同一段（#about 變成 #about-en）。href 先寫中文那一份，
-       這樣沒有 JavaScript 的時候點下去照樣會捲到對的地方。 -->
+  <!-- 導覽的每一項都是**一個真的頁面**，不是首頁上的錨點（Paul 2026-09-07）。
+       錨點的問題是：路人以為點進去會看到一整頁，結果只是捲到同一頁的一段。
+       標籤自己也有中英兩份，跟著 data-lang 一起切。 -->
   <div class="navlinks" id="navlinks">
-    <a href="#about" data-sec="about">關於我們</a>
-    <a href="#what" data-sec="what">我們做什麼</a>
+    <a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a>
+    <a href="./programs/"><span class="zh">我們做什麼</span><span class="en">What we do</span></a>
+    <a href="./team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="./alumni/">Alumni</a>
-    <a href="#join" data-sec="join">加入我們</a>
+    <a href="./join/"><span class="zh">加入我們</span><span class="en">Get involved</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="./app/">登入 / Sign in</a>
@@ -703,11 +704,6 @@ footer a{color:var(--ink);font-weight:600}
     html.setAttribute("lang", l === "zh" ? "zh-Hant" : "en");
     btn.textContent = l === "zh" ? "EN" : "中";
     btn.setAttribute("aria-label", l === "zh" ? "Switch to English" : "切換為中文");
-    /* 錨點要跟著換到同一段的另一個語言版本，不然切成英文之後
-       點「關於我們」會捲到一個被隱藏起來的區塊，畫面完全不動。 */
-    Array.prototype.forEach.call(links.querySelectorAll("a[data-sec]"), function (a) {
-      a.href = "#" + a.dataset.sec + (l === "en" ? "-en" : "");
-    });
   }
 
   btn.addEventListener("click", function () {

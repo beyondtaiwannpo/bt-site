@@ -28,7 +28,7 @@
 <link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
 <link rel="manifest" href="../shared/site.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
-<meta name="theme-color" content="#102A86">
+<meta name="theme-color" content="#EDE5D8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -37,34 +37,78 @@
 <style>
   /* 色票、字體家族、圓角全部來自 ../shared/brand.css，這裡一個都不重新宣告。
 
+     2026-09-07 翻新：這一頁是**外人按下「登入」之後看到的第一頁**，
+     所以視覺要跟對外那幾頁是同一個系統 —— 紙底、右上角的暖光、浮起來的玻璃、
+     藥丸形的按鈕。原本它長得像一個獨立的後台。
+
      下面這些卡片與按鈕的樣式跟 passport/index.html 裡的長得很像，
-     **是各寫一份，不是共用的**——brand.css 的檔頭明文寫著不要把按鈕、卡片、
+     **是各寫一份，不是共用的** —— brand.css 的檔頭明文寫著不要把按鈕、卡片、
      格線搬進去，理由是那會變成一個沒有人敢動的全站樣式表。
-     這兩個資料夾在階段 7 都要重做視覺，那時候才會知道有沒有真正共用的元件。 */
+
+     ── 這一頁不載中文網頁字體 ──
+     對外的內容頁有載（中文標題要撐到 96px 以上），這一頁的中文只有短標籤，
+     系統字體就夠。它是登入的必經之路，少三萬多位元組的 CSS 比較實在。
+     check.sh 的 FONT_CJK_PAGES 沒有把這一頁加進去，是刻意的。
+
+     ── 透明度不要拿來調文字顏色 ──
+     舊版用 opacity .55 到 .7 讓次要文字變淡。那會連對比度一起打折，
+     深藍在米白上 .7 只有約 4.2:1，過不了 WCAG AA 的 4.5:1。
+     現在一律用 rgba 指定顏色並且算過對比（.78 以上）。
+     這是這個 repo 第四次踩同一件事，README 有記。 */
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{overflow-x:clip}
+  body{margin:0;background:var(--paper);overflow-x:clip}
+  /* 右上角的一道暖光，跟對外那幾頁同一個做法。 */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+
+  /* 回首頁的路。外人從對外頁按「登入」進來，得有辦法回去。 */
+  .apphead{position:relative;z-index:1;padding:clamp(18px,4vw,32px) clamp(16px,5vw,32px) 0;
+    max-width:560px;margin:0 auto}
+  .apphead a{display:inline-block;position:relative}
+  .apphead img{height:28px;width:auto;display:block}
+  .apphead a::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+
   #bt-root{
+    position:relative;z-index:1;
     font-family:var(--body);color:var(--ink);line-height:1.55;
-    max-width:520px;margin:0 auto;padding:clamp(20px,6vw,44px) 14px 40px;
+    max-width:520px;margin:0 auto;padding:clamp(16px,4vw,32px) 16px 48px;
   }
   /* :where() 是必要的，不是風格。裸寫 #bt-root button 的特異性會蓋掉所有
      用 class 描述外觀的規則，.btn 的深藍底、.btn.ghost 的外框全部會失效。
      護照那邊因為這件事，畫面上所有按鈕的外觀死了一個多月都沒有人發現。
      **不要把 :where() 拿掉**（見 passport/index.html 同一條的註解）。 */
   :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
-  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
 
-  /* 2026-09-03（7-4）：內距與標題在手機上縮小。之前 30/28 + 36px 的 h2 在 390px
-     的螢幕上，卡片有三分之一是留白與標題，表單本身被擠到第二屏。 */
-  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:clamp(22px,5vw,30px) clamp(18px,5vw,28px)}
-  .card h2{font-family:var(--display);font-size:clamp(28px,7vw,34px);font-weight:700;letter-spacing:.02em;margin:0 0 4px;line-height:1.05}
-  .card .sub{font-size:14px;opacity:.65;margin-bottom:20px}
-  label{display:block;margin-bottom:15px}
-  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;display:block;margin-bottom:5px}
-  input{
-    width:100%;font-family:var(--body);font-size:15px;color:var(--ink);
-    padding:9px 11px;border:1px solid rgba(16,42,134,.28);border-radius:2px;
-    background:rgba(255,255,255,.55);
+  /* 卡片：跟頂欄同一塊玻璃。四層見 README「頂欄的 liquid glass」。
+     內距與標題在手機上要縮小 —— 之前 30/28 加 36px 的 h2 在 390px 的螢幕上，
+     卡片有三分之一是留白與標題，表單本身被擠到第二屏（2026-09-03，7-4）。 */
+  .card{
+    background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(237,229,216,.5));
+    backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);border-radius:20px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.75),
+               0 12px 34px rgba(16,42,134,.10),0 2px 6px rgba(16,42,134,.05);
+    padding:clamp(24px,5vw,34px) clamp(20px,5vw,30px);
   }
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .card{background:rgba(255,255,255,.8)}
+  }
+  .card h2{font-family:var(--display);font-size:clamp(30px,7.4vw,42px);font-weight:700;
+    letter-spacing:.01em;margin:0 0 6px;line-height:1.02}
+  .card .sub{font-size:14.5px;color:rgba(16,42,134,.8);margin-bottom:22px}
+
+  label{display:block;margin-bottom:16px}
+  label i{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(16,42,134,.8);display:block;margin-bottom:6px}
+  input{
+    width:100%;font-family:var(--body);font-size:15.5px;color:var(--ink);
+    padding:12px 14px;border:1px solid rgba(16,42,134,.28);border-radius:12px;
+    background:rgba(255,255,255,.7);
+  }
+  input:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px;border-color:transparent}
+
   /* ── 按鈕的輕重（2026-09-03，7-4）──
      一頁只有**一顆**實心深藍鈕，就是主要動作，滿版。
      第二選擇（Google）是滿版的框線鈕，用內文字體、不大寫、一行 ——
@@ -72,46 +116,62 @@
      比主要動作還搶眼（使用者 2026-09-01 的回報；量到是 284×71 對 84×47）。
      導覽（切換登入／註冊、回登入、登出）不是按鈕，是文字連結：見 .link。
      這裡不再有 .quiet：護照那邊的 .btn.quiet 是給「清除這本護照」的安全降級，
-     跟「這顆不是主要動作」不是同一件事，同名只會讓人把兩者混在一起。 */
+     跟「這顆不是主要動作」不是同一件事，同名只會讓人把兩者混在一起。
+     2026-09-07：形狀改成藥丸，跟對外那幾頁的 CTA 一致。輕重的規則沒有變。 */
   .btn{
     display:block;width:100%;
-    font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-    padding:13px 20px;border-radius:2px;background:var(--bt-navy);color:var(--bt-cream);
-    transition:opacity .15s;text-align:center;
+    font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    padding:14px 20px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:background .15s;text-align:center;
   }
-  .btn:hover{opacity:.86}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
   .btn[disabled]{opacity:.4;cursor:default}
   .btn.ghost{
     background:none;color:var(--ink);border:1px solid rgba(16,42,134,.35);
     font-family:var(--body);font-size:15px;font-weight:600;letter-spacing:0;text-transform:none;
-    padding:12px 16px;
+    padding:13px 16px;
   }
-  .btn.sm{display:inline-block;width:auto;font-size:14px;padding:7px 14px}
+  .btn.ghost:hover{background:rgba(255,255,255,.7);color:var(--ink)}
+  .btn.sm{display:inline-block;width:auto;font-size:14px;padding:8px 16px}
   .link{background:none;border:none;padding:0;font-family:var(--body);font-size:15px;font-weight:600;
     color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-  .link:hover{opacity:.75}
-  .stack{display:grid;gap:10px;margin-top:18px}
-  .nav{margin-top:16px;font-size:15px}
+  .link:hover{text-decoration-color:var(--bt-orange)}
+  .stack{display:grid;gap:10px;margin-top:20px}
+  .nav{margin-top:18px;font-size:15px}
   /* 說明文字：小字、無底色。**橘色框只留給錯誤與狀態訊息**（.wnote）——
-     說明跟錯誤共用一種框的時候，有事的那塊框跳不出來，這一頁就沒有輕重。 */
-  .note{font-size:13px;line-height:1.6;opacity:.7;margin-top:14px}
-  .note b{opacity:1}
-  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
-  .wnote{font-size:14px;line-height:1.55;margin-bottom:18px;padding:11px 14px;background:rgba(255,196,108,.3);border-left:3px solid var(--bt-orange);border-radius:2px}
-  .empty{text-align:center;padding:48px 0;opacity:.55;font-size:14px}
+     說明跟錯誤共用一種框的時候，有事的那塊框跳不出來，這一頁就沒有輕重。
+     顏色用 rgba 不用 opacity：opacity 會連 <b> 一起打折，
+     而且 .7 以下過不了對比度。 */
+  .note{font-size:13.5px;line-height:1.65;color:rgba(16,42,134,.8);margin-top:16px}
+  .note b{color:var(--ink);font-weight:600}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .wnote{font-size:14px;line-height:1.55;margin-bottom:18px;padding:12px 15px;
+    background:rgba(255,196,108,.3);border-left:3px solid var(--bt-orange);border-radius:10px}
+  .empty{text-align:center;padding:48px 0;color:rgba(16,42,134,.78);font-size:14px}
 
   /* 登入後的選單 */
-  .menu{display:grid;gap:10px}
+  .menu{display:grid;gap:12px}
   .mitem{
-    display:block;padding:16px 18px;border:1px solid rgba(16,42,134,.22);border-radius:2px;
-    background:rgba(255,255,255,.4);color:var(--ink);text-decoration:none;transition:background .15s;
+    display:block;padding:18px 20px;border:1px solid rgba(16,42,134,.18);border-radius:16px;
+    background:rgba(255,255,255,.55);color:var(--ink);text-decoration:none;
+    transition:background .15s,border-color .15s;
   }
-  .mitem:hover{background:rgba(255,255,255,.75)}
-  .mitem b{font-family:var(--display);font-size:23px;font-weight:600;display:block;line-height:1.15}
-  .mitem span{font-size:13px;opacity:.6}
+  .mitem:hover{background:rgba(255,255,255,.85);border-color:rgba(16,42,134,.32)}
+  .mitem b{font-family:var(--display);font-size:24px;font-weight:700;display:block;line-height:1.12}
+  .mitem span{font-size:13.5px;color:rgba(16,42,134,.78)}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<!-- 回首頁的路。外人從對外頁按「登入」進來，得有辦法回去。
+     放在 #bt-root 外面：那一層的內容整個由 src/main.js 重畫，
+     放進去的話每次重畫都會不見。 -->
+<header class="apphead">
+  <a href="../" aria-label="回 Beyond Taiwan 首頁">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+</header>
 <div id="bt-root"><div class="empty">載入中…</div></div>
 <script type="module" src="./src/main.js"></script>
 </body>

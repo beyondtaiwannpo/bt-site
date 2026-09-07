@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
+FILES="index.html about programs team join alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -93,7 +93,7 @@ fi
 # 這件事把 grep 的錯誤結束碼跟「沒掃到東西」混在一起，害這支檢查誤判成通過）。
 # 不掃 docs/、.superpowers/、vendor/（vendor 之後會放 supabase-js，原始碼裡
 # service_role 是 API 的一部分）。
-service_scope="index.html alumni privacy reset shared passport/index.html passport/src passport/activities.json"
+service_scope="index.html about programs team join alumni privacy reset shared passport/index.html passport/src passport/activities.json"
 [ -d .github ] && service_scope="$service_scope .github"
 if grep -rIq service_role $service_scope 2>/dev/null; then
   bad "§11-6 repo 裡出現 service_role"
@@ -118,7 +118,7 @@ BRAND_HEX="#EDE5D8 #FFE8C5 #FFC46C #C6C6C6 #102A86 #6BC6BB #FFF789"
 hexfilter=$(printf '%s\n' $BRAND_HEX | tr 'a-f' 'A-F' | sed 's/^/^/;s/$/$/' | paste -sd'|' -)
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html alumni privacy reset shared passport/src passport/activities.json 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html about programs team join alumni privacy reset shared passport/src passport/activities.json 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -vE "$hexfilter")
@@ -173,7 +173,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then
@@ -233,7 +233,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html alumni/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1054,6 +1054,28 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。", "This site uses no tracking or advertising tools."],
       mustHide: ["之後要改文案", "scripts/check-photos.mjs", "三種人"]
     },
+    // 2026-09-07 新增的四個對外內容頁。四頁共用同一個外殼，
+    // 所以 mustHide 取的是同一句（那段檔頭註解的最後一句）。
+    "about/index.html": {
+      mustShow: ["跳到主要內容", "我們在處理的是資訊落差。", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["維護者要講的話寫在 README"]
+    },
+    "programs/index.html": {
+      mustShow: ["跳到主要內容", "兩件事，都免費。", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["維護者要講的話寫在 README"]
+    },
+    "team/index.html": {
+      mustShow: ["跳到主要內容", "三十個人，全部是學生。", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["維護者要講的話寫在 README"]
+    },
+    "join/index.html": {
+      mustShow: ["跳到主要內容", "你不需要認識任何人。", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["維護者要講的話寫在 README"]
+    },
     // /alumni/ 是改版批 3 加的對外頁。mustShow 橫跨頁首、本文、頁尾；
     // mustHide 取檔頭那段註解的**最後一句** —— 取中間那句的話，
     // 破壞點在它後面時它仍然被關在註解裡（隱私頁 2026-09-01 就這樣漏掉過）。
@@ -1124,7 +1146,7 @@ leakOut=$(node -e '
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
+' index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -1160,7 +1182,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
+placeholder_scope="index.html about programs team join alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
