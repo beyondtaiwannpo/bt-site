@@ -91,8 +91,19 @@
      放在這裡，屬性在第一次繪製之前就掛好了，什麼都不會跳。
      這一小段刻意不寫成外部檔案：多一個來回就失去意義了。 -->
 <script>
-  document.documentElement.setAttribute(
-    "data-lang", /^zh/i.test(navigator.language || "") ? "zh" : "en");
+  /* 語言是這樣決定的，順序不能反：
+       1. 網址上的 ?lang= —— 使用者在上一頁選過，那個選擇要跟著他走。
+       2. 沒有的話才看瀏覽器的語言設定。
+     為什麼用網址不用 localStorage：**這個站不在任何人的裝置上存東西。**
+     讀者包含未成年人，「什麼都沒存」是一個值得保住的性質，
+     而且這樣隱私政策一個字都不用改。代價是網址上會多一段 ?lang=，
+     好處是把連結傳給別人時語言也跟著過去。
+     連結上的參數是頁尾那段 keepLang() 補的。 */
+  (function () {
+    var q = new URLSearchParams(location.search).get("lang");
+    document.documentElement.setAttribute("data-lang",
+      q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+  })();
 </script>
 
 <style>
@@ -708,6 +719,19 @@ footer a{color:var(--ink);font-weight:600}
     html.setAttribute("lang", l === "zh" ? "zh-Hant" : "en");
     btn.textContent = l === "zh" ? "EN" : "中";
     btn.setAttribute("aria-label", l === "zh" ? "Switch to English" : "切換為中文");
+    keepLang(l);
+  }
+
+  /* 把目前的語言寫進站內每一個連結，這樣點過去之後語言不會跳回瀏覽器預設。
+     跳過外部連結、mailto、純錨點，以及 app/ ——
+     那是登入的系統，它自己在讀網址上的 next 參數，不要去動它。 */
+  function keepLang(l) {
+    var as = document.querySelectorAll("a[href]");
+    for (var i = 0; i < as.length; i++) {
+      var h = as[i].getAttribute("href");
+      if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
+      as[i].setAttribute("href", h.split("?")[0] + "?lang=" + l);
+    }
   }
 
   btn.addEventListener("click", function () {

@@ -71,8 +71,19 @@
 <!-- 語言的判斷要在這裡，不能等到頁尾。中英兩份都在 HTML 裡，
      在瀏覽器套上 data-lang 之前畫面上是兩份接在一起。 -->
 <script>
-  document.documentElement.setAttribute(
-    "data-lang", /^zh/i.test(navigator.language || "") ? "zh" : "en");
+  /* 語言是這樣決定的，順序不能反：
+       1. 網址上的 ?lang= —— 使用者在上一頁選過，那個選擇要跟著他走。
+       2. 沒有的話才看瀏覽器的語言設定。
+     為什麼用網址不用 localStorage：**這個站不在任何人的裝置上存東西。**
+     讀者包含未成年人，「什麼都沒存」是一個值得保住的性質，
+     而且這樣隱私政策一個字都不用改。代價是網址上會多一段 ?lang=，
+     好處是把連結傳給別人時語言也跟著過去。
+     連結上的參數是下面那段 keepLang() 補的。 */
+  (function () {
+    var q = new URLSearchParams(location.search).get("lang");
+    document.documentElement.setAttribute("data-lang",
+      q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+  })();
 </script>
 
 <style>
@@ -598,9 +609,24 @@ img.avatar{object-fit:cover}
     document.documentElement.setAttribute("lang", next === "zh" ? "zh-Hant" : "en");
     this.textContent = next === "zh" ? "EN" : "\u4e2d";
     this.setAttribute("aria-label", next === "zh" ? "Switch to English" : "\u5207\u63db\u70ba\u4e2d\u6587");
+    keepLang(next);
     if (DATA) draw(DATA);
   });
   document.getElementById("lang").textContent = lang() === "zh" ? "EN" : "\u4e2d";
+  keepLang(lang());
+
+  /* 把目前的語言寫進站內每一個連結，這樣點過去之後語言不會跳回瀏覽器預設。
+     跳過外部連結、mailto、純錨點，以及 app/ ——
+     那是登入的系統，它自己在讀網址上的 next 參數，不要去動它。 */
+  function keepLang(l) {
+    var as = document.querySelectorAll("a[href]");
+    for (var i = 0; i < as.length; i++) {
+      var h = as[i].getAttribute("href");
+      if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
+      as[i].setAttribute("href", h.split("?")[0] + "?lang=" + l);
+    }
+  }
+
 
   fetch("./community.json")
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
