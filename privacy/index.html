@@ -31,50 +31,78 @@
 <link rel="stylesheet" href="../shared/brand.css">
 
 <style>
+/* 2026-09-07：視覺跟上改版後的設計系統。**內容一個字都沒有動** ——
+   這一頁是法律文字，改的只有排版。
+
+   ── 兩個刻意不做的決定 ──
+   1. **不載中文網頁字體。** 首頁與 alumni 有載，因為那兩頁的中文標題要撐到 100px 以上。
+      這一頁很少人會讀完，為它多載三萬多位元組的字體 CSS 不划算。
+      中文走系統字體，英文與數字走 Barlow Condensed，層次靠字級與粗細做。
+      （check.sh 的 FONT_CJK_PAGES 也沒有把這一頁加進去，是刻意的。）
+   2. **不加頂欄、不加 JavaScript。** 語言切換是純錨點（見下面 nav 的註解）。
+      這一頁是 Google OAuth 同意畫面指過來的地方，越少東西會壞越好。
+
+   ── 橘色的用法改了 ──
+   新的設計系統裡，主橘是「在動的東西」的顏色（光點、航線、CTA）。
+   舊版把每一條分隔線都畫成橘色，那等於把點綴色當成結構色用。
+   現在分隔線一律是深藍的低透明度，橘色只留給語言切換那兩顆與頁首那一條。 */
 *{box-sizing:border-box}
+:root{--gut:clamp(20px,5vw,72px)}
+html{overflow-x:clip}
 body{margin:0;background:var(--paper);color:var(--ink);
-  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased}
+  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
+/* 右上角的一道暖光，跟首頁同一個做法。 */
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
 
-.wrap{max-width:34em;margin:0 auto;padding:0 20px 72px}
+.wrap{position:relative;z-index:1;max-width:38em;margin:0;padding:0 var(--gut) clamp(56px,9vh,110px)}
 
-header{padding:28px 0 8px}
-header img{height:32px;display:block}
-h1{font-family:var(--display);font-size:34px;line-height:1.15;margin:20px 0 6px}
-.meta{font-size:15px;opacity:.7;margin:0 0 4px}
+header{padding:clamp(26px,5vh,56px) 0 0}
+header a.home{display:inline-block}
+header img{height:30px;width:auto;display:block}
+h1{font-family:var(--display);font-weight:700;
+  font-size:clamp(34px,5.4vw,64px);line-height:1.02;letter-spacing:-.01em;
+  margin:clamp(22px,4vh,44px) 0 8px}
+/* ⚠ 用 rgba 調淡的文字要實際算對比。深藍在米白上，.62 只有約 3.6:1、
+   .7 約 4.2:1，都過不了 WCAG AA 的 4.5:1；.78 才過得去。
+   「看起來還讀得到」不等於過得了 —— 這一頁改版時就是這樣被 Lighthouse 抓到的。 */
+.meta{font-size:14.5px;color:rgba(16,42,134,.78);margin:0}
 
 /* 語言切換：純錨點，沒有 JavaScript。中英文上下排，兩邊都完整。
    用切換的話沒有 JS 就得靠 :target，而那在有人直接連到某個段落時會壞掉。 */
-nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 0;
-  border-top:1px solid var(--bt-orange);border-bottom:1px solid var(--bt-orange);padding:12px 0}
-nav a{color:var(--ink);text-decoration:none;font-weight:600;font-size:15px;
-  border:1px solid var(--bt-orange);border-radius:999px;padding:5px 14px}
-nav a:hover{background:var(--bt-orange)}
-nav a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+nav{display:flex;gap:10px;flex-wrap:wrap;margin:clamp(20px,3.4vh,34px) 0 0;
+  border-top:1px solid rgba(16,42,134,.16);padding:16px 0 0}
+nav a{color:var(--ink);text-decoration:none;font-weight:600;font-size:14.5px;
+  border:1px solid rgba(16,42,134,.28);border-radius:999px;padding:7px 16px;line-height:1}
+nav a:hover{background:var(--bt-orange);border-color:var(--bt-orange)}
+nav a:focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
 
 section{padding-top:8px}
-h2{font-family:var(--display);font-size:25px;line-height:1.25;margin:38px 0 10px}
-h3{font-family:var(--display);font-size:20px;margin:26px 0 8px}
-p{margin:0 0 16px}
-ul{margin:0 0 16px;padding-left:1.25em}
+h2{font-weight:600;font-size:clamp(21px,2.4vw,28px);line-height:1.25;
+  margin:clamp(38px,6vh,64px) 0 12px;letter-spacing:-.005em}
+h3{font-weight:600;font-size:18px;margin:28px 0 8px}
+p{margin:0 0 16px;max-width:34em}
+ul{margin:0 0 16px;padding-left:1.25em;max-width:34em}
 li{margin:0 0 8px}
-code{font-size:.92em;background:var(--bt-orange);padding:1px 5px;border-radius:3px}
+/* code 原本是橘底，在新的用色裡橘色是「在動的東西」，靜態的行內標記改用低透明度的紙色。 */
+code{font-size:.92em;background:rgba(16,42,134,.07);padding:2px 6px;border-radius:3px}
 strong{font-weight:700}
 
 /* 表格在手機上會爆版，所以包一層可橫向捲動的容器。
    不用「窄螢幕就改成堆疊」那種寫法：這幾張表是「這個東西 → 誰看得到」的對照，
    拆成上下兩行之後對照關係就讀不出來了。 */
-.tw{overflow-x:auto;margin:0 0 20px;-webkit-overflow-scrolling:touch}
-table{border-collapse:collapse;width:100%;min-width:19em;font-size:16px}
-th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--bt-orange);vertical-align:top}
-th{font-weight:700;white-space:nowrap}
+.tw{overflow-x:auto;margin:0 0 22px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:19em;font-size:15.5px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid rgba(16,42,134,.14);vertical-align:top}
+th{font-weight:600;white-space:nowrap;color:rgba(16,42,134,.82);
+  font-size:13px;letter-spacing:.04em;border-bottom-color:rgba(16,42,134,.28)}
 
-footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--bt-orange);font-size:15px}
+footer{margin-top:clamp(56px,9vh,100px);padding-top:22px;
+  border-top:1px solid rgba(16,42,134,.16);font-size:14.5px;color:rgba(16,42,134,.78)}
 footer a{color:var(--ink);font-weight:600}
 
 @media (max-width:420px){
   body{font-size:16px}
-  h1{font-size:29px}
-  h2{font-size:22px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -83,7 +111,7 @@ footer a{color:var(--ink);font-weight:600}
 <div class="wrap">
 
 <header>
-  <img src="../shared/logo.png" alt="Beyond Taiwan">
+  <a class="home" href="../" aria-label="回 Beyond Taiwan 首頁"><img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
   <h1>隱私政策<br>Privacy Policy</h1>
   <p class="meta">最後更新 / Last updated: 2026-09-01</p>
   <nav>
