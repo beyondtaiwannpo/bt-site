@@ -404,14 +404,21 @@ GSAP_ST="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyU
 sri_bad=""
 grep -qF "integrity=\"${GSAP_CORE}\"" index.html || sri_bad="${sri_bad} gsap.min.js"
 grep -qF "integrity=\"${GSAP_ST}\"" index.html   || sri_bad="${sri_bad} ScrollTrigger.min.js"
-n_cross=$(grep -c 'cdnjs.cloudflare.com' index.html)
+# 數的是**載入標籤本身**，不是 cdnjs 這個字出現幾次 ——
+# 2026-09-07 加了 preconnect 與 preload 之後，後者從 2 變成 4，守門誤判。
+n_tag=$(grep -c '^<script src="https://cdnjs.cloudflare.com' index.html)
 n_anon=$(grep -c 'crossorigin="anonymous"' index.html)
+# preload 要跟真正載入的版本一致，不然預載的是另一份、白下載一次
+n_pre=$(grep -c 'rel="preload" as="script"' index.html)
+pre_ok=$(grep -A1 'rel="preload" as="script"' index.html | grep -c 'gsap/3.12.5/gsap.min.js')
 if [ -n "$sri_bad" ]; then
   bad "cdnjs 的 script 少了正確的 integrity：${sri_bad}"
-elif [ "$n_cross" != "2" ] || [ "$n_anon" != "2" ]; then
-  bad "cdnjs 的 script 不是兩支、或少了 crossorigin=anonymous（cdnjs ${n_cross} 次、crossorigin ${n_anon} 次）"
+elif [ "$n_tag" != "2" ] || [ "$n_anon" -lt "2" ]; then
+  bad "cdnjs 的 script 不是兩支、或少了 crossorigin=anonymous（標籤 ${n_tag} 支、crossorigin ${n_anon} 次）"
+elif [ "$n_pre" != "1" ] || [ "$pre_ok" != "1" ]; then
+  bad "GSAP 的 preload 不見了、或指到的版本跟真正載入的那一支不一樣（預載白做一次）"
 else
-  ok "GSAP 兩支都有正確的 integrity 與 crossorigin"
+  ok "GSAP 兩支都有正確的 integrity 與 crossorigin，preload 版本也對得上"
 fi
 
 # 會動的東西只准出現在 motion() 裡面

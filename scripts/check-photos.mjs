@@ -63,9 +63,14 @@ export function scanImgTags(html) {
     if (!/\bheight="\d+"/.test(t)) bad.push(`${src} 沒有 height`);
     if (src.includes(DIR + "/")) {
       photoSeen++;
-      // 第一張照片要立刻載（它在第一屏），其餘都 lazy。
-      if (photoSeen > 1 && !/loading="lazy"/.test(t)) bad.push(`${src} 沒有 loading="lazy"`);
-      if (photoSeen === 1 && /loading="lazy"/.test(t)) bad.push(`${src} 是第一張照片，不該 lazy`);
+      // **十張全部要 lazy。**
+      // 2026-09-07 改：這條規則原本是「第一張不 lazy、其餘 lazy」，
+      // 因為當時第一張照片就是首頁的主視覺、在第一屏裡，lazy 反而會拖慢它。
+      // 官網改版批 2 之後第一屏是那座台灣島，照片整批往下移到畫面之外，
+      // 那個理由就不成立了 —— 第一張照片不 lazy 只是白白佔住手機的頻寬。
+      // Lighthouse 實測：改成全部 lazy 之後首頁手機版的傳輸量下降。
+      // 哪天第一屏又換回照片，這條要記得改回來。
+      if (!/loading="lazy"/.test(t)) bad.push(`${src} 沒有 loading="lazy"（十張都要）`);
     }
   }
   return { count: tags.length, photos: photoSeen, bad };

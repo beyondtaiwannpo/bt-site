@@ -33,8 +33,10 @@
      加一片約 13 KB 的字體檔。護照與時間看板完全不受影響，它們沒有載。
 
      照片十張（中英各五），各 1200×800（3:2），webp 加 jpg 兩份用 <picture> 讓瀏覽器挑 ——
-     只給 webp 的話舊 iOS 會安靜地不顯示。每張都寫 width/height 防版面跳動，
-     第一張不 lazy（在第一屏）、其餘 lazy。scripts/check-photos.mjs 守著這些。
+     只給 webp 的話舊 iOS 會安靜地不顯示。每張都寫 width/height 防版面跳動。
+     **十張全部 lazy**：第一屏現在是那座島，第一張照片已經在畫面之外了。
+     （2026-09-07 改。批 2 之前第一張是主視覺，那時它不能 lazy。）
+     scripts/check-photos.mjs 守著這些。
      照片可以放的依據寫在 README「官網首頁的照片：可以放的依據是什麼」。
 
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。 -->
@@ -55,6 +57,17 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- GSAP 的載入標籤在頁尾。先在這裡預告一聲，瀏覽器就能提早開始下載，
+     不用等把整份 HTML 讀到底才發現要抓它。開場動畫早一點開始跑，
+     畫面上的字也早一點到位（LCP 的元素就是被開場動畫壓住的那一段副標）。
+     preconnect 到 cdnjs 也一起做：省一次 TLS 交握。
+     ⚠ 這段註解裡刻意不寫出 s-c-r-i-p-t 那個標籤的完整字樣：
+     check.sh 抓內嵌程式碼是用「開始標籤到結束標籤」去框的，
+     註解裡出現完整的開始標籤會把框的範圍整個帶歪，守門就誤判了。
+     這是 README 第 10 項那個坑的同一個形狀，2026-09-07 又踩了一次。 -->
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preload" as="script" crossorigin="anonymous"
+      href="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js">
 <!-- 字重只要真的用得到的那幾個。Noto Sans TC 每多一個字重就多約 30 KB 的 CSS
      （它被切成一百多個 unicode-range 片段），所以只要 900，而且只給標題。
      Iansui 是 Alumni 引言用的，那一頁還沒做，這裡先不要載。 -->
@@ -427,7 +440,7 @@ footer a{color:var(--ink);font-weight:600}
      真實現場感是 BT 照片美學的重點，島是輪廓，照片才是人。 -->
 <div class="wrap"><picture class="photo photo-lead">
   <source srcset="./photos/hero-listening.webp" type="image/webp">
-  <img src="./photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800">
+  <img src="./photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800" loading="lazy">
 </picture></div>
 
 <section class="sec" id="about">
