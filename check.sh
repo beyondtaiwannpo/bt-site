@@ -102,23 +102,44 @@ else
   ok "§11-6 沒有 service_role"
 fi
 
-# §11-14 只有三色。抓所有 #hex，扣掉三個允許值。
+# §11-14 色碼白名單。抓所有 #hex，扣掉允許值。
+#
+# 2026-09-07（官網改版批 1）：允許值從三色變成 Brand Book 2026-27 的七色。
+# **這是換規則不是拆守門**：白名單還在，集合還是寫死的，多一色照樣紅。
+# 為什麼是七色見 docs/2026-09-07-官網視覺方向.md。
+# 「一份設計最多用 3 色」那條用量上限仍然成立，但那是設計紀律，
+# 機器量不出來（同一頁的兩個區塊各用三色都合法），所以不放進這裡假裝守得住。
+#
 # ESTAMP-PALETTE 區塊是這條規則**唯一**的例外（使用者 2026-08-26）——
 # 排除它再掃，不是把十個季節色加進允許值。加進允許值等於讓那十色在任何地方
-# 都合法，那就是使用者明確拒絕的「放寬」。$FILES 現在是
-# "passport/index.html src passport/activities.json"：passport/index.html 要先剝掉色盤區塊，
-# 其餘檔案（src、passport/activities.json）不受影響、照舊整份掃。
+# 都合法，那就是使用者明確拒絕的「放寬」。passport/index.html 要先剝掉色盤區塊，
+# 其餘檔案不受影響、照舊整份掃。
+BRAND_HEX="#EDE5D8 #FFE8C5 #FFC46C #C6C6C6 #102A86 #6BC6BB #FFF789"
+hexfilter=$(printf '%s\n' $BRAND_HEX | tr 'a-f' 'A-F' | sed 's/^/^/;s/$/$/' | paste -sd'|' -)
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
 strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html privacy reset shared passport/src passport/activities.json 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
-        | grep -v '^#FFC46C$' | grep -v '^#EDE5D8$' | grep -v '^#102A86$')
+        | grep -vE "$hexfilter")
 if [ -n "$stray" ]; then
-  bad "§11-14 出現不允許的色碼："
+  bad "§11-14 出現不允許的色碼（白名單是 Brand Book 七色）："
   printf '%s\n' "$stray"
 else
-  ok "§11-14 只有三個色碼（ESTAMP-PALETTE 區塊是唯一例外，另外守在下面）"
+  ok "§11-14 只有 Brand Book 七色（ESTAMP-PALETTE 區塊是唯一例外，另外守在下面）"
+fi
+
+# 反向：白名單那七色**每一色都必須真的定義在 shared/brand.css 裡**。
+# 沒有這一條的話，把某一色從 brand.css 刪掉、頁面改寫死另一個值，
+# 上面那條照樣全綠（它只管「有沒有出現不該出現的」，不管「該有的還在不在」）。
+missinghex=""
+for c in $BRAND_HEX; do
+  grep -qiF "$c" shared/brand.css || missinghex="$missinghex $c"
+done
+if [ -n "$missinghex" ]; then
+  bad "shared/brand.css 裡找不到這幾個品牌色：$missinghex"
+else
+  ok "Brand Book 七色都定義在 shared/brand.css"
 fi
 
 # .estamp 的季節色盤是三色規則的**唯一例外**（使用者 2026-08-26）。
@@ -162,18 +183,26 @@ for c in $ESTAMP_PALETTE; do
 done
 [ "$outsidebad" = "0" ] && ok "季節色沒有出現在色盤區塊之外"
 
-# §11-14 rgba 只允許三種底色
+# §11-14 rgba 的底色只允許品牌七色加白
+#
+# 「深淺一律調透明度，不加新顏色」是 Brand Book 原文，所以 rgba 一定要有，
+# 但底色必須是那七色之一 —— 不然 rgba() 就變成偷渡新顏色的後門。
+# 白色留著：它不是第八色，是「把紙色再提亮一點」用的（卡片底、毛玻璃）。
+# 2026-09-07 從三個底色擴到八個，理由與上面的 hex 白名單同一條。
 strayrgba=$(grep -rhIo 'rgba([0-9 ]*,[0-9 ]*,[0-9 ]*,[^)]*)' $FILES 2>/dev/null \
         | sed 's/ //g' | sort -u \
-        | grep -v '^rgba(16,42,134,' | grep -v '^rgba(255,196,108,' | grep -v '^rgba(255,255,255,')
+        | grep -v '^rgba(237,229,216,' | grep -v '^rgba(255,232,197,' \
+        | grep -v '^rgba(255,196,108,' | grep -v '^rgba(198,198,198,' \
+        | grep -v '^rgba(16,42,134,'   | grep -v '^rgba(107,198,187,' \
+        | grep -v '^rgba(255,247,137,' | grep -v '^rgba(255,255,255,')
 if [ -n "$strayrgba" ]; then
-  bad "§11-14 出現不允許的 rgba："
+  bad "§11-14 出現不允許的 rgba 底色（只准品牌七色加白）："
   printf '%s\n' "$strayrgba"
 else
-  ok "§11-14 rgba 只用允許的三個底色"
+  ok "§11-14 rgba 只用品牌七色加白當底色"
 fi
 
-# §11-14 不允許 rgb()/hsl()（三色只能用 hex 或上面那三種 rgba 底色定義；
+# §11-14 不允許 rgb()/hsl()（顏色只能用 hex 或上面那八種 rgba 底色定義；
 # rgb( 這個 pattern 天生不會誤吃 rgba( ——"rgb" 後面緊接的是 "a" 不是 "("，
 # 所以不用另外排除）。
 strayfunc=$(grep -rhIoE 'rgb\([^)]*\)|hsl\([^)]*\)' $FILES 2>/dev/null | sort -u)
@@ -184,17 +213,98 @@ else
   ok "§11-14 沒有 rgb()/hsl()"
 fi
 
-# §11-15 不載入中文網頁字體
+# §11-15 字體（2026-09-07 重寫）
+#
+# 舊規則是「一畫面最多 2 種字體」加「不載入中文網頁字體」，實作上只有一條
+# grep 在看 Google Fonts 的請求裡有沒有 Noto / CJK。Paul 2026-09-07 放開這兩條，
+# 改成 Brand Book 五種裡的四種，見 docs/2026-09-07-官網視覺方向.md。
+#
+# **重寫不是刪掉，而且守得比舊版嚴。** 舊版有兩個看不到的地方：
+#   1. 它只看「跟 Google 要了什麼」，看不到「有人在 CSS 裡寫死一個系統字體」。
+#   2. 它把「不載中文字體」當成全站一律禁止，於是放開之後就無處可守。
+# 新版分成四層，各守一件事，缺一層就有一種壞法沒有人看著。
+#
+# 特別留意第三層那條「中文字體只給對外頁」：舊規則真正的理由是
+# 「中文字體檔案很大、海外幹部的網路不一定好」，那個理由沒有隨著放開而消失。
+# 護照與時間看板是幹部每天在用的頁面，它們照舊不載中文字體。
+# 之後做出 alumni/ 要記得把它加進 FONT_CJK_PAGES，不然那一頁的 Iansui 會被擋下來。
+
+# 白名單寫死在這裡，不用萬用字元 —— 多要一種字體就要改這幾行，那是刻意的摩擦，
+# 跟 ESTAMP_PALETTE 同一個做法。
+FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
+FONT_CJK="Noto+Sans+TC Iansui"
+FONT_CJK_PAGES="index.html"
+# brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
+FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
+FONT_TOKENS="--display --body --han --hand"
+
+# 第一層：不准自行載入字體檔。走 Google Fonts，不把 woff2 放進 repo。
+# （這一條要改的話是另一個決定：字體自架就能加 SRI，但 repo 會多好幾 MB，
+#   而且要自己切 subset。2026-09-07 Paul 選了維持現況。）
 if grep -rIq '@font-face' $FILES 2>/dev/null; then
-  bad "§11-15 出現 @font-face，不得自行載入字體"
+  bad "§11-15 出現 @font-face，不得自行載入字體檔"
 else
   ok "§11-15 沒有 @font-face"
 fi
-fontreq=$(grep -rhIo 'fonts.googleapis.com/css2?[^"]*' $FILES 2>/dev/null)
-if printf '%s' "$fontreq" | grep -qi 'Noto\|Source+Han\|CJK\|TC\b'; then
-  bad "§11-15 Google Fonts 請求含中文字體：$fontreq"
+
+# 第二層：Google Fonts 只准要白名單那四種。
+# 第三層：其中兩種是中文字體，只准對外頁去載。
+fontbad=""
+for f in $(grep -rlI 'fonts.googleapis.com/css2' $FILES 2>/dev/null); do
+  for fam in $(grep -ohI 'family=[^&"]*' "${f}" | sed 's/^family=//;s/:.*//' | sort -u); do
+    case " $FONT_ALLOWED " in
+      *" ${fam} "*) ;;
+      *) fontbad="${fontbad} ${f} 要了不在白名單的 ${fam}" ;;
+    esac
+    case " $FONT_CJK " in
+      *" ${fam} "*)
+        case " $FONT_CJK_PAGES " in
+          *" ${f} "*) ;;
+          *) fontbad="${fontbad} ${f} 不是對外頁卻載了中文字體 ${fam}" ;;
+        esac ;;
+    esac
+  done
+done
+if [ -n "$fontbad" ]; then
+  bad "§11-15 字體請求有問題：${fontbad}"
 else
-  ok "§11-15 字體請求只有 Barlow Condensed 與 Inter"
+  ok "§11-15 Google Fonts 只要白名單四種，中文字體只有對外頁載"
+fi
+
+# 第四層：除了 shared/brand.css，任何地方的 font-family 只准寫 var(--...)。
+# 這一層是舊版完全沒有的。它同時做掉兩件事：
+#   「最多幾種字體」變成「只有一個地方能決定用哪幾種」——比數數字可靠，
+#   而且下一個人想換字體時，找得到唯一該改的檔案。
+famraw=$(grep -rhIoE 'font-family:[^;}]*' index.html privacy reset app availability passport/index.html passport/src 2>/dev/null | sort -u)
+famhard=$(printf '%s\n' "$famraw" | grep -v '^$' | grep -vE '^font-family:var\(--(display|body|han|hand)\)$')
+if [ -n "$famhard" ]; then
+  bad "§11-15 有地方寫死了字體家族（只准 var(--display|--body|--han|--hand)）："
+  printf '%s\n' "$famhard"
+else
+  ok "§11-15 字體家族只從 shared/brand.css 來，別處都是 var()"
+fi
+
+# 第五層（反向）：brand.css 裡的四個 token 要在，而且它列出來的家族名
+# 必須**剛好等於**白名單。少一個代表 token 被刪了、頁面會靜靜地掉回系統字體；
+# 多一個代表有人繞過上面那層，直接在共用檔裡偷加了第五種字體。
+# 只看那四行宣告本身，不去剝註解。
+# （第一版是先剝掉 /* */ 再掃，結果 sed 的範圍刪除把單行註解的結尾配到了
+#   下一行註解，一路吃掉中間的 token —— 守門自己壞掉。錨定到 `^\s*--名稱:`
+#   既簡單又不會被註解餵飽，符合本檔檔頭那段「必須存在型要錨定完整形式」。）
+brandcss=$(grep -hE '^[[:space:]]*--(display|body|han|hand):' shared/brand.css)
+tokmiss=""
+for t in $FONT_TOKENS; do
+  printf '%s\n' "$brandcss" | grep -q -- "${t}:" || tokmiss="${tokmiss} ${t}"
+done
+famhave=$(printf '%s\n' "$brandcss" | grep -o '"[^"]*"' | tr -d '"' | sort -u)
+famwant=$(printf '%s' "$FONT_IN_BRAND" | tr '|' '\n' | sort -u)
+if [ -n "$tokmiss" ]; then
+  bad "§11-15 shared/brand.css 少了字體 token：${tokmiss}"
+elif [ "$famhave" != "$famwant" ]; then
+  bad "§11-15 shared/brand.css 的字體家族跟 check.sh 寫死的清單對不上："
+  printf '%s\n' "$famhave" | tr '\n' ' '; printf '\n'
+else
+  ok "§11-15 brand.css 的四個字體 token 都在，家族名剛好等於清單"
 fi
 
 # §10-1 分類代碼。排除 SVG 濾鏡的 xChannelSelector="R" / yChannelSelector="G"

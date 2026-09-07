@@ -7,16 +7,32 @@
 
 <!-- 這一頁是對外的門面，不是登入頁（規格 §2-1）。
      不認識 BT 的人、從搜尋或 IG 連過來的人，看到的是這一頁。
-     **它不碰 auth**：不載入 supabase、不判斷登入狀態、沒有任何 JavaScript。
+     **它不碰 auth**：不載入 supabase、不判斷登入狀態。
      右上角那顆按鈕只是一個連結。
 
      ── 2026-09-02：階段 7 的定稿版本 ──
-     文案是使用者的定稿（BT-官網文案-定稿.md，同資料夾），中文全文在上、
-     英文全文在下，各自能單獨讀完，不做語言切換 —— 跟 privacy/ 同一個做法。
-     寫完之後用程式對過：定稿檔裡每一段正文都一字不差地出現在這一頁。
+     文案是使用者的定稿（BT-官網文案-定稿.md，同資料夾），中文全文與英文全文
+     各自能單獨讀完。寫完之後用程式對過：定稿檔裡每一段正文都一字不差地出現在這一頁。
      之後要改文案**直接改這個檔案**，那份 .md 是紀錄不是來源（跟隱私政策同一個決定）。
 
-     照片五張，各 1200×800（3:2），webp 加 jpg 兩份用 <picture> 讓瀏覽器挑 ——
+     ── 2026-09-07：官網改版批 1（設計系統落地）──
+     Paul 2026-09-07 決定官網要「好看、動態、震撼」，並放開四條舊守門。
+     新的設計系統在 docs/2026-09-07-官網視覺方向.md，執行規格在 .claude/commands/bt-goal.md。
+     這一批只做三件事：頂欄、七色四字體、版面與字級。**六段文案一個字都沒動**，
+     用 git diff 對過。首頁那座一整屏的台灣是下一批，島的座標已經算好躺在
+     scripts/taiwan/coastline.txt。
+
+     這一批新增了 JavaScript（先前這一頁完全沒有）。它只做兩件事：
+     中英切換與手機選單。**沒有 JavaScript 的時候中英兩版都會顯示**，
+     跟改版前完全一樣 —— 切換是靠 JS 加上去的一個屬性，不是靠 JS 生出內容。
+
+     ── 中文字體只在這一頁載 ──
+     舊規則是「不載入中文網頁字體」，理由是檔案大、海外幹部的網路不一定好。
+     放開之後那個理由沒有消失，所以只載 Noto Sans TC 的 900 一個字重、只給標題用；
+     中文內文照舊走系統字體，跟改版前一模一樣。實測：多出來的是 33 KB 的 CSS
+     加一片約 13 KB 的字體檔。護照與時間看板完全不受影響，它們沒有載。
+
+     照片十張（中英各五），各 1200×800（3:2），webp 加 jpg 兩份用 <picture> 讓瀏覽器挑 ——
      只給 webp 的話舊 iOS 會安靜地不顯示。每張都寫 width/height 防版面跳動，
      第一張不 lazy（在第一屏）、其餘 lazy。scripts/check-photos.mjs 守著這些。
      照片可以放的依據寫在 README「官網首頁的照片：可以放的依據是什麼」。
@@ -29,7 +45,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/">
 <meta property="og:image" content="https://beyondtaiwannpo.com/photos/hero-listening.jpg">
-<meta name="theme-color" content="#102A86">
+<meta name="theme-color" content="#EDE5D8">
 
 <link rel="icon" type="image/png" sizes="32x32" href="./shared/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="./shared/favicon-48.png">
@@ -39,144 +55,327 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- 字重只要真的用得到的那幾個。Noto Sans TC 每多一個字重就多約 30 KB 的 CSS
+     （它被切成一百多個 unicode-range 片段），所以只要 900，而且只給標題。
+     Iansui 是 Alumni 引言用的，那一頁還沒做，這裡先不要載。 -->
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./shared/brand.css">
 
 <style>
 /* 色票與字體家族全部來自 ./shared/brand.css，這裡沒有任何寫死的色碼
    （唯一的例外是 <head> 的 theme-color，那是 meta 屬性，吃不了 var()）。
-   硬規則：一個畫面最多 3 種顏色、最多 2 種字體，check.sh 會擋。 */
+   深淺一律用 rgba 調透明度，不加新顏色 —— 那是 Brand Book 原文。 */
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);
-  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased}
+:root{
+  /* 版面的左右留白。放在這裡不放 brand.css，是因為那個檔案只放 token 不放版面。 */
+  --gut:clamp(20px,5vw,88px);
+}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+/* 右上角的一道暖光。這是淺橘唯一的用法：打在紙上的日照，不是漸層裝飾。 */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%);
+}
+main,footer,.topbar{position:relative;z-index:1}
 
-header{display:flex;align-items:center;justify-content:space-between;gap:16px;
-  padding:18px clamp(20px,5vw,64px)}
-header img{height:34px;width:auto;display:block}
-/* logo 不可改色、拉伸、旋轉、調透明度（硬規則） */
+/* 鍵盤使用者第一個 Tab 停的地方。滑鼠看不到它，聚焦時才出現。 */
+.skip{position:absolute;left:-9999px;top:0;z-index:80;
+  background:var(--bt-navy);color:var(--bt-cream);padding:12px 18px;text-decoration:none}
+.skip:focus{left:0}
+:focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
 
-.login{display:inline-block;background:var(--bt-orange);color:var(--bt-navy);text-decoration:none;
-  font-weight:600;font-size:15px;padding:9px 20px;border-radius:999px;white-space:nowrap}
-.login:hover{filter:brightness(.96)}
-.login:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+/* ═════════ 頂欄 ═════════ */
+/* 這條頂欄跟 shared/nav.js 是兩回事，不要混。
+   nav.js 是**登入後**的功能清單（護照、時間看板），只有幹部看得到；
+   這一條是給還沒登入、甚至還不認識 BT 的人看的。兩者混在一起的後果是
+   路人會看到他點不進去的功能。 */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:clamp(12px,2.2vw,32px);
+  padding:12px var(--gut);
+  background:rgba(237,229,216,.82);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(16,42,134,.12);
+}
+.topbar .home{display:flex;align-items:center;margin-right:auto;flex:0 0 auto}
+.topbar .home img{height:30px;width:auto;display:block}
+/* logo 不可改色、拉伸、旋轉、調透明度（Brand Book 硬規則） */
 
-main{max-width:40em;margin:0 auto;padding:clamp(16px,4vw,40px) clamp(20px,5vw,64px) 72px}
-h1{font-family:var(--display);font-size:clamp(36px,8.5vw,60px);line-height:1.08;margin:0 0 14px;
-  letter-spacing:.005em}
-.lead{font-size:19px;margin:0 0 28px}
-h2{font-family:var(--display);font-size:clamp(24px,5vw,30px);line-height:1.2;margin:0 0 14px;
-  letter-spacing:.01em}
-h3{font-size:17px;font-weight:600;margin:22px 0 6px}
-p{margin:0 0 16px}
-section{margin-top:52px}
-a{color:var(--ink);font-weight:600}
+.navlinks{display:flex;align-items:center;gap:clamp(12px,1.8vw,28px)}
+.navlinks a,.navlinks span.soon{
+  font-size:14.5px;font-weight:500;line-height:1;
+  color:var(--ink);text-decoration:none;
+  padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;
+}
+.navlinks a{opacity:.74}
+.navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+/* Alumni 那一頁還沒做（改版批 3）。先放著、但不做成連結 ——
+   點得下去卻沒有東西，比先不給點更糟。 */
+.navlinks span.soon{opacity:.4;cursor:default}
 
-/* ---------- 照片 ---------- */
+.lang{
+  min-width:44px;   /* 可點區域的寬度也要有 44，墊片只撐得了高度 */
+  font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.12em;
+  border:1px solid rgba(16,42,134,.32);border-radius:999px;
+  padding:6px 13px;background:none;color:var(--ink);cursor:pointer;line-height:1;
+}
+.lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.login{
+  display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+  font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px;white-space:nowrap;line-height:1;
+}
+.login:hover{background:var(--bt-orange);color:var(--bt-navy)}
+.burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;
+  padding:6px 8px;font-family:var(--display);font-size:14px;font-weight:700;letter-spacing:.1em}
+
+/* 手指的可點範圍至少 44x44，但視覺上維持原本的大小。
+   直接把按鈕撐到 44px 高的話頂欄會變得很笨重，所以改用一層看不見的墊片：
+   它只擴大可以點到的區域，畫面上什麼都沒變。
+   （段落裡的文字連結不在這一條的範圍內 —— 它們在句子中間，
+     撐大反而會蓋到旁邊的字。無障礙規範對句中連結本來就有豁免。） */
+.topbar .home,.lang,.login,.burger{position:relative}
+.topbar .home::after,.lang::after,.login::after,.burger::after{
+  content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px;
+}
+
+/* ═════════ 版面 ═════════ */
+/* 靠左、不對稱、大留白。置中是預設值，預設值就是沒有決定。 */
+/* main 不給下 padding：footer 自己有 margin-top，兩個疊起來
+   最後一張照片跟頁尾之間會空掉快兩百 px。 */
+main{padding:0}
+.wrap{padding:0 var(--gut)}
+
+.hero{padding:clamp(34px,7vh,96px) var(--gut) clamp(30px,6vh,70px)}
+h1{
+  font-family:var(--han);font-weight:900;
+  font-size:clamp(38px,7.4vw,116px);line-height:.98;letter-spacing:-.02em;
+  margin:0;max-width:13ch;text-wrap:balance;
+}
+/* 英文標題長很多，同樣的字級會擠成一團，所以放寬行長並收一點字級。 */
+.en h1{font-family:var(--display);font-size:clamp(40px,7.8vw,120px);line-height:.94;
+  letter-spacing:-.01em;max-width:15ch}
+.lead{
+  font-size:clamp(16px,1.35vw,20px);line-height:1.62;
+  max-width:34ch;margin:clamp(20px,3.2vh,34px) 0 0;
+  color:rgba(16,42,134,.82);
+}
+
+/* 每一段：標題在左窄欄，內文在右寬欄。窄螢幕收成一欄。 */
+.sec{padding:clamp(52px,8.5vh,124px) var(--gut) 0}
+.sec-in{
+  display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);
+  gap:clamp(18px,4.5vw,74px);align-items:start;
+  border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(20px,3.4vh,40px);
+}
+h2{
+  font-family:var(--han);font-weight:900;
+  font-size:clamp(25px,3.6vw,54px);line-height:1.05;letter-spacing:-.015em;
+  margin:0;text-wrap:balance;
+}
+.en h2{font-family:var(--display);font-size:clamp(27px,4vw,58px);line-height:1;letter-spacing:0}
+h3{
+  font-family:var(--display);font-weight:700;font-size:clamp(19px,1.7vw,25px);
+  letter-spacing:.005em;line-height:1.2;margin:38px 0 10px;
+}
+h3:first-child{margin-top:0}
+/* 行長：中文一個字約等於 1em，所以 34em 就是設計方向寫的「中文約 34 字」，
+   英文則約 68 個字元。行太長讀者換行時會找不到下一行的開頭。 */
+p{margin:0 0 17px;max-width:34em}
+.body a{color:var(--ink);font-weight:600;text-decoration-thickness:1px;text-underline-offset:3px}
+.body a:hover{color:var(--bt-navy);text-decoration-color:var(--bt-orange)}
+
+/* ── 照片 ── */
 /* width/height 由 HTML 屬性給（1200×800），這裡只讓它縮到容器寬；
-   aspect-ratio 讓瀏覽器在圖還沒載入時就先留好高度 —— 這就是不跳版的來源。 */
-.photo{display:block;margin:0 0 22px}
-.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;border-radius:var(--r);
+   aspect-ratio 讓瀏覽器在圖還沒載入時就先留好高度 —— 這就是不跳版的來源。
+   刻意不給圓角也不給陰影：全站每一塊都一樣的圓角加一樣的陰影，
+   是 AI 生成頁面最明顯的特徵之一。 */
+.photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
+.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;
   background:rgba(16,42,134,.06)}
+/* 第一屏那張往右溢出一點，讓第一眼就不是一個置中的方框。 */
+.hero .photo{margin-top:clamp(30px,5.5vh,64px);margin-right:calc(var(--gut) * -1)}
+@media (max-width:700px){.hero .photo{margin-right:0}}
 
-/* ---------- 數字 ---------- */
-.nums{display:grid;grid-template-columns:repeat(2,1fr);gap:18px 22px;margin:8px 0 0}
-.nums div{border-top:2px solid var(--bt-orange);padding-top:10px}
-.nums b{display:block;font-family:var(--display);font-size:clamp(26px,5.5vw,34px);
-  font-weight:700;line-height:1.1;margin-bottom:4px}
-.nums p{font-size:15px;line-height:1.55;margin:0;opacity:.85}
-@media (min-width:640px){.nums{grid-template-columns:repeat(3,1fr)}}
+/* ── 數字 ── */
+/* 數字本身用 Barlow Condensed 拉大，後面的中文說明維持內文字體。
+   包一層 span 只是為了讓兩者用不同的字體與字級，文字內容一個字都沒改。 */
+.nums{display:grid;grid-template-columns:1fr;gap:clamp(20px,3vw,34px);margin:0}
+@media (min-width:560px){.nums{grid-template-columns:repeat(2,1fr)}}
+@media (min-width:900px){.nums{grid-template-columns:repeat(3,1fr)}}
+.nums div{border-top:2px solid var(--bt-orange);padding-top:12px}
+.nums b{display:block;font-weight:500;font-size:15.5px;line-height:1.35;margin-bottom:7px}
+/* .fig 是行內的，不是自己一行。
+   理由是文案不可改而「每年 50 對配對」的數字在句子中間 ——
+   自己一行的話那一格會變成「每年 / 50 / 對配對」三段。
+   行內還有一個好處：下一個人改了文案、數字換了位置，版面也不會壞。 */
+.nums .fig{
+  font-family:var(--display);font-weight:700;
+  font-size:clamp(34px,4.4vw,62px);line-height:1;letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums;
+  display:inline-block;vertical-align:-.06em;margin-right:.12em;
+}
+.nums p{font-size:14.5px;line-height:1.55;margin:0;color:rgba(16,42,134,.72)}
 
-/* ---------- 英文區塊 ---------- */
-.en{margin-top:64px;padding-top:36px;border-top:1px solid var(--bt-orange)}
-.en section:first-of-type{margin-top:0}
+/* ── 語言 ── */
+/* 沒有 JavaScript 的時候，這裡什麼都不做，中英兩版都在頁面上（跟改版前一樣）。
+   JS 跑起來才會在 <html> 掛上 data-lang，然後這兩條規則開始生效。 */
+.en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);padding-top:clamp(16px,3vh,36px)}
+html[data-lang] .en{border-top:0;margin-top:0;padding-top:0}
+html[data-lang="zh"] .en,
+html[data-lang="en"] .zh{display:none}
 
-footer{max-width:40em;margin:0 auto;padding:24px clamp(20px,5vw,64px) 56px;
-  border-top:1px solid var(--bt-orange);font-size:15px}
-footer p{margin:0 0 8px}
+footer{
+  margin-top:clamp(56px,9vh,120px);padding:clamp(28px,4vh,44px) var(--gut) clamp(44px,7vh,84px);
+  border-top:1px solid rgba(16,42,134,.15);font-size:14.5px;color:rgba(16,42,134,.78);
+}
+footer p{margin:0 0 8px;max-width:none}
+footer a{color:var(--ink);font-weight:600}
 
-@media (max-width:420px){ body{font-size:16px} .lead{font-size:17px} }
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:820px){
+  .sec-in{grid-template-columns:1fr;gap:14px}
+  h2{margin-bottom:2px}
+}
+@media (max-width:700px){
+  /* 手機：導覽收進漢堡選單。展開時是一疊直的連結，不是抽屜。 */
+  .navlinks{
+    display:none;position:absolute;left:0;right:0;top:100%;
+    flex-direction:column;align-items:flex-start;gap:0;
+    padding:6px var(--gut) 16px;
+    background:var(--bt-cream);border-bottom:1px solid rgba(16,42,134,.12);
+  }
+  .navlinks.open{display:flex}
+  .navlinks a,.navlinks span.soon{padding:15px 1px;font-size:16px;border-bottom:0}
+  .burger{display:block}
+}
+@media (max-width:420px){
+  body{font-size:16px}
+  .login{padding:9px 14px;font-size:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
 </style>
 </head>
 <body>
 
-<header>
-  <img src="./shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
-  <a class="login" href="./app/">登入 / Sign in</a>
-</header>
+<a class="skip" href="#main">跳到主要內容 / Skip to content</a>
 
-<main>
+<nav class="topbar" aria-label="網站導覽">
+  <a class="home" href="#top" aria-label="Beyond Taiwan 首頁">
+    <img src="./shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <!-- data-sec 是給下面那段 JS 用的：切成英文時，錨點要指到英文那一份的
+       同一段（#about 變成 #about-en）。href 先寫中文那一份，
+       這樣沒有 JavaScript 的時候點下去照樣會捲到對的地方。 -->
+  <div class="navlinks" id="navlinks">
+    <a href="#about" data-sec="about">關於我們</a>
+    <a href="#what" data-sec="what">我們做什麼</a>
+    <span class="soon">Alumni</span>
+    <a href="#join" data-sec="join">加入我們</a>
+  </div>
+  <button class="lang" id="lang" type="button">EN</button>
+  <a class="login" href="./app/">登入 / Sign in</a>
+  <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
+</nav>
+
+<main id="main">
 
 <!-- ═══════════ 中文 ═══════════ -->
-<div lang="zh-Hant">
+<div class="zh" id="top" lang="zh-Hant">
 
-<section style="margin-top:0">
+<header class="hero">
   <h1>還有別條路，只是沒有人跟你說過。</h1>
   <p class="lead">Beyond Taiwan 是一群從台灣公立高中走出去的大學生。我們回來，把自己走過的路講給你聽。</p>
   <picture class="photo">
     <source srcset="./photos/hero-listening.webp" type="image/webp">
     <img src="./photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800">
   </picture>
-</section>
+</header>
 
-<section>
-  <h2>我們為什麼在</h2>
-  <picture class="photo">
-    <source srcset="./photos/talking-laptop.webp" type="image/webp">
-    <img src="./photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy">
-  </picture>
-  <p>在台灣，「出國念書」常被當成一件家裡有錢才能想的事。</p>
-  <p>這不完全是錯覺。留學代辦的費用不低，公立學校能給的海外升學資源，通常也比不上私立或國際學校。真正的問題不是錢而已，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
-  <p>於是很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
-  <p>Beyond Taiwan 處理的就是這一段落差。我們幾乎所有活動都免費，導生配對計畫、探索營、講座，都不收費。我們沒辦法幫你做決定，但可以讓你在做決定之前，先知道自己有哪些選擇。</p>
-</section>
-
-<section>
-  <h2>我們做什麼</h2>
-  <picture class="photo">
-    <source srcset="./photos/three-at-laptop.webp" type="image/webp">
-    <img src="./photos/three-at-laptop.jpg" alt="三個人擠在一台筆電前，中間那位笑著" width="1200" height="800" loading="lazy">
-  </picture>
-  <h3>探索營 College Bootcamp</h3>
-  <p>每年寒暑假各一場，免費。兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。我們會事先問你想讀什麼，再去找對應背景的人回來。</p>
-  <h3>導生配對計畫 Mentorship Program</h3>
-  <p>一學期配對一次。你會有一位走過同一條路的學長姐，他不會幫你寫 essay，但會陪你把卡住的地方講清楚。有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
-</section>
-
-<section>
-  <h2>誰在做這件事</h2>
-  <picture class="photo">
-    <source srcset="./photos/sharing-mic.webp" type="image/webp">
-    <img src="./photos/sharing-mic.jpg" alt="一位拿麥克風的講者站著分享，坐在地上的聽眾在笑" width="1200" height="800" loading="lazy">
-  </picture>
-  <p>Beyond Taiwan 現在有接近三十個人，全部是學生，分散在台灣、美國、加拿大、歐洲、澳洲、日本、韓國。</p>
-  <p>我們不是老師，也不是顧問。多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。</p>
-  <p>從 2020 年五月開始，七個人，到現在五年。</p>
-</section>
-
-<section>
-  <h2>數字</h2>
-  <div class="nums">
-    <div><b>250+ 位學員</b><p>從 2020 年到現在，超過 250 位高中生在申請路上有人可以問。</p></div>
-    <div><b>每年 50 對配對</b><p>一學期一次，配到就是一整個申請季有人陪。</p></div>
-    <div><b>100+ 位高中生</b><p>探索營舉辦兩年，收到超過 150 份申請，協助超過 100 位國內高中生。</p></div>
-    <div><b>20+ 位學長姐回來</b><p>超過 20 位 BT 校友回來當講者。他們當年也是被這樣帶過來的。</p></div>
-    <div><b>5 年，近 30 人</b><p>成立五年，幹部全部是學生，分布七個國家。</p></div>
-    <div><b>0 元</b><p>幾乎所有活動都免費。</p></div>
+<section class="sec" id="about">
+  <div class="sec-in">
+    <h2>我們為什麼在</h2>
+    <div class="body">
+      <p>在台灣，「出國念書」常被當成一件家裡有錢才能想的事。</p>
+      <p>這不完全是錯覺。留學代辦的費用不低，公立學校能給的海外升學資源，通常也比不上私立或國際學校。真正的問題不是錢而已，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
+      <p>於是很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
+      <p>Beyond Taiwan 處理的就是這一段落差。我們幾乎所有活動都免費，導生配對計畫、探索營、講座，都不收費。我們沒辦法幫你做決定，但可以讓你在做決定之前，先知道自己有哪些選擇。</p>
+      <picture class="photo">
+        <source srcset="./photos/talking-laptop.webp" type="image/webp">
+        <img src="./photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
   </div>
 </section>
 
-<section>
-  <h2>加入我們 / 聯絡</h2>
-  <picture class="photo">
-    <source srcset="./photos/group-photo.webp" type="image/webp">
-    <img src="./photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" loading="lazy">
-  </picture>
-  <h3>如果你是高中生</h3>
-  <p>下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</p>
-  <h3>如果你想贊助或合作</h3>
-  <p>我們持續在找願意一起做這件事的個人、企業與學校。過去合作過的單位包括美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
-  <p>來信：<a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
+<section class="sec" id="what">
+  <div class="sec-in">
+    <h2>我們做什麼</h2>
+    <div class="body">
+      <h3>探索營 College Bootcamp</h3>
+      <p>每年寒暑假各一場，免費。兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。我們會事先問你想讀什麼，再去找對應背景的人回來。</p>
+      <h3>導生配對計畫 Mentorship Program</h3>
+      <p>一學期配對一次。你會有一位走過同一條路的學長姐，他不會幫你寫 essay，但會陪你把卡住的地方講清楚。有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
+      <picture class="photo">
+        <source srcset="./photos/three-at-laptop.webp" type="image/webp">
+        <img src="./photos/three-at-laptop.jpg" alt="三個人擠在一台筆電前，中間那位笑著" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-in">
+    <h2>誰在做這件事</h2>
+    <div class="body">
+      <p>Beyond Taiwan 現在有接近三十個人，全部是學生，分散在台灣、美國、加拿大、歐洲、澳洲、日本、韓國。</p>
+      <p>我們不是老師，也不是顧問。多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。</p>
+      <p>從 2020 年五月開始，七個人，到現在五年。</p>
+      <picture class="photo">
+        <source srcset="./photos/sharing-mic.webp" type="image/webp">
+        <img src="./photos/sharing-mic.jpg" alt="一位拿麥克風的講者站著分享，坐在地上的聽眾在笑" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-in">
+    <h2>數字</h2>
+    <div class="body">
+      <div class="nums">
+        <div><b><span class="fig">250+</span> 位學員</b><p>從 2020 年到現在，超過 250 位高中生在申請路上有人可以問。</p></div>
+        <div><b>每年 <span class="fig">50</span> 對配對</b><p>一學期一次，配到就是一整個申請季有人陪。</p></div>
+        <div><b><span class="fig">100+</span> 位高中生</b><p>探索營舉辦兩年，收到超過 150 份申請，協助超過 100 位國內高中生。</p></div>
+        <div><b><span class="fig">20+</span> 位學長姐回來</b><p>超過 20 位 BT 校友回來當講者。他們當年也是被這樣帶過來的。</p></div>
+        <div><b><span class="fig">5</span> 年，近 30 人</b><p>成立五年，幹部全部是學生，分布七個國家。</p></div>
+        <div><b><span class="fig">0</span> 元</b><p>幾乎所有活動都免費。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="join">
+  <div class="sec-in">
+    <h2>加入我們 / 聯絡</h2>
+    <div class="body">
+      <h3>如果你是高中生</h3>
+      <p>下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</p>
+      <h3>如果你想贊助或合作</h3>
+      <p>我們持續在找願意一起做這件事的個人、企業與學校。過去合作過的單位包括美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
+      <p>來信：<a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
+      <picture class="photo">
+        <source srcset="./photos/group-photo.webp" type="image/webp">
+        <img src="./photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
+  </div>
 </section>
 
 </div>
@@ -184,73 +383,93 @@ footer p{margin:0 0 8px}
 <!-- ═══════════ English ═══════════ -->
 <div class="en" lang="en">
 
-<section>
+<header class="hero">
   <h1>There are other paths. No one told you about them.</h1>
   <p class="lead">Beyond Taiwan is a group of students who came out of Taiwan's public high schools. We went looking, and we came back to tell you what we found.</p>
   <picture class="photo">
     <source srcset="./photos/hero-listening.webp" type="image/webp">
     <img src="./photos/hero-listening.jpg" alt="A row of high-school students listening to a speaker; two blurred heads in the foreground" width="1200" height="800" loading="lazy">
   </picture>
-</section>
+</header>
 
-<section>
-  <h2>Why we exist</h2>
-  <picture class="photo">
-    <source srcset="./photos/talking-laptop.webp" type="image/webp">
-    <img src="./photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy">
-  </picture>
-  <p>In Taiwan, studying abroad is still widely treated as something only well-off families get to consider.</p>
-  <p>That impression is not baseless. Agency fees are high, and public schools rarely have the staff or resources to guide a student through an overseas application. But the harder barrier is information. If no one around you has done it, you do not even know what to ask.</p>
-  <p>So students rule the option out before they ever look into it. Not because it does not suit them, but because no one has shown them what it actually involves.</p>
-  <p>That gap is the reason Beyond Taiwan exists. Almost everything we run is free: mentorship, bootcamps, talks. We cannot make anyone's decision. We can make sure they know what they are choosing between.</p>
-</section>
-
-<section>
-  <h2>What we do</h2>
-  <picture class="photo">
-    <source srcset="./photos/three-at-laptop.webp" type="image/webp">
-    <img src="./photos/three-at-laptop.jpg" alt="Three students crowded around one laptop, the one in the middle smiling" width="1200" height="800" loading="lazy">
-  </picture>
-  <h3>College Bootcamp</h3>
-  <p>Twice a year, winter and summer, free. Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like. We ask what you want to study before the camp, then bring back people with that background.</p>
-  <h3>Mentorship Program</h3>
-  <p>One matching round per semester. You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on. Some pairs that started in an application season are still in touch more than two years later.</p>
-</section>
-
-<section>
-  <h2>Who runs this</h2>
-  <picture class="photo">
-    <source srcset="./photos/sharing-mic.webp" type="image/webp">
-    <img src="./photos/sharing-mic.jpg" alt="A speaker with a microphone; the audience seated on the floor, laughing" width="1200" height="800" loading="lazy">
-  </picture>
-  <p>Beyond Taiwan is close to thirty people, all of us students, spread across Taiwan, the United States, Canada, Europe, Australia, Japan and Korea.</p>
-  <p>We are not teachers and we are not consultants. Most of us are only a step or two ahead of you. Some finished their own applications recently enough to still remember not knowing where to start.</p>
-  <p>We began in May 2020 with seven people. Five years later, we are still here.</p>
-</section>
-
-<section>
-  <h2>Numbers</h2>
-  <div class="nums">
-    <div><b>250+ mentees</b><p>Since 2020, more than 250 high school students have had someone to ask.</p></div>
-    <div><b>50 pairs a year</b><p>One matching round each semester. A match means company for a whole application season.</p></div>
-    <div><b>100+ students reached</b><p>Two years of College Bootcamp, over 150 applications received, more than 100 students helped.</p></div>
-    <div><b>20+ alumni returned</b><p>More than 20 Beyond Taiwan alumni have come back as speakers. They were once on the other side of the room.</p></div>
-    <div><b>5 years, close to 30 people</b><p>Five years old. Every organizer is a student. Seven countries.</p></div>
-    <div><b>Free</b><p>Almost everything we run costs nothing.</p></div>
+<section class="sec" id="about-en">
+  <div class="sec-in">
+    <h2>Why we exist</h2>
+    <div class="body">
+      <p>In Taiwan, studying abroad is still widely treated as something only well-off families get to consider.</p>
+      <p>That impression is not baseless. Agency fees are high, and public schools rarely have the staff or resources to guide a student through an overseas application. But the harder barrier is information. If no one around you has done it, you do not even know what to ask.</p>
+      <p>So students rule the option out before they ever look into it. Not because it does not suit them, but because no one has shown them what it actually involves.</p>
+      <p>That gap is the reason Beyond Taiwan exists. Almost everything we run is free: mentorship, bootcamps, talks. We cannot make anyone's decision. We can make sure they know what they are choosing between.</p>
+      <picture class="photo">
+        <source srcset="./photos/talking-laptop.webp" type="image/webp">
+        <img src="./photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
   </div>
 </section>
 
-<section>
-  <h2>Get involved / Contact</h2>
-  <picture class="photo">
-    <source srcset="./photos/group-photo.webp" type="image/webp">
-    <img src="./photos/group-photo.jpg" alt="About thirty Beyond Taiwan cadres on a stage, all making the same hand sign" width="1200" height="800" loading="lazy">
-  </picture>
-  <h3>If you are a high school student</h3>
-  <p>The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</p>
-  <h3>If you want to support or partner with us</h3>
-  <p>We are always looking for individuals, companies and schools willing to build this with us. Past partners include the American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
-  <p>Write to us: <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
+<section class="sec" id="what-en">
+  <div class="sec-in">
+    <h2>What we do</h2>
+    <div class="body">
+      <h3>College Bootcamp</h3>
+      <p>Twice a year, winter and summer, free. Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like. We ask what you want to study before the camp, then bring back people with that background.</p>
+      <h3>Mentorship Program</h3>
+      <p>One matching round per semester. You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on. Some pairs that started in an application season are still in touch more than two years later.</p>
+      <picture class="photo">
+        <source srcset="./photos/three-at-laptop.webp" type="image/webp">
+        <img src="./photos/three-at-laptop.jpg" alt="Three students crowded around one laptop, the one in the middle smiling" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-in">
+    <h2>Who runs this</h2>
+    <div class="body">
+      <p>Beyond Taiwan is close to thirty people, all of us students, spread across Taiwan, the United States, Canada, Europe, Australia, Japan and Korea.</p>
+      <p>We are not teachers and we are not consultants. Most of us are only a step or two ahead of you. Some finished their own applications recently enough to still remember not knowing where to start.</p>
+      <p>We began in May 2020 with seven people. Five years later, we are still here.</p>
+      <picture class="photo">
+        <source srcset="./photos/sharing-mic.webp" type="image/webp">
+        <img src="./photos/sharing-mic.jpg" alt="A speaker with a microphone; the audience seated on the floor, laughing" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-in">
+    <h2>Numbers</h2>
+    <div class="body">
+      <div class="nums">
+        <div><b><span class="fig">250+</span> mentees</b><p>Since 2020, more than 250 high school students have had someone to ask.</p></div>
+        <div><b><span class="fig">50</span> pairs a year</b><p>One matching round each semester. A match means company for a whole application season.</p></div>
+        <div><b><span class="fig">100+</span> students reached</b><p>Two years of College Bootcamp, over 150 applications received, more than 100 students helped.</p></div>
+        <div><b><span class="fig">20+</span> alumni returned</b><p>More than 20 Beyond Taiwan alumni have come back as speakers. They were once on the other side of the room.</p></div>
+        <div><b><span class="fig">5</span> years, close to 30 people</b><p>Five years old. Every organizer is a student. Seven countries.</p></div>
+        <div><b><span class="fig">Free</span></b><p>Almost everything we run costs nothing.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="join-en">
+  <div class="sec-in">
+    <h2>Get involved / Contact</h2>
+    <div class="body">
+      <h3>If you are a high school student</h3>
+      <p>The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</p>
+      <h3>If you want to support or partner with us</h3>
+      <p>We are always looking for individuals, companies and schools willing to build this with us. Past partners include the American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
+      <p>Write to us: <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
+      <picture class="photo">
+        <source srcset="./photos/group-photo.webp" type="image/webp">
+        <img src="./photos/group-photo.jpg" alt="About thirty Beyond Taiwan cadres on a stage, all making the same hand sign" width="1200" height="800" loading="lazy">
+      </picture>
+    </div>
+  </div>
 </section>
 
 </div>
@@ -265,6 +484,51 @@ footer p{margin:0 0 8px}
   <p>beyondtaiwan2020@gmail.com</p>
   <p>Beyond Taiwan</p>
 </footer>
+
+<script>
+/* 這一頁的 JavaScript 只做兩件事：中英切換、手機選單。
+   兩件都是**加強**，不是必要 —— 關掉 JavaScript 的話中英兩版都會顯示、
+   導覽列的連結照樣可以點，跟改版前一模一樣。這一頁永遠不碰登入。 */
+(function () {
+  var html = document.documentElement;
+  var btn  = document.getElementById("lang");
+  var links = document.getElementById("navlinks");
+  var burger = document.getElementById("burger");
+
+  /* 第一次進來給哪一種語言：看瀏覽器的設定，不存任何東西在使用者的裝置上。
+     這一頁沒有 cookie 也沒有 localStorage，footer 那句「不使用任何追蹤工具」
+     要站得住腳，就不能為了記住語言而開始存東西。 */
+  setLang(/^zh/i.test(navigator.language || "") ? "zh" : "en");
+
+  function setLang(l) {
+    html.setAttribute("data-lang", l);
+    html.setAttribute("lang", l === "zh" ? "zh-Hant" : "en");
+    btn.textContent = l === "zh" ? "EN" : "中";
+    btn.setAttribute("aria-label", l === "zh" ? "Switch to English" : "切換為中文");
+    /* 錨點要跟著換到同一段的另一個語言版本，不然切成英文之後
+       點「關於我們」會捲到一個被隱藏起來的區塊，畫面完全不動。 */
+    Array.prototype.forEach.call(links.querySelectorAll("a[data-sec]"), function (a) {
+      a.href = "#" + a.dataset.sec + (l === "en" ? "-en" : "");
+    });
+  }
+
+  btn.addEventListener("click", function () {
+    setLang(html.getAttribute("data-lang") === "zh" ? "en" : "zh");
+  });
+
+  burger.addEventListener("click", function () {
+    var open = links.classList.toggle("open");
+    burger.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  /* 點了選單裡的連結就把選單收起來，不然捲過去之後它還蓋在畫面上。 */
+  links.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") {
+      links.classList.remove("open");
+      burger.setAttribute("aria-expanded", "false");
+    }
+  });
+})();
+</script>
 
 </body>
 </html>
