@@ -68,6 +68,13 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
 <link rel="stylesheet" href="../shared/brand.css">
 
+<!-- 語言的判斷要在這裡，不能等到頁尾。中英兩份都在 HTML 裡，
+     在瀏覽器套上 data-lang 之前畫面上是兩份接在一起。 -->
+<script>
+  document.documentElement.setAttribute(
+    "data-lang", /^zh/i.test(navigator.language || "") ? "zh" : "en");
+</script>
+
 <style>
 /* 色票與字體家族全部來自 ../shared/brand.css，這裡沒有寫死的色碼。 */
 *{box-sizing:border-box}
@@ -144,6 +151,14 @@ main,.topbar{position:relative;z-index:1}
   padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;opacity:.74}
 .navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
 .navlinks a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
+/* 中英兩份都在 HTML 裡，沒有 JavaScript 時兩份都讀得到。 */
+html[data-lang="zh"] .en,html[data-lang="en"] .zh{display:none}
+.lang{min-width:44px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.12em;
+  border:1px solid rgba(16,42,134,.32);border-radius:999px;padding:6px 13px;background:none;
+  color:var(--ink);cursor:pointer;line-height:1;position:relative}
+.lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.lang::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+
 .login{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
   font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px;white-space:nowrap;
   line-height:1;position:relative}
@@ -163,6 +178,8 @@ main,.topbar{position:relative;z-index:1}
    8em 剛好是八個中文字 =「他們從這裡出發。」，第二行是「然後回來。」。 */
 h1{font-family:var(--han);font-weight:900;font-size:clamp(30px,4.6vw,68px);
   line-height:1.04;letter-spacing:-.02em;margin:0;max-width:8em}
+.en h1{font-family:var(--display);font-weight:700;font-size:clamp(32px,5vw,72px);
+  line-height:1;letter-spacing:-.01em;max-width:11ch}
 .sub{font-size:clamp(15px,1.2vw,18px);line-height:1.62;max-width:32em;margin:0;
   color:rgba(16,42,134,.78)}
 
@@ -235,9 +252,9 @@ h1{font-family:var(--han);font-weight:900;font-size:clamp(30px,4.6vw,68px);
 /* 一直繞著島跑的那顆點。dasharray 只留一個點，讓它沿著同一個橢圓前進。
    周長由程式量出來寫進 --len，不寫死 —— 改了橢圓大小也不用回來改這裡。
    減少動態效果時，頁尾那條 *{animation:none} 會把它整個關掉，
-   點就靜靜停在起點，畫面上什麼都不缺。 */
+   點就靜靜停在起點，畫面上什麼都不缺。
+   同樣不能用 non-scaling-stroke（有虛線），理由見上面 .route。 */
 .orbiter{fill:none;stroke:var(--bt-orange);stroke-width:5;stroke-linecap:round;
-  vector-effect:non-scaling-stroke;
   stroke-dasharray:0.1 var(--len);
   animation:orbitrun 16s linear infinite;
   transition:opacity .3s ease}
@@ -247,18 +264,24 @@ h1{font-family:var(--han);font-weight:900;font-size:clamp(30px,4.6vw,68px);
 #ring{transition:opacity .45s ease}
 .flying #ring{opacity:0}
 
-/* 航線。平常看不見，選了誰才飛那一條。
-   同色，但比環繞線亮也比它粗一點 —— 沿著環繞線走的那一段如果跟它一模一樣，
-   飛完之後就看不出剛剛走過哪裡了（2026-09-07 實測）。 */
-.route{fill:none;stroke:var(--bt-orange);stroke-width:2.4;opacity:0;
-  vector-effect:non-scaling-stroke;stroke-linecap:round}
+/* 航線。平常看不見，選了誰才飛那一條。同色，但比環繞線亮也比它粗一點。
+
+   ⚠ **有 stroke-dasharray 的線不可以用 vector-effect:non-scaling-stroke。**
+   non-scaling-stroke 會讓虛線的長度用**螢幕像素**計算，
+   但我們給的長度是 getTotalLength() 回傳的**使用者座標**。
+   這張圖的 viewBox 是 1200，實際渲染約 1264px，比例 1.05 ——
+   於是虛線比路徑短了 5%，尾巴永遠畫不出來。
+   畫面上的症狀是「線斷在半空中，箭頭卻在正確的終點上，中間空一段」
+   （Paul 2026-09-07 回報）。沒有錯誤訊息。
+   `.orbit`、`.isle`、`.islet` 沒有虛線，它們留著 non-scaling-stroke 沒問題。 */
+.route{fill:none;stroke:var(--bt-orange);stroke-width:2.4;opacity:0;stroke-linecap:round}
 .route.on{opacity:1}
 
 /* 在飛的那個亮點。它跟航線是同一條 path，只是 dasharray 設成一個「點」，
    然後讓那個點沿著線走 —— 所以它一定飛在線上，不會有兩份座標對不齊的問題。
-   圓形筆帽讓那一小段變成一顆圓點，不是一小截線。 */
-.spark{fill:none;stroke:var(--bt-orange);stroke-width:5;stroke-linecap:round;opacity:0;
-  vector-effect:non-scaling-stroke}
+   圓形筆帽讓那一小段變成一顆圓點，不是一小截線。
+   同樣不能用 non-scaling-stroke，理由見上面 .route。 */
+.spark{fill:none;stroke:var(--bt-orange);stroke-width:5;stroke-linecap:round;opacity:0}
 
 /* 大頭照。JSON 裡沒給照片就顯示姓氏的單字圖示 —— 畫面一樣完整，
    而且不會為了「補一張圖」去放一張沒有取得同意的照片。 */
@@ -360,15 +383,13 @@ img.avatar{object-fit:cover}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <!-- 這一頁只有中文（航線圖上就是人名與城市），所以導覽的標籤也只有中文，
-         不像別的對外頁那樣放中英兩份 —— 放了但沒有語言切換的話，
-         兩份標籤會同時顯示，變成「關於我們About」。 -->
-    <a href="../about/">關於我們</a>
-    <a href="../programs/">我們做什麼</a>
-    <a href="../team/">團隊</a>
+    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
+    <a href="../programs/"><span class="zh">我們做什麼</span><span class="en">What we do</span></a>
+    <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="./" aria-current="page">Alumni</a>
-    <a href="../join/">加入我們</a>
+    <a href="../join/"><span class="zh">加入我們</span><span class="en">Get involved</span></a>
   </div>
+  <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/">登入 / Sign in</a>
   <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
 </nav>
@@ -376,8 +397,14 @@ img.avatar{object-fit:cover}
 <main id="main">
 
 <header class="head">
-  <h1>他們從這裡出發。然後回來。</h1>
-  <p class="sub">島上每一個亮點，是一所公立高中。點一個，看他飛去了哪裡。飛過的落點會留在圖上，點它可以反過來看那個人從台灣哪裡出發。</p>
+  <div class="zh">
+    <h1>他們從這裡出發。然後回來。</h1>
+    <p class="sub">島上每一個亮點，是一所公立高中。點一個，看他飛去了哪裡。飛過的落點會留在圖上，點它可以反過來看那個人從台灣哪裡出發。</p>
+  </div>
+  <div class="en">
+    <h1>They left from here. Then they came back.</h1>
+    <p class="sub">Every light on the island is a public high school. Tap one to see where that person flew. Places you have visited stay on the map, and tapping one shows where in Taiwan they started.</p>
+  </div>
 </header>
 
 <div class="chart">
@@ -420,7 +447,7 @@ img.avatar{object-fit:cover}
 <ul class="picker" id="picker" aria-label="選一位學長姐"></ul>
 
 <div class="card" id="card" role="region" aria-live="polite" aria-label="學長姐的話">
-  <p class="hint">點島上的任一個亮點。<br>那個人會從他的高中飛到現在所在的城市，這裡會出現他是誰、去了哪個國家，還有他自己的一句話。</p>
+  <p class="hint"><span class="zh">點島上的任一個亮點。<br>那個人會從他的高中飛到現在所在的城市，這裡會出現他是誰、去了哪個國家，還有他自己的一句話。</span><span class="en">Tap any light on the island.<br>That person flies from their high school to the city they live in now, and this is where you will see who they are, which country they went to, and something they said themselves.</span></p>
 </div>
 
 <noscript>
@@ -433,7 +460,7 @@ img.avatar{object-fit:cover}
 
 <div class="foot">
   <p id="demonote"></p>
-  <p><a href="../">回 Beyond Taiwan 首頁</a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
+  <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
 </div>
 
@@ -498,8 +525,11 @@ img.avatar{object-fit:cover}
   function flightPath(fx, fy, tx, ty) {
     var cxq = fx + (tx - fx) * 0.52, cyq = Math.min(fy, ty) - 210, M = 48;
     var out = "M" + fx.toFixed(1) + " " + fy.toFixed(1);
-    /* 少畫最後一段（M-1 而不是 M）：那一小段空出來給箭頭。
-       畫到底的話箭頭會整個蓋在落點的圓點上，兩個東西疊在一起。 */
+    /* 畫到倒數第二段就收：最後那一小段空出來給箭頭，
+       畫到底的話箭頭會整個蓋在落點的圓點上。
+       （箭頭是 marker-end，本來就落在路徑的最後一個點上，
+         所以線與箭頭一定是接在一起的 —— 前提是虛線的長度算對，
+         見 .route 上面那段關於 non-scaling-stroke 的警告。） */
     for (var j = 1; j <= M - 1; j++) {
       var u = j / M, w = 1 - u;
       out += " L" + (w * w * fx + 2 * w * u * cxq + u * u * tx).toFixed(1) +
@@ -532,6 +562,19 @@ img.avatar{object-fit:cover}
   var gNodes  = svg.querySelector(".nodes");
   var gDests  = svg.querySelector(".dests");
   var card    = document.getElementById("card");
+  var HINT    = card.innerHTML;          /* 一開始那段提示，重畫時要還原 */
+  var DATA    = null;                    /* community.json 讀進來之後放這裡 */
+
+  /* 現在是哪一種語言。<head> 已經決定好了，這裡只是讀回來。 */
+  function lang() { return document.documentElement.getAttribute("data-lang") === "en" ? "en" : "zh"; }
+
+  /* 取一個欄位的字：英文模式優先用 xxx_en，沒有就退回中文那一份。
+     所以 JSON 裡的英文欄位是**選填**的，少填不會讓畫面壞掉。 */
+  function txt(p, k) {
+    return (lang() === "en" && p[k + "_en"]) ? p[k + "_en"] : p[k];
+  }
+  /* 標點也要跟著語言走。英文句子裡放一個全形逗號會很刺眼。 */
+  function comma() { return lang() === "en" ? ", " : "\uff0c"; }
   var picker  = document.getElementById("picker");
 
   function el(name, attrs) {
@@ -545,9 +588,23 @@ img.avatar{object-fit:cover}
     });
   }
 
+  /* 切語言：整張圖重畫。
+     只換字串的話，島上的標籤、右邊的落點、手機的清單、卡片四個地方都要各自處理，
+     漏一個就會半中半英。重畫一次最單純，代價是選到一半的人會被清掉 ——
+     切語言本來就是「重新看一次」，這個代價是合理的。 */
+  document.getElementById("lang").addEventListener("click", function () {
+    var next = lang() === "zh" ? "en" : "zh";
+    document.documentElement.setAttribute("data-lang", next);
+    document.documentElement.setAttribute("lang", next === "zh" ? "zh-Hant" : "en");
+    this.textContent = next === "zh" ? "EN" : "\u4e2d";
+    this.setAttribute("aria-label", next === "zh" ? "Switch to English" : "\u5207\u63db\u70ba\u4e2d\u6587");
+    if (DATA) draw(DATA);
+  });
+  document.getElementById("lang").textContent = lang() === "zh" ? "EN" : "\u4e2d";
+
   fetch("./community.json")
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(draw)
+    .then(function (d) { DATA = d; draw(d); })
     .catch(function (e) {
       /* 資料讀不到就明說，不要留一張空白的圖讓人以為是自己網路的問題。 */
       card.innerHTML = '<p class="hint">名單一時讀不到，請重新整理看看。' +
@@ -558,6 +615,14 @@ img.avatar{object-fit:cover}
   function draw(data) {
     var people = (data && data.people) || [];
     if (!people.length) return;
+
+    /* 先清乾淨。這個函式會被呼叫第二次（切語言的時候），
+       不清的話航線與節點會疊上去，島也會被畫第二遍。 */
+    [gRoutes, gNodes, gDests].forEach(function (g) { while (g.firstChild) g.removeChild(g.firstChild); });
+    while (picker.firstChild) picker.removeChild(picker.firstChild);
+    document.getElementById("isleg").innerHTML = "";
+    svg.classList.remove("flying");
+    card.innerHTML = HINT;
 
     /* 島先畫。座標跟首頁同一份，從 coastline.txt 來。 */
     var isleg = document.getElementById("isleg");
@@ -588,9 +653,17 @@ img.avatar{object-fit:cover}
         g.appendChild(el("circle", { "class": "hit", cx: fx, cy: fy, r: 22 }));
         g.appendChild(el("circle", { "class": "ring", cx: fx, cy: fy, r: 13 }));
         g.appendChild(el("circle", { "class": "core", cx: fx, cy: fy, r: 5.5 }));
-        var t = el("text", { "class": "lbl", x: fx - 13, y: fy + 4, "text-anchor": "end" });
-        t.textContent = p.school; g.appendChild(t);
-      }, p.school + "，現在在 " + p.country + p.city));
+        /* 標籤放在島的哪一側，看那所學校在島的哪一側 ——
+           東半部的學校標籤往右放，才不會整條壓在島上。
+           英文校名比中文長很多（「宜蘭高中」四個字對 Yilan Senior High School），
+           全部往左放的話東部那幾個會蓋掉半座島。340 是島的中線附近。 */
+        var toRight = c[0] > 340;
+        var t = el("text", { "class": "lbl", x: fx + (toRight ? 13 : -13), y: fy + 4,
+                             "text-anchor": toRight ? "start" : "end" });
+        t.textContent = txt(p, "school"); g.appendChild(t);
+      }, lang() === "en"
+           ? txt(p, "school") + ", now in " + p.city + ", " + txt(p, "country")
+           : txt(p, "school") + "，現在在 " + txt(p, "country") + p.city));
 
       /* 還沒飛到的落點是看不見的，所以先不給鍵盤 Tab 到、也不報給讀螢幕的人。
          飛到之後才把 tabindex 換成 0（見 arrive()）—— 讓焦點停在一個看不見的
@@ -604,13 +677,15 @@ img.avatar{object-fit:cover}
         var b = el("text", { "class": "place", x: tx + 18, y: ty + 15 });
         b.textContent = p.place;
         var cty = el("text", { "class": "country", x: tx + 18, y: ty + 33 });
-        cty.textContent = p.country;
+        cty.textContent = txt(p, "country");
         g.appendChild(a); g.appendChild(b); g.appendChild(cty);
-      }, p.city + "，" + p.country + "，" + p.place + "，來自 " + p.school));
+      }, lang() === "en"
+           ? p.city + ", " + txt(p, "country") + ", " + p.place + ", from " + txt(p, "school")
+           : p.city + "，" + txt(p, "country") + "，" + p.place + "，來自 " + txt(p, "school")));
 
       var li = document.createElement("li");
       li.innerHTML = '<button type="button" aria-pressed="false" data-id="' + esc(p.id) + '">' +
-        '<span>' + esc(p.school) + '</span><span class="to">' + esc(p.country) + ' ' + esc(p.city) + '</span></button>';
+        '<span>' + esc(txt(p, "school")) + '</span><span class="to">' + esc(txt(p, "country")) + ' ' + esc(p.city) + '</span></button>';
       li.querySelector("button").addEventListener("click", function () { select(p); });
       picker.appendChild(li);
     });
@@ -621,8 +696,9 @@ img.avatar{object-fit:cover}
     orbiter.style.setProperty("--len", orbiter.getTotalLength());
 
     if (data.demo) {
-      document.getElementById("demonote").textContent =
-        "這一頁目前顯示的是示範資料，不是真實學員。換成真人之前，每一位公開的姓名與學校都會先取得本人同意。";
+      document.getElementById("demonote").textContent = lang() === "en"
+        ? "This page currently shows sample data, not real students. Before we put real people here, every name and school shown publicly will have that person's consent."
+        : "\u9019\u4e00\u9801\u76ee\u524d\u986f\u793a\u7684\u662f\u793a\u7bc4\u8cc7\u6599\uff0c\u4e0d\u662f\u771f\u5be6\u5b78\u54e1\u3002\u63db\u6210\u771f\u4eba\u4e4b\u524d\uff0c\u6bcf\u4e00\u4f4d\u516c\u958b\u7684\u59d3\u540d\u8207\u5b78\u6821\u90fd\u6703\u5148\u53d6\u5f97\u672c\u4eba\u540c\u610f\u3002";
     }
 
     /* 一個可以點、也可以用鍵盤按 Enter 的熱點。
@@ -682,12 +758,15 @@ img.avatar{object-fit:cover}
       var html =
         '<div class="who">' + face +
           '<p class="meta"><b>' + esc(p.name) + '</b>' +
-          '<span>' + esc(p.school) + ' → ' + esc(p.country) + ' ' + esc(p.city) +
-            '，' + esc(p.place) + '</span></p>' +
+          '<span>' + esc(txt(p, "school")) + ' → ' + esc(txt(p, "country")) + ' ' + esc(p.city) +
+            comma() + esc(p.place) + '</span></p>' +
         '</div>' +
-        '<p class="quote">「' + esc(p.quote) + '」</p>' +
-        (p.note ? '<p class="note">' + esc(p.note) + '</p>' : '') +
-        (data.demo ? '<span class="tag">示範資料，非真實學員</span>' : '');
+        '<p class="quote">' + (lang() === "en" ? '\u201c' : '\u300c') + esc(txt(p, "quote")) +
+          (lang() === "en" ? '\u201d' : '\u300d') + '</p>' +
+        (txt(p, "note") ? '<p class="note">' + esc(txt(p, "note")) + '</p>' : '') +
+        (data.demo ? '<span class="tag">' +
+          (lang() === "en" ? "Sample data, not real students" : "\u793a\u7bc4\u8cc7\u6599\uff0c\u975e\u771f\u5be6\u5b78\u54e1") +
+          '</span>' : '');
 
       arrive(dest);
       if (reduce) { route.setAttribute("marker-end", "url(#arw)"); card.innerHTML = html; return; }

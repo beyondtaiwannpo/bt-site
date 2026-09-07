@@ -269,9 +269,13 @@ h1{
   font-size:clamp(38px,7.4vw,116px);line-height:.98;letter-spacing:-.02em;
   margin:0;max-width:13ch;text-wrap:balance;
 }
-/* 英文標題長很多，同樣的字級會擠成一團，所以放寬行長並收一點字級。 */
+/* 英文標題長很多，同樣的字級會擠成一團，所以收一點字級。
+   11ch 是量出來的：斷成
+   There are / other paths. / No one / told you / about them.
+   （Paul 2026-09-07 指定的斷法。12ch 以上會變成四行、9ch 以下變六行。）
+   跟中文那個 13ch 一樣，這個數字不能照字數推算，改了要實際看一次。 */
 .en h1{font-family:var(--display);font-size:clamp(40px,7.8vw,120px);line-height:.94;
-  letter-spacing:-.01em;max-width:15ch}
+  letter-spacing:-.01em;max-width:11ch}
 .lead{
   font-size:clamp(16px,1.35vw,20px);line-height:1.62;
   max-width:34ch;margin:clamp(20px,3.2vh,34px) 0 0;
