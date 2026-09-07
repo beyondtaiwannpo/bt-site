@@ -307,6 +307,110 @@ else
   ok "§11-15 brand.css 的四個字體 token 都在，家族名剛好等於清單"
 fi
 
+# ════════ 首頁的島（官網改版批 2，2026-09-07）════════
+
+# 島的座標必須跟 scripts/taiwan/coastline.txt 一模一樣
+#
+# 首頁的 <path d="..."> 是一串四千字的數字。沒有這條守門的話，
+# 下一個人只會看到那串數字，不知道它從哪來，然後就地手改一個點 ——
+# 而那一改就再也回不去了：coastline.txt 重跑一次就會把他的修改蓋掉，
+# 或者更糟，兩邊從此不一樣，而畫面看起來都很正常。
+# 要調精細度的正確做法是改 build-coastline.py 的 eps 重跑，再整段貼回來。
+# 產生方式寫在 scripts/taiwan/README.md。
+missing_path=""
+n_path=0
+while IFS= read -r d; do
+  # 只認「M 後面接數字」的路徑。coastline.txt 裡的 MAIN 這個標頭也是 M 開頭，
+  # 第一版寫 M* 就把它一起數進去，變成 9 條。
+  case "$d" in M[0-9]*) ;; *) continue ;; esac
+  n_path=$((n_path+1))
+  grep -qF "$d" index.html || missing_path="${missing_path} 第${n_path}條"
+done < scripts/taiwan/coastline.txt
+if [ "$n_path" != "8" ]; then
+  bad "coastline.txt 的路徑不是 8 條（本島 1 + 離島 7），現在是 ${n_path} 條 —— 腳本改過就要回來改這個數字"
+elif [ -n "$missing_path" ]; then
+  bad "index.html 的島跟 scripts/taiwan/coastline.txt 對不上：${missing_path}（不要手改座標，改腳本重跑）"
+else
+  ok "首頁的島跟 coastline.txt 完全一致（本島 1 條 + 離島 7 條）"
+fi
+
+# GSAP 從 cdnjs 載，一定要有 SRI
+#
+# 「不從 CDN 載東西」2026-09-07 放開之後，integrity 是唯一擋得住
+# 「CDN 上的檔案被換掉」的東西。雜湊寫死在這裡是刻意的摩擦：
+# 升級 GSAP 就要同時換版本號、換 index.html 的雜湊、換這兩行。
+# 少了任何一步，頁面上的動畫會**安靜地不跑**（瀏覽器拒絕執行對不上的檔案，
+# 而畫面本來就設計成沒有動畫也完整），所以只能靠守門抓。
+GSAP_CORE="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+GSAP_ST="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg=="
+sri_bad=""
+grep -qF "integrity=\"${GSAP_CORE}\"" index.html || sri_bad="${sri_bad} gsap.min.js"
+grep -qF "integrity=\"${GSAP_ST}\"" index.html   || sri_bad="${sri_bad} ScrollTrigger.min.js"
+n_cross=$(grep -c 'cdnjs.cloudflare.com' index.html)
+n_anon=$(grep -c 'crossorigin="anonymous"' index.html)
+if [ -n "$sri_bad" ]; then
+  bad "cdnjs 的 script 少了正確的 integrity：${sri_bad}"
+elif [ "$n_cross" != "2" ] || [ "$n_anon" != "2" ]; then
+  bad "cdnjs 的 script 不是兩支、或少了 crossorigin=anonymous（cdnjs ${n_cross} 次、crossorigin ${n_anon} 次）"
+else
+  ok "GSAP 兩支都有正確的 integrity 與 crossorigin"
+fi
+
+# 會動的東西只准出現在 motion() 裡面
+#
+# prefers-reduced-motion 是無障礙需求不是視覺偏好（使用者 2026-08-25 的裁定）。
+# 護照那邊的動畫是 CSS，check-motion.mjs 用 CSSOM 逐條比對得出來；
+# 首頁的動畫是 GSAP，**CSS 檢查完全看不到它**。
+# 所以這裡守的是結構：所有 gsap / ScrollTrigger 的呼叫都關在 motion() 這一個函式裡，
+# 而 motion() 只有在「使用者沒開減少動態效果」時才會被呼叫。
+# 這樣「開了 reduce 卻還是有東西在動」在結構上就不可能發生，不需要跑瀏覽器才知道。
+motionOut=$(node -e '
+  const fs = require("fs");
+  const html = fs.readFileSync("index.html", "utf8");
+  // 只看內嵌的 <script>；<script src=...gsap.min.js> 那兩行本身含有 "gsap."，
+  // 不排除的話這條守門會抓到 script 標籤自己。
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+  const src = blocks.join("\n");
+  // 剝掉註解：這個 repo 的註解會解釋規則本身，裡面必然寫得出 gsap 這個字
+  // （本檔檔頭那段說明的同一個坑）。
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  const bad = [];
+  const GUARD = "if (!reduce && window.gsap) motion();";
+  if (!code.includes(GUARD)) bad.push("找不到那一行守衛：" + GUARD);
+
+  const head = code.indexOf("function motion() {");
+  if (head < 0) bad.push("找不到 function motion() {");
+  let from = -1, to = -1;
+  if (head >= 0) {
+    let i = code.indexOf("{", head), depth = 0;
+    from = i;
+    for (; i < code.length; i++) {
+      if (code[i] === "{") depth++;
+      else if (code[i] === "}") { depth--; if (depth === 0) { to = i; break; } }
+    }
+    if (to < 0) bad.push("motion() 的大括號沒有收尾");
+  }
+  const guardAt = code.indexOf(GUARD);
+  for (const m of code.matchAll(/\b(gsap|ScrollTrigger)\b/g)) {
+    const at = m.index;
+    const inMotion = from >= 0 && to > from && at > from && at < to;
+    const inGuard  = guardAt >= 0 && at >= guardAt && at < guardAt + GUARD.length;
+    if (!inMotion && !inGuard) {
+      const line = code.slice(0, at).split("\n").length;
+      bad.push("motion() 外面用到了 " + m[1] + "（內嵌 script 第 " + line + " 行）");
+    }
+  }
+  if (bad.length) { console.log(bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+motionCode=$?
+if [ $motionCode -eq 0 ]; then
+  ok "首頁的動畫全部關在 motion() 裡，reduce 時不會被呼叫"
+else
+  bad "首頁有動畫跑到 motion() 外面（開了減少動態效果還是會動）："
+  printf '  %s\n' "$motionOut"
+fi
+
 # §10-1 分類代碼。排除 SVG 濾鏡的 xChannelSelector="R" / yChannelSelector="G"
 # ——這是原型就有、蓋章要用的墨水紋理效果，不是分類代碼。只濾掉
 # ChannelSelector="X" 這個精確片段，不是整行都不看，避免真的分類代碼殘留

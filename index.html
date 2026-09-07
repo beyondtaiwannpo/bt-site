@@ -70,11 +70,15 @@
   /* 版面的左右留白。放在這裡不放 brand.css，是因為那個檔案只放 token 不放版面。 */
   --gut:clamp(20px,5vw,88px);
 }
-html{scroll-behavior:smooth}
+/* 島是刻意超出畫面右邊的，所以要把水平方向切掉，不然手機上整頁可以左右拖。
+   用 clip 不用 hidden：hidden 會讓 <html> 變成一個捲動容器，
+   頂欄的 position:sticky 就會失效（而且是安靜地失效，只有在手機上捲才看得出來）。
+   clip 只切不捲，sticky 不受影響。 */
+html{scroll-behavior:smooth;overflow-x:clip}
 body{
   margin:0;background:var(--paper);color:var(--ink);
   font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;
-  overflow-x:hidden;
+  overflow-x:clip;
 }
 /* 右上角的一道暖光。這是淺橘唯一的用法：打在紙上的日照，不是漸層裝飾。 */
 body::before{
@@ -150,7 +154,51 @@ main,footer,.topbar{position:relative;z-index:1}
 main{padding:0}
 .wrap{padding:0 var(--gut)}
 
-.hero{padding:clamp(34px,7vh,96px) var(--gut) clamp(30px,6vh,70px)}
+/* ═════════ 第一屏：島 ═════════ */
+/* 版面是刻意不對稱的：文字佔左邊窄的一半，島從右邊切出畫面。
+   置中放一座完整的島會變成插圖，切出去它才是地形。 */
+.hero{
+  position:relative;
+  min-height:calc(100svh - 58px);   /* 58px 是頂欄的高度 */
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);
+  align-items:center;
+  padding:0 var(--gut);
+}
+.hero-copy{position:relative;z-index:3;padding:6vh 0}
+.hero-isle{position:relative;z-index:2;height:100%;min-height:60svh}
+/* overflow:visible 是為了讓環繞的軌跡畫得出 viewBox 之外。
+   島的高度用 svh 不用 vh：手機瀏覽器的網址列會伸縮，vh 會讓島在捲動時抖一下。 */
+/* 切法（2026-09-07 批 2）：島比畫面高一截、右邊切掉一大塊。
+   三種切法都做出來看過：切更多的話南北兩端都不見，認不出是台灣，只剩一段海岸；
+   收更小的話留白太多，就不震撼了。這一組是「認得出來、但裝不下」。
+   要調的就是這兩個值，right 是往右推多少、height 是島多高。 */
+.isle-wrap{
+  position:absolute;right:-19%;top:50%;transform:translateY(-50%);
+  height:min(122svh,1050px);
+}
+.hero-isle svg{height:100%;width:auto;display:block;overflow:visible}
+/* 島是淺橘填底加深藍描邊，不是一塊實心深藍。
+   實心會把 370 個點的海岸線細節整個吃掉 —— 一塊色塊再大也只是色塊，
+   描邊之後每一個海灣都看得見，橘色的光點也更跳。
+   non-scaling-stroke：島在第一屏放到 1240px、之後在別處縮小，線寬都一樣。 */
+.isle{fill:var(--bt-sand);stroke:var(--bt-navy);stroke-width:1.6;
+  vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
+.islet{fill:var(--bt-sand);stroke:var(--bt-navy);stroke-width:1.3;
+  vector-effect:non-scaling-stroke;stroke-linejoin:round}
+/* 環繞的兩條軌跡就是 logo 上那圈箭頭。主橘一條、蒂芬妮綠一條。 */
+.orbit{fill:none;stroke:var(--bt-orange);stroke-width:2.2;opacity:.5}
+.orbit.b{stroke:var(--bt-teal);stroke-width:1.4;opacity:.45}
+/* 光點：主橘為主，蒂芬妮綠與亮黃各一兩顆。一個畫面不超過兩顆亮黃。 */
+.dot{fill:var(--bt-orange);stroke:var(--bt-navy);stroke-width:.9;vector-effect:non-scaling-stroke}
+.dot.t{fill:var(--bt-teal)}
+.dot.y{fill:var(--bt-yellow)}
+.halo{fill:none;stroke:var(--bt-orange);stroke-width:1.6;opacity:0}
+
+/* 開場時標題是一行一行落下的。那幾行不是寫死在 HTML 裡的，
+   是 JavaScript 量出實際換行位置之後包上去的（見頁尾的 splitLines）——
+   HTML 裡的 <h1> 永遠是一整句，換了文案或換了字級都不用回來改。 */
+h1 .ln{display:block}
+
 h1{
   font-family:var(--han);font-weight:900;
   font-size:clamp(38px,7.4vw,116px);line-height:.98;letter-spacing:-.02em;
@@ -197,9 +245,9 @@ p{margin:0 0 17px;max-width:34em}
 .photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
 .photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;
   background:rgba(16,42,134,.06)}
-/* 第一屏那張往右溢出一點，讓第一眼就不是一個置中的方框。 */
-.hero .photo{margin-top:clamp(30px,5.5vh,64px);margin-right:calc(var(--gut) * -1)}
-@media (max-width:700px){.hero .photo{margin-right:0}}
+/* 島的下面第一張照片：往右溢出到畫面邊緣，接住第一屏的不對稱。 */
+.photo-lead{margin-top:clamp(40px,7vh,96px);margin-right:calc(var(--gut) * -1)}
+@media (max-width:700px){.photo-lead{margin-right:0}}
 
 /* ── 數字 ── */
 /* 數字本身用 Barlow Condensed 拉大，後面的中文說明維持內文字體。
@@ -224,8 +272,10 @@ p{margin:0 0 17px;max-width:34em}
 /* ── 語言 ── */
 /* 沒有 JavaScript 的時候，這裡什麼都不做，中英兩版都在頁面上（跟改版前一樣）。
    JS 跑起來才會在 <html> 掛上 data-lang，然後這兩條規則開始生效。 */
-.en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);padding-top:clamp(16px,3vh,36px)}
-html[data-lang] .en{border-top:0;margin-top:0;padding-top:0}
+/* 這條分隔線只在「沒有 JavaScript、中英兩版都攤在同一頁」時才有意義，
+   而且只給 main 底下那一大塊；hero 裡的英文標題不需要它。 */
+main > .en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);padding-top:clamp(16px,3vh,36px)}
+html[data-lang] main > .en{border-top:0;margin-top:0;padding-top:0}
 html[data-lang="zh"] .en,
 html[data-lang="en"] .zh{display:none}
 
@@ -239,6 +289,16 @@ footer a{color:var(--ink);font-weight:600}
 @media (max-width:820px){
   .sec-in{grid-template-columns:1fr;gap:14px}
   h2{margin-bottom:2px}
+}
+@media (max-width:900px){
+  /* 窄螢幕：島改成排在標題下面，還是切出右邊，只是切得少一點。
+     縮成一整座放進畫面的話它就變回插圖了。 */
+  .hero{grid-template-columns:1fr;min-height:auto;padding-top:4vh;padding-bottom:2vh}
+  .hero-copy{padding-bottom:0}
+  .hero-isle{min-height:60svh;margin-top:0}
+  /* 窄螢幕不要置中：置中的話島會往上長，北端會壓到副標。
+     改成從自己那一列的頂端往下掛，文字跟島就分得乾乾淨淨。 */
+  .isle-wrap{right:-26%;height:74svh;top:0;transform:none}
 }
 @media (max-width:700px){
   /* 手機：導覽收進漢堡選單。展開時是一疊直的連結，不是抽屜。 */
@@ -286,17 +346,65 @@ footer a{color:var(--ink);font-weight:600}
 
 <main id="main">
 
-<!-- ═══════════ 中文 ═══════════ -->
-<div class="zh" id="top" lang="zh-Hant">
+<!-- 第一屏：一整個螢幕的台灣。
+     BT 的 Primary Logo 是「島輪廓加箭頭環繞」，所以首頁不是放一張台灣的圖，
+     是把 logo 放大到整個螢幕。**這是全站唯一需要震撼的地方**，
+     其他每一段都要安靜，讓這一個畫面獨大（docs/2026-09-07-官網視覺方向.md）。
 
-<header class="hero">
-  <h1>還有別條路，只是沒有人跟你說過。</h1>
-  <p class="lead">Beyond Taiwan 是一群從台灣公立高中走出去的大學生。我們回來，把自己走過的路講給你聽。</p>
-  <picture class="photo">
-    <source srcset="./photos/hero-listening.webp" type="image/webp">
-    <img src="./photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800">
-  </picture>
+     島刻意切出畫面。整座島完整放進一個框裡會變成一張插圖；切出去它才是地形。
+
+     ⚠ 下面那一長串座標**不是手畫的，也不要手改**。它是從 g0v 的 2010 縣市邊界
+     算出來的真實海岸線，產生方式與重算步驟寫在 scripts/taiwan/README.md。
+     要調精細度就改那支腳本的 eps 重跑，然後把 coastline.txt 的內容整段貼回來。
+     check.sh 會逐條比對這裡的 d 屬性跟 coastline.txt 一不一樣，改了一邊沒改另一邊會紅。
+
+     中英兩份標題都放在這一個 hero 裡，島只畫一次 —— 島的座標有 4 KB，
+     跟著語言複製兩份是白白多一份。 -->
+<header class="hero" id="top">
+  <div class="hero-copy">
+    <div class="zh" lang="zh-Hant">
+      <h1>還有別條路，只是沒有人跟你說過。</h1>
+      <p class="lead">Beyond Taiwan 是一群從台灣公立高中走出去的大學生。我們回來，把自己走過的路講給你聽。</p>
+    </div>
+    <div class="en" lang="en">
+      <h1>There are other paths. No one told you about them.</h1>
+      <p class="lead">Beyond Taiwan is a group of students who came out of Taiwan's public high schools. We went looking, and we came back to tell you what we found.</p>
+    </div>
+  </div>
+
+  <div class="hero-isle">
+    <!-- 置中交給外面這一層。捲動視差會改 <svg> 的 transform，
+         置中如果也寫在 svg 上會被蓋掉，島就會往下掉半個身子。 -->
+    <div class="isle-wrap">
+    <svg viewBox="0 0 495.7 706" role="img"
+         aria-label="台灣本島與澎湖、蘭嶼、綠島的海岸線輪廓">
+      <g class="orbits" aria-hidden="true">
+        <ellipse class="orbit"   cx="303" cy="350" rx="243" ry="404" transform="rotate(-9 303 350)"/>
+        <ellipse class="orbit b" cx="303" cy="350" rx="272" ry="432" transform="rotate(7 303 350)"/>
+      </g>
+      <path class="isle" d="M138.8 365.8 139.6 363.5 137.6 359.8 137.6 345.1 138.7 338.8 145.0 328.5 143.3 327.3 145.4 316.9 143.2 316.9 142.5 314.4 143.5 314.0 145.6 308.6 144.5 307.2 151.4 303.6 153.3 301.0 152.5 299.9 154.1 298.7 157.0 299.6 160.4 295.6 162.2 294.2 163.3 294.6 165.5 292.8 171.4 280.4 168.7 279.4 171.8 274.2 173.5 269.5 177.1 269.1 177.2 266.7 181.3 258.9 186.0 256.5 186.4 255.1 182.5 255.2 182.5 251.4 186.1 249.5 191.6 249.8 193.6 242.2 190.0 242.2 189.0 245.9 185.6 245.3 187.4 241.3 194.1 234.5 197.9 234.4 198.4 232.6 202.9 226.5 203.4 224.8 199.6 223.4 207.6 207.0 210.9 202.6 213.5 204.2 214.9 202.2 216.7 194.3 223.5 182.9 228.4 176.4 237.0 167.5 240.8 159.5 245.4 146.6 248.2 142.0 254.5 140.8 254.9 135.5 258.4 131.1 267.5 129.4 268.5 127.1 273.2 123.0 274.5 118.2 280.9 110.7 279.6 108.8 279.6 104.9 281.7 98.9 287.3 91.7 287.4 89.6 289.6 87.1 293.4 78.5 296.2 73.9 297.2 73.8 300.3 69.9 302.2 66.7 301.8 64.0 309.2 53.1 315.6 50.6 317.1 48.7 322.5 46.0 332.5 43.7 339.9 39.0 349.0 36.3 353.3 37.2 357.3 35.4 362.6 35.7 372.7 31.4 377.7 26.8 376.5 25.6 377.0 22.7 382.7 16.3 384.2 10.7 389.0 9.0 390.2 6.2 396.5 2.6 399.3 2.6 401.7 0.7 405.5 1.3 407.0 0.1 409.0 0.0 416.3 4.2 419.2 7.9 419.4 12.1 421.1 13.9 422.6 13.9 423.1 16.9 426.4 19.7 430.6 18.6 430.9 19.6 429.2 22.4 430.4 24.3 433.5 25.3 433.2 27.4 436.6 27.4 440.9 29.2 443.8 27.7 451.3 33.4 454.7 33.8 454.4 36.1 455.5 36.4 458.6 34.9 463.6 36.2 470.7 36.3 472.9 37.3 473.9 39.7 472.1 43.8 475.4 48.2 474.8 51.9 475.6 54.6 478.1 57.0 484.4 56.1 489.7 59.2 489.3 60.7 487.7 61.0 485.4 63.0 474.6 67.7 473.3 70.5 468.4 73.6 466.8 75.5 466.7 78.3 457.4 88.2 455.3 96.5 454.3 103.0 454.3 111.2 455.5 116.2 457.6 120.2 458.9 133.4 463.3 142.6 461.9 142.9 463.1 147.0 464.3 146.9 463.8 149.8 464.6 157.1 463.9 158.4 458.6 160.1 458.2 164.6 459.5 164.9 460.4 167.6 454.5 172.2 454.8 173.2 450.9 177.8 449.4 181.4 448.3 190.3 445.2 198.5 445.7 202.4 444.9 204.8 442.6 207.1 440.7 210.2 440.2 213.2 437.2 216.6 435.2 217.1 432.9 220.7 427.1 224.3 425.0 227.0 424.1 230.3 425.5 236.6 424.9 239.5 423.0 242.4 419.2 245.1 416.3 249.8 415.9 252.6 416.9 257.4 421.9 265.4 421.0 267.3 419.7 266.8 419.5 269.5 416.7 271.6 414.1 276.4 415.1 280.7 412.6 295.9 407.9 307.7 407.9 316.5 403.3 326.3 404.2 329.2 402.0 338.6 401.1 339.1 399.8 343.9 399.1 354.1 396.3 359.0 394.7 366.6 395.4 371.8 396.7 373.6 394.6 377.0 393.3 383.5 390.0 391.5 387.1 408.3 384.4 409.0 382.5 411.4 380.5 415.6 377.9 425.2 379.0 426.3 377.2 429.0 374.8 430.2 374.8 434.6 376.7 438.8 375.1 442.6 375.5 446.1 377.4 447.8 375.4 449.5 374.6 448.9 372.7 451.7 368.9 453.2 365.5 458.9 363.3 468.9 361.6 469.9 359.6 476.6 356.4 481.2 354.0 482.7 350.3 491.3 346.5 497.4 345.2 497.7 343.9 500.7 342.6 500.1 338.9 500.9 335.6 504.0 335.2 508.1 336.1 508.9 337.7 515.0 334.4 516.7 332.5 523.3 329.4 524.9 324.0 530.6 314.5 535.6 310.4 539.4 306.4 541.5 304.0 545.1 302.2 551.3 301.6 557.5 297.0 561.7 295.1 565.9 289.7 584.7 283.8 599.5 282.6 604.8 280.0 609.9 279.5 621.8 280.9 630.6 279.8 633.9 280.3 636.9 279.2 638.4 279.8 642.3 279.3 648.3 280.4 649.2 278.3 651.4 279.7 656.5 281.0 657.0 280.7 659.4 279.4 661.0 279.8 668.9 281.1 671.7 278.7 673.3 278.6 675.2 276.6 676.4 276.2 678.8 270.8 681.2 269.9 689.2 273.7 695.8 274.7 699.1 273.6 700.0 271.3 699.1 271.0 696.7 268.6 695.5 266.3 692.2 264.5 692.4 261.8 690.7 258.8 690.2 255.8 687.2 253.5 687.7 251.5 690.2 252.1 692.3 250.7 695.2 248.4 695.5 245.4 692.3 246.3 684.4 244.5 679.6 243.1 679.1 240.9 674.5 240.9 672.0 242.4 670.1 242.8 667.4 244.6 666.0 243.5 661.0 246.4 659.6 245.1 653.3 242.9 649.1 243.4 648.1 242.0 642.1 240.2 637.9 240.7 636.2 237.7 630.2 234.0 626.7 234.3 623.6 232.5 616.5 225.5 608.6 223.0 603.7 220.2 601.1 196.5 586.5 194.0 583.3 194.9 582.6 191.2 580.6 189.2 580.9 186.7 579.9 179.2 574.3 170.6 566.1 171.0 565.3 160.7 552.4 160.9 550.3 158.7 545.9 159.0 541.8 163.0 538.0 161.9 532.9 160.6 534.7 151.3 512.5 144.3 491.1 143.7 483.8 140.8 477.4 132.2 469.2 121.4 463.1 120.6 461.0 117.2 457.8 117.9 452.1 122.9 443.4 124.3 435.0 126.8 429.7 126.7 424.6 127.7 424.0 129.7 412.3 130.6 412.0 133.1 406.5 134.4 400.0 137.5 395.9 138.5 396.3 139.0 393.8 141.0 394.1 142.1 392.1 141.4 389.4 140.3 389.8 139.2 387.5 139.8 385.3 138.9 382.9 140.4 380.8 138.5 378.4 138.4 376.2 140.6 373.3 140.5 371.9 134.8 372.4 133.8 371.0 133.7 366.9 135.3 365.9 138.1 366.5 138.8 365.8Z"/>
+      <path class="islet" d="M32.2 336.8 30.4 336.6 29.1 338.6 27.2 337.7 24.7 341.1 24.5 342.5 20.2 344.0 21.0 345.2 21.3 349.1 19.3 351.0 19.8 356.9 16.6 356.0 15.0 357.2 10.9 357.0 13.8 354.5 15.4 355.7 17.6 353.8 17.6 351.7 15.4 349.9 17.4 348.7 18.6 346.7 17.0 345.7 17.4 343.1 19.2 339.7 22.8 341.5 24.6 341.2 27.2 337.6 27.4 335.4 30.2 334.8 32.5 333.5 34.4 334.7 35.4 334.1 37.4 336.5 38.1 339.2 36.0 339.6 36.3 343.6 38.3 345.3 38.1 348.9 42.0 350.4 44.6 349.3 46.1 349.6 47.3 351.5 51.0 352.5 51.5 356.5 53.5 358.7 50.6 359.5 49.9 357.5 44.6 357.6 37.0 364.0 37.0 368.4 35.3 367.4 30.5 368.3 30.9 366.0 36.4 361.8 35.7 359.8 34.3 359.1 30.7 360.5 32.0 357.0 29.7 354.6 28.7 352.5 31.0 352.6 33.1 354.9 35.3 355.8 35.5 353.0 37.1 352.5 36.4 349.4 36.8 347.6 35.3 346.2 35.7 344.9 33.8 344.3 35.0 342.3 32.5 338.6 32.2 336.8Z"/>
+      <path class="islet" d="M395.9 664.5 394.1 662.3 395.2 661.0 396.5 662.1 407.0 661.2 407.1 664.8 408.1 666.2 406.2 668.2 407.3 670.5 413.1 674.5 411.7 678.2 407.4 678.1 407.2 677.0 404.2 673.6 400.5 673.2 395.5 666.9 395.9 664.5Z"/>
+      <path class="islet" d="M122.5 372.2 120.1 374.6 116.9 374.3 115.6 376.0 115.9 378.2 112.1 378.2 110.7 377.1 114.3 373.3 126.6 365.1 128.4 365.9 128.9 367.9 126.7 367.6 124.4 369.3 122.5 372.2Z"/>
+      <path class="islet" d="M394.2 545.7 395.2 548.4 393.2 548.4 392.6 547.1 388.9 545.6 389.3 543.0 387.4 540.8 387.4 539.1 393.0 539.6 395.9 539.0 396.1 541.9 394.2 545.7Z"/>
+      <path class="islet" d="M178.9 612.5 177.8 611.9 180.5 606.4 183.1 605.6 184.6 606.7 184.3 608.3 178.9 612.5Z"/>
+      <path class="islet" d="M1.9 431.0 0.0 429.0 5.6 427.4 6.4 428.8 6.2 431.7 4.8 431.4 2.3 433.3 1.9 431.0Z"/>
+      <path class="islet" d="M15.5 394.5 16.6 392.3 18.5 392.5 17.9 399.8 14.4 399.7 16.0 397.8 15.5 394.5Z"/>
+      <g class="lights" aria-hidden="true"></g>
+    </svg>
+    </div>
+  </div>
 </header>
+
+<!-- ═══════════ 中文 ═══════════ -->
+<div class="zh" lang="zh-Hant">
+
+<!-- 這張照片本來是第一屏的主視覺。島接手之後它往下移，不刪 ——
+     真實現場感是 BT 照片美學的重點，島是輪廓，照片才是人。 -->
+<div class="wrap"><picture class="photo photo-lead">
+  <source srcset="./photos/hero-listening.webp" type="image/webp">
+  <img src="./photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800">
+</picture></div>
 
 <section class="sec" id="about">
   <div class="sec-in">
@@ -383,14 +491,10 @@ footer a{color:var(--ink);font-weight:600}
 <!-- ═══════════ English ═══════════ -->
 <div class="en" lang="en">
 
-<header class="hero">
-  <h1>There are other paths. No one told you about them.</h1>
-  <p class="lead">Beyond Taiwan is a group of students who came out of Taiwan's public high schools. We went looking, and we came back to tell you what we found.</p>
-  <picture class="photo">
-    <source srcset="./photos/hero-listening.webp" type="image/webp">
-    <img src="./photos/hero-listening.jpg" alt="A row of high-school students listening to a speaker; two blurred heads in the foreground" width="1200" height="800" loading="lazy">
-  </picture>
-</header>
+<div class="wrap"><picture class="photo photo-lead">
+  <source srcset="./photos/hero-listening.webp" type="image/webp">
+  <img src="./photos/hero-listening.jpg" alt="A row of high-school students listening to a speaker; two blurred heads in the foreground" width="1200" height="800" loading="lazy">
+</picture></div>
 
 <section class="sec" id="about-en">
   <div class="sec-in">
@@ -485,8 +589,22 @@ footer a{color:var(--ink);font-weight:600}
   <p>Beyond Taiwan</p>
 </footer>
 
+<!-- GSAP 從 cdnjs 載。integrity 是 cdnjs 官方公布的雜湊，檔案被換掉就不會執行 ——
+     這是「允許從 CDN 載東西」之後唯一擋得住供應鏈問題的東西，不要拿掉。
+     版本寫死不用 latest：latest 哪天改版，這裡的雜湊就對不上，整頁動畫靜悄悄地不跑。
+     要升級 GSAP 就同時換版本號、換這兩個雜湊、並改 check.sh 裡寫死的那一組。
+     （Google Fonts 那個 <link> 沒有 integrity，那是刻意的：Google 會依瀏覽器
+       回不同的 CSS，雜湊必然對不上，加了會讓某些人整頁沒有字體。
+       實測與決定記在 docs/2026-09-07-官網視覺方向.md。） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
+        integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"
+        integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
 <script>
-/* 這一頁的 JavaScript 只做兩件事：中英切換、手機選單。
+/* 這一段只做兩件事：中英切換、手機選單。
    兩件都是**加強**，不是必要 —— 關掉 JavaScript 的話中英兩版都會顯示、
    導覽列的連結照樣可以點，跟改版前一模一樣。這一頁永遠不碰登入。 */
 (function () {
@@ -527,6 +645,176 @@ footer a{color:var(--ink);font-weight:600}
       burger.setAttribute("aria-expanded", "false");
     }
   });
+})();
+</script>
+
+
+<script>
+/* ═══════════ 第一屏的島 ═══════════
+   ── 讀這一段之前先知道兩件事 ──
+
+   1. **資料與動畫分開。** 光點的位置全部在下面的 LIGHTS，動畫程式一個座標都沒寫死。
+      要移動或增減光點就只改 LIGHTS，不要碰下面任何一行。
+
+   2. **所有會動的東西都關在 motion() 裡面。** 外面那一段只負責把光點畫上去，
+      那是靜態的。使用者開了「減少動態效果」就不呼叫 motion()，
+      畫面上該有的東西一個都不會少，只是不動。
+      check.sh 會檢查「gsap 只出現在 motion() 裡面」——
+      在外面隨手加一行動畫會被擋下來，那是刻意的摩擦。 */
+(function () {
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── 資料 ──
+     16 個點的座標來自 scripts/taiwan/cities.json（縣市的投影座標），
+     跟島用的是同一個座標系，所以直接對得上。
+
+     這些點目前代表的是「島上有光」，不是「BT 服務過的某一所高中」。
+     設計方向寫的是光點對應服務過的公立高中所在地，但那份名單要回溯 BT 的事實資料庫，
+     而且每一所學校要不要寫出來得先問過。名單拿到之前，
+     頁面上不會也不可以宣稱這些點是哪些學校（SVG 的 aria-label 只說是海岸線輪廓）。
+     拿到名單之後改這個陣列就好，動畫程式不用動。
+
+     第三欄是顏色：空字串是主橘，t 是蒂芬妮綠，y 是亮黃。
+     綠與黃各兩顆，其餘全部主橘 —— 一個畫面不超過兩顆亮黃是 Brand Book 的用量規則。 */
+  var LIGHTS = [
+    [ 406.5,  54.6, "y"],   // 台北
+    [ 293.9, 101.2, ""],   // 新竹
+    [ 238.3, 236.8, ""],   // 台中
+    [ 208.6, 250.5, ""],   // 彰化
+    [ 196.0, 374.2, ""],   // 嘉義
+    [ 154.1, 473.0, "y"],   // 台南
+    [ 168.1, 549.7, "t"],   // 高雄
+    [ 203.3, 541.1, ""],   // 屏東
+    [ 413.3, 269.8, "t"],   // 花蓮
+    [ 442.0, 122.7, ""],   // 宜蘭
+    [ 327.1, 522.7, ""],   // 台東
+    [ 356.6,  62.7, ""],   // 桃園
+    [ 266.2, 151.9, ""],   // 苗栗
+    [ 210.3, 327.0, ""],   // 雲林
+    [ 240.2, 275.2, ""],   // 南投
+    [ 439.7,  35.1, ""],   // 基隆
+  ];
+
+  var NS = "http://www.w3.org/2000/svg";
+  var lights = document.querySelector(".lights");
+  var dots = [], halos = [];
+
+  /* ── 靜態：把光點畫上去。這一段跟動不動沒有關係，一定會跑。 ── */
+  LIGHTS.forEach(function (p) {
+    var halo = document.createElementNS(NS, "circle");
+    halo.setAttribute("class", "halo");
+    halo.setAttribute("cx", p[0]); halo.setAttribute("cy", p[1]); halo.setAttribute("r", 7);
+    var dot = document.createElementNS(NS, "circle");
+    dot.setAttribute("class", "dot" + (p[2] ? " " + p[2] : ""));
+    dot.setAttribute("cx", p[0]); dot.setAttribute("cy", p[1]); dot.setAttribute("r", 4.4);
+    lights.appendChild(halo); lights.appendChild(dot);
+    halos.push(halo); dots.push(dot);
+  });
+
+  /* window.gsap 沒載到就當作不能動（CDN 被擋、雜湊對不上都算）。
+     那種情況下這一頁還是完整的：島在、光點在、標題在、數字是最終值。 */
+  if (!reduce && window.gsap) motion();
+
+  /* ── 把標題量出實際的行，包成 span，開場才能一行一行落下 ──
+     為什麼不直接在 HTML 裡寫三個 span：那樣換行位置就被寫死了，
+     換了字級、換了語言、或哪天改了文案，斷句就會跑掉，而且沒有人會發現。
+     這裡量的是**真的渲染出來的行**，所以永遠正確。
+     量不出來（只有一行、或瀏覽器不給）就回傳 null，開場改成整塊一起動。 */
+  function splitLines(el) {
+    var node = el.firstChild;
+    if (!node || node.nodeType !== 3) return null;
+    var text = node.nodeValue, r = document.createRange();
+    var out = [], start = 0, prev = null;
+    for (var i = 1; i <= text.length; i++) {
+      r.setStart(node, i - 1); r.setEnd(node, i);
+      var box = r.getClientRects()[0];
+      if (!box) continue;
+      var top = Math.round(box.top);
+      if (prev === null) prev = top;
+      if (top !== prev) { out.push(text.slice(start, i - 1)); start = i - 1; prev = top; }
+    }
+    out.push(text.slice(start));
+    if (out.length < 2) return null;
+    el.textContent = "";
+    return out.map(function (t) {
+      var span = document.createElement("span");
+      span.className = "ln"; span.textContent = t;
+      el.appendChild(span);
+      return span;
+    });
+  }
+
+  /* ── 這裡面才有動畫。外面不准出現 gsap。 ── */
+  function motion() {
+    gsap.registerPlugin(ScrollTrigger);
+
+    /* 現在顯示的是哪一種語言，就對那一份標題做開場。
+       另一份是 display:none，量不到行也不需要動。 */
+    var lang = document.documentElement.getAttribute("data-lang") || "zh";
+    var copy = document.querySelector(".hero-copy ." + lang) || document.querySelector(".hero-copy .zh");
+    var h1 = copy.querySelector("h1"), lead = copy.querySelector(".lead");
+    var lines = null;
+    try { lines = splitLines(h1); } catch (e) { lines = null; }
+
+    /* 開場只有一個 timeline：島先出現，標題一行一行落下，副標，再畫出軌跡。
+       不做「每個區塊各自淡入」—— 那是現在 AI 生成頁面最明顯的特徵，
+       而且會讓整頁沒有一個地方是重點。下面五段一律安靜，只有這裡動。 */
+    var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+    tl.from(".hero-isle svg", { opacity: 0, scale: 1.12, duration: 1.5 }, 0)
+      .from(lines || h1, { opacity: 0, yPercent: 55, duration: 1, stagger: lines ? 0.09 : 0 }, 0.35)
+      .from(lead, { opacity: 0, y: 18, duration: 0.8 }, 0.9);
+
+    /* 環繞的軌跡用 stroke-dasharray 自己畫。
+       GSAP 的 DrawSVGPlugin 是付費外掛，免費的 CDN 版沒有，這幾行就是它做的事。 */
+    document.querySelectorAll(".orbits ellipse").forEach(function (e, i) {
+      var len = e.getTotalLength();
+      gsap.set(e, { strokeDasharray: len, strokeDashoffset: len });
+      tl.to(e, { strokeDashoffset: 0, duration: 2.2, ease: "power2.inOut" }, 0.4 + i * 0.25);
+    });
+
+    /* 光暈往外擴散然後消失，每一顆錯開時間。
+       一起閃的話會變成一個在閃的圖案，錯開才像很多個地方各自亮著。 */
+    halos.forEach(function (h, i) {
+      gsap.fromTo(h, { attr: { r: 5 }, opacity: 0.85 },
+        { attr: { r: 19 }, opacity: 0, duration: 2.6, repeat: -1, ease: "power2.out", delay: i * 0.34 });
+    });
+    dots.forEach(function (d, i) {
+      gsap.to(d, { attr: { r: 6 }, duration: 1.5, repeat: -1, yoyo: true, ease: "sine.inOut", delay: i * 0.2 });
+    });
+
+    /* 捲動時島慢慢轉 5 度、上移 8%，軌跡轉得更慢（scrub 值更大就是跟得更懶）。
+       這是視差不是特效：它讓島看起來在後面，不是貼在頁面上的一張圖。 */
+    gsap.to(".hero-isle svg", {
+      rotation: -5, yPercent: -8, ease: "none",
+      scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 0.6 }
+    });
+    gsap.to(".orbits", {
+      rotation: 26, transformOrigin: "303px 350px", ease: "none",
+      scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 1.2 }
+    });
+
+    /* 數字遞增。只有這一段有，因為那些數字是 community 規模的直接證據，
+       值得一個動畫；其他四段安靜就好。
+       HTML 裡寫的就是最終值，這裡先歸零再跑回去，跑完把原字串原樣寫回去 ——
+       所以就算動畫中途壞掉，畫面上也不會留下一個算到一半的數字。 */
+    document.querySelectorAll(".nums .fig").forEach(function (el) {
+      var finalText = el.textContent;
+      var m = finalText.match(/^(\d[\d,]*)(.*)$/);
+      if (!m) return;               /* 例如英文那一格的 Free，沒有數字就不動 */
+      var target = parseInt(m[1].replace(/,/g, ""), 10), suffix = m[2], box = { v: 0 };
+      el.textContent = "0" + suffix;
+      ScrollTrigger.create({
+        trigger: el, start: "top 88%", once: true,
+        onEnter: function () {
+          gsap.to(box, {
+            v: target, duration: 1.5, ease: "power2.out",
+            onUpdate: function () { el.textContent = Math.round(box.v).toLocaleString("en-US") + suffix; },
+            onComplete: function () { el.textContent = finalText; }
+          });
+        }
+      });
+    });
+  }
 })();
 </script>
 
