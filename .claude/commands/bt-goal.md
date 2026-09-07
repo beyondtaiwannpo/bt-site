@@ -2,7 +2,11 @@
 description: BT 官網要變成什麼樣子。動手做網站前先跑這個。
 ---
 
-# /goal：把 beyondtaiwannpo.com 做成一個真的好看的網站
+# /bt-goal：把 beyondtaiwannpo.com 做成一個真的好看的網站
+
+> 為什麼不叫 `/goal`：Claude Code 有內建的 `/goal`（用法 `/goal <condition>`），
+> 內建指令優先度高過專案自訂的，取同一個名字會被整個蓋掉，打下去只會看到
+> 「No goal set」。2026-09-07 踩過一次。改名前先確認新名字沒有內建指令佔用。
 
 **讀完先給計畫，不要直接開始寫程式。**
 
