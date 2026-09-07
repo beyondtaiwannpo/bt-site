@@ -2,6 +2,13 @@
 
 程式細節、慣例、部署見 README.md 與 docs/。
 
+## 這個 repo 要往哪走
+@GOALS.md
+GOALS.md 是方向盤：北極星、這一季的目標、明確不做的事、優先序規則、什麼情況要停下來問 Paul。
+開場先讀它再看 README.md 與 BT-Site-交接規格.md。
+北極星是「明年一位沒寫過程式的新任幹部能自己接手，Paul 不用碰」。
+任何讓「開一個資料夾、放一個 HTML、讀那三個共用檔案」不再成立的改動，先問 Paul。
+
 # 來自 Anson（second brain，~/Anson）的 context，開場自動載入
 @~/Anson/projects/bt-website/README.md
 @~/Anson/.claude/rules/brand-voice.md
