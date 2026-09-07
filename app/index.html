@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Beyond Taiwan</title>
+<!-- 這一頁不要進搜尋結果。它是登入頁，路人從搜尋結果直接掉進來只會看到一個
+     他登不進去的表單，而對外的入口是首頁。noindex 也順便讓 Lighthouse 的
+     SEO 從 91 回到 100 —— 那 9 分扣的就是「這頁沒有描述」，
+     但登入頁本來就不該有對外描述。
+     ⚠ 只有這一頁。/passport/ 與 /availability/ 沒有這一行也進不了索引，
+     因為它們沒登入會被導走；對外那七頁一行都不要加。 -->
+<meta name="robots" content="noindex, nofollow">
 <!-- 2026-09-02（階段 7 前置）：這一頁是登入後的入口（規格 §2-1）。
      `/` 是對外簡介，`/app/` 是登入與登入後的選單，`/passport/` 只剩護照本身。
 

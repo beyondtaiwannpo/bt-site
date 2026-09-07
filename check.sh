@@ -1276,5 +1276,34 @@ else
   fi
 fi
 
+# ── noindex 只准出現在登入相關的頁面 ──────────────────────────────────
+#
+# 名單裡的兩頁是登入流程（`/app/` 登入頁、`/reset/` 改密碼），
+# 路人從搜尋結果掉進去只會看到一個他用不到的表單。
+#
+# 這條守門真正要防的是**反過來那件事**：有人複製這兩頁的 <head>
+# 去開新頁面，把 noindex 一起帶走，那一頁就從 Google 消失，
+# 而畫面上**完全看不出來** —— 沒有錯誤、沒有紅字，只是再也沒有人搜得到。
+# 對一個要靠搜尋被找到的對外網站來說，這是最貴的一種靜默失敗。
+# 所以兩個方向都要檢查：名單外的不准有，名單內的不准掉。
+NOINDEX_PAGES="app/index.html reset/index.html"
+noindex_extra=""
+noindex_missing=""
+for f in $(printf '%s\n' index.html */index.html); do
+  in_list=0
+  for w in $NOINDEX_PAGES; do [ "$f" = "$w" ] && in_list=1; done
+  has=0
+  grep -qi 'name="robots"' "$f" && has=1
+  if [ $in_list -eq 1 ] && [ $has -eq 0 ]; then noindex_missing="${noindex_missing} ${f}"; fi
+  if [ $in_list -eq 0 ] && [ $has -eq 1 ]; then noindex_extra="${noindex_extra} ${f}"; fi
+done
+if [ -n "$noindex_extra" ]; then
+  bad "這些對外頁面不該有 robots meta（會從搜尋結果消失，而且看不出來）：${noindex_extra}"
+elif [ -n "$noindex_missing" ]; then
+  bad "這些登入相關頁面少了 noindex：${noindex_missing}"
+else
+  ok "noindex 只在登入相關的兩頁（app、reset），對外頁面一個都沒有"
+fi
+
 [ $fail -eq 0 ] && say "" && say "全部通過。" || { say ""; say "有項目未通過。"; }
 exit $fail
