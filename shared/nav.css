@@ -1,36 +1,72 @@
 /* 站台頂欄。跟 shared/nav.js 成對，每個登入後的頁面都載這一份。
-   色票與字體來自 brand.css，這裡不重新宣告任何色碼；rgba 只用守門允許的三個底。
+   色票與字體來自 brand.css，這裡不重新宣告任何色碼。
 
    ── 為什麼是米白底，不是深藍（2026-09-04 使用者裁定）──
    第一版整條鋪深藍。問題不是顏色是**面積**：深藍在 Brand Book 裡是點綴色
    （標題、線條、印章框），整條橫幅鋪滿等於把它當主色用；而整站其他頁面都是
    米白加細線，那條深藍看起來像貼上去的東西。
-   所以：米白底、深藍只用在文字、底下一條細線、當前項橘色底線。
-   兩層（頂欄 vs 各頁的子欄）靠三件事分：底線、當前項的橘色標記、留白 ——
-   跟隱私政策和首頁同一套做法，不靠色塊。 */
-.btnav{display:flex;align-items:center;gap:12px;padding:0 12px;height:48px;margin-bottom:14px;
-  background:var(--paper);color:var(--ink);font-family:var(--body);
-  border-bottom:1px solid rgba(16,42,134,.22)}
-.btnav-logo{display:flex;align-items:center;flex:none}
+   所以：米白底、深藍只用在文字、當前項橘色底線。
+
+   ── 2026-09-07：換成跟對外那一面同一塊 liquid glass ──
+   對外的頁面（首頁、about、alumni…）的頂欄是一條浮起來的玻璃。
+   登入後的工具原本是一條貼齊頂端、底下一條細線的橫幅，看起來像兩個網站。
+   現在兩邊用同一塊材質。玻璃的四層與那兩個實測後調過的不透明度值，
+   寫在 README「頂欄的 liquid glass」那一節。
+
+   ⚠ **這條頂欄跟對外那一條是兩個東西，不要合併。**
+   這一條的項目來自 nav.js 的 FEATURES，是登入後的功能清單；
+   對外那一條是給還沒登入的人看的。混在一起，路人會看到他點不進去的功能。 */
+.btnav{
+  position:sticky;top:12px;z-index:50;
+  display:flex;align-items:center;gap:12px;
+  max-width:940px;margin:12px auto 18px;
+  padding:8px 10px 8px 14px;
+  border-radius:999px;
+  color:var(--ink);font-family:var(--body);
+  background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(237,229,216,.6));
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(16,42,134,.05),
+             0 10px 30px rgba(16,42,134,.10),0 2px 6px rgba(16,42,134,.06);
+}
+/* 偵測不到 backdrop-filter 就退回不透明的紙色。硬做的話使用者會看到
+   一塊幾乎透明的東西壓在內容上，那比沒有玻璃難看得多。 */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .btnav{background:var(--bt-cream);border-color:rgba(16,42,134,.14)}
+}
+/* 視窗比 940 窄的時候，左右要留白，不然玻璃會貼著螢幕邊。 */
+@media (max-width:980px){ .btnav{margin-left:16px;margin-right:16px} }
+
+.btnav-logo{display:flex;align-items:center;flex:none;position:relative}
 .btnav-logo img{height:24px;width:auto;display:block}
-.btnav-items{display:flex;gap:2px;min-width:0}
+.btnav-items{display:flex;gap:4px;min-width:0}
 .btnav-items a{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.04em;
-  color:var(--ink);text-decoration:none;padding:6px 7px;border-bottom:3px solid transparent;
-  opacity:.6;white-space:nowrap}
+  color:var(--ink);text-decoration:none;padding:6px 9px;border-bottom:2px solid transparent;
+  opacity:.72;white-space:nowrap}
 .btnav-items a:hover{opacity:1}
 /* 當前所在：橘色底線、全深。 */
 .btnav-items a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
 .btnav-sp{flex:1}
-.btnav-who{font-size:14px;font-weight:600;max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.75}
+/* ⚠ 名字用 rgba 指定顏色，不要用 opacity。opacity 會連對比度一起打折：
+   深藍在米白上 .75 只有約 4.4:1，剛好過不了 WCAG AA 的 4.5:1。
+   這個 repo 已經在四個地方踩過同一件事。 */
+.btnav-who{font-size:14px;font-weight:600;max-width:6em;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:rgba(16,42,134,.82)}
 .btnav-who .short{display:none}
-/* 登出：深藍的低透明度框線。米白底上半透明白會消失，而深藍是允許的 rgba 底之一。 */
+/* 登出：藥丸形的框線鈕，跟對外頁的次要按鈕同一個形狀。 */
 .btnav-out{font-family:var(--body);font-size:14px;font-weight:600;color:var(--ink);
-  background:none;border:1px solid rgba(16,42,134,.3);border-radius:2px;padding:5px 10px;min-height:38px;cursor:pointer;flex:none}
-.btnav-out:hover{border-color:var(--ink)}
-.btnav :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+  background:none;border:1px solid rgba(16,42,134,.3);border-radius:999px;
+  padding:7px 14px;min-height:38px;cursor:pointer;flex:none;position:relative;
+  transition:background .15s,border-color .15s}
+.btnav-out:hover{border-color:var(--ink);background:rgba(255,255,255,.7)}
+/* 可點區域 44x44，視覺大小不變。跟對外頁同一個做法。 */
+.btnav-logo::after,.btnav-out::after{
+  content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+.btnav :focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
 /* 窄螢幕：名字只留第一個字，項目字級縮一點。量過 390／360／320（見 ledger）。 */
 @media (max-width:360px){
-  .btnav{gap:8px;padding:0 10px}
+  .btnav{gap:8px;padding:8px 8px 8px 12px}
   .btnav-who .full{display:none}.btnav-who .short{display:inline}
-  .btnav-items a{font-size:16px;padding:6px 5px}
+  .btnav-items a{font-size:16px;padding:6px 6px}
 }

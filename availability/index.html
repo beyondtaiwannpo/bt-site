@@ -17,35 +17,58 @@
 <link rel="stylesheet" href="../shared/nav.css">
 <style>
   /* 色票、字體、圓角全部來自 ../shared/brand.css，這裡一個都不重新宣告。 */
+  /* 2026-09-07：外殼跟對外那一面統一（紙底、右上角的暖光、浮起來的玻璃頂欄、
+     藥丸形的按鈕）。功能與版面沒有動，換的是視覺層。 */
+  html{overflow-x:clip}
+  body{background:var(--paper);overflow-x:clip}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+  #bt-root{position:relative;z-index:1}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   #bt-root{font-family:var(--body);color:var(--ink);line-height:1.55;max-width:940px;margin:0 auto;padding:14px 12px 60px}
   /* :where() 是必要的，不是風格 —— 見 passport/index.html 同一條的註解。 */
   :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
   #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
 
-  .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;margin-bottom:12px;
-    background:var(--paper);border:1px solid rgba(16,42,134,.14);border-radius:var(--r)}
+  /* 這一條玻璃只裝分頁鈕（logo 與登出在 shared 的頂欄）。
+     不加 width:fit-content 的話它會拉滿 940px，右邊三分之二是空的，
+     看起來像少畫了東西。護照那一條右邊還有集章進度，所以那邊是滿版。 */
+  .bar{display:flex;width:fit-content;max-width:100%;
+    align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;
+    border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(237,229,216,.5));
+    backdrop-filter:blur(16px) saturate(180%);
+    -webkit-backdrop-filter:blur(16px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 8px 24px rgba(16,42,134,.08)}
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .bar{background:rgba(255,255,255,.75)}
+  }
   .bar img{height:24px;width:auto;display:block}
   .bar .sp{flex:1}
-  .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:2px;overflow:hidden}
+  .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:999px;overflow:hidden}
   .tabs button{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.06em;
     padding:6px 12px;color:rgba(16,42,134,.55);transition:background .15s,color .15s}
   .tabs button[aria-current]{background:var(--bt-navy);color:var(--bt-cream)}
   .weeknav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:14px}
   .weeknav b{font-family:var(--display);font-size:18px;letter-spacing:.04em}
 
-  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:22px 20px}
+  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:18px;padding:24px 22px;
+    box-shadow:0 10px 30px rgba(16,42,134,.07)}
   .card h2{font-family:var(--display);font-size:30px;font-weight:700;letter-spacing:.03em;margin:0 0 4px;line-height:1.05}
-  .card .sub{font-size:13px;opacity:.6;margin-bottom:18px}
+  /* ⚠ 用 rgba 指定顏色不要用 opacity —— opacity 會連對比度一起打折。
+     深藍在米白上 .6 只有約 3.6:1，過不了 AA 的 4.5:1。這個 repo 踩過四次。 */
+  .card .sub{font-size:13.5px;color:rgba(16,42,134,.8);margin-bottom:18px}
   .card p{font-size:14px;margin:0 0 12px}
   label{display:block;margin-bottom:14px}
-  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;display:block;margin-bottom:5px}
+  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.8);display:block;margin-bottom:5px}
   input,select{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);padding:8px 10px;
-    border:1px solid rgba(16,42,134,.28);border-radius:2px;background:rgba(255,255,255,.55)}
+    border:1px solid rgba(16,42,134,.28);border-radius:12px;background:rgba(255,255,255,.7)}
   select{width:auto;min-width:96px}
   .btn{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-    padding:9px 18px;border-radius:2px;background:var(--bt-navy);color:var(--bt-cream);transition:opacity .15s}
-  .btn:hover{opacity:.86}
+    padding:11px 22px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:background .15s,color .15s}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
   .btn[disabled]{opacity:.4;cursor:default}
   .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
   .btn.sm{font-size:14px;padding:6px 12px}
@@ -54,20 +77,20 @@
   .btn.quiet:hover{color:var(--ink)}
   a.btn{text-decoration:none;display:inline-block}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
-  .wnote{font-size:12.5px;opacity:.75;padding:9px 12px;background:rgba(255,196,108,.25);border-radius:2px}
+  .wnote{font-size:12.5px;padding:10px 14px;background:rgba(255,196,108,.25);border-radius:12px}
   .wnote.big{font-size:15px;opacity:1;padding:14px 16px;margin-bottom:14px}
-  .empty{text-align:center;padding:40px 0;opacity:.55;font-size:14px}
+  .empty{text-align:center;padding:40px 0;color:rgba(16,42,134,.78);font-size:14px}
   .empty.sm{padding:14px 0}
-  .mini{font-size:12.5px;opacity:.7}
+  .mini{font-size:12.5px;color:rgba(16,42,134,.8)}
 
   /* ---------- 格線 ---------- */
   /* 48 列 × 7 欄。**刻意顯示完整 24 小時**：藏起來的那幾列有可能正是某個人
      唯一有空的時間，而少了一個人這件事在畫面上看不出來。捲動比藏起來誠實。 */
-  .gridwrap{overflow:auto;max-height:70vh;border:1px solid rgba(16,42,134,.18);border-radius:var(--r);background:var(--paper)}
+  .gridwrap{overflow:auto;max-height:70vh;border:1px solid rgba(16,42,134,.18);border-radius:16px;background:var(--paper)}
   table.grid{border-collapse:collapse;width:100%;font-size:11px}
   table.grid th{position:sticky;top:0;z-index:2;background:var(--paper);font-family:var(--display);
     font-size:14px;font-weight:600;padding:6px 2px;border-bottom:1px solid rgba(16,42,134,.2)}
-  table.grid th span{display:block;font-family:var(--body);font-size:10px;font-weight:400;opacity:.5}
+  table.grid th span{display:block;font-family:var(--body);font-size:10px;font-weight:400;color:rgba(16,42,134,.78)}
   table.grid th.hr{position:sticky;left:0;z-index:1;top:auto;font-family:var(--body);font-size:10px;
     font-weight:600;opacity:.55;width:40px;text-align:right;padding-right:6px;border-bottom:none}
   table.grid td{padding:0;border:1px solid rgba(16,42,134,.07)}
@@ -83,13 +106,13 @@
   /* 規格 §4-3 B：拖曳塗一百個格子在手機上不可行，已經實測過。
      所以這一塊排在格線**前面**，而且是預設看得到的那一塊。 */
   .batch{background:rgba(255,255,255,.45);border:1px solid rgba(16,42,134,.2);
-    border-radius:2px;padding:14px 14px 10px;margin-bottom:14px}
+    border-radius:14px;padding:14px 14px 10px;margin-bottom:14px}
   .brow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:14px}
-  .brow i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;min-width:44px}
+  .brow i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.8);min-width:44px}
   .brow.copy{margin:16px 0 6px}
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{font-family:var(--display);font-size:16px;font-weight:600;min-width:38px;height:38px;
-    border:1px solid rgba(16,42,134,.3);border-radius:2px;background:rgba(255,255,255,.6)}
+    border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7)}
   .chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
   .row.sticky{position:sticky;bottom:0;background:var(--paper);padding:12px 0 4px;margin-top:12px;
     border-top:1px solid rgba(16,42,134,.15)}
