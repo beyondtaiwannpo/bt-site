@@ -38,8 +38,9 @@ export function listHTML(forms, canCreate, msg) {
         ・收到 <span class="count">${f.counts.total}</span> 件${
           f.counts.received ? `，其中 ${f.counts.received} 件還沒處理` : ""}</div>
       <div class="row">
-        <button class="btn ghost sm" data-act="open-form" data-id="${esc(f.id)}">${
-          canCreate ? "編輯這份表單" : "看這份表單"}</button>
+        <button class="btn ghost sm" data-act="open-apps" data-id="${esc(f.id)}">看收到的申請</button>
+        <button class="btn quiet" data-act="open-form" data-id="${esc(f.id)}">${
+          canCreate ? "改這份表單" : "看這份表單"}</button>
       </div>
     </li>`;
   }).join("");
@@ -172,6 +173,105 @@ export function questionHTML(q, msg, busy) {
     </label>
     <div class="row">
       <button class="btn" data-act="q-save" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存這一題"}</button>
+    </div>
+  </div>`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// 批 4：審核
+// ═══════════════════════════════════════════════════════════════════════
+export const APP_STATUS = [
+  { v: "received",  label: "還沒處理", tag: "" },
+  { v: "interview", label: "邀請面試", tag: "closed" },
+  { v: "accepted",  label: "錄取",     tag: "open" },
+  { v: "rejected",  label: "婉拒",     tag: "draft" },
+];
+const appStatusOf = v => APP_STATUS.find(s => s.v === v) || APP_STATUS[0];
+
+export function fmtWhen(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d)) return "";
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+// 一件申請一列。
+//
+// ⚠ **答案預設是收起來的，但「展開」不打網路** —— 答案已經在手上了
+// （見 data.js 的 loadApplications）。審核就是一個一個看，
+// 每看一個等一次網路的話，看到第十個就不想看了。
+export function appsHTML(form, apps, questions, canDecide, sel, filter, pending, msg, busy) {
+  const shown = filter === "all" ? apps : apps.filter(a => a.status === filter);
+  const counts = {};
+  for (const s of APP_STATUS) counts[s.v] = apps.filter(a => a.status === s.v).length;
+
+  const rows = shown.map(a => {
+    const st = appStatusOf(a.status);
+    const on = sel.has(a.id);
+    return `<li>
+      <div class="arow">
+        ${canDecide ? `<label class="apick"><input type="checkbox" data-act="pick" data-id="${esc(a.id)}"${on ? " checked" : ""}
+          aria-label="選取 ${esc(a.applicant_name)}"></label>` : ""}
+        <div class="abody">
+          <div class="fhead">
+            <b>${esc(a.applicant_name)}</b>
+            <span class="tag ${st.tag}">${esc(st.label)}</span>
+          </div>
+          <div class="fmeta">${[esc(a.applicant_school || "沒填學校"), esc(a.applicant_grade || ""),
+            esc(a.applicant_email), fmtWhen(a.submitted_at) + " 送出"].filter(Boolean).join("・")}
+            ${a.guardian_email ? "<br>家長信箱：" + esc(a.guardian_email) : ""}</div>
+          <details class="ans">
+            <summary>看他寫了什麼</summary>
+            <dl>${questions.map(q => {
+              const v = a.answers.get ? a.answers.get(q.id) : "";
+              return `<dt>${esc(q.label)}</dt><dd>${v ? esc(v).replace(/\n/g, "<br>") : "<span class=\"mini\">（沒填）</span>"}</dd>`;
+            }).join("")}</dl>
+          </details>
+        </div>
+      </div>
+    </li>`;
+  }).join("");
+
+  const bar = canDecide ? `<div class="bulk${sel.size ? " on" : ""}">
+    <span>${sel.size ? `選了 ${sel.size} 個人` : "勾起來就可以一次處理很多人"}</span>
+    <span class="btnav-sp"></span>
+    <button class="btn ghost sm" data-act="pick-all">${
+      shown.length && shown.every(a => sel.has(a.id)) ? "全部取消" : "全選這一頁"}</button>
+    <button class="btn sm" data-act="decide" data-s="interview" ${sel.size && !busy ? "" : "disabled"}>邀請面試</button>
+    <button class="btn sm" data-act="decide" data-s="accepted"  ${sel.size && !busy ? "" : "disabled"}>錄取</button>
+    <button class="btn sm" data-act="decide" data-s="rejected"  ${sel.size && !busy ? "" : "disabled"}>婉拒</button>
+  </div>` : "";
+
+  return `<div class="card">
+    <div class="row" style="margin:0 0 14px">
+      <button class="btn quiet" data-act="back-list">← 回清單</button>
+      <button class="btn quiet" data-act="open-form" data-id="${esc(form.id)}">改這份表單</button>
+    </div>
+    <h2>${esc(form.title)}</h2>
+    <div class="sub">收到 ${apps.length} 件</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${pendingHTML(pending, busy)}
+    <div class="chips" style="margin-bottom:4px">
+      <button class="chip wide${filter === "all" ? " on" : ""}" data-act="filter" data-f="all">全部 ${apps.length}</button>
+      ${APP_STATUS.map(s => `<button class="chip wide${filter === s.v ? " on" : ""}" data-act="filter" data-f="${s.v}">${esc(s.label)} ${counts[s.v]}</button>`).join("")}
+    </div>
+    ${bar}
+    ${shown.length ? `<ul class="flist alist2">${rows}</ul>`
+      : `<div class="empty">這一格裡沒有人。</div>`}
+  </div>`;
+}
+
+// 還沒寄出去的信。**沒有待寄的信就完全不畫**，
+// 一個永遠顯示「0 封待寄」的區塊只是雜訊，久了沒有人會看它。
+function pendingHTML(pending, busy) {
+  if (!pending || !pending.length) return "";
+  const stuck = pending.filter(p => p.tries > 0);
+  return `<div class="wnote big">
+    還有 <b>${pending.length}</b> 封信沒有寄出去。
+    ${stuck.length ? `其中 ${stuck.length} 封試過但失敗了：${esc(stuck[0].error || "沒有錯誤訊息")}` : ""}
+    <div class="row">
+      <button class="btn ghost sm" data-act="send-mail" ${busy ? "disabled" : ""}>${busy ? "寄送中…" : "現在寄出去"}</button>
     </div>
   </div>`;
 }

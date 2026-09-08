@@ -127,6 +127,37 @@
   @media (max-width:560px){ .two{grid-template-columns:1fr} }
   /* 一列裡的小標籤加輸入，label 本身已經是 block，這裡只收掉下緣間距。 */
   .two label{margin-bottom:14px}
+  /* ---------- 審核（批 4）---------- */
+  .arow{display:flex;gap:12px;align-items:flex-start}
+  .apick{flex:none;padding-top:4px}
+  .apick input{width:19px;height:19px;accent-color:var(--bt-navy);cursor:pointer;margin:0}
+  .abody{flex:1;min-width:0}
+  .ans{margin-top:9px}
+  .ans summary{font-size:13.5px;color:rgba(16,42,134,.82);cursor:pointer;
+    display:inline-block;padding:3px 0}
+  .ans dl{margin:8px 0 0;padding:12px 14px;border-radius:12px;
+    background:rgba(255,255,255,.55);border:1px solid rgba(16,42,134,.14)}
+  .ans dt{font-size:12.5px;font-weight:700;letter-spacing:.02em;color:rgba(16,42,134,.75);margin-top:12px}
+  .ans dt:first-child{margin-top:0}
+  .ans dd{margin:4px 0 0;font-size:14.5px;line-height:1.6;overflow-wrap:anywhere}
+  /* 批次列。**選了人才變顯眼**——沒選人的時候它只是一行說明，
+     一直亮著的話那三顆會寄信的按鈕就變成背景的一部分。 */
+  .bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 4px;
+    padding:11px 13px;border-radius:14px;font-size:13.5px;
+    background:rgba(255,255,255,.45);border:1px solid rgba(16,42,134,.16)}
+  .bulk.on{background:rgba(255,196,108,.28);border-color:rgba(16,42,134,.28)}
+  /* ⚠ .chips 與 .chip 在 availability/index.html 裡是「批次填寫」那一段的樣式，
+     而這份外殼是從它的前半段複製過來的 —— 所以要在這裡自己寫一份。
+     2026-09-08 漏掉過一次：篩選那一排看起來像四段純文字，沒有人知道可以點。 */
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-family:var(--body);font-size:13.5px;font-weight:600;padding:0 13px;height:34px;
+    border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7);
+    color:var(--ink);transition:background .15s,color .15s}
+  .chip:hover{background:rgba(255,255,255,.95)}
+  .chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+  .chip.wide{min-width:0}
+  .alist2 li{padding:18px 0}
+
 </style>
 </head>
 <body>

@@ -178,3 +178,90 @@ test("學員頁畫得出我的申請與現在開放的，而且已經申請過�
   assert.match(h, /導生配對/);
   assert.equal((h.match(/探索營/g) || []).length, 1, "已經申請過的又出現在「現在開放」裡");
 });
+
+// ── /admin/ 審核（批 4）───────────────────────────────────────────────
+const apps = [
+  { id: "a1", applicant_name: "陳小安", applicant_school: "建中", applicant_grade: "高二",
+    applicant_email: "a@example.com", guardian_email: "mom@example.com",
+    status: "received", submitted_at: "2026-11-01T02:00:00Z", answers: new Map([["q1", "因為我想出國"]]) },
+  { id: "a2", applicant_name: "林大維", applicant_school: "北一女", applicant_grade: "高三",
+    applicant_email: "b@example.com", guardian_email: null,
+    status: "accepted", submitted_at: "2026-11-02T02:00:00Z", answers: new Map() },
+];
+const aq = [{ id: "q1", label: "你為什麼想參加", type: "long", required: true, options: [] }];
+const aform = { id: "f1", title: "探索營" };
+
+test("審核頁：每一件都看得到名字、學校、送出日期與狀態", () => {
+  const h = M.appsHTML(aform, apps, aq, true, new Set(), "all", [], "", false);
+  assert.match(h, /陳小安/);
+  assert.match(h, /建中/);
+  assert.match(h, /還沒處理/);
+  assert.match(h, /錄取/);
+  assert.match(h, /mom@example\.com/, "家長信箱要看得到，那是要寄告知信的地方");
+});
+
+test("答案是收起來的，但已經在頁面上（點開不打網路）", () => {
+  const h = M.appsHTML(aform, apps, aq, true, new Set(), "all", [], "", false);
+  assert.match(h, /<details class="ans">/);
+  assert.match(h, /因為我想出國/, "答案沒有畫進頁面，那就會變成點開才查");
+  assert.match(h, /（沒填）/, "沒填的題目要說出來，不是留白");
+});
+
+// ⚠ 這三顆按鈕會寄信給未成年人，而且收不回來。
+test("★ 沒有選人的時候，三顆會寄信的按鈕是鎖住的", () => {
+  const h = M.appsHTML(aform, apps, aq, true, new Set(), "all", [], "", false);
+  for (const s of ["interview", "accepted", "rejected"])
+    assert.match(h, new RegExp(`data-act="decide" data-s="${s}"[^>]*disabled`), s + " 沒有鎖住");
+});
+
+test("選了人之後按鈕開得動，而且說出選了幾個", () => {
+  const h = M.appsHTML(aform, apps, aq, true, new Set(["a1"]), "all", [], "", false);
+  assert.match(h, /選了 1 個人/);
+  assert.doesNotMatch(h, /data-act="decide" data-s="accepted"[^>]*disabled/);
+});
+
+test("★ 一般幹部看得到申請，但沒有任何會寄信的按鈕", () => {
+  const h = M.appsHTML(aform, apps, aq, false, new Set(), "all", [], "", false);
+  assert.match(h, /陳小安/, "看不到申請的話這一頁對他沒有用");
+  assert.doesNotMatch(h, /data-act="decide"/);
+  assert.doesNotMatch(h, /data-act="pick"/);
+});
+
+test("篩選：每一格都顯示數量，選到的那一格有標記", () => {
+  const h = M.appsHTML(aform, apps, aq, true, new Set(), "accepted", [], "", false);
+  assert.match(h, /全部 2/);
+  assert.match(h, /還沒處理 1/);
+  assert.match(h, /data-f="accepted"[^>]*>/);
+  assert.doesNotMatch(h, /陳小安/, "篩選成「錄取」之後不該看到還沒處理的人");
+});
+
+// ⚠ 這是「用資料庫寄信」那個取捨成立的前提：看不見的東西壞掉沒有人會發現。
+test("★ 有信沒寄出去就一定要說，而且給得出重試的路", () => {
+  const h = M.appsHTML(aform, apps, aq, true, new Set(), "all",
+    [{ id: "m1", kind: "accepted", tries: 2, error: "mail_not_configured" }], "", false);
+  assert.match(h, /還有 <b>1<\/b> 封信沒有寄出去/);
+  assert.match(h, /mail_not_configured/, "失敗原因要顯示出來");
+  assert.match(h, /data-act="send-mail"/);
+});
+
+test("沒有待寄的信就完全不畫那一塊（永遠顯示 0 的區塊是雜訊）", () => {
+  const h = M.appsHTML(aform, apps, aq, true, new Set(), "all", [], "", false);
+  assert.doesNotMatch(h, /沒有寄出去/);
+  assert.doesNotMatch(h, /data-act="send-mail"/);
+});
+
+test("跳脫：申請人的名字裡有角括號也不會變成標籤", () => {
+  const evil = [{ ...apps[0], applicant_name: '<img src=x onerror="alert(1)">' }];
+  const h = M.appsHTML(aform, evil, aq, true, new Set(), "all", [], "", false);
+  assert.ok(!h.includes("<img src=x"));
+});
+
+test("★ 錯誤代碼要翻成人話（看到它的多半是沒設定過 Vault 的學生）", async () => {
+  const D = await import("../admin/src/data.js");
+  assert.match(D.says(new Error("mail_not_configured")), /Vault/);
+  assert.match(D.says(new Error("mail_not_configured")), /pg_net/);
+  assert.match(D.says({ message: "not_director_of:Marketing" }), /不是你這個 team/);
+  assert.match(D.says(new Error("form_closed")), /已經關閉/);
+  assert.equal(D.says(new Error("某個沒見過的錯")), "某個沒見過的錯",
+    "沒對到的錯誤要原樣顯示，不要吞掉");
+});

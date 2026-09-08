@@ -136,3 +136,82 @@ export async function loadTeams() {
   return [...new Set((data || []).map(r => (r.team || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "zh-Hant"));
 }
+
+// ── 批 4：申請與寄信 ──────────────────────────────────────────────────
+
+// 一份表單收到的申請，連同答案。
+//
+// **答案一次全部拿回來，不是點開才查。** 一份表單一百多件、每件十題，
+// 是一千多列 —— 對 Postgres 是小事，但「點開才查」會讓審核的人每看一個人
+// 就等一次網路，而審核就是一個一個看。
+export async function loadApplications(formId) {
+  need();
+  const [ap, an] = await Promise.all([
+    supabase.from("applications")
+      .select("id, user_id, applicant_name, applicant_school, applicant_grade, " +
+              "applicant_email, guardian_email, status, submitted_at, decided_at")
+      .eq("form_id", formId)
+      .order("submitted_at", { ascending: true }),
+    supabase.from("application_answers").select("application_id, question_id, value"),
+  ]);
+  if (ap.error) throw ap.error;
+  if (an.error) throw an.error;
+  const byApp = new Map();
+  for (const a of an.data || []) {
+    if (!byApp.has(a.application_id)) byApp.set(a.application_id, new Map());
+    byApp.get(a.application_id).set(a.question_id, a.value);
+  }
+  return (ap.data || []).map(a => ({ ...a, answers: byApp.get(a.id) || new Map() }));
+}
+
+// 一次改很多筆。**回傳真的改了幾筆** —— 狀態本來就一樣的不算，
+// 那正是「按兩次錄取不會寄兩封信」的地方。
+export async function decide(ids, status) {
+  need();
+  const { data, error } = await supabase.rpc("decide_applications",
+    { p_ids: ids, p_status: status });
+  if (error) throw error;
+  return data;
+}
+
+export async function sendMail() {
+  need();
+  const { data, error } = await supabase.rpc("send_pending_mail", { p_limit: 100 });
+  if (error) throw error;
+  // 這支函式回的是一列 (sent, failed)。PostgREST 把它包成陣列。
+  const row = Array.isArray(data) ? data[0] : data;
+  return { sent: (row && row.sent) || 0, failed: (row && row.failed) || 0 };
+}
+
+// 還沒寄出去的信。**這一句是用資料庫寄信那個取捨成立的前提** ——
+// 看不見的東西壞掉沒有人會發現。
+export async function loadPending(formId) {
+  need();
+  const { data, error } = await supabase.from("mail_outbox")
+    .select("id, to_email, kind, created_at, tries, error")
+    .eq("form_id", formId).is("sent_at", null)
+    .order("created_at");
+  if (error) throw error;
+  return data || [];
+}
+
+// 資料庫丟出來的錯誤代碼翻成人話。
+//
+// **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
+// 「mail_not_configured」對他來說跟一段亂碼沒有兩樣，
+// 而他需要知道的是「去哪裡做什麼」，不是那個代碼長什麼樣。
+const SAYS = [
+  ["mail_not_configured",
+   "信件還沒設定好，所以寄不出去。要有人到 Supabase 的 Vault 加上 RESEND_API_KEY 與 BT_MAIL_FROM 兩個 secret，並且打開 pg_net。步驟寫在 supabase/migrations/2026-09-10-decisions-and-mail.sql 的最後面。"],
+  ["not_director_of:",
+   "這裡面有一份不是你這個 team 的申請，所以整批都沒有動。"],
+  ["not_president", "只有當屆 Co-President 可以做這件事。"],
+  ["not_cadre", "這個動作只有幹部做得了。"],
+  ["not_signed_in", "你的登入已經過期了，重新登入一次就好。"],
+  ["form_closed", "這份表單已經關閉了。"],
+];
+export function says(err) {
+  const m = String((err && err.message) || err || "");
+  for (const [code, text] of SAYS) if (m.includes(code)) return text;
+  return m;
+}

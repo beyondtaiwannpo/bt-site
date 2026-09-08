@@ -11,9 +11,11 @@ import * as UI from "./ui.js";
 
 let S = {
   user: null, me: null, down: false, busy: false, msg: "",
-  view: "list",            // list | form | question
+  view: "list",            // list | form | question | apps
   forms: [], teams: [],
   form: null, questions: [], qEditing: null,
+  // 批 4
+  apps: [], sel: new Set(), filter: "all", pending: [],
 };
 
 const root = () => document.getElementById("bt-root");
@@ -34,7 +36,10 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
 
   document.body.insertAdjacentHTML("afterbegin", nav);
-  if (S.view === "question") {
+  if (S.view === "apps" && S.form) {
+    el.innerHTML = UI.appsHTML(S.form, S.apps, S.questions, canEdit(),
+      S.sel, S.filter, S.pending, S.msg, S.busy);
+  } else if (S.view === "question") {
     el.innerHTML = UI.questionHTML(S.qEditing, S.msg, S.busy);
   } else if (S.view === "form" && S.form) {
     el.innerHTML = UI.formHTML(S.form, S.questions, canEdit(),
@@ -87,12 +92,31 @@ async function openForm(id) {
   try {
     const { form, questions } = await D.loadForm(id);
     S.form = form; S.questions = questions; S.view = "form"; S.busy = false; S.msg = "";
-  } catch (e) { S.busy = false; S.msg = "打不開：" + (e.message || e); }
+  } catch (e) { S.busy = false; S.msg = "打不開：" + D.says(e); }
   render();
 }
 
+async function openApps(id) {
+  S.busy = true; S.msg = ""; render();
+  try {
+    const { form, questions } = await D.loadForm(id);
+    S.form = form; S.questions = questions;
+    S.apps = await D.loadApplications(id);
+    S.pending = await D.loadPending(id);
+    S.sel = new Set(); S.filter = "all"; S.view = "apps"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "打不開：" + D.says(e); }
+  render();
+}
+
+// 改完狀態之後重讀。**連 pending 一起重讀** ——
+// 不然「還有 N 封沒寄出去」那一塊會停在改之前的數字。
+async function refreshApps() {
+  S.apps = await D.loadApplications(S.form.id);
+  S.pending = await D.loadPending(S.form.id);
+}
+
 async function reloadList() {
-  try { S.forms = await D.loadForms(); } catch (e) { S.msg = "清單載不到：" + (e.message || e); }
+  try { S.forms = await D.loadForms(); } catch (e) { S.msg = "清單載不到：" + D.says(e); }
 }
 
 document.addEventListener("click", async e => {
@@ -104,8 +128,77 @@ document.addEventListener("click", async e => {
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
 
-  if (act === "back-list") { S.view = "list"; S.msg = ""; await reloadList(); render(); return; }
+  if (act === "back-list") {
+    S.view = "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render(); return;
+  }
   if (act === "open-form") { await openForm(id); return; }
+  if (act === "open-apps") { await openApps(id); return; }
+
+  // ── 批 4：審核 ────────────────────────────────────────────────────
+  if (act === "filter") { S.filter = b.dataset.f; S.msg = ""; render(); return; }
+
+  if (act === "pick") {
+    // checkbox 的預設行為已經把勾打上去了，這裡只同步 S。
+    // **不要 preventDefault 再自己畫** —— 那會讓鍵盤操作變成兩套邏輯。
+    if (S.sel.has(id)) S.sel.delete(id); else S.sel.add(id);
+    render();
+    return;
+  }
+
+  if (act === "pick-all") {
+    const shown = S.filter === "all" ? S.apps : S.apps.filter(a => a.status === S.filter);
+    const allOn = shown.length && shown.every(a => S.sel.has(a.id));
+    for (const a of shown) { if (allOn) S.sel.delete(a.id); else S.sel.add(a.id); }
+    render();
+    return;
+  }
+
+  if (act === "decide") {
+    const status = b.dataset.s;
+    const ids = [...S.sel];
+    if (!ids.length) return;
+    const word = { interview: "邀請面試", accepted: "錄取", rejected: "婉拒" }[status] || status;
+    // ⚠ **這一步會寄信給未成年人，而且收不回來。** 所以要確認，
+    // 而且確認的句子裡要有人數與動作，不是一句「確定嗎」。
+    if (!confirm(`要把選起來的 ${ids.length} 個人標成「${word}」嗎？\n\n` +
+                 `每一個人都會收到一封信。信寄出去就收不回來了。`)) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const n = await D.decide(ids, status);
+      // 改完立刻試著把信寄出去。失敗不影響狀態（狀態已經改好了），
+      // 只會留在 outbox 裡，畫面上看得到。
+      let mailNote = "";
+      try {
+        const r = await D.sendMail();
+        mailNote = r.sent ? `，寄出 ${r.sent} 封信` : "";
+        if (r.failed) mailNote += `，${r.failed} 封沒寄成功`;
+      } catch (me) {
+        mailNote = "。信還沒寄出去：" + D.says(me);
+      }
+      S.sel = new Set();
+      await refreshApps();
+      S.busy = false;
+      S.msg = `${n} 個人標成「${word}」${mailNote}。`;
+    } catch (err) {
+      S.busy = false; S.msg = "改不了：" + D.says(err);
+    }
+    render();
+    return;
+  }
+
+  if (act === "send-mail") {
+    S.busy = true; S.msg = ""; render();
+    try {
+      const r = await D.sendMail();
+      S.pending = await D.loadPending(S.form.id);
+      S.busy = false;
+      S.msg = r.failed ? `寄出 ${r.sent} 封，${r.failed} 封失敗。` : `寄出 ${r.sent} 封。`;
+    } catch (err) {
+      S.busy = false; S.msg = "寄不出去：" + D.says(err);
+    }
+    render();
+    return;
+  }
 
   if (act === "new-form") {
     // President 沒有 team 的時候要先選一個，不然這份表單會屬於空字串，
@@ -119,7 +212,7 @@ document.addEventListener("click", async e => {
       const newId = await D.createForm(team, title.trim(), "program");
       S.busy = false;
       await openForm(newId);
-    } catch (err) { S.busy = false; S.msg = "開不出來：" + (err.message || err); render(); }
+    } catch (err) { S.busy = false; S.msg = "開不出來：" + D.says(err); render(); }
     return;
   }
 
@@ -136,7 +229,7 @@ document.addEventListener("click", async e => {
       await D.saveForm(S.form.id, patch);
       const { form, questions } = await D.loadForm(S.form.id);
       S.form = form; S.questions = questions; S.busy = false; S.msg = "存好了。";
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + (err.message || err); }
+    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); }
     render();
     return;
   }
@@ -152,7 +245,7 @@ document.addEventListener("click", async e => {
       await D.deleteForm(S.form.id);
       S.busy = false; S.view = "list"; S.form = null; S.msg = "刪掉了。";
       await reloadList();
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + (err.message || err); }
+    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); }
     render();
     return;
   }
@@ -189,7 +282,7 @@ document.addEventListener("click", async e => {
       else await D.addQuestion(S.form.id, q, S.questions);
       const r = await D.loadForm(S.form.id);
       S.questions = r.questions; S.busy = false; S.view = "form"; S.qEditing = null; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + (err.message || err); }
+    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); }
     render();
     return;
   }
@@ -201,7 +294,7 @@ document.addEventListener("click", async e => {
       await D.deleteQuestion(id);
       const r = await D.loadForm(S.form.id);
       S.questions = r.questions; S.busy = false; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + (err.message || err); }
+    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); }
     render();
     return;
   }
@@ -215,7 +308,7 @@ document.addEventListener("click", async e => {
       await D.swapOrd(S.questions[i], S.questions[j]);
       const r = await D.loadForm(S.form.id);
       S.questions = r.questions; S.busy = false;
-    } catch (err) { S.busy = false; S.msg = "換不了順序：" + (err.message || err); }
+    } catch (err) { S.busy = false; S.msg = "換不了順序：" + D.says(err); }
     render();
     return;
   }
