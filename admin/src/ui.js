@@ -25,7 +25,7 @@ export const dtVal = v => (v ? String(v).slice(0, 16) : "");
 // ── 表單清單 ──────────────────────────────────────────────────────────
 // canCreate：Director 與 President 才有。一般幹部進來是**唯讀**的，
 // 那是 2026-09-07 拍板的三層：看得到自己 team 的申請，但改不動表單。
-export function listHTML(forms, canCreate, msg) {
+export function listHTML(forms, canCreate, msg, isPresident) {
   const rows = forms.map(f => {
     const st = statusOf(f.status);
     return `<li>
@@ -49,7 +49,7 @@ export function listHTML(forms, canCreate, msg) {
     <h2>申請管理</h2>
     <div class="sub">開申請表、看收到的申請。你看得到的是自己 team 的表單。</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    ${tabsHTML("forms")}
+    ${tabsHTML("forms", isPresident)}
     ${canCreate ? `<div class="row" style="margin-bottom:6px">
       <button class="btn" data-act="new-form">開一份新的申請表</button>
     </div>` : `<div class="wnote">你可以看，但改不動。開表單與審核是 Director 與 Co-President 的事。</div>`}
@@ -359,14 +359,51 @@ export const RES_KINDS = [
 
 // 兩個大分頁：申請表 / 資源。**不是頂欄的第四個功能** ——
 // 它們是同一件事的兩面（對外給學生的東西），拆成兩個入口會讓人以為是兩個系統。
-export function tabsHTML(tab) {
+export function tabsHTML(tab, isPresident) {
   return `<div class="chips" style="margin-bottom:16px">
     <button class="chip wide${tab === "forms" ? " on" : ""}" data-act="tab" data-t="forms">申請表</button>
     <button class="chip wide${tab === "res" ? " on" : ""}" data-act="tab" data-t="res">資源</button>
+    ${isPresident ? `<button class="chip wide${tab === "team" ? " on" : ""}" data-act="tab" data-t="team">團隊頁</button>` : ""}
   </div>`;
 }
 
-export function resListHTML(items, canEdit, msg) {
+// 團隊頁的核可。**只有 Co-President 看得到這個分頁**（核可是他們的鑰匙）。
+//
+// ⚠ 那兩句提醒不是裝飾。系統沒有生日欄位，「未滿 18 不放」技術上擋不住，
+// 而大頭照對外是超出現行隱私政策告知範圍的新用途。
+// 這一頁是這兩件事**唯一會被看到的地方**。
+export function publicTeamHTML(people, msg, busy) {
+  const on = people.filter(p => p.public_approved).length;
+  return `<div class="card">
+    <h2>團隊頁</h2>
+    <div class="sub">誰出現在對外的 /team/ 上。已經公開 ${on} 人。</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    <div class="wnote big">核可之前確認兩件事：<br>
+      1. <b>他滿 18 歲了嗎。</b>未滿一律不放，不管職位。系統沒有生日欄位，這一條只有你擋得住。<br>
+      2. <b>隱私政策改了嗎。</b>現在的政策只說大頭照顯示在進度牆上，
+         對外公開是新用途。名字撤得下來，照片被搜尋引擎存過撤不乾淨。</div>
+    ${people.length ? `<ul class="flist">${people.map(p => {
+      const name = p.name_zh || p.name_en || "（沒有名字）";
+      return `<li>
+        <div class="arow">
+          <label class="apick"><input type="checkbox" data-act="approve" data-id="${esc(p.id)}"
+            ${p.public_approved ? "checked" : ""}${busy ? " disabled" : ""}
+            aria-label="核可 ${esc(name)}"></label>
+          <div class="abody">
+            <div class="fhead"><b>${esc(name)}</b>
+              ${p.public_approved ? `<span class="tag open">在公開頁面上</span>`
+                                  : `<span class="tag">還沒核可</span>`}</div>
+            <div class="fmeta">${esc([p.public_title, p.team].filter(Boolean).join("・") || "沒有填 team")}
+              ${p.avatar ? "・有大頭照" : "・沒有大頭照"}</div>
+          </div>
+        </div>
+      </li>`;
+    }).join("")}</ul>` : `<div class="empty">還沒有人自己打勾。<br>
+      幹部要先到 /app/ 打勾同意，才會出現在這裡。</div>`}
+  </div>`;
+}
+
+export function resListHTML(items, canEdit, msg, isPresident) {
   const rows = items.map(r => `<li>
     <div class="fhead">
       <b>${esc(r.title)}</b>
@@ -385,7 +422,7 @@ export function resListHTML(items, canEdit, msg) {
     <h2>資源</h2>
     <div class="sub">BT 產出的免費資源。這裡放的是**一條連結**，不是檔案。</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    ${tabsHTML("res")}
+    ${tabsHTML("res", isPresident)}
     ${canEdit ? `<div class="row" style="margin-bottom:6px">
       <button class="btn" data-act="res-new">加一個資源</button>
     </div>` : `<div class="wnote">你可以看，但改不動。</div>`}

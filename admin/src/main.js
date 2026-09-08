@@ -20,6 +20,8 @@ let S = {
   res: [], resEditing: null,
   // 批 6
   noticeTo: new Set(["accepted"]),
+  // 團隊頁
+  people: [],
 };
 
 const root = () => document.getElementById("bt-root");
@@ -27,6 +29,7 @@ const root = () => document.getElementById("bt-root");
 // **這只是畫面。真正的門在資料庫的 RLS**（is_director_of），
 // 前端少畫一顆按鈕不是安全機制。
 const canEdit = () => !!S.me && (S.me.board === "director" || S.me.board === "president");
+const isPres = () => !!S.me && S.me.board === "president";
 
 function render() {
   const el = root();
@@ -40,12 +43,14 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
 
   document.body.insertAdjacentHTML("afterbegin", nav);
-  if (S.view === "checkin" && S.form) {
+  if (S.view === "team") {
+    el.innerHTML = UI.publicTeamHTML(S.people, S.msg, S.busy);
+  } else if (S.view === "checkin" && S.form) {
     el.innerHTML = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
     el.innerHTML = UI.noticeHTML(S.form, S.apps, S.noticeTo, S.msg, S.busy);
   } else if (S.view === "res") {
-    el.innerHTML = UI.resListHTML(S.res, canEdit(), S.msg);
+    el.innerHTML = UI.resListHTML(S.res, canEdit(), S.msg, isPres());
   } else if (S.view === "res-edit") {
     el.innerHTML = UI.resEditHTML(S.resEditing, S.msg, S.busy);
   } else if (S.view === "apps" && S.form) {
@@ -57,7 +62,7 @@ function render() {
     el.innerHTML = UI.formHTML(S.form, S.questions, canEdit(),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else {
-    el.innerHTML = UI.listHTML(S.forms, canEdit(), S.msg);
+    el.innerHTML = UI.listHTML(S.forms, canEdit(), S.msg, isPres());
   }
 }
 
@@ -125,6 +130,15 @@ async function openApps(id) {
 async function refreshApps() {
   S.apps = await D.loadApplications(S.form.id);
   S.pending = await D.loadPending(S.form.id);
+}
+
+async function openTeam() {
+  S.busy = true; render();
+  try {
+    S.people = await D.loadPublicCandidates();
+    S.view = "team"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "名單載不到：" + D.says(e); }
+  render();
 }
 
 async function openRes() {
@@ -208,9 +222,23 @@ document.addEventListener("click", async e => {
   if (act === "tab") {
     S.msg = ""; S.sel = new Set();
     if (b.dataset.t === "res") { await openRes(); }
+    else if (b.dataset.t === "team") { await openTeam(); }
     else { S.view = "list"; await reloadList(); render(); }
     return;
   }
+  if (act === "approve") {
+    const ok = b.checked;
+    S.busy = true; render();
+    try {
+      await D.setApproved(id, ok);
+      const p = S.people.find(x => x.id === id);
+      if (p) p.public_approved = ok;
+      S.busy = false; S.msg = "";
+    } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
+    render();
+    return;
+  }
+
   if (act === "res-back") { await openRes(); return; }
   if (act === "res-new")  { S.resEditing = null; S.view = "res-edit"; S.msg = ""; render(); return; }
   if (act === "res-edit") {

@@ -14,7 +14,7 @@ import * as UI from "./ui.js";
 // "edit" 是補完／修改資料，"claim" 是輸入邀請碼，"delete" 是刪除確認。
 // 幹部與未登入的人不看它。
 let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
-          profile: null, view: null, busy: false, apps: [], opens: [] };
+          profile: null, pub: null, view: null, busy: false, apps: [], opens: [] };
 
 // 登入之後送他回原本要去的地方。白名單、為什麼要存起來、為什麼包 try/catch，
 // 全部在 nav.js —— 抽出去是為了測得到（main.js 一 import 就會跑 boot()）。
@@ -30,7 +30,7 @@ function render() {
   // 明明登入著的人說「請登入」（跟護照那邊同一個道理，spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail); return; }
-  if (S.role === "cadre") { el.innerHTML = UI.menuHTML(S.name || S.user.email); return; }
+  if (S.role === "cadre") { el.innerHTML = UI.menuHTML(S.name || S.user.email, S.pub, S.authMsg, S.busy); return; }
 
   // 學員（批 2）。**資料沒填齊就先擋在補完那一頁**，
   // 因為學校與年級是這個帳號唯一有用的東西，缺了等於這個人不存在。
@@ -118,7 +118,7 @@ async function boot() {
     // 而且這一頁不需要知道他蓋了幾個章。
     const { data, error } = await supabase
       .from("profiles")
-      .select("role, name_zh, name_en, school, grade, newsletter_opt_in")
+      .select("role, name_zh, name_en, school, grade, newsletter_opt_in, public_profile, public_approved, public_title")
       .eq("id", S.user.id).maybeSingle();
     if (error) throw error;
     S.role = data ? data.role : null;
@@ -126,6 +126,11 @@ async function boot() {
     // 學員頁只認一個 name。名字在資料庫裡是中英兩欄（幹部的護照要用），
     // 但學員只填一次，寫進 name_zh。這裡把兩欄收斂成一個值，
     // **收斂只做這一次**，畫面與存檔都用同一個。
+    S.pub = data ? {
+      public_profile: !!data.public_profile,
+      public_approved: !!data.public_approved,
+      public_title: data.public_title || "",
+    } : null;
     S.profile = data ? {
       name: data.name_zh || data.name_en || "",
       school: data.school || "",
@@ -259,7 +264,7 @@ document.addEventListener("click", async e => {
       await AUTH.signOut();
       S = { user: null, role: null, name: "", authMode: "in",
             authMsg: "帳號已經刪掉了。謝謝你來過。", authEmail: "", down: false,
-            profile: null, view: null, busy: false, apps: [], opens: [] };
+            profile: null, pub: null, view: null, busy: false, apps: [], opens: [] };
       render();
     } catch (err) {
       S.busy = false; S.authMsg = "刪不掉：" + (err.message || err); render();
@@ -267,10 +272,33 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  if (act === "save-public") {
+    const on = document.getElementById("pubchk").checked;
+    const t = document.getElementById("pubtitle");
+    S.busy = true; S.authMsg = ""; render();
+    try {
+      // **只送這兩欄。** public_approved 沒有發權限給前端，
+      // 送了整句會被拒，而那個拒絕長得像「存檔失敗」。
+      const { error } = await supabase.from("profiles").update({
+        public_profile: on,
+        public_title: t ? (t.value.trim() || null) : (S.pub && S.pub.public_title) || null,
+      }).eq("id", S.user.id);
+      if (error) throw error;
+      S.pub = { ...S.pub, public_profile: on,
+                public_title: t ? t.value.trim() : (S.pub && S.pub.public_title) || "" };
+      S.busy = false;
+      S.authMsg = on ? "存好了。還要等 Co-President 核可才會出現在公開頁面上。" : "存好了，已經不公開了。";
+    } catch (err) {
+      S.busy = false; S.authMsg = "存不起來：" + (err.message || err);
+    }
+    render();
+    return;
+  }
+
   if (act === "signout") {
     await AUTH.signOut();
     S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
-          profile: null, view: null, busy: false, apps: [], opens: [] };
+          profile: null, pub: null, view: null, busy: false, apps: [], opens: [] };
     render();
     return;
   }

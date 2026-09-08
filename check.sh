@@ -950,7 +950,12 @@ fi
 #
 # 清單寫死在這裡，改資料庫的 grant 就要同時改這一行。那是刻意的摩擦，
 # 跟 ESTAMP_PALETTE 同一個做法：例外一次只開一個洞，不是開一扇門。
-PROFILE_WRITABLE="avatar name_en name_zh team tz"
+# 2026-09-08：批 2 與團隊頁多了五欄（學員的 school / grade / newsletter_opt_in，
+# 幹部的 public_profile / public_title）。
+# **newsletter_opt_in_at 與 public_approved 不在裡面，那是刻意的**：
+# 前者是同意的時間戳（由 trigger 蓋，讓客戶端填等於沒有證據），
+# 後者是 Co-President 那把鑰匙（本人改得動的話兩把鑰匙就變成一把）。
+PROFILE_WRITABLE="avatar grade name_en name_zh newsletter_opt_in public_profile public_title school team tz"
 
 # 先守住這張清單自己。有人看到下面那條紅了，最省事的「修法」是把欄位加進清單 ——
 # 如果加進來的是 role，那就等於用一行 shell 撤掉整份規格 §3-1 那個洞的解法。
@@ -958,12 +963,17 @@ PROFILE_WRITABLE="avatar name_en name_zh team tz"
 # 「上次更新」由客戶端說了算。這兩個名字出現在清單裡一律 FAIL。
 listbad=0
 for c in $PROFILE_WRITABLE; do
-  if [ "$c" = "role" ] || [ "$c" = "updated_at" ]; then
-    bad "PROFILE_WRITABLE 裡出現 ${c}，那一欄不該由前端寫（規格 §3-1）"
+  # role / updated_at 的理由見上面。
+  # public_approved：本人改得動的話，兩把鑰匙就變成一把，
+  #   而 CLAUDE.md 的紅線「未成年一律不放」正是靠另外那一把擋的。
+  # newsletter_opt_in_at：同意的時間由客戶端填就不是證據了。
+  if [ "$c" = "role" ] || [ "$c" = "updated_at" ] || \
+     [ "$c" = "public_approved" ] || [ "$c" = "newsletter_opt_in_at" ]; then
+    bad "PROFILE_WRITABLE 裡出現 ${c}，那一欄不該由前端寫"
     listbad=1
   fi
 done
-[ "$listbad" = "0" ] && ok "PROFILE_WRITABLE 清單本身沒有 role / updated_at"
+[ "$listbad" = "0" ] && ok "PROFILE_WRITABLE 清單本身沒有那四個不該由前端寫的欄位"
 
 # 寫入點的**數量**也要對得上。沒有這一條的話，守門的掃描範圍會安靜地縮小：
 # 抽取用的 regex 認得的是 `.from("profiles") … .update({`，哪天有人改用
@@ -971,26 +981,46 @@ done
 # 而少抓到的部分完全不會有聲音 —— 剩下的幾個仍然全在清單裡，照樣綠燈。
 # 2026-08-31 反向驗證時實測到這件事：故意改掉三個寫入點，守門還是全過。
 # 所以數量寫死，增減寫入路徑就要回來改這一行（跟 ESTAMP_PALETTE 同一個做法）。
-PROFILE_WRITE_SITES=4
+# 2026-09-08：**掃描範圍原本只有 passport/src/data.js。**
+# 批 2 在 app/src/main.js 加了兩條寫進 profiles 的路徑（補完資料、團隊頁的勾），
+# 而這條守門完全沒有看到它們 —— 守門的範圍安靜地縮小了，
+# 這正是它自己下面那段註解在講的那種失敗。
+# 每個檔案各自寫死寫入點的數量，理由同下。
+PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:2"
 
 profileCols=$(node -e '
   const fs = require("fs");
-  const raw = fs.readFileSync("passport/src/data.js", "utf8");
-  const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
-  const want = Number(process.argv[1]);
-  const re = /\.from\("profiles"\)[\s\S]{0,80}?\.(?:update|upsert)\(\{([\s\S]*?)\}\)/g;
+  const want = process.argv.slice(1);
   const cols = new Set();
-  let m, sites = 0;
-  while ((m = re.exec(src))) {
-    sites++;
-    for (const k of m[1].matchAll(/(^|[{,\s])([a-z_]+)\s*:/g)) cols.add(k[2]);
+  const problems = [];
+  for (const spec of want) {
+    const [file, n] = spec.split(":");
+    const raw = fs.readFileSync(file, "utf8");
+    const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+    const re = /\.from\("profiles"\)[\s\S]{0,80}?\.(?:update|upsert)\(\{([\s\S]*?)\}\)/g;
+    let m, sites = 0;
+    while ((m = re.exec(src))) {
+      sites++;
+      // ⚠ 也要認得**簡寫屬性**（`{ school, grade }`）。
+      // 2026-09-08：原本的比對式只認 `key:`，於是 app/src/main.js 那句
+      // update({ name_zh: name, school, grade, ... }) 裡的 school 與 grade
+      // 完全沒有被看到 —— 守門綠燈，而那兩欄沒有在允許清單裡也沒有人會知道。
+      //
+      // 改成把物件依逗號拆開，每一段取冒號**前面**那一截當鍵；
+      // 沒有冒號的那一段整段就是鍵（那就是簡寫）。
+      // 這幾個物件都是平的（沒有巢狀、沒有含逗號的字串），所以拆逗號夠用；
+      // 哪天不是了，這裡會漏抓 —— 所以下面那個「寫入點數量」的檢查不能拿掉，
+      // 它是這個假設失效時唯一會出聲的地方。
+      for (const part of m[1].split(",")) {
+        const key = (part.includes(":") ? part.slice(0, part.indexOf(":")) : part).trim();
+        if (/^[a-z_][a-z0-9_]*$/.test(key)) cols.add(key);
+      }
+    }
+    if (sites !== Number(n)) problems.push(`${file} 的寫入點有 ${sites} 個，check.sh 說應該有 ${n} 個`);
   }
-  if (sites !== want) {
-    console.log(`寫入點有 ${sites} 個，check.sh 說應該有 ${want} 個`);
-    process.exit(1);
-  }
+  if (problems.length) { console.log(problems.join("；")); process.exit(1); }
   console.log([...cols].sort().join(" "));
-' "$PROFILE_WRITE_SITES" 2>&1)
+' $PROFILE_WRITE_FILES 2>&1)
 if [ $? -ne 0 ]; then
   bad "抽不出前端寫進 profiles 的欄位：${profileCols}"
 else
@@ -999,10 +1029,10 @@ else
     case " $PROFILE_WRITABLE " in *" $c "*) ;; *) extra="$extra $c" ;; esac
   done
   if [ -n "$extra" ]; then
-    bad "data.js 會寫 profiles 的這些欄位，但它們不在 PROFILE_WRITABLE 裡：${extra}"
+    bad "前端會寫 profiles 的這些欄位，但它們不在 PROFILE_WRITABLE 裡：${extra}"
     say "     資料庫沒發權限的話，整句 update 都會被拒，不是只有那一欄存不了。"
   else
-    ok "data.js 寫進 profiles 的欄位（${profileCols}）都在允許清單裡"
+    ok "前端寫進 profiles 的欄位（${profileCols}）都在允許清單裡"
   fi
 fi
 

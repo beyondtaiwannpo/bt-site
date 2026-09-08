@@ -247,6 +247,25 @@ export async function sendNotice(formId, statuses, subject, body) {
   return data;
 }
 
+// ── 團隊頁的核可（2026-09-08，補批 1 漏掉的一件）────────────────────
+// 只列**已經自己打過勾**的人。沒打勾的人不該出現在這份清單上 ——
+// 那會變成一份「還沒有人問過他們」的名單，而 Co-President 會很想直接核可。
+export async function loadPublicCandidates() {
+  need();
+  const { data, error } = await supabase.from("profiles")
+    .select("id, name_zh, name_en, team, avatar, public_title, public_profile, public_approved")
+    .eq("role", "cadre").eq("public_profile", true);
+  if (error) throw error;
+  return (data || []).sort((a, b) =>
+    String(a.name_zh || a.name_en || "").localeCompare(String(b.name_zh || b.name_en || ""), "zh-Hant"));
+}
+
+export async function setApproved(id, ok) {
+  need();
+  const { error } = await supabase.rpc("set_public_approved", { p_target: id, p_ok: ok });
+  if (error) throw error;
+}
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
@@ -258,6 +277,7 @@ const SAYS = [
   ["not_director_of:",
    "這裡面有一份不是你這個 team 的申請，所以整批都沒有動。"],
   ["not_president", "只有當屆 Co-President 可以做這件事。"],
+  ["not_a_cadre", "這個人不是幹部，不能放上團隊頁。"],
   ["not_cadre", "這個動作只有幹部做得了。"],
   ["not_signed_in", "你的登入已經過期了，重新登入一次就好。"],
   ["form_closed", "這份表單已經關閉了。"],
