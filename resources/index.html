@@ -308,6 +308,32 @@ footer a{color:var(--ink);font-weight:600}
     }
   }
 
+  /* 已經登入的話，右上角那顆改成「我的帳號」。
+     2026-09-08：Paul 回報「登入之後回首頁還是寫登入」。那顆按鈕的**行為**一直是對的
+     （不管有沒有登入，點下去都到 /app/，而 /app/ 自己會判斷要顯示什麼），
+     錯的只有那幾個字。
+
+     ⚠ **這裡不載入 supabase。** 對外頁面刻意不碰 auth（見這一頁檔頭），
+     為了一顆按鈕的字去載整包 supabase-js，會讓每一個路人都多下載一份他用不到的東西。
+     所以只看瀏覽器裡有沒有那把鑰匙：supabase-js 把 session 存在
+     localStorage 的 sb-（專案）-auth-token。
+
+     **不解析內容、不驗證過期。** 驗過期要整包 supabase-js，而這顆按鈕不值得。
+     票過期的話按下去會看到登入頁，那正是他該看到的東西。
+
+     try/catch 是必要的：無痕視窗與擋第三方資料的瀏覽器讀 localStorage 時會丟例外。
+     沒改到就是維持「登入」，那是安全的預設。 */
+  try {
+    var loginBtn = document.querySelector(".login");
+    for (var i = 0; loginBtn && i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (/^sb-.+-auth-token$/.test(k) && localStorage.getItem(k)) {
+        loginBtn.textContent = "我的帳號 / Account";
+        break;
+      }
+    }
+  } catch (e) { /* 讀不到就算了，維持「登入」。 */ }
+
   btn.addEventListener("click", function () {
     setLang(html.getAttribute("data-lang") === "zh" ? "en" : "zh");
   });
