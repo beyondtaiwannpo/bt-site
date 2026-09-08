@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team join impact partner alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
+FILES="index.html about programs team join impact partner apply admin alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -233,7 +233,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html impact/index.html partner/index.html alumni/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html impact/index.html partner/index.html apply/index.html alumni/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1071,6 +1071,14 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
+    // /apply/ 是批 3 加的對外頁。它的本文是 JavaScript 畫的，
+    // 所以錨點只能取靜態的那幾句（標題、頁首、頁尾）——
+    // 那也正好夠：註解吞掉任何一段，這三句一定會少一句。
+    "apply/index.html": {
+      mustShow: ["跳到主要內容", "現在開放什麼", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["維護者要講的話寫在 README"]
+    },
     "impact/index.html": {
       mustShow: ["跳到主要內容", "五年，這些是真的發生過的事。", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
@@ -1159,7 +1167,7 @@ leakOut=$(node -e '
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
+' index.html about/index.html programs/index.html team/index.html join/index.html impact/index.html partner/index.html apply/index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -1195,7 +1203,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team join impact partner alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
+placeholder_scope="index.html about programs team join impact partner apply admin alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}

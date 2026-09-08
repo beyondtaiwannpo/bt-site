@@ -19,6 +19,15 @@ export const FEATURES = [
     title: "幹部護照",     desc: "這一年的活動、章、心得與照片" },
   { key: "availability", label: "時間看板", href: "/availability/", roles: ["cadre"],
     title: "每週時間看板", desc: "填自己每週固定有空的時段，約會議時直接挑" },
+  // 2026-09-08（批 3）。**所有幹部都看得到這個入口，那是對的。**
+  // 每個幹部都屬於一個 team，而 2026-09-07 拍板的可見範圍是
+  // 「該 team 的幹部看得到自己 team 收到的申請」——
+  // 所以每個人進去都有東西可看。誰「改得動」是 /admin/ 裡面的事，
+  // 由資料庫的 is_director_of() 決定，不是靠這裡藏一個連結。
+  // **不要在這裡加一層 board_role 的過濾**：那會讓一般幹部連自己 team 的
+  // 申請都看不到，而那不是拍板的內容。
+  { key: "admin",        label: "申請管理", href: "/admin/",        roles: ["cadre"],
+    title: "申請管理",     desc: "開申請表、看自己 team 收到的申請" },
 ];
 
 export function featuresFor(role) {

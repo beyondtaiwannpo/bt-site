@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>做過什麼 / Beyond Taiwan</title>
+<title>現在開放 / Beyond Taiwan</title>
 
 <!-- 對外的內容頁（2026-09-07 新增）。
      這一頁講 BT 的使命與時間軸。數字來自 BT 的既有紀錄。
@@ -23,11 +23,11 @@
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
      ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
 
-<meta name="description" content="Beyond Taiwan 五年的數字與時間軸：250 位以上學員、每年 50 對導生配對、探索營協助超過 100 位高中生。數字全部來自 BT 自己的活動紀錄。">
-<meta property="og:title" content="做過什麼 / Beyond Taiwan">
-<meta property="og:description" content="Beyond Taiwan 五年的數字與時間軸：250 位以上學員、每年 50 對導生配對、探索營協助超過 100 位高中生。數字全部來自 BT 自己的活動紀錄。">
+<meta name="description" content="Beyond Taiwan 現在開放申請的計畫與幹部招募。探索營、導生配對計畫的申請都從這裡送出。">
+<meta property="og:title" content="現在開放 / Beyond Taiwan">
+<meta property="og:description" content="Beyond Taiwan 現在開放申請的計畫與幹部招募。">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://beyondtaiwannpo.com/impact/">
+<meta property="og:url" content="https://beyondtaiwannpo.com/apply/">
 <meta name="theme-color" content="#EDE5D8">
 
 <link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
@@ -196,30 +196,53 @@ footer a{color:var(--ink);font-weight:600}
 }
 @media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
-/* 數字。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
-   是兩欄的列，靠上面那條細線分隔，跟時間軸與六個 team 同一套語言。
-   數字本身用 Barlow Condensed 放到很大，那是這一頁唯一需要大聲的東西。 */
-.nums{margin:0;padding:0;list-style:none;
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-  column-gap:clamp(20px,4vw,56px)}
-.nums li{padding:20px 0;border-top:1px solid rgba(16,42,134,.14)}
-.nums li:nth-child(-n+2){border-top:0;padding-top:0}
-.nums b{display:block;font-family:var(--display);font-weight:700;
-  font-size:clamp(40px,4.8vw,68px);line-height:.95;letter-spacing:-.01em}
-.nums i{display:block;font-style:normal;font-family:var(--display);font-weight:600;
-  font-size:13px;letter-spacing:.14em;text-transform:uppercase;
-  color:rgba(16,42,134,.7);margin:7px 0 9px}
-.nums span{display:block;font-size:15.5px;line-height:1.6;
-  color:rgba(16,42,134,.82);max-width:24em}
-@media (max-width:700px){
-  /* 一欄的時候「前兩個不畫上線」就不對了，只有第一個不畫。
-     ⚠ 這裡一定要重寫 :nth-child(-n+2) 那一條，不能只寫 .nums li ——
-     媒體查詢不會提高特異性，:nth-child 那一條本來就比較高，會贏。
-     2026-09-08 就是這樣漏掉的：手機上第二格沒有上線，看起來像跟第一格黏在一起。 */
-  .nums{grid-template-columns:1fr}
-  .nums li:nth-child(-n+2){border-top:1px solid rgba(16,42,134,.14);padding-top:20px}
-  .nums li:first-child{border-top:0;padding-top:0}
-}
+  /* ---------- 現在開放 ---------- */
+  /* 這一頁的內容是從資料庫來的，所以樣式要能撐住「什麼都沒有」與
+     「一次十筆」兩種極端。用列不用卡片，跟站上其他地方同一套語言。 */
+  .alist{margin:0;padding:0;list-style:none;max-width:38em}
+  .alist li{padding:22px 0;border-top:1px solid rgba(16,42,134,.15)}
+  .alist li:first-child{border-top:0;padding-top:4px}
+  .alist h3{margin:0 0 6px;font-family:var(--display);font-size:clamp(21px,2.2vw,28px)}
+  .alist p{margin:0 0 12px;font-size:15.5px;color:rgba(16,42,134,.86)}
+  .when{font-size:13.5px;color:rgba(16,42,134,.8);margin-bottom:10px}
+  .btn{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+    font-family:var(--body);font-weight:600;font-size:16px;padding:13px 24px;border-radius:999px;
+    border:none;cursor:pointer;line-height:1.2}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+  .btn[disabled]{opacity:.45;cursor:default}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+  .btn.sm{font-size:14.5px;padding:9px 17px}
+  .quiet{background:none;border:none;padding:0;font-family:var(--body);font-size:15px;
+    font-weight:600;color:var(--ink);cursor:pointer;text-decoration:underline;
+    text-underline-offset:3px}
+  /* 表單。每一題一塊，之間留白，不畫框——畫框會讓一頁十題看起來像報稅。 */
+  .q{margin:0 0 26px;max-width:38em}
+  /* ⚠ :not(.opt) 是必要的，不是龜毛。單選與多選的每一個選項本身也是 <label>，
+     而且是 .q 的直接子元素 —— 不排除的話整排選項會跟題目一樣粗，
+     題目與選項在畫面上就分不出層次了。 */
+  .q > label:not(.opt){display:block;font-weight:600;font-size:16.5px;margin-bottom:4px}
+  .q .help{font-size:13.5px;color:rgba(16,42,134,.8);margin:0 0 9px}
+  .q input[type="text"],.q textarea{width:100%;font-family:var(--body);font-size:16px;
+    color:var(--ink);padding:12px 14px;border:1px solid rgba(16,42,134,.28);
+    border-radius:12px;background:rgba(255,255,255,.7)}
+  .q textarea{min-height:130px;line-height:1.65;resize:vertical}
+  .q input:focus-visible,.q textarea:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+  /* 單選與多選：整行都可以點。手機上那個圓圈只有十幾像素。 */
+  .opt{display:flex;gap:11px;align-items:flex-start;padding:9px 0;cursor:pointer;font-size:16px}
+  .opt input{width:19px;height:19px;flex:none;margin:2px 0 0;accent-color:var(--bt-navy);cursor:pointer}
+  /* ⚠ 「必填」不可以用橘色。橘色 #FFC46C 在米白上大約 1.5:1，
+     遠低於 WCAG AA 的 4.5:1 —— 那兩個字等於看不見。
+     這個 repo 已經在六個地方踩過「用顏色當唯一訊息」這件事。
+     必填這件事本來就是那兩個字在講，不是顏色在講。 */
+  .req{color:rgba(16,42,134,.72);font-weight:600;font-size:13.5px}
+  .note{font-size:14px;line-height:1.7;color:rgba(16,42,134,.85);max-width:34em}
+  .warn{font-size:15px;line-height:1.6;padding:14px 16px;border-radius:14px;
+    background:rgba(255,196,108,.3);max-width:38em;margin:0 0 20px}
+  .tagline{display:inline-block;font-family:var(--display);font-size:11.5px;font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:999px;
+    background:rgba(107,198,187,.42);color:rgba(16,42,134,.92);margin-bottom:8px}
+  .loading{padding:40px 0;color:rgba(16,42,134,.75)}
+
 </style>
 </head>
 <body>
@@ -231,10 +254,10 @@ footer a{color:var(--ink);font-weight:600}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
+    <a href="../apply/" aria-current="page"><span class="zh">現在開放</span><span class="en">Open now</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
-    <a href="../impact/" aria-current="page"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
+    <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
     <a href="../alumni/">Alumni</a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
@@ -245,131 +268,16 @@ footer a{color:var(--ink);font-weight:600}
 </nav>
 
 <main id="main">
-
-<div class="zh" lang="zh-Hant">
 <header class="hero">
-  <h1>五年，這些是真的發生過的事。</h1>
-  <p class="lead">下面每一個數字都來自 BT 自己的活動紀錄。沒有推估，也沒有四捨五入成比較好聽的數字。</p>
+  <h1><span class="zh">現在開放什麼</span><span class="en">Open right now</span></h1>
+  <p class="lead"><span class="zh">下面是現在收件中的申請。送出之前需要一個 BT 帳號，開帳號是免費的，兩分鐘。</span><span class="en">Everything currently open for applications. You need a Beyond Taiwan account to submit; it is free and takes two minutes.</span></p>
 </header>
-
 <section class="sec">
   <div class="sec-in">
-    <h2>數字</h2>
-    <div class="body">
-      <ul class="nums">
-        <li><b>250+</b><i>位學員</i><span>2020 年到現在，超過 250 位高中生在申請的路上有人可以問。</span></li>
-        <li><b>50</b><i>對配對／年</i><span>導生配對計畫一學期配對一次。</span></li>
-        <li><b>100+</b><i>位高中生</i><span>探索營辦了兩年，收到超過 150 份申請，協助超過 100 位高中生。</span></li>
-        <li><b>20+</b><i>位校友回來</i><span>超過 20 位 BT 校友回來當講者。</span></li>
-        <li><b>30</b><i>位幹部</i><span>接近三十位，全部是學生，分布在七個國家。</span></li>
-        <li><b>0</b><i>元</i><span>幾乎所有活動都免費。</span></li>
-      </ul>
-    </div>
+    <h2><span class="zh">申請</span><span class="en">Apply</span></h2>
+    <div class="body"><div id="ap-root"><div class="loading"><span class="zh">載入中…</span><span class="en">Loading…</span></div></div></div>
   </div>
 </section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>五年走過來</h2>
-    <div class="body">
-      <ul class="tl">
-        <li><b>2020.05</b><span>成立，七個人。</span></li>
-        <li><b>2020.09</b><span>導生制度開始，第一批 36 人。</span></li>
-        <li><b>2021.06</b><span>線上博覽會，超過 400 人參加。</span></li>
-        <li><b>2021.10</b><span>校園大使 18 位。</span></li>
-        <li><b>2023.06</b><span>第一屆探索營，超過 80 人。</span></li>
-        <li><b>2025.05</b><span>校友帳號超過 85 個。</span></li>
-        <li><b>現在</b><span>接近三十位幹部，全部是學生，分布七個國家。</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>一路上幫過我們的人</h2>
-    <div class="body">
-      <p>過去合作過的單位包括美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
-      <p>合作的形式不一定是錢。有的是一個場地，有的是把我們帶進學校，有的是派人來跟高中生講一個下午。</p>
-      <p><a href="../partner/">看怎麼跟我們合作</a></p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>這些數字怎麼來的</h2>
-    <div class="body">
-      <p>全部來自 BT 自己的活動紀錄。每一場營隊、每一輪配對、每一位回來的校友，當時都有人記下來。</p>
-      <p>我們手上還有一些數字，但把握不夠，所以這一頁沒有寫。寧可少一句話，也不要寫一個之後要撤回的數字。</p>
-      <p>如果你要引用這一頁的任何數字，寫信來問一聲，我們會告訴你它是怎麼算的。</p>
-    </div>
-  </div>
-</section>
-</div>
-
-<div class="en" lang="en">
-<header class="hero">
-  <h1>Five years. All of it actually happened.</h1>
-  <p class="lead">Every number below comes from Beyond Taiwan's own records. Nothing is estimated, and nothing is rounded up to sound better.</p>
-</header>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Numbers</h2>
-    <div class="body">
-      <ul class="nums">
-        <li><b>250+</b><i>students</i><span>Since 2020, more than 250 high school students have had someone to ask.</span></li>
-        <li><b>50</b><i>pairs a year</i><span>The mentorship programme pairs once a semester.</span></li>
-        <li><b>100+</b><i>students at bootcamp</i><span>Two years of College Bootcamp: over 150 applications, over 100 students.</span></li>
-        <li><b>20+</b><i>alumni came back</i><span>More than 20 Beyond Taiwan alumni have come back as speakers.</span></li>
-        <li><b>30</b><i>organisers</i><span>Close to thirty, all students, spread across seven countries.</span></li>
-        <li><b>0</b><i>NT dollars</i><span>Almost everything we run is free.</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Five years</h2>
-    <div class="body">
-      <ul class="tl">
-        <li><b>2020.05</b><span>Founded, seven people.</span></li>
-        <li><b>2020.09</b><span>Mentorship began, 36 students in the first round.</span></li>
-        <li><b>2021.06</b><span>Online fair, more than 400 attendees.</span></li>
-        <li><b>2021.10</b><span>18 campus ambassadors.</span></li>
-        <li><b>2023.06</b><span>First College Bootcamp, more than 80 students.</span></li>
-        <li><b>2025.05</b><span>More than 85 alumni accounts.</span></li>
-        <li><b>Today</b><span>Close to thirty organisers, all students, across seven countries.</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>People who helped</h2>
-    <div class="body">
-      <p>Past partners include the American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
-      <p>Partnership does not have to mean money. Sometimes it is a room. Sometimes it is bringing us into a school. Sometimes it is sending someone to spend an afternoon with a group of teenagers.</p>
-      <p><a href="../partner/">How to work with us</a></p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Where these numbers come from</h2>
-    <div class="body">
-      <p>All of them come from our own records. Every camp, every round of pairing, every alumnus who came back was written down at the time.</p>
-      <p>We hold a few more numbers that we are not confident enough about, so they are not on this page. Better one sentence short than one number we have to take back.</p>
-      <p>If you want to cite anything here, write to us and we will tell you how it was counted.</p>
-    </div>
-  </div>
-</section>
-</div>
-
 </main>
 
 <footer>
@@ -425,5 +333,6 @@ footer a{color:var(--ink);font-weight:600}
 })();
 </script>
 
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>

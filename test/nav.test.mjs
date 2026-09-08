@@ -23,9 +23,15 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
   }
 });
 
-test("★ 幹部看到兩個功能項，當前的那一項有標記", () => {
+// 2026-09-08（批 3）加了第三項「申請管理」，所以這一條不再寫死數字。
+// **改成對照 FEATURES 本身**：它守的是「頂欄畫出來的項數等於清單上該看到的項數」，
+// 那才是真正會壞的地方（過濾寫錯、或是有人在 navHTML 裡多畫一個寫死的連結）。
+// 順便把 key 列出來對一次，不然「數量對但畫錯項目」抓不到。
+test("★ 幹部看到 FEATURES 上所有屬於他的項目，當前的那一項有標記", () => {
   const h = navHTML({ current: "availability", role: "cadre", name: "王平" });
-  assert.equal(count(h, /<a href="\/[a-z-]+\/"/g), 2);
+  const mine = FEATURES.filter(f => f.roles.includes("cadre"));
+  assert.equal(count(h, /<a href="\/[a-z-]+\/"/g), mine.length);
+  for (const f of mine) assert.ok(h.includes(`href="${f.href}"`), `頂欄少了 ${f.key}`);
   assert.match(h, /href="\/availability\/" aria-current="page"/, "當前項沒有 aria-current");
   assert.ok(!/href="\/passport\/" aria-current/.test(h), "不是當前的項被標了");
 });

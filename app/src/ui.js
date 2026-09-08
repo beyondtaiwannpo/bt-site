@@ -253,17 +253,80 @@ export function completeHTML(p, msg, busy) {
   </div>`;
 }
 
+
+// ── 我的申請（批 3，2026-09-08）────────────────────────────────────────
+// 申請人最想知道的只有一件事：**我到哪一關了。**
+// 這一支就是那句話，而且是純函式，測得到。
+//
+// ⚠ 「已收到」後面那個日期是**表單上填的預計通知日**，沒填就只有「已收到」。
+// 不要編一個日期出來 —— 一個沒有根據的日期比沒有日期傷得更重，
+// 因為他會照那個日期來問。
+export function statusLine(app) {
+  const by = app.notify_by ? fmtDay(app.notify_by) : "";
+  switch (app.status) {
+    case "interview": return "邀請你面試";
+    case "accepted":  return "錄取了";
+    case "rejected":  return "這次沒有錄取";
+    default:          return by ? `已收到，${by} 前會通知你` : "已收到";
+  }
+}
+
+// yyyy 年 m 月 d 日。**不要用 toLocaleDateString** ——
+// 它會跟著使用者的系統語言變，同一個畫面上會出現兩種寫法。
+//
+// ⚠ **只有日期的字串不可以交給 new Date()。**
+// "2026-12-15" 會被當成 UTC 午夜，再用本地的 getDate() 讀出來，
+// 在台灣以西的時區就會少一天 —— 而畫面上那是一個看起來完全正常的日期。
+// 2026-09-08 實測：headless Chrome（美西時區）把 12/15 畫成 12/14。
+// 帶時間的字串（timestamptz）就該用本地時間讀，那是對的，所以只有日期要特判。
+export function fmtDay(v) {
+  if (!v) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) {
+    const [y, m, d] = String(v).split("-").map(Number);
+    return `${y} 年 ${m} 月 ${d} 日`;
+  }
+  const d = new Date(v);
+  if (isNaN(d)) return "";
+  return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+}
+
 // ── 學員的 dashboard ──────────────────────────────────────────────────
 // ⚠ **這一頁不放還不存在的東西。**（跟 menuHTML 同一條規矩，理由見它上面那段。）
 // 批 3 會在這裡長出「我的申請」與「現在開放的申請」，批 5 會長出資源。
 // 在那之前不放灰掉的入口 —— 點不下去的東西看起來像壞掉，而且會有人來問。
-export function studentHTML(p, msg) {
+export function studentHTML(p, msg, apps, opens) {
   const row = (k, val) => `<li><b>${esc(k)}</b>${
     val ? `<span>${esc(val)}</span>` : `<span class="empty-v">還沒填</span>`}</li>`;
+
+  // 我的申請。有申請才畫這一區 —— 沒有的時候畫一個空的區塊，
+  // 只是在告訴他「這裡本來應該有東西」。
+  const mine = (apps || []).length ? `
+    <h3 class="sec-h">我的申請</h3>
+    <ul class="applist">${apps.map(a => `<li>
+      <b>${esc(a.title)}</b>
+      <span class="st st-${esc(a.status)}">${esc(statusLine(a))}</span>
+      ${a.status === "interview" && a.interview_url
+        ? `<div class="st-more"><a href="${esc(a.interview_url)}">約面試時間</a>
+             <span class="empty-v">你還沒約時間</span></div>` : ""}
+    </li>`).join("")}</ul>` : "";
+
+  // 現在開放的。已經申請過的不再列出來（列出來他會以為可以再申請一次）。
+  const applied = new Set((apps || []).map(a => a.form_id));
+  const left = (opens || []).filter(f => !applied.has(f.id));
+  const now = left.length ? `
+    <h3 class="sec-h">現在開放</h3>
+    <ul class="applist">${left.map(f => `<li>
+      <b>${esc(f.title)}</b>
+      <div class="st-more"><a href="../apply/?f=${encodeURIComponent(f.id)}">看看這一個</a></div>
+    </li>`).join("")}</ul>` : "";
+
   return `<div class="card">
     <h2>${esc((p && p.name) || "你的帳號")}</h2>
     <div class="sub">Beyond Taiwan</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    ${mine}
+    ${now}
+    <h3 class="sec-h">我的資料</h3>
     <ul class="kv">
       ${row("學校", p && p.school)}
       ${row("年級", p && p.grade)}
@@ -272,9 +335,9 @@ export function studentHTML(p, msg) {
     <div class="row">
       <button class="btn ghost sm" data-act="edit-profile">改我的資料</button>
     </div>
-    <div class="note">下一場探索營、下一輪導生配對都會先公布在
+    ${mine || now ? "" : `<div class="note">下一場探索營、下一輪導生配對都會先公布在
       <a href="https://www.instagram.com/beyondtaiwan/">Instagram</a>，
-      也可以先看<a href="../programs/">我們在做什麼</a>。</div>
+      也可以先看<a href="../apply/">現在開放什麼</a>。</div>`}
     <div class="note"><button class="link" data-act="show-claim">我是 BT 幹部，我有邀請碼</button></div>
     <div class="nav"><button class="link" data-act="signout">登出</button></div>
     <!-- 刪除帳號放在最後、用最輕的樣式，但**一定要在這一頁上找得到**。

@@ -14,7 +14,7 @@ import * as UI from "./ui.js";
 // "edit" 是補完／修改資料，"claim" 是輸入邀請碼，"delete" 是刪除確認。
 // 幹部與未登入的人不看它。
 let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
-          profile: null, view: null, busy: false };
+          profile: null, view: null, busy: false, apps: [], opens: [] };
 
 // 登入之後送他回原本要去的地方。白名單、為什麼要存起來、為什麼包 try/catch，
 // 全部在 nav.js —— 抽出去是為了測得到（main.js 一 import 就會跑 boot()）。
@@ -43,7 +43,7 @@ function render() {
     if (sc) sc.addEventListener("focus", fillSchools, { once: true });
     return;
   }
-  el.innerHTML = UI.studentHTML(S.profile, S.authMsg);
+  el.innerHTML = UI.studentHTML(S.profile, S.authMsg, S.apps, S.opens);
 }
 
 
@@ -69,6 +69,39 @@ async function fillSchools() {
       .map(s => `<option value="${String(s.label).replace(/"/g, "&quot;")}"></option>`).join("");
   } catch (e) {
     console.warn("學校清單載不到，那一格照樣可以自己打字。", e);
+  }
+}
+
+// 我的申請 + 現在開放的。
+//
+// ⚠ **這兩句失敗不可以讓整頁掛掉。** 它們是 dashboard 上的兩區，
+// 而 dashboard 最重要的是「我的資料」與「刪除帳號」那兩件事。
+// 讀不到申請就少畫兩區，不要讓一個人因為這個而連自己的資料都看不到。
+async function loadStudentBits() {
+  try {
+    const [ap, op] = await Promise.all([
+      // forms 那一段是 PostgREST 的關聯查詢：applications 有 form_id 外鍵，
+      // 所以拿得到那一份表單的標題與預計通知日，不用再打一次。
+      supabase.from("applications")
+        .select("id, form_id, status, submitted_at, forms(title, notify_by, interview_url)")
+        .order("submitted_at", { ascending: false }),
+      supabase.from("forms").select("id, title, opens_at, closes_at").eq("status", "open"),
+    ]);
+    if (ap.error) throw ap.error;
+    if (op.error) throw op.error;
+    S.apps = (ap.data || []).map(a => ({
+      id: a.id, form_id: a.form_id, status: a.status,
+      title: (a.forms && a.forms.title) || "（表單已經被刪掉）",
+      notify_by: a.forms && a.forms.notify_by,
+      interview_url: a.forms && a.forms.interview_url,
+    }));
+    const now = Date.now();
+    S.opens = (op.data || []).filter(f =>
+      (!f.opens_at || new Date(f.opens_at).getTime() <= now) &&
+      (!f.closes_at || new Date(f.closes_at).getTime() >= now));
+  } catch (e) {
+    console.warn("讀不到申請，dashboard 少畫兩區。", e);
+    S.apps = []; S.opens = [];
   }
 }
 
@@ -99,6 +132,10 @@ async function boot() {
       grade: data.grade || "",
       newsletter: !!data.newsletter_opt_in,
     } : null;
+
+    // 學員的申請與現在開放的表單。**幹部不必查**，那一頁用不到，
+    // 而且多兩個查詢會讓每一次登入都慢一點。
+    if (S.role !== "cadre") await loadStudentBits();
 
     // 是幹部而且他本來就是要去某個地方 → 直接送過去，不要讓他多按一次。
     // takeNext 會同時看網址與存起來的鑰匙，而且拿完就丟掉。
@@ -222,7 +259,7 @@ document.addEventListener("click", async e => {
       await AUTH.signOut();
       S = { user: null, role: null, name: "", authMode: "in",
             authMsg: "帳號已經刪掉了。謝謝你來過。", authEmail: "", down: false,
-            profile: null, view: null, busy: false };
+            profile: null, view: null, busy: false, apps: [], opens: [] };
       render();
     } catch (err) {
       S.busy = false; S.authMsg = "刪不掉：" + (err.message || err); render();
@@ -233,7 +270,7 @@ document.addEventListener("click", async e => {
   if (act === "signout") {
     await AUTH.signOut();
     S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
-          profile: null, view: null, busy: false };
+          profile: null, view: null, busy: false, apps: [], opens: [] };
     render();
     return;
   }

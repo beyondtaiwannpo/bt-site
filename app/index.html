@@ -149,6 +149,25 @@
   .kv span{color:var(--ink);overflow-wrap:anywhere}
   .kv .empty-v{color:rgba(16,42,134,.55)}
 
+  /* 學員頁的小標題與「我的申請／現在開放」那兩區（批 3）。 */
+  .sec-h{font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:.03em;
+    margin:26px 0 6px;color:rgba(16,42,134,.9)}
+  .sec-h:first-of-type{margin-top:4px}
+  .applist{margin:0 0 4px;padding:0;list-style:none}
+  .applist li{padding:13px 0;border-top:1px solid rgba(16,42,134,.13)}
+  .applist li:first-child{border-top:0}
+  .applist b{display:block;font-size:15.5px;font-weight:600;line-height:1.35}
+  /* 狀態一律是文字，不是只有顏色。用顏色當唯一訊息的話，
+     色覺不同的人看到的是四個一樣的灰點。 */
+  .st{display:inline-block;margin-top:5px;font-size:13px;padding:3px 10px;border-radius:999px;
+    background:rgba(16,42,134,.09);color:rgba(16,42,134,.92)}
+  .st-accepted{background:rgba(107,198,187,.45)}
+  .st-interview{background:rgba(255,196,108,.45)}
+  .st-rejected{background:rgba(198,198,198,.45)}
+  .st-more{margin-top:7px;font-size:13.5px}
+  .st-more a{color:var(--ink);font-weight:600}
+  .st-more .empty-v{color:rgba(16,42,134,.62);margin-left:8px}
+
   /* ── 按鈕的輕重（2026-09-03，7-4）──
      一頁只有**一顆**實心深藍鈕，就是主要動作，滿版。
      第二選擇（Google）是滿版的框線鈕，用內文字體、不大寫、一行 ——
