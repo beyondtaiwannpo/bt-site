@@ -327,7 +327,15 @@ p{margin:0 0 17px;max-width:34em}
   background:rgba(16,42,134,.06)}
 /* 島的下面第一張照片：往右溢出到畫面邊緣，接住第一屏的不對稱。 */
 .photo-lead{margin-top:clamp(40px,7vh,96px);margin-right:calc(var(--gut) * -1)}
-@media (max-width:700px){.photo-lead{margin-right:0}}
+/* 導覽有八項之後，中等寬度會擠。**先縮字級與間距，再換漢堡** ——
+   1100px 上直接換成漢堡，對一台筆電來說太早了。
+   量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
+@media (max-width:1180px){
+  .navlinks{gap:clamp(7px,1.05vw,14px)}
+  .navlinks a{font-size:13.5px}
+  .login{padding:9px 14px;font-size:13.5px}
+}
+@media (max-width:900px){.photo-lead{margin-right:0}}
 
 /* ── 數字 ── */
 /* 數字本身用 Barlow Condensed 拉大，後面的中文說明維持內文字體。
@@ -427,6 +435,7 @@ footer a{color:var(--ink);font-weight:600}
        標籤自己也有中英兩份，跟著 data-lang 一起切。 -->
   <div class="navlinks" id="navlinks">
     <a href="./apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
+    <a href="./resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
     <a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="./programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="./impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>

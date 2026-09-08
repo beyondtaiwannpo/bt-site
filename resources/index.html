@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>合作 / Beyond Taiwan</title>
+<title>資源 / Beyond Taiwan</title>
 
 <!-- 對外的內容頁（2026-09-07 新增）。
      這一頁講 BT 的使命與時間軸。數字來自 BT 的既有紀錄。
@@ -23,11 +23,11 @@
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
      ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
 
-<meta name="description" content="跟 Beyond Taiwan 合作：場地、講者、把 BT 帶進學校，或直接贊助。過去合作過的單位包括 AIT、EducationUSA、TRÈS BON 好伴 café 與北一女。">
-<meta property="og:title" content="合作 / Beyond Taiwan">
-<meta property="og:description" content="跟 Beyond Taiwan 合作：場地、講者、把 BT 帶進學校，或直接贊助。過去合作過的單位包括 AIT、EducationUSA、TRÈS BON 好伴 café 與北一女。">
+<meta name="description" content="Beyond Taiwan 整理的免費資源：申請文書怎麼寫、選校怎麼看、時程怎麼排。開一個免費帳號就拿得到。">
+<meta property="og:title" content="資源 / Beyond Taiwan">
+<meta property="og:description" content="Beyond Taiwan 整理的免費資源。開一個免費帳號就拿得到。">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://beyondtaiwannpo.com/partner/">
+<meta property="og:url" content="https://beyondtaiwannpo.com/resources/">
 <meta name="theme-color" content="#EDE5D8">
 
 <link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
@@ -204,6 +204,26 @@ footer a{color:var(--ink);font-weight:600}
 }
 @media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+  /* ---------- 資源 ---------- */
+  .rlist{margin:0;padding:0;list-style:none;max-width:38em}
+  .rlist li{padding:22px 0;border-top:1px solid rgba(16,42,134,.15)}
+  .rlist li:first-child{border-top:0;padding-top:4px}
+  .rlist h3{margin:0 0 6px;font-family:var(--display);font-size:clamp(20px,2.1vw,26px)}
+  .rlist p{margin:0 0 12px;font-size:15.5px;color:rgba(16,42,134,.86)}
+  /* 類型標籤。文字不是圖示——圖示要另外學，而「PDF」三個字誰都看得懂。 */
+  .kind{display:inline-block;font-family:var(--display);font-size:11.5px;font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:999px;
+    background:rgba(16,42,134,.1);color:rgba(16,42,134,.9);margin-bottom:8px}
+  .btn{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+    font-family:var(--body);font-weight:600;font-size:15.5px;padding:11px 21px;border-radius:999px;
+    border:none;cursor:pointer;line-height:1.2}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+  .warn{font-size:15px;line-height:1.65;padding:14px 16px;border-radius:14px;
+    background:rgba(255,196,108,.3);max-width:38em;margin:0 0 22px}
+  .note{font-size:14px;line-height:1.7;color:rgba(16,42,134,.85);max-width:34em}
+  .loading{padding:40px 0;color:rgba(16,42,134,.75)}
+
 </style>
 </head>
 <body>
@@ -216,13 +236,13 @@ footer a{color:var(--ink);font-weight:600}
   </a>
   <div class="navlinks" id="navlinks">
     <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="../resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
+    <a href="../resources/" aria-current="page"><span class="zh">資源</span><span class="en">Resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
     <a href="../alumni/">Alumni</a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
-    <a href="../partner/" aria-current="page"><span class="zh">合作</span><span class="en">Partner</span></a>
+    <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/">登入 / Sign in</a>
@@ -230,109 +250,25 @@ footer a{color:var(--ink);font-weight:600}
 </nav>
 
 <main id="main">
-
-<div class="zh" lang="zh-Hant">
 <header class="hero">
-  <h1>一起做這件事。</h1>
-  <p class="lead">我們持續在找願意一起做這件事的個人、企業與學校。合作不一定是錢，很多時候是一個場地、一個下午、或是一句「來我們學校講」。</p>
+  <h1><span class="zh">我們整理過的東西</span><span class="en">What we have written down</span></h1>
+  <p class="lead"><span class="zh">申請文書怎麼寫、選校怎麼看、時程怎麼排。這些是 BT 五年下來一次一次講給學生聽的東西，寫下來讓更多人拿得到。全部免費。</span><span class="en">How to write your essays, how to read a school list, how to plan the timeline. Five years of things we have explained one student at a time, written down so more people can have them. All free.</span></p>
 </header>
-
 <section class="sec">
   <div class="sec-in">
-    <h2>合作過誰</h2>
+    <h2><span class="zh">資源</span><span class="en">Resources</span></h2>
+    <div class="body"><div id="rs-root"><div class="loading"><span class="zh">載入中…</span><span class="en">Loading…</span></div></div></div>
+  </div>
+</section>
+<section class="sec">
+  <div class="sec-in">
+    <h2><span class="zh">為什麼要登入</span><span class="en">Why sign in</span></h2>
     <div class="body">
-      <p>美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
-      <p>這幾個單位幫過的事都不一樣：有的提供場地，有的把我們介紹給對的人，有的直接讓我們進校園。<a href="../impact/">五年下來累積了什麼</a>寫在另一頁。</p>
+      <p class="note"><span class="zh">東西是免費的，但我們想知道拿的人是誰、在哪一間學校。那決定我們明年把營隊辦在哪裡、辦給誰。開帳號兩分鐘，不用付錢，也不會有人打電話給你。</span><span class="en">The material is free, but we want to know who is taking it and which school they are at. That is what decides where we run next year's camp and for whom. An account takes two minutes, costs nothing, and nobody will call you.</span></p>
+      <p class="note"><span class="zh">我們保存哪些資料、誰看得到，寫在<a href="../privacy/">隱私政策</a>裡。你隨時可以自己把帳號刪掉。</span><span class="en">What we keep and who can see it is in the <a href="../privacy/">privacy policy</a>. You can delete your account yourself at any time.</span></p>
     </div>
   </div>
 </section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>可以怎麼合作</h2>
-    <div class="body">
-      <ul class="rows">
-        <li><b>場地</b><span>一場探索營是兩天，需要一個能坐下幾十個高中生的空間。</span></li>
-        <li><b>講者</b><span>你如果走過海外升學這條路，回來講一個下午。對現場的高中生來說，那是一個真的存在的樣本，比任何簡報都有用。</span></li>
-        <li><b>學校</b><span>把 BT 帶進你的學校，讓學生在校內就問得到。</span></li>
-        <li><b>贊助</b><span>直接支持我們把活動辦下去。</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>贊助的錢用在哪</h2>
-    <div class="body">
-      <p>三件事：日常營運、暑期探索營、導生配對計畫。</p>
-      <p>學員不收費是刻意的設計，不是還沒開始收。我們處理的是資訊落差，把資訊放在付費牆後面就變成我們原本要解決的那個問題。所以這些活動能不能辦下去，靠的是願意支持的人。</p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>怎麼開始</h2>
-    <div class="body">
-      <p>寫一封信到 <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a>，講一下你是誰、想怎麼參與。不用寫得很正式。</p>
-      <p>我們是學生組織，幹部都在上學，回信可能不會太快，但每一封都會看。</p>
-    </div>
-  </div>
-</section>
-</div>
-
-<div class="en" lang="en">
-<header class="hero">
-  <h1>Build this with us.</h1>
-  <p class="lead">We are always looking for individuals, companies and schools willing to build this with us. It does not have to be money. Often it is a room, an afternoon, or an invitation to come and speak.</p>
-</header>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Who we have worked with</h2>
-    <div class="body">
-      <p>The American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
-      <p>Each of them helped in a different way: a venue, an introduction to the right people, a door into a school. <a href="../impact/">What five years added up to</a> is on another page.</p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Ways to work with us</h2>
-    <div class="body">
-      <ul class="rows">
-        <li><b>A venue</b><span>College Bootcamp runs for two days and needs a room that seats a few dozen teenagers.</span></li>
-        <li><b>Speaking</b><span>If you have walked this path, come and spend an afternoon. To the students in the room you are a real example, which beats any slide deck.</span></li>
-        <li><b>Your school</b><span>Bring Beyond Taiwan into your school so students can ask their questions on campus.</span></li>
-        <li><b>Sponsorship</b><span>Support us so the programmes keep running.</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Where sponsorship goes</h2>
-    <div class="body">
-      <p>Three things: day to day operations, the summer College Bootcamp, and the mentorship programme.</p>
-      <p>Students pay nothing, and that is deliberate. We work on an information gap, and putting information behind a paywall would recreate the very problem we set out to solve. So whether these programmes keep running depends on people willing to support them.</p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>How to start</h2>
-    <div class="body">
-      <p>Write to <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a> and tell us who you are and how you would like to be involved. It does not need to be formal.</p>
-      <p>We are a student organisation and everyone is in school, so a reply may take a while, but we read all of them.</p>
-    </div>
-  </div>
-</section>
-</div>
-
 </main>
 
 <footer>
@@ -388,5 +324,6 @@ footer a{color:var(--ink);font-weight:600}
 })();
 </script>
 
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>

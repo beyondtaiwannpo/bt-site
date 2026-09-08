@@ -16,6 +16,8 @@ let S = {
   form: null, questions: [], qEditing: null,
   // 批 4
   apps: [], sel: new Set(), filter: "all", pending: [],
+  // 批 5
+  res: [], resEditing: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -36,7 +38,11 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
 
   document.body.insertAdjacentHTML("afterbegin", nav);
-  if (S.view === "apps" && S.form) {
+  if (S.view === "res") {
+    el.innerHTML = UI.resListHTML(S.res, canEdit(), S.msg);
+  } else if (S.view === "res-edit") {
+    el.innerHTML = UI.resEditHTML(S.resEditing, S.msg, S.busy);
+  } else if (S.view === "apps" && S.form) {
     el.innerHTML = UI.appsHTML(S.form, S.apps, S.questions, canEdit(),
       S.sel, S.filter, S.pending, S.msg, S.busy);
   } else if (S.view === "question") {
@@ -115,6 +121,15 @@ async function refreshApps() {
   S.pending = await D.loadPending(S.form.id);
 }
 
+async function openRes() {
+  S.busy = true; render();
+  try {
+    S.res = await D.loadResources();
+    S.view = "res"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "資源載不到：" + D.says(e); }
+  render();
+}
+
 async function reloadList() {
   try { S.forms = await D.loadForms(); } catch (e) { S.msg = "清單載不到：" + D.says(e); }
 }
@@ -127,6 +142,45 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
+
+  // ── 批 5：資源 ────────────────────────────────────────────────────
+  if (act === "tab") {
+    S.msg = ""; S.sel = new Set();
+    if (b.dataset.t === "res") { await openRes(); }
+    else { S.view = "list"; await reloadList(); render(); }
+    return;
+  }
+  if (act === "res-back") { await openRes(); return; }
+  if (act === "res-new")  { S.resEditing = null; S.view = "res-edit"; S.msg = ""; render(); return; }
+  if (act === "res-edit") {
+    S.resEditing = S.res.find(r => r.id === id) || null;
+    S.view = "res-edit"; S.msg = ""; render(); return;
+  }
+  if (act === "res-save") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    const patch = {
+      title: val("rtitle"), blurb: val("rblurb"), kind: val("rkind"),
+      url: val("rurl"), team: val("rteam") || null, status: val("rstatus"),
+      ord: Number(val("rord")) || 100,
+    };
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.saveResource(S.resEditing ? S.resEditing.id : null, patch);
+      S.busy = false; S.resEditing = null;
+      await openRes();
+    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    return;
+  }
+  if (act === "res-del") {
+    if (!confirm("刪掉這個資源？外面那一頁上就不見了。")) return;
+    S.busy = true; render();
+    try {
+      await D.deleteResource(id);
+      S.busy = false; S.resEditing = null;
+      await openRes();
+    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); render(); }
+    return;
+  }
 
   if (act === "back-list") {
     S.view = "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render(); return;

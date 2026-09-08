@@ -195,6 +195,41 @@ export async function loadPending(formId) {
   return data || [];
 }
 
+// ── 批 5：資源 ────────────────────────────────────────────────────────
+// 後台這一邊一律用完整欄位（幹部一定是 authenticated，拿得到 url）。
+// 對外那一頁的兩種查詢在 resources/src/main.js，**兩邊刻意分開**。
+export async function loadResources() {
+  need();
+  const { data, error } = await supabase.from("resources")
+    .select("id, title, blurb, kind, url, team, status, ord, updated_at")
+    .order("ord");
+  if (error) throw error;
+  return data || [];
+}
+
+const RES_FIELDS = ["title", "blurb", "kind", "url", "team", "status", "ord"];
+export async function saveResource(id, patch) {
+  need();
+  const clean = {};
+  for (const k of RES_FIELDS) if (k in patch) clean[k] = patch[k];
+  if (!clean.title) throw new Error("資源要有名字。");
+  if (!clean.url) throw new Error("資源要有一條連結，不然這一列沒有用。");
+  if (id) {
+    const { error } = await supabase.from("resources").update(clean).eq("id", id);
+    if (error) throw error;
+    return id;
+  }
+  const { data, error } = await supabase.from("resources").insert(clean).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function deleteResource(id) {
+  need();
+  const { error } = await supabase.from("resources").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**

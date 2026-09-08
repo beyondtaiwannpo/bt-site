@@ -49,6 +49,7 @@ export function listHTML(forms, canCreate, msg) {
     <h2>申請管理</h2>
     <div class="sub">開申請表、看收到的申請。你看得到的是自己 team 的表單。</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${tabsHTML("forms")}
     ${canCreate ? `<div class="row" style="margin-bottom:6px">
       <button class="btn" data-act="new-form">開一份新的申請表</button>
     </div>` : `<div class="wnote">你可以看，但改不動。開表單與審核是 Director 與 Co-President 的事。</div>`}
@@ -272,6 +273,89 @@ function pendingHTML(pending, busy) {
     ${stuck.length ? `其中 ${stuck.length} 封試過但失敗了：${esc(stuck[0].error || "沒有錯誤訊息")}` : ""}
     <div class="row">
       <button class="btn ghost sm" data-act="send-mail" ${busy ? "disabled" : ""}>${busy ? "寄送中…" : "現在寄出去"}</button>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 批 5：資源
+// ═══════════════════════════════════════════════════════════════════════
+export const RES_KINDS = [
+  { v: "pdf", label: "PDF" }, { v: "video", label: "影片" },
+  { v: "slides", label: "投影片" }, { v: "sheet", label: "表格" },
+  { v: "book", label: "手冊" }, { v: "link", label: "連結" },
+];
+
+// 兩個大分頁：申請表 / 資源。**不是頂欄的第四個功能** ——
+// 它們是同一件事的兩面（對外給學生的東西），拆成兩個入口會讓人以為是兩個系統。
+export function tabsHTML(tab) {
+  return `<div class="chips" style="margin-bottom:16px">
+    <button class="chip wide${tab === "forms" ? " on" : ""}" data-act="tab" data-t="forms">申請表</button>
+    <button class="chip wide${tab === "res" ? " on" : ""}" data-act="tab" data-t="res">資源</button>
+  </div>`;
+}
+
+export function resListHTML(items, canEdit, msg) {
+  const rows = items.map(r => `<li>
+    <div class="fhead">
+      <b>${esc(r.title)}</b>
+      <span class="tag ${r.status === "published" ? "open" : "draft"}">${
+        r.status === "published" ? "已發布" : "還在寫"}</span>
+      <span class="tag">${esc((RES_KINDS.find(k => k.v === r.kind) || RES_KINDS[5]).label)}</span>
+    </div>
+    <div class="fmeta">${esc(r.blurb || "還沒寫介紹")}</div>
+    <div class="fmeta"><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.url)}</a></div>
+    ${canEdit ? `<div class="row">
+      <button class="btn ghost sm" data-act="res-edit" data-id="${esc(r.id)}">改</button>
+    </div>` : ""}
+  </li>`).join("");
+
+  return `<div class="card">
+    <h2>資源</h2>
+    <div class="sub">BT 產出的免費資源。這裡放的是**一條連結**，不是檔案。</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${tabsHTML("res")}
+    ${canEdit ? `<div class="row" style="margin-bottom:6px">
+      <button class="btn" data-act="res-new">加一個資源</button>
+    </div>` : `<div class="wnote">你可以看，但改不動。</div>`}
+    ${items.length ? `<ul class="flist">${rows}</ul>` : `<div class="empty">還沒有任何資源。</div>`}
+  </div>`;
+}
+
+export function resEditHTML(r, msg, busy) {
+  const cur = r || { title: "", blurb: "", kind: "pdf", url: "", team: "", status: "draft", ord: 100 };
+  return `<div class="card">
+    <div class="row" style="margin:0 0 14px">
+      <button class="btn quiet" data-act="res-back">← 回資源清單</button>
+    </div>
+    <h2>${r ? "改一個資源" : "加一個資源"}</h2>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    <label><i>名稱</i><input id="rtitle" value="${esc(cur.title)}" placeholder="申請文書怎麼開頭"></label>
+    <!-- ⚠ 介紹是**搜尋引擎唯一看得到的東西**（連結那一欄要登入才讀得到）。
+         所以這一格要寫得像一句對高中生講的話，不是一行檔名。 -->
+    <label><i>介紹（公開，沒登入的人也看得到，Google 也看得到）</i>
+      <textarea id="rblurb" placeholder="這是什麼、為什麼有用。寫給一個第一次聽到 BT 的高中生看。">${esc(cur.blurb || "")}</textarea></label>
+    <div class="two">
+      <label><i>類型</i><select id="rkind">
+        ${RES_KINDS.map(k => `<option value="${k.v}"${cur.kind === k.v ? " selected" : ""}>${esc(k.label)}</option>`).join("")}
+      </select></label>
+      <label><i>排序（小的在前）</i><input id="rord" type="number" value="${esc(String(cur.ord))}"></label>
+      <label><i>哪一個 team 維護</i><input id="rteam" value="${esc(cur.team || "")}"></label>
+      <label><i>狀態</i><select id="rstatus">
+        <option value="draft"${cur.status === "draft" ? " selected" : ""}>還在寫（外面看不到）</option>
+        <option value="published"${cur.status === "published" ? " selected" : ""}>已發布</option>
+      </select></label>
+    </div>
+    <label><i>連結（Google Drive、YouTube、Canva…）</i>
+      <input id="rurl" value="${esc(cur.url)}" placeholder="https://..."></label>
+    <!-- 這一句是人的流程，不是程式。Drive 的分享權限設錯，網站看不出來，
+         而使用者看到的是一頁「你需要存取權」。 -->
+    <div class="wnote">發布之前，<b>用無痕視窗打開這條連結自己點一次</b>。
+      Drive 的分享權限如果設成「只有我」，這裡完全看不出來，
+      而學生看到的會是一頁「你需要存取權」。</div>
+    <div class="row">
+      <button class="btn" data-act="res-save" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存起來"}</button>
+      ${r ? `<button class="btn quiet" data-act="res-del" data-id="${esc(r.id)}">刪掉</button>` : ""}
     </div>
   </div>`;
 }

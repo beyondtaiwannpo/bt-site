@@ -179,7 +179,15 @@ footer p{margin:0 0 8px;max-width:none}
 footer a{color:var(--ink);font-weight:600}
 
 @media (max-width:820px){.sec-in{grid-template-columns:1fr;gap:14px}}
-@media (max-width:700px){
+/* 導覽有八項之後，中等寬度會擠。**先縮字級與間距，再換漢堡** ——
+   1100px 上直接換成漢堡，對一台筆電來說太早了。
+   量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
+@media (max-width:1180px){
+  .navlinks{gap:clamp(7px,1.05vw,14px)}
+  .navlinks a{font-size:13.5px}
+  .login{padding:9px 14px;font-size:13.5px}
+}
+@media (max-width:900px){
   .navlinks{display:none;position:absolute;left:0;right:0;top:calc(100% + 8px);
     flex-direction:column;align-items:flex-start;gap:0;padding:6px 18px 10px;border-radius:20px;
     background:linear-gradient(180deg,rgba(255,255,255,.93),rgba(237,229,216,.88));
@@ -208,6 +216,7 @@ footer a{color:var(--ink);font-weight:600}
   </a>
   <div class="navlinks" id="navlinks">
     <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
+    <a href="../resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../programs/" aria-current="page"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>

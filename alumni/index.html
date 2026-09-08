@@ -359,7 +359,15 @@ img.avatar{object-fit:cover}
      資訊交給下面那排按鈕 —— 那裡的字是真正的 HTML，會照使用者的字級走。 */
   .node .lbl,.dest .city,.dest .place,.dest .country{display:none}
 }
-@media (max-width:700px){
+/* 導覽有八項之後，中等寬度會擠。**先縮字級與間距，再換漢堡** ——
+   1100px 上直接換成漢堡，對一台筆電來說太早了。
+   量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
+@media (max-width:1180px){
+  .navlinks{gap:clamp(7px,1.05vw,14px)}
+  .navlinks a{font-size:13.5px}
+  .login{padding:9px 14px;font-size:13.5px}
+}
+@media (max-width:900px){
   /* 面板用跟頂欄同一塊玻璃，只是更厚一點（後面是內容，要壓得住）。 */
   .navlinks{display:none;position:absolute;left:0;right:0;top:calc(100% + 8px);
     flex-direction:column;align-items:flex-start;gap:0;padding:6px 18px 10px;
@@ -395,6 +403,7 @@ img.avatar{object-fit:cover}
   </a>
   <div class="navlinks" id="navlinks">
     <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
+    <a href="../resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
