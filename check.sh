@@ -1393,6 +1393,30 @@ else
   ok "每一個有登入按鈕的對外頁面都會在登入後把字改掉"
 fi
 
+# ── 按下播放之前不准連到 YouTube ──────────────────────────────────────
+#
+# 首頁的宣傳影片用的是「封面先畫好，按下去才生出 iframe」的做法。
+# 這條守門要防的是有人把它「簡化」成兩種常見寫法，兩種都會讓
+# **每一個打開首頁的人**（包含根本不想看影片的人）被 Google 記一筆：
+#   1. 直接把 iframe 寫進 HTML。
+#   2. 拿 img.youtube.com 的縮圖當封面。
+# 那一刻 footer 那句「本網站不使用任何追蹤或廣告工具」與隱私政策就同時變成假的，
+# 而畫面上完全看不出差別 —— 影片照樣會播。
+#
+# 只掃對外頁面。iframe 這個字在程式裡是允許的（那正是按下去之後要生出來的東西），
+# 擋的是**寫死在 HTML 標籤裡**的那一種。
+ytbad=""
+for f in $(printf '%s\n' index.html */index.html); do
+  grep -qi '<iframe' "$f" && ytbad="${ytbad} ${f}(寫死的 iframe)"
+  grep -qi 'img\.youtube\.com\|i\.ytimg\.com' "$f" && ytbad="${ytbad} ${f}(YouTube 縮圖)"
+done
+if [ -n "$ytbad" ]; then
+  bad "對外頁面在使用者按下播放之前就會連到 YouTube：${ytbad}"
+  say "     封面要自己畫，iframe 要等按下去才生出來（見 index.html 的 VIDEO_ID 那一段）。"
+else
+  ok "首頁的影片按下播放之前不會連到 YouTube（沒有寫死的 iframe，也沒有用 YouTube 縮圖）"
+fi
+
 # ── noindex 只准出現在登入相關的頁面 ──────────────────────────────────
 #
 # 名單裡的兩頁是登入流程（`/app/` 登入頁、`/reset/` 改密碼），

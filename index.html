@@ -322,6 +322,32 @@ p{margin:0 0 17px;max-width:34em}
    aspect-ratio 讓瀏覽器在圖還沒載入時就先留好高度 —— 這就是不跳版的來源。
    刻意不給圓角也不給陰影：全站每一塊都一樣的圓角加一樣的陰影，
    是 AI 生成頁面最明顯的特徵之一。 */
+/* ═════════ 宣傳影片（2026-09-08）═════════ */
+/* ⚠ **按下播放之前絕對不可以連到 YouTube。**
+   下面那塊封面是純 CSS 畫的，沒有任何一個檔案是從站外載的。
+   不要「順手」改成去 YouTube 抓那支影片的縮圖來當封面 ——
+   那一秒起，每個進首頁的人都會被 Google 記一筆，
+   （check.sh 有一條在擋，連寫在註解裡的那個網域都會被抓到，這是刻意的）
+   而 footer 那句「本網站不使用任何追蹤或廣告工具」就不成立了。
+   要放自己的封面圖的話，圖檔放進 ./photos/，並回去改 scripts/check-photos.mjs 的張數。 */
+.vframe{position:relative;margin:clamp(26px,4.5vh,54px) 0 0;aspect-ratio:16/9;
+  border-radius:14px;overflow:hidden;display:grid;place-items:center;
+  /* 一道暖光打在深藍上，跟全站的招牌同一個手法（見 body::before）。
+     不加的話這塊封面是一片平的深藍，看起來像圖沒載出來。 */
+  background:radial-gradient(58% 68% at 50% 46%, rgba(255,196,108,.22) 0%, rgba(255,196,108,0) 70%),
+             linear-gradient(140deg,var(--bt-navy) 0%,rgba(16,42,134,.84) 55%,var(--bt-navy) 100%);
+  box-shadow:0 20px 46px rgba(16,42,134,.18)}
+.vframe iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.play{display:inline-flex;align-items:center;gap:14px;background:none;
+  border:1.5px solid rgba(255,255,255,.34);
+  color:var(--bt-cream);font-family:var(--display);font-weight:600;
+  font-size:clamp(18px,2vw,25px);letter-spacing:.08em;padding:16px 26px;border-radius:999px}
+/* 三角形用 border 畫，不用圖檔也不用 SVG ——
+   這一塊的整個重點就是「不從外面載任何東西」，自己站內也少一個檔案要顧。 */
+.play .tri{width:0;height:0;margin-left:2px;border-left:22px solid var(--bt-orange);
+  border-top:14px solid transparent;border-bottom:14px solid transparent}
+.play:hover,.play:focus-visible{background:rgba(255,255,255,.14)}
+.vnote{font-size:13.5px;color:rgba(16,42,134,.72);margin-top:12px}
 .photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
 .photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;
   background:rgba(16,42,134,.06)}
@@ -594,6 +620,31 @@ summary{cursor:pointer}
   </div>
 </section>
 
+<!-- 宣傳影片。**要放影片只要做一件事**：把 YouTube 的影片編號填進這一頁最下面
+     那段程式裡的 VIDEO_ID（網址 youtube.com/watch?v=XXXXXXXXXXX 裡 v= 後面那一串）。
+     填了中英兩段就會自己出現，沒填就整段不存在 —— 不用改 hidden，也不用改程式。
+     中英各一段但編號只填一次，是刻意的：填兩次就一定有一天只改到一邊。
+
+     ⚠ 這裡不要寫出開頭是小於號的 script 標籤，連在註解裡也不行。
+     check.sh 用正規表示式找內嵌的程式區塊，註解裡的那個標籤會被它當成真的，
+     於是往下一路吃到下一個結束標籤，把 GSAP 那兩行也吞進去，
+     然後回報「首頁有動畫跑到 motion() 外面」——訊息跟真正的原因完全對不上。
+     2026-09-08 踩過一次。 -->
+<section class="sec vid" id="video" hidden>
+  <div class="sec-in">
+    <h2>一分鐘看 BT</h2>
+    <div class="body">
+      <p>這一年的樣子，一分鐘。</p>
+      <div class="vframe">
+        <button class="play" type="button" data-play>
+          <span class="tri" aria-hidden="true"></span><span>播放影片</span>
+        </button>
+      </div>
+      <p class="vnote">按下播放才會連到 YouTube，在那之前這一頁不會跟 YouTube 有任何往來。</p>
+    </div>
+  </div>
+</section>
+
 <section class="sec">
   <div class="sec-in">
     <h2>誰在做這件事</h2>
@@ -681,6 +732,21 @@ summary{cursor:pointer}
         <source srcset="./photos/three-at-laptop.webp" type="image/webp">
         <img src="./photos/three-at-laptop.jpg" alt="Three students crowded around one laptop, the one in the middle smiling" width="1200" height="800" loading="lazy">
       </picture>
+    </div>
+  </div>
+</section>
+
+<section class="sec vid" id="video-en" hidden>
+  <div class="sec-in">
+    <h2>One minute</h2>
+    <div class="body">
+      <p>A year of Beyond Taiwan, in a minute.</p>
+      <div class="vframe">
+        <button class="play" type="button" data-play>
+          <span class="tri" aria-hidden="true"></span><span>Play</span>
+        </button>
+      </div>
+      <p class="vnote">YouTube only loads after you press play. Until then this page never contacts it.</p>
     </div>
   </div>
 </section>
@@ -1010,6 +1076,47 @@ summary{cursor:pointer}
       });
     });
   }
+})();
+</script>
+
+<script>
+/* ═══════════ 宣傳影片 ═══════════
+
+   ┌──────────────────────────────────────────────────────────────────────┐
+   │  要放影片，只改下面這一行的引號裡面，其他什麼都不用動。               │
+   │  影片編號在 YouTube 網址裡：youtube.com/watch?v=XXXXXXXXXXX          │
+   │  引號裡是空的（現在就是），首頁上那一段就整個不存在。                 │
+   └──────────────────────────────────────────────────────────────────────┘ */
+var VIDEO_ID = "";
+
+/* ⚠ **不要把 iframe 直接寫進 HTML。** 寫進去的話，每一個打開首頁的人
+   —— 包括根本沒有要看影片的人 —— 都會被 YouTube 記一筆，
+   而 footer 那句「本網站不使用任何追蹤或廣告工具」就不成立了。
+   下面的做法是：畫面上先放一塊自己畫的封面，按下去才把 iframe 生出來。
+   網域用 youtube-nocookie.com，那是 YouTube 自己提供的、不放追蹤 cookie 的版本。
+
+   放影片之後記得**隱私政策也要跟著看一次**（privacy/index.html 的第三方表格
+   已經有 YouTube 那一列，寫的是「僅在你按下首頁的播放鍵時」，不用改）。 */
+(function () {
+  if (!VIDEO_ID) return;                       // 沒填就什麼都不做，兩段都維持 hidden
+  var secs = document.querySelectorAll(".vid");
+  for (var i = 0; i < secs.length; i++) secs[i].hidden = false;
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("[data-play]") : null;
+    if (!b) return;
+    var frame = b.parentNode;
+    var f = document.createElement("iframe");
+    f.src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(VIDEO_ID) +
+            "?autoplay=1&rel=0";
+    f.title = document.documentElement.getAttribute("data-lang") === "en"
+      ? "Beyond Taiwan" : "Beyond Taiwan 宣傳影片";
+    f.allow = "autoplay; encrypted-media; picture-in-picture";
+    f.setAttribute("allowfullscreen", "");
+    f.referrerPolicy = "no-referrer";
+    frame.innerHTML = "";
+    frame.appendChild(f);
+  });
 })();
 </script>
 
