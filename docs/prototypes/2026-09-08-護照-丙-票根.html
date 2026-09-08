@@ -1,0 +1,107 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>護照 丙・票根</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../../shared/brand.css">
+<style>
+/* 丙：不是護照，是一疊撕下來的票根。
+   每個活動是一張登機證，蓋章＝撕票根，撕下來的那半留在你這裡。
+   （撕的動作護照裡本來就有，tearwrap / tearhalf。） */
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.7 var(--body);
+  padding:44px clamp(16px,4vw,60px) 90px}
+.wrap{max-width:1000px;margin:0 auto}
+.lab{font-family:var(--display);font-size:26px;font-weight:700;margin:0 0 4px}
+.lab small{display:block;font-family:var(--body);font-size:14px;font-weight:400;
+  color:rgba(16,42,134,.75);margin-top:4px}
+h3{font-family:var(--display);font-size:15px;letter-spacing:.18em;font-weight:600;
+  color:rgba(16,42,134,.6);margin:34px 0 14px}
+
+.tickets{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr))}
+/* 一張票：左邊是資訊，右邊是撕下來的票根，中間一排打孔。 */
+.tk{display:grid;grid-template-columns:1fr 178px;border-radius:12px;overflow:hidden;
+  background:linear-gradient(100deg,rgba(255,232,197,.85),rgba(237,229,216,.95));
+  box-shadow:0 12px 30px rgba(16,42,134,.11);position:relative}
+.tk .main{padding:18px 22px 17px}
+.tk .rt{position:relative;padding:16px 16px 46px;text-align:center;
+  background:rgba(255,255,255,.34);
+  display:flex;flex-direction:column;justify-content:center;gap:2px}
+/* 打孔線。左右各挖一個半圓，中間一排點 —— 那三樣加起來才會像票。 */
+.tk .rt::before{content:"";position:absolute;left:0;top:0;bottom:0;width:0;
+  border-left:2px dashed rgba(16,42,134,.35)}
+.tk::before,.tk::after{content:"";position:absolute;right:170px;width:16px;height:16px;
+  border-radius:50%;background:var(--paper);transform:translateX(50%)}
+.tk::before{top:-8px}
+.tk::after{bottom:-8px}
+
+.tk .rowa{display:flex;align-items:baseline;gap:10px}
+.tk .cat{font-family:var(--display);font-size:11px;letter-spacing:.2em;
+  color:rgba(16,42,134,.62)}
+.tk .mo{margin-left:auto;font-family:var(--display);font-size:12px;letter-spacing:.16em;
+  color:rgba(16,42,134,.55)}
+.tk b{display:block;font-size:21px;font-weight:600;margin-top:4px}
+.tk p{margin:3px 0 0;font-size:13.5px;color:rgba(16,42,134,.78)}
+.tk .rt small{font-family:var(--display);font-size:10px;letter-spacing:.2em;
+  color:rgba(16,42,134,.6)}
+.tk .rt strong{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.04em;
+  line-height:1}
+.tk .rt em{font-style:normal;font-family:var(--display);font-size:12.5px;letter-spacing:.14em;
+  color:rgba(16,42,134,.8)}
+/* 蓋過的：票根那半打上一個歪的章。 */
+.tk.done .rt{background:rgba(255,196,108,.34)}
+.tk.done .rt::after{content:"BOARDED";position:absolute;left:50%;top:50%;
+  top:auto;bottom:10px;
+  transform:translate(-50%,0) rotate(-8deg);font-family:var(--display);font-weight:700;
+  font-size:17px;letter-spacing:.1em;color:rgba(16,42,134,.62);
+  border:2px solid rgba(16,42,134,.5);border-radius:3px;padding:2px 9px;
+  mix-blend-mode:multiply;white-space:nowrap}
+/* 還沒開的：整張淡掉，票根寫解鎖日。 */
+.tk.locked{background:rgba(237,229,216,.7);box-shadow:none;
+  border:1px dashed rgba(16,42,134,.24)}
+.tk.locked .main{opacity:.5}
+.tk.locked .rt{background:none}
+/* 這個月的：橘色左邊條，一眼看得到「現在該做這張」。 */
+.tk.now .main{box-shadow:inset 5px 0 0 var(--bt-orange)}
+@media (max-width:640px){
+  .tk{grid-template-columns:1fr}
+  .tk .rt{border-top:2px dashed rgba(16,42,134,.35);flex-direction:row;gap:10px;
+    align-items:baseline;justify-content:center;padding:12px}
+  .tk .rt::before{display:none}
+  .tk::before,.tk::after{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<div class="wrap">
+<p class="lab">丙・票根
+  <small>不是護照，是一疊票。每個活動是一張登機證，蓋章就是撕票根，撕下來的那半留著。撕的動作護照裡本來就有。</small></p>
+
+<h3>已經上機 · 6</h3>
+<div class="tickets">
+  <div class="tk done"><div class="main">
+    <div class="rowa"><span class="cat">GATHER 聚會</span><span class="mo">09 / 九月 · 07:00</span></div>
+    <b>開學電影夜</b><p>新學年第一次全員上線，選片權給今年的新幹部</p></div>
+    <div class="rt"><small>BEYOND TAIWAN</small><strong>09.12</strong><em>2026</em></div></div>
+
+  <div class="tk done"><div class="main">
+    <div class="rowa"><span class="cat">PROMPT 題目</span><span class="mo">09 / 九月 · 07:00</span></div>
+    <b>我是怎麼進來的</b><p>三句話，寫下你當初為什麼點進 BT</p></div>
+    <div class="rt"><small>BEYOND TAIWAN</small><strong>09.20</strong><em>2026</em></div></div>
+</div>
+
+<h3>這個月 · 還沒撕</h3>
+<div class="tickets">
+  <div class="tk now"><div class="main">
+    <div class="rowa"><span class="cat">FRAME 鏡頭</span><span class="mo">10 / 十月 · 08:00</span></div>
+    <b>你這個月最常走的那條路</b><p>同一條路，六個國家的人各拍一張</p></div>
+    <div class="rt"><small>BEYOND TAIWAN</small><strong>撕</strong><em>TEAR HERE</em></div></div>
+</div>
+
+<h3>還沒解鎖</h3>
+<div class="tickets">
+  <div class="tk locked"><div class="main">
+    <div class="rowa"><span class="cat">GATHER 聚會</span><span class="mo">11 / 十一月 · 08:40</span></div>
+    <b>今年的歌單</b><p>一人一首，湊成一張今年的播放清單</p></div>
+    <div class="rt"><small>UNLOCKS</small><strong>11.01</strong><em>2026</em></div></div>
+</div>
+</div></body></html>

@@ -1,0 +1,145 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>護照 甲・一本真的護照</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../../shared/brand.css">
+<style>
+/* 甲：把護照當成一個「東西」，不是一張卡片。
+   直式跨頁、書背在中間、章直接蓋在紙上，會歪、會疊、會透。 */
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.7 var(--body);
+  display:grid;place-items:center;min-height:100vh;padding:44px 20px}
+.wrap{width:min(100%,1000px)}
+.lab{font-family:var(--display);font-size:26px;font-weight:700;margin:0 0 4px}
+.lab small{display:block;font-family:var(--body);font-size:14px;font-weight:400;
+  color:rgba(16,42,134,.75);margin-top:4px}
+
+/* 封面：深藍硬殼，比內頁大一圈，所以四邊看得到一條邊。 */
+.cover{margin-top:26px;border-radius:6px 16px 16px 6px;padding:14px 16px 14px 12px;
+  background:linear-gradient(135deg,#102A86 0%,rgba(16,42,134,.86) 46%,#102A86 100%);
+  box-shadow:0 30px 60px rgba(16,42,134,.28),0 6px 14px rgba(16,42,134,.18)}
+
+/* 跨頁。左右兩頁，中間是書背。 */
+.spread{display:grid;grid-template-columns:1fr 1fr;position:relative;
+  border-radius:3px 10px 10px 3px;overflow:hidden;min-height:520px;
+  background:var(--bt-cream)}
+/* 紙的花紋（guilloché）：兩層很淡的放射線，護照內頁就是靠這個看起來不像白紙。 */
+.spread::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:
+    repeating-conic-gradient(from 0deg at 24% 42%, rgba(16,42,134,.028) 0deg .32deg, rgba(16,42,134,0) .32deg 1.5deg),
+    repeating-conic-gradient(from 0deg at 76% 64%, rgba(16,42,134,.022) 0deg .3deg, rgba(16,42,134,0) .3deg 1.4deg),
+    radial-gradient(70% 60% at 50% 0%, rgba(255,232,197,.5), rgba(255,232,197,0) 70%)}
+/* 書背：中間一道陰影，兩頁才不會看起來是兩張卡片。 */
+.spread::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:54px;
+  transform:translateX(-50%);pointer-events:none;
+  background:linear-gradient(90deg,rgba(16,42,134,0) 0%,rgba(16,42,134,.05) 30%,
+    rgba(16,42,134,.20) 46%,rgba(16,42,134,.30) 50%,rgba(16,42,134,.20) 54%,
+    rgba(16,42,134,.05) 70%,rgba(16,42,134,0) 100%)}
+.pg{position:relative;z-index:1;padding:30px 34px 26px}
+.pg.l{padding-right:52px}
+.pg.r{padding-left:52px}
+
+.mhead{display:flex;align-items:baseline;gap:12px;
+  border-bottom:1.5px solid rgba(16,42,134,.35);padding-bottom:10px}
+.mno{font-family:var(--display);font-weight:700;font-size:62px;line-height:.86;letter-spacing:-.02em}
+.mzh{font-size:19px;font-weight:600}
+.mtime{margin-left:auto;font-family:var(--display);font-weight:600;font-size:26px;
+  letter-spacing:.06em;color:rgba(16,42,134,.75)}
+
+/* 左頁：像簽證頁上的欄位，不是三張卡片。 */
+.slots{list-style:none;margin:18px 0 0;padding:0}
+.slots li{padding:13px 0;border-bottom:1px dashed rgba(16,42,134,.28)}
+.slots i{display:block;font-style:normal;font-family:var(--display);font-size:12px;
+  letter-spacing:.16em;color:rgba(16,42,134,.6)}
+.slots b{display:block;font-size:19px;font-weight:600;margin-top:2px}
+.slots span{display:block;font-size:13.5px;color:rgba(16,42,134,.78);margin-top:2px}
+.slots .st{float:right;font-family:var(--display);font-size:13px;letter-spacing:.1em;
+  color:rgba(16,42,134,.55)}
+.slots .st.on{color:var(--bt-navy)}
+
+.wm{position:absolute;right:14px;bottom:-30px;font-family:var(--display);font-weight:700;
+  font-size:200px;line-height:1;color:rgba(16,42,134,.085);pointer-events:none;letter-spacing:-.04em}
+
+/* 右頁：章直接蓋在紙上。歪的、疊的、透的。 */
+.stamps{position:relative;height:100%;min-height:400px;margin-top:6px}
+.stamps .hint{font-family:var(--display);font-size:12px;letter-spacing:.16em;
+  color:rgba(16,42,134,.5)}
+.stamp{position:absolute;border:2.5px solid var(--bt-navy);border-radius:4px;
+  padding:9px 15px 8px;text-align:center;mix-blend-mode:multiply;opacity:.86;
+  background:rgba(255,255,255,.05)}
+.stamp .s1{font-family:var(--display);font-size:10px;letter-spacing:.2em;
+  color:rgba(16,42,134,.8)}
+.stamp .s2{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:.05em;
+  line-height:1.05;margin:2px 0 1px}
+.stamp .s3{font-family:var(--display);font-size:12px;letter-spacing:.14em;
+  color:rgba(16,42,134,.8)}
+.stamp.o{border-color:var(--bt-orange);background:rgba(255,196,108,.34)}
+.stamp.o .s1,.stamp.o .s3{color:rgba(16,42,134,.85)}
+.stamp.t{border-color:var(--bt-teal);background:rgba(107,198,187,.18)}
+/* 圓的入境章，跟長方形的活動章混在一起才像真的護照。 */
+.rnd{position:absolute;width:132px;height:132px;border-radius:50%;
+  border:2.5px solid var(--bt-navy);display:grid;place-items:center;text-align:center;
+  mix-blend-mode:multiply;opacity:.68}
+.rnd small{display:block;font-family:var(--display);font-size:10px;letter-spacing:.18em}
+.rnd b{display:block;font-family:var(--display);font-size:19px;letter-spacing:.06em;margin:2px 0}
+
+.foot{display:flex;align-items:center;gap:16px;margin-top:18px}
+.arrow{font-family:var(--display);font-size:15px;letter-spacing:.06em;font-weight:600;
+  background:none;border:1px solid rgba(16,42,134,.3);border-radius:999px;padding:9px 18px;
+  color:var(--ink);cursor:pointer}
+.dots{display:flex;gap:7px;margin:0 auto}
+.dot{width:9px;height:9px;border-radius:50%;border:1.5px solid rgba(16,42,134,.35)}
+.dot.on{background:var(--bt-orange);border-color:var(--bt-orange)}
+@media (max-width:820px){
+  .spread{grid-template-columns:1fr;min-height:0}
+  .spread::after{display:none}
+  .pg.l,.pg.r{padding:26px 22px}
+  .pg.r{border-top:1px dashed rgba(16,42,134,.3)}
+  .stamps{min-height:330px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<div class="wrap">
+<p class="lab">甲・一本真的護照
+  <small>直式跨頁、中間有書背。章直接蓋在紙上，會歪、會疊、會透，長方形的活動章跟圓形的入境章混在一起。</small></p>
+
+<div class="cover"><div class="spread">
+  <div class="pg l">
+    <div class="mhead"><span class="mno">09</span><span class="mzh">九月</span><span class="mtime">07:00</span></div>
+    <ul class="slots">
+      <li><span class="st on">STAMPED 09.12</span><i>GATHER 聚會</i><b>開學電影夜</b>
+        <span>新學年第一次全員上線，選片權給今年的新幹部</span></li>
+      <li><span class="st on">STAMPED 09.20</span><i>PROMPT 題目</i><b>我是怎麼進來的</b>
+        <span>三句話，寫下你當初為什麼點進 BT</span></li>
+      <li><span class="st on">STAMPED 09.26</span><i>FRAME 鏡頭</i><b>開學第一天</b>
+        <span>你的桌子、教室、通勤路上，隨便哪個</span></li>
+    </ul>
+    <div class="wm">09</div>
+  </div>
+  <div class="pg r">
+    <div class="stamps">
+      <span class="hint">ENTRIES / 入境紀錄</span>
+      <div class="stamp o" style="left:6%;top:34px;transform:rotate(-7deg)">
+        <div class="s1">BEYOND TAIWAN</div><div class="s2">OPENING NIGHT</div><div class="s3">2026.09.12</div></div>
+      <div class="stamp" style="left:44%;top:96px;transform:rotate(5deg)">
+        <div class="s1">BEYOND TAIWAN</div><div class="s2">HOW I GOT HERE</div><div class="s3">2026.09.20</div></div>
+      <div class="rnd" style="left:2%;top:168px;transform:rotate(-13deg)">
+        <div><small>IMMIGRATION</small><b>TAIPEI</b><small>26 SEP 2026</small></div></div>
+      <div class="stamp t" style="left:38%;top:236px;transform:rotate(-3deg)">
+        <div class="s1">BEYOND TAIWAN</div><div class="s2">DAY ONE</div><div class="s3">2026.09.26</div></div>
+      <div class="rnd" style="left:52%;top:300px;transform:rotate(9deg)">
+        <div><small>IMMIGRATION</small><b>SEATTLE</b><small>02 OCT 2026</small></div></div>
+    </div>
+  </div>
+</div></div>
+
+<div class="foot">
+  <button class="arrow">← 前一頁</button>
+  <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot on"></span>
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="dot"></span><span class="dot"></span></div>
+  <button class="arrow">下一頁 →</button>
+</div>
+</div></body></html>

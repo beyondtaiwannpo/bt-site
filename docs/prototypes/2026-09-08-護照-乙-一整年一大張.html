@@ -1,0 +1,103 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>護照 乙・一整年一大張</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../../shared/brand.css">
+<style>
+/* 乙：不翻頁。一整年就是一大張紙，往下捲。
+   好處是「今年蓋了多少」一眼看得完，而且沒有頁碼、沒有上一頁下一頁、
+   沒有「我剛剛在第幾頁」這種狀態要維護。 */
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.7 var(--body);
+  padding:44px clamp(16px,4vw,60px) 90px}
+.wrap{max-width:960px;margin:0 auto}
+.lab{font-family:var(--display);font-size:26px;font-weight:700;margin:0 0 4px}
+.lab small{display:block;font-family:var(--body);font-size:14px;font-weight:400;
+  color:rgba(16,42,134,.75);margin-top:4px}
+
+.sheet{margin-top:26px;border-radius:14px;padding:clamp(20px,3vw,38px);
+  background:linear-gradient(180deg,rgba(255,232,197,.6),rgba(237,229,216,.9) 30%);
+  box-shadow:0 26px 60px rgba(16,42,134,.13);position:relative;overflow:hidden}
+.sheet::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.6;
+  background:repeating-linear-gradient(90deg,rgba(16,42,134,.028) 0 1px,rgba(16,42,134,0) 1px 7px)}
+
+.tot{position:relative;display:flex;align-items:flex-end;gap:14px;
+  border-bottom:1.5px solid rgba(16,42,134,.28);padding-bottom:14px}
+.tot b{font-family:var(--display);font-weight:700;font-size:clamp(46px,7vw,84px);
+  line-height:.84;letter-spacing:-.02em}
+.tot span{font-family:var(--display);font-size:clamp(20px,3vw,32px);
+  color:rgba(16,42,134,.5);line-height:1.1}
+.tot i{font-style:normal;margin-left:auto;font-family:var(--display);font-size:13px;
+  letter-spacing:.18em;color:rgba(16,42,134,.6);padding-bottom:6px}
+
+/* 一個月一條。左邊是月份，右邊是那個月的章落在紙上。 */
+.mo{position:relative;display:grid;grid-template-columns:clamp(72px,10vw,116px) 1fr;
+  gap:clamp(12px,2.4vw,28px);padding:clamp(16px,2.4vw,26px) 0;
+  border-bottom:1px dashed rgba(16,42,134,.26)}
+.mo .no{font-family:var(--display);font-weight:700;font-size:clamp(38px,5.4vw,64px);
+  line-height:.9;letter-spacing:-.02em;color:rgba(16,42,134,.9)}
+.mo .no small{display:block;font-family:var(--body);font-size:13px;font-weight:500;
+  letter-spacing:.04em;color:rgba(16,42,134,.62);margin-top:4px}
+.mo.empty .no{color:rgba(16,42,134,.28)}
+.lane{display:flex;flex-wrap:wrap;align-items:center;gap:clamp(10px,1.6vw,22px);min-height:82px}
+
+.stamp{border:2.5px solid var(--bt-navy);border-radius:4px;padding:8px 14px 7px;
+  text-align:center;mix-blend-mode:multiply;opacity:.88}
+.stamp .s1{font-family:var(--display);font-size:9.5px;letter-spacing:.2em;color:rgba(16,42,134,.8)}
+.stamp .s2{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.05em;
+  line-height:1.05;margin:1px 0}
+.stamp .s3{font-family:var(--display);font-size:11.5px;letter-spacing:.14em;color:rgba(16,42,134,.8)}
+.stamp.o{border-color:var(--bt-orange);background:rgba(255,196,108,.34)}
+.stamp.t{border-color:var(--bt-teal);background:rgba(107,198,187,.18)}
+
+/* 還沒蓋的：一個虛線的空位，寫著活動名字。**不是空白** ——
+   空白看起來像壞掉，空位看起來像「這裡等你」。 */
+.slot{border:1.5px dashed rgba(16,42,134,.3);border-radius:4px;padding:9px 14px;
+  font-family:var(--display);font-size:14.5px;letter-spacing:.06em;
+  color:rgba(16,42,134,.5);background:rgba(255,255,255,.28)}
+.slot.now{border-color:var(--bt-orange);border-style:solid;color:var(--ink);
+  background:rgba(255,196,108,.22)}
+.lock{font-family:var(--display);font-size:13px;letter-spacing:.14em;color:rgba(16,42,134,.4)}
+@media (max-width:620px){
+  .mo{grid-template-columns:1fr;gap:8px}
+  .mo .no{display:flex;align-items:baseline;gap:10px;font-size:34px}
+  .mo .no small{margin-top:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<div class="wrap">
+<p class="lab">乙・一整年一大張
+  <small>不翻頁。整年就是一張紙往下捲，蓋過的章留在上面。沒有頁碼、沒有上一頁下一頁，往下捲就是往前走。</small></p>
+
+<div class="sheet">
+  <div class="tot"><b>6</b><span>/ 33</span><i>BEYOND TAIWAN · PASSPORT 2026-27</i></div>
+
+  <div class="mo"><div class="no">09<small>九月 · 07:00</small></div>
+    <div class="lane">
+      <div class="stamp o"><div class="s1">BEYOND TAIWAN</div><div class="s2">OPENING NIGHT</div><div class="s3">2026.09.12</div></div>
+      <div class="stamp"><div class="s1">BEYOND TAIWAN</div><div class="s2">HOW I GOT HERE</div><div class="s3">2026.09.20</div></div>
+      <div class="stamp t"><div class="s1">BEYOND TAIWAN</div><div class="s2">DAY ONE</div><div class="s3">2026.09.26</div></div>
+    </div></div>
+
+  <div class="mo"><div class="no">10<small>十月 · 08:00</small></div>
+    <div class="lane">
+      <div class="stamp o"><div class="s1">BEYOND TAIWAN</div><div class="s2">GAME NIGHT</div><div class="s3">2026.10.11</div></div>
+      <div class="stamp"><div class="s1">BEYOND TAIWAN</div><div class="s2">ONE YEAR ON</div><div class="s3">2026.10.18</div></div>
+      <div class="slot now">鏡頭・你這個月最常走的那條路</div>
+    </div></div>
+
+  <div class="mo"><div class="no">11<small>十一月 · 08:40</small></div>
+    <div class="lane">
+      <div class="stamp o"><div class="s1">BEYOND TAIWAN</div><div class="s2">PLAYLIST</div><div class="s3">2026.11.08</div></div>
+      <div class="slot">題目・你今年怕的是什麼</div>
+      <div class="slot">鏡頭・窗外</div>
+    </div></div>
+
+  <div class="mo empty"><div class="no">12<small>十二月 · 09:20</small></div>
+    <div class="lane"><span class="lock">12 月 1 日解鎖</span></div></div>
+
+  <div class="mo empty"><div class="no">01<small>一月 · 10:00</small></div>
+    <div class="lane"><span class="lock">1 月 1 日解鎖</span></div></div>
+</div>
+</div></body></html>
