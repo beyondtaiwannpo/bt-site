@@ -266,6 +266,22 @@ export async function setApproved(id, ok) {
   if (error) throw error;
 }
 
+// ── 信件文案（2026-09-08）──────────────────────────────────────────────
+export async function loadTemplates() {
+  need();
+  const { data, error } = await supabase.from("mail_templates")
+    .select("kind, subject, body, updated_at").order("kind");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveTemplate(kind, subject, body) {
+  need();
+  const { error } = await supabase.rpc("set_mail_template",
+    { p_kind: kind, p_subject: subject, p_body: body });
+  if (error) throw error;
+}
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
@@ -286,6 +302,7 @@ const SAYS = [
   ["form_closed", "這份表單已經關閉了。"],
   ["empty_mail", "主旨與內容都要寫，不能只寫一個。"],
   ["no_such_form", "找不到這份表單，可能已經被刪掉了。"],
+  ["no_such_template", "找不到這一種信的文案，可能是遷移檔還沒跑完。"],
 ];
 export function says(err) {
   const m = String((err && err.message) || err || "");

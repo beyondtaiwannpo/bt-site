@@ -158,6 +158,22 @@
   .chip.wide{min-width:0}
   .alist2 li{padding:18px 0}
 
+  /* ---------- 信件預覽（2026-09-08）---------- */
+  /* 預覽要看起來像一封信，不像一個輸入框 —— 白底、等寬留白、換行照原樣。
+     看起來像信，人才會用讀信的方式讀它，也才看得出哪裡怪。 */
+  .mailprev{background:rgba(255,255,255,.72);border:1px solid rgba(16,42,134,.18);
+    border-radius:14px;padding:18px 20px;max-width:38em}
+  .mailprev b{display:block;font-weight:600;font-size:15.5px;
+    padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(16,42,134,.14)}
+  .mailprev pre{margin:0;font-family:var(--body);font-size:14.5px;line-height:1.75;
+    white-space:pre-wrap;overflow-wrap:anywhere}
+  /* 系統加的那一段用淡一點的顏色，但**仍然過得了對比**（rgba .72 約 5.7:1）。
+     用 opacity 的話會連對比一起打折，這個 repo 踩過六次。 */
+  /* ⚠ margin-top 要撐出一個空行。信裡那一段前面真的有 \n\n，
+     但預覽拆成兩個 <pre>，換行就被吃掉了 —— 預覽要跟寄出去的一樣，
+     不然它就在騙人，而預覽騙人比沒有預覽糟。 */
+  .mailprev pre.tail{color:rgba(16,42,134,.72);margin-top:1.75em}
+
 </style>
 </head>
 <body>

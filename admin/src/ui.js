@@ -363,7 +363,8 @@ export function tabsHTML(tab, isPresident) {
   return `<div class="chips" style="margin-bottom:16px">
     <button class="chip wide${tab === "forms" ? " on" : ""}" data-act="tab" data-t="forms">申請表</button>
     <button class="chip wide${tab === "res" ? " on" : ""}" data-act="tab" data-t="res">資源</button>
-    ${isPresident ? `<button class="chip wide${tab === "team" ? " on" : ""}" data-act="tab" data-t="team">團隊頁</button>` : ""}
+    ${isPresident ? `<button class="chip wide${tab === "team" ? " on" : ""}" data-act="tab" data-t="team">團隊頁</button>
+    <button class="chip wide${tab === "mail" ? " on" : ""}" data-act="tab" data-t="mail">信件文案</button>` : ""}
   </div>`;
 }
 
@@ -464,6 +465,91 @@ export function resEditHTML(r, msg, busy) {
     <div class="row">
       <button class="btn" data-act="res-save" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存起來"}</button>
       ${r ? `<button class="btn quiet" data-act="res-del" data-id="${esc(r.id)}">刪掉</button>` : ""}
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 信件文案（2026-09-08）
+// ═══════════════════════════════════════════════════════════════════════
+export const MAIL_KINDS = [
+  { v: "guardian",  label: "家長告知信", when: "學生送出申請、而且填了家長信箱的時候" },
+  { v: "interview", label: "邀請面試",   when: "你按下「邀請面試」的時候" },
+  { v: "accepted",  label: "錄取通知",   when: "你按下「錄取」的時候" },
+  { v: "rejected",  label: "婉拒",       when: "你按下「婉拒」的時候" },
+];
+const kindOf = v => MAIL_KINDS.find(k => k.v === v) || MAIL_KINDS[0];
+
+// 系統會自己加在每一封信最後面的那一段。**這裡只是把它顯示出來，不能改。**
+// 「不要回覆這封信」是必要資訊不是禮貌用語 —— noreply 沒有 MX，
+// 按回覆會被退回，而那個人只會覺得沒有人理他。
+export function mailTail(kind) {
+  return kind === "guardian"
+    ? "這封信是告知，不需要回覆或簽名。有任何問題請寄到 beyondtaiwan2020@gmail.com。\n\nBeyond Taiwan"
+    : "不要回覆這封信，這個信箱沒有人看。有問題請寄到 beyondtaiwan2020@gmail.com。\n\nBeyond Taiwan";
+}
+
+// 代換。**跟資料庫那一支 mail_fill() 是同一套規則**，
+// 兩邊不一致的話預覽就會騙人 —— 而預覽騙人比沒有預覽糟。
+export function fillMail(text, name, title) {
+  return String(text == null ? "" : text)
+    .split("{姓名}").join(name)
+    .split("{活動名稱}").join(title);
+}
+
+export function mailListHTML(items, msg) {
+  return `<div class="card">
+    <h2>信件文案</h2>
+    <div class="sub">系統寄出去的四封信。只有 Co-President 改得動。</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${tabsHTML("mail", true)}
+    <ul class="flist">${MAIL_KINDS.map(k => {
+      const t = items.find(x => x.kind === k.v);
+      return `<li>
+        <div class="fhead"><b>${esc(k.label)}</b></div>
+        <div class="fmeta">${esc(k.when)}</div>
+        <div class="fmeta">主旨：${esc((t && t.subject) || "（還沒有）")}</div>
+        <div class="row">
+          <button class="btn ghost sm" data-act="mail-edit" data-k="${esc(k.v)}">改這一封</button>
+        </div>
+      </li>`;
+    }).join("")}</ul>
+  </div>`;
+}
+
+// 編輯一封信。**左邊改、右邊就是寄出去的樣子。**
+// 這一頁的價值在預覽：代換符號打錯不會壞掉，只會空著，
+// 而預覽是唯一會當場讓人看到「我把 {姓名} 打成 {名字} 了」的東西。
+export function mailEditHTML(kind, t, msg, busy) {
+  const k = kindOf(kind);
+  const NAME = "陳小安", TITLE = "2027 暑期探索營";
+  const subject = t ? t.subject : "";
+  const body = t ? t.body : "";
+  const extra = kind === "interview" ? "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/..." : "";
+  return `<div class="card">
+    <div class="row" style="margin:0 0 14px">
+      <button class="btn quiet" data-act="mail-back">← 回信件清單</button>
+    </div>
+    <h2>${esc(k.label)}</h2>
+    <div class="sub">${esc(k.when)}寄出。</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    <label><i>主旨</i><input id="msub" value="${esc(subject)}"></label>
+    <label><i>內文</i><textarea id="mbody" style="min-height:230px">${esc(body)}</textarea></label>
+    <div class="mini" style="margin:-6px 0 14px">
+      可以用兩個代換符號：<b>{姓名}</b> 與 <b>{活動名稱}</b>。
+      打錯或刪掉不會壞掉，那個位置會空著 —— 右邊的預覽會直接讓你看到。</div>
+
+    <h3 style="font-family:var(--display);font-size:20px;margin:26px 0 6px">寄出去會長這樣</h3>
+    <div class="mini" style="margin-bottom:8px">用「${esc(NAME)}」與「${esc(TITLE)}」當範例。</div>
+    <div class="mailprev"><b>${esc(fillMail(subject, NAME, TITLE)) || "（沒有主旨）"}</b><pre>${
+      esc(fillMail(body, NAME, TITLE) + extra)}</pre><pre class="tail">${esc(mailTail(kind))}</pre></div>
+    <div class="mini" style="margin:6px 0 0">
+      灰色那一段是<b>系統自己加的，改不掉</b>。「不要回覆這封信」是必要資訊：
+      那個信箱沒有人看，按回覆會被退回，而收信的人只會覺得沒有人理他。</div>
+
+    <div class="row">
+      <button class="btn" data-act="mail-save" data-k="${esc(kind)}" ${busy ? "disabled" : ""}>${
+        busy ? "存檔中…" : "存起來"}</button>
     </div>
   </div>`;
 }

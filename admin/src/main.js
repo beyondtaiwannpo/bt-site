@@ -22,6 +22,8 @@ let S = {
   noticeTo: new Set(["accepted"]),
   // 團隊頁
   people: [],
+  // 信件文案
+  tpls: [], tplKind: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -43,7 +45,11 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
 
   document.body.insertAdjacentHTML("afterbegin", nav);
-  if (S.view === "team") {
+  if (S.view === "mail") {
+    el.innerHTML = UI.mailListHTML(S.tpls, S.msg);
+  } else if (S.view === "mail-edit") {
+    el.innerHTML = UI.mailEditHTML(S.tplKind, S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy);
+  } else if (S.view === "team") {
     el.innerHTML = UI.publicTeamHTML(S.people, S.msg, S.busy);
   } else if (S.view === "checkin" && S.form) {
     el.innerHTML = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
@@ -130,6 +136,15 @@ async function openApps(id) {
 async function refreshApps() {
   S.apps = await D.loadApplications(S.form.id);
   S.pending = await D.loadPending(S.form.id);
+}
+
+async function openMail() {
+  S.busy = true; render();
+  try {
+    S.tpls = await D.loadTemplates();
+    S.view = "mail"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "文案載不到：" + D.says(e); }
+  render();
 }
 
 async function openTeam() {
@@ -223,9 +238,26 @@ document.addEventListener("click", async e => {
     S.msg = ""; S.sel = new Set();
     if (b.dataset.t === "res") { await openRes(); }
     else if (b.dataset.t === "team") { await openTeam(); }
+    else if (b.dataset.t === "mail") { await openMail(); }
     else { S.view = "list"; await reloadList(); render(); }
     return;
   }
+  if (act === "mail-back") { await openMail(); return; }
+  if (act === "mail-edit") { S.tplKind = b.dataset.k; S.view = "mail-edit"; S.msg = ""; render(); return; }
+  if (act === "mail-save") {
+    const sub = document.getElementById("msub").value.trim();
+    const body = document.getElementById("mbody").value.trim();
+    if (!sub || !body) { S.msg = "主旨與內文都要寫。"; render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.saveTemplate(b.dataset.k, sub, body);
+      S.tpls = await D.loadTemplates();
+      S.busy = false; S.msg = "存好了。下一封寄出去的信就是這個文案。";
+    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); }
+    render();
+    return;
+  }
+
   if (act === "approve") {
     const ok = b.checked;
     S.busy = true; render();

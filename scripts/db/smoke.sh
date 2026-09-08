@@ -130,7 +130,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-09-12-event-ops.sql \
          supabase/migrations/2026-09-13-public-team.sql \
          supabase/migrations/2026-09-14-anon-execute.sql \
-         supabase/migrations/2026-09-15-mail-secret-lookup.sql ; do
+         supabase/migrations/2026-09-15-mail-secret-lookup.sql \
+         supabase/migrations/2026-09-16-mail-templates.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -237,6 +238,28 @@ chkraise "幹部不能自己刪帳號" "cadre_must_ask" \
 psql -d "$DB" -q -c "select set_config('test.uid','$STU',false); select public.delete_my_account();" >/dev/null
 chk "學員刪帳號之後，申請與答案一起消失" "0|0" \
   "select (select count(*) from public.applications)||'|'||(select count(*) from public.application_answers)"
+
+echo
+echo "信件文案："
+chkas "${DIR}" "文案是從表裡讀出來的（改表就會改到信）" "1" \
+  "select count(*) from public.mail_templates where kind='accepted' and body like '%錄取了%'"
+chkraise "Director 改不動文案（那是全組織對外的聲音）" "not_president" \
+  "perform set_config('test.uid','${DIR}',true);
+   perform public.set_mail_template('accepted','x','y');"
+chkas "${PAUL}" "president 改得動" "accepted" \
+  "select public.set_mail_template('accepted','主旨 {活動名稱}','{姓名} 你好，測試一下。')"
+chkas "${DIR}" "改完之後，代換符號有被換掉" "陳小明你好，測試一下。" \
+  "select replace(split_part(public.mail_body('accepted','陳小明','探索營',null), chr(10), 1), ' ', '')"
+# ⚠ 信尾是系統加的，不在文案裡，所以改文案改不掉它。
+chkas "${DIR}" "★ 信尾那句改不掉（noreply 沒有 MX，那是必要資訊）" "t" \
+  "select public.mail_body('accepted','陳小明','探索營',null) like '%不要回覆這封信%'"
+# ⚠ 主旨也要跟著表走。不換的話文案只改得動一半——內文跟著表，主旨還是寫死的，
+# 而那種半套最難發現：改了主旨按存檔一切正常，直到信寄出去才看得到。
+chkas "${DIR}" "★ 主旨也是從表裡讀的" "主旨探索營" \
+  "select public.mail_subject('accepted','陳小明','探索營')"
+chkas "${DIR}" "★ 表裡讀不到就退回寫死的那一份（信照樣寄得出去）" "t" \
+  "delete from public.mail_templates where kind='accepted';
+   select public.mail_body('accepted','陳小明','探索營',null) like '%錄取了%'"
 
 echo
 echo "RLS（用 anon 與 authenticated 的身分讀，這一段超級使用者驗不到）："

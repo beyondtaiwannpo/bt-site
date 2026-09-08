@@ -273,3 +273,50 @@ test("★ 錯誤代碼要翻成人話（看到它的多半是沒設定過 Vault 
   assert.equal(D.says(new Error("某個沒見過的錯")), "某個沒見過的錯",
     "沒對到的錯誤要原樣顯示，不要吞掉");
 });
+
+// ── 信件文案（2026-09-08）────────────────────────────────────────────
+const tpl = { kind: "accepted", subject: "Beyond Taiwan：「{活動名稱}」錄取通知",
+              body: "{姓名} 你好，\n\n你申請的「{活動名稱}」錄取了。" };
+
+test("四封信都列得出來，而且說得出什麼時候會寄", () => {
+  const h = M.mailListHTML([tpl], "");
+  for (const k of M.MAIL_KINDS) {
+    assert.match(h, new RegExp(k.label));
+    assert.match(h, new RegExp(k.when.slice(0, 6)));
+  }
+});
+
+// ⚠ 這一頁的價值全在預覽：代換符號打錯不會壞掉、只會空著。
+test("★ 預覽要把代換符號換成範例，而且跟資料庫同一套規則", () => {
+  assert.equal(M.fillMail("{姓名} 你好，{活動名稱}", "陳小安", "探索營"), "陳小安 你好，探索營");
+  assert.equal(M.fillMail("{姓名}{姓名}", "A", "B"), "AA", "同一個符號出現兩次都要換");
+  assert.equal(M.fillMail(null, "A", "B"), "");
+  const h = M.mailEditHTML("accepted", tpl, "", false);
+  assert.match(h, /陳小安 你好/, "預覽沒有把 {姓名} 換掉");
+  assert.doesNotMatch(h.split("寄出去會長這樣")[1], /\{姓名\}/, "預覽裡還留著沒換的符號");
+});
+
+// ⚠ 「不要回覆這封信」是必要資訊不是禮貌用語：noreply 沒有 MX。
+test("★ 信尾是系統加的，預覽看得到但改不掉", () => {
+  const h = M.mailEditHTML("accepted", tpl, "", false);
+  assert.match(h, /不要回覆這封信/);
+  assert.match(h, /class="tail"/, "系統加的那段要跟可編輯的內文分開顯示");
+  assert.match(h, /改不掉/, "要說出來它改不掉，不然人會以為自己刪得掉");
+  // 家長那封的結尾不一樣（它不是「不要回覆」，是「不需要回覆或簽名」）
+  assert.match(M.mailTail("guardian"), /不需要回覆或簽名/);
+  assert.match(M.mailTail("accepted"), /不要回覆這封信/);
+});
+
+test("邀請面試那封的預覽要帶出 Cal 連結那一段（那是系統加的）", () => {
+  assert.match(M.mailEditHTML("interview", { kind: "interview", subject: "x", body: "y" }, "", false),
+    /cal\.com/);
+});
+
+test("信件文案那個分頁只有 Co-President 看得到", () => {
+  assert.doesNotMatch(M.tabsHTML("forms", false), /data-t="mail"/);
+  assert.match(M.tabsHTML("forms", true), /data-t="mail"/);
+});
+
+test("存檔中會鎖住按鈕", () => {
+  assert.match(M.mailEditHTML("accepted", tpl, "", true), /data-act="mail-save"[^>]*disabled/);
+});
