@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>我們做什麼 / Beyond Taiwan</title>
+<title>做過什麼 / Beyond Taiwan</title>
 
 <!-- 對外的內容頁（2026-09-07 新增）。
-     這一頁講兩個主要活動。細節與首頁那一段一致，這裡展開講。
+     這一頁講 BT 的使命與時間軸。數字來自 BT 的既有紀錄。
      ── 這一頁不碰 auth ──
      不載入 supabase、不判斷登入狀態。右上角那顆按鈕只是一個連結。
 
@@ -23,11 +23,11 @@
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
      ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
 
-<meta name="description" content="探索營 College Bootcamp 與導生配對計畫 Mentorship Program，都免費。">
-<meta property="og:title" content="我們做什麼 / Beyond Taiwan">
-<meta property="og:description" content="探索營 College Bootcamp 與導生配對計畫 Mentorship Program，都免費。">
+<meta name="description" content="Beyond Taiwan 五年的數字與時間軸：250 位以上學員、每年 50 對導生配對、探索營協助超過 100 位高中生。數字全部來自 BT 自己的活動紀錄。">
+<meta property="og:title" content="做過什麼 / Beyond Taiwan">
+<meta property="og:description" content="Beyond Taiwan 五年的數字與時間軸：250 位以上學員、每年 50 對導生配對、探索營協助超過 100 位高中生。數字全部來自 BT 自己的活動紀錄。">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://beyondtaiwannpo.com/programs/">
+<meta property="og:url" content="https://beyondtaiwannpo.com/impact/">
 <meta name="theme-color" content="#EDE5D8">
 
 <link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
@@ -196,6 +196,30 @@ footer a{color:var(--ink);font-weight:600}
 }
 @media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+/* 數字。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
+   是兩欄的列，靠上面那條細線分隔，跟時間軸與六個 team 同一套語言。
+   數字本身用 Barlow Condensed 放到很大，那是這一頁唯一需要大聲的東西。 */
+.nums{margin:0;padding:0;list-style:none;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  column-gap:clamp(20px,4vw,56px)}
+.nums li{padding:20px 0;border-top:1px solid rgba(16,42,134,.14)}
+.nums li:nth-child(-n+2){border-top:0;padding-top:0}
+.nums b{display:block;font-family:var(--display);font-weight:700;
+  font-size:clamp(40px,4.8vw,68px);line-height:.95;letter-spacing:-.01em}
+.nums i{display:block;font-style:normal;font-family:var(--display);font-weight:600;
+  font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(16,42,134,.7);margin:7px 0 9px}
+.nums span{display:block;font-size:15.5px;line-height:1.6;
+  color:rgba(16,42,134,.82);max-width:24em}
+@media (max-width:700px){
+  /* 一欄的時候「前兩個不畫上線」就不對了，只有第一個不畫。
+     ⚠ 這裡一定要重寫 :nth-child(-n+2) 那一條，不能只寫 .nums li ——
+     媒體查詢不會提高特異性，:nth-child 那一條本來就比較高，會贏。
+     2026-09-08 就是這樣漏掉的：手機上第二格沒有上線，看起來像跟第一格黏在一起。 */
+  .nums{grid-template-columns:1fr}
+  .nums li:nth-child(-n+2){border-top:1px solid rgba(16,42,134,.14);padding-top:20px}
+  .nums li:first-child{border-top:0;padding-top:0}
+}
 </style>
 </head>
 <body>
@@ -208,8 +232,8 @@ footer a{color:var(--ink);font-weight:600}
   </a>
   <div class="navlinks" id="navlinks">
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
-    <a href="../programs/" aria-current="page"><span class="zh">計畫</span><span class="en">Programmes</span></a>
-    <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
+    <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
+    <a href="../impact/" aria-current="page"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
     <a href="../alumni/">Alumni</a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
@@ -223,52 +247,61 @@ footer a{color:var(--ink);font-weight:600}
 
 <div class="zh" lang="zh-Hant">
 <header class="hero">
-  <h1>兩件事，都免費。</h1>
-  <p class="lead">探索營與導生配對計畫，加上不定期的講座。下一場什麼時候，會先在 Instagram 公布。</p>
+  <h1>五年，這些是真的發生過的事。</h1>
+  <p class="lead">下面每一個數字都來自 BT 自己的活動紀錄。沒有推估，也沒有四捨五入成比較好聽的數字。</p>
 </header>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>探索營 College Bootcamp</h2>
+    <h2>數字</h2>
     <div class="body">
-      <p>每年寒暑假各一場，兩天，免費。</p>
-      <p>兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。</p>
-      <p>我們會事先問你想讀什麼，再去找對應背景的人回來。所以每一屆的講者名單都不一樣。</p>
-      <p>第一屆在 2023 年六月，超過 80 位高中生參加。</p>
+      <ul class="nums">
+        <li><b>250+</b><i>位學員</i><span>2020 年到現在，超過 250 位高中生在申請的路上有人可以問。</span></li>
+        <li><b>50</b><i>對配對／年</i><span>導生配對計畫一學期配對一次。</span></li>
+        <li><b>100+</b><i>位高中生</i><span>探索營辦了兩年，收到超過 150 份申請，協助超過 100 位高中生。</span></li>
+        <li><b>20+</b><i>位校友回來</i><span>超過 20 位 BT 校友回來當講者。</span></li>
+        <li><b>30</b><i>位幹部</i><span>接近三十位，全部是學生，分布在七個國家。</span></li>
+        <li><b>0</b><i>元</i><span>幾乎所有活動都免費。</span></li>
+      </ul>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>導生配對計畫 Mentorship Program</h2>
+    <h2>五年走過來</h2>
     <div class="body">
-      <p>一學期配對一次，免費。</p>
-      <p>你會有一位走過同一條路的學長姐。他不會幫你寫 essay，但會陪你把卡住的地方講清楚。</p>
-      <p>有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
-      <p>導生制度從 2020 年九月開始，第一批 36 人。</p>
+      <ul class="tl">
+        <li><b>2020.05</b><span>成立，七個人。</span></li>
+        <li><b>2020.09</b><span>導生制度開始，第一批 36 人。</span></li>
+        <li><b>2021.06</b><span>線上博覽會，超過 400 人參加。</span></li>
+        <li><b>2021.10</b><span>校園大使 18 位。</span></li>
+        <li><b>2023.06</b><span>第一屆探索營，超過 80 人。</span></li>
+        <li><b>2025.05</b><span>校友帳號超過 85 個。</span></li>
+        <li><b>現在</b><span>接近三十位幹部，全部是學生，分布七個國家。</span></li>
+      </ul>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>講座</h2>
+    <h2>一路上幫過我們的人</h2>
     <div class="body">
-      <p>不定期舉辦，也不收費。場次同樣會在 Instagram 公布。</p>
+      <p>過去合作過的單位包括美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
+      <p>合作的形式不一定是錢。有的是一個場地，有的是把我們帶進學校，有的是派人來跟高中生講一個下午。</p>
+      <p><a href="../partner/">看怎麼跟我們合作</a></p>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>怎麼參加</h2>
+    <h2>這些數字怎麼來的</h2>
     <div class="body">
-      <p>下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</p>
-      <!-- ⚠ 批 3 做出 /apply/（正在開放的申請）之後，這顆按鈕與下面英文版那一顆
-     都要改成 ../apply/，文案改成「看現在開放什麼」。兩顆都要改。
-     現在指 Instagram，是因為下一場活動確實只在那裡公布。 -->
-      <p><a class="cta" href="https://www.instagram.com/beyondtaiwan/">到 Instagram 看下一場</a></p>
+      <p>全部來自 BT 自己的活動紀錄。每一場營隊、每一輪配對、每一位回來的校友，當時都有人記下來。</p>
+      <p>我們手上還有一些數字，但把握不夠，所以這一頁沒有寫。寧可少一句話，也不要寫一個之後要撤回的數字。</p>
+      <p>如果你要引用這一頁的任何數字，寫信來問一聲，我們會告訴你它是怎麼算的。</p>
     </div>
   </div>
 </section>
@@ -276,49 +309,61 @@ footer a{color:var(--ink);font-weight:600}
 
 <div class="en" lang="en">
 <header class="hero">
-  <h1>Two programmes. Both free.</h1>
-  <p class="lead">College Bootcamp and the Mentorship Program, plus talks through the year. Dates are announced on Instagram first.</p>
+  <h1>Five years. All of it actually happened.</h1>
+  <p class="lead">Every number below comes from Beyond Taiwan's own records. Nothing is estimated, and nothing is rounded up to sound better.</p>
 </header>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>College Bootcamp</h2>
+    <h2>Numbers</h2>
     <div class="body">
-      <p>Twice a year, winter and summer. Two days. Free.</p>
-      <p>Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like.</p>
-      <p>We ask what you want to study before the camp, then bring back people with that background. No two years have the same line-up.</p>
-      <p>The first bootcamp ran in June 2023 with more than 80 high school students.</p>
+      <ul class="nums">
+        <li><b>250+</b><i>students</i><span>Since 2020, more than 250 high school students have had someone to ask.</span></li>
+        <li><b>50</b><i>pairs a year</i><span>The mentorship programme pairs once a semester.</span></li>
+        <li><b>100+</b><i>students at bootcamp</i><span>Two years of College Bootcamp: over 150 applications, over 100 students.</span></li>
+        <li><b>20+</b><i>alumni came back</i><span>More than 20 Beyond Taiwan alumni have come back as speakers.</span></li>
+        <li><b>30</b><i>organisers</i><span>Close to thirty, all students, spread across seven countries.</span></li>
+        <li><b>0</b><i>NT dollars</i><span>Almost everything we run is free.</span></li>
+      </ul>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>Mentorship Program</h2>
+    <h2>Five years</h2>
     <div class="body">
-      <p>One matching round per semester. Free.</p>
-      <p>You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on.</p>
-      <p>Some pairs that started in an application season are still in touch more than two years later.</p>
-      <p>Mentorship began in September 2020 with 36 students.</p>
+      <ul class="tl">
+        <li><b>2020.05</b><span>Founded, seven people.</span></li>
+        <li><b>2020.09</b><span>Mentorship began, 36 students in the first round.</span></li>
+        <li><b>2021.06</b><span>Online fair, more than 400 attendees.</span></li>
+        <li><b>2021.10</b><span>18 campus ambassadors.</span></li>
+        <li><b>2023.06</b><span>First College Bootcamp, more than 80 students.</span></li>
+        <li><b>2025.05</b><span>More than 85 alumni accounts.</span></li>
+        <li><b>Today</b><span>Close to thirty organisers, all students, across seven countries.</span></li>
+      </ul>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>Talks</h2>
+    <h2>People who helped</h2>
     <div class="body">
-      <p>Held through the year, also free. Dates are announced on Instagram.</p>
+      <p>Past partners include the American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
+      <p>Partnership does not have to mean money. Sometimes it is a room. Sometimes it is bringing us into a school. Sometimes it is sending someone to spend an afternoon with a group of teenagers.</p>
+      <p><a href="../partner/">How to work with us</a></p>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>How to join</h2>
+    <h2>Where these numbers come from</h2>
     <div class="body">
-      <p>The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</p>
-      <p><a class="cta" href="https://www.instagram.com/beyondtaiwan/">See the next one on Instagram</a></p>
+      <p>All of them come from our own records. Every camp, every round of pairing, every alumnus who came back was written down at the time.</p>
+      <p>We hold a few more numbers that we are not confident enough about, so they are not on this page. Better one sentence short than one number we have to take back.</p>
+      <p>If you want to cite anything here, write to us and we will tell you how it was counted.</p>
     </div>
   </div>
 </section>

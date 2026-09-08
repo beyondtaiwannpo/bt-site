@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team join alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
+FILES="index.html about programs team join impact partner alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -233,7 +233,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html impact/index.html partner/index.html alumni/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1071,10 +1071,23 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
-    "join/index.html": {
-      mustShow: ["跳到主要內容", "你不需要認識任何人。", "回 Beyond Taiwan 首頁",
+    "impact/index.html": {
+      mustShow: ["跳到主要內容", "五年，這些是真的發生過的事。", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
+    },
+    "partner/index.html": {
+      mustShow: ["跳到主要內容", "一起做這件事。", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["維護者要講的話寫在 README"]
+    },
+    // join/ 2026-09-08（批 1）收成只剩轉址，所以它沒有頁首也沒有頁尾。
+    // 錨點改成那句看得見的「這一頁搬家了。」與轉址目標；
+    // mustHide 取檔頭註解的最後一句（跟其他頁同一個做法：取最後一句，
+    // 破壞點在它後面時才抓得到）。
+    "join/index.html": {
+      mustShow: ["這一頁搬家了。", "This page has moved."],
+      mustHide: ["漏一個的表現是「有時候會跳錯地方」"]
     },
     // /alumni/ 是改版批 3 加的對外頁。mustShow 橫跨頁首、本文、頁尾；
     // mustHide 取檔頭那段註解的**最後一句** —— 取中間那句的話，
@@ -1182,7 +1195,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team join alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
+placeholder_scope="index.html about programs team join impact partner alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
