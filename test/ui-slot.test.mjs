@@ -149,3 +149,28 @@ test("背面有小字標題 —— 一年後只看照片與心得認不出是哪
   assert.ok(back.includes(`<span class="btitle">${act.title_zh}</span>`), "背面要有標題");
   assert.ok(!back.includes('class="ttl"'), "是標籤不是標題，不准沿用正面的 .ttl");
 });
+
+// ── 章的高低錯開（2026-09-08）──────────────────────────────────────────
+// 框拿掉之後三個章直接坐在紙上，高度由 id 決定往上下錯開。
+// ⚠ 第一版取 id 的 [1]，而 id 是 09A / 09B / 09C 這種形狀 ——
+// [1] 是月份的個位數，同一個月三格完全一樣，三個章又停回同一條線上。
+// 那個 bug 不會報錯，只會讓畫面回到「排版排出來的」樣子。
+test("★ 同一個月三格的章高度互不相同（不可以取到月份那一位）", () => {
+  const acts = ["09A", "09B", "09C"].map(id => ({ ...act, id }));
+  const dys = acts.map(a => {
+    const h = slotHTML(state({ [a.id]: { date: "2026-09-12" } }), a);
+    const m = h.match(/--dy:(-?\d+)px/);
+    assert.ok(m, `${a.id} 沒有 --dy`);
+    return m[1];
+  });
+  assert.equal(new Set(dys).size, 3, `三格的 --dy 是 ${dys.join(" / ")}，有重複`);
+});
+
+// 由 id 算，不是亂數 —— 亂數的話同一格每次重繪都跳一次位置，
+// 那看起來是壞掉不是手感。跟角度（spec §7.1）同一條規則。
+test("★ 章的高低是固定的，同一格畫兩次要一樣", () => {
+  const s = state({ "09A": { date: "2026-09-12" } });
+  const a = slotHTML(s, act).match(/--dy:(-?\d+)px/)[1];
+  const b = slotHTML(state({ "09A": { date: "2026-09-12" } }), act).match(/--dy:(-?\d+)px/)[1];
+  assert.equal(a, b);
+});

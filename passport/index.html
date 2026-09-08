@@ -79,6 +79,28 @@
   .prog small{font-family:var(--body);font-size:10px;font-weight:600;letter-spacing:.16em;
     text-transform:uppercase;display:block;color:rgba(16,42,134,.78);line-height:1;margin-bottom:4px}
 
+  /* ---------- cover ---------- */
+  /* 護照的硬殼（2026-09-08）。Paul 從三個方向裡選了「一本真的護照」。
+     那本護照當時最大的問題不是配色，是**形狀**：一張很寬的卡片，
+     上面寫著「PAGE 03 / 13」跟「前一頁」，但它讀起來是個 dashboard 不是一本書。
+     殼是最便宜也最有效的一半 —— 書一旦有殼，它就是一個東西。
+
+     **書裡面一行都沒有動。** 書脊、針孔、guilloche、MRZ，
+     以及入境章那組逐格量出來的幾何（見下面 .estamp 的長註解）全部在原地。
+     那組數字是拿 .page 的寬度量的，殼只是在 .page 外面多包一層，
+     .page 自己的內距與寬度沒有變，所以不需要回去重量。
+
+     圓角左小右大：裝訂邊（左邊）本來就比書口（右邊）方。
+     內距左邊比右邊窄 4px 是同一個理由 —— 裝訂邊的殼包得比較緊。 */
+  .cover{
+    border-radius:8px 20px 20px 8px;
+    padding:13px 15px 13px 11px;
+    background:linear-gradient(135deg, var(--bt-navy) 0%, rgba(16,42,134,.84) 46%,
+                                       var(--bt-navy) 100%);
+    box-shadow:0 30px 62px rgba(16,42,134,.26),0 6px 14px rgba(16,42,134,.16),
+               inset 0 1px 0 rgba(255,255,255,.14);
+  }
+
   /* ---------- book ---------- */
   /* 書本外緣加圓角與影子，讓它像一本放在紙上的東西，不是一個貼平的框。
      裡面的書脊、MRZ、印章一律沒動。 */
@@ -94,12 +116,16 @@
       radial-gradient(120% 70% at 88% 0%, rgba(255,232,197,.55) 0%, rgba(255,232,197,0) 58%),
       linear-gradient(180deg, rgba(255,255,255,.72) 0%, rgba(255,255,255,.10) 42%, rgba(255,255,255,0) 100%),
       var(--paper);
-    box-shadow:0 18px 44px rgba(16,42,134,.13),0 4px 10px rgba(16,42,134,.06),
-               inset 0 1px 0 rgba(255,255,255,.6);
-    border:1px solid rgba(16,42,134,.16);
-    border-radius:18px;
+    /* 2026-09-08：外框與外影交給 .cover（殼在外面，紙不需要自己再有邊）。
+       留下的 inset 是紙的上緣反光，那是紙的一部分不是殼的。 */
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+    border:0;
+    border-radius:3px 12px 12px 3px;
     position:relative;overflow:hidden;
-    min-height:520px;
+    /* 2026-09-08：520 → 600。護照是一本比較方的東西，520px 高配上 940px 寬
+       讀起來是一張橫幅不是一本書。加高只會多出紙面，不會擠壓任何內容
+       （.page 有 flex:1，多的高度是它吸收的）。 */
+    min-height:600px;
     /* min-height 讓書維持固定高度，翻頁時大小不變、上一頁／下一頁不會移動。
        但內容比 520px 短的時候，多出來的高度會變成 nav 底下一條空白帶
        （實測：月份頁 44.7px、說明頁 134.2px）。
@@ -203,9 +229,19 @@
      只有需要留位置給章的格子才是 270，其他都是內容決定高度。
      月份頁的活動格子 270（下面 min-height:270px）、說明頁的三張卡 0
      （.slots.guide .slot）。 */
+  /* 2026-09-08：格子從「一個虛線框」改成「紙上的一欄」，上面一條界線分欄。
+     理由是章。章是這本護照唯一的酬賞，而它原本被關在一個小框裡蓋在框的中間 ——
+     真的護照的章是蓋在紙上的。把框拿掉之後，章直接落在 guilloche 上，
+     整頁才讀得出「這張紙被蓋過」。
+     **padding 維持 14px 不要動** —— 入境章那組量出來的幾何是拿它算的
+     （見下面 .estamp 的長註解：「之後如果調整 .mhead 的高度、.slot 的 padding
+     或 .cat 的字級，要回來重量一次」）。 */
   .slot{
-    border:1.5px dashed rgba(16,42,134,.3);border-radius:var(--r);
-    min-height:270px;padding:14px;
+    border:0;border-top:1.5px solid rgba(16,42,134,.3);border-radius:0;
+    /* 270 → 330（2026-09-08）：書加高到 600 之後，格子還停在 270 的話
+       下面會空出一整條死白。這個數字的意思一直是「先留出章的位置」，
+       章變大、又會上下錯開，要留的位置本來就跟著變大。 */
+    min-height:330px;padding:14px;
     display:flex;flex-direction:column;text-align:left;width:100%;
     transition:border-color .16s,background .16s;
     position:relative;
@@ -215,7 +251,7 @@
      必須在格子裡面），div 不是原生可聚焦元素也沒有 tabindex，:focus-visible
      永遠不會命中，留著是死 CSS。鍵盤可及性沒有退化——真正可聚焦的
      .faceopen 與 .flipbtn 已經套用通用的 #bt-root :focus-visible 規則。 */
-  .slot:hover{border-color:var(--bt-navy);background:rgba(255,196,108,.14)}
+  .slot:hover{border-top-color:var(--bt-navy);background:rgba(255,196,108,.14)}
   .slot .cat{font-size:9px;font-weight:700;letter-spacing:.2em;opacity:.5;text-transform:uppercase}
   .slot .ttl{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1;margin:5px 0 3px}
   .slot .en{font-size:10px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;opacity:.45}
@@ -225,7 +261,9 @@
     letter-spacing:.12em;text-transform:uppercase;opacity:.35;
   }
   .slot:hover .cta{opacity:.85}
-  .slot[data-done="1"]{border-style:solid;border-color:rgba(16,42,134,.18);background:rgba(255,196,108,.1)}
+  /* 蓋過章的格子：界線變淡，**不加底色**。加了底色章就又回到「一張小卡片裡」，
+     而拿掉框就是為了讓它蓋在紙上。已蓋與未蓋的差別靠章本身，不靠背景。 */
+  .slot[data-done="1"]{border-top-color:rgba(16,42,134,.18)}
   /* 背面那行標題是**標籤不是標題**：正面已經有大字標題與章了，背面補這一行是
      為了一年後翻回去看照片時知道那格題目是什麼。刻意比正面的 .ttl 小而淡 ——
      背面的主角是照片與心得（使用者 2026-08-25）。 */
@@ -299,20 +337,28 @@
      保留自己的欄位設定，直接寫規則就會贏，不需要 !important。 */
 
   /* ---------- the stamp ---------- */
-  .stampwrap{margin:14px 0 0;display:flex;justify-content:center;padding:6px 0 2px}
+  /* 2026-09-08：框拿掉之後章直接坐在紙上，所以它可以（也應該）大一點。
+     上緣多留 6px 是讓它跟上面那行說明分開，看起來像事後蓋上去的，
+     不像排版排出來的一個元件。 */
+  /* ⚠ 高低錯開用 margin-top 不用 transform。transform 只是把畫面上的東西挪走，
+     排版位置沒有動 —— 章往下挪 32px 之後會壓在同一格的翻面按鈕上，
+     而且不會有任何東西報錯（2026-09-08 第一版就是這樣，最左邊那格的 ↻ 消失了）。
+     margin 會把後面的東西一起帶下去，翻面按鈕永遠在章的下面。 */
+  .stampwrap{margin:calc(20px + var(--dy,0px)) 0 0;display:flex;justify-content:center;
+    padding:6px 0 2px}
   .tilt{transform-origin:center}
   .stamp{
     border:2.5px solid currentColor;border-radius:7px;
-    padding:7px 11px 5px;text-align:center;
+    padding:9px 14px 7px;text-align:center;
     opacity:.86;filter:url(#bt-ink);
     position:relative;
   }
   .stamp::after{
     content:"";position:absolute;inset:3px;border:1px solid currentColor;border-radius:4px;opacity:.55;
   }
-  .stamp .s1{font-size:7.5px;font-weight:700;letter-spacing:.26em;text-transform:uppercase}
-  .stamp .s2{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.06em;line-height:1.05;margin:1px 0;text-transform:uppercase}
-  .stamp .s3{font-size:9.5px;font-weight:600;letter-spacing:.14em;font-variant-numeric:tabular-nums}
+  .stamp .s1{font-size:8.5px;font-weight:700;letter-spacing:.26em;text-transform:uppercase}
+  .stamp .s2{font-family:var(--display);font-size:28px;font-weight:700;letter-spacing:.06em;line-height:1.05;margin:1px 0;text-transform:uppercase}
+  .stamp .s3{font-size:11px;font-weight:600;letter-spacing:.14em;font-variant-numeric:tabular-nums}
   /* 聚會章：橘底 + 深藍文字與框線（spec §3.1）。原型的 .ink-orange 用了
      不在三色名單裡的第四色，已移除；.stamp 既有的 opacity:.86 在有底色時
      會讓橘底透出紙面，讀起來仍像墨，保留不動。 */

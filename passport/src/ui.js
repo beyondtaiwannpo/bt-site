@@ -281,7 +281,11 @@ export function bookHTML(S) {
   // S.page 落在範圍外時退回第一頁而不是畫出 undefined。正常情況走不到這裡，
   // 但月份資料變少（有人停用了一整個月）時 S.page 可能指向已經不存在的頁。
   const cur = pages[S.page] || pages[0];
-  return `<div class="book">
+  // 2026-09-08：書外面多包一層 .cover（深藍硬殼）。**書裡面一行都沒有動** ——
+  // 書脊、針孔、guilloche、MRZ、入境章那組量出來的幾何全都在原地。
+  // 理由見 index.html 的 .cover：Paul 選了「一本真的護照」那個方向，
+  // 而這本最大的問題是形狀不是配色。
+  return `<div class="cover"><div class="book">
     <div class="page turn">${pageBodyHTML(S, cur)}
       <div class="pageno">PAGE ${String(S.page + 1).padStart(2, "0")} / ${pages.length}</div>
     </div>
@@ -295,7 +299,7 @@ export function bookHTML(S) {
       </div>
       <button class="arrow" data-act="next" ${S.page === pages.length - 1 ? "disabled" : ""}>下一頁 →</button>
     </div>
-  </div>`;
+  </div></div>`;
 }
 
 // 一頁的內容由 kind 決定。新增頁型只要在 pagesOf 加一種 kind、在這裡加一條分支。
@@ -350,7 +354,16 @@ export function idPageHTML(S) {
 function stampInner(act, st, extraClass) {
   const ink = act.category === "gather" ? "ink-fill" : "ink-navy";
   const rot = ((act.id.charCodeAt(2) * 7) % 11) - 5;   // 角度由 id 決定，固定不變（spec §7.1）
-  return `<div class="stampwrap"><div class="tilt" style="transform:rotate(${rot}deg)">
+  // 2026-09-08：高度也由 id 決定。框拿掉之後三個章直接坐在紙上，
+  // 而三個都停在同一條水平線上讀起來像排版排出來的，不像蓋上去的。
+  // 跟角度同一條規則：由 id 算、固定不變，**不是亂數** ——
+  // 亂數的話同一格每次重繪都跳一次位置，那看起來是壞掉不是手感。
+  // ⚠ 取 [2] 不是 [1]：id 是 09A / 09B / 09C 這種形狀，[1] 是月份的個位數，
+  // 同一個月三格完全一樣，三個章會落在同一個高度（2026-09-08 第一版就是這樣）。
+  // [2] 才是那一格自己的字母。乘數跟角度那條不一樣，不然高低會跟歪斜同步，
+  // 看起來還是有規律。
+  const dy = ((act.id.charCodeAt(2) * 13) % 9) * 7 - 24;
+  return `<div class="stampwrap" style="--dy:${dy}px"><div class="tilt" style="transform:rotate(${rot}deg)">
     <div class="stamp ${ink}${extraClass ? " " + extraClass : ""}">
       <div class="s1">Beyond Taiwan</div>
       <div class="s2">${esc(act.title_en)}</div>
