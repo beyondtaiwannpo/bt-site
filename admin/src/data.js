@@ -149,7 +149,7 @@ export async function loadApplications(formId) {
   const [ap, an] = await Promise.all([
     supabase.from("applications")
       .select("id, user_id, applicant_name, applicant_school, applicant_grade, " +
-              "applicant_email, guardian_email, status, submitted_at, decided_at")
+              "applicant_email, guardian_email, status, submitted_at, decided_at, checked_in_at")
       .eq("form_id", formId)
       .order("submitted_at", { ascending: true }),
     supabase.from("application_answers").select("application_id, question_id, value"),
@@ -230,6 +230,23 @@ export async function deleteResource(id) {
   if (error) throw error;
 }
 
+// ── 批 6：活動營運 ────────────────────────────────────────────────────
+export async function setCheckIn(ids, present) {
+  need();
+  const { data, error } = await supabase.rpc("set_check_in",
+    { p_ids: ids, p_present: present });
+  if (error) throw error;
+  return data;
+}
+
+export async function sendNotice(formId, statuses, subject, body) {
+  need();
+  const { data, error } = await supabase.rpc("send_notice",
+    { p_form_id: formId, p_statuses: statuses, p_subject: subject, p_body: body });
+  if (error) throw error;
+  return data;
+}
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
@@ -244,6 +261,8 @@ const SAYS = [
   ["not_cadre", "這個動作只有幹部做得了。"],
   ["not_signed_in", "你的登入已經過期了，重新登入一次就好。"],
   ["form_closed", "這份表單已經關閉了。"],
+  ["empty_mail", "主旨與內容都要寫，不能只寫一個。"],
+  ["no_such_form", "找不到這份表單，可能已經被刪掉了。"],
 ];
 export function says(err) {
   const m = String((err && err.message) || err || "");

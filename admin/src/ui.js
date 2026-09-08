@@ -248,6 +248,8 @@ export function appsHTML(form, apps, questions, canDecide, sel, filter, pending,
     <div class="row" style="margin:0 0 14px">
       <button class="btn quiet" data-act="back-list">← 回清單</button>
       <button class="btn quiet" data-act="open-form" data-id="${esc(form.id)}">改這份表單</button>
+      <button class="btn quiet" data-act="open-checkin" data-id="${esc(form.id)}">簽到</button>
+      <button class="btn quiet" data-act="open-notice" data-id="${esc(form.id)}">寄一封信</button>
     </div>
     <h2>${esc(form.title)}</h2>
     <div class="sub">收到 ${apps.length} 件</div>
@@ -273,6 +275,75 @@ function pendingHTML(pending, busy) {
     ${stuck.length ? `其中 ${stuck.length} 封試過但失敗了：${esc(stuck[0].error || "沒有錯誤訊息")}` : ""}
     <div class="row">
       <button class="btn ghost sm" data-act="send-mail" ${busy ? "disabled" : ""}>${busy ? "寄送中…" : "現在寄出去"}</button>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 批 6：活動營運
+// ═══════════════════════════════════════════════════════════════════════
+
+// 簽到。**只列錄取的人** —— 沒錄取的人不會來，
+// 把他們放進點名單只會讓現場那個人多滑一百列。
+export function checkinHTML(form, apps, canEdit, msg, busy) {
+  const list = apps.filter(a => a.status === "accepted");
+  const here = list.filter(a => a.checked_in_at).length;
+  return `<div class="card">
+    <div class="row" style="margin:0 0 14px">
+      <button class="btn quiet" data-act="open-apps" data-id="${esc(form.id)}">← 回申請清單</button>
+    </div>
+    <h2>簽到</h2>
+    <div class="sub">${esc(form.title)}・錄取 ${list.length} 人，
+      <b>到了 ${here} 人</b></div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${canEdit ? "" : `<div class="wnote">你可以看，但點不了。簽到是 Director 與 Co-President 的事。</div>`}
+    ${list.length ? `<ul class="flist">${list.map(a => `<li>
+      <div class="arow">
+        ${canEdit ? `<label class="apick"><input type="checkbox" data-act="checkin" data-id="${esc(a.id)}"
+          ${a.checked_in_at ? "checked" : ""} ${busy ? "disabled" : ""}
+          aria-label="${esc(a.applicant_name)} 到了"></label>` : ""}
+        <div class="abody">
+          <div class="fhead"><b>${esc(a.applicant_name)}</b>
+            ${a.checked_in_at ? `<span class="tag open">已到</span>` : `<span class="tag">還沒到</span>`}</div>
+          <div class="fmeta">${esc(a.applicant_school || "")}${a.applicant_grade ? "・" + esc(a.applicant_grade) : ""}</div>
+        </div>
+      </div>
+    </li>`).join("")}</ul>` : `<div class="empty">還沒有人錄取，所以沒有人要簽到。</div>`}
+  </div>`;
+}
+
+// 寄一封信給這場活動的人（行前信、通知）。
+export const NOTICE_TO = [
+  { v: "accepted",  label: "錄取的人" },
+  { v: "interview", label: "邀請面試的人" },
+  { v: "received",  label: "還沒處理的人" },
+];
+
+export function noticeHTML(form, apps, to, msg, busy) {
+  const n = apps.filter(a => to.has(a.status)).length;
+  return `<div class="card">
+    <div class="row" style="margin:0 0 14px">
+      <button class="btn quiet" data-act="open-apps" data-id="${esc(form.id)}">← 回申請清單</button>
+    </div>
+    <h2>寄一封信</h2>
+    <div class="sub">${esc(form.title)}</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    <label><i>寄給誰</i></label>
+    <div class="chips" style="margin:-8px 0 16px">
+      ${NOTICE_TO.map(t => `<button class="chip wide${to.has(t.v) ? " on" : ""}"
+        data-act="notice-to" data-t="${t.v}">${esc(t.label)}</button>`).join("")}
+    </div>
+    <label><i>主旨</i><input id="nsub" placeholder="探索營行前通知"></label>
+    <!-- 純文字，沒有排版工具。理由跟 supabase/email-templates/README.md 一樣：
+         版型越花俏越容易被判成垃圾信，而 SPF / DKIM / DMARC 三項全 pass
+         是花了一整個階段換來的。 -->
+    <label><i>內容（純文字，換行就是換行）</i>
+      <textarea id="nbody" style="min-height:200px" placeholder="時間、地點、要帶什麼。"></textarea></label>
+    <div class="wnote">收信人的名字與「不要回覆這封信」那一段系統會自己加，
+      <b>你只要寫中間那一段</b>。</div>
+    <div class="row">
+      <button class="btn" data-act="notice-send" ${n && !busy ? "" : "disabled"}>${
+        busy ? "寄出中…" : n ? `寄給這 ${n} 個人` : "先選要寄給誰"}</button>
     </div>
   </div>`;
 }

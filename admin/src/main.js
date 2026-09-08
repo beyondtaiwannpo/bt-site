@@ -18,6 +18,8 @@ let S = {
   apps: [], sel: new Set(), filter: "all", pending: [],
   // 批 5
   res: [], resEditing: null,
+  // 批 6
+  noticeTo: new Set(["accepted"]),
 };
 
 const root = () => document.getElementById("bt-root");
@@ -38,7 +40,11 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
 
   document.body.insertAdjacentHTML("afterbegin", nav);
-  if (S.view === "res") {
+  if (S.view === "checkin" && S.form) {
+    el.innerHTML = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
+  } else if (S.view === "notice" && S.form) {
+    el.innerHTML = UI.noticeHTML(S.form, S.apps, S.noticeTo, S.msg, S.busy);
+  } else if (S.view === "res") {
     el.innerHTML = UI.resListHTML(S.res, canEdit(), S.msg);
   } else if (S.view === "res-edit") {
     el.innerHTML = UI.resEditHTML(S.resEditing, S.msg, S.busy);
@@ -142,6 +148,61 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
+
+  // ── 批 6：活動營運 ────────────────────────────────────────────────
+  if (act === "open-checkin" || act === "open-notice") {
+    // apps 已經在手上就不用再查一次。從清單直接點進來的情況才要查。
+    if (!S.form || S.form.id !== id || !S.apps.length) await openApps(id);
+    S.view = act === "open-checkin" ? "checkin" : "notice";
+    S.msg = ""; render();
+    return;
+  }
+
+  if (act === "checkin") {
+    // checkbox 的預設行為已經把勾打上去了，這裡讀它的新狀態。
+    const present = b.checked;
+    S.busy = true; render();
+    try {
+      await D.setCheckIn([id], present);
+      const a = S.apps.find(x => x.id === id);
+      // **只改記憶體裡那一筆，不重讀整份名單。** 現場點名是一個接一個點的，
+      // 每點一個就重讀一百列，網路不好的場地會變成點一下等三秒。
+      if (a) a.checked_in_at = present ? new Date().toISOString() : null;
+      S.busy = false;
+    } catch (err) { S.busy = false; S.msg = "點不了：" + D.says(err); }
+    render();
+    return;
+  }
+
+  if (act === "notice-to") {
+    const t = b.dataset.t;
+    if (S.noticeTo.has(t)) S.noticeTo.delete(t); else S.noticeTo.add(t);
+    render();
+    return;
+  }
+
+  if (act === "notice-send") {
+    const sub = document.getElementById("nsub").value.trim();
+    const body = document.getElementById("nbody").value.trim();
+    if (!sub || !body) { S.msg = "主旨與內容都要寫。"; render(); return; }
+    const to = [...S.noticeTo];
+    const n = S.apps.filter(a => S.noticeTo.has(a.status)).length;
+    // ⚠ 這一步會一次寄信給一群未成年人，而且收不回來。
+    if (!confirm(`要把這封信寄給 ${n} 個人嗎？\n\n主旨：${sub}\n\n信寄出去就收不回來了。`)) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const made = await D.sendNotice(S.form.id, to, sub, body);
+      let note = "";
+      try {
+        const r = await D.sendMail();
+        note = r.failed ? `，寄出 ${r.sent} 封、${r.failed} 封失敗` : `，寄出 ${r.sent} 封`;
+      } catch (me) { note = "。信還沒寄出去：" + D.says(me); }
+      S.pending = await D.loadPending(S.form.id);
+      S.busy = false; S.msg = `排了 ${made} 封信${note}。`;
+    } catch (err) { S.busy = false; S.msg = "寄不出去：" + D.says(err); }
+    render();
+    return;
+  }
 
   // ── 批 5：資源 ────────────────────────────────────────────────────
   if (act === "tab") {
