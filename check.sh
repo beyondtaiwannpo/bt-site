@@ -916,23 +916,35 @@ fi
 # 免不了要寫出違規的字面，不剝的話這條守門會抓到自己然後永遠 FAIL。
 # **JS 那段裡面也不要寫違規字面** —— `//` 開頭的行不在剝除範圍內
 # （剝的是 shell 註解），控制端 2026-08-26 就這樣讓它抓到自己一次。
+# 2026-09-08：範圍從 check.sh 一支擴到**所有的 shell 腳本**。
+# 那天寫 scripts/db/smoke.sh 時踩到一模一樣的坑（`$got）`），
+# 而這條守門只看 check.sh，所以它沒有出聲。
+# 守門只守自己，等於只擋得住已經被擋過的那一次。
+SHELL_FILES=$(printf '%s\n' check.sh scripts/*.sh scripts/*/*.sh 2>/dev/null | while read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done)
 if node -e '
   // 先剝掉 shell 的整行註解，理由見上面那段（註解不會執行）。
-  const s = require("fs").readFileSync("check.sh", "utf8")
-    .split("\n").filter(l => !/^\s*#/.test(l)).join("\n");
-  const m = s.match(/\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/g);
-  if (m) { console.log([...new Set(m)].join("  ")); process.exit(1); }
-' 2>/dev/null; then
-  ok "check.sh 沒有變數名緊接非 ASCII 字元"
+  const fs = require("fs");
+  const bad = [];
+  for (const f of process.argv.slice(1)) {
+    const s = fs.readFileSync(f, "utf8")
+      .split("\n").filter(l => !/^\s*#/.test(l)).join("\n");
+    const m = s.match(/\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/g);
+    if (m) bad.push(f + "：" + [...new Set(m)].join("  "));
+  }
+  if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
+' $SHELL_FILES 2>/dev/null; then
+  ok "shell 腳本沒有變數名緊接非 ASCII 字元（掃了 $(printf '%s\n' $SHELL_FILES | wc -l | tr -d ' ') 支）"
 else
-  bad "check.sh 裡有變數名緊接非 ASCII 字元，FAIL 路徑上會 unbound variable："
+  bad "shell 腳本裡有變數名緊接非 ASCII 字元，FAIL 路徑上會 unbound variable："
   node -e '
-    const s = require("fs").readFileSync("check.sh", "utf8");
-    s.split("\n").forEach((l, i) => {
-      if (/^\s*#/.test(l)) return;
-      if (/\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/.test(l)) console.log(`  ${i+1}: ${l.trim()}`);
-    });
-  '
+    const fs = require("fs");
+    for (const f of process.argv.slice(1)) {
+      fs.readFileSync(f, "utf8").split("\n").forEach((l, i) => {
+        if (/^\s*#/.test(l)) return;
+        if (/\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/.test(l)) console.log(`  ${f}:${i+1}: ${l.trim()}`);
+      });
+    }
+  ' $SHELL_FILES
 fi
 
 # 前端往 profiles 寫的每一欄，都必須是資料庫真的發了權限的那幾欄
