@@ -83,9 +83,20 @@
   /* 書本外緣加圓角與影子，讓它像一本放在紙上的東西，不是一個貼平的框。
      裡面的書脊、MRZ、印章一律沒動。 */
   .book{
-    background:var(--paper);
-    box-shadow:0 14px 40px rgba(16,42,134,.10),0 3px 8px rgba(16,42,134,.05);
-    border:1px solid rgba(16,42,134,.18);
+    /* 2026-09-08：書原本是 var(--paper) 實色，跟頁面底色一模一樣，
+       所以它讀起來不像一本放在桌上的書，像一塊跟背景融在一起的區域。
+       Paul 的原話：「不太符合我們的色調」。
+       改成跟站上其他卡片同一套語言：**由上往下、由亮到暗的紙色**，
+       再加一道右上角的暖光（那是全站的招牌，見對外頁的 body::before）。
+       兩層都只用品牌色與白（check.sh §11-14 的 rgba 底色白名單）。
+       **書本身的東西一個都沒有動** —— 書脊、針孔、guilloche、MRZ 都還在。 */
+    background:
+      radial-gradient(120% 70% at 88% 0%, rgba(255,232,197,.55) 0%, rgba(255,232,197,0) 58%),
+      linear-gradient(180deg, rgba(255,255,255,.72) 0%, rgba(255,255,255,.10) 42%, rgba(255,255,255,0) 100%),
+      var(--paper);
+    box-shadow:0 18px 44px rgba(16,42,134,.13),0 4px 10px rgba(16,42,134,.06),
+               inset 0 1px 0 rgba(255,255,255,.6);
+    border:1px solid rgba(16,42,134,.16);
     border-radius:18px;
     position:relative;overflow:hidden;
     min-height:520px;
@@ -108,8 +119,12 @@
        再密就糊成一條淺色帶，兩者都不像針孔。
        opacity 從 .9 拿掉改成 1：原本那條是用來讓深藍不要太實，但現在上面有圓點，
        整條再壓一次會讓圓點也跟著糊掉。深藍本身的份量改用漸層那層的實色控制。 */
+    /* 2026-09-08：深藍上再蓋一層由上往下的亮暗，書脊才有「一條裝訂邊」的厚度，
+       不是一條平的色帶。針孔與寬度沒有動。 */
     background:
       radial-gradient(circle at 50% 50%, var(--paper) 1.6px, transparent 1.7px) 0 0 / 9px 22px repeat-y,
+      linear-gradient(180deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 30%,
+                              rgba(16,42,134,.35) 100%),
       var(--bt-navy);
   }
   .book::after{ /* guilloche：120x40 貼片、每片兩排、四條干涉正弦波，2026-08-23 定案 */
@@ -563,8 +578,11 @@
   /* ⚠ 2026-09-08：這一格從 <button> 變成 <a>（上傳搬到 /settings/）。
      **標籤換了，樣式要跟著補**：`:where(#bt-root button)` 那條重設對 <a> 沒有作用，
      所以底線與連結顏色要自己收掉，不然護照上會出現一格藍色底線的照片。 */
+  /* 照片：圓角 2px 改成 10px。整站其他地方的圓角都在 12 到 20 之間，
+     那個 2px 是唯一一個直角的東西，看起來像沒有跟著改到。
+     不用更大的圓角：這一格是證件照，它該看起來像貼上去的一張相片。 */
   .photo{
-    width:150px;height:190px;border:1px solid rgba(16,42,134,.35);border-radius:2px;
+    width:150px;height:190px;border:1px solid rgba(16,42,134,.28);border-radius:10px;
     background:rgba(255,196,108,.2);display:flex;align-items:center;justify-content:center;
     overflow:hidden;position:relative;
     text-decoration:none;color:inherit;cursor:pointer;
@@ -576,11 +594,17 @@
   .f i{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.5;display:block}
   .f b{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:.03em;line-height:1.2;display:block}
   .f.wide{grid-column:1/-1}
+  /* 2026-09-08：底色從深藍 5% 換成暖色的沙。
+     深藍調淡在米白上讀起來是冷灰，那是整頁唯一一塊冷的東西。
+     真的護照上那條機讀區本來就是另一種紙色，所以「不一樣」是對的，
+     只是它該跟這本書是同一個色系。
+     ⚠ **opacity 拿掉，改用 rgba 指定文字顏色。** opacity 會連對比度一起打折，
+     這個 repo 已經在七個地方踩過同一件事。.72 在米白上約 5.7:1，過得了 AA。 */
   .mrz{
-    margin-top:24px;padding:12px 14px;background:rgba(16,42,134,.05);
-    border-top:1px solid rgba(16,42,134,.25);border-radius:2px;
+    margin-top:24px;padding:12px 14px;background:rgba(255,232,197,.85);
+    border-top:1px solid rgba(16,42,134,.22);border-radius:8px;
     font-size:13px;font-weight:600;letter-spacing:.13em;font-variant-numeric:tabular-nums;
-    word-break:break-all;opacity:.75;line-height:1.9;
+    word-break:break-all;color:rgba(16,42,134,.72);line-height:1.9;
   }
   .motto{font-family:var(--display);font-size:24px;font-weight:500;line-height:1.35;
     margin-top:22px;padding-left:14px;border-left:3px solid var(--bt-orange)}

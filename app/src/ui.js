@@ -15,7 +15,6 @@
 
 // 選單卡片從 shared/nav.js 的 FEATURES 產生，跟頂欄同一份清單 —— 兩份清單的話
 // 漏加的那一頁不會壞、只會少一個入口，而那種缺陷沒有人會回報。
-import { featuresFor } from "../../shared/nav.js";
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -171,25 +170,17 @@ export function notCadreHTML(msg) {
     <div class="note">還不是幹部也沒關係，這個帳號留著。學員的功能用的是同一個帳號。</div>
   </div>`;
 }
-// 登入之後的選單。**這一頁不放還不存在的東西。**
-// 時間看板（階段 8）現在沒有，所以這裡就沒有它的入口 ——
-// 灰掉的「敬請期待」看起來像壞掉的功能，而且會有人來問什麼時候好。
-export function menuHTML(who, msg) {
-  return `<div class="card">
-    <h2>Beyond Taiwan</h2>
-    <div class="sub">${who ? esc(who) : ""}</div>
-    ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
-    <div class="menu">${featuresFor("cadre").map(f => `
-      <a class="mitem" href="${f.href}">
-        <b>${esc(f.title)}</b>
-        <span>${esc(f.desc)}</span>
-      </a>`).join("")}
-    </div>
-    <div class="row" style="margin-top:22px">
-      <button class="btn ghost sm" data-act="signout">登出</button>
-    </div>
-  </div>`;
-}
+// 2026-09-08：登入後的選單頁（menuHTML）整個刪掉。
+// Paul 的原話：「後面那一頁其實不用有了，就直接登入進到第 1 張圖就好」。
+//
+// 那一頁的工作是「一個功能的樞紐」，而那件事現在由**登入後的頂欄**做，
+// 而頂欄在每一頁都在 —— 一個只出現在某一頁的樞紐，本來就比頂欄少用。
+// 幹部登入後直接被送到 /settings/（見 main.js），路上少一次點擊。
+//
+// ⚠ 它連同四條測試一起刪掉，其中一條是「/app/ 的選單卡片跟頂欄用同一份
+// FEATURES 清單」。**那條保證沒有消失，是變成不必要了** ——
+// FEATURES 現在只剩頂欄一個消費者，一份清單自然不會有兩份。
+// 哪天又要做一個樞紐頁，那條測試要跟著回來。
 
 // 2026-09-08：「要不要出現在公開的團隊頁上」整塊搬到 /settings/ 了。
 // Paul 的原話：「可不可以直接做成一個設定 page，把護照的照片上傳也放到這一頁」。
@@ -319,7 +310,8 @@ export function fmtDay(v) {
 }
 
 // ── 學員的 dashboard ──────────────────────────────────────────────────
-// ⚠ **這一頁不放還不存在的東西。**（跟 menuHTML 同一條規矩，理由見它上面那段。）
+// ⚠ **這一頁不放還不存在的東西。** 灰掉的入口看起來像壞掉的功能，
+// 而且會有人來問什麼時候好。對外首頁的那條規矩在這裡一樣成立。
 // 批 3 會在這裡長出「我的申請」與「現在開放的申請」，批 5 會長出資源。
 // 在那之前不放灰掉的入口 —— 點不下去的東西看起來像壞掉，而且會有人來問。
 export function studentHTML(p, msg, apps, opens) {

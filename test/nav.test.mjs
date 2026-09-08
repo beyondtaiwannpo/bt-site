@@ -3,7 +3,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { FEATURES, featuresFor, navHTML } from "../shared/nav.js";
-import { menuHTML } from "../app/src/ui.js";
 
 const count = (h, re) => (h.match(re) || []).length;
 
@@ -49,7 +48,10 @@ test("★ 學員只看得到屬於學員的功能項，logo、名字、登出都
   assert.equal(count(h, /<a href="\/[a-z-]+\/"/g), mine.length, "學員看到了他進不去的功能");
   for (const f of FEATURES.filter(x => !x.roles.includes("student")))
     assert.ok(!h.includes(`href="${f.href}"`), `學員看到了幹部才有的 ${f.key}`);
-  assert.ok(h.includes('href="/app/"'), "沒有回入口的 logo 連結");
+  // 2026-09-08：logo 改成回對外的首頁。/app/ 現在只剩登入表單，
+  // 點 logo 回到一頁只有表單的地方沒有意義。
+  assert.ok(h.includes('href="/"'), "沒有回首頁的 logo 連結");
+  assert.ok(!h.includes('href="/app/"'), "logo 還指著只剩登入表單的 /app/");
   assert.ok(h.includes("小明"), "沒有名字");
   assert.ok(h.includes('data-act="signout"'), "沒有登出");
   assert.ok(h.includes('<nav class="btnav"'), "整條列不見了——空的列比消失誠實");
@@ -73,17 +75,9 @@ test("沒有名字時不畫名字那一格，但登出還在", () => {
   assert.ok(h.includes('data-act="signout"'));
 });
 
-// ★ 唯一來源：/app/ 的選單卡片跟頂欄用同一份清單。
-// 兩份清單的話漏加的那一頁不會壞、只會少一個入口，而那種缺陷沒有人會回報。
-test("★ /app/ 選單的每一張卡都對應 FEATURES 的一筆，數量一致", () => {
-  const h = menuHTML("王平");
-  const cadre = featuresFor("cadre");
-  assert.equal(count(h, /class="mitem"/g), cadre.length, "卡片數跟 FEATURES 不一致");
-  for (const f of cadre) {
-    assert.ok(h.includes(`href="${f.href}"`), `選單少了 ${f.key} 的入口`);
-    assert.ok(h.includes(f.title), `選單少了 ${f.key} 的標題`);
-  }
-});
+// 2026-09-08：原本這裡有一條「/app/ 的選單卡片跟頂欄用同一份 FEATURES」。
+// 選單頁刪掉之後 FEATURES 只剩頂欄一個消費者，**那條保證不是消失，是變成不必要**。
+// 哪天又要做一個樞紐頁，那條測試要跟著回來。
 
 test("app/src/ui.js 不准自己寫死功能的 href", () => {
   const src = readFileSync("app/src/ui.js", "utf8").replace(/<!--[\s\S]*?-->|\/\/[^\n]*/g, "");

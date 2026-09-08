@@ -51,7 +51,11 @@ export function navHTML({ current, role, name }) {
     `<a href="${f.href}"${f.key === current ? ' aria-current="page"' : ""}>${esc(f.label)}</a>`).join("");
   const n = String(name || "");
   return `<nav class="btnav" aria-label="站台導覽">
-    <a class="btnav-logo" href="/app/" aria-label="回到入口"><img src="/shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
+    <!-- 2026-09-08：logo 改成回**對外的首頁**，不是回 /app/。
+         /app/ 現在只剩登入表單（幹部登入後直接進 /settings/），
+         點 logo 回到一頁只有表單的地方沒有意義。
+         Paul 的原話：「按首頁會回到最外面」。 -->
+    <a class="btnav-logo" href="/" aria-label="回 Beyond Taiwan 首頁"><img src="/shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
     <div class="btnav-items">${items}</div>
     <span class="btnav-sp"></span>
     ${n ? `<span class="btnav-who" title="${esc(n)}"><span class="full">${esc(n)}</span><span class="short">${esc([...n][0])}</span></span>` : ""}

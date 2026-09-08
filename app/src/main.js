@@ -30,7 +30,18 @@ function render() {
   // 明明登入著的人說「請登入」（跟護照那邊同一個道理，spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail, S.busy); return; }
-  if (S.role === "cadre") { el.innerHTML = UI.menuHTML(S.name || S.user.email, S.authMsg); return; }
+  // 2026-09-08：幹部登入後**不再停在一頁選單**，直接送進 /settings/。
+  // Paul 的原話：「後面那一頁其實不用有了，就直接登入進到第 1 張圖就好」。
+  // 那一頁的工作（一個功能的樞紐）現在由登入後的頂欄做，
+  // 而頂欄在每一頁都在 —— 一個只出現在某一頁的樞紐，本來就比頂欄少用。
+  //
+  // 用 replace 不用 href：留在歷史裡的話，他從設定按上一頁會回到這裡，
+  // 而這裡又會立刻把他送回去，上一頁就變成按不動的。
+  if (S.role === "cadre") {
+    el.innerHTML = `<div class="empty">帶你進去…</div>`;
+    location.replace("../settings/");
+    return;
+  }
 
   // 學員（批 2）。**資料沒填齊就先擋在補完那一頁**，
   // 因為學校與年級是這個帳號唯一有用的東西，缺了等於這個人不存在。

@@ -1361,10 +1361,10 @@ fi
 loginbad=""
 for f in $(printf '%s\n' index.html */index.html); do
   grep -q 'class="login"' "$f" || continue
-  grep -q '我的帳號 / Account' "$f" || loginbad="${loginbad} ${f}"
+  grep -q '我的 BT 帳號 / Account' "$f" || loginbad="${loginbad} ${f}"
 done
 if [ -n "$loginbad" ]; then
-  bad "這些對外頁面有登入按鈕，但沒有「登入之後改成我的帳號」那一段：${loginbad}"
+  bad "這些對外頁面有登入按鈕，但沒有「登入之後改成我的 BT 帳號」那一段：${loginbad}"
 else
   ok "每一個有登入按鈕的對外頁面都會在登入後把字改掉"
 fi

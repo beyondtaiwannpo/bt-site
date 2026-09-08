@@ -6,7 +6,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authHTML, notCadreHTML, menuHTML, downHTML } from "../app/src/ui.js";
+import { authHTML, notCadreHTML, downHTML } from "../app/src/ui.js";
 import { resolveNext, stashNext, takeNext, NEXT } from "../app/src/nav.js";
 
 test("notCadreHTML 有邀請碼輸入框與升級按鈕，而且走得掉", () => {
@@ -148,29 +148,9 @@ test("白名單裡的每個目的地都是站內的相對路徑", () => {
   }
 });
 
-// ── 登入後的選單 ────────────────────────────────────────────────────
-test("選單有護照的入口，也走得掉", () => {
-  const h = menuHTML("王平");
-  // 2026-09-04：選單卡片從 shared/nav.js 的 FEATURES 產生，href 是根目錄相對路徑。
-  assert.ok(h.includes('href="/passport/"'), "選單裡沒有護照的入口");
-  assert.ok(h.includes('href="/availability/"'), "選單裡沒有看板的入口");
-  assert.ok(h.includes('data-act="signout"'), "選單裡沒有登出");
-  assert.ok(h.includes("王平"), "沒有顯示現在登入的是誰");
-});
-
-// 時間看板（階段 8）還不存在。灰掉的入口看起來像壞掉的功能，
-// 而且會有人來問什麼時候好 —— 對外首頁的那條規矩在這裡一樣成立。
-test("選單裡沒有還不存在的功能", () => {
-  const h = menuHTML("王平");
-  for (const bad of ["敬請期待", "即將推出", "Coming soon", "開發中", "待補", "TODO"])
-    assert.ok(!h.includes(bad), `選單裡出現了佔位的「${bad}」`);
-});
-
-test("選單會跳脫使用者的名字", () => {
-  const h = menuHTML('<img src=x onerror=alert(1)>');
-  assert.ok(!h.includes("<img src=x"), "名字被原樣當成標籤塞進 HTML");
-  assert.ok(h.includes("&lt;img src=x"), "名字根本沒有被顯示，這條測試等於沒測到");
-});
+// 登入後的選單頁 2026-09-08 刪掉了（見 app/src/ui.js 的墓碑註解），
+// 原本掛在它上面的三條測試（入口齊全、沒有佔位文案、名字要跳脫）跟著移除。
+// **跳脫那一條在別的地方仍然有人守**：studentHTML 與 settingsHTML 各有一條。
 
 // /app/ 的 downHTML 跟護照那一份是兩份，文案不同。
 // 護照那句「你的資料都還在」對一個還沒登入的人沒有意義。
