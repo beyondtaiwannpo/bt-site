@@ -260,6 +260,14 @@ test("★ 錯誤代碼要翻成人話（看到它的多半是沒設定過 Vault 
   const D = await import("../admin/src/data.js");
   assert.match(D.says(new Error("mail_not_configured")), /Vault/);
   assert.match(D.says(new Error("mail_not_configured")), /pg_net/);
+  // ⚠ 2026-09-08：資料庫會說「缺哪一個、Vault 裡實際有什麼」，
+  // **那段細節一定要傳到畫面上**。罐頭訊息蓋掉它的話，
+  // 看的人就少了唯一能看出「我名字打錯了」的線索。
+  const detailed = D.says(new Error(
+    "mail_not_configured：缺 RESEND_API_KEY。Vault 裡現在有：Resend API、BT_MAIL_FROM"));
+  assert.match(detailed, /Vault 裡現在有：Resend API、BT_MAIL_FROM/, "資料庫講的細節被蓋掉了");
+  assert.match(detailed, /修法/, "細節之外也要說怎麼修");
+  assert.doesNotMatch(detailed, /mail_not_configured/, "代碼本身不該留在畫面上");
   assert.match(D.says({ message: "not_director_of:Marketing" }), /不是你這個 team/);
   assert.match(D.says(new Error("form_closed")), /已經關閉/);
   assert.equal(D.says(new Error("某個沒見過的錯")), "某個沒見過的錯",

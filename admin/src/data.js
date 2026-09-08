@@ -272,8 +272,11 @@ export async function setApproved(id, ok) {
 // 「mail_not_configured」對他來說跟一段亂碼沒有兩樣，
 // 而他需要知道的是「去哪裡做什麼」，不是那個代碼長什麼樣。
 const SAYS = [
-  ["mail_not_configured",
-   "信件還沒設定好，所以寄不出去。要有人到 Supabase 的 Vault 加上 RESEND_API_KEY 與 BT_MAIL_FROM 兩個 secret，並且打開 pg_net。步驟寫在 supabase/migrations/2026-09-10-decisions-and-mail.sql 的最後面。"],
+  // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
+  // 2026-09-08：Paul 照步驟設定了，但名字打成「Resend API」，
+  // 而畫面上顯示的是這裡寫死的一句話 —— 看起來像他什麼都沒做。
+  // 資料庫那一端已經改成會說「缺哪一個、Vault 裡實際有什麼」，
+  // **那句話一定要傳到畫面上**，不能被這裡的罐頭訊息蓋掉。
   ["not_director_of:",
    "這裡面有一份不是你這個 team 的申請，所以整批都沒有動。"],
   ["not_president", "只有當屆 Co-President 可以做這件事。"],
@@ -286,6 +289,12 @@ const SAYS = [
 ];
 export function says(err) {
   const m = String((err && err.message) || err || "");
+  // 信件設定的錯誤是特例：**保留資料庫講的細節**（缺哪一個、實際有什麼），
+  // 後面才補上怎麼修。罐頭訊息蓋掉細節的話，看的人就少了唯一的線索。
+  if (m.includes("mail_not_configured")) {
+    return m.replace("mail_not_configured：", "信件還沒設定好：").replace("mail_not_configured", "信件還沒設定好") +
+      "　修法：到 Supabase 的 Vault 把那兩個 secret 的名字改成 RESEND_API_KEY 與 BT_MAIL_FROM（大小寫與底線要一樣），並確認 pg_net 已經打開。";
+  }
   for (const [code, text] of SAYS) if (m.includes(code)) return text;
   return m;
 }
