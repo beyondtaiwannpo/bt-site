@@ -207,20 +207,33 @@ footer a{color:var(--ink);font-weight:600}
 @media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
 /* 一排臉。**hidden 是預設**：一個人都還沒公開的時候整段不出現
-   （見 team/src/main.js 的檔頭）。 */
+   （見 team/src/main.js 的檔頭）。
+
+   ── 為什麼是「照片在左、名字在右」的橫列，不是照片在上名字在下 ──
+   2026-09-08 第一版是後者，Paul 的原話：「外面的照片區有夠醜」。他是對的，
+   而醜的原因是**版面在一個人的時候與三十個人的時候不能都成立**：
+   照片在上、名字在下的格子要窄（不然一張照片會有半個螢幕大），
+   而窄格子裝不下「Co-President 2026-2027・Sponsorship Team」，
+   那一行會斷成三行掛在一張小圓照底下。
+   橫列兩邊都成立：一個人的時候是一列，三十個人的時候是自動排成的兩三欄。 */
 .faces{list-style:none;margin:0;padding:0;
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));
-  gap:clamp(18px,2.4vw,30px);max-width:44em}
-.faces li{text-align:left}
-.faces img,.faces .noface{display:block;width:100%;aspect-ratio:1;border-radius:50%;
-  object-fit:cover;background:rgba(255,255,255,.6);margin-bottom:10px}
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,268px),1fr));
+  gap:clamp(16px,2vw,22px) clamp(20px,3vw,34px);max-width:46em}
+.faces li{display:flex;align-items:center;gap:14px;min-width:0}
+.faces img,.faces .noface{flex:none;width:68px;height:68px;border-radius:50%;
+  object-fit:cover;background:rgba(255,255,255,.6)}
+/* ⚠ object-position 往上偏。大頭照多半是站著拍的，臉在畫面上半部，
+   置中裁切會把下巴切掉、額頭上方留一大片背景（第一版就是這樣）。 */
+.faces img{object-position:center 28%}
 /* 沒有大頭照的人用名字第一個字。**不用灰色剪影** ——
    剪影看起來像「這個人不見了」，一個字看起來像「這個人在」。 */
 .faces .noface{display:grid;place-items:center;font-family:var(--display);
-  font-weight:700;font-size:clamp(30px,3.4vw,44px);color:rgba(16,42,134,.55);
+  font-weight:700;font-size:28px;color:rgba(16,42,134,.55);
   border:1px solid rgba(16,42,134,.14)}
-.faces b{display:block;font-size:16px;font-weight:600;line-height:1.3}
-.faces span{display:block;font-size:13.5px;color:rgba(16,42,134,.8);margin-top:2px}
+.faces .who{min-width:0}
+.faces b{display:block;font-size:16.5px;font-weight:600;line-height:1.25}
+.faces span{display:block;font-size:13.5px;line-height:1.45;
+  color:rgba(16,42,134,.8);margin-top:3px}
 
 </style>
 </head>

@@ -8,10 +8,12 @@ export function peopleHTML(people) {
   if (!people || !people.length) return "";
   return `<ul class="faces">${people.map(p => `<li>
     ${p.avatar
-      ? `<img src="${esc(p.avatar)}" alt="" width="120" height="120" loading="lazy">`
+      ? `<img src="${esc(p.avatar)}" alt="" width="68" height="68" loading="lazy">`
       : `<span class="noface" aria-hidden="true">${esc(initial(p.name))}</span>`}
-    <b>${esc(p.name)}</b>
-    <span>${esc([p.title, p.team].filter(Boolean).join("・"))}</span>
+    <div class="who">
+      <b>${esc(p.name)}</b>
+      <span>${esc([p.title, p.team].filter(Boolean).join("・"))}</span>
+    </div>
   </li>`).join("")}</ul>`;
 }
 
