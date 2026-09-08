@@ -174,6 +174,57 @@
      不然它就在騙人，而預覽騙人比沒有預覽糟。 */
   .mailprev pre.tail{color:rgba(16,42,134,.72);margin-top:1.75em}
 
+/* 開了「減少動態效果」就把所有動畫與過渡關掉。
+   **這是無障礙需求不是視覺偏好**（2026-08-25 裁定），check-motion.mjs 守著。
+   這三頁 2026-09-08 之前完全沒有這個區塊 —— 是那支守門的範圍
+   從 passport 一頁擴到全站之後才露出來的。 */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
+
+/* ═════════ 點下去要有回饋（2026-09-08）═════════ */
+/* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
+   Paul 的要求：「點擊會有回饋」。
+
+   ⚠ **五個登入後的頁面設了 -webkit-tap-highlight-color:transparent**，
+   那一行會把手機上唯一的預設回饋關掉。關掉就一定要自己補一個 ——
+   在那之前，那五頁在手機上按下去畫面完全不動，
+   而**畫面不動的時候使用者會再按一次**（這個 repo 一路上最常見的失敗形狀）。
+
+   ⚠ **不要給它 transition。** 按下去的回饋要立刻發生；
+   加了過渡就變成「按了之後才慢慢縮」，那比沒有回饋更像卡住。
+   沒有 transition 也表示它不是「會動位置的過渡」，
+   對 prefers-reduced-motion 沒有意義 —— 按鍵回饋不是前庭刺激來源。 */
+button{cursor:pointer}
+button[disabled]{cursor:default}
+button:not([disabled]):active,
+a.btn:active, a.cta:active, a.login:active, a.photo:active, a.avbtn:active,
+summary:active{
+  transform:scale(.97);
+}
+/* 實心的主要按鈕：壓下去再暗一階，光靠縮小在小按鈕上看不太出來。 */
+.btn:not([disabled]):not(.ghost):not(.quiet):active,
+a.btn:not(.ghost):active, a.cta:active, a.login:active{
+  background:var(--bt-navy);color:var(--bt-cream);filter:brightness(.88);
+}
+/* 框線鈕：壓下去底色再深一點。
+   ⚠ **.chip.on 要排除。** 選起來的 chip 底色是深藍，
+   蓋一層淺色上去會讓它在按著的時候閃白一下，看起來像取消選取。 */
+/* 用橘色不用深藍調淡：深藍 12% 在米白上讀起來是**冷灰**，
+   而整站是暖的 —— 那一下按壓會看起來像變髒，不像有回應。
+   橘色本來就是這個品牌「正在動的東西」的顏色，而正在被按的就是那個東西。 */
+.btn.ghost:not([disabled]):active, .chip:not(.on):active,
+.lang:active, .btnav-out:active{
+  background:rgba(255,196,108,.38);
+}
+.chip.on:active{filter:brightness(1.15)}
+/* 整行可以點的東西（單選、多選、勾選框）：按著的時候整行變色。
+   這些是 <label> 不是 <button>，上面那條抓不到，而它們是**手機上最常按的東西**。 */
+.opt:active, .check:active{background:rgba(255,196,108,.26);border-radius:10px}
+/* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
+.body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
+summary{cursor:pointer}
 </style>
 </head>
 <body>

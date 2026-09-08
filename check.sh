@@ -1350,6 +1350,30 @@ else
   fi
 fi
 
+# ── 每一頁都要有點擊回饋與 reduced-motion 區塊 ────────────────────────
+#
+# 2026-09-08 Paul：「點擊會有回饋」。那一段 CSS 在每一頁各有一份
+#（外殼各自一份的代價），**漏掉的那一頁不會壞，只會在手機上按下去毫無反應** ——
+# 而五個登入後的頁面設了 -webkit-tap-highlight-color:transparent，
+# 連瀏覽器預設的那一點回饋都關掉了，漏掉就是完全沒有。
+#
+# reduced-motion 一起守：admin、settings、join 三頁在 2026-09-08 之前
+# 根本沒有那個區塊，是 check-motion.mjs 的範圍從 passport 一頁擴到全站才露出來的。
+pressbad=""
+motionbad=""
+for f in $(printf '%s\n' index.html */index.html); do
+  grep -q '<style>' "$f" || continue
+  grep -q '點下去要有回饋' "$f" || pressbad="${pressbad} ${f}"
+  grep -q '@media (prefers-reduced-motion' "$f" || motionbad="${motionbad} ${f}"
+done
+if [ -n "$pressbad" ]; then
+  bad "這些頁面少了「點下去要有回饋」那一段 CSS：${pressbad}"
+elif [ -n "$motionbad" ]; then
+  bad "這些頁面少了 prefers-reduced-motion 區塊：${motionbad}"
+else
+  ok "每一頁都有點擊回饋與 reduced-motion 區塊"
+fi
+
 # ── 對外頁面：登入之後那顆按鈕要改字 ──────────────────────────────────
 #
 # 2026-09-08 Paul 回報「登入之後回首頁，右上角還是寫登入」。
