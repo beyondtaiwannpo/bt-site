@@ -209,6 +209,12 @@ const RULES = [
 ];
 
 // 絕對不能把原始錯誤丟給高中生看（spec §6.1）。一律翻譯。
+// 把「這個 email 已經有帳號」那一句轉出去。
+// **前端要認得出這一種失敗**，才能把人直接帶回登入畫面而不是丟一句話給他
+//（2026-09-08）。比對字串是難看的，但比在 main.js 再抄一份那句文案好 ——
+// 抄一份的話，改文案的人不會知道有第二個地方在對這句話。
+export const MSG_DUP_EMAIL = MSG.dupEmail;
+
 export function authMessage(err) {
   if (!err) return MSG.other;
   const m = String(err.message || "").toLowerCase();

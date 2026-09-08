@@ -29,7 +29,7 @@ function render() {
   // 連不上要排在最前面：那時候 S.user 是空的，掉到登入頁等於對一個
   // 明明登入著的人說「請登入」（跟護照那邊同一個道理，spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
-  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail); return; }
+  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail, S.busy); return; }
   if (S.role === "cadre") { el.innerHTML = UI.menuHTML(S.name || S.user.email, S.pub, S.authMsg, S.busy); return; }
 
   // 學員（批 2）。**資料沒填齊就先擋在補完那一頁**，
@@ -168,19 +168,46 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act;
 
   if (act === "retry") { location.reload(); return; }
+  // ⚠ 切換登入／註冊的時候**不要清掉 email**。
+  // 一個人打完 email 才發現自己按錯邊，切過去又要重打一次。
   if (act === "switch-auth") { S.authMode = b.dataset.m; S.authMsg = ""; render(); return; }
 
   if (act === "do-signin" || act === "do-signup") {
     const email = document.getElementById("ae").value.trim();
     const pw = document.getElementById("ap").value;
+    // ⚠ **先把 email 存起來，成功失敗都留著。**（2026-09-08 Paul 實測回報。）
+    // 密碼打錯就要重打一次 email，是在懲罰一個本來就已經有點挫折的人。
+    S.authEmail = email;
     // 空的就不要打網路 —— 空不空前端自己看得到，跑一趟只為了讓伺服器
     // 告訴我們這一格是空的（理由與實測見 passport/src/main.js 同一段）。
     if (!email || !pw) { S.authMsg = AUTH.authMessage(null); render(); return; }
+    S.busy = true; S.authMsg = ""; render();
     try {
-      if (act === "do-signup") await AUTH.signUp(email, pw);
-      else await AUTH.signIn(email, pw);
+      if (act === "do-signup") {
+        const data = await AUTH.signUp(email, pw);
+        S.busy = false;
+        // 開了 email 確認之後，註冊成功但**不會登入**（data.session 是 null）。
+        // 舊版在這裡直接 boot()，而 boot() 找不到使用者就把同一張登入表單再畫一次 ——
+        // 看起來就像按了沒反應。**沒有回應的送出，使用者只會再按一次。**
+        if (!data || !data.session) { S.authMode = "check"; render(); return; }
+      } else {
+        await AUTH.signIn(email, pw);
+        S.busy = false;
+      }
       await boot();
-    } catch (err) { S.authMsg = err.message; render(); }
+    } catch (err) {
+      S.busy = false;
+      // 這個 email 已經有帳號 → **直接帶他回登入畫面**，email 留著。
+      //（2026-09-08 Paul 實測回報。）叫他自己按「我已經有帳號了」再重打一次 email，
+      // 是把一件我們已經知道答案的事丟回去給他做。
+      if (err.message === AUTH.MSG_DUP_EMAIL) {
+        S.authMode = "in";
+        S.authMsg = "這個 email 已經有帳號了，直接登入就好。密碼忘記的話下面可以重設。";
+      } else {
+        S.authMsg = err.message;
+      }
+      render();
+    }
     return;
   }
 
@@ -198,11 +225,14 @@ document.addEventListener("click", async e => {
 
   if (act === "do-forgot") {
     const email = document.getElementById("fpe").value.trim();
+    S.authEmail = email;
     if (!email) { S.authMsg = AUTH.authMessage(null); render(); return; }
+    S.busy = true; S.authMsg = ""; render();
     // 相對路徑算出來，不要寫死線上網址 —— 寫死的話本機測不了。
     const redirectTo = new URL("../reset/", location.href).href;
     try { await AUTH.sendPasswordReset(email, redirectTo); }
-    catch (err) { S.authMsg = err.message; render(); return; }
+    catch (err) { S.busy = false; S.authMsg = err.message; render(); return; }
+    S.busy = false;
     // 這裡**不分辨**這個 email 有沒有帳號，理由見 ui.js 的 sent 那一段。
     S.authEmail = email; S.authMsg = ""; S.authMode = "sent"; render();
     return;

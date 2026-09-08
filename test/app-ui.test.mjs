@@ -324,3 +324,47 @@ test("註冊頁的標題是「註冊」，不是 5-7 之前的「註冊 BT 護�
   assert.match(h, /<h2>註冊<\/h2>/);
   assert.ok(!h.includes("註冊 BT 護照"), "現在註冊的是帳號，不是護照");
 });
+
+// ── 2026-09-08 Paul 實測回報的四件事 ──────────────────────────────────
+import { MSG_DUP_EMAIL } from "../shared/auth.js";
+
+// ⚠ 密碼打錯就要重打一次 email，是在懲罰一個本來就已經有點挫折的人。
+test("★ 登入與註冊都要把上次打的 email 帶回來（密碼不帶）", () => {
+  for (const mode of ["in", "up"]) {
+    const h = authHTML(mode, "密碼不對", "wang@example.com");
+    assert.match(h, /id="ae"[^>]*value="wang@example\.com"/, mode + " 沒有把 email 帶回來");
+    assert.doesNotMatch(h, /id="ap"[^>]*value=/, "密碼不該被帶回來");
+  }
+});
+
+test("忘記密碼那一頁也要帶回 email", () => {
+  assert.match(authHTML("forgot", "", "wang@example.com"), /id="fpe"[^>]*value="wang@example\.com"/);
+});
+
+// ⚠ 沒有回應的送出，使用者只會再按一次。
+test("★ 送出中：按鈕鎖住而且字會變", () => {
+  assert.match(authHTML("in", "", "", true), /data-act="do-signin" disabled/);
+  assert.match(authHTML("in", "", "", true), /處理中…/);
+  assert.match(authHTML("up", "", "", true), /data-act="do-signup" disabled/);
+  assert.match(authHTML("forgot", "", "", true), /寄出中…/);
+  assert.doesNotMatch(authHTML("in", "", "", false), /disabled/);
+});
+
+// ⚠ 開了 email 確認之後，註冊成功但不會登入。舊版在這裡什麼都不說。
+test("★ 註冊完有一頁告訴他去收信，而且說得出寄到哪個信箱", () => {
+  const h = authHTML("check", "", "wang@example.com");
+  assert.match(h, /去收一封信/);
+  assert.match(h, /wang@example\.com/);
+  assert.match(h, /垃圾郵件匣/, "收不到的第一個原因要講");
+  assert.match(h, /data-act="switch-auth" data-m="in"/, "要有一條回登入的路");
+});
+
+test("已經有帳號那句話，前端認得出來（才帶得回登入畫面）", () => {
+  assert.equal(typeof MSG_DUP_EMAIL, "string");
+  assert.match(MSG_DUP_EMAIL, /已經有/);
+});
+
+test("跳脫：email 裡的引號不會掙出 value 屬性", () => {
+  const h = authHTML("in", "", 'a" onfocus="alert(1)');
+  assert.ok(!h.includes('" onfocus'), "email 沒有跳脫，掙得出屬性");
+});

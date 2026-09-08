@@ -26,7 +26,7 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 // 會擋住下一個人的指示。留這幾行是為了說明它被推翻過，不是要繼續守它。
 // mode：in（登入）／up（註冊）／forgot（要重設連結）／sent（寄出去了）
 // email 只有 sent 用得到，用來把使用者剛才打的字回顯 —— 打錯字的人才看得出來。
-export function authHTML(mode, msg, email) {
+export function authHTML(mode, msg, email, busy) {
   const up = mode === "up";
 
   // ── 忘記密碼：輸入 email ──
@@ -34,9 +34,9 @@ export function authHTML(mode, msg, email) {
     <h2>忘記密碼</h2>
     <div class="sub">輸入你註冊時用的 email，我們寄一封重設連結給你。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
-    <label><i>Email</i><input id="fpe" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
+    <label><i>Email</i><input id="fpe" type="email" value="${esc(email || "")}" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
     <div class="stack">
-      <button class="btn" data-act="do-forgot">寄出重設連結</button>
+      <button class="btn" data-act="do-forgot" ${busy ? "disabled" : ""}>${busy ? "寄出中…" : "寄出重設連結"}</button>
     </div>
     <div class="nav"><button class="link" data-act="switch-auth" data-m="in">回登入</button></div>
     <div class="note"><b>用 Google 登入的話不需要密碼</b>，回登入頁直接按那顆 Google 按鈕就好。這一頁只對「用 email + 密碼註冊」的人有用。</div>
@@ -56,6 +56,19 @@ export function authHTML(mode, msg, email) {
     <div class="note" style="margin-top:0">沒收到的話，先看一下垃圾郵件匣。連結大約一小時內有效，過期了再回來要一次就好。</div>
     <div class="nav"><button class="link" data-act="switch-auth" data-m="in">回登入</button></div>
     <div class="note">試了幾次都收不到？寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
+  </div>`;
+
+  // ── 註冊完，等確認信 ──
+  // 2026-09-08 Paul 實測回報：「註冊帳號及登入完沒有 UI 提示」。
+  // 開了 email 確認之後，signUp 成功但**不會登入** —— 舊版在這裡什麼都不說，
+  // 只是把同一張登入表單再畫一次，看起來就像按了沒反應。
+  // 那正是這個 repo 反覆學到的同一件事：**沒有回應的送出，使用者只會再按一次。**
+  if (mode === "check") return `<div class="card">
+    <h2>去收一封信</h2>
+    <div class="sub">我們寄了一封確認信到 <b>${esc(email || "你的信箱")}</b>。點裡面的連結就完成註冊。</div>
+    <div class="note" style="margin-top:0">沒收到的話先看垃圾郵件匣。信可能要等一兩分鐘。</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">我點過了，去登入</button></div>
+    <div class="note">一直收不到？寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
   </div>`;
 
   return `<div class="card">
@@ -79,7 +92,11 @@ export function authHTML(mode, msg, email) {
          email 那格同樣關掉：GoTrue 自己會把 email 正規化成小寫，所以大小寫不致命，
          但 autocorrect 會把不認得的字串改掉，那是同一種「使用者看不見的竄改」。
          密碼那格不必：type="password" 本來就不會自動大寫或自動更正。 -->
-    <label><i>Email</i><input id="ae" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
+    <!-- ⚠ **email 那格要把上次打的字帶回來。**（2026-09-08 Paul 實測回報。）
+         密碼打錯就要重打一次 email，是在懲罰一個本來就已經有點挫折的人；
+         而且他重打的時候可能會打錯，於是錯誤訊息從「密碼不對」變成「查無此人」，
+         他就更找不到問題在哪。**密碼不帶回來**，那本來就該重打。 -->
+    <label><i>Email</i><input id="ae" type="email" value="${esc(email || "")}" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
     <label><i>密碼 / Password${up ? "（至少 6 個字）" : ""}</i><input id="ap" type="password" autocomplete="${up ? "new-password" : "current-password"}"></label>
     <!-- 「會出現在進度牆上」那段告知從註冊頁搬到升級頁（notCadreHTML）。
          5-7 之後註冊出來的是 student —— 他不會上牆、也還沒有護照，
@@ -93,8 +110,11 @@ export function authHTML(mode, msg, email) {
          而他不會來問，他會關掉頁面。
          （這段刻意不引用舊的那句字面 —— HTML 註解是會送到瀏覽器的，
            引用它等於把那句話留在頁面裡，守門也會抓到。） -->
+    <!-- 送出中要看得出來。沒有這個狀態的話，網路慢的時候畫面完全不動，
+         而使用者會再按一次（那是這個 repo 一路上最常見的失敗形狀）。 -->
     <div class="stack">
-      <button class="btn" data-act="${up ? "do-signup" : "do-signin"}">${up ? "註冊" : "登入"}</button>
+      <button class="btn" data-act="${up ? "do-signup" : "do-signin"}" ${busy ? "disabled" : ""}>${
+        busy ? "處理中…" : (up ? "註冊" : "登入")}</button>
     <!-- Google 登入（規格 §3-4）。**email + 密碼那條路不要拿掉**：
          有人沒有 Google 帳號、有人在中國、有人的 Google 就是登不進去。
          兩條路並存是規格明寫的決定，不是過渡狀態。
