@@ -116,6 +116,39 @@
   }
   input:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px;border-color:transparent}
 
+  /* 下拉。跟 input 同一個外觀，但 appearance:none 之後要自己畫箭頭，
+     所以刻意不畫 —— 保留瀏覽器原生的箭頭，各家長得不一樣但都看得懂，
+     而且鍵盤與螢幕閱讀器的行為是免費拿到的。 */
+  select{
+    width:100%;font-family:var(--body);font-size:15.5px;color:var(--ink);
+    padding:12px 14px;border:1px solid rgba(16,42,134,.28);border-radius:12px;
+    background:rgba(255,255,255,.7);
+  }
+  select:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px;border-color:transparent}
+
+  /* 勾選框。
+     ⚠ 上面那條 input{width:100%} 會把打勾的方框拉成滿版的一條，
+     所以這裡一定要把寬度收回來。改上面那條規則之前先想到這一格。
+     整段文字包在 <label> 裡，點字也能打勾 —— 手機上那個方框只有十幾像素，
+     不讓人點字的話很多人點不到。 */
+  .check{display:flex;gap:11px;align-items:flex-start;margin-bottom:16px;
+    font-size:14px;line-height:1.6;cursor:pointer}
+  .check input[type="checkbox"]{width:18px;height:18px;flex:none;margin:3px 0 0;
+    accent-color:var(--bt-navy);cursor:pointer}
+  .check span{color:rgba(16,42,134,.88)}
+  /* 可點區域至少 44 高，視覺不變。跟頂欄那幾顆同一個做法。 */
+  .check{position:relative;padding:4px 0}
+
+  /* 「我的資料」那幾行。左標籤右內容，中間一條細線，
+     跟對外頁的 .rows 同一套語言（不是六張圓角卡片）。 */
+  .kv{margin:0 0 4px;padding:0;list-style:none}
+  .kv li{display:grid;grid-template-columns:6.5em 1fr;gap:14px;
+    padding:11px 0;border-top:1px solid rgba(16,42,134,.13);font-size:14.5px}
+  .kv li:first-child{border-top:0}
+  .kv b{font-weight:600;color:rgba(16,42,134,.72);font-size:13px;letter-spacing:.03em}
+  .kv span{color:var(--ink);overflow-wrap:anywhere}
+  .kv .empty-v{color:rgba(16,42,134,.55)}
+
   /* ── 按鈕的輕重（2026-09-03，7-4）──
      一頁只有**一顆**實心深藍鈕，就是主要動作，滿版。
      第二選擇（Google）是滿版的框線鈕，用內文字體、不大寫、一行 ——

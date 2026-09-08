@@ -143,8 +143,12 @@ export function notCadreHTML(msg) {
     <div class="stack">
       <button class="btn" data-act="do-claim">我是幹部，我有邀請碼</button>
     </div>
+    <!-- 2026-09-08（批 2）：這一頁不再是學員的預設畫面，是他從自己的帳號頁
+         點「我是 BT 幹部，我有邀請碼」才會進來的。所以要有一條回得去的路 ——
+         沒有的話，一個好奇點進來的學員只剩下登出這個出口。 -->
+    <div class="nav"><button class="link" data-act="back-account">我不是幹部，回我的帳號</button></div>
     <div class="nav"><button class="link" data-act="signout">登出</button></div>
-    <div class="note">還不是幹部也沒關係，這個帳號留著。之後開放給學員的功能會用同一個帳號登入。</div>
+    <div class="note">還不是幹部也沒關係，這個帳號留著。學員的功能用的是同一個帳號。</div>
   </div>`;
 }
 // 登入之後的選單。**這一頁不放還不存在的東西。**
@@ -176,5 +180,130 @@ export function downHTML() {
       現在連不上資料庫，所以沒有辦法登入。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。
     </div>
     <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">再試一次</button></div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 學員（批 2，2026-09-08）
+// ═══════════════════════════════════════════════════════════════════════
+// 在這一批之前，`role !== "cadre"` 的人一律看到 notCadreHTML（「你還不是幹部」）。
+// 那一頁現在還在，但**不再是預設的畫面** —— 它變成學員頁上的一個小入口。
+//
+// 為什麼要換：學員不是「還沒升級的幹部」。他來這裡是為了拿資源、報名活動，
+// 而「你還不是 BT 幹部」對他來說是一句沒有意義的拒絕。
+// 同一個帳號，兩種人，兩個畫面。
+//
+// GOALS.md 目標 4 在 2026-09-07 拍板：這一屆要做 student。
+
+export const GRADES = ["高一", "高二", "高三", "已畢業", "其他"];
+
+// 資料齊了沒有。**姓名與學校是必要的，年級不是。**
+// 年級可以是「其他」，但那也要他自己選過 —— 所以三個都要有值才算齊。
+// 這一支是純函式，測得到；render 只問它，不要在別的地方再判斷一次。
+export function profileComplete(p) {
+  if (!p) return false;
+  return !!(String(p.name || "").trim() && String(p.school || "").trim() && String(p.grade || "").trim());
+}
+
+// ── 補完資料 ──────────────────────────────────────────────────────────
+// **這一頁擋在學員頁前面。**
+//
+// 為什麼不在註冊表單上問這四件事：
+//   1. 用 Google 進來的人根本沒有經過註冊表單。兩條路各問一次，
+//      就會有兩份要維護的欄位與兩種漏掉的方式。
+//   2. email + 密碼註冊之後要先收確認信才登得進來，那個時間點還寫不進 profiles。
+//      硬要的話得把資料塞進 auth 的 metadata 再讓 trigger 抄過去，
+//      那是一條只為了省一個畫面而多出來的路。
+//   3. 這一頁看得到脈絡：**電子報那個勾在這裡才有意義**，
+//      因為旁邊就寫著我們會拿它做什麼。夾在註冊表單的密碼欄下面沒有人會讀。
+//
+// ⚠ 電子報那個勾**預設不打**。預設打勾等於沒有同意。
+export function completeHTML(p, msg, busy) {
+  const v = k => esc(p && p[k] ? p[k] : "");
+  return `<div class="card">
+    <h2>還差幾個欄位</h2>
+    <div class="sub">填完就可以用了。之後隨時改得動。</div>
+    ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    <label><i>你的名字</i><input id="pn" value="${v("name")}" autocomplete="name" placeholder="王小明"></label>
+    <!-- list 指到一份 506 間學校的自動完成清單，資料在 app/schools.json，
+         由 scripts/schools/build.mjs 從教育部的名錄產生。
+         **datalist 不是下拉選單，它只是建議** —— 清單外的學校照樣打得進去，
+         那是刻意的：高職、海外、實驗教育的學生也要填得進來。
+         清單是等到第一次點這一格才去載的（見 main.js），
+         所以沒有 JavaScript 或還沒載完的時候，它就是一個普通的文字欄位。 -->
+    <label><i>就讀學校</i><input id="ps" list="schools" value="${v("school")}"
+      autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+      placeholder="打兩個字就會跳出來"></label>
+    <datalist id="schools"></datalist>
+    <label><i>年級</i><select id="pg">
+      <option value="">請選擇</option>
+      ${GRADES.map(g => `<option${p && p.grade === g ? " selected" : ""}>${esc(g)}</option>`).join("")}
+    </select></label>
+    <label class="check">
+      <input id="pnl" type="checkbox"${p && p.newsletter ? " checked" : ""}>
+      <span>我願意收 BT 的活動通知與資源更新。<br>
+        每次寄信都有取消訂閱的連結，你隨時可以停掉。不勾也不影響你使用這個帳號。</span>
+    </label>
+    <div class="stack">
+      <button class="btn" data-act="save-profile" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存起來"}</button>
+    </div>
+    <div class="note">我們問學校與年級，是為了知道要把活動辦在哪裡、辦給誰。
+      <b>不會公開，也不會給任何第三方。</b>完整寫在<a href="../privacy/">隱私政策</a>。</div>
+    <div class="nav"><button class="link" data-act="signout">登出</button></div>
+  </div>`;
+}
+
+// ── 學員的 dashboard ──────────────────────────────────────────────────
+// ⚠ **這一頁不放還不存在的東西。**（跟 menuHTML 同一條規矩，理由見它上面那段。）
+// 批 3 會在這裡長出「我的申請」與「現在開放的申請」，批 5 會長出資源。
+// 在那之前不放灰掉的入口 —— 點不下去的東西看起來像壞掉，而且會有人來問。
+export function studentHTML(p, msg) {
+  const row = (k, val) => `<li><b>${esc(k)}</b>${
+    val ? `<span>${esc(val)}</span>` : `<span class="empty-v">還沒填</span>`}</li>`;
+  return `<div class="card">
+    <h2>${esc((p && p.name) || "你的帳號")}</h2>
+    <div class="sub">Beyond Taiwan</div>
+    ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    <ul class="kv">
+      ${row("學校", p && p.school)}
+      ${row("年級", p && p.grade)}
+      ${row("活動通知", p && p.newsletter ? "有訂閱" : "沒有訂閱")}
+    </ul>
+    <div class="row">
+      <button class="btn ghost sm" data-act="edit-profile">改我的資料</button>
+    </div>
+    <div class="note">下一場探索營、下一輪導生配對都會先公布在
+      <a href="https://www.instagram.com/beyondtaiwan/">Instagram</a>，
+      也可以先看<a href="../programs/">我們在做什麼</a>。</div>
+    <div class="note"><button class="link" data-act="show-claim">我是 BT 幹部，我有邀請碼</button></div>
+    <div class="nav"><button class="link" data-act="signout">登出</button></div>
+    <!-- 刪除帳號放在最後、用最輕的樣式，但**一定要在這一頁上找得到**。
+         2026-09-07 Paul 決定申請資料不設保存期限（一直留著），
+         那個決定的對價就是當事人隨時拿得回控制權。
+         寫在隱私政策裡叫人來信不算數 —— 那是把成本轉嫁給他。 -->
+    <div class="note" style="margin-top:26px;border-top:1px solid rgba(16,42,134,.13);padding-top:16px">
+      <button class="link" data-act="ask-delete">刪除我的帳號與所有資料</button>
+    </div>
+  </div>`;
+}
+
+// 刪除帳號的確認。**打字確認，不是按兩次。**
+// 按兩次擋不住誤按，因為誤按的人第二次也會按。要他打字才會停下來讀。
+export function deleteHTML(msg, busy) {
+  return `<div class="card">
+    <h2>刪除帳號</h2>
+    <div class="sub">這個動作沒有辦法復原。</div>
+    ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    <div class="wnote">刪掉的東西包括：你的姓名、學校、年級、訂閱設定，
+      以及你送出過的每一份申請與裡面的答案。</div>
+    <p style="font-size:14px;line-height:1.65;margin:0 0 16px">
+      已經寄給你的信不會消失，那些在你自己的信箱裡。
+      如果你已經報名了某一場活動，刪掉帳號等於退出那一場。</p>
+    <label><i>確定的話，在下面打「刪除」兩個字</i><input id="dc" autocomplete="off"
+      autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="刪除"></label>
+    <div class="stack">
+      <button class="btn" data-act="do-delete" ${busy ? "disabled" : ""}>${busy ? "刪除中…" : "永久刪除我的帳號"}</button>
+    </div>
+    <div class="nav"><button class="link" data-act="back-account">先不要，回我的帳號</button></div>
   </div>`;
 }

@@ -10,7 +10,11 @@ import * as AUTH from "../../shared/auth.js";
 import { supabase } from "../../shared/supabase.js";
 import * as UI from "./ui.js";
 
-let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false };
+// view 只有在「學員」那條路上有意義：null 是 dashboard，
+// "edit" 是補完／修改資料，"claim" 是輸入邀請碼，"delete" 是刪除確認。
+// 幹部與未登入的人不看它。
+let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
+          profile: null, view: null, busy: false };
 
 // 登入之後送他回原本要去的地方。白名單、為什麼要存起來、為什麼包 try/catch，
 // 全部在 nav.js —— 抽出去是為了測得到（main.js 一 import 就會跑 boot()）。
@@ -26,8 +30,46 @@ function render() {
   // 明明登入著的人說「請登入」（跟護照那邊同一個道理，spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail); return; }
-  if (S.role !== "cadre") { el.innerHTML = UI.notCadreHTML(S.authMsg); return; }
-  el.innerHTML = UI.menuHTML(S.name || S.user.email);
+  if (S.role === "cadre") { el.innerHTML = UI.menuHTML(S.name || S.user.email); return; }
+
+  // 學員（批 2）。**資料沒填齊就先擋在補完那一頁**，
+  // 因為學校與年級是這個帳號唯一有用的東西，缺了等於這個人不存在。
+  if (S.view === "claim") { el.innerHTML = UI.notCadreHTML(S.authMsg); return; }
+  if (S.view === "delete") { el.innerHTML = UI.deleteHTML(S.authMsg, S.busy); return; }
+  if (S.view === "edit" || !UI.profileComplete(S.profile)) {
+    el.innerHTML = UI.completeHTML(S.profile, S.authMsg, S.busy);
+    // datalist 是等到使用者真的要打字才去載的（fillSchools 只跑一次）。
+    const sc = document.getElementById("ps");
+    if (sc) sc.addEventListener("focus", fillSchools, { once: true });
+    return;
+  }
+  el.innerHTML = UI.studentHTML(S.profile, S.authMsg);
+}
+
+
+// 學校自動完成。**只載一次，而且是等到使用者點進那一格才載。**
+// 那份 JSON 是 47KB，五百多間學校 —— 每個進到 /app/ 的人都載一次的話，
+// 大多數人根本走不到那一格（幹部、只是來登入的人）。
+//
+// 載不到就算了：datalist 空的時候那一格就是一個普通的文字欄位，
+// 使用者照樣填得進去。**這件事不值得對他說任何話**，
+// 因為對他來說本來就沒有壞掉，跳一個錯誤訊息只會嚇到人。
+let schoolsLoaded = false;
+async function fillSchools() {
+  if (schoolsLoaded) return;
+  schoolsLoaded = true;
+  try {
+    const res = await fetch("./schools.json");
+    if (!res.ok) return;
+    const data = await res.json();
+    const dl = document.getElementById("schools");
+    if (!dl || !data || !Array.isArray(data.schools)) return;
+    // 一次組好字串再塞，不要在迴圈裡 appendChild 五百次。
+    dl.innerHTML = data.schools
+      .map(s => `<option value="${String(s.label).replace(/"/g, "&quot;")}"></option>`).join("");
+  } catch (e) {
+    console.warn("學校清單載不到，那一格照樣可以自己打字。", e);
+  }
 }
 
 async function boot() {
@@ -42,10 +84,21 @@ async function boot() {
     // 只查自己那一列。**不要在這裡查護照的東西** —— 學員讀不到，
     // 而且這一頁不需要知道他蓋了幾個章。
     const { data, error } = await supabase
-      .from("profiles").select("role, name_zh, name_en").eq("id", S.user.id).maybeSingle();
+      .from("profiles")
+      .select("role, name_zh, name_en, school, grade, newsletter_opt_in")
+      .eq("id", S.user.id).maybeSingle();
     if (error) throw error;
     S.role = data ? data.role : null;
     S.name = data ? (data.name_zh || data.name_en || "") : "";
+    // 學員頁只認一個 name。名字在資料庫裡是中英兩欄（幹部的護照要用），
+    // 但學員只填一次，寫進 name_zh。這裡把兩欄收斂成一個值，
+    // **收斂只做這一次**，畫面與存檔都用同一個。
+    S.profile = data ? {
+      name: data.name_zh || data.name_en || "",
+      school: data.school || "",
+      grade: data.grade || "",
+      newsletter: !!data.newsletter_opt_in,
+    } : null;
 
     // 是幹部而且他本來就是要去某個地方 → 直接送過去，不要讓他多按一次。
     // takeNext 會同時看網址與存起來的鑰匙，而且拿完就丟掉。
@@ -123,9 +176,64 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  // ── 學員（批 2）─────────────────────────────────────────────────────
+  if (act === "edit-profile") { S.view = "edit"; S.authMsg = ""; render(); return; }
+  if (act === "show-claim")   { S.view = "claim"; S.authMsg = ""; render(); return; }
+  if (act === "ask-delete")   { S.view = "delete"; S.authMsg = ""; render(); return; }
+  if (act === "back-account"){ S.view = null; S.authMsg = ""; render(); return; }
+
+  if (act === "save-profile") {
+    const name = document.getElementById("pn").value.trim();
+    const school = document.getElementById("ps").value.trim();
+    const grade = document.getElementById("pg").value;
+    const newsletter = document.getElementById("pnl").checked;
+    if (!name || !school || !grade) {
+      S.authMsg = "姓名、學校、年級三個都要填。"; render(); return;
+    }
+    S.busy = true; S.authMsg = ""; render();
+    try {
+      // **只送這四欄。** updated_at 與 newsletter_opt_in_at 由資料庫蓋，
+      // 送了也會被覆蓋，而且 newsletter_opt_in_at 根本沒有發權限給前端 ——
+      // 多送一欄會讓整句 update 被拒（2026-09-01 profiles.team 那個坑）。
+      const { error } = await supabase.from("profiles").update({
+        name_zh: name, school, grade, newsletter_opt_in: newsletter,
+      }).eq("id", S.user.id);
+      if (error) throw error;
+      S.profile = { name, school, grade, newsletter };
+      S.name = name;
+      S.busy = false; S.view = null; render();
+    } catch (err) {
+      // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再按一次、
+      // 按五次、然後關掉（看板那一輪學到的同一件事）。
+      S.busy = false; S.authMsg = "存不起來：" + (err.message || err); render();
+    }
+    return;
+  }
+
+  if (act === "do-delete") {
+    const typed = document.getElementById("dc").value.trim();
+    if (typed !== "刪除") { S.authMsg = "要在那一格打「刪除」兩個字才會執行。"; render(); return; }
+    S.busy = true; S.authMsg = ""; render();
+    try {
+      const { error } = await supabase.rpc("delete_my_account");
+      if (error) throw error;
+      // 帳號沒了，本機的 session 也要清掉，不然下一次載入會拿著一張
+      // 指向不存在的人的票，畫面會變成「登入著但什麼都查不到」。
+      await AUTH.signOut();
+      S = { user: null, role: null, name: "", authMode: "in",
+            authMsg: "帳號已經刪掉了。謝謝你來過。", authEmail: "", down: false,
+            profile: null, view: null, busy: false };
+      render();
+    } catch (err) {
+      S.busy = false; S.authMsg = "刪不掉：" + (err.message || err); render();
+    }
+    return;
+  }
+
   if (act === "signout") {
     await AUTH.signOut();
-    S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false };
+    S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
+          profile: null, view: null, busy: false };
     render();
     return;
   }
