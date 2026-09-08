@@ -174,7 +174,7 @@ export function notCadreHTML(msg) {
 // 登入之後的選單。**這一頁不放還不存在的東西。**
 // 時間看板（階段 8）現在沒有，所以這裡就沒有它的入口 ——
 // 灰掉的「敬請期待」看起來像壞掉的功能，而且會有人來問什麼時候好。
-export function menuHTML(who, pub, msg, busy) {
+export function menuHTML(who, msg) {
   return `<div class="card">
     <h2>Beyond Taiwan</h2>
     <div class="sub">${who ? esc(who) : ""}</div>
@@ -185,46 +185,22 @@ export function menuHTML(who, pub, msg, busy) {
         <span>${esc(f.desc)}</span>
       </a>`).join("")}
     </div>
-    ${publicToggleHTML(pub, busy)}
     <div class="row" style="margin-top:22px">
       <button class="btn ghost sm" data-act="signout">登出</button>
     </div>
   </div>`;
 }
 
-// 幹部自己決定要不要出現在對外的 /team/ 上（2026-09-08 補批 1 漏掉的一件）。
+// 2026-09-08：「要不要出現在公開的團隊頁上」整塊搬到 /settings/ 了。
+// Paul 的原話：「可不可以直接做成一個設定 page，把護照的照片上傳也放到這一頁」。
 //
-// **這是兩把鑰匙裡的第一把。** 第二把是 Co-President 核可，在 /admin/。
-// 兩把都轉了才會出現在對外頁面上。
+// **搬過去的理由不只是整齊：設定的地方要跟後果的地方在同一個畫面上。**
+// 在 /settings/ 那一頁，勾「我同意公開」的時候旁邊就是那張大頭照，
+// 他看得到自己正在公開什麼；留在這裡的話，那張照片在另一個資料夾裡。
 //
-// ⚠ 文案要把**後果**講在前面，不是把選項講在前面。
-// 「你的名字與大頭照會出現在公開網頁上，任何人都看得到，而且會被搜尋引擎收錄」
-// 這句話比「要不要公開」有用得多 —— 一個高中生幹部按下去之前需要知道的是這個。
-export function publicToggleHTML(pub, busy) {
-  if (!pub) return "";
-  const on = !!pub.public_profile;
-  return `<div class="note" style="margin-top:26px;border-top:1px solid rgba(16,42,134,.13);padding-top:18px">
-    <b>要不要出現在公開的團隊頁上</b><br>
-    打勾之後，你的<b>名字、team 與大頭照會出現在 beyondtaiwannpo.com 上任何人都看得到的頁面</b>，
-    而且會被搜尋引擎收錄。不打勾完全沒有關係，也不影響你在 BT 做的任何事。
-    <label class="check" style="margin-top:12px">
-      <input id="pubchk" type="checkbox"${on ? " checked" : ""}${busy ? " disabled" : ""}>
-      <span>我同意公開我的名字、team 與大頭照</span>
-    </label>
-    ${on ? `<label><i>對外顯示的頭銜（選填）</i><input id="pubtitle"
-      value="${esc(pub.public_title || "")}" placeholder="Co-President 2026-27"></label>` : ""}
-    <div class="row" style="margin-top:0">
-      <button class="btn ghost sm" data-act="save-public" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存起來"}</button>
-    </div>
-    ${on ? `<div style="margin-top:10px">${pub.public_approved
-      ? "已經在公開的團隊頁上了。隨時可以把上面那個勾拿掉。"
-      : "還要等 Co-President 核可才會真的出現。"}</div>` : ""}
-  </div>`;
-}
+// 這裡不留一個回傳空字串的殼 —— 那種函式下一個人會花時間找它為什麼沒有作用。
+// 這段註解就是它的墓碑。
 
-// 連不上資料庫時的畫面。跟護照那一份是**兩份**，不是共用的：
-// 護照那份說「你的資料都還在」，那句話在登入頁上沒有意義（他還沒有資料）。
-// 文案不同，所以是不同的東西，不要為了少一份檔案硬合起來。
 export function downHTML() {
   return `<div class="card">
     <h2>資料庫休眠中</h2>
@@ -386,6 +362,7 @@ export function studentHTML(p, msg, apps, opens) {
     </ul>
     <div class="row">
       <button class="btn ghost sm" data-act="edit-profile">改我的資料</button>
+      <a class="btn ghost sm" href="../settings/" style="text-decoration:none">設定</a>
     </div>
     ${mine || now ? "" : `<div class="note">下一場探索營、下一輪導生配對都會先公布在
       <a href="https://www.instagram.com/beyondtaiwan/">Instagram</a>，
@@ -396,8 +373,11 @@ export function studentHTML(p, msg, apps, opens) {
          2026-09-07 Paul 決定申請資料不設保存期限（一直留著），
          那個決定的對價就是當事人隨時拿得回控制權。
          寫在隱私政策裡叫人來信不算數 —— 那是把成本轉嫁給他。 -->
+    <!-- 刪除帳號搬到 /settings/ 了（2026-09-08）。**這裡留一條路過去**，
+         不是留一顆一模一樣的按鈕 —— 兩個地方各有一顆會刪帳號的按鈕，
+         哪天其中一顆改了行為，另一顆不會跟著改。 -->
     <div class="note" style="margin-top:26px;border-top:1px solid rgba(16,42,134,.13);padding-top:16px">
-      <button class="link" data-act="ask-delete">刪除我的帳號與所有資料</button>
+      要改資料或刪除帳號，到<a href="../settings/">設定</a>。
     </div>
   </div>`;
 }

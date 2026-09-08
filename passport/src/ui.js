@@ -320,7 +320,11 @@ export function idPageHTML(S) {
       <div class="mtheme"><b>BEYOND TAIWAN</b><span>Passport · ${new Date(p.issued).getFullYear()}</span></div>
     </div>
     <div class="idgrid">
-      <button class="photo" data-act="avatar" title="上傳大頭照">${av}</button>
+      <!-- 2026-09-08：上傳搬到 /settings/。這裡保留那張照片（它是這一頁的一部分），
+           但按下去是**過去換**，不是在這裡開檔案選擇器。
+           搬走的理由：大頭照會出現在公開的團隊頁上，而「要不要公開」那個勾在設定頁 ——
+           **設定的地方要跟後果的地方在同一個畫面上。** -->
+      <a class="photo" href="../settings/" title="到設定換大頭照">${av}</a>
       <div>
         <div class="fields">
           <div class="f"><i>Type / 類別</i><b>BT</b></div>

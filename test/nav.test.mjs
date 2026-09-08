@@ -38,9 +38,17 @@ test("★ 幹部看到 FEATURES 上所有屬於他的項目，當前的那一項
 
 // ★ 學員：列照樣畫，只是功能項是空的。不整條藏起來——他知道自己在這個站裡，
 // 只是還沒有功能；之後開放給學員的功能只要在 roles 加 "student"，列就自動長出來。
-test("★ 學員的頂欄：零個功能項，但 logo、名字、登出都在", () => {
+// 2026-09-08：學員不再是零項——/settings/ 是第一個 roles 含 student 的功能，
+// 正是這個檔案檔頭一直在等的那一刻。
+// **這一條守的仍然是同一件事**：學員只看得到屬於他的那幾項，
+// 一項都不能多（多一項就是一條他點了會被彈回來的死路）。
+test("★ 學員只看得到屬於學員的功能項，logo、名字、登出都在", () => {
   const h = navHTML({ current: null, role: "student", name: "小明" });
-  assert.equal(count(h, /<a href="\/[a-z-]+\/"/g), 0, "學員看到了他進不去的功能");
+  const mine = FEATURES.filter(f => f.roles.includes("student"));
+  assert.ok(mine.length > 0, "學員一項都沒有的話，這一條就沒有在守任何東西了");
+  assert.equal(count(h, /<a href="\/[a-z-]+\/"/g), mine.length, "學員看到了他進不去的功能");
+  for (const f of FEATURES.filter(x => !x.roles.includes("student")))
+    assert.ok(!h.includes(`href="${f.href}"`), `學員看到了幹部才有的 ${f.key}`);
   assert.ok(h.includes('href="/app/"'), "沒有回入口的 logo 連結");
   assert.ok(h.includes("小明"), "沒有名字");
   assert.ok(h.includes('data-act="signout"'), "沒有登出");

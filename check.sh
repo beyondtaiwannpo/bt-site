@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team join impact partner apply resources admin alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
+FILES="index.html about programs team join impact partner apply resources admin settings alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -998,7 +998,7 @@ done
 # 而這條守門完全沒有看到它們 —— 守門的範圍安靜地縮小了，
 # 這正是它自己下面那段註解在講的那種失敗。
 # 每個檔案各自寫死寫入點的數量，理由同下。
-PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:2"
+PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:1 settings/src/main.js:3"
 
 profileCols=$(node -e '
   const fs = require("fs");
@@ -1009,6 +1009,12 @@ profileCols=$(node -e '
     const [file, n] = spec.split(":");
     const raw = fs.readFileSync(file, "utf8");
     const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+    // ⚠ **先確認每一個寫入點都用字面物件。**
+    // `.update(patch)` 這種寫法下面那條比對式看不懂，會靜靜地跳過 ——
+    // 守門變成「看不到就等於沒問題」，那是最糟的一種通過。
+    // 看不懂就大聲說看不懂，不要假裝檢查過了。
+    const opaque = (src.match(/\.from\("profiles"\)[\s\S]{0,80}?\.(?:update|upsert)\(\s*[^{\s]/g) || []);
+    if (opaque.length) problems.push(`${file} 有 ${opaque.length} 個寫入點不是字面物件（例如 .update(patch)），這條守門讀不到它寫了哪幾欄。請改成 .update({ ... })`);
     const re = /\.from\("profiles"\)[\s\S]{0,80}?\.(?:update|upsert)\(\{([\s\S]*?)\}\)/g;
     let m, sites = 0;
     while ((m = re.exec(src))) {
@@ -1250,7 +1256,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team join impact partner apply resources admin alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
+placeholder_scope="index.html about programs team join impact partner apply resources admin settings alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}

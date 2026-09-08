@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BT 設定</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+<meta name="theme-color" content="#102A86">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="../shared/nav.css">
+<style>
+  /* 色票、字體、圓角全部來自 ../shared/brand.css，這裡一個都不重新宣告。 */
+  /* 外殼從 availability/index.html 複製過來，跟 admin/ 同一個做法。
+     **刻意各自一份，不要搬進 shared/** —— 規格說 shared/ 要保持極小。 */
+  html{overflow-x:clip}
+  body{background:var(--paper);overflow-x:clip}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+  #bt-root{position:relative;z-index:1}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  #bt-root{font-family:var(--body);color:var(--ink);line-height:1.55;max-width:940px;margin:0 auto;padding:14px 12px 60px}
+  /* :where() 是必要的，不是風格 —— 見 passport/index.html 同一條的註解。 */
+  :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+  /* 這一條玻璃只裝分頁鈕（logo 與登出在 shared 的頂欄）。
+     不加 width:fit-content 的話它會拉滿 940px，右邊三分之二是空的，
+     看起來像少畫了東西。護照那一條右邊還有集章進度，所以那邊是滿版。 */
+  .bar{display:flex;width:fit-content;max-width:100%;
+    align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;
+    border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(237,229,216,.5));
+    backdrop-filter:blur(16px) saturate(180%);
+    -webkit-backdrop-filter:blur(16px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 8px 24px rgba(16,42,134,.08)}
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .bar{background:rgba(255,255,255,.75)}
+  }
+  .bar img{height:24px;width:auto;display:block}
+  .bar .sp{flex:1}
+  .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:999px;overflow:hidden}
+  .tabs button{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.06em;
+    padding:6px 12px;color:rgba(16,42,134,.55);transition:background .15s,color .15s}
+  .tabs button[aria-current]{background:var(--bt-navy);color:var(--bt-cream)}
+  .weeknav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:14px}
+  .weeknav b{font-family:var(--display);font-size:18px;letter-spacing:.04em}
+
+  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:18px;padding:24px 22px;
+    box-shadow:0 10px 30px rgba(16,42,134,.07)}
+  .card h2{font-family:var(--display);font-size:30px;font-weight:700;letter-spacing:.03em;margin:0 0 4px;line-height:1.05}
+  /* ⚠ 用 rgba 指定顏色不要用 opacity —— opacity 會連對比度一起打折。
+     深藍在米白上 .6 只有約 3.6:1，過不了 AA 的 4.5:1。這個 repo 踩過四次。 */
+  .card .sub{font-size:13.5px;color:rgba(16,42,134,.8);margin-bottom:18px}
+  .card p{font-size:14px;margin:0 0 12px}
+  label{display:block;margin-bottom:14px}
+  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.8);display:block;margin-bottom:5px}
+  input,select{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);padding:8px 10px;
+    border:1px solid rgba(16,42,134,.28);border-radius:12px;background:rgba(255,255,255,.7)}
+  select{width:auto;min-width:96px}
+  .btn{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    padding:11px 22px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:background .15s,color .15s}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+  .btn[disabled]{opacity:.4;cursor:default}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+  .btn.sm{font-size:14px;padding:6px 12px}
+  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.55);text-transform:none;letter-spacing:0;
+    font-family:var(--body);font-size:14px;font-weight:600;padding:2px 4px;text-decoration:underline}
+  .btn.quiet:hover{color:var(--ink)}
+  a.btn{text-decoration:none;display:inline-block}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .wnote{font-size:12.5px;padding:10px 14px;background:rgba(255,196,108,.25);border-radius:12px}
+  .wnote.big{font-size:15px;opacity:1;padding:14px 16px;margin-bottom:14px}
+  .empty{text-align:center;padding:40px 0;color:rgba(16,42,134,.78);font-size:14px}
+  .empty.sm{padding:14px 0}
+  .mini{font-size:12.5px;color:rgba(16,42,134,.8)}
+
+
+  /* ---------- 設定 ---------- */
+  .sec-h{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.03em;
+    margin:30px 0 6px;color:rgba(16,42,134,.92)}
+  .sec-h:first-of-type{margin-top:4px}
+  .sec-note{font-size:13.5px;line-height:1.65;color:rgba(16,42,134,.82);margin:0 0 14px}
+  select{width:100%;font-family:var(--body);font-size:15.5px;color:var(--ink);
+    padding:11px 13px;border:1px solid rgba(16,42,134,.28);border-radius:12px;
+    background:rgba(255,255,255,.7)}
+  select:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px;border-color:transparent}
+  /* ⚠ input{width:100%} 會把打勾的方框拉成滿版的一條。改上面那條規則前先想到這一格。 */
+  .check{display:flex;gap:11px;align-items:flex-start;margin:0 0 14px;padding:4px 0;
+    font-size:14.5px;line-height:1.6;cursor:pointer}
+  .check input[type="checkbox"]{width:19px;height:19px;flex:none;margin:2px 0 0;
+    accent-color:var(--bt-navy);cursor:pointer}
+
+  /* 大頭照：**照片跟「要不要公開」放在同一個畫面上**。
+     設定的地方跟後果的地方距離太遠，人就不知道自己在公開什麼。 */
+  .avrow{display:flex;gap:18px;align-items:center;margin-bottom:14px}
+  .avbtn{flex:none;width:92px;height:92px;border-radius:50%;overflow:hidden;
+    border:1px solid rgba(16,42,134,.22);background:rgba(255,255,255,.6);
+    display:grid;place-items:center;padding:0}
+  .avbtn img{width:100%;height:100%;object-fit:cover;object-position:center 28%;display:block}
+  .avbtn span{font-size:12px;line-height:1.4;color:rgba(16,42,134,.7)}
+  .avside{min-width:0;font-size:13.5px;line-height:1.6;color:rgba(16,42,134,.82)}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  @media (max-width:560px){ .two{grid-template-columns:1fr} .avrow{flex-wrap:wrap} }
+  .danger{margin-top:30px;border-top:1px solid rgba(16,42,134,.14);padding-top:18px}
+</style>
+</head>
+<body>
+<div id="bt-root"><div class="empty">載入中…</div></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

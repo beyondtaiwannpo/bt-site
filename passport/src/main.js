@@ -336,32 +336,9 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  if (act === "avatar") {
-    // spec §6.2 的再次告知。位置是刻意的：**在開檔案選擇器之前**問。
-    // 挑完照片才問等於「都選好了，不上傳很可惜」，那不是同意，是沉沒成本。
-    // 大頭照跟心得照片不同 —— 心得只有自己看得到，大頭照會出現在全體進度牆上。
-    if (!confirm("你的大頭照會出現在全體進度牆上，其他 BT 幹部看得到。要繼續上傳嗎？")) return;
-    const i = document.createElement("input"); i.type = "file"; i.accept = "image/*";
-    i.onchange = async () => {
-      const f = i.files && i.files[0]; if (!f) return;
-      let url;
-      try {
-        url = await compress(f, 420, 0.7);
-      } catch (err) {
-        toast("這張圖讀不到，換一張試試");
-        return;
-      }
-      S.profile.avatar = url;
-      render();
-      try {
-        await DATA.saveAvatar(url);
-      } catch (err) {
-        toast("大頭照沒有存起來，再試一次");
-      }
-    };
-    i.click(); return;
-  }
-
+  // 2026-09-08：上傳大頭照搬到 /settings/。**這裡不留一份**——
+  // 兩個地方各有一條上傳路徑，壓縮參數、告知文案、錯誤處理就會慢慢分岔，
+  // 而分岔是安靜的。資料頁上那張照片現在是一個連到設定的連結。
   if (act === "retry") {
     // 不先 render()：那會在 S.down 已經是 false、資料卻還沒回來的時候閃一下登入頁或申請頁。
     // 直接寫一句「正在重新連線…」，讓按下去的人知道有反應 —— 重試最長要等 7 秒（見 boot）。

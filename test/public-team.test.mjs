@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { peopleHTML, initial, toPerson } from "../team/src/ui.js";
-import { publicToggleHTML } from "../app/src/ui.js";
+import { settingsHTML } from "../settings/src/ui.js";
 import { publicTeamHTML, tabsHTML } from "../admin/src/ui.js";
 
 // ⚠ 這是對外頁面，「我們有三十個人但沒有人願意露臉」是內部資訊。
@@ -54,27 +54,50 @@ test("跳脫：名字與大頭照的網址都掙不出標籤", () => {
   assert.match(h, /&quot; onerror/);
 });
 
-// ── 第一把鑰匙：本人打勾 ──────────────────────────────────────────────
+// ── 第一把鑰匙：本人打勾（2026-09-08 搬到 /settings/）─────────────────
+const cadre = (extra = {}) => ({ role: "cadre", name_zh: "王平", email: "a@b.c", ...extra });
+
 // ⚠ 文案要把後果講在前面。一個高中生幹部按下去之前需要知道的是這個。
 test("★ 打勾之前就講清楚後果：公開網頁、任何人看得到、會被搜尋引擎收錄", () => {
-  const h = publicToggleHTML({ public_profile: false, public_approved: false }, false);
+  const h = settingsHTML(cadre(), "", false);
   assert.match(h, /任何人都看得到/);
   assert.match(h, /搜尋引擎/);
   assert.match(h, /不打勾完全沒有關係/);
 });
 
-test("打勾之後才出現頭銜那一格，而且說出還要等核可", () => {
-  const off = publicToggleHTML({ public_profile: false, public_approved: false }, false);
-  assert.doesNotMatch(off, /id="pubtitle"/);
-  const on = publicToggleHTML({ public_profile: true, public_approved: false }, false);
-  assert.match(on, /id="pubtitle"/);
-  assert.match(on, /還要等 Co-President 核可/);
-  const done = publicToggleHTML({ public_profile: true, public_approved: true }, false);
-  assert.match(done, /已經在公開的團隊頁上了/);
+// ⚠ 這是搬到設定頁的**理由本身**：設定的地方要跟後果的地方在同一個畫面上。
+test("★ 大頭照與「要不要公開」在同一個畫面上", () => {
+  const h = settingsHTML(cadre({ avatar: "data:image/jpeg;base64,x" }), "", false);
+  assert.match(h, /data-act="avatar"/, "設定頁要能換大頭照");
+  assert.match(h, /id="pub"/, "公開開關要在同一頁");
+  assert.ok(h.indexOf('data-act="avatar"') < h.indexOf('id="pub"'),
+    "照片要在勾選框上面，他才看得到自己正在公開什麼");
 });
 
-test("沒有 pub 資料（例如學員）就完全不畫這一塊", () => {
-  assert.equal(publicToggleHTML(null, false), "");
+test("打勾之後才出現頭銜那一格，而且說出還要等核可", () => {
+  assert.doesNotMatch(settingsHTML(cadre(), "", false), /id="ptitle"/);
+  const on = settingsHTML(cadre({ public_profile: true }), "", false);
+  assert.match(on, /id="ptitle"/);
+  assert.match(on, /還要等 Co-President 核可/);
+  assert.match(settingsHTML(cadre({ public_profile: true, public_approved: true }), "", false),
+    /已經在公開的團隊頁上了/);
+});
+
+test("★ 學員的設定頁沒有公開那一塊，也沒有大頭照", () => {
+  const h = settingsHTML({ role: "student", name_zh: "小明", email: "a@b.c" }, "", false);
+  assert.doesNotMatch(h, /id="pub"/, "學員不會出現在團隊頁上，不該看到那個勾");
+  assert.doesNotMatch(h, /data-act="avatar"/);
+  assert.match(h, /id="school"/, "學員要改得了學校");
+  assert.match(h, /id="grade"/);
+});
+
+// ⚠ 資料不設保存期限（2026-09-07 拍板）的對價：當事人隨時拿得回控制權。
+test("★ 學員的設定頁上找得到刪除帳號；幹部那一頁沒有（換屆交接的事）", () => {
+  assert.match(settingsHTML({ role: "student", name_zh: "小明" }, "", false),
+    /data-act="ask-delete"/);
+  const c = settingsHTML(cadre(), "", false);
+  assert.doesNotMatch(c, /data-act="ask-delete"/);
+  assert.match(c, /換屆交接/, "幹部要知道為什麼自己刪不了，而不是找不到按鈕");
 });
 
 // ── 第二把鑰匙：P/VP 核可 ─────────────────────────────────────────────
