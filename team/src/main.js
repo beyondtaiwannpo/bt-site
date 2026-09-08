@@ -7,7 +7,8 @@
 import { supabase } from "../../shared/supabase.js";
 import { peopleHTML, toPerson } from "./ui.js";
 
-const MOUNTS = ["faces-zh", "faces-en"];
+// 中英兩版各一個掛載點。**兩邊畫同一批人**，只有 team 底下那行小標不一樣。
+const MOUNTS = [["faces-zh", "zh"], ["faces-en", "en"]];
 
 (async () => {
   try {
@@ -21,13 +22,16 @@ const MOUNTS = ["faces-zh", "faces-en"];
       .eq("public_profile", true)
       .eq("public_approved", true);
     if (error) throw error;
+    // ⚠ **排序要是固定的，而且要看得懂為什麼。**
+    // 拍照那天的姿勢是照這個順序配的（往右看的人，右邊那個比「噠噠」），
+    // 所以「誰在誰旁邊」不能每次載入都不一樣。
+    // 用英文名的字母序：不用誰去維護一個順序欄位，加一個人也不會把別人的姿勢錯開太多。
     const people = (data || []).map(toPerson).filter(p => p.name)
-      .sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
+      .sort((a, b) => (a.en || a.zh).localeCompare(b.en || b.zh, "en"));
     if (!people.length) return;
-    const html = peopleHTML(people);
-    for (const id of MOUNTS) {
+    for (const [id, lang] of MOUNTS) {
       const el = document.getElementById(id);
-      if (el) { el.innerHTML = html; el.closest("section").hidden = false; }
+      if (el) { el.innerHTML = peopleHTML(people, lang); el.closest("section").hidden = false; }
     }
   } catch (e) {
     // 安靜地不出現。**不要對讀者說任何話** —— 對他來說本來就沒有壞掉。

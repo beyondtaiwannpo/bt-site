@@ -114,8 +114,16 @@
   .chip{font-family:var(--display);font-size:16px;font-weight:600;min-width:38px;height:38px;
     border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7)}
   .chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
-  .row.sticky{position:sticky;bottom:0;background:var(--paper);padding:12px 0 4px;margin-top:12px;
-    border-top:1px solid rgba(16,42,134,.15)}
+  /* ⚠ z-index 一定要比格線的時刻標籤高。
+     那些標籤是 `th.hr{position:sticky;left:0;z-index:1}`，
+     而**有 z-index 的定位元素一律畫在 z-index:auto 的上面，跟 HTML 順序無關**。
+     這條儲存列黏在畫面底部，捲動時會蓋到格線那一塊 ——
+     沒有 z-index 的話，時刻會穿過「儲存」兩個字（2026-09-08 Paul 實測回報）。
+     4 是為了同時高過 th（1）與 thead（2）。 */
+  .row.sticky{position:sticky;bottom:0;z-index:4;background:var(--paper);padding:12px 0 4px;margin-top:12px;
+    border-top:1px solid rgba(16,42,134,.15);
+    /* 底下多一點留白，不然在手機上它會貼著螢幕最下緣。 */
+    padding-bottom:10px}
 
   /* ---------- 成員清單 ---------- */
   table.who{width:100%;border-collapse:collapse;font-size:14px}

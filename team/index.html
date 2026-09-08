@@ -206,34 +206,90 @@ footer a{color:var(--ink);font-weight:600}
 }
 @media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
-/* 一排臉。**hidden 是預設**：一個人都還沒公開的時候整段不出現
+/* ═════════ 這一屆的人 ═════════ */
+/* **hidden 是預設**：一個人都還沒公開的時候整段不出現
    （見 team/src/main.js 的檔頭）。
 
-   ── 為什麼是「照片在左、名字在右」的橫列，不是照片在上名字在下 ──
-   2026-09-08 第一版是後者，Paul 的原話：「外面的照片區有夠醜」。他是對的，
-   而醜的原因是**版面在一個人的時候與三十個人的時候不能都成立**：
-   照片在上、名字在下的格子要窄（不然一張照片會有半個螢幕大），
-   而窄格子裝不下「Co-President 2026-2027・Sponsorship Team」，
-   那一行會斷成三行掛在一張小圓照底下。
-   橫列兩邊都成立：一個人的時候是一列，三十個人的時候是自動排成的兩三欄。 */
-.faces{list-style:none;margin:0;padding:0;
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,268px),1fr));
-  gap:clamp(16px,2vw,22px) clamp(20px,3vw,34px);max-width:46em}
-.faces li{display:flex;align-items:center;gap:14px;min-width:0}
-.faces img,.faces .noface{flex:none;width:68px;height:68px;border-radius:50%;
-  object-fit:cover;background:rgba(255,255,255,.6)}
-/* ⚠ object-position 往上偏。大頭照多半是站著拍的，臉在畫面上半部，
-   置中裁切會把下巴切掉、額頭上方留一大片背景（第一版就是這樣）。 */
-.faces img{object-position:center 28%}
+   ── 為什麼是「去背照片超出卡片」，不是一排小圓照 ──
+   2026-09-08 前兩版分別是「照片在上名字在下的小格子」與「照片在左名字在右的橫列」。
+   Paul 的原話：「小小一個圓很無聊，我要我的成員很驕傲可以在這上面」。
+   人是這個組織唯一真正的內容，把人縮成 68px 的圓等於說他們不重要。
+   現在的做法：一張卡片，去背照片掛在卡片上緣之外，頭超出框。
+
+   ⚠ **欄數是寫死的 4 / 3 / 2 / 1，不是 auto-fill。**
+   拍照那天的姿勢會互相連動（往右看的人，右邊那個比「噠噠」），
+   auto-fill 的話「誰在誰右邊」會隨著視窗寬度變，那些姿勢就對不起來。
+   欄數固定加上 main.js 的固定排序，左右鄰居才是可以事先算出來的。
+
+   ⚠ **每個人的姿勢單獨看也要成立。** 手機上一排一個，
+   那時候看不到任何連動，只看得到那一個人。 */
+.sec-people .sec-in{grid-template-columns:1fr;gap:clamp(14px,2vw,24px)}
+.sec-people .body{max-width:none}
+
+.teamsec{margin:clamp(40px,5.5vw,64px) 0 0}
+.teamsec:first-child{margin-top:clamp(20px,2.6vw,32px)}
+.teamsec h3{font-family:var(--display);font-weight:700;
+  font-size:clamp(19px,2.1vw,28px);letter-spacing:.07em;text-transform:uppercase;
+  line-height:1.1;margin:0;color:var(--ink)}
+/* 小標可能是空的（team 不在那六個裡面時查不到中英文說明）。
+   **留一行的高度**，不然有小標與沒小標的兩組，卡片會差一行沒對齊。 */
+.teamsec .sub{margin:3px 0 0;font-size:14px;line-height:1.4;min-height:1.4em;
+  max-width:none;color:rgba(16,42,134,.72)}
+
+/* padding-top 是留給第一排的頭超出來的空間；row-gap 是留給後面每一排的。 */
+.crew{list-style:none;margin:0;padding:0;display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  /* ⚠ **row-gap 與 padding-top 要蓋得住頭超出來的高度**，
+     不然第一排的頭會壓在 team 標題上，後面每一排的頭會壓在上一排的名字上。
+     超出來的高度 = .cut 的 height 減掉 74px（見下面的 bottom），最多 106px。 */
+  gap:clamp(86px,9vw,118px) clamp(12px,1.4vw,20px);
+  padding-top:clamp(86px,9vw,118px)}
+.crew li{position:relative;border-radius:18px;text-align:center;min-height:158px;
+  padding:84px 12px 16px;
+  background:linear-gradient(180deg,rgba(255,196,108,.5) 0%,rgba(255,232,197,.72) 100%);
+  box-shadow:0 12px 30px rgba(16,42,134,.10)}
+/* 一高一低的錯落。**用 margin 不用 transform** ——
+   transform 會跟下面照片的 hover 打架（同一個屬性只會留最後一個）。 */
+.crew li:nth-child(even){margin-top:clamp(12px,1.6vw,22px)}
+
+/* 去背照片（背景透明）。**卡片不能 overflow:hidden**，超出來的頭要看得到。
+   max-width 是防呆：直式照片如果比例很極端，寬度不能吃掉旁邊那個人的名字。 */
+.crew .cut{position:absolute;left:50%;bottom:calc(100% - 74px);transform:translateX(-50%);
+  height:clamp(140px,13vw,180px);width:auto;max-width:132%;
+  filter:drop-shadow(0 10px 16px rgba(16,42,134,.18))}
+/* 一般大頭照（沒有去背）：圓的，一樣掛在卡片上緣之外。
+   ⚠ object-position 往上偏。大頭照多半是站著拍的，臉在畫面上半部，
+   置中裁切會把下巴切掉、額頭上方留一大片背景。 */
+.crew .por{position:absolute;left:50%;bottom:calc(100% - 74px);transform:translateX(-50%);
+  width:clamp(104px,10vw,130px);height:clamp(104px,10vw,130px);border-radius:50%;
+  object-fit:cover;object-position:center 28%;background:var(--paper);
+  border:4px solid var(--paper);box-shadow:0 10px 24px rgba(16,42,134,.16)}
 /* 沒有大頭照的人用名字第一個字。**不用灰色剪影** ——
    剪影看起來像「這個人不見了」，一個字看起來像「這個人在」。 */
-.faces .noface{display:grid;place-items:center;font-family:var(--display);
-  font-weight:700;font-size:28px;color:rgba(16,42,134,.55);
-  border:1px solid rgba(16,42,134,.14)}
-.faces .who{min-width:0}
-.faces b{display:block;font-size:16.5px;font-weight:600;line-height:1.25}
-.faces span{display:block;font-size:13.5px;line-height:1.45;
-  color:rgba(16,42,134,.8);margin-top:3px}
+.crew .noface{position:absolute;left:50%;bottom:calc(100% - 74px);transform:translateX(-50%);
+  width:clamp(104px,10vw,130px);height:clamp(104px,10vw,130px);border-radius:50%;
+  background:var(--paper);border:1px solid rgba(16,42,134,.14);
+  display:grid;place-items:center;font-family:var(--display);font-weight:700;
+  font-size:clamp(34px,3.4vw,44px);color:rgba(16,42,134,.5)}
+/* 滑過去的時候人往上抬一點、歪一點。這一頁要看起來是活的，不是一排證件照。
+   reduce 的人不會有（整頁的 transition 在上面被關掉了）。 */
+.crew .cut,.crew .por,.crew .noface{transition:transform .3s cubic-bezier(.2,.7,.3,1)}
+.crew li:hover .cut{transform:translateX(-50%) translateY(-9px) rotate(-1.6deg)}
+.crew li:hover .por,.crew li:hover .noface{transform:translateX(-50%) translateY(-7px)}
+
+.crew b{display:block;font-family:var(--display);font-weight:700;
+  font-size:clamp(17px,1.5vw,22px);line-height:1.14;color:var(--ink)}
+.crew .cname{display:block;font-family:var(--han);font-weight:900;font-size:14px;
+  line-height:1.25;margin-top:3px;color:rgba(16,42,134,.84)}
+.crew .role{display:block;font-size:12.5px;line-height:1.5;margin-top:7px;
+  color:rgba(16,42,134,.8)}
+
+@media (max-width:1180px){.crew{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:760px){.crew{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:430px){
+  .crew{grid-template-columns:1fr;gap:clamp(86px,22vw,110px) 0}
+  .crew li:nth-child(even){margin-top:0}
+}
 
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
@@ -347,7 +403,7 @@ summary{cursor:pointer}
   </div>
 </section>
 
-<section class="sec" hidden>
+<section class="sec sec-people" hidden>
   <div class="sec-in">
     <h2>這一屆的人</h2>
     <div class="body">
@@ -411,7 +467,7 @@ summary{cursor:pointer}
   </div>
 </section>
 
-<section class="sec" hidden>
+<section class="sec sec-people" hidden>
   <div class="sec-in">
     <h2>This year</h2>
     <div class="body">

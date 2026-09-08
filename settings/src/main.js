@@ -71,6 +71,18 @@ async function boot() {
 // 圖片壓縮。**自己的一份**（不 import passport/）。
 // 420px、品質 0.7 —— 跟護照那邊同一組數字，因為存的是同一欄。
 // 改這裡的話那邊也要改，不然同一個人的大頭照會因為從哪裡上傳而不一樣大。
+// 把選到的照片縮小、壓成一段 data URL 存進 profiles.avatar。
+//
+// ⚠ **有透明背景的照片不能存成 jpeg。** jpeg 沒有透明這回事，
+// 存下去透明的地方會變成黑色 —— 一張去背照上傳完會變成一個黑色方塊裡的人。
+// 這不是理論上的問題：/team/ 的「頭超出卡片」就是靠去背照做的，
+// 幹部拍完去背照第一件事就是從這裡上傳。
+//
+// 所以先看有沒有透明像素：
+//   有 → 存 webp（有透明、又比 png 小很多），瀏覽器不支援 webp 就退回 png。
+//   沒有 → 存 jpeg，跟以前一樣。
+// **圖檔格式本身就是「這是不是去背照」的標記**，不用多開一個資料庫欄位，
+// 也不用要求誰記得去勾一個框（見 team/src/ui.js 的 toPerson）。
 function compress(file, maxDim, quality) {
   return new Promise((res, rej) => {
     const fr = new FileReader();
@@ -80,17 +92,54 @@ function compress(file, maxDim, quality) {
       img.onerror = () => rej(new Error("decode"));
       img.onload = () => {
         let { width: w, height: h } = img;
-        const sc = Math.min(1, maxDim / Math.max(w, h));
+        // 去背照是直的、而且會被放到比大頭照大，所以留多一點解析度。
+        // 但要先畫過一次才知道有沒有透明，這裡先用原圖的比例判斷不了，
+        // 所以一律用比較大的那個上限畫，jpeg 那條路再縮回去。
+        const cap = Math.max(maxDim, CUT_MAX);
+        const sc = Math.min(1, cap / Math.max(w, h));
         w = Math.round(w * sc); h = Math.round(h * sc);
         const c = document.createElement("canvas");
         c.width = w; c.height = h;
-        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        if (hasAlpha(ctx, w, h)) {
+          const webp = c.toDataURL("image/webp", 0.82);
+          res(/^data:image\/webp/.test(webp) ? webp : c.toDataURL("image/png"));
+          return;
+        }
+        // 不透明：縮回一般大頭照的尺寸再存 jpeg。
+        const sc2 = Math.min(1, maxDim / Math.max(w, h));
+        if (sc2 < 1) {
+          const c2 = document.createElement("canvas");
+          c2.width = Math.round(w * sc2); c2.height = Math.round(h * sc2);
+          c2.getContext("2d").drawImage(c, 0, 0, c2.width, c2.height);
+          res(c2.toDataURL("image/jpeg", quality));
+          return;
+        }
         res(c.toDataURL("image/jpeg", quality));
       };
       img.src = fr.result;
     };
     fr.readAsDataURL(file);
   });
+}
+
+// 去背照的長邊上限。比大頭照大，因為它在 /team/ 上會被放到接近 200px 高，
+// 而那些螢幕多半是兩倍解析度。
+const CUT_MAX = 560;
+
+// 有沒有任何一個像素是半透明的。
+// **門檻用 250 不是 255**：有些去背工具的邊緣會留下 254 這種幾乎不透明的值，
+// 而且 jpeg 來源解碼出來一律是 255，不會誤判。
+function hasAlpha(ctx, w, h) {
+  try {
+    const d = ctx.getImageData(0, 0, w, h).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true;
+  } catch (e) {
+    // 讀不到像素（理論上不會，來源是 data URL 不會污染 canvas）就當作不透明。
+    return false;
+  }
+  return false;
 }
 
 const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : null; };
