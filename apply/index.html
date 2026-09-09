@@ -112,6 +112,28 @@ main,footer,.topbar{position:relative;z-index:1}
   font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px;white-space:nowrap;
   line-height:1;position:relative}
 .login:hover{background:var(--bt-orange);color:var(--bt-navy)}
+/* 頂欄那顆按鈕在窄螢幕上只講一種語言（2026-09-08）。
+   Paul 回報「選單跑掉了」：登入之後那顆按鈕的字從「登入 / Sign in」變成
+   「我的 BT 帳號 / Account」，加上 logo、語言鈕、選單鈕，在 390px 的手機上
+   總寬就超過頂欄。這幾個都是 white-space:nowrap，縮不下去，
+   於是排在最後的「選單」被擠到玻璃外面去（而且沒有任何東西會報錯）。
+
+   **修法不是把選單藏起來**，是讓那顆按鈕在窄螢幕上只顯示一半：
+   現在看的是中文就只留中文那半，英文就只留英文那半。
+   兩種讀者都還看得懂，寬螢幕上兩半照舊都在。
+   斜線那一格要一起藏 —— 不藏的話會變成「登入 /」。 */
+@media (max-width:560px){
+  .lg-sep{display:none}
+  html[data-lang="en"] .lg-a{display:none}
+  html[data-lang="zh"] .lg-b{display:none}
+  /* 只藏一半還不夠寬裕：實測 390px 的手機上，中文那半「我的 BT 帳號」
+     排完只剩 1px 餘裕，任何一個字級或間距改動都會再擠出去一次。
+     這三行把餘裕拉到十幾 px。logo 是等比例縮小（height 改、width:auto），
+     沒有改色、拉伸、旋轉或透明度，Brand Book 的硬規則沒有被碰到。 */
+  .topbar{gap:10px}
+  .topbar .home img{height:26px}
+  .login{padding:9px 13px;font-size:14px}
+}
 .burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;position:relative;
   padding:6px 8px;font-family:var(--display);font-size:14px;font-weight:700;letter-spacing:.1em}
 /* 可點區域 44x44，視覺大小不變。 */
@@ -314,7 +336,7 @@ summary{cursor:pointer}
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
-  <a class="login" href="../app/">登入 / Sign in</a>
+  <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
   <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
 </nav>
 
@@ -388,7 +410,8 @@ summary{cursor:pointer}
     for (var i = 0; loginBtn && i < localStorage.length; i++) {
       var k = localStorage.key(i);
       if (/^sb-.+-auth-token$/.test(k) && localStorage.getItem(k)) {
-        loginBtn.textContent = "我的 BT 帳號 / Account";
+        loginBtn.innerHTML = '<span class="lg-a">我的 BT 帳號</span>' +
+          '<span class="lg-sep"> / </span><span class="lg-b">Account</span>';
         break;
       }
     }

@@ -1385,7 +1385,11 @@ fi
 loginbad=""
 for f in $(printf '%s\n' index.html */index.html); do
   grep -q 'class="login"' "$f" || continue
-  grep -q '我的 BT 帳號 / Account' "$f" || loginbad="${loginbad} ${f}"
+  # 2026-09-08 起這串字被拆成三個 <span>（窄螢幕上只顯示一種語言，
+  # 見各頁 .lg-sep 那則註解），所以不能再找完整的「我的 BT 帳號 / Account」。
+  # 「我的 BT 帳號」這半仍然是連在一起的一段字，用它就夠了 ——
+  # 這條守門要抓的是「哪一頁整段忘了加」，不是措辭。
+  grep -q '我的 BT 帳號' "$f" || loginbad="${loginbad} ${f}"
 done
 if [ -n "$loginbad" ]; then
   bad "這些對外頁面有登入按鈕，但沒有「登入之後改成我的 BT 帳號」那一段：${loginbad}"
