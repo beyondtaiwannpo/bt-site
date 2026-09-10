@@ -21,6 +21,19 @@ const TEAM_SUB = {
 // 有人填「Curriculum Team」、有人填「curriculum team」。
 // **收斂在這裡做一次**，不然畫面上會出現三個只差一個字的分組，
 // 而那看起來像資料壞掉，不像有人打字不一樣。
+// profiles.team 存的是一串用逗號隔開的 team 名字（2026-09-10，一個人可以在好幾個）。
+// **同一份規則在 settings/src/ui.js 與另外兩個資料夾也各有一份**
+// （資料夾之間不互相 import）。test/teams.test.mjs 拿同一張輸入表比對三份。
+// 全形逗號與頓號也吃：那是中文輸入法打出來的，而使用者不會知道差別。
+export function parseTeams(raw) {
+  const out = [];
+  for (const part of String(raw || "").split(/[,、;；]/)) {
+    const t = part.trim().replace(/\s+/g, " ");
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
 // 有些 team 在 profiles 裡存的是全名，而這一頁的清單上用的是縮寫。
 // 「Community Relations Team」→「CR」目前是唯一一組。
 // ⚠ **用別名表，不要去把兩邊改成同一個字。** 改名的話，
@@ -52,7 +65,10 @@ export function toPerson(row) {
     zh: row.name_zh || "",
     en: row.name_en || "",
     name: row.name_zh || row.name_en || "",
-    team: teamKey(row.team),
+    // 一個人可以在好幾個 team，所以這裡是一個陣列。
+    // 兩個 team 收斂完撞在一起（例如「CR」與「Community Relations Team」）
+    // 只留一個 —— 不然那個人會在同一組裡出現兩次。
+    teams: [...new Set(parseTeams(row.team).map(teamKey))],
     title: row.public_title || "",
     avatar,
     cut: !!avatar && !/^data:image\/jpe?g/i.test(avatar),
@@ -63,8 +79,13 @@ export function toPerson(row) {
 export function byTeam(people) {
   const map = new Map();
   for (const p of people) {
-    if (!map.has(p.team)) map.set(p.team, []);
-    map.get(p.team).push(p);
+    // 在好幾個 team 的人，每一組都會出現一次。那是刻意的：
+    // 這一頁回答的是「這個 team 有誰」，不是「這個人在哪裡」。
+    // 一個 team 都沒填的人歸到最後那一組（key 是空字串）。
+    for (const t of (p.teams && p.teams.length ? p.teams : [""])) {
+      if (!map.has(t)) map.set(t, []);
+      map.get(t).push(p);
+    }
   }
   const known = TEAM_ORDER.filter(t => map.has(t));
   const rest = [...map.keys()].filter(t => t && !TEAM_ORDER.includes(t)).sort();

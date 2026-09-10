@@ -83,6 +83,19 @@ export function tzSetupHTML(guess, q, results, msg) {
 
 // ── 團隊看板 ────────────────────────────────────────────────────────
 // counts: Map("dayIndex:minute" → [memberId]）；viewerTz 只用來顯示欄位標題。
+// profiles.team 存的是一串用逗號隔開的 team 名字（2026-09-10，一個人可以在好幾個）。
+// **同一份規則在 settings/src/ui.js 與另外兩個資料夾也各有一份**
+// （資料夾之間不互相 import）。test/teams.test.mjs 拿同一張輸入表比對三份。
+// 全形逗號與頓號也吃：那是中文輸入法打出來的，而使用者不會知道差別。
+export function parseTeams(raw) {
+  const out = [];
+  for (const part of String(raw || "").split(/[,、;；]/)) {
+    const t = part.trim().replace(/\s+/g, " ");
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
 // ── team 篩選（2026-09-10）──────────────────────────────────────────
 // Paul：「團隊看板那邊選一個 team 就可以只看到這個 team 的所有人」。
 //
@@ -97,8 +110,8 @@ export function tzSetupHTML(guess, q, results, msg) {
 export function teamsOf(members) {
   const seen = [];
   for (const m of members || []) {
-    const t = String(m.team || "").trim();
-    if (t && !seen.includes(t)) seen.push(t);
+    // 一個人可以在好幾個 team，每一個都要出現在選項裡。
+    for (const t of parseTeams(m.team)) if (!seen.includes(t)) seen.push(t);
   }
   return seen.sort((a, b) => a.localeCompare(b, "en"));
 }
@@ -107,7 +120,7 @@ export function teamsOf(members) {
 // 空白畫面看起來是壞掉，不是「這個 team 沒有人」。
 export function filterByTeam(members, team) {
   if (!team) return members;
-  const hit = (members || []).filter(m => String(m.team || "").trim() === team);
+  const hit = (members || []).filter(m => parseTeams(m.team).includes(team));
   return hit.length ? hit : members;
 }
 

@@ -617,6 +617,30 @@ export function introHTML() {
   </div>`;
 }
 
+// 一個人在畫面上要顯示的兩個名字（2026-09-10）。
+// Paul：「上面都是中文名不知道是誰」。幹部分布七個國家，很多人平常只用英文名
+// 互相稱呼；牆上只有中文名的話，看的人認不出那是誰。
+//
+// **同一份規則在 availability/src/data.js 與 admin/src/ui.js 也各有一份**
+// （資料夾之間不互相 import，跟每個資料夾各有一份 esc() 同一條規矩）。
+// 三份漂移的表現是「同一個人在三個地方顯示的名字不一樣」，不會報錯。
+// test/names.test.mjs 拿同一張輸入表逐項比對三份。
+export function namesOf(p) {
+  const zh = String(p.name_zh || "").trim();
+  const en = String(p.name_en || "").trim();
+  return {
+    name: zh || en || "（沒有名字）",
+    // 兩欄填了同一個字的人不重複顯示；只有一個名字的人也沒有第二個。
+    alt: zh && en && zh !== en ? en : "",
+  };
+}
+
+// 一行放得下的地方才用這個（牆上一人一格、動態一人一行，都放得下）。
+function nameHTML(p) {
+  const n = namesOf(p);
+  return esc(n.name) + (n.alt ? `<span class="alt">${esc(n.alt)}</span>` : "");
+}
+
 export function wallHTML(S) {
   if (S.wallLoading) return `<div class="wall"><div class="empty">正在讀取全體進度…</div></div>`;
   // 讀失敗要說出來，而且要留一個按得到的重新整理鍵。少了這一段的話，main.js 的
@@ -631,7 +655,7 @@ export function wallHTML(S) {
   const people = (S.wall || []).map(p => Object.assign({}, p, { count: (p.stamps || []).length }))
     .sort((a, b) => b.count - a.count);
   const feed = [];
-  people.forEach(p => (p.stamps || []).forEach(s => feed.push({ who: p.name_zh || p.name_en, id: s.act_id, d: s.stamped_on })));
+  people.forEach(p => (p.stamps || []).forEach(s => feed.push({ who: p, id: s.act_id, d: s.stamped_on })));
   feed.sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : 0);
 
   return `<div class="wall">
@@ -647,7 +671,7 @@ export function wallHTML(S) {
           : "";
         return `<div class="person">
           ${av}
-          <b>${esc(p.name_zh || p.name_en)}</b>
+          <b>${nameHTML(p)}</b>
           <span class="team">${esc(p.team || "")}</span>
           <div class="track">${S.months.map(m => {
             const acts = S.activities.filter(a => a.month === m.month);
@@ -662,7 +686,7 @@ export function wallHTML(S) {
     ${feed.length ? `<div class="feed"><h3>最近蓋的章</h3>
       ${feed.slice(0, 20).map(f => {
         const a = S.activities.find(x => x.id === f.id);
-        return `<div class="fitem"><time>${esc(f.d)}</time><span><b>${esc(f.who)}</b> 蓋了 <b>${a ? esc(a.title_zh) : esc(f.id)}</b></span></div>`;
+        return `<div class="fitem"><time>${esc(f.d)}</time><span><b>${nameHTML(f.who)}</b> 蓋了 <b>${a ? esc(a.title_zh) : esc(f.id)}</b></span></div>`;
       }).join("")}</div>` : ""}
     <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
   </div>`;
@@ -697,7 +721,17 @@ export function setupHTML(p, user) {
     <div class="sub">${p.id ? "改完按儲存，章不會消失。" : "一年 33 格，每個月三個。蓋滿的人，年底會有一整本回憶。"}</div>
     <label><i>中文名 / Name</i><input id="fz" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>
     <label><i>英文名 / Name in English（會印在機讀碼上）</i><input id="fe" value="${esc(p.name_en || "")}" placeholder="Ming Wang" maxlength="30"></label>
-    <label><i>所屬團隊 / Team</i><select id="ft">${TEAMS.map(t => `<option ${p.team === t ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+    <!-- ⚠ **本來就存在、但不在 TEAMS 裡的值要原樣留著當一個選項，而且是選起來的。**
+         2026-09-10 起一個人可以在好幾個 team（存成「A Team, B Team」這種逗號字串，
+         在 /settings/ 用勾的）。這個 select 只選得了一個，
+         少了下面那個 extra，那種人一按儲存就會被悄悄改成清單的第一個 ——
+         而他不會發現，因為畫面上顯示的本來就是那一個。
+         **這一頁刻意不做複選**：要選好幾個到設定頁，那裡才是改資料的地方。 -->
+    <label><i>所屬團隊 / Team</i><select id="ft">${
+      TEAMS.map(t => `<option ${p.team === t ? "selected" : ""}>${t}</option>`).join("")
+    }${p.team && !TEAMS.includes(p.team)
+      ? `<option selected>${esc(p.team)}</option>` : ""}</select>
+      <span class="fnote">要選好幾個 team 的話到<a href="../settings/">設定</a>。</span></label>
     <label><i>護照上的一句話 / Your line（選填）</i><textarea id="fm" maxlength="60" placeholder="你無法選擇你從未看見的東西。">${esc(p.motto || "")}</textarea></label>
     <div class="wnote" style="margin:0 0 16px">送出後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
     <div class="row">

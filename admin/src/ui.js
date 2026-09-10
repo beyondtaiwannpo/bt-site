@@ -2,6 +2,19 @@
 //（跟 app/ 與 availability/ 同一條規矩：資料夾之間不互相依賴）。
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// 一個人在畫面上要顯示的兩個名字（2026-09-10）。**同一份規則在
+// passport/src/ui.js 與 availability/src/data.js 也各有一份**
+// （資料夾之間不互相 import）。三份漂移的表現是「同一個人在三個地方顯示的名字
+// 不一樣」，不會報錯。test/names.test.mjs 拿同一張輸入表逐項比對三份。
+export function namesOf(p) {
+  const zh = String(p.name_zh || "").trim();
+  const en = String(p.name_en || "").trim();
+  return {
+    name: zh || en || "（沒有名字）",
+    alt: zh && en && zh !== en ? en : "",
+  };
+}
+
 export const TYPES = [
   { v: "short",  label: "短答",  hint: "一行字。姓名、學校、連結。" },
   { v: "long",   label: "長答",  hint: "一段字。「你為什麼想申請」那一類。" },
@@ -384,14 +397,14 @@ export function publicTeamHTML(people, msg, busy) {
       2. <b>隱私政策改了嗎。</b>現在的政策只說大頭照顯示在進度牆上，
          對外公開是新用途。名字撤得下來，照片被搜尋引擎存過撤不乾淨。</div>
     ${people.length ? `<ul class="flist">${people.map(p => {
-      const name = p.name_zh || p.name_en || "（沒有名字）";
+      const { name, alt } = namesOf(p);
       return `<li>
         <div class="arow">
           <label class="apick"><input type="checkbox" data-act="approve" data-id="${esc(p.id)}"
             ${p.public_approved ? "checked" : ""}${busy ? " disabled" : ""}
             aria-label="核可 ${esc(name)}"></label>
           <div class="abody">
-            <div class="fhead"><b>${esc(name)}</b>
+            <div class="fhead"><b>${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}</b>
               ${p.public_approved ? `<span class="tag open">在公開頁面上</span>`
                                   : `<span class="tag">還沒核可</span>`}</div>
             <div class="fmeta">${esc([p.public_title, p.team].filter(Boolean).join("・") || "沒有填 team")}

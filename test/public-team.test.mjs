@@ -209,3 +209,25 @@ test("★ 只有 Co-President 看得到「團隊頁」這個分頁", () => {
   assert.doesNotMatch(tabsHTML("forms", false), /data-t="team"/);
   assert.match(tabsHTML("forms", true), /data-t="team"/);
 });
+
+// ── 一個人可以在好幾個 team（Paul 2026-09-10）──────────────────────
+// profiles.team 存的是「A Team, B Team」這種逗號字串（沒有為此開新欄位）。
+test("★ 在兩個 team 的人，兩組都會出現", () => {
+  const h = peopleHTML([P({ name_en: "Both", team: "Curriculum Team, Marketing Team" })], "zh");
+  const groups = [...h.matchAll(/<h3>([^<]+)<\/h3>/g)].map(m => m[1]);
+  assert.deepEqual(groups, ["Curriculum", "Marketing"]);
+  assert.equal((h.match(/Both/g) || []).length, 2, "兩組各出現一次");
+});
+
+// ⚠ 兩個寫法收斂完撞在一起的時候只能算一次，不然那個人會在同一組裡出現兩次。
+test("★ 「CR, Community Relations Team」收斂完是同一組，只出現一次", () => {
+  const h = peopleHTML([P({ name_en: "Solo", team: "CR, Community Relations Team" })], "zh");
+  assert.deepEqual([...h.matchAll(/<h3>([^<]+)<\/h3>/g)].map(m => m[1]), ["CR"]);
+  assert.equal((h.match(/Solo/g) || []).length, 1);
+});
+
+test("一個 team 都沒填的人歸到最後那一組，不會消失", () => {
+  const h = peopleHTML([P({ name_en: "Nobody", team: "" })], "zh");
+  assert.match(h, /Nobody/);
+  assert.match(h, /還有這些人/);
+});

@@ -144,6 +144,14 @@ function hasAlpha(ctx, w, h) {
 
 const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : null; };
 
+// 勾起來的 team 收成一個逗號字串（2026-09-10，一個人可以在好幾個 team）。
+// 一個都沒勾的話回空字串，上面會轉成 null —— **不要回一個逗號**，
+// 那會讓那個人在畫面上多出一個沒有名字的 team。
+function pickedTeams() {
+  const boxes = document.querySelectorAll('input[name="team"]:checked');
+  return [...boxes].map(b => b.value.trim()).filter(Boolean).join(", ");
+}
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -195,7 +203,7 @@ document.addEventListener("click", async e => {
       patch = {
         name_zh: val("nzh") || null,
         name_en: val("nen") || null,
-        team: val("team") || null,
+        team: pickedTeams() || null,
         public_profile: !!(document.getElementById("pub") || {}).checked,
         public_title: document.getElementById("ptitle") ? (val("ptitle") || null) : S.me.public_title,
       };

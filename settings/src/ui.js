@@ -21,23 +21,50 @@ export const GRADES = ["高一", "高二", "高三", "已畢業", "其他"];
 export const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
                       "Sponsorship Team", "Internship Team", "Community Relations Team"];
 
-// 所屬 team 從自由文字改成選單（2026-09-10）。
-// Paul 要在時間看板上依 team 篩選，而**自由文字篩不動**：
-// 有人打「Curriculum」、有人打「Curriculum Team」、有人打小寫，
-// 篩選就會變成三個只差一個字的選項，看起來像資料壞掉。
+// profiles.team 存的是一串用逗號隔開的 team 名字，例如
+// 「Curriculum Team, Marketing Team」。一個人可以在好幾個 team（Paul 2026-09-10）。
 //
-// ⚠ **本來就存在、但不在清單裡的值要原樣留著當一個選項。**
-// 直接換成選單的話，那個人一按儲存，他的 team 就被悄悄改成清單的第一個，
-// 而他不會發現（畫面上本來顯示的就是那一個）。
+// **沒有為了這件事開新欄位或跑 migration。** 一個逗號字串在這個規模底下夠用，
+// 而多開一欄要動的是：資料表結構、給 anon 的欄位授權、check.sh 的可寫欄位清單、
+// 以及每一個讀 team 的地方 —— 換來的好處在三十個人的名單上是零。
+//
+// **同一份規則在 team/src/ui.js 與 availability/src/ui.js 也各有一份**
+// （資料夾之間不互相 import）。test/teams.test.mjs 拿同一張輸入表比對三份。
+// 全形逗號與頓號也吃：那是中文輸入法打出來的，而使用者不會知道差別。
+export function parseTeams(raw) {
+  const out = [];
+  for (const part of String(raw || "").split(/[,、;；]/)) {
+    const t = part.trim().replace(/\s+/g, " ");
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
+export function formatTeams(list) {
+  return parseTeams((list || []).join(",")).join(", ");
+}
+
+// 所屬 team 從自由文字改成勾選（2026-09-10）。
+// 自由文字**篩不動**：有人打「Curriculum」、有人打「Curriculum Team」、
+// 有人打小寫，時間看板的 team 篩選就會變成三個只差一個字的選項，
+// 看起來像資料壞掉。
+//
+// ⚠ **本來就存在、但不在清單裡的值要原樣留著，而且是勾起來的。**
+// 直接換成固定的六個勾的話，那個人一按儲存，他填的東西就消失了，
+// 而他不會發現 —— 畫面上本來就沒有那一格。
 export function teamPickHTML(cur) {
-  const now = String(cur || "");
-  const extra = now && !TEAMS.includes(now)
-    ? `<option value="${esc(now)}" selected>${esc(now)}（原本填的）</option>` : "";
-  return `<label><i>所屬 team</i><select id="team">
-    <option value=""${now ? "" : " selected"}>還沒選</option>
-    ${TEAMS.map(t => `<option${now === t ? " selected" : ""}>${esc(t)}</option>`).join("")}
-    ${extra}
-  </select></label>`;
+  const picked = parseTeams(cur);
+  const extra = picked.filter(t => !TEAMS.includes(t));
+  const box = (t, label) => `<label class="check tpick">
+    <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}>
+    <span>${esc(label)}</span></label>`;
+  return `<fieldset class="teams">
+    <legend>所屬 team（可以選好幾個）</legend>
+    <div class="tgrid">
+      ${TEAMS.map(t => box(t, t.replace(/\s*Team$/i, ""))).join("")}
+      ${extra.map(t => box(t, t + "（原本填的）")).join("")}
+    </div>
+  </fieldset>`;
 }
 
 export function settingsHTML(me, msg, busy) {
@@ -72,8 +99,13 @@ export function settingsHTML(me, msg, busy) {
 
     ${cadre ? avatarHTML(me) : ""}
 
-    <div class="row">
+    <!-- 2026-09-10：儲存列。Paul 的原話：「下面的存起來現在看起來不像整頁的儲存按鈕，
+         比較像大頭照那邊的」——他是對的，它原本就緊貼在大頭照那一塊底下，
+         看起來像那一區的按鈕。現在它自己是一條橫跨整張卡片的列，
+         上面一條線把它跟上面的內容分開，旁邊一句話說清楚它存的是整頁。 -->
+    <div class="saverow">
       <button class="btn" data-act="save" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存起來"}</button>
+      <span class="savenote">這一頁上面的變更會一起存起來。</span>
     </div>
 
     ${cadre ? `<h3 class="sec-h">護照</h3>

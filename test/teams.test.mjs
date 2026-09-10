@@ -7,8 +7,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TEAMS as PASSPORT_TEAMS } from "../passport/src/ui.js";
-import { TEAMS as SETTINGS_TEAMS, teamPickHTML } from "../settings/src/ui.js";
-import { TEAM_ORDER, teamKey } from "../team/src/ui.js";
+import { TEAMS as SETTINGS_TEAMS, teamPickHTML, formatTeams,
+         parseTeams as settingsParse } from "../settings/src/ui.js";
+import { TEAM_ORDER, teamKey, parseTeams as teamParse } from "../team/src/ui.js";
+import { parseTeams as avParse } from "../availability/src/ui.js";
 
 test("★ 護照與設定頁的 team 清單逐字一樣", () => {
   assert.deepEqual(SETTINGS_TEAMS, PASSPORT_TEAMS,
@@ -31,17 +33,54 @@ test("★ Community Relations Team 要對到 CR，不是自成一組", () => {
   assert.equal(teamKey("Community Relations"), "CR");
 });
 
-// ⚠ 換成選單之後最容易寫出來的 bug：本來就存在、但不在清單裡的值
-// 被悄悄換成清單的第一個。那個人不會發現，因為畫面上顯示的本來就是那一個。
-test("★ 本來填的 team 不在清單裡時，原樣留著當一個選項", () => {
+// ⚠ 換成勾選之後最容易寫出來的 bug：本來就存在、但不在清單裡的值消失了。
+// 那個人不會發現 —— 畫面上本來就沒有那一格。
+test("★ 本來填的 team 不在清單裡時，原樣留著而且是勾起來的", () => {
   const h = teamPickHTML("President's Office");
-  assert.ok(h.includes("President&#39;s Office"), "原本填的值不見了");
-  assert.match(h, /President&#39;s Office（原本填的）<\/option>/);
-  assert.match(h, /value="President&#39;s Office" selected/);
+  assert.match(h, /value="President&#39;s Office" checked/, "原本填的值不見了");
+  assert.match(h, /President&#39;s Office（原本填的）/);
 });
 
-test("清單裡的值會被選起來；沒填過的人停在「還沒選」", () => {
-  assert.match(teamPickHTML("Marketing Team"), /<option selected>Marketing Team<\/option>/);
-  assert.match(teamPickHTML(""), /<option value="" selected>還沒選<\/option>/);
-  assert.match(teamPickHTML(null), /<option value="" selected>還沒選<\/option>/);
+test("清單裡的值會被勾起來，沒填過的人一個都沒勾", () => {
+  const on = teamPickHTML("Marketing Team");
+  assert.match(on, /value="Marketing Team" checked/);
+  assert.doesNotMatch(on, /value="Curriculum Team" checked/);
+  assert.doesNotMatch(teamPickHTML(""), /checked/);
+  assert.doesNotMatch(teamPickHTML(null), /checked/);
+});
+
+// ── 一個人可以在好幾個 team（Paul 2026-09-10）──────────────────────
+test("★ 好幾個 team 的人，每一個都勾起來", () => {
+  const h = teamPickHTML("Curriculum Team, Marketing Team");
+  assert.match(h, /value="Curriculum Team" checked/);
+  assert.match(h, /value="Marketing Team" checked/);
+  assert.doesNotMatch(h, /value="Mentorship Team" checked/);
+});
+
+// parseTeams 這條規則在三個資料夾各有一份，這裡拿同一張表比對。
+// 漂移的表現是「同一個人在時間看板上屬於兩個 team，在對外團隊頁上只屬於一個」。
+const PARSERS = [["settings", settingsParse], ["team", teamParse], ["availability", avParse]];
+const PARSE_CASES = [
+  ["Curriculum Team, Marketing Team", ["Curriculum Team", "Marketing Team"]],
+  ["Curriculum Team,Marketing Team",  ["Curriculum Team", "Marketing Team"]],
+  // 全形逗號與頓號是中文輸入法打出來的，使用者不會知道差別。
+  ["A、B；C",                          ["A", "B", "C"]],
+  ["  A  Team ,  , B ",               ["A Team", "B"]],
+  ["A, A",                            ["A"]],
+  ["",                                []],
+  [null,                              []],
+  [undefined,                         []],
+];
+for (const [label, fn] of PARSERS) {
+  test(`★ ${label} 的 parseTeams 跟另外兩份講一樣的話`, () => {
+    for (const [input, want] of PARSE_CASES) {
+      assert.deepEqual(fn(input), want, `${label}：${JSON.stringify(input)}`);
+    }
+  });
+}
+
+test("★ 一個都沒勾的時候不能存成一個逗號", () => {
+  assert.equal(formatTeams([]), "");
+  assert.equal(formatTeams(["Curriculum Team"]), "Curriculum Team");
+  assert.equal(formatTeams(["A", "", "B", "A"]), "A, B", "空的與重複的要去掉");
 });

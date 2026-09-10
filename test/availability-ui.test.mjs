@@ -289,3 +289,14 @@ test("team 的名字會跳脫", () => {
   assert.ok(!h.includes("<img src=x"));
   assert.match(h, /&lt;img/);
 });
+
+// 一個人可以在好幾個 team（Paul 2026-09-10）。
+const MULTI = [
+  { id: "m", name: "多", alt: "", team: "Curriculum Team, Marketing Team", tz: "Asia/Taipei", updatedAt: null },
+  { id: "s", name: "單", alt: "", team: "Marketing Team", tz: "Asia/Taipei", updatedAt: null },
+];
+test("★ 在兩個 team 的人，兩個 team 的選項都有，篩哪一邊都找得到他", () => {
+  assert.deepEqual(teamsOf(MULTI), ["Curriculum Team", "Marketing Team"]);
+  assert.deepEqual(filterByTeam(MULTI, "Curriculum Team").map(m => m.id), ["m"]);
+  assert.deepEqual(filterByTeam(MULTI, "Marketing Team").map(m => m.id), ["m", "s"]);
+});

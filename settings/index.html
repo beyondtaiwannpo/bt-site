@@ -94,6 +94,15 @@
     background:rgba(255,255,255,.7)}
   select:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px;border-color:transparent}
   /* ⚠ input{width:100%} 會把打勾的方框拉成滿版的一條。改上面那條規則前先想到這一格。 */
+  /* 所屬 team 的複選（2026-09-10）。一個人可以在好幾個 team。
+     用 fieldset/legend 而不是一個 <i> 標籤：讀螢幕的人聽到的會是
+     「所屬 team，可以選好幾個，六個項目」，而不是六個沒有上下文的勾。 */
+  .teams{border:0;margin:0 0 16px;padding:0;min-width:0}
+  .teams legend{padding:0;font-size:12px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:rgba(16,42,134,.78);margin-bottom:8px}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));
+    gap:2px 14px}
+  .tgrid .check{margin:0}
   .check{display:flex;gap:11px;align-items:flex-start;margin:0 0 14px;padding:4px 0;
     font-size:14.5px;line-height:1.6;cursor:pointer}
   .check input[type="checkbox"]{width:19px;height:19px;flex:none;margin:2px 0 0;
@@ -111,6 +120,22 @@
 
   .two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
   @media (max-width:560px){ .two{grid-template-columns:1fr} .avrow{flex-wrap:wrap} }
+  /* 整頁的儲存列（2026-09-10）。橫跨整張卡片、上面一條線，
+     跟上面那幾個區塊分開 —— 它存的是整頁，不是它正上方那一區。
+
+     **黏在畫面底部**：這一頁在手機上要捲兩三屏，改完上面的名字之後
+     按鈕在很下面，而使用者不會知道自己還沒存。黏著就一直看得到。
+     ⚠ z-index 一定要有。它底下是一般文字（z-index:auto），
+     但**只要哪天上面多一個有 z-index 的東西（例如黏住的區塊標題），
+     沒有 z-index 的它就會被畫在下面**，跟 HTML 順序無關
+     —— 時間看板 2026-09-08 就是這樣壞的。
+     左右的負 margin 是為了讓那條線碰到卡片邊緣（卡片內距 22px）。 */
+  .saverow{position:sticky;bottom:0;z-index:3;
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    margin:24px -22px 0;padding:14px 22px 12px;
+    background:var(--paper);border-top:1px solid rgba(16,42,134,.18)}
+  .savenote{font-size:13px;color:rgba(16,42,134,.7)}
+  @media (max-width:560px){ .savenote{font-size:12.5px} }
   .danger{margin-top:30px;border-top:1px solid rgba(16,42,134,.14);padding-top:18px}
 /* 開了「減少動態效果」就把所有動畫與過渡關掉。
    **這是無障礙需求不是視覺偏好**（2026-08-25 裁定），check-motion.mjs 守著。
