@@ -56,6 +56,28 @@ export function navHTML({ current, role, name }) {
          點 logo 回到一頁只有表單的地方沒有意義。
          Paul 的原話：「按首頁會回到最外面」。 -->
     <a class="btnav-logo" href="/" aria-label="回 Beyond Taiwan 首頁"><img src="/shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
+    <!-- 窄螢幕上這幾個功能項收成一顆「選單」。
+         **開合是純 CSS**：一個看不見的 checkbox 加一個 label，
+         用 :checked 的兄弟選擇器把面板打開。
+
+         ⚠ 這一段註解在一個樣板字串（template literal）裡面，
+         所以**不要用反引號括程式碼**，那會把字串提早結束掉，
+         而錯誤訊息是離這裡很遠的一句 Unexpected token。2026-09-10 踩過。
+
+         ⚠ **不要「改良」成 <details>。** 試過了：<details> 在還沒展開的時候
+         會把 summary 以外的小孩整個藏起來，而那不是一條可以用 CSS 蓋掉的規則
+         （瀏覽器是用內部的 slot 做的）。結果是**寬螢幕上四個功能項整排消失**，
+         而且不會報錯 —— 2026-09-10 截圖才發現。
+
+         ⚠ **也不要改成用 JavaScript。** 那段程式要嘛塞進四個頁面的 main.js
+         （四份會各自壞掉、而且下一個做新功能的人一定會漏掉），
+         要嘛讓這個檔案在被 import 的時候偷偷掛一個全域監聽（副作用）。
+         checkbox 兩者都不用。
+
+         checkbox 是看得見的（只是被移到畫面外），所以鍵盤 tab 得到、
+         讀螢幕唸得出「展開選單」。 -->
+    <input class="btnav-toggle" type="checkbox" id="btnav-toggle" aria-label="展開選單">
+    <label class="btnav-burger" for="btnav-toggle">選單</label>
     <div class="btnav-items">${items}</div>
     <span class="btnav-sp"></span>
     ${n ? `<span class="btnav-who" title="${esc(n)}"><span class="full">${esc(n)}</span><span class="short">${esc([...n][0])}</span></span>` : ""}

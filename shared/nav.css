@@ -64,38 +64,69 @@
 .btnav-logo::after,.btnav-out::after{
   content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
 .btnav :focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
-/* ── 窄螢幕：頂欄換成兩排（2026-09-10）──────────────────────────────
-   Paul 回報「手機版裡面也長這樣」，附圖上「設定」壓在「登出」上面。
+/* ── 選單（2026-09-10）────────────────────────────────────────────
+   寬螢幕上這兩個東西根本不存在，那排連結就是頂欄的一部分，跟以前一模一樣。 */
+.btnav-toggle,.btnav-burger{display:none}
 
-   原因是**功能項從兩個變成四個**（2026-09-08 加了申請管理與設定），
-   而這裡原本那組窄螢幕的數字是兩個項目的時候量的，門檻還停在 360px。
-   實測 390px 上最後一項會跑出容器 171px —— 而且**不會有橫向捲軸**，
-   外面有東西把它切掉，所以桌機上、甚至捲動測試上都看不出來。
+/* ── 窄螢幕：四個功能項收進「選單」──────────────────────────────────
+   四個中文功能項在 390px 上一排放不下（實測最後一項跑出去 171px）。
+   第一版改成換行兩排，Paul 的原話：「這樣太醜了啦」——他是對的，
+   那讓一條藥丸變成一塊高高的東西，而上面那排右邊還空一大塊。
 
-   修法是換行：logo、名字、登出留在第一排，四個功能項自己一排。
-   **不要改成讓那一排自己左右捲** —— 使用者不會知道右邊還有東西，
-   而那正是「看不到的功能等於沒做」那一類的失敗。
-   代價是頂欄在手機上高一點，那是值得的。
-
-   ⚠ 之後再加一個功能項，這裡要再量一次：
-   `node scripts/check-mobile.mjs`（它會真的把視寬設成 390 與 360）。
-   headless Chrome 用 --window-size 量不到 390，最小是 500。 */
+   現在收進一顆「選單」，跟**對外頁面的頂欄同一個手勢**：
+   使用者在同一個網站不用學兩種操作。
+   代價是多點一下，換來的是頂欄在手機上仍然是一條藥丸。 */
 @media (max-width:700px){
-  .btnav{flex-wrap:wrap;row-gap:2px;padding:8px 10px}
-  .btnav-logo{order:1}
-  .btnav-sp{order:2}
-  .btnav-who{order:3}
-  .btnav-out{order:4}
-  /* 第二排：四項平均攤開，兩端貼齊玻璃的內緣。 */
-  .btnav-items{order:5;width:100%;justify-content:space-between;gap:2px}
-  .btnav-items a{font-size:15px;padding:6px 5px}
+  /* ⚠ **不要在這裡寫 position:relative。** .btnav 本來是 sticky，
+     而 sticky 已經是「定位過的」，下面那張面板的 absolute 本來就會以它為準。
+     寫了 relative 會把 sticky 蓋掉，手機上頂欄就不再跟著捲 —— 而那不會報錯。 */
+  .btnav{gap:10px;padding:7px 8px 7px 12px}
+  .btnav-logo img{height:22px}
+  .btnav-burger{
+    display:block;cursor:pointer;
+    font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:.08em;
+    color:var(--ink);padding:7px 12px;border-radius:999px;
+    border:1px solid rgba(16,42,134,.3);position:relative;white-space:nowrap;
+    /* 排到最右邊。<details> 是 display:contents，所以 summary 與那排連結
+       是頂欄的直接小孩，order 對它們有作用。 */
+    order:9}
+  .btnav-burger::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+  /* checkbox 本身要留在無障礙樹裡（鍵盤 tab 得到、讀螢幕唸得出來），
+     所以是移到畫面外，不是 display:none。 */
+  .btnav-toggle{display:block;position:absolute;width:1px;height:1px;
+    opacity:0;pointer-events:none;margin:0}
+  .btnav-toggle:checked ~ .btnav-burger{background:var(--bt-navy);color:var(--bt-cream);
+    border-color:var(--bt-navy)}
+  .btnav-toggle:focus-visible ~ .btnav-burger{outline:2px solid var(--bt-navy);outline-offset:3px}
+  /* 收起來是預設；打勾才展開。 */
+  .btnav-items{display:none}
+  .btnav-toggle:checked ~ .btnav-items{display:flex}
+  /* 展開的面板。
+     ⚠ **這一張是實色的，不是玻璃，而且不要「改回去」用 backdrop-filter。**
+     2026-09-10 實測：頂欄本身有 backdrop-filter，而在一個有 backdrop-filter
+     的元素裡面再放一個有 backdrop-filter 的面板，**底下的內容會透出來，
+     透的程度跟你寫的 alpha 對不起來** —— 背景寫到 rgba(...,.99) 了，
+     畫面上底下那張卡片的標題與 email 還是讀得出來。
+     換成實色底（var(--bt-cream) 那一層）之後就乾淨了。
+     面板是拿來讀的，讀不到就是壞的，玻璃在這裡不值那個代價。
+     白色那層漸層只是上緣的一道光，它蓋在實色上面，不影響不透明度。 */
+  .btnav-items{
+    position:absolute;left:0;right:0;top:calc(100% + 8px);
+    flex-direction:column;align-items:stretch;gap:0;padding:6px;border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,0) 55%),
+               var(--bt-cream);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 14px 34px rgba(16,42,134,.14)}
+  /* 面板裡一項一行，整行可點（44px 高），當前那一項底色標起來 ——
+     底線在一行一行的清單裡看不出來。 */
+  .btnav-items a{opacity:1;padding:12px 14px;border-bottom:0;border-radius:14px;font-size:17px}
+  .btnav-items a[aria-current]{background:rgba(255,196,108,.34)}
 }
 /* 更窄：名字只留第一個字，項目再縮一級。
    ⚠ 這一段在上面那段**後面**，所以同樣特異性的規則以這裡為準。
    font-size 要比上面小，不要比上面大（2026-09-10 之前這裡寫的是 16px，
    比 700px 那一段的 15px 還大，等於愈窄字愈大）。 */
 @media (max-width:360px){
-  .btnav{gap:8px;padding:8px 8px}
+  .btnav{gap:8px;padding:7px 8px}
   .btnav-who .full{display:none}.btnav-who .short{display:inline}
-  .btnav-items a{font-size:14px;padding:6px 3px}
 }

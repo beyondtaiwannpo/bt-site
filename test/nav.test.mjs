@@ -92,3 +92,38 @@ test("shared/ 不 import 任何功能資料夾", () => {
     assert.ok(!/^\s*import .*\/(passport|availability|app)\//m.test(src), `${f} import 了功能資料夾`);
   }
 });
+
+// ── 窄螢幕的「選單」（2026-09-10）──────────────────────────────────
+// 四個功能項在 390px 上一排放不下，所以窄螢幕收成一顆選單。
+// 開合是純 CSS：一個看不見的 checkbox 加一個 label。
+test("★ 選單的開關是 checkbox 加 label，而且 for 對得上 id", () => {
+  const h = navHTML({ current: "settings", role: "cadre", name: "王平" });
+  const id = (h.match(/<input class="btnav-toggle"[^>]*id="([^"]+)"/) || [])[1];
+  assert.ok(id, "沒有那個開關的 checkbox");
+  assert.ok(h.includes(`<label class="btnav-burger" for="${id}"`),
+    "label 的 for 沒有對到 checkbox 的 id —— 點下去不會有反應，而且不會報錯");
+  assert.match(h, /aria-label="展開選單"/, "讀螢幕的人聽不出那顆是什麼");
+});
+
+// ⚠ 這一條擋的是一個看起來像改良的改動。<details> 在還沒展開的時候
+// 會把 summary 以外的小孩整個藏起來，而那不是能用 CSS 蓋掉的規則
+// （瀏覽器用內部的 slot 做）。改過去的話**寬螢幕上四個功能項整排消失**，
+// 而且不會報錯 —— 2026-09-10 是靠截圖才發現的。
+test("★ 不准改用 <details> 做那顆選單", () => {
+  // ⚠ 要先把 HTML 註解剝掉再看。navHTML 裡那段註解本身就寫著這個標籤名
+  //（它在解釋為什麼不能用），不剝的話這條測試會抓到那段解釋自己。
+  const h = navHTML({ current: null, role: "cadre", name: "" })
+    .replace(/<!--[\s\S]*?-->/g, "");
+  assert.doesNotMatch(h, /<details/, "改成 details 的話寬螢幕上功能項會整排不見");
+  assert.doesNotMatch(h, /<summary/);
+});
+
+// 面板與那排連結是同一個 div，不是兩份。兩份的話寬螢幕改了一邊、
+// 窄螢幕還是舊的，而且沒有東西會報錯。
+test("★ 功能項只有一份，不是寬窄各一份", () => {
+  const h = navHTML({ current: "passport", role: "cadre", name: "王平" });
+  assert.equal((h.match(/class="btnav-items"/g) || []).length, 1);
+  for (const f of FEATURES.filter(x => x.roles.includes("cadre")))
+    assert.equal((h.match(new RegExp(`href="${f.href}"`, "g")) || []).length, 1,
+      `${f.key} 出現了不只一次`);
+});
