@@ -2216,6 +2216,18 @@ label{display:block;margin-bottom:14px}
 高度靠 `min-height` 加 `inline-flex` 置中，**不要靠 padding 湊** ——
 用 padding 湊的話，哪天有人改字體或字級，兩顆又會不一樣高，而且不會報錯。
 
+### 最後那 2px：button 與 label 的預設不一樣
+
+兩顆一樣的藥丸鈕，一顆是 `<button>` 一顆是 `<label>`，
+而瀏覽器對它們的預設不同：**button 預設 `border-box`，label 預設 `content-box`**。
+同一個 `min-height:38px`，button 是連框線一起 38、label 是框線外再加 2 —— 差 2px。
+`line-height` 同理。
+
+四個頁面現在剛好都寫了 `*{box-sizing:border-box}`，所以在真的站上看不出來 ——
+**而「剛好」正是之後會壞掉的那種理由**。所以共用的那份樣式自己寫死
+`box-sizing:border-box` 與 `line-height:1`，不假設 host 頁面有鋪好地基。
+（驗證的時候要用一個**故意沒有**那條通用規則的頁面去量，不然量不到。）
+
 ### `check-mobile.mjs` 多了第三種檢查
 
 原本只看「跑出自己那一排」與「疊在一起」，而這個 bug **兩種都不是**：

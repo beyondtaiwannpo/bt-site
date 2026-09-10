@@ -78,11 +78,23 @@
 
    ⚠ **高度靠 min-height 加 inline-flex 置中，不要靠 padding 湊。**
    用 padding 湊的話，只要哪天有人改了字體或字級，兩顆又會不一樣高，
-   而且不會有任何東西報錯。 */
+   而且不會有任何東西報錯。
+
+   ⚠ **box-sizing 與 line-height 那兩行不要拿掉。**
+   一顆是 <button>、一顆是 <label>，而瀏覽器對它們的預設不一樣：
+   button 預設 border-box，label 預設 content-box，
+   於是同一個 min-height:38px，button 是連框線一起 38、label 是框線外再加 2 —— 差 2px。
+   line-height 同理：不寫死的話兩者對繼承來的行高（頁面上是 1.55）處理不同。
+   寫清楚之後，高度完全由 min-height 決定，兩顆一定一樣。
+
+   這跟上面那條 margin 歸零是同一課：**共用元件要自己把地基鋪好，
+   不可以假設 host 頁面有寫 `*{box-sizing:border-box}`。**
+   四個頁面現在剛好都有寫，所以在真的站上看不出這 2px ——
+   而「剛好」正是之後會壞掉的那種理由。 */
 .btnav-out,.btnav-burger{
   font-family:var(--body);font-size:14px;font-weight:600;letter-spacing:normal;
   color:var(--ink);background:none;border:1px solid rgba(16,42,134,.3);border-radius:999px;
-  padding:0 14px;min-height:38px;
+  box-sizing:border-box;padding:0 14px;min-height:38px;line-height:1;
   display:inline-flex;align-items:center;justify-content:center;
   cursor:pointer;flex:none;position:relative;white-space:nowrap;
   transition:background .15s,border-color .15s}
