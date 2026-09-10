@@ -1,7 +1,8 @@
 // 看板的畫面契約。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { noticeHTML, membersHTML, downHTML, COL_ORDER, DAY_ZH, hhmm } from "../availability/src/ui.js";
+import { noticeHTML, membersHTML, downHTML, COL_ORDER, DAY_ZH, hhmm,
+         teamsOf, filterByTeam, teamFilterHTML } from "../availability/src/ui.js";
 import { namesOf } from "../availability/src/data.js";
 
 // ★ 2026-09-02 的 bug：知情同意按下去完全沒反應，而且沒有任何錯誤訊息。
@@ -232,4 +233,59 @@ test("★ namesOf：前後空白要先去掉", () => {
     { name: "Paul", alt: "" });
   assert.deepEqual(namesOf({ name_zh: "   ", name_en: "Lin" }),
     { name: "Lin", alt: "" }, "只有空白的欄位等於沒填");
+});
+
+// ── team 篩選（2026-09-10）──────────────────────────────────────────
+// Paul：「團隊看板那邊選一個 team 就可以只看到這個 team 的所有人」。
+const T = [
+  { id: "a", name: "甲", alt: "", team: "Curriculum Team", tz: "Asia/Taipei", updatedAt: null },
+  { id: "b", name: "乙", alt: "", team: "Sponsorship Team", tz: "Asia/Taipei", updatedAt: null },
+  { id: "c", name: "丙", alt: "", team: " Curriculum Team ", tz: null, updatedAt: null },
+  { id: "d", name: "丁", alt: "", team: "", tz: null, updatedAt: null },
+];
+
+// ⚠ 選項從名單長出來，不是寫死的清單。寫死的話 team 不在清單裡的人
+// （舊資料、打錯字、之後新增的組）會整個從畫面上消失，而看不到的人不會被催。
+test("★ 篩選的選項是從名單長出來的，沒填 team 的不會變成一個選項", () => {
+  assert.deepEqual(teamsOf(T), ["Curriculum Team", "Sponsorship Team"]);
+  assert.deepEqual(teamsOf([]), []);
+  assert.deepEqual(teamsOf(null), []);
+});
+
+test("★ 前後空白不會變成第二個選項", () => {
+  assert.equal(teamsOf(T).filter(t => t === "Curriculum Team").length, 1);
+  assert.equal(filterByTeam(T, "Curriculum Team").length, 2, "前後有空白的那個人被篩掉了");
+});
+
+test("篩選：空字串是全部；沒填 team 的人不屬於任何一個 team", () => {
+  assert.equal(filterByTeam(T, "").length, 4);
+  assert.equal(filterByTeam(T, "Sponsorship Team").map(m => m.id).join(""), "b");
+});
+
+// ⚠ 一片空白看起來是壞掉，不是「這個 team 沒有人」。
+test("★ 篩到一個人都沒有時回全部，不是回空的", () => {
+  assert.equal(filterByTeam(T, "Ghost Team").length, 4);
+});
+
+test("★ 只有一個 team 的時候不畫那排按鈕", () => {
+  assert.equal(teamFilterHTML({ allTeams: ["Curriculum Team"], team: "" }), "");
+  assert.equal(teamFilterHTML({ allTeams: [], team: "" }), "");
+  const h = teamFilterHTML({ allTeams: ["Curriculum Team", "Sponsorship Team"], team: "" });
+  assert.match(h, /全部/);
+  assert.match(h, /data-team="Curriculum Team"/);
+  assert.match(h, />Curriculum</, "按鈕上不用再寫一次 Team");
+});
+
+test("選起來的那一顆有標記，「全部」在沒選的時候是選起來的", () => {
+  const all = teamFilterHTML({ allTeams: ["A Team", "B Team"], team: "" });
+  assert.match(all, /class="chip on" data-act="team" data-team=""/);
+  const one = teamFilterHTML({ allTeams: ["A Team", "B Team"], team: "B Team" });
+  assert.match(one, /class="chip on" data-act="team" data-team="B Team"/);
+  assert.doesNotMatch(one, /class="chip on" data-act="team" data-team=""/);
+});
+
+test("team 的名字會跳脫", () => {
+  const h = teamFilterHTML({ allTeams: ['<img src=x>', "B Team"], team: "" });
+  assert.ok(!h.includes("<img src=x"));
+  assert.match(h, /&lt;img/);
 });

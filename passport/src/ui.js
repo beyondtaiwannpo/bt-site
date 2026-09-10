@@ -18,7 +18,10 @@ import { passportNo } from "./data.js";
 //
 // 順帶一提，機讀碼的 teamCode 取團隊名的前六個字母，六個組各自對到
 // CURRIC / MENTOR / MARKET / SPONSO / INTERN / COMMUN，互不重複。加東西進來前先確認不會撞。
-const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
+// 2026-09-10 加上 export：/settings/ 也要一份一模一樣的清單（資料夾之間不互相 import），
+// 而兩份清單漂移的表現是「同一個人在兩個地方屬於不同的 team」——
+// 不會報錯，只會讓時間看板的 team 篩選漏掉他。test/teams.test.mjs 逐字比對兩份。
+export const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
                "Sponsorship Team", "Internship Team", "Community Relations Team"];
 
 // 三個分類的**唯一定義點**。label / short / define 三個欄位分別餵給

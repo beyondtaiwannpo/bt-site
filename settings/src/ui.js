@@ -14,6 +14,32 @@ export const GRADES = ["高一", "高二", "高三", "已畢業", "其他"];
 
 // 幹部與學員看到的東西不一樣，但**是同一頁**。
 // 分成兩頁的話，「刪除帳號」「改名字」這種兩邊都有的東西就會有兩份。
+// BT 的六個 team。**這份清單在 passport/src/ui.js 也有一模一樣的一份**
+// （資料夾之間不互相 import，那是這個 repo 的依賴規矩）。
+// 兩份漂移的表現是「同一個人在兩個地方屬於不同的 team」——不會報錯，
+// 只會讓時間看板的 team 篩選漏掉他。test/teams.test.mjs 逐字比對兩份。
+export const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
+                      "Sponsorship Team", "Internship Team", "Community Relations Team"];
+
+// 所屬 team 從自由文字改成選單（2026-09-10）。
+// Paul 要在時間看板上依 team 篩選，而**自由文字篩不動**：
+// 有人打「Curriculum」、有人打「Curriculum Team」、有人打小寫，
+// 篩選就會變成三個只差一個字的選項，看起來像資料壞掉。
+//
+// ⚠ **本來就存在、但不在清單裡的值要原樣留著當一個選項。**
+// 直接換成選單的話，那個人一按儲存，他的 team 就被悄悄改成清單的第一個，
+// 而他不會發現（畫面上本來顯示的就是那一個）。
+export function teamPickHTML(cur) {
+  const now = String(cur || "");
+  const extra = now && !TEAMS.includes(now)
+    ? `<option value="${esc(now)}" selected>${esc(now)}（原本填的）</option>` : "";
+  return `<label><i>所屬 team</i><select id="team">
+    <option value=""${now ? "" : " selected"}>還沒選</option>
+    ${TEAMS.map(t => `<option${now === t ? " selected" : ""}>${esc(t)}</option>`).join("")}
+    ${extra}
+  </select></label>`;
+}
+
 export function settingsHTML(me, msg, busy) {
   const cadre = me.role === "cadre";
   const v = k => esc(me[k] || "");
@@ -27,7 +53,7 @@ export function settingsHTML(me, msg, busy) {
       <label><i>中文姓名</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
       <label><i>英文姓名</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
     </div>
-    <label><i>所屬 team</i><input id="team" value="${v("team")}" placeholder="Curriculum Team"></label>`
+    ${teamPickHTML(me.team)}`
     : `<label><i>你的名字</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
     <div class="two">
       <label><i>就讀學校</i><input id="school" list="schools" value="${v("school")}"

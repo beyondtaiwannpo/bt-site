@@ -114,6 +114,11 @@
   .chip{font-family:var(--display);font-size:16px;font-weight:600;min-width:38px;height:38px;
     border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7)}
   .chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+  /* team 篩選那一排（2026-09-10）。沿用 .chip 的外觀，只放寬寬度 ——
+     那些 chip 本來是給「一」「二」「三」這種一個字的標籤用的（min-width 與 height
+     都是 38，所以它是方的），而 team 的名字有到十幾個字。 */
+  .teamfilter{margin:0 0 14px}
+  .teamfilter .chip{min-width:0;height:auto;padding:8px 14px;font-size:14px;letter-spacing:.02em}
   /* ⚠ z-index 一定要比格線的時刻標籤高。
      那些標籤是 `th.hr{position:sticky;left:0;z-index:1}`，
      而**有 z-index 的定位元素一律畫在 z-index:auto 的上面，跟 HTML 順序無關**。

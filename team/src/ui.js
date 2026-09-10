@@ -21,10 +21,19 @@ const TEAM_SUB = {
 // 有人填「Curriculum Team」、有人填「curriculum team」。
 // **收斂在這裡做一次**，不然畫面上會出現三個只差一個字的分組，
 // 而那看起來像資料壞掉，不像有人打字不一樣。
+// 有些 team 在 profiles 裡存的是全名，而這一頁的清單上用的是縮寫。
+// 「Community Relations Team」→「CR」目前是唯一一組。
+// ⚠ **用別名表，不要去把兩邊改成同一個字。** 改名的話，
+// 已經填了舊名字的人會整組掉到最後面那個「還有這些人」裡，
+// 而且不會報錯 —— 頁面照樣畫得出來，只是他們被分到別的地方去了。
+const TEAM_ALIAS = { "community relations": "CR" };
+
 export function teamKey(raw) {
   const s = String(raw || "").trim().replace(/\s+/g, " ");
   if (!s) return "";
   const bare = s.replace(/\s*teams?$/i, "").trim();
+  const alias = TEAM_ALIAS[bare.toLowerCase()];
+  if (alias) return alias;
   const hit = TEAM_ORDER.find(t => t.toLowerCase() === bare.toLowerCase());
   return hit || bare;
 }

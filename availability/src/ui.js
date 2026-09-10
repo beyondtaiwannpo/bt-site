@@ -83,6 +83,46 @@ export function tzSetupHTML(guess, q, results, msg) {
 
 // ── 團隊看板 ────────────────────────────────────────────────────────
 // counts: Map("dayIndex:minute" → [memberId]）；viewerTz 只用來顯示欄位標題。
+// ── team 篩選（2026-09-10）──────────────────────────────────────────
+// Paul：「團隊看板那邊選一個 team 就可以只看到這個 team 的所有人」。
+//
+// ⚠ **選項是從名單本身長出來的，不是一份寫死的清單。**
+// 寫死的話，team 欄位不在清單裡的人（舊資料、打錯字、之後新增的組）
+// 就會整個從畫面上消失 —— 而那正是這一頁最不能發生的事：
+// 看不到的人不會被催。從資料長出來的話，最糟也只是多一個選項。
+//
+// 同一個 team 的大小寫或前後空白不同會變成兩個選項。那是刻意不在這裡收斂的：
+// 真正的修法是讓大家選不是打（/settings/ 2026-09-10 改成選單了），
+// 而在這裡偷偷合併會讓「有人填錯了」這件事再也看不見。
+export function teamsOf(members) {
+  const seen = [];
+  for (const m of members || []) {
+    const t = String(m.team || "").trim();
+    if (t && !seen.includes(t)) seen.push(t);
+  }
+  return seen.sort((a, b) => a.localeCompare(b, "en"));
+}
+
+// 選了不存在的 team（例如那個人剛改了 team）時回全部，不是回空的 ——
+// 空白畫面看起來是壞掉，不是「這個 team 沒有人」。
+export function filterByTeam(members, team) {
+  if (!team) return members;
+  const hit = (members || []).filter(m => String(m.team || "").trim() === team);
+  return hit.length ? hit : members;
+}
+
+// V.allTeams 與 V.team 由 main.js 給（見那邊 view() 的註解）。
+// 只有一個 team 的時候不畫 —— 一顆按不出差別的按鈕比沒有按鈕糟。
+export function teamFilterHTML(V) {
+  const teams = V.allTeams || [];
+  if (teams.length < 2) return "";
+  const chip = (val, label) =>
+    `<button class="chip${(V.team || "") === val ? " on" : ""}" data-act="team" data-team="${esc(val)}"
+      aria-pressed="${(V.team || "") === val}">${esc(label)}</button>`;
+  return `<div class="chips teamfilter">${chip("", "全部")}${
+    teams.map(t => chip(t, t.replace(/\s*Team$/i, ""))).join("")}</div>`;
+}
+
 export function boardHTML(S, counts, dates) {
   const total = S.members.filter(m => m.tz).length;
   // ⚠ **空的看板要說話。** 一片空白同時可能是三件事：沒有人填、沒有人設時區、
@@ -104,7 +144,7 @@ export function boardHTML(S, counts, dates) {
     }).join("");
     rows.push(`<tr><th class="hr">${min % 60 === 0 ? esc(hhmm(min)) : ""}</th>${cells}</tr>`);
   }
-  return `${notice}<div class="gridwrap"><table class="grid">
+  return `${teamFilterHTML(S)}${notice}<div class="gridwrap"><table class="grid">
     <thead><tr><th></th>${COL_ORDER.map((wd, i) =>
       `<th>${DAY_ZH[wd]}<span>${esc(dates[i] || "")}</span></th>`).join("")}</tr></thead>
     <tbody>${rows.join("")}</tbody></table></div>
@@ -254,6 +294,7 @@ export function membersHTML(S, now) {
     <h2>成員</h2>
     <div class="sub">超過 30 天沒更新的標紅。看板要問的是「這份資料還可信嗎」，
       所以沒有變的人也可以按「我確認過了」把時間往前推。</div>
+    ${teamFilterHTML(S)}
     <table class="who"><thead><tr><th>名字</th><th>所在地</th><th>上次更新</th></tr></thead><tbody>
     ${S.members.map(m => {
       const d = days(m.updatedAt);

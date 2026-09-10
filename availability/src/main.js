@@ -17,6 +17,7 @@ const K = DATA.key;
 let S = {
   user: null, role: null, myTz: null, myName: "", down: false, ready: false,
   tab: "board", members: [], slots: new Map(),
+  team: "",                       // team 篩選，空字串是「全部」（見 view()）
   mine: new Set(), saved: new Set(), dirty: false, mineMsg: "",
   weekStart: null, weekOffset: 0,
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
@@ -41,6 +42,17 @@ function weekLabel() {
 }
 
 // ── 畫面 ────────────────────────────────────────────────────────────
+// 畫面看到的名單。**S.members 永遠是全部的人，篩選只發生在這裡。**
+// 直接去改 S.members 的話，篩選會變成一個會吃掉資料的操作：
+// 選了一個 team 之後，其他人就從這個分頁的狀態裡消失了，
+// 而下一個要用全部名單的地方（例如選項本身）就再也長不出來。
+//
+// allTeams 一定要從**沒有篩過**的名單算，不然選了一個 team 之後
+// 其他選項會全部不見，使用者就回不到「全部」了。
+function view() {
+  return { ...S, members: UI.filterByTeam(S.members, S.team), allTeams: UI.teamsOf(S.members) };
+}
+
 function render() {
   const el = root();
   if (!el) return;
@@ -52,14 +64,16 @@ function render() {
   if (S.needTz) { el.innerHTML = UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg); return; }
 
   let inner, label = null;
+  const V = view();
   if (S.tab === "board") {
-    const counts = calcCounts(S.members, S.slots, S.weekStart, S.myTz);
+    const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz);
     S.boardTop = firstBusyMinute(counts);
-    inner = UI.boardHTML(S, counts, weekDates());
+    inner = UI.boardHTML(V, counts, weekDates());
     label = weekLabel();
   }
+  // 「我的時間」是自己的，跟 team 篩選無關，所以用 S 不是 V。
   else if (S.tab === "mine") inner = UI.mineHTML(S);
-  else inner = UI.membersHTML(S, Date.now());
+  else inner = UI.membersHTML(V, Date.now());
   el.innerHTML = navHTML({ current: "availability", role: S.role, name: S.myName })
                + UI.shellHTML(S.tab, inner, label, S.msg);
   if (S.peek) el.insertAdjacentHTML("beforeend", S.peek);
@@ -123,6 +137,9 @@ document.addEventListener("click", async e => {
   // 頂欄的登出。這一頁之前沒有登出（只有「回入口」），現在頂欄有了就要接。
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
   if (act === "tab") { S.tab = b.dataset.t; S.peek = null; render(); return; }
+  // team 篩選。**彈窗要一起關掉** —— 它裡面那份「有空／沒空」是用舊的篩選算的，
+  // 留著的話畫面上會同時有兩種篩選的結果，而且看不出來哪一份是舊的。
+  if (act === "team") { S.team = b.dataset.team || ""; S.peek = null; render(); return; }
 
   if (act === "week") {
     const d = +b.dataset.d;
@@ -330,12 +347,15 @@ function readBatch() {
 // 而那個事件看起來完全正常，只是日期錯了。
 function buildPeek() {
   const { col, min } = S.peekCell;
-  const counts = calcCounts(S.members, S.slots, S.weekStart, S.myTz);
+  // 篩了 team 的話彈窗也要跟著篩：格子上的數字是篩過的，
+  // 而彈窗說的是「這個數字是誰」——兩邊不一致的話那個數字看起來就是錯的。
+  const V = view();
+  const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz);
   const free = counts.get(col + ":" + min) || [];
   const inst = cellInstant(S.weekStart, col, min, S.myTz);
-  const zones = [...new Set(S.members.filter(m => m.tz).map(m => m.tz))].sort();
+  const zones = [...new Set(V.members.filter(m => m.tz).map(m => m.tz))].sort();
   S.peekLines = localTimesText(inst, zones, labelOf);
-  S.peek = UI.peekHTML(S, {
+  S.peek = UI.peekHTML(V, {
     free, minute: min,
     dayLabel: "星期" + UI.DAY_ZH[UI.COL_ORDER[col]],
     lines: S.peekLines,
