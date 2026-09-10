@@ -25,7 +25,7 @@ document.getElementById("bt-root").innerHTML = ${nav} + (${body});
 }
 
 make("settings", "settings",
-  `settingsHTML({ role:"cadre", email:"pinwang.0705@gmail.com", name_zh:"王平", name_en:"Paul Wang",
+  `settingsHTML({ role:"cadre", email:"cadre@example.com", name_zh:"王平", name_en:"Paul Wang",
     team:"Sponsorship Team, Marketing Team", avatar:"", public_profile:true, public_approved:false,
     public_title:"Co-President 2026-2027" }, "", false)`,
   `import { settingsHTML } from "./src/ui.js";`);
@@ -33,7 +33,7 @@ make("settings", "settings",
 const M = [["安","","Sponsorship Team",null,null],["林育安","Yu-An Lin","Curriculum Team","America/New_York","2026-09-09"],
   ["姚瑀恩","Yu-En Yao","Mentorship Team","Asia/Taipei","2026-09-05"],["陳品妤","Pin-Yu Chen","Marketing Team","America/Indianapolis","2026-09-05"]];
 make("availability", "availability",
-  `UI.shellHTML("who", UI.membersHTML(V, Date.now()), null, "")`,
+  `UI.shellHTML("board", UI.boardHTML(V, new Map(), ["9/7","9/8","9/9","9/10","9/11","9/12","9/13"]), "9/7 - 9/13（本週）", "")`,
   `import * as UI from "./src/ui.js";
    const M = ${JSON.stringify(M)};
    const members = M.map(([zh,en,team,tz,up],i)=>({id:"u"+i,name:zh,alt:en,team,tz,updatedAt:up}));

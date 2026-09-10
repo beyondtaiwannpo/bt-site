@@ -13,18 +13,18 @@ const root = () => document.getElementById("bt-root");
 function render() {
   const el = root();
   if (!el) return;
-  const head = document.querySelector(".btnav");
-  if (head) head.remove();
+  // ⚠ **頂欄要畫在 #bt-root 裡面**（見 admin/src/main.js 同一段註解）。
+  // 畫在 <body> 上的話它吃不到 #bt-root 的左右內距，
+  // 跟底下的內容就差 12px，Paul 2026-09-10 一眼看出來。
+  const nav = navHTML({ current: "settings",
+    role: S.me && S.me.role, name: (S.me && (S.me.name_zh || S.me.name_en)) || "" });
 
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { location.replace("../app/?next=" + encodeURIComponent("/settings/")); return; }
   if (!S.me) { el.innerHTML = UI.downHTML(); return; }
 
-  document.body.insertAdjacentHTML("afterbegin",
-    navHTML({ current: "settings", role: S.me.role, name: S.me.name_zh || S.me.name_en || "" }));
-
-  if (S.view === "delete") { el.innerHTML = UI.deleteHTML(S.msg, S.busy); return; }
-  el.innerHTML = UI.settingsHTML(S.me, S.msg, S.busy);
+  if (S.view === "delete") { el.innerHTML = nav + UI.deleteHTML(S.msg, S.busy); return; }
+  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy);
 
   // 學校清單只在學員那一頁用得到，而且是點進那一格才載。
   const sc = document.getElementById("school");

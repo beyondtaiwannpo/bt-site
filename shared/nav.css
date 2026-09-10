@@ -35,8 +35,12 @@
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .btnav{background:var(--bt-cream);border-color:rgba(16,42,134,.14)}
 }
-/* 視窗比 940 窄的時候，左右要留白，不然玻璃會貼著螢幕邊。 */
-@media (max-width:980px){ .btnav{margin-left:16px;margin-right:16px} }
+/* ⚠ **不要在這裡加左右 margin。**
+   2026-09-10 之前這裡有一條「視窗比 940 窄的時候左右留 16px」，
+   理由是「不然玻璃會貼著螢幕邊」。那條在頂欄被畫進 #bt-root 之後是多的：
+   #bt-root 自己就有左右內距，兩個加起來，頂欄就比底下所有東西**再縮 16px**，
+   看起來跟分頁列、格線、卡片全部對不齊（Paul：「這兩個怎麼不平行」）。
+   留白由頁面自己的容器負責，這條頂欄只負責填滿它被放進去的地方。 */
 
 .btnav-logo{display:flex;align-items:center;flex:none;position:relative}
 .btnav-logo img{height:24px;width:auto;display:block}

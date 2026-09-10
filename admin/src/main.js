@@ -36,40 +36,44 @@ const isPres = () => !!S.me && S.me.board === "president";
 function render() {
   const el = root();
   if (!el) return;
+  // ⚠ **頂欄要畫在 #bt-root 裡面，不要 insertAdjacentHTML 到 <body>。**
+  // 2026-09-10 Paul：「這兩個怎麼不平行」——頂欄跟底下的分頁列左右對不齊。
+  // 原因就是這件事：#bt-root 有自己的左右內距，畫在 body 上的頂欄吃不到它，
+  // 於是同一條頂欄在四個頁面各自停在不同的位置。全部畫進 #bt-root 就對齊了。
+  // 順帶一提，畫在裡面之後也不用再自己去 remove 上一次那條 —— innerHTML 蓋掉了。
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
-  const head = document.querySelector(".btnav");
-  if (head) head.remove();
 
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { location.replace("../app/?next=" + encodeURIComponent("/admin/")); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
 
-  document.body.insertAdjacentHTML("afterbegin", nav);
+  let body;
   if (S.view === "mail") {
-    el.innerHTML = UI.mailListHTML(S.tpls, S.msg);
+    body = UI.mailListHTML(S.tpls, S.msg);
   } else if (S.view === "mail-edit") {
-    el.innerHTML = UI.mailEditHTML(S.tplKind, S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy);
+    body = UI.mailEditHTML(S.tplKind, S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy);
   } else if (S.view === "team") {
-    el.innerHTML = UI.publicTeamHTML(S.people, S.msg, S.busy);
+    body = UI.publicTeamHTML(S.people, S.msg, S.busy);
   } else if (S.view === "checkin" && S.form) {
-    el.innerHTML = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
+    body = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
-    el.innerHTML = UI.noticeHTML(S.form, S.apps, S.noticeTo, S.msg, S.busy);
+    body = UI.noticeHTML(S.form, S.apps, S.noticeTo, S.msg, S.busy);
   } else if (S.view === "res") {
-    el.innerHTML = UI.resListHTML(S.res, canEdit(), S.msg, isPres());
+    body = UI.resListHTML(S.res, canEdit(), S.msg, isPres());
   } else if (S.view === "res-edit") {
-    el.innerHTML = UI.resEditHTML(S.resEditing, S.msg, S.busy);
+    body = UI.resEditHTML(S.resEditing, S.msg, S.busy);
   } else if (S.view === "apps" && S.form) {
-    el.innerHTML = UI.appsHTML(S.form, S.apps, S.questions, canEdit(),
+    body = UI.appsHTML(S.form, S.apps, S.questions, canEdit(),
       S.sel, S.filter, S.pending, S.msg, S.busy);
   } else if (S.view === "question") {
-    el.innerHTML = UI.questionHTML(S.qEditing, S.msg, S.busy);
+    body = UI.questionHTML(S.qEditing, S.msg, S.busy);
   } else if (S.view === "form" && S.form) {
-    el.innerHTML = UI.formHTML(S.form, S.questions, canEdit(),
+    body = UI.formHTML(S.form, S.questions, canEdit(),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else {
-    el.innerHTML = UI.listHTML(S.forms, canEdit(), S.msg, isPres());
+    body = UI.listHTML(S.forms, canEdit(), S.msg, isPres());
   }
+  el.innerHTML = nav + body;
 }
 
 async function boot() {

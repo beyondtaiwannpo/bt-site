@@ -1397,6 +1397,43 @@ else
   ok "每一個有登入按鈕的對外頁面都會在登入後把字改掉"
 fi
 
+# ── 不准有殘留的 _audit.html ──────────────────────────────────────────
+#
+# scripts/check-mobile.mjs 會產生四份帶假資料的 `<資料夾>/_audit.html`，
+# 跑完自己刪。但它中途被 Ctrl-C、或有人單獨跑 scripts/mobile-fixtures.mjs 的話，
+# 那四份會留在原地 —— 而它們會被後面每一條「掃過所有 html」的守門看到，
+# 於是 check.sh 會報一個**跟真正的程式完全無關的錯**
+#（2026-09-10 就是這樣：假資料裡的 email 被 §11-20 抓出來，
+#  訊息說「出現非組織信箱」，而 repo 裡其實一個字都沒有）。
+# 先在這裡擋，訊息才對得上原因。
+stray=$(ls */_audit.html 2>/dev/null)
+if [ -n "$stray" ]; then
+  bad "有殘留的假頁面（check-mobile 沒收乾淨）："
+  printf '  %s\n' $stray
+  say "     刪掉就好：rm -f */_audit.html"
+fi
+
+# ── 頂欄一律畫在 #bt-root 裡面 ────────────────────────────────────────
+#
+# 2026-09-10 Paul：「這兩個怎麼不平行」。四個登入後的頁面共用同一條頂欄，
+# 但其中兩頁把它 insertAdjacentHTML 到 <body>，另外兩頁畫在 #bt-root 裡。
+# #bt-root 有自己的左右內距，畫在 body 上的那條吃不到 —— 於是**同一條頂欄
+# 在不同頁面停在不同的位置**，而且跟底下的分頁列、格線、卡片全部對不齊。
+#
+# 這條守門要防的是它悄悄跑回去。畫在 body 上不會壞、不會報錯，
+# 只是差 12 到 16px，而那種差距只有在兩條東西並排的時候才看得出來。
+navbad=""
+for f in passport/src/main.js availability/src/main.js admin/src/main.js settings/src/main.js; do
+  grep -q "navHTML(" "$f" || continue
+  grep -q "document.body.insertAdjacentHTML" "$f" && navbad="${navbad} ${f}"
+done
+if [ -n "$navbad" ]; then
+  bad "這些頁面把頂欄畫到 <body> 上，會跟頁面內容對不齊：${navbad}"
+  say "     改成跟其他頁一樣，把 navHTML(...) 併進寫給 #bt-root 的那串 innerHTML。"
+else
+  ok "四個登入後的頁面都把頂欄畫在 #bt-root 裡（跟頁面內容對齊）"
+fi
+
 # ── 按下播放之前不准連到 YouTube ──────────────────────────────────────
 #
 # 首頁的宣傳影片用的是「封面先畫好，按下去才生出 iframe」的做法。
