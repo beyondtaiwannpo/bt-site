@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { noticeHTML, membersHTML, downHTML, COL_ORDER, DAY_ZH, hhmm } from "../availability/src/ui.js";
+import { namesOf } from "../availability/src/data.js";
 
 // ★ 2026-09-02 的 bug：知情同意按下去完全沒反應，而且沒有任何錯誤訊息。
 // 根因有兩個，這一條守第二個 —— **失敗一定要說話**。
@@ -166,4 +167,69 @@ test("講清楚事件建在誰的日曆、以及不會自動邀請人", () => {
   const h = peek();
   assert.ok(h.includes("你自己的"), "沒有講事件建在誰的日曆上");
   assert.ok(h.includes("不會自動加任何人"), "沒有講它不會自動邀請人");
+});
+
+// ── 名字要中英文都出現（2026-09-10）──────────────────────────────────
+// Paul 的原話：「上面都是中文名不知道是誰」。幹部分布七個國家，
+// 很多人平常只用英文名互相稱呼；認不出是誰就不知道該催誰，
+// 而「知道該催誰」是這一頁存在的理由（規格 §4-3 C）。
+test("★ 成員清單同時顯示中文名與英文名", () => {
+  const h = membersHTML({ ...S, members: [
+    { id: "a", name: "林育安", alt: "Lin Yu-An", team: "Curriculum Team",
+      tz: "Asia/Taipei", updatedAt: new Date().toISOString() },
+  ] }, Date.now());
+  assert.ok(h.includes("林育安"), "中文名不見了");
+  assert.ok(h.includes("Lin Yu-An"), "英文名不見了");
+});
+
+// 三種人都不能因為少了一個名字就變成空白或重複。
+// 名單上少一個人比排版醜嚴重得多 —— 少的那個就不會被催。
+test("★ 只有一個名字、或兩欄一樣的人，照樣只出現一次而且看得到", () => {
+  const one = (m) => membersHTML({ ...S, members: [{ team: "", tz: null, updatedAt: null, ...m }] },
+                                 Date.now());
+  const onlyZh = one({ id: "1", name: "只有中文", alt: "" });
+  assert.ok(onlyZh.includes("只有中文"));
+  assert.doesNotMatch(onlyZh, /class="alt"/, "沒有第二個名字時不該畫出空的那一格");
+
+  const onlyEn = one({ id: "2", name: "Only English", alt: "" });
+  assert.ok(onlyEn.includes("Only English"), "只有英文名的人整個不見了");
+
+  const same = one({ id: "3", name: "Paul", alt: "" });
+  assert.equal((same.match(/Paul/g) || []).length, 1, "同一個名字被印了兩次");
+
+  const none = one({ id: "4", name: "（沒有名字）", alt: "" });
+  assert.ok(none.includes("（沒有名字）"), "沒有名字的人不能整列變空白");
+});
+
+test("★ 名字會跳脫，兩個名字都是", () => {
+  const h = membersHTML({ ...S, members: [
+    { id: "x", name: "<img src=x>", alt: '"><script>', team: "", tz: null, updatedAt: null },
+  ] }, Date.now());
+  assert.ok(!h.includes("<img src=x"), "中文名沒有跳脫");
+  assert.ok(!h.includes('"><scr' + 'ipt>'), "英文名沒有跳脫");
+  assert.match(h, /&lt;img/);
+});
+
+// 四種邊界情況直接測那個純函式。上面那幾條測的是畫面，這幾條測的是規則本身 ——
+// 規則寫錯的表現是「名單上少一個人」或「同一個名字印兩次」，兩種都不會報錯。
+test("★ namesOf：只有中文、只有英文、兩欄一樣、兩欄都空", () => {
+  assert.deepEqual(namesOf({ name_zh: "林育安", name_en: "Lin Yu-An" }),
+    { name: "林育安", alt: "Lin Yu-An" });
+  assert.deepEqual(namesOf({ name_zh: "只有中文", name_en: "" }),
+    { name: "只有中文", alt: "" });
+  assert.deepEqual(namesOf({ name_zh: null, name_en: "Only English" }),
+    { name: "Only English", alt: "" }, "只有英文名的人要用英文名當主要的名字");
+  assert.deepEqual(namesOf({ name_zh: "Paul", name_en: "Paul" }),
+    { name: "Paul", alt: "" }, "兩欄一樣的人不該被印兩次");
+  assert.deepEqual(namesOf({}), { name: "（沒有名字）", alt: "" },
+    "兩欄都空的人不能整列變空白 —— 名單上少一個人就少催一個人");
+});
+
+// 前後空白是真的會發生的：手機鍵盤的自動空格、複製貼上帶進來的。
+// 沒有 trim 的話「 Paul」與「Paul」會被當成兩個不同的名字，然後印兩次。
+test("★ namesOf：前後空白要先去掉", () => {
+  assert.deepEqual(namesOf({ name_zh: "  Paul ", name_en: "Paul" }),
+    { name: "Paul", alt: "" });
+  assert.deepEqual(namesOf({ name_zh: "   ", name_en: "Lin" }),
+    { name: "Lin", alt: "" }, "只有空白的欄位等於沒填");
 });

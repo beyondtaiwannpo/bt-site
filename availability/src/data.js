@@ -7,6 +7,20 @@ import { groupByWeekday } from "./edit.js";
 const SLOT = 30;                      // 半小時一格
 export const key = (wd, min) => wd + ":" + min;
 
+// 一個人在畫面上要顯示的兩個名字。**純函式，好測** ——
+// 上面那個 fetch 需要真的資料庫才跑得起來，而這裡的規則有四種邊界情況
+// （只有中文、只有英文、兩欄一樣、兩欄都空），每一種寫錯的表現都是
+// 「名單上少一個人或多一個重複的字」，不會報錯。見 test/availability-ui.test.mjs。
+export function namesOf(p) {
+  const zh = (p.name_zh || "").trim();
+  const en = (p.name_en || "").trim();
+  return {
+    name: zh || en || "（沒有名字）",
+    // 兩欄填了同一個字的人不重複顯示；只有一個名字的人也沒有第二個。
+    alt: zh && en && zh !== en ? en : "",
+  };
+}
+
 // 一次把看板需要的三份資料拿回來。
 //
 // **三個查詢都要成功才算成功。** 只有 profiles 回來、availability 失敗的話，
@@ -28,9 +42,16 @@ export async function loadAll() {
     if (!slots.has(r.user_id)) slots.set(r.user_id, new Set());
     slots.get(r.user_id).add(key(r.weekday, r.minute));
   }
+  // 2026-09-10：多帶一個 alt（另一個名字）。
+  // Paul 的原話：「上面都是中文名不知道是誰」——
+  // 幹部分布七個國家，很多人平常只用英文名互相稱呼，
+  // 名單上只有中文名的話，看的人認不出那是誰，也就不知道該催誰，
+  // 而「知道該催誰」正是這一頁存在的理由（規格 §4-3 C）。
+  //
+  // **收斂在這裡做一次**，畫面那邊不要再判斷一次哪個名字是主要的。
   const members = pf.data.map(p => ({
     id: p.id,
-    name: p.name_zh || p.name_en || "（沒有名字）",
+    ...namesOf(p),
     team: p.team || "",
     tz: p.tz || null,
     updatedAt: meta.get(p.id) ? meta.get(p.id).updated_at : null,

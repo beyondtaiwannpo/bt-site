@@ -126,10 +126,10 @@ export function peekHTML(S, ctx) {
     <div class="sub">${ctx.free.length} 人有空</div>
     <div class="two">
       <div><i>有空</i>${ctx.free.length
-        ? `<ul>${ctx.free.map(id => `<li>${esc(nameOf(S, id))}</li>`).join("")}</ul>`
+        ? `<ul>${ctx.free.map(id => `<li>${nameHTML(memberOf(S, id))}</li>`).join("")}</ul>`
         : `<div class="empty sm">沒有人</div>`}</div>
       <div><i>沒空</i>${busy.length
-        ? `<ul class="dim">${busy.map(m => `<li>${esc(m.name)}</li>`).join("")}</ul>`
+        ? `<ul class="dim">${busy.map(m => `<li>${nameHTML(m)}</li>`).join("")}</ul>`
         : `<div class="empty sm">沒有人</div>`}</div>
     </div>
     ${noTz.length ? `<div class="wnote">${noTz.length} 個人還沒設定時區，
@@ -159,6 +159,16 @@ export function peekHTML(S, ctx) {
 }
 
 const nameOf = (S, id) => (S.members.find(m => m.id === id) || {}).name || id;
+
+// 名字要中英文都出現。**只在一行放得下的地方用這個** ——
+// 成員清單與彈窗的兩欄名單都是一人一行，放得下；
+// 而「還沒設定時區的是這幾個人」那一句是用頓號串起來的句子，
+// 兩個名字串進去會變成一團讀不出來的字，那裡維持只印主要的名字。
+function nameHTML(m) {
+  if (!m) return "";
+  return esc(m.name) + (m.alt ? `<span class="alt">${esc(m.alt)}</span>` : "");
+}
+const memberOf = (S, id) => S.members.find(m => m.id === id) || { name: id, alt: "" };
 
 // ── 我的每週時間 ────────────────────────────────────────────────────
 // **批次填寫排在格線前面，而且是預設看得到的那一塊。**
@@ -250,7 +260,7 @@ export function membersHTML(S, now) {
       const stale = d == null || d > 30;
       const filled = (S.slots.get(m.id) || new Set()).size;
       return `<tr class="${stale ? "stale" : ""}">
-        <td>${esc(m.name)}${m.team ? `<span class="team">${esc(m.team)}</span>` : ""}</td>
+        <td>${nameHTML(m)}${m.team ? `<span class="team">${esc(m.team)}</span>` : ""}</td>
         <td>${m.tz
               ? `${esc(labelOf(m.tz))}<span class="team">${esc(offsetLabel(new Date(now), m.tz))}</span>`
               : `<span class="warn">還沒設定時區</span>`}</td>

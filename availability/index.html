@@ -131,6 +131,11 @@
     text-transform:uppercase;opacity:.55;padding:6px 8px;border-bottom:1px solid rgba(16,42,134,.2)}
   table.who td{padding:9px 8px;border-bottom:1px dotted rgba(16,42,134,.16)}
   table.who .team{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.5}
+  /* 第二個名字（2026-09-10）。跟主要的名字同一行、小一級、淡一點 ——
+     它是幫你認人的，不是名字本身。放在同一行不換行，是因為下面那一行
+     已經被 team 佔走了，再多一行會讓每一列變成三行，一頁看不到幾個人。 */
+  .alt{margin-left:7px;font-size:12.5px;font-weight:400;opacity:.62;white-space:nowrap}
+  .two .alt{display:block;margin-left:0;font-size:12px}
   /* 規格 §4-3 C 寫「超過 30 天標紅」，但硬規則是一個畫面最多三色（見 brand.css），
      而 check.sh 會擋。**沒有為了這一個畫面去放寬硬規則** —— 那條規則的價值就在
      它不能被單一個需求推翻。改用既有的橘色當底、文字說清楚是什麼狀況。
