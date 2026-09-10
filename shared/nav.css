@@ -64,9 +64,38 @@
 .btnav-logo::after,.btnav-out::after{
   content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
 .btnav :focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
-/* 窄螢幕：名字只留第一個字，項目字級縮一點。量過 390／360／320（見 ledger）。 */
+/* ── 窄螢幕：頂欄換成兩排（2026-09-10）──────────────────────────────
+   Paul 回報「手機版裡面也長這樣」，附圖上「設定」壓在「登出」上面。
+
+   原因是**功能項從兩個變成四個**（2026-09-08 加了申請管理與設定），
+   而這裡原本那組窄螢幕的數字是兩個項目的時候量的，門檻還停在 360px。
+   實測 390px 上最後一項會跑出容器 171px —— 而且**不會有橫向捲軸**，
+   外面有東西把它切掉，所以桌機上、甚至捲動測試上都看不出來。
+
+   修法是換行：logo、名字、登出留在第一排，四個功能項自己一排。
+   **不要改成讓那一排自己左右捲** —— 使用者不會知道右邊還有東西，
+   而那正是「看不到的功能等於沒做」那一類的失敗。
+   代價是頂欄在手機上高一點，那是值得的。
+
+   ⚠ 之後再加一個功能項，這裡要再量一次：
+   `node scripts/check-mobile.mjs`（它會真的把視寬設成 390 與 360）。
+   headless Chrome 用 --window-size 量不到 390，最小是 500。 */
+@media (max-width:700px){
+  .btnav{flex-wrap:wrap;row-gap:2px;padding:8px 10px}
+  .btnav-logo{order:1}
+  .btnav-sp{order:2}
+  .btnav-who{order:3}
+  .btnav-out{order:4}
+  /* 第二排：四項平均攤開，兩端貼齊玻璃的內緣。 */
+  .btnav-items{order:5;width:100%;justify-content:space-between;gap:2px}
+  .btnav-items a{font-size:15px;padding:6px 5px}
+}
+/* 更窄：名字只留第一個字，項目再縮一級。
+   ⚠ 這一段在上面那段**後面**，所以同樣特異性的規則以這裡為準。
+   font-size 要比上面小，不要比上面大（2026-09-10 之前這裡寫的是 16px，
+   比 700px 那一段的 15px 還大，等於愈窄字愈大）。 */
 @media (max-width:360px){
-  .btnav{gap:8px;padding:8px 8px 8px 12px}
+  .btnav{gap:8px;padding:8px 8px}
   .btnav-who .full{display:none}.btnav-who .short{display:inline}
-  .btnav-items a{font-size:16px;padding:6px 6px}
+  .btnav-items a{font-size:14px;padding:6px 3px}
 }
