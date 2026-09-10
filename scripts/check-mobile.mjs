@@ -45,6 +45,9 @@ const PAGES = [
 //            **這是「選單跑掉了」的形狀**，而它多半不會產生橫向捲軸 ——
 //            頂欄外面有東西把它切掉，所以上面那條看不到它。
 //   clash  = 同一排裡相鄰兩個小孩疊在一起。
+//   offcentre = 說好置中的一排，裡面某個東西的中心線跟其他人對不上。
+//            **這一種既不溢出也不重疊，只是看起來歪**，而人一眼就看得出來
+//            （2026-09-10 Paul 看出「選單跟登出」差 7px，那時這支腳本說全過）。
 //
 // ⚠ **不要只看「有沒有超出視窗」。** 首頁那座島是刻意畫到畫面外、
 // 靠 html{overflow-x:clip} 切掉的，那是設計不是 bug；
@@ -59,7 +62,7 @@ const PROBE = `(() => {
       ? "." + el.className.trim().split(/\\s+/).join(".") : "");
   const txt = el => (el.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 16);
 
-  const escape = [], clash = [];
+  const escape = [], clash = [], offcentre = [];
   for (const box of document.querySelectorAll("body *")) {
     const cs = getComputedStyle(box);
     if (cs.display !== "flex" && cs.display !== "inline-flex") continue;
@@ -87,9 +90,26 @@ const PROBE = `(() => {
       if (dx > 1 && dy > 1) clash.push({ box: name(box), a: txt(kids[i - 1]), b: txt(kids[i]),
                                          px: Math.round(dx) });
     }
+    // 說好要置中的一排，裡面的東西中心線就該對齊。
+    // 2026-09-10 Paul 一眼看出「選單跟登出」沒對齊（差 7px），而這支腳本沒抓到 ——
+    // 因為它們既沒有跑出容器也沒有互相重疊，只是**一個的外框盒多了一截下邊界**
+    //（頁面自己的 label{margin-bottom:14px} 套到了共用頂欄的那顆按鈕上）。
+    // 置中對齊的是外框盒，所以看起來就是其中一顆往上跑。
+    if (cs.alignItems === "center" && kids.length > 1) {
+      const mids = kids.map(k => { const r = k.getBoundingClientRect(); return r.top + r.height / 2; });
+      const sorted = [...mids].sort((a, b) => a - b);
+      const med = sorted[Math.floor(sorted.length / 2)];
+      kids.forEach((k, i) => {
+        // 3px 以內不算（字體度量與 subpixel 本來就會有零點幾）。
+        if (Math.abs(mids[i] - med) > 3)
+          offcentre.push({ box: name(box), kid: name(k), text: txt(k),
+                           px: Math.round(mids[i] - med) });
+      });
+    }
   }
   return { vw, scroll: Math.round(de.scrollWidth - vw),
-           escape: escape.slice(0, 8), clash: clash.slice(0, 8) };
+           escape: escape.slice(0, 8), clash: clash.slice(0, 8),
+           offcentre: offcentre.slice(0, 8) };
 })()`;
 
 // ── CDP 的最小客戶端（Node 24 內建 WebSocket，不用裝任何東西）──────────
@@ -171,6 +191,9 @@ async function main() {
           bad.push(`${w}px ${p}：${o.box} 裡的 ${o.kid} 跑出去 ${o.px}px${o.text ? `（${o.text}）` : ""}`);
         for (const c of v.clash)
           bad.push(`${w}px ${p}：${c.box} 裡「${c.a}」與「${c.b}」疊了 ${c.px}px`);
+        for (const o of v.offcentre)
+          bad.push(`${w}px ${p}：${o.box} 說好置中，但 ${o.kid} 的中心線差 ${o.px}px` +
+                   `${o.text ? `（${o.text}）` : ""}`);
       }
     }
     ws.close();
@@ -181,11 +204,11 @@ async function main() {
   }
 
   if (bad.length) {
-    console.log("BAD 手機版有東西跑出畫面或疊在一起：");
+    console.log("BAD 手機版的版面有問題（跑出畫面、疊在一起、或該對齊卻沒對齊）：");
     for (const b of bad) console.log("  " + b);
     return 1;
   }
-  console.log(`OK 手機版版面（${WIDTHS.join(" / ")}px，${PAGES.length} 頁）沒有東西跑出畫面或疊在一起`);
+  console.log(`OK 手機版版面（${WIDTHS.join(" / ")}px，${PAGES.length} 頁）沒有跑出畫面、沒有疊在一起、該對齊的都對齊`);
   return 0;
 }
 

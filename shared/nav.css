@@ -42,6 +42,18 @@
    看起來跟分頁列、格線、卡片全部對不齊（Paul：「這兩個怎麼不平行」）。
    留白由頁面自己的容器負責，這條頂欄只負責填滿它被放進去的地方。 */
 
+/* ⚠ **這條頂欄裡的東西不吃頁面自己的通用樣式。**
+   2026-09-10：Paul 說「選單跟登出」沒對齊。原因是那顆選單是一個 <label>，
+   而時間看板那一頁有一條 `label{display:block;margin-bottom:14px}` ——
+   那 14px 的下邊界跟著套到選單上，於是它的「外框盒」比登出高 14px。
+   `align-items:center` 對齊的是**外框盒**，所以看起來就是選單往上跑了 7px，
+   而且**改 align-self 一點用都沒有**（它本來就置中，只是盒子多了一截）。
+   查了很久才找到，因為問題不在 shared/nav.css 裡，在別人的頁面上。
+
+   這一條把邊界歸零。跟護照那邊用 `:where(#bt-root button)` 重設按鈕外觀
+   是同一件事：**共用元件不可以依賴host頁面沒有寫某條通用規則。**
+   四個頁面各自都有 label{} 與 button{} 的通用規則，而它們互相不知道對方存在。 */
+.btnav > *{margin:0}
 .btnav-logo{display:flex;align-items:center;flex:none;position:relative}
 .btnav-logo img{height:24px;width:auto;display:block}
 .btnav-items{display:flex;gap:4px;min-width:0}
@@ -58,18 +70,30 @@
 .btnav-who{font-size:14px;font-weight:600;max-width:6em;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;color:rgba(16,42,134,.82)}
 .btnav-who .short{display:none}
-/* 登出：藥丸形的框線鈕，跟對外頁的次要按鈕同一個形狀。 */
-.btnav-out{font-family:var(--body);font-size:14px;font-weight:600;color:var(--ink);
-  background:none;border:1px solid rgba(16,42,134,.3);border-radius:999px;
-  padding:7px 14px;min-height:38px;cursor:pointer;flex:none;position:relative;
+/* 頂欄右邊那兩顆藥丸鈕：登出、以及窄螢幕才出現的選單。
+   **兩顆共用同一份樣式，不要各寫一份。**
+   2026-09-10 Paul：「我說選單跟登出…」——當時選單用 var(--display) 15px 700
+   加字距，登出用 var(--body) 14px 600，於是兩顆一高一低、一粗一細，
+   並排看就是歪的（量出來中心線差 7px）。兩顆是同一種東西，就該長得一模一樣。
+
+   ⚠ **高度靠 min-height 加 inline-flex 置中，不要靠 padding 湊。**
+   用 padding 湊的話，只要哪天有人改了字體或字級，兩顆又會不一樣高，
+   而且不會有任何東西報錯。 */
+.btnav-out,.btnav-burger{
+  font-family:var(--body);font-size:14px;font-weight:600;letter-spacing:normal;
+  color:var(--ink);background:none;border:1px solid rgba(16,42,134,.3);border-radius:999px;
+  padding:0 14px;min-height:38px;
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;flex:none;position:relative;white-space:nowrap;
   transition:background .15s,border-color .15s}
-.btnav-out:hover{border-color:var(--ink);background:rgba(255,255,255,.7)}
+.btnav-out:hover,.btnav-burger:hover{border-color:var(--ink);background:rgba(255,255,255,.7)}
 /* 可點區域 44x44，視覺大小不變。跟對外頁同一個做法。 */
 .btnav-logo::after,.btnav-out::after{
   content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
 .btnav :focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
 /* ── 選單（2026-09-10）────────────────────────────────────────────
-   寬螢幕上這兩個東西根本不存在，那排連結就是頂欄的一部分，跟以前一模一樣。 */
+   寬螢幕上這兩個東西根本不存在，那排連結就是頂欄的一部分，跟以前一模一樣。
+   ⚠ 這一條要排在上面那份共用樣式**後面**，不然 display 蓋不掉。 */
 .btnav-toggle,.btnav-burger{display:none}
 
 /* ── 窄螢幕：四個功能項收進「選單」──────────────────────────────────
@@ -86,14 +110,9 @@
      寫了 relative 會把 sticky 蓋掉，手機上頂欄就不再跟著捲 —— 而那不會報錯。 */
   .btnav{gap:10px;padding:7px 8px 7px 12px}
   .btnav-logo img{height:22px}
-  .btnav-burger{
-    display:block;cursor:pointer;
-    font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:.08em;
-    color:var(--ink);padding:7px 12px;border-radius:999px;
-    border:1px solid rgba(16,42,134,.3);position:relative;white-space:nowrap;
-    /* 排到最右邊。<details> 是 display:contents，所以 summary 與那排連結
-       是頂欄的直接小孩，order 對它們有作用。 */
-    order:9}
+  /* 選單這裡只做兩件事：出現、排到最右邊。**外觀完全沿用跟登出共用的那一份**，
+     所以兩顆永遠一樣高、一樣的字。 */
+  .btnav-burger{display:inline-flex;order:9}
   .btnav-burger::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
   /* checkbox 本身要留在無障礙樹裡（鍵盤 tab 得到、讀螢幕唸得出來），
      所以是移到畫面外，不是 display:none。 */
