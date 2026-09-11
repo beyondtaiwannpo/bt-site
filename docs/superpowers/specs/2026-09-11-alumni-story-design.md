@@ -204,14 +204,22 @@ public_alumni_avatar(p_key)  -- 回一個人的大頭照
 - 這一頁**仍然不載 supabase 套件**，用瀏覽器內建的 fetch 打 REST 端點。
 - `alumni/community.json` 留著，`_readme` 改寫成「這是示範資料，真名單在資料庫」。
 
-⚠ **待 Paul 決定**：那支 fetch 需要專案網址與公開金鑰，而它們現在在
-`shared/supabase.js`，那個檔案一被 import 就會把整包 supabase 套件拉進來。
-兩條路：
+### 金鑰放哪（Paul 2026-09-11 拍板）
 
-- 甲：新增 `shared/supabase-config.js` 只放兩個常數，`shared/supabase.js` 改成讀它。
-  單一真相，但**動到 `shared/`，GOALS 說要先問**。
-- 乙：`alumni/index.html` 自己寫一份常數，`check.sh` 加一條守門比對兩份一致。
-  不動 `shared/`，代價是同一個值有兩份。
+那支 fetch 需要專案網址與公開金鑰，而它們現在在 `shared/supabase.js`，
+那個檔案一被 import 就會把整包 supabase 套件拉進來。
+
+**決定：新增 `shared/supabase-config.js`**，裡面只有兩個常數，
+`shared/supabase.js` 改成從它 import。整站只有一份金鑰。
+
+這是 GOALS「在 `shared/` 加新檔案要先問 Paul」那一條，2026-09-11 問過並同意。
+理由：另一條路（`alumni/index.html` 自己寫一份，`check.sh` 比對）
+會讓同一個值有兩份，而換 Supabase 專案時漏改一份的表現是
+「對外頁面的校友名單安靜地空掉」，退回示範資料，**不會有人發現**。
+
+⚠ 那支新檔**只能放常數，不可以 import 任何東西**。
+它一旦 import `vendor/supabase-js.js`，這一節的理由就整個消失了。
+`check.sh` 加一條守它沒有 import。
 
 ---
 
@@ -281,8 +289,10 @@ public_alumni_avatar(p_key)  -- 回一個人的大頭照
 
 ## 十、會碰到的檔案
 
-- 新增：`supabase/migrations/2026-09-17-alumni-stories.sql`、`test/alumni-story.test.mjs`
-- 改：`supabase/schema.sql`、`supabase/rls-test.sql`、`shared/auth.js`、`shared/nav.js`、
+- 新增：`supabase/migrations/2026-09-17-alumni-stories.sql`、`test/alumni-story.test.mjs`、
+  `shared/supabase-config.js`
+- 改：`supabase/schema.sql`、`supabase/rls-test.sql`、`shared/supabase.js`、
+  `shared/auth.js`、`shared/nav.js`、
   `app/src/main.js`、`app/src/ui.js`、`settings/src/main.js`、`settings/src/ui.js`、
   `settings/index.html`、`admin/src/data.js`、`admin/src/main.js`、`admin/src/ui.js`、
   `alumni/index.html`、`alumni/community.json`、`privacy/index.html`、
