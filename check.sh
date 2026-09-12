@@ -1009,7 +1009,10 @@ done
 # 而這條守門完全沒有看到它們 —— 守門的範圍安靜地縮小了，
 # 這正是它自己下面那段註解在講的那種失敗。
 # 每個檔案各自寫死寫入點的數量，理由同下。
-PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:1 settings/src/main.js:3"
+# 2026-09-11：settings/src/main.js 從 3 個寫入點變成 4 個 —— C1 加了校友
+# 那一條路（只寫 name_zh / name_en，不碰 school / grade）。刻意的摩擦，
+# 改動寫入路徑的人要回來改這一行，理由見上面。
+PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:1 settings/src/main.js:4"
 
 profileCols=$(node -e '
   const fs = require("fs");
@@ -1132,6 +1135,40 @@ else
   else
     ok "前端寫進 alumni_stories 的欄位（${storyCols}）都在允許清單裡"
   fi
+fi
+
+# ── scripts/db/smoke.sh 的遷移檔清單要跟得上目錄（總審查 I4，2026-09-11）──
+#
+# 這批已經被它咬過一次：smoke.sh 的 for 迴圈清單是寫死的一串，
+# 停在 2026-09-16-mail-templates.sql，後來新增的三支（2026-09-17 到 19）
+# 一開始完全沒被跑到，腳本照樣印出「全部通過」——這正是這個 repo 最常見的
+# 失敗形狀：守門的範圍比現實窄，而少守的那一塊沒有人會發現。
+#
+# 「記得補清單」不是防法，寫在檔案裡的教訓只有讀到那一份的人會看到。
+# 這裡改成自動比對：少了任何一支就紅。
+#
+# ⚠ **不是比對全部遷移檔。** smoke.sh 用手刻的最小結構模擬 2026-09-08 之前
+# 的「既有結構」（護照、profiles 那幾張表），2026-09-08 之前的遷移檔本來就
+# 不在它的 for 迴圈裡，那是設計，不是漏掉。所以只比對「smoke.sh 清單裡最早
+# 那一支」（含）以後的遷移檔——比那更早的，用日期字串排序天生排得出來
+# （檔名開頭就是 YYYY-MM-DD）。
+smokeMissing=$(node -e '
+  const fs = require("fs");
+  const files = fs.readdirSync("supabase/migrations").filter(f => f.endsWith(".sql")).sort();
+  const smoke = fs.readFileSync("scripts/db/smoke.sh", "utf8");
+  const listed = new Set(
+    [...smoke.matchAll(/supabase\/migrations\/([A-Za-z0-9_.-]+\.sql)/g)].map(m => m[1]));
+  if (!listed.size) { console.log("__EMPTY__"); process.exit(0); }
+  const earliest = [...listed].sort()[0];
+  const missing = files.filter(f => f >= earliest && !listed.has(f));
+  console.log(missing.join(" "));
+' 2>&1)
+if [ "$smokeMissing" = "__EMPTY__" ]; then
+  bad "scripts/db/smoke.sh 裡完全抓不到任何 supabase/migrations/*.sql 的檔名，這條守門自己壞了"
+elif [ -n "$smokeMissing" ]; then
+  bad "scripts/db/smoke.sh 的遷移檔清單漏了：${smokeMissing}（在本機跑一次全部遷移檔會跑不到它們）"
+else
+  ok "scripts/db/smoke.sh 的遷移檔清單跟 supabase/migrations/ 目錄對得上"
 fi
 
 # 給維護者看的註解，不可以變成頁面上看得到的字

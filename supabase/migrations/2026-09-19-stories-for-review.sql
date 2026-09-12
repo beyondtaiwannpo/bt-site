@@ -64,17 +64,24 @@ begin;
 -- order by story_approved：false 排在 true 前面，所以**等核可的在最上面** ——
 -- 這一頁的工作就是處理那幾個。同一組裡面最近改過的排前面（改過文字會自動下架，
 -- 所以那幾個正是重新回到隊伍裡的人）。
+-- ⚠ **多回 approved_at**（總審查 I5，2026-09-11）。touch_updated_at() 是
+-- before update 的 trigger，而核可本身也是一句 update，所以按下核可之後
+-- updated_at 會被蓋成核可的時間——「內容最後改過：」這句話對**已核可**的人
+-- 會說謊，而那正是人在做安全判斷時看的資訊。不改 trigger（那是共用的，
+-- 改了會動到這張表以外的行為），改成後台自己分開顯示：未核可的人看
+-- 「內容最後改過」（updated_at），已核可的人看「核可於」（approved_at）。
 create or replace function public.stories_for_review()
 returns table (
   id uuid, name text, school text, county text, city text, country text, place text,
-  quote text, note text, public_story boolean, story_approved boolean, updated_at timestamptz
+  quote text, note text, public_story boolean, story_approved boolean,
+  updated_at timestamptz, approved_at timestamptz
 ) language sql security definer stable
 set search_path = public, pg_temp
 as $$
   select s.id,
          coalesce(nullif(btrim(s.display_name), ''), p.name_zh, p.name_en, '（沒有名字）'),
          s.school, s.county, s.city, s.country, s.place,
-         s.quote, s.note, s.public_story, s.story_approved, s.updated_at
+         s.quote, s.note, s.public_story, s.story_approved, s.updated_at, s.approved_at
     from public.alumni_stories s
     join public.profiles p on p.id = s.id
    where s.public_story
@@ -129,7 +136,7 @@ select * from (
       and (select body from sr) like '%name_zh%'
       and (select body from sr) like '%order by s.story_approved%'
       and (select array_to_string(proargnames, ',') from sr)
-          = 'id,name,school,county,city,country,place,quote,note,public_story,story_approved,updated_at'
+          = 'id,name,school,county,city,country,place,quote,note,public_story,story_approved,updated_at,approved_at'
       and (select count(*) from pg_proc p, aclexplode(p.proacl) x
             where p.proname='stories_for_review'
               and x.grantee in (0::regrole, 'anon'::regrole)
@@ -186,10 +193,10 @@ select * from (
   -- ★ 這一串欄位名就是後台那一頁的介面（admin/src/ui.js 的 alumniStoriesHTML）。
   --   改名字要兩邊一起改，不然畫面上會出現一排空白，而且不會有任何錯誤。
   union all select 8, '★ 回傳的欄位名跟後台讀的 key 一樣',
-    'id,name,school,county,city,country,place,quote,note,public_story,story_approved,updated_at',
+    'id,name,school,county,city,country,place,quote,note,public_story,story_approved,updated_at,approved_at',
     coalesce((select array_to_string(proargnames, ',') from sr), '（查不到）'),
     case when (select array_to_string(proargnames, ',') from sr)
-            = 'id,name,school,county,city,country,place,quote,note,public_story,story_approved,updated_at'
+            = 'id,name,school,county,city,country,place,quote,note,public_story,story_approved,updated_at,approved_at'
     then 'PASS' else 'FAIL' end
 
   union all select 9, '★ 沒登入的人叫不動這一支', '0 筆',

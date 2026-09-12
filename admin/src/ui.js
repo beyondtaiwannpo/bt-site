@@ -387,9 +387,13 @@ export function tabsHTML(tab, isPresident) {
 // ⚠ 那兩句提醒不是裝飾。系統沒有生日欄位，「未滿 18 不放」技術上擋不住，
 // 而大頭照對外是超出現行隱私政策告知範圍的新用途。
 // 這一頁是這兩件事**唯一會被看到的地方**。
+// ⚠ 這一頁只有 Co-President 看得到（呼叫端已經擋過），所以分頁列
+// 直接把 isPresident 寫死成 true —— 少了這一列，核可完想回申請表
+// 就只能重新整理整頁（小問題 7，總審查）。
 export function publicTeamHTML(people, msg, busy) {
   const on = people.filter(p => p.public_approved).length;
   return `<div class="card">
+    ${tabsHTML("team", true)}
     <h2>團隊頁</h2>
     <div class="sub">誰出現在對外的 /team/ 上。已經公開 ${on} 人。</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
@@ -423,6 +427,10 @@ export function publicTeamHTML(people, msg, busy) {
 // ⚠ 這裡要看到的是**內容**，不是名字。核可的意思是
 // 「這段文字可以用 BT 的名義公開」，看不到那段文字就沒辦法判斷 ——
 // 所以那一句話與那段介紹一律整段畫出來，不收在「點開才看得到」裡面。
+// ⚠ touch_updated_at() 是 before update 的 trigger，核可本身也是一句 update，
+// 所以按下核可之後 updated_at 會變成核可時間。對已核可的人顯示「內容最後改過」
+// 就是在說謊——那是人做安全判斷時看的資訊（總審查 I5）。不改共用的 trigger，
+// 改成這裡分開顯示：未核可看 updated_at，已核可看 approved_at。
 export function alumniStoriesHTML(rows, msg, busy) {
   // rows 可能是 undefined（載入失敗那一瞬間）。**這一頁寧可少東西也不能空白**，
   // 那是這個 repo 的規矩：連不上資料庫也要畫得出東西。
@@ -435,6 +443,7 @@ export function alumniStoriesHTML(rows, msg, busy) {
   const sorted = list.slice()
     .sort((a, b) => Number(!!a.story_approved) - Number(!!b.story_approved));
   return `<div class="card">
+    ${tabsHTML("stories", true)}
     <h2>校友頁</h2>
     <div class="sub">誰出現在對外的 /alumni/ 航線圖上。已經公開 ${on} 人。</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
@@ -457,7 +466,9 @@ export function alumniStoriesHTML(rows, msg, busy) {
               → ${esc([r.country, r.city, r.place].filter(Boolean).join("・"))}</div>
             <p class="fquote">${esc(r.quote || "")}</p>
             <p class="fmeta">${esc(r.note || "")}</p>
-            <div class="fmeta">內容最後改過：${esc(String(r.updated_at || "").slice(0, 10))}</div>
+            <div class="fmeta">${r.story_approved
+              ? `核可於：${esc(String(r.approved_at || "").slice(0, 10))}`
+              : `內容最後改過：${esc(String(r.updated_at || "").slice(0, 10))}`}</div>
           </div>
         </div>
       </li>`).join("")}</ul>` : `<div class="empty">還沒有人勾同意。<br>
