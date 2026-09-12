@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML } from "../settings/src/ui.js";
+import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML,
+         saveFailMessage } from "../settings/src/ui.js";
 import { alumniStoriesHTML, tabsHTML } from "../admin/src/ui.js";
 import { says } from "../admin/src/data.js";
 
@@ -91,6 +92,93 @@ test("★ settings/src/main.js 寫 alumni_stories 分 insert / update 兩條路�
   assert.equal(/\.from\("alumni_stories"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\s*[^{\s]/.test(src), false);
 });
 
+// ── 校友的設定頁：整條路在中段斷掉（2026-09-11 總審查的 C1 與 I2）──────
+//
+// 症狀：校友填完故事按「存起來」，看到的是「姓名、學校、年級三個都要填」，
+// 故事一個字都沒有被送出。成因是設定頁只有「幹部 / 不是幹部」兩分法，
+// 校友掉進學員那一條，而那條路在任何故事程式碼之前就 return。
+//
+// **375 條測試全綠，因為沒有一條斷言「校友不該看到年級」。**
+// 下面這幾條就是那個缺口：它們看的是校友那一份畫面本身。
+const ALUM = { role: "alumni", name_zh: "張小睿", name_en: "Rui Chang", email: "a@b.c" };
+const STUDENT = { role: "student", name_zh: "小明", email: "a@b.c" };
+const CADRE = { role: "cadre", name_zh: "王平", email: "a@b.c" };
+
+test("★ 校友的設定頁不可以出現「年級」與「就讀學校」（那是問高中生的）", () => {
+  const h = settingsHTML(ALUM, "", false, FULL);
+  assert.equal(/id="grade"/.test(h), false, "校友看到了年級那一格");
+  assert.equal(/id="school"/.test(h), false, "校友看到了「就讀學校」那一格");
+  assert.equal(/年級/.test(h), false);
+  assert.equal(/就讀學校/.test(h), false);
+  // 電子報同意是註冊時問高中生的事，校友那一頁沒有。
+  assert.equal(/id="nl"/.test(h), false);
+});
+
+test("★ 校友的設定頁要有中文姓名與英文姓名", () => {
+  const h = settingsHTML(ALUM, "", false, FULL);
+  assert.match(h, /id="nzh"/);
+  assert.match(h, /id="nen"/);
+  assert.match(h, /中文姓名/);
+  assert.match(h, /英文姓名/);
+});
+
+// ⚠ 同意書寫著「我同意把我的名字、**大頭照**、高中…放上公開的校友頁」，
+// 而 public_alumni_avatar() 拿的正是 profiles.avatar。
+// 沒有這一區的話，我們對他宣告的公開範圍裡有一個他給不了的東西。
+test("★ 校友的設定頁要有大頭照那一區，說明講的是校友頁不是進度牆", () => {
+  const h = settingsHTML(ALUM, "", false, FULL);
+  assert.match(h, /data-act="avatar"/, "校友換不了大頭照");
+  assert.match(h, /故事被核可之後/, "沒有說清楚那張照片什麼時候才會對外出現");
+  assert.equal(/進度牆/.test(h), false, "校友不在幹部的進度牆上");
+  assert.equal(/id="pub"/.test(h), false, "校友不會出現在公開團隊頁上，不該看到那個勾");
+});
+
+// 三分法的另外兩份**一個字都不可以變**。這一條是上面那些改動的安全網。
+test("★ 幹部與學員各自的畫面沒有變", () => {
+  const c = settingsHTML(CADRE, "", false, FULL);
+  assert.match(c, /id="nzh"/); assert.match(c, /id="nen"/);
+  assert.match(c, /所屬 team/);
+  assert.match(c, /data-act="avatar"/); assert.match(c, /id="pub"/);
+  assert.match(c, /進度牆/);
+  assert.match(c, /我的故事/);
+
+  const s = settingsHTML(STUDENT, "", false, null);
+  assert.match(s, /id="school"/); assert.match(s, /id="grade"/); assert.match(s, /id="nl"/);
+  assert.equal(/data-act="avatar"/.test(s), false);
+  assert.equal(/我的故事/.test(s), false);
+  assert.match(s, /data-act="ask-delete"/);
+});
+
+// ⚠ 存檔那條路也要認得三種人，不然畫面對了、按下去還是被擋。
+// 這一條的形狀跟 check.sh 那條欄位對帳守門一樣（讀原始碼），理由也一樣：
+// 每一句 update 都寫成字面物件，看得懂才守得到。
+test("★ 存檔有三條路，校友那一句只寫姓名，不碰 school / grade", () => {
+  const src = readFileSync(new URL("../settings/src/main.js", import.meta.url), "utf8")
+    .split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+  const sites = src.match(/\.from\("profiles"\)[\s\S]{0,80}?\.update\(\{[\s\S]*?\}\)/g) || [];
+  assert.equal(sites.length, 4,
+    "profiles 的寫入點應該是四個：大頭照、幹部、校友、學員");
+  const alum = sites.find(s => /name_en/.test(s) && !/public_profile/.test(s));
+  assert.ok(alum, "找不到校友那條存檔路徑（只寫中文姓名與英文姓名的那一句）");
+  assert.equal(/school|grade|newsletter/.test(alum), false,
+    "校友那一句寫了他畫面上根本沒有的欄位");
+  assert.match(src, /const alumni = S\.me\.role === "alumni";/);
+});
+
+// ⚠ 失敗一定要說話，而且要說實話。profiles 存好了、故事那一句才失敗的時候，
+// 只說「存不起來」會讓他以為整頁都沒存到，於是把已經存好的東西再改一次。
+test("★ 只有後半失敗的時候，訊息說得出是哪一半", () => {
+  const both = saveFailMessage(false, new Error("網路斷了"));
+  assert.match(both, /存不起來/);
+  assert.match(both, /網路斷了/);
+  assert.equal(/我的故事/.test(both), false);
+
+  const half = saveFailMessage(true, new Error("permission denied"));
+  assert.match(half, /你的資料存起來了/);
+  assert.match(half, /我的故事/);
+  assert.match(half, /permission denied/);
+});
+
 // ── 第三把鑰匙：Co-President 在 /admin/ 核可（2026-09-11）─────────────
 // 這一頁是「兩把鑰匙」裡的第二把唯一會被按下去的地方。
 const ROW = { id: "u1", name: "張 O 睿", school: "高雄中學", city: "Vancouver",
@@ -148,6 +236,42 @@ test("★ 一個人都沒勾的時候說清楚下一步在哪", () => {
 test("★ 校友頁分頁只有 Co-President 看得到", () => {
   assert.match(tabsHTML("stories", true), /data-t="stories"/);
   assert.equal(/data-t="stories"/.test(tabsHTML("forms", false)), false);
+});
+
+// 核可完要回得了申請表。少了分頁列就只能重新載入整頁，
+// 而 Paul 就是要一個一個按核可的人。
+test("★ 校友頁本身畫得出分頁列（核可完回得去申請表）", () => {
+  const h = alumniStoriesHTML([ROW], "", false);
+  assert.match(h, /data-act="tab"/);
+  assert.match(h, /data-t="forms"/);
+});
+
+// ⚠ touch_updated_at() 是 before update 的 trigger，而核可本身也是一句 update，
+// 所以按下核可之後 updated_at 就變成核可時間。
+// 「內容最後改過」對**已核可**的人會說謊，而那是人在做安全判斷時看的資訊。
+test("★ 已核可的顯示「核可於」，等核可的才顯示「內容最後改過」", () => {
+  const waiting = alumniStoriesHTML([{ ...ROW, story_approved: false }], "", false);
+  assert.match(waiting, /內容最後改過：2026-09-11/);
+  assert.equal(/核可於/.test(waiting), false);
+
+  const done = alumniStoriesHTML([{ ...ROW, story_approved: true,
+    updated_at: "2026-09-12T05:00:00Z", approved_at: "2026-09-12T05:00:00Z" }], "", false);
+  assert.match(done, /核可於：2026-09-12/);
+  assert.equal(/內容最後改過/.test(done), false,
+    "核可這個動作自己蓋掉了 updated_at，那一行對已核可的人是假的");
+});
+
+// 上面那一行要成立，資料庫那一支就得多回一欄。
+test("★ stories_for_review() 回傳的欄位含 approved_at", () => {
+  const sql = readFileSync(
+    new URL("../supabase/migrations/2026-09-19-stories-for-review.sql", import.meta.url), "utf8");
+  assert.match(sql, /approved_at timestamptz/);
+  assert.match(sql, /s\.approved_at/);
+  // 驗收表比對的那一串欄位名也要跟著改，不然畫面少一欄而且不會報錯。
+  const want = "id,name,school,county,city,country,place,quote,note," +
+               "public_story,story_approved,updated_at,approved_at";
+  assert.ok((sql.match(new RegExp(want, "g")) || []).length >= 2,
+    "驗收表裡的欄位名清單沒有跟著加 approved_at");
 });
 
 // ⚠ profiles 的讀取政策**不涵蓋校友那幾列**（2026-09-13-public-team.sql）。

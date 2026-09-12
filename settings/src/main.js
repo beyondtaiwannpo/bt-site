@@ -230,14 +230,19 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "save") {
+    // ⚠ **三種人，不是兩種**（總審查 C1，2026-09-11）。原本只有
+    // cadre / 不是 cadre 兩分法，校友掉進「不是 cadre」那一條，
+    // 那一條問的是「姓名、學校、年級」——校友的畫面上根本沒有那三格，
+    // 於是校友的故事一個字都存不進去。ui.js 已經是三分法，這裡要跟上。
     const cadre = S.me.role === "cadre";
+    const alumni = S.me.role === "alumni";
     // **只送這一頁真的有那一格的欄位。** 多送一個沒有權限的欄位，
     // 整句 update 都會被拒（2026-09-01 profiles.team 那個坑）。
     //
-    // ⚠ **兩條路各寫一句字面的 update，不要組一個 patch 物件再送。**
+    // ⚠ **三條路各寫一句字面的 update，不要組一個 patch 物件再送。**
     // check.sh 有一條守門在對「前端寫進 profiles 的欄位」與資料庫發出去的
     // 欄位權限，而它是用比對式讀原始碼的 —— `.update(patch)` 它看不懂，
-    // 會靜靜地漏掉這兩條寫入路徑。**寫成看得懂的樣子，是為了讓守門守得到。**
+    // 會靜靜地漏掉這幾條寫入路徑。**寫成看得懂的樣子，是為了讓守門守得到。**
     let patch;
     if (cadre) {
       patch = {
@@ -246,6 +251,13 @@ document.addEventListener("click", async e => {
         team: pickedTeams() || null,
         public_profile: !!(document.getElementById("pub") || {}).checked,
         public_title: document.getElementById("ptitle") ? (val("ptitle") || null) : S.me.public_title,
+      };
+    } else if (alumni) {
+      // 校友的「我的資料」只有中文姓名與英文姓名兩格（ui.js 同一份改動）。
+      // 不問學校、年級——那是問高中生的，校友的故事已經在下面另一張表裡。
+      patch = {
+        name_zh: val("nzh") || null,
+        name_en: val("nen") || null,
       };
     } else {
       const name = val("nzh"), school = val("school"), grade = val("grade");
@@ -258,21 +270,27 @@ document.addEventListener("click", async e => {
       };
     }
     S.busy = true; S.msg = ""; render();
+    let profileSaved = false;
     try {
       const { error } = cadre
         ? await supabase.from("profiles").update({
             name_zh: patch.name_zh, name_en: patch.name_en, team: patch.team,
             public_profile: patch.public_profile, public_title: patch.public_title,
           }).eq("id", S.user.id)
+        : alumni
+        ? await supabase.from("profiles").update({
+            name_zh: patch.name_zh, name_en: patch.name_en,
+          }).eq("id", S.user.id)
         : await supabase.from("profiles").update({
             name_zh: patch.name_zh, school: patch.school, grade: patch.grade,
             newsletter_opt_in: patch.newsletter_opt_in,
           }).eq("id", S.user.id);
       if (error) throw error;
+      profileSaved = true;
       S.me = { ...S.me, ...patch };
 
       // 「我的故事」。**另一張表，所以是第二個 API 呼叫。**學員沒有這一區。
-      if (S.me.role === "cadre" || S.me.role === "alumni") {
+      if (cadre || alumni) {
         const fields = {
           display_name: val("sname") || null,
           school: val("sschool") || null,
@@ -303,30 +321,40 @@ document.addEventListener("click", async e => {
         // 畫面什麼都沒發生」，這個 repo 2026-09-02 已經被同一件事咬過一次
         // （時間看板的知情同意按鈕）。所以分成兩條明確的路：
         // boot() 已經知道有沒有那一列（S.story 是 null 或物件）。
-        // 兩句都寫成字面物件，理由跟上面 profiles 那兩句一樣 ——
+        // 兩句都寫成字面物件，理由跟上面 profiles 那幾句一樣 ——
         // check.sh 的欄位對帳守門是用比對式讀原始碼的，讀得懂才守得到。
-        const { error: e3 } = S.story
-          ? await supabase.from("alumni_stories").update({
-              display_name: fields.display_name, school: fields.school, county: fields.county,
-              city: fields.city, country: fields.country, place: fields.place,
-              quote: fields.quote, note: fields.note,
-              school_en: fields.school_en, country_en: fields.country_en,
-              quote_en: fields.quote_en, note_en: fields.note_en,
-              public_story: fields.public_story,
-            }).eq("id", S.user.id)
-          : await supabase.from("alumni_stories").insert({
-              id: S.user.id,
-              display_name: fields.display_name, school: fields.school, county: fields.county,
-              city: fields.city, country: fields.country, place: fields.place,
-              quote: fields.quote, note: fields.note,
-              school_en: fields.school_en, country_en: fields.country_en,
-              quote_en: fields.quote_en, note_en: fields.note_en,
-              public_story: fields.public_story,
-            });
-        if (e3) throw e3;
-        // insert 成功之後 S.story 會變成物件，同一次載入裡按第二次存檔
-        // 就會走 update 那條，正確。
-        S.story = { ...(S.story || {}), ...fields };
+        try {
+          const { error: e3 } = S.story
+            ? await supabase.from("alumni_stories").update({
+                display_name: fields.display_name, school: fields.school, county: fields.county,
+                city: fields.city, country: fields.country, place: fields.place,
+                quote: fields.quote, note: fields.note,
+                school_en: fields.school_en, country_en: fields.country_en,
+                quote_en: fields.quote_en, note_en: fields.note_en,
+                public_story: fields.public_story,
+              }).eq("id", S.user.id)
+            : await supabase.from("alumni_stories").insert({
+                id: S.user.id,
+                display_name: fields.display_name, school: fields.school, county: fields.county,
+                city: fields.city, country: fields.country, place: fields.place,
+                quote: fields.quote, note: fields.note,
+                school_en: fields.school_en, country_en: fields.country_en,
+                quote_en: fields.quote_en, note_en: fields.note_en,
+                public_story: fields.public_story,
+              });
+          if (e3) throw e3;
+          // insert 成功之後 S.story 會變成物件，同一次載入裡按第二次存檔
+          // 就會走 update 那條，正確。
+          S.story = { ...(S.story || {}), ...fields };
+        } catch (err) {
+          // ⚠ 「我的資料」已經存好了，這裡才失敗——不能只說「存不起來」，
+          // 那會讓他以為整頁都沒存到，於是把已經存好的東西再改一次，
+          // 而真正失敗的那一半他完全不知道（小問題 8，總審查）。
+          S.busy = false;
+          S.msg = UI.saveFailMessage(true, err);
+          render();
+          return;
+        }
       }
 
       S.busy = false;
@@ -338,7 +366,7 @@ document.addEventListener("click", async e => {
       S.msg = notes.length ? "存好了。" + notes.join("") : "存好了。";
     } catch (err) {
       // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再按一次。
-      S.busy = false; S.msg = "存不起來：" + (err.message || err);
+      S.busy = false; S.msg = UI.saveFailMessage(profileSaved, err);
     }
     render();
     return;

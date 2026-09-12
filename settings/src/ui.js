@@ -67,8 +67,10 @@ export function teamPickHTML(cur) {
   </fieldset>`;
 }
 
-// 島上的 16 個起飛點。**順序與內容跟 scripts/taiwan/cities.json 一致**
-// （test/alumni-story.test.mjs 逐字比對）。
+// 島上的 16 個起飛點。**這 16 個縣市跟 scripts/taiwan/cities.json 是同一組**
+// （test/alumni-story.test.mjs 比對的是兩邊排序後的集合，所以守的是
+//  「有沒有多一個或少一個」，**不是順序**。下面這個順序是給人看的，
+//  由北到南再繞回東部，改順序不會有任何測試變紅）。
 // 填錯或填了表上沒有的縣市，那個人只會**安靜地不出現**在航線圖上，
 // 所以這裡是選單不是文字框，資料庫那邊還有一條 check constraint。
 export const COUNTIES = ["台北", "桃園", "新竹", "苗栗", "台中", "彰化", "南投",
@@ -95,9 +97,16 @@ export function storyStatus(story) {
   return "已經在公開的校友頁上了。改了那一句話或介紹，會自動下架等重新核可。";
 }
 
+// ⚠ **這一頁有三種人，不是兩種**（2026-09-11 修）。
+// 原本只有 cadre / 不是 cadre 兩分法，校友於是掉進學員那一條，
+// 看到的是「你的名字 / 就讀學校 / 年級」—— 那是問高中生的 ——
+// 而存檔那條路在任何故事程式碼之前就被「姓名、學校、年級三個都要填」擋住，
+// **校友的故事一個字都存不進去**。畫面對不對跟存不存得起來是同一件事的兩半，
+// 所以 ui.js 與 main.js 的分法必須一致：幹部 / 校友 / 學員。
 export function settingsHTML(me, msg, busy, story) {
   const cadre = me.role === "cadre";
-  const teller = cadre || me.role === "alumni";   // 誰有「我的故事」
+  const alumni = me.role === "alumni";
+  const teller = cadre || alumni;                // 誰有「我的故事」與大頭照
   const v = k => esc(me[k] || "");
   return `<div class="card">
     <h2>設定</h2>
@@ -105,11 +114,11 @@ export function settingsHTML(me, msg, busy, story) {
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
 
     <h3 class="sec-h">我的資料</h3>
-    ${cadre ? `<div class="two">
+    ${teller ? `<div class="two">
       <label><i>中文姓名</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
       <label><i>英文姓名</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
     </div>
-    ${teamPickHTML(me.team)}`
+    ${cadre ? teamPickHTML(me.team) : ""}`
     : `<label><i>你的名字</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
     <div class="two">
       <label><i>就讀學校</i><input id="school" list="schools" value="${v("school")}"
@@ -126,7 +135,7 @@ export function settingsHTML(me, msg, busy, story) {
       <span>我願意收 BT 的活動通知與資源更新。每一封都有取消訂閱的連結。</span>
     </label>`}
 
-    ${cadre ? avatarHTML(me) : ""}
+    ${teller ? avatarHTML(me, cadre) : ""}
     ${teller ? storyHTML(me, story) : ""}
 
     <!-- 2026-09-10：儲存列。Paul 的原話：「下面的存起來現在看起來不像整頁的儲存按鈕，
@@ -152,8 +161,29 @@ export function settingsHTML(me, msg, busy, story) {
 }
 
 // 大頭照與「要不要公開」**放在同一塊**，理由見檔頭。
-function avatarHTML(me) {
+//
+// 校友也有這一區（2026-09-11 修）。理由是他勾的那張同意書上寫著
+// 「我同意把我的名字、**大頭照**、高中…放上公開的校友頁」，
+// 而公開那一頁的照片拿的正是 profiles.avatar —— 沒有這一區的話，
+// 我們對他宣告的公開範圍裡有一個他根本給不了的東西。
+//
+// 但**說明要跟著分岔**：校友不在幹部的進度牆上，也不在公開團隊頁上，
+// 他的照片只會跟著那段故事出現在 /alumni/ 上。同一句話對兩種人不能都成立。
+function avatarHTML(me, cadre) {
   const on = !!me.public_profile;
+  if (!cadre) {
+    return `<h3 class="sec-h">大頭照</h3>
+    <div class="avrow">
+      <button class="avbtn" data-act="avatar" title="換一張大頭照">${
+        me.avatar ? `<img src="${esc(me.avatar)}" alt="">`
+                  : `<span>點這裡<br>上傳</span>`}</button>
+      <div class="avside">
+        這張照片會跟著你下面那段故事一起出現在<b>任何人都看得到的
+        <a href="../alumni/">公開校友頁</a></b>上，<b>故事被核可之後</b>才會出現。<br>
+        不上傳也沒有關係，那一頁會改用你名字的第一個字。
+      </div>
+    </div>`;
+  }
   return `<h3 class="sec-h">大頭照與公開</h3>
     <div class="avrow">
       <button class="avbtn" data-act="avatar" title="換一張大頭照">${
@@ -251,6 +281,18 @@ export function deleteHTML(msg, busy) {
       <button class="btn quiet" data-act="back">先不要</button>
     </div>
   </div>`;
+}
+
+// 存檔失敗的那一句話。**要說得出是哪一半沒存到。**
+//
+// 「我的資料」與「我的故事」是兩張表、兩句話。前一句成功、後一句失敗的時候，
+// 只說「存不起來」是假的：他會以為整頁都沒存到，於是把已經存好的東西再改一次，
+// 而真正失敗的那一半他完全不知道。
+export function saveFailMessage(profileSaved, err) {
+  const why = (err && (err.message || err.code)) || String(err || "");
+  return profileSaved
+    ? `你的資料存起來了，但「我的故事」那一段沒有存進去：${why}。再按一次「存起來」會重試那一段。`
+    : `存不起來：${why}`;
 }
 
 export function downHTML() {
