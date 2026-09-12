@@ -7,7 +7,9 @@ import * as AUTH from "../../shared/auth.js";
 import { navHTML } from "../../shared/nav.js";
 import * as UI from "./ui.js";
 
-let S = { user: null, me: null, down: false, busy: false, msg: "", view: "main" };
+// S.story：`null` 代表「還沒查」或「這個人沒有故事那一列」，`{}` 會讓人以為
+// 查過了但是空的 —— 學員完全不會發那個查詢，所以 `null` 才是誠實的初始值。
+let S = { user: null, me: null, story: null, down: false, busy: false, msg: "", view: "main" };
 const root = () => document.getElementById("bt-root");
 
 function render() {
@@ -24,14 +26,19 @@ function render() {
   if (!S.me) { el.innerHTML = UI.downHTML(); return; }
 
   if (S.view === "delete") { el.innerHTML = nav + UI.deleteHTML(S.msg, S.busy); return; }
-  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy);
+  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story);
 
-  // 學校清單只在學員那一頁用得到，而且是點進那一格才載。
-  const sc = document.getElementById("school");
-  if (sc) sc.addEventListener("focus", fillSchools, { once: true });
+  // 學校清單學員的 #school 跟幹部/校友「我的故事」那格的 #sschool 共用同一份
+  // datalist，兩格都要點進去才載（2026-09-11：故事那一格也接上自動完成）。
+  for (const id of ["school", "sschool"]) {
+    const el2 = document.getElementById(id);
+    if (el2) el2.addEventListener("focus", fillSchools, { once: true });
+  }
 }
 
 let schoolsLoaded = false;
+// 學校清單留一份在模組層，選高中要自動帶縣市（countyOf）才查得到。
+let SCHOOLS = [];
 async function fillSchools() {
   if (schoolsLoaded) return;
   schoolsLoaded = true;
@@ -41,13 +48,36 @@ async function fillSchools() {
     const data = await res.json();
     const dl = document.getElementById("schools");
     if (!dl || !data || !Array.isArray(data.schools)) return;
+    SCHOOLS = data.schools;
     dl.innerHTML = data.schools
       .map(s => `<option value="${String(s.label).replace(/"/g, "&quot;")}"></option>`).join("");
   } catch (e) {
     // 載不到就是一個普通的文字欄位，**不要對他說任何話** —— 對他來說沒有壞掉。
+    // 「我的故事」那一格的縣市也不會被自動帶出來，但他自己選得了。
     console.warn("學校清單載不到，那一格照樣可以自己打字。", e);
   }
 }
+
+// 選了高中就把縣市帶出來。**只在縣市還空著的時候帶** ——
+// 蓋掉他自己選的那一個會很嚇人，尤其是高中在新北、起飛點要選台北的人。
+// 對不上就不動，那一格他自己選得了。
+function countyOf(label) {
+  const hit = (SCHOOLS || []).find(s => s.label === label);
+  if (!hit) return "";
+  const c = String(hit.county || "").replace(/[市縣]$/, "").replace(/^臺/, "台");
+  if (c === "新北") return "台北";           // 圖上沒有新北，起飛點畫在台北
+  return UI.COUNTIES.includes(c) ? c : "";
+}
+
+// 高中那一格是自動完成，**change 才是「選定」的時機**（不是 input，
+// 打字過程每個字都會觸發 input，那時候還沒選好）。
+document.addEventListener("change", e => {
+  if (!e.target || e.target.id !== "sschool") return;
+  const sel = document.getElementById("scounty");
+  if (!sel || sel.value) return;          // 他自己選過就不要蓋掉
+  const c = countyOf(e.target.value);
+  if (c) sel.value = c;
+});
 
 async function boot() {
   try {
@@ -61,6 +91,16 @@ async function boot() {
       .eq("id", S.user.id).maybeSingle();
     if (error) throw error;
     S.me = { ...(data || {}), email: S.user.email };
+    // 「我的故事」是另一張表。學員沒有這一區，所以也不用查。
+    if (S.me.role === "cadre" || S.me.role === "alumni") {
+      const { data: st, error: e2 } = await supabase.from("alumni_stories")
+        .select("display_name, school, county, city, country, place, quote, note, " +
+                "school_en, country_en, quote_en, note_en, public_story, story_approved, updated_at")
+        .eq("id", S.user.id).maybeSingle();
+      // 讀不到故事**不擋整頁**：姓名與大頭照照樣要改得動。
+      if (e2) console.warn("故事讀不到，先當作還沒填：", e2);
+      S.story = st || null;
+    }
     render();
   } catch (e) {
     console.error("/settings/ 載入失敗：", e);
@@ -230,10 +270,72 @@ document.addEventListener("click", async e => {
           }).eq("id", S.user.id);
       if (error) throw error;
       S.me = { ...S.me, ...patch };
+
+      // 「我的故事」。**另一張表，所以是第二個 API 呼叫。**學員沒有這一區。
+      if (S.me.role === "cadre" || S.me.role === "alumni") {
+        const fields = {
+          display_name: val("sname") || null,
+          school: val("sschool") || null,
+          county: (document.getElementById("scounty") || {}).value || null,
+          city: val("scity") || null,
+          country: val("scountry") || null,
+          place: val("splace") || null,
+          quote: val("squote") || null,
+          note: val("snote") || null,
+          school_en: val("sschoolen") || null,
+          country_en: val("scountryen") || null,
+          quote_en: val("squoteen") || null,
+          note_en: val("snoteen") || null,
+          public_story: !!(document.getElementById("spub") || {}).checked,
+        };
+        // 勾了同意才要求填齊。還沒勾的人是在慢慢填，不要擋他存檔。
+        const missing = UI.storyMissing(fields);
+        if (fields.public_story && missing.length) {
+          S.busy = false;
+          S.msg = "要公開的話這幾格還沒填：" + missing.join("、");
+          render(); return;
+        }
+        // ⚠ **不可以用 .upsert()**：alumni_stories 是欄位層級授權，id 只有
+        // INSERT 權限、沒有 UPDATE 權限（Task 4 的遷移檔刻意這樣發，本人才
+        // 改不動「這是誰的故事」）。upsert 展開成
+        // `insert ... on conflict (id) do update set <payload 每一欄>`，
+        // id 會被塞進那份 SET 清單，整句被資料庫拒絕 —— 症狀是「按了存起來，
+        // 畫面什麼都沒發生」，這個 repo 2026-09-02 已經被同一件事咬過一次
+        // （時間看板的知情同意按鈕）。所以分成兩條明確的路：
+        // boot() 已經知道有沒有那一列（S.story 是 null 或物件）。
+        // 兩句都寫成字面物件，理由跟上面 profiles 那兩句一樣 ——
+        // check.sh 的欄位對帳守門是用比對式讀原始碼的，讀得懂才守得到。
+        const { error: e3 } = S.story
+          ? await supabase.from("alumni_stories").update({
+              display_name: fields.display_name, school: fields.school, county: fields.county,
+              city: fields.city, country: fields.country, place: fields.place,
+              quote: fields.quote, note: fields.note,
+              school_en: fields.school_en, country_en: fields.country_en,
+              quote_en: fields.quote_en, note_en: fields.note_en,
+              public_story: fields.public_story,
+            }).eq("id", S.user.id)
+          : await supabase.from("alumni_stories").insert({
+              id: S.user.id,
+              display_name: fields.display_name, school: fields.school, county: fields.county,
+              city: fields.city, country: fields.country, place: fields.place,
+              quote: fields.quote, note: fields.note,
+              school_en: fields.school_en, country_en: fields.country_en,
+              quote_en: fields.quote_en, note_en: fields.note_en,
+              public_story: fields.public_story,
+            });
+        if (e3) throw e3;
+        // insert 成功之後 S.story 會變成物件，同一次載入裡按第二次存檔
+        // 就會走 update 那條，正確。
+        S.story = { ...(S.story || {}), ...fields };
+      }
+
       S.busy = false;
-      S.msg = cadre && patch.public_profile && !S.me.public_approved
-        ? "存好了。公開那一項還要等 Co-President 核可才會出現。"
-        : "存好了。";
+      const notes = [];
+      if (cadre && patch.public_profile && !S.me.public_approved)
+        notes.push("公開那一項還要等 Co-President 核可才會出現。");
+      if (S.story && S.story.public_story && !S.story.story_approved)
+        notes.push("你的故事還要等 Co-President 核可才會出現在校友頁上。");
+      S.msg = notes.length ? "存好了。" + notes.join("") : "存好了。";
     } catch (err) {
       // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再按一次。
       S.busy = false; S.msg = "存不起來：" + (err.message || err);

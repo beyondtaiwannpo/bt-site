@@ -74,3 +74,25 @@ test("★ 離島的人看得到一句說明", () => {
   const h = storyHTML({ role: "alumni", name_zh: "張小睿" }, FULL);
   assert.match(h, /澎湖|金門|馬祖/);
 });
+
+// ⚠ alumni_stories 是欄位層級授權，id 只有 INSERT 權限、沒有 UPDATE 權限。
+// .upsert() 展開後會把 id 塞進 UPDATE 的 SET 清單，整句被資料庫拒絕
+//（症狀是「按了存起來，畫面什麼都沒發生」，2026-09-02 已經被同一件事咬過一次）。
+// 所以這裡**不准出現 .upsert()**，要分成 insert / update 兩條路，
+// 而且兩句都要是字面物件——check.sh 那條欄位對帳守門是用比對式讀原始碼的，
+// `.update(patch)` 這種寫法它看不懂，會靜靜地跳過那個寫入點。
+test("★ settings/src/main.js 寫 alumni_stories 分 insert / update 兩條路，都用字面物件，不用 upsert", () => {
+  const src = readFileSync(new URL("../settings/src/main.js", import.meta.url), "utf8");
+  assert.equal(/\.from\("alumni_stories"\)[\s\S]{0,80}?\.upsert\(/.test(src), false);
+  assert.match(src, /\.from\("alumni_stories"\)[\s\S]{0,80}?\.insert\(\{/);
+  assert.match(src, /\.from\("alumni_stories"\)[\s\S]{0,80}?\.update\(\{/);
+  assert.equal(/\.from\("alumni_stories"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\s*[^{\s]/.test(src), false);
+});
+
+// story_approved 由資料庫管。前端送它的話整句會被拒，而且那是在偷轉另一把鑰匙。
+test("★ 前端不送 story_approved 與 approved_at", () => {
+  const src = readFileSync(new URL("../settings/src/main.js", import.meta.url), "utf8")
+    .split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+  assert.equal(/story_approved\s*:/.test(src), false);
+  assert.equal(/approved_at\s*:/.test(src), false);
+});

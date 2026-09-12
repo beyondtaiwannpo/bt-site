@@ -1063,6 +1063,75 @@ else
   fi
 fi
 
+# 前端往 alumni_stories 寫的每一欄，都必須是資料庫真的發了權限的那幾欄
+# （2026-09-11，「我的故事」，跟上面 profiles 那條同一套道理）。
+#
+# 這張表是**兩條寫入路**，不是一條：insert（本人第一次填，含 id）跟
+# update（本人改自己那一列，不含 id）。id 只有 INSERT 權限、沒有 UPDATE 權限——
+# 這正是為什麼 settings/src/main.js 不准對這張表用 .upsert()（upsert 展開後
+# id 會被塞進 UPDATE 的 SET 清單，整句被拒，見 scripts/check-upsert.mjs 那條）。
+# 所以下面的比對式要同時認得 insert 跟 update 兩種呼叫，兩條路各算一個寫入點。
+#
+# story_approved / approved_at 不在清單裡：那是 Co-President 的鑰匙，
+# 本人改得動的話兩把鑰匙就變成一把。updated_at 不在清單裡：由資料庫的 trigger 蓋。
+STORY_WRITABLE="city country country_en county display_name id note note_en place public_story quote quote_en school school_en"
+
+listbad=0
+for c in $STORY_WRITABLE; do
+  if [ "$c" = "story_approved" ] || [ "$c" = "approved_at" ] || [ "$c" = "updated_at" ]; then
+    bad "STORY_WRITABLE 裡出現 ${c}，那一欄不該由前端寫"
+    listbad=1
+  fi
+done
+[ "$listbad" = "0" ] && ok "STORY_WRITABLE 清單本身沒有那三個不該由前端寫的欄位"
+
+# 寫入點的數量也要對得上，理由同上面 PROFILE_WRITE_FILES 那一段：
+# 少抓到的寫入點不會有聲音，剩下的幾個仍然全在清單裡，照樣綠燈。
+# settings/src/main.js 現在有兩個字面物件的寫入點：insert 一個、update 一個。
+STORY_WRITE_FILES="settings/src/main.js:2"
+
+storyCols=$(node -e '
+  const fs = require("fs");
+  const want = process.argv.slice(1);
+  const cols = new Set();
+  const problems = [];
+  for (const spec of want) {
+    const [file, n] = spec.split(":");
+    const raw = fs.readFileSync(file, "utf8");
+    const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+    // ⚠ 跟上面 profiles 那段一樣：看不懂就大聲說看不懂，不要假裝檢查過了。
+    const opaque = (src.match(/\.from\("alumni_stories"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\s*[^{\s]/g) || []);
+    if (opaque.length) problems.push(`${file} 有 ${opaque.length} 個寫入點不是字面物件（例如 .update(patch)），這條守門讀不到它寫了哪幾欄。請改成 .insert({ ... }) / .update({ ... })`);
+    const re = /\.from\("alumni_stories"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\{([\s\S]*?)\}\)/g;
+    let m, sites = 0;
+    while ((m = re.exec(src))) {
+      sites++;
+      // 也要認得簡寫屬性（`{ school, grade }`），理由同上面 profiles 那段。
+      for (const part of m[1].split(",")) {
+        const key = (part.includes(":") ? part.slice(0, part.indexOf(":")) : part).trim();
+        if (/^[a-z_][a-z0-9_]*$/.test(key)) cols.add(key);
+      }
+    }
+    if (sites !== Number(n)) problems.push(`${file} 的寫入點有 ${sites} 個，check.sh 說應該有 ${n} 個`);
+  }
+  if (problems.length) { console.log(problems.join("；")); process.exit(1); }
+  console.log([...cols].sort().join(" "));
+' $STORY_WRITE_FILES 2>&1)
+if [ $? -ne 0 ]; then
+  bad "抽不出前端寫進 alumni_stories 的欄位：${storyCols}"
+else
+  extra=""
+  for c in $storyCols; do
+    case " $STORY_WRITABLE " in *" $c "*) ;; *) extra="$extra $c" ;; esac
+  done
+  if [ -n "$extra" ]; then
+    bad "前端會寫 alumni_stories 的這些欄位，但它們不在 STORY_WRITABLE 裡：${extra}"
+    say "     資料庫沒發權限的話，整句 insert/update 都會被拒，不是只有那一欄存不了。"
+  else
+    ok "前端寫進 alumni_stories 的欄位（${storyCols}）都在允許清單裡"
+  fi
+fi
+
 # 給維護者看的註解，不可以變成頁面上看得到的字
 #
 # 2026-09-01 出過事：首頁那段長註解在編輯時被提早關閉（結束標記移到了中間），

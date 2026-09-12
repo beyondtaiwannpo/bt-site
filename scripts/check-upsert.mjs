@@ -53,7 +53,10 @@ export function scan(sqlFiles, dirs) {
 if (import.meta.url === "file://" + process.argv[1]) {
   const sql = fs.readdirSync("supabase/migrations").map(f => "supabase/migrations/" + f)
     .concat(["supabase/schema.sql"]).filter(f => f.endsWith(".sql"));
-  const r = scan(sql, ["availability/src", "app/src", "passport/src", "reset"]);
+  // 2026-09-11：加 settings/src（「我的故事」分 insert/update 兩條路，
+  // id 沒有 UPDATE 權限，upsert 會整句被拒）跟 admin/src（遲早也會寫資料）。
+  const r = scan(sql, ["availability/src", "app/src", "passport/src", "reset",
+                       "settings/src", "admin/src"]);
   if (r.broke) { console.log("GUARD-BROKE " + r.broke); process.exit(0); }
   console.log(r.bad.length ? "BAD " + r.bad.join(" ") : "OK " + r.tables.join(","));
 }
