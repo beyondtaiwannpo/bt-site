@@ -351,7 +351,9 @@ export async function updatePassword(newPassword) {
 // 而資料庫是嚴格比對，管理員建的小寫碼讓所有人都失敗，畫面卻只說「這個邀請碼不對」。
 // 病根是「同一件事在兩個地方各做一半」。呼叫端的 .trim() 只是順手，正確性不靠它。
 //
-// 回傳 'upgraded' 或 'already_cadre'。後者不是錯誤，也不會扣掉一組碼 ——
+// 回傳 'upgraded'（升成幹部）、'upgraded_alumni'（變成校友）、
+// 'already_cadre'、'already_alumni'。後兩者不是錯誤，也不會扣掉一組碼。
+// **身分由碼決定**（invite_codes.grants），前端說不出自己想變成什麼。
 // 使用者手滑連點兩下不該燒掉一組（claim_invite 裡那個 for update 就是為了這個）。
 export async function claimInvite(code) {
   if (!supabase) throw new Error(MSG.offline);

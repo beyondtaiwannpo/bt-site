@@ -266,6 +266,28 @@ export async function setApproved(id, ok) {
   if (error) throw error;
 }
 
+// ── 校友頁的核可（2026-09-11）────────────────────────────────────────
+// 只列**已經自己打過勾**的人，理由跟團隊頁那一份一模一樣：
+// 沒打勾的人出現在這裡，會變成一份「還沒有人問過他們」的名單。
+//
+// ⚠ **不要改成自己查 alumni_stories 再查 profiles 補名字。**
+// profiles 的讀取政策（2026-09-13-public-team.sql）不涵蓋校友那幾列 ——
+// 那樣查的結果是每一位校友都顯示「（沒有名字）」，而那正是要被核可的人。
+// 名字在 stories_for_review() 裡就解析好了（2026-09-19-stories-for-review.sql），
+// 順序也是那一支排的（等核可的在最上面）。
+export async function loadStories() {
+  need();
+  const { data, error } = await supabase.rpc("stories_for_review");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setStoryApproved(id, ok) {
+  need();
+  const { error } = await supabase.rpc("set_story_approved", { p_target: id, p_ok: ok });
+  if (error) throw error;
+}
+
 // ── 信件文案（2026-09-08）──────────────────────────────────────────────
 export async function loadTemplates() {
   need();
@@ -296,6 +318,10 @@ const SAYS = [
   ["not_director_of:",
    "這裡面有一份不是你這個 team 的申請，所以整批都沒有動。"],
   ["not_president", "只有當屆 Co-President 可以做這件事。"],
+  // set_story_approved() 的第二條失敗路徑（那一列不存在也走這裡）。
+  // ⚠ 排在 not_a_cadre / not_cadre **前面**：這張表是「誰先被 includes 命中誰贏」，
+  // 而這幾個代碼長得很像，哪天有人加一個含有它們的新代碼就會被前面那條吃掉。
+  ["not_alumni_or_cadre", "這個人不是幹部也不是校友，不能放上校友頁。"],
   ["not_a_cadre", "這個人不是幹部，不能放上團隊頁。"],
   ["not_cadre", "這個動作只有幹部做得了。"],
   ["not_signed_in", "你的登入已經過期了，重新登入一次就好。"],

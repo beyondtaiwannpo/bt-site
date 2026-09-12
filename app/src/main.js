@@ -37,7 +37,11 @@ function render() {
   //
   // 用 replace 不用 href：留在歷史裡的話，他從設定按上一頁會回到這裡，
   // 而這裡又會立刻把他送回去，上一頁就變成按不動的。
-  if (S.role === "cadre") {
+  //
+  // 2026-09-11：校友跟幹部一樣直接進設定。
+  // **校友不走學員那條補資料的路** —— 就讀學校與年級是問高中生的，
+  // 對一個已經出發的人沒有意義，而且那一頁沒填完會把他擋在外面。
+  if (S.role === "cadre" || S.role === "alumni") {
     el.innerHTML = `<div class="empty">帶你進去…</div>`;
     location.replace("../settings/");
     return;

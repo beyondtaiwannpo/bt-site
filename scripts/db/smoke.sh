@@ -117,6 +117,18 @@ create or replace function public.touch_updated_at() returns trigger language pl
 alter table public.profiles enable row level security;
 create policy profiles_read on public.profiles for select to authenticated
   using (auth.uid() = id or (public.is_cadre() and profiles.role = 'cadre'));
+-- ⚠ 2026-09-17-invite-grants.sql 會 alter invite_codes、把新的 claim_invite()
+-- 寫進 passports —— 兩張表都要先在（照 supabase/schema.sql 的樣子縮小版）。
+-- 這裡漏過一次：加那支遷移檔的時候忘了在這裡補表，於是 smoke.sh 在
+-- 2026-09-17 那一步直接炸掉，「跑得過」跟「有沒有跑」是兩件事（README 第 12 項）。
+create table public.invite_codes (
+  code text primary key, uses_left int not null default 1,
+  note text, created_at timestamptz default now());
+create table public.passports (
+  id uuid primary key references auth.users on delete cascade,
+  name_zh text, name_en text, team text, motto text, avatar text,
+  issued date default current_date, intro_seen boolean not null default false,
+  updated_at timestamptz default now());
 revoke all on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
 SQL
@@ -131,7 +143,10 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-09-13-public-team.sql \
          supabase/migrations/2026-09-14-anon-execute.sql \
          supabase/migrations/2026-09-15-mail-secret-lookup.sql \
-         supabase/migrations/2026-09-16-mail-templates.sql ; do
+         supabase/migrations/2026-09-16-mail-templates.sql \
+         supabase/migrations/2026-09-17-invite-grants.sql \
+         supabase/migrations/2026-09-18-alumni-stories.sql \
+         supabase/migrations/2026-09-19-stories-for-review.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else

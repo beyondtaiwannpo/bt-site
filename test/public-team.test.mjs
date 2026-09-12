@@ -210,6 +210,13 @@ test("★ 只有 Co-President 看得到「團隊頁」這個分頁", () => {
   assert.match(tabsHTML("forms", true), /data-t="team"/);
 });
 
+// 核可完要回得了申請表。兩個核可頁都要有，只加一頁會讓兩頁不一致。
+test("★ 團隊頁本身畫得出分頁列（核可完回得去申請表）", () => {
+  const h = publicTeamHTML([], "", false);
+  assert.match(h, /data-act="tab"/);
+  assert.match(h, /data-t="forms"/);
+});
+
 // ── 一個人可以在好幾個 team（Paul 2026-09-10）──────────────────────
 // profiles.team 存的是「A Team, B Team」這種逗號字串（沒有為此開新欄位）。
 test("★ 在兩個 team 的人，兩組都會出現", () => {

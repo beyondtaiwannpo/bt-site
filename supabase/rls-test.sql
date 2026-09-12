@@ -51,6 +51,7 @@ drop table if exists pg_temp.rls_result;
 
 -- 子表先刪、父表後刪。auth.users 那句其實會連帶清掉全部（一路 on delete cascade），
 -- 這裡還是一句一句寫出來，是為了讓「這個檔案會動到哪些表」一看就清楚。
+delete from alumni_stories where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from entries   where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from stamps    where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from visas     where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
@@ -98,7 +99,9 @@ values
   ('11111111-0000-0000-0000-000000000011','rlstest-k1@example.com','x',now(),now(),'{"invite":"RLSTEST-SETUP"}','authenticated','authenticated'),
   ('22222222-0000-0000-0000-000000000012','rlstest-k2@example.com','x',now(),now(),'{"invite":"RLSTEST-SETUP"}','authenticated','authenticated'),
   ('33333333-0000-0000-0000-000000000013','rlstest-k3@example.com','x',now(),now(),'{"invite":"RLSTEST-SETUP"}','authenticated','authenticated'),
-  ('44444444-0000-0000-0000-000000000014','rlstest-k4@example.com','x',now(),now(),'{"invite":"RLSTEST-SETUP"}','authenticated','authenticated');
+  ('44444444-0000-0000-0000-000000000014','rlstest-k4@example.com','x',now(),now(),'{"invite":"RLSTEST-SETUP"}','authenticated','authenticated'),
+  -- E 是校友（第 7 節用）。校友這個身分是 2026-09-17-invite-grants.sql 加的。
+  ('eeeeeeee-0000-0000-0000-000000000005','rlstest-e@example.com','x',now(),now(),'{"invite":"RLSTEST-SETUP"}','authenticated','authenticated');
 
 -- ★ 角色一律明寫，不依賴 default（理由見檔頭）。
 -- 甲乙是幹部；S 與 T 以及 K1-K4 是學員（等一下要測升級）。
@@ -108,6 +111,17 @@ update profiles set role = 'student'
  where id in ('55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066',
               '11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012',
               '33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014');
+-- E 是校友。第 7 節要用一個**不是幹部**的人來測故事那張表，
+-- 因為那張表的主要使用者是校友，而校友在別的地方什麼都看不到。
+update profiles set role = 'alumni' where id = 'eeeeeeee-0000-0000-0000-000000000005';
+
+-- ★ 甲在第 7 節多一個身分：Co-President。
+-- 這一句放在這裡而不是第 7 節裡面，是照檔頭那條「角色一律明寫」——
+-- 測試帳號的身分要在一個地方看得完。
+-- 第 3 到 6 節沒有任何一條測試碰到 is_president()，所以這不影響它們；
+-- 之後要加 president 相關的測試，看到的就是這一句。
+update profiles set role = 'cadre', board_role = 'president'
+ where id = 'aaaaaaaa-0000-0000-0000-000000000001';
 
 -- 名字放 profiles（2026-08-31 拆表之後 passports 沒有名字欄位了）。
 update profiles set name_zh = '測試甲', team = 'Curriculum Team'
@@ -645,12 +659,260 @@ begin
     coalesce(n, -1) = before_uses);
 end $$;
 
--- ---------- 7. 清掉測試資料 ----------
+-- ============================================================================
+-- 7. 校友的故事（alumni_stories）—— 2026-09-11 新增
+-- ============================================================================
+-- 這張表有**兩把鑰匙**：
+--   public_story    本人自己打的勾
+--   story_approved  P/VP 核可，**本人用任何路徑都不可以自己設成 true**
+-- 兩個都 true 才會出現在對外的 /alumni/ 上。
+-- 鑰匙變成一把的話，「未滿 18 一律不放」那條紅線技術上就沒有東西擋了。
+--
+-- ⚠ 這一段每一條負向的旁邊都配了一條正向對照（檔頭那一課）。
+-- 「本人改不動 story_approved」在**整張表本人都寫不動**的時候也會通過，
+-- 而那是一個壞掉的系統，不是一個安全的系統。
+--
+-- 身分：E 是校友（本人）、乙是一般幹部、甲是 Co-President、T 還是學員。
+-- 四個人的角色都在第 2 節明寫。
+
+-- ---- 本人（校友 E）----
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"eeeeeeee-0000-0000-0000-000000000005","role":"authenticated"}', false);
+
+do $$
+declare n int; blocked boolean; why text;
+begin
+  -- ★★ 這一條守的是 insert 那條路。
+  -- insert 如果不是逐欄授權，本人可以直接**建**一列已經核可好的進去 ——
+  -- 他沒有「改」任何東西，所以只守 update 完全擋不住他，
+  -- 而 story_own 那條政策（auth.uid() = id）會放行。
+  blocked := false;
+  begin
+    insert into alumni_stories (id, quote, story_approved)
+         values ('eeeeeeee-0000-0000-0000-000000000005', '我自己核可自己', true);
+  exception when insufficient_privilege or check_violation then blocked := true;
+  end;
+  insert into rls_result values (100, '★ 本人 insert 不進 story_approved = true', '被權限擋下',
+    case when blocked then '被權限擋下' else '插進去了 —— 兩把鑰匙變成一把' end, blocked);
+
+  -- ↓ 對照。沒有它，上面那條在「本人根本 insert 不了任何東西」的時候也會通過。
+  -- 撞主鍵這種情況要單獨報，不然上面那條的失敗會在這裡變成一句看不懂的話。
+  why := '';
+  begin
+    insert into alumni_stories (id, display_name, county, quote, public_story)
+         values ('eeeeeeee-0000-0000-0000-000000000005', '測試校友', '台北', '從台北出發', true);
+  exception
+    when unique_violation then why := '撞主鍵 —— 上面那個不該成功的 insert 成功了';
+    when insufficient_privilege or check_violation then why := '被權限擋下 —— 擋的是整個 insert，不是那一欄';
+  end;
+  insert into rls_result values (101, '★【對照】本人 insert 得進其他欄位', '插得進去',
+    case when why = '' then '插得進去' else why end, why = '');
+
+  select count(*) into n from alumni_stories where id = 'eeeeeeee-0000-0000-0000-000000000005';
+  insert into rls_result values (102, '本人讀得到自己那一列', '1 列', n || ' 列', n = 1);
+
+  blocked := false;
+  begin
+    update alumni_stories set story_approved = true
+     where id = 'eeeeeeee-0000-0000-0000-000000000005';
+  exception when insufficient_privilege then blocked := true;
+  end;
+  insert into rls_result values (103, '★ 本人改不動 story_approved', '被權限擋下',
+    case when blocked then '被權限擋下' else '自己核可了自己' end, blocked);
+
+  -- ↓ 對照：擋的是那一欄，不是整張表。
+  blocked := false;
+  begin
+    update alumni_stories set quote = '我改得動自己這一句'
+     where id = 'eeeeeeee-0000-0000-0000-000000000005';
+  exception when insufficient_privilege then blocked := true;
+  end;
+  insert into rls_result values (104, '★【對照】本人改得動自己的 quote', '改得動',
+    case when blocked then '也被擋下 —— 擋的是整張表，不是那一欄' else '改得動' end, not blocked);
+end $$;
+
+-- ---- 一般幹部（乙）----
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"bbbbbbbb-0000-0000-0000-000000000002","role":"authenticated"}', false);
+
+do $$
+declare n int; msg text; res boolean; why text;
+begin
+  -- 幹部也可以有自己的故事，兩把鑰匙是同一套。這一列同時是下面那條對照要用的。
+  why := '';
+  begin
+    insert into alumni_stories (id, display_name, county, quote, public_story)
+         values ('bbbbbbbb-0000-0000-0000-000000000002', '測試乙', '新竹', '乙的一句話', true);
+  exception when insufficient_privilege or check_violation then why := '（連自己那一列都 insert 不了）';
+  end;
+
+  select count(*) into n from alumni_stories where id = 'eeeeeeee-0000-0000-0000-000000000005';
+  insert into rls_result values (105, '★ 一般幹部讀不到別人的故事', '0 列', n || ' 列', n = 0);
+
+  -- ↓ 對照。沒有它，上面那條只證明了「乙什麼都讀不到」。
+  select count(*) into n from alumni_stories where id = 'bbbbbbbb-0000-0000-0000-000000000002';
+  insert into rls_result values (106, '★【對照】那個幹部讀得到自己那一列', '1 列',
+    n || ' 列' || why, n = 1);
+
+  -- ★ 核可那把鑰匙是 P/VP 的，不是全體三十個幹部的。
+  msg := ''; res := null;
+  begin res := set_story_approved('eeeeeeee-0000-0000-0000-000000000005', true);
+  exception when sqlstate 'P0001' then msg := sqlerrm; end;
+  insert into rls_result values (107, '★ 一般幹部核可不了別人的故事', 'not_president',
+    case when msg <> '' then msg else '核可成功了 —— 鑰匙發給全體幹部了' end, msg = 'not_president');
+end $$;
+
+-- ---- Co-President（甲）----
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', false);
+
+do $$
+declare n int; msg text; res boolean;
+begin
+  -- 核可要看內容，所以 president 讀得到別人的。這是第 105 條的正向對照：
+  -- 同樣兩列，換一個身分就讀得到，證明 105 的 0 列是政策擋的。
+  -- 只數這兩個測試帳號，不數整張表 —— 正式資料庫裡會有真的故事。
+  select count(*) into n from alumni_stories
+   where id in ('eeeeeeee-0000-0000-0000-000000000005','bbbbbbbb-0000-0000-0000-000000000002');
+  insert into rls_result values (108, '★ president 讀得到別人的故事（核可要看內容）', '2 列',
+    n || ' 列', n = 2);
+
+  msg := ''; res := null;
+  begin res := set_story_approved('eeeeeeee-0000-0000-0000-000000000005', true);
+  exception when sqlstate 'P0001' then msg := sqlerrm; end;
+  insert into rls_result values (109, '★【對照】president 核可得了校友', 'true',
+    case when msg <> '' then '被擋下：' || msg else coalesce(res::text, 'null') end,
+    coalesce(res, false));
+
+  -- 學員沒有故事。他出現在校友頁上是一個一定會被誤解的狀態。
+  -- **Task 7 的後台認的就是這個錯誤碼**，打錯字的話畫面上會變成一句
+  -- 看不懂的資料庫錯誤，而按按鈕的人只會以為系統壞了。
+  msg := ''; res := null;
+  begin res := set_story_approved('66666666-0000-0000-0000-000000000066', true);
+  exception when sqlstate 'P0001' then msg := sqlerrm; end;
+  insert into rls_result values (110, '★ 學員核可不了（not_alumni_or_cadre）', 'not_alumni_or_cadre',
+    case when msg <> '' then msg else '核可成功了 —— 學員會出現在校友頁上' end,
+    msg = 'not_alumni_or_cadre');
+end $$;
+
+-- ---- 管理者身分看結果 ----
+reset role;
+select set_config('request.jwt.claims', '', false);
+
+do $$
+declare n int; v_ok boolean; v_at timestamptz;
+begin
+  select story_approved, approved_at into v_ok, v_at
+    from alumni_stories where id = 'eeeeeeee-0000-0000-0000-000000000005';
+  insert into rls_result values (111, '核可之後 story_approved 是 true、approved_at 有值', 'true / 有',
+    coalesce(v_ok::text, '（查不到那一列）') || ' / ' ||
+    case when v_at is null then '沒有' else '有' end,
+    v_ok is true and v_at is not null);
+
+  -- ★ 兩把鑰匙都轉了，才出現在對外的名單上。
+  select count(*) into n from public_alumni()
+   where id = md5('eeeeeeee-0000-0000-0000-000000000005');
+  insert into rls_result values (112, '★【對照】兩把鑰匙都轉了就出現在對外名單上', '1 列',
+    n || ' 列', n = 1);
+
+  -- ★ 乙只轉了自己那一把（public_story），沒有被核可 —— 不可以出現。
+  -- 這一條跟上面那條是同一個函式、同一時刻、只差一把鑰匙。
+  select count(*) into n from public_alumni()
+   where id = md5('bbbbbbbb-0000-0000-0000-000000000002');
+  insert into rls_result values (113, '★ 只有本人打勾、沒有核可的不會出現在對外名單上', '0 列',
+    n || ' 列', n = 0);
+end $$;
+
+-- ---- 核可之後，本人又改了那一句話 ----
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"eeeeeeee-0000-0000-0000-000000000005","role":"authenticated"}', false);
+
+do $$
+declare n int;
+begin
+  with u as (update alumni_stories set quote = '核可之後我又改了這一句'
+              where id = 'eeeeeeee-0000-0000-0000-000000000005' returning 1)
+  select count(*) into n from u;
+  insert into rls_result values (114, '【對照】核可之後本人仍然改得動自己的 quote', '改到 1 列',
+    '改到 ' || n || ' 列', n = 1);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '', false);
+
+do $$
+declare n int; v_ok boolean; v_at timestamptz;
+begin
+  -- ★ 那段文字是用 BT 的名義公開的。不重審的話，核可一次之後可以改成任何內容。
+  select story_approved, approved_at into v_ok, v_at
+    from alumni_stories where id = 'eeeeeeee-0000-0000-0000-000000000005';
+  insert into rls_result values (115, '★ 改了那一句話，核可自己掉了', 'false / 清空',
+    coalesce(v_ok::text, '（查不到那一列）') || ' / ' ||
+    case when v_at is null then '清空' else '還留著' end,
+    v_ok is false and v_at is null);
+
+  select count(*) into n from public_alumni()
+   where id = md5('eeeeeeee-0000-0000-0000-000000000005');
+  insert into rls_result values (116, '★ 下架之後對外名單上也沒有他了', '0 列', n || ' 列', n = 0);
+end $$;
+
+-- ---- 再核可一次，然後只改城市 ----
+-- ★★ 這一組是第 115 條的反向對照，**不是補充**。
+-- 沒有它的話，一支「不管改什麼都下架」的 trigger 會讓 115 通過 ——
+-- 而那種版本的後果是：每更新一次近況就要重審一次，於是沒有人會去更新，
+-- 而那一頁的價值就是近況。
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', false);
+
+do $$
+declare msg text; res boolean;
+begin
+  msg := ''; res := null;
+  begin res := set_story_approved('eeeeeeee-0000-0000-0000-000000000005', true);
+  exception when sqlstate 'P0001' then msg := sqlerrm; end;
+  insert into rls_result values (117, '【前置】president 再核可一次', 'true',
+    case when msg <> '' then '被擋下：' || msg else coalesce(res::text, 'null') end,
+    coalesce(res, false));
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"eeeeeeee-0000-0000-0000-000000000005","role":"authenticated"}', false);
+
+do $$
+declare n int;
+begin
+  with u as (update alumni_stories set city = 'Osaka'
+              where id = 'eeeeeeee-0000-0000-0000-000000000005' returning 1)
+  select count(*) into n from u;
+  insert into rls_result values (118, '【前置】本人改得動自己的城市', '改到 1 列',
+    '改到 ' || n || ' 列', n = 1);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '', false);
+
+do $$
+declare v_ok boolean;
+begin
+  select story_approved into v_ok
+    from alumni_stories where id = 'eeeeeeee-0000-0000-0000-000000000005';
+  insert into rls_result values (119, '★ 改城市不會下架（只有那四欄文字會）', 'true',
+    coalesce(v_ok::text, '（查不到那一列）'), v_ok is true);
+end $$;
+
+-- ---------- 8. 清掉測試資料 ----------
 -- 跟開頭那段一模一樣。開頭那次清「上一次留下的」，這次清「這一次產生的」。
 -- 結果表是暫存表，不在這裡清，不然最後那句 select 就沒東西可以撈了。
 reset role;
 select set_config('request.jwt.claims', '', false);
 
+delete from alumni_stories where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from entries   where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from stamps    where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from visas     where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
@@ -659,7 +921,7 @@ delete from profiles  where id      in ('aaaaaaaa-0000-0000-0000-000000000001','
 delete from auth.users where id     in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from invite_codes where upper(btrim(code)) like 'RLSTEST-%';
 
--- ---------- 8. 條目數 ----------
+-- ---------- 9. 條目數 ----------
 -- **「全綠」和「全部都跑到了」是兩件事。**
 -- 這份測試分成十幾個 do 區塊。任何一個區塊中途丟出沒被接住的例外，
 -- 整支腳本會當場中止 —— 那種情況你會看到紅色錯誤，很明顯。
@@ -675,11 +937,11 @@ do $$
 declare n int;
 begin
   select count(*) into n from rls_result;
-  insert into rls_result values (98, '★ 這次實際跑完了幾條測試', '54 條',
-    n || ' 條', n = 54);
+  insert into rls_result values (98, '★ 這次實際跑完了幾條測試', '74 條',
+    n || ' 條', n = 74);
 end $$;
 
--- ---------- 9. 總結那一列 ----------
+-- ---------- 10. 總結那一列 ----------
 -- ord 給 0，而失敗組排在前面，所以這一列永遠是整張表的第一列。
 -- 這裡的 select 讀的是 insert 之前的狀態，不會把自己算進去。
 insert into rls_result
@@ -689,7 +951,7 @@ select 0, 'OVERALL 全部測試',
        bool_and(ok)
   from rls_result;
 
--- ---------- 10. 結果表 ----------
+-- ---------- 11. 結果表 ----------
 -- 這句一定要是整份檔案的最後一句：SQL Editor 只顯示最後一句的結果。
 select test_name, expected, actual,
        case when ok then 'PASS' else 'FAIL' end as pass

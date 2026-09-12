@@ -335,13 +335,15 @@ else
   ok "首頁與 alumni 的島都跟 coastline.txt 完全一致（本島 1 條 + 離島 7 條）"
 fi
 
-# ════════ /alumni/ 航線圖（官網改版批 3，2026-09-07）════════
+# ════════ /alumni/ 航線圖（官網改版批 3，2026-09-07；先讀資料庫，2026-09-11）════════
 
 # community.json 與縣市對照表
 #
-# 這一頁的北極星是「加一位學長姐＝在 JSON 加一個物件」。要讓那句話成立，
-# JSON 裡填的必須是縣市名而不是座標 —— 於是就多了一張縣市對照表，
-# 而多一份資料就會有兩份慢慢不一樣的風險。這條守門就是在守那件事。
+# 這份 JSON 現在是**示範資料兼退路**：真正的名單在資料庫，校友自己在 /settings/ 填、
+# Co-President 在 /admin/ 核可，頁面先問資料庫，沒有真人或連不上才顯示這裡。
+# 但這條守門的道理沒變——這一頁一定要有一份「示範資料長什麼樣」的範例可以
+# 直接開來看，而 county 填的必須是縣市名不是座標，於是有了下面這張對照表，
+# 多一份資料就會有兩份慢慢不一樣的風險。這條守門就是在守那件事。
 #
 # 三個方向一起守：
 #   1. 頁面裡的 COUNTY 表必須跟 scripts/taiwan/cities.json 完全相同。
@@ -805,6 +807,15 @@ else
   bad "shared/ 反向 import 了功能資料夾：$SHARED_UP"
 fi
 
+# supabase-config.js 存在的唯一理由是「不把整包套件拉進來」（2026-09-11）。
+# 它一旦 import 任何東西，/alumni/ 那條輕量的路就沒有了，而且不會有任何錯誤 ——
+# 頁面照樣會動，只是每個路人多下載一份 supabase-js。
+if grep -qE '^\s*import\s' shared/supabase-config.js 2>/dev/null; then
+  bad "shared/supabase-config.js 裡有 import，那支檔案必須只有常數"
+else
+  ok "shared/supabase-config.js 只有常數，沒有 import"
+fi
+
 # 沒登入的人直接打 /passport/ 要被導去 /app/，不能是空白或壞掉。
 # 這一條守的是「導向真的存在」，不是導向長什麼樣。
 if grep -q 'if (!S.user) { toApp(); return; }' passport/src/main.js \
@@ -998,7 +1009,10 @@ done
 # 而這條守門完全沒有看到它們 —— 守門的範圍安靜地縮小了，
 # 這正是它自己下面那段註解在講的那種失敗。
 # 每個檔案各自寫死寫入點的數量，理由同下。
-PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:1 settings/src/main.js:3"
+# 2026-09-11：settings/src/main.js 從 3 個寫入點變成 4 個 —— C1 加了校友
+# 那一條路（只寫 name_zh / name_en，不碰 school / grade）。刻意的摩擦，
+# 改動寫入路徑的人要回來改這一行，理由見上面。
+PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:1 settings/src/main.js:4"
 
 profileCols=$(node -e '
   const fs = require("fs");
@@ -1052,6 +1066,109 @@ else
   else
     ok "前端寫進 profiles 的欄位（${profileCols}）都在允許清單裡"
   fi
+fi
+
+# 前端往 alumni_stories 寫的每一欄，都必須是資料庫真的發了權限的那幾欄
+# （2026-09-11，「我的故事」，跟上面 profiles 那條同一套道理）。
+#
+# 這張表是**兩條寫入路**，不是一條：insert（本人第一次填，含 id）跟
+# update（本人改自己那一列，不含 id）。id 只有 INSERT 權限、沒有 UPDATE 權限——
+# 這正是為什麼 settings/src/main.js 不准對這張表用 .upsert()（upsert 展開後
+# id 會被塞進 UPDATE 的 SET 清單，整句被拒，見 scripts/check-upsert.mjs 那條）。
+# 所以下面的比對式要同時認得 insert 跟 update 兩種呼叫，兩條路各算一個寫入點。
+#
+# story_approved / approved_at 不在清單裡：那是 Co-President 的鑰匙，
+# 本人改得動的話兩把鑰匙就變成一把。updated_at 不在清單裡：由資料庫的 trigger 蓋。
+STORY_WRITABLE="city country country_en county display_name id note note_en place public_story quote quote_en school school_en"
+
+listbad=0
+for c in $STORY_WRITABLE; do
+  if [ "$c" = "story_approved" ] || [ "$c" = "approved_at" ] || [ "$c" = "updated_at" ]; then
+    bad "STORY_WRITABLE 裡出現 ${c}，那一欄不該由前端寫"
+    listbad=1
+  fi
+done
+[ "$listbad" = "0" ] && ok "STORY_WRITABLE 清單本身沒有那三個不該由前端寫的欄位"
+
+# 寫入點的數量也要對得上，理由同上面 PROFILE_WRITE_FILES 那一段：
+# 少抓到的寫入點不會有聲音，剩下的幾個仍然全在清單裡，照樣綠燈。
+# settings/src/main.js 現在有兩個字面物件的寫入點：insert 一個、update 一個。
+STORY_WRITE_FILES="settings/src/main.js:2"
+
+storyCols=$(node -e '
+  const fs = require("fs");
+  const want = process.argv.slice(1);
+  const cols = new Set();
+  const problems = [];
+  for (const spec of want) {
+    const [file, n] = spec.split(":");
+    const raw = fs.readFileSync(file, "utf8");
+    const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+    // ⚠ 跟上面 profiles 那段一樣：看不懂就大聲說看不懂，不要假裝檢查過了。
+    const opaque = (src.match(/\.from\("alumni_stories"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\s*[^{\s]/g) || []);
+    if (opaque.length) problems.push(`${file} 有 ${opaque.length} 個寫入點不是字面物件（例如 .update(patch)），這條守門讀不到它寫了哪幾欄。請改成 .insert({ ... }) / .update({ ... })`);
+    const re = /\.from\("alumni_stories"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\{([\s\S]*?)\}\)/g;
+    let m, sites = 0;
+    while ((m = re.exec(src))) {
+      sites++;
+      // 也要認得簡寫屬性（`{ school, grade }`），理由同上面 profiles 那段。
+      for (const part of m[1].split(",")) {
+        const key = (part.includes(":") ? part.slice(0, part.indexOf(":")) : part).trim();
+        if (/^[a-z_][a-z0-9_]*$/.test(key)) cols.add(key);
+      }
+    }
+    if (sites !== Number(n)) problems.push(`${file} 的寫入點有 ${sites} 個，check.sh 說應該有 ${n} 個`);
+  }
+  if (problems.length) { console.log(problems.join("；")); process.exit(1); }
+  console.log([...cols].sort().join(" "));
+' $STORY_WRITE_FILES 2>&1)
+if [ $? -ne 0 ]; then
+  bad "抽不出前端寫進 alumni_stories 的欄位：${storyCols}"
+else
+  extra=""
+  for c in $storyCols; do
+    case " $STORY_WRITABLE " in *" $c "*) ;; *) extra="$extra $c" ;; esac
+  done
+  if [ -n "$extra" ]; then
+    bad "前端會寫 alumni_stories 的這些欄位，但它們不在 STORY_WRITABLE 裡：${extra}"
+    say "     資料庫沒發權限的話，整句 insert/update 都會被拒，不是只有那一欄存不了。"
+  else
+    ok "前端寫進 alumni_stories 的欄位（${storyCols}）都在允許清單裡"
+  fi
+fi
+
+# ── scripts/db/smoke.sh 的遷移檔清單要跟得上目錄（總審查 I4，2026-09-11）──
+#
+# 這批已經被它咬過一次：smoke.sh 的 for 迴圈清單是寫死的一串，
+# 停在 2026-09-16-mail-templates.sql，後來新增的三支（2026-09-17 到 19）
+# 一開始完全沒被跑到，腳本照樣印出「全部通過」——這正是這個 repo 最常見的
+# 失敗形狀：守門的範圍比現實窄，而少守的那一塊沒有人會發現。
+#
+# 「記得補清單」不是防法，寫在檔案裡的教訓只有讀到那一份的人會看到。
+# 這裡改成自動比對：少了任何一支就紅。
+#
+# ⚠ **不是比對全部遷移檔。** smoke.sh 用手刻的最小結構模擬 2026-09-08 之前
+# 的「既有結構」（護照、profiles 那幾張表），2026-09-08 之前的遷移檔本來就
+# 不在它的 for 迴圈裡，那是設計，不是漏掉。所以只比對「smoke.sh 清單裡最早
+# 那一支」（含）以後的遷移檔——比那更早的，用日期字串排序天生排得出來
+# （檔名開頭就是 YYYY-MM-DD）。
+smokeMissing=$(node -e '
+  const fs = require("fs");
+  const files = fs.readdirSync("supabase/migrations").filter(f => f.endsWith(".sql")).sort();
+  const smoke = fs.readFileSync("scripts/db/smoke.sh", "utf8");
+  const listed = new Set(
+    [...smoke.matchAll(/supabase\/migrations\/([A-Za-z0-9_.-]+\.sql)/g)].map(m => m[1]));
+  if (!listed.size) { console.log("__EMPTY__"); process.exit(0); }
+  const earliest = [...listed].sort()[0];
+  const missing = files.filter(f => f >= earliest && !listed.has(f));
+  console.log(missing.join(" "));
+' 2>&1)
+if [ "$smokeMissing" = "__EMPTY__" ]; then
+  bad "scripts/db/smoke.sh 裡完全抓不到任何 supabase/migrations/*.sql 的檔名，這條守門自己壞了"
+elif [ -n "$smokeMissing" ]; then
+  bad "scripts/db/smoke.sh 的遷移檔清單漏了：${smokeMissing}（在本機跑一次全部遷移檔會跑不到它們）"
+else
+  ok "scripts/db/smoke.sh 的遷移檔清單跟 supabase/migrations/ 目錄對得上"
 fi
 
 # 給維護者看的註解，不可以變成頁面上看得到的字

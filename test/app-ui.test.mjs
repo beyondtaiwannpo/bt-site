@@ -34,6 +34,13 @@ test("notCadreHTML 沒有任何直接設定角色的路徑", () => {
   assert.ok(!/role/i.test(h), "這一頁出現了 role，前端不准有設定角色的路徑");
 });
 
+// 2026-09-11：同一個輸入框現在收兩種碼，按鈕的字不能只講幹部，
+// 不然校友拿到碼會以為自己走錯地方。
+test("★ 邀請碼那一頁的按鈕同時講幹部與校友", () => {
+  const h = notCadreHTML("");
+  assert.match(h, /我是幹部或校友，我有邀請碼/);
+});
+
 // email + 密碼那條路是備援，不准因為加了 Google 就消失（規格 §3-4）。
 test("登入頁同時有 Google 與 email 密碼兩條路", () => {
   for (const mode of ["in", "up"]) {
