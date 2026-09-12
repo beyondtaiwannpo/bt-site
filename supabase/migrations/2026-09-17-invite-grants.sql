@@ -162,6 +162,12 @@ select * from (
       and (select body from src) like '%v_grants = ''cadre''%'
       and (select body from src) like '%insert into passports%'
       and (select body from src) like '%uses_left = uses_left + 1%'
+      and (select body from src) like '%upgraded_alumni%'
+      and (select body from src) like '%already_alumni%'
+      and (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+            where n.nspname='public' and p.proname='claim_invite' and p.prosecdef) = 1
+      and (select count(*) from pg_proc where proname='claim_invite'
+            and 'search_path=public, pg_temp' = any(proconfig)) = 1
       and (select count(*) from pg_attribute a, aclexplode(a.attacl) x
             where a.attrelid='public.profiles'::regclass and a.attname='role'
               and x.grantee='authenticated'::regrole and x.privilege_type='UPDATE') = 0
@@ -238,6 +244,33 @@ select * from (
                 where p.proname='claim_invite'
                   and x.grantee in (0::regrole, 'anon'::regrole)
                   and x.privilege_type='EXECUTE') = 0
+    then 'PASS' else 'FAIL' end
+
+  -- ★ Task 3 的前端認的是這四個字串，不是這支函式「做了什麼」。
+  --   把回傳值打錯成別的字（例如 'ok_alumni'）不會讓上面任何一條變紅，
+  --   因為那幾條守的是行為（扣碼、補碼、建護照），不是回傳的字面。
+  union all select 12, '★ 回傳字串裡有 upgraded_alumni', 'true',
+    (select (body like '%upgraded_alumni%')::text from src),
+    (select case when body like '%upgraded_alumni%' then 'PASS' else 'FAIL' end from src)
+
+  union all select 13, '★ 回傳字串裡有 already_alumni', 'true',
+    (select (body like '%already_alumni%')::text from src),
+    (select case when body like '%already_alumni%' then 'PASS' else 'FAIL' end from src)
+
+  -- 這支檔案用 create or replace function 整個重建了 claim_invite，
+  -- 所以 2026-09-01-claim-invite.sql 驗收表裡守的這兩條也要在這裡重新守一次
+  -- ——貼這支檔案的人沒有理由回去重跑 9 月 1 日那一支。
+  union all select 14, 'claim_invite 是 security definer', 'true',
+    coalesce((select prosecdef::text from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+               where n.nspname='public' and p.proname='claim_invite'), '（函式不存在）'),
+    case when (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+                where n.nspname='public' and p.proname='claim_invite' and p.prosecdef) = 1
+    then 'PASS' else 'FAIL' end
+
+  union all select 15, 'search_path 釘死了', 'search_path=public, pg_temp',
+    coalesce((select array_to_string(proconfig, ' | ') from pg_proc where proname='claim_invite'), '（沒設）'),
+    case when (select count(*) from pg_proc where proname='claim_invite'
+                and 'search_path=public, pg_temp' = any(proconfig)) = 1
     then 'PASS' else 'FAIL' end
 ) x order by ord;
 
