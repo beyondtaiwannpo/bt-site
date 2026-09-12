@@ -178,3 +178,24 @@ test("★ 前端不送 story_approved 與 approved_at", () => {
   assert.equal(/story_approved\s*:/.test(src), false);
   assert.equal(/approved_at\s*:/.test(src), false);
 });
+
+// ── 第四步：/alumni/ 先讀資料庫，沒有真人才退回示範資料（2026-09-11）──────
+const page = readFileSync(new URL("../alumni/index.html", import.meta.url), "utf8");
+
+// 這一頁是對外頁面，載整包 supabase-js 會讓每個路人多下載一份他用不到的東西。
+test("★ /alumni/ 仍然不載 supabase 套件", () => {
+  assert.equal(/vendor\/supabase-js/.test(page), false);
+  assert.equal(/from "\.\.\/shared\/supabase\.js"/.test(page), false);
+});
+
+// 金鑰只有一份。這一頁用動態 import 去拿那支只有常數的小檔。
+test("★ 金鑰是 import 來的，不是又寫死一份", () => {
+  assert.match(page, /import\("\.\.\/shared\/supabase-config\.js"\)/);
+  assert.equal(/sb_publishable_/.test(page), false);
+});
+
+// 資料庫空的或連不上的時候，對外頁面不能空著，也不該講內部狀態。
+test("★ 讀不到資料庫就退回 community.json", () => {
+  assert.match(page, /public_alumni/);
+  assert.match(page, /community\.json/);
+});

@@ -730,14 +730,55 @@ summary{cursor:pointer}
   }
 
 
-  fetch("./community.json")
-    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  /* 資料來源：**先問資料庫，沒有真人才退回 community.json**（2026-09-11）。
+     這推翻了 2026-09-07「這一頁不接 Supabase」那個決定，理由是名單的維護者
+     從「寫程式的人」變成「校友本人」，記在 GOALS.md 與 decisions log。
+
+     ⚠ **這一頁仍然不載 supabase 套件。** 用動態 import 只拿那兩個常數
+     （shared/supabase-config.js 不 import 任何東西，check.sh 守著），
+     然後用瀏覽器內建的 fetch 打 REST 端點。
+
+     public_alumni() 回的欄位名跟 community.json 的 key 一模一樣，
+     所以下面不用寫任何轉換 —— 多一層轉換就多一個會慢慢漂移的地方。
+     唯一的例外是 photo：那一欄資料庫不會給，因為照片是點到那個人才去拿的
+     （見 select() 裡補照片那一段），不要在這裡順手補一個空字串進去。 */
+  function fromDB() {
+    return import("../shared/supabase-config.js").then(function (cfg) {
+      return fetch(cfg.SUPABASE_URL + "/rest/v1/rpc/public_alumni", {
+        method: "POST",
+        headers: { "Content-Type": "application/json",
+                   apikey: cfg.SUPABASE_PUBLISHABLE_KEY,
+                   Authorization: "Bearer " + cfg.SUPABASE_PUBLISHABLE_KEY },
+        body: "{}",
+      });
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (rows) {
+      /* 一位都還沒核可就當作沒有資料，退回示範那一份。
+         **這件事不對使用者說任何話**：對他來說沒有壞掉。 */
+      if (!Array.isArray(rows) || !rows.length) return null;
+      return { demo: false, people: rows };
+    });
+  }
+
+  function fromJSON() {
+    return fetch("./community.json")
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+  }
+
+  fromDB()
+    .catch(function (e) {
+      if (window.console) console.warn("校友名單讀不到資料庫，改用示範資料。", e);
+      return null;
+    })
+    .then(function (d) { return d || fromJSON(); })
     .then(function (d) { DATA = d; draw(d); })
     .catch(function (e) {
-      /* 資料讀不到就明說，不要留一張空白的圖讓人以為是自己網路的問題。 */
+      /* 兩條路都失敗才說話。留一張空白的圖會讓人以為是自己網路的問題。 */
       card.innerHTML = '<p class="hint">名單一時讀不到，請重新整理看看。' +
         '如果一直這樣，寫信給我們：<a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>';
-      if (window.console) console.error("community.json 讀取失敗", e);
+      if (window.console) console.error("校友名單讀取失敗", e);
     });
 
   function draw(data) {
@@ -751,6 +792,10 @@ summary{cursor:pointer}
     document.getElementById("isleg").innerHTML = "";
     svg.classList.remove("flying");
     card.innerHTML = HINT;
+    /* 這個函式會被呼叫第二次（切語言），上一個人的照片是非同步補上去的，
+       補的時候只認 card.dataset.id ——不清掉的話，語言切換的當下如果那個人
+       的照片剛好回來，會被貼進新畫面上不相干的卡片裡。 */
+    delete card.dataset.id;
 
     /* 島先畫。座標跟首頁同一份，從 coastline.txt 來。 */
     var isleg = document.getElementById("isleg");
@@ -879,6 +924,34 @@ summary{cursor:pointer}
          （Paul 2026-09-07 指定的順序：點 → 環線消失 → 飛到 → 跳出那個人。）
          有照片就放照片，沒有就放姓氏的單字圖示；照片一律要 alt、width、height，
          沒有的話手機上圖一載入整頁會往下跳。 */
+      /* 大頭照是點到那個人才去拿的（2026-09-11）。照片是 data URL，
+         一張二十到六十 KB，一開始全部載會壓垮這一頁的手機分數。
+         卡片本來就是「飛到了」才出現，所以這趟飛行的時間剛好夠拿。
+         拿不到就維持姓氏的單字圖示，畫面一樣完整。 */
+      if (!data.demo && p.photo === undefined) {
+        p.photo = "";
+        import("../shared/supabase-config.js").then(function (cfg) {
+          return fetch(cfg.SUPABASE_URL + "/rest/v1/rpc/public_alumni_avatar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json",
+                       apikey: cfg.SUPABASE_PUBLISHABLE_KEY,
+                       Authorization: "Bearer " + cfg.SUPABASE_PUBLISHABLE_KEY },
+            body: JSON.stringify({ p_key: p.id }),
+          });
+        }).then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (url) {
+            if (!url) return;
+            p.photo = url;
+            /* 已經畫出來的話就把圖片補上去，沒有的話下次點到就有了。 */
+            var slot = card.querySelector(".who .avatar");
+            if (slot && card.dataset.id === p.id) {
+              var img = new Image(72, 72);
+              img.className = "avatar"; img.src = url; img.alt = p.name;
+              slot.replaceWith(img);
+            }
+          }).catch(function () { /* 沒有照片不是錯誤 */ });
+      }
+
       var face = p.photo
         ? '<img class="avatar" src="' + esc(p.photo) + '" alt="' + esc(p.name) +
           '" width="72" height="72">'
@@ -897,7 +970,15 @@ summary{cursor:pointer}
           '</span>' : '');
 
       arrive(dest);
-      if (reduce) { route.setAttribute("marker-end", "url(#arw)"); card.innerHTML = html; return; }
+      if (reduce) {
+        route.setAttribute("marker-end", "url(#arw)");
+        card.innerHTML = html;
+        /* 減少動態效果的人也走這條路，照片補位靠這個 id 判斷「還是同一個人」——
+           漏了這一行的話，開了這個系統設定的人永遠看不到大頭照，
+           而且不會有任何錯誤訊息（控制端 2026-09-11 抓到的漏洞）。 */
+        card.dataset.id = p.id;
+        return;
+      }
       if (!reduce) {
         /* 環繞線退場，卡片先讓出畫面，都讓給這一趟飛行。 */
         svg.classList.add("flying");
@@ -940,6 +1021,7 @@ summary{cursor:pointer}
 
           /* 人到了，卡片才跳出來。 */
           card.innerHTML = html;
+          card.dataset.id = p.id;
           card.style.opacity = "";
           card.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }],
             { duration: 420, easing: "ease-out" });
