@@ -805,6 +805,15 @@ else
   bad "shared/ 反向 import 了功能資料夾：$SHARED_UP"
 fi
 
+# supabase-config.js 存在的唯一理由是「不把整包套件拉進來」（2026-09-11）。
+# 它一旦 import 任何東西，/alumni/ 那條輕量的路就沒有了，而且不會有任何錯誤 ——
+# 頁面照樣會動，只是每個路人多下載一份 supabase-js。
+if grep -qE '^\s*import\s' shared/supabase-config.js 2>/dev/null; then
+  bad "shared/supabase-config.js 裡有 import，那支檔案必須只有常數"
+else
+  ok "shared/supabase-config.js 只有常數，沒有 import"
+fi
+
 # 沒登入的人直接打 /passport/ 要被導去 /app/，不能是空白或壞掉。
 # 這一條守的是「導向真的存在」，不是導向長什麼樣。
 if grep -q 'if (!S.user) { toApp(); return; }' passport/src/main.js \

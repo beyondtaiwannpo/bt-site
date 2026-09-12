@@ -9,19 +9,16 @@
 // 每個功能各自 createClient 也會共用同一份 session，但那樣會有好幾個各自訂閱
 // auth 事件的 client，而「哪一個先收到 token 更新」是沒有保證的。一個就好。
 
-// publishable key 出現在這裡是正常的，不是外洩 —— 真正的防線是資料庫的 RLS。
-// 詳見 README「為什麼金鑰可以放在原始碼裡」。
-// 絕對不要把 sb_secret_ 開頭的金鑰放進這個檔案或這個 repo 的任何地方。
-//
-// 換專案時到後台 Project Settings → API Keys 複製新值蓋掉下面兩行
-// （URL 形如 https://xxxxxxxx.supabase.co，key 以 sb_publishable_ 開頭）。
-// 後台若只看得到 legacy 的 anon key，先在同一頁啟用／建立新版金鑰再回來（spec §4.1）。
+// 換專案時到 shared/supabase-config.js 改金鑰。詳見 README「為什麼金鑰可以放在原始碼裡」。
+// 絕對不要把 secret 開頭的金鑰放進這個 repo 的任何地方。
 // 填錯或改回佔位值時整站不會白畫面，會停在登入頁顯示「現在連不上資料庫」（見 shared/auth.js）。
 
 import { createClient } from "../vendor/supabase-js.js";
 
-export const SUPABASE_URL = "https://norjaglyaotzewxavmhv.supabase.co";
-export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Zizio16gUuM97qjhtD4Qaw_Sb_GKkyx";
+// 專案網址與金鑰在 shared/supabase-config.js，那支檔案不 import 任何東西，
+// 所以 /alumni/ 那種不載 supabase 套件的對外頁面也拿得到同一份值。
+export { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./supabase-config.js";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./supabase-config.js";
 
 
 // createClient 會對格式不對的網址（少了 https://、多了空白之類）當場 throw
