@@ -377,6 +377,7 @@ export function tabsHTML(tab, isPresident) {
     <button class="chip wide${tab === "forms" ? " on" : ""}" data-act="tab" data-t="forms">申請表</button>
     <button class="chip wide${tab === "res" ? " on" : ""}" data-act="tab" data-t="res">資源</button>
     ${isPresident ? `<button class="chip wide${tab === "team" ? " on" : ""}" data-act="tab" data-t="team">團隊頁</button>
+    <button class="chip wide${tab === "stories" ? " on" : ""}" data-act="tab" data-t="stories">校友頁</button>
     <button class="chip wide${tab === "mail" ? " on" : ""}" data-act="tab" data-t="mail">信件文案</button>` : ""}
   </div>`;
 }
@@ -414,6 +415,52 @@ export function publicTeamHTML(people, msg, busy) {
       </li>`;
     }).join("")}</ul>` : `<div class="empty">還沒有人自己打勾。<br>
       幹部要先到 /app/ 打勾同意，才會出現在這裡。</div>`}
+  </div>`;
+}
+
+// 校友頁的核可（2026-09-11）。**只有 Co-President 看得到這個分頁**（核可是他們的鑰匙）。
+//
+// ⚠ 這裡要看到的是**內容**，不是名字。核可的意思是
+// 「這段文字可以用 BT 的名義公開」，看不到那段文字就沒辦法判斷 ——
+// 所以那一句話與那段介紹一律整段畫出來，不收在「點開才看得到」裡面。
+export function alumniStoriesHTML(rows, msg, busy) {
+  // rows 可能是 undefined（載入失敗那一瞬間）。**這一頁寧可少東西也不能空白**，
+  // 那是這個 repo 的規矩：連不上資料庫也要畫得出東西。
+  const list = rows || [];
+  const on = list.filter(r => r.story_approved).length;
+  // 等核可的排最上面 —— 這一頁的工作就是處理那幾個。
+  // 資料庫那一支 stories_for_review() 已經 order by 過同一件事，這裡再排一次是
+  // **刻意的**：畫面的順序不該取決於呼叫端剛好給了什麼順序，而這一支是純函式，
+  // 測試守得住它。用穩定排序，所以同一組裡面仍然照資料庫給的順序（最近改過的在前）。
+  const sorted = list.slice()
+    .sort((a, b) => Number(!!a.story_approved) - Number(!!b.story_approved));
+  return `<div class="card">
+    <h2>校友頁</h2>
+    <div class="sub">誰出現在對外的 /alumni/ 航線圖上。已經公開 ${on} 人。</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    <div class="wnote big">核可之前確認三件事：<br>
+      1. <b>他滿 18 歲了嗎。</b>未滿一律不放。系統沒有生日欄位，這一條只有你擋得住。<br>
+      2. <b>他真的是 BT 校友嗎。</b>邀請碼可能被轉給別人。<br>
+      3. <b>這段文字可以用 BT 的名義公開嗎。</b>核可之後他再改那一句話或介紹，
+         系統會自動下架，重新回到這份清單上。</div>
+    ${sorted.length ? `<ul class="flist">${sorted.map(r => `<li>
+        <div class="arow">
+          <label class="apick"><input type="checkbox" data-act="approve-story" data-id="${esc(r.id)}"
+            ${r.story_approved ? "checked" : ""}${busy ? " disabled" : ""}
+            aria-label="核可 ${esc(r.name)}"></label>
+          <div class="abody">
+            <div class="fhead"><b>${esc(r.name)}</b>
+              ${r.story_approved ? `<span class="tag open">在公開頁面上</span>`
+                                 : `<span class="tag">等核可</span>`}</div>
+            <div class="fmeta">${esc([r.school, r.county].filter(Boolean).join("・"))}
+              → ${esc([r.country, r.city, r.place].filter(Boolean).join("・"))}</div>
+            <p class="fquote">${esc(r.quote || "")}</p>
+            <p class="fmeta">${esc(r.note || "")}</p>
+            <div class="fmeta">內容最後改過：${esc(String(r.updated_at || "").slice(0, 10))}</div>
+          </div>
+        </div>
+      </li>`).join("")}</ul>` : `<div class="empty">還沒有人勾同意。<br>
+      幹部與校友要先到「設定」把故事填完並勾同意，才會出現在這裡。</div>`}
   </div>`;
 }
 

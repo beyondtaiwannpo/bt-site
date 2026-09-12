@@ -3,6 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML } from "../settings/src/ui.js";
+import { alumniStoriesHTML, tabsHTML } from "../admin/src/ui.js";
+import { says } from "../admin/src/data.js";
 
 const FULL = {
   display_name: "張 O 睿", school: "高雄中學", county: "高雄", city: "Vancouver",
@@ -87,6 +89,68 @@ test("★ settings/src/main.js 寫 alumni_stories 分 insert / update 兩條路�
   assert.match(src, /\.from\("alumni_stories"\)[\s\S]{0,80}?\.insert\(\{/);
   assert.match(src, /\.from\("alumni_stories"\)[\s\S]{0,80}?\.update\(\{/);
   assert.equal(/\.from\("alumni_stories"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\s*[^{\s]/.test(src), false);
+});
+
+// ── 第三把鑰匙：Co-President 在 /admin/ 核可（2026-09-11）─────────────
+// 這一頁是「兩把鑰匙」裡的第二把唯一會被按下去的地方。
+const ROW = { id: "u1", name: "張 O 睿", school: "高雄中學", city: "Vancouver",
+  country: "加拿大", place: "UBC", quote: "現在換我回去講。", note: "第一次接觸 BT 是在高雄。",
+  public_story: true, story_approved: false, updated_at: "2026-09-11T02:00:00Z" };
+
+// 核可的是內容不是名字。看不到那段文字就沒辦法判斷能不能用 BT 的名義公開。
+test("★ 核可清單上看得到完整內容", () => {
+  const h = alumniStoriesHTML([ROW], "", false);
+  for (const w of ["張 O 睿", "高雄中學", "Vancouver", "現在換我回去講", "第一次接觸 BT"])
+    assert.match(h, new RegExp(w));
+});
+
+// 系統沒有生日欄位，「未滿 18 不放」只有人擋得住，而這裡是唯一會被看到的地方。
+test("★ 核可前要確認的三件事都寫在頁面上", () => {
+  const h = alumniStoriesHTML([ROW], "", false);
+  assert.match(h, /18/);
+  assert.match(h, /校友/);
+  assert.match(h, /BT 的名義|公開/);
+});
+
+test("等核可的排在已經公開的前面", () => {
+  const h = alumniStoriesHTML([
+    { ...ROW, id: "a", name: "已公開的人", story_approved: true },
+    { ...ROW, id: "b", name: "等核可的人", story_approved: false },
+  ], "", false);
+  assert.ok(h.indexOf("等核可的人") < h.indexOf("已公開的人"), "等核可的沒有排在最上面");
+});
+
+// 沒有人勾的時候不要畫一份「還沒有人問過」的名單，那會讓人很想直接核可。
+test("★ 一個人都沒勾的時候說清楚下一步在哪", () => {
+  const h = alumniStoriesHTML([], "", false);
+  assert.match(h, /還沒有人/);
+  assert.match(h, /設定/);
+});
+
+test("★ 校友頁分頁只有 Co-President 看得到", () => {
+  assert.match(tabsHTML("stories", true), /data-t="stories"/);
+  assert.equal(/data-t="stories"/.test(tabsHTML("forms", false)), false);
+});
+
+// ⚠ profiles 的讀取政策**不涵蓋校友那幾列**（2026-09-13-public-team.sql）。
+// 後台直接查 profiles 補名字，對校友永遠是空的 —— 畫面會顯示「（沒有名字）」，
+// 而那正是核可時最該看到的東西。名字要在 stories_for_review() 裡就解析好。
+// 這條守的是那個決定本身：有人「順手」把查 profiles 那段加回來就會紅。
+test("★ loadStories 只呼叫 stories_for_review()，不自己去查 profiles 補名字", () => {
+  const src = readFileSync(new URL("../admin/src/data.js", import.meta.url), "utf8");
+  const m = src.match(/export async function loadStories\(\)[\s\S]*?\n\}/);
+  assert.ok(m, "找不到 loadStories()");
+  assert.match(m[0], /supabase\.rpc\("stories_for_review"\)/);
+  assert.equal(/\.from\(/.test(m[0]), false, "loadStories 又自己去查表了");
+});
+
+// 失敗一定要說話，而且要說實話：set_story_approved() 丟得出兩種錯誤碼，
+// 兩種都要對得上人看得懂的中文，不然按按鈕的人會往錯的方向找。
+test("★ 核可失敗時看得到真正的原因（兩種錯誤碼都翻成中文）", () => {
+  assert.match(says(new Error("not_president")), /Co-President/);
+  const m = says(new Error("not_alumni_or_cadre"));
+  assert.match(m, /不是幹部|不是校友|校友/);
+  assert.equal(/not_alumni_or_cadre/.test(m), false, "把資料庫的代碼原封不動丟給人看");
 });
 
 // story_approved 由資料庫管。前端送它的話整句會被拒，而且那是在偷轉另一把鑰匙。

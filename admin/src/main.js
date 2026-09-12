@@ -22,6 +22,11 @@ let S = {
   noticeTo: new Set(["accepted"]),
   // 團隊頁
   people: [],
+  // 校友頁的核可（2026-09-11）。**一定要有初始值** ——
+  // 少了它，alumniStoriesHTML() 拿到的是 undefined，那一頁在某些時序下
+  // （例如載入失敗之後再 render 一次）會整個空白，而這個 repo 的規矩是
+  // 「連不上資料庫也要畫得出東西」。
+  stories: [],
   // 信件文案
   tpls: [], tplKind: null,
 };
@@ -54,6 +59,8 @@ function render() {
     body = UI.mailEditHTML(S.tplKind, S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy);
   } else if (S.view === "team") {
     body = UI.publicTeamHTML(S.people, S.msg, S.busy);
+  } else if (S.view === "stories") {
+    body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
   } else if (S.view === "checkin" && S.form) {
     body = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
@@ -160,6 +167,16 @@ async function openTeam() {
   render();
 }
 
+// 校友頁的核可清單。整份只有 Co-President 叫得動（門在資料庫那一支函式裡）。
+async function openStories() {
+  S.busy = true; render();
+  try {
+    S.stories = await D.loadStories();
+    S.view = "stories"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "校友名單載不到：" + D.says(e); }
+  render();
+}
+
 async function openRes() {
   S.busy = true; render();
   try {
@@ -242,6 +259,7 @@ document.addEventListener("click", async e => {
     S.msg = ""; S.sel = new Set();
     if (b.dataset.t === "res") { await openRes(); }
     else if (b.dataset.t === "team") { await openTeam(); }
+    else if (b.dataset.t === "stories") { await openStories(); }
     else if (b.dataset.t === "mail") { await openMail(); }
     else { S.view = "list"; await reloadList(); render(); }
     return;
@@ -269,6 +287,21 @@ document.addEventListener("click", async e => {
       await D.setApproved(id, ok);
       const p = S.people.find(x => x.id === id);
       if (p) p.public_approved = ok;
+      S.busy = false; S.msg = "";
+    } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
+    render();
+    return;
+  }
+
+  // 第二把鑰匙轉下去（或轉回來）。跟上面那顆「approve」同一個形狀：
+  // 只改記憶體裡那一筆，不重讀整份名單 —— 核可是一個一個看、一個一個按的。
+  if (act === "approve-story") {
+    const ok = b.checked;
+    S.busy = true; render();
+    try {
+      await D.setStoryApproved(id, ok);
+      const r = S.stories.find(x => x.id === id);
+      if (r) r.story_approved = ok;
       S.busy = false; S.msg = "";
     } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
     render();
