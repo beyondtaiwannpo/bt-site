@@ -157,13 +157,13 @@ export function notCadreHTML(msg) {
     <h2>你還不是 BT 幹部</h2>
     <div class="sub">護照目前只開放給幹部。你已經登入了，但還沒有升級。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
-    <label><i>邀請碼 / Invite code</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長拿"></label>
+    <label><i>邀請碼 / Invite code</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長或 BT 拿"></label>
     <div class="note" style="margin:0 0 14px">升級之後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
     <div class="stack">
-      <button class="btn" data-act="do-claim">我是幹部，我有邀請碼</button>
+      <button class="btn" data-act="do-claim">我是幹部或校友，我有邀請碼</button>
     </div>
     <!-- 2026-09-08（批 2）：這一頁不再是學員的預設畫面，是他從自己的帳號頁
-         點「我是 BT 幹部，我有邀請碼」才會進來的。所以要有一條回得去的路 ——
+         點「我是幹部或校友，我有邀請碼」才會進來的。所以要有一條回得去的路 ——
          沒有的話，一個好奇點進來的學員只剩下登出這個出口。 -->
     <div class="nav"><button class="link" data-act="back-account">我不是幹部，回我的帳號</button></div>
     <div class="nav"><button class="link" data-act="signout">登出</button></div>
@@ -359,7 +359,7 @@ export function studentHTML(p, msg, apps, opens) {
     ${mine || now ? "" : `<div class="note">下一場探索營、下一輪導生配對都會先公布在
       <a href="https://www.instagram.com/beyondtaiwan/">Instagram</a>，
       也可以先看<a href="../apply/">現在開放什麼</a>。</div>`}
-    <div class="note"><button class="link" data-act="show-claim">我是 BT 幹部，我有邀請碼</button></div>
+    <div class="note"><button class="link" data-act="show-claim">我是幹部或校友，我有邀請碼</button></div>
     <div class="nav"><button class="link" data-act="signout">登出</button></div>
     <!-- 刪除帳號放在最後、用最輕的樣式，但**一定要在這一頁上找得到**。
          2026-09-07 Paul 決定申請資料不設保存期限（一直留著），

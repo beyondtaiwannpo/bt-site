@@ -57,6 +57,13 @@ test("★ 學員只看得到屬於學員的功能項，logo、名字、登出都
   assert.ok(h.includes('<nav class="btnav"'), "整條列不見了——空的列比消失誠實");
 });
 
+// 校友（2026-09-11）。校友沒有護照、沒有時間看板、沒有申請管理，
+// 他在這個站上唯一的事情是「我的故事」，而那在設定裡面。
+test("★ 校友的頂欄只有設定，一項都不能多", () => {
+  const keys = featuresFor("alumni").map(f => f.key);
+  assert.deepEqual(keys, ["settings"]);
+});
+
 test("role 是 null（profiles 查不到）時也不會爆，當成沒有功能", () => {
   assert.doesNotThrow(() => navHTML({ current: null, role: null, name: "" }));
   assert.equal(count(navHTML({ current: null, role: null, name: "" }), /<a href="\/[a-z-]+\/"/g), 0);

@@ -31,7 +31,8 @@ export const FEATURES = [
   // 2026-09-08：設定。**這是第一個 roles 含 student 的項目。**
   // 這個檔案的檔頭一直寫著「之後開放給學員的功能只要在 roles 加 student，
   // 列就自動長出來，不用另外設計一條路徑」—— 就是這一刻。
-  { key: "settings",     label: "設定",     href: "/settings/",     roles: ["cadre", "student"],
+  // 2026-09-11：校友也用同一頁（他的「我的故事」在裡面）。
+  { key: "settings",     label: "設定",     href: "/settings/",     roles: ["cadre", "student", "alumni"],
     title: "設定",         desc: "名字、大頭照、要不要出現在公開的團隊頁上" },
 ];
 
