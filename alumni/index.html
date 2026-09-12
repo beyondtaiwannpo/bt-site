@@ -949,7 +949,11 @@ summary{cursor:pointer}
               img.className = "avatar"; img.src = url; img.alt = p.name;
               slot.replaceWith(img);
             }
-          }).catch(function () { /* 沒有照片不是錯誤 */ });
+          }).catch(function (err) {
+            /* 抓失敗會把 p.photo 永久釘在 ""，不會重試——那不是使用者的錯，
+               不對他說話，但至少留一行痕跡給看主控台的人。 */
+            console.warn("校友大頭照抓不到：", err);
+          });
       }
 
       var face = p.photo

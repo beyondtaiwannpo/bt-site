@@ -10,7 +10,7 @@
 // auth 事件的 client，而「哪一個先收到 token 更新」是沒有保證的。一個就好。
 
 // 換專案時到 shared/supabase-config.js 改金鑰。詳見 README「為什麼金鑰可以放在原始碼裡」。
-// 絕對不要把 secret 開頭的金鑰放進這個 repo 的任何地方。
+// 絕對不要把 sb_secret_ 開頭的金鑰放進這個 repo 的任何地方。
 // 填錯或改回佔位值時整站不會白畫面，會停在登入頁顯示「現在連不上資料庫」（見 shared/auth.js）。
 
 import { createClient } from "../vendor/supabase-js.js";
