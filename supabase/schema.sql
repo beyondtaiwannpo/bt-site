@@ -87,6 +87,8 @@ create table if not exists milestones (
 create table if not exists invite_codes (
   code       text primary key,
   uses_left  int not null default 1,
+  grants     text not null default 'cadre'
+             check (grants in ('cadre', 'alumni')),   -- 這組碼給什麼身分。校友沒有護照
   note       text,
   created_at timestamptz default now()
 );
