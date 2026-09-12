@@ -123,7 +123,7 @@ select * from (
       (select count(*) from sr) = 1
       and (select prosecdef from sr)
       and coalesce((select array_to_string(proconfig, ',') from sr), '') like '%search_path=%public%'
-      and (select body from sr) like '%is_president()%'
+      and (select body from sr) like '%and public.is_president()%'
       and (select body from sr) like '%where s.public_story%'
       and (select body from sr) like '%''cadre''%'
       and (select body from sr) like '%name_zh%'
@@ -154,9 +154,14 @@ select * from (
 
   -- ★ **這一條是整支檔案最重要的一條。** definer 不受 RLS 保護，
   --   少了本文裡這一句，任何登入的人都讀得到所有人的故事與姓名。
-  union all select 3, '★ 本文裡真的有 is_president()（這是唯一的門）', 'true',
-    coalesce((select (body like '%is_president()%')::text from sr), '（查不到）'),
-    coalesce((select case when body like '%is_president()%' then 'PASS' end from sr), 'FAIL')
+  --
+  -- ⚠ 錨點連 `and` 一起比對，**不是只找 is_president()**：
+  --   把 `and public.is_president()` 改成 `or public.is_president()`，
+  --   門就整個開了（那一句對每一列都成立，where 等於沒有過濾），
+  --   而只比對函式名的話這一條跟 OVERALL 都還是綠的。一個字的成本。
+  union all select 3, '★ 本文裡真的有 and public.is_president()（這是唯一的門）', 'true',
+    coalesce((select (body like '%and public.is_president()%')::text from sr), '（查不到）'),
+    coalesce((select case when body like '%and public.is_president()%' then 'PASS' end from sr), 'FAIL')
 
   -- ★ 沒打勾的人不准出現在核可清單上。
   union all select 4, '★ 只回本人自己打了勾的那幾列（where s.public_story）', 'true',

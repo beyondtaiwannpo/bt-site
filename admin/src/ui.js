@@ -451,7 +451,8 @@ export function alumniStoriesHTML(rows, msg, busy) {
           <div class="abody">
             <div class="fhead"><b>${esc(r.name)}</b>
               ${r.story_approved ? `<span class="tag open">在公開頁面上</span>`
-                                 : `<span class="tag">等核可</span>`}</div>
+                                 : `<span class="tag">等核可</span>`}
+              ${r.county ? "" : `<span class="tag">沒填縣市・不會出現在圖上</span>`}</div>
             <div class="fmeta">${esc([r.school, r.county].filter(Boolean).join("・"))}
               → ${esc([r.country, r.city, r.place].filter(Boolean).join("・"))}</div>
             <p class="fquote">${esc(r.quote || "")}</p>
