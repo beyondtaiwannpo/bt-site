@@ -85,24 +85,50 @@ async function boot() {
     if (who.offline) { S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
-    const { data, error } = await supabase.from("profiles")
-      .select("role, name_zh, name_en, team, avatar, school, grade, newsletter_opt_in, " +
-              "public_profile, public_approved, public_title")
+    // ★ 這兩張表同時查，不要排隊。兩個要的都只有 S.user.id，已經在手上了。
+    // 原本是等 profiles 回來看完角色才去查故事，白白多一趟往返
+    //（實測到 Supabase 一趟熱的約 100 到 240 毫秒）。
+    //
+    // ⚠ 為什麼一定要用 Promise.all，不能只是先塞進變數：supabase 的查詢建構器
+    // 是**懶的**，它的 then() 裡面才真的去 fetch（vendor/supabase-js.js 裡讀得到）。
+    // 只是塞進變數的話那一句根本還沒送出去，寫起來像同時發、跑起來還是接力。
+    //
+    // ⚠ 學員沒有「我的故事」這一區，所以對學員來說這是一個多發的查詢
+    //（RLS 會擋掉，回來是空的）。換到的是幹部與校友每次都少一趟往返。
+    const storyQ = supabase.from("alumni_stories")
+      .select("display_name, school, county, city, country, place, quote, note, " +
+              "school_en, country_en, quote_en, note_en, public_story, story_approved, updated_at")
       .eq("id", S.user.id).maybeSingle();
+    // ⚠⚠ 故事這一份要先把例外收成 { data, error }，**不能讓它 reject**。
+    // 下面那句 warn 的意思是「讀不到故事不擋整頁，姓名與大頭照照樣要改得動」，
+    // 而 Promise.all 只要有一個 reject 就整個 reject —— 不收的話，
+    // 故事表一出問題，整個設定頁會變成「資料庫休眠中」，那是行為的倒退。
+    const [meRes, storyRes] = await Promise.all([
+      supabase.from("profiles")
+        .select("role, name_zh, name_en, team, avatar, school, grade, newsletter_opt_in, " +
+                "public_profile, public_approved, public_title")
+        .eq("id", S.user.id).maybeSingle(),
+      Promise.resolve(storyQ).catch(err => ({ data: null, error: err })),
+    ]);
+    const { data, error } = meRes;
     if (error) throw error;
     S.me = { ...(data || {}), email: S.user.email };
-    // 「我的故事」是另一張表。學員沒有這一區，所以也不用查。
+    // 「我的故事」是另一張表。學員沒有這一區，所以查回來的東西直接丟掉。
     if (S.me.role === "cadre" || S.me.role === "alumni") {
-      const { data: st, error: e2 } = await supabase.from("alumni_stories")
-        .select("display_name, school, county, city, country, place, quote, note, " +
-                "school_en, country_en, quote_en, note_en, public_story, story_approved, updated_at")
-        .eq("id", S.user.id).maybeSingle();
+      const { data: st, error: e2 } = storyRes;
       // 讀不到故事**不擋整頁**：姓名與大頭照照樣要改得動。
       if (e2) console.warn("故事讀不到，先當作還沒填：", e2);
       S.story = st || null;
     }
     render();
   } catch (e) {
+    // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
+    // 之後就沒有人在開機時問伺服器「這個帳號還有效嗎」了，所以這種人會一路走到
+    // 這裡才被擋下來（理由與取捨見 shared/auth.js 的 currentUserDetailed）。
+    // **不能讓他看到「資料庫休眠中」**：資料庫是好的，是他的票沒了，
+    // 而那個畫面不會叫他重新登入，他會一直重整。
+    // 先清掉本機那張壞票再走，不清的話下一頁讀出來的還是它。
+    if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../app/?next=" + encodeURIComponent("/settings/")); return; }
     console.error("/settings/ 載入失敗：", e);
     S.down = true; render();
   }

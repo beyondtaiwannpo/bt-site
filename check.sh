@@ -441,6 +441,27 @@ else
   ok "GSAP 兩支都有正確的 integrity 與 crossorigin，preload 的版本與屬性也跟 script 對得上"
 fi
 
+# modulepreload 指到的檔案要真的存在。
+# ⚠ 這是一個「壞掉了也看起來完全正常」的東西，所以一定要有守門：
+# 路徑打錯的話瀏覽器只是多抓一個 404 回來，畫面一切正常、console 也不見得有紅字，
+# 但那一行存在的唯一理由就是預載，指錯就等於那一行不存在 —— 而且是安靜地不存在。
+# 沒有守門的話，下一個改檔名的人不會知道自己順手關掉了一項效能措施。
+mp_bad=""
+for f in */index.html; do
+  d=$(dirname "$f")
+  for h in $(grep -o 'rel="modulepreload" href="[^"]*"' "$f" | sed 's/.*href="//;s/"$//'); do
+    [ -f "$d/$h" ] || mp_bad="${mp_bad} ${f} 指到 ${h}"
+  done
+done
+mp_n=$(grep -l 'rel="modulepreload"' */index.html 2>/dev/null | wc -l | tr -d ' ')
+if [ -n "$mp_bad" ]; then
+  bad "modulepreload 指到不存在的檔案（那一行等於白寫，而畫面不會有任何異狀）：${mp_bad}"
+elif [ "$mp_n" -lt "5" ]; then
+  bad "有登入後的頁面沒有 modulepreload（只有 ${mp_n} 頁有，應該是 5 頁）"
+else
+  ok "五個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
+fi
+
 # 會動的東西只准出現在 motion() 裡面
 #
 # prefers-reduced-motion 是無障礙需求不是視覺偏好（使用者 2026-08-25 的裁定）。

@@ -89,12 +89,24 @@ async function boot() {
     if (who.offline) { S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
-    S.me = await D.loadMe(S.user.id);
+    // ★ 這兩件事同時發，不要排隊。loadForms() 不需要知道我是誰
+    //（它沒有參數，擋不擋得到是 RLS 的事），所以沒有理由等 loadMe 回來。
+    // 省下來的是一趟往返（實測到 Supabase 一趟熱的約 100 到 240 毫秒）。
+    // 非幹部誤按進來會多發這一個查詢，RLS 會擋掉，回來是空的。
+    const [me, forms] = await Promise.all([D.loadMe(S.user.id), D.loadForms()]);
+    S.me = me;
     if (!S.me || S.me.role !== "cadre") { render(); return; }
-    S.forms = await D.loadForms();
+    S.forms = forms;
     if (S.me.board === "president") S.teams = await D.loadTeams();
     render();
   } catch (e) {
+    // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
+    // 之後就沒有人在開機時問伺服器「這個帳號還有效嗎」了，所以這種人會一路走到
+    // 這裡才被擋下來（理由與取捨見 shared/auth.js 的 currentUserDetailed）。
+    // **不能讓他看到「資料庫休眠中」**：資料庫是好的，是他的票沒了，
+    // 而那個畫面不會叫他重新登入，他會一直重整。
+    // 先清掉本機那張壞票再走，不清的話下一頁讀出來的還是它。
+    if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../app/?next=" + encodeURIComponent("/admin/")); return; }
     console.error("/admin/ 載入失敗：", e);
     S.down = true; render();
   }

@@ -379,15 +379,63 @@ export function isOfflineError(err) {
                   Number(err.status || 0), String(err.code || "").toLowerCase());
 }
 
-// 回 { user, offline }。boot() 用它，其他地方用上面那個 currentUser() 就好。
+// ★ 2026-09-13：這兩支從 getUser() 換成 getSession()，理由是速度，代價寫在下面。
+//
+// 五個登入後的頁面開機都是「三趟接力」的網路往返：驗身分 → 查 profiles →
+// 載這一頁的資料，每一趟都要等上一趟。實測到 Supabase 一趟熱的約 100 到 240
+// 毫秒、第一趟要建連線約 650 毫秒，所以第一趟省下來就是使用者看到的
+// 「載入中…」直接短掉一截。
+//
+// getUser() 為什麼慢：**它沒有走本機的分支**。從我們自己釘住的那份
+// vendor/supabase-js.js 讀出來的實作是 `GET ${url}/user`，每次都發。
+// getSession() 則是從瀏覽器本機儲存讀出來、在本機檢查形狀，
+// **只有在 token 已經過期時才會發一趟網路**去換新的。常見情況是零網路。
+//
+// ⚠ 換來的代價，下一個維護的人一定要知道：
+// getUser() 順便在做「這個帳號現在還有效嗎」的把關（它問的是伺服器）。
+// getSession() 只看本機那張票還沒過期，所以**帳號被停用、或 token 被撤銷的人，
+// 會帶著一張本機還沒過期的票走進來**，然後第一個資料查詢才被伺服器擋下來。
+// 下面那支 sessionGone() 就是為了接住這種人，它不是附帶的小工具 ——
+// 少了它，那些人看到的會是「資料庫休眠中」，一個跟真實原因毫無關係的畫面。
+//
+// ⚠ 安全性上為什麼可以這樣做：這裡拿到的 id 只用來組查詢與顯示。
+// 真正的把關是伺服器端的 RLS，它每次都獨立驗那張簽過名的 token。
+// 有人去改自己瀏覽器裡存的 id，送出去的還是他本人那張票，
+// RLS 看的是票上的身分，所以他只會查到空的，不會查到別人的。
+// 換句話說：改本機資料只傷得到自己那一頁，碰不到別人的資料。
 export async function currentUserDetailed() {
   if (!supabase) return { user: null, offline: true };
-  const { data, error } = await supabase.auth.getUser();
-  return { user: (data && data.user) || null, offline: isOfflineError(error) };
+  const { data, error } = await supabase.auth.getSession();
+  const session = data && data.session;
+  return { user: (session && session.user) || null, offline: isOfflineError(error) };
 }
 
 export async function currentUser() {
   if (!supabase) return null;
-  const { data } = await supabase.auth.getUser();
-  return (data && data.user) || null;
+  const { data } = await supabase.auth.getSession();
+  return (data && data.session && data.session.user) || null;
+}
+
+// 「這個錯誤代表那張票已經不能用了」。開機改用 getSession() 之後才需要這支，
+// 理由見上面那段。用途只有一個：boot() 的 catch 裡先問這句，是的話回登入頁，
+// 不是的話才當成「連不上」。
+//
+// ★ 形狀是**實測**來的，不是照文件寫的（2026-09-13，正式專案
+//   norjaglyaotzewxavmhv，拿三種壞掉的 token 各打一次真的 API）：
+//     亂寫的 token      → {"code":"PGRST301", "message":"Expected 3 parts in JWT; got 1"}
+//     簽章錯的 token    → {"code":"PGRST301", "message":"No suitable key or wrong key type"}
+//     已經過期的 token  → {"code":"PGRST301", "message":"No suitable key or wrong key type"}
+//   三種都是 HTTP 401，但 **PostgREST 的錯誤物件沒有 status 欄位**
+//   （這正是 test/auth-message.test.mjs 檔頭那個 2026-09-01 事故的病根），
+//   所以這裡只能靠 code，不准去讀 status，也不要去比對上面那些英文句子 ——
+//   訊息會隨 PostgREST 版本改，code 不會。
+//
+// 為什麼不順便判 GoTrue 那條路（實測是 error_code "bad_jwt" 與 "validation_failed"）：
+// 用不到。session 過期的話 getSession() 自己會去換新的，換不成就回 null session，
+// 上面那支直接回 user: null，頁面本來就會導去登入頁。而那兩個形狀我只量到
+// **原始的 HTTP 回應**，沒有量過 supabase-js 包成錯誤物件之後長什麼樣 ——
+// 沒量過的東西不寫進判斷式，那是這個檔案的規矩。
+export function sessionGone(err) {
+  if (!err) return false;
+  return String(err.code || "").toLowerCase() === "pgrst301";
 }

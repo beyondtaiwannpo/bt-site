@@ -166,6 +166,14 @@ async function boot() {
     }
     render();
   } catch (e) {
+    // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
+    // 之後就沒有人在開機時問伺服器「這個帳號還有效嗎」了，所以這種人會一路走到
+    // 這裡才被擋下來（理由與取捨見 shared/auth.js 的 currentUserDetailed）。
+    // **不能讓他看到「資料庫休眠中」**：資料庫是好的，是他的票沒了，
+    // 而那個畫面不會叫他重新登入，他會一直重整。
+    // 先清掉本機那張壞票再走，不清的話下一頁讀出來的還是它。
+    // 這一頁**自己就是登入頁**，沒有地方可以導，所以是清掉票之後原地畫登入畫面。
+    if (AUTH.sessionGone(e)) { await AUTH.signOut(); S.user = null; S.profile = null; S.role = null; render(); return; }
     console.error("/app/ 載入失敗，畫面顯示的是「資料庫休眠中」那一頁。真正的原因：", e);
     S.down = true;
     render();

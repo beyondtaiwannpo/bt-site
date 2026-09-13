@@ -15,7 +15,7 @@
 //   **先量一次**，不要相信「應該會有 status 吧」。那正是這個 bug 的來源。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authMessage } from "../shared/auth.js";
+import { authMessage, sessionGone, isOfflineError } from "../shared/auth.js";
 
 // authMessage 對 invite 那一類會印 console.error 給維運的人看，測試時吞掉。
 const quiet = fn => { const e = console.error; console.error = () => {}; try { return fn(); } finally { console.error = e; } };
@@ -122,4 +122,56 @@ test("★ invalid_invite 排在 offline 前面（順序本身，用合成形狀�
 test("【對照】完全不認得的錯誤落到 other，不會被誤判成任何一類", () => {
   const msg = authMessage({ message: "something completely unexpected", code: "XX999" });
   assert.doesNotMatch(msg, /邀請碼|連不上|密碼/);
+});
+
+// ============================================================================
+// sessionGone()：那張票還能不能用（2026-09-13 加）
+// ============================================================================
+// 為什麼會有這支：開機從 getUser() 換成 getSession() 之後，就沒有人在開機時
+// 問伺服器「這個帳號還有效嗎」了（理由與取捨見 shared/auth.js 那段註解）。
+// 帳號被停用的人會帶著一張本機還沒過期的票走進來，第一個查詢才被擋下來。
+// sessionGone() 是接住這種人的那一層。
+//
+// ★ 下面三個形狀是**實測**來的（2026-09-13，正式專案 norjaglyaotzewxavmhv，
+//   拿三種壞掉的 token 各打一次真的 /rest/v1/）。跟這個檔案上半部一樣的規矩：
+//   要改判斷條件之前先量一次，不要相信「應該會有 status 吧」。
+const JWT_MALFORMED = { code: "PGRST301", details: null, hint: null,
+                        message: "Expected 3 parts in JWT; got 1" };
+const JWT_BAD_SIG   = { code: "PGRST301", details: "None of the keys was able to decode the JWT",
+                        hint: null, message: "No suitable key or wrong key type" };
+const JWT_EXPIRED   = { code: "PGRST301", details: "None of the keys was able to decode the JWT",
+                        hint: null, message: "No suitable key or wrong key type" };
+
+test("票壞掉的三種形狀都要認得出來", () => {
+  for (const [name, shape] of [["亂寫", JWT_MALFORMED], ["簽章錯", JWT_BAD_SIG], ["過期", JWT_EXPIRED]])
+    assert.equal(sessionGone(shape), true, name + "那張票沒有被認出來");
+});
+
+// ★★ 這一條是整支測試裡最重要的。
+// 資料庫休眠、或使用者網路斷掉的時候，如果 sessionGone() 說「票沒了」，
+// boot() 就會把所有登入中的人踢回登入頁 —— 他們會以為自己被登出、資料不見了。
+// 那正是 shared/auth.js 裡 currentUserDetailed() 上面那段註解在防的事，
+// 也是這個檔案上半部那個 2026-09-01 事故的同一個形狀：
+// **把「連不上」誤判成「你沒有權限」。**
+test("★ 連不上伺服器不算票壞掉（誤判的話所有人都會被踢回登入頁）", () => {
+  assert.equal(sessionGone(AUTH_OFFLINE), false, "auth 那條路的網路失敗被當成票壞掉了");
+  assert.equal(sessionGone(PGRST_OFFLINE), false, "postgrest 那條路的網路失敗被當成票壞掉了");
+  // 反向也要成立：票壞掉不可以被當成連不上，不然那個人會卡在休眠頁出不來。
+  assert.equal(isOfflineError(JWT_EXPIRED), false, "票過期被當成連不上了");
+});
+
+test("其他錯誤都不算票壞掉", () => {
+  assert.equal(sessionGone(RPC_INVALID_INVITE), false, "打錯邀請碼被當成票壞掉");
+  assert.equal(sessionGone(SERVER_5XX), false, "伺服器 5xx 被當成票壞掉");
+  assert.equal(sessionGone(RATE_LIMITED), false, "寄信限流被當成票壞掉");
+  assert.equal(sessionGone(null), false, "沒有錯誤被當成票壞掉");
+  assert.equal(sessionGone(undefined), false, "undefined 被當成票壞掉");
+});
+
+// 靠 code 判斷，不靠英文訊息 —— PostgREST 換版會改訊息，不會改 code。
+test("只認 code，不認訊息", () => {
+  assert.equal(sessionGone({ message: "Expected 3 parts in JWT; got 1" }), false,
+               "沒有 code、只有訊息長得像，就被當成票壞掉了");
+  assert.equal(sessionGone({ code: "pgrst301", message: "" }), true,
+               "code 是小寫的時候認不出來");
 });

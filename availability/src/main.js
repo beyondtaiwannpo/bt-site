@@ -139,15 +139,29 @@ async function boot() {
     S.user = who.user;
     if (!S.user) { location.replace("../app/?next=availability"); return; }
 
-    const { data, error } = await supabase
-      .from("profiles").select("role, tz, name_zh, name_en").eq("id", S.user.id).maybeSingle();
+    // ★ 這兩件事同時發，不要排隊。兩個要的都只有 S.user.id，而它已經在手上了。
+    // 原本是等 profiles 回來才開始載看板，白白多一趟往返（實測到 Supabase 一趟
+    // 熱的約 100 到 240 毫秒，第一趟要建連線約 650 毫秒）。
+    //
+    // ⚠ 為什麼一定要用 Promise.all，不能只是先塞進變數：supabase 的查詢建構器
+    // 是**懶的**，它的 then() 裡面才真的去 fetch（vendor/supabase-js.js 裡讀得到）。
+    // 只是 `const q = supabase.from(...)` 的話那一句根本還沒送出去，
+    // 寫起來像同時發、跑起來還是接力，而且沒有任何地方會報錯。
+    //
+    // ⚠ 代價要講清楚：非幹部其實用不到看板資料，但我們還是先發了。
+    // 學員誤按進來會多五個查詢（RLS 會擋掉，回來是空的）；換到的是
+    // **每一位幹部每一次載入都少一趟往返**。幹部是這一頁的常態，所以這樣划算。
+    const [profileRes, all] = await Promise.all([
+      supabase.from("profiles").select("role, tz, name_zh, name_en").eq("id", S.user.id).maybeSingle(),
+      DATA.loadAll(),
+    ]);
+    const { data, error } = profileRes;
     if (error) throw error;
     S.role = data ? data.role : null;
     S.myTz = data ? data.tz : null;
     S.myName = data ? (data.name_zh || data.name_en || "") : "";
     if (S.role !== "cadre") { S.ready = true; render(); return; }
 
-    const all = await DATA.loadAll();
     S.members = all.members; S.slots = all.slots;
     S.weekSlots = all.weekSlots; S.weekMarks = all.weekMarks;
     S.saved = new Set(S.slots.get(S.user.id) || []);
@@ -163,6 +177,13 @@ async function boot() {
     S.ready = true;
     render();
   } catch (e) {
+    // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
+    // 之後就沒有人在開機時問伺服器「這個帳號還有效嗎」了，所以這種人會一路走到
+    // 這裡才被擋下來（理由與取捨見 shared/auth.js 的 currentUserDetailed）。
+    // **不能讓他看到「資料庫休眠中」**：資料庫是好的，是他的票沒了，
+    // 而那個畫面不會叫他重新登入，他會一直重整。
+    // 先清掉本機那張壞票再走，不清的話下一頁讀出來的還是它。
+    if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../app/?next=availability"); return; }
     console.error("看板載入失敗。真正的原因：", e);
     S.down = true; render();
   }
