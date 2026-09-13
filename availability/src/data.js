@@ -21,9 +21,10 @@ export function namesOf(p) {
   };
 }
 
-// 一次把看板需要的三份資料拿回來。
+// 一次把看板需要的五份資料拿回來（profiles、availability、availability_meta，
+// 加上 2026-09-12「某一週的例外」新增的 availability_week、availability_week_mark）。
 //
-// **三個查詢都要成功才算成功。** 只有 profiles 回來、availability 失敗的話，
+// **五個查詢都要成功才算成功。** 只有 profiles 回來、availability 失敗的話，
 // 畫面會變成「每個人都完全沒空」——那看起來像大家都還沒填，
 // 而不是像出錯了，沒有人會回報。
 export async function loadAll() {
@@ -112,10 +113,12 @@ export async function saveMine(userId, wanted, current) {
 // 先刪光再寫回的話，刪成功而插入失敗等於他那一週的資料沒了，
 // 而他以為只是存檔失敗；就算兩句都成功，也會白跑幾十次不需要的請求。
 //
-// ⚠ **不准用 .upsert()。** availability_week 是欄位層級授權的表
+// ⚠ **不准用 .upsert()。** availability_week 完全沒有發 update 權限
 //（見遷移檔 2026-09-20-availability-week.sql：只發了 select / insert / delete，
-// 刻意沒有 update），upsert 會把 payload 每一欄都塞進 ON CONFLICT DO UPDATE
-// 的 SET 清單，其中有欄位沒拿到 update 授權，整句就會被 Postgres 拒絕。
+// 一個 update 都沒有 —— 這跟「欄位層級授權」不一樣，欄位層級授權是像
+// availability_meta 那樣只開放某幾欄可以 update，這裡是整張表的 update 都沒開），
+// upsert 會把 payload 每一欄都塞進 ON CONFLICT DO UPDATE 的 SET 清單，
+// 而這張表沒有任何一欄拿得到 update 授權，整句就會被 Postgres 拒絕。
 // 症狀是「按了存檔沒反應」——availability_meta 2026-09-02 就是這樣壞掉的，
 // 抄同一個教訓，這裡從一開始就不要犯。
 export async function saveWeek(userId, weekKey, wanted, current) {
