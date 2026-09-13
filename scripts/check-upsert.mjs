@@ -101,17 +101,39 @@ export function findUpserts(src, table, window = 220) {
 // 把「完全沒有 update 授權」的表整批列進守備範圍會誤傷 visas，所以「命中」
 // 跟「危險」要分兩層問，不能只看 findUpserts() 命中就報。
 //
-// tail 給 300 字元：目前這兩句 upsert 呼叫（.upsert(rows.map(...), { ... })）
-// 展開後大約 140 字元，300 留了一倍以上的餘裕。這裡跟 findUpserts() 一樣用
-// 字串掃描，不解析成 AST——找的是「同一句呼叫附近」，不是嚴謹的括號配對。
-function upsertGuardedEverywhere(src, table, window = 220, tail = 300) {
+// ⚠⚠ 2026-09-12 審查抓到一個 Critical：第一版只用 `.includes("ignoreDuplicates")`
+// 判斷有沒有豁免，**沒有驗證值是不是 true**。`ignoreDuplicates: false` 的效果
+// 等於沒有這個旗標（PostgREST 照樣展開成 ON CONFLICT DO UPDATE），但字串比對
+// 一樣會找到 "ignoreDuplicates" 這幾個字，於是被誤判成安全——這正是
+// `scan()` 對「所有表」都會經過的一關，等於把既有那條「欄位層級授權的表不准
+// 用任何 upsert」的無條件守門，悄悄放寬成「只要附近出現這幾個字，不管值」。
+// 修法：不比對字串出現與否，比對「值是不是字面的 true」。
+//
+// ⚠ 同一個根因的 Important：舊版的搜尋範圍是「從 .upsert( 往後數 tail 個字元」，
+// 不是「這句呼叫自己的參數」——理論上隔壁不相干的程式碼剛好在這個字元數以內
+// 提到 ignoreDuplicates: true，也會被當成這一句的豁免依據。改成配對括號，
+// 只在**這句 upsert 呼叫自己的參數區段**裡找，不看呼叫範圍以外的任何字元。
+function upsertGuardedEverywhere(src, table, window = 220) {
   const needle = 'from("' + table + '")';
   let i = 0;
   while ((i = src.indexOf(needle, i)) !== -1) {
     const upsertAt = src.indexOf(".upsert(", i);
     if (upsertAt !== -1 && upsertAt - i <= window) {
-      const afterCall = src.slice(upsertAt, upsertAt + tail);
-      if (!afterCall.includes("ignoreDuplicates")) return false; // 這一句沒有豁免
+      // 從 .upsert( 那個左括號開始，配對括號找到這句呼叫自己的右括號在哪裡。
+      // 不解析成 AST，只數 ( 跟 )——這個檔案裡的呼叫都不深，字串裡也沒有
+      // 出現過孤立的括號，字串掃描夠用（跟這支檔案其他函式同一個風格）。
+      const parenStart = upsertAt + ".upsert(".length - 1;
+      let depth = 0, end = -1;
+      for (let j = parenStart; j < src.length; j++) {
+        if (src[j] === "(") depth++;
+        else if (src[j] === ")") { depth--; if (depth === 0) { end = j; break; } }
+      }
+      // 找不到配對的右括號（理論上不該發生，除非檔案本身語法就有問題）：
+      // 寧可看到檔案結尾為止，也不要縮小範圍讓豁免變得更容易通過。
+      const call = end === -1 ? src.slice(upsertAt) : src.slice(upsertAt, end + 1);
+      // ⚠ 值要是字面的 true，`ignoreDuplicates: false` 或 `ignoreDuplicates: flag`
+      // 都不算豁免——那兩種情況 PostgREST 一樣會展開成 ON CONFLICT DO UPDATE。
+      if (!/ignoreDuplicates\s*:\s*true\b/.test(call)) return false; // 這一句沒有豁免
     }
     i += needle.length;
   }
