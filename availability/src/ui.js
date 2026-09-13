@@ -321,15 +321,23 @@ export function mineHTML(S) {
 
     ${week && S.weekMarksMine.size ? `<div class="wnote" style="margin-top:14px">
       你已經為這幾週特別設定過：
-      <ul class="wklist">${[...S.weekMarksMine].sort().map(k => `<li>
+      <ul class="wklist">${[...S.weekMarksMine].sort().map(k => {
+        // 過去的週仍然要列出來（讓他知道自己設過哪幾週），但不能按 clear-week ——
+        // 取消例外也是一種編輯，過去的週不能編輯是這一頁既有的規則（見上面 past 的說明），
+        // I3（2026-09-12 總審查）：以前這裡對每一週都畫按鈕，過去的週也能按。
+        const gone = isPastWeek(k, new Date(), S.myTz);
+        return `<li>
         <span>${esc(weekKeyLabel(k))}</span>
-        <button class="btn quiet sm" data-act="clear-week" data-w="${esc(k)}">回到平常的時間</button>
-      </li>`).join("")}</ul>
+        ${gone
+          ? `<span class="mini">（已經過去）</span>`
+          : `<button class="btn quiet sm" data-act="clear-week" data-w="${esc(k)}">回到平常的時間</button>`}
+      </li>`;
+      }).join("")}</ul>
     </div>` : ""}
 
     <div class="row sticky">
       ${past ? "" : `<button class="btn" data-act="save" ${S.dirty ? "" : "disabled"}>${S.dirty ? "儲存" : "已儲存"}</button>`}
-      <button class="btn ghost sm" data-act="confirm-same">我確認過了，沒有變</button>
+      ${week ? "" : `<button class="btn ghost sm" data-act="confirm-same">我確認過了，沒有變</button>`}
       <span class="mini">${esc(S.mineMsg || "")}</span>
     </div>
     <div class="wnote" style="margin-top:14px">時區：<b>${esc(labelOf(S.myTz))}</b>

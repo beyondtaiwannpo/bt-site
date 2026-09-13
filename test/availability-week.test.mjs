@@ -90,6 +90,39 @@ test("例外只影響那一週，別的週照樣用平常的", () => {
   assert.equal([...c.values()].flat().includes("u1"), true);   // 這一週是 09-07，不受影響
 });
 
+// ── I2（2026-09-12 總審查）：跨時區逐格判斷 ──────────────────────────
+// 規格 §二自己說這是「這次最需要測試的一段」，而在這條加進來之前，
+// 所有穿過 boardCounts() 的測試成員與觀看者都用同一個時區，完全沒有東西
+// 守著「逐格判斷，不是逐人逐週判斷」這件事（見 board.js 檔頭那段註解）。
+//
+// 案例（前一輪審查手推驗證過）：休士頓（Chicago）的成員平常週日 11:30、
+// 週三 20:00（他自己當地時間）有空。台北的觀看者看 2026-09-07 那一週。
+// 週日那一格换算回 Chicago 當地，屬於他自己時區的 2026-08-31 那一週
+// （台北的星期一早上是他的星期日晚上，跨到了他的上一週）；
+// 週三那一格屬於 2026-09-07 那一週，跟觀看者同一週。
+const CHI = "America/Chicago";
+test("★ 跨時區：觀看者的一週橫跨成員的兩個本地週，例外只蓋掉屬於那一週的格子", () => {
+  const houston = [{ id: "houston", tz: CHI }];
+  const slots = new Map([["houston", new Set(["0:690", "3:1200"])]]);   // 週日 11:30、週三 20:00（Chicago 當地）
+
+  // 先釘住兩格各自屬於哪一週，不然下面的斷言等於憑空假設。
+  assert.equal(weekKeyOf(toInstant(2026, 9, 6, 11, 30, CHI), CHI), "2026-08-31");
+  assert.equal(weekKeyOf(toInstant(2026, 9, 9, 20, 0, CHI), CHI), "2026-09-07");
+
+  // 只把「2026-08-31」那一週標成例外，而且設為空集合（那一週他完全沒空）；
+  // 「2026-09-07」那一週沒被動過，照舊看平常的時段。
+  const weekMarks = new Map([["houston", new Set(["2026-08-31"])]]);
+  const weekSlots = new Map();   // 空集合：沒有任何一格記錄在「2026-08-31」底下
+
+  const c = boardCounts(houston, slots, WEEK, TPE2, weekSlots, weekMarks);
+  const hits = [...c.entries()].filter(([, v]) => v.includes("houston")).map(([k]) => k);
+
+  // 正確結果：週日那一格消失（屬於被標成空的那一週），週三那一格保留。
+  // ⚠ 如果實作改成「整個成員這一週用同一份」而不是逐格判斷，
+  // houston 會整週消失（兩格都不見），這條斷言就會翻紅 —— 已經手動驗證過。
+  assert.equal(hits.length, 1, `houston 出現在 ${hits.length} 格，應該只剩週三那一格`);
+});
+
 // ── 畫面：mineHTML 的「平常的時間 / 某一週」切換 ──────────────────────
 const baseS = {
   mine: new Set(), saved: new Set(), dirty: false, mineMsg: "",
@@ -121,4 +154,12 @@ test("已經設定過例外的週會列出來，每一個都可以回到平常�
   const h = mineHTML({ ...baseS, mineMode: "week", weekMarksMine: new Set(["2026-09-07"]) });
   assert.match(h, /回到平常的時間/);
   assert.match(h, /data-act="clear-week"/);
+});
+
+// I3（2026-09-12 總審查）：過去的週仍然要出現在這份清單裡（讓他知道自己設過），
+// 但不能按 clear-week ——取消例外也是一種編輯，過去的週不能編輯的規則要一致。
+test("★ 清單裡過去的週不能按 clear-week，只有一句「已經過去」", () => {
+  const h = mineHTML({ ...baseS, mineMode: "week", weekMarksMine: new Set(["2020-01-06"]) });
+  assert.match(h, /已經過去/);
+  assert.equal(/data-act="clear-week"/.test(h), false, "過去的週不該畫出可以按的按鈕");
 });

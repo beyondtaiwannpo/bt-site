@@ -309,7 +309,14 @@ document.addEventListener("click", async e => {
       if (S.weekMarks.has(S.user.id)) S.weekMarks.get(S.user.id).delete(wk);
       if (S.weekSlots.has(S.user.id)) S.weekSlots.get(S.user.id).delete(wk);
       // 剛好是正在編輯的那一週，畫面上的格子也要跟著回到平常的時間。
-      if (wk === weekKeyOf(S.weekStart, S.myTz)) { S.weekMine = new Set(S.saved); S.weekSaved = new Set(); }
+      if (wk === weekKeyOf(S.weekStart, S.myTz)) {
+        S.weekMine = new Set(S.saved); S.weekSaved = new Set();
+        // 跟 I1 同一個根因：清乾淨之後這一週等於沒動過，weekTouched 也要跟著歸零，
+        // 不然使用者若在這一週改了東西沒存、又按了這顆鍵，S.dirty 會留在 true，
+        // 可能導致再存一次又建立一份一模一樣的例外。
+        S.weekTouched = false;
+      }
+      recomputeDirty();
       S.busy = false; S.mineMsg = "那一週回到你平常的時間了。";
     } catch (err) {
       console.error("取消某一週失敗。真正的原因：", err);
@@ -409,7 +416,7 @@ document.addEventListener("click", async e => {
       S.slots.set(S.user.id, new Set(S.mine));
       // 反過來同一個道理：剛存的是平常的時間，某一週那邊有沒有還沒存
       // 要重新問一次，不能直接寫 false（見上面那一支的註解）。
-      S.dirty = !setsEqual(S.weekMine, S.weekSaved);
+      S.dirty = S.weekTouched && !setsEqual(S.weekMine, S.weekSaved);
       S.mineMsg = r.add || r.del ? `存好了（+${r.add} / -${r.del}）。` : "沒有變動。";
       const me = S.members.find(m => m.id === S.user.id);
       if (me) me.updatedAt = new Date().toISOString();
