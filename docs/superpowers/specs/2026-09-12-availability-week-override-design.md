@@ -54,7 +54,6 @@ create table if not exists public.availability_week (
 create table if not exists public.availability_week_mark (
   user_id    uuid not null references public.profiles(id) on delete cascade,
   week_start date not null,
-  updated_at timestamptz not null default now(),
   primary key (user_id, week_start)
 );
 ```
@@ -115,8 +114,11 @@ create table if not exists public.availability_week_mark (
 - **`availability_week` 刻意不給 update 政策**，理由跟既有那張一樣：
   除了主鍵沒有別的欄位，「改時間」就是刪掉舊格子、插入新格子。
   沒有 update 政策也沒有 update 授權，等於「改到別人的列」這個 bug class 在這張表上不存在。
-- **`availability_week_mark` 需要 update**（`updated_at`），所以給 update 政策，
-  但**欄位授權只發 `updated_at`**，不含主鍵。
+- **`availability_week_mark` 也不給 update 政策。** 它只有主鍵兩欄，沒有任何可以改的東西：
+  設定一週就是 insert，取消就是 delete。**兩張新表都只有新增與刪除**，
+  所以「改到別人的列」這個 bug class 在這個功能上完全不存在 —— 不是被政策擋住，是不存在。
+  （初稿在這張表放了 `updated_at`，自我檢查時拿掉：沒有任何畫面用到它，
+  而有那一欄就必須發 update 權限，等於為了一個沒人看的欄位打開一整類風險。）
 
 ⚠⚠ **一定要先 `revoke all ... from anon, authenticated` 再 grant。**
 Supabase 在 public schema 設了 default privileges，**每一張新表自動把全部權限
@@ -142,7 +144,15 @@ Supabase 在 public schema 設了 default privileges，**每一張新表自動�
 
 上方多一個切換：**平常的時間** / **某一週**。
 
-- 選「某一週」時出現週次選單（本週起，往後不限）。
+- 選「某一週」時，編輯的是**看板目前正在看的那一週**，頁面上用「上一週 / 下一週」移動，
+  旁邊寫出那一週的日期範圍。
+
+  **為什麼不做週次下拉選單**：Paul 要的是「本週加未來全部」，而下拉選單沒辦法無限長，
+  設一個上限就等於偷偷把「全部」改成某個數字。看板本來就能往後翻不限，
+  而 `S.weekStart` 已經是兩個分頁共用的狀態，所以「我在看哪一週就編哪一週」
+  既沒有上限問題，也剛好是人想事情的順序。
+- **本週之前的週不能編輯**：切到「某一週」時如果目前停在過去，那一頁顯示
+  「過去的週不能改」並把「上一週」停用，不畫格子。
 - 選了某一週之後，**預先帶出他平常的時段**當起點（若該週已有例外則帶出例外）。
 - 底下一句話：「這一週會用這裡的設定，不會影響你平常的時間。」
 - 已經設定過例外的週**列在這一頁**，每一個可以「回到平常的時間」（刪掉 mark 與那一週的格子）。
