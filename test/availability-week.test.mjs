@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { weekKeyOf, isPastWeek, weekKeyLabel } from "../availability/src/weekkey.js";
 import { toInstant, startOfWeek } from "../availability/src/tz.js";
 import { boardCounts } from "../availability/src/board.js";
+import { mineHTML } from "../availability/src/ui.js";
 
 // 2026-09-09 是星期三，那一週的星期一是 09-07。
 test("週鍵是那一週的星期一", () => {
@@ -87,4 +88,37 @@ test("例外只影響那一週，別的週照樣用平常的", () => {
   const weekMarks = new Map([["u1", new Set(["2026-09-14"])]]);
   const c = boardCounts(M, base, WEEK, TPE2, weekSlots, weekMarks);
   assert.equal([...c.values()].flat().includes("u1"), true);   // 這一週是 09-07，不受影響
+});
+
+// ── 畫面：mineHTML 的「平常的時間 / 某一週」切換 ──────────────────────
+const baseS = {
+  mine: new Set(), saved: new Set(), dirty: false, mineMsg: "",
+  chips: new Set(), bfrom: 1140, bto: 1320, copyFrom: 1,
+  myTz: TPE2, mineMode: "usual", weekStart: WEEK,
+  weekMine: new Set(), weekMarksMine: new Set(),
+};
+
+test("★ 預設是「平常的時間」，畫面講的是每週固定", () => {
+  const h = mineHTML({ ...baseS });
+  assert.match(h, /每週固定/);
+  assert.equal(/這一週/.test(h), false);
+});
+
+test("★ 切到某一週時，說清楚不會影響平常的時間", () => {
+  const h = mineHTML({ ...baseS, mineMode: "week" });
+  assert.match(h, /不會影響你平常的時間/);
+  assert.match(h, /9\/7 – 9\/13/);
+});
+
+test("★ 過去的週不能編輯，而且要說為什麼", () => {
+  const past = startOfWeek(toInstant(2020, 1, 8, 12, 0, TPE2), TPE2, 1);
+  const h = mineHTML({ ...baseS, mineMode: "week", weekStart: past });
+  assert.match(h, /過去的週不能改/);
+  assert.equal(/data-act="toggle"/.test(h), false, "過去的週不該畫出可以點的格子");
+});
+
+test("已經設定過例外的週會列出來，每一個都可以回到平常的時間", () => {
+  const h = mineHTML({ ...baseS, mineMode: "week", weekMarksMine: new Set(["2026-09-07"]) });
+  assert.match(h, /回到平常的時間/);
+  assert.match(h, /data-act="clear-week"/);
 });

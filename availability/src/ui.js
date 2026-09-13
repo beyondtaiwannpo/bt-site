@@ -2,6 +2,7 @@
 //（跟 app/ 同一條規矩：資料夾之間不互相依賴）。
 import { labelOf } from "./tz-alias.js";
 import { offsetLabel } from "./tz.js";
+import { weekKeyOf, isPastWeek, weekKeyLabel } from "./weekkey.js";
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -227,18 +228,25 @@ const memberOf = (S, id) => S.members.find(m => m.id === id) || { name: id, alt:
 // **批次填寫排在格線前面，而且是預設看得到的那一塊。**
 // 規格 §4-3 B：拖曳塗一百個格子在手機上不可行，這點已經實測過。
 // 格線留著給微調用，不是主要的填法。
+// 2026-09-12 加「某一週」模式：平常的每週固定時間之外，
+// 可以為看板目前正在看的那一週（S.weekStart）單獨蓋掉一次，不影響其他週。
+// mineMode 沒有值就當 "usual" —— 既有呼叫端（main.js 接線是下一個任務）都不會傳這個欄位。
 export function mineHTML(S) {
+  const week = S.mineMode === "week";
+  const wk = week ? weekKeyOf(S.weekStart, S.myTz) : null;
+  const past = week && isPastWeek(wk, new Date(), S.myTz);
+  // 兩種模式共用同一段畫格子與批次工具的程式碼，只有這裡切資料來源：
+  // 平常模式讀 S.mine，某一週模式讀 S.weekMine。
+  const grid = week ? S.weekMine : S.mine;
+
   const opts = [];
   for (let m = 0; m <= 1440; m += 30) opts.push(m);
   // 選單的值從 S 來，不是寫死的 —— 重畫之後使用者剛選的時段要還在，
   // 不然他每加一段就得重選一次，那在手機上就是放棄的理由。
   const sel = (id, val) => `<select id="${id}">${opts.filter(m => m < 1440 || id === "bto")
     .map(m => `<option value="${m}"${m === val ? " selected" : ""}>${m === 1440 ? "24:00" : hhmm(m)}</option>`).join("")}</select>`;
-  return `<div class="card">
-    <h2>我的每週時間</h2>
-    <div class="sub">填「每週固定有空」的時段，不是特定日期。改一次可以用一整個學期。</div>
 
-    <div class="batch">
+  const batchAndGrid = `<div class="batch">
       <div class="brow">
         <i>時段</i>${sel("bfrom", S.bfrom)} <span>到</span> ${sel("bto", S.bto)}
       </div>
@@ -277,7 +285,7 @@ export function mineHTML(S) {
         const rows = [];
         for (let min = 0; min < 1440; min += 30) {
           const cells = COL_ORDER.map(wd => {
-            const on = S.mine.has(wd + ":" + min);
+            const on = grid.has(wd + ":" + min);
             return `<td><button class="cell ${on ? "on" : ""}" data-act="toggle"
               data-wd="${wd}" data-m="${min}" aria-pressed="${on}"
               aria-label="星期${DAY_ZH[wd]} ${hhmm(min)}"></button></td>`;
@@ -285,7 +293,33 @@ export function mineHTML(S) {
           rows.push(`<tr><th class="hr">${min % 60 === 0 ? hhmm(min) : ""}</th>${cells}</tr>`);
         }
         return rows.join("");
-      })()}</tbody></table></div>
+      })()}</tbody></table></div>`;
+
+  return `<div class="card">
+    <h2>${week ? "這一週的時間" : "我的每週時間"}</h2>
+    <div class="sub">${week
+      ? `${esc(weekKeyLabel(wk))} 這一週會用這裡的設定，<b>不會影響你平常的時間</b>。`
+      : "填「每週固定有空」的時段，不是特定日期。改一次可以用一整個學期。"}</div>
+    <div class="row">
+      <button class="btn quiet sm${week ? "" : " on"}" data-act="mine-mode" data-m="usual">平常的時間</button>
+      <button class="btn quiet sm${week ? " on" : ""}" data-act="mine-mode" data-m="week">某一週</button>
+    </div>
+    ${week ? `<div class="row">
+      <button class="btn quiet sm" data-act="week" data-d="-1">上一週</button>
+      <button class="btn quiet sm" data-act="week" data-d="1">下一週</button>
+    </div>` : ""}
+
+    ${past ? `<div class="wnote big">過去的週不能改。<br>
+      改已經過去的時間沒有意義，而且會讓人以為自己在改未來。
+      要改就往後翻到本週或以後。</div>` : batchAndGrid}
+
+    ${week && S.weekMarksMine.size ? `<div class="wnote" style="margin-top:14px">
+      你已經為這幾週特別設定過：
+      <ul class="flist">${[...S.weekMarksMine].sort().map(k => `<li>
+        ${esc(weekKeyLabel(k))}
+        <button class="btn quiet sm" data-act="clear-week" data-w="${esc(k)}">回到平常的時間</button>
+      </li>`).join("")}</ul>
+    </div>` : ""}
 
     <div class="row sticky">
       <button class="btn" data-act="save" ${S.dirty ? "" : "disabled"}>${S.dirty ? "儲存" : "已儲存"}</button>
