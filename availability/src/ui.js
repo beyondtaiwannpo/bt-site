@@ -300,9 +300,11 @@ export function mineHTML(S) {
     <div class="sub">${week
       ? `${esc(weekKeyLabel(wk))} 這一週會用這裡的設定，<b>不會影響你平常的時間</b>。`
       : "填「每週固定有空」的時段，不是特定日期。改一次可以用一整個學期。"}</div>
-    <div class="row">
-      <button class="btn quiet sm${week ? "" : " on"}" data-act="mine-mode" data-m="usual">平常的時間</button>
-      <button class="btn quiet sm${week ? " on" : ""}" data-act="mine-mode" data-m="week">某一週</button>
+    <div class="chips modeswitch">
+      <button class="chip${week ? "" : " on"}" data-act="mine-mode" data-m="usual"
+        aria-pressed="${!week}">平常的時間</button>
+      <button class="chip${week ? " on" : ""}" data-act="mine-mode" data-m="week"
+        aria-pressed="${week}">某一週</button>
     </div>
     ${week ? `<div class="row">
       <button class="btn quiet sm" data-act="week" data-d="-1">上一週</button>
@@ -315,8 +317,8 @@ export function mineHTML(S) {
 
     ${week && S.weekMarksMine.size ? `<div class="wnote" style="margin-top:14px">
       你已經為這幾週特別設定過：
-      <ul class="flist">${[...S.weekMarksMine].sort().map(k => `<li>
-        ${esc(weekKeyLabel(k))}
+      <ul class="wklist">${[...S.weekMarksMine].sort().map(k => `<li>
+        <span>${esc(weekKeyLabel(k))}</span>
         <button class="btn quiet sm" data-act="clear-week" data-w="${esc(k)}">回到平常的時間</button>
       </li>`).join("")}</ul>
     </div>` : ""}

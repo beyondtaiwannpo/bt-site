@@ -119,6 +119,17 @@
      都是 38，所以它是方的），而 team 的名字有到十幾個字。 */
   .teamfilter{margin:0 0 14px}
   .teamfilter .chip{min-width:0;height:auto;padding:8px 14px;font-size:14px;letter-spacing:.02em}
+  /* 「平常的時間 / 某一週」切換（2026-09-12）。沿用 .chip 的選中態 ——
+     使用者對星期勾選那套視覺語言已經熟悉，不用另外發明一種「選中」的畫法。
+     標籤不是單一個字，所以套用跟 team 篩選一樣的放寬寫法。 */
+  .modeswitch .chip{min-width:0;height:auto;padding:8px 14px;font-size:14px;letter-spacing:.02em}
+  /* 已經設定過例外的週清單（2026-09-12）。跟 admin/ 的 .flist 視覺語言一樣
+     （一行一列、上框線分隔），但這裡自己寫一份 —— 資料夾之間不共用樣式表，
+     即使兩邊看起來很像（見檔頭「esc 是自己的一份」同一條規矩）。 */
+  .wklist{margin:8px 0 0;padding:0;list-style:none}
+  .wklist li{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:8px 0;border-top:1px solid rgba(16,42,134,.14)}
+  .wklist li:first-child{border-top:0;padding-top:2px}
   /* ⚠ z-index 一定要比格線的時刻標籤高。
      那些標籤是 `th.hr{position:sticky;left:0;z-index:1}`，
      而**有 z-index 的定位元素一律畫在 z-index:auto 的上面，跟 HTML 順序無關**。
