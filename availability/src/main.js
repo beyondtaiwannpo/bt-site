@@ -5,11 +5,12 @@ import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 import { navHTML } from "../../shared/nav.js";
 import { searchTz } from "./tz-alias.js";
-import { applyRange, copyDay, quickDays } from "./edit.js";
+import { applyRange, copyDay, quickDays, diff } from "./edit.js";
 import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
 import { cellInstant, googleCalUrl, localTimesText, DEFAULT_TITLE } from "./calendar.js";
 import { labelOf } from "./tz-alias.js";
 import { startOfWeek, detectTz, partsIn, addDays } from "./tz.js";
+import { weekKeyOf } from "./weekkey.js";
 
 const root = () => document.getElementById("bt-root");
 const K = DATA.key;
@@ -19,6 +20,15 @@ let S = {
   tab: "board", members: [], slots: new Map(),
   team: "",                       // team 篩選，空字串是「全部」（見 view()）
   mine: new Set(), saved: new Set(), dirty: false, mineMsg: "",
+  // 某一週的例外（2026-09-12）。weekSlots / weekMarks 是**全部人**的
+  // （DATA.loadAll() 回來的原始形狀，board.js 的 boardCounts() 要吃這兩份），
+  // 跟下面四個「我自己」的欄位分開放，不要混在一起——
+  // 團隊看板要看全部人，「我的時間」只改自己那一份。
+  weekSlots: new Map(), weekMarks: new Map(),
+  mineMode: "usual",        // "usual" = 平常的時間、"week" = 某一週
+  weekMine: new Set(),      // 目前這一週的例外格子（編輯中，畫面看得到的那一份）
+  weekSaved: new Set(),     // 目前這一週 availability_week 資料表裡真正存的樣子，算差集用
+  weekMarksMine: new Set(), // 我自己設定過例外的那幾週（給「已經設定過的這幾週」那份清單用）
   weekStart: null, weekOffset: 0,
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
   needNotice: false, needTz: false, tzQuery: "", tzResults: [], tzGuess: null,
@@ -66,7 +76,9 @@ function render() {
   let inner, label = null;
   const V = view();
   if (S.tab === "board") {
-    const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz);
+    // 帶上 weekSlots / weekMarks：某一週被誰動過例外，看板要逐格改用那一份
+    // 而不是一路都用平常的時間（board.js 的判斷邏輯見那邊註解）。
+    const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz, S.weekSlots, S.weekMarks);
     S.boardTop = firstBusyMinute(counts);
     inner = UI.boardHTML(V, counts, weekDates());
     label = weekLabel();
@@ -105,8 +117,11 @@ async function boot() {
 
     const all = await DATA.loadAll();
     S.members = all.members; S.slots = all.slots;
+    S.weekSlots = all.weekSlots; S.weekMarks = all.weekMarks;
     S.saved = new Set(S.slots.get(S.user.id) || []);
     S.mine = new Set(S.saved);
+    // 我自己設定過例外的那幾週，給「我的時間」那份清單用。
+    S.weekMarksMine = new Set(S.weekMarks.get(S.user.id) || []);
 
     const me = S.members.find(m => m.id === S.user.id);
     S.needNotice = !(me && me.noticeSeenAt);
@@ -127,6 +142,39 @@ function setWeek(off) {
   S.weekStart = startOfWeek(base, S.myTz || "UTC", 1);
 }
 
+// 兩個 Set 內容是不是一模一樣。借用 edit.js 的 diff()，不要自己重寫一次比對邏輯。
+function setsEqual(a, b) {
+  const d = diff(a, b);
+  return !d.add.length && !d.del.length;
+}
+
+// 「我的時間」目前在編輯的是哪一份 Set —— 平常的（S.mine）還是某一週的（S.weekMine）。
+// toggle / apply / copyday 都要透過這支改，不能直接寫死 S.mine：
+// 不然在「某一週」模式下點格子，改到的其實是平常的時間，畫面看起來有變，
+// 但存檔存的是另一份資料，使用者完全看不出來哪裡錯了。
+function mineTarget() { return S.mineMode === "week" ? S.weekMine : S.mine; }
+function setMineTarget(set) { if (S.mineMode === "week") S.weekMine = set; else S.mine = set; }
+
+// 切到「某一週」模式、或在那個模式下翻週之後，把這一週要編輯的起點準備好。
+//
+// 這一週已經被我自己動過例外，就帶出例外本身；還沒有的話帶出**平常的時段**
+// 當起點——這是規格明寫的「預先帶出當起點」，讓人從自己平常的時間開始改，
+// 不是對著一張空表重填。
+//
+// **weekSaved 永遠對到 availability_week 資料表目前真正存的樣子**
+// （沒有例外就是空集合），不是「畫面上看到的起點」——
+// 這樣 saveWeek() 算差集才會對：第一次存某一週時，wanted 是整份平常的時段、
+// current 是空的，差集會把整份平常的時段當新資料寫進去，這是對的；
+// 如果 weekSaved 也偷懶帶成平常的時段，第一次存檔就會被誤判成「沒有變動」，
+// 資料庫裡那一週的 mark 也不會被建起來。
+function syncWeekMine() {
+  const wk = weekKeyOf(S.weekStart, S.myTz);
+  const marked = S.weekMarksMine.has(wk);
+  const existing = (S.weekSlots.get(S.user.id) || new Map()).get(wk) || new Set();
+  S.weekSaved = new Set(existing);
+  S.weekMine = new Set(marked ? existing : S.saved);
+}
+
 // ── 事件 ────────────────────────────────────────────────────────────
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
@@ -143,16 +191,21 @@ document.addEventListener("click", async e => {
 
   if (act === "week") {
     const d = +b.dataset.d;
-    // 前後各 4 週（使用者 2026-09-02 裁定）。翻週唯一的作用是看 DST 切換
-    // 前後的差別，一年兩次，範圍不需要更大。
-    const next = d === 0 ? 0 : Math.max(-4, Math.min(4, S.weekOffset + d));
+    // 往前四週（Paul 2026-09-02 裁定，往前只是回顧而且不能改）；
+    // 往後不限（Paul 2026-09-12：本週加未來全部都可以填，看板要看得到那麼遠）。
+    const next = d === 0 ? 0 : Math.max(-4, S.weekOffset + d);
     // 已經在邊界的話**要說話**，不能按了沒反應 —— 那正是這一頁反覆出現的症狀。
+    // 上限拿掉之後只剩往前這一種邊界，所以訊息不用再看方向。
     if (next === S.weekOffset && d !== 0) {
-      S.msg = d < 0 ? "只能往前看四週。" : "只能往後看四週。";
+      S.msg = "只能往前看四週。";
       render(); return;
     }
     S.msg = "";
-    setWeek(next); render(); return;
+    setWeek(next);
+    // 兩個分頁共用同一個 handler、同一份 S.weekStart（Paul 2026-09-12 裁定，
+    // 不依分頁分流）：翻週的時候如果正在編某一週，起點要跟著換到新的那一週。
+    if (S.mineMode === "week") syncWeekMine();
+    render(); return;
   }
 
   if (act === "notice-ok") {
@@ -189,6 +242,37 @@ document.addEventListener("click", async e => {
   }
   if (act === "change-tz") { S.needTz = true; S.tzQuery = ""; S.tzResults = []; render(); return; }
 
+  // 「我的時間」的兩個模式：平常的時間 ／ 某一週。
+  if (act === "mine-mode") {
+    S.mineMode = b.dataset.m; S.mineMsg = "";
+    // 切進「某一週」要先把起點準備好，不然畫面會先閃一次空表。
+    if (S.mineMode === "week") syncWeekMine();
+    render(); return;
+  }
+  // 取消某一週的例外，回到平常的時間。清單裡任何一週都可以按，
+  // 不限於現在正在看的那一週。
+  if (act === "clear-week") {
+    if (S.busy) return;
+    const wk = b.dataset.w;
+    S.busy = true; S.mineMsg = ""; render();
+    try {
+      await DATA.clearWeek(S.user.id, wk);
+      S.weekMarksMine.delete(wk);
+      // 團隊看板讀的是 S.weekMarks / S.weekSlots（全部人的那一份），
+      // 這兩份也要一起清掉，不然自己這一格要等下次重新整頁才會消失。
+      if (S.weekMarks.has(S.user.id)) S.weekMarks.get(S.user.id).delete(wk);
+      if (S.weekSlots.has(S.user.id)) S.weekSlots.get(S.user.id).delete(wk);
+      // 剛好是正在編輯的那一週，畫面上的格子也要跟著回到平常的時間。
+      if (wk === weekKeyOf(S.weekStart, S.myTz)) { S.weekMine = new Set(S.saved); S.weekSaved = new Set(); }
+      S.busy = false; S.mineMsg = "那一週回到你平常的時間了。";
+    } catch (err) {
+      console.error("取消某一週失敗。真正的原因：", err);
+      S.busy = false;
+      S.mineMsg = "取消不了：" + DATA.authMessage(err);
+    }
+    render(); return;
+  }
+
   if (act === "chip") {
     const wd = +b.dataset.wd;
     S.chips.has(wd) ? S.chips.delete(wd) : S.chips.add(wd);
@@ -205,8 +289,11 @@ document.addEventListener("click", async e => {
     if (!S.chips.size) { S.mineMsg = "先選要套用到哪幾天。"; render(); return; }
     if (S.bfrom >= S.bto) { S.mineMsg = "結束時間要比開始時間晚。"; render(); return; }
     const add = b.dataset.mode === "add";
-    const r = applyRange(S.mine, [...S.chips], S.bfrom, S.bto, add);
-    S.mine = r.set;
+    // 兩種模式共用同一顆按鈕，改到哪一份 Set 由 mineTarget() 決定 ——
+    // 寫死 S.mine 的話「某一週」模式點下去改的其實是平常的時間，
+    // 畫面看起來有反應，存檔卻存錯地方。
+    const r = applyRange(mineTarget(), [...S.chips], S.bfrom, S.bto, add);
+    setMineTarget(r.set);
     const n = r.changed;
     S.dirty = true;
     S.mineMsg = `${add ? "加了" : "拿掉了"} ${n} 格，記得按儲存。`;
@@ -218,8 +305,8 @@ document.addEventListener("click", async e => {
     const from = +document.getElementById("copyfrom").value;
     S.copyFrom = from;
     if (!S.chips.size) { S.mineMsg = "先選要複製到哪幾天。"; render(); return; }
-    const r = copyDay(S.mine, from, [...S.chips]);
-    S.mine = r.set;
+    const r = copyDay(mineTarget(), from, [...S.chips]);
+    setMineTarget(r.set);
     S.dirty = true;
     S.mineMsg = `複製好了，變動 ${r.changed} 格，記得按儲存。`;
     render(); return;
@@ -229,8 +316,9 @@ document.addEventListener("click", async e => {
   // 而使用者正在格線中間微調。只改那一顆按鈕的狀態。
   if (act === "toggle") {
     const k = K(+b.dataset.wd, +b.dataset.m);
-    const on = !S.mine.has(k);
-    on ? S.mine.add(k) : S.mine.delete(k);
+    const target = mineTarget();
+    const on = !target.has(k);
+    on ? target.add(k) : target.delete(k);
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", String(on));
     S.dirty = true;
@@ -241,12 +329,41 @@ document.addEventListener("click", async e => {
 
   if (act === "save") {
     readBatch();
+    // 「某一週」模式存的是 availability_week，不是 availability，
+    // 走完全不同的一支（差集也是另外兩份 Set）。
+    if (S.mineMode === "week") {
+      const wk = weekKeyOf(S.weekStart, S.myTz);
+      b.disabled = true; b.textContent = "存檔中…";
+      try {
+        const r = await DATA.saveWeek(S.user.id, wk, S.weekMine, S.weekSaved);
+        S.weekSaved = new Set(S.weekMine);
+        S.weekMarksMine.add(wk);
+        // 團隊看板讀 S.weekSlots / S.weekMarks（全部人的那一份），
+        // 存好也要一起同步，不然要重新整頁才看得到自己剛存的例外。
+        if (!S.weekSlots.has(S.user.id)) S.weekSlots.set(S.user.id, new Map());
+        S.weekSlots.get(S.user.id).set(wk, new Set(S.weekMine));
+        if (!S.weekMarks.has(S.user.id)) S.weekMarks.set(S.user.id, new Set());
+        S.weekMarks.get(S.user.id).add(wk);
+        // 剛存的是某一週，平常的時間有沒有還沒存是另一件事 ——
+        // 重新問一次 S.mine 跟 S.saved 是不是還一樣，不能直接寫 false，
+        // 不然平常那邊沒存的編輯會被這次存檔悄悄標成「已儲存」。
+        S.dirty = !setsEqual(S.mine, S.saved);
+        S.mineMsg = r.add || r.del ? `存好了（+${r.add} / -${r.del}）。` : "沒有變動。";
+      } catch (err) {
+        console.error("某一週存檔失敗：", err);
+        S.mineMsg = DATA.authMessage(err);
+        S.dirty = true;
+      }
+      render(); return;
+    }
     b.disabled = true; b.textContent = "存檔中…";
     try {
       const r = await DATA.saveMine(S.user.id, S.mine, S.saved);
       S.saved = new Set(S.mine);
       S.slots.set(S.user.id, new Set(S.mine));
-      S.dirty = false;
+      // 反過來同一個道理：剛存的是平常的時間，某一週那邊有沒有還沒存
+      // 要重新問一次，不能直接寫 false（見上面那一支的註解）。
+      S.dirty = !setsEqual(S.weekMine, S.weekSaved);
       S.mineMsg = r.add || r.del ? `存好了（+${r.add} / -${r.del}）。` : "沒有變動。";
       const me = S.members.find(m => m.id === S.user.id);
       if (me) me.updatedAt = new Date().toISOString();
@@ -350,7 +467,9 @@ function buildPeek() {
   // 篩了 team 的話彈窗也要跟著篩：格子上的數字是篩過的，
   // 而彈窗說的是「這個數字是誰」——兩邊不一致的話那個數字看起來就是錯的。
   const V = view();
-  const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz);
+  // 帶上 weekSlots / weekMarks，理由跟 render() 那邊一樣：
+  // 彈窗說的是「這個數字是誰」，數字本身要是已經套過某一週例外的那份。
+  const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz, S.weekSlots, S.weekMarks);
   const free = counts.get(col + ":" + min) || [];
   const inst = cellInstant(S.weekStart, col, min, S.myTz);
   const zones = [...new Set(V.members.filter(m => m.tz).map(m => m.tz))].sort();

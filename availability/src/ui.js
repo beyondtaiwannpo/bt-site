@@ -230,10 +230,14 @@ const memberOf = (S, id) => S.members.find(m => m.id === id) || { name: id, alt:
 // 格線留著給微調用，不是主要的填法。
 // 2026-09-12 加「某一週」模式：平常的每週固定時間之外，
 // 可以為看板目前正在看的那一週（S.weekStart）單獨蓋掉一次，不影響其他週。
-// mineMode 沒有值就當 "usual" —— 既有呼叫端（main.js 接線是下一個任務）都不會傳這個欄位。
+// mineMode 沒有值就當 "usual" —— main.js 2026-09-12 接線完成，兩種模式都會傳。
 export function mineHTML(S) {
   const week = S.mineMode === "week";
   const wk = week ? weekKeyOf(S.weekStart, S.myTz) : null;
+  // 過去的週不能改：格線一起不畫（見下面 past ? ... : batchAndGrid），
+  // 儲存鈕也要跟著不畫——不然那一週沒有任何可以點的格子，
+  // 按了儲存不會有任何事發生，「按了沒反應」正是這一頁反覆出現的症狀
+  // （controller 2026-09-12 裁定，見下面 row sticky 那一段）。
   const past = week && isPastWeek(wk, new Date(), S.myTz);
   // 兩種模式共用同一段畫格子與批次工具的程式碼，只有這裡切資料來源：
   // 平常模式讀 S.mine，某一週模式讀 S.weekMine。
@@ -324,7 +328,7 @@ export function mineHTML(S) {
     </div>` : ""}
 
     <div class="row sticky">
-      <button class="btn" data-act="save" ${S.dirty ? "" : "disabled"}>${S.dirty ? "儲存" : "已儲存"}</button>
+      ${past ? "" : `<button class="btn" data-act="save" ${S.dirty ? "" : "disabled"}>${S.dirty ? "儲存" : "已儲存"}</button>`}
       <button class="btn ghost sm" data-act="confirm-same">我確認過了，沒有變</button>
       <span class="mini">${esc(S.mineMsg || "")}</span>
     </div>
