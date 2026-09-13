@@ -148,6 +148,21 @@ function setsEqual(a, b) {
   return !d.add.length && !d.del.length;
 }
 
+// 依「目前這個模式」重新算 S.dirty，不是沿用舊值。
+//
+// ⚠ **切模式、翻週之後一定要呼叫這支。** S.dirty 是兩個模式共用的單一旗標；
+// 如果留著舊值不管，切模式或翻週之後儲存鈕可能是亮的，即使這個模式裡什麼都還沒改。
+// 那不只是外觀問題：某一週還沒有例外時 S.weekSaved 是空集合，這時候如果按下
+// 那顆「不該亮但亮著」的儲存鈕，saveWeek() 會把 S.weekMine（剛被 syncWeekMine()
+// 填成平常的時段）整份當成新資料寫進去，等於把平常的時間整份寫成那一週的例外，
+// 而且會建 mark——那一週從此跟平常的時間脫鉤，使用者不會發現。
+// （2026-09-12 controller 審查抓到，見 task-6-report.md 的修正段落。）
+function recomputeDirty() {
+  S.dirty = S.mineMode === "week"
+    ? !setsEqual(S.weekMine, S.weekSaved)
+    : !setsEqual(S.mine, S.saved);
+}
+
 // 「我的時間」目前在編輯的是哪一份 Set —— 平常的（S.mine）還是某一週的（S.weekMine）。
 // toggle / apply / copyday 都要透過這支改，不能直接寫死 S.mine：
 // 不然在「某一週」模式下點格子，改到的其實是平常的時間，畫面看起來有變，
@@ -204,7 +219,7 @@ document.addEventListener("click", async e => {
     setWeek(next);
     // 兩個分頁共用同一個 handler、同一份 S.weekStart（Paul 2026-09-12 裁定，
     // 不依分頁分流）：翻週的時候如果正在編某一週，起點要跟著換到新的那一週。
-    if (S.mineMode === "week") syncWeekMine();
+    if (S.mineMode === "week") { syncWeekMine(); recomputeDirty(); }
     render(); return;
   }
 
@@ -247,6 +262,9 @@ document.addEventListener("click", async e => {
     S.mineMode = b.dataset.m; S.mineMsg = "";
     // 切進「某一週」要先把起點準備好，不然畫面會先閃一次空表。
     if (S.mineMode === "week") syncWeekMine();
+    // 不管切去哪個模式都要重算 S.dirty——沿用切換前的舊值的話，
+    // 儲存鈕可能因為另一個模式沒存的編輯而亮著，見 recomputeDirty() 的註解。
+    recomputeDirty();
     render(); return;
   }
   // 取消某一週的例外，回到平常的時間。清單裡任何一週都可以按，
