@@ -2,6 +2,7 @@
 //（跟 app/ 同一條規矩：資料夾之間不互相依賴）。
 import { labelOf } from "./tz-alias.js";
 import { offsetLabel } from "./tz.js";
+import { weekKeyOf, isPastWeek, weekKeyLabel } from "./weekkey.js";
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -227,18 +228,29 @@ const memberOf = (S, id) => S.members.find(m => m.id === id) || { name: id, alt:
 // **批次填寫排在格線前面，而且是預設看得到的那一塊。**
 // 規格 §4-3 B：拖曳塗一百個格子在手機上不可行，這點已經實測過。
 // 格線留著給微調用，不是主要的填法。
+// 2026-09-12 加「某一週」模式：平常的每週固定時間之外，
+// 可以為看板目前正在看的那一週（S.weekStart）單獨蓋掉一次，不影響其他週。
+// mineMode 沒有值就當 "usual" —— main.js 2026-09-12 接線完成，兩種模式都會傳。
 export function mineHTML(S) {
+  const week = S.mineMode === "week";
+  const wk = week ? weekKeyOf(S.weekStart, S.myTz) : null;
+  // 過去的週不能改：格線一起不畫（見下面 past ? ... : batchAndGrid），
+  // 儲存鈕也要跟著不畫——不然那一週沒有任何可以點的格子，
+  // 按了儲存不會有任何事發生，「按了沒反應」正是這一頁反覆出現的症狀
+  // （controller 2026-09-12 裁定，見下面 row sticky 那一段）。
+  const past = week && isPastWeek(wk, new Date(), S.myTz);
+  // 兩種模式共用同一段畫格子與批次工具的程式碼，只有這裡切資料來源：
+  // 平常模式讀 S.mine，某一週模式讀 S.weekMine。
+  const grid = week ? S.weekMine : S.mine;
+
   const opts = [];
   for (let m = 0; m <= 1440; m += 30) opts.push(m);
   // 選單的值從 S 來，不是寫死的 —— 重畫之後使用者剛選的時段要還在，
   // 不然他每加一段就得重選一次，那在手機上就是放棄的理由。
   const sel = (id, val) => `<select id="${id}">${opts.filter(m => m < 1440 || id === "bto")
     .map(m => `<option value="${m}"${m === val ? " selected" : ""}>${m === 1440 ? "24:00" : hhmm(m)}</option>`).join("")}</select>`;
-  return `<div class="card">
-    <h2>我的每週時間</h2>
-    <div class="sub">填「每週固定有空」的時段，不是特定日期。改一次可以用一整個學期。</div>
 
-    <div class="batch">
+  const batchAndGrid = `<div class="batch">
       <div class="brow">
         <i>時段</i>${sel("bfrom", S.bfrom)} <span>到</span> ${sel("bto", S.bto)}
       </div>
@@ -277,7 +289,7 @@ export function mineHTML(S) {
         const rows = [];
         for (let min = 0; min < 1440; min += 30) {
           const cells = COL_ORDER.map(wd => {
-            const on = S.mine.has(wd + ":" + min);
+            const on = grid.has(wd + ":" + min);
             return `<td><button class="cell ${on ? "on" : ""}" data-act="toggle"
               data-wd="${wd}" data-m="${min}" aria-pressed="${on}"
               aria-label="星期${DAY_ZH[wd]} ${hhmm(min)}"></button></td>`;
@@ -285,11 +297,47 @@ export function mineHTML(S) {
           rows.push(`<tr><th class="hr">${min % 60 === 0 ? hhmm(min) : ""}</th>${cells}</tr>`);
         }
         return rows.join("");
-      })()}</tbody></table></div>
+      })()}</tbody></table></div>`;
+
+  return `<div class="card">
+    <h2>${week ? "這一週的時間" : "我的每週時間"}</h2>
+    <div class="sub">${week
+      ? `${esc(weekKeyLabel(wk))} 這一週會用這裡的設定，<b>不會影響你平常的時間</b>。`
+      : "填「每週固定有空」的時段，不是特定日期。改一次可以用一整個學期。"}</div>
+    <div class="chips modeswitch">
+      <button class="chip${week ? "" : " on"}" data-act="mine-mode" data-m="usual"
+        aria-pressed="${!week}">平常的時間</button>
+      <button class="chip${week ? " on" : ""}" data-act="mine-mode" data-m="week"
+        aria-pressed="${week}">某一週</button>
+    </div>
+    ${week ? `<div class="row">
+      <button class="btn quiet sm" data-act="week" data-d="-1">上一週</button>
+      <button class="btn quiet sm" data-act="week" data-d="1">下一週</button>
+    </div>` : ""}
+
+    ${past ? `<div class="wnote big">過去的週不能改。<br>
+      改已經過去的時間沒有意義，而且會讓人以為自己在改未來。
+      要改就往後翻到本週或以後。</div>` : batchAndGrid}
+
+    ${week && S.weekMarksMine.size ? `<div class="wnote" style="margin-top:14px">
+      你已經為這幾週特別設定過：
+      <ul class="wklist">${[...S.weekMarksMine].sort().map(k => {
+        // 過去的週仍然要列出來（讓他知道自己設過哪幾週），但不能按 clear-week ——
+        // 取消例外也是一種編輯，過去的週不能編輯是這一頁既有的規則（見上面 past 的說明），
+        // I3（2026-09-12 總審查）：以前這裡對每一週都畫按鈕，過去的週也能按。
+        const gone = isPastWeek(k, new Date(), S.myTz);
+        return `<li>
+        <span>${esc(weekKeyLabel(k))}</span>
+        ${gone
+          ? `<span class="mini">（已經過去）</span>`
+          : `<button class="btn quiet sm" data-act="clear-week" data-w="${esc(k)}">回到平常的時間</button>`}
+      </li>`;
+      }).join("")}</ul>
+    </div>` : ""}
 
     <div class="row sticky">
-      <button class="btn" data-act="save" ${S.dirty ? "" : "disabled"}>${S.dirty ? "儲存" : "已儲存"}</button>
-      <button class="btn ghost sm" data-act="confirm-same">我確認過了，沒有變</button>
+      ${past ? "" : `<button class="btn" data-act="save" ${S.dirty ? "" : "disabled"}>${S.dirty ? "儲存" : "已儲存"}</button>`}
+      ${week ? "" : `<button class="btn ghost sm" data-act="confirm-same">我確認過了，沒有變</button>`}
       <span class="mini">${esc(S.mineMsg || "")}</span>
     </div>
     <div class="wnote" style="margin-top:14px">時區：<b>${esc(labelOf(S.myTz))}</b>

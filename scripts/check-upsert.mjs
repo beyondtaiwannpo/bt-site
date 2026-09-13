@@ -9,8 +9,12 @@
 // 都放進 ON CONFLICT DO UPDATE 的 SET 清單，包含主鍵；而 availability_meta
 // 只發了 grant update (notice_seen_at)，於是整句被拒。
 //
-// **不是所有 upsert 都有問題**：護照對 stamps / entries / visas 用 upsert 是對的，
-// 那幾張表有表層級的 update 授權。有問題的只有欄位層級授權的表。
+// **不是所有 upsert 都有問題**：護照對 stamps / entries 用 upsert 是對的，
+// 那兩張表有表層級的 update 授權。對 visas 用 upsert 也是對的，但理由不一樣——
+// 那張表完全沒有 update 授權（見 2026-08-26-visas.sql），issueVisas() 與
+// restore() 靠的是 `{ ignoreDuplicates: true }`：PostgREST 遇到這個旗標會把
+// upsert 展開成 `ON CONFLICT DO NOTHING`，沒有 SET 清單，本來就不需要 update
+// 權限。真正有問題的是「有 insert 授權、卻在某句 upsert 裡沒有這個豁免」的表。
 import fs from "node:fs";
 
 export function columnGrantedTables(files) {
@@ -23,8 +27,64 @@ export function columnGrantedTables(files) {
   return out;
 }
 
+// ============================================================================
+// 2026-09-12（控制端裁定）：第二種守備範圍
+// ============================================================================
+// columnGrantedTables() 只抓「grant update (欄位) on 表」這種欄位層級部分授權
+// 的寫法。而 availability_week / availability_week_mark 這兩張新表**完全不發
+// update 授權**（見 2026-09-20-availability-week.sql 檔頭：「改時間」是刪舊
+// 插新，不是 update），所以上面那支守門根本看不到它們——這剛好漏掉風險更高的
+// 那一類：對完全沒有 update 權限的表用 upsert，ON CONFLICT DO UPDATE 會因為
+// 缺 update 權限讓整句被拒，症狀跟 2026-09-02 那次一模一樣（按了存檔沒反應）。
+//
+// 抓法：insert 授權的表，扣掉 update 授權的表（不管整表還是逐欄），剩下的
+// 就是「能 insert、但整份遷移檔完全沒給過它 update」的表。這裡要看懂
+// `grant a, b, c on t1, t2 to ...` 這種一次多權限多表的寫法，不是只有
+// columnGrantedTables() 認得的那一種形狀。
+
+// 權限清單用「括號外的逗號」切開——`select (a, b), update (c, d)` 這種
+// 欄位清單裡的逗號不算切點，不然會被切成四段，其中兩段是半個欄位清單。
+function splitPrivileges(list) {
+  const parts = [];
+  let depth = 0, cur = "";
+  for (const ch of list) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) { parts.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  parts.push(cur);
+  return parts;
+}
+
+export function tablesGrantedPrivilege(files, privilege) {
+  const out = new Set();
+  const re = /grant\s+([\s\S]*?)\s+on\s+((?:table\s+)?[a-z0-9_.,\s]+?)\s+to\b/gi;
+  for (const f of files) {
+    const src = fs.readFileSync(f, "utf8").replace(/--[^\n]*/g, "");
+    for (const m of src.matchAll(re)) {
+      const hasPriv = splitPrivileges(m[1]).some(p => new RegExp("^\\s*" + privilege + "\\b", "i").test(p));
+      if (!hasPriv) continue;
+      for (const t of m[2].replace(/^\s*table\s+/i, "").split(",")) {
+        const name = t.trim().replace(/^public\./i, "").toLowerCase();
+        if (/^[a-z_][a-z0-9_]*$/.test(name)) out.add(name);
+      }
+    }
+  }
+  return out;
+}
+
+export function neverUpdateGrantedTables(files) {
+  const inserted = tablesGrantedPrivilege(files, "insert");
+  const updated = tablesGrantedPrivilege(files, "update");
+  return new Set([...inserted].filter(t => !updated.has(t)));
+}
+
 // 在 from("表") 之後 window 個字元內出現 .upsert( 就算命中。
 // 用字串掃描不用 RegExp，表名不必跳脫。
+//
+// ⚠ 這支不要改判斷邏輯（控制端 2026-09-12 裁定明講）：它只負責「有沒有命中」，
+// 「命中了算不算危險」是下面 upsertGuardedEverywhere() 的事，兩層分開。
 export function findUpserts(src, table, window = 220) {
   const needle = 'from("' + table + '")';
   let i = 0;
@@ -35,16 +95,85 @@ export function findUpserts(src, table, window = 220) {
   return false;
 }
 
+// 命中之後才問的第二個問題：這句 upsert 有沒有帶 `{ ignoreDuplicates: true }`。
+// 有的話展開成 ON CONFLICT DO NOTHING，不需要 update 權限，不算危險——
+// 這是 visas 表既有、正確的用法（見檔頭那段說明）。反向驗證時發現，
+// 把「完全沒有 update 授權」的表整批列進守備範圍會誤傷 visas，所以「命中」
+// 跟「危險」要分兩層問，不能只看 findUpserts() 命中就報。
+//
+// ⚠⚠ 2026-09-12 審查抓到一個 Critical：第一版只用 `.includes("ignoreDuplicates")`
+// 判斷有沒有豁免，**沒有驗證值是不是 true**。`ignoreDuplicates: false` 的效果
+// 等於沒有這個旗標（PostgREST 照樣展開成 ON CONFLICT DO UPDATE），但字串比對
+// 一樣會找到 "ignoreDuplicates" 這幾個字，於是被誤判成安全——這正是
+// `scan()` 對「所有表」都會經過的一關，等於把既有那條「欄位層級授權的表不准
+// 用任何 upsert」的無條件守門，悄悄放寬成「只要附近出現這幾個字，不管值」。
+// 修法：不比對字串出現與否，比對「值是不是字面的 true」。
+//
+// ⚠ 同一個根因的 Important：舊版的搜尋範圍是「從 .upsert( 往後數 tail 個字元」，
+// 不是「這句呼叫自己的參數」——理論上隔壁不相干的程式碼剛好在這個字元數以內
+// 提到 ignoreDuplicates: true，也會被當成這一句的豁免依據。改成配對括號，
+// 只在**這句 upsert 呼叫自己的參數區段**裡找，不看呼叫範圍以外的任何字元。
+//
+// ⚠⚠ 2026-09-12 複審又抓到一個殘留：括號配對是單純數 ( 跟 )，**沒有跳過字串
+// 常值裡的括號**。像 `.upsert({ note: "unbalanced (" })` 這種呼叫，字串裡那個
+// `(` 會被當成真的左括號，depth 永遠回不到 0，配對找不到右括號。第一版遇到這
+// 種情況會「退回去看到檔案結尾為止」，於是檔案後面某個完全不相關的
+// `ignoreDuplicates: true` 就被誤判成這一句的豁免依據——**危險的 upsert 被
+// 放行**，而且沒有任何人會發現，因為症狀跟這整支守門要擋的東西一樣：
+// 「按了存檔沒反應，但守門是綠的」。
+//
+// 這裡不寫一個會跳過字串常值的解析器（沒必要，兩行的 fail-closed 更不會出錯）：
+// **配對失敗就直接當作沒有豁免**，讓這一句算危險。方向很重要，不要寫反：
+//   搜尋範圍變大 → 更容易撞到不相關的 ignoreDuplicates: true → 更容易誤判成
+//     豁免 → 危險的 upsert 被放行（誤放行——沒有人看得到，最壞的方向）
+//   搜尋範圍變小或算不出來 → 找不到豁免依據 → 當作不豁免 → 報成危險
+//     （誤報——會被人看到、會被處理，安全的方向）
+// 所以「算不出範圍」永遠要往「當作危險」那一邊倒，不能往「當作安全」那一邊倒。
+function upsertGuardedEverywhere(src, table, window = 220) {
+  const needle = 'from("' + table + '")';
+  let i = 0;
+  while ((i = src.indexOf(needle, i)) !== -1) {
+    const upsertAt = src.indexOf(".upsert(", i);
+    if (upsertAt !== -1 && upsertAt - i <= window) {
+      // 從 .upsert( 那個左括號開始，配對括號找到這句呼叫自己的右括號在哪裡。
+      // 不解析成 AST，只數 ( 跟 )——這個檔案裡的呼叫都不深，字串掃描夠用
+      // （跟這支檔案其他函式同一個風格），但正因為不解析字串常值，配對失敗
+      // 是預期中會發生的事，見上面的 fail-closed 說明。
+      const parenStart = upsertAt + ".upsert(".length - 1;
+      let depth = 0, end = -1;
+      for (let j = parenStart; j < src.length; j++) {
+        if (src[j] === "(") depth++;
+        else if (src[j] === ")") { depth--; if (depth === 0) { end = j; break; } }
+      }
+      // 找不到配對的右括號——fail closed：當作這一句沒有豁免，直接回報危險。
+      // **不要**退回去掃到檔案結尾找 ignoreDuplicates，那是把「算不出範圍」
+      // 導向「當作安全」，方向是反的（見上面那段說明）。
+      if (end === -1) return false;
+      const call = src.slice(upsertAt, end + 1);
+      // ⚠ 值要是字面的 true，`ignoreDuplicates: false` 或 `ignoreDuplicates: flag`
+      // 都不算豁免——那兩種情況 PostgREST 一樣會展開成 ON CONFLICT DO UPDATE。
+      if (!/ignoreDuplicates\s*:\s*true\b/.test(call)) return false; // 這一句沒有豁免
+    }
+    i += needle.length;
+  }
+  return true; // 這張表在這個檔案裡，每一句 upsert 都有豁免（或根本沒有 upsert）
+}
+
 export function scan(sqlFiles, dirs) {
-  const tables = columnGrantedTables(sqlFiles);
-  if (tables.size === 0) return { broke: "找不到任何欄位層級授權的表" };
+  // 兩種守備範圍取聯集：欄位層級部分授權的表（既有）＋完全沒有 update 授權、
+  // 但有 insert 授權的表（2026-09-12 加）。
+  const tables = new Set([...columnGrantedTables(sqlFiles), ...neverUpdateGrantedTables(sqlFiles)]);
+  if (tables.size === 0) {
+    return { broke: "找不到任何要守的表（欄位層級 update 授權，或完全沒有 update 授權的 insert 授權表）" };
+  }
   const bad = [];
   for (const d of dirs) {
     if (!fs.existsSync(d)) continue;
     for (const f of fs.readdirSync(d).filter(x => x.endsWith(".js"))) {
       const path = d + "/" + f;
       const src = fs.readFileSync(path, "utf8").replace(/\/\/[^\n]*/g, "");
-      for (const t of tables) if (findUpserts(src, t)) bad.push(path + ":" + t);
+      for (const t of tables)
+        if (findUpserts(src, t) && !upsertGuardedEverywhere(src, t)) bad.push(path + ":" + t);
     }
   }
   return { tables: [...tables].sort(), bad };

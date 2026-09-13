@@ -146,7 +146,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-09-16-mail-templates.sql \
          supabase/migrations/2026-09-17-invite-grants.sql \
          supabase/migrations/2026-09-18-alumni-stories.sql \
-         supabase/migrations/2026-09-19-stories-for-review.sql ; do
+         supabase/migrations/2026-09-19-stories-for-review.sql \
+         supabase/migrations/2026-09-20-availability-week.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
