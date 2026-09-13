@@ -39,6 +39,9 @@ let S = {
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
   needNotice: false, needTz: false, tzQuery: "", tzResults: [], tzGuess: null,
   peek: null, peekCell: null, peekLines: [], msg: "", busy: false, boardTop: null,
+  // 「我的時間」那張表**只在進入那一頁或換了內容時**捲一次，不是每次重畫都捲。
+  // 每次重畫都捲的話，使用者點一格、畫面重畫、捲動位置就被拉回去 —— 等於不能用。
+  mineScrolled: false,
   evTitle: "", copyMsg: ""
 };
 
@@ -103,6 +106,29 @@ function render() {
     const g = el.querySelector(".gridwrap");
     if (g) g.scrollTop = Math.max(0, (S.boardTop / 30) * 16 - 32);
   }
+  // 「我的時間」那一頁有一模一樣的問題，而且從來沒修過（2026-09-12 實測：
+  // 一個把時間填在晚上的人，第一格在往下 961px 的地方，而容器高度只有 503px）。
+  // 差別是這一頁**每點一格就會重畫**，所以只能捲一次 —— 見 S.mineScrolled 的註解。
+  // 一格都沒填的人捲到傍晚，因為上面那個批次工具的預設就是 19:00 到 22:00。
+  if (S.tab === "mine" && !S.mineScrolled) {
+    const g = el.querySelector(".gridwrap.mine");
+    if (g) {
+      const top = firstMineMinute(S.mineMode === "week" ? S.weekMine : S.mine);
+      g.scrollTop = Math.max(0, ((top == null ? 18 * 60 : top) / 30) * 16 - 32);
+      S.mineScrolled = true;
+    }
+  }
+}
+
+// 自己填的時段裡最早的那一刻（分鐘）。一格都沒有就回 null。
+// 格子的鍵是 "weekday:minute"，這裡只看後面那一半。
+function firstMineMinute(set) {
+  let best = null;
+  for (const k of (set || [])) {
+    const m = Number(k.split(":")[1]);
+    if (best === null || m < best) best = m;
+  }
+  return best;
 }
 
 // ── 啟動 ────────────────────────────────────────────────────────────
@@ -227,7 +253,7 @@ document.addEventListener("click", async e => {
   if (act === "retry") { location.reload(); return; }
   // 頂欄的登出。這一頁之前沒有登出（只有「回入口」），現在頂欄有了就要接。
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
-  if (act === "tab") { S.tab = b.dataset.t; S.peek = null; render(); return; }
+  if (act === "tab") { S.tab = b.dataset.t; S.peek = null; S.mineScrolled = false; render(); return; }
   // team 篩選。**彈窗要一起關掉** —— 它裡面那份「有空／沒空」是用舊的篩選算的，
   // 留著的話畫面上會同時有兩種篩選的結果，而且看不出來哪一份是舊的。
   if (act === "team") { S.team = b.dataset.team || ""; S.peek = null; render(); return; }
@@ -247,7 +273,7 @@ document.addEventListener("click", async e => {
     setWeek(next);
     // 兩個分頁共用同一個 handler、同一份 S.weekStart（Paul 2026-09-12 裁定，
     // 不依分頁分流）：翻週的時候如果正在編某一週，起點要跟著換到新的那一週。
-    if (S.mineMode === "week") { syncWeekMine(); recomputeDirty(); }
+    if (S.mineMode === "week") { syncWeekMine(); recomputeDirty(); S.mineScrolled = false; }
     render(); return;
   }
 
@@ -288,6 +314,8 @@ document.addEventListener("click", async e => {
   // 「我的時間」的兩個模式：平常的時間 ／ 某一週。
   if (act === "mine-mode") {
     S.mineMode = b.dataset.m; S.mineMsg = "";
+    // 換了模式就是換了一份表，捲動要重新對位。
+    S.mineScrolled = false;
     // 切進「某一週」要先把起點準備好，不然畫面會先閃一次空表。
     if (S.mineMode === "week") syncWeekMine();
     // 不管切去哪個模式都要重算 S.dirty——沿用切換前的舊值的話，

@@ -15,6 +15,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/brand.css">
+<!-- 這三支是登入後每一頁都一定會用到的，而且它們躺在相依鏈的**第三層**：
+     瀏覽器要先下載 src/main.js，才知道要 shared/auth.js，再才知道要 vendor/supabase-js.js
+     （217KB，這一頁最大的一個檔）。每一層都是一次完整的網路來回，
+     在本機看不出來，在真實網路上就是三次等待疊在「載入中…」那個畫面後面。
+     modulepreload 讓瀏覽器一開始就同時去抓，不用一層一層發現。
+     ⚠ 這不是快取或打包工具，是瀏覽器原生的一行 HTML —— 沒有 build step。
+     ⚠ 路徑改動的話這三行要跟著改，否則瀏覽器會抓一個 404 回來（不會壞，但白費一次請求）。 -->
+<link rel="modulepreload" href="../shared/auth.js">
+<link rel="modulepreload" href="../shared/supabase.js">
+<link rel="modulepreload" href="../vendor/supabase-js.js">
 <link rel="stylesheet" href="../shared/nav.css">
 
 <style>
