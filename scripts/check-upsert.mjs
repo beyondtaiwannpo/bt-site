@@ -113,6 +113,22 @@ export function findUpserts(src, table, window = 220) {
 // 不是「這句呼叫自己的參數」——理論上隔壁不相干的程式碼剛好在這個字元數以內
 // 提到 ignoreDuplicates: true，也會被當成這一句的豁免依據。改成配對括號，
 // 只在**這句 upsert 呼叫自己的參數區段**裡找，不看呼叫範圍以外的任何字元。
+//
+// ⚠⚠ 2026-09-12 複審又抓到一個殘留：括號配對是單純數 ( 跟 )，**沒有跳過字串
+// 常值裡的括號**。像 `.upsert({ note: "unbalanced (" })` 這種呼叫，字串裡那個
+// `(` 會被當成真的左括號，depth 永遠回不到 0，配對找不到右括號。第一版遇到這
+// 種情況會「退回去看到檔案結尾為止」，於是檔案後面某個完全不相關的
+// `ignoreDuplicates: true` 就被誤判成這一句的豁免依據——**危險的 upsert 被
+// 放行**，而且沒有任何人會發現，因為症狀跟這整支守門要擋的東西一樣：
+// 「按了存檔沒反應，但守門是綠的」。
+//
+// 這裡不寫一個會跳過字串常值的解析器（沒必要，兩行的 fail-closed 更不會出錯）：
+// **配對失敗就直接當作沒有豁免**，讓這一句算危險。方向很重要，不要寫反：
+//   搜尋範圍變大 → 更容易撞到不相關的 ignoreDuplicates: true → 更容易誤判成
+//     豁免 → 危險的 upsert 被放行（誤放行——沒有人看得到，最壞的方向）
+//   搜尋範圍變小或算不出來 → 找不到豁免依據 → 當作不豁免 → 報成危險
+//     （誤報——會被人看到、會被處理，安全的方向）
+// 所以「算不出範圍」永遠要往「當作危險」那一邊倒，不能往「當作安全」那一邊倒。
 function upsertGuardedEverywhere(src, table, window = 220) {
   const needle = 'from("' + table + '")';
   let i = 0;
@@ -120,17 +136,20 @@ function upsertGuardedEverywhere(src, table, window = 220) {
     const upsertAt = src.indexOf(".upsert(", i);
     if (upsertAt !== -1 && upsertAt - i <= window) {
       // 從 .upsert( 那個左括號開始，配對括號找到這句呼叫自己的右括號在哪裡。
-      // 不解析成 AST，只數 ( 跟 )——這個檔案裡的呼叫都不深，字串裡也沒有
-      // 出現過孤立的括號，字串掃描夠用（跟這支檔案其他函式同一個風格）。
+      // 不解析成 AST，只數 ( 跟 )——這個檔案裡的呼叫都不深，字串掃描夠用
+      // （跟這支檔案其他函式同一個風格），但正因為不解析字串常值，配對失敗
+      // 是預期中會發生的事，見上面的 fail-closed 說明。
       const parenStart = upsertAt + ".upsert(".length - 1;
       let depth = 0, end = -1;
       for (let j = parenStart; j < src.length; j++) {
         if (src[j] === "(") depth++;
         else if (src[j] === ")") { depth--; if (depth === 0) { end = j; break; } }
       }
-      // 找不到配對的右括號（理論上不該發生，除非檔案本身語法就有問題）：
-      // 寧可看到檔案結尾為止，也不要縮小範圍讓豁免變得更容易通過。
-      const call = end === -1 ? src.slice(upsertAt) : src.slice(upsertAt, end + 1);
+      // 找不到配對的右括號——fail closed：當作這一句沒有豁免，直接回報危險。
+      // **不要**退回去掃到檔案結尾找 ignoreDuplicates，那是把「算不出範圍」
+      // 導向「當作安全」，方向是反的（見上面那段說明）。
+      if (end === -1) return false;
+      const call = src.slice(upsertAt, end + 1);
       // ⚠ 值要是字面的 true，`ignoreDuplicates: false` 或 `ignoreDuplicates: flag`
       // 都不算豁免——那兩種情況 PostgREST 一樣會展開成 ON CONFLICT DO UPDATE。
       if (!/ignoreDuplicates\s*:\s*true\b/.test(call)) return false; // 這一句沒有豁免
