@@ -739,9 +739,17 @@ fi
 # SET 清單，包含主鍵；而 availability_meta 只發了 grant update (notice_seen_at)。
 # Postgres 要求 SET 清單上每一欄都有權限，於是整句被拒。
 #
-# **不是所有 upsert 都有問題**：護照對 stamps / entries / visas 用 upsert 是對的，
-# 那幾張表有表層級的 update 授權。有問題的只有「欄位層級授權」的表。
-# 所以這條守門先從 migration 讀出哪些表是欄位層級授權的，再去前端找那些表的 upsert。
+# **不是所有 upsert 都有問題**：護照對 stamps / entries 用 upsert 是對的，
+# 那兩張表有表層級的 update 授權。對 visas 用 upsert 也是對的，但理由不一樣——
+# 那張表完全沒有 update 授權（2026-08-26-visas.sql），issueVisas() / restore()
+# 靠的是 `{ ignoreDuplicates: true }`，PostgREST 展開成 ON CONFLICT DO NOTHING，
+# 沒有 SET 清單就不需要 update 權限。
+#
+# 2026-09-12（控制端裁定）：這條守門原本只認「欄位層級授權」的表，剛好漏掉
+# 風險更高的那一類——完全沒有 update 授權、卻有 insert 授權的表（例如
+# availability_week / availability_week_mark）。scripts/check-upsert.mjs
+# 現在抓兩種：欄位層級授權的表，加上「有 insert 授權但整份遷移檔完全沒發過
+# update」的表，兩種都去前端找有沒有一句 upsert 沒帶 ignoreDuplicates 豁免。
 PHOTO_OUT=$(node scripts/check-photos.mjs 2>&1)
 case "$PHOTO_OUT" in
   "OK "*)  ok "首頁照片：${PHOTO_OUT#OK }" ;;
@@ -758,8 +766,8 @@ esac
 
 UPSERT_OUT=$(node scripts/check-upsert.mjs 2>&1)
 case "$UPSERT_OUT" in
-  "OK "*)  ok "欄位層級授權的表沒有被 .upsert()（守著：${UPSERT_OUT#OK }）" ;;
-  "BAD "*) bad "這些地方對欄位層級授權的表用了 .upsert()，會整句被拒：${UPSERT_OUT#BAD }" ;;
+  "OK "*)  ok "沒有 update 授權（欄位層級或整表）的表沒有被沒豁免的 .upsert() 動到（守著：${UPSERT_OUT#OK }）" ;;
+  "BAD "*) bad "這些地方對沒有 update 授權的表用了沒有 ignoreDuplicates 豁免的 .upsert()，會整句被拒：${UPSERT_OUT#BAD }" ;;
   *)       bad "upsert 守門自己壞了（這不是發現違規）：$UPSERT_OUT" ;;
 esac
 
@@ -1134,6 +1142,165 @@ else
     say "     資料庫沒發權限的話，整句 insert/update 都會被拒，不是只有那一欄存不了。"
   else
     ok "前端寫進 alumni_stories 的欄位（${storyCols}）都在允許清單裡"
+  fi
+fi
+
+# ── 時間看板：某一週的例外——availability_week / availability_week_mark 的
+# 欄位對帳（2026-09-12）──
+#
+# 這兩張表除了主鍵沒有別的欄位（見 2026-09-20-availability-week.sql 檔頭：
+# 「改時間」是刪舊插新，不是 update；這兩張表刻意沒有 update 政策，
+# 也完全不發 update 授權）。上面 PROFILE_WRITABLE / STORY_WRITABLE 那兩段守的
+# 方向是「清單裡不准出現不該讓前端寫的欄位」（role、updated_at 那種）；
+# 這兩張表沒有那種欄位可防，但要照同樣的精神寫：**清單裡不准出現主鍵以外的
+# 名字**——以後這兩張表真的加了非主鍵欄位，那個新名字要先經過這裡的人工確認
+# 才能放進清單，不能悄悄混進來就綠燈。
+AVAIL_WEEK_PK="minute user_id week_start weekday"
+AVAIL_WEEK_WRITABLE="minute user_id week_start weekday"
+AVAIL_MARK_PK="user_id week_start"
+AVAIL_MARK_WRITABLE="user_id week_start"
+
+listbad=0
+for c in $AVAIL_WEEK_WRITABLE; do
+  case " $AVAIL_WEEK_PK " in *" $c "*) ;; *)
+    bad "AVAIL_WEEK_WRITABLE 裡出現 ${c}，不是主鍵欄位——這張表目前不該有別的可寫欄位"
+    listbad=1 ;;
+  esac
+done
+[ "$listbad" = "0" ] && ok "AVAIL_WEEK_WRITABLE 清單本身沒有主鍵以外的欄位"
+
+listbad=0
+for c in $AVAIL_MARK_WRITABLE; do
+  case " $AVAIL_MARK_PK " in *" $c "*) ;; *)
+    bad "AVAIL_MARK_WRITABLE 裡出現 ${c}，不是主鍵欄位——這張表目前不該有別的可寫欄位"
+    listbad=1 ;;
+  esac
+done
+[ "$listbad" = "0" ] && ok "AVAIL_MARK_WRITABLE 清單本身沒有主鍵以外的欄位"
+
+# 寫入點數量寫死，理由同 PROFILE_WRITE_FILES：少抓到的寫入點不會有聲音，
+# 剩下的幾個仍然全在清單裡，照樣綠燈。改動寫入路徑的人要回來改這一行。
+#
+# availability_week 目前只有一處：saveWeek() 差集寫法裡新增那段
+# （.from("availability_week").insert(rows)）。delete 不算寫入點——
+# 它不寫欄位值，只用 .eq()/.in() 選列，跟 PROFILE_WRITE_FILES 同一個算法。
+#
+# ⚠ 這個寫入點不是字面物件（.insert(rows)，rows 是變數），跟 profiles /
+# alumni_stories 那兩段直接寫字面物件的形狀不一樣。下面的抽取式如果找到的是
+# 變數名，會往回找離這個呼叫最近的一句 `const 那個變數 = ... return {...}`
+# 來解析——物件的形狀就寫在旁邊幾行，不是從外面傳進來的黑盒子，所以這裡選擇
+# 解析它，不是照 profiles 那段「看不懂就報 problems」的做法直接放棄
+# （真的解析不到才會報 problems，見下面）。
+AVAIL_WEEK_WRITE_FILES="availability/src/data.js:1"
+
+# availability_week_mark 目前也只有一處：saveWeek() 裡「標記這一週被動過」
+# 那句字面物件 insert（.insert({ user_id, week_start })）。
+AVAIL_MARK_WRITE_FILES="availability/src/data.js:1"
+
+availWeekCols=$(node -e '
+  const fs = require("fs");
+  const want = process.argv.slice(1);
+  const cols = new Set();
+  const problems = [];
+  for (const spec of want) {
+    const [file, n] = spec.split(":");
+    const raw = fs.readFileSync(file, "utf8");
+    const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+    const re = /\.from\("availability_week"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\s*([^)]*?)\s*\)/g;
+    let m, sites = 0;
+    while ((m = re.exec(src))) {
+      sites++;
+      let body = m[1];
+      if (body.startsWith("{")) {
+        body = body.slice(1, body.lastIndexOf("}"));
+      } else {
+        // 不是字面物件：往回找離這裡最近的一句 `const 變數 = ... return {...}`。
+        const ident = body.trim();
+        const prefix = src.slice(0, m.index);
+        const defRe = new RegExp("const\\s+" + ident + "\\s*=[\\s\\S]{0,400}?return\\s*\\{([\\s\\S]*?)\\}\\s*;", "g");
+        let dm, last = null;
+        while ((dm = defRe.exec(prefix))) last = dm;
+        if (!last) {
+          problems.push(`${file} 的寫入點用變數 ${ident}，找不到它怎麼定義的（return { ... }），這條守門讀不到它寫了哪幾欄`);
+          continue;
+        }
+        body = last[1];
+      }
+      for (const part of body.split(",")) {
+        const key = (part.includes(":") ? part.slice(0, part.indexOf(":")) : part).trim();
+        if (/^[a-z_][a-z0-9_]*$/.test(key)) cols.add(key);
+      }
+    }
+    if (sites !== Number(n)) problems.push(`${file} 對 availability_week 的寫入點有 ${sites} 個，check.sh 說應該有 ${n} 個`);
+  }
+  if (problems.length) { console.log(problems.join("；")); process.exit(1); }
+  console.log([...cols].sort().join(" "));
+' $AVAIL_WEEK_WRITE_FILES 2>&1)
+if [ $? -ne 0 ]; then
+  bad "抽不出前端寫進 availability_week 的欄位：${availWeekCols}"
+else
+  extra=""
+  for c in $availWeekCols; do
+    case " $AVAIL_WEEK_WRITABLE " in *" $c "*) ;; *) extra="$extra $c" ;; esac
+  done
+  if [ -n "$extra" ]; then
+    bad "前端會寫 availability_week 的這些欄位，但它們不在 AVAIL_WEEK_WRITABLE 裡：${extra}"
+    say "     這張表沒有 update 授權，欄位對不上的話整句 insert 都會被拒，不是只有那一欄存不了。"
+  else
+    ok "前端寫進 availability_week 的欄位（${availWeekCols}）都在允許清單裡"
+  fi
+fi
+
+availMarkCols=$(node -e '
+  const fs = require("fs");
+  const want = process.argv.slice(1);
+  const cols = new Set();
+  const problems = [];
+  for (const spec of want) {
+    const [file, n] = spec.split(":");
+    const raw = fs.readFileSync(file, "utf8");
+    const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+    const re = /\.from\("availability_week_mark"\)[\s\S]{0,80}?\.(?:insert|update|upsert)\(\s*([^)]*?)\s*\)/g;
+    let m, sites = 0;
+    while ((m = re.exec(src))) {
+      sites++;
+      let body = m[1];
+      if (body.startsWith("{")) {
+        body = body.slice(1, body.lastIndexOf("}"));
+      } else {
+        const ident = body.trim();
+        const prefix = src.slice(0, m.index);
+        const defRe = new RegExp("const\\s+" + ident + "\\s*=[\\s\\S]{0,400}?return\\s*\\{([\\s\\S]*?)\\}\\s*;", "g");
+        let dm, last = null;
+        while ((dm = defRe.exec(prefix))) last = dm;
+        if (!last) {
+          problems.push(`${file} 的寫入點用變數 ${ident}，找不到它怎麼定義的（return { ... }），這條守門讀不到它寫了哪幾欄`);
+          continue;
+        }
+        body = last[1];
+      }
+      for (const part of body.split(",")) {
+        const key = (part.includes(":") ? part.slice(0, part.indexOf(":")) : part).trim();
+        if (/^[a-z_][a-z0-9_]*$/.test(key)) cols.add(key);
+      }
+    }
+    if (sites !== Number(n)) problems.push(`${file} 對 availability_week_mark 的寫入點有 ${sites} 個，check.sh 說應該有 ${n} 個`);
+  }
+  if (problems.length) { console.log(problems.join("；")); process.exit(1); }
+  console.log([...cols].sort().join(" "));
+' $AVAIL_MARK_WRITE_FILES 2>&1)
+if [ $? -ne 0 ]; then
+  bad "抽不出前端寫進 availability_week_mark 的欄位：${availMarkCols}"
+else
+  extra=""
+  for c in $availMarkCols; do
+    case " $AVAIL_MARK_WRITABLE " in *" $c "*) ;; *) extra="$extra $c" ;; esac
+  done
+  if [ -n "$extra" ]; then
+    bad "前端會寫 availability_week_mark 的這些欄位，但它們不在 AVAIL_MARK_WRITABLE 裡：${extra}"
+    say "     這張表沒有 update 授權，欄位對不上的話整句 insert 都會被拒，不是只有那一欄存不了。"
+  else
+    ok "前端寫進 availability_week_mark 的欄位（${availMarkCols}）都在允許清單裡"
   fi
 fi
 

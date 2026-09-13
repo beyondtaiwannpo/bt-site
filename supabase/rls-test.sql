@@ -51,6 +51,8 @@ drop table if exists pg_temp.rls_result;
 
 -- 子表先刪、父表後刪。auth.users 那句其實會連帶清掉全部（一路 on delete cascade），
 -- 這裡還是一句一句寫出來，是為了讓「這個檔案會動到哪些表」一看就清楚。
+delete from availability_week      where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
+delete from availability_week_mark where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from alumni_stories where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from entries   where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from stamps    where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
@@ -906,12 +908,166 @@ begin
     coalesce(v_ok::text, '（查不到那一列）'), v_ok is true);
 end $$;
 
--- ---------- 8. 清掉測試資料 ----------
+-- ============================================================================
+-- 8. 時間看板：某一週的例外（availability_week / availability_week_mark，2026-09-12）
+-- ============================================================================
+-- 這兩張表跟 entries/stamps 那種「乙讀不到甲」形狀一樣，差別是**完全沒有
+-- update 授權**（見 2026-09-20-availability-week.sql 檔頭：「改時間」是刪舊
+-- 插新，不是 update）。每一條負向都配正向對照，理由是檔頭那一課：受測帳號
+-- 其實什麼都讀不到、寫不進去的時候，負向斷言一樣會通過，那時候證明的是
+-- 「這個帳號什麼都動不了」，不是「隔離有效」。
+--
+-- 身分：甲乙都是幹部（第 2 節已明寫 role='cadre'）；T 是學員
+-- （66666666-0000-0000-0000-000000000066，第 2 節已明寫 role='student'）。
+
+-- ---- 準備：甲已經填過某一週 ----
+reset role;
+select set_config('request.jwt.claims', '', false);
+insert into availability_week (user_id, week_start, weekday, minute) values
+  ('aaaaaaaa-0000-0000-0000-000000000001', '2026-09-14', 1, 540);
+insert into availability_week_mark (user_id, week_start) values
+  ('aaaaaaaa-0000-0000-0000-000000000001', '2026-09-14');
+
+-- ---- 幹部乙的視角 ----
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"bbbbbbbb-0000-0000-0000-000000000002","role":"authenticated"}', false);
+
+do $$
+declare n int; blocked boolean;
+begin
+  -- ===== 乙寫不進甲的 availability_week，寫得進自己的 =====
+  blocked := false;
+  begin
+    insert into availability_week (user_id, week_start, weekday, minute)
+         values ('aaaaaaaa-0000-0000-0000-000000000001', '2026-09-14', 2, 600);
+  exception when insufficient_privilege or check_violation then blocked := true;
+  end;
+  insert into rls_result values (120, '乙寫不進甲的 availability_week', '被政策擋下',
+    case when blocked then '被政策擋下' else '寫進去了' end, blocked);
+
+  -- ↓ 對照。沒有它，上面那條在「乙什麼都寫不進去」的時候也會通過。
+  blocked := false;
+  begin
+    insert into availability_week (user_id, week_start, weekday, minute)
+         values ('bbbbbbbb-0000-0000-0000-000000000002', '2026-09-14', 2, 600);
+  exception when insufficient_privilege or check_violation then blocked := true;
+  end;
+  insert into rls_result values (121, '【對照】乙寫得進自己的 availability_week', '寫入成功',
+    case when blocked then '被政策擋下，政策過緊' else '寫入成功' end, not blocked);
+
+  select count(*) into n from availability_week where user_id = 'bbbbbbbb-0000-0000-0000-000000000002';
+  insert into rls_result values (122, '【對照】乙讀得到自己剛寫的 availability_week', '1 列', n || ' 列', n = 1);
+
+  -- ===== ★ 沒有人 update 得動，同一個人 delete 得動自己的 =====
+  -- 兩張表都刻意沒有 update 政策、也完全不發 update 授權，所以連 RLS 都還沒
+  -- 輪到就會被權限擋下（42501 permission denied for table，insufficient_privilege）。
+  blocked := false;
+  begin
+    update availability_week set minute = 601
+     where user_id = 'bbbbbbbb-0000-0000-0000-000000000002';
+  exception when insufficient_privilege then blocked := true;
+  end;
+  insert into rls_result values (123, '★ 沒有人 update 得動 availability_week（沒發 update 權限）',
+    '被權限擋下', case when blocked then '被權限擋下' else '改成功了 —— update 授權被打開了' end, blocked);
+
+  -- ↓ 對照。沒有它，上面那條在「乙整張表都動不了（含 delete）」的時候也會通過，
+  -- 那時候看板整個是壞的，不是「只是沒開 update」。
+  with d as (delete from availability_week
+              where user_id = 'bbbbbbbb-0000-0000-0000-000000000002' returning 1)
+  select count(*) into n from d;
+  insert into rls_result values (124, '★【對照】同一個人 delete 得動自己的 availability_week',
+    '刪掉 1 列', '刪掉 ' || n || ' 列', n = 1);
+
+  -- ===== mark 表：同一套 =====
+  blocked := false;
+  begin
+    insert into availability_week_mark (user_id, week_start)
+         values ('aaaaaaaa-0000-0000-0000-000000000001', '2026-09-21');
+  exception when insufficient_privilege or check_violation then blocked := true;
+  end;
+  insert into rls_result values (125, '乙寫不進甲的 availability_week_mark', '被政策擋下',
+    case when blocked then '被政策擋下' else '寫進去了' end, blocked);
+
+  blocked := false;
+  begin
+    insert into availability_week_mark (user_id, week_start)
+         values ('bbbbbbbb-0000-0000-0000-000000000002', '2026-09-14');
+  exception when insufficient_privilege or check_violation then blocked := true;
+  end;
+  insert into rls_result values (126, '【對照】乙寫得進自己的 availability_week_mark', '寫入成功',
+    case when blocked then '被政策擋下，政策過緊' else '寫入成功' end, not blocked);
+
+  select count(*) into n from availability_week_mark where user_id = 'bbbbbbbb-0000-0000-0000-000000000002';
+  insert into rls_result values (127, '【對照】乙讀得到自己剛寫的 availability_week_mark',
+    '1 列', n || ' 列', n = 1);
+
+  blocked := false;
+  begin
+    update availability_week_mark set week_start = '2026-09-28'
+     where user_id = 'bbbbbbbb-0000-0000-0000-000000000002';
+  exception when insufficient_privilege then blocked := true;
+  end;
+  insert into rls_result values (128, '★ 沒有人 update 得動 availability_week_mark（沒發 update 權限）',
+    '被權限擋下', case when blocked then '被權限擋下' else '改成功了' end, blocked);
+
+  with d as (delete from availability_week_mark
+              where user_id = 'bbbbbbbb-0000-0000-0000-000000000002' returning 1)
+  select count(*) into n from d;
+  insert into rls_result values (129, '★【對照】同一個人 delete 得動自己的 availability_week_mark',
+    '刪掉 1 列', '刪掉 ' || n || ' 列', n = 1);
+end $$;
+
+-- ---- 學員 T 的視角：讀不到任何一列 ----
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"66666666-0000-0000-0000-000000000066","role":"authenticated"}', false);
+
+do $$
+declare n int; blocked boolean;
+begin
+  select count(*) into n from availability_week;
+  insert into rls_result values (130, '★ 學員讀不到任何一列 availability_week', '0 列', n || ' 列', n = 0);
+
+  select count(*) into n from availability_week_mark;
+  insert into rls_result values (131, '★ 學員讀不到任何一列 availability_week_mark', '0 列', n || ' 列', n = 0);
+
+  -- 學員連自己的都寫不進去——is_cadre() 卡在 insert 政策裡，不是只卡讀。
+  blocked := false;
+  begin
+    insert into availability_week (user_id, week_start, weekday, minute)
+         values ('66666666-0000-0000-0000-000000000066', '2026-09-14', 3, 660);
+  exception when insufficient_privilege or check_violation then blocked := true;
+  end;
+  insert into rls_result values (132, '學員寫不進 availability_week（連自己的也不行，看板只給幹部用）',
+    '被政策擋下', case when blocked then '被政策擋下' else '寫進去了' end, blocked);
+end $$;
+
+-- ---- 幹部（甲）視角：★【對照】上面兩條「學員讀不到」的正向對照 ----
+-- 沒有它，130/131 在「這兩張表根本沒有任何一列讀得出來」的時候也會通過。
+set role authenticated;
+select set_config('request.jwt.claims',
+                  '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', false);
+
+do $$
+declare n int;
+begin
+  select count(*) into n from availability_week where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  insert into rls_result values (133, '★【對照】幹部讀得到 availability_week（甲讀自己那格）',
+    '1 列', n || ' 列', n = 1);
+
+  select count(*) into n from availability_week_mark where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  insert into rls_result values (134, '★【對照】幹部讀得到 availability_week_mark', '1 列', n || ' 列', n = 1);
+end $$;
+
+-- ---------- 9. 清掉測試資料 ----------
 -- 跟開頭那段一模一樣。開頭那次清「上一次留下的」，這次清「這一次產生的」。
 -- 結果表是暫存表，不在這裡清，不然最後那句 select 就沒東西可以撈了。
 reset role;
 select set_config('request.jwt.claims', '', false);
 
+delete from availability_week      where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
+delete from availability_week_mark where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from alumni_stories where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from entries   where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from stamps    where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
@@ -921,7 +1077,7 @@ delete from profiles  where id      in ('aaaaaaaa-0000-0000-0000-000000000001','
 delete from auth.users where id     in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005','11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012','33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014','55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066');
 delete from invite_codes where upper(btrim(code)) like 'RLSTEST-%';
 
--- ---------- 9. 條目數 ----------
+-- ---------- 10. 條目數 ----------
 -- **「全綠」和「全部都跑到了」是兩件事。**
 -- 這份測試分成十幾個 do 區塊。任何一個區塊中途丟出沒被接住的例外，
 -- 整支腳本會當場中止 —— 那種情況你會看到紅色錯誤，很明顯。
@@ -933,15 +1089,18 @@ delete from invite_codes where upper(btrim(code)) like 'RLSTEST-%';
 --
 -- 數字寫死在這裡：加測試就要回來改它。跟 ESTAMP_PALETTE 同一個做法 ——
 -- 刻意的摩擦，不是為了難用。
+--
+-- 2026-09-12：74 條加上第 8 節（時間看板某一週的例外）新增的 15 條（ord
+-- 120~134），變成 89 條。
 do $$
 declare n int;
 begin
   select count(*) into n from rls_result;
-  insert into rls_result values (98, '★ 這次實際跑完了幾條測試', '74 條',
-    n || ' 條', n = 74);
+  insert into rls_result values (98, '★ 這次實際跑完了幾條測試', '89 條',
+    n || ' 條', n = 89);
 end $$;
 
--- ---------- 10. 總結那一列 ----------
+-- ---------- 11. 總結那一列 ----------
 -- ord 給 0，而失敗組排在前面，所以這一列永遠是整張表的第一列。
 -- 這裡的 select 讀的是 insert 之前的狀態，不會把自己算進去。
 insert into rls_result
@@ -951,7 +1110,7 @@ select 0, 'OVERALL 全部測試',
        bool_and(ok)
   from rls_result;
 
--- ---------- 11. 結果表 ----------
+-- ---------- 12. 結果表 ----------
 -- 這句一定要是整份檔案的最後一句：SQL Editor 只顯示最後一句的結果。
 select test_name, expected, actual,
        case when ok then 'PASS' else 'FAIL' end as pass
