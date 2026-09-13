@@ -29,6 +29,12 @@ let S = {
   weekMine: new Set(),      // 目前這一週的例外格子（編輯中，畫面看得到的那一份）
   weekSaved: new Set(),     // 目前這一週 availability_week 資料表裡真正存的樣子，算差集用
   weekMarksMine: new Set(), // 我自己設定過例外的那幾週（給「已經設定過的這幾週」那份清單用）
+  // 某一週模式裡，使用者是不是真的動過格子（2026-09-12 controller 二次審查裁定）。
+  // syncWeekMine() 帶出的起點跟資料庫現況本來就不一樣（見那支的註解），
+  // 光比對 weekMine/weekSaved 沒辦法分出「使用者真的改了」跟「只是換了一週還沒動」——
+  // 沒有這個旗標，切到一個從沒設過例外的週會直接看到儲存鈕亮著，按下去就會把
+  // 平常的時段整份寫成那一週的例外，而使用者什麼都還沒做。
+  weekTouched: false,
   weekStart: null, weekOffset: 0,
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
   needNotice: false, needTz: false, tzQuery: "", tzResults: [], tzGuess: null,
@@ -157,9 +163,17 @@ function setsEqual(a, b) {
 // 填成平常的時段）整份當成新資料寫進去，等於把平常的時間整份寫成那一週的例外，
 // 而且會建 mark——那一週從此跟平常的時間脫鉤，使用者不會發現。
 // （2026-09-12 controller 審查抓到，見 task-6-report.md 的修正段落。）
+//
+// ⚠ **某一週模式再多一層：光比對 weekMine/weekSaved 不夠。**
+// syncWeekMine() 帶出的起點（平常的時段）本來就跟資料庫現況（空集合）不一樣，
+// 這是刻意的設計，不是 bug（見 syncWeekMine() 的註解——weekSaved 不能偷懶
+// 帶成起點，不然差集會算錯）。但這代表「起點跟資料庫不同」不能當作「使用者動過」
+// 的證據：切到一個從沒設過例外的週，畫面一開始就會顯示跟資料庫不同的東西，
+// 這是正常的初始狀態，不是使用者的操作。所以某一週模式要多看 S.weekTouched——
+// 使用者真的碰過格子才算 dirty，單純換到一個新週不算。
 function recomputeDirty() {
   S.dirty = S.mineMode === "week"
-    ? !setsEqual(S.weekMine, S.weekSaved)
+    ? (S.weekTouched && !setsEqual(S.weekMine, S.weekSaved))
     : !setsEqual(S.mine, S.saved);
 }
 
@@ -167,7 +181,16 @@ function recomputeDirty() {
 // toggle / apply / copyday 都要透過這支改，不能直接寫死 S.mine：
 // 不然在「某一週」模式下點格子，改到的其實是平常的時間，畫面看起來有變，
 // 但存檔存的是另一份資料，使用者完全看不出來哪裡錯了。
-function mineTarget() { return S.mineMode === "week" ? S.weekMine : S.mine; }
+//
+// ⚠ **這支只在真的要拿去改的時候呼叫**（toggle 直接改回傳的參照、
+// apply/copyday 算完之後透過 setMineTarget() 存回去）——三個呼叫點都是這樣用，
+// 所以「某一週」模式下呼叫這支本身就等於「使用者真的動了這一週的格子」，
+// 在這裡把 S.weekTouched 設成 true 是最不會漏掉、也不會重複判斷的地方
+// （recomputeDirty() 要用這個旗標分辨「換了一週」跟「真的編輯過」，見那支的註解）。
+function mineTarget() {
+  if (S.mineMode === "week") S.weekTouched = true;
+  return S.mineMode === "week" ? S.weekMine : S.mine;
+}
 function setMineTarget(set) { if (S.mineMode === "week") S.weekMine = set; else S.mine = set; }
 
 // 切到「某一週」模式、或在那個模式下翻週之後，把這一週要編輯的起點準備好。
@@ -182,12 +205,17 @@ function setMineTarget(set) { if (S.mineMode === "week") S.weekMine = set; else 
 // current 是空的，差集會把整份平常的時段當新資料寫進去，這是對的；
 // 如果 weekSaved 也偷懶帶成平常的時段，第一次存檔就會被誤判成「沒有變動」，
 // 資料庫裡那一週的 mark 也不會被建起來。
+//
+// **每次呼叫都把 weekTouched 重設成 false。** 切模式、翻週都會經過這裡，
+// 那正是「換到一個新的週，使用者還沒動過」的時刻——不重設的話，
+// 上一週按過格子留下的 weekTouched=true 會被這一週繼續冒用。
 function syncWeekMine() {
   const wk = weekKeyOf(S.weekStart, S.myTz);
   const marked = S.weekMarksMine.has(wk);
   const existing = (S.weekSlots.get(S.user.id) || new Map()).get(wk) || new Set();
   S.weekSaved = new Set(existing);
   S.weekMine = new Set(marked ? existing : S.saved);
+  S.weekTouched = false;
 }
 
 // ── 事件 ────────────────────────────────────────────────────────────
