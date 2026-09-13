@@ -412,15 +412,33 @@ n_tag=$(grep -c '^<script src="https://cdnjs.cloudflare.com' index.html)
 n_anon=$(grep -c 'crossorigin="anonymous"' index.html)
 # preload 要跟真正載入的版本一致，不然預載的是另一份、白下載一次
 n_pre=$(grep -c 'rel="preload" as="script"' index.html)
-pre_ok=$(grep -A1 'rel="preload" as="script"' index.html | grep -c 'gsap/3.12.5/gsap.min.js')
+# -A2 不是 -A1：預載那一段現在是三行（rel / integrity / href），
+# 只看下一行的話 href 會落在範圍外，守門會誤報「preload 不見了」。
+pre_ok=$(grep -A2 'rel="preload" as="script"' index.html | grep -c 'gsap/3.12.5/gsap.min.js')
+# ⚠ 版本一樣還不夠，**屬性也要一樣**。2026-09-13 用 DevTools 逐項換掉再量，
+# 每一次都清快取重載（不清快取的話第二次請求會從快取來，看起來像已經修好了 ——
+# 我第一次就是這樣誤判的）。結論很明確：
+#   預載沒有 integrity → gsap.min.js 被下載兩次
+#   預載有 integrity   → 一次
+#   referrerpolicy 有沒有帶，都是一次（它不是原因）
+# 也就是 Chrome 在比對「這個預載能不能給這個 script 用」的時候會把 integrity
+# 算進去，對不上就當成另一份資源重抓。referrerpolicy 這裡照樣檢查，理由不是
+# 實測有影響，而是預載與 script 的屬性本來就該一字不差，下一次有人改動時
+# 不必再重做一次這個實驗。
+pre_sri=$(grep -A2 'rel="preload" as="script"' index.html | grep -cF "integrity=\"${GSAP_CORE}\"")
+pre_ref=$(grep -c 'rel="preload" as="script".*referrerpolicy="no-referrer"' index.html)
 if [ -n "$sri_bad" ]; then
   bad "cdnjs 的 script 少了正確的 integrity：${sri_bad}"
 elif [ "$n_tag" != "2" ] || [ "$n_anon" -lt "2" ]; then
   bad "cdnjs 的 script 不是兩支、或少了 crossorigin=anonymous（標籤 ${n_tag} 支、crossorigin ${n_anon} 次）"
 elif [ "$n_pre" != "1" ] || [ "$pre_ok" != "1" ]; then
   bad "GSAP 的 preload 不見了、或指到的版本跟真正載入的那一支不一樣（預載白做一次）"
+elif [ "$pre_sri" != "1" ]; then
+  bad "GSAP 的 preload 少了 integrity（或雜湊跟 script 標籤不一樣）—— 實測這會讓 gsap.min.js 被下載兩次"
+elif [ "$pre_ref" != "1" ]; then
+  bad "GSAP 的 preload 少了 referrerpolicy=\"no-referrer\"，跟 script 標籤對不起來"
 else
-  ok "GSAP 兩支都有正確的 integrity 與 crossorigin，preload 版本也對得上"
+  ok "GSAP 兩支都有正確的 integrity 與 crossorigin，preload 的版本與屬性也跟 script 對得上"
 fi
 
 # 會動的東西只准出現在 motion() 裡面
