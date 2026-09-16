@@ -3536,3 +3536,32 @@ Authentication → Users → 改 email。
 3. 寄信到 beyondtaiwan2020@gmail.com 找人幫忙
 
 給幹部的統一說法：「資料都還在，正在處理。」不要讓大家以為心得沒了。
+
+---
+
+## 海外大學資料庫的年度查驗（不是網站，但工具放在這個 repo）
+
+BT 在 Notion 上有一份對外免費的海外大學資料庫，112 所學校、七張表。
+它不是這個網站的一部分，但**維護它的工具放在這個 repo**，
+因為這裡是唯一會跟著交接下去的地方。
+
+**要跑查驗：** 在這個資料夾開 Claude Code，說「查驗大學資料庫」或打 `/verify-college-data`。
+- Skill：`.claude/skills/verify-college-data/SKILL.md`
+- Notion 的 ID 對照：`.claude/skills/verify-college-data/reference/notion-ids.md`
+- 給人看的 SOP（為什麼要查、怎麼驗收、踩過哪些坑）：
+  `~/Anson/references/sops/bt-college-database-verification.md`
+
+多久跑一次：一年一次，建議每年 3 月。
+另外三個情況要提前跑：有人回報數字跟官網不一樣、大型測驗改制、
+或要把這份資料拿去對外推廣。
+
+為什麼這件事需要一份 SOP：2026-09 第一次認真查驗，
+112 條官網連結壞了 69 條，英文門檻查完 58 所錯的比對的多。
+那不是資料過期，是從來沒有對過來源。
+更麻煩的是有六類錯誤是「整欄的前提就錯」，只比對數字會全部漏掉，
+例如 ETH Zurich 跟 EPFL 的學士班根本不是英文授課，
+表上原本填的是研究所的標準。六類都寫在 SOP 裡。
+
+⚠ 三個 Notion 頁面目前還在 Paul 個人的 workspace。
+要搬到 BT workspace 的話**三頁必須一起搬**，
+不然中文頁的 linked view 會全部斷掉。
