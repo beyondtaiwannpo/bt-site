@@ -28,7 +28,7 @@ let S = {
   // 「連不上資料庫也要畫得出東西」。
   stories: [],
   // 邀請碼（2026-10-14）。理由同上，一定要有初始值。
-  invites: [],
+  invites: [], inviteDraft: null,
   // 信件文案
   tpls: [], tplKind: null,
 };
@@ -64,7 +64,7 @@ function render() {
   } else if (S.view === "stories") {
     body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
   } else if (S.view === "invites") {
-    body = UI.inviteCodesHTML(S.invites, S.msg);
+    body = UI.inviteCodesHTML(S.invites, S.msg, S.busy, S.inviteDraft);
   } else if (S.view === "checkin" && S.form) {
     body = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
@@ -198,6 +198,7 @@ async function openInvites() {
   S.busy = true; render();
   try {
     S.invites = await D.loadInvites();
+    if (!S.inviteDraft) S.inviteDraft = { code: UI.suggestCode(), grants: "cadre", uses: 1, note: "" };
     S.view = "invites"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = "邀請碼載不到：" + D.says(e); }
   render();
@@ -331,6 +332,37 @@ document.addEventListener("click", async e => {
       if (r) r.story_approved = ok;
       S.busy = false; S.msg = "";
     } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
+    render();
+    return;
+  }
+
+  // ── 邀請碼的新增與停用（2026-10-14）────────────────────────────────
+  if (act === "invite-suggest" || act === "invite-new") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    S.inviteDraft = { code: val("ic-code"), grants: val("ic-grants") || "cadre",
+                      uses: val("ic-uses") || "1", note: val("ic-note") };
+    if (act === "invite-suggest") { S.inviteDraft.code = UI.suggestCode(); render(); return; }
+    if (!S.inviteDraft.code) { S.msg = "碼要填。"; render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const made = await D.createInvite(S.inviteDraft.code, S.inviteDraft.grants,
+                                        S.inviteDraft.uses, S.inviteDraft.note);
+      S.invites = await D.loadInvites();
+      S.inviteDraft = { code: UI.suggestCode(), grants: S.inviteDraft.grants, uses: 1, note: "" };
+      S.busy = false; S.msg = `建好了：${made}。用複製貼上的方式給對方，不要口頭念。`;
+    } catch (err) { S.busy = false; S.msg = "建不起來：" + D.says(err); }
+    render();
+    return;
+  }
+  if (act === "invite-disable") {
+    const code = b.dataset.code;
+    if (!confirm(`停用「${code}」？\n\n停用之後這組碼就不能再用了。後台沒有恢復的按鈕，要恢復得到 Supabase 改。`)) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.disableInvite(code);
+      S.invites = await D.loadInvites();
+      S.busy = false; S.msg = `「${code}」已經停用。`;
+    } catch (err) { S.busy = false; S.msg = "停用不了：" + D.says(err); }
     render();
     return;
   }

@@ -299,6 +299,22 @@ export async function loadInvites() {
   return data || [];
 }
 
+// 新增與停用（2026-10-14）。門在資料庫那兩支函式的第一句（2026-10-15-invite-admin.sql）。
+// uses 用 Number() 轉：input 的 value 是字串，送 "1" 給 int 參數 PostgREST 會找不到這支函式。
+export async function createInvite(code, grants, uses, note) {
+  need();
+  const { data, error } = await supabase.rpc("create_invite",
+    { p_code: code, p_grants: grants, p_uses: Number(uses), p_note: note });
+  if (error) throw error;
+  return data;
+}
+
+export async function disableInvite(code) {
+  need();
+  const { error } = await supabase.rpc("disable_invite", { p_code: code });
+  if (error) throw error;
+}
+
 // ── 信件文案（2026-09-08）──────────────────────────────────────────────
 export async function loadTemplates() {
   need();
@@ -337,6 +353,10 @@ const SAYS = [
   ["not_cadre", "這個動作只有幹部做得了。"],
   ["not_signed_in", "你的登入已經過期了，重新登入一次就好。"],
   ["form_closed", "這份表單已經關閉了。"],
+  ["bad_invite_code", "碼只能用英文字母、數字和連字號，2 到 64 個字，不能有空白或中文。"],
+  ["bad_uses", "可以用幾次要填 1 到 100 之間的數字。"],
+  ["bad_grants", "要選幹部碼或校友碼。"],
+  ["no_such_invite", "找不到這組碼，重新整理再試一次。"],
   ["empty_mail", "主旨與內容都要寫，不能只寫一個。"],
   ["no_such_form", "找不到這份表單，可能已經被刪掉了。"],
   ["no_such_template", "找不到這一種信的文案，可能是遷移檔還沒跑完。"],
@@ -349,6 +369,9 @@ export function says(err) {
     return m.replace("mail_not_configured：", "信件還沒設定好：").replace("mail_not_configured", "信件還沒設定好") +
       "　修法：到 Supabase 的 Vault 把那兩個 secret 的名字改成 RESEND_API_KEY 與 BT_MAIL_FROM（大小寫與底線要一樣），並確認 pg_net 已經打開。";
   }
+  // 撞碼也是特例：資料庫會說撞到的是哪一組，那一組的名字要留在畫面上。
+  const clash = m.match(/invite_exists:\s*(\S+)/);
+  if (clash) return `已經有一組「${clash[1]}」了。大小寫和前後空白不算差別，換一組碼。`;
   for (const [code, text] of SAYS) if (m.includes(code)) return text;
   return m;
 }

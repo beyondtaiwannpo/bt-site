@@ -1,8 +1,10 @@
-// 後台的「邀請碼」分頁（2026-10-14）。只有 Co-President 看得到，只能看。
+// 後台的「邀請碼」分頁（2026-10-14）。只有 Co-President 看得到。
+// 同一天加了新增與停用，不做刪除（Paul 拍板）。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { inviteCodesHTML, tabsHTML } from "../admin/src/ui.js";
+import { inviteCodesHTML, inviteFormHTML, suggestCode, tabsHTML } from "../admin/src/ui.js";
+import { says } from "../admin/src/data.js";
 
 const ROWS = [
   { code: "BT-CADRE", grants: "cadre", uses_left: 1, note: "給新幹部", created_at: "2026-10-01T03:00:00+00:00",
@@ -40,10 +42,53 @@ test("★ 紀錄從哪一天開始的提醒一定在", () => {
   assert.match(inviteCodesHTML([], ""), /使用紀錄從 2026-10-14 開始/);
 });
 
-// 第一版只做看（Paul 2026-10-14）。哪天有人加了按鈕，這一條會提醒他先問。
-test("★ 這一頁沒有任何改動邀請碼的按鈕或輸入框", () => {
-  const h = inviteCodesHTML(ROWS, "");
-  assert.doesNotMatch(h, /<input|<textarea|data-act="(?!tab")/);
+// 不做刪除（Paul 2026-10-14）。哪天有人加了刪除按鈕，這一條會提醒他先問。
+test("★ 這一頁沒有刪除邀請碼的按鈕", () => {
+  const h = inviteCodesHTML(ROWS, "", false, null);
+  assert.doesNotMatch(h, /data-act="invite-(delete|remove)"|刪除這組|刪掉這組/);
+});
+
+test("還有次數的碼有停用按鈕，用完的沒有", () => {
+  const h = inviteCodesHTML(ROWS, "", false, null);
+  assert.match(h, /data-act="invite-disable"\s+data-code="BT-CADRE"/);
+  assert.doesNotMatch(h, /data-code="BT-ALUM"/);
+});
+
+test("忙的時候新增與停用都按不下去", () => {
+  const h = inviteCodesHTML(ROWS, "", true, null);
+  assert.match(h, /data-act="invite-new" disabled/);
+  assert.match(h, /data-act="invite-disable"[^>]*disabled/);
+});
+
+test("新增表單把剛才填的值放回去（建失敗時不用重填）", () => {
+  const h = inviteFormHTML({ code: "bt-abc", grants: "alumni", uses: 3, note: "給<小明>" }, false);
+  assert.match(h, /id="ic-code" value="bt-abc"/);
+  assert.match(h, /value="alumni" selected/);
+  assert.match(h, /id="ic-uses"[^>]*value="3"/);
+  assert.match(h, /給&lt;小明&gt;/);
+});
+
+test("系統想的碼是 bt- 加六個字，而且沒有容易看錯的字", () => {
+  for (let i = 0; i < 200; i++) assert.match(suggestCode(), /^bt-[a-hjkmnp-z2-9]{6}$/);
+  assert.equal(suggestCode(() => 0), "bt-aaaaaa");
+  assert.equal(suggestCode(() => 0.9999999), "bt-999999");
+});
+
+// 資料庫說撞到哪一組，那一組的名字要留在畫面上。
+test("錯誤訊息翻成人話，撞碼時講得出是哪一組", () => {
+  assert.match(says({ message: "invite_exists:bt-new-01" }), /已經有一組「bt-new-01」/);
+  assert.match(says({ message: "bad_invite_code" }), /英文字母、數字和連字號/);
+  assert.match(says({ message: "bad_uses" }), /1 到 100/);
+  assert.match(says({ message: "no_such_invite" }), /找不到這組碼/);
+  assert.match(says({ message: "not_president" }), /Co-President/);
+});
+
+// 碼的格式規則前後端要一致：系統想出來的碼一定要通過資料庫那一關。
+test("★ 系統想的碼符合資料庫的格式檢查", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/2026-10-15-invite-admin.sql", import.meta.url), "utf8");
+  assert.match(sql, /\^\[A-Za-z0-9-\]\{2,64\}\$/);
+  const re = /^[A-Za-z0-9-]{2,64}$/;
+  for (let i = 0; i < 50; i++) assert.match(suggestCode(), re);
 });
 
 test("載入失敗時拿到 undefined 也畫得出東西", () => {

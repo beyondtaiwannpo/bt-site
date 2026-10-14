@@ -148,7 +148,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-09-18-alumni-stories.sql \
          supabase/migrations/2026-09-19-stories-for-review.sql \
          supabase/migrations/2026-09-20-availability-week.sql \
-         supabase/migrations/2026-10-14-invite-uses.sql ; do
+         supabase/migrations/2026-10-14-invite-uses.sql \
+         supabase/migrations/2026-10-15-invite-admin.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -376,6 +377,48 @@ else
 fi
 chk "刪帳號時紀錄跟著消失" "1" \
   "delete from auth.users where id='${ALUM}'; select count(*) from public.invite_uses"
+
+echo
+echo "後台新增與停用邀請碼（2026-10-14）："
+chkas "${PAUL}" "Co-President 建得了碼，前後空白會去掉" "bt-new-01" \
+  "select public.create_invite('  bt-new-01 ', 'alumni', 3, '  給校友小明 ')"
+chk "存進去的身分、次數、備註都對" "alumni|3|給校友小明" \
+  "select grants||'|'||uses_left||'|'||note from public.invite_codes where code='bt-new-01'"
+chkraise "★ 只差在大小寫會被擋，而且講得出撞到哪一組" "invite_exists:bt-new-01" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.create_invite('BT-NEW-01','cadre',1,null);"
+chkraise "碼裡有空白或中文會被擋" "bad_invite_code" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.create_invite('bt 新碼','cadre',1,null);"
+chkraise "次數超過 100 會被擋" "bad_uses" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.create_invite('bt-big','cadre',101,null);"
+chkraise "身分亂填會被擋" "bad_grants" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.create_invite('bt-x1','student',1,null);"
+chkraise "★ Director 建不了碼" "not_president" \
+  "perform set_config('test.uid','${DIR}',true); perform public.create_invite('bt-dir','cadre',1,null);"
+chkraise "★ 一般幹部建不了碼" "not_president" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.create_invite('bt-mem','cadre',1,null);"
+chkraise "★ Director 停用不了碼" "not_president" \
+  "perform set_config('test.uid','${DIR}',true); perform public.disable_invite('bt-new-01');"
+chk "被擋下來的那幾組都沒有建出來" "0" \
+  "select count(*) from public.invite_codes where code in ('bt-dir','bt-mem','bt-big','bt-x1','BT-NEW-01')"
+chkas "${PAUL}" "Co-President 停用得了" "0" "select public.disable_invite('bt-new-01')"
+chk "停用之後剩餘次數是 0" "0" "select uses_left from public.invite_codes where code='bt-new-01'"
+chkraise "停用之後真的不能用" "invalid_invite" \
+  "perform set_config('test.uid','${MEMBER}',true); update public.profiles set role='student' where id='${MEMBER}';
+   perform public.claim_invite('bt-new-01');"
+chkraise "停用不存在的碼會講出來" "no_such_invite" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.disable_invite('nope');"
+iagot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.create_invite('bt-anon','cadre',1,null);" 2>&1 || true)
+if echo "${iagot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動新增"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動新增：${iagot}"; fail=$((fail+1))
+fi
+avgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-15-invite-admin.sql 2>&1 || true)
+if echo "${avgot}" | grep -q "OVERALL.*PASS" && ! echo "${avgot}" | grep -q "FAIL"; then
+  echo "  ok   新增與停用那支遷移檔的驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 新增與停用那支遷移檔的驗收表沒全過："; echo "${avgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
 
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi

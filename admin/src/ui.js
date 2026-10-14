@@ -477,8 +477,10 @@ export function alumniStoriesHTML(rows, msg, busy) {
   </div>`;
 }
 
-// 邀請碼（2026-10-14）。**只有 Co-President 看得到這個分頁，而且只能看。**
-// Paul 拍板第一版不做新增、修改、刪除：發新碼照舊走 README「怎麼發新邀請碼」。
+// 邀請碼（2026-10-14）。**只有 Co-President 看得到這個分頁。**
+// 同一天 Paul 拍板：做新增與停用，**不做刪除**（刪掉之後使用紀錄就對不回任何一組碼）。
+// 真正的門在資料庫：create_invite() 與 disable_invite() 第一句都問 is_president()
+// （2026-10-15-invite-admin.sql）。這裡少畫一顆按鈕不是安全機制。
 //
 // ⚠ 使用紀錄是 2026-10-14 跑完 invite-uses 那支遷移檔之後才開始記的。
 // 之前用掉的次數只反映在「還剩幾次」，查不到是誰。那句提醒一定要留著，
@@ -487,7 +489,42 @@ export function alumniStoriesHTML(rows, msg, busy) {
 // role 是那個人**現在**的身分，grants 是**那一次**換到的身分。兩個不一樣
 // 就多寫一句「現在是…」，例如校友後來又拿了幹部碼。
 const ROLE_ZH = { cadre: "幹部", alumni: "校友", student: "學員" };
-export function inviteCodesHTML(rows, msg) {
+
+// 系統先幫忙想一組碼：bt- 加六個字。**刻意不用 0 o 1 l i**，
+// 那幾個字在很多字型裡長得一樣，而學生打錯時畫面只會說「這個邀請碼不對」。
+// rand 可以傳進來，測試才固定得住結果。
+const CODE_ABC = "abcdefghjkmnpqrstuvwxyz23456789";
+export function suggestCode(rand = Math.random) {
+  let out = "bt-";
+  for (let i = 0; i < 6; i++) out += CODE_ABC[Math.floor(rand() * CODE_ABC.length) % CODE_ABC.length];
+  return out;
+}
+
+// draft 是表單上現在填的值。存在 S 裡，不是只在 DOM 上：
+// 按下去之後畫面會重畫一次，沒存起來的話建失敗時剛填的東西就全不見了。
+export function inviteFormHTML(draft, busy) {
+  const d = draft || {};
+  const dis = busy ? " disabled" : "";
+  return `<div class="wnote" style="margin-bottom:14px"><b>發一組新的碼</b>
+    <div class="two">
+      <label><i>碼（英文字母、數字、連字號）</i><input id="ic-code" value="${esc(d.code || "")}"
+        autocomplete="off" spellcheck="false"${dis}></label>
+      <label><i>給什麼身分</i><select id="ic-grants"${dis}>
+        <option value="cadre"${d.grants !== "alumni" ? " selected" : ""}>幹部碼（會拿到護照）</option>
+        <option value="alumni"${d.grants === "alumni" ? " selected" : ""}>校友碼（沒有護照）</option>
+      </select></label>
+      <label><i>可以用幾次（一個人一組就填 1）</i><input id="ic-uses" type="number" min="1" max="100"
+        value="${esc(String(d.uses || 1))}"${dis}></label>
+      <label><i>備註：發給誰（只有這一頁看得到）</i><input id="ic-note" value="${esc(d.note || "")}"
+        placeholder="給課程組小明"${dis}></label>
+    </div>
+    <div class="row">
+      <button class="btn" data-act="invite-new"${dis}>建立這組碼</button>
+      <button class="btn ghost sm" data-act="invite-suggest"${dis}>換一組</button>
+    </div></div>`;
+}
+
+export function inviteCodesHTML(rows, msg, busy, draft) {
   const list = rows || [];
   const item = c => {
     const uses = Array.isArray(c.uses) ? c.uses : [];
@@ -499,20 +536,22 @@ export function inviteCodesHTML(rows, msg) {
                    : `<span class="tag draft">用完了</span>`}</div>
       ${c.note ? `<div class="fmeta">備註：${esc(c.note)}</div>` : ""}
       <div class="fmeta">建立於：${esc(String(c.created_at || "").slice(0, 10) || "不知道")}・有紀錄的使用 ${uses.length} 次</div>
-      ${uses.length ? `<ul class="flist">${uses.map(u => `<li>
-        <div class="fhead"><b>${esc(u.name || "（沒有名字）")}</b>
-          <span class="tag">換成${esc(ROLE_ZH[u.grants] || u.grants || "")}</span>
-          ${u.role && u.role !== u.grants ? `<span class="tag">現在是${esc(ROLE_ZH[u.role] || u.role)}</span>` : ""}</div>
-        <div class="fmeta">${esc(u.email || "（沒有 email）")}・${esc(String(u.used_at || "").slice(0, 10))}</div>
-      </li>`).join("")}</ul>` : ""}
+      ${left > 0 ? `<div class="row"><button class="btn ghost sm" data-act="invite-disable"
+        data-code="${esc(c.code)}"${busy ? " disabled" : ""}>停用</button></div>` : ""}
+      ${uses.length ? `<div class="fmeta" style="margin-top:8px"><b>誰用過</b></div>
+      ${uses.map(u => `<div class="fmeta">・<b>${esc(u.name || "（沒有名字）")}</b>
+        ${esc(u.email || "（沒有 email）")}・${esc(String(u.used_at || "").slice(0, 10))}・換成${esc(ROLE_ZH[u.grants] || u.grants || "")}${
+        u.role && u.role !== u.grants ? `（現在是${esc(ROLE_ZH[u.role] || u.role)}）` : ""}</div>`).join("")}` : ""}
     </li>`;
   };
   return `<div class="card">
     ${tabsHTML("invites", true)}
     <h2>邀請碼</h2>
-    <div class="sub">每一組碼還剩幾次、誰用過。這一頁只能看，要發新碼照 README「怎麼發新邀請碼」那一段做。</div>
+    <div class="sub">發新的碼、停用碼、看每一組還剩幾次與誰用過。</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${inviteFormHTML(draft, busy)}
     <div class="wnote big">使用紀錄從 2026-10-14 開始。在那之前用掉的次數只會反映在「還剩幾次」，查不到是誰用的。<br>
+      停用就是把剩餘次數改成 0，後台沒有恢復的按鈕，要恢復得到 Supabase 改。碼不能刪，刪了就看不出紀錄是哪一組的。<br>
       這一頁有每個人的 email，不要截圖傳出去。</div>
     ${list.length ? `<ul class="flist">${list.map(item).join("")}</ul>`
                   : `<div class="empty">還沒有任何邀請碼。</div>`}
