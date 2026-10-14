@@ -147,7 +147,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-09-17-invite-grants.sql \
          supabase/migrations/2026-09-18-alumni-stories.sql \
          supabase/migrations/2026-09-19-stories-for-review.sql \
-         supabase/migrations/2026-09-20-availability-week.sql ; do
+         supabase/migrations/2026-09-20-availability-week.sql \
+         supabase/migrations/2026-10-14-invite-uses.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -314,6 +315,67 @@ chkrole anon "" "沒登入讀得到「兩把鑰匙都轉了」的那個人" "小
   "select name_zh from public.profiles where public_profile and public_approved"
 chkrole anon "" "沒登入讀不到沒公開的幹部" "0" \
   "select count(*) from public.profiles where not public_profile"
+
+echo
+echo "邀請碼使用紀錄（2026-10-14）："
+# 兩位新的學員：NEWB 拿幹部碼，ALUM 拿校友碼。
+# **不用 STU**：前面「刪自己的帳號」那一段已經把他刪掉了，拿他來測會在錯的地方失敗。
+NEWB=77777777-7777-7777-7777-777777777777
+ALUM=66666666-6666-6666-6666-666666666666
+psql -d "${DB}" -q -c "
+  insert into auth.users (id,email) values ('${ALUM}','alum@example.com'), ('${NEWB}','newb@example.com');
+  insert into public.profiles (id,name_zh,role) values ('${ALUM}','老校友','student'), ('${NEWB}','新幹部','student');
+  insert into public.invite_codes (code,uses_left,grants,note) values
+    ('BT-CADRE',2,'cadre','給新幹部'), ('BT-ALUM',2,'alumni','給校友');
+" >/dev/null
+
+# 小寫加空白也要對得回那一組碼，而紀錄存的是那一列原本的寫法。
+chkas "${NEWB}" "學員拿幹部碼升級" "upgraded" "select public.claim_invite(' bt-cadre ')"
+chk "★ 紀錄存的是碼原本的寫法，不是使用者打的字" "BT-CADRE|cadre" \
+  "select code||'|'||grants from public.invite_uses where user_id='${NEWB}'"
+chkas "${NEWB}" "幹部再輸入一次" "already_cadre" "select public.claim_invite('BT-CADRE')"
+chk "★ 沒扣碼的那一次不記" "1|1" \
+  "select (select count(*) from public.invite_uses)||'|'||(select uses_left from public.invite_codes where code='BT-CADRE')"
+
+chkas "${ALUM}" "學員拿校友碼升級" "upgraded_alumni" "select public.claim_invite('BT-ALUM')"
+chkas "${ALUM}" "校友再拿一次校友碼" "already_alumni" "select public.claim_invite('BT-ALUM')"
+chk "★ 補回去的那一次不記，剩餘次數也對" "1|1" \
+  "select (select count(*) from public.invite_uses where code='BT-ALUM')||'|'||(select uses_left from public.invite_codes where code='BT-ALUM')"
+
+chkraise "★ 碼不對整筆回滾，連紀錄一起" "invalid_invite" \
+  "perform set_config('test.uid','${MEMBER}',true); update public.profiles set role='student' where id='${MEMBER}';
+   perform public.claim_invite('NOPE');"
+chk "回滾之後紀錄還是兩筆" "2" "select count(*) from public.invite_uses"
+
+chkrole authenticated "${PAUL}" "★ Co-President 看得到每一組碼" "2" \
+  "select count(*) from public.invite_codes_for_review()"
+chkrole authenticated "${PAUL}" "Co-President 看得到誰用的、email 與名字" "新幹部|newb@example.com|cadre" \
+  "select u->>'name'||'|'||(u->>'email')||'|'||(u->>'role') from public.invite_codes_for_review() r, jsonb_array_elements(r.uses) u where r.code='BT-CADRE'"
+chkrole authenticated "${DIR}" "★ Director 叫得動但一列都拿不到" "0" \
+  "select count(*) from public.invite_codes_for_review()"
+chkrole authenticated "${MEMBER}" "★ 一般幹部一列都拿不到" "0" \
+  "select count(*) from public.invite_codes_for_review()"
+iugot=$(psql -d "${DB}" -X -A -t -q -c "set role authenticated; select count(*) from public.invite_uses;" 2>&1 || true)
+if echo "${iugot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 登入的人直接查 invite_uses 會被擋"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 登入的人居然直接查得到 invite_uses：${iugot}"; fail=$((fail+1))
+fi
+iagot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.invite_codes_for_review();" 2>&1 || true)
+if echo "${iagot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動讀取函式"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動讀取函式：${iagot}"; fail=$((fail+1))
+fi
+# 遷移檔最後那張 PASS / FAIL 表。重跑一次沒有副作用（全是 if not exists 與 create or replace）。
+avgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-14-invite-uses.sql 2>&1 || true)
+if echo "${avgot}" | grep -q "OVERALL.*PASS" && ! echo "${avgot}" | grep -q "FAIL"; then
+  echo "  ok   遷移檔自己的驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 遷移檔自己的驗收表沒全過："; echo "${avgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+chk "刪帳號時紀錄跟著消失" "1" \
+  "delete from auth.users where id='${ALUM}'; select count(*) from public.invite_uses"
 
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi

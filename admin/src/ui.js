@@ -378,7 +378,8 @@ export function tabsHTML(tab, isPresident) {
     <button class="chip wide${tab === "res" ? " on" : ""}" data-act="tab" data-t="res">資源</button>
     ${isPresident ? `<button class="chip wide${tab === "team" ? " on" : ""}" data-act="tab" data-t="team">團隊頁</button>
     <button class="chip wide${tab === "stories" ? " on" : ""}" data-act="tab" data-t="stories">校友頁</button>
-    <button class="chip wide${tab === "mail" ? " on" : ""}" data-act="tab" data-t="mail">信件文案</button>` : ""}
+    <button class="chip wide${tab === "mail" ? " on" : ""}" data-act="tab" data-t="mail">信件文案</button>
+    <button class="chip wide${tab === "invites" ? " on" : ""}" data-act="tab" data-t="invites">邀請碼</button>` : ""}
   </div>`;
 }
 
@@ -473,6 +474,48 @@ export function alumniStoriesHTML(rows, msg, busy) {
         </div>
       </li>`).join("")}</ul>` : `<div class="empty">還沒有人勾同意。<br>
       幹部與校友要先到「設定」把故事填完並勾同意，才會出現在這裡。</div>`}
+  </div>`;
+}
+
+// 邀請碼（2026-10-14）。**只有 Co-President 看得到這個分頁，而且只能看。**
+// Paul 拍板第一版不做新增、修改、刪除：發新碼照舊走 README「怎麼發新邀請碼」。
+//
+// ⚠ 使用紀錄是 2026-10-14 跑完 invite-uses 那支遷移檔之後才開始記的。
+// 之前用掉的次數只反映在「還剩幾次」，查不到是誰。那句提醒一定要留著，
+// 不然看的人會以為「沒有紀錄」等於「沒有人用過」。
+//
+// role 是那個人**現在**的身分，grants 是**那一次**換到的身分。兩個不一樣
+// 就多寫一句「現在是…」，例如校友後來又拿了幹部碼。
+const ROLE_ZH = { cadre: "幹部", alumni: "校友", student: "學員" };
+export function inviteCodesHTML(rows, msg) {
+  const list = rows || [];
+  const item = c => {
+    const uses = Array.isArray(c.uses) ? c.uses : [];
+    const left = Number(c.uses_left) || 0;
+    return `<li>
+      <div class="fhead"><b>${esc(c.code)}</b>
+        <span class="tag">${c.grants === "alumni" ? "校友碼" : "幹部碼"}</span>
+        ${left > 0 ? `<span class="tag open">還剩 ${left} 次</span>`
+                   : `<span class="tag draft">用完了</span>`}</div>
+      ${c.note ? `<div class="fmeta">備註：${esc(c.note)}</div>` : ""}
+      <div class="fmeta">建立於：${esc(String(c.created_at || "").slice(0, 10) || "不知道")}・有紀錄的使用 ${uses.length} 次</div>
+      ${uses.length ? `<ul class="flist">${uses.map(u => `<li>
+        <div class="fhead"><b>${esc(u.name || "（沒有名字）")}</b>
+          <span class="tag">換成${esc(ROLE_ZH[u.grants] || u.grants || "")}</span>
+          ${u.role && u.role !== u.grants ? `<span class="tag">現在是${esc(ROLE_ZH[u.role] || u.role)}</span>` : ""}</div>
+        <div class="fmeta">${esc(u.email || "（沒有 email）")}・${esc(String(u.used_at || "").slice(0, 10))}</div>
+      </li>`).join("")}</ul>` : ""}
+    </li>`;
+  };
+  return `<div class="card">
+    ${tabsHTML("invites", true)}
+    <h2>邀請碼</h2>
+    <div class="sub">每一組碼還剩幾次、誰用過。這一頁只能看，要發新碼照 README「怎麼發新邀請碼」那一段做。</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    <div class="wnote big">使用紀錄從 2026-10-14 開始。在那之前用掉的次數只會反映在「還剩幾次」，查不到是誰用的。<br>
+      這一頁有每個人的 email，不要截圖傳出去。</div>
+    ${list.length ? `<ul class="flist">${list.map(item).join("")}</ul>`
+                  : `<div class="empty">還沒有任何邀請碼。</div>`}
   </div>`;
 }
 

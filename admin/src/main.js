@@ -27,6 +27,8 @@ let S = {
   // （例如載入失敗之後再 render 一次）會整個空白，而這個 repo 的規矩是
   // 「連不上資料庫也要畫得出東西」。
   stories: [],
+  // 邀請碼（2026-10-14）。理由同上，一定要有初始值。
+  invites: [],
   // 信件文案
   tpls: [], tplKind: null,
 };
@@ -61,6 +63,8 @@ function render() {
     body = UI.publicTeamHTML(S.people, S.msg, S.busy);
   } else if (S.view === "stories") {
     body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
+  } else if (S.view === "invites") {
+    body = UI.inviteCodesHTML(S.invites, S.msg);
   } else if (S.view === "checkin" && S.form) {
     body = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
@@ -189,6 +193,16 @@ async function openStories() {
   render();
 }
 
+// 邀請碼與使用紀錄。只讀，只有 Co-President 拿得到（門在資料庫那一支函式裡）。
+async function openInvites() {
+  S.busy = true; render();
+  try {
+    S.invites = await D.loadInvites();
+    S.view = "invites"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "邀請碼載不到：" + D.says(e); }
+  render();
+}
+
 async function openRes() {
   S.busy = true; render();
   try {
@@ -272,6 +286,7 @@ document.addEventListener("click", async e => {
     if (b.dataset.t === "res") { await openRes(); }
     else if (b.dataset.t === "team") { await openTeam(); }
     else if (b.dataset.t === "stories") { await openStories(); }
+    else if (b.dataset.t === "invites") { await openInvites(); }
     else if (b.dataset.t === "mail") { await openMail(); }
     else { S.view = "list"; await reloadList(); render(); }
     return;

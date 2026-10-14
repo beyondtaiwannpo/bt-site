@@ -288,6 +288,17 @@ export async function setStoryApproved(id, ok) {
   if (error) throw error;
 }
 
+// ── 邀請碼（2026-10-14）──────────────────────────────────────────────
+// 只讀。invite_codes 與 invite_uses 兩張表對所有登入身分都是關的，
+// 唯一的出口是 invite_codes_for_review()，門（is_president）寫在那一支的本文裡
+// （2026-10-14-invite-uses.sql）。不是 Co-President 的人叫它會拿到空的清單。
+export async function loadInvites() {
+  need();
+  const { data, error } = await supabase.rpc("invite_codes_for_review");
+  if (error) throw error;
+  return data || [];
+}
+
 // ── 信件文案（2026-09-08）──────────────────────────────────────────────
 export async function loadTemplates() {
   need();
