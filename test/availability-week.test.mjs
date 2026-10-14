@@ -150,8 +150,11 @@ test("★ 過去的週不能編輯，而且要說為什麼", () => {
   assert.equal(/data-act="toggle"/.test(h), false, "過去的週不該畫出可以點的格子");
 });
 
+// 這裡要的是「還沒過去的週」。mineHTML 用真實的今天判斷過去與否，
+// 原本寫 2026-09-07，那一週一過這條就壞了（2026-10-14 發現），所以改用遠在未來的週，
+// 跟下面那條用 2020 年當「一定已經過去」是同一個道理。2099-01-05 是星期一。
 test("已經設定過例外的週會列出來，每一個都可以回到平常的時間", () => {
-  const h = mineHTML({ ...baseS, mineMode: "week", weekMarksMine: new Set(["2026-09-07"]) });
+  const h = mineHTML({ ...baseS, mineMode: "week", weekMarksMine: new Set(["2099-01-05"]) });
   assert.match(h, /回到平常的時間/);
   assert.match(h, /data-act="clear-week"/);
 });
