@@ -151,7 +151,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-10-14-invite-uses.sql \
          supabase/migrations/2026-10-15-invite-admin.sql \
          supabase/migrations/2026-10-16-intern-role.sql \
-         supabase/migrations/2026-10-17-intern-passport.sql ; do
+         supabase/migrations/2026-10-17-intern-passport.sql \
+         supabase/migrations/2026-10-18-intern-admin.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -508,6 +509,72 @@ fi
 chk "刪帳號時實習護照、章、心得跟著消失" "0|0|0" \
   "delete from auth.users where id='${INT2}';
    select (select count(*) from public.intern_passports where id='${INT2}')||'|'||(select count(*) from public.intern_stamps where user_id='${INT2}')||'|'||(select count(*) from public.intern_entries where user_id='${INT2}')"
+
+echo
+echo "實習護照的後台（2026-10-18）："
+# 上面那一段刪了 INT2、INT1 變成幹部了。ISTAFF（Internship team 的幹部）、OTHER（別組）、PAUL 還在。
+chkas "${ISTAFF}" "Internship team 的幹部開得了新的一屆" "2027-28" \
+  "select public.save_intern_term('2027-28','2027-28 實習','INTERNSHIP 2027-28','2027-09-01','2028-07-31')"
+chk "新的一屆還不是 active（開屆與設成目前是兩個動作）" "f" "select active from public.intern_terms where id='2027-28'"
+chkraise "起訖日反過來會被擋" "bad_dates" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_intern_term('2028-29','x','X','2029-01-01','2028-01-01');"
+chkraise "屆別 id 有空白會被擋" "bad_term_id" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_intern_term('2028 29','x','X','2028-09-01','2029-07-31');"
+chkas "${ISTAFF}" "改既有那一屆的標題" "2026-27" \
+  "select public.save_intern_term('2026-27','2026-27 第一屆','INTERNSHIP 2026-27','2026-09-01','2027-07-31')"
+chk "標題改了，active 沒被動到" "2026-27第一屆|true" "select title_zh||'|'||active from public.intern_terms where id='2026-27'"
+chkas "${PAUL}" "Co-President 設成目前這一屆" "2027-28" "select public.activate_intern_term('2027-28')"
+chk "★ 只有一屆 active，而且是新的那一屆" "2027-28" "select id from public.intern_terms where active"
+chkraise "設一個不存在的屆會講出來" "no_such_term" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.activate_intern_term('1999-00');"
+chkas "${PAUL}" "切回去" "2026-27" "select public.activate_intern_term('2026-27')"
+
+chkas "${ISTAFF}" "加一格" "T2627-10" \
+  "select public.save_intern_task('T2627-10','2026-27',10,'project','第二個任務','SECOND TASK','交出第二個')"
+chkas "${ISTAFF}" "改同一格的標題（id 不變）" "T2627-10" \
+  "select public.save_intern_task('T2627-10','2026-27',10,'project','第二個任務（改）','SECOND TASK','  交出第二個  ')"
+chk "改到了，說明前後空白去掉了" "第二個任務（改）|交出第二個" \
+  "select title_zh||'|'||description from public.intern_tasks where id='T2627-10'"
+chkraise "★ 既有的格子換不了屆" "term_locked" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_intern_task('T2627-10','2027-28',10,'project','x','X',null);"
+chkraise "分類亂填會被擋" "bad_category" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_intern_task('T2627-11','2026-27',11,'party','x','X',null);"
+chkraise "標題留白會被擋" "empty_title" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_intern_task('T2627-11','2026-27',11,'project','  ','X',null);"
+chkas "${ISTAFF}" "停用一格" "f" "select public.set_intern_task_active('T2627-10', false)"
+chk "停用了" "f" "select active from public.intern_tasks where id='T2627-10'"
+chkas "${ISTAFF}" "恢復" "t" "select public.set_intern_task_active('T2627-10', true)"
+chkas "${ISTAFF}" "沒人蓋過的格子刪得掉" "T2627-10" "select public.delete_intern_task('T2627-10')"
+chk "真的刪了" "0" "select count(*) from public.intern_tasks where id='T2627-10'"
+# T2627-01 在上一段被 INT1 蓋過（他現在是幹部了，章還在）。
+chkraise "★ 蓋過的格子刪不掉，只能停用" "has_stamps" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.delete_intern_task('T2627-01');"
+chk "那一格與那個章都還在" "1|1" \
+  "select (select count(*) from public.intern_tasks where id='T2627-01')||'|'||(select count(*) from public.intern_stamps where task_id='T2627-01')"
+chkraise "★ 別的 team 的幹部改不了格子" "not_internship_team" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.save_intern_task('T2627-12','2026-27',12,'project','x','X',null);"
+chkraise "★ 別的 team 的幹部開不了屆" "not_internship_team" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.save_intern_term('2028-29','x','X','2028-09-01','2029-07-31');"
+chkraise "★ 一般幹部停用不了格子" "not_internship_team" \
+  "perform set_config('test.uid','${MEMBER}',true); update public.profiles set role='cadre' where id='${MEMBER}'; perform public.set_intern_task_active('T2627-01', false);"
+itgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${ISTAFF}',false);" -c "set role authenticated; insert into public.intern_tasks (id,term,seq,category,title_zh,title_en) values ('T2627-99','2026-27',99,'project','x','X');" 2>&1 || true)
+if echo "${itgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 繞過函式直接 insert 會被擋（表本身沒有寫入權限）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 直接 insert 居然成功：${itgot}"; fail=$((fail+1))
+fi
+iagot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.save_intern_task('T2627-99','2026-27',99,'project','x','X',null);" 2>&1 || true)
+if echo "${iagot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動：${iagot}"; fail=$((fail+1))
+fi
+iagot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-18-intern-admin.sql 2>&1 || true)
+if echo "${iagot}" | grep -q "OVERALL.*PASS" && ! echo "${iagot}" | grep -q "FAIL"; then
+  echo "  ok   後台那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL 後台那支遷移檔的驗收表沒全過："; echo "${iagot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
 
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi

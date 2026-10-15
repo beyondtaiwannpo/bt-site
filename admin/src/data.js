@@ -331,6 +331,61 @@ export async function saveTemplate(kind, subject, body) {
   if (error) throw error;
 }
 
+// ── 實習護照的後台（2026-10-18）────────────────────────────────────────
+// 讀是走 RLS（Internship team 讀得到五張 intern_* 表），寫全部走函式，
+// 門在函式第一句 is_internship_team()。表本身對前端只有 select。
+export async function loadInternAdmin() {
+  need();
+  const [te, ta, st, pe] = await Promise.all([
+    supabase.from("intern_terms").select("*").order("starts_on", { ascending: false }),
+    supabase.from("intern_tasks").select("*").order("term").order("seq"),
+    supabase.from("intern_stamps").select("task_id"),
+    supabase.from("profiles").select("id").eq("role", "intern"),
+  ]);
+  for (const r of [te, ta, st, pe]) if (r.error) throw r.error;
+  // 每一格被蓋過幾次。後台只要知道「有沒有人蓋過」（刪不刪得掉）與數字，
+  // 不要知道是誰 —— 那是進度牆的事。
+  const stamped = {};
+  for (const r of st.data || []) stamped[r.task_id] = (stamped[r.task_id] || 0) + 1;
+  return { terms: te.data || [], tasks: ta.data || [], stamped, interns: (pe.data || []).length };
+}
+
+export async function saveInternTerm(t) {
+  need();
+  const { data, error } = await supabase.rpc("save_intern_term",
+    { p_id: t.id, p_title_zh: t.title_zh, p_title_en: t.title_en, p_starts: t.starts_on, p_ends: t.ends_on });
+  if (error) throw error;
+  return data;
+}
+
+export async function activateInternTerm(id) {
+  need();
+  const { error } = await supabase.rpc("activate_intern_term", { p_id: id });
+  if (error) throw error;
+}
+
+// seq 用 Number() 轉：input 的 value 是字串，送 "10" 給 int 參數 PostgREST 會找不到這支函式。
+export async function saveInternTask(t) {
+  need();
+  const { data, error } = await supabase.rpc("save_intern_task",
+    { p_id: t.id, p_term: t.term, p_seq: Number(t.seq) || 100, p_category: t.category,
+      p_title_zh: t.title_zh, p_title_en: t.title_en, p_description: t.description });
+  if (error) throw error;
+  return data;
+}
+
+export async function setInternTaskActive(id, active) {
+  need();
+  const { error } = await supabase.rpc("set_intern_task_active", { p_id: id, p_active: !!active });
+  if (error) throw error;
+}
+
+export async function deleteInternTask(id) {
+  need();
+  const { error } = await supabase.rpc("delete_intern_task", { p_id: id });
+  if (error) throw error;
+}
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
@@ -360,6 +415,18 @@ const SAYS = [
   ["empty_mail", "主旨與內容都要寫，不能只寫一個。"],
   ["no_such_form", "找不到這份表單，可能已經被刪掉了。"],
   ["no_such_template", "找不到這一種信的文案，可能是遷移檔還沒跑完。"],
+  // 實習護照的後台（2026-10-18）
+  ["not_internship_team", "只有 Internship team 的幹部與 Co-President 改得動實習護照。"],
+  ["bad_term_id", "屆別的代號只能用英文字母、數字和連字號，例如 2027-28。"],
+  ["bad_task_id", "格子的代號只能用英文字母、數字和連字號，例如 T2728-01。"],
+  ["bad_dates", "結束日要在開始日之後。"],
+  ["empty_title", "中文標題與英文標題都要填。"],
+  ["bad_category", "分類要選入門、任務或反思。"],
+  ["no_such_term", "找不到這一屆，重新整理再試一次。"],
+  ["no_such_task", "找不到這一格，重新整理再試一次。"],
+  ["term_locked", "已經建好的格子不能換屆。要搬到別屆就另外建一格，這一格停用。"],
+  ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。"],
+  ["Could not find the function", "後台的函式還不在資料庫裡，要先跑 2026-10-18-intern-admin.sql。"],
 ];
 export function says(err) {
   const m = String((err && err.message) || err || "");
