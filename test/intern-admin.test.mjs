@@ -20,6 +20,12 @@ const DATA = {
   interns: 4,
 };
 
+test("Co-President 在實習護照分頁上，其他分頁不會不見", () => {
+  const h = internAdminHTML(DATA, null, "", false, true);
+  assert.match(h, /data-t="invites"/);
+  assert.doesNotMatch(internAdminHTML(DATA, null, "", false, false), /data-t="invites"/);
+});
+
 test("分頁：Internship team 的幹部看得到，別的 team 看不到，Co-President 一律看得到", () => {
   setInternStaff(false);
   assert.doesNotMatch(tabsHTML("forms", false), /data-t="interns"/);

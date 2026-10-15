@@ -268,6 +268,10 @@ export function completeHTML(p, msg, busy) {
     </div>
     <div class="note">我們問學校與年級，是為了知道要把活動辦在哪裡、辦給誰。
       <b>不會公開，也不會給任何第三方。</b>完整寫在<a href="../privacy/">隱私政策</a>。</div>
+    <!-- 2026-10-18：端對端測試設計到這一步才發現 —— 新註冊的幹部、校友、實習生
+         會先被擋在這一頁，而這一頁原本沒有「我有邀請碼」的入口，
+         他得先填一間高中才走得到學員頁上那顆按鈕。拿到邀請碼的人不該被問學校。 -->
+    <div class="note"><button class="link" data-act="show-claim">我是幹部、校友或實習生，我有邀請碼</button></div>
     <div class="nav"><button class="link" data-act="signout">登出</button></div>
   </div>`;
 }

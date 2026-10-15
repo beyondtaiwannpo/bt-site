@@ -748,7 +748,10 @@ export function suggestTaskId(termId, tasks) {
 
 // 主畫面：屆別一區、目前選的那一屆的格子一區。
 // data = { terms, tasks, stamped, interns }，sel = 正在看哪一屆的 id。
-export function internAdminHTML(data, sel, msg, busy) {
+// isPresident 要傳進來：分頁列上 Co-President 才有的那四個分頁靠它畫。
+// 2026-10-18 端對端測試抓到：寫死 false 的話，Co-President 一進實習護照分頁，
+// 邀請碼那幾個分頁就不見了，要重新整理才回得去。
+export function internAdminHTML(data, sel, msg, busy, isPresident) {
   const terms = data.terms || [];
   const cur = terms.find(t => t.id === sel) || terms.find(t => t.active) || terms[0] || null;
   const tasks = (data.tasks || []).filter(t => cur && t.term === cur.id);
@@ -789,7 +792,7 @@ export function internAdminHTML(data, sel, msg, busy) {
     </li>`; }).join("")}</ul>`).join("");
 
   return `<div class="card">
-    ${tabsHTML("interns", false, true)}
+    ${tabsHTML("interns", !!isPresident, true)}
     <h2>實習護照</h2>
     <div class="sub">這一屆的格子、開新的一屆。改完 intern 重新整理護照就看得到。目前 ${data.interns || 0} 位 intern。</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
@@ -808,8 +811,10 @@ export function internAdminHTML(data, sel, msg, busy) {
 }
 
 // 改或開一屆。id 建了就不能改（格子與護照靠它對應），所以改的時候那一格鎖住。
-export function internTermEditHTML(t, msg, busy) {
-  const cur = t || { id: "", title_zh: "", title_en: "", starts_on: "", ends_on: "" };
+// draft（2026-10-18 端對端測試抓到的）：存檔被擋之後畫面會重畫，沒有 draft 的話
+// 剛填的五格全部洗掉，使用者看到一句錯誤訊息跟一張空表單。畫面上的東西要留在畫面上。
+export function internTermEditHTML(t, msg, busy, draft) {
+  const cur = draft || t || { id: "", title_zh: "", title_en: "", starts_on: "", ends_on: "" };
   const dis = busy ? " disabled" : "";
   return `<div class="card">
     <div class="row" style="margin:0 0 14px"><button class="btn quiet" data-act="intern-back">← 回實習護照</button></div>
@@ -832,8 +837,8 @@ export function internTermEditHTML(t, msg, busy) {
 }
 
 // 改或加一格。id 與屆別建了就不能改。
-export function internTaskEditHTML(t, termId, suggestedId, msg, busy) {
-  const cur = t || { id: suggestedId || "", term: termId, seq: "", category: "project", title_zh: "", title_en: "", description: "" };
+export function internTaskEditHTML(t, termId, suggestedId, msg, busy, draft) {
+  const cur = draft || t || { id: suggestedId || "", term: termId, seq: "", category: "project", title_zh: "", title_en: "", description: "" };
   const dis = busy ? " disabled" : "";
   return `<div class="card">
     <div class="row" style="margin:0 0 14px"><button class="btn quiet" data-act="intern-back">← 回實習護照</button></div>

@@ -34,6 +34,8 @@ let S = {
   // 實習護照的後台（2026-10-18）。一定要有初始值，理由同 stories。
   intern: { terms: [], tasks: [], stamped: {}, interns: 0 }, internSel: null,
   internTermEditing: null, internTaskEditing: null, internTaskTerm: null,
+  // 存檔被擋時留住剛填的東西（端對端測試 2026-10-18 抓到：沒有這個，一句錯誤訊息會配一張空表單）。
+  internTermDraft: null, internTaskDraft: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -63,12 +65,12 @@ function render() {
 
   let body;
   if (S.view === "interns") {
-    body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy);
+    body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy, isPres());
   } else if (S.view === "intern-term") {
-    body = UI.internTermEditHTML(S.internTermEditing, S.msg, S.busy);
+    body = UI.internTermEditHTML(S.internTermEditing, S.msg, S.busy, S.internTermDraft);
   } else if (S.view === "intern-task") {
     body = UI.internTaskEditHTML(S.internTaskEditing, S.internTaskTerm,
-      UI.suggestTaskId(S.internTaskTerm, S.intern.tasks), S.msg, S.busy);
+      UI.suggestTaskId(S.internTaskTerm, S.intern.tasks), S.msg, S.busy, S.internTaskDraft);
   } else if (S.view === "mail") {
     body = UI.mailListHTML(S.tpls, S.msg);
   } else if (S.view === "mail-edit") {
@@ -399,22 +401,23 @@ document.addEventListener("click", async e => {
   // 每一個動作：按下去 busy（按鈕變「存檔中…」、其他按鈕關掉）、成功一句、失敗說錯在哪。
   if (act === "intern-back") { await openInterns(); return; }
   if (act === "intern-see")  { S.internSel = id; S.msg = `現在看的是 ${id}。`; render(); return; }
-  if (act === "intern-term-new")  { S.internTermEditing = null; S.view = "intern-term"; S.msg = ""; render(); return; }
+  if (act === "intern-term-new")  { S.internTermEditing = null; S.internTermDraft = null; S.view = "intern-term"; S.msg = ""; render(); return; }
   if (act === "intern-term-edit") {
-    S.internTermEditing = S.intern.terms.find(t => t.id === id) || null;
+    S.internTermEditing = S.intern.terms.find(t => t.id === id) || null; S.internTermDraft = null;
     S.view = "intern-term"; S.msg = ""; render(); return;
   }
   if (act === "intern-term-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const t = { id: id || val("it-id"), title_zh: val("it-zh"), title_en: val("it-en"),
                 starts_on: val("it-start"), ends_on: val("it-end") };
+    S.internTermDraft = t;
     if (!t.id || !t.title_zh || !t.title_en || !t.starts_on || !t.ends_on) {
       S.msg = "五格都要填：代號、中文名稱、英文名稱、開始日、結束日。"; render(); return;
     }
     S.busy = true; S.msg = ""; render();
     try {
       const made = await D.saveInternTerm(t);
-      S.internSel = made;
+      S.internSel = made; S.internTermDraft = null;
       S.msg = id ? `「${t.title_zh}」改好了。` : `「${t.title_zh}」開好了。還不是目前這一屆，要的話按「設成目前這一屆」。`;
       await openInterns(true);
     } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
@@ -433,22 +436,23 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "intern-task-new") {
-    S.internTaskEditing = null; S.internTaskTerm = b.dataset.term; S.view = "intern-task"; S.msg = ""; render(); return;
+    S.internTaskEditing = null; S.internTaskDraft = null; S.internTaskTerm = b.dataset.term; S.view = "intern-task"; S.msg = ""; render(); return;
   }
   if (act === "intern-task-edit") {
     const t = S.intern.tasks.find(x => x.id === id);
     if (!t) { S.msg = "找不到這一格，重新整理再試一次。"; render(); return; }
-    S.internTaskEditing = t; S.internTaskTerm = t.term; S.view = "intern-task"; S.msg = ""; render(); return;
+    S.internTaskEditing = t; S.internTaskDraft = null; S.internTaskTerm = t.term; S.view = "intern-task"; S.msg = ""; render(); return;
   }
   if (act === "intern-task-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const t = { id: id || val("ik-id"), term: b.dataset.term, seq: val("ik-seq"), category: val("ik-cat"),
                 title_zh: val("ik-zh"), title_en: val("ik-en"), description: val("ik-desc") };
+    S.internTaskDraft = t;
     if (!t.id || !t.title_zh || !t.title_en) { S.msg = "代號、中文標題、英文標題都要填。"; render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       await D.saveInternTask(t);
-      S.internSel = t.term;
+      S.internSel = t.term; S.internTaskDraft = null;
       S.msg = id ? `「${t.title_zh}」改好了。intern 重新整理護照就看得到。` : `「${t.title_zh}」加好了。intern 重新整理護照就看得到。`;
       await openInterns(true);
     } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
