@@ -3246,7 +3246,7 @@ intern 可以在「設定」自己刪帳號，護照、章、心得會跟著刪�
   入口刻意不放頂欄：頂欄不准依 team 過濾（`shared/nav.js` 檔頭），放上去其他五個 team 都會看到一個點了被彈回來的東西。
   誰算 Internship team：`profiles.team` 含「Internship Team」的幹部，加上 Co-President。
 
-### 上線前要跑兩支新的遷移檔
+### 兩支遷移檔（Paul 2026-10-17 已在正式 Supabase 上跑完，連同前面那 15 支）
 
 照順序，接在 `2026-10-15-invite-admin.sql` 後面：
 
