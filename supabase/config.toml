@@ -228,7 +228,7 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-# 假設正式站是開的（2026-10-18，Paul 沒答，照 README「怎麼關閉 email 確認」那一節的反向推）。
+# 跟正式站一樣是開的（Paul 2026-10-18 確認）。
 enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false

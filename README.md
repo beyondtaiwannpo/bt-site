@@ -3329,7 +3329,7 @@ node scripts/e2e/intern.mjs
 
 本機的設定在 `supabase/config.toml`（`supabase init` 產的，只有幾處改過，每一處有註解）：
 email 確認**開著**、忘記密碼兩封信之間至少 5 秒、三份信件範本指向 `supabase/email-templates/`。
-⚠ **email 確認開著是假設**（2026-10-18 Paul 沒答），正式站如果是關的，本機要跟著改，不然測的是另一個世界。
+email 確認開著跟正式站一樣（Paul 2026-10-18 確認）。限流的數字沒有對過，用的是 Supabase 的預設。
 
 跑完想自己看：`E2E_KEEP=1 node scripts/e2e/intern.mjs`，網站在 http://127.0.0.1:8765，
 收信匣在 http://127.0.0.1:54324，Supabase 的後台在 http://127.0.0.1:54323。
