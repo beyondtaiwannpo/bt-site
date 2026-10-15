@@ -129,6 +129,9 @@ create table public.passports (
   name_zh text, name_en text, team text, motto text, avatar text,
   issued date default current_date, intro_seen boolean not null default false,
   updated_at timestamptz default now());
+-- 2026-10-19-regrant-passport-tables.sql 要發這兩張表的權限，所以要先在（縮小版）。
+create table public.stamps (user_id uuid, act_id text, stamped_on date not null, primary key (user_id, act_id));
+create table public.entries (user_id uuid, act_id text, note text, photo text, primary key (user_id, act_id));
 revoke all on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
 SQL
@@ -152,7 +155,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-10-15-invite-admin.sql \
          supabase/migrations/2026-10-16-intern-role.sql \
          supabase/migrations/2026-10-17-intern-passport.sql \
-         supabase/migrations/2026-10-18-intern-admin.sql ; do
+         supabase/migrations/2026-10-18-intern-admin.sql \
+         supabase/migrations/2026-10-19-regrant-passport-tables.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else

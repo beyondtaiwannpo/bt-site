@@ -37,9 +37,11 @@ FILES="index.html about programs team join impact partner apply resources admin 
 # check.sh 自己）。真金鑰的字首後面一定接著一長串英數字元；pattern 要求字首後
 # 緊接 8 碼以上連續英數，規劃文件用白話文提到這個字首時（例如反引號、刪節號、
 # 空格、`\|`）湊不出這個長度，所以不需要也不應該排除任何目錄。
-if grep -rIEq --exclude-dir=.git 'sb_secret_[A-Za-z0-9]{8,}' . ; then
+# --exclude-dir=.temp：supabase/.temp 是 Supabase CLI（supabase start）自己放本機金鑰的地方，
+# supabase/.gitignore 擋著不會進 repo，但它就在工作樹裡，不排除的話每次 e2e 跑完守門就紅。
+if grep -rIEq --exclude-dir=.git --exclude-dir=.temp 'sb_secret_[A-Za-z0-9]{8,}' . ; then
   bad "§11-6 repo 裡出現 sb_secret_ 金鑰"
-  grep -rInE --exclude-dir=.git 'sb_secret_[A-Za-z0-9]{8,}' .
+  grep -rInE --exclude-dir=.git --exclude-dir=.temp 'sb_secret_[A-Za-z0-9]{8,}' .
 else
   ok "§11-6 沒有 sb_secret_ 金鑰"
 fi
@@ -79,9 +81,9 @@ fi
 # 「必須不存在」型的守門誤報只會吵、不會安靜放行（README 第 10 項），方向是安全的，
 # 但常紅的守門會被當成雜訊、然後被關掉 —— 那才是真正的損失。
 # 要在文件裡示範格式，就把帳密那兩段整個省略，只留協定與主機。
-if grep -rIEq --exclude-dir=.git 'postgres(ql)?://[^:/[:space:]]+:[^@[:space:]]+@' . ; then
+if grep -rIEq --exclude-dir=.git --exclude-dir=.temp 'postgres(ql)?://[^:/[:space:]]+:[^@[:space:]]+@' . ; then
   bad "repo 裡出現資料庫連線字串（裡面帶著密碼）"
-  grep -rInE --exclude-dir=.git 'postgres(ql)?://[^:/[:space:]]+:[^@[:space:]]+@' . | sed 's/:.*/: （內容不印出來）/'
+  grep -rInE --exclude-dir=.git --exclude-dir=.temp 'postgres(ql)?://[^:/[:space:]]+:[^@[:space:]]+@' . | sed 's/:.*/: （內容不印出來）/'
 else
   ok "repo 裡沒有資料庫連線字串"
 fi

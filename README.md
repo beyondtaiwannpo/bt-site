@@ -3304,43 +3304,67 @@ Paul 2026-10-15 拍板「進度牆只有 Internship Team 幹部與 intern 看得
 node scripts/e2e/intern.mjs
 ```
 
-需要本機 Postgres、`brew install postgrest`、Google Chrome。約 40 秒，印 ok / FAIL，最後一行是總數。
-**2026-10-18 跑過，73 項全過。**
+需要 Docker（Paul 的 Mac 用 OrbStack）、Supabase CLI（`brew install supabase/tap/supabase`）、Google Chrome。
+第一次 `supabase start` 要拉約 2 GB 的 image，之後每次約一分半。印 ok / FAIL，最後一行是總數。
+**2026-10-18 跑過，99 項全過。**
 
 它跟 `scripts/db/smoke.sh` 的分工：smoke.sh 驗資料庫那一半（函式邏輯、RLS），
 這一支驗「畫面接上去之後一個人真的走得完」。兩邊都綠才算 work。
 
 ### 它怎麼做到的
 
-`scripts/e2e/db.sh` 從零重建一個本機資料庫、跑完全部 18 支遷移檔、放三個幹部；
-`scripts/e2e/server.mjs` 起一個假的 Supabase：真的 PostgREST（`brew install postgrest`）接真的 Postgres，
-所以 RLS 是真的被評估；登入那一層是一個很小的替身，簽真的 JWT 給 PostgREST 驗，
-`auth.uid()` 讀到的就是瀏覽器裡那個人。前端一行都不用改，只有 `shared/supabase-config.js` 被換成指向本機。
+打的是**真的本機 Supabase**（`supabase start` 起的那一個，API 在 54321），不是替身：
+登入、確認信、限流、錯誤的形狀都是 Supabase 自己回的。
 
-然後 `intern.mjs` 用 Chrome 照一個真人會做的順序點過去：
-Co-President 登入、後台改格子加格子停用恢復刪掉、開新的一屆（兩種錯都要被擋住而且說得出原因）、發實習生碼、
-登出、新的人註冊、打錯碼被擋、打對碼變 intern、領護照、蓋章、翻面看心得、進度牆、設定頁、
-Internship team 的幹部只看得到牆、別組的幹部被導回登入頁，最後直接查資料庫對帳。
+- `scripts/e2e/db.sh` 把本機 Supabase 的資料庫清空，照 `schema.sql` 檔頭那句話從零重建：
+  `schema.sql` → `seed.sql` → `migrations/` 按日期全部跑一遍（33 支）。**這一步本身就在驗那句話做不做得到**，見下一節。
+- `scripts/e2e/server.mjs` 把這個 repo 的檔案放在 8765，只有 `shared/supabase-config.js` 換成指向本機。前端一行不改。
+- `scripts/e2e/intern.mjs` 用 Chrome 照一個真人的順序點過去：Co-President 登入、打開幹部護照、
+  後台改格子加格子停用恢復刪掉、開新的一屆（兩種錯都要被擋住而且說得出原因）、發實習生碼、
+  登出、新的人註冊、密碼太短被擋、**去收信匣點確認信**、沒點之前登不進去、點了之後登入、
+  打錯碼被擋、打對碼變 intern、領護照、蓋章、翻面看心得、進度牆、設定頁、
+  Internship team 的幹部只看得到牆、別組的幹部被導回登入頁、重複 email、打錯密碼、
+  忘記密碼連按兩次被限流、重設信用的是 repo 裡的範本、Google 按鈕送去的網址帶對了 next，
+  最後直接查資料庫對帳。
+
+本機的設定在 `supabase/config.toml`（`supabase init` 產的，只有幾處改過，每一處有註解）：
+email 確認**開著**、忘記密碼兩封信之間至少 5 秒、三份信件範本指向 `supabase/email-templates/`。
+⚠ **email 確認開著是假設**（2026-10-18 Paul 沒答），正式站如果是關的，本機要跟著改，不然測的是另一個世界。
+
+跑完想自己看：`E2E_KEEP=1 node scripts/e2e/intern.mjs`，網站在 http://127.0.0.1:8765，
+收信匣在 http://127.0.0.1:54324，Supabase 的後台在 http://127.0.0.1:54323。
 
 ### 它驗不到什麼
 
-Supabase 自己那一層：email 確認信、Google 登入、限流、Vault、真的寄信。
-那幾件只有在正式站上走一次才驗得到。
+真的 Google 同意畫面（要真的 Google 帳號）、Resend 真的寄信。這兩件只有在正式站上走一次。
 
-### 寫這支的時候抓到的三件事（都已修）
+### 它抓到的四件事（都已修）
 
 - 新註冊的人會先被擋在「還差幾個欄位」那一頁，而那一頁原本沒有「我有邀請碼」的入口，
-  拿到邀請碼的幹部、校友、實習生得先填一間高中。現在那一頁有那顆按鈕了。
-- 後台開新的一屆或加格子，存檔被擋之後整張表單被洗掉，使用者看到一句錯誤訊息配一張空表單。
-  現在填的東西會留在畫面上。
+  拿到邀請碼的人得先填一間高中。現在那一頁有那顆按鈕了。
+- 後台開新的一屆或加格子，存檔被擋之後整張表單被洗掉。現在填的東西會留在畫面上。
 - Co-President 一進實習護照分頁，邀請碼那幾個 Co-President 才有的分頁就不見了。
+- **從零重建資料庫之後，任何人打開幹部護照都是「資料庫休眠中」。** 見下一節。
 
-每一件都是「單元測試全綠、smoke.sh 全綠」之下漏掉的。它們不是程式錯，是畫面接起來之後路不通。
+每一件都是「單元測試全綠、smoke.sh 全綠」之下漏掉的。它們不是程式錯，是東西接起來之後路不通。
 
-### 下一個功能也要有一條
+### 下一個功能也要有一段
 
-新功能做完，在 `intern.mjs` 旁邊照同一個樣子寫一支，或在它裡面加一段。
-假 Supabase 跟 Chrome 那一段可以直接抄。
+新功能做完，在 `intern.mjs` 裡加一段，或照它的樣子另寫一支。本機 Supabase 跟 Chrome 那一段可以直接抄。
+
+## 從零重建資料庫：兩個坑（2026-10-18 端對端測試抓到的）
+
+`schema.sql` 檔頭說「schema.sql → seed.sql → migrations/ 按日期全部跑一遍」。2026-10-18 第一次真的照做，兩處紅：
+
+1. **「按日期」不是「按檔名」。** 同一天兩支的時候字母序會錯：
+   `2026-08-31-profiles-and-role-驗收.sql` 排在它要驗的那一支前面，
+   `2026-09-02-availability-revoke.sql` 排在建表的那一支前面。
+   規則：同一天之內，檔名帶「驗收」或「revoke」的排到那一天的最後。`scripts/e2e/db.sh` 已經這樣排。
+2. **`2026-08-25-milestones.sql` 收走了 passports / stamps / entries 的權限沒發回去。**
+   它檔頭說「對既有的權限沒有影響」，那句話是錯的。正式站沒事是因為那之後 `schema.sql` 又被整份貼過，
+   權限被補回來；從零重建走不到那一步，結果是每個人打開護照都看到「資料庫休眠中」。
+   修法是最後多一支 `2026-10-19-regrant-passport-tables.sql` 把權限發回去。**正式站也要跑它一次**，
+   無害（grant 可以重複），跑了之後重建的順序跟正式站才一致。
 
 ## 官網首頁的照片：可以放的依據是什麼
 
