@@ -149,7 +149,9 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-09-19-stories-for-review.sql \
          supabase/migrations/2026-09-20-availability-week.sql \
          supabase/migrations/2026-10-14-invite-uses.sql \
-         supabase/migrations/2026-10-15-invite-admin.sql ; do
+         supabase/migrations/2026-10-15-invite-admin.sql \
+         supabase/migrations/2026-10-16-intern-role.sql \
+         supabase/migrations/2026-10-17-intern-passport.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -419,6 +421,93 @@ if echo "${avgot}" | grep -q "OVERALL.*PASS" && ! echo "${avgot}" | grep -q "FAI
 else
   echo "  FAIL 新增與停用那支遷移檔的驗收表沒全過："; echo "${avgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
 fi
+
+echo
+echo "實習生身分與實習護照（2026-10-16 / 10-17）："
+# ⚠ 上面兩段為了印驗收表，各重跑了一次 2026-10-14 與 2026-10-15，
+# 而那兩支會把 claim_invite() 與 create_invite() 蓋回**不認 intern** 的版本。
+# 所以這一段先把 2026-10-16 再跑一次（它本來就設計成可以重跑），
+# 不然下面「學員拿 intern 碼」會在錯的地方失敗。
+irgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-16-intern-role.sql 2>&1 || true)
+if echo "${irgot}" | grep -q "OVERALL.*PASS" && ! echo "${irgot}" | grep -q "FAIL"; then
+  echo "  ok   intern 身分那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL intern 身分那支遷移檔的驗收表沒全過："; echo "${irgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+INT1=88888888-8888-8888-8888-888888888881
+INT2=88888888-8888-8888-8888-888888888882
+ISTAFF=99999999-9999-9999-9999-999999999991
+psql -d "${DB}" -q -c "
+  insert into auth.users (id,email) values ('${INT1}','i1@example.com'), ('${INT2}','i2@example.com'), ('${ISTAFF}','istaff@example.com');
+  insert into public.profiles (id,name_zh,role) values ('${INT1}','實習一號','student'), ('${INT2}','實習二號','student');
+  insert into public.profiles (id,name_zh,team,role,board_role) values ('${ISTAFF}','帶實習的','Curriculum Team, Internship Team','cadre','member');
+" >/dev/null
+
+chkas "${PAUL}" "Co-President 發得出 intern 碼" "bt-intern-01" \
+  "select public.create_invite('bt-intern-01','intern',5,'給 2026-27 的 intern')"
+chkas "${INT1}" "★ 學員拿 intern 碼變成 intern" "upgraded_intern" "select public.claim_invite('bt-intern-01')"
+chkas "${INT2}" "第二位也是" "upgraded_intern" "select public.claim_invite(' BT-INTERN-01 ')"
+chk "★ 身分真的變了，而且幹部護照那一列沒有多出來" "intern|intern|0" \
+  "select (select role from public.profiles where id='${INT1}')||'|'||(select role from public.profiles where id='${INT2}')||'|'||(select count(*) from public.passports where id in ('${INT1}','${INT2}'))"
+chk "★ 升級時實習護照建好了，而且掛在 active 的那一屆" "2026-27|2026-27" \
+  "select string_agg(term,'|' order by id) from public.intern_passports where id in ('${INT1}','${INT2}')"
+chkas "${INT1}" "intern 再拿一次 intern 碼：不扣碼" "already_intern" "select public.claim_invite('bt-intern-01')"
+chk "次數剩 3（兩個人各一次，第三次補回去了）" "3" "select uses_left from public.invite_codes where code='bt-intern-01'"
+chk "使用紀錄兩筆，身分是 intern" "2" "select count(*) from public.invite_uses where code='bt-intern-01' and grants='intern'"
+
+chkrole authenticated "${INT1}" "intern 讀得到這一屆的格子" "9" "select count(*) from public.intern_tasks where active"
+chkrole authenticated "${INT1}" "intern 蓋得了自己的章" "1" \
+  "insert into public.intern_stamps (user_id,task_id,stamped_on) values ('${INT1}','T2627-01','2026-10-01');
+   insert into public.intern_entries (user_id,task_id,note) values ('${INT1}','T2627-01','第一次會議很緊張');
+   select count(*) from public.intern_stamps where user_id='${INT1}'"
+chkrole authenticated "${INT1}" "intern 改得了自己護照上的一句話" "一句話" \
+  "update public.intern_passports set motto='一句話' where id='${INT1}'; select motto from public.intern_passports where id='${INT1}'"
+ipgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${INT1}',false);" -c "set role authenticated; update public.intern_passports set issued='2020-01-01' where id='${INT1}';" 2>&1 || true)
+if echo "${ipgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ intern 改不動核發日（欄位層級授權，只開 motto）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ intern 居然改得動核發日：${ipgot}"; fail=$((fail+1))
+fi
+chkrole authenticated "${INT2}" "★ 另一位 intern 看得到他的章，看不到他的心得" "1|0" \
+  "select (select count(*) from public.intern_stamps where user_id='${INT1}')||'|'||(select count(*) from public.intern_entries where user_id='${INT1}')"
+chkrole authenticated "${INT2}" "另一位 intern 讀得到他的名字（進度牆）" "實習一號" \
+  "select name_zh from public.profiles where id='${INT1}'"
+# 已經核可上公開團隊頁的那位（小安）任何人都讀得到，那是 2026-09-13 的決定，不是這裡的洞。
+chkrole authenticated "${INT2}" "★ intern 讀不到幹部的名字（公開團隊頁上的除外）" "0" \
+  "select count(*) from public.profiles where role='cadre' and not (public_profile and public_approved)"
+# 寫進別人的列不是「安靜地沒寫進去」，是資料庫直接丟錯 —— 那是對的，所以這裡抓的是錯誤訊息。
+isgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${INT2}',false);" -c "set role authenticated; insert into public.intern_stamps (user_id,task_id,stamped_on) values ('${INT1}','T2627-02','2026-10-02');" 2>&1 || true)
+if echo "${isgot}" | grep -qi "row-level security"; then
+  echo "  ok   ★ intern 寫不進別人的章"; pass=$((pass+1))
+else
+  echo "  FAIL ★ intern 居然寫得進別人的章：${isgot}"; fail=$((fail+1))
+fi
+chkrole authenticated "${ISTAFF}" "★ Internship team 的幹部看得到 intern 的章與名字，看不到心得" "1|實習一號|0" \
+  "select (select count(*) from public.intern_stamps)||'|'||(select name_zh from public.profiles where id='${INT1}')||'|'||(select count(*) from public.intern_entries)"
+isgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${ISTAFF}',false);" -c "set role authenticated; insert into public.intern_stamps (user_id,task_id,stamped_on) values ('${ISTAFF}','T2627-02','2026-10-02');" 2>&1 || true)
+if echo "${isgot}" | grep -qi "row-level security"; then
+  echo "  ok   Internship team 的幹部蓋不了章（intern 自己蓋，Paul 2026-10-15）"; pass=$((pass+1))
+else
+  echo "  FAIL Internship team 的幹部居然蓋得了章：${isgot}"; fail=$((fail+1))
+fi
+chkrole authenticated "${PAUL}" "Co-President 也看得到進度牆" "1" "select count(*) from public.intern_stamps"
+chkrole authenticated "${OTHER}" "★ 別的 team 的幹部一列都看不到（格子、章、intern 的名字）" "0|0|0" \
+  "select (select count(*) from public.intern_tasks)||'|'||(select count(*) from public.intern_stamps)||'|'||(select count(*) from public.profiles where role='intern')"
+chkrole authenticated "${INT1}" "★ intern 讀不到幹部護照那邊的邀請碼或申請" "0" \
+  "select count(*) from public.applications"
+chkas "${INT1}" "intern 拿幹部碼會變幹部（正常升級）" "upgraded" "select public.claim_invite('BT-CADRE')"
+chk "變幹部之後有幹部護照了" "1" "select count(*) from public.passports where id='${INT1}'"
+chkrole authenticated "${INT1}" "★ 變幹部之後讀不到實習護照（一個人同一時間只有一種身分）" "0" \
+  "select count(*) from public.intern_passports where id='${INT1}'"
+ipgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-17-intern-passport.sql 2>&1 || true)
+if echo "${ipgot}" | grep -q "OVERALL.*PASS" && ! echo "${ipgot}" | grep -q "FAIL"; then
+  echo "  ok   實習護照那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL 實習護照那支遷移檔的驗收表沒全過："; echo "${ipgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+chk "刪帳號時實習護照、章、心得跟著消失" "0|0|0" \
+  "delete from auth.users where id='${INT2}';
+   select (select count(*) from public.intern_passports where id='${INT2}')||'|'||(select count(*) from public.intern_stamps where user_id='${INT2}')||'|'||(select count(*) from public.intern_entries where user_id='${INT2}')"
 
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi

@@ -3189,6 +3189,91 @@ PASS / FAIL 表，全部 PASS 才算跑完。**跑完之後兩張表都是空的
 本機已經用 `./scripts/db/smoke.sh` 跑過（2026-10-14，71 項全過），
 其中一項是故意拿掉「只有 Co-President」那道門，確認測試會變紅。
 
+## 實習生護照 `/intern-passport/`（2026-10-17）
+
+Paul 2026-10-15 拍板：Internship team 每年對外招一批 intern，他們不是 BT 幹部，
+要有自己的一本護照。盤點與三個方案的比較在 `docs/2026-10-15-實習生護照盤點與設計.md`，
+選的是方案 C：**另開一個資料夾、另開一組資料表，幹部護照一行都沒動。**
+
+### 它長什麼樣
+
+跟幹部護照同一套外殼：一本書、格子、蓋章、翻面看心得、進度牆。差別在：
+
+- 格子不綁月份。**一個分類一頁**（入門、任務、反思），每頁的格子數量不限，
+  Internship team 要幾格就建幾格。
+- 一年一本。每一屆（`intern_terms`）一批格子，舊的一屆結束後資料留著，但不再能蓋。
+- 沒有入境章、沒有機讀碼、沒有匯出匯入、沒有清除護照。第一版刻意簡單，
+  抄得少，幹部護照以後改了要跟的就少。
+- intern 自己蓋章，沒有人核可。
+
+### 誰看得到什麼
+
+| 誰 | 看得到 |
+|---|---|
+| intern 自己 | 自己的整本護照；其他 intern 的名字、大頭照、蓋了哪幾格 |
+| Internship team 的幹部、Co-President | 每個 intern 的名字、大頭照、蓋了哪幾格（進度牆）。**看不到心得與照片** |
+| 其他幹部、學員、校友 | 一列都讀不到 |
+
+心得與照片只有本人，跟幹部護照同一條線，理由也一樣：願意誠實寫的前提是沒有別人看得到。
+這些都是資料庫的 RLS 擋的，不是畫面上藏按鈕（`supabase/migrations/2026-10-17-intern-passport.sql`）。
+
+intern 也**讀不到幹部護照的任何東西**：那五張表的政策只認 `is_cadre()`，一個字都沒改。
+反過來 intern 的頂欄只有「實習護照」與「設定」，時間看板與申請管理對他關著。
+
+### intern 怎麼進來
+
+1. Co-President 在 `/admin/` 的「邀請碼」分頁發一組**實習生碼**（身分選單多了這一項）。
+2. intern 自己註冊（跟學員一樣，什麼都不用給），登入後點「我是幹部、校友或實習生，我有邀請碼」輸入那組碼。
+3. 身分變成 `intern`，系統建一本實習護照、掛在 `active` 的那一屆，登入後直接進 `/intern-passport/`。
+4. 第一次進去填中英文名與一句話，就能蓋章。大頭照在「設定」換。
+
+intern 拿幹部碼會變成幹部（正常升級），但從此讀不到自己的實習護照：
+**一個人同一時間只有一種身分**，畫面才不會兩本護照打架。資料沒刪，要看得先改回 intern。
+intern 可以在「設定」自己刪帳號，護照、章、心得會跟著刪掉。
+
+### Internship team 怎麼改格子、開新的一屆
+
+不用改程式，去 Supabase 的 Table Editor：
+
+- **改格子文案**：`intern_tasks` 表，改 `title_zh`、`title_en`（會印在章上，全大寫、不要太長）、`description`。
+  **不要改 `id`**，章是靠它對到格子的。`category` 只能是 `onboard` / `project` / `reflect`。
+  已經有人蓋過的格子請把 `active` 改成 false，不要刪。
+- **加格子**：`intern_tasks` 加一列，`term` 填這一屆的 id、`seq` 填順序。
+- **開新的一屆**：`intern_terms` 加一列（id 例如 `2027-28`），`active` 勾起來、舊的那一列 `active` 拿掉。
+  只能有一列 active，資料庫擋著。然後為新的一屆建格子。
+  舊的一屆的格子、章、護照都留著，不要刪。
+- **Internship team 的幹部要看進度牆**：登入後到「設定」，護照那一段多一顆「實習生進度牆」。
+  入口刻意不放頂欄：頂欄不准依 team 過濾（`shared/nav.js` 檔頭），放上去其他五個 team 都會看到一個點了被彈回來的東西。
+  誰算 Internship team：`profiles.team` 含「Internship Team」的幹部，加上 Co-President。
+
+### 上線前要跑兩支新的遷移檔
+
+照順序，接在 `2026-10-15-invite-admin.sql` 後面：
+
+1. `supabase/migrations/2026-10-16-intern-role.sql`：身分多一種 `intern`，邀請碼認得它，`claim_invite()` 與 `create_invite()` 跟著改。
+2. `supabase/migrations/2026-10-17-intern-passport.sql`：五張 `intern_*` 表、RLS、`profiles` 多一條只開 intern 列的讀取政策、第一屆 `2026-27` 與九格暫定文案。
+
+兩支都有 PASS / FAIL 表，全 PASS 才算跑完。跑之前：後台的身分選單選「實習生碼」會被擋（`bad_grants`），
+intern 進 `/intern-passport/` 會看到「護照還沒準備好」，不會壞掉也不會空白。
+
+本機 `./scripts/db/smoke.sh` 跑過（2026-10-17，117 項全過），其中 intern 那一段 30 項：
+升級、不扣碼、幹部護照那一列沒多出來、intern 看不到彼此的心得、Internship team 看得到章看不到心得、
+別的 team 一列都看不到、intern 寫不進別人的章、刪帳號連帶刪乾淨。
+做過一次破壞測試：把心得的政策放寬給 Internship team，三條會變紅。
+
+⚠ 第二支會在 `profiles` 上**加一條** RLS（`profiles_read_interns`），這是 GOALS.md 說要先問 Paul 的那種改動。
+Paul 2026-10-15 拍板「進度牆只有 Internship Team 幹部與 intern 看得到」就是在批准這一條；
+它只開 `role = 'intern'` 的列，幹部那幾列對 intern 仍然關著，既有的 `profiles_read` 一個字沒動。
+
+### 程式在哪、守門守什麼
+
+- `intern-passport/index.html` 加 `src/` 三支，是 `passport/` 的刪減版。**兩邊刻意不互相 import**，`test/intern-ui.test.mjs` 守著。
+- 同一支測試也守：前端三個分類跟資料庫的 check 一字不差、資料層只碰 `intern_*` 五張表與 `profiles`、
+  intern 的頂欄只有兩項、幹部的頂欄沒有實習護照。
+- `check.sh`、`check-motion.mjs`、`scripts/check-icons.mjs`、`scripts/check-mobile.mjs` 都加了這一頁。
+  手機版面抓到過一次：格子的英文標題由 Internship team 自己填、沒有長度上限，章歪 5 度之後會頂出格子，
+  所以這本的章最寬只到格子減 12px、標題太長在字中間斷行。
+
 ## 官網首頁的照片：可以放的依據是什麼
 
 首頁上那幾張照片**不是「已經確認過所以都可以放」**，它們有一個具體的依據，

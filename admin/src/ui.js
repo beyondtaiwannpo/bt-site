@@ -488,7 +488,8 @@ export function alumniStoriesHTML(rows, msg, busy) {
 //
 // role 是那個人**現在**的身分，grants 是**那一次**換到的身分。兩個不一樣
 // 就多寫一句「現在是…」，例如校友後來又拿了幹部碼。
-const ROLE_ZH = { cadre: "幹部", alumni: "校友", student: "學員" };
+const ROLE_ZH = { cadre: "幹部", alumni: "校友", student: "學員", intern: "實習生" };
+const GRANT_TAG = { cadre: "幹部碼", alumni: "校友碼", intern: "實習生碼" };
 
 // 系統先幫忙想一組碼：bt- 加六個字。**刻意不用 0 o 1 l i**，
 // 那幾個字在很多字型裡長得一樣，而學生打錯時畫面只會說「這個邀請碼不對」。
@@ -510,8 +511,9 @@ export function inviteFormHTML(draft, busy) {
       <label><i>碼（英文字母、數字、連字號）</i><input id="ic-code" value="${esc(d.code || "")}"
         autocomplete="off" spellcheck="false"${dis}></label>
       <label><i>給什麼身分</i><select id="ic-grants"${dis}>
-        <option value="cadre"${d.grants !== "alumni" ? " selected" : ""}>幹部碼（會拿到護照）</option>
+        <option value="cadre"${d.grants !== "alumni" && d.grants !== "intern" ? " selected" : ""}>幹部碼（會拿到幹部護照）</option>
         <option value="alumni"${d.grants === "alumni" ? " selected" : ""}>校友碼（沒有護照）</option>
+        <option value="intern"${d.grants === "intern" ? " selected" : ""}>實習生碼（會拿到實習護照）</option>
       </select></label>
       <label><i>可以用幾次（一個人一組就填 1）</i><input id="ic-uses" type="number" min="1" max="100"
         value="${esc(String(d.uses || 1))}"${dis}></label>
@@ -531,7 +533,7 @@ export function inviteCodesHTML(rows, msg, busy, draft) {
     const left = Number(c.uses_left) || 0;
     return `<li>
       <div class="fhead"><b>${esc(c.code)}</b>
-        <span class="tag">${c.grants === "alumni" ? "校友碼" : "幹部碼"}</span>
+        <span class="tag">${esc(GRANT_TAG[c.grants] || c.grants || "")}</span>
         ${left > 0 ? `<span class="tag open">還剩 ${left} 次</span>`
                    : `<span class="tag draft">用完了</span>`}</div>
       ${c.note ? `<div class="fmeta">備註：${esc(c.note)}</div>` : ""}

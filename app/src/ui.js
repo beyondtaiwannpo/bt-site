@@ -155,12 +155,12 @@ export function authHTML(mode, msg, email, busy) {
 export function notCadreHTML(msg) {
   return `<div class="card">
     <h2>你還不是 BT 幹部</h2>
-    <div class="sub">護照目前只開放給幹部。你已經登入了，但還沒有升級。</div>
+    <div class="sub">護照只開放給幹部與實習生。你已經登入了，但還沒有升級。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     <label><i>邀請碼 / Invite code</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長或 BT 拿"></label>
     <div class="note" style="margin:0 0 14px">升級之後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
     <div class="stack">
-      <button class="btn" data-act="do-claim">我是幹部或校友，我有邀請碼</button>
+      <button class="btn" data-act="do-claim">我是幹部、校友或實習生，我有邀請碼</button>
     </div>
     <!-- 2026-09-08（批 2）：這一頁不再是學員的預設畫面，是他從自己的帳號頁
          點「我是幹部或校友，我有邀請碼」才會進來的。所以要有一條回得去的路 ——

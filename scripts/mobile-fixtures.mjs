@@ -50,6 +50,23 @@ make("passport", "passport",
      profile:{ id:"3f2a9c10-0000-4000-8000-000000000001", name_zh:"王平", name_en:"Paul Wang",
                team:"Sponsorship Team", issued:"2026-08-22", motto:"President 2026-27", avatar:"" } };`);
 
+// 實習護照（2026-10-17）。格子用最長的中英文標題，三個分類都有，蓋了兩格。
+make("intern-passport", "intern-passport",
+  `UI.barHTML(S) + UI.bookHTML(S)`,
+  `import * as UI from "./src/ui.js";
+   const tasks = [
+     {id:"T2627-01",category:"onboard",seq:1,title_zh:"認識 BT 與去年的成果",title_en:"MEET BT AND LAST YEAR",description:"看完 BT 的介紹與去年的成果，寫下一句你最有感覺的事"},
+     {id:"T2627-02",category:"onboard",seq:2,title_zh:"第一次會議",title_en:"FIRST MEETING",description:"參加第一次 Internship team 的會議"},
+     {id:"T2627-03",category:"onboard",seq:3,title_zh:"認識帶你的人",title_en:"YOUR MENTOR",description:"跟帶你的幹部聊過一次"},
+     {id:"T2627-04",category:"project",seq:4,title_zh:"第一個任務",title_en:"FIRST TASK",description:"交出你的第一個任務"},
+     {id:"T2627-07",category:"reflect",seq:7,title_zh:"我為什麼來",title_en:"WHY I CAME",description:"三句話"}];
+   const S = { page:2, view:"passport", tasks, stamps:{"T2627-01":{date:"2026-10-12"},"T2627-02":{date:"2026-10-20"}},
+     entries:{"T2627-01":{note:"第一次開會很緊張但大家都很友善",photo:null}},
+     justStamped:null, tearing:null, flipped:{}, justFlipped:null, staff:false, role:"intern", user:{id:"u1"},
+     term:{id:"2026-27",title_zh:"2026-27 實習",title_en:"INTERNSHIP 2026-27"},
+     profile:{ id:"3f2a9c10-0000-4000-8000-000000000002", name_zh:"實習一號", name_en:"Intern Number One",
+               issued:"2026-10-01", motto:"這一期想帶走一件事", avatar:"", term:"2026-27" } };`);
+
 make("admin", "admin",
   `UI.tabsHTML("team", true) + UI.publicTeamHTML([
      { id:"1", name_zh:"王小明", name_en:"Ming Wang", team:"Curriculum Team", public_title:"Director",

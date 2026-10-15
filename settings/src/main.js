@@ -105,7 +105,7 @@ async function boot() {
     // 故事表一出問題，整個設定頁會變成「資料庫休眠中」，那是行為的倒退。
     const [meRes, storyRes] = await Promise.all([
       supabase.from("profiles")
-        .select("role, name_zh, name_en, team, avatar, school, grade, newsletter_opt_in, " +
+        .select("role, board_role, name_zh, name_en, team, avatar, school, grade, newsletter_opt_in, " +
                 "public_profile, public_approved, public_title")
         .eq("id", S.user.id).maybeSingle(),
       Promise.resolve(storyQ).catch(err => ({ data: null, error: err })),
@@ -262,6 +262,9 @@ document.addEventListener("click", async e => {
     // 於是校友的故事一個字都存不進去。ui.js 已經是三分法，這裡要跟上。
     const cadre = S.me.role === "cadre";
     const alumni = S.me.role === "alumni";
+    // 2026-10-17：實習生的「我的資料」跟校友一樣只有中英文名兩格，存檔走校友那一句；
+    // 但他沒有「我的故事」，下面那一段不走。
+    const intern = S.me.role === "intern";
     // **只送這一頁真的有那一格的欄位。** 多送一個沒有權限的欄位，
     // 整句 update 都會被拒（2026-09-01 profiles.team 那個坑）。
     //
@@ -278,7 +281,7 @@ document.addEventListener("click", async e => {
         public_profile: !!(document.getElementById("pub") || {}).checked,
         public_title: document.getElementById("ptitle") ? (val("ptitle") || null) : S.me.public_title,
       };
-    } else if (alumni) {
+    } else if (alumni || intern) {
       // 校友的「我的資料」只有中文姓名與英文姓名兩格（ui.js 同一份改動）。
       // 不問學校、年級——那是問高中生的，校友的故事已經在下面另一張表裡。
       patch = {
@@ -303,7 +306,7 @@ document.addEventListener("click", async e => {
             name_zh: patch.name_zh, name_en: patch.name_en, team: patch.team,
             public_profile: patch.public_profile, public_title: patch.public_title,
           }).eq("id", S.user.id)
-        : alumni
+        : (alumni || intern)
         ? await supabase.from("profiles").update({
             name_zh: patch.name_zh, name_en: patch.name_en,
           }).eq("id", S.user.id)
@@ -315,7 +318,7 @@ document.addEventListener("click", async e => {
       profileSaved = true;
       S.me = { ...S.me, ...patch };
 
-      // 「我的故事」。**另一張表，所以是第二個 API 呼叫。**學員沒有這一區。
+      // 「我的故事」。**另一張表，所以是第二個 API 呼叫。**學員與實習生沒有這一區。
       if (cadre || alumni) {
         const fields = {
           display_name: val("sname") || null,

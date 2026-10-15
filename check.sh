@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team join impact partner apply resources admin settings alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json"
+FILES="index.html about programs team join impact partner apply resources admin settings alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -118,7 +118,7 @@ BRAND_HEX="#EDE5D8 #FFE8C5 #FFC46C #C6C6C6 #102A86 #6BC6BB #FFF789"
 hexfilter=$(printf '%s\n' $BRAND_HEX | tr 'a-f' 'A-F' | sed 's/^/^/;s/$/$/' | paste -sd'|' -)
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html about programs team join alumni privacy reset shared passport/src passport/activities.json 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html about programs team join alumni privacy reset shared passport/src passport/activities.json intern-passport 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -vE "$hexfilter")
@@ -173,7 +173,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json intern-passport/index.html intern-passport/src/*.js 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then
@@ -275,7 +275,7 @@ fi
 # 這一層是舊版完全沒有的。它同時做掉兩件事：
 #   「最多幾種字體」變成「只有一個地方能決定用哪幾種」——比數數字可靠，
 #   而且下一個人想換字體時，找得到唯一該改的檔案。
-famraw=$(grep -rhIoE 'font-family:[^;}]*' index.html privacy reset app availability passport/index.html passport/src 2>/dev/null | sort -u)
+famraw=$(grep -rhIoE 'font-family:[^;}]*' index.html privacy reset app availability passport/index.html passport/src intern-passport 2>/dev/null | sort -u)
 famhard=$(printf '%s\n' "$famraw" | grep -v '^$' | grep -vE '^font-family:var\(--(display|body|han|hand)\)$')
 if [ -n "$famhard" ]; then
   bad "§11-15 有地方寫死了字體家族（只准 var(--display|--body|--han|--hand)）："
@@ -456,10 +456,10 @@ done
 mp_n=$(grep -l 'rel="modulepreload"' */index.html 2>/dev/null | wc -l | tr -d ' ')
 if [ -n "$mp_bad" ]; then
   bad "modulepreload 指到不存在的檔案（那一行等於白寫，而畫面不會有任何異狀）：${mp_bad}"
-elif [ "$mp_n" -lt "5" ]; then
-  bad "有登入後的頁面沒有 modulepreload（只有 ${mp_n} 頁有，應該是 5 頁）"
+elif [ "$mp_n" -lt "6" ]; then
+  bad "有登入後的頁面沒有 modulepreload（只有 ${mp_n} 頁有，應該是 6 頁）"
 else
-  ok "五個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
+  ok "六個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
 fi
 
 # 會動的東西只准出現在 motion() 裡面
@@ -1579,7 +1579,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team join impact partner apply resources admin settings alumni privacy reset app availability passport/index.html passport/src passport/activities.json"
+placeholder_scope="index.html about programs team join impact partner apply resources admin settings alumni privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}

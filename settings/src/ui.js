@@ -106,7 +106,10 @@ export function storyStatus(story) {
 export function settingsHTML(me, msg, busy, story) {
   const cadre = me.role === "cadre";
   const alumni = me.role === "alumni";
-  const teller = cadre || alumni;                // 誰有「我的故事」與大頭照
+  // 2026-10-17：第四種人，實習生。名字兩格、大頭照（進度牆要用）、沒有故事、可以刪帳號。
+  const intern = me.role === "intern";
+  const teller = cadre || alumni;                // 誰有「我的故事」
+  const named = teller || intern;                // 誰的「我的資料」是中英文名兩格
   const v = k => esc(me[k] || "");
   return `<div class="card">
     <h2>設定</h2>
@@ -114,7 +117,7 @@ export function settingsHTML(me, msg, busy, story) {
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
 
     <h3 class="sec-h">我的資料</h3>
-    ${teller ? `<div class="two">
+    ${named ? `<div class="two">
       <label><i>中文姓名</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
       <label><i>英文姓名</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
     </div>
@@ -135,7 +138,7 @@ export function settingsHTML(me, msg, busy, story) {
       <span>我願意收 BT 的活動通知與資源更新。每一封都有取消訂閱的連結。</span>
     </label>`}
 
-    ${teller ? avatarHTML(me, cadre) : ""}
+    ${named ? avatarHTML(me, cadre, intern) : ""}
     ${teller ? storyHTML(me, story) : ""}
 
     <!-- 2026-09-10：儲存列。Paul 的原話：「下面的存起來現在看起來不像整頁的儲存按鈕，
@@ -149,7 +152,13 @@ export function settingsHTML(me, msg, busy, story) {
 
     ${cadre ? `<h3 class="sec-h">護照</h3>
     <p class="sec-note">個人標語、蓋章紀錄、心得與照片都在護照裡面。</p>
-    <div class="row"><a class="btn ghost sm" href="../passport/">去護照</a></div>` : ""}
+    <div class="row"><a class="btn ghost sm" href="../passport/">去護照</a>${
+      // Internship team 的幹部與 Co-President 多一顆：實習生的進度牆。
+      // 入口放這裡不放頂欄，因為頂欄不准依 team 過濾（shared/nav.js 檔頭）。
+      internshipStaff(me) ? `<a class="btn ghost sm" href="../intern-passport/">實習生進度牆</a>` : ""}</div>` : ""}
+    ${intern ? `<h3 class="sec-h">實習護照</h3>
+    <p class="sec-note">這一期的任務、章、心得與照片都在實習護照裡面。</p>
+    <div class="row"><a class="btn ghost sm" href="../intern-passport/">去實習護照</a></div>` : ""}
 
     <div class="danger">
       ${cadre
@@ -169,8 +178,26 @@ export function settingsHTML(me, msg, busy, story) {
 //
 // 但**說明要跟著分岔**：校友不在幹部的進度牆上，也不在公開團隊頁上，
 // 他的照片只會跟著那段故事出現在 /alumni/ 上。同一句話對兩種人不能都成立。
-function avatarHTML(me, cadre) {
+// 誰看得到實習生進度牆：Internship team 的幹部與 Co-President（跟資料庫的 is_internship_team() 同一條規則）。
+export function internshipStaff(me) {
+  return me.role === "cadre" &&
+    (me.board_role === "president" || parseTeams(me.team).includes("Internship Team"));
+}
+
+function avatarHTML(me, cadre, intern) {
   const on = !!me.public_profile;
+  if (intern) {
+    return `<h3 class="sec-h">大頭照</h3>
+    <div class="avrow">
+      <button class="avbtn" data-act="avatar" title="換一張大頭照">${
+        me.avatar ? `<img src="${esc(me.avatar)}" alt="">`
+                  : `<span>點這裡<br>上傳</span>`}</button>
+      <div class="avside">
+        這張照片會出現在<b>實習生進度牆</b>上，Internship team 的幹部與同一期的 intern 看得到。<br>
+        不會出現在任何對外的頁面上。不上傳也沒有關係。
+      </div>
+    </div>`;
+  }
   if (!cadre) {
     return `<h3 class="sec-h">大頭照</h3>
     <div class="avrow">

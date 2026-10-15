@@ -46,6 +46,13 @@ function render() {
     location.replace("../settings/");
     return;
   }
+  // 2026-10-17：實習生直接進實習護照。他在這個站上唯一的事就是那本護照，
+  // 設定頁從護照的頂欄進得去。不走學員那條補學校年級的路：那是問高中生的。
+  if (S.role === "intern") {
+    el.innerHTML = `<div class="empty">帶你進去…</div>`;
+    location.replace("../intern-passport/");
+    return;
+  }
 
   // 學員（批 2）。**資料沒填齊就先擋在補完那一頁**，
   // 因為學校與年級是這個帳號唯一有用的東西，缺了等於這個人不存在。
@@ -150,7 +157,7 @@ async function boot() {
 
     // 學員的申請與現在開放的表單。**幹部不必查**，那一頁用不到，
     // 而且多兩個查詢會讓每一次登入都慢一點。
-    if (S.role !== "cadre") await loadStudentBits();
+    if (S.role !== "cadre" && S.role !== "intern") await loadStudentBits();
 
     // 是幹部而且他本來就是要去某個地方 → 直接送過去，不要讓他多按一次。
     // takeNext 會同時看網址與存起來的鑰匙，而且拿完就丟掉。
