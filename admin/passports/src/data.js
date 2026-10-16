@@ -78,6 +78,67 @@ export async function deleteInternTask(id) {
   if (error) throw error;
 }
 
+// ── 幹部護照的後台（2026-10-20，批 2）────────────────────────────────────
+// 讀走 RLS（幹部讀得到 months、activities、destinations 與所有人的 stamps），
+// 寫全部走函式，門在函式第一句 require_president()。表本身對前端只有 select。
+//
+// ⚠ 只讀 stamps 的 act_id，不讀 user_id，**完全不讀 entries**：後台只要知道
+// 「這一格有沒有人蓋過」（刪不刪得掉）與數字，不要知道是誰，更不要知道心得。
+// entries 的 RLS 本來就只給本人，這裡連查都不查，是為了讓「不碰隱私界線」在程式碼裡看得出來。
+export async function loadPassportAdmin() {
+  need();
+  const [mo, ac, de, st] = await Promise.all([
+    supabase.from("months").select("seq, month, theme_zh, theme_en").order("seq"),
+    supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active")
+      .order("seq").order("id"),
+    supabase.from("destinations").select("code, city, active").order("code"),
+    supabase.from("stamps").select("act_id"),
+  ]);
+  for (const r of [mo, ac, de, st]) if (r.error) throw r.error;
+  const stamped = {};
+  for (const r of st.data || []) stamped[r.act_id] = (stamped[r.act_id] || 0) + 1;
+  return { months: mo.data || [], activities: ac.data || [], destinations: de.data || [], stamped };
+}
+
+// a = { id（null 是新增）, month, category, title_zh, title_en, description, needs_host, callback_to }
+export async function saveActivity(a) {
+  need();
+  const { data, error } = await supabase.rpc("save_activity", {
+    p_id: a.id || null, p_month: Number(a.month), p_category: a.category,
+    p_title_zh: a.title_zh, p_title_en: a.title_en, p_description: a.description || null,
+    p_needs_host: !!a.needs_host, p_callback_to: a.callback_to || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function setActivityActive(id, active) {
+  need();
+  const { error } = await supabase.rpc("set_activity_active", { p_id: id, p_active: !!active });
+  if (error) throw error;
+}
+
+export async function deleteActivity(id) {
+  need();
+  const { error } = await supabase.rpc("delete_activity", { p_id: id });
+  if (error) throw error;
+}
+
+export async function saveMonthTheme(seq, themeZh, themeEn) {
+  need();
+  const { error } = await supabase.rpc("save_month_theme",
+    { p_seq: Number(seq), p_theme_zh: themeZh || "", p_theme_en: themeEn || "" });
+  if (error) throw error;
+}
+
+export async function saveDestination(code, city, active) {
+  need();
+  const { data, error } = await supabase.rpc("save_destination",
+    { p_code: code, p_city: city, p_active: !!active });
+  if (error) throw error;
+  return data;
+}
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
@@ -118,6 +179,22 @@ const SAYS = [
   ["no_such_task", "找不到這一格，重新整理再試一次。"],
   ["term_locked", "已經建好的格子不能換屆。要搬到別屆就另外建一格，這一格停用。"],
   ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。"],
+  // 幹部護照的後台（2026-10-20）。**排在下面那條泛用的「Could not find the function」前面**，
+  // 不然會被它吃掉、指到錯的遷移檔。
+  ["bad_month", "月份要是護照上那 11 個月之一（9 月到隔年 7 月）。"],
+  ["month_full", "這個月的格子已經排到 Z 了，不能再加。"],
+  ["no_such_activity", "找不到這一格，重新整理再試一次。"],
+  ["month_locked", "已經建好的格子不能換月份：章是照月份算入境章的。要搬到別的月份就另外建一格，這一格停用。"],
+  ["bad_callback", "回望要指向另一個存在的格子編號，例如 09B，不能指向自己。"],
+  ["has_callback", "有別的格子回望這一格，不能刪。先把那一格的回望拿掉。"],
+  ["no_such_month", "找不到這個月份，重新整理再試一次。"],
+  ["bad_code", "城市代碼只能用 2 到 8 個英文字母或數字，例如 TPE。"],
+  ["empty_city", "城市名字要填。"],
+  ["public.save_activity", "幹部護照後台的函式還不在資料庫裡，要先跑 2026-10-20-passport-admin.sql。"],
+  ["public.set_activity_active", "幹部護照後台的函式還不在資料庫裡，要先跑 2026-10-20-passport-admin.sql。"],
+  ["public.delete_activity", "幹部護照後台的函式還不在資料庫裡，要先跑 2026-10-20-passport-admin.sql。"],
+  ["public.save_month_theme", "幹部護照後台的函式還不在資料庫裡，要先跑 2026-10-20-passport-admin.sql。"],
+  ["public.save_destination", "幹部護照後台的函式還不在資料庫裡，要先跑 2026-10-20-passport-admin.sql。"],
   ["Could not find the function", "後台的函式還不在資料庫裡，要先跑 2026-10-18-intern-admin.sql。"],
 ];
 export function says(err) {

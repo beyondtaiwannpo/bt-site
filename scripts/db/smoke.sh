@@ -132,6 +132,25 @@ create table public.passports (
 -- 2026-10-19-regrant-passport-tables.sql 要發這兩張表的權限，所以要先在（縮小版）。
 create table public.stamps (user_id uuid, act_id text, stamped_on date not null, primary key (user_id, act_id));
 create table public.entries (user_id uuid, act_id text, note text, photo text, primary key (user_id, act_id));
+-- 2026-10-20-passport-admin.sql 要改這三張表，所以要先在（照 supabase/schema.sql 的樣子縮小版，
+-- 連 seed 的 11 個月與 3 格一起放，後台那段要拿它們當對象）。
+create table public.months (seq int primary key, month int not null, theme_zh text not null, theme_en text not null);
+create table public.activities (
+  id text primary key, month int not null, seq int not null,
+  category text not null check (category in ('gather','prompt','frame')),
+  title_zh text not null, title_en text not null, description text,
+  needs_host boolean default false, callback_to text references public.activities, active boolean default true);
+create table public.destinations (code text primary key, city text not null, active boolean default true);
+create table public.visas (user_id uuid, month int, code text not null references public.destinations(code), primary key (user_id, month));
+insert into public.months values (1,9,'07:00',''),(2,10,'08:00',''),(3,11,'08:40',''),(4,12,'10:00',''),(5,1,'12:30',''),
+  (6,2,'14:00',''),(7,3,'16:00',''),(8,4,'18:00',''),(9,5,'19:30',''),(10,6,'21:00',''),(11,7,'23:50','');
+insert into public.activities (id,month,seq,category,title_zh,title_en,description,needs_host) values
+  ('09A',9,1,'gather','開學電影夜','OPENING NIGHT','新學年第一次全員上線',true),
+  ('09B',9,1,'prompt','我是怎麼進來的','HOW I GOT HERE','三句話',false),
+  ('09C',9,1,'frame','開學第一天','DAY ONE','你的桌子',false);
+insert into public.destinations (code,city) values ('TPE','TAIPEI'),('LAX','LOS ANGELES');
+revoke all on public.months, public.activities, public.destinations, public.visas from anon, authenticated;
+grant select on public.months, public.activities, public.destinations to authenticated;
 revoke all on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
 SQL
@@ -156,7 +175,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-10-16-intern-role.sql \
          supabase/migrations/2026-10-17-intern-passport.sql \
          supabase/migrations/2026-10-18-intern-admin.sql \
-         supabase/migrations/2026-10-19-regrant-passport-tables.sql ; do
+         supabase/migrations/2026-10-19-regrant-passport-tables.sql \
+         supabase/migrations/2026-10-20-passport-admin.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -578,6 +598,81 @@ if echo "${iagot}" | grep -q "OVERALL.*PASS" && ! echo "${iagot}" | grep -q "FAI
   echo "  ok   後台那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
 else
   echo "  FAIL 後台那支遷移檔的驗收表沒全過："; echo "${iagot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+
+echo
+echo "幹部護照的後台（2026-10-20）："
+# PAUL 是 Co-President，OTHER 與 MEMBER 不是。預先放了 9 月三格與兩個城市。
+chkas "${PAUL}" "Co-President 加一格：編號由系統算（09 月第四格是 09D）" "09D" \
+  "select public.save_activity(null,9,'prompt','新的一題','NEW PROMPT','  寫三句  ',false,null)"
+chk "seq 跟著月份表走（9 月是 1），說明前後空白去掉了" "1|寫三句|true" \
+  "select seq||'|'||description||'|'||active from public.activities where id='09D'"
+chkas "${PAUL}" "改同一格的標題（編號不變）" "09D" \
+  "select public.save_activity('09D',9,'prompt','改過的一題','NEW PROMPT','寫三句',false,'09B')"
+chk "改到了，回望指到 09B" "改過的一題|09B" "select title_zh||'|'||callback_to from public.activities where id='09D'"
+chkraise "★ 既有的格子換不了月份" "month_locked" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_activity('09D',10,'prompt','x','X',null,false,null);"
+chkraise "回望指向不存在的格子會被擋" "bad_callback" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_activity('09D',9,'prompt','x','X',null,false,'13Z');"
+chkraise "回望指向自己會被擋" "bad_callback" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_activity('09D',9,'prompt','x','X',null,false,'09D');"
+chkraise "月份不在 11 個月裡會被擋" "bad_month" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_activity(null,8,'prompt','x','X',null,false,null);"
+chkraise "分類亂填會被擋" "bad_category" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_activity(null,9,'party','x','X',null,false,null);"
+chkraise "標題留白會被擋" "empty_title" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_activity(null,9,'frame','  ','X',null,false,null);"
+chkas "${PAUL}" "停用一格" "f" "select public.set_activity_active('09D', false)"
+chk "停用了" "f" "select active from public.activities where id='09D'"
+chkas "${PAUL}" "恢復" "t" "select public.set_activity_active('09D', true)"
+chkraise "★ 被別格回望的格子刪不掉" "has_callback" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.delete_activity('09B');"
+chkas "${PAUL}" "沒人蓋過、沒人回望的格子刪得掉" "09D" "select public.delete_activity('09D')"
+chk "真的刪了" "0" "select count(*) from public.activities where id='09D'"
+chk "放一個章在 09A，一則心得在 09C" "1|1" \
+  "insert into public.stamps (user_id,act_id,stamped_on) values ('${DIR}','09A','2026-09-20');
+   insert into public.entries (user_id,act_id,note) values ('${DIR}','09C','只有我看得到');
+   select (select count(*) from public.stamps where act_id='09A')||'|'||(select count(*) from public.entries where act_id='09C')"
+chkraise "★ 蓋過的格子刪不掉，只能停用" "has_stamps" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.delete_activity('09A');"
+chkraise "★ 只寫過心得還沒蓋章的格子也刪不掉" "has_stamps" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.delete_activity('09C');"
+chk "那兩格與章、心得都還在" "2|1|1" \
+  "select (select count(*) from public.activities where id in ('09A','09C'))||'|'||(select count(*) from public.stamps)||'|'||(select count(*) from public.entries)"
+chkas "${PAUL}" "改 9 月的時刻" "1" "select public.save_month_theme(1,' 07:30 ','')"
+chk "改到了，seq 與 month 沒動" "07:30|9" "select theme_zh||'|'||month from public.months where seq=1"
+chkraise "改不存在的月份會講出來" "no_such_month" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_month_theme(12,'x','');"
+chkas "${PAUL}" "加一個城市：代碼轉大寫" "NRT" "select public.save_destination(' nrt ','TOKYO',true)"
+chkas "${PAUL}" "停用一個城市" "LAX" "select public.save_destination('LAX','LOS ANGELES',false)"
+chk "停用了，列還在" "false|3" "select (select active::text from public.destinations where code='LAX')||'|'||(select count(*) from public.destinations)"
+chkraise "城市代碼有空白或太長會被擋" "bad_code" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_destination('NEW YORK','x',true);"
+chkraise "城市名字留白會被擋" "empty_city" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_destination('JFK','  ',true);"
+chkraise "★ Director 改不了格子" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.save_activity('09A',9,'gather','x','X',null,true,null);"
+chkraise "★ 一般幹部停用不了格子" "not_president" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.set_activity_active('09A', false);"
+chkraise "★ 一般幹部加不了城市" "not_president" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.save_destination('SYD','SYDNEY',true);"
+pagot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; update public.activities set title_zh='直接改' where id='09A';" 2>&1 || true)
+if echo "${pagot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 連 Co-President 繞過函式直接 update 也會被擋（表本身沒有寫入權限）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 直接 update 居然成功：${pagot}"; fail=$((fail+1))
+fi
+pagot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.save_activity(null,9,'frame','x','X',null,false,null);" 2>&1 || true)
+if echo "${pagot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動：${pagot}"; fail=$((fail+1))
+fi
+pagot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-20-passport-admin.sql 2>&1 || true)
+if echo "${pagot}" | grep -q "OVERALL.*PASS" && ! echo "${pagot}" | grep -q "FAIL"; then
+  echo "  ok   幹部護照後台那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL 幹部護照後台那支遷移檔的驗收表沒全過："; echo "${pagot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
 fi
 
 echo

@@ -17,6 +17,11 @@ let S = {
   internTermEditing: null, internTaskEditing: null, internTaskTerm: null,
   // 存檔被擋時留住剛填的東西（端對端測試 2026-10-18 抓到：沒有這個，一句錯誤訊息會配一張空表單）。
   internTermDraft: null, internTaskDraft: null,
+  // 幹部護照的後台（2026-10-20，批 2）。一定要有初始值。
+  pass: { months: [], activities: [], destinations: [], stamped: {} },
+  actEditing: null, actMonth: null, actDraft: null,
+  monthEditing: null, monthDraft: null,
+  destEditing: null, destDraft: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -38,7 +43,15 @@ function render() {
   if (!internStaff()) { el.innerHTML = nav + UI.noAccessHTML(S.me); return; }
 
   let body;
-  if (S.view === "intern-term") {
+  if (S.view === "cadre" && isPres()) {
+    body = UI.passportAdminHTML(S.pass, S.msg, S.busy);
+  } else if (S.view === "act-edit" && isPres()) {
+    body = UI.activityEditHTML(S.actEditing, S.actMonth, S.pass.months, S.msg, S.busy, S.actDraft);
+  } else if (S.view === "month-edit" && isPres()) {
+    body = UI.monthEditHTML(S.monthEditing, S.msg, S.busy, S.monthDraft);
+  } else if (S.view === "dest-edit" && isPres()) {
+    body = UI.destinationEditHTML(S.destEditing, S.msg, S.busy, S.destDraft);
+  } else if (S.view === "intern-term") {
     body = UI.internTermEditHTML(S.internTermEditing, S.msg, S.busy, S.internTermDraft);
   } else if (S.view === "intern-task") {
     body = UI.internTaskEditHTML(S.internTaskEditing, S.internTaskTerm,
@@ -57,7 +70,9 @@ async function boot() {
     if (!S.user) { render(); return; }
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre" || !internStaff()) { render(); return; }
-    await openInterns();
+    // ?tab=cadre 直接開幹部護照（README 的連結用得到）。不是 Co-President 的回到實習護照。
+    if (new URLSearchParams(location.search).get("tab") === "cadre" && isPres()) await openCadre();
+    else await openInterns();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-passports"); return; }
     console.error(HERE + " 載入失敗：", e);
@@ -77,6 +92,16 @@ async function openInterns(keepMsg) {
   render();
 }
 
+// 幹部護照的後台。讀走 RLS，門在資料庫那五支函式（2026-10-20-passport-admin.sql）。
+async function openCadre(keepMsg) {
+  S.busy = true; if (!keepMsg) S.msg = ""; render();
+  try {
+    S.pass = await D.loadPassportAdmin();
+    S.view = "cadre"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "幹部護照載不到：" + D.says(e); S.view = "cadre"; }
+  render();
+}
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -85,7 +110,114 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
-  if (act === "tab") { S.msg = ""; await openInterns(); return; }
+  if (act === "tab") {
+    S.msg = "";
+    if (b.dataset.t === "cadre" && isPres()) await openCadre(); else await openInterns();
+    return;
+  }
+
+  // ── 幹部護照的後台（2026-10-20，批 2）────────────────────────────────
+  // 每一個動作：按下去 busy、成功一句、失敗說錯在哪、會丟東西的先問一次。
+  if (act === "cadre-back") { await openCadre(); return; }
+  if (act === "act-new") {
+    S.actEditing = null; S.actDraft = null; S.actMonth = Number(b.dataset.month); S.view = "act-edit"; S.msg = ""; render(); return;
+  }
+  if (act === "act-edit") {
+    const a = S.pass.activities.find(x => x.id === id);
+    if (!a) { S.msg = "找不到這一格，重新整理再試一次。"; render(); return; }
+    S.actEditing = a; S.actDraft = null; S.actMonth = a.month; S.view = "act-edit"; S.msg = ""; render(); return;
+  }
+  if (act === "act-save") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    const host = document.getElementById("ak-host");
+    const a = { id: id || null, month: val("ak-month") || S.actMonth, category: val("ak-cat"),
+                title_zh: val("ak-zh"), title_en: val("ak-en"), description: val("ak-desc"),
+                needs_host: !!(host && host.checked), callback_to: val("ak-cb").toUpperCase() };
+    S.actDraft = a;
+    if (!a.title_zh || !a.title_en) { S.msg = "中文標題與英文標題都要填。"; render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const made = await D.saveActivity(a);
+      S.actDraft = null;
+      S.msg = id ? `「${a.title_zh}」改好了。幹部重新整理護照就看得到。` : `「${a.title_zh}」加好了，編號是 ${made}。幹部重新整理護照就看得到。`;
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    return;
+  }
+  if (act === "act-off" || act === "act-on") {
+    const on = act === "act-on";
+    const a = S.pass.activities.find(x => x.id === id);
+    if (!on && !confirm(`停用「${a ? a.title_zh : id}」？\n\n停用之後護照上就看不到這一格，已經蓋過的章還在，之後可以恢復。`)) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.setActivityActive(id, on);
+      S.msg = `「${a ? a.title_zh : id}」${on ? "恢復了" : "停用了"}。`;
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = (on ? "恢復不了：" : "停用不了：") + D.says(err); render(); }
+    return;
+  }
+  if (act === "act-del") {
+    const a = S.pass.activities.find(x => x.id === id);
+    if (!confirm(`刪掉「${a ? a.title_zh : id}」？\n\n還沒有人蓋過，所以可以刪。刪了就回不來。`)) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.deleteActivity(id);
+      S.msg = `「${a ? a.title_zh : id}」刪掉了。`;
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); render(); }
+    return;
+  }
+  if (act === "month-edit") {
+    const m = S.pass.months.find(x => String(x.seq) === b.dataset.seq);
+    if (!m) { S.msg = "找不到這個月份，重新整理再試一次。"; render(); return; }
+    S.monthEditing = m; S.monthDraft = null; S.view = "month-edit"; S.msg = ""; render(); return;
+  }
+  if (act === "month-save") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    const d = { ...(S.monthEditing || {}), theme_zh: val("mk-zh"), theme_en: val("mk-en") };
+    S.monthDraft = d;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.saveMonthTheme(b.dataset.seq, d.theme_zh, d.theme_en);
+      S.monthDraft = null;
+      S.msg = `${UI.monthLabel(d.month)}的時刻改好了。`;
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    return;
+  }
+  if (act === "dest-new")  { S.destEditing = null; S.destDraft = null; S.view = "dest-edit"; S.msg = ""; render(); return; }
+  if (act === "dest-edit") {
+    const d = S.pass.destinations.find(x => x.code === b.dataset.code);
+    if (!d) { S.msg = "找不到這個城市，重新整理再試一次。"; render(); return; }
+    S.destEditing = d; S.destDraft = null; S.view = "dest-edit"; S.msg = ""; render(); return;
+  }
+  if (act === "dest-save") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    const d = { code: b.dataset.code || val("dk-code"), city: val("dk-city"), active: b.dataset.active !== "0" };
+    S.destDraft = d;
+    if (!d.code || !d.city) { S.msg = "代碼與城市名字都要填。"; render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const made = await D.saveDestination(d.code, d.city, d.active);
+      S.destDraft = null;
+      S.msg = b.dataset.code ? `「${d.city}」改好了。` : `「${d.city}」加好了，代碼是 ${made}。`;
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    return;
+  }
+  if (act === "dest-off" || act === "dest-on") {
+    const on = act === "dest-on";
+    const d = S.pass.destinations.find(x => x.code === b.dataset.code);
+    if (!d) { S.msg = "找不到這個城市，重新整理再試一次。"; render(); return; }
+    if (!on && !confirm(`停用「${d.city}」？\n\n之後新的入境章不會再抽到它，已經發出去的不動。可以恢復。`)) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.saveDestination(d.code, d.city, on);
+      S.msg = `「${d.city}」${on ? "恢復了" : "停用了"}。`;
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = (on ? "恢復不了：" : "停用不了：") + D.says(err); render(); }
+    return;
+  }
 
   // ── 實習護照的後台（2026-10-18）────────────────────────────────────
   // 每一個動作：按下去 busy（按鈕變「存檔中…」、其他按鈕關掉）、成功一句、失敗說錯在哪。

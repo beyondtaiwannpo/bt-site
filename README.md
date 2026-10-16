@@ -631,6 +631,14 @@ GitHub、Supabase、網域，全部掛 beyondtaiwan2020@gmail.com。
 
 ## 怎麼改活動文案
 
+**2026-10-20 起，Co-President 直接在後台改就好**：登入後到 `/admin/passports/?tab=cadre`
+（後台首頁分組列上的「護照」，再點「幹部護照」）。每一格有「改」「停用」，沒人蓋過的多一顆「刪掉」；
+每個月旁邊有「改時刻」；最下面是入境章抽得到的城市，只有「加」「改名字」「停用」。
+新格子的編號由系統照月份算（9 月第四格就是 09D），不用自己想。
+它背後是 `supabase/migrations/2026-10-20-passport-admin.sql` 開的五支函式，門全部是 `is_president()`，
+詳見「幹部護照的後台」那一節。**跑那支遷移檔之前，後台那一頁按下去會出現「要先跑 2026-10-20-passport-admin.sql」。**
+
+下面這套從 Supabase 改的做法留著當備用（後台壞掉、或要改後台不給改的欄位時）。
 課程組要改題目或活動說明，不用改程式，直接改資料庫，改完重整網頁就生效。
 
 1. 登入 https://supabase.com（用組織信箱）
@@ -3182,6 +3190,46 @@ Paul 2026-10-15：「現在很多東西都在申請管理裡面，可以根據�
 `scripts/e2e/intern.mjs`（路徑）、十支測試的 import 路徑加新的 `test/admin-hub.test.mjs`。
 本機 `node --test test/*.test.mjs` 462 項全過、`./check.sh` 全綠。
 **端對端測試 `scripts/e2e/intern.mjs` 改了路徑但沒有跑**（要 Docker 的本機 Supabase），下一次跑 e2e 的人要看它過不過。
+
+## 幹部護照的後台（2026-10-20，後台重整批 2）
+
+Paul 2026-10-15 拍板：「原本的護照活動 Co-President 也都可以改」，而且第一版**只給 Co-President**，
+不開給 Curriculum team，因為 team 這個欄位本人改得動（批 3 才補那道守門，補好再開給 team）。
+在這之前改格子要去 Supabase 的 Table Editor，那等於叫每年換屆的人去碰資料庫。
+
+### 在哪裡、能做什麼
+
+`/admin/passports/` 多一個「幹部護照」分頁（只有 Co-President 看得到）。一頁三件事：
+
+- **格子**：11 個月各一段。每一格可以改中英標題、說明、分類、要不要主持人、回望哪一格；可以停用與恢復；
+  **沒人蓋過的才有「刪掉」**。每個月底下有「加一格」。
+- **月份的時刻**：每個月旁邊的「改時刻」，只改右上角那一串字（`theme_zh`），留空就不顯示。
+- **城市**：加一個、改名字、停用、恢復。**沒有刪**。
+
+### 三條線，畫面擋一次、資料庫再擋一次
+
+| 線 | 畫面怎麼擋 | 資料庫怎麼擋 |
+|---|---|---|
+| 編號（`activities.id`）不能改，章靠它對到格子 | 編號是標籤不是輸入框；新格子的編號由系統算 | `save_activity()` 新增時自己算編號（月份兩位數加下一個大寫字母），改既有的只認既有編號 |
+| 蓋過的格子不能刪 | 蓋過的那一列沒有「刪掉」 | `delete_activity()` 查 `stamps` 與 `entries`，有就丟 `has_stamps`；被別格回望的丟 `has_callback` |
+| 城市不能刪 | 沒有那顆按鈕 | 沒有 `delete_destination()` 這支函式；`visas` 的外鍵本來就擋 |
+
+另外兩件：既有格子的**月份不能換**（`month_locked`，章是照月份算入境章的）；`months` 的 `seq` 與 `month` 後台不給碰，`seq` 由資料庫從 `months` 表查，不讓人填。
+
+### 隱私界線沒有動
+
+後台讀 `stamps` 只拿 `act_id` 算「這一格幾個人蓋過」，不拿 `user_id`；**完全不讀 `entries` 與 `visas`**。
+`test/passport-admin.test.mjs` 守著這件事：資料層出現 `from("entries")` 就紅。
+
+### 上線前要跑新的遷移檔
+
+`supabase/migrations/2026-10-20-passport-admin.sql`，接在 `2026-10-19-regrant-passport-tables.sql` 後面跑，
+要先跑過 `2026-09-08-students.sql`（`is_president()` 在那一支）。可以重跑。
+最後印 PASS / FAIL 表，10 項全 PASS 才算跑完。跑完之前後台那一頁的按鈕按下去會說「要先跑 2026-10-20-passport-admin.sql」。
+
+本機 `./scripts/db/smoke.sh` 已經跑過（183 項全過），其中有一段專門走這五支：
+Co-President 加一格拿到 09D、改既有格子換月份被擋、回望指錯被擋、蓋過或只寫過心得的格子刪不掉、
+Director 與一般幹部一支都叫不動、連 Co-President 繞過函式直接 update 也被擋、沒登入叫不動。
 
 ## 後台看邀請碼（2026-10-14）
 
