@@ -87,7 +87,7 @@ export function suggestTaskId(termId, tasks) {
 // isPresident 要傳進來：分頁列上 Co-President 才有的那四個分頁靠它畫。
 // 2026-10-18 端對端測試抓到：寫死 false 的話，Co-President 一進實習護照分頁，
 // 邀請碼那幾個分頁就不見了，要重新整理才回得去。
-export function internAdminHTML(data, sel, msg, busy, isPresident) {
+export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat) {
   const terms = data.terms || [];
   const cur = terms.find(t => t.id === sel) || terms.find(t => t.active) || terms[0] || null;
   const tasks = (data.tasks || []).filter(t => cur && t.term === cur.id);
@@ -109,7 +109,8 @@ export function internAdminHTML(data, sel, msg, busy, isPresident) {
   const byCat = INTERN_CATS.map(c => ({ c, rows: tasks.filter(t => t.category === c.v) }))
     .concat([{ c: { v: "?", label: "認不得的分類", hint: "" }, rows: tasks.filter(t => !INTERN_CATS.some(c => c.v === t.category)) }])
     .filter(g => g.rows.length);
-  const taskRows = byCat.map(g => `<div class="fmeta" style="margin-top:14px"><b>${esc(g.c.label)}</b>　${esc(g.c.hint)}</div>
+  const taskRows = byCat.map(g => `<div class="fmeta" style="margin-top:14px"><b>${esc(g.c.label)}</b>　${esc(g.c.hint)}
+      ${g.c.v === "?" ? "" : `<button class="btn quiet sm" data-act="ipreview" data-cat="${esc(g.c.v)}">看它在實習護照上長什麼樣</button>`}</div>
     <ul class="flist">${g.rows.map(t => {
       const n = (data.stamped || {})[t.id] || 0;
       return `<li>
@@ -134,6 +135,8 @@ export function internAdminHTML(data, sel, msg, busy, isPresident) {
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
     <div class="wnote">intern 的章與心得這裡碰不到。蓋過的格子只能停用不能刪：刪了他的章會跟著不見。
       要看誰蓋了什麼，到<a href="../../intern-passport/">實習生進度牆</a>。</div>
+    <div class="row" style="margin:8px 0 4px"><button class="btn quiet sm" data-act="ipreview" data-cat="">看它在實習護照上長什麼樣</button></div>
+    ${internPreviewHTML(previewCat, cur ? !!cur.active : true)}
 
     <h3 class="sec-h" style="margin-top:18px">屆別</h3>
     ${terms.length ? `<ul class="flist">${termRows}</ul>` : `<div class="empty">還沒有任何一屆。先開一屆，才能建格子。</div>`}
@@ -224,18 +227,32 @@ export const monthLabel = m => `${m} 月`;
 // 不另外畫一份護照：那會是第二份護照程式碼，改一次要改兩邊，而且畫出來的
 // 永遠不會跟真的一模一樣。看到的是登入者自己那本（含自己的章），
 // 要看「空白的」就看還沒蓋的格子。previewMonth 是 null 就不畫框。
-export function passportPreviewHTML(previewMonth, months) {
-  if (previewMonth == null) return "";
-  const src = `../../passport/?month=${encodeURIComponent(String(previewMonth))}`;
+function previewBoxHTML(title, hint, src) {
   return `<div class="preview-wrap" id="passport-preview">
-    <div class="fhead" style="margin-bottom:6px"><b>護照預覽：${esc(monthLabel(previewMonth))}</b>
-      <span class="mini">這是你自己那本，剛改的格子重新整理預覽就會出現</span>
+    <div class="fhead" style="margin-bottom:6px"><b>${title}</b>
+      <span class="mini">${hint}</span>
       <span style="flex:1"></span>
       <button class="btn quiet sm" data-act="preview-reload">重新整理預覽</button>
       <a class="btn quiet sm" href="${src}" target="_blank" rel="noopener">另開視窗</a>
       <button class="btn quiet sm" data-act="preview-close">關掉</button></div>
     <iframe class="preview-frame" src="${src}" title="護照預覽" loading="lazy"></iframe>
   </div>`;
+}
+
+export function passportPreviewHTML(previewMonth) {
+  if (previewMonth == null) return "";
+  const src = `../../passport/?month=${encodeURIComponent(String(previewMonth))}`;
+  return previewBoxHTML(`護照預覽：${esc(monthLabel(previewMonth))}`, "這是你自己那本，剛改的格子重新整理預覽就會出現", src);
+}
+
+// 實習護照的預覽（2026-10-16）。嵌的是 /intern-passport/ 的「樣書」：目前這一屆的格子、假的持照人、沒有章。
+// 樣書只畫**目前這一屆**（active 的那一屆），後台正在看別屆時這裡會提醒。
+export function internPreviewHTML(cat, viewingActive) {
+  if (cat == null) return "";
+  const c = INTERN_CATS.find(x => x.v === cat);
+  const src = `../../intern-passport/?view=sample${cat ? `&cat=${encodeURIComponent(cat)}` : ""}`;
+  const hint = (viewingActive === false ? "樣書只畫目前這一屆的格子，你現在在看的不是那一屆。" : "這是樣書：目前這一屆的格子、假的持照人、沒有章。intern 看到的就是這個樣子。");
+  return previewBoxHTML(`實習護照預覽${c ? `：${esc(c.label)}` : ""}`, hint, src);
 }
 
 export function passportAdminHTML(data, msg, busy, previewMonth) {

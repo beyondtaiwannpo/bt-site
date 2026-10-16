@@ -115,10 +115,11 @@ test("★ 進度牆：每個分類一格、沒有心得、有說明誰看得到"
   assert.ok(!h.includes("intern_entries") && !h.includes('class="note"'), "牆上不該有心得");
 });
 
-test("Internship team 的幹部只有進度牆那一個分頁", () => {
+test("Internship team 的幹部有進度牆與樣書，沒有「我的護照」", () => {
   const S = S0(); S.staff = true;
   const h = barHTML(S);
   assert.ok(h.includes("實習生進度牆"));
+  assert.ok(h.includes('data-v="sample"'));
   assert.ok(!h.includes('data-v="passport"'));
   assert.ok(!h.includes("Stamps collected"));
 });

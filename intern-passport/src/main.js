@@ -59,14 +59,25 @@ function toApp() {
   location.replace("../app/?next=intern-passport");
 }
 
+// 樣書用的 state：跟 S 共用 page 與 tasks，其他全是空的。
+function sampleState() {
+  return { ...S, sample: true, profile: UI.sampleProfile(S.term), stamps: {}, entries: {},
+           flipped: {}, justStamped: null, justFlipped: null, tearing: null };
+}
+
 function render() {
   const el = root();
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = `<div class="empty">請先登入。<a href="../app/">去登入頁</a></div>`; return; }
   const nav = navHTML({ current: "intern-passport", role: S.role,
                         name: S.profile ? (S.profile.name_zh || S.profile.name_en) : "" });
-  // Internship team 的幹部：只有牆。
-  if (S.staff) { el.innerHTML = nav + UI.barHTML(S) + UI.wallHTML(S); return; }
+  // Internship team 的幹部：牆，加「樣書」。樣書是同一套 bookHTML 畫的，
+  // 只是把持照人換成假的、章與心得清空（S.sample 讓資料頁不畫編輯鈕）。
+  // 不另外寫一份畫面：那會是第三份護照程式碼。
+  if (S.staff) {
+    el.innerHTML = nav + UI.barHTML(S) + (S.view === "sample" ? UI.bookHTML(sampleState()) : UI.wallHTML(S));
+    return;
+  }
   // 不是 intern 也不是 staff 的人 boot() 已經導走，走到這裡就講一句話不要空白。
   // 條件是 S.role && ...：role 為 null（profiles 查不到）不要接住，那是資料壞掉不是身分問題。
   if (S.role && S.role !== "intern") { el.innerHTML = `<div class="empty">這裡只開放給 BT 的實習生。<a href="../app/">回到入口</a></div>`; return; }
@@ -169,6 +180,8 @@ document.addEventListener("click", async e => {
 
   if (act === "signout") { await DATA.signOut(); location.replace("../app/"); return; }
   if (act === "tab") { S.view = b.dataset.v; render(); if (S.view === "wall" && !S.wall) loadWall(); return; }
+  // 樣書上只能翻頁。蓋章、撕章、改資料都不是真的，按了就講一句。
+  if (S.view === "sample" && ["open", "stamp", "unstamp", "edit", "flip"].includes(act)) { toast("這是樣書，看格子長什麼樣用的，蓋不了章。"); return; }
   if (act === "refresh") { loadWall(); return; }
   if (act === "prev") { S.page = Math.max(0, S.page - 1); render(); return; }
   if (act === "next") { S.page = Math.min(UI.pagesOf(S).length - 1, S.page + 1); render(); return; }
@@ -217,9 +230,9 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
-  if (document.getElementById("scrim") || !S.profile) return;
+  if (document.getElementById("scrim") || (!S.profile && S.view !== "sample")) return;
   if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-  if (S.view !== "passport") return;
+  if (S.view !== "passport" && S.view !== "sample") return;
   if (S.tearing && (e.key === "ArrowLeft" || e.key === "ArrowRight")) doUnstamp(S.tearing);
   if (e.key === "ArrowLeft" && S.page > 0) { S.page--; render(); }
   if (e.key === "ArrowRight" && S.page < UI.pagesOf(S).length - 1) { S.page++; render(); }
@@ -251,7 +264,13 @@ export async function boot() {
     // 不是 intern、也不是 Internship team 的幹部 → 回 /app/。
     // role 為 null 不導走：那是 profiles 查不到，跟「不是實習生」不是同一件事。
     if (S.role && S.role !== "intern" && !S.staff) { toApp(); return; }
-    if (S.staff) { S.view = "wall"; if (!S.wall) loadWall(); }
+    if (S.staff) {
+      // ?view=sample&cat=project：後台的預覽框直接開在樣書的那一頁（2026-10-16）。
+      // 只決定畫哪一頁，讀得到什麼仍然是 RLS 決定的。
+      const q = new URLSearchParams(location.search);
+      if (q.get("view") === "sample") { S.view = "sample"; S.page = UI.pageForCat(S, q.get("cat")); }
+      else { S.view = "wall"; if (!S.wall) loadWall(); }
+    }
     S.down = false;
     render();
   } catch (e) {

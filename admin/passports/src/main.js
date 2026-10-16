@@ -25,6 +25,8 @@ let S = {
   // 預覽框現在翻到哪個月。null 就沒有框。重畫不會重新載 iframe（src 沒變瀏覽器不會重抓），
   // 要重抓按「重新整理預覽」。
   previewMonth: null,
+  // 實習護照的預覽框：null 沒有框，"" 開在資料頁，"project" 之類開在那個分類。
+  internPreviewCat: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -60,7 +62,7 @@ function render() {
     body = UI.internTaskEditHTML(S.internTaskEditing, S.internTaskTerm,
       UI.suggestTaskId(S.internTaskTerm, S.intern.tasks), S.msg, S.busy, S.internTaskDraft);
   } else {
-    body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy, isPres());
+    body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy, isPres(), S.internPreviewCat);
   }
   el.innerHTML = nav + UI.groupBarHTML("passports", S.me) + body;
 }
@@ -128,7 +130,12 @@ document.addEventListener("click", async e => {
     const f = document.getElementById("passport-preview"); if (f) f.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
-  if (act === "preview-close") { S.previewMonth = null; render(); return; }
+  if (act === "ipreview") {
+    S.internPreviewCat = b.dataset.cat || ""; render();
+    const f = document.getElementById("passport-preview"); if (f) f.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  if (act === "preview-close") { S.previewMonth = null; S.internPreviewCat = null; render(); return; }
   if (act === "preview-reload") {
     const f = document.querySelector(".preview-frame"); if (f) f.src = f.src; return;
   }

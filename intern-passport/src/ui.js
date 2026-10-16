@@ -56,11 +56,26 @@ export function pagesOf(S) {
   ];
 }
 
+// ?cat=project 對到 pagesOf 的哪一頁（2026-10-16，給後台的預覽用）。找不到就回 0（資料頁）。
+export function pageForCat(S, cat) {
+  if (!cat) return 0;
+  const i = pagesOf(S).findIndex(pg => pg.kind === "cat" && pg.cat === cat);
+  return i < 0 ? 0 : i;
+}
+
+// 樣書的持照人（2026-10-16）。staff 沒有自己那一列 intern_passports，
+// 要看「這本護照長什麼樣」就用這個假的人填資料頁。只在畫面上，不寫進任何表。
+export function sampleProfile(term) {
+  return { id: "sample", name_zh: "實習生姓名", name_en: "INTERN NAME", motto: "",
+           issued: today(), avatar: null, term: term ? term.id : null };
+}
+
 export function barHTML(S) {
   const done = stampCount(S);
-  // staff（Internship team 的幹部）沒有自己的護照，只有進度牆那一個分頁。
+  // staff（Internship team 的幹部）沒有自己的護照：進度牆，加一本「樣書」看格子長什麼樣。
   const tabs = S.staff
-    ? `<button role="tab" aria-selected="true" data-act="tab" data-v="wall">實習生進度牆</button>`
+    ? `<button role="tab" aria-selected="${S.view !== "sample"}" data-act="tab" data-v="wall">實習生進度牆</button>
+       <button role="tab" aria-selected="${S.view === "sample"}" data-act="tab" data-v="sample">樣書</button>`
     : `<button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">我的護照</button>
        <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">進度牆</button>`;
   return `<div class="bar">
@@ -105,7 +120,7 @@ function pageBodyHTML(S, page) {
 // total > 0 不可省：格子還沒建好時 0 === 0 會蓋一個「0 / 0 · FULL」。
 export function idPageHTML(S) {
   const p = S.profile;
-  const av = p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : `<span>點此上傳<br>大頭照</span>`;
+  const av = p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : (S.sample ? `<span>大頭照</span>` : `<span>點此上傳<br>大頭照</span>`);
   const done = stampCount(S);
   const total = S.tasks.length;
   const term = S.term;
@@ -115,7 +130,7 @@ export function idPageHTML(S) {
       <div class="mtheme"><b>BEYOND TAIWAN</b><span>Intern Passport · ${esc(term ? term.title_en : "")}</span></div>
     </div>
     <div class="idgrid">
-      <a class="photo" href="../settings/" title="到設定換大頭照">${av}</a>
+      ${S.sample ? `<span class="photo">${av}</span>` : `<a class="photo" href="../settings/" title="到設定換大頭照">${av}</a>`}
       <div>
         <div class="fields">
           <div class="f"><i>Type / 類別</i><b>INTERN</b></div>
@@ -129,9 +144,9 @@ export function idPageHTML(S) {
       </div>
     </div>
     ${total > 0 && done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
-    <div class="row" style="margin-top:18px">
-      <button class="btn ghost sm" data-act="edit">編輯資料</button>
-    </div>`;
+    ${S.sample
+      ? `<div class="row" style="margin-top:18px"><span class="mini">這是樣書：格子是目前這一屆的，人是假的，章蓋不了。intern 看到的就是這個樣子。</span></div>`
+      : `<div class="row" style="margin-top:18px"><button class="btn ghost sm" data-act="edit">編輯資料</button></div>`}`;
 }
 
 function stampInner(act, st, extraClass) {
