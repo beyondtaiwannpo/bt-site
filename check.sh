@@ -449,19 +449,20 @@ fi
 # 但那一行存在的唯一理由就是預載，指錯就等於那一行不存在 —— 而且是安靜地不存在。
 # 沒有守門的話，下一個改檔名的人不會知道自己順手關掉了一項效能措施。
 mp_bad=""
-for f in */index.html; do
+# 2026-10-15：後台拆成四個資料夾，admin/*/index.html 也在範圍內。
+for f in */index.html admin/*/index.html; do
   d=$(dirname "$f")
   for h in $(grep -o 'rel="modulepreload" href="[^"]*"' "$f" | sed 's/.*href="//;s/"$//'); do
     [ -f "$d/$h" ] || mp_bad="${mp_bad} ${f} 指到 ${h}"
   done
 done
-mp_n=$(grep -l 'rel="modulepreload"' */index.html 2>/dev/null | wc -l | tr -d ' ')
+mp_n=$(grep -l 'rel="modulepreload"' */index.html admin/*/index.html 2>/dev/null | wc -l | tr -d ' ')
 if [ -n "$mp_bad" ]; then
   bad "modulepreload 指到不存在的檔案（那一行等於白寫，而畫面不會有任何異狀）：${mp_bad}"
-elif [ "$mp_n" -lt "6" ]; then
-  bad "有登入後的頁面沒有 modulepreload（只有 ${mp_n} 頁有，應該是 6 頁）"
+elif [ "$mp_n" -lt "9" ]; then
+  bad "有登入後的頁面沒有 modulepreload（只有 ${mp_n} 頁有，應該是 9 頁：六頁加後台的三個子資料夾）"
 else
-  ok "六個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
+  ok "九個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
 fi
 
 # 會動的東西只准出現在 motion() 裡面
@@ -850,6 +851,16 @@ fi
 # 護照壞掉會讓每一頁的頂欄一起壞。掃整個 shared/，不是固定清單——
 # 之後多一個共用模組也自動在範圍內。
 SHARED_UP=$(grep -lE '^\s*import .*/(passport|availability|app)/' shared/*.js 2>/dev/null | tr '\n' ' ')
+
+# 後台的四個資料夾互不 import（2026-10-15，後台拆資料夾時加）。
+# admin/site/ 壞掉不該讓 /admin/ 的申請審核打不開，反過來也一樣。
+# 只看 import 不看字串：分組列裡的連結目的地本來就會寫到別的資料夾。
+ADMIN_X=$(grep -lE '^\s*import .*(\.\./src/|/admin/|\.\./(site|passports|people)/)' admin/src/*.js admin/*/src/*.js 2>/dev/null | tr '\n' ' ')
+if [ -z "$ADMIN_X" ]; then
+  ok "後台的四個資料夾互不 import（只 import 自己的 ./ 與 shared/）"
+else
+  bad "後台的資料夾之間互相 import 了：$ADMIN_X"
+fi
 if [ -z "$SHARED_UP" ]; then
   ok "shared/ 沒有 import 任何功能資料夾（依賴方向只往下）"
 else
@@ -1686,7 +1697,7 @@ fi
 # 根本沒有那個區塊，是 check-motion.mjs 的範圍從 passport 一頁擴到全站才露出來的。
 pressbad=""
 motionbad=""
-for f in $(printf '%s\n' index.html */index.html); do
+for f in $(printf '%s\n' index.html */index.html admin/*/index.html); do
   grep -q '<style>' "$f" || continue
   grep -q '點下去要有回饋' "$f" || pressbad="${pressbad} ${f}"
   grep -q '@media (prefers-reduced-motion' "$f" || motionbad="${motionbad} ${f}"
@@ -1708,7 +1719,7 @@ fi
 #（外殼各自一份的代價），而漏掉的那一頁不會壞，只會對已經登入的人說錯話 ——
 # 沒有人會回報這種缺陷。這跟批 1 漏掉 /team/ 是同一類失敗。
 loginbad=""
-for f in $(printf '%s\n' index.html */index.html); do
+for f in $(printf '%s\n' index.html */index.html admin/*/index.html); do
   grep -q 'class="login"' "$f" || continue
   # 2026-09-08 起這串字被拆成三個 <span>（窄螢幕上只顯示一種語言，
   # 見各頁 .lg-sep 那則註解），所以不能再找完整的「我的 BT 帳號 / Account」。
@@ -1748,7 +1759,7 @@ fi
 # 這條守門要防的是它悄悄跑回去。畫在 body 上不會壞、不會報錯，
 # 只是差 12 到 16px，而那種差距只有在兩條東西並排的時候才看得出來。
 navbad=""
-for f in passport/src/main.js availability/src/main.js admin/src/main.js settings/src/main.js; do
+for f in passport/src/main.js availability/src/main.js admin/src/main.js admin/*/src/main.js settings/src/main.js; do
   grep -q "navHTML(" "$f" || continue
   grep -q "document.body.insertAdjacentHTML" "$f" && navbad="${navbad} ${f}"
 done
@@ -1772,7 +1783,7 @@ fi
 # 只掃對外頁面。iframe 這個字在程式裡是允許的（那正是按下去之後要生出來的東西），
 # 擋的是**寫死在 HTML 標籤裡**的那一種。
 ytbad=""
-for f in $(printf '%s\n' index.html */index.html); do
+for f in $(printf '%s\n' index.html */index.html admin/*/index.html); do
   grep -qi '<iframe' "$f" && ytbad="${ytbad} ${f}(寫死的 iframe)"
   grep -qi 'img\.youtube\.com\|i\.ytimg\.com' "$f" && ytbad="${ytbad} ${f}(YouTube 縮圖)"
 done
@@ -1796,7 +1807,7 @@ fi
 NOINDEX_PAGES="app/index.html reset/index.html"
 noindex_extra=""
 noindex_missing=""
-for f in $(printf '%s\n' index.html */index.html); do
+for f in $(printf '%s\n' index.html */index.html admin/*/index.html); do
   in_list=0
   for w in $NOINDEX_PAGES; do [ "$f" = "$w" ] && in_list=1; done
   has=0

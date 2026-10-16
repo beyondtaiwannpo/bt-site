@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { peopleHTML, initial, toPerson, teamKey, byTeam } from "../team/src/ui.js";
 import { settingsHTML } from "../settings/src/ui.js";
-import { publicTeamHTML, tabsHTML } from "../admin/src/ui.js";
+import { publicTeamHTML, tabsHTML } from "../admin/site/src/ui.js";
 
 const P = (o = {}) => toPerson({ name_zh: "王小明", name_en: "Ming Wang", team: "Curriculum", ...o });
 
@@ -210,11 +210,12 @@ test("★ 只有 Co-President 看得到「團隊頁」這個分頁", () => {
   assert.match(tabsHTML("forms", true), /data-t="team"/);
 });
 
-// 核可完要回得了申請表。兩個核可頁都要有，只加一頁會讓兩頁不一致。
-test("★ 團隊頁本身畫得出分頁列（核可完回得去申請表）", () => {
+// 核可完要回得了同一組的其他分頁。兩個核可頁都要有，只加一頁會讓兩頁不一致。
+// 2026-10-15 後台拆資料夾之後，這一組裡的分頁是資源、團隊頁、校友頁、信件文案；申請在 /admin/ 首頁。
+test("★ 團隊頁本身畫得出分頁列（核可完回得去資源）", () => {
   const h = publicTeamHTML([], "", false);
   assert.match(h, /data-act="tab"/);
-  assert.match(h, /data-t="forms"/);
+  assert.match(h, /data-t="res"/);
 });
 
 // ── 一個人可以在好幾個 team（Paul 2026-09-10）──────────────────────

@@ -8,7 +8,10 @@
 // 反斜線與正斜線在不同瀏覽器裡解析還不一樣。我們實際上只有一個目的地，
 // 所以參數只當一把鑰匙用：**它的值永遠不會被當成網址**。
 // 要加新的目的地就在這張表加一列，不要改成「如果是相對路徑就放行」。
-export const NEXT = { passport: "../passport/", availability: "../availability/", "intern-passport": "../intern-passport/" };
+// 2026-10-15：後台的四個資料夾也進表。在這之前 /admin/ 送的是一條路徑（"/admin/"），
+// 對不到表，所以從後台被踢去登入的人登入完會停在設定頁，不是回後台。
+export const NEXT = { passport: "../passport/", availability: "../availability/", "intern-passport": "../intern-passport/",
+  admin: "../admin/", "admin-site": "../admin/site/", "admin-passports": "../admin/passports/", "admin-people": "../admin/people/" };
 
 const KEY = "bt-next";
 

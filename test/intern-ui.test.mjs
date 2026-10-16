@@ -7,7 +7,7 @@ import { CATEGORY, CATNAME, SLOT_ORDER, stampCount, pagesOf, barHTML, idPageHTML
 import { passportNo } from "../intern-passport/src/data.js";
 import { FEATURES, featuresFor } from "../shared/nav.js";
 import { NEXT } from "../app/src/nav.js";
-import { inviteFormHTML, inviteCodesHTML } from "../admin/src/ui.js";
+import { inviteFormHTML, inviteCodesHTML } from "../admin/people/src/ui.js";
 import { internshipStaff } from "../settings/src/ui.js";
 
 const TASKS = [

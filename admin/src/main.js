@@ -1,9 +1,10 @@
-// 申請管理的邏輯。
+// 後台首頁加「申請」那一組的邏輯。
 //
-// 三個畫面：表單清單 → 一份表單 → 一題。狀態只有一個 S，畫面只從 S 產生。
-// **不在事件處理裡直接改 DOM**，一律改 S 再 render() ——
+// 2026-10-15 後台拆成四個資料夾（見 README「後台的四個資料夾」）：
+// 對外的東西在 admin/site/、兩本護照的格子在 admin/passports/、人與權限在 admin/people/。
+// 這一支只剩申請：表單清單 → 一份表單 → 一題，加審核、簽到、行前信。
+// 狀態只有一個 S，畫面只從 S 產生。**不在事件處理裡直接改 DOM**，一律改 S 再 render() ——
 // 兩條路徑會分岔，而分岔是安靜的（這個 repo 反覆踩到的同一件事）。
-import { supabase } from "../../shared/supabase.js";
 import * as AUTH from "../../shared/auth.js";
 import { navHTML } from "../../shared/nav.js";
 import * as D from "./data.js";
@@ -11,31 +12,15 @@ import * as UI from "./ui.js";
 
 let S = {
   user: null, me: null, down: false, busy: false, msg: "",
-  view: "list",            // list | form | question | apps
+  view: "list",            // list | form | question | apps | checkin | notice
   forms: [], teams: [],
   form: null, questions: [], qEditing: null,
   // 批 4
   apps: [], sel: new Set(), filter: "all", pending: [],
-  // 批 5
-  res: [], resEditing: null,
+  // 首頁那一句「還有 N 封信沒寄出去」（2026-10-15）。一定要有初始值。
+  pendingAll: [],
   // 批 6
   noticeTo: new Set(["accepted"]),
-  // 團隊頁
-  people: [],
-  // 校友頁的核可（2026-09-11）。**一定要有初始值** ——
-  // 少了它，alumniStoriesHTML() 拿到的是 undefined，那一頁在某些時序下
-  // （例如載入失敗之後再 render 一次）會整個空白，而這個 repo 的規矩是
-  // 「連不上資料庫也要畫得出東西」。
-  stories: [],
-  // 邀請碼（2026-10-14）。理由同上，一定要有初始值。
-  invites: [], inviteDraft: null,
-  // 信件文案
-  tpls: [], tplKind: null,
-  // 實習護照的後台（2026-10-18）。一定要有初始值，理由同 stories。
-  intern: { terms: [], tasks: [], stamped: {}, interns: 0 }, internSel: null,
-  internTermEditing: null, internTaskEditing: null, internTaskTerm: null,
-  // 存檔被擋時留住剛填的東西（端對端測試 2026-10-18 抓到：沒有這個，一句錯誤訊息會配一張空表單）。
-  internTermDraft: null, internTaskDraft: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -44,10 +29,6 @@ const root = () => document.getElementById("bt-root");
 // 前端少畫一顆按鈕不是安全機制。
 const canEdit = () => !!S.me && (S.me.board === "director" || S.me.board === "president");
 const isPres = () => !!S.me && S.me.board === "president";
-// Internship team 的幹部與 Co-President（跟資料庫的 is_internship_team() 同一條規則）。
-// team 可能是逗號字串（一個人在好幾個 team），所以用 includes。
-const internStaff = () => !!S.me && S.me.role === "cadre" &&
-  (S.me.board === "president" || String(S.me.team || "").includes("Internship Team"));
 
 function render() {
   const el = root();
@@ -60,35 +41,14 @@ function render() {
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
-  if (!S.user) { location.replace("../app/?next=" + encodeURIComponent("/admin/")); return; }
+  if (!S.user) { location.replace("../app/?next=admin"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
 
   let body;
-  if (S.view === "interns") {
-    body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy, isPres());
-  } else if (S.view === "intern-term") {
-    body = UI.internTermEditHTML(S.internTermEditing, S.msg, S.busy, S.internTermDraft);
-  } else if (S.view === "intern-task") {
-    body = UI.internTaskEditHTML(S.internTaskEditing, S.internTaskTerm,
-      UI.suggestTaskId(S.internTaskTerm, S.intern.tasks), S.msg, S.busy, S.internTaskDraft);
-  } else if (S.view === "mail") {
-    body = UI.mailListHTML(S.tpls, S.msg);
-  } else if (S.view === "mail-edit") {
-    body = UI.mailEditHTML(S.tplKind, S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy);
-  } else if (S.view === "team") {
-    body = UI.publicTeamHTML(S.people, S.msg, S.busy);
-  } else if (S.view === "stories") {
-    body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
-  } else if (S.view === "invites") {
-    body = UI.inviteCodesHTML(S.invites, S.msg, S.busy, S.inviteDraft);
-  } else if (S.view === "checkin" && S.form) {
+  if (S.view === "checkin" && S.form) {
     body = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
     body = UI.noticeHTML(S.form, S.apps, S.noticeTo, S.msg, S.busy);
-  } else if (S.view === "res") {
-    body = UI.resListHTML(S.res, canEdit(), S.msg, isPres());
-  } else if (S.view === "res-edit") {
-    body = UI.resEditHTML(S.resEditing, S.msg, S.busy);
   } else if (S.view === "apps" && S.form) {
     body = UI.appsHTML(S.form, S.apps, S.questions, canEdit(),
       S.sel, S.filter, S.pending, S.msg, S.busy);
@@ -98,9 +58,10 @@ function render() {
     body = UI.formHTML(S.form, S.questions, canEdit(),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else {
-    body = UI.listHTML(S.forms, canEdit(), S.msg, isPres());
+    // 首頁：分組那一張卡在上面，申請表清單在下面。
+    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy) + UI.listHTML(S.forms, canEdit(), S.msg, isPres());
   }
-  el.innerHTML = nav + body;
+  el.innerHTML = nav + UI.groupBarHTML("forms", S.me) + body;
 }
 
 async function boot() {
@@ -109,15 +70,16 @@ async function boot() {
     if (who.offline) { S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
-    // ★ 這兩件事同時發，不要排隊。loadForms() 不需要知道我是誰
+    // ★ 這幾件事同時發，不要排隊。loadForms() 不需要知道我是誰
     //（它沒有參數，擋不擋得到是 RLS 的事），所以沒有理由等 loadMe 回來。
     // 省下來的是一趟往返（實測到 Supabase 一趟熱的約 100 到 240 毫秒）。
-    // 非幹部誤按進來會多發這一個查詢，RLS 會擋掉，回來是空的。
-    const [me, forms] = await Promise.all([D.loadMe(S.user.id), D.loadForms()]);
+    // 非幹部誤按進來會多發這幾個查詢，RLS 會擋掉，回來是空的。
+    // 待寄的信載不到不該讓整頁打不開，所以它失敗就當成 0 封。
+    const [me, forms, pendingAll] = await Promise.all([
+      D.loadMe(S.user.id), D.loadForms(), D.loadPendingAll().catch(() => [])]);
     S.me = me;
     if (!S.me || S.me.role !== "cadre") { render(); return; }
-    UI.setInternStaff(internStaff());
-    S.forms = forms;
+    S.forms = forms; S.pendingAll = pendingAll;
     if (S.me.board === "president") S.teams = await D.loadTeams();
     render();
   } catch (e) {
@@ -127,7 +89,7 @@ async function boot() {
     // **不能讓他看到「資料庫休眠中」**：資料庫是好的，是他的票沒了，
     // 而那個畫面不會叫他重新登入，他會一直重整。
     // 先清掉本機那張壞票再走，不清的話下一頁讀出來的還是它。
-    if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../app/?next=" + encodeURIComponent("/admin/")); return; }
+    if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../app/?next=admin"); return; }
     console.error("/admin/ 載入失敗：", e);
     S.down = true; render();
   }
@@ -182,68 +144,11 @@ async function refreshApps() {
   S.pending = await D.loadPending(S.form.id);
 }
 
-async function openMail() {
-  S.busy = true; render();
-  try {
-    S.tpls = await D.loadTemplates();
-    S.view = "mail"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "文案載不到：" + D.says(e); }
-  render();
-}
-
-async function openTeam() {
-  S.busy = true; render();
-  try {
-    S.people = await D.loadPublicCandidates();
-    S.view = "team"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "名單載不到：" + D.says(e); }
-  render();
-}
-
-// 校友頁的核可清單。整份只有 Co-President 叫得動（門在資料庫那一支函式裡）。
-async function openStories() {
-  S.busy = true; render();
-  try {
-    S.stories = await D.loadStories();
-    S.view = "stories"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "校友名單載不到：" + D.says(e); }
-  render();
-}
-
-// 邀請碼與使用紀錄。只讀，只有 Co-President 拿得到（門在資料庫那一支函式裡）。
-async function openInvites() {
-  S.busy = true; render();
-  try {
-    S.invites = await D.loadInvites();
-    if (!S.inviteDraft) S.inviteDraft = { code: UI.suggestCode(), grants: "cadre", uses: 1, note: "" };
-    S.view = "invites"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "邀請碼載不到：" + D.says(e); }
-  render();
-}
-
-// 實習護照的後台。讀走 RLS（別的 team 讀回來是空的，但他們本來就看不到這個分頁）。
-async function openInterns(keepMsg) {
-  S.busy = true; if (!keepMsg) S.msg = ""; render();
-  try {
-    S.intern = await D.loadInternAdmin();
-    if (!S.internSel || !S.intern.terms.some(t => t.id === S.internSel))
-      S.internSel = (S.intern.terms.find(t => t.active) || S.intern.terms[0] || {}).id || null;
-    S.view = "interns"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "實習護照載不到：" + D.says(e); S.view = "interns"; }
-  render();
-}
-
-async function openRes() {
-  S.busy = true; render();
-  try {
-    S.res = await D.loadResources();
-    S.view = "res"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "資源載不到：" + D.says(e); }
-  render();
-}
-
 async function reloadList() {
-  try { S.forms = await D.loadForms(); } catch (e) { S.msg = "清單載不到：" + D.says(e); }
+  try {
+    S.forms = await D.loadForms();
+    S.pendingAll = await D.loadPendingAll().catch(() => []);
+  } catch (e) { S.msg = "清單載不到：" + D.says(e); }
 }
 
 document.addEventListener("click", async e => {
@@ -310,207 +215,19 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  // ── 批 5：資源 ────────────────────────────────────────────────────
-  if (act === "tab") {
-    S.msg = ""; S.sel = new Set();
-    if (b.dataset.t === "res") { await openRes(); }
-    else if (b.dataset.t === "team") { await openTeam(); }
-    else if (b.dataset.t === "stories") { await openStories(); }
-    else if (b.dataset.t === "invites") { await openInvites(); }
-    else if (b.dataset.t === "interns") { await openInterns(); }
-    else if (b.dataset.t === "mail") { await openMail(); }
-    else { S.view = "list"; await reloadList(); render(); }
-    return;
-  }
-  if (act === "mail-back") { await openMail(); return; }
-  if (act === "mail-edit") { S.tplKind = b.dataset.k; S.view = "mail-edit"; S.msg = ""; render(); return; }
-  if (act === "mail-save") {
-    const sub = document.getElementById("msub").value.trim();
-    const body = document.getElementById("mbody").value.trim();
-    if (!sub || !body) { S.msg = "主旨與內文都要寫。"; render(); return; }
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.saveTemplate(b.dataset.k, sub, body);
-      S.tpls = await D.loadTemplates();
-      S.busy = false; S.msg = "存好了。下一封寄出去的信就是這個文案。";
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); }
-    render();
-    return;
-  }
+  if (act === "tab") { S.view = "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render(); return; }
 
-  if (act === "approve") {
-    const ok = b.checked;
-    S.busy = true; render();
+  // 首頁那顆「現在寄出去」：把所有還沒寄的信都寄掉（2026-10-15）。
+  // send_pending_mail() 的門在資料庫（is_cadre），寄的是全部待寄的信，不分表單。
+  if (act === "send-mail-all") {
+    S.busy = true; S.msg = ""; render();
     try {
-      await D.setApproved(id, ok);
-      const p = S.people.find(x => x.id === id);
-      if (p) p.public_approved = ok;
-      S.busy = false; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
+      const r = await D.sendMail();
+      S.pendingAll = await D.loadPendingAll().catch(() => []);
+      S.busy = false;
+      S.msg = r.failed ? `寄出 ${r.sent} 封，${r.failed} 封失敗。` : `寄出 ${r.sent} 封。`;
+    } catch (err) { S.busy = false; S.msg = "寄不出去：" + D.says(err); }
     render();
-    return;
-  }
-
-  // 第二把鑰匙轉下去（或轉回來）。跟上面那顆「approve」同一個形狀：
-  // 只改記憶體裡那一筆，不重讀整份名單 —— 核可是一個一個看、一個一個按的。
-  if (act === "approve-story") {
-    const ok = b.checked;
-    S.busy = true; render();
-    try {
-      await D.setStoryApproved(id, ok);
-      const r = S.stories.find(x => x.id === id);
-      if (r) r.story_approved = ok;
-      S.busy = false; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
-    render();
-    return;
-  }
-
-  // ── 邀請碼的新增與停用（2026-10-14）────────────────────────────────
-  if (act === "invite-suggest" || act === "invite-new") {
-    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
-    S.inviteDraft = { code: val("ic-code"), grants: val("ic-grants") || "cadre",
-                      uses: val("ic-uses") || "1", note: val("ic-note") };
-    if (act === "invite-suggest") { S.inviteDraft.code = UI.suggestCode(); render(); return; }
-    if (!S.inviteDraft.code) { S.msg = "碼要填。"; render(); return; }
-    S.busy = true; S.msg = ""; render();
-    try {
-      const made = await D.createInvite(S.inviteDraft.code, S.inviteDraft.grants,
-                                        S.inviteDraft.uses, S.inviteDraft.note);
-      S.invites = await D.loadInvites();
-      S.inviteDraft = { code: UI.suggestCode(), grants: S.inviteDraft.grants, uses: 1, note: "" };
-      S.busy = false; S.msg = `建好了：${made}。用複製貼上的方式給對方，不要口頭念。`;
-    } catch (err) { S.busy = false; S.msg = "建不起來：" + D.says(err); }
-    render();
-    return;
-  }
-  if (act === "invite-disable") {
-    const code = b.dataset.code;
-    if (!confirm(`停用「${code}」？\n\n停用之後這組碼就不能再用了。後台沒有恢復的按鈕，要恢復得到 Supabase 改。`)) return;
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.disableInvite(code);
-      S.invites = await D.loadInvites();
-      S.busy = false; S.msg = `「${code}」已經停用。`;
-    } catch (err) { S.busy = false; S.msg = "停用不了：" + D.says(err); }
-    render();
-    return;
-  }
-
-  // ── 實習護照的後台（2026-10-18）────────────────────────────────────
-  // 每一個動作：按下去 busy（按鈕變「存檔中…」、其他按鈕關掉）、成功一句、失敗說錯在哪。
-  if (act === "intern-back") { await openInterns(); return; }
-  if (act === "intern-see")  { S.internSel = id; S.msg = `現在看的是 ${id}。`; render(); return; }
-  if (act === "intern-term-new")  { S.internTermEditing = null; S.internTermDraft = null; S.view = "intern-term"; S.msg = ""; render(); return; }
-  if (act === "intern-term-edit") {
-    S.internTermEditing = S.intern.terms.find(t => t.id === id) || null; S.internTermDraft = null;
-    S.view = "intern-term"; S.msg = ""; render(); return;
-  }
-  if (act === "intern-term-save") {
-    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
-    const t = { id: id || val("it-id"), title_zh: val("it-zh"), title_en: val("it-en"),
-                starts_on: val("it-start"), ends_on: val("it-end") };
-    S.internTermDraft = t;
-    if (!t.id || !t.title_zh || !t.title_en || !t.starts_on || !t.ends_on) {
-      S.msg = "五格都要填：代號、中文名稱、英文名稱、開始日、結束日。"; render(); return;
-    }
-    S.busy = true; S.msg = ""; render();
-    try {
-      const made = await D.saveInternTerm(t);
-      S.internSel = made; S.internTermDraft = null;
-      S.msg = id ? `「${t.title_zh}」改好了。` : `「${t.title_zh}」開好了。還不是目前這一屆，要的話按「設成目前這一屆」。`;
-      await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
-    return;
-  }
-  if (act === "intern-term-activate") {
-    const t = S.intern.terms.find(x => x.id === id);
-    if (!confirm(`把「${t ? t.title_zh : id}」設成目前這一屆？\n\n之後新進來的 intern 會拿到這一屆的護照，/intern-passport/ 顯示的也是這一屆的格子。`)) return;
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.activateInternTerm(id);
-      S.internSel = id;
-      S.msg = `「${t ? t.title_zh : id}」現在是目前這一屆了。`;
-      await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "設不了：" + D.says(err); render(); }
-    return;
-  }
-  if (act === "intern-task-new") {
-    S.internTaskEditing = null; S.internTaskDraft = null; S.internTaskTerm = b.dataset.term; S.view = "intern-task"; S.msg = ""; render(); return;
-  }
-  if (act === "intern-task-edit") {
-    const t = S.intern.tasks.find(x => x.id === id);
-    if (!t) { S.msg = "找不到這一格，重新整理再試一次。"; render(); return; }
-    S.internTaskEditing = t; S.internTaskDraft = null; S.internTaskTerm = t.term; S.view = "intern-task"; S.msg = ""; render(); return;
-  }
-  if (act === "intern-task-save") {
-    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
-    const t = { id: id || val("ik-id"), term: b.dataset.term, seq: val("ik-seq"), category: val("ik-cat"),
-                title_zh: val("ik-zh"), title_en: val("ik-en"), description: val("ik-desc") };
-    S.internTaskDraft = t;
-    if (!t.id || !t.title_zh || !t.title_en) { S.msg = "代號、中文標題、英文標題都要填。"; render(); return; }
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.saveInternTask(t);
-      S.internSel = t.term; S.internTaskDraft = null;
-      S.msg = id ? `「${t.title_zh}」改好了。intern 重新整理護照就看得到。` : `「${t.title_zh}」加好了。intern 重新整理護照就看得到。`;
-      await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
-    return;
-  }
-  if (act === "intern-task-off" || act === "intern-task-on") {
-    const on = act === "intern-task-on";
-    const t = S.intern.tasks.find(x => x.id === id);
-    if (!on && !confirm(`停用「${t ? t.title_zh : id}」？\n\n停用之後 intern 的護照上就看不到這一格，已經蓋過的章還在，之後可以恢復。`)) return;
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.setInternTaskActive(id, on);
-      S.msg = `「${t ? t.title_zh : id}」${on ? "恢復了" : "停用了"}。`;
-      await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = (on ? "恢復不了：" : "停用不了：") + D.says(err); render(); }
-    return;
-  }
-  if (act === "intern-task-del") {
-    const t = S.intern.tasks.find(x => x.id === id);
-    if (!confirm(`刪掉「${t ? t.title_zh : id}」？\n\n還沒有人蓋過，所以可以刪。刪了就回不來。`)) return;
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.deleteInternTask(id);
-      S.msg = `「${t ? t.title_zh : id}」刪掉了。`;
-      await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); render(); }
-    return;
-  }
-
-  if (act === "res-back") { await openRes(); return; }
-  if (act === "res-new")  { S.resEditing = null; S.view = "res-edit"; S.msg = ""; render(); return; }
-  if (act === "res-edit") {
-    S.resEditing = S.res.find(r => r.id === id) || null;
-    S.view = "res-edit"; S.msg = ""; render(); return;
-  }
-  if (act === "res-save") {
-    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
-    const patch = {
-      title: val("rtitle"), blurb: val("rblurb"), kind: val("rkind"),
-      url: val("rurl"), team: val("rteam") || null, status: val("rstatus"),
-      ord: Number(val("rord")) || 100,
-    };
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.saveResource(S.resEditing ? S.resEditing.id : null, patch);
-      S.busy = false; S.resEditing = null;
-      await openRes();
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
-    return;
-  }
-  if (act === "res-del") {
-    if (!confirm("刪掉這個資源？外面那一頁上就不見了。")) return;
-    S.busy = true; render();
-    try {
-      await D.deleteResource(id);
-      S.busy = false; S.resEditing = null;
-      await openRes();
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); render(); }
     return;
   }
 

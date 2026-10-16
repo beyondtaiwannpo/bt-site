@@ -194,40 +194,15 @@ export async function loadPending(formId) {
   if (error) throw error;
   return data || [];
 }
-
-// ── 批 5：資源 ────────────────────────────────────────────────────────
-// 後台這一邊一律用完整欄位（幹部一定是 authenticated，拿得到 url）。
-// 對外那一頁的兩種查詢在 resources/src/main.js，**兩邊刻意分開**。
-export async function loadResources() {
+// 全部還沒寄出去的信，不分表單（2026-10-15，後台首頁那一句「還有 N 封信沒寄出去」）。
+// RLS 決定看得到哪幾封：自己 team 的表單那幾封，Co-President 全部。
+// 只拿數字要用的欄位，不拿 to_email 與 body：首頁不需要知道寄給誰。
+export async function loadPendingAll() {
   need();
-  const { data, error } = await supabase.from("resources")
-    .select("id, title, blurb, kind, url, team, status, ord, updated_at")
-    .order("ord");
+  const { data, error } = await supabase.from("mail_outbox")
+    .select("id, form_id, tries, error").is("sent_at", null);
   if (error) throw error;
   return data || [];
-}
-
-const RES_FIELDS = ["title", "blurb", "kind", "url", "team", "status", "ord"];
-export async function saveResource(id, patch) {
-  need();
-  const clean = {};
-  for (const k of RES_FIELDS) if (k in patch) clean[k] = patch[k];
-  if (!clean.title) throw new Error("資源要有名字。");
-  if (!clean.url) throw new Error("資源要有一條連結，不然這一列沒有用。");
-  if (id) {
-    const { error } = await supabase.from("resources").update(clean).eq("id", id);
-    if (error) throw error;
-    return id;
-  }
-  const { data, error } = await supabase.from("resources").insert(clean).select("id").single();
-  if (error) throw error;
-  return data.id;
-}
-
-export async function deleteResource(id) {
-  need();
-  const { error } = await supabase.from("resources").delete().eq("id", id);
-  if (error) throw error;
 }
 
 // ── 批 6：活動營運 ────────────────────────────────────────────────────
@@ -245,145 +220,6 @@ export async function sendNotice(formId, statuses, subject, body) {
     { p_form_id: formId, p_statuses: statuses, p_subject: subject, p_body: body });
   if (error) throw error;
   return data;
-}
-
-// ── 團隊頁的核可（2026-09-08，補批 1 漏掉的一件）────────────────────
-// 只列**已經自己打過勾**的人。沒打勾的人不該出現在這份清單上 ——
-// 那會變成一份「還沒有人問過他們」的名單，而 Co-President 會很想直接核可。
-export async function loadPublicCandidates() {
-  need();
-  const { data, error } = await supabase.from("profiles")
-    .select("id, name_zh, name_en, team, avatar, public_title, public_profile, public_approved")
-    .eq("role", "cadre").eq("public_profile", true);
-  if (error) throw error;
-  return (data || []).sort((a, b) =>
-    String(a.name_zh || a.name_en || "").localeCompare(String(b.name_zh || b.name_en || ""), "zh-Hant"));
-}
-
-export async function setApproved(id, ok) {
-  need();
-  const { error } = await supabase.rpc("set_public_approved", { p_target: id, p_ok: ok });
-  if (error) throw error;
-}
-
-// ── 校友頁的核可（2026-09-11）────────────────────────────────────────
-// 只列**已經自己打過勾**的人，理由跟團隊頁那一份一模一樣：
-// 沒打勾的人出現在這裡，會變成一份「還沒有人問過他們」的名單。
-//
-// ⚠ **不要改成自己查 alumni_stories 再查 profiles 補名字。**
-// profiles 的讀取政策（2026-09-13-public-team.sql）不涵蓋校友那幾列 ——
-// 那樣查的結果是每一位校友都顯示「（沒有名字）」，而那正是要被核可的人。
-// 名字在 stories_for_review() 裡就解析好了（2026-09-19-stories-for-review.sql），
-// 順序也是那一支排的（等核可的在最上面）。
-export async function loadStories() {
-  need();
-  const { data, error } = await supabase.rpc("stories_for_review");
-  if (error) throw error;
-  return data || [];
-}
-
-export async function setStoryApproved(id, ok) {
-  need();
-  const { error } = await supabase.rpc("set_story_approved", { p_target: id, p_ok: ok });
-  if (error) throw error;
-}
-
-// ── 邀請碼（2026-10-14）──────────────────────────────────────────────
-// 只讀。invite_codes 與 invite_uses 兩張表對所有登入身分都是關的，
-// 唯一的出口是 invite_codes_for_review()，門（is_president）寫在那一支的本文裡
-// （2026-10-14-invite-uses.sql）。不是 Co-President 的人叫它會拿到空的清單。
-export async function loadInvites() {
-  need();
-  const { data, error } = await supabase.rpc("invite_codes_for_review");
-  if (error) throw error;
-  return data || [];
-}
-
-// 新增與停用（2026-10-14）。門在資料庫那兩支函式的第一句（2026-10-15-invite-admin.sql）。
-// uses 用 Number() 轉：input 的 value 是字串，送 "1" 給 int 參數 PostgREST 會找不到這支函式。
-export async function createInvite(code, grants, uses, note) {
-  need();
-  const { data, error } = await supabase.rpc("create_invite",
-    { p_code: code, p_grants: grants, p_uses: Number(uses), p_note: note });
-  if (error) throw error;
-  return data;
-}
-
-export async function disableInvite(code) {
-  need();
-  const { error } = await supabase.rpc("disable_invite", { p_code: code });
-  if (error) throw error;
-}
-
-// ── 信件文案（2026-09-08）──────────────────────────────────────────────
-export async function loadTemplates() {
-  need();
-  const { data, error } = await supabase.from("mail_templates")
-    .select("kind, subject, body, updated_at").order("kind");
-  if (error) throw error;
-  return data || [];
-}
-
-export async function saveTemplate(kind, subject, body) {
-  need();
-  const { error } = await supabase.rpc("set_mail_template",
-    { p_kind: kind, p_subject: subject, p_body: body });
-  if (error) throw error;
-}
-
-// ── 實習護照的後台（2026-10-18）────────────────────────────────────────
-// 讀是走 RLS（Internship team 讀得到五張 intern_* 表），寫全部走函式，
-// 門在函式第一句 is_internship_team()。表本身對前端只有 select。
-export async function loadInternAdmin() {
-  need();
-  const [te, ta, st, pe] = await Promise.all([
-    supabase.from("intern_terms").select("*").order("starts_on", { ascending: false }),
-    supabase.from("intern_tasks").select("*").order("term").order("seq"),
-    supabase.from("intern_stamps").select("task_id"),
-    supabase.from("profiles").select("id").eq("role", "intern"),
-  ]);
-  for (const r of [te, ta, st, pe]) if (r.error) throw r.error;
-  // 每一格被蓋過幾次。後台只要知道「有沒有人蓋過」（刪不刪得掉）與數字，
-  // 不要知道是誰 —— 那是進度牆的事。
-  const stamped = {};
-  for (const r of st.data || []) stamped[r.task_id] = (stamped[r.task_id] || 0) + 1;
-  return { terms: te.data || [], tasks: ta.data || [], stamped, interns: (pe.data || []).length };
-}
-
-export async function saveInternTerm(t) {
-  need();
-  const { data, error } = await supabase.rpc("save_intern_term",
-    { p_id: t.id, p_title_zh: t.title_zh, p_title_en: t.title_en, p_starts: t.starts_on, p_ends: t.ends_on });
-  if (error) throw error;
-  return data;
-}
-
-export async function activateInternTerm(id) {
-  need();
-  const { error } = await supabase.rpc("activate_intern_term", { p_id: id });
-  if (error) throw error;
-}
-
-// seq 用 Number() 轉：input 的 value 是字串，送 "10" 給 int 參數 PostgREST 會找不到這支函式。
-export async function saveInternTask(t) {
-  need();
-  const { data, error } = await supabase.rpc("save_intern_task",
-    { p_id: t.id, p_term: t.term, p_seq: Number(t.seq) || 100, p_category: t.category,
-      p_title_zh: t.title_zh, p_title_en: t.title_en, p_description: t.description });
-  if (error) throw error;
-  return data;
-}
-
-export async function setInternTaskActive(id, active) {
-  need();
-  const { error } = await supabase.rpc("set_intern_task_active", { p_id: id, p_active: !!active });
-  if (error) throw error;
-}
-
-export async function deleteInternTask(id) {
-  need();
-  const { error } = await supabase.rpc("delete_intern_task", { p_id: id });
-  if (error) throw error;
 }
 
 // 資料庫丟出來的錯誤代碼翻成人話。

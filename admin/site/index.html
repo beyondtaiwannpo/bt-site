@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BT 後台：對外</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../../shared/apple-touch-icon.png">
+<link rel="manifest" href="../../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+<meta name="theme-color" content="#102A86">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/brand.css">
+<!-- 這四支是登入後每一頁都一定會用到的，而且它們躺在相依鏈的**第三層**：
+     瀏覽器要先下載 src/main.js，才知道要 shared/auth.js，再才知道要 vendor/supabase-js.js
+     （217KB，這一頁最大的一個檔）。每一層都是一次完整的網路來回，
+     在本機看不出來，在真實網路上就是三次等待疊在「載入中…」那個畫面後面。
+     modulepreload 讓瀏覽器一開始就同時去抓，不用一層一層發現。
+     ⚠ 這不是快取或打包工具，是瀏覽器原生的一行 HTML —— 沒有 build step。
+     ⚠ 路徑改動的話這幾行要跟著改，否則瀏覽器會抓一個 404 回來（不會壞，但白費一次請求）。 -->
+<link rel="modulepreload" href="../../shared/auth.js">
+<link rel="modulepreload" href="../../shared/supabase.js">
+<link rel="modulepreload" href="../../vendor/supabase-js.js">
+<link rel="modulepreload" href="../../shared/supabase-config.js">
+<!-- 這一頁自己的模組。上面三行解決的是共用那一層，這幾行解決第二層：
+     瀏覽器要先把 src/main.js 下載完、解析完，才知道它還要 ./src/ui.js 之類的東西，
+     那又是一次完整的網路來回疊在「載入中…」後面。這幾行讓它一開始就一起抓。
+     ⚠ 檔名改了、或這一頁不再 import 某一支，這裡要跟著改 ——
+     check.sh 會檢查每一個 modulepreload 指到的檔案真的存在。 -->
+<link rel="modulepreload" href="./src/ui.js">
+<link rel="modulepreload" href="./src/data.js">
+<link rel="stylesheet" href="../../shared/nav.css">
+<style>
+  /* 色票、字體、圓角全部來自 ../shared/brand.css，這裡一個都不重新宣告。 */
+  /* 這一份外殼是從 availability/index.html 複製過來的（紙底、暖光、玻璃頂欄、
+     藥丸鈕、卡片）。**刻意各自一份，不要搬進 shared/** ——
+     規格說 shared/ 要保持極小，而版面一旦進了 shared/，
+     每加一個功能就會有人想改它，改壞一次就是四個頁面一起壞。 */
+  html{overflow-x:clip}
+  body{background:var(--paper);overflow-x:clip}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+  #bt-root{position:relative;z-index:1}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  #bt-root{font-family:var(--body);color:var(--ink);line-height:1.55;max-width:940px;margin:0 auto;padding:14px 12px 60px}
+  /* :where() 是必要的，不是風格 —— 見 passport/index.html 同一條的註解。 */
+  :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+  /* 這一條玻璃只裝分頁鈕（logo 與登出在 shared 的頂欄）。
+     不加 width:fit-content 的話它會拉滿 940px，右邊三分之二是空的，
+     看起來像少畫了東西。護照那一條右邊還有集章進度，所以那邊是滿版。 */
+  .bar{display:flex;width:fit-content;max-width:100%;
+    align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;
+    border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(237,229,216,.5));
+    backdrop-filter:blur(16px) saturate(180%);
+    -webkit-backdrop-filter:blur(16px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 8px 24px rgba(16,42,134,.08)}
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .bar{background:rgba(255,255,255,.75)}
+  }
+  .bar img{height:24px;width:auto;display:block}
+  .bar .sp{flex:1}
+  .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:999px;overflow:hidden}
+  .tabs button{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.06em;
+    padding:6px 12px;color:rgba(16,42,134,.55);transition:background .15s,color .15s}
+  .tabs button[aria-current]{background:var(--bt-navy);color:var(--bt-cream)}
+  .weeknav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:14px}
+  .weeknav b{font-family:var(--display);font-size:18px;letter-spacing:.04em}
+
+  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:18px;padding:24px 22px;
+    box-shadow:0 10px 30px rgba(16,42,134,.07)}
+  .card h2{font-family:var(--display);font-size:30px;font-weight:700;letter-spacing:.03em;margin:0 0 4px;line-height:1.05}
+  /* ⚠ 用 rgba 指定顏色不要用 opacity —— opacity 會連對比度一起打折。
+     深藍在米白上 .6 只有約 3.6:1，過不了 AA 的 4.5:1。這個 repo 踩過四次。 */
+  .card .sub{font-size:13.5px;color:rgba(16,42,134,.8);margin-bottom:18px}
+  .card p{font-size:14px;margin:0 0 12px}
+  label{display:block;margin-bottom:14px}
+  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.8);display:block;margin-bottom:5px}
+  input,select{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);padding:8px 10px;
+    border:1px solid rgba(16,42,134,.28);border-radius:12px;background:rgba(255,255,255,.7)}
+  select{width:auto;min-width:96px}
+  .btn{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    padding:11px 22px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:background .15s,color .15s}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+  .btn[disabled]{opacity:.4;cursor:default}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+  .btn.sm{font-size:14px;padding:6px 12px}
+  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.55);text-transform:none;letter-spacing:0;
+    font-family:var(--body);font-size:14px;font-weight:600;padding:2px 4px;text-decoration:underline}
+  .btn.quiet:hover{color:var(--ink)}
+  a.btn{text-decoration:none;display:inline-block}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .wnote{font-size:12.5px;padding:10px 14px;background:rgba(255,196,108,.25);border-radius:12px}
+  .wnote.big{font-size:15px;opacity:1;padding:14px 16px;margin-bottom:14px}
+  .empty{text-align:center;padding:40px 0;color:rgba(16,42,134,.78);font-size:14px}
+  .empty.sm{padding:14px 0}
+  .mini{font-size:12.5px;color:rgba(16,42,134,.8)}
+
+
+  /* ---------- 清單與卡片（從 admin/index.html 複製，各自一份） ---------- */
+  .flist{margin:0;padding:0;list-style:none}
+  .flist li{padding:16px 0;border-top:1px solid rgba(16,42,134,.14)}
+  .flist li:first-child{border-top:0;padding-top:4px}
+  .fhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .fhead b{font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:.02em}
+  /* 第二個名字（2026-09-10）。跟主要的名字同一行、小一級、淡一點 ——
+     它是幫你認人的，不是名字本身。見 ui.js 的 namesOf()。 */
+  .alt{margin-left:7px;font-family:var(--body);font-size:12.5px;font-weight:400;
+    letter-spacing:0;opacity:.62;white-space:nowrap}
+
+  .fmeta{font-size:13px;color:rgba(16,42,134,.8);margin-top:4px}
+  /* 校友頁核可清單上的那一句話（2026-09-11）。比 .fmeta 大一級，顏色是內文的深藍 ——
+     核可的對象就是這段文字，它不該跟旁邊的地點一樣小、一樣淡。 */
+  .fquote{font-size:14.5px;margin:6px 0 4px}
+  /* 狀態徽章。三種狀態三種底色，但**字一律深藍** ——
+     用顏色分辨狀態，不要用顏色當唯一的訊息（色覺不同的人看不出來），
+     所以每一顆裡面都有字。 */
+  .tag{display:inline-block;font-family:var(--display);font-size:11.5px;font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:999px;
+    background:rgba(16,42,134,.1);color:rgba(16,42,134,.9);white-space:nowrap}
+  .tag.open{background:rgba(107,198,187,.42)}
+  .tag.draft{background:rgba(198,198,198,.5)}
+  .tag.closed{background:rgba(255,196,108,.42)}
+  .count{font-family:var(--display);font-size:15px;font-weight:700}
+
+  /* 題目編輯器。一題一列，靠上面那條線分隔（跟對外頁的 .rows 同一套語言）。 */
+  .qlist{margin:0;padding:0;list-style:none}
+  .qlist li{padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+  .qlist li:first-child{border-top:0}
+  .qtop{display:flex;align-items:flex-start;gap:10px}
+  .qtop .qbody{flex:1;min-width:0}
+  .qlabel{font-weight:600;font-size:15.5px;overflow-wrap:anywhere}
+  .qsub{font-size:12.5px;color:rgba(16,42,134,.8);margin-top:3px}
+  .qmove{display:flex;flex-direction:column;gap:2px;flex:none}
+  .qmove button{font-family:var(--body);font-size:15px;line-height:1;width:30px;height:26px;
+    border:1px solid rgba(16,42,134,.22);border-radius:8px;background:rgba(255,255,255,.6)}
+  .qmove button[disabled]{opacity:.3}
+  .opts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .opts span{font-size:12.5px;padding:3px 9px;border-radius:999px;
+    background:rgba(255,255,255,.7);border:1px solid rgba(16,42,134,.18)}
+
+  textarea{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);line-height:1.6;
+    padding:10px 12px;border:1px solid rgba(16,42,134,.28);border-radius:12px;
+    background:rgba(255,255,255,.7);resize:vertical;min-height:88px}
+  /* 實習護照分頁的小標（2026-10-18），跟 /settings/ 的 .sec-h 同一個長相。 */
+  .sec-h{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.03em;margin:22px 0 8px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  @media (max-width:560px){ .two{grid-template-columns:1fr} }
+  /* 一列裡的小標籤加輸入，label 本身已經是 block，這裡只收掉下緣間距。 */
+  .two label{margin-bottom:14px}
+  /* ---------- 審核（批 4）---------- */
+  .arow{display:flex;gap:12px;align-items:flex-start}
+  .apick{flex:none;padding-top:4px}
+  .apick input{width:19px;height:19px;accent-color:var(--bt-navy);cursor:pointer;margin:0}
+  .abody{flex:1;min-width:0}
+  .ans{margin-top:9px}
+  .ans summary{font-size:13.5px;color:rgba(16,42,134,.82);cursor:pointer;
+    display:inline-block;padding:3px 0}
+  .ans dl{margin:8px 0 0;padding:12px 14px;border-radius:12px;
+    background:rgba(255,255,255,.55);border:1px solid rgba(16,42,134,.14)}
+  .ans dt{font-size:12.5px;font-weight:700;letter-spacing:.02em;color:rgba(16,42,134,.75);margin-top:12px}
+  .ans dt:first-child{margin-top:0}
+  .ans dd{margin:4px 0 0;font-size:14.5px;line-height:1.6;overflow-wrap:anywhere}
+  /* 批次列。**選了人才變顯眼**——沒選人的時候它只是一行說明，
+     一直亮著的話那三顆會寄信的按鈕就變成背景的一部分。 */
+  .bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 4px;
+    padding:11px 13px;border-radius:14px;font-size:13.5px;
+    background:rgba(255,255,255,.45);border:1px solid rgba(16,42,134,.16)}
+  .bulk.on{background:rgba(255,196,108,.28);border-color:rgba(16,42,134,.28)}
+  /* ⚠ .chips 與 .chip 在 availability/index.html 裡是「批次填寫」那一段的樣式，
+     而這份外殼是從它的前半段複製過來的 —— 所以要在這裡自己寫一份。
+     2026-09-08 漏掉過一次：篩選那一排看起來像四段純文字，沒有人知道可以點。 */
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-family:var(--body);font-size:13.5px;font-weight:600;padding:0 13px;height:34px;
+    border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7);
+    color:var(--ink);transition:background .15s,color .15s}
+  .chip:hover{background:rgba(255,255,255,.95)}
+  .chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+  .chip.wide{min-width:0}
+  /* 後台的分組列（2026-10-15）：四個資料夾各一份。是連結不是按鈕，所以 a.chip 去掉底線；
+     灰字是進不去的組，title 裡寫為什麼。 */
+  .groups{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+  a.chip{text-decoration:none;display:inline-flex;align-items:center}
+  .chip.off{opacity:.45;cursor:default}
+  .hub{margin:0 0 14px;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+  .hub li b{font-family:var(--display);font-size:18px;letter-spacing:.03em;display:block}
+  .hub li span{font-size:13px;color:rgba(16,42,134,.8)}
+  .hub li.off{opacity:.45}
+  @media (max-width:560px){ .hub{grid-template-columns:1fr} }
+  .alist2 li{padding:18px 0}
+
+  /* ---------- 信件預覽（2026-09-08）---------- */
+  /* 預覽要看起來像一封信，不像一個輸入框 —— 白底、等寬留白、換行照原樣。
+     看起來像信，人才會用讀信的方式讀它，也才看得出哪裡怪。 */
+  .mailprev{background:rgba(255,255,255,.72);border:1px solid rgba(16,42,134,.18);
+    border-radius:14px;padding:18px 20px;max-width:38em}
+  .mailprev b{display:block;font-weight:600;font-size:15.5px;
+    padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(16,42,134,.14)}
+  .mailprev pre{margin:0;font-family:var(--body);font-size:14.5px;line-height:1.75;
+    white-space:pre-wrap;overflow-wrap:anywhere}
+  /* 系統加的那一段用淡一點的顏色，但**仍然過得了對比**（rgba .72 約 5.7:1）。
+     用 opacity 的話會連對比一起打折，這個 repo 踩過六次。 */
+  /* ⚠ margin-top 要撐出一個空行。信裡那一段前面真的有 \n\n，
+     但預覽拆成兩個 <pre>，換行就被吃掉了 —— 預覽要跟寄出去的一樣，
+     不然它就在騙人，而預覽騙人比沒有預覽糟。 */
+  .mailprev pre.tail{color:rgba(16,42,134,.72);margin-top:1.75em}
+
+/* 開了「減少動態效果」就把所有動畫與過渡關掉。
+   **這是無障礙需求不是視覺偏好**（2026-08-25 裁定），check-motion.mjs 守著。
+   這三頁 2026-09-08 之前完全沒有這個區塊 —— 是那支守門的範圍
+   從 passport 一頁擴到全站之後才露出來的。 */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
+
+/* ═════════ 點下去要有回饋（2026-09-08）═════════ */
+/* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
+   Paul 的要求：「點擊會有回饋」。
+
+   ⚠ **五個登入後的頁面設了 -webkit-tap-highlight-color:transparent**，
+   那一行會把手機上唯一的預設回饋關掉。關掉就一定要自己補一個 ——
+   在那之前，那五頁在手機上按下去畫面完全不動，
+   而**畫面不動的時候使用者會再按一次**（這個 repo 一路上最常見的失敗形狀）。
+
+   ⚠ **不要給它 transition。** 按下去的回饋要立刻發生；
+   加了過渡就變成「按了之後才慢慢縮」，那比沒有回饋更像卡住。
+   沒有 transition 也表示它不是「會動位置的過渡」，
+   對 prefers-reduced-motion 沒有意義 —— 按鍵回饋不是前庭刺激來源。 */
+button{cursor:pointer}
+button[disabled]{cursor:default}
+button:not([disabled]):active,
+a.btn:active, a.cta:active, a.login:active, a.photo:active, a.avbtn:active,
+summary:active{
+  transform:scale(.97);
+}
+/* 實心的主要按鈕：壓下去再暗一階，光靠縮小在小按鈕上看不太出來。 */
+.btn:not([disabled]):not(.ghost):not(.quiet):active,
+a.btn:not(.ghost):active, a.cta:active, a.login:active{
+  background:var(--bt-navy);color:var(--bt-cream);filter:brightness(.88);
+}
+/* 框線鈕：壓下去底色再深一點。
+   ⚠ **.chip.on 要排除。** 選起來的 chip 底色是深藍，
+   蓋一層淺色上去會讓它在按著的時候閃白一下，看起來像取消選取。 */
+/* 用橘色不用深藍調淡：深藍 12% 在米白上讀起來是**冷灰**，
+   而整站是暖的 —— 那一下按壓會看起來像變髒，不像有回應。
+   橘色本來就是這個品牌「正在動的東西」的顏色，而正在被按的就是那個東西。 */
+.btn.ghost:not([disabled]):active, .chip:not(.on):active,
+.lang:active, .btnav-out:active{
+  background:rgba(255,196,108,.38);
+}
+.chip.on:active{filter:brightness(1.15)}
+/* 整行可以點的東西（單選、多選、勾選框）：按著的時候整行變色。
+   這些是 <label> 不是 <button>，上面那條抓不到，而它們是**手機上最常按的東西**。 */
+.opt:active, .check:active{background:rgba(255,196,108,.26);border-radius:10px}
+/* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
+.body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
+summary{cursor:pointer}
+</style>
+</head>
+<body>
+<div id="bt-root"><div class="empty">載入中…</div></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

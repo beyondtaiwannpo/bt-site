@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as R from "../resources/src/ui.js";
-import * as M from "../admin/src/ui.js";
+import * as M from "../admin/site/src/ui.js";
 
 const items = [
   { id: "1", kind: "book", title: "College Resource Book", blurb: "從高一到送出申請的完整時程。",
@@ -78,8 +78,11 @@ test("編輯頁講清楚介紹是公開的（那是搜尋引擎唯一看得到�
   assert.match(M.resEditHTML(null, "", false), /Google 也看得到/);
 });
 
-test("兩個大分頁：申請表與資源，當前的那一個有標記", () => {
-  assert.match(M.tabsHTML("res"), /data-t="res"[^>]*class|class="chip wide on" data-act="tab" data-t="res"/);
-  const h = M.tabsHTML("forms");
-  assert.ok(h.includes('data-t="forms"') && h.includes('data-t="res"'));
+// 2026-10-15 後台拆資料夾：資源在「對外」那一組（/admin/site/），所有幹部進得去；
+// 申請在 /admin/ 首頁，從分組列過去。
+test("資源分頁是這一組的第一個分頁，當前的那一個有標記", () => {
+  assert.match(M.tabsHTML("res"), /class="chip wide on" data-act="tab" data-t="res"/);
+  assert.ok(!M.tabsHTML("res", false).includes('data-t="team"'), "一般幹部看不到團隊頁那個分頁");
+  const bar = M.groupBarHTML("site", { role: "cadre", board: "member", team: "" });
+  assert.ok(bar.includes('data-group="forms"') && bar.includes('data-group="site"'));
 });

@@ -26,8 +26,10 @@ export const FEATURES = [
   // 由資料庫的 is_director_of() 決定，不是靠這裡藏一個連結。
   // **不要在這裡加一層 board_role 的過濾**：那會讓一般幹部連自己 team 的
   // 申請都看不到，而那不是拍板的內容。
-  { key: "admin",        label: "申請管理", href: "/admin/",        roles: ["cadre"],
-    title: "申請管理",     desc: "開申請表、看自己 team 收到的申請" },
+  // 2026-10-15：後台拆成四個資料夾（申請、對外、護照、人與權限），這一筆改名「後台」。
+  // 子資料夾不進頂欄：誰進得去哪一組由 /admin/ 首頁的分組列帶，這裡仍然不認 board_role。
+  { key: "admin",        label: "後台",     href: "/admin/",        roles: ["cadre"],
+    title: "後台",         desc: "申請表與審核、對外內容、護照的格子、邀請碼" },
   // 2026-09-08：設定。**這是第一個 roles 含 student 的項目。**
   // 這個檔案的檔頭一直寫著「之後開放給學員的功能只要在 roles 加 student，
   // 列就自動長出來，不用另外設計一條路徑」—— 就是這一刻。

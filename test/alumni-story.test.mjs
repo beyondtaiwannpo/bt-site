@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML,
          saveFailMessage } from "../settings/src/ui.js";
-import { alumniStoriesHTML, tabsHTML } from "../admin/src/ui.js";
-import { says } from "../admin/src/data.js";
+import { alumniStoriesHTML, tabsHTML } from "../admin/site/src/ui.js";
+import { says } from "../admin/site/src/data.js";
 
 const FULL = {
   display_name: "張 O 睿", school: "高雄中學", county: "高雄", city: "Vancouver",
@@ -240,10 +240,10 @@ test("★ 校友頁分頁只有 Co-President 看得到", () => {
 
 // 核可完要回得了申請表。少了分頁列就只能重新載入整頁，
 // 而 Paul 就是要一個一個按核可的人。
-test("★ 校友頁本身畫得出分頁列（核可完回得去申請表）", () => {
+test("★ 校友頁本身畫得出分頁列（核可完回得去資源）", () => {
   const h = alumniStoriesHTML([ROW], "", false);
   assert.match(h, /data-act="tab"/);
-  assert.match(h, /data-t="forms"/);
+  assert.match(h, /data-t="res"/);
 });
 
 // ⚠ touch_updated_at() 是 before update 的 trigger，而核可本身也是一句 update，
@@ -279,7 +279,7 @@ test("★ stories_for_review() 回傳的欄位含 approved_at", () => {
 // 而那正是核可時最該看到的東西。名字要在 stories_for_review() 裡就解析好。
 // 這條守的是那個決定本身：有人「順手」把查 profiles 那段加回來就會紅。
 test("★ loadStories 只呼叫 stories_for_review()，不自己去查 profiles 補名字", () => {
-  const src = readFileSync(new URL("../admin/src/data.js", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../admin/site/src/data.js", import.meta.url), "utf8");
   const m = src.match(/export async function loadStories\(\)[\s\S]*?\n\}/);
   assert.ok(m, "找不到 loadStories()");
   assert.match(m[0], /supabase\.rpc\("stories_for_review"\)/);

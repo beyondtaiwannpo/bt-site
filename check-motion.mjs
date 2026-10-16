@@ -27,6 +27,8 @@ const PAGES = [
   "alumni/index.html", "app/index.html", "admin/index.html", "settings/index.html",
   "availability/index.html", "passport/index.html", "privacy/index.html",
   "reset/index.html", "join/index.html", "intern-passport/index.html",
+  // 2026-10-15 後台拆成四個資料夾。
+  "admin/site/index.html", "admin/passports/index.html", "admin/people/index.html",
 ];
 const files = fs.readdirSync(".", { recursive: true })
   .filter(f => f.endsWith("index.html") && !f.includes("node_modules"));

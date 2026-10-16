@@ -158,9 +158,9 @@ async function main() {
     await go("/passport/");
     if (await until(`document.getElementById("fz") || document.querySelector(".book") || document.querySelector('[data-act="intro-done"]')`, "幹部護照")) ok("幹部護照打得開（從零重建後三張表的權限都在）");
     await go("/admin/");
-    if (await until(`document.querySelector('[data-t="interns"]')`, "後台有「實習護照」分頁")) ok("Co-President 的後台有「實習護照」分頁");
-    await click('[data-t="interns"]');
-    await until(`document.querySelector('[data-act="intern-task-new"]')`, "實習護照分頁載完");
+    if (await until(`document.querySelector('a[data-group="passports"]')`, "後台首頁有「護照」那一組")) ok("Co-President 的後台首頁有「護照」那一組（是連結）");
+    await go("/admin/passports/");
+    await until(`document.querySelector('[data-act="intern-task-new"]')`, "實習護照那一頁載完");
     await has("目前 0 位 intern", "還沒有 intern 時數字是 0");
     expect(await count('[data-act="intern-task-edit"]') === 9, "九格範例格子都在");
     await has("目前這一屆", "2026-27 標著目前這一屆");
@@ -302,7 +302,10 @@ async function main() {
     if (await until(`location.pathname === "/intern-passport/"`, "intern 打幹部護照會被導走")) ok("intern 打 /passport/ 最後被送回自己的實習護照");
     await go("/admin/");
     await until(`document.body.innerText.includes("幹部")`, "後台的擋人頁");
-    expect(await count('[data-t="interns"]') === 0, "intern 進不了後台");
+    expect(await count('[data-group]') === 0, "intern 進不了後台");
+    await go("/admin/passports/");
+    await until(`document.body.innerText.includes("幹部")`, "護照那一組的擋人頁");
+    expect(await count('[data-act="intern-task-new"]') === 0, "intern 硬打網址也進不了護照那一組");
 
     // ════════ 3. Internship team 的幹部：只有牆 ════════
     console.log("\nInternship team 的幹部：");
@@ -318,9 +321,10 @@ async function main() {
     await hasNot("第一次開會很緊張", "看不到心得");
     expect(psql("select count(*) from public.intern_entries") === "1", "（心得在資料庫裡，是 RLS 不給看）");
     await go("/admin/");
-    if (await until(`document.querySelector('[data-t="interns"]')`, "後台分頁")) ok("後台有「實習護照」分頁");
-    await click('[data-t="interns"]');
-    await until(`document.querySelector('[data-act="intern-task-new"]')`, "分頁載完");
+    if (await until(`document.querySelector('a[data-group="passports"]')`, "後台首頁")) ok("後台首頁的「護照」那一組對 Internship team 是連結");
+    expect(await count('a[data-group="people"]') === 0, "「人與權限」對 Internship team 的幹部是灰字");
+    await go("/admin/passports/");
+    await until(`document.querySelector('[data-act="intern-task-new"]')`, "護照那一組載完");
     await has("1 人蓋過", "後台看得到那一格被蓋過");
     expect(await count('[data-act="intern-task-del"][data-id="T2627-01"]') === 0, "蓋過的格子沒有刪掉按鈕");
     expect(await count('[data-act="intern-task-del"][data-id="T2627-02"]') === 1, "沒人蓋過的有");
@@ -335,8 +339,11 @@ async function main() {
     await go("/intern-passport/");
     if (await until(`location.pathname === "/app/"`, "被導走")) ok("打 /intern-passport/ 被導回 /app/");
     await go("/admin/");
-    await until(`document.querySelector('[data-t="forms"]')`, "後台");
-    expect(await count('[data-t="interns"]') === 0, "後台沒有「實習護照」分頁");
+    await until(`document.querySelector('[data-group="forms"]')`, "後台");
+    expect(await count('a[data-group="passports"]') === 0, "後台首頁的「護照」那一組是灰字");
+    await go("/admin/passports/");
+    await until(`document.body.innerText.includes("Internship team 用得到")`, "護照那一組的擋人頁");
+    expect(await count('[data-act="intern-task-new"]') === 0, "硬打網址也改不到格子");
     expect(await count('nav.btnav a[href="/intern-passport/"]') === 0, "頂欄沒有實習護照");
 
     // ════════ 5. 登入那一層：以前替身模仿的，現在是 GoTrue 真的回的 ════════

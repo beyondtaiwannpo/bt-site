@@ -1,10 +1,10 @@
-// 後台的「邀請碼」分頁（2026-10-14）。只有 Co-President 看得到。
+// 後台的「邀請碼」分頁（2026-10-14，2026-10-15 搬到 /admin/people/）。只有 Co-President 看得到。
 // 同一天加了新增與停用，不做刪除（Paul 拍板）。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { inviteCodesHTML, inviteFormHTML, suggestCode, tabsHTML } from "../admin/src/ui.js";
-import { says } from "../admin/src/data.js";
+import { inviteCodesHTML, inviteFormHTML, suggestCode, tabsHTML, noAccessHTML, canEnter, GROUPS } from "../admin/people/src/ui.js";
+import { says } from "../admin/people/src/data.js";
 
 const ROWS = [
   { code: "BT-CADRE", grants: "cadre", uses_left: 1, note: "給新幹部", created_at: "2026-10-01T03:00:00+00:00",
@@ -13,9 +13,17 @@ const ROWS = [
     uses: [{ name: "老校友", email: "alum@example.com", role: "cadre", grants: "alumni", used_at: "2026-10-14T06:00:00+00:00" }] },
 ];
 
-test("分頁只出現在 Co-President 那一列", () => {
-  assert.match(tabsHTML("forms", true), /data-t="invites"/);
-  assert.doesNotMatch(tabsHTML("forms", false), /data-t="invites"/);
+// 2026-10-15 後台拆資料夾：邀請碼在 /admin/people/，整組只有 Co-President 進得去。
+// 分組列上那一格對其他人是灰字，硬打網址進來看到的是 noAccessHTML，上面沒有任何按鈕。
+test("「人與權限」那一組只有 Co-President 進得去", () => {
+  const people = GROUPS.find(g => g.key === "people");
+  assert.equal(canEnter(people, { role: "cadre", board: "president", team: "" }), true);
+  assert.equal(canEnter(people, { role: "cadre", board: "director", team: "Internship Team" }), false);
+  assert.equal(canEnter(people, { role: "student", board: "president", team: "" }), false, "學員就算 board_role 被誤設也進不去");
+  const h = noAccessHTML({ role: "cadre", board: "member", team: "" });
+  assert.match(h, /Co-President/);
+  assert.doesNotMatch(h, /data-act="invite-new"/);
+  assert.match(tabsHTML("invites"), /data-t="invites"/);
 });
 
 test("每一組碼畫出剩幾次、身分、備註與誰用過", () => {

@@ -1,10 +1,10 @@
-// 實習護照的後台分頁（/admin/，2026-10-18）：Internship team 自己改格子、開新的一屆。
+// 實習護照的後台分頁（/admin/passports/，2026-10-18 做在 /admin/、2026-10-15 搬過來）：Internship team 自己改格子、開新的一屆。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tabsHTML, setInternStaff, internAdminHTML, internTermEditHTML, internTaskEditHTML,
-         suggestTaskId, INTERN_CATS } from "../admin/src/ui.js";
-import { says } from "../admin/src/data.js";
+import { tabsHTML, internAdminHTML, internTermEditHTML, internTaskEditHTML, noAccessHTML, canEnter, GROUPS,
+         suggestTaskId, INTERN_CATS } from "../admin/passports/src/ui.js";
+import { says } from "../admin/passports/src/data.js";
 
 const DATA = {
   terms: [
@@ -20,20 +20,22 @@ const DATA = {
   interns: 4,
 };
 
-test("Co-President 在實習護照分頁上，其他分頁不會不見", () => {
+test("實習護照那一頁畫得出這一組的分頁列", () => {
   const h = internAdminHTML(DATA, null, "", false, true);
-  assert.match(h, /data-t="invites"/);
-  assert.doesNotMatch(internAdminHTML(DATA, null, "", false, false), /data-t="invites"/);
+  assert.match(h, /data-t="interns"/);
 });
 
-test("分頁：Internship team 的幹部看得到，別的 team 看不到，Co-President 一律看得到", () => {
-  setInternStaff(false);
-  assert.doesNotMatch(tabsHTML("forms", false), /data-t="interns"/);
-  assert.match(tabsHTML("forms", true), /data-t="interns"/);
-  assert.match(tabsHTML("forms", false, true), /data-t="interns"/);
-  setInternStaff(true);
-  assert.match(tabsHTML("forms", false), /data-t="interns"/, "setInternStaff 之後，每一個分頁列都該有這一項");
-  setInternStaff(false);
+// 2026-10-15 後台拆資料夾：「護照」那一組的門在分組列（灰字）與 main.js 開頁第一句，
+// 真正的門在資料庫那五支函式的第一句 is_internship_team()。
+test("「護照」那一組：Internship team 的幹部進得去，別的 team 進不去，Co-President 一律進得去", () => {
+  const g = GROUPS.find(x => x.key === "passports");
+  assert.equal(canEnter(g, { role: "cadre", board: "member", team: "Curriculum Team" }), false);
+  assert.equal(canEnter(g, { role: "cadre", board: "president", team: "" }), true);
+  assert.equal(canEnter(g, { role: "cadre", board: "member", team: "Marketing Team, Internship Team" }), true, "一個人在好幾個 team 也要認得出來");
+  assert.equal(canEnter(g, { role: "intern", board: "member", team: "Internship Team" }), false, "intern 不是幹部");
+  const h = noAccessHTML({ role: "cadre", board: "member", team: "Curriculum Team" });
+  assert.match(h, /Internship team/);
+  assert.doesNotMatch(h, /data-act="intern-task-new"/);
 });
 
 test("三個分類跟 intern_tasks 的 check 一字不差（後台的下拉選單不能多也不能少）", () => {
@@ -122,7 +124,7 @@ test("後台的錯誤碼都翻成人話，而且函式還沒跑進資料庫時�
 });
 
 test("★ 主程式每一個實習護照的動作成功或失敗都會寫 S.msg（畫面要有回饋）", () => {
-  const src = readFileSync("admin/src/main.js", "utf8");
+  const src = readFileSync("admin/passports/src/main.js", "utf8");
   for (const act of ["intern-term-save", "intern-term-activate", "intern-task-save", "intern-task-off", "intern-task-del"]) {
     const i = src.indexOf(`act === "${act}"`);
     assert.ok(i > 0, `找不到 ${act}`);
@@ -134,7 +136,7 @@ test("★ 主程式每一個實習護照的動作成功或失敗都會寫 S.msg�
 });
 
 test("★ 後台資料層寫入只走函式，不直接 insert / update intern_* 表", () => {
-  const src = readFileSync("admin/src/data.js", "utf8").replace(/\/\/[^\n]*/g, "");
+  const src = readFileSync("admin/passports/src/data.js", "utf8").replace(/\/\/[^\n]*/g, "");
   assert.doesNotMatch(src, /from\("intern_[a-z]+"\)\s*\.(insert|update|upsert|delete)/);
   for (const fn of ["save_intern_term", "activate_intern_term", "save_intern_task", "set_intern_task_active", "delete_intern_task"])
     assert.ok(src.includes(`rpc("${fn}"`), `沒有呼叫 ${fn}`);

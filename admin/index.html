@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BT 申請管理</title>
+<title>BT 後台</title>
 <link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
 <link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
@@ -184,6 +184,16 @@
   .chip:hover{background:rgba(255,255,255,.95)}
   .chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
   .chip.wide{min-width:0}
+  /* 後台的分組列（2026-10-15）：四個資料夾各一份。是連結不是按鈕，所以 a.chip 去掉底線；
+     灰字是進不去的組，title 裡寫為什麼。 */
+  .groups{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+  a.chip{text-decoration:none;display:inline-flex;align-items:center}
+  .chip.off{opacity:.45;cursor:default}
+  .hub{margin:0 0 14px;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+  .hub li b{font-family:var(--display);font-size:18px;letter-spacing:.03em;display:block}
+  .hub li span{font-size:13px;color:rgba(16,42,134,.8)}
+  .hub li.off{opacity:.45}
+  @media (max-width:560px){ .hub{grid-template-columns:1fr} }
   .alist2 li{padding:18px 0}
 
   /* ---------- 信件預覽（2026-09-08）---------- */
