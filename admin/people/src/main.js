@@ -11,9 +11,11 @@ const HERE = "/admin/people/";
 
 let S = {
   user: null, me: null, down: false, busy: false, msg: "",
-  view: "invites",
+  view: "roster",          // roster | person | invites
   // 一定要有初始值：載入失敗之後再 render 一次不能整頁空白。
   invites: [], inviteDraft: null,
+  // 幹部名單（2026-10-21，批 3）
+  roster: [], changes: [], privileged: [], person: null, personDraft: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -31,7 +33,10 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
   if (!isPres()) { el.innerHTML = nav + UI.noAccessHTML(S.me); return; }
 
-  const body = UI.inviteCodesHTML(S.invites, S.msg, S.busy, S.inviteDraft);
+  let body;
+  if (S.view === "invites") body = UI.inviteCodesHTML(S.invites, S.msg, S.busy, S.inviteDraft);
+  else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.privileged, S.user.id, S.msg, S.busy, S.personDraft);
+  else body = UI.rosterHTML(S.roster, S.changes, S.privileged, S.user.id, S.msg, S.busy);
   el.innerHTML = nav + UI.groupBarHTML("people", S.me) + body;
 }
 
@@ -43,7 +48,9 @@ async function boot() {
     if (!S.user) { render(); return; }
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre" || !isPres()) { render(); return; }
-    await openInvites();
+    // ?tab=invites 直接開邀請碼（README 的連結用得到）。
+    if (new URLSearchParams(location.search).get("tab") === "invites") await openInvites();
+    else await openRoster();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-people"); return; }
     console.error(HERE + " 載入失敗：", e);
@@ -62,6 +69,22 @@ async function openInvites() {
   render();
 }
 
+// 幹部名單、變動紀錄、會長出權限的 team。三個查詢一起發。
+// 紀錄與 team 清單載不到不該讓名單打不開（遷移檔還沒跑的時候），所以各自接住。
+async function openRoster(keepMsg) {
+  S.busy = true; if (!keepMsg) S.msg = ""; render();
+  try {
+    const [roster, changes, privileged] = await Promise.all([
+      D.loadRoster(),
+      D.loadRoleChanges().catch(e => { S.msg = "變動紀錄載不到：" + D.says(e); return []; }),
+      D.loadPrivilegedTeams().catch(() => [{ name: "Internship Team" }]),
+    ]);
+    S.roster = roster; S.changes = changes; S.privileged = privileged;
+    S.view = "roster"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "名單載不到：" + D.says(e); S.view = "roster"; }
+  render();
+}
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -69,7 +92,48 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
-  if (act === "tab") { S.msg = ""; await openInvites(); return; }
+  if (act === "tab") {
+    S.msg = "";
+    if (b.dataset.t === "invites") await openInvites(); else await openRoster();
+    return;
+  }
+
+  // ── 幹部名單（2026-10-21，批 3）────────────────────────────────────
+  if (act === "roster-back") { await openRoster(); return; }
+  if (act === "person-edit") {
+    const p = S.roster.find(x => x.id === b.dataset.id);
+    if (!p) { S.msg = "找不到這個人，重新整理再試一次。"; render(); return; }
+    S.person = p; S.personDraft = null; S.view = "person"; S.msg = ""; render(); return;
+  }
+  if (act === "person-save") {
+    const p = S.roster.find(x => x.id === b.dataset.id);
+    if (!p) { S.msg = "找不到這個人，重新整理再試一次。"; render(); return; }
+    const roleEl = document.getElementById("pk-role");
+    const role = roleEl && !roleEl.disabled ? roleEl.value : p.board_role;
+    const team = [...document.querySelectorAll('input[name="team"]:checked')].map(x => x.value.trim()).filter(Boolean).join(", ");
+    S.personDraft = { board_role: role, team };
+    const roleChanged = role !== (p.board_role || "member");
+    const teamChanged = UI.parseTeams(team).join("|") !== UI.parseTeams(p.team).join("|");
+    if (!roleChanged && !teamChanged) { S.msg = "沒有改到任何東西。"; render(); return; }
+    // ⚠ 升成 Co-President 等於把整個後台給他，包括把你降級。畫面多問一次，資料庫那一側刻意不擋（換屆要用）。
+    if (roleChanged && role === "president" &&
+        !confirm(`把「${UI.namesOf(p).name}」升成 Co-President？\n\n他會拿到跟你一樣的全部權限，包括發邀請碼、改別人的職位、把你降級。這一筆會記在變動紀錄裡。`)) return;
+    S.busy = true; S.msg = ""; render();
+    const done = [];
+    try {
+      if (roleChanged) { await D.setBoardRole(p.id, role); done.push(`職位改成${UI.boardLabel(role)}`); }
+      if (teamChanged) { await D.setTeam(p.id, team); done.push(`team 改成${team || "（沒有）"}`); }
+      S.personDraft = null;
+      S.msg = `「${UI.namesOf(p).name}」${done.join("、")}。已經記進變動紀錄。`;
+      await openRoster(true);
+    } catch (err) {
+      // 職位改好了但 team 沒改到（或反過來）要講清楚，不然他會把改好的那一半再改一次。
+      S.busy = false;
+      S.msg = (done.length ? done.join("、") + "存好了，但後面那一步" : "") + "存不起來：" + D.says(err);
+      render();
+    }
+    return;
+  }
 
   // ── 邀請碼的新增與停用（2026-10-14）────────────────────────────────
   if (act === "invite-suggest" || act === "invite-new") {

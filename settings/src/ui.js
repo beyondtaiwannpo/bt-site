@@ -52,12 +52,33 @@ export function formatTeams(list) {
 // ⚠ **本來就存在、但不在清單裡的值要原樣留著，而且是勾起來的。**
 // 直接換成固定的六個勾的話，那個人一按儲存，他填的東西就消失了，
 // 而他不會發現 —— 畫面上本來就沒有那一格。
-export function teamPickHTML(cur) {
+//
+// 2026-10-21（後台重整批 3，Paul 2026-10-15 拍板第 2 題）：team 決定後台的權限，所以
+//   - Director 與 Co-President 的 team 鎖住，只有 Co-President 在後台改（locked = true，整塊變成唯讀）。
+//   - 一般幹部仍然自己勾，但「會長出權限的 team」（privileged，現在只有 Internship Team）
+//     沒勾的那一格關掉，要 Co-President 加。本來就在裡面的照樣勾著、也退得出來。
+// 畫面上關掉只是提醒；真正的門是資料庫上的 trigger（2026-10-21-people-admin.sql），
+// 硬改也存不進去，會看到「要 Co-President 改」那一句。
+export function teamLocked(me) {
+  return !!me && me.role === "cadre" && (me.board_role === "director" || me.board_role === "president");
+}
+export function teamPickHTML(cur, locked, privileged) {
   const picked = parseTeams(cur);
   const extra = picked.filter(t => !TEAMS.includes(t));
-  const box = (t, label) => `<label class="check tpick">
-    <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}>
-    <span>${esc(label)}</span></label>`;
+  const priv = privileged || [];
+  if (locked) {
+    return `<fieldset class="teams">
+      <legend>所屬 team</legend>
+      <div class="tgrid"><span>${picked.length ? esc(picked.join("、")) : "（還沒有）"}</span></div>
+      <div class="mini">你是 Director 或 Co-President，team 決定你在後台管得到哪些東西，所以由 Co-President 在後台改。要改請找他們。</div>
+    </fieldset>`;
+  }
+  const box = (t, label) => {
+    const lock = priv.includes(t) && !picked.includes(t);
+    return `<label class="check tpick">
+    <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}${lock ? " disabled" : ""}>
+    <span>${esc(label)}${lock ? "（要 Co-President 加）" : ""}</span></label>`;
+  };
   return `<fieldset class="teams">
     <legend>所屬 team（可以選好幾個）</legend>
     <div class="tgrid">
@@ -121,7 +142,7 @@ export function settingsHTML(me, msg, busy, story) {
       <label><i>中文姓名</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
       <label><i>英文姓名</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
     </div>
-    ${cadre ? teamPickHTML(me.team) : ""}`
+    ${cadre ? teamPickHTML(me.team, teamLocked(me), me.privileged_teams) : ""}`
     : `<label><i>你的名字</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
     <div class="two">
       <label><i>就讀學校</i><input id="school" list="schools" value="${v("school")}"
@@ -315,8 +336,14 @@ export function deleteHTML(msg, busy) {
 // 「我的資料」與「我的故事」是兩張表、兩句話。前一句成功、後一句失敗的時候，
 // 只說「存不起來」是假的：他會以為整頁都沒存到，於是把已經存好的東西再改一次，
 // 而真正失敗的那一半他完全不知道。
+// 資料庫那條守 team 的 trigger 丟出來的兩個代碼翻成人話（2026-10-21）。
+const SAYS = [
+  ["team_locked", "你的 team 由 Co-President 在後台改，這裡改不動。名字與大頭照有存進去的話上面會說。"],
+  ["team_needs_president", "勾進那個 team 會多出後台的權限，要 Co-President 在後台加。其他的勾選先拿掉再存一次。"],
+];
 export function saveFailMessage(profileSaved, err) {
-  const why = (err && (err.message || err.code)) || String(err || "");
+  let why = (err && (err.message || err.code)) || String(err || "");
+  for (const [code, text] of SAYS) if (why.includes(code)) { why = text; break; }
   return profileSaved
     ? `你的資料存起來了，但「我的故事」那一段沒有存進去：${why}。再按一次「存起來」會重試那一段。`
     : `存不起來：${why}`;

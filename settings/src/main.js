@@ -113,6 +113,14 @@ async function boot() {
     const { data, error } = meRes;
     if (error) throw error;
     S.me = { ...(data || {}), email: S.user.email };
+    // 哪幾個 team 一勾就會長出後台權限（2026-10-21）。讀不到就當成只有 Internship Team，
+    // 畫面少關一格不是安全問題，資料庫的 trigger 還是會擋。
+    if (S.me.role === "cadre") {
+      try {
+        const { data: pt } = await supabase.from("privileged_teams").select("name");
+        S.me.privileged_teams = (pt && pt.length) ? pt.map(r => r.name) : ["Internship Team"];
+      } catch (e) { S.me.privileged_teams = ["Internship Team"]; }
+    }
     // 「我的故事」是另一張表。學員沒有這一區，所以查回來的東西直接丟掉。
     if (S.me.role === "cadre" || S.me.role === "alumni") {
       const { data: st, error: e2 } = storyRes;
@@ -277,7 +285,9 @@ document.addEventListener("click", async e => {
       patch = {
         name_zh: val("nzh") || null,
         name_en: val("nen") || null,
-        team: pickedTeams() || null,
+        // Director 與 Co-President 的 team 鎖住（畫面上沒有勾選框），送原值；資料庫那條 trigger
+        // 看到沒變就放行。送 null 的話等於「把 team 清掉」，會被 team_locked 擋下來，連名字都存不到。
+        team: UI.teamLocked(S.me) ? (S.me.team || null) : (pickedTeams() || null),
         public_profile: !!(document.getElementById("pub") || {}).checked,
         public_title: document.getElementById("ptitle") ? (val("ptitle") || null) : S.me.public_title,
       };

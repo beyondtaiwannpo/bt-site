@@ -184,6 +184,17 @@
   .chip:hover{background:rgba(255,255,255,.95)}
   .chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
   .chip.wide{min-width:0}
+  /* team 勾選那一塊（2026-10-21）。從 settings/index.html 複製，各自一份。 */
+  .teams{border:0;margin:0 0 16px;padding:0;min-width:0}
+  .teams legend{padding:0;font-size:12px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:rgba(16,42,134,.78);margin-bottom:8px}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));
+    gap:2px 14px}
+  .tgrid .check{margin:0}
+  .check{display:flex;gap:11px;align-items:flex-start;margin:0 0 14px;padding:4px 0;
+    font-size:14.5px;line-height:1.6;cursor:pointer}
+  .check input[type="checkbox"]{width:19px;height:19px;flex:none;margin:2px 0 0;
+    accent-color:var(--bt-navy);cursor:pointer}
   /* 後台的分組列（2026-10-15）：四個資料夾各一份。是連結不是按鈕，所以 a.chip 去掉底線；
      灰字是進不去的組，title 裡寫為什麼。 */
   .groups{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}

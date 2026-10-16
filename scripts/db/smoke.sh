@@ -153,6 +153,11 @@ revoke all on public.months, public.activities, public.destinations, public.visa
 grant select on public.months, public.activities, public.destinations to authenticated;
 revoke all on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
+-- 2026-10-21-people-admin.sql 的 trigger 要靠「本人在 /settings/ 改 team」來測，
+-- 所以照 2026-08-31 那支的樣子把本人可改的那幾欄與政策放上（縮小版）。
+create policy profiles_write on public.profiles for update to authenticated
+  using (auth.uid() = id) with check (auth.uid() = id);
+grant update (name_zh, name_en, team, tz, avatar) on public.profiles to authenticated;
 SQL
 
 echo
@@ -176,7 +181,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-10-17-intern-passport.sql \
          supabase/migrations/2026-10-18-intern-admin.sql \
          supabase/migrations/2026-10-19-regrant-passport-tables.sql \
-         supabase/migrations/2026-10-20-passport-admin.sql ; do
+         supabase/migrations/2026-10-20-passport-admin.sql \
+         supabase/migrations/2026-10-21-people-admin.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -673,6 +679,70 @@ if echo "${pagot}" | grep -q "OVERALL.*PASS" && ! echo "${pagot}" | grep -q "FAI
   echo "  ok   幹部護照後台那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
 else
   echo "  FAIL 幹部護照後台那支遷移檔的驗收表沒全過："; echo "${pagot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+
+echo
+echo "人與權限的後台（2026-10-21）："
+# PAUL 是 Co-President；DIR 是 Curriculum 的 director；MEMBER 是一般幹部（上一段把他的 role 改回 cadre 了）；OTHER 是 Marketing 的 director。
+chkrole authenticated "${MEMBER}" "一般幹部自己改名字照常存得了（沒動 team 不經過守門）" "改名" \
+  "update public.profiles set name_zh='改名' where id='${MEMBER}'; select name_zh from public.profiles where id='${MEMBER}'"
+chkrole authenticated "${MEMBER}" "一般幹部自己勾普通的 team 照常" "CurriculumTeam,MarketingTeam" \
+  "update public.profiles set team='Curriculum Team, Marketing Team' where id='${MEMBER}'; select team from public.profiles where id='${MEMBER}'"
+ptgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MEMBER}',false);" -c "set role authenticated; update public.profiles set team='Curriculum Team, Internship Team' where id='${MEMBER}';" 2>&1 || true)
+if echo "${ptgot}" | grep -q "team_needs_president"; then
+  echo "  ok   ★ 一般幹部自己勾進 Internship Team 會被擋"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 一般幹部居然勾得進 Internship Team：${ptgot}"; fail=$((fail+1))
+fi
+chk "沒勾進去，還是原來那兩個" "CurriculumTeam,MarketingTeam" "select team from public.profiles where id='${MEMBER}'"
+ptgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" -c "set role authenticated; update public.profiles set team='Marketing' where id='${DIR}';" 2>&1 || true)
+if echo "${ptgot}" | grep -q "team_locked"; then
+  echo "  ok   ★ Director 自己換 team 會被擋（換了就能審別的 team）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ Director 居然自己換得了 team：${ptgot}"; fail=$((fail+1))
+fi
+chk "Director 的 team 沒變" "Curriculum" "select team from public.profiles where id='${DIR}'"
+chkrole authenticated "${DIR}" "Director 改名字照常（只有 team 鎖住）" "小安改" \
+  "update public.profiles set name_zh='小安改' where id='${DIR}'; select name_zh from public.profiles where id='${DIR}'"
+chkas "${PAUL}" "Co-President 把一般幹部加進 Internship Team" "CurriculumTeam,InternshipTeam" \
+  "select public.set_team('${MEMBER}','Curriculum Team, Internship Team')"
+chkas "${PAUL}" "Co-President 把 Director 換 team" "Marketing" "select public.set_team('${DIR}','Marketing')"
+chk "兩筆 team 的變動都記下來了（誰改、改誰、從什麼到什麼）" "2|2" \
+  "select (select count(*) from public.role_changes where field='team' and changed_by='${PAUL}')||'|'||(select count(*) from public.role_changes where field='team' and old_value in ('Curriculum','Curriculum Team, Marketing Team'))"
+chkas "${PAUL}" "同一個值再存一次不算變動" "Marketing" "select public.set_team('${DIR}','Marketing')"
+chk "紀錄還是兩筆" "2" "select count(*) from public.role_changes where field='team'"
+chkas "${PAUL}" "Co-President 把 Director 升成 Co-President" "president" "select public.set_board_role('${DIR}','president')"
+chk "職位的變動記下來了，連名字一起" "director|president|小安改" \
+  "select old_value||'|'||new_value||'|'||target_name from public.role_changes where field='board_role' and target='${DIR}'"
+chkas "${PAUL}" "降回 director" "director" "select public.set_board_role('${DIR}','director')"
+chkraise "★ 自我降級仍然擋著" "cannot_demote_self" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_board_role('${PAUL}','member');"
+chkraise "★ 學員升不了職位（就算 id 對）" "not_a_cadre" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_board_role('${STU}','director');"
+chkraise "★ Director 改不了別人的職位" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.set_board_role('${MEMBER}','director');"
+chkraise "★ Director 改不了別人的 team" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.set_team('${MEMBER}','Marketing');"
+chkrole authenticated "${PAUL}" "★ Co-President 讀得到紀錄" "4" "select count(*) from public.role_changes"
+chkrole authenticated "${DIR}" "★ Director 一筆紀錄都讀不到" "0" "select count(*) from public.role_changes"
+chkrole authenticated "${MEMBER}" "每個幹部都讀得到哪幾個 team 會長出權限（設定頁要用）" "InternshipTeam" "select name from public.privileged_teams"
+ptgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; insert into public.role_changes (target, field, old_value, new_value) values ('${DIR}','team','x','y');" 2>&1 || true)
+if echo "${ptgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 連 Co-President 也寫不進紀錄表（只有函式寫得進去）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 直接 insert 紀錄居然成功：${ptgot}"; fail=$((fail+1))
+fi
+ptgot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.set_team('${MEMBER}','x');" 2>&1 || true)
+if echo "${ptgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動：${ptgot}"; fail=$((fail+1))
+fi
+ptgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-21-people-admin.sql 2>&1 || true)
+if echo "${ptgot}" | grep -q "OVERALL.*PASS" && ! echo "${ptgot}" | grep -q "FAIL"; then
+  echo "  ok   人與權限那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL 人與權限那支遷移檔的驗收表沒全過："; echo "${ptgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
 fi
 
 echo

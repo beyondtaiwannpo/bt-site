@@ -50,6 +50,50 @@ export async function disableInvite(code) {
   if (error) throw error;
 }
 
+// ── 幹部名單、職位與 team（2026-10-21，批 3）────────────────────────────
+// 名單讀走 RLS（幹部讀得到所有幹部的 profiles）。寫全部走函式：
+// set_board_role() 與 set_team()，門在第一句 require_president()，每一筆都寫進 role_changes。
+export async function loadRoster() {
+  need();
+  const { data, error } = await supabase.from("profiles")
+    .select("id, name_zh, name_en, team, board_role")
+    .eq("role", "cadre");
+  if (error) throw error;
+  return (data || []).sort((a, b) =>
+    String(a.name_zh || a.name_en || "").localeCompare(String(b.name_zh || b.name_en || ""), "zh-Hant"));
+}
+
+// 變動紀錄。表的 RLS 只放 Co-President，別人讀回來是空的。最近的在前，只拿 30 筆。
+export async function loadRoleChanges() {
+  need();
+  const { data, error } = await supabase.from("role_changes")
+    .select("id, changed_by, target, target_name, field, old_value, new_value, created_at")
+    .order("created_at", { ascending: false }).limit(30);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function loadPrivilegedTeams() {
+  need();
+  const { data, error } = await supabase.from("privileged_teams").select("name, note").order("name");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setBoardRole(id, role) {
+  need();
+  const { data, error } = await supabase.rpc("set_board_role", { p_target: id, p_role: role });
+  if (error) throw error;
+  return data;
+}
+
+export async function setTeam(id, team) {
+  need();
+  const { data, error } = await supabase.rpc("set_team", { p_target: id, p_team: team || "" });
+  if (error) throw error;
+  return data;
+}
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
@@ -90,6 +134,14 @@ const SAYS = [
   ["no_such_task", "找不到這一格，重新整理再試一次。"],
   ["term_locked", "已經建好的格子不能換屆。要搬到別屆就另外建一格，這一格停用。"],
   ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。"],
+  // 人與權限（2026-10-21）。排在泛用的那一條前面。
+  ["bad_role", "職位只有一般幹部、Director、Co-President 三種。"],
+  ["cannot_demote_self", "不能把自己降級。要交棒的話，先把對方升成 Co-President，再請對方把你降下來。"],
+  ["team_locked", "這個人的 team 鎖住了，只能從這裡改。重新整理再試一次。"],
+  ["team_needs_president", "勾進那個 team 會多出後台的權限，要從這裡改。重新整理再試一次。"],
+  ["public.set_team", "人與權限的函式還不在資料庫裡，要先跑 2026-10-21-people-admin.sql。"],
+  ["public.set_board_role", "人與權限的函式還不在資料庫裡，要先跑 2026-10-21-people-admin.sql。"],
+  ["role_changes", "變動紀錄那張表還不在資料庫裡，要先跑 2026-10-21-people-admin.sql。"],
   ["Could not find the function", "後台的函式還不在資料庫裡，要先跑 2026-10-18-intern-admin.sql。"],
 ];
 export function says(err) {

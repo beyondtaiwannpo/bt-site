@@ -1513,7 +1513,7 @@ newsletter_opt_in_at、board_role）、四支函式，**沒有改任何一條既
 寄出去收不回來，而 team 裡可能有高一的幹部。
 
 `board_role` 不在任何 `grant update` 的清單裡，前端改不動。
-要改只能透過 `set_board_role()`，而它只有 president 叫得動，
+要改只能用 `set_board_role()`，而它只有 president 叫得動（2026-10-21 起 Co-President 在 `/admin/people/` 的「幹部名單」按，每一筆留紀錄，見「人與權限的後台」那一節），
 **而且擋住自我降級** —— 兩位 Co-President 其中一位手滑把自己降級、
 另一位剛好聯絡不上的話，這個系統就再也沒有人能發權限，只能回去下 SQL。
 
@@ -3152,7 +3152,7 @@ Paul 2026-10-15：「現在很多東西都在申請管理裡面，可以根據�
 | 申請表、審核、簽到、行前信 | `/admin/` | `admin/` | 所有幹部（自己 team 的；Director 與 Co-President 改得動） |
 | 資源目錄、團隊頁核可、校友頁核可、信件文案 | `/admin/site/` | `admin/site/` | 所有幹部看得到資源；其他三項只有 Co-President |
 | 實習護照的格子與屆別（批 2 會加幹部護照的格子） | `/admin/passports/` | `admin/passports/` | Internship team 的幹部與 Co-President |
-| 邀請碼（批 3 會加職位與 team） | `/admin/people/` | `admin/people/` | 只有 Co-President |
+| 幹部名單（職位與 team，2026-10-21 起）、邀請碼 | `/admin/people/` | `admin/people/` | 只有 Co-President |
 
 每個資料夾一個 `index.html` 加自己的 `src/data.js`（唯一碰資料庫）、`src/ui.js`（畫畫面）、`src/main.js`（接點擊），
 各自讀 `shared/` 那三個共用檔。**資料夾之間不互相 import**，`admin/site/` 也不 import `admin/src/`：
@@ -3190,6 +3190,59 @@ Paul 2026-10-15：「現在很多東西都在申請管理裡面，可以根據�
 `scripts/e2e/intern.mjs`（路徑）、十支測試的 import 路徑加新的 `test/admin-hub.test.mjs`。
 本機 `node --test test/*.test.mjs` 462 項全過、`./check.sh` 全綠。
 **端對端測試 `scripts/e2e/intern.mjs` 改了路徑但沒有跑**（要 Docker 的本機 Supabase），下一次跑 e2e 的人要看它過不過。
+
+## 人與權限的後台（2026-10-21，後台重整批 3）
+
+Paul 2026-10-15 拍板第 2、3 題（`docs/2026-10-15-後台重整盤點與設計.md`）。
+這一批補的是盤點時抓到、**在這之前就存在**的一個洞：後台的權限是 `board_role` 加 `team` 一起算的，
+而 `team` 是每個幹部在 `/settings/` 自己勾的。一位 Director 把自己勾到別的 team 就能審那個 team 的申請，
+任何幹部把自己勾進 Internship Team 就能改實習護照的格子。
+
+### 在哪裡、能做什麼
+
+`/admin/people/` 多一個「幹部名單」分頁（第一個分頁，邀請碼變第二個）。只有 Co-President 進得去。
+
+- **名單**：每一位幹部的名字、team、職位。按「改職位或 team」進去改。
+  畫面上一律叫「職位」，三個值是「一般幹部」「Director」「Co-President」，`board_role` 這個字只留在程式與文件裡。
+- **自己那一列的職位是關的**：不能自我降級（2026-09-08 就擋著）。要交棒，先把對方升成 Co-President，再請對方把你降下來。
+- **升成 Co-President 會多問一次**：他會拿到跟你一樣的全部權限，包括把你降級。資料庫那一側刻意不擋，換屆要用。
+- **最近的變動**在名單上面：誰改了誰、從什麼到什麼、什麼時候。存在 `role_changes` 表，只有 Co-President 讀得到，
+  只有那兩支函式寫得進去。**這是帳本不是通知**：不寄信、不彈提示，另一位 Co-President 登入就看得到。
+  刪了帳號的人紀錄還在，名字存在紀錄裡。
+
+### team 現在誰改得動
+
+| 誰 | 在 `/settings/` | 在 `/admin/people/` |
+|---|---|---|
+| 一般幹部 | 自己勾。但「會長出權限的 team」沒勾的那一格是關的，勾進去要 Co-President 加；本來就在裡面的退得出來 | Co-President 改得動 |
+| Director、Co-President | 唯讀，整塊變成一行字加「由 Co-President 在後台改」 | 只能在這裡改 |
+
+「會長出權限的 team」列在 `privileged_teams` 表，現在只有 Internship Team。
+之後某個 team 接了後台的功能（例如 Curriculum Team 接護照活動），加一列就好，程式不用改。
+設定頁開頁會讀這張表來決定關哪幾格，讀不到就當成只有 Internship Team。
+
+畫面上關掉只是提醒。**真正的門是 `profiles` 上的一條 trigger**（存檔前自動跑的檢查）：
+Director 或 Co-President 自己改 team 會被擋（`team_locked`），一般幹部自己勾進會長出權限的 team 會被擋（`team_needs_president`）。
+Co-President 走 `set_team()` 改才放行，而且那一筆會記進 `role_changes`。
+設定頁對鎖住的人**送原值不送空值**：送空值等於「把 team 清掉」，會被擋下來，連名字都存不到。
+
+### 刻意沒做
+
+- 不做雙人核可。三十人的組織，另一位在國外睡覺就等十二小時；要擋的事有紀錄就擋得住。
+- 不改 `role`（幹部／學員／校友／實習生）。那只走邀請碼，每一次變動都對得回 `invite_uses`。換屆把幹部轉成校友是 2027-07 的事，到時連護照怎麼封存一起想。
+- 不改 `is_director_of()` 與 `is_internship_team()`。它們看 team 的邏輯沒變，變的是 team 誰改得動。
+
+### 上線前要跑新的遷移檔
+
+`supabase/migrations/2026-10-21-people-admin.sql`，接在 `2026-10-20-passport-admin.sql` 後面跑，
+要先跑過 `2026-09-08-students.sql`。可以重跑。最後印 PASS / FAIL 表，12 項全 PASS 才算。
+**跑完之前**：幹部名單那一頁會說「變動紀錄載不到」，改職位或 team 按下去會說要先跑這支；
+設定頁對 Director 已經是唯讀的（那是畫面），但資料庫還沒擋，所以跑這支之前那個洞還在。
+
+本機 `./scripts/db/smoke.sh` 已經跑過（209 項全過），其中一段專門走這些：
+一般幹部改名字照常、自己勾普通 team 照常、自己勾進 Internship Team 被擋、Director 自己換 team 被擋、
+Co-President 替人改 team 與職位各留一筆紀錄、同一個值再存不算變動、自我降級擋著、學員升不了、
+Director 一筆紀錄都讀不到、連 Co-President 也寫不進紀錄表、沒登入叫不動。
 
 ## 幹部護照的後台（2026-10-20，後台重整批 2）
 

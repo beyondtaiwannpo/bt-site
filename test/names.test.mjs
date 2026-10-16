@@ -9,8 +9,9 @@ import assert from "node:assert/strict";
 import { namesOf as fromAvailability } from "../availability/src/data.js";
 import { namesOf as fromPassport } from "../passport/src/ui.js";
 import { namesOf as fromAdmin } from "../admin/site/src/ui.js";
+import { namesOf as fromPeople } from "../admin/people/src/ui.js";
 
-const IMPL = [["availability", fromAvailability], ["passport", fromPassport], ["admin/site", fromAdmin]];
+const IMPL = [["availability", fromAvailability], ["passport", fromPassport], ["admin/site", fromAdmin], ["admin/people", fromPeople]];
 
 // 每一種寫錯的表現都是「名單上少一個人」或「同一個名字印兩次」，不會報錯。
 const CASES = [

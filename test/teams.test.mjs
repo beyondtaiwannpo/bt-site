@@ -11,10 +11,13 @@ import { TEAMS as SETTINGS_TEAMS, teamPickHTML, formatTeams,
          parseTeams as settingsParse } from "../settings/src/ui.js";
 import { TEAM_ORDER, teamKey, parseTeams as teamParse } from "../team/src/ui.js";
 import { parseTeams as avParse } from "../availability/src/ui.js";
+import { TEAMS as PEOPLE_TEAMS, parseTeams as peopleParse } from "../admin/people/src/ui.js";
 
 test("★ 護照與設定頁的 team 清單逐字一樣", () => {
   assert.deepEqual(SETTINGS_TEAMS, PASSPORT_TEAMS,
     "兩份清單漂移了 —— 同一個人在兩個地方會屬於不同的 team");
+  // 2026-10-21 後台「人與權限」那一頁也有一份（Co-President 替人勾 team）。
+  assert.deepEqual(PEOPLE_TEAMS, PASSPORT_TEAMS, "後台那一份漂移了");
 });
 
 // /team/ 那一頁用縮寫（Sponsorship / CR），profiles 裡存的是全名
@@ -59,7 +62,7 @@ test("★ 好幾個 team 的人，每一個都勾起來", () => {
 
 // parseTeams 這條規則在三個資料夾各有一份，這裡拿同一張表比對。
 // 漂移的表現是「同一個人在時間看板上屬於兩個 team，在對外團隊頁上只屬於一個」。
-const PARSERS = [["settings", settingsParse], ["team", teamParse], ["availability", avParse]];
+const PARSERS = [["settings", settingsParse], ["team", teamParse], ["availability", avParse], ["admin/people", peopleParse]];
 const PARSE_CASES = [
   ["Curriculum Team, Marketing Team", ["Curriculum Team", "Marketing Team"]],
   ["Curriculum Team,Marketing Team",  ["Curriculum Team", "Marketing Team"]],
