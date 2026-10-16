@@ -219,7 +219,26 @@ export const monthLabel = m => `${m} 月`;
 
 // 主畫面：11 個月各一段（時刻與那個月的格子），最後是城市。
 // data = { months, activities, destinations, stamped }。
-export function passportAdminHTML(data, msg, busy) {
+// 「看它在護照上長什麼樣」（2026-10-16，Paul：改完看不到成品）。
+// 用 iframe 把**真的** /passport/ 嵌進來，帶 ?month=N 翻到那一個月。
+// 不另外畫一份護照：那會是第二份護照程式碼，改一次要改兩邊，而且畫出來的
+// 永遠不會跟真的一模一樣。看到的是登入者自己那本（含自己的章），
+// 要看「空白的」就看還沒蓋的格子。previewMonth 是 null 就不畫框。
+export function passportPreviewHTML(previewMonth, months) {
+  if (previewMonth == null) return "";
+  const src = `../../passport/?month=${encodeURIComponent(String(previewMonth))}`;
+  return `<div class="preview-wrap" id="passport-preview">
+    <div class="fhead" style="margin-bottom:6px"><b>護照預覽：${esc(monthLabel(previewMonth))}</b>
+      <span class="mini">這是你自己那本，剛改的格子重新整理預覽就會出現</span>
+      <span style="flex:1"></span>
+      <button class="btn quiet sm" data-act="preview-reload">重新整理預覽</button>
+      <a class="btn quiet sm" href="${src}" target="_blank" rel="noopener">另開視窗</a>
+      <button class="btn quiet sm" data-act="preview-close">關掉</button></div>
+    <iframe class="preview-frame" src="${src}" title="護照預覽" loading="lazy"></iframe>
+  </div>`;
+}
+
+export function passportAdminHTML(data, msg, busy, previewMonth) {
   const months = data.months || [];
   const acts = data.activities || [];
   const dis = busy ? " disabled" : "";
@@ -247,7 +266,8 @@ export function passportAdminHTML(data, msg, busy) {
     const rows = acts.filter(a => a.month === m.month);
     return `<h3 class="sec-h">${esc(monthLabel(m.month))}
       <span class="mini" style="font-weight:400;margin-left:8px">右上角的時刻：${m.theme_zh ? esc(m.theme_zh) : "（空）"}</span>
-      <button class="btn quiet sm" data-act="month-edit" data-seq="${esc(String(m.seq))}"${dis}>改時刻</button></h3>
+      <button class="btn quiet sm" data-act="month-edit" data-seq="${esc(String(m.seq))}"${dis}>改時刻</button>
+      <button class="btn quiet sm" data-act="preview" data-month="${esc(String(m.month))}">看它在護照上長什麼樣</button></h3>
       ${rows.length ? `<ul class="flist">${rows.map(actRow).join("")}</ul>` : `<div class="empty sm">這個月還沒有格子。</div>`}
       <div class="row" style="margin:4px 0 10px"><button class="btn ghost sm" data-act="act-new" data-month="${esc(String(m.month))}"${dis}>在 ${esc(monthLabel(m.month))}加一格</button></div>`;
   }).join("");
@@ -270,6 +290,7 @@ export function passportAdminHTML(data, msg, busy) {
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
     <div class="wnote">幹部的章、心得、照片這裡碰不到。<b>編號不能改</b>（章靠它對到格子），蓋過的格子只能停用不能刪，城市只能停用不能刪。
       ${months.length ? "" : "月份載不到的話，格子也不會出現。"}</div>
+    ${passportPreviewHTML(previewMonth, months)}
     ${months.length ? monthBlocks : `<div class="empty">月份還沒載到。</div>`}
     <h3 class="sec-h" style="margin-top:26px">城市（入境章抽城市用的）</h3>
     <div class="mini" style="margin-bottom:8px">有人抽到過的城市資料庫擋著不給刪，所以這裡只有停用。停用之後新的入境章不會再抽到它，已經發出去的不動。</div>

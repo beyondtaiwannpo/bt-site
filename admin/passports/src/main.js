@@ -22,6 +22,9 @@ let S = {
   actEditing: null, actMonth: null, actDraft: null,
   monthEditing: null, monthDraft: null,
   destEditing: null, destDraft: null,
+  // 預覽框現在翻到哪個月。null 就沒有框。重畫不會重新載 iframe（src 沒變瀏覽器不會重抓），
+  // 要重抓按「重新整理預覽」。
+  previewMonth: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -44,7 +47,7 @@ function render() {
 
   let body;
   if (S.view === "cadre" && isPres()) {
-    body = UI.passportAdminHTML(S.pass, S.msg, S.busy);
+    body = UI.passportAdminHTML(S.pass, S.msg, S.busy, S.previewMonth);
   } else if (S.view === "act-edit" && isPres()) {
     body = UI.activityEditHTML(S.actEditing, S.actMonth, S.pass.months, S.msg, S.busy, S.actDraft);
   } else if (S.view === "month-edit" && isPres()) {
@@ -119,6 +122,16 @@ document.addEventListener("click", async e => {
   // ── 幹部護照的後台（2026-10-20，批 2）────────────────────────────────
   // 每一個動作：按下去 busy、成功一句、失敗說錯在哪、會丟東西的先問一次。
   if (act === "cadre-back") { await openCadre(); return; }
+  // 預覽：改 S 再 render，框就出現；捲到框那裡，不然在長頁面的下半按了會以為沒反應。
+  if (act === "preview") {
+    S.previewMonth = Number(b.dataset.month); render();
+    const f = document.getElementById("passport-preview"); if (f) f.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  if (act === "preview-close") { S.previewMonth = null; render(); return; }
+  if (act === "preview-reload") {
+    const f = document.querySelector(".preview-frame"); if (f) f.src = f.src; return;
+  }
   if (act === "act-new") {
     S.actEditing = null; S.actDraft = null; S.actMonth = Number(b.dataset.month); S.view = "act-edit"; S.msg = ""; render(); return;
   }

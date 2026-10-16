@@ -272,6 +272,15 @@ export function pagesOf(S) {
   ];
 }
 
+// ?month=N 對到 pagesOf 的哪一頁（2026-10-16，給後台的預覽用）。
+// 不是整數、或那個月不存在，就回 0（資料頁），跟沒帶參數一樣。
+export function pageForMonth(S, raw) {
+  const m = Number(raw);
+  if (raw == null || raw === "" || !Number.isInteger(m)) return 0;
+  const i = pagesOf(S).findIndex(pg => pg.kind === "month" && pg.month.month === m);
+  return i < 0 ? 0 : i;
+}
+
 // 這個月的圓點要不要塗橘色。**acts.length > 0 那一半不可以省**：
 // [].every(...) 回 true，少了它的話，一個還沒有任何活動的月份會顯示成「已蓋滿」。
 function dotOn(S, m) {

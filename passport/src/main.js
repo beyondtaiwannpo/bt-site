@@ -538,6 +538,11 @@ export async function boot() {
     // 呼叫就能讓這一次畫面立刻反映修復後的 S.visas；實際寫入資料庫的網路請求
     // 在背景繼續跑，不擋這一次的 render（見 syncVisas 自己的註解）。
     syncVisas();
+    // ?month=9 直接翻到那個月（2026-10-16）。給後台的「看它在護照上長什麼樣」用：
+    // Co-President 改完一格，在同一頁的預覽框裡看到真的那本護照翻到那一頁。
+    // 這裡只決定開在哪一頁，資料、權限、隱私一個字都沒有變 —— 看到的仍然是
+    // 登入者自己的護照。找不到那個月就開在資料頁，跟沒帶參數一樣。
+    S.page = UI.pageForMonth(S, new URLSearchParams(location.search).get("month"));
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
