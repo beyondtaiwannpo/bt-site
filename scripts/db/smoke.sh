@@ -182,7 +182,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-10-18-intern-admin.sql \
          supabase/migrations/2026-10-19-regrant-passport-tables.sql \
          supabase/migrations/2026-10-20-passport-admin.sql \
-         supabase/migrations/2026-10-21-people-admin.sql ; do
+         supabase/migrations/2026-10-21-people-admin.sql \
+         supabase/migrations/2026-10-22-intern-board.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -743,6 +744,94 @@ if echo "${ptgot}" | grep -q "OVERALL.*PASS" && ! echo "${ptgot}" | grep -q "FAI
   echo "  ok   人與權限那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
 else
   echo "  FAIL 人與權限那支遷移檔的驗收表沒全過："; echo "${ptgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+
+echo
+echo "實習護照的蛇梯棋（2026-10-22）："
+# 上面那幾段：INT1 變成幹部、INT2 刪了。這裡再拿一位新的 intern（INT3）走一遍。
+# 目前 active 的是 2026-27（人與權限那一段最後切回去的）。
+INT3=88888888-8888-8888-8888-888888888883
+psql -d "$DB" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('$INT3','intern3@example.com');
+insert into public.profiles (id,name_zh,role) values ('$INT3','實習三號','student');
+SQL
+chkas "${INT3}" "學員拿 intern 碼變成 intern" "upgraded_intern" "select public.claim_invite('bt-intern-01')"
+# 30 格：3 梯（4→14、9→21、17→26）、3 蛇（16→6、24→13、28→19）、任務格 2、7、30（期末 T2627-06）。共 9 個不是空格。
+BOARD='[{"pos":2,"kind":"task","task_id":"T2627-01"},{"pos":4,"kind":"ladder","goes_to":14},{"pos":7,"kind":"task","task_id":"T2627-02"},{"pos":9,"kind":"ladder","goes_to":21},{"pos":16,"kind":"snake","goes_to":6},{"pos":17,"kind":"ladder","goes_to":26},{"pos":24,"kind":"snake","goes_to":13},{"pos":28,"kind":"snake","goes_to":19},{"pos":30,"kind":"task","task_id":"T2627-06"}]'
+chkas "${ISTAFF}" "Internship team 的幹部排得了棋盤" "2026-27" \
+  "select public.save_board('2026-27', 30, '${BOARD}'::jsonb)"
+chk "棋盤 30 格、9 個不是空格的格子、還沒開" "30|9|false" \
+  "select size||'|'||(select count(*) from public.intern_squares where term='2026-27')||'|'||active from public.intern_boards where term='2026-27'"
+chkraise "★ 梯子往下會被擋" "ladder_must_go_up" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_board('2026-27', 30, '[{\"pos\":10,\"kind\":\"ladder\",\"goes_to\":3}]'::jsonb);"
+chkraise "★ 蛇往上會被擋" "snake_must_go_down" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_board('2026-27', 30, '[{\"pos\":10,\"kind\":\"snake\",\"goes_to\":20}]'::jsonb);"
+chkraise "★ 最後一格不能是蛇頭" "last_square_cannot_be_snake" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_board('2026-27', 30, '[{\"pos\":30,\"kind\":\"snake\",\"goes_to\":2}]'::jsonb);"
+chkraise "★ 任務格綁別屆的格子會被擋" "bad_task" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_board('2026-27', 30, '[{\"pos\":3,\"kind\":\"task\",\"task_id\":\"NOPE\"}]'::jsonb);"
+chkraise "★ 別的 team 的幹部排不了棋盤" "not_internship_team" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.save_board('2026-27', 30, '[]'::jsonb);"
+# 上面幾條被擋的 save_board 不該動到棋盤。
+chk "被擋的存檔沒有動到棋盤" "9" "select count(*) from public.intern_squares where term='2026-27'"
+chkraise "★ 棋盤沒開之前擲不了" "no_board" \
+  "perform set_config('test.uid','${INT3}',true); perform public.roll_dice();"
+chkas "${PAUL}" "Co-President 把棋盤打開" "2026-27" "select public.set_board_active('2026-27', true)"
+chkraise "★ 沒有章就沒有票，擲不了" "no_ticket" \
+  "perform set_config('test.uid','${INT3}',true); perform public.roll_dice();"
+chkrole authenticated "${INT3}" "intern 蓋一個章" "1" \
+  "insert into public.intern_stamps (user_id,task_id,stamped_on) values ('${INT3}','T2627-03','2026-10-20'); select count(*) from public.intern_stamps where user_id='${INT3}'"
+chk "一個章一張票" "1" "select public.intern_tickets('${INT3}','2026-27')"
+# ⚠ roll_dice() 要包在子查詢裡只叫一次：寫成 between 的話 Postgres 會把那個運算式展開成兩次呼叫，第二次就 no_ticket。
+chkas "${INT3}" "★ 有票就擲得了，骰子在 1 到 6 之間" "t" \
+  "select ((r->>'rolled')::int between 1 and 6) from (select public.roll_dice() r) x"
+chk "寫了一列紀錄" "1" "select count(*) from public.intern_moves where user_id='${INT3}'"
+chk "票用掉了" "0" "select public.intern_tickets('${INT3}','2026-27')"
+chk "位置從紀錄算：from 0、to 在 1 到 30 之間" "0|true" \
+  "select from_pos||'|'||(to_pos between 1 and 30) from public.intern_moves where user_id='${INT3}' order by id desc limit 1"
+chkraise "★ 沒票再擲會被擋" "no_ticket" \
+  "perform set_config('test.uid','${INT3}',true); perform public.roll_dice();"
+chkraise "★ Internship team 的幹部擲不了（骰子是 intern 的）" "not_intern" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.roll_dice();"
+ibgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${INT3}',false);" -c "set role authenticated; insert into public.intern_moves (user_id,term,rolled,from_pos,landed,to_pos) values ('${INT3}','2026-27',6,0,6,6);" 2>&1 || true)
+if echo "${ibgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ intern 自己寫不進擲骰紀錄（只有 roll_dice 寫得進去）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ intern 居然寫得進擲骰紀錄：${ibgot}"; fail=$((fail+1))
+fi
+chkrole authenticated "${INT3}" "intern 讀得到棋盤與自己的紀錄" "9|1" \
+  "select (select count(*) from public.intern_squares)||'|'||(select count(*) from public.intern_moves)"
+chkrole authenticated "${ISTAFF}" "Internship team 看得到大家的位置" "1" \
+  "select count(*) from public.intern_positions() where user_id='${INT3}'"
+chkrole authenticated "${OTHER}" "★ 別的 team 的幹部一格都看不到（棋盤、紀錄、位置）" "0|0|0" \
+  "select (select count(*) from public.intern_squares)||'|'||(select count(*) from public.intern_moves)||'|'||(select count(*) from public.intern_positions())"
+chkraise "★ 棋盤開著的時候改蛇梯會被擋" "board_locked" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.save_board('2026-27', 30, '[{\"pos\":4,\"kind\":\"ladder\",\"goes_to\":15}]'::jsonb);"
+chkas "${ISTAFF}" "棋盤開著還是可以改任務格綁哪一格" "2026-27" \
+  "select public.save_board('2026-27', 30, '[{\"pos\":2,\"kind\":\"task\",\"task_id\":\"T2627-02\"},{\"pos\":4,\"kind\":\"ladder\",\"goes_to\":14},{\"pos\":9,\"kind\":\"ladder\",\"goes_to\":21},{\"pos\":16,\"kind\":\"snake\",\"goes_to\":6},{\"pos\":17,\"kind\":\"ladder\",\"goes_to\":26},{\"pos\":24,\"kind\":\"snake\",\"goes_to\":13},{\"pos\":28,\"kind\":\"snake\",\"goes_to\":19},{\"pos\":30,\"kind\":\"task\",\"task_id\":\"T2627-06\"}]'::jsonb)"
+# 終點規則：直接把人放到第 29 格（用超級使用者寫一列假紀錄；票 = 3 個章 - 2 次 = 1），
+# 再擲一次不管擲到幾都會碰到 30，沒蓋期末就停在 29。
+psql -d "$DB" -q -c "insert into public.intern_stamps (user_id,task_id,stamped_on) values ('$INT3','T2627-04','2026-10-21'),('$INT3','T2627-05','2026-10-21');" >/dev/null
+psql -d "$DB" -q -c "insert into public.intern_moves (user_id,term,rolled,from_pos,landed,to_pos) values ('$INT3','2026-27',1,28,29,29);" >/dev/null
+chkas "${INT3}" "★ 期末成果沒蓋章，走到終點會停在倒數第二格" "29|false" \
+  "select (r->>'to_pos')||'|'||(r->>'finished') from (select public.roll_dice() r) x"
+chkrole authenticated "${INT3}" "蓋了期末成果" "1" \
+  "insert into public.intern_stamps (user_id,task_id,stamped_on) values ('${INT3}','T2627-06','2026-10-22'); select count(*) from public.intern_stamps where user_id='${INT3}' and task_id='T2627-06'"
+chkas "${INT3}" "★ 蓋了之後再擲就到終點" "30|true" \
+  "select (r->>'to_pos')||'|'||(r->>'finished') from (select public.roll_dice() r) x"
+chkraise "到終點之後擲不了" "finished" \
+  "perform set_config('test.uid','${INT3}',true); perform public.roll_dice();"
+ibgot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.roll_dice();" 2>&1 || true)
+if echo "${ibgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動：${ibgot}"; fail=$((fail+1))
+fi
+ibgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-22-intern-board.sql 2>&1 || true)
+if echo "${ibgot}" | grep -q "OVERALL.*PASS" && ! echo "${ibgot}" | grep -q "FAIL"; then
+  echo "  ok   蛇梯棋那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL 蛇梯棋那支遷移檔的驗收表沒全過："; echo "${ibgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
 fi
 
 echo

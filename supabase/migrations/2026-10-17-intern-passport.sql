@@ -243,7 +243,9 @@ select * from (
        and table_name in ('intern_terms','intern_tasks','intern_passports','intern_stamps','intern_entries')
   ), rls as (
     select count(*) as n from pg_class c join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'public' and c.relname like 'intern_%' and c.relkind = 'r' and c.relrowsecurity
+     -- 2026-10-22 起蛇梯棋又加了三張 intern_* 表（自己那支遷移檔驗），這裡只數這五張。
+     where n.nspname = 'public' and c.relname in ('intern_terms','intern_tasks','intern_passports','intern_stamps','intern_entries')
+       and c.relkind = 'r' and c.relrowsecurity
   ), ins as (
     select count(*) as n from pol where tablename = 'intern_passports' and cmd = 'INSERT'
   ), upd as (
