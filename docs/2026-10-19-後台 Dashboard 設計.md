@@ -206,14 +206,14 @@
 > 假設你要加「活動行事曆」到「對外」那一組。
 >
 > 1. **決定它屬於哪一組。** 四組是：申請（所有幹部）、對外（資源所有幹部，其他 Co-President）、護照（Internship team 與 Co-President）、人與權限（Co-President）。選了組就等於選了誰看得到，因為那一組的資料夾開頁第一句就在檢查。
-> 2. **在側欄加一行。** 打開那一組的 `src/ui.js`，找到 `RAIL` 那張表（跟 `GROUPS` 在一起），在對的組底下加一行：`{ key: "calendar", label: "活動行事曆" }`。**四個資料夾的 `ui.js` 各有一份 `RAIL`，四份都要加同一行**，不然會變成「在 A 頁看得到，到 B 頁不見了」。跑 `node --test test/admin-hub.test.mjs` 會告訴你哪一份漏了。
+> 2. **在側欄加一行。** 打開那一組的 `src/ui.js`，找到 `ITEMS` 那張表（跟 `GROUPS` 在一起），在對的組底下加一行：`{ group: "site", key: "calendar", label: "活動行事曆", who: "cadre" }`。**四個資料夾的 `ui.js` 各有一份 `ITEMS`，四份都要加同一行**，不然會變成「在 A 頁看得到，到 B 頁不見了」。跑 `node --test test/admin-hub.test.mjs` 會告訴你哪一份漏了。
 > 3. **畫那一頁。** 在同一支 `ui.js` 加一個函式 `calendarHTML(rows, msg, busy)`，回傳一串 HTML。照這個骨架抄：
 >    ```
->    pageHead("活動行事曆", "這一屆對外的活動，一列一場。", [{ act: "new-event", label: "加一場" }])
+>    pageHead("活動行事曆", "這一屆對外的活動，一列一場。", [{ act: "new-event", label: "加一場", primary: true }])
 >    + msgHTML(msg)
->    + section("接下來的活動", listHTML(rows))
+>    + sectionHTML("接下來的活動", rows.length ? `<ul class="flist">${rows.map(row).join("")}</ul>` : emptyHTML("還沒有活動", "加第一場。"))
 >    ```
->    `pageHead`、`msgHTML`、`section`、`listHTML`、`emptyHTML` 這五個小函式每一支 `ui.js` 都有，長相由 `admin/admin.css` 決定，你不用寫 CSS。
+>    `pageHead`、`msgHTML`、`sectionHTML`、`emptyHTML`、`skeletonHTML` 這五個小函式每一支 `ui.js` 都有，長相由 `admin/admin.css` 決定，你不用寫 CSS。
 > 4. **接資料。** 在 `src/data.js` 加 `loadEvents()`。這一支檔案是這個資料夾裡**唯一**碰資料庫的，別的檔案不准 `from("...")`。
 > 5. **接點擊。** 在 `src/main.js` 的 `onClick` 裡加 `if (act === "new-event") { ... }`。照旁邊已經有的抄。
 > 6. **門在資料庫，不在畫面。** 如果這一頁會改東西，資料庫要有一支函式，第一句是 `is_president()` 或 `is_director_of()`。側欄把它灰掉只是提醒，不是安全機制。這一步要開遷移檔，先問 Co-President。
@@ -258,7 +258,7 @@
 
 抓到三件，都修了：
 
-1. 第一版 2-6 說「在 `RAIL` 加一行」，但沒說 `RAIL` 長什麼樣、在檔案的哪裡。**修法**：寫明「跟 `GROUPS` 在一起」，而且那一行的格式直接貼出來。
+1. 第一版 2-6 說「在 `ITEMS` 加一行」，但沒說 `ITEMS` 長什麼樣、在檔案的哪裡。**修法**：寫明「跟 `GROUPS` 在一起」，而且那一行的格式直接貼出來。
 2. 第一版第 3 步叫他「照 2-4 的 class 寫 HTML」。他不會寫 HTML。**修法**：每一支 `ui.js` 提供 `pageHead`、`msgHTML`、`section`、`listHTML`、`emptyHTML` 五個小函式，他只要拼，不用寫 class。這五個函式四個資料夾各一份，`test/admin-hub.test.mjs` 加一條守四份一字不差。
 3. 第一版沒講「哪幾步不用會寫程式」，他看到八步會整個放棄。**修法**：最後加一段分級。
 
@@ -306,3 +306,11 @@
 這四批加起來不碰任何遷移檔，不動 RLS，所以 `smoke.sh` 跑的是確認沒有東西被弄壞，不是驗新東西。
 
 GOALS.md 目標 2「交接實測」死線 10-31 還是排在這整件事前面。這次重做如果跟它搶同一個星期，先做目標 2。
+
+---
+
+## 5. 做完之後（2026-10-19 同日）
+
+四批當天全部做完並各自 commit（`b430d42`、`ff9f6c2`、`31db13f`、批 4 見 git log），沒有 push。每一批的截圖在 `docs/admin-redesign/after/`，README「後台第二次重整：側欄 Dashboard」四節記了每一批改了什麼、怎麼驗、還沒驗什麼。
+
+跟這份設計不一樣的地方，只有一件：邀請碼的「發一組新的碼」表單沒有收進頁首那顆按鈕後面，仍然常駐在頁面最上面（理由在 README 批 4 那一節）。其餘照設計。

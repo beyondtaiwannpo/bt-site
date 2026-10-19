@@ -304,3 +304,23 @@ a.btn{text-decoration:none}
 .inline-form{border-color:rgba(255,196,108,.9);background:rgba(255,232,197,.35)}
 /* 批次列：選了人之後黏在底部，捲到名單最下面也按得到。 */
 .bulk.on{position:sticky;bottom:12px;z-index:5;box-shadow:0 8px 24px rgba(16,42,134,.12)}
+
+/* ───────── 10. 其他三組（2026-10-19，批 4）───────── */
+/* 表格：給幹部名單與城市，欄位固定、每列一行。720px 以下自動變成一列一張。 */
+.table{width:100%;border-collapse:collapse;font-size:14px}
+.table th{text-align:left;font-family:var(--display);font-size:12.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(16,42,134,.7);padding:6px 10px 8px;border-bottom:1px solid rgba(16,42,134,.2)}
+.table td{padding:11px 10px;border-bottom:1px solid rgba(16,42,134,.12);vertical-align:middle}
+.table td.t-main b{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:.02em}
+.table td.t-act{text-align:right;white-space:nowrap}
+.table tr.off td{color:rgba(16,42,134,.6)}
+/* 左右兩欄：信件文案的「左邊改、右邊預覽」。 */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
+.cols .section{margin-bottom:0}
+@media (max-width:980px){ .cols{grid-template-columns:1fr} }
+@media (max-width:720px){
+  .table thead{display:none}
+  .table tr{display:block;padding:10px 0;border-bottom:1px solid rgba(16,42,134,.12)}
+  .table td{display:block;padding:2px 0;border:0}
+  .table td.t-act{text-align:left;padding-top:6px}
+}

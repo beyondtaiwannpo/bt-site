@@ -48,7 +48,9 @@ function render() {
   if (!internStaff()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); return; }
 
   let body;
-  if (S.view === "cadre" && isPres()) {
+  if (S.view === "cities" && isPres()) {
+    body = UI.citiesHTML(S.pass, S.msg, S.busy);
+  } else if (S.view === "cadre" && isPres()) {
     body = UI.passportAdminHTML(S.pass, S.msg, S.busy, S.previewMonth);
   } else if (S.view === "act-edit" && isPres()) {
     body = UI.activityEditHTML(S.actEditing, S.actMonth, S.pass.months, S.msg, S.busy, S.actDraft);
@@ -65,7 +67,8 @@ function render() {
     body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy, isPres(), S.internPreviewCat);
   }
   // 側欄亮哪一行：幹部護照的三個編輯畫面算在「幹部護照」底下，其餘算「實習護照」。
-  const tab = ["cadre", "act-edit", "month-edit", "dest-edit"].includes(S.view) ? "cadre" : "interns";
+  const tab = ["cities", "dest-edit"].includes(S.view) ? "cities"
+    : ["cadre", "act-edit", "month-edit"].includes(S.view) ? "cadre" : "interns";
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab, S.me), body);
 }
 
@@ -80,6 +83,7 @@ async function boot() {
     // ?tab=cadre 直接開幹部護照（README 的連結用得到）。不是 Co-President 的回到實習護照。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     if (want === "cadre" && isPres()) await openCadre();
+    else if (want === "cities" && isPres()) await openCities();
     else await openInterns();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-passports"); return; }
@@ -110,6 +114,16 @@ async function openCadre(keepMsg) {
   render();
 }
 
+// 城市那一頁跟幹部護照讀同一份資料（loadPassportAdmin），只是開在另一個畫面。
+async function openCities(keepMsg) {
+  S.busy = true; if (!keepMsg) S.msg = ""; render();
+  try {
+    S.pass = await D.loadPassportAdmin();
+    S.view = "cities"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = "城市載不到：" + D.says(e); S.view = "cities"; }
+  render();
+}
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -121,13 +135,16 @@ document.addEventListener("click", async e => {
   if (act === "tab") {
     e.preventDefault(); S.msg = "";
     history.replaceState(null, "", "#" + b.dataset.t);
-    if (b.dataset.t === "cadre" && isPres()) await openCadre(); else await openInterns();
+    if (b.dataset.t === "cadre" && isPres()) await openCadre();
+    else if (b.dataset.t === "cities" && isPres()) await openCities();
+    else await openInterns();
     return;
   }
 
   // ── 幹部護照的後台（2026-10-20，批 2）────────────────────────────────
   // 每一個動作：按下去 busy、成功一句、失敗說錯在哪、會丟東西的先問一次。
   if (act === "cadre-back") { await openCadre(); return; }
+  if (act === "cities-back") { await openCities(); return; }
   // 預覽：改 S 再 render，框就出現；捲到框那裡，不然在長頁面的下半按了會以為沒反應。
   if (act === "preview") {
     S.previewMonth = Number(b.dataset.month); render();
@@ -225,7 +242,7 @@ document.addEventListener("click", async e => {
       const made = await D.saveDestination(d.code, d.city, d.active);
       S.destDraft = null;
       S.msg = b.dataset.code ? `「${d.city}」改好了。` : `「${d.city}」加好了，代碼是 ${made}。`;
-      await openCadre(true);
+      await openCities(true);
     } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
     return;
   }
@@ -238,7 +255,7 @@ document.addEventListener("click", async e => {
     try {
       await D.saveDestination(d.code, d.city, on);
       S.msg = `「${d.city}」${on ? "恢復了" : "停用了"}。`;
-      await openCadre(true);
+      await openCities(true);
     } catch (err) { S.busy = false; S.msg = (on ? "恢復不了：" : "停用不了：") + D.says(err); render(); }
     return;
   }

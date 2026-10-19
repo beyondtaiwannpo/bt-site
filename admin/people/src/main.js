@@ -16,6 +16,8 @@ let S = {
   invites: [], inviteDraft: null,
   // 幹部名單（2026-10-21，批 3）
   roster: [], changes: [], privileged: [], person: null, personDraft: null,
+  // 名單的 team 篩選（2026-10-19）："" 全部、"__none" 還沒填 team、其他是 team 名。
+  rosterTeam: "",
 };
 
 const root = () => document.getElementById("bt-root");
@@ -36,8 +38,10 @@ function render() {
   let body;
   if (S.view === "invites") body = UI.inviteCodesHTML(S.invites, S.msg, S.busy, S.inviteDraft);
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.privileged, S.user.id, S.msg, S.busy, S.personDraft);
-  else body = UI.rosterHTML(S.roster, S.changes, S.privileged, S.user.id, S.msg, S.busy);
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", S.view === "invites" ? "invites" : "roster", S.me), body);
+  else if (S.view === "changes") body = UI.changesHTML(S.changes, S.roster, S.msg);
+  else body = UI.rosterHTML(S.roster, S.changes, S.privileged, S.user.id, S.msg, S.busy, S.rosterTeam);
+  const tab = S.view === "invites" ? "invites" : S.view === "changes" ? "changes" : "roster";
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body);
 }
 
 async function boot() {
@@ -51,6 +55,7 @@ async function boot() {
     // ?tab=invites 直接開邀請碼（README 的連結用得到）。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     if (want === "invites") await openInvites();
+    else if (want === "changes") await openRoster(false, "changes");
     else await openRoster();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-people"); return; }
@@ -72,7 +77,8 @@ async function openInvites() {
 
 // 幹部名單、變動紀錄、會長出權限的 team。三個查詢一起發。
 // 紀錄與 team 清單載不到不該讓名單打不開（遷移檔還沒跑的時候），所以各自接住。
-async function openRoster(keepMsg) {
+// view 預設 "roster"，變動紀錄那一頁讀同一份資料，只是開在另一個畫面。
+async function openRoster(keepMsg, view) {
   S.busy = true; if (!keepMsg) S.msg = ""; render();
   try {
     const [roster, changes, privileged] = await Promise.all([
@@ -81,7 +87,7 @@ async function openRoster(keepMsg) {
       D.loadPrivilegedTeams().catch(() => [{ name: "Internship Team" }]),
     ]);
     S.roster = roster; S.changes = changes; S.privileged = privileged;
-    S.view = "roster"; S.busy = false;
+    S.view = view || "roster"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = "名單載不到：" + D.says(e); S.view = "roster"; }
   render();
 }
@@ -96,9 +102,12 @@ document.addEventListener("click", async e => {
   if (act === "tab") {
     e.preventDefault(); S.msg = "";
     history.replaceState(null, "", "#" + b.dataset.t);
-    if (b.dataset.t === "invites") await openInvites(); else await openRoster();
+    if (b.dataset.t === "invites") await openInvites();
+    else if (b.dataset.t === "changes") await openRoster(false, "changes");
+    else await openRoster();
     return;
   }
+  if (act === "roster-team") { S.rosterTeam = b.dataset.team || ""; render(); return; }
 
   // ── 幹部名單（2026-10-21，批 3）────────────────────────────────────
   if (act === "roster-back") { await openRoster(); return; }

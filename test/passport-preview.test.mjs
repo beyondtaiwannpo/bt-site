@@ -26,7 +26,8 @@ test("每個月都有一顆預覽按鈕，沒按之前沒有框", () => {
 
 test("按了之後框出現，iframe 指到真的護照並帶 ?month", () => {
   const h = passportAdminHTML(DATA, "", false, 10);
-  assert.match(h, /<iframe[^>]*src="\.\.\/\.\.\/passport\/\?month=10"/);
+  // 框裡帶 &bare=1（2026-10-19，Paul 拍板）：那一頁不畫頂欄與子欄。
+  assert.match(h, /<iframe[^>]*src="\.\.\/\.\.\/passport\/\?month=10&bare=1"/);
   assert.match(h, /護照預覽：10 月/);
   assert.match(h, /data-act="preview-reload"/);
   assert.match(h, /data-act="preview-close"/);
@@ -78,10 +79,14 @@ test("後台的實習護照頁：上面一顆、每個分類一顆預覽鈕，�
 
 test("按了之後 iframe 指到實習護照的樣書並帶 ?cat", () => {
   const h = internAdminHTML(IDATA, "2026-27", "", false, true, "project");
-  assert.match(h, /<iframe[^>]*src="\.\.\/\.\.\/intern-passport\/\?view=sample&cat=project"/);
+  assert.match(h, /<iframe[^>]*src="\.\.\/\.\.\/intern-passport\/\?view=sample&cat=project&bare=1"/);
   assert.match(h, /實習護照預覽：任務/);
   const h0 = internAdminHTML(IDATA, "2026-27", "", false, true, "");
-  assert.match(h0, /src="\.\.\/\.\.\/intern-passport\/\?view=sample"/);
+  assert.match(h0, /src="\.\.\/\.\.\/intern-passport\/\?view=sample&bare=1"/);
+  // 兩頁真的認 bare=1，不畫頂欄（讀得到什麼仍然是 RLS 決定的）。
+  for (const f of ["passport/src/main.js", "intern-passport/src/main.js"]) {
+    assert.match(readFileSync(f, "utf8"), /get\("bare"\) === "1"/, `${f} 要認 ?bare=1`);
+  }
 });
 
 test("★ 正在看的不是目前這一屆時，預覽框會提醒樣書只畫目前這一屆", () => {

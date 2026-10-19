@@ -69,13 +69,15 @@ function render() {
   const el = root();
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = `<div class="empty">請先登入。<a href="../app/">去登入頁</a></div>`; return; }
-  const nav = navHTML({ current: "intern-passport", role: S.role,
+  // ?bare=1（2026-10-19，Paul 拍板）：後台的預覽框用的，不畫頂欄與子欄。只改畫面，權限不變。
+  const bare = new URLSearchParams(location.search).get("bare") === "1";
+  const nav = bare ? "" : navHTML({ current: "intern-passport", role: S.role,
                         name: S.profile ? (S.profile.name_zh || S.profile.name_en) : "" });
   // Internship team 的幹部：牆，加「樣書」。樣書是同一套 bookHTML 畫的，
   // 只是把持照人換成假的、章與心得清空（S.sample 讓資料頁不畫編輯鈕）。
   // 不另外寫一份畫面：那會是第三份護照程式碼。
   if (S.staff) {
-    el.innerHTML = nav + UI.barHTML(S) + (S.view === "sample" ? UI.bookHTML(sampleState()) : UI.wallHTML(S));
+    el.innerHTML = nav + (bare ? "" : UI.barHTML(S)) + (S.view === "sample" ? UI.bookHTML(sampleState()) : UI.wallHTML(S));
     return;
   }
   // 不是 intern 也不是 staff 的人 boot() 已經導走，走到這裡就講一句話不要空白。
@@ -84,7 +86,7 @@ function render() {
   // intern 沒有護照那一列：身分那支遷移檔跑了、護照那支還沒跑的空窗。說清楚，不要給他一張填不進去的表單。
   if (!S.profile) { el.innerHTML = `<div class="card"><h2>護照還沒準備好</h2><div class="sub">你的帳號已經是實習生了，但護照那一頁的資料表還沒建好。請管理者跑完 2026-10-17 那支遷移檔，再重新整理。</div><div class="row"><button class="btn ghost sm" data-act="signout">登出</button></div></div>`; return; }
   if (!S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile, S.user); return; }
-  el.innerHTML = nav + UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
+  el.innerHTML = nav + (bare ? "" : UI.barHTML(S)) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
 }
 
 async function loadWall() {

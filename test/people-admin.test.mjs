@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tabsHTML, rosterHTML, personEditHTML, BOARD_ROLES, boardLabel, TEAMS as PEOPLE_TEAMS } from "../admin/people/src/ui.js";
+import { tabsHTML, rosterHTML, changesHTML, personEditHTML, BOARD_ROLES, boardLabel, TEAMS as PEOPLE_TEAMS } from "../admin/people/src/ui.js";
 import { says } from "../admin/people/src/data.js";
 import { teamPickHTML, teamLocked, saveFailMessage, TEAMS as SETTINGS_TEAMS } from "../settings/src/ui.js";
 
@@ -45,8 +45,9 @@ test("名單：每個人一列、有後台權限的 team 標出來、自己那�
   assert.equal((h.match(/data-act="person-edit"/g) || []).length, 3);
 });
 
+// 變動紀錄 2026-10-19 起自己一頁（changesHTML）。
 test("★ 變動紀錄：誰改、改誰、從什麼到什麼，刪了帳號的人還看得到名字", () => {
-  const h = rosterHTML(ROWS, CHANGES, PRIV, ME, "", false);
+  const h = changesHTML(CHANGES, ROWS, "");
   assert.match(h, /小安<\/b>\s*<span class="tag">職位<\/span>/);
   assert.match(h, /一般幹部 → <b>Director<\/b>/);
   assert.match(h, /王平 改的/);
@@ -54,7 +55,13 @@ test("★ 變動紀錄：誰改、改誰、從什麼到什麼，刪了帳號的�
   assert.match(h, /Curriculum Team → <b>Marketing Team<\/b>/);
   assert.match(h, /2026-10-21 03:00/);
   // 沒有紀錄不是錯，但要說從哪一天開始記。
-  assert.match(rosterHTML(ROWS, [], PRIV, ME, "", false), /還沒有任何變動/);
+  assert.match(changesHTML([], ROWS, ""), /還沒有任何變動/);
+  // 名單那一頁：表格、team 篩選、沒有名字的排最後並標出來。
+  const r = rosterHTML(ROWS, CHANGES, PRIV, ME, "", false, "");
+  assert.match(r, /<table class="table"/);
+  assert.match(r, /data-act="roster-team" data-team=""/);
+  const only = rosterHTML(ROWS, CHANGES, PRIV, ME, "", false, "Internship Team");
+  assert.ok((only.match(/data-act="person-edit"/g) || []).length < 3, "篩選之後列數變少");
 });
 
 test("★ 自己那一列的職位選單是關的（不能自我降級），別人的開著", () => {

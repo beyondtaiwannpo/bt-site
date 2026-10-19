@@ -30,8 +30,10 @@ export const ITEMS = [
   { group: "site",      key: "mail",    label: "信件文案", who: "president" },
   { group: "passports", key: "interns", label: "實習護照", who: "intern-staff" },
   { group: "passports", key: "cadre",   label: "幹部護照", who: "president" },
+  { group: "passports", key: "cities",  label: "城市",     who: "president" },
   { group: "people",    key: "roster",  label: "幹部名單", who: "president" },
   { group: "people",    key: "invites", label: "邀請碼",   who: "president" },
+  { group: "people",    key: "changes", label: "變動紀錄", who: "president" },
 ];
 const WHY = { president: "只有 Co-President 進得去", "intern-staff": "只有 Internship team 的幹部與 Co-President 進得去" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
@@ -296,13 +298,13 @@ export const monthLabel = m => `${m} 月`;
 // 不另外畫一份護照：那會是第二份護照程式碼，改一次要改兩邊，而且畫出來的
 // 永遠不會跟真的一模一樣。看到的是登入者自己那本（含自己的章），
 // 要看「空白的」就看還沒蓋的格子。previewMonth 是 null 就不畫框。
-function previewBoxHTML(title, hint, src) {
+function previewBoxHTML(title, hint, src, openSrc) {
   return `<div class="preview-wrap" id="passport-preview">
     <div class="fhead" style="margin-bottom:6px"><b>${title}</b>
       <span class="mini">${hint}</span>
       <span style="flex:1"></span>
       <button class="btn quiet sm" data-act="preview-reload">重新整理預覽</button>
-      <a class="btn quiet sm" href="${src}" target="_blank" rel="noopener">另開視窗</a>
+      <a class="btn quiet sm" href="${openSrc || src}" target="_blank" rel="noopener">另開視窗</a>
       <button class="btn quiet sm" data-act="preview-close">關掉</button></div>
     <iframe class="preview-frame" src="${src}" title="護照預覽" loading="lazy"></iframe>
   </div>`;
@@ -310,8 +312,10 @@ function previewBoxHTML(title, hint, src) {
 
 export function passportPreviewHTML(previewMonth) {
   if (previewMonth == null) return "";
-  const src = `../../passport/?month=${encodeURIComponent(String(previewMonth))}`;
-  return previewBoxHTML(`護照預覽：${esc(monthLabel(previewMonth))}`, "這是你自己那本，剛改的格子重新整理預覽就會出現", src);
+  // 框裡帶 &bare=1：那一頁不畫頂欄與分頁列（Paul 2026-10-19 拍板），框裡只有那本護照。
+  // 「另開視窗」開的是完整的那一頁，有頂欄。
+  const full = `../../passport/?month=${encodeURIComponent(String(previewMonth))}`;
+  return previewBoxHTML(`護照預覽：${esc(monthLabel(previewMonth))}`, "這是你自己那本，剛改的格子重新整理預覽就會出現", full + "&bare=1", full);
 }
 
 // 實習護照的預覽（2026-10-16）。嵌的是 /intern-passport/ 的「樣書」：目前這一屆的格子、假的持照人、沒有章。
@@ -319,9 +323,9 @@ export function passportPreviewHTML(previewMonth) {
 export function internPreviewHTML(cat, viewingActive) {
   if (cat == null) return "";
   const c = INTERN_CATS.find(x => x.v === cat);
-  const src = `../../intern-passport/?view=sample${cat ? `&cat=${encodeURIComponent(cat)}` : ""}`;
+  const full = `../../intern-passport/?view=sample${cat ? `&cat=${encodeURIComponent(cat)}` : ""}`;
   const hint = (viewingActive === false ? "樣書只畫目前這一屆的格子，你現在在看的不是那一屆。" : "這是樣書：目前這一屆的格子、假的持照人、沒有章。intern 看到的就是這個樣子。");
-  return previewBoxHTML(`實習護照預覽${c ? `：${esc(c.label)}` : ""}`, hint, src);
+  return previewBoxHTML(`實習護照預覽${c ? `：${esc(c.label)}` : ""}`, hint, full + "&bare=1", full);
 }
 
 export function passportAdminHTML(data, msg, busy, previewMonth) {
@@ -357,30 +361,39 @@ export function passportAdminHTML(data, msg, busy, previewMonth) {
         actions: [{ act: "month-edit", label: "改時刻", seq: String(m.seq), disabled: busy },
                   { act: "preview", label: "看它在護照上長什麼樣", month: String(m.month) }] });
   }).join("");
-  const jump = months.length ? `<nav class="jump" aria-label="跳到某一個月">${months.map(m => `<a href="#m${esc(String(m.month))}">${esc(monthLabel(m.month))}</a>`).join("")}<a href="#cities">城市</a></nav>` : "";
-  const dests = data.destinations || [];
-  const destRows = dests.map(d => `<li>
-    <div class="fhead"><b>${esc(d.city)}</b><span class="tag">${esc(d.code)}</span>
-      ${d.active ? "" : `<span class="tag draft">停用中</span>`}</div>
-    <div class="row">
-      <button class="btn ghost sm" data-act="dest-edit" data-code="${esc(d.code)}"${dis}>改名字</button>
-      ${d.active
-        ? `<button class="btn ghost sm" data-act="dest-off" data-code="${esc(d.code)}"${dis}>停用</button>`
-        : `<button class="btn ghost sm" data-act="dest-on" data-code="${esc(d.code)}"${dis}>恢復</button>`}
-    </div>
-  </li>`).join("");
-
+  const jump = months.length ? `<nav class="jump" aria-label="跳到某一個月">${months.map(m => `<a href="#m${esc(String(m.month))}">${esc(monthLabel(m.month))}</a>`).join("")}</nav>` : "";
   return pageHead("幹部護照", "33 格的題目與說明、每個月右上角的時刻、入境章抽得到的城市。改完幹部重新整理護照就看得到。")
     + msgHTML(msg)
     + `<div class="note">幹部的章、心得、照片這裡碰不到。<b>編號不能改</b>（章靠它對到格子），蓋過的格子只能停用不能刪，城市只能停用不能刪。
       ${months.length ? "" : "月份載不到的話，格子也不會出現。"}</div>`
     + jump
     + passportPreviewHTML(previewMonth, months)
-    + (months.length ? monthBlocks : emptyHTML("月份還沒載到", "重新整理再試一次。"))
-    + sectionHTML("城市", `<div class="mini" style="margin-bottom:8px">入境章抽城市用的。有人抽到過的城市資料庫擋著不給刪，所以這裡只有停用。停用之後新的入境章不會再抽到它，已經發出去的不動。</div>
-    ${dests.length ? `<ul class="flist">${destRows}</ul>` : `<div class="empty sm">還沒有城市。</div>`}
-    <div class="row" style="margin:6px 0 4px"><button class="btn ghost sm" data-act="dest-new"${dis}>加一個城市</button></div>`,
-      { id: "cities" });
+    + (months.length ? monthBlocks : emptyHTML("月份還沒載到", "重新整理再試一次。"));
+}
+
+// 城市（2026-10-19 起自己一頁，側欄「護照 > 城市」）。24 個城市不該跟 33 格擠在同一頁的最底下。
+// 入境章抽城市用的。只有停用與恢復，沒有刪：visas 的外鍵本來就擋，後台不給那顆按鈕。
+export function citiesHTML(data, msg, busy) {
+  const dests = data.destinations || [];
+  const dis = busy ? " disabled" : "";
+  const rows = dests.map(d => `<tr${d.active ? "" : ' class="off"'}>
+    <td class="t-main"><b>${esc(d.city)}</b></td>
+    <td><span class="tag">${esc(d.code)}</span></td>
+    <td>${d.active ? `<span class="tag open">抽得到</span>` : `<span class="tag draft">停用中</span>`}</td>
+    <td class="t-act">
+      <button class="btn quiet sm" data-act="dest-edit" data-code="${esc(d.code)}"${dis}>改名字</button>
+      ${d.active
+        ? `<button class="btn quiet sm" data-act="dest-off" data-code="${esc(d.code)}"${dis}>停用</button>`
+        : `<button class="btn quiet sm" data-act="dest-on" data-code="${esc(d.code)}"${dis}>恢復</button>`}
+    </td>
+  </tr>`).join("");
+  return pageHead("城市", `入境章抽城市用的。${dests.length} 個城市，${dests.filter(d => d.active).length} 個抽得到。`,
+      [{ act: "dest-new", label: "加一個城市", primary: true, disabled: busy }])
+    + msgHTML(msg)
+    + `<div class="note">有人抽到過的城市資料庫擋著不給刪，所以這裡只有停用。停用之後新的入境章不會再抽到它，已經發出去的不動。</div>`
+    + sectionHTML("", dests.length
+      ? `<table class="table"><thead><tr><th>城市</th><th>代碼</th><th>狀態</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : emptyHTML("還沒有城市", "加第一個，入境章才抽得到東西。", { act: "dest-new", label: "加一個城市" }), { id: "cities" });
 }
 
 // 改或加一格。編號是標籤不是輸入框；改既有的格子時月份也鎖住。
@@ -436,7 +449,7 @@ export function monthEditHTML(m, msg, busy, draft) {
 export function destinationEditHTML(d, msg, busy, draft) {
   const cur = draft || d || { code: "", city: "", active: true };
   const dis = busy ? " disabled" : "";
-  return pageHead(d ? "改這個城市的名字" : "加一個城市", "入境章會印這個名字，建議全大寫英文。", [], { act: "cadre-back", label: "回幹部護照" })
+  return pageHead(d ? "改這個城市的名字" : "加一個城市", "入境章會印這個名字，建議全大寫英文。", [], { act: "cities-back", label: "回城市" })
     + msgHTML(msg)
     + sectionHTML("", `<div class="two">
       <label><i>代碼（2 到 8 個英文或數字，建議用機場代碼${d ? "；建了就不能改" : ""}）</i>
@@ -445,7 +458,7 @@ export function destinationEditHTML(d, msg, busy, draft) {
     </div>
     <div class="form-foot">
       <button class="btn" data-act="dest-save"${d ? ` data-code="${esc(d.code)}"` : ""} data-active="${cur.active === false ? "0" : "1"}"${dis}>${busy ? "存檔中…" : "存起來"}</button>
-      <button class="btn ghost" data-act="cadre-back"${dis}>取消</button>
+      <button class="btn ghost" data-act="cities-back"${dis}>取消</button>
     </div>`);
 }
 

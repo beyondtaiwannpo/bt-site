@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tabsHTML, passportAdminHTML, activityEditHTML, monthEditHTML, destinationEditHTML,
+import { tabsHTML, passportAdminHTML, citiesHTML, activityEditHTML, monthEditHTML, destinationEditHTML,
          ACT_CATS } from "../admin/passports/src/ui.js";
 import { says } from "../admin/passports/src/data.js";
 import { CATEGORY } from "../passport/src/ui.js";
@@ -43,7 +43,7 @@ test("主畫面：每個月一段、格子有編號與分類、蓋過的人數�
   assert.match(h, /要主持人/);
   assert.match(h, /回望 09B/);
   assert.match(h, /聚會/);
-  assert.match(h, /TAIPEI/);
+  assert.match(citiesHTML(DATA, "", false), /TAIPEI/);
 });
 
 test("★ 蓋過的格子沒有「刪掉」，沒人蓋過的才有", () => {
@@ -54,8 +54,11 @@ test("★ 蓋過的格子沒有「刪掉」，沒人蓋過的才有", () => {
   assert.match(h, /data-act="act-on" data-id="09B"/, "停用中的可以恢復");
 });
 
+// 城市 2026-10-19 起自己一頁（citiesHTML），不在幹部護照那一頁。
 test("★ 城市只有停用與恢復，沒有刪掉", () => {
-  const h = passportAdminHTML(DATA, "", false);
+  assert.doesNotMatch(passportAdminHTML(DATA, "", false), /dest-off|TAIPEI/, "城市不再跟 33 格擠在同一頁");
+  const h = citiesHTML(DATA, "", false);
+  assert.match(h, /<table class="table"/);
   assert.doesNotMatch(h, /dest-del/);
   assert.match(h, /data-act="dest-off" data-code="TPE"/);
   assert.match(h, /data-act="dest-on" data-code="LAX"/);

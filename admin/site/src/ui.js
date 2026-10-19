@@ -43,8 +43,10 @@ export const ITEMS = [
   { group: "site",      key: "mail",    label: "信件文案", who: "president" },
   { group: "passports", key: "interns", label: "實習護照", who: "intern-staff" },
   { group: "passports", key: "cadre",   label: "幹部護照", who: "president" },
+  { group: "passports", key: "cities",  label: "城市",     who: "president" },
   { group: "people",    key: "roster",  label: "幹部名單", who: "president" },
   { group: "people",    key: "invites", label: "邀請碼",   who: "president" },
+  { group: "people",    key: "changes", label: "變動紀錄", who: "president" },
 ];
 const WHY = { president: "只有 Co-President 進得去", "intern-staff": "只有 Internship team 的幹部與 Co-President 進得去" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
@@ -344,9 +346,9 @@ export function mailEditHTML(kind, t, msg, busy) {
   const subject = t ? t.subject : "";
   const body = t ? t.body : "";
   const extra = kind === "interview" ? "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/..." : "";
-  return pageHead(esc(k.label), `${esc(k.when)}寄出。`, [], { act: "mail-back", label: "回信件清單" })
+  return pageHead(esc(k.label), `${esc(k.when)}寄出。左邊改，右邊就是寄出去的樣子。`, [], { act: "mail-back", label: "回信件清單" })
     + msgHTML(msg)
-    + sectionHTML("", `<label><i>主旨</i><input id="msub" value="${esc(subject)}"></label>
+    + `<div class="cols">` + sectionHTML("", `<label><i>主旨</i><input id="msub" value="${esc(subject)}"></label>
     <label><i>內文</i><textarea id="mbody" style="min-height:230px">${esc(body)}</textarea></label>
     <div class="mini" style="margin:-6px 0 14px">
       可以用兩個代換符號：<b>{姓名}</b> 與 <b>{活動名稱}</b>。
@@ -361,7 +363,7 @@ export function mailEditHTML(kind, t, msg, busy) {
       esc(fillMail(body, NAME, TITLE) + extra)}</pre><pre class="tail">${esc(mailTail(kind))}</pre></div>
     <div class="mini" style="margin:6px 0 0">
       灰色那一段是<b>系統自己加的，改不掉</b>。「不要回覆這封信」是必要資訊：
-      那個信箱沒有人看，按回覆會被退回，而收信的人只會覺得沒有人理他。</div>`);
+      那個信箱沒有人看，按回覆會被退回，而收信的人只會覺得沒有人理他。</div>`) + `</div>`;
 }
 
 // 學員或還沒升級的人走到這裡。**不說「你沒有權限」**：他沒有做錯任何事，只是走錯地方。

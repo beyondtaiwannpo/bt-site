@@ -40,8 +40,10 @@ export const ITEMS = [
   { group: "site",      key: "mail",    label: "信件文案", who: "president" },
   { group: "passports", key: "interns", label: "實習護照", who: "intern-staff" },
   { group: "passports", key: "cadre",   label: "幹部護照", who: "president" },
+  { group: "passports", key: "cities",  label: "城市",     who: "president" },
   { group: "people",    key: "roster",  label: "幹部名單", who: "president" },
   { group: "people",    key: "invites", label: "邀請碼",   who: "president" },
+  { group: "people",    key: "changes", label: "變動紀錄", who: "president" },
 ];
 const WHY = { president: "只有 Co-President 進得去", "intern-staff": "只有 Internship team 的幹部與 Co-President 進得去" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
@@ -168,10 +170,45 @@ const valueZh = (field, v) => field === "board_role" ? boardLabel(v) : (v || "�
 
 // 主畫面：最近的變動在上面，名單在下面。rows 是 loadRoster()，changes 是 loadRoleChanges()，
 // privileged 是 loadPrivilegedTeams()，meId 是自己（自己那一列不給降級）。
-export function rosterHTML(rows, changes, privileged, meId, msg, busy) {
+export function rosterHTML(rows, changes, privileged, meId, msg, busy, teamFilter) {
   const list = rows || [];
   const dis = busy ? " disabled" : "";
-  const byId = Object.fromEntries(list.map(p => [p.id, p]));
+  const privNames = (privileged || []).map(p => p.name);
+  // team 的篩選：清單裡出現過的 team 都列出來，一個人在兩個 team 就兩個篩選都出現，但清單裡永遠只有一列。
+  const allTeams = [...new Set(list.flatMap(p => parseTeams(p.team)))].sort((a, b) => a.localeCompare(b));
+  const noTeam = list.filter(p => !parseTeams(p.team).length).length;
+  const shown = !teamFilter ? list
+    : teamFilter === "__none" ? list.filter(p => !parseTeams(p.team).length)
+    : list.filter(p => parseTeams(p.team).includes(teamFilter));
+  // 沒有名字的排最後，並標出來。
+  const sorted = shown.slice().sort((a, b) => Number(namesOf(a).name === "（沒有名字）") - Number(namesOf(b).name === "（沒有名字）"));
+  const chip = (v, label, n) => `<button class="chip${(teamFilter || "") === v ? " on" : ""}" data-act="roster-team" data-team="${esc(v)}">${esc(label)}${n != null ? ` ${n}` : ""}</button>`;
+  const filters = `<div class="chips" style="margin-bottom:14px">${chip("", "全部", list.length)}${
+    allTeams.map(t => chip(t, t.replace(/\s*Team$/i, ""), list.filter(p => parseTeams(p.team).includes(t)).length)).join("")}${
+    noTeam ? chip("__none", "還沒填 team", noTeam) : ""}</div>`;
+  const tr = p => {
+    const { name, alt } = namesOf(p);
+    const teams = parseTeams(p.team);
+    return `<tr>
+      <td class="t-main"><b>${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}</b>${p.id === meId ? ` <span class="tag">這是你</span>` : ""}${name === "（沒有名字）" ? ` <span class="tag warn">還沒填名字</span>` : ""}</td>
+      <td><span class="tag${p.board_role === "president" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span></td>
+      <td>${teams.length ? teams.map(t => esc(t) + (privNames.includes(t) ? "（有後台權限）" : "")).join("、") : "<span class=\"mini\">沒有填 team</span>"}</td>
+      <td class="t-act"><button class="btn quiet sm" data-act="person-edit" data-id="${esc(p.id)}"${dis}>改職位或 team</button></td>
+    </tr>`;
+  };
+  return pageHead("幹部名單", `${list.length} 位幹部。職位決定他在後台管到哪，team 決定管哪一個 team 的東西。`)
+    + msgHTML(msg)
+    + `<div class="note">每一筆改動都會記在<a href="#changes" data-act="tab" data-t="changes">變動紀錄</a>，兩位 Co-President 都看得到。把人升成 Co-President 等於把整個後台給他，包括把你降級。
+      Director 與 Co-President 的 team 只能在這裡改；一般幹部自己在設定頁勾，但勾進${esc(privNames.join("、") || "會長出權限的 team")}要在這裡加。</div>`
+    + sectionHTML("", filters + (sorted.length
+      ? `<table class="table"><thead><tr><th>名字</th><th>職位</th><th>team</th><th></th></tr></thead><tbody>${sorted.map(tr).join("")}</tbody></table>`
+      : list.length ? emptyHTML("這個篩選裡沒有人", "換一個 team 看看。") : emptyHTML("名單載不到或還沒有幹部", "重新整理再試一次。")), { id: "roster" });
+}
+
+// 變動紀錄（2026-10-19 起自己一頁，側欄「人與權限 > 變動紀錄」）。
+// 這是帳本不是通知：不寄信、不彈提示，另一位 Co-President 登入就看得到。
+export function changesHTML(changes, rows, msg) {
+  const byId = Object.fromEntries((rows || []).map(p => [p.id, p]));
   const who = id => { const p = byId[id]; return p ? namesOf(p).name : "（已經不在名單上）"; };
   const logRows = (changes || []).map(c => `<li>
     <div class="fhead"><b>${esc(c.target_name || who(c.target))}</b>
@@ -179,25 +216,10 @@ export function rosterHTML(rows, changes, privileged, meId, msg, busy) {
     <div class="fmeta">${esc(valueZh(c.field, c.old_value))} → <b>${esc(valueZh(c.field, c.new_value))}</b>
       ・${esc(who(c.changed_by))} 改的・${esc(fmtDate(c.created_at))}</div>
   </li>`).join("");
-  const privNames = (privileged || []).map(p => p.name);
-  const personRows = list.map(p => {
-    const { name, alt } = namesOf(p);
-    const teams = parseTeams(p.team);
-    return `<li>
-      <div class="fhead"><b>${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}</b>
-        <span class="tag${p.board_role === "president" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>
-        ${p.id === meId ? `<span class="tag">這是你</span>` : ""}</div>
-      <div class="fmeta">${teams.length ? teams.map(t => esc(t) + (privNames.includes(t) ? "（有後台權限）" : "")).join("、") : "沒有填 team"}</div>
-      <div class="row"><button class="btn ghost sm" data-act="person-edit" data-id="${esc(p.id)}"${dis}>改職位或 team</button></div>
-    </li>`;
-  }).join("");
-  return pageHead("幹部名單", `${list.length} 位幹部。職位決定他在後台管到哪，team 決定管哪一個 team 的東西。`)
+  return pageHead("變動紀錄", "誰改了誰的職位或 team、從什麼到什麼、什麼時候。最近 30 筆。只有 Co-President 看得到。")
     + msgHTML(msg)
-    + sectionHTML("名單", `<div class="note">每一筆改動都會記在下面，兩位 Co-President 都看得到。把人升成 Co-President 等於把整個後台給他，包括把你降級。
-      Director 與 Co-President 的 team 只能在這裡改；一般幹部自己在設定頁勾，但勾進${esc(privNames.join("、") || "會長出權限的 team")}要在這裡加。</div>
-    ${personRows ? `<ul class="flist">${personRows}</ul>` : emptyHTML("名單載不到或還沒有幹部", "重新整理再試一次。")}`, { id: "roster" })
-    + sectionHTML("最近的變動", logRows ? `<ul class="flist">${logRows}</ul>`
-      : `<div class="empty sm">還沒有任何變動。這張紀錄從跑完 2026-10-21-people-admin.sql 那一天開始記。</div>`, { id: "changes" });
+    + sectionHTML("", logRows ? `<ul class="flist">${logRows}</ul>`
+      : emptyHTML("還沒有任何變動", "這張紀錄從跑完 2026-10-21-people-admin.sql 那一天開始記。"), { id: "changes" });
 }
 
 // 改一個人的職位與 team。draft 留住存檔被擋時剛填的東西。
@@ -298,10 +320,10 @@ export function inviteCodesHTML(rows, msg, busy, draft) {
       <div class="fmeta">建立於：${esc(String(c.created_at || "").slice(0, 10) || "不知道")}・有紀錄的使用 ${uses.length} 次</div>
       ${left > 0 ? `<div class="row"><button class="btn ghost sm" data-act="invite-disable"
         data-code="${esc(c.code)}"${busy ? " disabled" : ""}>停用</button></div>` : ""}
-      ${uses.length ? `<div class="fmeta" style="margin-top:8px"><b>誰用過</b></div>
+      ${uses.length ? `<details class="ans"><summary>誰用過（${uses.length} 人，有 email，預設收著）</summary>
       ${uses.map(u => `<div class="fmeta">・<b>${esc(u.name || "（沒有名字）")}</b>
         ${esc(u.email || "（沒有 email）")}・${esc(String(u.used_at || "").slice(0, 10))}・換成${esc(ROLE_ZH[u.grants] || u.grants || "")}${
-        u.role && u.role !== u.grants ? `（現在是${esc(ROLE_ZH[u.role] || u.role)}）` : ""}</div>`).join("")}` : ""}
+        u.role && u.role !== u.grants ? `（現在是${esc(ROLE_ZH[u.role] || u.role)}）` : ""}</div>`).join("")}</details>` : ""}
     </li>`;
   };
   return pageHead("邀請碼", "發新的碼、停用碼、看每一組還剩幾次與誰用過。")

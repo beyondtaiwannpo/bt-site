@@ -393,8 +393,10 @@ export const ITEMS = [
   { group: "site",      key: "mail",    label: "信件文案", who: "president" },
   { group: "passports", key: "interns", label: "實習護照", who: "intern-staff" },
   { group: "passports", key: "cadre",   label: "幹部護照", who: "president" },
+  { group: "passports", key: "cities",  label: "城市",     who: "president" },
   { group: "people",    key: "roster",  label: "幹部名單", who: "president" },
   { group: "people",    key: "invites", label: "邀請碼",   who: "president" },
+  { group: "people",    key: "changes", label: "變動紀錄", who: "president" },
 ];
 const WHY = { president: "只有 Co-President 進得去", "intern-staff": "只有 Internship team 的幹部與 Co-President 進得去" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。

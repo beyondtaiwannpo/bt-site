@@ -99,9 +99,12 @@ function render() {
   if (S.profile.intro_seen === false) { el.innerHTML = UI.introHTML(); return; }
   // 頂欄是 shared 的（站台導覽），barHTML 是護照自己的子欄（內部分頁與蓋章進度）。
   // 兩層用顏色反轉分開：頂欄深藍底、子欄紙色底。
-  el.innerHTML = navHTML({ current: "passport", role: S.role,
+  // ?bare=1（2026-10-19，Paul 拍板）：後台的預覽框用的，不畫頂欄與子欄，框裡只有那本護照。
+  // 它只改畫面；讀得到什麼仍然是 RLS 決定的，跟 ?month= 同一類。
+  const bare = new URLSearchParams(location.search).get("bare") === "1";
+  el.innerHTML = (bare ? "" : navHTML({ current: "passport", role: S.role,
                            name: S.profile && (S.profile.name_zh || S.profile.name_en) })
-               + UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
+               + UI.barHTML(S)) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
 }
 
 async function loadWall() {
