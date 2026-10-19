@@ -205,6 +205,39 @@ export async function loadPendingAll() {
   return data || [];
 }
 
+// 首頁「今天要處理的事」與「你的 team」（2026-10-19，後台第二次重整批 2）。**只讀，沒有寫入。**
+// Paul 2026-10-19 拍板加這一支。規矩兩條（設計文件第 3 段第三輪）：
+//   1. **只查 canEnter 說進得去的那幾項，其他連問都不問。** 一般幹部不該看到「等你核可 0 人」，
+//      那等於告訴他有一個他進不去的功能；而 stories_for_review() 對非 president 回空清單不報錯，光靠結果分不出來。
+//   2. intern 的進度**只數筆數，不拿人名**；完全不讀 entries（test/admin-hub.test.mjs 守著）。
+// 每一項各自接住：載不到是 null，不是 0。0 跟載不到是兩回事，首頁要分開畫。
+export async function loadTodo(me) {
+  need();
+  const pres = !!me && me.board === "president";
+  const istaff = pres || String(me && me.team || "").includes("Internship Team");
+  const q = {
+    // 所有幹部讀得到：資源（算每個 team 有幾條）、幹部名單（找每個 team 的 Director；進度牆本來就看得到名字）。
+    resources: supabase.from("resources").select("id, team, status"),
+    roster: supabase.from("profiles").select("id, name_zh, name_en, team, board_role").eq("role", "cadre"),
+  };
+  if (pres) {
+    q.team = supabase.from("profiles").select("id").eq("role", "cadre").eq("public_profile", true).eq("public_approved", false);
+    q.stories = supabase.rpc("stories_for_review");
+  }
+  if (istaff) {
+    q.interns = supabase.from("profiles").select("id").eq("role", "intern");
+    q.stamps = supabase.from("intern_stamps").select("task_id");
+  }
+  const keys = Object.keys(q);
+  const rs = await Promise.allSettled(keys.map(k => q[k]));
+  const out = {};
+  keys.forEach((k, i) => {
+    const r = rs[i];
+    out[k] = r.status === "fulfilled" && !r.value.error ? (r.value.data || []) : null;
+  });
+  return out;
+}
+
 // ── 批 6：活動營運 ────────────────────────────────────────────────────
 export async function setCheckIn(ids, present) {
   need();

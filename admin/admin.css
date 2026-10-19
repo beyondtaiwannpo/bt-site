@@ -264,3 +264,31 @@ a.btn{text-decoration:none}
   .preview-frame{height:70vh}
   .fhead b{font-size:18px}
 }
+
+/* ───────── 8. 首頁（2026-10-19，批 2）───────── */
+/* 今天要處理的事：一排小卡，每張一個數字。數字用 Barlow Condensed，大到第一眼就看到它。 */
+.todo{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.kpi{background:rgba(255,255,255,.5);border:1px solid rgba(16,42,134,.16);border-radius:16px;padding:16px 18px 14px;
+  display:flex;flex-direction:column;gap:2px;min-height:140px}
+.kpi-n{font-family:var(--display);font-size:44px;font-weight:700;letter-spacing:.01em;line-height:1;color:var(--ink)}
+.kpi-u{font-size:16px;font-weight:600;margin-left:4px;letter-spacing:.06em}
+.kpi-l{font-size:14.5px;font-weight:600;margin-top:4px}
+.kpi-h{font-size:12.5px;color:rgba(16,42,134,.78);line-height:1.45}
+.kpi-a{margin-top:auto;padding-top:10px}
+/* 0 的卡還是畫，但變淡：它在說「這件事沒有要處理的」，不是「這個功能不存在」。用 rgba 不用 opacity（對比）。 */
+.kpi.zero .kpi-n,.kpi.zero .kpi-l{color:rgba(16,42,134,.5)}
+.kpi.gone .kpi-n{font-size:22px;padding-top:12px;color:rgba(16,42,134,.7)}
+/* 你的 team：每個 team 一段，三行。 */
+.teamlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px 24px}
+.teamblk{padding:12px 0 6px;border-top:1px solid rgba(16,42,134,.14)}
+.teamblk h3{display:flex;align-items:baseline;gap:8px;font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.03em;margin:0 0 6px}
+.teamblk h3 .hint{font-family:var(--body);font-size:12.5px;font-weight:400;letter-spacing:0;color:rgba(16,42,134,.78)}
+.teamblk ul{margin:0;padding:0;list-style:none;font-size:13.5px;line-height:1.7}
+.teamblk a{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(16,42,134,.3)}
+.teamblk a:hover{border-bottom-color:var(--bt-orange)}
+@media (max-width:720px){
+  /* 手機上兩張一排，不然六張卡要捲三屏才看完。 */
+  .todo{grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{padding:14px 14px 12px;min-height:0}
+  .kpi-n{font-size:36px}
+}

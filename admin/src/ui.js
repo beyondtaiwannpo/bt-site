@@ -438,19 +438,111 @@ export function tabsHTML(tab, isPresident) {
     .map(i => `<a class="rail-item${i.key === tab ? " on" : ""}" href="#${i.key}" data-act="tab" data-t="${i.key}">${esc(i.label)}</a>`).join("");
 }
 
-// 後台首頁那一張卡：四組各一句「這一組是做什麼的」，加上還沒寄出去的信。
-// pendingAll 是 loadPendingAll() 回來的清單（RLS 已經篩過，看得到的就是你管得到的）。
-export function hubHTML(me, pendingAll, canSend, busy) {
+// 後台首頁（2026-10-19，後台第二次重整批 2）：三塊。
+//   1. 你是誰、管到哪（頁首那一句）。
+//   2. 今天要處理的事：每張卡一個數字、一句話、一顆直達的按鈕。**只畫你管得到的**，
+//      數字 0 的卡還是畫但變淡；整排都是 0 收成一行；載不到寫「載不到」，不寫 0。
+//   3. 你的 team：你在幾個 team 就幾段，Co-President 看到全部。
+// forms 是 loadForms()，pendingAll 是 loadPendingAll()，todo 是 loadTodo()（null 代表還沒載）。
+// 這一頁不碰 entries、不列 intern 的名字：intern 那張卡只有筆數。
+const BOARD_ZH2 = { member: "一般幹部", director: "Director", president: "Co-President" };
+const splitTeams = raw => String(raw || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
+const nameOf = p => String(p.name_zh || "").trim() || String(p.name_en || "").trim() || "（沒有名字）";
+
+export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
+  const t = todo || {};
+  const pres = !!me && me.board === "president";
+  const istaff = pres || String(me && me.team || "").includes("Internship Team");
+  const received = (forms || []).reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0);
+  const firstForm = (forms || []).find(f => f.counts && f.counts.received > 0);
   const pending = pendingAll || [];
   const stuck = pending.filter(p => p.tries > 0);
-  return pageHead("後台", "四組。側欄上你進得去的是連結，進不去的是淡字。")
-    + (pending.length ? `<div class="msg info"><span class="msg-k">信件</span><span>還有 <b>${pending.length}</b> 封信沒有寄出去。${
-        stuck.length ? `其中 ${stuck.length} 封試過但失敗了：${esc(stuck[0].error || "沒有錯誤訊息")}` : ""}
-      ${canSend ? `<button class="btn ghost sm" data-act="send-mail-all" ${busy ? "disabled" : ""}>${
-        busy ? "寄送中…" : "現在寄出去"}</button>` : ""}</span></div>` : "")
-    + sectionHTML("四組", `<ul class="hub">${GROUPS.map(g => `<li${canEnter(g, me) ? "" : ' class="off"'}>
-      <b>${esc(g.label)}</b><span>${esc(g.hint)}</span></li>`).join("")}</ul>
-    <div class="mini">對外七頁（首頁、關於、計畫、做過什麼、合作、團隊、Alumni）的文字在 HTML 檔裡，不在這裡。改法見 README「對外的內容頁」那一節。</div>`);
+  const cards = [];
+  cards.push({ n: received, label: "還沒處理的申請", unit: "件",
+    hint: received ? `${firstForm ? esc(firstForm.title) : ""}` : "沒有要處理的",
+    act: firstForm ? { act: "open-apps", id: firstForm.id, label: "去審" } : null });
+  cards.push({ n: pending.length, label: "還沒寄出去的信", unit: "封",
+    hint: pending.length ? (stuck.length ? `其中 ${stuck.length} 封試過但失敗了：${esc(stuck[0].error || "沒有錯誤訊息")}` : "狀態改了就會排一封信") : "全部寄出去了",
+    act: pending.length && canSend ? { act: "send-mail-all", label: busy ? "寄送中…" : "現在寄出去", disabled: busy } : null });
+  if (pres) {
+    cards.push({ n: t.team === null ? null : (t.team || []).length, label: "等你核可上團隊頁", unit: "人",
+      hint: "本人勾了，等第二把鑰匙", href: "/admin/site/#team", go: "去核可" });
+    const st = t.stories === null ? null : (t.stories || []).filter(r => !r.story_approved).length;
+    cards.push({ n: st, label: "等你核可上校友頁", unit: "人", hint: "故事填完也勾了同意", href: "/admin/site/#stories", go: "去核可" });
+  }
+  if (istaff) {
+    const interns = t.interns === null ? null : (t.interns || []).length;
+    const stamps = (t.stamps || []).length;
+    cards.push({ n: interns, label: "這一屆的 intern", unit: "位",
+      hint: interns ? `平均蓋了 ${(stamps / interns).toFixed(1)} 格` : "還沒有 intern 進來", href: "/admin/passports/#interns", go: "看格子" });
+  }
+  if (pres) {
+    const ro = t.roster;
+    const noTeam = ro ? ro.filter(p => !splitTeams(p.team).length).length : null;
+    cards.push({ n: ro === null ? null : (ro || []).length, label: "幹部", unit: "位",
+      hint: noTeam ? `其中 ${noTeam} 位還沒填 team` : "team 都填了", href: "/admin/people/#roster", go: "看名單" });
+  }
+  return cards;
+}
+
+function kpiHTML(c) {
+  const gone = c.n === null;
+  const zero = !gone && !c.n;
+  const act = c.act ? `<button class="btn ghost sm" data-act="${esc(c.act.act)}"${c.act.id ? ` data-id="${esc(c.act.id)}"` : ""}${c.act.disabled ? " disabled" : ""}>${esc(c.act.label)}</button>`
+    : c.href && !zero && !gone ? `<a class="btn ghost sm" href="${esc(c.href)}">${esc(c.go || "去看")}</a>` : "";
+  return `<div class="kpi${zero ? " zero" : ""}${gone ? " gone" : ""}">
+    <div class="kpi-n">${gone ? "載不到" : esc(String(c.n))}<span class="kpi-u">${gone ? "" : esc(c.unit)}</span></div>
+    <div class="kpi-l">${esc(c.label)}</div>
+    <div class="kpi-h">${gone ? "重新整理再試一次" : c.hint}</div>
+    ${act ? `<div class="kpi-a">${act}</div>` : ""}
+  </div>`;
+}
+
+// 你的 team：每個 team 一段，三行：開放中的申請表、資源、Director。
+export function teamBlocksHTML(me, forms, todo) {
+  const t = todo || {};
+  const pres = !!me && me.board === "president";
+  const roster = t.roster || [];
+  const res = t.resources || [];
+  let teams;
+  if (pres) {
+    const set = new Set();
+    for (const p of roster) for (const x of splitTeams(p.team)) set.add(x);
+    for (const f of forms || []) if (f.team) set.add(f.team);
+    for (const r of res) if (r.team) set.add(r.team);
+    teams = [...set].sort((a, b) => a.localeCompare(b));
+  } else {
+    teams = splitTeams(me && me.team);
+  }
+  if (!teams.length) return emptyHTML("你還沒有 team", "到「設定」勾你的 team，這裡就會有你的位置。");
+  return `<div class="teamlist">${teams.map(team => {
+    const fs = (forms || []).filter(f => f.team === team);
+    const open = fs.filter(f => f.status === "open");
+    const rec = fs.reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0);
+    const rs = res.filter(r => r.team === team);
+    const pub = rs.filter(r => r.status === "published").length;
+    const dirs = roster.filter(p => p.board_role === "director" && splitTeams(p.team).includes(team)).map(nameOf);
+    const members = roster.filter(p => splitTeams(p.team).includes(team)).length;
+    return `<section class="teamblk">
+      <h3>${esc(team.replace(/\s*Team$/i, ""))}<span class="hint">${members ? `${members} 人` : ""}</span></h3>
+      <ul>
+        <li><a href="/admin/#forms">申請表</a>：${fs.length ? `${fs.length} 份，${open.length} 份開放中${rec ? `，<b>${rec} 件還沒處理</b>` : ""}` : "還沒有"}</li>
+        <li><a href="/admin/site/#res">資源</a>：${rs.length ? `${rs.length} 條，${pub} 條已發布` : "還沒有"}</li>
+        <li>Director：${dirs.length ? esc(dirs.join("、")) : "還沒指定"}</li>
+      </ul>
+    </section>`;
+  }).join("")}</div>`;
+}
+
+export function hubHTML(me, pendingAll, canSend, busy, forms, todo) {
+  const teams = splitTeams(me && me.team);
+  const who = `${esc(me && me.name || "")}，${esc(BOARD_ZH2[me && me.board] || "一般幹部")}${teams.length ? "，" + esc(teams.join("、")) : "，還沒填 team"}。你管得到的事都在這一頁。`;
+  const cards = todoCards(me, forms, pendingAll, todo, canSend, busy);
+  const allZero = cards.every(c => c.n === 0);
+  return pageHead("首頁", who)
+    + sectionHTML("今天要處理的事", allZero ? `<div class="empty"><b>今天沒有待辦</b><div>申請、信件、核可都處理完了。</div></div>`
+        : `<div class="todo">${cards.map(kpiHTML).join("")}</div>`, { id: "todo" })
+    + sectionHTML("你的 team", teamBlocksHTML(me, forms, todo), { id: "teams" });
 }
 
 // 學員或還沒升級的人走到這裡。**不說「你沒有權限」**：他沒有做錯任何事，只是走錯地方。

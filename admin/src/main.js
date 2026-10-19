@@ -19,6 +19,8 @@ let S = {
   apps: [], sel: new Set(), filter: "all", pending: [],
   // 首頁那一句「還有 N 封信沒寄出去」（2026-10-15）。一定要有初始值。
   pendingAll: [],
+  // 首頁三塊要的數字（2026-10-19，批 2）。null 是還沒載；每一項載不到是 null，不是 0。
+  todo: null,
   // 批 6
   noticeTo: new Set(["accepted"]),
 };
@@ -61,10 +63,17 @@ function render() {
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres());
   } else {
     // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
-    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy);
+    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy, S.forms, S.todo);
   }
   // 側欄亮哪一行：首頁亮「首頁」，其他全部算在「申請表」底下。
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", S.view === "home" ? "home" : "forms", S.me), body);
+  // 側欄右邊的小數字：待審的申請、等核可的人。**只在 /admin/ 這一組算**（別組沒有 loadTodo），有才顯示。
+  const t = S.todo || {};
+  const counts = {
+    forms: S.forms.reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0),
+    team: (t.team || []).length,
+    stories: (t.stories || []).filter(r => !r.story_approved).length,
+  };
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", S.view === "home" ? "home" : "forms", S.me, counts), body);
 }
 
 async function boot() {
@@ -84,6 +93,8 @@ async function boot() {
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     S.forms = forms; S.pendingAll = pendingAll;
     if (S.me.board === "president") S.teams = await D.loadTeams();
+    // 首頁三塊的數字。載不到不該讓整頁打不開，所以接住；每一項自己也會接住。
+    S.todo = await D.loadTodo(S.me).catch(() => ({}));
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     render();
@@ -153,6 +164,7 @@ async function reloadList() {
   try {
     S.forms = await D.loadForms();
     S.pendingAll = await D.loadPendingAll().catch(() => []);
+    S.todo = await D.loadTodo(S.me).catch(() => S.todo || {});
   } catch (e) { S.msg = "清單載不到：" + D.says(e); }
 }
 
