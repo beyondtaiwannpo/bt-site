@@ -292,3 +292,15 @@ a.btn{text-decoration:none}
   .kpi{padding:14px 14px 12px;min-height:0}
   .kpi-n{font-size:36px}
 }
+
+/* ───────── 9. 申請那一組（2026-10-19，批 3）───────── */
+/* 一份表單裡的三個分頁：申請、設定、活動。位置固定在頁首底下，不是藥丸，是一條底線。 */
+.subtabs{display:flex;gap:4px;margin:-8px 0 20px;border-bottom:1px solid rgba(16,42,134,.16)}
+.subtab{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.06em;padding:8px 14px 10px;
+  color:rgba(16,42,134,.62);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
+.subtab:hover{color:var(--ink)}
+.subtab.on{color:var(--ink);border-bottom-color:var(--bt-orange)}
+/* 內嵌表單：展開在清單上面的一張卡。 */
+.inline-form{border-color:rgba(255,196,108,.9);background:rgba(255,232,197,.35)}
+/* 批次列：選了人之後黏在底部，捲到名單最下面也按得到。 */
+.bulk.on{position:sticky;bottom:12px;z-index:5;box-shadow:0 8px 24px rgba(16,42,134,.12)}

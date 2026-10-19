@@ -23,6 +23,8 @@ let S = {
   todo: null,
   // 批 6
   noticeTo: new Set(["accepted"]),
+  // 開新表單的內嵌表單（2026-10-19，批 3）。null 是收起來，物件是展開著、裡面是填到一半的值。
+  newForm: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -60,7 +62,8 @@ function render() {
     body = UI.formHTML(S.form, S.questions, canEdit(),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else if (S.view === "list") {
-    body = UI.listHTML(S.forms, canEdit(), S.msg, isPres());
+    body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
+      isPres() ? S.teams : [], S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy);
   } else {
     // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
     body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy, S.forms, S.todo);
@@ -326,17 +329,24 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  // 開新表單：按一下在清單上面展開內嵌表單，填完按「建立」才真的開（2026-10-19 起不再用瀏覽器原生的那個名字對話框）。
   if (act === "new-form") {
-    // President 沒有 team 的時候要先選一個，不然這份表單會屬於空字串，
-    // 而空字串那個 team 沒有人在，等於開出來就沒有人看得到。
-    const team = S.me.team || (S.teams[0] || "");
-    if (!team) { S.msg = "你的 profile 還沒有填 team，開不出表單。先到護照裡填一下。"; render(); return; }
-    const title = prompt("這份申請表叫什麼名字？（之後改得動）");
-    if (!title || !title.trim()) return;
-    S.busy = true; render();
+    const team = (S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "") || (S.teams[0] || "");
+    if (!team) { S.msg = "你的 profile 還沒有填 team，開不出表單。先到「設定」填一下。"; render(); return; }
+    S.newForm = { title: "", team, kind: "program" }; S.msg = ""; render();
+    const el = document.getElementById("nf-title"); if (el) el.focus();
+    return;
+  }
+  if (act === "new-form-cancel") { S.newForm = null; S.msg = ""; render(); return; }
+  if (act === "new-form-save") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    S.newForm = { title: val("nf-title"), team: val("nf-team") || (S.newForm && S.newForm.team) || "", kind: val("nf-kind") || "program" };
+    if (!S.newForm.title) { S.msg = "表單要有名字。"; render(); return; }
+    if (!S.newForm.team) { S.msg = "要選一個 team。"; render(); return; }
+    S.busy = true; S.msg = ""; render();
     try {
-      const newId = await D.createForm(team, title.trim(), "program");
-      S.busy = false;
+      const newId = await D.createForm(S.newForm.team, S.newForm.title, S.newForm.kind);
+      S.busy = false; S.newForm = null;
       await openForm(newId);
     } catch (err) { S.busy = false; S.msg = "開不出來：" + D.says(err); render(); }
     return;

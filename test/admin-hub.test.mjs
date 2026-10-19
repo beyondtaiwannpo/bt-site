@@ -216,3 +216,47 @@ test("學員走到後台任何一組都不說「你沒有權限」", () => {
     assert.match(h, /給幹部用的/, label);
   }
 });
+
+// ── 申請那一組（2026-10-19，批 3）────────────────────────────────────
+const AF = { id: "f1", title: "探索營", team: "Curriculum Team", status: "open", counts: { total: 2, received: 1 } };
+
+test("開新表單是內嵌表單，不是 prompt()", () => {
+  assert.doesNotMatch(readFileSync("admin/src/main.js", "utf8"), /\bprompt\(/, "main.js 不准再用瀏覽器的 prompt()");
+  const closed = FORMS.listHTML([AF], true, "", false, null, [], "Curriculum Team", false);
+  assert.match(closed, /data-act="new-form"/);
+  assert.doesNotMatch(closed, /id="new-form"/);
+  const open = FORMS.listHTML([AF], true, "", true, { title: "", team: "Marketing Team", kind: "board" }, ["Curriculum Team", "Marketing Team"], "", false);
+  assert.match(open, /id="new-form"/);
+  assert.match(open, /<option selected>Marketing Team<\/option>/);
+  assert.match(open, /<option value="board" selected>/);
+  assert.match(open, /data-act="new-form-save"/);
+  assert.match(open, /data-act="new-form-cancel"/);
+  assert.doesNotMatch(open, /class="btn" data-act="new-form">/, "表單展開著的時候頁首那顆收起來");
+  // 不是 Co-President：team 是固定的，不能選。
+  const mine = FORMS.listHTML([AF], true, "", false, { title: "x", team: "Curriculum Team", kind: "program" }, [], "Curriculum Team", false);
+  assert.match(mine, /id="nf-team" value="Curriculum Team" disabled/);
+});
+
+test("Co-President 的申請表清單照 team 分段，Director 的不分", () => {
+  const two = [AF, { ...AF, id: "f2", title: "招募", team: "Marketing Team" }];
+  const pres = FORMS.listHTML(two, true, "", true, null, [], "", false);
+  assert.match(pres, /<h2>Curriculum<span class="hint">1 份/);
+  assert.match(pres, /<h2>Marketing<span class="hint">1 份/);
+  const dir = FORMS.listHTML(two, true, "", false, null, [], "", false);
+  assert.doesNotMatch(dir, /<h2>Curriculum/);
+});
+
+test("一份表單裡的三個分頁：申請、設定、活動，當前的有標記，四個畫面都有同一條", () => {
+  assert.match(FORMS.formTabsHTML(AF, "apps"), /class="subtab on" data-act="open-apps" data-id="f1" aria-current="page">申請/);
+  assert.match(FORMS.formTabsHTML(AF, "question"), /class="subtab on" data-act="open-form"[^>]*>設定/);
+  assert.match(FORMS.formTabsHTML(AF, "notice"), /class="subtab on" data-act="open-checkin"[^>]*>活動/);
+  for (const h of [
+    FORMS.formHTML(AF, [], true, [], "", false),
+    FORMS.appsHTML(AF, [], [], true, new Set(), "all", [], "", false),
+    FORMS.checkinHTML(AF, [], true, "", false),
+    FORMS.noticeHTML(AF, [], new Set(), "", false),
+  ]) {
+    assert.match(h, /class="subtabs"/);
+    assert.match(h, /data-act="back-list"/);
+  }
+});

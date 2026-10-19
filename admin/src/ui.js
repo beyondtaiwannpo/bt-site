@@ -29,8 +29,35 @@ export const dtVal = v => (v ? String(v).slice(0, 16) : "");
 // ── 表單清單 ──────────────────────────────────────────────────────────
 // canCreate：Director 與 President 才有。一般幹部進來是**唯讀**的，
 // 那是 2026-09-07 拍板的三層：看得到自己 team 的申請，但改不動表單。
-export function listHTML(forms, canCreate, msg, isPresident) {
-  const rows = forms.map(f => {
+// 開新表單的內嵌表單（2026-10-19，批 3）。取代瀏覽器原生的 prompt()：那個對話框長得跟網站不搭，
+// 手機上尤其醜，而且會把整個分頁卡住。draft = { title, team, kind }；teams 是 Co-President 才有的選單，
+// 其他人固定自己的 team。
+export function newFormHTML(draft, teams, myTeam, busy) {
+  const d = draft || { title: "", team: myTeam || "", kind: "program" };
+  const dis = busy ? " disabled" : "";
+  return `<div class="card inline-form" id="new-form">
+    <h2>開一份新的申請表</h2>
+    <div class="sub">先取名字，題目進去再加。開出來是「還在寫」，外面看不到。</div>
+    <div class="two">
+      <label><i>名字（之後改得動）</i><input id="nf-title" value="${esc(d.title)}" placeholder="2027 暑期探索營" maxlength="80"${dis}></label>
+      ${teams && teams.length
+        ? `<label><i>哪一個 team 的</i><select id="nf-team"${dis}>${teams.map(t => `<option${t === d.team ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`
+        : `<label><i>哪一個 team 的</i><input id="nf-team" value="${esc(d.team)}" disabled></label>`}
+      <label><i>種類</i><select id="nf-kind"${dis}>
+        <option value="program"${d.kind !== "board" ? " selected" : ""}>給高中生的計畫</option>
+        <option value="board"${d.kind === "board" ? " selected" : ""}>幹部招募</option>
+      </select></label>
+    </div>
+    <div class="row">
+      <button class="btn" data-act="new-form-save"${dis}>${busy ? "建立中…" : "建立"}</button>
+      <button class="btn ghost" data-act="new-form-cancel"${dis}>取消</button>
+    </div>
+  </div>`;
+}
+
+// 表單清單。newDraft 不是 null 就在清單上面展開內嵌表單；teams 與 myTeam 給那個表單用。
+export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, myTeam, busy) {
+  const row = f => {
     const st = statusOf(f.status);
     return `<li>
       <div class="fhead">
@@ -47,15 +74,42 @@ export function listHTML(forms, canCreate, msg, isPresident) {
           canCreate ? "改這份表單" : "看這份表單"}</button>
       </div>
     </li>`;
-  }).join("");
+  };
+  // Co-President 看得到全部，照 team 分段；其他人只看得到自己 team 的，不分段。
+  let rows;
+  if (isPresident && forms.length) {
+    const byTeam = new Map();
+    for (const f of forms) { const k = f.team || "沒有指定 team"; if (!byTeam.has(k)) byTeam.set(k, []); byTeam.get(k).push(f); }
+    rows = [...byTeam.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([team, fs]) => sectionHTML(esc(team.replace(/\s*Team$/i, "")), `<ul class="flist">${fs.map(row).join("")}</ul>`, { hint: `${fs.length} 份` })).join("");
+  } else {
+    rows = sectionHTML("", `<ul class="flist">${forms.map(row).join("")}</ul>`);
+  }
 
   return pageHead("申請表", "開申請表、看收到的申請。你看得到的是自己 team 的表單。",
-      canCreate ? [{ act: "new-form", label: "開一份新的申請表", primary: true }] : [])
+      canCreate && newDraft == null ? [{ act: "new-form", label: "開一份新的申請表", primary: true }] : [])
     + msgHTML(msg)
+    + (canCreate && newDraft != null ? newFormHTML(newDraft, teams, myTeam, busy) : "")
     + (canCreate ? "" : `<div class="note">你可以看，但改不動。開表單與審核是 Director 與 Co-President 的事。</div>`)
-    + sectionHTML("", forms.length ? `<ul class="flist">${rows}</ul>`
-      : emptyHTML("還沒有任何申請表", canCreate ? "開第一份，加幾題，狀態改成開放中，就會出現在 /apply/。" : "等 Director 或 Co-President 開第一份。",
-                  canCreate ? { act: "new-form", label: "開一份新的申請表" } : null));
+    + (forms.length ? rows : sectionHTML("",
+        emptyHTML("還沒有任何申請表", canCreate ? "開第一份，加幾題，狀態改成開放中，就會出現在 /apply/。" : "等 Director 或 Co-President 開第一份。",
+                  canCreate ? { act: "new-form", label: "開一份新的申請表" } : null)));
+}
+
+// 一份表單裡的三個分頁（2026-10-19，批 3）：申請（審核）、設定（欄位與題目）、活動（簽到與寄信）。
+// 位置固定在頁首底下，簽到跟行前信不再藏在底線字後面。view 是 main.js 的 S.view。
+export function formTabsHTML(form, view) {
+  const on = k => (k === "apps" && view === "apps") || (k === "form" && (view === "form" || view === "question")) ||
+                  (k === "event" && (view === "checkin" || view === "notice"));
+  const tab = (k, act, label) => `<button class="subtab${on(k) ? " on" : ""}" data-act="${act}" data-id="${esc(form.id)}"${on(k) ? ' aria-current="page"' : ""}>${label}</button>`;
+  return `<nav class="subtabs" aria-label="這份表單">${tab("apps", "open-apps", "申請")}${tab("form", "open-form", "設定")}${tab("event", "open-checkin", "活動")}</nav>`;
+}
+// 一份表單共用的頁首：名字、狀態、team，返回清單。
+export function formHeadHTML(form, view, count) {
+  const st = statusOf(form.status);
+  return pageHead(`${esc(form.title)} <span class="tag ${st.tag}">${esc(st.label)}</span>`,
+      `${esc(form.team || "沒有指定 team")}${count != null ? `，收到 ${count} 件` : ""}`, [], { act: "back-list", label: "回申請表清單" })
+    + formTabsHTML(form, view);
 }
 
 // ── 一份表單 ──────────────────────────────────────────────────────────
@@ -86,8 +140,7 @@ export function formHTML(form, questions, canEdit, teams, msg, busy) {
       </select></label>`
     : "";
 
-  return pageHead(`${esc(form.title)} <span class="tag ${st.tag}">${esc(st.label)}</span>`, esc(form.team || "沒有指定 team"),
-      [{ act: "open-apps", id: form.id, label: "看收到的申請" }], { act: "back-list", label: "回申請表清單" })
+  return formHeadHTML(form, "form")
     + msgHTML(msg)
     + sectionHTML("設定", `
     <label><i>表單名稱</i><input id="ftitle" value="${esc(form.title)}"${canEdit ? "" : " disabled"}></label>
@@ -232,10 +285,7 @@ export function appsHTML(form, apps, questions, canDecide, sel, filter, pending,
     <button class="btn sm" data-act="decide" data-s="rejected"  ${sel.size && !busy ? "" : "disabled"}>婉拒</button>
   </div>` : "";
 
-  return pageHead(esc(form.title), `收到 ${apps.length} 件`,
-      [{ act: "open-checkin", id: form.id, label: "簽到" }, { act: "open-notice", id: form.id, label: "寄一封信" },
-       { act: "open-form", id: form.id, label: "改這份表單" }],
-      { act: "back-list", label: "回申請表清單" })
+  return formHeadHTML(form, "apps", apps.length)
     + msgHTML(msg)
     + pendingHTML(pending, busy)
     + sectionHTML("", `<div class="chips" style="margin-bottom:4px">
@@ -269,10 +319,10 @@ function pendingHTML(pending, busy) {
 export function checkinHTML(form, apps, canEdit, msg, busy) {
   const list = apps.filter(a => a.status === "accepted");
   const here = list.filter(a => a.checked_in_at).length;
-  return pageHead("簽到", `${esc(form.title)}，錄取 ${list.length} 人，<b>到了 ${here} 人</b>`, [], { act: "open-apps", id: form.id, label: "回申請清單" })
+  return formHeadHTML(form, "checkin")
     + msgHTML(msg)
     + (canEdit ? "" : `<div class="note">你可以看，但點不了。簽到是 Director 與 Co-President 的事。</div>`)
-    + sectionHTML("", list.length ? `<ul class="flist">${list.map(a => `<li>
+    + sectionHTML("簽到", list.length ? `<ul class="flist">${list.map(a => `<li>
       <div class="arow">
         ${canEdit ? `<label class="apick"><input type="checkbox" data-act="checkin" data-id="${esc(a.id)}"
           ${a.checked_in_at ? "checked" : ""} ${busy ? "disabled" : ""}
@@ -283,7 +333,8 @@ export function checkinHTML(form, apps, canEdit, msg, busy) {
           <div class="fmeta">${esc(a.applicant_school || "")}${a.applicant_grade ? "・" + esc(a.applicant_grade) : ""}</div>
         </div>
       </div>
-    </li>`).join("")}</ul>` : emptyHTML("還沒有人錄取", "錄取之後，名單會出現在這裡，活動當天逐一點名。"));
+    </li>`).join("")}</ul>` : emptyHTML("還沒有人錄取", "錄取之後，名單會出現在這裡，活動當天逐一點名。"),
+      { hint: `錄取 ${list.length} 人，<b>到了 ${here} 人</b>`, actions: canEdit ? [{ act: "open-notice", label: "寄一封信給這些人", id: form.id }] : [] });
 }
 
 // 寄一封信給這場活動的人（行前信、通知）。
@@ -295,9 +346,9 @@ export const NOTICE_TO = [
 
 export function noticeHTML(form, apps, to, msg, busy) {
   const n = apps.filter(a => to.has(a.status)).length;
-  return pageHead("寄一封信", esc(form.title), [], { act: "open-apps", id: form.id, label: "回申請清單" })
+  return formHeadHTML(form, "notice")
     + msgHTML(msg)
-    + sectionHTML("", `<label><i>寄給誰</i></label>
+    + sectionHTML("寄一封信", `<label><i>寄給誰</i></label>
     <div class="chips" style="margin:-8px 0 16px">
       ${NOTICE_TO.map(t => `<button class="chip wide${to.has(t.v) ? " on" : ""}"
         data-act="notice-to" data-t="${t.v}">${esc(t.label)}</button>`).join("")}
@@ -313,7 +364,8 @@ export function noticeHTML(form, apps, to, msg, busy) {
     <div class="form-foot">
       <button class="btn" data-act="notice-send" ${n && !busy ? "" : "disabled"}>${
         busy ? "寄出中…" : n ? `寄給這 ${n} 個人` : "先選要寄給誰"}</button>
-    </div>`);
+      <button class="btn ghost" data-act="open-checkin" data-id="${esc(form.id)}">回簽到</button>
+    </div>`, { actions: [{ act: "open-checkin", label: "簽到", id: form.id }] });
 }
 
 // ── 後台的側欄與外殼（2026-10-19，後台第二次重整）──────────────────────
