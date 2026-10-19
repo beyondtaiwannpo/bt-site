@@ -35,6 +35,7 @@ export const ITEMS = [
   { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "president" },
   { group: "site",      key: "mail",    label: { zh: "信件文案", en: "Email copy" },      who: "president" },
   { group: "passports", key: "interns", label: { zh: "實習護照", en: "Intern passport" }, who: "intern-staff" },
+  { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "intern-staff" },
   { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "president" },
   { group: "passports", key: "cities",  label: { zh: "城市",     en: "Cities" },          who: "president" },
   { group: "people",    key: "roster",  label: { zh: "幹部名單", en: "Roster" },          who: "president" },
@@ -475,6 +476,110 @@ export function destinationEditHTML(d, msg, busy, draft) {
       <button class="btn" data-act="dest-save"${d ? ` data-code="${esc(d.code)}"` : ""} data-active="${cur.active === false ? "0" : "1"}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
       <button class="btn ghost" data-act="cities-back"${dis}>${T("common.cancel")}</button>
     </div>`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 實習護照的蛇梯棋（2026-10-22）：Internship team 排棋盤。
+// 資料：board = { term, size, active }，squares = [{ pos, kind, task_id, goes_to }]（空格不列）。
+// draft 是畫面上改到一半的：{ size, squares: { "<pos>": { kind, task_id, goes_to } }, dirty }。
+// 門在資料庫的 save_board() 與 set_board_active()；畫面上先擋一次（梯子往下、蛇往上）只是少一次來回。
+// ═══════════════════════════════════════════════════════════════════════
+export const BOARD_SIZES = [20, 30, 40];
+export const BOARD_PER_ROW = 5;
+// 蛇形排法：第 1 排（最下面）左到右，第 2 排右到左。回傳由上到下的每一排、每一排由左到右的格號。
+// **跟 intern-passport/src/ui.js 的 boardRows 同一份規則**（資料夾之間不互相 import），test/intern-board.test.mjs 比對。
+export function boardRows(size, perRow) {
+  const per = perRow || BOARD_PER_ROW;
+  const rows = [];
+  for (let start = 1; start <= size; start += per) {
+    const row = [];
+    for (let p = start; p < start + per && p <= size; p++) row.push(p);
+    if (Math.floor((start - 1) / per) % 2 === 1) row.reverse();
+    rows.push(row);
+  }
+  return rows.reverse();
+}
+// draft 的 squares 轉成 save_board() 要的陣列。空格不送。
+export function squaresToList(draft) {
+  return Object.entries(draft.squares || {})
+    .map(([pos, s]) => ({ pos: Number(pos), kind: s.kind, task_id: s.kind === "task" ? (s.task_id || null) : null,
+                          goes_to: (s.kind === "ladder" || s.kind === "snake") ? (s.goes_to == null ? null : Number(s.goes_to)) : null }))
+    .filter(s => s.kind && s.kind !== "plain")
+    .sort((a, b) => a.pos - b.pos);
+}
+// 畫面上先擋一次。回傳錯誤訊息的鍵，沒問題回 null。
+export function squareProblem(pos, s, size) {
+  if (!s || s.kind === "plain") return null;
+  if (s.kind === "task") return s.task_id ? null : "err.needTask";
+  const g = Number(s.goes_to);
+  if (!g || g < 1 || g > size) return "err.goesRange";
+  if (s.kind === "ladder" && g <= pos) return "err.ladderUp";
+  if (s.kind === "snake" && g >= pos) return "err.snakeDown";
+  return null;
+}
+
+export function boardAdminHTML(term, tasks, board, draft, sel, msg, busy) {
+  if (!term) {
+    return pageHead(T("bd.title"), "") + msgHTML(msg) + emptyHTML(T("bd.noTerm"), T("bd.noTermHint"));
+  }
+  const d = draft || { size: (board && board.size) || 30, squares: {}, dirty: false };
+  const size = Number(d.size) || 30;
+  const active = !!(board && board.active);
+  const dis = busy ? " disabled" : "";
+  const sq = d.squares || {};
+  const byTask = Object.fromEntries((tasks || []).map(t => [t.id, t]));
+  const kindText = (pos, s) => {
+    if (!s || s.kind === "plain") return "";
+    if (s.kind === "task") return byTask[s.task_id] ? esc(byTask[s.task_id].title_zh || byTask[s.task_id].title_en) : T("bd.kind.task");
+    if (s.kind === "ladder") return "↑ " + esc(String(s.goes_to || ""));
+    return "↓ " + esc(String(s.goes_to || ""));
+  };
+  const counts = { ladder: 0, snake: 0, task: 0 };
+  for (const s of Object.values(sq)) if (counts[s.kind] != null) counts[s.kind]++;
+  const grid = boardRows(size).map(row => row.map(pos => {
+    const s = sq[pos];
+    const kind = s ? s.kind : "plain";
+    const locked = active && (kind === "ladder" || kind === "snake");
+    return `<button class="bsq ${kind}${sel === pos ? " on" : ""}${pos === size ? " finish" : ""}${locked ? " off" : ""}" data-act="board-pick" data-pos="${pos}"${locked ? ' aria-disabled="true"' : ""} title="${T("bd.pick", { n: pos })}">
+      <span class="n">${pos}${pos === size ? ` ${esc(T("bd.finish"))}` : ""}</span><span class="k">${kindText(pos, s)}</span></button>`;
+  }).join("")).join("");
+  const cur = sel ? (sq[sel] || { kind: "plain" }) : null;
+  const curLocked = cur && active && (cur.kind === "ladder" || cur.kind === "snake");
+  const editor = sel ? `<div class="bedit" id="board-edit">
+    <h3>${esc(T("bd.pick", { n: sel }))}${sel === size ? ` <span class="tag">${esc(T("bd.finish"))}</span>` : ""}</h3>
+    <div class="two">
+      <label><i>${esc(T("bd.kind"))}</i><select id="bq-kind"${dis || (curLocked ? " disabled" : "")}>
+        ${["plain", "task", "ladder", "snake"].map(k => `<option value="${k}"${cur.kind === k ? " selected" : ""}${active && (k === "ladder" || k === "snake") && cur.kind !== k ? " disabled" : ""}>${esc(T("bd.kind." + k))}</option>`).join("")}
+      </select></label>
+      <label><i>${esc(T("bd.task"))}</i><select id="bq-task"${dis}>
+        <option value="">—</option>
+        ${(tasks || []).map(t => `<option value="${esc(t.id)}"${cur.task_id === t.id ? " selected" : ""}>${esc(t.title_zh || t.title_en)} (${esc(t.id)})</option>`).join("")}
+      </select></label>
+      <label><i>${esc(T("bd.goes"))}</i><input id="bq-goes" type="number" min="1" max="${size}" value="${esc(String(cur.goes_to || ""))}"${dis || (curLocked ? " disabled" : "")}></label>
+    </div>
+    <div class="row">
+      <button class="btn sm" data-act="board-apply" data-pos="${sel}"${dis}>${esc(T("bd.apply"))}</button>
+      <button class="btn ghost sm" data-act="board-clear" data-pos="${sel}"${dis || (curLocked ? " disabled" : "")}>${esc(T("bd.clear"))}</button>
+    </div>
+    ${sel === size ? `<div class="mini" style="margin-top:8px">${esc(T("bd.finishHint"))}</div>` : ""}
+  </div>` : `<div class="mini">${esc(T("bd.pickHint"))}</div>`;
+
+  return pageHead(T("bd.title"), T("bd.lede", { t: esc(term.title_zh) }),
+      [{ act: "board-save", label: busy ? T("bd.saving") : T("bd.save"), primary: true, disabled: busy },
+       { act: "ipreview", label: T("bd.preview") }])
+    + msgHTML(msg)
+    + `<div class="note">${esc(T("bd.rules"))}</div>`
+    + sectionHTML(T("bd.setup"), `<div class="two">
+        <label><i>${esc(T("bd.size"))}</i><select id="bd-size"${dis || (active ? " disabled" : "")}>
+          ${BOARD_SIZES.map(n => `<option value="${n}"${size === n ? " selected" : ""}>${n}</option>`).join("")}
+        </select></label>
+        <div>
+          <div class="mini" style="margin-bottom:8px">${esc(active ? T("bd.on") : T("bd.off"))}${d.dirty ? ` <span class="tag warn">${esc(T("bd.unsaved"))}</span>` : ""}</div>
+          ${board ? `<button class="btn ghost sm" data-act="board-toggle" data-on="${active ? "0" : "1"}"${dis}>${esc(active ? T("bd.turnOff") : T("bd.turnOn"))}</button>` : ""}
+        </div>
+      </div>`, { id: "board-setup" })
+    + sectionHTML(T("bd.layout"), `<div class="bgrid" style="grid-template-columns:repeat(${BOARD_PER_ROW},1fr)">${grid}</div>${editor}`,
+        { id: "board-layout", hint: T("bd.layoutHint", { l: counts.ladder, s: counts.snake, k: counts.task }) });
 }
 
 export function notCadreHTML() {

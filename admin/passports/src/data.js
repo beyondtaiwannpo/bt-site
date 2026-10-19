@@ -146,7 +146,40 @@ export async function saveDestination(code, city, active) {
 // 「mail_not_configured」對他來說跟一段亂碼沒有兩樣，
 // 而他需要知道的是「去哪裡做什麼」，不是那個代碼長什麼樣。
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
+// ── 蛇梯棋的棋盤（2026-10-22）。讀走 RLS，寫走 save_board() 與 set_board_active()，門在函式第一句。 ──
+export async function loadBoard(term) {
+  need();
+  const [b, sq] = await Promise.all([
+    supabase.from("intern_boards").select("term, size, active").eq("term", term).maybeSingle(),
+    supabase.from("intern_squares").select("pos, kind, task_id, goes_to").eq("term", term).order("pos"),
+  ]);
+  if (b.error) throw b.error;
+  if (sq.error) throw sq.error;
+  return { board: b.data || null, squares: sq.data || [] };
+}
+// squares 是 [{ pos, kind, task_id, goes_to }]，空格不用送。
+export async function saveBoard(term, size, squares) {
+  need();
+  const { data, error } = await supabase.rpc("save_board", { p_term: term, p_size: Number(size), p_squares: squares });
+  if (error) throw error;
+  return data;
+}
+export async function setBoardActive(term, active) {
+  need();
+  const { error } = await supabase.rpc("set_board_active", { p_term: term, p_active: !!active });
+  if (error) throw error;
+}
+
 const SAYS = [
+  ["ladder_must_go_up", "梯子要往上：通到的格子要比這一格大。", "A ladder must go up: the target must be a higher square."],
+  ["snake_must_go_down", "蛇要往下：通到的格子要比這一格小。", "A snake must go down: the target must be a lower square."],
+  ["last_square_cannot_be_snake", "最後一格不能是蛇頭。", "The last square cannot be a snake."],
+  ["bad_task", "有一個任務格綁的格子不是這一屆的。", "A task square points at a box that is not in this term."],
+  ["board_locked", "棋盤開著，格數與蛇梯鎖住了。要大改先關掉棋盤，或開新的一屆。", "The board is on, so size, snakes and ladders are locked. Turn it off first, or open a new term."],
+  ["bad_size", "格數要在 10 到 60 之間。", "Size must be between 10 and 60."],
+  ["no_board", "這一屆還沒有棋盤。", "This term has no board yet."],
+  ["public.save_board", "蛇梯棋的函式還不在資料庫裡，要先跑 2026-10-22-intern-board.sql。", "The board functions are not in the database yet. Run 2026-10-22-intern-board.sql first."],
+  ["public.set_board_active", "蛇梯棋的函式還不在資料庫裡，要先跑 2026-10-22-intern-board.sql。", "The board functions are not in the database yet. Run 2026-10-22-intern-board.sql first."],
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
   // 2026-09-08：Paul 照步驟設定了，但名字打成「Resend API」，
   // 而畫面上顯示的是這裡寫死的一句話 —— 看起來像他什麼都沒做。

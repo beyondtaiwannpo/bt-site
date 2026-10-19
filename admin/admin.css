@@ -334,3 +334,23 @@ a.btn{text-decoration:none}
   background:rgba(255,255,255,.55);color:var(--ink);font:600 13px/1 var(--body);cursor:pointer}
 .rail-lang .lang.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
 .rail-lang .lang:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+/* ───────── 11. 實習護照的蛇梯棋（2026-10-22）───────── */
+/* 棋盤：蛇形排法，跟 intern 看到的同一個方向（第一排在最下面、左到右，第二排右到左）。 */
+.bgrid{display:grid;gap:6px;margin:10px 0 16px;max-width:560px}
+.bsq{position:relative;aspect-ratio:1;border:1px solid rgba(16,42,134,.22);border-radius:10px;background:rgba(255,255,255,.55);
+  font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--ink);
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;padding:6px 7px;cursor:pointer;text-align:left}
+.bsq:hover{background:rgba(255,255,255,.95)}
+.bsq .n{font-size:12px;color:rgba(16,42,134,.6)}
+.bsq .k{font-family:var(--body);font-size:11.5px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.bsq.task{background:rgba(255,196,108,.32);border-color:rgba(255,196,108,.9)}
+.bsq.ladder{background:rgba(255,232,197,.7);border-color:var(--bt-orange)}
+.bsq.snake{background:rgba(107,198,187,.3);border-color:rgba(107,198,187,.9)}
+.bsq.on{outline:2px solid var(--bt-navy);outline-offset:1px}
+.bsq.finish{border-style:dashed}
+.bsq.off{opacity:.5;cursor:default}
+.bedit{padding:14px 16px;border:1px solid rgba(16,42,134,.16);border-radius:14px;background:rgba(255,255,255,.5)}
+.bedit h3{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.03em;margin:0 0 10px}
+.bedit .two label{margin-bottom:10px}
+@media (max-width:720px){ .bgrid{gap:4px} .bsq{font-size:11px;padding:4px 5px;border-radius:7px} .bsq .k{font-size:10px} }

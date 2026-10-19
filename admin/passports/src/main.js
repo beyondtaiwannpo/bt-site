@@ -28,6 +28,8 @@ let S = {
   previewMonth: null,
   // 實習護照的預覽框：null 沒有框，"" 開在資料頁，"project" 之類開在那個分類。
   internPreviewCat: null,
+  // 蛇梯棋的棋盤（2026-10-22）。board 是資料庫裡的，draft 是畫面上改到一半的，boardSel 是點了哪一格。
+  board: null, boardDraft: null, boardSel: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -49,7 +51,10 @@ function render() {
   if (!internStaff()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); return; }
 
   let body;
-  if (S.view === "cities" && isPres()) {
+  if (S.view === "board") {
+    const cur = S.intern.terms.find(t => t.id === S.internSel) || S.intern.terms.find(t => t.active) || null;
+    body = UI.boardAdminHTML(cur, cur ? S.intern.tasks.filter(t => t.term === cur.id && t.active) : [], S.board, S.boardDraft, S.boardSel, S.msg, S.busy);
+  } else if (S.view === "cities" && isPres()) {
     body = UI.citiesHTML(S.pass, S.msg, S.busy);
   } else if (S.view === "cadre" && isPres()) {
     body = UI.passportAdminHTML(S.pass, S.msg, S.busy, S.previewMonth);
@@ -68,7 +73,7 @@ function render() {
     body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy, isPres(), S.internPreviewCat);
   }
   // 側欄亮哪一行：幹部護照的三個編輯畫面算在「幹部護照」底下，其餘算「實習護照」。
-  const tab = ["cities", "dest-edit"].includes(S.view) ? "cities"
+  const tab = S.view === "board" ? "board" : ["cities", "dest-edit"].includes(S.view) ? "cities"
     : ["cadre", "act-edit", "month-edit"].includes(S.view) ? "cadre" : "interns";
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab, S.me), body);
 }
@@ -85,6 +90,7 @@ async function boot() {
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     if (want === "cadre" && isPres()) await openCadre();
     else if (want === "cities" && isPres()) await openCities();
+    else if (want === "board") await openBoard();
     else await openInterns();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-passports"); return; }
@@ -115,6 +121,25 @@ async function openCadre(keepMsg) {
   render();
 }
 
+// 蛇梯棋的棋盤：讀這一屆（側欄「實習護照」正在看的那一屆）的棋盤。draft 從資料庫的那份複製一份。
+async function openBoard(keepMsg) {
+  S.busy = true; if (!keepMsg) S.msg = ""; render();
+  try {
+    S.intern = await D.loadInternAdmin();
+    if (!S.internSel || !S.intern.terms.some(t => t.id === S.internSel))
+      S.internSel = (S.intern.terms.find(t => t.active) || S.intern.terms[0] || {}).id || null;
+    if (S.internSel) {
+      const { board, squares } = await D.loadBoard(S.internSel);
+      S.board = board;
+      const sq = {};
+      for (const s of squares) sq[s.pos] = { kind: s.kind, task_id: s.task_id, goes_to: s.goes_to };
+      S.boardDraft = { size: board ? board.size : 30, squares: sq, dirty: false };
+    } else { S.board = null; S.boardDraft = null; }
+    S.boardSel = null; S.view = "board"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = T("err.boardLoad") + D.says(e); S.view = "board"; }
+  render();
+}
+
 // 城市那一頁跟幹部護照讀同一份資料（loadPassportAdmin），只是開在另一個畫面。
 async function openCities(keepMsg) {
   S.busy = true; if (!keepMsg) S.msg = ""; render();
@@ -139,7 +164,60 @@ document.addEventListener("click", async e => {
     history.replaceState(null, "", "#" + b.dataset.t);
     if (b.dataset.t === "cadre" && isPres()) await openCadre();
     else if (b.dataset.t === "cities" && isPres()) await openCities();
+    else if (b.dataset.t === "board") await openBoard();
     else await openInterns();
+    return;
+  }
+
+  // ── 蛇梯棋的棋盤（2026-10-22）────────────────────────────────────────
+  if (act === "board-pick") {
+    if (b.getAttribute("aria-disabled") === "true") return;
+    S.boardSel = Number(b.dataset.pos); render();
+    const el = document.getElementById("board-edit"); if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return;
+  }
+  if (act === "board-apply" || act === "board-clear") {
+    const pos = Number(b.dataset.pos);
+    const val = i => { const el = document.getElementById(i); return el ? el.value : ""; };
+    const d = S.boardDraft || { size: 30, squares: {}, dirty: false };
+    const sizeEl = document.getElementById("bd-size"); if (sizeEl && !sizeEl.disabled) d.size = Number(sizeEl.value) || d.size;
+    if (act === "board-clear") { delete d.squares[pos]; }
+    else {
+      const s = { kind: val("bq-kind") || "plain", task_id: val("bq-task") || null, goes_to: val("bq-goes") ? Number(val("bq-goes")) : null };
+      const bad = UI.squareProblem(pos, s, Number(d.size));
+      if (bad) { S.msg = T(bad, { n: d.size }); render(); return; }
+      if (s.kind === "plain") delete d.squares[pos]; else d.squares[pos] = s;
+    }
+    d.dirty = true; S.boardDraft = d; S.msg = ""; render();
+    return;
+  }
+  if (act === "board-save") {
+    const d = S.boardDraft; if (!d || !S.internSel) return;
+    const sizeEl = document.getElementById("bd-size"); if (sizeEl && !sizeEl.disabled) d.size = Number(sizeEl.value) || d.size;
+    // 格數縮小的話，超出的格子丟掉（存之前先講清楚比存失敗好）。
+    for (const p of Object.keys(d.squares)) if (Number(p) > Number(d.size)) delete d.squares[p];
+    for (const [p, s] of Object.entries(d.squares)) {
+      const bad = UI.squareProblem(Number(p), s, Number(d.size));
+      if (bad) { S.boardSel = Number(p); S.msg = T("bd.pick", { n: p }) + "：" + T(bad, { n: d.size }); render(); return; }
+    }
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.saveBoard(S.internSel, d.size, UI.squaresToList(d));
+      S.msg = T("msg.boardSaved");
+      await openBoard(true);
+    } catch (err) { S.busy = false; S.msg = T("err.boardSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "board-toggle") {
+    const on = b.dataset.on === "1";
+    if (on && S.boardDraft && S.boardDraft.dirty) { S.msg = T("err.boardUnsaved"); render(); return; }
+    if (!confirm(T(on ? "confirm.boardOn" : "confirm.boardOff"))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.setBoardActive(S.internSel, on);
+      S.msg = T(on ? "msg.boardOn" : "msg.boardOff");
+      await openBoard(true);
+    } catch (err) { S.busy = false; S.msg = T("err.boardToggle") + D.says(err); render(); }
     return;
   }
 

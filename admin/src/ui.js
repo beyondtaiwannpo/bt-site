@@ -399,6 +399,7 @@ export const ITEMS = [
   { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "president" },
   { group: "site",      key: "mail",    label: { zh: "信件文案", en: "Email copy" },      who: "president" },
   { group: "passports", key: "interns", label: { zh: "實習護照", en: "Intern passport" }, who: "intern-staff" },
+  { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "intern-staff" },
   { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "president" },
   { group: "passports", key: "cities",  label: { zh: "城市",     en: "Cities" },          who: "president" },
   { group: "people",    key: "roster",  label: { zh: "幹部名單", en: "Roster" },          who: "president" },
