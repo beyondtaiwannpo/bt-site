@@ -12,7 +12,7 @@ import * as UI from "./ui.js";
 
 let S = {
   user: null, me: null, down: false, busy: false, msg: "",
-  view: "list",            // list | form | question | apps | checkin | notice
+  view: "home",            // home | list | form | question | apps | checkin | notice
   forms: [], teams: [],
   form: null, questions: [], qEditing: null,
   // 批 4
@@ -40,9 +40,9 @@ function render() {
   // 順帶一提，畫在裡面之後也不用再自己去 remove 上一次那條 —— innerHTML 蓋掉了。
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.downHTML(); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
   if (!S.user) { location.replace("../app/?next=admin"); return; }
-  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
+  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
 
   let body;
   if (S.view === "checkin" && S.form) {
@@ -57,11 +57,14 @@ function render() {
   } else if (S.view === "form" && S.form) {
     body = UI.formHTML(S.form, S.questions, canEdit(),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
+  } else if (S.view === "list") {
+    body = UI.listHTML(S.forms, canEdit(), S.msg, isPres());
   } else {
-    // 首頁：分組那一張卡在上面，申請表清單在下面。
-    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy) + UI.listHTML(S.forms, canEdit(), S.msg, isPres());
+    // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
+    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy);
   }
-  el.innerHTML = nav + UI.groupBarHTML("forms", S.me) + body;
+  // 側欄亮哪一行：首頁亮「首頁」，其他全部算在「申請表」底下。
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", S.view === "home" ? "home" : "forms", S.me), body);
 }
 
 async function boot() {
@@ -81,6 +84,8 @@ async function boot() {
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     S.forms = forms; S.pendingAll = pendingAll;
     if (S.me.board === "president") S.teams = await D.loadTeams();
+    // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
+    if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -215,7 +220,13 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  if (act === "tab") { S.view = "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render(); return; }
+  // 側欄：同一組裡換分頁不重新載入頁面，只改 S 再 render；網址的 # 跟著改，重新整理還在同一頁。
+  if (act === "tab") {
+    e.preventDefault();
+    const t = b.dataset.t === "home" ? "home" : "forms";
+    history.replaceState(null, "", "#" + t);
+    S.view = t === "home" ? "home" : "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render(); return;
+  }
 
   // 首頁那顆「現在寄出去」：把所有還沒寄的信都寄掉（2026-10-15）。
   // send_pending_mail() 的門在資料庫（is_cadre），寄的是全部待寄的信，不分表單。

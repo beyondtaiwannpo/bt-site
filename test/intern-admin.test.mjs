@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tabsHTML, internAdminHTML, internTermEditHTML, internTaskEditHTML, noAccessHTML, canEnter, GROUPS,
+import { tabsHTML, railHTML, internAdminHTML, internTermEditHTML, internTaskEditHTML, noAccessHTML, canEnter, GROUPS,
          suggestTaskId, INTERN_CATS } from "../admin/passports/src/ui.js";
 import { says } from "../admin/passports/src/data.js";
 
@@ -20,9 +20,10 @@ const DATA = {
   interns: 4,
 };
 
-test("實習護照那一頁畫得出這一組的分頁列", () => {
-  const h = internAdminHTML(DATA, null, "", false, true);
-  assert.match(h, /data-t="interns"/);
+test("實習護照那一頁的側欄亮在「實習護照」", () => {
+  const h = railHTML("passports", "interns", { role: "cadre", board: "president", team: "", name: "王平" });
+  assert.match(h, /class="rail-item on" href="#interns" data-act="tab" data-t="interns"/);
+  assert.match(h, /data-t="cadre"/);
 });
 
 // 2026-10-15 後台拆資料夾：「護照」那一組的門在分組列（灰字）與 main.js 開頁第一句，

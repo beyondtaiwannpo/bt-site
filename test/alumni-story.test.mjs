@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML,
          saveFailMessage } from "../settings/src/ui.js";
-import { alumniStoriesHTML, tabsHTML } from "../admin/site/src/ui.js";
+import { alumniStoriesHTML, tabsHTML, railHTML, shellHTML } from "../admin/site/src/ui.js";
 import { says } from "../admin/site/src/data.js";
 
 const FULL = {
@@ -240,10 +240,10 @@ test("★ 校友頁分頁只有 Co-President 看得到", () => {
 
 // 核可完要回得了申請表。少了分頁列就只能重新載入整頁，
 // 而 Paul 就是要一個一個按核可的人。
-test("★ 校友頁本身畫得出分頁列（核可完回得去資源）", () => {
-  const h = alumniStoriesHTML([ROW], "", false);
-  assert.match(h, /data-act="tab"/);
-  assert.match(h, /data-t="res"/);
+test("★ 校友頁整頁畫得出側欄（核可完回得去資源）", () => {
+  const h = shellHTML("", railHTML("site", "stories", { role: "cadre", board: "president", team: "", name: "王平" }), alumniStoriesHTML([ROW], "", false));
+  assert.match(h, /data-act="tab" data-t="res"/);
+  assert.match(h, /class="rail-item on" href="#stories"/);
 });
 
 // ⚠ touch_updated_at() 是 before update 的 trigger，而核可本身也是一句 update，

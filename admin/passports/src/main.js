@@ -42,10 +42,10 @@ function render() {
   if (!el) return;
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.downHTML(); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
   if (!S.user) { location.replace("../../app/?next=admin-passports"); return; }
-  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
-  if (!internStaff()) { el.innerHTML = nav + UI.noAccessHTML(S.me); return; }
+  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
+  if (!internStaff()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); return; }
 
   let body;
   if (S.view === "cadre" && isPres()) {
@@ -64,7 +64,9 @@ function render() {
   } else {
     body = UI.internAdminHTML(S.intern, S.internSel, S.msg, S.busy, isPres(), S.internPreviewCat);
   }
-  el.innerHTML = nav + UI.groupBarHTML("passports", S.me) + body;
+  // 側欄亮哪一行：幹部護照的三個編輯畫面算在「幹部護照」底下，其餘算「實習護照」。
+  const tab = ["cadre", "act-edit", "month-edit", "dest-edit"].includes(S.view) ? "cadre" : "interns";
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab, S.me), body);
 }
 
 async function boot() {
@@ -76,7 +78,8 @@ async function boot() {
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre" || !internStaff()) { render(); return; }
     // ?tab=cadre 直接開幹部護照（README 的連結用得到）。不是 Co-President 的回到實習護照。
-    if (new URLSearchParams(location.search).get("tab") === "cadre" && isPres()) await openCadre();
+    const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
+    if (want === "cadre" && isPres()) await openCadre();
     else await openInterns();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-passports"); return; }
@@ -116,7 +119,8 @@ document.addEventListener("click", async e => {
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") {
-    S.msg = "";
+    e.preventDefault(); S.msg = "";
+    history.replaceState(null, "", "#" + b.dataset.t);
     if (b.dataset.t === "cadre" && isPres()) await openCadre(); else await openInterns();
     return;
   }
@@ -278,7 +282,8 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "intern-task-new") {
-    S.internTaskEditing = null; S.internTaskDraft = null; S.internTaskTerm = b.dataset.term; S.view = "intern-task"; S.msg = ""; render(); return;
+    // 頁首那顆沒有 data-term，拿現在在看的那一屆。
+    S.internTaskEditing = null; S.internTaskDraft = null; S.internTaskTerm = b.dataset.term || S.internSel; S.view = "intern-task"; S.msg = ""; render(); return;
   }
   if (act === "intern-task-edit") {
     const t = S.intern.tasks.find(x => x.id === id);

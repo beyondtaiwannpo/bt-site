@@ -81,8 +81,8 @@ test("編輯頁講清楚介紹是公開的（那是搜尋引擎唯一看得到�
 // 2026-10-15 後台拆資料夾：資源在「對外」那一組（/admin/site/），所有幹部進得去；
 // 申請在 /admin/ 首頁，從分組列過去。
 test("資源分頁是這一組的第一個分頁，當前的那一個有標記", () => {
-  assert.match(M.tabsHTML("res"), /class="chip wide on" data-act="tab" data-t="res"/);
+  assert.match(M.tabsHTML("res"), /class="rail-item on" href="#res" data-act="tab" data-t="res"/);
   assert.ok(!M.tabsHTML("res", false).includes('data-t="team"'), "一般幹部看不到團隊頁那個分頁");
-  const bar = M.groupBarHTML("site", { role: "cadre", board: "member", team: "" });
-  assert.ok(bar.includes('data-group="forms"') && bar.includes('data-group="site"'));
+  const rail = M.railHTML("site", "res", { role: "cadre", board: "member", team: "", name: "王平" });
+  assert.ok(rail.includes('href="/admin/#forms"') && rail.includes('class="rail-item on" href="#res"'), "側欄上有申請表與資源");
 });

@@ -1,0 +1,266 @@
+/* 後台四頁共用的版面語言（2026-10-19，後台第二次重整，批 1）。
+ *
+ * 誰讀它：admin/index.html、admin/site/、admin/passports/、admin/people/ 四頁。
+ * 只給後台用，**不是全站樣式表**，所以放在 admin/ 不放 shared/（GOALS.md：shared/ 保持極小）。
+ * 色票、字體、圓角全部來自 shared/brand.css 的 token，這裡一個色碼都不重新宣告；
+ * 深淺一律調透明度。字體只寫 var(--display) 與 var(--body)，後台不載中文網頁字體
+ * （理由在 shared/brand.css 檔頭：海外幹部的網路）。
+ *
+ * 為什麼收成一份：2026-10-15 拆成四個資料夾之後，四個 index.html 各抄了一份 270 行的 CSS，
+ * 兩週內已經開始不一樣（資源頁的分頁列位置就是這樣跑掉的）。四頁要長得一樣，樣式就只能有一份。
+ *
+ * 規矩：**每一頁只能用這裡定義的東西，不准在 index.html 或 ui.js 裡再發明一種按鈕或框。**
+ * 要新長相就在這裡加一個 class，四頁一起拿到。
+ *
+ * 目錄（照出現順序）：
+ *   1. 外殼：#bt-root、.shell、.rail（側欄）、.main
+ *   2. 頁首與訊息：.page-head、.msg、.note
+ *   3. 區塊與清單：.section、.flist、.fhead、.fmeta、.tag、.row
+ *   4. 表單：.field、label、input、.two、.form-foot
+ *   5. 按鈕與 chip：.btn 四種、.chip
+ *   6. 功能自己的小東西：審核、題目編輯器、信件預覽、護照預覽框、team 勾選
+ *   7. 手機
+ *
+ * 「點下去要有回饋」與 prefers-reduced-motion 那兩段**留在各頁的 index.html 裡**，
+ * check.sh 逐頁檢查它們在不在，不能搬進來。
+ */
+
+/* ───────── 1. 外殼 ───────── */
+html{overflow-x:clip}
+body{background:var(--paper);overflow-x:clip;margin:0}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+#bt-root{position:relative;z-index:1;font-family:var(--body);color:var(--ink);line-height:1.55;
+  max-width:1180px;margin:0 auto;padding:0 16px 72px}
+/* :where() 是必要的，不是風格：讓 .btn 這類後面的規則蓋得過它（見 passport/index.html 同一條）。 */
+:where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+#bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+/* 頂欄來自 shared/nav.css，它自己是 940px 置中。後台的容器是 1180px，
+   頂欄要跟內容一樣寬，不然它會像浮在中間的一顆藥丸。只在後台蓋這一條。 */
+#bt-root .btnav{max-width:none}
+
+/* 側欄加內容。側欄 220px 黏在左邊，跟頂欄一起捲；內容區最寬 900px。 */
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);gap:32px;align-items:start}
+.main{min-width:0;max-width:900px}
+.shell.solo{display:block}
+.rail{position:sticky;top:96px;display:flex;flex-direction:column;gap:2px;
+  padding:6px 0 20px;font-size:14.5px}
+.rail-toggle,.rail-burger{display:none}
+/* 你是誰、管到哪。這一行是「我有什麼權限」的唯一來源。 */
+.rail-me{padding:8px 12px 14px;margin-bottom:6px;border-bottom:1px solid rgba(16,42,134,.14)}
+.rail-me b{display:block;font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:.02em;line-height:1.1}
+.rail-me span{display:block;font-size:12.5px;color:rgba(16,42,134,.8);margin-top:4px;line-height:1.45}
+/* 組名：小字全大寫的英文感標籤，但這裡是中文，所以用字距與淡色分出層次。 */
+.rail-group{font-family:var(--display);font-size:12.5px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:rgba(16,42,134,.62);padding:14px 12px 4px}
+.rail-group.off{color:rgba(16,42,134,.42)}
+.rail-group .why{display:block;font-family:var(--body);font-size:11.5px;font-weight:400;
+  letter-spacing:0;text-transform:none;color:rgba(16,42,134,.6);margin-top:2px}
+.rail-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;
+  color:var(--ink);text-decoration:none;font-weight:500;transition:background .15s}
+.rail-item:hover{background:rgba(255,255,255,.6)}
+.rail-item.on{background:var(--bt-navy);color:var(--bt-cream);font-weight:600}
+.rail-item.off{color:rgba(16,42,134,.45);pointer-events:none}
+.rail-item .rail-count{margin-left:auto;font-family:var(--display);font-size:13px;font-weight:700;
+  min-width:22px;height:22px;padding:0 7px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(255,196,108,.45);color:var(--ink)}
+.rail-item.on .rail-count{background:var(--bt-orange)}
+.rail-foot{margin-top:18px;padding:0 12px;font-size:12px;color:rgba(16,42,134,.72);line-height:1.5}
+
+/* ───────── 2. 頁首與訊息 ───────── */
+.page-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:6px 0 18px}
+.page-head .ph-text{flex:1;min-width:240px}
+.page-head h1{font-family:var(--display);font-size:34px;font-weight:700;letter-spacing:.02em;line-height:1.05;margin:0}
+.page-head h1 .alt{font-family:var(--body);font-size:14px;font-weight:400;letter-spacing:0;
+  color:rgba(16,42,134,.7);margin-left:8px;white-space:nowrap}
+.page-head .lede{font-size:14px;color:rgba(16,42,134,.82);margin-top:6px;max-width:60em}
+.page-head .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.back{display:inline-block;font-size:13.5px;font-weight:600;color:rgba(16,42,134,.75);text-decoration:none;
+  margin:0 0 10px;padding:0}
+.back:hover{color:var(--ink);text-decoration:underline}
+/* 訊息三種分開：做好了、沒做成、系統說明。位置固定在頁首底下。 */
+.msg{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;
+  padding:11px 14px;border-radius:12px;margin:0 0 18px;border:1px solid transparent}
+.msg.ok{background:rgba(107,198,187,.26);border-color:rgba(107,198,187,.6)}
+.msg.err{background:rgba(255,196,108,.3);border-color:rgba(255,196,108,.85)}
+.msg.info{background:rgba(255,255,255,.55);border-color:rgba(16,42,134,.16)}
+.msg .msg-k{font-family:var(--display);font-weight:700;letter-spacing:.06em;white-space:nowrap}
+/* 提醒（核可前確認三件事這一類）：淡沙色底、左邊一條深藍線。一頁最多一個，收在區塊的 h2 底下。 */
+.note{font-size:13.5px;line-height:1.6;padding:10px 14px;margin:0 0 16px;
+  border-left:3px solid var(--bt-navy);border-radius:0 12px 12px 0;background:rgba(255,232,197,.45)}
+.note b{font-weight:700}
+.note a{color:var(--ink)}
+/* 舊名字還有人在用，長相跟 .note 一樣。 */
+.wnote{font-size:13.5px;line-height:1.6;padding:10px 14px;margin:0 0 16px;
+  border-left:3px solid var(--bt-navy);border-radius:0 12px 12px 0;background:rgba(255,232,197,.45)}
+.wnote.big{font-size:14px}
+
+/* ───────── 3. 區塊與清單 ───────── */
+.section{margin:0 0 30px;scroll-margin-top:96px}
+.section > h2,.sec-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:.03em;margin:0 0 8px;line-height:1.15}
+.section > h2 .hint,.sec-h .mini{font-family:var(--body);font-size:13px;font-weight:400;letter-spacing:0;color:rgba(16,42,134,.78)}
+.section > h2 .sp{flex:1}
+/* 頁首底下那一排「跳到某一段」的小連結。超過 6 段才用。 */
+.jump{display:flex;gap:4px;flex-wrap:wrap;margin:-6px 0 20px}
+.jump a{font-family:var(--display);font-size:14px;font-weight:600;letter-spacing:.04em;color:var(--ink);
+  text-decoration:none;padding:4px 10px;border-radius:999px;border:1px solid rgba(16,42,134,.22);background:rgba(255,255,255,.5)}
+.jump a:hover{background:rgba(255,255,255,.95)}
+/* 卡片只給「這是一個東西」的地方：首頁待辦、預覽框、內嵌表單。清單不用卡片。 */
+.card{background:rgba(255,255,255,.5);border:1px solid rgba(16,42,134,.16);border-radius:16px;padding:18px 20px;margin:0 0 18px}
+.card h2{font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:.02em;margin:0 0 4px;line-height:1.1}
+.card .sub{font-size:13.5px;color:rgba(16,42,134,.82);margin-bottom:14px}
+.card p{font-size:14px;margin:0 0 12px}
+/* 一筆一列，上面一條細線分隔。 */
+.flist{margin:0;padding:0;list-style:none}
+.flist > li{padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+.flist > li:first-child{border-top:0;padding-top:2px}
+.fhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.fhead b{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.02em;line-height:1.2}
+/* 第二個名字（2026-09-10）：跟主要的名字同一行、小一級、淡一點。 */
+.alt{margin-left:6px;font-family:var(--body);font-size:12.5px;font-weight:400;letter-spacing:0;
+  color:rgba(16,42,134,.7);white-space:nowrap}
+.fmeta{font-size:13px;color:rgba(16,42,134,.8);margin-top:3px;line-height:1.5}
+.fmeta a{color:var(--ink)}
+.fquote{font-size:14.5px;margin:6px 0 4px}
+.count{font-family:var(--display);font-size:15px;font-weight:700}
+.mini{font-size:12.5px;color:rgba(16,42,134,.8)}
+/* 徽章裡一定有字，不靠顏色分辨。五種底色，字一律深藍。 */
+.tag{display:inline-block;font-family:var(--display);font-size:11.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap;
+  background:rgba(16,42,134,.1);color:rgba(16,42,134,.9);vertical-align:middle}
+.tag.open,.tag.done{background:rgba(107,198,187,.42)}
+.tag.draft{background:rgba(198,198,198,.5)}
+.tag.closed,.tag.warn{background:rgba(255,196,108,.42)}
+/* 一列裡的動作：靠右不靠右都可以，但一列最多三顆，第一顆框線、其他底線字。 */
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.empty{padding:22px 0 10px;color:rgba(16,42,134,.82);font-size:14px;line-height:1.6}
+.empty b{display:block;font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:.02em;color:var(--ink);margin-bottom:2px}
+.empty .row{margin-top:10px}
+.empty.sm{padding:10px 0}
+/* 載入中：三條淡灰的長方形，不是一行字。 */
+.skeleton{display:grid;gap:12px;padding:8px 0}
+.skeleton i{display:block;height:16px;border-radius:8px;background:rgba(16,42,134,.1)}
+.skeleton i:nth-child(1){width:38%;height:28px}
+.skeleton i:nth-child(2){width:72%}
+.skeleton i:nth-child(3){width:55%}
+
+/* ───────── 4. 表單 ───────── */
+label{display:block;margin-bottom:14px}
+label i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(16,42,134,.8);display:block;margin-bottom:5px}
+input,select,textarea{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);padding:9px 11px;
+  border:1px solid rgba(16,42,134,.28);border-radius:11px;background:rgba(255,255,255,.72)}
+select{width:auto;min-width:96px;max-width:100%}
+textarea{line-height:1.6;resize:vertical;min-height:88px}
+input:disabled,select:disabled,textarea:disabled{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.two label{margin-bottom:14px}
+.check{display:flex;gap:11px;align-items:flex-start;margin:0 0 14px;padding:4px 0;font-size:14.5px;line-height:1.6;cursor:pointer}
+.check input[type="checkbox"]{width:19px;height:19px;flex:none;margin:2px 0 0;accent-color:var(--bt-navy);cursor:pointer}
+/* 表單底部那一排：存起來在左、取消在右邊一點。長表單捲到底不用找。 */
+.form-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;padding:14px 0 0;
+  border-top:1px solid rgba(16,42,134,.12)}
+.form-foot .sp{flex:1}
+
+/* ───────── 5. 按鈕與 chip ───────── */
+/* 四種，不准再多：實心（一列只有一顆）、框線、底線字、危險（框線橘）。 */
+.btn{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:10px 20px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);
+  display:inline-flex;align-items:center;justify-content:center;line-height:1.1;text-decoration:none;
+  transition:background .15s,color .15s,border-color .15s}
+.btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+.btn[disabled]{opacity:.4;cursor:default}
+.btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+.btn.ghost:hover{background:rgba(255,255,255,.8);border-color:var(--ink);color:var(--ink)}
+.btn.sm{font-size:14px;padding:6px 12px}
+.btn.quiet{background:none;border:none;color:rgba(16,42,134,.7);text-transform:none;letter-spacing:0;
+  font-family:var(--body);font-size:14px;font-weight:600;padding:4px 6px;text-decoration:underline;text-underline-offset:3px}
+.btn.quiet:hover{color:var(--ink);background:none}
+.btn.danger{color:var(--ink);border:1px solid rgba(255,196,108,.9);background:rgba(255,196,108,.18);text-decoration:none}
+.btn.danger:hover{background:rgba(255,196,108,.5);color:var(--ink)}
+a.btn{text-decoration:none}
+/* chip：頁內的篩選與多選（寄給誰、全部／還沒處理），不是導覽。 */
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:var(--body);font-size:13.5px;font-weight:600;padding:0 13px;height:34px;
+  border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7);
+  color:var(--ink);display:inline-flex;align-items:center;text-decoration:none;transition:background .15s,color .15s}
+.chip:hover{background:rgba(255,255,255,.95)}
+.chip.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.chip.wide{min-width:0}
+.chip.off{opacity:.45;cursor:default}
+
+/* ───────── 6. 功能自己的小東西 ───────── */
+/* 審核（批 4） */
+.arow{display:flex;gap:12px;align-items:flex-start}
+.apick{flex:none;padding-top:4px;margin:0}
+.apick input{width:19px;height:19px;accent-color:var(--bt-navy);cursor:pointer;margin:0}
+.abody{flex:1;min-width:0}
+.ans{margin-top:9px}
+.ans summary{font-size:13.5px;color:rgba(16,42,134,.82);cursor:pointer;display:inline-block;padding:3px 0}
+.ans dl{margin:8px 0 0;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.55);border:1px solid rgba(16,42,134,.14)}
+.ans dt{font-size:12.5px;font-weight:700;letter-spacing:.02em;color:rgba(16,42,134,.75);margin-top:12px}
+.ans dt:first-child{margin-top:0}
+.ans dd{margin:4px 0 0;font-size:14.5px;line-height:1.6;overflow-wrap:anywhere}
+/* 批次列：選了人才變顯眼。 */
+.bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 4px;
+  padding:11px 13px;border-radius:14px;font-size:13.5px;background:rgba(255,255,255,.45);border:1px solid rgba(16,42,134,.16)}
+.bulk.on{background:rgba(255,196,108,.28);border-color:rgba(16,42,134,.28)}
+.btnav-sp{flex:1}
+.alist2 li{padding:18px 0}
+/* 題目編輯器 */
+.qlist{margin:0;padding:0;list-style:none}
+.qlist li{padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+.qlist li:first-child{border-top:0}
+.qtop{display:flex;align-items:flex-start;gap:10px}
+.qtop .qbody{flex:1;min-width:0}
+.qlabel{font-weight:600;font-size:15.5px;overflow-wrap:anywhere}
+.qsub{font-size:12.5px;color:rgba(16,42,134,.8);margin-top:3px}
+.qmove{display:flex;flex-direction:column;gap:2px;flex:none}
+.qmove button{font-family:var(--body);font-size:15px;line-height:1;width:30px;height:26px;
+  border:1px solid rgba(16,42,134,.22);border-radius:8px;background:rgba(255,255,255,.6)}
+.qmove button[disabled]{opacity:.3}
+.opts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.opts span{font-size:12.5px;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid rgba(16,42,134,.18)}
+/* 信件預覽（2026-09-08）：看起來像一封信，不像輸入框。 */
+.mailprev{background:rgba(255,255,255,.72);border:1px solid rgba(16,42,134,.18);border-radius:14px;padding:18px 20px;max-width:38em}
+.mailprev b{display:block;font-weight:600;font-size:15.5px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(16,42,134,.14)}
+.mailprev pre{margin:0;font-family:var(--body);font-size:14.5px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
+.mailprev pre.tail{color:rgba(16,42,134,.72);margin-top:1.75em}
+/* 護照預覽框（2026-10-16）。框高固定，裡面可以捲。 */
+.preview-wrap{margin:0 0 22px;padding:12px;border:1px solid rgba(16,42,134,.18);border-radius:14px;background:rgba(255,255,255,.45);scroll-margin-top:96px}
+.preview-wrap .fhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.preview-frame{display:block;width:100%;height:720px;border:0;border-radius:10px;background:var(--bt-cream)}
+/* team 勾選（2026-10-21）。 */
+.teams{border:0;margin:0 0 16px;padding:0;min-width:0}
+.teams legend{padding:0;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.8);margin-bottom:8px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));gap:2px 14px}
+.tgrid .check{margin:0}
+/* 首頁（批 1 先沿用舊的目錄卡，批 2 換成三塊） */
+.hub{margin:0 0 14px;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+.hub li b{font-family:var(--display);font-size:18px;letter-spacing:.03em;display:block}
+.hub li span{font-size:13px;color:rgba(16,42,134,.8)}
+.hub li.off{opacity:.45}
+
+/* ───────── 7. 手機 ───────── */
+@media (max-width:720px){
+  #bt-root{padding:0 12px 60px}
+  .shell{display:block}
+  .main{max-width:none}
+  /* 側欄收成一顆「後台選單」。開合是 checkbox 加 label 純 CSS，跟 shared/nav.css 的手機選單同一招。 */
+  .rail-burger{display:inline-flex;align-items:center;gap:8px;font-family:var(--body);font-size:14px;font-weight:600;
+    padding:0 14px;min-height:38px;border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7);
+    cursor:pointer;margin:0 0 14px}
+  .rail-burger::before{content:"";width:14px;height:2px;background:currentColor;box-shadow:0 -5px 0 currentColor,0 5px 0 currentColor}
+  .rail-toggle{display:block;position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0}
+  .rail-toggle:checked ~ .rail-burger{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+  .rail-toggle:focus-visible ~ .rail-burger{outline:2px solid var(--bt-navy);outline-offset:3px}
+  .rail{display:none;position:static;padding:4px 0 16px;margin:0 0 10px;border-bottom:1px solid rgba(16,42,134,.14)}
+  .rail-toggle:checked ~ .rail{display:flex}
+  .page-head h1{font-size:28px}
+  .two{grid-template-columns:1fr}
+  .hub{grid-template-columns:1fr}
+  .preview-frame{height:70vh}
+  .fhead b{font-size:18px}
+}

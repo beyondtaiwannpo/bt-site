@@ -5,52 +5,133 @@
 //（跟 app/ 與 availability/ 同一條規矩：資料夾之間不互相依賴）。
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-// ── 後台的分組列（2026-10-15）──────────────────────────────────────────
-// 後台拆成四個資料夾，每一頁最上面都是這一排。**四個資料夾各有一份**
+// ── 後台的側欄與外殼（2026-10-19，後台第二次重整）──────────────────────
+// 後台拆成四個資料夾，每一頁左邊都是這一條側欄。**四個資料夾各有一份這一段**
 //（資料夾之間不互相 import，跟 esc() 同一條規矩），test/admin-hub.test.mjs
-// 拿同一張輸入表比對四份講一樣的話。漂移的表現是「在 A 頁看得到的組，到 B 頁不見了」。
+// 逐字比對四份一模一樣。漂移的表現是「在 A 頁看得到的分頁，到 B 頁不見了」，不會報錯。
 //
-// who 是「誰進得去」，只決定畫面上那一格是連結還是灰字。
-// **真正的門在每個資料夾的 main.js 開頁第一句，以及資料庫的函式與 RLS。**
+// GROUPS 是四組，ITEMS 是每一組底下的分頁。who 是「誰看得到」，
+// 只決定側欄上那一行是連結還是淡字。**真正的門在每個資料夾的 main.js 開頁第一句，
+// 以及資料庫的函式與 RLS。**
 export const GROUPS = [
   { key: "forms",     label: "申請",     href: "/admin/",           who: "cadre",        hint: "申請表、審核、簽到、行前信" },
   { key: "site",      label: "對外",     href: "/admin/site/",      who: "cadre",        hint: "資源、團隊頁、校友頁、信件文案" },
   { key: "passports", label: "護照",     href: "/admin/passports/", who: "intern-staff", hint: "兩本護照的格子" },
   { key: "people",    label: "人與權限", href: "/admin/people/",    who: "president",    hint: "邀請碼、職位、team" },
 ];
-// me = { role, board, team }。team 可能是逗號字串（一個人在好幾個 team）。
-export function canEnter(g, me) {
+// 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
+// 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
+export const ITEMS = [
+  { group: "forms",     key: "home",    label: "首頁",     who: "cadre" },
+  { group: "forms",     key: "forms",   label: "申請表",   who: "cadre" },
+  { group: "site",      key: "res",     label: "資源",     who: "cadre" },
+  { group: "site",      key: "team",    label: "團隊頁",   who: "president" },
+  { group: "site",      key: "stories", label: "校友頁",   who: "president" },
+  { group: "site",      key: "mail",    label: "信件文案", who: "president" },
+  { group: "passports", key: "interns", label: "實習護照", who: "intern-staff" },
+  { group: "passports", key: "cadre",   label: "幹部護照", who: "president" },
+  { group: "people",    key: "roster",  label: "幹部名單", who: "president" },
+  { group: "people",    key: "invites", label: "邀請碼",   who: "president" },
+];
+const WHY = { president: "只有 Co-President 進得去", "intern-staff": "只有 Internship team 的幹部與 Co-President 進得去" };
+// me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
+function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
-  if (g.who === "cadre") return true;
-  if (g.who === "president") return me.board === "president";
-  if (g.who === "intern-staff") return me.board === "president" || String(me.team || "").includes("Internship Team");
+  if (who === "cadre") return true;
+  if (who === "president") return me.board === "president";
+  if (who === "intern-staff") return me.board === "president" || String(me.team || "").includes("Internship Team");
   return false;
 }
-export function groupBarHTML(current, me) {
-  return `<nav class="groups" aria-label="後台的分組">${GROUPS.map(g => canEnter(g, me)
-    ? `<a class="chip wide${g.key === current ? " on" : ""}" data-group="${g.key}" href="${g.href}"${
-        g.key === current ? ' aria-current="page"' : ""}>${esc(g.label)}</a>`
-    : `<span class="chip wide off" title="${esc(g.who === "president" ? "只有 Co-President 進得去" : "只有 Internship team 的幹部與 Co-President 進得去")}">${esc(g.label)}</span>`
-  ).join("")}</nav>`;
+export function canEnter(g, me) { return allowed(g.who, me); }
+export function canSee(item, me) { return allowed(item.who, me); }
+const BOARD_ZH = { member: "一般幹部", director: "Director", president: "Co-President" };
+
+// 側欄。group 是現在在哪一組，tab 是哪一個分頁，counts 是 { <key>: 數字 }（有才顯示，批 2 的首頁會餵）。
+// 同一組裡的分頁是 data-act="tab"（不重新載入頁面）；別組的是一般連結，帶 #key 讓那一頁開在對的分頁。
+export function railHTML(group, tab, me, counts) {
+  const c = counts || {};
+  const item = it => {
+    const on = it.group === group && it.key === tab;
+    const n = c[it.key] ? `<span class="rail-count">${esc(String(c[it.key]))}</span>` : "";
+    if (!canSee(it, me)) return `<span class="rail-item off">${esc(it.label)}</span>`;
+    const href = it.group === group ? `#${it.key}` : `${GROUPS.find(g => g.key === it.group).href}#${it.key}`;
+    return `<a class="rail-item${on ? " on" : ""}" href="${href}"${it.group === group ? ` data-act="tab" data-t="${it.key}"` : ""}${
+      on ? ' aria-current="page"' : ""}>${esc(it.label)}${n}</a>`;
+  };
+  const home = ITEMS.find(i => i.key === "home");
+  const groups = GROUPS.map(g => {
+    const ok = canEnter(g, me);
+    const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home");
+    return `<div class="rail-group${ok ? "" : " off"}">${esc(g.label)}${ok ? "" : `<span class="why">${esc(WHY[g.who] || "")}</span>`}</div>${
+      ok ? rows.map(item).join("") : rows.map(i => `<span class="rail-item off">${esc(i.label)}</span>`).join("")}`;
+  }).join("");
+  const teams = String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
+  return `<input class="rail-toggle" type="checkbox" id="rail-toggle" aria-label="展開後台選單">
+  <label class="rail-burger" for="rail-toggle">後台選單</label>
+  <nav class="rail" aria-label="後台的分組">
+    <div class="rail-me"><b>${esc(me && me.name || "")}</b>
+      <span>${esc(BOARD_ZH[me && me.board] || "一般幹部")}${teams.length ? "・" + esc(teams.join("、")) : "・還沒填 team"}</span></div>
+    ${item(home)}
+    ${groups}
+    <div class="rail-foot">對外七頁（首頁、關於、計畫、做過什麼、合作、團隊、Alumni）的文字在 HTML 檔裡，不在後台。改法見 README「對外的內容頁」。</div>
+  </nav>`;
 }
 
-// 這一組裡面的分頁。實習護照：Internship team 與 Co-President；幹部護照：只有 Co-President
-//（Paul 2026-10-15 拍板第 4 題：先只給 Co-President，team 的守門補好再開給 team）。
+// 整頁的外殼：頂欄在上，底下左側欄、右內容。
+export function shellHTML(nav, rail, body) {
+  return `${nav}<div class="shell${rail ? "" : " solo"}">${rail || ""}<main class="main">${body}</main></div>`;
+}
+
+// ── 每一頁共用的五個小零件。畫面函式只拼這些，不自己寫 class。 ──────────
+// 頁首：標題、一句說明、右邊最多兩顆動作。actions = [{ act, label, primary, href, disabled, id }]
+export function pageHead(title, lede, actions, back) {
+  const btn = a => a.href
+    ? `<a class="btn${a.primary ? "" : " ghost"}" href="${esc(a.href)}">${esc(a.label)}</a>`
+    : `<button class="btn${a.primary ? "" : " ghost"}" data-act="${esc(a.act)}"${a.id ? ` data-id="${esc(a.id)}"` : ""}${a.disabled ? " disabled" : ""}>${esc(a.label)}</button>`;
+  return `${back ? `<button class="back" data-act="${esc(back.act)}"${back.id ? ` data-id="${esc(back.id)}"` : ""}>← ${esc(back.label)}</button>` : ""}
+  <header class="page-head"><div class="ph-text"><h1>${title}</h1>${lede ? `<div class="lede">${lede}</div>` : ""}</div>${
+    actions && actions.length ? `<div class="actions">${actions.map(btn).join("")}</div>` : ""}</header>`;
+}
+// 訊息。做成了是綠的，沒做成是橘的。判斷靠訊息開頭那幾個字（「存不起來：」「載不到：」這一類是沒做成）。
+export function msgKind(msg) {
+  const s = String(msg || "");
+  if (!s) return "";
+  if (/(不了|不到|不起來|不出來|不掉|失敗|沒寄成功)[：:]/.test(s) || /要(填|寫|有)|不能|至少|沒有改到|都要|開不出|還沒有題目|先選|^沒有/.test(s)) return "err";
+  return "ok";
+}
+export function msgHTML(msg) {
+  const k = msgKind(msg);
+  if (!k) return "";
+  return `<div class="msg ${k}" role="status"><span class="msg-k">${k === "err" ? "沒成" : "好了"}</span><span>${esc(msg)}</span></div>`;
+}
+// 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
+export function sectionHTML(title, body, opts) {
+  const o = opts || {};
+  const acts = (o.actions || []).map(a => `<button class="btn quiet sm" data-act="${esc(a.act)}"${
+    Object.keys(a).filter(k => !["act", "label"].includes(k)).map(k => ` data-${k}="${esc(String(a[k]))}"`).join("")}${a.disabled ? " disabled" : ""}>${esc(a.label)}</button>`).join("");
+  return `<section class="section"${o.id ? ` id="${esc(o.id)}"` : ""}>${
+    title ? `<h2>${title}${o.hint ? `<span class="hint">${o.hint}</span>` : ""}${acts ? `<span class="sp"></span>${acts}` : ""}</h2>` : ""}${body}</section>`;
+}
+// 空狀態：一句講「這裡還沒有東西」，一句講「要怎麼開始」，一顆按鈕直接做。
+export function emptyHTML(title, hint, action) {
+  return `<div class="empty"><b>${esc(title)}</b>${hint ? `<div>${hint}</div>` : ""}${
+    action ? `<div class="row"><button class="btn ghost sm" data-act="${esc(action.act)}"${action.id ? ` data-id="${esc(action.id)}"` : ""}>${esc(action.label)}</button></div>` : ""}</div>`;
+}
+// 載入中。
+export function skeletonHTML() { return `<div class="skeleton" aria-label="載入中"><i></i><i></i><i></i></div>`; }
+
+// 舊名字：這一組底下的分頁。側欄用同一份 ITEMS 畫，這一支留給測試與 scripts/mobile-fixtures.mjs。
 export function tabsHTML(tab, isPresident) {
-  return `<div class="chips" style="margin-bottom:16px">
-    <button class="chip wide${tab === "interns" ? " on" : ""}" data-act="tab" data-t="interns">實習護照</button>
-    ${isPresident ? `<button class="chip wide${tab === "cadre" ? " on" : ""}" data-act="tab" data-t="cadre">幹部護照</button>` : ""}
-  </div>`;
+  const me = { role: "cadre", board: isPresident ? "president" : "member", team: "Internship Team" };
+  return ITEMS.filter(i => i.group === "passports" && i.key !== "home" && canSee(i, me))
+    .map(i => `<a class="rail-item${i.key === tab ? " on" : ""}" href="#${i.key}" data-act="tab" data-t="${i.key}">${esc(i.label)}</a>`).join("");
 }
 
 // 只有 Internship team 的幹部與 Co-President 進得來。別的幹部看到這一句，不是錯誤畫面。
 export function noAccessHTML(me) {
-  return `<div class="card">
-    ${groupBarHTML("passports", me)}
-    <h2>這一組只有 Internship team 用得到</h2>
-    <div class="sub">實習護照的格子由 Internship team 的幹部與 Co-President 改。你的 team 不在裡面，所以這一頁對你是關著的。</div>
-    <div class="row"><a class="btn ghost" href="../">回後台</a></div>
-  </div>`;
+  return pageHead("這一組只有 Internship team 用得到",
+    "實習護照的格子由 Internship team 的幹部與 Co-President 改。你的 team 不在裡面，所以這一頁對你是關著的。",
+    [{ label: "回後台首頁", href: "../" }]);
 }
 
 // 學員或還沒升級的人走到這裡。
@@ -109,8 +190,8 @@ export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat) {
   const byCat = INTERN_CATS.map(c => ({ c, rows: tasks.filter(t => t.category === c.v) }))
     .concat([{ c: { v: "?", label: "認不得的分類", hint: "" }, rows: tasks.filter(t => !INTERN_CATS.some(c => c.v === t.category)) }])
     .filter(g => g.rows.length);
-  const taskRows = byCat.map(g => `<div class="fmeta" style="margin-top:14px"><b>${esc(g.c.label)}</b>　${esc(g.c.hint)}
-      ${g.c.v === "?" ? "" : `<button class="btn quiet sm" data-act="ipreview" data-cat="${esc(g.c.v)}">看它在實習護照上長什麼樣</button>`}</div>
+  const taskRows = byCat.map(g => `<h3 class="sec-h" style="margin-top:18px">${esc(g.c.label)}<span class="mini">${esc(g.c.hint)}</span>
+      ${g.c.v === "?" ? "" : `<button class="btn quiet sm" data-act="ipreview" data-cat="${esc(g.c.v)}">看它在實習護照上長什麼樣</button>`}</h3>
     <ul class="flist">${g.rows.map(t => {
       const n = (data.stamped || {})[t.id] || 0;
       return `<li>
@@ -124,29 +205,24 @@ export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat) {
         ${t.active
           ? `<button class="btn ghost sm" data-act="intern-task-off" data-id="${esc(t.id)}"${dis}>停用</button>`
           : `<button class="btn ghost sm" data-act="intern-task-on" data-id="${esc(t.id)}"${dis}>恢復</button>`}
-        ${n ? "" : `<button class="btn quiet sm" data-act="intern-task-del" data-id="${esc(t.id)}"${dis}>刪掉</button>`}
+        ${n ? "" : `<button class="btn quiet danger sm" data-act="intern-task-del" data-id="${esc(t.id)}"${dis}>刪掉</button>`}
       </div>
     </li>`; }).join("")}</ul>`).join("");
 
-  return `<div class="card">
-    ${tabsHTML("interns", !!isPresident)}
-    <h2>實習護照</h2>
-    <div class="sub">這一屆的格子、開新的一屆。改完 intern 重新整理護照就看得到。目前 ${data.interns || 0} 位 intern。</div>
-    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <div class="wnote">intern 的章與心得這裡碰不到。蓋過的格子只能停用不能刪：刪了他的章會跟著不見。
-      要看誰蓋了什麼，到<a href="../../intern-passport/">實習生進度牆</a>。</div>
-    <div class="row" style="margin:8px 0 4px"><button class="btn quiet sm" data-act="ipreview" data-cat="">看它在實習護照上長什麼樣</button></div>
-    ${internPreviewHTML(previewCat, cur ? !!cur.active : true)}
-
-    <h3 class="sec-h" style="margin-top:18px">屆別</h3>
-    ${terms.length ? `<ul class="flist">${termRows}</ul>` : `<div class="empty">還沒有任何一屆。先開一屆，才能建格子。</div>`}
-    <div class="row" style="margin:6px 0 18px"><button class="btn ghost sm" data-act="intern-term-new"${dis}>開新的一屆</button></div>
-
-    <h3 class="sec-h">格子${cur ? `：${esc(cur.title_zh)}` : ""}</h3>
-    ${cur ? `<div class="row" style="margin-bottom:6px"><button class="btn" data-act="intern-task-new" data-term="${esc(cur.id)}"${dis}>加一格</button></div>
-      ${tasks.length ? taskRows : `<div class="empty">這一屆還沒有格子。</div>`}`
-      : `<div class="empty">先開一屆。</div>`}
-  </div>`;
+  const headActs = [{ act: "ipreview", label: "看它在實習護照上長什麼樣" }];
+  if (cur) headActs.unshift({ act: "intern-task-new", label: "加一格", primary: true, disabled: busy });
+  return pageHead("實習護照", `這一屆的格子、開新的一屆。改完 intern 重新整理護照就看得到。目前 ${data.interns || 0} 位 intern。`, headActs)
+    + msgHTML(msg)
+    + internPreviewHTML(previewCat, cur ? !!cur.active : true)
+    + sectionHTML("屆別", `${terms.length ? `<ul class="flist">${termRows}</ul>` : emptyHTML("還沒有任何一屆", "先開一屆，才能建格子。", { act: "intern-term-new", label: "開新的一屆" })}
+    ${terms.length ? `<div class="row" style="margin:6px 0 0"><button class="btn ghost sm" data-act="intern-term-new"${dis}>開新的一屆</button></div>` : ""}`,
+      { id: "terms" })
+    + sectionHTML(`格子${cur ? `：${esc(cur.title_zh)}` : ""}`, cur
+      ? `<div class="note">intern 的章與心得這裡碰不到。蓋過的格子只能停用不能刪：刪了他的章會跟著不見。
+        要看誰蓋了什麼，到<a href="../../intern-passport/">實習生進度牆</a>。</div>
+        ${tasks.length ? taskRows : emptyHTML("這一屆還沒有格子", "加第一格，代號系統會先想好。", { act: "intern-task-new", label: "加一格" })}`
+      : emptyHTML("先開一屆", "有了屆別才能建格子。"),
+      { id: "tasks" });
 }
 
 // 改或開一屆。id 建了就不能改（格子與護照靠它對應），所以改的時候那一格鎖住。
@@ -155,11 +231,9 @@ export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat) {
 export function internTermEditHTML(t, msg, busy, draft) {
   const cur = draft || t || { id: "", title_zh: "", title_en: "", starts_on: "", ends_on: "" };
   const dis = busy ? " disabled" : "";
-  return `<div class="card">
-    <div class="row" style="margin:0 0 14px"><button class="btn quiet" data-act="intern-back">← 回實習護照</button></div>
-    <h2>${t ? "改這一屆" : "開新的一屆"}</h2>
-    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <label><i>代號（英文字母、數字、連字號；建了就不能改）</i>
+  return pageHead(t ? "改這一屆" : "開新的一屆", "", [], { act: "intern-back", label: "回實習護照" })
+    + msgHTML(msg)
+    + sectionHTML("", `<label><i>代號（英文字母、數字、連字號；建了就不能改）</i>
       <input id="it-id" value="${esc(cur.id)}" placeholder="2027-28"${t ? " disabled" : dis}></label>
     <div class="two">
       <label><i>中文名稱</i><input id="it-zh" value="${esc(cur.title_zh)}" placeholder="2027-28 實習"${dis}></label>
@@ -167,24 +241,20 @@ export function internTermEditHTML(t, msg, busy, draft) {
       <label><i>開始日</i><input id="it-start" type="date" value="${esc(String(cur.starts_on || "").slice(0, 10))}"${dis}></label>
       <label><i>結束日</i><input id="it-end" type="date" value="${esc(String(cur.ends_on || "").slice(0, 10))}"${dis}></label>
     </div>
-    <div class="wnote">開了之後還不會變成「目前這一屆」，回上一頁按「設成目前這一屆」才會。</div>
-    <div class="row">
+    <div class="note">開了之後還不會變成「目前這一屆」，回上一頁按「設成目前這一屆」才會。</div>
+    <div class="form-foot">
       <button class="btn" data-act="intern-term-save"${t ? ` data-id="${esc(t.id)}"` : ""}${dis}>${busy ? "存檔中…" : "存起來"}</button>
       <button class="btn ghost" data-act="intern-back"${dis}>取消</button>
-    </div>
-  </div>`;
+    </div>`);
 }
 
 // 改或加一格。id 與屆別建了就不能改。
 export function internTaskEditHTML(t, termId, suggestedId, msg, busy, draft) {
   const cur = draft || t || { id: suggestedId || "", term: termId, seq: "", category: "project", title_zh: "", title_en: "", description: "" };
   const dis = busy ? " disabled" : "";
-  return `<div class="card">
-    <div class="row" style="margin:0 0 14px"><button class="btn quiet" data-act="intern-back">← 回實習護照</button></div>
-    <h2>${t ? "改這一格" : "加一格"}</h2>
-    <div class="sub">屆別：${esc(cur.term)}</div>
-    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <div class="two">
+  return pageHead(t ? "改這一格" : "加一格", `屆別：${esc(cur.term)}`, [], { act: "intern-back", label: "回實習護照" })
+    + msgHTML(msg)
+    + sectionHTML("", `<div class="two">
       <label><i>代號（建了就不能改，章靠它對到格子）</i>
         <input id="ik-id" value="${esc(cur.id)}"${t ? " disabled" : dis}></label>
       <label><i>分類</i><select id="ik-cat"${dis}>
@@ -196,11 +266,10 @@ export function internTaskEditHTML(t, termId, suggestedId, msg, busy, draft) {
     </div>
     <label><i>說明（格子正面那一行小字）</i>
       <textarea id="ik-desc" placeholder="做完什麼算完成" maxlength="120"${dis}>${esc(cur.description || "")}</textarea></label>
-    <div class="row">
+    <div class="form-foot">
       <button class="btn" data-act="intern-task-save" data-term="${esc(cur.term)}"${t ? ` data-id="${esc(t.id)}"` : ""}${dis}>${busy ? "存檔中…" : "存起來"}</button>
       <button class="btn ghost" data-act="intern-back"${dis}>取消</button>
-    </div>
-  </div>`;
+    </div>`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -275,19 +344,20 @@ export function passportAdminHTML(data, msg, busy, previewMonth) {
         ${a.active
           ? `<button class="btn ghost sm" data-act="act-off" data-id="${esc(a.id)}"${dis}>停用</button>`
           : `<button class="btn ghost sm" data-act="act-on" data-id="${esc(a.id)}"${dis}>恢復</button>`}
-        ${n ? "" : `<button class="btn quiet sm" data-act="act-del" data-id="${esc(a.id)}"${dis}>刪掉</button>`}
+        ${n ? "" : `<button class="btn quiet danger sm" data-act="act-del" data-id="${esc(a.id)}"${dis}>刪掉</button>`}
       </div>
     </li>`;
   };
   const monthBlocks = months.map(m => {
     const rows = acts.filter(a => a.month === m.month);
-    return `<h3 class="sec-h">${esc(monthLabel(m.month))}
-      <span class="mini" style="font-weight:400;margin-left:8px">右上角的時刻：${m.theme_zh ? esc(m.theme_zh) : "（空）"}</span>
-      <button class="btn quiet sm" data-act="month-edit" data-seq="${esc(String(m.seq))}"${dis}>改時刻</button>
-      <button class="btn quiet sm" data-act="preview" data-month="${esc(String(m.month))}">看它在護照上長什麼樣</button></h3>
-      ${rows.length ? `<ul class="flist">${rows.map(actRow).join("")}</ul>` : `<div class="empty sm">這個月還沒有格子。</div>`}
-      <div class="row" style="margin:4px 0 10px"><button class="btn ghost sm" data-act="act-new" data-month="${esc(String(m.month))}"${dis}>在 ${esc(monthLabel(m.month))}加一格</button></div>`;
+    return sectionHTML(esc(monthLabel(m.month)),
+      `${rows.length ? `<ul class="flist">${rows.map(actRow).join("")}</ul>` : `<div class="empty sm">這個月還沒有格子。</div>`}
+      <div class="row" style="margin:4px 0 0"><button class="btn ghost sm" data-act="act-new" data-month="${esc(String(m.month))}"${dis}>在 ${esc(monthLabel(m.month))}加一格</button></div>`,
+      { id: `m${m.month}`, hint: `右上角的時刻：${m.theme_zh ? esc(m.theme_zh) : "（空）"}`,
+        actions: [{ act: "month-edit", label: "改時刻", seq: String(m.seq), disabled: busy },
+                  { act: "preview", label: "看它在護照上長什麼樣", month: String(m.month) }] });
   }).join("");
+  const jump = months.length ? `<nav class="jump" aria-label="跳到某一個月">${months.map(m => `<a href="#m${esc(String(m.month))}">${esc(monthLabel(m.month))}</a>`).join("")}<a href="#cities">城市</a></nav>` : "";
   const dests = data.destinations || [];
   const destRows = dests.map(d => `<li>
     <div class="fhead"><b>${esc(d.city)}</b><span class="tag">${esc(d.code)}</span>
@@ -300,20 +370,17 @@ export function passportAdminHTML(data, msg, busy, previewMonth) {
     </div>
   </li>`).join("");
 
-  return `<div class="card">
-    ${tabsHTML("cadre", true)}
-    <h2>幹部護照</h2>
-    <div class="sub">33 格的題目與說明、每個月右上角的時刻、入境章抽得到的城市。改完幹部重新整理護照就看得到。</div>
-    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <div class="wnote">幹部的章、心得、照片這裡碰不到。<b>編號不能改</b>（章靠它對到格子），蓋過的格子只能停用不能刪，城市只能停用不能刪。
-      ${months.length ? "" : "月份載不到的話，格子也不會出現。"}</div>
-    ${passportPreviewHTML(previewMonth, months)}
-    ${months.length ? monthBlocks : `<div class="empty">月份還沒載到。</div>`}
-    <h3 class="sec-h" style="margin-top:26px">城市（入境章抽城市用的）</h3>
-    <div class="mini" style="margin-bottom:8px">有人抽到過的城市資料庫擋著不給刪，所以這裡只有停用。停用之後新的入境章不會再抽到它，已經發出去的不動。</div>
+  return pageHead("幹部護照", "33 格的題目與說明、每個月右上角的時刻、入境章抽得到的城市。改完幹部重新整理護照就看得到。")
+    + msgHTML(msg)
+    + `<div class="note">幹部的章、心得、照片這裡碰不到。<b>編號不能改</b>（章靠它對到格子），蓋過的格子只能停用不能刪，城市只能停用不能刪。
+      ${months.length ? "" : "月份載不到的話，格子也不會出現。"}</div>`
+    + jump
+    + passportPreviewHTML(previewMonth, months)
+    + (months.length ? monthBlocks : emptyHTML("月份還沒載到", "重新整理再試一次。"))
+    + sectionHTML("城市", `<div class="mini" style="margin-bottom:8px">入境章抽城市用的。有人抽到過的城市資料庫擋著不給刪，所以這裡只有停用。停用之後新的入境章不會再抽到它，已經發出去的不動。</div>
     ${dests.length ? `<ul class="flist">${destRows}</ul>` : `<div class="empty sm">還沒有城市。</div>`}
-    <div class="row" style="margin:6px 0 4px"><button class="btn ghost sm" data-act="dest-new"${dis}>加一個城市</button></div>
-  </div>`;
+    <div class="row" style="margin:6px 0 4px"><button class="btn ghost sm" data-act="dest-new"${dis}>加一個城市</button></div>`,
+      { id: "cities" });
 }
 
 // 改或加一格。編號是標籤不是輸入框；改既有的格子時月份也鎖住。
@@ -322,12 +389,9 @@ export function activityEditHTML(a, month, months, msg, busy, draft) {
   const cur = draft || a || { id: "", month, category: "gather", title_zh: "", title_en: "", description: "", needs_host: false, callback_to: "" };
   const dis = busy ? " disabled" : "";
   const lock = a ? " disabled" : dis;
-  return `<div class="card">
-    <div class="row" style="margin:0 0 14px"><button class="btn quiet" data-act="cadre-back">← 回幹部護照</button></div>
-    <h2>${a ? "改這一格" : "加一格"}</h2>
-    <div class="sub">${a ? `編號 <b>${esc(a.id)}</b>（不能改，章靠它對到格子）` : "編號由系統照月份算，存了之後就不能改。"}</div>
-    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <div class="two">
+  return pageHead(a ? "改這一格" : "加一格", a ? `編號 <b>${esc(a.id)}</b>（不能改，章靠它對到格子）` : "編號由系統照月份算，存了之後就不能改。", [], { act: "cadre-back", label: "回幹部護照" })
+    + msgHTML(msg)
+    + sectionHTML("", `<div class="two">
       <label><i>月份${a ? "（建了就不能換）" : ""}</i><select id="ak-month"${lock}>
         ${(months || []).map(m => `<option value="${esc(String(m.month))}"${String(cur.month) === String(m.month) ? " selected" : ""}>${esc(monthLabel(m.month))}</option>`).join("")}
       </select></label>
@@ -346,66 +410,49 @@ export function activityEditHTML(a, month, months, msg, busy, draft) {
       <label><i>回望哪一格（選填，例如 09B；打開這一格時會把那一格的心得拉回來）</i>
         <input id="ak-cb" value="${esc(cur.callback_to || "")}" placeholder="09B" maxlength="4"${dis}></label>
     </div>
-    <div class="row">
+    <div class="form-foot">
       <button class="btn" data-act="act-save"${a ? ` data-id="${esc(a.id)}"` : ""}${dis}>${busy ? "存檔中…" : "存起來"}</button>
       <button class="btn ghost" data-act="cadre-back"${dis}>取消</button>
-    </div>
-  </div>`;
+    </div>`);
 }
 
 // 改一個月右上角的時刻。seq 與月份不給改，只有那一串字。
 export function monthEditHTML(m, msg, busy, draft) {
   const cur = draft || m || { seq: "", month: "", theme_zh: "", theme_en: "" };
   const dis = busy ? " disabled" : "";
-  return `<div class="card">
-    <div class="row" style="margin:0 0 14px"><button class="btn quiet" data-act="cadre-back">← 回幹部護照</button></div>
-    <h2>${esc(monthLabel(cur.month))}的時刻</h2>
-    <div class="sub">月份頁右上角那一小串字。留空就不顯示。刻意不整點的時刻（08:40、23:50）是內容決定，不是打字錯誤。</div>
-    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <div class="two">
+  return pageHead(`${esc(monthLabel(cur.month))}的時刻`, "月份頁右上角那一小串字。留空就不顯示。刻意不整點的時刻（08:40、23:50）是內容決定，不是打字錯誤。", [], { act: "cadre-back", label: "回幹部護照" })
+    + msgHTML(msg)
+    + sectionHTML("", `<div class="two">
       <label><i>時刻</i><input id="mk-zh" value="${esc(cur.theme_zh || "")}" placeholder="07:00" maxlength="20"${dis}></label>
       <label><i>英文副標（現在的版面不顯示，留空就好）</i><input id="mk-en" value="${esc(cur.theme_en || "")}" maxlength="40"${dis}></label>
     </div>
-    <div class="row">
+    <div class="form-foot">
       <button class="btn" data-act="month-save" data-seq="${esc(String(cur.seq))}"${dis}>${busy ? "存檔中…" : "存起來"}</button>
       <button class="btn ghost" data-act="cadre-back"${dis}>取消</button>
-    </div>
-  </div>`;
+    </div>`);
 }
 
 // 加一個城市或改名字。代碼建了就不能改（visas 靠它）。
 export function destinationEditHTML(d, msg, busy, draft) {
   const cur = draft || d || { code: "", city: "", active: true };
   const dis = busy ? " disabled" : "";
-  return `<div class="card">
-    <div class="row" style="margin:0 0 14px"><button class="btn quiet" data-act="cadre-back">← 回幹部護照</button></div>
-    <h2>${d ? "改這個城市的名字" : "加一個城市"}</h2>
-    <div class="sub">入境章會印這個名字，建議全大寫英文。</div>
-    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <div class="two">
+  return pageHead(d ? "改這個城市的名字" : "加一個城市", "入境章會印這個名字，建議全大寫英文。", [], { act: "cadre-back", label: "回幹部護照" })
+    + msgHTML(msg)
+    + sectionHTML("", `<div class="two">
       <label><i>代碼（2 到 8 個英文或數字，建議用機場代碼${d ? "；建了就不能改" : ""}）</i>
         <input id="dk-code" value="${esc(cur.code)}" placeholder="TPE" maxlength="8"${d ? " disabled" : dis}></label>
       <label><i>城市名字</i><input id="dk-city" value="${esc(cur.city)}" placeholder="TAIPEI" maxlength="40"${dis}></label>
     </div>
-    <div class="row">
+    <div class="form-foot">
       <button class="btn" data-act="dest-save"${d ? ` data-code="${esc(d.code)}"` : ""} data-active="${cur.active === false ? "0" : "1"}"${dis}>${busy ? "存檔中…" : "存起來"}</button>
       <button class="btn ghost" data-act="cadre-back"${dis}>取消</button>
-    </div>
-  </div>`;
+    </div>`);
 }
 
 export function notCadreHTML() {
-  return `<div class="card">
-    <h2>這一頁是給幹部用的</h2>
-    <div class="sub">你的帳號是學員，後台看不到。</div>
-    <div class="row"><a class="btn ghost" href="../../app/">回我的帳號</a></div>
-  </div>`;
+  return pageHead("這一頁是給幹部用的", "你的帳號是學員，後台看不到。", [{ label: "回我的帳號", href: "../../app/" }]);
 }
 
 export function downHTML() {
-  return `<div class="card">
-    <h2>資料庫休眠中</h2>
-    <div class="wnote big" style="margin-top:16px">現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。</div>
-    <div class="row"><button class="btn ghost" data-act="retry">再試一次</button></div>
-  </div>`;
+  return pageHead("資料庫休眠中", "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。", [{ act: "retry", label: "再試一次" }]);
 }

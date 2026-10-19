@@ -50,17 +50,55 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
   }
 });
 
-test("★ 分組列：進得去的是連結、進不去的是灰字，當前的那一組有標記", () => {
+test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什麼、當前那一行有標記", () => {
   for (const [label, M] of IMPL) {
-    const bar = M.groupBarHTML("site", ME.member);
-    assert.match(bar, /<a class="chip wide on" data-group="site"[^>]*aria-current="page"/, label);
-    assert.match(bar, /<a class="chip wide" data-group="forms" href="\/admin\/"/, label);
-    assert.match(bar, /<span class="chip wide off" title="[^"]*Internship team[^"]*">護照<\/span>/, label);
-    assert.match(bar, /<span class="chip wide off" title="[^"]*Co-President[^"]*">人與權限<\/span>/, label);
-    assert.doesNotMatch(bar, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
-    const pres = M.groupBarHTML("forms", ME.pres);
-    assert.equal((pres.match(/<a /g) || []).length, 4, `${label}：Co-President 四組都是連結`);
+    const rail = M.railHTML("site", "res", { ...ME.member, name: "王平" });
+    assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page">資源/, label);
+    assert.match(rail, /<a class="rail-item" href="\/admin\/#forms">申請表/, `${label}：別組的分頁是帶 # 的一般連結`);
+    assert.match(rail, /<a class="rail-item" href="\/admin\/#home">首頁/, label);
+    assert.match(rail, /class="rail-group off">護照<span class="why">只有 Internship team/, label);
+    assert.match(rail, /class="rail-group off">人與權限<span class="why">只有 Co-President/, label);
+    assert.doesNotMatch(rail, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
+    assert.doesNotMatch(rail, /data-t="team"/, `${label}：一般幹部看不到團隊頁那一行`);
+    assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>一般幹部・Curriculum Team/, `${label}：側欄上要寫名字、職位、team`);
+    const pres = M.railHTML("forms", "home", { ...ME.pres, name: "王平" });
+    assert.equal((pres.match(/class="rail-item off"/g) || []).length, 0, `${label}：Co-President 沒有任何一行是淡的`);
+    assert.equal((pres.match(/<a class="rail-item/g) || []).length, M.ITEMS.length, `${label}：Co-President 每一行都是連結`);
+    assert.match(pres, /Co-President・還沒填 team/, label);
   }
+});
+
+test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellHTML、pageHead、msgHTML、sectionHTML、emptyHTML）", () => {
+  for (const [label, M] of IMPL) {
+    assert.deepEqual(M.ITEMS, FORMS.ITEMS, `${label} 的 ITEMS 跟 admin/ 不一樣`);
+    for (const fn of ["railHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter"]) {
+      assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
+    }
+  }
+});
+
+test("訊息：做成了是綠的、沒做成是橘的、空的不畫", () => {
+  assert.equal(FORMS.msgHTML(""), "");
+  assert.match(FORMS.msgHTML("存好了。"), /class="msg ok"/);
+  assert.match(FORMS.msgHTML("存不起來：你不是 Director"), /class="msg err"/);
+  assert.match(FORMS.msgHTML("清單載不到：連不上"), /class="msg err"/);
+  assert.match(FORMS.msgHTML("表單要有名字。"), /class="msg err"/);
+  assert.match(FORMS.msgHTML("寄出 3 封。"), /class="msg ok"/);
+  assert.match(FORMS.msgHTML("寄出 3 封，1 封失敗。"), /class="msg ok"/, "部分成功仍然算做了，訊息裡寫得清楚");
+  assert.match(FORMS.msgHTML("<b>x</b>"), /&lt;b&gt;/, "訊息要跳脫");
+});
+
+test("頁首：標題、說明、動作、返回；空狀態三段", () => {
+  const h = FORMS.pageHead("標題", "一句說明", [{ act: "go", label: "做", primary: true }, { label: "連", href: "/x/" }], { act: "back", label: "回去" });
+  assert.match(h, /<button class="back" data-act="back">← 回去<\/button>/);
+  assert.match(h, /<h1>標題<\/h1><div class="lede">一句說明<\/div>/);
+  assert.match(h, /<button class="btn" data-act="go">做<\/button>/);
+  assert.match(h, /<a class="btn ghost" href="\/x\/">連<\/a>/);
+  const e = FORMS.emptyHTML("沒有東西", "怎麼開始", { act: "new", label: "加一個" });
+  assert.match(e, /<b>沒有東西<\/b><div>怎麼開始<\/div>/);
+  assert.match(e, /data-act="new"/);
+  assert.match(FORMS.sectionHTML("段", "內", { id: "s1", hint: "提示", actions: [{ act: "a", label: "動", seq: "3" }] }),
+    /<section class="section" id="s1"><h2>段<span class="hint">提示<\/span><span class="sp"><\/span><button class="btn quiet sm" data-act="a" data-seq="3">動<\/button><\/h2>內<\/section>/);
 });
 
 test("後台首頁那張卡：四組各一句、進不去的灰掉、待寄的信有數字", () => {

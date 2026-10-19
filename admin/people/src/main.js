@@ -28,16 +28,16 @@ function render() {
   if (!el) return;
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.downHTML(); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
   if (!S.user) { location.replace("../../app/?next=admin-people"); return; }
-  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
-  if (!isPres()) { el.innerHTML = nav + UI.noAccessHTML(S.me); return; }
+  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
+  if (!isPres()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", "", S.me), UI.noAccessHTML(S.me)); return; }
 
   let body;
   if (S.view === "invites") body = UI.inviteCodesHTML(S.invites, S.msg, S.busy, S.inviteDraft);
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.privileged, S.user.id, S.msg, S.busy, S.personDraft);
   else body = UI.rosterHTML(S.roster, S.changes, S.privileged, S.user.id, S.msg, S.busy);
-  el.innerHTML = nav + UI.groupBarHTML("people", S.me) + body;
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", S.view === "invites" ? "invites" : "roster", S.me), body);
 }
 
 async function boot() {
@@ -49,7 +49,8 @@ async function boot() {
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre" || !isPres()) { render(); return; }
     // ?tab=invites 直接開邀請碼（README 的連結用得到）。
-    if (new URLSearchParams(location.search).get("tab") === "invites") await openInvites();
+    const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
+    if (want === "invites") await openInvites();
     else await openRoster();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-people"); return; }
@@ -93,7 +94,8 @@ document.addEventListener("click", async e => {
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") {
-    S.msg = "";
+    e.preventDefault(); S.msg = "";
+    history.replaceState(null, "", "#" + b.dataset.t);
     if (b.dataset.t === "invites") await openInvites(); else await openRoster();
     return;
   }

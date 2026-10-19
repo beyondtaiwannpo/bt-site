@@ -67,9 +67,11 @@ make("intern-passport", "intern-passport",
      profile:{ id:"3f2a9c10-0000-4000-8000-000000000002", name_zh:"實習一號", name_en:"Intern Number One",
                issued:"2026-10-01", motto:"這一期想帶走一件事", avatar:"", term:"2026-27" } };`);
 
+// 後台（2026-10-19 起是側欄外殼）：拿對外那一組最長的一頁（團隊頁）量，側欄用 Co-President 的，每一行都在。
 make("admin", "admin",
-  `UI.tabsHTML("team", true) + UI.publicTeamHTML([
+  `UI.shellHTML("", UI.railHTML("site", "team", { role:"cadre", board:"president", team:"Sponsorship Team, Internship Team", name:"王平" }),
+     UI.publicTeamHTML([
      { id:"1", name_zh:"王小明", name_en:"Ming Wang", team:"Curriculum Team", public_title:"Director",
-       avatar:"x", public_approved:true }], "", false)`,
-  `import * as UI from "./src/ui.js";`);
+       avatar:"x", public_approved:true }], "", false))`,
+  `import * as UI from "./site/src/ui.js";`);
 console.log("ok");

@@ -31,9 +31,9 @@ function render() {
   // 頂欄畫在 #bt-root 裡面，不 insertAdjacentHTML 到 <body>（理由見 admin/src/main.js 同一段）。
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.downHTML(); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
   if (!S.user) { location.replace("../../app/?next=admin-site"); return; }
-  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
+  if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
 
   let body;
   if (S.view === "mail") {
@@ -49,7 +49,9 @@ function render() {
   } else {
     body = UI.resListHTML(S.res, canEdit(), S.msg, isPres());
   }
-  el.innerHTML = nav + UI.groupBarHTML("site", S.me) + body;
+  // 側欄亮哪一行：編輯畫面算在它所屬的那個分頁底下。
+  const tab = { "res-edit": "res", "mail-edit": "mail" }[S.view] || S.view;
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab, S.me), body);
 }
 
 async function boot() {
@@ -62,7 +64,7 @@ async function boot() {
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     // ?tab=team 這種連結可以直接開到某一個分頁（README 裡的連結用得到）。
     // Co-President 專用的分頁對其他人回到資源，不報錯。
-    const want = new URLSearchParams(location.search).get("tab");
+    const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     if (want === "team" && isPres()) await openTeam();
     else if (want === "stories" && isPres()) await openStories();
     else if (want === "mail" && isPres()) await openMail();
@@ -122,7 +124,8 @@ document.addEventListener("click", async e => {
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
 
   if (act === "tab") {
-    S.msg = "";
+    e.preventDefault(); S.msg = "";
+    history.replaceState(null, "", "#" + b.dataset.t);
     if (b.dataset.t === "team") { await openTeam(); }
     else if (b.dataset.t === "stories") { await openStories(); }
     else if (b.dataset.t === "mail") { await openMail(); }

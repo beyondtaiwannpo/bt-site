@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { peopleHTML, initial, toPerson, teamKey, byTeam } from "../team/src/ui.js";
 import { settingsHTML } from "../settings/src/ui.js";
-import { publicTeamHTML, tabsHTML } from "../admin/site/src/ui.js";
+import { publicTeamHTML, tabsHTML, railHTML, shellHTML } from "../admin/site/src/ui.js";
 
 const P = (o = {}) => toPerson({ name_zh: "王小明", name_en: "Ming Wang", team: "Curriculum", ...o });
 
@@ -189,7 +189,7 @@ test("★ 核可那一頁一定要有那兩句提醒", () => {
 test("只列已經自己打過勾的人；一個都沒有的時候說明為什麼", () => {
   const h = publicTeamHTML([], "", false);
   assert.match(h, /還沒有人自己打勾/);
-  assert.match(h, /要先到 \/app\/ 打勾/);
+  assert.match(h, /要先到「設定」打勾/);
 });
 
 test("核可清單顯示狀態", () => {
@@ -210,12 +210,13 @@ test("★ 只有 Co-President 看得到「團隊頁」這個分頁", () => {
   assert.match(tabsHTML("forms", true), /data-t="team"/);
 });
 
-// 核可完要回得了同一組的其他分頁。兩個核可頁都要有，只加一頁會讓兩頁不一致。
-// 2026-10-15 後台拆資料夾之後，這一組裡的分頁是資源、團隊頁、校友頁、信件文案；申請在 /admin/ 首頁。
-test("★ 團隊頁本身畫得出分頁列（核可完回得去資源）", () => {
-  const h = publicTeamHTML([], "", false);
-  assert.match(h, /data-act="tab"/);
-  assert.match(h, /data-t="res"/);
+// 核可完要回得了同一組的其他分頁。2026-10-19 起分頁在側欄（railHTML），頁面本身不再畫分頁列；
+// 這裡量的是「整頁」：外殼加側欄加團隊頁，側欄上要有回資源的那一行。
+test("★ 團隊頁整頁畫得出側欄（核可完回得去資源）", () => {
+  const h = shellHTML("", railHTML("site", "team", { role: "cadre", board: "president", team: "", name: "王平" }), publicTeamHTML([], "", false));
+  assert.match(h, /data-act="tab" data-t="res"/);
+  assert.match(h, /class="rail-item on" href="#team"/);
+  assert.doesNotMatch(publicTeamHTML([], "", false), /data-act="tab"/, "頁面本身不再畫分頁列，分頁只在側欄");
 });
 
 // ── 一個人可以在好幾個 team（Paul 2026-09-10）──────────────────────

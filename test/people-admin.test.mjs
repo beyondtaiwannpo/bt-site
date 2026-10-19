@@ -21,7 +21,7 @@ const PRIV = [{ name: "Internship Team", note: "" }];
 
 test("兩個分頁都在，幹部名單是第一個", () => {
   const h = tabsHTML("roster");
-  assert.match(h, /class="chip wide on" data-act="tab" data-t="roster"/);
+  assert.match(h, /class="rail-item on" href="#roster" data-act="tab" data-t="roster"/);
   assert.match(h, /data-t="invites"/);
 });
 
