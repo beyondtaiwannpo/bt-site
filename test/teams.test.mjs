@@ -11,7 +11,9 @@ import { TEAMS as SETTINGS_TEAMS, teamPickHTML, formatTeams,
          parseTeams as settingsParse } from "../settings/src/ui.js";
 import { TEAM_ORDER, teamKey, parseTeams as teamParse } from "../team/src/ui.js";
 import { parseTeams as avParse } from "../availability/src/ui.js";
-import { TEAMS as PEOPLE_TEAMS, parseTeams as peopleParse } from "../admin/people/src/ui.js";
+import { TEAMS as PEOPLE_TEAMS, parseTeams as peopleParse, setLang as peopleLang } from "../admin/people/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+peopleLang("zh");
 
 test("★ 護照與設定頁的 team 清單逐字一樣", () => {
   assert.deepEqual(SETTINGS_TEAMS, PASSPORT_TEAMS,

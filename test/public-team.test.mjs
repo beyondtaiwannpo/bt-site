@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { peopleHTML, initial, toPerson, teamKey, byTeam } from "../team/src/ui.js";
 import { settingsHTML } from "../settings/src/ui.js";
-import { publicTeamHTML, tabsHTML, railHTML, shellHTML } from "../admin/site/src/ui.js";
+import { publicTeamHTML, tabsHTML, railHTML, shellHTML, setLang } from "../admin/site/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 
 const P = (o = {}) => toPerson({ name_zh: "王小明", name_en: "Ming Wang", team: "Curriculum", ...o });
 

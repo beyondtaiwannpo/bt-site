@@ -3,6 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as R from "../resources/src/ui.js";
 import * as M from "../admin/site/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+M.setLang("zh");
 
 const items = [
   { id: "1", kind: "book", title: "College Resource Book", blurb: "從高一到送出申請的完整時程。",
@@ -84,5 +86,5 @@ test("資源分頁是這一組的第一個分頁，當前的那一個有標記",
   assert.match(M.tabsHTML("res"), /class="rail-item on" href="#res" data-act="tab" data-t="res"/);
   assert.ok(!M.tabsHTML("res", false).includes('data-t="team"'), "一般幹部看不到團隊頁那個分頁");
   const rail = M.railHTML("site", "res", { role: "cadre", board: "member", team: "", name: "王平" });
-  assert.ok(rail.includes('href="/admin/#forms"') && rail.includes('class="rail-item on" href="#res"'), "側欄上有申請表與資源");
+  assert.ok(rail.includes('href="/admin/?lang=zh#forms"') && rail.includes('class="rail-item on" href="#res"'), "側欄上有申請表與資源");
 });

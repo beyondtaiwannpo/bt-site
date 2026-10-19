@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML,
          saveFailMessage } from "../settings/src/ui.js";
-import { alumniStoriesHTML, tabsHTML, railHTML, shellHTML } from "../admin/site/src/ui.js";
+import { alumniStoriesHTML, tabsHTML, railHTML, shellHTML, setLang } from "../admin/site/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 import { says } from "../admin/site/src/data.js";
 
 const FULL = {

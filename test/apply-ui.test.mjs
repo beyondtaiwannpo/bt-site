@@ -6,6 +6,8 @@ import * as A from "../apply/src/ui.js";
 import * as M from "../admin/src/ui.js";
 // 信件文案 2026-10-15 搬到 admin/site/（後台拆成四個資料夾）。
 import * as SITE from "../admin/site/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+M.setLang("zh"); SITE.setLang("zh");
 
 const form = { id: "f1", kind: "program", title: "2027 暑期探索營", intro: "兩天，免費。",
                closes_at: "2026-12-01T00:00:00Z", notify_by: "2026-12-15", lang: "zh" };
@@ -116,7 +118,7 @@ test("表單頁：唯讀的時候每一格都鎖住，也沒有存檔與刪除",
 
 test("表單頁：四種題型都在，而且說明了哪一種是什麼", () => {
   const h = M.questionHTML(null, "", false);
-  for (const t of M.TYPES) assert.match(h, new RegExp(`>${t.label}</option>`));
+  for (const t of M.TYPES) assert.match(h, new RegExp(`>${M.T(t.label)}</option>`));
   assert.match(h, /一行一個/, "選項怎麼填要講");
 });
 
@@ -283,8 +285,8 @@ const tpl = { kind: "accepted", subject: "Beyond Taiwan：「{活動名稱}」�
 test("四封信都列得出來，而且說得出什麼時候會寄", () => {
   const h = SITE.mailListHTML([tpl], "");
   for (const k of SITE.MAIL_KINDS) {
-    assert.match(h, new RegExp(k.label));
-    assert.match(h, new RegExp(k.when.slice(0, 6)));
+    assert.match(h, new RegExp(SITE.T(k.label)));
+    assert.match(h, new RegExp(SITE.T(k.when).slice(0, 6)));
   }
 });
 

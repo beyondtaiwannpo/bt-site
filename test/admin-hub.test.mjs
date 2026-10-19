@@ -13,6 +13,8 @@ import * as PASS from "../admin/passports/src/ui.js";
 import * as PEOPLE from "../admin/people/src/ui.js";
 
 const IMPL = [["admin", FORMS], ["admin/site", SITE], ["admin/passports", PASS], ["admin/people", PEOPLE]];
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支大部分斷言的是中文，所以先切成中文。英文那幾條自己切。
+for (const [, M] of IMPL) M.setLang("zh");
 
 const ME = {
   member:   { role: "cadre",   board: "member",    team: "Curriculum Team" },
@@ -54,8 +56,8 @@ test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什�
   for (const [label, M] of IMPL) {
     const rail = M.railHTML("site", "res", { ...ME.member, name: "王平" });
     assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page">資源/, label);
-    assert.match(rail, /<a class="rail-item" href="\/admin\/#forms">申請表/, `${label}：別組的分頁是帶 # 的一般連結`);
-    assert.match(rail, /<a class="rail-item" href="\/admin\/#home">首頁/, label);
+    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms">申請表/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
+    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home">首頁/, label);
     assert.match(rail, /class="rail-group off">護照<span class="why">只有 Internship team/, label);
     assert.match(rail, /class="rail-group off">人與權限<span class="why">只有 Co-President/, label);
     assert.doesNotMatch(rail, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
@@ -71,7 +73,7 @@ test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什�
 test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellHTML、pageHead、msgHTML、sectionHTML、emptyHTML）", () => {
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.ITEMS, FORMS.ITEMS, `${label} 的 ITEMS 跟 admin/ 不一樣`);
-    for (const fn of ["railHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter"]) {
+    for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName"]) {
       assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
     }
   }
@@ -124,7 +126,7 @@ test("首頁：Co-President 看到六張卡，每張一個數字、一顆直達�
   assert.match(h, /1 封試過但失敗了：boom/);
   assert.match(h, /data-act="send-mail-all"/);
   assert.match(h, /<div class="kpi-n">1<span class="kpi-u">人<\/span><\/div>\s*<div class="kpi-l">等你核可上團隊頁/);
-  assert.match(h, /href="\/admin\/site\/#team"/);
+  assert.match(h, /href="\/admin\/site\/\?lang=zh#team"/, "直達的連結帶著語言");
   assert.match(h, /<div class="kpi-n">1<span class="kpi-u">人<\/span><\/div>\s*<div class="kpi-l">等你核可上校友頁/, "只算還沒核可的");
   assert.match(h, /<div class="kpi-n">2<span class="kpi-u">位<\/span><\/div>\s*<div class="kpi-l">這一屆的 intern/);
   assert.match(h, /平均蓋了 1\.5 格/);
@@ -259,4 +261,177 @@ test("一份表單裡的三個分頁：申請、設定、活動，當前的有�
     assert.match(h, /class="subtabs"/);
     assert.match(h, /data-act="back-list"/);
   }
+});
+
+// ── 中英切換（2026-10-19，docs/2026-10-19-後台中英切換.md）────────────────
+// 四份 strings.js 的 COMMON 與機制要一模一樣；每個鍵中英都要有；每個畫面用英文畫出來不能剩中文。
+import * as FORMS_S from "../admin/src/strings.js";
+import * as SITE_S from "../admin/site/src/strings.js";
+import * as PASS_S from "../admin/passports/src/strings.js";
+import * as PEOPLE_S from "../admin/people/src/strings.js";
+const STR = [["admin", FORMS_S], ["admin/site", SITE_S], ["admin/passports", PASS_S], ["admin/people", PEOPLE_S]];
+
+test("★ 四份字典的 COMMON 與機制（T、pickLang、withLang、isErr）逐字一樣", () => {
+  for (const [label, S] of STR) {
+    assert.deepEqual(S.COMMON, FORMS_S.COMMON, `${label} 的 COMMON 跟 admin/ 不一樣`);
+    for (const fn of ["T", "pickLang", "withLang", "isErr", "setLang", "lang"]) {
+      assert.equal(String(S[fn]), String(FORMS_S[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
+    }
+    assert.equal(S.STORE_KEY, FORMS_S.STORE_KEY);
+  }
+});
+
+test("★ 每一個鍵 zh 與 en 都有，MINE 不跟 COMMON 撞鍵", () => {
+  for (const [label, S] of STR) {
+    for (const [k, row] of Object.entries(S.STRINGS)) {
+      assert.equal(typeof row.zh, "string", `${label} 的 ${k} 少了 zh`);
+      assert.equal(typeof row.en, "string", `${label} 的 ${k} 少了 en`);
+      assert.ok(row.zh.length, `${label} 的 ${k} 的 zh 是空的`);
+    }
+    for (const k of Object.keys(S.MINE)) assert.ok(!(k in S.COMMON), `${label} 的 MINE 跟 COMMON 都有 ${k}`);
+  }
+});
+
+test("語言怎麼決定：網址先、再存的、都沒有就英文；連結帶 ?lang=；單複數", () => {
+  const S = FORMS_S;
+  assert.equal(S.pickLang("?lang=zh", "en"), "zh");
+  assert.equal(S.pickLang("?tab=forms", "zh"), "zh");
+  assert.equal(S.pickLang("", null), "en");
+  assert.equal(S.pickLang("?lang=fr", "de"), "en", "認不得的值當成沒有");
+  S.setLang("en");
+  assert.equal(S.withLang("/admin/site/#team"), "/admin/site/?lang=en#team");
+  assert.equal(S.withLang("/admin/?tab=forms#x"), "/admin/?tab=forms&lang=en#x");
+  assert.equal(S.withLang("/admin/?lang=zh#x"), "/admin/?lang=zh#x", "已經有的不重複加");
+  assert.equal(S.T("forms.perTeam", { n: 1 }), "1 form");
+  assert.equal(S.T("forms.perTeam", { n: 3 }), "3 forms");
+  assert.equal(S.T({ zh: "甲", en: "A" }), "A", "T 也吃 { zh, en } 物件");
+  assert.equal(S.T("no.such.key"), "no.such.key", "鍵不存在就回鍵本身，畫面上看得到");
+  S.setLang("zh");
+  assert.equal(S.T("forms.perTeam", { n: 3 }), "3 份");
+  assert.ok(S.isErr("存不起來：x") && S.isErr("Could not save: x") && !S.isErr("寄出 3 封，1 封失敗。") && !S.isErr("Saved."));
+});
+
+test("★ 側欄有中英切換的兩顆按鈕，現在的那一顆亮著", () => {
+  for (const [label, M] of IMPL) {
+    const rail = M.railHTML("forms", "home", { ...ME.member, name: "a" });
+    assert.match(rail, /<button class="lang on" data-act="lang" data-lang="zh" aria-pressed="true">中文<\/button><button class="lang" data-act="lang" data-lang="en" aria-pressed="false">English<\/button>/, label);
+  }
+  FORMS.setLang("en");
+  try {
+    const rail = FORMS.railHTML("forms", "home", { ...ME.member, name: "a" });
+    assert.match(rail, /class="lang" data-act="lang" data-lang="zh"/);
+    assert.match(rail, /class="lang on" data-act="lang" data-lang="en"/);
+    assert.match(rail, /Admin menu/);
+  } finally { FORMS.setLang("zh"); }
+});
+
+// 英文畫出來不能剩中文。餵進去的假資料全部用英文，剩下的中文就是漏翻的。
+// 剔除：HTML 註解（樣板裡的中文註解）、placeholder（有幾格本來就要填中文）、切換鈕上的「中文」、
+// 信件預覽（信是寄給台灣學生的，範例與系統加的那段本來就是中文）。
+const CJK = /[一-鿿]/;
+function leftover(html) {
+  const h = String(html)
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/ placeholder="[^"]*"/g, "")
+    .replace(/<div class="rail-lang"[\s\S]*?<\/div>/g, "")
+    .replace(/<div class="mailprev">[\s\S]*?<\/div>/g, "")
+    .replace(/<div class="mini" style="margin-bottom:8px">[^<]*<\/div>/g, "")   // 「用「陳小安」當範例」那一句：範例是信裡真的會出現的中文
+    .replace(/\{姓名\}|\{活動名稱\}/g, "");   // 代換符號跟資料庫的 mail_fill() 一樣是中文，不翻
+  const m = h.match(CJK);
+  return m ? h.slice(Math.max(0, m.index - 40), m.index + 40) : "";
+}
+function allEn(label, M, screens) {
+  M.setLang("en");
+  try {
+    for (const [name, fn] of Object.entries(screens)) {
+      const left = leftover(fn());
+      assert.equal(left, "", `${label} 的 ${name} 用英文畫還剩中文：…${left}…`);
+    }
+  } finally { M.setLang("zh"); }
+}
+const EN_ME = { role: "cadre", board: "president", team: "Marketing Team, Internship Team", name: "Paul" };
+
+test("★ admin/ 每一個畫面用英文畫出來不剩中文", () => {
+  const form = { id: "f1", title: "Camp", team: "Curriculum Team", status: "open", kind: "board", intro: "", lang: "en", counts: { total: 2, received: 1 } };
+  const qs = [{ id: "q1", label: "Why", help: "h", type: "single", required: true, options: ["a", "b"] }, { id: "q2", label: "What", type: "short", options: [] }];
+  const app = { id: "a1", applicant_name: "Amy", applicant_school: "", applicant_grade: "G11", applicant_email: "a@x.io", guardian_email: "g@x.io", status: "accepted", submitted_at: "2026-10-01T00:00:00Z", checked_in_at: null, answers: new Map([["q1", "a"]]) };
+  const todo = { resources: [{ id: "r1", team: "Marketing Team", status: "published" }], roster: [{ id: "u1", name_zh: "", name_en: "Paul", team: "Marketing Team", board_role: "director" }, { id: "u2", team: "", board_role: "member" }],
+    team: [{ id: "u2" }], stories: [{ id: "s1", story_approved: false }], interns: [{ id: "i1" }], stamps: [] };
+  allEn("admin", FORMS, {
+    rail: () => FORMS.railHTML("forms", "home", { ...ME.member, name: "a" }, { forms: 2 }),
+    railPres: () => FORMS.railHTML("site", "res", EN_ME),
+    hub: () => FORMS.hubHTML(EN_ME, [{ id: 1, tries: 2, error: "boom" }], true, false, [form], todo),
+    hubZero: () => FORMS.hubHTML({ ...ME.member, name: "a", team: "" }, [], false, false, [], { resources: [], roster: null }),
+    hubGone: () => FORMS.hubHTML(EN_ME, [], true, true, [], { resources: [], roster: null, team: null, stories: null, interns: null, stamps: [] }),
+    list: () => FORMS.listHTML([form, { ...form, id: "f2", team: "", kind: "program", status: "draft" }], true, "Saved.", true, null, [], "", false),
+    listMember: () => FORMS.listHTML([], false, "", false, null, [], "", false),
+    listNew: () => FORMS.listHTML([form], true, "", true, { title: "", team: "Marketing Team", kind: "board" }, ["Marketing Team"], "", true),
+    form: () => FORMS.formHTML(form, qs, true, ["Marketing Team"], "", true),
+    formRo: () => FORMS.formHTML({ ...form, status: "closed" }, [], false, [], "Could not save: x", false),
+    question: () => FORMS.questionHTML(qs[0], "", false) + FORMS.questionHTML(null, "", true),
+    apps: () => FORMS.appsHTML(form, [app, { ...app, id: "a2", status: "received", applicant_school: "X" }], qs, true, new Set(["a1"]), "all", [{ id: 1, tries: 1, error: "" }], "", false),
+    appsEmpty: () => FORMS.appsHTML(form, [app], qs, true, new Set(), "rejected", [], "", true) + FORMS.appsHTML(form, [], qs, false, new Set(), "all", [], "", false),
+    checkin: () => FORMS.checkinHTML(form, [app, { ...app, id: "a3", checked_in_at: "2026-10-01" }], true, "", false) + FORMS.checkinHTML(form, [], false, "", false),
+    notice: () => FORMS.noticeHTML(form, [app], new Set(["accepted"]), "", false) + FORMS.noticeHTML(form, [app], new Set(), "", true),
+    other: () => FORMS.notCadreHTML() + FORMS.downHTML() + FORMS.skeletonHTML() + FORMS.msgHTML("Saved.") + FORMS.msgHTML("Could not save: x") + FORMS.tabsHTML("forms", true),
+  });
+});
+
+test("★ admin/site 每一個畫面用英文畫出來不剩中文", () => {
+  const people = [{ id: "1", name_zh: "", name_en: "Ming", team: "Curriculum Team", public_title: "Director", avatar: "x", public_approved: true }, { id: "2", name_en: "Amy", team: "", public_approved: false }];
+  const stories = [{ id: "s1", name: "Amy", school: "X High", county: "", country: "US", city: "NYC", place: "NYU", quote: "q", note: "n", story_approved: false, updated_at: "2026-10-01" },
+                   { id: "s2", name: "Bo", school: "Y", county: "Taipei", country: "UK", city: "", place: "", quote: "", note: "", story_approved: true, approved_at: "2026-10-02" }];
+  const res = [{ id: "r1", title: "Guide", blurb: "", kind: "pdf", url: "https://x.io", team: "Marketing Team", status: "published", ord: 1 }, { id: "r2", title: "Vid", blurb: "b", kind: "zzz", url: "https://y.io", status: "draft", ord: 2 }];
+  allEn("admin/site", SITE, {
+    rail: () => SITE.railHTML("site", "team", EN_ME),
+    team: () => SITE.publicTeamHTML(people, "", false) + SITE.publicTeamHTML([], "Could not change: x", true),
+    stories: () => SITE.alumniStoriesHTML(stories, "", false) + SITE.alumniStoriesHTML(undefined, "", false),
+    resList: () => SITE.resListHTML(res, true, "", true) + SITE.resListHTML([], false, "", false) + SITE.resListHTML([], true, "", false),
+    resEdit: () => SITE.resEditHTML(res[0], "", false) + SITE.resEditHTML(null, "", true),
+    mailList: () => SITE.mailListHTML([{ kind: "accepted", subject: "Hi", body: "b" }], ""),
+    mailEdit: () => SITE.mailEditHTML("interview", null, "", false) + SITE.mailEditHTML("guardian", { subject: "s", body: "b" }, "", true),
+    other: () => SITE.notCadreHTML() + SITE.downHTML() + SITE.tabsHTML("res", true),
+  });
+});
+
+test("★ admin/passports 每一個畫面用英文畫出來不剩中文", () => {
+  const terms = [{ id: "2026-27", title_zh: "", title_en: "INTERNSHIP 2026-27", starts_on: "2026-09-01", ends_on: "2027-07-31", active: true }, { id: "2027-28", title_zh: "", title_en: "NEXT", starts_on: "2027-09-01", ends_on: "2028-07-31", active: false }];
+  const tasks = [{ id: "T2627-01", term: "2026-27", seq: 1, category: "onboard", title_zh: "", title_en: "HELLO", description: "d", active: true },
+                 { id: "T2627-02", term: "2026-27", seq: 2, category: "zzz", title_zh: "", title_en: "ODD", description: "", active: false }];
+  const intern = { terms, tasks, stamped: { "T2627-01": 2 }, interns: 3 };
+  const months = [{ seq: 1, month: 9, theme_zh: "07:00", theme_en: "" }, { seq: 2, month: 10, theme_zh: "", theme_en: "" }];
+  const acts = [{ id: "09A", month: 9, category: "gather", title_zh: "", title_en: "OPENING", description: "d", active: true, needs_host: true, callback_to: "" },
+                { id: "09B", month: 9, category: "frame", title_zh: "", title_en: "PHOTO", description: "", active: false, needs_host: false, callback_to: "09A" }];
+  const dests = [{ code: "TPE", city: "TAIPEI", active: true }, { code: "NRT", city: "TOKYO", active: false }];
+  const pass = { months, activities: acts, destinations: dests, stamped: { "09A": 1 } };
+  allEn("admin/passports", PASS, {
+    rail: () => PASS.railHTML("passports", "interns", EN_ME),
+    noAccess: () => PASS.noAccessHTML(ME.member) + PASS.notCadreHTML() + PASS.downHTML() + PASS.tabsHTML("cadre", true),
+    interns: () => PASS.internAdminHTML(intern, "2027-28", "", false, true, "project") + PASS.internAdminHTML({ terms: [], tasks: [], stamped: {}, interns: 0 }, null, "", true, false, null),
+    termEdit: () => PASS.internTermEditHTML(terms[0], "", false, null) + PASS.internTermEditHTML(null, "", true, null),
+    taskEdit: () => PASS.internTaskEditHTML(tasks[0], "2026-27", "", "", false, null) + PASS.internTaskEditHTML(null, "2026-27", "T2627-03", "", true, null),
+    cadre: () => PASS.passportAdminHTML(pass, "", false, 9) + PASS.passportAdminHTML({ months: [], activities: [], destinations: [], stamped: {} }, "", true, null),
+    cities: () => PASS.citiesHTML(pass, "", false) + PASS.citiesHTML({ destinations: [] }, "", true),
+    actEdit: () => PASS.activityEditHTML(acts[0], 9, months, "", false, null) + PASS.activityEditHTML(null, 10, months, "", true, null),
+    monthEdit: () => PASS.monthEditHTML(months[0], "", false, null),
+    destEdit: () => PASS.destinationEditHTML(dests[0], "", false, null) + PASS.destinationEditHTML(null, "", true, null),
+  });
+});
+
+test("★ admin/people 每一個畫面用英文畫出來不剩中文", () => {
+  const roster = [{ id: "u1", name_zh: "", name_en: "Paul", team: "Sponsorship Team, Internship Team", board_role: "president" },
+                  { id: "u2", name_zh: "", name_en: "", team: "", board_role: "member" }, { id: "u3", name_en: "Amy", team: "Curriculum Team", board_role: "director" }];
+  const changes = [{ target: "u3", target_name: "", field: "board_role", old_value: "member", new_value: "director", changed_by: "u1", created_at: "2026-10-19T10:00:00Z" },
+                   { target: "zz", field: "team", old_value: "", new_value: "Curriculum Team", changed_by: "zz", created_at: "2026-10-19T10:00:00Z" }];
+  const priv = [{ name: "Internship Team" }];
+  const codes = [{ code: "bt-abc", grants: "cadre", uses_left: 2, note: "n", created_at: "2026-10-01", uses: [{ name: "", email: "", used_at: "2026-10-02", grants: "alumni", role: "cadre" }] },
+                 { code: "bt-def", grants: "intern", uses_left: 0, created_at: "", uses: [] }];
+  allEn("admin/people", PEOPLE, {
+    rail: () => PEOPLE.railHTML("people", "roster", EN_ME),
+    roster: () => PEOPLE.rosterHTML(roster, changes, priv, "u1", "", false, "") + PEOPLE.rosterHTML(roster, [], [], "u1", "", true, "__none") + PEOPLE.rosterHTML(roster, [], [], "u1", "", false, "Nope") + PEOPLE.rosterHTML([], [], [], "u1", "", false, ""),
+    changes: () => PEOPLE.changesHTML(changes, roster, "") + PEOPLE.changesHTML([], [], ""),
+    person: () => PEOPLE.personEditHTML(roster[0], priv, "u1", "", false, null) + PEOPLE.personEditHTML(roster[2], priv, "u1", "", true, { board_role: "member", team: "Odd Team" }),
+    invites: () => PEOPLE.inviteCodesHTML(codes, "", false, { code: "bt-x", grants: "alumni", uses: 2, note: "" }) + PEOPLE.inviteCodesHTML([], "", true, null),
+    other: () => PEOPLE.noAccessHTML(ME.member) + PEOPLE.notCadreHTML() + PEOPLE.downHTML() + PEOPLE.tabsHTML("invites"),
+  });
 });

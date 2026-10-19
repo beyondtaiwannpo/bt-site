@@ -6,6 +6,7 @@ import * as AUTH from "../../../shared/auth.js";
 import { navHTML } from "../../../shared/nav.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 const HERE = "/admin/passports/";
 
@@ -100,7 +101,7 @@ async function openInterns(keepMsg) {
     if (!S.internSel || !S.intern.terms.some(t => t.id === S.internSel))
       S.internSel = (S.intern.terms.find(t => t.active) || S.intern.terms[0] || {}).id || null;
     S.view = "interns"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "實習護照載不到：" + D.says(e); S.view = "interns"; }
+  } catch (e) { S.busy = false; S.msg = T("err.internLoad") + D.says(e); S.view = "interns"; }
   render();
 }
 
@@ -110,7 +111,7 @@ async function openCadre(keepMsg) {
   try {
     S.pass = await D.loadPassportAdmin();
     S.view = "cadre"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "幹部護照載不到：" + D.says(e); S.view = "cadre"; }
+  } catch (e) { S.busy = false; S.msg = T("err.cadreLoad") + D.says(e); S.view = "cadre"; }
   render();
 }
 
@@ -120,7 +121,7 @@ async function openCities(keepMsg) {
   try {
     S.pass = await D.loadPassportAdmin();
     S.view = "cities"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "城市載不到：" + D.says(e); S.view = "cities"; }
+  } catch (e) { S.busy = false; S.msg = T("err.citiesLoad") + D.says(e); S.view = "cities"; }
   render();
 }
 
@@ -131,6 +132,7 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") {
     e.preventDefault(); S.msg = "";
@@ -165,7 +167,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "act-edit") {
     const a = S.pass.activities.find(x => x.id === id);
-    if (!a) { S.msg = "找不到這一格，重新整理再試一次。"; render(); return; }
+    if (!a) { S.msg = T("err.noTask"); render(); return; }
     S.actEditing = a; S.actDraft = null; S.actMonth = a.month; S.view = "act-edit"; S.msg = ""; render(); return;
   }
   if (act === "act-save") {
@@ -175,42 +177,42 @@ document.addEventListener("click", async e => {
                 title_zh: val("ak-zh"), title_en: val("ak-en"), description: val("ak-desc"),
                 needs_host: !!(host && host.checked), callback_to: val("ak-cb").toUpperCase() };
     S.actDraft = a;
-    if (!a.title_zh || !a.title_en) { S.msg = "中文標題與英文標題都要填。"; render(); return; }
+    if (!a.title_zh || !a.title_en) { S.msg = T("err.titles"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       const made = await D.saveActivity(a);
       S.actDraft = null;
-      S.msg = id ? `「${a.title_zh}」改好了。幹部重新整理護照就看得到。` : `「${a.title_zh}」加好了，編號是 ${made}。幹部重新整理護照就看得到。`;
+      S.msg = id ? T("msg.actEdited", { t: a.title_zh }) : T("msg.actAdded", { t: a.title_zh, id: made });
       await openCadre(true);
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
   if (act === "act-off" || act === "act-on") {
     const on = act === "act-on";
     const a = S.pass.activities.find(x => x.id === id);
-    if (!on && !confirm(`停用「${a ? a.title_zh : id}」？\n\n停用之後護照上就看不到這一格，已經蓋過的章還在，之後可以恢復。`)) return;
+    if (!on && !confirm(T("confirm.actOff", { t: a ? a.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.setActivityActive(id, on);
-      S.msg = `「${a ? a.title_zh : id}」${on ? "恢復了" : "停用了"}。`;
+      S.msg = T(on ? "msg.enabled" : "msg.disabled", { t: a ? a.title_zh : id });
       await openCadre(true);
-    } catch (err) { S.busy = false; S.msg = (on ? "恢復不了：" : "停用不了：") + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T(on ? "err.enable" : "err.disable") + D.says(err); render(); }
     return;
   }
   if (act === "act-del") {
     const a = S.pass.activities.find(x => x.id === id);
-    if (!confirm(`刪掉「${a ? a.title_zh : id}」？\n\n還沒有人蓋過，所以可以刪。刪了就回不來。`)) return;
+    if (!confirm(T("confirm.actDel", { t: a ? a.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.deleteActivity(id);
-      S.msg = `「${a ? a.title_zh : id}」刪掉了。`;
+      S.msg = T("msg.deletedT", { t: a ? a.title_zh : id });
       await openCadre(true);
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); render(); }
     return;
   }
   if (act === "month-edit") {
     const m = S.pass.months.find(x => String(x.seq) === b.dataset.seq);
-    if (!m) { S.msg = "找不到這個月份，重新整理再試一次。"; render(); return; }
+    if (!m) { S.msg = T("err.noMonth"); render(); return; }
     S.monthEditing = m; S.monthDraft = null; S.view = "month-edit"; S.msg = ""; render(); return;
   }
   if (act === "month-save") {
@@ -221,49 +223,49 @@ document.addEventListener("click", async e => {
     try {
       await D.saveMonthTheme(b.dataset.seq, d.theme_zh, d.theme_en);
       S.monthDraft = null;
-      S.msg = `${UI.monthLabel(d.month)}的時刻改好了。`;
+      S.msg = T("msg.themeSaved", { m: UI.monthLabel(d.month) });
       await openCadre(true);
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
   if (act === "dest-new")  { S.destEditing = null; S.destDraft = null; S.view = "dest-edit"; S.msg = ""; render(); return; }
   if (act === "dest-edit") {
     const d = S.pass.destinations.find(x => x.code === b.dataset.code);
-    if (!d) { S.msg = "找不到這個城市，重新整理再試一次。"; render(); return; }
+    if (!d) { S.msg = T("err.noCity"); render(); return; }
     S.destEditing = d; S.destDraft = null; S.view = "dest-edit"; S.msg = ""; render(); return;
   }
   if (act === "dest-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const d = { code: b.dataset.code || val("dk-code"), city: val("dk-city"), active: b.dataset.active !== "0" };
     S.destDraft = d;
-    if (!d.code || !d.city) { S.msg = "代碼與城市名字都要填。"; render(); return; }
+    if (!d.code || !d.city) { S.msg = T("err.cityBoth"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       const made = await D.saveDestination(d.code, d.city, d.active);
       S.destDraft = null;
-      S.msg = b.dataset.code ? `「${d.city}」改好了。` : `「${d.city}」加好了，代碼是 ${made}。`;
+      S.msg = b.dataset.code ? T("msg.cityEdited", { c: d.city }) : T("msg.cityAdded", { c: d.city, code: made });
       await openCities(true);
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
   if (act === "dest-off" || act === "dest-on") {
     const on = act === "dest-on";
     const d = S.pass.destinations.find(x => x.code === b.dataset.code);
-    if (!d) { S.msg = "找不到這個城市，重新整理再試一次。"; render(); return; }
-    if (!on && !confirm(`停用「${d.city}」？\n\n之後新的入境章不會再抽到它，已經發出去的不動。可以恢復。`)) return;
+    if (!d) { S.msg = T("err.noCity"); render(); return; }
+    if (!on && !confirm(T("confirm.cityOff", { c: d.city }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.saveDestination(d.code, d.city, on);
-      S.msg = `「${d.city}」${on ? "恢復了" : "停用了"}。`;
+      S.msg = T(on ? "msg.enabled" : "msg.disabled", { t: d.city });
       await openCities(true);
-    } catch (err) { S.busy = false; S.msg = (on ? "恢復不了：" : "停用不了：") + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T(on ? "err.enable" : "err.disable") + D.says(err); render(); }
     return;
   }
 
   // ── 實習護照的後台（2026-10-18）────────────────────────────────────
   // 每一個動作：按下去 busy（按鈕變「存檔中…」、其他按鈕關掉）、成功一句、失敗說錯在哪。
   if (act === "intern-back") { await openInterns(); return; }
-  if (act === "intern-see")  { S.internSel = id; S.msg = `現在看的是 ${id}。`; render(); return; }
+  if (act === "intern-see")  { S.internSel = id; S.msg = T("msg.viewing", { id }); render(); return; }
   if (act === "intern-term-new")  { S.internTermEditing = null; S.internTermDraft = null; S.view = "intern-term"; S.msg = ""; render(); return; }
   if (act === "intern-term-edit") {
     S.internTermEditing = S.intern.terms.find(t => t.id === id) || null; S.internTermDraft = null;
@@ -275,27 +277,27 @@ document.addEventListener("click", async e => {
                 starts_on: val("it-start"), ends_on: val("it-end") };
     S.internTermDraft = t;
     if (!t.id || !t.title_zh || !t.title_en || !t.starts_on || !t.ends_on) {
-      S.msg = "五格都要填：代號、中文名稱、英文名稱、開始日、結束日。"; render(); return;
+      S.msg = T("err.termFive"); render(); return;
     }
     S.busy = true; S.msg = ""; render();
     try {
       const made = await D.saveInternTerm(t);
       S.internSel = made; S.internTermDraft = null;
-      S.msg = id ? `「${t.title_zh}」改好了。` : `「${t.title_zh}」開好了。還不是目前這一屆，要的話按「設成目前這一屆」。`;
+      S.msg = id ? T("msg.termEdited", { t: t.title_zh }) : T("msg.termAdded", { t: t.title_zh });
       await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
   if (act === "intern-term-activate") {
     const t = S.intern.terms.find(x => x.id === id);
-    if (!confirm(`把「${t ? t.title_zh : id}」設成目前這一屆？\n\n之後新進來的 intern 會拿到這一屆的護照，/intern-passport/ 顯示的也是這一屆的格子。`)) return;
+    if (!confirm(T("confirm.activate", { t: t ? t.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.activateInternTerm(id);
       S.internSel = id;
-      S.msg = `「${t ? t.title_zh : id}」現在是目前這一屆了。`;
+      S.msg = T("msg.activated", { t: t ? t.title_zh : id });
       await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "設不了：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.activate") + D.says(err); render(); }
     return;
   }
   if (act === "intern-task-new") {
@@ -304,7 +306,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "intern-task-edit") {
     const t = S.intern.tasks.find(x => x.id === id);
-    if (!t) { S.msg = "找不到這一格，重新整理再試一次。"; render(); return; }
+    if (!t) { S.msg = T("err.noTask"); render(); return; }
     S.internTaskEditing = t; S.internTaskDraft = null; S.internTaskTerm = t.term; S.view = "intern-task"; S.msg = ""; render(); return;
   }
   if (act === "intern-task-save") {
@@ -312,40 +314,57 @@ document.addEventListener("click", async e => {
     const t = { id: id || val("ik-id"), term: b.dataset.term, seq: val("ik-seq"), category: val("ik-cat"),
                 title_zh: val("ik-zh"), title_en: val("ik-en"), description: val("ik-desc") };
     S.internTaskDraft = t;
-    if (!t.id || !t.title_zh || !t.title_en) { S.msg = "代號、中文標題、英文標題都要填。"; render(); return; }
+    if (!t.id || !t.title_zh || !t.title_en) { S.msg = T("err.taskThree"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       await D.saveInternTask(t);
       S.internSel = t.term; S.internTaskDraft = null;
-      S.msg = id ? `「${t.title_zh}」改好了。intern 重新整理護照就看得到。` : `「${t.title_zh}」加好了。intern 重新整理護照就看得到。`;
+      S.msg = id ? T("msg.taskEdited", { t: t.title_zh }) : T("msg.taskAdded", { t: t.title_zh });
       await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
   if (act === "intern-task-off" || act === "intern-task-on") {
     const on = act === "intern-task-on";
     const t = S.intern.tasks.find(x => x.id === id);
-    if (!on && !confirm(`停用「${t ? t.title_zh : id}」？\n\n停用之後 intern 的護照上就看不到這一格，已經蓋過的章還在，之後可以恢復。`)) return;
+    if (!on && !confirm(T("confirm.taskOff", { t: t ? t.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.setInternTaskActive(id, on);
-      S.msg = `「${t ? t.title_zh : id}」${on ? "恢復了" : "停用了"}。`;
+      S.msg = T(on ? "msg.enabled" : "msg.disabled", { t: t ? t.title_zh : id });
       await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = (on ? "恢復不了：" : "停用不了：") + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T(on ? "err.enable" : "err.disable") + D.says(err); render(); }
     return;
   }
   if (act === "intern-task-del") {
     const t = S.intern.tasks.find(x => x.id === id);
-    if (!confirm(`刪掉「${t ? t.title_zh : id}」？\n\n還沒有人蓋過，所以可以刪。刪了就回不來。`)) return;
+    if (!confirm(T("confirm.actDel", { t: t ? t.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.deleteInternTask(id);
-      S.msg = `「${t ? t.title_zh : id}」刪掉了。`;
+      S.msg = T("msg.deletedT", { t: t ? t.title_zh : id });
       await openInterns(true);
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); render(); }
     return;
   }
 
 });
 
+// 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
+// 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。
+// 切換：改字典的語言、存起來、把 ?lang= 寫進網址、重畫。**不重新載入頁面**，填到一半的東西都在 S 裡不會不見。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+function applyLang(l) {
+  setLang(l);
+  document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+  document.title = T("title");
+}
+function switchLang(l) {
+  applyLang(l);
+  try { localStorage.setItem(STORE_KEY, lang()); } catch (e) { /* 無痕視窗存不了，這一頁照樣切 */ }
+  const u = new URL(location.href); u.searchParams.set("lang", lang());
+  history.replaceState(null, "", u.pathname + u.search + u.hash);
+  render();
+}
+applyLang(pickLang(location.search, readStored()));
 boot();

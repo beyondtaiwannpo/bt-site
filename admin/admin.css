@@ -324,3 +324,13 @@ a.btn{text-decoration:none}
   .table td{display:block;padding:2px 0;border:0}
   .table td.t-act{text-align:left;padding-top:6px}
 }
+
+/* ───────── 8. 中英切換（2026-10-19）───────── */
+/* 側欄「你是誰」底下兩顆小按鈕。現在的那一顆深藍底；另一顆是框線。
+   英文比中文長，按鈕用 flex 平分、不固定寬，整條側欄 220px 放得下「中文 / English」。
+   .lang:active 的按壓回饋在各頁 index.html 那段點擊回饋裡（跟對外網站同一個 class）。 */
+.rail-lang{display:flex;gap:6px;padding:0 12px;margin:0 0 10px}
+.rail-lang .lang{flex:1;min-height:30px;padding:0 10px;border:1px solid rgba(16,42,134,.3);border-radius:999px;
+  background:rgba(255,255,255,.55);color:var(--ink);font:600 13px/1 var(--body);cursor:pointer}
+.rail-lang .lang.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.rail-lang .lang:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}

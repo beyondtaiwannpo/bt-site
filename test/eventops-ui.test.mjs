@@ -2,6 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as M from "../admin/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+M.setLang("zh");
 
 const form = { id: "f1", title: "2027 暑期探索營" };
 const apps = [
@@ -56,7 +58,7 @@ test("選了之後按鈕上寫著要寄給幾個人", () => {
 
 test("三種收件對象都在，選到的有標記", () => {
   const h = M.noticeHTML(form, apps, new Set(["accepted"]), "", false);
-  for (const t of M.NOTICE_TO) assert.match(h, new RegExp(t.label));
+  for (const t of M.NOTICE_TO) assert.match(h, new RegExp(M.T(t.label)));
   assert.match(h, /class="chip wide on"[^>]*data-t="accepted"/);
 });
 

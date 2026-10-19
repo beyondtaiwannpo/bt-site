@@ -6,6 +6,7 @@ import * as AUTH from "../../../shared/auth.js";
 import { navHTML } from "../../../shared/nav.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 const HERE = "/admin/people/";
 
@@ -71,7 +72,7 @@ async function openInvites() {
     S.invites = await D.loadInvites();
     if (!S.inviteDraft) S.inviteDraft = { code: UI.suggestCode(), grants: "cadre", uses: 1, note: "" };
     S.view = "invites"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "邀請碼載不到：" + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.invitesLoad") + D.says(e); }
   render();
 }
 
@@ -83,12 +84,12 @@ async function openRoster(keepMsg, view) {
   try {
     const [roster, changes, privileged] = await Promise.all([
       D.loadRoster(),
-      D.loadRoleChanges().catch(e => { S.msg = "變動紀錄載不到：" + D.says(e); return []; }),
+      D.loadRoleChanges().catch(e => { S.msg = T("err.changesLoad") + D.says(e); return []; }),
       D.loadPrivilegedTeams().catch(() => [{ name: "Internship Team" }]),
     ]);
     S.roster = roster; S.changes = changes; S.privileged = privileged;
     S.view = view || "roster"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "名單載不到：" + D.says(e); S.view = "roster"; }
+  } catch (e) { S.busy = false; S.msg = T("err.rosterLoad") + D.says(e); S.view = "roster"; }
   render();
 }
 
@@ -98,6 +99,7 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") {
     e.preventDefault(); S.msg = "";
@@ -113,34 +115,34 @@ document.addEventListener("click", async e => {
   if (act === "roster-back") { await openRoster(); return; }
   if (act === "person-edit") {
     const p = S.roster.find(x => x.id === b.dataset.id);
-    if (!p) { S.msg = "找不到這個人，重新整理再試一次。"; render(); return; }
+    if (!p) { S.msg = T("err.noPerson"); render(); return; }
     S.person = p; S.personDraft = null; S.view = "person"; S.msg = ""; render(); return;
   }
   if (act === "person-save") {
     const p = S.roster.find(x => x.id === b.dataset.id);
-    if (!p) { S.msg = "找不到這個人，重新整理再試一次。"; render(); return; }
+    if (!p) { S.msg = T("err.noPerson"); render(); return; }
     const roleEl = document.getElementById("pk-role");
     const role = roleEl && !roleEl.disabled ? roleEl.value : p.board_role;
     const team = [...document.querySelectorAll('input[name="team"]:checked')].map(x => x.value.trim()).filter(Boolean).join(", ");
     S.personDraft = { board_role: role, team };
     const roleChanged = role !== (p.board_role || "member");
     const teamChanged = UI.parseTeams(team).join("|") !== UI.parseTeams(p.team).join("|");
-    if (!roleChanged && !teamChanged) { S.msg = "沒有改到任何東西。"; render(); return; }
+    if (!roleChanged && !teamChanged) { S.msg = T("err.nothingChanged"); render(); return; }
     // ⚠ 升成 Co-President 等於把整個後台給他，包括把你降級。畫面多問一次，資料庫那一側刻意不擋（換屆要用）。
     if (roleChanged && role === "president" &&
-        !confirm(`把「${UI.namesOf(p).name}」升成 Co-President？\n\n他會拿到跟你一樣的全部權限，包括發邀請碼、改別人的職位、把你降級。這一筆會記在變動紀錄裡。`)) return;
+        !confirm(T("confirm.promote", { name: UI.namesOf(p).name }))) return;
     S.busy = true; S.msg = ""; render();
     const done = [];
     try {
-      if (roleChanged) { await D.setBoardRole(p.id, role); done.push(`職位改成${UI.boardLabel(role)}`); }
-      if (teamChanged) { await D.setTeam(p.id, team); done.push(`team 改成${team || "（沒有）"}`); }
+      if (roleChanged) { await D.setBoardRole(p.id, role); done.push(T("msg.roleTo", { role: UI.boardLabel(role) })); }
+      if (teamChanged) { await D.setTeam(p.id, team); done.push(T("msg.teamTo", { team: team || T("value.none") })); }
       S.personDraft = null;
-      S.msg = `「${UI.namesOf(p).name}」${done.join("、")}。已經記進變動紀錄。`;
+      S.msg = T("msg.personSaved", { name: UI.namesOf(p).name, done: done.join(T("punct.list")) });
       await openRoster(true);
     } catch (err) {
       // 職位改好了但 team 沒改到（或反過來）要講清楚，不然他會把改好的那一半再改一次。
       S.busy = false;
-      S.msg = (done.length ? done.join("、") + "存好了，但後面那一步" : "") + "存不起來：" + D.says(err);
+      S.msg = (done.length ? T("msg.partial", { done: done.join(T("punct.list")) }) : "") + T("err.save") + D.says(err);
       render();
     }
     return;
@@ -152,31 +154,48 @@ document.addEventListener("click", async e => {
     S.inviteDraft = { code: val("ic-code"), grants: val("ic-grants") || "cadre",
                       uses: val("ic-uses") || "1", note: val("ic-note") };
     if (act === "invite-suggest") { S.inviteDraft.code = UI.suggestCode(); render(); return; }
-    if (!S.inviteDraft.code) { S.msg = "碼要填。"; render(); return; }
+    if (!S.inviteDraft.code) { S.msg = T("err.codeRequired"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       const made = await D.createInvite(S.inviteDraft.code, S.inviteDraft.grants,
                                         S.inviteDraft.uses, S.inviteDraft.note);
       S.invites = await D.loadInvites();
       S.inviteDraft = { code: UI.suggestCode(), grants: S.inviteDraft.grants, uses: 1, note: "" };
-      S.busy = false; S.msg = `建好了：${made}。用複製貼上的方式給對方，不要口頭念。`;
-    } catch (err) { S.busy = false; S.msg = "建不起來：" + D.says(err); }
+      S.busy = false; S.msg = T("msg.codeCreated", { code: made });
+    } catch (err) { S.busy = false; S.msg = T("err.createCode") + D.says(err); }
     render();
     return;
   }
   if (act === "invite-disable") {
     const code = b.dataset.code;
-    if (!confirm(`停用「${code}」？\n\n停用之後這組碼就不能再用了。後台沒有恢復的按鈕，要恢復得到 Supabase 改。`)) return;
+    if (!confirm(T("confirm.disableCode", { code }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.disableInvite(code);
       S.invites = await D.loadInvites();
-      S.busy = false; S.msg = `「${code}」已經停用。`;
-    } catch (err) { S.busy = false; S.msg = "停用不了：" + D.says(err); }
+      S.busy = false; S.msg = T("msg.codeDisabled", { code });
+    } catch (err) { S.busy = false; S.msg = T("err.disable") + D.says(err); }
     render();
     return;
   }
 
 });
 
+// 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
+// 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。
+// 切換：改字典的語言、存起來、把 ?lang= 寫進網址、重畫。**不重新載入頁面**，填到一半的東西都在 S 裡不會不見。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+function applyLang(l) {
+  setLang(l);
+  document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+  document.title = T("title");
+}
+function switchLang(l) {
+  applyLang(l);
+  try { localStorage.setItem(STORE_KEY, lang()); } catch (e) { /* 無痕視窗存不了，這一頁照樣切 */ }
+  const u = new URL(location.href); u.searchParams.set("lang", lang());
+  history.replaceState(null, "", u.pathname + u.search + u.hash);
+  render();
+}
+applyLang(pickLang(location.search, readStored()));
 boot();

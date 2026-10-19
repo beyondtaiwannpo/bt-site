@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { inviteCodesHTML, inviteFormHTML, suggestCode, tabsHTML, noAccessHTML, canEnter, GROUPS } from "../admin/people/src/ui.js";
+import { inviteCodesHTML, inviteFormHTML, suggestCode, tabsHTML, noAccessHTML, canEnter, GROUPS, setLang } from "../admin/people/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 import { says } from "../admin/people/src/data.js";
 
 const ROWS = [

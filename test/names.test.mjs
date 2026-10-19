@@ -9,7 +9,10 @@ import assert from "node:assert/strict";
 import { namesOf as fromAvailability } from "../availability/src/data.js";
 import { namesOf as fromPassport } from "../passport/src/ui.js";
 import { namesOf as fromAdmin } from "../admin/site/src/ui.js";
-import { namesOf as fromPeople } from "../admin/people/src/ui.js";
+import { namesOf as fromPeople, setLang as peopleLang } from "../admin/people/src/ui.js";
+import { setLang as siteLang } from "../admin/site/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+siteLang("zh"); peopleLang("zh");
 
 const IMPL = [["availability", fromAvailability], ["passport", fromPassport], ["admin/site", fromAdmin], ["admin/people", fromPeople]];
 

@@ -9,6 +9,7 @@ import * as AUTH from "../../shared/auth.js";
 import { navHTML } from "../../shared/nav.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 let S = {
   user: null, me: null, down: false, busy: false, msg: "",
@@ -140,7 +141,7 @@ async function openForm(id) {
   try {
     const { form, questions } = await D.loadForm(id);
     S.form = form; S.questions = questions; S.view = "form"; S.busy = false; S.msg = "";
-  } catch (e) { S.busy = false; S.msg = "打不開：" + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.open") + D.says(e); }
   render();
 }
 
@@ -152,7 +153,7 @@ async function openApps(id) {
     S.apps = await D.loadApplications(id);
     S.pending = await D.loadPending(id);
     S.sel = new Set(); S.filter = "all"; S.view = "apps"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "打不開：" + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.open") + D.says(e); }
   render();
 }
 
@@ -168,7 +169,7 @@ async function reloadList() {
     S.forms = await D.loadForms();
     S.pendingAll = await D.loadPendingAll().catch(() => []);
     S.todo = await D.loadTodo(S.me).catch(() => S.todo || {});
-  } catch (e) { S.msg = "清單載不到：" + D.says(e); }
+  } catch (e) { S.msg = T("err.list") + D.says(e); }
 }
 
 document.addEventListener("click", async e => {
@@ -178,6 +179,7 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
 
   // ── 批 6：活動營運 ────────────────────────────────────────────────
@@ -200,7 +202,7 @@ document.addEventListener("click", async e => {
       // 每點一個就重讀一百列，網路不好的場地會變成點一下等三秒。
       if (a) a.checked_in_at = present ? new Date().toISOString() : null;
       S.busy = false;
-    } catch (err) { S.busy = false; S.msg = "點不了：" + D.says(err); }
+    } catch (err) { S.busy = false; S.msg = T("err.checkin") + D.says(err); }
     render();
     return;
   }
@@ -215,22 +217,22 @@ document.addEventListener("click", async e => {
   if (act === "notice-send") {
     const sub = document.getElementById("nsub").value.trim();
     const body = document.getElementById("nbody").value.trim();
-    if (!sub || !body) { S.msg = "主旨與內容都要寫。"; render(); return; }
+    if (!sub || !body) { S.msg = T("err.noticeBoth"); render(); return; }
     const to = [...S.noticeTo];
     const n = S.apps.filter(a => S.noticeTo.has(a.status)).length;
     // ⚠ 這一步會一次寄信給一群未成年人，而且收不回來。
-    if (!confirm(`要把這封信寄給 ${n} 個人嗎？\n\n主旨：${sub}\n\n信寄出去就收不回來了。`)) return;
+    if (!confirm(T("confirm.notice", { n, sub }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       const made = await D.sendNotice(S.form.id, to, sub, body);
       let note = "";
       try {
         const r = await D.sendMail();
-        note = r.failed ? `，寄出 ${r.sent} 封、${r.failed} 封失敗` : `，寄出 ${r.sent} 封`;
-      } catch (me) { note = "。信還沒寄出去：" + D.says(me); }
+        note = r.failed ? T("mail.sentFailed", { sent: r.sent, failed: r.failed }) : T("mail.sentN", { n: r.sent });
+      } catch (me) { note = T("mail.notSent") + D.says(me); }
       S.pending = await D.loadPending(S.form.id);
-      S.busy = false; S.msg = `排了 ${made} 封信${note}。`;
-    } catch (err) { S.busy = false; S.msg = "寄不出去：" + D.says(err); }
+      S.busy = false; S.msg = T("msg.queued", { n: made, note });
+    } catch (err) { S.busy = false; S.msg = T("err.send") + D.says(err); }
     render();
     return;
   }
@@ -251,8 +253,8 @@ document.addEventListener("click", async e => {
       const r = await D.sendMail();
       S.pendingAll = await D.loadPendingAll().catch(() => []);
       S.busy = false;
-      S.msg = r.failed ? `寄出 ${r.sent} 封，${r.failed} 封失敗。` : `寄出 ${r.sent} 封。`;
-    } catch (err) { S.busy = false; S.msg = "寄不出去：" + D.says(err); }
+      S.msg = r.failed ? T("msg.sentSome", { sent: r.sent, failed: r.failed }) : T("msg.sent", { n: r.sent });
+    } catch (err) { S.busy = false; S.msg = T("err.send") + D.says(err); }
     render();
     return;
   }
@@ -286,11 +288,10 @@ document.addEventListener("click", async e => {
     const status = b.dataset.s;
     const ids = [...S.sel];
     if (!ids.length) return;
-    const word = { interview: "邀請面試", accepted: "錄取", rejected: "婉拒" }[status] || status;
+    const word = UI.decideWord(status);
     // ⚠ **這一步會寄信給未成年人，而且收不回來。** 所以要確認，
     // 而且確認的句子裡要有人數與動作，不是一句「確定嗎」。
-    if (!confirm(`要把選起來的 ${ids.length} 個人標成「${word}」嗎？\n\n` +
-                 `每一個人都會收到一封信。信寄出去就收不回來了。`)) return;
+    if (!confirm(T("confirm.decide", { n: ids.length, word }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       const n = await D.decide(ids, status);
@@ -299,17 +300,17 @@ document.addEventListener("click", async e => {
       let mailNote = "";
       try {
         const r = await D.sendMail();
-        mailNote = r.sent ? `，寄出 ${r.sent} 封信` : "";
-        if (r.failed) mailNote += `，${r.failed} 封沒寄成功`;
+        mailNote = r.sent ? T("mail.sentNote", { n: r.sent }) : "";
+        if (r.failed) mailNote += T("mail.failedNote", { n: r.failed });
       } catch (me) {
-        mailNote = "。信還沒寄出去：" + D.says(me);
+        mailNote = T("mail.notSent") + D.says(me);
       }
       S.sel = new Set();
       await refreshApps();
       S.busy = false;
-      S.msg = `${n} 個人標成「${word}」${mailNote}。`;
+      S.msg = T("msg.decided", { n, word, note: mailNote });
     } catch (err) {
-      S.busy = false; S.msg = "改不了：" + D.says(err);
+      S.busy = false; S.msg = T("err.change") + D.says(err);
     }
     render();
     return;
@@ -321,9 +322,9 @@ document.addEventListener("click", async e => {
       const r = await D.sendMail();
       S.pending = await D.loadPending(S.form.id);
       S.busy = false;
-      S.msg = r.failed ? `寄出 ${r.sent} 封，${r.failed} 封失敗。` : `寄出 ${r.sent} 封。`;
+      S.msg = r.failed ? T("msg.sentSome", { sent: r.sent, failed: r.failed }) : T("msg.sent", { n: r.sent });
     } catch (err) {
-      S.busy = false; S.msg = "寄不出去：" + D.says(err);
+      S.busy = false; S.msg = T("err.send") + D.says(err);
     }
     render();
     return;
@@ -332,7 +333,7 @@ document.addEventListener("click", async e => {
   // 開新表單：按一下在清單上面展開內嵌表單，填完按「建立」才真的開（2026-10-19 起不再用瀏覽器原生的那個名字對話框）。
   if (act === "new-form") {
     const team = (S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "") || (S.teams[0] || "");
-    if (!team) { S.msg = "你的 profile 還沒有填 team，開不出表單。先到「設定」填一下。"; render(); return; }
+    if (!team) { S.msg = T("err.noTeamProfile"); render(); return; }
     S.newForm = { title: "", team, kind: "program" }; S.msg = ""; render();
     const el = document.getElementById("nf-title"); if (el) el.focus();
     return;
@@ -341,31 +342,31 @@ document.addEventListener("click", async e => {
   if (act === "new-form-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     S.newForm = { title: val("nf-title"), team: val("nf-team") || (S.newForm && S.newForm.team) || "", kind: val("nf-kind") || "program" };
-    if (!S.newForm.title) { S.msg = "表單要有名字。"; render(); return; }
-    if (!S.newForm.team) { S.msg = "要選一個 team。"; render(); return; }
+    if (!S.newForm.title) { S.msg = T("err.formName"); render(); return; }
+    if (!S.newForm.team) { S.msg = T("err.pickTeam"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       const newId = await D.createForm(S.newForm.team, S.newForm.title, S.newForm.kind);
       S.busy = false; S.newForm = null;
       await openForm(newId);
-    } catch (err) { S.busy = false; S.msg = "開不出來：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.create") + D.says(err); render(); }
     return;
   }
 
   if (act === "save-form") {
     const patch = readForm();
-    if (!patch.title) { S.msg = "表單要有名字。"; render(); return; }
+    if (!patch.title) { S.msg = T("err.formName"); render(); return; }
     // 開放之前先擋一次：一份沒有題目的表單開出去，申請人看到的是一個空表單，
     // 而他會以為是網站壞了。**這是唯一一個前端擋得住、而且該擋的狀態**。
     if (patch.status === "open" && S.questions.length === 0) {
-      S.msg = "這份表單還沒有題目，不能開放。先加一題。"; render(); return;
+      S.msg = T("err.noQuestions"); render(); return;
     }
     S.busy = true; S.msg = ""; render();
     try {
       await D.saveForm(S.form.id, patch);
       const { form, questions } = await D.loadForm(S.form.id);
-      S.form = form; S.questions = questions; S.busy = false; S.msg = "存好了。";
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); }
+      S.form = form; S.questions = questions; S.busy = false; S.msg = T("msg.saved");
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render();
     return;
   }
@@ -373,15 +374,13 @@ document.addEventListener("click", async e => {
   if (act === "del-form") {
     const n = S.forms.find(f => f.id === S.form.id);
     const got = n && n.counts.total;
-    if (!confirm(got
-      ? `這份表單已經收到 ${got} 件申請。刪掉它，那些申請與答案會一起永久消失。確定嗎？`
-      : "刪掉這份表單？沒有辦法復原。")) return;
+    if (!confirm(got ? T("confirm.delFormApps", { n: got }) : T("confirm.delForm"))) return;
     S.busy = true; render();
     try {
       await D.deleteForm(S.form.id);
-      S.busy = false; S.view = "list"; S.form = null; S.msg = "刪掉了。";
+      S.busy = false; S.view = "list"; S.form = null; S.msg = T("msg.deleted");
       await reloadList();
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); }
+    } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); }
     render();
     return;
   }
@@ -396,12 +395,12 @@ document.addEventListener("click", async e => {
 
   if (act === "q-save") {
     const label = document.getElementById("qlabel").value.trim();
-    if (!label) { S.msg = "題目不能空白。"; render(); return; }
+    if (!label) { S.msg = T("err.qEmpty"); render(); return; }
     const type = document.getElementById("qtype").value;
     const options = document.getElementById("qopts").value
       .split("\n").map(x => x.trim()).filter(Boolean);
     if ((type === "single" || type === "multi") && options.length < 2) {
-      S.msg = "單選與多選至少要兩個選項，一行一個。"; render(); return;
+      S.msg = T("err.qOpts"); render(); return;
     }
     const q = {
       label,
@@ -418,19 +417,19 @@ document.addEventListener("click", async e => {
       else await D.addQuestion(S.form.id, q, S.questions);
       const r = await D.loadForm(S.form.id);
       S.questions = r.questions; S.busy = false; S.view = "form"; S.qEditing = null; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); }
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render();
     return;
   }
 
   if (act === "q-del") {
-    if (!confirm("刪掉這一題？已經送出的申請裡，這一題的答案會一起消失。")) return;
+    if (!confirm(T("confirm.delQ"))) return;
     S.busy = true; render();
     try {
       await D.deleteQuestion(id);
       const r = await D.loadForm(S.form.id);
       S.questions = r.questions; S.busy = false; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); }
+    } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); }
     render();
     return;
   }
@@ -444,10 +443,27 @@ document.addEventListener("click", async e => {
       await D.swapOrd(S.questions[i], S.questions[j]);
       const r = await D.loadForm(S.form.id);
       S.questions = r.questions; S.busy = false;
-    } catch (err) { S.busy = false; S.msg = "換不了順序：" + D.says(err); }
+    } catch (err) { S.busy = false; S.msg = T("err.reorder") + D.says(err); }
     render();
     return;
   }
 });
 
+// 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
+// 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。
+// 切換：改字典的語言、存起來、把 ?lang= 寫進網址、重畫。**不重新載入頁面**，填到一半的東西都在 S 裡不會不見。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+function applyLang(l) {
+  setLang(l);
+  document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+  document.title = T("title");
+}
+function switchLang(l) {
+  applyLang(l);
+  try { localStorage.setItem(STORE_KEY, lang()); } catch (e) { /* 無痕視窗存不了，這一頁照樣切 */ }
+  const u = new URL(location.href); u.searchParams.set("lang", lang());
+  history.replaceState(null, "", u.pathname + u.search + u.hash);
+  render();
+}
+applyLang(pickLang(location.search, readStored()));
 boot();

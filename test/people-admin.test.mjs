@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tabsHTML, rosterHTML, changesHTML, personEditHTML, BOARD_ROLES, boardLabel, TEAMS as PEOPLE_TEAMS } from "../admin/people/src/ui.js";
+import { tabsHTML, rosterHTML, changesHTML, personEditHTML, BOARD_ROLES, boardLabel, TEAMS as PEOPLE_TEAMS, setLang, T } from "../admin/people/src/ui.js";
+// 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 import { says } from "../admin/people/src/data.js";
 import { teamPickHTML, teamLocked, saveFailMessage, TEAMS as SETTINGS_TEAMS } from "../settings/src/ui.js";
 
@@ -91,7 +93,7 @@ test("★ 主程式：升成 Co-President 先問一次，成功失敗都寫 S.ms
   assert.match(body, /role === "president" &&\s*!confirm\(/);
   assert.match(body, /S\.busy = true/);
   assert.match(body, /D\.says\(err\)/);
-  assert.match(body, /done\.length \? done\.join/, "一半成功一半失敗要講出哪一半");
+  assert.match(body, /done\.length \? T\("msg\.partial"/, "一半成功一半失敗要講出哪一半");
 });
 
 test("★ 資料層只走 set_board_role 與 set_team，不直接 update profiles，也不寫 role_changes", () => {

@@ -6,6 +6,7 @@ import * as AUTH from "../../../shared/auth.js";
 import { navHTML } from "../../../shared/nav.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 const HERE = "/admin/site/";
 
@@ -82,7 +83,7 @@ async function openMail() {
   try {
     S.tpls = await D.loadTemplates();
     S.view = "mail"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "文案載不到：" + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.tplLoad") + D.says(e); }
   render();
 }
 
@@ -91,7 +92,7 @@ async function openTeam() {
   try {
     S.people = await D.loadPublicCandidates();
     S.view = "team"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "名單載不到：" + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.rosterLoad") + D.says(e); }
   render();
 }
 
@@ -101,7 +102,7 @@ async function openStories() {
   try {
     S.stories = await D.loadStories();
     S.view = "stories"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "校友名單載不到：" + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.storiesLoad") + D.says(e); }
   render();
 }
 
@@ -110,7 +111,7 @@ async function openRes() {
   try {
     S.res = await D.loadResources();
     S.view = "res"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = "資源載不到：" + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.resLoad") + D.says(e); }
   render();
 }
 
@@ -121,6 +122,7 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
 
   if (act === "tab") {
@@ -137,13 +139,13 @@ document.addEventListener("click", async e => {
   if (act === "mail-save") {
     const sub = document.getElementById("msub").value.trim();
     const body = document.getElementById("mbody").value.trim();
-    if (!sub || !body) { S.msg = "主旨與內文都要寫。"; render(); return; }
+    if (!sub || !body) { S.msg = T("err.mailBoth"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       await D.saveTemplate(b.dataset.k, sub, body);
       S.tpls = await D.loadTemplates();
-      S.busy = false; S.msg = "存好了。下一封寄出去的信就是這個文案。";
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); }
+      S.busy = false; S.msg = T("msg.tplSaved");
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render();
     return;
   }
@@ -156,7 +158,7 @@ document.addEventListener("click", async e => {
       const p = S.people.find(x => x.id === id);
       if (p) p.public_approved = ok;
       S.busy = false; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
+    } catch (err) { S.busy = false; S.msg = T("err.change") + D.says(err); }
     render();
     return;
   }
@@ -171,7 +173,7 @@ document.addEventListener("click", async e => {
       const r = S.stories.find(x => x.id === id);
       if (r) r.story_approved = ok;
       S.busy = false; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = "改不了：" + D.says(err); }
+    } catch (err) { S.busy = false; S.msg = T("err.change") + D.says(err); }
     render();
     return;
   }
@@ -194,20 +196,37 @@ document.addEventListener("click", async e => {
       await D.saveResource(S.resEditing ? S.resEditing.id : null, patch);
       S.busy = false; S.resEditing = null;
       await openRes();
-    } catch (err) { S.busy = false; S.msg = "存不起來：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
   if (act === "res-del") {
-    if (!confirm("刪掉這個資源？外面那一頁上就不見了。")) return;
+    if (!confirm(T("confirm.delRes"))) return;
     S.busy = true; render();
     try {
       await D.deleteResource(id);
       S.busy = false; S.resEditing = null;
       await openRes();
-    } catch (err) { S.busy = false; S.msg = "刪不掉：" + D.says(err); render(); }
+    } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); render(); }
     return;
   }
 
 });
 
+// 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
+// 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。
+// 切換：改字典的語言、存起來、把 ?lang= 寫進網址、重畫。**不重新載入頁面**，填到一半的東西都在 S 裡不會不見。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+function applyLang(l) {
+  setLang(l);
+  document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+  document.title = T("title");
+}
+function switchLang(l) {
+  applyLang(l);
+  try { localStorage.setItem(STORE_KEY, lang()); } catch (e) { /* 無痕視窗存不了，這一頁照樣切 */ }
+  const u = new URL(location.href); u.searchParams.set("lang", lang());
+  history.replaceState(null, "", u.pathname + u.search + u.hash);
+  render();
+}
+applyLang(pickLang(location.search, readStored()));
 boot();
