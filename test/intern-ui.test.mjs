@@ -203,7 +203,8 @@ test("★ /intern-passport/ 與 /passport/ 互不 import", () => {
 test("★ 實習護照的資料層不碰幹部護照的任何一張表", () => {
   const src = readFileSync("intern-passport/src/data.js", "utf8").replace(/\/\/[^\n]*/g, "");
   const tables = [...src.matchAll(/\.from\("([a-z_]+)"\)/g)].map(m => m[1]);
-  const allowed = new Set(["intern_terms", "intern_tasks", "intern_passports", "intern_stamps", "intern_entries", "profiles"]);
+  // 2026-10-22 蛇梯棋加了 intern_boards 與 intern_squares（只讀）；擲骰與位置走 rpc，不碰表。
+  const allowed = new Set(["intern_terms", "intern_tasks", "intern_passports", "intern_stamps", "intern_entries", "profiles", "intern_boards", "intern_squares"]);
   for (const t of tables) assert.ok(allowed.has(t), `data.js 碰了 ${t}`);
   assert.ok(!/\.update\(\{[^}]*updated_at/.test(src), "intern_passports 只發了 motto 一欄的權限，送 updated_at 整句會被拒");
 });

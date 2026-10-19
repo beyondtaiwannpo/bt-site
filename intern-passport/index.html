@@ -493,6 +493,65 @@
   .motto{font-family:var(--display);font-size:24px;font-weight:500;line-height:1.35;
     margin-top:22px;padding-left:14px;border-left:3px solid var(--bt-orange)}
 
+  /* ---------- 蛇梯棋（2026-10-22）---------- */
+  /* 棋盤：5 格一排、蛇形。格子是紙色、任務格沙色、梯子橘框、蛇蒂芬妮綠。棋子是大頭照。
+     橘色是「在動的東西」：骰子、正在走的棋子、剛落的那一格。 */
+  .bbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 14px}
+  .btix b{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:.02em}
+  .dice{position:relative;width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.9);
+    border:2px solid var(--bt-navy);display:grid;grid-template-columns:repeat(3,1fr);padding:6px;gap:2px;flex:none;
+    box-shadow:0 4px 12px rgba(16,42,134,.15)}
+  .dice i{display:block;border-radius:50%;background:transparent}
+  .dice i.on{background:var(--bt-navy)}
+  .dice.rolling{animation:diceroll .6s linear infinite;border-color:var(--bt-orange)}
+  .dice.rolling i.on{background:var(--bt-orange)}
+  @keyframes diceroll{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .bresult{font-size:14px;line-height:1.6;padding:10px 14px;margin:0 0 14px;border-left:3px solid var(--bt-orange);
+    background:rgba(255,232,197,.45);border-radius:0 10px 10px 0}
+  .bsuggest{margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .bwrap{max-width:520px}
+  .bgrid{display:grid;gap:5px}
+  .bq{position:relative;aspect-ratio:1;border:1px solid rgba(16,42,134,.22);border-radius:8px;background:rgba(255,255,255,.5);
+    padding:4px 5px;display:flex;flex-direction:column;align-items:flex-start;overflow:hidden}
+  .bq[data-act]{cursor:pointer}
+  .bq[data-act]:hover{background:rgba(255,196,108,.2)}
+  .bq .bn{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(16,42,134,.6);line-height:1}
+  .bq .sk{font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:.02em;margin-top:2px}
+  .bq .st{font-size:9.5px;font-weight:600;line-height:1.15;margin-top:2px;overflow-wrap:anywhere;color:var(--ink)}
+  .bq .st.done{text-decoration:line-through;color:rgba(16,42,134,.55)}
+  .bq.task{background:rgba(255,232,197,.7)}
+  .bq.ladder{border-color:var(--bt-orange);background:rgba(255,196,108,.22)}
+  .bq.ladder .sk{color:var(--ink)}
+  .bq.snake{border-color:var(--bt-teal);background:rgba(107,198,187,.22)}
+  .bq.finish{border:2px dashed var(--bt-navy)}
+  .bq.lit{box-shadow:0 0 0 3px var(--bt-orange);background:rgba(255,196,108,.4)}
+  .bstart{margin-top:6px;display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:rgba(16,42,134,.6)}
+  .pawns{position:absolute;right:3px;bottom:3px;display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:100%}
+  .bstart .pawns{position:static}
+  .pawn{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:var(--bt-navy);color:var(--bt-cream);
+    font-family:var(--display);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
+    object-fit:cover;box-shadow:0 2px 6px rgba(16,42,134,.25);line-height:1}
+  .pawn.me{width:28px;height:28px;border-color:var(--bt-orange);box-shadow:0 0 0 2px var(--bt-orange),0 3px 8px rgba(16,42,134,.3)}
+  .blegend{display:flex;gap:14px;margin-top:10px;font-size:11.5px;color:rgba(16,42,134,.78)}
+  .blegend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px;border:1px solid rgba(16,42,134,.22)}
+  .blegend .task::before{background:rgba(255,232,197,.9)}
+  .blegend .ladder::before{background:rgba(255,196,108,.5);border-color:var(--bt-orange)}
+  .blegend .snake::before{background:rgba(107,198,187,.45);border-color:var(--bt-teal)}
+  /* 進度牆上的棋盤加名次 */
+  .wboard{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;align-items:start;margin-bottom:22px}
+  .wrank{margin:0;padding:0 0 0 20px;font-size:13.5px;line-height:1.5}
+  .wrank li{padding:5px 0;border-bottom:1px dotted rgba(16,42,134,.16)}
+  .wrank b{display:block;font-family:var(--display);font-size:17px;font-weight:600}
+  .wrank span{color:rgba(16,42,134,.75);font-size:12.5px}
+  @media (max-width:640px){
+    .wboard{grid-template-columns:1fr}
+    .bq{border-radius:6px;padding:3px 4px}
+    .bq .st{display:none}
+    .pawn{width:18px;height:18px;font-size:9px}
+    .pawn.me{width:24px;height:24px}
+  }
+
   /* ---------- wall ---------- */
   .wall{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:18px;padding:24px 26px;
     box-shadow:0 10px 30px rgba(16,42,134,.07)}
@@ -608,7 +667,7 @@
        2026-08-26 加了 .tearhalf.l、.tearhalf.r（Task 7，撕掉這格裂成兩半
        往下掉的動畫）——這個分支 reduce 為真時 main.js 根本不會渲染出來，
        但守門認的是宣告，不是用不用得到，一樣要列進來。 */
-    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front,.tearhalf.l,.tearhalf.r{animation:none}
+    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front,.tearhalf.l,.tearhalf.r,.dice.rolling{animation:none}
   }
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。

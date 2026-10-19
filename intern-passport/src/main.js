@@ -15,7 +15,9 @@ let S = {
   user: null, role: null, staff: false, term: null,
   profile: null, tasks: [], stamps: {}, entries: {},
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-  down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null
+  down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null,
+  // 蛇梯棋（2026-10-22）。board 是 null 就沒有棋盤頁。
+  board: null, squares: [], positions: [], lastRoll: null, rolling: false, animPos: null
 };
 
 function compress(file, maxDim, quality) {
@@ -63,7 +65,7 @@ function toApp() {
 // 樣書用的 state：跟 S 共用 page 與 tasks，其他全是空的。
 function sampleState() {
   return { ...S, sample: true, profile: UI.sampleProfile(S.term), stamps: {}, entries: {},
-           flipped: {}, justStamped: null, justFlipped: null, tearing: null };
+           flipped: {}, justStamped: null, justFlipped: null, tearing: null, lastRoll: null, rolling: false, animPos: null };
 }
 
 function render() {
@@ -92,7 +94,11 @@ function render() {
 
 async function loadWall() {
   S.wallLoading = true; S.wallError = false; render();
-  try { S.wall = await DATA.loadWall(); }
+  try {
+    S.wall = await DATA.loadWall();
+    // 棋盤開著就連位置一起更新（載不到不算牆壞掉）。
+    if (S.board) S.positions = await DATA.loadPositions().catch(() => S.positions);
+  }
   catch (e) { console.error("進度牆讀取失敗：", e); S.wallError = true; }
   finally { S.wallLoading = false; render(); }
 }
@@ -133,6 +139,35 @@ function openModal(id) {
   setTimeout(() => { const n = d.querySelector("#mn"); if (n) n.focus(); }, 30);
 }
 
+// 擲骰子。骰子在資料庫擲，這裡只負責：按下去鎖住按鈕、收結果、把棋子一格一格推到落點、再推到蛇梯的另一頭。
+// prefers-reduced-motion 開著就直接跳到終點。失敗把票與位置留在原地（資料庫沒動，重讀一次 positions 就對了）。
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function doRoll() {
+  if (S.rolling) return;
+  S.rolling = true; S.lastRoll = null; render();
+  let r;
+  try { r = await DATA.rollDice(); }
+  catch (e) {
+    S.rolling = false; render();
+    const m = String(e && e.message || "");
+    toast(m.includes("no_ticket") ? T("m.rollNoTicket") : m.includes("finished") ? T("m.rollFinished") : m.includes("no_board") ? T("m.rollNoBoard") : T("m.rollFail"));
+    return;
+  }
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const from = UI.myStanding(S).pos;
+  // 先把骰子停下來（點數出現），再走棋。
+  S.rolling = false; S.lastRoll = { ...r, to_pos: r.landed, kind: "plain" }; S.animPos = from; render();
+  if (!reduce) {
+    await sleep(350);
+    for (let p = from + 1; p <= r.landed; p++) { S.animPos = p; render(); await sleep(160); }
+    if (r.to_pos !== r.landed) { await sleep(300); S.animPos = r.to_pos; render(); await sleep(200); }
+  }
+  S.lastRoll = r; S.animPos = null;
+  // 位置與票都是資料庫算的，重讀一次，不自己加減。
+  try { S.positions = await DATA.loadPositions(); } catch (e) { /* 下一次重整會對 */ }
+  render();
+}
+
 async function doStamp(id) {
   const d = document.getElementById("scrim"); if (!d) return;
   const date = d.querySelector("#md").value || UI.today();
@@ -148,6 +183,7 @@ async function doStamp(id) {
   try {
     await DATA.saveStamp(id, { date, note, photo });
     toast(fresh ? T("m.stamped") : T("m.updated"));
+    if (S.board && fresh) { S.positions = await DATA.loadPositions().catch(() => S.positions); render(); }
   } catch (e) {
     toast(T("m.notSaved"));
   }
@@ -167,6 +203,7 @@ async function doUnstamp(id) {
   try {
     await DATA.removeStamp(id);
     toast(T("m.torn"));
+    if (S.board) { S.positions = await DATA.loadPositions().catch(() => S.positions); render(); }
   } catch (e) {
     S.stamps[id] = stampBackup;
     S.entries[id] = entryBackup;
@@ -191,6 +228,7 @@ document.addEventListener("click", async e => {
   if (act === "go") { S.page = Number(b.dataset.p); render(); return; }
   if (act === "flip") { S.flipped[b.dataset.id] = b.dataset.to; S.justFlipped = b.dataset.id; render(); return; }
   if (act === "open") { openModal(b.dataset.id); return; }
+  if (act === "roll") { if (S.view === "sample") { toast(T("m.sampleOnly")); return; } doRoll(); return; }
   if (act === "close") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
   if (act === "stamp") { doStamp(b.dataset.id); return; }
 
@@ -267,6 +305,8 @@ export async function boot() {
     // 不是 intern、也不是 Internship team 的幹部 → 回 /app/。
     // role 為 null 不導走：那是 profiles 查不到，跟「不是實習生」不是同一件事。
     if (S.role && S.role !== "intern" && !S.staff) { toApp(); return; }
+    // 棋盤開著：別人的棋子要名字與大頭照，牆的名單本來就讀得到，先讀一次（失敗就先沒有別人的棋子）。
+    if (S.board && !S.wall) DATA.loadWall().then(w => { S.wall = w; render(); }).catch(() => {});
     if (S.staff) {
       // ?view=sample&cat=project：後台的預覽框直接開在樣書的那一頁（2026-10-16）。
       // 只決定畫哪一頁，讀得到什麼仍然是 RLS 決定的。

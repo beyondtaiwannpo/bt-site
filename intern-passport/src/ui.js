@@ -55,6 +55,8 @@ export function pagesOf(S) {
   // 認不得的分類排到最後、不丟掉：category 改名而這裡沒跟上時，錯誤要是「順序不對」不是「格子消失」。
   const unknown = [...new Set((S.tasks || []).map(t => t.category).filter(c => !SLOT_ORDER.includes(c)))];
   return [
+    // 蛇梯棋（2026-10-22）：這一屆的棋盤開著，它就是第一頁。沒開就跟以前一樣。
+    ...(S.board ? [{ kind: "board", label: T("page.board") }] : []),
     { kind: "id", label: T("page.id") },
     { kind: "guide", label: T("page.guide") },
     ...[...cats, ...unknown].map(c => ({ kind: "cat", cat: c, label: CATEGORY[c] ? T(CATEGORY[c].zh) : c }))
@@ -117,6 +119,7 @@ export function bookHTML(S) {
 }
 
 function pageBodyHTML(S, page) {
+  if (page.kind === "board") return boardPageHTML(S);
   if (page.kind === "id") return idPageHTML(S);
   if (page.kind === "guide") return guidePageHTML();
   return catPageHTML(S, page.cat);
@@ -228,6 +231,117 @@ export function slotHTML(S, a) {
   </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 蛇梯棋（2026-10-22，docs/2026-10-19-實習護照蛇梯棋計畫.md）
+// S.board = { term, size, active }，S.squares = [{ pos, kind, task_id, goes_to }]，
+// S.positions = intern_positions() 的 [{ user_id, pos, rolls, tickets }]，S.lastRoll = roll_dice() 的結果，
+// S.animPos = 棋子走到一半的位置（main.js 一格一格推），S.rolling = 骰子在轉。
+// 骰子在資料庫擲；這裡只畫。不讀 entries。
+// ═══════════════════════════════════════════════════════════════════════
+export const BOARD_PER_ROW = 5;
+// 蛇形排法。**跟 admin/passports/src/ui.js 的 boardRows 同一份規則**（資料夾之間不互相 import），test/intern-board.test.mjs 逐字比對。
+export function boardRows(size, perRow) {
+  const per = perRow || BOARD_PER_ROW;
+  const rows = [];
+  for (let start = 1; start <= size; start += per) {
+    const row = [];
+    for (let p = start; p < start + per && p <= size; p++) row.push(p);
+    if (Math.floor((start - 1) / per) % 2 === 1) row.reverse();
+    rows.push(row);
+  }
+  return rows.reverse();
+}
+// 我的位置、票、別人的位置，全部從 S.positions 來（資料庫算的）。
+export function myStanding(S) {
+  const me = S.profile && (S.positions || []).find(p => p.user_id === S.profile.id);
+  return { pos: me ? me.pos : 0, tickets: me ? me.tickets : 0, rolls: me ? me.rolls : 0 };
+}
+const squareAt = (S, pos) => (S.squares || []).find(s => s.pos === pos) || null;
+const taskOf = (S, id) => (S.tasks || []).find(t => t.id === id) || null;
+
+// 棋盤本體。pawns = [{ user_id, pos, me, name, avatar }]。
+export function boardGridHTML(S, pawns, opts) {
+  const size = S.board ? S.board.size : 0;
+  if (!size) return "";
+  const o = opts || {};
+  const byPos = {};
+  for (const p of pawns || []) { (byPos[p.pos] = byPos[p.pos] || []).push(p); }
+  const pawn = p => p.avatar
+    ? `<img class="pawn${p.me ? " me" : ""}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">`
+    : `<span class="pawn${p.me ? " me" : ""}" title="${esc(p.name)}">${esc(String(p.name || "?").trim().slice(0, 1))}</span>`;
+  const cell = pos => {
+    const sq = squareAt(S, pos);
+    const kind = sq ? sq.kind : "plain";
+    const t = sq && sq.kind === "task" ? taskOf(S, sq.task_id) : null;
+    const done = t && S.stamps && S.stamps[t.id];
+    const here = byPos[pos] || [];
+    const lit = o.lit === pos;
+    let label = "";
+    if (kind === "ladder") label = `<span class="sk">↑${esc(String(sq.goes_to))}</span>`;
+    else if (kind === "snake") label = `<span class="sk">↓${esc(String(sq.goes_to))}</span>`;
+    else if (t) label = `<span class="st${done ? " done" : ""}">${esc(t.title_zh || t.title_en)}</span>`;
+    return `<div class="bq ${kind}${pos === size ? " finish" : ""}${lit ? " lit" : ""}${done ? " stamped" : ""}" data-pos="${pos}"${t && !o.sample ? ` data-act="open" data-id="${esc(t.id)}" role="button" tabindex="0"` : ""}>
+      <span class="bn">${pos === size ? esc(T("board.finish")) : pos}</span>${label}
+      ${here.length ? `<span class="pawns">${here.map(pawn).join("")}</span>` : ""}
+    </div>`;
+  };
+  const start = byPos[0] || [];
+  return `<div class="bwrap"><div class="bgrid" style="grid-template-columns:repeat(${BOARD_PER_ROW},1fr)">${
+    boardRows(size).map(r => r.map(cell).join("")).join("")}</div>
+    <div class="bstart"><span class="bn">${esc(T("board.start"))}</span>${start.length ? `<span class="pawns">${start.map(pawn).join("")}</span>` : ""}</div></div>`;
+}
+
+// 骰子：轉的時候是問號，停了是點數。
+function diceHTML(n, rolling) {
+  const pips = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] }[n] || [];
+  return `<span class="dice${rolling ? " rolling" : ""}" aria-hidden="true">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => `<i${pips.includes(i) ? ' class="on"' : ""}></i>`).join("")}</span>`;
+}
+
+// 擲完那一行：擲到幾、落在哪、爬了還是滑了，加推薦下一格。
+export function rollResultHTML(S) {
+  const r = S.lastRoll; if (!r) return "";
+  let s = T("board.rolled", { r: r.rolled, l: r.landed });
+  if (r.kind === "ladder" && r.goes_to) s += T("board.ladder", { t: r.to_pos });
+  else if (r.kind === "snake" && r.goes_to) s += T("board.snake", { t: r.to_pos });
+  else if (r.to_pos !== r.landed) s += T("board.stop", { t: r.to_pos });
+  const sq = squareAt(S, r.to_pos);
+  const t = sq && sq.kind === "task" ? taskOf(S, sq.task_id) : null;
+  const suggest = t && !S.stamps[t.id]
+    ? `<div class="bsuggest">${T("board.suggest", { t: esc(t.title_zh || t.title_en) })} <button class="btn ghost sm" data-act="open" data-id="${esc(t.id)}">${T("board.goStamp")}</button></div>` : "";
+  return `<div class="bresult" role="status">${s}。${suggest}</div>`;
+}
+
+export function boardPageHTML(S) {
+  const size = S.board ? S.board.size : 0;
+  const my = myStanding(S);
+  const pos = S.animPos != null ? S.animPos : my.pos;
+  const finished = my.pos >= size;
+  const lastSq = squareAt(S, size);
+  const lastTask = lastSq && lastSq.kind === "task" ? taskOf(S, lastSq.task_id) : null;
+  const waiting = !finished && my.pos === size - 1 && lastTask && !S.stamps[lastTask.id];
+  const others = (S.positions || []).filter(p => !S.profile || p.user_id !== S.profile.id).map(p => {
+    const who = (S.wall || []).find(w => w.id === p.user_id) || {};
+    return { user_id: p.user_id, pos: p.pos, me: false, name: namesOf(who).name, avatar: who.avatar || null };
+  });
+  const pawns = S.sample ? others : others.concat([{ user_id: "me", pos, me: true, name: S.profile ? namesOf(S.profile).name : T("board.me"), avatar: S.profile && S.profile.avatar }]);
+  const canRoll = !S.sample && !S.rolling && my.tickets > 0 && !finished;
+  const btnText = S.rolling ? T("board.rolling") : finished ? T("board.finished") : my.tickets > 0 ? T("board.roll") : T("board.noTicket");
+  return `<div class="mhead">
+      <div class="mnum">${String(size).padStart(2, "0")}</div>
+      <div class="mzh">${T("board.title")}</div>
+      <div class="mtheme"><b>${my.pos >= size ? esc(T("board.finished")) : my.pos ? esc(T("board.pos", { n: my.pos })) : esc(T("board.atStart"))}</b><span>${esc(T("board.sub"))}</span></div>
+    </div>
+    <div class="bbar">
+      ${diceHTML(S.lastRoll ? S.lastRoll.rolled : 6, !!S.rolling)}
+      <div class="btix"><b>${esc(T("board.tickets", { n: my.tickets }))}</b></div>
+      <button class="btn" data-act="roll"${canRoll ? "" : " disabled"}>${esc(btnText)}</button>
+    </div>
+    ${waiting ? `<div class="bresult">${T("board.waiting", { t: esc(lastTask.title_zh || lastTask.title_en) })}</div>` : rollResultHTML(S)}
+    ${boardGridHTML(S, pawns, { lit: S.lastRoll ? S.lastRoll.to_pos : null, sample: !!S.sample })}
+    <div class="blegend"><span class="task">${esc(T("board.legendTask"))}</span><span class="ladder">${esc(T("board.legendLadder"))}</span><span class="snake">${esc(T("board.legendSnake"))}</span></div>
+    <div class="wnote" style="margin-top:14px">${esc(S.sample ? T("board.sampleNote") : T("board.rules"))}</div>`;
+}
+
 export function guideCardsHTML() {
   return `<div class="slots guide">${SLOT_ORDER.map(c => {
     const g = CATEGORY[c];
@@ -260,9 +374,21 @@ export function wallHTML(S) {
   feed.sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : 0);
   const cats = SLOT_ORDER.filter(c => S.tasks.some(t => t.category === c));
 
+  // 棋盤開著：牆的最上面是大家的棋子在同一張棋盤上，旁邊一排名次（位置優先，章數其次）。
+  let boardPart = "";
+  if (S.board && people.length) {
+    const posOf = id => ((S.positions || []).find(x => x.user_id === id) || {}).pos || 0;
+    const pawns = people.map(p => ({ user_id: p.id, pos: posOf(p.id), me: !!(S.profile && p.id === S.profile.id), name: namesOf(p).name, avatar: p.avatar }));
+    const rank = people.slice().sort((a, b) => posOf(b.id) - posOf(a.id) || b.count - a.count);
+    boardPart = `<h3>${T("wall.board")}</h3>
+      <div class="wboard">${boardGridHTML(S, pawns, { sample: true })}
+      <ol class="wrank">${rank.map(p => `<li><b>${nameHTML(p)}</b><span>${posOf(p.id) >= S.board.size ? esc(T("wall.rankDone")) : esc(T("wall.rank", { n: posOf(p.id) }))}・${p.count} / ${total}</span></li>`).join("")}</ol></div>`;
+  }
+
   return `<div class="wall">
     <h3>${T("wall.title")}</h3>
     <div class="wnote">${T("wall.note")}</div>
+    ${boardPart}
     ${people.length === 0 ? `<div class="empty">${T("wall.empty")}</div>` :
       `<div class="people">${people.map(p => {
         const on = new Set((p.intern_stamps || []).map(s => s.task_id));

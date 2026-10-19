@@ -62,6 +62,18 @@ export async function loadAll() {
     tasks = ta.data || [];
   }
 
+  // 蛇梯棋（2026-10-22）：這一屆開著的棋盤、格子、大家在第幾格。
+  // **三個查詢載不到不讓護照打不開**（遷移檔還沒跑、或棋盤沒開都會是空的）：棋盤是護照上面的一層，不是護照。
+  let board = null, squares = [], positions = [];
+  if (term) {
+    const [bo, sq, po] = await Promise.all([
+      supabase.from("intern_boards").select("term, size, active").eq("term", term.id).eq("active", true).maybeSingle(),
+      supabase.from("intern_squares").select("pos, kind, task_id, goes_to").eq("term", term.id).order("pos"),
+      supabase.rpc("intern_positions"),
+    ]);
+    if (!bo.error && bo.data) { board = bo.data; squares = sq.error ? [] : (sq.data || []); positions = po.error ? [] : (po.data || []); }
+  }
+
   const stamps = {};
   (st.data || []).forEach(r => { stamps[r.task_id] = { date: r.stamped_on }; });
   const entries = {};
@@ -87,8 +99,24 @@ export async function loadAll() {
       issued: pa.data.issued,
       term: pa.data.term
     } : null,
-    tasks, stamps, entries
+    tasks, stamps, entries,
+    board, squares, positions
   };
+}
+
+// 擲骰子。骰子在資料庫裡擲（roll_dice()），這裡只收結果：{ rolled, landed, to_pos, kind, goes_to, tickets_left, finished }。
+// 沒票、到終點、棋盤沒開，資料庫會用 no_ticket / finished / no_board 擋，main.js 翻成人話。
+export async function rollDice() {
+  await requireUser();
+  const { data, error } = await supabase.rpc("roll_dice");
+  if (error) throw error;
+  return data;
+}
+// 大家在第幾格（進度牆與棋盤上別人的棋子）。只有位置、擲過幾次、幾張票，沒有流水。
+export async function loadPositions() {
+  const { data, error } = await supabase.rpc("intern_positions");
+  if (error) throw error;
+  return data || [];
 }
 
 // 名字住在 profiles（這個人），一句話住在 intern_passports（這本護照）。

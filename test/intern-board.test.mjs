@@ -90,3 +90,102 @@ test("★ 側欄四份都有「棋盤」，而且資料層只讀 intern_boards �
   assert.match(d, /rpc\("set_board_active"/);
   assert.doesNotMatch(d, /intern_moves|intern_entries/, "後台不讀擲骰流水，更不讀心得");
 });
+
+// ── intern 看到的棋盤（intern-passport/） ────────────────────────────
+import * as IN from "../intern-passport/src/ui.js";
+IN.setLang("zh");
+const ITASKS = [
+  { id: "T2627-01", category: "onboard", seq: 1, title_zh: "認識 BT", title_en: "MEET BT", description: "" },
+  { id: "T2627-02", category: "project", seq: 2, title_zh: "第一個任務", title_en: "FIRST TASK", description: "" },
+  { id: "T2627-06", category: "project", seq: 6, title_zh: "期末成果", title_en: "FINAL", description: "" },
+];
+const SQ = [{ pos: 2, kind: "task", task_id: "T2627-01" }, { pos: 4, kind: "ladder", goes_to: 14 }, { pos: 7, kind: "task", task_id: "T2627-02" },
+  { pos: 16, kind: "snake", goes_to: 6 }, { pos: 30, kind: "task", task_id: "T2627-06" }];
+const ME = { id: "u1", name_zh: "實習一號", name_en: "Amy", avatar: null, term: "2026-27" };
+const IS = extra => ({ profile: ME, tasks: ITASKS, stamps: { "T2627-01": { date: "2026-10-01" } }, entries: {}, term: { id: "2026-27", title_zh: "2026-27 實習", title_en: "INTERNSHIP 2026-27" },
+  page: 0, view: "passport", flipped: {}, staff: false, wall: [{ id: "u2", name_zh: "實習二號", name_en: "Bob", avatar: null, intern_stamps: [] }],
+  board: { term: "2026-27", size: 30, active: true }, squares: SQ,
+  positions: [{ user_id: "u1", pos: 9, rolls: 2, tickets: 1 }, { user_id: "u2", pos: 14, rolls: 3, tickets: 0 }],
+  lastRoll: null, rolling: false, animPos: null, ...extra });
+
+test("★ 兩邊的 boardRows 逐字一樣（intern 看到的排法跟後台排的一樣）", () => {
+  assert.equal(String(IN.boardRows), String(PA.boardRows));
+  assert.equal(IN.BOARD_PER_ROW, PA.BOARD_PER_ROW);
+});
+
+test("棋盤開著就是第一頁；沒開就沒有這一頁", () => {
+  assert.equal(IN.pagesOf(IS())[0].kind, "board");
+  assert.equal(IN.pagesOf(IS({ board: null }))[0].kind, "id");
+});
+
+test("棋盤頁：我在第 9 格、1 張票、擲得了；別人的棋子也在；任務格點得開；蓋過的劃掉", () => {
+  const h = IN.boardPageHTML(IS());
+  assert.match(h, /你在第 9 格/);
+  assert.match(h, /1 張票/);
+  assert.match(h, /<button class="btn" data-act="roll">擲骰子/);
+  assert.match(h, /data-pos="9"[\s\S]*?class="pawn me"[^>]*>實/);
+  assert.match(h, /data-pos="14"[\s\S]*?class="pawn"[^>]*>實/);
+  assert.match(h, /class="bq task[^"]*stamped" data-pos="2" data-act="open" data-id="T2627-01"/);
+  assert.match(h, /class="st done">認識 BT/);
+  assert.match(h, /data-pos="4"[\s\S]*?↑14/);
+  assert.match(h, /data-pos="16"[\s\S]*?↓6/);
+  assert.match(h, /data-pos="30"[^>]*>\s*<span class="bn">終點/);
+  assert.equal((h.match(/data-pos="/g) || []).length, 30);
+});
+
+test("沒票就按不了而且講為什麼；到終點說到了；差一格說差哪一格", () => {
+  const none = IN.boardPageHTML(IS({ positions: [{ user_id: "u1", pos: 9, rolls: 3, tickets: 0 }] }));
+  assert.match(none, /data-act="roll" disabled>蓋一個章就有票/);
+  const done = IN.boardPageHTML(IS({ positions: [{ user_id: "u1", pos: 30, rolls: 9, tickets: 2 }] }));
+  assert.match(done, /data-act="roll" disabled>到終點了/);
+  const wait = IN.boardPageHTML(IS({ positions: [{ user_id: "u1", pos: 29, rolls: 9, tickets: 2 }] }));
+  assert.match(wait, /差一格：蓋了「期末成果」就到終點/);
+});
+
+test("擲完那一行：擲到幾、爬梯子或滑蛇、落在沒做的任務格就推薦", () => {
+  const S = IS({ lastRoll: { rolled: 3, landed: 4, to_pos: 14, kind: "ladder", goes_to: 14, tickets_left: 0, finished: false } });
+  assert.match(IN.rollResultHTML(S), /擲到 <b>3<\/b>，落在第 4 格，爬梯子到第 14 格/);
+  const S2 = IS({ lastRoll: { rolled: 2, landed: 7, to_pos: 7, kind: "task", goes_to: null, tickets_left: 0, finished: false } });
+  const h = IN.rollResultHTML(S2);
+  assert.match(h, /推薦下一個做「第一個任務」/);
+  assert.match(h, /data-act="open" data-id="T2627-02"/);
+  const S3 = IS({ lastRoll: { rolled: 5, landed: 16, to_pos: 6, kind: "snake", goes_to: 6 } });
+  assert.match(IN.rollResultHTML(S3), /滑蛇到第 6 格/);
+  // 棋子正在走：畫面上的位置是 animPos，不是資料庫的。
+  assert.match(IN.boardPageHTML(IS({ animPos: 11 })), /data-pos="11"[\s\S]*?class="pawn me"/);
+  // 骰子在轉：按鈕鎖住。
+  assert.match(IN.boardPageHTML(IS({ rolling: true })), /data-act="roll" disabled>擲骰中/);
+});
+
+test("樣書上沒有我的棋子、任務格點不開、按鈕是關的", () => {
+  const h = IN.boardPageHTML(IS({ sample: true, profile: IN.sampleProfile({ id: "2026-27" }), stamps: {} }));
+  assert.doesNotMatch(h, /pawn me/);
+  assert.doesNotMatch(h, /data-act="open"/);
+  assert.match(h, /data-act="roll" disabled/);
+  assert.match(h, /樣書的棋盤/);
+});
+
+test("進度牆：棋盤開著就先畫大家的棋子與名次，位置在前章數在後", () => {
+  const S = IS({ wall: [{ id: "u1", name_zh: "實習一號", avatar: null, intern_stamps: [{ task_id: "T2627-01" }] }, { id: "u2", name_zh: "實習二號", avatar: null, intern_stamps: [] }] });
+  const h = IN.wallHTML(S);
+  assert.match(h, /大家在哪一格/);
+  assert.match(h, /<ol class="wrank"><li><b>實習二號<\/b><span>第 14 格・0 \/ 3<\/span><\/li><li><b>實習一號<\/b><span>第 9 格・1 \/ 3/);
+  assert.doesNotMatch(IN.wallHTML(IS({ board: null, wall: S.wall })), /大家在哪一格/);
+});
+
+test("★ 英文畫出來不剩中文（棋盤頁、擲完那一行、牆）", () => {
+  IN.setLang("en");
+  const base = { profile: { ...ME, name_zh: "" }, tasks: ITASKS.map(t => ({ ...t, title_zh: "" })), term: { id: "2026-27", title_zh: "", title_en: "X" },
+    wall: [{ id: "u2", name_zh: "", name_en: "Bob", avatar: null, intern_stamps: [] }] };
+  const h = IN.boardPageHTML(IS(base)) + IN.rollResultHTML(IS({ ...base, lastRoll: { rolled: 2, landed: 7, to_pos: 7, kind: "task" } }))
+    + IN.wallHTML(IS(base)) + IN.boardPageHTML(IS({ ...base, sample: true, profile: IN.sampleProfile({ id: "2026-27" }) })) + IN.pagesOf(IS(base)).map(p => p.label).join(",");
+  IN.setLang("zh");
+  assert.doesNotMatch(h, /[一-鿿]/);
+});
+
+test("★ intern 的資料層：骰子走 rpc 不碰表、位置走 rpc、不讀 entries 以外的新表", () => {
+  const d = readFileSync("intern-passport/src/data.js", "utf8");
+  assert.match(d, /rpc\("roll_dice"\)/);
+  assert.match(d, /rpc\("intern_positions"\)/);
+  assert.doesNotMatch(d, /from\("intern_moves"\)/, "流水只在資料庫，前端不直接讀");
+});
