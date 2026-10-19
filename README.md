@@ -3139,30 +3139,42 @@ Paul 的原話：「我是說整個網頁的 reload 速度，不是只有時間�
 PASS / FAIL 表，全部 PASS 才算跑完。**跑完之後兩張表都是空的，這是對的**——
 這支只建結構，沒有人真的填過例外之前不會有資料。
 
-## 後台的中英切換（2026-10-19）
+## 登入後頁面的中英切換（2026-10-19）
 
-Paul 2026-10-19：「後台加一個中英切換，像對外網站那樣，預設英文。」做法與理由在 `docs/2026-10-19-後台中英切換.md`，
-英文版每一個畫面的截圖在 `docs/admin-redesign/en/`（`m` 開頭的是手機）。
+Paul 2026-10-19：「後台加一個中英切換，像對外網站那樣，預設英文。」看了截圖之後：「上面的 bar 跟設定都還是中文」，
+範圍定為**所有登入後的頁面**。做法與理由在 `docs/2026-10-19-後台中英切換.md`，
+英文版每一個畫面的截圖在 `docs/admin-redesign/en/`（後台的沒有前綴；`settings-`、`app-`、`passport-`、`intern-passport-`、`availability-` 是後來那六處；`m` 是手機）。
+
+### 哪些地方換得了
+
+後台四組（`/admin/` 全部）、頂欄（`shared/nav.js`）、`/settings/`、`/app/`（登入頁與學員帳號）、`/passport/`、`/intern-passport/`、`/availability/`，
+加上登入失敗那六句（`shared/auth.js`）。對外七頁本來就有自己的切換，沒動。
+
+**翻的是介面，不是資料。** 格子的題目與說明（`activities`、`intern_tasks`）、章上的字、月份右上角的時刻、城市名、縣市名、表單名、年級的值，
+幹部填什麼就是什麼。護照資料頁上原本「Type / 類別」這種中英並排的標籤，英文版只剩英文那一半。
 
 ### 幹部看到的
 
-- 側欄「你是誰」那一塊底下有兩顆小按鈕「中文 / English」，現在的那一顆是深藍底。手機上在「後台選單」展開的那一塊裡。
+- 切換鈕在兩個地方：後台側欄「你是誰」那一塊底下，與 `/settings/`「我的資料」上面。都是兩顆小按鈕「中文 / English」，現在的那一顆深藍底。
+  頂欄、護照、時間看板上**沒有**切換鈕，它們跟著選過的語言走。
 - 按下去整頁換語言，不重新載入，填到一半的表單不會不見。
-- 第一次進來是英文。選過一次之後記在瀏覽器裡（`localStorage` 的 `bt-lang`），下次登入還是那個語言。
-- 網址會多一段 `?lang=en` 或 `?lang=zh`，側欄到別組的連結也帶著，所以把網址貼給別人，對方看到的是同一個語言。
-- 翻的是介面，不是資料。表單名、題目、城市名、intern 格子的中文標題，幹部填什麼就顯示什麼。
-  信件文案那一頁的預覽也還是中文，因為信是真的寄給台灣的學生與家長的。
+- 第一次進來是英文。選過一次之後記在瀏覽器裡（`localStorage` 的 `bt-lang`），之後每一頁、下次登入都是那個語言。
+- 網址會多一段 `?lang=en` 或 `?lang=zh`，頂欄與側欄的連結也帶著，所以把網址貼給別人，對方看到的是同一個語言。
+- 信件文案那一頁的預覽還是中文，因為信是真的寄給台灣的學生與家長的。時間看板「各地當地時間」那幾行的星期跟著語言，城市名維持「台北 / Taipei」並排。
 
 ### 字放在哪裡
 
-四個後台資料夾各有一支 `src/strings.js`：`admin/src/`、`admin/site/src/`、`admin/passports/src/`、`admin/people/src/`。
+每一個登入後的資料夾各有一支 `src/strings.js`：`admin/src/`、`admin/site/src/`、`admin/passports/src/`、`admin/people/src/`、
+`settings/src/`、`app/src/`、`passport/src/`、`intern-passport/src/`、`availability/src/`。
+頂欄的字在 `shared/nav.js` 裡面（`FEATURES` 的 `label` / `title` / `desc` 與 `NAV` 那幾句），登入的六句錯誤在 `shared/auth.js` 的 `MSG_ZH_EN`，
+都是 `{ zh, en }` 並排，沒有另開檔，`shared/` 一個檔案都沒加。
 每一句長這樣，中文與英文在同一行：
 
 ```js
 "forms.new": { zh: "開一份新的申請表", en: "New form" },
 ```
 
-- `COMMON` 那一段是側欄、按鈕、共用訊息，四支一模一樣，`test/admin-hub.test.mjs` 逐字比對，改一支就要改四支。
+- `COMMON` 那一段是共用的按鈕與訊息，後台四支一模一樣（`test/admin-hub.test.mjs` 逐字比對），另外五支也一模一樣（`test/lang.test.mjs`），改一支就要改那一組的每一支。
 - `MINE` 是那一組自己的畫面。鍵是英文，用點分段，前面是畫面、後面是用途。
 - 鍵以 `err.` 開頭的句子是「沒做成」的訊息，畫面會自動畫成橘的。
 - 帶數字的句子用 `{n}`。英文的單複數寫成 `{n:form|forms}`：1 的時候是前面那個字，其他是後面那個。中文照常寫。
@@ -3175,14 +3187,17 @@ Paul 2026-10-19：「後台加一個中英切換，像對外網站那樣，預�
 3. 要在側欄、按鈕這種四組都有的地方加字，加在 `COMMON`，而且四支都要加一樣的。
 4. 跑 `node --test test/*.test.mjs`。有一條測試會把每一個畫面用英文畫一次，剩下任何中文字就會紅，並印出那一句在哪。
    漏翻的鍵在畫面上會直接顯示成 `forms.new` 這種字，一眼就看得到。
+5. 頂欄要多一個功能項，在 `shared/nav.js` 的 `FEATURES` 加一筆，`label` / `title` / `desc` 都要給 `{ zh, en }`，`test/nav.test.mjs` 守著。
+6. 既有的測試斷言的是中文，所以每一支測試開頭都有一行 `setLang("zh")`；寫新測試照做，不然預設是英文。
 
 ### 這一批沒動的
 
-頂欄（`shared/nav.js`）、護照、時間看板、設定頁還是中文，這一批只做後台四組。
-資料庫與查詢一行都沒改。
+資料庫與查詢一行都沒改。`scripts/e2e/intern.mjs` 的斷言全是中文，開頭多存了一個 `bt-lang=zh`，跑起來跟以前一樣。
+刪帳號那一格打「刪除」或「delete」都算（英文版加的，中文那條不變）。
 
-本機 `node --test test/*.test.mjs` 522 項全過、`./check.sh` 全綠、`node scripts/check-mobile.mjs` 18 頁全過。
-**還沒驗的**：真的登入後按下切換（截圖是 `ui.js` 配假資料畫的，`?lang=` 與 `localStorage` 那一段只有純函式測試，沒有在瀏覽器裡走過）。
+本機 `node --test test/*.test.mjs` 531 項全過、`./check.sh` 全綠、`node scripts/check-mobile.mjs` 18 頁全過。
+**還沒驗的**：真的登入後按下切換（截圖是 `ui.js` 配假資料畫的，`?lang=` 與 `localStorage` 那一段只有純函式測試，沒有在瀏覽器裡走過）；
+端對端那支（`scripts/e2e/intern.mjs`）這一批沒跑，本機沒有 Supabase。
 
 ## 後台第二次重整：側欄 Dashboard（2026-10-19）
 
