@@ -6,7 +6,9 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authHTML, notCadreHTML, downHTML } from "../app/src/ui.js";
+import { authHTML, notCadreHTML, downHTML, setLang } from "../app/src/ui.js";
+// 登入後的頁面 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 import { resolveNext, stashNext, takeNext, NEXT } from "../app/src/nav.js";
 
 test("notCadreHTML 有邀請碼輸入框與升級按鈕，而且走得掉", () => {
@@ -313,7 +315,8 @@ test("註冊頁的標題是「註冊」，不是 5-7 之前的「註冊 BT 護�
 });
 
 // ── 2026-09-08 Paul 實測回報的四件事 ──────────────────────────────────
-import { MSG_DUP_EMAIL } from "../shared/auth.js";
+import { isDupEmail, setAuthLang } from "../shared/auth.js";
+setAuthLang("zh");
 
 // ⚠ 密碼打錯就要重打一次 email，是在懲罰一個本來就已經有點挫折的人。
 test("★ 登入與註冊都要把上次打的 email 帶回來（密碼不帶）", () => {
@@ -347,8 +350,9 @@ test("★ 註冊完有一頁告訴他去收信，而且說得出寄到哪個信�
 });
 
 test("已經有帳號那句話，前端認得出來（才帶得回登入畫面）", () => {
-  assert.equal(typeof MSG_DUP_EMAIL, "string");
-  assert.match(MSG_DUP_EMAIL, /已經有/);
+  assert.ok(isDupEmail(new Error("這個 email 已經有護照了，直接登入就好。")));
+  assert.ok(isDupEmail(new Error("This email already has an account. Just sign in.")), "英文那句也認得");
+  assert.ok(!isDupEmail(new Error("x")));
 });
 
 test("跳脫：email 裡的引號不會掙出 value 屬性", () => {

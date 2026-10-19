@@ -15,7 +15,9 @@
 //   **先量一次**，不要相信「應該會有 status 吧」。那正是這個 bug 的來源。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authMessage, sessionGone, isOfflineError } from "../shared/auth.js";
+import { authMessage, sessionGone, isOfflineError, setAuthLang } from "../shared/auth.js";
+// 六句錯誤 2026-10-19 起中英兩版；這一支斷言的是中文。
+setAuthLang("zh");
 
 // authMessage 對 invite 那一類會印 console.error 給維運的人看，測試時吞掉。
 const quiet = fn => { const e = console.error; console.error = () => {}; try { return fn(); } finally { console.error = e; } };

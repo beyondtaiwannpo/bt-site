@@ -7,7 +7,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { namesOf as fromAvailability } from "../availability/src/data.js";
-import { namesOf as fromPassport } from "../passport/src/ui.js";
+import { setLang as availLang } from "../availability/src/ui.js";
+availLang("zh");
+import { namesOf as fromPassport, setLang as passportLang } from "../passport/src/ui.js";
+passportLang("zh");
 import { namesOf as fromAdmin } from "../admin/site/src/ui.js";
 import { namesOf as fromPeople, setLang as peopleLang } from "../admin/people/src/ui.js";
 import { setLang as siteLang } from "../admin/site/src/ui.js";

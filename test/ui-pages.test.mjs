@@ -4,7 +4,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML, monthPageHTML,
-         idPageHTML, CATEGORY, CATNAME, SLOT_ORDER } from "../passport/src/ui.js";
+         idPageHTML, CATEGORY, CATNAME, SLOT_ORDER, setLang, T } from "../passport/src/ui.js";
+// 護照 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },

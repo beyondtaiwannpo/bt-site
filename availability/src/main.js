@@ -11,6 +11,7 @@ import { cellInstant, googleCalUrl, localTimesText, DEFAULT_TITLE } from "./cale
 import { labelOf } from "./tz-alias.js";
 import { startOfWeek, detectTz, partsIn, addDays } from "./tz.js";
 import { weekKeyOf } from "./weekkey.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 const root = () => document.getElementById("bt-root");
 const K = DATA.key;
@@ -57,7 +58,7 @@ function weekDates() {
 function weekLabel() {
   const p = partsIn(S.weekStart, S.myTz);
   const e = addDays(p.year, p.month, p.day, 6);
-  return `${p.month}/${p.day} – ${e.month}/${e.day}` + (S.weekOffset === 0 ? "（本週）" : "");
+  return `${p.month}/${p.day} – ${e.month}/${e.day}` + (S.weekOffset === 0 ? T("week.thisTag") : "");
 }
 
 // ── 畫面 ────────────────────────────────────────────────────────────
@@ -76,9 +77,9 @@ function render() {
   const el = root();
   if (!el) return;
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
-  if (!S.ready) { el.innerHTML = `<div class="empty">載入中…</div>`; return; }
+  if (!S.ready) { el.innerHTML = `<div class="empty">${T("loading")}</div>`; return; }
   // 未升級的人也有頂欄：對他來說功能項是空的，但 logo、名字、登出都在。
-  if (S.role !== "cadre") { el.innerHTML = navHTML({ current: null, role: S.role, name: S.myName }) + UI.notCadreHTML(); return; }
+  if (S.role !== "cadre") { el.innerHTML = navHTML({ current: null, role: S.role, name: S.myName, lang: lang() }) + UI.notCadreHTML(); return; }
   if (S.needNotice) { el.innerHTML = UI.noticeHTML(S.msg, S.busy); return; }
   if (S.needTz) { el.innerHTML = UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg); return; }
 
@@ -95,7 +96,7 @@ function render() {
   // 「我的時間」是自己的，跟 team 篩選無關，所以用 S 不是 V。
   else if (S.tab === "mine") inner = UI.mineHTML(S);
   else inner = UI.membersHTML(V, Date.now());
-  el.innerHTML = navHTML({ current: "availability", role: S.role, name: S.myName })
+  el.innerHTML = navHTML({ current: "availability", role: S.role, name: S.myName, lang: lang() })
                + UI.shellHTML(S.tab, inner, label, S.msg);
   if (S.peek) el.insertAdjacentHTML("beforeend", S.peek);
   // 看板一打開停在 00:00，而大家有空的時間多半在傍晚 —— 第一格常常在第 38 列，
@@ -287,7 +288,7 @@ document.addEventListener("click", async e => {
     // 已經在邊界的話**要說話**，不能按了沒反應 —— 那正是這一頁反覆出現的症狀。
     // 上限拿掉之後只剩往前這一種邊界，所以訊息不用再看方向。
     if (next === S.weekOffset && d !== 0) {
-      S.msg = "只能往前看四週。";
+      S.msg = T("m.onlyBack");
       render(); return;
     }
     S.msg = "";
@@ -319,7 +320,7 @@ document.addEventListener("click", async e => {
     // 這一步會打網路。沒有這個 busy 的話，網路慢的時候點下去完全沒反應 ——
     // 跟知情同意那個 bug 是同一個形狀（2026-09-02 順手補的）。
     if (S.busy) return;
-    S.busy = true; S.msg = "存起來中…"; render();
+    S.busy = true; S.msg = T("m.saving"); render();
     try {
       await DATA.saveTz(S.user.id, b.dataset.tz);
       S.myTz = b.dataset.tz; S.needTz = false; S.msg = ""; S.busy = false;
@@ -366,11 +367,11 @@ document.addEventListener("click", async e => {
         S.weekTouched = false;
       }
       recomputeDirty();
-      S.busy = false; S.mineMsg = "那一週回到你平常的時間了。";
+      S.busy = false; S.mineMsg = T("m.reverted");
     } catch (err) {
       console.error("取消某一週失敗。真正的原因：", err);
       S.busy = false;
-      S.mineMsg = "取消不了：" + DATA.authMessage(err);
+      S.mineMsg = T("m.revertFail") + DATA.authMessage(err);
     }
     render(); return;
   }
@@ -388,8 +389,8 @@ document.addEventListener("click", async e => {
 
   if (act === "apply") {
     readBatch();
-    if (!S.chips.size) { S.mineMsg = "先選要套用到哪幾天。"; render(); return; }
-    if (S.bfrom >= S.bto) { S.mineMsg = "結束時間要比開始時間晚。"; render(); return; }
+    if (!S.chips.size) { S.mineMsg = T("m.pickDays"); render(); return; }
+    if (S.bfrom >= S.bto) { S.mineMsg = T("m.endAfter"); render(); return; }
     const add = b.dataset.mode === "add";
     // 兩種模式共用同一顆按鈕，改到哪一份 Set 由 mineTarget() 決定 ——
     // 寫死 S.mine 的話「某一週」模式點下去改的其實是平常的時間，
@@ -398,7 +399,7 @@ document.addEventListener("click", async e => {
     setMineTarget(r.set);
     const n = r.changed;
     S.dirty = true;
-    S.mineMsg = `${add ? "加了" : "拿掉了"} ${n} 格，記得按儲存。`;
+    S.mineMsg = T(add ? "m.added" : "m.removed", { n });
     render(); return;
   }
 
@@ -406,11 +407,11 @@ document.addEventListener("click", async e => {
     readBatch();
     const from = +document.getElementById("copyfrom").value;
     S.copyFrom = from;
-    if (!S.chips.size) { S.mineMsg = "先選要複製到哪幾天。"; render(); return; }
+    if (!S.chips.size) { S.mineMsg = T("m.pickCopy"); render(); return; }
     const r = copyDay(mineTarget(), from, [...S.chips]);
     setMineTarget(r.set);
     S.dirty = true;
-    S.mineMsg = `複製好了，變動 ${r.changed} 格，記得按儲存。`;
+    S.mineMsg = T("m.copied", { n: r.changed });
     render(); return;
   }
 
@@ -425,7 +426,7 @@ document.addEventListener("click", async e => {
     b.setAttribute("aria-pressed", String(on));
     S.dirty = true;
     const save = document.querySelector('[data-act="save"]');
-    if (save) { save.disabled = false; save.textContent = "儲存"; }
+    if (save) { save.disabled = false; save.textContent = T("mn.save"); }
     return;
   }
 
@@ -435,7 +436,7 @@ document.addEventListener("click", async e => {
     // 走完全不同的一支（差集也是另外兩份 Set）。
     if (S.mineMode === "week") {
       const wk = weekKeyOf(S.weekStart, S.myTz);
-      b.disabled = true; b.textContent = "存檔中…";
+      b.disabled = true; b.textContent = T("m.savingBtn");
       try {
         const r = await DATA.saveWeek(S.user.id, wk, S.weekMine, S.weekSaved);
         S.weekSaved = new Set(S.weekMine);
@@ -450,7 +451,7 @@ document.addEventListener("click", async e => {
         // 重新問一次 S.mine 跟 S.saved 是不是還一樣，不能直接寫 false，
         // 不然平常那邊沒存的編輯會被這次存檔悄悄標成「已儲存」。
         S.dirty = !setsEqual(S.mine, S.saved);
-        S.mineMsg = r.add || r.del ? `存好了（+${r.add} / -${r.del}）。` : "沒有變動。";
+        S.mineMsg = r.add || r.del ? T("m.savedDiff", { a: r.add, d: r.del }) : T("m.noChange");
       } catch (err) {
         console.error("某一週存檔失敗：", err);
         S.mineMsg = DATA.authMessage(err);
@@ -458,7 +459,7 @@ document.addEventListener("click", async e => {
       }
       render(); return;
     }
-    b.disabled = true; b.textContent = "存檔中…";
+    b.disabled = true; b.textContent = T("m.savingBtn");
     try {
       const r = await DATA.saveMine(S.user.id, S.mine, S.saved);
       S.saved = new Set(S.mine);
@@ -466,7 +467,7 @@ document.addEventListener("click", async e => {
       // 反過來同一個道理：剛存的是平常的時間，某一週那邊有沒有還沒存
       // 要重新問一次，不能直接寫 false（見上面那一支的註解）。
       S.dirty = S.weekTouched && !setsEqual(S.weekMine, S.weekSaved);
-      S.mineMsg = r.add || r.del ? `存好了（+${r.add} / -${r.del}）。` : "沒有變動。";
+      S.mineMsg = r.add || r.del ? T("m.savedDiff", { a: r.add, d: r.del }) : T("m.noChange");
       const me = S.members.find(m => m.id === S.user.id);
       if (me) me.updatedAt = new Date().toISOString();
     } catch (err) {
@@ -479,12 +480,12 @@ document.addEventListener("click", async e => {
 
   if (act === "confirm-same") {
     // 一樣會打網路，一樣要先講話再等。
-    b.disabled = true; b.textContent = "記錄中…";
+    b.disabled = true; b.textContent = T("m.recording");
     try {
       const at = await DATA.confirmUnchanged();
       const me = S.members.find(m => m.id === S.user.id);
       if (me) me.updatedAt = at;
-      S.mineMsg = "記下來了，這份時間是最新的。";
+      S.mineMsg = T("m.confirmed");
     } catch (err) {
       console.error("確認沒變失敗。真正的原因：", err);
       S.mineMsg = DATA.authMessage(err);
@@ -495,7 +496,7 @@ document.addEventListener("click", async e => {
   if (act === "peek") {
     S.peekCell = { col: +b.dataset.c, min: +b.dataset.m };
     S.copyMsg = "";
-    S.evTitle = S.evTitle || DEFAULT_TITLE;
+    S.evTitle = S.evTitle || T("cal.title");
     buildPeek(); render(); return;
   }
 
@@ -503,12 +504,12 @@ document.addEventListener("click", async e => {
     const text = (S.peekLines || []).join("\n");
     try {
       await navigator.clipboard.writeText(text);
-      S.copyMsg = "複製好了。";
+      S.copyMsg = T("m.copiedLines");
     } catch (err) {
       // 不是 https、或舊瀏覽器的話 clipboard API 不在。
       // **不要靜靜地失敗** —— 那又是一次「按了沒反應」（README 第 13 項）。
       console.error("複製失敗。真正的原因：", err);
-      S.copyMsg = "複製不了，請自己選取上面那幾行。";
+      S.copyMsg = T("m.copyFail");
     }
     buildPeek(); render(); return;
   }
@@ -546,7 +547,7 @@ document.addEventListener("input", e => {
     const list = document.querySelector(".tzlist");
     if (list) list.innerHTML = S.tzResults.map(r =>
       `<button class="tzitem" data-act="tz-pick" data-tz="${r.tz}"><b>${r.label}</b><span>${r.tz}</span></button>`
-    ).join("") || `<div class="empty sm">找不到「${S.tzQuery}」。換個講法試試，例如打州名或最近的大城市。</div>`;
+    ).join("") || `<div class="empty sm">${T("tz.none", { q: UI.esc(S.tzQuery) })}</div>`;
   }
 });
 
@@ -575,10 +576,10 @@ function buildPeek() {
   const free = counts.get(col + ":" + min) || [];
   const inst = cellInstant(S.weekStart, col, min, S.myTz);
   const zones = [...new Set(V.members.filter(m => m.tz).map(m => m.tz))].sort();
-  S.peekLines = localTimesText(inst, zones, labelOf);
+  S.peekLines = localTimesText(inst, zones, labelOf, [0, 1, 2, 3, 4, 5, 6].map(UI.dayShort));
   S.peek = UI.peekHTML(V, {
     free, minute: min,
-    dayLabel: "星期" + UI.DAY_ZH[UI.COL_ORDER[col]],
+    dayLabel: UI.dayFull(UI.COL_ORDER[col]),
     lines: S.peekLines,
     calUrl: googleCalUrl(inst, undefined, S.evTitle),
     title: S.evTitle,
@@ -586,4 +587,8 @@ function buildPeek() {
   });
 }
 
+// 語言（2026-10-19 中英切換）。網址 ?lang= 先、再 localStorage 的、都沒有就英文。切換鈕在 /settings/，這一頁跟著走。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+setLang(pickLang(location.search, readStored()));
+document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
 boot();

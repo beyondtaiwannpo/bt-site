@@ -8,9 +8,16 @@
 // 而那張照片會出現在公開的團隊頁上 —— **設定的地方跟後果的地方距離太遠**。
 // 放在同一個畫面上，勾「我同意公開」的時候旁邊就是那張照片，
 // 他看得到自己正在公開什麼。
+//
+// 2026-10-19 起畫面上的字全部從 ./strings.js 的字典來（T("鍵")），中英兩版並排在那一支裡。
+// 這一頁也是中英切換鈕的家（langSwitchHTML，在「我的資料」上面），其他登入後的頁面跟著這裡選的走。
+import { T, lang, setLang } from "./strings.js";
+export { T, lang, setLang };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// 年級。**值存在資料庫裡是中文**（高一、高二…），英文只是畫面上的顯示，存的還是這幾個字。
 export const GRADES = ["高一", "高二", "高三", "已畢業", "其他"];
+export const gradeLabel = g => (GRADES.includes(g) ? T("grade." + g) : g);
 
 // 幹部與學員看到的東西不一樣，但**是同一頁**。
 // 分成兩頁的話，「刪除帳號」「改名字」這種兩邊都有的東西就會有兩份。
@@ -68,22 +75,22 @@ export function teamPickHTML(cur, locked, privileged) {
   const priv = privileged || [];
   if (locked) {
     return `<fieldset class="teams">
-      <legend>所屬 team</legend>
-      <div class="tgrid"><span>${picked.length ? esc(picked.join("、")) : "（還沒有）"}</span></div>
-      <div class="mini">你是 Director 或 Co-President，team 決定你在後台管得到哪些東西，所以由 Co-President 在後台改。要改請找他們。</div>
+      <legend>${T("team.legend")}</legend>
+      <div class="tgrid"><span>${picked.length ? esc(picked.join(T("punct.list"))) : T("team.none")}</span></div>
+      <div class="mini">${T("team.lockedNote")}</div>
     </fieldset>`;
   }
   const box = (t, label) => {
     const lock = priv.includes(t) && !picked.includes(t);
     return `<label class="check tpick">
     <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}${lock ? " disabled" : ""}>
-    <span>${esc(label)}${lock ? "（要 Co-President 加）" : ""}</span></label>`;
+    <span>${esc(label)}${lock ? T("team.needPres") : ""}</span></label>`;
   };
   return `<fieldset class="teams">
-    <legend>所屬 team（可以選好幾個）</legend>
+    <legend>${T("team.legendMulti")}</legend>
     <div class="tgrid">
       ${TEAMS.map(t => box(t, t.replace(/\s*Team$/i, ""))).join("")}
-      ${extra.map(t => box(t, t + "（原本填的）")).join("")}
+      ${extra.map(t => box(t, t + T("team.original"))).join("")}
     </div>
   </fieldset>`;
 }
@@ -94,28 +101,36 @@ export function teamPickHTML(cur, locked, privileged) {
 //  由北到南再繞回東部，改順序不會有任何測試變紅）。
 // 填錯或填了表上沒有的縣市，那個人只會**安靜地不出現**在航線圖上，
 // 所以這裡是選單不是文字框，資料庫那邊還有一條 check constraint。
+// 縣市名是資料（存進資料庫、畫在圖上），不翻。
 export const COUNTIES = ["台北", "桃園", "新竹", "苗栗", "台中", "彰化", "南投",
                          "雲林", "嘉義", "台南", "高雄", "屏東", "宜蘭", "花蓮",
                          "台東", "基隆"];
 
 // 必填的六格加一句話。**英文是選填的** —— /alumni/ 沒有英文就顯示中文那一份。
 const STORY_NEED = [
-  ["school", "高中"], ["county", "縣市"], ["city", "現在的城市"],
-  ["country", "國家"], ["place", "學校或公司"], ["quote", "一句話"], ["note", "介紹"],
+  ["school", "story.school"], ["county", "story.county"], ["city", "story.city"],
+  ["country", "story.country"], ["place", "story.place"], ["quote", "story.quote"], ["note", "story.note"],
 ];
 
 export function storyMissing(story) {
   const s = story || {};
-  return STORY_NEED.filter(([k]) => !String(s[k] || "").trim()).map(([, label]) => label);
+  return STORY_NEED.filter(([k]) => !String(s[k] || "").trim()).map(([, key]) => T(key));
 }
 
 // 狀態一句話。**「勾了但還沒核可」跟「已經公開」要看得出差別** ——
 // 看不出來的話，那個人會以為自己已經在網站上了。
 export function storyStatus(story) {
   const s = story || {};
-  if (!s.public_story) return "還沒有勾同意，所以這一段只有你自己看得到。";
-  if (!s.story_approved) return "已經送出，等 Co-President 核可才會出現在公開的校友頁上。";
-  return "已經在公開的校友頁上了。改了那一句話或介紹，會自動下架等重新核可。";
+  if (!s.public_story) return T("story.st.private");
+  if (!s.story_approved) return T("story.st.pending");
+  return T("story.st.live");
+}
+
+// 中英切換（2026-10-19）：兩顆小按鈕，現在的那一顆亮著。字面「中文」「English」刻意不翻。
+// main.js 接 data-act="lang"。
+export function langSwitchHTML() {
+  const b = l => `<button class="lang${lang() === l ? " on" : ""}" data-act="lang" data-lang="${l}" aria-pressed="${lang() === l}">${l === "zh" ? "中文" : "English"}</button>`;
+  return `<div class="langrow" role="group" aria-label="${esc(T("lang.label"))}"><span class="langlbl">${T("lang.label")}</span>${b("zh")}${b("en")}</div>`;
 }
 
 // ⚠ **這一頁有三種人，不是兩種**（2026-09-11 修）。
@@ -133,30 +148,31 @@ export function settingsHTML(me, msg, busy, story) {
   const named = teller || intern;                // 誰的「我的資料」是中英文名兩格
   const v = k => esc(me[k] || "");
   return `<div class="card">
-    <h2>設定</h2>
+    <h2>${T("s.title")}</h2>
     <div class="sub">${esc(me.email || "")}</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
 
-    <h3 class="sec-h">我的資料</h3>
+    ${langSwitchHTML()}
+    <h3 class="sec-h">${T("s.me")}</h3>
     ${named ? `<div class="two">
-      <label><i>中文姓名</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
-      <label><i>英文姓名</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
+      <label><i>${T("s.nameZh")}</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
+      <label><i>${T("s.nameEn")}</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
     </div>
     ${cadre ? teamPickHTML(me.team, teamLocked(me), me.privileged_teams) : ""}`
-    : `<label><i>你的名字</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
+    : `<label><i>${T("s.name")}</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
     <div class="two">
-      <label><i>就讀學校</i><input id="school" list="schools" value="${v("school")}"
+      <label><i>${T("s.school")}</i><input id="school" list="schools" value="${v("school")}"
         autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-        placeholder="打兩個字就會跳出來"></label>
-      <label><i>年級</i><select id="grade">
-        <option value="">請選擇</option>
-        ${GRADES.map(g => `<option${me.grade === g ? " selected" : ""}>${esc(g)}</option>`).join("")}
+        placeholder="${esc(T("s.schoolPh"))}"></label>
+      <label><i>${T("s.grade")}</i><select id="grade">
+        <option value="">${T("s.pick")}</option>
+        ${GRADES.map(g => `<option value="${esc(g)}"${me.grade === g ? " selected" : ""}>${esc(gradeLabel(g))}</option>`).join("")}
       </select></label>
     </div>
     <datalist id="schools"></datalist>
     <label class="check">
       <input id="nl" type="checkbox"${me.newsletter_opt_in ? " checked" : ""}>
-      <span>我願意收 BT 的活動通知與資源更新。每一封都有取消訂閱的連結。</span>
+      <span>${T("s.newsletter")}</span>
     </label>`}
 
     ${named ? avatarHTML(me, cadre, intern) : ""}
@@ -167,25 +183,24 @@ export function settingsHTML(me, msg, busy, story) {
          看起來像那一區的按鈕。現在它自己是一條橫跨整張卡片的列，
          上面一條線把它跟上面的內容分開，旁邊一句話說清楚它存的是整頁。 -->
     <div class="saverow">
-      <button class="btn" data-act="save" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存起來"}</button>
-      <span class="savenote">這一頁上面的變更會一起存起來。</span>
+      <button class="btn" data-act="save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("s.save")}</button>
+      <span class="savenote">${T("s.saveNote")}</span>
     </div>
 
-    ${cadre ? `<h3 class="sec-h">護照</h3>
-    <p class="sec-note">個人標語、蓋章紀錄、心得與照片都在護照裡面。</p>
-    <div class="row"><a class="btn ghost sm" href="../passport/">去護照</a>${
+    ${cadre ? `<h3 class="sec-h">${T("s.passport")}</h3>
+    <p class="sec-note">${T("s.passportNote")}</p>
+    <div class="row"><a class="btn ghost sm" href="../passport/">${T("s.goPassport")}</a>${
       // Internship team 的幹部與 Co-President 多一顆：實習生的進度牆。
       // 入口放這裡不放頂欄，因為頂欄不准依 team 過濾（shared/nav.js 檔頭）。
-      internshipStaff(me) ? `<a class="btn ghost sm" href="../intern-passport/">實習生進度牆</a>` : ""}</div>` : ""}
-    ${intern ? `<h3 class="sec-h">實習護照</h3>
-    <p class="sec-note">這一期的任務、章、心得與照片都在實習護照裡面。</p>
-    <div class="row"><a class="btn ghost sm" href="../intern-passport/">去實習護照</a></div>` : ""}
+      internshipStaff(me) ? `<a class="btn ghost sm" href="../intern-passport/">${T("s.internWall")}</a>` : ""}</div>` : ""}
+    ${intern ? `<h3 class="sec-h">${T("s.internPassport")}</h3>
+    <p class="sec-note">${T("s.internNote")}</p>
+    <div class="row"><a class="btn ghost sm" href="../intern-passport/">${T("s.goIntern")}</a></div>` : ""}
 
     <div class="danger">
       ${cadre
-        ? `<p class="sec-note">要離開 BT 的話，帳號的處理是換屆交接的一部分，
-             寄信到 <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a>。</p>`
-        : `<button class="btn quiet" data-act="ask-delete">刪除我的帳號與所有資料</button>`}
+        ? `<p class="sec-note">${T("s.leave")}</p>`
+        : `<button class="btn quiet" data-act="ask-delete">${T("s.delete")}</button>`}
     </div>
   </div>`;
 }
@@ -207,52 +222,41 @@ export function internshipStaff(me) {
 
 function avatarHTML(me, cadre, intern) {
   const on = !!me.public_profile;
-  if (intern) {
-    return `<h3 class="sec-h">大頭照</h3>
-    <div class="avrow">
-      <button class="avbtn" data-act="avatar" title="換一張大頭照">${
+  const btn = `<button class="avbtn" data-act="avatar" title="${esc(T("av.change"))}">${
         me.avatar ? `<img src="${esc(me.avatar)}" alt="">`
-                  : `<span>點這裡<br>上傳</span>`}</button>
+                  : `<span>${T("av.upload")}</span>`}</button>`;
+  if (intern) {
+    return `<h3 class="sec-h">${T("av.title")}</h3>
+    <div class="avrow">
+      ${btn}
       <div class="avside">
-        這張照片會出現在<b>實習生進度牆</b>上，Internship team 的幹部與同一期的 intern 看得到。<br>
-        不會出現在任何對外的頁面上。不上傳也沒有關係。
+        ${T("av.intern")}
       </div>
     </div>`;
   }
   if (!cadre) {
-    return `<h3 class="sec-h">大頭照</h3>
+    return `<h3 class="sec-h">${T("av.title")}</h3>
     <div class="avrow">
-      <button class="avbtn" data-act="avatar" title="換一張大頭照">${
-        me.avatar ? `<img src="${esc(me.avatar)}" alt="">`
-                  : `<span>點這裡<br>上傳</span>`}</button>
+      ${btn}
       <div class="avside">
-        這張照片會跟著你下面那段故事一起出現在<b>任何人都看得到的
-        <a href="../alumni/">公開校友頁</a></b>上，<b>故事被核可之後</b>才會出現。<br>
-        不上傳也沒有關係，那一頁會改用你名字的第一個字。
+        ${T("av.alumni")}
       </div>
     </div>`;
   }
-  return `<h3 class="sec-h">大頭照與公開</h3>
+  return `<h3 class="sec-h">${T("av.titleCadre")}</h3>
     <div class="avrow">
-      <button class="avbtn" data-act="avatar" title="換一張大頭照">${
-        me.avatar ? `<img src="${esc(me.avatar)}" alt="">`
-                  : `<span>點這裡<br>上傳</span>`}</button>
+      ${btn}
       <div class="avside">
-        這張照片會出現在<b>全體幹部看得到的進度牆</b>上。<br>
-        下面那個勾打起來之後，它還會出現在<b>任何人都看得到的公開團隊頁</b>上。
+        ${T("av.cadre")}
       </div>
     </div>
     <label class="check">
       <input id="pub" type="checkbox"${on ? " checked" : ""}>
-      <span>我同意把我的名字、team 與大頭照放上
-        <a href="../team/">公開的團隊頁</a>。那一頁任何人都看得到，也會被搜尋引擎收錄。
-        不打勾完全沒有關係，也不影響你在 BT 做的任何事。</span>
+      <span>${T("av.consent")}</span>
     </label>
-    ${on ? `<label><i>對外顯示的頭銜（選填）</i><input id="ptitle"
+    ${on ? `<label><i>${T("av.ptitle")}</i><input id="ptitle"
       value="${esc(me.public_title || "")}" placeholder="Co-President 2026-2027"></label>
-    <p class="sec-note">${me.public_approved
-      ? "已經在公開的團隊頁上了。隨時可以把上面那個勾拿掉。"
-      : "還要等 Co-President 核可才會真的出現在公開頁面上。"}</p>` : ""}`;
+    <p class="sec-note">${me.public_approved ? T("av.approved") : T("av.pending")}</p>` : ""}`;
 }
 
 // 「我的故事」。幹部與校友都有，學員沒有（高中生還沒出發）。
@@ -263,70 +267,65 @@ export function storyHTML(me, story) {
   const s = story || {};
   const v = k => esc(s[k] || "");
   const on = !!s.public_story;
-  return `<h3 class="sec-h">我的故事</h3>
-    <p class="sec-note">填完並且勾同意、Co-President 核可之後，
-      你會出現在<a href="../alumni/">公開的校友頁</a>那張航線圖上：
-      從你的高中飛到你現在的城市。</p>
-    <label><i>公開顯示的名字</i><input id="sname" value="${v("display_name")}"
+  return `<h3 class="sec-h">${T("st.title")}</h3>
+    <p class="sec-note">${T("st.lede")}</p>
+    <label><i>${T("st.name")}</i><input id="sname" value="${v("display_name")}"
       placeholder="${esc(me.name_zh || me.name_en || "")}">
       </label>
-    <p class="sec-note">想遮字就寫成「張 O 睿」。空著的話用你上面填的姓名。</p>
+    <p class="sec-note">${T("st.nameNote")}</p>
     <div class="two">
-      <label><i>高中</i><input id="sschool" list="schools" value="${v("school")}"
+      <label><i>${T("st.school")}</i><input id="sschool" list="schools" value="${v("school")}"
         autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-        placeholder="打兩個字就會跳出來"></label>
-      <label><i>高中在哪個縣市</i><select id="scounty">
-        <option value="">請選擇</option>
+        placeholder="${esc(T("s.schoolPh"))}"></label>
+      <label><i>${T("st.county")}</i><select id="scounty">
+        <option value="">${T("s.pick")}</option>
         ${COUNTIES.map(c => `<option${s.county === c ? " selected" : ""}>${esc(c)}</option>`).join("")}
       </select></label>
     </div>
-    <p class="sec-note">選了高中之後這一格會自己跳出來。
-      新北的高中選「台北」，圖上的起飛點畫在台北。
-      高中在澎湖、金門、馬祖的話先寫信給我們，那三個地方還不在圖上。</p>
+    <p class="sec-note">${T("st.countyNote")}</p>
     <div class="two">
-      <label><i>現在的城市</i><input id="scity" value="${v("city")}" placeholder="Vancouver"></label>
-      <label><i>國家</i><input id="scountry" value="${v("country")}" placeholder="加拿大"></label>
+      <label><i>${T("st.city")}</i><input id="scity" value="${v("city")}" placeholder="Vancouver"></label>
+      <label><i>${T("st.country")}</i><input id="scountry" value="${v("country")}" placeholder="${esc(T("st.countryPh"))}"></label>
     </div>
-    <label><i>現在念哪間學校或在哪裡工作</i><input id="splace" value="${v("place")}" placeholder="UBC"></label>
-    <label><i>你自己的一句話</i><input id="squote" value="${v("quote")}"
-      placeholder="現在換我回去講。台下坐的就是三年前的我。"></label>
-    <p class="sec-note">這一句在那一頁上用手寫體排出來，是整頁最重要的地方。</p>
-    <label><i>一段介紹</i><input id="snote" value="${v("note")}"
-      placeholder="兩三句：從哪裡出發、現在在做什麼。"></label>
-    <details class="enfold"><summary>英文版（選填）</summary>
-      <p class="sec-note">那一頁有中英切換。沒填的話英文版就顯示中文這一份，畫面不會壞。</p>
+    <label><i>${T("st.place")}</i><input id="splace" value="${v("place")}" placeholder="UBC"></label>
+    <label><i>${T("st.quote")}</i><input id="squote" value="${v("quote")}"
+      placeholder="${esc(T("st.quotePh"))}"></label>
+    <p class="sec-note">${T("st.quoteNote")}</p>
+    <label><i>${T("st.note")}</i><input id="snote" value="${v("note")}"
+      placeholder="${esc(T("st.notePh"))}"></label>
+    <details class="enfold"><summary>${T("st.en")}</summary>
+      <p class="sec-note">${T("st.enNote")}</p>
       <div class="two">
-        <label><i>高中（英文）</i><input id="sschoolen" value="${v("school_en")}"></label>
-        <label><i>國家（英文）</i><input id="scountryen" value="${v("country_en")}"></label>
+        <label><i>${T("st.schoolEn")}</i><input id="sschoolen" value="${v("school_en")}"></label>
+        <label><i>${T("st.countryEn")}</i><input id="scountryen" value="${v("country_en")}"></label>
       </div>
-      <label><i>那一句話（英文）</i><input id="squoteen" value="${v("quote_en")}"></label>
-      <label><i>介紹（英文）</i><input id="snoteen" value="${v("note_en")}"></label>
+      <label><i>${T("st.quoteEn")}</i><input id="squoteen" value="${v("quote_en")}"></label>
+      <label><i>${T("st.noteEn")}</i><input id="snoteen" value="${v("note_en")}"></label>
     </details>
     <label class="check">
       <input id="spub" type="checkbox"${on ? " checked" : ""}>
-      <span>我同意把我的<b>名字、大頭照、高中、現在的城市與學校、上面那一句話與介紹</b>
-        放上<a href="../alumni/">公開的校友頁</a>。那一頁任何人都看得到，也會被搜尋引擎收錄。
-        隨時可以把這個勾拿掉，拿掉就會從那一頁消失。</span>
+      <span>${T("st.consent")}</span>
     </label>
     <p class="sec-note">${esc(storyStatus(s))}</p>`;
 }
 
 // 刪除帳號的確認。**打字確認，不是按兩次。**
 // 按兩次擋不住誤按，因為誤按的人第二次也會按。
+// 打「刪除」或「delete」都算（2026-10-19 英文版加的，中文那條不變）。
+export const DELETE_WORDS = ["刪除", "delete"];
+export const typedDelete = v => DELETE_WORDS.includes(String(v || "").trim().toLowerCase());
 export function deleteHTML(msg, busy) {
   return `<div class="card">
-    <h2>刪除帳號</h2>
-    <div class="sub">這個動作沒有辦法復原。</div>
+    <h2>${T("del.title")}</h2>
+    <div class="sub">${T("del.sub")}</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
-    <div class="wnote big">刪掉的東西包括：你的姓名、學校、年級、訂閱設定，
-      以及你送出過的每一份申請與裡面的答案。</div>
-    <p class="sec-note">已經寄給你的信不會消失，那些在你自己的信箱裡。
-      如果你已經報名了某一場活動，刪掉帳號等於退出那一場。</p>
-    <label><i>確定的話，在下面打「刪除」兩個字</i><input id="dc" autocomplete="off"
-      autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="刪除"></label>
+    <div class="wnote big">${T("del.what")}</div>
+    <p class="sec-note">${T("del.mail")}</p>
+    <label><i>${T("del.type")}</i><input id="dc" autocomplete="off"
+      autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${esc(T("del.typePh"))}"></label>
     <div class="row">
-      <button class="btn" data-act="do-delete" ${busy ? "disabled" : ""}>${busy ? "刪除中…" : "永久刪除我的帳號"}</button>
-      <button class="btn quiet" data-act="back">先不要</button>
+      <button class="btn" data-act="do-delete" ${busy ? "disabled" : ""}>${busy ? T("del.deleting") : T("del.do")}</button>
+      <button class="btn quiet" data-act="back">${T("del.no")}</button>
     </div>
   </div>`;
 }
@@ -338,21 +337,19 @@ export function deleteHTML(msg, busy) {
 // 而真正失敗的那一半他完全不知道。
 // 資料庫那條守 team 的 trigger 丟出來的兩個代碼翻成人話（2026-10-21）。
 const SAYS = [
-  ["team_locked", "你的 team 由 Co-President 在後台改，這裡改不動。名字與大頭照有存進去的話上面會說。"],
-  ["team_needs_president", "勾進那個 team 會多出後台的權限，要 Co-President 在後台加。其他的勾選先拿掉再存一次。"],
+  ["team_locked", "sf.teamLocked"],
+  ["team_needs_president", "sf.teamNeedsPres"],
 ];
 export function saveFailMessage(profileSaved, err) {
   let why = (err && (err.message || err.code)) || String(err || "");
-  for (const [code, text] of SAYS) if (why.includes(code)) { why = text; break; }
-  return profileSaved
-    ? `你的資料存起來了，但「我的故事」那一段沒有存進去：${why}。再按一次「存起來」會重試那一段。`
-    : `存不起來：${why}`;
+  for (const [code, key] of SAYS) if (why.includes(code)) { why = T(key); break; }
+  return profileSaved ? T("sf.half", { why }) : T("err.save", { why });
 }
 
 export function downHTML() {
   return `<div class="card">
-    <h2>資料庫休眠中</h2>
-    <div class="wnote big" style="margin-top:16px">現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。</div>
-    <div class="row"><button class="btn ghost" data-act="retry">再試一次</button></div>
+    <h2>${T("down.title")}</h2>
+    <div class="wnote big" style="margin-top:16px">${T("down.lede")}</div>
+    <div class="row"><button class="btn ghost" data-act="retry">${T("common.retry")}</button></div>
   </div>`;
 }

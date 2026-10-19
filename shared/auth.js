@@ -16,33 +16,50 @@ import { supabase } from "./supabase.js";
 
 // 畫面文案逐字抄自 spec §6.1。這幾行是規格，不是文案建議，不要改寫、不要「潤飾」。
 // 任何錯誤訊息都只能寄到組織信箱，不得出現任何人的名字或私人信箱（spec §11-20）。
-const MSG = {
-  invite:   "這個邀請碼不對，或是已經被用完了。跟你的組長要一組新的。",
-  dupEmail: "這個 email 已經有護照了，直接登入就好。",
+// 2026-10-19 中英切換：每一句是 { zh, en } 兩句並排，MSG_* 與 authMessage() 照現在的語言挑
+// （網址 ?lang=、再 localStorage 的 bt-lang、都沒有就英文，跟 shared/nav.js 的 navLang 同一套）。
+// 中文那一句一個字都沒改。
+const MSG_ZH_EN = {
+  invite:   { zh: "這個邀請碼不對，或是已經被用完了。跟你的組長要一組新的。", en: "This invite code is wrong or has been used up. Ask your team lead for a new one." },
+  dupEmail: { zh: "這個 email 已經有護照了，直接登入就好。", en: "This email already has an account. Just sign in." },
   // badEmail 是六句裡唯一**刻意不附組織信箱**的一句，spec §6.1 明文寫進去的決定：
   // 這是使用者自己就能修好的問題（打錯字），附上信箱等於把一個改一個字母的事
   // 升級成一封求助信。**不要為了跟其他五句一致而幫它加上信箱。**
-  badEmail: "這個 email 看起來不太對，檢查一下有沒有打錯。",
-  shortPw:  "密碼至少要 6 個字。",
-  offline:  "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。",
+  badEmail: { zh: "這個 email 看起來不太對，檢查一下有沒有打錯。", en: "This email does not look right. Check for typos." },
+  shortPw:  { zh: "密碼至少要 6 個字。", en: "The password needs at least 6 characters." },
+  offline:  { zh: "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。", en: "We cannot reach the database right now. Email beyondtaiwan2020@gmail.com. Your data is still there." },
   // 2026-09-01：後半句從「寄信到組織信箱」改成指向自助那顆鍵。
   // 自助入口做好之後，叫人寫信給我們等於把一件他三十秒能自己做完的事
   // 變成一封信加上一次人工重設。組織信箱那條路沒有消失，它在忘記密碼頁上。
-  badLogin: "email 或密碼不對。忘記密碼的話，按下面的「寄一封重設連結給我」。",
+  badLogin: { zh: "email 或密碼不對。忘記密碼的話，按下面的「寄一封重設連結給我」。", en: "Wrong email or password. Forgot it? Press \"Send me a reset link\" below." },
   // 寄信被限流（2026-09-01 加，忘記密碼那條路上）。
   // **不可以用 other 那句「再試一次」頂著。** 限流的意思正是「現在再試一次一定失敗」，
   // 叫他馬上再按等於叫他去撞牆，而且他會以為是自己哪裡打錯了。
   // 這一句要講的是「等」跟「信可能已經在路上」。
-  tooMany:  "剛剛已經寄過一封了，等一分鐘再按一次。信可能還在路上，先看一下垃圾郵件匣。",
+  tooMany:  { zh: "剛剛已經寄過一封了，等一分鐘再按一次。信可能還在路上，先看一下垃圾郵件匣。", en: "We just sent one. Wait a minute before trying again. It may still be on its way, so check your spam folder first." },
   // 伺服器出狀況。**2026-09-01 之前這一句是「這個邀請碼不對」。**
   // 那時候唯一會回 500 的路是註冊 trigger 檢查邀請碼失敗，所以那樣講是對的。
   // 階段 5-7 把門搬去 claim_invite 之後，trigger 裡已經沒有邀請碼檢查了
   // （實測 pg_proc.prosrc：只剩 insert into profiles），
   // **於是那句話變成在任何情況下都是錯的** —— 而且它會出現在根本沒有邀請碼欄位的
   // 忘記密碼頁上，叫使用者去跟組長要一組新的碼。前提沒了，話要跟著改（README 第 11 項）。
-  serverError: "伺服器出了狀況，等一下再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。",
-  other:    "出了點狀況，再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。"
+  serverError: { zh: "伺服器出了狀況，等一下再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。", en: "The server had a problem. Try again in a moment. If it keeps failing, email beyondtaiwan2020@gmail.com." },
+  other:    { zh: "出了點狀況，再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。", en: "Something went wrong. Try again. If it keeps failing, email beyondtaiwan2020@gmail.com." }
 };
+let forcedLang = null;
+// 呼叫端（app/src/main.js）開頁時設一次，之後切換也設；沒設的時候自己看網址與 localStorage。
+export function setAuthLang(l) { forcedLang = (l === "zh" || l === "en") ? l : null; }
+function authLang() {
+  if (forcedLang) return forcedLang;
+  let q = null, stored = null;
+  try { q = new URLSearchParams(location.search).get("lang"); } catch (e) {}
+  try { stored = localStorage.getItem("bt-lang"); } catch (e) {}
+  return q === "zh" || q === "en" ? q : (stored === "zh" || stored === "en" ? stored : "en");
+}
+// MSG 讀起來跟以前一樣是「鍵對一句話」，只是那句話照現在的語言挑。
+const MSG = new Proxy({}, { get: (_, k) => MSG_ZH_EN[k] ? MSG_ZH_EN[k][authLang()] : undefined });
+// 判斷「這個錯誤是不是重複 email」要兩種語言都認（app/src/main.js 用 === 比對）。
+export const isDupEmail = err => !!err && Object.values(MSG_ZH_EN.dupEmail).includes(err.message || err);
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │ 判斷條件：signUp 路徑上的五種形狀全部已對正式專案實測（2026-08-17 兩輪    │

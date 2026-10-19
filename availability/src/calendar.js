@@ -58,11 +58,13 @@ const DAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 
 // 那一格在每個時區的當地時間，一行一個，可以整段複製到群組裡。
 // zones 是 IANA 名稱的陣列（呼叫端自己去重與排序）。
-export function localTimesText(instant, zones, labelOf) {
+// days：七個星期名（0 = 星期日），英文版由 main.js 傳進來；沒傳就是中文（2026-10-19）。
+export function localTimesText(instant, zones, labelOf, days) {
+  const D = days || DAY_ZH;
   return zones.map(tz => {
     const p = partsIn(instant, tz);
     const wd = weekdayOf(p.year, p.month, p.day);
     const name = labelOf ? labelOf(tz) : tz;
-    return `${name}　${p.month}/${p.day}（${DAY_ZH[wd]}）${two(p.hour)}:${two(p.minute)}`;
+    return `${name}　${p.month}/${p.day}（${D[wd]}）${two(p.hour)}:${two(p.minute)}`;
   });
 }

@@ -2,7 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { visasOf, pendingVisasOf, angleOf, monthPageHTML } from "../passport/src/ui.js";
+import { visasOf, pendingVisasOf, angleOf, monthPageHTML, setLang } from "../passport/src/ui.js";
+// 護照 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 
 const MONTHS = [9,10,11,12,1,2,3,4,5,6,7].map((month, seq) => ({ seq, month }));
 const DEST = ["TPE TAIPEI","LAX LOS ANGELES","JFK NEW YORK","BNA NASHVILLE","MSN MADISON",

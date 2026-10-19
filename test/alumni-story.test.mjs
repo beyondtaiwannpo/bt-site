@@ -3,7 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML,
-         saveFailMessage } from "../settings/src/ui.js";
+         saveFailMessage , setLang as settingsLang } from "../settings/src/ui.js";
+// 登入後的頁面 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+settingsLang("zh");
 import { alumniStoriesHTML, tabsHTML, railHTML, shellHTML, setLang } from "../admin/site/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");

@@ -2,7 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { noticeHTML, membersHTML, downHTML, COL_ORDER, DAY_ZH, hhmm,
-         teamsOf, filterByTeam, teamFilterHTML } from "../availability/src/ui.js";
+         teamsOf, filterByTeam, teamFilterHTML, setLang } from "../availability/src/ui.js";
+// 時間看板 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 import { namesOf } from "../availability/src/data.js";
 
 // ★ 2026-09-02 的 bug：知情同意按下去完全沒反應，而且沒有任何錯誤訊息。

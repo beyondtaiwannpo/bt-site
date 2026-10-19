@@ -158,7 +158,7 @@ test("★ 只有日期的字串不可以少一天，不管跑在哪個時區", (
 });
 
 test("學員頁的日期用同一套規則（兩邊各寫一份會分岔）", async () => {
-  const S = await import("../app/src/ui.js");
+  const S = await import("../app/src/ui.js"); S.setLang("zh");
   assert.equal(S.fmtDay("2026-12-15"), "2026 年 12 月 15 日");
   assert.equal(S.statusLine({ status: "received", notify_by: "2026-12-15" }),
     "已收到，2026 年 12 月 15 日 前會通知你");
@@ -170,7 +170,7 @@ test("學員頁的日期用同一套規則（兩邊各寫一份會分岔）", as
 });
 
 test("學員頁畫得出我的申請與現在開放的，而且已經申請過的不再列一次", async () => {
-  const S = await import("../app/src/ui.js");
+  const S = await import("../app/src/ui.js"); S.setLang("zh");
   const p = { name: "王小明", school: "建中", grade: "高二", newsletter: true };
   const apps = [{ id: "a1", form_id: "f1", status: "interview", title: "探索營",
                   interview_url: "https://cal.com/bt" }];

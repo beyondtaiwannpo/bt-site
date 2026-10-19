@@ -1,6 +1,10 @@
 // 純渲染層：只吃 state（S）與活動/月份資料，吐 HTML 字串。不碰儲存，不碰 DOM 事件。
 // passportNo 從 data.js import（data.js 不可以反向依賴這裡，見該檔案的註解）。
 import { passportNo } from "./data.js";
+// 2026-10-19 起畫面上的字全部從 ./strings.js 的字典來（T("鍵")），中英兩版並排在那一支裡。
+// 格子、章、月份時刻的文案來自資料庫，維持原樣，不翻。
+import { T, lang, setLang } from "./strings.js";
+export { T, lang, setLang };
 
 // BT 的六個組。**這裡只放團隊，不放職位。**
 // 原本第七項是 "President's Office"，2026-08-22 拿掉 —— 那不是 BT 的正式團隊，
@@ -36,10 +40,11 @@ export const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
 // 刪之前確認過沒有消費者：categories 這個鍵在全 repo 的程式、SQL、守門裡
 // 一次都沒被讀，schema.sql 也沒有 categories 表（分類是 activities.category
 // 的字串，不是獨立的表）。**不要因為 JSON 看起來少了東西就把 desc 加回去。**
+// label 與 short 是字典的鍵（2026-10-19 中英切換），畫的時候 T()。
 export const CATEGORY = {
-  gather: { label: "聚會 GATHER", short: "聚會", define: "What the whole team does", body: "Once a month, all of BT does one thing together. Games, playlists, guessing whose photo that is. By the end of the year you'll know what twenty nine people's camera rolls look like, what they listen to, what they were like in high school." },
-  prompt: { label: "題目 PROMPT", short: "題目", define: "A question only you can see", body: "Once a month, one question, written to yourself in July. In September you write down what you want, and in July the passport pulls it back out for you. Nobody else can open what you write here, so you can be honest." },
-  frame:  { label: "鏡頭 FRAME",  short: "鏡頭", define: "A photo prompt", body: "Once a month, one photo. The moon, a manhole cover, a bus stop. Things you walk past every day and have never once looked at. Thirty of us shoot the same thing and the difference between six countries shows up on its own." }
+  gather: { label: "cat.gather", short: "cat.gather.short", define: "What the whole team does", body: "Once a month, all of BT does one thing together. Games, playlists, guessing whose photo that is. By the end of the year you'll know what twenty nine people's camera rolls look like, what they listen to, what they were like in high school." },
+  prompt: { label: "cat.prompt", short: "cat.prompt.short", define: "A question only you can see", body: "Once a month, one question, written to yourself in July. In September you write down what you want, and in July the passport pulls it back out for you. Nobody else can open what you write here, so you can be honest." },
+  frame:  { label: "cat.frame",  short: "cat.frame.short", define: "A photo prompt", body: "Once a month, one photo. The moon, a manhole cover, a bus stop. Things you walk past every day and have never once looked at. Thirty of us shoot the same thing and the difference between six countries shows up on its own." }
 };
 
 // CATNAME 從 CATEGORY 衍生，不要各寫一份 —— 那就又變回兩個真相來源了。
@@ -215,9 +220,9 @@ export function faceOf(S, a) {
   return (S.flipped || {})[a.id] === "back" ? "back" : "front";
 }
 
-// 中文月名是語言常數，不是活動內容，可以留在程式裡（spec §5 只禁止活動內容寫死）。
-const MONTH_ZH = { 1:"一月",2:"二月",3:"三月",4:"四月",5:"五月",6:"六月",
-                   7:"七月",8:"八月",9:"九月",10:"十月",11:"十一月",12:"十二月" };
+// 月名是語言常數，不是活動內容，可以留在程式裡（spec §5 只禁止活動內容寫死）。
+// 2026-10-19 起在 strings.js 的 month.1 到 month.12，這裡只留一支取用的函式。
+export const monthName = m => (m >= 1 && m <= 12 ? T("month." + m) : String(m));
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const today = () => new Date().toISOString().slice(0, 10);
@@ -245,11 +250,11 @@ export function barHTML(S) {
   // 「我的護照／進度牆」就是整個站的全部。
   return `<div class="bar">
     <div class="tabs" role="tablist">
-      <button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">我的護照</button>
-      <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">進度牆</button>
+      <button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">${T("bar.mine")}</button>
+      <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">${T("bar.wall")}</button>
     </div>
     <div class="sp"></div>
-    <div class="prog"><small>Stamps collected</small>${done} <span style="opacity:.4">/ ${S.activities.length}</span></div>
+    <div class="prog"><small>${T("bar.stamps")}</small>${done} <span style="opacity:.4">/ ${S.activities.length}</span></div>
   </div>`;
 }
 
@@ -264,10 +269,10 @@ export function barHTML(S) {
 // （不進 localStorage、不進備份檔、不進網址），所以改變頁序沒有相容性問題。
 export function pagesOf(S) {
   return [
-    { kind: "id", label: "資料頁" },
-    { kind: "guide", label: "怎麼用" },
+    { kind: "id", label: T("page.id") },
+    { kind: "guide", label: T("page.guide") },
     ...S.months.map(m => ({
-      kind: "month", month: m, label: MONTH_ZH[m.month] || String(m.month)
+      kind: "month", month: m, label: monthName(m.month)
     }))
   ];
 }
@@ -302,14 +307,14 @@ export function bookHTML(S) {
       <div class="pageno">PAGE ${String(S.page + 1).padStart(2, "0")} / ${pages.length}</div>
     </div>
     <div class="nav">
-      <button class="arrow" data-act="prev" ${S.page === 0 ? "disabled" : ""}>← 前一頁</button>
+      <button class="arrow" data-act="prev" ${S.page === 0 ? "disabled" : ""}>${T("nav.prev")}</button>
       <div class="dots">
         ${pages.map((p, i) => {
           const on = p.kind === "month" ? ` data-on="${dotOn(S, p.month)}"` : "";
           return `<button data-act="go" data-p="${i}"${on} aria-current="${S.page === i}" aria-label="${esc(p.label)}" title="${esc(p.label)}"></button>`;
         }).join("")}
       </div>
-      <button class="arrow" data-act="next" ${S.page === pages.length - 1 ? "disabled" : ""}>下一頁 →</button>
+      <button class="arrow" data-act="next" ${S.page === pages.length - 1 ? "disabled" : ""}>${T("nav.next")}</button>
     </div>
   </div></div>`;
 }
@@ -327,12 +332,12 @@ function pageBodyHTML(S, page) {
 export function idPageHTML(S) {
   const p = S.profile;
   const [l1, l2] = mrz(p);
-  const av = S.profile.avatar ? `<img src="${esc(S.profile.avatar)}" alt="">` : `<span>點此上傳<br>大頭照</span>`;
+  const av = S.profile.avatar ? `<img src="${esc(S.profile.avatar)}" alt="">` : `<span>${T("id.upload")}</span>`;
   const done = stampCount(S);
   const total = S.activities.length;
   return `<div class="mhead">
       <div class="mnum">00</div>
-      <div class="mzh">持照人資料</div>
+      <div class="mzh">${T("id.title")}</div>
       <div class="mtheme"><b>BEYOND TAIWAN</b><span>Passport · ${new Date(p.issued).getFullYear()}</span></div>
     </div>
     <div class="idgrid">
@@ -340,15 +345,15 @@ export function idPageHTML(S) {
            但按下去是**過去換**，不是在這裡開檔案選擇器。
            搬走的理由：大頭照會出現在公開的團隊頁上，而「要不要公開」那個勾在設定頁 ——
            **設定的地方要跟後果的地方在同一個畫面上。** -->
-      <a class="photo" href="../settings/" title="到設定換大頭照">${av}</a>
+      <a class="photo" href="../settings/" title="${esc(T("id.changeAvatar"))}">${av}</a>
       <div>
         <div class="fields">
-          <div class="f"><i>Type / 類別</i><b>BT</b></div>
-          <div class="f"><i>Code / 代碼</i><b>TWN</b></div>
-          <div class="f"><i>Passport No. / 護照號碼</i><b>${passportNo(p.id)}</b></div>
-          <div class="f"><i>Date of issue / 核發日</i><b>${esc(p.issued)}</b></div>
-          <div class="f wide"><i>Name / 姓名</i><b>${esc(p.name_zh)} · ${esc(p.name_en).toUpperCase()}</b></div>
-          <div class="f wide"><i>Team / 所屬團隊</i><b>${esc(p.team)}</b></div>
+          <div class="f"><i>${T("id.type")}</i><b>BT</b></div>
+          <div class="f"><i>${T("id.code")}</i><b>TWN</b></div>
+          <div class="f"><i>${T("id.no")}</i><b>${passportNo(p.id)}</b></div>
+          <div class="f"><i>${T("id.issue")}</i><b>${esc(p.issued)}</b></div>
+          <div class="f wide"><i>${T("id.name")}</i><b>${esc(p.name_zh)} · ${esc(p.name_en).toUpperCase()}</b></div>
+          <div class="f wide"><i>${T("id.team")}</i><b>${esc(p.team)}</b></div>
         </div>
         ${p.motto ? `<div class="motto">「${esc(p.motto)}」</div>` : ""}
       </div>
@@ -356,10 +361,10 @@ export function idPageHTML(S) {
     ${total > 0 && done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
     <div class="mrz">${esc(l1)}<br>${esc(l2)}</div>
     <div class="row" style="margin-top:18px">
-      <button class="btn ghost sm" data-act="edit">編輯資料</button>
-      <button class="btn ghost sm" data-act="export">匯出備份</button>
-      <button class="btn ghost sm" data-act="import">匯入還原</button>
-      <button class="btn sm quiet" data-act="reset">清除這本護照</button>
+      <button class="btn ghost sm" data-act="edit">${T("id.edit")}</button>
+      <button class="btn ghost sm" data-act="export">${T("id.export")}</button>
+      <button class="btn ghost sm" data-act="import">${T("id.import")}</button>
+      <button class="btn sm quiet" data-act="reset">${T("id.reset")}</button>
     </div>`;
 }
 
@@ -448,11 +453,11 @@ export function monthPageHTML(S, m) {
   const dest = full ? visasOf(S)[m.month] : null;
   const dated = full ? acts.map(a => S.stamps[a.id].date).sort().slice(-1)[0] : "";
   const angle = angleOf((S.profile && S.profile.id) || "", m.month);
-  const zh = MONTH_ZH[m.month] || String(m.month);
+  const zh = monthName(m.month);
   return `${dest ? entryStampHTML(dest, dated, angle, m.month) : ""}
     <div class="mhead">
       <div class="mnum">${String(m.month).padStart(2, "0")}</div>
-      <div class="mzh">${zh}</div>
+      <div class="mzh">${esc(zh)}</div>
       ${m.theme_zh ? `<div class="mtheme clock"><b>${esc(m.theme_zh)}</b>${m.theme_en ? `<span>${esc(m.theme_en)}</span>` : ""}</div>` : ""}
     </div>
     <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
@@ -471,17 +476,17 @@ export function callbackHTML(S, act) {
   const src = S.activities.find(a => a.id === act.callback_to);
   // 來源那格可能被停用（boot 會濾掉 active === false），這時候講不出是哪個月，
   // 退成不提月份的說法。不能因此整塊不顯示：那個人的心得還在，還是該給他看。
-  const when = src ? MONTH_ZH[src.month] : "";
+  const when = src ? monthName(src.month) : "";
   const e = S.entries[act.callback_to];
   const st = S.stamps[act.callback_to];
 
   if (!e || !e.note) {
     // spec §7.3：沒寫過時照樣可作答，**不阻擋**。所以這裡只是一段說明，
     // 不是警告，也不會關掉下面的輸入框。
-    const none = when ? `你${when}沒有寫這格` : "你之前沒有寫這格";
-    return `<div class="wnote" style="margin:0 0 16px">${esc(none)}。沒關係，這格照樣可以寫。</div>`;
+    const none = when ? T("cb.noneWhen", { when }) : T("cb.none");
+    return `<div class="wnote" style="margin:0 0 16px">${esc(none)}${T("cb.noneTail")}</div>`;
   }
-  const label = when ? `你在${when}寫的` : "你之前寫的";
+  const label = when ? T("cb.wroteWhen", { when }) : T("cb.wrote");
   return `<div class="wnote" style="margin:0 0 16px">
     <b>${esc(label)}</b>${st ? `　<span style="opacity:.7">${esc(st.date)}</span>` : ""}
     <div style="margin-top:6px;font-size:13px;opacity:.9">「${esc(e.note)}」</div>
@@ -496,7 +501,7 @@ export function callbackHTML(S, act) {
 // 44px 的最小點擊區是 spec §3.3 的要求：手機一格佔滿寬度，滑動時很容易誤觸，
 // 所以翻面只能由這顆觸發，不能「點整格就翻」。
 function flipBtnHTML(id, to) {
-  return `<button class="flipbtn" data-act="flip" data-id="${id}" data-to="${to}" aria-label="${to === "back" ? "翻到背面" : "翻到正面"}">↻</button>`;
+  return `<button class="flipbtn" data-act="flip" data-id="${id}" data-to="${to}" aria-label="${esc(to === "back" ? T("flip.back") : T("flip.front"))}">↻</button>`;
 }
 
 // CATNAME 取不到就印空字串。取不到代表有人改了 category 名稱，
@@ -545,9 +550,9 @@ export function slotHTML(S, a) {
   // 而 .faceopen 仍是真按鈕，鍵盤使用者 tab 得到、按 Enter 開得了。
   const front = `<div class="face front" data-act="open" data-id="${a.id}" aria-hidden="${face === "back"}">
       <button class="faceopen" data-act="open" data-id="${a.id}">
-        <span class="cat">${esc(CATNAME[a.category] || "")}</span>
+        <span class="cat">${esc(CATNAME[a.category] ? T(CATNAME[a.category]) : "")}</span>
         <span class="ttl">${esc(a.title_zh)}</span>
-        ${st ? "" : `<span class="en">${esc(a.title_en)}</span><span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}
+        ${st ? "" : `<span class="en">${esc(a.title_en)}</span><span class="hint">${esc(a.description)}</span><span class="cta">${T("slot.cta")}</span>`}
       </button>
       ${st ? stampHTML(a, st, anim, tearing) + flipBtnHTML(a.id, "back") : ""}
     </div>`;
@@ -588,7 +593,7 @@ export function guideCardsHTML() {
     const g = CATEGORY[c];
     if (!g) return "";
     return `<div class="slot">
-      <span class="cat">${esc(g.label)}</span>
+      <span class="cat">${esc(T(g.label))}</span>
       <span class="ttl">${esc(g.define)}</span>
       <span class="hint">${esc(g.body)}</span>
     </div>`;
@@ -604,7 +609,7 @@ export function guideCardsHTML() {
 // 視覺重量對得上）。2026-08-23 使用者看過對照圖後的決定。
 export function guidePageHTML() {
   return `<div class="mhead solo">
-      <div class="mzh">怎麼用這本護照</div>
+      <div class="mzh">${T("guide.title")}</div>
     </div>
     ${guideCardsHTML()}`;
 }
@@ -617,11 +622,11 @@ export function guidePageHTML() {
 export function introHTML() {
   return `<div class="card" style="max-width:940px">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
-    <h2>怎麼用這本護照</h2>
-    <div class="sub">一年 33 格，每個月三格。這一頁之後在護照裡隨時翻得到。</div>
+    <h2>${T("guide.title")}</h2>
+    <div class="sub">${T("intro.sub")}</div>
     ${guideCardsHTML()}
     <div class="row" style="margin-top:22px">
-      <button class="btn" data-act="intro-done">開始蓋章</button>
+      <button class="btn" data-act="intro-done">${T("intro.start")}</button>
     </div>
   </div>`;
 }
@@ -638,7 +643,7 @@ export function namesOf(p) {
   const zh = String(p.name_zh || "").trim();
   const en = String(p.name_en || "").trim();
   return {
-    name: zh || en || "（沒有名字）",
+    name: zh || en || T("common.noName"),
     // 兩欄填了同一個字的人不重複顯示；只有一個名字的人也沒有第二個。
     alt: zh && en && zh !== en ? en : "",
   };
@@ -651,14 +656,14 @@ function nameHTML(p) {
 }
 
 export function wallHTML(S) {
-  if (S.wallLoading) return `<div class="wall"><div class="empty">正在讀取全體進度…</div></div>`;
+  if (S.wallLoading) return `<div class="wall"><div class="empty">${T("wall.loading")}</div></div>`;
   // 讀失敗要說出來，而且要留一個按得到的重新整理鍵。少了這一段的話，main.js 的
   // loadWall() 一旦拋錯，畫面會永遠停在上面那句「正在讀取全體進度…」——
   // 那看起來像網路很慢，學生會一直等，不會知道該按什麼。
   if (S.wallError) return `<div class="wall">
-    <h3>全體進度牆</h3>
-    <div class="empty">進度牆讀不到。按下面的重新整理再試一次，你自己的護照不受影響。</div>
-    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
+    <h3>${T("wall.title")}</h3>
+    <div class="empty">${T("wall.error")}</div>
+    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">${T("wall.refresh")}</button></div>
   </div>`;
   const total = S.activities.length;
   const people = (S.wall || []).map(p => Object.assign({}, p, { count: (p.stamps || []).length }))
@@ -668,9 +673,9 @@ export function wallHTML(S) {
   feed.sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : 0);
 
   return `<div class="wall">
-    <h3>全體進度牆</h3>
-    <div class="wnote">這面牆是公開的：所有 BT 幹部都看得到你的名字、團隊、大頭照與蓋章紀錄。你寫的心得和上傳的活動照片不會出現在這裡，其他幹部看不到。</div>
-    ${people.length === 0 ? `<div class="empty">還沒有人蓋章。去蓋第一個吧。</div>` :
+    <h3>${T("wall.title")}</h3>
+    <div class="wnote">${T("wall.note")}</div>
+    ${people.length === 0 ? `<div class="empty">${T("wall.empty")}</div>` :
       `<div class="people">${people.map(p => {
         const on = new Set((p.stamps || []).map(s => s.act_id));
         // 大頭照只用既有的 .person 樣式加一段 inline 的圓形裁切，不新增 class（spec §3.4）。
@@ -686,18 +691,18 @@ export function wallHTML(S) {
             const acts = S.activities.filter(a => a.month === m.month);
             const got = acts.filter(a => on.has(a.id)).length;
             const op = got === 0 ? 1 : (0.34 + 0.66 * got / acts.length);
-            const zh = MONTH_ZH[m.month] || String(m.month);
-            return `<i data-on="${got > 0 ? 1 : 0}" style="opacity:${op.toFixed(2)}" title="${zh} ${got}/${acts.length}"></i>`;
+            const zh = monthName(m.month);
+            return `<i data-on="${got > 0 ? 1 : 0}" style="opacity:${op.toFixed(2)}" title="${esc(zh)} ${got}/${acts.length}"></i>`;
           }).join("")}</div>
           <div class="cnt">${p.count || 0} / ${total}</div>
         </div>`;
       }).join("")}</div>`}
-    ${feed.length ? `<div class="feed"><h3>最近蓋的章</h3>
+    ${feed.length ? `<div class="feed"><h3>${T("wall.recent")}</h3>
       ${feed.slice(0, 20).map(f => {
         const a = S.activities.find(x => x.id === f.id);
-        return `<div class="fitem"><time>${esc(f.d)}</time><span><b>${nameHTML(f.who)}</b> 蓋了 <b>${a ? esc(a.title_zh) : esc(f.id)}</b></span></div>`;
+        return `<div class="fitem"><time>${esc(f.d)}</time><span>${T("wall.stamped", { who: nameHTML(f.who), what: a ? esc(a.title_zh) : esc(f.id) })}</span></div>`;
       }).join("")}</div>` : ""}
-    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
+    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">${T("wall.refresh")}</button></div>
   </div>`;
 }
 
@@ -714,11 +719,11 @@ export function wallHTML(S) {
 export function downHTML() {
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
-    <h2>資料庫休眠中</h2>
+    <h2>${T("down.title")}</h2>
     <div class="wnote" style="margin:16px 0 0">
-      資料庫休眠中，你的資料都還在。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。
+      ${T("down.lede")}
     </div>
-    <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">再試一次</button></div>
+    <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">${T("common.retry")}</button></div>
   </div>`;
 }
 
@@ -726,26 +731,26 @@ export function setupHTML(p, user) {
   p = p || {};
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
-    <h2>${p.id ? "編輯護照資料" : "申請你的 BT 護照"}</h2>
-    <div class="sub">${p.id ? "改完按儲存，章不會消失。" : "一年 33 格，每個月三個。蓋滿的人，年底會有一整本回憶。"}</div>
-    <label><i>中文名 / Name</i><input id="fz" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>
-    <label><i>英文名 / Name in English（會印在機讀碼上）</i><input id="fe" value="${esc(p.name_en || "")}" placeholder="Ming Wang" maxlength="30"></label>
+    <h2>${p.id ? T("setup.edit") : T("setup.apply")}</h2>
+    <div class="sub">${p.id ? T("setup.editSub") : T("setup.applySub")}</div>
+    <label><i>${T("setup.nameZh")}</i><input id="fz" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>
+    <label><i>${T("setup.nameEn")}</i><input id="fe" value="${esc(p.name_en || "")}" placeholder="Ming Wang" maxlength="30"></label>
     <!-- ⚠ **本來就存在、但不在 TEAMS 裡的值要原樣留著當一個選項，而且是選起來的。**
          2026-09-10 起一個人可以在好幾個 team（存成「A Team, B Team」這種逗號字串，
          在 /settings/ 用勾的）。這個 select 只選得了一個，
          少了下面那個 extra，那種人一按儲存就會被悄悄改成清單的第一個 ——
          而他不會發現，因為畫面上顯示的本來就是那一個。
          **這一頁刻意不做複選**：要選好幾個到設定頁，那裡才是改資料的地方。 -->
-    <label><i>所屬團隊 / Team</i><select id="ft">${
+    <label><i>${T("setup.team")}</i><select id="ft">${
       TEAMS.map(t => `<option ${p.team === t ? "selected" : ""}>${t}</option>`).join("")
     }${p.team && !TEAMS.includes(p.team)
       ? `<option selected>${esc(p.team)}</option>` : ""}</select>
-      <span class="fnote">要選好幾個 team 的話到<a href="../settings/">設定</a>。</span></label>
-    <label><i>護照上的一句話 / Your line（選填）</i><textarea id="fm" maxlength="60" placeholder="你無法選擇你從未看見的東西。">${esc(p.motto || "")}</textarea></label>
-    <div class="wnote" style="margin:0 0 16px">送出後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
+      <span class="fnote">${T("setup.teamNote")}</span></label>
+    <label><i>${T("setup.motto")}</i><textarea id="fm" maxlength="60" placeholder="${esc(T("setup.mottoPh"))}">${esc(p.motto || "")}</textarea></label>
+    <div class="wnote" style="margin:0 0 16px">${T("setup.note")}</div>
     <div class="row">
-      <button class="btn" data-act="issue">${p.id ? "儲存" : "核發護照"}</button>
-      ${p.id ? `<button class="btn ghost" data-act="cancel">取消</button>` : ""}
+      <button class="btn" data-act="issue">${p.id ? T("common.save") : T("setup.issue")}</button>
+      ${p.id ? `<button class="btn ghost" data-act="cancel">${T("common.cancel")}</button>` : ""}
       <!-- 沒有名字 = 這個人現在**到不了資料頁**，而匯入還原的另一顆按鈕就在資料頁上。
            不放這一顆的話，spec §11-10 的「匯出 → 清除護照 → 匯入還原」根本走不完：
            清完之後畫面就停在這一頁，只有「核發護照」跟「登出」，備份檔沒有地方可以餵進去。
@@ -756,8 +761,8 @@ export function setupHTML(p, user) {
            （clearAll 只把欄位設成 null，不刪列），所以重整一次 p.id 就會有值，
            用 p.id 判斷的話這顆按鈕會在重整後消失，死路又回來了。
            從資料頁按「編輯資料」進來的人一定有名字，所以那條路上不會多出這顆。 -->
-      ${(p.name_zh || p.name_en) ? "" : `<button class="btn ghost sm" data-act="import">匯入還原</button>`}
-      ${user ? `<button class="btn ghost sm" data-act="signout" style="margin-left:auto">登出</button>` : ""}
+      ${(p.name_zh || p.name_en) ? "" : `<button class="btn ghost sm" data-act="import">${T("id.import")}</button>`}
+      ${user ? `<button class="btn ghost sm" data-act="signout" style="margin-left:auto">${T("common.signout")}</button>` : ""}
     </div>
   </div>`;
 }

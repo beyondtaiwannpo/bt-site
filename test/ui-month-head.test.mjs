@@ -2,7 +2,9 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { monthPageHTML, idPageHTML } from "../passport/src/ui.js";
+import { monthPageHTML, idPageHTML, setLang } from "../passport/src/ui.js";
+// 護照 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 
 // 沒有既有的 state 工廠可沿用（原本是單一個 const 物件），這裡把它改成
 // 每次呼叫回傳新物件的工廠，讓後面新增的測試可以用 S()。

@@ -3,7 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boardCounts, firstBusyMinute } from "../availability/src/board.js";
 import { startOfWeek } from "../availability/src/tz.js";
-import { boardHTML } from "../availability/src/ui.js";
+import { boardHTML, setLang } from "../availability/src/ui.js";
+// 時間看板 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 
 const TPE = "Asia/Taipei", DET = "America/Detroit";
 const evening = id => new Set((() => {

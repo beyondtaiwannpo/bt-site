@@ -8,6 +8,7 @@
 import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 import { navHTML } from "../../shared/nav.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 let S = {
   user: null,
@@ -62,7 +63,7 @@ const root = () => document.getElementById("bt-root");
 // 慢一點的網路會看到一片白。
 function toApp() {
   const el = root();
-  if (el) el.innerHTML = `<div class="empty">帶你去登入頁…</div>`;
+  if (el) el.innerHTML = `<div class="empty">${T("m.toLogin")}</div>`;
   location.replace("../app/?next=passport");
 }
 
@@ -73,7 +74,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   // 沒登入不會走到這裡（boot() 已經導去 /app/）。真的走到了就是 boot 的判斷漏了，
   // 那時候顯示一句話比顯示空白好 —— 這一頁不再有登入表單可以退回去。
-  if (!S.user) { el.innerHTML = `<div class="empty">請先登入。<a href="../app/">去登入頁</a></div>`; return; }
+  if (!S.user) { el.innerHTML = `<div class="empty">${T("m.pleaseLogin")}</div>`; return; }
   // 不是幹部的人也不會走到這裡（boot() 導去 /app/，升級表單在那邊）。
   // 同樣的道理：走到了就講一句話，不要空白。
   //
@@ -81,7 +82,7 @@ function render() {
   // S.role 是 null 的時候（profiles 那一列查不到、或資料庫還沒遷移）不要接住，
   // 讓它掉到下面既有的分支去 —— 那跟「是學員」不是同一件事，
   // 把它說成「你還不是幹部」會讓一個資料壞掉的幹部以為問題出在自己沒升級。
-  if (S.role && S.role !== "cadre") { el.innerHTML = `<div class="empty">這裡只開放給 BT 幹部。<a href="../app/">回到入口</a></div>`; return; }
+  if (S.role && S.role !== "cadre") { el.innerHTML = `<div class="empty">${T("m.cadreOnly")}</div>`; return; }
   // Task 6 之後 trigger 會先建一列空的 passport，所以「有 profile 但兩個名字都空」
   // 也要當成還沒申請過，繼續停在申請畫面（brief Step 6）。
   if (!S.profile || !S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile, S.user); return; }
@@ -102,7 +103,7 @@ function render() {
   // ?bare=1（2026-10-19，Paul 拍板）：後台的預覽框用的，不畫頂欄與子欄，框裡只有那本護照。
   // 它只改畫面；讀得到什麼仍然是 RLS 決定的，跟 ?month= 同一類。
   const bare = new URLSearchParams(location.search).get("bare") === "1";
-  el.innerHTML = (bare ? "" : navHTML({ current: "passport", role: S.role,
+  el.innerHTML = (bare ? "" : navHTML({ current: "passport", role: S.role, lang: lang(),
                            name: S.profile && (S.profile.name_zh || S.profile.name_en) })
                + UI.barHTML(S)) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
 }
@@ -131,7 +132,7 @@ function openModal(id) {
   const d = document.createElement("div");
   d.className = "scrim"; d.id = "scrim";
   d.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${UI.esc(a.title_zh)}">
-    <div class="mt">${UI.esc(UI.CATNAME[a.category] || "")} · ${String(a.month).padStart(2, "0")}月</div>
+    <div class="mt">${UI.esc(UI.CATNAME[a.category] ? T(UI.CATNAME[a.category]) : "")} · ${UI.esc(UI.monthName(a.month))}</div>
     <h3>${UI.esc(a.title_zh)}</h3>
     <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${UI.esc(a.title_en)}</div>
     <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${UI.esc(a.description)}</p>
@@ -139,14 +140,14 @@ function openModal(id) {
          這個順序是有意義的 —— 先看到自己九月寫的，接著就是今天要寫的那一格，
          視線是連續的。放到輸入框下面的話，人已經開始打字了才看到，等於沒有回望。 -->
     ${UI.callbackHTML(S, a)}
-    <label><i>日期 / Date</i><input type="date" id="md" value="${UI.esc(st ? st.date : UI.today())}"></label>
-    <label><i>一句話 / One line（選填，最多 60 字）</i><textarea id="mn" maxlength="60" placeholder="那天發生了什麼？">${st ? UI.esc(entry.note || "") : ""}</textarea></label>
-    <label><i>照片（選填，只存在你的護照裡）</i><input type="file" id="mf" accept="image/*"></label>
+    <label><i>${T("md.date")}</i><input type="date" id="md" value="${UI.esc(st ? st.date : UI.today())}"></label>
+    <label><i>${T("md.note")}</i><textarea id="mn" maxlength="60" placeholder="${UI.esc(T("md.notePh"))}">${st ? UI.esc(entry.note || "") : ""}</textarea></label>
+    <label><i>${T("md.photo")}</i><input type="file" id="mf" accept="image/*"></label>
     <img class="prev" id="mp" src="${UI.esc(entry.photo || "")}" style="${entry.photo ? "" : "display:none"}" alt="">
     <div class="row" style="margin-top:14px">
-      <button class="btn" data-act="stamp" data-id="${id}">${st ? "更新" : "蓋章"}</button>
-      <button class="btn ghost" data-act="close">取消</button>
-      ${st ? `<button class="btn ghost sm" data-act="unstamp" data-id="${id}" style="margin-left:auto">撕掉這格</button>` : ""}
+      <button class="btn" data-act="stamp" data-id="${id}">${st ? T("md.update") : T("md.stamp")}</button>
+      <button class="btn ghost" data-act="close">${T("common.cancel")}</button>
+      ${st ? `<button class="btn ghost sm" data-act="unstamp" data-id="${id}" style="margin-left:auto">${T("md.unstamp")}</button>` : ""}
     </div>
   </div>`;
   document.body.appendChild(d);
@@ -158,7 +159,7 @@ function openModal(id) {
       const url = await compress(file, 640, 0.68);
       const p = d.querySelector("#mp");
       p.src = url; p.style.display = "block"; p.dataset.new = "1";
-    } catch (e) { toast("這張圖讀不到，換一張試試"); }
+    } catch (e) { toast(T("m.imgFail")); }
   });
   setTimeout(() => { const n = d.querySelector("#mn"); if (n) n.focus(); }, 30);
 }
@@ -197,10 +198,10 @@ async function doStamp(id) {
 
   try {
     await DATA.saveStamp(id, { date, note, photo });
-    toast(fresh ? "蓋好了。" : "已更新。");
+    toast(fresh ? T("m.stamped") : T("m.updated"));
     syncVisas();
   } catch (e) {
-    toast("沒有存起來，再試一次。");
+    toast(T("m.notSaved"));
   }
 }
 
@@ -234,12 +235,12 @@ async function doUnstamp(id) {
   render();
   try {
     await DATA.removeStamp(id);
-    toast("撕掉了。");
+    toast(T("m.torn"));
   } catch (e) {
     S.stamps[id] = stampBackup;
     S.entries[id] = entryBackup;
     render();
-    toast("沒有存起來，再試一次。");
+    toast(T("m.notSaved"));
   }
 }
 
@@ -298,7 +299,7 @@ document.addEventListener("click", async e => {
 
   if (act === "unstamp") {
     const id = b.dataset.id;
-    if (!confirm("撕掉這格？日期、心得和照片都會不見。")) return;
+    if (!confirm(T("confirm.unstamp"))) return;
     const d = document.getElementById("scrim"); if (d) d.remove();
     // 在呼叫的當下求值，不要存成模組層級的常數 —— 使用者可以隨時在
     // 系統設定裡切換這個偏好，存起來的話開著這個分頁的人切了也不會生效。
@@ -323,7 +324,7 @@ document.addEventListener("click", async e => {
   if (act === "issue") {
     const name_zh = document.getElementById("fz").value.trim();
     const name_en = document.getElementById("fe").value.trim();
-    if (!name_zh && !name_en) { toast("至少填一個名字"); return; }
+    if (!name_zh && !name_en) { toast(T("m.needName")); return; }
     const p = {
       name_zh, name_en: name_en || name_zh,
       team: document.getElementById("ft").value,
@@ -334,8 +335,8 @@ document.addEventListener("click", async e => {
       await boot();
       S.view = "passport"; S.page = 0;
       render();
-      toast("護照核發完成。");
-    } catch (e) { toast("沒有存起來，再試一次。"); }
+      toast(T("m.issued"));
+    } catch (e) { toast(T("m.notSaved")); }
     return;
   }
 
@@ -346,7 +347,7 @@ document.addEventListener("click", async e => {
     // 不先 render()：那會在 S.down 已經是 false、資料卻還沒回來的時候閃一下登入頁或申請頁。
     // 直接寫一句「正在重新連線…」，讓按下去的人知道有反應 —— 重試最長要等 7 秒（見 boot）。
     S.down = false;
-    root().innerHTML = `<div class="empty">正在重新連線…</div>`;
+    root().innerHTML = `<div class="empty">${T("m.reconnect")}</div>`;
     await boot();
     return;
   }
@@ -364,7 +365,7 @@ document.addEventListener("click", async e => {
       // 去讀它之前被撤銷的話，下載會安靜地失敗 —— 沒有錯誤、沒有檔案，而使用者
       // 剛剛才看到「備份下載好了」。延後釋放，寧可多佔一下記憶體。
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      toast("備份下載好了。收在你自己的雲端硬碟裡。");
+      toast(T("m.exported"));
     } catch (e) { toast(e.message); }
     return;
   }
@@ -382,50 +383,43 @@ document.addEventListener("click", async e => {
 
       // 匯入前顯示摘要（spec §7.4）。passport_no 可能不存在（手工改過的檔案
       // 仍可能通過格式檢查），那時候就不要印出「原本屬於護照 undefined」。
-      const summary = `這個備份檔有 ${b.stamps.length} 個章，`
-        + `匯出日期 ${String(b.exported_at || "不明").slice(0, 10)}`
-        + (b.passport_no ? `，原本屬於護照 ${b.passport_no}。` : "。");
+      const summary = T("m.summary", { n: b.stamps.length, d: String(b.exported_at || T("m.unknownDate")).slice(0, 10) })
+        + (b.passport_no ? T("m.belonged", { no: b.passport_no }) : T("m.period"));
       const has = Object.keys(S.stamps).length;
       // spec §7.4 要的是「說清楚會蓋掉什麼」。護照資料**兩種模式都會被覆蓋** ——
       // 合併只合併章與心得，姓名那些一律換成備份檔裡的。不講的話，選了「合併」的人
       // 會以為自己什麼都沒被動到，然後發現名字變成別人的（跨帳號還原時特別明顯）。
       // 2026-08-17 實測跨帳號合併時撞到：B 選了合併，名字變成 A 的，而對話框從頭到尾沒提。
-      const profileNote = "還原也會把你的姓名、團隊、標語和大頭照換成備份檔裡的。";
+      const profileNote = T("m.profileNote");
 
       let mode = "overwrite";
       if (has > 0) {
         // 目前護照已有內容時，明確詢問覆蓋還是合併；預設覆蓋，並說清楚會蓋掉什麼。
-        mode = confirm(
-          `${summary}\n\n`
-          + `你現在的護照已經有 ${has} 個章。\n\n`
-          + `按「確定」＝ 覆蓋：現在這 ${has} 個章、心得和照片會全部刪掉，換成備份檔裡的。\n`
-          + `按「取消」＝ 合併：兩邊的章都留，同一格以備份檔的內容為準。\n\n`
-          + `${profileNote}（兩種選擇都一樣）`
-        ) ? "overwrite" : "merge";
-      } else if (!confirm(`${summary}\n\n${profileNote}\n\n要還原到你現在的帳號嗎？`)) {
+        mode = confirm(T("confirm.importHas", { summary, has, note: profileNote })) ? "overwrite" : "merge";
+      } else if (!confirm(T("confirm.importEmpty", { summary, note: profileNote }))) {
         return;
       }
 
       try {
         const r = await DATA.importPassport(b, mode);
-        toast(`還原了 ${r.written} 個章。`);
+        toast(T("m.restored", { n: r.written }));
         await boot();
       } catch (e) {
         // 這句話能說得這麼肯定，是因為 importPassport 是先寫後刪的（見該函式的註解）。
         // 換成先刪後寫的話這裡就是在騙人：資料早就沒了。改那個順序之前先改這句話。
         console.error("匯入失敗：", e);
-        toast("還原失敗，資料沒有被改動。再試一次。");
+        toast(T("m.restoreFail"));
       }
     };
     i.click(); return;
   }
 
   if (act === "reset") {
-    if (!confirm("清除這本護照？所有的章、心得和照片都會消失，無法復原。")) return;
+    if (!confirm(T("confirm.reset"))) return;
     try {
       await DATA.clearAll();
     } catch (e) {
-      toast("沒有清除成功，再試一次。");
+      toast(T("m.resetFail"));
       return;
     }
     // **列出要清掉的，不是列出要保留的。** 要清的正好是「護照內容」，
@@ -515,7 +509,7 @@ export async function boot() {
     // 主動砍掉，那是拿「已經壞掉的體驗」去換「本來會好的結果」。改成等太久就換句話說。
     const slow = setTimeout(() => {
       const el = root();
-      if (el) el.innerHTML = `<div class="empty">還在連資料庫…<br>如果一直停在這裡，可能是資料庫休眠了。</div>`;
+      if (el) el.innerHTML = `<div class="empty">${T("m.slow")}</div>`;
     }, 2500);
     let all;
     try { all = await DATA.loadAll(); } finally { clearTimeout(slow); }
@@ -562,4 +556,8 @@ export async function boot() {
     render();
   }
 }
+// 語言（2026-10-19 中英切換）。網址 ?lang= 先、再 localStorage 的、都沒有就英文。切換鈕在 /settings/，這一頁跟著走。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+setLang(pickLang(location.search, readStored()));
+document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
 boot();

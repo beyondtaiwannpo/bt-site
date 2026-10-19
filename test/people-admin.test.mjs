@@ -7,7 +7,8 @@ import { tabsHTML, rosterHTML, changesHTML, personEditHTML, BOARD_ROLES, boardLa
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
 import { says } from "../admin/people/src/data.js";
-import { teamPickHTML, teamLocked, saveFailMessage, TEAMS as SETTINGS_TEAMS } from "../settings/src/ui.js";
+import { teamPickHTML, teamLocked, saveFailMessage, TEAMS as SETTINGS_TEAMS, setLang as settingsLang } from "../settings/src/ui.js";
+settingsLang("zh");
 
 const ME = "11111111-1111-1111-1111-111111111111";
 const ROWS = [

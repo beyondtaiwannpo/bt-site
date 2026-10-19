@@ -115,7 +115,8 @@ async function main() {
   await new Promise((res, rej) => { ws.addEventListener("open", res, { once: true }); ws.addEventListener("error", rej, { once: true }); });
   const send = cdp(ws);
   await send("Page.enable"); await send("Runtime.enable");
-  await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.confirm = () => true;` });
+  // 登入後的頁面 2026-10-19 起有中英切換，預設英文；這一支的斷言全是中文，所以先把語言存成中文。
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.confirm = () => true; try { localStorage.setItem("bt-lang", "zh"); } catch (e) {}` });
   await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
 
   const ev = async expr => (await send("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true })).result.value;

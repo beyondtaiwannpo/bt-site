@@ -6,7 +6,8 @@ import { pageForMonth } from "../passport/src/ui.js";
 import { passportAdminHTML, passportPreviewHTML, internAdminHTML, internPreviewHTML, setLang } from "../admin/passports/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
-import { pageForCat, sampleProfile, idPageHTML, barHTML } from "../intern-passport/src/ui.js";
+import { pageForCat, sampleProfile, idPageHTML, barHTML, setLang as internLang } from "../intern-passport/src/ui.js";
+internLang("zh");
 
 const S = { months: [{ seq: 1, month: 9 }, { seq: 2, month: 10 }, { seq: 3, month: 11 }] };
 const DATA = { months: S.months, activities: [], destinations: [], stamped: {} };

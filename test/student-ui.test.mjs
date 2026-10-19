@@ -5,7 +5,9 @@
 // 預設打勾的同意、少了刪除入口、送出時多送一欄。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { completeHTML, studentHTML, deleteHTML, profileComplete, GRADES } from "../app/src/ui.js";
+import { completeHTML, studentHTML, deleteHTML, profileComplete, GRADES, setLang } from "../app/src/ui.js";
+// 登入後的頁面 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 
 const full = { name: "王小明", school: "臺北市立建國高級中學", grade: "高二", newsletter: true };
 

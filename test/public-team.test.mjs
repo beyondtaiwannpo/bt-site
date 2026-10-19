@@ -3,7 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { peopleHTML, initial, toPerson, teamKey, byTeam } from "../team/src/ui.js";
-import { settingsHTML } from "../settings/src/ui.js";
+import { settingsHTML, setLang as settingsLang } from "../settings/src/ui.js";
+// 登入後的頁面 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+settingsLang("zh");
 import { publicTeamHTML, tabsHTML, railHTML, shellHTML, setLang } from "../admin/site/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");

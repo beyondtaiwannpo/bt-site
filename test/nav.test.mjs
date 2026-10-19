@@ -3,14 +3,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { FEATURES, featuresFor, navHTML } from "../shared/nav.js";
+// 頂欄 2026-10-19 起中英兩版，連結帶 ?lang=；這一支斷言中文，所以每一次都傳 lang: "zh"。
 
 const count = (h, re) => (h.match(re) || []).length;
 
 test("FEATURES 每一筆都有 key / label / href / roles / title / desc", () => {
   assert.ok(FEATURES.length >= 2);
   for (const f of FEATURES)
-    for (const k of ["key", "label", "href", "roles", "title", "desc"])
+    for (const k of ["key", "label", "href", "roles", "title", "desc"]) {
+      // label / title / desc 是 { zh, en } 兩句並排（2026-10-19 中英切換）。
+      if (["label", "title", "desc"].includes(k)) { assert.ok(f[k] && f[k].zh && f[k].en, `${f.key || "?"} 的 ${k} 要有 zh 與 en`); continue; }
       assert.ok(f[k] != null && String(f[k]).length, `${f.key || "?"} 少了 ${k}`);
+    }
 });
 
 // href 是根目錄相對路徑，而且那個資料夾真的存在。
@@ -27,12 +31,12 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
 // 那才是真正會壞的地方（過濾寫錯、或是有人在 navHTML 裡多畫一個寫死的連結）。
 // 順便把 key 列出來對一次，不然「數量對但畫錯項目」抓不到。
 test("★ 幹部看到 FEATURES 上所有屬於他的項目，當前的那一項有標記", () => {
-  const h = navHTML({ current: "availability", role: "cadre", name: "王平" });
+  const h = navHTML({ current: "availability", role: "cadre", name: "王平", lang: "zh" });
   const mine = FEATURES.filter(f => f.roles.includes("cadre"));
-  assert.equal(count(h, /<a href="\/[a-z-]+\/"/g), mine.length);
-  for (const f of mine) assert.ok(h.includes(`href="${f.href}"`), `頂欄少了 ${f.key}`);
-  assert.match(h, /href="\/availability\/" aria-current="page"/, "當前項沒有 aria-current");
-  assert.ok(!/href="\/passport\/" aria-current/.test(h), "不是當前的項被標了");
+  assert.equal(count(h, /<a href="\/[a-z-]+\/\?lang=zh"/g), mine.length);
+  for (const f of mine) assert.ok(h.includes(`href="${f.href}?lang=zh"`), `頂欄少了 ${f.key}`);
+  assert.match(h, /href="\/availability\/\?lang=zh" aria-current="page"/, "當前項沒有 aria-current");
+  assert.ok(!/href="\/passport\/\?lang=zh" aria-current/.test(h), "不是當前的項被標了");
 });
 
 // ★ 學員：列照樣畫，只是功能項是空的。不整條藏起來——他知道自己在這個站裡，
@@ -42,12 +46,12 @@ test("★ 幹部看到 FEATURES 上所有屬於他的項目，當前的那一項
 // **這一條守的仍然是同一件事**：學員只看得到屬於他的那幾項，
 // 一項都不能多（多一項就是一條他點了會被彈回來的死路）。
 test("★ 學員只看得到屬於學員的功能項，logo、名字、登出都在", () => {
-  const h = navHTML({ current: null, role: "student", name: "小明" });
+  const h = navHTML({ current: null, role: "student", name: "小明", lang: "zh" });
   const mine = FEATURES.filter(f => f.roles.includes("student"));
   assert.ok(mine.length > 0, "學員一項都沒有的話，這一條就沒有在守任何東西了");
-  assert.equal(count(h, /<a href="\/[a-z-]+\/"/g), mine.length, "學員看到了他進不去的功能");
+  assert.equal(count(h, /<a href="\/[a-z-]+\/\?lang=zh"/g), mine.length, "學員看到了他進不去的功能");
   for (const f of FEATURES.filter(x => !x.roles.includes("student")))
-    assert.ok(!h.includes(`href="${f.href}"`), `學員看到了幹部才有的 ${f.key}`);
+    assert.ok(!h.includes(`href="${f.href}?lang=zh"`), `學員看到了幹部才有的 ${f.key}`);
   // 2026-09-08：logo 改成回對外的首頁。/app/ 現在只剩登入表單，
   // 點 logo 回到一頁只有表單的地方沒有意義。
   assert.ok(h.includes('href="/"'), "沒有回首頁的 logo 連結");
@@ -65,19 +69,19 @@ test("★ 校友的頂欄只有設定，一項都不能多", () => {
 });
 
 test("role 是 null（profiles 查不到）時也不會爆，當成沒有功能", () => {
-  assert.doesNotThrow(() => navHTML({ current: null, role: null, name: "" }));
-  assert.equal(count(navHTML({ current: null, role: null, name: "" }), /<a href="\/[a-z-]+\/"/g), 0);
+  assert.doesNotThrow(() => navHTML({ current: null, role: null, name: "", lang: "zh" }));
+  assert.equal(count(navHTML({ current: null, role: null, name: "", lang: "zh" }), /<a href="\/[a-z-]+\/\?lang=zh"/g), 0);
 });
 
 test("名字會跳脫，而且窄螢幕用的第一個字也跳脫", () => {
-  const h = navHTML({ current: "passport", role: "cadre", name: '<b>x</b>' });
+  const h = navHTML({ current: "passport", role: "cadre", name: '<b>x</b>', lang: "zh" });
   assert.ok(!h.includes("<b>x</b>"), "名字被原樣塞進 HTML");
   assert.ok(h.includes("&lt;b&gt;x&lt;/b&gt;"), "名字沒有被顯示");
   assert.ok(h.includes('<span class="short">&lt;</span>'), "第一個字沒有跳脫");
 });
 
 test("沒有名字時不畫名字那一格，但登出還在", () => {
-  const h = navHTML({ current: "passport", role: "cadre", name: "" });
+  const h = navHTML({ current: "passport", role: "cadre", name: "", lang: "zh" });
   assert.ok(!h.includes("btnav-who"));
   assert.ok(h.includes('data-act="signout"'));
 });
@@ -104,7 +108,7 @@ test("shared/ 不 import 任何功能資料夾", () => {
 // 四個功能項在 390px 上一排放不下，所以窄螢幕收成一顆選單。
 // 開合是純 CSS：一個看不見的 checkbox 加一個 label。
 test("★ 選單的開關是 checkbox 加 label，而且 for 對得上 id", () => {
-  const h = navHTML({ current: "settings", role: "cadre", name: "王平" });
+  const h = navHTML({ current: "settings", role: "cadre", name: "王平", lang: "zh" });
   const id = (h.match(/<input class="btnav-toggle"[^>]*id="([^"]+)"/) || [])[1];
   assert.ok(id, "沒有那個開關的 checkbox");
   assert.ok(h.includes(`<label class="btnav-burger" for="${id}"`),
@@ -119,7 +123,7 @@ test("★ 選單的開關是 checkbox 加 label，而且 for 對得上 id", () =
 test("★ 不准改用 <details> 做那顆選單", () => {
   // ⚠ 要先把 HTML 註解剝掉再看。navHTML 裡那段註解本身就寫著這個標籤名
   //（它在解釋為什麼不能用），不剝的話這條測試會抓到那段解釋自己。
-  const h = navHTML({ current: null, role: "cadre", name: "" })
+  const h = navHTML({ current: null, role: "cadre", name: "", lang: "zh" })
     .replace(/<!--[\s\S]*?-->/g, "");
   assert.doesNotMatch(h, /<details/, "改成 details 的話寬螢幕上功能項會整排不見");
   assert.doesNotMatch(h, /<summary/);
@@ -128,9 +132,9 @@ test("★ 不准改用 <details> 做那顆選單", () => {
 // 面板與那排連結是同一個 div，不是兩份。兩份的話寬螢幕改了一邊、
 // 窄螢幕還是舊的，而且沒有東西會報錯。
 test("★ 功能項只有一份，不是寬窄各一份", () => {
-  const h = navHTML({ current: "passport", role: "cadre", name: "王平" });
+  const h = navHTML({ current: "passport", role: "cadre", name: "王平", lang: "zh" });
   assert.equal((h.match(/class="btnav-items"/g) || []).length, 1);
   for (const f of FEATURES.filter(x => x.roles.includes("cadre")))
-    assert.equal((h.match(new RegExp(`href="${f.href}"`, "g")) || []).length, 1,
+    assert.equal((h.match(new RegExp(`href="${f.href}\\?lang=zh"`, "g")) || []).length, 1,
       `${f.key} 出現了不只一次`);
 });

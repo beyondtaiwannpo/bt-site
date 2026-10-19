@@ -9,6 +9,7 @@ import * as AUTH from "../../shared/auth.js";
 // 登入頁本身完全正常 —— 那種錯誤最容易活著上線。
 import { supabase } from "../../shared/supabase.js";
 import * as UI from "./ui.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 // view 只有在「學員」那條路上有意義：null 是 dashboard，
 // "edit" 是補完／修改資料，"claim" 是輸入邀請碼，"delete" 是刪除確認。
@@ -42,14 +43,14 @@ function render() {
   // **校友不走學員那條補資料的路** —— 就讀學校與年級是問高中生的，
   // 對一個已經出發的人沒有意義，而且那一頁沒填完會把他擋在外面。
   if (S.role === "cadre" || S.role === "alumni") {
-    el.innerHTML = `<div class="empty">帶你進去…</div>`;
+    el.innerHTML = `<div class="empty">${T("m.taking")}</div>`;
     location.replace("../settings/");
     return;
   }
   // 2026-10-17：實習生直接進實習護照。他在這個站上唯一的事就是那本護照，
   // 設定頁從護照的頂欄進得去。不走學員那條補學校年級的路：那是問高中生的。
   if (S.role === "intern") {
-    el.innerHTML = `<div class="empty">帶你進去…</div>`;
+    el.innerHTML = `<div class="empty">${T("m.taking")}</div>`;
     location.replace("../intern-passport/");
     return;
   }
@@ -113,7 +114,7 @@ async function loadStudentBits() {
     if (op.error) throw op.error;
     S.apps = (ap.data || []).map(a => ({
       id: a.id, form_id: a.form_id, status: a.status,
-      title: (a.forms && a.forms.title) || "（表單已經被刪掉）",
+      title: (a.forms && a.forms.title) || T("m.formGone"),
       notify_by: a.forms && a.forms.notify_by,
       interview_url: a.forms && a.forms.interview_url,
     }));
@@ -165,7 +166,7 @@ async function boot() {
     // 不是碰巧的。
     const n = S.role === "cadre" && takeNext(location.search, store());
     if (n) {
-      root().innerHTML = `<div class="empty">帶你過去…</div>`;
+      root().innerHTML = `<div class="empty">${T("m.takingOver")}</div>`;
       // replace 不留下歷史紀錄。用 href 的話，他從護照按上一頁會回到這裡，
       // 而這裡又會立刻把他送回護照 —— 上一頁就變成按不動的。
       location.replace(n);
@@ -225,9 +226,9 @@ document.addEventListener("click", async e => {
       // 這個 email 已經有帳號 → **直接帶他回登入畫面**，email 留著。
       //（2026-09-08 Paul 實測回報。）叫他自己按「我已經有帳號了」再重打一次 email，
       // 是把一件我們已經知道答案的事丟回去給他做。
-      if (err.message === AUTH.MSG_DUP_EMAIL) {
+      if (AUTH.isDupEmail(err)) {
         S.authMode = "in";
-        S.authMsg = "這個 email 已經有帳號了，直接登入就好。密碼忘記的話下面可以重設。";
+        S.authMsg = T("m.dup");
       } else {
         S.authMsg = err.message;
       }
@@ -285,7 +286,7 @@ document.addEventListener("click", async e => {
     const grade = document.getElementById("pg").value;
     const newsletter = document.getElementById("pnl").checked;
     if (!name || !school || !grade) {
-      S.authMsg = "姓名、學校、年級三個都要填。"; render(); return;
+      S.authMsg = T("m.three"); render(); return;
     }
     S.busy = true; S.authMsg = ""; render();
     try {
@@ -302,14 +303,14 @@ document.addEventListener("click", async e => {
     } catch (err) {
       // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再按一次、
       // 按五次、然後關掉（看板那一輪學到的同一件事）。
-      S.busy = false; S.authMsg = "存不起來：" + (err.message || err); render();
+      S.busy = false; S.authMsg = T("err.save") + (err.message || err); render();
     }
     return;
   }
 
   if (act === "do-delete") {
     const typed = document.getElementById("dc").value.trim();
-    if (typed !== "刪除") { S.authMsg = "要在那一格打「刪除」兩個字才會執行。"; render(); return; }
+    if (!UI.typedDelete(typed)) { S.authMsg = T("m.typeDelete"); render(); return; }
     S.busy = true; S.authMsg = ""; render();
     try {
       const { error } = await supabase.rpc("delete_my_account");
@@ -318,11 +319,11 @@ document.addEventListener("click", async e => {
       // 指向不存在的人的票，畫面會變成「登入著但什麼都查不到」。
       await AUTH.signOut();
       S = { user: null, role: null, name: "", authMode: "in",
-            authMsg: "帳號已經刪掉了。謝謝你來過。", authEmail: "", down: false,
+            authMsg: T("m.deleted"), authEmail: "", down: false,
             profile: null, view: null, busy: false, apps: [], opens: [] };
       render();
     } catch (err) {
-      S.busy = false; S.authMsg = "刪不掉：" + (err.message || err); render();
+      S.busy = false; S.authMsg = T("m.delFail") + (err.message || err); render();
     }
     return;
   }
@@ -336,4 +337,11 @@ document.addEventListener("click", async e => {
   }
 });
 
+// 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
+// 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文。切換鈕在 /settings/，這一頁跟著走。
+// shared/auth.js 的六句錯誤訊息也要知道語言（setAuthLang），不然登入失敗那一句會跟畫面不同語言。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+setLang(pickLang(location.search, readStored()));
+AUTH.setAuthLang(lang());
+document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
 boot();

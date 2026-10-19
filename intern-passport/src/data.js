@@ -9,13 +9,14 @@
 // 安全性不在這個檔案裡，在資料庫裡。這裡每一句 .eq("user_id", ...) 都只是少傳一點資料，
 // 真正擋住別人心得的是 intern_entries 那四條 RLS（2026-10-17-intern-passport.sql）。
 import { supabase } from "../../shared/supabase.js";
+import { T } from "./strings.js";
 import { currentUser } from "../../shared/auth.js";
 
 export { signOut, isOfflineError, sessionGone, currentUserDetailed, currentUser } from "../../shared/auth.js";
 
 async function requireUser() {
   const user = await currentUser();
-  if (!user) throw new Error("尚未登入");
+  if (!user) throw new Error(T("err.notSignedIn"));
   return user;
 }
 

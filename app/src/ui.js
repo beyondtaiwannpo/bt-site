@@ -16,6 +16,9 @@
 // 選單卡片從 shared/nav.js 的 FEATURES 產生，跟頂欄同一份清單 —— 兩份清單的話
 // 漏加的那一頁不會壞、只會少一個入口，而那種缺陷沒有人會回報。
 
+// 2026-10-19 起畫面上的字全部從 ./strings.js 的字典來（T("鍵")），中英兩版並排在那一支裡。
+import { T, lang, setLang } from "./strings.js";
+export { T, lang, setLang };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // ⚠ 這裡原本有一段註解寫著「不做自助重設、不做重設畫面、不呼叫
@@ -30,16 +33,16 @@ export function authHTML(mode, msg, email, busy) {
 
   // ── 忘記密碼：輸入 email ──
   if (mode === "forgot") return `<div class="card">
-    <h2>忘記密碼</h2>
-    <div class="sub">輸入你註冊時用的 email，我們寄一封重設連結給你。</div>
+    <h2>${T("fp.title")}</h2>
+    <div class="sub">${T("fp.sub")}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     <label><i>Email</i><input id="fpe" type="email" value="${esc(email || "")}" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
     <div class="stack">
-      <button class="btn" data-act="do-forgot" ${busy ? "disabled" : ""}>${busy ? "寄出中…" : "寄出重設連結"}</button>
+      <button class="btn" data-act="do-forgot" ${busy ? "disabled" : ""}>${busy ? T("fp.sending") : T("fp.send")}</button>
     </div>
-    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">回登入</button></div>
-    <div class="note"><b>用 Google 登入的話不需要密碼</b>，回登入頁直接按那顆 Google 按鈕就好。這一頁只對「用 email + 密碼註冊」的人有用。</div>
-    <div class="note">連 email 也想不起來？寄信到 beyondtaiwan2020@gmail.com，我們幫你找。</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">${T("fp.back")}</button></div>
+    <div class="note">${T("fp.google")}</div>
+    <div class="note">${T("fp.noEmail")}</div>
   </div>`;
 
   // ── 寄出之後 ──
@@ -50,11 +53,11 @@ export function authHTML(mode, msg, email, busy) {
   // 前端的文案要跟那個事實一致 —— 寫「如果這個信箱有帳號」，不要寫「已寄出」。
   // test/ui-pages.test.mjs 有一條在守這件事。
   if (mode === "sent") return `<div class="card">
-    <h2>信寄出去了</h2>
-    <div class="sub">如果 <b>${esc(email || "那個信箱")}</b> 有帳號，我們寄了一封重設連結給它。</div>
-    <div class="note" style="margin-top:0">沒收到的話，先看一下垃圾郵件匣。連結大約一小時內有效，過期了再回來要一次就好。</div>
-    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">回登入</button></div>
-    <div class="note">試了幾次都收不到？寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
+    <h2>${T("sent.title")}</h2>
+    <div class="sub">${T("sent.sub", { email: esc(email || T("sent.thatEmail")) })}</div>
+    <div class="note" style="margin-top:0">${T("sent.note")}</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">${T("fp.back")}</button></div>
+    <div class="note">${T("sent.help")}</div>
   </div>`;
 
   // ── 註冊完，等確認信 ──
@@ -63,21 +66,21 @@ export function authHTML(mode, msg, email, busy) {
   // 只是把同一張登入表單再畫一次，看起來就像按了沒反應。
   // 那正是這個 repo 反覆學到的同一件事：**沒有回應的送出，使用者只會再按一次。**
   if (mode === "check") return `<div class="card">
-    <h2>去收一封信</h2>
-    <div class="sub">我們寄了一封確認信到 <b>${esc(email || "你的信箱")}</b>。點裡面的連結就完成註冊。</div>
-    <div class="note" style="margin-top:0">沒收到的話先看垃圾郵件匣。信可能要等一兩分鐘。</div>
-    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">我點過了，去登入</button></div>
-    <div class="note">一直收不到？寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
+    <h2>${T("check.title")}</h2>
+    <div class="sub">${T("check.sub", { email: esc(email || T("check.yourEmail")) })}</div>
+    <div class="note" style="margin-top:0">${T("check.note")}</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">${T("check.done")}</button></div>
+    <div class="note">${T("check.help")}</div>
   </div>`;
 
   return `<div class="card">
-    <h2>${up ? "註冊" : "登入"}</h2>
+    <h2>${up ? T("auth.signup") : T("auth.signin")}</h2>
     <!-- 註冊不再需要邀請碼（2026-09-01，階段 5-7 把門搬到角色升級）。
          **那格輸入已經移除，不是留著不讀。** 留著的話它是一句謊：使用者會以為
          自己填的東西有作用，打錯了還會以為是自己的問題，而實際上不管填什麼都會
          註冊成功、身分都是 student。**沒有作用的輸入框比沒有輸入框更糟。**
          邀請碼現在在登入之後那一頁輸入（notCadreHTML）。 -->
-    <div class="sub">${up ? "先開帳號，之後再輸入邀請碼升級成幹部。" : "用你註冊時的 email 登入。"}</div>
+    <div class="sub">${up ? T("auth.subUp") : T("auth.subIn")}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     <!-- 邀請碼那格的 autocapitalize/autocorrect/spellcheck 全部關掉。
          **大小寫那一半已經不再是理由**：trigger 現在是
@@ -96,7 +99,7 @@ export function authHTML(mode, msg, email, busy) {
          而且他重打的時候可能會打錯，於是錯誤訊息從「密碼不對」變成「查無此人」，
          他就更找不到問題在哪。**密碼不帶回來**，那本來就該重打。 -->
     <label><i>Email</i><input id="ae" type="email" value="${esc(email || "")}" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
-    <label><i>密碼 / Password${up ? "（至少 6 個字）" : ""}</i><input id="ap" type="password" autocomplete="${up ? "new-password" : "current-password"}"></label>
+    <label><i>${T("auth.pw")}${up ? T("auth.pwMin") : ""}</i><input id="ap" type="password" autocomplete="${up ? "new-password" : "current-password"}"></label>
     <!-- 「會出現在進度牆上」那段告知從註冊頁搬到升級頁（notCadreHTML）。
          5-7 之後註冊出來的是 student —— 他不會上牆、也還沒有護照，
          在那個時間點講這段話是錯的時機，而且會讓人以為註冊就等於加入 BT。
@@ -113,7 +116,7 @@ export function authHTML(mode, msg, email, busy) {
          而使用者會再按一次（那是這個 repo 一路上最常見的失敗形狀）。 -->
     <div class="stack">
       <button class="btn" data-act="${up ? "do-signup" : "do-signin"}" ${busy ? "disabled" : ""}>${
-        busy ? "處理中…" : (up ? "註冊" : "登入")}</button>
+        busy ? T("auth.busy") : (up ? T("auth.signup") : T("auth.signin"))}</button>
     <!-- Google 登入（規格 §3-4）。**email + 密碼那條路不要拿掉**：
          有人沒有 Google 帳號、有人在中國、有人的 Google 就是登不進去。
          兩條路並存是規格明寫的決定，不是過渡狀態。
@@ -126,15 +129,15 @@ export function authHTML(mode, msg, email, busy) {
          第一次點就是註冊，第二次點就是登入，使用者不需要先決定自己是哪一種。 -->
       <!-- 標籤只有中文：雙語標籤正是它折成兩行的原因，而「Google」這個字不需要翻譯
            （使用者 2026-09-03 裁定）。 -->
-      <button class="btn ghost" data-act="do-google">用 Google 登入</button>
+      <button class="btn ghost" data-act="do-google">${T("auth.google")}</button>
     </div>
-    <div class="nav"><button class="link" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "還沒有帳號，要註冊"}</button></div>
-    <div class="note">用 Google 進來的話不需要密碼。<b>還是需要邀請碼</b>——登入之後再輸入。</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? T("auth.haveAccount") : T("auth.noAccount")}</button></div>
+    <div class="note">${T("auth.googleNote")}</div>
     <!-- 2026-09-01：寄信接好之後，忘記密碼改成自助為主、組織信箱為輔。
          **組織信箱那條不要刪** —— 自助那條路需要「還記得自己用哪個 email」，
          而連 email 都想不起來的人（換過信箱、當初用學校信箱註冊）沒有別的出口。
          一條自助路徑蓋不住所有情況，留著人工那條的成本只是一行字。 -->
-    ${up ? "" : `<div class="note">忘記密碼？<button class="link" data-act="switch-auth" data-m="forgot">寄一封重設連結給我</button><br>連 email 也想不起來的話，寄信到 beyondtaiwan2020@gmail.com。</div>`}
+    ${up ? "" : `<div class="note">${T("auth.forgot")}<button class="link" data-act="switch-auth" data-m="forgot">${T("auth.sendReset")}</button><br>${T("auth.noEmail")}</div>`}
   </div>`;
 }
 
@@ -154,20 +157,20 @@ export function authHTML(mode, msg, email, busy) {
 // 換成別的字 —— 那是使用者看不見的竄改，資料庫救不了。
 export function notCadreHTML(msg) {
   return `<div class="card">
-    <h2>你還不是 BT 幹部</h2>
-    <div class="sub">護照只開放給幹部與實習生。你已經登入了，但還沒有升級。</div>
+    <h2>${T("nc.title")}</h2>
+    <div class="sub">${T("nc.sub")}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
-    <label><i>邀請碼 / Invite code</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長或 BT 拿"></label>
-    <div class="note" style="margin:0 0 14px">升級之後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
+    <label><i>${T("nc.code")}</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${esc(T("nc.codePh"))}"></label>
+    <div class="note" style="margin:0 0 14px">${T("nc.note")}</div>
     <div class="stack">
-      <button class="btn" data-act="do-claim">我是幹部、校友或實習生，我有邀請碼</button>
+      <button class="btn" data-act="do-claim">${T("nc.claim")}</button>
     </div>
     <!-- 2026-09-08（批 2）：這一頁不再是學員的預設畫面，是他從自己的帳號頁
          點「我是幹部或校友，我有邀請碼」才會進來的。所以要有一條回得去的路 ——
          沒有的話，一個好奇點進來的學員只剩下登出這個出口。 -->
-    <div class="nav"><button class="link" data-act="back-account">我不是幹部，回我的帳號</button></div>
-    <div class="nav"><button class="link" data-act="signout">登出</button></div>
-    <div class="note">還不是幹部也沒關係，這個帳號留著。學員的功能用的是同一個帳號。</div>
+    <div class="nav"><button class="link" data-act="back-account">${T("nc.back")}</button></div>
+    <div class="nav"><button class="link" data-act="signout">${T("common.signout")}</button></div>
+    <div class="note">${T("nc.keep")}</div>
   </div>`;
 }
 // 2026-09-08：登入後的選單頁（menuHTML）整個刪掉。
@@ -194,11 +197,11 @@ export function notCadreHTML(msg) {
 
 export function downHTML() {
   return `<div class="card">
-    <h2>資料庫休眠中</h2>
+    <h2>${T("down.title")}</h2>
     <div class="wnote" style="margin:16px 0 0">
-      現在連不上資料庫，所以沒有辦法登入。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。
+      ${T("down.lede")}
     </div>
-    <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">再試一次</button></div>
+    <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">${T("common.retry")}</button></div>
   </div>`;
 }
 
@@ -214,7 +217,9 @@ export function downHTML() {
 //
 // GOALS.md 目標 4 在 2026-09-07 拍板：這一屆要做 student。
 
+// 年級。**值存在資料庫裡是中文**，英文只是畫面上的顯示（跟 settings/src/ui.js 同一份規則）。
 export const GRADES = ["高一", "高二", "高三", "已畢業", "其他"];
+export const gradeLabel = g => (GRADES.includes(g) ? T("grade." + g) : g);
 
 // 資料齊了沒有。**姓名與學校是必要的，年級不是。**
 // 年級可以是「其他」，但那也要他自己選過 —— 所以三個都要有值才算齊。
@@ -240,39 +245,37 @@ export function profileComplete(p) {
 export function completeHTML(p, msg, busy) {
   const v = k => esc(p && p[k] ? p[k] : "");
   return `<div class="card">
-    <h2>還差幾個欄位</h2>
-    <div class="sub">填完就可以用了。之後隨時改得動。</div>
+    <h2>${T("cp.title")}</h2>
+    <div class="sub">${T("cp.sub")}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
-    <label><i>你的名字</i><input id="pn" value="${v("name")}" autocomplete="name" placeholder="王小明"></label>
+    <label><i>${T("cp.name")}</i><input id="pn" value="${v("name")}" autocomplete="name" placeholder="${esc(T("cp.namePh"))}"></label>
     <!-- list 指到一份 506 間學校的自動完成清單，資料在 app/schools.json，
          由 scripts/schools/build.mjs 從教育部的名錄產生。
          **datalist 不是下拉選單，它只是建議** —— 清單外的學校照樣打得進去，
          那是刻意的：高職、海外、實驗教育的學生也要填得進來。
          清單是等到第一次點這一格才去載的（見 main.js），
          所以沒有 JavaScript 或還沒載完的時候，它就是一個普通的文字欄位。 -->
-    <label><i>就讀學校</i><input id="ps" list="schools" value="${v("school")}"
+    <label><i>${T("cp.school")}</i><input id="ps" list="schools" value="${v("school")}"
       autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-      placeholder="打兩個字就會跳出來"></label>
+      placeholder="${esc(T("cp.schoolPh"))}"></label>
     <datalist id="schools"></datalist>
-    <label><i>年級</i><select id="pg">
-      <option value="">請選擇</option>
-      ${GRADES.map(g => `<option${p && p.grade === g ? " selected" : ""}>${esc(g)}</option>`).join("")}
+    <label><i>${T("cp.grade")}</i><select id="pg">
+      <option value="">${T("cp.pick")}</option>
+      ${GRADES.map(g => `<option value="${esc(g)}"${p && p.grade === g ? " selected" : ""}>${esc(gradeLabel(g))}</option>`).join("")}
     </select></label>
     <label class="check">
       <input id="pnl" type="checkbox"${p && p.newsletter ? " checked" : ""}>
-      <span>我願意收 BT 的活動通知與資源更新。<br>
-        每次寄信都有取消訂閱的連結，你隨時可以停掉。不勾也不影響你使用這個帳號。</span>
+      <span>${T("cp.newsletter")}</span>
     </label>
     <div class="stack">
-      <button class="btn" data-act="save-profile" ${busy ? "disabled" : ""}>${busy ? "存檔中…" : "存起來"}</button>
+      <button class="btn" data-act="save-profile" ${busy ? "disabled" : ""}>${busy ? T("cp.saving") : T("cp.save")}</button>
     </div>
-    <div class="note">我們問學校與年級，是為了知道要把活動辦在哪裡、辦給誰。
-      <b>不會公開，也不會給任何第三方。</b>完整寫在<a href="../privacy/">隱私政策</a>。</div>
+    <div class="note">${T("cp.why")}</div>
     <!-- 2026-10-18：端對端測試設計到這一步才發現 —— 新註冊的幹部、校友、實習生
          會先被擋在這一頁，而這一頁原本沒有「我有邀請碼」的入口，
          他得先填一間高中才走得到學員頁上那顆按鈕。拿到邀請碼的人不該被問學校。 -->
-    <div class="note"><button class="link" data-act="show-claim">我是幹部、校友或實習生，我有邀請碼</button></div>
-    <div class="nav"><button class="link" data-act="signout">登出</button></div>
+    <div class="note"><button class="link" data-act="show-claim">${T("nc.claim")}</button></div>
+    <div class="nav"><button class="link" data-act="signout">${T("common.signout")}</button></div>
   </div>`;
 }
 
@@ -287,14 +290,14 @@ export function completeHTML(p, msg, busy) {
 export function statusLine(app) {
   const by = app.notify_by ? fmtDay(app.notify_by) : "";
   switch (app.status) {
-    case "interview": return "邀請你面試";
-    case "accepted":  return "錄取了";
-    case "rejected":  return "這次沒有錄取";
-    default:          return by ? `已收到，${by} 前會通知你` : "已收到";
+    case "interview": return T("st.interview");
+    case "accepted":  return T("st.accepted");
+    case "rejected":  return T("st.rejected");
+    default:          return by ? T("st.receivedBy", { by }) : T("st.received");
   }
 }
 
-// yyyy 年 m 月 d 日。**不要用 toLocaleDateString** ——
+// yyyy 年 m 月 d 日（英文 yyyy-mm-dd）。**不要用 toLocaleDateString** ——
 // 它會跟著使用者的系統語言變，同一個畫面上會出現兩種寫法。
 //
 // ⚠ **只有日期的字串不可以交給 new Date()。**
@@ -306,11 +309,12 @@ export function fmtDay(v) {
   if (!v) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) {
     const [y, m, d] = String(v).split("-").map(Number);
-    return `${y} 年 ${m} 月 ${d} 日`;
+    return T("date.ymd", { y, m, d, mm: String(m).padStart(2, "0"), dd: String(d).padStart(2, "0") });
   }
   const d = new Date(v);
   if (isNaN(d)) return "";
-  return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  const m = d.getMonth() + 1, dd = d.getDate();
+  return T("date.ymd", { y: d.getFullYear(), m, d: dd, mm: String(m).padStart(2, "0"), dd: String(dd).padStart(2, "0") });
 }
 
 // ── 學員的 dashboard ──────────────────────────────────────────────────
@@ -320,51 +324,49 @@ export function fmtDay(v) {
 // 在那之前不放灰掉的入口 —— 點不下去的東西看起來像壞掉，而且會有人來問。
 export function studentHTML(p, msg, apps, opens) {
   const row = (k, val) => `<li><b>${esc(k)}</b>${
-    val ? `<span>${esc(val)}</span>` : `<span class="empty-v">還沒填</span>`}</li>`;
+    val ? `<span>${esc(val)}</span>` : `<span class="empty-v">${T("sd.empty")}</span>`}</li>`;
 
   // 我的申請。有申請才畫這一區 —— 沒有的時候畫一個空的區塊，
   // 只是在告訴他「這裡本來應該有東西」。
   const mine = (apps || []).length ? `
-    <h3 class="sec-h">我的申請</h3>
+    <h3 class="sec-h">${T("sd.mine")}</h3>
     <ul class="applist">${apps.map(a => `<li>
       <b>${esc(a.title)}</b>
       <span class="st st-${esc(a.status)}">${esc(statusLine(a))}</span>
       ${a.status === "interview" && a.interview_url
-        ? `<div class="st-more"><a href="${esc(a.interview_url)}">約面試時間</a>
-             <span class="empty-v">你還沒約時間</span></div>` : ""}
+        ? `<div class="st-more"><a href="${esc(a.interview_url)}">${T("sd.book")}</a>
+             <span class="empty-v">${T("sd.notBooked")}</span></div>` : ""}
     </li>`).join("")}</ul>` : "";
 
   // 現在開放的。已經申請過的不再列出來（列出來他會以為可以再申請一次）。
   const applied = new Set((apps || []).map(a => a.form_id));
   const left = (opens || []).filter(f => !applied.has(f.id));
   const now = left.length ? `
-    <h3 class="sec-h">現在開放</h3>
+    <h3 class="sec-h">${T("sd.open")}</h3>
     <ul class="applist">${left.map(f => `<li>
       <b>${esc(f.title)}</b>
-      <div class="st-more"><a href="../apply/?f=${encodeURIComponent(f.id)}">看看這一個</a></div>
+      <div class="st-more"><a href="../apply/?f=${encodeURIComponent(f.id)}">${T("sd.look")}</a></div>
     </li>`).join("")}</ul>` : "";
 
   return `<div class="card">
-    <h2>${esc((p && p.name) || "你的帳號")}</h2>
+    <h2>${esc((p && p.name) || T("sd.account"))}</h2>
     <div class="sub">Beyond Taiwan</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     ${mine}
     ${now}
-    <h3 class="sec-h">我的資料</h3>
+    <h3 class="sec-h">${T("sd.me")}</h3>
     <ul class="kv">
-      ${row("學校", p && p.school)}
-      ${row("年級", p && p.grade)}
-      ${row("活動通知", p && p.newsletter ? "有訂閱" : "沒有訂閱")}
+      ${row(T("sd.school"), p && p.school)}
+      ${row(T("sd.grade"), p && gradeLabel(p.grade))}
+      ${row(T("sd.news"), p && p.newsletter ? T("sd.subscribed") : T("sd.unsubscribed"))}
     </ul>
     <div class="row">
-      <button class="btn ghost sm" data-act="edit-profile">改我的資料</button>
-      <a class="btn ghost sm" href="../settings/" style="text-decoration:none">設定</a>
+      <button class="btn ghost sm" data-act="edit-profile">${T("sd.edit")}</button>
+      <a class="btn ghost sm" href="../settings/" style="text-decoration:none">${T("sd.settings")}</a>
     </div>
-    ${mine || now ? "" : `<div class="note">下一場探索營、下一輪導生配對都會先公布在
-      <a href="https://www.instagram.com/beyondtaiwan/">Instagram</a>，
-      也可以先看<a href="../apply/">現在開放什麼</a>。</div>`}
-    <div class="note"><button class="link" data-act="show-claim">我是幹部或校友，我有邀請碼</button></div>
-    <div class="nav"><button class="link" data-act="signout">登出</button></div>
+    ${mine || now ? "" : `<div class="note">${T("sd.ig")}</div>`}
+    <div class="note"><button class="link" data-act="show-claim">${T("sd.claim")}</button></div>
+    <div class="nav"><button class="link" data-act="signout">${T("common.signout")}</button></div>
     <!-- 刪除帳號放在最後、用最輕的樣式，但**一定要在這一頁上找得到**。
          2026-09-07 Paul 決定申請資料不設保存期限（一直留著），
          那個決定的對價就是當事人隨時拿得回控制權。
@@ -373,28 +375,29 @@ export function studentHTML(p, msg, apps, opens) {
          不是留一顆一模一樣的按鈕 —— 兩個地方各有一顆會刪帳號的按鈕，
          哪天其中一顆改了行為，另一顆不會跟著改。 -->
     <div class="note" style="margin-top:26px;border-top:1px solid rgba(16,42,134,.13);padding-top:16px">
-      要改資料或刪除帳號，到<a href="../settings/">設定</a>。
+      ${T("sd.toSettings")}
     </div>
   </div>`;
 }
 
 // 刪除帳號的確認。**打字確認，不是按兩次。**
 // 按兩次擋不住誤按，因為誤按的人第二次也會按。要他打字才會停下來讀。
+// 打「刪除」或「delete」都算（2026-10-19 英文版加的，中文那條不變）。
+export const DELETE_WORDS = ["刪除", "delete"];
+export const typedDelete = v => DELETE_WORDS.includes(String(v || "").trim().toLowerCase());
 export function deleteHTML(msg, busy) {
   return `<div class="card">
-    <h2>刪除帳號</h2>
-    <div class="sub">這個動作沒有辦法復原。</div>
+    <h2>${T("del.title")}</h2>
+    <div class="sub">${T("del.sub")}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
-    <div class="wnote">刪掉的東西包括：你的姓名、學校、年級、訂閱設定，
-      以及你送出過的每一份申請與裡面的答案。</div>
+    <div class="wnote">${T("del.what")}</div>
     <p style="font-size:14px;line-height:1.65;margin:0 0 16px">
-      已經寄給你的信不會消失，那些在你自己的信箱裡。
-      如果你已經報名了某一場活動，刪掉帳號等於退出那一場。</p>
-    <label><i>確定的話，在下面打「刪除」兩個字</i><input id="dc" autocomplete="off"
-      autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="刪除"></label>
+      ${T("del.mail")}</p>
+    <label><i>${T("del.type")}</i><input id="dc" autocomplete="off"
+      autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${esc(T("del.typePh"))}"></label>
     <div class="stack">
-      <button class="btn" data-act="do-delete" ${busy ? "disabled" : ""}>${busy ? "刪除中…" : "永久刪除我的帳號"}</button>
+      <button class="btn" data-act="do-delete" ${busy ? "disabled" : ""}>${busy ? T("del.deleting") : T("del.do")}</button>
     </div>
-    <div class="nav"><button class="link" data-act="back-account">先不要，回我的帳號</button></div>
+    <div class="nav"><button class="link" data-act="back-account">${T("del.no")}</button></div>
   </div>`;
 }

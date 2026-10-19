@@ -209,10 +209,18 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 /* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
+/* 中英切換（2026-10-19）：「我的資料」上面兩顆小按鈕，現在的那一顆深藍底。
+   這一頁是切換鈕唯一的家（頂欄只是導覽，不放），其他登入後的頁面跟著這裡選的走。 */
+.langrow{display:flex;gap:6px;align-items:center;margin:0 0 18px}
+.langrow .lang{min-height:32px;padding:0 14px;border:1px solid rgba(16,42,134,.3);border-radius:999px;
+  background:rgba(255,255,255,.55);color:var(--ink);font:600 13px/1 var(--body);cursor:pointer}
+.langrow .lang.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.langrow .lang:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+.langrow .langlbl{font-size:12.5px;color:rgba(16,42,134,.75);margin-right:4px}
 </style>
 </head>
 <body>
-<div id="bt-root"><div class="empty">載入中…</div></div>
+<div id="bt-root"><div class="empty">Loading… 載入中…</div></div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

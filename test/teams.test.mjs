@@ -6,11 +6,14 @@
 // 「同一個人在兩個地方屬於不同的 team」，不會報錯，只會讓篩選漏掉他。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TEAMS as PASSPORT_TEAMS } from "../passport/src/ui.js";
+import { TEAMS as PASSPORT_TEAMS, setLang as passportLang } from "../passport/src/ui.js";
+passportLang("zh");
 import { TEAMS as SETTINGS_TEAMS, teamPickHTML, formatTeams,
-         parseTeams as settingsParse } from "../settings/src/ui.js";
+         parseTeams as settingsParse , setLang as settingsLang } from "../settings/src/ui.js";
+settingsLang("zh");
 import { TEAM_ORDER, teamKey, parseTeams as teamParse } from "../team/src/ui.js";
-import { parseTeams as avParse } from "../availability/src/ui.js";
+import { parseTeams as avParse, setLang as availLang } from "../availability/src/ui.js";
+availLang("zh");
 import { TEAMS as PEOPLE_TEAMS, parseTeams as peopleParse, setLang as peopleLang } from "../admin/people/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 peopleLang("zh");

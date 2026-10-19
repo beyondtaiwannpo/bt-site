@@ -2,6 +2,7 @@
 //（跟 app/ 同一條規矩：護照壞掉不該讓別的功能一起打不開）。
 import { supabase } from "../../shared/supabase.js";
 import { authMessage, isOfflineError } from "../../shared/auth.js";
+import { T } from "./strings.js";
 import { groupByWeekday } from "./edit.js";
 
 const SLOT = 30;                      // 半小時一格
@@ -15,7 +16,7 @@ export function namesOf(p) {
   const zh = (p.name_zh || "").trim();
   const en = (p.name_en || "").trim();
   return {
-    name: zh || en || "（沒有名字）",
+    name: zh || en || T("common.noName"),
     // 兩欄填了同一個字的人不重複顯示；只有一個名字的人也沒有第二個。
     alt: zh && en && zh !== en ? en : "",
   };

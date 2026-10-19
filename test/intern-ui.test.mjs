@@ -3,7 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { CATEGORY, CATNAME, SLOT_ORDER, stampCount, pagesOf, barHTML, idPageHTML, catPageHTML,
-         slotHTML, wallHTML, setupHTML, guidePageHTML, namesOf } from "../intern-passport/src/ui.js";
+         slotHTML, wallHTML, setupHTML, guidePageHTML, namesOf, setLang, T } from "../intern-passport/src/ui.js";
+// 實習護照 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 import { passportNo } from "../intern-passport/src/data.js";
 import { FEATURES, featuresFor } from "../shared/nav.js";
 import { NEXT } from "../app/src/nav.js";
@@ -28,8 +30,8 @@ test("三種分類的順序與定義只有一份，CATNAME 從 CATEGORY 衍生",
   assert.deepEqual(SLOT_ORDER, ["onboard", "project", "reflect"]);
   assert.deepEqual(Object.keys(CATNAME).sort(), SLOT_ORDER.slice().sort());
   for (const c of SLOT_ORDER) {
-    assert.ok(CATEGORY[c].label && CATEGORY[c].zh && CATEGORY[c].body, `${c} 少了文案`);
-    assert.doesNotMatch(CATEGORY[c].body, /待補/, `${c} 的文案還是佔位字`);
+    assert.ok(T(CATEGORY[c].label) && T(CATEGORY[c].zh) && T(CATEGORY[c].body), `${c} 少了文案`);
+    assert.doesNotMatch(T(CATEGORY[c].body), /待補/, `${c} 的文案還是佔位字`);
   }
 });
 

@@ -1,16 +1,21 @@
 // 實習護照的渲染層：只吃 state（S）吐 HTML 字串。不碰儲存，不碰 DOM 事件。
 // 從 passport/src/ui.js 抄「格子、蓋章、心得、進度牆」四件事，其他沒抄（見 data.js 檔頭）。
 import { passportNo } from "./data.js";
+// 2026-10-19 起畫面上的字全部從 ./strings.js 的字典來（T("鍵")），中英兩版並排在那一支裡。
+// 格子的文案來自 intern_tasks 表，維持原樣，不翻。
+import { T, lang, setLang } from "./strings.js";
+export { T, lang, setLang };
 
 // 三種分類的**唯一定義點**。對應 intern_tasks.category 的 check。
 // 文案是暫定的，Internship team 看過再改；改這裡不影響資料庫，格子的文案在 intern_tasks 表。
+// label / short / zh / body 是字典的鍵（2026-10-19 中英切換），畫的時候 T()；define 本來就是英文。
 export const CATEGORY = {
-  onboard: { label: "入門 ONBOARD", short: "入門", zh: "入門",
-             define: "What you do in the first month", body: "認識 BT、認識帶你的人、第一次開會。這幾格是這一期的起點，第一個月蓋完。" },
-  project: { label: "任務 PROJECT", short: "任務", zh: "任務",
-             define: "The work itself", body: "你實際交出去的東西。第一個任務、期中、期末，每交一次蓋一格。" },
-  reflect: { label: "反思 REFLECT", short: "反思", zh: "反思",
-             define: "Written to yourself", body: "寫給自己的。只有你看得到這幾格裡寫了什麼，帶你的人也看不到，所以可以誠實寫。" }
+  onboard: { label: "cat.onboard", short: "cat.onboard.short", zh: "cat.onboard.short",
+             define: "What you do in the first month", body: "cat.onboard.body" },
+  project: { label: "cat.project", short: "cat.project.short", zh: "cat.project.short",
+             define: "The work itself", body: "cat.project.body" },
+  reflect: { label: "cat.reflect", short: "cat.reflect.short", zh: "cat.reflect.short",
+             define: "Written to yourself", body: "cat.reflect.body" }
 };
 export const CATNAME = Object.fromEntries(Object.entries(CATEGORY).map(([k, v]) => [k, v.label]));
 
@@ -35,7 +40,7 @@ export function faceOf(S, a) {
 export function namesOf(p) {
   const zh = String(p.name_zh || "").trim();
   const en = String(p.name_en || "").trim();
-  return { name: zh || en || "（沒有名字）", alt: zh && en && zh !== en ? en : "" };
+  return { name: zh || en || T("common.noName"), alt: zh && en && zh !== en ? en : "" };
 }
 function nameHTML(p) {
   const n = namesOf(p);
@@ -50,9 +55,9 @@ export function pagesOf(S) {
   // 認不得的分類排到最後、不丟掉：category 改名而這裡沒跟上時，錯誤要是「順序不對」不是「格子消失」。
   const unknown = [...new Set((S.tasks || []).map(t => t.category).filter(c => !SLOT_ORDER.includes(c)))];
   return [
-    { kind: "id", label: "資料頁" },
-    { kind: "guide", label: "怎麼用" },
-    ...[...cats, ...unknown].map(c => ({ kind: "cat", cat: c, label: (CATEGORY[c] || {}).zh || c }))
+    { kind: "id", label: T("page.id") },
+    { kind: "guide", label: T("page.guide") },
+    ...[...cats, ...unknown].map(c => ({ kind: "cat", cat: c, label: CATEGORY[c] ? T(CATEGORY[c].zh) : c }))
   ];
 }
 
@@ -66,7 +71,7 @@ export function pageForCat(S, cat) {
 // 樣書的持照人（2026-10-16）。staff 沒有自己那一列 intern_passports，
 // 要看「這本護照長什麼樣」就用這個假的人填資料頁。只在畫面上，不寫進任何表。
 export function sampleProfile(term) {
-  return { id: "sample", name_zh: "實習生姓名", name_en: "INTERN NAME", motto: "",
+  return { id: "sample", name_zh: T("sample.name"), name_en: "INTERN NAME", motto: "",
            issued: today(), avatar: null, term: term ? term.id : null };
 }
 
@@ -74,14 +79,14 @@ export function barHTML(S) {
   const done = stampCount(S);
   // staff（Internship team 的幹部）沒有自己的護照：進度牆，加一本「樣書」看格子長什麼樣。
   const tabs = S.staff
-    ? `<button role="tab" aria-selected="${S.view !== "sample"}" data-act="tab" data-v="wall">實習生進度牆</button>
-       <button role="tab" aria-selected="${S.view === "sample"}" data-act="tab" data-v="sample">樣書</button>`
-    : `<button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">我的護照</button>
-       <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">進度牆</button>`;
+    ? `<button role="tab" aria-selected="${S.view !== "sample"}" data-act="tab" data-v="wall">${T("bar.wall")}</button>
+       <button role="tab" aria-selected="${S.view === "sample"}" data-act="tab" data-v="sample">${T("bar.sample")}</button>`
+    : `<button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">${T("bar.mine")}</button>
+       <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">${T("bar.wallShort")}</button>`;
   return `<div class="bar">
     <div class="tabs" role="tablist">${tabs}</div>
     <div class="sp"></div>
-    ${S.staff ? "" : `<div class="prog"><small>Stamps collected</small>${done} <span style="opacity:.4">/ ${S.tasks.length}</span></div>`}
+    ${S.staff ? "" : `<div class="prog"><small>${T("bar.stamps")}</small>${done} <span style="opacity:.4">/ ${S.tasks.length}</span></div>`}
   </div>`;
 }
 
@@ -99,14 +104,14 @@ export function bookHTML(S) {
       <div class="pageno">PAGE ${String(S.page + 1).padStart(2, "0")} / ${pages.length}</div>
     </div>
     <div class="nav">
-      <button class="arrow" data-act="prev" ${S.page === 0 ? "disabled" : ""}>← 前一頁</button>
+      <button class="arrow" data-act="prev" ${S.page === 0 ? "disabled" : ""}>${T("nav.prev")}</button>
       <div class="dots">
         ${pages.map((p, i) => {
           const on = p.kind === "cat" ? ` data-on="${dotOn(S, p.cat)}"` : "";
           return `<button data-act="go" data-p="${i}"${on} aria-current="${S.page === i}" aria-label="${esc(p.label)}" title="${esc(p.label)}"></button>`;
         }).join("")}
       </div>
-      <button class="arrow" data-act="next" ${S.page === pages.length - 1 ? "disabled" : ""}>下一頁 →</button>
+      <button class="arrow" data-act="next" ${S.page === pages.length - 1 ? "disabled" : ""}>${T("nav.next")}</button>
     </div>
   </div></div>`;
 }
@@ -120,33 +125,33 @@ function pageBodyHTML(S, page) {
 // total > 0 不可省：格子還沒建好時 0 === 0 會蓋一個「0 / 0 · FULL」。
 export function idPageHTML(S) {
   const p = S.profile;
-  const av = p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : (S.sample ? `<span>大頭照</span>` : `<span>點此上傳<br>大頭照</span>`);
+  const av = p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : (S.sample ? `<span>${T("id.avatar")}</span>` : `<span>${T("id.upload")}</span>`);
   const done = stampCount(S);
   const total = S.tasks.length;
   const term = S.term;
   return `<div class="mhead">
       <div class="mnum">00</div>
-      <div class="mzh">持照人資料</div>
+      <div class="mzh">${T("id.title")}</div>
       <div class="mtheme"><b>BEYOND TAIWAN</b><span>Intern Passport · ${esc(term ? term.title_en : "")}</span></div>
     </div>
     <div class="idgrid">
-      ${S.sample ? `<span class="photo">${av}</span>` : `<a class="photo" href="../settings/" title="到設定換大頭照">${av}</a>`}
+      ${S.sample ? `<span class="photo">${av}</span>` : `<a class="photo" href="../settings/" title="${esc(T("id.changeAvatar"))}">${av}</a>`}
       <div>
         <div class="fields">
-          <div class="f"><i>Type / 類別</i><b>INTERN</b></div>
-          <div class="f"><i>Code / 代碼</i><b>TWN</b></div>
-          <div class="f"><i>Passport No. / 護照號碼</i><b>${passportNo(p.id)}</b></div>
-          <div class="f"><i>Date of issue / 核發日</i><b>${esc(p.issued)}</b></div>
-          <div class="f wide"><i>Name / 姓名</i><b>${esc(p.name_zh)} · ${esc(p.name_en).toUpperCase()}</b></div>
-          <div class="f wide"><i>Term / 屆別</i><b>${esc(term ? term.title_zh : (p.term || "還沒開這一屆"))}</b></div>
+          <div class="f"><i>${T("id.type")}</i><b>INTERN</b></div>
+          <div class="f"><i>${T("id.code")}</i><b>TWN</b></div>
+          <div class="f"><i>${T("id.no")}</i><b>${passportNo(p.id)}</b></div>
+          <div class="f"><i>${T("id.issue")}</i><b>${esc(p.issued)}</b></div>
+          <div class="f wide"><i>${T("id.name")}</i><b>${esc(p.name_zh)} · ${esc(p.name_en).toUpperCase()}</b></div>
+          <div class="f wide"><i>${T("id.term")}</i><b>${esc(term ? term.title_zh : (p.term || T("id.noTerm")))}</b></div>
         </div>
         ${p.motto ? `<div class="motto">「${esc(p.motto)}」</div>` : ""}
       </div>
     </div>
     ${total > 0 && done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
     ${S.sample
-      ? `<div class="row" style="margin-top:18px"><span class="mini">這是樣書：格子是目前這一屆的，人是假的，章蓋不了。intern 看到的就是這個樣子。</span></div>`
-      : `<div class="row" style="margin-top:18px"><button class="btn ghost sm" data-act="edit">編輯資料</button></div>`}`;
+      ? `<div class="row" style="margin-top:18px"><span class="mini">${T("id.sampleNote")}</span></div>`
+      : `<div class="row" style="margin-top:18px"><button class="btn ghost sm" data-act="edit">${T("id.edit")}</button></div>`}`;
 }
 
 function stampInner(act, st, extraClass) {
@@ -177,18 +182,18 @@ export function stampHTML(act, st, animate, tearing) {
 // 一個分類一頁。格子數量不限，三欄 grid 自己往下排。
 export function catPageHTML(S, cat) {
   const acts = S.tasks.filter(t => t.category === cat);
-  const g = CATEGORY[cat] || { zh: cat, label: cat, define: "" };
+  const g = CATEGORY[cat] || { zh: { zh: cat, en: cat }, label: { zh: cat, en: cat }, define: "" };
   const done = acts.filter(t => S.stamps[t.id]).length;
   return `<div class="mhead">
       <div class="mnum">${String(SLOT_ORDER.indexOf(cat) + 1).padStart(2, "0")}</div>
-      <div class="mzh">${esc(g.zh)}</div>
+      <div class="mzh">${esc(T(g.zh))}</div>
       <div class="mtheme"><b>${done} / ${acts.length}</b><span>${esc(g.define)}</span></div>
     </div>
     <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
 }
 
 function flipBtnHTML(id, to) {
-  return `<button class="flipbtn" data-act="flip" data-id="${esc(id)}" data-to="${to}" aria-label="${to === "back" ? "翻到背面" : "翻到正面"}">↻</button>`;
+  return `<button class="flipbtn" data-act="flip" data-id="${esc(id)}" data-to="${to}" aria-label="${esc(to === "back" ? T("flip.back") : T("flip.front"))}">↻</button>`;
 }
 
 // 一格。正面：分類、標題、章、翻面鈕；背面：小字標題、說明、心得、照片。
@@ -205,9 +210,9 @@ export function slotHTML(S, a) {
 
   const front = `<div class="face front" data-act="open" data-id="${esc(a.id)}" aria-hidden="${face === "back"}">
       <button class="faceopen" data-act="open" data-id="${esc(a.id)}">
-        <span class="cat">${esc(CATNAME[a.category] || "")}</span>
+        <span class="cat">${esc(CATNAME[a.category] ? T(CATNAME[a.category]) : "")}</span>
         <span class="ttl">${esc(a.title_zh)}</span>
-        ${st ? "" : `<span class="en">${esc(a.title_en)}</span><span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}
+        ${st ? "" : `<span class="en">${esc(a.title_en)}</span><span class="hint">${esc(a.description)}</span><span class="cta">${T("slot.cta")}</span>`}
       </button>
       ${st ? stampHTML(a, st, anim, tearing) + flipBtnHTML(a.id, "back") : ""}
     </div>`;
@@ -227,25 +232,25 @@ export function guideCardsHTML() {
   return `<div class="slots guide">${SLOT_ORDER.map(c => {
     const g = CATEGORY[c];
     return `<div class="slot">
-      <span class="cat">${esc(g.label)}</span>
+      <span class="cat">${esc(T(g.label))}</span>
       <span class="ttl">${esc(g.define)}</span>
-      <span class="hint">${esc(g.body)}</span>
+      <span class="hint">${esc(T(g.body))}</span>
     </div>`;
   }).join("")}</div>`;
 }
 
 export function guidePageHTML() {
-  return `<div class="mhead solo"><div class="mzh">怎麼用這本護照</div></div>
+  return `<div class="mhead solo"><div class="mzh">${T("guide.title")}</div></div>
     ${guideCardsHTML()}
-    <div class="wnote" style="margin-top:22px">格子由 Internship team 定，做完一件就蓋一個章。心得與照片只有你看得到；你的名字、大頭照跟蓋了哪幾格，Internship team 與同一期的 intern 看得到。</div>`;
+    <div class="wnote" style="margin-top:22px">${T("guide.note")}</div>`;
 }
 
 export function wallHTML(S) {
-  if (S.wallLoading) return `<div class="wall"><div class="empty">正在讀取全體進度…</div></div>`;
+  if (S.wallLoading) return `<div class="wall"><div class="empty">${T("wall.loading")}</div></div>`;
   if (S.wallError) return `<div class="wall">
-    <h3>實習生進度牆</h3>
-    <div class="empty">進度牆讀不到。按下面的重新整理再試一次${S.staff ? "" : "，你自己的護照不受影響"}。</div>
-    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
+    <h3>${T("wall.title")}</h3>
+    <div class="empty">${T("wall.error", { own: S.staff ? "" : T("wall.errorOwn") })}</div>
+    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">${T("wall.refresh")}</button></div>
   </div>`;
   const total = S.tasks.length;
   const people = (S.wall || []).map(p => Object.assign({}, p, { count: (p.intern_stamps || []).length }))
@@ -256,9 +261,9 @@ export function wallHTML(S) {
   const cats = SLOT_ORDER.filter(c => S.tasks.some(t => t.category === c));
 
   return `<div class="wall">
-    <h3>實習生進度牆</h3>
-    <div class="wnote">這面牆 Internship team 的幹部與這一期的 intern 看得到：名字、大頭照與蓋章紀錄。心得和照片不會出現在這裡，誰都看不到。</div>
-    ${people.length === 0 ? `<div class="empty">還沒有人蓋章。</div>` :
+    <h3>${T("wall.title")}</h3>
+    <div class="wnote">${T("wall.note")}</div>
+    ${people.length === 0 ? `<div class="empty">${T("wall.empty")}</div>` :
       `<div class="people">${people.map(p => {
         const on = new Set((p.intern_stamps || []).map(s => s.task_id));
         const av = p.avatar
@@ -272,17 +277,17 @@ export function wallHTML(S) {
             const acts = S.tasks.filter(t => t.category === c);
             const got = acts.filter(t => on.has(t.id)).length;
             const op = got === 0 ? 1 : (0.34 + 0.66 * got / acts.length);
-            return `<i data-on="${got > 0 ? 1 : 0}" style="opacity:${op.toFixed(2)}" title="${esc(CATEGORY[c].zh)} ${got}/${acts.length}"></i>`;
+            return `<i data-on="${got > 0 ? 1 : 0}" style="opacity:${op.toFixed(2)}" title="${esc(T(CATEGORY[c].zh))} ${got}/${acts.length}"></i>`;
           }).join("")}</div>
           <div class="cnt">${p.count || 0} / ${total}</div>
         </div>`;
       }).join("")}</div>`}
-    ${feed.length ? `<div class="feed"><h3>最近蓋的章</h3>
+    ${feed.length ? `<div class="feed"><h3>${T("wall.recent")}</h3>
       ${feed.slice(0, 20).map(f => {
         const a = S.tasks.find(x => x.id === f.id);
-        return `<div class="fitem"><time>${esc(f.d)}</time><span><b>${nameHTML(f.who)}</b> 蓋了 <b>${a ? esc(a.title_zh) : esc(f.id)}</b></span></div>`;
+        return `<div class="fitem"><time>${esc(f.d)}</time><span>${T("wall.stamped", { who: nameHTML(f.who), what: a ? esc(a.title_zh) : esc(f.id) })}</span></div>`;
       }).join("")}</div>` : ""}
-    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
+    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">${T("wall.refresh")}</button></div>
   </div>`;
 }
 
@@ -290,11 +295,11 @@ export function wallHTML(S) {
 export function downHTML() {
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
-    <h2>資料庫休眠中</h2>
+    <h2>${T("down.title")}</h2>
     <div class="wnote" style="margin:16px 0 0">
-      資料庫休眠中，你的資料都還在。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。
+      ${T("down.lede")}
     </div>
-    <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">再試一次</button></div>
+    <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">${T("common.retry")}</button></div>
   </div>`;
 }
 
@@ -303,16 +308,16 @@ export function setupHTML(p, user) {
   p = p || {};
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
-    <h2>${p.name_zh || p.name_en ? "編輯護照資料" : "領你的實習護照"}</h2>
-    <div class="sub">${p.name_zh || p.name_en ? "改完按儲存，章不會消失。" : "這一期的每一件事一格，做完就蓋章。"}</div>
-    <label><i>中文名 / Name</i><input id="fz" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>
-    <label><i>英文名 / Name in English</i><input id="fe" value="${esc(p.name_en || "")}" placeholder="Ming Wang" maxlength="30"></label>
-    <label><i>護照上的一句話 / Your line（選填）</i><textarea id="fm" maxlength="60" placeholder="這一期想帶走什麼">${esc(p.motto || "")}</textarea></label>
-    <div class="wnote" style="margin:0 0 16px">送出後，你的姓名、大頭照與蓋章紀錄會出現在進度牆上，<b>Internship team 的幹部與同一期的 intern 看得到</b>。你寫的心得和上傳的照片只留在你自己的護照裡，<b>誰都看不到</b>。</div>
+    <h2>${p.name_zh || p.name_en ? T("setup.edit") : T("setup.claim")}</h2>
+    <div class="sub">${p.name_zh || p.name_en ? T("setup.editSub") : T("setup.claimSub")}</div>
+    <label><i>${T("setup.nameZh")}</i><input id="fz" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>
+    <label><i>${T("setup.nameEn")}</i><input id="fe" value="${esc(p.name_en || "")}" placeholder="Ming Wang" maxlength="30"></label>
+    <label><i>${T("setup.motto")}</i><textarea id="fm" maxlength="60" placeholder="${esc(T("setup.mottoPh"))}">${esc(p.motto || "")}</textarea></label>
+    <div class="wnote" style="margin:0 0 16px">${T("setup.note")}</div>
     <div class="row">
-      <button class="btn" data-act="issue">${p.name_zh || p.name_en ? "儲存" : "領護照"}</button>
-      ${p.name_zh || p.name_en ? `<button class="btn ghost" data-act="cancel">取消</button>` : ""}
-      ${user ? `<button class="btn ghost sm" data-act="signout" style="margin-left:auto">登出</button>` : ""}
+      <button class="btn" data-act="issue">${p.name_zh || p.name_en ? T("common.save") : T("setup.claimBtn")}</button>
+      ${p.name_zh || p.name_en ? `<button class="btn ghost" data-act="cancel">${T("common.cancel")}</button>` : ""}
+      ${user ? `<button class="btn ghost sm" data-act="signout" style="margin-left:auto">${T("common.signout")}</button>` : ""}
     </div>
   </div>`;
 }

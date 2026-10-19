@@ -6,6 +6,7 @@ import { supabase } from "../../shared/supabase.js";
 import * as AUTH from "../../shared/auth.js";
 import { navHTML } from "../../shared/nav.js";
 import * as UI from "./ui.js";
+import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 // S.story：`null` 代表「還沒查」或「這個人沒有故事那一列」，`{}` 會讓人以為
 // 查過了但是空的 —— 學員完全不會發那個查詢，所以 `null` 才是誠實的初始值。
@@ -18,7 +19,7 @@ function render() {
   // ⚠ **頂欄要畫在 #bt-root 裡面**（見 admin/src/main.js 同一段註解）。
   // 畫在 <body> 上的話它吃不到 #bt-root 的左右內距，
   // 跟底下的內容就差 12px，Paul 2026-09-10 一眼看出來。
-  const nav = navHTML({ current: "settings",
+  const nav = navHTML({ current: "settings", lang: lang(),
     role: S.me && S.me.role, name: (S.me && (S.me.name_zh || S.me.name_en)) || "" });
 
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
@@ -232,6 +233,7 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
   if (act === "back") { S.view = "main"; S.msg = ""; render(); return; }
   if (act === "ask-delete") { S.view = "delete"; S.msg = ""; render(); return; }
@@ -239,10 +241,8 @@ document.addEventListener("click", async e => {
   if (act === "avatar") {
     // ⚠ **在開檔案選擇器之前問**（規格 §6.2）。挑完照片才問等於
     // 「都選好了，不上傳很可惜」—— 那不是同意，是沉沒成本。
-    const extra = S.me.public_profile
-      ? "，而且因為你勾了公開，它也會出現在任何人都看得到的團隊頁上"
-      : "";
-    if (!confirm(`你的大頭照會出現在全體進度牆上，其他 BT 幹部看得到${extra}。要繼續上傳嗎？`)) return;
+    const extra = S.me.public_profile ? T("m.avatarExtra") : "";
+    if (!confirm(T("m.avatarConfirm", { extra }))) return;
     const i = document.createElement("input");
     i.type = "file"; i.accept = "image/*";
     i.onchange = async () => {
@@ -250,13 +250,13 @@ document.addEventListener("click", async e => {
       if (!f) return;
       let url;
       try { url = await compress(f, 420, 0.7); }
-      catch (err) { S.msg = "這張圖讀不到，換一張試試。"; render(); return; }
+      catch (err) { S.msg = T("m.imgFail"); render(); return; }
       S.busy = true; S.msg = ""; S.me.avatar = url; render();
       try {
         const { error } = await supabase.from("profiles").update({ avatar: url }).eq("id", S.user.id);
         if (error) throw error;
-        S.busy = false; S.msg = "換好了。";
-      } catch (err) { S.busy = false; S.msg = "大頭照沒有存起來：" + (err.message || err); }
+        S.busy = false; S.msg = T("m.avatarOk");
+      } catch (err) { S.busy = false; S.msg = T("m.avatarFail") + (err.message || err); }
       render();
     };
     i.click();
@@ -300,7 +300,7 @@ document.addEventListener("click", async e => {
       };
     } else {
       const name = val("nzh"), school = val("school"), grade = val("grade");
-      if (!name || !school || !grade) { S.msg = "姓名、學校、年級三個都要填。"; render(); return; }
+      if (!name || !school || !grade) { S.msg = T("m.three"); render(); return; }
       patch = {
         name_zh: name,
         school: school,
@@ -349,7 +349,7 @@ document.addEventListener("click", async e => {
         const missing = UI.storyMissing(fields);
         if (fields.public_story && missing.length) {
           S.busy = false;
-          S.msg = "要公開的話這幾格還沒填：" + missing.join("、");
+          S.msg = T("m.storyMissing") + missing.join(T("punct.list"));
           render(); return;
         }
         // ⚠ **不可以用 .upsert()**：alumni_stories 是欄位層級授權，id 只有
@@ -399,10 +399,10 @@ document.addEventListener("click", async e => {
       S.busy = false;
       const notes = [];
       if (cadre && patch.public_profile && !S.me.public_approved)
-        notes.push("公開那一項還要等 Co-President 核可才會出現。");
+        notes.push(T("m.pendingTeam"));
       if (S.story && S.story.public_story && !S.story.story_approved)
-        notes.push("你的故事還要等 Co-President 核可才會出現在校友頁上。");
-      S.msg = notes.length ? "存好了。" + notes.join("") : "存好了。";
+        notes.push(T("m.pendingStory"));
+      S.msg = T("m.saved", { notes: notes.join(T("punct.sent")) }).trim();
     } catch (err) {
       // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再按一次。
       S.busy = false; S.msg = UI.saveFailMessage(profileSaved, err);
@@ -412,7 +412,7 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "do-delete") {
-    if (val("dc") !== "刪除") { S.msg = "要在那一格打「刪除」兩個字才會執行。"; render(); return; }
+    if (!UI.typedDelete(val("dc"))) { S.msg = T("m.typeDelete"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
       const { error } = await supabase.rpc("delete_my_account");
@@ -422,10 +422,26 @@ document.addEventListener("click", async e => {
       await AUTH.signOut();
       location.replace("../");
     } catch (err) {
-      S.busy = false; S.msg = "刪不掉：" + (err.message || err); render();
+      S.busy = false; S.msg = T("m.delFail") + (err.message || err); render();
     }
     return;
   }
 });
 
+// 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
+// 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。
+// 切換：改字典的語言、存起來、把 ?lang= 寫進網址、重畫。**不重新載入頁面**。
+function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+function applyLang(l) {
+  setLang(l);
+  document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+}
+function switchLang(l) {
+  applyLang(l);
+  try { localStorage.setItem(STORE_KEY, lang()); } catch (e) { /* 無痕視窗存不了，這一頁照樣切 */ }
+  const u = new URL(location.href); u.searchParams.set("lang", lang());
+  history.replaceState(null, "", u.pathname + u.search + u.hash);
+  render();
+}
+applyLang(pickLang(location.search, readStored()));
 boot();

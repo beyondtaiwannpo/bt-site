@@ -15,6 +15,7 @@
 // `import * as DATA from "./data.js"`，再匯出之後它與 ui.js 一行都不用改。
 // **新功能不要走這裡**，直接 import shared/auth.js。
 import { supabase } from "../../shared/supabase.js";
+import { T } from "./strings.js";
 import { currentUser } from "../../shared/auth.js";
 
 export { supabase };
@@ -33,7 +34,7 @@ export { signOut, isOfflineError, sessionGone, currentUserDetailed, currentUser 
 // 成本是每次寫入多一次本地查詢，不是多一趟網路 —— supabase-js 有 session 快取。
 async function requireUser() {
   const user = await currentUser();
-  if (!user) throw new Error("尚未登入");
+  if (!user) throw new Error(T("err.notSignedIn"));
   return user;
 }
 
@@ -322,7 +323,7 @@ export async function exportPassport() {
   // 畫面可能因為某次儲存失敗而跟資料庫不一致，那時候匯出 S 會把「看起來有」的
   // 東西寫進備份檔，而那個檔案還原回去會少東西 —— 備份檔說謊比沒有備份更糟。
   const all = await loadAll();
-  if (!all.profile) throw new Error("還沒有護照可以匯出。");
+  if (!all.profile) throw new Error(T("err.noExport"));
   return {
     version: BACKUP_VERSION,          // 供日後格式變更判斷（spec §7.4）
     exported_at: new Date().toISOString(),
@@ -354,12 +355,12 @@ export async function exportPassport() {
 export function parseBackup(text) {
   let j;
   try { j = JSON.parse(text); }
-  catch (e) { throw new Error("這個檔案讀不出來，可能不是護照備份檔，或是在傳送過程中壞掉了。"); }
+  catch (e) { throw new Error(T("err.badFile")); }
   if (!j || typeof j !== "object" || !Array.isArray(j.stamps) || !j.profile) {
-    throw new Error("這是一個 JSON 檔，但不是護照備份檔。請選你從護照按「匯出備份」下載的那個檔案。");
+    throw new Error(T("err.notBackup"));
   }
   if (Number(j.version) > BACKUP_VERSION) {
-    throw new Error("這個備份檔來自比較新的版本，這個網站讀不了。請寄信到 beyondtaiwan2020@gmail.com。");
+    throw new Error(T("err.tooNew"));
   }
   return j;
 }

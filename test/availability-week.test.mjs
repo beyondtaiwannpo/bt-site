@@ -5,7 +5,9 @@ import assert from "node:assert/strict";
 import { weekKeyOf, isPastWeek, weekKeyLabel } from "../availability/src/weekkey.js";
 import { toInstant, startOfWeek } from "../availability/src/tz.js";
 import { boardCounts } from "../availability/src/board.js";
-import { mineHTML } from "../availability/src/ui.js";
+import { mineHTML, setLang } from "../availability/src/ui.js";
+// 時間看板 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+setLang("zh");
 
 // 2026-09-09 是星期三，那一週的星期一是 09-07。
 test("週鍵是那一週的星期一", () => {
