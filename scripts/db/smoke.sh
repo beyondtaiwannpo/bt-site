@@ -183,7 +183,8 @@ for f in supabase/migrations/2026-09-08-students.sql \
          supabase/migrations/2026-10-19-regrant-passport-tables.sql \
          supabase/migrations/2026-10-20-passport-admin.sql \
          supabase/migrations/2026-10-21-people-admin.sql \
-         supabase/migrations/2026-10-22-intern-board.sql ; do
+         supabase/migrations/2026-10-22-intern-board.sql \
+         supabase/migrations/2026-10-23-intern-pawn.sql ; do
   if psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; then
     echo "  ok   $(basename "$f")"; pass=$((pass+1))
   else
@@ -827,6 +828,27 @@ if echo "${ibgot}" | grep -qi "permission denied"; then
 else
   echo "  FAIL ★ 沒登入居然叫得動：${ibgot}"; fail=$((fail+1))
 fi
+# 棋子（2026-10-23）：本人選得了、只能選那八個、別人改不了、位置那支函式帶出來。
+# ⚠ 上面重跑過 2026-10-17-intern-passport.sql，它的 revoke all 會把 pawn 那一欄的授權收掉；
+# 正式站也一樣：重跑 10-17 之後要再跑一次 10-23。這裡先重跑 10-23，順便當它的重跑檢查。
+pwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-23-intern-pawn.sql 2>&1 || true)
+if echo "${pwgot}" | grep -q "OVERALL.*PASS" && ! echo "${pwgot}" | grep -q "FAIL"; then
+  echo "  ok   棋子那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL 棋子那支遷移檔的驗收表沒全過："; echo "${pwgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+chkrole authenticated "${INT3}" "intern 選得了自己的棋子" "cat" \
+  "update public.intern_passports set pawn='cat' where id='${INT3}'; select pawn from public.intern_passports where id='${INT3}'"
+pwgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${INT3}',false);" -c "set role authenticated; update public.intern_passports set pawn='mario' where id='${INT3}';" 2>&1 || true)
+if echo "${pwgot}" | grep -qi "check constraint"; then
+  echo "  ok   ★ 棋子只能是那八個之一"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 亂填的棋子居然存得進去：${pwgot}"; fail=$((fail+1))
+fi
+chkrole authenticated "${ISTAFF}" "位置那支函式帶出棋子（別人的棋子才畫得出來）" "cat" \
+  "select pawn from public.intern_positions() where user_id='${INT3}'"
+chkrole authenticated "${ISTAFF}" "★ Internship team 的幹部改不了 intern 的棋子" "cat" \
+  "update public.intern_passports set pawn='bird' where id='${INT3}'; select pawn from public.intern_passports where id='${INT3}'"
 ibgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-22-intern-board.sql 2>&1 || true)
 if echo "${ibgot}" | grep -q "OVERALL.*PASS" && ! echo "${ibgot}" | grep -q "FAIL"; then
   echo "  ok   蛇梯棋那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))

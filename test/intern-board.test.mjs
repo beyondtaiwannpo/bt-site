@@ -169,7 +169,8 @@ test("進度牆：棋盤開著就先畫大家的棋子與名次，位置在前�
   const S = IS({ wall: [{ id: "u1", name_zh: "實習一號", avatar: null, intern_stamps: [{ task_id: "T2627-01" }] }, { id: "u2", name_zh: "實習二號", avatar: null, intern_stamps: [] }] });
   const h = IN.wallHTML(S);
   assert.match(h, /大家在哪一格/);
-  assert.match(h, /<ol class="wrank"><li><b>實習二號<\/b><span>第 14 格・0 \/ 3<\/span><\/li><li><b>實習一號<\/b><span>第 9 格・1 \/ 3/);
+  assert.match(h, /<ol class="wrank"><li><span class="pawn"[^>]*>實<\/span><div><b>實習二號<\/b><span>第 14 格・0 \/ 3<\/span><\/div><\/li><li><span class="pawn me"[^>]*>實<\/span><div><b>實習一號<\/b><span>第 9 格・1 \/ 3/);
+  assert.match(h, /誰是哪一顆/);
   assert.doesNotMatch(IN.wallHTML(IS({ board: null, wall: S.wall })), /大家在哪一格/);
 });
 
@@ -188,4 +189,68 @@ test("★ intern 的資料層：骰子走 rpc 不碰表、位置走 rpc、不讀
   assert.match(d, /rpc\("roll_dice"\)/);
   assert.match(d, /rpc\("intern_positions"\)/);
   assert.doesNotMatch(d, /from\("intern_moves"\)/, "流水只在資料庫，前端不直接讀");
+});
+
+
+// ── 棋子與畫出來的蛇梯（2026-10-23，批 5） ──────────────────────────
+test("★ 八顆棋子，代號跟遷移檔的 check 一樣；每顆都是自己畫的向量、只用色票的 var()", () => {
+  assert.deepEqual(IN.PAWN_KEYS, ["meeple", "checker", "cat", "bird", "fish", "star", "boat", "kite"]);
+  const sql = readFileSync("supabase/migrations/2026-10-23-intern-pawn.sql", "utf8");
+  for (const k of IN.PAWN_KEYS) assert.ok(sql.includes(`'${k}'`), `遷移檔的 check 少了 ${k}`);
+  for (const k of IN.PAWN_KEYS) {
+    const h = IN.pawnHTML({ pawn: k, name: "Amy", me: false });
+    assert.match(h, /^<svg class="pawn" viewBox="0 0 24 24"/);
+    assert.doesNotMatch(h, /#[0-9a-fA-F]{3,6}\b|<img|http/, "棋子不准寫死色碼、不准外部圖");
+    assert.match(h, /var\(--bt-/);
+  }
+});
+
+test("棋子：有代號畫向量、沒有就大頭照、再沒有就名字第一個字；自己的多 me", () => {
+  assert.match(IN.pawnHTML({ pawn: "cat", name: "Amy", me: true }), /class="pawn me"/);
+  assert.match(IN.pawnHTML({ pawn: null, avatar: "data:x", name: "Amy" }), /<img class="pawn" src="data:x"/);
+  assert.match(IN.pawnHTML({ pawn: "nope", name: "實習" }), /<span class="pawn"[^>]*>實<\/span>/);
+});
+
+test("選棋子：資料頁有（現在的那一顆亮著），第一次上棋盤沒選就先問，選了或先跳過就不問", () => {
+  const h = IN.idPageHTML(IS({ profile: { ...ME, pawn: "bird" } }));
+  assert.match(h, /id="pawn-picker"/);
+  assert.match(h, /class="ppbtn on" data-act="pawn" data-key="bird"/);
+  assert.equal((h.match(/data-act="pawn"/g) || []).length, 9, "八顆加大頭照");
+  assert.doesNotMatch(IN.idPageHTML(IS({ board: null })), /pawn-picker/, "棋盤沒開就不用選棋子");
+  const first = IN.boardPageHTML(IS());
+  assert.match(first, /class="ppick first"/);
+  assert.match(first, /data-act="pawn-skip"/);
+  assert.doesNotMatch(IN.boardPageHTML(IS({ profile: { ...ME, pawn: "cat" } })), /ppick/);
+  assert.doesNotMatch(IN.boardPageHTML(IS({ pawnSkipped: true })), /ppick/);
+  assert.doesNotMatch(IN.boardPageHTML(IS({ sample: true, profile: IN.sampleProfile({ id: "2026-27" }) })), /ppick/);
+});
+
+test("★ 畫出來的蛇與梯：梯子兩條軌加橫檔，蛇一條彎線加頭；每條有 id 給棋子沿著走；顏色只用 var()", () => {
+  const centers = {}; for (let p = 1; p <= 30; p++) { const r = Math.floor((p - 1) / 5), c = (p - 1) % 5; centers[p] = { x: (r % 2 ? 4 - c : c) * 100 + 50, y: (5 - r) * 100 + 50 }; }
+  const svg = IN.boardLinesSVG(SQ, centers, 100);
+  assert.match(svg, /<g class="ladder" data-from="4" data-to="14">/);
+  assert.match(svg, /id="line-4"/);
+  assert.match(svg, /<g class="snake" data-from="16" data-to="6">/);
+  assert.match(svg, /id="line-16" d="M[^"]*C[^"]*S/);
+  assert.equal((svg.match(/<circle/g) || []).length, 3, "蛇頭一個圓加兩隻眼睛");
+  assert.doesNotMatch(svg, /#[0-9a-fA-F]{3,6}\b/);
+  assert.match(svg, /stroke:var\(--bt-orange\)/);
+  assert.match(svg, /stroke:var\(--bt-teal\)/);
+  assert.equal(IN.boardLinesSVG(SQ, {}, 100), "", "格子還沒量到就什麼都不畫");
+});
+
+test("棋盤格子裡有 svg 容器；飛行中格子裡不畫我；牆上的棋子帶代號", () => {
+  const h = IN.boardPageHTML(IS({ profile: { ...ME, pawn: "cat" }, positions: [{ user_id: "u1", pos: 9, rolls: 2, tickets: 1, pawn: "cat" }, { user_id: "u2", pos: 14, rolls: 3, tickets: 0, pawn: "boat" }] }));
+  assert.match(h, /<svg class="blines" aria-hidden="true"><\/svg>/);
+  assert.match(h, /data-pos="9"[\s\S]*?<svg class="pawn me"/);
+  assert.match(h, /data-pos="14"[\s\S]*?<svg class="pawn" viewBox/);
+  assert.doesNotMatch(IN.boardPageHTML(IS({ profile: { ...ME, pawn: "cat" }, flying: true })), /pawn me/);
+});
+
+test("★ 英文畫出來不剩中文（選棋子、牆的圖例）", () => {
+  IN.setLang("en");
+  const h = IN.pawnPickerHTML("cat", false) + IN.pawnPickerHTML(null, true)
+    + IN.wallHTML(IS({ profile: { ...ME, name_zh: "" }, tasks: ITASKS.map(t => ({ ...t, title_zh: "" })), wall: [{ id: "u2", name_zh: "", name_en: "Bob", avatar: null, intern_stamps: [] }] }));
+  IN.setLang("zh");
+  assert.doesNotMatch(h, /[\u4e00-\u9fff]/);
 });

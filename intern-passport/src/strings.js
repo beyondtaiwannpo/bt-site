@@ -148,6 +148,22 @@ export const MINE = {
   "m.rollNoTicket":    { zh: "沒有票了。蓋一個章就有票。", en: "No rolls left. Stamp a box to earn one." },
   "m.rollFinished":    { zh: "你已經到終點了。", en: "You have already finished." },
   "m.rollNoBoard":     { zh: "這一屆的棋盤還沒開。", en: "This term's board is not on yet." },
+  // 棋子（2026-10-23）
+  "pawn.title":        { zh: "你的棋子", en: "Your pawn" },
+  "pawn.hint":         { zh: "挑一個，棋盤上的你就長這樣。隨時可以換。", en: "Pick one. This is you on the board. You can change it any time." },
+  "pawn.first":        { zh: "先挑一個棋子再上路", en: "Pick a pawn before you start" },
+  "pawn.skip":         { zh: "先用大頭照", en: "Use my avatar for now" },
+  "pawn.none":         { zh: "大頭照", en: "Avatar" },
+  "pawn.meeple":       { zh: "小人", en: "Meeple" },
+  "pawn.checker":      { zh: "棋子", en: "Checker" },
+  "pawn.cat":          { zh: "貓", en: "Cat" },
+  "pawn.bird":         { zh: "鳥", en: "Bird" },
+  "pawn.fish":         { zh: "魚", en: "Fish" },
+  "pawn.star":         { zh: "星星", en: "Star" },
+  "pawn.boat":         { zh: "船", en: "Boat" },
+  "pawn.kite":         { zh: "風箏", en: "Kite" },
+  "m.pawnSaved":       { zh: "換好了。", en: "Pawn changed." },
+  "wall.who":          { zh: "誰是哪一顆", en: "Who is which pawn" },
 };
 
 export const STRINGS = { ...COMMON, ...MINE };

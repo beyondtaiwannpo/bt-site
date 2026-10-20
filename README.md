@@ -3230,16 +3230,29 @@ Paul 2026-10-19：Internship team 想把實習護照做成 snake and ladders，�
 任務格點了直接開蓋章的視窗；蓋過的任務格劃掉。進度牆最上面多了大家的棋子在同一張棋盤上，旁邊一排名次（位置優先，章數其次）。樣書（staff 看的）也有棋盤，但沒有棋子、按不了。
 位置與票永遠重讀資料庫（`intern_positions()`），前端不自己加減；蓋章、撕章之後也重讀一次。
 
+### 真的蛇、真的梯、自己的棋子（2026-10-23，批 5）
+
+Internship team 2026-10-20 看了第一版說要像真的桌遊：每個人一顆自己的角色棋子、擲骰子前進、看得到別人、落在梯子爬上去、落在蛇頭滑下去。機制本來就是這樣，這一批改的是長相（截圖 `docs/intern-board/b5-*`）：
+
+- **蛇與梯是畫出來的**：梯子兩條橘色軌加橫檔，蛇一條蒂芬妮綠的彎線加頭與眼睛，深藍描邊，SVG 疊在格子上面那一層（`.blines`）。格子的中心是畫完之後量的（`main.js` 的 `drawBoardLines()`，`getBoundingClientRect`），不寫死像素，視窗大小變了再量一次，手機 5 格一排也對得準。畫線的是純函式 `boardLinesSVG()`，測試守著它只用色票的 `var()`。「↑21」「↓6」的小字還在，變次要。
+- **棋子是自己畫的八顆向量**：小人、棋子、貓、鳥、魚、星星、船、風箏（`PAWNS`），全部用 Brand Book 的色票，沒有外部圖、沒有商標角色。自己那顆比較大、有橘色圈；別人的小一號。沒選的用大頭照，再沒有就名字第一個字。
+- **選棋子**：護照資料頁一句話底下有一排；第一次上棋盤還沒選會先問一次，可以「先用大頭照」。存在 `intern_passports.pawn`（`supabase/migrations/2026-10-23-intern-pawn.sql`：加一欄、`grant update (pawn)` 給本人、check 只收那八個代號、`intern_positions()` 多回傳 pawn 讓別人的棋子畫得出來、PASS 表 5 項）。
+  ⚠ **重跑 `2026-10-17-intern-passport.sql` 會把 pawn 那一欄的授權收掉**（它的 revoke all），重跑之後要再跑一次 10-23。`smoke.sh` 照這個順序走過（248 項）。
+- **落在蛇梯沿著線走**：棋子先一格一格走到落點，再變成一顆浮在上面的棋子沿著那條線（`getPointAtLength`）滑或爬到另一頭，不是瞬間移過去。`prefers-reduced-motion` 開著直接跳。
+- **同一格好幾顆**往左疊、交錯高低，哪一顆都看得到一半以上。
+- **進度牆**上同一張畫出來的棋盤，名次旁邊畫每個人的棋子，看得出誰是哪一顆。
+
 ### 檔案
 
 | 哪裡 | 做什麼 |
 |---|---|
+| `supabase/migrations/2026-10-23-intern-pawn.sql` | `intern_passports.pawn`、授權、check、`intern_positions()` 回傳 pawn |
 | `supabase/migrations/2026-10-22-intern-board.sql` | 三張表、`roll_dice()`、`save_board()`、`set_board_active()`、`intern_positions()`、RLS、PASS 表 |
 | `intern-passport/src/{data,ui,main}.js`、`index.html` | 棋盤頁、骰子、走棋、牆上的棋盤；字典在 `strings.js` 的 `board.*` |
 | `admin/passports/src/{data,ui,main}.js` | 後台「棋盤」分頁；側欄 `ITEMS` 四份各加一行 |
 | `test/intern-board.test.mjs` | 兩邊的 `boardRows` 逐字一樣、畫面、英文不剩中文、資料層不讀流水與心得 |
 
-**還沒驗的**：真的登入後的畫面與動畫（截圖是 `ui.js` 配假資料畫的）；正式站的遷移檔要 Paul 跑，跑完之前後台「棋盤」存檔會說要先跑那一支，intern 那邊看不到棋盤、跟以前一樣。
+**還沒驗的**：真的登入後的畫面與動畫（截圖是 `ui.js` 配假資料畫的；棋子沿著蛇梯飛那一段只在程式裡，沒有抓到截圖）；正式站要跑 `2026-10-22-intern-board.sql` 與 `2026-10-23-intern-pawn.sql` 兩支，跑完之前後台「棋盤」存檔會說要先跑那一支，intern 那邊看不到棋盤、跟以前一樣。
 
 ## 後台第二次重整：側欄 Dashboard（2026-10-19）
 

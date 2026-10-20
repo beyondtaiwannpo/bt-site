@@ -149,6 +149,7 @@ export function idPageHTML(S) {
           <div class="f wide"><i>${T("id.term")}</i><b>${esc(term ? term.title_zh : (p.term || T("id.noTerm")))}</b></div>
         </div>
         ${p.motto ? `<div class="motto">「${esc(p.motto)}」</div>` : ""}
+        ${S.board && !S.sample ? pawnPickerHTML(p.pawn || null, false) : ""}
       </div>
     </div>
     ${total > 0 && done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
@@ -259,16 +260,96 @@ export function myStanding(S) {
 const squareAt = (S, pos) => (S.squares || []).find(s => s.pos === pos) || null;
 const taskOf = (S, id) => (S.tasks || []).find(t => t.id === id) || null;
 
-// 棋盤本體。pawns = [{ user_id, pos, me, name, avatar }]。
+// ── 棋子（2026-10-23）──────────────────────────────────────────────────
+// 八顆自己畫的扁平向量棋子，全部用 Brand Book 的色票（style 裡寫 var(--bt-...)，check.sh 的色碼白名單掃得到），
+// 沒有外部圖、沒有商標角色。代號跟 intern_passports.pawn 的 check 一樣，加一顆要兩邊一起加。
+const O = "stroke:var(--bt-navy);stroke-width:1.4;stroke-linejoin:round";
+export const PAWNS = {
+  meeple:  { color: "var(--bt-orange)", body: `<path d="M12 3a3 3 0 0 1 3 3c0 1.3-.7 2.3-1.6 2.8L17 12h3l-1 4h-2.4l.9 5H6.5l.9-5H5l-1-4h3l3.6-3.2A3 3 0 0 1 9 6a3 3 0 0 1 3-3z" style="fill:var(--bt-orange);${O}"/>` },
+  checker: { color: "var(--bt-navy)",   body: `<circle cx="12" cy="12" r="9" style="fill:var(--bt-navy);${O}"/><circle cx="12" cy="12" r="5" style="fill:none;stroke:var(--bt-cream);stroke-width:1.6"/>` },
+  cat:     { color: "var(--bt-yellow)", body: `<path d="M5 20V8l4 3h6l4-3v12z" style="fill:var(--bt-yellow);${O}"/><circle cx="9.5" cy="14" r="1.1" style="fill:var(--bt-navy)"/><circle cx="14.5" cy="14" r="1.1" style="fill:var(--bt-navy)"/>` },
+  bird:    { color: "var(--bt-teal)",   body: `<path d="M3 13c3-5 9-6 13-4l5-1-3 3c1 6-5 10-11 9l-4-2 5-1z" style="fill:var(--bt-teal);${O}"/><circle cx="15" cy="10.5" r="1" style="fill:var(--bt-navy)"/>` },
+  fish:    { color: "var(--bt-teal)",   body: `<path d="M3 12c3-5 8-6 13-3l5-4v10l-5-4c-5 3-10 2-13-3z" style="fill:var(--bt-teal);${O}"/><circle cx="8" cy="11.5" r="1" style="fill:var(--bt-navy)"/>` },
+  star:    { color: "var(--bt-orange)", body: `<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" style="fill:var(--bt-orange);${O}"/>` },
+  boat:    { color: "var(--bt-navy)",   body: `<path d="M12 3v11h7z" style="fill:var(--bt-sand);${O}"/><path d="M3 15h18l-3 5H6z" style="fill:var(--bt-navy);${O}"/>` },
+  kite:    { color: "var(--bt-teal)",   body: `<path d="M12 2l7 8-7 10-7-10z" style="fill:var(--bt-teal);${O}"/><path d="M12 20c-1 2 1 3-1 4" style="fill:none;${O}"/><path d="M5 10h14M12 2v18" style="fill:none;stroke:var(--bt-navy);stroke-width:1"/>` },
+};
+export const PAWN_KEYS = Object.keys(PAWNS);
+// 一顆棋子的 HTML：有代號畫向量，沒有就大頭照，再沒有就名字第一個字。
+export function pawnHTML(p) {
+  const cls = `pawn${p.me ? " me" : ""}`;
+  const name = esc(p.name || "");
+  if (p.pawn && PAWNS[p.pawn]) {
+    return `<svg class="${cls}" viewBox="0 0 24 24" role="img" aria-label="${name}" title="${name}"><title>${name}</title>${PAWNS[p.pawn].body}</svg>`;
+  }
+  if (p.avatar) return `<img class="${cls}" src="${esc(p.avatar)}" alt="${name}" title="${name}">`;
+  return `<span class="${cls}" title="${name}">${esc(String(p.name || "?").trim().slice(0, 1))}</span>`;
+}
+// 選棋子。current 是現在的代號（null 就是大頭照）。first 是「第一次上棋盤還沒選」那一版，多一顆「先用大頭照」。
+export function pawnPickerHTML(current, first) {
+  return `<div class="ppick${first ? " first" : ""}" id="pawn-picker">
+    <div class="pphead"><b>${esc(first ? T("pawn.first") : T("pawn.title"))}</b><span>${esc(T("pawn.hint"))}</span></div>
+    <div class="ppgrid">${PAWN_KEYS.map(k => `<button class="ppbtn${current === k ? " on" : ""}" data-act="pawn" data-key="${k}" aria-pressed="${current === k}" title="${esc(T("pawn." + k))}">
+      <svg viewBox="0 0 24 24" aria-hidden="true">${PAWNS[k].body}</svg><span>${esc(T("pawn." + k))}</span></button>`).join("")}
+      ${first ? `<button class="ppbtn skip" data-act="pawn-skip">${esc(T("pawn.skip"))}</button>` : `<button class="ppbtn${!current ? " on" : ""}" data-act="pawn" data-key="" aria-pressed="${!current}"><span>${esc(T("pawn.none"))}</span></button>`}
+    </div>
+  </div>`;
+}
+
+// ── 真的蛇與梯（2026-10-23）──────────────────────────────────────────
+// centers = { <pos>: { x, y } } 是每一格的中心（main.js 畫完格子之後量的，相對於 .bwrap），cell 是一格的寬。
+// 回傳 svg 裡面的內容：梯子兩條軌加橫檔（橘），蛇一條彎彎的粗線加頭（蒂芬妮綠），深藍描邊。
+// 每條線有 id="line-<pos>"，棋子落在蛇梯上就沿著這條線走（main.js 用 getPointAtLength）。純函式，測試守著。
+export function boardLinesSVG(squares, centers, cell) {
+  const f = n => Math.round(n * 10) / 10;
+  const out = [];
+  for (const sq of squares || []) {
+    if ((sq.kind !== "ladder" && sq.kind !== "snake") || !sq.goes_to) continue;
+    const a = centers[sq.pos], b = centers[sq.goes_to];
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;                       // 垂直方向
+    if (sq.kind === "ladder") {
+      const w = cell * 0.16;
+      const rails = [-1, 1].map(s => `M${f(a.x + nx * w * s)} ${f(a.y + ny * w * s)} L${f(b.x + nx * w * s)} ${f(b.y + ny * w * s)}`).join(" ");
+      const n = Math.max(2, Math.floor(len / (cell * 0.42)));
+      let rungs = "";
+      for (let i = 1; i < n; i++) {
+        const t = i / n, cx = a.x + dx * t, cy = a.y + dy * t;
+        rungs += `M${f(cx + nx * w)} ${f(cy + ny * w)} L${f(cx - nx * w)} ${f(cy - ny * w)} `;
+      }
+      out.push(`<g class="ladder" data-from="${sq.pos}" data-to="${sq.goes_to}">
+        <path d="${rails} ${rungs}" style="fill:none;stroke:var(--bt-navy);stroke-width:${f(cell * 0.09)};stroke-linecap:round"/>
+        <path id="line-${sq.pos}" d="M${f(a.x)} ${f(a.y)} L${f(b.x)} ${f(b.y)}" style="fill:none;stroke:none"/>
+        <path d="${rails} ${rungs}" style="fill:none;stroke:var(--bt-orange);stroke-width:${f(cell * 0.045)};stroke-linecap:round"/>
+      </g>`);
+    } else {
+      // 蛇：頭在 pos（上面），尾在 goes_to（下面）。三段三次曲線，左右各扭一次。
+      const wig = cell * 0.55;
+      const p1 = { x: a.x + dx * 0.33 + nx * wig, y: a.y + dy * 0.33 + ny * wig };
+      const p2 = { x: a.x + dx * 0.66 - nx * wig, y: a.y + dy * 0.66 - ny * wig };
+      const d = `M${f(a.x)} ${f(a.y)} C${f(a.x + nx * wig)} ${f(a.y + ny * wig)}, ${f(p1.x)} ${f(p1.y)}, ${f(a.x + dx * 0.5)} ${f(a.y + dy * 0.5)} S${f(p2.x)} ${f(p2.y)}, ${f(b.x)} ${f(b.y)}`;
+      const hr = cell * 0.16;
+      out.push(`<g class="snake" data-from="${sq.pos}" data-to="${sq.goes_to}">
+        <path d="${d}" style="fill:none;stroke:var(--bt-navy);stroke-width:${f(cell * 0.17)};stroke-linecap:round"/>
+        <path id="line-${sq.pos}" d="${d}" style="fill:none;stroke:var(--bt-teal);stroke-width:${f(cell * 0.11)};stroke-linecap:round"/>
+        <circle cx="${f(a.x)}" cy="${f(a.y)}" r="${f(hr)}" style="fill:var(--bt-teal);stroke:var(--bt-navy);stroke-width:${f(cell * 0.04)}"/>
+        <circle cx="${f(a.x - nx * hr * 0.45 + (dx / len) * hr * 0.2)}" cy="${f(a.y - ny * hr * 0.45 + (dy / len) * hr * 0.2)}" r="${f(hr * 0.18)}" style="fill:var(--bt-navy)"/>
+        <circle cx="${f(a.x + nx * hr * 0.45 + (dx / len) * hr * 0.2)}" cy="${f(a.y + ny * hr * 0.45 + (dy / len) * hr * 0.2)}" r="${f(hr * 0.18)}" style="fill:var(--bt-navy)"/>
+      </g>`);
+    }
+  }
+  return out.join("");
+}
+
+// 棋盤本體。pawns = [{ user_id, pos, me, name, avatar, pawn }]。
 export function boardGridHTML(S, pawns, opts) {
   const size = S.board ? S.board.size : 0;
   if (!size) return "";
   const o = opts || {};
   const byPos = {};
   for (const p of pawns || []) { (byPos[p.pos] = byPos[p.pos] || []).push(p); }
-  const pawn = p => p.avatar
-    ? `<img class="pawn${p.me ? " me" : ""}" src="${esc(p.avatar)}" alt="${esc(p.name)}" title="${esc(p.name)}">`
-    : `<span class="pawn${p.me ? " me" : ""}" title="${esc(p.name)}">${esc(String(p.name || "?").trim().slice(0, 1))}</span>`;
+  const pawn = pawnHTML;
   const cell = pos => {
     const sq = squareAt(S, pos);
     const kind = sq ? sq.kind : "plain";
@@ -286,8 +367,10 @@ export function boardGridHTML(S, pawns, opts) {
     </div>`;
   };
   const start = byPos[0] || [];
+  // .blines 是空的，main.js 畫完格子量到中心之後才用 boardLinesSVG() 填進去（視窗大小變了再量一次）。
   return `<div class="bwrap"><div class="bgrid" style="grid-template-columns:repeat(${BOARD_PER_ROW},1fr)">${
     boardRows(size).map(r => r.map(cell).join("")).join("")}</div>
+    <svg class="blines" aria-hidden="true"></svg>
     <div class="bstart"><span class="bn">${esc(T("board.start"))}</span>${start.length ? `<span class="pawns">${start.map(pawn).join("")}</span>` : ""}</div></div>`;
 }
 
@@ -321,12 +404,15 @@ export function boardPageHTML(S) {
   const waiting = !finished && my.pos === size - 1 && lastTask && !S.stamps[lastTask.id];
   const others = (S.positions || []).filter(p => !S.profile || p.user_id !== S.profile.id).map(p => {
     const who = (S.wall || []).find(w => w.id === p.user_id) || {};
-    return { user_id: p.user_id, pos: p.pos, me: false, name: namesOf(who).name, avatar: who.avatar || null };
+    return { user_id: p.user_id, pos: p.pos, me: false, name: namesOf(who).name, avatar: who.avatar || null, pawn: p.pawn || null };
   });
-  const pawns = S.sample ? others : others.concat([{ user_id: "me", pos, me: true, name: S.profile ? namesOf(S.profile).name : T("board.me"), avatar: S.profile && S.profile.avatar }]);
+  const mine = { user_id: "me", pos, me: true, name: S.profile ? namesOf(S.profile).name : T("board.me"), avatar: S.profile && S.profile.avatar, pawn: S.profile && S.profile.pawn };
+  // S.flying：棋子正沿著蛇或梯飛（main.js 用另一顆浮在上面的棋子畫），格子裡先不畫我。
+  const pawns = S.sample || S.flying ? others : others.concat([mine]);
+  const needPick = !S.sample && S.profile && !S.profile.pawn && !S.pawnSkipped;
   const canRoll = !S.sample && !S.rolling && my.tickets > 0 && !finished;
   const btnText = S.rolling ? T("board.rolling") : finished ? T("board.finished") : my.tickets > 0 ? T("board.roll") : T("board.noTicket");
-  return `<div class="mhead">
+  return `<div class="mhead bhead">
       <div class="mnum">${String(size).padStart(2, "0")}</div>
       <div class="mzh">${T("board.title")}</div>
       <div class="mtheme"><b>${my.pos >= size ? esc(T("board.finished")) : my.pos ? esc(T("board.pos", { n: my.pos })) : esc(T("board.atStart"))}</b><span>${esc(T("board.sub"))}</span></div>
@@ -336,6 +422,7 @@ export function boardPageHTML(S) {
       <div class="btix"><b>${esc(T("board.tickets", { n: my.tickets }))}</b></div>
       <button class="btn" data-act="roll"${canRoll ? "" : " disabled"}>${esc(btnText)}</button>
     </div>
+    ${needPick ? pawnPickerHTML(null, true) : ""}
     ${waiting ? `<div class="bresult">${T("board.waiting", { t: esc(lastTask.title_zh || lastTask.title_en) })}</div>` : rollResultHTML(S)}
     ${boardGridHTML(S, pawns, { lit: S.lastRoll ? S.lastRoll.to_pos : null, sample: !!S.sample })}
     <div class="blegend"><span class="task">${esc(T("board.legendTask"))}</span><span class="ladder">${esc(T("board.legendLadder"))}</span><span class="snake">${esc(T("board.legendSnake"))}</span></div>
@@ -377,12 +464,14 @@ export function wallHTML(S) {
   // 棋盤開著：牆的最上面是大家的棋子在同一張棋盤上，旁邊一排名次（位置優先，章數其次）。
   let boardPart = "";
   if (S.board && people.length) {
-    const posOf = id => ((S.positions || []).find(x => x.user_id === id) || {}).pos || 0;
-    const pawns = people.map(p => ({ user_id: p.id, pos: posOf(p.id), me: !!(S.profile && p.id === S.profile.id), name: namesOf(p).name, avatar: p.avatar }));
+    const rowOf = id => (S.positions || []).find(x => x.user_id === id) || {};
+    const posOf = id => rowOf(id).pos || 0;
+    const pawns = people.map(p => ({ user_id: p.id, pos: posOf(p.id), me: !!(S.profile && p.id === S.profile.id), name: namesOf(p).name, avatar: p.avatar, pawn: rowOf(p.id).pawn || null }));
     const rank = people.slice().sort((a, b) => posOf(b.id) - posOf(a.id) || b.count - a.count);
     boardPart = `<h3>${T("wall.board")}</h3>
       <div class="wboard">${boardGridHTML(S, pawns, { sample: true })}
-      <ol class="wrank">${rank.map(p => `<li><b>${nameHTML(p)}</b><span>${posOf(p.id) >= S.board.size ? esc(T("wall.rankDone")) : esc(T("wall.rank", { n: posOf(p.id) }))}・${p.count} / ${total}</span></li>`).join("")}</ol></div>`;
+      <div><div class="wwho">${esc(T("wall.who"))}</div>
+      <ol class="wrank">${rank.map(p => `<li>${pawnHTML(pawns.find(x => x.user_id === p.id))}<div><b>${nameHTML(p)}</b><span>${posOf(p.id) >= S.board.size ? esc(T("wall.rankDone")) : esc(T("wall.rank", { n: posOf(p.id) }))}・${p.count} / ${total}</span></div></li>`).join("")}</ol></div></div>`;
   }
 
   return `<div class="wall">

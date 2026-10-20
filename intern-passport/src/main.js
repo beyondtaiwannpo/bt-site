@@ -17,7 +17,9 @@ let S = {
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
   down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null,
   // 蛇梯棋（2026-10-22）。board 是 null 就沒有棋盤頁。
-  board: null, squares: [], positions: [], lastRoll: null, rolling: false, animPos: null
+  board: null, squares: [], positions: [], lastRoll: null, rolling: false, animPos: null,
+  // 棋子（2026-10-23）：flying 是正沿著蛇梯飛、pawnSkipped 是這一次登入先不選棋子。
+  flying: false, pawnSkipped: false
 };
 
 function compress(file, maxDim, quality) {
@@ -68,8 +70,31 @@ function sampleState() {
            flipped: {}, justStamped: null, justFlipped: null, tearing: null, lastRoll: null, rolling: false, animPos: null };
 }
 
+// 畫完格子才量得到每一格在哪：蛇與梯是 SVG 疊在格子上面那一層，中心從畫出來的格子量（不寫死像素），
+// 視窗大小變了再量一次。每一張棋盤（護照頁、牆）各畫各的。
+export function drawBoardLines() {
+  document.querySelectorAll(".bwrap").forEach(wrap => {
+    const svg = wrap.querySelector(".blines"); if (!svg) return;
+    const wr = wrap.getBoundingClientRect();
+    const centers = {}; let cell = 0;
+    wrap.querySelectorAll(".bq[data-pos]").forEach(q => {
+      const r = q.getBoundingClientRect();
+      centers[Number(q.dataset.pos)] = { x: r.left - wr.left + r.width / 2, y: r.top - wr.top + r.height / 2 };
+      cell = r.width;
+    });
+    svg.setAttribute("viewBox", `0 0 ${Math.round(wr.width)} ${Math.round(wr.height)}`);
+    svg.setAttribute("width", Math.round(wr.width)); svg.setAttribute("height", Math.round(wr.height));
+    svg.innerHTML = UI.boardLinesSVG(S.squares, centers, cell);
+  });
+}
+window.addEventListener("resize", drawBoardLines);
+
 function render() {
   const el = root();
+  _render(el);
+  if (S.board) drawBoardLines();
+}
+function _render(el) {
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = `<div class="empty">${T("m.pleaseLogin")}</div>`; return; }
   // ?bare=1（2026-10-19，Paul 拍板）：後台的預覽框用的，不畫頂欄與子欄。只改畫面，權限不變。
@@ -142,6 +167,33 @@ function openModal(id) {
 // 擲骰子。骰子在資料庫擲，這裡只負責：按下去鎖住按鈕、收結果、把棋子一格一格推到落點、再推到蛇梯的另一頭。
 // prefers-reduced-motion 開著就直接跳到終點。失敗把票與位置留在原地（資料庫沒動，重讀一次 positions 就對了）。
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 棋子沿著畫出來的蛇或梯走（不是瞬間移到另一頭）。另外做一顆浮在上面的棋子，用 getPointAtLength 一路推；
+// 這段期間格子裡不畫我（S.flying）。找不到那條線（還沒畫出來）就直接跳。
+async function flyAlong(fromPos, toPos) {
+  const wrap = document.querySelector(".page .bwrap");
+  const path = wrap && wrap.querySelector(`#line-${fromPos}`);
+  if (!path || typeof path.getTotalLength !== "function") { S.animPos = toPos; render(); return; }
+  S.flying = true; render();
+  const w2 = document.querySelector(".page .bwrap"), p2 = w2 && w2.querySelector(`#line-${fromPos}`);
+  if (!p2) { S.flying = false; S.animPos = toPos; render(); return; }
+  const fly = document.createElement("div");
+  fly.className = "pawnfly";
+  fly.innerHTML = UI.pawnHTML({ me: true, name: S.profile ? UI.namesOf(S.profile).name : "", avatar: S.profile && S.profile.avatar, pawn: S.profile && S.profile.pawn });
+  w2.appendChild(fly);
+  const len = p2.getTotalLength(), dur = 700, t0 = performance.now();
+  await new Promise(done => {
+    const step = now => {
+      const t = Math.min(1, (now - t0) / dur), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      const pt = p2.getPointAtLength(len * e);
+      fly.style.transform = `translate(${pt.x}px, ${pt.y}px)`;
+      if (t < 1) requestAnimationFrame(step); else done();
+    };
+    requestAnimationFrame(step);
+  });
+  fly.remove();
+  S.flying = false; S.animPos = toPos; render();
+  await sleep(150);
+}
 async function doRoll() {
   if (S.rolling) return;
   S.rolling = true; S.lastRoll = null; render();
@@ -160,7 +212,7 @@ async function doRoll() {
   if (!reduce) {
     await sleep(350);
     for (let p = from + 1; p <= r.landed; p++) { S.animPos = p; render(); await sleep(160); }
-    if (r.to_pos !== r.landed) { await sleep(300); S.animPos = r.to_pos; render(); await sleep(200); }
+    if (r.to_pos !== r.landed) { await sleep(300); await flyAlong(r.landed, r.to_pos); }
   }
   S.lastRoll = r; S.animPos = null;
   // 位置與票都是資料庫算的，重讀一次，不自己加減。
@@ -228,6 +280,16 @@ document.addEventListener("click", async e => {
   if (act === "go") { S.page = Number(b.dataset.p); render(); return; }
   if (act === "flip") { S.flipped[b.dataset.id] = b.dataset.to; S.justFlipped = b.dataset.id; render(); return; }
   if (act === "open") { openModal(b.dataset.id); return; }
+  if (act === "pawn") {
+    if (S.view === "sample") { toast(T("m.sampleOnly")); return; }
+    const key = b.dataset.key || null;
+    const before = S.profile.pawn;
+    S.profile.pawn = key; render();
+    try { await DATA.savePawn(key); toast(T("m.pawnSaved")); }
+    catch (e) { S.profile.pawn = before; render(); toast(T("m.notSaved")); }
+    return;
+  }
+  if (act === "pawn-skip") { S.pawnSkipped = true; render(); return; }
   if (act === "roll") { if (S.view === "sample") { toast(T("m.sampleOnly")); return; } doRoll(); return; }
   if (act === "close") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
   if (act === "stamp") { doStamp(b.dataset.id); return; }

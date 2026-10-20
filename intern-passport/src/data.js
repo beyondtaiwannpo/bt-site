@@ -96,12 +96,20 @@ export async function loadAll() {
       name_en: me.name_en ?? null,
       avatar: me.avatar ?? null,
       motto: pa.data.motto,
+      pawn: pa.data.pawn || null,
       issued: pa.data.issued,
       term: pa.data.term
     } : null,
     tasks, stamps, entries,
     board, squares, positions
   };
+}
+
+// 棋子（2026-10-23）。intern_passports 只開了 motto 與 pawn 兩欄的 update；資料庫的 check 只收那八個代號。
+export async function savePawn(key) {
+  const user = await requireUser();
+  const { error } = await supabase.from("intern_passports").update({ pawn: key || null }).eq("id", user.id);
+  if (error) throw error;
 }
 
 // 擲骰子。骰子在資料庫裡擲（roll_dice()），這裡只收結果：{ rolled, landed, to_pos, kind, goes_to, tickets_left, finished }。
