@@ -175,7 +175,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json intern-passport/index.html intern-passport/src/*.js 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/*.css shared/*.js passport/src/*.js passport/activities.json intern-passport/index.html intern-passport/src/*.js 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then
