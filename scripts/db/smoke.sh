@@ -213,6 +213,23 @@ insert into public.form_questions (id,form_id,ord,label,type,required) values
  ('$Q2','$FORM',2,'想讀什麼','short',false);
 SQL
 
+# 2026-10-24 那一支要**在有資料之後**才跑：它會把今天的幹部搬成 people / positions / assignments，
+# 空資料庫上跑只驗得到結構、驗不到搬資料那一段。所以它不在上面的清單裡，在這裡單獨跑。
+echo
+echo "跑 2026-10-24-ranks-and-workspaces.sql（在有幹部資料之後）："
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-24-ranks-and-workspaces.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   職級與指派那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 職級與指派那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "搬資料：四位幹部各一列 people、各一筆 2026-27 的職位" "4|4" \
+  "select (select count(*) from public.people where profile_id is not null)||'|'||(select count(*) from public.positions where term_id='2026-27')"
+chk "搬資料：Director 對自己 team 的申請與資源是「管」，一般幹部是「看」" "manage|manage|view" \
+  "select (select level from public.assignments where user_id='$DIR' and workspace_id='apps:Curriculum')||'|'||(select level from public.assignments where user_id='$DIR' and workspace_id='res:Curriculum')||'|'||(select level from public.assignments where user_id='$MEMBER' and workspace_id='apps:Curriculum')"
+chk "搬資料：Co-President 沒有指派（職級本身就是全部），職位名稱從職級算出來" "0|Co-President|Director,Curriculum" \
+  "select (select count(*) from public.assignments where user_id='$PAUL')||'|'||(select title_en from public.positions po join public.people pe on pe.id=po.person_id where pe.profile_id='$PAUL')||'|'||(select title_en from public.positions po join public.people pe on pe.id=po.person_id where pe.profile_id='$DIR')"
+
 echo
 echo "走流程："
 chk "同意的時間戳由 trigger 蓋（前端寫不到那一欄）" "t" \
@@ -269,7 +286,7 @@ chkas "$DIR" "Director 點得了簽到" "1" \
 chkas "$DIR" "行前信寄給錄取的人（收件人由資料庫自己撈）" "1" \
   "select public.send_notice('$FORM'::uuid, array['accepted'],'行前通知','九點台大集合。')"
 
-chkraise "Director 核可不了團隊頁（只有 president 可以）" "not_president" \
+chkraise "Director 核可不了團隊頁（Co-President 與 Senior Adviser 才可以）" "not_senior" \
   "perform set_config('test.uid','$DIR',true);
    perform public.set_public_approved('$DIR'::uuid,true);"
 chkraise "president 降級不了自己" "cannot_demote_self" \
@@ -296,7 +313,7 @@ echo
 echo "信件文案："
 chkas "${DIR}" "文案是從表裡讀出來的（改表就會改到信）" "1" \
   "select count(*) from public.mail_templates where kind='accepted' and body like '%錄取了%'"
-chkraise "Director 改不動文案（那是全組織對外的聲音）" "not_president" \
+chkraise "Director 改不動文案（那是全組織對外的聲音）" "not_senior" \
   "perform set_config('test.uid','${DIR}',true);
    perform public.set_mail_template('accepted','x','y');"
 chkas "${PAUL}" "president 改得動" "accepted" \
@@ -475,6 +492,10 @@ psql -d "${DB}" -q -c "
   insert into public.profiles (id,name_zh,role) values ('${INT1}','實習一號','student'), ('${INT2}','實習二號','student');
   insert into public.profiles (id,name_zh,team,role,board_role) values ('${ISTAFF}','帶實習的','Curriculum Team, Internship Team','cadre','member');
 " >/dev/null
+# 2026-10-24 起 team 只是標籤：Internship team 的幹部要靠指派才碰得到實習護照。
+# 這就是 README「新人怎麼上線」第 3 步。
+chkas "${PAUL}" "Co-President 把帶實習的幹部派進實習護照工作區（改）" "edit" \
+  "select public.assign('${ISTAFF}','intern-passport','edit')"
 
 chkas "${PAUL}" "Co-President 發得出 intern 碼" "bt-intern-01" \
   "select public.create_invite('bt-intern-01','intern',5,'給 2026-27 的 intern')"
@@ -658,11 +679,11 @@ chkraise "城市代碼有空白或太長會被擋" "bad_code" \
   "perform set_config('test.uid','${PAUL}',true); perform public.save_destination('NEW YORK','x',true);"
 chkraise "城市名字留白會被擋" "empty_city" \
   "perform set_config('test.uid','${PAUL}',true); perform public.save_destination('JFK','  ',true);"
-chkraise "★ Director 改不了格子" "not_president" \
+chkraise "★ Director 改不了格子（沒被派進 passport 工作區）" "not_ws_edit:passport" \
   "perform set_config('test.uid','${OTHER}',true); perform public.save_activity('09A',9,'gather','x','X',null,true,null);"
-chkraise "★ 一般幹部停用不了格子" "not_president" \
+chkraise "★ 一般幹部停用不了格子" "not_ws_edit:passport" \
   "perform set_config('test.uid','${MEMBER}',true); perform public.set_activity_active('09A', false);"
-chkraise "★ 一般幹部加不了城市" "not_president" \
+chkraise "★ 一般幹部加不了城市" "not_ws_edit:passport" \
   "perform set_config('test.uid','${MEMBER}',true); perform public.save_destination('SYD','SYDNEY',true);"
 pagot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; update public.activities set title_zh='直接改' where id='09A';" 2>&1 || true)
 if echo "${pagot}" | grep -qi "permission denied"; then
@@ -690,28 +711,23 @@ chkrole authenticated "${MEMBER}" "一般幹部自己改名字照常存得了（
   "update public.profiles set name_zh='改名' where id='${MEMBER}'; select name_zh from public.profiles where id='${MEMBER}'"
 chkrole authenticated "${MEMBER}" "一般幹部自己勾普通的 team 照常" "CurriculumTeam,MarketingTeam" \
   "update public.profiles set team='Curriculum Team, Marketing Team' where id='${MEMBER}'; select team from public.profiles where id='${MEMBER}'"
-ptgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MEMBER}',false);" -c "set role authenticated; update public.profiles set team='Curriculum Team, Internship Team' where id='${MEMBER}';" 2>&1 || true)
-if echo "${ptgot}" | grep -q "team_needs_president"; then
-  echo "  ok   ★ 一般幹部自己勾進 Internship Team 會被擋"; pass=$((pass+1))
-else
-  echo "  FAIL ★ 一般幹部居然勾得進 Internship Team：${ptgot}"; fail=$((fail+1))
-fi
-chk "沒勾進去，還是原來那兩個" "CurriculumTeam,MarketingTeam" "select team from public.profiles where id='${MEMBER}'"
-ptgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" -c "set role authenticated; update public.profiles set team='Marketing' where id='${DIR}';" 2>&1 || true)
-if echo "${ptgot}" | grep -q "team_locked"; then
-  echo "  ok   ★ Director 自己換 team 會被擋（換了就能審別的 team）"; pass=$((pass+1))
-else
-  echo "  FAIL ★ Director 居然自己換得了 team：${ptgot}"; fail=$((fail+1))
-fi
-chk "Director 的 team 沒變" "Curriculum" "select team from public.profiles where id='${DIR}'"
-chkrole authenticated "${DIR}" "Director 改名字照常（只有 team 鎖住）" "小安改" \
+# 2026-10-24 起 team 只是標籤，不再長出權限：10-21 那條 trigger 拆掉了，每個人自己勾得了任何 team，
+# 勾進 Internship Team 也不會因此碰得到實習護照（那要靠指派）。
+chkrole authenticated "${MEMBER}" "一般幹部自己勾進 Internship Team 存得了（只是標籤）" "CurriculumTeam,InternshipTeam" \
+  "update public.profiles set team='Curriculum Team, Internship Team' where id='${MEMBER}'; select team from public.profiles where id='${MEMBER}'"
+chkas "${MEMBER}" "★ 勾了 Internship Team 還是碰不到實習護照（沒有指派）" "f" "select public.can_edit('intern-passport')"
+chkrole authenticated "${DIR}" "Director 自己換 team 也存得了" "Marketing" \
+  "update public.profiles set team='Marketing' where id='${DIR}'; select team from public.profiles where id='${DIR}'"
+chkas "${DIR}" "★ 換了標籤之後，管的還是原本那個 team 的申請，不是新標籤的" "true|false" \
+  "select public.is_director_of('Curriculum')||'|'||public.is_director_of('Marketing')"
+chkrole authenticated "${DIR}" "Director 改名字照常" "小安改" \
   "update public.profiles set name_zh='小安改' where id='${DIR}'; select name_zh from public.profiles where id='${DIR}'"
-chkas "${PAUL}" "Co-President 把一般幹部加進 Internship Team" "CurriculumTeam,InternshipTeam" \
-  "select public.set_team('${MEMBER}','Curriculum Team, Internship Team')"
-chkas "${PAUL}" "Co-President 把 Director 換 team" "Marketing" "select public.set_team('${DIR}','Marketing')"
+chkas "${PAUL}" "Co-President 替一般幹部改 team 標籤" "CurriculumTeam" \
+  "select public.set_team('${MEMBER}','Curriculum Team')"
+chkas "${PAUL}" "Co-President 替 Director 改回去" "Curriculum" "select public.set_team('${DIR}','Curriculum')"
 chk "兩筆 team 的變動都記下來了（誰改、改誰、從什麼到什麼）" "2|2" \
-  "select (select count(*) from public.role_changes where field='team' and changed_by='${PAUL}')||'|'||(select count(*) from public.role_changes where field='team' and old_value in ('Curriculum','Curriculum Team, Marketing Team'))"
-chkas "${PAUL}" "同一個值再存一次不算變動" "Marketing" "select public.set_team('${DIR}','Marketing')"
+  "select (select count(*) from public.role_changes where field='team' and changed_by='${PAUL}')||'|'||(select count(*) from public.role_changes where field='team' and old_value in ('Marketing','Curriculum Team, Internship Team'))"
+chkas "${PAUL}" "同一個值再存一次不算變動" "Curriculum" "select public.set_team('${DIR}','Curriculum')"
 chk "紀錄還是兩筆" "2" "select count(*) from public.role_changes where field='team'"
 chkas "${PAUL}" "Co-President 把 Director 升成 Co-President" "president" "select public.set_board_role('${DIR}','president')"
 chk "職位的變動記下來了，連名字一起" "director|president|小安改" \
@@ -723,9 +739,9 @@ chkraise "★ 學員升不了職位（就算 id 對）" "not_a_cadre" \
   "perform set_config('test.uid','${PAUL}',true); perform public.set_board_role('${STU}','director');"
 chkraise "★ Director 改不了別人的職位" "not_president" \
   "perform set_config('test.uid','${OTHER}',true); perform public.set_board_role('${MEMBER}','director');"
-chkraise "★ Director 改不了別人的 team" "not_president" \
+chkraise "★ Director 改不了別人的 team" "not_senior" \
   "perform set_config('test.uid','${OTHER}',true); perform public.set_team('${MEMBER}','Marketing');"
-chkrole authenticated "${PAUL}" "★ Co-President 讀得到紀錄" "4" "select count(*) from public.role_changes"
+chkrole authenticated "${PAUL}" "★ Co-President 讀得到紀錄（職位兩筆、team 兩筆）" "4" "select count(*) from public.role_changes where field in ('board_role','team')"
 chkrole authenticated "${DIR}" "★ Director 一筆紀錄都讀不到" "0" "select count(*) from public.role_changes"
 chkrole authenticated "${MEMBER}" "每個幹部都讀得到哪幾個 team 會長出權限（設定頁要用）" "InternshipTeam" "select name from public.privileged_teams"
 ptgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; insert into public.role_changes (target, field, old_value, new_value) values ('${DIR}','team','x','y');" 2>&1 || true)
@@ -855,6 +871,210 @@ if echo "${ibgot}" | grep -q "OVERALL.*PASS" && ! echo "${ibgot}" | grep -q "FAI
 else
   echo "  FAIL 蛇梯棋那支遷移檔的驗收表沒全過："; echo "${ibgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
 fi
+
+echo
+echo "職級與指派（2026-10-24）："
+# 上面為了印驗收表重跑了 10-14 到 10-23 好幾支，它們各自把 claim_invite、is_internship_team、
+# 幹部護照五支、set_team 蓋回舊版，10-21 還把 team 的 trigger 建回來。
+# 正式站也一樣：**這一支之後再跑任何一支舊的，就要把這一支再跑一次。** 這裡先重跑，順便當它的重跑檢查
+# （INT1、NEWB、ISTAFF 是搬資料那一段跑完之後才變成幹部的，重跑要替他們補 people 與職位）。
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-24-ranks-and-workspaces.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   職級與指派那支遷移檔的驗收表全部 PASS（重跑）"; pass=$((pass+1))
+else
+  echo "  FAIL 職級與指派那支遷移檔的驗收表沒全過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "重跑補齊了後來才變幹部的人（每位幹部一列 people、一筆職位），而且沒有重複" "t" \
+  "select (select count(*) from public.people where profile_id is not null) = (select count(*) from public.profiles where role='cadre')
+      and (select count(*) from public.positions where term_id='2026-27') = (select count(*) from public.profiles where role='cadre')"
+# 現在的人：PAUL Co-President；DIR Curriculum 的 Director（管 apps:Curriculum、res:Curriculum）；OTHER Marketing 的 Director；
+# MEMBER 一般幹部（看 apps:Curriculum Team）；ISTAFF 一般幹部（改 intern-passport）；INT1、NEWB 幹部沒指派；INT3 intern。
+
+# ── Senior Adviser：跟 Co-President 一樣的範圍，除了加人、刪人、改名、改職級 ──
+chkas "${PAUL}" "Co-President 把 OTHER 升成 Senior Adviser" "senior_adviser" "select public.set_board_role('${OTHER}','senior_adviser')"
+chkas "${OTHER}" "★ Senior Adviser 看得到、改得動每一個工作區（不靠指派）" "true|true|true" \
+  "select public.can_edit('apps:Curriculum')||'|'||public.can_edit('passport')||'|'||public.can_manage('intern-passport')"
+chkas "${OTHER}" "Senior Adviser 核可得了團隊頁" "t" "select public.set_public_approved('${DIR}', true)"
+chkas "${OTHER}" "Senior Adviser 派得了人（把 MEMBER 派進 res:Curriculum 當改）" "edit" "select public.assign('${MEMBER}','res:Curriculum','edit')"
+chkraise "★ Senior Adviser 發不了邀請碼" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.create_invite('bt-sa','cadre',1,null);"
+chkraise "★ Senior Adviser 改不了職級" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.set_board_role('${MEMBER}','director');"
+chkraise "★ Senior Adviser 改不了名字" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.rename_person((select id from public.people where profile_id='${MEMBER}'),'x','y');"
+chkraise "★ Senior Adviser 刪不了人" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.remove_member((select id from public.people where profile_id='${MEMBER}'));"
+chkraise "★ Senior Adviser 按不了結束這一屆" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.end_term('2027-28','x','X','2027-08-01','2028-07-31', array['${OTHER}']::uuid[]);"
+chkraise "職級亂填會被擋" "bad_role" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_board_role('${MEMBER}','boss');"
+
+# ── Associate 沒有指派就什麼都碰不到；「管」才派得了人，而且只限自己那個工作區 ──
+chkas "${MEMBER}" "一般幹部：看得到自己 team 的申請、改不動；別的 team 連看都看不到" "true|false|false" \
+  "select public.is_on_team('Curriculum Team')||'|'||public.is_director_of('Curriculum Team')||'|'||public.is_on_team('Marketing')"
+rwgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MEMBER}',false);" -c "set role authenticated; insert into public.resources (title,url,status,team) values ('偷放','https://x','draft','Marketing');" 2>&1 || true)
+if echo "${rwgot}" | grep -qi "row-level security"; then
+  echo "  ok   ★ 一般幹部放不進沒被派的 team 的資源（RLS）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 一般幹部居然放得進別的 team 的資源：${rwgot}"; fail=$((fail+1))
+fi
+chkrole authenticated "${MEMBER}" "被派成「改」的那個 team 就放得進（res:Curriculum）" "1" \
+  "insert into public.resources (title,url,status,team) values ('可以放','https://y','draft','Curriculum'); select count(*) from public.resources where title='可以放'"
+chkas "${DIR}" "Director 對自己管的工作區派得了人（MEMBER 升成改）" "edit" "select public.assign('${MEMBER}','apps:Curriculum','edit')"
+chkas "${MEMBER}" "派了之後改得動了" "t" "select public.is_director_of('Curriculum')"
+chkraise "★ Director 派不了別的 team 的工作區" "not_ws_manage:apps:Marketing" \
+  "perform set_config('test.uid','${DIR}',true); perform public.assign('${MEMBER}','apps:Marketing','view');"
+chkraise "★ 派不了 intern（只派幹部）" "not_a_cadre" \
+  "perform set_config('test.uid','${DIR}',true); perform public.assign('${INT3}','apps:Curriculum','view');"
+chkraise "等級亂填會被擋" "bad_level" \
+  "perform set_config('test.uid','${DIR}',true); perform public.assign('${MEMBER}','apps:Curriculum','owner');"
+chkraise "沒有那個工作區會講出來" "no_such_workspace" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.assign('${MEMBER}','apps:Nope','view');"
+chkas "${DIR}" "Director 看得到自己工作區裡有誰" "2" "select count(*) from public.workspace_members('apps:Curriculum')"
+chkas "${MEMBER}" "★ 一般幹部看不到工作區裡有誰（連自己被派進去的也不行，那是管的事）" "0" "select count(*) from public.workspace_members('apps:Curriculum')"
+chkas "${DIR}" "移出去" "t" "select public.unassign('${MEMBER}','apps:Curriculum')"
+chkas "${MEMBER}" "移出去之後連看都看不到了" "f" "select public.is_on_team('Curriculum')"
+chk "派與移出都記了帳" "t" \
+  "select count(*) >= 3 from public.role_changes where field='assignment' and target='${MEMBER}' and changed_by in ('${DIR}','${OTHER}')"
+chkas "${DIR}" "my_access()：職級加我所有的工作區（給側欄用）" "director|manage" \
+  "select (a->>'rank')||'|'||(select w->>'level' from jsonb_array_elements(a->'workspaces') w where w->>'id'='apps:Curriculum') from (select public.my_access() a) x"
+chkas "${PAUL}" "Co-President 開一個新的工作區" "custom:summer-camp" \
+  "select public.create_workspace('summer-camp','2027 夏令營','Summer camp 2027','${DIR}')"
+chk "擁有人記的是 DIR" "1" "select count(*) from public.workspaces where id='custom:summer-camp' and owner='${DIR}' and kind='custom'"
+chkas "${DIR}" "擁有人對那個工作區是管" "t" "select public.can_manage('custom:summer-camp')"
+chkraise "工作區代號有大寫或空白會被擋" "bad_slug" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.create_workspace('Summer Camp','x','X',null);"
+
+# ── 歷屆名單：人的紀錄可以沒有帳號 ──
+chkas "${PAUL}" "補過去的一屆" "2024-25" "select public.create_term('2024-25','2024-25 屆','TERM 2024-25','2024-08-01','2025-07-31')"
+chk "補的那一屆是 ended，current 還是 2026-27" "ended|2026-27" \
+  "select (select status from public.terms where id='2024-25')||'|'||(select id from public.terms where status='current')"
+OLD1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.add_person('老幹部','Old Cadre','平台之前的');" | tail -1 | tr -d ' \n')
+chk "名單上加了一筆沒有帳號的人" "1" "select count(*) from public.people where id='${OLD1}' and profile_id is null"
+chkas "${PAUL}" "給他 2024-25 的職位" "t" \
+  "select public.set_position('${OLD1}','2024-25','Curriculum 的 Director','Director, Curriculum Team','Curriculum Team') > 0"
+chkas "${OTHER}" "貼一整屆：同名同姓又沒帳號的那一筆重複使用，不同的人新建" "2" \
+  "select public.import_positions('2024-25', '[{\"name_zh\":\"老幹部\",\"name_en\":\"old cadre\",\"title_en\":\"Director, Curriculum Team\",\"team\":\"Curriculum Team\"},{\"name_zh\":\"另一位\",\"name_en\":\"Another One\",\"title_en\":\"Associate, Marketing Team\",\"team\":\"Marketing Team\"}]'::jsonb)"
+chk "貼完只多了一個人（老幹部對到既有那一筆）" "1|1" \
+  "select (select count(*) from public.people where name_zh='老幹部')||'|'||(select count(*) from public.people where name_zh='另一位')"
+chk "2024-25 那一屆兩個人" "2" "select count(*) from public.positions where term_id='2024-25'"
+chkrole authenticated "${PAUL}" "★ Co-President 的名單看得到沒帳號的人，標成沒有帳號" "t" \
+  "select exists (select 1 from public.roster() where person_id='${OLD1}' and profile_id is null)"
+chkrole authenticated "${MEMBER}" "★ 一般幹部叫得動名單但一列都拿不到" "0" "select count(*) from public.roster()"
+chkrole authenticated "${MEMBER}" "★ 一般幹部直接查 people 只看得到自己那一列" "1" "select count(*) from public.people"
+rwgot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.people;" 2>&1 || true)
+if echo "${rwgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入讀不到 people"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然讀得到 people：${rwgot}"; fail=$((fail+1))
+fi
+chkas "${PAUL}" "綁著那一筆的校友碼" "bt-old-01" "select public.create_invite_for('${OLD1}','bt-old-01','給老幹部')"
+chk "一律 alumni、只能用一次、綁著那一筆" "1|alumni|true" \
+  "select uses_left||'|'||grants||'|'||(person_id='${OLD1}') from public.invite_codes where code='bt-old-01'"
+chkraise "同一筆還有沒用掉的碼就不再發" "has_unused_invite" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.create_invite_for('${OLD1}','bt-old-02',null);"
+chkrole authenticated "${PAUL}" "名單上看得到那組還沒用的碼" "bt-old-01" "select pending_code from public.roster() where person_id='${OLD1}'"
+OLDU=aaaaaaaa-1111-1111-1111-111111111111
+OLDV=aaaaaaaa-1111-1111-1111-111111111112
+psql -d "${DB}" -q -c "insert into auth.users (id,email) values ('${OLDU}','old@example.com'),('${OLDV}','other-old@example.com');
+  insert into public.profiles (id,name_zh,role) values ('${OLDU}','老幹部本人','student'),('${OLDV}','不是他','student');" >/dev/null
+chkas "${OLDU}" "★ 他拿那組碼註冊：變校友，而且認領了那一筆" "upgraded_alumni" "select public.claim_invite('bt-old-01')"
+chk "紀錄歸到他身上，歷屆職位跟著來，沒有多出第二筆" "t" \
+  "select (select profile_id from public.people where id='${OLD1}') = '${OLDU}'
+      and (select count(*) from public.positions where person_id='${OLD1}' and term_id='2024-25') = 1
+      and (select count(*) from public.people where profile_id='${OLDU}') = 1"
+chk "認領記了帳" "1" "select count(*) from public.role_changes where field='claimed' and target='${OLDU}'"
+# 把那組碼的次數手動加回 1，模擬「碼被轉手」：第二個人拿到也認不了那一筆。
+psql -d "${DB}" -q -c "update public.invite_codes set uses_left=1 where code='bt-old-01';" >/dev/null
+chkraise "★ 已經被認走的紀錄，第二個人拿到碼也認不了" "record_claimed" \
+  "perform set_config('test.uid','${OLDV}',true); perform public.claim_invite('bt-old-01');"
+chk "整筆回滾：碼沒被燒掉、那個人還是學員" "1|student" \
+  "select (select uses_left from public.invite_codes where code='bt-old-01')||'|'||(select role from public.profiles where id='${OLDV}')"
+# 兩筆像同一個人：合併
+DUP=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.add_person('另一位','another one',null);" | tail -1 | tr -d ' \n')
+chkrole authenticated "${PAUL}" "名單提示「可能是同一個人」（英文名不分大小寫）" "t" \
+  "select '${DUP}' = any(maybe_dup) from public.roster() where name_en='Another One' and person_id<>'${DUP}'"
+KEEP=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Another One';" | tr -d ' \n')
+chkas "${PAUL}" "合併：留下的那一筆回來" "${KEEP}" "select public.merge_people('${KEEP}','${DUP}')"
+chk "職位還在留下的那一筆上，另一筆刪掉了" "1|0" \
+  "select (select count(*) from public.positions where person_id='${KEEP}')||'|'||(select count(*) from public.people where id='${DUP}')"
+chkraise "兩筆都有帳號就不合併" "both_have_accounts" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.merge_people((select id from public.people where profile_id='${DIR}'),(select id from public.people where profile_id='${MEMBER}'));"
+chkas "${PAUL}" "Co-President 改名：people 與 profiles 一起改" "小安新|小安新" \
+  "select public.rename_person((select id from public.people where profile_id='${DIR}'),'小安新','An Hsiao') ; select (select name_zh from public.profiles where id='${DIR}')||'|'||(select name_zh from public.people where profile_id='${DIR}')"
+chkrole anon "" "★ 對外團隊頁：兩把鑰匙都轉、這一屆有職位的人，頭銜從職位算" "小安新|Director,Curriculum|2026-27" \
+  "select name_zh||'|'||title_en||'|'||term from public.public_team()"
+chkrole anon "" "★ 沒有帳號的人不會出現在對外頁" "0" "select count(*) from public.public_team() where name_zh='另一位'"
+psql -d "${DB}" -q -c "insert into public.alumni_stories (id,county,public_story,story_approved,quote) values ('${MEMBER}','台北',true,true,'一句話');" >/dev/null
+chkrole anon "" "校友頁多一欄：最後一屆的職位 · 屆別" "Associate,Curriculum·2026-27" \
+  "select title from public.public_alumni() where name='改名'"
+
+# ── 刪除成員與結束這一屆（只有 Co-President）──
+chkraise "★ 不能刪自己" "cannot_remove_self" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.remove_member((select id from public.people where profile_id='${PAUL}'));"
+chkas "${PAUL}" "刪除成員：登入帳號沒了，護照跟著沒了，名單上那一筆留著標成沒有帳號" "0|0|1" \
+  "select public.remove_member((select id from public.people where profile_id='${NEWB}'));
+   select (select count(*) from auth.users where id='${NEWB}')||'|'||(select count(*) from public.passports where id='${NEWB}')||'|'||(select count(*) from public.people where name_zh='新幹部' and profile_id is null)"
+chk "刪人記了帳，名字在紀錄裡" "新幹部" "select target_name from public.role_changes where field='removed' and old_value='cadre'"
+chkraise "刪名單上的紀錄：有帳號的不行" "has_account" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.delete_person((select id from public.people where profile_id='${DIR}'));"
+chkas "${PAUL}" "沒帳號的紀錄刪得掉" "t" "select public.delete_person((select id from public.people where name_zh='新幹部'))"
+chkraise "★ 結束這一屆：自己不在留下的名單裡會被擋" "must_keep_self" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.end_term('2027-28','x','X','2027-08-01','2028-07-31', array['${DIR}']::uuid[]);"
+chkraise "屆別代號格式不對會被擋" "bad_term_id" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.end_term('next','x','X','2027-08-01','2028-07-31', array['${PAUL}']::uuid[]);"
+chk "還沒結束：current 還是 2026-27，沒有人變校友" "2026-27|0" \
+  "select (select id from public.terms where status='current')||'|'||(select count(*) from public.role_changes where field='role')"
+chkas "${PAUL}" "★ 結束這一屆：留 PAUL、DIR、OTHER、ISTAFF，其他變校友" "2026-27|2027-28|4|2" \
+  "select (r->>'ended')||'|'||(r->>'term')||'|'||(r->>'kept')||'|'||(r->>'alumni') from (select public.end_term('2027-28','2027-28 屆','TERM 2027-28','2027-08-01','2028-07-31', array['${PAUL}','${DIR}','${OTHER}','${ISTAFF}']::uuid[]) r) x"
+chk "沒留下的：role 變 alumni、職級歸零、指派清掉、團隊頁下架、職位紀錄留著" "alumni|member|0|false|1" \
+  "select role||'|'||board_role||'|'||(select count(*) from public.assignments where user_id='${MEMBER}')||'|'||public_approved||'|'||(select count(*) from public.positions po join public.people pe on pe.id=po.person_id where pe.profile_id='${MEMBER}' and term_id='2026-27') from public.profiles where id='${MEMBER}'"
+chk "留下的：2027-28 複製了一筆職位、指派沒動、職級沒動" "1|manage|senior_adviser" \
+  "select (select count(*) from public.positions po join public.people pe on pe.id=po.person_id where pe.profile_id='${DIR}' and term_id='2027-28')||'|'||(select level from public.assignments where user_id='${DIR}' and workspace_id='apps:Curriculum')||'|'||(select board_role from public.profiles where id='${OTHER}')"
+chk "屆別切過去了，舊的一屆是 ended" "2027-28|ended" \
+  "select (select id from public.terms where status='current')||'|'||(select status from public.terms where id='2026-27')"
+chkas "${MEMBER}" "★ 變校友之後什麼工作區都碰不到" "false|false" "select public.can_view('apps:Curriculum')||'|'||public.is_cadre()"
+chkrole anon "" "★ 團隊頁只剩這一屆的人（小安新還在，一般幹部不在）" "1" "select count(*) from public.public_team()"
+chkrole anon "" "校友頁的頭銜還在（職位紀錄沒刪）" "Associate,Curriculum·2026-27" \
+  "select title from public.public_alumni() where name='改名'"
+chk "換屆記了帳（每一位變校友的各一筆，加一筆屆別）" "2|1" \
+  "select (select count(*) from public.role_changes where field='role' and new_value='alumni')||'|'||(select count(*) from public.role_changes where field='term' and old_value='2026-27')"
+chkraise "同一個屆別代號不能再結束一次" "term_exists" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.end_term('2026-27','x','X','2028-08-01','2029-07-31', array['${PAUL}']::uuid[]);"
+rwgot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.roster();" 2>&1 || true)
+if echo "${rwgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動名單"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動名單：${rwgot}"; fail=$((fail+1))
+fi
+rwgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; insert into public.assignments (user_id,workspace_id,level) values ('${DIR}','passport','manage');" 2>&1 || true)
+if echo "${rwgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 連 Co-President 也寫不進指派表（只有 assign 寫得進去）"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 直接 insert 指派居然成功：${rwgot}"; fail=$((fail+1))
+fi
+
+# ── 破壞測試：把 Co-President 的門拿掉，驗收表要變紅 ──
+# 一條只會變綠的驗收表等於沒有驗收表。這裡把遷移檔裡每一句 require_president() 拿掉再跑一次，
+# 第 2 項（人的管理七支的門）與 OVERALL 要變 FAIL；然後把真的那一支跑回來。
+BROKEN=$(mktemp -t bt-broken-XXXXXX.sql)
+# 只換行首的那幾句（函式本文），不換驗收表裡那一句比對用的字串，不然驗收表會跟著一起壞、看起來還是綠的。
+sed 's/^  perform public.require_president();/  perform public.require_senior();/' supabase/migrations/2026-10-24-ranks-and-workspaces.sql > "${BROKEN}"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+rm -f "${BROKEN}"
+if echo "${rwgot}" | grep -q "OVERALL.*FAIL" && echo "${rwgot}" | grep "人的管理七支" | grep -q "FAIL"; then
+  echo "  ok   ★ 破壞測試：拿掉 Co-President 的門，驗收表第 2 項與 OVERALL 變紅"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 破壞測試：門拿掉了驗收表還是綠的（驗收表守不住）"; echo "${rwgot}" | grep -i "OVERALL\|七支\|error" | head -5; fail=$((fail+1))
+fi
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-24-ranks-and-workspaces.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   真的那一支跑回來，驗收表又全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 跑回來之後驗收表沒全過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+chkraise "門回來了：Senior Adviser 又刪不了人" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.remove_member((select id from public.people where profile_id='${DIR}'));"
 
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
