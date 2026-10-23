@@ -228,6 +228,12 @@ export function wsLabel(w) {
 export function positionFor(p, termId) {
   return (p && Array.isArray(p.positions) ? p.positions : []).find(x => x.term === termId) || null;
 }
+// 同一屆的全部職位（2026-10-26 起一個人一屆可以兼好幾個，例如 Sponsorship 的 Adviser 兼 Curriculum 的 Associate）。
+export function positionsFor(p, termId) {
+  return (p && Array.isArray(p.positions) ? p.positions : []).filter(x => x.term === termId);
+}
+// 同一屆所有職位接成一句：「Adviser, Sponsorship Team · Associate, Curriculum Team」。
+export const positionsLine = (p, termId) => positionsFor(p, termId).map(positionTitle).filter(Boolean).join(" · ");
 export const positionTitle = pos => pos ? ((lang() === "zh" ? (pos.title_zh || pos.title_en) : (pos.title_en || pos.title_zh)) || "") : "";
 export const currentTerm = terms => (terms || []).find(t => t.status === "current") || null;
 // 2026-27 → 2027-28。對不出來就回空字串，讓人自己填。
@@ -291,7 +297,7 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter) {
         dup ? ` <span class="tag warn">${T("ro.maybeDup")}</span>` : ""}${
         p.pending_code ? `<div class="mini">${T("ro.pendingCode", { code: esc(p.pending_code) })}</div>` : ""}</td>
       <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
-      <td>${pos ? `${esc(positionTitle(pos))}${pos.team ? `<div class="mini">${esc(pos.team)}</div>` : ""}`
+      <td>${pos ? `${esc(positionsLine(p, pos.term))}${positionsFor(p, pos.term).some(x => x.team) ? `<div class="mini">${esc(positionsFor(p, pos.term).map(x => x.team).filter(Boolean).join(T("punct.list")))}</div>` : ""}`
                : lastPos ? `<span class="mini">${esc(positionTitle(lastPos))}・${esc(lastPos.term)}</span>` : `<span class="mini">${T("ro.noPosition")}</span>`}</td>
       <td>${ws.length ? ws.map(w => `<span class="tag">${esc(w.id)}・${esc(levelLabel(w.level))}</span>`).join(" ") : `<span class="mini">${hasAccount(p) && p.role === "cadre" ? T("ro.noWs") : ""}</span>`}</td>
       <td class="t-act"><button class="btn quiet sm" data-act="person-edit" data-id="${esc(p.person_id)}"${dis}>${T("ro.edit")}</button></td>
@@ -332,13 +338,15 @@ const teamSelect = (id, val, dis) => {
 // 這一屆的職位、team 標籤（只是標籤）、他在哪幾個工作區（唯讀，去工作區頁改）、
 // 最底下是危險的事：發校友碼、合併、刪除成員或刪除紀錄。draft 留住存檔被擋時剛填的東西。
 // remove = { typed }：按了「刪除成員」之後第二步的狀態（要把名字打一次）。
-export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people, remove) {
+export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people, remove, email) {
   const cur = currentTerm(terms);
   const d = draft || {};
   const termId = d.term || (cur ? cur.id : ((terms || [])[0] || {}).id || "");
-  const pos = positionFor(p, termId) || {};
-  const v = Object.assign({ board_role: p.board_role || "member", name_zh: p.name_zh || "", name_en: p.name_en || "",
-    title_zh: pos.title_zh || "", title_en: pos.title_en || "", pteam: pos.team || "", team: p.team || "" }, d);
+  // 這一屆的職位是一張清單（2026-10-26）。draft.rows 留住改到一半的；沒有就從資料來。
+  // 每一列的 orig 是它原本的 team（沒有 team 的職位是空字串）；新加的一列 orig 是 null。
+  const rows = Array.isArray(d.rows) ? d.rows
+    : positionsFor(p, termId).map(x => ({ orig: x.team || "", title_zh: x.title_zh || "", title_en: x.title_en || "", team: x.team || "" }));
+  const v = Object.assign({ board_role: p.board_role || "member", name_zh: p.name_zh || "", name_en: p.name_en || "", team: p.team || "" }, d);
   const picked = parseTeams(v.team);
   const extra = picked.filter(t => !TEAMS.includes(t));
   const dis = busy ? " disabled" : "";
@@ -355,20 +363,33 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
       ${BOARD_ROLES.map(r => `<option value="${r.v}"${v.board_role === r.v ? " selected" : ""}>${esc(T(r.label))}（${esc(T(r.hint))}）</option>`).join("")}
     </select></label>
     ${self ? `<div class="mini" style="margin:-6px 0 14px">${T("pe.selfNote")}</div>` : !isPres ? `<div class="mini" style="margin:-6px 0 14px">${T("pe.presOnly")}</div>` : `<div class="mini" style="margin:-6px 0 14px">${T("pe.rankNote")}</div>`}`) : "";
+  // 註冊用的 email（2026-10-26）：唯讀，一顆複製。只在這一頁，名單表格上不印。email 是 person_email() 回的，
+  // undefined 表示還在載或載不到，null 表示沒有帳號。
+  const emailLine = !hasAccount(p) ? `<div class="mini">${T("pe.email")}${T("punct.colon")}${T("ro.noAccount")}</div>`
+    : email === undefined ? `<div class="mini">${T("pe.email")}${T("punct.colon")}${T("pe.emailLoading")}</div>`
+    : `<div class="row" style="margin-bottom:14px"><span class="mini">${T("pe.email")}${T("punct.colon")}<b>${esc(email || "")}</b></span>
+       ${email ? `<button class="btn quiet sm" data-act="copy-email" data-email="${esc(email)}"${dis}>${T("pe.emailCopy")}</button>` : ""}</div>`;
   const nameSec = sectionHTML(T("pe.name"), `<div class="two">
       <label><i>${T("pe.nameZh")}</i><input id="pk-zh" value="${esc(v.name_zh)}"${isPres ? dis : " disabled"}></label>
       <label><i>${T("pe.nameEn")}</i><input id="pk-en" value="${esc(v.name_en)}"${isPres ? dis : " disabled"}></label>
-    </div>${!isPres ? `<div class="mini">${T("pe.presOnly")}</div>` : ""}`);
+    </div>${emailLine}${!isPres ? `<div class="mini">${T("pe.presOnly")}</div>` : ""}`);
+  const posRow = (r, i) => `<div class="card posrow" data-posrow="${i}" data-orig="${r.orig == null ? "" : esc(r.orig)}" data-isnew="${r.orig == null ? "1" : "0"}">
+      <div class="two">
+        <label><i>${T("pe.titleEn")}</i><input id="pk-ten-${i}" value="${esc(r.title_en)}" placeholder="Director, Curriculum Team"${dis}></label>
+        <label><i>${T("pe.titleZh")}</i><input id="pk-tzh-${i}" value="${esc(r.title_zh)}" placeholder="${esc(T("pe.titleZhPh"))}"${dis}></label>
+      </div>
+      <label><i>${T("pe.posTeam")}</i>${teamSelect(`pk-pteam-${i}`, r.team, dis)}</label>
+      <div class="row">${r.orig == null
+        ? `<button class="btn ghost sm" data-act="position-row-drop" data-i="${i}"${dis}>${T("pe.posRowDrop")}</button>`
+        : `<button class="btn ghost sm" data-act="position-delete" data-id="${esc(p.person_id)}" data-term="${esc(termId)}" data-team="${esc(r.orig)}"${dis}>${T("pe.posDelete")}</button>`}</div>
+    </div>`;
+  const otherTerms = [...new Set((p.positions || []).map(x => x.term).filter(t => t !== termId))];
   const posSec = sectionHTML(T("pe.position"), `<label><i>${T("pe.term")}</i><select id="pk-term" data-act="person-term"${dis}>${
       (terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
-    <div class="two">
-      <label><i>${T("pe.titleEn")}</i><input id="pk-ten" value="${esc(v.title_en)}" placeholder="Director, Curriculum Team"${dis}></label>
-      <label><i>${T("pe.titleZh")}</i><input id="pk-tzh" value="${esc(v.title_zh)}" placeholder="${esc(T("pe.titleZhPh"))}"${dis}></label>
-    </div>
-    <label><i>${T("pe.posTeam")}</i>${teamSelect("pk-pteam", v.pteam, dis)}</label>
+    ${rows.length ? rows.map(posRow).join("") : `<div class="mini" style="margin-bottom:10px">${T("pe.posNone", { term: esc(termId) })}</div>`}
+    <div class="row"><button class="btn ghost sm" data-act="position-row-add"${dis}>${T("pe.posAdd")}</button></div>
     <div class="mini">${T("pe.posNote", { term: esc(termId) })}</div>${
-    positionFor(p, termId) ? `<div class="row"><button class="btn ghost sm" data-act="position-delete" data-id="${esc(p.person_id)}" data-term="${esc(termId)}"${dis}>${T("pe.posDelete")}</button></div>` : ""}${
-    (p.positions || []).length > 1 ? `<div class="mini" style="margin-top:8px">${T("pe.history")}${esc((p.positions || []).map(x => `${x.term}: ${(lang() === "zh" ? (x.title_zh || x.title_en) : (x.title_en || x.title_zh)) || ""}`).join(T("punct.list")))}</div>` : ""}`);
+    otherTerms.length ? `<div class="mini" style="margin-top:8px">${T("pe.history")}${esc(otherTerms.map(t => `${t}: ${positionsLine(p, t)}`).join(T("punct.list")))}</div>` : ""}`);
   const teamSec = cadre ? sectionHTML(T("pe.teams"), `<div class="tgrid">${TEAMS.map(box).join("")}${extra.map(t => box(t)).join("")}</div>
     <div class="mini" style="margin-top:8px">${T("pe.teamsNote")}</div>`) : "";
   const wsSec = cadre ? sectionHTML(T("pe.ws"), ws.length

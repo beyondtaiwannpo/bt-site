@@ -68,6 +68,8 @@ export function toPerson(row) {
     // 一個人可以在好幾個 team，所以這裡是一個陣列。
     // 兩個 team 收斂完撞在一起（例如「CR」與「Community Relations Team」）
     // 只留一個 —— 不然那個人會在同一組裡出現兩次。
+    // 2026-10-26 起 public_team() 一筆職位一列，每一列只有一個 team、各帶自己的頭銜：
+    // 兼兩個 team 的人會以兩列進來，byTeam() 把他放進兩組，各印那一組的職位。
     teams: [...new Set(parseTeams(row.team).map(teamKey))],
     // 2026-10-24 起頭銜是「這一屆的職位 · 屆別」（public_team() 回 title_en / title_zh / term）；
     // 舊的 public_title 欄位搬進職位之後就拿掉了，這裡留一個退路給還沒跑遷移檔的資料庫。

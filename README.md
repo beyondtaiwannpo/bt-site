@@ -3440,6 +3440,38 @@ team 裡有 Internship Team 的人拿 `intern-passport` 一筆「改」（Direct
 - `/settings/` 對 Director 的 team 還是唯讀（畫面），資料庫已經放行。
 - 「管理者怎麼處理帳號問題」那一節的「我要離開 BT」已經照新模型改寫（批 3）。
 
+## 同一屆好幾個職位、改一個人那一頁印 email（2026-10-26，批 4）
+
+Paul 2026-10-23 看了批 2 的截圖之後追加兩件：一個人同一屆可以兼好幾個職位（例如 Sponsorship Team 的 Adviser 兼 Curriculum Team 的 Associate），
+職級還是一個人一個；改一個人那一頁要印他註冊用的 email。
+
+### 職位變成清單
+
+- 資料庫：`positions` 的唯一鍵從「人 × 屆」改成「人 × 屆 × team」（沒有 team 的職位，例如 Co-President，彼此算同一筆）。
+  `set_position()` 存的是那一屆那個 team 的那一筆；`delete_position()` 多一個參數 `p_team`，刪的也是那一筆；
+  貼一整屆同一個人第二行、不同 team，變成第二筆不是被擋；換屆複製那一屆的全部；合併搬全部。
+- 改一個人：「職位」區塊改成一張清單，每一列各自有英文、中文、team 與「刪掉這一筆職位」，底下「＋ 這一屆再加一個職位」。
+  存檔時逐列比對：改了名稱就存那一筆；換了 team 等於刪舊的那一筆再存一筆新的；同一個 team 填兩列會被擋。換屆別選單時清單換成那一屆的。
+- 名單：這一屆的所有職位用「 · 」接成一句，底下小字列 team。
+- `/team/`：`public_team()` 改成一筆職位一列，兼兩個 team 的人在兩組各出現一次、各印那一組的頭銜（同一張臉可以出現在兩組，刻意的）。
+- `/alumni/`：`public_alumni()` 的 `title` 把最後一屆的所有職位用「 · 」接起來，最後接屆別。
+
+### 註冊用的 email
+
+改一個人那一頁名字底下一行「註冊用的 email：…」加一顆「複製」。只有 Co-President 與 Senior Adviser 拿得到（`person_email()` 的門是 `is_senior()`，
+跟 `invite_codes_for_review()` 一樣從 `auth.users` 拿）。沒有帳號的人印「沒有帳號」。**名單表格上不印 email**，只在這一頁。
+
+### 上線前要跑新的遷移檔
+
+`supabase/migrations/2026-10-26-multi-positions.sql`，接在 `2026-10-25-drop-public-title.sql` 後面跑。5 項 PASS。
+`2026-10-24` 那支同步改成同一版（建表就用新的唯一鍵、八支函式本文一樣、搬資料「這一屆已經有職位的人跳過」），所以之後重跑 10-24 不會把這一支蓋回去。
+本機 `./scripts/db/smoke.sh` 358 項全過。
+
+### 檔案
+
+`admin/people/src/{ui,main,data,strings}.js`、`team/src/ui.js`（一行註解）、兩支遷移檔、`scripts/db/smoke.sh`、`test/people-admin.test.mjs`。截圖 `docs/admin-redesign/perm/19`、`20`、`21`。
+**沒驗的**：真的登入後按「複製」（`navigator.clipboard` 要 https 或 localhost，正式站是 https 沒問題）。
+
 ## 整站改看指派（2026-10-24，批 3）
 
 批 1 的資料庫、批 2 的人與權限頁之後，這一批把**其他每一個還看 `team` 字串或 `board_role` 的畫面**換成看指派，

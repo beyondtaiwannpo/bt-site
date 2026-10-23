@@ -119,12 +119,15 @@ create table if not exists public.positions (
   title_zh   text,
   title_en   text,
   team       text,
-  created_at timestamptz not null default now(),
-  unique (person_id, term_id)
+  created_at timestamptz not null default now()
 );
+-- 2026-10-26 起同一屆可以有好幾個職位（Paul 10-23：例如 Sponsorship 的 Adviser 兼 Curriculum 的 Associate）。
+-- 唯一鍵是 人 × 屆 × team；沒有 team 的職位（Co-President）彼此算同一筆。原本的 unique (person_id, term_id) 由 10-26 拿掉。
+alter table public.positions drop constraint if exists positions_person_id_term_id_key;
+create unique index if not exists positions_one_per_team on public.positions (person_id, term_id, (coalesce(team, '')));
 comment on table public.positions is
-  '每人每屆一筆：職位名稱（自由文字，例如 Director, Internship Team）與 team。
-   團隊頁的頭銜從這裡算：title · term。職位是對外怎麼稱呼，不是職級。';
+  '每人每屆每個 team 一筆：職位名稱（自由文字，例如 Director, Internship Team）與 team。
+   一個人同一屆可以有好幾筆（2026-10-26）。團隊頁的頭銜從這裡算：title · term。職位是對外怎麼稱呼，不是職級。';
 
 create table if not exists public.workspaces (
   id         text primary key,                 -- passport / intern-passport / apps:<team> / res:<team> / custom:<slug>
@@ -702,10 +705,10 @@ begin
     raise exception 'empty_title' using errcode = 'P0001';
   end if;
   select coalesce(title_en, title_zh) || '/' || coalesce(team, '') into v_old
-    from positions where person_id = p_person and term_id = p_term;
+    from positions where person_id = p_person and term_id = p_term and coalesce(team, '') = coalesce(nullif(btrim(p_team), ''), '');
   insert into positions (person_id, term_id, title_zh, title_en, team)
   values (p_person, p_term, nullif(btrim(p_title_zh), ''), nullif(btrim(p_title_en), ''), nullif(btrim(p_team), ''))
-  on conflict (person_id, term_id) do update
+  on conflict (person_id, term_id, (coalesce(team, ''))) do update
     set title_zh = excluded.title_zh, title_en = excluded.title_en, team = excluded.team
   returning id into v_id;
   perform public.log_change((select profile_id from people where id = p_person), public.person_name(p_person),
@@ -715,22 +718,23 @@ end $$;
 revoke all on function public.set_position(uuid, text, text, text, text) from public, anon;
 grant execute on function public.set_position(uuid, text, text, text, text) to authenticated;
 
-create or replace function public.delete_position(p_person uuid, p_term text)
+drop function if exists public.delete_position(uuid, text);
+create or replace function public.delete_position(p_person uuid, p_term text, p_team text)
 returns boolean language plpgsql security definer
 set search_path = public, pg_temp
 as $$
 declare v_old text;
 begin
   perform public.require_senior();
-  delete from positions where person_id = p_person and term_id = p_term
+  delete from positions where person_id = p_person and term_id = p_term and coalesce(team, '') = coalesce(nullif(btrim(p_team), ''), '')
     returning coalesce(title_en, title_zh) || '/' || coalesce(team, '') into v_old;
   if not found then return false; end if;
   perform public.log_change((select profile_id from people where id = p_person), public.person_name(p_person),
     'position', p_term || ':' || v_old, null);
   return true;
 end $$;
-revoke all on function public.delete_position(uuid, text) from public, anon;
-grant execute on function public.delete_position(uuid, text) to authenticated;
+revoke all on function public.delete_position(uuid, text, text) from public, anon;
+grant execute on function public.delete_position(uuid, text, text) to authenticated;
 
 -- 貼一整屆：[{name_zh, name_en, title_zh, title_en, team}, …]。
 -- 同一個中英文名、而且還沒有帳號的那一筆會重複使用（同一個人跨兩屆貼兩次不該變兩個人）；
@@ -765,7 +769,7 @@ begin
     insert into positions (person_id, term_id, title_zh, title_en, team)
     values (v_person, p_term, nullif(btrim(coalesce(r->>'title_zh', '')), ''),
             nullif(btrim(coalesce(r->>'title_en', '')), ''), nullif(btrim(coalesce(r->>'team', '')), ''))
-    on conflict (person_id, term_id) do update
+    on conflict (person_id, term_id, (coalesce(team, ''))) do update
       set title_zh = excluded.title_zh, title_en = excluded.title_en, team = excluded.team;
     n := n + 1;
   end loop;
@@ -881,7 +885,7 @@ begin
   v_drop_name := public.person_name(p_drop);
   insert into positions (person_id, term_id, title_zh, title_en, team)
   select p_keep, term_id, title_zh, title_en, team from positions where person_id = p_drop
-  on conflict (person_id, term_id) do nothing;
+  on conflict (person_id, term_id, (coalesce(team, ''))) do nothing;
   update invite_codes set person_id = p_keep where person_id = p_drop;
   if v_keep_profile is null and v_drop_profile is not null then
     update people set profile_id = null where id = p_drop;
@@ -965,7 +969,7 @@ begin
     insert into positions (person_id, term_id, title_zh, title_en, team)
     select v_person, term_id, title_zh, title_en, team from positions
      where person_id in (select id from people where profile_id = v_uid and id <> v_person)
-    on conflict (person_id, term_id) do nothing;
+    on conflict (person_id, term_id, (coalesce(team, ''))) do nothing;
     delete from people where profile_id = v_uid and id <> v_person;
     perform public.log_change(v_uid, public.person_name(v_person), 'claimed', null, v_person::text);
     v_claimed := true;
@@ -1040,7 +1044,7 @@ begin
       insert into positions (person_id, term_id, title_zh, title_en, team)
       select v_person, p_next_id, title_zh, title_en, team from positions
        where person_id = v_person and term_id = v_cur
-      on conflict (person_id, term_id) do nothing;
+      on conflict (person_id, term_id, (coalesce(team, ''))) do nothing;
       v_kept := v_kept + 1;
     else
       update profiles set role = 'alumni', board_role = 'member', public_profile = false, public_approved = false
@@ -1122,6 +1126,7 @@ revoke all on function public.workspace_members(text) from public, anon;
 grant execute on function public.workspace_members(text) to authenticated;
 
 -- 對外團隊頁：兩把鑰匙都轉、而且在 current 那一屆有職位的幹部。頭銜從職位算，不再讀 public_title。
+-- **一筆職位一列**（2026-10-26）：同一個人兼兩個 team 的職位，團隊頁兩組各出現一次，各印那一組的頭銜。
 -- 換屆之後沒留下的人自然消失（end_term 也把他的核可撤了，雙重保險）。
 create or replace function public.public_team()
 returns table (id uuid, name_zh text, name_en text, team text, avatar text, title_zh text, title_en text, term text)
@@ -1136,7 +1141,7 @@ as $$
     join positions po on po.person_id = pe.id
     join terms t on t.id = po.term_id and t.status = 'current'
    where p.public_profile and p.public_approved and p.role = 'cadre'
-   order by p.name_en;
+   order by p.name_en, po.team nulls first;
 $$;
 revoke all on function public.public_team() from public;
 grant execute on function public.public_team() to anon, authenticated;
@@ -1156,9 +1161,13 @@ as $$
          coalesce(nullif(btrim(s.display_name), ''), p.name_zh, p.name_en),
          s.school, s.county, s.city, s.country, s.place,
          s.quote, s.note, s.school_en, s.country_en, s.quote_en, s.note_en,
-         (select coalesce(po.title_en, po.title_zh) || ' · ' || po.term_id
+         -- 最後一屆的所有職位用「 · 」接起來，最後接屆別（10-26 起一屆可以有好幾筆）。
+         (select string_agg(coalesce(po.title_en, po.title_zh), ' · ' order by po.team nulls first) || ' · ' || po.term_id
             from people pe join positions po on po.person_id = pe.id join terms t on t.id = po.term_id
-           where pe.profile_id = p.id order by t.starts_on desc limit 1)
+           where pe.profile_id = p.id
+             and t.id = (select t2.id from people pe2 join positions po2 on po2.person_id = pe2.id join terms t2 on t2.id = po2.term_id
+                          where pe2.profile_id = p.id order by t2.starts_on desc limit 1)
+           group by po.term_id)
     from public.alumni_stories s
     join public.profiles p on p.id = s.id
    where s.public_story and s.story_approved
@@ -1168,6 +1177,18 @@ as $$
 $$;
 revoke all on function public.public_alumni() from public;
 grant execute on function public.public_alumni() to anon, authenticated;
+
+-- 一個人註冊用的 email（2026-10-26，Paul 10-23）：只在「改一個人」那一頁印，只有 Co-President 與 Senior Adviser 拿得到，
+-- 名單表格上不印。跟 invite_codes_for_review() 一樣從 auth.users 拿。沒有帳號回 null。
+create or replace function public.person_email(p_person uuid)
+returns text language sql stable security definer
+set search_path = public, auth, pg_temp
+as $$
+  select u.email from public.people pe join auth.users u on u.id = pe.profile_id
+   where pe.id = p_person and public.is_senior();
+$$;
+revoke all on function public.person_email(uuid) from public, anon;
+grant execute on function public.person_email(uuid) to authenticated;
 
 -- ---------- 14. 把今天的資料搬過去（零遺失；重跑不會重複）----------
 do $$
@@ -1237,10 +1258,13 @@ begin
                        and r.board_role <> 'president'
                        then ', ' || btrim(split_part(r.team, ',', 1)) else '' end;
     end if;
-    insert into positions (person_id, term_id, title_zh, title_en, team)
-    values (v_person, (select id from terms where status = 'current'), v_title, v_title,
-            nullif(btrim(split_part(coalesce(r.team, ''), ',', 1)), ''))
-    on conflict (person_id, term_id) do nothing;
+    -- 搬過就不再搬：這一屆已經有任何一筆職位的人跳過（10-26 起一屆可以有好幾筆，不能靠唯一鍵擋重複搬）。
+    if not exists (select 1 from positions where person_id = v_person and term_id = (select id from terms where status = 'current')) then
+      insert into positions (person_id, term_id, title_zh, title_en, team)
+      values (v_person, (select id from terms where status = 'current'), v_title, v_title,
+              nullif(btrim(split_part(coalesce(r.team, ''), ',', 1)), ''))
+      on conflict (person_id, term_id, (coalesce(team, ''))) do nothing;
+    end if;
     -- 指派：Co-President 與 Senior Adviser 不派（職級本身就是全部）。
     if r.board_role in ('president', 'senior_adviser') then continue; end if;
     for t in select btrim(x) from unnest(string_to_array(coalesce(r.team, ''), ',')) x where btrim(x) <> '' loop
@@ -1337,7 +1361,8 @@ select * from (
   ), ppl as (
     select count(*) as n from public.people pe join public.profiles pr on pr.id = pe.profile_id where pr.role = 'cadre'
   ), pos as (
-    select count(*) as n from public.positions po join public.terms t on t.id = po.term_id and t.status = 'current'
+    -- 一個人同一屆可以有好幾筆（10-26），所以數的是「有職位的人」不是筆數。
+    select count(distinct pr.id) as n from public.positions po join public.terms t on t.id = po.term_id and t.status = 'current'
       join public.people pe on pe.id = po.person_id join public.profiles pr on pr.id = pe.profile_id where pr.role = 'cadre'
   ), title_ok as (
     -- 由上面那個 DO 區塊用動態 SQL 算好放在暫存表裡（public_title 被 10-25 drop 之後這裡不能直接寫那一欄）。

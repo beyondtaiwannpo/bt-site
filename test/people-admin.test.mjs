@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { tabsHTML, rosterHTML, changesHTML, personEditHTML, personNewHTML, workspacesHTML, termsHTML,
-  BOARD_ROLES, boardLabel, LEVELS, levelLabel, pasteParse, nextTermId, positionFor, currentTerm, TEAMS as PEOPLE_TEAMS, setLang, T } from "../admin/people/src/ui.js";
+  BOARD_ROLES, boardLabel, LEVELS, levelLabel, pasteParse, nextTermId, positionFor, positionsFor, positionsLine, currentTerm, TEAMS as PEOPLE_TEAMS, setLang, T } from "../admin/people/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
 import { says } from "../admin/people/src/data.js";
@@ -100,8 +100,9 @@ test("★ 改一個人：自己的職級關著；Senior Adviser 改不了職級�
   assert.match(other, /value="director" selected/);
   assert.match(other, /value="senior_adviser"/);
   assert.match(other, /value="Curriculum Team" checked/);
-  assert.match(other, /id="pk-ten" value="Director, Curriculum Team"/, "這一屆的職位帶進表單");
-  assert.match(other, /data-act="position-delete" data-id="p2" data-term="2026-27"/);
+  assert.match(other, /id="pk-ten-0" value="Director, Curriculum Team"/, "這一屆的職位帶進表單");
+  assert.match(other, /data-act="position-row-add"/, "可以再加一個職位");
+  assert.match(other, /data-act="position-delete" data-id="p2" data-term="2026-27" data-team="Curriculum Team"/);
   assert.match(other, /歷屆：/);
   assert.match(other, /data-act="member-remove" data-id="p2"/);
   assert.match(other, /data-act="person-save" data-id="p2"/);
@@ -110,7 +111,7 @@ test("★ 改一個人：自己的職級關著；Senior Adviser 改不了職級�
   assert.match(sa, /<select id="pk-role" disabled>/);
   assert.match(sa, /<input id="pk-zh" value="小安" disabled>/);
   assert.doesNotMatch(sa, /data-act="member-remove"/);
-  assert.match(sa, /id="pk-ten"/, "職位 Senior Adviser 改得了");
+  assert.match(sa, /id="pk-ten-0"/, "職位 Senior Adviser 改得了");
   const old = personEditHTML(PEOPLE[3], TERMS, ME, true, "", false, null, PEOPLE, null);
   assert.doesNotMatch(old, /id="pk-role"/);
   assert.match(old, /bt-old-01/);
@@ -129,14 +130,16 @@ test("★ 刪除成員是兩步：第二步列出會刪掉的東西、要把名�
 });
 
 test("存檔被擋之後剛填的東西要留在畫面上，換屆別表單換成那一屆的職位", () => {
-  const h = personEditHTML(PEOPLE[1], TERMS, ME, true, "存不起來：x", false, { board_role: "president", team: "Marketing Team", title_en: "Boss" }, PEOPLE, null);
+  const h = personEditHTML(PEOPLE[1], TERMS, ME, true, "存不起來：x", false, { board_role: "president", team: "Marketing Team", rows: [{ orig: "Curriculum Team", title_zh: "", title_en: "Boss", team: "Curriculum Team" }, { orig: null, title_zh: "", title_en: "", team: "" }] }, PEOPLE, null);
   assert.match(h, /value="president" selected/);
   assert.match(h, /value="Marketing Team" checked/);
   assert.doesNotMatch(h, /value="Curriculum Team" checked/);
-  assert.match(h, /id="pk-ten" value="Boss"/);
+  assert.match(h, /id="pk-ten-0" value="Boss"/);
+  assert.match(h, /data-posrow="1" data-orig="" data-isnew="1"/, "新加的那一列也留著");
+  assert.match(h, /data-act="position-row-drop" data-i="1"/);
   const past = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, { term: "2025-26" }, PEOPLE, null);
   assert.match(past, /<option value="2025-26" selected>/);
-  assert.match(past, /id="pk-ten" value="Associate, Curriculum Team"/);
+  assert.match(past, /id="pk-ten-0" value="Associate, Curriculum Team"/);
   assert.equal(positionFor(PEOPLE[1], "2025-26").title_en, "Associate, Curriculum Team");
   assert.equal(currentTerm(TERMS).id, "2026-27");
 });
@@ -277,4 +280,31 @@ test("★ 遷移檔：兩支函式第一句是門、都寫紀錄、trigger 擋�
   assert.match(sql, /create policy role_changes_read on public\.role_changes\s+for select to authenticated using \(public\.is_president\(\)\)/);
   assert.doesNotMatch(sql, /grant (insert|update|delete)[^\n]*role_changes/);
   assert.match(sql, /before update of team on public\.profiles/);
+});
+
+// 2026-10-26：同一屆可以兼好幾個職位（Paul 10-23）。
+test("★ 同一屆好幾個職位：名單接成一句、改一個人一列一筆、各自刪得掉；email 只在改一個人那一頁", () => {
+  const two = { ...PEOPLE[1], positions: [
+    { term: "2026-27", title_en: "Adviser, Sponsorship Team", team: "Sponsorship Team" },
+    { term: "2026-27", title_en: "Associate, Curriculum Team", team: "Curriculum Team" },
+    { term: "2025-26", title_en: "Associate", team: "" }] };
+  assert.equal(positionsFor(two, "2026-27").length, 2);
+  assert.equal(positionsLine(two, "2026-27"), "Adviser, Sponsorship Team · Associate, Curriculum Team");
+  const roster = rosterHTML([two], TERMS, ME, true, "", false, null);
+  assert.match(roster, /Adviser, Sponsorship Team · Associate, Curriculum Team/);
+  assert.doesNotMatch(roster, /director@example\.com/, "名單表格上不印 email");
+  const h = personEditHTML(two, TERMS, ME, true, "", false, null, [two], null, "director@example.com");
+  assert.equal((h.match(/data-posrow=/g) || []).length, 2);
+  assert.match(h, /data-act="position-delete" data-id="p2" data-term="2026-27" data-team="Sponsorship Team"/);
+  assert.match(h, /data-act="position-delete" data-id="p2" data-term="2026-27" data-team="Curriculum Team"/);
+  assert.match(h, /歷屆：2025-26: Associate/);
+  assert.match(h, /director@example\.com/);
+  assert.match(h, /data-act="copy-email" data-email="director@example.com"/);
+  assert.match(personEditHTML(two, TERMS, ME, true, "", false, null, [two], null, undefined), /載入中/);
+  assert.match(personEditHTML(PEOPLE[3], TERMS, ME, true, "", false, null, PEOPLE, null, null), /註冊用的 email：沒有帳號/);
+  const src = readFileSync("admin/people/src/main.js", "utf8");
+  const save = src.slice(src.indexOf('act === "person-save"'), src.indexOf('act === "position-delete"'));
+  assert.match(save, /before\.team \|\| ""\) !== r\.team\) posOps\.push\(\{ del: r\.orig \}\)/, "換了 team 要先刪舊的那一筆");
+  assert.match(save, /err\.posTeamDup/, "同一個 team 兩筆要擋");
+  assert.match(src, /D\.personEmail\(/);
 });

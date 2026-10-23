@@ -141,7 +141,9 @@ export const assign          = (id, ws, level) => rpc("assign", { p_target: id, 
 export const unassign        = (id, ws) => rpc("unassign", { p_target: id, p_ws: ws });
 export const createWorkspace = (slug, zh, en, owner) => rpc("create_workspace", { p_slug: slug, p_title_zh: zh, p_title_en: en, p_owner: owner || null });
 export const setPosition     = (person, term, zh, en, team) => rpc("set_position", { p_person: person, p_term: term, p_title_zh: zh, p_title_en: en, p_team: team || null });
-export const deletePosition  = (person, term) => rpc("delete_position", { p_person: person, p_term: term });
+export const deletePosition  = (person, term, team) => rpc("delete_position", { p_person: person, p_term: term, p_team: team || null });
+// 註冊用的 email，只有 Co-President 與 Senior Adviser 拿得到（門在函式裡）；沒有帳號回 null。
+export const personEmail     = person => rpc("person_email", { p_person: person });
 export const renamePerson    = (person, zh, en) => rpc("rename_person", { p_person: person, p_name_zh: zh, p_name_en: en });
 export const addPerson       = (zh, en, note) => rpc("add_person", { p_name_zh: zh, p_name_en: en, p_note: note || null });
 export const removeMember    = person => rpc("remove_member", { p_person: person });

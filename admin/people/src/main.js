@@ -50,7 +50,7 @@ function render() {
   else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior()); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
-  else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove);
+  else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail);
   else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter);
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body);
 }
@@ -131,6 +131,15 @@ async function reopenPerson(id, msg) {
   try { await loadCore(true); } catch (e) { S.msg += T("err.rosterLoad") + D.says(e); }
   S.person = findPerson(id) || null; S.personDraft = null; S.remove = null;
   S.view = S.person ? "person" : "roster"; S.busy = false; render();
+  if (S.person && S.personEmail === undefined) loadEmail(S.person);
+}
+// 註冊用的 email（2026-10-26）：另外叫一次 person_email()，回來再重畫那一行。沒有帳號不叫。
+// 載不到不擋整頁，只是那一行停在「載入中」。
+async function loadEmail(p) {
+  S.personEmail = undefined;
+  if (!p || !p.profile_id) { S.personEmail = null; return; }
+  try { S.personEmail = await D.personEmail(p.person_id); } catch (e) { S.personEmail = undefined; }
+  if (S.person && S.person.person_id === p.person_id) render();
 }
 async function run(label, fn) {
   S.busy = true; S.msg = ""; render();
@@ -139,18 +148,26 @@ async function run(label, fn) {
 }
 
 // 改一個人那一頁的表單值。只讀畫面上開著的欄位；關著的（自己的職級、Senior Adviser 看到的名字）照原值。
+// 這一屆的職位是一張清單（2026-10-26）：每一列 { orig, title_zh, title_en, team }，orig 是原本的 team（新加的是 null）。
+function readPosRows(p, termId) {
+  const els = [...document.querySelectorAll("[data-posrow]")];
+  if (!els.length && !document.getElementById("pk-term")) {
+    return UI.positionsFor(p, termId).map(x => ({ orig: x.team || "", title_zh: x.title_zh || "", title_en: x.title_en || "", team: x.team || "" }));
+  }
+  return els.map(el => {
+    const i = el.dataset.posrow;
+    return { orig: el.dataset.isnew === "1" ? null : (el.dataset.orig || ""), title_zh: val(`pk-tzh-${i}`), title_en: val(`pk-ten-${i}`), team: val(`pk-pteam-${i}`) };
+  });
+}
 function readPersonForm(p) {
   const roleEl = document.getElementById("pk-role");
   const termId = val("pk-term") || (S.personDraft && S.personDraft.term) || (UI.currentTerm(S.terms) || {}).id || "";
-  const pos = UI.positionFor(p, termId) || {};
   return {
     board_role: roleEl && !roleEl.disabled ? roleEl.value : (p.board_role || "member"),
     name_zh: document.getElementById("pk-zh") && !document.getElementById("pk-zh").disabled ? val("pk-zh") : (p.name_zh || ""),
     name_en: document.getElementById("pk-en") && !document.getElementById("pk-en").disabled ? val("pk-en") : (p.name_en || ""),
     term: termId,
-    title_zh: document.getElementById("pk-tzh") ? val("pk-tzh") : (pos.title_zh || ""),
-    title_en: document.getElementById("pk-ten") ? val("pk-ten") : (pos.title_en || ""),
-    pteam: document.getElementById("pk-pteam") ? val("pk-pteam") : (pos.team || ""),
+    rows: readPosRows(p, termId),
     team: document.querySelector('input[name="team"]')
       ? [...document.querySelectorAll('input[name="team"]:checked')].map(x => x.value.trim()).filter(Boolean).join(", ")
       : (p.team || ""),
@@ -180,7 +197,8 @@ document.addEventListener("click", async e => {
   if (act === "person-edit") {
     const p = findPerson(b.dataset.id);
     if (!p) { S.msg = T("err.noPerson"); render(); return; }
-    S.person = p; S.personDraft = null; S.remove = null; S.view = "person"; S.msg = ""; render(); return;
+    S.person = p; S.personDraft = null; S.remove = null; S.view = "person"; S.msg = ""; render();
+    loadEmail(p); return;
   }
   if (act === "person-save") {
     const p = findPerson(b.dataset.id);
@@ -188,14 +206,28 @@ document.addEventListener("click", async e => {
     const f = readPersonForm(p);
     S.personDraft = f;
     const cadre = !!p.profile_id && p.role === "cadre";
-    const pos = UI.positionFor(p, f.term) || {};
     const roleChanged = cadre && f.board_role !== (p.board_role || "member");
     const nameChanged = f.name_zh !== (p.name_zh || "") || f.name_en !== (p.name_en || "");
-    const posChanged = f.title_zh !== (pos.title_zh || "") || f.title_en !== (pos.title_en || "") || f.pteam !== (pos.team || "");
+    // 職位清單的差異：原本那一筆（orig）改了名稱或換了 team，或新加的一列有填。
+    // 換了 team 等於「刪舊的那一筆、存一筆新的」，因為唯一鍵是 人 × 屆 × team。
+    const posOps = [];
+    const seenTeams = new Set();
+    for (const r of f.rows) {
+      const empty = !r.title_zh && !r.title_en;
+      if (r.orig == null && empty) continue;
+      if (seenTeams.has(r.team)) { S.msg = T("err.posTeamDup"); render(); return; }
+      seenTeams.add(r.team);
+      if (empty) { S.msg = T("err.titleRequired"); render(); return; }
+      const before = r.orig == null ? null : UI.positionsFor(p, f.term).find(x => (x.team || "") === r.orig);
+      const same = before && (before.title_zh || "") === r.title_zh && (before.title_en || "") === r.title_en && (before.team || "") === r.team;
+      if (same) continue;
+      if (before && (before.team || "") !== r.team) posOps.push({ del: r.orig });
+      posOps.push({ set: r });
+    }
+    const posChanged = posOps.length > 0;
     const teamChanged = cadre && UI.parseTeams(f.team).join("|") !== UI.parseTeams(p.team).join("|");
     if (!roleChanged && !nameChanged && !posChanged && !teamChanged) { S.msg = T("err.nothingChanged"); render(); return; }
     if (nameChanged && !f.name_zh && !f.name_en) { S.msg = T("err.nameRequired"); render(); return; }
-    if (posChanged && !f.title_zh && !f.title_en) { S.msg = T("err.titleRequired"); render(); return; }
     // ⚠ 升成 Co-President 等於把整個後台給他，包括把你降級。畫面多問一次，資料庫那一側刻意不擋（換屆要用）。
     if (roleChanged && f.board_role === "president" && !confirm(T("confirm.promote", { name: pname(p) }))) return;
     S.busy = true; S.msg = ""; render();
@@ -203,7 +235,10 @@ document.addEventListener("click", async e => {
     try {
       if (roleChanged) { await D.setBoardRole(p.profile_id, f.board_role); done.push(T("msg.roleTo", { role: UI.boardLabel(f.board_role) })); }
       if (nameChanged) { await D.renamePerson(p.person_id, f.name_zh, f.name_en); done.push(T("msg.nameTo", { name: f.name_zh || f.name_en })); }
-      if (posChanged) { await D.setPosition(p.person_id, f.term, f.title_zh, f.title_en, f.pteam); done.push(T("msg.positionTo", { term: f.term, title: f.title_en || f.title_zh })); }
+      for (const op of posOps) {
+        if (op.del != null) { await D.deletePosition(p.person_id, f.term, op.del); done.push(T("msg.positionGone", { term: f.term })); }
+        else { await D.setPosition(p.person_id, f.term, op.set.title_zh, op.set.title_en, op.set.team); done.push(T("msg.positionTo", { term: f.term, title: op.set.title_en || op.set.title_zh })); }
+      }
       if (teamChanged) { await D.setTeam(p.profile_id, f.team); done.push(T("msg.teamTo", { team: f.team || T("value.none") })); }
       await reopenPerson(p.person_id, T("msg.personSaved", { name: f.name_zh || f.name_en || pname(p), done: done.join(T("punct.list")) }));
     } catch (err) {
@@ -216,10 +251,23 @@ document.addEventListener("click", async e => {
   }
   if (act === "position-delete") {
     const p = findPerson(b.dataset.id); if (!p) return;
-    if (!confirm(T("confirm.deletePosition", { term: b.dataset.term }))) return;
-    const ok = await run("err.save", () => D.deletePosition(p.person_id, b.dataset.term));
+    if (!confirm(T("confirm.deletePosition", { term: b.dataset.term, team: b.dataset.team || T("value.none") }))) return;
+    const ok = await run("err.save", () => D.deletePosition(p.person_id, b.dataset.term, b.dataset.team || ""));
     if (ok !== undefined) await reopenPerson(p.person_id, T("msg.personSaved", { name: pname(p), done: T("msg.positionGone", { term: b.dataset.term }) }));
     return;
+  }
+  // 職位清單加一列、拿掉還沒存的那一列：只動 S.personDraft.rows，重畫。
+  if (act === "position-row-add" || act === "position-row-drop") {
+    if (!S.person) return;
+    const f = readPersonForm(S.person);
+    if (act === "position-row-add") f.rows.push({ orig: null, title_zh: "", title_en: "", team: "" });
+    else f.rows.splice(Number(b.dataset.i), 1);
+    S.personDraft = f; render(); return;
+  }
+  if (act === "copy-email") {
+    try { await navigator.clipboard.writeText(b.dataset.email); S.msg = T("msg.copied", { email: b.dataset.email }); }
+    catch (e) { S.msg = T("err.copy"); }
+    render(); return;
   }
   if (act === "person-code") {
     const p = findPerson(b.dataset.id); if (!p) return;
@@ -388,8 +436,9 @@ document.addEventListener("change", async e => {
   if (!el) return;
   if (el.dataset.act === "person-term" && S.person) {
     const f = readPersonForm(S.person);
-    const pos = UI.positionFor(S.person, f.term) || {};
-    S.personDraft = Object.assign(f, { title_zh: pos.title_zh || "", title_en: pos.title_en || "", pteam: pos.team || "" });
+    // 換屆別：清單換成那一屆的職位，改到一半的不帶過去。
+    f.rows = UI.positionsFor(S.person, f.term).map(x => ({ orig: x.team || "", title_zh: x.title_zh || "", title_en: x.title_en || "", team: x.team || "" }));
+    S.personDraft = f;
     render(); return;
   }
   if (el.dataset.act === "ws-level" && S.wsSel) {

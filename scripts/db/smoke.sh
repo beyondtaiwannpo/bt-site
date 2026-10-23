@@ -1109,5 +1109,49 @@ else
 fi
 
 echo
+echo "同一屆好幾個職位、人的 email（2026-10-26）："
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-26-multi-positions.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   多職位那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 多職位那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -6; fail=$((fail+1))
+fi
+# 現在 current 是 2027-28。DIR 在 2027-28 有一筆（從 2026-27 複製的，team Curriculum）。
+DIRP=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where profile_id='${DIR}';" | tr -d ' \n')
+chkas "${PAUL}" "同一屆再加一個別的 team 的職位（Sponsorship 的 Adviser）" "t" \
+  "select public.set_position('${DIRP}','2027-28','Sponsorship 的 Adviser','Adviser, Sponsorship Team','Sponsorship Team') > 0"
+chk "★ 同一屆兩筆都在" "2" "select count(*) from public.positions where person_id='${DIRP}' and term_id='2027-28'"
+chkas "${PAUL}" "同一個 team 再存一次是改，不是第三筆" "t" \
+  "select public.set_position('${DIRP}','2027-28','', 'Director, Curriculum Team (v2)','Curriculum') > 0"
+chk "還是兩筆，Curriculum 那一筆的名稱改了" "2|Director,CurriculumTeam(v2)" \
+  "select count(*)||'|'||(select title_en from public.positions where person_id='${DIRP}' and term_id='2027-28' and team='Curriculum') from public.positions where person_id='${DIRP}' and term_id='2027-28'"
+chkrole anon "" "★ 團隊頁一筆職位一列：小安新在兩個 team 各出現一次、各印自己的頭銜" "2|Adviser,SponsorshipTeam" \
+  "select count(*)||'|'||(select title_en from public.public_team() where team='Sponsorship Team') from public.public_team() where name_zh='小安新'"
+chkas "${PAUL}" "刪掉其中一筆（指定 team）" "t" "select public.delete_position('${DIRP}','2027-28','Sponsorship Team')"
+chk "剩一筆" "1" "select count(*) from public.positions where person_id='${DIRP}' and term_id='2027-28'"
+chkas "${PAUL}" "貼一整屆：同一個人兩行、兩個 team，變成兩筆不是被擋" "2" \
+  "select public.import_positions('2024-25', '[{\"name_zh\":\"兼兩個\",\"name_en\":\"Two Hats\",\"title_en\":\"Adviser, Sponsorship Team\",\"team\":\"Sponsorship Team\"},{\"name_zh\":\"兼兩個\",\"name_en\":\"two hats\",\"title_en\":\"Associate, Curriculum Team\",\"team\":\"Curriculum Team\"}]'::jsonb)"
+chk "一個人、兩筆職位" "1|2" \
+  "select (select count(*) from public.people where name_zh='兼兩個')||'|'||(select count(*) from public.positions po join public.people pe on pe.id=po.person_id where pe.name_zh='兼兩個')"
+psql -d "${DB}" -q -c "update public.alumni_stories set public_story=true, story_approved=true where id='${MEMBER}';" >/dev/null
+chkrole anon "" "校友頁的頭銜：最後一屆的職位全部接起來" "Associate,Curriculum·2026-27" "select title from public.public_alumni() where name='改名'"
+chkas "${PAUL}" "★ Co-President 拿得到一個人註冊用的 email" "director@example.com" "select public.person_email('${DIRP}')"
+chkas "${OTHER}" "Senior Adviser 也拿得到" "director@example.com" "select public.person_email('${DIRP}')"
+chkas "${ISTAFF}" "★ 一般幹部拿不到（空的）" "" "select coalesce(public.person_email('${DIRP}'),'')"
+chk "沒有帳號的人回空的" "" "select coalesce(public.person_email((select id from public.people where name_zh='兼兩個')),'')"
+rwgot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.person_email('${DIRP}');" 2>&1 || true)
+if echo "${rwgot}" | grep -qi "permission denied"; then
+  echo "  ok   ★ 沒登入叫不動 person_email"; pass=$((pass+1))
+else
+  echo "  FAIL ★ 沒登入居然叫得動 person_email：${rwgot}"; fail=$((fail+1))
+fi
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-24-ranks-and-workspaces.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   多職位之後 10-24 重跑還是全部 PASS（數的是有職位的人不是筆數）"; pass=$((pass+1))
+else
+  echo "  FAIL 多職位之後 10-24 重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -5; fail=$((fail+1))
+fi
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
