@@ -393,7 +393,8 @@ export const GROUPS = [
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
 // 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
 export const ITEMS = [
-  { group: "forms",     key: "home",    label: { zh: "首頁",     en: "Home" },            who: "cadre" },
+  // 2026-10-23 第三次重整批 4：叫「總覽」不叫「首頁」，頂欄那一顆「後台」跟它才不會是同一個地方兩個名字。
+  { group: "forms",     key: "home",    label: { zh: "總覽",     en: "Overview" },        who: "cadre" },
   { group: "forms",     key: "forms",   label: { zh: "申請表",   en: "Forms" },           who: "cadre" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
   { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "senior" },
@@ -449,7 +450,9 @@ export function railHTML(group, tab, me, counts) {
   const groups = GROUPS.map(g => {
     const ok = canEnter(g, me);
     const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home");
-    return `<div class="rail-group${ok ? "" : " off"}">${esc(T(g.label))}${ok ? "" : `<span class="why">${esc(T(WHY[g.who]) || "")}</span>`}</div>${
+    // 2026-10-23 批 4：進不去的組只留組名變淡，不再掛一段為什麼。為什麼在總覽的「你的存取」那一塊講一次就好；
+    // 三段灰色長文在側欄上看起來像三個警告。WHY 留著給 title（滑過去還看得到）。
+    return `<div class="rail-group${ok ? "" : " off"}"${ok ? "" : ` title="${esc(T(WHY[g.who]) || "")}"`}>${esc(T(g.label))}</div>${
       ok ? rows.map(item).join("") : rows.map(i => `<span class="rail-item off">${esc(T(i.label))}</span>`).join("")}`;
   }).join("");
   const teams = String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
@@ -658,7 +661,7 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
   const cards = [];
   cards.push({ n: received, label: T("card.apps"), unit: T("card.apps.unit"),
     hint: received ? `${firstForm ? esc(firstForm.title) : ""}` : T("card.apps.none"),
-    act: firstForm ? { act: "open-apps", id: firstForm.id, label: T("card.apps.go") } : null });
+    act: firstForm ? { act: "open-apps", id: firstForm.id, label: canEditAny(me, "apps:") ? T("card.apps.go") : T("card.apps.see") } : null });
   cards.push({ n: pending.length, label: T("card.mail"), unit: T("card.mail.unit"),
     hint: pending.length ? (stuck.length ? T("mail.stuck", { n: stuck.length, err: esc(stuck[0].error || T("mail.noErr")) }) : T("card.mail.hint")) : T("card.mail.done"),
     act: pending.length && canSend ? { act: "send-mail-all", label: busy ? T("mail.sending") : T("mail.sendNow"), disabled: busy } : null });
@@ -702,16 +705,24 @@ export function teamBlocksHTML(me, forms, todo) {
   const pres = senior(me);
   const roster = t.roster || [];
   const res = t.resources || [];
+  // 2026-10-23 批 4：team 的清單從工作區來（有 apps:X 或 res:X 的 X），不從標籤來。
+  // 盤點抓到 Community Relations 有兩個工作區但沒有人勾那個標籤，整個 team 從這裡消失。
+  const wsTeams = (t.workspaces || []).filter(w => w.active !== false && /^(apps|res):/.test(w.id)).map(w => w.id.replace(/^(apps|res):/, ""));
   let teams;
   if (pres) {
-    const set = new Set();
+    const set = new Set(wsTeams);
     for (const p of roster) for (const x of splitTeams(p.team)) set.add(x);
     for (const f of forms || []) if (f.team) set.add(f.team);
     for (const r of res) if (r.team) set.add(r.team);
     teams = [...set].sort((a, b) => a.localeCompare(b));
   } else {
-    teams = splitTeams(me && me.team);
+    // 自己被派進去的 team（任何等級）加自己勾的標籤。
+    const set = new Set(Object.keys((me && me.ws) || {}).filter(id => /^(apps|res):/.test(id)).map(id => id.replace(/^(apps|res):/, "")));
+    for (const x of splitTeams(me && me.team)) set.add(x);
+    teams = [...set].sort((a, b) => a.localeCompare(b));
   }
+  // Director 是誰：名單讀得到就從名單；讀不到（或名單上沒有）就從公開團隊頁的職位算，那是公開資料，誰都拿得到。
+  const pubDirs = team => (t.directors || []).filter(d => d.team === team && /director/i.test(String(d.title_en || d.title_zh || ""))).map(nameOf);
   if (!teams.length) return emptyHTML(T("team.none"), T("team.noneHint"));
   return `<div class="teamlist">${teams.map(team => {
     const fs = (forms || []).filter(f => f.team === team);
@@ -719,7 +730,8 @@ export function teamBlocksHTML(me, forms, todo) {
     const rec = fs.reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0);
     const rs = res.filter(r => r.team === team);
     const pub = rs.filter(r => r.status === "published").length;
-    const dirs = roster.filter(p => p.board_role === "director" && splitTeams(p.team).includes(team)).map(nameOf);
+    const fromRoster = roster.filter(p => p.board_role === "director" && splitTeams(p.team).includes(team)).map(nameOf);
+    const dirs = fromRoster.length ? fromRoster : pubDirs(team);
     const members = roster.filter(p => splitTeams(p.team).includes(team)).length;
     return `<section class="teamblk">
       <h3>${esc(team.replace(/\s*Team$/i, ""))}<span class="hint">${members ? T("team.members", { n: members }) : ""}</span></h3>
@@ -727,18 +739,54 @@ export function teamBlocksHTML(me, forms, todo) {
         <li><a href="${withLang("/admin/#forms")}">${T("team.forms")}</a>${T("punct.colon")}${fs.length ? `${T("team.formsSum", { n: fs.length, open: open.length })}${rec ? T("team.formsRec", { n: rec }) : ""}` : T("team.noneYet")}</li>
         <li><a href="${withLang("/admin/site/#res")}">${T("team.res")}</a>${T("punct.colon")}${rs.length ? T("team.resSum", { n: rs.length, pub }) : T("team.noneYet")}</li>
         <li>${T("team.director")}${dirs.length ? esc(dirs.join(T("punct.list"))) : T("team.noDirector")}</li>
+        ${pres ? `<li><a href="${withLang("/admin/people/#ws=" + encodeURIComponent("apps:" + team))}">${T("team.people")}</a></li>`
+          : wsLevel(me, "apps:" + team) === "manage" || wsLevel(me, "res:" + team) === "manage" ? `<li>${T("team.peopleHint")}</li>` : ""}
       </ul>
     </section>`;
   }).join("")}</div>`;
 }
 
-export function hubHTML(me, pendingAll, canSend, busy, forms, todo) {
+// 你的存取（2026-10-23 批 4）：一行一個工作區，印人看的名字、等級、一顆直達的按鈕。
+// senior 不列（他本來就全部都有，只印一句）；什麼都沒被派的人看到「找你的 Director 或 Co-President」加各 team 公開的 Director。
+// features 是頂欄那幾項（shared/nav.js 的 FEATURES 經 main.js 翻成 { label, desc, href }），在這裡印一次它們各是什麼。
+export function accessHTML(me, todo, features) {
+  const t = todo || {};
+  const wsList = t.workspaces || [];
+  const title = id => { const w = wsList.find(x => x.id === id); return w ? ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || id) : id; };
+  const go = id => {
+    if (id === "intern-passport") return [{ href: "/intern-passport/", label: T("hub.goWall") }, { href: "/admin/passports/#interns", label: T("hub.goAdmin") }];
+    if (id === "passport") return [{ href: "/admin/passports/#cadre", label: T("hub.goAdmin") }];
+    if (id.startsWith("apps:")) return [{ href: "/admin/#forms", label: T("hub.goForms") }];
+    if (id.startsWith("res:")) return [{ href: "/admin/site/#res", label: T("hub.goRes") }];
+    return [];
+  };
+  const feat = (features || []).length ? `<ul class="feat">${features.map(f => `<li><a href="${withLang(f.href)}">${esc(f.label)}</a>${T("punct.colon")}${esc(f.desc)}</li>`).join("")}</ul>` : "";
+  let body;
+  if (senior(me)) body = `<div class="mini">${T("hub.accessSenior")}</div>`;
+  else {
+    const mine = Object.entries((me && me.ws) || {});
+    if (mine.length) {
+      body = `<ul class="flist access">${mine.map(([id, lv]) => `<li><div class="fhead"><b>${esc(title(id))}</b><span class="tag">${esc(T("level." + lv))}</span></div>
+        <div class="row">${go(id).map(g => `<a class="btn ghost sm" href="${withLang(g.href)}">${esc(g.label)}</a>`).join("")}</div></li>`).join("")}</ul>`;
+    } else {
+      const byTeam = new Map();
+      for (const d of t.directors || []) if (d.team && /director/i.test(String(d.title_en || d.title_zh || ""))) { if (!byTeam.has(d.team)) byTeam.set(d.team, []); byTeam.get(d.team).push(nameOf(d)); }
+      body = `<div class="note">${T("hub.accessNone")}</div>` + (byTeam.size
+        ? `<ul class="teamblk-dirs">${[...byTeam.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([team, names]) => `<li><b>${esc(team.replace(/\s*Team$/i, ""))}</b>${T("punct.colon")}${esc(names.join(T("punct.list")))}</li>`).join("")}</ul>`
+        : `<div class="mini">${T("hub.accessNoDirs")}</div>`);
+    }
+  }
+  return body + feat;
+}
+
+export function hubHTML(me, pendingAll, canSend, busy, forms, todo, features) {
   const teams = splitTeams(me && me.team);
   const who = T("hub.who", { name: esc(me && me.name || ""), board: esc(boardName(me && me.board)),
     teams: teams.length ? esc(teams.join(T("punct.list"))) : T("rail.noTeam") });
   const cards = todoCards(me, forms, pendingAll, todo, canSend, busy);
   const allZero = cards.every(c => c.n === 0);
   return pageHead(T("hub.title"), who)
+    + sectionHTML(T("hub.access"), accessHTML(me, todo, features), { id: "access" })
     + sectionHTML(T("hub.todo"), allZero ? `<div class="empty"><b>${T("hub.none")}</b><div>${T("hub.noneHint")}</div></div>`
         : `<div class="todo">${cards.map(kpiHTML).join("")}</div>`, { id: "todo" })
     + sectionHTML(T("hub.teams"), teamBlocksHTML(me, forms, todo), { id: "teams" });

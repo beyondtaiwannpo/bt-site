@@ -61,9 +61,11 @@ test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什�
     const rail = M.railHTML("site", "res", { ...ME.member, name: "王平" });
     assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page">資源/, label);
     assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms">申請表/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
-    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home">首頁/, label);
-    assert.match(rail, /class="rail-group off">護照<span class="why">只有被派進護照工作區/, label);
-    assert.match(rail, /class="rail-group off">人與權限<span class="why">只有 Co-President/, label);
+    // 2026-10-23 批 4：「首頁」改叫「總覽」；進不去的組只留組名變淡，為什麼放在 title（滑過去才看得到），不再是一段灰字。
+    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home">總覽/, label);
+    assert.match(rail, /class="rail-group off" title="只有被派進護照工作區[^"]*">護照<\/div>/, label);
+    assert.match(rail, /class="rail-group off" title="只有 Co-President[^"]*">人與權限<\/div>/, label);
+    assert.doesNotMatch(rail, /class="why"/, `${label}：側欄不再有灰色長文`);
     assert.doesNotMatch(rail, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
     assert.doesNotMatch(rail, /data-t="team"/, `${label}：一般幹部看不到團隊頁那一行`);
     assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>Associate・Curriculum Team/, `${label}：側欄上要寫名字、職級、team`);
@@ -542,4 +544,38 @@ test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、�
     assert.match(d, /from\("profiles"\)\.select\("id, name_zh, name_en, board_role"\)/, `${f} 找人只讀名字與職級`);
     assert.doesNotMatch(d, /person_email/, `${f} 不准讀 email`);
   }
+});
+
+// 2026-10-23 第三次重整批 4：總覽的「你的存取」、「你的 team」從工作區算、只能看的人卡上寫「去看」。
+test("★ 總覽「你的存取」：被派的人一行一個工作區加直達；senior 一句；什麼都沒有的人看到找誰加各 team 公開的 Director；頂欄四項各一句", () => {
+  const WS = [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "Curriculum Team 的申請", active: true },
+              { id: "intern-passport", kind: "intern-passport", title_zh: "實習護照", active: true },
+              { id: "apps:Community Relations Team", kind: "apps", title_zh: "Community Relations 的申請", active: true }];
+  const DIRS = [{ id: "u2", name_zh: "林育安", team: "Curriculum Team", title_en: "Director, Curriculum Team" }, { id: "u9", name_zh: "某某", team: "Curriculum Team", title_en: "Associate, Curriculum Team" }];
+  const FEAT = [{ label: "護照", desc: "這一年的活動、章、心得與照片", href: "/passport/" }];
+  const istaff = FORMS.accessHTML({ ...ME.istaff, ws: { "intern-passport": "edit", "apps:Curriculum Team": "view" } }, { workspaces: WS, directors: DIRS }, FEAT);
+  assert.match(istaff, /<b>實習護照<\/b><span class="tag">改<\/span>/);
+  assert.match(istaff, /href="\/intern-passport\/\?lang=zh">進度牆/, "被派進實習護照的人從這裡直達進度牆（頂欄對幹部沒有這一項）");
+  assert.match(istaff, /href="\/admin\/passports\/\?lang=zh#interns">後台/);
+  assert.match(istaff, /<b>Curriculum Team 的申請<\/b><span class="tag">看<\/span>/);
+  assert.match(istaff, /<ul class="feat"><li><a href="\/passport\/\?lang=zh">護照<\/a>：這一年的活動/);
+  const none = FORMS.accessHTML({ ...ME.member, ws: {} }, { workspaces: WS, directors: DIRS }, []);
+  assert.match(none, /你還沒被派進任何工作區/);
+  assert.match(none, /<b>Curriculum<\/b>：林育安/, "各 team 公開的 Director");
+  assert.doesNotMatch(none, /某某/, "Associate 不算 Director");
+  assert.match(FORMS.accessHTML({ ...ME.member, ws: {} }, { workspaces: WS, directors: [] }, []), /還沒有人公開在團隊頁上/);
+  assert.match(FORMS.accessHTML(ME.pres, {}, []), /不用派/);
+  assert.match(FORMS.hubHTML({ ...ME.pres, name: "王平" }, [], true, false, [], { resources: [], roster: [] }), /<h1>總覽<\/h1>[\s\S]*<h2>你的存取/);
+  // 你的 team 從工作區算：Community Relations 沒有人勾標籤也會出現；Director 讀不到名單時從公開團隊頁算。
+  const blocks = FORMS.teamBlocksHTML({ ...ME.pres }, [], { resources: [], roster: [], workspaces: WS, directors: DIRS });
+  assert.match(blocks, /<h3>Community Relations/);
+  assert.match(blocks, /Director：林育安/);
+  assert.match(blocks, /href="\/admin\/people\/\?lang=zh#ws=apps%3ACurriculum%20Team">誰在這個 team 的工作區/);
+  const dir = FORMS.teamBlocksHTML({ ...ME.director, team: "", ws: { "apps:Marketing Team": "manage" } }, [], { resources: [], roster: [], workspaces: WS, directors: [] });
+  assert.match(dir, /<h3>Marketing/, "被派進去的 team 就算沒勾標籤也有一段");
+  assert.match(dir, /誰在做/);
+  // 只能看的人，卡上寫「去看」不寫「去審」。
+  const view = FORMS.hubHTML({ ...ME.member, name: "a", team: "Curriculum Team", ws: { "apps:Curriculum Team": "view" } }, [], false, false, FORMS_DATA, { resources: [], roster: [] });
+  assert.match(view, /data-act="open-apps" data-id="f1">去看/);
+  assert.match(readFileSync("app/src/main.js", "utf8"), /S\.profile && S\.profile\.name \? "\.\.\/admin\/" : "\.\.\/settings\/"/, "幹部登入後進總覽，沒名字的才進設定");
 });

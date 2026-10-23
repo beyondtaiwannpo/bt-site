@@ -235,6 +235,9 @@ export async function loadTodo(me) {
     // 所有幹部讀得到：資源（算每個 team 有幾條）、幹部名單（找每個 team 的 Director；進度牆本來就看得到名字）。
     resources: supabase.from("resources").select("id, team, status"),
     roster: supabase.from("profiles").select("id, name_zh, name_en, team, board_role").eq("role", "cadre"),
+    // 2026-10-23 批 4：「你的 team」從工作區算；「你的存取」印工作區的名字；Director 讀不到名單時從公開團隊頁算（公開資料）。
+    workspaces: supabase.from("workspaces").select("id, kind, team, title_zh, title_en, active"),
+    directors: supabase.rpc("public_team"),
   };
   if (pres) {
     q.team = supabase.from("profiles").select("id").eq("role", "cadre").eq("public_profile", true).eq("public_approved", false);

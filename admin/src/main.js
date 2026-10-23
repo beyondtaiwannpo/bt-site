@@ -6,7 +6,7 @@
 // 狀態只有一個 S，畫面只從 S 產生。**不在事件處理裡直接改 DOM**，一律改 S 再 render() ——
 // 兩條路徑會分岔，而分岔是安靜的（這個 repo 反覆踩到的同一件事）。
 import * as AUTH from "../../shared/auth.js";
-import { navHTML } from "../../shared/nav.js";
+import { navHTML, featuresFor, tx } from "../../shared/nav.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
@@ -72,7 +72,9 @@ function render() {
       UI.mpItems(S.me, "apps:", S.workspaces));
   } else {
     // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
-    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy, S.forms, S.todo);
+    // 頂欄那幾項各是什麼（shared/nav.js 的 FEATURES 本來就有一句 desc，9-08 刪掉選單頁之後沒地方印；總覽印一次）。
+    const features = featuresFor(S.me.role).map(f => ({ label: tx(f.label, lang()), desc: tx(f.desc, lang()), href: f.href }));
+    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy, S.forms, S.todo, features);
   }
   // 側欄亮哪一行：首頁亮「首頁」，其他全部算在「申請表」底下。
   // 側欄右邊的小數字：待審的申請、等核可的人。**只在 /admin/ 這一組算**（別組沒有 loadTodo），有才顯示。

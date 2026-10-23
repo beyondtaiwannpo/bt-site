@@ -3315,6 +3315,46 @@ Director 加自己 team 的人：Resources → 誰在做 → 打名字 → 加�
 本機 `node --test test/*.test.mjs` 566 項、`./check.sh`、`node scripts/check-mobile.mjs` 19 頁全過。截圖 `docs/admin-redesign/v3/b3-01`、`b3-02`（假資料，Director 的視角）。
 **還沒驗的**：真的用一位 Director 的帳號按一次（本機沒有登入態，正式站沒 push）。
 
+### 批 4：一條導覽，而且認得你（2026-10-23）
+
+Paul 的原話：「上面那條 Passport、Availability、Admin、Settings 也不像是最好的做法。」他拍板走 (b)：**頂欄留著當切換 app 的那一條，`shared/nav.js` 一行不改**，側欄留在後台裡面，兩條靠三件事不再重複：名字不重、頂欄不解釋、側欄沒有灰色長文。
+
+- **側欄「Home」改叫「總覽」（Overview）**。頂欄的「後台」跟它不再是同一個地方兩個名字。
+- **進不去的組只留組名變淡**，底下那一段「只有 Co-President 進得去」拿掉（滑過去的 title 還在）。為什麼在總覽講一次就好。
+- **總覽多一塊「你的存取」**：一行一個工作區，印人看的名字、等級、直達的按鈕（申請表、資源、實習護照的進度牆與後台）。
+  Co-President 與 Senior Adviser 只印一句「不用派」。**什麼都沒被派的新人看到的是**「你還沒被派進任何工作區，找你的 Director 或 Co-President」，底下列各 team 公開在團隊頁上的 Director（從 `public_team()` 讀，公開資料，沒公開的不印）。
+  底下再印頂欄四項各是什麼（`shared/nav.js` 的 `FEATURES` 本來就有一句 `desc`，9-08 刪掉選單頁之後沒地方印）。
+- **「你的 team」從工作區算**：有 `apps:X` 或 `res:X` 就有一段，不再靠標籤（盤點抓到 Community Relations 沒有人勾標籤就整個消失）。非 senior 看自己被派進去的 team 加自己勾的。每段多一行：senior 連到那個 team 的工作區頁，「管」的人提示去「誰在做」。Director 的名字讀不到名單時從公開團隊頁算。
+- 只能看申請的人，卡上那顆字是「去看」不是「去審」。
+- **登入後**：幹部直接進 `/admin/`（總覽），名字兩格都空的才進 `/settings/`；校友照舊進設定，實習生照舊進實習護照。`app/src/main.js` 一處。
+
+本機 `node --test test/*.test.mjs` 567 項、`./check.sh`、`node scripts/check-mobile.mjs` 19 頁全過。截圖 `docs/admin-redesign/v3/b4-01`（Director）、`b4-02`（新人）。
+**還沒驗的**：真的登入一次看落點與總覽（本機沒有登入態，正式站沒 push）。
+四批到此做完，前後點擊對照表在設計文件 6-1，沒有一件變長。
+
+### 以後加東西怎麼加（寫給明年接手的人，取代 10-19 那一版的八步）
+
+**先回答一題：這個東西是不是「要派人進去做」的？** 是（營隊、專案、新的護照）就是一個**工作區**；不是（一張只有 Co-President 看的報表）就只是一個**分頁**。
+
+**A. 它是一個工作區**
+
+1. 後台 → People → Workspaces，最底下「新增工作區」：英文名稱、中文名稱、擁有人、一開始就放進去的人各自一個等級，按一次建好。**不用寫程式。** 它會自動出現在每個人「改一個人」那一頁的存取格最底下、Workspaces 清單裡、被派進去的人的總覽「你的存取」裡。
+2. 它需要自己的頁面嗎（例如營隊要有報名名單、簽到）？不需要就做完了。需要就往下做 B，在 B 的第 2 步把 `who: "ws:custom:<代號>"` 寫進去，再在那一頁的畫面函式最後一個參數傳 `UI.mpItems(S.me, "custom:<代號>", S.workspaces)`，那一頁就會長出「誰在做」的成員分頁，Director 式的人能自己管人。
+
+**B. 它是一個分頁**
+
+1. **決定它屬於哪一組。** 申請（`admin/`）、對外（`admin/site/`）、護照（`admin/passports/`）、人與權限（`admin/people/`）。都不像的話開第五個資料夾：整個複製 `admin/site/`（它最小）改名，`index.html` 的標題改掉。
+2. **側欄加一行。** 四個（或五個）資料夾的 `src/ui.js` 裡 `ITEMS` 那張表各加同一行：`{ group: "site", key: "calendar", label: { zh: "活動行事曆", en: "Calendar" }, who: "cadre" }`。`who` 四選一：`cadre`、`senior`（Co-President 加 Senior Adviser）、`president`、`ws:<工作區代號>`。跑 `node --test test/admin-hub.test.mjs` 會告訴你哪一份漏了。
+3. **字先寫。** 那一組的 `src/strings.js` 的 `MINE` 加這一頁要用的句子，中英各一句。
+4. **畫那一頁。** 那一組的 `src/ui.js` 加一個函式，只拼這幾個零件：`pageHead()`、`sectionHTML()`、`emptyHTML()`、`skeletonHTML()`、`mpLinksHTML()`（要成員分頁才用）。不自己寫 class，長相 `admin/admin.css` 管。
+5. **接資料。** `src/data.js` 加一支讀的函式。這一支檔案是這個資料夾裡唯一碰資料庫的。
+6. **接點擊。** `src/main.js` 的 `onClick` 加 `if (act === "…")`。做成了寫 `S.msg = T("msg.…")`（鍵不以 `err.` 開頭就是綠的 toast，可以順手設 `S.undo`）；沒做成寫 `S.msg = T("err.…") + D.says(e)`；會丟東西的先 `if (UI.needAsk(S, b, T("confirm.…"))) return;`，**不用 `confirm()`**（測試會擋）。
+7. **門在資料庫。** 這一頁會改東西的話，資料庫要有一支函式，第一句是 `require_senior()` 或 `require_ws_edit('<工作區>')`。側欄灰掉只是提醒。這一步要開遷移檔，先問 Co-President。
+8. **跑三個檢查**：`node --test test/*.test.mjs`、`./check.sh`、`node scripts/check-mobile.mjs`。有遷移檔多跑 `./scripts/db/smoke.sh`。
+9. **README 加一段**：這一頁做什麼、誰進得去、資料在哪張表、有沒有成員分頁。
+
+1、2、3、9 不用會寫程式。4、5、6 要看得懂旁邊的程式碼照抄。7 要找人。
+
 ## 後台第二次重整：側欄 Dashboard（2026-10-19）
 
 Paul 2026-10-19 登入看過四個資料夾版的後台之後：「超亂超不知道在幹嘛。我要弄成像是 BT dashboard 一樣」。
@@ -3338,7 +3378,7 @@ Paul 拍板三題都照建議：方案乙（側欄）、首頁加一支只讀的
 - 幹部護照頁首底下多一排 11 個月加「城市」的小連結，點了跳到那一段（純 HTML 錨點）。
 - 「刪掉」這一類會丟東西的按鈕統一是 `.btn.danger`（橘框），不用紅色（Brand Book 沒有紅）。
 
-**加一個新的後台分頁要做的事**在設計文件 2-6（八步，哪幾步不用會寫程式都寫了）。一句話版：`ITEMS` 四份各加一行，那一組的 `ui.js` 加一個畫面函式用五個小零件拼，`main.js` 接 `data-act="tab"`，門在資料庫。
+**加一個新的後台分頁要做的事**：2026-10-23 起看上面「以後加東西怎麼加」那一節（它取代了設計文件 2-6 的八步，多了「先問是不是工作區」那一題與成員分頁）。
 
 本機 `node --test test/*.test.mjs` 506 項全過、`./check.sh` 全綠、`node scripts/check-mobile.mjs` 18 頁全過、`./scripts/db/smoke.sh` 209 項全過（這一批沒有遷移檔，跑它是確認沒弄壞）。
 **還沒驗的**：真的登入後的畫面（截圖是 `ui.js` 配假資料畫的，頂欄與資料庫那一段沒有在截圖裡走過）。

@@ -42,7 +42,14 @@ function render() {
   // 2026-09-11：校友跟幹部一樣直接進設定。
   // **校友不走學員那條補資料的路** —— 就讀學校與年級是問高中生的，
   // 對一個已經出發的人沒有意義，而且那一頁沒填完會把他擋在外面。
-  if (S.role === "cadre" || S.role === "alumni") {
+  // 2026-10-23（後台第三次重整批 4，Paul 拍板第 3 題）：**幹部登入後直接進後台總覽**，名字兩格都空的才進設定。
+  // 盤點時 Director、Associate、新人每一件事都多一下「點 Admin」。校友照舊進設定（他的東西在那裡）。
+  if (S.role === "cadre") {
+    el.innerHTML = `<div class="empty">${T("m.taking")}</div>`;
+    location.replace(S.profile && S.profile.name ? "../admin/" : "../settings/");
+    return;
+  }
+  if (S.role === "alumni") {
     el.innerHTML = `<div class="empty">${T("m.taking")}</div>`;
     location.replace("../settings/");
     return;

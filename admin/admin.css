@@ -410,3 +410,15 @@ a.btn{text-decoration:none}
 /* ───────── 14. 成員分頁（2026-10-23，第三次重整批 3）───────── */
 /* 清單頁首底下那一排「誰在做…」：跟 chip 同一個長相，但它是入口不是篩選，所以多一點上下距。 */
 .mp-links{margin:-6px 0 18px}
+
+/* ───────── 15. 總覽（2026-10-23，第三次重整批 4）───────── */
+/* 你的存取：一行一個工作區。 */
+.access{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0 24px}
+.access > li{padding:10px 0;border-top:1px solid rgba(16,42,134,.14)}
+.access > li:first-child{border-top:1px solid rgba(16,42,134,.14);padding-top:10px}
+.access .row{margin-top:6px}
+/* 各 team 公開的 Director（什麼都沒被派的人看的）。 */
+.teamblk-dirs{margin:8px 0 0;padding:0;list-style:none;font-size:14px;line-height:1.7}
+/* 頂欄四項各是什麼：小字一行一項。 */
+.feat{margin:12px 0 0;padding:0;list-style:none;font-size:13px;color:rgba(16,42,134,.82);line-height:1.6}
+.feat a{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(16,42,134,.3)}
