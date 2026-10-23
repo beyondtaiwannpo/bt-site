@@ -34,7 +34,7 @@ function render() {
   // 頂欄畫在 #bt-root 裡面，不 insertAdjacentHTML 到 <body>（理由見 admin/src/main.js 同一段）。
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-site"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
 
@@ -55,12 +55,16 @@ function render() {
   // 側欄亮哪一行：編輯畫面算在它所屬的那個分頁底下。
   const tab = { "res-edit": "res", "mail-edit": "mail" }[S.view] || S.view;
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab, S.me), body);
+  UI.afterRender(S, el);
 }
 
-async function boot() {
+// 開頁連不上先自己再試一次（兩秒後），第二次才顯示「資料庫休眠中」。
+// 2026-10-23 盤點時 Settings 一次載入失敗就整頁變成那一句，重開就好；一次抖動不該讓人去寄信求救。
+function retryBoot() { return new Promise(r => setTimeout(() => r(boot(true)), 2000)); }
+async function boot(retried) {
   try {
     const who = await AUTH.currentUserDetailed();
-    if (who.offline) { S.down = true; render(); return; }
+    if (who.offline) { if (!retried) return retryBoot(); S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
     S.me = await D.loadMe(S.user.id);
@@ -68,18 +72,23 @@ async function boot() {
     // ?tab=team 這種連結可以直接開到某一個分頁（README 裡的連結用得到）。
     // Co-President 專用的分頁對其他人回到資源，不報錯。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
-    if (want === "team" && isPres()) await openTeam();
-    else if (want === "stories" && isPres()) await openStories();
-    else if (want === "mail" && isPres()) await openMail();
-    else await openRes();
+    await openTab(want);
   } catch (e) {
     // 票已經不能用了：先清掉本機那張壞票再去登入頁（理由見 admin/src/main.js 同一段）。
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-site"); return; }
     console.error(HERE + " 載入失敗：", e);
-    S.down = true; render();
+    if (!retried) return retryBoot();
+    S.downErr = String(e && e.message || e); S.down = true; render();
   }
 }
 
+// 哪一個分頁：Co-President 專用的對其他人回到資源，不報錯。側欄、上一頁、網址列改 # 都走這裡。
+async function openTab(want) {
+  if (want === "team" && isPres()) await openTeam();
+  else if (want === "stories" && isPres()) await openStories();
+  else if (want === "mail" && isPres()) await openMail();
+  else await openRes();
+}
 async function openMail() {
   S.busy = true; render();
   try {
@@ -124,16 +133,14 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
 
   if (act === "tab") {
     e.preventDefault(); S.msg = "";
-    history.replaceState(null, "", "#" + b.dataset.t);
-    if (b.dataset.t === "team") { await openTeam(); }
-    else if (b.dataset.t === "stories") { await openStories(); }
-    else if (b.dataset.t === "mail") { await openMail(); }
-    else { await openRes(); }
+    history.pushState(null, "", "#" + b.dataset.t);
+    await openTab(b.dataset.t);
     return;
   }
   if (act === "mail-back") { await openMail(); return; }
@@ -202,7 +209,7 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "res-del") {
-    if (!confirm(T("confirm.delRes"))) return;
+    if (UI.needAsk(S, b, T("confirm.delRes"))) return;
     S.busy = true; render();
     try {
       await D.deleteResource(id);
@@ -232,3 +239,6 @@ function switchLang(l) {
 }
 applyLang(pickLang(location.search, readStored()));
 boot();
+// 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
+window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
+

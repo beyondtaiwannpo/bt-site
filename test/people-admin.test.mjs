@@ -213,7 +213,7 @@ test("純函式：貼上解析、下一屆代號", () => {
 test("★ 主程式：升成 Co-President 先問一次；刪人要名字打一樣；結束這一屆要代號打一樣；自己永遠在留下的名單裡", () => {
   const src = readFileSync("admin/people/src/main.js", "utf8");
   const save = src.slice(src.indexOf('act === "person-save"'), src.indexOf('act === "position-delete"'));
-  assert.match(save, /f\.board_role === "president" && !confirm\(/);
+  assert.match(save, /f\.board_role === "president" && UI\.needAsk\(S, b, /, "升成 Co-President 要先問一次（inline confirm）");
   assert.match(save, /done\.length \? T\("msg\.partial"/, "一半成功一半失敗要講出哪一半");
   const rm = src.slice(src.indexOf('act === "member-remove-go"'), src.indexOf('act === "person-merge"'));
   assert.match(rm, /typed !== b\.dataset\.name/);

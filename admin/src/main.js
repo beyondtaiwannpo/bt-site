@@ -47,7 +47,7 @@ function render() {
   // 順帶一提，畫在裡面之後也不用再自己去 remove 上一次那條 —— innerHTML 蓋掉了。
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../app/?next=admin"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
 
@@ -80,12 +80,16 @@ function render() {
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", S.view === "home" ? "home" : "forms", S.me, counts), body);
+  UI.afterRender(S, el);
 }
 
-async function boot() {
+// 開頁連不上先自己再試一次（兩秒後），第二次才顯示「資料庫休眠中」。
+// 2026-10-23 盤點時 Settings 一次載入失敗就整頁變成那一句，重開就好；一次抖動不該讓人去寄信求救。
+function retryBoot() { return new Promise(r => setTimeout(() => r(boot(true)), 2000)); }
+async function boot(retried) {
   try {
     const who = await AUTH.currentUserDetailed();
-    if (who.offline) { S.down = true; render(); return; }
+    if (who.offline) { if (!retried) return retryBoot(); S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
     // ★ 這幾件事同時發，不要排隊。loadForms() 不需要知道我是誰
@@ -113,8 +117,14 @@ async function boot() {
     // 先清掉本機那張壞票再走，不清的話下一頁讀出來的還是它。
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../app/?next=admin"); return; }
     console.error("/admin/ 載入失敗：", e);
-    S.down = true; render();
+    if (!retried) return retryBoot();
+    S.downErr = String(e && e.message || e); S.down = true; render();
   }
+}
+
+// 側欄的兩個分頁：首頁、申請表清單。上一頁與網址列改 # 也走這裡。
+async function openTab(t) {
+  S.view = t === "home" ? "home" : "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render();
 }
 
 // 把畫面上那幾格讀成一個物件。**讀取集中在這裡一支**，
@@ -181,6 +191,7 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
 
@@ -223,7 +234,7 @@ document.addEventListener("click", async e => {
     const to = [...S.noticeTo];
     const n = S.apps.filter(a => S.noticeTo.has(a.status)).length;
     // ⚠ 這一步會一次寄信給一群未成年人，而且收不回來。
-    if (!confirm(T("confirm.notice", { n, sub }))) return;
+    if (UI.needAsk(S, b, T("confirm.notice", { n, sub }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       const made = await D.sendNotice(S.form.id, to, sub, body);
@@ -243,8 +254,8 @@ document.addEventListener("click", async e => {
   if (act === "tab") {
     e.preventDefault();
     const t = b.dataset.t === "home" ? "home" : "forms";
-    history.replaceState(null, "", "#" + t);
-    S.view = t === "home" ? "home" : "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render(); return;
+    history.pushState(null, "", "#" + t);
+    await openTab(t); return;
   }
 
   // 首頁那顆「現在寄出去」：把所有還沒寄的信都寄掉（2026-10-15）。
@@ -293,7 +304,7 @@ document.addEventListener("click", async e => {
     const word = UI.decideWord(status);
     // ⚠ **這一步會寄信給未成年人，而且收不回來。** 所以要確認，
     // 而且確認的句子裡要有人數與動作，不是一句「確定嗎」。
-    if (!confirm(T("confirm.decide", { n: ids.length, word }))) return;
+    if (UI.needAsk(S, b, T("confirm.decide", { n: ids.length, word }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       const n = await D.decide(ids, status);
@@ -378,7 +389,7 @@ document.addEventListener("click", async e => {
   if (act === "del-form") {
     const n = S.forms.find(f => f.id === S.form.id);
     const got = n && n.counts.total;
-    if (!confirm(got ? T("confirm.delFormApps", { n: got }) : T("confirm.delForm"))) return;
+    if (UI.needAsk(S, b, got ? T("confirm.delFormApps", { n: got }) : T("confirm.delForm"))) return;
     S.busy = true; render();
     try {
       await D.deleteForm(S.form.id);
@@ -427,7 +438,7 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "q-del") {
-    if (!confirm(T("confirm.delQ"))) return;
+    if (UI.needAsk(S, b, T("confirm.delQ"))) return;
     S.busy = true; render();
     try {
       await D.deleteQuestion(id);
@@ -471,3 +482,6 @@ function switchLang(l) {
 }
 applyLang(pickLang(location.search, readStored()));
 boot();
+// 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
+window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
+

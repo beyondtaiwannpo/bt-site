@@ -51,6 +51,11 @@ export const COMMON = {
   "down.title":       { zh: "資料庫休眠中", en: "Database is asleep" },
   "down.lede":        { zh: "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。",
                         en: "We cannot reach the database right now. Email beyondtaiwan2020@gmail.com to have it woken up." },
+  "down.detail":      { zh: "資料庫回的是：", en: "The database said: " },
+  // 回饋（2026-10-23，第三次重整批 1）：toast 與 inline confirm 用的三句
+  "toast.undo":       { zh: "復原", en: "Undo" },
+  "toast.close":      { zh: "關掉", en: "Close" },
+  "ask.yes":          { zh: "確定", en: "Yes, do it" },
 };
 
 export const MINE = {

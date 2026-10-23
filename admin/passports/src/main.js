@@ -44,7 +44,7 @@ function render() {
   if (!el) return;
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-passports"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
   if (!internStaff() && !isPres()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); return; }
@@ -75,27 +75,37 @@ function render() {
   const tab = S.view === "board" ? "board" : ["cities", "dest-edit"].includes(S.view) ? "cities"
     : ["cadre", "act-edit", "month-edit"].includes(S.view) ? "cadre" : "interns";
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab, S.me), body);
+  UI.afterRender(S, el);
 }
 
-async function boot() {
+// 開頁連不上先自己再試一次（兩秒後），第二次才顯示「資料庫休眠中」。
+// 2026-10-23 盤點時 Settings 一次載入失敗就整頁變成那一句，重開就好；一次抖動不該讓人去寄信求救。
+function retryBoot() { return new Promise(r => setTimeout(() => r(boot(true)), 2000)); }
+async function boot(retried) {
   try {
     const who = await AUTH.currentUserDetailed();
-    if (who.offline) { S.down = true; render(); return; }
+    if (who.offline) { if (!retried) return retryBoot(); S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre" || (!internStaff() && !isPres())) { render(); return; }
     // ?tab=cadre 直接開幹部護照（README 的連結用得到）。不是 Co-President 的回到實習護照。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
-    if (want === "cadre" && isPres()) await openCadre();
-    else if (want === "cities" && isPres()) await openCities();
-    else if (want === "board") await openBoard();
-    else await openInterns();
+    await openTab(want);
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-passports"); return; }
     console.error(HERE + " 載入失敗：", e);
-    S.down = true; render();
+    if (!retried) return retryBoot();
+    S.downErr = String(e && e.message || e); S.down = true; render();
   }
+}
+
+// 哪一個分頁：不是 Co-President 的回到實習護照。側欄、上一頁、網址列改 # 都走這裡。
+async function openTab(want) {
+  if (want === "cadre" && isPres()) await openCadre();
+  else if (want === "cities" && isPres()) await openCities();
+  else if (want === "board") await openBoard();
+  else await openInterns();
 }
 
 // 實習護照的後台。讀走 RLS（別的 team 讀回來是空的，但他們本來就看不到這個分頁）。
@@ -156,15 +166,13 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") {
     e.preventDefault(); S.msg = "";
-    history.replaceState(null, "", "#" + b.dataset.t);
-    if (b.dataset.t === "cadre" && isPres()) await openCadre();
-    else if (b.dataset.t === "cities" && isPres()) await openCities();
-    else if (b.dataset.t === "board") await openBoard();
-    else await openInterns();
+    history.pushState(null, "", "#" + b.dataset.t);
+    await openTab(b.dataset.t);
     return;
   }
 
@@ -210,7 +218,7 @@ document.addEventListener("click", async e => {
   if (act === "board-toggle") {
     const on = b.dataset.on === "1";
     if (on && S.boardDraft && S.boardDraft.dirty) { S.msg = T("err.boardUnsaved"); render(); return; }
-    if (!confirm(T(on ? "confirm.boardOn" : "confirm.boardOff"))) return;
+    if (UI.needAsk(S, b, T(on ? "confirm.boardOn" : "confirm.boardOff"))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.setBoardActive(S.internSel, on);
@@ -267,7 +275,7 @@ document.addEventListener("click", async e => {
   if (act === "act-off" || act === "act-on") {
     const on = act === "act-on";
     const a = S.pass.activities.find(x => x.id === id);
-    if (!on && !confirm(T("confirm.actOff", { t: a ? a.title_zh : id }))) return;
+    if (!on && UI.needAsk(S, b, T("confirm.actOff", { t: a ? a.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.setActivityActive(id, on);
@@ -278,7 +286,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "act-del") {
     const a = S.pass.activities.find(x => x.id === id);
-    if (!confirm(T("confirm.actDel", { t: a ? a.title_zh : id }))) return;
+    if (UI.needAsk(S, b, T("confirm.actDel", { t: a ? a.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.deleteActivity(id);
@@ -329,7 +337,7 @@ document.addEventListener("click", async e => {
     const on = act === "dest-on";
     const d = S.pass.destinations.find(x => x.code === b.dataset.code);
     if (!d) { S.msg = T("err.noCity"); render(); return; }
-    if (!on && !confirm(T("confirm.cityOff", { c: d.city }))) return;
+    if (!on && UI.needAsk(S, b, T("confirm.cityOff", { c: d.city }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.saveDestination(d.code, d.city, on);
@@ -367,7 +375,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "intern-term-activate") {
     const t = S.intern.terms.find(x => x.id === id);
-    if (!confirm(T("confirm.activate", { t: t ? t.title_zh : id }))) return;
+    if (UI.needAsk(S, b, T("confirm.activate", { t: t ? t.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.activateInternTerm(id);
@@ -404,7 +412,7 @@ document.addEventListener("click", async e => {
   if (act === "intern-task-off" || act === "intern-task-on") {
     const on = act === "intern-task-on";
     const t = S.intern.tasks.find(x => x.id === id);
-    if (!on && !confirm(T("confirm.taskOff", { t: t ? t.title_zh : id }))) return;
+    if (!on && UI.needAsk(S, b, T("confirm.taskOff", { t: t ? t.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.setInternTaskActive(id, on);
@@ -415,7 +423,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "intern-task-del") {
     const t = S.intern.tasks.find(x => x.id === id);
-    if (!confirm(T("confirm.actDel", { t: t ? t.title_zh : id }))) return;
+    if (UI.needAsk(S, b, T("confirm.actDel", { t: t ? t.title_zh : id }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.deleteInternTask(id);
@@ -445,3 +453,6 @@ function switchLang(l) {
 }
 applyLang(pickLang(location.search, readStored()));
 boot();
+// 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
+window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
+

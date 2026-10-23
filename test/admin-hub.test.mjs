@@ -77,21 +77,45 @@ test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什�
 test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellHTML、pageHead、msgHTML、sectionHTML、emptyHTML）", () => {
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.ITEMS, FORMS.ITEMS, `${label} 的 ITEMS 跟 admin/ 不一樣`);
-    for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName"]) {
+    for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
+                       "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML"]) {
       assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
     }
   }
 });
 
-test("訊息：做成了是綠的、沒做成是橘的、空的不畫", () => {
+// 2026-10-23 批 1：做成了的訊息改走 toast（afterRender），頁首只畫沒做成的。
+test("訊息：沒做成是橘的留在頁首、做成了不畫在頁首（走 toast）、空的不畫", () => {
   assert.equal(FORMS.msgHTML(""), "");
-  assert.match(FORMS.msgHTML("存好了。"), /class="msg ok"/);
+  assert.equal(FORMS.msgHTML("存好了。"), "");
   assert.match(FORMS.msgHTML("存不起來：你不是 Director"), /class="msg err"/);
   assert.match(FORMS.msgHTML("清單載不到：連不上"), /class="msg err"/);
   assert.match(FORMS.msgHTML("表單要有名字。"), /class="msg err"/);
-  assert.match(FORMS.msgHTML("寄出 3 封。"), /class="msg ok"/);
-  assert.match(FORMS.msgHTML("寄出 3 封，1 封失敗。"), /class="msg ok"/, "部分成功仍然算做了，訊息裡寫得清楚");
-  assert.match(FORMS.msgHTML("<b>x</b>"), /&lt;b&gt;/, "訊息要跳脫");
+  assert.equal(FORMS.msgHTML("寄出 3 封。"), "");
+  assert.equal(FORMS.msgKind("寄出 3 封，1 封失敗。"), "ok", "部分成功仍然算做了，訊息裡寫得清楚");
+  assert.match(FORMS.msgHTML("存不起來：<b>x</b>"), /&lt;b&gt;/, "訊息要跳脫");
+});
+
+// 2026-10-23 批 1：十處瀏覽器原生 confirm() 全換成 inline confirm（needAsk）。跟守 prompt( 那條同一個做法。
+test("★ 四個 main.js 不准再用瀏覽器的 confirm()，會丟東西的按鈕走 needAsk", () => {
+  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/passports/src/main.js", "admin/people/src/main.js"]) {
+    const body = readFileSync(f, "utf8");
+    assert.doesNotMatch(body, /(^|[^.\w])confirm\(/m, `${f} 還在用 confirm()`);
+    assert.match(body, /UI\.afterRender\(S, el\)/, `${f} 的 render() 沒有叫 afterRender（toast、inline confirm、捲回最上面都靠它）`);
+    assert.match(body, /addEventListener\("popstate"/, `${f} 沒接 popstate（上一頁與網址列改 # 要能換分頁）`);
+    assert.match(body, /history\.pushState/, `${f} 側欄切分頁要用 pushState，不然上一頁回不去`);
+  }
+});
+
+// needAsk：第一次按回 true 並記住要問什麼；按了「確定」（data-confirmed="1"）再進來回 false。沒有 document 也能跑（測試環境）。
+test("needAsk：第一次問、第二次放行", () => {
+  const S = {};
+  const b = { dataset: { act: "ws-unassign", id: "u1" } };
+  assert.equal(FORMS.needAsk(S, b, "真的要移出？"), true);
+  assert.deepEqual(S.ask, { act: "ws-unassign", id: "u1", text: "真的要移出？" });
+  const yes = { dataset: { act: "ws-unassign", id: "u1", confirmed: "1" } };
+  assert.equal(FORMS.needAsk(S, yes, "真的要移出？"), false);
+  assert.equal(S.ask, null);
 });
 
 test("頁首：標題、說明、動作、返回；空狀態三段", () => {

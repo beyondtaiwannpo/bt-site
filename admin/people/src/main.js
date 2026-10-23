@@ -38,7 +38,7 @@ function render() {
   if (!el) return;
   const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
 
-  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
+  if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-people"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
   if (!isSenior()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", "", S.me), UI.noAccessHTML(S.me)); return; }
@@ -53,12 +53,16 @@ function render() {
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail);
   else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter);
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body);
+  UI.afterRender(S, el);
 }
 
-async function boot() {
+// 開頁連不上先自己再試一次（兩秒後），第二次才顯示「資料庫休眠中」。
+// 2026-10-23 盤點時 Settings 一次載入失敗就整頁變成那一句，重開就好；一次抖動不該讓人去寄信求救。
+function retryBoot() { return new Promise(r => setTimeout(() => r(boot(true)), 2000)); }
+async function boot(retried) {
   try {
     const who = await AUTH.currentUserDetailed();
-    if (who.offline) { S.down = true; render(); return; }
+    if (who.offline) { if (!retried) return retryBoot(); S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
     S.me = await D.loadMe(S.user.id);
@@ -69,7 +73,8 @@ async function boot() {
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-people"); return; }
     console.error(HERE + " 載入失敗：", e);
-    S.down = true; render();
+    if (!retried) return retryBoot();
+    S.downErr = String(e && e.message || e); S.down = true; render();
   }
 }
 
@@ -181,11 +186,12 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act;
 
   if (act === "retry") { location.reload(); return; }
+  if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") {
     e.preventDefault(); S.msg = "";
-    history.replaceState(null, "", "#" + b.dataset.t);
+    history.pushState(null, "", "#" + b.dataset.t);
     await openTab(b.dataset.t, b.dataset.ws);
     return;
   }
@@ -229,7 +235,7 @@ document.addEventListener("click", async e => {
     if (!roleChanged && !nameChanged && !posChanged && !teamChanged) { S.msg = T("err.nothingChanged"); render(); return; }
     if (nameChanged && !f.name_zh && !f.name_en) { S.msg = T("err.nameRequired"); render(); return; }
     // ⚠ 升成 Co-President 等於把整個後台給他，包括把你降級。畫面多問一次，資料庫那一側刻意不擋（換屆要用）。
-    if (roleChanged && f.board_role === "president" && !confirm(T("confirm.promote", { name: pname(p) }))) return;
+    if (roleChanged && f.board_role === "president" && UI.needAsk(S, b, T("confirm.promote", { name: pname(p) }))) return;
     S.busy = true; S.msg = ""; render();
     const done = [];
     try {
@@ -251,7 +257,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "position-delete") {
     const p = findPerson(b.dataset.id); if (!p) return;
-    if (!confirm(T("confirm.deletePosition", { term: b.dataset.term, team: b.dataset.team || T("value.none") }))) return;
+    if (UI.needAsk(S, b, T("confirm.deletePosition", { term: b.dataset.term, team: b.dataset.team || T("value.none") }))) return;
     const ok = await run("err.save", () => D.deletePosition(p.person_id, b.dataset.term, b.dataset.team || ""));
     if (ok !== undefined) await reopenPerson(p.person_id, T("msg.personSaved", { name: pname(p), done: T("msg.positionGone", { term: b.dataset.term }) }));
     return;
@@ -278,7 +284,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "record-delete") {
     const p = findPerson(b.dataset.id); if (!p) return;
-    if (!confirm(T("confirm.deleteRecord", { name: pname(p) }))) return;
+    if (UI.needAsk(S, b, T("confirm.deleteRecord", { name: pname(p) }))) return;
     const ok = await run("err.remove", () => D.deletePerson(p.person_id));
     if (ok !== undefined) { S.person = null; S.msg = T("msg.recordDeleted"); await openRoster(true); }
     return;
@@ -298,7 +304,7 @@ document.addEventListener("click", async e => {
   if (act === "person-merge") {
     const keep = findPerson(b.dataset.keep), drop = findPerson(b.dataset.drop);
     if (!keep || !drop) return;
-    if (!confirm(T("confirm.merge", { keep: pname(keep), drop: pname(drop) }))) return;
+    if (UI.needAsk(S, b, T("confirm.merge", { keep: pname(keep), drop: pname(drop) }))) return;
     const ok = await run("err.merge", () => D.mergePeople(keep.person_id, drop.person_id));
     if (ok !== undefined) await reopenPerson(keep.person_id, T("msg.merged"));
     return;
@@ -325,15 +331,27 @@ document.addEventListener("click", async e => {
     S.wsDraft = { person, level };
     if (!person) { S.msg = T("err.pickPerson"); render(); return; }
     const p = S.people.find(x => x.profile_id === person);
-    const ok = await run("err.assign", () => D.assign(person, b.dataset.ws, level));
-    if (ok !== undefined) { S.wsDraft = null; S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws: b.dataset.ws, level: UI.levelLabel(level) }); await openWorkspaces(null, true); }
+    const ws = b.dataset.ws;
+    const ok = await run("err.assign", () => D.assign(person, ws, level));
+    if (ok !== undefined) {
+      S.wsDraft = null; S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(level) });
+      // 復原：再送一次反向的那一筆（移出），走同一支函式、同一道門。
+      S.undo = async () => { const r = await run("err.unassign", () => D.unassign(person, ws)); if (r !== undefined) { S.msg = T("msg.unassigned", { name: p ? pname(p) : "", ws }); await openWorkspaces(null, true); } };
+      await openWorkspaces(null, true);
+    }
     return;
   }
   if (act === "ws-unassign") {
     const p = S.people.find(x => x.profile_id === b.dataset.id);
-    if (!confirm(T("confirm.unassign", { name: p ? pname(p) : "", ws: S.wsSel }))) return;
-    const ok = await run("err.unassign", () => D.unassign(b.dataset.id, S.wsSel));
-    if (ok !== undefined) { S.msg = T("msg.unassigned", { name: p ? pname(p) : "", ws: S.wsSel }); await openWorkspaces(null, true); }
+    if (UI.needAsk(S, b, T("confirm.unassign", { name: p ? pname(p) : "", ws: S.wsSel }))) return;
+    const ws = S.wsSel, id = b.dataset.id;
+    const was = (S.members.find(m => m.user_id === id) || {}).level || "view";
+    const ok = await run("err.unassign", () => D.unassign(id, ws));
+    if (ok !== undefined) {
+      S.msg = T("msg.unassigned", { name: p ? pname(p) : "", ws });
+      S.undo = async () => { const r = await run("err.assign", () => D.assign(id, ws, was)); if (r !== undefined) { S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(was) }); await openWorkspaces(null, true); } };
+      await openWorkspaces(null, true);
+    }
     return;
   }
   if (act === "ws-create") {
@@ -418,7 +436,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "invite-disable") {
     const code = b.dataset.code;
-    if (!confirm(T("confirm.disableCode", { code }))) return;
+    if (UI.needAsk(S, b, T("confirm.disableCode", { code }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       await D.disableInvite(code);
@@ -443,9 +461,14 @@ document.addEventListener("change", async e => {
   }
   if (el.dataset.act === "ws-level" && S.wsSel) {
     const p = S.people.find(x => x.profile_id === el.dataset.id);
-    const level = el.value;
-    const ok = await run("err.assign", () => D.assign(el.dataset.id, S.wsSel, level));
-    if (ok !== undefined) { S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws: S.wsSel, level: UI.levelLabel(level) }); await openWorkspaces(null, true); }
+    const level = el.value, ws = S.wsSel, id = el.dataset.id;
+    const was = (S.members.find(m => m.user_id === id) || {}).level || "view";
+    const ok = await run("err.assign", () => D.assign(id, ws, level));
+    if (ok !== undefined) {
+      S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(level) });
+      S.undo = async () => { const r = await run("err.assign", () => D.assign(id, ws, was)); if (r !== undefined) { S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(was) }); await openWorkspaces(null, true); } };
+      await openWorkspaces(null, true);
+    }
   }
 });
 
@@ -467,3 +490,6 @@ function switchLang(l) {
 }
 applyLang(pickLang(location.search, readStored()));
 boot();
+// 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
+window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
+

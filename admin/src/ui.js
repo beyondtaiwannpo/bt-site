@@ -494,8 +494,71 @@ export function msgKind(msg) {
 }
 export function msgHTML(msg) {
   const k = msgKind(msg);
-  if (!k) return "";
+  // 做成了的訊息走 toast（afterRender），頁首只畫沒做成的：錯誤要留在表單旁邊看得到。
+  if (!k || k === "ok") return "";
   return `<div class="msg ${k}" role="status"><span class="msg-k">${k === "err" ? T("msg.err") : T("msg.ok")}</span><span>${esc(msg)}</span></div>`;
+}
+// ── 回饋（2026-10-23，後台第三次重整批 1）────────────────────────────
+// toast：畫面左下角一小條字。掛在 <body> 底下不在 #bt-root 裡，所以 render() 重畫不會把它洗掉。
+// 做成了（ok）幾秒後自己消失，可以帶一顆「復原」；沒做成（err）留著，要自己關。
+// 同一句話已經在畫面上就不再疊一條。四份一模一樣（test/admin-hub.test.mjs 逐字比對）。
+export function toast(msg, undo) {
+  if (typeof document === "undefined") return null;
+  const kind = msgKind(msg);
+  if (!kind) return null;
+  let box = document.querySelector(".toasts");
+  if (!box) { box = document.createElement("div"); box.className = "toasts"; box.setAttribute("aria-live", "polite"); document.body.appendChild(box); }
+  for (const t of box.children) if (t.dataset.text === String(msg)) return t;
+  const el = document.createElement("div");
+  el.className = "toast " + kind; el.dataset.text = String(msg); el.setAttribute("role", kind === "err" ? "alert" : "status");
+  el.innerHTML = `<span class="toast-k">${kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
+    undo ? `<button type="button" class="toast-undo">${esc(T("toast.undo"))}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
+  const gone = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
+  el.querySelector(".toast-x").addEventListener("click", gone);
+  if (undo) el.querySelector(".toast-undo").addEventListener("click", () => { gone(); undo(); });
+  box.appendChild(el);
+  if (kind === "ok") setTimeout(gone, undo ? 9000 : 6000);
+  return el;
+}
+// inline confirm：取代瀏覽器的 confirm()。按了會丟東西的按鈕，原地長出一行「真的要…？確定／取消」。
+// needAsk(S, b, text)：第一次按回 true，並把那一行直接掛上去（**不重畫**，表單裡打到一半的字還在）；
+// 按了「確定」再進來時 b.dataset.confirmed 是 "1"，回 false，動作照做。
+export function needAsk(S, b, text) {
+  if (b.dataset.confirmed === "1") { S.ask = null; return false; }
+  S.ask = { act: b.dataset.act, id: b.dataset.id || "", text: String(text || "") };
+  if (typeof document !== "undefined") mountAsk(document, S.ask);
+  return true;
+}
+export function mountAsk(root, ask) {
+  if (!ask || !root) return;
+  for (const old of root.querySelectorAll(".ask")) old.remove();
+  const sel = `[data-act="${ask.act}"]` + (ask.id ? `[data-id="${ask.id}"]` : "");
+  const b = [...root.querySelectorAll(sel)].find(x => x.dataset.confirmed !== "1" && !x.closest(".ask"));
+  if (!b) return;
+  const row = document.createElement("span");
+  row.className = "ask";
+  row.innerHTML = `<span class="ask-t">${esc(ask.text).replace(/\n+/g, " ")}</span><button type="button" class="btn danger sm" data-act="${esc(ask.act)}"${
+    ask.id ? ` data-id="${esc(ask.id)}"` : ""} data-confirmed="1">${esc(T("ask.yes"))}</button><button type="button" class="btn ghost sm" data-act="ask-cancel">${esc(T("common.cancel"))}</button>`;
+  // 「確定」那顆要帶著原按鈕的其他 data-*（例如 data-term、data-team），動作才認得。
+  const yes = row.querySelector('[data-confirmed="1"]');
+  for (const [k, v] of Object.entries(b.dataset)) if (!["act", "id", "confirmed"].includes(k)) yes.dataset[k] = v;
+  b.hidden = true;
+  b.insertAdjacentElement("afterend", row);
+}
+export function cancelAsk(S, root) {
+  S.ask = null;
+  if (!root) return;
+  for (const r of root.querySelectorAll(".ask")) { const prev = r.previousElementSibling; if (prev) prev.hidden = false; r.remove(); }
+}
+// 每次 render() 之後叫一次：ok 的訊息變 toast 並清掉（頁首不畫它），err 的訊息 toast 一次並留在頁首；
+// 有待確認的那一行就掛回去；換了畫面就捲回最上面（從名單按「改」不會落在頁尾）。
+export function afterRender(S, root) {
+  if (S.msg) {
+    if (msgKind(S.msg) === "ok") { toast(S.msg, S.undo); S.msg = ""; S.undo = null; S.toasted = ""; }
+    else if (S.msg !== S.toasted) { toast(S.msg); S.toasted = S.msg; }
+  } else S.toasted = "";
+  if (S.ask) mountAsk(root, S.ask);
+  if (S.view !== S.lastView) { if (S.lastView !== undefined && typeof window !== "undefined") window.scrollTo(0, 0); S.lastView = S.view; }
 }
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {
@@ -632,6 +695,8 @@ export function notCadreHTML() {
   return pageHead(T("notCadre.title"), T("notCadre.lede"), [{ label: T("notCadre.back"), href: "../app/" }]);
 }
 
-export function downHTML() {
-  return pageHead(T("down.title"), T("down.lede"), [{ act: "retry", label: T("common.retry") }]);
+// err：資料庫真正回的那一句，印在底下小字。開頁會先自己重試一次（main.js 的 retryBoot），第二次才顯示這一頁。
+export function downHTML(err) {
+  return pageHead(T("down.title"), T("down.lede"), [{ act: "retry", label: T("common.retry") }])
+    + (err ? `<div class="mini">${esc(T("down.detail"))}${esc(err)}</div>` : "");
 }

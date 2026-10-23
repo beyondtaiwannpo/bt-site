@@ -80,8 +80,9 @@ test("切到另一屆看得到那一屆的格子，而且那一屆有「設成�
 });
 
 test("★ 忙的時候每一顆按鈕都按不下去，訊息會顯示", () => {
-  const h = internAdminHTML(DATA, "2026-27", "存好了。", true);
-  assert.match(h, /存好了。/);
+  // 2026-10-23 批 1 起「做成了」走 toast，頁首只畫沒做成的；這裡拿一句沒做成的驗訊息有畫出來。
+  const h = internAdminHTML(DATA, "2026-27", "存不起來：x", true);
+  assert.match(h, /存不起來：x/);
   const buttons = h.match(/<button[^>]*data-act="intern-[^"]*"[^>]*>/g) || [];
   assert.ok(buttons.length >= 5);
   for (const b of buttons) assert.match(b, /disabled/, `忙的時候還按得下去：${b}`);

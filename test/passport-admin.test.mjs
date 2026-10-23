@@ -128,7 +128,8 @@ test("★ 主程式每一個幹部護照的動作成功或失敗都會寫 S.msg�
   }
   for (const act of ["act-off", "act-del", "dest-off"]) {
     const i = src.indexOf(`act === "${act}"`);
-    assert.match(src.slice(i, i + 600), /confirm\(/, `${act} 會丟東西或藏東西，要先問一次`);
+    // 2026-10-23 批 1：問一次改走 inline confirm（UI.needAsk），不再用瀏覽器的 confirm()。
+    assert.match(src.slice(i, i + 600), /UI\.needAsk\(S, b, /, `${act} 會丟東西或藏東西，要先問一次`);
   }
 });
 
