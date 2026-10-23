@@ -3292,6 +3292,29 @@ Paul 拍板四題都照建議：頂欄留著（側欄「Home」改叫「總覽�
 本機 `node --test test/*.test.mjs` 564 項、`./check.sh`、`node scripts/check-mobile.mjs` 19 頁全過。截圖 `docs/admin-redesign/v3/b2-01` 到 `b2-03`（假資料）。
 **還沒驗的**：真的登入後改一格。本機沒有登入態，正式站還是舊版（沒 push）。
 
+### 批 3：在東西上管東西，成員分頁（2026-10-23）
+
+Paul 的原話：「我的 team 要怎麼改他們自己的 workspace？」盤點時的答案是：今天不能，People 整組鎖給 Co-President 與 Senior Adviser，Director 連自己 team 的工作區有誰都看不到。
+這一批**不是把 People 開給 Director**，是把成員清單放到那個東西自己的頁面上：
+
+| 工作區 | 入口在哪 | 誰看得到 |
+|---|---|---|
+| `apps:<team>` | Forms 清單頁首底下一顆「誰在做 X 的申請」 | 對那個工作區是「管」的人；Co-President 與 Senior Adviser 看到六個 |
+| `res:<team>` | Resources 頁同一個位置 | 同上 |
+| `intern-passport`、`passport` | 實習護照、幹部護照後台頁首底下 | 同上 |
+
+點進去是成員分頁：誰在裡面、等級下拉（改了就存，toast 帶復原）、移出（inline confirm，帶復原）、底下打名字加人。
+「管」的人可以把別人加成「管」（Paul 10-23 第 2 題照資料庫規則開，畫面不收緊）。
+
+- 讀 `workspace_members()`（where 裡有 `can_manage`），寫 `assign()` / `unassign()`（第一句 `can_manage`）。**沒有新的資料庫函式、沒有遷移檔。**
+- 找人的清單從 `profiles` 讀名字與職級（幹部本來就讀得到所有幹部的這幾欄，進度牆就是這樣畫的），**不讀 email**；`test/admin-hub.test.mjs` 守著三個資料夾的 `data.js` 不准出現 `person_email`。
+- 四個 `ui.js` 各一份一模一樣的 `membersPanelHTML()`、`mpLinksHTML()`、`mpItems()`、`mpFind()`、`mpName()`（測試逐字比對）；三個功能資料夾的 `data.js` 各加五支一行的包裝、`main.js` 各加同一段 `openMembers()` 與五個動作。資料夾之間照樣不 import。
+- 等級三句（`level.view / edit / manage`）與成員分頁的字從 people 的 `MINE` 搬進四份 `COMMON`。
+
+Director 加自己 team 的人：Resources → 誰在做 → 打名字 → 加，四下；今天做不到。
+本機 `node --test test/*.test.mjs` 566 項、`./check.sh`、`node scripts/check-mobile.mjs` 19 頁全過。截圖 `docs/admin-redesign/v3/b3-01`、`b3-02`（假資料，Director 的視角）。
+**還沒驗的**：真的用一位 Director 的帳號按一次（本機沒有登入態，正式站沒 push）。
+
 ## 後台第二次重整：側欄 Dashboard（2026-10-19）
 
 Paul 2026-10-19 登入看過四個資料夾版的後台之後：「超亂超不知道在幹嘛。我要弄成像是 BT dashboard 一樣」。

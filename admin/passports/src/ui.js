@@ -198,6 +198,57 @@ export function afterRender(S, root) {
   if (S.ask) mountAsk(root, S.ask);
   if (S.view !== S.lastView) { if (S.lastView !== undefined && typeof window !== "undefined") window.scrollTo(0, 0); S.lastView = S.view; }
 }
+// ── 成員分頁（2026-10-23，第三次重整批 3）────────────────────────────
+// 對一個工作區是「管」的人（Director）在那個東西自己的頁面上（Forms、Resources、兩本護照後台）看到誰在裡面、加人、改等級、移出，
+// 不用進 /admin/people/。讀 workspace_members()（where 裡有 can_manage）、寫 assign() / unassign()（第一句 can_manage），
+// 沒有新的資料庫函式。找人的清單從 profiles 讀（幹部本來就讀得到所有幹部的名字），不讀 email。四份一模一樣（測試逐字比對）。
+// mp = { ws, name, rows: workspace_members 回的, cadres: [{ id, name_zh, name_en, board_role }], meId, q, level }
+export function mpName(r) {
+  const zh = String(r && r.name_zh || "").trim(), en = String(r && r.name_en || "").trim();
+  return zh ? (en ? `${zh} (${en})` : zh) : (en || T("common.noName"));
+}
+export function mpFind(people, q) {
+  const s = String(q || "").trim().toLowerCase();
+  if (!s) return null;
+  const list = people || [];
+  return list.find(p => mpName(p).toLowerCase() === s)
+    || list.find(p => String(p.name_zh || "").toLowerCase() === s || String(p.name_en || "").toLowerCase() === s)
+    || null;
+}
+// 這一頁該列哪幾個「誰在做…」的入口：senior 看所有這一類的工作區，其他人只有自己是「管」的那幾個。
+// workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
+export function mpItems(me, prefix, workspaces) {
+  const title = w => (lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || w.id;
+  const all = (workspaces || []).filter(w => w.active !== false && (w.id === prefix || w.id.startsWith(prefix)));
+  return all.filter(w => senior(me) || ((me && me.ws) || {})[w.id] === "manage").map(w => ({ ws: w.id, name: title(w) }));
+}
+export function mpLinksHTML(items) {
+  if (!items || !items.length) return "";
+  return `<div class="chips mp-links">${items.map(i => `<button class="chip" data-act="members-open" data-ws="${esc(i.ws)}" data-name="${esc(i.name)}">${esc(T("mp.open", { name: i.name }))}</button>`).join("")}</div>`;
+}
+export function membersPanelHTML(mp, msg, busy) {
+  const dis = busy ? " disabled" : "";
+  const LV = ["view", "edit", "manage"];
+  const lv = l => T("level." + l);
+  const rows = mp.rows || [];
+  const inWs = new Set(rows.map(r => r.user_id));
+  const row = r => `<tr><td class="t-main"><b>${esc(mpName(r))}</b> <span class="tag">${esc(boardName(r.board_role))}</span>${r.user_id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
+    <td><select data-act="members-level" data-id="${esc(r.user_id)}" aria-label="${esc(T("mp.level"))}"${dis}>${LV.map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></td>
+    <td class="t-act"><button class="btn quiet sm" data-act="members-unassign" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></td></tr>`;
+  return pageHead(T("mp.title", { name: esc(mp.name || mp.ws) }), T("mp.lede"), [], { act: "members-back", label: T("mp.back") })
+    + msgHTML(msg)
+    + `<div class="note">${T("mp.levels")}</div>`
+    + sectionHTML(T("mp.list"), rows.length
+        ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${rows.map(row).join("")}</tbody></table>`
+        : emptyHTML(T("mp.nobody"), T("mp.nobodyHint")))
+    + sectionHTML(T("mp.add"), `<div class="two">
+        <label><i>${T("mp.who")}</i><input id="mp-q" list="mp-people" value="${esc(mp.q || "")}" placeholder="${esc(T("mp.whoPh"))}" autocomplete="off"${dis}>
+          <datalist id="mp-people">${(mp.cadres || []).filter(p => !inWs.has(p.id)).map(p => `<option value="${esc(mpName(p))}">`).join("")}</datalist></label>
+        <label><i>${T("mp.level")}</i><select id="mp-level"${dis}>${LV.map(l => `<option value="${l}"${(mp.level || "view") === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></label>
+      </div>
+      <div class="row"><button class="btn" data-act="members-assign" data-ws="${esc(mp.ws)}"${dis}>${busy ? T("common.saving") : T("mp.addGo")}</button></div>
+      <div class="mini">${T("mp.addNote")}</div>`);
+}
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {
   const o = opts || {};
@@ -262,7 +313,7 @@ export function suggestTaskId(termId, tasks) {
 // isPresident 要傳進來：分頁列上 Co-President 才有的那四個分頁靠它畫。
 // 2026-10-18 端對端測試抓到：寫死 false 的話，Co-President 一進實習護照分頁，
 // 邀請碼那幾個分頁就不見了，要重新整理才回得去。
-export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat) {
+export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat, mpItems) {
   const terms = data.terms || [];
   const cur = terms.find(t => t.id === sel) || terms.find(t => t.active) || terms[0] || null;
   const tasks = (data.tasks || []).filter(t => cur && t.term === cur.id);
@@ -307,6 +358,7 @@ export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat) {
   if (cur) headActs.unshift({ act: "intern-task-new", label: T("ik.new"), primary: true, disabled: busy });
   return pageHead(T("it.title"), T("it.lede", { n: data.interns || 0 }), headActs)
     + msgHTML(msg)
+    + mpLinksHTML(mpItems)
     + internPreviewHTML(previewCat, cur ? !!cur.active : true)
     + sectionHTML(T("it.terms"), `${terms.length ? `<ul class="flist">${termRows}</ul>` : emptyHTML(T("it.empty"), T("it.emptyHint"), { act: "intern-term-new", label: T("it.new") })}
     ${terms.length ? `<div class="row" style="margin:6px 0 0"><button class="btn ghost sm" data-act="intern-term-new"${dis}>${T("it.new")}</button></div>` : ""}`,
@@ -420,7 +472,7 @@ export function internPreviewHTML(cat, viewingActive) {
   return previewBoxHTML(c ? T("ipv.titleCat", { c: esc(T(c.label)) }) : T("ipv.title"), hint, full + "&bare=1", full);
 }
 
-export function passportAdminHTML(data, msg, busy, previewMonth) {
+export function passportAdminHTML(data, msg, busy, previewMonth, mpItems) {
   const months = data.months || [];
   const acts = data.activities || [];
   const dis = busy ? " disabled" : "";
@@ -456,6 +508,7 @@ export function passportAdminHTML(data, msg, busy, previewMonth) {
   const jump = months.length ? `<nav class="jump" aria-label="${esc(T("pa.jump"))}">${months.map(m => `<a href="#m${esc(String(m.month))}">${esc(monthLabel(m.month))}</a>`).join("")}</nav>` : "";
   return pageHead(T("pa.title"), T("pa.lede"))
     + msgHTML(msg)
+    + mpLinksHTML(mpItems)
     + `<div class="note">${T("pa.note")}
       ${months.length ? "" : T("pa.noMonths")}</div>`
     + jump

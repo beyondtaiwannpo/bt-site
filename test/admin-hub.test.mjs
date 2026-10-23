@@ -78,7 +78,8 @@ test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellH
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.ITEMS, FORMS.ITEMS, `${label} 的 ITEMS 跟 admin/ 不一樣`);
     for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
-                       "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML"]) {
+                       "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML",
+                       "mpName", "mpFind", "mpItems", "mpLinksHTML", "membersPanelHTML"]) {
       assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
     }
   }
@@ -490,4 +491,55 @@ test("★ admin/people 每一個畫面用英文畫出來不剩中文", () => {
     invites: () => PEOPLE.inviteCodesHTML(codes, "", false, { code: "bt-x", grants: "alumni", uses: 2, note: "" }) + PEOPLE.inviteCodesHTML([], "", true, null),
     other: () => PEOPLE.noAccessHTML(ME.member) + PEOPLE.notCadreHTML() + PEOPLE.downHTML() + PEOPLE.tabsHTML("invites"),
   });
+});
+
+// 2026-10-23 第三次重整批 3：成員分頁。對一個工作區是「管」的人在那個東西自己的頁面上加人、改等級、移出。
+test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只列還沒在裡面的幹部；入口只給「管」的人，senior 全部", () => {
+  const ws = [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "Curriculum Team 的申請", title_en: "Curriculum Team applications", active: true },
+              { id: "apps:Marketing Team", kind: "apps", title_zh: "Marketing Team 的申請", title_en: "", active: true },
+              { id: "res:Curriculum Team", kind: "res", title_zh: "Curriculum Team 的資源", title_en: "", active: true },
+              { id: "apps:Old Team", kind: "apps", title_zh: "舊", active: false }];
+  const dir = { role: "cadre", board: "director", team: "Curriculum Team", ws: { "apps:Curriculum Team": "manage", "res:Curriculum Team": "edit" } };
+  const items = FORMS.mpItems(dir, "apps:", ws);
+  assert.deepEqual(items, [{ ws: "apps:Curriculum Team", name: "Curriculum Team 的申請" }], "只列自己是「管」的，不列「改」的、不列停用的");
+  assert.equal(FORMS.mpItems(dir, "res:", ws).length, 0, "資源只有「改」，沒有入口");
+  assert.equal(FORMS.mpItems(ME.senior, "apps:", ws).length, 2, "senior 全部");
+  assert.equal(FORMS.mpItems(ME.member, "apps:", ws).length, 0);
+  assert.equal(FORMS.mpItems(ME.senior, "intern-passport", [{ id: "intern-passport", kind: "intern-passport", title_zh: "實習護照", active: true }]).length, 1, "整個代號也可以");
+  assert.match(FORMS.mpLinksHTML(items), /data-act="members-open" data-ws="apps:Curriculum Team" data-name="Curriculum Team 的申請"/);
+  assert.equal(FORMS.mpLinksHTML([]), "");
+  const mp = { ws: "apps:Curriculum Team", name: "Curriculum Team 的申請", meId: "u1",
+    rows: [{ user_id: "u1", name_zh: "王平", name_en: "Paul", board_role: "president", level: "manage" }, { user_id: "u3", name_zh: "", name_en: "Mei", board_role: "member", level: "view" }],
+    cadres: [{ id: "u1", name_zh: "王平", name_en: "Paul", board_role: "president" }, { id: "u3", name_zh: "", name_en: "Mei", board_role: "member" }, { id: "u4", name_zh: "小新", name_en: "Shin", board_role: "member" }] };
+  const h = FORMS.membersPanelHTML(mp, "", false);
+  assert.match(h, /<h1>Curriculum Team 的申請的成員<\/h1>/);
+  assert.match(h, /data-act="members-back"/);
+  assert.match(h, /這是你/);
+  assert.match(h, /<select data-act="members-level" data-id="u3"[^>]*><option value="view" selected>看/);
+  assert.match(h, /data-act="members-unassign" data-id="u3"/);
+  const pick = h.slice(h.indexOf('<datalist id="mp-people">'), h.indexOf("</datalist>"));
+  assert.match(pick, /<option value="小新 \(Shin\)">/);
+  assert.doesNotMatch(pick, /Mei/, "已經在裡面的不列");
+  assert.match(h, /data-act="members-assign" data-ws="apps:Curriculum Team"/);
+  assert.equal(FORMS.mpFind(mp.cadres, "小新 (Shin)").id, "u4");
+  assert.equal(FORMS.mpFind(mp.cadres, "mei").id, "u3");
+  assert.equal(FORMS.mpFind(mp.cadres, "x"), null);
+  assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: [] }, "", false), /還沒有人被派進來/);
+  assert.match(FORMS.membersPanelHTML(mp, "", true), /disabled/);
+  // 清單頁接得上：最後一個參數給了就畫入口，沒給就沒有。
+  assert.match(FORMS.listHTML([], true, "", false, null, [], "", false, items), /data-act="members-open"/);
+  assert.doesNotMatch(FORMS.listHTML([], true, "", false, null, [], "", false), /members-open/);
+  assert.match(SITE.resListHTML([], true, "", false, items), /data-act="members-open"/);
+});
+
+test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、加、移出、改等級，寫的是 assign / unassign，不讀 email", () => {
+  for (const f of ["admin/src", "admin/site/src", "admin/passports/src"]) {
+    const m = readFileSync(`${f}/main.js`, "utf8"), d = readFileSync(`${f}/data.js`, "utf8");
+    for (const act of ["members-open", "members-back", "members-assign", "members-unassign", "members-level"]) assert.match(m, new RegExp(act), `${f} 沒接 ${act}`);
+    assert.match(m, /UI\.needAsk\(S, b, T\("confirm\.mpRemove"/, `${f} 移出要先問一次`);
+    assert.match(m, /S\.undo = /, `${f} 要有復原`);
+    assert.match(d, /rpc\("workspace_members"/); assert.match(d, /rpc\("assign"/); assert.match(d, /rpc\("unassign"/);
+    assert.match(d, /from\("profiles"\)\.select\("id, name_zh, name_en, board_role"\)/, `${f} 找人只讀名字與職級`);
+    assert.doesNotMatch(d, /person_email/, `${f} 不准讀 email`);
+  }
 });

@@ -64,9 +64,12 @@ function render() {
   } else if (S.view === "form" && S.form) {
     body = UI.formHTML(S.form, S.questions, canEdit(),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
+  } else if (S.view === "members" && S.mp) {
+    body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else if (S.view === "list") {
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
-      isPres() ? S.teams : [], S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy);
+      isPres() ? S.teams : [], S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy,
+      UI.mpItems(S.me, "apps:", S.workspaces));
   } else {
     // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
     body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy, S.forms, S.todo);
@@ -105,6 +108,7 @@ async function boot(retried) {
     if (S.me.senior) S.teams = await D.loadTeams();
     // 首頁三塊的數字。載不到不該讓整頁打不開，所以接住；每一項自己也會接住。
     S.todo = await D.loadTodo(S.me).catch(() => ({}));
+    S.workspaces = await D.loadWorkspaces().catch(() => []);
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     render();
@@ -184,6 +188,24 @@ async function reloadList() {
   } catch (e) { S.msg = T("err.list") + D.says(e); }
 }
 
+// ── 成員分頁（2026-10-23，第三次重整批 3）────────────────────────────
+// 對這個工作區是「管」的人在這裡加人、改等級、移出，不用進 /admin/people/。門在 workspace_members / assign / unassign 裡。
+// backView：按「回上一頁」回到哪個畫面。
+async function openMembers(ws, name, backView) {
+  S.busy = true; S.msg = ""; render();
+  try {
+    const [rows, cadres] = await Promise.all([D.loadMembers(ws), D.loadCadres().catch(() => [])]);
+    S.mp = { ws, name, rows: rows || [], cadres, meId: S.user.id, q: "", level: "view", backView: backView || (S.mp && S.mp.backView) || S.view };
+    S.view = "members"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = T("err.mpLoad") + D.says(e); }
+  render();
+}
+async function reloadMembers(msg) {
+  S.msg = msg || "";
+  try { S.mp.rows = await D.loadMembers(S.mp.ws) || []; } catch (e) { S.msg = T("err.mpLoad") + D.says(e); }
+  S.busy = false; render();
+}
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -192,6 +214,40 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
+  // ── 成員分頁（2026-10-23，第三次重整批 3）──
+  if (act === "members-open") { await openMembers(b.dataset.ws, b.dataset.name); return; }
+  if (act === "members-back") { S.view = (S.mp && S.mp.backView) || "list"; S.msg = ""; render(); return; }
+  if (act === "members-assign" && S.mp) {
+    const qEl = document.getElementById("mp-q"), lvEl = document.getElementById("mp-level");
+    const q = qEl ? qEl.value.trim() : "", level = lvEl ? lvEl.value : "view";
+    S.mp.q = q; S.mp.level = level;
+    if (!q) { S.msg = T("err.mpPick"); render(); return; }
+    const inWs = new Set(S.mp.rows.map(r => r.user_id));
+    const p = UI.mpFind(S.mp.cadres.filter(c => !inWs.has(c.id)), q);
+    if (!p) { S.msg = T("err.mpNoSuch"); render(); return; }
+    const ws = S.mp.ws;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.assign(p.id, ws, level);
+      S.mp.q = ""; S.mp.level = "view";
+      S.undo = async () => { S.busy = true; render(); try { await D.unassign(p.id, ws); await reloadMembers(T("msg.mpRemoved", { name: UI.mpName(p) })); } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); } };
+      await reloadMembers(T("msg.mpAssigned", { name: UI.mpName(p), level: T("level." + level) }));
+    } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); }
+    return;
+  }
+  if (act === "members-unassign" && S.mp) {
+    const r = S.mp.rows.find(x => x.user_id === b.dataset.id); if (!r) return;
+    if (UI.needAsk(S, b, T("confirm.mpRemove", { name: UI.mpName(r) }))) return;
+    const ws = S.mp.ws, was = r.level;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.unassign(r.user_id, ws);
+      S.undo = async () => { S.busy = true; render(); try { await D.assign(r.user_id, ws, was); await reloadMembers(T("msg.mpAssigned", { name: UI.mpName(r), level: T("level." + was) })); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
+      await reloadMembers(T("msg.mpRemoved", { name: UI.mpName(r) }));
+    } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); }
+    return;
+  }
+
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
 
@@ -485,3 +541,17 @@ boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
+// 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
+document.addEventListener("change", async e => {
+  const el = e.target.closest('[data-act="members-level"]');
+  if (!el || !S.mp || S.view !== "members") return;
+  const r = S.mp.rows.find(x => x.user_id === el.dataset.id); if (!r) return;
+  const ws = S.mp.ws, was = r.level, level = el.value;
+  if (was === level) return;
+  S.busy = true; S.msg = ""; render();
+  try {
+    await D.assign(r.user_id, ws, level);
+    S.undo = async () => { S.busy = true; render(); try { await D.assign(r.user_id, ws, was); await reloadMembers(T("msg.mpLevel", { name: UI.mpName(r), level: T("level." + was) })); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
+    await reloadMembers(T("msg.mpLevel", { name: UI.mpName(r), level: T("level." + level) }));
+  } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); }
+});

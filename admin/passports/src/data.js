@@ -171,6 +171,40 @@ export async function loadBoard(term) {
   if (sq.error) throw sq.error;
   return { board: b.data || null, squares: sq.data || [] };
 }
+
+// ── 成員分頁（2026-10-23，第三次重整批 3）：讀誰在工作區裡、找人的名單、派與移出。門都在資料庫那三支函式裡。 ──
+export async function loadWorkspaces() {
+  need();
+  const { data, error } = await supabase.from("workspaces").select("id, kind, team, title_zh, title_en, owner, active").order("id");
+  if (error) throw error;
+  return data || [];
+}
+export async function loadMembers(ws) {
+  need();
+  const { data, error } = await supabase.rpc("workspace_members", { p_ws: ws });
+  if (error) throw error;
+  return data || [];
+}
+// 找人用：幹部的名字與職級。幹部本來就讀得到所有幹部的這幾欄（profiles_read），**不讀 email**。
+export async function loadCadres() {
+  need();
+  const { data, error } = await supabase.from("profiles").select("id, name_zh, name_en, board_role").eq("role", "cadre").order("name_en");
+  if (error) throw error;
+  return data || [];
+}
+export async function assign(id, ws, level) {
+  need();
+  const { data, error } = await supabase.rpc("assign", { p_target: id, p_ws: ws, p_level: level });
+  if (error) throw error;
+  return data;
+}
+export async function unassign(id, ws) {
+  need();
+  const { data, error } = await supabase.rpc("unassign", { p_target: id, p_ws: ws });
+  if (error) throw error;
+  return data;
+}
+
 // squares 是 [{ pos, kind, task_id, goes_to }]，空格不用送。
 export async function saveBoard(term, size, squares) {
   need();

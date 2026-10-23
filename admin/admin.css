@@ -406,3 +406,7 @@ a.btn{text-decoration:none}
   .table.grid tr{display:table-row;padding:0;border:0}
   .table.grid td,.table.grid th{display:table-cell}
 }
+
+/* ───────── 14. 成員分頁（2026-10-23，第三次重整批 3）───────── */
+/* 清單頁首底下那一排「誰在做…」：跟 chip 同一個長相，但它是入口不是篩選，所以多一點上下距。 */
+.mp-links{margin:-6px 0 18px}

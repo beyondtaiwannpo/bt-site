@@ -62,7 +62,7 @@ export function newFormHTML(draft, teams, myTeam, busy) {
 }
 
 // 表單清單。newDraft 不是 null 就在清單上面展開內嵌表單；teams 與 myTeam 給那個表單用。
-export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, myTeam, busy) {
+export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, myTeam, busy, mpItems) {
   const row = f => {
     const st = statusOf(f.status);
     return `<li>
@@ -95,6 +95,7 @@ export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, my
   return pageHead(T("forms.title"), T("forms.lede"),
       canCreate && newDraft == null ? [{ act: "new-form", label: T("forms.new"), primary: true }] : [])
     + msgHTML(msg)
+    + mpLinksHTML(mpItems)
     + (canCreate && newDraft != null ? newFormHTML(newDraft, teams, myTeam, busy) : "")
     + (canCreate ? "" : `<div class="note">${T("forms.readonly")}</div>`)
     + (forms.length ? rows : sectionHTML("",
@@ -561,6 +562,57 @@ export function afterRender(S, root) {
   } else S.toasted = "";
   if (S.ask) mountAsk(root, S.ask);
   if (S.view !== S.lastView) { if (S.lastView !== undefined && typeof window !== "undefined") window.scrollTo(0, 0); S.lastView = S.view; }
+}
+// ── 成員分頁（2026-10-23，第三次重整批 3）────────────────────────────
+// 對一個工作區是「管」的人（Director）在那個東西自己的頁面上（Forms、Resources、兩本護照後台）看到誰在裡面、加人、改等級、移出，
+// 不用進 /admin/people/。讀 workspace_members()（where 裡有 can_manage）、寫 assign() / unassign()（第一句 can_manage），
+// 沒有新的資料庫函式。找人的清單從 profiles 讀（幹部本來就讀得到所有幹部的名字），不讀 email。四份一模一樣（測試逐字比對）。
+// mp = { ws, name, rows: workspace_members 回的, cadres: [{ id, name_zh, name_en, board_role }], meId, q, level }
+export function mpName(r) {
+  const zh = String(r && r.name_zh || "").trim(), en = String(r && r.name_en || "").trim();
+  return zh ? (en ? `${zh} (${en})` : zh) : (en || T("common.noName"));
+}
+export function mpFind(people, q) {
+  const s = String(q || "").trim().toLowerCase();
+  if (!s) return null;
+  const list = people || [];
+  return list.find(p => mpName(p).toLowerCase() === s)
+    || list.find(p => String(p.name_zh || "").toLowerCase() === s || String(p.name_en || "").toLowerCase() === s)
+    || null;
+}
+// 這一頁該列哪幾個「誰在做…」的入口：senior 看所有這一類的工作區，其他人只有自己是「管」的那幾個。
+// workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
+export function mpItems(me, prefix, workspaces) {
+  const title = w => (lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || w.id;
+  const all = (workspaces || []).filter(w => w.active !== false && (w.id === prefix || w.id.startsWith(prefix)));
+  return all.filter(w => senior(me) || ((me && me.ws) || {})[w.id] === "manage").map(w => ({ ws: w.id, name: title(w) }));
+}
+export function mpLinksHTML(items) {
+  if (!items || !items.length) return "";
+  return `<div class="chips mp-links">${items.map(i => `<button class="chip" data-act="members-open" data-ws="${esc(i.ws)}" data-name="${esc(i.name)}">${esc(T("mp.open", { name: i.name }))}</button>`).join("")}</div>`;
+}
+export function membersPanelHTML(mp, msg, busy) {
+  const dis = busy ? " disabled" : "";
+  const LV = ["view", "edit", "manage"];
+  const lv = l => T("level." + l);
+  const rows = mp.rows || [];
+  const inWs = new Set(rows.map(r => r.user_id));
+  const row = r => `<tr><td class="t-main"><b>${esc(mpName(r))}</b> <span class="tag">${esc(boardName(r.board_role))}</span>${r.user_id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
+    <td><select data-act="members-level" data-id="${esc(r.user_id)}" aria-label="${esc(T("mp.level"))}"${dis}>${LV.map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></td>
+    <td class="t-act"><button class="btn quiet sm" data-act="members-unassign" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></td></tr>`;
+  return pageHead(T("mp.title", { name: esc(mp.name || mp.ws) }), T("mp.lede"), [], { act: "members-back", label: T("mp.back") })
+    + msgHTML(msg)
+    + `<div class="note">${T("mp.levels")}</div>`
+    + sectionHTML(T("mp.list"), rows.length
+        ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${rows.map(row).join("")}</tbody></table>`
+        : emptyHTML(T("mp.nobody"), T("mp.nobodyHint")))
+    + sectionHTML(T("mp.add"), `<div class="two">
+        <label><i>${T("mp.who")}</i><input id="mp-q" list="mp-people" value="${esc(mp.q || "")}" placeholder="${esc(T("mp.whoPh"))}" autocomplete="off"${dis}>
+          <datalist id="mp-people">${(mp.cadres || []).filter(p => !inWs.has(p.id)).map(p => `<option value="${esc(mpName(p))}">`).join("")}</datalist></label>
+        <label><i>${T("mp.level")}</i><select id="mp-level"${dis}>${LV.map(l => `<option value="${l}"${(mp.level || "view") === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></label>
+      </div>
+      <div class="row"><button class="btn" data-act="members-assign" data-ws="${esc(mp.ws)}"${dis}>${busy ? T("common.saving") : T("mp.addGo")}</button></div>
+      <div class="mini">${T("mp.addNote")}</div>`);
 }
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {

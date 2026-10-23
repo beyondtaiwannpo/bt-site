@@ -276,6 +276,40 @@ export async function sendNotice(formId, statuses, subject, body) {
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
 // 「mail_not_configured」對他來說跟一段亂碼沒有兩樣，
 // 而他需要知道的是「去哪裡做什麼」，不是那個代碼長什麼樣。
+
+// ── 成員分頁（2026-10-23，第三次重整批 3）：讀誰在工作區裡、找人的名單、派與移出。門都在資料庫那三支函式裡。 ──
+export async function loadWorkspaces() {
+  need();
+  const { data, error } = await supabase.from("workspaces").select("id, kind, team, title_zh, title_en, owner, active").order("id");
+  if (error) throw error;
+  return data || [];
+}
+export async function loadMembers(ws) {
+  need();
+  const { data, error } = await supabase.rpc("workspace_members", { p_ws: ws });
+  if (error) throw error;
+  return data || [];
+}
+// 找人用：幹部的名字與職級。幹部本來就讀得到所有幹部的這幾欄（profiles_read），**不讀 email**。
+export async function loadCadres() {
+  need();
+  const { data, error } = await supabase.from("profiles").select("id, name_zh, name_en, board_role").eq("role", "cadre").order("name_en");
+  if (error) throw error;
+  return data || [];
+}
+export async function assign(id, ws, level) {
+  need();
+  const { data, error } = await supabase.rpc("assign", { p_target: id, p_ws: ws, p_level: level });
+  if (error) throw error;
+  return data;
+}
+export async function unassign(id, ws) {
+  need();
+  const { data, error } = await supabase.rpc("unassign", { p_target: id, p_ws: ws });
+  if (error) throw error;
+  return data;
+}
+
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
