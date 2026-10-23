@@ -33,12 +33,11 @@ let S = {
 };
 
 const root = () => document.getElementById("bt-root");
-const isPres = () => !!S.me && S.me.board === "president";
-// Internship team 的幹部與 Co-President（跟資料庫的 is_internship_team() 同一條規則）。
-// team 可能是逗號字串（一個人在好幾個 team），所以用 includes。
-// **這只是畫面。真正的門在資料庫那五支函式的第一句。**
-const internStaff = () => !!S.me && S.me.role === "cadre" &&
-  (S.me.board === "president" || String(S.me.team || "").includes("Internship Team"));
+// 2026-10-24 起看指派（my_access()）：幹部護照那幾個分頁給被派進 passport 工作區的人，
+// 實習護照給被派進 intern-passport 的人；Co-President 與 Senior Adviser 兩邊都有。
+// **這只是畫面。真正的門在資料庫那幾支函式的第一句（require_ws_edit / require_internship_team）。**
+const isPres = () => !!UI.wsLevel(S.me, "passport");
+const internStaff = () => !!S.me && S.me.role === "cadre" && !!UI.wsLevel(S.me, "intern-passport");
 
 function render() {
   const el = root();
@@ -48,7 +47,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML()); return; }
   if (!S.user) { location.replace("../../app/?next=admin-passports"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
-  if (!internStaff()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); return; }
+  if (!internStaff() && !isPres()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); return; }
 
   let body;
   if (S.view === "board") {
@@ -85,7 +84,7 @@ async function boot() {
     S.user = who.user;
     if (!S.user) { render(); return; }
     S.me = await D.loadMe(S.user.id);
-    if (!S.me || S.me.role !== "cadre" || !internStaff()) { render(); return; }
+    if (!S.me || S.me.role !== "cadre" || (!internStaff() && !isPres())) { render(); return; }
     // ?tab=cadre 直接開幹部護照（README 的連結用得到）。不是 Co-President 的回到實習護照。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     if (want === "cadre" && isPres()) await openCadre();

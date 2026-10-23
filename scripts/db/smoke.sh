@@ -1077,5 +1077,37 @@ chkraise "門回來了：Senior Adviser 又刪不了人" "not_president" \
   "perform set_config('test.uid','${OTHER}',true); perform public.remove_member((select id from public.people where profile_id='${DIR}'));"
 
 echo
+echo "拿掉搬走的東西（2026-10-25）："
+# 批 3：drop public_title 與 privileged_teams。先確認 public_title 的值真的在職位裡，再 drop。
+psql -d "${DB}" -q -c "update public.profiles set public_title='Treasurer 2026-27' where id='${ISTAFF}';" >/dev/null
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-24-ranks-and-workspaces.sql 2>&1 || true)
+chk "搬值：後來才填的 public_title 不會蓋掉已經有的職位（搬過就不再搬）" "Associate,CurriculumTeam" \
+  "select title_en from public.positions po join public.people pe on pe.id=po.person_id where pe.profile_id='${ISTAFF}' and term_id='2027-28'"
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-25-drop-public-title.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   drop 那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL drop 那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -6; fail=$((fail+1))
+fi
+chk "★ public_title 與 privileged_teams 真的不在了" "0|0" \
+  "select (select count(*) from information_schema.columns where table_name='profiles' and column_name='public_title')||'|'||(select count(*) from pg_tables where tablename='privileged_teams')"
+chkrole anon "" "團隊頁還是讀得到（頭銜從職位來，不靠那一欄）" "1" "select count(*) from public.public_team()"
+chkrole authenticated "${MEMBER}" "設定頁：變校友的人改 team 標籤照常存得了（沒有 trigger 了）" "MarketingTeam" \
+  "update public.profiles set team='Marketing Team' where id='${MEMBER}'; select team from public.profiles where id='${MEMBER}'"
+# ⚠ drop 之後重跑 10-24 一定要還跑得過（舊遷移檔被重跑之後就得重跑它），它讀 public_title 那幾句是動態 SQL。
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-24-ranks-and-workspaces.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   ★ public_title 不在了之後，10-24 那支重跑還是全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL ★ public_title 不在了之後 10-24 重跑壞掉："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -6; fail=$((fail+1))
+fi
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-25-drop-public-title.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then
+  echo "  ok   drop 那支可以重跑"; pass=$((pass+1))
+else
+  echo "  FAIL drop 那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

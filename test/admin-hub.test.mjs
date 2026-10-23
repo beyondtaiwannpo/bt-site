@@ -19,7 +19,9 @@ for (const [, M] of IMPL) M.setLang("zh");
 const ME = {
   member:   { role: "cadre",   board: "member",    team: "Curriculum Team" },
   director: { role: "cadre",   board: "director",  team: "Marketing Team" },
-  istaff:   { role: "cadre",   board: "member",    team: "Marketing Team, Internship Team" },
+  istaff:   { role: "cadre",   board: "member",    team: "Marketing Team, Internship Team", ws: { "intern-passport": "edit" } },
+  senior:   { role: "cadre",   board: "senior_adviser", team: "" },
+  pdir:     { role: "cadre",   board: "director",  team: "Curriculum Team", ws: { "apps:Curriculum Team": "manage", "passport": "edit" } },
   pres:     { role: "cadre",   board: "president", team: "" },
   student:  { role: "student", board: "president", team: "Internship Team" },
   intern:   { role: "intern",  board: "member",    team: "Internship Team" },
@@ -38,6 +40,8 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
     member:   { forms: true, site: true, passports: false, people: false },
     director: { forms: true, site: true, passports: false, people: false },
     istaff:   { forms: true, site: true, passports: true,  people: false },
+    senior:   { forms: true, site: true, passports: true,  people: true },
+    pdir:     { forms: true, site: true, passports: true,  people: false },
     pres:     { forms: true, site: true, passports: true,  people: true },
     // 學員與 intern 什麼都進不去，就算 board_role 或 team 被誤設也一樣。
     student:  { forms: false, site: false, passports: false, people: false },
@@ -58,7 +62,7 @@ test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什�
     assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page">資源/, label);
     assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms">申請表/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
     assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home">首頁/, label);
-    assert.match(rail, /class="rail-group off">護照<span class="why">只有 Internship team/, label);
+    assert.match(rail, /class="rail-group off">護照<span class="why">只有被派進護照工作區/, label);
     assert.match(rail, /class="rail-group off">人與權限<span class="why">只有 Co-President/, label);
     assert.doesNotMatch(rail, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
     assert.doesNotMatch(rail, /data-t="team"/, `${label}：一般幹部看不到團隊頁那一行`);
@@ -349,7 +353,7 @@ function allEn(label, M, screens) {
     }
   } finally { M.setLang("zh"); }
 }
-const EN_ME = { role: "cadre", board: "president", team: "Marketing Team, Internship Team", name: "Paul" };
+const EN_ME = { role: "cadre", board: "president", team: "Marketing Team, Internship Team", name: "Paul", senior: true, pres: true, ws: {} };
 
 test("★ admin/ 每一個畫面用英文畫出來不剩中文", () => {
   const form = { id: "f1", title: "Camp", team: "Curriculum Team", status: "open", kind: "board", intro: "", lang: "en", counts: { total: 2, received: 1 } };
@@ -378,7 +382,7 @@ test("★ admin/ 每一個畫面用英文畫出來不剩中文", () => {
 });
 
 test("★ admin/site 每一個畫面用英文畫出來不剩中文", () => {
-  const people = [{ id: "1", name_zh: "", name_en: "Ming", team: "Curriculum Team", public_title: "Director", avatar: "x", public_approved: true }, { id: "2", name_en: "Amy", team: "", public_approved: false }];
+  const people = [{ id: "1", name_zh: "", name_en: "Ming", team: "Curriculum Team", title: "Director · 2026-27", avatar: "x", public_approved: true }, { id: "2", name_en: "Amy", team: "", public_approved: false }];
   const stories = [{ id: "s1", name: "Amy", school: "X High", county: "", country: "US", city: "NYC", place: "NYU", quote: "q", note: "n", story_approved: false, updated_at: "2026-10-01" },
                    { id: "s2", name: "Bo", school: "Y", county: "Taipei", country: "UK", city: "", place: "", quote: "", note: "", story_approved: true, approved_at: "2026-10-02" }];
   const res = [{ id: "r1", title: "Guide", blurb: "", kind: "pdf", url: "https://x.io", team: "Marketing Team", status: "published", ord: 1 }, { id: "r2", title: "Vid", blurb: "b", kind: "zzz", url: "https://y.io", status: "draft", ord: 2 }];

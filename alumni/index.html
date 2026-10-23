@@ -963,6 +963,9 @@ summary{cursor:pointer}
       var html =
         '<div class="who">' + face +
           '<p class="meta"><b>' + esc(p.name) + '</b>' +
+          /* 2026-10-24：最後一屆在 BT 的職位（public_alumni() 多回的 title，例如 Director, Curriculum Team · 2025-26）。
+             示範資料與平台之前沒補過職位的校友沒有這一欄，就不印。 */
+          (p.title ? '<span>' + esc(p.title) + '</span>' : '') +
           '<span>' + esc(txt(p, "school")) + ' → ' + esc(txt(p, "country")) + ' ' + esc(p.city) +
             comma() + esc(p.place) + '</span></p>' +
         '</div>' +

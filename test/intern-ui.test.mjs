@@ -182,12 +182,14 @@ test("後台發碼多了實習生碼，清單上的標籤也認得", () => {
   assert.doesNotMatch(list, /現在是/);
 });
 
-test("★ 設定頁：誰看得到實習生進度牆的入口，跟資料庫的 is_internship_team() 同一條規則", () => {
-  assert.equal(internshipStaff({ role: "cadre", team: "Curriculum Team, Internship Team", board_role: "member" }), true);
+test("★ 設定頁：誰看得到實習生進度牆的入口，跟資料庫的 is_internship_team() 同一條規則（2026-10-24 起看指派）", () => {
+  assert.equal(internshipStaff({ role: "cadre", team: "Curriculum Team, Internship Team", board_role: "member" }), false, "只勾了標籤沒有指派，看不到");
+  assert.equal(internshipStaff({ role: "cadre", team: "", board_role: "member", ws: { "intern-passport": "view" } }), true);
   assert.equal(internshipStaff({ role: "cadre", team: "Marketing Team", board_role: "president" }), true);
+  assert.equal(internshipStaff({ role: "cadre", team: "Marketing Team", board_role: "senior_adviser" }), true);
   assert.equal(internshipStaff({ role: "cadre", team: "Marketing Team", board_role: "member" }), false);
-  assert.equal(internshipStaff({ role: "student", team: "Internship Team", board_role: "member" }), false,
-    "team 填了 Internship Team 的學員不能因此看到進度牆");
+  assert.equal(internshipStaff({ role: "student", team: "Internship Team", board_role: "member", ws: { "intern-passport": "edit" } }), false,
+    "學員不能因此看到進度牆");
   assert.equal(internshipStaff({ role: "intern", team: null, board_role: "member" }), false);
 });
 

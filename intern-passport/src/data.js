@@ -80,10 +80,16 @@ export async function loadAll() {
   (en.data || []).forEach(r => { entries[r.task_id] = { note: r.note, photo: r.photo }; });
 
   const me = pf.data || {};
-  // staff：Internship team 的幹部或 Co-President。這裡算的只是「畫哪個畫面」，
-  // 真正決定他讀得到什麼的是資料庫的 is_internship_team()。
-  const staff = me.role === "cadre" &&
-    (me.board_role === "president" || String(me.team || "").includes("Internship Team"));
+  // staff：被派進 intern-passport 工作區的幹部，或 Co-President、Senior Adviser（2026-10-24 起看指派，
+  // 跟資料庫的 is_internship_team() 同一條規則）。這裡算的只是「畫哪個畫面」，
+  // 真正決定他讀得到什麼的是 RLS。my_access() 叫不到（遷移檔還沒跑）就當成沒有指派。
+  let staff = me.role === "cadre" && (me.board_role === "president" || me.board_role === "senior_adviser");
+  if (me.role === "cadre" && !staff) {
+    try {
+      const { data: a } = await supabase.rpc("my_access");
+      staff = !!(a && Array.isArray(a.workspaces) && a.workspaces.some(w => w.id === "intern-passport"));
+    } catch (e) { /* 沒有指派 */ }
+  }
   return {
     role: me.role ?? null,
     staff,

@@ -1553,8 +1553,9 @@ newsletter_opt_in_at、board_role）、四支函式，**沒有改任何一條既
 這個按鈕不是加分項。2026-09-07 Paul 決定申請資料不設保存期限，
 **那個決定的對價就是當事人隨時拿得回控制權**，寫在隱私政策裡叫人來信不算數。
 
-幹部走不到這一條（函式裡擋著）：護照有蓋章紀錄與別人看得到的進度，
-幹部要離開是換屆交接的事，不是一個按鈕。
+幹部走不到這一條（函式裡擋著）：護照有蓋章紀錄與別人看得到的進度，幹部要離開不該是他自己按一下。
+2026-10-24 起幹部的離開有兩條路，都在後台由 Co-President 做：換屆時「結束這一屆」（他變成校友，資料留著），
+或「刪除成員」（登入與護照整個刪掉，名單上的紀錄留著標成沒有帳號）。見「人與權限的後台：職級與指派」。
 
 ## 全站的點擊回饋（2026-09-08）
 
@@ -3437,7 +3438,58 @@ team 裡有 Internship Team 的人拿 `intern-passport` 一筆「改」（Direct
 
 - 後台側欄還是看 `board_role` 加 `team` 字串藏「護照」那一組，所以**被派進實習護照但 team 標籤沒勾 Internship Team 的人，側欄看不到那一組**；反過來 team 勾了但沒指派的人側欄看得到、按下去被資料庫擋。都不是洞，只是畫面還沒跟上（批 3 改成問 `my_access()`）。
 - `/settings/` 對 Director 的 team 還是唯讀（畫面），資料庫已經放行。
-- 「管理者怎麼處理帳號問題」那一節寫的「幹部要離開不是一個按鈕」已經不對了，批 4 改寫。
+- 「管理者怎麼處理帳號問題」那一節的「我要離開 BT」已經照新模型改寫（批 3）。
+
+## 整站改看指派（2026-10-24，批 3）
+
+批 1 的資料庫、批 2 的人與權限頁之後，這一批把**其他每一個還看 `team` 字串或 `board_role` 的畫面**換成看指派，
+並把搬走的欄位真的拿掉。
+
+### 誰看得到哪一組（側欄與每一頁的第一句）
+
+四個後台資料夾的 `loadMe()` 多叫一次 `my_access()`，拿到 `me.ws`（`{ "apps:Curriculum Team": "manage", … }`）；
+側欄的 `ITEMS` 的 `who` 從「president / intern-staff」改成四種：`cadre`、`president`、`senior`（Co-President 加 Senior Adviser）、
+`ws:<工作區>`（被派進那個工作區，任何等級；`ws:a|b` 是其中任何一個）。護照那一組是 `ws:passport|intern-passport`，
+幹部護照與城市兩個分頁 `ws:passport`，實習護照與棋盤 `ws:intern-passport`；對外那組的團隊頁、校友頁、信件文案是 `senior`。
+`my_access()` 叫不到（遷移檔還沒跑）就當成沒有指派：側欄少幾行，但 Co-President 與 Senior Adviser 靠職級照樣全部看得到。
+
+跟著換的還有：後台首頁「今天要處理的事」裡 intern 那張卡（被派進實習護照的人才有）、申請與資源的「新增」按鈕
+（對任何一個 `apps:` 或 `res:` 工作區是改或管的人才有，新表單預設 team 是你能改的第一個）、
+`/admin/passports/` 開頁的門（被派進兩本護照任何一本的人進得來，各分頁再看自己那一本）、
+`/intern-passport/` 的進度牆（被派進 intern-passport 的幹部）、`/settings/` 的「實習生的進度牆」那顆按鈕。
+**每一處都只是畫面。** 資料庫那一側 10-24 已經換成 `can_view / can_edit`，畫面沒跟上也只是看得到按不動。
+
+### `/settings/`
+
+- team 回到每個人自己勾，每一格都開著，底下一句「只是標籤」。10-21 的鎖與「要 Co-President 加」都拿掉了。
+- 「對外顯示的頭銜（選填）」那一格拿掉。勾了公開之後改成一行唯讀：「團隊頁上會印：Director, Curriculum Team · 2026-27。要改請找 Co-President」，
+  值從 `positions`（RLS 只給自己那幾列）加 current 那一屆算。這一屆沒有職位就寫「團隊頁上不會出現，請 Co-President 到幹部名單填」。
+- 存檔不再送 `public_title`。
+
+### `/team/` 與 `/alumni/`
+
+- `/team/` 改叫 `public_team()`：只回兩把鑰匙都轉、而且這一屆有職位的人，頭銜是 `title_en · 屆別`，分組用職位上的 team。換屆之後沒留下的人自動消失。
+- `/alumni/` 卡片的名字底下多一行最後一屆的職位（`public_alumni()` 的 `title`），示範資料與沒補過職位的老校友沒有這一行。
+- `/admin/site/` 的團隊頁核可清單也改成印職位（讀 `people` 加 `positions`，載不到就沒有頭銜，不擋核可）。
+
+### 上線前要跑新的遷移檔
+
+`supabase/migrations/2026-10-25-drop-public-title.sql`，接在 `2026-10-24-ranks-and-workspaces.sql` 後面跑，**而且要等這一批的前端上線之後**
+（前端已經不讀 `public_title`、不讀 `privileged_teams`）。做三件事：drop `profiles.public_title`、drop `privileged_teams`、再確認 team 的 trigger 不在。5 項 PASS。
+10-24 那支改成用動態 SQL 讀 `public_title`，所以這一欄不在了它還是跑得過（smoke 有一條專門驗這件事）。
+跑完這一支之後再重跑 `2026-10-21-people-admin.sql` 會把 `privileged_teams` 與 trigger 建回來，那時 10-24 與 10-25 都要再跑一次。
+
+本機 `./scripts/db/smoke.sh` 341 項全過。
+
+### 檔案
+
+`admin/{src,site/src,passports/src,people/src}/{data,ui}.js`（`loadMe` 加 `ws`、`allowed()` 看 `ws:`、`wsLevel / canEditWs / canEditAny` 三個小函式）、
+`admin/src/main.js`、`admin/site/src/main.js`、`admin/passports/src/main.js`、`admin/src/data.js`（`loadTodo`）、`admin/site/src/data.js`（核可清單的頭銜）、
+`settings/src/{ui,main,strings}.js`、`team/src/{main,ui}.js`、`alumni/index.html`（一行）、`intern-passport/src/data.js`、
+四份 `strings.js` 的 `why.passports` 與 passports 的 `noAccess` 兩句。測試改 `admin-hub`、`people-admin`、`public-team`、`intern-admin`、`intern-ui`、`lang` 六支。
+截圖 `docs/admin-redesign/perm/17`、`18`、`m6`。
+
+**沒驗的**：真的登入後的畫面。Paul 本機登入後看三處：`/settings/` 的 team 勾選與那一行頭銜、`/team/`、`/admin/passports/` 用一位被派進實習護照但沒勾 Internship Team 標籤的幹部。
 
 ## 人與權限的後台：職級與指派（2026-10-24，批 2）
 
@@ -4215,8 +4267,11 @@ Authentication → Users → 改 email。
 1. **先請他自己匯出。** 護照資料頁 → 「匯出備份」→ 下載 JSON 檔。
    **等他回報「檔案拿到了」再往下做。** 不要你幫他匯出，也不要跳過這步
 2. 他說不需要備份的話，跟他確認一次：「刪掉之後這一年的章和心得都回不來，確定嗎？」
-3. 確認之後：Authentication → Users → 該列 `⋯` → Delete user
+3. 確認之後，**2026-10-24 起不用進 Supabase**：後台，人與權限，幹部名單，按他那一列的「改」，最底下「刪除成員」，
+   第二步會列出會一起刪掉的東西，把他的名字打一次才送得出去。名單上那一筆留著標成「沒有帳號」，歷屆人數還算得到他。
+   （Supabase 那條路還在：Authentication → Users → 該列 `⋯` → Delete user，但後台那條會記進變動紀錄，Supabase 那條不會。）
 4. 刪完不要再問「要不要復原」—— 沒有復原這個選項
+5. 他只是這一屆結束不做了、不是要刪資料的話，**不要刪**：換屆時在屆別那一頁「結束這一屆」不勾他，他變成校友，資料都還在。
 
 **「我的章不見了」**
 

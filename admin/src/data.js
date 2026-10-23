@@ -20,7 +20,21 @@ export async function loadMe(userId) {
     board: data.board_role || "member",
     team: data.team || "",
     name: data.name_zh || data.name_en || "",
+    senior: data.board_role === "president" || data.board_role === "senior_adviser",
+    pres: data.board_role === "president",
+    ws: await loadMyWorkspaces(),
   };
+}
+// 我被派進哪幾個工作區（2026-10-24，my_access()）：{ "apps:Curriculum Team": "manage", … }。
+// 這只決定側欄藏不藏、按鈕畫不畫；真正的門在資料庫。叫不到（遷移檔還沒跑）就當成空的，
+// 側欄會少幾行，但 Co-President 與 Senior Adviser 靠職級照樣全部看得到。
+async function loadMyWorkspaces() {
+  const ws = {};
+  try {
+    const { data } = await supabase.rpc("my_access");
+    if (data && Array.isArray(data.workspaces)) for (const w of data.workspaces) ws[w.id] = w.level;
+  } catch (e) { /* 空的 */ }
+  return ws;
 }
 
 // 表單清單加每一份收到幾件。
@@ -214,8 +228,9 @@ export async function loadPendingAll() {
 // 每一項各自接住：載不到是 null，不是 0。0 跟載不到是兩回事，首頁要分開畫。
 export async function loadTodo(me) {
   need();
-  const pres = !!me && me.board === "president";
-  const istaff = pres || String(me && me.team || "").includes("Internship Team");
+  // 2026-10-24：pres 這裡的意思是 senior（Co-President 或 Senior Adviser）；istaff 是被派進實習護照工作區的人。
+  const pres = !!me && !!me.senior;
+  const istaff = pres || !!((me && me.ws) || {})["intern-passport"];
   const q = {
     // 所有幹部讀得到：資源（算每個 team 有幾條）、幹部名單（找每個 team 的 Director；進度牆本來就看得到名字）。
     resources: supabase.from("resources").select("id, team, status"),

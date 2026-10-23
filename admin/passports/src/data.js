@@ -21,7 +21,21 @@ export async function loadMe(userId) {
     board: data.board_role || "member",
     team: data.team || "",
     name: data.name_zh || data.name_en || "",
+    senior: data.board_role === "president" || data.board_role === "senior_adviser",
+    pres: data.board_role === "president",
+    ws: await loadMyWorkspaces(),
   };
+}
+// 我被派進哪幾個工作區（2026-10-24，my_access()）：{ "apps:Curriculum Team": "manage", … }。
+// 這只決定側欄藏不藏、按鈕畫不畫；真正的門在資料庫。叫不到（遷移檔還沒跑）就當成空的，
+// 側欄會少幾行，但 Co-President 與 Senior Adviser 靠職級照樣全部看得到。
+async function loadMyWorkspaces() {
+  const ws = {};
+  try {
+    const { data } = await supabase.rpc("my_access");
+    if (data && Array.isArray(data.workspaces)) for (const w of data.workspaces) ws[w.id] = w.level;
+  } catch (e) { /* 空的 */ }
+  return ws;
 }
 
 // ── 實習護照的後台（2026-10-18）────────────────────────────────────────

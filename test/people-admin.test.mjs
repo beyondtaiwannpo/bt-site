@@ -9,7 +9,7 @@ import { tabsHTML, rosterHTML, changesHTML, personEditHTML, personNewHTML, works
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
 import { says } from "../admin/people/src/data.js";
-import { teamPickHTML, teamLocked, saveFailMessage, TEAMS as SETTINGS_TEAMS, setLang as settingsLang } from "../settings/src/ui.js";
+import { teamPickHTML, TEAMS as SETTINGS_TEAMS, setLang as settingsLang } from "../settings/src/ui.js";
 settingsLang("zh");
 
 const ME = "11111111-1111-1111-1111-111111111111";
@@ -241,38 +241,21 @@ test("★ 錯誤碼翻成人話，指到對的遷移檔", () => {
 });
 
 // ── 設定頁那一側 ─────────────────────────────────────────────────────
-test("★ Director 與 Co-President 的 team 在設定頁是唯讀的，一般幹部不是", () => {
-  assert.equal(teamLocked({ role: "cadre", board_role: "director" }), true);
-  assert.equal(teamLocked({ role: "cadre", board_role: "president" }), true);
-  assert.equal(teamLocked({ role: "cadre", board_role: "member" }), false);
-  assert.equal(teamLocked({ role: "student", board_role: "president" }), false, "學員沒有 team 那一塊，鎖不鎖無所謂，但不該算成鎖");
-  const locked = teamPickHTML("Curriculum Team", true, ["Internship Team"]);
-  assert.doesNotMatch(locked, /<input/);
-  assert.match(locked, /Curriculum Team/);
-  assert.match(locked, /由 Co-President 在後台改/);
-});
-
-test("★ 一般幹部：會長出權限的 team 沒勾的那一格關掉，本來就在裡面的照樣勾著", () => {
-  const h = teamPickHTML("Marketing Team", false, ["Internship Team"]);
-  assert.match(h, /value="Internship Team" disabled/);
-  assert.match(h, /Internship（要 Co-President 加）/);
+// 2026-10-24 起 team 只是標籤：沒有鎖、沒有「要 Co-President 加」的格子，每個人自己勾。
+test("★ 設定頁的 team 勾選：每一格都開著、本來就有的照樣勾著、清單外的值原樣留著", () => {
+  const h = teamPickHTML("Marketing Team, Odd Team");
+  assert.doesNotMatch(h, /disabled/);
+  assert.match(h, /value="Internship Team"/);
   assert.match(h, /value="Marketing Team" checked/);
-  assert.doesNotMatch(h, /value="Marketing Team" checked disabled/);
-  const already = teamPickHTML("Internship Team", false, ["Internship Team"]);
-  assert.match(already, /value="Internship Team" checked/);
-  assert.doesNotMatch(already, /value="Internship Team" checked disabled/, "本來就在裡面的要退得出來");
-  // 沒傳 privileged 的舊呼叫端照樣能用。
-  assert.doesNotMatch(teamPickHTML("Marketing Team"), /disabled/);
+  assert.match(h, /value="Odd Team" checked/);
+  assert.match(h, /只是標籤/);
+  assert.match(h, /工作區/);
 });
 
-test("設定頁把 trigger 的兩個代碼翻成人話", () => {
-  assert.match(saveFailMessage(false, new Error("team_locked")), /Co-President/);
-  assert.doesNotMatch(saveFailMessage(false, new Error("team_needs_president")), /team_needs_president/);
-});
-
-test("★ 設定頁存檔：team 鎖住時送原值，不送 null", () => {
+test("★ 設定頁存檔：team 一律送勾的那幾格，不再送 public_title", () => {
   const src = readFileSync("settings/src/main.js", "utf8");
-  assert.match(src, /team: UI\.teamLocked\(S\.me\) \? \(S\.me\.team \|\| null\) : \(pickedTeams\(\) \|\| null\)/);
+  assert.match(src, /team: pickedTeams\(\) \|\| null/);
+  assert.doesNotMatch(src.replace(/\/\/[^\n]*/g, ""), /public_title/);
 });
 
 test("★ people 的 TEAMS 跟設定頁那一份逐字一樣", () => {

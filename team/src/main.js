@@ -12,15 +12,11 @@ const MOUNTS = [["faces-zh", "zh"], ["faces-en", "en"]];
 
 (async () => {
   try {
-    // **只讀 anon 讀得到的那幾欄。** 資料庫的欄位授權只發了這幾欄給沒登入的人
-    // （見 supabase/migrations/2026-09-13-public-team.sql），
-    // 多要一欄整句會被拒，而那個拒絕會讓整段消失 —— 對使用者來說看不出差別，
-    // 對維護的人來說是一個很難找的 bug。
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, name_zh, name_en, team, avatar, public_title")
-      .eq("public_profile", true)
-      .eq("public_approved", true);
+    // 2026-10-24 起走 public_team()（2026-10-24-ranks-and-workspaces.sql）：
+    // 只回「本人同意、Co-President 核可、而且這一屆有職位」的幹部，頭銜從職位算（title_en · term），
+    // 分組用職位上的 team（空的退回 profiles.team 第一個）。換屆之後沒留下的人自動消失。
+    // 它是 security definer，沒登入也叫得動；不再直接讀 profiles 那幾欄。
+    const { data, error } = await supabase.rpc("public_team");
     if (error) throw error;
     // ⚠ **排序要是固定的，而且要看得懂為什麼。**
     // 拍照那天的姿勢是照這個順序配的（往右看的人，右邊那個比「噠噠」），

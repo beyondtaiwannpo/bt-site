@@ -41,7 +41,7 @@ export const COMMON = {
   "board.director":   { zh: "Director", en: "Director" },
   "board.president":  { zh: "Co-President", en: "Co-President" },
   "why.president":    { zh: "只有 Co-President 進得去", en: "Co-Presidents only" },
-  "why.internStaff":  { zh: "只有 Internship team 的幹部與 Co-President 進得去", en: "Internship team and Co-Presidents only" },
+  "why.passports":    { zh: "只有被派進護照工作區的人、Co-President 與 Senior Adviser 進得去", en: "Only people assigned to a passport workspace, Co-Presidents and Senior Advisers" },
   "board.senior":     { zh: "Senior Adviser", en: "Senior Adviser" },
   "why.senior":       { zh: "只有 Co-President 與 Senior Adviser 進得去", en: "Co-Presidents and Senior Advisers only" },
   // 走錯地方、連不上

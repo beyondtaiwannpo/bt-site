@@ -88,7 +88,7 @@ function allEn(label, M, screens) {
 }
 
 test("★ /settings/ 每一個畫面用英文畫出來不剩中文", () => {
-  const cadre = { role: "cadre", board_role: "member", email: "a@x.io", name_zh: "", name_en: "Paul", team: "Marketing Team, Odd Team", avatar: "", public_profile: true, public_approved: false, public_title: "", privileged_teams: ["Internship Team"] };
+  const cadre = { role: "cadre", board_role: "member", email: "a@x.io", name_zh: "", name_en: "Paul", team: "Marketing Team, Odd Team", avatar: "", public_profile: true, public_approved: false, title: "", ws: {} };
   const story = { display_name: "", school: "X High", county: "", city: "NYC", country: "US", place: "NYU", quote: "q", note: "n", public_story: true, story_approved: false };
   allEn("settings", SETTINGS, {
     cadre: () => SETTINGS.settingsHTML(cadre, "", false, story),

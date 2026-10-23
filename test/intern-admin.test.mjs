@@ -30,14 +30,18 @@ test("實習護照那一頁的側欄亮在「實習護照」", () => {
 
 // 2026-10-15 後台拆資料夾：「護照」那一組的門在分組列（灰字）與 main.js 開頁第一句，
 // 真正的門在資料庫那五支函式的第一句 is_internship_team()。
-test("「護照」那一組：Internship team 的幹部進得去，別的 team 進不去，Co-President 一律進得去", () => {
+// 2026-10-24 起看指派（my_access() 回的 me.ws）：勾了 Internship Team 的標籤不算，要被派進 intern-passport 或 passport 工作區。
+test("「護照」那一組：被派進護照工作區的幹部進得去，只勾 team 標籤的進不去，Co-President 與 Senior Adviser 一律進得去", () => {
   const g = GROUPS.find(x => x.key === "passports");
   assert.equal(canEnter(g, { role: "cadre", board: "member", team: "Curriculum Team" }), false);
   assert.equal(canEnter(g, { role: "cadre", board: "president", team: "" }), true);
-  assert.equal(canEnter(g, { role: "cadre", board: "member", team: "Marketing Team, Internship Team" }), true, "一個人在好幾個 team 也要認得出來");
-  assert.equal(canEnter(g, { role: "intern", board: "member", team: "Internship Team" }), false, "intern 不是幹部");
+  assert.equal(canEnter(g, { role: "cadre", board: "senior_adviser", team: "" }), true);
+  assert.equal(canEnter(g, { role: "cadre", board: "member", team: "Marketing Team, Internship Team" }), false, "只勾了標籤沒有指派，進不去");
+  assert.equal(canEnter(g, { role: "cadre", board: "member", team: "", ws: { "intern-passport": "view" } }), true, "被派進實習護照（看）就進得去");
+  assert.equal(canEnter(g, { role: "cadre", board: "director", team: "", ws: { passport: "edit" } }), true, "被派進幹部護照也進得去");
+  assert.equal(canEnter(g, { role: "intern", board: "member", team: "Internship Team", ws: { "intern-passport": "edit" } }), false, "intern 不是幹部");
   const h = noAccessHTML({ role: "cadre", board: "member", team: "Curriculum Team" });
-  assert.match(h, /Internship team/);
+  assert.match(h, /工作區/);
   assert.doesNotMatch(h, /data-act="intern-task-new"/);
 });
 

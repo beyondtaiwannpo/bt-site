@@ -1173,7 +1173,7 @@ grant execute on function public.public_alumni() to anon, authenticated;
 do $$
 declare
   v_pres uuid;
-  r record; t text; v_person uuid; v_owner uuid; v_title text; v_level text;
+  r record; t text; v_person uuid; v_owner uuid; v_title text; v_level text; v_has_pt boolean;
   teams text[] := array['Curriculum Team', 'Mentorship Team', 'Marketing Team',
                         'Sponsorship Team', 'Internship Team', 'Community Relations Team'];
 begin
@@ -1214,14 +1214,21 @@ begin
     on conflict (id) do nothing;
   end loop;
 
-  for r in select id, name_zh, name_en, team, board_role, public_title from profiles where role = 'cadre' loop
+  -- public_title 這一欄 2026-10-25 那支會 drop。這裡用動態 SQL 讀它，欄位不在就當成空的，
+  -- 所以這一支在 10-25 之後還是跑得過（重跑舊遷移檔之後要再跑它，見檔頭）。
+  v_has_pt := exists (select 1 from information_schema.columns
+                       where table_schema = 'public' and table_name = 'profiles' and column_name = 'public_title');
+  for r in select id, name_zh, name_en, team, board_role from profiles where role = 'cadre' loop
     -- 一列 people
     select id into v_person from people where profile_id = r.id;
     if v_person is null then
       insert into people (name_zh, name_en, profile_id) values (r.name_zh, r.name_en, r.id) returning id into v_person;
     end if;
     -- 這一屆的職位：public_title 原封不動；沒填的從職級加 team 算。
-    v_title := nullif(btrim(coalesce(r.public_title, '')), '');
+    v_title := null;
+    if v_has_pt then
+      execute 'select nullif(btrim(coalesce(public_title, '''')), '''') from public.profiles where id = $1' into v_title using r.id;
+    end if;
     if v_title is null then
       v_title := case r.board_role when 'president' then 'Co-President'
                                    when 'senior_adviser' then 'Senior Adviser'
@@ -1260,6 +1267,25 @@ begin
 end $$;
 
 commit;
+
+-- 驗收表第 15 項（public_title 逐字搬進職位）要讀 public_title，而那一欄 10-25 之後不在了，
+-- 靜態 SQL 會直接報錯。所以先用動態 SQL 算好放進暫存表，欄位不在就算 0（沒有東西可以對不上）。
+do $$
+declare n int := 0;
+begin
+  create temp table if not exists bt_title_check (n int);
+  delete from bt_title_check;
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'profiles' and column_name = 'public_title') then
+    execute $q$
+      select count(*) from public.profiles pr join public.people pe on pe.profile_id = pr.id
+        join public.positions po on po.person_id = pe.id join public.terms t on t.id = po.term_id and t.status = 'current'
+       where pr.role = 'cadre' and nullif(btrim(coalesce(pr.public_title, '')), '') is not null
+         and po.title_en is distinct from btrim(pr.public_title)
+    $q$ into n;
+  end if;
+  insert into bt_title_check values (n);
+end $$;
 
 -- ============================================================================
 -- 驗收：查 prosrc 的幾條先剝掉 SQL 註解再比對（理由見 2026-09-01-claim-invite.sql）。
@@ -1314,10 +1340,8 @@ select * from (
     select count(*) as n from public.positions po join public.terms t on t.id = po.term_id and t.status = 'current'
       join public.people pe on pe.id = po.person_id join public.profiles pr on pr.id = pe.profile_id where pr.role = 'cadre'
   ), title_ok as (
-    select count(*) as n from public.profiles pr join public.people pe on pe.profile_id = pr.id
-      join public.positions po on po.person_id = pe.id join public.terms t on t.id = po.term_id and t.status = 'current'
-     where pr.role = 'cadre' and nullif(btrim(coalesce(pr.public_title, '')), '') is not null
-       and po.title_en is distinct from btrim(pr.public_title)
+    -- 由上面那個 DO 區塊用動態 SQL 算好放在暫存表裡（public_title 被 10-25 drop 之後這裡不能直接寫那一欄）。
+    select n from pg_temp.bt_title_check
   ), dir_ok as (
     -- 每一位 director 對他 team 字串裡的每一個 team 都 can_edit（用指派表直接對，不靠 auth.uid()）
     select count(*) as n from public.profiles pr, unnest(string_to_array(coalesce(pr.team, ''), ',')) x

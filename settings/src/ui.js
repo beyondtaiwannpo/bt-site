@@ -60,38 +60,22 @@ export function formatTeams(list) {
 // 直接換成固定的六個勾的話，那個人一按儲存，他填的東西就消失了，
 // 而他不會發現 —— 畫面上本來就沒有那一格。
 //
-// 2026-10-21（後台重整批 3，Paul 2026-10-15 拍板第 2 題）：team 決定後台的權限，所以
-//   - Director 與 Co-President 的 team 鎖住，只有 Co-President 在後台改（locked = true，整塊變成唯讀）。
-//   - 一般幹部仍然自己勾，但「會長出權限的 team」（privileged，現在只有 Internship Team）
-//     沒勾的那一格關掉，要 Co-President 加。本來就在裡面的照樣勾著、也退得出來。
-// 畫面上關掉只是提醒；真正的門是資料庫上的 trigger（2026-10-21-people-admin.sql），
-// 硬改也存不進去，會看到「要 Co-President 改」那一句。
-export function teamLocked(me) {
-  return !!me && me.role === "cadre" && (me.board_role === "director" || me.board_role === "president");
-}
-export function teamPickHTML(cur, locked, privileged) {
+// 2026-10-24（權限重新設計，Paul 10-23 第 3 題）：team 從此**只是標籤**（時間看板篩選、團隊頁分組），
+// 不長出任何權限，所以每個人又自己勾得了任何 team，10-21 那條鎖住 Director 的 trigger 拆掉了。
+// 後台的權限看「指派」（/admin/people/ 的工作區那一頁），跟這裡勾什麼無關。
+export function teamPickHTML(cur) {
   const picked = parseTeams(cur);
   const extra = picked.filter(t => !TEAMS.includes(t));
-  const priv = privileged || [];
-  if (locked) {
-    return `<fieldset class="teams">
-      <legend>${T("team.legend")}</legend>
-      <div class="tgrid"><span>${picked.length ? esc(picked.join(T("punct.list"))) : T("team.none")}</span></div>
-      <div class="mini">${T("team.lockedNote")}</div>
-    </fieldset>`;
-  }
-  const box = (t, label) => {
-    const lock = priv.includes(t) && !picked.includes(t);
-    return `<label class="check tpick">
-    <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}${lock ? " disabled" : ""}>
-    <span>${esc(label)}${lock ? T("team.needPres") : ""}</span></label>`;
-  };
+  const box = (t, label) => `<label class="check tpick">
+    <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}>
+    <span>${esc(label)}</span></label>`;
   return `<fieldset class="teams">
     <legend>${T("team.legendMulti")}</legend>
     <div class="tgrid">
       ${TEAMS.map(t => box(t, t.replace(/\s*Team$/i, ""))).join("")}
       ${extra.map(t => box(t, t + T("team.original"))).join("")}
     </div>
+    <div class="mini">${T("team.labelNote")}</div>
   </fieldset>`;
 }
 
@@ -158,7 +142,7 @@ export function settingsHTML(me, msg, busy, story) {
       <label><i>${T("s.nameZh")}</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
       <label><i>${T("s.nameEn")}</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
     </div>
-    ${cadre ? teamPickHTML(me.team, teamLocked(me), me.privileged_teams) : ""}`
+    ${cadre ? teamPickHTML(me.team) : ""}`
     : `<label><i>${T("s.name")}</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
     <div class="two">
       <label><i>${T("s.school")}</i><input id="school" list="schools" value="${v("school")}"
@@ -214,10 +198,11 @@ export function settingsHTML(me, msg, busy, story) {
 //
 // 但**說明要跟著分岔**：校友不在幹部的進度牆上，也不在公開團隊頁上，
 // 他的照片只會跟著那段故事出現在 /alumni/ 上。同一句話對兩種人不能都成立。
-// 誰看得到實習生進度牆：Internship team 的幹部與 Co-President（跟資料庫的 is_internship_team() 同一條規則）。
+// 誰看得到實習生進度牆（2026-10-24 起看指派）：被派進 intern-passport 工作區的幹部，
+// 以及 Co-President 與 Senior Adviser。me.ws 是 my_access() 回的 { 工作區: 等級 }，跟資料庫的 is_internship_team() 同一條規則。
 export function internshipStaff(me) {
   return me.role === "cadre" &&
-    (me.board_role === "president" || parseTeams(me.team).includes("Internship Team"));
+    (me.board_role === "president" || me.board_role === "senior_adviser" || !!((me.ws || {})["intern-passport"]));
 }
 
 function avatarHTML(me, cadre, intern) {
@@ -254,8 +239,7 @@ function avatarHTML(me, cadre, intern) {
       <input id="pub" type="checkbox"${on ? " checked" : ""}>
       <span>${T("av.consent")}</span>
     </label>
-    ${on ? `<label><i>${T("av.ptitle")}</i><input id="ptitle"
-      value="${esc(me.public_title || "")}" placeholder="Co-President 2026-2027"></label>
+    ${on ? `<p class="sec-note">${me.title ? T("av.titleIs", { title: esc(me.title) }) : T("av.noTitle")}</p>
     <p class="sec-note">${me.public_approved ? T("av.approved") : T("av.pending")}</p>` : ""}`;
 }
 
@@ -335,10 +319,7 @@ export function deleteHTML(msg, busy) {
 // 「我的資料」與「我的故事」是兩張表、兩句話。前一句成功、後一句失敗的時候，
 // 只說「存不起來」是假的：他會以為整頁都沒存到，於是把已經存好的東西再改一次，
 // 而真正失敗的那一半他完全不知道。
-// 資料庫那條守 team 的 trigger 丟出來的兩個代碼翻成人話（2026-10-21）。
 const SAYS = [
-  ["team_locked", "sf.teamLocked"],
-  ["team_needs_president", "sf.teamNeedsPres"],
 ];
 export function saveFailMessage(profileSaved, err) {
   let why = (err && (err.message || err.code)) || String(err || "");

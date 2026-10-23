@@ -41,7 +41,7 @@ export const COMMON = {
   "board.director":   { zh: "Director", en: "Director" },
   "board.president":  { zh: "Co-President", en: "Co-President" },
   "why.president":    { zh: "只有 Co-President 進得去", en: "Co-Presidents only" },
-  "why.internStaff":  { zh: "只有 Internship team 的幹部與 Co-President 進得去", en: "Internship team and Co-Presidents only" },
+  "why.passports":    { zh: "只有被派進護照工作區的人、Co-President 與 Senior Adviser 進得去", en: "Only people assigned to a passport workspace, Co-Presidents and Senior Advisers" },
   "board.senior":     { zh: "Senior Adviser", en: "Senior Adviser" },
   "why.senior":       { zh: "只有 Co-President 與 Senior Adviser 進得去", en: "Co-Presidents and Senior Advisers only" },
   // 走錯地方、連不上
@@ -55,8 +55,8 @@ export const COMMON = {
 
 export const MINE = {
   // 進不去
-  "noAccess.title":   { zh: "這一組只有 Internship team 用得到", en: "This section is for the Internship team only" },
-  "noAccess.lede":    { zh: "實習護照的格子由 Internship team 的幹部與 Co-President 改。你的 team 不在裡面，所以這一頁對你是關著的。", en: "Intern passport boxes are edited by Internship team cadres and Co-Presidents. Your team is not one of them, so this page is closed to you." },
+  "noAccess.title":   { zh: "這一組要被派進護照的工作區才用得到", en: "This section needs a passport workspace assignment" },
+  "noAccess.lede":    { zh: "兩本護照的格子由被派進那個工作區的幹部、Co-President 與 Senior Adviser 改。你沒有被派進去，所以這一頁對你是關著的；要進來請找 Co-President 到後台的工作區把你加進去。", en: "Passport boxes are edited by cadres assigned to that workspace, Co-Presidents and Senior Advisers. You are not assigned, so this page is closed to you; ask a Co-President to add you under Workspaces in the admin." },
   "noAccess.back":    { zh: "回後台首頁", en: "Back to admin home" },
   // 實習護照的分類
   "cat.onboard":      { zh: "入門", en: "Onboarding" },

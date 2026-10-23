@@ -69,7 +69,9 @@ export function toPerson(row) {
     // 兩個 team 收斂完撞在一起（例如「CR」與「Community Relations Team」）
     // 只留一個 —— 不然那個人會在同一組裡出現兩次。
     teams: [...new Set(parseTeams(row.team).map(teamKey))],
-    title: row.public_title || "",
+    // 2026-10-24 起頭銜是「這一屆的職位 · 屆別」（public_team() 回 title_en / title_zh / term）；
+    // 舊的 public_title 欄位搬進職位之後就拿掉了，這裡留一個退路給還沒跑遷移檔的資料庫。
+    title: row.title_en || row.title_zh ? `${row.title_en || row.title_zh}${row.term ? ` · ${row.term}` : ""}` : (row.public_title || ""),
     avatar,
     cut: !!avatar && !/^data:image\/jpe?g/i.test(avatar),
   };

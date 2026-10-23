@@ -107,20 +107,27 @@ async function boot() {
     const [meRes, storyRes] = await Promise.all([
       supabase.from("profiles")
         .select("role, board_role, name_zh, name_en, team, avatar, school, grade, newsletter_opt_in, " +
-                "public_profile, public_approved, public_title")
+                "public_profile, public_approved")
         .eq("id", S.user.id).maybeSingle(),
       Promise.resolve(storyQ).catch(err => ({ data: null, error: err })),
     ]);
     const { data, error } = meRes;
     if (error) throw error;
     S.me = { ...(data || {}), email: S.user.email };
-    // 哪幾個 team 一勾就會長出後台權限（2026-10-21）。讀不到就當成只有 Internship Team，
-    // 畫面少關一格不是安全問題，資料庫的 trigger 還是會擋。
+    // 2026-10-24：幹部多讀兩樣，都是「有就有、沒有也不擋整頁」：
+    //   - 我被派進哪幾個工作區（my_access()），決定要不要畫「實習生的進度牆」那顆按鈕；
+    //   - 這一屆我的職位（positions，RLS 只給自己那幾列），團隊頁印的頭銜就是它，這裡只顯示不給改。
     if (S.me.role === "cadre") {
+      S.me.ws = {};
       try {
-        const { data: pt } = await supabase.from("privileged_teams").select("name");
-        S.me.privileged_teams = (pt && pt.length) ? pt.map(r => r.name) : ["Internship Team"];
-      } catch (e) { S.me.privileged_teams = ["Internship Team"]; }
+        const { data: a } = await supabase.rpc("my_access");
+        if (a && Array.isArray(a.workspaces)) for (const w of a.workspaces) S.me.ws[w.id] = w.level;
+      } catch (e) { /* 遷移檔還沒跑，當成沒有指派 */ }
+      try {
+        const { data: term } = await supabase.from("terms").select("id").eq("status", "current").maybeSingle();
+        const { data: pos } = term ? await supabase.from("positions").select("title_zh, title_en").eq("term_id", term.id).maybeSingle() : { data: null };
+        S.me.title = term && pos ? `${pos.title_en || pos.title_zh || ""} · ${term.id}` : "";
+      } catch (e) { S.me.title = ""; }
     }
     // 「我的故事」是另一張表。學員沒有這一區，所以查回來的東西直接丟掉。
     if (S.me.role === "cadre" || S.me.role === "alumni") {
@@ -285,11 +292,9 @@ document.addEventListener("click", async e => {
       patch = {
         name_zh: val("nzh") || null,
         name_en: val("nen") || null,
-        // Director 與 Co-President 的 team 鎖住（畫面上沒有勾選框），送原值；資料庫那條 trigger
-        // 看到沒變就放行。送 null 的話等於「把 team 清掉」，會被 team_locked 擋下來，連名字都存不到。
-        team: UI.teamLocked(S.me) ? (S.me.team || null) : (pickedTeams() || null),
+        // 2026-10-24 起 team 只是標籤，每個人自己勾。頭銜從後台的職位算，這裡不再送 public_title。
+        team: pickedTeams() || null,
         public_profile: !!(document.getElementById("pub") || {}).checked,
-        public_title: document.getElementById("ptitle") ? (val("ptitle") || null) : S.me.public_title,
       };
     } else if (alumni || intern) {
       // 校友的「我的資料」只有中文姓名與英文姓名兩格（ui.js 同一份改動）。
@@ -314,7 +319,7 @@ document.addEventListener("click", async e => {
       const { error } = cadre
         ? await supabase.from("profiles").update({
             name_zh: patch.name_zh, name_en: patch.name_en, team: patch.team,
-            public_profile: patch.public_profile, public_title: patch.public_title,
+            public_profile: patch.public_profile,
           }).eq("id", S.user.id)
         : (alumni || intern)
         ? await supabase.from("profiles").update({

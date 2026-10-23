@@ -33,8 +33,7 @@ export const MINE = {
   // 所屬 team
   "team.legend":      { zh: "所屬 team", en: "Team" },
   "team.none":        { zh: "（還沒有）", en: "(none yet)" },
-  "team.lockedNote":  { zh: "你是 Director 或 Co-President，team 決定你在後台管得到哪些東西，所以由 Co-President 在後台改。要改請找他們。", en: "You are a Director or Co-President. Your team decides what you can reach in the admin, so Co-Presidents change it there. Ask them." },
-  "team.needPres":    { zh: "（要 Co-President 加）", en: " (a Co-President has to add you)" },
+  "team.labelNote":   { zh: "只是標籤：時間看板篩選、團隊頁分組用，不決定你在後台管得到什麼。後台的權限由 Co-President 在工作區那一頁派。", en: "A label only: for the availability filter and team page grouping. It does not decide what you can reach in the admin; Co-Presidents assign that under Workspaces." },
   "team.legendMulti": { zh: "所屬 team（可以選好幾個）", en: "Teams (pick as many as apply)" },
   "team.original":    { zh: "（原本填的）", en: " (as previously entered)" },
   // 我的故事還缺什麼、狀態一句話
@@ -79,7 +78,8 @@ export const MINE = {
   "av.titleCadre":    { zh: "大頭照與公開", en: "Avatar and public page" },
   "av.cadre":         { zh: "這張照片會出現在<b>全體幹部看得到的進度牆</b>上。<br>\n        下面那個勾打起來之後，它還會出現在<b>任何人都看得到的公開團隊頁</b>上。", en: "This photo appears on the <b>progress wall all cadres can see</b>.<br>If you tick the box below it also appears on the <b>public team page, which anyone can see</b>." },
   "av.consent":       { zh: "我同意把我的名字、team 與大頭照放上\n        <a href=\"../team/\">公開的團隊頁</a>。那一頁任何人都看得到，也會被搜尋引擎收錄。\n        不打勾完全沒有關係，也不影響你在 BT 做的任何事。", en: "I agree to put my name, team and avatar on the <a href=\"../team/\">public team page</a>. Anyone can see that page and search engines index it. Not ticking is completely fine and does not affect anything you do in BT." },
-  "av.ptitle":        { zh: "對外顯示的頭銜（選填）", en: "Public title (optional)" },
+  "av.titleIs":       { zh: "團隊頁上會印：{title}。要改請找 Co-President。", en: "The team page will show: {title}. Ask a Co-President to change it." },
+  "av.noTitle":       { zh: "這一屆還沒有你的職位，團隊頁上不會出現。請 Co-President 到後台的幹部名單填。", en: "You have no position this term yet, so you will not appear on the team page. Ask a Co-President to set it under Roster in the admin." },
   "av.approved":      { zh: "已經在公開的團隊頁上了。隨時可以把上面那個勾拿掉。", en: "You are on the public team page. You can untick the box above at any time." },
   "av.pending":       { zh: "還要等 Co-President 核可才會真的出現在公開頁面上。", en: "A Co-President has to approve it before it actually appears on the public page." },
   // 我的故事
@@ -117,8 +117,6 @@ export const MINE = {
   "del.do":           { zh: "永久刪除我的帳號", en: "Permanently delete my account" },
   "del.no":           { zh: "先不要", en: "Not now" },
   // 存檔失敗、連不上
-  "sf.teamLocked":    { zh: "你的 team 由 Co-President 在後台改，這裡改不動。名字與大頭照有存進去的話上面會說。", en: "Your team is changed by Co-Presidents in the admin, not here. If your name and avatar were saved, it says so above." },
-  "sf.teamNeedsPres": { zh: "勾進那個 team 會多出後台的權限，要 Co-President 在後台加。其他的勾選先拿掉再存一次。", en: "Joining that team grants admin access, so a Co-President has to add you in the admin. Untick it and save again." },
   "sf.half":          { zh: "你的資料存起來了，但「我的故事」那一段沒有存進去：{why}。再按一次「存起來」會重試那一段。", en: "Your details were saved, but the \"My story\" part was not: {why}. Press \"Save\" again to retry that part." },
   "err.save":         { zh: "存不起來：{why}", en: "Could not save: {why}" },
   "down.title":       { zh: "資料庫休眠中", en: "Database is asleep" },

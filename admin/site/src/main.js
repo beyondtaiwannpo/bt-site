@@ -23,8 +23,10 @@ let S = {
 
 const root = () => document.getElementById("bt-root");
 // Director 與 President 改得動資源，一般幹部唯讀。**這只是畫面，真正的門在資料庫的 RLS。**
-const canEdit = () => !!S.me && (S.me.board === "director" || S.me.board === "president");
-const isPres = () => !!S.me && S.me.board === "president";
+// 2026-10-24 起看指派：對任何一個 res: 工作區是「改」或「管」的人才有「新增資源」；
+// 團隊頁、校友頁、信件文案給 Co-President 與 Senior Adviser（senior）。門仍在資料庫。
+const canEdit = () => UI.canEditAny(S.me, "res:");
+const isPres = () => !!S.me && !!S.me.senior;
 
 function render() {
   const el = root();

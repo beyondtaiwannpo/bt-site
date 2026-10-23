@@ -32,8 +32,10 @@ const root = () => document.getElementById("bt-root");
 // Director 與 President 改得動，一般幹部唯讀（2026-09-07 拍板的三層）。
 // **這只是畫面。真正的門在資料庫的 RLS**（is_director_of），
 // 前端少畫一顆按鈕不是安全機制。
-const canEdit = () => !!S.me && (S.me.board === "director" || S.me.board === "president");
-const isPres = () => !!S.me && S.me.board === "president";
+// 2026-10-24 起看指派：對任何一個 apps: 工作區是「改」或「管」的人才有「開新表單」；
+// Co-President 與 Senior Adviser（senior）看得到所有 team 的表單與 team 選單。
+const canEdit = () => UI.canEditAny(S.me, "apps:");
+const isPres = () => !!S.me && !!S.me.senior;
 
 function render() {
   const el = root();
@@ -96,7 +98,7 @@ async function boot() {
     S.me = me;
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     S.forms = forms; S.pendingAll = pendingAll;
-    if (S.me.board === "president") S.teams = await D.loadTeams();
+    if (S.me.senior) S.teams = await D.loadTeams();
     // 首頁三塊的數字。載不到不該讓整頁打不開，所以接住；每一項自己也會接住。
     S.todo = await D.loadTodo(S.me).catch(() => ({}));
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
@@ -332,7 +334,9 @@ document.addEventListener("click", async e => {
 
   // 開新表單：按一下在清單上面展開內嵌表單，填完按「建立」才真的開（2026-10-19 起不再用瀏覽器原生的那個名字對話框）。
   if (act === "new-form") {
-    const team = (S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "") || (S.teams[0] || "");
+    // 預設 team：我能改的第一個 apps: 工作區；senior 沒有指派就拿 team 標籤或清單的第一個。
+    const mine = Object.entries(S.me.ws || {}).filter(([id, lv]) => id.startsWith("apps:") && ["edit", "manage"].includes(lv)).map(([id]) => id.slice(5));
+    const team = mine[0] || (S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "") || (S.teams[0] || "");
     if (!team) { S.msg = T("err.noTeamProfile"); render(); return; }
     S.newForm = { title: "", team, kind: "program" }; S.msg = ""; render();
     const el = document.getElementById("nf-title"); if (el) el.focus();

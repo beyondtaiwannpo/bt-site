@@ -29,7 +29,7 @@ document.getElementById("bt-root").innerHTML = ${nav} + (${body});
 make("settings", "settings",
   `settingsHTML({ role:"cadre", email:"cadre@example.com", name_zh:"王平", name_en:"Paul Wang",
     team:"Sponsorship Team, Marketing Team", avatar:"", public_profile:true, public_approved:false,
-    public_title:"Co-President 2026-2027" }, "", false)`,
+    title:"Co-President · 2026-27" }, "", false)`,
   `import { settingsHTML } from "./src/ui.js";`);
 
 const M = [["安","","Sponsorship Team",null,null],["林育安","Yu-An Lin","Curriculum Team","America/New_York","2026-09-09"],
@@ -73,7 +73,7 @@ make("intern-passport", "intern-passport",
 make("admin", "admin",
   `UI.shellHTML("", UI.railHTML("site", "team", { role:"cadre", board:"president", team:"Sponsorship Team, Internship Team", name:"王平" }),
      UI.publicTeamHTML([
-     { id:"1", name_zh:"王小明", name_en:"Ming Wang", team:"Curriculum Team", public_title:"Director",
+     { id:"1", name_zh:"王小明", name_en:"Ming Wang", team:"Curriculum Team", title:"Director · 2026-27",
        avatar:"x", public_approved:true }], "", false))`,
   `import * as UI from "./site/src/ui.js";`);
 

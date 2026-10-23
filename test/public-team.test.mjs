@@ -19,7 +19,7 @@ test("★ 一個人都沒有的時候回空字串，不是「還沒有人公開�
 });
 
 test("有人的時候畫得出英文名、中文名與頭銜", () => {
-  const h = peopleHTML([P({ public_title: "Director" })], "zh");
+  const h = peopleHTML([P({ title_en: "Director", term: "2026-27" })], "zh");
   assert.match(h, /Ming Wang/);
   assert.match(h, /王小明/);
   assert.match(h, /Director/);
@@ -112,7 +112,7 @@ test("★ /team/ 的欄數是寫死的，不是 auto-fill", () => {
 // 中文名那一格如果取名叫 zh，英文版會把每個人的中文名整個藏起來，
 // 而且不會報錯 —— 只是畫面上少了東西。2026-09-08 踩過一次。
 test("★ 卡片裡不准用 zh / en 當 class 名（會被語言切換藏掉）", () => {
-  const h = peopleHTML([P({ public_title: "Director" })], "en");
+  const h = peopleHTML([P({ title_en: "Director", term: "2026-27" })], "en");
   assert.doesNotMatch(h, /class="(zh|en)"/);
   assert.match(h, /王小明/, "英文版一樣要看得到中文名");
 });
@@ -154,10 +154,12 @@ test("★ 大頭照與「要不要公開」在同一個畫面上", () => {
     "照片要在勾選框上面，他才看得到自己正在公開什麼");
 });
 
-test("打勾之後才出現頭銜那一格，而且說出還要等核可", () => {
-  assert.doesNotMatch(settingsHTML(cadre(), "", false), /id="ptitle"/);
-  const on = settingsHTML(cadre({ public_profile: true }), "", false);
-  assert.match(on, /id="ptitle"/);
+test("打勾之後才印頭銜（從後台的職位算，這裡不給改），而且說出還要等核可", () => {
+  assert.doesNotMatch(settingsHTML(cadre(), "", false), /團隊頁上會印/);
+  assert.doesNotMatch(settingsHTML(cadre({ public_profile: true }), "", false), /id="ptitle"/, "自由文字的頭銜那一格拿掉了（2026-10-24）");
+  const on = settingsHTML(cadre({ public_profile: true, title: "Director, Curriculum Team · 2026-27" }), "", false);
+  assert.match(on, /團隊頁上會印：Director, Curriculum Team · 2026-27/);
+  assert.match(settingsHTML(cadre({ public_profile: true }), "", false), /這一屆還沒有你的職位/);
   assert.match(on, /還要等 Co-President 核可/);
   assert.match(settingsHTML(cadre({ public_profile: true, public_approved: true }), "", false),
     /已經在公開的團隊頁上了/);
@@ -198,9 +200,9 @@ test("只列已經自己打過勾的人；一個都沒有的時候說明為什�
 
 test("核可清單顯示狀態", () => {
   const h = publicTeamHTML([
-    { id: "1", name_zh: "王小明", team: "Curriculum", public_title: "Director",
+    { id: "1", name_zh: "王小明", team: "Curriculum", title: "Director · 2026-27",
       avatar: "x", public_approved: true },
-    { id: "2", name_zh: "陳小安", team: "", public_title: "", avatar: null, public_approved: false },
+    { id: "2", name_zh: "陳小安", team: "", title: "", avatar: null, public_approved: false },
   ], "", false);
   assert.match(h, /在公開頁面上/);
   assert.match(h, /還沒核可/);

@@ -32,7 +32,7 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 export const GROUPS = [
   { key: "forms",     label: { zh: "申請",     en: "Applications" }, href: "/admin/",           who: "cadre",        hint: { zh: "申請表、審核、簽到、行前信", en: "Forms, review, check-in, notices" } },
   { key: "site",      label: { zh: "對外",     en: "Public site" },  href: "/admin/site/",      who: "cadre",        hint: { zh: "資源、團隊頁、校友頁、信件文案", en: "Resources, team page, alumni page, email copy" } },
-  { key: "passports", label: { zh: "護照",     en: "Passports" },    href: "/admin/passports/", who: "intern-staff", hint: { zh: "兩本護照的格子", en: "Boxes in both passports" } },
+  { key: "passports", label: { zh: "護照",     en: "Passports" },    href: "/admin/passports/", who: "ws:passport|intern-passport", hint: { zh: "兩本護照的格子", en: "Boxes in both passports" } },
   { key: "people",    label: { zh: "人與權限", en: "People" },       href: "/admin/people/",    who: "senior",       hint: { zh: "名單、職級、工作區、屆別、邀請碼", en: "Roster, ranks, workspaces, terms, invite codes" } },
 ];
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
@@ -41,20 +41,20 @@ export const ITEMS = [
   { group: "forms",     key: "home",    label: { zh: "首頁",     en: "Home" },            who: "cadre" },
   { group: "forms",     key: "forms",   label: { zh: "申請表",   en: "Forms" },           who: "cadre" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
-  { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "president" },
-  { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "president" },
-  { group: "site",      key: "mail",    label: { zh: "信件文案", en: "Email copy" },      who: "president" },
-  { group: "passports", key: "interns", label: { zh: "實習護照", en: "Intern passport" }, who: "intern-staff" },
-  { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "intern-staff" },
-  { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "president" },
-  { group: "passports", key: "cities",  label: { zh: "城市",     en: "Cities" },          who: "president" },
+  { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "senior" },
+  { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "senior" },
+  { group: "site",      key: "mail",    label: { zh: "信件文案", en: "Email copy" },      who: "senior" },
+  { group: "passports", key: "interns", label: { zh: "實習護照", en: "Intern passport" }, who: "ws:intern-passport" },
+  { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "ws:intern-passport" },
+  { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "ws:passport" },
+  { group: "passports", key: "cities",  label: { zh: "城市",     en: "Cities" },          who: "ws:passport" },
   { group: "people",    key: "roster",     label: { zh: "幹部名單", en: "Roster" },          who: "senior" },
   { group: "people",    key: "workspaces", label: { zh: "工作區",   en: "Workspaces" },      who: "senior" },
   { group: "people",    key: "terms",      label: { zh: "屆別",     en: "Terms" },           who: "senior" },
   { group: "people",    key: "invites",    label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
   { group: "people",    key: "changes",    label: { zh: "變動紀錄", en: "Change log" },      who: "senior" },
 ];
-const WHY = { president: "why.president", senior: "why.senior", "intern-staff": "why.internStaff" };
+const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
 function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
@@ -62,9 +62,16 @@ function allowed(who, me) {
   if (who === "president") return me.board === "president";
   // 2026-10-24 起職級有四級：senior 是 Co-President 加 Senior Adviser（跟資料庫的 is_senior() 同一條規則）。
   if (who === "senior") return me.board === "president" || me.board === "senior_adviser";
-  if (who === "intern-staff") return me.board === "president" || me.board === "senior_adviser" || String(me.team || "").includes("Internship Team");
+  // "ws:a|b"：被派進其中任何一個工作區（任何等級），或 senior。me.ws 是 my_access() 回的 { 工作區: 等級 }。
+  if (who.startsWith("ws:")) return senior(me) || who.slice(3).split("|").some(id => !!(me.ws || {})[id]);
   return false;
 }
+const senior = me => !!me && me.role === "cadre" && (me.board === "president" || me.board === "senior_adviser");
+// 我對這個工作區的等級：senior 一律 manage，沒被派回空字串。main.js 用它決定畫不畫按鈕，門仍在資料庫。
+export function wsLevel(me, id) { return senior(me) ? "manage" : String((me && me.ws || {})[id] || ""); }
+export const canEditWs = (me, id) => ["edit", "manage"].includes(wsLevel(me, id));
+// 有沒有被派進任何一個某種工作區（例如 "apps:"）而且能改：首頁與申請表的「新增」按鈕用。
+export const canEditAny = (me, prefix) => senior(me) || Object.entries((me && me.ws) || {}).some(([id, lv]) => id.startsWith(prefix) && ["edit", "manage"].includes(lv));
 export function canEnter(g, me) { return allowed(g.who, me); }
 export function canSee(item, me) { return allowed(item.who, me); }
 const BOARD_KEY = { member: "board.member", director: "board.director", senior_adviser: "board.senior", president: "board.president" };
@@ -154,7 +161,7 @@ export function skeletonHTML() { return `<div class="skeleton" aria-label="${esc
 
 // 舊名字：這一組底下的分頁。側欄用同一份 ITEMS 畫，這一支留給測試與 scripts/mobile-fixtures.mjs。
 export function tabsHTML(tab, isPresident) {
-  const me = { role: "cadre", board: isPresident === false ? "member" : "president", team: "Internship Team" };
+  const me = { role: "cadre", board: isPresident === false ? "member" : "president", ws: { "intern-passport": "edit" } };
   return ITEMS.filter(i => i.group === "people" && i.key !== "home" && canSee(i, me))
     .map(i => `<a class="rail-item${i.key === tab ? " on" : ""}" href="#${i.key}" data-act="tab" data-t="${i.key}">${esc(T(i.label))}</a>`).join("");
 }

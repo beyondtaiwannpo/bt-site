@@ -22,7 +22,21 @@ export async function loadMe(userId) {
     board: data.board_role || "member",
     team: data.team || "",
     name: data.name_zh || data.name_en || "",
+    senior: data.board_role === "president" || data.board_role === "senior_adviser",
+    pres: data.board_role === "president",
+    ws: await loadMyWorkspaces(),
   };
+}
+// 我被派進哪幾個工作區（2026-10-24，my_access()）：{ "apps:Curriculum Team": "manage", … }。
+// 這只決定側欄藏不藏、按鈕畫不畫；真正的門在資料庫。叫不到（遷移檔還沒跑）就當成空的，
+// 側欄會少幾行，但 Co-President 與 Senior Adviser 靠職級照樣全部看得到。
+async function loadMyWorkspaces() {
+  const ws = {};
+  try {
+    const { data } = await supabase.rpc("my_access");
+    if (data && Array.isArray(data.workspaces)) for (const w of data.workspaces) ws[w.id] = w.level;
+  } catch (e) { /* 空的 */ }
+  return ws;
 }
 
 // ── 資源（批 5）────────────────────────────────────────────────────────
@@ -67,11 +81,30 @@ export async function deleteResource(id) {
 export async function loadPublicCandidates() {
   need();
   const { data, error } = await supabase.from("profiles")
-    .select("id, name_zh, name_en, team, avatar, public_title, public_profile, public_approved")
+    .select("id, name_zh, name_en, team, avatar, public_profile, public_approved")
     .eq("role", "cadre").eq("public_profile", true);
   if (error) throw error;
-  return (data || []).sort((a, b) =>
+  // 2026-10-24 起團隊頁的頭銜從這一屆的職位算（positions），不再有自由文字的 public_title。
+  // 這兩張表 Co-President 與 Senior Adviser 讀得到全部（RLS），載不到就沒有頭銜，不擋核可。
+  const titles = await loadCurrentTitles().catch(() => ({}));
+  return (data || []).map(p => ({ ...p, title: titles[p.id] || "" })).sort((a, b) =>
     String(a.name_zh || a.name_en || "").localeCompare(String(b.name_zh || b.name_en || ""), "zh-Hant"));
+}
+// { profile_id: "Director, Curriculum Team · 2026-27" }，只有 current 那一屆。
+async function loadCurrentTitles() {
+  const { data: term } = await supabase.from("terms").select("id").eq("status", "current").maybeSingle();
+  if (!term) return {};
+  const [{ data: people }, { data: positions }] = await Promise.all([
+    supabase.from("people").select("id, profile_id").not("profile_id", "is", null),
+    supabase.from("positions").select("person_id, title_zh, title_en").eq("term_id", term.id),
+  ]);
+  const byPerson = Object.fromEntries((positions || []).map(x => [x.person_id, x]));
+  const out = {};
+  for (const pe of people || []) {
+    const pos = byPerson[pe.id];
+    if (pos) out[pe.profile_id] = `${pos.title_en || pos.title_zh || ""} · ${term.id}`;
+  }
+  return out;
 }
 
 export async function setApproved(id, ok) {
