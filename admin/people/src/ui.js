@@ -152,18 +152,20 @@ export function toast(msg, undo) {
   if (typeof document === "undefined") return null;
   const kind = msgKind(msg);
   if (!kind) return null;
+  // undo 可以是一個函式（鈕上寫「復原」），或 { label, fn }（鈕上寫別的字，例如「同時給兩個工作區『管』」）。
+  const u = typeof undo === "function" ? { label: T("toast.undo"), fn: undo } : (undo && undo.fn ? undo : null);
   let box = document.querySelector(".toasts");
   if (!box) { box = document.createElement("div"); box.className = "toasts"; box.setAttribute("aria-live", "polite"); document.body.appendChild(box); }
   for (const t of box.children) if (t.dataset.text === String(msg)) return t;
   const el = document.createElement("div");
   el.className = "toast " + kind; el.dataset.text = String(msg); el.setAttribute("role", kind === "err" ? "alert" : "status");
   el.innerHTML = `<span class="toast-k">${kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
-    undo ? `<button type="button" class="toast-undo">${esc(T("toast.undo"))}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
+    u ? `<button type="button" class="toast-undo">${esc(u.label)}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
   const gone = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
   el.querySelector(".toast-x").addEventListener("click", gone);
-  if (undo) el.querySelector(".toast-undo").addEventListener("click", () => { gone(); undo(); });
+  if (u) el.querySelector(".toast-undo").addEventListener("click", () => { gone(); u.fn(); });
   box.appendChild(el);
-  if (kind === "ok") setTimeout(gone, undo ? 9000 : 6000);
+  if (kind === "ok") setTimeout(gone, u ? 9000 : 6000);
   return el;
 }
 // inline confirm：取代瀏覽器的 confirm()。按了會丟東西的按鈕，原地長出一行「真的要…？確定／取消」。
@@ -263,6 +265,63 @@ export const BOARD_ROLES = [
 export const boardLabel = v => T((BOARD_ROLES.find(r => r.v === v) || BOARD_ROLES[0]).label);
 export const LEVELS = ["view", "edit", "manage"];
 export const levelLabel = v => T("level." + (LEVELS.includes(v) ? v : "view"));
+
+// ── 2026-10-23 第三次重整批 2：從人管人 ──────────────────────────────
+// 工作區給人看的名字：名單與改一個人那一頁不再印代號（apps:Curriculum Team）。
+// 有工作區清單就用它的標題，沒有（還沒載到）就從代號推。代號只在網址裡。
+export function wsName(id, workspaces) {
+  const w = (workspaces || []).find(x => x.id === id);
+  if (w) return wsLabel(w);
+  const s = String(id || "");
+  if (s === "passport") return T("ws.kind.passport");
+  if (s === "intern-passport") return T("ws.kind.intern");
+  if (s.startsWith("apps:")) return T("ws.name.apps", { team: s.slice(5) });
+  if (s.startsWith("res:")) return T("ws.name.res", { team: s.slice(4) });
+  if (s.startsWith("custom:")) return s.slice(7);
+  return s;
+}
+// 存取格：一個人在每一個工作區的等級排成一張表，一格一個下拉，改了就存（main.js 接 change 的 data-act="grid-level"）。
+// 列是六個 team（申請、資源兩欄）、兩本護照、自訂的工作區；資料就是 roster() 回的 workspaces，跟 Workspaces 那一頁同一份。
+// 還沒載到工作區清單的時候每一格都畫（exists 回 true），載到了就只畫真的存在的。
+export function accessGridHTML(p, workspaces, busy) {
+  const dis = busy ? " disabled" : "";
+  const have = Object.fromEntries((Array.isArray(p.workspaces) ? p.workspaces : []).map(w => [w.id, w.level]));
+  const active = (workspaces || []).filter(w => w.active !== false);
+  const exists = id => !active.length || active.some(w => w.id === id);
+  const cell = id => exists(id)
+    ? `<select data-act="grid-level" data-id="${esc(p.profile_id)}" data-ws="${esc(id)}" aria-label="${esc(wsName(id, workspaces))}"${dis}>${
+        ["", ...LEVELS].map(l => `<option value="${l}"${(have[id] || "") === l ? " selected" : ""}>${l ? esc(levelLabel(l)) : esc(T("grid.none"))}</option>`).join("")}</select>`
+    : `<span class="mini">—</span>`;
+  const teamRows = TEAMS.map(t => `<tr><th scope="row">${esc(t.replace(/\s*Team$/i, ""))}</th><td>${cell("apps:" + t)}</td><td>${cell("res:" + t)}</td></tr>`).join("");
+  const single = (id, label) => `<tr><th scope="row">${esc(label)}</th><td colspan="2">${cell(id)}</td></tr>`;
+  const customs = active.filter(w => w.kind === "custom").map(w => single(w.id, wsLabel(w))).join("");
+  return `<table class="table grid"><thead><tr><th></th><th>${T("grid.apps")}</th><th>${T("grid.res")}</th></tr></thead><tbody>${teamRows}${
+    single("passport", wsName("passport", workspaces))}${single("intern-passport", wsName("intern-passport", workspaces))}${customs}</tbody></table>`;
+}
+// 找人用的那一串字：「王小明 (Ming Wang)」。datalist 的選項值就是它，main.js 用 findByPickName 對回去。
+export function pickName(p) { const { name, alt } = namesOf({ name_zh: p.name_zh, name_en: p.name_en }); return alt ? `${name} (${alt})` : name; }
+export function findByPickName(people, q) {
+  const s = String(q || "").trim().toLowerCase();
+  if (!s) return null;
+  const list = (people || []).filter(p => p.profile_id);
+  return list.find(p => pickName(p).toLowerCase() === s)
+    || list.find(p => String(p.name_zh || "").toLowerCase() === s || String(p.name_en || "").toLowerCase() === s)
+    || null;
+}
+// 自訂工作區的代號從英文名稱算：小寫、英數、連字號。「Winter camp 2027」→「winter-camp-2027」。
+export function slugify(s) {
+  return String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
+// 結束這一屆之後、名單最上面那一段「接下來要做的事」：留下的人一列一顆「改」，做完按收起來。
+export function afterEndHTML(after, people, busy) {
+  if (!after) return "";
+  const dis = busy ? " disabled" : "";
+  const kept = (people || []).filter(p => p.profile_id && (after.kept || []).includes(p.profile_id));
+  return sectionHTML(T("tm.afterTitle", { term: esc(after.term) }), `<div class="note">${T("tm.afterNote")}</div>
+    <ul class="flist">${kept.map(p => `<li><div class="fhead"><b>${esc(pickName(p))}</b><span class="tag">${esc(boardLabel(p.board_role))}</span></div>
+      <div class="row"><button class="btn ghost sm" data-act="person-edit" data-id="${esc(p.person_id)}"${dis}>${T("ro.edit")}</button></div></li>`).join("")}</ul>
+    <div class="row"><button class="btn quiet sm" data-act="after-dismiss"${dis}>${T("tm.afterDone")}</button></div>`, { id: "after-end" });
+}
 const FIELD_KEY = { board_role: "field.board_role", team: "field.team", name: "field.name", role: "field.role",
   position: "field.position", assignment: "field.assignment", removed: "field.removed", claimed: "field.claimed",
   merged: "field.merged", term: "field.term" };
@@ -325,17 +384,20 @@ const hasAccount = p => !!p.profile_id;
 
 // 幹部名單。people 是 roster()；filter = { term: 屆別代號或 "all", team: "" 全部 / "__none" / team 名 }。
 // 預設只列現在這一屆有職位的人，切到「全部」才看得到歷屆與沒有帳號的人。
-export function rosterHTML(people, terms, meId, isPres, msg, busy, filter) {
+export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, workspaces, after) {
   const list = people || [];
   const cur = currentTerm(terms);
-  const f = Object.assign({ term: cur ? cur.id : "all", team: "" }, filter || {});
+  const f = Object.assign({ term: cur ? cur.id : "all", team: "", q: "" }, filter || {});
+  // 找名字（2026-10-23 批 2）：中英文都認，大小寫不分。main.js 接 input 事件、重畫後把游標放回去。
+  const q = String(f.q || "").trim().toLowerCase();
+  const hit = p => !q || String(p.name_zh || "").toLowerCase().includes(q) || String(p.name_en || "").toLowerCase().includes(q);
   const dis = busy ? " disabled" : "";
   const inTerm = p => f.term === "all" || !!positionFor(p, f.term);
   const teamsOf = p => parseTeams(p.team).length ? parseTeams(p.team) : (positionFor(p, f.term) && positionFor(p, f.term).team ? [positionFor(p, f.term).team] : []);
   const base = list.filter(inTerm);
   const allTeams = [...new Set(base.flatMap(teamsOf))].sort((a, b) => a.localeCompare(b));
   const noTeam = base.filter(p => !teamsOf(p).length).length;
-  const shown = !f.team ? base : f.team === "__none" ? base.filter(p => !teamsOf(p).length) : base.filter(p => teamsOf(p).includes(f.team));
+  const shown = (!f.team ? base : f.team === "__none" ? base.filter(p => !teamsOf(p).length) : base.filter(p => teamsOf(p).includes(f.team))).filter(hit);
   const noName = T("common.noName");
   // 有帳號的在前，沒有名字的最後。
   const sorted = shown.slice().sort((a, b) => Number(hasAccount(b)) - Number(hasAccount(a)) || Number(personName(a).name === noName) - Number(personName(b).name === noName));
@@ -361,16 +423,21 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter) {
         p.pending_code ? `<div class="mini">${T("ro.pendingCode", { code: esc(p.pending_code) })}</div>` : ""}</td>
       <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
       <td>${pos ? `${esc(positionsLine(p, pos.term))}${positionsFor(p, pos.term).some(x => x.team) ? `<div class="mini">${esc(positionsFor(p, pos.term).map(x => x.team).filter(Boolean).join(T("punct.list")))}</div>` : ""}`
-               : lastPos ? `<span class="mini">${esc(positionTitle(lastPos))}・${esc(lastPos.term)}</span>` : `<span class="mini">${T("ro.noPosition")}</span>`}</td>
-      <td>${ws.length ? ws.map(w => `<span class="tag">${esc(w.id)}・${esc(levelLabel(w.level))}</span>`).join(" ") : `<span class="mini">${hasAccount(p) && p.role === "cadre" ? T("ro.noWs") : ""}</span>`}</td>
+               : lastPos ? `<span class="mini">${esc(positionTitle(lastPos))}・${esc(lastPos.term)}</span>` : `<span class="mini">${T("ro.noPosition")}</span>`}${
+        hasAccount(p) && p.role === "cadre" && !parseTeams(p.team).length
+          ? `<div style="margin-top:6px"><select data-act="row-team" data-id="${esc(p.profile_id)}" aria-label="${esc(T("ro.setTeam"))}"${dis}><option value="">${T("ro.setTeam")}</option>${
+              TEAMS.map(t => `<option value="${esc(t)}">${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></div>` : ""}</td>
+      <td>${ws.length ? ws.map(w => `<span class="tag">${esc(wsName(w.id, workspaces))}・${esc(levelLabel(w.level))}</span>`).join(" ") : `<span class="mini">${hasAccount(p) && p.role === "cadre" ? T("ro.noWs") : ""}</span>`}</td>
       <td class="t-act"><button class="btn quiet sm" data-act="person-edit" data-id="${esc(p.person_id)}"${dis}>${T("ro.edit")}</button></td>
     </tr>`;
   };
   return pageHead(T("ro.title"), T("ro.lede", { n: base.length, term: f.term === "all" ? T("ro.allTerms") : f.term }),
       [{ act: "person-new", label: T("ro.addPast"), disabled: busy }])
     + msgHTML(msg)
+    + afterEndHTML(after, list, busy)
     + `<div class="note">${isPres ? T("ro.note") : T("ro.noteSenior")}</div>`
-    + sectionHTML("", termChips + teamChips + (sorted.length
+    + sectionHTML("", `<label class="ro-search"><i>${T("ro.search")}</i><input id="ro-search" type="search" value="${esc(f.q || "")}" placeholder="${esc(T("ro.searchPh"))}" autocomplete="off"></label>`
+      + termChips + teamChips + (sorted.length
       ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ro.rank")}</th><th>${T("ro.position")}</th><th>${T("ro.ws")}</th><th></th></tr></thead><tbody>${sorted.map(tr).join("")}</tbody></table>`
       : list.length ? emptyHTML(T("ro.emptyFilter"), T("ro.emptyFilterHint")) : emptyHTML(T("ro.empty"), T("ro.emptyHint"))), { id: "roster" });
 }
@@ -401,7 +468,7 @@ const teamSelect = (id, val, dis) => {
 // 這一屆的職位、team 標籤（只是標籤）、他在哪幾個工作區（唯讀，去工作區頁改）、
 // 最底下是危險的事：發校友碼、合併、刪除成員或刪除紀錄。draft 留住存檔被擋時剛填的東西。
 // remove = { typed }：按了「刪除成員」之後第二步的狀態（要把名字打一次）。
-export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people, remove, email) {
+export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people, remove, email, workspaces) {
   const cur = currentTerm(terms);
   const d = draft || {};
   const termId = d.term || (cur ? cur.id : ((terms || [])[0] || {}).id || "");
@@ -455,9 +522,11 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
     otherTerms.length ? `<div class="mini" style="margin-top:8px">${T("pe.history")}${esc(otherTerms.map(t => `${t}: ${positionsLine(p, t)}`).join(T("punct.list")))}</div>` : ""}`);
   const teamSec = cadre ? sectionHTML(T("pe.teams"), `<div class="tgrid">${TEAMS.map(box).join("")}${extra.map(t => box(t)).join("")}</div>
     <div class="mini" style="margin-top:8px">${T("pe.teamsNote")}</div>`) : "";
-  const wsSec = cadre ? sectionHTML(T("pe.ws"), ws.length
-      ? `<div class="chips">${ws.map(w => `<a class="chip" href="#workspaces" data-act="tab" data-t="workspaces" data-ws="${esc(w.id)}">${esc(w.id)}・${esc(levelLabel(w.level))}</a>`).join("")}</div>`
-      : `<div class="mini">${T("pe.noWs")}</div>`,
+  // 存取（2026-10-23 批 2）：可以直接改的一張格子，不再是唯讀標籤加「去工作區那一頁改」。
+  const wsSec = cadre ? sectionHTML(T("pe.ws"),
+      (p.board_role === "president" || p.board_role === "senior_adviser" ? `<div class="note">${T("pe.wsSenior")}</div>` : "")
+      + accessGridHTML(p, workspaces, busy)
+      + `<div class="mini" style="margin-top:8px">${T("pe.wsNote")}${ws.length ? "" : " " + T("pe.noWs")}</div>`,
     { hint: T("pe.wsHint") }) : "";
   const dupSec = dups.length ? sectionHTML(T("pe.dup"), `<div class="note">${T("pe.dupNote")}</div>${
     dups.map(o => `<div class="row"><b>${esc(personName(o).name)}</b>${hasAccount(o) ? ` <span class="tag">${T("pe.dupHasAccount")}</span>` : ` <span class="tag draft">${T("ro.noAccount")}</span>`}
@@ -528,7 +597,7 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   const inWs = new Set((members || []).map(m => m.user_id));
   const byProfile = Object.fromEntries(cadres.map(p => [p.profile_id, p]));
   const KIND = { passport: "ws.kind.passport", "intern-passport": "ws.kind.intern", apps: "ws.kind.apps", res: "ws.kind.res", custom: "ws.kind.custom" };
-  const li = x => `<a class="rail-item${x.id === sel ? " on" : ""}" href="#workspaces" data-act="ws-pick" data-ws="${esc(x.id)}">${esc(wsLabel(x))}<span class="rail-count">${esc(T(KIND[x.kind] || "ws.kind.custom"))}</span></a>`;
+  const li = x => `<a class="rail-item${x.id === sel ? " on" : ""}" href="#ws=${encodeURIComponent(x.id)}" data-act="ws-pick" data-ws="${esc(x.id)}">${esc(wsLabel(x))}<span class="rail-count">${esc(T(KIND[x.kind] || "ws.kind.custom"))}</span></a>`;
   const left = list.length ? `<div class="wslist">${list.map(li).join("")}</div>` : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
   const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
   const memberRow = m => `<tr>
@@ -544,25 +613,35 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
       : emptyHTML(T("ws.nobody"), T("ws.nobodyHint"))}
     <div class="card" style="margin-top:16px"><h2>${T("ws.add")}</h2>
       <div class="two">
-        <label><i>${T("ws.who")}</i><select id="ws-person"${dis}><option value="">${T("ws.whoPh")}</option>${
-          cadres.filter(p => !inWs.has(p.profile_id)).map(p => `<option value="${esc(p.profile_id)}"${d.person === p.profile_id ? " selected" : ""}>${esc(personName(p).name)}${p.board_role !== "member" ? `（${esc(boardLabel(p.board_role))}）` : ""}</option>`).join("")}</select></label>
+        <label><i>${T("ws.who")}</i><input id="ws-person-q" list="ws-people" value="${esc(d.personQ || "")}" placeholder="${esc(T("ws.whoPh"))}" autocomplete="off"${dis}>
+          <datalist id="ws-people">${cadres.filter(p => !inWs.has(p.profile_id)).map(p => `<option value="${esc(pickName(p))}">`).join("")}</datalist></label>
         <label><i>${T("ws.level")}</i><select id="ws-levelnew"${dis}>${LEVELS.map(l => `<option value="${l}"${(d.level || "view") === l ? " selected" : ""}>${esc(levelLabel(l))}</option>`).join("")}</select></label>
       </div>
       <div class="row"><button class="btn" data-act="ws-assign" data-ws="${esc(w.id)}"${dis}>${T("ws.addGo")}</button></div>
-      <div class="mini">${T("ws.addNote")}</div>
+      <div class="mini">${T("ws.whoNote")} ${T("ws.addNote")}</div>
     </div>`;
-  const create = canCreate ? `<details class="ans" style="margin-top:16px"${d.slug ? " open" : ""}><summary>${T("ws.new")}</summary>
-    <div class="two">
-      <label><i>${T("ws.slug")}</i><input id="wsn-slug" value="${esc(d.slug || "")}" placeholder="summer-camp-2027"${dis}></label>
-      <label><i>${T("ws.ownerPick")}</i><select id="wsn-owner"${dis}><option value="">${T("value.none")}</option>${cadres.map(p => `<option value="${esc(p.profile_id)}"${d.owner === p.profile_id ? " selected" : ""}>${esc(personName(p).name)}</option>`).join("")}</select></label>
-      <label><i>${T("ws.titleZh")}</i><input id="wsn-zh" value="${esc(d.title_zh || "")}"${dis}></label>
-      <label><i>${T("ws.titleEn")}</i><input id="wsn-en" value="${esc(d.title_en || "")}"${dis}></label>
+  // 新增工作區（2026-10-23 批 2）：一張表單做完，名稱、擁有人、代號（從英文名稱自動算）、一開始就放進去的人各自一個等級。
+  // 不再收在摺疊裡。main.js 的 ws-create 先建工作區，再把勾起來的人一個一個派進去。
+  const mem = Array.isArray(d.members) ? d.members : [];
+  const memRow = p => { const m = mem.find(x => x.id === p.profile_id); return `<div class="row wsn-row">
+      <label class="check" style="margin:0"><input type="checkbox" name="wsn-member" value="${esc(p.profile_id)}"${m ? " checked" : ""}${dis}><span>${esc(pickName(p))}${p.board_role !== "member" ? ` <span class="mini">${esc(boardLabel(p.board_role))}</span>` : ""}</span></label>
+      <select id="wsn-lv-${esc(p.profile_id)}" aria-label="${esc(T("ws.level"))}"${dis}>${LEVELS.map(l => `<option value="${l}"${(m ? m.level : "view") === l ? " selected" : ""}>${esc(levelLabel(l))}</option>`).join("")}</select>
+    </div>`; };
+  const create = canCreate ? sectionHTML(T("ws.new"), `<div class="two">
+      <label><i>${T("ws.titleEn")}</i><input id="wsn-en" value="${esc(d.title_en || "")}" placeholder="Winter camp 2027"${dis}></label>
+      <label><i>${T("ws.titleZh")}</i><input id="wsn-zh" value="${esc(d.title_zh || "")}" placeholder="2027 冬令營"${dis}></label>
+      <label><i>${T("ws.ownerPick")}</i><select id="wsn-owner"${dis}><option value="">${T("value.none")}</option>${cadres.map(p => `<option value="${esc(p.profile_id)}"${d.owner === p.profile_id ? " selected" : ""}>${esc(pickName(p))}</option>`).join("")}</select></label>
+      <label><i>${T("ws.slug")}</i><input id="wsn-slug" value="${esc(d.slug || "")}" placeholder="winter-camp-2027" autocomplete="off"${dis}></label>
     </div>
-    <div class="row"><button class="btn ghost" data-act="ws-create"${dis}>${T("ws.createGo")}</button></div>
-    <div class="mini">${T("ws.newNote")}</div></details>` : "";
+    <div class="mini">${T("ws.slugNote")}</div>
+    <h3 class="sec-h" style="margin-top:16px">${T("ws.newMembers")}</h3>
+    <div class="wsn-list">${cadres.map(memRow).join("")}</div>
+    <div class="row" style="margin-top:14px"><button class="btn" data-act="ws-create"${dis}>${busy ? T("common.saving") : T("ws.createGo")}</button></div>
+    <div class="mini">${T("ws.newNote")}</div>`, { id: "ws-new" }) : "";
   return pageHead(T("ws.title"), T("ws.lede"))
     + msgHTML(msg)
-    + `<div class="cols"><section class="section">${left}${create}</section><section class="section">${right}</section></div>`;
+    + `<div class="cols"><section class="section">${left}</section><section class="section">${right}</section></div>`
+    + create;
 }
 
 // 屆別：清單加人數、補過去的一屆、貼一整屆、結束這一屆（三步）。

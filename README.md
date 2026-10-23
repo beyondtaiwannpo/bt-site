@@ -3276,6 +3276,22 @@ Paul 拍板四題都照建議：頂欄留著（側欄「Home」改叫「總覽�
 本機 `node --test test/*.test.mjs` 560 項、`./check.sh`、`node scripts/check-mobile.mjs` 19 頁全過。
 **還沒驗的**：真的登入後按一次。正式站是 GitHub Pages 從 `main` 發布，這一批還沒 push，Paul 的 Chrome 上看到的還是舊版；本機沒有登入態。截圖 `docs/admin-redesign/v3/b1-01-toast-undo-and-inline-confirm.png` 是假資料掛出來的。
 
+### 批 2：從人管人（2026-10-23）
+
+`/admin/people/` 這一組。Paul 的原話：「要設定 workspace 得去 Workspaces，可是在 Roster 也應該能設。」
+
+- **改一個人那一頁多一張存取格**：列是六個 team（申請、資源兩欄）加兩本護照加自訂的工作區，每一格一個「無／看／改／管」的下拉，改了就存，左下角 toast 帶「復原」。資料就是 `roster()` 回的 `workspaces`，跟 Workspaces 那一頁同一份，沒有新表。
+  Co-President 與 Senior Adviser 那一頁多一句「這張表對他只是紀錄」。
+- **存了一筆帶 team 的 Director 職位**，左下角那條 toast 多一顆「同時給 X 的申請與資源『管』」，按了才送兩筆 `assign()`，不自動送（Paul 10-23 第 4 題）。他兩個都已經是「管」就不問。
+- **名單**：多一個找名字的框（中英都認，重畫後游標放回去）；工作區標籤印人看的名字（「Curriculum Team applications · Manage」）不印代號；還沒填 team 的幹部那一列直接有一個 team 下拉，選了就存、toast 帶復原，不用進去那一頁。
+- **Workspaces**：每個工作區有自己的網址 `#ws=<代號>`（上一頁、書籤、別頁連過來都能用）；加人改成打名字（`<datalist>`，已經在裡面的不列）；**新增工作區是一張表單**，不再收在摺疊裡：英文名稱、中文名稱、擁有人、代號（從英文名稱自動算，想改可以改）、一開始就放進去的人各自一個等級，按一次建好並一個一個派進去，中途有人派不進去會講是誰、前面派好的留著。
+- **屆別**：結束這一屆之後，名單最上面多一段「接下來要做的事」，留下來的人一列一顆「改」，做完按「收起來」。
+- 改一個人那一頁的網址是 `#person=<id>`，回名單是 `#roster`，上一頁回得去。
+- 樣式 `admin/admin.css` 第 13 段；字典 `admin/people/src/strings.js` 多二十幾句中英。
+
+本機 `node --test test/*.test.mjs` 564 項、`./check.sh`、`node scripts/check-mobile.mjs` 19 頁全過。截圖 `docs/admin-redesign/v3/b2-01` 到 `b2-03`（假資料）。
+**還沒驗的**：真的登入後改一格。本機沒有登入態，正式站還是舊版（沒 push）。
+
 ## 後台第二次重整：側欄 Dashboard（2026-10-19）
 
 Paul 2026-10-19 登入看過四個資料夾版的後台之後：「超亂超不知道在幹嘛。我要弄成像是 BT dashboard 一樣」。

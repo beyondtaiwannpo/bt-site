@@ -384,3 +384,25 @@ a.btn{text-decoration:none}
   background:rgba(255,196,108,.22);border:1px solid rgba(255,196,108,.9);font-size:13.5px;line-height:1.45;vertical-align:middle}
 .ask-t{max-width:34em}
 @media (max-width:720px){.toasts{left:10px;right:10px;bottom:10px;max-width:none}}
+
+/* ───────── 13. 從人管人（2026-10-23，第三次重整批 2）───────── */
+/* 存取格：改一個人那一頁的一張小表，列是 team、欄是申請／資源。th 靠左、字跟內文一樣大，不是表頭那種全大寫。 */
+.table.grid{max-width:560px}
+.table.grid th[scope="row"]{font-family:var(--body);font-size:14.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink);
+  padding:8px 10px 8px 0;border-bottom:1px solid rgba(16,42,134,.12);white-space:nowrap}
+.table.grid td{padding:6px 10px 6px 0}
+.table.grid select{min-width:84px}
+/* 名單的找名字框：窄一點、跟 chip 排在一起。 */
+.ro-search{max-width:320px;margin-bottom:10px}
+.ro-search input{padding:8px 11px}
+.table select[data-act="row-team"]{max-width:200px}
+/* 新增工作區那張表單底下的名單：一行一個人，勾選在左、等級在右。 */
+.wsn-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:2px 20px}
+.wsn-row{margin-top:0;padding:4px 0;justify-content:space-between}
+.wsn-row .check{flex:1}
+.wsn-row select{min-width:80px}
+@media (max-width:720px){
+  .table.grid thead{display:table-header-group}
+  .table.grid tr{display:table-row;padding:0;border:0}
+  .table.grid td,.table.grid th{display:table-cell}
+}

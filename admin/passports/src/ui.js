@@ -142,18 +142,20 @@ export function toast(msg, undo) {
   if (typeof document === "undefined") return null;
   const kind = msgKind(msg);
   if (!kind) return null;
+  // undo 可以是一個函式（鈕上寫「復原」），或 { label, fn }（鈕上寫別的字，例如「同時給兩個工作區『管』」）。
+  const u = typeof undo === "function" ? { label: T("toast.undo"), fn: undo } : (undo && undo.fn ? undo : null);
   let box = document.querySelector(".toasts");
   if (!box) { box = document.createElement("div"); box.className = "toasts"; box.setAttribute("aria-live", "polite"); document.body.appendChild(box); }
   for (const t of box.children) if (t.dataset.text === String(msg)) return t;
   const el = document.createElement("div");
   el.className = "toast " + kind; el.dataset.text = String(msg); el.setAttribute("role", kind === "err" ? "alert" : "status");
   el.innerHTML = `<span class="toast-k">${kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
-    undo ? `<button type="button" class="toast-undo">${esc(T("toast.undo"))}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
+    u ? `<button type="button" class="toast-undo">${esc(u.label)}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
   const gone = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
   el.querySelector(".toast-x").addEventListener("click", gone);
-  if (undo) el.querySelector(".toast-undo").addEventListener("click", () => { gone(); undo(); });
+  if (u) el.querySelector(".toast-undo").addEventListener("click", () => { gone(); u.fn(); });
   box.appendChild(el);
-  if (kind === "ok") setTimeout(gone, undo ? 9000 : 6000);
+  if (kind === "ok") setTimeout(gone, u ? 9000 : 6000);
   return el;
 }
 // inline confirm：取代瀏覽器的 confirm()。按了會丟東西的按鈕，原地長出一行「真的要…？確定／取消」。

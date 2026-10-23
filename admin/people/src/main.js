@@ -17,7 +17,8 @@ let S = {
   view: "roster",          // roster | person | person-new | workspaces | terms | invites | changes
   // 一定要有初始值：載入失敗之後再 render 一次不能整頁空白。
   people: [], terms: [], changes: [],
-  filter: { term: null, team: "" },       // term 為 null 表示「這一屆」（rosterHTML 自己找 current）
+  filter: { term: null, team: "", q: "" }, // term 為 null 表示「這一屆」（rosterHTML 自己找 current）；q 是找名字
+  afterEnd: null,                          // 結束這一屆之後名單最上面那一段 { term, kept: [profile_id…] }
   person: null, personDraft: null, remove: null, newDraft: null,
   workspaces: [], wsSel: null, members: [], wsDraft: null,
   termDraft: null, end: null,
@@ -50,8 +51,8 @@ function render() {
   else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior()); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
-  else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail);
-  else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter);
+  else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces);
+  else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd);
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body);
   UI.afterRender(S, el);
 }
@@ -79,6 +80,15 @@ async function boot(retried) {
 }
 
 async function openTab(key, ws) {
+  key = String(key || "");
+  // #ws=<代號>：直接開某一個工作區；#person=<id>：直接開某一個人（屆別結束之後那一段、總覽都連這種網址）。
+  if (key.startsWith("ws=")) return openWorkspaces(decodeURIComponent(key.slice(3)));
+  if (key.startsWith("person=")) {
+    await openRoster();
+    const p = findPerson(decodeURIComponent(key.slice(7)));
+    if (p) { S.person = p; S.personDraft = null; S.remove = null; S.view = "person"; render(); loadEmail(p); }
+    return;
+  }
   if (key === "invites") return openInvites();
   if (key === "changes") return openRoster(false, "changes");
   if (key === "workspaces") return openWorkspaces(ws);
@@ -89,12 +99,13 @@ async function openTab(key, ws) {
 // 名單、屆別、變動紀錄三個查詢一起發。紀錄載不到不該讓名單打不開（遷移檔還沒跑的時候），各自接住。
 async function loadCore(keepMsg) {
   if (!keepMsg) S.msg = "";
-  const [people, terms, changes] = await Promise.all([
+  const [people, terms, changes, workspaces] = await Promise.all([
     D.loadPeople(),
     D.loadTerms().catch(e => { S.msg = T("err.termsLoad") + D.says(e); return []; }),
     D.loadRoleChanges().catch(e => { S.msg = T("err.changesLoad") + D.says(e); return []; }),
+    D.loadWorkspaces().catch(() => []),
   ]);
-  S.people = people || []; S.terms = terms; S.changes = changes;
+  S.people = people || []; S.terms = terms; S.changes = changes; S.workspaces = workspaces || [];
   if (S.person) S.person = findPerson(S.person.person_id) || null;
 }
 async function openRoster(keepMsg, view) {
@@ -197,13 +208,16 @@ document.addEventListener("click", async e => {
   }
   if (act === "roster-term") { S.filter.term = b.dataset.v || "all"; render(); return; }
   if (act === "roster-team") { S.filter.team = b.dataset.v || ""; render(); return; }
-  if (act === "roster-back") { S.person = null; S.personDraft = null; S.remove = null; S.newDraft = null; await openRoster(); return; }
+  if (act === "roster-back") { S.person = null; S.personDraft = null; S.remove = null; S.newDraft = null; history.pushState(null, "", "#roster"); await openRoster(); return; }
+  if (act === "after-dismiss") { S.afterEnd = null; render(); return; }
 
   // ── 一個人 ──────────────────────────────────────────────────────────
   if (act === "person-edit") {
     const p = findPerson(b.dataset.id);
     if (!p) { S.msg = T("err.noPerson"); render(); return; }
-    S.person = p; S.personDraft = null; S.remove = null; S.view = "person"; S.msg = ""; render();
+    S.person = p; S.personDraft = null; S.remove = null; S.view = "person"; S.msg = "";
+    history.pushState(null, "", "#person=" + encodeURIComponent(p.person_id));
+    render();
     loadEmail(p); return;
   }
   if (act === "person-save") {
@@ -246,6 +260,17 @@ document.addEventListener("click", async e => {
         else { await D.setPosition(p.person_id, f.term, op.set.title_zh, op.set.title_en, op.set.team); done.push(T("msg.positionTo", { term: f.term, title: op.set.title_en || op.set.title_zh })); }
       }
       if (teamChanged) { await D.setTeam(p.profile_id, f.team); done.push(T("msg.teamTo", { team: f.team || T("value.none") })); }
+      // 存了一筆帶 team 的 Director 職位（Paul 2026-10-23 第 4 題）：問一句、一顆鈕同時給那個 team 的申請與資源「管」。不自動送，
+      // 因為一個打錯 team 的職位會送出兩筆權限。只問最後一筆；他已經兩個都是「管」就不問。
+      const dirTeam = f.board_role === "director" ? (posOps.filter(op => op.set && op.set.team).map(op => op.set.team).pop() || "") : "";
+      const hasBoth = t => ["apps:" + t, "res:" + t].every(id => (p.workspaces || []).some(w => w.id === id && w.level === "manage"));
+      if (dirTeam && !hasBoth(dirTeam)) {
+        const who = f.name_zh || f.name_en || pname(p), pid = p.profile_id, personId = p.person_id;
+        S.undo = { label: T("pe.grantBoth", { team: dirTeam }), fn: async () => {
+          const r = await run("err.assign", async () => { await D.assign(pid, "apps:" + dirTeam, "manage"); await D.assign(pid, "res:" + dirTeam, "manage"); return true; });
+          if (r !== undefined) await reopenPerson(personId, T("msg.grantedBoth", { name: who, team: dirTeam }));
+        } };
+      }
       await reopenPerson(p.person_id, T("msg.personSaved", { name: f.name_zh || f.name_en || pname(p), done: done.join(T("punct.list")) }));
     } catch (err) {
       // 前面幾步做好了、後面那一步沒做到要講清楚，不然他會把做好的那一半再做一次。
@@ -325,12 +350,14 @@ document.addEventListener("click", async e => {
   }
 
   // ── 工作區與指派 ───────────────────────────────────────────────────
-  if (act === "ws-pick") { e.preventDefault(); S.wsDraft = null; await openWorkspaces(b.dataset.ws); return; }
+  if (act === "ws-pick") { e.preventDefault(); S.wsDraft = null; history.pushState(null, "", "#ws=" + encodeURIComponent(b.dataset.ws)); await openWorkspaces(b.dataset.ws); return; }
   if (act === "ws-assign") {
-    const person = val("ws-person"), level = val("ws-levelnew") || "view";
-    S.wsDraft = { person, level };
-    if (!person) { S.msg = T("err.pickPerson"); render(); return; }
-    const p = S.people.find(x => x.profile_id === person);
+    const q = val("ws-person-q"), level = val("ws-levelnew") || "view";
+    S.wsDraft = { personQ: q, level };
+    if (!q) { S.msg = T("err.pickPerson"); render(); return; }
+    const p = UI.findByPickName(S.people.filter(x => x.profile_id && x.role === "cadre"), q);
+    if (!p) { S.msg = T("err.noSuchPerson"); render(); return; }
+    const person = p.profile_id;
     const ws = b.dataset.ws;
     const ok = await run("err.assign", () => D.assign(person, ws, level));
     if (ok !== undefined) {
@@ -355,10 +382,24 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "ws-create") {
-    const d = { slug: val("wsn-slug"), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner") };
+    const members = [...document.querySelectorAll('input[name="wsn-member"]:checked')].map(x => ({ id: x.value, level: val("wsn-lv-" + x.value) || "view" }));
+    const d = { slug: val("wsn-slug") || UI.slugify(val("wsn-en")), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner"), members };
     S.wsDraft = d;
     const id = await run("err.createWs", () => D.createWorkspace(d.slug, d.title_zh, d.title_en, d.owner || null));
-    if (id !== undefined) { S.wsDraft = null; S.msg = T("msg.wsCreated", { id }); await openWorkspaces(id, true); }
+    if (id === undefined) return;
+    // 建好了再派人，一個一個送；中途有人派不進去，講清楚是誰，前面派好的留著。
+    let n = 0;
+    for (const m of members) {
+      try { await D.assign(m.id, id, m.level); n++; }
+      catch (err) {
+        const p = S.people.find(x => x.profile_id === m.id);
+        S.busy = false; S.wsDraft = Object.assign({}, d, { members: members.slice(n) });
+        S.msg = T("err.wsMembers") + (p ? pname(p) + T("punct.colon") : "") + D.says(err);
+        await openWorkspaces(id, true); return;
+      }
+    }
+    S.wsDraft = null; S.msg = T("msg.wsCreatedWith", { name: d.title_en || d.title_zh || id, n });
+    await openWorkspaces(id, true);
     return;
   }
 
@@ -411,6 +452,7 @@ document.addEventListener("click", async e => {
     if (r !== undefined) {
       S.end = null;
       S.msg = T("msg.ended", { term: cur.id, next: r.term || n.id, stay: r.kept, go: r.alumni });
+      S.afterEnd = { term: cur.id, kept: keep.filter(id => id !== S.user.id) };
       S.filter.term = null;
       await openRoster(true);
     }
@@ -459,6 +501,34 @@ document.addEventListener("change", async e => {
     S.personDraft = f;
     render(); return;
   }
+  // 存取格（2026-10-23 批 2）：一格改了就送。選「無」是移出，其他是派進去或改等級；toast 帶復原（送回原值）。
+  if (el.dataset.act === "grid-level" && S.person) {
+    const id = el.dataset.id, ws = el.dataset.ws, level = el.value;
+    const p = S.person, personId = p.person_id, who = pname(p);
+    const was = ((p.workspaces || []).find(w => w.id === ws) || {}).level || "";
+    if (was === level) return;
+    const send = lv => lv ? D.assign(id, ws, lv) : D.unassign(id, ws);
+    const ok = await run(level ? "err.assign" : "err.unassign", () => send(level));
+    if (ok === undefined) { await reopenPerson(personId, S.msg); return; }
+    const wsn = UI.wsName(ws, S.workspaces);
+    S.undo = async () => {
+      const r = await run(was ? "err.assign" : "err.unassign", () => send(was));
+      if (r !== undefined) await reopenPerson(personId, was ? T("msg.cell", { name: who, ws: wsn, level: UI.levelLabel(was) }) : T("msg.cellNone", { name: who, ws: wsn }));
+    };
+    await reopenPerson(personId, level ? T("msg.cell", { name: who, ws: wsn, level: UI.levelLabel(level) }) : T("msg.cellNone", { name: who, ws: wsn }));
+    return;
+  }
+  // 名單列上直接填 team（還沒填的人才有這個下拉）。toast 帶復原（清回空的）。
+  if (el.dataset.act === "row-team" && el.value) {
+    const id = el.dataset.id, team = el.value;
+    const p = S.people.find(x => x.profile_id === id);
+    const ok = await run("err.save", () => D.setTeam(id, team));
+    if (ok === undefined) { render(); return; }
+    S.undo = async () => { const r = await run("err.save", () => D.setTeam(id, "")); if (r !== undefined) { S.msg = T("msg.teamSet", { name: p ? pname(p) : "", team: T("value.none") }); await openRoster(true); } };
+    S.msg = T("msg.teamSet", { name: p ? pname(p) : "", team });
+    await openRoster(true);
+    return;
+  }
   if (el.dataset.act === "ws-level" && S.wsSel) {
     const p = S.people.find(x => x.profile_id === el.dataset.id);
     const level = el.value, ws = S.wsSel, id = el.dataset.id;
@@ -470,6 +540,25 @@ document.addEventListener("change", async e => {
       await openWorkspaces(null, true);
     }
   }
+});
+
+// 打字的即時反應（2026-10-23 批 2）。找名字：改 S 再 render()，然後把游標放回搜尋框，不然每打一個字就失焦。
+// 自訂工作區的代號：英文名稱打到哪，代號跟到哪（使用者自己改過代號之後就不跟了）。這一條直接改那一格，不重畫。
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (!el || !el.id) return;
+  if (el.id === "ro-search") {
+    S.filter.q = el.value; render();
+    const again = document.getElementById("ro-search");
+    if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* search 型的欄位有的瀏覽器不給 */ } }
+    return;
+  }
+  if (el.id === "wsn-en") {
+    const slug = document.getElementById("wsn-slug");
+    if (slug && (!slug.value || slug.dataset.auto === "1")) { slug.value = UI.slugify(el.value); slug.dataset.auto = "1"; }
+    return;
+  }
+  if (el.id === "wsn-slug") el.dataset.auto = "0";
 });
 
 // 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。

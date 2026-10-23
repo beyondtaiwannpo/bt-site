@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { tabsHTML, rosterHTML, changesHTML, personEditHTML, personNewHTML, workspacesHTML, termsHTML,
+  accessGridHTML, afterEndHTML, wsName, slugify, findByPickName,
   BOARD_ROLES, boardLabel, LEVELS, levelLabel, pasteParse, nextTermId, positionFor, positionsFor, positionsLine, currentTerm, TEAMS as PEOPLE_TEAMS, setLang, T } from "../admin/people/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
@@ -61,8 +62,11 @@ test("★ 名單預設只列這一屆有職位的人；歷屆全部才看得到�
   assert.doesNotMatch(cur, /老幹部/);
   assert.match(cur, /2026-27：3 人/);
   assert.match(cur, /這是你/);
-  assert.match(cur, /apps:Curriculum Team・管/);
-  assert.match(cur, /intern-passport・改/);
+  // 2026-10-23 批 2：名單印人看的名字，不印代號。
+  assert.match(cur, /Curriculum Team 的申請・管/);
+  assert.match(cur, /實習護照・改/);
+  assert.doesNotMatch(cur, /apps:Curriculum Team・/);
+  assert.match(cur, /<input id="ro-search" type="search"/, "名單有找名字的框");
   assert.match(cur, /Director, Curriculum Team/);
   const all = rosterHTML(PEOPLE, TERMS, ME, true, "", false, { term: "all", team: "" });
   assert.equal((all.match(/data-act="person-edit"/g) || []).length, 6);
@@ -106,7 +110,13 @@ test("★ 改一個人：自己的職級關著；Senior Adviser 改不了職級�
   assert.match(other, /歷屆：/);
   assert.match(other, /data-act="member-remove" data-id="p2"/);
   assert.match(other, /data-act="person-save" data-id="p2"/);
-  assert.match(other, /apps:Curriculum Team・管/);
+  // 2026-10-23 批 2：工作區那一塊是改得動的存取格，一格一個下拉，改了就存（main.js 接 grid-level）。
+  const grid = other.slice(other.indexOf('class="table grid"'), other.indexOf("</table>", other.indexOf('class="table grid"')));
+  assert.match(grid, /data-act="grid-level" data-id="22222222-2222-2222-2222-222222222222" data-ws="apps:Curriculum Team"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管/);
+  assert.match(grid, /data-ws="res:Curriculum Team"/);
+  assert.match(grid, /data-ws="apps:Mentorship Team"[^>]*><option value="" selected>無/, "沒派的那一格是「無」");
+  assert.match(grid, /data-ws="passport"/); assert.match(grid, /data-ws="intern-passport"/);
+  assert.doesNotMatch(other, /data-act="tab" data-t="workspaces"/, "不再叫人去工作區那一頁改");
   const sa = personEditHTML(PEOPLE[1], TERMS, ME, false, "", false, null, PEOPLE, null);
   assert.match(sa, /<select id="pk-role" disabled>/);
   assert.match(sa, /<input id="pk-zh" value="小安" disabled>/);
@@ -157,17 +167,32 @@ test("★ 工作區：左邊清單、右邊誰在裡面與等級、加人只列�
               { id: "custom:old", kind: "custom", title_zh: "舊的", active: false }];
   const members = [{ user_id: PEOPLE[1].profile_id, name_zh: "小安", name_en: "", board_role: "director", level: "manage" }];
   const h = workspacesHTML(ws, "apps:Curriculum Team", members, PEOPLE, "", false, null, true);
-  assert.match(h, /class="rail-item on" href="#workspaces" data-act="ws-pick" data-ws="apps:Curriculum Team"/);
+  assert.match(h, /class="rail-item on" href="#ws=apps%3ACurriculum%20Team" data-act="ws-pick" data-ws="apps:Curriculum Team"/, "每個工作區有自己的網址");
   assert.doesNotMatch(h, /custom:old/, "停用的工作區不列");
   assert.match(h, /擁有人 小安/);
   assert.match(h, /<select data-act="ws-level" data-id="22222222-2222-2222-2222-222222222222">/);
   assert.match(h, /<option value="manage" selected>管/);
   assert.match(h, /data-act="ws-unassign" data-id="22222222-2222-2222-2222-222222222222"/);
-  const pick = h.slice(h.indexOf('id="ws-person"'), h.indexOf("</select>", h.indexOf('id="ws-person"')));
-  assert.match(pick, /<option value="33333333-3333-3333-3333-333333333333"/, "Mei 還沒在裡面，選得到");
-  assert.doesNotMatch(pick, /22222222-2222-2222-2222-222222222222/, "已經在裡面的不再列");
+  // 2026-10-23 批 2：找人改成打字（datalist），選項值是「名字 (英文名)」，main.js 用 findByPickName 對回去。
+  const pick = h.slice(h.indexOf('<datalist id="ws-people">'), h.indexOf("</datalist>"));
+  assert.match(h, /<input id="ws-person-q" list="ws-people"/);
+  assert.match(pick, /<option value="Mei">/, "Mei 還沒在裡面，選得到");
+  assert.doesNotMatch(pick, /小安/, "已經在裡面的不再列");
   assert.doesNotMatch(pick, /畢業的/, "校友派不了");
   assert.doesNotMatch(pick, /老幹部/, "沒帳號的派不了");
+  assert.equal(findByPickName(PEOPLE, "mei").person_id, "p3");
+  assert.equal(findByPickName(PEOPLE, "王平 (Paul)").person_id, "p1");
+  assert.equal(findByPickName(PEOPLE, "nobody"), null);
+  // 新增工作區是一張表單，不收在摺疊裡：名稱、擁有人、代號、一開始就放進去的人各自一個等級。
+  assert.match(h, /<input id="wsn-en"/); assert.match(h, /<input id="wsn-slug"/);
+  assert.match(h, /name="wsn-member" value="33333333-3333-3333-3333-333333333333"/);
+  assert.match(h, /<select id="wsn-lv-33333333-3333-3333-3333-333333333333"/);
+  assert.doesNotMatch(h, /<details/, "新增工作區不再收在摺疊裡");
+  assert.equal(slugify("Winter camp 2027!"), "winter-camp-2027");
+  assert.equal(wsName("apps:Curriculum Team", []), "Curriculum Team 的申請");
+  assert.equal(wsName("apps:Curriculum Team", ws), "Curriculum Team 的申請");
+  assert.equal(wsName("intern-passport", []), "實習護照");
+  assert.equal(wsName("custom:camp", []), "camp");
   assert.match(h, /data-act="ws-assign" data-ws="apps:Curriculum Team"/);
   assert.match(h, /data-act="ws-create"/);
   assert.doesNotMatch(workspacesHTML(ws, null, [], PEOPLE, "", false, null, false), /data-act="ws-create"/);
@@ -307,4 +332,46 @@ test("★ 同一屆好幾個職位：名單接成一句、改一個人一列一�
   assert.match(save, /before\.team \|\| ""\) !== r\.team\) posOps\.push\(\{ del: r\.orig \}\)/, "換了 team 要先刪舊的那一筆");
   assert.match(save, /err\.posTeamDup/, "同一個 team 兩筆要擋");
   assert.match(src, /D\.personEmail\(/);
+});
+
+// 2026-10-23 第三次重整批 2：存取格、列上改 team、結束之後要做的事。
+test("★ 存取格：六個 team 兩欄加兩本護照加自訂；還沒載到工作區清單每一格都畫；載到了只畫存在的", () => {
+  const all = accessGridHTML(PEOPLE[2], [], false);
+  assert.equal((all.match(/data-act="grid-level"/g) || []).length, 6 * 2 + 2);
+  assert.match(all, /data-ws="intern-passport"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit" selected>改/);
+  const some = accessGridHTML(PEOPLE[2], [{ id: "apps:Curriculum Team", kind: "apps", active: true }, { id: "custom:camp", kind: "custom", title_en: "Winter camp", active: true }], false);
+  assert.equal((some.match(/data-act="grid-level"/g) || []).length, 2, "只有存在的工作區有下拉，其他是一條橫線");
+  assert.match(some, /Winter camp/);
+  assert.match(accessGridHTML(PEOPLE[2], [], true), /disabled/);
+});
+
+test("名單：還沒填 team 的幹部列上直接有 team 下拉；找名字縮清單", () => {
+  const noTeam = Object.assign({}, PEOPLE[2], { team: "" });
+  const h = rosterHTML([PEOPLE[0], noTeam], TERMS, ME, true, "", false, null, []);
+  assert.match(h, /<select data-act="row-team" data-id="33333333-3333-3333-3333-333333333333"/);
+  assert.doesNotMatch(h, /data-act="row-team" data-id="11111111/, "有 team 的沒有那個下拉");
+  const q = rosterHTML(PEOPLE, TERMS, ME, true, "", false, { q: "mei" }, []);
+  assert.equal((q.match(/data-act="person-edit"/g) || []).length, 1);
+  assert.match(q, /Mei/);
+});
+
+test("結束這一屆之後：留下的人一列一顆「改」，有收起來的鈕", () => {
+  const h = afterEndHTML({ term: "2026-27", kept: [PEOPLE[1].profile_id, PEOPLE[2].profile_id] }, PEOPLE, false);
+  assert.match(h, /2026-27 結束了/);
+  assert.match(h, /data-act="person-edit" data-id="p2"/); assert.match(h, /data-act="person-edit" data-id="p3"/);
+  assert.doesNotMatch(h, /data-id="p1"/);
+  assert.match(h, /data-act="after-dismiss"/);
+  assert.equal(afterEndHTML(null, PEOPLE, false), "");
+});
+
+test("★ 主程式：存取格改了就送、送反向的那一筆當復原；存了 Director 的職位問一句配兩個工作區；工作區有自己的網址", () => {
+  const src = readFileSync("admin/people/src/main.js", "utf8");
+  const grid = src.slice(src.indexOf('dataset.act === "grid-level"'), src.indexOf('dataset.act === "row-team"'));
+  assert.match(grid, /D\.unassign\(id, ws\)/); assert.match(grid, /D\.assign\(id, ws, lv\)/);
+  assert.match(grid, /S\.undo = /, "存取格要有復原");
+  assert.match(src, /T\("pe\.grantBoth"/, "Director 職位存完要問配兩個工作區");
+  assert.doesNotMatch(src.slice(src.indexOf("const dirTeam"), src.indexOf("S.undo = { label: T(\"pe.grantBoth\"")), /await D\.assign/, "配工作區不能自動送，要等他按");
+  assert.match(src.slice(src.indexOf("S.undo = { label: T(\"pe.grantBoth\""), src.indexOf("await reopenPerson(p.person_id, T(\"msg.personSaved\"")), /fn: async \(\) => \{[\s\S]*await D\.assign\(pid, "apps:" \+ dirTeam, "manage"\)/, "按了那顆鈕才送兩筆");
+  assert.match(src, /"#ws=" \+ encodeURIComponent/); assert.match(src, /"#person=" \+ encodeURIComponent/);
+  assert.match(src, /key\.startsWith\("ws="\)/); assert.match(src, /key\.startsWith\("person="\)/);
 });
