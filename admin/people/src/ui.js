@@ -33,7 +33,7 @@ export const GROUPS = [
   { key: "forms",     label: { zh: "申請",     en: "Applications" }, href: "/admin/",           who: "cadre",        hint: { zh: "申請表、審核、簽到、行前信", en: "Forms, review, check-in, notices" } },
   { key: "site",      label: { zh: "對外",     en: "Public site" },  href: "/admin/site/",      who: "cadre",        hint: { zh: "資源、團隊頁、校友頁、信件文案", en: "Resources, team page, alumni page, email copy" } },
   { key: "passports", label: { zh: "護照",     en: "Passports" },    href: "/admin/passports/", who: "intern-staff", hint: { zh: "兩本護照的格子", en: "Boxes in both passports" } },
-  { key: "people",    label: { zh: "人與權限", en: "People" },       href: "/admin/people/",    who: "president",    hint: { zh: "邀請碼、職位、team", en: "Invite codes, roles, teams" } },
+  { key: "people",    label: { zh: "人與權限", en: "People" },       href: "/admin/people/",    who: "senior",       hint: { zh: "名單、職級、工作區、屆別、邀請碼", en: "Roster, ranks, workspaces, terms, invite codes" } },
 ];
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
 // 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
@@ -48,22 +48,26 @@ export const ITEMS = [
   { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "intern-staff" },
   { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "president" },
   { group: "passports", key: "cities",  label: { zh: "城市",     en: "Cities" },          who: "president" },
-  { group: "people",    key: "roster",  label: { zh: "幹部名單", en: "Roster" },          who: "president" },
-  { group: "people",    key: "invites", label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
-  { group: "people",    key: "changes", label: { zh: "變動紀錄", en: "Change log" },      who: "president" },
+  { group: "people",    key: "roster",     label: { zh: "幹部名單", en: "Roster" },          who: "senior" },
+  { group: "people",    key: "workspaces", label: { zh: "工作區",   en: "Workspaces" },      who: "senior" },
+  { group: "people",    key: "terms",      label: { zh: "屆別",     en: "Terms" },           who: "senior" },
+  { group: "people",    key: "invites",    label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
+  { group: "people",    key: "changes",    label: { zh: "變動紀錄", en: "Change log" },      who: "senior" },
 ];
-const WHY = { president: "why.president", "intern-staff": "why.internStaff" };
+const WHY = { president: "why.president", senior: "why.senior", "intern-staff": "why.internStaff" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
 function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
   if (who === "cadre") return true;
   if (who === "president") return me.board === "president";
-  if (who === "intern-staff") return me.board === "president" || String(me.team || "").includes("Internship Team");
+  // 2026-10-24 起職級有四級：senior 是 Co-President 加 Senior Adviser（跟資料庫的 is_senior() 同一條規則）。
+  if (who === "senior") return me.board === "president" || me.board === "senior_adviser";
+  if (who === "intern-staff") return me.board === "president" || me.board === "senior_adviser" || String(me.team || "").includes("Internship Team");
   return false;
 }
 export function canEnter(g, me) { return allowed(g.who, me); }
 export function canSee(item, me) { return allowed(item.who, me); }
-const BOARD_KEY = { member: "board.member", director: "board.director", president: "board.president" };
+const BOARD_KEY = { member: "board.member", director: "board.director", senior_adviser: "board.senior", president: "board.president" };
 export const boardName = board => T(BOARD_KEY[board] || "board.member");
 
 // 側欄。group 是現在在哪一組，tab 是哪一個分頁，counts 是 { <key>: 數字 }（有才顯示，批 2 的首頁會餵）。
@@ -174,60 +178,131 @@ export function parseTeams(raw) {
   }
   return out;
 }
-// 畫面上一律叫「職位」，三個值顯示成中文；board_role 這個字只留在程式與文件裡（設計文件第 3 段第一輪）。
-// label 與 hint 是字典的鍵，畫的時候才 T()。
+// ═══════════════════════════════════════════════════════════════════════
+// 職級與指派（2026-10-24，權限重新設計批 2）。設計：docs/2026-10-23-權限重新設計.md。
+// 畫面上一律叫「職級」，四個值顯示成 Associate / Director / Senior Adviser / Co-President；
+// board_role 與 member 這兩個字只留在程式與文件裡。label 與 hint 是字典的鍵，畫的時候才 T()。
+// 每一顆按鈕背後都是資料庫的一支函式，門在那裡；這裡少畫一顆不是安全機制。
+// ═══════════════════════════════════════════════════════════════════════
 export const BOARD_ROLES = [
-  { v: "member",    label: "board.member",    hint: "role.member.hint" },
-  { v: "director",  label: "board.director",  hint: "role.director.hint" },
-  { v: "president", label: "board.president", hint: "role.president.hint" },
+  { v: "member",         label: "board.member",    hint: "role.member.hint" },
+  { v: "director",       label: "board.director",  hint: "role.director.hint" },
+  { v: "senior_adviser", label: "board.senior",    hint: "role.senior.hint" },
+  { v: "president",      label: "board.president", hint: "role.president.hint" },
 ];
 export const boardLabel = v => T((BOARD_ROLES.find(r => r.v === v) || BOARD_ROLES[0]).label);
-const FIELD_KEY = { board_role: "field.board_role", team: "field.team" };
+export const LEVELS = ["view", "edit", "manage"];
+export const levelLabel = v => T("level." + (LEVELS.includes(v) ? v : "view"));
+const FIELD_KEY = { board_role: "field.board_role", team: "field.team", name: "field.name", role: "field.role",
+  position: "field.position", assignment: "field.assignment", removed: "field.removed", claimed: "field.claimed",
+  merged: "field.merged", term: "field.term" };
 const fmtDate = v => String(v || "").slice(0, 16).replace("T", " ");
-const valueZh = (field, v) => field === "board_role" ? boardLabel(v) : (v || T("value.none"));
+const ROLE_NAME = { cadre: "role.cadre", alumni: "role.alumni", student: "role.student", intern: "role.intern" };
+// 紀錄裡的值翻成人看的字。指派存成「等級@工作區」，職位存成「屆別:名稱/team」。
+function valueZh(field, v) {
+  if (v == null || v === "") return T("value.none");
+  if (field === "board_role") return boardLabel(v);
+  if (field === "role") return ROLE_NAME[v] ? T(ROLE_NAME[v]) : v;
+  if (field === "assignment") {
+    const i = String(v).indexOf("@");
+    if (i < 0) return v;
+    const lv = String(v).slice(0, i); const ws = String(v).slice(i + 1);
+    return (lv ? (LEVELS.includes(lv) ? levelLabel(lv) : lv) : T("value.none")) + " @ " + ws;
+  }
+  return v;
+}
+// 工作區在畫面上的名字：看語言挑中文或英文標題，沒有就用代號。
+export function wsLabel(w) {
+  if (!w) return "";
+  const t = lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh);
+  return t || w.id;
+}
+// 一個人在某一屆的職位（roster() 回的 positions 是 [{ term, title_zh, title_en, team }]）。
+export function positionFor(p, termId) {
+  return (p && Array.isArray(p.positions) ? p.positions : []).find(x => x.term === termId) || null;
+}
+export const positionTitle = pos => pos ? ((lang() === "zh" ? (pos.title_zh || pos.title_en) : (pos.title_en || pos.title_zh)) || "") : "";
+export const currentTerm = terms => (terms || []).find(t => t.status === "current") || null;
+// 2026-27 → 2027-28。對不出來就回空字串，讓人自己填。
+export function nextTermId(cur) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(cur || ""));
+  if (!m) return "";
+  const y = Number(m[1]) + 1;
+  return `${y}-${String((y + 1) % 100).padStart(2, "0")}`;
+}
+// 貼一整屆：一行一個人，逗號或 tab 隔開：中文名, 英文名, 職位, team。
+// 回 { rows, bad }，bad 是讀不出來的行號（一行連一個名字都沒有）。
+export function pasteParse(text) {
+  const rows = []; const bad = [];
+  String(text || "").split(/\r?\n/).forEach((line, i) => {
+    const s = line.trim();
+    if (!s) return;
+    const c = s.split(/\t|,|，/).map(x => x.trim());
+    const r = { name_zh: c[0] || "", name_en: c[1] || "", title_en: c[2] || "", title_zh: c[2] || "", team: c[3] || "" };
+    if (!r.name_zh && !r.name_en) { bad.push(i + 1); return; }
+    rows.push(r);
+  });
+  return { rows, bad };
+}
+const personName = p => namesOf({ name_zh: p.name_zh, name_en: p.name_en });
+const hasAccount = p => !!p.profile_id;
 
-// 主畫面：最近的變動在上面，名單在下面。rows 是 loadRoster()，changes 是 loadRoleChanges()，
-// privileged 是 loadPrivilegedTeams()，meId 是自己（自己那一列不給降級）。
-export function rosterHTML(rows, changes, privileged, meId, msg, busy, teamFilter) {
-  const list = rows || [];
+// 幹部名單。people 是 roster()；filter = { term: 屆別代號或 "all", team: "" 全部 / "__none" / team 名 }。
+// 預設只列現在這一屆有職位的人，切到「全部」才看得到歷屆與沒有帳號的人。
+export function rosterHTML(people, terms, meId, isPres, msg, busy, filter) {
+  const list = people || [];
+  const cur = currentTerm(terms);
+  const f = Object.assign({ term: cur ? cur.id : "all", team: "" }, filter || {});
   const dis = busy ? " disabled" : "";
-  const privNames = (privileged || []).map(p => p.name);
-  // team 的篩選：清單裡出現過的 team 都列出來，一個人在兩個 team 就兩個篩選都出現，但清單裡永遠只有一列。
-  const allTeams = [...new Set(list.flatMap(p => parseTeams(p.team)))].sort((a, b) => a.localeCompare(b));
-  const noTeam = list.filter(p => !parseTeams(p.team).length).length;
-  const shown = !teamFilter ? list
-    : teamFilter === "__none" ? list.filter(p => !parseTeams(p.team).length)
-    : list.filter(p => parseTeams(p.team).includes(teamFilter));
-  // 沒有名字的排最後，並標出來。
+  const inTerm = p => f.term === "all" || !!positionFor(p, f.term);
+  const teamsOf = p => parseTeams(p.team).length ? parseTeams(p.team) : (positionFor(p, f.term) && positionFor(p, f.term).team ? [positionFor(p, f.term).team] : []);
+  const base = list.filter(inTerm);
+  const allTeams = [...new Set(base.flatMap(teamsOf))].sort((a, b) => a.localeCompare(b));
+  const noTeam = base.filter(p => !teamsOf(p).length).length;
+  const shown = !f.team ? base : f.team === "__none" ? base.filter(p => !teamsOf(p).length) : base.filter(p => teamsOf(p).includes(f.team));
   const noName = T("common.noName");
-  const sorted = shown.slice().sort((a, b) => Number(namesOf(a).name === noName) - Number(namesOf(b).name === noName));
-  const chip = (v, label, n) => `<button class="chip${(teamFilter || "") === v ? " on" : ""}" data-act="roster-team" data-team="${esc(v)}">${esc(label)}${n != null ? ` ${n}` : ""}</button>`;
-  const filters = `<div class="chips" style="margin-bottom:14px">${chip("", T("ro.all"), list.length)}${
-    allTeams.map(t => chip(t, t.replace(/\s*Team$/i, ""), list.filter(p => parseTeams(p.team).includes(t)).length)).join("")}${
-    noTeam ? chip("__none", T("ro.noTeam"), noTeam) : ""}</div>`;
+  // 有帳號的在前，沒有名字的最後。
+  const sorted = shown.slice().sort((a, b) => Number(hasAccount(b)) - Number(hasAccount(a)) || Number(personName(a).name === noName) - Number(personName(b).name === noName));
+  const chip = (act, v, label, n, on) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-v="${esc(v)}"${dis}>${esc(label)}${n != null ? ` ${n}` : ""}</button>`;
+  const termChips = `<div class="chips" style="margin-bottom:8px">${
+    (terms || []).map(t => chip("roster-term", t.id, t.id + (t.status === "current" ? T("ro.curMark") : ""), list.filter(p => positionFor(p, t.id)).length, f.term === t.id)).join("")}${
+    chip("roster-term", "all", T("ro.allTerms"), list.length, f.term === "all")}</div>`;
+  const teamChips = `<div class="chips" style="margin-bottom:14px">${chip("roster-team", "", T("ro.all"), base.length, !f.team)}${
+    allTeams.map(t => chip("roster-team", t, t.replace(/\s*Team$/i, ""), base.filter(p => teamsOf(p).includes(t)).length, f.team === t)).join("")}${
+    noTeam ? chip("roster-team", "__none", T("ro.noTeam"), noTeam, f.team === "__none") : ""}</div>`;
   const tr = p => {
-    const { name, alt } = namesOf(p);
-    const teams = parseTeams(p.team);
-    return `<tr>
-      <td class="t-main"><b>${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}</b>${p.id === meId ? ` <span class="tag">${T("ro.you")}</span>` : ""}${name === noName ? ` <span class="tag warn">${T("ro.noName")}</span>` : ""}</td>
-      <td><span class="tag${p.board_role === "president" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span></td>
-      <td>${teams.length ? teams.map(t => esc(t) + (privNames.includes(t) ? T("ro.priv") : "")).join(T("punct.list")) : `<span class="mini">${T("ro.noTeamCell")}</span>`}</td>
-      <td class="t-act"><button class="btn quiet sm" data-act="person-edit" data-id="${esc(p.id)}"${dis}>${T("ro.edit")}</button></td>
+    const { name, alt } = personName(p);
+    const pos = positionFor(p, f.term === "all" ? (cur ? cur.id : "") : f.term);
+    const lastPos = f.term === "all" && !pos && p.positions && p.positions.length ? p.positions[0] : null;
+    const ws = Array.isArray(p.workspaces) ? p.workspaces : [];
+    const dup = Array.isArray(p.maybe_dup) && p.maybe_dup.length;
+    return `<tr${hasAccount(p) ? "" : ' class="off"'}>
+      <td class="t-main"><b>${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}</b>${
+        p.profile_id === meId ? ` <span class="tag">${T("ro.you")}</span>` : ""}${
+        name === noName ? ` <span class="tag warn">${T("ro.noName")}</span>` : ""}${
+        !hasAccount(p) ? ` <span class="tag draft">${T("ro.noAccount")}</span>` : p.role !== "cadre" ? ` <span class="tag">${esc(ROLE_NAME[p.role] ? T(ROLE_NAME[p.role]) : p.role)}</span>` : ""}${
+        dup ? ` <span class="tag warn">${T("ro.maybeDup")}</span>` : ""}${
+        p.pending_code ? `<div class="mini">${T("ro.pendingCode", { code: esc(p.pending_code) })}</div>` : ""}</td>
+      <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
+      <td>${pos ? `${esc(positionTitle(pos))}${pos.team ? `<div class="mini">${esc(pos.team)}</div>` : ""}`
+               : lastPos ? `<span class="mini">${esc(positionTitle(lastPos))}・${esc(lastPos.term)}</span>` : `<span class="mini">${T("ro.noPosition")}</span>`}</td>
+      <td>${ws.length ? ws.map(w => `<span class="tag">${esc(w.id)}・${esc(levelLabel(w.level))}</span>`).join(" ") : `<span class="mini">${hasAccount(p) && p.role === "cadre" ? T("ro.noWs") : ""}</span>`}</td>
+      <td class="t-act"><button class="btn quiet sm" data-act="person-edit" data-id="${esc(p.person_id)}"${dis}>${T("ro.edit")}</button></td>
     </tr>`;
   };
-  return pageHead(T("ro.title"), T("ro.lede", { n: list.length }))
+  return pageHead(T("ro.title"), T("ro.lede", { n: base.length, term: f.term === "all" ? T("ro.allTerms") : f.term }),
+      [{ act: "person-new", label: T("ro.addPast"), disabled: busy }])
     + msgHTML(msg)
-    + `<div class="note">${T("ro.note", { priv: esc(privNames.join(T("punct.list")) || T("ro.privFallback")) })}</div>`
-    + sectionHTML("", filters + (sorted.length
-      ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ro.role")}</th><th>${T("ro.team")}</th><th></th></tr></thead><tbody>${sorted.map(tr).join("")}</tbody></table>`
+    + `<div class="note">${isPres ? T("ro.note") : T("ro.noteSenior")}</div>`
+    + sectionHTML("", termChips + teamChips + (sorted.length
+      ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ro.rank")}</th><th>${T("ro.position")}</th><th>${T("ro.ws")}</th><th></th></tr></thead><tbody>${sorted.map(tr).join("")}</tbody></table>`
       : list.length ? emptyHTML(T("ro.emptyFilter"), T("ro.emptyFilterHint")) : emptyHTML(T("ro.empty"), T("ro.emptyHint"))), { id: "roster" });
 }
 
-// 變動紀錄（2026-10-19 起自己一頁，側欄「人與權限 > 變動紀錄」）。
-// 這是帳本不是通知：不寄信、不彈提示，另一位 Co-President 登入就看得到。
-export function changesHTML(changes, rows, msg) {
-  const byId = Object.fromEntries((rows || []).map(p => [p.id, p]));
-  const who = id => { const p = byId[id]; return p ? namesOf(p).name : T("ch.gone"); };
+// 變動紀錄（帳本不是通知）。people 用來把 uuid 翻成名字。
+export function changesHTML(changes, people, msg) {
+  const byId = Object.fromEntries((people || []).filter(p => p.profile_id).map(p => [p.profile_id, p]));
+  const who = id => { const p = byId[id]; return p ? personName(p).name : (id ? T("ch.gone") : T("ch.system")); };
   const logRows = (changes || []).map(c => `<li>
     <div class="fhead"><b>${esc(c.target_name || who(c.target))}</b>
       <span class="tag">${esc(FIELD_KEY[c.field] ? T(FIELD_KEY[c.field]) : c.field)}</span></div>
@@ -240,36 +315,232 @@ export function changesHTML(changes, rows, msg) {
       : emptyHTML(T("ch.empty"), T("ch.emptyHint")), { id: "changes" });
 }
 
-// 改一個人的職位與 team。draft 留住存檔被擋時剛填的東西。
-export function personEditHTML(p, privileged, meId, msg, busy, draft) {
-  const cur = draft || { board_role: p.board_role || "member", team: p.team || "" };
-  const picked = parseTeams(cur.team);
+const teamSelect = (id, val, dis) => {
+  const extra = val && !TEAMS.includes(val) ? [val] : [];
+  return `<select id="${id}"${dis}><option value=""${!val ? " selected" : ""}>${T("value.none")}</option>${
+    [...TEAMS, ...extra].map(t => `<option value="${esc(t)}"${val === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
+};
+
+// 改一個人：職級（只有 Co-President 改得了，自己那一列關著）、名字（只有 Co-President）、
+// 這一屆的職位、team 標籤（只是標籤）、他在哪幾個工作區（唯讀，去工作區頁改）、
+// 最底下是危險的事：發校友碼、合併、刪除成員或刪除紀錄。draft 留住存檔被擋時剛填的東西。
+// remove = { typed }：按了「刪除成員」之後第二步的狀態（要把名字打一次）。
+export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people, remove) {
+  const cur = currentTerm(terms);
+  const d = draft || {};
+  const termId = d.term || (cur ? cur.id : ((terms || [])[0] || {}).id || "");
+  const pos = positionFor(p, termId) || {};
+  const v = Object.assign({ board_role: p.board_role || "member", name_zh: p.name_zh || "", name_en: p.name_en || "",
+    title_zh: pos.title_zh || "", title_en: pos.title_en || "", pteam: pos.team || "", team: p.team || "" }, d);
+  const picked = parseTeams(v.team);
   const extra = picked.filter(t => !TEAMS.includes(t));
-  const privNames = (privileged || []).map(x => x.name);
   const dis = busy ? " disabled" : "";
-  const { name, alt } = namesOf(p);
-  const self = p.id === meId;
+  const { name, alt } = personName(p);
+  const self = p.profile_id === meId;
+  const cadre = hasAccount(p) && p.role === "cadre";
+  const ws = Array.isArray(p.workspaces) ? p.workspaces : [];
+  const dups = (people || []).filter(o => Array.isArray(p.maybe_dup) && p.maybe_dup.includes(o.person_id));
   const box = t => `<label class="check tpick">
     <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}${dis}>
-    <span>${esc(t.replace(/\s*Team$/i, ""))}${privNames.includes(t) ? T("ro.priv") : ""}</span></label>`;
-  return pageHead(`${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}`,
-      T("pe.lede", { role: esc(boardLabel(p.board_role)), team: p.team ? T("pe.team", { team: esc(p.team) }) : "" }), [], { act: "roster-back", label: T("pe.back") })
-    + msgHTML(msg)
-    + sectionHTML("", `<label><i>${T("pe.role")}</i><select id="pk-role"${self ? " disabled" : dis}>
-      ${BOARD_ROLES.map(r => `<option value="${r.v}"${cur.board_role === r.v ? " selected" : ""}>${esc(T(r.label))}（${esc(T(r.hint))}）</option>`).join("")}
+    <span>${esc(t.replace(/\s*Team$/i, ""))}</span></label>`;
+  const lede = !hasAccount(p) ? T("pe.ledeNoAccount") : cadre ? T("pe.lede", { role: esc(boardLabel(p.board_role)) }) : T("pe.ledeOther", { role: esc(ROLE_NAME[p.role] ? T(ROLE_NAME[p.role]) : p.role) });
+  const rankSec = cadre ? sectionHTML(T("pe.rank"), `<label><i>${T("pe.rank")}</i><select id="pk-role"${self || !isPres ? " disabled" : dis}>
+      ${BOARD_ROLES.map(r => `<option value="${r.v}"${v.board_role === r.v ? " selected" : ""}>${esc(T(r.label))}（${esc(T(r.hint))}）</option>`).join("")}
     </select></label>
-    ${self ? `<div class="mini" style="margin:-6px 0 14px">${T("pe.selfNote")}</div>` : ""}
-    <fieldset class="teams" style="margin-bottom:14px">
-      <legend>${T("pe.teams")}</legend>
-      <div class="tgrid">${TEAMS.map(box).join("")}${extra.map(t => box(t)).join("")}</div>
-    </fieldset>
+    ${self ? `<div class="mini" style="margin:-6px 0 14px">${T("pe.selfNote")}</div>` : !isPres ? `<div class="mini" style="margin:-6px 0 14px">${T("pe.presOnly")}</div>` : `<div class="mini" style="margin:-6px 0 14px">${T("pe.rankNote")}</div>`}`) : "";
+  const nameSec = sectionHTML(T("pe.name"), `<div class="two">
+      <label><i>${T("pe.nameZh")}</i><input id="pk-zh" value="${esc(v.name_zh)}"${isPres ? dis : " disabled"}></label>
+      <label><i>${T("pe.nameEn")}</i><input id="pk-en" value="${esc(v.name_en)}"${isPres ? dis : " disabled"}></label>
+    </div>${!isPres ? `<div class="mini">${T("pe.presOnly")}</div>` : ""}`);
+  const posSec = sectionHTML(T("pe.position"), `<label><i>${T("pe.term")}</i><select id="pk-term" data-act="person-term"${dis}>${
+      (terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
+    <div class="two">
+      <label><i>${T("pe.titleEn")}</i><input id="pk-ten" value="${esc(v.title_en)}" placeholder="Director, Curriculum Team"${dis}></label>
+      <label><i>${T("pe.titleZh")}</i><input id="pk-tzh" value="${esc(v.title_zh)}" placeholder="${esc(T("pe.titleZhPh"))}"${dis}></label>
+    </div>
+    <label><i>${T("pe.posTeam")}</i>${teamSelect("pk-pteam", v.pteam, dis)}</label>
+    <div class="mini">${T("pe.posNote", { term: esc(termId) })}</div>${
+    positionFor(p, termId) ? `<div class="row"><button class="btn ghost sm" data-act="position-delete" data-id="${esc(p.person_id)}" data-term="${esc(termId)}"${dis}>${T("pe.posDelete")}</button></div>` : ""}${
+    (p.positions || []).length > 1 ? `<div class="mini" style="margin-top:8px">${T("pe.history")}${esc((p.positions || []).map(x => `${x.term}: ${(lang() === "zh" ? (x.title_zh || x.title_en) : (x.title_en || x.title_zh)) || ""}`).join(T("punct.list")))}</div>` : ""}`);
+  const teamSec = cadre ? sectionHTML(T("pe.teams"), `<div class="tgrid">${TEAMS.map(box).join("")}${extra.map(t => box(t)).join("")}</div>
+    <div class="mini" style="margin-top:8px">${T("pe.teamsNote")}</div>`) : "";
+  const wsSec = cadre ? sectionHTML(T("pe.ws"), ws.length
+      ? `<div class="chips">${ws.map(w => `<a class="chip" href="#workspaces" data-act="tab" data-t="workspaces" data-ws="${esc(w.id)}">${esc(w.id)}・${esc(levelLabel(w.level))}</a>`).join("")}</div>`
+      : `<div class="mini">${T("pe.noWs")}</div>`,
+    { hint: T("pe.wsHint") }) : "";
+  const dupSec = dups.length ? sectionHTML(T("pe.dup"), `<div class="note">${T("pe.dupNote")}</div>${
+    dups.map(o => `<div class="row"><b>${esc(personName(o).name)}</b>${hasAccount(o) ? ` <span class="tag">${T("pe.dupHasAccount")}</span>` : ` <span class="tag draft">${T("ro.noAccount")}</span>`}
+      ${isPres ? `<button class="btn ghost sm" data-act="person-merge" data-keep="${esc(p.person_id)}" data-drop="${esc(o.person_id)}"${dis}>${T("pe.mergeInto")}</button>` : ""}</div>`).join("")}`) : "";
+  let danger = "";
+  if (isPres) {
+    if (!hasAccount(p)) {
+      danger = sectionHTML(T("pe.dangerNoAccount"), `${p.pending_code
+        ? `<div class="note">${T("pe.pendingCode", { code: esc(p.pending_code) })}</div>`
+        : `<div class="row"><input id="pk-code" value="${esc(d.code || "")}" placeholder="bt-xxxxxx" style="max-width:220px"${dis}>
+           <button class="btn ghost sm" data-act="person-code" data-id="${esc(p.person_id)}"${dis}>${T("pe.issueCode")}</button></div>
+           <div class="mini">${T("pe.issueCodeNote")}</div>`}
+        <div class="row" style="margin-top:14px"><button class="btn danger sm" data-act="record-delete" data-id="${esc(p.person_id)}"${dis}>${T("pe.deleteRecord")}</button></div>
+        <div class="mini">${T("pe.deleteRecordNote")}</div>`);
+    } else if (!self) {
+      danger = sectionHTML(T("pe.danger"), remove
+        ? `<div class="note">${T("pe.removeList", { name: esc(name) })}</div>
+           <label><i>${T("pe.removeType", { name: esc(name) })}</i><input id="pk-confirm" value="${esc(remove.typed || "")}" autocomplete="off"${dis}></label>
+           <div class="row"><button class="btn danger" data-act="member-remove-go" data-id="${esc(p.person_id)}" data-name="${esc(name)}"${dis}>${T("pe.removeGo")}</button>
+           <button class="btn ghost" data-act="member-remove-cancel"${dis}>${T("common.cancel")}</button></div>`
+        : `<div class="row"><button class="btn danger sm" data-act="member-remove" data-id="${esc(p.person_id)}"${dis}>${T("pe.remove")}</button></div>
+           <div class="mini">${T("pe.removeNote")}</div>`);
+    }
+  }
+  return pageHead(`${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}`, lede, [], { act: "roster-back", label: T("pe.back") })
+    + msgHTML(msg)
+    + rankSec + nameSec + posSec + teamSec + wsSec
+    + `<div class="form-foot" style="margin-bottom:28px">
+      <button class="btn" data-act="person-save" data-id="${esc(p.person_id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
+      <button class="btn ghost" data-act="roster-back"${dis}>${T("common.cancel")}</button>
+    </div>`
+    + dupSec + danger;
+}
+
+// 加一筆過去的紀錄（沒有帳號的人）：名字加一筆職位。
+export function personNewHTML(terms, msg, busy, draft) {
+  const d = draft || {};
+  const dis = busy ? " disabled" : "";
+  const termId = d.term || ((terms || []).find(t => t.status !== "current") || (terms || [])[0] || {}).id || "";
+  return pageHead(T("pn.title"), T("pn.lede"), [], { act: "roster-back", label: T("pe.back") })
+    + msgHTML(msg)
+    + sectionHTML("", `<div class="two">
+      <label><i>${T("pe.nameZh")}</i><input id="pn-zh" value="${esc(d.name_zh || "")}"${dis}></label>
+      <label><i>${T("pe.nameEn")}</i><input id="pn-en" value="${esc(d.name_en || "")}"${dis}></label>
+    </div>
+    <label><i>${T("pe.term")}</i><select id="pn-term"${dis}>${(terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
+    <div class="two">
+      <label><i>${T("pe.titleEn")}</i><input id="pn-ten" value="${esc(d.title_en || "")}" placeholder="Associate, Marketing Team"${dis}></label>
+      <label><i>${T("pe.titleZh")}</i><input id="pn-tzh" value="${esc(d.title_zh || "")}"${dis}></label>
+    </div>
+    <label><i>${T("pe.posTeam")}</i>${teamSelect("pn-pteam", d.pteam || "", dis)}</label>
+    <label><i>${T("pn.note")}</i><input id="pn-note" value="${esc(d.note || "")}" placeholder="${esc(T("pn.notePh"))}"${dis}></label>
+    <div class="note">${T("pn.order")}</div>
     <div class="form-foot">
-      <button class="btn" data-act="person-save" data-id="${esc(p.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
+      <button class="btn" data-act="person-create"${dis}>${busy ? T("common.saving") : T("pn.create")}</button>
       <button class="btn ghost" data-act="roster-back"${dis}>${T("common.cancel")}</button>
     </div>`);
 }
 
-// 只有 Co-President 進得來。真正的門在資料庫那幾支函式的第一句（is_president()），
+// 工作區：左邊清單、右邊這個工作區裡有誰、底下加人。sel 是選中的工作區 id，members 是 workspace_members(sel)。
+// draft = { person, level, slug, title_zh, title_en, owner }。canCreate 是能不能新增工作區（Co-President 與 Senior Adviser）。
+export function workspacesHTML(workspaces, sel, members, people, msg, busy, draft, canCreate) {
+  const list = (workspaces || []).filter(w => w.active !== false);
+  const d = draft || {};
+  const dis = busy ? " disabled" : "";
+  const w = list.find(x => x.id === sel) || null;
+  const cadres = (people || []).filter(p => hasAccount(p) && p.role === "cadre");
+  const inWs = new Set((members || []).map(m => m.user_id));
+  const byProfile = Object.fromEntries(cadres.map(p => [p.profile_id, p]));
+  const KIND = { passport: "ws.kind.passport", "intern-passport": "ws.kind.intern", apps: "ws.kind.apps", res: "ws.kind.res", custom: "ws.kind.custom" };
+  const li = x => `<a class="rail-item${x.id === sel ? " on" : ""}" href="#workspaces" data-act="ws-pick" data-ws="${esc(x.id)}">${esc(wsLabel(x))}<span class="rail-count">${esc(T(KIND[x.kind] || "ws.kind.custom"))}</span></a>`;
+  const left = list.length ? `<div class="wslist">${list.map(li).join("")}</div>` : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
+  const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
+  const memberRow = m => `<tr>
+      <td class="t-main"><b>${esc(namesOf(m).name)}${namesOf(m).alt ? `<span class="alt">${esc(namesOf(m).alt)}</span>` : ""}</b> <span class="tag">${esc(boardLabel(m.board_role))}</span></td>
+      <td><select data-act="ws-level" data-id="${esc(m.user_id)}"${dis}>${LEVELS.map(l => `<option value="${l}"${m.level === l ? " selected" : ""}>${esc(levelLabel(l))}</option>`).join("")}</select></td>
+      <td class="t-act"><button class="btn quiet sm" data-act="ws-unassign" data-id="${esc(m.user_id)}"${dis}>${T("ws.remove")}</button></td>
+    </tr>`;
+  const right = !w ? `<div class="empty"><b>${T("ws.pickOne")}</b></div>` : `
+    <h2>${esc(wsLabel(w))}<span class="hint">${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
+    <div class="note">${T("ws.levels")}</div>
+    ${(members || []).length
+      ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ws.level")}</th><th></th></tr></thead><tbody>${members.map(memberRow).join("")}</tbody></table>`
+      : emptyHTML(T("ws.nobody"), T("ws.nobodyHint"))}
+    <div class="card" style="margin-top:16px"><h2>${T("ws.add")}</h2>
+      <div class="two">
+        <label><i>${T("ws.who")}</i><select id="ws-person"${dis}><option value="">${T("ws.whoPh")}</option>${
+          cadres.filter(p => !inWs.has(p.profile_id)).map(p => `<option value="${esc(p.profile_id)}"${d.person === p.profile_id ? " selected" : ""}>${esc(personName(p).name)}${p.board_role !== "member" ? `（${esc(boardLabel(p.board_role))}）` : ""}</option>`).join("")}</select></label>
+        <label><i>${T("ws.level")}</i><select id="ws-levelnew"${dis}>${LEVELS.map(l => `<option value="${l}"${(d.level || "view") === l ? " selected" : ""}>${esc(levelLabel(l))}</option>`).join("")}</select></label>
+      </div>
+      <div class="row"><button class="btn" data-act="ws-assign" data-ws="${esc(w.id)}"${dis}>${T("ws.addGo")}</button></div>
+      <div class="mini">${T("ws.addNote")}</div>
+    </div>`;
+  const create = canCreate ? `<details class="ans" style="margin-top:16px"${d.slug ? " open" : ""}><summary>${T("ws.new")}</summary>
+    <div class="two">
+      <label><i>${T("ws.slug")}</i><input id="wsn-slug" value="${esc(d.slug || "")}" placeholder="summer-camp-2027"${dis}></label>
+      <label><i>${T("ws.ownerPick")}</i><select id="wsn-owner"${dis}><option value="">${T("value.none")}</option>${cadres.map(p => `<option value="${esc(p.profile_id)}"${d.owner === p.profile_id ? " selected" : ""}>${esc(personName(p).name)}</option>`).join("")}</select></label>
+      <label><i>${T("ws.titleZh")}</i><input id="wsn-zh" value="${esc(d.title_zh || "")}"${dis}></label>
+      <label><i>${T("ws.titleEn")}</i><input id="wsn-en" value="${esc(d.title_en || "")}"${dis}></label>
+    </div>
+    <div class="row"><button class="btn ghost" data-act="ws-create"${dis}>${T("ws.createGo")}</button></div>
+    <div class="mini">${T("ws.newNote")}</div></details>` : "";
+  return pageHead(T("ws.title"), T("ws.lede"))
+    + msgHTML(msg)
+    + `<div class="cols"><section class="section">${left}${create}</section><section class="section">${right}</section></div>`;
+}
+
+// 屆別：清單加人數、補過去的一屆、貼一整屆、結束這一屆（三步）。
+// draft = { new: {id, zh, en, starts, ends}, paste: { term, text } }
+// end = null 或 { step: 1|2|3, next: {id, zh, en, starts, ends}, keep: [profile_id…], typed }
+export function termsHTML(terms, people, meId, isPres, msg, busy, draft, end) {
+  const d = draft || {}; const nw = d.new || {}; const ps = d.paste || {};
+  const dis = busy ? " disabled" : "";
+  const cur = currentTerm(terms);
+  const count = t => (people || []).filter(p => positionFor(p, t.id)).length;
+  const noAcc = t => (people || []).filter(p => positionFor(p, t.id) && !hasAccount(p)).length;
+  const rows = (terms || []).map(t => `<li><div class="fhead"><b>${esc(t.id)}</b>${t.status === "current" ? `<span class="tag open">${T("tm.current")}</span>` : `<span class="tag draft">${T("tm.ended")}</span>`}</div>
+    <div class="fmeta">${esc((lang() === "zh" ? (t.title_zh || t.title_en) : (t.title_en || t.title_zh)) || "")}・${esc(t.starts_on)} → ${esc(t.ends_on)}・${T("tm.count", { n: count(t), m: noAcc(t) })}</div></li>`).join("");
+  const listSec = sectionHTML(T("tm.list"), rows ? `<ul class="flist">${rows}</ul>` : emptyHTML(T("tm.empty"), T("tm.emptyHint")));
+  const newSec = sectionHTML(T("tm.new"), `<div class="two">
+      <label><i>${T("tm.id")}</i><input id="tm-id" value="${esc(nw.id || "")}" placeholder="2024-25"${dis}></label>
+      <span></span>
+      <label><i>${T("ws.titleZh")}</i><input id="tm-zh" value="${esc(nw.zh || "")}" placeholder="2024-25 屆"${dis}></label>
+      <label><i>${T("ws.titleEn")}</i><input id="tm-en" value="${esc(nw.en || "")}" placeholder="TERM 2024-25"${dis}></label>
+      <label><i>${T("tm.starts")}</i><input id="tm-starts" type="date" value="${esc(nw.starts || "")}"${dis}></label>
+      <label><i>${T("tm.ends")}</i><input id="tm-ends" type="date" value="${esc(nw.ends || "")}"${dis}></label>
+    </div>
+    <div class="row"><button class="btn ghost" data-act="term-create"${dis}>${T("tm.createGo")}</button></div>
+    <div class="mini">${T("tm.newNote")}</div>`);
+  const pasteSec = sectionHTML(T("tm.paste"), `<label><i>${T("pe.term")}</i><select id="tp-term"${dis}>${(terms || []).map(t => `<option value="${esc(t.id)}"${(ps.term || (cur && cur.id)) === t.id ? " selected" : ""}>${esc(t.id)}</option>`).join("")}</select></label>
+    <label><i>${T("tm.pasteBox")}</i><textarea id="tp-text" rows="6" placeholder="${esc(T("tm.pastePh"))}"${dis}>${esc(ps.text || "")}</textarea></label>${
+    ps.preview ? `<div class="note">${T("tm.pastePreview", { n: ps.preview.rows.length, bad: ps.preview.bad.length ? T("tm.pasteBad", { lines: ps.preview.bad.join(", ") }) : "" })}</div>
+      <table class="table"><thead><tr><th>${T("pe.nameZh")}</th><th>${T("pe.nameEn")}</th><th>${T("ro.position")}</th><th>${T("ro.team")}</th></tr></thead><tbody>${
+        ps.preview.rows.map(r => `<tr><td>${esc(r.name_zh)}</td><td>${esc(r.name_en)}</td><td>${esc(r.title_en)}</td><td>${esc(r.team)}</td></tr>`).join("")}</tbody></table>
+      <div class="row"><button class="btn" data-act="paste-go"${dis}>${T("tm.pasteGo", { n: ps.preview.rows.length })}</button><button class="btn ghost" data-act="paste-cancel"${dis}>${T("common.cancel")}</button></div>`
+    : `<div class="row"><button class="btn ghost" data-act="paste-preview"${dis}>${T("tm.pastePreviewGo")}</button></div>`}
+    <div class="mini">${T("tm.pasteNote")}</div>`);
+  let endSec = "";
+  if (isPres && cur) {
+    if (!end) {
+      endSec = sectionHTML(T("tm.end"), `<div class="note">${T("tm.endNote", { term: esc(cur.id) })}</div>
+        <div class="row"><button class="btn danger" data-act="end-start"${dis}>${T("tm.endStart", { term: esc(cur.id) })}</button></div>`);
+    } else {
+      const n = end.next || {};
+      const cadres = (people || []).filter(p => hasAccount(p) && p.role === "cadre");
+      const keep = new Set(end.keep || []);
+      keep.add(meId);
+      const stay = cadres.filter(p => keep.has(p.profile_id)).length;
+      const go = cadres.length - stay;
+      const step1 = `<h3>${T("tm.step1")}</h3><div class="two">
+        <label><i>${T("tm.id")}</i><input id="en-id" value="${esc(n.id || nextTermId(cur.id))}"${dis}></label><span></span>
+        <label><i>${T("ws.titleZh")}</i><input id="en-zh" value="${esc(n.zh || "")}"${dis}></label>
+        <label><i>${T("ws.titleEn")}</i><input id="en-en" value="${esc(n.en || "")}"${dis}></label>
+        <label><i>${T("tm.starts")}</i><input id="en-starts" type="date" value="${esc(n.starts || "")}"${dis}></label>
+        <label><i>${T("tm.ends")}</i><input id="en-ends" type="date" value="${esc(n.ends || "")}"${dis}></label>
+      </div><div class="row"><button class="btn" data-act="end-step2"${dis}>${T("tm.next")}</button><button class="btn ghost" data-act="end-cancel"${dis}>${T("common.cancel")}</button></div>`;
+      const step2 = `<h3>${T("tm.step2")}</h3><div class="note">${T("tm.keepNote")}</div>
+        <div class="row" style="margin-bottom:10px"><button class="btn ghost sm" data-act="end-keep-all"${dis}>${T("tm.keepAll")}</button><button class="btn ghost sm" data-act="end-keep-none"${dis}>${T("tm.keepNone")}</button>
+          <span class="tag open">${T("tm.stay", { n: stay })}</span><span class="tag warn">${T("tm.go", { n: go })}</span></div>
+        <div class="tgrid">${cadres.map(p => `<label class="check tpick"><input type="checkbox" name="keep" value="${esc(p.profile_id)}"${keep.has(p.profile_id) ? " checked" : ""}${p.profile_id === meId ? " disabled" : dis}>
+          <span>${esc(personName(p).name)}<span class="mini"> ${esc(boardLabel(p.board_role))}${p.profile_id === meId ? "・" + T("ro.you") : ""}</span></span></label>`).join("")}</div>
+        <div class="row" style="margin-top:14px"><button class="btn" data-act="end-step3"${dis}>${T("tm.next")}</button><button class="btn ghost" data-act="end-back1"${dis}>${T("tm.back")}</button></div>`;
+      const step3 = `<h3>${T("tm.step3")}</h3><div class="note">${T("tm.confirmNote", { term: esc(cur.id), next: esc(n.id || ""), stay, go })}</div>
+        <label><i>${T("tm.typeId", { id: esc(n.id || "") })}</i><input id="en-typed" value="${esc(end.typed || "")}" autocomplete="off"${dis}></label>
+        <div class="row"><button class="btn danger" data-act="end-go"${dis}>${T("tm.endGo")}</button><button class="btn ghost" data-act="end-back2"${dis}>${T("tm.back")}</button></div>`;
+      endSec = sectionHTML(T("tm.end"), end.step === 3 ? step3 : end.step === 2 ? step2 : step1, { id: "end-term" });
+    }
+  }
+  return pageHead(T("tm.title"), T("tm.lede"))
+    + msgHTML(msg)
+    + listSec + endSec + newSec + pasteSec;
+}
+
+// 只有 Co-President 與 Senior Adviser 進得來。真正的門在資料庫那幾支函式的第一句，
 // 這裡少畫一個分頁不是安全機制：Director 硬打網址進來，看到的是這一句，按不到任何東西。
 export function noAccessHTML(me) {
   return pageHead(T("noAccess.title"), T("noAccess.lede"),

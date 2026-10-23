@@ -21,6 +21,10 @@ export async function loadMe(userId) {
     board: data.board_role || "member",
     team: data.team || "",
     name: data.name_zh || data.name_en || "",
+    // 2026-10-24 起職級四級。senior 是「Co-President 或 Senior Adviser」，跟資料庫的 is_senior() 同一條規則：
+    // 這一組整組開給他們；發碼、改名、刪人、改職級、結束這一屆仍然只有 Co-President（pres）。
+    senior: data.board_role === "president" || data.board_role === "senior_adviser",
+    pres: data.board_role === "president",
   };
 }
 
@@ -95,6 +99,47 @@ export async function setTeam(id, team) {
   return data;
 }
 
+// ── 職級與指派（2026-10-24，權限重新設計批 2）─────────────────────────
+// 設計：docs/2026-10-23-權限重新設計.md。名單從 roster() 讀（含沒有帳號的人與歷屆職位，
+// 門 is_senior() 在函式本文裡，別人叫回來是空的）。寫全部走函式，每一筆都記 role_changes。
+// 這一支裡沒有任何一句直接 insert / update 新的那五張表：表對前端只有讀的權限。
+const rpc = async (fn, args) => {
+  need();
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw error;
+  return data;
+};
+export const loadPeople      = () => rpc("roster");
+export const loadTerms       = async () => {
+  need();
+  const { data, error } = await supabase.from("terms")
+    .select("id, title_zh, title_en, starts_on, ends_on, status").order("starts_on", { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
+export const loadWorkspaces  = async () => {
+  need();
+  const { data, error } = await supabase.from("workspaces")
+    .select("id, kind, team, title_zh, title_en, owner, active").order("id");
+  if (error) throw error;
+  return data || [];
+};
+export const loadMembers     = ws => rpc("workspace_members", { p_ws: ws });
+export const assign          = (id, ws, level) => rpc("assign", { p_target: id, p_ws: ws, p_level: level });
+export const unassign        = (id, ws) => rpc("unassign", { p_target: id, p_ws: ws });
+export const createWorkspace = (slug, zh, en, owner) => rpc("create_workspace", { p_slug: slug, p_title_zh: zh, p_title_en: en, p_owner: owner || null });
+export const setPosition     = (person, term, zh, en, team) => rpc("set_position", { p_person: person, p_term: term, p_title_zh: zh, p_title_en: en, p_team: team || null });
+export const deletePosition  = (person, term) => rpc("delete_position", { p_person: person, p_term: term });
+export const renamePerson    = (person, zh, en) => rpc("rename_person", { p_person: person, p_name_zh: zh, p_name_en: en });
+export const addPerson       = (zh, en, note) => rpc("add_person", { p_name_zh: zh, p_name_en: en, p_note: note || null });
+export const removeMember    = person => rpc("remove_member", { p_person: person });
+export const deletePerson    = person => rpc("delete_person", { p_person: person });
+export const mergePeople     = (keep, drop) => rpc("merge_people", { p_keep: keep, p_drop: drop });
+export const createInviteFor = (person, code, note) => rpc("create_invite_for", { p_person: person, p_code: code, p_note: note || null });
+export const createTerm      = (id, zh, en, starts, ends) => rpc("create_term", { p_id: id, p_title_zh: zh, p_title_en: en, p_starts: starts, p_ends: ends });
+export const importPositions = (term, rows) => rpc("import_positions", { p_term: term, p_rows: rows });
+export const endTerm         = (id, zh, en, starts, ends, keep) => rpc("end_term", { p_next_id: id, p_next_title_zh: zh, p_next_title_en: en, p_starts: starts, p_ends: ends, p_keep: keep });
+
 // 資料庫丟出來的錯誤代碼翻成人話。
 //
 // **看到這幾句話的人多半是一個沒有設定過 Vault 的學生。**
@@ -137,8 +182,33 @@ const SAYS = [
   ["no_such_task", "找不到這一格，重新整理再試一次。", "Box not found. Refresh and try again."],
   ["term_locked", "已經建好的格子不能換屆。要搬到別屆就另外建一格，這一格停用。", "An existing box cannot move to another term. Create a new box there and disable this one."],
   ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。", "Someone has already stamped this box, so it can only be disabled, not deleted. Their stamp stays. New people will not see the box."],
+  // 職級與指派（2026-10-24）。排在泛用的那幾條前面。
+  ["not_senior", "只有 Co-President 與 Senior Adviser 可以做這件事。", "Only Co-Presidents and Senior Advisers can do this."],
+  ["not_ws_manage:", "你對這個工作區不是「管」，派不了人。找這個工作區的管理者或 Co-President。", "You do not manage this workspace, so you cannot assign people. Ask its manager or a Co-President."],
+  ["not_ws_edit:", "你沒有被派進這個工作區，改不了。", "You are not assigned to this workspace, so you cannot edit it."],
+  ["bad_level", "等級只有看、改、管三種。", "A level is one of view, edit or manage."],
+  ["no_such_workspace", "找不到這個工作區，重新整理再試一次。", "Workspace not found. Refresh and try again."],
+  ["bad_slug", "工作區代號只能用小寫英文字母、數字和連字號，2 到 40 個字。", "A workspace id can only use lowercase letters, digits and hyphens, 2 to 40 characters."],
+  ["no_such_person", "找不到這個人，重新整理再試一次。", "Person not found. Refresh and try again."],
+  ["empty_name", "中文名或英文名至少要填一個。", "Fill in at least one of the Chinese or English name."],
+  ["no_account", "這個人沒有帳號，沒有東西可以從平台移除。要拿掉名單上的紀錄用「刪除紀錄」。", "This person has no account, so there is nothing to remove from the platform. Use \"Delete record\" to drop the roster record."],
+  ["has_account", "這個人有帳號，不能只刪紀錄。要先用「刪除成員」把帳號移除。", "This person has an account, so the record alone cannot be deleted. Use \"Remove member\" first."],
+  ["cannot_remove_self", "不能刪自己。要離開的話，先把另一位 Co-President 升上來，再請他刪你。", "You cannot remove yourself. To leave, promote another Co-President first and have them remove you."],
+  ["has_unused_invite", "這一筆還綁著一組沒用掉的校友碼，先到邀請碼那一頁停用它。", "This record still has an unused alumni code. Disable it under Invite codes first."],
+  ["person_has_account", "這個人已經有帳號了，不用再發校友碼。", "This person already has an account, so no alumni code is needed."],
+  ["record_claimed", "這一筆紀錄已經被別的帳號認走了。", "This record has already been claimed by another account."],
+  ["both_have_accounts", "兩筆都有帳號，不能合併。先確認哪一個帳號是對的，把另一個用「刪除成員」移除。", "Both records have accounts, so they cannot be merged. Decide which account is right and remove the other with \"Remove member\"."],
+  ["same_person", "選到同一筆了。", "That is the same record."],
+  ["term_exists", "已經有這個屆別代號了。", "That term id already exists."],
+  ["no_current_term", "現在沒有哪一屆是這一屆，要先在 Supabase 把一屆設成 current。", "No term is current right now. Set one to current in Supabase first."],
+  ["must_keep_self", "留下的名單裡一定要有你自己，不然按下去你就變成校友了。", "You must be on the keep list, or you would become an alumnus the moment you press it."],
+  ["bad_rows", "貼進來的內容讀不出來，一行一個人，欄位用逗號隔開。", "Could not read the pasted lines. One person per line, fields separated by commas."],
+  ["public.roster", "職級與指派的函式還不在資料庫裡，要先跑 2026-10-24-ranks-and-workspaces.sql。", "The ranks and workspaces functions are not in the database yet. Run 2026-10-24-ranks-and-workspaces.sql first."],
+  ["public.assign", "職級與指派的函式還不在資料庫裡，要先跑 2026-10-24-ranks-and-workspaces.sql。", "The ranks and workspaces functions are not in the database yet. Run 2026-10-24-ranks-and-workspaces.sql first."],
+  ["public.terms", "屆別那張表還不在資料庫裡，要先跑 2026-10-24-ranks-and-workspaces.sql。", "The terms table is not in the database yet. Run 2026-10-24-ranks-and-workspaces.sql first."],
+  ["public.workspaces", "工作區那張表還不在資料庫裡，要先跑 2026-10-24-ranks-and-workspaces.sql。", "The workspaces table is not in the database yet. Run 2026-10-24-ranks-and-workspaces.sql first."],
   // 人與權限（2026-10-21）。排在泛用的那一條前面。
-  ["bad_role", "職位只有一般幹部、Director、Co-President 三種。", "A role is one of member, Director or Co-President."],
+  ["bad_role", "職級只有 Associate、Director、Senior Adviser、Co-President 四種。", "A rank is one of Associate, Director, Senior Adviser or Co-President."],
   ["cannot_demote_self", "不能把自己降級。要交棒的話，先把對方升成 Co-President，再請對方把你降下來。", "You cannot demote yourself. To hand over, promote the other person to Co-President first and have them demote you."],
   ["team_locked", "這個人的 team 鎖住了，只能從這裡改。重新整理再試一次。", "This person's team is locked and can only be changed here. Refresh and try again."],
   ["team_needs_president", "勾進那個 team 會多出後台的權限，要從這裡改。重新整理再試一次。", "Joining that team grants admin access, so it has to be changed here. Refresh and try again."],

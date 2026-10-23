@@ -317,6 +317,10 @@ a.btn{text-decoration:none}
 /* 左右兩欄：信件文案的「左邊改、右邊預覽」。 */
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
 .cols .section{margin-bottom:0}
+/* 工作區那一頁左邊的清單（2026-10-24）：借側欄那一行的樣子，右邊的小字是種類。 */
+.wslist{display:flex;flex-direction:column;gap:2px}
+.wslist .rail-item{justify-content:space-between}
+.wslist .rail-count{font-weight:400;text-transform:none;letter-spacing:0}
 @media (max-width:980px){ .cols{grid-template-columns:1fr} }
 @media (max-width:720px){
   .table thead{display:none}

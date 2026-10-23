@@ -36,7 +36,7 @@ export const GROUPS = [
   { key: "forms",     label: { zh: "申請",     en: "Applications" }, href: "/admin/",           who: "cadre",        hint: { zh: "申請表、審核、簽到、行前信", en: "Forms, review, check-in, notices" } },
   { key: "site",      label: { zh: "對外",     en: "Public site" },  href: "/admin/site/",      who: "cadre",        hint: { zh: "資源、團隊頁、校友頁、信件文案", en: "Resources, team page, alumni page, email copy" } },
   { key: "passports", label: { zh: "護照",     en: "Passports" },    href: "/admin/passports/", who: "intern-staff", hint: { zh: "兩本護照的格子", en: "Boxes in both passports" } },
-  { key: "people",    label: { zh: "人與權限", en: "People" },       href: "/admin/people/",    who: "president",    hint: { zh: "邀請碼、職位、team", en: "Invite codes, roles, teams" } },
+  { key: "people",    label: { zh: "人與權限", en: "People" },       href: "/admin/people/",    who: "senior",       hint: { zh: "名單、職級、工作區、屆別、邀請碼", en: "Roster, ranks, workspaces, terms, invite codes" } },
 ];
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
 // 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
@@ -51,22 +51,26 @@ export const ITEMS = [
   { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "intern-staff" },
   { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "president" },
   { group: "passports", key: "cities",  label: { zh: "城市",     en: "Cities" },          who: "president" },
-  { group: "people",    key: "roster",  label: { zh: "幹部名單", en: "Roster" },          who: "president" },
-  { group: "people",    key: "invites", label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
-  { group: "people",    key: "changes", label: { zh: "變動紀錄", en: "Change log" },      who: "president" },
+  { group: "people",    key: "roster",     label: { zh: "幹部名單", en: "Roster" },          who: "senior" },
+  { group: "people",    key: "workspaces", label: { zh: "工作區",   en: "Workspaces" },      who: "senior" },
+  { group: "people",    key: "terms",      label: { zh: "屆別",     en: "Terms" },           who: "senior" },
+  { group: "people",    key: "invites",    label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
+  { group: "people",    key: "changes",    label: { zh: "變動紀錄", en: "Change log" },      who: "senior" },
 ];
-const WHY = { president: "why.president", "intern-staff": "why.internStaff" };
+const WHY = { president: "why.president", senior: "why.senior", "intern-staff": "why.internStaff" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
 function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
   if (who === "cadre") return true;
   if (who === "president") return me.board === "president";
-  if (who === "intern-staff") return me.board === "president" || String(me.team || "").includes("Internship Team");
+  // 2026-10-24 起職級有四級：senior 是 Co-President 加 Senior Adviser（跟資料庫的 is_senior() 同一條規則）。
+  if (who === "senior") return me.board === "president" || me.board === "senior_adviser";
+  if (who === "intern-staff") return me.board === "president" || me.board === "senior_adviser" || String(me.team || "").includes("Internship Team");
   return false;
 }
 export function canEnter(g, me) { return allowed(g.who, me); }
 export function canSee(item, me) { return allowed(item.who, me); }
-const BOARD_KEY = { member: "board.member", director: "board.director", president: "board.president" };
+const BOARD_KEY = { member: "board.member", director: "board.director", senior_adviser: "board.senior", president: "board.president" };
 export const boardName = board => T(BOARD_KEY[board] || "board.member");
 
 // 側欄。group 是現在在哪一組，tab 是哪一個分頁，counts 是 { <key>: 數字 }（有才顯示，批 2 的首頁會餵）。

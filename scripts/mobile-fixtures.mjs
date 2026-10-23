@@ -12,9 +12,11 @@ const nav = `navHTML({ current:CUR, role:"cadre", name:"王平" })`;
 const acts = JSON.parse(readFileSync("passport/activities.json","utf8"));
 
 function make(file, cur, body, extra = "") {
+  // shared/ 的相對路徑跟資料夾深度走：admin/ 是 ../shared，admin/people/ 是 ../../shared（2026-10-24）。
+  const up = "../".repeat(file.split("/").length);
   const boot = `
 <script type="module">
-import { navHTML } from "../shared/nav.js";
+import { navHTML } from "${up}shared/nav.js";
 ${extra}
 const CUR = ${JSON.stringify(cur)};
 document.getElementById("bt-root").innerHTML = ${nav} + (${body});
@@ -74,4 +76,16 @@ make("admin", "admin",
      { id:"1", name_zh:"王小明", name_en:"Ming Wang", team:"Curriculum Team", public_title:"Director",
        avatar:"x", public_approved:true }], "", false))`,
   `import * as UI from "./site/src/ui.js";`);
+
+// 人與權限（2026-10-24）：拿最長的一頁「改一個人」量，中英文名、兩屆職位、兩個工作區、刪除成員第二步全開。
+make("admin/people", "admin",
+  `UI.shellHTML("", UI.railHTML("people", "roster", { role:"cadre", board:"president", team:"Sponsorship Team, Internship Team", name:"王平" }),
+     UI.personEditHTML(P, TERMS, "me", true, "", false, null, [P], { typed:"" }))`,
+  `import * as UI from "./src/ui.js";
+   const TERMS = [{ id:"2026-27", title_zh:"2026-27 屆", title_en:"TERM 2026-27", starts_on:"2026-08-01", ends_on:"2027-07-31", status:"current" },
+                  { id:"2025-26", title_zh:"", title_en:"", starts_on:"2025-08-01", ends_on:"2026-07-31", status:"ended" }];
+   const P = { person_id:"p2", profile_id:"u2", name_zh:"林育安", name_en:"Yu-An Lin", role:"cadre", board_role:"director", team:"Curriculum Team, Internship Team",
+     positions:[{ term:"2026-27", title_zh:"Curriculum 的 Director", title_en:"Director, Curriculum Team", team:"Curriculum Team" },
+                { term:"2025-26", title_en:"Associate, Curriculum Team", team:"Curriculum Team" }],
+     workspaces:[{ id:"apps:Curriculum Team", level:"manage" }, { id:"res:Curriculum Team", level:"manage" }, { id:"intern-passport", level:"edit" }], maybe_dup:null };`);
 console.log("ok");

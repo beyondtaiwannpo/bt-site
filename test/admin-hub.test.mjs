@@ -62,7 +62,7 @@ test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什�
     assert.match(rail, /class="rail-group off">人與權限<span class="why">只有 Co-President/, label);
     assert.doesNotMatch(rail, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
     assert.doesNotMatch(rail, /data-t="team"/, `${label}：一般幹部看不到團隊頁那一行`);
-    assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>一般幹部・Curriculum Team/, `${label}：側欄上要寫名字、職位、team`);
+    assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>Associate・Curriculum Team/, `${label}：側欄上要寫名字、職級、team`);
     const pres = M.railHTML("forms", "home", { ...ME.pres, name: "王平" });
     assert.equal((pres.match(/class="rail-item off"/g) || []).length, 0, `${label}：Co-President 沒有任何一行是淡的`);
     assert.equal((pres.match(/<a class="rail-item/g) || []).length, M.ITEMS.length, `${label}：Co-President 每一行都是連結`);
@@ -419,18 +419,46 @@ test("★ admin/passports 每一個畫面用英文畫出來不剩中文", () => 
 });
 
 test("★ admin/people 每一個畫面用英文畫出來不剩中文", () => {
-  const roster = [{ id: "u1", name_zh: "", name_en: "Paul", team: "Sponsorship Team, Internship Team", board_role: "president" },
-                  { id: "u2", name_zh: "", name_en: "", team: "", board_role: "member" }, { id: "u3", name_en: "Amy", team: "Curriculum Team", board_role: "director" }];
+  const terms = [{ id: "2026-27", title_zh: "", title_en: "TERM 2026-27", starts_on: "2026-08-01", ends_on: "2027-07-31", status: "current" },
+                 { id: "2025-26", title_zh: "", title_en: "", starts_on: "2025-08-01", ends_on: "2026-07-31", status: "ended" }];
+  const people = [
+    { person_id: "p1", profile_id: "u1", name_zh: "", name_en: "Paul", role: "cadre", board_role: "president", team: "Sponsorship Team, Internship Team",
+      positions: [{ term: "2026-27", title_zh: "", title_en: "Co-President", team: "" }], workspaces: [], note: "", pending_code: null, maybe_dup: null },
+    { person_id: "p2", profile_id: "u2", name_zh: "", name_en: "", role: "cadre", board_role: "member", team: "", positions: [], workspaces: [{ id: "apps:Curriculum Team", level: "view" }], maybe_dup: null },
+    { person_id: "p3", profile_id: "u3", name_en: "Amy", role: "cadre", board_role: "director", team: "Curriculum Team",
+      positions: [{ term: "2026-27", title_en: "Director, Curriculum Team", team: "Curriculum Team" }, { term: "2025-26", title_en: "Associate", team: "" }], workspaces: [{ id: "apps:Curriculum Team", level: "manage" }], maybe_dup: ["p4"] },
+    { person_id: "p4", profile_id: null, name_en: "amy", role: null, board_role: null, team: null, positions: [{ term: "2025-26", title_en: "Associate", team: "Marketing Team" }], workspaces: [], pending_code: "bt-old", maybe_dup: ["p3"] },
+    { person_id: "p5", profile_id: "u5", name_en: "Old", role: "alumni", board_role: "member", team: "", positions: [], workspaces: [], maybe_dup: null },
+  ];
   const changes = [{ target: "u3", target_name: "", field: "board_role", old_value: "member", new_value: "director", changed_by: "u1", created_at: "2026-10-19T10:00:00Z" },
-                   { target: "zz", field: "team", old_value: "", new_value: "Curriculum Team", changed_by: "zz", created_at: "2026-10-19T10:00:00Z" }];
-  const priv = [{ name: "Internship Team" }];
+                   { target: "zz", field: "team", old_value: "", new_value: "Curriculum Team", changed_by: "zz", created_at: "2026-10-19T10:00:00Z" },
+                   { target: "u2", field: "assignment", old_value: "@apps:X", new_value: "edit@apps:X", changed_by: null, created_at: "2026-10-19T10:00:00Z" },
+                   { target: null, target_name: "Gone", field: "removed", old_value: "cadre", new_value: "p9", changed_by: "u1", created_at: "2026-10-19T10:00:00Z" },
+                   { target: "u5", field: "role", old_value: "cadre", new_value: "alumni", changed_by: "u1", created_at: "2026-10-19T10:00:00Z" }];
+  const ws = [{ id: "passport", kind: "passport", team: null, title_zh: "", title_en: "Cadre passport", owner: "u1", active: true },
+              { id: "apps:Curriculum Team", kind: "apps", team: "Curriculum Team", title_zh: "", title_en: "", owner: "u3", active: true }];
+  const members = [{ user_id: "u3", name_zh: "", name_en: "Amy", board_role: "director", level: "manage", granted_by: null, created_at: "" }];
   const codes = [{ code: "bt-abc", grants: "cadre", uses_left: 2, note: "n", created_at: "2026-10-01", uses: [{ name: "", email: "", used_at: "2026-10-02", grants: "alumni", role: "cadre" }] },
                  { code: "bt-def", grants: "intern", uses_left: 0, created_at: "", uses: [] }];
+  const paste = { term: "2025-26", text: "a, b, c, d", preview: { rows: [{ name_zh: "", name_en: "b", title_en: "c", title_zh: "c", team: "d" }], bad: [2] } };
   allEn("admin/people", PEOPLE, {
     rail: () => PEOPLE.railHTML("people", "roster", EN_ME),
-    roster: () => PEOPLE.rosterHTML(roster, changes, priv, "u1", "", false, "") + PEOPLE.rosterHTML(roster, [], [], "u1", "", true, "__none") + PEOPLE.rosterHTML(roster, [], [], "u1", "", false, "Nope") + PEOPLE.rosterHTML([], [], [], "u1", "", false, ""),
-    changes: () => PEOPLE.changesHTML(changes, roster, "") + PEOPLE.changesHTML([], [], ""),
-    person: () => PEOPLE.personEditHTML(roster[0], priv, "u1", "", false, null) + PEOPLE.personEditHTML(roster[2], priv, "u1", "", true, { board_role: "member", team: "Odd Team" }),
+    roster: () => PEOPLE.rosterHTML(people, terms, "u1", true, "", false, null) + PEOPLE.rosterHTML(people, terms, "u1", false, "", true, { term: "all", team: "__none" })
+      + PEOPLE.rosterHTML(people, terms, "u1", true, "", false, { term: "2025-26", team: "Nope" }) + PEOPLE.rosterHTML([], [], "u1", true, "", false, null),
+    changes: () => PEOPLE.changesHTML(changes, people, "") + PEOPLE.changesHTML([], [], ""),
+    person: () => PEOPLE.personEditHTML(people[0], terms, "u1", true, "", false, null, people, null)
+      + PEOPLE.personEditHTML(people[2], terms, "u1", true, "", true, { board_role: "member", team: "Odd Team", term: "2025-26" }, people, { typed: "x" })
+      + PEOPLE.personEditHTML(people[2], terms, "u1", false, "", false, null, people, null)
+      + PEOPLE.personEditHTML(people[3], terms, "u1", true, "", false, null, people, null)
+      + PEOPLE.personEditHTML({ ...people[3], pending_code: null }, terms, "u1", true, "", false, null, [], null)
+      + PEOPLE.personEditHTML(people[4], terms, "u1", true, "", false, null, people, null),
+    personNew: () => PEOPLE.personNewHTML(terms, "", false, null) + PEOPLE.personNewHTML([], "", true, { name_en: "x" }),
+    workspaces: () => PEOPLE.workspacesHTML(ws, "apps:Curriculum Team", members, people, "", false, null, true) + PEOPLE.workspacesHTML(ws, null, [], people, "", true, { slug: "x" }, true)
+      + PEOPLE.workspacesHTML([], null, [], [], "", false, null, false) + PEOPLE.workspacesHTML(ws, "passport", [], people, "", false, null, false),
+    terms: () => PEOPLE.termsHTML(terms, people, "u1", true, "", false, { paste }, null) + PEOPLE.termsHTML(terms, people, "u1", true, "", false, null, { step: 1, next: {}, keep: [], typed: "" })
+      + PEOPLE.termsHTML(terms, people, "u1", true, "", true, null, { step: 2, next: { id: "2027-28" }, keep: ["u3"], typed: "" })
+      + PEOPLE.termsHTML(terms, people, "u1", true, "", false, null, { step: 3, next: { id: "2027-28" }, keep: ["u3"], typed: "x" })
+      + PEOPLE.termsHTML([], [], "u1", false, "", false, null, null),
     invites: () => PEOPLE.inviteCodesHTML(codes, "", false, { code: "bt-x", grants: "alumni", uses: 2, note: "" }) + PEOPLE.inviteCodesHTML([], "", true, null),
     other: () => PEOPLE.noAccessHTML(ME.member) + PEOPLE.notCadreHTML() + PEOPLE.downHTML() + PEOPLE.tabsHTML("invites"),
   });
