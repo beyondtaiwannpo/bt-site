@@ -399,6 +399,9 @@ export const ITEMS = [
   // 2026-10-23 第三次重整批 4：叫「總覽」不叫「首頁」，頂欄那一顆「後台」跟它才不會是同一個地方兩個名字。
   { group: "forms",     key: "home",    label: { zh: "總覽",     en: "Overview" },        who: "cadre" },
   { group: "forms",     key: "forms",   label: { zh: "申請表",   en: "Forms" },           who: "cadre" },
+  // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
+  { group: "forms",     key: "request",  label: { zh: "跟 Marketing 提需求", en: "Request from Marketing" }, who: "cadre" },
+  { group: "forms",     key: "requests", label: { zh: "行銷需求單", en: "Marketing requests" }, who: "ws:custom:marketing-requests" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
   { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "senior" },
   { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "senior" },
@@ -453,7 +456,8 @@ export function railHTML(group, tab, me, counts) {
   const home = ITEMS.find(i => i.key === "home");
   const groups = GROUPS.map(g => {
     const ok = canEnter(g, me);
-    const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home");
+    // 2026-10-31：進得去的組裡，綁工作區的那幾行（who 是 ws:…）只給被派進去的人看（行銷需求單的佇列在「申請」這一組，幹部都進得了組）。
+    const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home" && (!String(i.who).startsWith("ws:") || canSee(i, me)));
     // 2026-10-23 批 4：進不去的組只留組名變淡，不再掛一段為什麼。為什麼在總覽的「你的存取」那一塊講一次就好；
     // 三段灰色長文在側欄上看起來像三個警告。WHY 留著給 title（滑過去還看得到）。
     return `<div class="rail-group${ok ? "" : " off"}"${ok ? "" : ` title="${esc(T(WHY[g.who]) || "")}"`}>${esc(T(g.label))}</div>${
@@ -744,6 +748,7 @@ export function wsCellHref(w) {
   if (id === "intern-passport") return "/admin/passports/#interns";
   if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
+  if (id === "custom:marketing-requests") return "/admin/#requests";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
@@ -833,6 +838,18 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
     cards.push({ n: interns, label: T("card.interns"), unit: T("card.interns.unit"),
       hint: interns ? T("card.interns.hint", { n: (stamps / interns).toFixed(1) }) : T("card.interns.none"), href: withLang("/admin/passports/#interns"), go: T("card.interns.go") });
   }
+  // 2026-10-31 行銷需求單：rq 是 loadRequests() 回的（RLS 決定看得到哪些）。工作區「改」以上看等處理的數；送單的人看自己最近一張還在跑的。
+  const rq = t.requests;
+  if (rq !== undefined && canEditWs(me, "custom:marketing-requests")) {
+    const waiting = rq === null ? null : (rq || []).filter(r => r.status === "new" || r.status === "in_progress").length;
+    cards.push({ n: waiting, label: T("card.rq"), unit: T("card.rq.unit"), hint: waiting ? T("card.rq.hint", { n: (rq || []).filter(r => r.status === "new").length }) : T("card.rq.none"),
+      href: "#requests", go: T("card.rq.go") });
+  }
+  const myOpen = (rq || []).filter(r => me && r.requester === me.id && (r.status === "new" || r.status === "in_progress"));
+  if (myOpen.length) {
+    const r = myOpen[0];
+    cards.push({ n: myOpen.length, label: T("card.myrq"), unit: T("card.rq.unit"), hint: T("card.myrq.hint", { title: esc(r.title), status: T("rq.st." + r.status) }), href: "#request", go: T("card.myrq.go") });
+  }
   if (pres) {
     const ro = t.roster;
     const noTeam = ro ? ro.filter(p => !splitTeams(p.team).length).length : null;
@@ -913,6 +930,7 @@ export function accessHTML(me, todo, features) {
     if (id === "intern-passport") return [{ href: "/intern-passport/", label: T("hub.goWall") }, { href: "/admin/passports/#interns", label: T("hub.goAdmin") }];
     if (id === "passport") return [{ href: "/admin/passports/#cadre", label: T("hub.goAdmin") }];
     if (id === "apps" || id.startsWith("apps:")) return [{ href: "/admin/#forms", label: T("hub.goForms") }];
+    if (id === "custom:marketing-requests") return [{ href: "/admin/#requests", label: T("hub.goRequests") }];
     if (id.startsWith("res:")) return [{ href: "/admin/site/#res", label: T("hub.goRes") }];
     return [];
   };
@@ -962,4 +980,85 @@ export function notCadreHTML() {
 export function downHTML(err) {
   return pageHead(T("down.title"), T("down.lede"), [{ act: "retry", label: T("common.retry") }])
     + (err ? `<div class="mini">${esc(T("down.detail"))}${esc(err)}</div>` : "");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 行銷需求單（2026-10-31，docs/2026-10-24-行銷需求單.md）
+// ═══════════════════════════════════════════════════════════════════════
+// 兩頁：每一位幹部的「跟 Marketing 提需求」（表單加我送過的），Marketing 需求工作區的「行銷需求單」佇列。
+// 資料都從 loadRequests() 來（RLS 決定看得到哪些），這裡只畫。
+export const RQ_KINDS = ["poster", "post", "video", "other"];
+export const RQ_STATUS = ["new", "in_progress", "done", "withdrawn"];
+const rqDate = d => d ? String(d).slice(0, 10) : "";
+const rqLinks = s => String(s || "").split(/\n/).map(x => x.trim()).filter(Boolean);
+export function rqMine(rows, me) { return (rows || []).filter(r => me && r.requester === me.id); }
+// 送單的表單加「我送過的」。d 是填到一半的值；mine 是我的單。
+export function requestPageHTML(me, mine, d, msg, busy) {
+  const v = d || {};
+  const dis = busy ? " disabled" : "";
+  const opt = (k, cur) => RQ_KINDS.map(x => `<option value="${x}"${(cur || "poster") === x ? " selected" : ""}>${esc(T("rq.kind." + x))}</option>`).join("");
+  const row = r => `<li class="rq-row${r.status === "withdrawn" ? " off" : ""}">
+      <div class="fhead"><b>${esc(r.title)}</b> <span class="tag${r.status === "done" ? " open" : r.status === "in_progress" ? " warn" : ""}">${esc(T("rq.st." + r.status))}</span> <span class="mini">${esc(T("rq.kind." + r.kind))}${r.needed_by ? `・${esc(T("rq.by", { d: rqDate(r.needed_by) }))}` : ""}</span></div>
+      ${r.reply ? `<div class="fmeta rq-reply"><i>${T("rq.replyLabel")}</i>${esc(r.reply)}</div>` : ""}
+      <div class="fmeta">${esc(T("rq.sent", { d: rqDate(r.created_at) }))}${r.status === "new" ? ` <button class="lnk" data-act="rq-withdraw" data-id="${esc(r.id)}"${dis}>${T("rq.withdraw")}</button>` : ""}</div>
+    </li>`;
+  return pageHead(T("rq.title"), T("rq.lede"))
+    + msgHTML(msg)
+    + sectionHTML(T("rq.formTitle"), `<div class="two">
+        <label><i>${T("rq.kind")}</i><select id="rq-kind"${dis}>${opt("kind", v.kind)}</select></label>
+        <label><i>${T("rq.needed")}</i><input id="rq-needed" type="date" value="${esc(v.needed_by || "")}"${dis}></label>
+        <label class="wide"><i>${T("rq.titleF")}</i><input id="rq-title" value="${esc(v.title || "")}" placeholder="${esc(T("rq.titlePh"))}"${dis}></label>
+        <label class="wide"><i>${T("rq.purpose")}</i><input id="rq-purpose" value="${esc(v.purpose || "")}" placeholder="${esc(T("rq.purposePh"))}"${dis}></label>
+        <label class="wide"><i>${T("rq.brief")}</i><textarea id="rq-brief" style="min-height:120px" placeholder="${esc(T("rq.briefPh"))}"${dis}>${esc(v.brief || "")}</textarea></label>
+        <label class="wide"><i>${T("rq.links")}</i><textarea id="rq-links" style="min-height:64px" placeholder="${esc(T("rq.linksPh"))}"${dis}>${esc(v.links || "")}</textarea></label>
+        <label><i>${T("rq.contact")}</i><input id="rq-contact" value="${esc(v.contact || "")}" placeholder="${esc(T("rq.contactPh"))}"${dis}></label>
+      </div>
+      <div class="form-foot"><button class="btn" data-act="rq-submit"${dis}>${busy ? T("common.saving") : T("rq.submit")}</button><span class="mini">${T("rq.submitNote")}</span></div>`, { id: "rq-form" })
+    + sectionHTML(T("rq.mineTitle"), (mine || []).length ? `<ul class="flist">${mine.map(row).join("")}</ul>` : emptyHTML(T("rq.mineNone"), T("rq.mineNoneHint")), { id: "rq-mine" });
+}
+// Marketing 的佇列。f = { status: "open"|"done"|"all", kind, q }，sel 是打開的那一張，canEdit 是「改」以上。
+export function rqFilter(rows, f) {
+  const o = Object.assign({ status: "open", kind: "", q: "" }, f || {});
+  const q = String(o.q || "").trim().toLowerCase();
+  return (rows || []).filter(r => (o.status === "all" || (o.status === "done" ? r.status === "done" : o.status === "withdrawn" ? r.status === "withdrawn" : (r.status === "new" || r.status === "in_progress")))
+    && (!o.kind || r.kind === o.kind)
+    && (!q || String(r.title || "").toLowerCase().includes(q) || String(r.purpose || "").toLowerCase().includes(q)));
+}
+export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy) {
+  const o = Object.assign({ status: "open", kind: "", q: "" }, f || {});
+  const dis = busy ? " disabled" : "";
+  const who = id => { const p = (people || []).find(x => x.id === id); return p ? mpName(p) : T("rq.someone"); };
+  const open = sel ? (rows || []).find(r => r.id === sel) : null;
+  if (open) {
+    const r = open;
+    return pageHead(esc(r.title), esc(T("rq.oneLede", { who: who(r.requester), d: rqDate(r.created_at) })), [], { act: "rq-back", label: T("rq.back") })
+      + msgHTML(msg)
+      + sectionHTML(T("rq.details"), `<dl class="rq-dl">
+          <dt>${T("rq.kind")}</dt><dd>${esc(T("rq.kind." + r.kind))}</dd>
+          <dt>${T("rq.needed")}</dt><dd>${r.needed_by ? esc(rqDate(r.needed_by)) : T("value.none")}</dd>
+          <dt>${T("rq.purpose")}</dt><dd>${r.purpose ? esc(r.purpose) : T("value.none")}</dd>
+          <dt>${T("rq.brief")}</dt><dd class="pre">${r.brief ? esc(r.brief) : T("value.none")}</dd>
+          <dt>${T("rq.links")}</dt><dd>${(r.asset_links || []).length ? (r.asset_links || []).map(l => `<a href="${esc(l)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("<br>") : T("value.none")}</dd>
+          <dt>${T("rq.contact")}</dt><dd>${r.contact ? esc(r.contact) : T("value.none")}</dd>
+        </dl>`)
+      + sectionHTML(T("rq.handle"), r.status === "withdrawn" ? `<div class="note">${T("rq.withdrawnNote")}</div>` : canEdit ? `<div class="two">
+          <label><i>${T("rq.status")}</i><select id="rq-status"${dis}>${["new", "in_progress", "done"].map(s => `<option value="${s}"${r.status === s ? " selected" : ""}>${esc(T("rq.st." + s))}</option>`).join("")}</select></label>
+          <label class="wide"><i>${T("rq.reply")}</i><textarea id="rq-reply" style="min-height:90px" placeholder="${esc(T("rq.replyPh"))}"${dis}>${esc(r.reply || "")}</textarea></label>
+        </div>
+        <div class="form-foot"><button class="btn" data-act="rq-save" data-id="${esc(r.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
+          ${r.status !== "done" ? `<button class="btn ghost" data-act="rq-done" data-id="${esc(r.id)}"${dis}>${T("rq.markDone")}</button>` : ""}
+          <span class="mini">${T("rq.doneNote")}</span></div>` : `<div class="note">${T("rq.viewOnly")}</div>`);
+  }
+  const shown = rqFilter(rows, o);
+  const groups = [["new", shown.filter(r => r.status === "new")], ["in_progress", shown.filter(r => r.status === "in_progress")], ["done", shown.filter(r => r.status === "done")], ["withdrawn", shown.filter(r => r.status === "withdrawn")]].filter(g => g[1].length);
+  const chip = (act, v, label, on) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-v="${esc(v)}">${esc(label)}</button>`;
+  const row = r => `<li class="rq-row"><div class="fhead"><b><a href="#requests/${esc(r.id)}" data-act="rq-open" data-id="${esc(r.id)}">${esc(r.title)}</a></b> <span class="mini">${esc(T("rq.kind." + r.kind))}</span></div>
+      <div class="fmeta">${esc(who(r.requester))}・${esc(T("rq.sent", { d: rqDate(r.created_at) }))}${r.needed_by ? `・${esc(T("rq.by", { d: rqDate(r.needed_by) }))}` : ""}${r.purpose ? `・${esc(r.purpose)}` : ""}</div></li>`;
+  return pageHead(T("rq.queueTitle"), T("rq.queueLede"))
+    + msgHTML(msg)
+    + `<div class="chips" style="margin-bottom:8px">${[["open", T("rq.f.open")], ["done", T("rq.f.done")], ["withdrawn", T("rq.f.withdrawn")], ["all", T("rq.f.all")]].map(([v, l]) => chip("rq-fstatus", v, l, o.status === v)).join("")}</div>
+       <div class="chips" style="margin-bottom:10px">${chip("rq-fkind", "", T("rq.f.anyKind"), !o.kind)}${RQ_KINDS.map(k => chip("rq-fkind", k, T("rq.kind." + k), o.kind === k)).join("")}</div>
+       <div class="ro-search"><input id="rq-q" type="search" value="${esc(o.q || "")}" placeholder="${esc(T("rq.findPh"))}" autocomplete="off"></div>`
+    + (groups.length ? groups.map(([st, rs]) => sectionHTML(`${esc(T("rq.st." + st))}<span class="hint">${rs.length}</span>`, `<ul class="flist">${rs.map(row).join("")}</ul>`)).join("")
+        : emptyHTML(T("rq.queueNone"), T("rq.queueNoneHint")));
 }

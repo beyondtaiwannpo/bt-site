@@ -1323,6 +1323,66 @@ else
   echo "  FAIL 申請合併那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
 fi
 
+
+echo "行銷需求單（2026-10-31）："
+# 這時候：PAUL Co-President、OTHER Senior Adviser、DIR 管 apps、NEWDIR 改 apps、INT1 幹部沒有任何指派、MEMBER 校友。
+# 先讓 DIR 管 res:Marketing Team（遷移檔會把他抄進需求工作區），NEWDIR 當送單的人（別的 team 的幹部）。
+psql -d "${DB}" -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${DIR}','res:Marketing Team','manage') on conflict (user_id, workspace_id) do update set level='manage';" >/dev/null
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-31-marketing-requests.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   行銷需求單那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 行銷需求單那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "★ res:Marketing 的成員照原等級抄進需求工作區" "manage" "select level from public.assignments where user_id='${DIR}' and workspace_id='custom:marketing-requests'"
+RQ=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${NEWDIR}',false);" \
+  -c "select public.submit_request('poster','冬令營海報','2027 冬令營','2026-12-01','A2 直式，要有報名 QR code','{https://drive.google.com/x,https://canva.com/y}','LINE: newdir')" 2>&1 | tail -1 | tr -d ' \n')
+case "${RQ}" in ????????-*) echo "  ok   幹部送了一張需求單（${RQ}）"; pass=$((pass+1));; *) echo "  FAIL 送單失敗：${RQ}"; fail=$((fail+1));; esac
+chk "單子存對：種類、狀態 new、送單的人、兩條素材連結" "poster|new|${NEWDIR}|2" "select kind||'|'||status||'|'||requester||'|'||array_length(asset_links,1) from public.requests where id='${RQ}'"
+chk "★ 排了一封 request_new 給每一個「管」的人（DIR 一封），信裡有標題、日期、連結、送單的人、不要回覆" "1|true|true|true|true|true" \
+  "select count(*)||'|'||bool_and(body like '%冬令營海報%')||'|'||bool_and(body like '%2026-12-01%')||'|'||bool_and(body like '%/admin/#requests/${RQ}%')||'|'||bool_and(body like '%New Director%')||'|'||bool_and(body like '%不要回覆這封信%') from public.mail_outbox where kind='request_new' and request_id='${RQ}'"
+chk "信是寄給 DIR 的 email" "director@example.com" "select to_email from public.mail_outbox where kind='request_new' and request_id='${RQ}'"
+chkrole authenticated "${NEWDIR}" "送單的人讀得到自己的單" "1" "select count(*) from public.requests where id='${RQ}'"
+chkrole authenticated "${DIR}" "Marketing 需求工作區的人讀得到全部" "1" "select count(*) from public.requests"
+chkrole authenticated "${INT1}" "★ 破壞測試：沒被派進需求工作區的幹部讀不到別人的單" "0" "select count(*) from public.requests"
+chkrole authenticated "${OTHER}" "Senior Adviser 靠職級讀得到" "1" "select count(*) from public.requests"
+chkraise "★ 沒被派的幹部改不了狀態（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${INT1}',true); perform public.set_request_status('${RQ}','in_progress','');"
+chkas "${PAUL}" "Co-President 把 ISTAFF（Internship 的幹部）派進需求工作區當「看」" "view" "select public.assign('${ISTAFF}','custom:marketing-requests','view')"
+chkrole authenticated "${ISTAFF}" "「看」的人讀得到全部了" "1" "select count(*) from public.requests"
+chkraise "★ 只有「看」的人還是改不了狀態（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.set_request_status('${RQ}','in_progress','');"
+chkas "${DIR}" "「管」的人改成進行中" "in_progress" "select public.set_request_status('${RQ}','in_progress','')"
+chkraise "★ 已經在做了，送單的人收不回（already_started）" "already_started" \
+  "perform set_config('test.uid','${NEWDIR}',true); perform public.withdraw_request('${RQ}');"
+chkraise "★ 別人收不回不是自己的單（not_yours）" "not_yours" \
+  "perform set_config('test.uid','${INT1}',true); perform public.withdraw_request('${RQ}');"
+chkas "${DIR}" "標做完了，寫回覆" "done" "select public.set_request_status('${RQ}','done','做好了，檔在 Drive 的 2027 冬令營資料夾')"
+chk "★ 寄了一封 request_done 給送單的人，信裡有回覆與連結" "1|newdir@example.com|true|true" \
+  "select count(*)||'|'||min(to_email)||'|'||bool_and(body like '%做好了，檔在 Drive%')||'|'||bool_and(body like '%/admin/#request/${RQ}%') from public.mail_outbox where kind='request_done' and request_id='${RQ}'"
+chkas "${DIR}" "再標一次 done 不再寄第二封" "done" "select public.set_request_status('${RQ}','done','')"
+chk "還是只有一封 request_done" "1" "select count(*) from public.mail_outbox where kind='request_done' and request_id='${RQ}'"
+chkrole authenticated "${DIR}" "工作區的人在 outbox 看得到 request 那幾封（總覽才算得到）" "2" "select count(*) from public.mail_outbox where request_id='${RQ}'"
+# 第二張：送單的人自己收回
+RQ2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${NEWDIR}',false);" \
+  -c "select public.submit_request('post','IG 貼文','','2026-11-15','','{}','')" 2>&1 | tail -1 | tr -d ' \n')
+chkas "${NEWDIR}" "送單的人在「新的」時收得回" "withdrawn" "select public.withdraw_request('${RQ2}')"
+chkraise "收回的單 Marketing 也動不了（withdrawn）" "withdrawn" \
+  "perform set_config('test.uid','${DIR}',true); perform public.set_request_status('${RQ2}','in_progress','');"
+chkraise "★ 校友送不了單（not_cadre）" "not_cadre" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.submit_request('other','x','','2026-12-01','','{}','');"
+chkraise "沒有標題擋（empty_title）" "empty_title" \
+  "perform set_config('test.uid','${NEWDIR}',true); perform public.submit_request('other','  ','','2026-12-01','','{}','');"
+got=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${NEWDIR}',false);" \
+  -c "set role authenticated; do \$\$ begin insert into public.requests (kind,title,requester) values ('other','偷插的','${NEWDIR}'); raise notice 'NOT_BLOCKED'; exception when insufficient_privilege then raise notice 'BLOCKED'; end \$\$;" 2>&1 || true)
+if echo "${got}" | grep -q "BLOCKED" && ! echo "${got}" | grep -q "NOT_BLOCKED"; then echo "  ok   ★ 沒有人能直接 insert requests（一律走 submit_request）"; pass=$((pass+1)); else echo "  FAIL 直接 insert requests 沒被擋：${got}"; fail=$((fail+1)); fi
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-31-marketing-requests.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then
+  echo "  ok   行銷需求單那支可以重跑"; pass=$((pass+1))
+else
+  echo "  FAIL 行銷需求單那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

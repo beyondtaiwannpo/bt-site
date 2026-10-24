@@ -3290,6 +3290,41 @@ Paul 2026-10-24：「蛇梯棋要讓 intern 看得到、有棋子、而且要彩
 
 **還沒驗的**：真的登入後的畫面與動畫（截圖是 `ui.js` 配假資料畫的；棋子沿著蛇梯飛那一段只在程式裡，沒有抓到截圖）；正式站要跑 `2026-10-22-intern-board.sql` 與 `2026-10-23-intern-pawn.sql` 兩支，跑完之前後台「棋盤」存檔會說要先跑那一支，intern 那邊看不到棋盤、跟以前一樣。
 
+## 行銷需求單（2026-10-31）
+
+Paul 2026-10-24：「其他 team 要跟 Marketing 提需求，要有一張表單，送出去給 Marketing team。」設計在 `docs/2026-10-24-行銷需求單.md`，三題 Paul 都照建議：送單當下就寄信、改狀態要「改」以上、送單的人在「新的」時可以收回。
+**不碰申請表那套（forms / applications）**，那是給外面的學生用的。截圖 `docs/admin-redesign/requests/rq-01` 到 `06`（本機假資料）。
+
+### 怎麼用
+
+- **任何幹部**：後台側欄「申請 → 跟 Marketing 提需求」。填種類（海報、貼文、影片、其他）、什麼時候要、一句話、給哪個活動、說明、素材連結（一行一條，放 Drive 或 Canva 的連結，不上傳檔案）、聯絡方式，按「送給 Marketing」。底下「我送過的」看狀態與 Marketing 的回覆；狀態還是「新的」可以收回。
+- **Marketing**：側欄「行銷需求單」（只有被派進「行銷需求單」工作區的人看得到，Co-President 與 Senior Adviser 靠職級）。清單預設只列還沒做完的，照「新的、進行中」分段，可以篩種類、找標題；點一張開來看全部欄位，改狀態、寫回覆、「標做完了」。
+- **信兩封**：送單那一刻寄給工作區裡每一個「管」的人（一人一封）；標做完了寄一封給送單的人（只寄一次，回覆那一段會帶進去）。文案在「對外 → 信件文案」的「需求單：給 Marketing 的通知」與「需求單：做完了」，代換符號 `{requester}` `{title}` `{needed_by}` `{link}` `{reply}`。
+  **送單當下就寄**：函式排完信直接叫 `send_pending_mail`，Resend 沒設好信會留在 outbox，總覽「還沒寄出去的信」那張卡看得到。
+- **總覽的卡**：對需求工作區「改」以上的人多一張「Marketing 需求單等處理：N」；送過單的人多一張「你送的需求單」（最近一張還在跑的）。
+- **People → Workspaces**：Marketing 那一列多一格「行銷需求單」（連到佇列），成員區跟別的工作區一樣加人、改等級。改一個人那一頁的存取格也多這一格。
+
+### 資料庫
+
+`supabase/migrations/2026-10-31-marketing-requests.sql`，接在 10-30 後面跑，可以重跑，PASS 表 7 項。
+- 表 `requests`（種類、標題、給哪個活動、什麼時候要、說明、素材連結 text[]、聯絡方式、送單的人、狀態 new／in_progress／done／withdrawn、回覆）。
+- 工作區 `custom:marketing-requests`（kind custom、team Marketing Team、擁有人 Marketing 的 Director，找不到就 Co-President），**建好把 `res:Marketing Team` 現在的成員照原等級抄一份進來**。之後加人減人在 People → Workspaces。
+- 三支函式：`submit_request()`（第一句 `is_cadre()`）、`set_request_status()`（第一句 `can_edit('custom:marketing-requests')`）、`withdraw_request()`（本人且 new）。`requests` 沒有任何寫的政策，連本人也不能直接 insert（smoke 守著）。
+- RLS 讀：送單的人自己的、工作區「看」以上全部。`mail_outbox` 多一欄 `request_id` 與一條讀的政策（request 那幾封給工作區的人看）。
+- `scripts/db/smoke.sh` 多一段 29 項：送單、抄成員、信的內容與收件人、**別的 team 的幹部讀不到別人的單（破壞測試）**、只有「看」改不了、已經在做收不回、別人收不回、做完寄一封且只寄一次、校友送不了、直接 insert 被擋、重跑。本機 450 項全過。
+
+### 檔案
+
+| 哪裡 | 做什麼 |
+|---|---|
+| `supabase/migrations/2026-10-31-marketing-requests.sql` | 表、工作區、信的種類、三支函式、RLS、PASS 表 |
+| `admin/src/{data,ui,main,strings}.js` | 送單頁、佇列頁、總覽兩張卡；字典 `rq.*`、`card.rq*` |
+| 四份 `ui.js` 的 `ITEMS` 與 `wsCellHref` | 側欄兩行（綁工作區的那一行只給被派進去的人看）、Workspaces 那一格連到佇列 |
+| `admin/site/src/{ui,strings}.js` | 信件文案多兩種，預覽的代換跟資料庫同一套 |
+| `test/requests.test.mjs` | 側欄、送單頁、佇列、卡、信件文案、資料層只走函式、英文不剩中文 |
+
+**還沒驗的**：正式站（遷移檔沒跑、程式沒 push），真的寄出去的信長什麼樣（本機只有 outbox 裡的內容）。
+
 ## 後台第三次重整：從人管人、在東西上管東西、一條導覽（2026-10-23）
 
 Paul 2026-10-23：「workspace 這件事真的很亂，每件事都散在不同地方。」前兩次重整之後功能夠了，問題是一件事要跑三個地方。

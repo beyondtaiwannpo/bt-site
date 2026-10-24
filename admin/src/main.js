@@ -26,6 +26,8 @@ let S = {
   noticeTo: new Set(["accepted"]),
   // 開新表單的內嵌表單（2026-10-19，批 3）。null 是收起來，物件是展開著、裡面是填到一半的值。
   newForm: null,
+  // 行銷需求單（2026-10-31）：requests 是 loadRequests() 回的（RLS 決定看得到哪些）；rqDraft 填到一半的表單；rqF 佇列的篩選；rqSel 打開的那一張。
+  requests: null, rqDraft: null, rqF: { status: "open", kind: "", q: "" }, rqSel: null, cadres: [],
 };
 
 const root = () => document.getElementById("bt-root");
@@ -67,6 +69,10 @@ function render() {
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
+  } else if (S.view === "request") {
+    body = UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy);
+  } else if (S.view === "requests") {
+    body = UI.requestsQueueHTML(S.requests || [], S.cadres, S.rqF, S.rqSel, UI.canEditWs(S.me, "custom:marketing-requests"), S.msg, S.busy);
   } else if (S.view === "list") {
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
       S.teams.length ? S.teams : UI.TEAM_LABELS, S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy,
@@ -85,7 +91,9 @@ function render() {
     team: (t.team || []).length,
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", S.view === "home" ? "home" : "forms", S.me, counts), body);
+  // 側欄亮哪一行：總覽、需求單那兩頁各自亮，其他全部算在「申請表」底下。
+  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : "forms";
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body);
   UI.afterRender(S, el);
 }
 
@@ -112,8 +120,12 @@ async function boot(retried) {
     // 首頁三塊的數字。載不到不該讓整頁打不開，所以接住；每一項自己也會接住。
     S.todo = await D.loadTodo(S.me).catch(() => ({}));
     S.workspaces = await D.loadWorkspaces().catch(() => []);
+    // 行銷需求單（2026-10-31）：讀一次，總覽的卡也靠它；載不到是 null，卡會印「載不到」。
+    S.requests = await D.loadRequests().catch(() => null);
+    if (S.todo) S.todo.requests = S.requests;
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
+    else if (/^requests?(\/|$)/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -131,7 +143,28 @@ async function boot(retried) {
 
 // 側欄的兩個分頁：首頁、申請表清單。上一頁與網址列改 # 也走這裡。
 async function openTab(t) {
+  // 行銷需求單（2026-10-31）：#request 是送單那一頁（#request/<id> 只是信裡的直達，一樣開那一頁），#requests 是佇列，#requests/<id> 打開那一張。
+  const m = /^(requests?)(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
+  if (m) {
+    // 沒被派進需求工作區的人（RLS 只會給他自己的單）直接開他自己那一頁。
+    const queueOk = UI.canSee(UI.ITEMS.find(i => i.key === "requests"), S.me);
+    S.view = m[1] === "request" || !queueOk ? "request" : "requests"; S.msg = ""; S.rqSel = m[1] === "requests" && queueOk ? (m[2] || null) : null;
+    await reloadRequests(); render(); return;
+  }
   S.view = t === "home" ? "home" : "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render();
+}
+async function reloadRequests() {
+  try {
+    S.requests = await D.loadRequests();
+    if (S.todo) S.todo.requests = S.requests;
+    if (S.view === "requests" && !S.cadres.length) S.cadres = await D.loadCadres().catch(() => []);
+  } catch (e) { S.msg = T("err.rqLoad") + D.says(e); }
+}
+// 送單的表單讀成一個物件（欄位名單只在這裡一份）。
+function readRequest() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  return { kind: val("rq-kind") || "poster", title: val("rq-title"), purpose: val("rq-purpose"), needed_by: val("rq-needed"), brief: val("rq-brief"),
+    links: val("rq-links"), contact: val("rq-contact") };
 }
 
 // 把畫面上那幾格讀成一個物件。**讀取集中在這裡一支**，
@@ -217,6 +250,44 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
+  // ── 行銷需求單（2026-10-31）──
+  if (act === "rq-submit") {
+    const d = readRequest(); S.rqDraft = d;
+    if (!d.title) { S.msg = T("err.rqTitle"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const links = d.links.split(/\n/).map(x => x.trim()).filter(Boolean);
+      await D.submitRequest(Object.assign({}, d, { links }));
+      S.rqDraft = null; S.busy = false; S.msg = T("msg.rqSent");
+      await reloadRequests(); render();
+    } catch (e) { S.busy = false; S.msg = T("err.rqSubmit") + D.says(e); render(); }
+    return;
+  }
+  if (act === "rq-withdraw") {
+    const r = (S.requests || []).find(x => x.id === id); if (!r) return;
+    if (UI.needAsk(S, b, T("confirm.rqWithdraw", { title: r.title }))) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.withdrawRequest(id); S.busy = false; S.msg = T("msg.rqWithdrawn", { title: r.title }); await reloadRequests(); render(); }
+    catch (e) { S.busy = false; S.msg = T("err.rqWithdraw") + D.says(e); render(); }
+    return;
+  }
+  if (act === "rq-open") { e.preventDefault(); S.rqSel = id; S.msg = ""; history.pushState(null, "", "#requests/" + id); render(); return; }
+  if (act === "rq-back") { S.rqSel = null; S.msg = ""; history.pushState(null, "", "#requests"); render(); return; }
+  if (act === "rq-fstatus") { S.rqF = Object.assign({}, S.rqF, { status: b.dataset.v }); render(); return; }
+  if (act === "rq-fkind") { S.rqF = Object.assign({}, S.rqF, { kind: b.dataset.v }); render(); return; }
+  if (act === "rq-save" || act === "rq-done") {
+    const r = (S.requests || []).find(x => x.id === id); if (!r) return;
+    const st = document.getElementById("rq-status"), rp = document.getElementById("rq-reply");
+    const status = act === "rq-done" ? "done" : (st ? st.value : r.status), reply = rp ? rp.value.trim() : r.reply;
+    if (status === "done" && r.status !== "done" && UI.needAsk(S, b, T("confirm.rqDone", { title: r.title }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.setRequestStatus(id, status, reply);
+      S.busy = false; S.msg = status === "done" && r.status !== "done" ? T("msg.rqDone", { title: r.title }) : T("msg.rqSaved");
+      await reloadRequests(); render();
+    } catch (e) { S.busy = false; S.msg = T("err.rqSave") + D.says(e); render(); }
+    return;
+  }
   // ── 成員分頁（2026-10-23，第三次重整批 3）──
   if (act === "members-open") { await openMembers(b.dataset.ws, b.dataset.name); return; }
   if (act === "members-back") { S.view = (S.mp && S.mp.backView) || "list"; S.msg = ""; render(); return; }
@@ -583,6 +654,12 @@ document.addEventListener("change", async e => {
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("input", e => {
+  // 行銷需求單的佇列：邊打邊篩，重畫後游標放回去。
+  if (e.target && e.target.id === "rq-q" && S.view === "requests") {
+    S.rqF = Object.assign({}, S.rqF, { q: e.target.value }); render();
+    const again = document.getElementById("rq-q"); if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* search 型的欄位有的瀏覽器不給 */ } }
+    return;
+  }
   const el = e.target.closest('[data-act="pk-q"],[data-act="pk-mq"]');
   if (!el || !S.mp || S.view !== "members") return;
   S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), el); render(); UI.pkRefocus(el.dataset.ns, el.dataset.act === "pk-mq" ? "mq" : "q");

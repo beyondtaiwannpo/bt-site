@@ -44,6 +44,9 @@ export const ITEMS = [
   // 2026-10-23 第三次重整批 4：叫「總覽」不叫「首頁」，頂欄那一顆「後台」跟它才不會是同一個地方兩個名字。
   { group: "forms",     key: "home",    label: { zh: "總覽",     en: "Overview" },        who: "cadre" },
   { group: "forms",     key: "forms",   label: { zh: "申請表",   en: "Forms" },           who: "cadre" },
+  // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
+  { group: "forms",     key: "request",  label: { zh: "跟 Marketing 提需求", en: "Request from Marketing" }, who: "cadre" },
+  { group: "forms",     key: "requests", label: { zh: "行銷需求單", en: "Marketing requests" }, who: "ws:custom:marketing-requests" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
   { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "senior" },
   { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "senior" },
@@ -98,7 +101,8 @@ export function railHTML(group, tab, me, counts) {
   const home = ITEMS.find(i => i.key === "home");
   const groups = GROUPS.map(g => {
     const ok = canEnter(g, me);
-    const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home");
+    // 2026-10-31：進得去的組裡，綁工作區的那幾行（who 是 ws:…）只給被派進去的人看（行銷需求單的佇列在「申請」這一組，幹部都進得了組）。
+    const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home" && (!String(i.who).startsWith("ws:") || canSee(i, me)));
     // 2026-10-23 批 4：進不去的組只留組名變淡，不再掛一段為什麼。為什麼在總覽的「你的存取」那一塊講一次就好；
     // 三段灰色長文在側欄上看起來像三個警告。WHY 留著給 title（滑過去還看得到）。
     return `<div class="rail-group${ok ? "" : " off"}"${ok ? "" : ` title="${esc(T(WHY[g.who]) || "")}"`}>${esc(T(g.label))}</div>${
@@ -389,6 +393,7 @@ export function wsCellHref(w) {
   if (id === "intern-passport") return "/admin/passports/#interns";
   if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
+  if (id === "custom:marketing-requests") return "/admin/#requests";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
@@ -597,7 +602,17 @@ export const MAIL_KINDS = [
   { v: "rejected",  label: "mail.rejected",  when: "mail.rejected.when" },
   // 2026-10-29 邀請信：五個代換符號 {name} {position} {term} {link} {sender}，不是 {姓名} {活動名稱}。
   { v: "invite",    label: "mail.invite",    when: "mail.invite.when" },
+  // 2026-10-31 行銷需求單：兩封，代換符號 {requester} {title} {needed_by} {link} {reply}。
+  { v: "request_new",  label: "mail.request_new",  when: "mail.request_new.when" },
+  { v: "request_done", label: "mail.request_done", when: "mail.request_done.when" },
 ];
+export const REQUEST_SAMPLE = { requester: "Mei Wu", title: "2027 冬令營報名海報", needed_by: "2026-12-01", link: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", reply: "做好了，檔在 Drive 的 2027 冬令營資料夾。" };
+export function fillRequest(text, s) {
+  const v = Object.assign({}, REQUEST_SAMPLE, s || {});
+  return String(text == null ? "" : text)
+    .split("{requester}").join(v.requester).split("{title}").join(v.title).split("{needed_by}").join(v.needed_by)
+    .split("{link}").join(v.link).split("{reply}").join(v.reply);
+}
 // 邀請信預覽用的範例（信裡真的會出現的東西，不跟著後台的語言翻）。
 export const INVITE_SAMPLE = { name: "Mei Wu", position: "Director, Curriculum Team", term: "2026-27", link: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", sender: "Paul Wang" };
 export function fillInvite(text, s) {
@@ -652,20 +667,20 @@ export function mailEditHTML(kind, t, msg, busy) {
   const subject = t ? t.subject : "";
   const body = t ? t.body : "";
   const extra = kind === "interview" ? "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/..." : "";
-  const isInvite = kind === "invite";
-  const fill = s => isInvite ? fillInvite(s) : fillMail(s, NAME, TITLE);
+  const isInvite = kind === "invite", isRequest = kind.startsWith("request_");
+  const fill = s => isInvite ? fillInvite(s) : isRequest ? fillRequest(s) : fillMail(s, NAME, TITLE);
   return pageHead(esc(T(k.label)), esc(T("mail.editLede", { when: T(k.when) })), [], { act: "mail-back", label: T("mail.back") })
     + msgHTML(msg)
     + `<div class="cols">` + sectionHTML("", `<label><i>${T("mail.subjectLabel")}</i><input id="msub" value="${esc(subject)}"></label>
     <label><i>${T("mail.body")}</i><textarea id="mbody" style="min-height:230px">${esc(body)}</textarea></label>
     <div class="mini" style="margin:-6px 0 14px">
-      ${isInvite ? T("mail.varsInvite") : T("mail.vars")}</div>
+      ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : T("mail.vars")}</div>
 
     <div class="form-foot">
       <button class="btn" data-act="mail-save" data-k="${esc(kind)}" ${busy ? "disabled" : ""}>${
         busy ? T("common.saving") : T("common.save")}</button>
     </div>`)
-    + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
+    + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : isRequest ? T("mail.sampleRequest", { name: esc(REQUEST_SAMPLE.requester), title: esc(REQUEST_SAMPLE.title) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
     <div class="mailprev"><b>${esc(fill(subject)) || T("mail.noSubjectPrev")}</b><pre>${
       esc(fill(body) + extra)}</pre><pre class="tail">${esc(mailTail(kind))}</pre></div>
     <div class="mini" style="margin:6px 0 0">

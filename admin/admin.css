@@ -312,6 +312,15 @@ a.btn{text-decoration:none}
   color:rgba(16,42,134,.7);padding:6px 10px 8px;border-bottom:1px solid rgba(16,42,134,.2)}
 .table td{padding:11px 10px;border-bottom:1px solid rgba(16,42,134,.12);vertical-align:middle}
 .table td.t-main b{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:.02em}
+/* 行銷需求單（2026-10-31）：一張單的欄位表、說明保留換行、收回的那一列淡掉。 */
+.rq-dl{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 14px;margin:0;font-size:14px}
+.rq-dl dt{font-family:var(--display);font-size:12.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,42,134,.7);padding-top:2px}
+.rq-dl dd{margin:0;overflow-wrap:anywhere}
+.rq-dl dd.pre{white-space:pre-wrap}
+.rq-row.off{opacity:.55}
+.rq-reply i{font-style:normal;font-weight:600;margin-right:4px}
+.two label.wide{grid-column:1/-1}
+@media (max-width:720px){ .rq-dl{grid-template-columns:1fr;gap:2px 0} .rq-dl dd{margin-bottom:8px} }
 /* 兩行的名字（2026-10-24）：中文一行、英文淡字一行，永遠兩行，列高才齊；名字欄不縮、不裁，讓旁邊的 team 淡字先讓。 */
 .nm{display:inline-flex;flex-direction:column;align-items:flex-start;text-align:left;line-height:1.2;flex:0 0 auto;vertical-align:middle}
 .nm b{white-space:nowrap}

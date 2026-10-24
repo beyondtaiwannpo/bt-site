@@ -31,6 +31,9 @@ export const ITEMS = [
   // 2026-10-23 第三次重整批 4：叫「總覽」不叫「首頁」，頂欄那一顆「後台」跟它才不會是同一個地方兩個名字。
   { group: "forms",     key: "home",    label: { zh: "總覽",     en: "Overview" },        who: "cadre" },
   { group: "forms",     key: "forms",   label: { zh: "申請表",   en: "Forms" },           who: "cadre" },
+  // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
+  { group: "forms",     key: "request",  label: { zh: "跟 Marketing 提需求", en: "Request from Marketing" }, who: "cadre" },
+  { group: "forms",     key: "requests", label: { zh: "行銷需求單", en: "Marketing requests" }, who: "ws:custom:marketing-requests" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
   { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "senior" },
   { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "senior" },
@@ -85,7 +88,8 @@ export function railHTML(group, tab, me, counts) {
   const home = ITEMS.find(i => i.key === "home");
   const groups = GROUPS.map(g => {
     const ok = canEnter(g, me);
-    const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home");
+    // 2026-10-31：進得去的組裡，綁工作區的那幾行（who 是 ws:…）只給被派進去的人看（行銷需求單的佇列在「申請」這一組，幹部都進得了組）。
+    const rows = ITEMS.filter(i => i.group === g.key && i.key !== "home" && (!String(i.who).startsWith("ws:") || canSee(i, me)));
     // 2026-10-23 批 4：進不去的組只留組名變淡，不再掛一段為什麼。為什麼在總覽的「你的存取」那一塊講一次就好；
     // 三段灰色長文在側欄上看起來像三個警告。WHY 留著給 title（滑過去還看得到）。
     return `<div class="rail-group${ok ? "" : " off"}"${ok ? "" : ` title="${esc(T(WHY[g.who]) || "")}"`}>${esc(T(g.label))}</div>${
@@ -376,6 +380,7 @@ export function wsCellHref(w) {
   if (id === "intern-passport") return "/admin/passports/#interns";
   if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
+  if (id === "custom:marketing-requests") return "/admin/#requests";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。

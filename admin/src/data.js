@@ -315,6 +315,13 @@ export async function unassign(id, ws) {
 
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
+  // 行銷需求單（2026-10-31）
+  ["not_allowed", "你對行銷需求單是「看」，改狀態要「改」以上，找 Marketing 的 Director。", "You have View on Marketing requests; changing status needs Edit. Ask the Marketing Director."],
+  ["already_started", "Marketing 已經在做了，收不回；直接跟他們講。", "Marketing has already started; it cannot be withdrawn. Talk to them directly."],
+  ["not_yours", "這不是你送的單。", "This is not your request."],
+  ["withdrawn", "這張單已經收回了。", "This request was withdrawn."],
+  ["bad_kind", "種類要選海報、貼文、影片或其他。", "Pick poster, post, video or other."],
+  ["no_such_request", "找不到這張單，重新整理再試一次。", "Request not found. Refresh and try again."],
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
   // 2026-09-08：Paul 照步驟設定了，但名字打成「Resend API」，
   // 而畫面上顯示的是這裡寫死的一句話 —— 看起來像他什麼都沒做。
@@ -366,4 +373,35 @@ export function says(err) {
   if (clash) return T("says.inviteExists", { code: clash[1] });
   for (const row of SAYS) if (m.includes(row[0])) return row[col];
   return m;
+}
+
+// ── 行銷需求單（2026-10-31）──────────────────────────────────────────────
+// 讀 requests（RLS：送單的人自己的、需求工作區「看」以上全部）；寫一律走三支函式。
+export async function loadRequests() {
+  need();
+  const { data, error } = await supabase.from("requests")
+    .select("id, kind, title, purpose, needed_by, brief, asset_links, contact, requester, status, reply, created_at, updated_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+export async function submitRequest(d) {
+  need();
+  const { data, error } = await supabase.rpc("submit_request", {
+    p_kind: d.kind, p_title: d.title, p_purpose: d.purpose || "", p_needed_by: d.needed_by || null,
+    p_brief: d.brief || "", p_asset_links: d.links || [], p_contact: d.contact || "" });
+  if (error) throw error;
+  return data;
+}
+export async function setRequestStatus(id, status, reply) {
+  need();
+  const { data, error } = await supabase.rpc("set_request_status", { p_id: id, p_status: status, p_reply: reply == null ? null : reply });
+  if (error) throw error;
+  return data;
+}
+export async function withdrawRequest(id) {
+  need();
+  const { data, error } = await supabase.rpc("withdraw_request", { p_id: id });
+  if (error) throw error;
+  return data;
 }
