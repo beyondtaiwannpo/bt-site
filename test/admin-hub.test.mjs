@@ -556,10 +556,12 @@ test("★ 總覽「你的存取」：被派的人一行一個工作區加直達�
   const DIRS = [{ id: "u2", name_zh: "林育安", team: "Curriculum Team", title_en: "Director, Curriculum Team" }, { id: "u9", name_zh: "某某", team: "Curriculum Team", title_en: "Associate, Curriculum Team" }];
   const FEAT = [{ label: "護照", desc: "這一年的活動、章、心得與照片", href: "/passport/" }];
   const istaff = FORMS.accessHTML({ ...ME.istaff, ws: { "intern-passport": "edit", "apps:Curriculum Team": "view" } }, { workspaces: WS, directors: DIRS }, FEAT);
-  assert.match(istaff, /<b>實習護照<\/b><span class="tag">改<\/span>/);
+  // 2026-10-24 照 team 分組：Internship 那一段底下是「實習護照（格子與棋盤）」加等級，Curriculum 那一段是「申請（表單與審核）」。
+  assert.match(istaff, /<b>Internship<\/b><\/div><div class="row"><span>實習護照（格子與棋盤）<\/span><span class="tag">改<\/span>/);
   assert.match(istaff, /href="\/intern-passport\/\?lang=zh">進度牆/, "被派進實習護照的人從這裡直達進度牆（頂欄對幹部沒有這一項）");
   assert.match(istaff, /href="\/admin\/passports\/\?lang=zh#interns">後台/);
-  assert.match(istaff, /<b>Curriculum Team 的申請<\/b><span class="tag">看<\/span>/);
+  assert.match(istaff, /<b>Curriculum<\/b><\/div><div class="row"><span>申請（表單與審核）<\/span><span class="tag">看<\/span>/);
+  assert.match(istaff, /玩護照是身分帶來的/); assert.match(istaff, /時間看板沒有指派/);
   assert.match(istaff, /<ul class="feat"><li><a href="\/passport\/\?lang=zh">護照<\/a>：這一年的活動/);
   const none = FORMS.accessHTML({ ...ME.member, ws: {} }, { workspaces: WS, directors: DIRS }, []);
   assert.match(none, /你還沒被派進任何工作區/);
@@ -599,4 +601,23 @@ test("總覽「你的存取」：Co-President 看到一顆「全部（職級）�
   assert.match(h, /<span class="tag open">全部（職級）<\/span>/);
   assert.match(h, /不用派/);
   assert.doesNotMatch(h, /class="flist access"/, "不列工作區");
+});
+
+// 2026-10-24 工作區照 team 分組：四份同一套 wsTeamOf / wsCellLabel / wsCellHref / wsRows。
+test("★ 工作區屬於哪一列、叫什麼、連到哪（四份一樣）", () => {
+  for (const [label, M] of IMPL) {
+    for (const fn of ["wsTeamOf", "wsCellLabel", "wsCellHref", "wsRows"]) assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
+  }
+  assert.equal(FORMS.wsTeamOf({ id: "apps:Curriculum Team" }), "Curriculum Team");
+  assert.equal(FORMS.wsTeamOf({ id: "intern-passport" }), "Internship Team", "實習護照在 Internship 底下");
+  assert.equal(FORMS.wsTeamOf({ id: "passport" }), "", "幹部護照是整個 BT");
+  assert.equal(FORMS.wsTeamOf({ id: "custom:camp", team: "Marketing Team" }), "Marketing Team");
+  assert.equal(FORMS.wsTeamOf({ id: "custom:camp", owner: "u2" }, [{ profile_id: "u2", team: "Curriculum Team, Internship Team" }]), "Curriculum Team", "自訂的沒有 team 欄就看擁有人的第一個 team");
+  assert.equal(FORMS.wsTeamOf({ id: "custom:camp" }), "", "都沒有就放整個 BT");
+  assert.equal(FORMS.wsCellLabel({ id: "passport" }), "幹部護照（格子與城市）");
+  assert.equal(FORMS.wsCellLabel({ id: "intern-passport" }), "實習護照（格子與棋盤）");
+  assert.equal(FORMS.wsCellLabel({ id: "apps:Curriculum Team" }), "申請（表單與審核）");
+  assert.equal(FORMS.wsCellHref({ id: "apps:X" }), "/admin/#forms"); assert.equal(FORMS.wsCellHref({ id: "intern-passport" }), "/admin/passports/#interns");
+  const rows = FORMS.wsRows([{ id: "passport" }, { id: "apps:Internship Team" }, { id: "intern-passport" }, { id: "res:Internship Team" }, { id: "custom:camp", team: "Internship Team" }], ["Curriculum Team", "Internship Team"]);
+  assert.deepEqual(rows.map(r => [r.label, r.cells.map(c => c.id)]), [["整個 BT", ["passport"]], ["Curriculum", []], ["Internship", ["apps:Internship Team", "res:Internship Team", "intern-passport", "custom:camp"]]], "整個 BT 在最上面，Internship 列：申請、資源、實習護照、自訂");
 });

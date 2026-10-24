@@ -233,6 +233,46 @@ export function mpFind(people, q) {
 }
 // 這一頁該列哪幾個「誰在做…」的入口：senior 看所有這一類的工作區，其他人只有自己是「管」的那幾個。
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
+// 一個工作區屬於哪一列（2026-10-24 照 team 分組）：apps:X / res:X 是 X；intern-passport 是 Internship Team；passport 是整個 BT（""）；
+// 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
+export function wsTeamOf(w, people) {
+  const id = String((w && w.id) || "");
+  if (id.startsWith("apps:")) return id.slice(5);
+  if (id.startsWith("res:")) return id.slice(4);
+  if (id === "intern-passport") return "Internship Team";
+  if (id === "passport") return "";
+  if (w && w.team) return w.team;
+  const o = w && w.owner && (people || []).find(p => p.profile_id === w.owner || p.id === w.owner);
+  const t = o ? String(o.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean)[0] : "";
+  return t || "";
+}
+// 那一格叫什麼：兩本護照用長名稱（講清楚管的是格子不是能不能玩），申請與資源用短的，自訂的用它的標題。
+export function wsCellLabel(w) {
+  const id = String((w && w.id) || "");
+  if (id === "passport") return T("ws.long.passport");
+  if (id === "intern-passport") return T("ws.long.intern");
+  if (id.startsWith("apps:")) return T("ws.long.apps");
+  if (id.startsWith("res:")) return T("ws.long.res");
+  return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
+}
+export function wsCellHref(w) {
+  const id = String((w && w.id) || "");
+  if (id === "passport") return "/admin/passports/#cadre";
+  if (id === "intern-passport") return "/admin/passports/#interns";
+  if (id.startsWith("apps:")) return "/admin/#forms";
+  if (id.startsWith("res:")) return "/admin/site/#res";
+  return "/admin/people/#ws=" + encodeURIComponent(id);
+}
+// 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
+export function wsRows(workspaces, teams, people) {
+  const active = (workspaces || []).filter(w => w.active !== false);
+  const order = { "intern-passport": 3, passport: 0 };
+  const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
+  const groups = new Map([["", []]]);
+  for (const t of teams || []) groups.set(t, []);
+  for (const w of active) { const t = wsTeamOf(w, people); if (!groups.has(t)) groups.set(t, []); groups.get(t).push(w); }
+  return [...groups.entries()].map(([team, cells]) => ({ team, label: team ? team.replace(/\s*Team$/i, "") : T("ws.board"), cells: cells.sort((a, b) => rank(a) - rank(b)) }));
+}
 export function mpItems(me, prefix, workspaces) {
   const title = w => (lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || w.id;
   const all = (workspaces || []).filter(w => w.active !== false && (w.id === prefix || w.id.startsWith(prefix)));
@@ -368,11 +408,12 @@ export const levelLabel = v => T("level." + (LEVELS.includes(v) ? v : "view"));
 // 工作區給人看的名字：名單與改一個人那一頁不再印代號（apps:Curriculum Team）。
 // 有工作區清單就用它的標題，沒有（還沒載到）就從代號推。代號只在網址裡。
 export function wsName(id, workspaces) {
+  const s = String(id || "");
+  // 兩本護照一律用長名稱（2026-10-24）：「幹部護照（格子與城市）」，講清楚那一格管的是格子，不是能不能玩。
+  if (s === "passport") return T("ws.long.passport");
+  if (s === "intern-passport") return T("ws.long.intern");
   const w = (workspaces || []).find(x => x.id === id);
   if (w) return wsLabel(w);
-  const s = String(id || "");
-  if (s === "passport") return T("ws.kind.passport");
-  if (s === "intern-passport") return T("ws.kind.intern");
   if (s.startsWith("apps:")) return T("ws.name.apps", { team: s.slice(5) });
   if (s.startsWith("res:")) return T("ws.name.res", { team: s.slice(4) });
   if (s.startsWith("custom:")) return s.slice(7);
@@ -381,21 +422,29 @@ export function wsName(id, workspaces) {
 // 存取格：一個人在每一個工作區的等級排成一張表，一格一個下拉，改了就存（main.js 接 change 的 data-act="grid-level"）。
 // 列是六個 team（申請、資源兩欄）、兩本護照、自訂的工作區；資料就是 roster() 回的 workspaces，跟 Workspaces 那一頁同一份。
 // 還沒載到工作區清單的時候每一格都畫（exists 回 true），載到了就只畫真的存在的。
-export function accessGridHTML(p, workspaces, busy) {
+// 還沒載到工作區清單的時候用這一份預設（跟 10-24 遷移檔建的十四個一樣），格子才畫得出來。
+export function defaultWorkspaces() {
+  return [{ id: "passport", kind: "passport" }, { id: "intern-passport", kind: "intern-passport" }]
+    .concat(TEAMS.flatMap(t => [{ id: "apps:" + t, kind: "apps", team: t }, { id: "res:" + t, kind: "res", team: t }]));
+}
+// 2026-10-24 Paul：十四列的平表看不懂（「實習護照應該在 Internship 底下」「幹部護照屬於整個 board」「表單在哪」）。
+// 改成一列一個 team，欄是那個 team 擁有的東西：Internship 多一格實習護照；最上面「整個 BT」一列放幹部護照；自訂的掛在它的 team 底下。
+// 每一格的標題連到那個東西自己的頁面。底下三句：等級怎麼看、玩護照是身分帶來的、時間看板沒有指派。
+export function accessGridHTML(p, workspaces, busy, people) {
   const dis = busy ? " disabled" : "";
   const have = Object.fromEntries((Array.isArray(p.workspaces) ? p.workspaces : []).map(w => [w.id, w.level]));
-  const active = (workspaces || []).filter(w => w.active !== false);
-  const exists = id => !active.length || active.some(w => w.id === id);
+  const list = (workspaces || []).filter(w => w.active !== false).length ? workspaces : defaultWorkspaces();
   const byRank = isOrgWide(p.board_role);
-  const cell = id => !exists(id) ? `<span class="mini">—</span>` : byRank
-    ? `<select class="byrank" disabled aria-label="${esc(wsName(id, workspaces))}"><option selected>${T("grid.byRank")}</option></select>`
-    : `<select data-act="grid-level" data-id="${esc(p.profile_id)}" data-ws="${esc(id)}" aria-label="${esc(wsName(id, workspaces))}"${dis}>${
-        ["", ...LEVELS].map(l => `<option value="${l}"${(have[id] || "") === l ? " selected" : ""}>${l ? esc(levelLabel(l)) : esc(T("grid.none"))}</option>`).join("")}</select>`;
-  const teamRows = TEAMS.map(t => `<tr><th scope="row">${esc(t.replace(/\s*Team$/i, ""))}</th><td>${cell("apps:" + t)}</td><td>${cell("res:" + t)}</td></tr>`).join("");
-  const single = (id, label) => `<tr><th scope="row">${esc(label)}</th><td colspan="2">${cell(id)}</td></tr>`;
-  const customs = active.filter(w => w.kind === "custom").map(w => single(w.id, wsLabel(w))).join("");
-  return `<table class="table grid"><thead><tr><th></th><th>${T("grid.apps")}</th><th>${T("grid.res")}</th></tr></thead><tbody>${teamRows}${
-    single("passport", wsName("passport", workspaces))}${single("intern-passport", wsName("intern-passport", workspaces))}${customs}</tbody></table>`;
+  const sel = w => byRank
+    ? `<select class="byrank" disabled aria-label="${esc(wsCellLabel(w))}"><option selected>${T("grid.byRank")}</option></select>`
+    : `<select data-act="grid-level" data-id="${esc(p.profile_id)}" data-ws="${esc(w.id)}" aria-label="${esc(wsCellLabel(w))}"${dis}>${
+        ["", ...LEVELS].map(l => `<option value="${l}"${(have[w.id] || "") === l ? " selected" : ""}>${l ? esc(levelLabel(l)) : esc(T("grid.none"))}</option>`).join("")}</select>`;
+  const cell = w => `<div class="gcell"><a class="glabel" href="${withLang(wsCellHref(w))}">${esc(wsCellLabel(w))}</a>${sel(w)}</div>`;
+  const rows = wsRows(list, TEAMS, people).filter(r => r.cells.length);
+  return `<table class="table grid"><tbody>${rows.map(r => `<tr><th scope="row">${esc(r.label)}</th><td><div class="gcells">${r.cells.map(cell).join("")}</div></td></tr>`).join("")}</tbody></table>
+    <div class="mini" style="margin-top:8px">${T("ws.levelLegend")}</div>
+    <div class="mini">${T("ws.playNote")}</div>
+    <div class="mini">${T("ws.availNote")}</div>`;
 }
 // 找人用的那一串字：「王小明 (Ming Wang)」。datalist 的選項值就是它，main.js 用 findByPickName 對回去。
 export function pickName(p) { const { name, alt } = namesOf({ name_zh: p.name_zh, name_en: p.name_en }); return alt ? `${name} (${alt})` : name; }
@@ -648,7 +697,7 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
   // 存取（2026-10-23 批 2）：可以直接改的一張格子，不再是唯讀標籤加「去工作區那一頁改」。
   const wsSec = cadre ? sectionHTML(T("pe.ws"),
       (p.board_role === "president" || p.board_role === "senior_adviser" ? `<div class="note">${T("pe.wsSenior")}</div>` : "")
-      + accessGridHTML(p, workspaces, busy)
+      + accessGridHTML(p, workspaces, busy, people)
       + `<div class="mini" style="margin-top:8px">${T("pe.wsNote")}${ws.length ? "" : " " + T("pe.noWs")}</div>`,
     { hint: T("pe.wsHint") }) : "";
   const dupSec = dups.length ? sectionHTML(T("pe.dup"), `<div class="note">${T("pe.dupNote")}</div>${
@@ -723,8 +772,10 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   const inWs = new Set((members || []).map(m => m.user_id));
   const byProfile = Object.fromEntries(cadres.map(p => [p.profile_id, p]));
   const KIND = { passport: "ws.kind.passport", "intern-passport": "ws.kind.intern", apps: "ws.kind.apps", res: "ws.kind.res", custom: "ws.kind.custom" };
-  const li = x => `<a class="rail-item${x.id === sel ? " on" : ""}" href="#ws=${encodeURIComponent(x.id)}" data-act="ws-pick" data-ws="${esc(x.id)}">${esc(wsLabel(x))}<span class="rail-count">${esc(T(KIND[x.kind] || "ws.kind.custom"))}</span></a>`;
-  const left = list.length ? `<div class="wslist">${list.map(li).join("")}</div>` : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
+  const li = x => `<a class="rail-item${x.id === sel ? " on" : ""}" href="#ws=${encodeURIComponent(x.id)}" data-act="ws-pick" data-ws="${esc(x.id)}">${esc(wsCellLabel(x))}<span class="rail-count">${esc(T(KIND[x.kind] || "ws.kind.custom"))}</span></a>`;
+  // 左邊照 team 分組（2026-10-24）：整個 BT、六個 team，每一組底下是那個 team 擁有的東西。
+  const left = list.length ? wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="rail-group">${esc(r.label)}</div><div class="wslist">${r.cells.map(li).join("")}</div>`).join("")
+    : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
   const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
   const memberRow = m => `<tr>
       <td class="t-main"><b>${esc(namesOf(m).name)}${namesOf(m).alt ? `<span class="alt">${esc(namesOf(m).alt)}</span>` : ""}</b> <span class="tag">${esc(boardLabel(m.board_role))}</span></td>
@@ -739,7 +790,7 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
       <td><span class="mini">${T("level.manage")}</span></td><td></td>
     </tr>`;
   const right = !w ? `<div class="empty"><b>${T("ws.pickOne")}</b></div>` : `
-    <h2>${esc(wsLabel(w))}<span class="hint">${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
+    <h2>${esc(wsCellLabel(w))}<span class="hint">${esc(wsTeamOf(w, people) || T("ws.board"))}・${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
     <div class="note">${T("ws.levels")}</div>
     ${(members || []).length || seniors.length
       ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ws.level")}</th><th></th></tr></thead><tbody>${seniors.map(seniorRow).join("")}${(members || []).map(memberRow).join("")}</tbody></table>`
@@ -760,13 +811,17 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
       <label class="check" style="margin:0"><input type="checkbox" name="wsn-member" value="${esc(p.profile_id)}"${m ? " checked" : ""}${dis}><span>${esc(pickName(p))}${p.board_role !== "member" ? ` <span class="mini">${esc(boardLabel(p.board_role))}</span>` : ""}</span></label>
       <select id="wsn-lv-${esc(p.profile_id)}" aria-label="${esc(T("ws.level"))}"${dis}>${LEVELS.map(l => `<option value="${l}"${(m ? m.level : "view") === l ? " selected" : ""}>${esc(levelLabel(l))}</option>`).join("")}</select>
     </div>`; };
-  const create = canCreate ? sectionHTML(T("ws.new"), `<div class="two">
+  // 先選 team（2026-10-24）：新的那一格會出現在那個 team 的那一列底下。表上沒有欄位存 team，靠擁有人勾的 team 推，
+  // 所以擁有人只列那個 team 的人；沒選 team 的放在「整個 BT」那一列。
+  const ownerPool = d.team ? cadres.filter(p => parseTeams(p.team).includes(d.team)) : cadres;
+  const create = canCreate ? sectionHTML(T("ws.new"), `<div class="note">${T("ws.newWhat")}</div><div class="two">
+      <label><i>${T("ws.team")}</i><select id="wsn-team" data-act="wsn-team"${dis}><option value="">${T("ws.board")}</option>${TEAMS.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>
+      <label><i>${T("ws.ownerPick")}</i><select id="wsn-owner"${dis}><option value="">${T("value.none")}</option>${ownerPool.map(p => `<option value="${esc(p.profile_id)}"${d.owner === p.profile_id ? " selected" : ""}>${esc(pickName(p))}</option>`).join("")}</select></label>
       <label><i>${T("ws.titleEn")}</i><input id="wsn-en" value="${esc(d.title_en || "")}" placeholder="Winter camp 2027"${dis}></label>
       <label><i>${T("ws.titleZh")}</i><input id="wsn-zh" value="${esc(d.title_zh || "")}" placeholder="2027 冬令營"${dis}></label>
-      <label><i>${T("ws.ownerPick")}</i><select id="wsn-owner"${dis}><option value="">${T("value.none")}</option>${cadres.map(p => `<option value="${esc(p.profile_id)}"${d.owner === p.profile_id ? " selected" : ""}>${esc(pickName(p))}</option>`).join("")}</select></label>
       <label><i>${T("ws.slug")}</i><input id="wsn-slug" value="${esc(d.slug || "")}" placeholder="winter-camp-2027" autocomplete="off"${dis}></label>
     </div>
-    <div class="mini">${T("ws.slugNote")}</div>
+    <div class="mini">${T("ws.slugNote")} ${d.team ? T("ws.teamByOwner", { team: esc(d.team.replace(/\s*Team$/i, "")) }) : ""}</div>
     <h3 class="sec-h" style="margin-top:16px">${T("ws.newMembers")}</h3>
     <div class="wsn-list">${cadres.map(memRow).join("")}</div>
     <div class="row" style="margin-top:14px"><button class="btn" data-act="ws-create"${dis}>${busy ? T("common.saving") : T("ws.createGo")}</button></div>

@@ -592,6 +592,11 @@ document.addEventListener("change", async e => {
     await openRoster(true);
     return;
   }
+  if (el.dataset.act === "wsn-team") {
+    S.wsDraft = Object.assign({}, S.wsDraft, { team: el.value, owner: "", slug: val("wsn-slug"), title_zh: val("wsn-zh"), title_en: val("wsn-en"),
+      members: [...document.querySelectorAll('input[name="wsn-member"]:checked')].map(x => ({ id: x.value, level: val("wsn-lv-" + x.value) || "view" })) });
+    render(); return;
+  }
   if (el.dataset.act === "ws-level" && S.wsSel) {
     const p = S.people.find(x => x.profile_id === el.dataset.id);
     const level = el.value, ws = S.wsSel, id = el.dataset.id;

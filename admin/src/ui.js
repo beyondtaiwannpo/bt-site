@@ -588,6 +588,46 @@ export function mpFind(people, q) {
 }
 // 這一頁該列哪幾個「誰在做…」的入口：senior 看所有這一類的工作區，其他人只有自己是「管」的那幾個。
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
+// 一個工作區屬於哪一列（2026-10-24 照 team 分組）：apps:X / res:X 是 X；intern-passport 是 Internship Team；passport 是整個 BT（""）；
+// 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
+export function wsTeamOf(w, people) {
+  const id = String((w && w.id) || "");
+  if (id.startsWith("apps:")) return id.slice(5);
+  if (id.startsWith("res:")) return id.slice(4);
+  if (id === "intern-passport") return "Internship Team";
+  if (id === "passport") return "";
+  if (w && w.team) return w.team;
+  const o = w && w.owner && (people || []).find(p => p.profile_id === w.owner || p.id === w.owner);
+  const t = o ? String(o.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean)[0] : "";
+  return t || "";
+}
+// 那一格叫什麼：兩本護照用長名稱（講清楚管的是格子不是能不能玩），申請與資源用短的，自訂的用它的標題。
+export function wsCellLabel(w) {
+  const id = String((w && w.id) || "");
+  if (id === "passport") return T("ws.long.passport");
+  if (id === "intern-passport") return T("ws.long.intern");
+  if (id.startsWith("apps:")) return T("ws.long.apps");
+  if (id.startsWith("res:")) return T("ws.long.res");
+  return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
+}
+export function wsCellHref(w) {
+  const id = String((w && w.id) || "");
+  if (id === "passport") return "/admin/passports/#cadre";
+  if (id === "intern-passport") return "/admin/passports/#interns";
+  if (id.startsWith("apps:")) return "/admin/#forms";
+  if (id.startsWith("res:")) return "/admin/site/#res";
+  return "/admin/people/#ws=" + encodeURIComponent(id);
+}
+// 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
+export function wsRows(workspaces, teams, people) {
+  const active = (workspaces || []).filter(w => w.active !== false);
+  const order = { "intern-passport": 3, passport: 0 };
+  const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
+  const groups = new Map([["", []]]);
+  for (const t of teams || []) groups.set(t, []);
+  for (const w of active) { const t = wsTeamOf(w, people); if (!groups.has(t)) groups.set(t, []); groups.get(t).push(w); }
+  return [...groups.entries()].map(([team, cells]) => ({ team, label: team ? team.replace(/\s*Team$/i, "") : T("ws.board"), cells: cells.sort((a, b) => rank(a) - rank(b)) }));
+}
 export function mpItems(me, prefix, workspaces) {
   const title = w => (lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || w.id;
   const all = (workspaces || []).filter(w => w.active !== false && (w.id === prefix || w.id.startsWith(prefix)));
@@ -773,8 +813,13 @@ export function accessHTML(me, todo, features) {
   else {
     const mine = Object.entries((me && me.ws) || {});
     if (mine.length) {
-      body = `<ul class="flist access">${mine.map(([id, lv]) => `<li><div class="fhead"><b>${esc(title(id))}</b><span class="tag">${esc(T("level." + lv))}</span></div>
-        <div class="row">${go(id).map(g => `<a class="btn ghost sm" href="${withLang(g.href)}">${esc(g.label)}</a>`).join("")}</div></li>`).join("")}</ul>`;
+      // 照 team 分組（2026-10-24）：一段一個 team，底下是他在那個 team 的東西，名字用長名稱（「實習護照（格子與棋盤）」）。
+      const wsOf = id => wsList.find(x => x.id === id) || { id };
+      const rows = wsRows(mine.map(([id]) => wsOf(id)), [], null).filter(r => r.cells.length);
+      body = `<ul class="flist access">${rows.map(r => `<li><div class="fhead"><b>${esc(r.label)}</b></div>${r.cells.map(w => {
+        const lv = (me.ws || {})[w.id];
+        return `<div class="row"><span>${esc(wsCellLabel(w))}</span><span class="tag">${esc(T("level." + lv))}</span>${go(w.id).map(g => `<a class="btn quiet sm" href="${withLang(g.href)}">${esc(g.label)}</a>`).join("")}</div>`; }).join("")}</li>`).join("")}</ul>
+        <div class="mini">${T("ws.playNote")} ${T("ws.availNote")}</div>`;
     } else {
       const byTeam = new Map();
       for (const d of t.directors || []) if (d.team && /director/i.test(String(d.title_en || d.title_zh || ""))) { if (!byTeam.has(d.team)) byTeam.set(d.team, []); byTeam.get(d.team).push(nameOf(d)); }

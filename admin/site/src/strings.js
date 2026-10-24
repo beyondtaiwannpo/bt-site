@@ -60,6 +60,15 @@ export const COMMON = {
   "toast.close":      { zh: "關掉", en: "Close" },
   "ask.yes":          { zh: "確定", en: "Yes, do it" },
   "grid.byRank":      { zh: "全部（職級）", en: "All (by rank)" },
+  // 工作區照 team 分組（2026-10-24）：長名稱講清楚那一格管的是什麼
+  "ws.long.passport": { zh: "幹部護照（格子與城市）", en: "Cadre passport (boxes & cities)" },
+  "ws.long.intern":   { zh: "實習護照（格子與棋盤）", en: "Intern passport (boxes & board)" },
+  "ws.long.apps":     { zh: "申請（表單與審核）", en: "Applications (forms & review)" },
+  "ws.long.res":      { zh: "資源", en: "Resources" },
+  "ws.board":         { zh: "整個 BT", en: "Board (whole BT)" },
+  "ws.playNote":      { zh: "玩護照是身分帶來的（每位幹部有自己的、每位實習生有自己的），這幾格只管誰能改格子。", en: "Playing a passport comes with the role (every cadre has theirs, every intern theirs); these cells only control who edits the boxes." },
+  "ws.availNote":     { zh: "時間看板沒有指派，每位幹部都用。", en: "Availability has no assignments: every cadre uses it." },
+  "ws.levelLegend":   { zh: "看：讀得到。改：改得動。管：改得動，而且可以在那個東西自己的頁面上加人、改等級、移出。", en: "View: can read. Edit: can change. Manage: can change, and can add, re-level or remove people on that thing's own page." },
   // 成員分頁（2026-10-23，第三次重整批 3）：對一個工作區是「管」的人，在那個東西自己的頁面上加人、改等級、移出。
   "level.view":       { zh: "看", en: "View" },
   "level.edit":       { zh: "改", en: "Edit" },

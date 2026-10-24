@@ -67,7 +67,7 @@ test("★ 名單預設只列這一屆有職位的人；歷屆全部才看得到�
   assert.match(cur, /這是你/);
   // 2026-10-23 批 2：名單印人看的名字，不印代號。
   assert.match(cur, /Curriculum Team 的申請・管/);
-  assert.match(cur, /實習護照・改/);
+  assert.match(cur, /實習護照（格子與棋盤）・改/, "名單的徽章用長名稱");
   assert.doesNotMatch(cur, /apps:Curriculum Team・/);
   assert.match(cur, /<input id="ro-search" type="search"/, "名單有找名字的框");
   assert.match(cur, /Director, Curriculum Team/);
@@ -194,7 +194,7 @@ test("★ 工作區：左邊清單、右邊誰在裡面與等級、加人只列�
   assert.equal(slugify("Winter camp 2027!"), "winter-camp-2027");
   assert.equal(wsName("apps:Curriculum Team", []), "Curriculum Team 的申請");
   assert.equal(wsName("apps:Curriculum Team", ws), "Curriculum Team 的申請");
-  assert.equal(wsName("intern-passport", []), "實習護照");
+  assert.equal(wsName("intern-passport", []), "實習護照（格子與棋盤）");
   assert.equal(wsName("custom:camp", []), "camp");
   assert.match(h, /data-act="ws-assign" data-ws="apps:Curriculum Team"/);
   assert.match(h, /data-act="ws-create"/);
@@ -581,4 +581,37 @@ test("★ 依職級的每一個面：名單工作區欄、team 篩選、側欄�
   assert.match(t, /Co-President/); assert.match(t, /Director/);
   // 面：邀請表單「他會是」是職級的字，跟職位分開。
   assert.match(invitesPageHTML([], [], TERMS, "", false, { who: "cadre:president" }, null, true), /<option value="cadre:president" selected>幹部：Co-President/);
+});
+
+// 2026-10-24 工作區照 team 分組：存取格一列一個 team、Workspaces 左邊分組、「加一個專案或營隊」先選 team。
+test("★ 存取格照 team 分組：整個 BT 一列放幹部護照、Internship 多一格實習護照、格子的標題連到那個東西、三句說明", async () => {
+  const { defaultWorkspaces } = await import("../admin/people/src/ui.js");
+  const g = accessGridHTML(PEOPLE[2], [], false);
+  const heads = [...g.matchAll(/<th scope="row">([^<]+)<\/th>/g)].map(m => m[1]);
+  assert.deepEqual(heads.slice(0, 2), ["整個 BT", "Curriculum"]); assert.ok(heads.includes("Internship"));
+  const board = g.slice(g.indexOf("整個 BT"), g.indexOf("<th scope=\"row\">Curriculum"));
+  assert.match(board, /href="\/admin\/passports\/\?lang=zh#cadre">幹部護照（格子與城市）<\/a>/);
+  assert.doesNotMatch(board, /實習護照/);
+  const intern = g.slice(g.indexOf("<th scope=\"row\">Internship"), g.indexOf("<th scope=\"row\">Community"));
+  assert.match(intern, /申請（表單與審核）[\s\S]*資源[\s\S]*href="\/admin\/passports\/\?lang=zh#interns">實習護照（格子與棋盤）/);
+  assert.match(intern, /data-ws="intern-passport"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit" selected>改/);
+  assert.equal((g.match(/data-act="grid-level"/g) || []).length, 14, "十四個工作區十四個下拉");
+  for (const s of ["看：讀得到", "玩護照是身分帶來的", "時間看板沒有指派"]) assert.match(g, new RegExp(s));
+  assert.equal(defaultWorkspaces().length, 14);
+  // 自訂的掛在它的 team 那一列（靠擁有人的 team）。
+  const ws = defaultWorkspaces().concat([{ id: "custom:camp", kind: "custom", title_en: "Winter camp", owner: PEOPLE[1].profile_id, active: true }]);
+  const g2 = accessGridHTML(PEOPLE[2], ws, false, PEOPLE);
+  const cur = g2.slice(g2.indexOf("<th scope=\"row\">Curriculum"), g2.indexOf("<th scope=\"row\">Mentorship"));
+  assert.match(cur, /Winter camp/, "小安是 Curriculum 的人，她擁有的營隊掛在 Curriculum 那一列");
+  // Workspaces 頁：左邊分組、右邊標題用長名稱加屬於哪一列；「加一個專案或營隊」先選 team。
+  const h = workspacesHTML(ws, "intern-passport", [], PEOPLE, "", false, { team: "Curriculum Team" }, true);
+  assert.match(h, /<div class="rail-group">整個 BT<\/div><div class="wslist">[^]*?幹部護照（格子與城市）/);
+  assert.match(h, /<div class="rail-group">Internship<\/div>/);
+  assert.match(h, /<h2>實習護照（格子與棋盤）<span class="hint">Internship Team・intern-passport/);
+  assert.match(h, /<h2>加一個專案或營隊<\/h2>/); assert.match(h, /<select id="wsn-team" data-act="wsn-team"/);
+  const owners = h.slice(h.indexOf('id="wsn-owner"'), h.indexOf("</select>", h.indexOf('id="wsn-owner"')));
+  assert.match(owners, /小安/); assert.doesNotMatch(owners, /Mei/, "選了 Curriculum，擁有人只列 Curriculum 的人");
+  assert.match(h, /會排在 Curriculum 那一列底下/);
+  assert.match(h, /一份成員清單/, "表單上寫它今天是什麼");
+  assert.doesNotMatch(h, /新增工作區/);
 });

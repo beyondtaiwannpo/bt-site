@@ -428,3 +428,12 @@ a.btn{text-decoration:none}
 select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-style:dashed}
 .table tr.byrank td{color:rgba(16,42,134,.7)}
 .tag.off{opacity:.45;text-decoration:line-through}
+
+/* ───────── 17. 存取格照 team 分組（2026-10-24）───────── */
+/* 一列一個 team，格子橫排；每一格上面一個連到那個東西的小標，下面一個下拉。 */
+.gcells{display:flex;gap:10px 18px;flex-wrap:wrap}
+.gcell{display:flex;flex-direction:column;gap:4px;min-width:150px}
+.glabel{font-size:12px;font-weight:600;color:rgba(16,42,134,.8);text-decoration:none;border-bottom:1px solid rgba(16,42,134,.25);align-self:flex-start}
+.glabel:hover{border-bottom-color:var(--bt-orange)}
+.table.grid{max-width:none}
+.wslist + .rail-group{margin-top:8px}
