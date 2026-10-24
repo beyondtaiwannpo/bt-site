@@ -1153,5 +1153,21 @@ else
 fi
 
 echo
+echo "對外頁面不放中文名（2026-10-27）："
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-27-public-names-english.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   對外英文名那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 對外英文名那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+# 那位校友的 display_name 是空的、name_zh 是「改名」、再給他一個英文名：對外要看到英文名。
+psql -d "${DB}" -q -c "update public.profiles set name_en='Renamed Person' where id='${MEMBER}';" >/dev/null
+chkrole anon "" "★ 校友頁的名字先用英文名，中文名退後" "RenamedPerson" \
+  "select replace(name,' ','') from public.public_alumni() where title like 'Associate%' limit 1"
+psql -d "${DB}" -q -c "update public.profiles set name_en=null where id='${MEMBER}';" >/dev/null
+chkrole anon "" "沒有英文名才退回中文名" "改名" \
+  "select name from public.public_alumni() where title like 'Associate%' limit 1"
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

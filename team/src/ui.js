@@ -64,7 +64,8 @@ export function toPerson(row) {
   return {
     zh: row.name_zh || "",
     en: row.name_en || "",
-    name: row.name_zh || row.name_en || "",
+    // 2026-10-24 Paul：對外頁面不放中文。首字與大字都先用英文名，沒有英文名才退回中文。
+    name: row.name_en || row.name_zh || "",
     // 一個人可以在好幾個 team，所以這裡是一個陣列。
     // 兩個 team 收斂完撞在一起（例如「CR」與「Community Relations Team」）
     // 只留一個 —— 不然那個人會在同一組裡出現兩次。
@@ -127,9 +128,11 @@ export function peopleHTML(people, lang) {
 // 英文版會把每個人的中文名整個藏起來（2026-09-08 第一版就是這樣，畫面上只剩英文名）。
 // 主名字用哪一個：有英文名就英文名當大字（那是 --display 這套字體撐得起來的形狀），
 // 中文名在下面一行。**兩個都沒有的人不會走到這裡**（main.js 已經濾掉）。
+// 2026-10-24 Paul：「對外中文全部 hide out」。卡片上只印英文名；
+// 中文名不再印在下面那一行。沒有英文名的人才印中文名（不然卡片上沒有名字）。
 function cardHTML(p) {
   const big = p.en || p.zh;
-  const small = p.en && p.zh ? p.zh : "";
+  const small = "";
   const face = !p.avatar
     ? `<span class="noface" aria-hidden="true">${esc(initial(p.name))}</span>`
     : `<img class="${p.cut ? "cut" : "por"}" src="${esc(p.avatar)}" alt="" loading="lazy">`;

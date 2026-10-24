@@ -18,11 +18,17 @@ test("★ 一個人都沒有的時候回空字串，不是「還沒有人公開�
   assert.equal(peopleHTML(null, "zh"), "");
 });
 
-test("有人的時候畫得出英文名、中文名與頭銜", () => {
+// 2026-10-24 Paul：對外頁面不放中文名。有英文名的人卡片上只有英文名。
+test("★ 有英文名的人卡片上只印英文名與頭銜，中文名不印", () => {
   const h = peopleHTML([P({ title_en: "Director", term: "2026-27" })], "zh");
   assert.match(h, /Ming Wang/);
-  assert.match(h, /王小明/);
+  assert.doesNotMatch(h, /王小明/);
   assert.match(h, /Director/);
+});
+
+test("沒有英文名的人才退回印中文名（不然卡片上沒有名字）", () => {
+  const h = peopleHTML([P({ name_en: "" })], "zh");
+  assert.match(h, /王小明/);
 });
 
 // ⚠ 分組是這一版的重點：Paul 要的是「分成 team」。
@@ -60,6 +66,7 @@ test("沒有大頭照的人用名字第一個字，不是灰色剪影", () => {
   const h = peopleHTML([P({ name_zh: "王小明", name_en: "" })], "zh");
   assert.match(h, /class="noface"/);
   assert.match(h, />王</);
+  assert.match(peopleHTML([P()], "zh"), />M</, "有英文名的人首字用英文");
   assert.doesNotMatch(h, /<img/);
 });
 
@@ -114,11 +121,11 @@ test("★ /team/ 的欄數是寫死的，不是 auto-fill", () => {
 test("★ 卡片裡不准用 zh / en 當 class 名（會被語言切換藏掉）", () => {
   const h = peopleHTML([P({ title_en: "Director", term: "2026-27" })], "en");
   assert.doesNotMatch(h, /class="(zh|en)"/);
-  assert.match(h, /王小明/, "英文版一樣要看得到中文名");
+  assert.match(h, /Ming Wang/, "英文版一樣要看得到名字");
 });
 
-test("toPerson 只收斂一次（中文名優先，沒有就用英文名）", () => {
-  assert.equal(toPerson({ name_zh: "王小明", name_en: "Paul" }).name, "王小明");
+test("toPerson 只收斂一次（英文名優先，沒有就用中文名；2026-10-24 對外不放中文）", () => {
+  assert.equal(toPerson({ name_zh: "王小明", name_en: "Paul" }).name, "Paul");
   assert.equal(toPerson({ name_zh: null, name_en: "Paul" }).name, "Paul");
   assert.equal(toPerson({}).name, "");
 });
