@@ -311,6 +311,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "ev-save") {
     const patch = readEvent();
+    if (!UI.evCoverOk(patch.cover_url)) { S.msg = T("err.evCover"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try { await D.saveEvent(id, patch); S.busy = false; S.msg = T("msg.evSaved"); await reloadEvents(S.evSel); render(); }
     catch (e) { S.busy = false; S.msg = T("err.evSave") + D.says(e); render(); }
@@ -324,7 +325,11 @@ document.addEventListener("click", async e => {
     S.busy = true; S.msg = ""; render();
     try {
       // 按「準備好了」之前先把表單上的字存一次，不然填了沒存就按會被擋「要填開始時間」。
-      if (act === "ev-ready" && UI.canEditWs(S.me, ev.workspace_id) && document.getElementById("ev-tzh")) await D.saveEvent(id, readEvent());
+      if (act === "ev-ready" && UI.canEditWs(S.me, ev.workspace_id) && document.getElementById("ev-tzh")) {
+        const patch = readEvent();
+        if (!UI.evCoverOk(patch.cover_url)) throw new Error(T("err.evCoverRaw"));
+        await D.saveEvent(id, patch);
+      }
       if (act === "ev-ready") await D.setEventReady(id, true);
       else if (act === "ev-unready") await D.setEventReady(id, false);
       else await D.publishEvent(id, act === "ev-publish");

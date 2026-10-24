@@ -1080,6 +1080,15 @@ export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy) {
 // 這一頁填的是內容（標題、一句話、說明、封面網址與同意、時間、地點、名額）；報名表的題目走現有的表單編輯頁；
 // 誰在裡面、簽到、行前信都是現有的入口，這裡只放連結。不是頁面編輯器。
 export const EV_STATUS = ["draft", "ready", "published", "archived"];
+// 封面網址像不像一張圖：http(s)，而且副檔名是圖（可以帶 ?query），或是 Drive／Google 圖床／Cloudinary／Unsplash 那幾種看得出是圖的網址。
+// 這只是前端先擋一次，資料庫的 save_event 只收 https。
+export function evCoverOk(url) {
+  const u = String(url || "").trim();
+  if (!u) return true;
+  if (!/^https?:\/\//i.test(u)) return false;
+  if (/\.(jpe?g|png|webp|gif|avif|svg)(\?.*)?$/i.test(u)) return true;
+  return /^https:\/\/(drive\.google\.com\/(uc\?|file\/d\/|thumbnail\?)|lh3\.googleusercontent\.com\/|res\.cloudinary\.com\/|images\.unsplash\.com\/)/i.test(u);
+}
 export function evSlug(s) { return String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40); }
 const evDate = d => d ? String(d).slice(0, 16).replace("T", " ") : "";
 // datetime-local 要的格式（本機時間）。

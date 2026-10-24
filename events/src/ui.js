@@ -36,11 +36,13 @@ export function split(events) {
     past: list.filter(e => e.is_past && new Date(e.ends_at || e.starts_at) >= yearAgo).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at)),
   };
 }
+// 封面連結壞掉（team 貼錯、Drive 權限沒開）：卡片換成跟「沒有封面」一樣的色塊，不留破圖的圖示；一場活動的頁把那一塊整個拿掉，不留空位。
+const NOIMG = "this.outerHTML='<span class=&quot;ev-noimg&quot;></span>'";
 export function cardHTML(e, l, base) {
   const s = T[l], st = signupState(e);
   const tag = st === "open" ? `<span class="ev-tag on">${s.signup}</span>` : st === "full" ? `<span class="ev-tag">${s.full}</span>` : st === "ended" ? `<span class="ev-tag">${s.ended}</span>` : "";
   return `<a class="ev-card" href="${esc(base || "")}#${esc(e.slug)}">
-    ${e.cover_url ? `<img src="${esc(e.cover_url)}" alt="" loading="lazy">` : `<span class="ev-noimg"></span>`}
+    ${e.cover_url ? `<img src="${esc(e.cover_url)}" alt="" loading="lazy" onerror="${NOIMG}">` : `<span class="ev-noimg"></span>`}
     <span class="ev-body"><b>${esc(pick(e, "title", l))}</b><span class="ev-when">${esc(fmtWhen(e.starts_at, e.ends_at, l))}${e.place ? `・${esc(e.place)}` : ""}</span>${pick(e, "summary", l) ? `<span class="ev-sum">${esc(pick(e, "summary", l))}</span>` : ""}${tag}</span>
   </a>`;
 }
@@ -55,7 +57,7 @@ export function detailHTML(e, l) {
     ? `<p><a class="cta" href="../apply/?f=${esc(e.form_id)}">${s.signup}</a> <span class="ev-note">${s.cap(e.signed_up, e.capacity)}${l === "zh" ? "。" : ". "}${s.login}</span></p>`
     : `<p class="ev-note"><b>${st === "full" ? s.full : st === "ended" ? s.ended : st === "soon" ? s.opens(fmtWhen(e.signup_opens_at, null, l)) : s.closed}</b>${e.capacity ? `・${s.cap(e.signed_up, e.capacity)}` : ""}</p>`;
   return `<header class="hero ev-hero"><p class="ev-by">${esc(s.by(e.team))}</p><h1>${esc(pick(e, "title", l))}</h1>${pick(e, "summary", l) ? `<p class="lead">${esc(pick(e, "summary", l))}</p>` : ""}</header>
-    ${e.cover_url ? `<section class="sec"><div class="sec-in"><img class="ev-cover" src="${esc(e.cover_url)}" alt=""></div></section>` : ""}
+    ${e.cover_url ? `<section class="sec ev-cover-sec"><div class="sec-in"><img class="ev-cover" src="${esc(e.cover_url)}" alt="" onerror="this.closest('section').remove()"></div></section>` : ""}
     <section class="sec"><div class="sec-in"><div class="body">
       <ul class="rows"><li><b>${s.when}</b><span>${esc(fmtWhen(e.starts_at, e.ends_at, l))}</span></li>${e.place ? `<li><b>${s.place}</b><span>${esc(e.place)}</span></li>` : ""}</ul>
       ${pick(e, "body", l) ? `<div class="ev-text">${esc(pick(e, "body", l)).replace(/\n/g, "<br>")}</div>` : ""}

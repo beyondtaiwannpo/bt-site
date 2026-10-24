@@ -523,7 +523,9 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 summary{cursor:pointer}
 
 /* 近期活動的卡（2026-11-01）：跟 /events/ 同一套規則。沒有活動整段 hidden。 */
-.ev-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:22px;margin-top:8px}
+.ev-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:8px}
+@media (max-width:900px){.ev-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.ev-cards{grid-template-columns:1fr}}
 .ev-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1px solid rgba(16,42,134,.16);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.45)}
 .ev-card:hover{border-color:var(--bt-navy);box-shadow:0 10px 26px rgba(16,42,134,.1)}
 .ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:rgba(255,196,108,.35)}

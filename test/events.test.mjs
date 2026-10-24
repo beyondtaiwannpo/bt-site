@@ -93,3 +93,10 @@ test("★ 英文畫出來不剩中文（清單、一場活動）", () => {
   }
   F.setLang("zh");
 });
+
+test("封面網址像不像一張圖（存檔前先擋）：空的可以、https 加圖的副檔名可以、Drive／Cloudinary 可以、其他擋", () => {
+  for (const ok of ["", "https://x/y.jpg", "https://x/y.PNG?w=800", "https://x/a/b.webp", "https://drive.google.com/uc?id=abc", "https://drive.google.com/file/d/abc/view", "https://lh3.googleusercontent.com/d/abc", "https://res.cloudinary.com/bt/image/upload/v1/a.jpg", "https://images.unsplash.com/photo-1"]) assert.ok(F.evCoverOk(ok), ok);
+  for (const bad of ["http://x/y", "https://drive.google.com/drive/folders/abc", "https://x/page.html", "ftp://x/y.jpg", "x.jpg", "https://docs.google.com/document/d/abc"]) assert.ok(!F.evCoverOk(bad), bad);
+  const m = readFileSync("admin/src/main.js", "utf8");
+  assert.match(m, /if \(!UI\.evCoverOk\(patch\.cover_url\)\) \{ S\.msg = T\("err\.evCover"\)/);
+});

@@ -32,7 +32,7 @@ test("清單：卡片連到 ./#代號（不用 ?e=，語言切換會把 ? 換掉
   const zh = U.listHTML(EVS, "zh"), en = U.listHTML(EVS, "en");
   assert.match(zh, /<h2>近期活動<\/h2>/); assert.match(zh, /<h2>過去的活動<\/h2>/);
   assert.match(zh, /<a class="ev-card" href="\.\/#camp">/); assert.match(zh, /<b>2027 冬令營<\/b>/); assert.match(en, /<b>Winter Camp 2027<\/b>/);
-  assert.match(zh, /<img src="https:\/\/x\/y.jpg" alt="" loading="lazy">/);
+  assert.match(zh, /<img src="https:\/\/x\/y.jpg" alt="" loading="lazy" onerror=/);
   assert.match(zh, /<span class="ev-tag on">報名<\/span>/); assert.match(zh, /<span class="ev-tag">額滿<\/span>/);
   assert.doesNotMatch(zh, /太久以前/);
   const home = U.homeCardsHTML(EVS, "zh");
@@ -67,4 +67,19 @@ test("★ 首頁：兩段 hidden、標題只有「近期活動」「Upcoming」�
   assert.doesNotMatch(idx, /<script type="module">[\s\S]*gsap/, "首頁的 module 不碰動畫");
   assert.match(ev, /<div id="ev-zh">/); assert.match(ev, /<div id="ev-en">/); assert.match(ev, /<script type="module" src="\.\/src\/main\.js">/);
   assert.match(chk, /sb_publishable_/, "check.sh 守著金鑰只在設定檔");
+});
+
+test("封面連結壞掉：卡片的 img 帶 onerror 換成色塊、沒有封面直接色塊；一場活動的封面壞掉整塊拿掉、沒有封面不留空位", () => {
+  const card = U.cardHTML(EVS[0], "zh", "./");
+  assert.match(card, /<img src="https:\/\/x\/y.jpg" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;ev-noimg&quot;><\/span>'">/);
+  assert.match(U.cardHTML({ ...EVS[0], cover_url: null }, "zh", "./"), /<span class="ev-noimg"><\/span>/);
+  const one = U.detailHTML(EVS[0], "zh");
+  assert.match(one, /<section class="sec ev-cover-sec">[\s\S]*onerror="this\.closest\('section'\)\.remove\(\)"/);
+  assert.doesNotMatch(U.detailHTML({ ...EVS[0], cover_url: null }, "zh"), /ev-cover/);
+  for (const f of ["index.html", "events/index.html"]) {
+    const css = readFileSync(f, "utf8");
+    assert.match(css, /\.ev-cards\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/, `${f} 桌機三欄`);
+    assert.match(css, /@media \(max-width:900px\)\{\.ev-cards\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/, `${f} 平板兩欄`);
+    assert.match(css, /@media \(max-width:600px\)\{\.ev-cards\{grid-template-columns:1fr\}\}/, `${f} 手機一欄`);
+  }
 });

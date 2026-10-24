@@ -351,6 +351,8 @@ export const MINE = {
   "err.evCreate":     { zh: "開不了：", en: "Could not create: " },
   "err.evSave":       { zh: "存不起來：", en: "Could not save: " },
   "err.evStatus":     { zh: "改不了狀態：", en: "Could not change status: " },
+  "err.evCover":      { zh: "封面那條連結不像一張圖：要 https 開頭，結尾是 .jpg／.png／.webp，或是 Drive、Cloudinary 的圖片網址。", en: "That cover link doesn't look like an image: it should start with https and end in .jpg/.png/.webp, or be a Drive or Cloudinary image URL." },
+  "err.evCoverRaw":   { zh: "封面那條連結不像一張圖", en: "that cover link doesn't look like an image" },
   // 行銷需求單（2026-10-31）
   "card.rq":          { zh: "Marketing 需求單等處理", en: "Marketing requests waiting" },
   "card.rq.unit":     { zh: "張", en: "" },
