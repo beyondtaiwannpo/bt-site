@@ -521,6 +521,18 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 /* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
+
+/* 近期活動的卡（2026-11-01）：跟 /events/ 同一套規則。沒有活動整段 hidden。 */
+.ev-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:22px;margin-top:8px}
+.ev-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1px solid rgba(16,42,134,.16);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.45)}
+.ev-card:hover{border-color:var(--bt-navy);box-shadow:0 10px 26px rgba(16,42,134,.1)}
+.ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:rgba(255,196,108,.35)}
+.ev-body{display:flex;flex-direction:column;gap:5px;padding:14px 16px 16px}
+.ev-body b{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:.01em}
+.ev-when{font-size:13px;color:rgba(16,42,134,.78)}
+.ev-sum{font-size:14px;line-height:1.5}
+.ev-tag{align-self:flex-start;margin-top:4px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid rgba(16,42,134,.3)}
+.ev-tag.on{background:var(--bt-orange);border-color:var(--bt-orange)}
 </style>
 </head>
 <body>
@@ -643,6 +655,17 @@ summary{cursor:pointer}
   </div>
 </section>
 
+<!-- 近期活動（2026-11-01，Paul 2026-10-24 同意這一句新標題；首頁其他文案不動）。
+     這一段沒有寫死任何活動：開頁用 fetch 打 public_events()，最多三張卡；
+     讀不到、或沒有公開中的活動，整段維持 hidden，首頁跟以前一模一樣（跟團隊頁「一個人都還沒公開就整段不出現」同一個做法）。
+     程式在這一頁最底下那段 type="module" 的 script。 -->
+<section class="sec sec-events" id="events" hidden>
+  <div class="sec-in">
+    <h2>近期活動</h2>
+    <div class="body"><div class="ev-cards" id="ev-cards-zh"></div></div>
+  </div>
+</section>
+
 <!-- 宣傳影片。**要放影片只要做一件事**：把 YouTube 的影片編號填進這一頁最下面
      那段程式裡的 VIDEO_ID（網址 youtube.com/watch?v=XXXXXXXXXXX 裡 v= 後面那一串）。
      填了中英兩段就會自己出現，沒填就整段不存在 —— 不用改 hidden，也不用改程式。
@@ -756,6 +779,13 @@ summary{cursor:pointer}
         <img src="./photos/three-at-laptop.jpg" alt="Three students crowded around one laptop, the one in the middle smiling" width="1200" height="800" loading="lazy">
       </picture>
     </div>
+  </div>
+</section>
+
+<section class="sec sec-events" id="events-en" hidden>
+  <div class="sec-in">
+    <h2>Upcoming</h2>
+    <div class="body"><div class="ev-cards" id="ev-cards-en"></div></div>
   </div>
 </section>
 
@@ -1144,5 +1174,24 @@ var VIDEO_ID = "";
 })();
 </script>
 
+<script type="module">
+/* 近期活動（2026-11-01）。不載 supabase-js：只拿 shared/supabase-config.js 的網址與公開金鑰，fetch 打 public_events()。
+   三秒內拿不到、或沒有公開中的活動，兩段維持 hidden。畫卡片的函式跟 /events/ 共用（events/src/ui.js）。 */
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./shared/supabase-config.js";
+import { homeCardsHTML } from "./events/src/ui.js";
+(async () => {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 3000);
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/public_events", { method: "POST", signal: ctl.signal,
+      headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: "Bearer " + SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) return;
+    const events = await r.json();
+    const zh = homeCardsHTML(events, "zh"), en = homeCardsHTML(events, "en");
+    if (!zh) return;
+    document.getElementById("ev-cards-zh").innerHTML = zh; document.getElementById("ev-cards-en").innerHTML = en;
+    document.getElementById("events").hidden = false; document.getElementById("events-en").hidden = false;
+  } catch (e) { /* 整段維持 hidden */ } finally { clearTimeout(t); }
+})();
+</script>
 </body>
 </html>

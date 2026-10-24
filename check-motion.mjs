@@ -22,7 +22,7 @@ import fs from "node:fs";
 // 變數名接非 ASCII 只掃 check.sh）。**加新頁面的時候要回來加。**
 // 下面那條 files.length 的檢查會在有人漏加時出聲。
 const PAGES = [
-  "index.html", "about/index.html", "programs/index.html", "team/index.html",
+  "index.html", "about/index.html", "programs/index.html", "team/index.html", "events/index.html",
   "impact/index.html", "partner/index.html", "apply/index.html", "resources/index.html",
   "alumni/index.html", "app/index.html", "admin/index.html", "settings/index.html",
   "availability/index.html", "passport/index.html", "privacy/index.html",

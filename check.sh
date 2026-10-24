@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team join impact partner apply resources admin settings alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
+FILES="index.html about programs team events join impact partner apply resources admin settings alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -120,7 +120,7 @@ BRAND_HEX="#EDE5D8 #FFE8C5 #FFC46C #C6C6C6 #102A86 #6BC6BB #FFF789"
 hexfilter=$(printf '%s\n' $BRAND_HEX | tr 'a-f' 'A-F' | sed 's/^/^/;s/$/$/' | paste -sd'|' -)
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html about programs team join alumni privacy reset shared passport/src passport/activities.json intern-passport 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html about programs team events join alumni privacy reset shared passport/src passport/activities.json intern-passport 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -vE "$hexfilter")
@@ -175,7 +175,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html about/index.html programs/index.html team/index.html join/index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/*.css shared/*.js passport/src/*.js passport/activities.json intern-passport/index.html intern-passport/src/*.js 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html about/index.html programs/index.html team/index.html events/index.html events/src/*.js join/index.html alumni/index.html privacy/index.html reset/index.html reset/reset.js shared/*.css shared/*.js passport/src/*.js passport/activities.json intern-passport/index.html intern-passport/src/*.js 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then
@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1455,6 +1455,12 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
+    // 2026-11-01 活動頁。本文是 JavaScript 畫的（public_events()），錨點只取靜態的那幾句。
+    "events/index.html": {
+      mustShow: ["跳到主要內容", "探索營、說明會、校友之夜。", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["check.sh 守著金鑰不准寫在別的地方"]
+    },
     // /apply/ 是批 3 加的對外頁。它的本文是 JavaScript 畫的，
     // 所以錨點只能取靜態的那幾句（標題、頁首、頁尾）——
     // 那也正好夠：註解吞掉任何一段，這三句一定會少一句。
@@ -1556,7 +1562,7 @@ leakOut=$(node -e '
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html about/index.html programs/index.html team/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
+' index.html about/index.html programs/index.html team/index.html events/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -1592,7 +1598,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team join impact partner apply resources admin settings alumni privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
+placeholder_scope="index.html about programs team events join impact partner apply resources admin settings alumni privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
@@ -1815,6 +1821,18 @@ for f in $(printf '%s\n' index.html */index.html admin/*/index.html); do
   if [ $in_list -eq 1 ] && [ $has -eq 0 ]; then noindex_missing="${noindex_missing} ${f}"; fi
   if [ $in_list -eq 0 ] && [ $has -eq 1 ]; then noindex_extra="${noindex_extra} ${f}"; fi
 done
+
+# ───────── 公開金鑰只准在 shared/supabase-config.js（2026-11-01）─────────
+# 首頁與 /events/ 不載 supabase-js，用 fetch 打 PostgREST，要的網址與公開金鑰一律 import shared/supabase-config.js。
+# 抄一份進頁面的話，換金鑰那天就會有一頁漏掉；而且 rest/v1 的呼叫只該出現在 import 了設定檔的那幾支。
+keyleak=$(grep -rlI --include=*.html --include=*.js -e 'sb_publishable_' -e 'supabase\.co' . 2>/dev/null | grep -v '^./shared/supabase-config.js$' | grep -v '^./shared/vendor/' | grep -v '^./vendor/' | grep -v '^./node_modules/' | grep -v '_audit.html' | grep -v '^./docs/' | grep -v '^./scripts/' | grep -v '^./test/' || true)
+if [ -n "${keyleak}" ]; then bad "專案網址或公開金鑰寫在 shared/supabase-config.js 以外的地方（要 import，不要抄）："; echo "${keyleak}"; fi
+restcall=$(grep -rlI --include=*.html --include=*.js 'rest/v1/rpc' . 2>/dev/null | grep -v '^./node_modules/' | grep -v '_audit.html' | grep -v '^./docs/' | grep -v '^./test/' || true)
+for f in ${restcall}; do
+  grep -q 'shared/supabase-config.js' "$f" || bad "$f 直接打 rest/v1 卻沒有 import shared/supabase-config.js"
+done
+[ -z "${keyleak}" ] && ok "公開金鑰只在 shared/supabase-config.js；打 rest/v1 的頁面都是 import 來的"
+
 if [ -n "$noindex_extra" ]; then
   bad "這些對外頁面不該有 robots meta（會從搜尋結果消失，而且看不出來）：${noindex_extra}"
 elif [ -n "$noindex_missing" ]; then

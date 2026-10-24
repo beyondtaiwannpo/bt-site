@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>活動 / Beyond Taiwan</title>
+
+<!-- 活動（2026-11-01 活動上架批 3）。
+     這一頁沒有寫死任何活動：開頁用 fetch 打 public_events()（只回 Co-President 放上對外頁的那幾場），
+     畫成清單；網址帶 #<代號> 就畫那一場。讀不到就印一句「活動載不到」，不留壞掉的框。
+     不載 supabase-js，只拿 shared/supabase-config.js 的網址與公開金鑰（check.sh 守著金鑰不准寫在別的地方）。
+     ── 這一頁不碰 auth ──
+     右上角那顆按鈕只是一個連結。報名按鈕連到 /apply/?f=<報名表>，那邊才要登入。
+     ── 中英兩版 ──
+     兩塊都畫，語言切換只顯示一塊，跟團隊頁同一個做法。
+     封面圖是 team 在後台貼的連結，Co-President 放上去之前要看過照片同意（docs/2026-10-24-活動上架.md）。 -->
+
+<meta name="description" content="Beyond Taiwan 近期的活動：探索營、說明會、校友之夜。免費，公立高中生優先。">
+<meta property="og:title" content="活動 / Beyond Taiwan">
+<meta property="og:description" content="Beyond Taiwan 近期的活動：探索營、說明會、校友之夜。免費，公立高中生優先。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://beyondtaiwannpo.com/events/">
+<meta name="theme-color" content="#EDE5D8">
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 不擋渲染的載法（media="print" 加 onload 切回 all）。
+     那份 CSS 有三萬多位元組，擋著載會讓文字晚一秒多才出現。
+     沒有 JavaScript 的瀏覽器走 noscript 那一行。 -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
+<link rel="stylesheet" href="../shared/brand.css">
+
+<!-- 語言的判斷要在這裡，不能等到頁尾。中英兩版都在 HTML 裡，
+     在瀏覽器套上 data-lang 之前畫面上是兩版接在一起；
+     判斷寫在頁尾的話畫面已經畫完才藏掉一版，下面所有東西會跳一次。 -->
+<script>
+  /* 語言是這樣決定的，順序不能反：
+       1. 網址上的 ?lang= —— 使用者在上一頁選過，那個選擇要跟著他走。
+       2. 沒有的話才看瀏覽器的語言設定。
+     為什麼用網址不用 localStorage：**這個站不在任何人的裝置上存東西。**
+     讀者包含未成年人，「什麼都沒存」是一個值得保住的性質，
+     而且這樣隱私政策一個字都不用改。代價是網址上會多一段 ?lang=，
+     好處是把連結傳給別人時語言也跟著過去。
+     連結上的參數是頁尾那段 keepLang() 補的。 */
+  (function () {
+    var q = new URLSearchParams(location.search).get("lang");
+    document.documentElement.setAttribute("data-lang",
+      q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+  })();
+</script>
+
+<style>
+*{box-sizing:border-box}
+:root{--gut:clamp(20px,5vw,88px)}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+main,footer,.topbar{position:relative;z-index:1}
+.skip{position:absolute;left:-9999px;top:0;z-index:80;
+  background:var(--bt-navy);color:var(--bt-cream);padding:12px 18px;text-decoration:none}
+.skip:focus{left:0}
+:focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
+
+/* ═════════ 頂欄：liquid glass ═════════ */
+/* 跟首頁同一塊玻璃，樣式刻意各自寫一份 —— 搬進 shared/ 的話 shared/ 就開始長版面，
+   而規格說它要保持極小。玻璃的四層與兩個實測後調過的值見 README「頂欄的 liquid glass」。
+   這條頂欄跟 shared/nav.js 是兩回事：那是登入後的功能清單，只有幹部看得到。 */
+.topbar{
+  position:sticky;top:12px;z-index:50;
+  display:flex;align-items:center;gap:clamp(10px,1.8vw,26px);
+  margin:12px var(--gut) 0;padding:9px 10px 9px 16px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(237,229,216,.6));
+  backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(16,42,134,.05),
+             0 10px 30px rgba(16,42,134,.10),0 2px 6px rgba(16,42,134,.06);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .topbar{background:var(--bt-cream);border-color:rgba(16,42,134,.14)}
+}
+.topbar .home{display:flex;align-items:center;margin-right:auto;flex:0 0 auto;position:relative}
+.topbar .home img{height:30px;width:auto;display:block}
+.navlinks{display:flex;align-items:center;gap:clamp(10px,1.5vw,24px)}
+.navlinks a{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;
+  opacity:.74;padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap}
+.navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+.navlinks a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
+.lang{min-width:44px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.12em;
+  border:1px solid rgba(16,42,134,.32);border-radius:999px;padding:6px 13px;background:none;
+  color:var(--ink);cursor:pointer;line-height:1;position:relative}
+.lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.login{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+  font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px;white-space:nowrap;
+  line-height:1;position:relative}
+.login:hover{background:var(--bt-orange);color:var(--bt-navy)}
+/* 頂欄那顆按鈕在窄螢幕上只講一種語言（2026-09-08）。
+   Paul 回報「選單跑掉了」：登入之後那顆按鈕的字從「登入 / Sign in」變成
+   「我的 BT 帳號 / Account」，加上 logo、語言鈕、選單鈕，在 390px 的手機上
+   總寬就超過頂欄。這幾個都是 white-space:nowrap，縮不下去，
+   於是排在最後的「選單」被擠到玻璃外面去（而且沒有任何東西會報錯）。
+
+   **修法不是把選單藏起來**，是讓那顆按鈕在窄螢幕上只顯示一半：
+   現在看的是中文就只留中文那半，英文就只留英文那半。
+   兩種讀者都還看得懂，寬螢幕上兩半照舊都在。
+   斜線那一格要一起藏 —— 不藏的話會變成「登入 /」。 */
+@media (max-width:560px){
+  .lg-sep{display:none}
+  html[data-lang="en"] .lg-a{display:none}
+  html[data-lang="zh"] .lg-b{display:none}
+  /* 只藏一半還不夠寬裕：實測 390px 的手機上，中文那半「我的 BT 帳號」
+     排完只剩 1px 餘裕，任何一個字級或間距改動都會再擠出去一次。
+     這三行把餘裕拉到十幾 px。logo 是等比例縮小（height 改、width:auto），
+     沒有改色、拉伸、旋轉或透明度，Brand Book 的硬規則沒有被碰到。 */
+  .topbar{gap:10px}
+  .topbar .home img{height:26px}
+  .login{padding:9px 13px;font-size:14px}
+}
+.burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;position:relative;
+  padding:6px 8px;font-family:var(--display);font-size:14px;font-weight:700;letter-spacing:.1em}
+/* 可點區域 44x44，視覺大小不變。 */
+.topbar .home::after,.lang::after,.login::after,.burger::after{
+  content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+
+/* ═════════ 版面 ═════════ */
+.hero{padding:clamp(40px,8vh,110px) var(--gut) clamp(20px,3vh,40px)}
+h1{font-family:var(--han);font-weight:900;font-size:clamp(36px,6.4vw,96px);
+  line-height:1;letter-spacing:-.02em;margin:0;max-width:9em}
+.en h1{font-family:var(--display);font-weight:700;font-size:clamp(38px,6.8vw,100px);
+  line-height:.96;letter-spacing:-.01em;max-width:15ch}
+.lead{font-size:clamp(16px,1.35vw,20px);line-height:1.62;max-width:34em;
+  margin:clamp(20px,3.2vh,34px) 0 0;color:rgba(16,42,134,.82)}
+
+.sec{padding:clamp(46px,7.5vh,110px) var(--gut) 0}
+.sec-in{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);
+  gap:clamp(18px,4.5vw,74px);align-items:start;
+  border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(20px,3.4vh,40px)}
+h2{font-family:var(--han);font-weight:900;font-size:clamp(24px,3.4vw,50px);
+  line-height:1.06;letter-spacing:-.015em;margin:0;text-wrap:balance}
+.en h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.8vw,54px);
+  line-height:1;letter-spacing:0}
+h3{font-family:var(--display);font-weight:700;font-size:clamp(19px,1.7vw,25px);
+  letter-spacing:.005em;line-height:1.2;margin:36px 0 10px}
+h3:first-child{margin-top:0}
+p{margin:0 0 17px;max-width:34em}
+.body a{color:var(--ink);font-weight:600;text-decoration-thickness:1px;text-underline-offset:3px}
+.body a:hover{text-decoration-color:var(--bt-orange)}
+.pull{font-family:var(--hand);font-size:clamp(21px,2.6vw,34px);line-height:1.55;
+  margin:clamp(22px,3.4vh,38px) 0;max-width:22em;color:var(--ink)}
+
+/* 時間軸。只有這一段是真的時間順序，所以只有這裡用得起年份當標記
+   —— 其他地方不准用 01/02/03 那種編號（見視覺方向「要避開的套路」）。 */
+.tl{margin:0;padding:0;list-style:none;max-width:34em}
+.tl li{display:grid;grid-template-columns:5.5em 1fr;gap:clamp(12px,2vw,26px);
+  padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+.tl li:first-child{border-top:0;padding-top:0}
+.tl b{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.03em;
+  color:rgba(16,42,134,.7);white-space:nowrap}
+.tl span{font-size:16px;line-height:1.6}
+
+/* 團隊的六個 team。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
+   是六列，靠上面那條線分隔。 */
+.rows{margin:0;padding:0;list-style:none;max-width:34em}
+.rows li{padding:16px 0;border-top:1px solid rgba(16,42,134,.14)}
+.rows li:first-child{border-top:0;padding-top:0}
+.rows b{display:block;font-family:var(--display);font-weight:700;font-size:19px;
+  letter-spacing:.02em;margin-bottom:4px}
+.rows span{font-size:15.5px;line-height:1.6;color:rgba(16,42,134,.78)}
+
+.cta{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+  font-weight:600;font-size:16px;padding:14px 26px;border-radius:999px;margin-top:6px}
+.cta:hover{background:var(--bt-orange);color:var(--bt-navy)}
+
+.en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);
+  padding-top:clamp(16px,3vh,36px)}
+html[data-lang] .en{border-top:0;margin-top:0;padding-top:0}
+html[data-lang="zh"] .en,html[data-lang="en"] .zh{display:none}
+
+footer{margin-top:clamp(56px,9vh,120px);
+  padding:clamp(28px,4vh,44px) var(--gut) clamp(44px,7vh,84px);
+  border-top:1px solid rgba(16,42,134,.15);font-size:14.5px;color:rgba(16,42,134,.78)}
+footer p{margin:0 0 8px;max-width:none}
+footer a{color:var(--ink);font-weight:600}
+
+@media (max-width:820px){.sec-in{grid-template-columns:1fr;gap:14px}}
+/* 導覽有八項之後，中等寬度會擠。**先縮字級與間距，再換漢堡** ——
+   1100px 上直接換成漢堡，對一台筆電來說太早了。
+   量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
+@media (max-width:1180px){
+  .navlinks{gap:clamp(7px,1.05vw,14px)}
+  .navlinks a{font-size:13.5px}
+  .login{padding:9px 14px;font-size:13.5px}
+}
+@media (max-width:900px){
+  .navlinks{display:none;position:absolute;left:0;right:0;top:calc(100% + 8px);
+    flex-direction:column;align-items:flex-start;gap:0;padding:6px 18px 10px;border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.93),rgba(237,229,216,.88));
+    backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 14px 34px rgba(16,42,134,.14)}
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .navlinks{background:var(--bt-cream)}
+  }
+  .navlinks.open{display:flex}
+  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
+  .burger{display:block}
+  .tl li{grid-template-columns:1fr;gap:2px}
+}
+@media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+/* ═════════ 這一屆的人 ═════════ */
+/* **hidden 是預設**：一個人都還沒公開的時候整段不出現
+   （見 team/src/main.js 的檔頭）。
+
+   ── 為什麼是「去背照片超出卡片」，不是一排小圓照 ──
+   2026-09-08 前兩版分別是「照片在上名字在下的小格子」與「照片在左名字在右的橫列」。
+   Paul 的原話：「小小一個圓很無聊，我要我的成員很驕傲可以在這上面」。
+   人是這個組織唯一真正的內容，把人縮成 68px 的圓等於說他們不重要。
+   現在的做法：一張卡片，去背照片掛在卡片上緣之外，頭超出框。
+
+   ⚠ **欄數是寫死的 4 / 3 / 2 / 1，不是 auto-fill。**
+   拍照那天的姿勢會互相連動（往右看的人，右邊那個比「噠噠」），
+   auto-fill 的話「誰在誰右邊」會隨著視窗寬度變，那些姿勢就對不起來。
+   欄數固定加上 main.js 的固定排序，左右鄰居才是可以事先算出來的。
+
+   ⚠ **每個人的姿勢單獨看也要成立。** 手機上一排一個，
+   那時候看不到任何連動，只看得到那一個人。 */
+.sec-people .sec-in{grid-template-columns:1fr;gap:clamp(14px,2vw,24px)}
+.sec-people .body{max-width:none}
+
+.teamsec{margin:clamp(40px,5.5vw,64px) 0 0}
+.teamsec:first-child{margin-top:clamp(20px,2.6vw,32px)}
+.teamsec h3{font-family:var(--display);font-weight:700;
+  font-size:clamp(19px,2.1vw,28px);letter-spacing:.07em;text-transform:uppercase;
+  line-height:1.1;margin:0;color:var(--ink)}
+/* 小標可能是空的（team 不在那六個裡面時查不到中英文說明）。
+   **留一行的高度**，不然有小標與沒小標的兩組，卡片會差一行沒對齊。 */
+.teamsec .sub{margin:3px 0 0;font-size:14px;line-height:1.4;min-height:1.4em;
+  max-width:none;color:rgba(16,42,134,.72)}
+
+/* padding-top 是留給第一排的頭超出來的空間；row-gap 是留給後面每一排的。 */
+.crew{list-style:none;margin:0;padding:0;display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  /* ⚠ **row-gap 與 padding-top 要蓋得住頭超出來的高度**，
+     不然第一排的頭會壓在 team 標題上，後面每一排的頭會壓在上一排的名字上。
+     超出來的高度 = .cut 的 height 減掉 74px（見下面的 bottom），最多 106px。 */
+  gap:clamp(86px,9vw,118px) clamp(12px,1.4vw,20px);
+  padding-top:clamp(86px,9vw,118px)}
+.crew li{position:relative;border-radius:18px;text-align:center;min-height:158px;
+  padding:84px 12px 16px;
+  background:linear-gradient(180deg,rgba(255,196,108,.5) 0%,rgba(255,232,197,.72) 100%);
+  box-shadow:0 12px 30px rgba(16,42,134,.10)}
+/* 卡片一律對齊，不做高低錯落（2026-09-13 Paul 決定）。
+   原本偶數卡片有 margin-top 做鋸齒感，但那個「偶數」是按整份名單算不是按每排算，
+   縮到三欄的時候節奏會每排翻面，看起來不像設計像沒對齊。要復原就把 margin-top 加回來，
+   並且改成按每排算（例如 :nth-child(4n+2), :nth-child(4n+4)）。 */
+
+/* 去背照片（背景透明）。**卡片不能 overflow:hidden**，超出來的頭要看得到。
+   max-width 是防呆：直式照片如果比例很極端，寬度不能吃掉旁邊那個人的名字。 */
+.crew .cut{position:absolute;left:50%;bottom:calc(100% - 74px);transform:translateX(-50%);
+  height:clamp(140px,13vw,180px);width:auto;max-width:132%;
+  filter:drop-shadow(0 10px 16px rgba(16,42,134,.18))}
+/* 一般大頭照（沒有去背）：圓的，一樣掛在卡片上緣之外。
+   ⚠ object-position 往上偏。大頭照多半是站著拍的，臉在畫面上半部，
+   置中裁切會把下巴切掉、額頭上方留一大片背景。 */
+.crew .por{position:absolute;left:50%;bottom:calc(100% - 74px);transform:translateX(-50%);
+  width:clamp(104px,10vw,130px);height:clamp(104px,10vw,130px);border-radius:50%;
+  object-fit:cover;object-position:center 28%;background:var(--paper);
+  border:4px solid var(--paper);box-shadow:0 10px 24px rgba(16,42,134,.16)}
+/* 沒有大頭照的人用名字第一個字。**不用灰色剪影** ——
+   剪影看起來像「這個人不見了」，一個字看起來像「這個人在」。 */
+.crew .noface{position:absolute;left:50%;bottom:calc(100% - 74px);transform:translateX(-50%);
+  width:clamp(104px,10vw,130px);height:clamp(104px,10vw,130px);border-radius:50%;
+  background:var(--paper);border:1px solid rgba(16,42,134,.14);
+  display:grid;place-items:center;font-family:var(--display);font-weight:700;
+  font-size:clamp(34px,3.4vw,44px);color:rgba(16,42,134,.5)}
+/* 滑過去的時候人往上抬一點、歪一點。這一頁要看起來是活的，不是一排證件照。
+   reduce 的人不會有（整頁的 transition 在上面被關掉了）。 */
+.crew .cut,.crew .por,.crew .noface{transition:transform .3s cubic-bezier(.2,.7,.3,1)}
+.crew li:hover .cut{transform:translateX(-50%) translateY(-9px) rotate(-1.6deg)}
+.crew li:hover .por,.crew li:hover .noface{transform:translateX(-50%) translateY(-7px)}
+
+.crew b{display:block;font-family:var(--display);font-weight:700;
+  font-size:clamp(17px,1.5vw,22px);line-height:1.14;color:var(--ink)}
+.crew .cname{display:block;font-family:var(--han);font-weight:900;font-size:14px;
+  line-height:1.25;margin-top:3px;color:rgba(16,42,134,.84)}
+.crew .role{display:block;font-size:12.5px;line-height:1.5;margin-top:7px;
+  color:rgba(16,42,134,.8)}
+
+@media (max-width:1180px){.crew{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:760px){.crew{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:430px){
+  .crew{grid-template-columns:1fr;gap:clamp(86px,22vw,110px) 0}
+}
+
+/* ═════════ 點下去要有回饋（2026-09-08）═════════ */
+/* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
+   Paul 的要求：「點擊會有回饋」。
+
+   ⚠ **五個登入後的頁面設了 -webkit-tap-highlight-color:transparent**，
+   那一行會把手機上唯一的預設回饋關掉。關掉就一定要自己補一個 ——
+   在那之前，那五頁在手機上按下去畫面完全不動，
+   而**畫面不動的時候使用者會再按一次**（這個 repo 一路上最常見的失敗形狀）。
+
+   ⚠ **不要給它 transition。** 按下去的回饋要立刻發生；
+   加了過渡就變成「按了之後才慢慢縮」，那比沒有回饋更像卡住。
+   沒有 transition 也表示它不是「會動位置的過渡」，
+   對 prefers-reduced-motion 沒有意義 —— 按鍵回饋不是前庭刺激來源。 */
+button{cursor:pointer}
+button[disabled]{cursor:default}
+button:not([disabled]):active,
+a.btn:active, a.cta:active, a.login:active, a.photo:active, a.avbtn:active,
+summary:active{
+  transform:scale(.97);
+}
+/* 實心的主要按鈕：壓下去再暗一階，光靠縮小在小按鈕上看不太出來。 */
+.btn:not([disabled]):not(.ghost):not(.quiet):active,
+a.btn:not(.ghost):active, a.cta:active, a.login:active{
+  background:var(--bt-navy);color:var(--bt-cream);filter:brightness(.88);
+}
+/* 框線鈕：壓下去底色再深一點。
+   ⚠ **.chip.on 要排除。** 選起來的 chip 底色是深藍，
+   蓋一層淺色上去會讓它在按著的時候閃白一下，看起來像取消選取。 */
+/* 用橘色不用深藍調淡：深藍 12% 在米白上讀起來是**冷灰**，
+   而整站是暖的 —— 那一下按壓會看起來像變髒，不像有回應。
+   橘色本來就是這個品牌「正在動的東西」的顏色，而正在被按的就是那個東西。 */
+.btn.ghost:not([disabled]):active, .chip:not(.on):active,
+.lang:active, .btnav-out:active{
+  background:rgba(255,196,108,.38);
+}
+.chip.on:active{filter:brightness(1.15)}
+/* 整行可以點的東西（單選、多選、勾選框）：按著的時候整行變色。
+   這些是 <label> 不是 <button>，上面那條抓不到，而它們是**手機上最常按的東西**。 */
+.opt:active, .check:active{background:rgba(255,196,108,.26);border-radius:10px}
+/* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
+.body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
+summary{cursor:pointer}
+
+/* ───────── 活動卡（2026-11-01）：三欄到手機一欄，封面 3:2，狀態標籤只用品牌色。 ───────── */
+.ev-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:22px;margin-top:8px}
+.ev-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1px solid rgba(16,42,134,.16);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.45)}
+.ev-card:hover{border-color:var(--bt-navy);box-shadow:0 10px 26px rgba(16,42,134,.1)}
+.ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:rgba(255,196,108,.35)}
+.ev-body{display:flex;flex-direction:column;gap:5px;padding:14px 16px 16px}
+.ev-body b{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:.01em}
+.ev-when{font-size:13px;color:rgba(16,42,134,.78)}
+.ev-sum{font-size:14px;line-height:1.5}
+.ev-tag{align-self:flex-start;margin-top:4px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid rgba(16,42,134,.3)}
+.ev-tag.on{background:var(--bt-orange);border-color:var(--bt-orange)}
+.ev-cover{display:block;width:100%;max-width:820px;aspect-ratio:3/2;object-fit:cover;border-radius:16px}
+.ev-by{font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 6px}
+.ev-text{line-height:1.75}
+.ev-note{font-size:14px;color:rgba(16,42,134,.82)}
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main"><span class="zh">跳到主要內容</span><span class="en">Skip to content</span></a>
+
+<nav class="topbar" aria-label="網站導覽">
+  <a class="home" href="../" aria-label="Beyond Taiwan 首頁">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <div class="navlinks" id="navlinks">
+    <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
+    <a href="../resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
+    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
+    <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
+    <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
+    <a href="../alumni/">Alumni</a>
+    <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
+    <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
+  </div>
+  <button class="lang" id="lang" type="button">EN</button>
+  <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
+  <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
+</nav>
+
+<main id="main">
+
+<div class="zh" lang="zh-Hant">
+<header class="hero">
+  <h1>活動</h1>
+  <p class="lead">探索營、說明會、校友之夜。免費，公立高中生優先。</p>
+</header>
+<div id="ev-zh"><section class="sec"><div class="sec-in"><div class="body"><p>載入中…</p></div></div></section></div>
+</div>
+
+<div class="en" lang="en">
+<header class="hero">
+  <h1>Events</h1>
+  <p class="lead">Bootcamps, info sessions, mentor nights. Free, public-school students first.</p>
+</header>
+<div id="ev-en"><section class="sec"><div class="sec-in"><div class="body"><p>Loading…</p></div></div></section></div>
+</div>
+
+</main>
+
+<footer>
+  <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
+  <p>本網站不使用任何追蹤或廣告工具。</p>
+  <p lang="en">This site uses no tracking or advertising tools.</p>
+  <p>beyondtaiwan2020@gmail.com</p>
+  <p>Beyond Taiwan</p>
+</footer>
+
+<script>
+(function () {
+  var html = document.documentElement;
+  var btn = document.getElementById("lang");
+  var links = document.getElementById("navlinks");
+  var burger = document.getElementById("burger");
+  /* 語言在 <head> 就決定好了（那裡有寫為什麼：晚一步決定畫面會跳）。
+     這裡只補按鈕文字，不要再判斷一次 —— 判斷兩次就會有一個地方沒改到。 */
+  setLang(html.getAttribute("data-lang") === "en" ? "en" : "zh");
+  function setLang(l) {
+    html.setAttribute("data-lang", l);
+    html.setAttribute("lang", l === "zh" ? "zh-Hant" : "en");
+    btn.textContent = l === "zh" ? "EN" : "\u4e2d";
+    btn.setAttribute("aria-label", l === "zh" ? "Switch to English" : "\u5207\u63db\u70ba\u4e2d\u6587");
+    keepLang(l);
+  }
+
+  /* 把目前的語言寫進站內每一個連結，這樣點過去之後語言不會跳回瀏覽器預設。
+     跳過外部連結、mailto、純錨點，以及 app/ ——
+     那是登入的系統，它自己在讀網址上的 next 參數，不要去動它。 */
+  /* 這一頁的連結有的帶自己的參數（報名是 ../apply/?f=…、一場活動是 ./#代號），所以不能把 ? 後面整段換掉，
+     只改 lang 這一個。main.js 畫完清單會再叫一次 window.btKeepLang()。 */
+  function keepLang(l) {
+    var as = document.querySelectorAll("a[href]");
+    for (var i = 0; i < as.length; i++) {
+      var h = as[i].getAttribute("href");
+      if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
+      var u = new URL(h, location.href); u.searchParams.set("lang", l);
+      as[i].setAttribute("href", u.pathname + u.search + u.hash);
+    }
+    window.btKeepLang = function () { keepLang(html.getAttribute("data-lang") === "en" ? "en" : "zh"); };
+  }
+
+  /* 已經登入的話，右上角那顆改成「我的帳號」。
+     2026-09-08：Paul 回報「登入之後回首頁還是寫登入」。那顆按鈕的**行為**一直是對的
+     （不管登入沒登入，點下去都到 /app/，而 /app/ 自己會判斷要顯示什麼），
+     錯的只有那幾個字。
+
+     ⚠ **這裡不載入 supabase。** 對外頁面刻意不碰 auth（見這一頁檔頭），
+     為了一顆按鈕的字去載整包 supabase-js，會讓每一個路人都多下載一份他用不到的東西。
+     所以只看瀏覽器裡有沒有那把鑰匙：supabase-js 把 session 存在
+     localStorage 的 `sb-<專案>-auth-token`。
+
+     **不解析內容、不驗證過期。** 驗過期要整包 supabase-js，而這顆按鈕不值得。
+     票過期的話按下去會看到登入頁，那正是他該看到的東西。
+
+     try/catch 是必要的：無痕視窗與擋第三方資料的瀏覽器會在讀 localStorage 時丟例外。
+     沒改到就是維持「登入」，那是安全的預設。 */
+  try {
+    var loginBtn = document.querySelector(".login");
+    for (var i = 0; loginBtn && i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (/^sb-.+-auth-token$/.test(k) && localStorage.getItem(k)) {
+        loginBtn.innerHTML = '<span class="lg-a">我的 BT 帳號</span>' +
+          '<span class="lg-sep"> / </span><span class="lg-b">Account</span>';
+        break;
+      }
+    }
+  } catch (e) { /* 讀不到就算了，維持「登入」。 */ }
+
+  btn.addEventListener("click", function () {
+    setLang(html.getAttribute("data-lang") === "zh" ? "en" : "zh");
+  });
+  burger.addEventListener("click", function () {
+    var open = links.classList.toggle("open");
+    burger.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  links.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") {
+      links.classList.remove("open");
+      burger.setAttribute("aria-expanded", "false");
+    }
+  });
+})();
+</script>
+
+<script type="module" src="./src/main.js"></script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
