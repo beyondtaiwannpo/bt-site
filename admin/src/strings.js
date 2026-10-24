@@ -35,6 +35,7 @@ export const COMMON = {
   "rail.groups":      { zh: "後台的分組", en: "Admin sections" },
   "rail.lang":        { zh: "語言", en: "Language" },
   "rail.noTeam":      { zh: "還沒填 team", en: "no team yet" },
+  "rail.allTeams":    { zh: "全部 team", en: "all teams" },
   "rail.foot":        { zh: "對外七頁（首頁、關於、計畫、做過什麼、合作、團隊、Alumni）的文字在 HTML 檔裡，不在後台。改法見 README「對外的內容頁」。",
                         en: "The seven public pages (home, about, programs, impact, partner, team, alumni) live in HTML files, not here. See README, the section on the public content pages." },
   "board.member":     { zh: "Associate", en: "Associate" },
@@ -58,6 +59,7 @@ export const COMMON = {
   "toast.undo":       { zh: "復原", en: "Undo" },
   "toast.close":      { zh: "關掉", en: "Close" },
   "ask.yes":          { zh: "確定", en: "Yes, do it" },
+  "grid.byRank":      { zh: "全部（職級）", en: "All (by rank)" },
   // 成員分頁（2026-10-23，第三次重整批 3）：對一個工作區是「管」的人，在那個東西自己的頁面上加人、改等級、移出。
   "level.view":       { zh: "看", en: "View" },
   "level.edit":       { zh: "改", en: "Edit" },

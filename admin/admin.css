@@ -427,3 +427,4 @@ a.btn{text-decoration:none}
 /* Co-President 與 Senior Adviser 不靠指派：存取格每一格鎖住印「全部（職級）」，成員清單那幾列淡一點。 */
 select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-style:dashed}
 .table tr.byrank td{color:rgba(16,42,134,.7)}
+.tag.off{opacity:.45;text-decoration:line-through}

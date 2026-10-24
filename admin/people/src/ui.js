@@ -101,7 +101,9 @@ export function railHTML(group, tab, me, counts) {
     return `<div class="rail-group${ok ? "" : " off"}"${ok ? "" : ` title="${esc(T(WHY[g.who]) || "")}"`}>${esc(T(g.label))}</div>${
       ok ? rows.map(item).join("") : rows.map(i => `<span class="rail-item off">${esc(T(i.label))}</span>`).join("")}`;
   }).join("");
-  const teams = String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
+  // Co-President 與 Senior Adviser 是整個組織的（Paul 2026-10-24），這一行印「全部 team」，不印他自己勾的標籤。
+  const teams = (me && (me.board === "president" || me.board === "senior_adviser")) ? [T("rail.allTeams")]
+    : String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
   return `<input class="rail-toggle" type="checkbox" id="rail-toggle" aria-label="${esc(T("rail.open"))}">
   <label class="rail-burger" for="rail-toggle">${T("rail.menu")}</label>
   <nav class="rail" aria-label="${esc(T("rail.groups"))}">
@@ -492,7 +494,11 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
   const hit = p => !q || String(p.name_zh || "").toLowerCase().includes(q) || String(p.name_en || "").toLowerCase().includes(q);
   const dis = busy ? " disabled" : "";
   const inTerm = p => f.term === "all" || !!positionFor(p, f.term);
-  const teamsOf = p => parseTeams(p.team).length ? parseTeams(p.team) : (positionFor(p, f.term) && positionFor(p, f.term).team ? [positionFor(p, f.term).team] : []);
+  // 一個人算在哪幾個 team 的 chip 底下：Co-President 與 Senior Adviser 是整個組織的，只算他這一屆**帶 team 的職位**（通常沒有），
+  // 不看他自己勾的標籤，跟 /team/ 的「領導」那一組同一條規則。其他人照舊：標籤，沒有標籤就看職位的 team。
+  const posTeams = p => positionsFor(p, f.term === "all" ? (cur ? cur.id : "") : f.term).map(x => x.team).filter(Boolean);
+  const teamsOf = p => isOrgWide(p.board_role) ? [...new Set(posTeams(p))]
+    : parseTeams(p.team).length ? parseTeams(p.team) : (positionFor(p, f.term) && positionFor(p, f.term).team ? [positionFor(p, f.term).team] : []);
   const base = list.filter(inTerm);
   const allTeams = [...new Set(base.flatMap(teamsOf))].sort((a, b) => a.localeCompare(b));
   const noTeam = base.filter(p => !teamsOf(p).length).length;
@@ -521,13 +527,21 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
         dup ? ` <span class="tag warn">${T("ro.maybeDup")}</span>` : ""}${
         p.pending_code ? `<div class="mini">${T("ro.pendingCode", { code: esc(p.pending_code) })}</div>` : ""}</td>
       <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
-      <td>${pos ? `${esc(positionsLine(p, pos.term))}${positionsFor(p, pos.term).some(x => x.team) ? `<div class="mini">${esc(positionsFor(p, pos.term).map(x => x.team).filter(Boolean).join(T("punct.list")))}</div>`
-               : positionsFor(p, pos.term).some(x => isOrgWide(rankOfTitle(x.title_en, ""))) ? `<div class="mini">${T("pe.allTeams")}</div>` : ""}`
+      <td>${pos ? positionsFor(p, pos.term).map(x => {
+                 // 一筆職位一行，不用「 · 」接成一句：職級是左邊那一欄的徽章，職位是這裡的字，兩件事分開看。
+                 // 職位的字對得上某一級、卻跟他的職級不同（例如職級 Co-President、職位寫 Senior Adviser），標出來讓人看到。
+                 const r = rankOfTitle(x.title_en, x.team);
+                 const clash = hasAccount(p) && p.role === "cadre" && r && r !== "custom" && r !== (p.board_role || "member");
+                 return `<div>${esc(positionTitle(x))}${x.team ? `<span class="mini"> ${esc(x.team)}</span>` : isOrgWide(r) ? `<span class="mini"> ${T("pe.allTeams")}</span>` : ""}${
+                   clash ? ` <span class="tag warn" title="${esc(T("ro.rankMismatchHint"))}">${T("ro.rankMismatch")}</span>` : ""}</div>`; }).join("")
                : lastPos ? `<span class="mini">${esc(positionTitle(lastPos))}・${esc(lastPos.term)}</span>` : `<span class="mini">${T("ro.noPosition")}</span>`}${
         hasAccount(p) && p.role === "cadre" && !parseTeams(p.team).length
           ? `<div style="margin-top:6px"><select data-act="row-team" data-id="${esc(p.profile_id)}" aria-label="${esc(T("ro.setTeam"))}"${dis}><option value="">${T("ro.setTeam")}</option>${
               TEAMS.map(t => `<option value="${esc(t)}">${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></div>` : ""}</td>
-      <td>${ws.length ? ws.map(w => `<span class="tag">${esc(wsName(w.id, workspaces))}・${esc(levelLabel(w.level))}</span>`).join(" ") : `<span class="mini">${hasAccount(p) && p.role === "cadre" ? T("ro.noWs") : ""}</span>`}</td>
+      <td>${hasAccount(p) && p.role === "cadre" && isOrgWide(p.board_role)
+          // 這兩級靠職級就有一切：先一顆「全部（職級）」，後面明寫的指派淡掉留著（多餘但不藏，藏了就沒人會去清）。
+          ? `<span class="tag open">${T("grid.byRank")}</span>${ws.map(w => ` <span class="tag off" title="${esc(T("ro.wsRedundant"))}">${esc(wsName(w.id, workspaces))}・${esc(levelLabel(w.level))}</span>`).join("")}`
+          : ws.length ? ws.map(w => `<span class="tag">${esc(wsName(w.id, workspaces))}・${esc(levelLabel(w.level))}</span>`).join(" ") : `<span class="mini">${hasAccount(p) && p.role === "cadre" ? T("ro.noWs") : ""}</span>`}</td>
       <td class="t-act"><button class="btn quiet sm" data-act="person-edit" data-id="${esc(p.person_id)}"${dis}>${T("ro.edit")}</button></td>
     </tr>`;
   };

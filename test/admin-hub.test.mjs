@@ -72,7 +72,9 @@ test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什�
     const pres = M.railHTML("forms", "home", { ...ME.pres, name: "王平" });
     assert.equal((pres.match(/class="rail-item off"/g) || []).length, 0, `${label}：Co-President 沒有任何一行是淡的`);
     assert.equal((pres.match(/<a class="rail-item/g) || []).length, M.ITEMS.length, `${label}：Co-President 每一行都是連結`);
-    assert.match(pres, /Co-President・還沒填 team/, label);
+    // 2026-10-24：Co-President 與 Senior Adviser 是整個組織的，側欄印「全部 team」，不印標籤也不印「還沒填」。
+    assert.match(pres, /Co-President・全部 team/, label);
+    assert.match(M.railHTML("forms", "home", { ...ME.senior, name: "顧", team: "Marketing Team" }), /Senior Adviser・全部 team/, `${label}：Senior Adviser 就算勾了標籤也印全部 team`);
   }
 });
 
@@ -150,7 +152,7 @@ const TODO = { resources: [{ id: "r1", team: "Curriculum Team", status: "publish
 
 test("首頁：Co-President 看到六張卡，每張一個數字、一顆直達的按鈕", () => {
   const h = FORMS.hubHTML({ ...ME.pres, name: "王平", team: "Sponsorship Team" }, [{ id: 1, tries: 0 }, { id: 2, tries: 2, error: "boom" }], true, false, FORMS_DATA, TODO);
-  assert.match(h, /王平，Co-President，Sponsorship Team/);
+  assert.match(h, /王平，Co-President，全部 team/, "總覽那一行：Co-President 印全部 team，不印標籤");
   assert.match(h, /<div class="kpi-n">3<span class="kpi-u">件<\/span><\/div>\s*<div class="kpi-l">還沒處理的申請/);
   assert.match(h, /data-act="open-apps" data-id="f1">去審/, "按下去直接到第一份有待審的表單");
   assert.match(h, /<div class="kpi-n">2<span class="kpi-u">封/);
@@ -590,4 +592,11 @@ test("成員分頁：Co-President 與 Senior Adviser 置頂標「依職級」，
   assert.equal((h.match(/class="byrank"/g) || []).length, 2);
   assert.doesNotMatch(h.slice(0, mei), /members-unassign/);
   assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: mp.cadres }, "", false), /依職級|全部（職級）/, "沒有指派也列得出依職級的人");
+});
+
+test("總覽「你的存取」：Co-President 看到一顆「全部（職級）」徽章加一句，不列十四個工作區", () => {
+  const h = FORMS.accessHTML({ ...ME.pres, ws: {} }, { workspaces: [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "x", active: true }], directors: [] }, []);
+  assert.match(h, /<span class="tag open">全部（職級）<\/span>/);
+  assert.match(h, /不用派/);
+  assert.doesNotMatch(h, /class="flist access"/, "不列工作區");
 });

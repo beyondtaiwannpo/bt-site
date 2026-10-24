@@ -91,7 +91,9 @@ export function railHTML(group, tab, me, counts) {
     return `<div class="rail-group${ok ? "" : " off"}"${ok ? "" : ` title="${esc(T(WHY[g.who]) || "")}"`}>${esc(T(g.label))}</div>${
       ok ? rows.map(item).join("") : rows.map(i => `<span class="rail-item off">${esc(T(i.label))}</span>`).join("")}`;
   }).join("");
-  const teams = String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
+  // Co-President 與 Senior Adviser 是整個組織的（Paul 2026-10-24），這一行印「全部 team」，不印他自己勾的標籤。
+  const teams = (me && (me.board === "president" || me.board === "senior_adviser")) ? [T("rail.allTeams")]
+    : String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
   return `<input class="rail-toggle" type="checkbox" id="rail-toggle" aria-label="${esc(T("rail.open"))}">
   <label class="rail-burger" for="rail-toggle">${T("rail.menu")}</label>
   <nav class="rail" aria-label="${esc(T("rail.groups"))}">

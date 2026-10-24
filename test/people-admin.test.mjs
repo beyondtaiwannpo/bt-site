@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tabsHTML, rosterHTML, changesHTML, personEditHTML, personNewHTML, workspacesHTML, termsHTML,
+import { tabsHTML, rosterHTML, changesHTML, personEditHTML, personNewHTML, workspacesHTML, termsHTML, invitesPageHTML,
   accessGridHTML, afterEndHTML, wsName, slugify, findByPickName, deriveTitle, rankOfTitle, rankByName, RANK_CHOICES,
   BOARD_ROLES, boardLabel, LEVELS, levelLabel, pasteParse, nextTermId, positionFor, positionsFor, positionsLine, currentTerm, TEAMS as PEOPLE_TEAMS, setLang, T } from "../admin/people/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
@@ -322,7 +322,9 @@ test("★ 同一屆好幾個職位：名單接成一句、改一個人一列一�
   assert.equal(positionsFor(two, "2026-27").length, 2);
   assert.equal(positionsLine(two, "2026-27"), "Adviser, Sponsorship Team · Associate, Curriculum Team");
   const roster = rosterHTML([two], TERMS, ME, true, "", false, null);
-  assert.match(roster, /Adviser, Sponsorship Team · Associate, Curriculum Team/);
+  // 2026-10-24：名單裡一筆職位一行，不再用「 · 」接成一句（職級是左邊那一欄，職位是字，分開看）。positionsLine 留給歷屆那一行。
+  // 他的職級是 Director，兩筆職位的字卻是 Adviser 與 Associate，所以各自後面會多一顆「跟職級不同」。
+  assert.match(roster, /<div>Adviser, Sponsorship Team<span class="mini"> Sponsorship Team<\/span> <span class="tag warn"[^>]*>跟職級不同<\/span><\/div><div>Associate, Curriculum Team<span class="mini"> Curriculum Team<\/span> <span class="tag warn"/);
   assert.doesNotMatch(roster, /director@example\.com/, "名單表格上不印 email");
   const h = personEditHTML(two, TERMS, ME, true, "", false, null, [two], null, "director@example.com");
   assert.equal((h.match(/data-posrow=/g) || []).length, 2);
@@ -534,7 +536,7 @@ test("★ 不綁 team 的兩級：表單 team 鎖住、名單印「全部 team�
   const dir = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, null, PEOPLE, null, undefined, []);
   assert.match(dir, /<select id="pk-pteam-0">/); assert.match(dir, /data-act="grid-level"/);
   const ro = rosterHTML(PEOPLE, TERMS, ME, true, "", false, null, []);
-  assert.match(ro, /Co-President<div class="mini">全部 team<\/div>/, "名單：Co-President · 全部 team");
+  assert.match(ro, /<div>Co-President<span class="mini"> 全部 team<\/span><\/div>/, "名單：Co-President 全部 team");
   const ws = [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "Curriculum Team 的申請", active: true }];
   const h = workspacesHTML(ws, "apps:Curriculum Team", [{ user_id: PEOPLE[2].profile_id, name_zh: "", name_en: "Mei", board_role: "member", level: "view" }], PEOPLE, "", false, null, true);
   const lead = h.indexOf('class="byrank"'), mei = h.indexOf('data-act="ws-level"');
@@ -543,4 +545,33 @@ test("★ 不綁 team 的兩級：表單 team 鎖住、名單印「全部 team�
   assert.doesNotMatch(h.slice(lead, mei), /ws-unassign|ws-level/, "依職級那一列沒有下拉與移出");
   const src = readFileSync("admin/people/src/main.js", "utf8");
   assert.match(src, /team = UI\.isOrgWide\(rank\) \? "" : val\(`pk-pteam-\$\{i\}`\)/, "存的時候 team 是空的");
+});
+
+// Paul 2026-10-24 的規矩：一個概念改了，畫它的每一個面同一筆一起改。這裡一面一條。
+test("★ 依職級的每一個面：名單工作區欄、team 篩選、側欄那一行、職級與職位分開、對不上的標出來", () => {
+  const pres = { ...PEOPLE[0], workspaces: [{ id: "apps:Community Relations Team", level: "manage" }], team: "Sponsorship Team" };
+  const h = rosterHTML([pres, PEOPLE[1], PEOPLE[2]], TERMS, ME, true, "", false, null, []);
+  // 面：名單的工作區欄。先「全部（職級）」，明寫的指派淡掉留著（不藏，藏了就沒人會去清），而且不再印「沒有被派進任何工作區」。
+  const presRow = h.slice(h.indexOf("<tbody>"), h.indexOf("</tr>", h.indexOf("<tbody>")));
+  assert.match(presRow, /<span class="tag open">全部（職級）<\/span> <span class="tag off"[^>]*>Community Relations Team 的申請・管<\/span>/);
+  assert.doesNotMatch(presRow, /沒有被派進任何工作區/);
+    // 面：team 的篩選 chip。Co-President 勾了 Sponsorship 標籤、但職位沒有 team，不算在 Sponsorship 底下（跟 /team/ 的領導組一致）。
+  assert.doesNotMatch(h, /data-v="Sponsorship Team"/, "沒有人真的在 Sponsorship，chip 不出現");
+  assert.match(h, /data-act="roster-team" data-v="">全部 3/);
+  const withTeamPos = { ...pres, positions: [{ term: "2026-27", title_en: "Co-President", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
+  assert.match(rosterHTML([withTeamPos], TERMS, ME, true, "", false, null, []), /data-v="Sponsorship Team">Sponsorship 1/, "另外有一筆帶 team 的職位才算進那個 team");
+  // 面：職級與職位分開。職位的字是「Senior Adviser」但職級是 Co-President：標「跟職級不同」。
+  const clash = { ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Senior Adviser", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
+  const c = rosterHTML([clash], TERMS, ME, true, "", false, null, []);
+  assert.match(c, /<td><span class="tag open">Co-President<\/span><\/td>/, "職級欄還是 Co-President");
+  assert.match(c, /<div>Senior Adviser<span class="mini"> 全部 team<\/span> <span class="tag warn"[^>]*>跟職級不同<\/span><\/div>/);
+  assert.match(c, /<div>Associate, Sponsorship Team<span class="mini"> Sponsorship Team<\/span> <span class="tag warn"/, "Associate 也跟 Co-President 不同，一樣標");
+  assert.doesNotMatch(c, /Senior Adviser · Associate/, "不再接成一句");
+  const fine = rosterHTML([PEOPLE[1]], TERMS, ME, true, "", false, null, []);
+  assert.doesNotMatch(fine, /跟職級不同/, "Director 的職位寫 Director 不標");
+  // 面：屆別「誰留下」的清單印的是職級徽章，不是職位，所以不受影響；確認還在。
+  const t = termsHTML(TERMS, [PEOPLE[0], PEOPLE[1]], ME, true, "", false, null, { step: 2, next: {}, keep: [] });
+  assert.match(t, /Co-President/); assert.match(t, /Director/);
+  // 面：邀請表單「他會是」是職級的字，跟職位分開。
+  assert.match(invitesPageHTML([], [], TERMS, "", false, { who: "cadre:president" }, null, true), /<option value="cadre:president" selected>幹部：Co-President/);
 });

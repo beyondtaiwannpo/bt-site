@@ -456,7 +456,9 @@ export function railHTML(group, tab, me, counts) {
     return `<div class="rail-group${ok ? "" : " off"}"${ok ? "" : ` title="${esc(T(WHY[g.who]) || "")}"`}>${esc(T(g.label))}</div>${
       ok ? rows.map(item).join("") : rows.map(i => `<span class="rail-item off">${esc(T(i.label))}</span>`).join("")}`;
   }).join("");
-  const teams = String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
+  // Co-President 與 Senior Adviser 是整個組織的（Paul 2026-10-24），這一行印「全部 team」，不印他自己勾的標籤。
+  const teams = (me && (me.board === "president" || me.board === "senior_adviser")) ? [T("rail.allTeams")]
+    : String(me && me.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
   return `<input class="rail-toggle" type="checkbox" id="rail-toggle" aria-label="${esc(T("rail.open"))}">
   <label class="rail-burger" for="rail-toggle">${T("rail.menu")}</label>
   <nav class="rail" aria-label="${esc(T("rail.groups"))}">
@@ -767,7 +769,7 @@ export function accessHTML(me, todo, features) {
   };
   const feat = (features || []).length ? `<ul class="feat">${features.map(f => `<li><a href="${withLang(f.href)}">${esc(f.label)}</a>${T("punct.colon")}${esc(f.desc)}</li>`).join("")}</ul>` : "";
   let body;
-  if (senior(me)) body = `<div class="mini">${T("hub.accessSenior")}</div>`;
+  if (senior(me)) body = `<div class="row" style="margin:0 0 6px"><span class="tag open">${T("grid.byRank")}</span><span class="mini">${T("hub.accessSenior")}</span></div>`;
   else {
     const mine = Object.entries((me && me.ws) || {});
     if (mine.length) {
@@ -785,7 +787,7 @@ export function accessHTML(me, todo, features) {
 }
 
 export function hubHTML(me, pendingAll, canSend, busy, forms, todo, features) {
-  const teams = splitTeams(me && me.team);
+  const teams = senior(me) ? [T("rail.allTeams")] : splitTeams(me && me.team);
   const who = T("hub.who", { name: esc(me && me.name || ""), board: esc(boardName(me && me.board)),
     teams: teams.length ? esc(teams.join(T("punct.list"))) : T("rail.noTeam") });
   const cards = todoCards(me, forms, pendingAll, todo, canSend, busy);
