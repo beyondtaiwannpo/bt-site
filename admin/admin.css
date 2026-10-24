@@ -412,14 +412,15 @@ a.btn{text-decoration:none}
 .lnk{white-space:nowrap;font-size:13px;font-weight:600;color:var(--bt-navy);text-decoration:underline;text-underline-offset:3px;padding:0;background:none;border:0}
 .lnk:disabled{opacity:.4;text-decoration:none;cursor:default}
 .ma-list{flex:1;overflow:auto;padding:2px 0}
-.ma-row{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-bottom:1px solid rgba(16,42,134,.07);font-size:14px;white-space:nowrap;margin:0;cursor:default}
+.ma-row{display:flex;align-items:center;gap:8px;min-height:36px;padding:4px 12px;border-bottom:1px solid rgba(16,42,134,.07);font-size:14px;white-space:nowrap;margin:0;cursor:default}
 .ma-row.pick{cursor:pointer}
 .ma-row:hover{background:rgba(16,42,134,.05)}
 .ma-row.on{background:rgba(16,42,134,.1)}
-.ma-row b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
-.ma-row .mini{font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.ma-row b{font-weight:600;white-space:normal;line-height:1.2;flex:0 1 auto} /* 名字不裁斷：窄的時候換到第二行 */
+.ma-row .mini{font-size:12px;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0} /* team 淡字先讓 */
 .ma-row input[type="checkbox"]{width:16px;height:16px;flex:none;margin:0;accent-color:var(--bt-navy)}
-.ma-row select{height:26px;padding:0 4px;font-size:12.5px;flex:none}
+.ma-row select{height:26px;width:72px;padding:0 2px;font-size:12px;flex:none}
+.ma-foot{flex:none;padding:8px 12px;border-top:1px solid rgba(16,42,134,.12)}
 .ma-row .sp{flex:1}
 .ma-row.byrank{opacity:.8}
 .rk{flex:none;font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1;padding:3px 5px;border:1px solid rgba(16,42,134,.35);border-radius:5px;color:var(--bt-navy)}

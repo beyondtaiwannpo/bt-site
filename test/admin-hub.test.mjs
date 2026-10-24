@@ -528,7 +528,15 @@ test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只�
   // 2026-10-24 兩欄成員區（membersAreaHTML，ns "mp"）：左「在這個工作區裡（N）」右「還沒在裡面（M）」，各自一個 ma-col；右欄只列還沒在裡面的幹部。
   const cols = h.split('<section class="ma-col">'); assert.equal(cols.length, 3, "兩欄");
   const [, L, R] = cols;
-  assert.match(L, /在這個工作區裡（2）/); assert.match(R, /還沒在裡面（1）/);
+  assert.match(L, /在這個工作區裡（2）/, "算人：王平（依職級，雖然也有一筆指派）加 Mei"); assert.match(R, /還沒在裡面（1）/);
+  // 2026-10-24：王平是 Co-President 卻還留著一筆指派，只能畫成一列灰的「全部（職級）」，不畫下拉與移出；底下給 senior 一條清掉。
+  assert.equal((L.match(/王平/g) || []).length, 1, "一個人一列");
+  assert.match(L, /<div class="ma-row byrank"><b>王平 \(Paul\)<\/b><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）/);
+  assert.doesNotMatch(L, /data-act="members-level" data-id="u1"|data-act="members-unassign" data-id="u1"/, "依職級的人沒有下拉與移出");
+  assert.doesNotMatch(L, /members-cleanup/, "不是 senior 看不到清掉");
+  const Ls = FORMS.membersPanelHTML(Object.assign({}, mp, { senior: true }), "", false).split('<section class="ma-col">')[1];
+  assert.match(Ls, /另外有 1 筆指派是給靠職級就有一切的人的，多餘。 <button type="button" class="lnk" data-act="members-cleanup" data-ids="u1">清掉這 1 筆<\/button>/);
+  assert.doesNotMatch(R, /王平/, "依職級的人也不在右邊");
   assert.match(R, /name="mp-member" value="u4" data-act="pk-tick" data-ns="mp"/);
   assert.match(R, /<b>小新 \(Shin\)<\/b><span class="rk" title="Associate">AS<\/span>/, "職級是兩個字母的標，不是 pill");
   assert.doesNotMatch(R, /Mei/, "已經在裡面的不列在右邊");
@@ -596,7 +604,12 @@ test("★ 多選加人：不列在裡面的與靠職級的；找名字含中英�
   assert.match(h, /<span class="rk" title="Director">DR<\/span>/); assert.match(h, /<span class="rk" title="顧問">AD<\/span>/);
   // 左欄：在裡面的人一列一行，等級下拉與移出；Co-President 與 Senior Adviser 置頂、標依職級、沒有下拉與移出。
   const L = h.split('<section class="ma-col">')[1];
-  assert.match(L, /在這個工作區裡（1）/);
+  assert.match(L, /在這個工作區裡（3）/, "算人：兩位依職級加小安");
+  // 同一個人兩筆指派只畫一列；依職級的人就算有指派也只有一列灰的。
+  const dup = area(rows.concat([{ user_id: "u2", level: "view" }, { user_id: "u5", name_zh: "阿顧", name_en: "Gu", board_role: "senior_adviser", level: "edit" }]), {}, { canCleanup: true, acts: { level: "members-level", remove: "members-unassign", cleanup: "members-cleanup" } }).split('<section class="ma-col">')[1];
+  assert.equal((dup.match(/data-id="u2"/g) || []).length, 2, "小安一列（下拉加移出各一個 data-id）");
+  assert.equal((dup.match(/阿顧/g) || []).length, 1); assert.match(dup, /在這個工作區裡（3）/);
+  assert.match(dup, /data-act="members-cleanup" data-ids="u5"/);
   assert.match(L, /<div class="ma-row byrank"><b>王平 \(Paul\)<\/b><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）<\/span>/);
   assert.match(L, /<div class="ma-row byrank"><b>阿顧 \(Gu\)<\/b><span class="rk" title="Senior Adviser">SA<\/span>/);
   assert.match(L, /<div class="ma-row"><b>小安<\/b><span class="rk" title="Director">DR<\/span>[\s\S]*?<select data-act="members-level" data-id="u2"[^>]*><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管<\/option><\/select>\s*<button type="button" class="lnk" data-act="members-unassign" data-id="u2">移出<\/button>/);
@@ -631,6 +644,16 @@ test("★ 多選加人：不列在裡面的與靠職級的；找名字含中英�
   setL("en");
   assert.equal(Ten("pk.addN", { n: 1 }), "Add 1 person"); assert.equal(Ten("pk.addN", { n: 3 }), "Add 3 people");
   setL("zh");
+});
+
+test("成員區的列：名字不裁斷（可以換行）、下拉縮小、team 淡字先讓；四個 main.js 接了清掉多餘指派", () => {
+  const css = readFileSync("admin/admin.css", "utf8");
+  assert.match(css, /\.ma-row b\{[^}]*white-space:normal/, "名字可以換到第二行");
+  assert.doesNotMatch(css, /\.ma-row b\{[^}]*text-overflow:ellipsis/, "名字不裁斷");
+  assert.match(css, /\.ma-row\{[^}]*min-height:36px/, "列是 min-height，不是固定高");
+  assert.match(css, /\.ma-row select\{[^}]*width:72px/);
+  for (const f of ["admin/src", "admin/site/src", "admin/passports/src"]) assert.match(readFileSync(`${f}/main.js`, "utf8"), /act === "members-cleanup"[\s\S]*?D\.unassign\(id, ws\)[\s\S]*?S\.undo = [\s\S]*?D\.assign\(w\.id, ws, w\.level\)/, `${f} 清掉要有復原`);
+  assert.match(readFileSync("admin/people/src/main.js", "utf8"), /act === "ws-cleanup"[\s\S]*?D\.unassign\(id, ws\)[\s\S]*?S\.undo = [\s\S]*?D\.assign\(w\.id, ws, w\.level\)/);
 });
 
 test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、加、移出、改等級，寫的是 assign / unassign，不讀 email", () => {

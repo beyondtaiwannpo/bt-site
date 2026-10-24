@@ -169,7 +169,7 @@ async function openMembers(ws, name, backView) {
   S.busy = true; S.msg = ""; render();
   try {
     const [rows, cadres] = await Promise.all([D.loadMembers(ws), D.loadCadres().catch(() => [])]);
-    S.mp = { ws, name, rows: rows || [], cadres, meId: S.user.id, q: "", level: "view", backView: backView || (S.mp && S.mp.backView) || S.view };
+    S.mp = { ws, name, rows: rows || [], cadres, meId: S.user.id, senior: !!S.me.senior, pk: null, backView: backView || (S.mp && S.mp.backView) || S.view };
     S.view = "members"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.mpLoad") + D.says(e); }
   render();
@@ -215,6 +215,19 @@ document.addEventListener("click", async e => {
       S.busy = false; S.msg = T("err.mpSome") + names + T("punct.colon") + D.says(failed[0].e); render(); return;
     }
     await reloadMembers(T("msg.mpAssignedN", { n: done.length, level: T("level." + level) }));
+    return;
+  }
+  if (act === "members-cleanup" && S.mp) {
+    // 清掉靠職級就有一切的人身上多餘的指派（2026-10-24）。復原是照原本的等級派回去。
+    const ws = S.mp.ws, ids = String(b.dataset.ids || "").split(",").filter(Boolean);
+    const was = ids.map(id => ({ id, level: (S.mp.rows.find(r => r.user_id === id) || {}).level || "view" }));
+    if (!ids.length) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      for (const id of ids) await D.unassign(id, ws);
+      S.undo = async () => { S.busy = true; render(); try { for (const w of was) await D.assign(w.id, ws, w.level); await reloadMembers(T("msg.uncleaned", { n: was.length })); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
+      await reloadMembers(T("msg.cleaned", { n: ids.length }));
+    } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); }
     return;
   }
   if (act === "members-unassign" && S.mp) {

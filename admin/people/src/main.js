@@ -391,6 +391,19 @@ document.addEventListener("click", async e => {
     await openWorkspaces(null, true);
     return;
   }
+  if (act === "ws-cleanup") {
+    // 清掉靠職級就有一切的人身上多餘的指派（2026-10-24）。復原是照原本的等級派回去。
+    const ws = S.wsSel, ids = String(b.dataset.ids || "").split(",").filter(Boolean);
+    const was = ids.map(id => ({ id, level: (S.members.find(m => m.user_id === id) || {}).level || "view" }));
+    if (!ids.length) return;
+    const ok = await run("err.unassign", async () => { for (const id of ids) await D.unassign(id, ws); return true; });
+    if (ok !== undefined) {
+      S.msg = T("msg.cleaned", { n: ids.length });
+      S.undo = async () => { const r = await run("err.assign", async () => { for (const w of was) await D.assign(w.id, ws, w.level); return true; }); if (r !== undefined) { S.msg = T("msg.uncleaned", { n: was.length }); await openWorkspaces(null, true); } };
+      await openWorkspaces(null, true);
+    }
+    return;
+  }
   if (act === "ws-unassign") {
     const p = S.people.find(x => x.profile_id === b.dataset.id);
     if (UI.needAsk(S, b, T("confirm.unassign", { name: p ? pname(p) : "", ws: S.wsSel }))) return;

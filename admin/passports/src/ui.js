@@ -270,7 +270,7 @@ export function pkRefocus(ns, which) {
 // 一列一行 36px：勾選（右欄）・名字・兩個字母的職級標（CP SA DR AD AS）・team 淡字。左欄的列是 名字・職級標・等級下拉・移出。
 // 五個面都用這一塊（Workspaces 右欄、四個成員分頁、加一個專案或營隊）。四份一模一樣（測試逐字比對）。
 // a = { rows（在裡面的，workspace_members 的形狀）, people（幹部名單，候選人從這裡算）, pk, busy, meId,
-//       acts: { level, remove }（左欄下拉與移出的 data-act）, go: { act, ...data }（右欄那顆按鈕；沒有就不畫）,
+//       acts: { level, remove, cleanup }（左欄下拉、移出、清掉多餘指派的 data-act）, canCleanup（Co-President 或 Senior Adviser 才給那條連結）, go: { act, ...data }（右欄那顆按鈕；沒有就不畫）,
 //       draft: true 的話是「還沒建立」的模式：左欄列的是勾起來的人（移出 = 取消勾），右欄是還沒勾的 }
 export const RANK_TAG = { president: "CP", senior_adviser: "SA", director: "DR", adviser: "AD", member: "AS" };
 export const rankTag = board => `<span class="rk" title="${esc(boardName(board))}">${RANK_TAG[board] || "AS"}</span>`;
@@ -292,15 +292,27 @@ export function membersAreaHTML(ns, a) {
       items: picked.filter(hit).map(p => `<div class="ma-row"><b>${esc(mpName(p))}</b>${rankTag(p.board_role)}${teamsHTML(p)}<span class="sp"></span><button type="button" class="lnk" data-act="pk-untick" data-ns="${esc(ns)}" data-id="${esc(p.id)}"${dis}>${T("ma.untick")}</button></div>`),
       empty: T("ma.willAddNone") };
   } else {
-    const inWs = new Set(rows.map(r => r.user_id));
-    const seniors = people.filter(p => ["president", "senior_adviser"].includes(p.board_role) && !inWs.has(p.id));
+    // 一個人只畫一列（Paul 2026-10-24 看到同一級的人有的灰的有的有下拉）：Co-President 與 Senior Adviser 一律一列「全部（職級）」，
+    // 就算 assignments 裡還留著他的指派也不畫成可以改的那種；那些多餘的指派底下給一條「清掉」。其他人同一個 id 只留第一筆。
+    const isSenior = b => ["president", "senior_adviser"].includes(b);
+    const seniorIds = new Set(people.filter(p => isSenior(p.board_role)).map(p => p.id));
+    for (const r of rows) if (isSenior(r.board_role)) seniorIds.add(r.user_id);
+    const seniors = people.filter(p => seniorIds.has(p.id))
+      .concat(rows.filter(r => seniorIds.has(r.user_id) && !people.some(p => p.id === r.user_id)).map(r => ({ id: r.user_id, name_zh: r.name_zh, name_en: r.name_en, board_role: r.board_role })));
+    const seen = new Set();
+    const plain = rows.filter(r => !seniorIds.has(r.user_id) && !seen.has(r.user_id) && seen.add(r.user_id));
+    const redundant = rows.filter(r => seniorIds.has(r.user_id));
     const seniorRow = p => `<div class="ma-row byrank"><b>${esc(mpName(p))}</b>${rankTag(p.board_role)}<span class="mini">${T("grid.byRank")}</span>${p.id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : ""}<span class="sp"></span><span class="mini">${esc(T("level.manage"))}</span></div>`;
     // 左欄的列不印 team（Paul 定的形狀：名字・職級標・等級・移出），欄位窄的時候才放得下。
     const row = r => `<div class="ma-row"><b>${esc(mpName(r))}</b>${rankTag(r.board_role)}${r.user_id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : ""}<span class="sp"></span>
         <select data-act="${esc(o.acts.level)}" data-id="${esc(r.user_id)}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select>
         <button type="button" class="lnk" data-act="${esc(o.acts.remove)}" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></div>`;
-    left = { n: rows.length, title: T("ma.in", { n: rows.length }),
-      items: seniors.filter(hit).map(seniorRow).concat(rows.filter(hit).map(row)), empty: T("ma.inNone") };
+    const nPeople = seniors.length + plain.length;
+    left = { n: nPeople, title: T("ma.in", { n: nPeople }),
+      items: seniors.filter(hit).map(seniorRow).concat(plain.filter(hit).map(row)), empty: T("ma.inNone"),
+      foot: redundant.length && o.acts.cleanup && o.canCleanup
+        ? `<div class="ma-foot mini">${T("ma.redundant", { n: redundant.length })} <button type="button" class="lnk" data-act="${esc(o.acts.cleanup)}" data-ids="${esc(redundant.map(r => r.user_id).join(","))}"${dis}>${T("ma.cleanup", { n: redundant.length })}</button></div>`
+        : "" };
   }
   // 右欄
   const inIds = o.draft ? pk.ticked : rows.map(r => r.user_id);
@@ -316,7 +328,7 @@ export function membersAreaHTML(ns, a) {
   return `<div class="ma picker" data-ns="${esc(ns)}">
     <section class="ma-col"><div class="ma-head"><div class="ma-title">${left.title}</div>
         <input id="${esc(ns)}-mq" class="ma-find" value="${esc(pk.mq || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-mq" data-ns="${esc(ns)}"${dis}></div>
-      <div class="ma-list">${left.items.length ? left.items.join("") : `<div class="ma-empty mini">${left.n ? T("pk.noneShown") : left.empty}</div>`}</div></section>
+      <div class="ma-list">${left.items.length ? left.items.join("") : `<div class="ma-empty mini">${left.n ? T("pk.noneShown") : left.empty}</div>`}</div>${left.foot || ""}</section>
     <section class="ma-col"><div class="ma-head"><div class="ma-title">${T("ma.out", { n: cands.length })}${shown.length !== cands.length ? `<span class="mini"> ${T("ma.shown", { n: shown.length })}</span>` : ""}</div>
         <input id="${esc(ns)}-q" class="ma-find" value="${esc(pk.q || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-q" data-ns="${esc(ns)}"${dis}>
         ${teamsHere.length ? `<div class="ma-chips">${teamsHere.map(chip).join("")}</div>` : ""}
@@ -384,7 +396,7 @@ export function membersPanelHTML(mp, msg, busy) {
     + msgHTML(msg)
     + `<div class="note">${T("mp.levels")}</div>`
     + membersAreaHTML("mp", { rows: mp.rows || [], people: mp.cadres || [], pk: mp.pk, busy, meId: mp.meId,
-        acts: { level: "members-level", remove: "members-unassign" }, go: { act: "members-assign", ws: mp.ws } });
+        acts: { level: "members-level", remove: "members-unassign", cleanup: "members-cleanup" }, canCleanup: !!mp.senior, go: { act: "members-assign", ws: mp.ws } });
 }
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {
