@@ -45,10 +45,13 @@ test("五個分頁都在，幹部名單是第一個，邀請碼只有 Co-Preside
   assert.doesNotMatch(tabsHTML("roster", false), /data-t="invites"/);
 });
 
-test("★ 職級四級，畫面上不出現 board_role、member 這些字", () => {
-  assert.deepEqual(BOARD_ROLES.map(r => r.v), ["member", "director", "senior_adviser", "president"]);
+test("★ 職級五級、固定順序，畫面上不出現 board_role、member 這些字", () => {
+  // 2026-10-28 第五級 Adviser。順序就是下拉與名單的順序。
+  assert.deepEqual(BOARD_ROLES.map(r => r.v), ["president", "senior_adviser", "director", "adviser", "member"]);
   assert.equal(boardLabel("member"), "Associate");
   assert.equal(boardLabel("senior_adviser"), "Senior Adviser");
+  assert.equal(boardLabel("adviser"), "顧問");
+  assert.equal(boardLabel("nonsense"), "Associate", "不認得的值退回 Associate，不是清單第一個");
   const h = rosterHTML(PEOPLE, TERMS, ME, true, "", false, null);
   assert.doesNotMatch(h, /board_role|\bmember\b|\bsenior_adviser\b|\bpresident\b/);
   assert.match(h, /Associate/); assert.match(h, /Director/); assert.match(h, /Co-President/);
@@ -381,10 +384,11 @@ test("★ 主程式：存取格改了就送、送反向的那一筆當復原；�
 
 // 2026-10-24 Paul：「不要用打的，給一個下拉列我們的職級」。標題從職級加 team 推出來；對不上的既有紀錄是「自訂」，文字不丟。
 test("★ 職位下拉：四級有 team 沒 team 推出來的字；既有紀錄對得上就選那一級、對不上是自訂；貼一整屆認職級名", () => {
-  const want = { president: "Co-President", senior_adviser: "Senior Adviser", director: "Director", member: "Associate" };
+  const want = { president: "Co-President", senior_adviser: "Senior Adviser", director: "Director", adviser: "Adviser", member: "Associate" };
+  const wantZh = { ...want, adviser: "顧問" };
   for (const r of RANK_CHOICES) {
-    assert.deepEqual(deriveTitle(r, ""), { title_en: want[r], title_zh: want[r] });
-    assert.deepEqual(deriveTitle(r, "Curriculum Team"), { title_en: want[r] + ", Curriculum Team", title_zh: want[r] + ", Curriculum Team" });
+    assert.deepEqual(deriveTitle(r, ""), { title_en: want[r], title_zh: wantZh[r] });
+    assert.deepEqual(deriveTitle(r, "Curriculum Team"), { title_en: want[r] + ", Curriculum Team", title_zh: wantZh[r] + ", Curriculum Team" });
     assert.equal(rankOfTitle(deriveTitle(r, "Marketing Team").title_en, "Marketing Team"), r, "推出來的字反推得回那一級");
     assert.equal(rankByName(want[r].toUpperCase()), r);
   }
@@ -392,6 +396,9 @@ test("★ 職位下拉：四級有 team 沒 team 推出來的字；既有紀錄�
   assert.equal(rankOfTitle("Head of Fun", ""), "custom");
   assert.equal(rankOfTitle("", ""), "");
   assert.equal(rankByName("Boss"), "");
+  assert.equal(rankByName("顧問"), "adviser", "貼一整屆也認中文的職級名");
+  // title_en 不看畫面語言：切到英文畫面推出來的字一樣。
+  setLang("en"); assert.equal(deriveTitle("adviser", "Sponsorship Team").title_en, "Adviser, Sponsorship Team"); assert.equal(deriveTitle("adviser", "").title_zh, "顧問"); setLang("zh");
   // 畫面：對得上的列下拉預選、文字框藏著（值還在）；對不上的列選「自訂」、文字框露出來。
   const other = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, null, PEOPLE, null);
   assert.match(other, /<select id="pk-rank-0" data-act="pos-rank"[^>]*>[\s\S]*?<option value="director" selected>Director/);
@@ -404,4 +411,31 @@ test("★ 職位下拉：四級有 team 沒 team 推出來的字；既有紀錄�
   const src = readFileSync("admin/people/src/main.js", "utf8");
   assert.match(src, /rank && rank !== "custom" \? UI\.deriveTitle\(rank, team\)/);
   assert.match(src, /dataset\.act === "pos-rank"/);
+});
+
+// 2026-10-28：Adviser 職級。遷移檔有五個值、set_board_role 收 adviser、is_senior 不含 adviser；/team/ 組內 Director、Adviser、Associate。
+test("★ Adviser：遷移檔與 10-24 同步成五個值、is_senior 不變；名單照職級排；Director 職位的那顆鈕不給 Adviser；/team/ 組內順序", async () => {
+  const mig = readFileSync("supabase/migrations/2026-10-28-adviser-rank.sql", "utf8");
+  assert.match(mig, /check \(board_role in \('member', 'adviser', 'director', 'senior_adviser', 'president'\)\)/);
+  assert.match(mig, /if p_role not in \('member', 'adviser', 'director', 'senior_adviser', 'president'\)/);
+  assert.match(mig, /perform public\.require_president\(\);/);
+  assert.doesNotMatch(mig, /create or replace function public\.is_senior/, "is_senior 不動");
+  assert.match(mig, /要先跑過 2026-10-27-public-names-english\.sql/);
+  const m24 = readFileSync("supabase/migrations/2026-10-24-ranks-and-workspaces.sql", "utf8");
+  assert.match(m24, /check \(board_role in \('member', 'adviser', 'director', 'senior_adviser', 'president'\)\)/, "10-24 同步，重跑不會蓋回四個值");
+  assert.match(m24, /and board_role in \('president', 'senior_adviser'\)/, "is_senior 還是兩個值");
+  assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /2026-10-28-adviser-rank\.sql/);
+  const adv = { person_id: "p7", profile_id: "77777777-7777-7777-7777-777777777777", name_zh: "顧小問", name_en: "Ad Viser", role: "cadre", board_role: "adviser", team: "Sponsorship Team",
+    positions: [{ term: "2026-27", title_en: "Adviser, Sponsorship Team", title_zh: "顧問, Sponsorship Team", team: "Sponsorship Team" }], workspaces: [], maybe_dup: null };
+  const h = rosterHTML([PEOPLE[2], adv, PEOPLE[1], PEOPLE[0]], TERMS, ME, true, "", false, null, []);
+  const order = [...h.matchAll(/data-act="person-edit" data-id="(p\d)"/g)].map(m => m[1]);
+  assert.deepEqual(order, ["p1", "p2", "p7", "p3"], "Co-President、Director、Adviser、Associate");
+  assert.match(h, /<span class="tag">顧問<\/span>/);
+  const edit = personEditHTML(adv, TERMS, ME, true, "", false, null, [adv], null);
+  assert.match(edit, /<option value="adviser" selected>顧問/);
+  assert.match(edit, /<select id="pk-rank-0"[^>]*>[\s\S]*?<option value="adviser" selected>/, "既有的「Adviser, Sponsorship Team」對得回 Adviser 那一級");
+  const src = readFileSync("admin/people/src/main.js", "utf8");
+  assert.match(src, /const dirTeam = f\.board_role === "director" \?/, "配兩個工作區那顆鈕只給 Director");
+  const { rankWeight } = await import("../team/src/ui.js");
+  assert.deepEqual(["Associate, X · 2026-27", "Adviser, X · 2026-27", "Director, X · 2026-27"].sort((a, b) => rankWeight(a) - rankWeight(b)), ["Director, X · 2026-27", "Adviser, X · 2026-27", "Associate, X · 2026-27"]);
 });

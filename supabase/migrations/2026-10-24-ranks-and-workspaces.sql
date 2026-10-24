@@ -52,9 +52,10 @@ begin;
 
 -- ---------- 0. 職級 ----------
 -- 2026-09-08 那支把 board_role 鎖在三個值，這裡換成四個。
+-- 2026-10-28 同步成五個（多 adviser，見 2026-10-28-adviser-rank.sql），重跑這一支不會把那一支蓋回去。
 alter table public.profiles drop constraint if exists profiles_board_role_check;
 alter table public.profiles add constraint profiles_board_role_check
-  check (board_role in ('member', 'director', 'senior_adviser', 'president'));
+  check (board_role in ('member', 'adviser', 'director', 'senior_adviser', 'president'));
 comment on column public.profiles.board_role is
   '職級：president（Co-President）/ senior_adviser（Senior Adviser）/ director / member（畫面叫 Associate）。
    2026-10-24 起 director 與 member 自己不帶任何權限，權限看 assignments。只有 set_board_role() 改得動。';
@@ -366,7 +367,7 @@ as $$
 declare v_old text;
 begin
   perform public.require_president();
-  if p_role not in ('member', 'director', 'senior_adviser', 'president') then
+  if p_role not in ('member', 'adviser', 'director', 'senior_adviser', 'president') then
     raise exception 'bad_role' using errcode = 'P0001';
   end if;
   if p_target = auth.uid() and p_role <> 'president' then

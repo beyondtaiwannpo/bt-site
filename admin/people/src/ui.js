@@ -6,7 +6,7 @@
 //
 // 2026-10-19 起畫面上的字全部從 ./strings.js 的字典來（T("鍵")），中英兩版並排在那一支裡。
 // 這一支只管拼 HTML，不再寫死任何一句給人看的字。怎麼加一句見 README「後台的中英切換」。
-import { T, lang, setLang, withLang, isErr } from "./strings.js";
+import { T, lang, setLang, withLang, isErr, STRINGS } from "./strings.js";
 export { T, lang, setLang };
 // 一個人在畫面上要顯示的兩個名字。**同一份規則在 admin/site、passport、availability 也各有一份**
 //（資料夾之間不互相 import），test/names.test.mjs 逐項比對。
@@ -75,7 +75,7 @@ export const canEditWs = (me, id) => ["edit", "manage"].includes(wsLevel(me, id)
 export const canEditAny = (me, prefix) => senior(me) || Object.entries((me && me.ws) || {}).some(([id, lv]) => id.startsWith(prefix) && ["edit", "manage"].includes(lv));
 export function canEnter(g, me) { return allowed(g.who, me); }
 export function canSee(item, me) { return allowed(item.who, me); }
-const BOARD_KEY = { member: "board.member", director: "board.director", senior_adviser: "board.senior", president: "board.president" };
+const BOARD_KEY = { member: "board.member", adviser: "board.adviser", director: "board.director", senior_adviser: "board.senior", president: "board.president" };
 export const boardName = board => T(BOARD_KEY[board] || "board.member");
 
 // 側欄。group 是現在在哪一組，tab 是哪一個分頁，counts 是 { <key>: 數字 }（有才顯示，批 2 的首頁會餵）。
@@ -310,22 +310,28 @@ export function parseTeams(raw) {
 // board_role 與 member 這兩個字只留在程式與文件裡。label 與 hint 是字典的鍵，畫的時候才 T()。
 // 每一顆按鈕背後都是資料庫的一支函式，門在那裡；這裡少畫一顆不是安全機制。
 // ═══════════════════════════════════════════════════════════════════════
+// 2026-10-28 五級，順序就是下拉與名單的順序：Co-President、Senior Adviser、Director、Adviser、Associate。
 export const BOARD_ROLES = [
-  { v: "member",         label: "board.member",    hint: "role.member.hint" },
-  { v: "director",       label: "board.director",  hint: "role.director.hint" },
-  { v: "senior_adviser", label: "board.senior",    hint: "role.senior.hint" },
   { v: "president",      label: "board.president", hint: "role.president.hint" },
+  { v: "senior_adviser", label: "board.senior",    hint: "role.senior.hint" },
+  { v: "director",       label: "board.director",  hint: "role.director.hint" },
+  { v: "adviser",        label: "board.adviser",   hint: "role.adviser.hint" },
+  { v: "member",         label: "board.member",    hint: "role.member.hint" },
 ];
-export const boardLabel = v => T((BOARD_ROLES.find(r => r.v === v) || BOARD_ROLES[0]).label);
+export const boardLabel = v => T((BOARD_ROLES.find(r => r.v === v) || BOARD_ROLES.find(r => r.v === "member")).label);
+export const rankOrder = v => { const i = BOARD_ROLES.findIndex(r => r.v === v); return i < 0 ? BOARD_ROLES.length : i; };
+// 推標題用的固定標籤：title_en 永遠是英文、title_zh 永遠是中文那一句，**不看現在畫面是哪一種語言**
+//（不然中文畫面存出來的 title_en 會是「顧問, X」）。
+const RANK_EN = { president: "Co-President", senior_adviser: "Senior Adviser", director: "Director", adviser: "Adviser", member: "Associate" };
+const rankZh = v => { const r = BOARD_ROLES.find(x => x.v === v); return r ? T({ zh: STRINGS[r.label].zh, en: STRINGS[r.label].zh }) : ""; };
 // 職位下拉（Paul 2026-10-24：「不要用打的，給一個下拉列我們的職級」）。
 // 存的 title_en / title_zh 從職級標籤加 team 推出來：「Director, Curriculum Team」，沒有 team 就只有「Director」。
 // 中文那一欄也用同一個英文標籤（職級在中文畫面本來就印英文），加 team。選「自訂」才露出兩個文字框，存他打的。
-export const RANK_CHOICES = ["president", "senior_adviser", "director", "member"];
+export const RANK_CHOICES = BOARD_ROLES.map(r => r.v);
 export function deriveTitle(rank, team) {
-  const label = boardLabel(rank);
   const t = String(team || "").trim();
-  const s = t ? `${label}, ${t}` : label;
-  return { title_en: s, title_zh: s };
+  const en = RANK_EN[rank] || "", zh = rankZh(rank) || en;
+  return { title_en: t ? `${en}, ${t}` : en, title_zh: t ? `${zh}, ${t}` : zh };
 }
 // 既有的紀錄：title_en 對得上某一級推出來的字就選那一級，對不上就是「自訂」，文字框照存的印，不會丟。
 export function rankOfTitle(title_en, team) {
@@ -337,7 +343,7 @@ export function rankOfTitle(title_en, team) {
 // 貼一整屆的第三欄可以是職級名（Director、Co-President…）或自訂文字。
 export function rankByName(s) {
   const q = String(s || "").trim().toLowerCase();
-  return RANK_CHOICES.find(r => boardLabel(r).toLowerCase() === q) || "";
+  return RANK_CHOICES.find(r => RANK_EN[r].toLowerCase() === q || rankZh(r).toLowerCase() === q) || "";
 }
 // 職位那一格的下拉。sel 是 RANK_CHOICES 之一、"custom" 或空字串。
 export function rankSelect(id, sel, dis) {
@@ -483,7 +489,7 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
   const shown = (!f.team ? base : f.team === "__none" ? base.filter(p => !teamsOf(p).length) : base.filter(p => teamsOf(p).includes(f.team))).filter(hit);
   const noName = T("common.noName");
   // 有帳號的在前，沒有名字的最後。
-  const sorted = shown.slice().sort((a, b) => Number(hasAccount(b)) - Number(hasAccount(a)) || Number(personName(a).name === noName) - Number(personName(b).name === noName));
+  const sorted = shown.slice().sort((a, b) => Number(hasAccount(b)) - Number(hasAccount(a)) || rankOrder(a.board_role) - rankOrder(b.board_role) || Number(personName(a).name === noName) - Number(personName(b).name === noName));
   const chip = (act, v, label, n, on) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-v="${esc(v)}"${dis}>${esc(label)}${n != null ? ` ${n}` : ""}</button>`;
   const termChips = `<div class="chips" style="margin-bottom:8px">${
     (terms || []).map(t => chip("roster-term", t.id, t.id + (t.status === "current" ? T("ro.curMark") : ""), list.filter(p => positionFor(p, t.id)).length, f.term === t.id)).join("")}${

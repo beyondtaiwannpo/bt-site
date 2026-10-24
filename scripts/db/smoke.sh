@@ -1169,5 +1169,32 @@ chkrole anon "" "沒有英文名才退回中文名" "改名" \
   "select name from public.public_alumni() where title like 'Associate%' limit 1"
 
 echo
+echo "第五個職級 Adviser（2026-10-28）："
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-28-adviser-rank.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   adviser 那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL adviser 那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -6; fail=$((fail+1))
+fi
+# OTHER 這時是 Senior Adviser。降成 Adviser：不是 senior、進不了名單、派不了人；職級本身不帶權限，跟 Associate 一樣看指派。
+chkas "${PAUL}" "Co-President 把 OTHER 改成 Adviser" "adviser" "select public.set_board_role('${OTHER}','adviser')"
+chkas "${OTHER}" "★ Adviser 不是 senior（看不到名單那一組）" "f" "select public.is_senior()"
+chkraise "★ Adviser 派不了人（不靠職級，要靠指派）" "not_ws_manage" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.assign('${MEMBER}','res:Curriculum','view');"
+chk "職級變動記了一筆 senior_adviser → adviser" "1" \
+  "select count(*) from public.role_changes where target='${OTHER}' and field='board_role' and old_value='senior_adviser' and new_value='adviser'"
+chkraise "沒有的值還是擋（bad_role）" "bad_role" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_board_role('${OTHER}','chairman');"
+chk "★ 10-24 重跑之後 check 還是五個值（已同步）" "1" \
+  "select count(*) from pg_constraint where conname='profiles_board_role_check' and pg_get_constraintdef(oid) like '%''adviser''%'"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-28-adviser-rank.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then
+  echo "  ok   adviser 那支可以重跑"; pass=$((pass+1))
+else
+  echo "  FAIL adviser 那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+chkas "${PAUL}" "改回 Senior Adviser（留給後面的人）" "senior_adviser" "select public.set_board_role('${OTHER}','senior_adviser')"
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

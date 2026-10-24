@@ -59,6 +59,13 @@ export function teamKey(raw) {
 // 所以「不是 jpeg」就等於「這是一張去背照」——
 // 不用多開一個資料庫欄位，也不用要求誰記得去勾一個框。
 // 見 settings/src/main.js 的 compress()。
+// 組內順序（2026-10-28）：職位開頭是 Director 的排最前、Adviser 其次、其他照名字。Co-President 與 Senior Adviser 沒有 team，不在組裡。
+export function rankWeight(title) {
+  const t = String(title || "").trim().toLowerCase();
+  if (t.startsWith("director")) return 0;
+  if (t.startsWith("adviser")) return 1;
+  return 2;
+}
 export function toPerson(row) {
   const avatar = row.avatar || "";
   return {

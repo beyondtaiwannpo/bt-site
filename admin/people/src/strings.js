@@ -43,6 +43,8 @@ export const COMMON = {
   "why.president":    { zh: "只有 Co-President 進得去", en: "Co-Presidents only" },
   "why.passports":    { zh: "只有被派進護照工作區的人、Co-President 與 Senior Adviser 進得去", en: "Only people assigned to a passport workspace, Co-Presidents and Senior Advisers" },
   "board.senior":     { zh: "Senior Adviser", en: "Senior Adviser" },
+  // 2026-10-28 第五級：跟著一個 team 的顧問，職級本身不帶權限（跟 Director、Associate 一樣看指派）。中文畫面叫「顧問」。
+  "board.adviser":    { zh: "顧問", en: "Adviser" },
   "why.senior":       { zh: "只有 Co-President 與 Senior Adviser 進得去", en: "Co-Presidents and Senior Advisers only" },
   // 走錯地方、連不上
   "notCadre.title":   { zh: "這一頁是給幹部用的", en: "This page is for cadres" },
@@ -92,6 +94,7 @@ export const MINE = {
   // 職級（2026-10-24 四級）
   "role.member.hint":   { zh: "沒有自己的權限，看指派", en: "No access of their own, assignments decide" },
   "role.director.hint": { zh: "沒有自己的權限，看指派；團隊頁印 Director", en: "No access of their own, assignments decide; shown as Director" },
+  "role.adviser.hint":  { zh: "跟著一個 team 的顧問；沒有自己的權限，看指派；團隊頁印 Adviser", en: "Attached to one team; no access of their own, assignments decide; shown as Adviser" },
   "role.senior.hint":   { zh: "整個後台，不能加人、刪人、改名、改職級", en: "The whole admin, except adding, removing, renaming people or changing ranks" },
   "role.president.hint":{ zh: "整個後台，包括這一頁的每一件事", en: "The whole admin, including everything on this page" },
   "field.board_role":   { zh: "職級", en: "Rank" },

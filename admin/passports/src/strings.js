@@ -43,6 +43,8 @@ export const COMMON = {
   "why.president":    { zh: "只有 Co-President 進得去", en: "Co-Presidents only" },
   "why.passports":    { zh: "只有被派進護照工作區的人、Co-President 與 Senior Adviser 進得去", en: "Only people assigned to a passport workspace, Co-Presidents and Senior Advisers" },
   "board.senior":     { zh: "Senior Adviser", en: "Senior Adviser" },
+  // 2026-10-28 第五級：跟著一個 team 的顧問，職級本身不帶權限（跟 Director、Associate 一樣看指派）。中文畫面叫「顧問」。
+  "board.adviser":    { zh: "顧問", en: "Adviser" },
   "why.senior":       { zh: "只有 Co-President 與 Senior Adviser 進得去", en: "Co-Presidents and Senior Advisers only" },
   // 走錯地方、連不上
   "notCadre.title":   { zh: "這一頁是給幹部用的", en: "This page is for cadres" },

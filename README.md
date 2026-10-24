@@ -3346,6 +3346,18 @@ Paul 看了批 2 的截圖：「不要用打的，給一個下拉列我們的職
 貼一整屆的第三欄可以是職級名（Director、Associate）也可以是自訂文字，同一條規則。名單、`/team/`、`/alumni/` 不動（它們讀的還是 `title_en` / `title_zh`）。沒有遷移檔。
 測試 `test/people-admin.test.mjs` 多一條：四級有 team 沒 team 推出來的字、反推、自訂來回。截圖 `docs/admin-redesign/v3/b5-01`。**還沒驗的**：真的登入後存一次。
 
+### 第五個職級 Adviser（2026-10-28）
+
+Paul 2026-10-24：加一級「Adviser」。Senior Adviser 是不屬於 team 的老成員，範圍跟 Co-President 一樣，不動；Adviser 跟著某一個 team，**職級本身不帶權限**，跟 Director、Associate 一樣看指派。
+
+- 資料庫：`profiles.board_role` 的 check 放成五個值，`set_board_role()` 收 `adviser`。`is_senior()` 不動（Adviser 不是 senior）。換屆時 Adviser 跟 Director 一樣歸 Associate。
+- 畫面：職級下拉與名單順序固定 Co-President、Senior Adviser、Director、Adviser、Associate；名單照這個順序排。職位下拉多 Adviser，推出來的字是「Adviser, Sponsorship Team」（中文那一欄「顧問, Sponsorship Team」；`title_en` 永遠是英文，不看畫面語言）。「同時給兩個工作區『管』」那顆鈕只給 Director，Adviser 沒有。
+- `/team/`：同一組裡 Director 在前、Adviser 其次、其他照英文名（看職位開頭那個字）。
+
+**上線前要跑新的遷移檔** `supabase/migrations/2026-10-28-adviser-rank.sql`，**接在 `2026-10-27-public-names-english.sql` 後面跑**，4 項 PASS，可以重跑。`2026-10-24` 那支同步改成五個值，重跑它不會把這一支蓋回去；但重跑 `2026-10-21-people-admin.sql` 會把 `set_board_role` 建回三個值的版本，那時 10-24 與 10-28 都要再跑一次。
+跑這一支之前，後台把人改成 Adviser 會被資料庫擋（`bad_role`），畫面上的選項已經在。
+本機 `./scripts/db/smoke.sh` 多一段：改成 Adviser、不是 senior、派不了人、記了一筆、壞值照擋、重跑。
+
 ### 以後加東西怎麼加（寫給明年接手的人，取代 10-19 那一版的八步）
 
 **先回答一題：這個東西是不是「要派人進去做」的？** 是（營隊、專案、新的護照）就是一個**工作區**；不是（一張只有 Co-President 看的報表）就只是一個**分頁**。
@@ -3497,9 +3509,10 @@ Paul 2026-10-23 定的新模型，設計與十一題拍板在 `docs/2026-10-23-�
 | Co-President | `president` | 全部，包括發碼加人、刪人、改任何人的名字、改職級、結束這一屆 |
 | Senior Adviser | `senior_adviser` | 看得到、改得動後台每一個工作區，派得了人。**不能**加人、刪人、改名、改職級 |
 | Director | `director` | 沒有。權限全部來自指派 |
+| Adviser（中文畫面「顧問」，2026-10-28 加的第五級） | `adviser` | 沒有。權限全部來自指派。跟著某一個 team 的顧問，跟 Senior Adviser 不同：Senior Adviser 是不屬於 team 的老成員，範圍跟 Co-President 一樣 |
 | Associate | `member` | 沒有。權限全部來自指派 |
 
-Director 與 Associate 在資料庫眼裡一樣，差別只在團隊頁的頭銜。`member` 這個值刻意沒改名（改了要動十幾支函式與舊紀錄），畫面上一律叫 Associate。
+Director、Adviser 與 Associate 在資料庫眼裡一樣，差別只在團隊頁的頭銜。`member` 這個值刻意沒改名（改了要動十幾支函式與舊紀錄），畫面上一律叫 Associate。
 
 ### 工作區與指派
 
