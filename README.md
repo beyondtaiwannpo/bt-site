@@ -3392,10 +3392,10 @@ Paul 看了改一個人那一頁：這兩級是整個組織的，不該掛在某
 | 名單的 team 篩選 | 這兩級只算他這一屆帶 team 的職位，不看自己勾的標籤；跟 `/team/` 的領導組同一條規則（勾了 Sponsorship 標籤但職位沒有 team，就不算在 Sponsorship 底下） |
 | 側欄「你是誰」那一行（四個資料夾）、總覽那一行 | 「Co-President・全部 team」，不印標籤 |
 | 總覽「你的存取」 | 一顆「全部（職級）」加一句，不列十四個工作區 |
-| 名單的職位欄 | 一筆職位一行，不再用「 · 」接成一句。職級是左邊那一欄的徽章，職位是字，兩件事分開看。職位的字對得上某一級、卻跟職級不同（例如職級 Co-President、職位寫 Senior Adviser），後面標「跟職級不同」，滑過去說職級決定權限、職位只是團隊頁印的字 |
+| 名單的職位欄 | 一筆職位一行，不再用「 · 」接成一句。職級是左邊那一欄的徽章，職位是字，兩件事分開看。**每一筆都不標**（兼職位是正常的，Paul：「我是 president 也是 Sponsorship 的 associate」）；唯一的提醒是每人一句「沒有這個職級的職位」，只在這一屆沒有任何一筆職位對得上職級的時候出現。職位的字已經含 team 就不再接一次 team（「Adviser, Sponsorship Team」後面不會再印 Sponsorship Team） |
 | Workspaces 右邊、四份成員分頁、存取格、`/team/` 領導組 | 2026-10-24 上一筆已經改好，測試守著 |
 | 屆別「誰留下」、邀請「他會是」 | 印的是職級徽章，本來就跟職位分開，沒有改，測試確認 |
-| `strings.js` | `ro.noWs` 不再對這兩級印；多 `rail.allTeams`（四份 COMMON）、`ro.wsRedundant`、`ro.rankMismatch`、`ro.rankMismatchHint` |
+| `strings.js` | `ro.noWs` 不再對這兩級印；多 `rail.allTeams`（四份 COMMON）、`ro.wsRedundant`、`ro.noRankPosition`、`ro.noRankPositionHint`（2026-10-24 同日把每筆職位的「跟職級不同」換成每人一句） |
 
 截圖 `docs/admin-redesign/v3/b7-02`。測試 579 項。
 

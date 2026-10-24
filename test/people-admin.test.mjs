@@ -323,8 +323,9 @@ test("★ 同一屆好幾個職位：名單接成一句、改一個人一列一�
   assert.equal(positionsLine(two, "2026-27"), "Adviser, Sponsorship Team · Associate, Curriculum Team");
   const roster = rosterHTML([two], TERMS, ME, true, "", false, null);
   // 2026-10-24：名單裡一筆職位一行，不再用「 · 」接成一句（職級是左邊那一欄，職位是字，分開看）。positionsLine 留給歷屆那一行。
-  // 他的職級是 Director，兩筆職位的字卻是 Adviser 與 Associate，所以各自後面會多一顆「跟職級不同」。
-  assert.match(roster, /<div>Adviser, Sponsorship Team<span class="mini"> Sponsorship Team<\/span> <span class="tag warn"[^>]*>跟職級不同<\/span><\/div><div>Associate, Curriculum Team<span class="mini"> Curriculum Team<\/span> <span class="tag warn"/);
+  // 職位的字已經含 team，後面不再接一次 team；每一筆都不標（兼職位是正常的）。他的職級是 Director，而兩筆職位都不是 Director，所以底下一句「沒有這個職級的職位」。
+  assert.match(roster, /<div>Adviser, Sponsorship Team<\/div><div>Associate, Curriculum Team<\/div><div class="mini"><span class="tag warn"[^>]*>沒有這個職級的職位<\/span><\/div>/);
+  assert.doesNotMatch(roster, /Sponsorship Team<span class="mini"> Sponsorship Team/, "team 不重複印");
   assert.doesNotMatch(roster, /director@example\.com/, "名單表格上不印 email");
   const h = personEditHTML(two, TERMS, ME, true, "", false, null, [two], null, "director@example.com");
   assert.equal((h.match(/data-posrow=/g) || []).length, 2);
@@ -560,15 +561,21 @@ test("★ 依職級的每一個面：名單工作區欄、team 篩選、側欄�
   assert.match(h, /data-act="roster-team" data-v="">全部 3/);
   const withTeamPos = { ...pres, positions: [{ term: "2026-27", title_en: "Co-President", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
   assert.match(rosterHTML([withTeamPos], TERMS, ME, true, "", false, null, []), /data-v="Sponsorship Team">Sponsorship 1/, "另外有一筆帶 team 的職位才算進那個 team");
-  // 面：職級與職位分開。職位的字是「Senior Adviser」但職級是 Co-President：標「跟職級不同」。
-  const clash = { ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Senior Adviser", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
-  const c = rosterHTML([clash], TERMS, ME, true, "", false, null, []);
-  assert.match(c, /<td><span class="tag open">Co-President<\/span><\/td>/, "職級欄還是 Co-President");
-  assert.match(c, /<div>Senior Adviser<span class="mini"> 全部 team<\/span> <span class="tag warn"[^>]*>跟職級不同<\/span><\/div>/);
-  assert.match(c, /<div>Associate, Sponsorship Team<span class="mini"> Sponsorship Team<\/span> <span class="tag warn"/, "Associate 也跟 Co-President 不同，一樣標");
-  assert.doesNotMatch(c, /Senior Adviser · Associate/, "不再接成一句");
-  const fine = rosterHTML([PEOPLE[1]], TERMS, ME, true, "", false, null, []);
-  assert.doesNotMatch(fine, /跟職級不同/, "Director 的職位寫 Director 不標");
+  // 面：職級與職位分開畫，但兼職位是正常的（Paul 2026-10-24：「我是 president 也是 Sponsorship 的 associate」），每一筆都不標。
+  const multi = { ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Co-President", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
+  const m = rosterHTML([multi], TERMS, ME, true, "", false, null, []);
+  assert.match(m, /<td><span class="tag open">Co-President<\/span><\/td>/, "職級欄是 Co-President");
+  assert.match(m, /<div>Co-President<span class="mini"> 全部 team<\/span><\/div><div>Associate, Sponsorship Team<\/div>/, "兩筆各一行，team 不重複印");
+  assert.doesNotMatch(m, /tag warn/, "Co-President 兼 Associate 不標任何東西");
+  // 職位寫 Senior Adviser、職級是 Co-President：只是印出來，也不標（領導那兩級互相不算衝突）。
+  const sa = rosterHTML([{ ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Senior Adviser", team: "" }, { term: "2026-27", title_en: "Co-President", team: "" }] }], TERMS, ME, true, "", false, null, []);
+  assert.doesNotMatch(sa, /tag warn/);
+  // 唯一的提醒：這一屆沒有任何一筆職位對得上職級，每人一句、只一句。
+  const none = { ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }, { term: "2026-27", title_en: "Adviser, Marketing Team", team: "Marketing Team" }] };
+  const n = rosterHTML([none], TERMS, ME, true, "", false, null, []);
+  assert.equal((n.match(/沒有這個職級的職位/g) || []).length, 1);
+  assert.doesNotMatch(rosterHTML([PEOPLE[1]], TERMS, ME, true, "", false, null, []), /沒有這個職級的職位/, "Director 有 Director 的職位，不提醒");
+  assert.doesNotMatch(m, /跟職級不同/, "舊的那顆標籤不在了");
   // 面：屆別「誰留下」的清單印的是職級徽章，不是職位，所以不受影響；確認還在。
   const t = termsHTML(TERMS, [PEOPLE[0], PEOPLE[1]], ME, true, "", false, null, { step: 2, next: {}, keep: [] });
   assert.match(t, /Co-President/); assert.match(t, /Director/);

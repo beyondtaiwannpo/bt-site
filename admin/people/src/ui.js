@@ -529,11 +529,15 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
       <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
       <td>${pos ? positionsFor(p, pos.term).map(x => {
                  // 一筆職位一行，不用「 · 」接成一句：職級是左邊那一欄的徽章，職位是這裡的字，兩件事分開看。
-                 // 職位的字對得上某一級、卻跟他的職級不同（例如職級 Co-President、職位寫 Senior Adviser），標出來讓人看到。
+                 // 一個人可以兼好幾個職位（10-23、10-26），Co-President 兼 Sponsorship 的 Associate 是正常的，**每一筆都不標**。
+                 // team 的小字只在職位的字裡還沒有那個 team 的時候才印（「Adviser, Sponsorship Team」後面不再接一次 Sponsorship Team）。
                  const r = rankOfTitle(x.title_en, x.team);
-                 const clash = hasAccount(p) && p.role === "cadre" && r && r !== "custom" && r !== (p.board_role || "member");
-                 return `<div>${esc(positionTitle(x))}${x.team ? `<span class="mini"> ${esc(x.team)}</span>` : isOrgWide(r) ? `<span class="mini"> ${T("pe.allTeams")}</span>` : ""}${
-                   clash ? ` <span class="tag warn" title="${esc(T("ro.rankMismatchHint"))}">${T("ro.rankMismatch")}</span>` : ""}</div>`; }).join("")
+                 const title = positionTitle(x);
+                 const teamShown = x.team && !title.toLowerCase().endsWith(String(x.team).toLowerCase());
+                 return `<div>${esc(title)}${teamShown ? `<span class="mini"> ${esc(x.team)}</span>` : !x.team && isOrgWide(r) ? `<span class="mini"> ${T("pe.allTeams")}</span>` : ""}</div>`; }).join("")
+               // 唯一的提醒是每人一句：這一屆**沒有任何一筆**職位對得上他的職級（例如職級 Co-President、職位只有 Associate）。
+               + (hasAccount(p) && p.role === "cadre" && !positionsFor(p, pos.term).some(x => rankOfTitle(x.title_en, x.team) === (p.board_role || "member"))
+                   ? `<div class="mini"><span class="tag warn" title="${esc(T("ro.noRankPositionHint"))}">${T("ro.noRankPosition")}</span></div>` : "")
                : lastPos ? `<span class="mini">${esc(positionTitle(lastPos))}・${esc(lastPos.term)}</span>` : `<span class="mini">${T("ro.noPosition")}</span>`}${
         hasAccount(p) && p.role === "cadre" && !parseTeams(p.team).length
           ? `<div style="margin-top:6px"><select data-act="row-team" data-id="${esc(p.profile_id)}" aria-label="${esc(T("ro.setTeam"))}"${dis}><option value="">${T("ro.setTeam")}</option>${
