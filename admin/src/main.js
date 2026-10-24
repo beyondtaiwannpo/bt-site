@@ -28,6 +28,8 @@ let S = {
   newForm: null,
   // 行銷需求單（2026-10-31）：requests 是 loadRequests() 回的（RLS 決定看得到哪些）；rqDraft 填到一半的表單；rqF 佇列的篩選；rqSel 打開的那一張。
   requests: null, rqDraft: null, rqF: { status: "open", kind: "", q: "" }, rqSel: null, cadres: [],
+  // 活動上架（2026-11-01）：events 是 loadEvents() 回的；evSel 打開的那一場（slug）；evDraft 開活動那張表單填到一半的值；evSigned 那一場的報名數。
+  events: null, evSel: null, evDraft: null, evSigned: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -69,6 +71,12 @@ function render() {
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
+  } else if (S.view === "events") {
+    body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams());
+  } else if (S.view === "event" && S.evSel) {
+    const ev = (S.events || []).find(e => e.slug === S.evSel);
+    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy)
+              : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
   } else if (S.view === "request") {
     body = UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy);
   } else if (S.view === "requests") {
@@ -92,7 +100,7 @@ function render() {
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
   // 側欄亮哪一行：總覽、需求單那兩頁各自亮，其他全部算在「申請表」底下。
-  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : "forms";
+  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : "forms";
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body);
   UI.afterRender(S, el);
 }
@@ -123,9 +131,11 @@ async function boot(retried) {
     // 行銷需求單（2026-10-31）：讀一次，總覽的卡也靠它；載不到是 null，卡會印「載不到」。
     S.requests = await D.loadRequests().catch(() => null);
     if (S.todo) S.todo.requests = S.requests;
+    S.events = await D.loadEvents().catch(() => null);
+    if (S.todo) S.todo.events = S.events;
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
-    else if (/^requests?(\/|$)/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    else if (/^(requests?|events)(\/|$)/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -142,7 +152,37 @@ async function boot(retried) {
 }
 
 // 側欄的兩個分頁：首頁、申請表清單。上一頁與網址列改 # 也走這裡。
+// 能開活動的 team：senior 全部；其他人是自己資源工作區「管」的那幾個 team（門在資料庫的 create_event）。
+function evTeams() {
+  if (!S.me) return [];
+  if (S.me.senior) return (S.teams && S.teams.length ? S.teams : UI.TEAM_LABELS);
+  return Object.entries(S.me.ws || {}).filter(([id, lv]) => id.startsWith("res:") && lv === "manage").map(([id]) => id.slice(4));
+}
+async function reloadEvents(slug) {
+  try {
+    S.events = await D.loadEvents();
+    if (S.todo) S.todo.events = S.events;
+    if (slug) {
+      const ev = (S.events || []).find(e => e.slug === slug);
+      S.evSigned = ev && ev.form_id ? await D.loadSignedUp(ev.form_id).catch(() => null) : null;
+      if (ev && ev.form_id && !(S.forms || []).some(f => f.id === ev.form_id)) S.forms = await D.loadForms().catch(() => S.forms);
+    }
+  } catch (e) { S.msg = T("err.evLoad") + D.says(e); }
+}
+function readEvent() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  const chk = id => { const el = document.getElementById(id); return !!(el && el.checked); };
+  const iso = v => v ? new Date(v).toISOString() : "";
+  return { title_zh: val("ev-tzh"), title_en: val("ev-ten"), summary_zh: val("ev-szh"), summary_en: val("ev-sen"), body_zh: val("ev-bzh"), body_en: val("ev-ben"),
+    starts_at: iso(val("ev-starts")), ends_at: iso(val("ev-ends")), place: val("ev-place"), capacity: Number(val("ev-cap") || 0), cover_url: val("ev-cover"), cover_consent: chk("ev-consent") };
+}
 async function openTab(t) {
+  // 活動上架（2026-11-01）：#events 清單，#events/<代號> 一場。
+  const ev = /^events(?:\/([a-z0-9-]+))?$/.exec(t || "");
+  if (ev) {
+    S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = "";
+    await reloadEvents(ev[1]); render(); return;
+  }
   // 行銷需求單（2026-10-31）：#request 是送單那一頁（#request/<id> 只是信裡的直達，一樣開那一頁），#requests 是佇列，#requests/<id> 打開那一張。
   const m = /^(requests?)(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
   if (m) {
@@ -250,6 +290,49 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
+  // ── 活動上架（2026-11-01）──
+  if (act === "ev-open") { e.preventDefault(); history.pushState(null, "", "#events/" + b.dataset.slug); await openTab("events/" + b.dataset.slug); return; }
+  if (act === "ev-back") { history.pushState(null, "", "#events"); await openTab("events"); return; }
+  if (act === "ev-create") {
+    const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+    const d = { team: val("ev-team"), slug: val("ev-slug") || UI.evSlug(val("ev-ten")), title_zh: val("ev-tzh"), title_en: val("ev-ten"), with_form: !!(document.getElementById("ev-withform") || {}).checked };
+    S.evDraft = d;
+    if (!d.title_zh && !d.title_en) { S.msg = T("err.evTitle"); render(); return; }
+    if (!d.slug) { S.msg = T("err.evSlug"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.createEvent(d.team, d.slug, d.title_zh, d.title_en, d.with_form);
+      S.evDraft = null; S.busy = false; S.msg = T("msg.evCreated", { title: d.title_zh || d.title_en });
+      // 開好直接進那一場。工作區也多了一個，me.ws 要重讀才畫得出「改」的按鈕。
+      S.me = await D.loadMe(S.user.id).catch(() => S.me); S.workspaces = await D.loadWorkspaces().catch(() => S.workspaces);
+      history.pushState(null, "", "#events/" + d.slug); await openTab("events/" + d.slug);
+    } catch (e) { S.busy = false; S.msg = T("err.evCreate") + D.says(e); render(); }
+    return;
+  }
+  if (act === "ev-save") {
+    const patch = readEvent();
+    S.busy = true; S.msg = ""; render();
+    try { await D.saveEvent(id, patch); S.busy = false; S.msg = T("msg.evSaved"); await reloadEvents(S.evSel); render(); }
+    catch (e) { S.busy = false; S.msg = T("err.evSave") + D.says(e); render(); }
+    return;
+  }
+  if (act === "ev-ready" || act === "ev-unready" || act === "ev-publish" || act === "ev-unpublish") {
+    const ev = (S.events || []).find(x => x.id === id); if (!ev) return;
+    const title = UI.evTitle(ev);
+    if (act === "ev-publish" && UI.needAsk(S, b, T("confirm.evPublish", { title }))) return;
+    if (act === "ev-unpublish" && UI.needAsk(S, b, T("confirm.evUnpublish", { title }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      // 按「準備好了」之前先把表單上的字存一次，不然填了沒存就按會被擋「要填開始時間」。
+      if (act === "ev-ready" && UI.canEditWs(S.me, ev.workspace_id) && document.getElementById("ev-tzh")) await D.saveEvent(id, readEvent());
+      if (act === "ev-ready") await D.setEventReady(id, true);
+      else if (act === "ev-unready") await D.setEventReady(id, false);
+      else await D.publishEvent(id, act === "ev-publish");
+      S.busy = false; S.msg = T("msg." + act.replace("-", "."), { title });
+      await reloadEvents(S.evSel); render();
+    } catch (e) { S.busy = false; S.msg = T("err.evStatus") + D.says(e); render(); }
+    return;
+  }
   // ── 行銷需求單（2026-10-31）──
   if (act === "rq-submit") {
     const d = readRequest(); S.rqDraft = d;

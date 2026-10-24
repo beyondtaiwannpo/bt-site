@@ -315,6 +315,19 @@ export async function unassign(id, ws) {
 
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
+  // 活動上架（2026-11-01）
+  ["not_team_manager", "開活動要是那個 team 的 Director（資源工作區「管」）或 Co-President。", "Creating an event needs that team's Director (Manage on its resources) or a Co-President."],
+  ["slug_taken", "這個代號已經有活動用了，換一個。", "That slug is already used by another event."],
+  ["bad_slug", "代號只能用小寫英文、數字和連字號，2 到 40 個字。", "The slug can only use lowercase letters, digits and hyphens, 2 to 40 characters."],
+  ["cover_not_https", "封面網址要是 https:// 開頭。", "The cover URL must start with https://."],
+  ["consent_required", "封面有填就要勾「照片裡的人與那場活動都在拍攝同意範圍內」。", "With a cover image you must tick the photo-consent box."],
+  ["need_both_titles", "中英標題都要填才能準備好。", "Both titles are needed before it can be marked ready."],
+  ["need_start", "要填開始時間才能準備好。", "A start time is needed before it can be marked ready."],
+  ["already_published", "已經在對外頁上了，要改先請 Co-President 撤下來。", "Already published; ask a Co-President to unpublish first."],
+  ["not_ready", "要先按「準備好了」。", "Mark it ready first."],
+  ["not_published", "這場活動不在對外頁上。", "This event is not published."],
+  ["no_such_event", "找不到這場活動，重新整理再試一次。", "Event not found. Refresh and try again."],
+  ["full", "額滿了。", "Full."],
   // 行銷需求單（2026-10-31）
   ["not_allowed", "你對行銷需求單是「看」，改狀態要「改」以上，找 Marketing 的 Director。", "You have View on Marketing requests; changing status needs Edit. Ask the Marketing Director."],
   ["already_started", "Marketing 已經在做了，收不回；直接跟他們講。", "Marketing has already started; it cannot be withdrawn. Talk to them directly."],
@@ -402,6 +415,47 @@ export async function setRequestStatus(id, status, reply) {
 export async function withdrawRequest(id) {
   need();
   const { data, error } = await supabase.rpc("withdraw_request", { p_id: id });
+  if (error) throw error;
+  return data;
+}
+
+// ── 活動上架（2026-11-01）──────────────────────────────────────────────
+// 讀 events（RLS：工作區「看」以上自己那場，senior 全部）；寫一律走函式。報名數從 applications 算（RLS 決定看不看得到）。
+export async function loadEvents() {
+  need();
+  const { data, error } = await supabase.from("events")
+    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at")
+    .order("starts_at", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return data || [];
+}
+export async function loadSignedUp(formId) {
+  need();
+  const { count, error } = await supabase.from("applications").select("id", { count: "exact", head: true }).eq("form_id", formId).neq("status", "rejected");
+  if (error) throw error;
+  return count || 0;
+}
+export async function createEvent(team, slug, titleZh, titleEn, withForm) {
+  need();
+  const { data, error } = await supabase.rpc("create_event", { p_team: team, p_slug: slug, p_title_zh: titleZh, p_title_en: titleEn, p_with_form: !!withForm });
+  if (error) throw error;
+  return data;
+}
+export async function saveEvent(id, patch) {
+  need();
+  const { data, error } = await supabase.rpc("save_event", { p_id: id, p_patch: patch });
+  if (error) throw error;
+  return data;
+}
+export async function setEventReady(id, ready) {
+  need();
+  const { data, error } = await supabase.rpc("set_event_ready", { p_id: id, p_ready: !!ready });
+  if (error) throw error;
+  return data;
+}
+export async function publishEvent(id, on) {
+  need();
+  const { data, error } = await supabase.rpc(on ? "publish_event" : "unpublish_event", { p_id: id });
   if (error) throw error;
   return data;
 }

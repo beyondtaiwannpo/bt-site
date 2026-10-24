@@ -400,6 +400,8 @@ export const ITEMS = [
   { group: "forms",     key: "home",    label: { zh: "總覽",     en: "Overview" },        who: "cadre" },
   { group: "forms",     key: "forms",   label: { zh: "申請表",   en: "Forms" },           who: "cadre" },
   // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
+  // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
+  { group: "forms",     key: "events",   label: { zh: "活動",     en: "Events" },          who: "cadre" },
   { group: "forms",     key: "request",  label: { zh: "跟 Marketing 提需求", en: "Request from Marketing" }, who: "cadre" },
   { group: "forms",     key: "requests", label: { zh: "行銷需求單", en: "Marketing requests" }, who: "ws:custom:marketing-requests" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
@@ -749,6 +751,7 @@ export function wsCellHref(w) {
   if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
   if (id === "custom:marketing-requests") return "/admin/#requests";
+  if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
@@ -845,6 +848,12 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
     cards.push({ n: waiting, label: T("card.rq"), unit: T("card.rq.unit"), hint: waiting ? T("card.rq.hint", { n: (rq || []).filter(r => r.status === "new").length }) : T("card.rq.none"),
       href: "#requests", go: T("card.rq.go") });
   }
+  // 2026-11-01 活動上架：senior 看「等上線的活動」（ready 的）；其他人看自己 team 還在草稿或準備好的活動數。
+  const ev = t.events;
+  if (ev !== undefined && pres) {
+    const ready = ev === null ? null : (ev || []).filter(e => e.status === "ready").length;
+    cards.push({ n: ready, label: T("card.ev"), unit: T("card.ev.unit"), hint: ready ? T("card.ev.hint") : T("card.ev.none"), href: "#events", go: T("card.ev.go") });
+  }
   const myOpen = (rq || []).filter(r => me && r.requester === me.id && (r.status === "new" || r.status === "in_progress"));
   if (myOpen.length) {
     const r = myOpen[0];
@@ -931,6 +940,7 @@ export function accessHTML(me, todo, features) {
     if (id === "passport") return [{ href: "/admin/passports/#cadre", label: T("hub.goAdmin") }];
     if (id === "apps" || id.startsWith("apps:")) return [{ href: "/admin/#forms", label: T("hub.goForms") }];
     if (id === "custom:marketing-requests") return [{ href: "/admin/#requests", label: T("hub.goRequests") }];
+    if (id.startsWith("custom:event-")) return [{ href: "/admin/#events/" + encodeURIComponent(id.slice(13)), label: T("hub.goEvent") }];
     if (id.startsWith("res:")) return [{ href: "/admin/site/#res", label: T("hub.goRes") }];
     return [];
   };
@@ -1061,4 +1071,87 @@ export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy) {
        <div class="ro-search"><input id="rq-q" type="search" value="${esc(o.q || "")}" placeholder="${esc(T("rq.findPh"))}" autocomplete="off"></div>`
     + (groups.length ? groups.map(([st, rs]) => sectionHTML(`${esc(T("rq.st." + st))}<span class="hint">${rs.length}</span>`, `<ul class="flist">${rs.map(row).join("")}</ul>`)).join("")
         : emptyHTML(T("rq.queueNone"), T("rq.queueNoneHint")));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 活動上架（2026-11-01，docs/2026-10-24-活動上架.md）
+// ═══════════════════════════════════════════════════════════════════════
+// 清單加一頁一場活動。一場活動 = 那個 team 的一個工作區（custom:event-<代號>）加一份報名表（可以沒有）。
+// 這一頁填的是內容（標題、一句話、說明、封面網址與同意、時間、地點、名額）；報名表的題目走現有的表單編輯頁；
+// 誰在裡面、簽到、行前信都是現有的入口，這裡只放連結。不是頁面編輯器。
+export const EV_STATUS = ["draft", "ready", "published", "archived"];
+export function evSlug(s) { return String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40); }
+const evDate = d => d ? String(d).slice(0, 16).replace("T", " ") : "";
+// datetime-local 要的格式（本機時間）。
+const evLocal = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; };
+export const evPast = e => !!(e && (e.ends_at || e.starts_at) && new Date(e.ends_at || e.starts_at) < new Date());
+export const evTitle = e => (lang() === "zh" ? (e.title_zh || e.title_en) : (e.title_en || e.title_zh)) || e.slug;
+// 清單：照狀態分段（準備好了 → 草稿 → 對外中 → 過去或撤下）。canCreate 是能開活動的人（senior 或某個 team 的資源「管」）。
+export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTeams) {
+  const dis = busy ? " disabled" : "";
+  const d = draft || {};
+  const ev = events || [];
+  const groups = [["ready", ev.filter(e => e.status === "ready")], ["draft", ev.filter(e => e.status === "draft")],
+    ["published", ev.filter(e => e.status === "published" && !evPast(e))], ["past", ev.filter(e => e.status === "archived" || (e.status === "published" && evPast(e)))]].filter(g => g[1].length);
+  const row = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(T("ev.st." + e.status))}</span></div>
+      <div class="fmeta">${esc(e.team.replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
+  const create = (canCreateTeams || []).length ? sectionHTML(T("ev.new"), `<div class="note">${T("ev.newWhat")}</div><div class="two">
+      <label><i>${T("ev.team")}</i><select id="ev-team"${dis}>${canCreateTeams.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>
+      <label><i>${T("ev.slug")}</i><input id="ev-slug" value="${esc(d.slug || "")}" placeholder="winter-camp-2027" autocomplete="off"${dis}></label>
+      <label><i>${T("ev.titleZh")}</i><input id="ev-tzh" value="${esc(d.title_zh || "")}" placeholder="2027 冬令營"${dis}></label>
+      <label><i>${T("ev.titleEn")}</i><input id="ev-ten" value="${esc(d.title_en || "")}" placeholder="Winter Camp 2027"${dis}></label>
+    </div>
+    <label class="check"><input type="checkbox" id="ev-withform"${d.with_form === false ? "" : " checked"}${dis}><span>${T("ev.withForm")}</span></label>
+    <div class="row"><button class="btn" data-act="ev-create"${dis}>${busy ? T("common.saving") : T("ev.createGo")}</button><span class="mini">${T("ev.createNote")}</span></div>`, { id: "ev-new" }) : "";
+  return pageHead(T("ev.title"), T("ev.lede"))
+    + msgHTML(msg)
+    + (groups.length ? groups.map(([k, es]) => sectionHTML(`${esc(T("ev.g." + k))}<span class="hint">${es.length}</span>`, `<ul class="flist">${es.map(row).join("")}</ul>`)).join("")
+        : emptyHTML(T("ev.none"), (canCreateTeams || []).length ? T("ev.noneHint") : T("ev.noneHintNo")))
+    + create;
+}
+// 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
+// canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
+export function eventEditHTML(e, form, signed, me, msg, busy) {
+  const dis = busy ? " disabled" : "";
+  const canEdit = canEditWs(me, e.workspace_id), canManage = wsLevel(me, e.workspace_id) === "manage", sen = senior(me);
+  const ro = canEdit ? "" : " readonly";
+  const st = e.status;
+  const publicLink = `/events/?e=${encodeURIComponent(e.slug)}`;
+  const statusLine = st === "published" ? T("ev.stLine.published", { who: esc(e.published_by_name || ""), d: esc(evDate(e.published_at)) })
+    : st === "ready" ? T("ev.stLine.ready") : st === "archived" ? T("ev.stLine.archived") : T("ev.stLine.draft");
+  const keys = `<div class="row" style="flex-wrap:wrap;gap:8px">
+      ${st === "draft" && canManage ? `<button class="btn" data-act="ev-ready" data-id="${esc(e.id)}"${dis}>${T("ev.ready")}</button>` : ""}
+      ${st === "ready" && canManage ? `<button class="btn ghost" data-act="ev-unready" data-id="${esc(e.id)}"${dis}>${T("ev.unready")}</button>` : ""}
+      ${st === "ready" && sen ? `<button class="btn" data-act="ev-publish" data-id="${esc(e.id)}"${dis}>${T("ev.publish")}</button>` : ""}
+      ${st === "ready" && !sen ? `<span class="mini">${T("ev.waitSenior")}</span>` : ""}
+      ${st === "published" && sen ? `<button class="btn ghost" data-act="ev-unpublish" data-id="${esc(e.id)}"${dis}>${T("ev.unpublish")}</button>` : ""}
+      ${st === "published" ? `<a class="btn ghost sm" href="${esc(publicLink)}" target="_blank" rel="noopener">${T("ev.seePublic")}</a>` : ""}
+    </div>`;
+  const links = `<ul class="plain">
+      <li>${form ? `<a href="#" data-act="open-form" data-id="${esc(form.id)}">${T("ev.formEdit")}</a>${T("punct.colon")}${esc(T("status." + form.status))}${form.opens_at ? `・${esc(T("ev.opens", { d: evDate(form.opens_at) }))}` : ""}` : T("ev.noFormLine")}</li>
+      ${form ? `<li><a href="#" data-act="open-apps" data-id="${esc(form.id)}">${T("ev.attendees", { n: signed == null ? "?" : signed })}</a>${e.capacity ? ` / ${esc(String(e.capacity))}` : ""}</li>
+      <li><a href="#" data-act="open-checkin" data-id="${esc(form.id)}">${T("ev.checkin")}</a>・<a href="#" data-act="open-notice" data-id="${esc(form.id)}">${T("ev.notice")}</a></li>` : ""}
+      ${canManage ? `<li><button class="lnk" data-act="members-open" data-ws="${esc(e.workspace_id)}" data-name="${esc(evTitle(e))}">${T("ev.members")}</button></li>` : ""}
+    </ul>`;
+  return pageHead(esc(evTitle(e)), `${esc(e.team.replace(/\s*Team$/i, ""))}・${esc(e.slug)}`, [], { act: "ev-back", label: T("ev.back") })
+    + msgHTML(msg)
+    + sectionHTML(T("ev.status"), `<div class="note">${statusLine}</div>${keys}`)
+    + sectionHTML(T("ev.content"), `<div class="two">
+        <label><i>${T("ev.titleZh")}</i><input id="ev-tzh" value="${esc(e.title_zh || "")}"${ro}${dis}></label>
+        <label><i>${T("ev.titleEn")}</i><input id="ev-ten" value="${esc(e.title_en || "")}"${ro}${dis}></label>
+        <label><i>${T("ev.sumZh")}</i><input id="ev-szh" value="${esc(e.summary_zh || "")}" placeholder="${esc(T("ev.sumPh"))}"${ro}${dis}></label>
+        <label><i>${T("ev.sumEn")}</i><input id="ev-sen" value="${esc(e.summary_en || "")}"${ro}${dis}></label>
+        <label class="wide"><i>${T("ev.bodyZh")}</i><textarea id="ev-bzh" style="min-height:120px"${ro}${dis}>${esc(e.body_zh || "")}</textarea></label>
+        <label class="wide"><i>${T("ev.bodyEn")}</i><textarea id="ev-ben" style="min-height:120px"${ro}${dis}>${esc(e.body_en || "")}</textarea></label>
+        <label><i>${T("ev.starts")}</i><input id="ev-starts" type="datetime-local" value="${esc(evLocal(e.starts_at))}"${ro}${dis}></label>
+        <label><i>${T("ev.ends")}</i><input id="ev-ends" type="datetime-local" value="${esc(evLocal(e.ends_at))}"${ro}${dis}></label>
+        <label><i>${T("ev.place")}</i><input id="ev-place" value="${esc(e.place || "")}"${ro}${dis}></label>
+        <label><i>${T("ev.capacity")}</i><input id="ev-cap" type="number" min="0" value="${esc(String(e.capacity || 0))}"${ro}${dis}></label>
+        <label class="wide"><i>${T("ev.cover")}</i><input id="ev-cover" value="${esc(e.cover_url || "")}" placeholder="https://…"${ro}${dis}></label>
+      </div>
+      ${e.cover_url ? `<img class="ev-cover" src="${esc(e.cover_url)}" alt="">` : ""}
+      <label class="check"><input type="checkbox" id="ev-consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label>
+      <div class="mini">${T("ev.coverNote")}</div>
+      ${canEdit ? `<div class="form-foot"><button class="btn" data-act="ev-save" data-id="${esc(e.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button></div>` : `<div class="mini">${T("ev.readOnly")}</div>`}`)
+    + sectionHTML(T("ev.signup"), links);
 }
