@@ -497,14 +497,17 @@
   /* 棋盤：5 格一排、蛇形。格子是紙色、任務格沙色、梯子橘框、蛇蒂芬妮綠。棋子是大頭照。
      橘色是「在動的東西」：骰子、正在走的棋子、剛落的那一格。 */
   .bbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 14px}
+  /* 棋子的三個調出來的顏色（2026-10-24）：全部從七色 color-mix，不是新色碼。 */
+  :root{--pawn-deepteal:color-mix(in srgb,var(--bt-teal) 55%,var(--bt-navy));--pawn-rust:color-mix(in srgb,var(--bt-orange) 55%,var(--bt-navy));--pawn-lime:color-mix(in srgb,var(--bt-yellow) 60%,var(--bt-teal))}
+  .bhead .mtheme b{color:var(--bt-navy)}
   .btix b{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:.02em}
   .dice{position:relative;width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.9);
     border:2px solid var(--bt-navy);display:grid;grid-template-columns:repeat(3,1fr);padding:6px;gap:2px;flex:none;
     box-shadow:0 4px 12px rgba(16,42,134,.15)}
   .dice i{display:block;border-radius:50%;background:transparent}
   .dice i.on{background:var(--bt-navy)}
-  .dice.rolling{animation:diceroll .6s linear infinite;border-color:var(--bt-orange)}
-  .dice.rolling i.on{background:var(--bt-orange)}
+  .dice.rolling{animation:diceroll .6s linear infinite;border-color:var(--bt-navy);background:var(--bt-orange)}
+  .dice.rolling i.on{background:var(--bt-navy)}
   @keyframes diceroll{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   .bresult{font-size:14px;line-height:1.6;padding:10px 14px;margin:0 0 14px;border-left:3px solid var(--bt-orange);
     background:rgba(255,232,197,.45);border-radius:0 10px 10px 0}
@@ -541,16 +544,28 @@
     padding:4px 5px;display:flex;flex-direction:column;align-items:flex-start;overflow:hidden}
   .bq[data-act]{cursor:pointer}
   .bq[data-act]:hover{background:rgba(255,196,108,.2)}
-  .bq .bn{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(16,42,134,.6);line-height:1}
+  /* 格號 .6 在淡色格子上只有 3.3 到 3.8:1（test/intern-board.test.mjs 算的），拉到 .75 是 4.7 到 5.7:1。 */
+  .bq .bn{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(16,42,134,.75);line-height:1}
   .bq .sk{font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:.02em;margin-top:2px}
   .bq .st{font-size:9.5px;font-weight:600;line-height:1.15;margin-top:2px;overflow-wrap:anywhere;color:var(--ink)}
   .bq .st.done{text-decoration:line-through;color:rgba(16,42,134,.55)}
   .bq.task{background:rgba(255,232,197,.7)}
+  .bq.task .st{font-weight:700}
+  /* 上色（2026-10-24）：三個分類三個副色，任務格深一點、它後面的空格淡淡的同色（到下一個任務格為止）。
+     alpha 是算過的：深藍標題在每一種底上都 >= 8:1，.75 的格號 >= 4.7:1（test/intern-board.test.mjs 用同一條公式守著）。 */
+  .bq.z-onboard{background:rgba(107,198,187,.14)}
+  .bq.z-project{background:rgba(16,42,134,.06)}
+  .bq.z-reflect{background:rgba(255,247,137,.25)}
+  .bq.task.c-onboard{background:rgba(107,198,187,.38);border-color:var(--bt-teal)}
+  .bq.task.c-project{background:rgba(16,42,134,.16);border-color:var(--bt-navy)}
+  .bq.task.c-reflect{background:rgba(255,247,137,.6);border-color:rgba(16,42,134,.35)}
+  /* 我在的那一格：柔柔的橘光。剛落的那一格（.lit）亮一點。 */
+  .bq.here{box-shadow:0 0 0 2px var(--bt-orange),0 0 16px 4px rgba(255,196,108,.7)}
   .bq.ladder{border-color:var(--bt-orange);background:rgba(255,196,108,.22)}
   .bq.ladder .sk{color:var(--ink)}
   .bq.snake{border-color:var(--bt-teal);background:rgba(107,198,187,.22)}
   .bq.finish{border:2px dashed var(--bt-navy)}
-  .bq.lit{box-shadow:0 0 0 3px var(--bt-orange);background:rgba(255,196,108,.4)}
+  .bq.lit{box-shadow:0 0 0 3px var(--bt-orange),0 0 20px 6px rgba(255,196,108,.85);background:rgba(255,196,108,.45)}
   .bstart{margin-top:6px;display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;
     text-transform:uppercase;color:rgba(16,42,134,.6)}
   .pawns{position:absolute;right:3px;bottom:3px;display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:100%}
@@ -562,6 +577,9 @@
   .blegend{display:flex;gap:14px;margin-top:10px;font-size:11.5px;color:rgba(16,42,134,.78)}
   .blegend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px;border:1px solid rgba(16,42,134,.22)}
   .blegend .task::before{background:rgba(255,232,197,.9)}
+  .blegend .c-onboard::before{background:rgba(107,198,187,.38);border-color:var(--bt-teal)}
+  .blegend .c-project::before{background:rgba(16,42,134,.16);border-color:var(--bt-navy)}
+  .blegend .c-reflect::before{background:rgba(255,247,137,.6)}
   .blegend .ladder::before{background:rgba(255,196,108,.5);border-color:var(--bt-orange)}
   .blegend .snake::before{background:rgba(107,198,187,.45);border-color:var(--bt-teal)}
   /* 進度牆上的棋盤加名次 */

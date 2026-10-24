@@ -264,15 +264,18 @@ const taskOf = (S, id) => (S.tasks || []).find(t => t.id === id) || null;
 // 八顆自己畫的扁平向量棋子，全部用 Brand Book 的色票（style 裡寫 var(--bt-...)，check.sh 的色碼白名單掃得到），
 // 沒有外部圖、沒有商標角色。代號跟 intern_passports.pawn 的 check 一樣，加一顆要兩邊一起加。
 const O = "stroke:var(--bt-navy);stroke-width:1.4;stroke-linejoin:round";
+// 八顆八個顏色（2026-10-24 上色）：七色裡拿橘、深藍、亮黃、蒂芬妮綠、中性灰五個，再用 color-mix 從七色調出三個
+// （深蒂芬妮、鐵鏽橘、萊姆），定義在 index.html 的 :root（--pawn-*），還是只有品牌色，沒有新的色碼。
+export const PAWN_COLORS = { meeple: "orange", checker: "navy", cat: "yellow", bird: "teal", fish: "deepteal", star: "rust", boat: "grey", kite: "lime" };
 export const PAWNS = {
   meeple:  { color: "var(--bt-orange)", body: `<path d="M12 3a3 3 0 0 1 3 3c0 1.3-.7 2.3-1.6 2.8L17 12h3l-1 4h-2.4l.9 5H6.5l.9-5H5l-1-4h3l3.6-3.2A3 3 0 0 1 9 6a3 3 0 0 1 3-3z" style="fill:var(--bt-orange);${O}"/>` },
   checker: { color: "var(--bt-navy)",   body: `<circle cx="12" cy="12" r="9" style="fill:var(--bt-navy);${O}"/><circle cx="12" cy="12" r="5" style="fill:none;stroke:var(--bt-cream);stroke-width:1.6"/>` },
   cat:     { color: "var(--bt-yellow)", body: `<path d="M5 20V8l4 3h6l4-3v12z" style="fill:var(--bt-yellow);${O}"/><circle cx="9.5" cy="14" r="1.1" style="fill:var(--bt-navy)"/><circle cx="14.5" cy="14" r="1.1" style="fill:var(--bt-navy)"/>` },
   bird:    { color: "var(--bt-teal)",   body: `<path d="M3 13c3-5 9-6 13-4l5-1-3 3c1 6-5 10-11 9l-4-2 5-1z" style="fill:var(--bt-teal);${O}"/><circle cx="15" cy="10.5" r="1" style="fill:var(--bt-navy)"/>` },
-  fish:    { color: "var(--bt-teal)",   body: `<path d="M3 12c3-5 8-6 13-3l5-4v10l-5-4c-5 3-10 2-13-3z" style="fill:var(--bt-teal);${O}"/><circle cx="8" cy="11.5" r="1" style="fill:var(--bt-navy)"/>` },
-  star:    { color: "var(--bt-orange)", body: `<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" style="fill:var(--bt-orange);${O}"/>` },
-  boat:    { color: "var(--bt-navy)",   body: `<path d="M12 3v11h7z" style="fill:var(--bt-sand);${O}"/><path d="M3 15h18l-3 5H6z" style="fill:var(--bt-navy);${O}"/>` },
-  kite:    { color: "var(--bt-teal)",   body: `<path d="M12 2l7 8-7 10-7-10z" style="fill:var(--bt-teal);${O}"/><path d="M12 20c-1 2 1 3-1 4" style="fill:none;${O}"/><path d="M5 10h14M12 2v18" style="fill:none;stroke:var(--bt-navy);stroke-width:1"/>` },
+  fish:    { color: "var(--pawn-deepteal)", body: `<path d="M3 12c3-5 8-6 13-3l5-4v10l-5-4c-5 3-10 2-13-3z" style="fill:var(--pawn-deepteal);${O}"/><circle cx="8" cy="11.5" r="1" style="fill:var(--bt-navy)"/>` },
+  star:    { color: "var(--pawn-rust)",   body: `<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" style="fill:var(--pawn-rust);${O}"/>` },
+  boat:    { color: "var(--bt-grey)",   body: `<path d="M12 3v11h7z" style="fill:var(--bt-sand);${O}"/><path d="M3 15h18l-3 5H6z" style="fill:var(--bt-grey);${O}"/>` },
+  kite:    { color: "var(--pawn-lime)",   body: `<path d="M12 2l7 8-7 10-7-10z" style="fill:var(--pawn-lime);${O}"/><path d="M12 20c-1 2 1 3-1 4" style="fill:none;${O}"/><path d="M5 10h14M12 2v18" style="fill:none;stroke:var(--bt-navy);stroke-width:1"/>` },
 };
 export const PAWN_KEYS = Object.keys(PAWNS);
 // 一顆棋子的 HTML：有代號畫向量，沒有就大頭照，再沒有就名字第一個字。
@@ -322,6 +325,7 @@ export function boardLinesSVG(squares, centers, cell) {
         <path d="${rails} ${rungs}" style="fill:none;stroke:var(--bt-navy);stroke-width:${f(cell * 0.09)};stroke-linecap:round"/>
         <path id="line-${sq.pos}" d="M${f(a.x)} ${f(a.y)} L${f(b.x)} ${f(b.y)}" style="fill:none;stroke:none"/>
         <path d="${rails} ${rungs}" style="fill:none;stroke:var(--bt-orange);stroke-width:${f(cell * 0.045)};stroke-linecap:round"/>
+        <path class="grain" d="${rails}" style="fill:none;stroke:var(--bt-cream);stroke-width:${f(cell * 0.012)};stroke-dasharray:${f(cell * 0.06)} ${f(cell * 0.05)};stroke-opacity:.8"/>
       </g>`);
     } else {
       // 蛇：頭在 pos（上面），尾在 goes_to（下面）。三段三次曲線，左右各扭一次。
@@ -333,6 +337,8 @@ export function boardLinesSVG(squares, centers, cell) {
       out.push(`<g class="snake" data-from="${sq.pos}" data-to="${sq.goes_to}">
         <path d="${d}" style="fill:none;stroke:var(--bt-navy);stroke-width:${f(cell * 0.17)};stroke-linecap:round"/>
         <path id="line-${sq.pos}" d="${d}" style="fill:none;stroke:var(--bt-teal);stroke-width:${f(cell * 0.11)};stroke-linecap:round"/>
+        <path class="spine" d="${d}" style="fill:none;stroke:var(--bt-navy);stroke-width:${f(cell * 0.025)};stroke-dasharray:${f(cell * 0.1)} ${f(cell * 0.07)};stroke-opacity:.45;stroke-linecap:round"/>
+        <path class="tongue" d="M${f(a.x - (dx / len) * hr)} ${f(a.y - (dy / len) * hr)} l${f(-(dx / len) * hr * 0.9)} ${f(-(dy / len) * hr * 0.9)} m${f((dx / len) * hr * 0.35)} ${f((dy / len) * hr * 0.35)} l${f(nx * hr * 0.3 - (dx / len) * hr * 0.25)} ${f(ny * hr * 0.3 - (dy / len) * hr * 0.25)} m${f(-nx * hr * 0.3 + (dx / len) * hr * 0.25)} ${f(-ny * hr * 0.3 + (dy / len) * hr * 0.25)} l${f(-nx * hr * 0.3 - (dx / len) * hr * 0.25)} ${f(-ny * hr * 0.3 - (dy / len) * hr * 0.25)}" style="fill:none;stroke:var(--bt-orange);stroke-width:${f(cell * 0.03)};stroke-linecap:round"/>
         <circle cx="${f(a.x)}" cy="${f(a.y)}" r="${f(hr)}" style="fill:var(--bt-teal);stroke:var(--bt-navy);stroke-width:${f(cell * 0.04)}"/>
         <circle cx="${f(a.x - nx * hr * 0.45 + (dx / len) * hr * 0.2)}" cy="${f(a.y - ny * hr * 0.45 + (dy / len) * hr * 0.2)}" r="${f(hr * 0.18)}" style="fill:var(--bt-navy)"/>
         <circle cx="${f(a.x + nx * hr * 0.45 + (dx / len) * hr * 0.2)}" cy="${f(a.y + ny * hr * 0.45 + (dy / len) * hr * 0.2)}" r="${f(hr * 0.18)}" style="fill:var(--bt-navy)"/>
@@ -350,6 +356,14 @@ export function boardGridHTML(S, pawns, opts) {
   const byPos = {};
   for (const p of pawns || []) { (byPos[p.pos] = byPos[p.pos] || []).push(p); }
   const pawn = pawnHTML;
+  // 分區（2026-10-24 上色）：從起點走到終點，每個任務格把它的分類帶給後面的空格，直到下一個任務格。
+  // 任務格本身上同一色但深一點（class c-<分類>），空格淡淡的（class z-<分類>）；蛇梯格保留自己的顏色。
+  const zone = {}; let cur = "";
+  for (let p = 1; p <= size; p++) {
+    const s = squareAt(S, p), t0 = s && s.kind === "task" ? taskOf(S, s.task_id) : null;
+    if (t0 && SLOT_ORDER.includes(t0.category)) cur = t0.category;
+    zone[p] = cur;
+  }
   const cell = pos => {
     const sq = squareAt(S, pos);
     const kind = sq ? sq.kind : "plain";
@@ -357,11 +371,13 @@ export function boardGridHTML(S, pawns, opts) {
     const done = t && S.stamps && S.stamps[t.id];
     const here = byPos[pos] || [];
     const lit = o.lit === pos;
+    const mine = here.some(p => p.me);
+    const tint = t && zone[pos] ? ` c-${zone[pos]}` : kind === "plain" && zone[pos] ? ` z-${zone[pos]}` : "";
     let label = "";
     if (kind === "ladder") label = `<span class="sk">↑${esc(String(sq.goes_to))}</span>`;
     else if (kind === "snake") label = `<span class="sk">↓${esc(String(sq.goes_to))}</span>`;
     else if (t) label = `<span class="st${done ? " done" : ""}">${esc(t.title_zh || t.title_en)}</span>`;
-    return `<div class="bq ${kind}${pos === size ? " finish" : ""}${lit ? " lit" : ""}${done ? " stamped" : ""}" data-pos="${pos}"${t && !o.sample ? ` data-act="open" data-id="${esc(t.id)}" role="button" tabindex="0"` : ""}>
+    return `<div class="bq ${kind}${tint}${pos === size ? " finish" : ""}${lit ? " lit" : ""}${mine ? " here" : ""}${done ? " stamped" : ""}" data-pos="${pos}"${t && !o.sample ? ` data-act="open" data-id="${esc(t.id)}" role="button" tabindex="0"` : ""}>
       <span class="bn">${pos === size ? esc(T("board.finish")) : pos}</span>${label}
       ${here.length ? `<span class="pawns">${here.map(pawn).join("")}</span>` : ""}
     </div>`;
@@ -425,7 +441,7 @@ export function boardPageHTML(S) {
     ${needPick ? pawnPickerHTML(null, true) : ""}
     ${waiting ? `<div class="bresult">${T("board.waiting", { t: esc(lastTask.title_zh || lastTask.title_en) })}</div>` : rollResultHTML(S)}
     ${boardGridHTML(S, pawns, { lit: S.lastRoll ? S.lastRoll.to_pos : null, sample: !!S.sample })}
-    <div class="blegend"><span class="task">${esc(T("board.legendTask"))}</span><span class="ladder">${esc(T("board.legendLadder"))}</span><span class="snake">${esc(T("board.legendSnake"))}</span></div>
+    <div class="blegend">${SLOT_ORDER.map(c => `<span class="c-${c}">${esc(T(CATEGORY[c].short))}</span>`).join("")}<span class="ladder">${esc(T("board.legendLadder"))}</span><span class="snake">${esc(T("board.legendSnake"))}</span></div>
     <div class="wnote" style="margin-top:14px">${esc(S.sample ? T("board.sampleNote") : T("board.rules"))}</div>`;
 }
 

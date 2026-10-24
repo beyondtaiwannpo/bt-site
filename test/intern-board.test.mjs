@@ -254,3 +254,64 @@ test("★ 英文畫出來不剩中文（選棋子、牆的圖例）", () => {
   IN.setLang("zh");
   assert.doesNotMatch(h, /[\u4e00-\u9fff]/);
 });
+
+// ── 上色（2026-10-24，Paul：「要彩色」）────────────────────────────────────────
+test("★ 上色：任務格照分類上色、後面的空格淡淡的同色到下一個任務格、蛇梯格保留；我在的那一格發光；圖例多三個分類", () => {
+  const S = IS({ profile: { ...ME, pawn: "cat" }, positions: [{ user_id: "u1", pos: 9, rolls: 2, tickets: 1, pawn: "cat" }] });
+  const h = IN.boardPageHTML(S);
+  assert.match(h, /class="bq task c-onboard[^"]*" data-pos="2"/, "任務格帶它的分類");
+  assert.match(h, /class="bq plain z-onboard[^"]*" data-pos="3"/, "任務格後面的空格淡淡的同一色");
+  assert.match(h, /class="bq ladder[^"]*" data-pos="4"/, "梯子格不上分類色");
+  assert.doesNotMatch(h, /class="bq ladder z-/);
+  assert.match(h, /class="bq plain" data-pos="1"/, "第一個任務格之前沒有分區");
+  assert.match(h, /class="bq plain z-project here" data-pos="9"/, "我在第 9 格（第 7 格的任務是 project，往後都淡藍）：here");
+  assert.equal((h.match(/ here"/g) || []).length, 1, "只有一格發光");
+  assert.match(h, /<div class="blegend"><span class="c-onboard">/);
+  assert.doesNotMatch(IN.boardPageHTML(IS({ sample: true, profile: IN.sampleProfile({ id: "2026-27" }) })), / here"/, "樣書上沒有我，不發光");
+});
+
+test("★ 八顆棋子八個不一樣的顏色，三個調出來的是 color-mix 七色（index.html 的 --pawn-*），沒有新色碼", () => {
+  const colors = Object.values(IN.PAWN_COLORS);
+  assert.equal(new Set(colors).size, 8, "八個顏色不重複");
+  const html = readFileSync("intern-passport/index.html", "utf8");
+  for (const v of ["deepteal", "rust", "lime"]) assert.match(html, new RegExp(`--pawn-${v}:color-mix\\(in srgb,var\\(--bt-[a-z]+\\) \\d+%,var\\(--bt-[a-z]+\\)\\)`), `--pawn-${v} 要從七色調`);
+  for (const k of IN.PAWN_KEYS) {
+    const fill = IN.PAWNS[k].color, want = IN.PAWN_COLORS[k];
+    assert.ok(IN.pawnHTML({ pawn: k, name: "x" }).includes(`fill:${fill}`), `${k} 的主色要真的畫在棋子上`);
+    assert.ok(fill === `var(--bt-${want})` || fill === `var(--pawn-${want})`, `${k} 的填色 ${fill} 要是 ${want}`);
+  }
+});
+
+test("★ 梯子有紋路、蛇有脊與舌頭（舌頭是橘的，七色裡沒有紅）；還是只用 var()", () => {
+  const centers = {}; for (let p = 1; p <= 30; p++) { const r = Math.floor((p - 1) / 5), c = (p - 1) % 5; centers[p] = { x: (r % 2 ? 4 - c : c) * 100 + 50, y: (5 - r) * 100 + 50 }; }
+  const svg = IN.boardLinesSVG(SQ, centers, 100);
+  assert.match(svg, /<path class="grain"[^>]*stroke:var\(--bt-cream\)[^>]*stroke-dasharray/);
+  assert.match(svg, /<path class="spine"[^>]*stroke:var\(--bt-navy\)[^>]*stroke-opacity:\.45/);
+  assert.match(svg, /<path class="tongue"[^>]*stroke:var\(--bt-orange\)/);
+  assert.doesNotMatch(svg, /#[0-9a-fA-F]{3,6}\b|red/);
+  assert.equal((svg.match(/<circle/g) || []).length, 3, "蛇頭一個圓加兩隻眼睛，舌頭是 path 不是圓");
+});
+
+// 對比度不用眼睛看：從 index.html 把每一種格子底的 rgba 讀出來，疊在白 .5 疊在紙上，算深藍標題與 .75 的格號。
+test("★ 格子上的字對比度：深藍標題 >= 4.5:1、格號 >= 4.5:1，每一種底色都算", () => {
+  const html = readFileSync("intern-passport/index.html", "utf8");
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const over = (fg, a, bg) => fg.map((c, i) => c * a + bg[i] * (1 - a));
+  const lum = rgb => { const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; const [r, g, b] = rgb.map(f); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const ratio = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return (h + 0.05) / (l + 0.05); };
+  const PAPER = hex("#EDE5D8"), NAVY = hex("#102A86"), WHITE = [255, 255, 255];
+  const base = over(WHITE, 0.5, PAPER);
+  const bnAlpha = Number(html.match(/\.bq \.bn\{[^}]*color:rgba\(16,42,134,(\.\d+)\)/)[1]);
+  const sels = [".bq.task", ".bq.z-onboard", ".bq.z-project", ".bq.z-reflect", ".bq.task.c-onboard", ".bq.task.c-project", ".bq.task.c-reflect", ".bq.ladder", ".bq.snake", ".bq.lit"];
+  const out = {};
+  for (const sel of sels) {
+    const m = html.match(new RegExp(sel.replace(/\./g, "\\.") + "\\{[^}]*background:rgba\\((\\d+),(\\d+),(\\d+),(\\.\\d+|\\d\\.?\\d*)\\)"));
+    assert.ok(m, `${sel} 要有 rgba 底色`);
+    const bg = over([+m[1], +m[2], +m[3]], +m[4], base);
+    const title = ratio(NAVY, bg), num = ratio(over(NAVY, bnAlpha, bg), bg);
+    out[sel] = { title: +title.toFixed(2), num: +num.toFixed(2) };
+    assert.ok(title >= 4.5, `${sel} 標題 ${title.toFixed(2)}:1 不到 4.5`);
+    assert.ok(num >= 4.5, `${sel} 格號 ${num.toFixed(2)}:1 不到 4.5`);
+  }
+  assert.ok(bnAlpha >= 0.75, "格號的 alpha 至少 .75（.6 時三種底都不到 4.5）");
+});
