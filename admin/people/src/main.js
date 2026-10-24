@@ -127,7 +127,7 @@ async function openInvites(keepMsg) {
   render();
 }
 function readInviteForm() {
-  const rank = val("in-rank"), team = val("in-team");
+  const rank = val("in-rank"), team = UI.isOrgWide(rank) ? "" : val("in-team");
   const t = rank && rank !== "custom" ? UI.deriveTitle(rank, team) : { title_en: val("in-ten"), title_zh: val("in-tzh") };
   return { email: val("in-email"), who: val("in-who") || "cadre:member", rank, team, term: val("in-term"),
            name_zh: val("in-zh"), name_en: val("in-en"), title_en: rank ? t.title_en : "", title_zh: rank ? t.title_zh : "",
@@ -182,7 +182,7 @@ function readPosRows(p, termId) {
   }
   return els.map(el => {
     const i = el.dataset.posrow;
-    const rank = val(`pk-rank-${i}`), team = val(`pk-pteam-${i}`);
+    const rank = val(`pk-rank-${i}`), team = UI.isOrgWide(rank) ? "" : val(`pk-pteam-${i}`);
     const t = rank && rank !== "custom" ? UI.deriveTitle(rank, team) : { title_zh: val(`pk-tzh-${i}`), title_en: val(`pk-ten-${i}`) };
     return { orig: el.dataset.isnew === "1" ? null : (el.dataset.orig || ""), rank, title_zh: t.title_zh, title_en: t.title_en, team };
   });
@@ -348,7 +348,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "person-new") { S.newDraft = null; S.view = "person-new"; S.msg = ""; render(); return; }
   if (act === "person-create") {
-    const rank = val("pn-rank"), pteam = val("pn-pteam");
+    const rank = val("pn-rank"), pteam = UI.isOrgWide(rank) ? "" : val("pn-pteam");
     const t = rank && rank !== "custom" ? UI.deriveTitle(rank, pteam) : { title_en: val("pn-ten"), title_zh: val("pn-tzh") };
     const d = { name_zh: val("pn-zh"), name_en: val("pn-en"), term: val("pn-term"), rank, title_en: t.title_en, title_zh: t.title_zh, pteam, note: val("pn-note") };
     S.newDraft = d;

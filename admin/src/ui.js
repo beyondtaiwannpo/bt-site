@@ -601,14 +601,18 @@ export function membersPanelHTML(mp, msg, busy) {
   const lv = l => T("level." + l);
   const rows = mp.rows || [];
   const inWs = new Set(rows.map(r => r.user_id));
+  // Co-President 與 Senior Adviser 本來就到得了（is_senior），列在最上面標「依職級」，沒有下拉也沒有移出。只是畫面。
+  const seniors = (mp.cadres || []).filter(p => ["president", "senior_adviser"].includes(p.board_role) && !inWs.has(p.id));
+  const seniorRow = p => `<tr class="byrank"><td class="t-main"><b>${esc(mpName(p))}</b> <span class="tag">${esc(boardName(p.board_role))}</span> <span class="tag open">${T("grid.byRank")}</span>${p.id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
+    <td><span class="mini">${esc(lv("manage"))}</span></td><td></td></tr>`;
   const row = r => `<tr><td class="t-main"><b>${esc(mpName(r))}</b> <span class="tag">${esc(boardName(r.board_role))}</span>${r.user_id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
     <td><select data-act="members-level" data-id="${esc(r.user_id)}" aria-label="${esc(T("mp.level"))}"${dis}>${LV.map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></td>
     <td class="t-act"><button class="btn quiet sm" data-act="members-unassign" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></td></tr>`;
   return pageHead(T("mp.title", { name: esc(mp.name || mp.ws) }), T("mp.lede"), [], { act: "members-back", label: T("mp.back") })
     + msgHTML(msg)
     + `<div class="note">${T("mp.levels")}</div>`
-    + sectionHTML(T("mp.list"), rows.length
-        ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${rows.map(row).join("")}</tbody></table>`
+    + sectionHTML(T("mp.list"), rows.length || seniors.length
+        ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${seniors.map(seniorRow).join("")}${rows.map(row).join("")}</tbody></table>`
         : emptyHTML(T("mp.nobody"), T("mp.nobodyHint")))
     + sectionHTML(T("mp.add"), `<div class="two">
         <label><i>${T("mp.who")}</i><input id="mp-q" list="mp-people" value="${esc(mp.q || "")}" placeholder="${esc(T("mp.whoPh"))}" autocomplete="off"${dis}>

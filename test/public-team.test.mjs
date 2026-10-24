@@ -253,3 +253,21 @@ test("一個 team 都沒填的人歸到最後那一組，不會消失", () => {
   assert.match(h, /Nobody/);
   assert.match(h, /還有這些人/);
 });
+
+// Paul 2026-10-24：Co-President 與 Senior Adviser 的職位不綁 team。/team/ 把他們排在最前面「領導」那一組，不進 team 組；
+// 另外一筆帶 team 的職位會以另一列進來、照常分組。public_team() 對沒 team 的職位會退回標籤上的 team，所以這裡看職位不看 team。
+test("★ 領導那一組在最前面，Co-President 不進 team 組", async () => {
+  const { isLeadership } = await import("../team/src/ui.js");
+  assert.equal(isLeadership("Co-President"), true); assert.equal(isLeadership("Senior Adviser"), true);
+  assert.equal(isLeadership("Director, Curriculum Team"), false); assert.equal(isLeadership("Adviser, Sponsorship Team"), false);
+  const h = peopleHTML([
+    P({ name_en: "A", team: "Marketing", title_en: "Director, Marketing Team", term: "2026-27" }),
+    P({ name_en: "Paul", team: "Sponsorship", title_en: "Co-President", term: "2026-27" }),
+    P({ name_en: "Paul", team: "Curriculum", title_en: "Associate, Curriculum Team", term: "2026-27" }),
+  ], "en");
+  const order = [...h.matchAll(/<h3>([^<]+)<\/h3>/g)].map(m => m[1]);
+  assert.deepEqual(order, ["Leadership", "Curriculum", "Marketing"], "領導在最前面，Sponsorship 組不出現（Paul 不進去）");
+  const lead = h.slice(h.indexOf("<h3>Leadership"), h.indexOf("<h3>Curriculum"));
+  assert.match(lead, /Paul/); assert.doesNotMatch(lead, /Director/);
+  assert.match(peopleHTML([P({ name_en: "Paul", team: "Sponsorship", title_en: "Co-President", term: "2026-27" })], "zh"), /<h3>領導<\/h3>/);
+});

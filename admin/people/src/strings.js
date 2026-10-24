@@ -58,6 +58,7 @@ export const COMMON = {
   "toast.undo":       { zh: "復原", en: "Undo" },
   "toast.close":      { zh: "關掉", en: "Close" },
   "ask.yes":          { zh: "確定", en: "Yes, do it" },
+  "grid.byRank":      { zh: "全部（職級）", en: "All (by rank)" },
   // 成員分頁（2026-10-23，第三次重整批 3）：對一個工作區是「管」的人，在那個東西自己的頁面上加人、改等級、移出。
   "level.view":       { zh: "看", en: "View" },
   "level.edit":       { zh: "改", en: "Edit" },
@@ -238,6 +239,8 @@ export const MINE = {
   "ws.name.apps":     { zh: "{team} 的申請", en: "{team} applications" },
   "ws.name.res":      { zh: "{team} 的資源", en: "{team} resources" },
   "grid.none":        { zh: "無", en: "None" },
+  // Paul 2026-10-24：Co-President 與 Senior Adviser 不綁 team；存取格對這兩級印「全部（職級）」
+  "pe.allTeams":      { zh: "全部 team", en: "All teams" },
   "grid.apps":        { zh: "申請", en: "Applications" },
   "grid.res":         { zh: "資源", en: "Resources" },
   "pe.wsNote":        { zh: "一格改了就存，左下角會告訴你，幾秒內按「復原」可以改回來。「管」的人可以在那個東西自己的頁面上加人。", en: "Each cell saves as you change it; the corner tells you, and Undo within a few seconds puts it back. Manage lets them add people on that thing's own page." },

@@ -386,12 +386,19 @@ test("★ 主程式：存取格改了就送、送反向的那一筆當復原；�
 test("★ 職位下拉：四級有 team 沒 team 推出來的字；既有紀錄對得上就選那一級、對不上是自訂；貼一整屆認職級名", () => {
   const want = { president: "Co-President", senior_adviser: "Senior Adviser", director: "Director", adviser: "Adviser", member: "Associate" };
   const wantZh = { ...want, adviser: "顧問" };
+  // Paul 2026-10-24：Co-President 與 Senior Adviser 不綁 team，推出來的字只有職級；其他三級接「, team」。
+  const orgWide = ["president", "senior_adviser"];
   for (const r of RANK_CHOICES) {
     assert.deepEqual(deriveTitle(r, ""), { title_en: want[r], title_zh: wantZh[r] });
-    assert.deepEqual(deriveTitle(r, "Curriculum Team"), { title_en: want[r] + ", Curriculum Team", title_zh: wantZh[r] + ", Curriculum Team" });
+    if (orgWide.includes(r)) assert.deepEqual(deriveTitle(r, "Curriculum Team"), { title_en: want[r], title_zh: wantZh[r] }, r + " 不接 team");
+    else assert.deepEqual(deriveTitle(r, "Curriculum Team"), { title_en: want[r] + ", Curriculum Team", title_zh: wantZh[r] + ", Curriculum Team" });
     assert.equal(rankOfTitle(deriveTitle(r, "Marketing Team").title_en, "Marketing Team"), r, "推出來的字反推得回那一級");
     assert.equal(rankByName(want[r].toUpperCase()), r);
   }
+  assert.equal(rankOfTitle("Co-President", "Sponsorship Team"), "president", "舊紀錄帶著 team 也認得出是 Co-President");
+  assert.equal(rankOfTitle("Co-President, Sponsorship Team", "Sponsorship Team"), "custom", "舊的「Co-President, Team」照存的印，不改");
+  const pasted = pasteParse("王平, Paul Wang, Co-President, Sponsorship Team\n小安, Ann, Director, Curriculum Team");
+  assert.deepEqual(pasted.rows.map(x => [x.title_en, x.team]), [["Co-President", ""], ["Director, Curriculum Team", "Curriculum Team"]], "貼一整屆：這兩級忽略 team 那一欄");
   assert.equal(rankOfTitle("Director, Curriculum Team", "Marketing Team"), "custom", "team 對不上就不是那一級");
   assert.equal(rankOfTitle("Head of Fun", ""), "custom");
   assert.equal(rankOfTitle("", ""), "");
@@ -512,4 +519,28 @@ test("★ 邀請信的遷移檔：六欄、兩張表的 kind 收 invite、六支
   assert.match(mig, /要先跑過 2026-10-28-adviser-rank\.sql/);
   assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /2026-10-29-invites\.sql/);
   assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /invite_wrong_email/, "smoke 有 email 綁定的破壞測試");
+});
+
+// Paul 2026-10-24：Co-President 與 Senior Adviser 的職位不綁 team（表單鎖住印「全部 team」）；存取格對這兩級印「全部（職級）」；
+// 工作區成員清單把這兩級置頂標「依職級」、沒有下拉與移出。
+test("★ 不綁 team 的兩級：表單 team 鎖住、名單印「全部 team」、存取格鎖住、成員清單置頂「依職級」", async () => {
+  const { isOrgWide, ORG_WIDE } = await import("../admin/people/src/ui.js");
+  assert.deepEqual(ORG_WIDE, ["president", "senior_adviser"]); assert.equal(isOrgWide("adviser"), false, "Adviser 綁 team");
+  const pres = personEditHTML(PEOPLE[0], TERMS, ME, true, "", false, null, PEOPLE, null, undefined, []);
+  assert.match(pres, /<select id="pk-pteam-0" disabled data-orgwide="1"><option value="" selected>全部 team<\/option><\/select>/, "Co-President 那一列 team 鎖住");
+  assert.match(pres, /<select class="byrank" disabled[^>]*><option selected>全部（職級）<\/option><\/select>/, "存取格每一格印全部（職級）");
+  assert.doesNotMatch(pres, /data-act="grid-level"/, "沒有可以改的格");
+  assert.match(pres, /本來就看得到、改得動每一個工作區/, "那一句說明留著");
+  const dir = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, null, PEOPLE, null, undefined, []);
+  assert.match(dir, /<select id="pk-pteam-0">/); assert.match(dir, /data-act="grid-level"/);
+  const ro = rosterHTML(PEOPLE, TERMS, ME, true, "", false, null, []);
+  assert.match(ro, /Co-President<div class="mini">全部 team<\/div>/, "名單：Co-President · 全部 team");
+  const ws = [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "Curriculum Team 的申請", active: true }];
+  const h = workspacesHTML(ws, "apps:Curriculum Team", [{ user_id: PEOPLE[2].profile_id, name_zh: "", name_en: "Mei", board_role: "member", level: "view" }], PEOPLE, "", false, null, true);
+  const lead = h.indexOf('class="byrank"'), mei = h.indexOf('data-act="ws-level"');
+  assert.ok(lead > 0 && lead < mei, "Co-President 置頂");
+  assert.match(h, /<tr class="byrank">[\s\S]*?王平[\s\S]*?全部（職級）/);
+  assert.doesNotMatch(h.slice(lead, mei), /ws-unassign|ws-level/, "依職級那一列沒有下拉與移出");
+  const src = readFileSync("admin/people/src/main.js", "utf8");
+  assert.match(src, /team = UI\.isOrgWide\(rank\) \? "" : val\(`pk-pteam-\$\{i\}`\)/, "存的時候 team 是空的");
 });

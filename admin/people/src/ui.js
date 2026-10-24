@@ -246,14 +246,18 @@ export function membersPanelHTML(mp, msg, busy) {
   const lv = l => T("level." + l);
   const rows = mp.rows || [];
   const inWs = new Set(rows.map(r => r.user_id));
+  // Co-President 與 Senior Adviser 本來就到得了（is_senior），列在最上面標「依職級」，沒有下拉也沒有移出。只是畫面。
+  const seniors = (mp.cadres || []).filter(p => ["president", "senior_adviser"].includes(p.board_role) && !inWs.has(p.id));
+  const seniorRow = p => `<tr class="byrank"><td class="t-main"><b>${esc(mpName(p))}</b> <span class="tag">${esc(boardName(p.board_role))}</span> <span class="tag open">${T("grid.byRank")}</span>${p.id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
+    <td><span class="mini">${esc(lv("manage"))}</span></td><td></td></tr>`;
   const row = r => `<tr><td class="t-main"><b>${esc(mpName(r))}</b> <span class="tag">${esc(boardName(r.board_role))}</span>${r.user_id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
     <td><select data-act="members-level" data-id="${esc(r.user_id)}" aria-label="${esc(T("mp.level"))}"${dis}>${LV.map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></td>
     <td class="t-act"><button class="btn quiet sm" data-act="members-unassign" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></td></tr>`;
   return pageHead(T("mp.title", { name: esc(mp.name || mp.ws) }), T("mp.lede"), [], { act: "members-back", label: T("mp.back") })
     + msgHTML(msg)
     + `<div class="note">${T("mp.levels")}</div>`
-    + sectionHTML(T("mp.list"), rows.length
-        ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${rows.map(row).join("")}</tbody></table>`
+    + sectionHTML(T("mp.list"), rows.length || seniors.length
+        ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${seniors.map(seniorRow).join("")}${rows.map(row).join("")}</tbody></table>`
         : emptyHTML(T("mp.nobody"), T("mp.nobodyHint")))
     + sectionHTML(T("mp.add"), `<div class="two">
         <label><i>${T("mp.who")}</i><input id="mp-q" list="mp-people" value="${esc(mp.q || "")}" placeholder="${esc(T("mp.whoPh"))}" autocomplete="off"${dis}>
@@ -329,8 +333,12 @@ const rankZh = v => { const r = BOARD_ROLES.find(x => x.v === v); return r ? T({
 // 存的 title_en / title_zh 從職級標籤加 team 推出來：「Director, Curriculum Team」，沒有 team 就只有「Director」。
 // 中文那一欄也用同一個英文標籤（職級在中文畫面本來就印英文），加 team。選「自訂」才露出兩個文字框，存他打的。
 export const RANK_CHOICES = BOARD_ROLES.map(r => r.v);
+// 不綁 team 的兩級（Paul 2026-10-24）：Co-President 與 Senior Adviser 是整個組織的，職位上沒有 team，推出來的字就只有職級。
+// Adviser（10-28 那一級）跟著一個 team，不在這裡。
+export const ORG_WIDE = ["president", "senior_adviser"];
+export const isOrgWide = rank => ORG_WIDE.includes(rank);
 export function deriveTitle(rank, team) {
-  const t = String(team || "").trim();
+  const t = isOrgWide(rank) ? "" : String(team || "").trim();
   const en = RANK_EN[rank] || "", zh = rankZh(rank) || en;
   return { title_en: t ? `${en}, ${t}` : en, title_zh: t ? `${zh}, ${t}` : zh };
 }
@@ -376,10 +384,11 @@ export function accessGridHTML(p, workspaces, busy) {
   const have = Object.fromEntries((Array.isArray(p.workspaces) ? p.workspaces : []).map(w => [w.id, w.level]));
   const active = (workspaces || []).filter(w => w.active !== false);
   const exists = id => !active.length || active.some(w => w.id === id);
-  const cell = id => exists(id)
-    ? `<select data-act="grid-level" data-id="${esc(p.profile_id)}" data-ws="${esc(id)}" aria-label="${esc(wsName(id, workspaces))}"${dis}>${
-        ["", ...LEVELS].map(l => `<option value="${l}"${(have[id] || "") === l ? " selected" : ""}>${l ? esc(levelLabel(l)) : esc(T("grid.none"))}</option>`).join("")}</select>`
-    : `<span class="mini">—</span>`;
+  const byRank = isOrgWide(p.board_role);
+  const cell = id => !exists(id) ? `<span class="mini">—</span>` : byRank
+    ? `<select class="byrank" disabled aria-label="${esc(wsName(id, workspaces))}"><option selected>${T("grid.byRank")}</option></select>`
+    : `<select data-act="grid-level" data-id="${esc(p.profile_id)}" data-ws="${esc(id)}" aria-label="${esc(wsName(id, workspaces))}"${dis}>${
+        ["", ...LEVELS].map(l => `<option value="${l}"${(have[id] || "") === l ? " selected" : ""}>${l ? esc(levelLabel(l)) : esc(T("grid.none"))}</option>`).join("")}</select>`;
   const teamRows = TEAMS.map(t => `<tr><th scope="row">${esc(t.replace(/\s*Team$/i, ""))}</th><td>${cell("apps:" + t)}</td><td>${cell("res:" + t)}</td></tr>`).join("");
   const single = (id, label) => `<tr><th scope="row">${esc(label)}</th><td colspan="2">${cell(id)}</td></tr>`;
   const customs = active.filter(w => w.kind === "custom").map(w => single(w.id, wsLabel(w))).join("");
@@ -463,7 +472,7 @@ export function pasteParse(text) {
     const c = s.split(/\t|,|，/).map(x => x.trim());
     const rank = rankByName(c[2]);
     const titles = rank ? deriveTitle(rank, c[3] || "") : { title_en: c[2] || "", title_zh: c[2] || "" };
-    const r = { name_zh: c[0] || "", name_en: c[1] || "", title_en: titles.title_en, title_zh: titles.title_zh, team: c[3] || "" };
+    const r = { name_zh: c[0] || "", name_en: c[1] || "", title_en: titles.title_en, title_zh: titles.title_zh, team: isOrgWide(rank) ? "" : (c[3] || "") };
     if (!r.name_zh && !r.name_en) { bad.push(i + 1); return; }
     rows.push(r);
   });
@@ -512,7 +521,8 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
         dup ? ` <span class="tag warn">${T("ro.maybeDup")}</span>` : ""}${
         p.pending_code ? `<div class="mini">${T("ro.pendingCode", { code: esc(p.pending_code) })}</div>` : ""}</td>
       <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
-      <td>${pos ? `${esc(positionsLine(p, pos.term))}${positionsFor(p, pos.term).some(x => x.team) ? `<div class="mini">${esc(positionsFor(p, pos.term).map(x => x.team).filter(Boolean).join(T("punct.list")))}</div>` : ""}`
+      <td>${pos ? `${esc(positionsLine(p, pos.term))}${positionsFor(p, pos.term).some(x => x.team) ? `<div class="mini">${esc(positionsFor(p, pos.term).map(x => x.team).filter(Boolean).join(T("punct.list")))}</div>`
+               : positionsFor(p, pos.term).some(x => isOrgWide(rankOfTitle(x.title_en, ""))) ? `<div class="mini">${T("pe.allTeams")}</div>` : ""}`
                : lastPos ? `<span class="mini">${esc(positionTitle(lastPos))}・${esc(lastPos.term)}</span>` : `<span class="mini">${T("ro.noPosition")}</span>`}${
         hasAccount(p) && p.role === "cadre" && !parseTeams(p.team).length
           ? `<div style="margin-top:6px"><select data-act="row-team" data-id="${esc(p.profile_id)}" aria-label="${esc(T("ro.setTeam"))}"${dis}><option value="">${T("ro.setTeam")}</option>${
@@ -548,7 +558,9 @@ export function changesHTML(changes, people, msg) {
       : emptyHTML(T("ch.empty"), T("ch.emptyHint")), { id: "changes" });
 }
 
-const teamSelect = (id, val, dis) => {
+// orgWide = true：職級是 Co-President 或 Senior Adviser，整格鎖住、只印「全部 team」，存的時候 team 是空的。
+const teamSelect = (id, val, dis, orgWide) => {
+  if (orgWide) return `<select id="${id}" disabled data-orgwide="1"><option value="" selected>${T("pe.allTeams")}</option></select>`;
   const extra = val && !TEAMS.includes(val) ? [val] : [];
   return `<select id="${id}"${dis}><option value=""${!val ? " selected" : ""}>${T("value.none")}</option>${
     [...TEAMS, ...extra].map(t => `<option value="${esc(t)}"${val === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
@@ -596,7 +608,7 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
   const posRow = (r, i) => { const rank = r.rank != null ? r.rank : rankOfTitle(r.title_en, r.team); return `<div class="card posrow" data-posrow="${i}" data-orig="${r.orig == null ? "" : esc(r.orig)}" data-isnew="${r.orig == null ? "1" : "0"}">
       <div class="two">
         <label><i>${T("pe.rankPick")}</i>${rankSelect(`pk-rank-${i}`, rank, dis)}</label>
-        <label><i>${T("pe.posTeam")}</i>${teamSelect(`pk-pteam-${i}`, r.team, dis)}</label>
+        <label><i>${T("pe.posTeam")}</i>${teamSelect(`pk-pteam-${i}`, r.team, dis, isOrgWide(rank))}</label>
       </div>
       <div class="two"${rank === "custom" ? "" : " hidden"}>
         <label><i>${T("pe.titleEn")}</i><input id="pk-ten-${i}" value="${esc(r.title_en)}" placeholder="Director, Curriculum Team"${dis}></label>
@@ -668,7 +680,7 @@ export function personNewHTML(terms, msg, busy, draft) {
     <label><i>${T("pe.term")}</i><select id="pn-term"${dis}>${(terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
     <div class="two">
       <label><i>${T("pe.rankPick")}</i>${rankSelect("pn-rank", d.rank != null ? d.rank : rankOfTitle(d.title_en, d.pteam), dis)}</label>
-      <label><i>${T("pe.posTeam")}</i>${teamSelect("pn-pteam", d.pteam || "", dis)}</label>
+      <label><i>${T("pe.posTeam")}</i>${teamSelect("pn-pteam", d.pteam || "", dis, isOrgWide(d.rank != null ? d.rank : rankOfTitle(d.title_en, d.pteam)))}</label>
     </div>
     <div class="two"${(d.rank != null ? d.rank : rankOfTitle(d.title_en, d.pteam)) === "custom" ? "" : " hidden"}>
       <label><i>${T("pe.titleEn")}</i><input id="pn-ten" value="${esc(d.title_en || "")}" placeholder="Associate, Marketing Team"${dis}></label>
@@ -701,11 +713,18 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
       <td><select data-act="ws-level" data-id="${esc(m.user_id)}"${dis}>${LEVELS.map(l => `<option value="${l}"${m.level === l ? " selected" : ""}>${esc(levelLabel(l))}</option>`).join("")}</select></td>
       <td class="t-act"><button class="btn quiet sm" data-act="ws-unassign" data-id="${esc(m.user_id)}"${dis}>${T("ws.remove")}</button></td>
     </tr>`;
+  // Co-President 與 Senior Adviser 本來就到得了每一個工作區（is_senior）。列在最上面、標「依職級」、沒有下拉也沒有移出，
+  // 這樣看的人（例如 Director）知道還有誰到得了。只是畫面，資料庫沒有這幾筆指派。
+  const seniors = cadres.filter(p => isOrgWide(p.board_role) && !inWs.has(p.profile_id));
+  const seniorRow = p => `<tr class="byrank">
+      <td class="t-main"><b>${esc(personName(p).name)}${personName(p).alt ? `<span class="alt">${esc(personName(p).alt)}</span>` : ""}</b> <span class="tag">${esc(boardLabel(p.board_role))}</span> <span class="tag open">${T("grid.byRank")}</span></td>
+      <td><span class="mini">${T("level.manage")}</span></td><td></td>
+    </tr>`;
   const right = !w ? `<div class="empty"><b>${T("ws.pickOne")}</b></div>` : `
     <h2>${esc(wsLabel(w))}<span class="hint">${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
     <div class="note">${T("ws.levels")}</div>
-    ${(members || []).length
-      ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ws.level")}</th><th></th></tr></thead><tbody>${members.map(memberRow).join("")}</tbody></table>`
+    ${(members || []).length || seniors.length
+      ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ws.level")}</th><th></th></tr></thead><tbody>${seniors.map(seniorRow).join("")}${(members || []).map(memberRow).join("")}</tbody></table>`
       : emptyHTML(T("ws.nobody"), T("ws.nobodyHint"))}
     <div class="card" style="margin-top:16px"><h2>${T("ws.add")}</h2>
       <div class="two">
@@ -914,7 +933,7 @@ export function inviteFormNewHTML(draft, terms, busy) {
       <label><i>${T("in.email")}</i><input id="in-email" type="email" value="${esc(d.email || "")}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="name@example.com"${dis}></label>
       <label><i>${T("in.who")}</i><select id="in-who"${dis}>${INVITE_WHO.map(v => `<option value="${v}"${who === v ? " selected" : ""}>${esc(whoLabel(v))}</option>`).join("")}</select></label>
       <label><i>${T("in.position")}</i>${rankSelect("in-rank", posRank, dis)}</label>
-      <label><i>${T("pe.posTeam")}</i>${teamSelect("in-team", d.team || "", dis)}</label>
+      <label><i>${T("pe.posTeam")}</i>${teamSelect("in-team", d.team || "", dis, isOrgWide(posRank))}</label>
     </div>
     <div class="two"${posRank === "custom" ? "" : " hidden"}>
       <label><i>${T("pe.titleEn")}</i><input id="in-ten" value="${esc(d.title_en || "")}" placeholder="Director, Curriculum Team"${dis}></label>

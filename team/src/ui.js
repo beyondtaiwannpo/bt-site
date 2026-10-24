@@ -66,9 +66,17 @@ export function rankWeight(title) {
   if (t.startsWith("adviser")) return 1;
   return 2;
 }
+// 整個組織的職位（Paul 2026-10-24）：職位本身就是「Co-President」或「Senior Adviser」（沒有逗號接 team）。
+// public_team() 對沒有 team 的職位會退回那個人標籤上的 team，所以這裡不看 row.team，看職位開頭那個字。
+export function isLeadership(title_en) {
+  const t = String(title_en || "").trim().toLowerCase().replace(/\s*·.*$/, "");
+  return t === "co-president" || t === "senior adviser" || t === "president";
+}
+export const LEAD_KEY = "__lead";
 export function toPerson(row) {
   const avatar = row.avatar || "";
   return {
+    lead: isLeadership(row.title_en || row.title_zh || row.public_title),
     zh: row.name_zh || "",
     en: row.name_en || "",
     // 2026-10-24 Paul：對外頁面不放中文。首字與大字都先用英文名，沒有英文名才退回中文。
@@ -94,15 +102,17 @@ export function byTeam(people) {
     // 在好幾個 team 的人，每一組都會出現一次。那是刻意的：
     // 這一頁回答的是「這個 team 有誰」，不是「這個人在哪裡」。
     // 一個 team 都沒填的人歸到最後那一組（key 是空字串）。
-    for (const t of (p.teams && p.teams.length ? p.teams : [""])) {
+    // 整個組織的職位進最前面那一組，不進 team 組；他另外那一筆帶 team 的職位會以另一列進來、照常分組。
+    for (const t of (p.lead ? [LEAD_KEY] : (p.teams && p.teams.length ? p.teams : [""]))) {
       if (!map.has(t)) map.set(t, []);
       map.get(t).push(p);
     }
   }
+  const lead = map.has(LEAD_KEY) ? [LEAD_KEY] : [];
   const known = TEAM_ORDER.filter(t => map.has(t));
-  const rest = [...map.keys()].filter(t => t && !TEAM_ORDER.includes(t)).sort();
+  const rest = [...map.keys()].filter(t => t && t !== LEAD_KEY && !TEAM_ORDER.includes(t)).sort();
   const none = map.has("") ? [""] : [];
-  return [...known, ...rest, ...none].map(key => ({ key, people: map.get(key) }));
+  return [...lead, ...known, ...rest, ...none].map(key => ({ key, people: map.get(key) }));
 }
 
 // 沒有大頭照的人用名字的第一個字。
@@ -122,7 +132,9 @@ export function peopleHTML(people, lang) {
   if (!people || !people.length) return "";
   return byTeam(people).map(g => {
     const sub = TEAM_SUB[g.key] ? TEAM_SUB[g.key][lang === "en" ? 1 : 0] : "";
-    const head = g.key
+    const head = g.key === LEAD_KEY
+      ? `<h3>${lang === "en" ? "Leadership" : "領導"}</h3><p class="sub">${lang === "en" ? "Co-Presidents and Senior Advisers" : "Co-President 與 Senior Adviser"}</p>`
+      : g.key
       ? `<h3>${esc(g.key)}</h3>${sub ? `<p class="sub">${esc(sub)}</p>` : `<p class="sub"></p>`}`
       : `<h3>${lang === "en" ? "Also on the board" : "還有這些人"}</h3><p class="sub"></p>`;
     return `<section class="teamsec">${head}<ul class="crew">${g.people.map(cardHTML).join("")}</ul></section>`;

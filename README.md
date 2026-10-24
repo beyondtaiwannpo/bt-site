@@ -3372,6 +3372,18 @@ Paul 2026-10-24：加一級「Adviser」。Senior Adviser 是不屬於 team 的�
 跑這一支之前，後台把人改成 Adviser 會被資料庫擋（`bad_role`），畫面上的選項已經在。
 本機 `./scripts/db/smoke.sh` 多一段：改成 Adviser、不是 senior、派不了人、記了一筆、壞值照擋、重跑。
 
+### Co-President 與 Senior Adviser 不綁 team；存取格與成員清單印「依職級」（2026-10-24）
+
+Paul 看了改一個人那一頁：這兩級是整個組織的，不該掛在某一個 team 底下；而他們的存取格每一格都「無」加一句說明，看起來像沒權限。
+
+- **職位**：職位下拉選 Co-President 或 Senior Adviser 的時候，team 那一格鎖住、印「全部 team」，存的 team 是空的，推出來的字只有職級（「Co-President」，沒有「, Team」）。Adviser（10-28 那一級）照舊跟著一個 team。
+  既有帶 team 的這兩級紀錄照存的印，再存一次 team 就清掉。貼一整屆的那一行是這兩級就忽略 team 那一欄。名單印「Co-President · 全部 team」。
+- **`/team/`**：這兩級的職位排在最前面一組「領導」（英文 Leadership），不進 team 組；他另外那一筆帶 team 的職位（例如兼 Curriculum 的 Associate）會以另一列進來、照常分組。前端看的是職位開頭那個字，不看 `public_team()` 退回的 team，所以**沒有遷移檔**。
+- **存取格**：這兩級每一格是鎖住的「全部（職級）」，淡色、虛線框，那一句說明留著。
+- **Workspaces 的成員清單與 Forms、Resources、兩本護照後台的成員分頁**：這兩級置頂、標「依職級」、沒有下拉也沒有移出，Director 看得出還有誰到得了自己的工作區。只是畫面：`my_access()` 與 `can_*` 本來就對 `is_senior()` 直接放行，資料庫沒有這幾筆指派。
+
+測試 577 項、`./check.sh`、`node scripts/check-mobile.mjs` 全過。截圖 `docs/admin-redesign/v3/b7-01`。沒有遷移檔。
+
 ### 以後加東西怎麼加（寫給明年接手的人，取代 10-19 那一版的八步）
 
 **先回答一題：這個東西是不是「要派人進去做」的？** 是（營隊、專案、新的護照）就是一個**工作區**；不是（一張只有 Co-President 看的報表）就只是一個**分頁**。

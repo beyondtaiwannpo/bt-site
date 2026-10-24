@@ -579,3 +579,15 @@ test("★ 總覽「你的存取」：被派的人一行一個工作區加直達�
   assert.match(view, /data-act="open-apps" data-id="f1">去看/);
   assert.match(readFileSync("app/src/main.js", "utf8"), /S\.profile && S\.profile\.name \? "\.\.\/admin\/" : "\.\.\/settings\/"/, "幹部登入後進總覽，沒名字的才進設定");
 });
+
+test("成員分頁：Co-President 與 Senior Adviser 置頂標「依職級」，沒有下拉與移出", () => {
+  const mp = { ws: "apps:Curriculum Team", name: "x", meId: "u1",
+    rows: [{ user_id: "u3", name_zh: "", name_en: "Mei", board_role: "member", level: "view" }],
+    cadres: [{ id: "u1", name_zh: "王平", name_en: "Paul", board_role: "president" }, { id: "u3", name_zh: "", name_en: "Mei", board_role: "member" }, { id: "u5", name_zh: "", name_en: "Sa", board_role: "senior_adviser" }] };
+  const h = FORMS.membersPanelHTML(mp, "", false);
+  const first = h.indexOf("<tbody>"), lead = h.indexOf('class="byrank"'), mei = h.indexOf('data-act="members-level" data-id="u3"');
+  assert.ok(first < lead && lead < mei);
+  assert.equal((h.match(/class="byrank"/g) || []).length, 2);
+  assert.doesNotMatch(h.slice(0, mei), /members-unassign/);
+  assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: mp.cadres }, "", false), /依職級|全部（職級）/, "沒有指派也列得出依職級的人");
+});
