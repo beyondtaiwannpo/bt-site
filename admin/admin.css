@@ -396,11 +396,19 @@ a.btn{text-decoration:none}
 .ro-search{max-width:320px;margin-bottom:10px}
 .ro-search input{padding:8px 11px}
 .table select[data-act="row-team"]{max-width:200px}
-/* 新增工作區那張表單底下的名單：一行一個人，勾選在左、等級在右。 */
-.wsn-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:2px 20px}
-.wsn-row{margin-top:0;padding:4px 0;justify-content:space-between}
-.wsn-row .check{flex:1}
-.wsn-row select{min-width:80px}
+/* 多選加人（2026-10-24）：找名字與等級一排、team chip、名單在一個會捲的框裡（兩欄排到手機變一欄）、底下一顆「加 N 個人」。 */
+.picker{margin-top:4px}
+.pk-chips{margin-top:8px}
+.pk-tools{margin-top:8px;align-items:center}
+.pk-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:0 20px;max-height:min(46vh,420px);overflow:auto;
+  margin-top:6px;padding:4px 8px;border:1px solid rgba(16,42,134,.12);border-radius:12px;background:rgba(255,255,255,.55)}
+.pk-row{margin:0;padding:6px 0}
+.pk-row .tag{margin-left:2px}
+.pk-foot{margin-top:12px;align-items:center}
+@media (max-width:720px){
+  .pk-list{max-height:52vh}
+  .pk-foot{position:sticky;bottom:0;z-index:4;padding:10px 0;background:var(--bt-cream);box-shadow:0 -8px 16px rgba(255,255,255,.9)}
+}
 @media (max-width:720px){
   .table.grid thead{display:table-header-group}
   .table.grid tr{display:table-row;padding:0;border:0}

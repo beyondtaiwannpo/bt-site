@@ -83,7 +83,9 @@ test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellH
     assert.deepEqual(M.ITEMS, FORMS.ITEMS, `${label} 的 ITEMS 跟 admin/ 不一樣`);
     for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
                        "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML",
-                       "mpName", "mpFind", "mpItems", "mpLinksHTML", "membersPanelHTML"]) {
+                       "mpName", "mpFind", "mpItems", "mpLinksHTML", "membersPanelHTML",
+                       "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "pickerHTML"]) {
+      if (fn === "PK_TEAMS") continue;
       assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
     }
   }
@@ -523,10 +525,13 @@ test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只�
   assert.match(h, /這是你/);
   assert.match(h, /<select data-act="members-level" data-id="u3"[^>]*><option value="view" selected>看/);
   assert.match(h, /data-act="members-unassign" data-id="u3"/);
-  const pick = h.slice(h.indexOf('<datalist id="mp-people">'), h.indexOf("</datalist>"));
-  assert.match(pick, /<option value="小新 \(Shin\)">/);
+  // 2026-10-24 加人改成多選那一塊（pickerHTML，ns "mp"）：還沒在裡面的幹部一列一個勾選；在裡面的與靠職級的不列。
+  const pick = h.slice(h.indexOf('<div class="pk-list">'), h.indexOf('<div class="row pk-foot">'));
+  assert.match(pick, /name="mp-member" value="u4" data-act="pk-tick" data-ns="mp"/);
+  assert.match(pick, /<b>小新 \(Shin\)<\/b> <span class="tag">Associate<\/span>/);
   assert.doesNotMatch(pick, /Mei/, "已經在裡面的不列");
-  assert.match(h, /data-act="members-assign" data-ws="apps:Curriculum Team"/);
+  assert.doesNotMatch(pick, /王平/, "Co-President 靠職級就有，不列");
+  assert.match(h, /data-act="members-assign" data-ns="mp" data-ws="apps:Curriculum Team" disabled>加 0 個人</, "沒勾人那顆是灰的");
   assert.equal(FORMS.mpFind(mp.cadres, "小新 (Shin)").id, "u4");
   assert.equal(FORMS.mpFind(mp.cadres, "mei").id, "u3");
   assert.equal(FORMS.mpFind(mp.cadres, "x"), null);
@@ -538,6 +543,67 @@ test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只�
   assert.match(SITE.resListHTML([], true, "", false, items), /data-act="members-open"/);
 });
 
+// 2026-10-24 Paul：「一次很難加好幾個人」。加人改成多選：篩名字、team chip、全勾看到的、一個等級、加 N 個人、復原移出那 N 個。
+test("★ 多選加人：不列在裡面的與靠職級的；找名字含中英；team chip 是其中任何一個；全勾只勾篩出來的；人數在按鈕上；復原只移這一批", async () => {
+  const people = [
+    { id: "u1", name_zh: "王平", name_en: "Paul", board_role: "president", team: "Curriculum Team" },
+    { id: "u2", name_zh: "小安", name_en: "", board_role: "director", team: "Curriculum Team" },
+    { id: "u3", name_zh: "", name_en: "Mei", board_role: "member", team: "Marketing Team, Internship Team" },
+    { id: "u4", name_zh: "小新", name_en: "Shin", board_role: "member", team: "Marketing Team" },
+    { id: "u5", name_zh: "阿顧", name_en: "Gu", board_role: "senior_adviser", team: "" },
+    { id: "u6", name_zh: "小美", name_en: "May", board_role: "adviser", team: "" }];
+  const cands = FORMS.pkCandidates(people, ["u2"]);
+  assert.deepEqual(cands.map(p => p.id), ["u3", "u4", "u6"], "在裡面的 u2 不列，Co-President 與 Senior Adviser 不列");
+  assert.deepEqual(FORMS.pkShown(cands, { q: "shin" }).map(p => p.id), ["u4"], "英文名包含就算");
+  assert.deepEqual(FORMS.pkShown(cands, { q: "小" }).map(p => p.id), ["u4", "u6"], "中文名包含就算");
+  assert.deepEqual(FORMS.pkShown(cands, { teams: ["Internship Team"] }).map(p => p.id), ["u3"], "team chip 看的是他勾的每一個 team");
+  assert.deepEqual(FORMS.pkShown(cands, { teams: ["Internship Team", "Marketing Team"] }).map(p => p.id), ["u3", "u4"], "勾兩個 chip 是其中任何一個");
+  assert.deepEqual(FORMS.pkShown(cands, { q: "mei", teams: ["Curriculum Team"] }), [], "名字與 team 都要對得上");
+  // 全勾看到的：只勾篩出來的那幾個，原本勾的留著；全部取消是空。
+  const el = (act, extra) => ({ dataset: Object.assign({ act, ns: "mp" }, extra || {}) });
+  let pk = FORMS.pkReduce(null, people, ["u2"], Object.assign(el("pk-q"), { value: "小" }));
+  assert.equal(pk.q, "小");
+  pk = FORMS.pkReduce(pk, people, ["u2"], el("pk-all"));
+  assert.deepEqual(pk.ticked, ["u4", "u6"], "全勾只勾篩出來的");
+  pk = FORMS.pkReduce(pk, people, ["u2"], Object.assign(el("pk-q"), { value: "" }));
+  pk = FORMS.pkReduce(pk, people, ["u2"], Object.assign(el("pk-tick"), { value: "u3", checked: true }));
+  assert.deepEqual(pk.ticked, ["u4", "u6", "u3"]);
+  pk = FORMS.pkReduce(pk, people, ["u2"], Object.assign(el("pk-tick"), { value: "u6", checked: false }));
+  assert.deepEqual(pk.ticked, ["u4", "u3"]);
+  pk = FORMS.pkReduce(pk, people, ["u2"], el("pk-team", { team: "Marketing Team" }));
+  assert.deepEqual(pk.teams, ["Marketing Team"]);
+  pk = FORMS.pkReduce(pk, people, ["u2"], el("pk-team", { team: "Marketing Team" }));
+  assert.deepEqual(pk.teams, [], "再按一次就拿掉");
+  pk = FORMS.pkReduce(pk, people, ["u2"], Object.assign(el("pk-level"), { value: "edit" }));
+  assert.equal(pk.level, "edit");
+  // 勾過的人後來被加進去了（在裡面）就不算：pkPicked 只算還列得出來的。
+  assert.deepEqual(FORMS.pkPicked(people, ["u2", "u3"], pk), ["u4"]);
+  const h = FORMS.pickerHTML("mp", people, ["u2"], pk, false, { act: "members-assign", ws: "apps" });
+  assert.match(h, /<button class="btn" data-act="members-assign" data-ns="mp" data-ws="apps">加 2 個人<\/button>/, "按鈕上的數字是勾了幾個人");
+  assert.match(h, /列出 3 人，可以加的共 3 人/);
+  assert.match(h, /data-team="Marketing Team"/); assert.match(h, /data-team="Internship Team"/);
+  assert.doesNotMatch(h, /data-team="Curriculum Team"/, "沒有可加的人的 team 不出 chip");
+  assert.match(h, /value="u4" data-act="pk-tick" data-ns="mp" checked/);
+  assert.match(h, /<option value="edit" selected>/);
+  assert.match(h, /<span class="mini">Marketing<\/span> <span class="mini">Internship<\/span>/, "team 標籤，不帶 Team 那個字");
+  assert.doesNotMatch(FORMS.pickerHTML("wsn", people, [], pk, false, null), /pk-foot/, "沒給按鈕就不畫（新增工作區那張表單自己算）");
+  assert.match(FORMS.pickerHTML("mp", people, ["u2", "u3", "u4", "u6"], {}, false, { act: "x" }), /每一位幹部都已經在裡面了/);
+  assert.match(FORMS.pickerHTML("mp", people, [], { q: "zzz" }, false, { act: "x" }), /沒有對得上的人/);
+  assert.match(FORMS.pickerHTML("mp", people, [], pk, true, { act: "x" }), /存檔中…/);
+  assert.equal(FORMS.pkReduce(pk, people, [], el("pk-none")).ticked.length, 0);
+  // 復原只移出這一批：做出復原之後清單再變也不影響。
+  const removed = []; const ids = ["u4", "u3"];
+  const undo = FORMS.batchUndo(ids, async id => { removed.push(id); });
+  ids.push("u6");
+  assert.equal(await undo(), 2);
+  assert.deepEqual(removed, ["u4", "u3"], "後來多勾的 u6 不會被移出");
+  // 英文的單複數。
+  const { T: Ten, setLang: setL } = await import("../admin/src/strings.js");
+  setL("en");
+  assert.equal(Ten("pk.addN", { n: 1 }), "Add 1 person"); assert.equal(Ten("pk.addN", { n: 3 }), "Add 3 people");
+  setL("zh");
+});
+
 test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、加、移出、改等級，寫的是 assign / unassign，不讀 email", () => {
   for (const f of ["admin/src", "admin/site/src", "admin/passports/src"]) {
     const m = readFileSync(`${f}/main.js`, "utf8"), d = readFileSync(`${f}/data.js`, "utf8");
@@ -545,7 +611,14 @@ test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、�
     assert.match(m, /UI\.needAsk\(S, b, T\("confirm\.mpRemove"/, `${f} 移出要先問一次`);
     assert.match(m, /S\.undo = /, `${f} 要有復原`);
     assert.match(d, /rpc\("workspace_members"/); assert.match(d, /rpc\("assign"/); assert.match(d, /rpc\("unassign"/);
-    assert.match(d, /from\("profiles"\)\.select\("id, name_zh, name_en, board_role"\)/, `${f} 找人只讀名字與職級`);
+    assert.match(d, /from\("profiles"\)\.select\("id, name_zh, name_en, board_role, team"\)/, `${f} 找人只讀名字、職級、team`);
+    // 2026-10-24 一次加一批：每個人一支 assign() 同時送、復原是 batchUndo 那一批、勾選與打字走 pkReduce。
+    assert.match(m, /UI\.pkPicked\(S\.mp\.cadres/, `${f} 加人要從勾起來的人算`);
+    assert.match(m, /Promise\.all\(ids\.map\(id => D\.assign\(id, ws, level\)/, `${f} 一批人同時送`);
+    assert.match(m, /UI\.batchUndo\(done, id => D\.unassign\(id, ws\)\)/, `${f} 復原移出的是這一批`);
+    assert.match(m, /UI\.pkReduce\(S\.mp\.pk/, `${f} 勾選與打字走 pkReduce`);
+    assert.match(m, /UI\.pkRefocus\(/, `${f} 打字重畫後游標要放回去`);
+    assert.match(m, /e\.key !== "Enter"/, `${f} Enter 要送出`);
     assert.doesNotMatch(d, /person_email/, `${f} 不准讀 email`);
   }
 });

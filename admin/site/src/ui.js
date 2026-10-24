@@ -221,7 +221,7 @@ export function afterRender(S, root) {
 // 對一個工作區是「管」的人（Director）在那個東西自己的頁面上（Forms、Resources、兩本護照後台）看到誰在裡面、加人、改等級、移出，
 // 不用進 /admin/people/。讀 workspace_members()（where 裡有 can_manage）、寫 assign() / unassign()（第一句 can_manage），
 // 沒有新的資料庫函式。找人的清單從 profiles 讀（幹部本來就讀得到所有幹部的名字），不讀 email。四份一模一樣（測試逐字比對）。
-// mp = { ws, name, rows: workspace_members 回的, cadres: [{ id, name_zh, name_en, board_role }], meId, q, level }
+// mp = { ws, name, rows: workspace_members 回的, cadres: [{ id, name_zh, name_en, board_role, team }], meId, pk（多選加人的狀態，見 pickerHTML）}
 export function mpName(r) {
   const zh = String(r && r.name_zh || "").trim(), en = String(r && r.name_en || "").trim();
   return zh ? (en ? `${zh} (${en})` : zh) : (en || T("common.noName"));
@@ -233,6 +233,71 @@ export function mpFind(people, q) {
   return list.find(p => mpName(p).toLowerCase() === s)
     || list.find(p => String(p.name_zh || "").toLowerCase() === s || String(p.name_en || "").toLowerCase() === s)
     || null;
+}
+// ── 一次加好幾個人（2026-10-24，Paul：「一次很難加好幾個人」）────────────────────────
+// 每一個加成員的面（Workspaces 右欄、四個成員分頁、加一個專案或營隊）都用這一塊。四份一模一樣（測試逐字比對）。
+// people：[{ id, name_zh, name_en, board_role, team }]。已經在工作區裡的人與靠職級就有一切的那兩級不列。
+// pk = { q, teams: [team…], ticked: [id…], level }。ns 是這一塊在頁面上的前綴（同一頁可以有兩塊，例如 Workspaces 的右欄與新增表單）。
+export const PK_TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team", "Sponsorship Team", "Internship Team", "Community Relations Team"];
+export function pkTeamsOf(p) { return String(p && p.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean); }
+export function pkCandidates(people, inIds) {
+  const inWs = new Set(inIds || []);
+  return (people || []).filter(p => p && p.id && !inWs.has(p.id) && !["president", "senior_adviser"].includes(p.board_role));
+}
+// 找名字是「包含」不是「等於」，中英都找；team chip 勾了幾個就是「其中任何一個」。
+export function pkShown(cands, pk) {
+  const q = String(pk && pk.q || "").trim().toLowerCase();
+  const teams = (pk && pk.teams) || [];
+  return (cands || []).filter(p => (!q || mpName(p).toLowerCase().includes(q))
+    && (!teams.length || pkTeamsOf(p).some(t => teams.includes(t))));
+}
+// 「全勾看到的」= 原本勾的加上現在列出來的；篩掉的不動。「全部取消」= 空。
+export function pkTickAll(pk, shown) { return [...new Set([...((pk && pk.ticked) || []), ...(shown || []).map(p => p.id)])]; }
+export function pkToggle(pk, id, on) { const s = new Set((pk && pk.ticked) || []); if (on) s.add(id); else s.delete(id); return [...s]; }
+// 真的會送出去的人：勾了、而且還列得出來（已經在裡面或已經不是幹部的就算勾過也不算）。
+export function pkPicked(people, inIds, pk) { const ok = new Set(pkCandidates(people, inIds).map(p => p.id)); return ((pk && pk.ticked) || []).filter(id => ok.has(id)); }
+// 一個事件（打字、勾、換等級、按 chip、全勾、全取消）之後 pk 變成什麼。純函式，四個 main.js 都只呼叫它。
+export function pkReduce(pk, people, inIds, el) {
+  const a = el && el.dataset ? el.dataset.act : "";
+  const p0 = Object.assign({ q: "", teams: [], ticked: [], level: "view" }, pk || {});
+  if (a === "pk-q") return Object.assign(p0, { q: el.value });
+  if (a === "pk-level") return Object.assign(p0, { level: el.value });
+  if (a === "pk-tick") return Object.assign(p0, { ticked: pkToggle(p0, el.value, !!el.checked) });
+  if (a === "pk-team") { const t = el.dataset.team; return Object.assign(p0, { teams: p0.teams.includes(t) ? p0.teams.filter(x => x !== t) : p0.teams.concat(t) }); }
+  if (a === "pk-all") return Object.assign(p0, { ticked: pkTickAll(p0, pkShown(pkCandidates(people, inIds), p0)) });
+  if (a === "pk-none") return Object.assign(p0, { ticked: [] });
+  return p0;
+}
+// 復原一整批：把當時那 N 個人移出，之後畫面怎麼變都不影響（先抄一份 id）。回傳移出的人數。
+export function batchUndo(ids, unassign) { const snap = [...(ids || [])]; return async () => { for (const id of snap) await unassign(id); return snap.length; }; }
+// 重畫之後把游標放回找人的欄位，不然每打一個字就失焦。
+export function pkRefocus(ns) {
+  const el = typeof document !== "undefined" ? document.getElementById(ns + "-q") : null;
+  if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (x) { /* 有的瀏覽器不給 */ } }
+}
+// go = { act, ...data }：底下那顆「加 N 個人」。沒給就不畫（新增工作區那張表單自己的建立鈕會算人數）。
+export function pickerHTML(ns, people, inIds, pk, busy, go) {
+  const p0 = Object.assign({ q: "", teams: [], ticked: [], level: "view" }, pk || {});
+  const cands = pkCandidates(people, inIds);
+  const shown = pkShown(cands, p0);
+  const ticked = new Set(p0.ticked);
+  const n = pkPicked(people, inIds, p0).length;
+  const teamsHere = PK_TEAMS.filter(t => cands.some(p => pkTeamsOf(p).includes(t)));
+  const short = t => t.replace(/\s*Team$/i, "");
+  const dis = busy ? " disabled" : "";
+  const chip = t => `<button type="button" class="chip${p0.teams.includes(t) ? " on" : ""}" data-act="pk-team" data-ns="${esc(ns)}" data-team="${esc(t)}"${dis}>${esc(short(t))}</button>`;
+  const row = p => `<label class="check pk-row"><input type="checkbox" name="${esc(ns)}-member" value="${esc(p.id)}" data-act="pk-tick" data-ns="${esc(ns)}"${ticked.has(p.id) ? " checked" : ""}${dis}><span><b>${esc(mpName(p))}</b> <span class="tag">${esc(boardName(p.board_role))}</span>${pkTeamsOf(p).map(t => ` <span class="mini">${esc(short(t))}</span>`).join("")}</span></label>`;
+  const goBtn = go ? `<button class="btn" data-act="${esc(go.act)}" data-ns="${esc(ns)}"${Object.keys(go).filter(k => k !== "act").map(k => ` data-${k}="${esc(String(go[k]))}"`).join("")}${busy || !n ? " disabled" : ""}>${busy ? T("common.saving") : T("pk.addN", { n })}</button>` : "";
+  return `<div class="picker" data-ns="${esc(ns)}">
+    <div class="two"><label><i>${T("pk.find")}</i><input id="${esc(ns)}-q" value="${esc(p0.q)}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-q" data-ns="${esc(ns)}"${dis}></label>
+      <label><i>${T("pk.level")}</i><select id="${esc(ns)}-level" data-act="pk-level" data-ns="${esc(ns)}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${p0.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select></label></div>
+    ${teamsHere.length ? `<div class="chips pk-chips">${teamsHere.map(chip).join("")}</div>` : ""}
+    <div class="row pk-tools"><span class="mini">${T("pk.shown", { n: shown.length, all: cands.length })}</span><span class="sp"></span>
+      <button type="button" class="btn quiet sm" data-act="pk-all" data-ns="${esc(ns)}"${busy || !shown.length ? " disabled" : ""}>${T("pk.tickAll")}</button>
+      <button type="button" class="btn quiet sm" data-act="pk-none" data-ns="${esc(ns)}"${busy || !n ? " disabled" : ""}>${T("pk.untick")}</button></div>
+    <div class="pk-list">${shown.length ? shown.map(row).join("") : `<div class="mini">${cands.length ? T("pk.noneShown") : T("pk.noneLeft")}</div>`}</div>
+    ${goBtn ? `<div class="row pk-foot">${goBtn}<span class="mini">${T("pk.note")}</span></div>` : ""}
+  </div>`;
 }
 // 這一頁該列哪幾個「誰在做…」的入口：senior 看所有這一類的工作區，其他人只有自己是「管」的那幾個。
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
@@ -306,13 +371,8 @@ export function membersPanelHTML(mp, msg, busy) {
     + sectionHTML(T("mp.list"), rows.length || seniors.length
         ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${seniors.map(seniorRow).join("")}${rows.map(row).join("")}</tbody></table>`
         : emptyHTML(T("mp.nobody"), T("mp.nobodyHint")))
-    + sectionHTML(T("mp.add"), `<div class="two">
-        <label><i>${T("mp.who")}</i><input id="mp-q" list="mp-people" value="${esc(mp.q || "")}" placeholder="${esc(T("mp.whoPh"))}" autocomplete="off"${dis}>
-          <datalist id="mp-people">${(mp.cadres || []).filter(p => !inWs.has(p.id)).map(p => `<option value="${esc(mpName(p))}">`).join("")}</datalist></label>
-        <label><i>${T("mp.level")}</i><select id="mp-level"${dis}>${LV.map(l => `<option value="${l}"${(mp.level || "view") === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></label>
-      </div>
-      <div class="row"><button class="btn" data-act="members-assign" data-ws="${esc(mp.ws)}"${dis}>${busy ? T("common.saving") : T("mp.addGo")}</button></div>
-      <div class="mini">${T("mp.addNote")}</div>`);
+    // 加人（2026-10-24 改成一次好幾個）：勾人、一個等級套全部、一顆「加 N 個人」。
+    + sectionHTML(T("mp.add"), pickerHTML("mp", mp.cadres || [], [...inWs], mp.pk, busy, { act: "members-assign", ws: mp.ws }));
 }
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {

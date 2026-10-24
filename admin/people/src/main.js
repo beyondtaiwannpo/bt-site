@@ -367,21 +367,28 @@ document.addEventListener("click", async e => {
 
   // ── 工作區與指派 ───────────────────────────────────────────────────
   if (act === "ws-pick") { e.preventDefault(); S.wsDraft = null; history.pushState(null, "", "#ws=" + encodeURIComponent(b.dataset.ws)); await openWorkspaces(b.dataset.ws); return; }
+  // 多選加人的 chip、全勾、全取消（2026-10-24）：右欄是 pk、新增表單是 npk。打字與勾選走 input / change。
+  if (["pk-team", "pk-all", "pk-none"].includes(act) && S.view === "workspaces") { pkApply(b); render(); return; }
   if (act === "ws-assign") {
-    const q = val("ws-person-q"), level = val("ws-levelnew") || "view";
-    S.wsDraft = { personQ: q, level };
-    if (!q) { S.msg = T("err.pickPerson"); render(); return; }
-    const p = UI.findByPickName(S.people.filter(x => x.profile_id && x.role === "cadre"), q);
-    if (!p) { S.msg = T("err.noSuchPerson"); render(); return; }
-    const person = p.profile_id;
-    const ws = b.dataset.ws;
-    const ok = await run("err.assign", () => D.assign(person, ws, level));
-    if (ok !== undefined) {
-      S.wsDraft = null; S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(level) });
-      // 復原：再送一次反向的那一筆（移出），走同一支函式、同一道門。
-      S.undo = async () => { const r = await run("err.unassign", () => D.unassign(person, ws)); if (r !== undefined) { S.msg = T("msg.unassigned", { name: p ? pname(p) : "", ws }); await openWorkspaces(null, true); } };
-      await openWorkspaces(null, true);
+    // 一次加一批（2026-10-24）：每個人一支 assign()（同一道門），同時送；沒有新的資料庫函式。
+    const ws = b.dataset.ws, d = S.wsDraft || {}, pk = d.pk || {}, level = pk.level || "view";
+    const ids = UI.pkPicked(pkPeople(), S.members.map(m => m.user_id), pk);
+    if (!ids.length) { S.msg = T("err.pickPerson"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    const out = await Promise.all(ids.map(id => D.assign(id, ws, level).then(() => null, e => ({ id, e }))));
+    const failed = out.filter(Boolean), done = ids.filter(id => !failed.some(f => f.id === id));
+    S.wsDraft = Object.assign({}, d, { pk: Object.assign({}, pk, { q: "", ticked: failed.map(f => f.id) }) });
+    if (done.length) {
+      // 復原移出的是這一批那 N 個人，不多不少。
+      const undo = UI.batchUndo(done, id => D.unassign(id, ws));
+      S.undo = async () => { const n = await run("err.unassign", undo); if (n !== undefined) { S.msg = T("msg.unassignedN", { n, ws }); await openWorkspaces(null, true); } };
     }
+    S.busy = false;
+    if (failed.length) {
+      const names = failed.map(f => { const p = S.people.find(x => x.profile_id === f.id); return p ? pname(p) : f.id; }).join(T("punct.list"));
+      S.msg = T("err.assignSome") + names + T("punct.colon") + D.says(failed[0].e);
+    } else S.msg = T("msg.assignedN", { n: done.length, ws, level: UI.levelLabel(level) });
+    await openWorkspaces(null, true);
     return;
   }
   if (act === "ws-unassign") {
@@ -398,8 +405,10 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "ws-create") {
-    const members = [...document.querySelectorAll('input[name="wsn-member"]:checked')].map(x => ({ id: x.value, level: val("wsn-lv-" + x.value) || "view" }));
-    const d = { slug: val("wsn-slug") || UI.slugify(val("wsn-en")), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner"), members };
+    // 一開始就放進去的人（2026-10-24 改成多選那一塊）：勾起來的人都是同一個等級。
+    const npk = (S.wsDraft || {}).npk || {};
+    const members = UI.pkPicked(pkPeople(), [], npk).map(id => ({ id, level: npk.level || "view" }));
+    const d = Object.assign({}, S.wsDraft, { slug: val("wsn-slug") || UI.slugify(val("wsn-en")), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner"), members });
     S.wsDraft = d;
     const id = await run("err.createWs", () => D.createWorkspace(d.slug, d.title_zh, d.title_en, d.owner || null));
     if (id === undefined) return;
@@ -409,7 +418,7 @@ document.addEventListener("click", async e => {
       try { await D.assign(m.id, id, m.level); n++; }
       catch (err) {
         const p = S.people.find(x => x.profile_id === m.id);
-        S.busy = false; S.wsDraft = Object.assign({}, d, { members: members.slice(n) });
+        S.busy = false; S.wsDraft = Object.assign({}, d, { npk: Object.assign({}, npk, { ticked: members.slice(n).map(m => m.id) }) });
         S.msg = T("err.wsMembers") + (p ? pname(p) + T("punct.colon") : "") + D.says(err);
         await openWorkspaces(id, true); return;
       }
@@ -594,10 +603,11 @@ document.addEventListener("change", async e => {
     return;
   }
   if (el.dataset.act === "wsn-team") {
-    S.wsDraft = Object.assign({}, S.wsDraft, { team: el.value, owner: "", slug: val("wsn-slug"), title_zh: val("wsn-zh"), title_en: val("wsn-en"),
-      members: [...document.querySelectorAll('input[name="wsn-member"]:checked')].map(x => ({ id: x.value, level: val("wsn-lv-" + x.value) || "view" })) });
+    S.wsDraft = Object.assign({}, S.wsDraft, { team: el.value, owner: "", slug: val("wsn-slug"), title_zh: val("wsn-zh"), title_en: val("wsn-en") });
     render(); return;
   }
+  // 多選加人（2026-10-24）：勾一個人、換等級。
+  if (el.dataset.act === "pk-tick" || el.dataset.act === "pk-level") { if (S.view === "workspaces") { pkApply(el); render(); } return; }
   if (el.dataset.act === "ws-level" && S.wsSel) {
     const p = S.people.find(x => x.profile_id === el.dataset.id);
     const level = el.value, ws = S.wsSel, id = el.dataset.id;
@@ -622,6 +632,7 @@ document.addEventListener("input", e => {
     if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* search 型的欄位有的瀏覽器不給 */ } }
     return;
   }
+  if (el.dataset.act === "pk-q" && S.view === "workspaces") { pkApply(el); render(); UI.pkRefocus(el.dataset.ns); return; }
   if (el.id === "wsn-en") {
     const slug = document.getElementById("wsn-slug");
     if (slug && (!slug.value || slug.dataset.auto === "1")) { slug.value = UI.slugify(el.value); slug.dataset.auto = "1"; }
@@ -651,3 +662,18 @@ boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
+// 多選加人（2026-10-24）：Workspaces 這一頁有兩塊，右欄（ns "ws"，已經在裡面的人不列）與新增表單（ns "wsn"，全部幹部）。
+// 事件丟給 UI.pkReduce 算出新狀態，存回 S.wsDraft.pk / .npk。pkPeople() 是幹部名單換成那一塊要的形狀。
+function pkPeople() { return UI.pkPeopleOf(S.people.filter(p => p.profile_id && p.role === "cadre")); }
+function pkApply(el) {
+  const ns = el.dataset.ns, d = S.wsDraft || {};
+  if (ns === "wsn") S.wsDraft = Object.assign({}, d, { npk: UI.pkReduce(d.npk, pkPeople(), [], el), slug: val("wsn-slug"), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner") });
+  else S.wsDraft = Object.assign({}, d, { pk: UI.pkReduce(d.pk, pkPeople(), S.members.map(m => m.user_id), el) });
+}
+// 在多選那一塊裡按 Enter 就是按底下那顆「加 N 個人」（新增表單那一塊沒有那顆，Enter 不做事；空白鍵勾選是瀏覽器原生的）。
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const box = e.target.closest(".picker"); if (!box) return;
+  const go = box.querySelector(".pk-foot .btn"); if (!go || go.disabled) return;
+  e.preventDefault(); go.click();
+});

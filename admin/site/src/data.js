@@ -173,7 +173,7 @@ export async function loadMembers(ws) {
 // 找人用：幹部的名字與職級。幹部本來就讀得到所有幹部的這幾欄（profiles_read），**不讀 email**。
 export async function loadCadres() {
   need();
-  const { data, error } = await supabase.from("profiles").select("id, name_zh, name_en, board_role").eq("role", "cadre").order("name_en");
+  const { data, error } = await supabase.from("profiles").select("id, name_zh, name_en, board_role, team").eq("role", "cadre").order("name_en");
   if (error) throw error;
   return data || [];
 }

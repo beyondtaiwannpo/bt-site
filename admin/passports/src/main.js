@@ -191,22 +191,30 @@ document.addEventListener("click", async e => {
   // ── 成員分頁（2026-10-23，第三次重整批 3）──
   if (act === "members-open") { await openMembers(b.dataset.ws, b.dataset.name); return; }
   if (act === "members-back") { S.view = (S.mp && S.mp.backView) || "interns"; S.msg = ""; render(); return; }
+  // 多選加人的 chip、全勾、全取消（2026-10-24）：改 pk 再重畫。打字與勾選走 input / change。
+  if (["pk-team", "pk-all", "pk-none"].includes(act) && S.mp && S.view === "members") {
+    S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), b); render(); return;
+  }
   if (act === "members-assign" && S.mp) {
-    const qEl = document.getElementById("mp-q"), lvEl = document.getElementById("mp-level");
-    const q = qEl ? qEl.value.trim() : "", level = lvEl ? lvEl.value : "view";
-    S.mp.q = q; S.mp.level = level;
-    if (!q) { S.msg = T("err.mpPick"); render(); return; }
-    const inWs = new Set(S.mp.rows.map(r => r.user_id));
-    const p = UI.mpFind(S.mp.cadres.filter(c => !inWs.has(c.id)), q);
-    if (!p) { S.msg = T("err.mpNoSuch"); render(); return; }
-    const ws = S.mp.ws;
+    // 一次加一批（2026-10-24）：勾起來的人每一個送一支 assign()（同一道門 can_manage），同時送，30 個人一秒內；沒有新的資料庫函式。
+    const ws = S.mp.ws, pk = S.mp.pk || {}, level = pk.level || "view";
+    const ids = UI.pkPicked(S.mp.cadres, S.mp.rows.map(r => r.user_id), pk);
+    if (!ids.length) { S.msg = T("err.mpPick"); render(); return; }
     S.busy = true; S.msg = ""; render();
-    try {
-      await D.assign(p.id, ws, level);
-      S.mp.q = ""; S.mp.level = "view";
-      S.undo = async () => { S.busy = true; render(); try { await D.unassign(p.id, ws); await reloadMembers(T("msg.mpRemoved", { name: UI.mpName(p) })); } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); } };
-      await reloadMembers(T("msg.mpAssigned", { name: UI.mpName(p), level: T("level." + level) }));
-    } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); }
+    const out = await Promise.all(ids.map(id => D.assign(id, ws, level).then(() => null, e => ({ id, e }))));
+    const failed = out.filter(Boolean), done = ids.filter(id => !failed.some(f => f.id === id));
+    S.mp.pk = Object.assign({}, pk, { q: "", ticked: failed.map(f => f.id) });
+    if (done.length) {
+      // 復原移出的是這一批那 N 個人，不多不少。
+      const undo = UI.batchUndo(done, id => D.unassign(id, ws));
+      S.undo = async () => { S.busy = true; render(); try { const n = await undo(); await reloadMembers(T("msg.mpRemovedN", { n })); } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); } };
+    }
+    if (failed.length) {
+      const names = failed.map(f => UI.mpName(S.mp.cadres.find(c => c.id === f.id) || {})).join(T("punct.list"));
+      try { S.mp.rows = await D.loadMembers(ws) || []; } catch (x) { /* 下面的錯誤訊息比較重要 */ }
+      S.busy = false; S.msg = T("err.mpSome") + names + T("punct.colon") + D.says(failed[0].e); render(); return;
+    }
+    await reloadMembers(T("msg.mpAssignedN", { n: done.length, level: T("level." + level) }));
     return;
   }
   if (act === "members-unassign" && S.mp) {
@@ -513,6 +521,9 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
+  const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
+  if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
   const el = e.target.closest('[data-act="members-level"]');
   if (!el || !S.mp || S.view !== "members") return;
   const r = S.mp.rows.find(x => x.user_id === el.dataset.id); if (!r) return;
@@ -524,4 +535,17 @@ document.addEventListener("change", async e => {
     S.undo = async () => { S.busy = true; render(); try { await D.assign(r.user_id, ws, was); await reloadMembers(T("msg.mpLevel", { name: UI.mpName(r), level: T("level." + was) })); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
     await reloadMembers(T("msg.mpLevel", { name: UI.mpName(r), level: T("level." + level) }));
   } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); }
+});
+
+// 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
+document.addEventListener("input", e => {
+  const el = e.target.closest('[data-act="pk-q"]');
+  if (!el || !S.mp || S.view !== "members") return;
+  S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), el); render(); UI.pkRefocus(el.dataset.ns);
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const box = e.target.closest(".picker"); if (!box) return;
+  const go = box.querySelector(".pk-foot .btn"); if (!go || go.disabled) return;
+  e.preventDefault(); go.click();
 });
