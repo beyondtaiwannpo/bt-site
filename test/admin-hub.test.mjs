@@ -531,14 +531,14 @@ test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只�
   assert.match(L, /在這個工作區裡（2）/, "算人：王平（依職級，雖然也有一筆指派）加 Mei"); assert.match(R, /還沒在裡面（1）/);
   // 2026-10-24：王平是 Co-President 卻還留著一筆指派，只能畫成一列灰的「全部（職級）」，不畫下拉與移出；底下給 senior 一條清掉。
   assert.equal((L.match(/王平/g) || []).length, 1, "一個人一列");
-  assert.match(L, /<div class="ma-row byrank"><b>王平 \(Paul\)<\/b><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）/);
+  assert.match(L, /<div class="ma-row byrank"><span class="nm"><b>王平<\/b><span class="nm-en">Paul<\/span><\/span><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）/);
   assert.doesNotMatch(L, /data-act="members-level" data-id="u1"|data-act="members-unassign" data-id="u1"/, "依職級的人沒有下拉與移出");
   assert.doesNotMatch(L, /members-cleanup/, "不是 senior 看不到清掉");
   const Ls = FORMS.membersPanelHTML(Object.assign({}, mp, { senior: true }), "", false).split('<section class="ma-col">')[1];
   assert.match(Ls, /另外有 1 筆指派是給靠職級就有一切的人的，多餘。 <button type="button" class="lnk" data-act="members-cleanup" data-ids="u1">清掉這 1 筆<\/button>/);
   assert.doesNotMatch(R, /王平/, "依職級的人也不在右邊");
   assert.match(R, /name="mp-member" value="u4" data-act="pk-tick" data-ns="mp"/);
-  assert.match(R, /<b>小新 \(Shin\)<\/b><span class="rk" title="Associate">AS<\/span>/, "職級是兩個字母的標，不是 pill");
+  assert.match(R, /<span class="nm"><b>小新<\/b><span class="nm-en">Shin<\/span><\/span><span class="rk" title="Associate">AS<\/span>/, "職級是兩個字母的標，不是 pill");
   assert.doesNotMatch(R, /Mei/, "已經在裡面的不列在右邊");
   assert.doesNotMatch(R, /王平/, "Co-President 靠職級就有，不列在右邊");
   assert.match(L, /<input id="mp-mq" class="ma-find"/, "左欄也有找名字");
@@ -610,9 +610,9 @@ test("★ 多選加人：不列在裡面的與靠職級的；找名字含中英�
   assert.equal((dup.match(/data-id="u2"/g) || []).length, 2, "小安一列（下拉加移出各一個 data-id）");
   assert.equal((dup.match(/阿顧/g) || []).length, 1); assert.match(dup, /在這個工作區裡（3）/);
   assert.match(dup, /data-act="members-cleanup" data-ids="u5"/);
-  assert.match(L, /<div class="ma-row byrank"><b>王平 \(Paul\)<\/b><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）<\/span>/);
-  assert.match(L, /<div class="ma-row byrank"><b>阿顧 \(Gu\)<\/b><span class="rk" title="Senior Adviser">SA<\/span>/);
-  assert.match(L, /<div class="ma-row"><b>小安<\/b><span class="rk" title="Director">DR<\/span>[\s\S]*?<select data-act="members-level" data-id="u2"[^>]*><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管<\/option><\/select>\s*<button type="button" class="lnk" data-act="members-unassign" data-id="u2">移出<\/button>/);
+  assert.match(L, /<div class="ma-row byrank"><span class="nm"><b>王平<\/b><span class="nm-en">Paul<\/span><\/span><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）<\/span>/);
+  assert.match(L, /<div class="ma-row byrank"><span class="nm"><b>阿顧<\/b><span class="nm-en">Gu<\/span><\/span><span class="rk" title="Senior Adviser">SA<\/span>/);
+  assert.match(L, /<div class="ma-row"><span class="nm"><b>小安<\/b><span class="nm-en"><\/span><\/span><span class="rk" title="Director">DR<\/span>[\s\S]*?<select data-act="members-level" data-id="u2"[^>]*><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管<\/option><\/select>\s*<button type="button" class="lnk" data-act="members-unassign" data-id="u2">移出<\/button>/);
   assert.ok(L.indexOf('class="ma-row byrank"') < L.indexOf('data-id="u2"'), "依職級的置頂");
   // 左欄的找名字只篩左欄。
   const Lq = area(rows, Object.assign({}, pk, { mq: "小安" })).split('<section class="ma-col">')[1];
@@ -627,7 +627,7 @@ test("★ 多選加人：不列在裡面的與靠職級的；找名字含中英�
   // draft 模式（加一個專案或營隊）：左欄是勾起來的人（取消 = pk-untick），右欄是還沒勾的，沒有「加 N 個人」。
   const d = FORMS.membersAreaHTML("wsn", { people, pk: { ticked: ["u4"], level: "edit" }, busy: false, draft: true });
   const [, dL, dR] = d.split('<section class="ma-col">');
-  assert.match(dL, /建好就放進去（1）/); assert.match(dL, /<b>小新 \(Shin\)<\/b>[\s\S]*?data-act="pk-untick" data-ns="wsn" data-id="u4"/);
+  assert.match(dL, /建好就放進去（1）/); assert.match(dL, /<span class="nm"><b>小新<\/b><span class="nm-en">Shin<\/span><\/span>[\s\S]*?data-act="pk-untick" data-ns="wsn" data-id="u4"/);
   assert.doesNotMatch(dR, /value="u4"/, "勾了的人搬到左邊"); assert.match(dR, /value="u3"/); assert.match(dR, /value="u2"/, "draft 模式沒有「已經在裡面」這回事");
   assert.doesNotMatch(d, /members-assign|ws-assign/, "沒有加 N 個人那顆，建立鈕自己算");
   assert.deepEqual(FORMS.pkReduce({ ticked: ["u4", "u3"] }, people, [], { dataset: { act: "pk-untick", id: "u4" } }).ticked, ["u3"]);
@@ -648,9 +648,19 @@ test("★ 多選加人：不列在裡面的與靠職級的；找名字含中英�
 
 test("成員區的列：名字不裁斷（可以換行）、下拉縮小、team 淡字先讓；四個 main.js 接了清掉多餘指派", () => {
   const css = readFileSync("admin/admin.css", "utf8");
-  assert.match(css, /\.ma-row b\{[^}]*white-space:normal/, "名字可以換到第二行");
-  assert.doesNotMatch(css, /\.ma-row b\{[^}]*text-overflow:ellipsis/, "名字不裁斷");
-  assert.match(css, /\.ma-row\{[^}]*min-height:36px/, "列是 min-height，不是固定高");
+  // 2026-10-24 第四版：名字是兩行的 .nm（中文一行、英文一行），不縮不裁；列是 min-height 不是固定高。
+  assert.match(css, /\.nm\{[^}]*flex:0 0 auto/, "名字那一塊不縮");
+  assert.doesNotMatch(css, /\.nm b\{[^}]*text-overflow:ellipsis/, "名字不裁斷");
+  assert.match(css, /\.nm \.nm-en\{[^}]*min-height:14px/, "沒有英文名第二行也留高度，列才齊");
+  assert.match(css, /\.ma-row\{[^}]*min-height:40px/, "列是 min-height，不是固定高");
+  // 四份一樣的 nameBlock：永遠兩個元素，中文在 b、英文在 nm-en；沒有英文名第二個是空的；只有英文名就放在第一行。
+  for (const [label, M] of IMPL) {
+    assert.equal(String(M.nameBlock), String(FORMS.nameBlock), `${label} 的 nameBlock 跟 admin/ 不一樣`);
+    assert.equal(M.nameBlock({ name_zh: "王宥媗", name_en: "Sophie Wang" }), '<span class="nm"><b>王宥媗</b><span class="nm-en">Sophie Wang</span></span>');
+    assert.equal(M.nameBlock({ name_zh: "小安", name_en: "" }), '<span class="nm"><b>小安</b><span class="nm-en"></span></span>');
+    assert.equal(M.nameBlock({ name_zh: "", name_en: "Mei" }), '<span class="nm"><b>Mei</b><span class="nm-en"></span></span>');
+    assert.equal(M.nameBlock({}), '<span class="nm"><b>（沒有名字）</b><span class="nm-en"></span></span>');
+  }
   assert.match(css, /\.ma-row select\{[^}]*width:72px/);
   for (const f of ["admin/src", "admin/site/src", "admin/passports/src"]) assert.match(readFileSync(`${f}/main.js`, "utf8"), /act === "members-cleanup"[\s\S]*?D\.unassign\(id, ws\)[\s\S]*?S\.undo = [\s\S]*?D\.assign\(w\.id, ws, w\.level\)/, `${f} 清掉要有復原`);
   assert.match(readFileSync("admin/people/src/main.js", "utf8"), /act === "ws-cleanup"[\s\S]*?D\.unassign\(id, ws\)[\s\S]*?S\.undo = [\s\S]*?D\.assign\(w\.id, ws, w\.level\)/);

@@ -312,6 +312,13 @@ a.btn{text-decoration:none}
   color:rgba(16,42,134,.7);padding:6px 10px 8px;border-bottom:1px solid rgba(16,42,134,.2)}
 .table td{padding:11px 10px;border-bottom:1px solid rgba(16,42,134,.12);vertical-align:middle}
 .table td.t-main b{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:.02em}
+/* 兩行的名字（2026-10-24）：中文一行、英文淡字一行，永遠兩行，列高才齊；名字欄不縮、不裁，讓旁邊的 team 淡字先讓。 */
+.nm{display:inline-flex;flex-direction:column;align-items:flex-start;text-align:left;line-height:1.2;flex:0 0 auto;vertical-align:middle}
+.nm b{white-space:nowrap}
+.nm .nm-en{display:block;font-family:var(--body);font-size:12px;font-weight:400;letter-spacing:0;color:rgba(16,42,134,.7);white-space:nowrap;min-height:14px}
+.table td.t-main{min-width:220px}
+.table td.t-main .nm{margin-right:4px}
+.tpick .nm{line-height:1.15}
 .table td.t-act{text-align:right;white-space:nowrap}
 .table tr.off td{color:rgba(16,42,134,.6)}
 /* 左右兩欄：信件文案的「左邊改、右邊預覽」。 */
@@ -412,11 +419,11 @@ a.btn{text-decoration:none}
 .lnk{white-space:nowrap;font-size:13px;font-weight:600;color:var(--bt-navy);text-decoration:underline;text-underline-offset:3px;padding:0;background:none;border:0}
 .lnk:disabled{opacity:.4;text-decoration:none;cursor:default}
 .ma-list{flex:1;overflow:auto;padding:2px 0}
-.ma-row{display:flex;align-items:center;gap:8px;min-height:36px;padding:4px 12px;border-bottom:1px solid rgba(16,42,134,.07);font-size:14px;white-space:nowrap;margin:0;cursor:default}
+.ma-row{display:flex;align-items:center;gap:8px;min-height:40px;padding:3px 12px;border-bottom:1px solid rgba(16,42,134,.07);font-size:14px;white-space:nowrap;margin:0;cursor:default}
 .ma-row.pick{cursor:pointer}
 .ma-row:hover{background:rgba(16,42,134,.05)}
 .ma-row.on{background:rgba(16,42,134,.1)}
-.ma-row b{font-weight:600;white-space:normal;line-height:1.2;flex:0 1 auto} /* 名字不裁斷：窄的時候換到第二行 */
+.ma-row .nm b{font-weight:600;font-size:14px} /* 名字不裁斷：.nm 不縮（flex:0 0 auto），team 淡字先讓 */
 .ma-row .mini{font-size:12px;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0} /* team 淡字先讓 */
 .ma-row input[type="checkbox"]{width:16px;height:16px;flex:none;margin:0;accent-color:var(--bt-navy)}
 .ma-row select{height:26px;width:72px;padding:0 2px;font-size:12px;flex:none}

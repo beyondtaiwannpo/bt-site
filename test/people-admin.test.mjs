@@ -187,7 +187,7 @@ test("★ 工作區：左邊清單、右邊誰在裡面與等級、加人只列�
   assert.match(dup, /data-act="ws-cleanup" data-ids="11111111-1111-1111-1111-111111111111"/);
   assert.match(pick, /<input id="ws-q" class="ma-find" value="" placeholder="打名字，中英都可以" autocomplete="off" data-act="pk-q" data-ns="ws">/);
   assert.match(pick, /name="ws-member" value="33333333-3333-3333-3333-333333333333" data-act="pk-tick" data-ns="ws"/, "Mei 還沒在裡面，勾得到");
-  assert.match(pick, /<b>Mei<\/b><span class="rk" title="Associate">AS<\/span><span class="mini">Marketing<\/span> <span class="mini">Internship<\/span>/);
+  assert.match(pick, /<span class="nm"><b>Mei<\/b><span class="nm-en"><\/span><\/span><span class="rk" title="Associate">AS<\/span><span class="mini">Marketing<\/span> <span class="mini">Internship<\/span>/);
   assert.doesNotMatch(pick, /小安/, "已經在裡面的不再列");
   assert.doesNotMatch(pick, /王平/, "Co-President 靠職級就有，不列");
   assert.doesNotMatch(pick, /畢業的/, "校友派不了");
@@ -555,11 +555,14 @@ test("★ 不綁 team 的兩級：表單 team 鎖住、名單印「全部 team�
   assert.match(dir, /<select id="pk-pteam-0">/); assert.match(dir, /data-act="grid-level"/);
   const ro = rosterHTML(PEOPLE, TERMS, ME, true, "", false, null, []);
   assert.match(ro, /<div>Co-President<span class="mini"> 全部 team<\/span><\/div>/, "名單：Co-President 全部 team");
+  // 2026-10-24：名單的名字是兩行（中文一個元素、英文一個元素），不再是「中文 英文」擠在同一行。
+  assert.match(ro, /<td class="t-main"><span class="nm"><b>王平<\/b><span class="nm-en">Paul<\/span><\/span>/, "名單：中文一行、英文一行");
+  assert.doesNotMatch(ro, /class="alt"/, "名單不再用同一行的 alt");
   const ws = [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "Curriculum Team 的申請", active: true }];
   const h = workspacesHTML(ws, "apps:Curriculum Team", [{ user_id: PEOPLE[2].profile_id, name_zh: "", name_en: "Mei", board_role: "member", level: "view" }], PEOPLE, "", false, null, true);
   const lead = h.indexOf('class="ma-row byrank"'), mei = h.indexOf('data-act="ws-level"');
   assert.ok(lead > 0 && lead < mei, "Co-President 置頂");
-  assert.match(h, /<div class="ma-row byrank"><b>王平 \(Paul\)<\/b><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）/);
+  assert.match(h, /<div class="ma-row byrank"><span class="nm"><b>王平<\/b><span class="nm-en">Paul<\/span><\/span><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）/);
   assert.doesNotMatch(h.slice(lead, mei), /ws-unassign|ws-level/, "依職級那一列沒有下拉與移出");
   const src = readFileSync("admin/people/src/main.js", "utf8");
   assert.match(src, /team = UI\.isOrgWide\(rank\) \? "" : val\(`pk-pteam-\$\{i\}`\)/, "存的時候 team 是空的");
