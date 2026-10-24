@@ -237,6 +237,8 @@ export function mpFind(people, q) {
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
+  // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
+  if (id === "apps") return "";
   if (id.startsWith("apps:")) return id.slice(5);
   if (id.startsWith("res:")) return id.slice(4);
   if (id === "intern-passport") return "Internship Team";
@@ -251,7 +253,7 @@ export function wsCellLabel(w) {
   const id = String((w && w.id) || "");
   if (id === "passport") return T("ws.long.passport");
   if (id === "intern-passport") return T("ws.long.intern");
-  if (id.startsWith("apps:")) return T("ws.long.apps");
+  if (id === "apps" || id.startsWith("apps:")) return T("ws.long.apps");
   if (id.startsWith("res:")) return T("ws.long.res");
   return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
 }
@@ -259,14 +261,14 @@ export function wsCellHref(w) {
   const id = String((w && w.id) || "");
   if (id === "passport") return "/admin/passports/#cadre";
   if (id === "intern-passport") return "/admin/passports/#interns";
-  if (id.startsWith("apps:")) return "/admin/#forms";
+  if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
 export function wsRows(workspaces, teams, people) {
   const active = (workspaces || []).filter(w => w.active !== false);
-  const order = { "intern-passport": 3, passport: 0 };
+  const order = { apps: 0, passport: 1, "intern-passport": 3 };
   const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
   const groups = new Map([["", []]]);
   for (const t of teams || []) groups.set(t, []);
@@ -414,6 +416,7 @@ export function wsName(id, workspaces) {
   if (s === "intern-passport") return T("ws.long.intern");
   const w = (workspaces || []).find(x => x.id === id);
   if (w) return wsLabel(w);
+  if (s === "apps") return T("ws.long.apps");
   if (s.startsWith("apps:")) return T("ws.name.apps", { team: s.slice(5) });
   if (s.startsWith("res:")) return T("ws.name.res", { team: s.slice(4) });
   if (s.startsWith("custom:")) return s.slice(7);
@@ -424,8 +427,8 @@ export function wsName(id, workspaces) {
 // 還沒載到工作區清單的時候每一格都畫（exists 回 true），載到了就只畫真的存在的。
 // 還沒載到工作區清單的時候用這一份預設（跟 10-24 遷移檔建的十四個一樣），格子才畫得出來。
 export function defaultWorkspaces() {
-  return [{ id: "passport", kind: "passport" }, { id: "intern-passport", kind: "intern-passport" }]
-    .concat(TEAMS.flatMap(t => [{ id: "apps:" + t, kind: "apps", team: t }, { id: "res:" + t, kind: "res", team: t }]));
+  return [{ id: "apps", kind: "apps" }, { id: "passport", kind: "passport" }, { id: "intern-passport", kind: "intern-passport" }]
+    .concat(TEAMS.map(t => ({ id: "res:" + t, kind: "res", team: t })));
 }
 // 2026-10-24 Paul：十四列的平表看不懂（「實習護照應該在 Internship 底下」「幹部護照屬於整個 board」「表單在哪」）。
 // 改成一列一個 team，欄是那個 team 擁有的東西：Internship 多一格實習護照；最上面「整個 BT」一列放幹部護照；自訂的掛在它的 team 底下。

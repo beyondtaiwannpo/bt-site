@@ -34,7 +34,8 @@ const root = () => document.getElementById("bt-root");
 // 前端少畫一顆按鈕不是安全機制。
 // 2026-10-24 起看指派：對任何一個 apps: 工作區是「改」或「管」的人才有「開新表單」；
 // Co-President 與 Senior Adviser（senior）看得到所有 team 的表單與 team 選單。
-const canEdit = () => UI.canEditAny(S.me, "apps:");
+// 2026-10-30 起申請是整個 BT 一個工作區 apps：改得動的人是被派成改或管的人（senior 靠職級）。
+const canEdit = () => UI.canEditWs(S.me, "apps");
 const isPres = () => !!S.me && !!S.me.senior;
 
 function render() {
@@ -68,8 +69,8 @@ function render() {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else if (S.view === "list") {
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
-      isPres() ? S.teams : [], S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy,
-      UI.mpItems(S.me, "apps:", S.workspaces));
+      S.teams.length ? S.teams : UI.TEAM_LABELS, S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy,
+      UI.mpItems(S.me, "apps", S.workspaces));
   } else {
     // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
     // 頂欄那幾項各是什麼（shared/nav.js 的 FEATURES 本來就有一句 desc，9-08 刪掉選單頁之後沒地方印；總覽印一次）。
@@ -107,7 +108,7 @@ async function boot(retried) {
     S.me = me;
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     S.forms = forms; S.pendingAll = pendingAll;
-    if (S.me.senior) S.teams = await D.loadTeams();
+    S.teams = await D.loadTeams().catch(() => []);
     // 首頁三塊的數字。載不到不該讓整頁打不開，所以接住；每一項自己也會接住。
     S.todo = await D.loadTodo(S.me).catch(() => ({}));
     S.workspaces = await D.loadWorkspaces().catch(() => []);
@@ -403,10 +404,8 @@ document.addEventListener("click", async e => {
 
   // 開新表單：按一下在清單上面展開內嵌表單，填完按「建立」才真的開（2026-10-19 起不再用瀏覽器原生的那個名字對話框）。
   if (act === "new-form") {
-    // 預設 team：我能改的第一個 apps: 工作區；senior 沒有指派就拿 team 標籤或清單的第一個。
-    const mine = Object.entries(S.me.ws || {}).filter(([id, lv]) => id.startsWith("apps:") && ["edit", "manage"].includes(lv)).map(([id]) => id.slice(5));
-    const team = mine[0] || (S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "") || (S.teams[0] || "");
-    if (!team) { S.msg = T("err.noTeamProfile"); render(); return; }
+    // 表單上的 team 只是標籤（2026-10-30 起申請不分 team）：預設拿自己勾的第一個 team，沒有就清單第一個，再沒有就空著也能開。
+    const team = (S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "") || (S.teams[0] || "") || "";
     S.newForm = { title: "", team, kind: "program" }; S.msg = ""; render();
     const el = document.getElementById("nf-title"); if (el) el.focus();
     return;

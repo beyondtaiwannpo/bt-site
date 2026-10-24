@@ -38,6 +38,8 @@ export const dtVal = v => (v ? String(v).slice(0, 16) : "");
 // 開新表單的內嵌表單（2026-10-19，批 3）。取代瀏覽器原生的 prompt()：那個對話框長得跟網站不搭，
 // 手機上尤其醜，而且會把整個分頁卡住。draft = { title, team, kind }；teams 是 Co-President 才有的選單，
 // 其他人固定自己的 team。
+// 表單上的 team 標籤可以選的六個（跟 admin/people/src/ui.js 的 TEAMS 同一份，test/teams.test.mjs 比對）。
+export const TEAM_LABELS = ["Curriculum Team", "Mentorship Team", "Marketing Team", "Sponsorship Team", "Internship Team", "Community Relations Team"];
 export function newFormHTML(draft, teams, myTeam, busy) {
   const d = draft || { title: "", team: myTeam || "", kind: "program" };
   const dis = busy ? " disabled" : "";
@@ -81,9 +83,10 @@ export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, my
       </div>
     </li>`;
   };
-  // Co-President 看得到全部，照 team 分段；其他人只看得到自己 team 的，不分段。
+  // 2026-10-30 起申請是整個 BT 一個工作區：看得到的人看得到全部表單，team 只是標籤，有兩個以上的 team 就照標籤分段。
   let rows;
-  if (isPresident && forms.length) {
+  const teamsHere = new Set(forms.map(f => f.team || ""));
+  if ((isPresident || teamsHere.size > 1) && forms.length) {
     const byTeam = new Map();
     for (const f of forms) { const k = f.team || T("forms.noTeam"); if (!byTeam.has(k)) byTeam.set(k, []); byTeam.get(k).push(f); }
     rows = [...byTeam.entries()].sort((a, b) => a[0].localeCompare(b[0]))
@@ -592,6 +595,8 @@ export function mpFind(people, q) {
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
+  // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
+  if (id === "apps") return "";
   if (id.startsWith("apps:")) return id.slice(5);
   if (id.startsWith("res:")) return id.slice(4);
   if (id === "intern-passport") return "Internship Team";
@@ -606,7 +611,7 @@ export function wsCellLabel(w) {
   const id = String((w && w.id) || "");
   if (id === "passport") return T("ws.long.passport");
   if (id === "intern-passport") return T("ws.long.intern");
-  if (id.startsWith("apps:")) return T("ws.long.apps");
+  if (id === "apps" || id.startsWith("apps:")) return T("ws.long.apps");
   if (id.startsWith("res:")) return T("ws.long.res");
   return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
 }
@@ -614,14 +619,14 @@ export function wsCellHref(w) {
   const id = String((w && w.id) || "");
   if (id === "passport") return "/admin/passports/#cadre";
   if (id === "intern-passport") return "/admin/passports/#interns";
-  if (id.startsWith("apps:")) return "/admin/#forms";
+  if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
 export function wsRows(workspaces, teams, people) {
   const active = (workspaces || []).filter(w => w.active !== false);
-  const order = { "intern-passport": 3, passport: 0 };
+  const order = { apps: 0, passport: 1, "intern-passport": 3 };
   const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
   const groups = new Map([["", []]]);
   for (const t of teams || []) groups.set(t, []);
@@ -708,7 +713,7 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
   const cards = [];
   cards.push({ n: received, label: T("card.apps"), unit: T("card.apps.unit"),
     hint: received ? `${firstForm ? esc(firstForm.title) : ""}` : T("card.apps.none"),
-    act: firstForm ? { act: "open-apps", id: firstForm.id, label: canEditAny(me, "apps:") ? T("card.apps.go") : T("card.apps.see") } : null });
+    act: firstForm ? { act: "open-apps", id: firstForm.id, label: canEditWs(me, "apps") ? T("card.apps.go") : T("card.apps.see") } : null });
   cards.push({ n: pending.length, label: T("card.mail"), unit: T("card.mail.unit"),
     hint: pending.length ? (stuck.length ? T("mail.stuck", { n: stuck.length, err: esc(stuck[0].error || T("mail.noErr")) }) : T("card.mail.hint")) : T("card.mail.done"),
     act: pending.length && canSend ? { act: "send-mail-all", label: busy ? T("mail.sending") : T("mail.sendNow"), disabled: busy } : null });
@@ -786,8 +791,8 @@ export function teamBlocksHTML(me, forms, todo) {
         <li><a href="${withLang("/admin/#forms")}">${T("team.forms")}</a>${T("punct.colon")}${fs.length ? `${T("team.formsSum", { n: fs.length, open: open.length })}${rec ? T("team.formsRec", { n: rec }) : ""}` : T("team.noneYet")}</li>
         <li><a href="${withLang("/admin/site/#res")}">${T("team.res")}</a>${T("punct.colon")}${rs.length ? T("team.resSum", { n: rs.length, pub }) : T("team.noneYet")}</li>
         <li>${T("team.director")}${dirs.length ? esc(dirs.join(T("punct.list"))) : T("team.noDirector")}</li>
-        ${pres ? `<li><a href="${withLang("/admin/people/#ws=" + encodeURIComponent("apps:" + team))}">${T("team.people")}</a></li>`
-          : wsLevel(me, "apps:" + team) === "manage" || wsLevel(me, "res:" + team) === "manage" ? `<li>${T("team.peopleHint")}</li>` : ""}
+        ${pres ? `<li><a href="${withLang("/admin/people/#ws=" + encodeURIComponent("res:" + team))}">${T("team.people")}</a></li>`
+          : wsLevel(me, "res:" + team) === "manage" ? `<li>${T("team.peopleHint")}</li>` : ""}
       </ul>
     </section>`;
   }).join("")}</div>`;
@@ -803,7 +808,7 @@ export function accessHTML(me, todo, features) {
   const go = id => {
     if (id === "intern-passport") return [{ href: "/intern-passport/", label: T("hub.goWall") }, { href: "/admin/passports/#interns", label: T("hub.goAdmin") }];
     if (id === "passport") return [{ href: "/admin/passports/#cadre", label: T("hub.goAdmin") }];
-    if (id.startsWith("apps:")) return [{ href: "/admin/#forms", label: T("hub.goForms") }];
+    if (id === "apps" || id.startsWith("apps:")) return [{ href: "/admin/#forms", label: T("hub.goForms") }];
     if (id.startsWith("res:")) return [{ href: "/admin/site/#res", label: T("hub.goRes") }];
     return [];
   };

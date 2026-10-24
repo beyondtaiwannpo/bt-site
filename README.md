@@ -3411,6 +3411,18 @@ Paul 看了十四列的平表：「實習護照應該在 Internship 底下」「
 
 掃過的面：改一個人那一頁的存取格、Workspaces 頁（左邊分組、右邊標題印屬於哪一列、加一個專案或營隊）、總覽「你的存取」（照 team 分段、長名稱、兩句說明）、名單的工作區徽章（長名稱）、四份成員分頁的入口（走同一支 `wsCellLabel`）。`wsTeamOf / wsCellLabel / wsCellHref / wsRows` 四個 `ui.js` 各一份一模一樣，測試逐字比對。截圖 `docs/admin-redesign/v3/b8-01`。沒有遷移檔。
 
+### 申請變成整個 BT 一個工作區（2026-10-30）
+
+Paul 2026-10-24：BT 不再分 team 辦計畫，六個「apps:<team>」工作區合併成一個整個 BT 的「申請（表單與審核）」，掛在「整個 BT」那一列。
+Co-President 與 Senior Adviser 靠職級就有；其他人要被派進這一個工作區（看／改／管，Director 也要派）才碰得到申請表與審核。**表單上的 team 欄留著，只是標籤。**
+
+**上線前要跑** `supabase/migrations/2026-10-30-applications-org-wide.sql`，接在 `2026-10-29-invites.sql` 後面，6 項 PASS，可以重跑。它做三件事：建 `apps` 工作區；把 `apps:<team>` 上的指派搬過去（同一個人取最高的等級，每人記一筆變動紀錄），舊指派刪掉、六個舊工作區停用；`is_on_team()` 與 `is_director_of()` 改成看 `apps` 這一個工作區（參數留著不看）。
+申請那一側所有的門（forms、form_questions、applications、application_answers、mail_outbox 的 RLS，`decide_applications`、`send_notice`、`set_check_in`）都是經過這兩支判斷的，所以一條 policy 都不用重寫。`submit_application` 是學員自己的申請，沒有 team 的門；`send_pending_mail` 的門仍是 `is_cadre`（10-24 記著的已知事項）。
+⚠ 重跑 10-24 會把那兩支判斷建回舊版、也會照 team 標籤再種一次 `apps:<team>` 的指派，那時要再跑這一支。
+
+畫面掃過的面：存取格（申請一格在「整個 BT」那一列、team 列只剩資源與實習護照，九個下拉）；Workspaces 左邊分組與右邊標題；總覽「你的存取」與「你的 team」（team 的人連到資源工作區）；申請那一組的門（`canEditWs(me, "apps")`）、成員分頁入口、表單清單（看得到的人看得到全部，有兩個以上的 team 標籤就照標籤分段）、新表單的 team 下拉（所有人都選得到六個 team，只是標籤）；改一個人那一頁存了 Director 職位那顆鈕改成「那個 team 的資源管、申請改」；字典與 README。
+本機 `./scripts/db/smoke.sh` 多一段：合併取最高、舊指派搬走、Director 看得到全部 team 的表單、**沒被派的幹部讀不到未開放的表單也開不了表單**、派了就有、派不進停用的舊工作區、重跑。
+
 ### 以後加東西怎麼加（寫給明年接手的人，取代 10-19 那一版的八步）
 
 **先回答一題：這個東西是不是「要派人進去做」的？** 是（營隊、專案、新的護照）就是一個**工作區**；不是（一張只有 Co-President 看的報表）就只是一個**分頁**。

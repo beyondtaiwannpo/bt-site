@@ -275,11 +275,12 @@ document.addEventListener("click", async e => {
       // 存了一筆帶 team 的 Director 職位（Paul 2026-10-23 第 4 題）：問一句、一顆鈕同時給那個 team 的申請與資源「管」。不自動送，
       // 因為一個打錯 team 的職位會送出兩筆權限。只問最後一筆；他已經兩個都是「管」就不問。
       const dirTeam = f.board_role === "director" ? (posOps.filter(op => op.set && op.set.team).map(op => op.set.team).pop() || "") : "";
-      const hasBoth = t => ["apps:" + t, "res:" + t].every(id => (p.workspaces || []).some(w => w.id === id && w.level === "manage"));
+      // 2026-10-30 起申請是整個 BT 一個工作區：Director 配的是那個 team 的資源「管」加整個申請「改」。
+      const hasBoth = t => (p.workspaces || []).some(w => w.id === "res:" + t && w.level === "manage") && (p.workspaces || []).some(w => w.id === "apps" && ["edit", "manage"].includes(w.level));
       if (dirTeam && !hasBoth(dirTeam)) {
         const who = f.name_zh || f.name_en || pname(p), pid = p.profile_id, personId = p.person_id;
         S.undo = { label: T("pe.grantBoth", { team: dirTeam }), fn: async () => {
-          const r = await run("err.assign", async () => { await D.assign(pid, "apps:" + dirTeam, "manage"); await D.assign(pid, "res:" + dirTeam, "manage"); return true; });
+          const r = await run("err.assign", async () => { await D.assign(pid, "res:" + dirTeam, "manage"); await D.assign(pid, "apps", "edit"); return true; });
           if (r !== undefined) await reopenPerson(personId, T("msg.grantedBoth", { name: who, team: dirTeam }));
         } };
       }

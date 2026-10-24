@@ -23,7 +23,7 @@ const PEOPLE = [
     positions: [{ term: "2026-27", title_zh: "Co-President", title_en: "Co-President", team: "" }], workspaces: [], maybe_dup: null },
   { person_id: "p2", profile_id: "22222222-2222-2222-2222-222222222222", name_zh: "小安", name_en: "", role: "cadre", board_role: "director", team: "Curriculum Team",
     positions: [{ term: "2026-27", title_zh: "", title_en: "Director, Curriculum Team", team: "Curriculum Team" }, { term: "2025-26", title_en: "Associate, Curriculum Team", team: "Curriculum Team" }],
-    workspaces: [{ id: "apps:Curriculum Team", level: "manage" }, { id: "res:Curriculum Team", level: "manage" }], maybe_dup: null },
+    workspaces: [{ id: "apps", level: "manage" }, { id: "res:Curriculum Team", level: "manage" }], maybe_dup: null },
   { person_id: "p3", profile_id: "33333333-3333-3333-3333-333333333333", name_zh: "", name_en: "Mei", role: "cadre", board_role: "member", team: "Marketing Team, Internship Team",
     positions: [{ term: "2026-27", title_en: "Associate, Marketing Team", team: "Marketing Team" }], workspaces: [{ id: "intern-passport", level: "edit" }], maybe_dup: null },
   { person_id: "p4", profile_id: null, name_zh: "老幹部", name_en: "Old Cadre", role: null, board_role: null, team: null,
@@ -66,7 +66,7 @@ test("★ 名單預設只列這一屆有職位的人；歷屆全部才看得到�
   assert.match(cur, /2026-27：3 人/);
   assert.match(cur, /這是你/);
   // 2026-10-23 批 2：名單印人看的名字，不印代號。
-  assert.match(cur, /Curriculum Team 的申請・管/);
+  assert.match(cur, /申請（表單與審核）・管/, "2026-10-30 起申請是整個 BT 一個工作區");
   assert.match(cur, /實習護照（格子與棋盤）・改/, "名單的徽章用長名稱");
   assert.doesNotMatch(cur, /apps:Curriculum Team・/);
   assert.match(cur, /<input id="ro-search" type="search"/, "名單有找名字的框");
@@ -115,9 +115,9 @@ test("★ 改一個人：自己的職級關著；Senior Adviser 改不了職級�
   assert.match(other, /data-act="person-save" data-id="p2"/);
   // 2026-10-23 批 2：工作區那一塊是改得動的存取格，一格一個下拉，改了就存（main.js 接 grid-level）。
   const grid = other.slice(other.indexOf('class="table grid"'), other.indexOf("</table>", other.indexOf('class="table grid"')));
-  assert.match(grid, /data-act="grid-level" data-id="22222222-2222-2222-2222-222222222222" data-ws="apps:Curriculum Team"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管/);
+  assert.match(grid, /data-act="grid-level" data-id="22222222-2222-2222-2222-222222222222" data-ws="apps"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管/);
   assert.match(grid, /data-ws="res:Curriculum Team"/);
-  assert.match(grid, /data-ws="apps:Mentorship Team"[^>]*><option value="" selected>無/, "沒派的那一格是「無」");
+  assert.match(grid, /data-ws="res:Mentorship Team"[^>]*><option value="" selected>無/, "沒派的那一格是「無」");
   assert.match(grid, /data-ws="passport"/); assert.match(grid, /data-ws="intern-passport"/);
   assert.doesNotMatch(other, /data-act="tab" data-t="workspaces"/, "不再叫人去工作區那一頁改");
   const sa = personEditHTML(PEOPLE[1], TERMS, ME, false, "", false, null, PEOPLE, null);
@@ -346,9 +346,9 @@ test("★ 同一屆好幾個職位：名單接成一句、改一個人一列一�
 // 2026-10-23 第三次重整批 2：存取格、列上改 team、結束之後要做的事。
 test("★ 存取格：六個 team 兩欄加兩本護照加自訂；還沒載到工作區清單每一格都畫；載到了只畫存在的", () => {
   const all = accessGridHTML(PEOPLE[2], [], false);
-  assert.equal((all.match(/data-act="grid-level"/g) || []).length, 6 * 2 + 2);
+  assert.equal((all.match(/data-act="grid-level"/g) || []).length, 1 + 6 + 2, "整個 BT 的申請、六個 team 的資源、兩本護照");
   assert.match(all, /data-ws="intern-passport"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit" selected>改/);
-  const some = accessGridHTML(PEOPLE[2], [{ id: "apps:Curriculum Team", kind: "apps", active: true }, { id: "custom:camp", kind: "custom", title_en: "Winter camp", active: true }], false);
+  const some = accessGridHTML(PEOPLE[2], [{ id: "apps", kind: "apps", active: true }, { id: "custom:camp", kind: "custom", title_en: "Winter camp", active: true }], false);
   assert.equal((some.match(/data-act="grid-level"/g) || []).length, 2, "只有存在的工作區有下拉，其他是一條橫線");
   assert.match(some, /Winter camp/);
   assert.match(accessGridHTML(PEOPLE[2], [], true), /disabled/);
@@ -380,7 +380,7 @@ test("★ 主程式：存取格改了就送、送反向的那一筆當復原；�
   assert.match(grid, /S\.undo = /, "存取格要有復原");
   assert.match(src, /T\("pe\.grantBoth"/, "Director 職位存完要問配兩個工作區");
   assert.doesNotMatch(src.slice(src.indexOf("const dirTeam"), src.indexOf("S.undo = { label: T(\"pe.grantBoth\"")), /await D\.assign/, "配工作區不能自動送，要等他按");
-  assert.match(src.slice(src.indexOf("S.undo = { label: T(\"pe.grantBoth\""), src.indexOf("await reopenPerson(p.person_id, T(\"msg.personSaved\"")), /fn: async \(\) => \{[\s\S]*await D\.assign\(pid, "apps:" \+ dirTeam, "manage"\)/, "按了那顆鈕才送兩筆");
+  assert.match(src.slice(src.indexOf("S.undo = { label: T(\"pe.grantBoth\""), src.indexOf("await reopenPerson(p.person_id, T(\"msg.personSaved\"")), /fn: async \(\) => \{[\s\S]*await D\.assign\(pid, "res:" \+ dirTeam, "manage"\); await D\.assign\(pid, "apps", "edit"\)/, "按了那顆鈕才送兩筆：那個 team 的資源管、整個申請改（2026-10-30）");
   assert.match(src, /"#ws=" \+ encodeURIComponent/); assert.match(src, /"#person=" \+ encodeURIComponent/);
   assert.match(src, /key\.startsWith\("ws="\)/); assert.match(src, /key\.startsWith\("person="\)/);
 });
@@ -590,14 +590,15 @@ test("★ 存取格照 team 分組：整個 BT 一列放幹部護照、Internshi
   const heads = [...g.matchAll(/<th scope="row">([^<]+)<\/th>/g)].map(m => m[1]);
   assert.deepEqual(heads.slice(0, 2), ["整個 BT", "Curriculum"]); assert.ok(heads.includes("Internship"));
   const board = g.slice(g.indexOf("整個 BT"), g.indexOf("<th scope=\"row\">Curriculum"));
-  assert.match(board, /href="\/admin\/passports\/\?lang=zh#cadre">幹部護照（格子與城市）<\/a>/);
+  assert.match(board, /href="\/admin\/\?lang=zh#forms">申請（表單與審核）<\/a>[\s\S]*href="\/admin\/passports\/\?lang=zh#cadre">幹部護照（格子與城市）<\/a>/, "整個 BT 那一列：申請（2026-10-30 起整個 BT 一個）、幹部護照");
   assert.doesNotMatch(board, /實習護照/);
   const intern = g.slice(g.indexOf("<th scope=\"row\">Internship"), g.indexOf("<th scope=\"row\">Community"));
-  assert.match(intern, /申請（表單與審核）[\s\S]*資源[\s\S]*href="\/admin\/passports\/\?lang=zh#interns">實習護照（格子與棋盤）/);
+  assert.match(intern, /資源[\s\S]*href="\/admin\/passports\/\?lang=zh#interns">實習護照（格子與棋盤）/);
+  assert.doesNotMatch(intern, /申請（表單與審核）/, "team 那一列沒有申請了");
   assert.match(intern, /data-ws="intern-passport"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit" selected>改/);
-  assert.equal((g.match(/data-act="grid-level"/g) || []).length, 14, "十四個工作區十四個下拉");
+  assert.equal((g.match(/data-act="grid-level"/g) || []).length, 9, "九個工作區九個下拉");
   for (const s of ["看：讀得到", "玩護照是身分帶來的", "時間看板沒有指派"]) assert.match(g, new RegExp(s));
-  assert.equal(defaultWorkspaces().length, 14);
+  assert.equal(defaultWorkspaces().length, 9);
   // 自訂的掛在它的 team 那一列（靠擁有人的 team）。
   const ws = defaultWorkspaces().concat([{ id: "custom:camp", kind: "custom", title_en: "Winter camp", owner: PEOPLE[1].profile_id, active: true }]);
   const g2 = accessGridHTML(PEOPLE[2], ws, false, PEOPLE);
@@ -614,4 +615,20 @@ test("★ 存取格照 team 分組：整個 BT 一列放幹部護照、Internshi
   assert.match(h, /會排在 Curriculum 那一列底下/);
   assert.match(h, /一份成員清單/, "表單上寫它今天是什麼");
   assert.doesNotMatch(h, /新增工作區/);
+});
+
+// 2026-10-30：申請變成整個 BT 一個工作區。
+test("★ 申請是整個 BT 一個工作區：遷移檔合併六個、改兩支判斷；表單 team 只是標籤；smoke 有沒被派的 Associate 被擋", () => {
+  const mig = readFileSync("supabase/migrations/2026-10-30-applications-org-wide.sql", "utf8");
+  assert.match(mig, /values \('apps', 'apps', null,/); assert.match(mig, /update workspaces set active = false where id like 'apps:%'/);
+  assert.match(mig, /delete from assignments where workspace_id like 'apps:%'/);
+  assert.match(mig, /select public\.can_view\('apps'\);/); assert.match(mig, /select public\.can_edit\('apps'\);/);
+  assert.match(mig, /insert into role_changes/, "合併記帳");
+  assert.match(mig, /要先跑過 2026-10-29-invites\.sql/);
+  const sm = readFileSync("scripts/db/smoke.sh", "utf8");
+  assert.match(sm, /2026-10-30-applications-org-wide\.sql/); assert.match(sm, /沒被派的幹部/, "smoke 有沒被派的幹部被擋的破壞測試");
+  const main = readFileSync("admin/src/main.js", "utf8");
+  assert.match(main, /const canEdit = \(\) => UI\.canEditWs\(S\.me, "apps"\)/, "申請那一組的門看 apps 這一個工作區");
+  assert.match(main, /UI\.mpItems\(S\.me, "apps", S\.workspaces\)/, "成員分頁的入口是那一個工作區");
+  assert.doesNotMatch(main, /id\.startsWith\("apps:"\)/, "新表單不再從 apps:<team> 推 team");
 });

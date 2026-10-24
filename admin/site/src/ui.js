@@ -240,6 +240,8 @@ export function mpFind(people, q) {
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
+  // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
+  if (id === "apps") return "";
   if (id.startsWith("apps:")) return id.slice(5);
   if (id.startsWith("res:")) return id.slice(4);
   if (id === "intern-passport") return "Internship Team";
@@ -254,7 +256,7 @@ export function wsCellLabel(w) {
   const id = String((w && w.id) || "");
   if (id === "passport") return T("ws.long.passport");
   if (id === "intern-passport") return T("ws.long.intern");
-  if (id.startsWith("apps:")) return T("ws.long.apps");
+  if (id === "apps" || id.startsWith("apps:")) return T("ws.long.apps");
   if (id.startsWith("res:")) return T("ws.long.res");
   return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
 }
@@ -262,14 +264,14 @@ export function wsCellHref(w) {
   const id = String((w && w.id) || "");
   if (id === "passport") return "/admin/passports/#cadre";
   if (id === "intern-passport") return "/admin/passports/#interns";
-  if (id.startsWith("apps:")) return "/admin/#forms";
+  if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
 export function wsRows(workspaces, teams, people) {
   const active = (workspaces || []).filter(w => w.active !== false);
-  const order = { "intern-passport": 3, passport: 0 };
+  const order = { apps: 0, passport: 1, "intern-passport": 3 };
   const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
   const groups = new Map([["", []]]);
   for (const t of teams || []) groups.set(t, []);

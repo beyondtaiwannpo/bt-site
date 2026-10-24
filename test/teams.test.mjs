@@ -15,6 +15,7 @@ import { TEAM_ORDER, teamKey, parseTeams as teamParse } from "../team/src/ui.js"
 import { parseTeams as avParse, setLang as availLang } from "../availability/src/ui.js";
 availLang("zh");
 import { TEAMS as PEOPLE_TEAMS, parseTeams as peopleParse, setLang as peopleLang } from "../admin/people/src/ui.js";
+import { TEAM_LABELS as FORMS_TEAM_LABELS } from "../admin/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 peopleLang("zh");
 
@@ -23,6 +24,8 @@ test("★ 護照與設定頁的 team 清單逐字一樣", () => {
     "兩份清單漂移了 —— 同一個人在兩個地方會屬於不同的 team");
   // 2026-10-21 後台「人與權限」那一頁也有一份（Co-President 替人勾 team）。
   assert.deepEqual(PEOPLE_TEAMS, PASSPORT_TEAMS, "後台那一份漂移了");
+  // 2026-10-30：申請那一組的表單 team 標籤下拉也有一份（team 只是標籤，所有人都選得到）。
+  assert.deepEqual(FORMS_TEAM_LABELS, PASSPORT_TEAMS, "申請那一組的那一份漂移了");
 });
 
 // /team/ 那一頁用縮寫（Sponsorship / CR），profiles 裡存的是全名

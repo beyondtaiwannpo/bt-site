@@ -1288,5 +1288,41 @@ else
 fi
 
 echo
+echo "申請變成整個 BT 一個工作區（2026-10-30）："
+# 這時候：DIR 管 apps:Curriculum；INT1、NEWB 幹部沒有任何指派；OTHER Senior Adviser；PAUL Co-President。先給 NEWDIR 一筆 view 看合併取最高。
+psql -d "${DB}" -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${DIR}','apps:Marketing','view') on conflict do nothing;" >/dev/null
+BEFORE=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.assignments where workspace_id like 'apps:%'" | tr -d ' \n')
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-30-applications-org-wide.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   申請合併那支遷移檔跑過，驗收表全部 PASS（合併前 apps:<team> 上有 ${BEFORE} 筆指派）"; pass=$((pass+1))
+else
+  echo "  FAIL 申請合併那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "★ DIR 在兩個 team 的 apps 是 manage 與 view，合併後在 apps 上是最高的 manage" "manage" "select level from public.assignments where user_id='${DIR}' and workspace_id='apps'"
+chk "舊的 apps:<team> 指派都搬走了、工作區停用、記了一筆合併" "0|0|true" \
+  "select (select count(*) from public.assignments where workspace_id like 'apps:%')||'|'||(select count(*) from public.workspaces where id like 'apps:%' and active)||'|'||exists(select 1 from public.role_changes where target='${DIR}' and field='assignment' and new_value='manage@apps')"
+chkas "${DIR}" "★ Director 現在看得到**全部** team 的表單（is_on_team 不看 team 了）" "true|true" "select public.is_on_team('Marketing')||'|'||public.is_director_of('Nope')"
+chkrole authenticated "${DIR}" "Director 讀得到別的 team 的表單列" "1" "select count(*) from public.forms where id='${FORM}'"
+# ── 破壞測試：沒被派進 apps 的幹部什麼都碰不到（NEWDIR 是邀請信那一段進來的 Director，沒有任何指派；NEWB 這時已經是校友） ──
+chkas "${NEWDIR}" "★ 沒被派的幹部（Associate 或 Director 都一樣）：is_on_team / is_director_of 都是 false" "false|false" "select public.is_on_team('Curriculum')||'|'||public.is_director_of('Curriculum')"
+chkrole authenticated "${NEWDIR}" "★ 沒被派的幹部讀不到還沒開放的表單（開放中的對外本來就看得到）" "0" "select count(*) from public.forms where status<>'open'"
+got=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${NEWDIR}',false);" \
+  -c "set role authenticated; do \$\$ begin insert into public.forms (team,title,status) values ('Curriculum','偷開的表單','draft'); raise notice 'NOT_BLOCKED'; exception when others then raise notice 'BLOCKED %', SQLERRM; end \$\$;" 2>&1 || true)
+if echo "${got}" | grep -q "BLOCKED" && ! echo "${got}" | grep -q "NOT_BLOCKED"; then echo "  ok   ★ 沒被派的幹部開不了表單（forms_insert 的 RLS 擋）"; pass=$((pass+1)); else echo "  FAIL ★ 沒被派的幹部開得了表單：${got}"; fail=$((fail+1)); fi
+chkas "${PAUL}" "Co-President 把那位 Director 派進 apps 當 edit" "edit" "select public.assign('${NEWDIR}','apps','edit')"
+chkas "${NEWDIR}" "派了之後就是全部表單的 Director 式權限" "t" "select public.is_director_of('Whatever')"
+chkas "${OTHER}" "Senior Adviser 靠職級" "t" "select public.is_director_of('x')"
+chkraise "派不進停用的 apps:Curriculum（no_such_workspace）" "no_such_workspace" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.assign('${INT1}','apps:Curriculum','view');"
+chk "my_access 回的是 apps 不是 apps:<team>" "apps|manage" \
+  "select (w->>'id')||'|'||(w->>'level') from (select set_config('test.uid','${DIR}',true)) s, jsonb_array_elements((select public.my_access())->'workspaces') w where w->>'id' like 'apps%' limit 1"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-30-applications-org-wide.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then
+  echo "  ok   申請合併那支可以重跑"; pass=$((pass+1))
+else
+  echo "  FAIL 申請合併那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
