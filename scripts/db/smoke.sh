@@ -1383,6 +1383,75 @@ else
   echo "  FAIL 行銷需求單那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
 fi
 
+
+echo "活動上架（2026-11-01）："
+# 這時候：DIR 管 res:Marketing Team（上一段給的）、PAUL Co-President、OTHER Senior Adviser、ISTAFF 只在 Internship、STU 與 WRONG 是學員（有名字）。
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-01-events.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   活動那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 活動那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+EV=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" \
+  -c "select public.create_event('Marketing Team','winter-camp-2027','2027 冬令營','Winter Camp 2027',true)" 2>&1 | tail -1 | tr -d ' \n')
+case "${EV}" in ????????-*) echo "  ok   Marketing 的 Director 開了一場活動（${EV}）"; pass=$((pass+1));; *) echo "  FAIL 開活動失敗：${EV}"; fail=$((fail+1));; esac
+chk "★ 一場活動 = 工作區（team 填 Marketing、開的人是管）+ 報名表（draft）+ 草稿" "custom:event-winter-camp-2027|MarketingTeam|manage|draft|draft" \
+  "select e.workspace_id||'|'||w.team||'|'||a.level||'|'||f.status||'|'||e.status from public.events e join public.workspaces w on w.id=e.workspace_id join public.assignments a on a.workspace_id=w.id and a.user_id='${DIR}' join public.forms f on f.id=e.form_id where e.id='${EV}'"
+EVF=$(psql -d "${DB}" -X -A -t -q -c "select form_id from public.events where id='${EV}'" | tr -d ' \n')
+chkraise "★ 別的 team 的幹部開不了 Marketing 的活動（not_team_manager）" "not_team_manager" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.create_event('Marketing Team','x-event','x','x',true);"
+chkraise "代號撞到擋（slug_taken）" "slug_taken" \
+  "perform set_config('test.uid','${DIR}',true); perform public.create_event('Marketing Team','winter-camp-2027','y','y',false);"
+chkrole anon "" "★ 破壞測試：沒登入的人看不到草稿" "0" "select count(*) from public.public_events()"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.events;" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 events 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到 events 表：${angot}"; fail=$((fail+1)); fi
+chkrole authenticated "${ISTAFF}" "★ 別的 team 的幹部讀不到這場活動（RLS）" "0" "select count(*) from public.events"
+chkas "${DIR}" "「改」以上存內容（封面是 https、日期、地點、名額 1）" "${EV}" \
+  "select public.save_event('${EV}', '{\"summary_zh\":\"三天兩夜\",\"summary_en\":\"Three days\",\"body_zh\":\"說明\",\"body_en\":\"Body\",\"cover_url\":\"https://drive.google.com/cover.jpg\",\"starts_at\":\"2027-01-20T01:00:00Z\",\"ends_at\":\"2027-01-22T09:00:00Z\",\"place\":\"台北\",\"capacity\":1}'::jsonb)"
+chkraise "封面不是 https 擋（cover_not_https）" "cover_not_https" \
+  "perform set_config('test.uid','${DIR}',true); perform public.save_event('${EV}', '{\"cover_url\":\"http://x/y.jpg\"}'::jsonb);"
+chkraise "★ 封面有填、同意沒勾，按不了準備好了（consent_required）" "consent_required" \
+  "perform set_config('test.uid','${DIR}',true); perform public.set_event_ready('${EV}', true);"
+chkas "${DIR}" "勾了同意" "${EV}" "select public.save_event('${EV}', '{\"cover_consent\":true}'::jsonb)"
+chkas "${DIR}" "準備好了" "ready" "select public.set_event_ready('${EV}', true)"
+chkraise "★ 破壞測試：「管」的人自己放不上對外頁（not_senior）" "not_senior" \
+  "perform set_config('test.uid','${DIR}',true); perform public.publish_event('${EV}');"
+chkrole anon "" "ready 還不是對外，沒登入的人還是看不到" "0" "select count(*) from public.public_events()"
+chkas "${PAUL}" "★ Co-President 放上對外頁" "published" "select public.publish_event('${EV}')"
+chkrole anon "" "★ 沒登入的人看得到 published 的，而且有標題、封面、名額、報名還沒開" "winter-camp-2027|2027冬令營|WinterCamp2027|https://drive.google.com/cover.jpg|1|false|0|false|false" \
+  "select slug||'|'||title_zh||'|'||title_en||'|'||cover_url||'|'||capacity||'|'||signup_open||'|'||signed_up||'|'||is_full||'|'||is_past from public.public_events()"
+chkrole anon "" "public_event(slug) 一場" "1" "select count(*) from public.public_event('winter-camp-2027')"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" -c "select public.save_event('${EV}', '{\"cover_url\":\"https://drive.google.com/other.jpg\"}'::jsonb)" >/dev/null 2>&1
+chk "換了封面同意自動退回（要重新勾）" "f" "select cover_consent from public.events where id='${EV}'"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" -c "select public.save_event('${EV}', '{\"cover_consent\":true}'::jsonb)" >/dev/null 2>&1
+# 額滿硬關：開放報名表、名額 1。報名的人用兩位新的學員（前面的 STU 已經被別段刪掉或改過）。
+EVS1=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1
+EVS2=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2
+psql -d "$DB" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${EVS1}','evs1@example.com'), ('${EVS2}','evs2@example.com');
+insert into public.profiles (id,name_zh,role) values ('${EVS1}','報名一號','student'), ('${EVS2}','報名二號','student');
+update public.forms set status='open' where id='${EVF}';
+SQL
+chkrole anon "" "報名表開了，對外看得到 signup_open" "true" "select signup_open::text from public.public_events()"
+APP1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${EVS1}',false);" -c "set role authenticated; select public.submit_application('${EVF}', '[]'::jsonb)" 2>&1 | tail -1 | tr -d ' \n' || true)
+case "${APP1}" in ????????-*) echo "  ok   第一位學員報到名"; pass=$((pass+1));; *) echo "  FAIL 第一位報名失敗：${APP1}"; fail=$((fail+1));; esac
+chkrole anon "" "★ 對外看得到額滿（1 / 1）" "1|true" "select signed_up||'|'||is_full from public.public_events()"
+chkraise "★ 額滿硬關：第二位報不了（full）" "full" \
+  "perform set_config('test.uid','${EVS2}',true); perform public.submit_application('${EVF}', '[]'::jsonb);"
+chkas "${EVS1}" "報過的人再送回原本那一筆，不算第二個名額" "${APP1}" "select public.submit_application('${EVF}', '[]'::jsonb)"
+chkas "${PAUL}" "拒了那一位名額就空出來" "1" "select public.decide_applications(array['${APP1}']::uuid[], 'rejected')"
+chkrole anon "" "拒了之後不再額滿" "0|false" "select signed_up||'|'||is_full from public.public_events()"
+chkraise "★ 已經 published 的按不了準備好了（already_published）" "already_published" \
+  "perform set_config('test.uid','${DIR}',true); perform public.set_event_ready('${EV}', true);"
+chkas "${OTHER}" "Senior Adviser 撤下來" "archived" "select public.unpublish_event('${EV}')"
+chkrole anon "" "撤了對外就沒有" "0" "select count(*) from public.public_events()"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-01-events.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then
+  echo "  ok   活動那支可以重跑"; pass=$((pass+1))
+else
+  echo "  FAIL 活動那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
