@@ -61,6 +61,16 @@ export async function createInvite(code, grants, uses, note) {
   return data;
 }
 
+// ── 邀請信（2026-10-29）。門在資料庫：邀請與重寄 require_senior、撤銷 require_president、清單 is_senior。 ──
+export const loadInviteList = () => rpc("invites_for_review");
+export const invitePerson   = d => rpc("invite_person", { p_email: d.email, p_grants: d.grants, p_rank: d.rank || null,
+  p_name_zh: d.name_zh || null, p_name_en: d.name_en || null, p_title_en: d.title_en || null, p_title_zh: d.title_zh || null,
+  p_team: d.team || null, p_term: d.term || null, p_line: d.line || null, p_note: d.note || null });
+export const resendInvite   = code => rpc("resend_invite", { p_code: code });
+export const revokeInvite   = code => rpc("revoke_invite", { p_code: code });
+// 排進 outbox 之後立刻寄（跟審核那一頁同一支函式）。
+export const sendMail       = () => rpc("send_pending_mail", { p_limit: 40 });
+
 export async function disableInvite(code) {
   need();
   const { error } = await supabase.rpc("disable_invite", { p_code: code });
@@ -161,6 +171,13 @@ export const endTerm         = (id, zh, en, starts, ends, keep) => rpc("end_term
 // 而他需要知道的是「去哪裡做什麼」，不是那個代碼長什麼樣。
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
+  // 邀請信（2026-10-29）
+  ["invite_pending",     T({ zh: "這個 email 還有一組沒用的邀請。先撤銷或重寄那一組。", en: "This email already has a live invite. Revoke or resend that one first." }), T({ zh: "", en: "" })],
+  ["email_has_account",  T({ zh: "這個 email 已經有帳號了。他直接登入就好；要給他身分，用名單上的「發校友碼」或批次碼。", en: "This email already has an account. They can sign in; to grant a role use the roster or a batch code." }), ""],
+  ["bad_email",          T({ zh: "email 的格式不對。", en: "That is not a valid email." }), ""],
+  ["already_claimed",    T({ zh: "這組邀請已經被認領了，不用重寄。", en: "This invite was already claimed; no need to resend." }), ""],
+  ["not_an_invite",      T({ zh: "這不是邀請信的碼。", en: "That is not an invite code." }), ""],
+  ["term_required",      T({ zh: "填了職位就要選屆別。", en: "Pick a term when you give a position." }), ""],
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
   // 2026-09-08：Paul 照步驟設定了，但名字打成「Resend API」，
   // 而畫面上顯示的是這裡寫死的一句話 —— 看起來像他什麼都沒做。

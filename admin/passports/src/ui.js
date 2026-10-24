@@ -42,7 +42,8 @@ export const ITEMS = [
   { group: "people",    key: "roster",     label: { zh: "幹部名單", en: "Roster" },          who: "senior" },
   { group: "people",    key: "workspaces", label: { zh: "工作區",   en: "Workspaces" },      who: "senior" },
   { group: "people",    key: "terms",      label: { zh: "屆別",     en: "Terms" },           who: "senior" },
-  { group: "people",    key: "invites",    label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
+  // 2026-10-29 邀請信：打 email 與職位寄一封信。Co-President 與 Senior Adviser 都邀得了（撤銷只有 Co-President，門在資料庫）。
+  { group: "people",    key: "invites",    label: { zh: "邀請",     en: "Invites" },         who: "senior" },
   { group: "people",    key: "changes",    label: { zh: "變動紀錄", en: "Change log" },      who: "senior" },
 ];
 const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports" };

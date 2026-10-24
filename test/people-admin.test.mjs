@@ -439,3 +439,77 @@ test("★ Adviser：遷移檔與 10-24 同步成五個值、is_senior 不變；�
   const { rankWeight } = await import("../team/src/ui.js");
   assert.deepEqual(["Associate, X · 2026-27", "Adviser, X · 2026-27", "Director, X · 2026-27"].sort((a, b) => rankWeight(a) - rankWeight(b)), ["Director, X · 2026-27", "Adviser, X · 2026-27", "Associate, X · 2026-27"]);
 });
+
+// 2026-10-29 邀請信（docs/2026-10-24-邀請信.md）。表單、清單狀態、重寄與撤銷、批次碼收在摺疊裡；主程式寄完立刻 send_pending_mail。
+test("★ 邀請頁：表單六格、職位下拉共用、清單五種狀態、撤銷只給 Co-President、認領了的沒有重寄、批次碼在摺疊裡", async () => {
+  const { invitesPageHTML, INVITE_WHO, whoLabel } = await import("../admin/people/src/ui.js");
+  assert.deepEqual(INVITE_WHO, ["cadre:president", "cadre:senior_adviser", "cadre:director", "cadre:adviser", "cadre:member", "alumni", "intern"]);
+  assert.equal(whoLabel("cadre:adviser"), "幹部：顧問"); assert.equal(whoLabel("alumni"), "校友");
+  const rows = [
+    { code: "bt-aaaa1111", email: "a@example.com", grants: "alumni", rank: null, person_id: "p9", person_name: "Second Alum", title: "Director, Marketing Team", status: "sent", created_at: "2026-10-29T01:00:00Z", expires_at: "2026-11-28T01:00:00Z", invited_by_name: "Paul Wang" },
+    { code: "bt-bbbb2222", email: "b@example.com", grants: "cadre", rank: "director", status: "claimed", created_at: "2026-10-20T01:00:00Z", claimed_name: "New Director", claimed_at: "2026-10-21T01:00:00Z", invited_by_name: "Paul Wang" },
+    { code: "bt-cccc3333", email: "c@example.com", grants: "cadre", rank: "member", status: "failed", mail_error: "boom", created_at: "2026-10-22T01:00:00Z", invited_by_name: "Paul Wang" },
+    { code: "bt-dddd4444", email: "d@example.com", grants: "intern", status: "expired", created_at: "2026-09-01T01:00:00Z", invited_by_name: "Paul Wang" },
+  ];
+  const h = invitesPageHTML(rows, [], TERMS, "", false, null, null, true);
+  for (const id of ["in-email", "in-who", "in-rank", "in-team", "in-term", "in-zh", "in-en", "in-line", "in-note"]) assert.match(h, new RegExp(`id="${id}"`), id);
+  assert.match(h, /<select id="in-rank" data-act="pos-rank"/, "職位下拉跟改一個人那一頁同一個");
+  assert.match(h, /data-act="invite-send"/);
+  assert.match(h, /<b>a@example\.com<\/b><span class="tag open">寄出<\/span>/);
+  assert.match(h, /校友・Director, Marketing Team/);
+  assert.match(h, /2026-11-28 到期/);
+  assert.match(h, /data-act="invite-resend" data-code="bt-aaaa1111"/);
+  assert.match(h, /data-act="invite-revoke" data-code="bt-aaaa1111"/);
+  assert.match(h, /href="#person=p9"/, "有名單紀錄的連過去");
+  assert.match(h, /<span class="tag done">認領了<\/span>/);
+  assert.match(h, /New Director 在 2026-10-21 認領了/);
+  assert.doesNotMatch(h, /data-act="invite-resend" data-code="bt-bbbb2222"/, "認領了的不能重寄");
+  assert.doesNotMatch(h, /data-act="invite-revoke" data-code="bt-bbbb2222"/);
+  assert.match(h, /寄失敗<\/span>/); assert.match(h, /寄信的錯誤：boom/);
+  assert.match(h, /過期<\/span>/); assert.match(h, /data-act="invite-resend" data-code="bt-dddd4444"/, "過期的可以重寄");
+  assert.match(h, /<details class="ans" id="batch"><summary>批次碼/);
+  assert.match(h, /id="ic-code"/, "舊的批次碼表單在摺疊裡");
+  const sa = invitesPageHTML(rows, [], TERMS, "", false, null, null, false);
+  assert.doesNotMatch(sa, /data-act="invite-revoke"/, "Senior Adviser 沒有撤銷");
+  assert.doesNotMatch(sa, /id="batch"/, "Senior Adviser 看不到批次碼");
+  assert.match(sa, /data-act="invite-resend"/, "但重寄得了");
+  assert.match(invitesPageHTML([], [], TERMS, "", false, null, null, true), /還沒有邀請任何人/);
+  assert.match(invitesPageHTML(rows, [], TERMS, "", true, null, null, true), /data-act="invite-send" disabled/);
+  const src = readFileSync("admin/people/src/main.js", "utf8");
+  const send = src.slice(src.indexOf('act === "invite-send"'), src.indexOf('act === "invite-resend"'));
+  assert.match(send, /D\.invitePerson\(/); assert.match(send, /await D\.sendMail\(\)/, "排進 outbox 之後立刻寄");
+  assert.match(src.slice(src.indexOf('act === "invite-revoke"'), src.indexOf("邀請碼的新增與停用")), /UI\.needAsk\(S, b, T\("confirm\.revokeInvite"/);
+  const d = readFileSync("admin/people/src/data.js", "utf8");
+  for (const fn of ["invites_for_review", "invite_person", "resend_invite", "revoke_invite", "send_pending_mail"]) assert.match(d, new RegExp(`rpc\\("${fn}"`), fn);
+  // 側欄：邀請那一行 Senior Adviser 也看得到。
+  const { ITEMS, canSee } = await import("../admin/people/src/ui.js");
+  const row = ITEMS.find(i => i.key === "invites");
+  assert.equal(row.who, "senior"); assert.equal(T(row.label), "邀請");
+  assert.equal(canSee(row, { role: "cadre", board: "senior_adviser" }), true);
+  assert.equal(canSee(row, { role: "cadre", board: "director" }), false);
+});
+
+test("★ 邀請信的遷移檔：六欄、兩張表的 kind 收 invite、六支函式的門、claim_invite 三道檢查、預設文案中英都有 {link}", () => {
+  const mig = readFileSync("supabase/migrations/2026-10-29-invites.sql", "utf8");
+  for (const c of ["email", "rank", "expires_at", "opened_at", "revoked_at", "invited_by"]) assert.match(mig, new RegExp(`add column if not exists ${c}`), c);
+  assert.match(mig, /check \(kind in \('guardian', 'interview', 'accepted', 'rejected', 'notice', 'invite'\)\)/);
+  assert.match(mig, /check \(kind in \('guardian', 'interview', 'accepted', 'rejected', 'invite'\)\)/);
+  const fn = name => { const i = mig.indexOf(`create or replace function public.${name}(`); return mig.slice(i, mig.indexOf("$$;", i)); };
+  assert.match(fn("invite_person"), /perform public\.require_senior\(\);/);
+  assert.match(fn("resend_invite"), /perform public\.require_senior\(\);/);
+  assert.match(fn("revoke_invite"), /perform public\.require_president\(\);/);
+  assert.match(fn("invites_for_review"), /and public\.is_senior\(\)/);
+  assert.match(mig, /grant execute on function public\.invite_opened\(text\) to anon, authenticated;/);
+  assert.match(mig, /revoke all on function public\.invites_for_review\(\) from public, anon;/);
+  const claim = fn("claim_invite");
+  for (const e of ["invite_revoked", "invite_expired", "invite_wrong_email", "for update", "uses_left > 0", "uses_left = uses_left + 1", "insert into invite_uses"]) assert.ok(claim.includes(e), `claim_invite 少了 ${e}`);
+  assert.match(claim, /select lower\(email\) into v_bound from auth\.users where id = v_uid/, "email 比的是登入帳號的 email，不是前端說的");
+  assert.match(claim, /update profiles set board_role = v_rank where id = v_uid/, "認領時把邀請定的職級寫進去");
+  assert.match(mig, /interval '30 days'/);
+  const tpl = mig.slice(mig.indexOf("('invite',"), mig.indexOf("on conflict (kind) do nothing"));
+  assert.ok((tpl.match(/\{link\}/g) || []).length >= 2, "中英各一段都有 {link}");
+  for (const p of ["{name}", "{position}", "{sender}"]) assert.ok(tpl.includes(p), p);
+  assert.match(mig, /要先跑過 2026-10-28-adviser-rank\.sql/);
+  assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /2026-10-29-invites\.sql/);
+  assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /invite_wrong_email/, "smoke 有 email 綁定的破壞測試");
+});

@@ -1196,5 +1196,97 @@ fi
 chkas "${PAUL}" "改回 Senior Adviser（留給後面的人）" "senior_adviser" "select public.set_board_role('${OTHER}','senior_adviser')"
 
 echo
+echo "邀請信（2026-10-29）："
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-10-29-invites.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   邀請信那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 邀請信那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+# 這時候：PAUL Co-President、OTHER Senior Adviser、MEMBER 已經是校友。屆別裡 2026-27 已結束、2027-28 是這一屆。
+TERM0=$(psql -d "${DB}" -X -A -t -q -c "select id from public.terms order by starts_on limit 1" | tr -d ' \n')
+# ── 邀請一位校友：名單多一筆、職位一筆、outbox 一封、碼綁 email ──
+IVA=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.invite_person('NewAlum@Example.com','alumni',null,'老校友二','Second Alum','Director, Marketing Team','','Marketing Team','${TERM0}','歡迎回來','備註只有後台看')" 2>&1 | tail -1 | tr -d ' \n')
+case "${IVA}" in bt-*) echo "  ok   Co-President 邀請一位校友，拿到一組碼（${IVA}）"; pass=$((pass+1));; *) echo "  FAIL 邀請校友沒拿到碼：${IVA}"; fail=$((fail+1));; esac
+chk "★ 碼綁 email（小寫存）、單次、30 天、記了誰邀的" "newalum@example.com|1|true|${PAUL}" \
+  "select email||'|'||uses_left||'|'||(expires_at > now() + interval '29 days')||'|'||invited_by from public.invite_codes where code='${IVA}'"
+chk "名單多了那一筆，還沒有帳號，職位掛在上面" "SecondAlum|Director,MarketingTeam|${TERM0}" \
+  "select pe.name_en||'|'||po.title_en||'|'||po.term_id from public.people pe join public.positions po on po.person_id=pe.id join public.invite_codes c on c.person_id=pe.id where c.code='${IVA}' and pe.profile_id is null"
+chk "★ outbox 排了一封 invite，信裡有連結、名字、職位、邀請的人、那一句話、不要回覆" "true|true|true|true|true|true" \
+  "select (body like '%/app/?invite=${IVA}%')||'|'||(body like '%Second Alum%')||'|'||(body like '%Director, Marketing Team%')||'|'||(body like '%王平%')||'|'||(body like '%歡迎回來%')||'|'||(body like '%不要回覆這封信%') from public.mail_outbox where kind='invite' and invite_code='${IVA}'"
+chk "主旨中英都有" "t" "select subject like '%邀請你%' and subject like '%invited%' from public.mail_outbox where invite_code='${IVA}'"
+chkraise "同一個 email 還有活的碼就擋（invite_pending）" "invite_pending" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_person('newalum@example.com','alumni',null,'','','','','','','','');"
+chkraise "已經有帳號的 email 不能邀（email_has_account）" "email_has_account" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_person('member@example.com','alumni',null,'','','','','','','','');"
+chkraise "壞的 email 擋（bad_email）" "bad_email" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_person('not-an-email','alumni',null,'','','','','','','','');"
+chkraise "邀幹部一定要有職級（bad_role）" "bad_role" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_person('x1@example.com','cadre',null,'','','','','','','','');"
+# ── Senior Adviser 邀得了幹部（職級 director），撤不了；校友什麼都叫不動 ──
+IVD=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${OTHER}',false);" \
+  -c "select public.invite_person('newdir@example.com','cadre','director','','New Director','','','Curriculum Team','','','')" 2>&1 | tail -1 | tr -d ' \n')
+case "${IVD}" in bt-*) echo "  ok   Senior Adviser 邀得了一位 Director（${IVD}）"; pass=$((pass+1));; *) echo "  FAIL Senior Adviser 邀不了：${IVD}"; fail=$((fail+1));; esac
+chk "幹部的碼記著職級" "director|cadre" "select rank||'|'||grants from public.invite_codes where code='${IVD}'"
+chkraise "★ Senior Adviser 撤不了（not_president）" "not_president" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.revoke_invite('${IVD}');"
+chkraise "★ 校友邀不了（not_senior）" "not_senior" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.invite_person('x2@example.com','alumni',null,'','','','','','','','');"
+chkrole authenticated "${MEMBER}" "★ 校友看不到邀請清單" "0" "select count(*) from public.invites_for_review()"
+chkas "${OTHER}" "Senior Adviser 看得到清單，狀態是 queued（還沒寄）" "queued" "select status from public.invites_for_review() where code='${IVA}'"
+# ── 沒登入也能記「開過信」，而且什麼都不回 ──
+chkrole anon "" "★ 沒登入的人叫 invite_opened 不會回東西" "" "select public.invite_opened('${IVA}')"
+chk "開過信記了時間，再叫一次不會蓋掉" "t" "select opened_at is not null from public.invite_codes where code='${IVA}'"
+chkrole anon "" "沒登入的人看得到碼是寄給誰的，但只有遮過的 email" "alumni|n***@example.com|live" "select grants||'|'||email_hint||'|'||status from public.invite_peek('${IVA}')"
+chkas "${OTHER}" "清單上狀態變成 opened" "opened" "select status from public.invites_for_review() where code='${IVA}'"
+# ── 破壞測試：用別的 email 登入認領，要被擋；用對的 email 才過 ──
+WRONG=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1
+RIGHT=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2
+NEWDIR=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3
+psql -d "${DB}" -q -c "
+  insert into auth.users (id,email) values ('${WRONG}','someone.else@example.com'), ('${RIGHT}','newalum@example.com'), ('${NEWDIR}','newdir@example.com');
+  insert into public.profiles (id,name_zh,name_en,role) values ('${WRONG}','路人','Passer By','student'), ('${RIGHT}','','Second Alum','student'), ('${NEWDIR}','','New Director','student');
+" >/dev/null
+chkraise "★★ 別的 email 登入認領被擋（invite_wrong_email），碼沒被燒掉" "invite_wrong_email:n\*\*\*@example.com" \
+  "perform set_config('test.uid','${WRONG}',true); perform public.claim_invite('${IVA}');"
+chk "碼還在（uses_left 還是 1）" "1" "select uses_left from public.invite_codes where code='${IVA}'"
+chkas "${RIGHT}" "★ 對的 email 認領成功，變成校友" "upgraded_alumni" "select public.claim_invite('${IVA}')"
+chk "名單那一筆歸到他、職位在他身上" "Director,MarketingTeam" \
+  "select po.title_en from public.people pe join public.positions po on po.person_id=pe.id where pe.profile_id='${RIGHT}'"
+chkas "${OTHER}" "清單上狀態 claimed，印他的名字" "claimed|SecondAlum" "select status||'|'||claimed_name from public.invites_for_review() where code='${IVA}'"
+chkas "${NEWDIR}" "★ 幹部的邀請：認領時職級寫進去" "upgraded" "select public.claim_invite('${IVD}')"
+chk "職級是 director、記了一筆（改的人算邀請的人）" "director|member|director|${OTHER}" \
+  "select p.board_role||'|'||r.old_value||'|'||r.new_value||'|'||r.changed_by from public.profiles p join public.role_changes r on r.target=p.id and r.field='board_role' where p.id='${NEWDIR}'"
+chkraise "認領過的碼不能重寄（already_claimed）" "already_claimed" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.resend_invite('${IVA}');"
+# ── 過期、撤銷、重寄 ──
+IVE=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.invite_person('late@example.com','alumni',null,'','','','','','','','')" 2>&1 | tail -1 | tr -d ' \n')
+psql -d "${DB}" -q -c "update public.invite_codes set expires_at = now() - interval '1 day' where code='${IVE}';" >/dev/null
+LATE=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4
+psql -d "${DB}" -q -c "insert into auth.users (id,email) values ('${LATE}','late@example.com'); insert into public.profiles (id,name_zh,role) values ('${LATE}','晚到','student');" >/dev/null
+chkraise "★ 過期的碼認領被擋（invite_expired）" "invite_expired" \
+  "perform set_config('test.uid','${LATE}',true); perform public.claim_invite('${IVE}');"
+chkas "${OTHER}" "清單上狀態 expired" "expired" "select status from public.invites_for_review() where code='${IVE}'"
+IVE2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${OTHER}',false);" -c "select public.resend_invite('${IVE}')" 2>&1 | tail -1 | tr -d ' \n')
+case "${IVE2}" in bt-*) echo "  ok   重寄換了一組新碼（${IVE2}）"; pass=$((pass+1));; *) echo "  FAIL 重寄沒拿到新碼：${IVE2}"; fail=$((fail+1));; esac
+chk "★ 舊碼死了、新碼活著、同一個 email、outbox 多一封" "0|1|late@example.com|2" \
+  "select (select uses_left from public.invite_codes where code='${IVE}')||'|'||(select uses_left from public.invite_codes where code='${IVE2}')||'|'||(select email from public.invite_codes where code='${IVE2}')||'|'||(select count(*) from public.mail_outbox where kind='invite' and to_email='late@example.com')"
+chkas "${PAUL}" "Co-President 撤銷" "" "select public.revoke_invite('${IVE2}')"
+chkraise "★ 撤銷的碼認領被擋（invite_revoked）" "invite_revoked" \
+  "perform set_config('test.uid','${LATE}',true); perform public.claim_invite('${IVE2}');"
+chkas "${OTHER}" "清單上狀態 revoked" "revoked" "select status from public.invites_for_review() where code='${IVE2}'"
+chk "邀請、重寄、撤銷都記在變動紀錄" "3" "select count(*) from public.role_changes where field='invite' and target_name in ('late@example.com')"
+# ── 舊的批次碼照舊 ──
+chk "批次碼那六欄是空的，還能用" "t" "select email is null and expires_at is null from public.invite_codes where code='BT-ALUM'"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-10-29-invites.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then
+  echo "  ok   邀請信那支可以重跑（文案不會被蓋）"; pass=$((pass+1))
+else
+  echo "  FAIL 邀請信那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -324,3 +324,15 @@ test("信件文案那個分頁只有 Co-President 看得到", () => {
 test("存檔中會鎖住按鈕", () => {
   assert.match(SITE.mailEditHTML("accepted", tpl, "", true), /data-act="mail-save"[^>]*disabled/);
 });
+
+// 2026-10-29 邀請信在信件文案裡是第五種，五個代換符號，預覽用範例填。
+test("★ 信件文案第五種：邀請信，五個代換符號、預覽有連結、{link} 一定要在的提醒", () => {
+  assert.ok(SITE.MAIL_KINDS.some(k => k.v === "invite"));
+  assert.equal(SITE.fillInvite("{name}/{position}/{term}/{link}/{sender}", { name: "A", position: "B", term: "C", link: "D", sender: "E" }), "A/B/C/D/E");
+  assert.equal(SITE.fillInvite("{name}{name}"), "Mei WuMei Wu", "沒給範例就用內建的");
+  const h = SITE.mailEditHTML("invite", { kind: "invite", subject: "Hi {name}", body: "{sender} invites you: {link}" }, "", false);
+  assert.match(h, /<b>Hi Mei Wu<\/b>/);
+  assert.match(h, /Paul Wang invites you: https:\/\/beyondtaiwannpo\.com\/app\/\?invite=bt-a1b2c3d4/);
+  assert.match(h, /\{link\}/, "提醒裡講 {link} 一定要在");
+  assert.doesNotMatch(h, /\{姓名\}/, "邀請信不用舊的兩個符號");
+});

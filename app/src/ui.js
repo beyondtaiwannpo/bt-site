@@ -28,7 +28,15 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 // 會擋住下一個人的指示。留這幾行是為了說明它被推翻過，不是要繼續守它。
 // mode：in（登入）／up（註冊）／forgot（要重設連結）／sent（寄出去了）
 // email 只有 sent 用得到，用來把使用者剛才打的字回顯 —— 打錯字的人才看得出來。
-export function authHTML(mode, msg, email, busy) {
+// invite（2026-10-29）：有邀請連結的時候，卡片最上面一條說這是寄給誰的，Google 那顆放第一顆（他只要選對帳號）。
+export function inviteBannerHTML(inv) {
+  if (!inv) return "";
+  const st = inv.status;
+  if (st === "claimed") return `<div class="wnote" style="margin:0 0 16px">${T("inv.bannerClaimed")}</div>`;
+  if (st === "expired" || st === "revoked") return `<div class="wnote" style="margin:0 0 16px">${T("inv.bannerDead")}</div>`;
+  return `<div class="note" style="margin:0 0 16px">${inv.email_hint ? T("inv.banner", { email: esc(inv.email_hint) }) : T("inv.bannerNoHint")}</div>`;
+}
+export function authHTML(mode, msg, email, busy, invite) {
   const up = mode === "up";
 
   // ── 忘記密碼：輸入 email ──
@@ -80,8 +88,10 @@ export function authHTML(mode, msg, email, busy) {
          自己填的東西有作用，打錯了還會以為是自己的問題，而實際上不管填什麼都會
          註冊成功、身分都是 student。**沒有作用的輸入框比沒有輸入框更糟。**
          邀請碼現在在登入之後那一頁輸入（notCadreHTML）。 -->
-    <div class="sub">${up ? T("auth.subUp") : T("auth.subIn")}</div>
+    <div class="sub">${invite ? T("inv.sub") : up ? T("auth.subUp") : T("auth.subIn")}</div>
+    ${inviteBannerHTML(invite)}
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    ${invite ? `<div class="stack" style="margin-bottom:14px"><button class="btn" data-act="do-google">${T("inv.google")}</button></div><div class="mini" style="margin:0 0 14px">${T("inv.orEmail")}</div>` : ""}
     <!-- 邀請碼那格的 autocapitalize/autocorrect/spellcheck 全部關掉。
          **大小寫那一半已經不再是理由**：trigger 現在是
          where upper(btrim(code)) = upper(btrim(v_code))，手機鍵盤把第一個字母變成大寫
@@ -115,7 +125,7 @@ export function authHTML(mode, msg, email, busy) {
     <!-- 送出中要看得出來。沒有這個狀態的話，網路慢的時候畫面完全不動，
          而使用者會再按一次（那是這個 repo 一路上最常見的失敗形狀）。 -->
     <div class="stack">
-      <button class="btn" data-act="${up ? "do-signup" : "do-signin"}" ${busy ? "disabled" : ""}>${
+      <button class="btn${invite ? " ghost" : ""}" data-act="${up ? "do-signup" : "do-signin"}" ${busy ? "disabled" : ""}>${
         busy ? T("auth.busy") : (up ? T("auth.signup") : T("auth.signin"))}</button>
     <!-- Google 登入（規格 §3-4）。**email + 密碼那條路不要拿掉**：
          有人沒有 Google 帳號、有人在中國、有人的 Google 就是登不進去。
@@ -129,10 +139,10 @@ export function authHTML(mode, msg, email, busy) {
          第一次點就是註冊，第二次點就是登入，使用者不需要先決定自己是哪一種。 -->
       <!-- 標籤只有中文：雙語標籤正是它折成兩行的原因，而「Google」這個字不需要翻譯
            （使用者 2026-09-03 裁定）。 -->
-      <button class="btn ghost" data-act="do-google">${T("auth.google")}</button>
+      ${invite ? "" : `<button class="btn ghost" data-act="do-google">${T("auth.google")}</button>`}
     </div>
     <div class="nav"><button class="link" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? T("auth.haveAccount") : T("auth.noAccount")}</button></div>
-    <div class="note">${T("auth.googleNote")}</div>
+    <div class="note">${invite ? T("inv.googleNote") : T("auth.googleNote")}</div>
     <!-- 2026-09-01：寄信接好之後，忘記密碼改成自助為主、組織信箱為輔。
          **組織信箱那條不要刪** —— 自助那條路需要「還記得自己用哪個 email」，
          而連 email 都想不起來的人（換過信箱、當初用學校信箱註冊）沒有別的出口。

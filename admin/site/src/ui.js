@@ -55,7 +55,8 @@ export const ITEMS = [
   { group: "people",    key: "roster",     label: { zh: "幹部名單", en: "Roster" },          who: "senior" },
   { group: "people",    key: "workspaces", label: { zh: "工作區",   en: "Workspaces" },      who: "senior" },
   { group: "people",    key: "terms",      label: { zh: "屆別",     en: "Terms" },           who: "senior" },
-  { group: "people",    key: "invites",    label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
+  // 2026-10-29 邀請信：打 email 與職位寄一封信。Co-President 與 Senior Adviser 都邀得了（撤銷只有 Co-President，門在資料庫）。
+  { group: "people",    key: "invites",    label: { zh: "邀請",     en: "Invites" },         who: "senior" },
   { group: "people",    key: "changes",    label: { zh: "變動紀錄", en: "Change log" },      who: "senior" },
 ];
 const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports" };
@@ -442,7 +443,17 @@ export const MAIL_KINDS = [
   { v: "interview", label: "mail.interview", when: "mail.interview.when" },
   { v: "accepted",  label: "mail.accepted",  when: "mail.accepted.when" },
   { v: "rejected",  label: "mail.rejected",  when: "mail.rejected.when" },
+  // 2026-10-29 邀請信：五個代換符號 {name} {position} {term} {link} {sender}，不是 {姓名} {活動名稱}。
+  { v: "invite",    label: "mail.invite",    when: "mail.invite.when" },
 ];
+// 邀請信預覽用的範例（信裡真的會出現的東西，不跟著後台的語言翻）。
+export const INVITE_SAMPLE = { name: "Mei Wu", position: "Director, Curriculum Team", term: "2026-27", link: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", sender: "Paul Wang" };
+export function fillInvite(text, s) {
+  const v = Object.assign({}, INVITE_SAMPLE, s || {});
+  return String(text == null ? "" : text)
+    .split("{name}").join(v.name).split("{position}").join(v.position).split("{term}").join(v.term)
+    .split("{link}").join(v.link).split("{sender}").join(v.sender);
+}
 const kindOf = v => MAIL_KINDS.find(k => k.v === v) || MAIL_KINDS[0];
 
 // 系統會自己加在每一封信最後面的那一段。**這裡只是把它顯示出來，不能改。**
@@ -489,20 +500,22 @@ export function mailEditHTML(kind, t, msg, busy) {
   const subject = t ? t.subject : "";
   const body = t ? t.body : "";
   const extra = kind === "interview" ? "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/..." : "";
+  const isInvite = kind === "invite";
+  const fill = s => isInvite ? fillInvite(s) : fillMail(s, NAME, TITLE);
   return pageHead(esc(T(k.label)), esc(T("mail.editLede", { when: T(k.when) })), [], { act: "mail-back", label: T("mail.back") })
     + msgHTML(msg)
     + `<div class="cols">` + sectionHTML("", `<label><i>${T("mail.subjectLabel")}</i><input id="msub" value="${esc(subject)}"></label>
     <label><i>${T("mail.body")}</i><textarea id="mbody" style="min-height:230px">${esc(body)}</textarea></label>
     <div class="mini" style="margin:-6px 0 14px">
-      ${T("mail.vars")}</div>
+      ${isInvite ? T("mail.varsInvite") : T("mail.vars")}</div>
 
     <div class="form-foot">
       <button class="btn" data-act="mail-save" data-k="${esc(kind)}" ${busy ? "disabled" : ""}>${
         busy ? T("common.saving") : T("common.save")}</button>
     </div>`)
-    + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
-    <div class="mailprev"><b>${esc(fillMail(subject, NAME, TITLE)) || T("mail.noSubjectPrev")}</b><pre>${
-      esc(fillMail(body, NAME, TITLE) + extra)}</pre><pre class="tail">${esc(mailTail(kind))}</pre></div>
+    + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
+    <div class="mailprev"><b>${esc(fill(subject)) || T("mail.noSubjectPrev")}</b><pre>${
+      esc(fill(body) + extra)}</pre><pre class="tail">${esc(mailTail(kind))}</pre></div>
     <div class="mini" style="margin:6px 0 0">
       ${T("mail.tailNote")}</div>`) + `</div>`;
 }

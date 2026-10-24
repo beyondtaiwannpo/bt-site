@@ -46,7 +46,7 @@ function render() {
 
   const filter = { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all", team: S.filter.team };
   let body, tab = "roster";
-  if (S.view === "invites") { body = UI.inviteCodesHTML(S.invites, S.msg, S.busy, S.inviteDraft); tab = "invites"; }
+  if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres()); tab = "invites"; }
   else if (S.view === "changes") { body = UI.changesHTML(S.changes, S.people, S.msg); tab = "changes"; }
   else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior()); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
@@ -114,14 +114,24 @@ async function openRoster(keepMsg, view) {
   catch (e) { S.busy = false; S.msg = T("err.rosterLoad") + D.says(e); S.view = "roster"; }
   render();
 }
-async function openInvites() {
-  S.busy = true; render();
+// 邀請頁（2026-10-29）：邀請清單（senior）加舊的批次碼（president 才讀得到，別人讀到空的就空的）。
+async function openInvites(keepMsg) {
+  S.busy = true; if (!keepMsg) S.msg = ""; render();
   try {
-    S.invites = await D.loadInvites();
+    if (!S.terms.length) await loadCore(true);
+    S.inviteList = await D.loadInviteList();
+    S.invites = isPres() ? await D.loadInvites().catch(() => []) : [];
     if (!S.inviteDraft) S.inviteDraft = { code: UI.suggestCode(), grants: "cadre", uses: 1, note: "" };
     S.view = "invites"; S.busy = false;
-  } catch (e) { S.busy = false; S.msg = T("err.invitesLoad") + D.says(e); }
+  } catch (e) { S.busy = false; S.msg = T("err.inviteList") + D.says(e); S.view = "invites"; }
   render();
+}
+function readInviteForm() {
+  const rank = val("in-rank"), team = val("in-team");
+  const t = rank && rank !== "custom" ? UI.deriveTitle(rank, team) : { title_en: val("in-ten"), title_zh: val("in-tzh") };
+  return { email: val("in-email"), who: val("in-who") || "cadre:member", rank, team, term: val("in-term"),
+           name_zh: val("in-zh"), name_en: val("in-en"), title_en: rank ? t.title_en : "", title_zh: rank ? t.title_zh : "",
+           line: val("in-line"), note: val("in-note") };
 }
 async function openWorkspaces(ws, keepMsg) {
   S.busy = true; if (!keepMsg) S.msg = ""; render();
@@ -464,6 +474,43 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  // ── 邀請信（2026-10-29）────────────────────────────────────────────
+  if (act === "invite-send") {
+    const d = readInviteForm(); S.inviteNew = d;
+    if (!d.email) { S.msg = T("err.emailRequired"); render(); return; }
+    const grants = d.who.startsWith("cadre:") ? "cadre" : d.who;
+    const boardRank = grants === "cadre" ? d.who.slice(6) : "";
+    if (grants === "cadre" && !boardRank) { S.msg = T("err.rankRequired2"); render(); return; }
+    if ((d.title_en || d.title_zh) && !d.term) { S.msg = T("err.termRequired"); render(); return; }
+    const code = await run("err.invite", () => D.invitePerson({ email: d.email, grants, rank: boardRank, name_zh: d.name_zh, name_en: d.name_en,
+      title_en: d.title_en, title_zh: d.title_zh, team: d.team, term: d.term, line: d.line, note: d.note }));
+    if (code === undefined) return;
+    // 排進去了就立刻寄。寄不出去不是邀請失敗：碼已經在，清單上會標「排隊中」，再按重寄或等下一次寄信。
+    let mailErr = "";
+    try { await D.sendMail(); } catch (e) { mailErr = D.says(e); }
+    S.inviteNew = null;
+    S.msg = mailErr ? T("msg.invitedQueued", { code }) + mailErr : T("msg.invited", { email: d.email, code });
+    await openInvites(true);
+    return;
+  }
+  if (act === "invite-resend") {
+    const code = await run("err.resend", () => D.resendInvite(b.dataset.code));
+    if (code === undefined) return;
+    let mailErr = "";
+    try { await D.sendMail(); } catch (e) { mailErr = D.says(e); }
+    S.msg = mailErr ? T("msg.invitedQueued", { code }) + mailErr : T("msg.resent", { email: b.dataset.email, code });
+    await openInvites(true);
+    return;
+  }
+  if (act === "invite-revoke") {
+    if (UI.needAsk(S, b, T("confirm.revokeInvite", { email: b.dataset.email }))) return;
+    const ok = await run("err.revoke", () => D.revokeInvite(b.dataset.code));
+    if (ok === undefined) return;
+    S.msg = T("msg.revoked", { email: b.dataset.email });
+    await openInvites(true);
+    return;
+  }
+
   // ── 邀請碼的新增與停用（2026-10-14）────────────────────────────────
   if (act === "invite-suggest" || act === "invite-new") {
     S.inviteDraft = { code: val("ic-code"), grants: val("ic-grants") || "cadre",
@@ -501,6 +548,7 @@ document.addEventListener("change", async e => {
   if (!el) return;
   // 職位下拉換了（2026-10-24）：重畫一次，選「自訂」才露出文字框。加一筆過去的紀錄那一頁也用同一個 data-act。
   if (el.dataset.act === "pos-rank") {
+    if (S.view === "invites") { S.inviteNew = Object.assign(readInviteForm(), { rank: el.value }); render(); return; }
     if (S.view === "person-new") {
       const val2 = i => { const x = document.getElementById(i); return x ? String(x.value || "").trim() : ""; };
       S.newDraft = Object.assign({}, S.newDraft, { name_zh: val2("pn-zh"), name_en: val2("pn-en"), term: val2("pn-term"), rank: el.value, title_en: val2("pn-ten"), title_zh: val2("pn-tzh"), pteam: val2("pn-pteam"), note: val2("pn-note") });

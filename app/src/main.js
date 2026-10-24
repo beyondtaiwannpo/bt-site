@@ -14,7 +14,9 @@ import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 // view 只有在「學員」那條路上有意義：null 是 dashboard，
 // "edit" 是補完／修改資料，"claim" 是輸入邀請碼，"delete" 是刪除確認。
 // 幹部與未登入的人不看它。
-let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
+// invite（2026-10-29 邀請信）：網址 ?invite=碼 收進 sessionStorage（跟 next 同一招，網址上的東西不當網址用），
+// 登入或註冊成功後自動認領，他不用打碼。info 是 invite_peek() 回的 { grants, email_hint, status }，登入頁印給他看。
+let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false, invite: "", inviteInfo: null,
           profile: null, view: null, busy: false, apps: [], opens: [] };
 
 // 登入之後送他回原本要去的地方。白名單、為什麼要存起來、為什麼包 try/catch，
@@ -30,7 +32,7 @@ function render() {
   // 連不上要排在最前面：那時候 S.user 是空的，掉到登入頁等於對一個
   // 明明登入著的人說「請登入」（跟護照那邊同一個道理，spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
-  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail, S.busy); return; }
+  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail, S.busy, S.invite ? S.inviteInfo || {} : null); return; }
   // 2026-09-08：幹部登入後**不再停在一頁選單**，直接送進 /settings/。
   // Paul 的原話：「後面那一頁其實不用有了，就直接登入進到第 1 張圖就好」。
   // 那一頁的工作（一個功能的樞紐）現在由登入後的頂欄做，
@@ -135,14 +137,62 @@ async function loadStudentBits() {
   }
 }
 
+// 邀請連結（2026-10-29）：先看網址，再看口袋裡（Google 繞一圈回來網址上就沒有了）。
+const INVITE_KEY = "bt-invite";
+function pickInvite() {
+  const st = store();
+  let q = null; try { q = new URLSearchParams(location.search).get("invite"); } catch (e) {}
+  if (q && /^[A-Za-z0-9-]{2,64}$/.test(q)) { try { st && st.setItem(INVITE_KEY, q); } catch (e) {} return q; }
+  try { return (st && st.getItem(INVITE_KEY)) || ""; } catch (e) { return ""; }
+}
+function dropInvite() { try { const st = store(); st && st.removeItem(INVITE_KEY); } catch (e) {} S.invite = ""; S.inviteInfo = null; }
+// 認領的錯誤翻成人話（這幾個只有邀請信那條路會丟，shared/auth.js 的表不認得）。
+function inviteError(err) {
+  const m = String((err && err.message) || err || "");
+  const we = m.match(/invite_wrong_email:(\S+)/);
+  if (we) return T("inv.wrongEmail", { email: we[1] });
+  if (m.includes("invite_expired")) return T("inv.expired");
+  if (m.includes("invite_revoked")) return T("inv.revoked");
+  if (m.includes("record_claimed")) return T("inv.recordClaimed");
+  if (m.includes("invalid_invite")) return T("inv.used");
+  return AUTH.authMessage(err);
+}
+async function claimFromInvite() {
+  const code = S.invite; if (!code) return false;
+  try {
+    const { error } = await supabase.rpc("claim_invite", { p_code: code });
+    if (error) throw error;
+    dropInvite();
+    return true;
+  } catch (err) {
+    // 碼留在口袋裡：他換對帳號登入再來，不用重新點信裡的連結。
+    S.authMsg = inviteError(err);
+    return false;
+  }
+}
+
 async function boot() {
   try {
     S.authMsg = AUTH.configMessage();
+    S.invite = pickInvite();
     const who = await AUTH.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }
     S.down = false;
     S.user = who.user;
-    if (!S.user) { render(); return; }
+    if (!S.user) {
+      if (S.invite) {
+        // 登入頁要印「這組碼是寄給 n***@ 的」，而且記一次「開過信」。兩支都沒登入也叫得動，叫不到就當沒有。
+        try { const { data } = await supabase.rpc("invite_peek", { p_code: S.invite }); S.inviteInfo = (data && data[0]) || {}; } catch (e) { S.inviteInfo = {}; }
+        try { await supabase.rpc("invite_opened", { p_code: S.invite }); } catch (e) { /* 只是統計 */ }
+        S.authMode = "in";
+      }
+      render(); return;
+    }
+    // 口袋裡有邀請碼：登入成功的這一刻自動認領，然後照新身分走（底下 role 會重讀）。
+    if (S.invite) {
+      const ok = await claimFromInvite();
+      if (ok) { root().innerHTML = `<div class="empty">${T("m.taking")}</div>`; location.replace(location.pathname); return; }
+    }
 
     // 只查自己那一列。**不要在這裡查護照的東西** —— 學員讀不到，
     // 而且這一頁不需要知道他蓋了幾個章。
@@ -246,6 +296,7 @@ document.addEventListener("click", async e => {
 
   if (act === "do-google") {
     S.authMsg = "";
+    // 邀請碼已經在 sessionStorage（pickInvite），繞完 Google 回來 boot() 會撿起來自動認領。
     // 離開之前先把鑰匙收起來。**這一行才是真正讓 Google 那條路回得到護照的東西**
     // —— 下面 redirectTo 帶著 location.search 是第二層保險，不是主要機制
     //（實測過我們確實有送出去，但那一串要活過 GoTrue 的 callback，而那一步驗不到）。

@@ -52,7 +52,8 @@ export const ITEMS = [
   { group: "people",    key: "roster",     label: { zh: "幹部名單", en: "Roster" },          who: "senior" },
   { group: "people",    key: "workspaces", label: { zh: "工作區",   en: "Workspaces" },      who: "senior" },
   { group: "people",    key: "terms",      label: { zh: "屆別",     en: "Terms" },           who: "senior" },
-  { group: "people",    key: "invites",    label: { zh: "邀請碼",   en: "Invite codes" },    who: "president" },
+  // 2026-10-29 邀請信：打 email 與職位寄一封信。Co-President 與 Senior Adviser 都邀得了（撤銷只有 Co-President，門在資料庫）。
+  { group: "people",    key: "invites",    label: { zh: "邀請",     en: "Invites" },         who: "senior" },
   { group: "people",    key: "changes",    label: { zh: "變動紀錄", en: "Change log" },      who: "senior" },
 ];
 const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports" };
@@ -889,6 +890,78 @@ export function inviteCodesHTML(rows, msg, busy, draft) {
     + sectionHTML(T("iv.issued"), `<div class="note">${T("iv.issuedNote")}</div>
     ${list.length ? `<ul class="flist">${list.map(item).join("")}</ul>`
                   : emptyHTML(T("iv.empty"), T("iv.emptyHint"))}`, { id: "codes" });
+}
+
+// ── 邀請信（2026-10-29，docs/2026-10-24-邀請信.md）────────────────────
+// rows 是 invites_for_review()；batch 是 invite_codes_for_review()（舊的批次碼，收在摺疊裡）；
+// draft = { email, who, rank（職位下拉）, team, term, name_zh, name_en, title_en, title_zh, line, note }。
+// who 是「他會是」那一格的值：cadre:<職級>、alumni、intern。
+export const INVITE_WHO = ["cadre:president", "cadre:senior_adviser", "cadre:director", "cadre:adviser", "cadre:member", "alumni", "intern"];
+export function whoLabel(v) {
+  if (v === "alumni") return T("in.who.alumni");
+  if (v === "intern") return T("in.who.intern");
+  return T("in.who.cadre", { rank: boardLabel(String(v || "").replace(/^cadre:/, "")) });
+}
+export function inviteFormNewHTML(draft, terms, busy) {
+  const d = draft || {};
+  const dis = busy ? " disabled" : "";
+  const who = d.who || "cadre:member";
+  const cur = currentTerm(terms);
+  const termId = d.term || (cur ? cur.id : "");
+  const posRank = d.rank != null ? d.rank : rankOfTitle(d.title_en, d.team);
+  return `<div class="card inline-form" id="invite-new"><h2>${T("in.form")}</h2>
+    <div class="two">
+      <label><i>${T("in.email")}</i><input id="in-email" type="email" value="${esc(d.email || "")}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="name@example.com"${dis}></label>
+      <label><i>${T("in.who")}</i><select id="in-who"${dis}>${INVITE_WHO.map(v => `<option value="${v}"${who === v ? " selected" : ""}>${esc(whoLabel(v))}</option>`).join("")}</select></label>
+      <label><i>${T("in.position")}</i>${rankSelect("in-rank", posRank, dis)}</label>
+      <label><i>${T("pe.posTeam")}</i>${teamSelect("in-team", d.team || "", dis)}</label>
+    </div>
+    <div class="two"${posRank === "custom" ? "" : " hidden"}>
+      <label><i>${T("pe.titleEn")}</i><input id="in-ten" value="${esc(d.title_en || "")}" placeholder="Director, Curriculum Team"${dis}></label>
+      <label><i>${T("pe.titleZh")}</i><input id="in-tzh" value="${esc(d.title_zh || "")}"${dis}></label>
+    </div>
+    <div class="two">
+      <label><i>${T("in.term")}</i><select id="in-term"${dis}><option value="">${T("value.none")}</option>${(terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
+      <span></span>
+      <label><i>${T("in.nameZh")}</i><input id="in-zh" value="${esc(d.name_zh || "")}"${dis}></label>
+      <label><i>${T("in.nameEn")}</i><input id="in-en" value="${esc(d.name_en || "")}"${dis}></label>
+      <label><i>${T("in.line")}</i><input id="in-line" value="${esc(d.line || "")}" placeholder="${esc(T("in.linePh"))}"${dis}></label>
+      <label><i>${T("in.note")}</i><input id="in-note" value="${esc(d.note || "")}"${dis}></label>
+    </div>
+    <div class="row"><button class="btn" data-act="invite-send"${dis}>${busy ? T("in.sending") : T("in.send")}</button></div>
+    <div class="mini">${T("in.formNote")}</div>
+  </div>`;
+}
+const ST_TAG = { queued: "", sent: "open", failed: "warn", opened: "open", claimed: "done", expired: "draft", revoked: "draft" };
+export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft, isPres) {
+  const list = rows || [];
+  const dis = busy ? " disabled" : "";
+  const d10 = v => String(v || "").slice(0, 10);
+  const item = r => {
+    const who = r.grants === "cadre" ? T("in.who.cadre", { rank: boardLabel(r.rank || "member") }) : r.grants === "intern" ? T("in.who.intern") : T("in.who.alumni");
+    const live = ["queued", "sent", "failed", "opened"].includes(r.status);
+    return `<li>
+      <div class="fhead"><b>${esc(r.email)}</b><span class="tag ${ST_TAG[r.status] || ""}">${esc(T("in.st." + r.status) || r.status)}</span>${
+        r.person_name && r.person_name !== T("common.noName") ? `<span class="alt">${esc(r.person_name)}</span>` : ""}</div>
+      <div class="fmeta">${T("in.meta", { who: esc(who + (r.title ? "・" + r.title : "")), when: esc(d10(r.created_at)), by: esc(r.invited_by_name || "") })}${
+        live && r.expires_at ? "・" + T("in.expires", { d: esc(d10(r.expires_at)) }) : ""}・<span class="mini">${T("in.code", { code: esc(r.code) })}</span></div>
+      ${r.status === "failed" && r.mail_error ? `<div class="fmeta">${T("in.mailErr", { err: esc(r.mail_error) })}</div>` : ""}
+      ${r.status === "claimed" ? `<div class="fmeta">${T("in.claimedBy", { name: esc(r.claimed_name || ""), d: esc(d10(r.claimed_at)) })}</div>` : ""}
+      ${r.note ? `<div class="fmeta">${T("iv.noteLine", { note: esc(r.note) })}</div>` : ""}
+      <div class="row">${
+        r.status !== "claimed" ? `<button class="btn ghost sm" data-act="invite-resend" data-code="${esc(r.code)}" data-email="${esc(r.email)}"${dis}>${T("in.resend")}</button>` : ""}${
+        live && isPres ? `<button class="btn quiet sm" data-act="invite-revoke" data-code="${esc(r.code)}" data-email="${esc(r.email)}"${dis}>${T("in.revoke")}</button>` : ""}${
+        r.person_id ? `<a class="btn quiet sm" href="#person=${encodeURIComponent(r.person_id)}" data-act="tab" data-t="person=${esc(r.person_id)}">${T("in.openRecord")}</a>` : ""}</div>
+    </li>`;
+  };
+  return pageHead(T("in.title"), T("in.lede"))
+    + msgHTML(msg)
+    + inviteFormNewHTML(draft, terms, busy)
+    + sectionHTML(T("in.list"), list.length ? `<ul class="flist">${list.map(item).join("")}</ul>` : emptyHTML(T("in.empty"), T("in.emptyHint")), { id: "invites" })
+    + (isPres ? `<details class="ans" id="batch"><summary>${T("in.batch")}</summary>${inviteFormHTML(batchDraft, busy)}${
+        sectionHTML(T("iv.issued"), `<div class="note">${T("iv.issuedNote")}</div>${(batch || []).length
+          ? `<ul class="flist">${(batch || []).map(c => inviteCodesHTML([c], "", busy, null).replace(/^[\s\S]*?<ul class="flist">/, "").replace(/<\/ul>[\s\S]*$/, "")).join("")}</ul>`
+          : emptyHTML(T("iv.empty"), T("iv.emptyHint"))}`, { id: "codes" })}</details>` : "");
 }
 
 export function notCadreHTML() {

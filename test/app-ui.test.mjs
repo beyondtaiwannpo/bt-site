@@ -6,6 +6,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { authHTML, notCadreHTML, downHTML, setLang } from "../app/src/ui.js";
 // 登入後的頁面 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
@@ -358,4 +359,26 @@ test("已經有帳號那句話，前端認得出來（才帶得回登入畫面�
 test("跳脫：email 裡的引號不會掙出 value 屬性", () => {
   const h = authHTML("in", "", 'a" onfocus="alert(1)');
   assert.ok(!h.includes('" onfocus'), "email 沒有跳脫，掙得出屬性");
+});
+
+// 2026-10-29 邀請連結：登入頁最上面說寄給誰、Google 那顆放第一顆、不用打碼；碼死了或用過了講清楚。
+test("★ 有邀請連結的登入頁：Google 第一顆、印遮過的 email、沒有「還需要邀請碼」那句；沒有連結的頁面不變", () => {
+  const h = authHTML("in", "", "", false, { grants: "alumni", email_hint: "n***@example.com", status: "live" });
+  assert.match(h, /n\*\*\*@example\.com/);
+  const google = h.indexOf('data-act="do-google"'), signin = h.indexOf('data-act="do-signin"');
+  assert.ok(google > 0 && google < signin, "Google 在 email 密碼之前");
+  assert.equal((h.match(/data-act="do-google"/g) || []).length, 1, "Google 只有一顆");
+  assert.doesNotMatch(h, /還是需要邀請碼|You still need an invite code/);
+  assert.match(h, /不需要邀請碼|no invite code/);
+  assert.match(authHTML("in", "", "", false, { status: "claimed" }), /已經用過了/);
+  assert.match(authHTML("in", "", "", false, { status: "expired" }), /過期或被撤銷/);
+  const plain = authHTML("in", "", "", false);
+  assert.ok(plain.indexOf('data-act="do-signin"') < plain.indexOf('data-act="do-google"'), "沒有邀請連結的頁面 Google 還是在後面");
+  const src = readFileSync("app/src/main.js", "utf8");
+  assert.match(src, /URLSearchParams\(location\.search\)\.get\("invite"\)/);
+  assert.match(src, /sessionStorage|store\(\)/, "碼收在 sessionStorage，不當網址用");
+  assert.match(src, /rpc\("claim_invite", \{ p_code: code \}\)/, "登入後自動認領");
+  assert.match(src, /rpc\("invite_opened"/); assert.match(src, /rpc\("invite_peek"/);
+  assert.match(src, /invite_wrong_email/);
+  assert.doesNotMatch(src, /document\.getElementById\("ci"\)\.value[\s\S]*?S\.invite/, "邀請連結那條路沒有輸入框");
 });
