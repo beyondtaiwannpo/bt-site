@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { tabsHTML, rosterHTML, changesHTML, personEditHTML, personNewHTML, workspacesHTML, termsHTML,
-  accessGridHTML, afterEndHTML, wsName, slugify, findByPickName,
+  accessGridHTML, afterEndHTML, wsName, slugify, findByPickName, deriveTitle, rankOfTitle, rankByName, RANK_CHOICES,
   BOARD_ROLES, boardLabel, LEVELS, levelLabel, pasteParse, nextTermId, positionFor, positionsFor, positionsLine, currentTerm, TEAMS as PEOPLE_TEAMS, setLang, T } from "../admin/people/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
@@ -228,7 +228,10 @@ test("★ 屆別：人數含沒帳號的；結束這一屆三步，自己勾死�
 
 test("純函式：貼上解析、下一屆代號", () => {
   const r = pasteParse("王小明\tMing Wang\tDirector\tCurriculum Team\n李小華，Hua Lee，Associate");
-  assert.deepEqual(r.rows.map(x => [x.name_zh, x.name_en, x.title_en, x.team]), [["王小明", "Ming Wang", "Director", "Curriculum Team"], ["李小華", "Hua Lee", "Associate", ""]]);
+  // 2026-10-24 起第三欄是職級名就推成「職級, team」，不是就當自訂文字原樣存。
+  assert.deepEqual(r.rows.map(x => [x.name_zh, x.name_en, x.title_en, x.team]), [["王小明", "Ming Wang", "Director, Curriculum Team", "Curriculum Team"], ["李小華", "Hua Lee", "Associate", ""]]);
+  const custom = pasteParse("林小花, Flower Lin, Head of Fun, Marketing Team");
+  assert.equal(custom.rows[0].title_en, "Head of Fun"); assert.equal(custom.rows[0].title_zh, "Head of Fun");
   assert.deepEqual(r.bad, []);
   assert.equal(nextTermId("2026-27"), "2027-28");
   assert.equal(nextTermId("2099-00"), "2100-01");
@@ -374,4 +377,31 @@ test("★ 主程式：存取格改了就送、送反向的那一筆當復原；�
   assert.match(src.slice(src.indexOf("S.undo = { label: T(\"pe.grantBoth\""), src.indexOf("await reopenPerson(p.person_id, T(\"msg.personSaved\"")), /fn: async \(\) => \{[\s\S]*await D\.assign\(pid, "apps:" \+ dirTeam, "manage"\)/, "按了那顆鈕才送兩筆");
   assert.match(src, /"#ws=" \+ encodeURIComponent/); assert.match(src, /"#person=" \+ encodeURIComponent/);
   assert.match(src, /key\.startsWith\("ws="\)/); assert.match(src, /key\.startsWith\("person="\)/);
+});
+
+// 2026-10-24 Paul：「不要用打的，給一個下拉列我們的職級」。標題從職級加 team 推出來；對不上的既有紀錄是「自訂」，文字不丟。
+test("★ 職位下拉：四級有 team 沒 team 推出來的字；既有紀錄對得上就選那一級、對不上是自訂；貼一整屆認職級名", () => {
+  const want = { president: "Co-President", senior_adviser: "Senior Adviser", director: "Director", member: "Associate" };
+  for (const r of RANK_CHOICES) {
+    assert.deepEqual(deriveTitle(r, ""), { title_en: want[r], title_zh: want[r] });
+    assert.deepEqual(deriveTitle(r, "Curriculum Team"), { title_en: want[r] + ", Curriculum Team", title_zh: want[r] + ", Curriculum Team" });
+    assert.equal(rankOfTitle(deriveTitle(r, "Marketing Team").title_en, "Marketing Team"), r, "推出來的字反推得回那一級");
+    assert.equal(rankByName(want[r].toUpperCase()), r);
+  }
+  assert.equal(rankOfTitle("Director, Curriculum Team", "Marketing Team"), "custom", "team 對不上就不是那一級");
+  assert.equal(rankOfTitle("Head of Fun", ""), "custom");
+  assert.equal(rankOfTitle("", ""), "");
+  assert.equal(rankByName("Boss"), "");
+  // 畫面：對得上的列下拉預選、文字框藏著（值還在）；對不上的列選「自訂」、文字框露出來。
+  const other = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, null, PEOPLE, null);
+  assert.match(other, /<select id="pk-rank-0" data-act="pos-rank"[^>]*>[\s\S]*?<option value="director" selected>Director/);
+  assert.match(other, /<div class="two" hidden>\s*<label><i>[^<]*<\/i><input id="pk-ten-0" value="Director, Curriculum Team"/);
+  const custom = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, { rows: [{ orig: "Curriculum Team", title_zh: "", title_en: "Boss", team: "Curriculum Team" }] }, PEOPLE, null);
+  assert.match(custom, /<option value="custom" selected>/);
+  assert.match(custom, /<div class="two">\s*<label><i>[^<]*<\/i><input id="pk-ten-0" value="Boss"/, "自訂的文字框露出來、值還在");
+  assert.match(personNewHTML(TERMS, "", false, null), /<select id="pn-rank" data-act="pos-rank"/);
+  // 主程式：下拉選了職級就推標題，自訂才讀文字框。
+  const src = readFileSync("admin/people/src/main.js", "utf8");
+  assert.match(src, /rank && rank !== "custom" \? UI\.deriveTitle\(rank, team\)/);
+  assert.match(src, /dataset\.act === "pos-rank"/);
 });

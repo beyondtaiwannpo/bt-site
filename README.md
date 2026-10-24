@@ -3332,6 +3332,14 @@ Paul 的原話：「上面那條 Passport、Availability、Admin、Settings 也�
 **還沒驗的**：真的登入一次看落點與總覽（本機沒有登入態，正式站沒 push）。
 四批到此做完，前後點擊對照表在設計文件 6-1，沒有一件變長。
 
+### 職位改成下拉（2026-10-24）
+
+Paul 看了批 2 的截圖：「不要用打的，給一個下拉列我們的職級。」改一個人那一頁的每一筆職位、加一筆過去的紀錄，職位那一格都變成下拉：Co-President、Senior Adviser、Director、Associate，最後一個是「自訂…」。
+存進 `positions` 的 `title_en` 與 `title_zh` 從職級加 team 推出來（`deriveTitle()`）：「Director, Curriculum Team」，沒有 team 就只有「Director」；中文那一欄也是同一串（職級在中文畫面本來就印英文）。
+選「自訂」才露出原本那兩個文字框，存他打的。既有紀錄對得上推出來的字就預選那一級，對不上就選「自訂」、文字照存的印，什麼都不會丟（`rankOfTitle()`）。
+貼一整屆的第三欄可以是職級名（Director、Associate）也可以是自訂文字，同一條規則。名單、`/team/`、`/alumni/` 不動（它們讀的還是 `title_en` / `title_zh`）。沒有遷移檔。
+測試 `test/people-admin.test.mjs` 多一條：四級有 team 沒 team 推出來的字、反推、自訂來回。截圖 `docs/admin-redesign/v3/b5-01`。**還沒驗的**：真的登入後存一次。
+
 ### 以後加東西怎麼加（寫給明年接手的人，取代 10-19 那一版的八步）
 
 **先回答一題：這個東西是不是「要派人進去做」的？** 是（營隊、專案、新的護照）就是一個**工作區**；不是（一張只有 Co-President 看的報表）就只是一個**分頁**。

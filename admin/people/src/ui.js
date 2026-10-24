@@ -317,6 +317,33 @@ export const BOARD_ROLES = [
   { v: "president",      label: "board.president", hint: "role.president.hint" },
 ];
 export const boardLabel = v => T((BOARD_ROLES.find(r => r.v === v) || BOARD_ROLES[0]).label);
+// 職位下拉（Paul 2026-10-24：「不要用打的，給一個下拉列我們的職級」）。
+// 存的 title_en / title_zh 從職級標籤加 team 推出來：「Director, Curriculum Team」，沒有 team 就只有「Director」。
+// 中文那一欄也用同一個英文標籤（職級在中文畫面本來就印英文），加 team。選「自訂」才露出兩個文字框，存他打的。
+export const RANK_CHOICES = ["president", "senior_adviser", "director", "member"];
+export function deriveTitle(rank, team) {
+  const label = boardLabel(rank);
+  const t = String(team || "").trim();
+  const s = t ? `${label}, ${t}` : label;
+  return { title_en: s, title_zh: s };
+}
+// 既有的紀錄：title_en 對得上某一級推出來的字就選那一級，對不上就是「自訂」，文字框照存的印，不會丟。
+export function rankOfTitle(title_en, team) {
+  const s = String(title_en || "").trim().toLowerCase();
+  if (!s) return "";
+  for (const r of RANK_CHOICES) if (deriveTitle(r, team).title_en.toLowerCase() === s) return r;
+  return "custom";
+}
+// 貼一整屆的第三欄可以是職級名（Director、Co-President…）或自訂文字。
+export function rankByName(s) {
+  const q = String(s || "").trim().toLowerCase();
+  return RANK_CHOICES.find(r => boardLabel(r).toLowerCase() === q) || "";
+}
+// 職位那一格的下拉。sel 是 RANK_CHOICES 之一、"custom" 或空字串。
+export function rankSelect(id, sel, dis) {
+  return `<select id="${id}" data-act="pos-rank"${dis}><option value=""${!sel ? " selected" : ""}>${T("pe.rankPickPh")}</option>${
+    RANK_CHOICES.map(r => `<option value="${r}"${sel === r ? " selected" : ""}>${esc(boardLabel(r))}</option>`).join("")}<option value="custom"${sel === "custom" ? " selected" : ""}>${T("pe.custom")}</option></select>`;
+}
 export const LEVELS = ["view", "edit", "manage"];
 export const levelLabel = v => T("level." + (LEVELS.includes(v) ? v : "view"));
 
@@ -427,7 +454,9 @@ export function pasteParse(text) {
     const s = line.trim();
     if (!s) return;
     const c = s.split(/\t|,|，/).map(x => x.trim());
-    const r = { name_zh: c[0] || "", name_en: c[1] || "", title_en: c[2] || "", title_zh: c[2] || "", team: c[3] || "" };
+    const rank = rankByName(c[2]);
+    const titles = rank ? deriveTitle(rank, c[3] || "") : { title_en: c[2] || "", title_zh: c[2] || "" };
+    const r = { name_zh: c[0] || "", name_en: c[1] || "", title_en: titles.title_en, title_zh: titles.title_zh, team: c[3] || "" };
     if (!r.name_zh && !r.name_en) { bad.push(i + 1); return; }
     rows.push(r);
   });
@@ -557,22 +586,25 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
       <label><i>${T("pe.nameZh")}</i><input id="pk-zh" value="${esc(v.name_zh)}"${isPres ? dis : " disabled"}></label>
       <label><i>${T("pe.nameEn")}</i><input id="pk-en" value="${esc(v.name_en)}"${isPres ? dis : " disabled"}></label>
     </div>${emailLine}${!isPres ? `<div class="mini">${T("pe.presOnly")}</div>` : ""}`);
-  const posRow = (r, i) => `<div class="card posrow" data-posrow="${i}" data-orig="${r.orig == null ? "" : esc(r.orig)}" data-isnew="${r.orig == null ? "1" : "0"}">
+  const posRow = (r, i) => { const rank = r.rank != null ? r.rank : rankOfTitle(r.title_en, r.team); return `<div class="card posrow" data-posrow="${i}" data-orig="${r.orig == null ? "" : esc(r.orig)}" data-isnew="${r.orig == null ? "1" : "0"}">
       <div class="two">
+        <label><i>${T("pe.rankPick")}</i>${rankSelect(`pk-rank-${i}`, rank, dis)}</label>
+        <label><i>${T("pe.posTeam")}</i>${teamSelect(`pk-pteam-${i}`, r.team, dis)}</label>
+      </div>
+      <div class="two"${rank === "custom" ? "" : " hidden"}>
         <label><i>${T("pe.titleEn")}</i><input id="pk-ten-${i}" value="${esc(r.title_en)}" placeholder="Director, Curriculum Team"${dis}></label>
         <label><i>${T("pe.titleZh")}</i><input id="pk-tzh-${i}" value="${esc(r.title_zh)}" placeholder="${esc(T("pe.titleZhPh"))}"${dis}></label>
       </div>
-      <label><i>${T("pe.posTeam")}</i>${teamSelect(`pk-pteam-${i}`, r.team, dis)}</label>
       <div class="row">${r.orig == null
         ? `<button class="btn ghost sm" data-act="position-row-drop" data-i="${i}"${dis}>${T("pe.posRowDrop")}</button>`
         : `<button class="btn ghost sm" data-act="position-delete" data-id="${esc(p.person_id)}" data-term="${esc(termId)}" data-team="${esc(r.orig)}"${dis}>${T("pe.posDelete")}</button>`}</div>
-    </div>`;
+    </div>`; };
   const otherTerms = [...new Set((p.positions || []).map(x => x.term).filter(t => t !== termId))];
   const posSec = sectionHTML(T("pe.position"), `<label><i>${T("pe.term")}</i><select id="pk-term" data-act="person-term"${dis}>${
       (terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
     ${rows.length ? rows.map(posRow).join("") : `<div class="mini" style="margin-bottom:10px">${T("pe.posNone", { term: esc(termId) })}</div>`}
     <div class="row"><button class="btn ghost sm" data-act="position-row-add"${dis}>${T("pe.posAdd")}</button></div>
-    <div class="mini">${T("pe.posNote", { term: esc(termId) })}</div>${
+    <div class="mini">${T("pe.posDerived")} ${T("pe.posNote", { term: esc(termId) })}</div>${
     otherTerms.length ? `<div class="mini" style="margin-top:8px">${T("pe.history")}${esc(otherTerms.map(t => `${t}: ${positionsLine(p, t)}`).join(T("punct.list")))}</div>` : ""}`);
   const teamSec = cadre ? sectionHTML(T("pe.teams"), `<div class="tgrid">${TEAMS.map(box).join("")}${extra.map(t => box(t)).join("")}</div>
     <div class="mini" style="margin-top:8px">${T("pe.teamsNote")}</div>`) : "";
@@ -628,10 +660,13 @@ export function personNewHTML(terms, msg, busy, draft) {
     </div>
     <label><i>${T("pe.term")}</i><select id="pn-term"${dis}>${(terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
     <div class="two">
+      <label><i>${T("pe.rankPick")}</i>${rankSelect("pn-rank", d.rank != null ? d.rank : rankOfTitle(d.title_en, d.pteam), dis)}</label>
+      <label><i>${T("pe.posTeam")}</i>${teamSelect("pn-pteam", d.pteam || "", dis)}</label>
+    </div>
+    <div class="two"${(d.rank != null ? d.rank : rankOfTitle(d.title_en, d.pteam)) === "custom" ? "" : " hidden"}>
       <label><i>${T("pe.titleEn")}</i><input id="pn-ten" value="${esc(d.title_en || "")}" placeholder="Associate, Marketing Team"${dis}></label>
       <label><i>${T("pe.titleZh")}</i><input id="pn-tzh" value="${esc(d.title_zh || "")}"${dis}></label>
     </div>
-    <label><i>${T("pe.posTeam")}</i>${teamSelect("pn-pteam", d.pteam || "", dis)}</label>
     <label><i>${T("pn.note")}</i><input id="pn-note" value="${esc(d.note || "")}" placeholder="${esc(T("pn.notePh"))}"${dis}></label>
     <div class="note">${T("pn.order")}</div>
     <div class="form-foot">

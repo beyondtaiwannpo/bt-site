@@ -172,7 +172,9 @@ function readPosRows(p, termId) {
   }
   return els.map(el => {
     const i = el.dataset.posrow;
-    return { orig: el.dataset.isnew === "1" ? null : (el.dataset.orig || ""), title_zh: val(`pk-tzh-${i}`), title_en: val(`pk-ten-${i}`), team: val(`pk-pteam-${i}`) };
+    const rank = val(`pk-rank-${i}`), team = val(`pk-pteam-${i}`);
+    const t = rank && rank !== "custom" ? UI.deriveTitle(rank, team) : { title_zh: val(`pk-tzh-${i}`), title_en: val(`pk-ten-${i}`) };
+    return { orig: el.dataset.isnew === "1" ? null : (el.dataset.orig || ""), rank, title_zh: t.title_zh, title_en: t.title_en, team };
   });
 }
 function readPersonForm(p) {
@@ -336,9 +338,12 @@ document.addEventListener("click", async e => {
   }
   if (act === "person-new") { S.newDraft = null; S.view = "person-new"; S.msg = ""; render(); return; }
   if (act === "person-create") {
-    const d = { name_zh: val("pn-zh"), name_en: val("pn-en"), term: val("pn-term"), title_en: val("pn-ten"), title_zh: val("pn-tzh"), pteam: val("pn-pteam"), note: val("pn-note") };
+    const rank = val("pn-rank"), pteam = val("pn-pteam");
+    const t = rank && rank !== "custom" ? UI.deriveTitle(rank, pteam) : { title_en: val("pn-ten"), title_zh: val("pn-tzh") };
+    const d = { name_zh: val("pn-zh"), name_en: val("pn-en"), term: val("pn-term"), rank, title_en: t.title_en, title_zh: t.title_zh, pteam, note: val("pn-note") };
     S.newDraft = d;
     if (!d.name_zh && !d.name_en) { S.msg = T("err.nameRequired"); render(); return; }
+    if (!rank) { S.msg = T("err.rankRequired"); render(); return; }
     if (!d.title_zh && !d.title_en) { S.msg = T("err.titleRequired"); render(); return; }
     const id = await run("err.save", async () => {
       const pid = await D.addPerson(d.name_zh, d.name_en, d.note);
@@ -494,6 +499,16 @@ document.addEventListener("click", async e => {
 document.addEventListener("change", async e => {
   const el = e.target.closest("[data-act]");
   if (!el) return;
+  // 職位下拉換了（2026-10-24）：重畫一次，選「自訂」才露出文字框。加一筆過去的紀錄那一頁也用同一個 data-act。
+  if (el.dataset.act === "pos-rank") {
+    if (S.view === "person-new") {
+      const val2 = i => { const x = document.getElementById(i); return x ? String(x.value || "").trim() : ""; };
+      S.newDraft = Object.assign({}, S.newDraft, { name_zh: val2("pn-zh"), name_en: val2("pn-en"), term: val2("pn-term"), rank: el.value, title_en: val2("pn-ten"), title_zh: val2("pn-tzh"), pteam: val2("pn-pteam"), note: val2("pn-note") });
+      render(); return;
+    }
+    if (S.person) { S.personDraft = readPersonForm(S.person); render(); }
+    return;
+  }
   if (el.dataset.act === "person-term" && S.person) {
     const f = readPersonForm(S.person);
     // 換屆別：清單換成那一屆的職位，改到一半的不帶過去。
