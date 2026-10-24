@@ -159,7 +159,7 @@ document.addEventListener("click", async e => {
   if (act === "members-open") { await openMembers(b.dataset.ws, b.dataset.name); return; }
   if (act === "members-back") { S.view = (S.mp && S.mp.backView) || "res"; S.msg = ""; render(); return; }
   // 多選加人的 chip、全勾、全取消（2026-10-24）：改 pk 再重畫。打字與勾選走 input / change。
-  if (["pk-team", "pk-all", "pk-none"].includes(act) && S.mp && S.view === "members") {
+  if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && S.mp && S.view === "members") {
     S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), b); render(); return;
   }
   if (act === "members-assign" && S.mp) {
@@ -325,13 +325,13 @@ document.addEventListener("change", async e => {
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("input", e => {
-  const el = e.target.closest('[data-act="pk-q"]');
+  const el = e.target.closest('[data-act="pk-q"],[data-act="pk-mq"]');
   if (!el || !S.mp || S.view !== "members") return;
-  S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), el); render(); UI.pkRefocus(el.dataset.ns);
+  S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), el); render(); UI.pkRefocus(el.dataset.ns, el.dataset.act === "pk-mq" ? "mq" : "q");
 });
 document.addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
   const box = e.target.closest(".picker"); if (!box) return;
-  const go = box.querySelector(".pk-foot .btn"); if (!go || go.disabled) return;
+  const go = box.querySelector('[data-act="members-assign"],[data-act="ws-assign"]'); if (!go || go.disabled) return;
   e.preventDefault(); go.click();
 });

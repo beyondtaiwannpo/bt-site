@@ -84,7 +84,7 @@ test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellH
     for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
                        "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML",
                        "mpName", "mpFind", "mpItems", "mpLinksHTML", "membersPanelHTML",
-                       "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "pickerHTML"]) {
+                       "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "rankTag", "membersAreaHTML"]) {
       if (fn === "PK_TEAMS") continue;
       assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
     }
@@ -525,17 +525,22 @@ test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只�
   assert.match(h, /這是你/);
   assert.match(h, /<select data-act="members-level" data-id="u3"[^>]*><option value="view" selected>看/);
   assert.match(h, /data-act="members-unassign" data-id="u3"/);
-  // 2026-10-24 加人改成多選那一塊（pickerHTML，ns "mp"）：還沒在裡面的幹部一列一個勾選；在裡面的與靠職級的不列。
-  const pick = h.slice(h.indexOf('<div class="pk-list">'), h.indexOf('<div class="row pk-foot">'));
-  assert.match(pick, /name="mp-member" value="u4" data-act="pk-tick" data-ns="mp"/);
-  assert.match(pick, /<b>小新 \(Shin\)<\/b> <span class="tag">Associate<\/span>/);
-  assert.doesNotMatch(pick, /Mei/, "已經在裡面的不列");
-  assert.doesNotMatch(pick, /王平/, "Co-President 靠職級就有，不列");
+  // 2026-10-24 兩欄成員區（membersAreaHTML，ns "mp"）：左「在這個工作區裡（N）」右「還沒在裡面（M）」，各自一個 ma-col；右欄只列還沒在裡面的幹部。
+  const cols = h.split('<section class="ma-col">'); assert.equal(cols.length, 3, "兩欄");
+  const [, L, R] = cols;
+  assert.match(L, /在這個工作區裡（2）/); assert.match(R, /還沒在裡面（1）/);
+  assert.match(R, /name="mp-member" value="u4" data-act="pk-tick" data-ns="mp"/);
+  assert.match(R, /<b>小新 \(Shin\)<\/b><span class="rk" title="Associate">AS<\/span>/, "職級是兩個字母的標，不是 pill");
+  assert.doesNotMatch(R, /Mei/, "已經在裡面的不列在右邊");
+  assert.doesNotMatch(R, /王平/, "Co-President 靠職級就有，不列在右邊");
+  assert.match(L, /<input id="mp-mq" class="ma-find"/, "左欄也有找名字");
+  assert.match(R, /<div class="ma-head">[\s\S]*<input id="mp-q" class="ma-find"[\s\S]*data-act="pk-all"[\s\S]*data-act="pk-none"[\s\S]*<select id="mp-level"[\s\S]*data-act="members-assign"[\s\S]*<\/div>\s*<div class="ma-list">/, "控制項全在右欄的頭（釘住），名單在底下");
   assert.match(h, /data-act="members-assign" data-ns="mp" data-ws="apps:Curriculum Team" disabled>加 0 個人</, "沒勾人那顆是灰的");
   assert.equal(FORMS.mpFind(mp.cadres, "小新 (Shin)").id, "u4");
   assert.equal(FORMS.mpFind(mp.cadres, "mei").id, "u3");
   assert.equal(FORMS.mpFind(mp.cadres, "x"), null);
   assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: [] }, "", false), /還沒有人被派進來/);
+  assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: [] }, "", false), /每一位幹部都已經在裡面了/);
   assert.match(FORMS.membersPanelHTML(mp, "", true), /disabled/);
   // 清單頁接得上：最後一個參數給了就畫入口，沒給就沒有。
   assert.match(FORMS.listHTML([], true, "", false, null, [], "", false, items), /data-act="members-open"/);
@@ -578,18 +583,42 @@ test("★ 多選加人：不列在裡面的與靠職級的；找名字含中英�
   assert.equal(pk.level, "edit");
   // 勾過的人後來被加進去了（在裡面）就不算：pkPicked 只算還列得出來的。
   assert.deepEqual(FORMS.pkPicked(people, ["u2", "u3"], pk), ["u4"]);
-  const h = FORMS.pickerHTML("mp", people, ["u2"], pk, false, { act: "members-assign", ws: "apps" });
-  assert.match(h, /<button class="btn" data-act="members-assign" data-ns="mp" data-ws="apps">加 2 個人<\/button>/, "按鈕上的數字是勾了幾個人");
-  assert.match(h, /列出 3 人，可以加的共 3 人/);
+  const rows = [{ user_id: "u2", name_zh: "小安", name_en: "", board_role: "director", level: "manage" }];
+  const area = (r, p, extra) => FORMS.membersAreaHTML("mp", Object.assign({ rows: r, people, pk: p, busy: false, acts: { level: "members-level", remove: "members-unassign" }, go: { act: "members-assign", ws: "apps" } }, extra || {}));
+  const h = area(rows, pk);
+  assert.match(h, /<button class="btn sm" data-act="members-assign" data-ns="mp" data-ws="apps">加 2 個人<\/button>/, "按鈕上的數字是勾了幾個人");
+  assert.match(h, /還沒在裡面（3）/);
   assert.match(h, /data-team="Marketing Team"/); assert.match(h, /data-team="Internship Team"/);
   assert.doesNotMatch(h, /data-team="Curriculum Team"/, "沒有可加的人的 team 不出 chip");
-  assert.match(h, /value="u4" data-act="pk-tick" data-ns="mp" checked/);
-  assert.match(h, /<option value="edit" selected>/);
+  assert.match(h, /<label class="ma-row pick on"><input type="checkbox" name="mp-member" value="u4" data-act="pk-tick" data-ns="mp" checked/, "勾起來的那一列有底色");
+  assert.match(h, /<select id="mp-level" data-act="pk-level" data-ns="mp"[^>]*><option value="view">看<\/option><option value="edit" selected>/);
   assert.match(h, /<span class="mini">Marketing<\/span> <span class="mini">Internship<\/span>/, "team 標籤，不帶 Team 那個字");
-  assert.doesNotMatch(FORMS.pickerHTML("wsn", people, [], pk, false, null), /pk-foot/, "沒給按鈕就不畫（新增工作區那張表單自己算）");
-  assert.match(FORMS.pickerHTML("mp", people, ["u2", "u3", "u4", "u6"], {}, false, { act: "x" }), /每一位幹部都已經在裡面了/);
-  assert.match(FORMS.pickerHTML("mp", people, [], { q: "zzz" }, false, { act: "x" }), /沒有對得上的人/);
-  assert.match(FORMS.pickerHTML("mp", people, [], pk, true, { act: "x" }), /存檔中…/);
+  assert.match(h, /<span class="rk" title="Director">DR<\/span>/); assert.match(h, /<span class="rk" title="顧問">AD<\/span>/);
+  // 左欄：在裡面的人一列一行，等級下拉與移出；Co-President 與 Senior Adviser 置頂、標依職級、沒有下拉與移出。
+  const L = h.split('<section class="ma-col">')[1];
+  assert.match(L, /在這個工作區裡（1）/);
+  assert.match(L, /<div class="ma-row byrank"><b>王平 \(Paul\)<\/b><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）<\/span>/);
+  assert.match(L, /<div class="ma-row byrank"><b>阿顧 \(Gu\)<\/b><span class="rk" title="Senior Adviser">SA<\/span>/);
+  assert.match(L, /<div class="ma-row"><b>小安<\/b><span class="rk" title="Director">DR<\/span>[\s\S]*?<select data-act="members-level" data-id="u2"[^>]*><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管<\/option><\/select>\s*<button type="button" class="lnk" data-act="members-unassign" data-id="u2">移出<\/button>/);
+  assert.ok(L.indexOf('class="ma-row byrank"') < L.indexOf('data-id="u2"'), "依職級的置頂");
+  // 左欄的找名字只篩左欄。
+  const Lq = area(rows, Object.assign({}, pk, { mq: "小安" })).split('<section class="ma-col">')[1];
+  assert.doesNotMatch(Lq, /王平/); assert.match(Lq, /小安/);
+  assert.match(area(rows, Object.assign({}, pk, { mq: "zzz" })), /沒有對得上的人/);
+  // 空狀態與存檔中。
+  assert.match(area([], {}, { people: people.filter(p => !["president", "senior_adviser"].includes(p.board_role)) }), /還沒有人被派進來。右邊勾人加進來。/);
+  assert.doesNotMatch(area([], {}), /還沒有人被派進來/, "沒有指派但有依職級的人，左欄不算空");
+  assert.match(area(rows.concat([{ user_id: "u3", level: "view" }, { user_id: "u4", level: "view" }, { user_id: "u6", level: "view" }]), {}), /每一位幹部都已經在裡面了/);
+  assert.match(area(rows, { q: "zzz" }), /沒有對得上的人/);
+  assert.match(area(rows, pk, { busy: true }), /存檔中…/);
+  // draft 模式（加一個專案或營隊）：左欄是勾起來的人（取消 = pk-untick），右欄是還沒勾的，沒有「加 N 個人」。
+  const d = FORMS.membersAreaHTML("wsn", { people, pk: { ticked: ["u4"], level: "edit" }, busy: false, draft: true });
+  const [, dL, dR] = d.split('<section class="ma-col">');
+  assert.match(dL, /建好就放進去（1）/); assert.match(dL, /<b>小新 \(Shin\)<\/b>[\s\S]*?data-act="pk-untick" data-ns="wsn" data-id="u4"/);
+  assert.doesNotMatch(dR, /value="u4"/, "勾了的人搬到左邊"); assert.match(dR, /value="u3"/); assert.match(dR, /value="u2"/, "draft 模式沒有「已經在裡面」這回事");
+  assert.doesNotMatch(d, /members-assign|ws-assign/, "沒有加 N 個人那顆，建立鈕自己算");
+  assert.deepEqual(FORMS.pkReduce({ ticked: ["u4", "u3"] }, people, [], { dataset: { act: "pk-untick", id: "u4" } }).ticked, ["u3"]);
+  assert.equal(FORMS.pkReduce({}, people, [], { dataset: { act: "pk-mq" }, value: "x" }).mq, "x");
   assert.equal(FORMS.pkReduce(pk, people, [], el("pk-none")).ticked.length, 0);
   // 復原只移出這一批：做出復原之後清單再變也不影響。
   const removed = []; const ids = ["u4", "u3"];
@@ -665,9 +694,9 @@ test("成員分頁：Co-President 與 Senior Adviser 置頂標「依職級」，
     rows: [{ user_id: "u3", name_zh: "", name_en: "Mei", board_role: "member", level: "view" }],
     cadres: [{ id: "u1", name_zh: "王平", name_en: "Paul", board_role: "president" }, { id: "u3", name_zh: "", name_en: "Mei", board_role: "member" }, { id: "u5", name_zh: "", name_en: "Sa", board_role: "senior_adviser" }] };
   const h = FORMS.membersPanelHTML(mp, "", false);
-  const first = h.indexOf("<tbody>"), lead = h.indexOf('class="byrank"'), mei = h.indexOf('data-act="members-level" data-id="u3"');
-  assert.ok(first < lead && lead < mei);
-  assert.equal((h.match(/class="byrank"/g) || []).length, 2);
+  const first = h.indexOf('<div class="ma-list">'), lead = h.indexOf('class="ma-row byrank"'), mei = h.indexOf('data-act="members-level" data-id="u3"');
+  assert.ok(first > 0 && first < lead && lead < mei);
+  assert.equal((h.match(/class="ma-row byrank"/g) || []).length, 2);
   assert.doesNotMatch(h.slice(0, mei), /members-unassign/);
   assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: mp.cadres }, "", false), /依職級|全部（職級）/, "沒有指派也列得出依職級的人");
 });

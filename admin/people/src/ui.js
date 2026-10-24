@@ -232,7 +232,7 @@ export function mpFind(people, q) {
     || null;
 }
 // ── 一次加好幾個人（2026-10-24，Paul：「一次很難加好幾個人」）────────────────────────
-// 每一個加成員的面（Workspaces 右欄、四個成員分頁、加一個專案或營隊）都用這一塊。四份一模一樣（測試逐字比對）。
+// 這幾支純函式是底下 membersAreaHTML 的零件（候選人、篩選、勾選、一批復原）。四份一模一樣（測試逐字比對）。
 // people：[{ id, name_zh, name_en, board_role, team }]。已經在工作區裡的人與靠職級就有一切的那兩級不列。
 // pk = { q, teams: [team…], ticked: [id…], level }。ns 是這一塊在頁面上的前綴（同一頁可以有兩塊，例如 Workspaces 的右欄與新增表單）。
 export const PK_TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team", "Sponsorship Team", "Internship Team", "Community Relations Team"];
@@ -256,8 +256,10 @@ export function pkPicked(people, inIds, pk) { const ok = new Set(pkCandidates(pe
 // 一個事件（打字、勾、換等級、按 chip、全勾、全取消）之後 pk 變成什麼。純函式，四個 main.js 都只呼叫它。
 export function pkReduce(pk, people, inIds, el) {
   const a = el && el.dataset ? el.dataset.act : "";
-  const p0 = Object.assign({ q: "", teams: [], ticked: [], level: "view" }, pk || {});
+  const p0 = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view" }, pk || {});
   if (a === "pk-q") return Object.assign(p0, { q: el.value });
+  if (a === "pk-mq") return Object.assign(p0, { mq: el.value });
+  if (a === "pk-untick") return Object.assign(p0, { ticked: pkToggle(p0, el.dataset.id, false) });
   if (a === "pk-level") return Object.assign(p0, { level: el.value });
   if (a === "pk-tick") return Object.assign(p0, { ticked: pkToggle(p0, el.value, !!el.checked) });
   if (a === "pk-team") { const t = el.dataset.team; return Object.assign(p0, { teams: p0.teams.includes(t) ? p0.teams.filter(x => x !== t) : p0.teams.concat(t) }); }
@@ -268,32 +270,69 @@ export function pkReduce(pk, people, inIds, el) {
 // 復原一整批：把當時那 N 個人移出，之後畫面怎麼變都不影響（先抄一份 id）。回傳移出的人數。
 export function batchUndo(ids, unassign) { const snap = [...(ids || [])]; return async () => { for (const id of snap) await unassign(id); return snap.length; }; }
 // 重畫之後把游標放回找人的欄位，不然每打一個字就失焦。
-export function pkRefocus(ns) {
-  const el = typeof document !== "undefined" ? document.getElementById(ns + "-q") : null;
+export function pkRefocus(ns, which) {
+  const el = typeof document !== "undefined" ? document.getElementById(ns + "-" + (which || "q")) : null;
   if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (x) { /* 有的瀏覽器不給 */ } }
 }
-// go = { act, ...data }：底下那顆「加 N 個人」。沒給就不畫（新增工作區那張表單自己的建立鈕會算人數）。
-export function pickerHTML(ns, people, inIds, pk, busy, go) {
-  const p0 = Object.assign({ q: "", teams: [], ticked: [], level: "view" }, pk || {});
-  const cands = pkCandidates(people, inIds);
-  const shown = pkShown(cands, p0);
-  const ticked = new Set(p0.ticked);
-  const n = pkPicked(people, inIds, p0).length;
-  const teamsHere = PK_TEAMS.filter(t => cands.some(p => pkTeamsOf(p).includes(t)));
+// ── 成員區：兩欄（2026-10-24，Paul：「UI 很醜，看不到全部」）────────────────────────────
+// 左欄「在裡面的 (N)」、右欄「還沒在裡面的 (M)」，兩欄一樣高（桌機約 60vh、手機各 40vh 上下疊）、各自在裡面捲，
+// 控制項（找名字、team chip、全勾／全取消、等級、「加 N 個人」）釘在右欄最上面；左欄也有一個找名字。
+// 一列一行 36px：勾選（右欄）・名字・兩個字母的職級標（CP SA DR AD AS）・team 淡字。左欄的列是 名字・職級標・等級下拉・移出。
+// 五個面都用這一塊（Workspaces 右欄、四個成員分頁、加一個專案或營隊）。四份一模一樣（測試逐字比對）。
+// a = { rows（在裡面的，workspace_members 的形狀）, people（幹部名單，候選人從這裡算）, pk, busy, meId,
+//       acts: { level, remove }（左欄下拉與移出的 data-act）, go: { act, ...data }（右欄那顆按鈕；沒有就不畫）,
+//       draft: true 的話是「還沒建立」的模式：左欄列的是勾起來的人（移出 = 取消勾），右欄是還沒勾的 }
+export const RANK_TAG = { president: "CP", senior_adviser: "SA", director: "DR", adviser: "AD", member: "AS" };
+export const rankTag = board => `<span class="rk" title="${esc(boardName(board))}">${RANK_TAG[board] || "AS"}</span>`;
+export function membersAreaHTML(ns, a) {
+  const o = a || {};
+  const pk = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view" }, o.pk || {});
+  const people = o.people || [], rows = o.rows || [];
+  const dis = o.busy ? " disabled" : "";
   const short = t => t.replace(/\s*Team$/i, "");
-  const dis = busy ? " disabled" : "";
-  const chip = t => `<button type="button" class="chip${p0.teams.includes(t) ? " on" : ""}" data-act="pk-team" data-ns="${esc(ns)}" data-team="${esc(t)}"${dis}>${esc(short(t))}</button>`;
-  const row = p => `<label class="check pk-row"><input type="checkbox" name="${esc(ns)}-member" value="${esc(p.id)}" data-act="pk-tick" data-ns="${esc(ns)}"${ticked.has(p.id) ? " checked" : ""}${dis}><span><b>${esc(mpName(p))}</b> <span class="tag">${esc(boardName(p.board_role))}</span>${pkTeamsOf(p).map(t => ` <span class="mini">${esc(short(t))}</span>`).join("")}</span></label>`;
-  const goBtn = go ? `<button class="btn" data-act="${esc(go.act)}" data-ns="${esc(ns)}"${Object.keys(go).filter(k => k !== "act").map(k => ` data-${k}="${esc(String(go[k]))}"`).join("")}${busy || !n ? " disabled" : ""}>${busy ? T("common.saving") : T("pk.addN", { n })}</button>` : "";
-  return `<div class="picker" data-ns="${esc(ns)}">
-    <div class="two"><label><i>${T("pk.find")}</i><input id="${esc(ns)}-q" value="${esc(p0.q)}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-q" data-ns="${esc(ns)}"${dis}></label>
-      <label><i>${T("pk.level")}</i><select id="${esc(ns)}-level" data-act="pk-level" data-ns="${esc(ns)}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${p0.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select></label></div>
-    ${teamsHere.length ? `<div class="chips pk-chips">${teamsHere.map(chip).join("")}</div>` : ""}
-    <div class="row pk-tools"><span class="mini">${T("pk.shown", { n: shown.length, all: cands.length })}</span><span class="sp"></span>
-      <button type="button" class="btn quiet sm" data-act="pk-all" data-ns="${esc(ns)}"${busy || !shown.length ? " disabled" : ""}>${T("pk.tickAll")}</button>
-      <button type="button" class="btn quiet sm" data-act="pk-none" data-ns="${esc(ns)}"${busy || !n ? " disabled" : ""}>${T("pk.untick")}</button></div>
-    <div class="pk-list">${shown.length ? shown.map(row).join("") : `<div class="mini">${cands.length ? T("pk.noneShown") : T("pk.noneLeft")}</div>`}</div>
-    ${goBtn ? `<div class="row pk-foot">${goBtn}<span class="mini">${T("pk.note")}</span></div>` : ""}
+  const teamsHTML = p => pkTeamsOf(p).map(t => `<span class="mini">${esc(short(t))}</span>`).join(" ");
+  const byId = Object.fromEntries(people.map(p => [p.id, p]));
+  const mq = String(pk.mq || "").trim().toLowerCase();
+  const hit = p => !mq || mpName(p).toLowerCase().includes(mq);
+  // 左欄
+  let left;
+  if (o.draft) {
+    const picked = pkPicked(people, [], pk).map(id => byId[id]).filter(Boolean);
+    left = { n: picked.length, title: T("ma.willAdd", { n: picked.length }),
+      items: picked.filter(hit).map(p => `<div class="ma-row"><b>${esc(mpName(p))}</b>${rankTag(p.board_role)}${teamsHTML(p)}<span class="sp"></span><button type="button" class="lnk" data-act="pk-untick" data-ns="${esc(ns)}" data-id="${esc(p.id)}"${dis}>${T("ma.untick")}</button></div>`),
+      empty: T("ma.willAddNone") };
+  } else {
+    const inWs = new Set(rows.map(r => r.user_id));
+    const seniors = people.filter(p => ["president", "senior_adviser"].includes(p.board_role) && !inWs.has(p.id));
+    const seniorRow = p => `<div class="ma-row byrank"><b>${esc(mpName(p))}</b>${rankTag(p.board_role)}<span class="mini">${T("grid.byRank")}</span>${p.id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : ""}<span class="sp"></span><span class="mini">${esc(T("level.manage"))}</span></div>`;
+    // 左欄的列不印 team（Paul 定的形狀：名字・職級標・等級・移出），欄位窄的時候才放得下。
+    const row = r => `<div class="ma-row"><b>${esc(mpName(r))}</b>${rankTag(r.board_role)}${r.user_id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : ""}<span class="sp"></span>
+        <select data-act="${esc(o.acts.level)}" data-id="${esc(r.user_id)}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select>
+        <button type="button" class="lnk" data-act="${esc(o.acts.remove)}" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></div>`;
+    left = { n: rows.length, title: T("ma.in", { n: rows.length }),
+      items: seniors.filter(hit).map(seniorRow).concat(rows.filter(hit).map(row)), empty: T("ma.inNone") };
+  }
+  // 右欄
+  const inIds = o.draft ? pk.ticked : rows.map(r => r.user_id);
+  const cands = pkCandidates(people, inIds);
+  const shown = pkShown(cands, pk);
+  const ticked = new Set(pk.ticked);
+  const n = o.draft ? 0 : pkPicked(people, inIds, pk).length;
+  const teamsHere = PK_TEAMS.filter(t => cands.some(p => pkTeamsOf(p).includes(t)));
+  const chip = t => `<button type="button" class="chip sm${pk.teams.includes(t) ? " on" : ""}" data-act="pk-team" data-ns="${esc(ns)}" data-team="${esc(t)}"${dis}>${esc(short(t))}</button>`;
+  const cand = p => `<label class="ma-row pick${ticked.has(p.id) && !o.draft ? " on" : ""}"><input type="checkbox" name="${esc(ns)}-member" value="${esc(p.id)}" data-act="pk-tick" data-ns="${esc(ns)}"${ticked.has(p.id) && !o.draft ? " checked" : ""}${dis}><b>${esc(mpName(p))}</b>${rankTag(p.board_role)}${teamsHTML(p)}</label>`;
+  const goBtn = o.go ? `<button class="btn sm" data-act="${esc(o.go.act)}" data-ns="${esc(ns)}"${Object.keys(o.go).filter(k => k !== "act").map(k => ` data-${k}="${esc(String(o.go[k]))}"`).join("")}${o.busy || !n ? " disabled" : ""}>${o.busy ? T("common.saving") : T("pk.addN", { n })}</button>` : "";
+  const levelSel = `<select id="${esc(ns)}-level" data-act="pk-level" data-ns="${esc(ns)}" aria-label="${esc(T("pk.level"))}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${pk.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select>`;
+  return `<div class="ma picker" data-ns="${esc(ns)}">
+    <section class="ma-col"><div class="ma-head"><div class="ma-title">${left.title}</div>
+        <input id="${esc(ns)}-mq" class="ma-find" value="${esc(pk.mq || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-mq" data-ns="${esc(ns)}"${dis}></div>
+      <div class="ma-list">${left.items.length ? left.items.join("") : `<div class="ma-empty mini">${left.n ? T("pk.noneShown") : left.empty}</div>`}</div></section>
+    <section class="ma-col"><div class="ma-head"><div class="ma-title">${T("ma.out", { n: cands.length })}${shown.length !== cands.length ? `<span class="mini"> ${T("ma.shown", { n: shown.length })}</span>` : ""}</div>
+        <input id="${esc(ns)}-q" class="ma-find" value="${esc(pk.q || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-q" data-ns="${esc(ns)}"${dis}>
+        ${teamsHere.length ? `<div class="ma-chips">${teamsHere.map(chip).join("")}</div>` : ""}
+        <div class="ma-tools"><button type="button" class="lnk" data-act="pk-all" data-ns="${esc(ns)}"${o.busy || !shown.length ? " disabled" : ""}>${T("pk.tickAll")}</button>
+          <button type="button" class="lnk" data-act="pk-none" data-ns="${esc(ns)}"${o.busy || !pk.ticked.length ? " disabled" : ""}>${T("pk.untick")}</button><span class="sp"></span>${levelSel}${goBtn}</div></div>
+      <div class="ma-list">${shown.length ? shown.map(cand).join("") : `<div class="ma-empty mini">${cands.length ? T("pk.noneShown") : T("pk.noneLeft")}</div>`}</div></section>
   </div>`;
 }
 // 這一頁該列哪幾個「誰在做…」的入口：senior 看所有這一類的工作區，其他人只有自己是「管」的那幾個。
@@ -350,26 +389,12 @@ export function mpLinksHTML(items) {
   return `<div class="chips mp-links">${items.map(i => `<button class="chip" data-act="members-open" data-ws="${esc(i.ws)}" data-name="${esc(i.name)}">${esc(T("mp.open", { name: i.name }))}</button>`).join("")}</div>`;
 }
 export function membersPanelHTML(mp, msg, busy) {
-  const dis = busy ? " disabled" : "";
-  const LV = ["view", "edit", "manage"];
-  const lv = l => T("level." + l);
-  const rows = mp.rows || [];
-  const inWs = new Set(rows.map(r => r.user_id));
-  // Co-President 與 Senior Adviser 本來就到得了（is_senior），列在最上面標「依職級」，沒有下拉也沒有移出。只是畫面。
-  const seniors = (mp.cadres || []).filter(p => ["president", "senior_adviser"].includes(p.board_role) && !inWs.has(p.id));
-  const seniorRow = p => `<tr class="byrank"><td class="t-main"><b>${esc(mpName(p))}</b> <span class="tag">${esc(boardName(p.board_role))}</span> <span class="tag open">${T("grid.byRank")}</span>${p.id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
-    <td><span class="mini">${esc(lv("manage"))}</span></td><td></td></tr>`;
-  const row = r => `<tr><td class="t-main"><b>${esc(mpName(r))}</b> <span class="tag">${esc(boardName(r.board_role))}</span>${r.user_id === mp.meId ? ` <span class="tag">${T("mp.you")}</span>` : ""}</td>
-    <td><select data-act="members-level" data-id="${esc(r.user_id)}" aria-label="${esc(T("mp.level"))}"${dis}>${LV.map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(lv(l))}</option>`).join("")}</select></td>
-    <td class="t-act"><button class="btn quiet sm" data-act="members-unassign" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></td></tr>`;
+  // 2026-10-24：兩欄成員區（左「在裡面的」右「還沒在裡面的」，見 membersAreaHTML）。Co-President 與 Senior Adviser 在左欄最上面標「依職級」。
   return pageHead(T("mp.title", { name: esc(mp.name || mp.ws) }), T("mp.lede"), [], { act: "members-back", label: T("mp.back") })
     + msgHTML(msg)
     + `<div class="note">${T("mp.levels")}</div>`
-    + sectionHTML(T("mp.list"), rows.length || seniors.length
-        ? `<table class="table"><thead><tr><th>${T("mp.name")}</th><th>${T("mp.level")}</th><th></th></tr></thead><tbody>${seniors.map(seniorRow).join("")}${rows.map(row).join("")}</tbody></table>`
-        : emptyHTML(T("mp.nobody"), T("mp.nobodyHint")))
-    // 加人（2026-10-24 改成一次好幾個）：勾人、一個等級套全部、一顆「加 N 個人」。
-    + sectionHTML(T("mp.add"), pickerHTML("mp", mp.cadres || [], [...inWs], mp.pk, busy, { act: "members-assign", ws: mp.ws }));
+    + membersAreaHTML("mp", { rows: mp.rows || [], people: mp.cadres || [], pk: mp.pk, busy, meId: mp.meId,
+        acts: { level: "members-level", remove: "members-unassign" }, go: { act: "members-assign", ws: mp.ws } });
 }
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {
@@ -843,28 +868,11 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   const left = list.length ? wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="rail-group">${esc(r.label)}</div><div class="wslist">${r.cells.map(li).join("")}</div>`).join("")
     : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
   const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
-  const memberRow = m => `<tr>
-      <td class="t-main"><b>${esc(namesOf(m).name)}${namesOf(m).alt ? `<span class="alt">${esc(namesOf(m).alt)}</span>` : ""}</b> <span class="tag">${esc(boardLabel(m.board_role))}</span></td>
-      <td><select data-act="ws-level" data-id="${esc(m.user_id)}"${dis}>${LEVELS.map(l => `<option value="${l}"${m.level === l ? " selected" : ""}>${esc(levelLabel(l))}</option>`).join("")}</select></td>
-      <td class="t-act"><button class="btn quiet sm" data-act="ws-unassign" data-id="${esc(m.user_id)}"${dis}>${T("ws.remove")}</button></td>
-    </tr>`;
-  // Co-President 與 Senior Adviser 本來就到得了每一個工作區（is_senior）。列在最上面、標「依職級」、沒有下拉也沒有移出，
-  // 這樣看的人（例如 Director）知道還有誰到得了。只是畫面，資料庫沒有這幾筆指派。
-  const seniors = cadres.filter(p => isOrgWide(p.board_role) && !inWs.has(p.profile_id));
-  const seniorRow = p => `<tr class="byrank">
-      <td class="t-main"><b>${esc(personName(p).name)}${personName(p).alt ? `<span class="alt">${esc(personName(p).alt)}</span>` : ""}</b> <span class="tag">${esc(boardLabel(p.board_role))}</span> <span class="tag open">${T("grid.byRank")}</span></td>
-      <td><span class="mini">${T("level.manage")}</span></td><td></td>
-    </tr>`;
+  // 2026-10-24：兩欄成員區（左「在裡面的」右「還沒在裡面的」，見 membersAreaHTML）。Co-President 與 Senior Adviser 在左欄最上面標「依職級」。
   const right = !w ? `<div class="empty"><b>${T("ws.pickOne")}</b></div>` : `
     <h2>${esc(wsCellLabel(w))}<span class="hint">${esc(wsTeamOf(w, people) || T("ws.board"))}・${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
-    <div class="note">${T("ws.levels")}</div>
-    ${(members || []).length || seniors.length
-      ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ws.level")}</th><th></th></tr></thead><tbody>${seniors.map(seniorRow).join("")}${(members || []).map(memberRow).join("")}</tbody></table>`
-      : emptyHTML(T("ws.nobody"), T("ws.nobodyHint"))}
-    <div class="card" style="margin-top:16px"><h2>${T("ws.add")}</h2>
-      ${pickerHTML("ws", pkPeople, [...inWs], d.pk, busy, { act: "ws-assign", ws: w.id })}
-      <div class="mini">${T("ws.addNote")}</div>
-    </div>`;
+    <div class="note">${T("ws.levels")} ${T("ws.addNote")}</div>
+    ${membersAreaHTML("ws", { rows: members || [], people: pkPeople, pk: d.pk, busy, acts: { level: "ws-level", remove: "ws-unassign" }, go: { act: "ws-assign", ws: w.id } })}`;
   // 新增工作區（2026-10-23 批 2）：一張表單做完，名稱、擁有人、代號（從英文名稱自動算）、一開始就放進去的人各自一個等級。
   // 不再收在摺疊裡。main.js 的 ws-create 先建工作區，再把勾起來的人一個一個派進去。
   // 一開始就放進去的人（2026-10-24 改成同一塊多選）：一個等級套全部，建立鈕上算人數。
@@ -881,12 +889,12 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
     </div>
     <div class="mini">${T("ws.slugNote")} ${d.team ? T("ws.teamByOwner", { team: esc(d.team.replace(/\s*Team$/i, "")) }) : ""}</div>
     <h3 class="sec-h" style="margin-top:16px">${T("ws.newMembers")}</h3>
-    ${pickerHTML("wsn", pkPeople, [], d.npk, busy, null)}
+    ${membersAreaHTML("wsn", { people: pkPeople, pk: d.npk, busy, draft: true })}
     <div class="row" style="margin-top:14px"><button class="btn" data-act="ws-create"${dis}>${busy ? T("common.saving") : (nNew ? T("ws.createGoN", { n: nNew }) : T("ws.createGo"))}</button></div>
     <div class="mini">${T("ws.newNote")}</div>`, { id: "ws-new" }) : "";
   return pageHead(T("ws.title"), T("ws.lede"))
     + msgHTML(msg)
-    + `<div class="cols"><section class="section">${left}</section><section class="section">${right}</section></div>`
+    + `<div class="cols cols-slim"><section class="section">${left}</section><section class="section">${right}</section></div>`
     + create;
 }
 

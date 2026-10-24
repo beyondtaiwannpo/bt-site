@@ -368,7 +368,7 @@ document.addEventListener("click", async e => {
   // ── 工作區與指派 ───────────────────────────────────────────────────
   if (act === "ws-pick") { e.preventDefault(); S.wsDraft = null; history.pushState(null, "", "#ws=" + encodeURIComponent(b.dataset.ws)); await openWorkspaces(b.dataset.ws); return; }
   // 多選加人的 chip、全勾、全取消（2026-10-24）：右欄是 pk、新增表單是 npk。打字與勾選走 input / change。
-  if (["pk-team", "pk-all", "pk-none"].includes(act) && S.view === "workspaces") { pkApply(b); render(); return; }
+  if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && S.view === "workspaces") { pkApply(b); render(); return; }
   if (act === "ws-assign") {
     // 一次加一批（2026-10-24）：每個人一支 assign()（同一道門），同時送；沒有新的資料庫函式。
     const ws = b.dataset.ws, d = S.wsDraft || {}, pk = d.pk || {}, level = pk.level || "view";
@@ -632,7 +632,7 @@ document.addEventListener("input", e => {
     if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* search 型的欄位有的瀏覽器不給 */ } }
     return;
   }
-  if (el.dataset.act === "pk-q" && S.view === "workspaces") { pkApply(el); render(); UI.pkRefocus(el.dataset.ns); return; }
+  if ((el.dataset.act === "pk-q" || el.dataset.act === "pk-mq") && S.view === "workspaces") { pkApply(el); render(); UI.pkRefocus(el.dataset.ns, el.dataset.act === "pk-mq" ? "mq" : "q"); return; }
   if (el.id === "wsn-en") {
     const slug = document.getElementById("wsn-slug");
     if (slug && (!slug.value || slug.dataset.auto === "1")) { slug.value = UI.slugify(el.value); slug.dataset.auto = "1"; }
@@ -674,6 +674,6 @@ function pkApply(el) {
 document.addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
   const box = e.target.closest(".picker"); if (!box) return;
-  const go = box.querySelector(".pk-foot .btn"); if (!go || go.disabled) return;
+  const go = box.querySelector('[data-act="members-assign"],[data-act="ws-assign"]'); if (!go || go.disabled) return;
   e.preventDefault(); go.click();
 });

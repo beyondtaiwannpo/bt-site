@@ -176,11 +176,14 @@ test("★ 工作區：左邊清單、右邊誰在裡面與等級、加人只列�
   assert.match(h, /<select data-act="ws-level" data-id="22222222-2222-2222-2222-222222222222">/);
   assert.match(h, /<option value="manage" selected>管/);
   assert.match(h, /data-act="ws-unassign" data-id="22222222-2222-2222-2222-222222222222"/);
-  // 2026-10-24 加人改成多選那一塊（ns "ws"）：還沒在裡面的幹部一列一個勾選，校友與沒帳號的不在，Co-President 靠職級不列。
-  const pick = h.slice(h.indexOf('<div class="picker" data-ns="ws">'), h.indexOf('<div class="mini">校友要當 mentor'));
-  assert.match(pick, /<input id="ws-q" value="" placeholder="打名字，中英都可以" autocomplete="off" data-act="pk-q" data-ns="ws">/);
+  // 2026-10-24 兩欄成員區（ns "ws"）：右欄只列還沒在裡面的幹部，校友與沒帳號的不在，Co-President 靠職級在左欄。
+  const area = h.slice(h.indexOf('<div class="ma picker" data-ns="ws">'), h.indexOf('<section class="section" id="ws-new">'));
+  const pick = area.split('<section class="ma-col">')[2];
+  assert.match(h, /class="cols cols-slim"/, "左邊的工作區清單是窄欄，成員區吃剩下的寬");
+  assert.match(area, /在這個工作區裡（1）/); assert.match(pick, /還沒在裡面（1）/);
+  assert.match(pick, /<input id="ws-q" class="ma-find" value="" placeholder="打名字，中英都可以" autocomplete="off" data-act="pk-q" data-ns="ws">/);
   assert.match(pick, /name="ws-member" value="33333333-3333-3333-3333-333333333333" data-act="pk-tick" data-ns="ws"/, "Mei 還沒在裡面，勾得到");
-  assert.match(pick, /<b>Mei<\/b> <span class="tag">Associate<\/span> <span class="mini">Marketing<\/span> <span class="mini">Internship<\/span>/);
+  assert.match(pick, /<b>Mei<\/b><span class="rk" title="Associate">AS<\/span><span class="mini">Marketing<\/span> <span class="mini">Internship<\/span>/);
   assert.doesNotMatch(pick, /小安/, "已經在裡面的不再列");
   assert.doesNotMatch(pick, /王平/, "Co-President 靠職級就有，不列");
   assert.doesNotMatch(pick, /畢業的/, "校友派不了");
@@ -195,7 +198,8 @@ test("★ 工作區：左邊清單、右邊誰在裡面與等級、加人只列�
   assert.match(h, /<input id="wsn-en"/); assert.match(h, /<input id="wsn-slug"/);
   assert.match(h, /name="wsn-member" value="33333333-3333-3333-3333-333333333333" data-act="pk-tick" data-ns="wsn"/);
   assert.match(h, /name="wsn-member" value="22222222-2222-2222-2222-222222222222"/, "新增表單那一塊不管誰在哪個工作區，幹部都列");
-  assert.match(h, /<select id="wsn-level" data-act="pk-level" data-ns="wsn">/);
+  assert.match(h, /建好就放進去（0）/, "新增表單那一塊是 draft 模式：左欄是勾起來的人");
+  assert.match(h, /<select id="wsn-level" data-act="pk-level" data-ns="wsn"[^>]*>/);
   assert.match(h, /data-act="ws-create">建立工作區</);
   assert.match(workspacesHTML(ws, "apps:Curriculum Team", members, PEOPLE, "", false, { npk: { ticked: ["33333333-3333-3333-3333-333333333333", "22222222-2222-2222-2222-222222222222"] } }, true),
     /data-act="ws-create">建立工作區並放 2 個人進去</, "建立鈕上算人數");
@@ -549,9 +553,9 @@ test("★ 不綁 team 的兩級：表單 team 鎖住、名單印「全部 team�
   assert.match(ro, /<div>Co-President<span class="mini"> 全部 team<\/span><\/div>/, "名單：Co-President 全部 team");
   const ws = [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "Curriculum Team 的申請", active: true }];
   const h = workspacesHTML(ws, "apps:Curriculum Team", [{ user_id: PEOPLE[2].profile_id, name_zh: "", name_en: "Mei", board_role: "member", level: "view" }], PEOPLE, "", false, null, true);
-  const lead = h.indexOf('class="byrank"'), mei = h.indexOf('data-act="ws-level"');
+  const lead = h.indexOf('class="ma-row byrank"'), mei = h.indexOf('data-act="ws-level"');
   assert.ok(lead > 0 && lead < mei, "Co-President 置頂");
-  assert.match(h, /<tr class="byrank">[\s\S]*?王平[\s\S]*?全部（職級）/);
+  assert.match(h, /<div class="ma-row byrank"><b>王平 \(Paul\)<\/b><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）/);
   assert.doesNotMatch(h.slice(lead, mei), /ws-unassign|ws-level/, "依職級那一列沒有下拉與移出");
   const src = readFileSync("admin/people/src/main.js", "utf8");
   assert.match(src, /team = UI\.isOrgWide\(rank\) \? "" : val\(`pk-pteam-\$\{i\}`\)/, "存的時候 team 是空的");

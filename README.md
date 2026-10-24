@@ -3460,6 +3460,21 @@ Paul 看了 Workspaces 的截圖說「一次很難加好幾個人」。原本每
 - 截圖 `docs/admin-redesign/v3/b9-01-workspaces-bulk-add.png`（Workspaces 右欄，篩 Marketing、勾了兩個）、`b9-02-members-panel-bulk-add.png`（Forms 的成員分頁）、`b9-03-members-panel-mobile.png`（手機）。
 - 測試：`test/admin-hub.test.mjs`「多選加人」那一條（篩選、全勾只勾篩出來的、按鈕上的人數、復原只移這一批、英文單複數），`test/people-admin.test.mjs` 工作區那一條（右欄與新增表單兩塊）。
 
+### 成員區改成兩欄（2026-10-24，同一天的第二版）
+
+Paul 看了上面那一版的截圖說「UI 很醜，而且看不到全部」。原本「在裡面的人」是一張表、「加人」是底下另一塊，兩邊要上下捲著對照。
+現在五個面（People → Workspaces 右欄、Forms／Resources／幹部護照／實習護照的成員分頁、「加一個專案或營隊」）都換成同一塊兩欄的成員區（四份 `ui.js` 的 `membersAreaHTML`，測試逐字比對；上一版的 `pickerHTML` 已經拿掉）：
+
+- **左欄「在這個工作區裡（N）」**：一列一行 36px，名字・兩個字母的職級標（CP 共同會長、SA 資深顧問、DR 總監、AD 顧問、AS 幹部）・等級下拉・移出。Co-President 與 Senior Adviser 置頂淡一點標「全部（職級）」。欄頂有自己的找名字。
+- **右欄「還沒在裡面（M）」**：欄頂釘著找名字、team chip（一排可以橫捲）、全勾看到的／全部取消、等級下拉、「加 N 個人」；名單在底下自己捲。一列一行：勾選・名字・職級標・team 淡字。勾了的列有底色，滑過有底色。
+- **兩欄一樣高**（桌機 60vh，手機各 40vh 上下疊）、各自在裡面捲，所以 1280×800 的螢幕上在裡面的人與可以加的人同時看得到，不用捲頁面（截圖驗過：成員區頂 110、底 543，視窗 721）。
+- Workspaces 那一頁的工作區清單改成左邊一條 180px 的窄欄，成員區吃剩下的寬。
+- 「加一個專案或營隊」那一塊是同一個元件的「還沒建立」模式：左欄是勾起來的人（「取消」拿掉），右欄是還沒勾的，建立鈕上算人數。
+- 鍵盤與復原照舊：空白鍵勾、在那一塊裡按 Enter 就是按「加 N 個人」、toast 的「復原」只移出這一批。
+- 截圖 `docs/admin-redesign/v3/b10-01-workspaces-two-columns.png`（Workspaces，幹部護照，18 位候選）、`b10-02-members-panel-two-columns.png`（Forms 的成員分頁，篩 Mentorship）、`b10-03-members-panel-mobile.png`（手機，上下疊）。
+  這三張是用假資料在本機畫的（`_audit.html`，不進 repo）；正式站要等這一筆 push 上去之後才看得到新版。
+- 測試：`test/admin-hub.test.mjs` 成員分頁與「多選加人」那兩條（兩欄、標題裡的人數、控制項在右欄的頭、左欄找名字只篩左欄、draft 模式），`test/people-admin.test.mjs` 工作區那一條。
+
 ## 後台第二次重整：側欄 Dashboard（2026-10-19）
 
 Paul 2026-10-19 登入看過四個資料夾版的後台之後：「超亂超不知道在幹嘛。我要弄成像是 BT dashboard 一樣」。
