@@ -475,8 +475,7 @@ export function publicTeamHTML(people, msg, busy) {
   const on = people.filter(p => p.public_approved).length;
   return pageHead(T("team.title"), T("team.lede", { n: on }))
     + msgHTML(msg)
-    + sectionHTML("", `<div class="note">${T("team.note")}</div>
-    ${people.length ? `<ul class="flist">${people.map(p => {
+    + sectionHTML("", `${people.length ? `<ul class="flist">${people.map(p => {
       const { name, alt } = namesOf(p);
       return `<li>
         <div class="arow">

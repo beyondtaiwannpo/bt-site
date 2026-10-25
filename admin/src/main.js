@@ -548,9 +548,12 @@ document.addEventListener("click", async e => {
   }
 
   // 側欄：同一組裡換分頁不重新載入頁面，只改 S 再 render；網址的 # 跟著改，重新整理還在同一頁。
+  // 側欄每一行都是 data-act="tab"，key 直接交給 openTab 認（home、forms、events、meetings、request、requests）。
+  // 2026-10-25 Paul：「I can't get into events」。之前這裡把 home 以外的一律當 forms，
+  // 活動、會議、需求單從側欄點都回到表單那一頁，只有直接打網址才進得去。
   if (act === "tab") {
     e.preventDefault();
-    const t = b.dataset.t === "home" ? "home" : "forms";
+    const t = b.dataset.t || "forms";
     history.pushState(null, "", "#" + t);
     await openTab(t); return;
   }

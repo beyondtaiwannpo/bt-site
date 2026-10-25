@@ -760,3 +760,13 @@ test("★ 工作區屬於哪一列、叫什麼、連到哪（四份一樣）", (
   assert.deepEqual(rows.map(r => [r.label, r.cells.map(c => c.id)]), [["整個 BT", ["apps", "passport"]], ["Curriculum", []], ["Internship", ["res:Internship Team", "intern-passport", "custom:camp"]]], "整個 BT 列：申請、幹部護照；Internship 列：資源、實習護照、自訂（2026-10-30 起申請不分 team）");
   assert.equal(FORMS.wsTeamOf({ id: "apps" }), ""); assert.equal(FORMS.wsCellLabel({ id: "apps" }), "申請（表單與審核）"); assert.equal(FORMS.wsCellHref({ id: "apps" }), "/admin/#forms");
 });
+
+// 2026-10-25 Paul：「I can't get into events」。側欄的 tab handler 曾經把 home 以外的一律當 forms。
+// 守住：main.js 的 tab 分支直接拿 data-t 交給 openTab，不再寫死成 forms。
+test("★ 側欄點擊把 data-t 原樣交給 openTab（活動、會議、需求單從側欄進得去）", () => {
+  const src = readFileSync(new URL("../admin/src/main.js", import.meta.url), "utf8");
+  const i = src.indexOf('act === "tab"');
+  const block = src.slice(i, i + 400);
+  assert.match(block, /const t = b\.dataset\.t \|\| "forms"/);
+  assert.doesNotMatch(block, /=== "home" \? "home" : "forms"/);
+});
