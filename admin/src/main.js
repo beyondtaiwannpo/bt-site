@@ -30,6 +30,8 @@ let S = {
   requests: null, rqDraft: null, rqF: { status: "open", kind: "", q: "" }, rqSel: null, cadres: [],
   // 活動上架（2026-11-01）：events 是 loadEvents() 回的；evSel 打開的那一場（slug）；evDraft 開活動那張表單填到一半的值；evSigned 那一場的報名數。
   events: null, evSel: null, evDraft: null, evSigned: null,
+  // 會議（2026-11-02）：meetings 是 loadMeetings() 回的；mtSel 打開的那一場；mtDraft 表單填到一半（含勾人的 pk）。
+  meetings: null, mtSel: null, mtDraft: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -71,6 +73,13 @@ function render() {
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
+  } else if (S.view === "meetings") {
+    body = UI.meetingsListHTML(S.meetings || [], S.me, UI.mtScopes(S.me, S.teams), S.mtDraft, S.cadres, S.msg, S.busy);
+  } else if (S.view === "meeting" && S.mtSel) {
+    const m = (S.meetings || []).find(x => x.id === S.mtSel);
+    const scopes = UI.mtScopes(S.me, S.teams);
+    body = m ? UI.meetingHTML(m, S.me, S.cadres, scopes.includes(m.scope), scopes, S.mtDraft, S.msg, S.busy)
+             : UI.emptyHTML(T("mt.notFound"), "", { act: "mt-back", label: T("mt.back") });
   } else if (S.view === "events") {
     body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams());
   } else if (S.view === "event" && S.evSel) {
@@ -100,7 +109,7 @@ function render() {
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
   // 側欄亮哪一行：總覽、需求單那兩頁各自亮，其他全部算在「申請表」底下。
-  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : "forms";
+  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : "forms";
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body);
   UI.afterRender(S, el);
 }
@@ -133,9 +142,13 @@ async function boot(retried) {
     if (S.todo) S.todo.requests = S.requests;
     S.events = await D.loadEvents().catch(() => null);
     if (S.todo) S.todo.events = S.events;
+    S.meetings = await D.loadMeetings().catch(() => null);
+    if (S.todo) S.todo.meetings = S.meetings;
+    // 提醒信的退路（2026-11-02）：開頁叫一次 tick_mail()，Resend 沒設好也不會讓頁面壞。
+    D.tickMail().catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
-    else if (/^(requests?|events)(\/|$)/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    else if (/^(requests?|events|meetings)(\/|$)/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -176,7 +189,25 @@ function readEvent() {
   return { title_zh: val("ev-tzh"), title_en: val("ev-ten"), summary_zh: val("ev-szh"), summary_en: val("ev-sen"), body_zh: val("ev-bzh"), body_en: val("ev-ben"),
     starts_at: iso(val("ev-starts")), ends_at: iso(val("ev-ends")), place: val("ev-place"), capacity: Number(val("ev-cap") || 0), cover_url: val("ev-cover"), cover_consent: chk("ev-consent") };
 }
+async function reloadMeetings() {
+  try { S.meetings = await D.loadMeetings(); if (S.todo) S.todo.meetings = S.meetings; if (!S.cadres.length) S.cadres = await D.loadCadres().catch(() => []); }
+  catch (e) { S.msg = T("err.mtLoad") + D.says(e); }
+}
+function readMeeting() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  const iso = v => v ? new Date(v).toISOString() : "";
+  const pk = (S.mtDraft && S.mtDraft.pk) || { ticked: [] };
+  return { scope: val("mt-scope") || "board", title: val("mt-title"), starts_at: iso(val("mt-starts")), ends_at: iso(val("mt-ends")), agenda: val("mt-agenda"), doc_url: val("mt-doc"), attendees: UI.pkPicked(S.cadres, [], pk, true) };
+}
 async function openTab(t) {
+  // 會議（2026-11-02）：#meetings 清單，#meetings/<id> 一場。
+  const mt = /^meetings(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
+  if (mt) {
+    S.view = mt[1] ? "meeting" : "meetings"; S.mtSel = mt[1] || null; S.mtDraft = null; S.msg = "";
+    await reloadMeetings();
+    if (mt[1]) { const m = (S.meetings || []).find(x => x.id === mt[1]); if (m) S.mtDraft = { pk: { ticked: (m.attendees || []).map(a => a.user_id), q: "", mq: "", teams: [], level: "view" } }; }
+    render(); return;
+  }
   // 活動上架（2026-11-01）：#events 清單，#events/<代號> 一場。
   const ev = /^events(?:\/([a-z0-9-]+))?$/.exec(t || "");
   if (ev) {
@@ -290,6 +321,33 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
+  // ── 會議（2026-11-02）──
+  if (act === "mt-open") { e.preventDefault(); history.pushState(null, "", "#meetings/" + id); await openTab("meetings/" + id); return; }
+  if (act === "mt-back") { history.pushState(null, "", "#meetings"); await openTab("meetings"); return; }
+  if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && (S.view === "meetings" || S.view === "meeting")) {
+    S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], b, true) }); render(); return;
+  }
+  if (act === "mt-save") {
+    const d = readMeeting(); S.mtDraft = Object.assign({}, S.mtDraft, d);
+    if (!d.title) { S.msg = T("err.mtTitle"); render(); return; }
+    if (!d.starts_at || !d.ends_at) { S.msg = T("err.mtTime"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const newId = await D.saveMeeting(id || null, d);
+      S.busy = false; S.msg = id ? T("msg.mtSaved") : T("msg.mtCreated", { title: d.title });
+      if (!id) { S.mtDraft = null; history.pushState(null, "", "#meetings/" + newId); await openTab("meetings/" + newId); return; }
+      await reloadMeetings(); render();
+    } catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
+    return;
+  }
+  if (act === "mt-delete") {
+    const m = (S.meetings || []).find(x => x.id === id); if (!m) return;
+    if (UI.needAsk(S, b, T("confirm.mtDelete", { title: m.title }))) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.deleteMeeting(id); S.busy = false; S.msg = T("msg.mtDeleted", { title: m.title }); history.pushState(null, "", "#meetings"); await openTab("meetings"); }
+    catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
+    return;
+  }
   // ── 活動上架（2026-11-01）──
   if (act === "ev-open") { e.preventDefault(); history.pushState(null, "", "#events/" + b.dataset.slug); await openTab("events/" + b.dataset.slug); return; }
   if (act === "ev-back") { history.pushState(null, "", "#events"); await openTab("events"); return; }
@@ -726,6 +784,7 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 document.addEventListener("change", async e => {
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
+  if (pkEl && (S.view === "meetings" || S.view === "meeting")) { S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); return; }
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
   const el = e.target.closest('[data-act="members-level"]');
   if (!el || !S.mp || S.view !== "members") return;
@@ -742,6 +801,10 @@ document.addEventListener("change", async e => {
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("input", e => {
+  // 會議的勾人那一塊（2026-11-02）：找名字。
+  if (e.target && (e.target.dataset.act === "pk-q" || e.target.dataset.act === "pk-mq") && (S.view === "meetings" || S.view === "meeting")) {
+    S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], e.target, true) }); render(); UI.pkRefocus("mt", e.target.dataset.act === "pk-mq" ? "mq" : "q"); return;
+  }
   // 行銷需求單的佇列：邊打邊篩，重畫後游標放回去。
   if (e.target && e.target.id === "rq-q" && S.view === "requests") {
     S.rqF = Object.assign({}, S.rqF, { q: e.target.value }); render();

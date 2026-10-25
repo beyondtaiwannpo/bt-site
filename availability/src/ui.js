@@ -204,8 +204,10 @@ export function peekHTML(S, ctx) {
       <!-- 用 <a> 不用 <button>：長按與中鍵開新分頁才會有作用。
            標題改的時候由 main.js 直接改這個 href。 -->
       <a class="btn" id="callink" href="${esc(ctx.calUrl)}" target="_blank" rel="noopener">${T("pk.gcal")}</a>
+      ${ctx.canSchedule && !ctx.schedule ? `<button class="btn ghost" data-act="sch-open">${T("sch.open")}</button>` : ""}
       <button class="btn ghost" data-act="close-peek">${T("pk.close")}</button>
     </div>
+    ${ctx.schedule || ""}
     <div class="wnote" style="margin-top:12px">${T("pk.note")}</div>
   </div></div>`;
 }

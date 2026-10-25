@@ -402,6 +402,8 @@ export const ITEMS = [
   // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
   { group: "forms",     key: "events",   label: { zh: "活動",     en: "Events" },          who: "cadre" },
+  // 2026-11-02 會議紀錄：每一位幹部看得到；排會與記會議的門在資料庫（senior 或那個 team 的 Director）。
+  { group: "forms",     key: "meetings", label: { zh: "會議",     en: "Meetings" },        who: "cadre" },
   { group: "forms",     key: "request",  label: { zh: "跟 Marketing 提需求", en: "Request from Marketing" }, who: "cadre" },
   { group: "forms",     key: "requests", label: { zh: "行銷需求單", en: "Marketing requests" }, who: "ws:custom:marketing-requests" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
@@ -608,9 +610,10 @@ export function mpFind(people, q) {
 // pk = { q, teams: [team…], ticked: [id…], level }。ns 是這一塊在頁面上的前綴（同一頁可以有兩塊，例如 Workspaces 的右欄與新增表單）。
 export const PK_TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team", "Sponsorship Team", "Internship Team", "Community Relations Team"];
 export function pkTeamsOf(p) { return String(p && p.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean); }
-export function pkCandidates(people, inIds) {
+// all = true 的時候 Co-President 與 Senior Adviser 也列（會議的出席名單要勾得到他們；工作區那種「靠職級就有」的才不列）。
+export function pkCandidates(people, inIds, all) {
   const inWs = new Set(inIds || []);
-  return (people || []).filter(p => p && p.id && !inWs.has(p.id) && !["president", "senior_adviser"].includes(p.board_role));
+  return (people || []).filter(p => p && p.id && !inWs.has(p.id) && (all || !["president", "senior_adviser"].includes(p.board_role)));
 }
 // 找名字是「包含」不是「等於」，中英都找；team chip 勾了幾個就是「其中任何一個」。
 export function pkShown(cands, pk) {
@@ -623,9 +626,9 @@ export function pkShown(cands, pk) {
 export function pkTickAll(pk, shown) { return [...new Set([...((pk && pk.ticked) || []), ...(shown || []).map(p => p.id)])]; }
 export function pkToggle(pk, id, on) { const s = new Set((pk && pk.ticked) || []); if (on) s.add(id); else s.delete(id); return [...s]; }
 // 真的會送出去的人：勾了、而且還列得出來（已經在裡面或已經不是幹部的就算勾過也不算）。
-export function pkPicked(people, inIds, pk) { const ok = new Set(pkCandidates(people, inIds).map(p => p.id)); return ((pk && pk.ticked) || []).filter(id => ok.has(id)); }
+export function pkPicked(people, inIds, pk, all) { const ok = new Set(pkCandidates(people, inIds, all).map(p => p.id)); return ((pk && pk.ticked) || []).filter(id => ok.has(id)); }
 // 一個事件（打字、勾、換等級、按 chip、全勾、全取消）之後 pk 變成什麼。純函式，四個 main.js 都只呼叫它。
-export function pkReduce(pk, people, inIds, el) {
+export function pkReduce(pk, people, inIds, el, all) {
   const a = el && el.dataset ? el.dataset.act : "";
   const p0 = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view" }, pk || {});
   if (a === "pk-q") return Object.assign(p0, { q: el.value });
@@ -634,7 +637,7 @@ export function pkReduce(pk, people, inIds, el) {
   if (a === "pk-level") return Object.assign(p0, { level: el.value });
   if (a === "pk-tick") return Object.assign(p0, { ticked: pkToggle(p0, el.value, !!el.checked) });
   if (a === "pk-team") { const t = el.dataset.team; return Object.assign(p0, { teams: p0.teams.includes(t) ? p0.teams.filter(x => x !== t) : p0.teams.concat(t) }); }
-  if (a === "pk-all") return Object.assign(p0, { ticked: pkTickAll(p0, pkShown(pkCandidates(people, inIds), p0)) });
+  if (a === "pk-all") return Object.assign(p0, { ticked: pkTickAll(p0, pkShown(pkCandidates(people, inIds, all), p0)) });
   if (a === "pk-none") return Object.assign(p0, { ticked: [] });
   return p0;
 }
@@ -668,8 +671,8 @@ export function membersAreaHTML(ns, a) {
   // 左欄
   let left;
   if (o.draft) {
-    const picked = pkPicked(people, [], pk).map(id => byId[id]).filter(Boolean);
-    left = { n: picked.length, title: T("ma.willAdd", { n: picked.length }),
+    const picked = pkPicked(people, [], pk, o.all).map(id => byId[id]).filter(Boolean);
+    left = { n: picked.length, title: o.titleLeft ? o.titleLeft(picked.length) : T("ma.willAdd", { n: picked.length }),
       items: picked.filter(hit).map(p => `<div class="ma-row">${nameBlock(p)}${rankTag(p.board_role)}${teamsHTML(p)}<span class="sp"></span><button type="button" class="lnk" data-act="pk-untick" data-ns="${esc(ns)}" data-id="${esc(p.id)}"${dis}>${T("ma.untick")}</button></div>`),
       empty: T("ma.willAddNone") };
   } else {
@@ -697,10 +700,10 @@ export function membersAreaHTML(ns, a) {
   }
   // 右欄
   const inIds = o.draft ? pk.ticked : rows.map(r => r.user_id);
-  const cands = pkCandidates(people, inIds);
+  const cands = pkCandidates(people, inIds, o.all);
   const shown = pkShown(cands, pk);
   const ticked = new Set(pk.ticked);
-  const n = o.draft ? 0 : pkPicked(people, inIds, pk).length;
+  const n = o.draft ? 0 : pkPicked(people, inIds, pk, o.all).length;
   const teamsHere = PK_TEAMS.filter(t => cands.some(p => pkTeamsOf(p).includes(t)));
   const chip = t => `<button type="button" class="chip sm${pk.teams.includes(t) ? " on" : ""}" data-act="pk-team" data-ns="${esc(ns)}" data-team="${esc(t)}"${dis}>${esc(short(t))}</button>`;
   const cand = p => `<label class="ma-row pick${ticked.has(p.id) && !o.draft ? " on" : ""}"><input type="checkbox" name="${esc(ns)}-member" value="${esc(p.id)}" data-act="pk-tick" data-ns="${esc(ns)}"${ticked.has(p.id) && !o.draft ? " checked" : ""}${dis}>${nameBlock(p)}${rankTag(p.board_role)}${teamsHTML(p)}</label>`;
@@ -847,6 +850,15 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
     const waiting = rq === null ? null : (rq || []).filter(r => r.status === "new" || r.status === "in_progress").length;
     cards.push({ n: waiting, label: T("card.rq"), unit: T("card.rq.unit"), hint: waiting ? T("card.rq.hint", { n: (rq || []).filter(r => r.status === "new").length }) : T("card.rq.none"),
       href: "#requests", go: T("card.rq.go") });
+  }
+  // 2026-11-02 會議：每一位幹部看「下一場會議」（自己在名單上的、還沒開的第一場）。
+  const mt = t.meetings;
+  if (mt !== undefined && me) {
+    const mine = (mt || []).filter(m => new Date(m.starts_at) > new Date() && (m.attendees || []).some(a => a.user_id === me.id)).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+    if (mt === null || mine.length) {
+      const m = mine[0];
+      cards.push({ n: mt === null ? null : mine.length, label: T("card.mt"), unit: T("card.mt.unit"), hint: m ? T("card.mt.hint", { title: esc(m.title), d: esc(mtWhen(m.starts_at)) }) : "", href: m ? "#meetings/" + m.id : "#meetings", go: T("card.mt.go") });
+    }
   }
   // 2026-11-01 活動上架：senior 看「等上線的活動」（ready 的）；其他人看自己 team 還在草稿或準備好的活動數。
   const ev = t.events;
@@ -1163,4 +1175,71 @@ export function eventEditHTML(e, form, signed, me, msg, busy) {
       <div class="mini">${T("ev.coverNote")}</div>
       ${canEdit ? `<div class="form-foot"><button class="btn" data-act="ev-save" data-id="${esc(e.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button></div>` : `<div class="mini">${T("ev.readOnly")}</div>`}`)
     + sectionHTML(T("ev.signup"), links);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 會議紀錄（2026-11-02，docs/2026-10-24-會議與排程.md）
+// ═══════════════════════════════════════════════════════════════════════
+// 清單（之後的、過去的）加一場會議（出席與回覆、Drive 連結、議程）。排會本身在 /availability/ 的看板上；這裡的「記一場會議」是補紀錄或手動排。
+// 時間印瀏覽器的時區（後台的人自己的），旁邊不另印台北，避免兩個時間看混。
+export const mtWhen = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())} ${p(x.getHours())}:${p(x.getMinutes())}`; };
+const mtLocal = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; };
+export const mtScope = s => s === "board" ? T("mt.board") : String(s || "").replace(/\s*Team$/i, "");
+// 我能排哪些範圍：senior 全部；其他人是自己資源工作區「管」的 team。
+export function mtScopes(me, teams) {
+  if (senior(me)) return ["board"].concat(teams && teams.length ? teams : TEAM_LABELS);
+  return Object.entries((me && me.ws) || {}).filter(([id, lv]) => id.startsWith("res:") && lv === "manage").map(([id]) => id.slice(4));
+}
+// meetings：[{ id, scope, title, starts_at, ends_at, agenda, doc_url, attendees: [{ user_id, status }] }]
+export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy) {
+  const now = new Date();
+  const up = (meetings || []).filter(m => new Date(m.ends_at) >= now).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const past = (meetings || []).filter(m => new Date(m.ends_at) < now).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
+  const row = m => { const at = m.attendees || [], yes = at.filter(a => a.status === "accepted").length;
+    return `<li><div class="fhead"><b><a href="#meetings/${esc(m.id)}" data-act="mt-open" data-id="${esc(m.id)}">${esc(m.title)}</a></b> <span class="mini">${esc(mtScope(m.scope))}</span></div>
+      <div class="fmeta">${esc(mtWhen(m.starts_at))}・${esc(T("mt.people", { n: at.length, yes }))}${m.doc_url ? `・<a href="${esc(m.doc_url)}" target="_blank" rel="noopener">${T("mt.doc")}</a>` : ""}${me && at.some(a => a.user_id === me.id) ? `・<span class="tag${at.find(a => a.user_id === me.id).status === "accepted" ? " open" : ""}">${esc(T("mt.st." + at.find(a => a.user_id === me.id).status))}</span>` : ""}</div></li>`; };
+  return pageHead(T("mt.title"), T("mt.lede"))
+    + msgHTML(msg)
+    + sectionHTML(`${T("mt.upcoming")}<span class="hint">${up.length}</span>`, up.length ? `<ul class="flist">${up.map(row).join("")}</ul>` : emptyHTML(T("mt.noneUp"), T("mt.noneUpHint")))
+    + (past.length ? sectionHTML(`${T("mt.past")}<span class="hint">${past.length}</span>`, `<ul class="flist">${past.map(row).join("")}</ul>`) : "")
+    + (scopes.length ? meetingFormHTML(null, draft, scopes, people, busy) : "");
+}
+// 記一場會議 / 改一場：m 是現有那一場（null 是新的），d 是填到一半的值（含 pk 勾人的狀態）。
+export function meetingFormHTML(m, d, scopes, people, busy) {
+  const v = Object.assign({ scope: scopes[0] || "board", title: "", starts_at: "", ends_at: "", agenda: "", doc_url: "" }, m || {}, d || {});
+  const dis = busy ? " disabled" : "";
+  const pk = (d && d.pk) || { ticked: (m ? (m.attendees || []).map(a => a.user_id) : []), q: "", mq: "", teams: [], level: "view" };
+  return sectionHTML(m ? T("mt.edit") : T("mt.new"), `<div class="two">
+      <label><i>${T("mt.scope")}</i><select id="mt-scope"${dis}>${scopes.map(s => `<option value="${esc(s)}"${v.scope === s ? " selected" : ""}>${esc(mtScope(s))}</option>`).join("")}</select></label>
+      <label><i>${T("mt.titleF")}</i><input id="mt-title" value="${esc(v.title)}" placeholder="BT 會議"${dis}></label>
+      <label><i>${T("mt.starts")}</i><input id="mt-starts" type="datetime-local" value="${esc(mtLocal(v.starts_at))}"${dis}></label>
+      <label><i>${T("mt.ends")}</i><input id="mt-ends" type="datetime-local" value="${esc(mtLocal(v.ends_at))}"${dis}></label>
+      <label class="wide"><i>${T("mt.agenda")}</i><input id="mt-agenda" value="${esc(v.agenda || "")}"${dis}></label>
+      <label class="wide"><i>${T("mt.docF")}</i><input id="mt-doc" value="${esc(v.doc_url || "")}" placeholder="https://docs.google.com/…"${dis}></label>
+    </div>
+    <h3 class="sec-h">${T("mt.attendees")}</h3>
+    ${membersAreaHTML("mt", { people: people || [], pk, busy, draft: true, all: true, titleLeft: n => T("mt.ticked", { n }) })}
+    <div class="form-foot"><button class="btn" data-act="mt-save" data-id="${esc(m ? m.id : "")}"${dis}>${busy ? T("common.saving") : (m ? T("common.save") : T("mt.createGo"))}</button>
+      ${m ? `<button class="btn ghost" data-act="mt-delete" data-id="${esc(m.id)}"${dis}>${T("mt.delete")}</button>` : ""}
+      <span class="mini">${m ? T("mt.editNote") : T("mt.newNote")}</span></div>`, { id: "mt-form" });
+}
+// 一場會議：出席與回覆、連結、議程；能排的人底下可以改。
+export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
+  const who = id => { const p = (people || []).find(x => x.id === id); return p ? mpName(p) : T("rq.someone"); };
+  const at = m.attendees || [];
+  const grp = st => at.filter(a => a.status === st);
+  const li = a => `<li>${nameBlock((people || []).find(x => x.id === a.user_id) || { name_en: who(a.user_id) })}${a.user_id === (me && me.id) ? ` <span class="tag">${T("mp.you")}</span>` : ""}</li>`;
+  return pageHead(esc(m.title), `${esc(mtScope(m.scope))}・${esc(mtWhen(m.starts_at))}–${esc(mtWhen(m.ends_at).slice(11))}`, [], { act: "mt-back", label: T("mt.back") })
+    + msgHTML(msg)
+    + sectionHTML(T("mt.details"), `<dl class="rq-dl">
+        <dt>${T("mt.agenda")}</dt><dd>${m.agenda ? esc(m.agenda) : T("value.none")}</dd>
+        <dt>${T("mt.doc")}</dt><dd>${m.doc_url ? `<a href="${esc(m.doc_url)}" target="_blank" rel="noopener">${esc(m.doc_url)}</a>` : T("mt.noDoc")}</dd>
+        <dt>${T("mt.when")}</dt><dd>${esc(mtWhen(m.starts_at))}–${esc(mtWhen(m.ends_at).slice(11))} <span class="mini">${T("mt.tzNote")}</span></dd>
+      </dl>`)
+    + sectionHTML(`${T("mt.attendees")}<span class="hint">${at.length}</span>`, at.length ? `<div class="mt-rsvp">
+        <div><i>${T("mt.st.accepted")}（${grp("accepted").length}）</i><ul class="plain">${grp("accepted").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>
+        <div><i>${T("mt.st.invited")}（${grp("invited").length}）</i><ul class="plain">${grp("invited").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>
+        <div><i>${T("mt.st.declined")}（${grp("declined").length}）</i><ul class="plain">${grp("declined").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>
+      </div>` : `<div class="mini">${T("mt.nobody")}</div>`)
+    + (canEdit ? meetingFormHTML(m, draft, scopes, people, busy) : "");
 }

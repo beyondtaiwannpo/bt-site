@@ -68,3 +68,21 @@ export function localTimesText(instant, zones, labelOf, days) {
     return `${name}　${p.month}/${p.day}（${D[wd]}）${two(p.hour)}:${two(p.minute)}`;
   });
 }
+
+// .ics（RFC 5545 最基本的那幾行）。跟資料庫 meeting_ics() 同一個形狀：CRLF、UID、DTSTAMP、DTSTART/DTEND 是 UTC Z、SUMMARY、DESCRIPTION、URL。
+// 這一份給回覆那一頁的「下載 .ics」用；信裡附的是資料庫那一份。
+export function icsEscape(s) { return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+// 一行超過 75 個位元組要折行（下一行開頭一個空白）。這裡的欄位都短，但 DESCRIPTION 可能長，照規矩折。
+export function icsFold(line) {
+  const enc = new TextEncoder(), out = []; let cur = "";
+  for (const ch of line) { if (enc.encode(cur + ch).length > 75) { out.push(cur); cur = " " + ch; } else cur += ch; }
+  out.push(cur); return out.join("\r\n");
+}
+export function icsText(m) {
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Beyond Taiwan//bt-site//EN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+    "UID:" + m.uid, "DTSTAMP:" + stamp(m.now || new Date()), "DTSTART:" + stamp(m.start), "DTEND:" + stamp(m.end), "SUMMARY:" + icsEscape(m.title)];
+  if (m.description) lines.push("DESCRIPTION:" + icsEscape(m.description));
+  if (m.url) lines.push("URL:" + m.url);
+  lines.push("END:VEVENT", "END:VCALENDAR");
+  return lines.map(icsFold).join("\r\n") + "\r\n";
+}

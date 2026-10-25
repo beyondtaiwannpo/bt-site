@@ -3290,6 +3290,32 @@ Paul 2026-10-24：「蛇梯棋要讓 intern 看得到、有棋子、而且要彩
 
 **還沒驗的**：真的登入後的畫面與動畫（截圖是 `ui.js` 配假資料畫的；棋子沿著蛇梯飛那一段只在程式裡，沒有抓到截圖）；正式站要跑 `2026-10-22-intern-board.sql` 與 `2026-10-23-intern-pawn.sql` 兩支，跑完之前後台「棋盤」存檔會說要先跑那一支，intern 那邊看不到棋盤、跟以前一樣。
 
+## 會議紀錄與排會（2026-11-02）
+
+Paul 2026-10-24 清單的第 1、2 項，設計在 `docs/2026-10-24-會議與排程.md`，五題都照建議：信裡附 .ics 加「加到 Google 日曆」連結（不做 OAuth、不做 Edge Function）、開會前 24 小時提醒、Co-President 與 Senior Adviser 排任何會、Director 排自己 team 的、出席的人登入後回「會到／不能到」、紀錄全部幹部看得到。截圖 `docs/admin-redesign/meetings/mt-*`（本機假資料）。
+
+### 批 1：資料庫
+
+`supabase/migrations/2026-11-02-meetings.sql`，接在 11-01 後面跑，可以重跑，PASS 表 6 項。
+- 兩張表：`meetings`（範圍 board 或 team 名、標題、時間、一行議程、Drive 連結只收 docs／drive.google.com）、`meeting_attendees`（誰、`invited`／`accepted`／`declined`）。幹部讀兩張表；沒有寫的政策。
+- 函式：`schedule_meeting()`（存一場、每位出席者一封 `meeting_invite` 附 .ics、直接寄）、`save_meeting()`／`delete_meeting()`（門是 `can_schedule(scope)`：senior 全部、team 的要那個 team 資源工作區「管」）、`set_rsvp()`（只改自己那一筆）、`queue_meeting_reminders()`（24 小時內要開、還沒提醒過的，每位沒說不能到的一封，一場只排一次）、`tick_mail()`（幹部叫：排提醒加寄信）。
+- 信：`mail_outbox` 多 `ics`、`meeting_id` 兩欄；`send_pending_mail()` 整支重建，唯一的差別是有 ics 就當附件（`meeting.ics`，base64）送 Resend。信裡的時間照收信的人 `profiles.tz` 印。.ics 是資料庫拼的（`meeting_ics()`：CRLF、UID、DTSTAMP、DTSTART／DTEND 是 UTC Z、SUMMARY、DESCRIPTION、URL，逗號分號有跳脫）。
+- **pg_cron**：這一支不會自己開擴充。Paul 要在 Supabase Dashboard → Database → Extensions 打開 pg_cron；**先開再跑這一支**，它就會排一條每 15 分鐘的工作（排提醒加寄信）。**先跑了之後才開的話，再跑一次這一支**。沒開就靠退路：後台每一次開頁叫一次 `tick_mail()`。
+- `scripts/db/smoke.sh` 多一段：排會存對、三封邀請附 .ics 且欄位對、信裡時間照各人時區（紐約與台北各驗一句）、逗號跳脫、**沒有「管」任何 team 的幹部排不了（破壞）**、**Director 排不了別的 team 與整個 BT（破壞）**、紀錄連結只收 Drive、結束要在開始後、回覆與不在名單上回不了、改名單保留回覆、全部幹部看得到、anon 讀不到表、提醒只排一次且不寄給說不能到的、校友叫不了 tick_mail、重跑。本機 504 項全過（本機沒有 pg_cron，那一行印「沒開」）。
+
+### 批 2：後台與看板
+
+- 後台側欄「申請 → 會議」（每一位幹部）：之後的、過去的，每一列時間（瀏覽器時區）、範圍、幾人幾人會到、紀錄連結、我的回覆狀態。能排的人底下有「記一場會議」（補紀錄用，不寄信）：範圍、標題、開始結束、議程、Docs 連結、出席的人（成員區那一塊，Co-President 也勾得到）。一場會議那一頁：議程、紀錄、出席分「會到／還沒回／不能到」三欄；能排的人可以改與刪。總覽多一張「你的下一場會」。
+- `/availability/` 看板：點一格的彈窗裡，能排會的人多一顆「排一場會」：範圍、幾分鐘（預設一小時）、標題、Docs 連結、一行議程、出席的人（**這一格有空的已經先勾好**，可以找名字、全勾、全取消）、「排會並寄邀請（N 人）」。送出叫 `schedule_meeting()`，彈窗關掉、toast 說寄了幾封。勾人那一塊是後台成員區的精簡版，另一份在 `availability/src/schedule.js`（資料夾之間不 import）。
+- 信件文案多「會議：邀請」「會議：開會前一天提醒」兩種，代換符號 `{name}` `{title}` `{when}` `{agenda}` `{doc}` `{link}`。
+
+### 批 3：出席的人
+
+- 信裡的連結 `/availability/?meeting=<id>`：登入後看板最上面多一塊：標題、範圍、我時區的時間、議程、紀錄連結、「會到」「不能到」（按了叫 `set_rsvp()`，亮起來打勾）、「加到 Google 日曆」（現有的 `googleCalUrl()`）、「下載 .ics」（`calendar.js` 的 `icsText()` 拼的 data: 連結）。
+- `.ics` 兩份同一個形狀（資料庫那一份附在信裡，前端那一份給下載）；`test/meetings.test.mjs` 驗 RFC 5545 的基本規矩：CRLF、必要欄位、UTC Z、跳脫、每行不超過 75 個位元組（長行折行）、資料庫那一份也有同樣的欄位。
+  **沒驗的**：真的在 Google Calendar 與 Apple Calendar 打開那個檔（這台機器上沒有登入的 Google 帳號，Apple Calendar 的匯入要在桌面點；格式照 RFC 最基本的那幾行，兩邊都收）。Resend 真的帶附件寄出去也沒驗（本機的 `net.http_post` 是替身）。
+- 其他沒驗的：正式站（遷移檔沒跑、沒 push）、Paul 在 Chrome 真的排一場（會寄真的信）。
+
 ## 活動上架（2026-11-01）
 
 Paul 2026-10-24：「所有活動都要上線，各 team 自己設計自己的活動，而且要出現在對外首頁。」設計在 `docs/2026-10-24-活動上架.md`，五題 Paul 都照建議：兩道鑰匙上對外頁、首頁多一段「近期活動／Upcoming」、過去的留 12 個月、報名要登入、額滿硬關。

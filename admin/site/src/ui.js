@@ -47,6 +47,8 @@ export const ITEMS = [
   // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
   { group: "forms",     key: "events",   label: { zh: "活動",     en: "Events" },          who: "cadre" },
+  // 2026-11-02 會議紀錄：每一位幹部看得到；排會與記會議的門在資料庫（senior 或那個 team 的 Director）。
+  { group: "forms",     key: "meetings", label: { zh: "會議",     en: "Meetings" },        who: "cadre" },
   { group: "forms",     key: "request",  label: { zh: "跟 Marketing 提需求", en: "Request from Marketing" }, who: "cadre" },
   { group: "forms",     key: "requests", label: { zh: "行銷需求單", en: "Marketing requests" }, who: "ws:custom:marketing-requests" },
   { group: "site",      key: "res",     label: { zh: "資源",     en: "Resources" },       who: "cadre" },
@@ -253,9 +255,10 @@ export function mpFind(people, q) {
 // pk = { q, teams: [team…], ticked: [id…], level }。ns 是這一塊在頁面上的前綴（同一頁可以有兩塊，例如 Workspaces 的右欄與新增表單）。
 export const PK_TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team", "Sponsorship Team", "Internship Team", "Community Relations Team"];
 export function pkTeamsOf(p) { return String(p && p.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean); }
-export function pkCandidates(people, inIds) {
+// all = true 的時候 Co-President 與 Senior Adviser 也列（會議的出席名單要勾得到他們；工作區那種「靠職級就有」的才不列）。
+export function pkCandidates(people, inIds, all) {
   const inWs = new Set(inIds || []);
-  return (people || []).filter(p => p && p.id && !inWs.has(p.id) && !["president", "senior_adviser"].includes(p.board_role));
+  return (people || []).filter(p => p && p.id && !inWs.has(p.id) && (all || !["president", "senior_adviser"].includes(p.board_role)));
 }
 // 找名字是「包含」不是「等於」，中英都找；team chip 勾了幾個就是「其中任何一個」。
 export function pkShown(cands, pk) {
@@ -268,9 +271,9 @@ export function pkShown(cands, pk) {
 export function pkTickAll(pk, shown) { return [...new Set([...((pk && pk.ticked) || []), ...(shown || []).map(p => p.id)])]; }
 export function pkToggle(pk, id, on) { const s = new Set((pk && pk.ticked) || []); if (on) s.add(id); else s.delete(id); return [...s]; }
 // 真的會送出去的人：勾了、而且還列得出來（已經在裡面或已經不是幹部的就算勾過也不算）。
-export function pkPicked(people, inIds, pk) { const ok = new Set(pkCandidates(people, inIds).map(p => p.id)); return ((pk && pk.ticked) || []).filter(id => ok.has(id)); }
+export function pkPicked(people, inIds, pk, all) { const ok = new Set(pkCandidates(people, inIds, all).map(p => p.id)); return ((pk && pk.ticked) || []).filter(id => ok.has(id)); }
 // 一個事件（打字、勾、換等級、按 chip、全勾、全取消）之後 pk 變成什麼。純函式，四個 main.js 都只呼叫它。
-export function pkReduce(pk, people, inIds, el) {
+export function pkReduce(pk, people, inIds, el, all) {
   const a = el && el.dataset ? el.dataset.act : "";
   const p0 = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view" }, pk || {});
   if (a === "pk-q") return Object.assign(p0, { q: el.value });
@@ -279,7 +282,7 @@ export function pkReduce(pk, people, inIds, el) {
   if (a === "pk-level") return Object.assign(p0, { level: el.value });
   if (a === "pk-tick") return Object.assign(p0, { ticked: pkToggle(p0, el.value, !!el.checked) });
   if (a === "pk-team") { const t = el.dataset.team; return Object.assign(p0, { teams: p0.teams.includes(t) ? p0.teams.filter(x => x !== t) : p0.teams.concat(t) }); }
-  if (a === "pk-all") return Object.assign(p0, { ticked: pkTickAll(p0, pkShown(pkCandidates(people, inIds), p0)) });
+  if (a === "pk-all") return Object.assign(p0, { ticked: pkTickAll(p0, pkShown(pkCandidates(people, inIds, all), p0)) });
   if (a === "pk-none") return Object.assign(p0, { ticked: [] });
   return p0;
 }
@@ -313,8 +316,8 @@ export function membersAreaHTML(ns, a) {
   // 左欄
   let left;
   if (o.draft) {
-    const picked = pkPicked(people, [], pk).map(id => byId[id]).filter(Boolean);
-    left = { n: picked.length, title: T("ma.willAdd", { n: picked.length }),
+    const picked = pkPicked(people, [], pk, o.all).map(id => byId[id]).filter(Boolean);
+    left = { n: picked.length, title: o.titleLeft ? o.titleLeft(picked.length) : T("ma.willAdd", { n: picked.length }),
       items: picked.filter(hit).map(p => `<div class="ma-row">${nameBlock(p)}${rankTag(p.board_role)}${teamsHTML(p)}<span class="sp"></span><button type="button" class="lnk" data-act="pk-untick" data-ns="${esc(ns)}" data-id="${esc(p.id)}"${dis}>${T("ma.untick")}</button></div>`),
       empty: T("ma.willAddNone") };
   } else {
@@ -342,10 +345,10 @@ export function membersAreaHTML(ns, a) {
   }
   // 右欄
   const inIds = o.draft ? pk.ticked : rows.map(r => r.user_id);
-  const cands = pkCandidates(people, inIds);
+  const cands = pkCandidates(people, inIds, o.all);
   const shown = pkShown(cands, pk);
   const ticked = new Set(pk.ticked);
-  const n = o.draft ? 0 : pkPicked(people, inIds, pk).length;
+  const n = o.draft ? 0 : pkPicked(people, inIds, pk, o.all).length;
   const teamsHere = PK_TEAMS.filter(t => cands.some(p => pkTeamsOf(p).includes(t)));
   const chip = t => `<button type="button" class="chip sm${pk.teams.includes(t) ? " on" : ""}" data-act="pk-team" data-ns="${esc(ns)}" data-team="${esc(t)}"${dis}>${esc(short(t))}</button>`;
   const cand = p => `<label class="ma-row pick${ticked.has(p.id) && !o.draft ? " on" : ""}"><input type="checkbox" name="${esc(ns)}-member" value="${esc(p.id)}" data-act="pk-tick" data-ns="${esc(ns)}"${ticked.has(p.id) && !o.draft ? " checked" : ""}${dis}>${nameBlock(p)}${rankTag(p.board_role)}${teamsHTML(p)}</label>`;
@@ -608,7 +611,17 @@ export const MAIL_KINDS = [
   // 2026-10-31 行銷需求單：兩封，代換符號 {requester} {title} {needed_by} {link} {reply}。
   { v: "request_new",  label: "mail.request_new",  when: "mail.request_new.when" },
   { v: "request_done", label: "mail.request_done", when: "mail.request_done.when" },
+  // 2026-11-02 會議：兩封，代換符號 {name} {title} {when} {agenda} {doc} {link}。
+  { v: "meeting_invite",   label: "mail.meeting_invite",   when: "mail.meeting_invite.when" },
+  { v: "meeting_reminder", label: "mail.meeting_reminder", when: "mail.meeting_reminder.when" },
 ];
+export const MEETING_SAMPLE = { name: "Mei Wu", title: "Marketing 週會", when: "2027-03-01 10:00–11:00（Asia/Taipei）", agenda: "海報進度、嘖嘖頁分工", doc: "https://docs.google.com/document/d/…", link: "https://beyondtaiwannpo.com/availability/?meeting=9f2c…" };
+export function fillMeeting(text, s) {
+  const v = Object.assign({}, MEETING_SAMPLE, s || {});
+  return String(text == null ? "" : text)
+    .split("{name}").join(v.name).split("{title}").join(v.title).split("{when}").join(v.when)
+    .split("{agenda}").join(v.agenda).split("{doc}").join(v.doc).split("{link}").join(v.link);
+}
 export const REQUEST_SAMPLE = { requester: "Mei Wu", title: "2027 冬令營報名海報", needed_by: "2026-12-01", link: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", reply: "做好了，檔在 Drive 的 2027 冬令營資料夾。" };
 export function fillRequest(text, s) {
   const v = Object.assign({}, REQUEST_SAMPLE, s || {});
@@ -670,20 +683,20 @@ export function mailEditHTML(kind, t, msg, busy) {
   const subject = t ? t.subject : "";
   const body = t ? t.body : "";
   const extra = kind === "interview" ? "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/..." : "";
-  const isInvite = kind === "invite", isRequest = kind.startsWith("request_");
-  const fill = s => isInvite ? fillInvite(s) : isRequest ? fillRequest(s) : fillMail(s, NAME, TITLE);
+  const isInvite = kind === "invite", isRequest = kind.startsWith("request_"), isMeeting = kind.startsWith("meeting_");
+  const fill = s => isInvite ? fillInvite(s) : isRequest ? fillRequest(s) : isMeeting ? fillMeeting(s) : fillMail(s, NAME, TITLE);
   return pageHead(esc(T(k.label)), esc(T("mail.editLede", { when: T(k.when) })), [], { act: "mail-back", label: T("mail.back") })
     + msgHTML(msg)
     + `<div class="cols">` + sectionHTML("", `<label><i>${T("mail.subjectLabel")}</i><input id="msub" value="${esc(subject)}"></label>
     <label><i>${T("mail.body")}</i><textarea id="mbody" style="min-height:230px">${esc(body)}</textarea></label>
     <div class="mini" style="margin:-6px 0 14px">
-      ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : T("mail.vars")}</div>
+      ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
 
     <div class="form-foot">
       <button class="btn" data-act="mail-save" data-k="${esc(kind)}" ${busy ? "disabled" : ""}>${
         busy ? T("common.saving") : T("common.save")}</button>
     </div>`)
-    + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : isRequest ? T("mail.sampleRequest", { name: esc(REQUEST_SAMPLE.requester), title: esc(REQUEST_SAMPLE.title) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
+    + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : isRequest ? T("mail.sampleRequest", { name: esc(REQUEST_SAMPLE.requester), title: esc(REQUEST_SAMPLE.title) }) : isMeeting ? T("mail.sampleMeeting", { name: esc(MEETING_SAMPLE.name), title: esc(MEETING_SAMPLE.title) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
     <div class="mailprev"><b>${esc(fill(subject)) || T("mail.noSubjectPrev")}</b><pre>${
       esc(fill(body) + extra)}</pre><pre class="tail">${esc(mailTail(kind))}</pre></div>
     <div class="mini" style="margin:6px 0 0">

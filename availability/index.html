@@ -259,6 +259,20 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 /* 整行可以點的東西（單選、多選、勾選框）：按著的時候整行變色。
    這些是 <label> 不是 <button>，上面那條抓不到，而它們是**手機上最常按的東西**。 */
 .opt:active, .check:active{background:rgba(255,196,108,.26);border-radius:10px}
+/* 排一場會與回覆（2026-11-02）。 */
+.sch{margin-top:16px;padding-top:14px;border-top:1px solid rgba(16,42,134,.16)}
+.sch h3{margin:0 0 2px}
+.sch .two label.wide{grid-column:1/-1}
+.sch-who{margin:10px 0}
+.sch-who > i{display:block;font-style:normal;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,42,134,.7);margin-bottom:6px}
+.sch-who .row input{flex:1;min-width:120px}
+.sch-list{max-height:40vh;overflow:auto;border:1px solid rgba(16,42,134,.14);border-radius:12px;padding:4px 10px;background:rgba(255,255,255,.5);margin-top:6px}
+.sch-row{display:flex;flex-direction:row;align-items:center;gap:10px;margin:0;padding:5px 0}
+.sch-row input[type="checkbox"]{margin:0;flex:none}
+.wnote.err{border-left:3px solid var(--bt-orange)}
+.rsvp{margin:0 0 18px;padding:14px 16px;border:1px solid var(--bt-orange);border-radius:14px;background:rgba(255,232,197,.45)}
+.rsvp h3{margin:0 0 2px}
+.rsvp .row{flex-wrap:wrap;gap:8px;margin-top:10px}
 /* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}

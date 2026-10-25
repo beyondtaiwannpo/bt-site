@@ -82,7 +82,7 @@ test("總覽的卡：「改」以上看等處理的數；送過單的人看自�
 });
 
 test("信件文案多兩種，預覽的代換跟資料庫的 request_fill 同一套符號", () => {
-  assert.deepEqual(SITE.MAIL_KINDS.slice(-2).map(k => k.v), ["request_new", "request_done"]);
+  assert.ok(["request_new", "request_done"].every(v => SITE.MAIL_KINDS.some(k => k.v === v)));
   assert.equal(SITE.fillRequest("{requester}：{title}，{needed_by}，{link}，{reply}", { requester: "A", title: "B", needed_by: "C", link: "D", reply: "E" }), "A：B，C，D，E");
   const h = SITE.mailEditHTML("request_done", { subject: "你的需求單做完了：{title}", body: "{requester} 你好，{reply}" }, "", false);
   assert.match(h, /你的需求單做完了：2027 冬令營報名海報/); assert.match(h, /Mei Wu 你好，做好了/);

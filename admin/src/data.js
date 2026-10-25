@@ -315,6 +315,11 @@ export async function unassign(id, ws) {
 
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
+  // 會議（2026-11-02）
+  ["not_invited", "這場會的名單上沒有你。", "You are not on this meeting's list."],
+  ["bad_doc_url", "會議紀錄的連結要是 Google Docs 或 Drive 的。", "The notes link must be a Google Docs or Drive link."],
+  ["bad_time", "結束要在開始之後。", "The end must be after the start."],
+  ["no_such_meeting", "找不到這場會，可能已經刪了。", "Meeting not found; it may have been deleted."],
   // 活動上架（2026-11-01）
   ["not_team_manager", "開活動要是那個 team 的 Director（資源工作區「管」）或 Co-President。", "Creating an event needs that team's Director (Manage on its resources) or a Co-President."],
   ["slug_taken", "這個代號已經有活動用了，換一個。", "That slug is already used by another event."],
@@ -456,6 +461,39 @@ export async function setEventReady(id, ready) {
 export async function publishEvent(id, on) {
   need();
   const { data, error } = await supabase.rpc(on ? "publish_event" : "unpublish_event", { p_id: id });
+  if (error) throw error;
+  return data;
+}
+
+// ── 會議紀錄（2026-11-02）──────────────────────────────────────────────
+// 讀兩張表（幹部都讀得到）；寫走 save_meeting / delete_meeting。tick_mail() 開頁叫一次：排 24 小時內的提醒信並把 outbox 寄出去（pg_cron 沒開的退路）。
+export async function loadMeetings() {
+  need();
+  const [m, a] = await Promise.all([
+    supabase.from("meetings").select("id, scope, title, starts_at, ends_at, agenda, doc_url, reminded_at, created_by").order("starts_at", { ascending: false }),
+    supabase.from("meeting_attendees").select("meeting_id, user_id, status, replied_at"),
+  ]);
+  if (m.error) throw m.error;
+  if (a.error) throw a.error;
+  const by = new Map();
+  for (const x of a.data || []) { if (!by.has(x.meeting_id)) by.set(x.meeting_id, []); by.get(x.meeting_id).push(x); }
+  return (m.data || []).map(x => Object.assign({}, x, { attendees: by.get(x.id) || [] }));
+}
+export async function saveMeeting(id, d) {
+  need();
+  const { data, error } = await supabase.rpc("save_meeting", { p_id: id || null, p_scope: d.scope, p_title: d.title, p_starts: d.starts_at, p_ends: d.ends_at, p_agenda: d.agenda || "", p_doc_url: d.doc_url || null, p_attendees: d.attendees || [] });
+  if (error) throw error;
+  return data;
+}
+export async function deleteMeeting(id) {
+  need();
+  const { data, error } = await supabase.rpc("delete_meeting", { p_id: id });
+  if (error) throw error;
+  return data;
+}
+export async function tickMail() {
+  need();
+  const { data, error } = await supabase.rpc("tick_mail");
   if (error) throw error;
   return data;
 }

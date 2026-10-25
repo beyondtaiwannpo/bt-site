@@ -209,3 +209,45 @@ export async function saveTz(userId, tz) {
 }
 
 export { SLOT, isOfflineError, authMessage };
+
+// ── 排會與回覆（2026-11-02）────────────────────────────────────────────
+// 我被派進哪幾個工作區（能排哪些 team 的會）：my_access() 回 { workspaces: [{ id, level }] }。叫不到就當空的。
+export async function loadAccess() {
+  const ws = {};
+  try { const { data } = await supabase.rpc("my_access"); if (data && Array.isArray(data.workspaces)) for (const w of data.workspaces) ws[w.id] = w.level; } catch (e) { /* 空的 */ }
+  return ws;
+}
+export async function scheduleMeeting(d) {
+  const { data, error } = await supabase.rpc("schedule_meeting", { p_scope: d.scope, p_title: d.title, p_starts: d.starts, p_ends: d.ends, p_agenda: d.agenda || "", p_doc_url: d.doc || null, p_attendees: d.attendees });
+  if (error) throw error;
+  return data;
+}
+// 一場會議加我自己那一筆（回覆那一頁用）。RLS：幹部讀得到。
+export async function loadMeeting(id, userId) {
+  const [m, a] = await Promise.all([
+    supabase.from("meetings").select("id, scope, title, starts_at, ends_at, agenda, doc_url").eq("id", id).maybeSingle(),
+    supabase.from("meeting_attendees").select("status").eq("meeting_id", id).eq("user_id", userId).maybeSingle(),
+  ]);
+  if (m.error) throw m.error;
+  if (!m.data) return null;
+  return Object.assign({}, m.data, { my_status: a.data ? a.data.status : null });
+}
+export async function setRsvp(id, status) {
+  const { data, error } = await supabase.rpc("set_rsvp", { p_meeting: id, p_status: status });
+  if (error) throw error;
+  return data;
+}
+const SAYS2 = [
+  ["not_allowed", "你排不了這個範圍的會：整個 BT 的要 Co-President 或 Senior Adviser，team 的要那個 team 的 Director。", "You can't schedule for this scope: BT-wide needs a Co-President or Senior Adviser; a team needs that team's Director."],
+  ["not_invited", "這場會的名單上沒有你。", "You are not on this meeting's list."],
+  ["bad_doc_url", "會議紀錄的連結要是 Google Docs 或 Drive 的。", "The notes link must be a Google Docs or Drive link."],
+  ["bad_time", "結束要在開始之後。", "The end must be after the start."],
+  ["empty_title", "會議要有標題。", "The meeting needs a title."],
+  ["no_such_meeting", "找不到這場會，可能已經刪了。", "Meeting not found; it may have been deleted."],
+  ["Could not find the function", "資料庫還沒跑 2026-11-02-meetings.sql。", "The database has not run 2026-11-02-meetings.sql yet."],
+];
+export function saysMeeting(err, zh) {
+  const m = String((err && err.message) || err || "");
+  for (const r of SAYS2) if (m.includes(r[0])) return zh ? r[1] : r[2];
+  return m;
+}

@@ -7,7 +7,8 @@ import { navHTML } from "../../shared/nav.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays, diff } from "./edit.js";
 import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
-import { cellInstant, googleCalUrl, localTimesText, DEFAULT_TITLE } from "./calendar.js";
+import { cellInstant, googleCalUrl, localTimesText, DEFAULT_TITLE, icsText } from "./calendar.js";
+import * as SCH from "./schedule.js";
 import { labelOf } from "./tz-alias.js";
 import { startOfWeek, detectTz, partsIn, addDays } from "./tz.js";
 import { weekKeyOf } from "./weekkey.js";
@@ -43,7 +44,9 @@ let S = {
   // 「我的時間」那張表**只在進入那一頁或換了內容時**捲一次，不是每次重畫都捲。
   // 每次重畫都捲的話，使用者點一格、畫面重畫、捲動位置就被拉回去 —— 等於不能用。
   mineScrolled: false,
-  evTitle: "", copyMsg: ""
+  evTitle: "", copyMsg: "",
+  // 排會與回覆（2026-11-02）：ws 是我被派進的工作區（能排哪些 team）；sch 是彈窗裡排會那一塊的狀態（null 是沒展開）；rsvp 是信裡連進來那一場。
+  ws: {}, senior: false, sch: null, rsvp: null, rsvpMsg: ""
 };
 
 // ── 換算：把所有人的時段落到觀看者的格子上 ──────────────────────────
@@ -85,12 +88,16 @@ function render() {
 
   let inner, label = null;
   const V = view();
+  // 回覆那一塊（2026-11-02）：信裡連進來的那一場，放在看板最上面。
+  const rsvpBlock = S.rsvp ? SCH.rsvpHTML(S.rsvp, whenText(S.rsvp), googleCalUrl(new Date(S.rsvp.starts_at), Math.round((new Date(S.rsvp.ends_at) - new Date(S.rsvp.starts_at)) / 60000), S.rsvp.title, S.rsvp.agenda),
+      "data:text/calendar;charset=utf-8," + encodeURIComponent(icsText({ uid: "meeting-" + S.rsvp.id + "@beyondtaiwannpo.com", start: new Date(S.rsvp.starts_at), end: new Date(S.rsvp.ends_at), title: S.rsvp.title, description: S.rsvp.agenda, url: S.rsvp.doc_url })), S.busy)
+    : S.rsvpMsg ? `<div class="wnote err">${UI.esc(S.rsvpMsg)}</div>` : "";
   if (S.tab === "board") {
     // 帶上 weekSlots / weekMarks：某一週被誰動過例外，看板要逐格改用那一份
     // 而不是一路都用平常的時間（board.js 的判斷邏輯見那邊註解）。
     const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz, S.weekSlots, S.weekMarks);
     S.boardTop = firstBusyMinute(counts);
-    inner = UI.boardHTML(V, counts, weekDates());
+    inner = rsvpBlock + (UI.boardHTML(V, counts, weekDates()));
     label = weekLabel();
   }
   // 「我的時間」是自己的，跟 team 篩選無關，所以用 S 不是 V。
@@ -164,6 +171,11 @@ async function boot() {
     if (S.role !== "cadre") { S.ready = true; render(); return; }
 
     S.members = all.members; S.slots = all.slots;
+    // 排會與回覆（2026-11-02）：我能排哪些範圍；信裡的連結 ?meeting=<id> 進來就先把那一場撈出來。
+    S.ws = await DATA.loadAccess();
+    try { const { data } = await supabase.from("profiles").select("board_role").eq("id", S.user.id).maybeSingle(); S.senior = !!data && ["president", "senior_adviser"].includes(data.board_role); } catch (e) { S.senior = false; }
+    const mid = new URLSearchParams(location.search).get("meeting");
+    if (mid) { try { S.rsvp = await DATA.loadMeeting(mid, S.user.id); if (!S.rsvp) S.rsvpMsg = T("rsvp.gone"); } catch (e) { S.rsvpMsg = DATA.saysMeeting(e, lang() === "zh"); } }
     S.weekSlots = all.weekSlots; S.weekMarks = all.weekMarks;
     S.saved = new Set(S.slots.get(S.user.id) || []);
     S.mine = new Set(S.saved);
@@ -493,9 +505,37 @@ document.addEventListener("click", async e => {
     render(); return;
   }
 
+  // ── 排一場會（2026-11-02）──
+  if (act === "sch-open") { S.sch = { ticked: (S.peekFree || []).slice(), q: "", title: S.evTitle || T("cal.title"), minutes: 60, scope: scopes()[0] }; buildPeek(); render(); return; }
+  if (act === "sch-cancel") { S.sch = null; buildPeek(); render(); return; }
+  if (act === "sch-all" || act === "sch-none") {
+    readSch();
+    S.sch.ticked = act === "sch-all" ? [...new Set(S.sch.ticked.concat(SCH.shown(view().members, S.sch.q).map(m => m.id)))] : [];
+    buildPeek(); render(); return;
+  }
+  if (act === "sch-send") {
+    readSch();
+    const d = S.sch;
+    if (!d.ticked.length) { d.msg = T("sch.needPeople"); buildPeek(); render(); return; }
+    const start = cellInstant(S.weekStart, S.peekCell.col, S.peekCell.min, S.myTz);
+    const end = new Date(start.getTime() + (+d.minutes || 60) * 60000);
+    S.busy = true; d.msg = ""; buildPeek(); render();
+    try {
+      await DATA.scheduleMeeting({ scope: d.scope, title: (d.title || "").trim() || T("cal.title"), starts: start.toISOString(), ends: end.toISOString(), agenda: d.agenda, doc: (d.doc || "").trim() || null, attendees: d.ticked });
+      S.busy = false; S.sch = null; S.peek = null; S.msg = T("sch.sent", { n: d.ticked.length }); render();
+    } catch (e) { S.busy = false; d.msg = DATA.saysMeeting(e, lang() === "zh"); buildPeek(); render(); }
+    return;
+  }
+  if (act === "rsvp" && S.rsvp) {
+    S.busy = true; render();
+    try { await DATA.setRsvp(S.rsvp.id, b.dataset.v); S.rsvp.my_status = b.dataset.v; S.busy = false; S.msg = T(b.dataset.v === "accepted" ? "rsvp.saidYes" : "rsvp.saidNo"); }
+    catch (e) { S.busy = false; S.msg = DATA.saysMeeting(e, lang() === "zh"); }
+    render(); return;
+  }
+  if (act === "rsvp-close") { S.rsvp = null; S.rsvpMsg = ""; history.replaceState(null, "", location.pathname); render(); return; }
   if (act === "peek") {
     S.peekCell = { col: +b.dataset.c, min: +b.dataset.m };
-    S.copyMsg = "";
+    S.copyMsg = ""; S.sch = null;
     S.evTitle = S.evTitle || T("cal.title");
     buildPeek(); render(); return;
   }
@@ -541,6 +581,11 @@ document.addEventListener("input", e => {
     }
     return;
   }
+  if (e.target.id === "sch-q") {
+    readSch(); S.sch.q = e.target.value; buildPeek(); render();
+    const again = document.getElementById("sch-q"); if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* 有的瀏覽器不給 */ } }
+    return;
+  }
   if (e.target.id === "tzq") {
     S.tzQuery = e.target.value;
     S.tzResults = searchTz(S.tzQuery);
@@ -565,6 +610,22 @@ function readBatch() {
 // **時間一律從 S.weekStart 算**（見 calendar.js 的 cellInstant）——
 // 使用者可能是在翻週的時候點的，用「本週」算的話事件會差一整週，
 // 而那個事件看起來完全正常，只是日期錯了。
+// 排會（2026-11-02）：我能排哪些範圍；把彈窗裡排會那一塊的欄位收進 S.sch（重畫之後才不會回到預設值）。
+function scopes() { return SCH.scopesFor(S.senior, S.ws, UI.teamsOf(S.members)); }
+function readSch() {
+  if (!S.sch) return;
+  const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  for (const [k, id] of [["scope", "sch-scope"], ["minutes", "sch-minutes"], ["title", "sch-title"], ["doc", "sch-doc"], ["agenda", "sch-agenda"], ["q", "sch-q"]]) { const v = val(id); if (v !== undefined) S.sch[k] = v; }
+  const boxes = document.querySelectorAll('input[name="sch-member"]');
+  if (boxes.length) { const on = new Set([...boxes].filter(x => x.checked).map(x => x.value)), shownIds = new Set([...boxes].map(x => x.value)); S.sch.ticked = [...new Set(S.sch.ticked.filter(id => !shownIds.has(id)).concat([...on]))]; }
+}
+// 一場會的時間照我的時區印。
+function whenText(m) {
+  const z = S.myTz || "Asia/Taipei";
+  const f = d => { const p = partsIn(d, z); return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")} ${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`; };
+  const e = partsIn(new Date(m.ends_at), z);
+  return `${f(new Date(m.starts_at))}–${String(e.hour).padStart(2, "0")}:${String(e.minute).padStart(2, "0")}（${z}）`;
+}
 function buildPeek() {
   const { col, min } = S.peekCell;
   // 篩了 team 的話彈窗也要跟著篩：格子上的數字是篩過的，
@@ -577,7 +638,11 @@ function buildPeek() {
   const inst = cellInstant(S.weekStart, col, min, S.myTz);
   const zones = [...new Set(V.members.filter(m => m.tz).map(m => m.tz))].sort();
   S.peekLines = localTimesText(inst, zones, labelOf, [0, 1, 2, 3, 4, 5, 6].map(UI.dayShort));
+  S.peekFree = free;
+  const sc = scopes();
   S.peek = UI.peekHTML(V, {
+    canSchedule: sc.length > 0,
+    schedule: S.sch ? SCH.scheduleHTML(S.sch, { scopes: sc, members: V.members, free, when: `${UI.dayFull(UI.COL_ORDER[col])} ${UI.hhmm(min)}` }, S.busy) : "",
     free, minute: min,
     dayLabel: UI.dayFull(UI.COL_ORDER[col]),
     lines: S.peekLines,
