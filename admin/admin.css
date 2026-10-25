@@ -197,6 +197,19 @@ a.btn{text-decoration:none}
 .apick{flex:none;padding-top:4px;margin:0}
 .apick input{width:19px;height:19px;accent-color:var(--bt-navy);cursor:pointer;margin:0}
 .abody{flex:1;min-width:0}
+/* 收合面板（2026-11-03，邀請頁的批次碼）：有框、箭頭、標題加一句說明。<details> 原生吃 Enter 與 aria-expanded。 */
+.fold{margin-top:18px;border:1px solid rgba(16,42,134,.18);border-radius:14px;background:rgba(255,255,255,.45)}
+.fold > summary{list-style:none;display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;font-size:14px}
+.fold > summary::-webkit-details-marker{display:none}
+.fold > summary b{font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:.02em}
+.fold > summary .mini{flex:1;min-width:0}
+.fold .chev{flex:none;width:9px;height:9px;border-right:2px solid var(--bt-navy);border-bottom:2px solid var(--bt-navy);transform:rotate(-45deg);transition:transform .15s;margin-right:2px}
+.fold[open] .chev{transform:rotate(45deg)}
+.fold > summary:hover{background:rgba(16,42,134,.04);border-radius:14px}
+.fold-body{padding:4px 16px 16px;border-top:1px solid rgba(16,42,134,.12)}
+/* 名單的職位欄（2026-11-03）：一筆一行、team 用「·」接在同一行、欄位不折到兩行。 */
+.table td.t-pos{min-width:240px}
+.pos-line{white-space:nowrap}
 .ans{margin-top:9px}
 .ans summary{font-size:13.5px;color:rgba(16,42,134,.82);cursor:pointer;display:inline-block;padding:3px 0}
 .ans dl{margin:8px 0 0;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.55);border:1px solid rgba(16,42,134,.14)}

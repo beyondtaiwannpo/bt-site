@@ -46,7 +46,7 @@ function render() {
 
   const filter = { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all", team: S.filter.team };
   let body, tab = "roster";
-  if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres()); tab = "invites"; }
+  if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres(), batchOpen()); tab = "invites"; }
   else if (S.view === "changes") { body = UI.changesHTML(S.changes, S.people, S.msg); tab = "changes"; }
   else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior()); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
@@ -658,6 +658,11 @@ document.addEventListener("input", e => {
 // 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。
 // 切換：改字典的語言、存起來、把 ?lang= 寫進網址、重畫。**不重新載入頁面**，填到一半的東西都在 S 裡不會不見。
 function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e) { return null; } }
+// 邀請頁「批次碼」那一塊上次開著沒（2026-11-03）。
+function batchOpen() { try { return localStorage.getItem("bt-batch-open") === "1"; } catch (e) { return false; } }
+document.addEventListener("toggle", e => {
+  if (e.target && e.target.id === "batch") { try { localStorage.setItem("bt-batch-open", e.target.open ? "1" : "0"); } catch (x) { /* 無痕視窗存不了 */ } }
+}, true);
 function applyLang(l) {
   setLang(l);
   document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";

@@ -694,14 +694,14 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
         dup ? ` <span class="tag warn">${T("ro.maybeDup")}</span>` : ""}${
         p.pending_code ? `<div class="mini">${T("ro.pendingCode", { code: esc(p.pending_code) })}</div>` : ""}</td>
       <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
-      <td>${pos ? positionsFor(p, pos.term).map(x => {
+      <td class="t-pos">${pos ? positionsFor(p, pos.term).map(x => {
                  // 一筆職位一行，不用「 · 」接成一句：職級是左邊那一欄的徽章，職位是這裡的字，兩件事分開看。
                  // 一個人可以兼好幾個職位（10-23、10-26），Co-President 兼 Sponsorship 的 Associate 是正常的，**每一筆都不標**。
                  // team 的小字只在職位的字裡還沒有那個 team 的時候才印（「Adviser, Sponsorship Team」後面不再接一次 Sponsorship Team）。
                  const r = rankOfTitle(x.title_en, x.team);
                  const title = positionTitle(x);
                  const teamShown = x.team && !title.toLowerCase().endsWith(String(x.team).toLowerCase());
-                 return `<div>${esc(title)}${teamShown ? `<span class="mini"> ${esc(x.team)}</span>` : !x.team && isOrgWide(r) ? `<span class="mini"> ${T("pe.allTeams")}</span>` : ""}</div>`; }).join("")
+                 return `<div class="pos-line">${esc(title)}${teamShown ? `<span class="mini"> · ${esc(x.team)}</span>` : !x.team && isOrgWide(r) ? `<span class="mini"> · ${T("pe.allTeams")}</span>` : ""}</div>`; }).join("")
                // 唯一的提醒是每人一句：這一屆**沒有任何一筆**職位對得上他的職級（例如職級 Co-President、職位只有 Associate）。
                + (hasAccount(p) && p.role === "cadre" && !positionsFor(p, pos.term).some(x => rankOfTitle(x.title_en, x.team) === (p.board_role || "member"))
                    ? `<div class="mini"><span class="tag warn" title="${esc(T("ro.noRankPositionHint"))}">${T("ro.noRankPosition")}</span></div>` : "")
@@ -711,7 +711,8 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
               TEAMS.map(t => `<option value="${esc(t)}">${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></div>` : ""}</td>
       <td>${hasAccount(p) && p.role === "cadre" && isOrgWide(p.board_role)
           // 這兩級靠職級就有一切：先一顆「全部（職級）」，後面明寫的指派淡掉留著（多餘但不藏，藏了就沒人會去清）。
-          ? `<span class="tag open">${T("grid.byRank")}</span>${ws.map(w => ` <span class="tag off" title="${esc(T("ro.wsRedundant"))}">${esc(wsName(w.id, workspaces))}・${esc(levelLabel(w.level))}</span>`).join("")}`
+          // 2026-11-03：靠職級的人只印徽章，不再印劃掉的舊指派（那幾筆 2026-11-03 那支遷移檔會清掉，改一個人那一頁還有「清掉」可以按）。
+          ? `<span class="tag open">${T("grid.byRank")}</span>`
           : ws.length ? ws.map(w => `<span class="tag">${esc(wsName(w.id, workspaces))}・${esc(levelLabel(w.level))}</span>`).join(" ") : `<span class="mini">${hasAccount(p) && p.role === "cadre" ? T("ro.noWs") : ""}</span>`}</td>
       <td class="t-act"><button class="btn quiet sm" data-act="person-edit" data-id="${esc(p.person_id)}"${dis}>${T("ro.edit")}</button></td>
     </tr>`;
@@ -1121,7 +1122,8 @@ export function inviteFormNewHTML(draft, terms, busy) {
   </div>`;
 }
 const ST_TAG = { queued: "", sent: "open", failed: "warn", opened: "open", claimed: "done", expired: "draft", revoked: "draft" };
-export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft, isPres) {
+// batchOpen：上次有沒有展開（main.js 從 localStorage 讀），預設收著。
+export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft, isPres, batchOpen) {
   const list = rows || [];
   const dis = busy ? " disabled" : "";
   const d10 = v => String(v || "").slice(0, 10);
@@ -1146,10 +1148,11 @@ export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft
     + msgHTML(msg)
     + inviteFormNewHTML(draft, terms, busy)
     + sectionHTML(T("in.list"), list.length ? `<ul class="flist">${list.map(item).join("")}</ul>` : emptyHTML(T("in.empty"), T("in.emptyHint")), { id: "invites" })
-    + (isPres ? `<details class="ans" id="batch"><summary>${T("in.batch")}</summary>${inviteFormHTML(batchDraft, busy)}${
+    // 2026-11-03 Paul 找不到那一行字：改成有框、有箭頭、有一句說明的面板。<details> 原生就吃 Enter 與 aria-expanded，main.js 記住開著沒。
+    + (isPres ? `<details class="fold" id="batch"${batchOpen ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("in.batch")}</b><span class="mini">${T("in.batchHint")}</span></summary><div class="fold-body">${inviteFormHTML(batchDraft, busy)}${
         sectionHTML(T("iv.issued"), `<div class="note">${T("iv.issuedNote")}</div>${(batch || []).length
           ? `<ul class="flist">${(batch || []).map(c => inviteCodesHTML([c], "", busy, null).replace(/^[\s\S]*?<ul class="flist">/, "").replace(/<\/ul>[\s\S]*$/, "")).join("")}</ul>`
-          : emptyHTML(T("iv.empty"), T("iv.emptyHint"))}`, { id: "codes" })}</details>` : "");
+          : emptyHTML(T("iv.empty"), T("iv.emptyHint"))}`, { id: "codes" })}</div></details>` : "");
 }
 
 export function notCadreHTML() {

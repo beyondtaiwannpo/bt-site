@@ -341,7 +341,7 @@ test("★ 同一屆好幾個職位：名單接成一句、改一個人一列一�
   const roster = rosterHTML([two], TERMS, ME, true, "", false, null);
   // 2026-10-24：名單裡一筆職位一行，不再用「 · 」接成一句（職級是左邊那一欄，職位是字，分開看）。positionsLine 留給歷屆那一行。
   // 職位的字已經含 team，後面不再接一次 team；每一筆都不標（兼職位是正常的）。他的職級是 Director，而兩筆職位都不是 Director，所以底下一句「沒有這個職級的職位」。
-  assert.match(roster, /<div>Adviser, Sponsorship Team<\/div><div>Associate, Curriculum Team<\/div><div class="mini"><span class="tag warn"[^>]*>沒有這個職級的職位<\/span><\/div>/);
+  assert.match(roster, /<div class="pos-line">Adviser, Sponsorship Team<\/div><div class="pos-line">Associate, Curriculum Team<\/div><div class="mini"><span class="tag warn"[^>]*>沒有這個職級的職位<\/span><\/div>/);
   assert.doesNotMatch(roster, /Sponsorship Team<span class="mini"> Sponsorship Team/, "team 不重複印");
   assert.doesNotMatch(roster, /director@example\.com/, "名單表格上不印 email");
   const h = personEditHTML(two, TERMS, ME, true, "", false, null, [two], null, "director@example.com");
@@ -494,7 +494,8 @@ test("★ 邀請頁：表單六格、職位下拉共用、清單五種狀態、�
   assert.doesNotMatch(h, /data-act="invite-revoke" data-code="bt-bbbb2222"/);
   assert.match(h, /寄失敗<\/span>/); assert.match(h, /寄信的錯誤：boom/);
   assert.match(h, /過期<\/span>/); assert.match(h, /data-act="invite-resend" data-code="bt-dddd4444"/, "過期的可以重寄");
-  assert.match(h, /<details class="ans" id="batch"><summary>批次碼/);
+  assert.match(h, /<details class="fold" id="batch"><summary><span class="chev" aria-hidden="true"><\/span><b>批次碼<\/b><span class="mini">給一整批人同一組碼/, "批次碼是一塊有框有箭頭的面板，預設收著");
+  assert.match(invitesPageHTML(rows, [], TERMS, "", false, null, null, true, true), /<details class="fold" id="batch" open>/, "上次開著就開著");
   assert.match(h, /id="ic-code"/, "舊的批次碼表單在摺疊裡");
   const sa = invitesPageHTML(rows, [], TERMS, "", false, null, null, false);
   assert.doesNotMatch(sa, /data-act="invite-revoke"/, "Senior Adviser 沒有撤銷");
@@ -554,7 +555,7 @@ test("★ 不綁 team 的兩級：表單 team 鎖住、名單印「全部 team�
   const dir = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, null, PEOPLE, null, undefined, []);
   assert.match(dir, /<select id="pk-pteam-0">/); assert.match(dir, /data-act="grid-level"/);
   const ro = rosterHTML(PEOPLE, TERMS, ME, true, "", false, null, []);
-  assert.match(ro, /<div>Co-President<span class="mini"> 全部 team<\/span><\/div>/, "名單：Co-President 全部 team");
+  assert.match(ro, /<div class="pos-line">Co-President<span class="mini"> · 全部 team<\/span><\/div>/, "名單：Co-President · 全部 team 同一行");
   // 2026-10-24：名單的名字是兩行（中文一個元素、英文一個元素），不再是「中文 英文」擠在同一行。
   assert.match(ro, /<td class="t-main"><span class="nm"><b>王平<\/b><span class="nm-en">Paul<\/span><\/span>/, "名單：中文一行、英文一行");
   assert.doesNotMatch(ro, /class="alt"/, "名單不再用同一行的 alt");
@@ -574,7 +575,9 @@ test("★ 依職級的每一個面：名單工作區欄、team 篩選、側欄�
   const h = rosterHTML([pres, PEOPLE[1], PEOPLE[2]], TERMS, ME, true, "", false, null, []);
   // 面：名單的工作區欄。先「全部（職級）」，明寫的指派淡掉留著（不藏，藏了就沒人會去清），而且不再印「沒有被派進任何工作區」。
   const presRow = h.slice(h.indexOf("<tbody>"), h.indexOf("</tr>", h.indexOf("<tbody>")));
-  assert.match(presRow, /<span class="tag open">全部（職級）<\/span> <span class="tag off"[^>]*>Community Relations Team 的申請・管<\/span>/);
+  // 2026-11-03：靠職級的人只印徽章，不再印劃掉的舊指派。
+  assert.match(presRow, /<span class="tag open">全部（職級）<\/span><\/td>/);
+  assert.doesNotMatch(presRow, /tag off/, "名單不印劃掉的指派");
   assert.doesNotMatch(presRow, /沒有被派進任何工作區/);
     // 面：team 的篩選 chip。Co-President 勾了 Sponsorship 標籤、但職位沒有 team，不算在 Sponsorship 底下（跟 /team/ 的領導組一致）。
   assert.doesNotMatch(h, /data-v="Sponsorship Team"/, "沒有人真的在 Sponsorship，chip 不出現");
@@ -585,7 +588,8 @@ test("★ 依職級的每一個面：名單工作區欄、team 篩選、側欄�
   const multi = { ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Co-President", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
   const m = rosterHTML([multi], TERMS, ME, true, "", false, null, []);
   assert.match(m, /<td><span class="tag open">Co-President<\/span><\/td>/, "職級欄是 Co-President");
-  assert.match(m, /<div>Co-President<span class="mini"> 全部 team<\/span><\/div><div>Associate, Sponsorship Team<\/div>/, "兩筆各一行，team 不重複印");
+  assert.match(m, /<div class="pos-line">Co-President<span class="mini"> · 全部 team<\/span><\/div><div class="pos-line">Associate, Sponsorship Team<\/div>/, "兩筆各一行（不折行），team 不重複印");
+  assert.match(readFileSync("admin/admin.css", "utf8"), /\.pos-line\{white-space:nowrap\}/, "一筆職位不折成兩行");
   assert.doesNotMatch(m, /tag warn/, "Co-President 兼 Associate 不標任何東西");
   // 職位寫 Senior Adviser、職級是 Co-President：只是印出來，也不標（領導那兩級互相不算衝突）。
   const sa = rosterHTML([{ ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Senior Adviser", team: "" }, { term: "2026-27", title_en: "Co-President", team: "" }] }], TERMS, ME, true, "", false, null, []);

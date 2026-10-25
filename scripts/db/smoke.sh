@@ -1512,6 +1512,25 @@ else
   echo "  FAIL 會議那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
 fi
 
+
+echo "清掉靠職級的人多餘的指派（2026-11-03）："
+# 先種一筆多餘的（PAUL 是 Co-President、OTHER 是 Senior Adviser），遷移檔要把它們清掉並記下來。
+psql -d "${DB}" -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${PAUL}','res:Marketing Team','manage'), ('${OTHER}','apps','view') on conflict (user_id, workspace_id) do update set level=excluded.level;" >/dev/null
+BEFORE=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.assignments a join public.profiles p on p.id=a.user_id where p.board_role in ('president','senior_adviser')" | tr -d ' \n')
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-03-drop-redundant-assignments.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   清多餘指派那支遷移檔跑過，驗收表全部 PASS（清掉前有 ${BEFORE} 筆）"; pass=$((pass+1))
+else
+  echo "  FAIL 清多餘指派那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "★ 這兩級身上一筆指派都不剩" "0" "select count(*) from public.assignments a join public.profiles p on p.id=a.user_id where p.board_role in ('president','senior_adviser')"
+chk "★ 每一筆刪除都記了（new_value 是 by_rank，old 是等級@工作區）" "t" "select count(*) >= ${BEFORE} and bool_and(old_value like '%@%') from public.role_changes where field='assignment' and new_value='by_rank'"
+chkas "${PAUL}" "★ 之後再派 Co-President 進任何工作區：不寫、回 by_rank" "by_rank" "select public.assign('${OTHER}','res:Marketing Team','manage')"
+chk "真的沒有寫進去" "0" "select count(*) from public.assignments where user_id='${OTHER}'"
+chkas "${PAUL}" "一般幹部照常派得進去" "view" "select public.assign('${ISTAFF}','res:Marketing Team','view')"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-03-drop-redundant-assignments.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then echo "  ok   清多餘指派那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 清多餘指派那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
