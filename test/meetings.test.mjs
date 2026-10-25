@@ -83,11 +83,11 @@ test("回覆那一塊：兩顆按鈕照目前的回覆亮、Google 日曆連結�
 });
 
 test("★ .ics 照 RFC 5545 的基本規矩：CRLF、必要欄位、UTC Z、跳脫、折行不超過 75 個位元組；跟資料庫那一份同一個形狀", () => {
-  const ics = CAL.icsText({ uid: "meeting-m1@beyondtaiwannpo.com", start: new Date("2027-03-01T02:00:00Z"), end: new Date("2027-03-01T03:00:00Z"), title: "Marketing 週會; 第二季", description: "海報進度, 嘖嘖頁\n分工", url: "https://docs.google.com/document/d/abc", now: new Date("2026-10-24T00:00:00Z") });
+  const ics = CAL.icsText({ uid: "meeting-m1", start: new Date("2027-03-01T02:00:00Z"), end: new Date("2027-03-01T03:00:00Z"), title: "Marketing 週會; 第二季", description: "海報進度, 嘖嘖頁\n分工", url: "https://docs.google.com/document/d/abc", now: new Date("2026-10-24T00:00:00Z") });
   assert.ok(ics.endsWith("\r\n")); assert.ok(!/[^\r]\n/.test(ics), "每一行 CRLF");
   const lines = ics.split("\r\n").filter(Boolean);
   assert.equal(lines[0], "BEGIN:VCALENDAR"); assert.equal(lines[lines.length - 1], "END:VCALENDAR");
-  for (const l of ["VERSION:2.0", "PRODID:-//Beyond Taiwan//bt-site//EN", "METHOD:PUBLISH", "BEGIN:VEVENT", "UID:meeting-m1@beyondtaiwannpo.com", "DTSTAMP:20261024T000000Z", "DTSTART:20270301T020000Z", "DTEND:20270301T030000Z", "SUMMARY:Marketing 週會\; 第二季", "DESCRIPTION:海報進度\\, 嘖嘖頁\\n分工", "URL:https://docs.google.com/document/d/abc", "END:VEVENT"]) assert.ok(lines.includes(l), "少了 " + l);
+  for (const l of ["VERSION:2.0", "PRODID:-//Beyond Taiwan//bt-site//EN", "METHOD:PUBLISH", "BEGIN:VEVENT", "UID:meeting-m1", "DTSTAMP:20261024T000000Z", "DTSTART:20270301T020000Z", "DTEND:20270301T030000Z", "SUMMARY:Marketing 週會\; 第二季", "DESCRIPTION:海報進度\\, 嘖嘖頁\\n分工", "URL:https://docs.google.com/document/d/abc", "END:VEVENT"]) assert.ok(lines.includes(l), "少了 " + l);
   const enc = new TextEncoder();
   for (const l of ics.split("\r\n")) assert.ok(enc.encode(l).length <= 75, "超過 75 位元組：" + l);
   const long = CAL.icsText({ uid: "x", start: new Date(0), end: new Date(3600000), title: "很長的標題".repeat(20) });

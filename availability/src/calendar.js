@@ -69,7 +69,7 @@ export function localTimesText(instant, zones, labelOf, days) {
   });
 }
 
-// .ics（RFC 5545 最基本的那幾行）。跟資料庫 meeting_ics() 同一個形狀：CRLF、UID、DTSTAMP、DTSTART/DTEND 是 UTC Z、SUMMARY、DESCRIPTION、URL。
+// .ics（RFC 5545 最基本的那幾行）。跟資料庫 meeting_ics() 同一個形狀：CRLF、UID（meeting-<uuid>，不帶 @ 網域，check.sh 不放行組織信箱以外的 @）、DTSTAMP、DTSTART/DTEND 是 UTC Z、SUMMARY、DESCRIPTION、URL。
 // 這一份給回覆那一頁的「下載 .ics」用；信裡附的是資料庫那一份。
 export function icsEscape(s) { return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
 // 一行超過 75 個位元組要折行（下一行開頭一個空白）。這裡的欄位都短，但 DESCRIPTION 可能長，照規矩折。

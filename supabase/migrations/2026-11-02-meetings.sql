@@ -133,7 +133,7 @@ begin
   if m.id is null then return null; end if;
   v := 'BEGIN:VCALENDAR' || E'\r\n' || 'VERSION:2.0' || E'\r\n' || 'PRODID:-//Beyond Taiwan//bt-site//EN' || E'\r\n' || 'METHOD:PUBLISH' || E'\r\n'
     || 'BEGIN:VEVENT' || E'\r\n'
-    || 'UID:meeting-' || m.id::text || '@beyondtaiwannpo.com' || E'\r\n'
+    || 'UID:meeting-' || m.id::text || E'\r\n'
     || 'DTSTAMP:' || z || E'\r\n'
     || 'DTSTART:' || to_char(m.starts_at at time zone 'UTC', 'YYYYMMDD"T"HH24MISS"Z"') || E'\r\n'
     || 'DTEND:' || to_char(m.ends_at at time zone 'UTC', 'YYYYMMDD"T"HH24MISS"Z"') || E'\r\n'

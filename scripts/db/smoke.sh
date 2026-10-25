@@ -1468,7 +1468,7 @@ case "${MT}" in ????????-*) echo "  ok   Marketing 的 Director 排了一場 tea
 chk "★ 會議存對：範圍、標題、三位出席、都還沒回" "MarketingTeam|Marketing週會|3|3" \
   "select m.scope||'|'||m.title||'|'||(select count(*) from public.meeting_attendees a where a.meeting_id=m.id)||'|'||(select count(*) from public.meeting_attendees a where a.meeting_id=m.id and a.status='invited') from public.meetings m where m.id='${MT}'"
 chk "★ 三封邀請信，每一封附 .ics（VCALENDAR、UID、DTSTART 是 UTC Z、SUMMARY）" "3|true|true|true|true" \
-  "select count(*)||'|'||bool_and(ics like 'BEGIN:VCALENDAR'||E'\r\n'||'%')||'|'||bool_and(ics like '%UID:meeting-${MT}@beyondtaiwannpo.com%')||'|'||bool_and(ics like '%DTSTART:20270301T020000Z%')||'|'||bool_and(ics like '%SUMMARY:Marketing 週會%') from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}'"
+  "select count(*)||'|'||bool_and(ics like 'BEGIN:VCALENDAR'||E'\r\n'||'%')||'|'||bool_and(ics like '%UID:meeting-${MT}'||E'\r\n'||'%')||'|'||bool_and(ics like '%DTSTART:20270301T020000Z%')||'|'||bool_and(ics like '%SUMMARY:Marketing 週會%') from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}'"
 chk "★ 信裡的時間照收信的人的時區：ISTAFF 是紐約（02:00Z = 前一天 21:00）、PAUL 台北 10:00" "true|true" \
   "select (select body like '%2027-02-28 21:00–22:00（America/New_York）%' from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}' and to_email='istaff@example.com')||'|'||(select body like '%2027-03-01 10:00–11:00（Asia/Taipei）%' from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}' and to_email='paul@example.com')"
 chk "信裡有議程、Drive 連結、回覆連結、不要回覆" "true|true|true|true" \

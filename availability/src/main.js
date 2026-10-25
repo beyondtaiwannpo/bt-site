@@ -90,7 +90,7 @@ function render() {
   const V = view();
   // 回覆那一塊（2026-11-02）：信裡連進來的那一場，放在看板最上面。
   const rsvpBlock = S.rsvp ? SCH.rsvpHTML(S.rsvp, whenText(S.rsvp), googleCalUrl(new Date(S.rsvp.starts_at), Math.round((new Date(S.rsvp.ends_at) - new Date(S.rsvp.starts_at)) / 60000), S.rsvp.title, S.rsvp.agenda),
-      "data:text/calendar;charset=utf-8," + encodeURIComponent(icsText({ uid: "meeting-" + S.rsvp.id + "@beyondtaiwannpo.com", start: new Date(S.rsvp.starts_at), end: new Date(S.rsvp.ends_at), title: S.rsvp.title, description: S.rsvp.agenda, url: S.rsvp.doc_url })), S.busy)
+      "data:text/calendar;charset=utf-8," + encodeURIComponent(icsText({ uid: "meeting-" + S.rsvp.id, start: new Date(S.rsvp.starts_at), end: new Date(S.rsvp.ends_at), title: S.rsvp.title, description: S.rsvp.agenda, url: S.rsvp.doc_url })), S.busy)
     : S.rsvpMsg ? `<div class="wnote err">${UI.esc(S.rsvpMsg)}</div>` : "";
   if (S.tab === "board") {
     // 帶上 weekSlots / weekMarks：某一週被誰動過例外，看板要逐格改用那一份
