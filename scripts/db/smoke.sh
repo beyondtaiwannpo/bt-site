@@ -1531,6 +1531,32 @@ chkas "${PAUL}" "一般幹部照常派得進去" "view" "select public.assign('$
 rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-03-drop-redundant-assignments.sql 2>&1 || true)
 if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then echo "  ok   清多餘指派那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 清多餘指派那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
 
+
+echo "幹部護照補 passports 那一列（2026-11-04）："
+# 重現 Alice 的那條路：幹部有 profiles、沒有 passports。先數有幾位這樣的（這份假資料的幹部幾乎都是直接種的，沒有 passports）。
+MISSING=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.profiles p where p.role='cadre' and not exists (select 1 from public.passports ps where ps.id=p.id)" | tr -d ' \n')
+chkrole authenticated "${PAUL}" "★ 重現：沒有 passports 列的幹部存名字，profiles 影響 1 列" "1" \
+  "with a as (update public.profiles set name_zh='王平' where id='${PAUL}' returning id) select count(*) from a"
+chkrole authenticated "${PAUL}" "★ 重現：同一個人更新 passports 影響 0 列而且沒有錯（這就是存了卻像沒存）" "0" \
+  "with b as (update public.passports set motto='x' where id='${PAUL}' returning id) select count(*) from b"
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-04-passport-self-heal.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   補護照那支遷移檔跑過，驗收表全部 PASS（補了 ${MISSING} 位）"; pass=$((pass+1))
+else
+  echo "  FAIL 補護照那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "★ 補完每一位幹部都有 passports 列" "0" "select count(*) from public.profiles p where p.role='cadre' and not exists (select 1 from public.passports ps where ps.id=p.id)"
+chkrole authenticated "${PAUL}" "★ 補完之後同一句 update passports 影響 1 列" "1" \
+  "with b as (update public.passports set motto='一句話' where id='${PAUL}' returning id) select count(*) from b"
+chkas "${PAUL}" "有列的幹部叫 ensure_passport：exists" "exists" "select public.ensure_passport()"
+psql -d "${DB}" -q -c "delete from public.passports where id='${ISTAFF}';" >/dev/null
+chkas "${ISTAFF}" "★ 之後又少了那一列的幹部自己叫 ensure_passport 就補回來" "created" "select public.ensure_passport()"
+chk "真的補了" "1" "select count(*) from public.passports where id='${ISTAFF}'"
+chkas "${EVS1}" "學員叫 ensure_passport：not_cadre，不會多一本" "not_cadre" "select public.ensure_passport()"
+chk "學員沒有護照" "0" "select count(*) from public.passports where id='${EVS1}'"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-04-passport-self-heal.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then echo "  ok   補護照那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 補護照那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

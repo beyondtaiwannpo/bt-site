@@ -27,6 +27,32 @@ export { signOut, isOfflineError, sessionGone, currentUserDetailed, currentUser 
 
 /* ---------- 護照內容 ---------- */
 
+// 「這個人」（profiles）加「這本護照」（passports）合成畫面要的 profile 物件。純函式，test/passport-save.test.mjs 守著。
+// 2026-10-25 之前是「passports 那一列不在就整個 profile 是 null」：幹部有名字、沒有 passports 列的時候，
+// 畫面以為他還沒申請、一直停在空的申請表，而他每按一次儲存名字其實都存進去了（Alice 回報的那個 bug）。
+// 現在 profiles 那一列在就組得出來，passports 那一列不在就 motto / issued / intro_seen 是 null，由 ensure_passport() 補列。
+export function mergeProfile(userId, pf, pa) {
+  if (!pf) return null;
+  return {
+    id:         userId,
+    name_zh:    pf.name_zh    ?? null,
+    name_en:    pf.name_en    ?? null,
+    team:       pf.team       ?? null,
+    avatar:     pf.avatar     ?? null,
+    tz:         pf.tz         ?? null,
+    role:       pf.role       ?? null,
+    motto:      pa ? pa.motto : null,
+    issued:     pa ? pa.issued : null,
+    intro_seen: pa ? pa.intro_seen : null,
+  };
+}
+// 幹部自己沒有 passports 那一列就補一列（2026-11-04-passport-self-heal.sql）。回 created / exists / not_cadre。
+export async function ensurePassport() {
+  const { data, error } = await supabase.rpc("ensure_passport");
+  if (error) throw error;
+  return data;
+}
+
 // 每個寫入函式開頭都重新問一次 currentUser()，而不是信任呼叫端傳進來的 id。
 // 理由：id 若由呼叫端提供，「寫誰的資料」就變成畫面狀態說了算，而畫面狀態可能是
 // 上一個使用者留下的（同一台電腦換人登入、session 過期後又登入別的帳號）。
@@ -153,24 +179,10 @@ export async function loadAll() {
   // 「填護照資料」頁，而使用者存不進去（passports 沒有 insert policy，補不回來）。
   const me = pf.data || {};
   return {
-    // role 放在最外層而不是塞進 profile，理由是**學員沒有 profile**：
-    // 「有沒有護照」由 passports 那一列決定，而學員沒有那一列，所以下面
-    // profile 會是 null。角色如果只掛在 profile 裡，前端就永遠不知道
-    // 一個沒有護照的人是學員還是資料壞掉 —— 而那兩件事該顯示的畫面完全不同
-    // （前者是「你還不是幹部，有邀請碼嗎」，後者是「填護照資料」）。
     role: me.role ?? null,
-    profile: pa.data ? {
-      id:         user.id,
-      name_zh:    me.name_zh    ?? null,
-      name_en:    me.name_en    ?? null,
-      team:       me.team       ?? null,
-      avatar:     me.avatar     ?? null,
-      tz:         me.tz         ?? null,
-      role:       me.role       ?? null,
-      motto:      pa.data.motto,
-      issued:     pa.data.issued,
-      intro_seen: pa.data.intro_seen
-    } : null,
+    profile: mergeProfile(user.id, pf.data, pa.data),
+    // 2026-10-25：passports 那一列在不在，main.js 開頁看到幹部沒有就叫 ensure_passport() 補一列（Alice 那個 bug）。
+    hasPassport: !!pa.data,
     stamps, entries,
     activities: ac.data || [],
     months: mo.data || [],
@@ -197,16 +209,27 @@ export async function saveProfile(p) {
   // 而且沒有權限，會直接被擋下來。
   //
   // 不寫 issued：核發日是註冊那天，從這裡寫的話每次改暱稱都會把它改成今天。
+  // ⚠ 兩句都 .select("id") 把影響到的列拿回來。**RLS 把那一列濾掉、或那一列根本不在，PostgREST 不報錯，只是影響 0 列**，
+  // 2026-10-25 Alice 就是這樣「存了卻像沒存」。0 列就丟一個看得懂的錯，不要安靜。
   const a = await supabase.from("profiles").update({
     name_zh: p.name_zh, name_en: p.name_en, team: p.team
-  }).eq("id", user.id);
+  }).eq("id", user.id).select("id");
   if (a.error) throw a.error;
+  if (!a.data || !a.data.length) throw new Error("profile_missing");
 
-  const b = await supabase.from("passports").update({
+  const upd = () => supabase.from("passports").update({
     motto: p.motto,
     updated_at: new Date().toISOString()
-  }).eq("id", user.id);
+  }).eq("id", user.id).select("id");
+  let b = await upd();
   if (b.error) throw b.error;
+  if (!b.data || !b.data.length) {
+    // 沒有 passports 那一列（用別的路變成幹部的人）：補一列再存一次。
+    await ensurePassport();
+    b = await upd();
+    if (b.error) throw b.error;
+    if (!b.data || !b.data.length) throw new Error("passport_missing");
+  }
 }
 
 // 大頭照是「這個人」的，不是「這本護照」的 —— 之後學員也會有大頭照，

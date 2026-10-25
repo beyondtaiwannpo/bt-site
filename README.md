@@ -3290,6 +3290,27 @@ Paul 2026-10-24：「蛇梯棋要讓 intern 看得到、有棋子、而且要彩
 
 **還沒驗的**：真的登入後的畫面與動畫（截圖是 `ui.js` 配假資料畫的；棋子沿著蛇梯飛那一段只在程式裡，沒有抓到截圖）；正式站要跑 `2026-10-22-intern-board.sql` 與 `2026-10-23-intern-pawn.sql` 兩支，跑完之前後台「棋盤」存檔會說要先跑那一支，intern 那邊看不到棋盤、跟以前一樣。
 
+## 護照「按儲存欄位清空、沒存」（2026-10-25，Alice 回報）
+
+**根因（本機重現，不是猜的）**：幹部有 `profiles` 那一列、**沒有 `passports` 那一列**的時候，`/passport/` 的申請表按儲存：
+`update profiles … where id = 自己` 影響 1 列（名字其實存進去了），`update passports … where id = 自己` 影響 **0 列而且 PostgREST 不報錯**；
+頁面重讀，`passport/src/data.js` 只在 passports 那一列存在時才組出 profile，所以又回到空的申請表。
+每按一次都一樣，而名單上看得到她的名字（名單讀 profiles 與 people）。
+passports 那一列只有 `claim_invite()`（拿碼升級成幹部那一刻）會建（2026-09-01 起註冊的 trigger 不再建）；用別的路變成幹部、或資料從別處種進來的人就沒有。
+同一種安靜的 0 列也會發生在 `profiles` 那一列不在的帳號（存什麼都是 0 列）。
+
+**修了三層**（`test/passport-save.test.mjs` 四條守著，`scripts/db/smoke.sh` 先重現再修）：
+1. `supabase/migrations/2026-11-04-passport-self-heal.sql`：補每一位 role 是 cadre 卻沒有 passports 列的人；加 `ensure_passport()`（登入的幹部叫一下，自己沒有就補）；PASS 表另印「有帳號但 profiles 沒有那一列」的人數。跟 11-02、11-03 互不相干。
+2. `passport/src/data.js`：profiles 那一列在就組得出 profile（`mergeProfile`，passports 不在就 motto 等是 null）；存檔兩句 update 都 `.select("id")` 把影響的列拿回來，**0 列就丟 `profile_missing` / `passport_missing`**，passports 0 列先叫 `ensure_passport()` 補再存一次。
+3. `passport/src/main.js`：開頁看到「幹部、有 profile、沒 passports」先補一列再讀一次；存失敗的 toast 分三種（沒有 profile 那一列、護照那一列補不出來、其他），兩種都叫人截圖給 Paul。
+
+**另外查過的**：`/settings/` 的存檔路沒有這個問題（錯誤會印在頁首，而且現在的程式不再送 `public_title`；10-25 跑在 push 之前那一段，舊瀏覽器送 `public_title` 會收到 42703 並印出來，不會安靜清空）；10-29 的 `claim_invite()` 會建 passports 列，但**不會把 people 的名字抄進 profiles**，所以剛拿碼進來的人護照先看到申請表、名單上卻有名字，那是預期的（他自己填一次）。
+
+**Paul 要幫 Alice 查的**（Supabase → Table editor）：
+- `profiles`：找 `name_zh = '潘荐綾'`（或用她的 email 在 Authentication 找 id）。看 `role` 是不是 `cadre`、`name_zh` / `name_en` / `team` 有沒有值（有值就表示她按儲存那幾次其實存進去了）。
+- `passports`：用那個 id 找，**沒有那一列就是這個 bug**；跑了 11-04 之後會補上，她重新整理就會看到護照。
+- 如果 `profiles` 根本沒有她那一列：那是另一種壞法（註冊的 trigger 沒建），11-04 的驗收表最後一行會印人數；那時把 id 給我。
+
 ## 名單三處修正與清掉多餘的指派（2026-11-03）
 
 Paul 2026-10-24 看名單與邀請頁的三件事，一筆 commit：

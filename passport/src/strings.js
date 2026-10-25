@@ -122,6 +122,8 @@ export const MINE = {
   "m.stamped":        { zh: "蓋好了。", en: "Stamped." },
   "m.updated":        { zh: "已更新。", en: "Updated." },
   "m.notSaved":       { zh: "沒有存起來，再試一次。", en: "Not saved. Try again." },
+  "m.noProfileRow":   { zh: "沒有存起來：資料庫裡找不到你這個人的那一列。把這句話截圖給 Paul。", en: "Not saved: your profile row is missing in the database. Send Paul a screenshot of this." },
+  "m.noPassportRow":  { zh: "沒有存起來：你的護照那一列補不出來。把這句話截圖給 Paul。", en: "Not saved: your passport row could not be created. Send Paul a screenshot of this." },
   "m.torn":           { zh: "撕掉了。", en: "Torn off." },
   "confirm.unstamp":  { zh: "撕掉這格？日期、心得和照片都會不見。", en: "Tear this off? The date, note and photo will be gone." },
   "m.needName":       { zh: "至少填一個名字", en: "Fill in at least one name" },

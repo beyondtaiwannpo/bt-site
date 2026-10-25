@@ -336,7 +336,12 @@ document.addEventListener("click", async e => {
       S.view = "passport"; S.page = 0;
       render();
       toast(T("m.issued"));
-    } catch (e) { toast(T("m.notSaved")); }
+    } catch (e) {
+      // 講清楚是哪一種沒存：0 列（沒有那一列或 RLS 擋掉）跟網路或權限錯誤是兩回事，讓 Paul 查得到。
+      const m = String(e && e.message || "");
+      console.error("存檔失敗。真正的原因：", e);
+      toast(m === "profile_missing" ? T("m.noProfileRow") : m === "passport_missing" ? T("m.noPassportRow") : T("m.notSaved"));
+    }
     return;
   }
 
@@ -523,6 +528,11 @@ export async function boot() {
     // 里程碑功能已於 2026-08-27 從前端移除（milestones 表還在資料庫裡，
     // 只是不再被讀取），但這個教訓——整包裝進去、不要手寫逐欄指派——
     // 對 destinations、visas 這些現在還在用的東西一樣成立。
+    // 2026-10-25（Alice）：幹部有 profiles、沒有 passports 那一列，畫面會一直停在申請表。開頁就補一列再讀一次。
+    if (all.role === "cadre" && all.profile && !all.hasPassport && !S.healed) {
+      S.healed = true;
+      try { await DATA.ensurePassport(); all = await DATA.loadAll(); } catch (e) { console.error("補護照那一列失敗。真正的原因：", e); }
+    }
     Object.assign(S, all);
     // active === false 的活動要濾掉。這一行留在這裡而不是搬進 data.js：
     // data.js 的職責是「把資料庫裡的東西拿回來」，要不要顯示是畫面的事。
