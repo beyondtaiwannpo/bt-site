@@ -1452,6 +1452,66 @@ else
   echo "  FAIL 活動那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
 fi
 
+
+echo "會議紀錄與排會（2026-11-02）："
+# 這時候：DIR 管 res:Marketing Team（不管 Curriculum）、PAUL Co-President、OTHER Senior Adviser、ISTAFF 是 Internship 的幹部、INT1 幹部沒有指派。
+psql -d "${DB}" -q -c "update public.profiles set tz='America/New_York' where id='${ISTAFF}';" >/dev/null
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-02-meetings.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   會議那支遷移檔跑過，驗收表全部 PASS（本機沒有 pg_cron，提醒靠 tick_mail）"; pass=$((pass+1))
+else
+  echo "  FAIL 會議那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+MT=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" \
+  -c "select public.schedule_meeting('Marketing Team','Marketing 週會','2027-03-01 02:00+00','2027-03-01 03:00+00','海報進度, 嘖嘖頁','https://docs.google.com/document/d/abc', array['${PAUL}','${ISTAFF}','${DIR}']::uuid[])" 2>&1 | tail -1 | tr -d ' \n' || true)
+case "${MT}" in ????????-*) echo "  ok   Marketing 的 Director 排了一場 team 會議（${MT}）"; pass=$((pass+1));; *) echo "  FAIL 排會失敗：${MT}"; fail=$((fail+1));; esac
+chk "★ 會議存對：範圍、標題、三位出席、都還沒回" "MarketingTeam|Marketing週會|3|3" \
+  "select m.scope||'|'||m.title||'|'||(select count(*) from public.meeting_attendees a where a.meeting_id=m.id)||'|'||(select count(*) from public.meeting_attendees a where a.meeting_id=m.id and a.status='invited') from public.meetings m where m.id='${MT}'"
+chk "★ 三封邀請信，每一封附 .ics（VCALENDAR、UID、DTSTART 是 UTC Z、SUMMARY）" "3|true|true|true|true" \
+  "select count(*)||'|'||bool_and(ics like 'BEGIN:VCALENDAR'||E'\r\n'||'%')||'|'||bool_and(ics like '%UID:meeting-${MT}@beyondtaiwannpo.com%')||'|'||bool_and(ics like '%DTSTART:20270301T020000Z%')||'|'||bool_and(ics like '%SUMMARY:Marketing 週會%') from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}'"
+chk "★ 信裡的時間照收信的人的時區：ISTAFF 是紐約（02:00Z = 前一天 21:00）、PAUL 台北 10:00" "true|true" \
+  "select (select body like '%2027-02-28 21:00–22:00（America/New_York）%' from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}' and to_email='istaff@example.com')||'|'||(select body like '%2027-03-01 10:00–11:00（Asia/Taipei）%' from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}' and to_email='paul@example.com')"
+chk "信裡有議程、Drive 連結、回覆連結、不要回覆" "true|true|true|true" \
+  "select bool_and(body like '%海報進度, 嘖嘖頁%')||'|'||bool_and(body like '%https://docs.google.com/document/d/abc%')||'|'||bool_and(body like '%/availability/?meeting=${MT}%')||'|'||bool_and(body like '%不要回覆這封信%') from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}'"
+chk "ics 的逗號有跳脫（DESCRIPTION 裡的「, 」變成「\\,」）" "t" "select position(E'\\\\,' in ics) > 0 from public.mail_outbox where kind='meeting_invite' and meeting_id='${MT}' limit 1"
+chkraise "★ 破壞測試：沒有「管」任何 team 的幹部（ISTAFF）排不了會（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.schedule_meeting('board','x','2027-03-02 02:00+00','2027-03-02 03:00+00','','',array['${ISTAFF}']::uuid[]);"
+chkraise "★ 破壞測試：Director 排不了別的 team 的會（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${DIR}',true); perform public.schedule_meeting('Curriculum Team','x','2027-03-02 02:00+00','2027-03-02 03:00+00','','',array['${DIR}']::uuid[]);"
+chkraise "★ Director 排不了整個 BT 的會（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${DIR}',true); perform public.schedule_meeting('board','x','2027-03-02 02:00+00','2027-03-02 03:00+00','','',array['${DIR}']::uuid[]);"
+chkraise "Drive 以外的紀錄連結擋（bad_doc_url）" "bad_doc_url" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_meeting(null,'board','x','2027-03-02 02:00+00','2027-03-02 03:00+00','','https://notion.so/x',array['${PAUL}']::uuid[]);"
+chkraise "結束要在開始之後（bad_time）" "bad_time" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_meeting(null,'board','x','2027-03-02 03:00+00','2027-03-02 02:00+00','','',array['${PAUL}']::uuid[]);"
+chkas "${ISTAFF}" "★ 出席的人回「會到」" "accepted" "select public.set_rsvp('${MT}','accepted')"
+chkraise "★ 不在名單上的人回不了（not_invited）" "not_invited" \
+  "perform set_config('test.uid','${INT1}',true); perform public.set_rsvp('${MT}','accepted');"
+chkas "${DIR}" "改名單：拿掉 PAUL、加 OTHER；ISTAFF 回過的保留" "${MT}" \
+  "select public.save_meeting('${MT}','Marketing Team','Marketing 週會','2027-03-01 02:00+00','2027-03-01 03:00+00','海報進度','https://docs.google.com/document/d/abc', array['${ISTAFF}','${DIR}','${OTHER}']::uuid[])"
+chk "名單換了、ISTAFF 還是 accepted" "accepted|false|true" \
+  "select (select status from public.meeting_attendees where meeting_id='${MT}' and user_id='${ISTAFF}')||'|'||exists(select 1 from public.meeting_attendees where meeting_id='${MT}' and user_id='${PAUL}')||'|'||exists(select 1 from public.meeting_attendees where meeting_id='${MT}' and user_id='${OTHER}')"
+chkrole authenticated "${ISTAFF}" "★ 會議紀錄全部幹部看得到（沒被派進任何工作區的也看得到）" "1" "select count(*) from public.meetings"
+mgot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.meetings;" 2>&1 || true)
+if echo "${mgot}" | grep -qi "permission denied"; then echo "  ok   沒登入讀不到 meetings 表"; pass=$((pass+1)); else echo "  FAIL anon 讀得到 meetings：${mgot}"; fail=$((fail+1)); fi
+# 提醒：一場兩小時後開的會 → tick_mail 排了兩封；再叫一次不會再排。
+MT2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.schedule_meeting('board','Board 臨時會', now() + interval '2 hours', now() + interval '3 hours','','', array['${PAUL}','${OTHER}']::uuid[])" 2>&1 | tail -1 | tr -d ' \n' || true)
+psql -d "${DB}" -q -c "select set_config('test.uid','${OTHER}',false); select public.set_rsvp('${MT2}','declined');" >/dev/null 2>&1
+chkas "${PAUL}" "★ tick_mail 排了提醒：兩位出席、一位說不能到，所以 1 封" "1" "select public.tick_mail()"
+chk "提醒信是 meeting_reminder、附 ics、那一場記了 reminded_at" "1|true|true" \
+  "select count(*)||'|'||bool_and(ics is not null)||'|'||(select reminded_at is not null from public.meetings where id='${MT2}') from public.mail_outbox where kind='meeting_reminder' and meeting_id='${MT2}'"
+chkas "${PAUL}" "再叫一次不會再排" "0" "select public.tick_mail()"
+chkraise "★ 校友叫不了 tick_mail（not_cadre）" "not_cadre" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.tick_mail();"
+chkas "${DIR}" "刪掉那一場（Director 自己 team 的）" "deleted" "select public.delete_meeting('${MT}')"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-02-meetings.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then
+  echo "  ok   會議那支可以重跑"; pass=$((pass+1))
+else
+  echo "  FAIL 會議那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1))
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
