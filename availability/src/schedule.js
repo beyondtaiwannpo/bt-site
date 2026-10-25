@@ -4,6 +4,8 @@ import { esc } from "./ui.js";
 import { T } from "./strings.js";
 
 export const SCOPE_BOARD = "board";
+// 職級的兩個字母（跟後台成員區同一張表：CP SA DR AD AS）。
+export const RANK_TAG = { president: "CP", senior_adviser: "SA", director: "DR", adviser: "AD", member: "AS" };
 export const parseTeams = raw => String(raw || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
 // 我能排哪些範圍：senior 全部（整個 BT 加六個 team）；其他人是自己資源工作區「管」的那幾個 team。ws 是 my_access() 回的 { 工作區: 等級 }。
 export function scopesFor(senior, ws, teams) {
@@ -20,7 +22,8 @@ export function scheduleHTML(sch, ctx, busy) {
   const dis = busy ? " disabled" : "";
   const ticked = new Set(d.ticked);
   const list = shown(ctx.members, d.q);
-  const row = m => `<label class="check sch-row"><input type="checkbox" name="sch-member" value="${esc(m.id)}" data-act="sch-tick"${ticked.has(m.id) ? " checked" : ""}${dis}><span>${esc(m.name)}${m.alt ? `<span class="alt">${esc(m.alt)}</span>` : ""}${ctx.free.includes(m.id) ? ` <span class="mini">${T("sch.isFree")}</span>` : ""}</span></label>`;
+  // 一列：☑ 中文名 (English) · 職級標 · team 淡字（· 有空），全部同一行、靠左，跟後台的成員區一樣。
+  const row = m => `<label class="check sch-row"><input type="checkbox" name="sch-member" value="${esc(m.id)}" data-act="sch-tick"${ticked.has(m.id) ? " checked" : ""}${dis}><b>${esc(m.name)}</b>${m.alt ? `<span class="alt">${esc(m.alt)}</span>` : ""}<span class="rk">${RANK_TAG[m.board_role] || "AS"}</span>${parseTeams(m.team).map(t => `<span class="mini">${esc(t.replace(/\s*Team$/i, ""))}</span>`).join(" ")}${ctx.free.includes(m.id) ? `<span class="mini free">${T("sch.isFree")}</span>` : ""}</label>`;
   return `<div class="sch" id="sch">
     <h3>${T("sch.title")}</h3>
     <div class="sub">${esc(ctx.when)}</div>

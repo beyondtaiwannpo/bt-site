@@ -267,8 +267,16 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 .sch-who > i{display:block;font-style:normal;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,42,134,.7);margin-bottom:6px}
 .sch-who .row input{flex:1;min-width:120px}
 .sch-list{max-height:40vh;overflow:auto;border:1px solid rgba(16,42,134,.14);border-radius:12px;padding:4px 10px;background:rgba(255,255,255,.5);margin-top:6px}
-.sch-row{display:flex;flex-direction:row;align-items:center;gap:10px;margin:0;padding:5px 0}
-.sch-row input[type="checkbox"]{margin:0;flex:none}
+.sch-row{display:flex;flex-direction:row;align-items:center;gap:8px;margin:0;padding:6px 0;min-height:36px;white-space:nowrap;text-align:left;justify-content:flex-start;border-bottom:1px solid rgba(16,42,134,.07)}
+.sch-row:last-child{border-bottom:0}
+.sch-row input[type="checkbox"]{margin:0;flex:none;width:16px;height:16px;accent-color:var(--bt-navy)}
+.sch-row b{font-weight:600;flex:0 0 auto}
+.sch-row .alt{margin-left:0}
+.sch-row .mini{font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sch-row .mini.free{color:var(--bt-navy);font-weight:600}
+/* 職級的兩個字母（跟後台一樣的樣子，規則抄一份，資料夾之間不 import）。 */
+.rk{flex:none;font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1;padding:3px 5px;border:1px solid rgba(16,42,134,.35);border-radius:5px;color:var(--bt-navy)}
+@media (max-width:480px){ .sch .two{grid-template-columns:1fr} .sch-row{white-space:normal;flex-wrap:wrap;row-gap:2px} }
 .wnote.err{border-left:3px solid var(--bt-orange)}
 .rsvp{margin:0 0 18px;padding:14px 16px;border:1px solid var(--bt-orange);border-radius:14px;background:rgba(255,232,197,.45)}
 .rsvp h3{margin:0 0 2px}

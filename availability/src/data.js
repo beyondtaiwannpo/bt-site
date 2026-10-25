@@ -31,7 +31,7 @@ export function namesOf(p) {
 export async function loadAll() {
   if (!supabase) throw new Error(authMessage(null));
   const [pf, av, mt, wk, wm] = await Promise.all([
-    supabase.from("profiles").select("id, name_zh, name_en, team, tz").eq("role", "cadre"),
+    supabase.from("profiles").select("id, name_zh, name_en, team, tz, board_role").eq("role", "cadre"),
     supabase.from("availability").select("user_id, weekday, minute"),
     supabase.from("availability_meta").select("user_id, updated_at, notice_seen_at"),
     supabase.from("availability_week").select("user_id, week_start, weekday, minute"),
@@ -74,6 +74,7 @@ export async function loadAll() {
     id: p.id,
     ...namesOf(p),
     team: p.team || "",
+    board_role: p.board_role || "member",
     tz: p.tz || null,
     updatedAt: meta.get(p.id) ? meta.get(p.id).updated_at : null,
     noticeSeenAt: meta.get(p.id) ? meta.get(p.id).notice_seen_at : null,

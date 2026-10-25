@@ -61,11 +61,13 @@ test("總覽的卡：我在名單上、還沒開的下一場；沒有就沒有�
 });
 
 test("看板上排一場會：有空的人預勾、找名字、全勾只勾篩出來的、送出鈕算人數；彈窗只給能排的人那顆按鈕", () => {
-  const members = [{ id: "u1", name: "王平", alt: "Paul" }, { id: "u2", name: "小安", alt: "Ann" }, { id: "u5", name: "雅婷", alt: "Tina" }];
+  const members = [{ id: "u1", name: "王平", alt: "Paul", board_role: "president", team: "" }, { id: "u2", name: "小安", alt: "Ann", board_role: "member", team: "Curriculum Team" }, { id: "u5", name: "雅婷", alt: "Tina", board_role: "director", team: "Marketing Team, Sponsorship Team" }];
   const ctx = { scopes: ["Marketing Team"], members, free: ["u1", "u2"], when: "星期一 10:00" };
   const h = SCH.scheduleHTML({ ticked: ["u1", "u2"], q: "", title: "BT 會議", minutes: 60 }, ctx, false);
-  assert.match(h, /value="u1" data-act="sch-tick" checked/); assert.match(h, /value="u5" data-act="sch-tick">/);
-  assert.match(h, /<span class="mini">有空<\/span>/);
+  assert.match(h, /value="u1" data-act="sch-tick" checked><b>王平<\/b><span class="alt">Paul<\/span><span class="rk">CP<\/span><span class="mini free">有空<\/span>/, "一列：名字、英文、職級標、有空");
+  assert.match(h, /value="u5" data-act="sch-tick"><b>雅婷<\/b><span class="alt">Tina<\/span><span class="rk">DR<\/span><span class="mini">Marketing<\/span> <span class="mini">Sponsorship<\/span>/, "team 淡字不帶 Team 那個字");
+  assert.match(readFileSync("availability/index.html", "utf8"), /\.sch-row\{display:flex;flex-direction:row;align-items:center/, "一列同一行靠左（看板自己的 CSS，不 import admin）");
+  assert.match(readFileSync("availability/src/data.js", "utf8"), /select\("id, name_zh, name_en, team, tz, board_role"\)/, "名單帶職級");
   assert.match(h, /data-act="sch-send">排會並寄邀請（2 人）<\/button>/);
   assert.match(h, /<option value="60" selected>60<\/option>/);
   assert.deepEqual(SCH.shown(members, "tina").map(m => m.id), ["u5"]);
