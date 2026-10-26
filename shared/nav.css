@@ -59,7 +59,7 @@
 .btnav-items{display:flex;gap:4px;min-width:0}
 .btnav-items a{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.04em;
   color:var(--ink);text-decoration:none;padding:6px 9px;border-bottom:2px solid transparent;
-  opacity:.72;white-space:nowrap}
+  opacity:.72;white-space:nowrap;transition:opacity var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
 .btnav-items a:hover{opacity:1}
 /* 當前所在：橘色底線、全深。 */
 .btnav-items a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
@@ -97,12 +97,12 @@
   box-sizing:border-box;padding:0 14px;min-height:38px;line-height:1;
   display:inline-flex;align-items:center;justify-content:center;
   cursor:pointer;flex:none;position:relative;white-space:nowrap;
-  transition:background .15s,border-color .15s}
+  transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
 .btnav-out:hover,.btnav-burger:hover{border-color:var(--ink);background:rgba(255,255,255,.7)}
 /* 可點區域 44x44，視覺大小不變。跟對外頁同一個做法。 */
 .btnav-logo::after,.btnav-out::after{
   content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
-.btnav :focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
+.btnav :focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 /* ── 選單（2026-09-10）────────────────────────────────────────────
    寬螢幕上這兩個東西根本不存在，那排連結就是頂欄的一部分，跟以前一模一樣。
    ⚠ 這一條要排在上面那份共用樣式**後面**，不然 display 蓋不掉。 */
@@ -132,7 +132,7 @@
     opacity:0;pointer-events:none;margin:0}
   .btnav-toggle:checked ~ .btnav-burger{background:var(--bt-navy);color:var(--bt-cream);
     border-color:var(--bt-navy)}
-  .btnav-toggle:focus-visible ~ .btnav-burger{outline:2px solid var(--bt-navy);outline-offset:3px}
+  .btnav-toggle:focus-visible ~ .btnav-burger{outline:var(--ring);outline-offset:var(--ring-gap)}
   /* 收起來是預設；打勾才展開。 */
   .btnav-items{display:none}
   .btnav-toggle:checked ~ .btnav-items{display:flex}

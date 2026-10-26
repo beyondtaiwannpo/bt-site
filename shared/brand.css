@@ -69,4 +69,38 @@
   --hand:"Iansui", "Klee One", "PingFang TC", cursive;        /* Alumni 引言，只用在這一個地方 */
 
   --r:3px;
+
+  /* ── 動態 token（2026-11-05 視覺收尾）──
+     全站每一個 transition 都讀這三個時間與這一條 easing，不再各頁各寫 .15s / .16s / .18s。
+     --dur-1 是顏色一閃、--dur-2 是滑過與浮起、--dur-3 是捲到才出現那種進場。
+     reduce（使用者開了「減少動態效果」）時三個全部歸零，過渡立刻發生，
+     各頁的 reduce 區塊照舊還在，這裡只是多一層保險。
+     ⚠ 按下去那一下的縮小**刻意沒有過渡**（2026-09-08 的決定，見各頁「點下去要有回饋」），
+     所以這三個 token 不要套到 :active 上。 */
+  --dur-1:120ms;
+  --dur-2:200ms;
+  --dur-3:360ms;
+  --ease:cubic-bezier(.2,.7,.2,1);
+  /* 鍵盤聚焦環：全站同一條，2px 深藍實線、離元件 3px。深藍在米白上 9.9:1，
+     在白上 12.4:1，過 WCAG 2.2 焦點外觀的 3:1。橘色只有 1.6:1，不能當焦點環。 */
+  --ring:2px solid var(--bt-navy);
+  --ring-gap:3px;
+}
+
+/* ── 全站互動地基（2026-11-05）──
+   這一段是檔頭說的「不放版面」的唯一例外，理由寫在這裡：
+   下面四條都不是按鈕、卡片或格線，是「任何頁面都該一樣」的無障礙與瀏覽器層級行為。
+   各頁自己再寫一次等於二十二份會慢慢不一樣的副本（聚焦環 2026-11-05 之前就已經是 2px 與 3px 兩種）。 */
+/* 1. 鍵盤聚焦環。各頁有 #bt-root :focus-visible 的照舊，但一律讀上面那兩個 token。 */
+:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+/* 2. 選取文字：橘底深藍字（7.9:1）。 */
+::selection{background:var(--bt-orange);color:var(--bt-navy)}
+/* 3. 換頁時淡入淡出（View Transitions API）。只有這一行，不支援的瀏覽器照舊換頁。
+   不加 view-transition-name，只用整頁的淡出淡入，玻璃頂欄與島都不另外指定。 */
+@view-transition{navigation:auto}
+/* 4. reduce：過渡歸零、換頁不淡。顏色的過渡不是前庭刺激來源，但歸零最單純，
+   而且跟各頁 *{transition:none} 那條一致。 */
+@media (prefers-reduced-motion:reduce){
+  :root{--dur-1:0ms;--dur-2:0ms;--dur-3:0ms}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
 }
