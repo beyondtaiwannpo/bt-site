@@ -99,7 +99,7 @@ main,.topbar{position:relative;z-index:1}
 .skip{position:absolute;left:-9999px;top:0;z-index:80;
   background:var(--bt-navy);color:var(--bt-cream);padding:12px 18px;text-decoration:none}
 .skip:focus{left:0}
-:focus-visible{outline:2px solid var(--bt-navy);outline-offset:3px}
+:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 /* 島上的點與落點是 SVG 群組，瀏覽器預設的 outline 會框出一個**長方形**，
    而且把旁邊的學校名字一起框進去，看起來像選到了一格表格。
    ⚠ 要連 :focus 一起擋，不能只擋 :focus-visible ——
@@ -159,21 +159,21 @@ main,.topbar{position:relative;z-index:1}
 .topbar .home img{height:30px;width:auto;display:block}
 .navlinks{display:flex;align-items:center;gap:clamp(12px,1.8vw,28px)}
 .navlinks a{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;
-  padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;opacity:.74}
+  padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;transition:opacity var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease);opacity:.74}
 .navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
 .navlinks a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
 /* 中英兩份都在 HTML 裡，沒有 JavaScript 時兩份都讀得到。 */
 html[data-lang="zh"] .en,html[data-lang="en"] .zh{display:none}
 .lang{min-width:44px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.12em;
   border:1px solid rgba(16,42,134,.32);border-radius:999px;padding:6px 13px;background:none;
-  color:var(--ink);cursor:pointer;line-height:1;position:relative}
+  color:var(--ink);cursor:pointer;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease);line-height:1;position:relative}
 .lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
 .lang::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
 
 .login{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
   font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px;white-space:nowrap;
-  line-height:1;position:relative}
-.login:hover{background:var(--bt-orange);color:var(--bt-navy)}
+  line-height:1;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease);position:relative}
+.login:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
 /* 頂欄那顆按鈕在窄螢幕上只講一種語言（2026-09-08）。
    Paul 回報「選單跑掉了」：登入之後那顆按鈕的字從「登入 / Sign in」變成
    「我的 BT 帳號 / Account」，加上 logo、語言鈕、選單鈕，在 390px 的手機上
@@ -326,7 +326,7 @@ h1{font-family:var(--han);font-weight:900;font-size:clamp(30px,4.6vw,68px);
 img.avatar{object-fit:cover}
 .who .meta{margin:0}
 .who .meta b{display:block;font-size:19px;font-weight:600;color:var(--ink);margin-bottom:3px}
-.who .meta span{display:block;font-size:14px;color:rgba(16,42,134,.62)}
+.who .meta span{display:block;font-size:14px;color:rgba(16,42,134,.72)}
 
 /* 一段介紹。放在引言下面 —— 先聽他自己說，再看他是誰。 */
 .note{font-size:15.5px;line-height:1.75;color:rgba(16,42,134,.78);
@@ -338,7 +338,7 @@ img.avatar{object-fit:cover}
    跟其他到處都是的網頁一模一樣（見 docs/2026-09-07-官網視覺方向.md 要避開的套路）。
    它現在直接坐在紙上。 */
 .card{margin:clamp(22px,4vh,44px) var(--gut) 0;max-width:660px;min-height:184px}
-.card .meta{font-size:13.5px;letter-spacing:.02em;color:rgba(16,42,134,.62);margin:0 0 14px}
+.card .meta{font-size:13.5px;letter-spacing:.02em;color:rgba(16,42,134,.72);margin:0 0 14px}
 .card .meta b{color:var(--ink);font-weight:600}
 /* 這一句是整頁的重點。Iansui 是 Brand Book 指定給「故事分享與引言」的手寫體。 */
 .card .quote{font-family:var(--hand);font-size:clamp(20px,2.3vw,30px);line-height:1.6;
