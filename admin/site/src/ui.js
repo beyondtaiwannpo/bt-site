@@ -676,30 +676,40 @@ export function mailListHTML(items, msg) {
 // 這一頁的價值在預覽：代換符號打錯不會壞掉，只會空著，
 // 而預覽是唯一會當場讓人看到「我把 {姓名} 打成 {名字} 了」的東西。
 // 範例的名字與活動名稱、面試那一段加的連結文字，都是信裡真的會出現的中文，不跟著後台的語言翻。
-export function mailEditHTML(kind, t, msg, busy) {
+// prev = { lang: "zh"|"en", w: 600|375 }（預覽看哪一種語言、多寬）。
+export function mailEditHTML(kind, t, msg, busy, prev) {
   const k = kindOf(kind);
   const NAME = "陳小安", TITLE = "2027 暑期探索營";
+  // 預覽預設照後台現在的語言看（切成英文的人先看英文版），可以再用 chip 換。
+  const pv = Object.assign({ lang: lang() === "en" ? "en" : "zh", w: 600 }, prev || {});
   const subject = t ? t.subject : "";
   const body = t ? t.body : "";
-  const extra = kind === "interview" ? "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/..." : "";
+  const subjectEn = (t && t.subject_en) || "", bodyEn = (t && t.body_en) || "";
+  const btnZh = (t && t.button_label) || "", btnEn = (t && t.button_label_en) || "";
+  const extra = kind === "interview" ? (pv.lang === "en" ? "\n\nPick a time that suits you:\nhttps://cal.com/..." : "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/...") : "";
   const isInvite = kind === "invite", isRequest = kind.startsWith("request_"), isMeeting = kind.startsWith("meeting_");
   const fill = s => isInvite ? fillInvite(s) : isRequest ? fillRequest(s) : isMeeting ? fillMeeting(s) : fillMail(s, NAME, TITLE);
   return pageHead(esc(T(k.label)), esc(T("mail.editLede", { when: T(k.when) })), [], { act: "mail-back", label: T("mail.back") })
     + msgHTML(msg)
     + `<div class="cols">` + sectionHTML("", `<label><i>${T("mail.subjectLabel")}</i><input id="msub" value="${esc(subject)}"></label>
     <label><i>${T("mail.body")}</i><textarea id="mbody" style="min-height:230px">${esc(body)}</textarea></label>
+    <label><i>${T("mail.button")}</i><input id="mbtn" value="${esc(btnZh)}" placeholder="${esc(mailButtonLabel(kind, "zh"))}"></label>
     <div class="mini" style="margin:-6px 0 14px">
       ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
+    <details class="fold"><summary><span class="chev" aria-hidden="true"></span><b>${T("mail.enTitle")}</b><span class="mini">${T("mail.enHint")}</span></summary><div class="fold-body">
+    <label><i>${T("mail.subjectEn")}</i><input id="msub-en" value="${esc(subjectEn)}"></label>
+    <label><i>${T("mail.bodyEn")}</i><textarea id="mbody-en" style="min-height:180px">${esc(bodyEn)}</textarea></label>
+    <label><i>${T("mail.buttonEn")}</i><input id="mbtn-en" value="${esc(btnEn)}" placeholder="${esc(mailButtonLabel(kind, "en"))}"></label></div></details>
 
     <div class="form-foot">
       <button class="btn" data-act="mail-save" data-k="${esc(kind)}" ${busy ? "disabled" : ""}>${
         busy ? T("common.saving") : T("common.save")}</button>
     </div>`)
     + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : isRequest ? T("mail.sampleRequest", { name: esc(REQUEST_SAMPLE.requester), title: esc(REQUEST_SAMPLE.title) }) : isMeeting ? T("mail.sampleMeeting", { name: esc(MEETING_SAMPLE.name), title: esc(MEETING_SAMPLE.title) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
-    <div class="mailprev"><b>${esc(fill(subject)) || T("mail.noSubjectPrev")}</b><pre>${
-      esc(fill(body) + extra)}</pre><pre class="tail">${esc(mailTail(kind))}</pre></div>
+    <div class="chips" style="margin-bottom:8px"><button class="chip${pv.lang === "zh" ? " on" : ""}" data-act="mail-prev-lang" data-v="zh">${T("mail.langZh")}</button><button class="chip${pv.lang === "en" ? " on" : ""}" data-act="mail-prev-lang" data-v="en">${T("mail.langEn")}</button><span class="sp"></span><button class="chip${pv.w === 600 ? " on" : ""}" data-act="mail-prev-w" data-v="600">${T("mail.desktop")}</button><button class="chip${pv.w === 375 ? " on" : ""}" data-act="mail-prev-w" data-v="375">${T("mail.phone")}</button></div>
+    <iframe class="mailframe" title="${esc(T("mail.previewTitle"))}" style="width:${pv.w}px" srcdoc="${esc(mailHtml({ kind, lang: pv.lang, subject: fill(pv.lang === "en" && subjectEn ? subjectEn : subject), body: fill(pv.lang === "en" && bodyEn ? bodyEn : body) + (pv.lang === "en" ? "" : extra), buttonLabel: pv.lang === "en" ? btnEn : btnZh, buttonUrl: MAIL_SAMPLE_URL[kind] || "https://beyondtaiwannpo.com/apply/" }))}"></iframe>
     <div class="mini" style="margin:6px 0 0">
-      ${T("mail.tailNote")}</div>`) + `</div>`;
+      ${T("mail.layoutNote")}</div>`) + `</div>`;
 }
 
 // 學員或還沒升級的人走到這裡。**不說「你沒有權限」**：他沒有做錯任何事，只是走錯地方。
@@ -711,4 +721,45 @@ export function notCadreHTML() {
 export function downHTML(err) {
   return pageHead(T("down.title"), T("down.lede"), [{ act: "retry", label: T("common.retry") }])
     + (err ? `<div class="mini">${esc(T("down.detail"))}${esc(err)}</div>` : "");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 信長什麼樣（2026-11-05）：純文字包成 HTML 的版型。**跟資料庫的 mail_html() 同一個形狀**（test/mail-layout.test.mjs 比對記號），
+// 這一份只給後台的即時預覽；真的寄出去的是資料庫那一份。
+// ═══════════════════════════════════════════════════════════════════════
+export const MAIL_PHOTOS = { invite: "group-photo.jpg", meeting_invite: "talking-laptop.jpg", meeting_reminder: "talking-laptop.jpg", request_new: "sharing-mic.jpg", request_done: "sharing-mic.jpg", guardian: "hero-listening.jpg", accepted: "three-at-laptop.jpg" };
+export const MAIL_BUTTON = {
+  invite: { zh: "接受邀請", en: "Accept invitation" }, meeting_invite: { zh: "回覆出席", en: "Reply" }, meeting_reminder: { zh: "回覆出席", en: "Reply" },
+  request_new: { zh: "打開需求單", en: "Open request" }, request_done: { zh: "看回覆", en: "Open request" }, interview: { zh: "挑一個時段", en: "Pick a time" },
+};
+export const MAIL_SAMPLE_URL = {
+  invite: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", meeting_invite: "https://beyondtaiwannpo.com/availability/?meeting=9f2c…", meeting_reminder: "https://beyondtaiwannpo.com/availability/?meeting=9f2c…",
+  request_new: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", request_done: "https://beyondtaiwannpo.com/admin/#request/9f2c…", interview: "https://cal.com/beyondtaiwan/interview",
+};
+export function mailButtonLabel(kind, lang, custom) {
+  if (custom && String(custom).trim()) return String(custom).trim();
+  const d = MAIL_BUTTON[kind];
+  return d ? d[lang === "en" ? "en" : "zh"] : (lang === "en" ? "Open Beyond Taiwan" : "打開 Beyond Taiwan");
+}
+export function mailHtml(o) {
+  const lang = o.lang === "en" ? "en" : "zh", kind = o.kind || "", url = o.buttonUrl || "";
+  const hero = "https://beyondtaiwannpo.com/photos/" + (MAIL_PHOTOS[kind] || "hero-listening.jpg");
+  const label = mailButtonLabel(kind, lang, o.buttonLabel);
+  const paras = String(o.body || "").split(/\n\s*\n/).map(p => p.trim()).filter(p => p && !(url && p === url))
+    .map(p => `<p style="margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.7;color:#102A86;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+  const contact = kind === "guardian"
+    ? (lang === "en" ? "This email is for your information; no reply or signature is needed. Questions: beyondtaiwan2020@gmail.com" : "這封信是告知，不需要回覆或簽名。有任何問題請寄到 beyondtaiwan2020@gmail.com。")
+    : (lang === "en" ? "Please do not reply to this email; nobody reads this mailbox. Questions: beyondtaiwan2020@gmail.com" : "不要回覆這封信，這個信箱沒有人看。有問題請寄到 beyondtaiwan2020@gmail.com。");
+  return `<!doctype html><html lang="${lang === "en" ? "en" : "zh-Hant"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(o.subject)}</title>`
+    + `<style>@media only screen and (max-width:620px){.bt-wrap{width:100%!important}.bt-pad{padding:20px!important}.bt-btn{display:block!important;width:100%!important;box-sizing:border-box!important}}</style>`
+    + `</head><body style="margin:0;padding:0;background:#EDE5D8;">`
+    + `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#EDE5D8;"><tr><td align="center" style="padding:24px 12px;">`
+    + `<table role="presentation" class="bt-wrap" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:16px;overflow:hidden;">`
+    + `<tr><td align="left" style="padding:24px 32px 8px;"><img src="https://beyondtaiwannpo.com/shared/logo.png" width="140" alt="Beyond Taiwan" style="display:block;width:140px;height:auto;border:0;"></td></tr>`
+    + `<tr><td style="padding:0;"><img src="${hero}" width="600" alt="" style="display:block;width:100%;height:auto;border:0;"></td></tr>`
+    + `<tr><td class="bt-pad" style="padding:28px 32px 8px;"><h1 style="margin:0 0 16px;font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;font-size:30px;line-height:1.15;font-weight:700;color:#102A86;">${esc(o.subject)}</h1>${paras}</td></tr>`
+    + (url ? `<tr><td class="bt-pad" align="left" style="padding:8px 32px 28px;"><a class="bt-btn" href="${esc(url)}" style="display:inline-block;background:#FFC46C;color:#102A86;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;line-height:48px;height:48px;padding:0 32px;border-radius:999px;">${esc(label)}</a>`
+      + `<p style="margin:12px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#6B6B6B;word-break:break-all;">${esc(url)}</p></td></tr>` : "")
+    + `<tr><td class="bt-pad" style="padding:20px 32px 28px;border-top:1px solid #C6C6C6;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B6B6B;">${contact}<br>Beyond Taiwan · beyondtaiwannpo.com</td></tr>`
+    + `</table></td></tr></table></body></html>`;
 }

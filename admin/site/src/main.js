@@ -42,7 +42,7 @@ function render() {
   if (S.view === "mail") {
     body = UI.mailListHTML(S.tpls, S.msg);
   } else if (S.view === "mail-edit") {
-    body = UI.mailEditHTML(S.tplKind, S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy);
+    body = UI.mailEditHTML(S.tplKind, S.tplDraft || S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy, S.mailPrev);
   } else if (S.view === "team") {
     body = UI.publicTeamHTML(S.people, S.msg, S.busy);
   } else if (S.view === "stories") {
@@ -91,6 +91,13 @@ async function openTab(want) {
   else if (want === "stories" && isPres()) await openStories();
   else if (want === "mail" && isPres()) await openMail();
   else await openRes();
+}
+// 信件文案那一頁的六格讀成一個物件（切換預覽重畫前先收起來，不然打到一半的字會不見）。
+function readMailForm() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  if (val("msub") === undefined) return S.tplDraft || {};
+  S.tplDraft = { kind: S.tplKind, subject: val("msub").trim(), body: val("mbody").trim(), subject_en: (val("msub-en") || "").trim(), body_en: (val("mbody-en") || "").trim(), button_label: (val("mbtn") || "").trim(), button_label_en: (val("mbtn-en") || "").trim() };
+  return S.tplDraft;
 }
 async function openMail() {
   S.busy = true; render();
@@ -220,15 +227,15 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "mail-back") { await openMail(); return; }
-  if (act === "mail-edit") { S.tplKind = b.dataset.k; S.view = "mail-edit"; S.msg = ""; render(); return; }
+  if (act === "mail-edit") { S.tplKind = b.dataset.k; S.tplDraft = null; S.view = "mail-edit"; S.msg = ""; render(); return; }
+  if (act === "mail-prev-lang" || act === "mail-prev-w") { S.mailPrev = Object.assign({ lang: "zh", w: 600 }, S.mailPrev, act === "mail-prev-lang" ? { lang: b.dataset.v } : { w: +b.dataset.v }); readMailForm(); render(); return; }
   if (act === "mail-save") {
-    const sub = document.getElementById("msub").value.trim();
-    const body = document.getElementById("mbody").value.trim();
-    if (!sub || !body) { S.msg = T("err.mailBoth"); render(); return; }
+    const t = readMailForm();
+    if (!t.subject || !t.body) { S.msg = T("err.mailBoth"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
-      await D.saveTemplate(b.dataset.k, sub, body);
-      S.tpls = await D.loadTemplates();
+      await D.saveTemplate(b.dataset.k, t);
+      S.tpls = await D.loadTemplates(); S.tplDraft = null;
       S.busy = false; S.msg = T("msg.tplSaved");
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render();

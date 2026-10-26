@@ -1557,6 +1557,51 @@ chk "學員沒有護照" "0" "select count(*) from public.passports where id='${
 rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-04-passport-self-heal.sql 2>&1 || true)
 if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then echo "  ok   補護照那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 補護照那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
 
+
+echo "信長什麼樣（2026-11-05）："
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-05-email-layout.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   信的版型那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 信的版型那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "★ 雙語模板自動拆成中英兩份（邀請、需求單兩封、會議兩封）" "5|5" \
+  "select count(*) filter (where body_en is not null)||'|'||count(*) filter (where subject_en is not null) from public.mail_templates where kind in ('invite','request_new','request_done','meeting_invite','meeting_reminder')"
+chk "拆完中文那一份不再含英文段落" "f" "select body like '%Hi {name}%' from public.mail_templates where kind='invite'"
+# 每一種信各排一封（帶 <b> 的使用者字），包起來看按鈕與跳脫。排信的函式沒動，直接種 outbox 列。
+psql -d "${DB}" -q -c "insert into public.mail_outbox (to_email, subject, body, kind, invite_code, request_id, meeting_id, application_id, form_id) values
+ ('r1@example.com','BT 邀請　Invite','<b>名字</b> 你好，'||E'\n\n'||'https://beyondtaiwannpo.com/app/?invite=bt-zz'||E'\n\n'||'Hi <b>Name</b>,'||E'\n\n'||'https://beyondtaiwannpo.com/app/?invite=bt-zz'||E'\n\n'||'不要回覆這封信，這個信箱沒有人看。','invite','bt-zz',null,null,null,null),
+ ('r2@example.com','需求單　Request','內文 <i>x</i>'||E'\n\n'||'Hi team,'||E'\n\n'||'body','request_new',null,'${RQ}',null,null,null),
+ ('r3@example.com','需求單做完　Done','內文','request_done',null,'${RQ}',null,null,null),
+ ('r4@example.com','會議　Meeting','內文','meeting_invite',null,null,'${MT2}',null,null),
+ ('r5@example.com','提醒　Reminder','內文','meeting_reminder',null,null,'${MT2}',null,null),
+ ('r6@example.com','家長','您好 <script>','guardian',null,null,null,null,null),
+ ('r7@example.com','面試','內文','interview',null,null,null,null,'${FORM}'),
+ ('r8@example.com','錄取','內文','accepted',null,null,null,null,null),
+ ('r9@example.com','未錄取','內文','rejected',null,null,null,null,null),
+ ('r10@example.com','行前','內文','notice',null,null,null,null,null);" >/dev/null
+chkas "${PAUL}" "★ 十種信都包得出 HTML（每一種都有 logo、一張照片、信尾）" "10|10|10|10" \
+  "select count(*)||'|'||count(*) filter (where (r.html) like '%shared/logo.png%')||'|'||count(*) filter (where (r.html) like '%/photos/%')||'|'||count(*) filter (where (r.html) like '%beyondtaiwan2020@gmail.com%') from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email like 'r%@example.com'"
+chkas "${PAUL}" "★ 按鈕連對：邀請連 /app/?invite=、需求單連那一張、會議連回覆頁、面試連 Cal" "true|true|true|true" \
+  "select (select r.html like '%href=\"https://beyondtaiwannpo.com/app/?invite=bt-zz\"%' from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r1@example.com')||'|'||(select r.html like '%href=\"https://beyondtaiwannpo.com/admin/#requests/${RQ}\"%' from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r2@example.com')||'|'||(select r.html like '%href=\"https://beyondtaiwannpo.com/availability/?meeting=${MT2}\"%' from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r4@example.com')||'|'||(select r.html like '%href=\"https://cal.com%' or r.html like '%href=\"https://beyondtaiwannpo.com/apply/\"%' from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r7@example.com')"
+chkas "${PAUL}" "★ 使用者的字全部跳脫：沒有一封含原始的 <b>、<i>、<script>" "0" \
+  "select count(*) from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email like 'r%@example.com' and (r.html like '%<b>名字%' or r.html like '%<i>x%' or r.html like '%<script>%')"
+chkas "${PAUL}" "一封一種語言：沒有帳號的收件人預設中文，主旨只留中文那一段，按鈕的字是中文預設" "BT邀請|zh|true" \
+  "select r.subject||'|'||r.lang||'|'||(r.html like '%>接受邀請</a>%') from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r1@example.com'"
+psql -d "${DB}" -q -c "update public.profiles set lang='en' where id='${ISTAFF}'; update public.mail_outbox set to_email='istaff@example.com' where to_email='r4@example.com';" >/dev/null
+chkas "${PAUL}" "★ 收信的人 profiles.lang 是 en：主旨與按鈕都是英文" "Meeting|en|true" \
+  "select r.subject||'|'||r.lang||'|'||(r.html like '%>Reply</a>%') from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='istaff@example.com' and o.kind='meeting_invite'"
+psql -d "${DB}" -q -c "update public.mail_settings set value='false' where key='one_lang';" >/dev/null
+chkas "${PAUL}" "開關關掉：兩種語言疊在一起（主旨整句、內文兩段都在）" "BT邀請　Invite|both|true" \
+  "select r.subject||'|'||r.lang||'|'||(r.html like '%Hi &lt;b&gt;Name&lt;/b&gt;,%') from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r1@example.com'"
+psql -d "${DB}" -q -c "update public.mail_settings set value='true' where key='one_lang';" >/dev/null
+chkas "${PAUL}" "後台改文案（七個參數）：英文版與按鈕的字存得進去" "invite" \
+  "select public.set_mail_template('invite','主旨','內文 {link}','Subject','Body {link}','現在加入','Join now')"
+chkas "${PAUL}" "改了按鈕的字就用那個字" "t" "select r.html like '%>現在加入</a>%' from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r1@example.com'"
+psql -d "${DB}" -q -c "delete from public.mail_outbox where to_email like 'r%@example.com' or to_email='istaff@example.com' and kind='meeting_invite' and subject like '會議%';" >/dev/null
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-05-email-layout.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then echo "  ok   信的版型那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 信的版型那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

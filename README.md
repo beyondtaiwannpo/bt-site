@@ -3290,6 +3290,34 @@ Paul 2026-10-24：「蛇梯棋要讓 intern 看得到、有棋子、而且要彩
 
 **還沒驗的**：真的登入後的畫面與動畫（截圖是 `ui.js` 配假資料畫的；棋子沿著蛇梯飛那一段只在程式裡，沒有抓到截圖）；正式站要跑 `2026-10-22-intern-board.sql` 與 `2026-10-23-intern-pawn.sql` 兩支，跑完之前後台「棋盤」存檔會說要先跑那一支，intern 那邊看不到棋盤、跟以前一樣。
 
+## 信長什麼樣（2026-11-05）
+
+Paul 2026-10-26 把邀請信跟一封設計過的電子報放在一起看：「信真的很醜、不專業，要多一點圖，連結要是一顆按鈕，沒有人會按那條連結。」
+從此 BT 寄的每一種信（邀請、會議兩封、需求單兩封、申請那五封）都套同一套版型。截圖 `docs/admin-redesign/email/email-01` 到 `04`（600 與 375 寬，本機畫的）。
+
+### 設計（小小一段）
+- **一套 table 排版的 HTML**：600 寬、紙色底（品牌米白 `#EDE5D8`）、白卡片圓角；頂上 BT 的 logo（`https://beyondtaiwannpo.com/shared/logo.png`，絕對網址不當附件）；每種信一張網站上本來就有的照片（邀請用團體照、會議用兩人對筆電、需求單用傳麥克風、申請那幾封用聽講的那張；**沒有新照片**）；標題用顯示字型 Barlow Condensed（收不到字型就 Arial Narrow、Arial）；內文段落；**一顆橘色主按鈕**（48 高、圓角、手機上全寬）；信尾那句「不要回覆這封信」加 Beyond Taiwan 與網址。
+- 按鈕的字是**深藍不是白**：白字在主橘上對比只有 1.6:1，看不清楚；深藍在橘上 7:1。這是跟 Paul 原話唯一的偏離，理由是看得見。
+- 按鈕連到哪不用人填：從那一封信自己推（邀請連 `/app/?invite=`、會議連回覆頁、需求單連那一張、面試連 Cal 連結、申請那幾封連 `/apply/`）。內文裡那一行網址會自動變成按鈕（不重複印在段落裡，按鈕底下留一行小字給不能按的收件軟體）。
+- **文案還是 cadre 在後台「信件文案」改**：主旨、內文、按鈕的字（空的用預設），中英各一份；版型是寫死的程式。預覽是包好的 HTML（iframe），可以切中英、切 600 或 375 寬。
+- 純文字那一份照舊（原本的 body），寄給 Resend 的時候 html 與 text 一起送（收件軟體不吃 HTML 就看 text）。一封包起來約 3KB，遠低於 Gmail 會剪的 102KB。
+
+### 語言（Paul 在決定，先照建議做、留開關）
+- **一封一種語言**：照收信的人的 `profiles.lang`（新欄，zh 或 en；還沒有東西寫它，之後讓 `/settings/` 的語言切換寫進去），沒有就中文。英文版的文案用模板的 `subject_en` / `body_en`，空的就寄中文。
+- 要回到兩種疊在一起：`mail_settings` 表把 `one_lang` 改成 `false`，一個開關。
+- 既有的雙語模板遷移檔自動拆成中英兩份（主旨用全形空格「　」分，內文用英文那一段的開頭 Hi {name}, 分）；申請那五封原本就只有中文，英文收件人先看到中文版，要英文版到後台填。
+
+### 資料庫
+`supabase/migrations/2026-11-05-email-layout.sql`，接在 11-04 後面跑，可以重跑，PASS 表 7 項。
+- `mail_templates` 多 `subject_en`、`body_en`、`button_label`、`button_label_en`；`profiles` 多 `lang`；`mail_settings` 一張小表。
+- `mail_html(kind, subject, body, button_label, button_url, lang)` 包版型（所有使用者的字先跳脫）；`mail_button_url(那一列)`、`mail_lang_for(email)`、`mail_render(outbox_id)`（給預覽與 smoke 看包好的結果）。
+- `send_pending_mail()` 整支重建：寄之前算語言、按鈕、html；**排信的那幾支函式一個字不動**。
+- `set_mail_template()` 多一個七參數的版本（舊的三參數留著）。
+- `scripts/db/smoke.sh` 多一段：十種信各排一封（帶 `<b>`、`<script>` 的使用者字）→ 每一封有 logo、照片、信尾；按鈕連對；沒有一封含原始標籤；沒帳號的收件人中文、`profiles.lang = en` 的英文主旨與按鈕；開關關掉兩種疊；後台改按鈕的字就用那個字；重跑。本機 534 項全過。
+- `test/mail-layout.test.mjs` 四條：JS 預覽版跟 SQL 同一套記號、跳脫與按鈕規則、遷移檔的關鍵句、信件文案頁的欄位與預覽。
+
+**沒驗的**：真的在 Gmail 與 iOS Mail 裡打開（這台沒有登入的信箱；版型用的是 table、inline style、一條 media query，是郵件軟體最保守的那一套）；Resend 真的收到 html 加 text（本機 `net.http_post` 是替身）；正式站。
+
 ## 護照「按儲存欄位清空、沒存」（2026-10-25，Alice 回報）
 
 **根因（本機重現，不是猜的）**：幹部有 `profiles` 那一列、**沒有 `passports` 那一列**的時候，`/passport/` 的申請表按儲存：

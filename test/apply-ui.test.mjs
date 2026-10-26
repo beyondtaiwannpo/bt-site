@@ -303,9 +303,11 @@ test("★ 預覽要把代換符號換成範例，而且跟資料庫同一套規�
 // ⚠ 「不要回覆這封信」是必要資訊不是禮貌用語：noreply 沒有 MX。
 test("★ 信尾是系統加的，預覽看得到但改不掉", () => {
   const h = SITE.mailEditHTML("accepted", tpl, "", false);
+  // 2026-11-05：預覽是包好的 HTML（iframe srcdoc），信尾在版型的 footer 裡，跟可編輯的內文分開。
   assert.match(h, /不要回覆這封信/);
-  assert.match(h, /class="tail"/, "系統加的那段要跟可編輯的內文分開顯示");
-  assert.match(h, /改不掉/, "要說出來它改不掉，不然人會以為自己刪得掉");
+  assert.match(h, /<iframe class="mailframe"[^>]*srcdoc="/, "預覽是包好的版型");
+  assert.match(h, /border-top:1px solid #C6C6C6;[^"]*&quot;&gt;不要回覆這封信/, "信尾在 footer 那一格，不在內文裡");
+  assert.match(h, /寫死的程式/, "要說出來版型改不掉，改的是字");
   // 家長那封的結尾不一樣（它不是「不要回覆」，是「不需要回覆或簽名」）
   assert.match(SITE.mailTail("guardian"), /不需要回覆或簽名/);
   assert.match(SITE.mailTail("accepted"), /不要回覆這封信/);
@@ -331,8 +333,9 @@ test("★ 信件文案第五種：邀請信，五個代換符號、預覽有連�
   assert.equal(SITE.fillInvite("{name}/{position}/{term}/{link}/{sender}", { name: "A", position: "B", term: "C", link: "D", sender: "E" }), "A/B/C/D/E");
   assert.equal(SITE.fillInvite("{name}{name}"), "Mei WuMei Wu", "沒給範例就用內建的");
   const h = SITE.mailEditHTML("invite", { kind: "invite", subject: "Hi {name}", body: "{sender} invites you: {link}" }, "", false);
-  assert.match(h, /<b>Hi Mei Wu<\/b>/);
+  assert.match(h, /&lt;h1 [\s\S]*?&gt;Hi Mei Wu&lt;\/h1&gt;/, "主旨變成版型的標題（srcdoc 裡是跳脫過的）");
   assert.match(h, /Paul Wang invites you: https:\/\/beyondtaiwannpo\.com\/app\/\?invite=bt-a1b2c3d4/);
+  assert.match(h, /href=&quot;https:\/\/beyondtaiwannpo\.com\/app\/\?invite=bt-a1b2c3d4&quot;[\s\S]*?&gt;接受邀請&lt;\/a&gt;/, "按鈕連到邀請、字是預設的「接受邀請」");
   assert.match(h, /\{link\}/, "提醒裡講 {link} 一定要在");
   assert.doesNotMatch(h, /\{姓名\}/, "邀請信不用舊的兩個符號");
 });

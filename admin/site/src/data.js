@@ -139,15 +139,17 @@ export async function setStoryApproved(id, ok) {
 export async function loadTemplates() {
   need();
   const { data, error } = await supabase.from("mail_templates")
-    .select("kind, subject, body, updated_at").order("kind");
+    .select("kind, subject, body, subject_en, body_en, button_label, button_label_en, updated_at").order("kind");
   if (error) throw error;
   return data || [];
 }
 
-export async function saveTemplate(kind, subject, body) {
+// 2026-11-05 起七個參數：中英各一份主旨與內文、按鈕的字中英（空的用每種信的預設）。
+export async function saveTemplate(kind, t) {
   need();
-  const { error } = await supabase.rpc("set_mail_template",
-    { p_kind: kind, p_subject: subject, p_body: body });
+  const { error } = await supabase.rpc("set_mail_template", {
+    p_kind: kind, p_subject: t.subject, p_body: t.body, p_subject_en: t.subject_en || null, p_body_en: t.body_en || null,
+    p_button_label: t.button_label || null, p_button_label_en: t.button_label_en || null });
   if (error) throw error;
 }
 
