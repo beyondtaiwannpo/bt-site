@@ -59,7 +59,7 @@
      （作者樣式表無論特異性多低都排在 UA 樣式表前面），但輸給任何一條 class 規則。
      **不要把 :where() 拿掉**，check.sh 有一條檢查在守它。見 spec 2026-08-22 §1。 */
   :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
-  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+  #bt-root :focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 
   /* ---------- shell ---------- */
   /* 統計列：跟頂欄同一塊玻璃，只是矮一點。 */
@@ -80,8 +80,8 @@
   .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:999px;overflow:hidden}
   .tabs button{
     font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.09em;
-    text-transform:uppercase;padding:6px 14px;color:rgba(16,42,134,.55);
-    transition:background .15s,color .15s;
+    text-transform:uppercase;padding:6px 14px;color:rgba(16,42,134,.72);
+    transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease);
   }
   .tabs button[aria-selected="true"]{background:var(--bt-navy);color:var(--bt-cream)}
   .prog{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:.02em;line-height:1}
@@ -206,14 +206,14 @@
   .nav button.arrow{
     font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.06em;
     padding:7px 16px;border:1px solid rgba(16,42,134,.25);border-radius:999px;
-    transition:background .15s,border-color .15s;
+    transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease);
   }
   .nav button.arrow:not(:disabled):hover{background:rgba(255,255,255,.7);border-color:rgba(16,42,134,.4)}
   .nav button.arrow:disabled{opacity:.3;cursor:default}
   .dots{display:flex;gap:5px;flex:1;justify-content:center;flex-wrap:wrap}
   .dots button{width:9px;height:9px;border-radius:50%;border:1px solid rgba(16,42,134,.4)}
   .dots button[data-on="1"]{background:var(--bt-orange);border-color:var(--bt-orange)}
-  .dots button[aria-current="true"]{outline:2px solid var(--bt-navy);outline-offset:2px}
+  .dots button[aria-current="true"]{outline:var(--ring);outline-offset:var(--ring-gap)}
 
   /* ---------- month page ---------- */
   .mhead{display:flex;align-items:flex-end;gap:16px;border-bottom:2px solid var(--bt-navy);padding-bottom:10px;margin-bottom:22px}
@@ -254,7 +254,7 @@
        章變大、又會上下錯開，要留的位置本來就跟著變大。 */
     min-height:330px;padding:14px;
     display:flex;flex-direction:column;text-align:left;width:100%;
-    transition:border-color .16s,background .16s;
+    transition:border-color var(--dur-2) var(--ease),background var(--dur-2) var(--ease);
     position:relative;
     min-width:0;
   }
@@ -538,7 +538,7 @@
   .ppbtn svg{width:30px;height:30px;overflow:visible}
   .ppbtn.on{border-color:var(--bt-orange);box-shadow:0 0 0 2px var(--bt-orange);background:rgba(255,232,197,.6);color:var(--ink)}
   .ppbtn.skip{width:auto;justify-content:center;padding:7px 12px}
-  .wwho{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.6);margin:0 0 6px}
+  .wwho{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.72);margin:0 0 6px}
   .wrank li{display:flex;align-items:center;gap:10px}
   .wrank .pawn{flex:none;width:26px;height:26px}
   .bq{position:relative;aspect-ratio:1;border:1px solid rgba(16,42,134,.22);border-radius:8px;background:rgba(255,255,255,.5);
@@ -549,7 +549,7 @@
   .bq .bn{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.06em;color:rgba(16,42,134,.75);line-height:1}
   .bq .sk{font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:.02em;margin-top:2px}
   .bq .st{font-size:9.5px;font-weight:600;line-height:1.15;margin-top:2px;overflow-wrap:anywhere;color:var(--ink)}
-  .bq .st.done{text-decoration:line-through;color:rgba(16,42,134,.55)}
+  .bq .st.done{text-decoration:line-through;color:rgba(16,42,134,.72)}
   .bq.task{background:rgba(255,232,197,.7)}
   .bq.task .st{font-weight:700}
   /* 上色（2026-10-24）：三個分類三個副色，任務格深一點、它後面的空格淡淡的同色（到下一個任務格為止）。
@@ -568,7 +568,7 @@
   .bq.finish{border:2px dashed var(--bt-navy)}
   .bq.lit{box-shadow:0 0 0 3px var(--bt-orange),0 0 20px 6px rgba(255,196,108,.85);background:rgba(255,196,108,.45)}
   .bstart{margin-top:6px;display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;
-    text-transform:uppercase;color:rgba(16,42,134,.6)}
+    text-transform:uppercase;color:rgba(16,42,134,.72)}
   .pawns{position:absolute;right:3px;bottom:3px;display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:100%}
   .bstart .pawns{position:static}
   .pawn{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:var(--bt-navy);color:var(--bt-cream);
@@ -634,20 +634,21 @@
   .card .sub{font-size:13px;opacity:.6;margin-bottom:24px}
   label{display:block;margin-bottom:15px}
   label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;display:block;margin-bottom:5px}
-  input,select,textarea{
+  input,select,textarea{transition:border-color var(--dur-2) var(--ease),background var(--dur-2) var(--ease);
     width:100%;font-family:var(--body);font-size:15px;color:var(--ink);
     padding:9px 11px;border:1px solid rgba(16,42,134,.28);border-radius:2px;
     background:rgba(255,255,255,.55);
   }
+  input:hover,select:hover,textarea:hover{border-color:rgba(16,42,134,.5)}
   textarea{resize:vertical;min-height:64px}
   /* 2026-09-07：形狀改成藥丸，跟對外那一面的 CTA 一致。
      **按鈕的輕重規則沒有變**（實心深藍是主要動作、ghost 是次要、quiet 是降級）。 */
   .btn{
     font-family:var(--display);font-size:18px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
     padding:12px 24px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);
-    transition:background .15s,color .15s;
+    transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease);
   }
-  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
   .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
   .btn.ghost:hover{background:rgba(255,255,255,.7);color:var(--ink)}
   .btn.sm{font-size:15px;padding:7px 14px}
@@ -672,7 +673,7 @@
   .modal .mt{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.5;margin-bottom:16px}
   .prev{width:100%;max-height:210px;object-fit:cover;border-radius:2px;margin-top:8px;display:block}
 
-  .empty{text-align:center;padding:40px 10px;opacity:.55;font-size:14px}
+  .empty{text-align:center;padding:40px 10px;color:rgba(16,42,134,.78);font-size:14px}
   .toast{
     position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
     background:var(--bt-navy);color:var(--bt-cream);padding:10px 18px;border-radius:2px;
@@ -706,6 +707,10 @@
        改動這裡或 .mhead 的任何尺寸之後，要回來重量一次：這是幾何關係，沒有測試守得住。 */
     .overprint{font-size:13px;top:26px}
   }
+/* 開頁的「載入中」會呼吸（2026-11-05）。只動透明度，不動位置；reduce 區塊會關掉。 */
+.empty.loading{animation:bt-pulse 1.6s ease-in-out infinite}
+@keyframes bt-pulse{50%{opacity:.45}}
+
   @media (prefers-reduced-motion:reduce){
     /* 五個動畫全部關掉：.stamp.land、.page.turn、.overprint.land、
        .flip.turning-back、.flip.turning-front（2026-08-25 翻面加的兩個）。
@@ -716,7 +721,7 @@
        2026-08-26 加了 .tearhalf.l、.tearhalf.r（Task 7，撕掉這格裂成兩半
        往下掉的動畫）——這個分支 reduce 為真時 main.js 根本不會渲染出來，
        但守門認的是宣告，不是用不用得到，一樣要列進來。 */
-    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front,.tearhalf.l,.tearhalf.r,.dice.rolling{animation:none}
+    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front,.tearhalf.l,.tearhalf.r,.dice.rolling,.empty.loading{animation:none}
   }
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
@@ -773,7 +778,7 @@ summary{cursor:pointer}
   </defs>
 </svg>
 
-<div id="bt-root"><div class="empty">Loading… 載入實習護照中…</div></div>
+<div id="bt-root" aria-busy="true"><div class="empty loading">Loading… 載入實習護照中…</div></div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

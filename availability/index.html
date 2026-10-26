@@ -52,7 +52,7 @@
   #bt-root{font-family:var(--body);color:var(--ink);line-height:1.55;max-width:940px;margin:0 auto;padding:14px 12px 60px}
   /* :where() 是必要的，不是風格 —— 見 passport/index.html 同一條的註解。 */
   :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
-  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+  #bt-root :focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 
   /* 這一條玻璃只裝分頁鈕（logo 與登出在 shared 的頂欄）。
      不加 width:fit-content 的話它會拉滿 940px，右邊三分之二是空的，
@@ -72,7 +72,7 @@
   .bar .sp{flex:1}
   .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:999px;overflow:hidden}
   .tabs button{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.06em;
-    padding:6px 12px;color:rgba(16,42,134,.55);transition:background .15s,color .15s}
+    padding:6px 12px;color:rgba(16,42,134,.72);transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease)}
   .tabs button[aria-current]{background:var(--bt-navy);color:var(--bt-cream)}
   .weeknav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:14px}
   .weeknav b{font-family:var(--display);font-size:18px;letter-spacing:.04em}
@@ -86,17 +86,18 @@
   .card p{font-size:14px;margin:0 0 12px}
   label{display:block;margin-bottom:14px}
   label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.8);display:block;margin-bottom:5px}
-  input,select{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);padding:8px 10px;
+  input,select{transition:border-color var(--dur-2) var(--ease),background var(--dur-2) var(--ease);width:100%;font-family:var(--body);font-size:15px;color:var(--ink);padding:8px 10px;
     border:1px solid rgba(16,42,134,.28);border-radius:12px;background:rgba(255,255,255,.7)}
+  input:hover,select:hover,textarea:hover{border-color:rgba(16,42,134,.5)}
   select{width:auto;min-width:96px}
   .btn{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
     padding:11px 22px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);
-    transition:background .15s,color .15s}
-  .btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+    transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease)}
+  .btn:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
   .btn[disabled]{opacity:.4;cursor:default}
   .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
   .btn.sm{font-size:14px;padding:6px 12px}
-  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.55);text-transform:none;letter-spacing:0;
+  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.72);text-transform:none;letter-spacing:0;
     font-family:var(--body);font-size:14px;font-weight:600;padding:2px 4px;text-decoration:underline}
   .btn.quiet:hover{color:var(--ink)}
   a.btn{text-decoration:none;display:inline-block}
@@ -216,6 +217,10 @@
   .times pre{font-family:var(--body);font-size:13px;line-height:1.6;margin:6px 0 0;padding:10px 12px;
     background:rgba(255,255,255,.5);border:1px solid rgba(16,42,134,.16);border-radius:2px;
     white-space:pre-wrap;overflow-x:auto}
+/* 開頁的「載入中」會呼吸（2026-11-05）。只動透明度，不動位置；reduce 區塊會關掉。 */
+.empty.loading{animation:bt-pulse 1.6s ease-in-out infinite}
+@keyframes bt-pulse{50%{opacity:.45}}
+
 
   @media (prefers-reduced-motion: reduce){
     *{transition:none !important;animation:none !important}
@@ -287,7 +292,7 @@ summary{cursor:pointer}
 </style>
 </head>
 <body>
-<div id="bt-root"><div class="empty">Loading… 載入中…</div></div>
+<div id="bt-root" aria-busy="true"><div class="empty loading">Loading… 載入中…</div></div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
