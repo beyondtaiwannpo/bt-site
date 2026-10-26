@@ -3302,18 +3302,20 @@ Paul 2026-10-26 把邀請信跟一封設計過的電子報放在一起看：「�
 - **文案還是 cadre 在後台「信件文案」改**：主旨、內文、按鈕的字（空的用預設），中英各一份；版型是寫死的程式。預覽是包好的 HTML（iframe），可以切中英、切 600 或 375 寬。
 - 純文字那一份照舊（原本的 body），寄給 Resend 的時候 html 與 text 一起送（收件軟體不吃 HTML 就看 text）。一封包起來約 3KB，遠低於 Gmail 會剪的 102KB。
 
-### 語言（Paul 在決定，先照建議做、留開關）
-- **一封一種語言**：照收信的人的 `profiles.lang`（新欄，zh 或 en；還沒有東西寫它，之後讓 `/settings/` 的語言切換寫進去），沒有就中文。英文版的文案用模板的 `subject_en` / `body_en`，空的就寄中文。
-- 要回到兩種疊在一起：`mail_settings` 表把 `one_lang` 改成 `false`，一個開關。
-- 既有的雙語模板遷移檔自動拆成中英兩份（主旨用全形空格「　」分，內文用英文那一段的開頭 Hi {name}, 分）；申請那五封原本就只有中文，英文收件人先看到中文版，要英文版到後台填。
+### 語言（Paul 2026-10-26 拍板）
+- **一封一種語言**，照收信的人的 `profiles.lang`（新欄，zh 或 en；還沒有東西寫它，之後讓 `/settings/` 的語言切換寫進去）。
+- **被邀請的人還沒有帳號**：邀請信用邀請人按下「邀請」那一刻的介面語言（前端把 `p_lang` 帶給 `invite_person`，記在 `invite_codes.lang` 與那一封信的 `mail_outbox.lang`）。重寄由重寄的人再帶一次，所以中文介面重寄就變中文。
+- 兩個都沒有就中文。英文版的文案用模板的 `subject_en` / `body_en`，空的就寄中文。
+- 兩種疊在一起那個選項留著但關著：`mail_settings` 表把 `one_lang` 改成 `false` 就回到以前的樣子。
+- **模板怎麼存**：中英各一欄（`subject_zh`、`body_zh`、`subject_en`、`body_en`），`subject` 與 `body` 是資料庫自己算的合併欄（generated column，中間放一行 `[[en]]`）。這樣排信的那幾支函式照舊讀 `subject, body` 一個字不用改，寄之前再依收信的人切回一種。第一版拆成中文欄之後排信函式只讀到中文、英文收件人永遠收到中文，是 smoke 抓到的，所以改成這樣。既有的雙語模板遷移檔自動拆開（主旨用全形空格「　」分，內文從 Hi / Dear 那一行分）；申請那五封原本就只有中文，要英文版到後台填。
 
 ### 資料庫
-`supabase/migrations/2026-11-05-email-layout.sql`，接在 11-04 後面跑，可以重跑，PASS 表 7 項。
-- `mail_templates` 多 `subject_en`、`body_en`、`button_label`、`button_label_en`；`profiles` 多 `lang`；`mail_settings` 一張小表。
+`supabase/migrations/2026-11-05-email-layout.sql`，接在 11-04 後面跑，可以重跑，PASS 表 10 項。
+- `mail_templates` 改成 `subject_zh`、`body_zh`、`subject_en`、`body_en` 加 `button_label`、`button_label_en`，`subject` 與 `body` 變合併欄；`profiles`、`invite_codes`、`mail_outbox` 各多 `lang`；`mail_settings` 一張小表。`invite_person` 多一個十二參數版、`resend_invite` 多一個兩參數版（帶語言），舊的留著。
 - `mail_html(kind, subject, body, button_label, button_url, lang)` 包版型（所有使用者的字先跳脫）；`mail_button_url(那一列)`、`mail_lang_for(email)`、`mail_render(outbox_id)`（給預覽與 smoke 看包好的結果）。
 - `send_pending_mail()` 整支重建：寄之前算語言、按鈕、html；**排信的那幾支函式一個字不動**。
 - `set_mail_template()` 多一個七參數的版本（舊的三參數留著）。
-- `scripts/db/smoke.sh` 多一段：十種信各排一封（帶 `<b>`、`<script>` 的使用者字）→ 每一封有 logo、照片、信尾；按鈕連對；沒有一封含原始標籤；沒帳號的收件人中文、`profiles.lang = en` 的英文主旨與按鈕；開關關掉兩種疊；後台改按鈕的字就用那個字；重跑。本機 534 項全過。
+- `scripts/db/smoke.sh` 多一段：十種信各排一封（帶 `<b>`、`<script>` 的使用者字）→ 每一封有 logo、照片、信尾；按鈕連對；沒有一封含原始標籤；沒帳號的收件人中文、`profiles.lang = en` 的英文主旨與按鈕；英文介面按「邀請」那一封走真的排信函式出來是英文、中文介面重寄變中文、有帳號的人自己的 lang 優先；開關關掉兩種疊；後台改按鈕的字就用那個字；重跑。本機 539 項全過。
 - `test/mail-layout.test.mjs` 四條：JS 預覽版跟 SQL 同一套記號、跳脫與按鈕規則、遷移檔的關鍵句、信件文案頁的欄位與預覽。
 
 **沒驗的**：真的在 Gmail 與 iOS Mail 裡打開（這台沒有登入的信箱；版型用的是 table、inline style、一條 media query，是郵件軟體最保守的那一套）；Resend 真的收到 html 加 text（本機 `net.http_post` 是替身）；正式站。

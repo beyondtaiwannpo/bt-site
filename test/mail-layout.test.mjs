@@ -43,7 +43,7 @@ test("★ 遷移檔：send_pending_mail 送 html 加 text、按鈕從 outbox 那
   assert.match(SQL, /set_mail_template\(p_kind text, p_subject text, p_body text, p_subject_en text, p_body_en text, p_button_label text, p_button_label_en text\)/);
   const d = readFileSync("admin/site/src/data.js", "utf8");
   assert.match(d, /p_subject_en: t\.subject_en \|\| null, p_body_en: t\.body_en \|\| null,\s*p_button_label: t\.button_label \|\| null, p_button_label_en: t\.button_label_en \|\| null/);
-  assert.match(d, /select\("kind, subject, body, subject_en, body_en, button_label, button_label_en, updated_at"\)/);
+  assert.match(d, /select\("kind, subject:subject_zh, body:body_zh, subject_en, body_en, button_label, button_label_en, updated_at"\)/);
 });
 
 test("信件文案頁：中英兩份、按鈕的字、預覽是包好的 iframe、語言與寬度可以切", () => {

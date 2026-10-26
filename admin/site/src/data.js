@@ -139,7 +139,7 @@ export async function setStoryApproved(id, ok) {
 export async function loadTemplates() {
   need();
   const { data, error } = await supabase.from("mail_templates")
-    .select("kind, subject, body, subject_en, body_en, button_label, button_label_en, updated_at").order("kind");
+    .select("kind, subject:subject_zh, body:body_zh, subject_en, body_en, button_label, button_label_en, updated_at").order("kind");   // subject / body 在資料庫是合併欄，後台改的是中文那兩欄
   if (error) throw error;
   return data || [];
 }

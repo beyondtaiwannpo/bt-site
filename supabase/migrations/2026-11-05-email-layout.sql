@@ -8,24 +8,31 @@
 --   一套 table 排版的 HTML（600 寬、紙色底、頂上 BT logo、顯示字型的標題、內文段落、一顆橘色主按鈕、每種信一張既有的照片、信尾那句不要回覆），
 --   每一種信都套（邀請、會議兩封、需求單兩封、申請那五封）。寄給 Resend 的時候 html 與 text 一起送（text 就是原本那段純文字）。
 --   **文案還是 cadre 在後台「信件文案」改：主旨、內文、按鈕的字；版型是寫死的程式。**
---   語言：一封信一種語言，照收信的人的語言（profiles.lang；沒有就中文）。要兩種疊在一起只要把 mail_settings.one_lang 關掉（Paul 還在決定）。
+--   語言（Paul 2026-10-26 拍板）：一封信一種語言，照收信的人的語言（profiles.lang）；被邀請的人還沒有帳號，就用邀請人按下「邀請」那一刻的介面語言
+--   （前端帶 p_lang 進來，存在 invite_codes.lang 與 mail_outbox.lang）。兩個都沒有就中文。要兩種疊在一起只要把 mail_settings.one_lang 關掉，預設關著那個選項。
 --
 -- ============================================================================
 -- 這一支在做什麼
 -- ============================================================================
---   1. mail_templates 多四欄：subject_en、body_en（英文版；空的就用中文那一份）、button_label、button_label_en（按鈕的字；空的用每種信的預設）。
+--   1. mail_templates 改成 subject_zh / body_zh / subject_en / body_en 四欄各存一種語言，加 button_label / button_label_en（按鈕的字；空的用每種信的預設）；
+--      subject 與 body 變成自動合併的欄（排信的函式照舊讀它們）。
 --      既有的雙語文案自動拆：主旨用全形空格「　」分、內文用英文那一段的開頭（Hi {name}, / Hi Marketing team,）分。
 --   2. profiles 多一欄 lang（zh / en，可以空）；mail_settings 一張小表（one_lang 開關，預設開）。
 --   3. mail_html(kind, subject, body, button_label, button_url, lang)：把純文字包成 HTML。所有使用者的字都跳脫。
 --      mail_button_url(outbox 那一列)：按鈕連到哪，從那一列的 invite_code / request_id / meeting_id / application_id 推。
 --   4. send_pending_mail() 整支重建：寄之前算 lang、按鈕、html；Resend 收 html 加 text。
 --      **排信的那幾支函式一個字不動**（它們排的還是純文字；英文版的文案由 send 這一步換）。
---   5. set_mail_template() 多一個版本收七個參數（舊的三參數版留著）。mail_render(outbox_id) 給 smoke 與預覽看包好的 HTML。
+--   5. set_mail_template() 多一個版本收七個參數（舊的三參數版改成寫中文那兩欄）。mail_render(outbox_id) 給 smoke 與預覽看包好的 HTML。
+--   6. invite_person() 多一個十二參數版、resend_invite() 多一個兩參數版：帶邀請人的介面語言（舊的留著）。
 -- ============================================================================
 
 begin;
 
--- ---------- 1. 模板多欄、自動拆雙語 ----------
+-- ---------- 1. 模板中英各一欄、subject 與 body 改成自動合併 ----------
+-- 為什麼這樣做：排信的那幾支函式（queue_invite_mail、需求單、會議）都是 select subject, body from mail_templates。
+-- 模板拆成中英之後它們若只讀到中文，英文收件人就永遠收到中文（2026-11-05 smoke 抓到的）。
+-- 所以真正存的是 subject_zh / body_zh / subject_en / body_en，subject 與 body 變成資料庫自己算的合併欄（generated column）：
+-- 主旨「中文　英文」（全形空格分），內文「中文 \n\n[[en]]\n 英文」。排信的函式一個字不用動，寄之前再依收信的人的語言切回一種。
 alter table public.mail_templates add column if not exists subject_en text;
 alter table public.mail_templates add column if not exists body_en text;
 alter table public.mail_templates add column if not exists button_label text;
@@ -33,19 +40,40 @@ alter table public.mail_templates add column if not exists button_label_en text;
 do $$
 declare r record; v_pos int; v_marker text;
 begin
-  for r in select * from mail_templates where body_en is null loop
-    v_marker := null;
-    foreach v_marker in array array[E'\nHi {name},', E'\nHi Marketing team,', E'\nHi {requester},', E'\nHi {姓名},', E'\nDear '] loop
-      v_pos := position(v_marker in r.body);
-      if v_pos > 0 then
-        update mail_templates set body_en = btrim(substring(r.body from v_pos)), body = rtrim(substring(r.body from 1 for v_pos - 1)) where kind = r.kind;
-        exit;
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'mail_templates' and column_name = 'subject_zh') then
+    alter table public.mail_templates rename column subject to subject_zh;
+    alter table public.mail_templates rename column body to body_zh;
+    -- 既有的雙語模板拆開：英文那一段從 Hi / Dear 那一行開始，主旨用全形空格分。
+    for r in select * from mail_templates where body_en is null loop
+      foreach v_marker in array array[E'\nHi {name},', E'\nHi Marketing team,', E'\nHi {requester},', E'\nHi {姓名},', E'\nDear '] loop
+        v_pos := position(v_marker in r.body_zh);
+        if v_pos > 0 then
+          update mail_templates set body_en = btrim(substring(r.body_zh from v_pos)), body_zh = rtrim(substring(r.body_zh from 1 for v_pos - 1)) where kind = r.kind;
+          exit;
+        end if;
+      end loop;
+      if position('　' in r.subject_zh) > 0 and r.subject_en is null then
+        update mail_templates set subject_en = btrim(split_part(r.subject_zh, '　', 2)), subject_zh = btrim(split_part(r.subject_zh, '　', 1)) where kind = r.kind;
       end if;
     end loop;
-    if position('　' in r.subject) > 0 and r.subject_en is null then
-      update mail_templates set subject_en = btrim(split_part(r.subject, '　', 2)), subject = btrim(split_part(r.subject, '　', 1)) where kind = r.kind;
-    end if;
-  end loop;
+    alter table public.mail_templates add column subject text generated always as
+      (case when nullif(btrim(coalesce(subject_en, '')), '') is null then subject_zh else subject_zh || '　' || btrim(subject_en) end) stored;
+    alter table public.mail_templates add column body text generated always as
+      (case when nullif(btrim(coalesce(body_en, '')), '') is null then body_zh else body_zh || E'\n\n[[en]]\n' || btrim(body_en) end) stored;
+  end if;
+end $$;
+
+-- 舊的三參數版改成寫中文那兩欄（subject 與 body 現在是算出來的，寫不進去）。
+create or replace function public.set_mail_template(p_kind text, p_subject text, p_body text)
+returns text language plpgsql security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform public.require_senior();
+  if coalesce(btrim(p_subject), '') = '' or coalesce(btrim(p_body), '') = '' then raise exception 'empty_mail' using errcode = 'P0001'; end if;
+  update public.mail_templates set subject_zh = p_subject, body_zh = p_body, updated_by = auth.uid() where kind = p_kind;
+  if not found then raise exception 'no_such_template' using errcode = 'P0001'; end if;
+  return p_kind;
 end $$;
 
 -- ---------- 2. 語言與開關 ----------
@@ -57,6 +85,10 @@ do $$ begin
 end $$;
 create table if not exists public.mail_settings (key text primary key, value text not null, updated_at timestamptz not null default now());
 insert into public.mail_settings (key, value) values ('one_lang', 'true') on conflict (key) do nothing;
+
+-- 邀請人按「邀請」那一刻的介面語言，跟著那組碼走；重寄時由重寄的人再帶一次。mail_outbox.lang 是那一封信的提示，收信的人自己有帳號有 lang 的話優先。
+alter table public.invite_codes add column if not exists lang text check (lang in ('zh', 'en'));
+alter table public.mail_outbox  add column if not exists lang text check (lang in ('zh', 'en'));
 revoke all on public.mail_settings from anon, authenticated;
 grant select on public.mail_settings to authenticated;
 alter table public.mail_settings enable row level security;
@@ -107,15 +139,49 @@ as $$
     else '' end
 $$;
 
--- 收信的人的語言：profiles.lang；沒有就中文。one_lang 關掉就回 both（兩種疊在一起，跟以前一樣）。
-create or replace function public.mail_lang_for(p_email text)
+-- 收信的人的語言：profiles.lang；沒有帳號就用那一封信帶的提示（邀請信是邀請人的介面語言）；都沒有就中文。
+-- one_lang 關掉就回 both（兩種疊在一起，跟以前一樣）。
+create or replace function public.mail_lang_for(p_email text, p_hint text default null)
 returns text language sql stable
 set search_path = public, auth, pg_temp
 as $$
   select case
     when coalesce((select value from mail_settings where key = 'one_lang'), 'true') <> 'true' then 'both'
-    else coalesce((select p.lang from auth.users u join profiles p on p.id = u.id where lower(u.email) = lower(p_email) limit 1), 'zh') end
+    else coalesce((select p.lang from auth.users u join profiles p on p.id = u.id where lower(u.email) = lower(p_email) limit 1),
+                  case when p_hint in ('zh', 'en') then p_hint end, 'zh') end
 $$;
+
+-- 邀請：多一個 p_lang（邀請人當下的介面語言）。原本十一個參數的版本留著，這一支包它，再把語言記到碼與那一封信上。
+create or replace function public.invite_person(
+  p_email text, p_grants text, p_rank text,
+  p_name_zh text, p_name_en text, p_title_en text, p_title_zh text, p_team text, p_term text,
+  p_line text, p_note text, p_lang text)
+returns text language plpgsql security definer
+set search_path = public, pg_temp
+as $$
+declare v_code text; v_lang text := case when p_lang in ('zh', 'en') then p_lang else 'zh' end;
+begin
+  v_code := public.invite_person(p_email, p_grants, p_rank, p_name_zh, p_name_en, p_title_en, p_title_zh, p_team, p_term, p_line, p_note);
+  update invite_codes set lang = v_lang where code = v_code;
+  update mail_outbox set lang = v_lang where invite_code = v_code and sent_at is null;
+  return v_code;
+end $$;
+revoke all on function public.invite_person(text, text, text, text, text, text, text, text, text, text, text, text) from public, anon;
+grant execute on function public.invite_person(text, text, text, text, text, text, text, text, text, text, text, text) to authenticated;
+
+create or replace function public.resend_invite(p_code text, p_lang text)
+returns text language plpgsql security definer
+set search_path = public, pg_temp
+as $$
+declare v_code text; v_lang text := case when p_lang in ('zh', 'en') then p_lang else 'zh' end;
+begin
+  v_code := public.resend_invite(p_code);
+  update invite_codes set lang = v_lang where code = v_code;
+  update mail_outbox set lang = v_lang where invite_code = v_code and sent_at is null;
+  return v_code;
+end $$;
+revoke all on function public.resend_invite(text, text) from public, anon;
+grant execute on function public.resend_invite(text, text) to authenticated;
 
 -- 純文字 → HTML。段落用空行分；一行裡只有按鈕那個網址的話不印（按鈕就是它）。所有字先跳脫。
 create or replace function public.mail_html(p_kind text, p_subject text, p_body text, p_button_label text, p_button_url text, p_lang text)
@@ -164,7 +230,12 @@ returns text language plpgsql immutable
 as $$
 declare v_pos int; v_marker text;
 begin
-  if p_lang = 'both' then return p_body; end if;
+  -- 新模板合併時放了 [[en]] 這一行，切這個最準；舊的信（沒有那一行）退回用 Hi / Dear 那一行。
+  if p_lang = 'both' then return replace(p_body, E'\n\n[[en]]\n', E'\n\n'); end if;
+  v_pos := position(E'\n\n[[en]]\n' in p_body);
+  if v_pos > 0 then
+    return case when p_lang = 'en' then btrim(substring(p_body from v_pos + 8)) else rtrim(substring(p_body from 1 for v_pos - 1)) end;
+  end if;
   foreach v_marker in array array[E'\nHi ', E'\nDear '] loop
     v_pos := position(v_marker in p_body);
     if v_pos > 0 then
@@ -187,7 +258,7 @@ begin
   if not public.is_cadre() then raise exception 'not_cadre' using errcode = 'P0001'; end if;
   select * into r from mail_outbox where id = p_id;
   if r.id is null then raise exception 'no_such_mail' using errcode = 'P0001'; end if;
-  v_lang := public.mail_lang_for(r.to_email);
+  v_lang := public.mail_lang_for(r.to_email, r.lang);
   v_sub := public.mail_pick_lang_subject(r.subject, v_lang);
   -- 信尾那句（mail_tail）在純文字裡是最後一段，HTML 自己有 footer，切掉它再切語言。
   v_body := r.body;
@@ -225,7 +296,7 @@ begin
   loop
     begin
       -- 2026-11-05：寄之前包版型。語言照收信的人；主旨與純文字也只留那一種語言（one_lang 關掉就兩種都留）。
-      v_lang := public.mail_lang_for(r.to_email);
+      v_lang := public.mail_lang_for(r.to_email, r.lang);
       v_sub := public.mail_pick_lang_subject(r.subject, v_lang);
       v_txt := r.body;
       v_tail_pos := greatest(position(E'\n\n不要回覆這封信' in v_txt), position(E'\n\n這封信是告知' in v_txt));
@@ -262,7 +333,7 @@ begin
   perform public.require_senior();
   if coalesce(btrim(p_subject), '') = '' or coalesce(btrim(p_body), '') = '' then raise exception 'empty_mail' using errcode = 'P0001'; end if;
   update public.mail_templates
-     set subject = p_subject, body = p_body, subject_en = nullif(btrim(coalesce(p_subject_en, '')), ''), body_en = nullif(btrim(coalesce(p_body_en, '')), ''),
+     set subject_zh = p_subject, body_zh = p_body, subject_en = nullif(btrim(coalesce(p_subject_en, '')), ''), body_en = nullif(btrim(coalesce(p_body_en, '')), ''),
          button_label = nullif(btrim(coalesce(p_button_label, '')), ''), button_label_en = nullif(btrim(coalesce(p_button_label_en, '')), ''), updated_by = auth.uid()
    where kind = p_kind;
   if not found then raise exception 'no_such_template' using errcode = 'P0001'; end if;
@@ -275,19 +346,25 @@ commit;
 
 select * from (
   with t as (
-    select (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'mail_templates' and column_name in ('subject_en', 'body_en', 'button_label', 'button_label_en')) as cols,
+    select (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'mail_templates' and column_name in ('subject_zh', 'body_zh', 'subject_en', 'body_en', 'button_label', 'button_label_en')) as cols,
+           (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'mail_templates' and column_name in ('subject', 'body') and is_generated = 'ALWAYS') as gen_cols,
            (select count(*) from pg_proc where proname in ('mail_html', 'mail_button_url', 'mail_lang_for', 'mail_render', 'mail_defaults', 'html_escape', 'mail_pick_lang_part', 'mail_pick_lang_subject')) as fns,
            (select regexp_replace(prosrc, '--[^\n]*', '', 'g') like '%''html'', v_html%' from pg_proc where proname = 'send_pending_mail') as sends_html,
            (select count(*) from mail_templates where body_en is not null) as split_en,
            (select value from mail_settings where key = 'one_lang') as one_lang,
+           (select count(*) from information_schema.columns where table_schema = 'public' and column_name = 'lang' and table_name in ('invite_codes', 'mail_outbox', 'profiles')) as lang_cols,
+           (select count(*) from pg_proc where (proname = 'invite_person' and pronargs = 12) or (proname = 'resend_invite' and pronargs = 2)) as invite_fns,
            (select public.mail_html('invite', 'T', 'a <b>x</b>', null, 'https://x/y', 'zh') like '%&lt;b&gt;%') as escapes,
            length(public.mail_html('invite', 'T', repeat('段落。', 200), null, 'https://x/y', 'zh')) as size
   )
-  select 0 ord, 'OVERALL' as 項目, null::text as 應該是, null::text as 實際是, case when cols = 4 and fns = 8 and sends_html and escapes then 'PASS' else 'FAIL' end as 結果 from t
-  union all select 1, '★ 模板多了四欄', '4', cols::text, case when cols = 4 then 'PASS' else 'FAIL' end from t
+  select 0 ord, 'OVERALL' as 項目, null::text as 應該是, null::text as 實際是, case when cols = 6 and gen_cols = 2 and fns = 8 and sends_html and escapes and lang_cols = 3 and invite_fns = 2 then 'PASS' else 'FAIL' end as 結果 from t
+  union all select 1, '★ 模板中英各一欄加按鈕的字（六欄）', '6', cols::text, case when cols = 6 then 'PASS' else 'FAIL' end from t
+  union all select 11, '★ subject 與 body 變成自動合併欄（排信函式不用改）', '2', gen_cols::text, case when gen_cols = 2 then 'PASS' else 'FAIL' end from t
   union all select 2, '★ 八支函式在', '8', fns::text, case when fns = 8 then 'PASS' else 'FAIL' end from t
   union all select 3, '★ send_pending_mail 送 html 加 text', 'true', sends_html::text, case when sends_html then 'PASS' else 'FAIL' end from t
   union all select 4, '★ 使用者的字有跳脫', 'true', escapes::text, case when escapes then 'PASS' else 'FAIL' end from t
+  union all select 45, '★ 三張表各多一欄 lang（profiles、invite_codes、mail_outbox）', '3', lang_cols::text, case when lang_cols = 3 then 'PASS' else 'FAIL' end from t
+  union all select 46, '★ 邀請與重寄多了帶語言的版本', '2', invite_fns::text, case when invite_fns = 2 then 'PASS' else 'FAIL' end from t
   union all select 5, '資訊：自動拆出英文版的模板數（其餘英文收件人會看到中文版）', '（看一眼）', split_en::text, 'PASS' from t
   union all select 6, '資訊：one_lang 開關（true 一封一種語言；false 兩種疊）', 'true', one_lang, 'PASS' from t
   union all select 7, '資訊：一封很長的信包起來幾個字（Gmail 超過 102KB 會剪）', '< 100000', size::text, case when size < 100000 then 'PASS' else 'FAIL' end from t

@@ -1567,7 +1567,7 @@ else
 fi
 chk "★ 雙語模板自動拆成中英兩份（邀請、需求單兩封、會議兩封）" "5|5" \
   "select count(*) filter (where body_en is not null)||'|'||count(*) filter (where subject_en is not null) from public.mail_templates where kind in ('invite','request_new','request_done','meeting_invite','meeting_reminder')"
-chk "拆完中文那一份不再含英文段落" "f" "select body like '%Hi {name}%' from public.mail_templates where kind='invite'"
+chk "拆完中文那一欄不再含英文段落，合併欄 body 兩段都在（排信函式讀的是它）" "false|true|true" "select (body_zh like '%Hi {name}%')||'|'||(body like '%Hi {name}%')||'|'||(body like E'%\\n\\n[[en]]\\n%') from public.mail_templates where kind='invite'"
 # 每一種信各排一封（帶 <b> 的使用者字），包起來看按鈕與跳脫。排信的函式沒動，直接種 outbox 列。
 psql -d "${DB}" -q -c "insert into public.mail_outbox (to_email, subject, body, kind, invite_code, request_id, meeting_id, application_id, form_id) values
  ('r1@example.com','BT 邀請　Invite','<b>名字</b> 你好，'||E'\n\n'||'https://beyondtaiwannpo.com/app/?invite=bt-zz'||E'\n\n'||'Hi <b>Name</b>,'||E'\n\n'||'https://beyondtaiwannpo.com/app/?invite=bt-zz'||E'\n\n'||'不要回覆這封信，這個信箱沒有人看。','invite','bt-zz',null,null,null,null),
@@ -1598,6 +1598,21 @@ psql -d "${DB}" -q -c "update public.mail_settings set value='true' where key='o
 chkas "${PAUL}" "後台改文案（七個參數）：英文版與按鈕的字存得進去" "invite" \
   "select public.set_mail_template('invite','主旨','內文 {link}','Subject','Body {link}','現在加入','Join now')"
 chkas "${PAUL}" "改了按鈕的字就用那個字" "t" "select r.html like '%>現在加入</a>%' from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.to_email='r1@example.com'"
+# 邀請人的介面語言（Paul 2026-10-26）：被邀請的人沒帳號，邀請信照邀請人按下去那一刻的語言；重寄由重寄的人再帶一次。
+LCODE=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.invite_person('langtest@example.com','alumni',null,'','Lang Test','','','','','','','en')" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 英文介面按「邀請」：碼與那一封信都記 en" "en|en" \
+  "select (select lang from public.invite_codes where code='${LCODE}')||'|'||(select lang from public.mail_outbox where invite_code='${LCODE}')"
+chkas "${PAUL}" "★ 沒帳號的被邀請人收到英文版（主旨、按鈕，用前一條改過的英文文案）" "Subject|en|true" \
+  "select r.subject||'|'||r.lang||'|'||(r.html like '%>Join now</a>%' or r.html like '%>Accept invitation</a>%') from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.invite_code='${LCODE}'"
+LCODE2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.resend_invite('${LCODE}','zh')" 2>&1 | tail -1 | tr -d ' \n')
+chkas "${PAUL}" "★ 中文介面重寄：新的那一封變中文" "zh|zh" \
+  "select (select lang from public.invite_codes where code='${LCODE2}')||'|'||r.lang from public.mail_outbox o cross join lateral public.mail_render(o.id) r where o.invite_code='${LCODE2}'"
+chk "沒帶語言的舊版 invite_person 還在、信照中文" "zh" \
+  "select public.mail_lang_for('nobody@example.com', null)"
+chk "收信的人自己有帳號有 lang，優先於那一封信帶的提示" "en" "select public.mail_lang_for('istaff@example.com', 'zh')"
+psql -d "${DB}" -q -c "delete from public.mail_outbox where invite_code in ('${LCODE}','${LCODE2}'); delete from public.invite_codes where code in ('${LCODE}','${LCODE2}'); delete from public.people where name_en='Lang Test';" >/dev/null
 psql -d "${DB}" -q -c "delete from public.mail_outbox where to_email like 'r%@example.com' or to_email='istaff@example.com' and kind='meeting_invite' and subject like '會議%';" >/dev/null
 rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-05-email-layout.sql 2>&1 || true)
 if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then echo "  ok   信的版型那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 信的版型那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi

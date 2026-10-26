@@ -65,8 +65,9 @@ export async function createInvite(code, grants, uses, note) {
 export const loadInviteList = () => rpc("invites_for_review");
 export const invitePerson   = d => rpc("invite_person", { p_email: d.email, p_grants: d.grants, p_rank: d.rank || null,
   p_name_zh: d.name_zh || null, p_name_en: d.name_en || null, p_title_en: d.title_en || null, p_title_zh: d.title_zh || null,
-  p_team: d.team || null, p_term: d.term || null, p_line: d.line || null, p_note: d.note || null });
-export const resendInvite   = code => rpc("resend_invite", { p_code: code });
+  p_team: d.team || null, p_term: d.term || null, p_line: d.line || null, p_note: d.note || null,
+  p_lang: lang() });   // 被邀請的人還沒有帳號，邀請信用邀請人此刻的介面語言（Paul 2026-10-26）
+export const resendInvite   = code => rpc("resend_invite", { p_code: code, p_lang: lang() });
 export const revokeInvite   = code => rpc("revoke_invite", { p_code: code });
 // 排進 outbox 之後立刻寄（跟審核那一頁同一支函式）。
 export const sendMail       = () => rpc("send_pending_mail", { p_limit: 40 });
