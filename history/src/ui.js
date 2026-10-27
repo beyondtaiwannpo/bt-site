@@ -76,10 +76,9 @@ export function timelineHTML(stops, lang) {
     (stops || []).map((s, i) => `<li class="tl-item">${cardHTML(s, i, lang)}</li>`).join("") + `</ol>`;
 }
 
-// 左上淡淡的大年份：用七段式的方塊數字（SVG 形狀）畫，不用文字。
-// 理由：它是裝飾，但只要是文字（連 SVG 的 <text> 都算）Lighthouse 就把它當成「最大的內容」去量 LCP，
-// 而它要等資料來才知道年份。形狀不算內容，年份帶與卡才是給人讀的。digits 的 <symbol> 在 index.html 裡。
-export const ghostHTML = year => String(year || "").replace(/\D/g, "").split("").map((d, i) => `<use href="#d${d}" x="${i * 74}"/>`).join("");
+// 左上淡淡的大年份：顯示字型（Barlow Condensed）的真文字，只留數字。
+// 批 3 原本用七段式的方塊數字避開 Lighthouse 把它當 LCP 量，Paul 2026-11-06 覺得突兀，改回文字並接受那個模擬數字。
+export const ghostHTML = year => esc(String(year || "").replace(/\D/g, ""));
 
 export const loadingHTML = lang => `<p class="state" aria-busy="true"><span class="dot"></span>${esc(t("loading", lang))}</p>`;
 export const errorHTML = lang => `<p class="state err" role="alert">${esc(t("loadError", lang))}</p>`;

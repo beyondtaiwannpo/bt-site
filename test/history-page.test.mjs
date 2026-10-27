@@ -228,11 +228,9 @@ test("骨架（批 3）：一進來先畫一張骨架卡，有 aria-busy，沒�
   assert.ok(h.includes(STR.zh.loading));
 });
 
-test("大年份（批 3）：是形狀不是文字，一個數字一個 <use>", () => {
-  const h = UI.ghostHTML("2023");
-  assert.equal((h.match(/<use /g) || []).length, 4);
-  assert.ok(h.includes('href="#d2"') && h.includes('href="#d3"'));
-  assert.ok(!/<text/.test(h));
+test("大年份：顯示字型的真文字，只留數字", () => {
+  assert.equal(UI.ghostHTML("2023"), "2023");
+  assert.equal(UI.ghostHTML("2023-06"), "202306");
   assert.equal(UI.ghostHTML(""), "");
 });
 

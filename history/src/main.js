@@ -66,8 +66,8 @@ function placeDot() {
   const x = stripCentres.length > 1 ? stripCentres[i] + (stripCentres[i + 1] - stripCentres[i]) * f : stripCentres[0];
   dot.style.left = x.toFixed(1) + "px";
 }
-// 左上淡淡的大年份，跟著現在那一站。方塊數字不是文字（ui.js 的 ghostHTML 有理由）。
-function paintGhost() { const g = $("ghost"); if (g && current >= 0) g.innerHTML = UI.ghostHTML(stops[current].year); }
+// 左上淡淡的大年份，跟著現在那一站。
+function paintGhost() { const g = $("ghost"); if (g && current >= 0) g.textContent = UI.ghostHTML(stops[current].year); }
 function setCurrent(i) {
   if (i === aim) aim = -1;
   if (i === current) return;

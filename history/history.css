@@ -42,8 +42,7 @@ html[data-lang="zh"] .title h1{font-family:var(--han);font-weight:900;letter-spa
 /* 整個世界（場景與卡）靠近一站時一起稍微放大；原點放在畫面中偏下，也就是路上那一站附近。 */
 .world{position:absolute;inset:0;transform-origin:62% 64%;will-change:transform}
 /* 左上淡淡的大年份：參考站的節奏。不是給人讀的（aria-hidden），年份帶與卡才是。 */
-.ghost-svg{position:absolute;left:var(--gut);top:96px;width:min(38vw,520px);height:auto;pointer-events:none;overflow:visible}
-.ghost{fill:var(--bt-navy);fill-opacity:.09}
+.ghost{position:absolute;left:var(--gut);top:72px;font-family:var(--display);font-weight:700;font-size:clamp(120px,22vw,300px);line-height:1;letter-spacing:-.02em;color:var(--bt-navy);opacity:.09;pointer-events:none;user-select:none}
 /* 捲得快：頂欄與年份帶淡一點，停下來就回來。只動透明度。 */
 .top,.strip{transition:opacity var(--dur-2) var(--ease)}
 html.rushing .top,html.rushing .strip{opacity:.45}
@@ -182,7 +181,7 @@ html[data-lang="zh"] .panel-title{font-family:var(--han);font-weight:900;letter-
   .card-title{font-size:15px}
   .card-sub{display:none}
   .card-thumb{width:44px;height:44px}
-  .ghost-svg{top:70px;width:56vw}
+  .ghost{top:60px;font-size:30vw}
   .strip-year{font-size:19px}
   .strip-stop{min-width:64px;padding:6px 10px 4px}
   .strip-progress{font-size:12px;padding:8px 10px}
