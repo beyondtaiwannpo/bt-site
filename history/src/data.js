@@ -4,12 +4,12 @@ import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "../../shared/supabase-co
 
 // 打 public_milestones()。**不載 supabase-js**：對外頁只拿網址與公開金鑰，用瀏覽器的 fetch 打 PostgREST（跟 /events/ 同一招）。
 // 公開金鑰本來就是公開的，真正的門是資料庫：那支函式只回 published 的站與 consent=true 的照片。
+// 用 GET、金鑰放在查詢字串、不加自訂標頭：這樣是瀏覽器眼中的「簡單請求」，不用先送一趟 CORS 預檢，
+// 冷啟動少一個來回（2026-11-06 批 2 量到預檢加 POST 約 440ms，批 3 改掉）。那支函式沒有參數，GET 跟 POST 拿到的一樣。
 export async function fetchStops(timeoutMs) {
   const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), timeoutMs || 6000);
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/public_milestones`, {
-      method: "POST", signal: ctl.signal,
-      headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`, "Content-Type": "application/json" }, body: "{}" });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/public_milestones?apikey=${encodeURIComponent(SUPABASE_PUBLISHABLE_KEY)}`, { signal: ctl.signal });
     if (!r.ok) throw new Error("HTTP " + r.status);
     return normalize(await r.json());
   } finally { clearTimeout(tm); }
@@ -46,6 +46,7 @@ const MOTIF_RULES = [
   ["gate",     /ambassador|campus|school|visit/],
   ["tents",    /bootcamp|camp|retreat|workshop/],
   ["pin",      /alumni|account|network|community/],
+  ["cadre",    /cadre|officer|organis|team|thirty|today|now/],
 ];
 export function motifFor(slug) {
   const s = String(slug || "").toLowerCase();

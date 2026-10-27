@@ -42,7 +42,8 @@ test("代號對場景：關鍵字決定要畫哪一個小場景，認不出來�
   assert.equal(D.motifFor("2023-first-bootcamp"), "tents");
   assert.equal(D.motifFor("2023-summer-camp"), "tents");
   assert.equal(D.motifFor("2025-alumni-accounts"), "pin");
-  assert.equal(D.motifFor("today"), "signpost");
+  assert.equal(D.motifFor("today"), "cadre", "seed 的最後一站 today 是「接近三十位幹部」，畫幹部那一組");
+  assert.equal(D.motifFor("2024-something-else"), "signpost");
   assert.equal(D.motifFor(""), "signpost");
   assert.equal(D.motifFor(null), "signpost");
   assert.ok(S.MOTIFS.includes("signpost"), "scene.js 一定要有預設那一個");
@@ -121,7 +122,7 @@ test("覆蓋層：日期、標題、一句話、說明分段、照片有說明�
 
 test("減少動態那條：同樣的站排成直立時間軸，每站一張卡，順序一樣", () => {
   const h = UI.timelineHTML(STOPS, "zh");
-  assert.equal((h.match(/class="card"/g) || []).length, 3);
+  assert.equal((h.match(/class="card[" ]/g) || []).length, 3);
   assert.ok(h.indexOf("2020") < h.indexOf("2023") && h.indexOf("2023") < h.indexOf("2026"));
   assert.match(h, /<ol[^>]*class="timeline"/);
 });
@@ -141,37 +142,104 @@ test("中英字典：兩邊的鍵一模一樣，t() 缺語言退回英文", () =
   assert.equal(t("nope", "zh"), "nope");
 });
 
-test("場景：站的位置照順序往右、往上（斜向的路）；每站間距固定；世界寬跟站數走", () => {
+test("場景（批 3）：站沿路排在算出來的點上；鏡頭跟著進度沿路走；針孔投影近大遠小、近寬遠窄", () => {
   const w = S.world(7);
   assert.equal(w.stops.length, 7);
-  for (let i = 1; i < 7; i++) {
-    assert.ok(w.stops[i].x > w.stops[i - 1].x, "x 要往右");
-    assert.equal(w.stops[i].x - w.stops[i - 1].x, S.GAP);
-  }
-  assert.ok(S.roadY(w.width) < S.roadY(0), "路要往上走");
-  assert.ok(w.width >= w.stops[6].x + S.GAP / 2);
+  for (let i = 1; i < 7; i++) assert.equal(w.stops[i].z - w.stops[i - 1].z, S.GAP, "站與站沿路等距");
+  assert.ok(w.length > w.stops[6].z, "路要比最後一站長");
   assert.equal(S.world(0).stops.length, 0);
-  assert.ok(S.world(1).width > 0);
-  // 鏡頭：進度 0 在第一站、進度 1 在最後一站、中間線性
-  assert.equal(S.camX(w, 0), w.stops[0].x);
-  assert.equal(S.camX(w, 1), w.stops[6].x);
-  assert.ok(Math.abs(S.camX(w, 0.5) - w.stops[3].x) < 1e-6);
+  assert.ok(S.world(1).length > 0);
+  // 鏡頭：進度 0 停在第一站前面 AHEAD 的地方、進度 1 停在最後一站前面；中間單調往前
+  assert.equal(S.camZ(w, 0), w.stops[0].z - S.AHEAD);
+  assert.equal(S.camZ(w, 1), w.stops[6].z - S.AHEAD);
+  let last = -Infinity;
+  for (let p = 0; p <= 1.0001; p += 0.01) { const z = S.camZ(w, p); assert.ok(z >= last - 1e-9, "鏡頭不能倒退"); last = z; }
+  assert.ok(Math.abs(S.camZ(w, 0.5) - (w.stops[3].z - S.AHEAD)) < 1e-6, "進度一半剛好在第四站");
   assert.equal(S.nearest(w, 0.5), 3);
   assert.equal(S.nearest(w, 0.99), 6);
   assert.equal(S.progressFor(w, 3), 0.5);
   assert.equal(S.progressFor(S.world(1), 0), 0);
+  // 投影：同一條線上越遠的地面點在畫面上越高、越小；在鏡頭後面的點不畫
+  const cam = S.camera(1000, false), cz = S.camZ(w, 0);
+  const a = S.project(cam, 0, 0, cz + 300, cz), b = S.project(cam, 0, 0, cz + 900, cz), c = S.project(cam, 0, 0, cz + 2500, cz);
+  assert.ok(a && b && c);
+  assert.ok(a.y > b.y && b.y > c.y, "越遠越高");
+  assert.ok(a.s > b.s && b.s > c.s, "越遠越小");
+  assert.ok(b.x > a.x, "路往右上退（鏡頭偏轉）");
+  assert.equal(S.project(cam, 0, 0, cz - 400, cz), null, "鏡頭後面的點不畫");
+  // 站的螢幕點：每一站都算得出來，第一站停在畫面裡
+  const pts = S.stopPoints(w, cam, cz);
+  assert.equal(pts.length, 7);
+  assert.ok(pts[0] && pts[0].x > 0 && pts[0].x < 1000 && pts[0].y > 0 && pts[0].y < S.H, JSON.stringify(pts[0]));
+  // 路：近端比遠端寬
+  const road = S.roadPolygon(cam, cz, w.length);
+  assert.ok(road.points.split(" ").length > 20);
+  assert.ok(road.nearWidth > road.farWidth * 3, `近 ${road.nearWidth} 遠 ${road.farWidth}`);
+  // 直式（手機）：路更陡，也就是同樣往前一段，畫面上的 y 變化比 x 變化大
+  const tall = S.camera(375, true);
+  const t1 = S.project(tall, 0, 0, cz + 300, cz), t2 = S.project(tall, 0, 0, cz + 900, cz);
+  const w1 = S.project(cam, 0, 0, cz + 300, cz), w2 = S.project(cam, 0, 0, cz + 900, cz);
+  assert.ok((t1.y - t2.y) / (t2.x - t1.x) > (w1.y - w2.y) / (w2.x - w1.x), "直式的路要比橫式陡");
 });
 
-test("場景 SVG：六層都在、沒有點陣圖、顏色只有 var(--bt-*) 或品牌七色的 rgba，而且裡面沒有任何一站的文字", () => {
-  const svg = S.sceneSVG(S.world(7), STOPS.map(s => D.motifFor(s.slug)));
-  for (const id of ["sky", "far", "mid", "road", "near", "stops"]) assert.ok(svg.includes(`data-layer="${id}"`), "少了 " + id + " 層");
+test("場景 SVG（批 3）：九層都在、有 symbol 與 use、沒有點陣圖、沒有色碼、沒有任何一站的文字、小於 60 KB；直式少一層遠景", () => {
+  const motifs = STOPS.map(s => D.motifFor(s.slug));
+  const svg = S.sceneSVG(S.world(7), motifs, false);
+  for (const id of ["sky", "far", "back", "town", "road", "stops", "life", "near", "haze"]) assert.ok(svg.includes(`data-layer="${id}"`), "少了 " + id + " 層");
+  assert.ok(/<symbol /.test(svg) && (svg.match(/<use /g) || []).length > 30, "物件要用 symbol 加 use 重複用");
   assert.ok(!/<image/i.test(svg));
-  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(svg), "SVG 裡不准寫死色碼");
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(svg.replace(/href="#[a-z-]+"/g, "")), "SVG 裡不准寫死色碼");
   for (const s of STOPS) { assert.ok(!svg.includes(s.title_zh)); assert.ok(!svg.includes(s.title_en)); }
   assert.ok(svg.includes('data-stop="0"') && svg.includes('data-stop="6"'));
   assert.ok(svg.length < 60000, "SVG 太大：" + svg.length);
-  for (const m of S.MOTIFS) assert.ok(S.vignetteSVG(m, 0, 0).includes("<g"), m);
-  assert.equal(S.vignetteSVG("nonsense", 0, 0), S.vignetteSVG("signpost", 0, 0));
+  for (const m of S.MOTIFS) assert.ok(S.vignetteSVG(m).includes("<g"), m);
+  assert.equal(S.vignetteSVG("nonsense"), S.vignetteSVG("signpost"));
+  // 每一種小場景至少三個形狀、有一個閒置動畫的鉤子
+  for (const m of S.MOTIFS) { const v = S.vignetteSVG(m); assert.ok((v.match(/<(rect|circle|polygon|path|ellipse|use)/g) || []).length >= 3, m + " 太少形狀"); assert.ok(/class="[^"]*anim-/.test(v), m + " 沒有閒置動畫的鉤子"); }
+  const tallSvg = S.sceneSVG(S.world(7), motifs, true);
+  assert.ok(!tallSvg.includes('data-layer="back"') || (tallSvg.match(/<use /g) || []).length < (svg.match(/<use /g) || []).length, "直式要少畫一些遠景");
+  // 會動的東西：公車、機車、人、鳥
+  for (const k of ["bus", "scooter", "walker", "bird"]) assert.ok(svg.includes(`data-mover="${k}"`), "少了會動的 " + k);
+});
+
+test("代號對場景（批 3）：多一種 cadre；全部八種場景都畫得出來", () => {
+  assert.equal(D.motifFor("2026-cadre-thirty"), "cadre");
+  assert.equal(D.motifFor("2027-new-officers"), "cadre");
+  for (const m of ["table", "chairs", "laptops", "gate", "tents", "pin", "cadre", "signpost"]) assert.ok(S.MOTIFS.includes(m), m + " 場景沒畫");
+});
+
+test("卡（批 3）：有勾了同意的照片就放第一張當縮圖（lazy、decoding=async、alt 空），沒有照片就沒有 <img>", () => {
+  const withPhoto = UI.cardHTML(STOPS[1], 1, "zh");
+  assert.match(withPhoto, /<img[^>]*class="card-thumb"[^>]*>/);
+  assert.match(withPhoto, /<img[^>]*loading="lazy"/);
+  assert.match(withPhoto, /<img[^>]*decoding="async"/);
+  assert.match(withPhoto, /<img[^>]*alt=""/);
+  assert.ok(withPhoto.includes("history/m1/a.jpg"));
+  assert.ok(!UI.cardHTML(STOPS[0], 0, "zh").includes("<img"));
+  // 卡上可以有一句話（有才印）
+  assert.ok(withPhoto.includes("一句話"));
+});
+
+test("骨架（批 3）：一進來先畫一張骨架卡，有 aria-busy，沒有任何一站的文字", () => {
+  const h = UI.skeletonHTML("zh");
+  assert.ok(h.includes("aria-busy"));
+  assert.ok(h.includes("skeleton"));
+  for (const s of STOPS) assert.ok(!h.includes(s.title_zh));
+  assert.ok(h.includes(STR.zh.loading));
+});
+
+test("大年份（批 3）：是形狀不是文字，一個數字一個 <use>", () => {
+  const h = UI.ghostHTML("2023");
+  assert.equal((h.match(/<use /g) || []).length, 4);
+  assert.ok(h.includes('href="#d2"') && h.includes('href="#d3"'));
+  assert.ok(!/<text/.test(h));
+  assert.equal(UI.ghostHTML(""), "");
+});
+
+test("年份帶（批 3）：有一顆隨捲動滑的點，大年份小標籤", () => {
+  const h = UI.stripHTML(STOPS, 0, "en");
+  assert.ok(h.includes('class="strip-dot"'));
+  assert.ok(h.includes("strip-year") && h.includes("strip-title"));
 });
 
 test("esc：五個該逃的字都逃掉", () => {

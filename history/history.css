@@ -34,29 +34,55 @@ html[data-lang="zh"] .title h1{font-family:var(--han);font-weight:900;letter-spa
 /* 顏色只在這裡給。scene.js 的形狀只掛 class。 */
 .c-navy{fill:var(--bt-navy)}.c-teal{fill:var(--bt-teal)}.c-orange{fill:var(--bt-orange)}.c-sand{fill:var(--bt-sand)}
 .c-cream{fill:var(--bt-cream)}.c-yellow{fill:var(--bt-yellow)}.c-grey{fill:var(--bt-grey)}
-.s-sand{stroke:var(--bt-sand)}
+.s-sand{stroke:var(--bt-sand)}.s-navy{stroke:var(--bt-navy)}.s-orange{stroke:var(--bt-orange)}
+/* 人與車的顏色：symbol 裡寫 currentColor，放的時候掛 p-* 決定。漸層的停點同理。 */
+.p-navy{color:var(--bt-navy)}.p-orange{color:var(--bt-orange)}.p-teal{color:var(--bt-teal)}
+.st-cream{stop-color:var(--bt-cream)}.st-sand{stop-color:var(--bt-sand)}.st-orange{stop-color:var(--bt-orange)}.st-teal{stop-color:var(--bt-teal)}.st-navy{stop-color:var(--bt-navy)}
+.near-plant{filter:saturate(.9)}
+/* 整個世界（場景與卡）靠近一站時一起稍微放大；原點放在畫面中偏下，也就是路上那一站附近。 */
+.world{position:absolute;inset:0;transform-origin:62% 64%;will-change:transform}
+/* 左上淡淡的大年份：參考站的節奏。不是給人讀的（aria-hidden），年份帶與卡才是。 */
+.ghost-svg{position:absolute;left:var(--gut);top:96px;width:min(38vw,520px);height:auto;pointer-events:none;overflow:visible}
+.ghost{fill:var(--bt-navy);fill-opacity:.09}
+/* 捲得快：頂欄與年份帶淡一點，停下來就回來。只動透明度。 */
+.top,.strip{transition:opacity var(--dur-2) var(--ease)}
+html.rushing .top,html.rushing .strip{opacity:.45}
 
-/* 卡片層跟路同一層平移。--s 是每單位幾 px，--tx --ty 是這一層的平移（單位），--x --y 是這一站在世界裡的位置。 */
-.cards{position:absolute;inset:0;pointer-events:none;--s:1;--tx:0;--ty:0}
+/* 卡站在小場景上方。--x --y 是這一幀算出來的畫面座標（單位），--s 是每單位幾 px。卡本身不隨遠近縮放（字要讀得到），只有靠近才浮出來。 */
+.cards{position:absolute;inset:0;pointer-events:none;--s:1}
 .card{position:absolute;pointer-events:auto;
-  left:calc((var(--x) + var(--tx)) * var(--s) * 1px);top:calc((var(--y) + var(--ty)) * var(--s) * 1px);
-  transform:translate(-50%,-100%) translateY(12px);opacity:0;visibility:hidden;
-  display:flex;align-items:center;gap:12px;min-height:56px;width:max-content;max-width:min(300px,80vw);
-  padding:10px 12px 10px 14px;border:1px solid rgba(16,42,134,.18);border-radius:14px;
-  background:rgba(237,229,216,.96);color:var(--ink);text-align:left;cursor:pointer;
-  box-shadow:0 10px 30px rgba(16,42,134,.14),0 2px 6px rgba(16,42,134,.08);
+  left:calc(var(--x) * var(--s) * 1px);top:calc(var(--y) * var(--s) * 1px);
+  transform:translate(-50%,-100%) translateY(14px);opacity:0;visibility:hidden;
+  display:flex;align-items:center;gap:12px;min-height:60px;width:max-content;max-width:min(340px,82vw);
+  padding:10px 16px 10px 12px;border:1px solid rgba(16,42,134,.16);border-radius:14px;
+  background:rgba(237,229,216,.97);color:var(--ink);text-align:left;cursor:pointer;
+  box-shadow:0 14px 36px rgba(16,42,134,.16),0 2px 6px rgba(16,42,134,.08);
   font:400 15px/1.3 var(--body);
   transition:opacity var(--dur-3) var(--ease),transform var(--dur-3) var(--ease),visibility 0s linear var(--dur-3),box-shadow var(--dur-2) var(--ease)}
 .card.near{opacity:1;visibility:visible;transform:translate(-50%,-100%) translateY(0);transition-delay:0s}
-.card:hover{box-shadow:0 16px 40px rgba(16,42,134,.22),0 2px 6px rgba(16,42,134,.1)}
-.card-year{font:700 22px/1 var(--display);color:var(--bt-navy);letter-spacing:.02em;flex:0 0 auto}
-.card-title{flex:1 1 auto;font-weight:500;min-width:0}
-html[data-lang="zh"] .card-title{font-size:15px}
+.card:hover{box-shadow:0 20px 48px rgba(16,42,134,.24),0 2px 6px rgba(16,42,134,.1)}
+.card-thumb{flex:0 0 auto;width:56px;height:56px;border-radius:10px;object-fit:cover;background:rgba(16,42,134,.08)}
 .card-plus{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:var(--bt-orange);color:var(--bt-navy);
   display:grid;place-items:center;font:700 20px/1 var(--display)}
+.card-text{display:flex;flex-direction:column;min-width:0;gap:1px}
+.card-year{font:700 12px/1 var(--display);letter-spacing:.16em;color:rgba(16,42,134,.78)}
+.card-title{font-weight:600;font-size:16px;line-height:1.25}
+html[data-lang="zh"] .card-title{font-size:16px}
+.card-sub{font-size:12.5px;line-height:1.3;color:rgba(16,42,134,.78);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;max-width:240px}
 /* 卡片底下一條小尾巴指到站。 */
 .card::after{content:"";position:absolute;left:50%;bottom:-9px;width:14px;height:14px;transform:translateX(-50%) rotate(45deg);
-  background:rgba(237,229,216,.96);border-right:1px solid rgba(16,42,134,.18);border-bottom:1px solid rgba(16,42,134,.18)}
+  background:rgba(237,229,216,.97);border-right:1px solid rgba(16,42,134,.16);border-bottom:1px solid rgba(16,42,134,.16)}
+
+/* 一進來先站著的骨架卡：形狀跟真的卡一樣，呼吸一下。資料到了就拿掉。 */
+.skeleton-wrap{position:absolute;inset:0;pointer-events:none}
+.skeleton-wrap:empty{display:none}
+.card-skeleton{position:absolute;left:62%;top:50%;transform:translate(-50%,-100%);display:flex;align-items:center;gap:12px;min-height:60px;width:min(300px,78vw);
+  padding:10px 16px 10px 12px;border:1px solid rgba(16,42,134,.12);border-radius:14px;background:rgba(237,229,216,.9);box-shadow:0 14px 36px rgba(16,42,134,.1)}
+.sk-plus{width:30px;height:30px;border-radius:50%;background:rgba(255,196,108,.6);flex:0 0 auto}
+.sk-text{display:flex;flex-direction:column;gap:7px;flex:1 1 auto}
+.sk-line{display:block;height:10px;border-radius:5px;background:rgba(16,42,134,.1);animation:sk-breathe 1.3s var(--ease) infinite}
+.sk-year{width:44px}.sk-title{width:78%}
+@keyframes sk-breathe{0%,100%{opacity:.5}50%{opacity:1}}
 
 /* 第一次進來的提示。捲一點就消失。 */
 .hint{position:absolute;left:50%;bottom:calc(var(--strip-h) + 18px);transform:translateX(-50%);margin:0;
@@ -67,23 +93,29 @@ html[data-lang="zh"] .card-title{font-size:15px}
 .hint.gone{opacity:0;visibility:hidden}
 @keyframes hint-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(8px)}}
 
-/* ── 底部年份帶 ── */
+/* ── 底部年份帶：大年份、小標籤、橘線，一顆點隨捲動滑。 ── */
 .strip{position:fixed;left:0;right:0;bottom:0;z-index:55;height:var(--strip-h);display:flex;align-items:center;gap:10px;
   padding:0 var(--gut);background:linear-gradient(180deg,rgba(237,229,216,.6),rgba(237,229,216,.96));
   backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
   border-top:1px solid rgba(16,42,134,.1)}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.strip{background:var(--bt-cream)}}
-.strip-stops{display:flex;align-items:stretch;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity;padding:4px 0}
+.strip-stops{position:relative;display:flex;align-items:stretch;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity;padding:6px 0 4px}
 .strip-stops::-webkit-scrollbar{display:none}
-.strip-stop{flex:0 0 auto;min-height:44px;min-width:64px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;
-  padding:6px 12px;border:0;border-radius:10px;background:none;color:var(--ink);cursor:pointer;text-align:left;scroll-snap-align:center;
+.strip-stops::before{content:"";position:absolute;left:0;right:0;top:5px;height:1px;background:rgba(16,42,134,.14)}
+.strip-dot{position:absolute;top:0;left:0;width:11px;height:11px;border-radius:50%;background:var(--bt-orange);border:2px solid var(--bt-cream);box-shadow:0 0 0 1px rgba(16,42,134,.25);
+  transform:translate(-50%,0);transition:left var(--dur-1) linear;pointer-events:none;z-index:1}
+.strip-stop{flex:0 0 auto;min-height:44px;min-width:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;
+  padding:6px 12px 4px;border:0;border-radius:8px 8px 0 0;background:none;color:var(--ink);cursor:pointer;text-align:left;scroll-snap-align:center;
   border-bottom:2px solid transparent;transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
 .strip-stop:hover{background:rgba(255,196,108,.26)}
-.strip-stop.on{border-bottom-color:var(--bt-orange);background:rgba(255,196,108,.22)}
-.strip-year{font:700 16px/1 var(--display);letter-spacing:.02em}
-.strip-title{font-size:12px;line-height:1.2;color:rgba(16,42,134,.78);white-space:nowrap}
+.strip-stop.on{border-bottom-color:var(--bt-orange)}
+.strip-year{font:700 22px/1 var(--display);letter-spacing:.01em;color:rgba(16,42,134,.72)}
+.strip-stop.on .strip-year{color:var(--ink)}
+.strip-title{font:600 10.5px/1.2 var(--body);letter-spacing:.12em;text-transform:uppercase;color:rgba(16,42,134,.74);white-space:nowrap}
+html[data-lang="zh"] .strip-title{letter-spacing:.08em;font-size:11.5px}
 .strip-stop.on .strip-title{color:var(--ink)}
-.strip-progress{flex:0 0 auto;font:700 13px/1 var(--display);letter-spacing:.14em;background:var(--bt-navy);color:var(--bt-cream);border-radius:999px;padding:9px 13px;white-space:nowrap}
+.strip-progress{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;font:700 13px/1 var(--display);letter-spacing:.14em;background:var(--bt-navy);color:var(--bt-cream);border-radius:999px;padding:9px 13px;white-space:nowrap}
+.strip-progress::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--bt-orange)}
 
 /* ── 覆蓋層 ── */
 .panel{position:fixed;top:0;right:0;bottom:0;z-index:80;width:min(600px,100%);background:var(--paper);color:var(--ink);overflow-y:auto;
@@ -146,8 +178,13 @@ html[data-lang="zh"] .panel-title{font-family:var(--han);font-weight:900;letter-
   .title .sub{display:none}
   .title h1{font-size:18px}
   .play{padding:9px 11px;font-size:12px}
-  .card{max-width:min(280px,82vw);padding:9px 10px 9px 12px;gap:10px}
-  .card-year{font-size:19px}
+  .card{max-width:min(280px,84vw);padding:9px 12px 9px 10px;gap:10px}
+  .card-title{font-size:15px}
+  .card-sub{display:none}
+  .card-thumb{width:44px;height:44px}
+  .ghost-svg{top:70px;width:56vw}
+  .strip-year{font-size:19px}
+  .strip-stop{min-width:64px;padding:6px 10px 4px}
   .strip-progress{font-size:12px;padding:8px 10px}
   /* 手機上照片橫著滑，一張一屏，用手指掃。 */
   .gallery{display:flex;overflow-x:auto;gap:10px;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(-1 * var(--gut));padding:0 var(--gut)}
@@ -170,4 +207,5 @@ button:not([disabled]):active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
   .card{transform:translate(-50%,-100%)}
+  .world{will-change:auto}
 }

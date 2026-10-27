@@ -12,10 +12,11 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || new URL
 
 let lang = doc.getAttribute("data-lang") || "en";
 let stops = [], w = S.world(0), motifs = [];
-let current = -1, progress = 0, viewW = 1000, scale = 1;
+let current = -1, progress = 0, viewW = 1000, scale = 1, tall = false, cam = S.camera(1000, false);
 let api = null;                 // motion() 回的把手；減少動態或 gsap 沒載到就是 null
-let layers = {}, cardsEl = null, cardEls = [];
-let openedFrom = null, savedY = 0, playing = false, raf = 0;
+let reg = null;                 // scene.attach() 記下來的節點
+let cardsEl = null, cardEls = [], stripCentres = [];
+let openedFrom = null, savedY = 0, playing = false, raf = 0, clock = 0;
 let aim = -1;   // 鍵盤連按時的目標站：鏡頭還在滑的時候 current 還沒變，連按三下要跳三站不是一站
 
 // ── 語言 ──
@@ -27,7 +28,7 @@ function setLang(l) {
   const home = $("home"); if (home) home.href = "../?lang=" + l;
   $("lang").textContent = t("lang", l); $("lang").setAttribute("aria-label", t("langLabel", l));
   paintPlay();
-  if (stops.length) { renderCards(); renderStrip(); if (!$("panel").hidden) $("panel").innerHTML = UI.overlayHTML(stops[current], lang); }
+  if (stops.length) { renderCards(); renderStrip(); paintGhost(); if (!$("panel").hidden) $("panel").innerHTML = UI.overlayHTML(stops[current], lang); }
 }
 function paintPlay() { const b = $("play"); b.textContent = playing ? t("pause", lang) : t("play", lang); b.setAttribute("aria-pressed", playing ? "true" : "false"); }
 
@@ -36,15 +37,42 @@ function renderCards() {
   if (!cardsEl) return;
   cardsEl.innerHTML = stops.map((s, i) => UI.cardHTML(s, i, lang)).join("");
   cardEls = [...cardsEl.querySelectorAll(".card")];
-  cardEls.forEach((c, i) => { c.style.setProperty("--x", w.stops[i].x); c.style.setProperty("--y", w.stops[i].y - 150); });
-  markNear();
+  placeCards(S.stopPoints(w, cam, S.camZ(w, progress)));
 }
-function renderStrip() { $("strip").innerHTML = UI.stripHTML(stops, current, lang); }
+// 卡站在小場景上方：--x --y 是畫面座標（單位），--s 是每單位幾 px。卡不隨遠近縮放（字要讀得到），靠近才浮出來。
+function placeCards(pts) {
+  cardEls.forEach((c, i) => {
+    const p = pts[i]; if (!p) { c.classList.remove("near"); return; }
+    // 卡不准被畫面左右切掉（手機上那一站靠右邊）：夾在邊界內，尾巴可以歪一點沒關係。
+    const half = (c.offsetWidth || 280) / 2 / scale + 10 / scale;
+    const x = Math.min(viewW - half, Math.max(half, p.x));
+    c.style.setProperty("--x", x.toFixed(1)); c.style.setProperty("--y", p.top.toFixed(1));
+    // 鏡頭快到了卡才浮出來：現在這一站，加上下一站在快到之前那一小段。
+    c.classList.toggle("near", p.depth < S.AHEAD + 520);
+  });
+}
+function renderStrip() {
+  $("strip").innerHTML = UI.stripHTML(stops, current, lang);
+  measureStrip(); placeDot();
+}
+function measureStrip() {
+  const box = $("strip").querySelector(".strip-stops");
+  stripCentres = box ? [...box.querySelectorAll(".strip-stop")].map(b => b.offsetLeft + b.offsetWidth / 2) : [];
+}
+// 年份帶上的那顆點：在兩站的中心之間照進度滑。
+function placeDot() {
+  const dot = $("strip").querySelector(".strip-dot"); if (!dot || stripCentres.length < 1) return;
+  const q = progress * (stripCentres.length - 1), i = Math.min(stripCentres.length - 2, Math.max(0, Math.floor(q))), f = q - i;
+  const x = stripCentres.length > 1 ? stripCentres[i] + (stripCentres[i + 1] - stripCentres[i]) * f : stripCentres[0];
+  dot.style.left = x.toFixed(1) + "px";
+}
+// 左上淡淡的大年份，跟著現在那一站。方塊數字不是文字（ui.js 的 ghostHTML 有理由）。
+function paintGhost() { const g = $("ghost"); if (g && current >= 0) g.innerHTML = UI.ghostHTML(stops[current].year); }
 function setCurrent(i) {
   if (i === aim) aim = -1;
   if (i === current) return;
   current = i;
-  renderStrip(); revealCurrent();
+  renderStrip(); revealCurrent(); paintGhost();
   // 網址寫上這一站。replaceState 不會讓瀏覽器自己跳。
   history.replaceState(null, "", location.pathname + location.search + D.hashFor(stops[i]));
 }
@@ -55,29 +83,56 @@ function revealCurrent(instant) {
   const box = strip.querySelector(".strip-stops");
   box.scrollTo({ left: on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2, behavior: instant || reduce ? "auto" : "smooth" });
 }
-function markNear() {
-  const cx = S.camX(w, progress);
-  cardEls.forEach((c, i) => c.classList.toggle("near", Math.abs(w.stops[i].x - cx) < S.GAP * 0.42));
+// 捲得快的時候頂欄與年份帶稍微淡掉，停下來就回來。
+let lastP = 0, lastT = 0, rushTimer = 0;
+function rush(p) {
+  const now = performance.now(), dt = now - lastT;
+  if (dt > 0 && dt < 200) {
+    const v = Math.abs(p - lastP) / dt * 1000 * Math.max(1, w.n - 1);   // 每秒走幾站
+    if (v > 1.6) { doc.classList.add("rushing"); clearTimeout(rushTimer); rushTimer = setTimeout(() => doc.classList.remove("rushing"), 260); }
+  }
+  lastP = p; lastT = now;
 }
 let measured = [0, 0];   // 上次量到的 stage 尺寸；每次推進度先比一下，變了就重量（事件來不來都不靠）
 function onProgress(p) {
   progress = p;
   if (stageEl && (stageEl.clientWidth !== measured[0] || stageEl.clientHeight !== measured[1])) { size(); return; }
-  S.applyTransforms(layers, S.transforms(w, p, viewW));
-  const tr = S.transforms(w, p, viewW).stops;
-  if (cardsEl) { cardsEl.style.setProperty("--tx", tr[0]); cardsEl.style.setProperty("--ty", tr[1]); }
-  markNear();
+  if (!reg) return;
+  const pts = S.frame(reg, w, cam, p, clock);
+  placeCards(pts);
+  // 靠近一站鏡頭稍微放大：整個世界（場景與卡）一起。
+  const zoom = 1 + 0.05 * S.closeness(w, p);
+  if (worldEl) worldEl.style.transform = `scale(${zoom.toFixed(3)})`;
+  placeDot(); rush(p);
   const n = S.nearest(w, p); if (n >= 0) setCurrent(n);
   if (p > 0.01) $("hint").classList.add("gone");
 }
-let stageEl = null, sceneEl = null;   // 會動的那一條或靜的那一張，boot() 決定
+// 閒置的時鐘：路上的車與人。進度沒變的時候 frame() 只動它們。
+function onTick(tsec) { clock = tsec; if (reg && !document.hidden) S.frame(reg, w, cam, progress, clock); }
+let stageEl = null, sceneEl = null, worldEl = null;   // 會動的那一條或靜的那一張，boot() 決定
+function buildScene() {
+  sceneEl.innerHTML = S.sceneSVG(w, motifs, tall);
+  reg = S.attach(sceneEl); reg.lastP = undefined;
+  S.layout(reg, cam);
+  if (api) api.rebind();
+}
+// 資料來了：站數在村子鋪好的長度內就只放站，不重鋪（重鋪一次是這一頁最重的排版）。
+function placeStops() {
+  if (!reg || stops.length > S.MIN_STOPS) { buildScene(); return; }
+  S.placeStops(reg, w, motifs);
+  if (api) api.rebind();
+}
 function size() {
   if (!stageEl) return;
   const h = stageEl.clientHeight || innerHeight, ww = stageEl.clientWidth || innerWidth;
   measured = [stageEl.clientWidth, stageEl.clientHeight];
   scale = h / S.H; viewW = ww / scale;
+  const nowTall = ww < h * 0.9;
+  cam = S.camera(viewW, nowTall);
   sceneEl.setAttribute("viewBox", `0 0 ${viewW.toFixed(1)} ${S.H}`);
   if (cardsEl) cardsEl.style.setProperty("--s", scale);
+  if (nowTall !== tall || !reg) { tall = nowTall; buildScene(); } else S.layout(reg, cam);
+  reg.lastP = undefined;
   onProgress(progress);
 }
 
@@ -171,40 +226,64 @@ $("play").addEventListener("click", () => playing ? stopPlay() : startPlay());
 addEventListener("hashchange", () => { const i = D.indexFromHash(location.hash, stops); if (i >= 0 && i !== current) goTo(i); });
 // 視窗變了就重量。用 ResizeObserver 不用 resize 事件：嵌在別的視窗裡（預覽面板、iframe）時 resize 不一定會來，而 stage 的大小變了是真的。
 let roTimer = 0;
-const onResize = () => { clearTimeout(roTimer); roTimer = setTimeout(() => { size(); if (api) api.refresh(); }, 80); };
+const onResize = () => { clearTimeout(roTimer); roTimer = setTimeout(() => { size(); measureStrip(); placeDot(); if (api) api.refresh(); }, 80); };
 addEventListener("resize", onResize);
 if ("ResizeObserver" in window) new ResizeObserver(onResize).observe(document.documentElement);
+
+// GSAP 的兩支 script 排在 main.js 後面（這樣主程式先跑、先去拿資料）。等它們載完或失敗再決定走哪一條。
+// 已經載到的（window.gsap 在）不等；還在路上的等 load 或 error；最多等四秒，之後當作沒載到走直立時間軸。
+function gsapReady() {
+  const waits = [...document.querySelectorAll('script[src*="cdnjs.cloudflare.com/ajax/libs/gsap"]')]
+    .filter(s => !(/ScrollTrigger/.test(s.src) ? window.ScrollTrigger : window.gsap))
+    .map(s => new Promise(res => { s.addEventListener("load", res, { once: true }); s.addEventListener("error", res, { once: true }); }));
+  return Promise.race([Promise.all(waits), new Promise(res => setTimeout(res, 4000))]);
+}
+
+// 讓瀏覽器先畫一幀再繼續。分頁在背景時 requestAnimationFrame 不會來，所以最多等 150ms 就往下走，不會卡住。
+const paintFirst = () => new Promise(r => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 150); });
 
 // ── 開頁 ──
 // 捲動位置由網址的 #代號 決定，不讓瀏覽器自己恢復上一次的位置（重新整理之後兩邊搶，鏡頭會跳兩次）。
 try { history.scrollRestoration = "manual"; } catch (e) {}
 async function boot() {
   setLang(lang);
-  const state = $("state"); state.innerHTML = UI.loadingHTML(lang);
-  try { stops = await D.fetchStops(); }
-  catch (e) { console.error("public_milestones() 拿不到：", e); state.innerHTML = UI.errorHTML(lang); return; }
+  // 先把路畫出來、放一張骨架卡，不等資料（手機上 public_milestones() 要幾百毫秒，空白幾百毫秒看起來像壞了）。
+  const state = $("state");
+  stageEl = reduce ? $("stage-static") : $("stage"); sceneEl = stageEl.querySelector("svg"); worldEl = stageEl.querySelector(".world");
+  (reduce ? $("static") : $("road-wrap")).hidden = false;
+  $("skeleton").innerHTML = UI.skeletonHTML(lang);
+  const fetching = D.fetchStops();
+  // 先讓瀏覽器把頂欄與骨架畫出來，再畫路（擋在第一次繪製前面就是白畫面）。
+  await paintFirst();
+  size();
+  let rows;
+  await gsapReady();
+  try { rows = await fetching; }
+  catch (e) { console.error("public_milestones() 拿不到：", e); $("skeleton").innerHTML = ""; state.innerHTML = UI.errorHTML(lang); return; }
+  stops = rows;
+  $("skeleton").innerHTML = "";
   if (!stops.length) { state.innerHTML = UI.emptyHTML(lang); return; }
   state.innerHTML = "";
   w = S.world(stops.length); motifs = stops.map(s => D.motifFor(s.slug));
   const start = Math.max(0, D.indexFromHash(location.hash, stops));
   // 能動的條件：沒開減少動態效果，而且 gsap 真的載到了（CDN 被擋、雜湊對不上都算沒載到）。
   const canMove = !reduce && window.gsap && window.ScrollTrigger;
-  stageEl = canMove ? $("stage") : $("stage-static"); sceneEl = stageEl.querySelector("svg");
-  sceneEl.innerHTML = S.sceneSVG(w, motifs);
-  for (const k of ["far", "mid", "road", "stops", "near"]) layers[k] = sceneEl.querySelector(`[data-layer="${k}"]`);
-
+  if (!canMove && !reduce) {
+    // 本來準備走動的，gsap 沒來：換到靜的那一張。
+    $("road-wrap").hidden = true; $("static").hidden = false;
+    stageEl = $("stage-static"); sceneEl = stageEl.querySelector("svg"); worldEl = null; reg = null;
+  }
   if (canMove) {
     cardsEl = $("cards");
-    $("road-wrap").hidden = false; $("road-wrap").style.height = `${(stops.length + 1) * 100}vh`;
-    renderCards(); size();
-    api = S.motion({ wrap: $("road-wrap"), stage: $("stage"), onProgress });
-    size(); api.refresh();
+    $("road-wrap").style.height = `${(stops.length + 1) * 100}vh`;
+    placeStops(); size(); renderCards();
+    api = S.motion({ wrap: $("road-wrap"), stage: $("stage"), svg: sceneEl, onProgress, onTick });
+    api.rebind(); api.refresh();
     // 帶 #代號 進來就直接站到那一站（瞬間，不滑），沒有就第一站。年份帶與網址由 onProgress 順手寫。
     api.jump(S.progressFor(w, start), true);
   } else {
     // 直立時間軸：場景畫一張靜的在上面（進度 0），底下每一站一張卡。
-    $("static").hidden = false;
-    size(); onProgress(0);
+    placeStops(); size(); onProgress(0);
     $("timeline").innerHTML = UI.timelineHTML(stops, lang);
     cardEls = [...$("timeline").querySelectorAll(".card")];
     if (start > 0) goTo(start, true); else setCurrent(0);
@@ -220,6 +299,6 @@ async function boot() {
     }
   }
   $("strip").hidden = false;
-  revealCurrent(true);
+  renderStrip(); revealCurrent(true);
 }
 boot();

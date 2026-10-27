@@ -18,22 +18,30 @@ export function dateText(iso, lang) {
 export const progressText = (i, n) => String(n ? i + 1 : 0).padStart(2, "0") + " / " + String(n).padStart(2, "0");
 
 // 路邊那張卡。是 button：點或 Enter 都打開覆蓋層。data-i 是站的序號，main.js 用它找站。
+// 有勾了同意的照片就把第一張當小縮圖（參考站的卡也是這樣）；沒有就沒有 <img>，不會有破圖。
 export function cardHTML(stop, i, lang) {
-  const title = pick(stop, "title", lang);
+  const title = pick(stop, "title", lang), summary = pick(stop, "summary", lang);
+  const thumb = stop.photos && stop.photos[0] ? `<img class="card-thumb" src="${esc(stop.photos[0].url)}" alt="" loading="lazy" decoding="async" width="72" height="72">` : "";
   // 不用 aria-label：讀螢幕的名字要以看得見的字開頭（WCAG 2.5.3），所以年份與標題照印，「打開這一站」用看不見的 span 接在後面。
-  return `<button type="button" class="card" data-i="${i}">` +
-    `<span class="card-year">${esc(stop.year)}</span>` +
+  return `<button type="button" class="card${thumb ? " has-thumb" : ""}" data-i="${i}">` + thumb +
+    `<span class="card-plus" aria-hidden="true">+</span>` +
+    `<span class="card-text"><span class="card-year">${esc(stop.year)}</span>` +
     `<span class="card-title">${esc(title)}</span>` +
-    `<span class="sr">（${esc(t("open", lang))}）</span>` +
-    `<span class="card-plus" aria-hidden="true">+</span></button>`;
+    (summary ? `<span class="card-sub">${esc(summary)}</span>` : "") +
+    `<span class="sr">（${esc(t("open", lang))}）</span></span></button>`;
 }
 
-// 底部年份帶：每站一顆，現在那一站 aria-current。
+// 一進來先畫的骨架：一張卡的形狀加「路在鋪」那一句，資料到了就換成真的卡。沒有任何一站的文字。
+export const skeletonHTML = lang =>
+  `<div class="skeleton card-skeleton" aria-busy="true"><span class="sk-plus"></span><span class="sk-text"><span class="sk-line sk-year"></span><span class="sk-line sk-title"></span></span>` +
+  `<span class="sr">${esc(t("loading", lang))}</span></div>`;
+
+// 底部年份帶：每站一顆（大年份、小標籤），現在那一站 aria-current；一顆小點隨捲動在帶上滑（位置 main.js 每一幀寫）。
 export function stripHTML(stops, current, lang) {
   const items = (stops || []).map((s, i) =>
     `<button type="button" class="strip-stop${i === current ? " on" : ""}" data-i="${i}"${i === current ? ' aria-current="step"' : ""}>` +
     `<span class="strip-year">${esc(s.year)}</span><span class="strip-title">${esc(shortTitle(s, lang))}</span></button>`).join("");
-  return `<div class="strip-stops" role="group" aria-label="${esc(t("strip", lang))}">${items}</div>` +
+  return `<div class="strip-stops" role="group" aria-label="${esc(t("strip", lang))}"><span class="strip-dot" aria-hidden="true"></span>${items}</div>` +
     `<div class="strip-progress" aria-live="polite"><span class="sr">${esc(t("progress", lang))} </span>${progressText(current, (stops || []).length)}</div>`;
 }
 
@@ -67,6 +75,11 @@ export function timelineHTML(stops, lang) {
   return `<ol class="timeline" aria-label="${esc(t("timelineTitle", lang))}">` +
     (stops || []).map((s, i) => `<li class="tl-item">${cardHTML(s, i, lang)}</li>`).join("") + `</ol>`;
 }
+
+// 左上淡淡的大年份：用七段式的方塊數字（SVG 形狀）畫，不用文字。
+// 理由：它是裝飾，但只要是文字（連 SVG 的 <text> 都算）Lighthouse 就把它當成「最大的內容」去量 LCP，
+// 而它要等資料來才知道年份。形狀不算內容，年份帶與卡才是給人讀的。digits 的 <symbol> 在 index.html 裡。
+export const ghostHTML = year => String(year || "").replace(/\D/g, "").split("").map((d, i) => `<use href="#d${d}" x="${i * 74}"/>`).join("");
 
 export const loadingHTML = lang => `<p class="state" aria-busy="true"><span class="dot"></span>${esc(t("loading", lang))}</p>`;
 export const errorHTML = lang => `<p class="state err" role="alert">${esc(t("loadError", lang))}</p>`;

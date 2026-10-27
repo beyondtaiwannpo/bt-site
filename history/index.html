@@ -11,8 +11,9 @@
      每一站可以點開看那一年的說明與照片。計畫在 docs/2026-11-05-BT-歷史之路計畫.md。
 
      ── 這一頁在做什麼 ──
-     一條斜向的路，分層的 inline SVG（天空、遠山、中景、路、每一站、近景），捲動時鏡頭沿路前進，各層視差不同。
-     每一站路邊一個小場景加一張卡；點卡打開覆蓋層。底部一條年份帶。
+     一台架得高、斜著往下看的鏡頭（批 3，2026-11-06 重畫）：一條從左下退進霧裡的路、路邊的村子、路上會動的車與人，
+     每個東西每一幀照真的針孔投影算位置與大小（scene.js 開頭有解釋）。捲動是鏡頭沿路往前走，靠近每一站停一下。
+     每一站路邊一個小場景加一張卡；點卡打開覆蓋層。底部一條年份帶，左上一個淡淡的大年份。
      開了「減少動態效果」、或 GSAP 從 cdnjs 載不到：不釘、不視差，同樣的站排成直立時間軸，一站都不少。
 
      ── 資料只從一個地方來 ──
@@ -39,11 +40,14 @@
 <link rel="manifest" href="../shared/site.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
 
-<!-- GSAP 在頁尾載，這裡先預告，瀏覽器提早去抓。preload 的屬性要跟頁尾那支一字不差（check.sh 的理由見首頁）。 -->
+<!-- GSAP 在頁尾載，這裡先預告，瀏覽器提早去抓。preload 的屬性要跟頁尾那支一字不差（check.sh 的理由見首頁）。兩支都預告。 -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="preload" as="script" crossorigin="anonymous" referrerpolicy="no-referrer"
       integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
       href="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js">
+<link rel="preload" as="script" crossorigin="anonymous" referrerpolicy="no-referrer"
+      integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg=="
+      href="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js">
 <!-- main.js 底下那四支模組先預告，不用等 main.js 讀完才一支一支去抓（Lighthouse 實測模組是三層瀑布）。
      Supabase 的 preconnect 刻意不加：那要把專案網址再抄一份在這裡，check.sh 不准（網址只能在 shared/supabase-config.js）。 -->
 <link rel="modulepreload" href="./src/data.js">
@@ -93,11 +97,17 @@
 <main id="main">
   <div id="state" class="state-wrap"></div>
 
-  <!-- 會動的那一條：外面這一段很高（JS 照站數設），裡面的 stage 被釘住一整屏，捲動只推鏡頭。 -->
+  <!-- 會動的那一條：外面這一段很高（JS 照站數設），裡面的 stage 被釘住一整屏，捲動只推鏡頭。
+       .world 包住場景與卡，靠近一站時整個一起稍微放大。骨架卡在資料來之前先站著。 -->
   <section class="road-wrap" id="road-wrap" hidden>
     <div class="stage" id="stage">
-      <svg id="scene" class="scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"></svg>
-      <div class="cards" id="cards"></div>
+      <div class="world" id="world">
+        <svg id="scene" class="scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"></svg>
+        <div class="cards" id="cards"></div>
+      </div>
+      <!-- 左上淡淡的大年份：七段式的方塊數字，不是文字（理由見 src/ui.js 的 ghostHTML）。年份由 main.js 塞 <use> 進來。 -->
+      <svg class="ghost-svg" viewBox="0 0 300 100" preserveAspectRatio="xMinYMin meet" aria-hidden="true" focusable="false"><defs><symbol id="d0" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/><rect x="4" y="84" width="56" height="16" rx="4"/><rect x="0" y="50" width="16" height="46" rx="4"/><rect x="0" y="4" width="16" height="46" rx="4"/></symbol><symbol id="d1" overflow="visible"><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/></symbol><symbol id="d2" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="4" y="42" width="56" height="16" rx="4"/><rect x="0" y="50" width="16" height="46" rx="4"/><rect x="4" y="84" width="56" height="16" rx="4"/></symbol><symbol id="d3" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="4" y="42" width="56" height="16" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/><rect x="4" y="84" width="56" height="16" rx="4"/></symbol><symbol id="d4" overflow="visible"><rect x="0" y="4" width="16" height="46" rx="4"/><rect x="4" y="42" width="56" height="16" rx="4"/><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/></symbol><symbol id="d5" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="0" y="4" width="16" height="46" rx="4"/><rect x="4" y="42" width="56" height="16" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/><rect x="4" y="84" width="56" height="16" rx="4"/></symbol><symbol id="d6" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="0" y="4" width="16" height="46" rx="4"/><rect x="4" y="42" width="56" height="16" rx="4"/><rect x="0" y="50" width="16" height="46" rx="4"/><rect x="4" y="84" width="56" height="16" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/></symbol><symbol id="d7" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/></symbol><symbol id="d8" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/><rect x="4" y="84" width="56" height="16" rx="4"/><rect x="0" y="50" width="16" height="46" rx="4"/><rect x="0" y="4" width="16" height="46" rx="4"/><rect x="4" y="42" width="56" height="16" rx="4"/></symbol><symbol id="d9" overflow="visible"><rect x="4" y="0" width="56" height="16" rx="4"/><rect x="48" y="4" width="16" height="46" rx="4"/><rect x="48" y="50" width="16" height="46" rx="4"/><rect x="4" y="84" width="56" height="16" rx="4"/><rect x="0" y="4" width="16" height="46" rx="4"/><rect x="4" y="42" width="56" height="16" rx="4"/></symbol></defs><g class="ghost" id="ghost"></g></svg>
+      <div class="skeleton-wrap" id="skeleton"></div>
       <p class="hint" id="hint" aria-hidden="true"><span class="zh">往下捲</span><span class="en">Scroll</span><span class="hint-arrow"></span></p>
     </div>
   </section>
@@ -118,14 +128,16 @@
 <div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden></div>
 <div class="lightbox" id="lightbox" hidden></div>
 
-<!-- GSAP 從 cdnjs 載，integrity 是 cdnjs 公布的雜湊，檔案被換掉就不執行；那時這一頁退回直立時間軸，不會壞。
-     升級版本要同時改這裡、head 的 preload、首頁、check.sh 的兩個雜湊。 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
+<!-- 主程式排在 GSAP 前面、GSAP 加 defer：三支都在網頁讀完之後照順序跑，所以主程式先跑、先去拿資料、先把路與骨架畫出來，
+     不用等 GSAP 下載完。主程式會等那兩支載完（或失敗）再決定走動的還是直立時間軸（main.js 的 gsapReady）。
+     GSAP 從 cdnjs 載，integrity 是 cdnjs 公布的雜湊，檔案被換掉就不執行；那時這一頁退回直立時間軸，不會壞。
+     升級版本要同時改這裡、head 的兩個 preload、首頁、check.sh 的兩個雜湊。 -->
+<script type="module" src="./src/main.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer
         integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer
         integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script type="module" src="./src/main.js"></script>
 </body>
 </html>
