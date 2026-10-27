@@ -3494,6 +3494,13 @@ Paul 看完批 3 說還不錯，接著要把主題換成機場：BT 這個名字
 - 結尾那一句我定的是「路還在走。／下一站，等你一起。」與「The journey continues. / Next stop, with you.」，在 `strings.js` 的 `endLine` 與 `endSub`。
 - 飛機是平面貼圖，沿滑行道在畫面上的方向（約 50 度）畫，所以推出登機門那一段是側滑不是轉彎；要真的轉彎就是 3D，那是另一個決定。
 
+### 同一天第二輪（Paul 看過之後要修的三件）
+
+- **飛機重畫成客機**：圓機頭、收細的尾錐、一排窗、駕駛艙窗、後掠機翼、翼下兩具引擎、水平尾翼、橘色垂直尾翼帶一片奶油色的台灣、起落架在地上看得到、離地就收（`frame()` 看 `lift`）。每個零件掛 `pl-*` 的 class，測試「飛機（批 4 修正）」照名字數。停著的飛機是同一具身體，尾翼 `currentColor`。
+- **換鏡分兩步**：室內先淡出並往左上滑走（0.36 到 0.385），室外再縮進來（0.375 到 0.40），任何一刻兩邊不同時超過一半（有測試）。
+- **起飛的顏色**：地面的霧只在地平線附近濃、往下很快變淡、帶一點沙色；離地後看得到的距離拉遠一倍，跑道一路收細退遠；天空多一層高空藍的漸層，黃昏那一層與地平線的白帶隨離地淡掉。
+- 一個順手抓到的錯，寫在這裡給下一個畫 SVG 的人：**同一個元素不能寫兩次 `class`**，瀏覽器只認第一個，第二個整個不見（尾翼因此變黑）。測試現在擋整個場景裡的重複 class。
+
 ## 視覺收尾（2026-11-05）
 
 Paul 2026-11-05：「我要讓這個網站變成最好看的。」這一輪不加新功能，只把全站「碰到會有反應」的細節做齊，
@@ -3694,6 +3701,91 @@ Paul 2026-10-24：「其他 team 要跟 Marketing 提需求，要有一張表單
 | `test/requests.test.mjs` | 側欄、送單頁、佇列、卡、信件文案、資料層只走函式、英文不剩中文 |
 
 **還沒驗的**：正式站（遷移檔沒跑、程式沒 push），真的寄出去的信長什麼樣（本機只有 outbox 裡的內容）。
+
+## 後台速度（2026-11-06）
+
+Paul 2026-11-06 說後台換頁很慢，而且剛上線的側欄新項目重整一下就不見。量了之後兩件事都有解，數字在 `docs/2026-11-06-後台速度與自動儲存.md`。
+
+### 慢在哪
+
+從台北到 Supabase（新加坡）一趟約 300 毫秒。改前每一頁的畫面要等**所有**資料回來才畫，而資料是一層一層排隊去拿的：
+先問「我是誰」（profiles），回來再問「我被派進哪幾個工作區」（my_access），回來再去拿這一頁真正要的東西。
+總覽最嚴重，八層排隊，實測 3.6 秒畫面上只有一句「載入中…」。
+
+### 改了四件事
+
+1. **「我是誰」只問一次，問完記十分鐘。** `shared/auth.js` 多了 `whoAmI(userId)`：profiles 與 my_access **同時**問，
+   答案存進這個分頁的 sessionStorage（關掉分頁就沒有）。十分鐘內從後台任何一頁換到另一頁，這一步不用等。
+   會主動清掉的時候：登出、自己在 /settings/ 改了資料、在時間看板改了時區、換一個人登入。
+   職級被 Co-President 改掉的人最慢十分鐘後側欄才會跟著變，但真正的門在資料庫的 RLS，側欄只是畫面。
+   這是 shared/ 在這一輪唯一的改動，而且放在那裡的理由是檔頭本來就寫的：「我是不是幹部」只該有一個答案來源。
+2. **側欄先畫。** 四個後台資料夾的 `index.html` 一開始就有一個灰色的側欄骨架（還沒跑任何程式就看得到），
+   `main.js` 一知道我是誰就把真的側欄與頂欄畫上去（`paintShell()`），內容那一格先放骨架，資料回來再換掉。
+3. **要等的東西一起等。** 總覽的六樣東西（teams、todo、workspaces、requests、events、meetings）改成 `Promise.all` 一起發；
+   對外、護照那兩組的 workspaces 跟「我是誰」同時發；/settings/ 從四層變一層；時間看板從三層變一層；實習護照少一層。
+4. **滑過側欄就先抓。** 滑鼠滑過側欄上別的資料夾那一行，就先把那一頁的 HTML 與四支模組抓進快取（`<link rel="prefetch">`），真的點下去靜態檔已經在本機。
+
+本機用一個每趟加 300 毫秒的代理重現台北到新加坡的距離，改前改後同一個帳號同一個資料庫：
+總覽內容出現從 5.4 秒變 1.9 秒，對外那一組 2.0 秒變 0.7 秒，護照後台 1.9 秒變 0.65 秒，名單那一組側欄從 0.68 秒變成開頁就在。
+
+### 版本號：為什麼側欄新項目重整會不見
+
+GitHub Pages 把每個檔案快取 10 分鐘。改了程式推上去的十分鐘內，你的瀏覽器可能拿到**新的 index.html 配舊的 ui.js**（或反過來），
+四個資料夾各一份側欄，哪一份先過期哪一份先換新，所以「有時候有、重整又不見」。不是程式邏輯壞掉。
+
+解法是每一次改動都換一個版本號，所有模組的網址都帶著它：
+- `version.json`：線上現在是哪一版。
+- 九個登入後頁面的 `index.html`：`<meta name="bt-version">`、一張 `<script type="importmap">`（把 `./src/ui.js` 這種乾淨的模組名稱對到 `./src/ui.js?v=版本號`）、`modulepreload` 與 `<script src>` 都帶 `?v=`。
+  importmap 的好處是 `.js` 檔裡的 `import` 一行都不用改，node 的測試照樣直接讀原始檔。
+- 版本一換，整個資料夾加 shared/ 一起換新，不會新舊混著用。
+- 每一頁開頁會用 `cache: "no-store"` 讀一次線上的 `version.json`，跟自己載進來的不一樣，就在左下角掛一條「網站有新版本了，重新整理一下」加一顆「重新整理」，不會自己消失。
+
+**換版本號怎麼做（不用會寫程式）：**
+
+平常不用做。`.git/hooks/pre-commit` 會在你 commit 動到登入後頁面（admin、settings、passport、intern-passport、availability、app、shared、vendor）的時候自動跑 `scripts/pre-commit-bump.sh`，
+它換一個版本號（現在的日期時間）、改 `version.json` 與九個 `index.html`，然後把這幾個檔一起放進同一個 commit。
+它只會幫你加「跑之前沒有任何未暫存改動」的檔；哪個檔你自己改到一半，它會印出來叫你看過再自己 `git add`。
+
+要自己跑的話：
+
+```bash
+./scripts/bump-version.sh
+```
+
+然後把它印出來的那幾個檔 `git add` 再 commit。只檢查不改用 `./scripts/bump-version.sh --check`，`check.sh` 也會跑這一條。
+
+⚠ `.git/hooks/pre-commit` 不在 repo 裡（git 的規矩）。換一台電腦接手的人要自己裝：在 `.git/hooks/pre-commit` 加一行 `./scripts/pre-commit-bump.sh || exit 1`（現在 Paul 的 Mac 上那支還有一行台灣中文的守門）。沒裝的話 `check.sh` 會在版本號對不上的時候紅，不會靜靜地放過。
+
+### 程式在哪、守門守什麼
+
+- `shared/auth.js`：`whoAmI()`、`forgetMe()`、`meCacheValid()`（純函式，test/autosave.test.mjs 測）。
+- 四個後台 `main.js`：`paintShell()`、`boot()` 的並行；四個後台 `ui.js`：`bindPrefetch()`、`prefetchTargets()`、`checkVersion()`、`loadedVersion()`、`versionDiffers()`（四份一模一樣，test/admin-hub.test.mjs 逐字比對）。
+- settings、passport、intern-passport、availability 的 `main.js` 各有一份 `checkVersion()`（它們沒有後台那套 toast，用 `.verbar` 那一條）。
+- `scripts/bump-version.sh`、`scripts/pre-commit-bump.sh`、`version.json`。
+- `check.sh`：modulepreload 的檔案存在檢查會先剝掉 `?v=`；多守「九個 index.html 的版本號都跟 version.json 一樣、importmap 把 src/ 每一支都對到」與「八個登入後 main.js 都有 checkVersion」。
+
+## 自動儲存（2026-11-06）
+
+Paul 2026-11-06：「希望每一格都像 Workspaces 那一頁一樣，改了就存，左下角那個通知留著。」
+
+### 規矩
+
+- 打字的欄位（文字、多行文字）停 800 毫秒、或離開那一格，就存。
+- 選的欄位（下拉、勾選、單選、日期）改了馬上存。
+- 存的時候欄位旁邊有一個小字「存檔中…」，存好變「存好了」兩秒後回到「改了就存」；左下角照樣是那個 toast，原本有「復原」的還是有。
+- 存失敗：小字變成「沒存進去，剛打的字還在，再試一次」，左下角一條橘色的錯誤，**欄位裡的字不動**。
+- 值沒變不會重送（離開欄位又停 800 毫秒不會存兩次）。
+- 還留著按鈕的只有會「送出去、丟東西、改結構」的動作：上架與下架、標成可以用、移出成員、結束這一屆、刪掉、寄邀請、排一場新會議、上傳、新增一筆（建立之後進入編輯就自動存）。
+
+### 哪些表單現在是改了就存
+
+AUTOSAVE_FORMS_PLACEHOLDER
+
+### 程式在哪
+
+- 四個後台 `ui.js` 各一份一模一樣的 `debounce()`、`saveMode()`、`dirtyTracker()`、`formValues()`、`autosaveHint()`、`autosaveState()`、`bindAutosave()`（test/admin-hub.test.mjs 逐字比對，純函式在 test/autosave.test.mjs）；settings、passport、intern-passport、availability 的 `ui.js` 各一份一樣的。
+- 接法寫在那一段的檔頭註解：容器加 `data-autosave="<act>"`、欄位加 `name`、`main.js` 的 `boot()` 掛一次 `UI.bindAutosave(root(), onAutosave)`，`onAutosave` 用原本那個 act 的資料層函式存，成功不重畫（使用者可能還在打字）。
+- 小字的樣式 `.autosave` 在 `admin/admin.css`，四個非後台資料夾的 `index.html` 各一份。
 
 ## 後台第三次重整：從人管人、在東西上管東西、一條導覽（2026-10-23）
 
@@ -5008,6 +5100,8 @@ GitHub Pages 會讓瀏覽器把程式檔留一陣子，而普通的強制重新�
 後台、護照這幾頁的程式是另外載入的檔案，可能還是舊的。
 要讓原本的視窗也更新：按 Cmd+Option+I 打開開發者工具，在重新整理按鈕上按右鍵，選「清除快取並強制重新載入」。
 （2026-10-14 後台加「邀請碼」分頁時，Paul 就是這樣看不到。）
+2026-11-06 起登入後的頁面會自己發現線上有新版本，左下角出現「網站有新版本了，重新整理一下」，按「重新整理」就好；
+上面那段是它沒出現的時候才需要做的。為什麼會這樣、版本號怎麼換，見「後台速度」。
 
 ---
 
