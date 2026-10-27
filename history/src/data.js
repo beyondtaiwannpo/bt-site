@@ -38,15 +38,16 @@ export function shortTitle(stop, lang) {
 }
 
 // 代號裡的關鍵字決定路邊畫哪一個小場景。順序有意義：先命中的贏。
-// 認不出來就是路牌 —— 後台加一站的人不用知道這張表，加什麼代號都有東西畫。
+// 批 4 換成機場的詞：成立是七個旅客在登機門、導生是兩個座位、博覽會是看板前、大使是登機門的牌、探索營是一組登機的人、校友是有地圖針的尾翼、幹部是地勤。
+// 認不出來就是指示牌 —— 後台加一站的人不用知道這張表，加什麼代號都有東西畫。
 const MOTIF_RULES = [
-  ["table",    /found|start|birth|origin/],
-  ["chairs",   /mentor|pair|guide/],
-  ["laptops",  /fair|expo|online|webinar|talk|forum/],
-  ["gate",     /ambassador|campus|school|visit/],
-  ["tents",    /bootcamp|camp|retreat|workshop/],
-  ["pin",      /alumni|account|network|community/],
-  ["cadre",    /cadre|officer|organis|team|thirty|today|now/],
+  ["seven",    /found|start|birth|origin/],
+  ["seats",    /mentor|pair|guide/],
+  ["board",    /fair|expo|online|webinar|talk|forum/],
+  ["sign",     /ambassador|campus|school|visit/],
+  ["boarding", /bootcamp|camp|retreat|workshop/],
+  ["tail",     /alumni|account|network|community/],
+  ["crew",     /cadre|officer|organis|team|thirty|today|now/],
 ];
 export function motifFor(slug) {
   const s = String(slug || "").toLowerCase();

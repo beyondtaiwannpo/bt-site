@@ -38,7 +38,6 @@ html[data-lang="zh"] .title h1{font-family:var(--han);font-weight:900;letter-spa
 /* 人與車的顏色：symbol 裡寫 currentColor，放的時候掛 p-* 決定。漸層的停點同理。 */
 .p-navy{color:var(--bt-navy)}.p-orange{color:var(--bt-orange)}.p-teal{color:var(--bt-teal)}
 .st-cream{stop-color:var(--bt-cream)}.st-sand{stop-color:var(--bt-sand)}.st-orange{stop-color:var(--bt-orange)}.st-teal{stop-color:var(--bt-teal)}.st-navy{stop-color:var(--bt-navy)}
-.near-plant{filter:saturate(.9)}
 /* 整個世界（場景與卡）靠近一站時一起稍微放大；原點放在畫面中偏下，也就是路上那一站附近。 */
 .world{position:absolute;inset:0;transform-origin:62% 64%;will-change:transform}
 /* 左上淡淡的大年份：參考站的節奏。不是給人讀的（aria-hidden），年份帶與卡才是。 */
@@ -71,6 +70,32 @@ html[data-lang="zh"] .card-title{font-size:16px}
 /* 卡片底下一條小尾巴指到站。 */
 .card::after{content:"";position:absolute;left:50%;bottom:-9px;width:14px;height:14px;transform:translateX(-50%) rotate(45deg);
   background:rgba(237,229,216,.97);border-right:1px solid rgba(16,42,134,.16);border-bottom:1px solid rgba(16,42,134,.16)}
+
+/* ── 出發看板：字是 HTML，疊在 SVG 畫的框上（框 540 寬、300 高，畫在牆那一層 0.62 倍）。
+   --x --y 是框的中上那一點（單位），--s 是每單位幾 px；整塊的大小都用 --s 乘出來，縮放視窗也對得上。
+   翻牌：每一個字一片，motion() 用 gsap 把它們從上往下翻（rotateX）。 ── */
+.board-wrap{position:absolute;inset:0;pointer-events:none;--s:1}
+.board-wrap:empty{display:none}
+.board{position:absolute;left:calc(var(--x) * var(--s) * 1px);top:calc(var(--y) * var(--s) * 1px);transform:translateX(-50%);
+  width:calc(var(--s) * 325px);height:calc(var(--s) * 174px);padding:calc(var(--s) * 5px) calc(var(--s) * 6px) 0;
+  display:flex;flex-direction:column;font:700 calc(var(--s) * 8.6px)/1 var(--display);letter-spacing:.06em;color:var(--bt-cream);perspective:calc(var(--s) * 400px)}
+.board-head,.board-row{display:grid;grid-template-columns:4.6em 1fr 4.2em 3.2em 7.2em;gap:0 .6em;align-items:center;min-height:0}
+.board-head{height:calc(var(--s) * 18px);color:var(--bt-navy);font-size:.78em;letter-spacing:.14em;margin-bottom:calc(var(--s) * 4px)}
+.board-row{flex:1 1 0;overflow:hidden;white-space:nowrap}
+.board-row>span{overflow:hidden;display:block}
+.flip{display:inline-block;min-width:.66em;text-align:center;background:rgba(16,42,134,.75);box-shadow:inset 0 -1px 0 rgba(237,229,216,.12);margin-right:1px;border-radius:1px;line-height:1.5;backface-visibility:hidden}
+.b-dest .flip{background:rgba(16,42,134,.6)}
+.b-status .flip{color:var(--bt-yellow)}
+.board-row.now .b-status .flip{color:var(--bt-navy);background:var(--bt-yellow)}
+.board-row.now .flip{box-shadow:inset 0 0 0 1px rgba(255,196,108,.35)}
+
+/* 最後一站之後那一句：停在畫面中間，飛機底下。 */
+.end{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) translateY(16px);text-align:center;opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity var(--dur-3) var(--ease),transform var(--dur-3) var(--ease),visibility 0s linear var(--dur-3)}
+.end.show{opacity:1;visibility:visible;transform:translate(-50%,-50%);transition-delay:0s}
+.end-line{margin:0;font:700 clamp(32px,5vw,56px)/1.1 var(--display);letter-spacing:.02em;color:var(--ink)}
+html[data-lang="zh"] .end-line{font-family:var(--han);font-weight:900;letter-spacing:.08em}
+.end-sub{margin:8px 0 0;font-size:16px;color:rgba(16,42,134,.8)}
 
 /* 一進來先站著的骨架卡：形狀跟真的卡一樣，呼吸一下。資料到了就拿掉。 */
 .skeleton-wrap{position:absolute;inset:0;pointer-events:none}

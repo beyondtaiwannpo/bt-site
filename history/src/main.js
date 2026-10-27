@@ -1,4 +1,4 @@
-// /history/ 的主程式：拿資料、畫場景、接捲動、年份帶、鍵盤、覆蓋層、網址 hash、中英、自動走。
+// /history/ 的主程式：拿資料、畫場景、接捲動、年份帶、出發看板、鍵盤、覆蓋層、網址 hash、中英、自動走。
 // 這一支碰 DOM，純函式都在 data.js、ui.js、scene.js。gsap 不在這裡（只在 scene.js 的 motion()）。
 import * as D from "./data.js";
 import * as UI from "./ui.js";
@@ -15,7 +15,7 @@ let stops = [], w = S.world(0), motifs = [];
 let current = -1, progress = 0, viewW = 1000, scale = 1, tall = false, cam = S.camera(1000, false);
 let api = null;                 // motion() 回的把手；減少動態或 gsap 沒載到就是 null
 let reg = null;                 // scene.attach() 記下來的節點
-let cardsEl = null, cardEls = [], stripCentres = [];
+let cardsEl = null, cardEls = [], stripCentres = [], boardEl = null, endEl = null;
 let openedFrom = null, savedY = 0, playing = false, raf = 0, clock = 0;
 let aim = -1;   // 鍵盤連按時的目標站：鏡頭還在滑的時候 current 還沒變，連按三下要跳三站不是一站
 
@@ -28,6 +28,7 @@ function setLang(l) {
   const home = $("home"); if (home) home.href = "../?lang=" + l;
   $("lang").textContent = t("lang", l); $("lang").setAttribute("aria-label", t("langLabel", l));
   paintPlay();
+  if (endEl) endEl.innerHTML = UI.endHTML(l);
   if (stops.length) { renderCards(); renderStrip(); paintGhost(); if (!$("panel").hidden) $("panel").innerHTML = UI.overlayHTML(stops[current], lang); }
 }
 function paintPlay() { const b = $("play"); b.textContent = playing ? t("pause", lang) : t("play", lang); b.setAttribute("aria-pressed", playing ? "true" : "false"); }
@@ -37,7 +38,28 @@ function renderCards() {
   if (!cardsEl) return;
   cardsEl.innerHTML = stops.map((s, i) => UI.cardHTML(s, i, lang)).join("");
   cardEls = [...cardsEl.querySelectorAll(".card")];
-  placeCards(S.stopPoints(w, cam, S.camZ(w, progress)));
+  placeCards(S.stopPoints(w, cam, S.eased(w, progress)));
+}
+// 出發看板（航廈牆上那一塊）：字是 HTML，疊在 SVG 畫的框上。只在開頁與重畫場景時整面畫，走到哪一站只換狀態那一欄（翻牌的動畫掛在既有的節點上，整面重畫會把它弄掉）。
+function renderBoard() {
+  if (!boardEl) return;
+  boardEl.innerHTML = UI.boardHTML(stops, current);
+  if (api) api.rebind();
+}
+function paintBoardStatus() {
+  if (!boardEl || !boardEl.firstChild) return;
+  const rows = UI.boardRows(stops, current);
+  [...boardEl.querySelectorAll(".board-row")].forEach((r, i) => {
+    if (!rows[i]) return;
+    r.classList.toggle("now", i === current);
+    const st = r.querySelector(".b-status"); if (st && st.textContent !== rows[i].status) st.innerHTML = UI.flipWord(rows[i].status);
+  });
+}
+function placeBoard(b) {
+  if (!boardEl) return;
+  if (!b) { boardEl.style.visibility = "hidden"; return; }
+  boardEl.style.visibility = "";
+  boardEl.style.setProperty("--x", b.x.toFixed(1)); boardEl.style.setProperty("--y", b.y.toFixed(1));
 }
 // 卡站在小場景上方：--x --y 是畫面座標（單位），--s 是每單位幾 px。卡不隨遠近縮放（字要讀得到），靠近才浮出來。
 function placeCards(pts) {
@@ -47,8 +69,8 @@ function placeCards(pts) {
     const half = (c.offsetWidth || 280) / 2 / scale + 10 / scale;
     const x = Math.min(viewW - half, Math.max(half, p.x));
     c.style.setProperty("--x", x.toFixed(1)); c.style.setProperty("--y", p.top.toFixed(1));
-    // 鏡頭快到了卡才浮出來：現在這一站，加上下一站在快到之前那一小段。
-    c.classList.toggle("near", p.depth < S.AHEAD + 520);
+    // 鏡頭快到了卡才浮出來：現在這一站，加上下一站在快到之前那一小段（scene.js 的 stopPoints 算 near）。
+    c.classList.toggle("near", !!p.near);
   });
 }
 function renderStrip() {
@@ -72,7 +94,7 @@ function setCurrent(i) {
   if (i === aim) aim = -1;
   if (i === current) return;
   current = i;
-  renderStrip(); revealCurrent(); paintGhost();
+  renderStrip(); revealCurrent(); paintGhost(); paintBoardStatus();
   // 網址寫上這一站。replaceState 不會讓瀏覽器自己跳。
   history.replaceState(null, "", location.pathname + location.search + D.hashFor(stops[i]));
 }
@@ -98,8 +120,9 @@ function onProgress(p) {
   progress = p;
   if (stageEl && (stageEl.clientWidth !== measured[0] || stageEl.clientHeight !== measured[1])) { size(); return; }
   if (!reg) return;
-  const pts = S.frame(reg, w, cam, p, clock);
-  placeCards(pts);
+  const fr = S.frame(reg, w, cam, p, clock);
+  placeCards(fr.stops); placeBoard(fr.board);
+  if (endEl) endEl.classList.toggle("show", fr.end);
   // 靠近一站鏡頭稍微放大：整個世界（場景與卡）一起。
   const zoom = 1 + 0.05 * S.closeness(w, p);
   if (worldEl) worldEl.style.transform = `scale(${zoom.toFixed(3)})`;
@@ -116,9 +139,9 @@ function buildScene() {
   S.layout(reg, cam);
   if (api) api.rebind();
 }
-// 資料來了：站數在村子鋪好的長度內就只放站，不重鋪（重鋪一次是這一頁最重的排版）。
+// 資料來了：把站放進鋪好的機場與航廈，不重鋪（世界的長度跟站數無關，重鋪一次是這一頁最重的排版）。
 function placeStops() {
-  if (!reg || stops.length > S.MIN_STOPS) { buildScene(); return; }
+  if (!reg) { buildScene(); return; }
   S.placeStops(reg, w, motifs);
   if (api) api.rebind();
 }
@@ -131,6 +154,7 @@ function size() {
   cam = S.camera(viewW, nowTall);
   sceneEl.setAttribute("viewBox", `0 0 ${viewW.toFixed(1)} ${S.H}`);
   if (cardsEl) cardsEl.style.setProperty("--s", scale);
+  if (boardEl) boardEl.style.setProperty("--s", scale);
   if (nowTall !== tall || !reg) { tall = nowTall; buildScene(); } else S.layout(reg, cam);
   reg.lastP = undefined;
   onProgress(progress);
@@ -250,6 +274,7 @@ async function boot() {
   // 先把路畫出來、放一張骨架卡，不等資料（手機上 public_milestones() 要幾百毫秒，空白幾百毫秒看起來像壞了）。
   const state = $("state");
   stageEl = reduce ? $("stage-static") : $("stage"); sceneEl = stageEl.querySelector("svg"); worldEl = stageEl.querySelector(".world");
+  endEl = reduce ? null : $("end"); if (endEl) endEl.innerHTML = UI.endHTML(lang);
   (reduce ? $("static") : $("road-wrap")).hidden = false;
   $("skeleton").innerHTML = UI.skeletonHTML(lang);
   const fetching = D.fetchStops();
@@ -274,11 +299,12 @@ async function boot() {
     stageEl = $("stage-static"); sceneEl = stageEl.querySelector("svg"); worldEl = null; reg = null;
   }
   if (canMove) {
-    cardsEl = $("cards");
-    $("road-wrap").style.height = `${(stops.length + 1) * 100}vh`;
+    cardsEl = $("cards"); boardEl = $("board");
+    // 捲動的長度：每站一屏，最少九屏（四段要有地方走；站少的時候不能三下就起飛）。
+    $("road-wrap").style.height = `${Math.max(stops.length + 1, 9) * 100}vh`;
     placeStops(); size(); renderCards();
     api = S.motion({ wrap: $("road-wrap"), stage: $("stage"), svg: sceneEl, onProgress, onTick });
-    api.rebind(); api.refresh();
+    renderBoard(); api.refresh();
     // 帶 #代號 進來就直接站到那一站（瞬間，不滑），沒有就第一站。年份帶與網址由 onProgress 順手寫。
     api.jump(S.progressFor(w, start), true);
   } else {

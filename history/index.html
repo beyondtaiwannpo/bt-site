@@ -11,9 +11,12 @@
      每一站可以點開看那一年的說明與照片。計畫在 docs/2026-11-05-BT-歷史之路計畫.md。
 
      ── 這一頁在做什麼 ──
-     一台架得高、斜著往下看的鏡頭（批 3，2026-11-06 重畫）：一條從左下退進霧裡的路、路邊的村子、路上會動的車與人，
-     每個東西每一幀照真的針孔投影算位置與大小（scene.js 開頭有解釋）。捲動是鏡頭沿路往前走，靠近每一站停一下。
-     每一站路邊一個小場景加一張卡；點卡打開覆蓋層。底部一條年份帶，左上一個淡淡的大年份。
+     一趟機場（批 4，2026-11-06 換的，Paul 要的：BT 的名字、Passport 的入境章、學生出國，都是機場）。
+     捲動的比例切成四段：0 到 30% 一個背背包的旅客在航廈裡由左往右走（側視，報到櫃台、翻牌的出發看板、安檢、窗牆、登機門）；
+     30 到 40% 走進空橋、鏡頭從窗戶拉出去換成外面；40 到 80% 一架 BT 顏色的飛機從登機門推出去、沿滑行道滑過航廈、塔台、機棚
+     （批 3 那台針孔鏡頭，每一幀重算每個東西的位置與大小，scene.js 開頭有解釋）；80 到 100% 對正跑道、加速、離地，鏡頭跟著抬頭。
+     站不管幾個都平均分在整趟上，每一站照自己落在哪一段站在走道旁、滑行道旁或雲上，一個小場景加一張卡；點卡打開覆蓋層。
+     底部一條年份帶，左上一個淡淡的大年份。出發看板上列的是真的站（年份當時間、英文標題當目的地），字是 HTML 疊在 SVG 的框上。
      開了「減少動態效果」、或 GSAP 從 cdnjs 載不到：不釘、不視差，同樣的站排成直立時間軸，一站都不少。
 
      ── 資料只從一個地方來 ──
@@ -103,11 +106,15 @@
     <div class="stage" id="stage">
       <div class="world" id="world">
         <svg id="scene" class="scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"></svg>
+        <!-- 出發看板的字（英文，裝飾用；同樣的站在年份帶與卡上）。位置每一幀由 main.js 寫，跟著航廈的牆走。 -->
+        <div class="board-wrap" id="board" aria-hidden="true"></div>
         <div class="cards" id="cards"></div>
       </div>
       <!-- 左上淡淡的大年份：顯示字型的真文字。Paul 2026-11-06 看過方塊數字覺得突兀，改成文字，Lighthouse 模擬的 LCP 數字他接受。年份由 main.js 塞進來。 -->
       <div class="ghost" id="ghost" aria-hidden="true"></div>
       <div class="skeleton-wrap" id="skeleton"></div>
+      <!-- 最後一站之後那一句安靜的結尾（中英在 strings.js）。 -->
+      <div class="end" id="end" aria-hidden="true"></div>
       <p class="hint" id="hint" aria-hidden="true"><span class="zh">往下捲</span><span class="en">Scroll</span><span class="hint-arrow"></span></p>
     </div>
   </section>

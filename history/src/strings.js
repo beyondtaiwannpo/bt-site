@@ -25,6 +25,9 @@ export const STR = {
     closeLightbox: "關掉",
     timelineTitle: "每一站",
     noJs: "這一頁要開 JavaScript 才看得到路。每一站的文字也在首頁「五年走過來」那一段。",
+    board: "Departures",
+    endLine: "路還在走。",
+    endSub: "下一站，等你一起。",
   },
   en: {
     title: "Our Road",
@@ -50,6 +53,9 @@ export const STR = {
     closeLightbox: "Close",
     timelineTitle: "Every stop",
     noJs: "This page needs JavaScript to draw the road. The same stops are written out on the home page under “Five years so far”.",
+    board: "Departures",
+    endLine: "The journey continues.",
+    endSub: "Next stop, with you.",
   },
 };
 export const t = (key, lang) => {
