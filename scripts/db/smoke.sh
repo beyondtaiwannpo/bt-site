@@ -97,6 +97,14 @@ end $$;
 -- 這兩句在 Supabase 上本來就有。沒有的話 anon 連 auth.uid() 都叫不動，
 -- 而那會讓下面的 RLS 檢查全部因為「錯的理由」失敗。
 grant usage on schema public, auth to anon, authenticated;
+-- Storage 的替身（2026-11-06 歷史之路）：只要 buckets 與 objects 兩張表的那幾欄，遷移檔的 bucket 與四條政策才跑得到、驗得到。
+create schema storage;
+create table storage.buckets (id text primary key, name text not null, public boolean not null default false, file_size_limit bigint, allowed_mime_types text[]);
+create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets(id), name text, owner uuid, metadata jsonb, created_at timestamptz default now());
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon, authenticated;
+grant select, insert, update, delete on storage.objects to anon, authenticated;
+grant select on storage.buckets to anon, authenticated;
 SQL
 
 echo "建護照那邊既有的結構（這幾支要接在它後面）"
@@ -1616,6 +1624,81 @@ psql -d "${DB}" -q -c "delete from public.mail_outbox where invite_code in ('${L
 psql -d "${DB}" -q -c "delete from public.mail_outbox where to_email like 'r%@example.com' or to_email='istaff@example.com' and kind='meeting_invite' and subject like '會議%';" >/dev/null
 rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-05-email-layout.sql 2>&1 || true)
 if echo "${rwgot}" | grep -q "OVERALL.*PASS"; then echo "  ok   信的版型那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 信的版型那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+
+
+echo "歷史之路（2026-11-06）："
+# 這時候：DIR 與 PAUL 管 res:Marketing Team、OTHER Senior Adviser、ISTAFF 是 Internship 的幹部（不管 Marketing）、STU 是學員。
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-06-history-milestones.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   歷史之路那支遷移檔跑過，驗收表全部 PASS（含 Storage 那兩列）"; pass=$((pass+1))
+else
+  echo "  FAIL 歷史之路那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chkrole anon "" "★ 沒登入拿得到七點 seed 的 JSON，而且沒有 status、沒有誰建的" "7|0|0" \
+  "select jsonb_array_length(j)||'|'||(select count(*) from jsonb_array_elements(j) e where e ? 'status')||'|'||(select count(*) from jsonb_array_elements(j) e where e ? 'created_by') from public.public_milestones() j"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.history_milestones;" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 history_milestones 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到 history_milestones 表：${angot}"; fail=$((fail+1)); fi
+chkraise "★ 破壞測試：不是 Marketing「管」也不是 senior 的幹部加不了站（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_milestone('{\"slug\":\"x-stop\",\"happened_on\":\"2024-01-01\",\"title_zh\":\"x\",\"title_en\":\"x\"}'::jsonb);"
+chkraise "代號不合格擋（bad_slug）" "bad_slug" \
+  "perform set_config('test.uid','${DIR}',true); perform public.upsert_milestone('{\"slug\":\"Bad Slug\",\"happened_on\":\"2024-01-01\",\"title_zh\":\"x\",\"title_en\":\"x\"}'::jsonb);"
+HM=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" \
+  -c "select public.upsert_milestone('{\"slug\":\"2024-winter-camp\",\"happened_on\":\"2024-01-20\",\"title_zh\":\"第一次冬令營\",\"title_en\":\"First winter camp\",\"summary_zh\":\"三天\",\"summary_en\":\"Three days\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${HM}" in ????????-*) echo "  ok   Marketing 的 Director 加了一站（${HM}）"; pass=$((pass+1));; *) echo "  FAIL 加站失敗：${HM}"; fail=$((fail+1));; esac
+chk "新的一站是草稿，排在最後（sort 80）" "draft|80" "select status||'|'||sort from public.history_milestones where id='${HM}'"
+chkrole anon "" "★ 破壞測試：沒登入的人看不到草稿（還是 7 點）" "7" "select jsonb_array_length(public.public_milestones())"
+chkrole authenticated "${ISTAFF}" "別的 team 的幹部讀得到清單（後台看得到，改不動）" "8" "select count(*) from public.history_milestones"
+chkrole authenticated "${STU}" "學員什麼都讀不到" "0" "select count(*) from public.history_milestones"
+chkraise "照片不是 https 擋（photo_not_https）" "photo_not_https" \
+  "perform set_config('test.uid','${DIR}',true); perform public.add_milestone_photo('${HM}','http://x/y.jpg');"
+HP=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" \
+  -c "select public.add_milestone_photo('${HM}','https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/history/${HM}/a.jpg','營隊合照','Group photo',false)" 2>&1 | tail -1 | tr -d ' \n')
+case "${HP}" in ????????-*) echo "  ok   掛了一張照片，同意還沒勾（${HP}）"; pass=$((pass+1));; *) echo "  FAIL 掛照片失敗：${HP}"; fail=$((fail+1));; esac
+chkraise "★ 破壞測試：有照片沒勾同意，按不了準備好了（consent_required）" "consent_required" \
+  "perform set_config('test.uid','${DIR}',true); perform public.set_milestone_status('${HM}','ready');"
+chkas "${DIR}" "勾了同意" "${HP}" "select public.update_milestone_photo('${HP}', '{\"consent\":true}'::jsonb)"
+chkas "${DIR}" "準備好了" "ready" "select public.set_milestone_status('${HM}','ready')"
+chkraise "★ 破壞測試：Marketing 的 Director 自己放不上去（not_senior）" "not_senior" \
+  "perform set_config('test.uid','${DIR}',true); perform public.set_milestone_status('${HM}','published');"
+chkrole anon "" "ready 還不是對外（還是 7 點）" "7" "select jsonb_array_length(public.public_milestones())"
+chkas "${PAUL}" "★ Co-President 放上去" "published" "select public.set_milestone_status('${HM}','published')"
+chkrole anon "" "★ 對外多了這一站，照片一張、有說明、沒有名字欄位" "8|1|Groupphoto|false" \
+  "select jsonb_array_length(j)||'|'||jsonb_array_length(e->'photos')||'|'||(e->'photos'->0->>'caption_en')||'|'||(e->'photos'->0 ? 'created_by') from public.public_milestones() j, jsonb_array_elements(j) e where e->>'slug'='2024-winter-camp'"
+HP2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${OTHER}',false);" \
+  -c "select public.add_milestone_photo('${HM}','https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/history/${HM}/b.jpg','','',false)" 2>&1 | tail -1 | tr -d ' \n')
+case "${HP2}" in ????????-*) echo "  ok   Senior Adviser 再掛一張（沒勾同意）"; pass=$((pass+1));; *) echo "  FAIL Senior Adviser 掛照片失敗：${HP2}"; fail=$((fail+1));; esac
+chkrole anon "" "★ 沒勾同意的那一張對外看不到（這一站照片還是 1 張）" "1" \
+  "select jsonb_array_length(e->'photos') from public.public_milestones() j, jsonb_array_elements(j) e where e->>'slug'='2024-winter-camp'"
+chkas "${PAUL}" "把第一張的同意取消" "${HP}" "select public.update_milestone_photo('${HP}', '{\"consent\":false}'::jsonb)"
+chk "★ 同意一取消，那一站自動退回草稿" "draft" "select status from public.history_milestones where id='${HM}'"
+chkrole anon "" "對外立刻少了這一站（7 點）" "7" "select jsonb_array_length(public.public_milestones())"
+chkas "${DIR}" "刪照片回它的網址（後台拿去刪 Storage 的檔）" "https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/history/${HM}/b.jpg" "select public.delete_milestone_photo('${HP2}')"
+chkraise "不是編的人刪不了照片（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.delete_milestone_photo('${HP}');"
+HM0=$(psql -d "${DB}" -X -A -t -q -c "select id from public.history_milestones where slug='2020-founded'" | tr -d ' \n')
+chkas "${DIR}" "重排：新的那一站搬到最前面" "2" "select public.reorder_milestones(array['${HM}','${HM0}']::uuid[])"
+chk "sort 照傳進來的順序變 10、20" "10|20" "select (select sort from public.history_milestones where id='${HM}')||'|'||(select sort from public.history_milestones where id='${HM0}')"
+chkraise "不是編的人重排不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.reorder_milestones(array['${HM}']::uuid[]);"
+chkas "${DIR}" "改代號與日期" "${HM}" "select public.upsert_milestone('{\"id\":\"${HM}\",\"slug\":\"2024-first-winter-camp\",\"happened_on\":\"2024-01-21\"}'::jsonb)"
+chkraise "改成已經有人用的代號擋（slug_taken）" "slug_taken" \
+  "perform set_config('test.uid','${DIR}',true); perform public.upsert_milestone('{\"id\":\"${HM}\",\"slug\":\"2020-founded\"}'::jsonb);"
+# Storage 政策（替身表）：編的人傳得上 history bucket，別的幹部不行。
+chkrole authenticated "${DIR}" "★ Storage：Marketing 的 Director 傳得上 history bucket" "1" \
+  "insert into storage.objects (bucket_id, name, owner) values ('history','${HM}/a.jpg','${DIR}'); select count(*) from storage.objects where bucket_id='history'"
+stgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${ISTAFF}',false);" -c "set role authenticated; insert into storage.objects (bucket_id, name, owner) values ('history','${HM}/x.jpg','${ISTAFF}');" 2>&1 || true)
+if echo "${stgot}" | grep -qi "row-level security"; then echo "  ok   ★ 破壞測試：別的 team 的幹部傳不上 history bucket（RLS）"; pass=$((pass+1)); else echo "  FAIL 別的幹部傳得上 history bucket：${stgot}"; fail=$((fail+1)); fi
+chkrole anon "" "Storage：沒登入的人讀得到 history bucket 的檔（對外頁要用 <img>）" "1" "select count(*) from storage.objects where bucket_id='history'"
+psql -d "${DB}" -q -c "delete from storage.objects where bucket_id='history';" >/dev/null
+# 破壞測試：把同意那一道門拿掉，驗收表要變紅。
+BROKEN=$(mktemp)
+sed "s/if not public.milestone_consent_ok(p_id) then raise exception 'consent_required' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-06-history-milestones.sql > "${BROKEN}"
+bkgot=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bkgot}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉同意那一道門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉同意那一道門驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-06-history-milestones.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then echo "  ok   歷史之路那支可以重跑（裝回同意那一道門）"; pass=$((pass+1)); else echo "  FAIL 歷史之路那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+chk "重跑不蓋掉改過的字（代號還是改過的）" "2024-first-winter-camp" "select slug from public.history_milestones where id='${HM}'"
 
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
