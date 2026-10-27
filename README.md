@@ -3336,7 +3336,48 @@ Paul 2026-11-05 看了 asklex.law/journey 之後定的：做一頁 `/history/`�
 
 - **遷移檔沒在正式 Supabase 上跑過。** 跑 `2026-11-06-history-milestones.sql`，看 PASS 表 12 項（正式站有 storage schema，Storage 那兩項要是 PASS 不是 SKIP）。bucket 跟政策是遷移檔建的，不用手動開；如果 SQL Editor 對 `storage.objects` 建政策被擋，就到 Storage 手動建一個叫 `history` 的公開 bucket，再把遷移檔第 6 段那四條政策貼進 Storage 的 Policies。
 - 跑完到後台加一站、傳一張照片、勾同意、準備好了、放上去，然後開 `https://norjaglyaotzewxavmhv.supabase.co/rest/v1/rpc/public_milestones`（帶 `apikey` 公開金鑰）看那一站在不在 JSON 裡。
-- 批 2（前台那條路）與批 3（效能、守門、README 前台那一節）還沒開始。
+- ~~批 2（前台那條路）還沒開始。~~ 批 2 2026-11-06 做完了，見下一節。批 3 剩下的是正式站上的 Lighthouse 與第一位真的編輯者走一次。
+
+## 歷史之路（2026-11-06，批 2：前台 `/history/`）
+
+批 1 做了資料庫與後台，這一節是那條路本身：`https://beyondtaiwannpo.com/history/`。
+截圖在 `docs/history/page-01` 到 `page-07`（桌機、375px、覆蓋層、燈箱、減少動態效果那一版；照片那兩張是拿首頁既有的照片塞進去看版面，正式站現在還沒有任何一站有照片）。
+
+### 這一頁做什麼
+
+- 一條斜向的路，天空、遠山與雲、中景的樹與房子、路、每一站路邊的小場景、近景的草，六層各自用不同速度動（視差）。往下捲，鏡頭就沿路往右上走。
+- 每一站路邊一個小場景加一張卡（年份、標題、「+」），鏡頭靠近才浮出來。小場景照代號裡的英文關鍵字挑：`found` 七個人一張桌、`mentor` 兩把椅、`fair` / `online` 筆電、`ambassador` / `campus` 校門、`bootcamp` / `camp` 帳篷與舞台、`alumni` 地圖針，認不出來就是一根路牌。**後台加站的人不用知道這張表**，隨便什麼代號都有東西畫。
+- 底部一條年份帶：每一站的年份與短標題，現在那一站亮著，右邊「03 / 07」。點年份帶、鍵盤左右鍵都能跳站。
+- 點一張卡（或 Tab 到它按 Enter）：右邊滑進來一層，日期、標題、一句話、說明、照片。照片手機上用手指滑、桌機點一張放大。「回到路上」關掉，捲動位置不變，焦點回到那張卡。Esc 也關。
+- 每一站有自己的網址：`/history/#2023-first-bootcamp`。帶著這個網址進來直接站到那一站，不會自己打開那一層（IG 簡介可以直連某一站）。
+- 右上「自動走 / Play journey」：鏡頭自己往前走，每站大約四秒，人一捲、一碰、一按鍵就停。「EN / 中」切語言，語言跟著網址 `?lang=` 走（跟其他對外頁一樣，不在裝置上存東西；只會**讀**登入後那些頁存的 `bt-lang`，不寫）。
+- 開了系統的「減少動態效果」、或 GSAP 從 cdnjs 載不到（公司網路擋、雜湊對不上）：不釘、不視差，上面一張靜的路景，底下同樣的站排成直立時間軸，卡與那一層一模一樣。網址加 `?motion=off` 可以不改系統設定就看到這一版。
+- 沒有照片的站印一句「照片整理中」，不會有破圖。資料拿不到印一句「路載不到」。
+- 資料只從 `public_milestones()` 來（跟 `/events/` 一樣用 fetch 打，不載 supabase-js）。**這一頁一行站的文字都沒寫死**，場景程式（`history/src/scene.js`）裡找不到任何一站的標題，`test/history-page.test.mjs` 守著這件事。加一站永遠只在後台。
+
+### 不會寫程式的人怎麼檢查
+
+1. 開 `beyondtaiwannpo.com/history/`，往下捲。路要往右上走，每到一站卡會浮出來，底部年份帶跟著亮。七站都走到，最後一站是「接近三十位幹部」。
+2. 點任何一張卡，看那一層滑進來、「回到路上」按下去位置沒跑掉。
+3. 手機（直的）再走一次：卡按得到，年份帶可以左右滑，照片可以左右滑。
+4. 把網址改成 `/history/?motion=off`，看到的應該是一條直立的時間軸，七站都在，點一張卡一樣會開。
+5. 在後台加一站、放上去，再開這一頁：那一站要自己出現在路上，路邊有東西（認得的代號有小場景，不認得的是路牌）。**不用改任何程式。**
+6. 按 F12 看 Console，不該有紅字。
+
+### 程式在哪、怎麼守
+
+- `history/index.html` 外殼、`history/history.css` 版面（這一頁的 CSS 不在 `<style>` 裡，`check-motion.mjs` 與 check.sh 的點擊回饋那條會連它一起掃）、`history/src/strings.js` 中英字典、`history/src/data.js` 拿資料與代號、`history/src/ui.js` 卡與那一層的 HTML（純函式）、`history/src/scene.js` 場景與唯一會動的 `motion()`、`history/src/main.js` 接起來。
+- 只讀 `shared/brand.css` 與 `shared/supabase-config.js`，不掛 `nav.js`，`shared/` 一個檔都沒加。顏色只在 `history.css` 用 `var(--bt-*)` 給，SVG 的形狀只掛 class，所以 check.sh 的七色白名單掃得到。
+- GSAP 與 ScrollTrigger 從 cdnjs 載、帶 SRI、只准出現在 `scene.js` 的 `motion()` 裡；`main.js` 只有在「沒開減少動態效果而且 gsap 真的載到了」才呼叫它。check.sh 多了兩條守這件事。
+- 守門：`./check.sh`、`node --test test/*.test.mjs`（`history-page.test.mjs` 十四條：資料整理、代號對場景、hash、語言、進度、卡、年份帶、那一層、時間軸、載入與錯誤、字典、場景座標、場景 SVG 不含站的文字也不含色碼、逃脫）、`node check-motion.mjs`、`node scripts/check-mobile.mjs`（390 與 360px）。
+- 效能（本機 Lighthouse 12 手機模式，跟首頁同一台機器同一次跑）：見 `docs/2026-11-05-BT-歷史之路計畫.md` 驗收紀錄批 2 最下面那一段。正式站上線後要照 `docs/2026-09-07-效能實測.md` 再量一次。
+
+### 還沒做、要 Paul 看的
+
+- **正式站還沒量過。** 本機的數字只能比相對值。
+- 中英標題是我定的：「歷史之路 / Our Road」，副標「BT 怎麼走過來。往下捲，沿著路走。/ How BT got here. Scroll to walk the road.」。要改在 `history/index.html` 的 `<header>`（兩處）與 `history/src/strings.js` 的 `title`。
+- 七種小場景是照 `/impact/` 那七點的代號挑的（`history/src/data.js` 的 `MOTIF_RULES`）。要換圖案改 `scene.js` 的 `VIGNETTES`，要換對應改那張表。
+- 這一頁還沒放進任何導覽列（首頁、`/about/`、`/impact/` 都沒有連過來）。放哪裡是文案決定，先不動。
 
 ## 視覺收尾（2026-11-05）
 
