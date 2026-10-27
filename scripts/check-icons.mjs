@@ -13,7 +13,7 @@ import fs from "node:fs";
 // 2026-09-08（批 1）再加 impact 與 partner。join 還在，但已經只剩轉址。
 // 2026-09-08（批 3）再加 apply 與 admin，（批 5）再加 resources，最後再加 settings。
 export const PAGES = ["index.html", "about/index.html", "programs/index.html", "events/index.html",
-                      "team/index.html", "join/index.html", "alumni/index.html",
+                      "team/index.html", "join/index.html", "alumni/index.html", "history/index.html",
                       "impact/index.html", "partner/index.html",
                       "apply/index.html", "admin/index.html", "resources/index.html",
                       "settings/index.html",

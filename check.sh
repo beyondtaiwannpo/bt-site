@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team events join impact partner apply resources admin settings alumni privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
+FILES="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -120,7 +120,7 @@ BRAND_HEX="#EDE5D8 #FFE8C5 #FFC46C #C6C6C6 #102A86 #6BC6BB #FFF789"
 hexfilter=$(printf '%s\n' $BRAND_HEX | tr 'a-f' 'A-F' | sed 's/^/^/;s/$/$/' | paste -sd'|' -)
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html about programs team events join alumni privacy reset shared passport/src passport/activities.json intern-passport 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html about programs team events join alumni history privacy reset shared passport/src passport/activities.json intern-passport 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -vE "$hexfilter")
@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html history/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -277,7 +277,7 @@ fi
 # 這一層是舊版完全沒有的。它同時做掉兩件事：
 #   「最多幾種字體」變成「只有一個地方能決定用哪幾種」——比數數字可靠，
 #   而且下一個人想換字體時，找得到唯一該改的檔案。
-famraw=$(grep -rhIoE 'font-family:[^;}]*' index.html privacy reset app availability passport/index.html passport/src intern-passport 2>/dev/null | sort -u)
+famraw=$(grep -rhIoE 'font-family:[^;}]*' index.html history privacy reset app availability passport/index.html passport/src intern-passport 2>/dev/null | sort -u)
 famhard=$(printf '%s\n' "$famraw" | grep -v '^$' | grep -vE '^font-family:var\(--(display|body|han|hand)\)$')
 if [ -n "$famhard" ]; then
   bad "§11-15 有地方寫死了字體家族（只准 var(--display|--body|--han|--hand)）："
@@ -1501,6 +1501,12 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["取而代之的是一段 noscript 說明加上聯絡方式"]
     },
+    // /history/ 歷史之路（2026-11-06）。本文是 JavaScript 畫的，靜態 HTML 裡只有標題、兩顆按鈕與 noscript 那一句。
+    "history/index.html": {
+      mustShow: ["跳到主要內容 / Skip to content", "歷史之路", "Our Road", "Play journey",
+                 "這一頁要開 JavaScript 才看得到路。"],
+      mustHide: ["左上一個回首頁的 logo 就夠。"]
+    },
     "privacy/index.html": {
       mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],
       mustHide: ["因為手機上會有人真的從頭讀到尾"]
@@ -1557,12 +1563,13 @@ leakOut=$(node -e '
     //   登入按鈕活了下來）。瀏覽器上的症狀是「整頁沒有樣式、logo 不見」，
     //   而純文字的檢查看不到樣式。所以這一層檢查的是「剝掉註解之後標籤還在不在」。
     const stripped = raw.replace(/<!--[\s\S]*?-->/g, "");
-    for (const tag of ["<title>", "<style>", "shared/brand.css", "<img "])
+    // /history/ 的樣式在自己的 history.css，沒有 <style>；連了本機 .css 的頁面改看那一行。
+    for (const tag of ["<title>", /href="\.\/[^"]+\.css"/.test(stripped) ? ".css\"" : "<style>", "shared/brand.css", "<img "])
       if (!stripped.includes(tag))
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html about/index.html programs/index.html team/index.html events/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html privacy/index.html reset/index.html 2>&1)
+' index.html about/index.html programs/index.html team/index.html events/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html history/index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -1598,7 +1605,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team events join impact partner apply resources admin settings alumni privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
+placeholder_scope="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
@@ -1641,6 +1648,58 @@ if [ $? -eq 0 ]; then
 else
   bad "alumni 有動畫沒有被 reduce 判斷關住："
   printf '%s\n' "$alReduce"
+fi
+
+# /history/ 的 GSAP：兩支都要有正確的 SRI，而且 gsap 只准出現在 scene.js 的 motion() 裡
+#
+# 跟首頁同一條規則，差別是程式在 ES module（history/src/scene.js）不是內嵌 script。
+# motion() 不會被呼叫的條件在 main.js：開了減少動態效果、或 window.gsap 沒載到，兩種都退回直立時間軸。
+hi_bad=""
+grep -qF "integrity=\"${GSAP_CORE}\"" history/index.html || hi_bad="${hi_bad} gsap.min.js"
+grep -qF "integrity=\"${GSAP_ST}\"" history/index.html   || hi_bad="${hi_bad} ScrollTrigger.min.js"
+hi_tag=$(grep -c '^<script src="https://cdnjs.cloudflare.com' history/index.html)
+hi_pre=$(grep -A2 'rel="preload" as="script"' history/index.html | grep -cF "integrity=\"${GSAP_CORE}\"")
+if [ -n "$hi_bad" ]; then
+  bad "history/index.html 的 cdnjs script 少了正確的 integrity：${hi_bad}"
+elif [ "$hi_tag" != "2" ] || [ "$hi_pre" != "1" ]; then
+  bad "history/index.html 的 cdnjs script 不是兩支、或 preload 的 integrity 跟 script 對不上（標籤 ${hi_tag} 支、preload ${hi_pre}）"
+else
+  ok "history/index.html 的 GSAP 兩支都有正確的 integrity，preload 也對得上"
+fi
+hiMotion=$(node -e '
+  const fs = require("fs");
+  const code = fs.readFileSync("history/src/scene.js", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const bad = [];
+  const head = code.indexOf("export function motion(");
+  let from = -1, to = -1;
+  if (head < 0) bad.push("找不到 export function motion(");
+  else {
+    // 參數是解構的 { wrap, stage, onProgress }，第一個大括號不是函式本體，要找簽名收尾的 ") {"
+    let i = code.indexOf(") {", head) + 2, depth = 0; from = i;
+    for (; i < code.length; i++) {
+      if (code[i] === "{") depth++;
+      else if (code[i] === "}") { depth--; if (depth === 0) { to = i; break; } }
+    }
+    if (to < 0) bad.push("motion() 的大括號沒有收尾");
+  }
+  for (const m of code.matchAll(/\b(gsap|ScrollTrigger)\b/g))
+    if (!(from >= 0 && to > from && m.index > from && m.index < to))
+      bad.push("motion() 外面用到了 " + m[1] + "（scene.js 第 " + code.slice(0, m.index).split("\n").length + " 行）");
+  for (const f of ["history/src/main.js", "history/src/ui.js", "history/src/data.js", "history/src/strings.js"]) {
+    const c = fs.readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    for (const m of c.matchAll(/\bgsap\.|\bScrollTrigger\./g)) bad.push(f + " 用到了 gsap（只准 scene.js 的 motion()）");
+  }
+  const main = fs.readFileSync("history/src/main.js", "utf8");
+  if (!main.includes("matchMedia(\"(prefers-reduced-motion: reduce)\")")) bad.push("main.js 找不到 prefers-reduced-motion 的判斷");
+  if (!/const canMove = !reduce && window\.gsap && window\.ScrollTrigger;/.test(main)) bad.push("main.js 找不到「沒開減少動態效果而且 gsap 載到了」那一行判斷");
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "/history/ 的動畫全部關在 scene.js 的 motion() 裡，reduce 或 gsap 沒載到就不呼叫"
+else
+  bad "/history/ 有動畫跑到 motion() 外面："
+  printf '%s\n' "$hiMotion"
 fi
 
 # 對外頁面不可以漏掉任何一份清單
@@ -1703,10 +1762,12 @@ fi
 # 根本沒有那個區塊，是 check-motion.mjs 的範圍從 passport 一頁擴到全站才露出來的。
 pressbad=""
 motionbad=""
+# 2026-11-06：/history/ 的 CSS 在自己的 history.css 不在 <style> 裡，所以這裡連頁面同資料夾裡被 <link> 進來的 .css 一起看。
 for f in $(printf '%s\n' index.html */index.html admin/*/index.html); do
-  grep -q '<style>' "$f" || continue
-  grep -q '點下去要有回饋' "$f" || pressbad="${pressbad} ${f}"
-  grep -q '@media (prefers-reduced-motion' "$f" || motionbad="${motionbad} ${f}"
+  css=$(grep -oE 'href="\./[^"]+\.css"' "$f" | sed 's/href="\.\///;s/"$//' | sed "s|^|$(dirname "$f")/|")
+  if ! grep -q '<style>' "$f" && [ -z "$css" ]; then continue; fi
+  cat "$f" $css 2>/dev/null | grep -q '點下去要有回饋' || pressbad="${pressbad} ${f}"
+  cat "$f" $css 2>/dev/null | grep -q '@media (prefers-reduced-motion' || motionbad="${motionbad} ${f}"
 done
 if [ -n "$pressbad" ]; then
   bad "這些頁面少了「點下去要有回饋」那一段 CSS：${pressbad}"

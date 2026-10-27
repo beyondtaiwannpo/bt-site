@@ -26,7 +26,7 @@ const PAGES = [
   "impact/index.html", "partner/index.html", "apply/index.html", "resources/index.html",
   "alumni/index.html", "app/index.html", "admin/index.html", "settings/index.html",
   "availability/index.html", "passport/index.html", "privacy/index.html",
-  "reset/index.html", "join/index.html", "intern-passport/index.html",
+  "reset/index.html", "join/index.html", "intern-passport/index.html", "history/index.html",
   // 2026-10-15 後台拆成四個資料夾。
   "admin/site/index.html", "admin/passports/index.html", "admin/people/index.html",
 ];
@@ -69,8 +69,12 @@ function takeBlock(text, re) {
 function run(page) {
 const html = fs.readFileSync(page, "utf8");
 const m0 = html.match(/<style>([\s\S]*?)<\/style>/);
-if (!m0) return;   // 沒有 <style> 的頁面沒有 CSS 動畫可以漏
-const css = m0[1]
+// 2026-11-06：/history/ 的 CSS 在同資料夾的 history.css，不在 <style> 裡。
+// 頁面裡用 <link href="./xxx.css"> 連進來的本機樣式表一起掃；shared/brand.css 不算（它自己有 reduce 區塊，而且每一頁都讀）。
+const dir = page.includes("/") ? page.slice(0, page.lastIndexOf("/") + 1) : "";
+const linked = [...html.matchAll(/<link[^>]+href="\.\/([^"]+\.css)"/g)].map(m => fs.readFileSync(dir + m[1], "utf8"));
+if (!m0 && !linked.length) return;   // 沒有 <style> 也沒連本機 CSS 的頁面沒有 CSS 動畫可以漏
+const css = ((m0 ? m0[1] : "") + "\n" + linked.join("\n"))
   .replace(/\/\*[\s\S]*?\*\//g, "");   // 先剝註解，否則註解裡的文字會被當成選擇器
 
 const rules = block => [...block.matchAll(/([^{}]+)\{([^}]*)\}/g)];
