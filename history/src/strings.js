@@ -1,0 +1,58 @@
+// /history/ 的中英字典。頁面上每一句固定的字都在這裡，兩邊的鍵要一模一樣（test/history-page.test.mjs 守著）。
+// 站本身的文字（標題、一句話、說明、照片說明）不在這裡，那些從資料庫來。
+export const STR = {
+  zh: {
+    title: "歷史之路",
+    subtitle: "BT 怎麼走過來。往下捲，沿著路走。",
+    play: "自動走",
+    pause: "停一下",
+    lang: "EN",
+    langLabel: "切換到英文",
+    home: "Beyond Taiwan 首頁",
+    scrollHint: "往下捲",
+    open: "打開這一站",
+    back: "回到路上",
+    photos: "照片",
+    noPhotos: "照片整理中。",
+    loading: "路在鋪，等一下。",
+    loadError: "路載不到。等一下再來，或先回首頁。",
+    empty: "路上還沒有任何一站。",
+    strip: "每一站",
+    prev: "上一站",
+    next: "下一站",
+    progress: "第幾站",
+    lightbox: "放大看",
+    closeLightbox: "關掉",
+    timelineTitle: "每一站",
+    noJs: "這一頁要開 JavaScript 才看得到路。每一站的文字也在首頁「五年走過來」那一段。",
+  },
+  en: {
+    title: "Our Road",
+    subtitle: "How BT got here. Scroll to walk the road.",
+    play: "Play journey",
+    pause: "Pause",
+    lang: "中",
+    langLabel: "Switch to Chinese",
+    home: "Beyond Taiwan home",
+    scrollHint: "Scroll",
+    open: "Open this stop",
+    back: "Back to the road",
+    photos: "Photos",
+    noPhotos: "Photos coming.",
+    loading: "Paving the road, one moment.",
+    loadError: "The road could not load. Try again shortly, or go back home.",
+    empty: "No stops on the road yet.",
+    strip: "Every stop",
+    prev: "Previous stop",
+    next: "Next stop",
+    progress: "Stop",
+    lightbox: "View larger",
+    closeLightbox: "Close",
+    timelineTitle: "Every stop",
+    noJs: "This page needs JavaScript to draw the road. The same stops are written out on the home page under “Five years so far”.",
+  },
+};
+export const t = (key, lang) => {
+  const d = STR[lang] || STR.en;
+  return d[key] != null ? d[key] : (STR.en[key] != null ? STR.en[key] : key);
+};

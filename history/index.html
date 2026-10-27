@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>歷史之路 / Beyond Taiwan</title>
+
+<!-- /history/ 歷史之路（2026-11-06，批 2）
+
+     Paul 2026-11-05 看了 asklex.law/journey 之後定的：一頁「BT 怎麼走過來」，捲動就沿著一條路往前走，
+     每一站可以點開看那一年的說明與照片。計畫在 docs/2026-11-05-BT-歷史之路計畫.md。
+
+     ── 這一頁在做什麼 ──
+     一條斜向的路，分層的 inline SVG（天空、遠山、中景、路、每一站、近景），捲動時鏡頭沿路前進，各層視差不同。
+     每一站路邊一個小場景加一張卡；點卡打開覆蓋層。底部一條年份帶。
+     開了「減少動態效果」、或 GSAP 從 cdnjs 載不到：不釘、不視差，同樣的站排成直立時間軸，一站都不少。
+
+     ── 資料只從一個地方來 ──
+     public_milestones()，資料庫那支只回放上去的站與勾了同意的照片。這一頁一行站的文字都沒寫死。
+     要加一站：後台 → 對外 → 歷史之路（README「歷史之路」）。**這一頁一行都不用動。**
+
+     ── 檔案 ──
+     history.css 版面、src/strings.js 中英字典、src/data.js 資料與代號、src/ui.js 畫面的純函式、
+     src/scene.js 場景與唯一會動的 motion()、src/main.js 接起來。只讀 shared/brand.css 與 shared/supabase-config.js。
+
+     ── 不掛 nav.js ──
+     這一頁是給外面的人看的一條路，不是功能清單。左上一個回首頁的 logo 就夠。 -->
+
+<meta name="description" content="Beyond Taiwan 怎麼走過來：從七個人到七個國家，一站一站。">
+<meta property="og:title" content="歷史之路 / Beyond Taiwan">
+<meta property="og:description" content="往下捲，沿著路走。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://beyondtaiwannpo.com/history/">
+<meta name="theme-color" content="#EDE5D8">
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+
+<!-- GSAP 在頁尾載，這裡先預告，瀏覽器提早去抓。preload 的屬性要跟頁尾那支一字不差（check.sh 的理由見首頁）。 -->
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preload" as="script" crossorigin="anonymous" referrerpolicy="no-referrer"
+      integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+      href="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 字體不擋渲染（跟首頁同一招：media=print，載完切回 all）。中文標題載 Noto Sans TC 900 一個字重。 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap"></noscript>
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="./history.css">
+
+<!-- 語言要在第一次繪製前決定，不然中英兩份會先疊著出現一下。
+     順序：網址 ?lang=（上一頁選的）、再 localStorage 的 bt-lang（登入後那些頁用的同一把鍵，只讀不寫）、再瀏覽器語言。 -->
+<script>
+  (function () {
+    var q = null, s = null;
+    try { q = new URLSearchParams(location.search).get("lang"); } catch (e) {}
+    try { s = localStorage.getItem("bt-lang"); } catch (e) {}
+    var l = (q === "zh" || q === "en") ? q : (s === "zh" || s === "en") ? s : (/^zh/i.test(navigator.language || "") ? "zh" : "en");
+    document.documentElement.setAttribute("data-lang", l);
+    document.documentElement.lang = l === "zh" ? "zh-Hant" : "en";
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">跳到主要內容 / Skip to content</a>
+
+<header class="top">
+  <a class="home" id="home" href="../" aria-label="Beyond Taiwan 首頁 / home">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <div class="title">
+    <h1><span class="zh">歷史之路</span><span class="en">Our Road</span></h1>
+    <p class="sub"><span class="zh">BT 怎麼走過來。往下捲，沿著路走。</span><span class="en">How BT got here. Scroll to walk the road.</span></p>
+  </div>
+  <div class="tools">
+    <button type="button" class="play" id="play" aria-pressed="false">Play journey</button>
+    <button type="button" class="lang" id="lang" aria-label="Switch language">EN</button>
+  </div>
+</header>
+
+<main id="main">
+  <div id="state" class="state-wrap"></div>
+
+  <!-- 會動的那一條：外面這一段很高（JS 照站數設），裡面的 stage 被釘住一整屏，捲動只推鏡頭。 -->
+  <section class="road-wrap" id="road-wrap" hidden>
+    <div class="stage" id="stage">
+      <svg id="scene" class="scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"></svg>
+      <div class="cards" id="cards"></div>
+      <p class="hint" id="hint" aria-hidden="true"><span class="zh">往下捲</span><span class="en">Scroll</span><span class="hint-arrow"></span></p>
+    </div>
+  </section>
+
+  <!-- 減少動態效果、或 gsap 沒載到：一張靜的場景加直立時間軸。 -->
+  <section class="static" id="static" hidden>
+    <div class="stage stage-static" id="stage-static" aria-hidden="true">
+      <svg class="scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"></svg>
+    </div>
+    <ol class="timeline" id="timeline"></ol>
+  </section>
+
+  <noscript><p class="state"><span class="zh">這一頁要開 JavaScript 才看得到路。每一站的文字也在首頁「五年走過來」那一段。</span><span class="en">This page needs JavaScript to draw the road. The same stops are written out on the home page under “Five years so far”.</span></p></noscript>
+</main>
+
+<nav class="strip" id="strip" aria-label="每一站 / Every stop" hidden></nav>
+
+<div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden></div>
+<div class="lightbox" id="lightbox" hidden></div>
+
+<!-- GSAP 從 cdnjs 載，integrity 是 cdnjs 公布的雜湊，檔案被換掉就不執行；那時這一頁退回直立時間軸，不會壞。
+     升級版本要同時改這裡、head 的 preload、首頁、check.sh 的兩個雜湊。 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
+        integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"
+        integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
