@@ -241,6 +241,36 @@ test("投影（批 4）：航廈側視的站點、停機坪的針孔投影、起
   assert.equal(S.travellerX(0.35), S.TERM_LEN); assert.equal(S.travellerX(0.5), S.TERM_LEN);
 });
 
+test("飛機（批 4 修正）：客機該有的零件都在；換鏡兩條曲線不會同時超過一半", () => {
+  const svg = S.sceneSVG(S.world(7), ["seven"], false);
+  const sym = svg.slice(svg.indexOf('<symbol id="s-btplane"'), svg.indexOf("</symbol>", svg.indexOf('<symbol id="s-btplane"')));
+  const count = cls => (sym.match(new RegExp(`class="${cls}[ "]`, "g")) || []).length;
+  assert.equal(count("pl-fuselage c-cream"), 1, "機身");
+  assert.equal(count("pl-cockpit"), 1, "駕駛艙窗");
+  assert.ok(count("pl-window") >= 6, "一排窗");
+  assert.equal(count("pl-wing"), 2, "兩片機翼");
+  assert.equal(count("pl-engine"), 2, "兩具引擎");
+  assert.equal(count("pl-stab"), 2, "水平尾翼");
+  assert.equal(count("pl-fin c-orange"), 1, "橘色的垂直尾翼（class 只能寫一次，寫兩次瀏覽器只認第一個，尾翼會變黑）");
+  assert.equal(count("pl-mark c-cream"), 1, "尾翼上奶油色的台灣");
+  assert.ok((sym.match(/class="pl-gear"/g) || []).length === 1 && (sym.match(/<circle[^>]*class="c-navy"/g) || []).length >= 3, "三組起落架");
+  assert.ok(svg.includes('data-shadow="1"') && svg.includes('id="s-planeshadow"'), "影子是分開的貼圖，離地後留在地上");
+  // 停著的飛機也是同一具身體，尾翼是 currentColor
+  const parked = svg.slice(svg.indexOf('<symbol id="s-plane"'), svg.indexOf("</symbol>", svg.indexOf('<symbol id="s-plane"')));
+  assert.ok(/class="pl-fin" fill="currentColor"/.test(parked));
+  // 整個場景裡沒有任何一個元素寫了兩次 class
+  assert.ok(!/<[a-z]+ [^>]*class="[^"]*"[^>]*class="/.test(svg), "有元素寫了兩次 class");
+  // 換鏡：室內先走、室外再來，任何一刻兩邊不同時超過 0.5；兩條都單調
+  let lastInt = 1, lastExt = 0;
+  for (let e = 0.35; e <= 0.41; e += 0.001) {
+    const h = S.handoff(e);
+    assert.ok(!(h.int > 0.5 && h.ext > 0.5), "兩邊同時超過一半 " + e);
+    assert.ok(h.int <= lastInt + 1e-9 && h.ext >= lastExt - 1e-9, "曲線要單調 " + e); lastInt = h.int; lastExt = h.ext;
+  }
+  assert.equal(S.handoff(0.36).int, 1); assert.equal(S.handoff(0.4).ext, 1);
+  assert.ok(S.handoff(0.375).int < 0.5 && S.handoff(0.375).ext === 0, "室內先淡到一半以下，室外還沒開始");
+});
+
 test("場景 SVG（批 4）：室內與室外兩個世界、該有的層都在、symbol 加 use、沒有點陣圖、沒有色碼、沒有任何一站的文字、小於 70 KB；直式少畫一些", () => {
   const motifs = STOPS.map(s => D.motifFor(s.slug));
   const svg = S.sceneSVG(S.world(7), motifs, false);

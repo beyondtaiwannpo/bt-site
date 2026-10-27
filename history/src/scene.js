@@ -80,7 +80,7 @@ export function planePose(e) {
   return { x, y, z, pitch, lift };
 }
 // 鏡頭在飛機後面多遠：離地之後往後退一點，整架飛機與底下的地才都在畫面裡。
-export const aheadAt = lift => AHEAD * (1 + 0.6 * lift);
+export const aheadAt = lift => AHEAD * (1 + 0.9 * lift);
 export const camZ = (w, e) => { const q = planePose(typeof e === "number" ? e : 0); return q.z - aheadAt(q.lift); };
 
 export function world(n) {
@@ -112,7 +112,7 @@ export const horizonY = cam => cam.cy - cam.f * Math.tan(cam.pitch);
 export function viewCam(cam, e) {
   const q = planePose(e);
   if (!q.lift) return cam;
-  return { ...cam, h: cam.h + q.y + (110 - cam.h) * q.lift, pitch: cam.pitch - 0.3 * q.lift };
+  return { ...cam, h: cam.h + q.y + (110 - cam.h) * q.lift, pitch: cam.pitch - 0.27 * q.lift };
 }
 // 世界的一點投到畫面。回 { x, y, s, depth }，在鏡頭後面回 null。
 export function project(cam, X, Y, Z, cz) {
@@ -136,10 +136,11 @@ const ceilYAt = k => eyeY - (eyeY - INT.ceilY) * (k / INT.wallK);
 const LAYERS_INT = [["outside", 0.5], ["wall", INT.wallK], ["vig", 0.8], ["mid", 1], ["fore", INT.nearK]];
 const VIG_K = 0.8, VIG_H = 118, VIG_INT = 4.2;   // 小場景畫的是室外距離 f 的大小（人 24 高），室內放大 4.2 倍才跟旅客（150 高）同一個尺度
 const vigInt = tall => tall ? VIG_INT * 0.75 : VIG_INT;   // 直式畫面窄，小一點才不會壓到旅客
-// 換鏡：0.36 全室內、0.40 全室外。
+// 換鏡：室內先淡出並往左上滑走（0.36 到 0.385），室外再縮進來（0.375 到 0.40），只重疊一小段，任何一刻兩邊不會同時超過一半。
 export function handoff(e) {
-  const h = smooth(clamp01((e - HAND[0]) / (HAND[1] - HAND[0])));
-  return { int: 1 - h, ext: h };
+  const out = smooth(clamp01((e - HAND[0]) / (0.025)));
+  const inn = smooth(clamp01((e - (HAND[0] + 0.015)) / (HAND[1] - HAND[0] - 0.015)));
+  return { int: 1 - out, ext: inn, slide: out };
 }
 
 // 每一站在畫面上的點與卡要放的高度。不在現在這一段的站回 null（卡就藏起來）。near 是「鏡頭到了，卡要浮出來」。
@@ -163,10 +164,11 @@ export function stopPoints(w, cam, e) {
 
 // ── 路（滑行道，到跑道頭變寬成跑道）：每一幀重算的多邊形 ──
 const halfAt = Z => Z < APRON_LEN ? ROAD_HALF : Z < APRON_LEN + 400 ? ROAD_HALF + (RUNWAY_HALF - ROAD_HALF) * smooth((Z - APRON_LEN) / 400) : RUNWAY_HALF;
+let farNow = FAR;   // 這一幀看多遠：地面時 FAR，起飛後更遠（frame() 每一幀設）
 function samplesZ(cz, length) {
   const out = []; let dz = 70;
-  for (let z = Math.max(cz + 60, -1800); z < Math.min(length, cz + FAR); z += dz, dz *= 1.09) out.push(z);
-  out.push(Math.min(length, cz + FAR));
+  for (let z = Math.max(cz + 60, -1800); z < Math.min(length, cz + farNow); z += dz, dz *= 1.09) out.push(z);
+  out.push(Math.min(length, cz + farNow));
   return out;
 }
 const pts = list => list.map(p => `${f1(p.x)},${f1(p.y)}`).join(" ");
@@ -196,20 +198,35 @@ function centreline(cam, cz, length) {
 // 影子：朝右下的長影，所有戶外的東西共用同一個方向（光從左上來）。
 const shadow = (w, h) => `<polygon points="${-w * 0.45},0 ${w * 0.45},0 ${w * 0.45 + h * 0.9},${h * 0.32} ${-w * 0.45 + h * 0.9},${h * 0.32}" class="c-navy" fill-opacity=".14"/>`;
 // ── 飛機怎麼畫 ──
-// 滑行道在畫面上往右上退（投影算出來約 50 度），飛機是平面貼圖，所以沿著那個方向畫：機身是一個轉了 HEAD 度的橢圓，
-// 機翼垂直機身（靠鏡頭那一片長、遠的那一片短，因為是從後上方看），尾翼不轉、直直站在機尾那一點（算好的座標）。
+// 滑行道在畫面上往右上退（投影算出來約 50 度），飛機是平面貼圖，所以沿著那個方向畫：從後上方看一架客機。
+// 轉了 HEAD 度的 group 裡是機身（圓機頭、收細的尾錐）、一排窗、駕駛艙窗、後掠的機翼（靠鏡頭那一片長、遠的那一片短）、
+// 翼下兩具引擎、水平尾翼。垂直尾翼不轉、直直站在機尾那一點（算好的座標），BT 那一架的尾翼是橘色帶一片奶油色的台灣。
+// 起落架（.pl-gear）在地上看得到，離地之後 frame() 收起來。每個零件掛 pl-* 的 class，測試照這些名字找。
 const HEAD = -50;
 function planeBody({ wing, fin, stripe, bt }) {
-  const finFill = fin === "currentColor" ? `fill="currentColor"` : `class="${fin}"`;
-  return `<g transform="rotate(${HEAD})">` +
-    `<polygon points="-6,-30 -40,-30 -70,-92 -46,-92" class="${wing}"/><polygon points="-6,-14 -40,-14 -84,50 -56,50" class="${wing}"/>` +
-    `<ellipse cx="-46" cy="-60" rx="9" ry="6" class="c-grey"/><ellipse cx="-50" cy="18" rx="11" ry="7" class="c-grey"/>` +
-    `<ellipse cx="0" cy="-22" rx="92" ry="15" class="c-cream"/><ellipse cx="84" cy="-22" rx="12" ry="12" class="c-cream"/>` +
-    `<rect x="-74" y="-26" width="150" height="3" class="c-navy" fill-opacity="${stripe}"/>` + (bt ? `<rect x="-74" y="-21" width="150" height="2" class="c-orange"/>` : "") +
-    `<polygon points="-76,-22 -98,-44 -88,-44 -70,-30" class="${wing}"/><polygon points="-76,-22 -98,0 -88,0 -70,-14" class="${wing}"/>` +
-    (bt ? `<g class="anim-strobe"><circle cx="-70" cy="-92" r="3.5" class="c-yellow"/><circle cx="-84" cy="50" r="3.5" class="c-yellow"/><circle cx="-96" cy="-22" r="3" class="c-orange"/></g>` : "") +
+  const finAttr = fin === "currentColor" ? `class="pl-fin" fill="currentColor"` : `class="pl-fin ${fin}"`;
+  const windows = [...Array(9)].map((_, i) => `<rect class="pl-window c-navy" x="${-58 + i * 13}" y="-27" width="6" height="3.5" rx="1" fill-opacity=".6"/>`).join("");
+  return `<g class="pl-body" transform="rotate(${HEAD})">` +
+    // 遠的那一片機翼與引擎（畫在機身後面）
+    `<polygon class="pl-wing ${wing}" points="12,-30 -12,-30 -52,-86 -36,-86"/><ellipse class="pl-engine c-grey" cx="-22" cy="-58" rx="9" ry="5"/><ellipse class="c-navy" cx="-14" cy="-58" rx="2.5" ry="4" fill-opacity=".5"/>` +
+    `<polygon class="pl-stab ${wing}" points="-82,-28 -96,-28 -108,-54 -98,-54"/>` +
+    // 機身：尾錐收細、機頭圓
+    `<path class="pl-fuselage c-cream" d="M-104,-28 L-32,-35 Q40,-37 72,-35 Q98,-31 106,-22 Q98,-13 72,-9 Q40,-7 -32,-9 L-104,-16 Z"/>` +
+    `<path class="c-navy" d="M-104,-16 L-32,-9 Q40,-7 72,-9 Q90,-11 100,-16 Q90,-13 72,-13 Q40,-11 -32,-13 Z" fill-opacity=".14"/>` +
+    `<rect class="c-navy" x="-74" y="-23" width="160" height="2" fill-opacity="${stripe}"/>` + (bt ? `<rect class="c-orange" x="-74" y="-20" width="160" height="1.6"/>` : "") +
+    windows +
+    `<path class="pl-cockpit c-navy" d="M84,-30 L96,-27 Q100,-24 96,-23 L84,-25 Z" fill-opacity=".8"/>` +
+    // 靠鏡頭那一片機翼與引擎
+    `<polygon class="pl-wing ${wing}" points="12,-14 -12,-14 -68,54 -48,54"/><polygon class="c-navy" points="-12,-14 -68,54 -48,54 -4,-14" fill-opacity=".12"/>` +
+    `<ellipse class="pl-engine c-grey" cx="-30" cy="18" rx="13" ry="7.5"/><ellipse class="c-navy" cx="-19" cy="18" rx="3" ry="6" fill-opacity=".55"/>` +
+    `<polygon class="pl-stab ${wing}" points="-82,-16 -96,-16 -110,12 -98,12"/>` +
+    (bt ? `<g class="anim-strobe"><circle cx="-66" cy="54" r="3.5" class="c-yellow"/><circle cx="-50" cy="-86" r="3" class="c-yellow"/><circle cx="-106" cy="-22" r="3" class="c-orange"/></g>` : "") +
     `</g>` +
-    `<polygon points="-74,53 -68,-6 -52,-6 -60,53" ${finFill}/>` + (bt ? `<circle cx="-61" cy="8" r="5" class="c-cream"/>` : "");
+    // 起落架：機頭一組、主輪兩組（位置是機身那幾點轉過之後再往下一點）
+    `<g class="pl-gear"><rect x="36" y="-66" width="2" height="9" class="c-navy"/><circle cx="37" cy="-56" r="3.2" class="c-navy"/><rect x="-7" y="-4" width="2" height="9" class="c-navy"/><circle cx="-6" cy="6" r="3.6" class="c-navy"/><rect x="-26" y="10" width="2" height="9" class="c-navy"/><circle cx="-25" cy="20" r="3.6" class="c-navy"/></g>` +
+    // 垂直尾翼：站在機尾（-104,-22 轉過去是 -84,63）
+    `<polygon ${finAttr} points="-86,64 -78,0 -62,0 -72,64"/>` +
+    (bt ? `<path class="pl-mark c-cream" d="M-72,16 Q-66,10 -65,20 Q-64,32 -69,44 Q-74,38 -74,28 Q-74,20 -72,16 Z"/>` : "");
 }
 const win = (x, y, w, h, op) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="c-navy" fill-opacity="${op || ".5"}"/>`;
 const SYMBOLS = {
@@ -294,7 +311,7 @@ const SYMBOLS = {
   // 我們那一架：BT 的顏色（奶油機身、藍窗線加一條橘線、橘尾翼帶一個白印、青機翼），翼尖與機尾有頻閃燈。
   btplane: planeBody({ wing: "c-teal", fin: "c-orange", stripe: ".6", bt: true }),
   // 飛機在地上的影子（離地之後縮小變淡）。
-  planeshadow: `<ellipse cx="0" cy="0" rx="96" ry="15" class="c-navy" fill-opacity=".2" transform="translate(18 10) rotate(${HEAD})"/>`,
+  planeshadow: `<ellipse cx="0" cy="0" rx="104" ry="18" class="c-navy" fill-opacity=".22" transform="translate(22 12) rotate(${HEAD})"/>`,
   // 地勤：橘背心、拿兩支指揮棒。顏色 currentColor（背心）。
   crew: `<ellipse cx="3" cy="1" rx="7" ry="1.8" class="c-navy" fill-opacity=".18"/><rect x="-4" y="-15" width="8" height="15" rx="2.5" class="c-navy"/><rect x="-5" y="-15" width="10" height="9" rx="2" fill="currentColor"/><circle cx="0" cy="-19" r="4" class="c-sand"/>` +
     `<g class="anim-flag" transform="translate(0,-14)"><rect x="-14" y="-6" width="10" height="2" class="c-orange"/><rect x="4" y="-6" width="10" height="2" class="c-orange"/></g>`,
@@ -315,11 +332,11 @@ export const SYMBOL_NAMES = Object.keys(SYMBOLS);
 const defs = () => `<defs>` + SYMBOL_NAMES.map(k => `<symbol id="s-${k}" overflow="visible">${SYMBOLS[k]}</symbol>`).join("") +
   `<linearGradient id="g-am" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-teal" stop-opacity=".5"/><stop offset=".55" class="st-cream" stop-opacity="0"/></linearGradient>` +
   `<linearGradient id="g-pm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-orange" stop-opacity=".55"/><stop offset=".55" class="st-sand" stop-opacity=".4"/><stop offset="1" class="st-cream" stop-opacity="0"/></linearGradient>` +
-  `<linearGradient id="g-alt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-navy" stop-opacity=".6"/><stop offset=".45" class="st-teal" stop-opacity=".45"/><stop offset=".8" class="st-cream" stop-opacity=".2"/><stop offset="1" class="st-cream" stop-opacity="0"/></linearGradient>` +
+  `<linearGradient id="g-alt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-navy" stop-opacity=".9"/><stop offset=".3" class="st-navy" stop-opacity=".55"/><stop offset=".6" class="st-teal" stop-opacity=".45"/><stop offset=".85" class="st-cream" stop-opacity=".15"/><stop offset="1" class="st-cream" stop-opacity="0"/></linearGradient>` +
   `<linearGradient id="g-horizon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-cream" stop-opacity=".95"/><stop offset="1" class="st-cream" stop-opacity="0"/></linearGradient>` +
   `<linearGradient id="g-corner" x1="0" y1="1" x2="1" y2="0"><stop offset=".45" class="st-cream" stop-opacity="0"/><stop offset="1" class="st-cream" stop-opacity=".85"/></linearGradient>` +
   `<linearGradient id="g-foot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-navy" stop-opacity="0"/><stop offset="1" class="st-navy" stop-opacity=".12"/></linearGradient>` +
-  `<linearGradient id="g-ghaze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-cream" stop-opacity="0"/><stop offset=".1" class="st-cream" stop-opacity=".8"/><stop offset=".5" class="st-cream" stop-opacity=".7"/><stop offset="1" class="st-cream" stop-opacity=".45"/></linearGradient>` +
+  `<linearGradient id="g-ghaze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-cream" stop-opacity="0"/><stop offset=".08" class="st-cream" stop-opacity=".62"/><stop offset=".4" class="st-sand" stop-opacity=".3"/><stop offset="1" class="st-sand" stop-opacity=".1"/></linearGradient>` +
   `<linearGradient id="g-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-sand" stop-opacity=".55"/><stop offset="1" class="st-cream" stop-opacity=".9"/></linearGradient>` +
   `<linearGradient id="g-ceil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-navy" stop-opacity=".22"/><stop offset="1" class="st-navy" stop-opacity=".06"/></linearGradient>` +
   `</defs>`;
@@ -429,8 +446,8 @@ function airportObjects(tall) {
   out.push(use("windsock", 280, APRON_LEN - 700, 1));
   if (!tall) for (let z = -600; z < APRON_LEN + 9000; z += 260 + r() * 300) out.push(use("grassclump", 260 + r() * 400, z, 1 + r() * 0.6));
   // 滑行道邊燈（青）每 220 一對；跑道邊燈（黃）每 160 一對。
-  for (let z = -1200; z < APRON_LEN; z += 220) { out.push(use("edgelight", -ROAD_HALF - 12, z, 1)); out.push(use("edgelight", ROAD_HALF + 12, z, 1)); }
-  for (let z = APRON_LEN + 400; z < APRON_LEN + 11000; z += 160) { out.push(use("rwylight", -RUNWAY_HALF - 14, z, 1)); out.push(use("rwylight", RUNWAY_HALF + 14, z, 1)); }
+  for (let z = -1200; z < APRON_LEN; z += 260) { out.push(use("edgelight", -ROAD_HALF - 12, z, 1)); out.push(use("edgelight", ROAD_HALF + 12, z, 1)); }
+  for (let z = APRON_LEN + 400; z < APRON_LEN + 9500; z += 240) { out.push(use("rwylight", -RUNWAY_HALF - 14, z, 1)); out.push(use("rwylight", RUNWAY_HALF + 14, z, 1)); }
   return out;
 }
 function stopObjects(w, motifs) {
@@ -541,7 +558,7 @@ export function attach(svg) {
     ceil: { slab: svg.querySelector(".ceil-slab"), base: svg.querySelector(".ceil-base"), beams: svg.querySelector(".ceil-beams"), lights: svg.querySelector(".ceil-lights") },
     floor: { slab: svg.querySelector(".floor-slab"), lines: svg.querySelector(".floor-lines"), rows: svg.querySelector(".floor-rows") },
     traveller: svg.querySelector("[data-traveller]"), legA: svg.querySelector(".leg-a"), legB: svg.querySelector(".leg-b"), arm: svg.querySelector(".arm"),
-    plane: { el: svg.querySelector("[data-plane]"), base: 1, last: "" }, shadow: { el: svg.querySelector("[data-shadow]"), base: 1, last: "" },
+    plane: { el: svg.querySelector("[data-plane]"), base: 1, last: "" }, gear: svg.querySelector("[data-plane] .pl-gear"), shadow: { el: svg.querySelector("[data-shadow]"), base: 1, last: "" },
     board: svg.querySelector("[data-board]"),
   };
   return reg;
@@ -574,11 +591,12 @@ const set = (o, attr, v) => { if (o.last !== v) { o.last = v; o.el.setAttribute(
 const hide = o => { if (o.hidden !== true) { o.hidden = true; o.el.setAttribute("visibility", "hidden"); } };
 const show = o => { if (o.hidden !== false) { o.hidden = false; o.el.removeAttribute("visibility"); } };
 function place(o, p, extra) {
-  if (!p || p.depth > FAR) { hide(o); return; }
+  if (!p || p.depth > farNow) { hide(o); return; }
   show(o);
   const k = p.s * o.base, flip = o.v < 0 ? -1 : 1;
   set(o, "transform", `translate(${f1(p.x)} ${f1(p.y)}) ${extra || ""}scale(${f1(k * flip * 100) / 100} ${f1(k * 100) / 100})`);
-  const fade = p.depth > FADE_FROM ? Math.max(0.06, 1 - (p.depth - FADE_FROM) / (FAR - FADE_FROM)) : 1;
+  const fadeFrom = FADE_FROM * (farNow / FAR);
+  const fade = p.depth > fadeFrom ? Math.max(0.06, 1 - (p.depth - fadeFrom) / (farNow - fadeFrom)) : 1;
   const fv = String(Math.round(fade * 20) / 20);
   if (o.fade !== fv) { o.fade = fv; o.el.setAttribute("opacity", fv); }
 }
@@ -601,9 +619,9 @@ export function frame(reg, w, cam, p, t) {
     const intOn = hd.int > 0, extOn = hd.ext > 0;
     reg.int.setAttribute("opacity", f1(hd.int * 10) / 10); reg.int.style.display = intOn ? "" : "none";
     reg.ext.setAttribute("opacity", f1(hd.ext * 10) / 10); reg.ext.style.display = extOn ? "" : "none";
-    const ox = cam.xT + 140, oy = 400;
-    reg.int.setAttribute("transform", hd.int < 1 ? `translate(${f1(ox)} ${oy}) scale(${f1(1 + 0.7 * hd.ext)}) translate(${f1(-ox)} ${-oy})` : "");
-    reg.ext.setAttribute("transform", hd.ext < 1 ? `translate(${f1(cam.cx)} ${cam.cy}) scale(${f1(1.25 - 0.25 * hd.ext)}) translate(${f1(-cam.cx)} ${-cam.cy})` : "");
+    const ox = cam.xT + 140, oy = 400, sl = hd.slide || 0;
+    reg.int.setAttribute("transform", sl > 0 ? `translate(${f1(-sl * 260)} ${f1(-sl * 90)}) translate(${f1(ox)} ${oy}) scale(${f1(1 + 0.25 * sl)}) translate(${f1(-ox)} ${-oy})` : "");
+    reg.ext.setAttribute("transform", hd.ext < 1 ? `translate(${f1(cam.cx)} ${cam.cy}) scale(${f1(1.2 - 0.2 * hd.ext)}) translate(${f1(-cam.cx)} ${-cam.cy})` : "");
     if (intOn) {
       for (const n in reg.layers) { const L = reg.layers[n]; set(L, "transform", layerT(cam, tx, L.k)); }
       reg.floor.lines.setAttribute("d", crossLines(cam, tx, INT.wallY, INT.wallK, INT.nearY, INT.nearK, 200));
@@ -617,6 +635,7 @@ export function frame(reg, w, cam, p, t) {
       reg.arm.setAttribute("transform", `rotate(${f1(-a * 0.8)} 16 -112)`);
     }
     if (extOn) {
+      farNow = FAR + 3000 * q.lift;
       if (q.lift) horizonLayout(reg, vc); else if (reg.lifted) horizonLayout(reg, cam);
       reg.lifted = q.lift > 0;
       const rd = roadPolygon(vc, cz, w.length);
@@ -625,7 +644,7 @@ export function frame(reg, w, cam, p, t) {
       reg.road.r.setAttribute("points", strip(vc, cz, w.length, ROAD_HALF, ROAD_HALF + 26));
       reg.road.dashes.setAttribute("d", centreline(vc, cz, w.length));
       for (const qd of reg.paddies) {
-        if (qd.z1 < cz - 100 || qd.z0 > cz + FAR) { hide(qd); continue; }
+        if (qd.z1 < cz - 100 || qd.z0 > cz + farNow) { hide(qd); continue; }
         const a = project(vc, qd.x0, 0, Math.max(qd.z0, cz + 50), cz), b = project(vc, qd.x1, 0, Math.max(qd.z0, cz + 50), cz), c = project(vc, qd.x1, 0, qd.z1, cz), d = project(vc, qd.x0, 0, qd.z1, cz);
         if (!(a && b && c && d)) { hide(qd); continue; }
         show(qd); set(qd, "points", pts([a, b, c, d]));
@@ -638,16 +657,22 @@ export function frame(reg, w, cam, p, t) {
       // 我們那一架與它的影子。
       const pp = project(vc, q.x, q.y, q.z, cz);
       place(reg.plane, pp, q.pitch ? `rotate(${f1(-q.pitch)}) ` : "");
+      // 離地就收起落架（opacity 只寫變了的值）。
+      const gear = String(Math.round(clamp01(1 - q.lift * 4) * 10) / 10);
+      if (reg.gear && reg.gearLast !== gear) { reg.gearLast = gear; reg.gear.setAttribute("opacity", gear); }
       const sh = project(vc, q.x, 0, q.z, cz);
       if (sh) { sh.s *= Math.max(0.35, 1 - q.lift * 0.6); place(reg.shadow, sh); reg.shadow.el.setAttribute("opacity", f1(1 - q.lift * 0.8)); } else hide(reg.shadow);
       // 地面退進霧裡、天空變高空的藍。
-      reg.groundHaze.setAttribute("opacity", f1(q.lift * 0.85 * 10) / 10);
+      reg.groundHaze.setAttribute("opacity", f1(q.lift * 10) / 10);
       reg.sky.alt.setAttribute("opacity", f1(q.lift * 10) / 10);
+      reg.sky.pm.setAttribute("opacity", f1((1 - q.lift * 0.7) * 10) / 10);
+      reg.horizon.setAttribute("opacity", f1((1 - q.lift * 0.55) * 20) / 20);
+      // 跑道與地面退遠：離地之後霧從更遠的地方開始、也更遠才消失，跑道一路收細進去。
       if (reg.ridges) reg.ridges.setAttribute("transform", `translate(${f1(-cz * 0.025 + cam.viewW * 0.3)} ${f1(horizonY(vc) + 2)})`);
     }
     // 天空：早晨到黃昏（到跑道頭），太陽慢慢往右下走、變橘。
     const day = clamp01(e / PHASES.takeoff[0]);
-    reg.sky.pm.setAttribute("opacity", f1(day * 10) / 10);
+    reg.sky.pm.setAttribute("opacity", f1(day * (1 - q.lift * 0.7) * 10) / 10);
     reg.sky.sunPm.setAttribute("fill-opacity", f1(day * 8) / 10);
     reg.sky.sun.setAttribute("transform", `translate(${f1(cam.viewW * (0.2 + 0.55 * day))} ${f1(horizonY(vc) - 110 + 60 * day - 120 * q.lift)})`);
   }
