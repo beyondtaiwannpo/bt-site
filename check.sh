@@ -1659,12 +1659,18 @@ grep -qF "integrity=\"${GSAP_CORE}\"" history/index.html || hi_bad="${hi_bad} gs
 grep -qF "integrity=\"${GSAP_ST}\"" history/index.html   || hi_bad="${hi_bad} ScrollTrigger.min.js"
 hi_tag=$(grep -c '^<script src="https://cdnjs.cloudflare.com' history/index.html)
 hi_pre=$(grep -A2 'rel="preload" as="script"' history/index.html | grep -cF "integrity=\"${GSAP_CORE}\"")
+hi_pre2=$(grep -A2 'rel="preload" as="script"' history/index.html | grep -cF "integrity=\"${GSAP_ST}\"")
+# 2026-11-06 批 3：主程式要排在 GSAP 前面（先跑、先拿資料），GSAP 兩支加 defer。順序錯了主程式會等 GSAP 下載完才開始。
+hi_order=$(grep -n '<script type="module" src="./src/main.js">\|<script src="https://cdnjs.cloudflare.com' history/index.html | head -1 | grep -c 'main.js')
+hi_defer=$(grep -c '^<script src="https://cdnjs.cloudflare.com[^>]* defer' history/index.html)
 if [ -n "$hi_bad" ]; then
   bad "history/index.html 的 cdnjs script 少了正確的 integrity：${hi_bad}"
-elif [ "$hi_tag" != "2" ] || [ "$hi_pre" != "1" ]; then
-  bad "history/index.html 的 cdnjs script 不是兩支、或 preload 的 integrity 跟 script 對不上（標籤 ${hi_tag} 支、preload ${hi_pre}）"
+elif [ "$hi_tag" != "2" ] || [ "$hi_pre" != "1" ] || [ "$hi_pre2" != "1" ]; then
+  bad "history/index.html 的 cdnjs script 不是兩支、或 preload 的 integrity 跟 script 對不上（標籤 ${hi_tag} 支、preload ${hi_pre} 與 ${hi_pre2}）"
+elif [ "$hi_order" != "1" ] || [ "$hi_defer" != "2" ]; then
+  bad "history/index.html 的 main.js 要排在 GSAP 兩支前面，而且 GSAP 兩支都要 defer（順序 ${hi_order}、defer ${hi_defer}）"
 else
-  ok "history/index.html 的 GSAP 兩支都有正確的 integrity，preload 也對得上"
+  ok "history/index.html 的 GSAP 兩支都有正確的 integrity，preload 也對得上，main.js 排在前面且 GSAP 有 defer"
 fi
 hiMotion=$(node -e '
   const fs = require("fs");
