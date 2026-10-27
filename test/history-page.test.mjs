@@ -241,22 +241,31 @@ test("投影（批 4）：航廈側視的站點、停機坪的針孔投影、起
   assert.equal(S.travellerX(0.35), S.TERM_LEN); assert.equal(S.travellerX(0.5), S.TERM_LEN);
 });
 
-test("飛機（批 4 修正）：客機該有的零件都在；換鏡兩條曲線不會同時超過一半", () => {
+test("飛機（批 4 修正）：預先畫好的四分之三視角，客機該有的零件都在，地面與爬升兩張；換鏡兩條曲線不會同時超過一半", () => {
   const svg = S.sceneSVG(S.world(7), ["seven"], false);
-  const sym = svg.slice(svg.indexOf('<symbol id="s-btplane"'), svg.indexOf("</symbol>", svg.indexOf('<symbol id="s-btplane"')));
-  const count = cls => (sym.match(new RegExp(`class="${cls}[ "]`, "g")) || []).length;
-  assert.equal(count("pl-fuselage c-cream"), 1, "機身");
-  assert.equal(count("pl-cockpit"), 1, "駕駛艙窗");
-  assert.ok(count("pl-window") >= 6, "一排窗");
-  assert.equal(count("pl-wing"), 2, "兩片機翼");
-  assert.equal(count("pl-engine"), 2, "兩具引擎");
-  assert.equal(count("pl-stab"), 2, "水平尾翼");
-  assert.equal(count("pl-fin c-orange"), 1, "橘色的垂直尾翼（class 只能寫一次，寫兩次瀏覽器只認第一個，尾翼會變黑）");
-  assert.equal(count("pl-mark c-cream"), 1, "尾翼上奶油色的台灣");
-  assert.ok((sym.match(/class="pl-gear"/g) || []).length === 1 && (sym.match(/<circle[^>]*class="c-navy"/g) || []).length >= 3, "三組起落架");
+  const symbolOf = id => svg.slice(svg.indexOf(`<symbol id="${id}"`), svg.indexOf("</symbol>", svg.indexOf(`<symbol id="${id}"`)));
+  const count = (sym, cls) => (sym.match(new RegExp(`class="${cls}[ "]`, "g")) || []).length;
+  for (const [id, gear] of [["s-btplane", 1], ["s-btclimb", 0]]) {
+    const sym = symbolOf(id);
+    assert.equal(count(sym, "pl-fuselage c-cream"), 1, id + " 機身");
+    assert.equal(count(sym, "pl-cockpit"), 1, id + " 駕駛艙窗");
+    assert.ok(count(sym, "pl-window") >= 8, id + " 一排窗");
+    assert.equal(count(sym, "pl-wing"), 2, id + " 兩片機翼");
+    assert.equal(count(sym, "pl-engine"), 2, id + " 兩具引擎");
+    assert.equal(count(sym, "pl-stab"), 2, id + " 水平尾翼");
+    assert.equal(count(sym, "pl-fin c-orange"), 1, id + " 橘色的垂直尾翼（class 只能寫一次，寫兩次瀏覽器只認第一個，尾翼會變黑）");
+    assert.equal(count(sym, "pl-mark c-cream"), 1, id + " 尾翼上奶油色的台灣");
+    assert.equal((sym.match(/class="pl-gear"/g) || []).length, gear, id + (gear ? " 三組起落架" : " 離地那一張沒有起落架"));
+    assert.ok(!/rotate\(/.test(sym), id + " 不轉角度，四分之三視角是畫好的");
+    // 機頭在畫面上指右上（滑行道的方向）：機身 path 最右邊的點比最左邊的點高（y 小）
+    const nums = [...sym.slice(sym.indexOf('pl-fuselage'), sym.indexOf('/>', sym.indexOf('pl-fuselage'))).matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(m => [+m[1], +m[2]]);
+    const right = nums.reduce((a, b) => b[0] > a[0] ? b : a), left = nums.reduce((a, b) => b[0] < a[0] ? b : a);
+    assert.ok(right[1] < left[1], id + " 機頭要在右上");
+  }
   assert.ok(svg.includes('data-shadow="1"') && svg.includes('id="s-planeshadow"'), "影子是分開的貼圖，離地後留在地上");
+  assert.ok(svg.includes('href="#s-btplane" class="pl-ground"') && svg.includes('href="#s-btclimb" class="pl-climb" opacity="0"'), "兩張都放了，爬升那一張先藏著");
   // 停著的飛機也是同一具身體，尾翼是 currentColor
-  const parked = svg.slice(svg.indexOf('<symbol id="s-plane"'), svg.indexOf("</symbol>", svg.indexOf('<symbol id="s-plane"')));
+  const parked = symbolOf("s-plane");
   assert.ok(/class="pl-fin" fill="currentColor"/.test(parked));
   // 整個場景裡沒有任何一個元素寫了兩次 class
   assert.ok(!/<[a-z]+ [^>]*class="[^"]*"[^>]*class="/.test(svg), "有元素寫了兩次 class");

@@ -198,36 +198,53 @@ function centreline(cam, cz, length) {
 // 影子：朝右下的長影，所有戶外的東西共用同一個方向（光從左上來）。
 const shadow = (w, h) => `<polygon points="${-w * 0.45},0 ${w * 0.45},0 ${w * 0.45 + h * 0.9},${h * 0.32} ${-w * 0.45 + h * 0.9},${h * 0.32}" class="c-navy" fill-opacity=".14"/>`;
 // ── 飛機怎麼畫 ──
-// 滑行道在畫面上往右上退（投影算出來約 50 度），飛機是平面貼圖，所以沿著那個方向畫：從後上方看一架客機。
-// 轉了 HEAD 度的 group 裡是機身（圓機頭、收細的尾錐）、一排窗、駕駛艙窗、後掠的機翼（靠鏡頭那一片長、遠的那一片短）、
-// 翼下兩具引擎、水平尾翼。垂直尾翼不轉、直直站在機尾那一點（算好的座標），BT 那一架的尾翼是橘色帶一片奶油色的台灣。
-// 起落架（.pl-gear）在地上看得到，離地之後 frame() 收起來。每個零件掛 pl-* 的 class，測試照這些名字找。
+// 2026-11-06 第三輪：不再把俯視圖轉角度送進投影（那樣沿滑行道一壓就變成一根棍子）。改成預先畫好的四分之三視角符號，
+// 跟低多邊形等角插畫畫飛機的方法一樣（查過 "low poly airliner isometric illustration"：從側上方看，機身是一根長管，看得到亮的頂面與
+// 帶一排窗的側面，機頭圓、尾錐往上收，機翼是平的平行四邊形往後掠，兩具短圓筒引擎掛在翼下、看得到後端的排氣口，
+// 垂直尾翼直立、水平尾翼小，機頭指著滑行道的方向）。放的時候只 translate 加 scale 到投影出來的地面點，跟其他符號一樣。
+// 座標系：t 沿機身（機頭是正，畫面上往右上，就是滑行道在畫面上的方向約 50 度）、w 橫向（正的靠觀看者）、z 高度。
+// 畫面 = t * U + w * V + z * (0, -1)。U、V 是那兩個方向在畫面上的單位向量（V 壓扁一點，因為是從上面看）。
 const HEAD = -50;
-function planeBody({ wing, fin, stripe, bt }) {
+const U = [Math.cos(HEAD * Math.PI / 180), Math.sin(HEAD * Math.PI / 180)], V = [-U[1] * 0.85, U[0] * 0.85];
+function airliner({ wing, fin, stripe, bt, pitch, gear, belly }) {
+  const th = (pitch || 0) * Math.PI / 180, c = Math.cos(th), sn = Math.sin(th);
+  // 機頭抬起：t、z 繞機身中點轉。
+  const P = (t, w, z) => { const t2 = t * c - z * sn, z2 = t * sn + z * c; return `${f1(t2 * U[0] + w * V[0])},${f1(t2 * U[1] + w * V[1] - z2)}`; };
+  const poly = (cls, pts, extra) => `<polygon class="${cls}" points="${pts.map(q => P(...q)).join(" ")}"${extra || ""}/>`;
   const finAttr = fin === "currentColor" ? `class="pl-fin" fill="currentColor"` : `class="pl-fin ${fin}"`;
-  const windows = [...Array(9)].map((_, i) => `<rect class="pl-window c-navy" x="${-58 + i * 13}" y="-27" width="6" height="3.5" rx="1" fill-opacity=".6"/>`).join("");
-  return `<g class="pl-body" transform="rotate(${HEAD})">` +
-    // 遠的那一片機翼與引擎（畫在機身後面）
-    `<polygon class="pl-wing ${wing}" points="12,-30 -12,-30 -52,-86 -36,-86"/><ellipse class="pl-engine c-grey" cx="-22" cy="-58" rx="9" ry="5"/><ellipse class="c-navy" cx="-14" cy="-58" rx="2.5" ry="4" fill-opacity=".5"/>` +
-    `<polygon class="pl-stab ${wing}" points="-82,-28 -96,-28 -108,-54 -98,-54"/>` +
-    // 機身：尾錐收細、機頭圓
-    `<path class="pl-fuselage c-cream" d="M-104,-28 L-32,-35 Q40,-37 72,-35 Q98,-31 106,-22 Q98,-13 72,-9 Q40,-7 -32,-9 L-104,-16 Z"/>` +
-    `<path class="c-navy" d="M-104,-16 L-32,-9 Q40,-7 72,-9 Q90,-11 100,-16 Q90,-13 72,-13 Q40,-11 -32,-13 Z" fill-opacity=".14"/>` +
-    `<rect class="c-navy" x="-74" y="-23" width="160" height="2" fill-opacity="${stripe}"/>` + (bt ? `<rect class="c-orange" x="-74" y="-20" width="160" height="1.6"/>` : "") +
-    windows +
-    `<path class="pl-cockpit c-navy" d="M84,-30 L96,-27 Q100,-24 96,-23 L84,-25 Z" fill-opacity=".8"/>` +
-    // 靠鏡頭那一片機翼與引擎
-    `<polygon class="pl-wing ${wing}" points="12,-14 -12,-14 -68,54 -48,54"/><polygon class="c-navy" points="-12,-14 -68,54 -48,54 -4,-14" fill-opacity=".12"/>` +
-    `<ellipse class="pl-engine c-grey" cx="-30" cy="18" rx="13" ry="7.5"/><ellipse class="c-navy" cx="-19" cy="18" rx="3" ry="6" fill-opacity=".55"/>` +
-    `<polygon class="pl-stab ${wing}" points="-82,-16 -96,-16 -110,12 -98,12"/>` +
-    (bt ? `<g class="anim-strobe"><circle cx="-66" cy="54" r="3.5" class="c-yellow"/><circle cx="-50" cy="-86" r="3" class="c-yellow"/><circle cx="-106" cy="-22" r="3" class="c-orange"/></g>` : "") +
-    `</g>` +
-    // 起落架：機頭一組、主輪兩組（位置是機身那幾點轉過之後再往下一點）
-    `<g class="pl-gear"><rect x="36" y="-66" width="2" height="9" class="c-navy"/><circle cx="37" cy="-56" r="3.2" class="c-navy"/><rect x="-7" y="-4" width="2" height="9" class="c-navy"/><circle cx="-6" cy="6" r="3.6" class="c-navy"/><rect x="-26" y="10" width="2" height="9" class="c-navy"/><circle cx="-25" cy="20" r="3.6" class="c-navy"/></g>` +
-    // 垂直尾翼：站在機尾（-104,-22 轉過去是 -84,63）
-    `<polygon ${finAttr} points="-86,64 -78,0 -62,0 -72,64"/>` +
-    (bt ? `<path class="pl-mark c-cream" d="M-72,16 Q-66,10 -65,20 Q-64,32 -69,44 Q-74,38 -74,28 Q-74,20 -72,16 Z"/>` : "");
+  const out = [];
+  // 比例照插畫的習慣放大：機身長 170 高 40（真飛機更細，畫成那樣在這個尺寸只剩一根棍子）、引擎大、機翼寬。線條：機身與機翼描一條淡藍邊。
+  const edge = ' stroke-width="1.2" stroke-opacity=".35"';   // 配 s-navy 的 class 一起用（class 只能寫一次）
+  // 遠的那一片機翼、引擎、水平尾翼（畫在機身後面）
+  out.push(poly(`pl-wing ${wing} s-navy`, [[26, -8, 44], [-16, -8, 44], [-62, -72, 50], [-44, -72, 50]], edge));
+  out.push(poly("pl-engine c-grey", [[8, -38, 40], [-30, -38, 40], [-30, -38, 24], [8, -38, 24]]));
+  out.push(poly(`pl-stab ${wing}`, [[-66, -8, 46], [-84, -8, 46], [-98, -34, 50], [-86, -34, 50]]));
+  // 機身：側面（帶窗）、機腹（深）、頂面（亮）；機頭圓、尾錐往上收
+  const side = `M${P(-88, 12, 40)} L${P(-30, 12, 14)} L${P(70, 12, 14)} Q${P(96, 12, 16)} ${P(100, 12, 34)} Q${P(96, 12, 54)} ${P(72, 12, 56)} L${P(-30, 12, 56)} L${P(-88, 12, 52)} Z`;
+  out.push(`<path class="pl-fuselage c-cream s-navy" d="${side}"${edge}/>`);
+  out.push(`<path class="c-navy" d="M${P(-88, 12, 40)} L${P(-30, 12, 14)} L${P(70, 12, 14)} Q${P(96, 12, 16)} ${P(100, 12, 34)} L${P(94, 12, 26)} Q${P(88, 12, 22)} ${P(70, 12, 22)} L${P(-30, 12, 22)} L${P(-86, 12, 43)} Z" fill-opacity="${belly ? ".32" : ".18"}"/>`);
+  out.push(`<path class="c-cream s-navy" d="M${P(-88, 12, 52)} L${P(-30, 12, 56)} L${P(72, 12, 56)} Q${P(96, 12, 54)} ${P(100, 12, 34)} L${P(96, -10, 38)} Q${P(90, -10, 56)} ${P(72, -10, 58)} L${P(-30, -10, 58)} L${P(-88, -10, 54)} Z"${edge}/>`);
+  // 窗線、橘線、一排窗、駕駛艙窗（都在側面）
+  out.push(poly("c-navy", [[-64, 12.2, 40], [66, 12.2, 40], [66, 12.2, 37.5], [-64, 12.2, 37.5]], ` fill-opacity="${stripe}"`));
+  if (bt) out.push(poly("c-orange", [[-64, 12.3, 36.5], [66, 12.3, 36.5], [66, 12.3, 34.8], [-64, 12.3, 34.8]]));
+  for (let t = -56; t <= 56; t += 11) out.push(poly("pl-window c-navy", [[t, 12.4, 46], [t + 5.5, 12.4, 46], [t + 5.5, 12.4, 42], [t, 12.4, 42]], ' fill-opacity=".62"'));
+  out.push(poly("pl-cockpit c-navy", [[76, 12.4, 50], [92, 12.4, 46], [92, 12.4, 40], [76, 12.4, 41]], ' fill-opacity=".82"'));
+  // 靠觀看者這一片機翼（翼根在機身中段，往後掠，翼尖稍微抬起）、引擎（看得到後端的排氣口）、水平尾翼
+  out.push(poly(`pl-wing ${wing} s-navy`, [[26, 14, 30], [-18, 14, 30], [-74, 92, 36], [-52, 92, 36]], edge));
+  out.push(poly("c-navy", [[-18, 14, 30], [-74, 92, 36], [-52, 92, 36], [4, 14, 30]], ' fill-opacity=".1"'));
+  out.push(poly("pl-engine c-grey s-navy", [[12, 46, 26], [-30, 46, 26], [-30, 46, 6], [12, 46, 6]], edge));
+  out.push(`<ellipse class="c-navy" cx="${P(-30, 46, 16).split(",")[0]}" cy="${P(-30, 46, 16).split(",")[1]}" rx="5" ry="10" fill-opacity=".6"/>`);
+  out.push(poly("c-navy", [[12, 46, 26], [-30, 46, 26], [-30, 46, 21], [12, 46, 21]], ' fill-opacity=".12"'));
+  out.push(poly(`pl-stab ${wing} s-navy`, [[-66, 14, 42], [-84, 14, 42], [-100, 44, 46], [-88, 44, 46]], edge));
+  // 起落架：機頭一組、主輪兩組（離地的那一張沒有）
+  if (gear) out.push(`<g class="pl-gear">` + [[76, 8], [-4, 24], [-4, -4]].map(([t, w]) => `<polygon class="c-navy" points="${[[t - 1.2, w, 16], [t + 1.2, w, 16], [t + 1.2, w, 5], [t - 1.2, w, 5]].map(q => P(...q)).join(" ")}"/><circle class="c-navy" cx="${P(t, w, 4).split(",")[0]}" cy="${P(t, w, 4).split(",")[1]}" r="4"/>`).join("") + `</g>`);
+  // 垂直尾翼直直站在機尾，BT 那一架是橘色帶一片奶油色的台灣
+  out.push(`<polygon ${finAttr} points="${[[-62, 0, 52], [-88, 0, 52], [-106, 0, 112], [-90, 0, 112]].map(q => P(...q)).join(" ")}"/>`);
+  if (bt) { const [mx, my] = P(-90, 0, 80).split(",").map(Number); out.push(`<path class="pl-mark c-cream" d="M${mx + 1},${my - 15} Q${mx + 8},${my - 8} ${mx + 7},${my + 1} Q${mx + 6},${my + 13} ${mx - 1},${my + 18} Q${mx - 7},${my + 9} ${mx - 6},${my} Q${mx - 5},${my - 9} ${mx + 1},${my - 15} Z"/>`); }
+  if (bt) out.push(`<g class="anim-strobe"><circle cx="${P(-63, 92, 36).split(",")[0]}" cy="${P(-63, 92, 36).split(",")[1]}" r="3.5" class="c-yellow"/><circle cx="${P(-53, -72, 50).split(",")[0]}" cy="${P(-53, -72, 50).split(",")[1]}" r="3" class="c-yellow"/><circle cx="${P(-92, 0, 50).split(",")[0]}" cy="${P(-92, 0, 50).split(",")[1]}" r="3" class="c-orange"/></g>`);
+  return out.join("");
 }
+const planeBody = o => airliner({ pitch: 0, gear: true, ...o });
 const win = (x, y, w, h, op) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="c-navy" fill-opacity="${op || ".5"}"/>`;
 const SYMBOLS = {
   // ── 室內（1 倍那一層的大小：人約 150 高） ──
@@ -310,8 +327,10 @@ const SYMBOLS = {
   plane: planeBody({ wing: "c-grey", fin: "currentColor", stripe: ".55" }),
   // 我們那一架：BT 的顏色（奶油機身、藍窗線加一條橘線、橘尾翼帶一個白印、青機翼），翼尖與機尾有頻閃燈。
   btplane: planeBody({ wing: "c-teal", fin: "c-orange", stripe: ".6", bt: true }),
+  // 爬升那一張：機頭抬 15 度、起落架收了、多看到一點機腹。起飛那一下兩張交叉淡入（frame()）。
+  btclimb: airliner({ wing: "c-teal", fin: "c-orange", stripe: ".6", bt: true, pitch: 15, gear: false, belly: true }),
   // 飛機在地上的影子（離地之後縮小變淡）。
-  planeshadow: `<ellipse cx="0" cy="0" rx="104" ry="18" class="c-navy" fill-opacity=".22" transform="translate(22 12) rotate(${HEAD})"/>`,
+  planeshadow: `<ellipse cx="0" cy="0" rx="112" ry="26" class="c-navy" fill-opacity=".22" transform="translate(30 16) rotate(${HEAD})"/>`,
   // 地勤：橘背心、拿兩支指揮棒。顏色 currentColor（背心）。
   crew: `<ellipse cx="3" cy="1" rx="7" ry="1.8" class="c-navy" fill-opacity=".18"/><rect x="-4" y="-15" width="8" height="15" rx="2.5" class="c-navy"/><rect x="-5" y="-15" width="10" height="9" rx="2" fill="currentColor"/><circle cx="0" cy="-19" r="4" class="c-sand"/>` +
     `<g class="anim-flag" transform="translate(0,-14)"><rect x="-14" y="-6" width="10" height="2" class="c-orange"/><rect x="4" y="-6" width="10" height="2" class="c-orange"/></g>`,
@@ -444,10 +463,10 @@ function airportObjects(tall) {
   out.push(use("fueltruck", 150, 850, 1)); out.push(use("fueltruck", 150, 3100, 1));
   for (let z = 400; z < APRON_LEN; z += 1400) out.push(use("taxisign", 125, z, 1));
   out.push(use("windsock", 280, APRON_LEN - 700, 1));
-  if (!tall) for (let z = -600; z < APRON_LEN + 9000; z += 260 + r() * 300) out.push(use("grassclump", 260 + r() * 400, z, 1 + r() * 0.6));
+  if (!tall) for (let z = -600; z < APRON_LEN + 9000; z += 420 + r() * 400) out.push(use("grassclump", 260 + r() * 400, z, 1 + r() * 0.6));
   // 滑行道邊燈（青）每 220 一對；跑道邊燈（黃）每 160 一對。
   for (let z = -1200; z < APRON_LEN; z += 260) { out.push(use("edgelight", -ROAD_HALF - 12, z, 1)); out.push(use("edgelight", ROAD_HALF + 12, z, 1)); }
-  for (let z = APRON_LEN + 400; z < APRON_LEN + 9500; z += 240) { out.push(use("rwylight", -RUNWAY_HALF - 14, z, 1)); out.push(use("rwylight", RUNWAY_HALF + 14, z, 1)); }
+  for (let z = APRON_LEN + 400; z < APRON_LEN + 9500; z += 300) { out.push(use("rwylight", -RUNWAY_HALF - 14, z, 1)); out.push(use("rwylight", RUNWAY_HALF + 14, z, 1)); }
   return out;
 }
 function stopObjects(w, motifs) {
@@ -468,7 +487,7 @@ function lifeObjects() {
   const m = (name, X, z0, v, cls) => `<g data-mover="${name}" data-x="${X}" data-z0="${z0}" data-v="${v}"><use href="#s-${name === "walker" ? "crew" : name === "fuel" ? "fueltruck" : name}" class="${cls}"/></g>`;
   return m("carts", 150, 300, 95, "p-navy") + m("carts", 150, 1900, 80, "p-navy") + m("fuel", 130, 1200, -120, "p-teal") +
     m("walker", 115, 500, 18, "p-orange") + m("walker", 118, 1600, -16, "p-teal") +
-    `<g data-shadow="1"><use href="#s-planeshadow"/></g><g data-plane="1"><use href="#s-btplane"/></g>`;
+    `<g data-shadow="1"><use href="#s-planeshadow"/></g><g data-plane="1"><use href="#s-btplane" class="pl-ground"/><use href="#s-btclimb" class="pl-climb" opacity="0"/></g>`;
 }
 function fields(tall) {
   // 草地的色塊與航廈前的混凝土：每一幀投影四個角。
@@ -558,7 +577,7 @@ export function attach(svg) {
     ceil: { slab: svg.querySelector(".ceil-slab"), base: svg.querySelector(".ceil-base"), beams: svg.querySelector(".ceil-beams"), lights: svg.querySelector(".ceil-lights") },
     floor: { slab: svg.querySelector(".floor-slab"), lines: svg.querySelector(".floor-lines"), rows: svg.querySelector(".floor-rows") },
     traveller: svg.querySelector("[data-traveller]"), legA: svg.querySelector(".leg-a"), legB: svg.querySelector(".leg-b"), arm: svg.querySelector(".arm"),
-    plane: { el: svg.querySelector("[data-plane]"), base: 1, last: "" }, gear: svg.querySelector("[data-plane] .pl-gear"), shadow: { el: svg.querySelector("[data-shadow]"), base: 1, last: "" },
+    plane: { el: svg.querySelector("[data-plane]"), base: 1.15, last: "" }, planeGround: svg.querySelector("[data-plane] .pl-ground"), planeClimb: svg.querySelector("[data-plane] .pl-climb"), shadow: { el: svg.querySelector("[data-shadow]"), base: 1, last: "" },
     board: svg.querySelector("[data-board]"),
   };
   return reg;
@@ -656,10 +675,10 @@ export function frame(reg, w, cam, p, t) {
       }
       // 我們那一架與它的影子。
       const pp = project(vc, q.x, q.y, q.z, cz);
-      place(reg.plane, pp, q.pitch ? `rotate(${f1(-q.pitch)}) ` : "");
-      // 離地就收起落架（opacity 只寫變了的值）。
-      const gear = String(Math.round(clamp01(1 - q.lift * 4) * 10) / 10);
-      if (reg.gear && reg.gearLast !== gear) { reg.gearLast = gear; reg.gear.setAttribute("opacity", gear); }
+      place(reg.plane, pp);
+      // 離地那一下：地面那一張淡出、爬升那一張淡入（兩張都是預先畫好的四分之三視角）。
+      const k = String(Math.round(smooth(clamp01((q.lift - 0.04) / 0.22)) * 10) / 10);
+      if (reg.planeClimb && reg.climbLast !== k) { reg.climbLast = k; reg.planeClimb.setAttribute("opacity", k); reg.planeGround.setAttribute("opacity", String(1 - k)); }
       const sh = project(vc, q.x, 0, q.z, cz);
       if (sh) { sh.s *= Math.max(0.35, 1 - q.lift * 0.6); place(reg.shadow, sh); reg.shadow.el.setAttribute("opacity", f1(1 - q.lift * 0.8)); } else hide(reg.shadow);
       // 地面退進霧裡、天空變高空的藍。
