@@ -30,14 +30,8 @@ html[data-lang="zh"] .title h1{font-family:var(--han);font-weight:900;letter-spa
 /* ── 場景 ── */
 .road-wrap{position:relative}
 .stage{position:relative;height:100svh;min-height:420px;width:100%;overflow:hidden}
-.scene{position:absolute;inset:0;width:100%;height:100%;display:block}
-/* 顏色只在這裡給。scene.js 的形狀只掛 class。 */
-.c-navy{fill:var(--bt-navy)}.c-teal{fill:var(--bt-teal)}.c-orange{fill:var(--bt-orange)}.c-sand{fill:var(--bt-sand)}
-.c-cream{fill:var(--bt-cream)}.c-yellow{fill:var(--bt-yellow)}.c-grey{fill:var(--bt-grey)}
-.s-sand{stroke:var(--bt-sand)}.s-navy{stroke:var(--bt-navy)}.s-orange{stroke:var(--bt-orange)}
-/* 人與車的顏色：symbol 裡寫 currentColor，放的時候掛 p-* 決定。漸層的停點同理。 */
-.p-navy{color:var(--bt-navy)}.p-orange{color:var(--bt-orange)}.p-teal{color:var(--bt-teal)}
-.st-cream{stop-color:var(--bt-cream)}.st-sand{stop-color:var(--bt-sand)}.st-orange{stop-color:var(--bt-orange)}.st-teal{stop-color:var(--bt-teal)}.st-navy{stop-color:var(--bt-navy)}
+.scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+/* 3D 的顏色不在 CSS：main.js 開頁把 --bt-* 七色讀出來丟給 scene.js。 */
 /* 整個世界（場景與卡）靠近一站時一起稍微放大；原點放在畫面中偏下，也就是路上那一站附近。 */
 .world{position:absolute;inset:0;transform-origin:62% 64%;will-change:transform}
 /* 左上淡淡的大年份：參考站的節奏。不是給人讀的（aria-hidden），年份帶與卡才是。 */
@@ -46,7 +40,7 @@ html[data-lang="zh"] .title h1{font-family:var(--han);font-weight:900;letter-spa
 .top,.strip{transition:opacity var(--dur-2) var(--ease)}
 html.rushing .top,html.rushing .strip{opacity:.45}
 
-/* 卡站在小場景上方。--x --y 是這一幀算出來的畫面座標（單位），--s 是每單位幾 px。卡本身不隨遠近縮放（字要讀得到），只有靠近才浮出來。 */
+/* 卡站在小場景上方。--x --y 是這一幀 3D 錨點投到螢幕的像素（--s 固定 1，留著是批 3 的介面）。卡本身不隨遠近縮放（字要讀得到），只有靠近才浮出來。 */
 .cards{position:absolute;inset:0;pointer-events:none;--s:1}
 .card{position:absolute;pointer-events:auto;
   left:calc(var(--x) * var(--s) * 1px);top:calc(var(--y) * var(--s) * 1px);
@@ -71,26 +65,8 @@ html[data-lang="zh"] .card-title{font-size:16px}
 .card::after{content:"";position:absolute;left:50%;bottom:-9px;width:14px;height:14px;transform:translateX(-50%) rotate(45deg);
   background:rgba(237,229,216,.97);border-right:1px solid rgba(16,42,134,.16);border-bottom:1px solid rgba(16,42,134,.16)}
 
-/* ── 出發看板：字是 HTML，疊在 SVG 畫的框上（框 540 寬、300 高，畫在牆那一層 0.62 倍）。
-   --x --y 是框的中上那一點（單位），--s 是每單位幾 px；整塊的大小都用 --s 乘出來，縮放視窗也對得上。
-   翻牌：每一個字一片，motion() 用 gsap 把它們從上往下翻（rotateX）。 ── */
-.board-wrap{position:absolute;inset:0;pointer-events:none;--s:1}
-.board-wrap:empty{display:none}
-.board{position:absolute;left:calc(var(--x) * var(--s) * 1px);top:calc(var(--y) * var(--s) * 1px);transform:translateX(-50%);
-  width:calc(var(--s) * 325px);height:calc(var(--s) * 174px);padding:calc(var(--s) * 5px) calc(var(--s) * 6px) 0;
-  display:flex;flex-direction:column;font:700 calc(var(--s) * 8.6px)/1 var(--display);letter-spacing:.06em;color:var(--bt-cream);perspective:calc(var(--s) * 400px)}
-.board-head,.board-row{display:grid;grid-template-columns:4.6em 1fr 4.2em 3.2em 7.2em;gap:0 .6em;align-items:center;min-height:0}
-.board-head{height:calc(var(--s) * 18px);color:var(--bt-navy);font-size:.78em;letter-spacing:.14em;margin-bottom:calc(var(--s) * 4px)}
-.board-row{flex:1 1 0;overflow:hidden;white-space:nowrap}
-.board-row>span{overflow:hidden;display:block}
-.flip{display:inline-block;min-width:.66em;text-align:center;background:rgba(16,42,134,.75);box-shadow:inset 0 -1px 0 rgba(237,229,216,.12);margin-right:1px;border-radius:1px;line-height:1.5;backface-visibility:hidden}
-.b-dest .flip{background:rgba(16,42,134,.6)}
-.b-status .flip{color:var(--bt-yellow)}
-.board-row.now .b-status .flip{color:var(--bt-navy);background:var(--bt-yellow)}
-.board-row.now .flip{box-shadow:inset 0 0 0 1px rgba(255,196,108,.35)}
-
-/* 最後一站之後那一句：停在畫面中間，飛機底下。 */
-.end{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) translateY(16px);text-align:center;opacity:0;visibility:hidden;pointer-events:none;
+/* 最後一站之後那一句：畫面中偏下，飛機與最後一站的卡在它上面。 */
+.end{position:absolute;left:50%;top:70%;transform:translate(-50%,-50%) translateY(16px);text-align:center;opacity:0;visibility:hidden;pointer-events:none;
   transition:opacity var(--dur-3) var(--ease),transform var(--dur-3) var(--ease),visibility 0s linear var(--dur-3)}
 .end.show{opacity:1;visibility:visible;transform:translate(-50%,-50%);transition-delay:0s}
 .end-line{margin:0;font:700 clamp(32px,5vw,56px)/1.1 var(--display);letter-spacing:.02em;color:var(--ink)}
@@ -184,9 +160,8 @@ html[data-lang="zh"] .panel-title{font-family:var(--han);font-weight:900;letter-
 .state .dot{width:10px;height:10px;border-radius:50%;background:var(--bt-orange);animation:pulse 1.2s var(--ease) infinite}
 @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
 
-/* ── 減少動態效果或 gsap 沒載到：靜的場景加直立時間軸 ── */
-.static{padding:72px 0 calc(var(--strip-h) + 20px)}
-.stage-static{height:44svh;min-height:280px}
+/* ── 減少動態效果、?motion=off、沒有 WebGL、Three 或 gsap 沒載到：直立時間軸 ── */
+.static{padding:96px 0 calc(var(--strip-h) + 20px)}
 .timeline{list-style:none;margin:0;padding:28px var(--gut) 20px;max-width:720px;position:relative}
 .timeline::before{content:"";position:absolute;left:calc(var(--gut) + 15px);top:0;bottom:0;width:2px;background:rgba(16,42,134,.22)}
 .tl-item{position:relative;padding:0 0 18px 48px}

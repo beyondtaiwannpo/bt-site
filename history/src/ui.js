@@ -45,11 +45,10 @@ export function stripHTML(stops, current, lang) {
     `<div class="strip-progress" aria-live="polite"><span class="sr">${esc(t("progress", lang))} </span>${progressText(current, (stops || []).length)}</div>`;
 }
 
-// 出發看板（批 4）：航廈牆上那一塊翻牌看板，列的是真的站。年份當起飛時間、英文標題當目的地、班次 BT 加兩位序號、登機門 A 開頭、
+// 出發看板：列是真的站。年份當起飛時間、英文標題當目的地、班次 BT 加兩位序號、登機門 A 開頭（跟 airport.js 的 gateFor 一樣）、
 // 狀態照現在走到哪一站（走過的 DEPARTED、現在 BOARDING、還沒到 ON TIME）。
-// **只有英文**：翻牌看板的慣例，而且英文大寫才像那一塊板子；沒有英文標題的站退回中文（空白更糟）。其他地方照常中英。
-// 這是裝飾（aria-hidden）：同樣的站在年份帶與卡上給讀螢幕的人。字在 HTML 不在 SVG，場景 SVG 裡仍然找不到任何一站的文字。
-export const flipWord = s => String(s).split("").map(c => `<span class="flip">${esc(c)}</span>`).join("");
+// **只有英文**：翻牌看板的慣例；沒有英文標題的站退回中文（空白更糟）。其他地方照常中英。
+// 批 5 起看板的字畫在 3D 航廈牆上的 CanvasTexture（scene.js 的 setBoard），這裡是那些字唯一的來源；場景程式裡找不到任何一站的文字。
 export function boardRows(stops, current) {
   return (stops || []).map((s, i) => ({
     time: String(s.year || ""),
@@ -58,12 +57,6 @@ export function boardRows(stops, current) {
     gate: "A" + (i + 1),
     status: i < current ? "DEPARTED" : i === current ? "BOARDING" : "ON TIME",
   }));
-}
-export function boardHTML(stops, current) {
-  const rows = boardRows(stops, current);
-  if (!rows.length) return "";
-  return `<div class="board" aria-hidden="true"><div class="board-head"><span>TIME</span><span>DESTINATION</span><span>FLIGHT</span><span>GATE</span><span>STATUS</span></div>` +
-    rows.map((r, i) => `<div class="board-row${i === current ? " now" : ""}"><span class="b-time">${flipWord(r.time)}</span><span class="b-dest">${flipWord(r.dest)}</span><span class="b-flight">${flipWord(r.flight)}</span><span class="b-gate">${flipWord(r.gate)}</span><span class="b-status">${flipWord(r.status)}</span></div>`).join("") + `</div>`;
 }
 // 最後一站之後那一句安靜的結尾。
 export const endHTML = lang => `<p class="end-line">${esc(t("endLine", lang))}</p><p class="end-sub">${esc(t("endSub", lang))}</p>`;

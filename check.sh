@@ -1709,13 +1709,15 @@ hiMotion=$(node -e '
   for (const m of code.matchAll(/\b(gsap|ScrollTrigger)\b/g))
     if (!(from >= 0 && to > from && m.index > from && m.index < to))
       bad.push("motion() 外面用到了 " + m[1] + "（scene.js 第 " + code.slice(0, m.index).split("\n").length + " 行）");
-  for (const f of ["history/src/main.js", "history/src/ui.js", "history/src/data.js", "history/src/strings.js"]) {
+  for (const f of ["history/src/main.js", "history/src/ui.js", "history/src/data.js", "history/src/strings.js", "history/src/airport.js", "history/src/plane.js"]) {
     const c = fs.readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     for (const m of c.matchAll(/\bgsap\.|\bScrollTrigger\./g)) bad.push(f + " 用到了 gsap（只准 scene.js 的 motion()）");
   }
   const main = fs.readFileSync("history/src/main.js", "utf8");
   if (!main.includes("matchMedia(\"(prefers-reduced-motion: reduce)\")")) bad.push("main.js 找不到 prefers-reduced-motion 的判斷");
-  if (!/const canMove = !reduce && window\.gsap && window\.ScrollTrigger;/.test(main)) bad.push("main.js 找不到「沒開減少動態效果而且 gsap 載到了」那一行判斷");
+  // 批 5：走 3D 的條件集中在 airport.js 的 pickMode（reduce、?motion=off、WebGL、gsap、Three 五樣都要有），main.js 只准問它。
+  if (!/A\.pickMode\(\{ reduce, motionOff, webgl, gsap: /.test(main)) bad.push("main.js 找不到 A.pickMode({ reduce, motionOff, webgl, gsap, three }) 那一行判斷");
+  if (!/import\("\.\/scene\.js"\)/.test(main)) bad.push("main.js 要動態 import scene.js（Three 載不到才接得住，頁面才不會白掉）");
   if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
 ' 2>&1)
 if [ $? -eq 0 ]; then
@@ -1723,6 +1725,48 @@ if [ $? -eq 0 ]; then
 else
   bad "/history/ 有動畫跑到 motion() 外面："
   printf '%s\n' "$hiMotion"
+fi
+
+# /history/ 的 Three.js（批 5，2026-11-06）：只從 cdnjs 載、importmap 帶 cdnjs 公布的 sha512、
+# 只有 scene.js 與 plane.js 准 import three、沒有模型檔或圖檔。
+# 升級 Three 就要同時換 history/index.html 的網址與雜湊、換這一行。雜湊的來源：
+#   curl -s https://api.cdnjs.com/libraries/three.js/<版本>?fields=sri
+THREE_SRI="sha512-zTnt1Hf43YVf2to5DC6GE6cPRSC/xgPJDf3PLQussTsaDak1uHdbnWtIYnOQiL40AIa2OZfFkayQXVdzL1/DqA=="
+THREE_URL="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js"
+hiThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
+  const fs = require("fs");
+  const bad = [];
+  const html = fs.readFileSync("history/index.html", "utf8");
+  const maps = [...html.matchAll(/<script type="importmap">([\s\S]*?)<\/script>/g)];
+  if (maps.length !== 1) bad.push("history/index.html 要有一個（而且只有一個）importmap，現在 " + maps.length + " 個");
+  else {
+    let map; try { map = JSON.parse(maps[0][1]); } catch (e) { bad.push("importmap 不是合法的 JSON：" + e.message); }
+    if (map) {
+      const urls = Object.values(map.imports || {});
+      if (map.imports.three !== process.env.THREE_URL) bad.push("importmap 的 three 不是 " + process.env.THREE_URL + "（現在 " + map.imports.three + "）");
+      for (const u of urls) if (!/^https:\/\/cdnjs\.cloudflare\.com\//.test(u)) bad.push("importmap 裡有不是 cdnjs 的網址：" + u);
+      if (!map.integrity || map.integrity[map.imports.three] !== process.env.THREE_SRI) bad.push("importmap 的 integrity 少了、或跟 check.sh 的 THREE_SRI 不一樣");
+    }
+    const firstModule = html.search(/<script type="module"/), mapAt = html.indexOf("<script type=\"importmap\">");
+    if (firstModule >= 0 && mapAt > firstModule) bad.push("importmap 要排在第一個 module script 前面，不然瀏覽器不認");
+  }
+  for (const f of fs.readdirSync("history/src")) {
+    const c = fs.readFileSync("history/src/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const uses = /from\s+["\x27]three["\x27]/.test(c) || /import\(\s*["\x27]three["\x27]/.test(c);
+    if (uses && !["scene.js", "plane.js"].includes(f)) bad.push("history/src/" + f + " import 了 three（只准 scene.js 與 plane.js）");
+    if (!uses && f === "scene.js") bad.push("scene.js 沒有從 importmap 的 three 載（應該 import * as THREE from \"three\"）");
+  }
+  const bin = fs.readdirSync("history", { recursive: true }).filter(f => /\.(glb|gltf|obj|fbx|png|jpg|jpeg|webp|bin|ktx2|hdr)$/i.test(String(f)));
+  if (bin.length) bad.push("history/ 裡放了模型或圖檔（全部要用程式幾何）：" + bin.join("、"));
+  const js = fs.readdirSync("history/src").reduce((n, f) => n + fs.statSync("history/src/" + f).size, 0);
+  if (js > 250 * 1024) bad.push("history/src 的 JS 加起來 " + Math.round(js / 1024) + " KB，超過 250 KB（不含 Three）");
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "/history/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 scene.js 與 plane.js import 它、沒有模型檔、JS 不含 Three 小於 250 KB"
+else
+  bad "/history/ 的 Three 載入方式不對："
+  printf '%s\n' "$hiThree"
 fi
 
 # 對外頁面不可以漏掉任何一份清單

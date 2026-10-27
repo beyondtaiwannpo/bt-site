@@ -11,13 +11,13 @@
      每一站可以點開看那一年的說明與照片。計畫在 docs/2026-11-05-BT-歷史之路計畫.md。
 
      ── 這一頁在做什麼 ──
-     一趟機場（批 4，2026-11-06 換的，Paul 要的：BT 的名字、Passport 的入境章、學生出國，都是機場）。
-     捲動的比例切成四段：0 到 30% 一個背背包的旅客在航廈裡由左往右走（側視，報到櫃台、翻牌的出發看板、安檢、窗牆、登機門）；
-     30 到 40% 走進空橋、鏡頭從窗戶拉出去換成外面；40 到 80% 一架 BT 顏色的飛機從登機門推出去、沿滑行道滑過航廈、塔台、機棚
-     （批 3 那台針孔鏡頭，每一幀重算每個東西的位置與大小，scene.js 開頭有解釋）；80 到 100% 對正跑道、加速、離地，鏡頭跟著抬頭。
-     站不管幾個都平均分在整趟上，每一站照自己落在哪一段站在走道旁、滑行道旁或雲上，一個小場景加一張卡；點卡打開覆蓋層。
-     底部一條年份帶，左上一個淡淡的大年份。出發看板上列的是真的站（年份當時間、英文標題當目的地），字是 HTML 疊在 SVG 的框上。
-     開了「減少動態效果」、或 GSAP 從 cdnjs 載不到：不釘、不視差，同樣的站排成直立時間軸，一站都不少。
+     一趟機場（批 4 Paul 定的主題：BT 的名字、Passport 的入境章、學生出國，都是機場），批 5（2026-11-06）換成真的 3D（Three.js）。
+     捲動的比例切成四段：0 到 30% 鏡頭在航廈裡面跟著一個背背包的旅客走（地磚、玻璃牆外的飛機、報到櫃台、出發看板、安檢、座位、商店、登機門）；
+     30 到 40% 走進空橋、穿過機艙門、鏡頭升高後退到停機坪的視角，一條連續的鏡頭曲線不切鏡；40 到 80% 一架 BT 顏色的飛機從登機門推出去、
+     沿一條三個彎的滑行道經過航廈、塔台、機棚、消防站、別的飛機；80 到 100% 對正跑道、加速、抬頭、收輪、爬升，鏡頭繞到後面追，機場在霧裡縮小。
+     站不管幾個都平均分在整趟上，每一站照自己落在哪一段有一個 3D 的錨點（走道旁、滑行道旁、空中），一個小場景加一張卡（卡是 HTML，用相機投影貼上去）；點卡打開覆蓋層。
+     底部一條年份帶，左上一個淡淡的大年份。出發看板掛在航廈裡，列的是真的站（年份當時間、英文標題當目的地），字是程式畫的 canvas 貼圖。
+     開了「減少動態效果」、網址加 ?motion=off、沒有 WebGL、Three 或 GSAP 從 cdnjs 載不到：同樣的站排成直立時間軸，一站都不少。
 
      ── 資料只從一個地方來 ──
      public_milestones()，資料庫那支只回放上去的站與勾了同意的照片。這一頁一行站的文字都沒寫死。
@@ -25,7 +25,9 @@
 
      ── 檔案 ──
      history.css 版面、src/strings.js 中英字典、src/data.js 資料與代號、src/ui.js 畫面的純函式、
-     src/scene.js 場景與唯一會動的 motion()、src/main.js 接起來。只讀 shared/brand.css 與 shared/supabase-config.js。
+     src/airport.js 機場的數字（飛機、鏡頭、旅客、站的錨點，純數學）、src/plane.js 客機工廠、
+     src/scene.js Three 的場景與唯一會動的 motion()、src/main.js 接起來。只讀 shared/brand.css 與 shared/supabase-config.js。
+     Three 從 cdnjs 載（下面的 importmap，帶 integrity），沒有模型檔、沒有貼圖檔，全部用程式幾何。
 
      ── 不掛 nav.js ──
      這一頁是給外面的人看的一條路，不是功能清單。左上一個回首頁的 logo 就夠。 -->
@@ -36,6 +38,14 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/history/">
 <meta name="theme-color" content="#EDE5D8">
+
+<!-- Three.js 只從 cdnjs 載。integrity 是 cdnjs 公布的 sha512（2026-11-06 用 curl 加 openssl 算過一致），檔案被換掉瀏覽器就不執行，
+     那時 scene.js 載不進來，這一頁退回直立時間軸不會壞。升級版本要同時改這裡的網址與雜湊、check.sh 的 THREE_SRI。
+     importmap 一定要排在任何 module script 前面。 -->
+<script type="importmap">
+{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js"},
+ "integrity":{"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js":"sha512-zTnt1Hf43YVf2to5DC6GE6cPRSC/xgPJDf3PLQussTsaDak1uHdbnWtIYnOQiL40AIa2OZfFkayQXVdzL1/DqA=="}}
+</script>
 
 <link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
@@ -101,13 +111,11 @@
   <div id="state" class="state-wrap"></div>
 
   <!-- 會動的那一條：外面這一段很高（JS 照站數設），裡面的 stage 被釘住一整屏，捲動只推鏡頭。
-       .world 包住場景與卡，靠近一站時整個一起稍微放大。骨架卡在資料來之前先站著。 -->
+       .world 包住 3D 的 canvas 與卡，靠近一站時整個一起稍微放大。骨架卡在資料來之前先站著。 -->
   <section class="road-wrap" id="road-wrap" hidden>
     <div class="stage" id="stage">
       <div class="world" id="world">
-        <svg id="scene" class="scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"></svg>
-        <!-- 出發看板的字（英文，裝飾用；同樣的站在年份帶與卡上）。位置每一幀由 main.js 寫，跟著航廈的牆走。 -->
-        <div class="board-wrap" id="board" aria-hidden="true"></div>
+        <canvas id="scene" class="scene" aria-hidden="true"></canvas>
         <div class="cards" id="cards"></div>
       </div>
       <!-- 左上淡淡的大年份：顯示字型的真文字。Paul 2026-11-06 看過方塊數字覺得突兀，改成文字，Lighthouse 模擬的 LCP 數字他接受。年份由 main.js 塞進來。 -->
@@ -119,11 +127,8 @@
     </div>
   </section>
 
-  <!-- 減少動態效果、或 gsap 沒載到：一張靜的場景加直立時間軸。 -->
+  <!-- 減少動態效果、?motion=off、沒有 WebGL、Three 或 gsap 沒載到：直立時間軸，同樣的站一站不少。 -->
   <section class="static" id="static" hidden>
-    <div class="stage stage-static" id="stage-static" aria-hidden="true">
-      <svg class="scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"></svg>
-    </div>
     <ol class="timeline" id="timeline"></ol>
   </section>
 
@@ -135,8 +140,9 @@
 <div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden></div>
 <div class="lightbox" id="lightbox" hidden></div>
 
-<!-- 主程式排在 GSAP 前面、GSAP 加 defer：三支都在網頁讀完之後照順序跑，所以主程式先跑、先去拿資料、先把路與骨架畫出來，
-     不用等 GSAP 下載完。主程式會等那兩支載完（或失敗）再決定走動的還是直立時間軸（main.js 的 gsapReady）。
+<!-- 主程式排在 GSAP 前面、GSAP 加 defer：三支都在網頁讀完之後照順序跑，所以主程式先跑、先去拿資料、先把骨架畫出來，
+     不用等 GSAP 下載完。主程式會等那兩支載完（或失敗）、再動態 import scene.js（它才去 cdnjs 拿 Three），
+     兩個都到了才走 3D，不然直立時間軸（main.js 的 boot 與 airport.js 的 pickMode）。
      GSAP 從 cdnjs 載，integrity 是 cdnjs 公布的雜湊，檔案被換掉就不執行；那時這一頁退回直立時間軸，不會壞。
      升級版本要同時改這裡、head 的兩個 preload、首頁、check.sh 的兩個雜湊。 -->
 <script type="module" src="./src/main.js"></script>

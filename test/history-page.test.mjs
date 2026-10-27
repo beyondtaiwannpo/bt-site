@@ -5,7 +5,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as D from "../history/src/data.js";
 import * as UI from "../history/src/ui.js";
-import * as S from "../history/src/scene.js";
+import * as A from "../history/src/airport.js";
+import { buildAirliner, PLANE_PARTS, setGear, steerNose } from "../history/src/plane.js";
+import fs from "node:fs";
 import { STR, t } from "../history/src/strings.js";
 
 // 假資料：故意不照時間排，看 normalize 會不會排回去；一站有照片、其餘沒有。
@@ -47,8 +49,8 @@ test("代號對場景：關鍵字決定要畫哪一個小場景，認不出來�
   assert.equal(D.motifFor("2024-something-else"), "signpost");
   assert.equal(D.motifFor(""), "signpost");
   assert.equal(D.motifFor(null), "signpost");
-  assert.ok(S.MOTIFS.includes("signpost"), "scene.js 一定要有預設那一個");
-  for (const m of ["seven", "seats", "board", "sign", "boarding", "tail", "crew", "signpost"]) assert.ok(S.MOTIFS.includes(m), m + " 場景沒畫");
+  assert.ok(A.MOTIFS.includes("signpost"), "一定要有預設那一個");
+  for (const m of ["seven", "seats", "board", "sign", "boarding", "tail", "crew", "signpost"]) assert.ok(A.MOTIFS.includes(m), m + " 場景沒畫");
 });
 
 test("hash：每一站的網址是 #代號；帶 hash 進來找得到那一站的序號，找不到回 -1；語言黏在後面也認得", () => {
@@ -143,169 +145,212 @@ test("中英字典：兩邊的鍵一模一樣，t() 缺語言退回英文", () =
   assert.equal(t("nope", "zh"), "nope");
 });
 
-// ── 批 4：機場 ──
-test("四段（批 4）：進度對段的邊界是固定比例，站不管幾個都平均分，每一站照自己落在哪一段決定畫在哪裡", () => {
-  assert.deepEqual(Object.keys(S.PHASES), ["terminal", "bridge", "apron", "takeoff"]);
-  assert.equal(S.phaseFor(0), "terminal"); assert.equal(S.phaseFor(0.29), "terminal");
-  assert.equal(S.phaseFor(0.3), "bridge"); assert.equal(S.phaseFor(0.39), "bridge");
-  assert.equal(S.phaseFor(0.4), "apron"); assert.equal(S.phaseFor(0.79), "apron");
-  assert.equal(S.phaseFor(0.8), "takeoff"); assert.equal(S.phaseFor(1), "takeoff"); assert.equal(S.phaseFor(1.5), "takeoff");
-  // 段與段相接，從 0 到 1
-  const b = Object.values(S.PHASES); assert.equal(b[0][0], 0); assert.equal(b[3][1], 1);
-  for (let i = 1; i < 4; i++) assert.equal(b[i][0], b[i - 1][1]);
-  // 七站：0 .167 .333 .5 .667 .833 1
-  const w = S.world(7);
+
+// ── 批 5：真的 3D（Three.js）。這裡測的是 airport.js 與 plane.js 的純函式，不開瀏覽器、不載 Three。 ──
+
+// Three 的替身：plane.js 吃一個 THREE 物件，測試給它一個什麼都接得住的殼，只記名字與樹狀結構。
+function fakeThree() {
+  const vec = (x = 0, y = 0, z = 0) => { const v = { x, y, z }; v.set = (a, b, c) => { v.x = a; v.y = b; v.z = c; return v; }; v.copy = o => v.set(o.x, o.y, o.z); v.clone = () => vec(v.x, v.y, v.z); return v; };
+  class Node {
+    constructor(...args) { this.args = args; this.children = []; this.name = ""; this.position = vec(); this.rotation = vec(); this.scale = vec(1, 1, 1); this.castShadow = false; this.receiveShadow = false; this.userData = {}; }
+    add(...cs) { for (const c of cs) { this.children.push(c); c.parent = this; } return this; }
+    traverse(fn) { fn(this); for (const c of this.children) c.traverse(fn); }
+    getObjectByName(n) { let hit = null; this.traverse(o => { if (!hit && o.name === n) hit = o; }); return hit; }
+  }
+  const chain = new Proxy(class Any { constructor(...a) { this.args = a; } }, { construct(T, a) { return new Proxy(new T(...a), { get: (o, k) => k in o ? o[k] : (() => chainObj) }); } });
+  const chainObj = new Proxy({}, { get: (o, k) => k === "then" ? undefined : (() => chainObj) });
+  const nodeTypes = new Set(["Group", "Object3D", "Mesh", "InstancedMesh", "Sprite"]);
+  return new Proxy({}, { get: (_, k) => nodeTypes.has(k) ? Node : (k === "Vector3" || k === "Vector2") ? function (x, y, z) { return vec(x, y, z); } : chain });
+}
+
+test("飛機工廠（批 5）：全部用基本幾何組，零件名字齊全，兩種尾翼色；起落架收放、機鼻輪轉向只動對應的零件", () => {
+  const THREE = fakeThree();
+  const plane = buildAirliner(THREE, { tail: 0xff0000, body: 0xffffff });
+  const names = []; plane.traverse(o => { if (o.name) names.push(o.name); });
+  for (const part of PLANE_PARTS) assert.ok(names.includes(part), "少了零件 " + part);
+  assert.equal(PLANE_PARTS.filter(n => /^wing/.test(n)).length, 2);
+  assert.equal(PLANE_PARTS.filter(n => /^engine/.test(n)).length, 2);
+  assert.ok(PLANE_PARTS.includes("fin") && PLANE_PARTS.includes("finTaiwan") && PLANE_PARTS.includes("cockpit") && PLANE_PARTS.includes("windows"));
+  assert.ok(PLANE_PARTS.includes("gearNose") && PLANE_PARTS.includes("gearMainL") && PLANE_PARTS.includes("gearMainR"));
+  assert.ok(names.filter(n => n === "wheel").length >= 3, "至少三個輪子");
+  // 起落架：1 放下、0 收起（三組都收進去）
+  setGear(plane, 1);
+  const nose = plane.getObjectByName("gearNose"), left = plane.getObjectByName("gearMainL");
+  const yDown = nose.position.y, rotDown = left.rotation.x;
+  setGear(plane, 0);
+  assert.ok(nose.position.y > yDown, "收起來的起落架要往上");
+  assert.notEqual(left.rotation.x, rotDown, "主起落架收起來要轉進翼根");
+  // 機鼻輪轉向
+  steerNose(plane, 0.4);
+  assert.ok(Math.abs(nose.rotation.y - 0.4) < 1e-9);
+  // 工廠的參數：不同尾翼色、不同比例
+  const other = buildAirliner(THREE, { tail: 0x00ff00, body: 0xffffff, scale: 0.8 });
+  assert.equal(other.scale.x, 0.8);
+});
+
+test("滑行道（批 5）：路點至少三個真的轉彎，樣條連續、等弧長取樣、頭尾落在路點上；從登機門推出到跑道頭", () => {
+  const pts = A.TAXI_WAYPOINTS;
+  assert.ok(pts.length >= 6);
+  assert.ok(A.polylineTurns(pts, 35) >= 3, "至少三個 35 度以上的轉彎，現在 " + A.polylineTurns(pts, 35));
+  const tw = A.taxiway();
+  assert.ok(tw.length > 300, "滑行道總長 " + tw.length);
+  const first = tw.at(0), last = tw.at(tw.length);
+  assert.ok(Math.hypot(first.x - pts[0][0], first.z - pts[0][1]) < 1e-6);
+  assert.ok(Math.hypot(last.x - pts[pts.length - 1][0], last.z - pts[pts.length - 1][1]) < 1e-6);
+  // 連續：相鄰 1 公尺的點距離不超過 1.5 公尺（等弧長取樣沒有跳）
+  for (let d = 0; d < tw.length - 1; d += 1) { const a = tw.at(d), b = tw.at(d + 1); const gap = Math.hypot(a.x - b.x, a.z - b.z); assert.ok(gap > 0.5 && gap < 1.5, "弧長 " + d + " 跳了 " + gap); }
+  // 切線是單位向量；轉彎處的航向變了
+  const t0 = tw.at(5).yaw, tEnd = tw.at(tw.length - 5).yaw;
+  assert.ok(Math.abs(((t0 - tEnd + Math.PI) % (2 * Math.PI)) - Math.PI) > 0.5, "起點與終點的航向要不一樣（有轉過彎）");
+  // 跑道頭：最後一個路點落在跑道上
+  assert.ok(Math.abs(pts[pts.length - 1][1] - A.RUNWAY.z) < 1e-6, "滑行道要接到跑道中線");
+  assert.ok(pts[pts.length - 1][0] <= A.RUNWAY.x1 && pts[pts.length - 1][0] >= A.RUNWAY.x0);
+});
+
+test("飛機的姿態（批 5）：登機前停在登機門、0.40 到 0.80 沿滑行道不倒退、在地上不側傾、機鼻輪在轉彎處會轉、起飛段加速抬頭收輪爬升", () => {
+  const g = A.planePoseAt(0.2), g2 = A.planePoseAt(0.39);
+  assert.deepEqual([g.x, g.z], [g2.x, g2.z], "登機前飛機不動");
+  assert.deepEqual([g.x, g.z], A.GATE_STAND, "停在登機門的停機位");
+  assert.equal(g.gear, 1); assert.equal(g.y, 0);
+  // 沿滑行道走：弧長單調、不側傾、在地上
+  let lastS = -1;
+  for (let e = 0.40; e <= 0.80; e += 0.002) {
+    const q = A.planePoseAt(e);
+    assert.ok(q.s >= lastS - 1e-9, "弧長倒退 " + e); lastS = q.s;
+    assert.equal(q.roll, 0); assert.equal(q.y, 0); assert.equal(q.gear, 1);
+  }
+  // 推出去那一段是倒退：航向不變、位置沿航向的反方向走
+  const p0 = A.planePoseAt(0.40), p1 = A.planePoseAt(0.42);
+  assert.ok(Math.abs(p0.yaw - p1.yaw) < 0.05, "推出去的時候機頭方向不變");
+  assert.ok(p1.pushback && p1.s > 0, "推出去那一段 pushback 要是 true");
+  // 機鼻輪：整段裡有轉過（絕對值超過 0.15 弧度），直線上接近 0
+  let maxSteer = 0; for (let e = 0.44; e <= 0.80; e += 0.002) maxSteer = Math.max(maxSteer, Math.abs(A.planePoseAt(e).steer));
+  assert.ok(maxSteer > 0.15, "機鼻輪沒轉：" + maxSteer);
+  // 起飛：速度（弧長的差）遞增、對正跑道、抬頭、收輪、爬升；最後一刻在高空
+  const r0 = A.planePoseAt(0.80), r1 = A.planePoseAt(0.84), r2 = A.planePoseAt(0.88);
+  assert.ok(Math.abs(r0.z - A.RUNWAY.z) < 1, "對正跑道中線");
+  assert.ok(Math.abs(r1.x - r0.x) < Math.abs(r2.x - r1.x), "加速：後一段走得比前一段遠");
+  assert.ok(A.planePoseAt(0.9).pitch > 0.05 && A.planePoseAt(0.9).y > 0, "0.9 已經抬頭離地");
+  assert.ok(A.planePoseAt(0.9).gear < 1 && A.planePoseAt(1).gear === 0, "離地後收輪");
+  assert.ok(A.planePoseAt(1).y > 250, "進度 1 在高空");
+  let lastY = -1; for (let e = 0.86; e <= 1.0001; e += 0.005) { const y = A.planePoseAt(e).y; assert.ok(y >= lastY - 1e-9, "爬升不掉高度 " + e); lastY = y; }
+});
+
+test("鏡頭樣條（批 5）：航廈往前走在人的高度、空橋那一段一條連續曲線不跳、停機坪高角度跟著飛機、起飛追在後面升高；每一段取樣都在 0 到 1 連續", () => {
+  // 整條路每千分之一取樣，相鄰兩幀的鏡頭位置不跳（最大一步看段：航廈慢、起飛快）
+  let prev = A.cameraAt(0);
+  for (let e = 0.001; e <= 1.0001; e += 0.001) {
+    const c = A.cameraAt(e); const step = Math.hypot(c.pos[0] - prev.pos[0], c.pos[1] - prev.pos[1], c.pos[2] - prev.pos[2]);
+    const limit = e < 0.335 ? 4 : e < 0.8 ? 8 : 40;   // 航廈與空橋走路、升高後退、起飛追，三種速度
+    assert.ok(step < limit, `鏡頭在 ${e.toFixed(3)} 跳了 ${step.toFixed(1)}`);
+    assert.ok(c.fov > 20 && c.fov < 80); prev = c;
+  }
+  // 航廈：在人的眼睛高度、沿走道往 +X 走、看向前方
+  const a = A.cameraAt(0.05), b = A.cameraAt(0.25);
+  assert.ok(a.pos[1] > 1.3 && a.pos[1] < 2.2 && b.pos[1] > 1.3 && b.pos[1] < 2.2, "航廈的鏡頭在人的高度");
+  assert.ok(b.pos[0] > a.pos[0] + 20, "航廈的鏡頭往前走");
+  assert.ok(a.look[0] > a.pos[0], "看向前方");
+  const T = A.TERMINAL;
+  assert.ok(a.pos[2] > T.z0 && a.pos[2] < T.z1 && a.pos[0] > T.x0 && a.pos[0] < T.x1, "鏡頭在航廈體積裡面");
+  // 空橋：0.30 還在室內低處、0.40 已經在室外高處；中間單調升高
+  const c30 = A.cameraAt(0.30), c40 = A.cameraAt(0.40);
+  assert.ok(c30.pos[1] < 3 && c40.pos[1] > 40, "空橋那一段從人的高度升到停機坪的視角");
+  assert.ok(c40.pos[2] > T.z1, "0.40 的鏡頭在航廈外面（停機坪那一側）");
+  // 停機坪：鏡頭跟著飛機，離飛機的水平距離固定，俯角在 30 到 45 度
+  for (const e of [0.45, 0.55, 0.65, 0.75]) {
+    const c = A.cameraAt(e), q = A.planePoseAt(e);
+    const dx = c.pos[0] - q.x, dz = c.pos[2] - q.z, dh = Math.hypot(dx, dz), ang = Math.atan2(c.pos[1] - q.y, dh) * 180 / Math.PI;
+    assert.ok(ang > 28 && ang < 46, "俯角 " + ang.toFixed(1) + " 在 " + e);
+    assert.ok(Math.hypot(c.look[0] - q.x, c.look[2] - q.z) < 25, "看著飛機附近");
+  }
+  // 起飛：鏡頭在飛機後面（飛機往 -X 飛，所以鏡頭 X 比飛機大）、比飛機高一點、跟著爬
+  const t1 = A.cameraAt(0.95), q1 = A.planePoseAt(0.95), t2 = A.cameraAt(1), q2 = A.planePoseAt(1);
+  assert.ok(t1.pos[0] > q1.x && t2.pos[0] > q2.x, "追在飛機後面");
+  assert.ok(t2.pos[1] > t1.pos[1] && t2.pos[1] > q2.y * 0.6, "跟著爬升");
+});
+
+test("旅客（批 5）：航廈裡走在鏡頭前面、進空橋、上飛機就看不到了；走路的循環只在他在走的時候", () => {
+  const a = A.travellerAt(0.05), c = A.cameraAt(0.05);
+  assert.ok(a.visible && a.walking);
+  assert.ok(a.pos[0] > c.pos[0] + 2 && a.pos[0] < c.pos[0] + 12, "在鏡頭前面幾公尺");
+  const d = A.travellerAt(0.33);
+  assert.ok(d.visible && d.pos[2] > A.TERMINAL.z1 - 1, "0.33 已經走進空橋（過了玻璃牆）");
+  assert.ok(!A.travellerAt(0.42).visible, "上了飛機就看不到");
+  assert.ok(!A.travellerAt(0.9).visible);
+});
+
+test("站（批 5）：平均分在 0 到 1 上，每一站有一個 3D 錨點與一段；航廈的站在走道旁、停機坪的站在滑行道旁、起飛的站跟著飛機；1、7、25 站都成立", () => {
+  assert.deepEqual(Object.keys(A.PHASES), ["terminal", "bridge", "apron", "takeoff"]);
+  assert.equal(A.phaseFor(0), "terminal"); assert.equal(A.phaseFor(0.3), "bridge"); assert.equal(A.phaseFor(0.4), "apron"); assert.equal(A.phaseFor(0.8), "takeoff"); assert.equal(A.phaseFor(1.5), "takeoff");
+  const w = A.world(7);
   assert.deepEqual(w.stops.map(s => +s.p.toFixed(3)), [0, 0.167, 0.333, 0.5, 0.667, 0.833, 1]);
   assert.deepEqual(w.stops.map(s => s.phase), ["terminal", "terminal", "terminal", "apron", "apron", "takeoff", "takeoff"]);
-  for (let i = 0; i < 7; i++) assert.equal(S.progressFor(w, i), i / 6);
-  // 航廈的站沿走道往右排、停機坪的站沿滑行道往前排、起飛那一段的在跑道之後
-  assert.ok(w.stops[1].x > w.stops[0].x && w.stops[2].x > w.stops[1].x);
-  assert.ok(w.stops[4].z > w.stops[3].z);
-  assert.ok(w.stops[5].z > w.stops[4].z && w.stops[6].z > w.stops[5].z);
-  // 一站、二十五站都成立：每一站都有一段，同一段裡沒有兩站疊在同一點
-  assert.equal(S.world(1).stops.length, 1); assert.equal(S.world(1).stops[0].phase, "terminal");
-  assert.equal(S.world(0).stops.length, 0);
-  const big = S.world(25);
-  for (const s of big.stops) assert.ok(["terminal", "apron", "takeoff"].includes(s.phase), s.phase);
-  const seen = new Set(); for (const s of big.stops) { const k = s.phase + ":" + (s.phase === "terminal" ? s.x : s.z); assert.ok(!seen.has(k), "兩站疊在 " + k); seen.add(k); }
-  assert.ok(big.stops.filter(s => s.phase === "apron").length >= 9, "四成的捲動在停機坪，二十五站應該有九站以上在那裡");
+  for (let i = 0; i < 7; i++) { assert.equal(A.progressFor(w, i), i / 6); assert.equal(w.stops[i].anchor.length, 3); }
+  const T = A.TERMINAL;
+  for (const s of w.stops.slice(0, 2)) assert.ok(s.anchor[0] > T.x0 && s.anchor[0] < T.x1 && s.anchor[2] > T.z0 && s.anchor[2] < T.z1, "航廈的站在航廈裡 " + s.anchor);
+  assert.ok(w.stops[1].anchor[0] > w.stops[0].anchor[0], "航廈的站沿走道往前");
+  // 停機坪的站在滑行道旁：離飛機在那一刻的位置 8 到 40 公尺
+  for (const s of w.stops.filter(s => s.phase === "apron")) { const q = A.planePoseAt(s.p); const d = Math.hypot(s.anchor[0] - q.x, s.anchor[2] - q.z); assert.ok(d > 8 && d < 40, "停機坪的站離飛機 " + d); }
+  // 起飛的站：最後一站在空中跟著飛機
+  const lastStop = w.stops[6], q = A.planePoseAt(1); assert.ok(lastStop.anchor[1] > 100 && Math.hypot(lastStop.anchor[0] - q.x, lastStop.anchor[2] - q.z) < 80);
+  assert.equal(A.world(1).stops.length, 1); assert.equal(A.world(0).stops.length, 0);
+  const big = A.world(25); const seen = new Set();
+  for (const s of big.stops) { const k = s.anchor.map(v => v.toFixed(1)).join(","); assert.ok(!seen.has(k), "兩站疊在 " + k); seen.add(k); }
+  assert.ok(big.stops.filter(s => s.phase === "apron").length >= 9);
+  // 每一站帶一個小場景的位置（motif 由 data.js 決定，這裡只給位置與朝向）
+  for (const s of w.stops) assert.ok(typeof s.yaw === "number");
   // 慢下來的進度：每一站的 p 對自己不變，中間單調
-  for (let i = 0; i < 7; i++) assert.ok(Math.abs(S.eased(w, i / 6) - i / 6) < 1e-9);
-  let last = -1; for (let p = 0; p <= 1.0001; p += 0.005) { const e = S.eased(w, p); assert.ok(e >= last - 1e-9); last = e; }
-  assert.equal(S.eased(S.world(1), 0.37), 0.37, "一站的時候進度就是進度");
-  assert.equal(S.nearest(w, 0.5), 3); assert.equal(S.nearest(w, 0.99), 6);
+  for (let i = 0; i < 7; i++) assert.ok(Math.abs(A.eased(w, i / 6) - i / 6) < 1e-9);
+  let last = -1; for (let p = 0; p <= 1.0001; p += 0.005) { const e = A.eased(w, p); assert.ok(e >= last - 1e-9); last = e; }
+  assert.equal(A.nearest(w, 0.5), 3); assert.equal(A.nearest(w, 0.99), 6);
 });
 
-test("出發看板（批 4）：列是真的站，年份當時間、英文標題當目的地、狀態照走到哪；只有英文；在 HTML 不在 SVG", () => {
+test("登機門號碼與出發看板（批 5）：登機門的牌從站的序號來、跟看板那一欄一致；看板的字只從 boardRows 來", () => {
+  assert.equal(A.gateFor(0), "A1"); assert.equal(A.gateFor(6), "A7");
   const rows = UI.boardRows(STOPS, 1);
-  assert.equal(rows.length, 3);
-  assert.deepEqual(rows.map(r => r.time), ["2020", "2023", "2026"]);
-  assert.equal(rows[0].dest, "FOUNDED");
-  assert.equal(rows[1].dest, "FIRST COLLEGE BOOTCAMP");
-  assert.deepEqual(rows.map(r => r.status), ["DEPARTED", "BOARDING", "ON TIME"]);
-  assert.ok(rows.every(r => /^BT\d{2}$/.test(r.flight)), JSON.stringify(rows.map(r => r.flight)));
-  assert.ok(rows.every(r => /^[A-Z]\d+$/.test(r.gate)));
-  // 沒有英文標題的站退回中文（看板只有英文是慣例，但空白更糟）
-  assert.equal(UI.boardRows([{ year: "2022", title_zh: "只有中文", title_en: "" }], 0)[0].dest, "只有中文");
-  const h = UI.boardHTML(STOPS, 1), text = h.replace(/<[^>]+>/g, "");
-  assert.ok(text.includes("FOUNDED") && text.includes("BOARDING"), text);
-  assert.ok(!text.includes("成立") && !text.includes("第一屆"), "看板上不出現中文標題");
-  assert.ok((h.match(/class="flip"/g) || []).length >= 12, "每一格是一片翻牌");
-  assert.ok(h.includes('aria-hidden="true"'), "看板是裝飾，年份帶與卡才是給讀螢幕的人的");
-  assert.equal(UI.boardHTML([], 0), "");
+  for (let i = 0; i < rows.length; i++) assert.equal(rows[i].gate, A.gateFor(i));
+  // 旅客登機的那一個登機門：落在空橋之前最後一站的號碼
+  assert.equal(A.boardingGate(7), "A3", "七站：第三站（序號 2）是走進空橋前最後一站");
+  assert.equal(A.boardingGate(1), "A1");
+  assert.equal(A.boardingGate(25), "A" + (A.world(25).stops.filter(s => s.p < A.PHASES.bridge[1]).length), "空橋結束之前的站都算在登機門之前");
+  // 看板的 canvas 文字：一列一行，欄位順序 TIME DESTINATION FLIGHT GATE STATUS
+  const lines = A.boardLines(rows);
+  assert.equal(lines.length, 3);
+  assert.deepEqual(lines[1].cells, ["2023", "FIRST COLLEGE BOOTCAMP", "BT02", "A2", "BOARDING"]);
+  assert.equal(lines[1].now, true);
+  assert.deepEqual(A.boardLines([]), []);
 });
 
-test("投影（批 4）：航廈側視的站點、停機坪的針孔投影、起飛的鏡頭抬頭；不在這一段的站不給點", () => {
-  const w = S.world(7), cam = S.camera(1000, false);
-  // 進度 0：第一站（航廈）在畫面裡，停機坪與起飛的站沒有點
-  const p0 = S.stopPoints(w, cam, 0);
-  assert.ok(p0[0] && p0[0].x > 0 && p0[0].x < 1000 && p0[0].y > 0 && p0[0].y < S.H && p0[0].near, JSON.stringify(p0[0]));
-  assert.equal(p0[3], null); assert.equal(p0[6], null);
-  assert.ok(!p0[2].near, "第三站還遠，卡先不浮出來");
-  // 走到第二站：第二站 near、第一站不 near
-  const p1 = S.stopPoints(w, cam, 1 / 6);
-  assert.ok(p1[1].near && !p1[0].near);
-  // 停機坪：第四站在自己的進度那一刻在畫面裡而且 near；航廈的站沒有點
-  const p3 = S.stopPoints(w, cam, 0.5);
-  assert.ok(p3[3] && p3[3].near && p3[3].x > 0 && p3[3].x < 1000, JSON.stringify(p3[3]));
-  assert.equal(p3[0], null);
-  assert.ok(p3[4] && !p3[4].near, "下一站看得到但還沒到");
-  // 起飛：最後一站在進度 1 的時候在畫面裡而且 near
-  const p6 = S.stopPoints(w, cam, 1);
-  assert.ok(p6[6] && p6[6].near && p6[6].x > -200 && p6[6].x < 1200 && p6[6].y > 0 && p6[6].y < S.H, JSON.stringify(p6[6]));
-  // 飛機：沿滑行道一路往前（Z 單調），離地之前在地上，進度 1 在空中
-  let lastZ = -Infinity;
-  for (let e = 0.36; e <= 1.0001; e += 0.01) { const q = S.planePose(e); assert.ok(q.z >= lastZ - 1e-9, "飛機不倒退 " + e); lastZ = q.z; }
-  assert.equal(S.planePose(0.5).y, 0); assert.equal(S.planePose(0.84).y, 0);
-  assert.ok(S.planePose(1).y > 300);
-  assert.ok(S.planePose(0.40).x < S.planePose(0.6).x - 50, "一開始在登機門（靠航廈那一邊），推出來之後在滑行道中線");
-  // 鏡頭：起飛時比在地上高、俯角比較小（抬頭）
-  const ground = S.viewCam(cam, 0.6), air = S.viewCam(cam, 1);
-  assert.equal(ground.h, cam.h); assert.equal(ground.pitch, cam.pitch);
-  assert.ok(air.h > cam.h + 300 && air.pitch < cam.pitch - 0.1);
-  assert.ok(S.horizonY(air) > S.horizonY(cam), "抬頭之後地平線在畫面上往下掉");
-  // 換鏡：0.36 全室內、0.40 全室外，中間兩邊都有、單調
-  const a = S.handoff(0.36), m = S.handoff(0.38), z = S.handoff(0.4);
-  assert.equal(a.int, 1); assert.equal(a.ext, 0); assert.equal(z.int, 0); assert.equal(z.ext, 1);
-  assert.ok(m.int > 0 && m.int < 1 && m.ext > 0 && m.ext < 1);
-  assert.ok(S.handoff(0.1).int === 1 && S.handoff(0.9).ext === 1);
-  // 批 3 留下來的投影本身沒變：越遠越高越小、鏡頭後面不畫
-  const cz = 0, pa = S.project(cam, 0, 0, 300, cz), pb = S.project(cam, 0, 0, 900, cz);
-  assert.ok(pa.y > pb.y && pa.s > pb.s); assert.equal(S.project(cam, 0, 0, -400, cz), null);
-  // 直式：停機坪更陡
-  const tall = S.camera(375, true);
-  const t1 = S.project(tall, 0, 0, 300, 0), t2 = S.project(tall, 0, 0, 900, 0), w1 = S.project(cam, 0, 0, 300, 0), w2 = S.project(cam, 0, 0, 900, 0);
-  assert.ok((t1.y - t2.y) / (t2.x - t1.x) > (w1.y - w2.y) / (w2.x - w1.x));
-  // 航廈的旅客：進度 0 在起點，0.35 走到空橋盡頭，之後站著不動
-  assert.equal(S.travellerX(0), 0); assert.ok(S.travellerX(0.2) > 0 && S.travellerX(0.2) < S.TERM_LEN);
-  assert.equal(S.travellerX(0.35), S.TERM_LEN); assert.equal(S.travellerX(0.5), S.TERM_LEN);
+test("退路（批 5）：減少動態、?motion=off、沒有 WebGL、Three 或 GSAP 載不到，四種都走直立時間軸；全部都有才走 3D", () => {
+  const ok = { reduce: false, motionOff: false, webgl: true, gsap: true, three: true };
+  assert.equal(A.pickMode(ok), "3d");
+  assert.equal(A.pickMode({ ...ok, reduce: true }), "timeline");
+  assert.equal(A.pickMode({ ...ok, motionOff: true }), "timeline");
+  assert.equal(A.pickMode({ ...ok, webgl: false }), "timeline");
+  assert.equal(A.pickMode({ ...ok, gsap: false }), "timeline");
+  assert.equal(A.pickMode({ ...ok, three: false }), "timeline");
+  assert.equal(A.pickMode({}), "timeline");
+  // 像素密度與陰影貼圖：手機降一級
+  assert.deepEqual(A.quality({ phone: false, dpr: 3 }), { dpr: 2, shadow: 1024 });
+  assert.deepEqual(A.quality({ phone: true, dpr: 3 }), { dpr: 1.5, shadow: 512 });
+  assert.deepEqual(A.quality({ phone: false, dpr: 1 }), { dpr: 1, shadow: 1024 });
 });
 
-test("飛機（批 4 修正）：預先畫好的四分之三視角，客機該有的零件都在，地面與爬升兩張；換鏡兩條曲線不會同時超過一半", () => {
-  const svg = S.sceneSVG(S.world(7), ["seven"], false);
-  const symbolOf = id => svg.slice(svg.indexOf(`<symbol id="${id}"`), svg.indexOf("</symbol>", svg.indexOf(`<symbol id="${id}"`)));
-  const count = (sym, cls) => (sym.match(new RegExp(`class="${cls}[ "]`, "g")) || []).length;
-  for (const [id, gear] of [["s-btplane", 1], ["s-btclimb", 0]]) {
-    const sym = symbolOf(id);
-    assert.equal(count(sym, "pl-fuselage c-cream"), 1, id + " 機身");
-    assert.equal(count(sym, "pl-cockpit"), 1, id + " 駕駛艙窗");
-    assert.ok(count(sym, "pl-window") >= 8, id + " 一排窗");
-    assert.equal(count(sym, "pl-wing"), 2, id + " 兩片機翼");
-    assert.equal(count(sym, "pl-engine"), 2, id + " 兩具引擎");
-    assert.equal(count(sym, "pl-stab"), 2, id + " 水平尾翼");
-    assert.equal(count(sym, "pl-fin c-orange"), 1, id + " 橘色的垂直尾翼（class 只能寫一次，寫兩次瀏覽器只認第一個，尾翼會變黑）");
-    assert.equal(count(sym, "pl-mark c-cream"), 1, id + " 尾翼上奶油色的台灣");
-    assert.equal((sym.match(/class="pl-gear"/g) || []).length, gear, id + (gear ? " 三組起落架" : " 離地那一張沒有起落架"));
-    assert.ok(!/rotate\(/.test(sym), id + " 不轉角度，四分之三視角是畫好的");
-    // 機頭在畫面上指右上（滑行道的方向）：機身 path 最右邊的點比最左邊的點高（y 小）
-    const nums = [...sym.slice(sym.indexOf('pl-fuselage'), sym.indexOf('/>', sym.indexOf('pl-fuselage'))).matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(m => [+m[1], +m[2]]);
-    const right = nums.reduce((a, b) => b[0] > a[0] ? b : a), left = nums.reduce((a, b) => b[0] < a[0] ? b : a);
-    assert.ok(right[1] < left[1], id + " 機頭要在右上");
-  }
-  assert.ok(svg.includes('data-shadow="1"') && svg.includes('id="s-planeshadow"'), "影子是分開的貼圖，離地後留在地上");
-  assert.ok(svg.includes('href="#s-btplane" class="pl-ground"') && svg.includes('href="#s-btclimb" class="pl-climb" opacity="0"'), "兩張都放了，爬升那一張先藏著");
-  // 停著的飛機也是同一具身體，尾翼是 currentColor
-  const parked = symbolOf("s-plane");
-  assert.ok(/class="pl-fin" fill="currentColor"/.test(parked));
-  // 整個場景裡沒有任何一個元素寫了兩次 class
-  assert.ok(!/<[a-z]+ [^>]*class="[^"]*"[^>]*class="/.test(svg), "有元素寫了兩次 class");
-  // 換鏡：室內先走、室外再來，任何一刻兩邊不同時超過 0.5；兩條都單調
-  let lastInt = 1, lastExt = 0;
-  for (let e = 0.35; e <= 0.41; e += 0.001) {
-    const h = S.handoff(e);
-    assert.ok(!(h.int > 0.5 && h.ext > 0.5), "兩邊同時超過一半 " + e);
-    assert.ok(h.int <= lastInt + 1e-9 && h.ext >= lastExt - 1e-9, "曲線要單調 " + e); lastInt = h.int; lastExt = h.ext;
-  }
-  assert.equal(S.handoff(0.36).int, 1); assert.equal(S.handoff(0.4).ext, 1);
-  assert.ok(S.handoff(0.375).int < 0.5 && S.handoff(0.375).ext === 0, "室內先淡到一半以下，室外還沒開始");
-});
-
-test("場景 SVG（批 4）：室內與室外兩個世界、該有的層都在、symbol 加 use、沒有點陣圖、沒有色碼、沒有任何一站的文字、小於 70 KB；直式少畫一些", () => {
-  const motifs = STOPS.map(s => D.motifFor(s.slug));
-  const svg = S.sceneSVG(S.world(7), motifs, false);
-  assert.ok(svg.includes('data-world="int"') && svg.includes('data-world="ext"'));
-  for (const id of ["sky", "ceiling", "outside", "wall", "vig", "mid", "fore", "far", "back", "field", "road", "stops", "life", "near", "clouds", "haze"]) assert.ok(svg.includes(`data-layer="${id}"`), "少了 " + id + " 層");
-  assert.ok(/<symbol /.test(svg) && (svg.match(/<use /g) || []).length > 40, "物件要用 symbol 加 use 重複用");
-  assert.ok(!/<image/i.test(svg));
-  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(svg.replace(/href="#[a-z0-9-]+"/g, "")), "SVG 裡不准寫死色碼");
-  for (const s of STOPS) { assert.ok(!svg.includes(s.title_zh)); assert.ok(!svg.includes(s.title_en)); assert.ok(!svg.includes("FOUNDED")); }
-  assert.ok(svg.includes('data-stop="0"') && svg.includes('data-stop="6"'));
-  assert.ok(svg.includes('data-board="1"'), "看板的框在 SVG，字在 HTML");
-  assert.ok(svg.includes('data-plane="1"') && svg.includes('data-shadow="1"'), "我們那一架飛機與它的影子");
-  assert.ok(svg.includes('data-traveller="1"') && svg.includes('class="leg-a"') && svg.includes('class="leg-b"'), "旅客與兩條腿");
-  for (const k of ["carts", "fuel", "walker", "bird", "glide"]) assert.ok(svg.includes(`data-mover="${k}"`), "少了會動的 " + k);
-  for (const k of ["anim-beacon", "anim-strobe", "anim-idle", "anim-flag"]) assert.ok(svg.includes(k), "少了閒置動畫的鉤子 " + k);
-  assert.ok(svg.length < 70000, "SVG 太大：" + svg.length);
-  const tallSvg = S.sceneSVG(S.world(7), motifs, true);
-  assert.ok(tallSvg.length < 70000);
-  assert.ok((tallSvg.match(/<use /g) || []).length < (svg.match(/<use /g) || []).length, "直式要少畫一些");
-  // 八種小場景：每一種三個以上的形狀、一個閒置動畫的鉤子；認不出來的名字退回指示牌
-  for (const m of S.MOTIFS) { const v = S.vignetteSVG(m); assert.ok(v.includes("<g")); assert.ok((v.match(/<(rect|circle|polygon|path|ellipse|use)/g) || []).length >= 3, m + " 太少形狀"); assert.ok(/class="[^"]*anim-/.test(v), m + " 沒有閒置動畫的鉤子"); }
-  assert.equal(S.vignetteSVG("nonsense"), S.vignetteSVG("signpost"));
-  // 只放站那一層：二十五站也放得進去，沒有站的文字
-  const many = S.stopsSVG(S.world(25), Array(25).fill("signpost")) + S.terminalStopsSVG(S.world(25), Array(25).fill("signpost"));
-  assert.equal((many.match(/data-stop=/g) || []).length, 25);
-  assert.ok(S.world(25).stops.filter(s => s.phase === "takeoff" && s.y > 0).length >= 1, "起飛那一段離地之後的站站在雲上");
+test("資料與場景分開（批 5）：scene.js、airport.js、plane.js、index.html 裡沒有任何一站的文字；Three 只在 scene.js 與 plane.js 出現；程式碼裡沒有寫死色碼", () => {
+  const files = ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/index.html", "history/src/main.js"];
+  const src = Object.fromEntries(files.map(f => [f, fs.readFileSync(new URL("../" + f, import.meta.url), "utf8")]));
+  for (const f of files) for (const s of STOPS) { assert.ok(!src[f].includes(s.title_zh), f + " 有站的中文標題"); assert.ok(!src[f].includes(s.title_en), f + " 有站的英文標題"); }
+  for (const f of ["history/src/airport.js", "history/src/main.js", "history/src/ui.js", "history/src/data.js"]) assert.ok(!/from\s+["']three["']/.test(src[f] || fs.readFileSync(new URL("../" + f, import.meta.url), "utf8")), f + " 不准 import three");
+  assert.ok(/from\s+["']three["']/.test(src["history/src/scene.js"]), "scene.js 用 importmap 的 three");
+  for (const f of ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js"]) assert.ok(!/#[0-9a-fA-F]{6}\b/.test(src[f].replace(/\/\/.*$/gm, "")), f + " 裡不准寫死色碼（顏色從 CSS 變數讀）");
+  // importmap：three 只從 cdnjs 來，帶 integrity
+  const im = /<script type="importmap">([\s\S]*?)<\/script>/.exec(src["history/index.html"]);
+  assert.ok(im, "index.html 要有 importmap");
+  const map = JSON.parse(im[1]);
+  assert.match(map.imports.three, /^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/\d+\.\d+\.\d+\/three\.module\.min\.js$/);
+  assert.match(map.integrity[map.imports.three], /^sha512-[A-Za-z0-9+/=]{88}$/);
+  // 沒有模型檔、沒有貼圖檔
+  assert.ok(!fs.readdirSync(new URL("../history/", import.meta.url), { recursive: true }).some(f => /\.(glb|gltf|obj|fbx|png|jpg|jpeg|webp|bin)$/i.test(String(f))), "history/ 裡不放模型或圖檔");
 });
 
 test("卡（批 3）：有勾了同意的照片就放第一張當縮圖（lazy、decoding=async、alt 空），沒有照片就沒有 <img>", () => {
