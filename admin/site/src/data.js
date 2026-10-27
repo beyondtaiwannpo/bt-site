@@ -192,6 +192,70 @@ export async function unassign(id, ws) {
   return data;
 }
 
+// ── 歷史之路（2026-11-06）────────────────────────────────────────────
+// 讀兩張表（RLS：幹部讀全部；學員什麼都讀不到）；寫一律走函式（門在 can_edit_history()）。
+export async function loadMilestones() {
+  need();
+  const { data, error } = await supabase.from("history_milestones")
+    .select("id, slug, happened_on, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, sort, status, published_at, updated_at, history_photos(id, url, caption_zh, caption_en, consent, sort)")
+    .order("sort").order("happened_on");
+  if (error) throw error;
+  return data || [];
+}
+export async function upsertMilestone(patch) {
+  need();
+  const { data, error } = await supabase.rpc("upsert_milestone", { p_patch: patch });
+  if (error) throw error;
+  return data;
+}
+export async function setMilestoneStatus(id, status) {
+  need();
+  const { data, error } = await supabase.rpc("set_milestone_status", { p_id: id, p_status: status });
+  if (error) throw error;
+  return data;
+}
+export async function reorderMilestones(ids) {
+  need();
+  const { data, error } = await supabase.rpc("reorder_milestones", { p_ids: ids });
+  if (error) throw error;
+  return data;
+}
+export async function addPhoto(milestoneId, url, capZh, capEn, consent) {
+  need();
+  const { data, error } = await supabase.rpc("add_milestone_photo", { p_milestone: milestoneId, p_url: url, p_caption_zh: capZh || "", p_caption_en: capEn || "", p_consent: !!consent });
+  if (error) throw error;
+  return data;
+}
+export async function updatePhoto(id, patch) {
+  need();
+  const { data, error } = await supabase.rpc("update_milestone_photo", { p_id: id, p_patch: patch });
+  if (error) throw error;
+  return data;
+}
+// 刪那一列，再把 Storage 的檔也刪掉（刪不掉只是多佔一點空間，不擋）。
+export async function deletePhoto(id) {
+  need();
+  const { data: url, error } = await supabase.rpc("delete_milestone_photo", { p_id: id });
+  if (error) throw error;
+  const path = storagePath(url);
+  if (path) { try { await supabase.storage.from("history").remove([path]); } catch (e) { /* 檔留著，不擋 */ } }
+  return url;
+}
+// 公開網址 → bucket 裡的路徑（…/object/public/history/<id>/<檔名> → <id>/<檔名>）。
+export function storagePath(url) {
+  const m = /\/object\/public\/history\/(.+)$/.exec(String(url || ""));
+  return m ? decodeURIComponent(m[1]) : "";
+}
+// 傳一張已經縮好的圖到 history bucket，回公開網址。路徑 <站的 id>/<時間>-<亂數>.jpg，不用原檔名（原檔名可能有人名）。
+export async function uploadPhoto(milestoneId, blob) {
+  need();
+  const name = `${milestoneId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage.from("history").upload(name, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+  if (error) throw error;
+  const { data } = supabase.storage.from("history").getPublicUrl(name);
+  return data.publicUrl;
+}
+
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
@@ -229,6 +293,22 @@ const SAYS = [
   ["no_such_task", "找不到這一格，重新整理再試一次。", "Box not found. Refresh and try again."],
   ["term_locked", "已經建好的格子不能換屆。要搬到別屆就另外建一格，這一格停用。", "An existing box cannot move to another term. Create a new box there and disable this one."],
   ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。", "Someone has already stamped this box, so it can only be disabled, not deleted. Their stamp stays. New people will not see the box."],
+  // 歷史之路（2026-11-06）
+  ["consent_required", "有照片還沒勾「拍攝同意已確認」，勾了才上得去。", "A photo is still missing the consent tick; tick it before this can go live."],
+  ["need_both_titles", "中文與英文標題都要填才上得去。", "Both the Chinese and English titles are needed to go live."],
+  ["need_date", "日期要填。", "The date is required."],
+  ["bad_date", "日期的格式不對，用 2023-06-01 這種寫法。", "The date format is wrong; use 2023-06-01."],
+  ["bad_slug", "代號要小寫英文、數字、連字號，2 到 40 字。", "The slug needs lowercase letters, digits and hyphens, 2 to 40 characters."],
+  ["slug_taken", "這個代號已經有一站用了，換一個。", "That slug is already used by another stop."],
+  ["already_published", "這一站已經在路上或準備好了，不用再按。", "This stop is already ready or live."],
+  ["not_ready", "要先按「準備好了」。", "Mark it ready first."],
+  ["not_published", "這一站不在路上。", "This stop is not live."],
+  ["not_senior", "只有 Co-President 或 Senior Adviser 做得了這件事。", "Only a Co-President or Senior Adviser can do this."],
+  ["not_allowed", "你沒有權限做這件事。加站與傳照片要是 Marketing 的 Director 或 Co-President。", "You do not have permission. Adding stops and photos needs Marketing's Director or a Co-President."],
+  ["no_such_milestone", "找不到這一站，重新整理再試一次。", "Stop not found. Refresh and try again."],
+  ["no_such_photo", "找不到這張照片，重新整理再試一次。", "Photo not found. Refresh and try again."],
+  ["photo_not_https", "照片網址要 https 開頭。", "The photo URL must start with https."],
+  ["Bucket not found", "Storage 的 history bucket 還不在，要先跑 2026-11-06-history-milestones.sql（或在 Supabase 的 Storage 手動建一個叫 history 的公開 bucket）。", "The history storage bucket does not exist yet. Run 2026-11-06-history-milestones.sql first (or create a public bucket named history in Supabase Storage)."],
   ["Could not find the function", "後台的函式還不在資料庫裡，要先跑 2026-10-18-intern-admin.sql。", "The admin functions are not in the database yet. Run 2026-10-18-intern-admin.sql first."],
 ];
 export function says(err) {

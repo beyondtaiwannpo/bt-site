@@ -506,3 +506,21 @@ select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-st
 .glabel:hover{border-bottom-color:var(--bt-orange)}
 .table.grid{max-width:none}
 .wslist + .rail-group{margin-top:8px}
+
+/* ───────── 歷史之路（2026-11-06）：照片卡與上傳格 ───────── */
+.hi-list{counter-reset:stop}
+.hi-list > li{counter-increment:stop;position:relative;padding-left:44px}
+.hi-list > li::before{content:counter(stop,decimal-leading-zero);position:absolute;left:0;top:16px;font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.04em;color:rgba(16,42,134,.72)}
+.hi-list > li:first-child::before{top:4px}
+.hi-warn{color:var(--ink);background:rgba(255,196,108,.42);border-radius:999px;padding:1px 8px;font-weight:600}
+.hi-photos{list-style:none;margin:0 0 14px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.hi-photo{border:1px solid rgba(16,42,134,.16);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.5)}
+.hi-photo img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:rgba(16,42,134,.08)}
+.hi-photo-f{padding:12px 14px 6px}
+.hi-photo-f label{margin-bottom:10px}
+.hi-photo-f .row{margin-top:4px;margin-bottom:8px}
+.hi-upload{display:block;margin:6px 0 0}
+.hi-upload input[type="file"]{padding:14px;border-style:dashed;cursor:pointer}
+.hi-up{display:flex;gap:10px;align-items:center;margin:6px 0 10px}
+.hi-up progress{flex:1;max-width:320px;height:10px;accent-color:var(--bt-orange)}
+@media (max-width:640px){.hi-photos{grid-template-columns:1fr}}

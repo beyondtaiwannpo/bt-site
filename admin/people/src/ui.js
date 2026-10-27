@@ -52,6 +52,8 @@ export const ITEMS = [
   { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "senior" },
   { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "senior" },
   { group: "site",      key: "mail",    label: { zh: "信件文案", en: "Email copy" },      who: "senior" },
+  // 2026-11-06 歷史之路：每一位幹部看得到清單；加站、傳照片、按 ready 要 Marketing 資源工作區「管」或 senior，上架只有 senior（門在資料庫）。
+  { group: "site",      key: "history", label: { zh: "歷史之路", en: "History" },         who: "cadre" },
   { group: "passports", key: "interns", label: { zh: "實習護照", en: "Intern passport" }, who: "ws:intern-passport" },
   { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "ws:intern-passport" },
   { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "ws:passport" },

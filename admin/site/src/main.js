@@ -12,13 +12,15 @@ const HERE = "/admin/site/";
 
 let S = {
   user: null, me: null, down: false, busy: false, msg: "",
-  view: "res",             // res | res-edit | team | stories | mail | mail-edit
+  view: "res",             // res | res-edit | team | stories | mail | mail-edit | history | history-edit
   res: [], resEditing: null,
   people: [],
   // 校友頁與信件文案**一定要有初始值**：少了它，載入失敗之後再 render 一次會整頁空白，
   // 而這個 repo 的規矩是「連不上資料庫也要畫得出東西」。
   stories: [],
   tpls: [], tplKind: null,
+  // 歷史之路（2026-11-06）：hist 是 loadMilestones() 整形後的清單；hiSel 打開的那一站 id（"new" 是新的一站）；hiUp 上傳中 { pct, name }。
+  hist: [], hiSel: null, hiUp: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -49,13 +51,19 @@ function render() {
     body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
   } else if (S.view === "res-edit") {
     body = UI.resEditHTML(S.resEditing, S.msg, S.busy);
+  } else if (S.view === "history") {
+    body = UI.historyListHTML(S.hist, S.me, S.msg, S.busy);
+  } else if (S.view === "history-edit") {
+    const m = S.hiSel === "new" ? null : S.hist.find(x => x.id === S.hiSel);
+    body = (S.hiSel === "new" || m) ? UI.historyEditHTML(m, S.me, S.msg, S.busy, S.hiUp)
+      : UI.pageHead(T("hi.notFound"), "", [], { act: "hi-back", label: T("hi.back") }) + UI.msgHTML(S.msg);
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else {
     body = UI.resListHTML(S.res, canEdit(), S.msg, isPres(), UI.mpItems(S.me, "res:", S.workspaces));
   }
   // 側欄亮哪一行：編輯畫面算在它所屬的那個分頁底下。
-  const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res" }[S.view] || S.view;
+  const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res", "history-edit": "history" }[S.view] || S.view;
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab, S.me), body);
   UI.afterRender(S, el);
 }
@@ -87,6 +95,9 @@ async function boot(retried) {
 
 // 哪一個分頁：Co-President 專用的對其他人回到資源，不報錯。側欄、上一頁、網址列改 # 都走這裡。
 async function openTab(want) {
+  // 歷史之路（2026-11-06）：#history 清單，#history/<id> 一站，#history/new 新的一站。幹部都看得到清單。
+  const hi = /^history(?:\/([a-z0-9-]+))?$/.exec(want || "");
+  if (hi) { await openHistory(hi[1] || null); return; }
   if (want === "team" && isPres()) await openTeam();
   else if (want === "stories" && isPres()) await openStories();
   else if (want === "mail" && isPres()) await openMail();
@@ -125,6 +136,55 @@ async function openStories() {
     S.view = "stories"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.storiesLoad") + D.says(e); }
   render();
+}
+
+// ── 歷史之路（2026-11-06）────────────────────────────────────────────
+async function openHistory(sel) {
+  S.busy = true; render();
+  try {
+    S.hist = UI.hiRows(await D.loadMilestones());
+    S.hiSel = sel; S.view = sel ? "history-edit" : "history"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = T("err.hiLoad") + D.says(e); }
+  render();
+}
+async function reloadHistory(msg) {
+  S.msg = msg || "";
+  try { S.hist = UI.hiRows(await D.loadMilestones()); } catch (e) { S.msg = T("err.hiLoad") + D.says(e); }
+  S.busy = false; render();
+}
+// 一站那張表單讀成一個 patch（只有能編的人看得到這幾格；沒有就回 null）。
+function readMilestone() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  if (val("hi-tzh") === undefined) return null;
+  return { title_zh: val("hi-tzh").trim(), title_en: val("hi-ten").trim(), summary_zh: val("hi-szh").trim(), summary_en: val("hi-sen").trim(),
+    body_zh: val("hi-bzh"), body_en: val("hi-ben"), happened_on: val("hi-date"), slug: val("hi-slug").trim() };
+}
+// 瀏覽器端先縮圖再傳（計畫：最長邊 1600）。回一個 JPEG Blob。讀不出來就丟 err.hiResize。
+// 用 canvas 不用任何函式庫；EXIF 方向交給瀏覽器（createImageBitmap 的 imageOrientation）。
+async function shrinkImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch (e) { throw new Error(T("err.hiResize")); }
+  const { w, h } = UI.hiFit(bmp.width, bmp.height);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+  bmp.close && bmp.close();
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
+  if (!blob) throw new Error(T("err.hiResize"));
+  return blob;
+}
+async function uploadFile(milestoneId, file) {
+  if (!UI.hiFileOk(file)) { S.msg = T("err.hiFile"); render(); return; }
+  S.busy = true; S.msg = ""; S.hiUp = { pct: 10, name: file.name }; render();
+  try {
+    const blob = await shrinkImage(file);
+    S.hiUp = { pct: 45, name: file.name }; render();
+    const url = await D.uploadPhoto(milestoneId, blob);
+    S.hiUp = { pct: 85, name: file.name }; render();
+    await D.addPhoto(milestoneId, url, "", "", false);
+    S.hiUp = null;
+    await reloadHistory(T("msg.hiPhotoAdded"));
+  } catch (e) { S.hiUp = null; S.busy = false; S.msg = T("err.hiUpload") + D.says(e); render(); }
 }
 
 async function openRes() {
@@ -270,6 +330,60 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  // ── 歷史之路（2026-11-06）──
+  if (act === "hi-open") { e.preventDefault(); history.pushState(null, "", "#history/" + id); await openHistory(id); return; }
+  if (act === "hi-back") { history.pushState(null, "", "#history"); await openHistory(null); return; }
+  if (act === "hi-new") { history.pushState(null, "", "#history/new"); S.hiSel = "new"; S.view = "history-edit"; S.msg = ""; render(); return; }
+  if (act === "hi-save") {
+    const patch = readMilestone(); if (!patch) return;
+    if (!patch.title_zh && !patch.title_en) { S.msg = T("err.hiTitle"); render(); return; }
+    if (!patch.happened_on) { S.msg = T("err.hiDate"); render(); return; }
+    if (!patch.slug) patch.slug = UI.hiSlug(patch.title_en, patch.happened_on);
+    if (!UI.hiSlugOk(patch.slug)) { S.msg = T("err.hiSlug"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const newId = await D.upsertMilestone(id ? Object.assign({ id }, patch) : patch);
+      if (!id) { history.replaceState(null, "", "#history/" + newId); S.hiSel = newId; }
+      await reloadHistory(id ? T("msg.hiSaved") : T("msg.hiCreated", { title: patch.title_zh || patch.title_en }));
+    } catch (err) { S.busy = false; S.msg = T("err.hiSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "hi-move") {
+    const ids = UI.hiMove(S.hist, id, b.dataset.dir); if (!ids) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.reorderMilestones(ids); await reloadHistory(T("msg.hiMoved")); }
+    catch (err) { S.busy = false; S.msg = T("err.hiMove") + D.says(err); render(); }
+    return;
+  }
+  if (act === "hi-ready" || act === "hi-unready" || act === "hi-publish" || act === "hi-unpublish") {
+    const m = S.hist.find(x => x.id === id); if (!m) return;
+    const title = UI.hiTitle(m);
+    if (act === "hi-publish" && UI.needAsk(S, b, T("confirm.hiPublish", { title }))) return;
+    if (act === "hi-unpublish" && UI.needAsk(S, b, T("confirm.hiUnpublish", { title }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      // 按「準備好了」之前先把表單上的字存一次，不然填了沒存就按會被擋「中英標題都要填」。
+      if (act === "hi-ready") { const patch = readMilestone(); if (patch && UI.hiSlugOk(patch.slug) && patch.happened_on) await D.upsertMilestone(Object.assign({ id }, patch)); }
+      await D.setMilestoneStatus(id, { "hi-ready": "ready", "hi-unready": "draft", "hi-publish": "published", "hi-unpublish": "archived" }[act]);
+      await reloadHistory(T("msg." + act.replace("-", "."), { title }));
+    } catch (err) { S.busy = false; S.msg = T("err.hiStatus") + D.says(err); render(); }
+    return;
+  }
+  if (act === "hi-ph-save") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    S.busy = true; S.msg = ""; render();
+    try { await D.updatePhoto(id, { caption_zh: val("hi-ph-czh-" + id), caption_en: val("hi-ph-cen-" + id) }); await reloadHistory(T("msg.hiPhotoSaved")); }
+    catch (err) { S.busy = false; S.msg = T("err.hiPhoto") + D.says(err); render(); }
+    return;
+  }
+  if (act === "hi-ph-del") {
+    if (UI.needAsk(S, b, T("confirm.hiDelPhoto"))) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.deletePhoto(id); await reloadHistory(T("msg.hiPhotoDel")); }
+    catch (err) { S.busy = false; S.msg = T("err.hiPhoto") + D.says(err); render(); }
+    return;
+  }
+
   if (act === "res-back") { await openRes(); return; }
   if (act === "res-new")  { S.resEditing = null; S.view = "res-edit"; S.msg = ""; render(); return; }
   if (act === "res-edit") {
@@ -327,6 +441,17 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 歷史之路（2026-11-06）：勾同意立刻送（這一格是上架的門，不該等人按存）；選了檔就縮圖上傳。
+  const consent = e.target.closest('[data-act="hi-ph-consent"]');
+  if (consent && S.view === "history-edit") {
+    const on = consent.checked;
+    S.busy = true; S.msg = ""; render();
+    try { await D.updatePhoto(consent.dataset.id, { consent: on }); await reloadHistory(T("msg.hiPhotoSaved")); }
+    catch (err) { S.busy = false; S.msg = T("err.hiPhoto") + D.says(err); render(); }
+    return;
+  }
+  const fileEl = e.target.closest("#hi-file");
+  if (fileEl && S.view === "history-edit") { const f = fileEl.files && fileEl.files[0]; if (f) await uploadFile(fileEl.dataset.id, f); return; }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
@@ -345,6 +470,13 @@ document.addEventListener("change", async e => {
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("input", e => {
+  // 歷史之路（2026-11-06）：新的一站打英文標題或日期時，代號跟著算；人自己改過代號就不再動它。
+  if (S.view === "history-edit" && S.hiSel === "new" && (e.target.id === "hi-ten" || e.target.id === "hi-date")) {
+    const slugEl = document.getElementById("hi-slug");
+    if (slugEl && !slugEl.dataset.touched) slugEl.value = UI.hiSlug(document.getElementById("hi-ten").value, document.getElementById("hi-date").value);
+    return;
+  }
+  if (S.view === "history-edit" && e.target.id === "hi-slug") { e.target.dataset.touched = "1"; return; }
   const el = e.target.closest('[data-act="pk-q"],[data-act="pk-mq"]');
   if (!el || !S.mp || S.view !== "members") return;
   S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), el); render(); UI.pkRefocus(el.dataset.ns, el.dataset.act === "pk-mq" ? "mq" : "q");

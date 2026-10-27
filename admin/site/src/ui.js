@@ -55,6 +55,8 @@ export const ITEMS = [
   { group: "site",      key: "team",    label: { zh: "團隊頁",   en: "Team page" },       who: "senior" },
   { group: "site",      key: "stories", label: { zh: "校友頁",   en: "Alumni page" },     who: "senior" },
   { group: "site",      key: "mail",    label: { zh: "信件文案", en: "Email copy" },      who: "senior" },
+  // 2026-11-06 歷史之路：每一位幹部看得到清單；加站、傳照片、按 ready 要 Marketing 資源工作區「管」或 senior，上架只有 senior（門在資料庫）。
+  { group: "site",      key: "history", label: { zh: "歷史之路", en: "History" },         who: "cadre" },
   { group: "passports", key: "interns", label: { zh: "實習護照", en: "Intern passport" }, who: "ws:intern-passport" },
   { group: "passports", key: "board",   label: { zh: "棋盤",     en: "Board" },           who: "ws:intern-passport" },
   { group: "passports", key: "cadre",   label: { zh: "幹部護照", en: "Cadre passport" },  who: "ws:passport" },
@@ -762,4 +764,103 @@ export function mailHtml(o) {
       + `<p style="margin:12px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#6B6B6B;word-break:break-all;">${esc(url)}</p></td></tr>` : "")
     + `<tr><td class="bt-pad" style="padding:20px 32px 28px;border-top:1px solid #C6C6C6;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B6B6B;">${contact}<br>Beyond Taiwan · beyondtaiwannpo.com</td></tr>`
     + `</table></td></tr></table></body></html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 歷史之路（2026-11-06，docs/2026-11-05-BT-歷史之路計畫.md 批 1）
+// ═══════════════════════════════════════════════════════════════════════
+// 清單加一頁一站。一站 = history_milestones 一列加它底下的照片（history_photos）。
+// 這一頁填的是內容（中英標題、一句話、說明、日期、代號）與照片（說明、同意）；狀態三顆按鈕跟 Events 同一套。
+// 誰能編只是畫面上藏按鈕，**真正的門在資料庫的 can_edit_history()**。
+export const HI_WS = "res:Marketing Team";
+export const HI_MAX = 1600;
+export function hiCanEdit(me) { return senior(me) || wsLevel(me, HI_WS) === "manage"; }
+// 代號：年份加英文標題，小寫、連字號、最多 40 字。中文拼不出東西就回空（畫面會要人自己打）。
+export function hiSlug(titleEn, happenedOn) {
+  const y = /^(\d{4})/.exec(String(happenedOn || ""));
+  const t = String(titleEn || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return [y ? y[1] : "", t].filter(Boolean).join("-").slice(0, 40).replace(/-+$/g, "");
+}
+export const hiSlugOk = s => /^[a-z0-9-]{2,40}$/.test(String(s || ""));
+// 縮圖：最長邊縮到 1600，小的不放大，邊長最少 1。
+export function hiFit(w, h, max) {
+  const m = max || HI_MAX, big = Math.max(w, h);
+  if (big <= m) return { w, h };
+  const r = m / big;
+  return { w: Math.max(1, Math.round(w * r)), h: Math.max(1, Math.round(h * r)) };
+}
+// 選檔先擋一次：只收圖、原檔 25 MB 以內（更大的手機瀏覽器解碼會卡死）。縮完一定在 5 MB 以內（bucket 的上限）。
+export const hiFileOk = f => !!f && /^image\//.test(String(f.type || "")) && Number(f.size || 0) <= 25 * 1024 * 1024;
+export const hiTitle = m => (lang() === "zh" ? (m.title_zh || m.title_en) : (m.title_en || m.title_zh)) || m.slug || "";
+// 上下移：回一整串新順序的 id（交給 reorder_milestones）；動不了回 null。
+export function hiMove(rows, id, dir) {
+  const ids = (rows || []).map(r => r.id);
+  const i = ids.indexOf(id); if (i < 0) return null;
+  const j = dir === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= ids.length) return null;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  return ids;
+}
+// 資料庫回的巢狀欄位 history_photos 整成 photos，站照 sort 排、照片照 sort 排。
+export function hiRows(data) {
+  return (data || []).map(r => { const { history_photos, ...m } = r; m.photos = [...(history_photos || [])].sort((a, b) => (a.sort || 0) - (b.sort || 0)); return m; })
+    .sort((a, b) => (a.sort || 0) - (b.sort || 0) || String(a.happened_on || "").localeCompare(String(b.happened_on || "")));
+}
+export const hiNoConsent = m => ((m && m.photos) || []).filter(p => !p.consent).length;
+export const hiConsentOk = m => hiNoConsent(m) === 0;
+const hiTag = st => `<span class="tag${st === "published" ? " open" : st === "ready" ? " warn" : st === "archived" ? "" : " draft"}">${esc(T("hi.st." + st))}</span>`;
+// 清單：每一站一列（日期、標題、狀態、幾張照片、幾張沒勾同意）；能編的人有上下移與「加一站」。
+export function historyListHTML(rows, me, msg, busy) {
+  const can = hiCanEdit(me);
+  const list = rows || [];
+  const row = (m, i) => { const n = (m.photos || []).length, nc = hiNoConsent(m);
+    return `<li><div class="fhead"><b><a href="#history/${esc(m.id)}" data-act="hi-open" data-id="${esc(m.id)}">${esc(hiTitle(m))}</a></b> ${hiTag(m.status)}</div>
+      <div class="fmeta">${esc(m.happened_on || "")}・${n ? esc(T("hi.photos", { n })) : T("hi.noPhotos")}${nc ? `・<span class="hi-warn">${esc(T("hi.noConsentN", { n: nc }))}</span>` : ""}</div>
+      ${can ? `<div class="row"><button class="btn ghost sm" data-act="hi-move" data-id="${esc(m.id)}" data-dir="up"${i === 0 || busy ? " disabled" : ""}>↑ ${T("hi.up")}</button><button class="btn ghost sm" data-act="hi-move" data-id="${esc(m.id)}" data-dir="down"${i === list.length - 1 || busy ? " disabled" : ""}>↓ ${T("hi.down")}</button></div>` : ""}</li>`; };
+  return pageHead(T("hi.title"), T("hi.lede"), can ? [{ act: "hi-new", label: T("hi.new"), primary: true }] : [])
+    + msgHTML(msg)
+    + (can ? "" : `<div class="note">${T("hi.readonly")}</div>`)
+    + sectionHTML("", list.length ? `<ol class="flist hi-list">${list.map(row).join("")}</ol>` : emptyHTML(T("hi.none"), T("hi.noneHint"), can ? { act: "hi-new", label: T("hi.new") } : null));
+}
+// 一站：m 是那一列（null 是新的一站）；up 是上傳中的 { pct, name }。
+export function historyEditHTML(m, me, msg, busy, up) {
+  const can = hiCanEdit(me), sen = senior(me), dis = busy ? " disabled" : "", ro = can ? "" : " readonly";
+  const v = Object.assign({ id: "", slug: "", happened_on: "", title_zh: "", title_en: "", summary_zh: "", summary_en: "", body_zh: "", body_en: "", status: "draft", photos: [] }, m || {});
+  const isNew = !v.id, st = v.status, nc = hiNoConsent(v);
+  const statusLine = st === "published" ? T("hi.stLine.published") : st === "ready" ? T("hi.stLine.ready") : st === "archived" ? T("hi.stLine.archived") : T("hi.stLine.draft");
+  const keys = isNew ? "" : sectionHTML(T("hi.status"), `<div class="note">${statusLine}</div>
+      ${nc ? `<div class="msg err" role="status"><span class="msg-k">${T("msg.err")}</span><span>${esc(T("hi.consentBlock", { n: nc }))}</span></div>` : ""}
+      <div class="row">
+      ${(st === "draft" || st === "archived") && can ? `<button class="btn" data-act="hi-ready" data-id="${esc(v.id)}"${nc || busy ? " disabled" : ""}>${T("hi.ready")}</button>` : ""}
+      ${st === "ready" && can ? `<button class="btn ghost" data-act="hi-unready" data-id="${esc(v.id)}"${dis}>${T("hi.unready")}</button>` : ""}
+      ${st === "ready" && sen ? `<button class="btn" data-act="hi-publish" data-id="${esc(v.id)}"${dis}>${T("hi.publish")}</button>` : ""}
+      ${st === "ready" && !sen ? `<span class="mini">${T("hi.waitSenior")}</span>` : ""}
+      ${st === "published" && sen ? `<button class="btn ghost" data-act="hi-unpublish" data-id="${esc(v.id)}"${dis}>${T("hi.unpublish")}</button>` : ""}
+      ${st === "published" ? `<a class="btn ghost sm" href="/history/#${esc(v.slug)}" target="_blank" rel="noopener">${T("hi.seePublic")}</a>` : ""}
+    </div>`);
+  const content = sectionHTML(T("hi.content"), `<div class="two">
+      <label><i>${T("hi.titleZh")}</i><input id="hi-tzh" value="${esc(v.title_zh)}"${ro}${dis}></label>
+      <label><i>${T("hi.titleEn")}</i><input id="hi-ten" value="${esc(v.title_en)}"${ro}${dis}></label>
+      <label><i>${T("hi.sumZh")}</i><input id="hi-szh" value="${esc(v.summary_zh)}"${ro}${dis}></label>
+      <label><i>${T("hi.sumEn")}</i><input id="hi-sen" value="${esc(v.summary_en)}"${ro}${dis}></label>
+      <label class="wide"><i>${T("hi.bodyZh")}</i><textarea id="hi-bzh" style="min-height:120px"${ro}${dis}>${esc(v.body_zh)}</textarea></label>
+      <label class="wide"><i>${T("hi.bodyEn")}</i><textarea id="hi-ben" style="min-height:120px"${ro}${dis}>${esc(v.body_en)}</textarea></label>
+      <label><i>${T("hi.date")}</i><input id="hi-date" type="date" value="${esc(v.happened_on)}"${ro}${dis}><span class="mini">${T("hi.dateNote")}</span></label>
+      <label><i>${T("hi.slug")}</i><input id="hi-slug" value="${esc(v.slug)}" placeholder="2023-first-bootcamp" autocomplete="off"${ro}${dis}><span class="mini">${T("hi.slugNote")}</span></label>
+    </div>
+    ${can ? `<div class="form-foot"><button class="btn" data-act="hi-save" data-id="${esc(v.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>${isNew ? `<span class="mini">${T("hi.saveFirst")}</span>` : ""}</div>` : ""}`);
+  const photoCard = p => `<li class="hi-photo">
+      <img src="${esc(p.url)}" alt="" loading="lazy">
+      <div class="hi-photo-f">
+        <label><i>${T("hi.capZh")}</i><input id="hi-ph-czh-${esc(p.id)}" value="${esc(p.caption_zh || "")}"${ro}${dis}></label>
+        <label><i>${T("hi.capEn")}</i><input id="hi-ph-cen-${esc(p.id)}" value="${esc(p.caption_en || "")}"${ro}${dis}></label>
+        <label class="check"><input type="checkbox" data-act="hi-ph-consent" data-id="${esc(p.id)}"${p.consent ? " checked" : ""}${can ? "" : " disabled"}${dis}><span>${T("hi.consent")}</span></label>
+        ${can ? `<div class="row"><button class="btn ghost sm" data-act="hi-ph-save" data-id="${esc(p.id)}"${dis}>${T("hi.savePhotos")}</button><button class="btn quiet danger sm" data-act="hi-ph-del" data-id="${esc(p.id)}"${dis}>${T("hi.delPhoto")}</button></div>` : ""}
+      </div></li>`;
+  const photos = isNew ? "" : sectionHTML(`${T("hi.photosSec")}<span class="hint">${(v.photos || []).length}</span>`, `<div class="note">${T("hi.photoNote")}</div>
+      ${(v.photos || []).length ? `<ul class="hi-photos">${v.photos.map(photoCard).join("")}</ul>` : ""}
+      ${can ? (up ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(T("hi.uploading", { name: up.name || "" }))}</span></div>`
+        : `<label class="hi-upload"><i>${T("hi.upload")}</i><input type="file" id="hi-file" accept="image/*" data-id="${esc(v.id)}"${dis}></label>`) : ""}`);
+  return pageHead(isNew ? T("hi.newTitle") : esc(hiTitle(v)), isNew ? "" : `${esc(v.happened_on || "")}・${esc(v.slug)}`, [], { act: "hi-back", label: T("hi.back") })
+    + msgHTML(msg) + keys + content + photos;
 }
