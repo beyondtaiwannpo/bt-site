@@ -20,9 +20,11 @@ export const progressText = (i, n) => String(n ? i + 1 : 0).padStart(2, "0") + "
 // 路邊那張卡。是 button：點或 Enter 都打開覆蓋層。data-i 是站的序號，main.js 用它找站。
 export function cardHTML(stop, i, lang) {
   const title = pick(stop, "title", lang);
-  return `<button type="button" class="card" data-i="${i}" aria-label="${esc(t("open", lang))}：${esc(title)}">` +
+  // 不用 aria-label：讀螢幕的名字要以看得見的字開頭（WCAG 2.5.3），所以年份與標題照印，「打開這一站」用看不見的 span 接在後面。
+  return `<button type="button" class="card" data-i="${i}">` +
     `<span class="card-year">${esc(stop.year)}</span>` +
     `<span class="card-title">${esc(title)}</span>` +
+    `<span class="sr">（${esc(t("open", lang))}）</span>` +
     `<span class="card-plus" aria-hidden="true">+</span></button>`;
 }
 
@@ -31,7 +33,7 @@ export function stripHTML(stops, current, lang) {
   const items = (stops || []).map((s, i) =>
     `<button type="button" class="strip-stop${i === current ? " on" : ""}" data-i="${i}"${i === current ? ' aria-current="step"' : ""}>` +
     `<span class="strip-year">${esc(s.year)}</span><span class="strip-title">${esc(shortTitle(s, lang))}</span></button>`).join("");
-  return `<div class="strip-stops" role="list" aria-label="${esc(t("strip", lang))}">${items}</div>` +
+  return `<div class="strip-stops" role="group" aria-label="${esc(t("strip", lang))}">${items}</div>` +
     `<div class="strip-progress" aria-live="polite"><span class="sr">${esc(t("progress", lang))} </span>${progressText(current, (stops || []).length)}</div>`;
 }
 

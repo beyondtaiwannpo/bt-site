@@ -16,6 +16,7 @@ let current = -1, progress = 0, viewW = 1000, scale = 1;
 let api = null;                 // motion() 回的把手；減少動態或 gsap 沒載到就是 null
 let layers = {}, cardsEl = null, cardEls = [];
 let openedFrom = null, savedY = 0, playing = false, raf = 0;
+let aim = -1;   // 鍵盤連按時的目標站：鏡頭還在滑的時候 current 還沒變，連按三下要跳三站不是一站
 
 // ── 語言 ──
 function setLang(l) {
@@ -40,6 +41,7 @@ function renderCards() {
 }
 function renderStrip() { $("strip").innerHTML = UI.stripHTML(stops, current, lang); }
 function setCurrent(i) {
+  if (i === aim) aim = -1;
   if (i === current) return;
   current = i;
   renderStrip(); revealCurrent();
@@ -114,12 +116,13 @@ function closePanel() {
   if (openedFrom && openedFrom.isConnected) openedFrom.focus(); else { const c = cardEls[current]; if (c) c.focus(); }
   openedFrom = null;
 }
-function openLightbox(k) {
-  const s = stops[current]; if (!s || !s.photos[k]) return;
-  const p = s.photos[k], cap = lang === "zh" ? (p.caption_zh || p.caption_en) : (p.caption_en || p.caption_zh);
+// 燈箱直接拿覆蓋層裡那張圖的網址與說明，不回頭查資料（覆蓋層畫的是什麼就放大什麼）。
+function openLightbox(btn) {
+  const img = btn.querySelector("img"); if (!img) return;
+  const cap = img.getAttribute("alt") || "";
   const lb = $("lightbox");
   lb.innerHTML = `<button type="button" class="lb-close" data-lb-close aria-label="${UI.esc(t("closeLightbox", lang))}">×</button>` +
-    `<figure><img src="${UI.esc(p.url)}" alt="${UI.esc(cap)}" decoding="async">${cap ? `<figcaption>${UI.esc(cap)}</figcaption>` : ""}</figure>`;
+    `<figure><img src="${UI.esc(img.getAttribute("src"))}" alt="${UI.esc(cap)}" decoding="async">${cap ? `<figcaption>${UI.esc(cap)}</figcaption>` : ""}</figure>`;
   lb.hidden = false; lb.querySelector("[data-lb-close]").focus();
 }
 function closeLightbox() { const lb = $("lightbox"); if (lb.hidden) return; lb.hidden = true; lb.innerHTML = ""; const b = $("panel").querySelector(".shot-btn"); if (b) b.focus(); }
@@ -142,15 +145,16 @@ function startPlay() {
 }
 function stopPlay() { if (!playing) return; playing = false; cancelAnimationFrame(raf); paintPlay(); }
 // 人一動就停：滾輪、手指、鍵盤。
-for (const ev of ["wheel", "touchstart", "pointerdown"]) addEventListener(ev, e => { if (playing && !e.target.closest("#play")) stopPlay(); }, { passive: true });
+for (const ev of ["wheel", "touchstart", "pointerdown"]) addEventListener(ev, e => { aim = -1; if (playing && !e.target.closest("#play")) stopPlay(); }, { passive: true });
 
 // ── 鍵盤 ──
 addEventListener("keydown", e => {
   if (e.key === "Escape") { if (!$("lightbox").hidden) closeLightbox(); else closePanel(); return; }
   if (!$("panel").hidden) return;
   if (e.altKey || e.ctrlKey || e.metaKey) return;
-  if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); goTo(current + 1); }
-  else if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); goTo(current - 1); }
+  const base = aim >= 0 ? aim : current;
+  if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); if (base + 1 < stops.length) { aim = base + 1; goTo(aim); } }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); if (base - 1 >= 0) { aim = base - 1; goTo(aim); } }
   else if (playing && /^(ArrowUp|ArrowDown|PageUp|PageDown|Home|End| )$/.test(e.key)) stopPlay();
 });
 
@@ -159,7 +163,7 @@ document.addEventListener("click", e => {
   const card = e.target.closest(".card"); if (card) { openStop(+card.dataset.i, card); return; }
   const strip = e.target.closest(".strip-stop"); if (strip) { stopPlay(); goTo(+strip.dataset.i); return; }
   if (e.target.closest("[data-close]")) { closePanel(); return; }
-  const shot = e.target.closest(".shot-btn"); if (shot) { if (matchMedia("(min-width: 760px)").matches) openLightbox(+shot.dataset.k); return; }
+  const shot = e.target.closest(".shot-btn"); if (shot) { if (matchMedia("(min-width: 760px)").matches) openLightbox(shot); return; }
   if (e.target.closest("[data-lb-close]") || e.target === $("lightbox")) { closeLightbox(); return; }
 });
 $("lang").addEventListener("click", () => setLang(lang === "zh" ? "en" : "zh"));

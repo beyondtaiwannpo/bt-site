@@ -82,8 +82,8 @@ test("卡：年份、標題、「+」，是個 button，aria 有站名；中英�
   assert.ok(zh.includes("第一屆探索營，超過 80 人"));
   assert.ok(en.includes("First College Bootcamp"));
   assert.ok(!en.includes("第一屆"), "英文卡不夾中文");
-  assert.match(zh, /aria-label="[^"]*打開[^"]*"/);
-  assert.match(en, /aria-label="[^"]*Open[^"]*"/);
+  assert.ok(zh.includes("打開這一站") && en.includes("Open this stop"), "讀螢幕的人要聽得到這是可以打開的");
+  assert.ok(!/aria-label=/.test(zh), "不用 aria-label，名字要以看得見的字開頭");
   assert.ok(zh.includes(">+<") || zh.includes("aria-hidden=\"true\">+"), "要有加號");
 });
 
