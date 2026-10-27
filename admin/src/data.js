@@ -1,7 +1,7 @@
 // 申請管理的資料層。直接用 shared/，**不 import 別的功能資料夾**
 //（跟 app/ 與 availability/ 同一條規矩：一個功能壞掉不該讓別的功能打不開）。
 import { supabase } from "../../shared/supabase.js";
-import { authMessage } from "../../shared/auth.js";
+import { authMessage, whoAmI } from "../../shared/auth.js";
 import { T, lang } from "./strings.js";
 
 const need = () => { if (!supabase) throw new Error(authMessage(null)); };
@@ -10,10 +10,9 @@ const need = () => { if (!supabase) throw new Error(authMessage(null)); };
 // team 決定看得到哪一份表單。**三個都要**，少一個就得在別的地方猜。
 export async function loadMe(userId) {
   need();
-  const { data, error } = await supabase
-    .from("profiles").select("role, board_role, team, name_zh, name_en")
-    .eq("id", userId).maybeSingle();
-  if (error) throw error;
+  // 2026-11-06 起從 shared/auth.js 的 whoAmI() 拿：profiles 與 my_access() 同時查、同一個分頁十分鐘內不重問
+  //（理由與清除時機寫在那裡）。這裡只負責把那一列整理成這一組要的形狀。
+  const { row: data, ws } = await whoAmI(userId);
   if (!data) return null;
   return {
     role: data.role,
@@ -22,19 +21,8 @@ export async function loadMe(userId) {
     name: data.name_zh || data.name_en || "",
     senior: data.board_role === "president" || data.board_role === "senior_adviser",
     pres: data.board_role === "president",
-    ws: await loadMyWorkspaces(),
+    ws,
   };
-}
-// 我被派進哪幾個工作區（2026-10-24，my_access()）：{ "apps:Curriculum Team": "manage", … }。
-// 這只決定側欄藏不藏、按鈕畫不畫；真正的門在資料庫。叫不到（遷移檔還沒跑）就當成空的，
-// 側欄會少幾行，但 Co-President 與 Senior Adviser 靠職級照樣全部看得到。
-async function loadMyWorkspaces() {
-  const ws = {};
-  try {
-    const { data } = await supabase.rpc("my_access");
-    if (data && Array.isArray(data.workspaces)) for (const w of data.workspaces) ws[w.id] = w.level;
-  } catch (e) { /* 空的 */ }
-  return ws;
 }
 
 // 表單清單加每一份收到幾件。

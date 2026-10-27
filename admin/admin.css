@@ -524,3 +524,19 @@ select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-st
 .hi-up{display:flex;gap:10px;align-items:center;margin:6px 0 10px}
 .hi-up progress{flex:1;max-width:320px;height:10px;accent-color:var(--bt-orange)}
 @media (max-width:640px){.hi-photos{grid-template-columns:1fr}}
+
+/* ═════════ 開頁骨架（2026-11-06，後台速度）═════════ */
+/* index.html 裡那個還沒跑 JavaScript 就先畫出來的側欄與內容骨架。
+   .sk 是側欄裡一條一條的灰bar，寬度在 HTML 裡用 style 給，因為那一段是靜態的、沒有 class 可以逐條算。
+   真的側欄一畫出來整個 #bt-root 被換掉，這幾條規則就沒有東西可以套。 */
+.rail.skel{gap:10px;padding-top:10px}
+.rail.skel .rail-me{display:grid;gap:8px;padding-bottom:12px}
+.sk{display:block;height:14px;border-radius:7px;background:rgba(16,42,134,.1);width:70%}
+.sk:nth-of-type(odd){width:55%}
+
+/* ═════════ 自動儲存的小字（2026-11-06）═════════ */
+/* 欄位旁邊那個「改了就存／存檔中…／存好了」。淡字，存好了變蒂芬妮綠一下，沒存進去是橘的。 */
+.autosave{font-size:13px;color:rgba(16,42,134,.62);white-space:nowrap}
+.autosave.saving{color:rgba(16,42,134,.82)}
+.autosave.saved{color:var(--bt-navy);font-weight:600}
+.autosave.failed{color:var(--ink);font-weight:600;border-left:3px solid var(--bt-orange);padding-left:8px;white-space:normal}

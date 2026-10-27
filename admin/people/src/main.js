@@ -57,6 +57,17 @@ function render() {
   UI.afterRender(S, el);
 }
 
+// 側欄與頂欄先畫（2026-11-06，後台速度）：知道我是誰就先把外殼畫出來，內容那一格放骨架，資料回來 render() 整個換掉。
+// S.me 從分頁快取拿幾乎不用等（shared/auth.js 的 whoAmI），所以外殼可以在第一趟資料回來之前就在。
+function paintShell(tab) {
+  const el = root();
+  if (!el || !S.me) return;
+  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab || "", S.me), UI.skeletonHTML());
+  UI.afterRender(S, el);
+  // 線上有沒有更新的版本（理由見 admin/src/main.js 同一段）。
+  UI.checkVersion("../../");
+}
 // 開頁連不上先自己再試一次（兩秒後），第二次才顯示「資料庫休眠中」。
 // 2026-10-23 盤點時 Settings 一次載入失敗就整頁變成那一句，重開就好；一次抖動不該讓人去寄信求救。
 function retryBoot() { return new Promise(r => setTimeout(() => r(boot(true)), 2000)); }
@@ -70,6 +81,7 @@ async function boot(retried) {
     if (!S.me || S.me.role !== "cadre" || !isSenior()) { render(); return; }
     // ?tab= 或 #key 直接開某個分頁（README 的連結用得到）。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
+    paintShell(String(want || "").split("=")[0]);
     await openTab(want);
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-people"); return; }

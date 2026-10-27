@@ -114,6 +114,18 @@ function render() {
   UI.afterRender(S, el);
 }
 
+// 側欄與頂欄先畫（2026-11-06）：知道我是誰就先把外殼畫出來，內容那一格放骨架，資料回來 render() 整個換掉。
+// 不等資料的理由：外殼只要 S.me，而 S.me 從分頁快取拿幾乎不用等。這一頁的「慢」實測全部在資料那一半。
+function paintShell() {
+  const el = root();
+  if (!el || !S.me) return;
+  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
+  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", "home", S.me, {}), UI.skeletonHTML());
+  UI.afterRender(S, el);
+  // 線上有沒有更新的版本（GitHub Pages 快取 10 分鐘，四個資料夾各一份側欄，哪一份先過期哪一份先換新；
+  // Paul 2026-11-06 遇到的「側欄新項目重整就不見」就是這個）。讀到不一樣就在左下角提醒重整。
+  UI.checkVersion("../");
+}
 // 開頁連不上先自己再試一次（兩秒後），第二次才顯示「資料庫休眠中」。
 // 2026-10-23 盤點時 Settings 一次載入失敗就整頁變成那一句，重開就好；一次抖動不該讓人去寄信求救。
 function retryBoot() { return new Promise(r => setTimeout(() => r(boot(true)), 2000)); }
@@ -123,27 +135,30 @@ async function boot(retried) {
     if (who.offline) { if (!retried) return retryBoot(); S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
-    // ★ 這幾件事同時發，不要排隊。loadForms() 不需要知道我是誰
-    //（它沒有參數，擋不擋得到是 RLS 的事），所以沒有理由等 loadMe 回來。
-    // 省下來的是一趟往返（實測到 Supabase 一趟熱的約 100 到 240 毫秒）。
-    // 非幹部誤按進來會多發這幾個查詢，RLS 會擋掉，回來是空的。
-    // 待寄的信載不到不該讓整頁打不開，所以它失敗就當成 0 封。
-    const [me, forms, pendingAll] = await Promise.all([
-      D.loadMe(S.user.id), D.loadForms(), D.loadPendingAll().catch(() => [])]);
-    S.me = me;
+    // ★ 2026-11-06 後台速度：三段。
+    //   1. 表單與待寄的信先發出去（不需要知道我是誰，RLS 決定看得到哪些）；
+    //   2. 等「我是誰」回來（shared/auth.js 的 whoAmI：profiles 與 my_access 同時查，同一個分頁十分鐘內直接用快取，
+    //      所以從別的後台頁換過來這一步幾乎不花時間），側欄與頂欄**立刻畫**，內容先是骨架；
+    //   3. 首頁要的六樣東西一起等（teams、todo、workspaces、requests、events、meetings），改前是一個接一個 await，
+    //      每個 300 毫秒排隊，實測總覽 3.6 秒才有畫面。載不到的各自接住，不讓整頁打不開。
+    const formsP = D.loadForms(), pendingP = D.loadPendingAll().catch(() => []);
+    formsP.catch(() => {});
+    S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre") { render(); return; }
-    S.forms = forms; S.pendingAll = pendingAll;
-    S.teams = await D.loadTeams().catch(() => []);
-    // 首頁三塊的數字。載不到不該讓整頁打不開，所以接住；每一項自己也會接住。
-    S.todo = await D.loadTodo(S.me).catch(() => ({}));
-    S.workspaces = await D.loadWorkspaces().catch(() => []);
-    // 行銷需求單（2026-10-31）：讀一次，總覽的卡也靠它；載不到是 null，卡會印「載不到」。
-    S.requests = await D.loadRequests().catch(() => null);
-    if (S.todo) S.todo.requests = S.requests;
-    S.events = await D.loadEvents().catch(() => null);
-    if (S.todo) S.todo.events = S.events;
-    S.meetings = await D.loadMeetings().catch(() => null);
-    if (S.todo) S.todo.meetings = S.meetings;
+    paintShell();
+    const [forms, pendingAll, teams, todo, workspaces, requests, events, meetings] = await Promise.all([
+      formsP, pendingP,
+      D.loadTeams().catch(() => []),
+      D.loadTodo(S.me).catch(() => ({})),
+      D.loadWorkspaces().catch(() => []),
+      D.loadRequests().catch(() => null),
+      D.loadEvents().catch(() => null),
+      D.loadMeetings().catch(() => null),
+    ]);
+    S.forms = forms; S.pendingAll = pendingAll; S.teams = teams; S.todo = todo; S.workspaces = workspaces;
+    S.requests = requests; if (S.todo) S.todo.requests = S.requests;
+    S.events = events; if (S.todo) S.todo.events = S.events;
+    S.meetings = meetings; if (S.todo) S.todo.meetings = S.meetings;
     // 提醒信的退路（2026-11-02）：開頁叫一次 tick_mail()，Resend 沒設好也不會讓頁面壞。
     D.tickMail().catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。

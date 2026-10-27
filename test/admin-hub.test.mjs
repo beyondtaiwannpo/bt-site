@@ -84,7 +84,9 @@ test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellH
     for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
                        "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML",
                        "mpName", "mpFind", "mpItems", "mpLinksHTML", "membersPanelHTML",
-                       "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "rankTag", "membersAreaHTML"]) {
+                       "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "rankTag", "membersAreaHTML",
+                       "prefetchTargets", "bindPrefetch", "loadedVersion", "versionDiffers", "checkVersion",
+                       "debounce", "saveMode", "dirtyTracker", "formValues", "autosaveHint", "autosaveState", "bindAutosave"]) {
       if (fn === "PK_TEAMS") continue;
       assert.equal(String(M[fn]), String(FORMS[fn]), `${label} 的 ${fn} 跟 admin/ 不一樣`);
     }

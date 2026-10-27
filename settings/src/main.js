@@ -80,7 +80,31 @@ document.addEventListener("change", e => {
   if (c) sel.value = c;
 });
 
+// 版本提示（2026-11-06，後台速度）：開頁問一次線上的 version.json（cache: no-store，繞過 GitHub Pages 的 10 分鐘快取），
+// 跟這一頁載進來的 <meta name="bt-version"> 不一樣就在左下角掛一條「有新版本，重新整理」，不會自己消失。
+// 讀不到就不提。後台那四份在 ui.js（checkVersion），這幾個資料夾各自一份一樣的。
+export function versionDiffers(loaded, live) { return !!loaded && !!live && String(loaded) !== String(live); }
+async function checkVersion(rootUrl) {
+  if (typeof fetch === "undefined" || typeof document === "undefined") return false;
+  try {
+    const meta = document.querySelector('meta[name="bt-version"]');
+    const r = await fetch(`${rootUrl}version.json`, { cache: "no-store" });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!versionDiffers(meta ? meta.content : "", j && j.v)) return false;
+    document.querySelectorAll(".verbar").forEach(n => n.remove());
+    const d = document.createElement("div");
+    d.className = "verbar"; d.setAttribute("role", "status");
+    d.innerHTML = `<span></span><button type="button" class="btn"></button>`;
+    d.querySelector("span").textContent = T("ver.newer");
+    const b = d.querySelector("button"); b.textContent = T("ver.reload"); b.addEventListener("click", () => location.reload());
+    document.body.appendChild(d);
+    return true;
+  } catch (e) { return false; }
+}
+
 async function boot() {
+  checkVersion("../");
   try {
     const who = await AUTH.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }
@@ -104,30 +128,26 @@ async function boot() {
     // 下面那句 warn 的意思是「讀不到故事不擋整頁，姓名與大頭照照樣要改得動」，
     // 而 Promise.all 只要有一個 reject 就整個 reject —— 不收的話，
     // 故事表一出問題，整個設定頁會變成「資料庫休眠中」，那是行為的倒退。
-    const [meRes, storyRes] = await Promise.all([
-      supabase.from("profiles")
-        .select("role, board_role, name_zh, name_en, team, avatar, school, grade, newsletter_opt_in, " +
-                "public_profile, public_approved")
-        .eq("id", S.user.id).maybeSingle(),
+    // 2026-11-06 後台速度：原本四層（profiles → my_access → terms → positions），現在一層全部同時發。
+    //   - 「我是誰」走 shared/auth.js 的 whoAmI(…, true)：fresh，**這一頁不吃分頁快取**，因為它就是改自己資料的地方，
+    //     要看到的是資料庫現在的值；查完它會把新值寫回快取，別的頁面接著用。
+    //   - terms 與 positions 不用等 profiles：positions 的 RLS 只給自己那幾列，先全拿回來再挑這一屆的。
+    //     學員會多發這兩個查詢（RLS 擋掉，回來是空的），換到的是幹部每次少兩趟往返。
+    const [whoRes, storyRes, termRes, posRes] = await Promise.all([
+      AUTH.whoAmI(S.user.id, true),
       Promise.resolve(storyQ).catch(err => ({ data: null, error: err })),
+      Promise.resolve(supabase.from("terms").select("id").eq("status", "current").maybeSingle()).catch(() => ({ data: null })),
+      Promise.resolve(supabase.from("positions").select("title_zh, title_en, term_id")).catch(() => ({ data: null })),
     ]);
-    const { data, error } = meRes;
-    if (error) throw error;
-    S.me = { ...(data || {}), email: S.user.email };
+    S.me = { ...(whoRes.row || {}), email: S.user.email };
     // 2026-10-24：幹部多讀兩樣，都是「有就有、沒有也不擋整頁」：
     //   - 我被派進哪幾個工作區（my_access()），決定要不要畫「實習生的進度牆」那顆按鈕；
     //   - 這一屆我的職位（positions，RLS 只給自己那幾列），團隊頁印的頭銜就是它，這裡只顯示不給改。
     if (S.me.role === "cadre") {
-      S.me.ws = {};
-      try {
-        const { data: a } = await supabase.rpc("my_access");
-        if (a && Array.isArray(a.workspaces)) for (const w of a.workspaces) S.me.ws[w.id] = w.level;
-      } catch (e) { /* 遷移檔還沒跑，當成沒有指派 */ }
-      try {
-        const { data: term } = await supabase.from("terms").select("id").eq("status", "current").maybeSingle();
-        const { data: pos } = term ? await supabase.from("positions").select("title_zh, title_en").eq("term_id", term.id).maybeSingle() : { data: null };
-        S.me.title = term && pos ? `${pos.title_en || pos.title_zh || ""} · ${term.id}` : "";
-      } catch (e) { S.me.title = ""; }
+      S.me.ws = whoRes.ws || {};
+      const term = termRes && termRes.data;
+      const pos = term ? ((posRes && posRes.data) || []).find(p => p.term_id === term.id) : null;
+      S.me.title = term && pos ? `${pos.title_en || pos.title_zh || ""} · ${term.id}` : "";
     }
     // 「我的故事」是另一張表。學員沒有這一區，所以查回來的東西直接丟掉。
     if (S.me.role === "cadre" || S.me.role === "alumni") {
@@ -262,6 +282,7 @@ document.addEventListener("click", async e => {
       try {
         const { error } = await supabase.from("profiles").update({ avatar: url }).eq("id", S.user.id);
         if (error) throw error;
+        AUTH.forgetMe();
         S.busy = false; S.msg = T("m.avatarOk");
       } catch (err) { S.busy = false; S.msg = T("m.avatarFail") + (err.message || err); }
       render();
@@ -402,6 +423,7 @@ document.addEventListener("click", async e => {
       }
 
       S.busy = false;
+      AUTH.forgetMe(); // 名字、team、公開勾選改了，別的頁面的側欄要跟著變
       const notes = [];
       if (cadre && patch.public_profile && !S.me.public_approved)
         notes.push(T("m.pendingTeam"));

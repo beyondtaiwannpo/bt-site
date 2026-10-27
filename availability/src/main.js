@@ -140,7 +140,31 @@ function firstMineMinute(set) {
 }
 
 // ── 啟動 ────────────────────────────────────────────────────────────
+// 版本提示（2026-11-06，後台速度）：開頁問一次線上的 version.json（cache: no-store，繞過 GitHub Pages 的 10 分鐘快取），
+// 跟這一頁載進來的 <meta name="bt-version"> 不一樣就在左下角掛一條「有新版本，重新整理」，不會自己消失。
+// 讀不到就不提。後台那四份在 ui.js（checkVersion），這幾個資料夾各自一份一樣的。
+export function versionDiffers(loaded, live) { return !!loaded && !!live && String(loaded) !== String(live); }
+async function checkVersion(rootUrl) {
+  if (typeof fetch === "undefined" || typeof document === "undefined") return false;
+  try {
+    const meta = document.querySelector('meta[name="bt-version"]');
+    const r = await fetch(`${rootUrl}version.json`, { cache: "no-store" });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!versionDiffers(meta ? meta.content : "", j && j.v)) return false;
+    document.querySelectorAll(".verbar").forEach(n => n.remove());
+    const d = document.createElement("div");
+    d.className = "verbar"; d.setAttribute("role", "status");
+    d.innerHTML = `<span></span><button type="button" class="btn"></button>`;
+    d.querySelector("span").textContent = T("ver.newer");
+    const b = d.querySelector("button"); b.textContent = T("ver.reload"); b.addEventListener("click", () => location.reload());
+    document.body.appendChild(d);
+    return true;
+  } catch (e) { return false; }
+}
+
 async function boot() {
+  checkVersion("../");
   try {
     const who = await AUTH.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }
@@ -159,12 +183,13 @@ async function boot() {
     // ⚠ 代價要講清楚：非幹部其實用不到看板資料，但我們還是先發了。
     // 學員誤按進來會多五個查詢（RLS 會擋掉，回來是空的）；換到的是
     // **每一位幹部每一次載入都少一趟往返**。幹部是這一頁的常態，所以這樣划算。
-    const [profileRes, all] = await Promise.all([
-      supabase.from("profiles").select("role, tz, name_zh, name_en").eq("id", S.user.id).maybeSingle(),
+    // 2026-11-06 後台速度：「我是誰」改走 shared/auth.js 的 whoAmI（profiles 與 my_access 同時查、分頁快取十分鐘），
+    // 原本這一頁要三層（profiles → my_access → profiles 再讀 board_role），現在一層。存了時區之後會 forgetMe()。
+    const [whoRes, all] = await Promise.all([
+      AUTH.whoAmI(S.user.id),
       DATA.loadAll(),
     ]);
-    const { data, error } = profileRes;
-    if (error) throw error;
+    const data = whoRes.row;
     S.role = data ? data.role : null;
     S.myTz = data ? data.tz : null;
     S.myName = data ? (data.name_zh || data.name_en || "") : "";
@@ -172,8 +197,8 @@ async function boot() {
 
     S.members = all.members; S.slots = all.slots;
     // 排會與回覆（2026-11-02）：我能排哪些範圍；信裡的連結 ?meeting=<id> 進來就先把那一場撈出來。
-    S.ws = await DATA.loadAccess();
-    try { const { data } = await supabase.from("profiles").select("board_role").eq("id", S.user.id).maybeSingle(); S.senior = !!data && ["president", "senior_adviser"].includes(data.board_role); } catch (e) { S.senior = false; }
+    S.ws = whoRes.ws || {};
+    S.senior = !!data && ["president", "senior_adviser"].includes(data.board_role);
     const mid = new URLSearchParams(location.search).get("meeting");
     if (mid) { try { S.rsvp = await DATA.loadMeeting(mid, S.user.id); if (!S.rsvp) S.rsvpMsg = T("rsvp.gone"); } catch (e) { S.rsvpMsg = DATA.saysMeeting(e, lang() === "zh"); } }
     S.weekSlots = all.weekSlots; S.weekMarks = all.weekMarks;
@@ -335,6 +360,7 @@ document.addEventListener("click", async e => {
     S.busy = true; S.msg = T("m.saving"); render();
     try {
       await DATA.saveTz(S.user.id, b.dataset.tz);
+      AUTH.forgetMe(); // 時區在「我是誰」的分頁快取裡，存了就讓下一頁重讀
       S.myTz = b.dataset.tz; S.needTz = false; S.msg = ""; S.busy = false;
       setWeek(S.weekOffset); render();
     } catch (err) {

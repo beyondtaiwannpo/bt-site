@@ -56,21 +56,19 @@ export async function loadAll() {
   // 格子要等知道是哪一屆才查得到。沒有 active 的屆別就是空的，畫面會說。
   const term = te.data || null;
   let tasks = [];
-  if (term) {
-    const ta = await supabase.from("intern_tasks").select("*").eq("term", term.id).eq("active", true).order("seq");
-    if (ta.error) throw ta.error;
-    tasks = ta.data || [];
-  }
-
   // 蛇梯棋（2026-10-22）：這一屆開著的棋盤、格子、大家在第幾格。
   // **三個查詢載不到不讓護照打不開**（遷移檔還沒跑、或棋盤沒開都會是空的）：棋盤是護照上面的一層，不是護照。
+  // 2026-11-06 後台速度：格子跟棋盤那三個都只要知道是哪一屆，所以四個一起發（原本格子先、棋盤後，多一趟）。
   let board = null, squares = [], positions = [];
   if (term) {
-    const [bo, sq, po] = await Promise.all([
+    const [ta, bo, sq, po] = await Promise.all([
+      supabase.from("intern_tasks").select("*").eq("term", term.id).eq("active", true).order("seq"),
       supabase.from("intern_boards").select("term, size, active").eq("term", term.id).eq("active", true).maybeSingle(),
       supabase.from("intern_squares").select("pos, kind, task_id, goes_to").eq("term", term.id).order("pos"),
       supabase.rpc("intern_positions"),
     ]);
+    if (ta.error) throw ta.error;
+    tasks = ta.data || [];
     if (!bo.error && bo.data) { board = bo.data; squares = sq.error ? [] : (sq.data || []); positions = po.error ? [] : (po.data || []); }
   }
 

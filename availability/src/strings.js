@@ -21,6 +21,13 @@ export const COMMON = {
   "common.back":      { zh: "回入口", en: "Back to the entrance" },
   "lang.label":       { zh: "語言", en: "Language" },
   "punct.list":       { zh: "、", en: ", " },
+  // 版本提示與自動儲存（2026-11-06）。九份 strings.js 的 COMMON 要一模一樣（test/lang.test.mjs、test/admin-hub.test.mjs 逐字比對）。
+  "ver.newer":        { zh: "網站有新版本了，重新整理一下就會換成新的。", en: "A newer version is live. Reload to get it." },
+  "ver.reload":       { zh: "重新整理", en: "Reload" },
+  "auto.saving":      { zh: "存檔中…", en: "Saving…" },
+  "auto.saved":       { zh: "存好了", en: "Saved" },
+  "auto.hint":        { zh: "改了就存", en: "saves as you change it" },
+  "auto.failed":      { zh: "沒存進去，剛打的字還在，再試一次。", en: "Not saved. What you typed is still here; try again." },
 };
 
 export const MINE = {

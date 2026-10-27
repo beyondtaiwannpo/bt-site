@@ -309,7 +309,60 @@ export async function signIn(email, pw) {
   return data;
 }
 
-export async function signOut() { if (supabase) await supabase.auth.signOut(); }
+// 登出的時候順手把「我是誰」的分頁快取清掉（見下面 whoAmI）。不清的話下一個在同一個分頁登入的人
+// 會先看到上一個人的側欄，直到十分鐘後過期。
+export async function signOut() { forgetMe(); if (supabase) await supabase.auth.signOut(); }
+
+/* ---------- 「我是誰」的分頁快取（2026-11-06，後台速度）---------- */
+// 登入後每一頁開頁都要先問兩件事才能畫側欄：profiles 那一列（角色、職級、team、名字）
+// 與 my_access()（我被派進哪幾個工作區）。改之前每頁都重問、而且兩趟串著問，
+// 從台北到 Supabase 一趟約 300 毫秒，所以每一次換頁固定先等 600 毫秒畫面才動。
+// 這個答案十秒前在上一頁才剛問過，換頁不該再問一次。
+//
+// 做法：兩個查詢**同時**發，結果存進 sessionStorage（**只有這個分頁、關掉就沒有**），
+// 十分鐘內同一個人開任何一頁直接用。十分鐘是上限不是精準值：職級被 Co-President 改掉的人
+// 最慢十分鐘後側欄才會跟著變，而真正的門在資料庫的 RLS，側欄只是畫面。
+// 會主動清掉的時候：登出（上面 signOut）、自己在 /settings/ 改了資料（那一頁存完會叫 forgetMe）、
+// 換了一個人登入（快取的 key 帶著 user id，對不上就不用）。
+//
+// 為什麼放在這個檔案而不是每個資料夾各一份：檔頭那段寫的，「我是不是幹部」只該有一個答案來源。
+// 四個後台資料夾各自快取的話，四份 TTL 與清除時機一定會漸漸不一樣。
+// 這是 shared/ 在 2026-11-06 唯一的改動，shared/ 沒有新檔案。
+const ME_KEY = "bt-me";
+const ME_TTL = 10 * 60 * 1000;
+// profiles 讀的欄位是登入後所有頁面會用到的聯集，每一頁從裡面挑自己要的。
+// **不讀 email、不讀任何別人的列**，只讀自己那一列（RLS 本來就只給自己）。
+const ME_COLS = "role, board_role, team, name_zh, name_en, tz, avatar, school, grade, newsletter_opt_in, public_profile, public_approved";
+function meStore() { try { return typeof sessionStorage !== "undefined" ? sessionStorage : null; } catch (e) { return null; } }
+export function forgetMe() { const st = meStore(); if (st) try { st.removeItem(ME_KEY); } catch (e) { /* 隱私模式 */ } }
+// 純函式，測試用：快取項對這個人、而且還沒過期才算數。
+export function meCacheValid(item, userId, now) {
+  return !!item && item.id === userId && typeof item.at === "number" && (now - item.at) >= 0 && (now - item.at) < ME_TTL && !!item.row;
+}
+export function rememberMe(userId, row, ws) {
+  const st = meStore(); if (!st) return;
+  try { st.setItem(ME_KEY, JSON.stringify({ id: userId, at: Date.now(), row, ws: ws || {} })); } catch (e) { /* 存不進去就每次問 */ }
+}
+export function recallMe(userId) {
+  const st = meStore(); if (!st) return null;
+  try { const item = JSON.parse(st.getItem(ME_KEY) || "null"); return meCacheValid(item, userId, Date.now()) ? item : null; } catch (e) { return null; }
+}
+// 回 { row, ws }：row 是 profiles 自己那一列（沒有就是 null），ws 是 { "apps:Curriculum Team": "manage", … }。
+// fresh = true 跳過快取（/settings/ 這種要改自己資料的頁面用）。查完一定寫回快取。
+export async function whoAmI(userId, fresh) {
+  if (!supabase) throw new Error(MSG.offline);
+  if (!fresh) { const c = recallMe(userId); if (c) return { row: c.row, ws: c.ws || {}, cached: true }; }
+  const [pr, ac] = await Promise.all([
+    supabase.from("profiles").select(ME_COLS).eq("id", userId).maybeSingle(),
+    // my_access() 叫不到（遷移檔還沒跑）就當成沒有指派，不擋整頁。
+    Promise.resolve(supabase.rpc("my_access")).catch(() => ({ data: null })),
+  ]);
+  if (pr.error) throw pr.error;
+  const ws = {};
+  if (ac && ac.data && Array.isArray(ac.data.workspaces)) for (const w of ac.data.workspaces) ws[w.id] = w.level;
+  if (pr.data) rememberMe(userId, pr.data, ws);
+  return { row: pr.data || null, ws, cached: false };
+}
 
 // Google 登入（規格 §3-4）。Supabase 內建的供應商，前端只有這一顆按鈕。
 //

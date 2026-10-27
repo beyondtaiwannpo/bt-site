@@ -348,7 +348,31 @@ document.addEventListener("animationend", e => {
 });
 
 /* ---------- boot ---------- */
+// 版本提示（2026-11-06，後台速度）：開頁問一次線上的 version.json（cache: no-store，繞過 GitHub Pages 的 10 分鐘快取），
+// 跟這一頁載進來的 <meta name="bt-version"> 不一樣就在左下角掛一條「有新版本，重新整理」，不會自己消失。
+// 讀不到就不提。後台那四份在 ui.js（checkVersion），這幾個資料夾各自一份一樣的。
+export function versionDiffers(loaded, live) { return !!loaded && !!live && String(loaded) !== String(live); }
+async function checkVersion(rootUrl) {
+  if (typeof fetch === "undefined" || typeof document === "undefined") return false;
+  try {
+    const meta = document.querySelector('meta[name="bt-version"]');
+    const r = await fetch(`${rootUrl}version.json`, { cache: "no-store" });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!versionDiffers(meta ? meta.content : "", j && j.v)) return false;
+    document.querySelectorAll(".verbar").forEach(n => n.remove());
+    const d = document.createElement("div");
+    d.className = "verbar"; d.setAttribute("role", "status");
+    d.innerHTML = `<span></span><button type="button" class="btn"></button>`;
+    d.querySelector("span").textContent = T("ver.newer");
+    const b = d.querySelector("button"); b.textContent = T("ver.reload"); b.addEventListener("click", () => location.reload());
+    document.body.appendChild(d);
+    return true;
+  } catch (e) { return false; }
+}
+
 export async function boot() {
+  checkVersion("../");
   try {
     const who = await DATA.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }

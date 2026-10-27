@@ -164,7 +164,7 @@ export function msgHTML(msg) {
 // toast：畫面左下角一小條字。掛在 <body> 底下不在 #bt-root 裡，所以 render() 重畫不會把它洗掉。
 // 做成了（ok）幾秒後自己消失，可以帶一顆「復原」；沒做成（err）留著，要自己關。
 // 同一句話已經在畫面上就不再疊一條。四份一模一樣（test/admin-hub.test.mjs 逐字比對）。
-export function toast(msg, undo) {
+export function toast(msg, undo, opts) {
   if (typeof document === "undefined") return null;
   const kind = msgKind(msg);
   if (!kind) return null;
@@ -181,7 +181,7 @@ export function toast(msg, undo) {
   el.querySelector(".toast-x").addEventListener("click", gone);
   if (u) el.querySelector(".toast-undo").addEventListener("click", () => { gone(); u.fn(); });
   box.appendChild(el);
-  if (kind === "ok") setTimeout(gone, u ? 9000 : 6000);
+  if (kind === "ok" && !(opts && opts.sticky)) setTimeout(gone, u ? 9000 : 6000);
   return el;
 }
 // inline confirm：取代瀏覽器的 confirm()。按了會丟東西的按鈕，原地長出一行「真的要…？確定／取消」。
@@ -223,6 +223,147 @@ export function afterRender(S, root) {
   } else S.toasted = "";
   if (S.ask) mountAsk(root, S.ask);
   if (S.view !== S.lastView) { if (S.lastView !== undefined && typeof window !== "undefined") window.scrollTo(0, 0); S.lastView = S.view; }
+  bindPrefetch(root);
+}
+// ── 側欄預取與版本提示（2026-11-06，後台速度）。四份一模一樣（測試逐字比對）。 ──
+// 滑過側欄上別的資料夾那一行，就先把那一頁的 HTML 與四支模組抓進快取（<link rel="prefetch">），
+// 真的點下去的時候靜態檔已經在本機。#bt-root 不會被換掉（只有裡面的 innerHTML 會），所以監聽掛一次就好。
+const PREFETCHED = new Set();
+export function prefetchTargets(href) {
+  const path = String(href || "").split("#")[0].split("?")[0];
+  if (!path || !path.endsWith("/")) return [];
+  const v = loadedVersion();
+  const q = v ? `?v=${encodeURIComponent(v)}` : "";
+  return [path, ...["main", "ui", "data", "strings"].map(m => `${path}src/${m}.js${q}`)];
+}
+export function bindPrefetch(root) {
+  if (!root || typeof document === "undefined" || root.dataset.prefetch === "1") return;
+  root.dataset.prefetch = "1";
+  const go = e => {
+    const a = e.target && e.target.closest ? e.target.closest("a.rail-item[href]") : null;
+    if (!a) return;
+    for (const u of prefetchTargets(a.getAttribute("href"))) {
+      if (PREFETCHED.has(u)) continue;
+      PREFETCHED.add(u);
+      const l = document.createElement("link"); l.rel = "prefetch"; l.href = u; document.head.appendChild(l);
+    }
+  };
+  root.addEventListener("mouseover", go);
+  root.addEventListener("touchstart", go, { passive: true });
+}
+// ── 自動儲存（2026-11-06，Paul：「希望每一格都像 Workspaces 那一頁一樣，改了就存」）。四份一模一樣（測試逐字比對）。 ──
+// 規矩：打字的欄位（text、textarea）停 800 毫秒或離開欄位就存；選的（select、checkbox、radio、date）改了馬上存。
+// 存的時候左下角照樣是 toast（存好了／存不起來），欄位旁邊多一個小字「存檔中…／存好了」。
+// 存失敗**不重畫**，剛打的字留在格子裡，再改一下就會再存一次。
+// 還留著按鈕的只有會「送出去、丟東西、花錢」的動作：上架與下架、標成可以用、移出成員、結束這一屆、刪掉、寄邀請、排會議、上傳。
+//
+// 怎麼接（每一個表單三步）：
+//   1. ui.js：表單的容器加 data-autosave="<act>"（加 data-id 之類的辨識），欄位要有 name；拿掉「存起來」那顆鈕，
+//      放 <span class="autosave" data-for="<act>">改了就存</span>（autosaveHint()）。
+//   2. main.js：boot 時 UI.bindAutosave(root(), onAutosave) 一次；onAutosave(act, box, field) 讀 UI.formValues(box) 去存。
+//   3. 存的時候 UI.autosaveState(box, "saving") → 成功 "saved" 加 toast → 失敗 "failed" 加錯誤 toast，**不 render()**。
+export function debounce(fn, ms) {
+  let t = null;
+  const d = (...a) => { clearTimeout(t); t = setTimeout(() => { t = null; fn(...a); }, ms); };
+  d.flush = (...a) => { clearTimeout(t); t = null; fn(...a); };
+  d.cancel = () => { clearTimeout(t); t = null; };
+  return d;
+}
+export const AUTOSAVE_MS = 800;
+// 這一格要怎麼存："now"（選的）、"typed"（打字的）、null（不在 data-autosave 容器裡、或標了 data-noauto）。
+export function saveMode(el) {
+  if (!el || !el.closest || !el.closest("[data-autosave]")) return null;
+  if (el.dataset && el.dataset.noauto) return null;
+  const tag = String(el.tagName || "").toUpperCase(), type = String(el.type || "").toLowerCase();
+  if (tag === "SELECT") return "now";
+  if (tag === "TEXTAREA") return "typed";
+  if (tag !== "INPUT") return null;
+  if (["checkbox", "radio", "date", "time", "datetime-local", "month", "week", "color", "range", "number"].includes(type)) return "now";
+  if (["button", "submit", "file", "hidden", "reset", "image"].includes(type)) return null;
+  return "typed";
+}
+// 記每一格最後存成功的值，一樣就不再送一次（離開欄位又停 800 毫秒會觸發兩次）。
+export function dirtyTracker() {
+  const last = new Map();
+  return {
+    changed: (key, value) => !last.has(key) || last.get(key) !== value,
+    mark: (key, value) => { last.set(key, value); },
+    forget: key => { last.delete(key); },
+  };
+}
+// 容器裡每一格讀成 { name: value }：文字去頭尾空白、checkbox 是布林、radio 取選到的、沒有 name 的不讀。
+export function formValues(box) {
+  const out = {};
+  for (const f of box.querySelectorAll("input, select, textarea")) {
+    const name = f.name || (f.dataset && f.dataset.name) || "";
+    if (!name) continue;
+    const type = String(f.type || "").toLowerCase();
+    if (type === "checkbox") out[name] = !!f.checked;
+    else if (type === "radio") { if (f.checked) out[name] = f.value; else if (!(name in out)) out[name] = out[name]; }
+    else out[name] = typeof f.value === "string" ? f.value.trim() : f.value;
+  }
+  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
+  return out;
+}
+export function autosaveHint(act, extra) { return `<span class="autosave" data-for="${esc(act)}"${extra ? ` ${extra}` : ""}>${esc(T("auto.hint"))}</span>`; }
+// 欄位旁邊那個小字：saving → 「存檔中…」、saved → 「存好了」（兩秒後回到「改了就存」）、failed → 「沒存進去…」。
+export function autosaveState(box, state) {
+  if (!box || !box.querySelector) return;
+  const el = box.querySelector(".autosave");
+  if (!el) return;
+  clearTimeout(el._t);
+  el.classList.remove("saving", "saved", "failed");
+  if (state === "saving") { el.classList.add("saving"); el.textContent = T("auto.saving"); }
+  else if (state === "saved") { el.classList.add("saved"); el.textContent = T("auto.saved"); el._t = setTimeout(() => { el.classList.remove("saved"); el.textContent = T("auto.hint"); }, 2000); }
+  else if (state === "failed") { el.classList.add("failed"); el.textContent = T("auto.failed"); }
+  else el.textContent = T("auto.hint");
+}
+// 掛一次在 #bt-root 上（它不會被換掉，裡面的 innerHTML 才會）。onSave(act, box, field) 回 Promise。
+// 同一個容器一次只跑一個存檔；跑的時候又改了，跑完再存一次（不丟掉後面那一次改動）。
+export function bindAutosave(root, onSave) {
+  if (!root || typeof document === "undefined" || root.dataset.autosave === "1") return;
+  root.dataset.autosave = "1";
+  const timers = new Map(), running = new Map(), again = new Map();
+  const run = async (box, field) => {
+    const act = box.dataset.autosave;
+    if (running.get(box)) { again.set(box, field); return; }
+    running.set(box, true);
+    try { await onSave(act, box, field); }
+    finally {
+      running.delete(box);
+      const f = again.get(box);
+      if (f) { again.delete(box); run(box, f); }
+    }
+  };
+  const schedule = (field, now) => {
+    const box = field.closest("[data-autosave]");
+    if (!box) return;
+    let d = timers.get(box);
+    if (!d) { d = debounce(f => run(box, f), AUTOSAVE_MS); timers.set(box, d); }
+    if (now) d.flush(field); else d(field);
+  };
+  root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });
+  root.addEventListener("change", e => { const m = saveMode(e.target); if (m === "now") schedule(e.target, true); else if (m === "typed") schedule(e.target, true); });
+  root.addEventListener("focusout", e => { const m = saveMode(e.target); if (m === "typed") { const d = timers.get(e.target.closest("[data-autosave]")); if (d) d.flush(e.target); } });
+}
+// 這一頁載進來的版本：index.html 的 <meta name="bt-version">，scripts/bump-version.sh 會一起改。
+export function loadedVersion() {
+  const m = typeof document !== "undefined" ? document.querySelector('meta[name="bt-version"]') : null;
+  return m ? String(m.content || "") : "";
+}
+export function versionDiffers(loaded, live) { return !!loaded && !!live && String(loaded) !== String(live); }
+// 開頁問一次線上的 version.json（cache: no-store，繞過 GitHub Pages 的 10 分鐘快取）。
+// 跟載進來的不一樣就在左下角掛一條「有新版本，重新整理」，不會自己消失。讀不到就不提，不是錯。
+export async function checkVersion(rootUrl) {
+  if (typeof fetch === "undefined") return false;
+  try {
+    const r = await fetch(`${rootUrl}version.json`, { cache: "no-store" });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!versionDiffers(loadedVersion(), j && j.v)) return false;
+    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true });
+    return true;
+  } catch (e) { return false; }
 }
 // ── 成員分頁（2026-10-23，第三次重整批 3）────────────────────────────
 // 對一個工作區是「管」的人（Director）在那個東西自己的頁面上（Forms、Resources、兩本護照後台）看到誰在裡面、加人、改等級、移出，

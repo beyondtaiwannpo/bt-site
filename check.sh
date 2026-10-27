@@ -452,7 +452,8 @@ mp_bad=""
 # 2026-10-15：後台拆成四個資料夾，admin/*/index.html 也在範圍內。
 for f in */index.html admin/*/index.html; do
   d=$(dirname "$f")
-  for h in $(grep -o 'rel="modulepreload" href="[^"]*"' "$f" | sed 's/.*href="//;s/"$//'); do
+  # 2026-11-06 起網址帶版本號（?v=…，見 scripts/bump-version.sh），比對檔案存不存在要先把它剝掉。
+  for h in $(grep -o 'rel="modulepreload" href="[^"]*"' "$f" | sed 's/.*href="//;s/"$//;s/?v=.*$//'); do
     [ -f "$d/$h" ] || mp_bad="${mp_bad} ${f} 指到 ${h}"
   done
 done
@@ -464,6 +465,22 @@ elif [ "$mp_n" -lt "9" ]; then
 else
   ok "九個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
 fi
+
+# 版本號（2026-11-06，後台速度）：九個登入後頁面的 ?v= 與 <meta name="bt-version"> 要跟 version.json 一樣，
+# importmap 要把那個資料夾 src/ 裡每一支都對到帶版本號的網址。少一支的話那一支會走沒有版本號的網址，
+# 就又回到「新 index.html 配舊模組」。規則與理由在 scripts/bump-version.sh 檔頭。
+if ./scripts/bump-version.sh --check >/dev/null 2>&1; then
+  ok "版本號：version.json、九個 index.html 的 meta、modulepreload、script、importmap 都是同一版"
+else
+  bad "版本號對不上（跑 ./scripts/bump-version.sh 換一版，再把它印出來的檔 git add）："
+  ./scripts/bump-version.sh --check | grep FAIL
+fi
+# 版本提示：四個後台 main.js 開頁都要問一次線上的 version.json（不問的話側欄「重整就不見」那件事會回來）。
+ver_missing=""
+for f in admin/src/main.js admin/site/src/main.js admin/people/src/main.js admin/passports/src/main.js settings/src/main.js passport/src/main.js intern-passport/src/main.js availability/src/main.js; do
+  grep -q 'checkVersion(' "$f" || ver_missing="$ver_missing $f"
+done
+if [ -n "$ver_missing" ]; then bad "開頁沒有問線上版本（checkVersion）：$ver_missing"; else ok "八個登入後頁面開頁都會問一次線上版本"; fi
 
 # 會動的東西只准出現在 motion() 裡面
 #

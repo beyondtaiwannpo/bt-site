@@ -196,11 +196,9 @@ async function boot() {
 
     // 只查自己那一列。**不要在這裡查護照的東西** —— 學員讀不到，
     // 而且這一頁不需要知道他蓋了幾個章。
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role, name_zh, name_en, school, grade, newsletter_opt_in")
-      .eq("id", S.user.id).maybeSingle();
-    if (error) throw error;
+    // 2026-11-06 後台速度：走 shared/auth.js 的 whoAmI（分頁快取）。幹部從後台繞回來這一頁再被送走的時候，
+    // 這一步不用再問一次資料庫。這一頁存了資料（下面那句 update）會 forgetMe()。
+    const { row: data } = await AUTH.whoAmI(S.user.id);
     S.role = data ? data.role : null;
     S.name = data ? (data.name_zh || data.name_en || "") : "";
     // 學員頁只認一個 name。名字在資料庫裡是中英兩欄（幹部的護照要用），
@@ -355,6 +353,7 @@ document.addEventListener("click", async e => {
         name_zh: name, school, grade, newsletter_opt_in: newsletter,
       }).eq("id", S.user.id);
       if (error) throw error;
+      AUTH.forgetMe();
       S.profile = { name, school, grade, newsletter };
       S.name = name;
       S.busy = false; S.view = null; render();
