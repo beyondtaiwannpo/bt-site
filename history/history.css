@@ -35,7 +35,9 @@ html[data-lang="zh"] .title h1{font-family:var(--han);font-weight:900;letter-spa
 /* 整個世界（場景與卡）靠近一站時一起稍微放大；原點放在畫面中偏下，也就是路上那一站附近。 */
 .world{position:absolute;inset:0;transform-origin:62% 64%;will-change:transform}
 /* 左上淡淡的大年份：參考站的節奏。不是給人讀的（aria-hidden），年份帶與卡才是。 */
-.ghost{position:absolute;left:var(--gut);top:72px;font-family:var(--display);font-weight:700;font-size:clamp(120px,22vw,300px);line-height:1;letter-spacing:-.02em;color:var(--bt-navy);opacity:.09;pointer-events:none;user-select:none}
+.ghost{position:absolute;left:var(--gut);top:72px;font-family:var(--display);font-weight:700;font-size:clamp(120px,22vw,300px);line-height:1;letter-spacing:-.02em;color:var(--bt-navy);opacity:.09;pointer-events:none;user-select:none;transition:opacity var(--dur-3) var(--ease)}
+/* 室內那兩段（航廈與空橋）大年份淡一半（main.js 掛 inside）。 */
+html.inside .ghost{opacity:.045}
 /* 捲得快：頂欄與年份帶淡一點，停下來就回來。只動透明度。 */
 .top,.strip{transition:opacity var(--dur-2) var(--ease)}
 html.rushing .top,html.rushing .strip{opacity:.45}

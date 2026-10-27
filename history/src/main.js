@@ -117,6 +117,8 @@ function onProgress(p) {
   const zoom = 1 + 0.04 * A.closeness(w, p);
   if (worldEl) worldEl.style.transform = `scale(${zoom.toFixed(3)})`;
   placeDot(); rush(p);
+  // 室內那兩段（航廈與空橋）左上的大年份淡一半，不然壓在 3D 的室內上很突兀。
+  doc.classList.toggle("inside", eased < A.PHASES.apron[0]);
   const n = A.nearest(w, p); if (n >= 0) setCurrent(n);
   if (p > 0.01) $("hint").classList.add("gone");
 }
