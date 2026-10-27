@@ -3290,6 +3290,54 @@ Paul 2026-10-24：「蛇梯棋要讓 intern 看得到、有棋子、而且要彩
 
 **還沒驗的**：真的登入後的畫面與動畫（截圖是 `ui.js` 配假資料畫的；棋子沿著蛇梯飛那一段只在程式裡，沒有抓到截圖）；正式站要跑 `2026-10-22-intern-board.sql` 與 `2026-10-23-intern-pawn.sql` 兩支，跑完之前後台「棋盤」存檔會說要先跑那一支，intern 那邊看不到棋盤、跟以前一樣。
 
+## 歷史之路（2026-11-06，批 1：資料庫與後台）
+
+Paul 2026-11-05 看了 asklex.law/journey 之後定的：做一頁 `/history/`，捲動沿著一條路走，每一站可以點開看那一年的說明與照片，後台自己加站。
+計畫、資料表、三批與每一批的八步自我檢查在 `docs/2026-11-05-BT-歷史之路計畫.md`。這一節是批 1：資料庫與後台。前台那條路是批 2，還沒做。
+截圖在 `docs/history/admin-01` 到 `admin-08`（本機假資料，桌機與 375px）。
+
+### 不會寫程式的人怎麼加一站、傳照片、放上去
+
+你要是 Marketing 的 Director（Marketing 資源工作區「管」的人）或 Co-President、Senior Adviser。別的幹部看得到清單，改不動。
+
+1. 登入後到 **後台 → 對外 → 歷史之路**（網址 `/admin/site/#history`）。清單上是現在的每一站，照順序排，每一站後面寫日期、狀態、幾張照片。
+2. 按右上角 **加一站**。填中文標題、英文標題（兩個都要，不然上不了路）、日期（只知道年月就填那個月的 1 號）。一句話與說明可以先空著。
+   代號會從年份與英文標題自動算出來（例如 `2023-first-bootcamp`），通常不用動。按 **存起來**。
+3. 存好之後下面多了「照片」那一塊。按 **加照片** 選一張，瀏覽器會先把它縮到 1600 寬再傳，傳的時候有進度條。傳好之後填中英說明，按 **存照片說明**。
+   **每一張照片都要勾「拍攝同意已確認」。** 照片裡有未成年人的，一定要先拿到拍攝同意才勾。沒勾的這一站按不了「準備好了」，就算按了資料庫也會擋（`consent_required`）。照片不標名字，沒有那個欄位。
+4. 照片都勾了，按 **準備好了**。這時對外還看不到。
+5. Co-President 或 Senior Adviser 打開那一站，按 **放上去**（會先問一次）。這一站就在 `/history/` 的那條路上了（批 2 做完之後；現在只有 JSON 端點）。
+6. 要調順序：清單上每一站有 **往上**、**往下**。要撤下來：Co-President 按 **撤下來**；要再上去先按一次「準備好了」。
+7. 已經在路上的站，改文字直接存就會更新。**取消任何一張照片的同意，那一站會自動退回草稿**，對外立刻看不到。
+
+### 資料庫（`supabase/migrations/2026-11-06-history-milestones.sql`）
+
+接在 11-05 後面跑，可以重跑，PASS 表 12 項（含 Storage 兩項，本機沒有 storage schema 時印 SKIP）。
+- 兩張表 `history_milestones`（一站：代號、日期、中英標題與一句話與說明、順序、狀態 draft／ready／published／archived）與 `history_photos`（網址、中英說明、同意、順序）。
+  **表名加了 `history_` 前綴**：計畫裡寫的 `milestones` 這個名字，2026-08-25 護照的里程碑已經用掉了（功能從前端拿掉了，表還在）。函式名照計畫。
+- 誰能編：`can_edit_history()` 一支，等於 `is_senior()` 或 `can_manage('res:Marketing Team')`。七支函式每一支第一句都問它。
+- 兩把鑰匙：`set_milestone_status(id, 'ready')` 編的人按，要中英標題都有、每一張照片都勾同意；`'published'` 只有 Co-President 或 Senior Adviser，而且只能從 ready 來，同意那一道再擋一次。`'draft'` 退回、`'archived'` 撤下。
+- 照片：`add_milestone_photo()`（只收 https）、`update_milestone_photo()`（說明、同意、順序；同意從 true 改 false 時那一站自動退回 draft）、`delete_milestone_photo()`（回網址，後台拿去把 Storage 的檔也刪掉）。`reorder_milestones(uuid[])` 整串重排。
+- 對外只有 `public_milestones()` 一支，回一個 JSON 陣列，沒登入也叫得到：只回 published 的站、只回 consent=true 的照片、沒有狀態與誰建的。兩張表本身不開給 anon。幹部登入後讀得到全部（後台清單要看草稿），學員什麼都讀不到。
+- Storage bucket `history`：公開讀（對外頁直接 `<img>`）、5 MB、只收 jpeg／png／webp／avif；上傳、改、刪四條政策只給 `can_edit_history()` 的人。檔案路徑是 `<站的 id>/<時間>-<亂數>.jpg`，刻意不用原檔名（原檔名可能有人名）。
+- 七點 seed：`/impact/`「五年走過來」那七點，中英一字不改（句尾句號拿掉當標題），published，沒有照片。「現在」那一點沒有日期，用這一屆開始的 2026-08-01，後台改得動。`on conflict (slug) do nothing`，重跑不會把後台改過的字蓋回來。
+- `scripts/db/smoke.sh` 多 Storage 的替身（兩張表）與歷史之路一段 38 項：anon 拿得到七點、anon 讀不到表、**不是編的人加不了站（破壞）**、代號不合格、加站、**anon 看不到草稿（破壞）**、別 team 的幹部讀得到清單、學員讀不到、照片不是 https 擋、**沒勾同意按不了準備好了（破壞）**、勾了同意、準備好了、**Director 自己放不上去（破壞）**、ready 還不對外、Co-President 放上去、對外欄位對、沒勾同意的那一張對外看不到、取消同意自動退回草稿、刪照片、不是編的人刪不了、重排、改代號、代號撞到、Storage 編的人傳得上、**別的幹部傳不上（破壞）**、anon 讀得到檔、**拿掉同意那一道門驗收表變紅（破壞）**、重跑、重跑不蓋字。
+
+### 後台（`/admin/site/#history`）
+
+- 側欄「對外」底下多一行「歷史之路／History」，四份 `ITEMS` 與 `GROUPS` 的提示一起改（`test/admin-hub.test.mjs` 逐字比對）。幹部都看得到；能編的人（`hiCanEdit`：senior 或 Marketing 資源工作區「管」）才有「加一站」、上下移、存、照片那幾顆。**門在資料庫，畫面只是藏按鈕。**
+- 清單 `historyListHTML`：編號、標題、狀態標籤（草稿、準備好了、在路上、撤下了）、日期、幾張照片、幾張沒勾同意（橘底），上下移到頂到底是停用的。
+- 一站 `historyEditHTML`：上線那一塊（狀態一句、「準備好了」「退回草稿」「放上去」「撤下來」照身分出現，有照片沒勾同意就印一句橘的並把「準備好了」停用）、這一站（中英標題、一句話、說明、日期、代號；新的一站打英文標題或日期時代號跟著算，自己改過就不再動）、照片（每張一卡：圖、中英說明、同意勾選、存說明、刪掉；底下一格選檔，傳的時候換成進度條）。新的一站沒有照片那一塊，要先存一次。
+- 縮圖在瀏覽器做：`createImageBitmap`（照 EXIF 轉正）→ canvas 最長邊 1600 → JPEG 0.86 → `supabase.storage.from("history").upload()` → `add_milestone_photo()`。原檔只收圖、25 MB 以內。縮完一定在 bucket 的 5 MB 上限內。
+- 勾同意那一格**改了立刻送**，不用按存：它是上架的門，不該等人記得按存。刪照片會先問一次，刪完連 Storage 的檔一起刪（刪不掉只是多佔空間，不擋）。
+- 字典 `hi.*`、`msg.hi*`、`err.hi*`、`confirm.hi*` 在 `admin/site/src/strings.js`；資料層 `admin/site/src/data.js` 只走那七支函式加 Storage 兩個呼叫；`test/history-admin.test.mjs` 九條（側欄、權限、代號、縮圖尺寸、上下移、資料整形、清單、一站、字典）。
+
+### 還沒做、要 Paul 做的
+
+- **遷移檔沒在正式 Supabase 上跑過。** 跑 `2026-11-06-history-milestones.sql`，看 PASS 表 12 項（正式站有 storage schema，Storage 那兩項要是 PASS 不是 SKIP）。bucket 跟政策是遷移檔建的，不用手動開；如果 SQL Editor 對 `storage.objects` 建政策被擋，就到 Storage 手動建一個叫 `history` 的公開 bucket，再把遷移檔第 6 段那四條政策貼進 Storage 的 Policies。
+- 跑完到後台加一站、傳一張照片、勾同意、準備好了、放上去，然後開 `https://norjaglyaotzewxavmhv.supabase.co/rest/v1/rpc/public_milestones`（帶 `apikey` 公開金鑰）看那一站在不在 JSON 裡。
+- 批 2（前台那條路）與批 3（效能、守門、README 前台那一節）還沒開始。
+
 ## 視覺收尾（2026-11-05）
 
 Paul 2026-11-05：「我要讓這個網站變成最好看的。」這一輪不加新功能，只把全站「碰到會有反應」的細節做齊，
