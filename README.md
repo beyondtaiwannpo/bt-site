@@ -3565,6 +3565,14 @@ Paul 看完批 4 第三輪在線上的樣子，否決了 2.5D 的畫法：「飛
 - 守門：`./check.sh` 多守 Three（importmap 只准 cdnjs、雜湊對、只有 `scene.js` 與 `plane.js` import three、`history/` 沒有模型或圖檔、JS 不含 Three 小於 250 KB）；main.js 的判斷改成 `A.pickMode(...)` 與動態 import。`node check-motion.mjs`（23 頁）、`node scripts/check-mobile.mjs`（20 頁）、`node --test test/*.test.mjs`（672 條）都綠。
 - `test/history-page.test.mjs` 批 5 那九條：飛機工廠的零件與起落架、滑行道的彎與樣條、飛機的姿態、鏡頭樣條、旅客、站的錨點、登機門號碼與看板、退路與畫質、資料與場景分開（沒有站的文字、沒有色碼、importmap 帶 integrity、沒有模型檔）。
 
+### 同一天第二輪（主 session 看過之後要修的四件）
+
+- 空橋改成兩段直的（A 段沿 z、B 段沿 x 接到機身），鏡頭沿中線走、門前三公尺停住看門，玻璃牆在門口留洞；登機門是深藍門框加號碼牌；空橋是有燈條的隧道、一邊是窗看得到機身、B 段玻璃頂。測試每百分之一取樣鏡頭不穿任何一面牆（`airport.js` 的 `WALLS` 與 `VOLUMES`）。
+- 航廈：奶油色地磚、格狀天花板加燈條、淡沙色柱子、深藍帶子、橘色指標、三色商店門面、盆栽、青橘座位、坐著與拖行李箱的人；人改成圓潤的膠囊樣子，五種品牌色。
+- 看板：貼圖 2048 寬、列高至少 48 像素（`boardLayout`），現在這一站橘底，換站整塊翻一下。
+- 雲：奶油白往白推、自發光、不接影；沿爬升的路放在飛機旁邊與底下；霧變薄，爬升初期機場看得到。
+- 重拍 page-24、25、26、28、32。
+
 ### 要 Paul 看一眼的幾個判斷
 
 - Three 的 SRI 走 importmap 的 `integrity` 欄位（Chrome 127、Safari 18.4、Firefox 138 起認得）。更舊的瀏覽器照樣載得到、只是不驗雜湊；不用 `modulepreload` 是因為 `check.sh` 把它當成登入後頁面的守門在數。
