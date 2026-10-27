@@ -86,10 +86,16 @@ export function buildAirliner(THREE, opts) {
   plane.add(cockpit);
   // 一排窗：兩側各一條細長的帶子，稍微嵌在機身外。
   const windows = new THREE.Group(); windows.name = "windows";
-  for (const sx of [-1, 1]) { const strip = mesh(THREE, new THREE.BoxGeometry(0.1, 0.5, 22), darkMat, "strip", false); strip.position.set(sx * (RADIUS - 0.02), 0.55, 1.5); windows.add(strip); }
+  // 窗帶在門那一段斷開（門在 z=11），不然窗帶會橫穿過門變成一個十字。
+  for (const sx of [-1, 1]) {
+    const a = mesh(THREE, new THREE.BoxGeometry(0.1, 0.5, 19.6), darkMat, "strip", false); a.position.set(sx * (RADIUS - 0.02), 0.55, 0.3); windows.add(a);
+    const b = mesh(THREE, new THREE.BoxGeometry(0.1, 0.5, 1.2), darkMat, "strip", false); b.position.set(sx * (RADIUS - 0.02), 0.55, 12.5); windows.add(b);
+  }
   plane.add(windows);
-  // 左前的機艙門（空橋接的那一扇）：機頭後 8 公尺、模型的 +x 那一側（面向航廈停的時候是靠航廈那一邊）。
-  const door = mesh(THREE, new THREE.BoxGeometry(0.08, 1.9, 1.0), darkMat, "door", false); door.position.set(RADIUS - 0.02, 0.05, 11); plane.add(door);
+  // 左前的機艙門（空橋接的那一扇）：機頭後 8 公尺、模型的 +x 那一側（面向航廈停的時候是靠航廈那一邊）。深藍的門加一圈奶油色的門框。
+  const door = new THREE.Group(); door.name = "door";
+  door.add(mesh(THREE, new THREE.BoxGeometry(0.1, 2.2, 1.3), markMat, "frame", false), mesh(THREE, new THREE.BoxGeometry(0.14, 1.9, 1.0), darkMat, "leaf", false));
+  door.position.set(RADIUS - 0.04, 0.05, 11); plane.add(door);
 
   plane.add(wing(THREE, bodyMat, 1, "wingR"), wing(THREE, bodyMat, -1, "wingL"));
   plane.add(engine(THREE, bodyMat, darkMat, 1, "engineR"), engine(THREE, bodyMat, darkMat, -1, "engineL"));

@@ -33,8 +33,28 @@ export const CORRIDOR_Z = -20;                                        // 旅客�
 export const WALK = { x0: 0, x1: 100 };                               // 航廈那一段鏡頭從哪走到哪
 export const GATE_DESK = [106, -12];                                  // 登機門櫃台
 export const GATE_DOOR = [113, 0];                                    // 玻璃牆上通往空橋的門
-export const GATE_STAND = [120, 40];                                  // 我們那一架停的位置（機身中心）
-export const PLANE_DOOR = [119, 29];                                  // 機艙門（面向航廈停，左前門）。空橋的盡頭伸進機身皮一公尺，從裡面看出去才是門不是停機坪
+export const GATE_STAND = [120, 48];                                  // 我們那一架停的位置（機身中心）
+export const PLANE_DOOR = [118, 37];                                  // 機艙門（面向航廈停，左前門，在機身皮上 x=118）
+// 空橋是兩段直的（第二輪改的）：A 段從玻璃牆的門沿 +z 走到機艙門的 z，B 段轉 90 度沿 +x 接到機身。直的才有辦法用方框檢查鏡頭有沒有穿牆。
+export const BRIDGE = { x: GATE_DOOR[0], zEnd: PLANE_DOOR[1], half: 1.6, h: 2.8, floorEnd: 2.4 };
+// 牆的方框 [x0, x1, y0, y1, z0, z1]：航廈的三面實牆、玻璃牆（門口留 4 公尺的洞）、空橋兩段的牆。測試拿這些檢查鏡頭每一幀都不在牆裡、而且離牆有 0.3 公尺。
+export const WALLS = (() => {
+  const T = TERMINAL, b = BRIDGE, g = GATE_DOOR[0], w = 0.3, H = 12;
+  return [
+    [T.x0, T.x1, 0, H, T.z0 - w, T.z0 + w], [T.x0 - w, T.x0 + w, 0, H, T.z0, T.z1], [T.x1 - w, T.x1 + w, 0, H, T.z0, T.z1],
+    [T.x0, g - 2, 0, H, T.z1 - 0.2, T.z1 + 0.2], [g + 2, T.x1, 0, H, T.z1 - 0.2, T.z1 + 0.2],
+    [b.x - b.half - 0.15, b.x - b.half, 0, 8, 0, b.zEnd + b.half], [b.x + b.half, b.x + b.half + 0.15, 0, 8, 0, b.zEnd - b.half],
+    [b.x - b.half, PLANE_DOOR[0], 0, 8, b.zEnd - b.half - 0.15, b.zEnd - b.half], [b.x - b.half, PLANE_DOOR[0], 0, 8, b.zEnd + b.half, b.zEnd + b.half + 0.15],
+  ];
+})();
+// 鏡頭准待的地方：航廈裡面、門口那一片、空橋 A、空橋 B。
+export const VOLUMES = (() => {
+  const T = TERMINAL, b = BRIDGE, g = GATE_DOOR[0];
+  return [[T.x0 + 0.3, T.x1 - 0.3, T.z0 + 0.3, T.z1 - 0.2], [g - 1.5, g + 1.5, T.z1 - 0.2, T.z1 + 0.2], [b.x - b.half, b.x + b.half, 0, b.zEnd + b.half], [b.x - b.half, PLANE_DOOR[0], b.zEnd - b.half, b.zEnd + b.half]];
+})();
+export const insideBox = (p, B) => p[0] > B[0] && p[0] < B[1] && p[1] > B[2] && p[1] < B[3] && p[2] > B[4] && p[2] < B[5];
+// 一點到方框的距離（在裡面是 0）。
+export function boxDistance(p, B) { const dx = Math.max(B[0] - p[0], 0, p[0] - B[1]), dy = Math.max(B[2] - p[1], 0, p[1] - B[3]), dz = Math.max(B[4] - p[2], 0, p[2] - B[5]); return Math.hypot(dx, dy, dz); }
 export const RUNWAY = { z: 400, x0: -900, x1: 320, half: 22 };        // 跑道沿 x 軸，飛機往 -x 起飛
 export const TOWER = [40, 80];
 export const CAM_OFF = [80, 95, 115];                                 // 停機坪的鏡頭相對飛機的位置（高角度四分之三）
@@ -151,14 +171,15 @@ export function planePoseAt(e) {
 
 // ── 旅客與鏡頭 ──
 // 空橋那一段的路：走道盡頭 → 轉向門 → 門 → 空橋裡 → 機艙門。走的人與鏡頭都沿這一條。
-const BOARD_PATH = [[WALK.x1, CORRIDOR_Z], [107, -14], [GATE_DOOR[0], -3], [GATE_DOOR[0] + 0.5, 4], [116, 16], [PLANE_DOOR[0], PLANE_DOOR[1]]];
+const BOARD_PATH = [[WALK.x1, CORRIDOR_Z], [106, -14], [GATE_DOOR[0] - 1, -5], [GATE_DOOR[0], 1], [GATE_DOOR[0], 12], [GATE_DOOR[0], 26], [GATE_DOOR[0], PLANE_DOOR[1] - 1.6], [GATE_DOOR[0] + 1.6, PLANE_DOOR[1]], [PLANE_DOOR[0], PLANE_DOOR[1]]];
 let _board = null;
 const boardPath = () => _board || (_board = makeCurve(BOARD_PATH, 600));
 const WALK_END = 0.335;      // 鏡頭走到空橋盡頭（機艙門前 4 公尺）的進度
-const STOP_SHORT = 4;        // 鏡頭在機艙門前停住的距離：再近就只看得到引擎的進氣口
+const STOP_SHORT = 3;        // 鏡頭在機艙門前停住的距離
 const BOARD_IN = 0.345;      // 旅客走進機艙、看不到的進度
 // 空橋地板從門口的 0 升到機艙門的 2.4（空橋本來就是斜的）。
-const bridgeFloorY = s => { const bp = boardPath(); const door = bp.length * 0.42; return s < door ? 0 : 2.4 * clamp01((s - door) / (bp.length - door)); };
+// A 段從門口的 0 升到轉角的 2.4（空橋本來就是斜的），B 段平的。用 z 算，不用弧長。
+export const bridgeFloorY = (s, z) => { const bp = boardPath(); const q = typeof z === "number" ? z : bp.at(s).z; return q <= 0 ? 0 : BRIDGE.floorEnd * clamp01(q / (BRIDGE.zEnd - BRIDGE.half)); };
 
 export function travellerAt(e) {
   const camS = walkArc(e), bp = boardPath();
@@ -182,8 +203,8 @@ function risePath() {
   if (_rise) return _rise;
   const g = GATE_STAND, o = CAM_OFF, end = [g[0] + o[0], o[1], g[1] + o[2]];
   const bp = boardPath(), q = bp.at(bp.length - STOP_SHORT), y0 = 1.7 + bridgeFloorY(bp.length - STOP_SHORT);
-  // 先直直往上穿過空橋的頂，再斜著退到停機坪的視角；不從機身上面貼著飛過去（那幾幀只看得到一片奶油色）。
-  return (_rise = [[q.x, y0, q.z], [q.x + 2, 30, q.z - 4], [lerp(q.x, end[0], 0.5), lerp(30, end[1], 0.6), lerp(q.z, end[2], 0.45)], end]);
+  // 先直直往上穿過空橋 B 段的玻璃頂，再斜著退到停機坪的視角；不從機身上面貼著飛過去（那幾幀只看得到一片奶油色）。
+  return (_rise = [[q.x, y0, q.z], [q.x, 30, q.z - 3], [lerp(q.x, end[0], 0.5), lerp(30, end[1], 0.6), lerp(q.z, end[2], 0.45)], end]);
 }
 function rise3(u) {
   // 三維的 Catmull-Rom（用兩個二維的：xz 與 y 各算一次，同一個 u）
@@ -202,7 +223,7 @@ export function cameraAt(e, tall) {
     const y = EYE + bridgeFloorY(s);
     // 最後十公尺慢慢轉頭看機艙門（門在左前方的機身上），不然看出去只有門旁邊的引擎與停機坪。
     const k = smooth(clamp01((s - (bp.length - STOP_SHORT - 10)) / 10));
-    const door = [PLANE_DOOR[0] + 1.2, 2.6 + 0.9, PLANE_DOOR[1] + 0.5];
+    const door = [PLANE_DOOR[0], PLANE_REST_Y, PLANE_DOOR[1]];
     const look = [lerp(ahead.x, door[0], k), lerp(y - 0.3 + (bridgeFloorY(Math.min(bp.length, s + 5)) - bridgeFloorY(s)), door[1], k), lerp(ahead.z, door[2], k)];
     return { pos: [q.x, y, q.z], look, fov: inside };
   }
@@ -210,7 +231,7 @@ export function cameraAt(e, tall) {
     const u = smooth((e - WALK_END) / (PHASES.apron[0] - WALK_END));
     const pos = rise3(u), g = GATE_STAND;
     // 一開始看著機艙門前方，慢慢轉成看飛機中心
-    const look = [lerp(PLANE_DOOR[0] + 1.2, g[0], u), lerp(3.5, 2, u), lerp(PLANE_DOOR[1] + 0.5, g[1], u)];   // 先看著機艙門，升起來之後慢慢轉成看飛機中心
+    const look = [lerp(PLANE_DOOR[0], g[0], u), lerp(PLANE_REST_Y, 2, u), lerp(PLANE_DOOR[1], g[1], u)];   // 先看著機艙門，升起來之後慢慢轉成看飛機中心
     return { pos, look, fov: lerp(inside, CAM_FOV.outside, u) };
   }
   const q = planePoseAt(e);
@@ -245,6 +266,13 @@ export const gateFor = i => "A" + (i + 1);
 // 旅客登機的那一個登機門：空橋結束之前的站都算，取最後一站的號碼。
 export const boardingGate = n => gateFor(Math.max(0, world(n).stops.filter(s => s.p < PHASES.bridge[1]).length - 1));
 // 看板上的字：一列一行，欄位 TIME DESTINATION FLIGHT GATE STATUS，全部從 ui.js 的 boardRows 來（那裡是唯一的來源）。
+// 看板貼圖的版面：寬 2048、高照看板的長寬比（8 比 2.9）；列高至少 48 像素才讀得到，放不下的站只顯示現在這一站附近那幾列。
+export function boardLayout(n) {
+  const width = 2048, height = 742, top = 150, rowH = Math.max(48, Math.min(96, Math.floor((height - top) / Math.max(1, n))));
+  const visible = Math.max(1, Math.min(n, Math.floor((height - top) / rowH)));
+  return { width, height, top, rowH, visible };
+}
+export const boardWindow = (n, current, visible) => Math.max(0, Math.min(n - visible, current - Math.floor(visible / 2)));
 export const boardLines = rows => (rows || []).map(r => ({ cells: [r.time, r.dest, r.flight, r.gate, r.status], now: r.status === "BOARDING" }));
 
 // ── 退路與畫質 ──

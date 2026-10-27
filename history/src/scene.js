@@ -49,6 +49,9 @@ function colours(p) {
     ceiling: cream.clone().lerp(grey, 0.1),
     dark: navy.clone().lerp(grey, 0.2),
     skin: sand.clone().lerp(cream, 0.4),
+    cloud: cream.clone().lerp(new THREE.Color(1, 1, 1), 0.55),         // 雲：奶油白往白推（不是色票，是把奶油色打亮）
+    column: cream.clone().lerp(sand, 0.5),                            // 柱子：淡淡的品牌沙色
+    plant: teal.clone().lerp(navy, 0.3).lerp(grey, 0.15),             // 盆栽
     trunk: navy.clone().lerp(sand, 0.6).lerp(grey, 0.3),
   };
 }
@@ -75,10 +78,11 @@ function instanced(geo, material, places, shadow) {
   return im;
 }
 // 文字 canvas → 貼圖。lines 是 [{ text, size, color, x, y, align, font }]。
-function textTexture(w, h, bg, lines) {
+function textTexture(w, h, bg, lines, rects) {
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   const ctx = c.getContext("2d");
   ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+  for (const r of rects || []) { ctx.fillStyle = r.color; ctx.fillRect(r.x, r.y, r.w, r.h); }
   for (const l of lines) { ctx.fillStyle = l.color; ctx.font = l.font; ctx.textAlign = l.align || "left"; ctx.textBaseline = "middle"; ctx.fillText(l.text, l.x, l.y); }
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   return tex;
@@ -94,32 +98,36 @@ function tileTexture(p) {
   return tex;
 }
 
-// 一個人：膠囊的身體、球的頭、兩條腿、兩隻手、可選的背包。高 1.75。腿的樞紐在髖，走路的循環在 render() 裡轉 rotation.x。
+// 一個人（第二輪改成圓潤的樣子）：一顆膠囊的身體、一顆貼著身體的球頭、兩條短短的膠囊腿、兩隻貼著身體的膠囊手，沒有關節、沒有露出來的樞紐。高 1.75。
+// 顏色由 shirt 給（品牌色輪流）。opts.bag 拖一個行李箱、opts.backpack 背包、opts.vest 橘背心、opts.seated 坐姿（腿往前、身體矮一點）。
 function figure(mats, opts) {
   const o = opts || {}, g = new THREE.Group(); g.name = "figure";
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.62, 2, 8), o.shirt || mats.figTeal); body.position.y = 1.08; body.castShadow = true;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), mats.skin); head.position.y = 1.6; head.castShadow = true;
-  g.add(body, head);
-  for (const [name, sx] of [["legL", -0.12], ["legR", 0.12]]) {
-    const pivot = new THREE.Group(); pivot.name = name; pivot.position.set(sx, 0.78, 0);
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.78, 6), mats.dark); leg.position.y = -0.39; leg.castShadow = true;
+  const shirt = o.shirt || mats.figTeal;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.62, 3, 10), shirt); body.position.y = o.seated ? 0.78 : 0.98; body.castShadow = true; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 8), mats.skin); head.position.y = (o.seated ? 0.78 : 0.98) + 0.62; head.castShadow = true; g.add(head);
+  for (const [name, sx] of [["legL", -0.14], ["legR", 0.14]]) {
+    const pivot = new THREE.Group(); pivot.name = name; pivot.position.set(sx, o.seated ? 0.45 : 0.62, 0);
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.36, 2, 8), mats.dark); leg.position.y = -0.3; leg.castShadow = true;
+    if (o.seated) { pivot.rotation.x = -Math.PI / 2 + 0.2; }
     pivot.add(leg); g.add(pivot);
   }
-  for (const [name, sx] of [["armL", -0.32], ["armR", 0.32]]) {
-    const pivot = new THREE.Group(); pivot.name = name; pivot.position.set(sx, 1.38, 0);
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.6, 6), o.shirt || mats.figTeal); arm.position.y = -0.3;
+  for (const [name, sx] of [["armL", -0.36], ["armR", 0.36]]) {
+    const pivot = new THREE.Group(); pivot.name = name; pivot.position.set(sx, (o.seated ? 0.78 : 0.98) + 0.3, 0);
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.4, 2, 8), shirt); arm.position.y = -0.28; pivot.rotation.z = sx < 0 ? 0.12 : -0.12;
     pivot.add(arm); g.add(pivot);
   }
-  if (o.backpack) { const bp = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), mats.orange); bp.position.set(0, 1.12, -0.3); bp.castShadow = true; g.add(bp); }
-  if (o.vest) { const v = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), mats.orange); v.position.y = 1.12; g.add(v); }
-  g.userData.phase = o.phase || Math.random() * 6.28;
+  if (o.backpack) { const bp = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.44, 0.22), mats.orange); bp.position.set(0, 1.1, -0.34); bp.castShadow = true; g.add(bp); }
+  if (o.vest) { const v = new THREE.Mesh(new THREE.CapsuleGeometry(0.33, 0.3, 2, 10), mats.orange); v.position.y = 1.02; g.add(v); }
+  if (o.bag) { const bag = new THREE.Group(); bag.name = "bag"; bag.add(box(0.38, 0.6, 0.26, o.bag, 0, 0.42, 0), box(0.04, 0.6, 0.04, mats.grey, -0.12, 1.0, 0), box(0.04, 0.6, 0.04, mats.grey, 0.12, 1.0, 0), box(0.3, 0.04, 0.04, mats.grey, 0, 1.3, 0)); bag.position.set(0.5, 0, -0.5); bag.rotation.x = -0.35; g.add(bag); }
+  g.userData.phase = o.phase || Math.random() * 6.28; g.userData.seated = !!o.seated;
   return g;
 }
 function walkCycle(fig, t, walking) {
-  const a = walking ? Math.sin(t * 7 + fig.userData.phase) * 0.55 : 0;
+  if (fig.userData.seated) { fig.position.y = fig.userData.baseY + Math.sin(t * 1.1 + fig.userData.phase) * 0.008; return; }
+  const a = walking ? Math.sin(t * 7 + fig.userData.phase) * 0.5 : 0;
   const lL = fig.getObjectByName("legL"), lR = fig.getObjectByName("legR"), aL = fig.getObjectByName("armL"), aR = fig.getObjectByName("armR");
-  if (lL) lL.rotation.x = a; if (lR) lR.rotation.x = -a; if (aL) aL.rotation.x = -a * 0.7; if (aR) aR.rotation.x = a * 0.7;
-  fig.position.y = fig.userData.baseY + (walking ? Math.abs(Math.sin(t * 7 + fig.userData.phase)) * 0.05 : Math.sin(t * 1.3 + fig.userData.phase) * 0.012);
+  if (lL) lL.rotation.x = a; if (lR) lR.rotation.x = -a; if (aL) aL.rotation.x = -a * 0.5; if (aR) aR.rotation.x = a * 0.5;
+  fig.position.y = fig.userData.baseY + (walking ? Math.abs(Math.sin(t * 7 + fig.userData.phase)) * 0.04 : Math.sin(t * 1.3 + fig.userData.phase) * 0.012);
 }
 
 // 一棵低多邊形的樹：圓錐加圓柱，InstancedMesh 用。
@@ -135,14 +143,16 @@ export function createScene({ canvas, palette, phone, fonts }) {
     frame: lam(P.dark), dark: lam(P.dark), cream: lam(P.cream), sand: lam(P.sand), orange: lam(P.orange), teal: lam(P.teal), navy: lam(P.navy), grey: lam(P.grey),
     yellowLight: lam(P.yellow, { emissive: P.yellow, emissiveIntensity: 0.9 }), orangeLight: lam(P.orange, { emissive: P.orange, emissiveIntensity: 1 }),
     skin: lam(P.skin), figTeal: lam(P.teal.clone().lerp(P.navy, 0.3)), figNavy: lam(P.navy.clone().lerp(P.grey, 0.3)), figSand: lam(P.sand.clone().lerp(P.grey, 0.2)),
-    cloud: lam(P.cream, { transparent: true, opacity: 0.92 }), ceiling: lam(P.ceiling, { emissive: P.cream, emissiveIntensity: 0.45 }), floor: null, trunk: lam(P.trunk), leaf: lam(P.grassDark), mark: lam(P.cream),
+    cloud: lam(P.cloud, { emissive: P.cloud, emissiveIntensity: 0.55, transparent: true, opacity: 0.96 }), ceiling: lam(P.ceiling, { emissive: P.cream, emissiveIntensity: 0.45 }), floor: null, trunk: lam(P.trunk), leaf: lam(P.grassDark), mark: lam(P.cream),
+    column: lam(P.column), light: lam(P.sand, { emissive: P.sand, emissiveIntensity: 0.7 }), plant: lam(P.plant), pot: lam(P.navy.clone().lerp(P.grey, 0.5)),
+    figOrange: lam(P.orange.clone().lerp(P.navy, 0.1)), figCream: lam(P.cream.clone().lerp(P.grey, 0.15)), figYellow: lam(P.yellow.clone().lerp(P.sand, 0.5)),
   };
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(q.dpr);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   scene.background = P.sky.clone();
-  scene.fog = new THREE.FogExp2(P.sky.clone(), 0.0028);
+  scene.fog = new THREE.FogExp2(P.sky.clone(), 0.0022);
   const camera = new THREE.PerspectiveCamera(A.CAM_FOV.inside, 16 / 9, 0.3, 6000);
   scene.add(camera);
 
@@ -191,91 +201,131 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // ═══ 航廈 ═══
   const term = new THREE.Group(); world.add(term);
   const tx = (T.x0 + T.x1) / 2, tz = (T.z0 + T.z1) / 2, tw_ = T.x1 - T.x0, td = T.z1 - T.z0;
-  // 地板（有格線的地磚）、天花板、三面實牆（內外都看得到）、玻璃牆（直櫺）。屋頂不投影，裡面才亮得起來。
-  const tile = tileTexture(palette); tile.repeat.set(tw_ / 4, td / 4); mats.floor = lam(P.floor, { map: tile });
+  const figMats = [mats.figTeal, mats.figNavy, mats.figOrange, mats.figSand, mats.figCream];
+  const pick = i => figMats[i % figMats.length];
+  // 地板（奶油色地磚）、天花板（一格一格的板子加燈條）、三面實牆（內外都看得到）、玻璃牆（直櫺，門口留洞）。屋頂不投影，裡面才亮得起來。
+  const tile = tileTexture(palette); tile.repeat.set(tw_ / 4, td / 4); mats.floor = lam(P.cream, { map: tile });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(tw_, td), mats.floor); floor.rotation.x = -Math.PI / 2; floor.position.set(tx, 0.01, tz); floor.receiveShadow = true; term.add(floor);
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(tw_, td), mats.ceiling); ceil.rotation.x = Math.PI / 2; ceil.position.set(tx, T.h - 0.7, tz); term.add(ceil);   // 比屋頂板的底面低 0.3，不然兩個面重疊會閃（z-fighting）
+  {
+    const panels = [], lights = [];
+    for (let x = T.x0 + 3; x < T.x1 - 2; x += 6) for (let z = T.z0 + 3; z < T.z1 - 2; z += 6) panels.push([x, T.h - 1.0, z]);
+    for (let x = T.x0 + 6; x < T.x1; x += 12) for (const z of [-30, -20, -10]) lights.push([x, T.h - 1.25, z]);
+    term.add(instanced(new THREE.BoxGeometry(5.4, 0.25, 5.4), lam(P.ceiling, { emissive: P.cream, emissiveIntensity: 0.3 }), panels, false));
+    term.add(instanced(new THREE.BoxGeometry(5, 0.14, 0.7), mats.light, lights, false));
+  }
   const roof = box(tw_ + 3, 0.8, td + 3, mats.roof, tx, T.h, tz, false); roof.receiveShadow = false; term.add(roof);
   const sideM = lam(P.wall, { side: THREE.DoubleSide });
   for (const [w, h, d, x, y, z] of [[tw_, T.h, 0.6, tx, T.h / 2, T.z0], [0.6, T.h, td, T.x0, T.h / 2, tz], [0.6, T.h, td, T.x1, T.h / 2, tz]]) { const m = box(w, h, d, sideM, x, y, z, false); term.add(m); }
-  // 陸側牆上一條品牌色的帶子與幾扇門
-  term.add(box(tw_, 1.2, 0.2, mats.orange, tx, T.h - 1.4, T.z0 + 0.4, false));
+  // 陸側牆上一條深藍的帶子、幾扇門、幾面橘色的指標
+  term.add(box(tw_, 1.0, 0.2, mats.navy, tx, T.h - 1.6, T.z0 + 0.4, false));
   term.add(instanced(new THREE.BoxGeometry(3, 3.2, 0.3), mats.frame, [[10, 1.6, T.z0 + 0.4], [60, 1.6, T.z0 + 0.4], [95, 1.6, T.z0 + 0.4]], false));
-  // 玻璃牆：一整面淡青的玻璃，直櫺每 4 公尺一支、橫櫺兩條，登機門那一段留一個洞。
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(tw_, T.h - 0.8), mats.glass); glass.position.set(tx, (T.h - 0.8) / 2, T.z1); term.add(glass);
+  // 玻璃牆：兩片淡青的玻璃，中間在登機門那裡留 4 公尺的洞（鏡頭要走過去）；直櫺每 4 公尺一支、橫櫺兩條。
+  const gd = A.GATE_DOOR[0], gh = T.h - 0.8;
+  for (const [x0, x1] of [[T.x0, gd - 2], [gd + 2, T.x1]]) { const gl = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, gh), mats.glass); gl.position.set((x0 + x1) / 2, gh / 2, T.z1); term.add(gl); }
   {
-    const v = []; for (let x = T.x0; x <= T.x1; x += 4) if (Math.abs(x - A.GATE_DOOR[0]) > 2.2) v.push([x, (T.h - 0.8) / 2, T.z1]);
-    term.add(instanced(new THREE.BoxGeometry(0.25, T.h - 0.8, 0.35), mats.frame, v, false));
-    term.add(instanced(new THREE.BoxGeometry(tw_, 0.22, 0.35), mats.frame, [[tx, 4, T.z1], [tx, 8, T.z1]], false));
+    const v = []; for (let x = T.x0; x <= T.x1; x += 4) if (Math.abs(x - gd) > 2.2) v.push([x, gh / 2, T.z1]);
+    term.add(instanced(new THREE.BoxGeometry(0.25, gh, 0.35), mats.frame, v, false));
+    term.add(instanced(new THREE.BoxGeometry(gd - 2 - T.x0, 0.22, 0.35), mats.frame, [[(T.x0 + gd - 2) / 2, 4, T.z1], [(T.x0 + gd - 2) / 2, 8, T.z1]], false));
+    term.add(instanced(new THREE.BoxGeometry(T.x1 - gd - 2, 0.22, 0.35), mats.frame, [[(gd + 2 + T.x1) / 2, 4, T.z1], [(gd + 2 + T.x1) / 2, 8, T.z1]], false));
+    term.add(box(4.4, gh - 3.4, 0.35, lam(P.wall), gd, 3.4 + (gh - 3.4) / 2, T.z1, false));   // 門上方的牆
   }
-  // 登機門：玻璃牆上一個門框加門檻；門上一塊牌（登機門號碼，setGate 填）。
-  term.add(box(3.6, 0.3, 0.6, mats.frame, A.GATE_DOOR[0], 3.1, A.GATE_DOOR[1], false), box(0.3, 3, 0.6, mats.frame, A.GATE_DOOR[0] - 1.8, 1.5, A.GATE_DOOR[1], false), box(0.3, 3, 0.6, mats.frame, A.GATE_DOOR[0] + 1.8, 1.5, A.GATE_DOOR[1], false));
-  const gateSign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.9), lam(P.navy)); gateSign.position.set(A.GATE_DOOR[0], 3.9, A.GATE_DOOR[1] - 0.4); term.add(gateSign);
-  const gateSign2 = gateSign.clone(); gateSign2.position.set(A.GATE_DESK[0] + 1, 4.6, A.GATE_DESK[1] + 1); gateSign2.rotation.y = -Math.PI / 2; term.add(gateSign2);
-  // 柱子：兩排，每 15 公尺一支。
+  // 登機門：深藍的門框、門檻；門上一塊牌（登機門號碼，setGate 填），面向走過來的人（-z）。
+  term.add(box(4.2, 0.35, 0.7, mats.navy, gd, 3.2, T.z1, false), box(0.35, 3.2, 0.7, mats.navy, gd - 1.95, 1.6, T.z1, false), box(0.35, 3.2, 0.7, mats.navy, gd + 1.95, 1.6, T.z1, false));
+  const gateSign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.1), lam(P.navy)); gateSign.position.set(gd, 4.1, T.z1 - 0.4); gateSign.rotation.y = Math.PI; term.add(gateSign);
+  const gateSign2 = gateSign.clone(); gateSign2.position.set(A.GATE_DESK[0] + 1.2, 1.9, A.GATE_DESK[1] - 0.62); gateSign2.rotation.y = Math.PI; gateSign2.scale.setScalar(0.5); term.add(gateSign2);
+  // 柱子：兩排，每 15 公尺一支，淡沙色。
   {
     const cols = []; for (let x = 5; x < T.x1; x += 15) cols.push([x, T.h / 2, -30], [x, T.h / 2, -10]);
-    term.add(instanced(new THREE.CylinderGeometry(0.55, 0.55, T.h, 10), mats.wallShade, cols));
+    term.add(instanced(new THREE.CylinderGeometry(0.55, 0.55, T.h, 10), mats.column, cols));
   }
-  // 天花板的燈條：每 10 公尺一條，發光。
-  { const l = []; for (let x = 0; x < T.x1; x += 10) l.push([x, T.h - 0.9, -20]); term.add(instanced(new THREE.BoxGeometry(6, 0.15, 0.6), lam(P.sand, { emissive: P.sand, emissiveIntensity: 0.6 }), l, false)); }
-  // 報到櫃台（x 5 到 45，靠陸側），每一座一個螢幕、一個站櫃台的人。
+  // 橘色的指標：掛在走道上方，面向走過來的人，上面一支奶油色的箭頭。
+  for (const x of [18, 48, 78, 104]) {
+    const g = new THREE.Group(); g.position.set(x, 4.6, -20); g.rotation.y = -Math.PI / 2;
+    g.add(box(3.2, 0.9, 0.12, mats.orange, 0, 0, 0, false), box(1.2, 0.12, 0.14, mats.cream, 0.6, 0, 0.02, false));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 3), mats.cream); tip.rotation.z = -Math.PI / 2; tip.position.set(1.35, 0, 0.02); g.add(tip);
+    g.add(instanced(new THREE.CylinderGeometry(0.04, 0.04, T.h - 6, 5), mats.grey, [[-1.2, (T.h - 6) / 2 + 0.45, 0], [1.2, (T.h - 6) / 2 + 0.45, 0]], false));
+    term.add(g);
+  }
+  // 報到櫃台（x 5 到 45，靠陸側）：深藍的櫃台、奶油色的檯面、螢幕、站櫃台的人。
   {
-    const desks = [], screens = [];
-    for (let x = 6; x <= 44; x += 6.5) { desks.push([x, 0.55, -34]); screens.push([x, 2.6, -33.4]); }
-    term.add(instanced(new THREE.BoxGeometry(5, 1.1, 1.6), mats.navy, desks), instanced(new THREE.BoxGeometry(1.1, 0.7, 0.08), mats.dark, screens, false));
+    const desks = [], tops = [], screens = [];
+    for (let x = 6; x <= 44; x += 6.5) { desks.push([x, 0.55, -34]); tops.push([x, 1.14, -34]); screens.push([x, 2.6, -33.4]); }
+    term.add(instanced(new THREE.BoxGeometry(5, 1.1, 1.6), mats.navy, desks), instanced(new THREE.BoxGeometry(5.2, 0.08, 1.8), mats.cream, tops, false), instanced(new THREE.BoxGeometry(1.1, 0.7, 0.08), mats.dark, screens, false));
     term.add(instanced(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 5), mats.grey, screens.map(([x, y, z]) => [x, 1.8, z]), false));
-    for (const x of [12.5, 25.5, 38.5]) { const f = figure(mats, { shirt: mats.figNavy }); f.position.set(x, 0, -35.3); f.userData.baseY = 0; f.rotation.y = 0; term.add(f); idleFigs.push(f); }
+    for (const x of [12.5, 25.5, 38.5]) { const f = figure(mats, { shirt: mats.figNavy }); f.position.set(x, 0, -35.3); f.userData.baseY = 0; term.add(f); idleFigs.push(f); }
+    for (const [x, k] of [[19, 0], [19.6, 2], [32, 3], [32.5, 1]]) { const f = figure(mats, { shirt: pick(k), bag: pick(k + 1) }); f.position.set(x, 0, -31.6 - (k % 2) * 1.2); f.userData.baseY = 0; term.add(f); idleFigs.push(f); }
   }
   // 出發看板：兩塊，掛在走道上方、正面朝 -x（迎著走過來的人），字是 CanvasTexture（setBoard 換）。
   const boardMat = lam(P.navy); const boards = [];
   for (const x of [36, 84]) {
     const g = new THREE.Group(); g.position.set(x, 6.3, -20); g.rotation.y = -Math.PI / 2;
-    g.add(box(8.6, 3.4, 0.5, mats.frame, 0, 0, 0, false));
+    g.add(box(8.6, 3.4, 0.5, mats.navy, 0, 0, 0, false));
     const face = new THREE.Mesh(new THREE.PlaneGeometry(8, 2.9), boardMat); face.position.z = 0.26; g.add(face);
     const hang = instanced(new THREE.CylinderGeometry(0.06, 0.06, T.h - 8, 5), mats.grey, [[-3.8, (T.h - 8) / 2 + 1.7, 0], [3.8, (T.h - 8) / 2 + 1.7, 0]], false); g.add(hang);
     term.add(g); boards.push(face);
   }
-  // 安檢：一個門框、一條輸送帶、一個安檢員。
-  { const x = 52; term.add(box(0.3, 2.3, 1.1, mats.frame, x, 1.15, -22.6, false), box(0.3, 2.3, 1.1, mats.frame, x, 1.15, -20.4, false), box(0.3, 0.25, 2.5, mats.frame, x, 2.4, -21.5, false));
+  // 安檢：一個深藍的門框、一條輸送帶、一個安檢員。
+  { const x = 52; term.add(box(0.3, 2.3, 1.1, mats.navy, x, 1.15, -22.6, false), box(0.3, 2.3, 1.1, mats.navy, x, 1.15, -20.4, false), box(0.3, 0.25, 2.5, mats.navy, x, 2.4, -21.5, false));
     term.add(box(5, 0.9, 0.9, mats.grey, x, 0.45, -18.2), box(1.6, 1.4, 1.2, mats.dark, x - 0.4, 1.15, -18.2));
     const f = figure(mats, { shirt: mats.figNavy }); f.position.set(x + 1.2, 0, -16.8); f.userData.baseY = 0; f.rotation.y = Math.PI; term.add(f); idleFigs.push(f); }
-  // 座位：靠空側的候機區，一排五張，幾排；一些人坐著（短的人）。
+  // 座位：候機區一排五張，青與橘輪流；有人坐著。
   {
-    const seats = [], benches = [];
-    for (let x = 60; x <= 100; x += 7) for (const z of [-7, -11, -29, -33]) { benches.push([x, 0.28, z]); for (let k = 0; k < 5; k++) seats.push([x - 2 + k * 1, 0.62, z]); }
-    term.add(instanced(new THREE.BoxGeometry(5.2, 0.12, 0.9), mats.grey, benches), instanced(new THREE.BoxGeometry(0.8, 0.55, 0.8), mats.navy, seats));
-    for (const [x, z] of [[62, -7], [71, -11], [90, -29], [96, -33], [83, -7]]) { const f = figure(mats, { shirt: mats.figSand }); f.position.set(x, -0.35, z); f.scale.set(1, 0.78, 1); f.userData.baseY = -0.35; term.add(f); idleFigs.push(f); }
+    const seatsT = [], seatsO = [], benches = [];
+    let k = 0;
+    for (let x = 60; x <= 100; x += 7) for (const z of [-7, -11, -29, -33]) { benches.push([x, 0.28, z]); for (let i = 0; i < 5; i++) (k++ % 2 ? seatsT : seatsO).push([x - 2 + i, 0.62, z]); }
+    term.add(instanced(new THREE.BoxGeometry(5.2, 0.12, 0.9), mats.grey, benches), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.teal, seatsT), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.orange, seatsO));
+    for (const [x, z, i] of [[62, -7, 0], [71, -11, 1], [90, -29, 2], [96, -33, 3], [83, -7, 4], [67, -29, 1]]) { const f = figure(mats, { shirt: pick(i), seated: true }); f.position.set(x, 0.42, z + 0.1); f.userData.baseY = 0.42; f.rotation.y = z > -20 ? Math.PI : 0; term.add(f); idleFigs.push(f); }
   }
-  // 商店：陸側三間，橘色雨棚、招牌。
-  for (const x of [58, 72, 90]) {
-    term.add(box(9, 4, 5, mats.wallShade, x, 2, -37), box(9.6, 0.3, 2.2, mats.orange, x, 3.4, -33.6, false), box(6, 1, 0.2, mats.navy, x, 4.6, -34.4, false));
+  // 商店：陸側三間，各自一種顏色的門面與雨棚、一塊招牌、架上幾樣東西。
+  for (const [x, front, awn] of [[58, mats.teal, mats.orange], [72, mats.orange, mats.navy], [90, mats.navy, mats.teal]]) {
+    term.add(box(9, 4, 5, front, x, 2, -37), box(9.6, 0.3, 2.2, awn, x, 3.4, -33.6, false), box(6, 1, 0.2, mats.cream, x, 4.6, -34.4, false));
     term.add(instanced(new THREE.BoxGeometry(0.9, 0.9, 0.5), mats.sand, [[x - 2.6, 0.45, -34.9], [x - 1.4, 0.45, -34.9], [x + 1.4, 0.45, -34.9], [x + 2.6, 0.45, -34.9]], false));
   }
-  // 登機門櫃台：一座櫃台、一個站著的地勤、一支指示牌。
-  term.add(box(3.4, 1.1, 1.1, mats.navy, A.GATE_DESK[0], 0.55, A.GATE_DESK[1]), box(3.6, 0.1, 1.3, mats.sand, A.GATE_DESK[0], 1.12, A.GATE_DESK[1], false));
-  { const f = figure(mats, { shirt: mats.figNavy }); f.position.set(A.GATE_DESK[0], 0, A.GATE_DESK[1] - 1.3); f.userData.baseY = 0; f.rotation.y = Math.PI; term.add(f); idleFigs.push(f); }
-  // 空橋：門口一個圓亭、一條斜的走廊到機艙門。牆是 DoubleSide，鏡頭在裡面走也看得到；朝機頭那一面是玻璃，露出機身。
+  // 盆栽：柱子旁與候機區幾盆。
   {
-    const a = new THREE.Vector3(A.GATE_DOOR[0], 0, A.GATE_DOOR[1]), b = new THREE.Vector3(A.PLANE_DOOR[0], 2.4, A.PLANE_DOOR[1]);
-    const len = a.distanceTo(b), mid = a.clone().add(b).multiplyScalar(0.5), yaw = Math.atan2(b.x - a.x, b.z - a.z), pitch = Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z));
-    const g = new THREE.Group(); g.position.copy(mid); g.position.y += 1.5; g.rotation.y = yaw; g.rotation.x = -pitch;
-    const wallM = lam(P.wall, { side: THREE.DoubleSide });
-    g.add(box(3.2, 0.2, len, wallM, 0, -1.4, 0), box(3.2, 0.2, len, wallM, 0, 1.35, 0, false));
-    g.add(box(0.15, 2.8, len, wallM, -1.55, 0, 0, false));            // 靠機尾那一面實牆
-    g.add(box(0.15, 1.1, len, wallM, 1.55, -0.85, 0, false), box(0.15, 0.4, len, wallM, 1.55, 1.15, 0, false));   // 靠機頭那一面：下半牆、上面一條，中間是窗
-    g.add(new THREE.Mesh(new THREE.PlaneGeometry(len, 1.4), mats.glass).rotateY(-Math.PI / 2).translateZ(-1.56).translateY(0.15));
-    { const f = instanced(new THREE.BoxGeometry(0.12, 1.5, 0.12), mats.frame, Array.from({ length: Math.floor(len / 3) }, (_, i) => [1.58, 0.15, -len / 2 + 1.5 + i * 3]), false); g.add(f); }
-    term.add(g);
-    term.add(cyl(2.4, 2.4, 3.6, mats.wallShade, A.GATE_DOOR[0], 1.8, A.GATE_DOOR[1] + 0.8, 12));
-    term.add(cyl(0.3, 0.3, 2.4, mats.frame, A.PLANE_DOOR[0] - 1.2, 1.2, A.PLANE_DOOR[1] - 3, 6), cyl(0.3, 0.3, 2.4, mats.frame, A.PLANE_DOOR[0] + 1.2, 1.2, A.PLANE_DOOR[1] - 3, 6));
+    const pots = [], leaves = [];
+    for (const [x, z] of [[5, -27], [20, -13], [35, -27], [50, -13], [65, -27.5], [80, -12.5], [95, -27], [110, -27], [57, -8], [99, -8]]) { pots.push([x, 0.4, z]); leaves.push([x, 1.4, z, 0, 1]); }
+    term.add(instanced(new THREE.CylinderGeometry(0.55, 0.45, 0.8, 8), mats.pot, pots), instanced(new THREE.IcosahedronGeometry(0.75, 0), mats.plant, leaves));
+  }
+  // 登機門櫃台：深藍的櫃台、奶油色檯面、一個站著的地勤、一支小牌。
+  term.add(box(3.4, 1.1, 1.1, mats.navy, A.GATE_DESK[0], 0.55, A.GATE_DESK[1]), box(3.6, 0.1, 1.3, mats.cream, A.GATE_DESK[0], 1.12, A.GATE_DESK[1], false));
+  { const f = figure(mats, { shirt: mats.figNavy }); f.position.set(A.GATE_DESK[0], 0, A.GATE_DESK[1] + 1.3); f.userData.baseY = 0; f.rotation.y = Math.PI; term.add(f); idleFigs.push(f); }
+  // 空橋：兩段直的（A 段從門沿 +z、B 段轉 90 度沿 +x 到機身），是一條有燈的隧道：一邊實牆、一邊玻璃看得到機身；B 段的頂是玻璃，鏡頭從那裡升出去。
+  {
+    const B = A.BRIDGE, wallM = lam(P.wall, { side: THREE.DoubleSide }), inner = B.half - 0.08;
+    const zA0 = T.z1, zA1 = B.zEnd + B.half, lenA = zA1 - zA0, y0 = 0, y1 = B.floorEnd;
+    // A 段：地板是斜的（用一個旋轉的盒子），牆跟著斜。
+    const gA = new THREE.Group(); const pitch = Math.atan2(y1 - y0, lenA); gA.position.set(B.x, (y0 + y1) / 2, (zA0 + zA1) / 2); gA.rotation.x = -pitch; term.add(gA);
+    const L = Math.hypot(lenA, y1 - y0);
+    gA.add(box(B.half * 2, 0.16, L, wallM, 0, -0.08, 0));                                   // 地板
+    gA.add(new THREE.Mesh(new THREE.BoxGeometry(B.half * 2, 0.12, L), lam(P.ceiling)).translateY(B.h));   // 頂
+    gA.add(box(0.15, B.h, L, wallM, -B.half, B.h / 2, 0, false));                            // 靠 -x 那一面實牆
+    gA.add(box(0.15, 1.0, L, wallM, B.half, 0.5, 0, false), box(0.15, 0.4, L, wallM, B.half, B.h - 0.2, 0, false));   // 靠機身那一面：下半牆、上面一條，中間是窗
+    gA.add(new THREE.Mesh(new THREE.PlaneGeometry(L, B.h - 1.4), mats.glass).rotateY(-Math.PI / 2).translateZ(-B.half).translateY(1.0 + (B.h - 1.4) / 2));
+    gA.add(instanced(new THREE.BoxGeometry(0.1, B.h - 1.4, 0.1), mats.frame, Array.from({ length: Math.floor(L / 3) }, (_, i) => [B.half, 1.0 + (B.h - 1.4) / 2, -L / 2 + 1.5 + i * 3]), false));
+    gA.add(instanced(new THREE.BoxGeometry(1.2, 0.08, 0.5), mats.light, Array.from({ length: Math.floor(L / 4) }, (_, i) => [0, B.h - 0.1, -L / 2 + 2 + i * 4]), false));
+    gA.add(box(0.25, 0.08, L, mats.orange, -inner, 1.0, 0, false));                          // 扶手
+    // B 段：平的，沿 +x 到機身；-z 那一面是窗（看得到機頭）、頂是玻璃。
+    const xB0 = B.x - B.half, xB1 = A.PLANE_DOOR[0], lenB = xB1 - xB0;
+    const gB = new THREE.Group(); gB.position.set((xB0 + xB1) / 2, y1, B.zEnd); term.add(gB);
+    gB.add(box(lenB, 0.16, B.half * 2, wallM, 0, -0.08, 0));
+    gB.add(new THREE.Mesh(new THREE.PlaneGeometry(lenB, B.half * 2), mats.glass).rotateX(Math.PI / 2).translateZ(-B.h));
+    gB.add(box(lenB, B.h, 0.15, wallM, 0, B.h / 2, B.half, false));                            // 靠 +z 那一面實牆
+    gB.add(box(lenB, 1.0, 0.15, wallM, 0, 0.5, -B.half, false), box(lenB, 0.4, 0.15, wallM, 0, B.h - 0.2, -B.half, false));
+    gB.add(new THREE.Mesh(new THREE.PlaneGeometry(lenB, B.h - 1.4), mats.glass).translateZ(-B.half).translateY(1.0 + (B.h - 1.4) / 2));
+    gB.add(instanced(new THREE.BoxGeometry(1.2, 0.08, 0.5), mats.light, Array.from({ length: Math.floor(lenB / 2.5) }, (_, i) => [-lenB / 2 + 1 + i * 2.5, B.h - 0.1, 0]), false));
+    gB.add(box(lenB, 0.08, 0.25, mats.orange, 0, 1.0, inner, false));
+    // 門口的圓亭、B 段底下的兩支腳
+    term.add(cyl(2.4, 2.4, 3.6, mats.wallShade, B.x, 1.8, T.z1 + 1.2, 12));
+    term.add(cyl(0.3, 0.3, y1, mats.frame, B.x - 1.2, y1 / 2, B.zEnd + B.half + 0.6, 6), cyl(0.3, 0.3, y1, mats.frame, xB1 - 1.5, y1 / 2, B.zEnd + B.half + 0.6, 6));
   }
   // 其他登機門的空橋與停著的飛機：兩座，直直伸出去。
   for (const [x, tail] of [[40, "teal"], [75, "navy"]]) {
-    const g = new THREE.Group(); g.position.set(x, 2.6, 15);
-    g.add(box(3.2, 2.9, 30, lam(P.wall), 0, 0, 0)); g.add(box(3.4, 0.5, 30, mats.teal, 0, 0.2, 0, false));
-    term.add(g, cyl(0.3, 0.3, 2.6, mats.frame, x - 1.2, 1.3, 24, 6), cyl(0.3, 0.3, 2.6, mats.frame, x + 1.2, 1.3, 24, 6));
-    const pl = buildAirliner(THREE, { body: P.cream, tail: P[tail], mark: P.cream, dark: P.dark }); pl.position.set(x + 7, A.PLANE_REST_Y, 40); pl.rotation.y = Math.PI; shadowOn(pl); world.add(pl);
+    const g = new THREE.Group(); g.position.set(x, 2.6, 19);
+    g.add(box(3.2, 2.9, 38, lam(P.wall), 0, 0, 0)); g.add(box(3.4, 0.5, 38, mats.teal, 0, 0.2, 0, false));
+    term.add(g, cyl(0.3, 0.3, 2.6, mats.frame, x - 1.2, 1.3, 32, 6), cyl(0.3, 0.3, 2.6, mats.frame, x + 1.2, 1.3, 32, 6));
+    const pl = buildAirliner(THREE, { body: P.cream, tail: P[tail], mark: P.cream, dark: P.dark }); pl.position.set(x + 7, A.PLANE_REST_Y, A.GATE_STAND[1]); pl.rotation.y = Math.PI; shadowOn(pl); world.add(pl);
   }
 
   // ═══ 停機坪上的東西 ═══
@@ -311,13 +361,16 @@ export function createScene({ canvas, palette, phone, fonts }) {
     for (let z = 240; z <= 320; z += 20) places.push([340, 0, z, z, 1]);
     world.add(instanced(treeGeo(), mats.leaf, places), instanced(trunkGeo(), mats.trunk, places));
   }
-  // 雲：低多邊形球組成的幾團，高處，慢慢飄。鏡頭爬到它們上面，它們就從底下過。
+  // 雲：好幾顆低多邊形的球疊成一團，奶油白往白推、自己微微發光、不投影也不接影（才不會被地面的草色與影子染成褐色）。
+  // 沿著爬升的路放（飛機往 -x 爬到 x 約 -1550、高 420），在飛機旁邊與底下，爬升時從旁邊過；慢慢飄。
   const clouds = [];
-  for (let i = 0; i < 9; i++) {
-    const g = new THREE.Group(); const n = 3 + (i % 3);
-    for (let k = 0; k < n; k++) { const s = new THREE.Mesh(new THREE.IcosahedronGeometry(14 + (k * 7) % 12, 0), mats.cloud); s.position.set((k - n / 2) * 16, (k % 2) * 5, (k * 11) % 10); s.scale.y = 0.55; g.add(s); }
-    // 沿著爬升的路放（飛機往 -x 爬到 x 約 -1550、高 420），爬升時雲從旁邊過；前面幾團低一點在跑道外。
-    g.position.set(-150 - i * 170, 120 + i * 32, 400 + ((i * 97) % 240) - 120); g.userData.v = 0.6 + (i % 3) * 0.3; world.add(g); clouds.push(g);
+  const cloudGeo = [new THREE.IcosahedronGeometry(10, 1), new THREE.IcosahedronGeometry(14, 1), new THREE.IcosahedronGeometry(18, 1)];
+  for (let i = 0; i < 14; i++) {
+    const g = new THREE.Group(); const n = 4 + (i % 3);
+    for (let k = 0; k < n; k++) { const s = new THREE.Mesh(cloudGeo[(i + k) % 3], mats.cloud); s.position.set((k - n / 2) * 13 + ((k * 7) % 5), (k % 2) * 4 - ((k * 3) % 4), ((k * 11) % 10) - 5); s.scale.set(1.15, 0.5 + (k % 2) * 0.1, 1); s.castShadow = false; s.receiveShadow = false; g.add(s); }
+    const t = i / 13, side = i % 2 ? 1 : -1;
+    g.position.set(-120 - t * 1500, 90 + t * 300 - 70 + (i % 3) * 30, A.RUNWAY.z + side * (80 + (i % 4) * 60));
+    g.userData.v = 0.5 + (i % 3) * 0.3; world.add(g); clouds.push(g);
   }
 
   // ═══ 我們那一架 ═══
@@ -326,7 +379,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const traveller = figure(mats, { shirt: mats.figTeal, backpack: true, phase: 0 }); traveller.userData.baseY = 0; world.add(traveller);
   // 走道上來回走的兩個人
   const walkers = [];
-  for (const [x0, x1, z, sp] of [[10, 95, -17, 1.2], [90, 20, -24, 1.0]]) { const f = figure(mats, { shirt: mats.figSand }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
+  for (const [x0, x1, z, sp, k] of [[10, 95, -17, 1.2, 0], [90, 20, -24, 1.0, 2], [30, 100, -14, 0.9, 3], [105, 5, -26.5, 1.1, 4]]) { const f = figure(mats, { shirt: figMats[k % figMats.length], bag: figMats[(k + 2) % figMats.length] }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
 
   // ═══ 站：小場景與錨點記號 ═══
   const stopsGroup = new THREE.Group(); world.add(stopsGroup);
@@ -346,17 +399,25 @@ export function createScene({ canvas, palette, phone, fonts }) {
   }
 
   // ═══ 看板與登機門牌 ═══
+  // 出發看板：版面照 airport.js 的 boardLayout（寬 2048、列高至少 48 像素），現在這一站那一列整列橘底深藍字；站多到放不下就只畫現在這一站附近的幾列。
+  // 換站的時候整塊翻一下（render() 看 boardFlip：先壓扁、換貼圖、再彈回來），翻牌看板的感覺。
+  let boardFlip = null, boardCurrent = -1;
   function setBoard(rows) {
-    const lines = A.boardLines(rows);
-    const W = 1024, H = 372, rowH = Math.min(44, (H - 60) / Math.max(1, lines.length));
-    const tl = [{ text: "TIME", x: 30, y: 30 }, { text: "DESTINATION", x: 170, y: 30 }, { text: "FLIGHT", x: 640, y: 30 }, { text: "GATE", x: 760, y: 30 }, { text: "STATUS", x: 860, y: 30 }]
-      .map(l => ({ ...l, font: `700 22px ${fonts.display}`, color: palette.grey }));
-    lines.forEach((l, i) => {
-      const y = 70 + i * rowH, col = l.now ? palette.yellow : palette.cream;
-      [30, 170, 640, 760, 860].forEach((x, k) => tl.push({ text: String(l.cells[k]).slice(0, k === 1 ? 30 : 12), x, y, font: `700 ${Math.round(rowH * 0.62)}px ${fonts.display}`, color: k === 4 ? (l.now ? palette.yellow : palette.sand) : col }));
+    const lines = A.boardLines(rows), n = lines.length, L = A.boardLayout(n), current = Math.max(0, lines.findIndex(l => l.now));
+    const from = A.boardWindow(n, current, L.visible);
+    const cols = [60, 340, 1240, 1500, 1720];
+    const tl = ["TIME", "DESTINATION", "FLIGHT", "GATE", "STATUS"].map((t, k) => ({ text: t, x: cols[k], y: 70, font: `700 44px ${fonts.display}`, color: palette.grey }));
+    const rects = [];
+    lines.slice(from, from + L.visible).forEach((l, i) => {
+      const y = L.top + i * L.rowH + L.rowH / 2;
+      if (l.now) rects.push({ x: 24, y: y - L.rowH / 2 + 3, w: L.width - 48, h: L.rowH - 6, color: palette.orange });
+      const col = l.now ? palette.navy : palette.cream;
+      cols.forEach((x, k) => tl.push({ text: String(l.cells[k]).slice(0, k === 1 ? 34 : 12), x, y, font: `700 ${Math.round(L.rowH * 0.6)}px ${fonts.display}`, color: k === 4 && !l.now ? palette.sand : col }));
     });
-    const tex = textTexture(W, H, palette.navy, tl);
-    boards.forEach(b => { if (b.material.map) b.material.map.dispose(); b.material.map = tex; b.material.needsUpdate = true; });
+    const tex = textTexture(L.width, L.height, palette.navy, tl, rects);
+    if (boardCurrent >= 0 && boardCurrent !== current && boards[0].material.map) boardFlip = { tex, t0: null };
+    else boards.forEach(b => { if (b.material.map) b.material.map.dispose(); b.material.map = tex; b.material.needsUpdate = true; });
+    boardCurrent = current;
   }
   function setGate(label) {
     const tex = textTexture(512, 136, palette.navy, [{ text: "GATE", x: 40, y: 68, font: `700 48px ${fonts.display}`, color: palette.sand }, { text: label, x: 472, y: 68, font: `700 92px ${fonts.display}`, color: palette.cream, align: "right" }]);
@@ -383,13 +444,20 @@ export function createScene({ canvas, palette, phone, fonts }) {
     if (tr.visible) { traveller.position.set(tr.pos[0], tr.pos[1], tr.pos[2]); traveller.userData.baseY = tr.pos[1]; traveller.rotation.y = tr.yaw; walkCycle(traveller, t, tr.walking); }
     // 天空與霧：離地之後慢慢變成高空的藍、霧變薄（機場在底下的霧裡縮小）。
     const lift = qp.lift || 0;
-    scene.background.copy(P.sky).lerp(P.skyHigh, lift * 0.85); scene.fog.color.copy(P.sky).lerp(P.skyHigh, lift * 0.5); scene.fog.density = lerp(0.0028, 0.0012, lift);
+    scene.background.copy(P.sky).lerp(P.skyHigh, lift * 0.85); scene.fog.color.copy(P.sky).lerp(P.skyHigh, lift * 0.5); scene.fog.density = lerp(0.0022, 0.0009, lift);
     hemi.intensity = lerp(0.95, 0.7, lift);
     // 太陽跟著鏡頭看的點；室內陰影的範圍小、室外大。
     sun.target.position.copy(lookV); sun.position.copy(lookV).add(SUN_OFF);
     setShadowSpan(e < A.PHASES.apron[0] ? 70 : e < A.PHASES.takeoff[0] ? 220 : 400);
     // 閒置：信標、雲、加油車、行李車、走道上的人、原地的人。
     beacon.rotation.y = t * 2.4;
+    if (boardFlip) {
+      if (boardFlip.t0 == null) boardFlip.t0 = t;
+      const u = (t - boardFlip.t0) / 0.5, sy = u < 0.5 ? 1 - u * 2 : Math.min(1, (u - 0.5) * 2);
+      if (u >= 0.5 && boardFlip.tex) { boards.forEach(b => { if (b.material.map) b.material.map.dispose(); b.material.map = boardFlip.tex; b.material.needsUpdate = true; }); boardFlip.tex = null; }
+      boards.forEach(b => { b.scale.y = Math.max(0.02, sy); });
+      if (u >= 1) boardFlip = null;
+    }
     for (const cl of clouds) cl.position.x += cl.userData.v * 0.016;
     fuel[0].position.x = 150 + Math.sin(t * 0.12) * 40; fuel[0].rotation.y = Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2;
     { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(100 + Math.cos(ang) * 26, 0, 110 + Math.sin(ang) * 26); tug.rotation.y = -ang; }

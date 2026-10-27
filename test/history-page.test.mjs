@@ -269,6 +269,37 @@ test("鏡頭樣條（批 5）：航廈往前走在人的高度、空橋那一段
   assert.ok(t2.pos[1] > t1.pos[1] && t2.pos[1] > q2.y * 0.6, "跟著爬升");
 });
 
+test("鏡頭不穿牆（批 5 第二輪）：航廈與空橋那兩段每百分之一取樣，鏡頭不在任何一面牆裡、離牆至少 0.3 公尺、而且一直在准待的地方（航廈裡、門口、空橋 A、空橋 B）", () => {
+  assert.ok(A.WALLS.length >= 8 && A.VOLUMES.length === 4);
+  // 0 到 0.33 每百分之一，加上鏡頭停在機艙門前的 0.335；0.34 起鏡頭已經升上去了（那一段是刻意穿過空橋 B 段的玻璃頂）。
+  for (const e of [...Array.from({ length: 34 }, (_, k) => k / 100), 0.335]) {
+    const c = A.cameraAt(e), p = c.pos;
+    for (const B of A.WALLS) assert.ok(A.boxDistance(p, B) >= 0.3, `鏡頭在 ${e} 離牆太近：${p.map(v => v.toFixed(1))} 牆 ${B}`);
+    assert.ok(A.VOLUMES.some(V => p[0] > V[0] && p[0] < V[1] && p[2] > V[2] && p[2] < V[3]), `鏡頭在 ${e} 跑到准待的地方外面：${p.map(v => v.toFixed(1))}`);
+    assert.ok(p[1] > 1.2 && p[1] < 5, "人的高度（空橋是斜的所以會升到 4.1）");
+    // 旅客也一樣不穿牆
+    const t = A.travellerAt(e); if (t.visible) for (const B of A.WALLS) assert.ok(!A.insideBox([t.pos[0], t.pos[1] + 1, t.pos[2]], B), `旅客在 ${e} 走進牆裡`);
+  }
+  // 空橋是兩段直的：A 段沿 z、B 段沿 x，兩段都接得上
+  assert.equal(A.BRIDGE.x, A.GATE_DOOR[0]); assert.equal(A.BRIDGE.zEnd, A.PLANE_DOOR[1]);
+  assert.ok(A.bridgeFloorY(0, 0) === 0 && A.bridgeFloorY(0, A.BRIDGE.zEnd) === A.BRIDGE.floorEnd);
+});
+
+test("看板的版面（批 5 第二輪）：貼圖至少 1024 寬、列高至少 48 像素；站多到放不下就只顯示現在這一站附近那幾列", () => {
+  for (const n of [1, 7, 12, 25]) {
+    const L = A.boardLayout(n);
+    assert.ok(L.width >= 1024, "寬 " + L.width);
+    assert.ok(L.rowH >= 48, n + " 站的列高 " + L.rowH);
+    assert.ok(L.visible >= 1 && L.visible <= n && L.top + L.visible * L.rowH <= L.height, n + " 站放得下 " + L.visible + " 列");
+  }
+  assert.equal(A.boardLayout(7).visible, 7, "七站全部放得下");
+  const L25 = A.boardLayout(25);
+  assert.ok(L25.visible < 25);
+  assert.equal(A.boardWindow(25, 0, L25.visible), 0);
+  assert.equal(A.boardWindow(25, 24, L25.visible), 25 - L25.visible);
+  const mid = A.boardWindow(25, 12, L25.visible); assert.ok(mid <= 12 && mid + L25.visible > 12, "現在這一站一定在窗裡");
+});
+
 test("旅客（批 5）：航廈裡走在鏡頭前面、進空橋、上飛機就看不到了；走路的循環只在他在走的時候", () => {
   const a = A.travellerAt(0.05), c = A.cameraAt(0.05);
   assert.ok(a.visible && a.walking);
