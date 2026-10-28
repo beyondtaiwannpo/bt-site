@@ -540,3 +540,12 @@ select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-st
 .autosave.saving{color:rgba(16,42,134,.82)}
 .autosave.saved{color:var(--bt-navy);font-weight:600}
 .autosave.failed{color:var(--ink);font-weight:600;border-left:3px solid var(--bt-orange);padding-left:8px;white-space:normal}
+
+/* 名單上「沒有帳號」的人前面那個勾（2026-11-07 批次邀請）：點擊範圍 44px，手機上按得到；-10px 的外距把它收回列高裡。 */
+.tick{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin:-12px 0 -12px -12px;vertical-align:middle;cursor:pointer}
+.tick input[type="checkbox"]{width:20px;height:20px;margin:0;accent-color:var(--bt-navy);cursor:pointer}
+.bk-row .two label i{white-space:normal}
+/* 邀請頁「掛到名單上已經有的紀錄」那個選擇器（2026-11-07）：單選鈕靠左、字靠左，一列 44px 高。 */
+.attach .check{margin:0;min-height:44px;align-items:center;justify-content:flex-start;text-align:left}
+.attach .check input[type="radio"]{width:18px;height:18px;flex:none;margin:0;accent-color:var(--bt-navy);cursor:pointer}
+.attach .check span{flex:1;min-width:0}

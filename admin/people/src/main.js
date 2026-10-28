@@ -23,6 +23,8 @@ let S = {
   workspaces: [], wsSel: null, members: [], wsDraft: null,
   termDraft: null, end: null,
   invites: [], inviteDraft: null,
+  // 把老幹部請回來（2026-11-07）：名單上勾起來要一起寄的人與每一列填的 email（bulk），邀請狀態 roster_invites() 合進 people 的 invite 欄。
+  bulk: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -44,15 +46,15 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
   if (!isSenior()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", "", S.me), UI.noAccessHTML(S.me)); return; }
 
-  const filter = { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all", team: S.filter.team };
+  const filter = { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all", team: S.filter.team, noacc: !!S.filter.noacc };
   let body, tab = "roster";
-  if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres(), batchOpen()); tab = "invites"; }
+  if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres(), batchOpen(), S.people); tab = "invites"; }
   else if (S.view === "changes") { body = UI.changesHTML(S.changes, S.people, S.msg); tab = "changes"; }
   else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior()); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces);
-  else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd);
+  else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd, S.bulk);
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body);
   UI.afterRender(S, el);
 }
@@ -113,13 +115,15 @@ async function openTab(key, ws) {
 // 名單、屆別、變動紀錄三個查詢一起發。紀錄載不到不該讓名單打不開（遷移檔還沒跑的時候），各自接住。
 async function loadCore(keepMsg) {
   if (!keepMsg) S.msg = "";
-  const [people, terms, changes, workspaces] = await Promise.all([
+  const [people, terms, changes, workspaces, rosterInv] = await Promise.all([
     D.loadPeople(),
     D.loadTerms().catch(e => { S.msg = T("err.termsLoad") + D.says(e); return []; }),
     D.loadRoleChanges().catch(e => { S.msg = T("err.changesLoad") + D.says(e); return []; }),
     D.loadWorkspaces().catch(() => []),
+    // 2026-11-07 沒有帳號的人的邀請狀態。遷移檔還沒跑的時候載不到，名單照畫、徽章不印。
+    D.loadRosterInvites().catch(e => { S.msg = T("err.inviteStatus") + D.says(e); return null; }),
   ]);
-  S.people = people || []; S.terms = terms; S.changes = changes; S.workspaces = workspaces || [];
+  S.people = UI.mergeInvites(people || [], rosterInv); S.terms = terms; S.changes = changes; S.workspaces = workspaces || [];
   if (S.person) S.person = findPerson(S.person.person_id) || null;
 }
 async function openRoster(keepMsg, view) {
@@ -143,9 +147,12 @@ async function openInvites(keepMsg) {
 function readInviteForm() {
   const rank = val("in-rank"), team = UI.isOrgWide(rank) ? "" : val("in-team");
   const t = rank && rank !== "custom" ? UI.deriveTitle(rank, team) : { title_en: val("in-ten"), title_zh: val("in-tzh") };
+  const picked = document.querySelector('input[name="in-attach"]:checked');
   return { email: val("in-email"), who: val("in-who") || "cadre:member", rank, team, term: val("in-term"),
            name_zh: val("in-zh"), name_en: val("in-en"), title_en: rank ? t.title_en : "", title_zh: rank ? t.title_zh : "",
-           line: val("in-line"), note: val("in-note") };
+           line: val("in-line"), note: val("in-note"),
+           // 2026-11-07：掛到名單上哪一筆（某一筆的 id、"__new"、或空的表示還沒選）。candidates 是資料庫回的同名清單，留著重畫還在。
+           attach: picked ? picked.value : "", candidates: (S.inviteNew && S.inviteNew.candidates) || null };
 }
 async function openWorkspaces(ws, keepMsg) {
   S.busy = true; if (!keepMsg) S.msg = ""; render();
@@ -180,6 +187,16 @@ async function loadEmail(p) {
   if (!p || !p.profile_id) { S.personEmail = null; return; }
   try { S.personEmail = await D.personEmail(p.person_id); } catch (e) { S.personEmail = undefined; }
   if (S.person && S.person.person_id === p.person_id) render();
+}
+// 批次面板上填的東西收進 S.bulk（重畫不會掉）：每一列的 email 與語言、全部套用的語言。
+function readBulk() {
+  if (!S.bulk) S.bulk = { ticked: [], emails: {}, langs: {}, lang: lang(), results: null };
+  S.bulk.emails = S.bulk.emails || {}; S.bulk.langs = S.bulk.langs || {};
+  const g = document.getElementById("bk-lang"); if (g) S.bulk.lang = g.value || lang();
+  for (const id of S.bulk.ticked || []) {
+    const e = document.getElementById("bk-email-" + id); if (e) S.bulk.emails[id] = e.value;
+    const l = document.getElementById("bk-lang-" + id); if (l) S.bulk.langs[id] = l.value || "";
+  }
 }
 async function run(label, fn) {
   S.busy = true; S.msg = ""; render();
@@ -340,6 +357,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "roster-term") { S.filter.term = b.dataset.v || "all"; render(); return; }
   if (act === "roster-team") { S.filter.team = b.dataset.v || ""; render(); return; }
+  if (act === "roster-noacc") { S.filter.noacc = !S.filter.noacc; render(); return; }
   if (act === "roster-back") { S.person = null; S.personDraft = null; S.remove = null; S.newDraft = null; history.pushState(null, "", "#roster"); await openRoster(); return; }
   if (act === "after-dismiss") { S.afterEnd = null; render(); return; }
 
@@ -387,6 +405,60 @@ document.addEventListener("click", async e => {
     const code = val("pk-code") || UI.suggestCode();
     const made = await run("err.issueCode", () => D.createInviteFor(p.person_id, code, pname(p)));
     if (made !== undefined) await reopenPerson(p.person_id, T("msg.codeIssued", { code: made }));
+    return;
+  }
+  // ── 邀請回來（2026-11-07）：改一個人那一頁，沒有帳號的紀錄 ──────────
+  if (act === "invite-back-send") {
+    const p = findPerson(b.dataset.id); if (!p) return;
+    const ib = { email: val("ib-email"), lang: val("ib-lang") || lang(), line: val("ib-line") };
+    S.personDraft = Object.assign(readPersonForm(p), { ib });
+    if (!ib.email) { S.msg = T("err.emailRequired"); render(); return; }
+    const inv = p.invite, live = inv && ["queued", "sent", "failed", "opened"].includes(inv.status);
+    // 還活著的邀請、email 沒改：等於重寄（換新碼、再排一封）。改了 email 資料庫會回 existing，叫人先撤銷。
+    if (live && ib.email.toLowerCase() === String(inv.email || "").toLowerCase()) {
+      const code = await run("err.resend", () => D.resendInvite(inv.code));
+      if (code === undefined) return;
+      let mailErr = ""; try { await D.sendMail(); } catch (e) { mailErr = D.says(e); }
+      await reopenPerson(p.person_id, mailErr ? T("msg.invitedQueued", { code }) + mailErr : T("msg.resent", { email: ib.email, code }));
+      return;
+    }
+    const r = await run("err.inviteBack", () => D.inviteBack(p.person_id, ib.email, ib.lang, ib.line));
+    if (r === undefined) return;
+    if (r && r.existing) { await reopenPerson(p.person_id, T("ib.existing", { code: r.code })); return; }
+    let mailErr = ""; try { await D.sendMail(); } catch (e) { mailErr = D.says(e); }
+    await reopenPerson(p.person_id, mailErr ? T("msg.invitedQueued", { code: r.code }) + mailErr : T("msg.invitedBack", { email: r.email || ib.email }));
+    return;
+  }
+  if (act === "invite-back-resend") {
+    const code = await run("err.resend", () => D.resendInvite(b.dataset.code));
+    if (code === undefined) return;
+    let mailErr = ""; try { await D.sendMail(); } catch (e) { mailErr = D.says(e); }
+    await reopenPerson(b.dataset.id, mailErr ? T("msg.invitedQueued", { code }) + mailErr : T("msg.resent", { email: b.dataset.email, code }));
+    return;
+  }
+  if (act === "invite-back-revoke") {
+    if (UI.needAsk(S, b, T("confirm.revokeBack", { email: b.dataset.email }))) return;
+    const ok = await run("err.revoke", () => D.revokeInvite(b.dataset.code));
+    if (ok === undefined) return;
+    await reopenPerson(b.dataset.id, T("msg.revoked", { email: b.dataset.email }));
+    return;
+  }
+  // ── 一批（2026-11-07）：名單上勾起來的人，右邊那個面板 ─────────────
+  if (act === "bulk-untick") { if (S.bulk) S.bulk.ticked = (S.bulk.ticked || []).filter(id => id !== b.dataset.id); render(); return; }
+  if (act === "bulk-clear") { S.bulk = null; render(); return; }
+  if (act === "bulk-send") {
+    readBulk();
+    const rows = UI.bulkRows(S.people, S.bulk);
+    const { payload, missing } = UI.bulkPayload(rows);
+    if (missing.length) { S.msg = T("bk.missing", { names: missing.map(id => { const p = findPerson(id); return p ? pname(p) : id; }).join(T("punct.list")) }); render(); return; }
+    if (!payload.length) return;
+    const res = await run("err.bulk", () => D.inviteBackMany(payload));
+    if (res === undefined) return;
+    let mailErr = ""; try { await D.sendMail(); } catch (e) { mailErr = D.says(e); }
+    // 一列一個結果留在面板上；錯誤先過 says() 變成人看得懂的字。
+    S.bulk.results = (res || []).map(r => Object.assign({}, r, { error: r.error ? D.says(new Error(r.error)) : "" }));
+    S.msg = T("bk.summary", UI.bulkSummary(S.bulk.results)) + (mailErr ? " " + T("bk.mailNotSent") + mailErr : "");
+    await openRoster(true);
     return;
   }
   if (act === "record-delete") {
@@ -574,8 +646,23 @@ document.addEventListener("click", async e => {
     const boardRank = grants === "cadre" ? d.who.slice(6) : "";
     if (grants === "cadre" && !boardRank) { S.msg = T("err.rankRequired2"); render(); return; }
     if ((d.title_en || d.title_zh) && !d.term) { S.msg = T("err.termRequired"); render(); return; }
-    const code = await run("err.invite", () => D.invitePerson({ email: d.email, grants, rank: boardRank, name_zh: d.name_zh, name_en: d.name_en,
-      title_en: d.title_en, title_zh: d.title_zh, team: d.team, term: d.term, line: d.line, note: d.note }));
+    // 2026-11-07：名單上有同名、沒有帳號的人就要先選（掛上去或建新的）。沒有同名的就讓資料庫自己對（它也會對一次，剛好一筆就掛）。
+    const matches = Array.isArray(d.candidates) && d.candidates.length ? S.people.filter(p => d.candidates.includes(p.person_id)) : UI.nameMatches(S.people, d.name_zh, d.name_en);
+    if (grants !== "intern" && matches.length && !d.attach) { S.msg = T("err.attachPick"); render(); return; }
+    const person = d.attach === "__new" ? UI.NIL_UUID : (d.attach || null);
+    let code;
+    try {
+      S.busy = true; S.msg = ""; render();
+      code = await D.invitePerson({ email: d.email, grants, rank: boardRank, name_zh: d.name_zh, name_en: d.name_en,
+        title_en: d.title_en, title_zh: d.title_zh, team: d.team, term: d.term, line: d.line, note: d.note, person });
+      S.busy = false;
+    } catch (err) {
+      S.busy = false;
+      // 資料庫自己撞到同名好幾筆：帶 id 回來，畫面畫同一個選擇器讓人選。
+      const ids = UI.ambiguousIds(err);
+      if (ids.length) S.inviteNew = Object.assign({}, d, { candidates: ids, attach: "" });
+      S.msg = T("err.invite") + D.says(err); render(); return;
+    }
     if (code === undefined) return;
     // 排進去了就立刻寄。寄不出去不是邀請失敗：碼已經在，清單上會標「排隊中」，再按重寄或等下一次寄信。
     let mailErr = "";
@@ -636,9 +723,23 @@ document.addEventListener("click", async e => {
 
 // 兩個下拉選單是「選了就動」的：改一個人那一頁換屆別（表單換成那一屆的職位）、工作區裡改等級（直接存）。
 document.addEventListener("change", async e => {
+  // 2026-11-07：這兩種欄位沒有 data-act，要在下面那一句 closest 之前接。
+  //   邀請頁打完名字（離開欄位）：重畫一次，名單上有同名的人就跳出「掛到哪一筆」。
+  //   批次面板的語言下拉：收進 S.bulk，重畫不會掉。
+  const t = e.target;
+  if (t && (t.id === "in-zh" || t.id === "in-en") && S.view === "invites") { S.inviteNew = Object.assign(readInviteForm(), { candidates: null }); render(); return; }
+  if (t && (t.id === "bk-lang" || String(t.id || "").startsWith("bk-lang-"))) { readBulk(); return; }
   const el = e.target.closest("[data-act]");
   if (!el) return;
   // 職位下拉換了（2026-10-24）：重畫一次，選「自訂」才露出文字框。加一筆過去的紀錄那一頁也用同一個 data-act。
+  // 名單上的勾（2026-11-07 批次邀請）：改 S.bulk 再重畫，右邊的面板跟著出現。
+  if (el.dataset.act === "bulk-tick") {
+    readBulk();
+    const set = new Set((S.bulk && S.bulk.ticked) || []);
+    if (el.checked) set.add(el.dataset.id); else set.delete(el.dataset.id);
+    S.bulk = Object.assign({ emails: {}, langs: {}, lang: lang() }, S.bulk || {}, { ticked: [...set], results: null });
+    render(); return;
+  }
   if (el.dataset.act === "pos-rank") {
     if (S.view === "invites") { S.inviteNew = Object.assign(readInviteForm(), { rank: el.value }); render(); return; }
     if (S.view === "person-new") {
@@ -715,6 +816,7 @@ document.addEventListener("input", e => {
     return;
   }
   if ((el.dataset.act === "pk-q" || el.dataset.act === "pk-mq") && S.view === "workspaces") { pkApply(el); render(); UI.pkRefocus(el.dataset.ns, el.dataset.act === "pk-mq" ? "mq" : "q"); return; }
+  if (String(el.id || "").startsWith("bk-email-") && S.bulk) { (S.bulk.emails = S.bulk.emails || {})[el.id.slice(9)] = el.value; return; }
   if (el.id === "wsn-en") {
     const slug = document.getElementById("wsn-slug");
     if (slug && (!slug.value || slug.dataset.auto === "1")) { slug.value = UI.slugify(el.value); slug.dataset.auto = "1"; }

@@ -54,11 +54,18 @@ export const loadInviteList = () => rpc("invites_for_review");
 export const invitePerson   = d => rpc("invite_person", { p_email: d.email, p_grants: d.grants, p_rank: d.rank || null,
   p_name_zh: d.name_zh || null, p_name_en: d.name_en || null, p_title_en: d.title_en || null, p_title_zh: d.title_zh || null,
   p_team: d.team || null, p_term: d.term || null, p_line: d.line || null, p_note: d.note || null,
-  p_lang: lang() });   // 被邀請的人還沒有帳號，邀請信用邀請人此刻的介面語言（Paul 2026-10-26）
+  p_lang: lang(),      // 被邀請的人還沒有帳號，邀請信用邀請人此刻的介面語言（Paul 2026-10-26）
+  // 2026-11-07：掛到名單上既有的一筆。null 讓資料庫自己對名字（剛好一筆就掛）、某一筆的 id 是畫面選定的、全零是「一定建新的」。
+  p_person: d.person || null });
 export const resendInvite   = code => rpc("resend_invite", { p_code: code, p_lang: lang() });
 export const revokeInvite   = code => rpc("revoke_invite", { p_code: code });
 // 排進 outbox 之後立刻寄（跟審核那一頁同一支函式）。
 export const sendMail       = () => rpc("send_pending_mail", { p_limit: 40 });
+// 把老幹部請回來（2026-11-07）：對名單上沒有帳號的一筆直接寄邀請信、一次一批、名單上每一筆最近一組邀請的狀態。
+// 門都在資料庫（invite_back 與 invite_back_many 是 require_senior，roster_invites 的 where 裡是 is_senior）。
+export const inviteBack      = (person, email, lg, line) => rpc("invite_back", { p_person: person, p_email: email, p_lang: lg || lang(), p_line: line || null });
+export const inviteBackMany  = rows => rpc("invite_back_many", { p_rows: rows });
+export const loadRosterInvites = () => rpc("roster_invites");
 
 export async function disableInvite(code) {
   need();
@@ -161,8 +168,9 @@ export const endTerm         = (id, zh, en, starts, ends, keep) => rpc("end_term
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
   // 邀請信（2026-10-29）
-  ["invite_pending",     T({ zh: "這個 email 還有一組沒用的邀請。先撤銷或重寄那一組。", en: "This email already has a live invite. Revoke or resend that one first." }), T({ zh: "", en: "" })],
-  ["email_has_account",  T({ zh: "這個 email 已經有帳號了。他直接登入就好；要給他身分，用名單上的「發校友碼」或批次碼。", en: "This email already has an account. They can sign in; to grant a role use the roster or a batch code." }), ""],
+  // 2026-11-07 改成三欄的寫法：原本用 T({zh,en}) 在載入那一刻就定了語言，切換之後不會跟著換。
+  ["invite_pending",     "這個 email 或這一筆紀錄還有一組活著的邀請（還沒過期、還沒撤銷）。要換就先撤銷，或直接重寄那一組。", "This email or record still has a live invite (not expired, not revoked). Revoke it first, or resend that one."],
+  ["email_has_account",  "這個 email 已經有登入帳號了，他直接登入就好。是別人的話換一個 email。", "This email already has a login account; they can just sign in. If it is a different person, use another email."],
   ["bad_email",          T({ zh: "email 的格式不對。", en: "That is not a valid email." }), ""],
   ["already_claimed",    T({ zh: "這組邀請已經被認領了，不用重寄。", en: "This invite was already claimed; no need to resend." }), ""],
   ["not_an_invite",      T({ zh: "這不是邀請信的碼。", en: "That is not an invite code." }), ""],
@@ -210,12 +218,15 @@ const SAYS = [
   ["no_such_workspace", "找不到這個工作區，重新整理再試一次。", "Workspace not found. Refresh and try again."],
   ["bad_slug", "工作區代號只能用小寫英文字母、數字和連字號，2 到 40 個字。", "A workspace id can only use lowercase letters, digits and hyphens, 2 to 40 characters."],
   ["no_such_person", "找不到這個人，重新整理再試一次。", "Person not found. Refresh and try again."],
+  // 把老幹部請回來（2026-11-07）。排在泛用的那幾條前面。
+  // person_has_account 一定要排在 has_account 前面：says() 用 includes 比對，排後面永遠輪不到它（2026-11-07 抓到的）。
+  ["person_has_account", "這個人已經有登入帳號了，不用邀請。", "This person already has a login account, so no invite is needed."],
+  ["ambiguous_person", "名單上有好幾筆同名、沒有帳號的紀錄，先選一筆再寄。", "The roster has several records with this name and no account. Pick one first."],
   ["empty_name", "中文名或英文名至少要填一個。", "Fill in at least one of the Chinese or English name."],
   ["no_account", "這個人沒有帳號，沒有東西可以從平台移除。要拿掉名單上的紀錄用「刪除紀錄」。", "This person has no account, so there is nothing to remove from the platform. Use \"Delete record\" to drop the roster record."],
   ["has_account", "這個人有帳號，不能只刪紀錄。要先用「刪除成員」把帳號移除。", "This person has an account, so the record alone cannot be deleted. Use \"Remove member\" first."],
   ["cannot_remove_self", "不能刪自己。要離開的話，先把另一位 Co-President 升上來，再請他刪你。", "You cannot remove yourself. To leave, promote another Co-President first and have them remove you."],
-  ["has_unused_invite", "這一筆還綁著一組沒用掉的校友碼，先到邀請碼那一頁停用它。", "This record still has an unused alumni code. Disable it under Invite codes first."],
-  ["person_has_account", "這個人已經有帳號了，不用再發校友碼。", "This person already has an account, so no alumni code is needed."],
+  ["has_unused_invite", "這一筆還綁著一組活著的邀請或校友碼。先在上面「邀請回來」那一塊撤銷它，或到邀請頁停用那組碼。", "This record still has a live invite or alumni code. Revoke it under \"Invite back\" above, or disable the code on the Invites page."],
   ["record_claimed", "這一筆紀錄已經被別的帳號認走了。", "This record has already been claimed by another account."],
   ["both_have_accounts", "兩筆都有帳號，不能合併。先確認哪一個帳號是對的，把另一個用「刪除成員」移除。", "Both records have accounts, so they cannot be merged. Decide which account is right and remove the other with \"Remove member\"."],
   ["same_person", "選到同一筆了。", "That is the same record."],

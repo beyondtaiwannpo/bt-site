@@ -733,7 +733,7 @@ export function afterEndHTML(after, people, busy) {
 }
 const FIELD_KEY = { board_role: "field.board_role", team: "field.team", name: "field.name", role: "field.role",
   position: "field.position", assignment: "field.assignment", removed: "field.removed", claimed: "field.claimed",
-  merged: "field.merged", term: "field.term" };
+  merged: "field.merged", term: "field.term", invite: "field.invite", invite_back: "field.invite_back" };
 const fmtDate = v => String(v || "").slice(0, 16).replace("T", " ");
 const ROLE_NAME = { cadre: "role.cadre", alumni: "role.alumni", student: "role.student", intern: "role.intern" };
 // 紀錄裡的值翻成人看的字。指派存成「等級@工作區」，職位存成「屆別:名稱/team」。
@@ -795,10 +795,132 @@ const hasAccount = p => !!p.profile_id;
 
 // 幹部名單。people 是 roster()；filter = { term: 屆別代號或 "all", team: "" 全部 / "__none" / team 名 }。
 // 預設只列現在這一屆有職位的人，切到「全部」才看得到歷屆與沒有帳號的人。
-export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, workspaces, after) {
+
+// ── 把老幹部請回來（2026-11-07）───────────────────────────────────────
+// Paul 看了「校友碼與刪除紀錄」那一塊之後說三件事混在一起：名單紀錄、登入帳號、邀請。這一段把它們拆開：
+//   名單上沒有帳號的紀錄 → 一顆「寄邀請信」（invite_back），狀態從 roster_invites() 來，合進每一個人的 invite 欄（mergeInvites）；
+//   名單上勾一批人 → 右邊一個面板一次寄（invite_back_many），一人一個結果；
+//   邀請頁打了名字對到名單上的人 → 先問要掛到哪一筆（nameMatches / inviteChooserHTML），資料庫也會自己對（ambiguous_person 就帶 id 回來問）。
+const INV_TAG = { queued: "", sent: "open", failed: "warn", opened: "open", claimed: "done", expired: "draft", revoked: "draft" };
+const d16 = v => String(v || "").slice(0, 16).replace("T", " ");
+const LANG_OPTS = (v, blankLabel) => `${blankLabel != null ? `<option value=""${!v ? " selected" : ""}>${esc(blankLabel)}</option>` : ""}<option value="zh"${v === "zh" ? " selected" : ""}>${T("ib.langZh")}</option><option value="en"${v === "en" ? " selected" : ""}>${T("ib.langEn")}</option>`;
+// 名單合上邀請狀態。只掛在沒有帳號的人身上（有帳號的人邀請早就認領完了，名單上不用再講）。狀態載不到就每一個都是 null，名單照畫。
+export function mergeInvites(people, invites) {
+  const by = Object.fromEntries((invites || []).map(i => [i.person_id, i]));
+  return (people || []).map(p => Object.assign({}, p, { invite: !hasAccount(p) && by[p.person_id] ? by[p.person_id] : null }));
+}
+// 手抄的批次碼才印「校友碼 xxx 還沒用」：roster() 的 pending_code 也會抓到邀請信那組碼，那組已經用徽章講了。
+const plainCode = p => p && p.pending_code && !(p.invite && p.invite.code === p.pending_code) ? p.pending_code : "";
+export function inviteBadgeHTML(inv) {
+  if (!inv || !inv.status) return "";
+  const when = inv.status === "claimed" ? inv.claimed_at : inv.status === "opened" ? inv.opened_at : inv.status === "revoked" ? inv.revoked_at
+    : inv.status === "expired" ? inv.expires_at : inv.sent_at || inv.created_at;
+  const title = [inv.email ? T("ib.to", { email: inv.email }) : "", when ? d16(when) : ""].filter(Boolean).join("・");
+  return `<span class="inv" style="white-space:nowrap"><span class="tag ${INV_TAG[inv.status] || ""}" title="${esc(title)}">${esc(T("in.st." + inv.status) || inv.status)}</span>`
+    + (when ? `<span class="mini"> ${esc(d16(when).slice(0, 10))}</span>` : "") + `</span>`
+    + (inv.status === "failed" && inv.mail_error ? `<div class="mini">${T("ib.mailErr", { err: esc(inv.mail_error) })}</div>` : "");
+}
+// 改一個人那一頁的「邀請回來」。draft.ib = { email, lang, line, code } 留住填到一半的。
+// 認領了就只剩狀態；還活著（排隊、寄出、開過、寄失敗）就表單與狀態都在：按「寄」而 email 沒變等於重寄，換了 email 資料庫會回 existing 叫你先撤銷。
+export function inviteBackHTML(p, draft, busy, isPres) {
+  const d = (draft && draft.ib) || {};
+  const inv = p.invite || null;
+  const dis = busy ? " disabled" : "";
+  const live = !!inv && ["queued", "sent", "failed", "opened"].includes(inv.status);
+  const email = d.email != null ? d.email : (inv && inv.email) || p.email || "";
+  const lg = d.lang || (inv && inv.lang) || lang();
+  const times = inv ? [["created", inv.created_at], ["sent", inv.sent_at], ["opened", inv.opened_at], ["claimed", inv.claimed_at], ["revoked", inv.revoked_at], ["expires", live ? inv.expires_at : null]]
+    .filter(x => x[1]).map(x => T("ib.at." + x[0], { d: esc(d16(x[1])) })).join("・") : "";
+  const status = inv ? `<div class="fhead" style="margin-top:14px"><b>${T("ib.status")}</b>${inviteBadgeHTML(inv)}</div>
+    <div class="fmeta">${T("ib.to", { email: esc(inv.email || "") })}${inv.invited_by_name ? "・" + T("ib.by", { who: esc(inv.invited_by_name) }) : ""}・<span class="mini">${T("in.code", { code: esc(inv.code || "") })}</span></div>
+    ${times ? `<div class="fmeta">${times}</div>` : ""}
+    <div class="row">${inv.status !== "claimed" ? `<button class="btn ghost sm" data-act="invite-back-resend" data-code="${esc(inv.code)}" data-email="${esc(inv.email || "")}" data-id="${esc(p.person_id)}"${dis}>${T("ib.resend")}</button>` : ""}${
+      live && isPres ? `<button class="btn quiet sm" data-act="invite-back-revoke" data-code="${esc(inv.code)}" data-email="${esc(inv.email || "")}" data-id="${esc(p.person_id)}"${dis}>${T("ib.revoke")}</button>` : ""}</div>` : "";
+  const form = inv && inv.status === "claimed" ? "" : `<div class="two">
+      <label><i>${T("ib.email")}</i><input id="ib-email" type="email" value="${esc(email)}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="name@example.com"${dis}></label>
+      <label><i>${T("ib.lang")}</i><select id="ib-lang"${dis}>${LANG_OPTS(lg)}</select></label>
+      <label><i>${T("ib.line")}</i><input id="ib-line" value="${esc(d.line || "")}" placeholder="${esc(T("in.linePh"))}"${dis}></label>
+    </div>
+    <div class="row"><button class="btn" data-act="invite-back-send" data-id="${esc(p.person_id)}"${dis}>${busy ? T("ib.sending") : T("ib.send")}</button></div>`;
+  const code = plainCode(p);
+  const codeFold = isPres ? `<details class="fold"${code ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("ib.codeFold")}</b><span class="mini">${T("ib.codeFoldHint")}</span></summary><div class="fold-body">${code
+      ? `<div class="note">${T("pe.pendingCode", { code: esc(code) })}</div>`
+      : `<div class="row"><input id="pk-code" value="${esc(d.code || "")}" placeholder="bt-xxxxxx" style="max-width:220px"${dis}>
+         <button class="btn ghost sm" data-act="person-code" data-id="${esc(p.person_id)}"${dis}>${T("pe.issueCode")}</button></div>
+         <div class="mini">${T("pe.issueCodeNote")}</div>`}</div></details>` : "";
+  return sectionHTML(T("ib.title"), `<div class="note">${T("ib.lede")}</div>${form}${status}${codeFold}`, { id: "invite-back" });
+}
+// 名單上勾起來的人。bulk = { ticked: [person_id…], lang, emails: { id: "…" }, langs: { id: "zh" | "en" | "" }, results: invite_back_many 回的 }。
+export function bulkRows(people, bulk) {
+  const b = bulk || {};
+  const by = Object.fromEntries((people || []).map(p => [p.person_id, p]));
+  return (b.ticked || []).map(id => by[id]).filter(Boolean).map(p => ({
+    person_id: p.person_id, name: pickName(p),
+    email: b.emails && b.emails[p.person_id] != null ? b.emails[p.person_id] : ((p.invite && p.invite.email) || p.email || ""),
+    lang: (b.langs && b.langs[p.person_id]) || b.lang || lang(),
+  }));
+}
+export function bulkPayload(rows) {
+  const payload = [], missing = [];
+  for (const r of rows || []) { if (String(r.email || "").trim()) payload.push({ person: r.person_id, email: String(r.email).trim(), lang: r.lang }); else missing.push(r.person_id); }
+  return { payload, missing };
+}
+export function bulkSummary(results) {
+  const out = { sent: 0, existing: 0, error: 0 };
+  for (const r of results || []) out[r.status === "sent" ? "sent" : r.status === "existing" ? "existing" : "error"]++;
+  return out;
+}
+// 右邊那個面板。results 裡的 error 已經在 main.js 過過 says()，這裡照印。
+export function bulkPanelHTML(bulk, people, busy) {
+  const b = bulk || {};
+  if (!(b.ticked || []).length) return "";
+  const rows = bulkRows(people, b);
+  const dis = busy ? " disabled" : "";
+  const res = Object.fromEntries((b.results || []).map(r => [r.person, r]));
+  const line = r => { const x = res[r.person_id]; if (!x) return "";
+    const k = x.status === "sent" ? "done" : x.status === "existing" ? "open" : "warn";
+    // 錯誤的原因放 tag 外面：.tag 會把字轉大寫，「EMAIL」會讀起來像在吼人。
+    return `<div class="mini" style="margin:-4px 0 8px"><span class="tag ${k}">${x.status === "error" ? T("bk.result.errorTag") : T("bk.result." + (x.status === "sent" ? "sent" : "existing"))}</span>${x.status === "error" ? " " + esc(x.error || "") : ""}</div>`; };
+  const row = r => `<div class="card posrow bk-row" data-bk="${esc(r.person_id)}">
+    <div class="two">
+      <label><i>${esc(r.name)}</i><input id="bk-email-${esc(r.person_id)}" type="email" value="${esc(r.email)}" placeholder="name@example.com" autocomplete="off" autocapitalize="off" spellcheck="false"${dis}></label>
+      <label><i>${T("ib.lang")}</i><select id="bk-lang-${esc(r.person_id)}"${dis}>${LANG_OPTS((b.langs || {})[r.person_id] || "", T("bk.langRow"))}</select></label>
+    </div>${line(r)}
+    <div class="row"><button class="btn ghost sm" data-act="bulk-untick" data-id="${esc(r.person_id)}"${dis}>${T("bk.untick")}</button></div>
+  </div>`;
+  const sum = b.results ? `<div class="note" style="margin-top:12px">${T("bk.summary", bulkSummary(b.results))}</div>` : "";
+  return sectionHTML(T("bk.title", { n: rows.length }), `<div class="note">${T("bk.lede")}</div>
+    <label><i>${T("bk.lang")}</i><select id="bk-lang"${dis}>${LANG_OPTS(b.lang || lang())}</select></label>
+    ${rows.map(row).join("")}
+    <div class="row"><button class="btn" data-act="bulk-send"${dis}>${busy ? T("bk.sending") : T("bk.send", { n: rows.length })}</button>
+      <button class="btn ghost" data-act="bulk-clear"${dis}>${T("bk.clear")}</button></div>${sum}`, { id: "bulk" });
+}
+// 邀請頁：打的名字對到名單上沒有帳號的人（中文全等、英文不分大小寫）。
+export function nameMatches(people, nameZh, nameEn) {
+  const zh = String(nameZh || "").trim(), en = String(nameEn || "").trim().toLowerCase();
+  if (!zh && !en) return [];
+  return (people || []).filter(p => !hasAccount(p) && ((en && String(p.name_en || "").trim().toLowerCase() === en) || (zh && String(p.name_zh || "").trim() === zh)));
+}
+export function inviteChooserHTML(matches, picked, busy) {
+  if (!(matches || []).length) return "";
+  const dis = busy ? " disabled" : "";
+  const pos = m => (m.positions || []).map(x => `${positionTitle(x)}・${x.term}`).join(T("punct.list")) || T("in.attachPos");
+  return `<div class="note attach" id="in-attach-box"><b>${T("in.attach")}</b><div class="mini" style="margin:4px 0 10px">${T("in.attachNote")}</div>${
+    matches.map(m => `<label class="check"><input type="radio" name="in-attach" value="${esc(m.person_id)}"${picked === m.person_id ? " checked" : ""}${dis}><span><b>${esc(pickName(m))}</b> <span class="mini">${esc(pos(m))}</span>${plainCode(m) ? ` <span class="mini">${T("ro.pendingCode", { code: esc(plainCode(m)) })}</span>` : ""}${m.invite ? " " + inviteBadgeHTML(m.invite) : ""}</span></label>`).join("")}
+    <label class="check"><input type="radio" name="in-attach" value="__new"${picked === "__new" ? " checked" : ""}${dis}><span>${T("in.attachNew")}</span></label></div>`;
+}
+// 資料庫自己撞到同名好幾筆：ambiguous_person:id1,id2 拆成清單，畫面拿去畫同一個選擇器。
+export function ambiguousIds(err) {
+  const m = String((err && err.message) || err || "").match(/ambiguous_person:([^\s]+)/);
+  return m ? m[1].split(",").map(x => x.trim()).filter(Boolean) : [];
+}
+export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+
+export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, workspaces, after, bulk) {
   const list = people || [];
   const cur = currentTerm(terms);
-  const f = Object.assign({ term: cur ? cur.id : "all", team: "", q: "" }, filter || {});
+  const f = Object.assign({ term: cur ? cur.id : "all", team: "", q: "", noacc: false }, filter || {});
+  const tick = new Set(((bulk || {}).ticked) || []);
   // 找名字（2026-10-23 批 2）：中英文都認，大小寫不分。main.js 接 input 事件、重畫後把游標放回去。
   const q = String(f.q || "").trim().toLowerCase();
   const hit = p => !q || String(p.name_zh || "").toLowerCase().includes(q) || String(p.name_en || "").toLowerCase().includes(q);
@@ -809,7 +931,9 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
   const posTeams = p => positionsFor(p, f.term === "all" ? (cur ? cur.id : "") : f.term).map(x => x.team).filter(Boolean);
   const teamsOf = p => isOrgWide(p.board_role) ? [...new Set(posTeams(p))]
     : parseTeams(p.team).length ? parseTeams(p.team) : (positionFor(p, f.term) && positionFor(p, f.term).team ? [positionFor(p, f.term).team] : []);
-  const base = list.filter(inTerm);
+  // 「沒有帳號」那顆 chip（2026-11-07）：只留名單上沒有登入帳號的人，勾一批人一起寄邀請信就是在這裡。
+  const noAccN = list.filter(inTerm).filter(p => !hasAccount(p)).length;
+  const base = list.filter(inTerm).filter(p => !f.noacc || !hasAccount(p));
   const allTeams = [...new Set(base.flatMap(teamsOf))].sort((a, b) => a.localeCompare(b));
   const noTeam = base.filter(p => !teamsOf(p).length).length;
   const shown = (!f.team ? base : f.team === "__none" ? base.filter(p => !teamsOf(p).length) : base.filter(p => teamsOf(p).includes(f.team))).filter(hit);
@@ -822,7 +946,8 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
     chip("roster-term", "all", T("ro.allTerms"), list.length, f.term === "all")}</div>`;
   const teamChips = `<div class="chips" style="margin-bottom:14px">${chip("roster-team", "", T("ro.all"), base.length, !f.team)}${
     allTeams.map(t => chip("roster-team", t, t.replace(/\s*Team$/i, ""), base.filter(p => teamsOf(p).includes(t)).length, f.team === t)).join("")}${
-    noTeam ? chip("roster-team", "__none", T("ro.noTeam"), noTeam, f.team === "__none") : ""}</div>`;
+    noTeam ? chip("roster-team", "__none", T("ro.noTeam"), noTeam, f.team === "__none") : ""}${
+    noAccN ? chip("roster-noacc", "", T("ro.noAccountChip"), noAccN, !!f.noacc) : ""}</div>`;
   const tr = p => {
     const { name, alt } = personName(p);
     const pos = positionFor(p, f.term === "all" ? (cur ? cur.id : "") : f.term);
@@ -830,12 +955,13 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
     const ws = Array.isArray(p.workspaces) ? p.workspaces : [];
     const dup = Array.isArray(p.maybe_dup) && p.maybe_dup.length;
     return `<tr${hasAccount(p) ? "" : ' class="off"'}>
-      <td class="t-main">${nameBlock(p)}${
+      <td class="t-main">${!hasAccount(p) ? `<label class="tick"><input type="checkbox" data-act="bulk-tick" data-id="${esc(p.person_id)}"${tick.has(p.person_id) ? " checked" : ""} aria-label="${esc(T("ro.tick"))}"${dis}></label>` : ""}${nameBlock(p)}${
         p.profile_id === meId ? ` <span class="tag">${T("ro.you")}</span>` : ""}${
         name === noName ? ` <span class="tag warn">${T("ro.noName")}</span>` : ""}${
         !hasAccount(p) ? ` <span class="tag draft">${T("ro.noAccount")}</span>` : p.role !== "cadre" ? ` <span class="tag">${esc(ROLE_NAME[p.role] ? T(ROLE_NAME[p.role]) : p.role)}</span>` : ""}${
         dup ? ` <span class="tag warn">${T("ro.maybeDup")}</span>` : ""}${
-        p.pending_code ? `<div class="mini">${T("ro.pendingCode", { code: esc(p.pending_code) })}</div>` : ""}</td>
+        p.invite ? ` ${inviteBadgeHTML(p.invite)}` : ""}${
+        plainCode(p) ? `<div class="mini">${T("ro.pendingCode", { code: esc(plainCode(p)) })}</div>` : ""}</td>
       <td>${hasAccount(p) && p.role === "cadre" ? `<span class="tag${p.board_role === "president" || p.board_role === "senior_adviser" ? " open" : ""}">${esc(boardLabel(p.board_role))}</span>` : `<span class="mini">—</span>`}</td>
       <td class="t-pos">${pos ? positionsFor(p, pos.term).map(x => {
                  // 一筆職位一行，不用「 · 」接成一句：職級是左邊那一欄的徽章，職位是這裡的字，兩件事分開看。
@@ -864,6 +990,7 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
       [{ act: "person-new", label: T("ro.addPast"), disabled: busy }])
     + msgHTML(msg)
     + afterEndHTML(after, list, busy)
+    + bulkPanelHTML(bulk, list, busy)
     + `<div class="note">${isPres ? T("ro.note") : T("ro.noteSenior")}</div>`
     + sectionHTML("", `<label class="ro-search"><i>${T("ro.search")}</i><input id="ro-search" type="search" value="${esc(f.q || "")}" placeholder="${esc(T("ro.searchPh"))}" autocomplete="off"></label>`
       + termChips + teamChips + (sorted.length
@@ -969,16 +1096,14 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
     dups.map(o => `<div class="row"><b>${esc(personName(o).name)}</b>${hasAccount(o) ? ` <span class="tag">${T("pe.dupHasAccount")}</span>` : ` <span class="tag draft">${T("ro.noAccount")}</span>`}
       ${isPres ? `<button class="btn ghost sm" data-act="person-merge" data-keep="${esc(p.person_id)}" data-drop="${esc(o.person_id)}"${dis}>${T("pe.mergeInto")}</button>` : ""}</div>`).join("")}`) : "";
   let danger = "";
-  if (isPres) {
-    if (!hasAccount(p)) {
-      danger = sectionHTML(T("pe.dangerNoAccount"), `${p.pending_code
-        ? `<div class="note">${T("pe.pendingCode", { code: esc(p.pending_code) })}</div>`
-        : `<div class="row"><input id="pk-code" value="${esc(d.code || "")}" placeholder="bt-xxxxxx" style="max-width:220px"${dis}>
-           <button class="btn ghost sm" data-act="person-code" data-id="${esc(p.person_id)}"${dis}>${T("pe.issueCode")}</button></div>
-           <div class="mini">${T("pe.issueCodeNote")}</div>`}
-        <div class="row" style="margin-top:14px"><button class="btn danger sm" data-act="record-delete" data-id="${esc(p.person_id)}"${dis}>${T("pe.deleteRecord")}</button></div>
-        <div class="mini">${T("pe.deleteRecordNote")}</div>`);
-    } else if (!self) {
+  // 沒有帳號的紀錄（2026-11-07）：「邀請回來」取代原本的「校友碼與刪除紀錄」。Co-President 與 Senior Adviser 都寄得了；
+  // 發碼那一條收在摺疊裡（沒有 email 的人才用）；刪除紀錄還是只有 Co-President，放最底下。
+  if (!hasAccount(p)) {
+    danger = inviteBackHTML(p, d, busy, isPres)
+      + (isPres ? sectionHTML(T("pe.deleteRecord"), `<div class="row"><button class="btn danger sm" data-act="record-delete" data-id="${esc(p.person_id)}"${dis}>${T("pe.deleteRecord")}</button></div>
+        <div class="mini">${T("pe.deleteRecordNote")}</div>`) : "");
+  } else if (isPres) {
+    if (!self) {
       danger = sectionHTML(T("pe.danger"), remove
         ? `<div class="note">${T("pe.removeList", { name: esc(name) })}</div>
            <label><i>${T("pe.removeType", { name: esc(name) })}</i><input id="pk-confirm" value="${esc(remove.typed || "")}" autocomplete="off"${dis}></label>
@@ -1240,9 +1365,12 @@ export function whoLabel(v) {
   if (v === "intern") return T("in.who.intern");
   return T("in.who.cadre", { rank: boardLabel(String(v || "").replace(/^cadre:/, "")) });
 }
-export function inviteFormNewHTML(draft, terms, busy) {
+export function inviteFormNewHTML(draft, terms, busy, people) {
   const d = draft || {};
   const dis = busy ? " disabled" : "";
+  // 2026-11-07：打的名字對到名單上沒有帳號的人，先問要掛到哪一筆。d.candidates 是資料庫回 ambiguous_person 帶的 id（優先）。
+  const matches = Array.isArray(d.candidates) && d.candidates.length
+    ? (people || []).filter(p => d.candidates.includes(p.person_id)) : nameMatches(people, d.name_zh, d.name_en);
   const who = d.who || "cadre:member";
   const cur = currentTerm(terms);
   const termId = d.term || (cur ? cur.id : "");
@@ -1263,6 +1391,9 @@ export function inviteFormNewHTML(draft, terms, busy) {
       <span></span>
       <label><i>${T("in.nameZh")}</i><input id="in-zh" value="${esc(d.name_zh || "")}"${dis}></label>
       <label><i>${T("in.nameEn")}</i><input id="in-en" value="${esc(d.name_en || "")}"${dis}></label>
+    </div>
+    ${inviteChooserHTML(matches, d.attach || "", busy)}
+    <div class="two">
       <label><i>${T("in.line")}</i><input id="in-line" value="${esc(d.line || "")}" placeholder="${esc(T("in.linePh"))}"${dis}></label>
       <label><i>${T("in.note")}</i><input id="in-note" value="${esc(d.note || "")}"${dis}></label>
     </div>
@@ -1272,7 +1403,7 @@ export function inviteFormNewHTML(draft, terms, busy) {
 }
 const ST_TAG = { queued: "", sent: "open", failed: "warn", opened: "open", claimed: "done", expired: "draft", revoked: "draft" };
 // batchOpen：上次有沒有展開（main.js 從 localStorage 讀），預設收著。
-export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft, isPres, batchOpen) {
+export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft, isPres, batchOpen, people) {
   const list = rows || [];
   const dis = busy ? " disabled" : "";
   const d10 = v => String(v || "").slice(0, 10);
@@ -1295,7 +1426,7 @@ export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft
   };
   return pageHead(T("in.title"), T("in.lede"))
     + msgHTML(msg)
-    + inviteFormNewHTML(draft, terms, busy)
+    + inviteFormNewHTML(draft, terms, busy, people)
     + sectionHTML(T("in.list"), list.length ? `<ul class="flist">${list.map(item).join("")}</ul>` : emptyHTML(T("in.empty"), T("in.emptyHint")), { id: "invites" })
     // 2026-11-03 Paul 找不到那一行字：改成有框、有箭頭、有一句說明的面板。<details> 原生就吃 Enter 與 aria-expanded，main.js 記住開著沒。
     + (isPres ? `<details class="fold" id="batch"${batchOpen ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("in.batch")}</b><span class="mini">${T("in.batchHint")}</span></summary><div class="fold-body">${inviteFormHTML(batchDraft, busy)}${
