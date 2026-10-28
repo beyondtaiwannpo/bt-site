@@ -1015,8 +1015,8 @@ export function historyEditHTML(m, me, msg, busy, up) {
       </div></li>`;
   const photos = isNew ? "" : sectionHTML(`${T("hi.photosSec")}<span class="hint">${(v.photos || []).length}</span>`, `<div class="note">${T("hi.photoNote")}</div>
       ${(v.photos || []).length ? `<ul class="hi-photos">${v.photos.map(photoCard).join("")}</ul>` : ""}
-      ${can ? (up ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(T("hi.uploading", { name: up.name || "" }))}</span></div>`
-        : `<label class="hi-upload"><i>${T("hi.upload")}</i><input type="file" id="hi-file" accept="image/*" data-id="${esc(v.id)}"${dis}></label>`) : ""}`);
+      ${can ? (up ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(up.n > 1 ? T("hi.uploadingN", { name: up.name || "", i: up.i || 1, n: up.n }) : T("hi.uploading", { name: up.name || "" }))}</span></div>`
+        : `<label class="hi-upload"><i>${T("hi.upload")}</i><input type="file" id="hi-file" accept="image/*" multiple data-id="${esc(v.id)}"${dis}></label>`) : ""}`);
   return pageHead(isNew ? T("hi.newTitle") : esc(hiTitle(v)), isNew ? "" : `${esc(v.happened_on || "")}・${esc(v.slug)}`, [], { act: "hi-back", label: T("hi.back") })
     + msgHTML(msg) + keys + content + photos;
 }

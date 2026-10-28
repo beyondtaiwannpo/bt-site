@@ -101,7 +101,7 @@ test("一站：欄位、代號自動算的提示、照片卡（同意勾選、�
   assert.match(draft, /<div data-autosave="hi-save" data-id="m1">/); assert.doesNotMatch(draft, /data-act="hi-save"/);
   assert.match(draft, /<span class="autosave" data-for="hi-save">/);
   assert.match(draft, /data-act="hi-ready" data-id="m1"/); assert.doesNotMatch(draft, /hi-publish/);
-  assert.match(draft, /<input type="file" id="hi-file" accept="image\/\*"/);
+  assert.match(draft, /<input type="file" id="hi-file" accept="image\/\*" multiple/, "一次可以選好幾張（2026-11-07）");
   assert.match(draft, /data-act="hi-ph-del" data-id="p1"/);
   // 照片說明兩格改了就存（容器是那張卡，data-id 是照片），同意勾選標 data-noauto（它本來就是勾了就送），「存照片說明」鈕沒有了。
   assert.match(draft, /<div class="hi-photo-f" data-autosave="hi-ph-save" data-id="p1">/); assert.doesNotMatch(draft, /hi-ph-save"[^>]*>存/);

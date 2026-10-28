@@ -189,20 +189,34 @@ async function shrinkImage(file) {
   if (!blob) throw new Error(T("err.hiResize"));
   return blob;
 }
-async function uploadFile(milestoneId, file) {
-  if (!UI.hiFileOk(file)) { S.msg = T("err.hiFile"); render(); return; }
-  S.busy = true; S.msg = ""; S.hiUp = { pct: 10, name: file.name }; render();
-  try {
-    const blob = await shrinkImage(file);
-    S.hiUp = { pct: 45, name: file.name }; render();
-    const url = await D.uploadPhoto(milestoneId, blob);
-    S.hiUp = { pct: 85, name: file.name }; render();
-    await D.addPhoto(milestoneId, url, "", "", false);
-    S.hiUp = null;
-    await reloadHistory(T("msg.hiPhotoAdded"));
-  } catch (e) { S.hiUp = null; S.busy = false; S.msg = T("err.hiUpload") + D.says(e); render(); }
+// 一次可以選好幾張（Paul 2026-11-07）。一張一張傳，壞掉的那幾張記下來，其他照傳；傳完重讀一次。
+async function uploadFiles(milestoneId, files) {
+  const bad = files.filter(f => !UI.hiFileOk(f)).map(f => f.name);
+  const ok = files.filter(f => UI.hiFileOk(f));
+  if (!ok.length) { S.msg = T("err.hiFile"); render(); return; }
+  S.busy = true; S.msg = ""; S.hiUp = { pct: 0, name: ok[0].name, i: 1, n: ok.length }; render();
+  const failed = [];
+  for (let i = 0; i < ok.length; i++) {
+    const file = ok[i];
+    const base = Math.round(i / ok.length * 100), span = 100 / ok.length;
+    const step = pct => { S.hiUp = { pct: Math.round(base + span * pct / 100), name: file.name, i: i + 1, n: ok.length }; render(); };
+    try {
+      step(10);
+      const blob = await shrinkImage(file);
+      step(45);
+      const url = await D.uploadPhoto(milestoneId, blob);
+      step(85);
+      await D.addPhoto(milestoneId, url, "", "", false);
+    } catch (e) { failed.push(file.name + "（" + D.says(e) + "）"); }
+  }
+  S.hiUp = null;
+  const n = ok.length - failed.length;
+  const parts = [];
+  if (n) parts.push(T(n === 1 ? "msg.hiPhotoAdded" : "msg.hiPhotosAdded", { n }));
+  if (failed.length) parts.push(T("err.hiUploadSome") + failed.join("、"));
+  if (bad.length) parts.push(T("err.hiFileSome") + bad.join("、"));
+  await reloadHistory(parts.join(" "));
 }
-
 async function openRes() {
   S.busy = true; render();
   try {
@@ -540,7 +554,7 @@ document.addEventListener("change", async e => {
     return;
   }
   const fileEl = e.target.closest("#hi-file");
-  if (fileEl && S.view === "history-edit") { const f = fileEl.files && fileEl.files[0]; if (f) await uploadFile(fileEl.dataset.id, f); return; }
+  if (fileEl && S.view === "history-edit") { const fs = Array.from(fileEl.files || []); if (fs.length) await uploadFiles(fileEl.dataset.id, fs); return; }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
