@@ -120,3 +120,23 @@ test("★ 英文畫出來不剩中文（會議清單、一場會議、看板排�
   }
   F.setLang("zh"); AV.setLang("zh");
 });
+
+test("勾或取消出席的人，人數與送出鈕的數字跟著變（Paul 2026-10-28 回報數字不動）", () => {
+  const ctx = { scopes: ["board"], members: [{ id: "u1", name: "王平" }], free: [], when: "w" };
+  const h = SCH.scheduleHTML({ ticked: ["u1"] }, ctx, false);
+  assert.match(h, /<i id="sch-who-n">/, "人數那一行有 id，change 才改得到");
+  assert.match(h, /id="sch-send" data-act="sch-send"/, "送出鈕有 id");
+  const m = readFileSync("availability/src/main.js", "utf8");
+  const i = m.indexOf('document.addEventListener("change"');
+  assert.ok(i > 0, "有 change 監聽");
+  const body = m.slice(i, i + 600);
+  assert.match(body, /sch-member/); assert.match(body, /readSch\(\)/);
+  assert.match(body, /sch-who-n/); assert.match(body, /T\("sch\.send"/); assert.match(body, /btn\.disabled = !n/);
+});
+
+test("寄信修好：send_pending_mail 的 r 是 mail_outbox 的型別（11-05 那一版用 record，每封信都 cannot cast）", () => {
+  const s = readFileSync("supabase/migrations/2026-11-11-fix-mail-send.sql", "utf8");
+  assert.match(s, /r public\.mail_outbox%rowtype; v_key text;/);
+  assert.doesNotMatch(s, /^\s*r record;/m);
+  assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /2026-11-11-fix-mail-send\.sql/, "smoke 有跑這一支");
+});

@@ -34,7 +34,7 @@ export function scheduleHTML(sch, ctx, busy) {
       <label><i>${T("sch.doc")}</i><input id="sch-doc" value="${esc(d.doc)}" placeholder="https://docs.google.com/…"${dis}></label>
       <label class="wide"><i>${T("sch.agenda")}</i><input id="sch-agenda" value="${esc(d.agenda)}" placeholder="${esc(T("sch.agendaPh"))}"${dis}></label>
     </div>
-    <div class="sch-who"><i>${T("sch.who", { n: d.ticked.length })}</i>
+    <div class="sch-who"><i id="sch-who-n">${T("sch.who", { n: d.ticked.length })}</i>
       <div class="row"><input id="sch-q" value="${esc(d.q)}" placeholder="${esc(T("sch.find"))}" autocomplete="off" data-act="sch-q"${dis}>
         <button type="button" class="btn ghost sm" data-act="sch-all"${dis}>${T("sch.all")}</button>
         <button type="button" class="btn ghost sm" data-act="sch-none"${dis}>${T("sch.none")}</button></div>
@@ -42,7 +42,7 @@ export function scheduleHTML(sch, ctx, busy) {
     </div>
     ${d.msg ? `<div class="wnote err">${esc(d.msg)}</div>` : ""}
     <div class="row">
-      <button class="btn" data-act="sch-send"${dis || !d.ticked.length ? " disabled" : ""}>${busy ? T("common.saving") : T("sch.send", { n: d.ticked.length })}</button>
+      <button class="btn" id="sch-send" data-act="sch-send"${dis || !d.ticked.length ? " disabled" : ""}>${busy ? T("common.saving") : T("sch.send", { n: d.ticked.length })}</button>
       <button class="btn ghost" data-act="sch-cancel"${dis}>${T("common.cancel")}</button>
     </div>
     <div class="wnote">${T("sch.note")}</div>

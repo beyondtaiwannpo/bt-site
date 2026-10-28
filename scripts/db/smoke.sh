@@ -2096,6 +2096,28 @@ psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-10-hide-months.sql >/
 chkraise "裝回去之後 Associate 還是藏不了" "not_ws_edit" \
   "perform set_config('test.uid','${ASSOC}',true); perform public.set_month_hidden(11, true);"
 
+echo "── 寄信修好（2026-11-11-fix-mail-send.sql）──"
+# 先證明 bug 在：11-05 那一版的 send_pending_mail 寄一封新信會卡在 cannot cast。
+psql -d "${DB}" -X -A -t -q -c "insert into public.mail_outbox (to_email, subject, body, kind) values ('fix1@x.test', 's', 'b', 'invite');" >/dev/null
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false); select public.send_pending_mail(50);" >/dev/null 2>&1 || true
+chk "★ 修之前：新信卡在 cannot cast（重現 Paul 回報的）" "1" "select count(*) from public.mail_outbox where to_email='fix1@x.test' and sent_at is null and error like '%cannot cast type record%'"
+fxgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-11-fix-mail-send.sql 2>&1 || true)
+if echo "${fxgot}" | grep -q "OVERALL.*PASS" && ! echo "${fxgot}" | grep -q "|FAIL"; then echo "  ok   寄信修好那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 寄信修好那支驗收表："; echo "${fxgot}" | head -12; fail=$((fail+1)); fi
+chk "卡住的那封 tries 歸零了" "0" "select tries from public.mail_outbox where to_email='fix1@x.test'"
+psql -d "${DB}" -X -A -t -q -c "insert into public.mail_outbox (to_email, subject, body, kind, ics) values ('fix2@x.test', 's', 'b', 'meeting_invite', 'BEGIN:VCALENDAR');" >/dev/null
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false); select public.send_pending_mail(50);" >/dev/null 2>&1 || true
+chk "★ 修之後：卡住的那封寄出去了" "t" "select sent_at is not null and error is null from public.mail_outbox where to_email='fix1@x.test'"
+chk "★ 修之後：帶 .ics 的會議邀請也寄出去了" "t" "select sent_at is not null and error is null from public.mail_outbox where to_email='fix2@x.test'"
+fx2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-11-fix-mail-send.sql 2>&1 || true)
+if echo "${fx2}" | grep -q "OVERALL.*PASS"; then echo "  ok   寄信修好那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 寄信修好那支重跑沒過"; fail=$((fail+1)); fi
+# 破壞測試：把 r 改回 record，驗收表要變紅
+BROKEN=$(mktemp)
+sed "s/  r public.mail_outbox%rowtype; v_key text;/  r record; v_key text;/" supabase/migrations/2026-11-11-fix-mail-send.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：r 改回 record，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL r 改回 record 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-11-fix-mail-send.sql >/dev/null 2>&1 || true
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

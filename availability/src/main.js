@@ -640,6 +640,16 @@ document.addEventListener("click", async e => {
   }
 });
 
+// 勾或取消一位出席的人：人數與按鈕上的數字跟著變（2026-10-28 Paul 回報勾了數字不動）。
+// 不重畫整個彈窗，名單捲到一半的位置才不會跳回最上面。
+document.addEventListener("change", e => {
+  if (e.target.name !== "sch-member" || !S.sch) return;
+  readSch();
+  const n = S.sch.ticked.length;
+  const lab = document.getElementById("sch-who-n"); if (lab) lab.textContent = T("sch.who", { n });
+  const btn = document.getElementById("sch-send"); if (btn && !S.busy) { btn.textContent = T("sch.send", { n }); btn.disabled = !n; }
+});
+
 document.addEventListener("input", e => {
   // 標題改了就跟著改連結的 href。**不重畫整個彈窗** ——
   // 重畫會讓輸入框失焦，使用者打第二個字就得再點一次。
