@@ -416,6 +416,7 @@ export async function boot() {
 
     // 整包裝進去，不要手寫逐欄指派（理由見 passport/src/main.js 的 boot）。
     Object.assign(S, all);
+    UI.setGroups(all.groups);
     // 不是 intern、也不是 Internship team 的幹部 → 回 /app/。
     // role 為 null 不導走：那是 profiles 查不到，跟「不是實習生」不是同一件事。
     if (S.role && S.role !== "intern" && !S.staff) { toApp(); return; }

@@ -2143,6 +2143,111 @@ psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-12-reveal-months.sql 
 chkraise "裝回去之後 Associate 還是揭曉不了" "not_ws_edit" \
   "perform set_config('test.uid','${ASSOC}',true); perform public.set_month_revealed(12, true);"
 
+echo "── 幹部護照的月份全部從後台管（2026-11-13-passport-months-control.sql）──"
+pmgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-13-passport-months-control.sql 2>&1 || true)
+if echo "${pmgot}" | grep -q "OVERALL.*PASS" && ! echo "${pmgot}" | grep -q "|FAIL"; then echo "  ok   月份那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 月份那支驗收表："; echo "${pmgot}" | head -12; fail=$((fail+1)); fi
+chk "★ 九月有人蓋過章，清理不動：九月、十月都還在" "2" "select count(*) from public.months where month in (9,10)"
+chkraise "★ Associate 加不了月份" "not_ws_edit" "perform set_config('test.uid','${ASSOC}',true); perform public.add_month(8);"
+chkraise "★ 學員刪不了月份" "not_ws_edit" "perform set_config('test.uid','${STU}',true); perform public.delete_month(9);"
+chkraise "★ Associate 搬不了格子" "not_ws_edit" "perform set_config('test.uid','${ASSOC}',true); perform public.move_activity('09B', 11);"
+chkraise "★ Associate 排不了順序" "not_ws_edit" "perform set_config('test.uid','${ASSOC}',true); perform public.move_month(9, 1);"
+chkraise "已經有的月份加不了第二次" "month_exists" "perform set_config('test.uid','${PAUL}',true); perform public.add_month(9);"
+chkraise "13 月不存在" "bad_month" "perform set_config('test.uid','${PAUL}',true); perform public.add_month(13);"
+chkas "${PAUL}" "加八月，排在最後面" "12" "select public.add_month(8)"
+chk "八月沒揭曉、沒藏、時刻空白" "false|false|" "select revealed||'|'||hidden||'|'||theme_zh from public.months where month=8"
+chkas "${PAUL}" "八月往前移一格" "" "select public.move_month(8, -1)"
+chk "八月跑到七月前面" "8,7" "select string_agg(month::text, ',' order by seq) from (select * from public.months order by seq desc limit 2) t"
+chkas "${PAUL}" "已經在最前面再往前：不動、不報錯" "" "select public.move_month((select month from public.months order by seq limit 1), -1)"
+chkas "${PAUL}" "在八月加一格" "08A" "select public.save_activity(null,8,'gather','八月聚會','Aug',null,false,null)"
+chkas "${PAUL}" "八月往前再移一格（格子的 seq 跟著走）" "" "select public.move_month(8, -1)"
+chk "★ 格子的 seq 等於它的月份的 seq" "0" "select count(*) from public.activities a join public.months m on m.month=a.month where a.seq <> m.seq"
+chkraise "★ 還有格子的月份刪不掉" "month_has_boxes" "perform set_config('test.uid','${PAUL}',true); perform public.delete_month(8);"
+chkraise "★ 有人蓋過的格子搬不動" "has_stamps" "perform set_config('test.uid','${PAUL}',true); perform public.move_activity('09A', 11);"
+chkraise "★ 只寫過心得的格子也搬不動" "has_stamps" "perform set_config('test.uid','${PAUL}',true); perform public.move_activity('09C', 11);"
+chkraise "搬到不存在的月份" "bad_month" "perform set_config('test.uid','${PAUL}',true); perform public.move_activity('08A', 13);"
+chkas "${PAUL}" "08A 搬到十二月" "08A" "select public.move_activity('08A', 12)"
+chk "編號不變、月份與 seq 換成十二月的" "08A|12|true" "select a.id||'|'||a.month||'|'||(a.seq = m.seq) from public.activities a join public.months m on m.month=12 where a.id='08A'"
+chkas "${PAUL}" "八月空了，刪得掉" "8" "select public.delete_month(8)"
+chk "八月不在了" "0" "select count(*) from public.months where month=8"
+psql -d "${DB}" -X -A -t -q -c "insert into public.visas (user_id, month, code) select '${DIR}', 12, code from public.destinations limit 1 on conflict do nothing;" >/dev/null 2>&1 || true
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false); select public.add_month(8);" >/dev/null 2>&1 || true
+psql -d "${DB}" -X -A -t -q -c "insert into public.visas (user_id, month, code) select '${DIR}', 8, code from public.destinations limit 1 on conflict do nothing;" >/dev/null 2>&1 || true
+chkraise "★ 有人拿到那個月入境章的月份刪不掉" "month_has_visas" "perform set_config('test.uid','${PAUL}',true); perform public.delete_month(8);"
+psql -d "${DB}" -X -A -t -q -c "delete from public.visas where month = 8; delete from public.months where month = 8;" >/dev/null
+# 破壞測試：拿掉「還有格子就擋」，驗收表要變紅
+BROKEN=$(mktemp)
+sed "s/  perform public.require_ws_edit('passport');//" supabase/migrations/2026-11-13-passport-months-control.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 require_ws_edit，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 require_ws_edit 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-13-passport-months-control.sql >/dev/null 2>&1 || true
+chkraise "裝回去之後 Associate 還是加不了月份" "not_ws_edit" "perform set_config('test.uid','${ASSOC}',true); perform public.add_month(8);"
+# 清理那一段：做成跟正式站一樣（九月只有 09B、十月是空的、沒人蓋過），再跑一次。
+psql -d "${DB}" -X -A -t -q -c "delete from public.stamps where act_id in (select id from public.activities where month in (9,10));
+  delete from public.entries where act_id in (select id from public.activities where month in (9,10));
+  delete from public.visas where month in (9,10);
+  update public.activities set callback_to = null where callback_to in (select id from public.activities where month in (9,10) and id <> '09B');
+  delete from public.activities where month in (9,10) and id <> '09B';
+  insert into public.activities (id, month, seq, category, title_zh, title_en, callback_to) select '07B', 7, seq, 'prompt', '現在還算數嗎', 'STILL TRUE?', '09B' from public.months where month = 7 on conflict (id) do update set callback_to = '09B';" >/dev/null
+pm2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-13-passport-months-control.sql 2>&1 || true)
+if echo "${pm2}" | grep -q "OVERALL.*PASS"; then echo "  ok   月份那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 月份那支重跑沒過"; fail=$((fail+1)); fi
+chk "★ 清理做了：九月、十月不在了" "0" "select count(*) from public.months where month in (9,10)"
+chk "★ 09B 搬到十一月，七月那格還回望它" "11|09B" "select coalesce((select month::text from public.activities where id='09B'),'沒有09B')||'|'||coalesce((select callback_to from public.activities where id='07B'),'沒有07B回望')"
+pm3=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-13-passport-months-control.sql 2>&1 || true)
+if echo "${pm3}" | grep -q "OVERALL.*PASS"; then echo "  ok   清理之後再重跑也沒事"; pass=$((pass+1)); else echo "  FAIL 清理之後重跑沒過"; fail=$((fail+1)); fi
+
+echo "── 實習護照的分類從後台管（2026-11-14-intern-groups.sql）──"
+iggot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-14-intern-groups.sql 2>&1 || true)
+if echo "${iggot}" | grep -q "OVERALL.*PASS" && ! echo "${iggot}" | grep -q "|FAIL"; then echo "  ok   分類那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 分類那支驗收表："; echo "${iggot}" | head -12; fail=$((fail+1)); fi
+chk "原本那三個分類照順序放進去了" "onboard,project,reflect" "select string_agg(key, ',' order by seq) from public.intern_groups"
+chkraise "★ 學員（不是 Internship team） 加不了分類" "not_internship_team" "perform set_config('test.uid','${STU}',true); perform public.save_intern_group(null,'x','X','','','','');"
+chkraise "★ 學員（不是 Internship team） 刪不了分類" "not_internship_team" "perform set_config('test.uid','${STU}',true); perform public.delete_intern_group('reflect');"
+chkraise "★ 學員（不是 Internship team） 排不了順序" "not_internship_team" "perform set_config('test.uid','${STU}',true); perform public.move_intern_group('reflect', -1);"
+chkraise "名字留白會被擋" "empty_title" "perform set_config('test.uid','${ISTAFF}',true); perform public.save_intern_group(null,' ','X','','','','');"
+igkey=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${ISTAFF}',false);" -c "select public.save_intern_group(null,'分享','Share','跟大家說','Tell everyone','說明','Body')" 2>&1 | tail -1 | tr -d ' ')
+chk "新增一個分類：代號自己產生、排在最後" "Share|true" "select name_en||'|'||(seq = (select max(seq) from public.intern_groups)) from public.intern_groups where key='${igkey}'"
+chkas "${ISTAFF}" "新的分類底下加一格" "T2627-77" "select public.save_intern_task('T2627-77','2026-27',77,'${igkey}','分享一次','SHARE ONCE',null)"
+chkraise "★ 不存在的分類放不進格子" "bad_category" "perform set_config('test.uid','${ISTAFF}',true); perform public.save_intern_task('T2627-78','2026-27',78,'nope','x','X',null);"
+chkraise "★ 還有格子的分類刪不掉" "group_has_tasks" "perform set_config('test.uid','${ISTAFF}',true); perform public.delete_intern_group('${igkey}');"
+chkas "${ISTAFF}" "改名字" "${igkey}" "select public.save_intern_group('${igkey}','分享會','Sharing','','','','')"
+chk "改到了，代號沒變" "分享會|Sharing" "select name_zh||'|'||name_en from public.intern_groups where key='${igkey}'"
+chkas "${ISTAFF}" "往前移一格" "" "select public.move_intern_group('${igkey}', -1)"
+chk "跑到反思前面" "onboard,project,${igkey},reflect" "select string_agg(key, ',' order by seq) from public.intern_groups where key in ('onboard','project','reflect','${igkey}')"
+chkas "${ISTAFF}" "格子換回任務" "T2627-77" "select public.save_intern_task('T2627-77','2026-27',77,'project','分享一次','SHARE ONCE',null)"
+chkas "${ISTAFF}" "空了的分類刪得掉" "${igkey}" "select public.delete_intern_group('${igkey}')"
+chk "刪掉了" "0" "select count(*) from public.intern_groups where key='${igkey}'"
+chkrole authenticated "${STU}" "★ 學員讀不到分類（RLS）" "0" "select count(*) from public.intern_groups"
+chkrole authenticated "${ISTAFF}" "【對照】Internship team 讀得到分類，跟格子同一條" "true|true" "select ((select count(*) from public.intern_groups) > 0)::text||'|'||((select count(*) from public.intern_tasks) > 0)::text"
+ig2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-14-intern-groups.sql 2>&1 || true)
+if echo "${ig2}" | grep -q "OVERALL.*PASS"; then echo "  ok   分類那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 分類那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/  perform public.require_internship_team();//" supabase/migrations/2026-11-14-intern-groups.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 require_internship_team，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 require_internship_team 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-14-intern-groups.sql >/dev/null 2>&1 || true
+chkraise "裝回去之後外人還是加不了分類" "not_internship_team" "perform set_config('test.uid','${STU}',true); perform public.save_intern_group(null,'x','X','','','','');"
+
+echo "── 格子的時間與範例照片（2026-11-15-box-time-and-example.sql）──"
+bxgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-15-box-time-and-example.sql 2>&1 || true)
+if echo "${bxgot}" | grep -q "OVERALL.*PASS" && ! echo "${bxgot}" | grep -q "|FAIL"; then echo "  ok   格子那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 格子那支驗收表："; echo "${bxgot}" | head -12; fail=$((fail+1)); fi
+EXU="https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/passport-examples/09B/1-a.jpg"
+chkas "${PAUL}" "存時間與照片" "09B" "select public.set_activity_extras('09B', '2026-11-22 12:00:00+00', '${EXU}')"
+chk "存到了" "2026-11-22T12:00|true" "select to_char(happens_at at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI')||'|'||(example_url = '${EXU}')::text from public.activities where id='09B'"
+chkraise "★ 別的網站的照片網址擋掉" "bad_example_url" "perform set_config('test.uid','${PAUL}',true); perform public.set_activity_extras('09B', null, 'https://evil.example.com/a.jpg');"
+chkraise "★ 別的 bucket 也擋" "bad_example_url" "perform set_config('test.uid','${PAUL}',true); perform public.set_activity_extras('09B', null, 'https://x.supabase.co/storage/v1/object/public/history/a.jpg');"
+chkraise "★ Associate 改不了" "not_ws_edit" "perform set_config('test.uid','${ASSOC}',true); perform public.set_activity_extras('09B', null, null);"
+chkas "${PAUL}" "清掉時間與照片" "09B" "select public.set_activity_extras('09B', null, '  ')"
+chk "清掉了" "t|t" "select (happens_at is null)::text::char(1)||'|'||(example_url is null)::text::char(1) from public.activities where id='09B'"
+BROKEN=$(mktemp)
+sed "s/  perform public.require_ws_edit('passport');//" supabase/migrations/2026-11-15-box-time-and-example.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 require_ws_edit，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 require_ws_edit 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-15-box-time-and-example.sql >/dev/null 2>&1 || true
+bx2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-15-box-time-and-example.sql 2>&1 || true)
+if echo "${bx2}" | grep -q "OVERALL.*PASS"; then echo "  ok   格子那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 格子那支重跑沒過"; fail=$((fail+1)); fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

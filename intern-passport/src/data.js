@@ -88,7 +88,11 @@ export async function loadAll() {
       staff = !!(a && Array.isArray(a.workspaces) && a.workspaces.some(w => w.id === "intern-passport"));
     } catch (e) { /* 沒有指派 */ }
   }
+  // 分類（2026-11-14，intern_groups）。載不到就是空的，畫面用程式裡那三個（遷移檔還沒跑的時候）。
+  let groups = [];
+  try { const g = await supabase.from("intern_groups").select("*").order("seq"); if (!g.error) groups = g.data || []; } catch (e) { /* 表還不在 */ }
   return {
+    groups,
     role: me.role ?? null,
     staff,
     term,

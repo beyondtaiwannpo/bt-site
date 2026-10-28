@@ -42,7 +42,29 @@ export async function loadInternAdmin() {
   // 不要知道是誰 —— 那是進度牆的事。
   const stamped = {};
   for (const r of st.data || []) stamped[r.task_id] = (stamped[r.task_id] || 0) + 1;
-  return { terms: te.data || [], tasks: ta.data || [], stamped, interns: (pe.data || []).length };
+  // 分類（2026-11-14）。表還不在（遷移檔還沒跑）就是空的，畫面用程式裡那三個。
+  let groups = [];
+  try { const g = await supabase.from("intern_groups").select("*").order("seq"); if (!g.error) groups = g.data || []; } catch (e) { /* 表還不在 */ }
+  return { terms: te.data || [], tasks: ta.data || [], stamped, interns: (pe.data || []).length, groups };
+}
+
+// 實習護照的分類（2026-11-14）：加、改字、刪、排順序。規則在 2026-11-14-intern-groups.sql。
+export async function saveInternGroup(g) {
+  need();
+  const { data, error } = await supabase.rpc("save_intern_group", { p_key: g.key || null, p_name_zh: g.name_zh, p_name_en: g.name_en,
+    p_tagline_zh: g.tagline_zh || "", p_tagline_en: g.tagline_en || "", p_body_zh: g.body_zh || "", p_body_en: g.body_en || "" });
+  if (error) throw error;
+  return data;
+}
+export async function deleteInternGroup(key) {
+  need();
+  const { error } = await supabase.rpc("delete_intern_group", { p_key: key });
+  if (error) throw error;
+}
+export async function moveInternGroup(key, dir) {
+  need();
+  const { error } = await supabase.rpc("move_intern_group", { p_key: key, p_dir: Number(dir) });
+  if (error) throw error;
 }
 
 export async function saveInternTerm(t) {
@@ -92,18 +114,41 @@ export async function loadPassportAdmin() {
   need();
   const [mo, ac, de, st] = await Promise.all([
     supabase.from("months").select("seq, month, theme_zh, theme_en, hidden, revealed").order("seq"),
-    supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active")
+    supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active, happens_at, example_url")
       .order("seq").order("id"),
     supabase.from("destinations").select("code, city, active").order("code"),
     supabase.from("stamps").select("act_id"),
   ]);
-  for (const r of [mo, ac, de, st]) if (r.error) throw r.error;
+  // 2026-11-15 的兩欄（時間、範例照片）還沒跑遷移檔的話，少那兩欄再讀一次，後台照樣打得開。
+  let acts = ac;
+  if (ac.error && ac.error.code === "42703")
+    acts = await supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active").order("seq").order("id");
+  for (const r of [mo, acts, de, st]) if (r.error) throw r.error;
   const stamped = {};
   for (const r of st.data || []) stamped[r.act_id] = (stamped[r.act_id] || 0) + 1;
-  return { months: mo.data || [], activities: ac.data || [], destinations: de.data || [], stamped };
+  return { months: mo.data || [], activities: acts.data || [], destinations: de.data || [], stamped };
 }
 
 // a = { id（null 是新增）, month, category, title_zh, title_en, description, needs_host, callback_to }
+// 格子的時間與範例照片（2026-11-15）。iso 是 null 就是清掉時間，url 是空就是拿掉照片。
+export async function setActivityExtras(id, iso, url) {
+  need();
+  const { error } = await supabase.rpc("set_activity_extras", { p_id: id, p_happens_at: iso || null, p_example_url: url || null });
+  if (error) throw error;
+}
+// 範例照片傳到 passport-examples bucket，回公開網址。路徑 <格子>/<時間>-<亂數>.jpg，不用原檔名。
+export async function uploadExample(actId, blob) {
+  need();
+  const name = `${actId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage.from("passport-examples").upload(name, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+  if (error) throw error;
+  return supabase.storage.from("passport-examples").getPublicUrl(name).data.publicUrl;
+}
+export async function removeExample(url) {
+  const m = /\/object\/public\/passport-examples\/(.+)$/.exec(String(url || ""));
+  if (m) { try { await supabase.storage.from("passport-examples").remove([decodeURIComponent(m[1])]); } catch (e) { /* 檔留著，不擋 */ } }
+}
+
 export async function saveActivity(a) {
   need();
   const { data, error } = await supabase.rpc("save_activity", {
@@ -138,6 +183,28 @@ export async function setMonthHidden(month, hidden) {
 export async function setMonthRevealed(month, revealed) {
   need();
   const { error } = await supabase.rpc("set_month_revealed", { p_month: Number(month), p_revealed: !!revealed });
+  if (error) throw error;
+}
+
+// 月份全部從後台管（2026-11-13）：加、刪、排順序、把格子搬到別的月份。規則在 2026-11-13-passport-months-control.sql。
+export async function addMonth(month) {
+  need();
+  const { error } = await supabase.rpc("add_month", { p_month: Number(month) });
+  if (error) throw error;
+}
+export async function deleteMonth(month) {
+  need();
+  const { error } = await supabase.rpc("delete_month", { p_month: Number(month) });
+  if (error) throw error;
+}
+export async function moveMonth(month, dir) {
+  need();
+  const { error } = await supabase.rpc("move_month", { p_month: Number(month), p_dir: Number(dir) });
+  if (error) throw error;
+}
+export async function moveActivity(id, month) {
+  need();
+  const { error } = await supabase.rpc("move_activity", { p_id: id, p_month: Number(month) });
   if (error) throw error;
 }
 
@@ -272,6 +339,12 @@ const SAYS = [
   ["no_such_activity", "找不到這一格，重新整理再試一次。", "Box not found. Refresh and try again."],
   ["month_locked", "已經建好的格子不能換月份：章是照月份算入境章的。要搬到別的月份就另外建一格，這一格停用。", "An existing box cannot move to another month: entry stamps are counted by month. Create a new box in the other month and disable this one."],
   ["bad_callback", "回望要指向另一個存在的格子編號，例如 09B，不能指向自己。", "Looks back must point to another existing box id, for example 09B, not to itself."],
+  ["group_has_tasks", "這個分類底下還有格子（任何一屆都算），刪不掉。先把格子換到別的分類或刪掉。", "This group still has boxes (in any term). Move them to another group or delete them first."],
+  ["no_such_group", "找不到這個分類，可能被別人刪了。重新整理再試一次。", "That group no longer exists; someone may have deleted it. Refresh and try again."],
+  ["bad_example_url", "範例照片要從這一頁上傳，不能貼外面的網址。", "Upload the example photo on this page; outside links are not accepted."],
+  ["month_exists", "護照裡已經有這個月了。", "The passport already has this month."],
+  ["month_has_boxes", "這個月還有格子，刪不掉。先把格子搬到別的月份或刪掉。", "This month still has boxes. Move them to another month or delete them first."],
+  ["month_has_visas", "已經有人拿到這個月的入境章，這個月刪不掉。可以改成藏起來。", "Someone already has this month's entry stamp, so it cannot be deleted. Hide it instead."],
   ["has_callback", "有別的格子回望這一格，不能刪。先把那一格的回望拿掉。", "Another box looks back at this one, so it cannot be deleted. Remove that box's look-back first."],
   ["no_such_month", "找不到這個月份，重新整理再試一次。", "Month not found. Refresh and try again."],
   ["bad_code", "城市代碼只能用 2 到 8 個英文字母或數字，例如 TPE。", "A city code can only use 2 to 8 letters or digits, for example TPE."],

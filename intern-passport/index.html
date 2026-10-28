@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="bt-version" content="2026-10-28-0929">
+<meta name="bt-version" content="2026-10-28-1010">
 <!-- 版本號與 importmap（2026-11-06）：這一段由 scripts/bump-version.sh 整段改寫，不要手改。
      importmap 把「./src/ui.js」這種乾淨的模組名稱對到帶版本號的網址，所以 .js 裡的 import 不用帶版本號，
      而 GitHub Pages 的 10 分鐘快取不會讓新舊模組混著用。為什麼要這樣見 README「後台速度」。 -->
 <!-- bt-importmap -->
-<script type="importmap">{ "imports": { "/intern-passport/src/data.js": "/intern-passport/src/data.js?v=2026-10-28-0929", "/intern-passport/src/main.js": "/intern-passport/src/main.js?v=2026-10-28-0929", "/intern-passport/src/strings.js": "/intern-passport/src/strings.js?v=2026-10-28-0929", "/intern-passport/src/ui.js": "/intern-passport/src/ui.js?v=2026-10-28-0929", "/shared/auth.js": "/shared/auth.js?v=2026-10-28-0929", "/shared/supabase.js": "/shared/supabase.js?v=2026-10-28-0929", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-10-28-0929", "/shared/nav.js": "/shared/nav.js?v=2026-10-28-0929", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-10-28-0929" } }</script>
+<script type="importmap">{ "imports": { "/intern-passport/src/data.js": "/intern-passport/src/data.js?v=2026-10-28-1010", "/intern-passport/src/main.js": "/intern-passport/src/main.js?v=2026-10-28-1010", "/intern-passport/src/strings.js": "/intern-passport/src/strings.js?v=2026-10-28-1010", "/intern-passport/src/ui.js": "/intern-passport/src/ui.js?v=2026-10-28-1010", "/shared/auth.js": "/shared/auth.js?v=2026-10-28-1010", "/shared/supabase.js": "/shared/supabase.js?v=2026-10-28-1010", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-10-28-1010", "/shared/nav.js": "/shared/nav.js?v=2026-10-28-1010", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-10-28-1010" } }</script>
 <!-- /bt-importmap -->
 <title>Beyond Taiwan Intern Passport</title>
 <!-- 實習生護照（2026-10-17，方案 C，見 docs/2026-10-15-實習生護照盤點與設計.md）。
@@ -27,12 +27,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/brand.css">
 <!-- modulepreload：理由見 passport/index.html 同一段。路徑改了這幾行要跟著改，check.sh 會查檔案存不存在。 -->
-<link rel="modulepreload" href="../shared/auth.js?v=2026-10-28-0929">
-<link rel="modulepreload" href="../shared/supabase.js?v=2026-10-28-0929">
-<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-10-28-0929">
-<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-10-28-0929">
-<link rel="modulepreload" href="./src/ui.js?v=2026-10-28-0929">
-<link rel="modulepreload" href="./src/data.js?v=2026-10-28-0929">
+<link rel="modulepreload" href="../shared/auth.js?v=2026-10-28-1010">
+<link rel="modulepreload" href="../shared/supabase.js?v=2026-10-28-1010">
+<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-10-28-1010">
+<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-10-28-1010">
+<link rel="modulepreload" href="./src/ui.js?v=2026-10-28-1010">
+<link rel="modulepreload" href="./src/data.js?v=2026-10-28-1010">
 <link rel="stylesheet" href="../shared/nav.css">
 
 <style>
@@ -566,6 +566,10 @@
   .bq.z-reflect{background:rgba(255,247,137,.25)}
   .bq.task.c-onboard{background:rgba(107,198,187,.38);border-color:var(--bt-teal)}
   .bq.task.c-project{background:rgba(16,42,134,.16);border-color:var(--bt-navy)}
+  .bq.z-t4{background:rgba(255,196,108,.16)}
+  .bq.z-t5{background:rgba(198,198,198,.22)}
+  .bq.task.c-t4{background:rgba(255,196,108,.42);border-color:var(--bt-orange)}
+  .bq.task.c-t5{background:rgba(198,198,198,.5);border-color:rgba(16,42,134,.35)}
   .bq.task.c-reflect{background:rgba(255,247,137,.6);border-color:rgba(16,42,134,.35)}
   /* 我在的那一格：柔柔的橘光。剛落的那一格（.lit）亮一點。 */
   .bq.here{box-shadow:0 0 0 2px var(--bt-orange),0 0 16px 4px rgba(255,196,108,.7)}
@@ -588,6 +592,8 @@
   .blegend .c-onboard::before{background:rgba(107,198,187,.38);border-color:var(--bt-teal)}
   .blegend .c-project::before{background:rgba(16,42,134,.16);border-color:var(--bt-navy)}
   .blegend .c-reflect::before{background:rgba(255,247,137,.6)}
+  .blegend .c-t4::before{background:rgba(255,196,108,.42);border-color:var(--bt-orange)}
+  .blegend .c-t5::before{background:rgba(198,198,198,.5)}
   .blegend .ladder::before{background:rgba(255,196,108,.5);border-color:var(--bt-orange)}
   .blegend .snake::before{background:rgba(107,198,187,.45);border-color:var(--bt-teal)}
   /* 進度牆上的棋盤加名次 */
@@ -798,6 +804,6 @@ summary{cursor:pointer}
 </svg>
 
 <div id="bt-root" aria-busy="true"><div class="empty loading">Loading… 載入實習護照中…</div></div>
-<script type="module" src="./src/main.js?v=2026-10-28-0929"></script>
+<script type="module" src="./src/main.js?v=2026-10-28-1010"></script>
 </body>
 </html>

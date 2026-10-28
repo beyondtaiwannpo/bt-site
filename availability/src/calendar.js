@@ -21,6 +21,15 @@ export function cellInstant(weekStart, col, minute, viewerTz) {
   return toInstant(d.year, d.month, d.day, Math.floor(minute / 60), minute % 60, viewerTz);
 }
 
+// cellInstant 反過來（2026-11-15，護照後台「到時間看板排會」那條連結帶 ?at= 進來）：
+// 某一刻落在這一週的哪一格。col 是從星期一算的第幾天（0 到 6），min 往下取到半小時。不在這一週回 null。
+export function cellOf(instant, weekStart, viewerTz) {
+  const t = partsIn(instant, viewerTz), w = partsIn(weekStart, viewerTz);
+  const col = Math.round((Date.UTC(t.year, t.month - 1, t.day) - Date.UTC(w.year, w.month - 1, w.day)) / 86400000);
+  if (col < 0 || col > 6) return null;
+  return { col, min: t.hour * 60 + (t.minute >= 30 ? 30 : 0) };
+}
+
 const two = n => String(n).padStart(2, "0");
 // Google 日曆要的是 YYYYMMDDTHHMMSSZ（UTC）。
 function stamp(date) {

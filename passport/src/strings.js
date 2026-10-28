@@ -85,6 +85,7 @@ export const MINE = {
   "cb.wroteWhen":     { zh: "你在{when}寫的", en: "What you wrote in {when}" },
   "cb.wrote":         { zh: "你之前寫的", en: "What you wrote before" },
   // 說明頁、引導頁
+  "slot.example":     { zh: "範例照片", en: "Example photo" },
   "veil.seal":        { zh: "未揭曉", en: "SEALED" },
   "veil.title":       { zh: "這個月還沒揭曉", en: "Not revealed yet" },
   "veil.note":        { zh: "在群組公布之後，這一頁才會打開。", en: "This page opens once it's announced in the group." },

@@ -562,6 +562,16 @@ function flipBtnHTML(id, to) {
 // 聖誕樹，明年翻回去看的時候一張照片配一行心得，人不會記得那格題目是什麼 ——
 // 而那正是翻回去要找的資訊（使用者 2026-08-25）。用 .btitle 不用 .ttl：
 // 它是標籤，背面的主角是照片與心得。
+// 格子的時間（2026-11-15，activities.happens_at）照看的人自己電腦的時區印：「11/22（六）20:00」。
+// tz 只給測試用；沒給就用瀏覽器的時區。
+export function whenText(iso, tz) {
+  if (!iso) return "";
+  const d = new Date(iso); if (isNaN(d)) return "";
+  const o = { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false };
+  if (tz) o.timeZone = tz;
+  return new Intl.DateTimeFormat(lang() === "en" ? "en-US" : "zh-TW", o).format(d);
+}
+
 export function slotHTML(S, a) {
   const st = S.stamps[a.id];
   const entry = S.entries[a.id] || {};
@@ -590,7 +600,7 @@ export function slotHTML(S, a) {
       <button class="faceopen" data-act="open" data-id="${a.id}">
         <span class="cat">${esc(CATNAME[a.category] ? T(CATNAME[a.category]) : "")}</span>
         <span class="ttl">${esc(a.title_zh)}</span>
-        ${st ? "" : `<span class="en">${esc(a.title_en)}</span><span class="hint">${esc(a.description)}</span><span class="cta">${T("slot.cta")}</span>`}
+        ${st ? "" : `<span class="en">${esc(a.title_en)}</span>${a.happens_at ? `<span class="when">${esc(whenText(a.happens_at))}</span>` : ""}<span class="hint">${esc(a.description)}</span>${a.example_url ? `<img class="example" src="${esc(a.example_url)}" alt="${esc(T("slot.example"))}" loading="lazy">` : ""}<span class="cta">${T("slot.cta")}</span>`}
       </button>
       ${st ? stampHTML(a, st, anim, tearing) + flipBtnHTML(a.id, "back") : ""}
     </div>`;
@@ -839,6 +849,9 @@ export function debounce(fn, ms) {
   return d;
 }
 export const AUTOSAVE_MS = 800;
+// 打字的欄位（2026-10-28 Paul：「我要打完一句才存，現在是邊打邊存」）：離開那一格就存，或停手 4 秒才存。
+// 勾選、選單這種按了就算數的還是馬上存（flush）。
+export const TYPED_MS = 4000;
 // 這一格要怎麼存："now"（選的）、"typed"（打字的）、null（不在 data-autosave 容器裡、或標了 data-noauto）。
 export function saveMode(el) {
   if (!el || !el.closest || !el.closest("[data-autosave]")) return null;
@@ -908,7 +921,7 @@ export function bindAutosave(root, onSave) {
     const box = field.closest("[data-autosave]");
     if (!box) return;
     let d = timers.get(box);
-    if (!d) { d = debounce(f => run(box, f), AUTOSAVE_MS); timers.set(box, d); }
+    if (!d) { d = debounce(f => run(box, f), TYPED_MS); timers.set(box, d); }
     if (now) d.flush(field); else d(field);
   };
   root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });

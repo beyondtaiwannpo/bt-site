@@ -82,8 +82,10 @@ test("★ 編號不是輸入框：新增時說由系統算，改既有的時只�
   assert.match(edit, /data-autosave="act-save" data-id="09A"/);
   assert.doesNotMatch(edit, /data-act="act-save"/);
   assert.match(edit, /<span class="autosave" data-for="act-save">/);
-  for (const n of ["month", "category", "title_zh", "title_en", "description", "needs_host", "callback_to"]) assert.match(edit, new RegExp(` name="${n}"`), `${n} 沒有 name，formValues 讀不到`);
-  assert.match(edit, /id="ak-host" name="needs_host" type="checkbox"[^>]*checked/);
+  for (const n of ["month", "category", "title_zh", "title_en", "description", "happens_at", "callback_to"]) assert.match(edit, new RegExp(` name="${n}"`), `${n} 沒有 name，formValues 讀不到`);
+  // 主持人那個勾 2026-10-28 拿掉（護照上沒有地方用到它），換成「什麼時候辦」。
+  assert.doesNotMatch(edit, /ak-host/);
+  assert.match(edit, /id="ak-when" name="happens_at" type="datetime-local"/);
 });
 
 test("存檔被擋之後剛填的東西要留在畫面上（draft 優先於原值）", () => {

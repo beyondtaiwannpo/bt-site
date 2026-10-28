@@ -65,6 +65,8 @@ function render() {
     body = UI.monthEditHTML(S.monthEditing, S.msg, S.busy, S.monthDraft);
   } else if (S.view === "dest-edit" && isPres()) {
     body = UI.destinationEditHTML(S.destEditing, S.msg, S.busy, S.destDraft);
+  } else if (S.view === "intern-group") {
+    body = UI.internGroupEditHTML(S.groupEditing, S.msg, S.busy);
   } else if (S.view === "intern-term") {
     body = UI.internTermEditHTML(S.internTermEditing, S.msg, S.busy, S.internTermDraft);
   } else if (S.view === "intern-task") {
@@ -140,10 +142,22 @@ async function onAutosave(act, box, field) {
     if (act === "act-save") {
       const a = { id: ds.id, month: v.month || S.actMonth, category: v.category, title_zh: v.title_zh, title_en: v.title_en,
                   description: v.description, needs_host: !!v.needs_host, callback_to: String(v.callback_to || "").toUpperCase() };
-      if (!a.title_zh || !a.title_en) return fail(T("err.titles"));
-      await D.saveActivity(a);
-      const cur = S.pass.activities.find(x => x.id === a.id); if (cur) Object.assign(cur, a);
-      done = T("msg.actEdited", { t: a.title_zh });
+      const cur = S.pass.activities.find(x => x.id === a.id);
+      // 時間那一格（2026-11-15）走自己的函式；主持人那個勾 2026-10-28 從表單拿掉了（護照上沒有地方用到它），值照原本的留著。
+      if (fname === "happens_at") {
+        const iso = v.happens_at ? new Date(v.happens_at).toISOString() : null;
+        await D.setActivityExtras(ds.id, iso, cur ? cur.example_url : null);
+        if (cur) cur.happens_at = iso;
+        const link = box.querySelector('a[href*="availability"]'); if (link && cur) link.href = UI.boardLink(cur);
+        done = T("msg.whenSaved");
+      } else {
+        a.needs_host = cur ? !!cur.needs_host : false;
+        if (!a.title_zh || !a.title_en) return fail(T("err.titles"));
+        await D.saveActivity(a);
+        if (cur) Object.assign(cur, a);
+        const link = box.querySelector('a[href*="availability"]'); if (link && cur) link.href = UI.boardLink(cur);
+        done = T("msg.actEdited", { t: a.title_zh });
+      }
     } else if (act === "month-save") {
       await D.saveMonthTheme(ds.seq, v.theme_zh, v.theme_en);
       const cur = S.pass.months.find(x => String(x.seq) === ds.seq); if (cur) Object.assign(cur, { theme_zh: v.theme_zh, theme_en: v.theme_en });
@@ -185,6 +199,7 @@ async function openInterns(keepMsg) {
   S.busy = true; if (!keepMsg) S.msg = ""; render();
   try {
     S.intern = await D.loadInternAdmin();
+    UI.setInternGroups(S.intern.groups);
     if (!S.internSel || !S.intern.terms.some(t => t.id === S.internSel))
       S.internSel = (S.intern.terms.find(t => t.active) || S.intern.terms[0] || {}).id || null;
     S.view = "interns"; S.busy = false;
@@ -462,6 +477,44 @@ document.addEventListener("click", async e => {
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
+  // 範例照片拿掉（2026-11-15）。
+  if (act === "ak-photo-del") {
+    const cur = S.pass.activities.find(x => x.id === b.dataset.id); if (!cur) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const old = cur.example_url;
+      await D.setActivityExtras(cur.id, cur.happens_at, null);
+      cur.example_url = null; await D.removeExample(old);
+      S.busy = false; S.actEditing = cur; S.msg = T("msg.exampleGone");
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
+    render(); return;
+  }
+  // 月份全部從後台管（2026-11-13）：加、刪、排順序、搬格子。刪月份與搬格子先問一次。
+  if (act === "month-add" || act === "month-del" || act === "month-move" || act === "act-move") {
+    let run, done, ask = "";
+    if (act === "month-add") {
+      const el = document.getElementById("add-month"); if (!el) return;
+      const label = UI.monthLabel(Number(el.value));
+      run = () => D.addMonth(el.value); done = T("msg.monthAdded", { m: label });
+    } else if (act === "month-del") {
+      const label = UI.monthLabel(Number(b.dataset.month));
+      ask = T("confirm.deleteMonth", { m: label });
+      run = () => D.deleteMonth(b.dataset.month); done = T("msg.monthDeleted", { m: label });
+    } else if (act === "month-move") {
+      run = () => D.moveMonth(b.dataset.month, b.dataset.dir); done = T("msg.monthMoved", { m: UI.monthLabel(Number(b.dataset.month)) });
+    } else {
+      const el = document.getElementById("move-" + b.dataset.id); if (!el) return;
+      const a = S.pass.activities.find(x => x.id === b.dataset.id);
+      const t = a ? a.title_zh : b.dataset.id, label = UI.monthLabel(Number(el.value));
+      ask = T("confirm.moveAct", { t, m: label });
+      run = () => D.moveActivity(b.dataset.id, el.value); done = T("msg.actMoved", { t, m: label });
+    }
+    if (ask && UI.needAsk(S, b, ask)) return;
+    S.busy = true; S.msg = ""; render();
+    try { await run(); S.msg = done; await openCadre(true); }
+    catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
   // 揭曉或蓋回去一個月（2026-11-12）。兩個方向都先問：揭曉是全體幹部當下看得到，蓋回去是大家看過的那一頁不見。
   if (act === "month-reveal") {
     const reveal = b.dataset.reveal === "1";
@@ -532,6 +585,30 @@ document.addEventListener("click", async e => {
   // ── 實習護照的後台（2026-10-18）────────────────────────────────────
   // 每一個動作：按下去 busy（按鈕變「存檔中…」、其他按鈕關掉）、成功一句、失敗說錯在哪。
   if (act === "intern-back") { await openInterns(); return; }
+  // 實習護照的分類（2026-11-14）。刪先問一次。
+  if (act === "ig-new") { S.groupEditing = null; S.view = "intern-group"; S.msg = ""; render(); return; }
+  if (act === "ig-edit") { S.groupEditing = (S.intern.groups || []).find(g => g.key === b.dataset.key) || null; S.view = "intern-group"; S.msg = ""; render(); return; }
+  if (act === "ig-save") {
+    const v = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+    const g = { key: b.dataset.key || null, name_zh: v("ig-name-zh"), name_en: v("ig-name-en"), tagline_zh: v("ig-tag-zh"), tagline_en: v("ig-tag-en"), body_zh: v("ig-body-zh"), body_en: v("ig-body-en") };
+    S.groupEditing = Object.assign({}, S.groupEditing || {}, g, { key: g.key || "" });
+    S.busy = true; S.msg = ""; render();
+    try { await D.saveInternGroup(g); S.msg = T("msg.groupSaved", { t: g.name_zh }); await openInterns(true); }
+    catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
+  if (act === "ig-move" || act === "ig-del") {
+    const g = (S.intern.groups || []).find(x => x.key === b.dataset.key);
+    const name = g ? g.name_zh : b.dataset.key;
+    if (act === "ig-del" && UI.needAsk(S, b, T("confirm.groupDel", { t: name }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (act === "ig-del") { await D.deleteInternGroup(b.dataset.key); S.msg = T("msg.groupDeleted", { t: name }); }
+      else { await D.moveInternGroup(b.dataset.key, b.dataset.dir); S.msg = T("msg.groupMoved", { t: name }); }
+      await openInterns(true);
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
   if (act === "intern-see")  { S.internSel = id; S.msg = T("msg.viewing", { id }); render(); return; }
   if (act === "intern-term-new")  { S.internTermEditing = null; S.internTermDraft = null; S.view = "intern-term"; S.msg = ""; render(); return; }
   if (act === "intern-term-edit") {
@@ -642,6 +719,21 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 範例照片（2026-11-15）：選了就縮圖、上傳、存進那一格。
+  if (e.target && e.target.id === "ak-photo") {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const cur = S.pass.activities.find(x => x.id === e.target.dataset.id); if (!cur) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const blob = await shrinkImage(file);
+      const url = await D.uploadExample(cur.id, blob);
+      const old = cur.example_url;
+      await D.setActivityExtras(cur.id, cur.happens_at, url);
+      cur.example_url = url; if (old) await D.removeExample(old);
+      S.busy = false; S.actEditing = cur; S.msg = T("msg.exampleSaved");
+    } catch (err) { S.busy = false; S.msg = T("err.save") + (err && err.message === "bad_file" ? T("err.exampleFile") : D.says(err)); }
+    render(); return;
+  }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
@@ -670,3 +762,18 @@ document.addEventListener("keydown", e => {
   const go = box.querySelector('[data-act="members-assign"],[data-act="ws-assign"]'); if (!go || go.disabled) return;
   e.preventDefault(); go.click();
 });
+
+// 範例照片先在瀏覽器縮到最長邊 1600 再傳（跟歷史之路那一份一樣的做法；資料夾之間不 import，所以自己一份）。
+async function shrinkImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch (e) { throw new Error("bad_file"); }
+  const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+  bmp.close && bmp.close();
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
+  if (!blob) throw new Error("bad_file");
+  return blob;
+}

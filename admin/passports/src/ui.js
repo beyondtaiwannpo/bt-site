@@ -269,6 +269,9 @@ export function debounce(fn, ms) {
   return d;
 }
 export const AUTOSAVE_MS = 800;
+// 打字的欄位（2026-10-28 Paul：「我要打完一句才存，現在是邊打邊存」）：離開那一格就存，或停手 4 秒才存。
+// 勾選、選單這種按了就算數的還是馬上存（flush）。
+export const TYPED_MS = 4000;
 // 這一格要怎麼存："now"（選的）、"typed"（打字的）、null（不在 data-autosave 容器裡、或標了 data-noauto）。
 export function saveMode(el) {
   if (!el || !el.closest || !el.closest("[data-autosave]")) return null;
@@ -338,7 +341,7 @@ export function bindAutosave(root, onSave) {
     const box = field.closest("[data-autosave]");
     if (!box) return;
     let d = timers.get(box);
-    if (!d) { d = debounce(f => run(box, f), AUTOSAVE_MS); timers.set(box, d); }
+    if (!d) { d = debounce(f => run(box, f), TYPED_MS); timers.set(box, d); }
     if (now) d.flush(field); else d(field);
   };
   root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });
@@ -614,6 +617,14 @@ export const INTERN_CATS = [
   { v: "project", label: "cat.project", hint: "cat.project.hint" },
   { v: "reflect", label: "cat.reflect", hint: "cat.reflect.hint" },
 ];
+// 2026-11-14 起分類從資料庫來（intern_groups）。載到了就把 INTERN_CATS 原地換掉，其他地方照舊問它；
+// 載不到（遷移檔還沒跑）就維持上面三個。
+export function setInternGroups(groups) {
+  if (!Array.isArray(groups) || !groups.length) return;
+  INTERN_CATS.length = 0;
+  for (const g of groups.slice().sort((a, b) => a.seq - b.seq))
+    INTERN_CATS.push({ v: g.key, label: { zh: g.name_zh, en: g.name_en }, hint: { zh: g.tagline_zh || g.tagline_en || "", en: g.tagline_en || g.tagline_zh || "" }, row: g });
+}
 const internCatOf = v => INTERN_CATS.find(c => c.v === v) || { v, label: { zh: v, en: v }, hint: { zh: "", en: "" } };
 
 // 新格子的代號：T 加屆別的四個數字加流水號。例如 2026-27 的第 10 格是 T2627-10。
@@ -675,6 +686,25 @@ export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat, m
       </div>
     </li>`; }).join("")}</ul>`).join("");
 
+  // 分類（2026-11-14）：一頁一個分類，這裡加、改字、排順序、刪（底下沒有格子才刪得掉，任何一屆都算）。
+  const fromDb = (data.groups || []).length > 0;
+  const groupRows = INTERN_CATS.map((c, i) => {
+    const n = (data.tasks || []).filter(t => t.category === c.v).length;
+    return `<li>
+      <div class="fhead"><b>${esc(T(c.label))}</b><span class="tag">${esc(c.row ? c.row.name_en : T(c.label))}</span><span class="tag">${T("ig.count", { n })}</span></div>
+      <div class="fmeta">${esc(T(c.hint))}</div>
+      ${fromDb ? `<div class="row">
+        <button class="btn ghost sm" data-act="ig-edit" data-key="${esc(c.v)}"${dis}>${T("common.edit")}</button>
+        ${i > 0 ? `<button class="btn ghost sm" data-act="ig-move" data-key="${esc(c.v)}" data-dir="-1"${dis}>${T("pa.earlier")}</button>` : ""}
+        ${i < INTERN_CATS.length - 1 ? `<button class="btn ghost sm" data-act="ig-move" data-key="${esc(c.v)}" data-dir="1"${dis}>${T("pa.later")}</button>` : ""}
+        ${n ? "" : `<button class="btn quiet danger sm" data-act="ig-del" data-key="${esc(c.v)}"${dis}>${T("common.delete")}</button>`}
+      </div>` : ""}
+    </li>`;
+  }).join("");
+  const groupsSec = sectionHTML(T("ig.title"), `<div class="note">${fromDb ? T("ig.note") : T("ig.needSql")}</div>
+    <ul class="flist">${groupRows}</ul>
+    ${fromDb ? `<div class="row" style="margin:6px 0 0"><button class="btn ghost sm" data-act="ig-new"${dis}>${T("ig.new")}</button></div>` : ""}`, { id: "groups" });
+
   const headActs = [{ act: "ipreview", label: T("ik.preview") }];
   if (cur) headActs.unshift({ act: "intern-task-new", label: T("ik.new"), primary: true, disabled: busy });
   return pageHead(T("it.title"), T("it.lede", { n: data.interns || 0 }), headActs)
@@ -684,11 +714,32 @@ export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat, m
     + sectionHTML(T("it.terms"), `${terms.length ? `<ul class="flist">${termRows}</ul>` : emptyHTML(T("it.empty"), T("it.emptyHint"), { act: "intern-term-new", label: T("it.new") })}
     ${terms.length ? `<div class="row" style="margin:6px 0 0"><button class="btn ghost sm" data-act="intern-term-new"${dis}>${T("it.new")}</button></div>` : ""}`,
       { id: "terms" })
+    + groupsSec
     + sectionHTML(cur ? T("ik.sectionOf", { t: esc(cur.title_zh) }) : T("ik.section"), cur
       ? `<div class="note">${T("ik.note")}</div>
         ${tasks.length ? taskRows : emptyHTML(T("ik.empty"), T("ik.emptyHint"), { act: "intern-task-new", label: T("ik.new") })}`
       : emptyHTML(T("ik.needTerm"), T("ik.needTermHint")),
       { id: "tasks" });
+}
+
+// 改或加一個分類（2026-11-14）。一顆存檔鈕，不自動存：新的分類存之前還沒有代號。
+export function internGroupEditHTML(g, msg, busy) {
+  const cur = g || { key: "", name_zh: "", name_en: "", tagline_zh: "", tagline_en: "", body_zh: "", body_en: "" };
+  const dis = busy ? " disabled" : "";
+  const f = (id, label, v, ph, area) => `<label><i>${label}</i>${area
+    ? `<textarea id="${id}" rows="3"${dis}>${esc(v || "")}</textarea>`
+    : `<input id="${id}" value="${esc(v || "")}" placeholder="${esc(ph || "")}"${dis}>`}</label>`;
+  return pageHead(cur.key ? T("ig.editTitle") : T("ig.newTitle"), T("ig.lede"), [], { act: "intern-back", label: T("it.back") })
+    + msgHTML(msg)
+    + `<div class="form"><div class="two">
+      ${f("ig-name-zh", T("ig.nameZh"), cur.name_zh, "入門")}
+      ${f("ig-name-en", T("ig.nameEn"), cur.name_en, "Onboard")}
+      ${f("ig-tag-zh", T("ig.tagZh"), cur.tagline_zh, "第一個月做的事")}
+      ${f("ig-tag-en", T("ig.tagEn"), cur.tagline_en, "What you do in the first month")}
+      ${f("ig-body-zh", T("ig.bodyZh"), cur.body_zh, "", true)}
+      ${f("ig-body-en", T("ig.bodyEn"), cur.body_en, "", true)}
+    </div>
+    <div class="row"><button class="btn" data-act="ig-save" data-key="${esc(cur.key || "")}"${dis}>${busy ? T("common.saving") : T("ig.save")}</button></div></div>`;
 }
 
 // 改或開一屆。id 建了就不能改（格子與護照靠它對應），所以改的時候那一格鎖住。
@@ -818,10 +869,16 @@ export function passportAdminHTML(data, msg, busy, previewMonth, mpItems) {
           ? `<button class="btn ghost sm" data-act="act-off" data-id="${esc(a.id)}"${dis}>${T("ik.disable")}</button>`
           : `<button class="btn ghost sm" data-act="act-on" data-id="${esc(a.id)}"${dis}>${T("ik.enable")}</button>`}
         ${n ? "" : `<button class="btn quiet danger sm" data-act="act-del" data-id="${esc(a.id)}"${dis}>${T("common.delete")}</button>`}
+        ${n || months.length < 2 ? "" : `<label class="movebox">${T("pa.moveTo")} <select id="move-${esc(a.id)}"${dis}>${months.filter(m => m.month !== a.month).map(m => `<option value="${m.month}">${esc(monthLabel(m.month))}</option>`).join("")}</select></label>
+        <button class="btn ghost sm" data-act="act-move" data-id="${esc(a.id)}"${dis}>${T("pa.move")}</button>`}
       </div>
     </li>`;
   };
-  const monthBlocks = months.map(m => {
+  // 還沒有的月份（2026-11-13）：「加一個月」的選單只列這些。
+  const missing = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8].filter(n => !months.some(m => m.month === n));
+  const addMonth = missing.length ? `<div class="row addmonth"><label>${T("pa.addMonthLabel")} <select id="add-month"${dis}>${missing.map(n => `<option value="${n}">${esc(monthLabel(n))}</option>`).join("")}</select></label>
+      <button class="btn ghost sm" data-act="month-add"${dis}>${T("pa.addMonth")}</button><span class="fmeta">${T("pa.addMonthHint")}</span></div>` : "";
+  const monthBlocks = months.map((m, i) => {
     const rows = acts.filter(a => a.month === m.month);
     // 藏起來的月份（2026-11-10）：護照上沒有這一頁、格子不算，標題旁邊寫清楚，一顆鈕打開。
     const hidTag = m.hidden ? `<span class="tag warn">${T("pa.hiddenTag")}</span> ` : "";
@@ -834,6 +891,9 @@ export function passportAdminHTML(data, msg, busy, previewMonth, mpItems) {
       <div class="row" style="margin:4px 0 0"><button class="btn ghost sm" data-act="act-new" data-month="${esc(String(m.month))}"${dis}>${T("pa.addIn", { m: esc(monthLabel(m.month)) })}</button></div>`,
       { id: `m${m.month}`, hint: hidTag + covTag + T("pa.theme", { t: m.theme_zh ? esc(m.theme_zh) : T("pa.themeEmpty") }),
         actions: [{ act: "month-edit", label: T("pa.editTheme"), seq: String(m.seq), disabled: busy },
+                  ...(i > 0 ? [{ act: "month-move", label: T("pa.earlier"), month: String(m.month), dir: "-1", disabled: busy }] : []),
+                  ...(i < months.length - 1 ? [{ act: "month-move", label: T("pa.later"), month: String(m.month), dir: "1", disabled: busy }] : []),
+                  ...(rows.length ? [] : [{ act: "month-del", label: T("pa.deleteMonth"), month: String(m.month), disabled: busy }]),
                   ...(m.hidden ? [] : [{ act: "month-reveal", label: covered ? T("pa.revealMonth") : T("pa.coverMonth"), month: String(m.month), reveal: covered ? "1" : "0", disabled: busy }]),
                   { act: "month-hide", label: m.hidden ? T("pa.showMonth") : T("pa.hideMonth"), month: String(m.month), hide: m.hidden ? "0" : "1", disabled: busy },
                   ...(m.hidden ? [] : [{ act: "preview", label: T("pa.preview"), month: String(m.month) }])] });
@@ -845,6 +905,7 @@ export function passportAdminHTML(data, msg, busy, previewMonth, mpItems) {
     + `<div class="note">${T("pa.note")}
       ${months.length ? "" : T("pa.noMonths")}</div>`
     + jump
+    + addMonth
     + passportPreviewHTML(previewMonth, months)
     + (months.length ? monthBlocks : emptyHTML(T("pa.monthsGone"), T("pa.monthsGoneHint")));
 }
@@ -877,6 +938,22 @@ export function citiesHTML(data, msg, busy) {
 // 改或加一格。編號是標籤不是輸入框；改既有的格子時月份也鎖住。
 // draft：存檔被擋之後畫面會重畫，沒有 draft 的話剛填的東西全部洗掉（實習護照那邊 2026-10-18 抓過同一件事）。
 // 2026-11-06 自動儲存：既有的格子（有 id）改了就存，新的一格還是一顆「加一格」鈕（編號要由資料庫算出來才有東西可以對）。
+// datetime-local 要的「YYYY-MM-DDTHH:mm」，照這台電腦的時區。空的就空字串。
+export function localInput(iso) {
+  if (!iso) return "";
+  const d = new Date(iso); if (isNaN(d)) return "";
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+// 「到時間看板排會」的連結（2026-11-15）：帶標題；有時間就帶 at，看板直接翻到那一週、打開那一格的排會。
+export function boardLink(a) {
+  const q = new URLSearchParams();
+  if (a && a.title_zh) q.set("title", a.title_zh);
+  if (a && a.happens_at) q.set("at", new Date(a.happens_at).toISOString());
+  const s = q.toString();
+  return "../../availability/" + (s ? "?" + s : "");
+}
+
 export function activityEditHTML(a, month, months, msg, busy, draft) {
   const cur = draft || a || { id: "", month, category: "gather", title_zh: "", title_en: "", description: "", needs_host: false, callback_to: "" };
   const dis = busy ? " disabled" : "";
@@ -897,12 +974,17 @@ export function activityEditHTML(a, month, months, msg, busy, draft) {
     <label><i>${T("ik.desc")}</i>
       <textarea id="ak-desc" name="description" placeholder="${esc(T("ak.descPh"))}" maxlength="200"${dis}>${esc(cur.description || "")}</textarea></label>
     <div class="two">
-      <label class="check" style="display:flex;gap:10px;align-items:center;font-size:14.5px">
-        <input id="ak-host" name="needs_host" type="checkbox" style="width:18px;height:18px"${cur.needs_host ? " checked" : ""}${dis}>
-        <span>${T("ak.host")}</span></label>
+      ${a ? `<label><i>${T("ak.when")}</i><input id="ak-when" name="happens_at" type="datetime-local" value="${esc(localInput(cur.happens_at))}"${dis}>
+        <span class="fmeta">${T("ak.whenHint")}</span>
+        <a class="btn ghost sm" style="margin-top:8px" target="_blank" rel="noopener" href="${esc(boardLink(cur))}">${T("ak.toBoard")}</a></label>`
+        : `<div class="fmeta">${T("ak.extrasLater")}</div>`}
       <label><i>${T("ak.cb")}</i>
         <input id="ak-cb" name="callback_to" value="${esc(cur.callback_to || "")}" placeholder="09B" maxlength="4"${dis}></label>
     </div>
+    ${a ? `<div class="exbox"><i>${T("ak.example")}</i>
+      ${cur.example_url ? `<img src="${esc(cur.example_url)}" alt="" class="exprev"><button class="btn quiet danger sm" data-act="ak-photo-del" data-id="${esc(a.id)}"${dis}>${T("ak.exampleDel")}</button>` : ""}
+      <input type="file" id="ak-photo" accept="image/*" data-noauto="1" data-id="${esc(a.id)}"${dis}>
+      <span class="fmeta">${T("ak.exampleHint")}</span></div>` : ""}
     <div class="form-foot">
       ${auto ? autosaveHint("act-save") : `<button class="btn" data-act="act-save"${dis}>${busy ? T("common.saving") : T("ak.newTitle")}</button>`}
       <button class="btn ghost" data-act="cadre-back"${dis}>${auto ? T("ak.back") : T("common.cancel")}</button>

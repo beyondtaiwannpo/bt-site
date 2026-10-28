@@ -641,6 +641,9 @@ export function debounce(fn, ms) {
   return d;
 }
 export const AUTOSAVE_MS = 800;
+// 打字的欄位（2026-10-28 Paul：「我要打完一句才存，現在是邊打邊存」）：離開那一格就存，或停手 4 秒才存。
+// 勾選、選單這種按了就算數的還是馬上存（flush）。
+export const TYPED_MS = 4000;
 // 這一格要怎麼存："now"（選的）、"typed"（打字的）、null（不在 data-autosave 容器裡、或標了 data-noauto）。
 export function saveMode(el) {
   if (!el || !el.closest || !el.closest("[data-autosave]")) return null;
@@ -710,7 +713,7 @@ export function bindAutosave(root, onSave) {
     const box = field.closest("[data-autosave]");
     if (!box) return;
     let d = timers.get(box);
-    if (!d) { d = debounce(f => run(box, f), AUTOSAVE_MS); timers.set(box, d); }
+    if (!d) { d = debounce(f => run(box, f), TYPED_MS); timers.set(box, d); }
     if (now) d.flush(field); else d(field);
   };
   root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });

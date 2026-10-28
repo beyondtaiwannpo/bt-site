@@ -22,6 +22,30 @@ export const CATNAME = Object.fromEntries(Object.entries(CATEGORY).map(([k, v]) 
 // 分類的順序：入門 → 任務 → 反思。頁序與格子排序都問這一個陣列。
 export const SLOT_ORDER = ["onboard", "project", "reflect"];
 
+// 2026-11-14 起分類從資料庫來（intern_groups，後台「實習護照」改）。載到了就把上面三樣**原地換掉**，
+// 所以其他地方照舊問 CATEGORY / CATNAME / SLOT_ORDER；載不到（遷移檔還沒跑）就維持上面寫死的三個。
+// 中英文用 { zh, en } 物件放進去，T() 本來就吃這種物件。
+export function setGroups(rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+  const list = rows.slice().sort((a, b) => a.seq - b.seq);
+  for (const k of Object.keys(CATEGORY)) delete CATEGORY[k];
+  for (const k of Object.keys(CATNAME)) delete CATNAME[k];
+  SLOT_ORDER.length = 0;
+  for (const g of list) {
+    const tag = { zh: `${g.name_zh} ${String(g.name_en || "").toUpperCase()}`, en: String(g.name_en || "").toUpperCase() };
+    CATEGORY[g.key] = {
+      label: tag, short: { zh: g.name_zh, en: g.name_en }, zh: { zh: g.name_zh, en: g.name_en },
+      define: { zh: g.tagline_zh || g.tagline_en || "", en: g.tagline_en || g.tagline_zh || "" },
+      body: { zh: g.body_zh || g.body_en || "", en: g.body_en || g.body_zh || "" }
+    };
+    CATNAME[g.key] = tag;
+    SLOT_ORDER.push(g.key);
+  }
+}
+// 棋盤上的顏色（2026-11-14）：照分類的位置輪流用五種，原本三個分類的顏色不變。
+const TONES = ["onboard", "project", "reflect", "t4", "t5"];
+export const toneOf = cat => { const i = SLOT_ORDER.indexOf(cat); return i < 0 ? "" : TONES[i % TONES.length]; };
+
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -159,7 +183,7 @@ export function idPageHTML(S) {
 }
 
 function stampInner(act, st, extraClass) {
-  const ink = act.category === "project" ? "ink-fill" : "ink-navy";
+  const ink = SLOT_ORDER.indexOf(act.category) % 2 === 1 ? "ink-fill" : "ink-navy";
   // 角度與高低都由 id 決定，不是亂數：重整不會跳。取 id 最後兩個字。
   const code = String(act.id).slice(-2);
   const rot = ((code.charCodeAt(0) * 7 + code.charCodeAt(1) * 3) % 11) - 5;
@@ -191,7 +215,7 @@ export function catPageHTML(S, cat) {
   return `<div class="mhead">
       <div class="mnum">${String(SLOT_ORDER.indexOf(cat) + 1).padStart(2, "0")}</div>
       <div class="mzh">${esc(T(g.zh))}</div>
-      <div class="mtheme"><b>${done} / ${acts.length}</b><span>${esc(g.define)}</span></div>
+      <div class="mtheme"><b>${done} / ${acts.length}</b><span>${esc(T(g.define))}</span></div>
     </div>
     <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
 }
@@ -361,7 +385,7 @@ export function boardGridHTML(S, pawns, opts) {
   const zone = {}; let cur = "";
   for (let p = 1; p <= size; p++) {
     const s = squareAt(S, p), t0 = s && s.kind === "task" ? taskOf(S, s.task_id) : null;
-    if (t0 && SLOT_ORDER.includes(t0.category)) cur = t0.category;
+    if (t0 && SLOT_ORDER.includes(t0.category)) cur = toneOf(t0.category);
     zone[p] = cur;
   }
   const cell = pos => {
@@ -441,7 +465,7 @@ export function boardPageHTML(S) {
     ${needPick ? pawnPickerHTML(null, true) : ""}
     ${waiting ? `<div class="bresult">${T("board.waiting", { t: esc(lastTask.title_zh || lastTask.title_en) })}</div>` : rollResultHTML(S)}
     ${boardGridHTML(S, pawns, { lit: S.lastRoll ? S.lastRoll.to_pos : null, sample: !!S.sample })}
-    <div class="blegend">${SLOT_ORDER.map(c => `<span class="c-${c}">${esc(T(CATEGORY[c].short))}</span>`).join("")}<span class="ladder">${esc(T("board.legendLadder"))}</span><span class="snake">${esc(T("board.legendSnake"))}</span></div>
+    <div class="blegend">${SLOT_ORDER.map(c => `<span class="c-${toneOf(c)}">${esc(T(CATEGORY[c].short))}</span>`).join("")}<span class="ladder">${esc(T("board.legendLadder"))}</span><span class="snake">${esc(T("board.legendSnake"))}</span></div>
     <div class="wnote" style="margin-top:14px">${esc(S.sample ? T("board.sampleNote") : T("board.rules"))}</div>`;
 }
 
@@ -450,7 +474,7 @@ export function guideCardsHTML() {
     const g = CATEGORY[c];
     return `<div class="slot">
       <span class="cat">${esc(T(g.label))}</span>
-      <span class="ttl">${esc(g.define)}</span>
+      <span class="ttl">${esc(T(g.define))}</span>
       <span class="hint">${esc(T(g.body))}</span>
     </div>`;
   }).join("")}</div>`;
@@ -578,6 +602,9 @@ export function debounce(fn, ms) {
   return d;
 }
 export const AUTOSAVE_MS = 800;
+// 打字的欄位（2026-10-28 Paul：「我要打完一句才存，現在是邊打邊存」）：離開那一格就存，或停手 4 秒才存。
+// 勾選、選單這種按了就算數的還是馬上存（flush）。
+export const TYPED_MS = 4000;
 // 這一格要怎麼存："now"（選的）、"typed"（打字的）、null（不在 data-autosave 容器裡、或標了 data-noauto）。
 export function saveMode(el) {
   if (!el || !el.closest || !el.closest("[data-autosave]")) return null;
@@ -647,7 +674,7 @@ export function bindAutosave(root, onSave) {
     const box = field.closest("[data-autosave]");
     if (!box) return;
     let d = timers.get(box);
-    if (!d) { d = debounce(f => run(box, f), AUTOSAVE_MS); timers.set(box, d); }
+    if (!d) { d = debounce(f => run(box, f), TYPED_MS); timers.set(box, d); }
     if (now) d.flush(field); else d(field);
   };
   root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });

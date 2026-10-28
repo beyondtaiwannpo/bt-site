@@ -135,7 +135,9 @@ function openModal(id) {
     <div class="mt">${UI.esc(UI.CATNAME[a.category] ? T(UI.CATNAME[a.category]) : "")} · ${UI.esc(UI.monthName(a.month))}</div>
     <h3>${UI.esc(a.title_zh)}</h3>
     <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${UI.esc(a.title_en)}</div>
+    ${a.happens_at ? `<div class="when" style="margin:-4px 0 10px">${UI.esc(UI.whenText(a.happens_at))}</div>` : ""}
     <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${UI.esc(a.description)}</p>
+    ${a.example_url ? `<figure style="margin:0 0 18px"><img src="${UI.esc(a.example_url)}" alt="" style="max-width:100%;max-height:260px;border-radius:6px;display:block"><figcaption style="font-size:12px;opacity:.65;margin-top:6px">${T("slot.example")}</figcaption></figure>` : ""}
     <!-- 回望區塊的位置：在活動說明之後、要填的東西之前（spec §7.3「顯示在題目上方」）。
          這個順序是有意義的 —— 先看到自己九月寫的，接著就是今天要寫的那一格，
          視線是連續的。放到輸入框下面的話，人已經開始打字了才看到，等於沒有回望。 -->

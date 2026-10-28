@@ -7,7 +7,7 @@ import { navHTML } from "../../shared/nav.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays, diff } from "./edit.js";
 import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
-import { cellInstant, googleCalUrl, localTimesText, DEFAULT_TITLE, icsText } from "./calendar.js";
+import { cellInstant, cellOf, googleCalUrl, localTimesText, DEFAULT_TITLE, icsText } from "./calendar.js";
 import * as SCH from "./schedule.js";
 import { labelOf } from "./tz-alias.js";
 import { startOfWeek, detectTz, partsIn, addDays } from "./tz.js";
@@ -212,6 +212,9 @@ async function boot() {
     S.needTz = !S.myTz;
     S.tzGuess = detectTz();
     setWeek(0);
+    // 從護照後台「到時間看板排會」來的（2026-11-15）：?title= 帶標題，?at= 帶時間。
+    // 有時間就翻到那一週、打開那一格，能排會的人直接看到排會的表單（這一格有空的已經先勾好）。
+    openFromLink(new URLSearchParams(location.search));
     S.ready = true;
     render();
   } catch (e) {
@@ -226,6 +229,23 @@ async function boot() {
     S.down = true; render();
   }
 }
+function openFromLink(qp) {
+  const title = (qp.get("title") || "").trim().slice(0, 80);
+  if (title) S.evTitle = title;
+  const at = new Date(qp.get("at") || "");
+  if (isNaN(at) || !S.myTz) return;
+  const now = startOfWeek(new Date(), S.myTz, 1), then = startOfWeek(at, S.myTz, 1);
+  const off = Math.round((then - now) / (7 * 86400000));
+  if (off < -4) return;   // 往前只到四週（看板本來的規則）
+  setWeek(off);
+  const cell = cellOf(at, S.weekStart, S.myTz);
+  if (!cell) return;
+  S.peekCell = cell;
+  S.evTitle = S.evTitle || T("cal.title");
+  buildPeek();
+  if (scopes().length) { S.sch = { ticked: (S.peekFree || []).slice(), q: "", title: S.evTitle, minutes: 60, scope: scopes()[0] }; buildPeek(); }
+}
+
 function setWeek(off) {
   S.weekOffset = off;
   const base = new Date(Date.now() + off * 7 * 86400000);
