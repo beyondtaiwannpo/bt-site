@@ -67,3 +67,10 @@ test("遷移檔：第一次加欄才藏九、十月，門是 require_ws_edit('pa
   assert.match(sql, /perform public\.require_ws_edit\('passport'\)/);
   assert.match(sql, /revoke all on function public\.set_month_hidden\(int, boolean\) from public, anon/);
 });
+
+test("★ 月份那一排不改網址的 #（# 後面是分頁名，m9 會被當成未知分頁丟去實習護照）", () => {
+  const h = passportAdminHTML({ months: MONTHS, activities: ACTS, destinations: [], stamped: {} }, "", false, null, []);
+  const nav = h.slice(h.indexOf('class="jump"'), h.indexOf("</nav>", h.indexOf('class="jump"')));
+  assert.doesNotMatch(nav, /href="#m\d/);
+  assert.match(nav, /data-act="jump" data-to="m9"/);
+});

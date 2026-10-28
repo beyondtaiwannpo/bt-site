@@ -834,7 +834,7 @@ export function passportAdminHTML(data, msg, busy, previewMonth, mpItems) {
                   { act: "month-hide", label: m.hidden ? T("pa.showMonth") : T("pa.hideMonth"), month: String(m.month), hide: m.hidden ? "0" : "1", disabled: busy },
                   ...(m.hidden ? [] : [{ act: "preview", label: T("pa.preview"), month: String(m.month) }])] });
   }).join("");
-  const jump = months.length ? `<nav class="jump" aria-label="${esc(T("pa.jump"))}">${months.map(m => `<a href="#m${esc(String(m.month))}">${esc(monthLabel(m.month))}</a>`).join("")}</nav>` : "";
+  const jump = months.length ? `<nav class="jump" aria-label="${esc(T("pa.jump"))}">${months.map(m => `<a href="#cadre" data-act="jump" data-to="m${esc(String(m.month))}">${esc(monthLabel(m.month))}</a>`).join("")}</nav>` : "";
   return pageHead(T("pa.title"), T("pa.lede"))
     + msgHTML(msg)
     + mpLinksHTML(mpItems)

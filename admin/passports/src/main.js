@@ -256,6 +256,14 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
+  // 月份那一排（2026-11-10）：只捲到那一個月，網址不變。原本是 href="#m9"，
+  // 網址的 # 後面是分頁名，路由看不懂 m9 就退回實習護照（Paul 回報「按九月跑去實習護照」）。
+  if (act === "jump") {
+    e.preventDefault();
+    const el = document.getElementById(b.dataset.to);
+    if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    return;
+  }
   if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
   // ── 成員分頁（2026-10-23，第三次重整批 3）──
   if (act === "members-open") { await openMembers(b.dataset.ws, b.dataset.name); return; }
