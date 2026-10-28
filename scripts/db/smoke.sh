@@ -35,7 +35,7 @@ FORM=aaaaaaaa-0000-0000-0000-000000000001
 Q1=bbbbbbbb-0000-0000-0000-000000000001
 Q2=bbbbbbbb-0000-0000-0000-000000000002
 
-cleanup() { psql -d postgres -q -c "drop database if exists $DB;" >/dev/null 2>&1 || true; }
+cleanup() { [ -n "${KEEPDB:-}" ] || psql -d postgres -q -c "drop database if exists $DB;" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
 pass=0; fail=0
@@ -1970,6 +1970,104 @@ chk "★ 重跑不動資料：七筆、兩個帳戶、改過的類別名字還�
   "select (select count(*) from public.fin_transactions)||'|'||(select count(*) from public.fin_accounts)||'|'||(select name_zh from public.fin_categories where code='venue')||'|'||(select count(*) from public.fin_categories)"
 chkraise "重跑之後作廢過的還是不能改（tx_voided）" "tx_voided" \
   "perform set_config('test.uid','${SD}',true); perform public.fin_update_transaction('${T6}','{\"amount\":1}'::jsonb);"
+
+echo "行銷需求單第二版（2026-11-09）："
+# 這時候 requests 裡有第一版那一段留下的兩張：RQ（done）、RQ2（withdrawn）。先用超級使用者塞一張舊的 new，驗對照表。
+# 另外建四個人：MKM 管需求工作區、MKE 改需求工作區、RQR 是 Curriculum 的幹部（送單的人）、OUTC 是別的 team 的幹部（什麼都沒被派）。
+MKM=88880000-0000-0000-0000-000000000001
+MKE=88880000-0000-0000-0000-000000000002
+RQR=88880000-0000-0000-0000-000000000003
+OUTC=88880000-0000-0000-0000-000000000004
+OLDN=88880000-0000-0000-0000-0000000000f1
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${MKM}','mkm@example.com'), ('${MKE}','mke@example.com'), ('${RQR}','rqr@example.com'), ('${OUTC}','outc@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values
+  ('${MKM}','行銷長','Mark Manage','Marketing Team','cadre','director'),
+  ('${MKE}','行銷員','Mia Edit','Marketing Team','cadre','member'),
+  ('${RQR}','課程員','Rae Curr','Curriculum Team','cadre','member'),
+  ('${OUTC}','路人','Otto Out','Mentorship Team','cadre','member');
+insert into public.assignments (user_id, workspace_id, level) values ('${MKM}','custom:marketing-requests','manage'), ('${MKE}','custom:marketing-requests','edit')
+  on conflict (user_id, workspace_id) do update set level = excluded.level;
+insert into public.requests (id, kind, title, requester, status) values ('${OLDN}','poster','舊的新單','${RQR}','new');
+SQL
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-09-marketing-requests-v2.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   需求單第二版那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 需求單第二版那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+chk "★ 舊狀態照對照表搬：new→submitted、done→published（記了發布時間）、withdrawn 不變" "submitted|published|true|withdrawn" \
+  "select (select status from public.requests where id='${OLDN}')||'|'||(select status from public.requests where id='${RQ}')||'|'||(select published_at is not null from public.requests where id='${RQ}')||'|'||(select status from public.requests where id='${RQ2}')"
+chk "舊單的第一版欄位還讀得到（說明、兩條素材連結）" "A2直式，要有報名QRcode|2" "select brief||'|'||array_length(asset_links,1) from public.requests where id='${RQ}'"
+chk "★ 已發布那封文案換成第二版，中英兩欄都換（還是第一版預設值的才換）" "true|true|true|true" \
+  "select (subject_zh like '%已發布%')::text||'|'||(body_zh like '%已經發布了%')::text||'|'||(subject_en like '%published%')::text||'|'||(body_en like '%is published%')::text from public.mail_templates where kind='request_done'"
+RQ3=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" \
+  -c "select public.submit_request('{\"title\":\"C-2 bootcamp 報名倒數\",\"owner_id\":\"${RQR}\",\"owner_team\":\"Curriculum Team\",\"goal_cta\":\"讓高中生點 bio 連結報名\",\"platforms\":[\"ig_carousel\",\"ig_story\"],\"key_line\":\"最後三天\",\"must_have\":[{\"text\":\"截止 12/1 23:59\",\"confirmed_by\":\"Rae\"},{\"text\":\"  \"},{\"text\":\"報名連結\"}],\"draft\":\"- 一\\n- 二\",\"visual_refs\":[{\"url\":\"https://instagram.com/p/x\",\"note\":\"字的排法\"},{\"url\":\"\",\"note\":\"沒網址\"}],\"publish_on\":\"2026-12-01\",\"shots\":[{\"who\":\"結尾的人\",\"what\":\"每人一句\",\"seconds\":\"8\",\"is_closing\":true},{\"who\":\"A\",\"what\":\"縮時做事\",\"seconds\":\"20\"},{\"who\":\"B\",\"what\":\"揮手\",\"seconds\":\"abc\"},{\"who\":\"\",\"what\":\"\"}],\"assignee\":\"${MKE}\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${RQ3}" in ????????-*) echo "  ok   幹部用第二版送了一張（${RQ3}）"; pass=$((pass+1));; *) echo "  FAIL 第二版送單失敗：${RQ3}"; fail=$((fail+1));; esac
+chk "★ 送單的人塞了 assignee 也不算數（接的人是 Marketing 指定的）" "true" "select (assignee is null)::text from public.requests where id='${RQ3}'"
+chk "存對：狀態、負責人、兩個平台、一定要有的兩條（空的丟掉）、視覺參考一條、發布日、種類算影片" "submitted|${RQR}|2|2|Rae|1|2026-12-01|video" \
+  "select status||'|'||owner_id||'|'||cardinality(platforms)||'|'||jsonb_array_length(must_have)||'|'||(must_have->0->>'confirmed_by')||'|'||jsonb_array_length(visual_refs)||'|'||publish_on||'|'||kind from public.requests where id='${RQ3}'"
+chk "★ 拍攝指示：空列丟掉、結尾話排到最後、秒數不是數字的留空" "3|true|A|20|true" \
+  "select jsonb_array_length(shots)||'|'||(shots->2->>'is_closing')||'|'||(shots->0->>'who')||'|'||(shots->0->>'seconds')||'|'||((shots->1->'seconds')='null'::jsonb)::text from public.requests where id='${RQ3}'"
+chk "送單排了一封 request_new 給 MKM（管的人），信裡有預計發布日" "1|true" \
+  "select count(*)||'|'||bool_and(body like '%2026-12-01%') from public.mail_outbox where kind='request_new' and request_id='${RQ3}' and to_email='mkm@example.com'"
+chkrole authenticated "${RQR}" "送單的人讀得到自己的單" "1" "select count(*) from public.requests where id='${RQ3}'"
+chkrole authenticated "${OUTC}" "★ 破壞測試：別的 team 的幹部讀不到這張單" "0" "select count(*) from public.requests where id='${RQ3}'"
+chkrole authenticated "${MKE}" "需求工作區「改」的人讀得到" "1" "select count(*) from public.requests where id='${RQ3}'"
+chkraise "★ 破壞測試：送單的人指定不了接的人（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${RQR}',true); perform public.set_request_assignee('${RQ3}','${RQR}');"
+chkraise "★ 別的 team 的幹部也指定不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${OUTC}',true); perform public.set_request_assignee('${RQ3}','${MKE}');"
+chkraise "★ 接的人只能是需求工作區裡的人（not_in_workspace）" "not_in_workspace" \
+  "perform set_config('test.uid','${MKE}',true); perform public.set_request_assignee('${RQ3}','${OUTC}');"
+chkas "${MKE}" "「改」的人指定 MKE 自己接" "${MKE}" "select public.set_request_assignee('${RQ3}','${MKE}')"
+chkas "${MKE}" "「接的人」名單：需求工作區的人（MKM、MKE 都在）" "2" "select count(*) from public.request_assignees() where id in ('${MKM}','${MKE}')"
+chkraise "★ 別的 team 的幹部拿不到「接的人」名單（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${OUTC}',true); perform public.request_assignees();"
+chkas "${MKE}" "改成進行中" "in_progress" "select public.set_request_status('${RQ3}','in_progress','')"
+chkraise "★ 破壞測試：進行中了，送單的人收不回（already_started）" "already_started" \
+  "perform set_config('test.uid','${RQR}',true); perform public.withdraw_request('${RQ3}');"
+chkas "${MKE}" "改成待審核" "in_review" "select public.set_request_status('${RQ3}','in_review','')"
+chkraise "待審核也收不回（already_started）" "already_started" \
+  "perform set_config('test.uid','${RQR}',true); perform public.withdraw_request('${RQ3}');"
+chkraise "不認得的狀態擋（bad_status）" "bad_status" \
+  "perform set_config('test.uid','${MKE}',true); perform public.set_request_status('${RQ3}','bogus','');"
+chkas "${MKE}" "標成已發布，寫回覆" "published" "select public.set_request_status('${RQ3}','published','發了，連結在 IG')"
+chk "★ 已發布寄一封 request_done 給送單的人，信裡有回覆、連結、「已經發布」" "1|rqr@example.com|true|true|true" \
+  "select count(*)||'|'||min(to_email)||'|'||bool_and(body like '%發了，連結在 IG%')||'|'||bool_and(body like '%/admin/#request/${RQ3}%')||'|'||bool_and(body like '%已經發布了%') from public.mail_outbox where kind='request_done' and request_id='${RQ3}'"
+chkas "${MKE}" "退回待審核" "in_review" "select public.set_request_status('${RQ3}','in_review','')"
+chkas "${MKE}" "再發布一次" "published" "select public.set_request_status('${RQ3}','published','')"
+chk "★ 退回再發布不寄第二封" "1" "select count(*) from public.mail_outbox where kind='request_done' and request_id='${RQ3}'"
+chkas "${MKE}" "舊頁面送 done 照對照表轉成 published（OLDN 那一張）" "published" "select public.set_request_status('${OLDN}','done','')"
+chkas "${MKE}" "舊頁面送 new 轉成 submitted" "submitted" "select public.set_request_status('${OLDN}','new','')"
+# 第四張：7 天規則只警告，明天發布照樣送得出去；「已送出」時收得回
+RQ4=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" \
+  -c "select public.submit_request(jsonb_build_object('title','明天就要','publish_on',(current_date + 1)::text))" 2>&1 | tail -1 | tr -d ' \n')
+case "${RQ4}" in ????????-*) echo "  ok   ★ 發布日只剩一天也送得出去（7 天規則只在畫面警告）"; pass=$((pass+1));; *) echo "  FAIL 發布日太近被擋了：${RQ4}"; fail=$((fail+1));; esac
+chkas "${RQR}" "★ 「已送出」時收得回" "withdrawn" "select public.withdraw_request('${RQ4}')"
+chkraise "收回的 Marketing 指定不了接的人（withdrawn）" "withdrawn" \
+  "perform set_config('test.uid','${MKE}',true); perform public.set_request_assignee('${RQ4}','${MKE}');"
+chkraise "不認得的平台擋（bad_platform）" "bad_platform" \
+  "perform set_config('test.uid','${RQR}',true); perform public.submit_request('{\"title\":\"x\",\"platforms\":[\"tiktok\"]}'::jsonb);"
+chkraise "負責人不是幹部擋（bad_owner）" "bad_owner" \
+  "perform set_config('test.uid','${RQR}',true); perform public.submit_request('{\"title\":\"x\",\"owner_id\":\"${MEMBER}\"}'::jsonb);"
+chkraise "★ 校友送不了第二版的單（not_cadre）" "not_cadre" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.submit_request('{\"title\":\"x\"}'::jsonb);"
+RQ5=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" \
+  -c "select public.submit_request('poster','舊頁面送的','','2026-12-01','','{}','')" 2>&1 | tail -1 | tr -d ' \n')
+chk "第一版七個參數那支還送得出去，狀態是 submitted" "submitted" "select status from public.requests where id='${RQ5}'"
+# 破壞測試：把「只在已送出時收得回」拿掉，驗收表要變紅；重跑裝回去、資料不動
+BROKEN=$(mktemp)
+sed "s/if r.status <> 'submitted' then raise exception 'already_started' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-09-marketing-requests-v2.sql > "${BROKEN}"
+bkgot=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bkgot}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「只在已送出時收得回」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉「只在已送出時收得回」驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-09-marketing-requests-v2.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then echo "  ok   需求單第二版那支可以重跑（裝回那一道門）"; pass=$((pass+1)); else echo "  FAIL 需求單第二版那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+chk "★ 重跑不動資料：RQ3 還是已發布、接的人還在、拍攝三列、信沒多寄" "published|${MKE}|3|1" \
+  "select status||'|'||assignee||'|'||jsonb_array_length(shots)||'|'||(select count(*) from public.mail_outbox where kind='request_done' and request_id='${RQ3}') from public.requests where id='${RQ3}'"
+chkraise "重跑之後收回的門還在（already_started）" "already_started" \
+  "perform set_config('test.uid','${RQR}',true); perform public.withdraw_request('${RQ3}');"
 
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
