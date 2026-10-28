@@ -1657,6 +1657,13 @@ case "${HP}" in ????????-*) echo "  ok   掛了一張照片，同意還沒勾（
 chkraise "★ 破壞測試：有照片沒勾同意，按不了準備好了（consent_required）" "consent_required" \
   "perform set_config('test.uid','${DIR}',true); perform public.set_milestone_status('${HM}','ready');"
 chkas "${DIR}" "勾了同意" "${HP}" "select public.update_milestone_photo('${HP}', '{\"consent\":true}'::jsonb)"
+# 2026-11-07 Paul 回報「照片說明存不起來」。先在這裡重現：改兩句說明、讀回來要是新的。
+chkas "${DIR}" "改照片說明（中英）" "${HP}" "select public.update_milestone_photo('${HP}', '{\"caption_zh\":\"第一屆合照\",\"caption_en\":\"First camp group photo\"}'::jsonb)"
+chk "照片說明存進去了" "第一屆合照|Firstcampgroupphoto|true" "select caption_zh || '|' || caption_en || '|' || consent from history_photos where id = '${HP}'"
+chkas "${DIR}" "只改英文說明，中文不動" "${HP}" "select public.update_milestone_photo('${HP}', '{\"caption_en\":\"Camp 2023\"}'::jsonb)"
+chk "中文說明沒被清掉" "第一屆合照|Camp2023" "select caption_zh || '|' || caption_en from history_photos where id = '${HP}'"
+# 改回原本的說明，下面對外那一段還要比對它。
+chkas "${DIR}" "說明改回去" "${HP}" "select public.update_milestone_photo('${HP}', '{\"caption_zh\":\"營隊合照\",\"caption_en\":\"Group photo\"}'::jsonb)"
 chkas "${DIR}" "準備好了" "ready" "select public.set_milestone_status('${HM}','ready')"
 chkraise "★ 破壞測試：Marketing 的 Director 自己放不上去（not_senior）" "not_senior" \
   "perform set_config('test.uid','${DIR}',true); perform public.set_milestone_status('${HM}','published');"

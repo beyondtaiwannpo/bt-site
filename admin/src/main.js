@@ -487,13 +487,15 @@ document.addEventListener("click", async e => {
     const title = UI.evTitle(ev);
     if (act === "ev-publish" && UI.needAsk(S, b, T("confirm.evPublish", { title }))) return;
     if (act === "ev-unpublish" && UI.needAsk(S, b, T("confirm.evUnpublish", { title }))) return;
+    // 按「準備好了」之前先把表單上的字存一次，不然填了沒存就按會被擋「要填開始時間」。
+    // ⚠ 要在 render() 之前讀：render() 會照 S.events 重畫表單，重畫完再讀到的是舊值
+    // （2026-11-07 歷史之路的照片說明就是這樣存成舊的，Paul 回報「存不起來」）。
+    const pending = act === "ev-ready" && UI.canEditWs(S.me, ev.workspace_id) && document.getElementById("ev-tzh") ? readEvent() : null;
     S.busy = true; S.msg = ""; render();
     try {
-      // 按「準備好了」之前先把表單上的字存一次，不然填了沒存就按會被擋「要填開始時間」。
-      if (act === "ev-ready" && UI.canEditWs(S.me, ev.workspace_id) && document.getElementById("ev-tzh")) {
-        const patch = readEvent();
-        if (!UI.evCoverOk(patch.cover_url)) throw new Error(T("err.evCoverRaw"));
-        await D.saveEvent(id, patch);
+      if (pending) {
+        if (!UI.evCoverOk(pending.cover_url)) throw new Error(T("err.evCoverRaw"));
+        await D.saveEvent(id, pending);
       }
       if (act === "ev-ready") await D.setEventReady(id, true);
       else if (act === "ev-unready") await D.setEventReady(id, false);
