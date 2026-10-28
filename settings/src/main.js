@@ -139,13 +139,15 @@ async function boot() {
     //     要看到的是資料庫現在的值；查完它會把新值寫回快取，別的頁面接著用。
     //   - terms 與 positions 不用等 profiles：positions 的 RLS 只給自己那幾列，先全拿回來再挑這一屆的。
     //     學員會多發這兩個查詢（RLS 擋掉，回來是空的），換到的是幹部每次少兩趟往返。
-    const [whoRes, storyRes, termRes, posRes] = await Promise.all([
+    const [whoRes, storyRes, termRes, posRes, welRes] = await Promise.all([
       AUTH.whoAmI(S.user.id, true),
       Promise.resolve(storyQ).catch(err => ({ data: null, error: err })),
       Promise.resolve(supabase.from("terms").select("id").eq("status", "current").maybeSingle()).catch(() => ({ data: null })),
       Promise.resolve(supabase.from("positions").select("title_zh, title_en, term_id")).catch(() => ({ data: null })),
+      // 2026-11-07 校友的歡迎卡按掉了沒。欄位不在 whoAmI 那一份裡（那一份是六個頁面共用的分頁快取），這裡自己多問一欄；讀不到就當沒按過。
+      Promise.resolve(supabase.from("profiles").select("alumni_welcome_dismissed_at").eq("id", S.user.id).maybeSingle()).catch(() => ({ data: null })),
     ]);
-    S.me = { ...(whoRes.row || {}), email: S.user.email };
+    S.me = { ...(whoRes.row || {}), email: S.user.email, alumni_welcome_dismissed_at: (welRes && welRes.data && welRes.data.alumni_welcome_dismissed_at) || null };
     // 2026-10-24：幹部多讀兩樣，都是「有就有、沒有也不擋整頁」：
     //   - 我被派進哪幾個工作區（my_access()），決定要不要畫「實習生的進度牆」那顆按鈕；
     //   - 這一屆我的職位（positions，RLS 只給自己那幾列），團隊頁印的頭銜就是它，這裡只顯示不給改。
@@ -270,6 +272,15 @@ document.addEventListener("click", async e => {
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
   if (act === "back") { S.view = "main"; S.msg = ""; render(); return; }
   if (act === "ask-delete") { S.view = "delete"; S.msg = ""; render(); return; }
+  // 校友的歡迎卡（2026-11-07）：按掉就記在帳號上（dismiss_alumni_welcome()，只寫自己那一列），換裝置也不會再跳出來。
+  if (act === "welcome-dismiss") {
+    try {
+      const { data, error } = await supabase.rpc("dismiss_alumni_welcome");
+      if (error) throw error;
+      S.me = { ...S.me, alumni_welcome_dismissed_at: data || new Date().toISOString() };
+    } catch (err) { console.warn("歡迎卡收不起來：", err); UI.toast(T("w.dismissFail")); }
+    render(); return;
+  }
 
   if (act === "avatar") {
     // ⚠ **在開檔案選擇器之前問**（規格 §6.2）。挑完照片才問等於

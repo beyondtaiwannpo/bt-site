@@ -114,6 +114,14 @@ export const MINE = {
   "st.quoteEn":       { zh: "那一句話（英文）", en: "The line (English)" },
   "st.noteEn":        { zh: "介紹（英文）", en: "Intro (English)" },
   "st.consent":       { zh: "我同意把我的<b>名字、大頭照、高中、現在的城市與學校、上面那一句話與介紹</b>\n        放上<a href=\"../alumni/\">公開的校友頁</a>。那一頁任何人都看得到，也會被搜尋引擎收錄。\n        隨時可以把這個勾拿掉，拿掉就會從那一頁消失。", en: "I agree to put my <b>name, avatar, high school, current city and school, the line and the intro above</b> on the <a href=\"../alumni/\">public alumni page</a>. Anyone can see that page and search engines index it. You can untick this at any time and you disappear from that page." },
+  // 校友登入後的歡迎卡（2026-11-07，Paul 拍板的第四件）。故事還沒填或還沒勾同意的校友看得到，按掉就記在帳號上。
+  "w.title":          { zh: "歡迎回來", en: "Welcome back" },
+  "w.lede":           { zh: "你在這個網站上是 BT 的校友：你那幾屆的職位已經記在名單上，這裡是你自己的一頁。有三件事可以做：", en: "On this site you are a BT alumnus: your positions from your terms are already on the roster, and this page is yours. Three things you can do:" },
+  "w.story":          { zh: "<b>寫下你的故事</b>，勾了同意、Co-President 核可之後，你會出現在<a href=\"../alumni/\">公開的校友頁</a>那張航線圖上。往下捲就是那一格。", en: "<b>Write your story.</b> Once you tick consent and a Co-President approves it, you appear on the route map of the <a href=\"../alumni/\">public alumni page</a>. Scroll down to find it." },
+  "w.events":         { zh: "<b>看看最近開放的活動</b>，在<a href=\"../events/\">活動頁</a>。想回來講一場、帶一組，從那裡報名。", en: "<b>See what is coming up</b> on the <a href=\"../events/\">events page</a>. If you want to come back to speak or mentor, sign up there." },
+  "w.contact":        { zh: "<b>把聯絡方式保持最新</b>：上面的名字、大頭照，還有你登入用的 email。我們只會用它寄活動通知。", en: "<b>Keep your details current</b>: your name and avatar above, and the email you sign in with. We only use it for event notices." },
+  "w.dismiss":        { zh: "知道了，收起來", en: "Got it, hide this" },
+  "w.dismissFail":    { zh: "收不起來，等一下再試。", en: "Could not hide it. Try again in a moment." },
   // 刪除帳號
   "del.title":        { zh: "刪除帳號", en: "Delete account" },
   "del.sub":          { zh: "這個動作沒有辦法復原。", en: "This cannot be undone." },

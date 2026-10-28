@@ -123,6 +123,26 @@ export function langSwitchHTML() {
 // 而存檔那條路在任何故事程式碼之前就被「姓名、學校、年級三個都要填」擋住，
 // **校友的故事一個字都存不進去**。畫面對不對跟存不存得起來是同一件事的兩半，
 // 所以 ui.js 與 main.js 的分法必須一致：幹部 / 校友 / 學員。
+// 校友的歡迎卡（2026-11-07）。只給校友；故事還沒填或還沒勾同意才出現；按掉過（profiles.alumni_welcome_dismissed_at 有值）就不再出現。
+// 故事一勾同意，卡就自己不見，不用按。
+export function showWelcome(me, story) {
+  if (!me || me.role !== "alumni") return false;
+  if (me.alumni_welcome_dismissed_at) return false;
+  return !(story && story.public_story);
+}
+export function welcomeHTML(me, story) {
+  if (!showWelcome(me, story)) return "";
+  return `<div class="welcome" role="region" aria-label="${esc(T("w.title"))}">
+    <h3>${T("w.title")}</h3>
+    <p>${T("w.lede")}</p>
+    <ol>
+      <li>${T("w.story")}</li>
+      <li>${T("w.events")}</li>
+      <li>${T("w.contact")}</li>
+    </ol>
+    <div class="row"><button class="btn ghost sm" data-act="welcome-dismiss">${T("w.dismiss")}</button></div>
+  </div>`;
+}
 export function settingsHTML(me, msg, busy, story) {
   const cadre = me.role === "cadre";
   const alumni = me.role === "alumni";
@@ -140,6 +160,7 @@ export function settingsHTML(me, msg, busy, story) {
     <h2>${T("s.title")}</h2>
     <div class="sub">${esc(me.email || "")}</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${welcomeHTML(me, story)}
 
     ${langSwitchHTML()}
     <div data-autosave="profile" data-id="${esc(me.id || "")}">

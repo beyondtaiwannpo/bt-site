@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="bt-version" content="2026-10-27-2014">
+<meta name="bt-version" content="2026-10-27-2052">
 <!-- 版本號與 importmap（2026-11-06）：這一段由 scripts/bump-version.sh 整段改寫，不要手改。
      importmap 把「./src/ui.js」這種乾淨的模組名稱對到帶版本號的網址，所以 .js 裡的 import 不用帶版本號，
      而 GitHub Pages 的 10 分鐘快取不會讓新舊模組混著用。為什麼要這樣見 README「後台速度」。 -->
 <!-- bt-importmap -->
-<script type="importmap">{ "imports": { "/intern-passport/src/data.js": "/intern-passport/src/data.js?v=2026-10-27-2014", "/intern-passport/src/main.js": "/intern-passport/src/main.js?v=2026-10-27-2014", "/intern-passport/src/strings.js": "/intern-passport/src/strings.js?v=2026-10-27-2014", "/intern-passport/src/ui.js": "/intern-passport/src/ui.js?v=2026-10-27-2014", "/shared/auth.js": "/shared/auth.js?v=2026-10-27-2014", "/shared/supabase.js": "/shared/supabase.js?v=2026-10-27-2014", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-10-27-2014", "/shared/nav.js": "/shared/nav.js?v=2026-10-27-2014", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-10-27-2014" } }</script>
+<script type="importmap">{ "imports": { "/intern-passport/src/data.js": "/intern-passport/src/data.js?v=2026-10-27-2052", "/intern-passport/src/main.js": "/intern-passport/src/main.js?v=2026-10-27-2052", "/intern-passport/src/strings.js": "/intern-passport/src/strings.js?v=2026-10-27-2052", "/intern-passport/src/ui.js": "/intern-passport/src/ui.js?v=2026-10-27-2052", "/shared/auth.js": "/shared/auth.js?v=2026-10-27-2052", "/shared/supabase.js": "/shared/supabase.js?v=2026-10-27-2052", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-10-27-2052", "/shared/nav.js": "/shared/nav.js?v=2026-10-27-2052", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-10-27-2052" } }</script>
 <!-- /bt-importmap -->
 <title>Beyond Taiwan Intern Passport</title>
 <!-- 實習生護照（2026-10-17，方案 C，見 docs/2026-10-15-實習生護照盤點與設計.md）。
@@ -27,12 +27,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/brand.css">
 <!-- modulepreload：理由見 passport/index.html 同一段。路徑改了這幾行要跟著改，check.sh 會查檔案存不存在。 -->
-<link rel="modulepreload" href="../shared/auth.js?v=2026-10-27-2014">
-<link rel="modulepreload" href="../shared/supabase.js?v=2026-10-27-2014">
-<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-10-27-2014">
-<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-10-27-2014">
-<link rel="modulepreload" href="./src/ui.js?v=2026-10-27-2014">
-<link rel="modulepreload" href="./src/data.js?v=2026-10-27-2014">
+<link rel="modulepreload" href="../shared/auth.js?v=2026-10-27-2052">
+<link rel="modulepreload" href="../shared/supabase.js?v=2026-10-27-2052">
+<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-10-27-2052">
+<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-10-27-2052">
+<link rel="modulepreload" href="./src/ui.js?v=2026-10-27-2052">
+<link rel="modulepreload" href="./src/data.js?v=2026-10-27-2052">
 <link rel="stylesheet" href="../shared/nav.css">
 
 <style>
@@ -798,6 +798,6 @@ summary{cursor:pointer}
 </svg>
 
 <div id="bt-root" aria-busy="true"><div class="empty loading">Loading… 載入實習護照中…</div></div>
-<script type="module" src="./src/main.js?v=2026-10-27-2014"></script>
+<script type="module" src="./src/main.js?v=2026-10-27-2052"></script>
 </body>
 </html>
