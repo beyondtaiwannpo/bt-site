@@ -441,6 +441,19 @@ document.addEventListener("click", async e => {
     } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); render(); }
     return;
   }
+  // 藏起來或打開一個月（2026-11-10）。藏要先問一次，打開不用問。
+  if (act === "month-hide") {
+    const hide = b.dataset.hide === "1";
+    const label = UI.monthLabel(Number(b.dataset.month));
+    if (hide && UI.needAsk(S, b, T("confirm.hideMonth", { m: label }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.setMonthHidden(b.dataset.month, hide);
+      S.msg = T(hide ? "msg.monthHidden" : "msg.monthShown", { m: label });
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
   if (act === "month-edit") {
     const m = S.pass.months.find(x => String(x.seq) === b.dataset.seq);
     if (!m) { S.msg = T("err.noMonth"); render(); return; }

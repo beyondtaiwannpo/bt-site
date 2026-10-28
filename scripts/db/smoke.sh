@@ -2070,5 +2070,32 @@ chkraise "重跑之後收回的門還在（already_started）" "already_started"
   "perform set_config('test.uid','${RQR}',true); perform public.withdraw_request('${RQ3}');"
 
 echo
+echo "── 護照藏月份（2026-11-10-hide-months.sql）──"
+hmgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-10-hide-months.sql 2>&1 || true)
+if echo "${hmgot}" | grep -q "OVERALL.*PASS" && ! echo "${hmgot}" | grep -q "|FAIL"; then echo "  ok   藏月份那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 藏月份那支驗收表："; echo "${hmgot}" | head -12; fail=$((fail+1)); fi
+chk "第一次跑完藏的是九月、十月" "9,10" "select string_agg(month::text, ',' order by seq) from public.months where hidden"
+chkraise "★ Associate 藏不了月份" "not_ws_edit" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.set_month_hidden(11, true);"
+chkraise "★ 學員藏不了月份" "not_ws_edit" \
+  "perform set_config('test.uid','${STU}',true); perform public.set_month_hidden(11, true);"
+chkraise "沒有這個月" "bad_month" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_month_hidden(13, true);"
+chkas "${PAUL}" "Co-President 把九月打開" "" "select public.set_month_hidden(9, false)"
+chk "九月打開了，十月還藏著" "10" "select string_agg(month::text, ',' order by seq) from public.months where hidden"
+hm2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-10-hide-months.sql 2>&1 || true)
+if echo "${hm2}" | grep -q "OVERALL.*PASS"; then echo "  ok   藏月份那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 藏月份那支重跑沒過"; fail=$((fail+1)); fi
+chk "★ 重跑不會把打開的九月又藏回去" "10" "select string_agg(month::text, ',' order by seq) from public.months where hidden"
+chk "藏不是刪：月份還是 11 個" "11" "select count(*) from public.months"
+# 破壞測試：拿掉那道門，驗收表要變紅
+BROKEN=$(mktemp)
+sed "s/  perform public.require_ws_edit('passport');//" supabase/migrations/2026-11-10-hide-months.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 require_ws_edit，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 require_ws_edit 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-10-hide-months.sql >/dev/null 2>&1 || true
+chkraise "裝回去之後 Associate 還是藏不了" "not_ws_edit" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.set_month_hidden(11, true);"
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

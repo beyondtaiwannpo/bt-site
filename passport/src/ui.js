@@ -267,6 +267,25 @@ export function barHTML(S) {
 //
 // S.page 的語意是這個陣列的 0 起算索引。它沒有被持久化到任何地方
 // （不進 localStorage、不進備份檔、不進網址），所以改變頁序沒有相容性問題。
+// 藏起來的月份（months.hidden，2026-11-10，Paul：這一屆從十一月開始）。
+// 藏的月份：沒有那一頁、那個月的格子不算進總數、全體進度沒有那一格、不發入境章、
+// TPE 給第一個沒藏的月份（visasOf 看的是 months[0]，所以濾完再傳進去就對了）。
+// 只濾畫面，不刪資料：打開就回來。main.js 載完資料呼叫一次。
+export function visibleOf(months, activities) {
+  const ms = (months || []).filter(m => !m.hidden);
+  const keep = new Set(ms.map(m => m.month));
+  return { months: ms, activities: (activities || []).filter(a => keep.has(a.month)) };
+}
+// 藏起來那幾個月蓋過的章，不進 S.stamps（stampCount 數的是 S.stamps，不濾的話「N / 總數」會超過總數）。
+// 回一份新的物件，資料庫裡的章不動。allActs 是濾之前的全部格子，用來知道每一個章屬於哪個月。
+export function stampsShown(stamps, allActs, months) {
+  const hiddenM = new Set((months || []).filter(m => m.hidden).map(m => m.month));
+  const hiddenIds = new Set((allActs || []).filter(a => hiddenM.has(a.month)).map(a => a.id));
+  const out = {};
+  for (const k of Object.keys(stamps || {})) if (!hiddenIds.has(k)) out[k] = stamps[k];
+  return out;
+}
+
 export function pagesOf(S) {
   return [
     { kind: "id", label: T("page.id") },
@@ -666,7 +685,12 @@ export function wallHTML(S) {
     <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">${T("wall.refresh")}</button></div>
   </div>`;
   const total = S.activities.length;
-  const people = (S.wall || []).map(p => Object.assign({}, p, { count: (p.stamps || []).length }))
+  // 只算看得到的格子：藏起來的月份蓋過的章留在資料庫，但不算進「N / 總數」，不然會超過總數。
+  const shown = new Set(S.activities.map(a => a.id));
+  const people = (S.wall || []).map(p => {
+    const st = (p.stamps || []).filter(s => shown.has(s.act_id));
+    return Object.assign({}, p, { stamps: st, count: st.length });
+  })
     .sort((a, b) => b.count - a.count);
   const feed = [];
   people.forEach(p => (p.stamps || []).forEach(s => feed.push({ who: p, id: s.act_id, d: s.stamped_on })));

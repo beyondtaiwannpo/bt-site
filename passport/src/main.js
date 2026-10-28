@@ -599,6 +599,8 @@ export async function boot() {
     // active === false 的活動要濾掉。這一行留在這裡而不是搬進 data.js：
     // data.js 的職責是「把資料庫裡的東西拿回來」，要不要顯示是畫面的事。
     S.activities = all.activities.filter(a => a.active !== false);
+    // 藏起來的月份（2026-11-10）：那一頁、那幾格、全體進度那一格都拿掉。理由同上，是畫面的事。
+    { const v = UI.visibleOf(all.months, S.activities); S.months = v.months; S.activities = v.activities; S.stamps = UI.stampsShown(all.stamps, all.activities, all.months); }
     // 學員 → 導去 /app/ 輸入邀請碼。這一條要放在 loadAll 之後，因為 role 是
     // loadAll 帶回來的；學員的查詢不會報錯，只會回空的（RLS 擋的是列不是請求）。
     if (S.role && S.role !== "cadre") { toApp(); return; }

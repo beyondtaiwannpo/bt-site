@@ -91,7 +91,7 @@ export async function deleteInternTask(id) {
 export async function loadPassportAdmin() {
   need();
   const [mo, ac, de, st] = await Promise.all([
-    supabase.from("months").select("seq, month, theme_zh, theme_en").order("seq"),
+    supabase.from("months").select("seq, month, theme_zh, theme_en, hidden").order("seq"),
     supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active")
       .order("seq").order("id"),
     supabase.from("destinations").select("code, city, active").order("code"),
@@ -124,6 +124,13 @@ export async function setActivityActive(id, active) {
 export async function deleteActivity(id) {
   need();
   const { error } = await supabase.rpc("delete_activity", { p_id: id });
+  if (error) throw error;
+}
+
+// 藏起來或打開一個月（2026-11-10）。藏起來不刪任何東西，見 2026-11-10-hide-months.sql。
+export async function setMonthHidden(month, hidden) {
+  need();
+  const { error } = await supabase.rpc("set_month_hidden", { p_month: Number(month), p_hidden: !!hidden });
   if (error) throw error;
 }
 
