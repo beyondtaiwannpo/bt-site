@@ -1707,6 +1707,93 @@ rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-06-history-mi
 if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then echo "  ok   歷史之路那支可以重跑（裝回同意那一道門）"; pass=$((pass+1)); else echo "  FAIL 歷史之路那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
 chk "重跑不蓋掉改過的字（代號還是改過的）" "2024-first-winter-camp" "select slug from public.history_milestones where id='${HM}'"
 
+echo "把老幹部請回來（2026-11-07）："
+# 這時候：PAUL Co-President、OTHER Senior Adviser、MEMBER 校友、STU 學員。OLD1 那一筆 10-24 已經被認領了，所以另外建兩筆沒有帳號的人。
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-07-alumni-invite-back.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   請回來那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 請回來那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+IB1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.add_person('陳回來','Comeback Chen','2022 屆的');" | tail -1 | tr -d ' \n')
+IB2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.add_person('','Comeback Two','');" | tail -1 | tr -d ' \n')
+psql -d "${DB}" -q -c "select set_config('test.uid','${PAUL}',false); select public.set_position('${IB1}','2024-25','','Associate, Marketing Team','Marketing Team');" >/dev/null
+IBR=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${OTHER}',false);" \
+  -c "select public.invite_back('${IB1}','Comeback@Example.com','en','歡迎回來')" 2>&1 | tail -1 | tr -d ' \n')
+IBC=$(echo "${IBR}" | sed -n 's/.*"code":"\([^"]*\)".*/\1/p')
+case "${IBC}" in bt-*) echo "  ok   Senior Adviser 對一筆沒有帳號的紀錄寄邀請信，拿到一組碼（${IBC}）"; pass=$((pass+1));; *) echo "  FAIL 請回來沒拿到碼：${IBR}"; fail=$((fail+1));; esac
+chk "★ 碼是校友碼、綁紀錄、綁 email（小寫）、單次、30 天、記語言" "alumni|true|comeback@example.com|1|true|en" \
+  "select grants||'|'||(person_id='${IB1}')||'|'||email||'|'||uses_left||'|'||(expires_at > now() + interval '29 days')||'|'||lang from public.invite_codes where code='${IBC}'"
+chk "紀錄上記了 email（下次預填）、outbox 排了一封 invite、信裡有連結與那一句話" "comeback@example.com|1|true|true" \
+  "select (select email from public.people where id='${IB1}')||'|'||(select count(*) from public.mail_outbox where invite_code='${IBC}')||'|'||(select body like '%/app/?invite=${IBC}%' from public.mail_outbox where invite_code='${IBC}')||'|'||(select body like '%歡迎回來%' from public.mail_outbox where invite_code='${IBC}')"
+chk "變動紀錄記了一筆 invite_back" "1" "select count(*) from public.role_changes where field='invite_back' and new_value='${IBC}'"
+chkas "${PAUL}" "★ 同一筆再按一次：回同一組碼、existing = true、沒有再寄第二封" "${IBC}|true|1" \
+  "select (r->>'code')||'|'||(r->>'existing')||'|'||(select count(*) from public.mail_outbox where kind='invite' and to_email='comeback@example.com') from (select public.invite_back('${IB1}','other@example.com','zh') r) x"
+chkas "${PAUL}" "名單上的邀請狀態：這一筆 queued、有 email" "queued|comeback@example.com" "select status||'|'||email from public.roster_invites() where person_id='${IB1}'"
+chkrole authenticated "${MEMBER}" "★ 校友拿不到名單的邀請狀態" "0" "select count(*) from public.roster_invites()"
+chkraise "★ 破壞測試：有帳號的紀錄不能請回來（person_has_account）" "person_has_account" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_back((select id from public.people where profile_id='${MEMBER}'),'x@example.com','zh');"
+chkraise "★ 破壞測試：email 已經是別人的登入擋（email_has_account）" "email_has_account" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_back('${IB2}','member@example.com','zh');"
+chkraise "壞的 email 擋（bad_email）" "bad_email" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_back('${IB2}','nope','zh');"
+chkraise "★ 破壞測試：不是 Co-President 也不是 Senior Adviser 叫不動（not_senior）" "not_senior" \
+  "perform set_config('test.uid','${MEMBER}',true); perform public.invite_back('${IB2}','x@example.com','zh');"
+chkraise "★ 破壞測試：綁著活的邀請的紀錄刪不掉（has_unused_invite）" "has_unused_invite" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.delete_person('${IB1}');"
+# ── 一批：一列壞 email、一列已經有活的邀請、一列好的 ──
+IBM=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.invite_back_many('[{\"person\":\"${IB2}\",\"email\":\"bad\",\"lang\":\"zh\"},{\"person\":\"${IB1}\",\"email\":\"comeback@example.com\",\"lang\":\"zh\"},{\"person\":\"${IB2}\",\"email\":\"two@example.com\",\"lang\":\"zh\"}]'::jsonb)" 2>&1 | grep -v '^$' | tail -1)
+chk "★ 一批三列：第一列壞 email 回 error 寫原因、第二列 existing、第三列 sent；壞的那一列沒有擋住後面的" "error|true|existing|sent" \
+  "select (j->0->>'status')||'|'||((j->0->>'error') like '%bad_email%')||'|'||(j->1->>'status')||'|'||(j->2->>'status') from (select '${IBM}'::jsonb j) x"
+chk "第一列真的寄了：碼綁 IB2、outbox 一封；批次本身記一筆 invite_back" "1|1|1" \
+  "select (select count(*) from public.invite_codes where person_id='${IB2}' and email='two@example.com' and uses_left>0)||'|'||(select count(*) from public.mail_outbox where kind='invite' and to_email='two@example.com')||'|'||(select count(*) from public.role_changes where field='invite_back' and old_value='bulk')"
+# ── 認領：錯的 email 擋、對的 email 變校友並拿回紀錄與職位 ──
+IBW=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaab1
+IBX=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaab2
+psql -d "${DB}" -q -c "insert into auth.users (id,email) values ('${IBW}','stranger@example.com'), ('${IBX}','comeback@example.com');
+  insert into public.profiles (id,name_zh,name_en,role) values ('${IBW}','','Stranger','student'), ('${IBX}','','Comeback Chen','student');" >/dev/null
+chkraise "★★ 破壞測試：用別的 email 登入認領被擋（invite_wrong_email）" "invite_wrong_email" \
+  "perform set_config('test.uid','${IBW}',true); perform public.claim_invite('${IBC}');"
+chkas "${IBX}" "★ 對的 email 認領：變成校友" "upgraded_alumni" "select public.claim_invite('${IBC}')"
+chkas "${PAUL}" "紀錄歸到他、2024-25 的職位在他身上、名單狀態 claimed" "true|1|claimed" \
+  "select (select profile_id='${IBX}' from public.people where id='${IB1}')||'|'||(select count(*) from public.positions where person_id='${IB1}' and term_id='2024-25')||'|'||(select status from public.roster_invites() where person_id='${IB1}')"
+# ── 邀請頁打名字：同名的沒帳號紀錄剛好一筆就掛上去，不再多建一筆 ──
+NP=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.people" | tr -d ' \n')
+psql -d "${DB}" -q -c "select set_config('test.uid','${PAUL}',false); select public.revoke_invite((select code from public.invite_codes where person_id='${IB2}' and uses_left>0 limit 1));" >/dev/null
+IBP=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.invite_person('two2@example.com','alumni',null,'','comeback two','','','','','','','zh')" 2>&1 | tail -1 | tr -d ' \n')
+case "${IBP}" in bt-*) echo "  ok   邀請頁打了同名（不分大小寫）的名字，拿到碼（${IBP}）"; pass=$((pass+1));; *) echo "  FAIL 邀請頁同名沒成：${IBP}"; fail=$((fail+1));; esac
+chk "★ 掛到既有那一筆：people 沒多、碼綁 IB2、紀錄的 email 更新" "${NP}|true|two2@example.com" \
+  "select (select count(*) from public.people)||'|'||(select person_id='${IB2}' from public.invite_codes where code='${IBP}')||'|'||(select email from public.people where id='${IB2}')"
+IB3=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.add_person('','Comeback Chen','另一個同名的');" | tail -1 | tr -d ' \n')
+IB4=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.add_person('','comeback chen','又一個');" | tail -1 | tr -d ' \n')
+chkraise "★ 同名好幾筆就問（ambiguous_person 帶兩個 id）" "ambiguous_person:.*${IB3}.*${IB4}\|ambiguous_person:.*${IB4}.*${IB3}" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_person('three@example.com','alumni',null,'','Comeback Chen','','','','','','','zh');"
+IBQ=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.invite_person('three@example.com','alumni',null,'','Comeback Chen','','','','','','','zh','${IB4}')" 2>&1 | tail -1 | tr -d ' \n')
+chk "畫面選定那一筆帶 p_person：碼綁 IB4" "t" "select person_id='${IB4}' from public.invite_codes where code='${IBQ}'"
+NP2=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.people" | tr -d ' \n')
+IBN=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" \
+  -c "select public.invite_person('four@example.com','alumni',null,'','Comeback Chen','','','','','','','zh','00000000-0000-0000-0000-000000000000')" 2>&1 | tail -1 | tr -d ' \n')
+chk "帶全零 uuid 就一定建新的一筆" "$((NP2+1))" "select count(*) from public.people"
+chkraise "帶的那一筆有帳號就擋（person_has_account）" "person_has_account" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.invite_person('five@example.com','alumni',null,'','','','','','','','','zh','${IB1}');"
+# ── 校友的歡迎卡 ──
+chkas "${IBX}" "校友關掉歡迎卡：寫了時間" "t" "select public.dismiss_alumni_welcome() is not null"
+chkrole authenticated "${IBX}" "自己讀得到那個時間" "t" "select alumni_welcome_dismissed_at is not null from public.profiles where id='${IBX}'"
+chkas "${IBX}" "再按一次不會改時間" "t" "select public.dismiss_alumni_welcome() = (select alumni_welcome_dismissed_at from public.profiles where id='${IBX}')"
+# 破壞測試：把「有帳號擋」拿掉，驗收表要變紅。
+BROKEN=$(mktemp)
+sed "s/if v_profile is not null then raise exception 'person_has_account' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-07-alumni-invite-back.sql > "${BROKEN}"
+bkgot=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bkgot}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「有帳號擋」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉「有帳號擋」驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-07-alumni-invite-back.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then echo "  ok   請回來那支可以重跑（裝回那一道門）"; pass=$((pass+1)); else echo "  FAIL 請回來那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+chk "重跑不動資料：紀錄上的 email 還在" "two2@example.com" "select email from public.people where id='${IB2}'"
+chkas "${PAUL}" "★ 名單上 pending_code 不再抓邀請信那組碼（IB4 綁著的是邀請信，印空的）" "" "select coalesce(pending_code,'') from public.roster() where person_id='${IB4}'"
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
