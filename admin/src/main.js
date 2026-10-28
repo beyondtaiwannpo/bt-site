@@ -26,8 +26,9 @@ let S = {
   noticeTo: new Set(["accepted"]),
   // 開新表單的內嵌表單（2026-10-19，批 3）。null 是收起來，物件是展開著、裡面是填到一半的值。
   newForm: null,
-  // 行銷需求單（2026-10-31）：requests 是 loadRequests() 回的（RLS 決定看得到哪些）；rqDraft 填到一半的表單；rqF 佇列的篩選；rqSel 打開的那一張。
-  requests: null, rqDraft: null, rqF: { status: "open", kind: "", q: "" }, rqSel: null, cadres: [],
+  // 行銷需求單（2026-10-31，第二版 2026-11-09）：requests 是 loadRequests() 回的（RLS 決定看得到哪些）；rqDraft 填到一半的表單（也存在 localStorage）；
+  // rqF 佇列的篩選；rqSel 打開的那一張；rqAssignees 「接的人」下拉的名單（需求工作區的成員）。
+  requests: null, rqDraft: null, rqF: { status: "open", mine: "", q: "" }, rqSel: null, rqAssignees: [], cadres: [],
   // 活動上架（2026-11-01）：events 是 loadEvents() 回的；evSel 打開的那一場（slug）；evDraft 開活動那張表單填到一半的值；evSigned 那一場的報名數。
   events: null, evSel: null, evDraft: null, evSigned: null,
   // 會議（2026-11-02）：meetings 是 loadMeetings() 回的；mtSel 打開的那一場；mtDraft 表單填到一半（含勾人的 pk）。
@@ -87,9 +88,11 @@ function render() {
     body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy)
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
   } else if (S.view === "request") {
-    body = UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy);
+    if (!S.rqDraft) S.rqDraft = rqDraftLoad();
+    body = UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy, S.cadres, UI.rqToday());
   } else if (S.view === "requests") {
-    body = UI.requestsQueueHTML(S.requests || [], S.cadres, S.rqF, S.rqSel, UI.canEditWs(S.me, "custom:marketing-requests"), S.msg, S.busy);
+    body = UI.requestsQueueHTML(S.requests || [], S.cadres, S.rqF, S.rqSel, UI.canEditWs(S.me, "custom:marketing-requests"), S.msg, S.busy,
+      { assignees: S.rqAssignees, today: UI.rqToday(), me: S.me });
   } else if (S.view === "list") {
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
       S.teams.length ? S.teams : UI.TEAM_LABELS, S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy,
@@ -244,15 +247,37 @@ async function reloadRequests() {
   try {
     S.requests = await D.loadRequests();
     if (S.todo) S.todo.requests = S.requests;
-    if (S.view === "requests" && !S.cadres.length) S.cadres = await D.loadCadres().catch(() => []);
+    // 名單：送單頁選負責人、兩頁印名字都要。佇列另外要「接的人」那一份（需求工作區的成員）。
+    if (!S.cadres.length) S.cadres = await D.loadCadres().catch(() => []);
+    if (S.view === "requests") S.rqAssignees = await D.loadAssignees().catch(() => []);
   } catch (e) { S.msg = T("err.rqLoad") + D.says(e); }
 }
-// 送單的表單讀成一個物件（欄位名單只在這裡一份）。
+// 送單的表單讀成一個草稿物件（欄位名單只在這裡一份）。可以多列的三塊照畫面上現在有幾列讀。
 function readRequest() {
-  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
-  return { kind: val("rq-kind") || "poster", title: val("rq-title"), purpose: val("rq-purpose"), needed_by: val("rq-needed"), brief: val("rq-brief"),
-    links: val("rq-links"), contact: val("rq-contact") };
+  const val = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+  const count = pre => document.querySelectorAll(`[id^="${pre}"]`).length;
+  const d = UI.rqBlank();
+  Object.assign(d, {
+    title: val("rq-title"), owner_team: val("rq-owner-team"), owner_id: val("rq-owner"), goal_cta: val("rq-goal"),
+    platforms: UI.RQ_PLATFORMS.filter(p => { const el = document.getElementById("rq-pf-" + p); return el && el.checked; }),
+    platform_other: val("rq-pf-note"), key_line: val("rq-key"), draft: val("rq-draft"), draft_doc_url: val("rq-doc"),
+    publish_on: val("rq-publish"), other_notes: val("rq-notes"),
+    must: Array.from({ length: count("rq-must-text-") }, (_, i) => ({ text: val("rq-must-text-" + i), confirmed_by: val("rq-must-by-" + i) })),
+    refs: Array.from({ length: count("rq-ref-url-") }, (_, i) => ({ url: val("rq-ref-url-" + i), note: val("rq-ref-note-" + i) })),
+    shots: Array.from({ length: count("rq-shot-who-") }, (_, i) => ({ who: val("rq-shot-who-" + i), what: val("rq-shot-what-" + i), seconds: val("rq-shot-sec-" + i), note: val("rq-shot-note-" + i) })),
+    closing: { who: val("rq-close-who"), seconds: val("rq-close-sec"), note: val("rq-close-note") },
+  });
+  // 負責人不在選的 team 裡（剛換 team）就清掉，不然送出去的是上一個 team 的人。
+  if (d.owner_id && !(S.cadres || []).some(p => p.id === d.owner_id && String(p.team || "").split(/[,、;；]/).map(x => x.trim()).includes(d.owner_team))) d.owner_id = "";
+  return d;
 }
+// 草稿存在 localStorage（Paul 的規格：送出之前都留著）。讀寫都包 try：私密瀏覽或被擋的時候照樣能填，只是不留。
+function rqDraftLoad() {
+  try { const raw = localStorage.getItem(UI.rqDraftKey(S.me)); if (raw) return Object.assign(UI.rqBlank(), JSON.parse(raw)); } catch (x) { /* 沒有就是空白表單 */ }
+  return UI.rqBlank();
+}
+function rqDraftSave() { try { localStorage.setItem(UI.rqDraftKey(S.me), JSON.stringify(S.rqDraft)); } catch (x) { /* 存不了就算了 */ } }
+function rqDraftClear() { try { localStorage.removeItem(UI.rqDraftKey(S.me)); } catch (x) { /* 同上 */ } }
 
 // 把畫面上那幾格讀成一個物件。**讀取集中在這裡一支**，
 // 存檔那一段就不會有第二份欄位名單（兩份一定會分岔）。
@@ -322,10 +347,16 @@ async function onAutosave(act, box, field) {
     if (act === "rq-save") {
       const r = (S.requests || []).find(x => x.id === id); if (!r) return;
       const v = UI.formValues(box);
-      // 「做完」不走這裡：那會寄信，要按「標成做完」那顆鈕先問一次（下拉裡本來就沒給選）。
-      if (v.status === "done" && r.status !== "done") { const st = document.getElementById("rq-status"); if (st) st.value = r.status; return fail(T("err.rqDoneBtn")); }
-      await D.setRequestStatus(id, v.status || r.status, v.reply != null ? v.reply : r.reply);
-      r.status = v.status || r.status; r.reply = v.reply != null ? v.reply : r.reply;
+      // 接的人是另一支函式（set_request_assignee），改的是那一格才叫它。
+      if (field && field.name === "assignee") {
+        await D.setRequestAssignee(id, v.assignee || null);
+        r.assignee = v.assignee || null;
+      } else {
+        // 「已發布」不走這裡：那會寄信，要按「標成已發布」那顆鈕先問一次（下拉裡本來就沒給選）。
+        if (v.status === "published" && UI.rqStatus(r.status) !== "published") { const st = document.getElementById("rq-status"); if (st) st.value = UI.rqStatus(r.status); return fail(T("err.rqPublishBtn")); }
+        await D.setRequestStatus(id, v.status || UI.rqStatus(r.status), v.reply != null ? v.reply : r.reply);
+        r.status = v.status || UI.rqStatus(r.status); r.reply = v.reply != null ? v.reply : r.reply;
+      }
       dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.rqSaved"));
       return;
     }
@@ -507,15 +538,29 @@ document.addEventListener("click", async e => {
   }
   // ── 行銷需求單（2026-10-31）──
   if (act === "rq-submit") {
-    const d = readRequest(); S.rqDraft = d;
-    if (!d.title) { S.msg = T("err.rqTitle"); render(); return; }
+    S.rqDraft = readRequest(); rqDraftSave();
+    const p = UI.rqPayload(S.rqDraft);
+    if (!p.title) { S.msg = T("err.rqTitle"); render(); return; }
+    if (!p.owner_id) { S.msg = T("err.rqOwner"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
-      const links = d.links.split(/\n/).map(x => x.trim()).filter(Boolean);
-      await D.submitRequest(Object.assign({}, d, { links }));
-      S.rqDraft = null; S.busy = false; S.msg = T("msg.rqSent");
+      await D.submitRequest(p);
+      S.rqDraft = UI.rqBlank(); rqDraftClear(); S.busy = false; S.msg = T("msg.rqSent");
       await reloadRequests(); render();
     } catch (e) { S.busy = false; S.msg = T("err.rqSubmit") + D.says(e); render(); }
+    return;
+  }
+  // 可以多列的三塊：先把畫面上的字讀回草稿，再加一列或刪一列，存起來重畫。
+  const rqRows = { "rq-add-must": ["must", 1], "rq-del-must": ["must", -1], "rq-add-ref": ["refs", 1], "rq-del-ref": ["refs", -1], "rq-add-shot": ["shots", 1], "rq-del-shot": ["shots", -1] };
+  if (act === "rq-add-must" || act === "rq-del-must" || act === "rq-add-ref" || act === "rq-del-ref" || act === "rq-add-shot" || act === "rq-del-shot") {
+    const [k, dir] = rqRows[act];
+    const d = readRequest();
+    const blank = { must: { text: "", confirmed_by: "" }, refs: { url: "", note: "" }, shots: { who: "", what: "", seconds: "", note: "" } }[k];
+    if (dir > 0) d[k].push(Object.assign({}, blank));
+    else { d[k].splice(Number(b.dataset.i), 1); if (!d[k].length && k !== "shots") d[k].push(Object.assign({}, blank)); }
+    S.rqDraft = d; rqDraftSave(); render();
+    const focus = dir > 0 ? { must: "rq-must-text-", refs: "rq-ref-url-", shots: "rq-shot-who-" }[k] + (d[k].length - 1) : null;
+    if (focus) { const el = document.getElementById(focus); if (el) el.focus(); }
     return;
   }
   if (act === "rq-withdraw") {
@@ -529,17 +574,19 @@ document.addEventListener("click", async e => {
   if (act === "rq-open") { e.preventDefault(); S.rqSel = id; S.msg = ""; history.pushState(null, "", "#requests/" + id); render(); return; }
   if (act === "rq-back") { S.rqSel = null; S.msg = ""; history.pushState(null, "", "#requests"); render(); return; }
   if (act === "rq-fstatus") { S.rqF = Object.assign({}, S.rqF, { status: b.dataset.v }); render(); return; }
-  if (act === "rq-fkind") { S.rqF = Object.assign({}, S.rqF, { kind: b.dataset.v }); render(); return; }
-  // 狀態與回覆 2026-11-06 起改了就存（onAutosave 的 "rq-save"）；「標成做完」會寄信，留鈕、先問一次。回覆框裡的字一起帶過去。
-  if (act === "rq-done") {
+  if (act === "rq-fmine") { S.rqF = Object.assign({}, S.rqF, { mine: S.rqF.mine ? "" : b.dataset.v }); render(); return; }
+  // 列印：瀏覽器自己的列印對話框，admin.css 的 @media print 只留那一張單（側欄、頂欄、處理那一塊都藏起來）。
+  if (act === "rq-print") { window.print(); return; }
+  // 狀態、接的人、回覆改了就存（onAutosave 的 "rq-save"）；「標成已發布」會寄信，留鈕、先問一次。回覆框裡的字一起帶過去。
+  if (act === "rq-publish") {
     const r = (S.requests || []).find(x => x.id === id); if (!r) return;
     const rp = document.getElementById("rq-reply");
     const reply = rp ? rp.value.trim() : r.reply;
-    if (r.status !== "done" && UI.needAsk(S, b, T("confirm.rqDone", { title: r.title }))) return;
+    if (UI.needAsk(S, b, T("confirm.rqPublish", { title: r.title }))) return;
     S.busy = true; S.msg = ""; render();
     try {
-      await D.setRequestStatus(id, "done", reply);
-      S.busy = false; S.msg = T("msg.rqDone", { title: r.title });
+      await D.setRequestStatus(id, "published", reply);
+      S.busy = false; S.msg = T("msg.rqPublished", { title: r.title });
       await reloadRequests(); render();
     } catch (e) { S.busy = false; S.msg = T("err.rqSave") + D.says(e); render(); }
     return;
@@ -867,6 +914,10 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 行銷需求單：換了負責人的 team，人那一格要換成那個 team 的人，所以重畫。
+  if (S.view === "request" && e.target && (e.target.id === "rq-owner-team" || e.target.id === "rq-owner")) {
+    S.rqDraft = readRequest(); rqDraftSave(); if (e.target.id === "rq-owner-team") render(); return;
+  }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
   if (pkEl && (S.view === "meetings" || S.view === "meeting")) { S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); autosaveMeeting(); return; }
@@ -889,6 +940,12 @@ document.addEventListener("input", e => {
   // 會議的勾人那一塊（2026-11-02）：找名字。
   if (e.target && (e.target.dataset.act === "pk-q" || e.target.dataset.act === "pk-mq") && (S.view === "meetings" || S.view === "meeting")) {
     S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], e.target, true) }); render(); UI.pkRefocus("mt", e.target.dataset.act === "pk-mq" ? "mq" : "q"); return;
+  }
+  // 行銷需求單的送單頁：打一個字就存草稿（不重畫，游標不會跳）；發布日改了，7 天警告跟著出現或藏起來。
+  if (S.view === "request" && e.target && e.target.closest && e.target.closest("#rq-form, #rq-shots")) {
+    S.rqDraft = readRequest(); rqDraftSave();
+    if (e.target.id === "rq-publish") { const w = document.getElementById("rq-publish-warn"); if (w) w.hidden = !UI.rqTooSoon(e.target.value, UI.rqToday()); }
+    return;
   }
   // 行銷需求單的佇列：邊打邊篩，重畫後游標放回去。
   if (e.target && e.target.id === "rq-q" && S.view === "requests") {

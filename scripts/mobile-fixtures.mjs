@@ -11,7 +11,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 const nav = `navHTML({ current:CUR, role:"cadre", name:"王平" })`;
 const acts = JSON.parse(readFileSync("passport/activities.json","utf8"));
 
-function make(file, cur, body, extra = "") {
+// out 預設是 _audit.html；同一個資料夾要量兩頁以上時給別的名字（_audit-xxx.html，一樣由 check-mobile.mjs 刪掉、.gitignore 擋）。
+function make(file, cur, body, extra = "", out = "_audit.html") {
   // shared/ 的相對路徑跟資料夾深度走：admin/ 是 ../shared，admin/people/ 是 ../../shared（2026-10-24）。
   const up = "../".repeat(file.split("/").length);
   const boot = `
@@ -23,7 +24,7 @@ document.getElementById("bt-root").innerHTML = ${nav} + (${body});
 </script>`;
   let s = readFileSync(file + "/index.html","utf8");
   s = s.replace(/<script type="module" src="[^"]*main\.js"><\/script>/, boot);
-  writeFileSync(file + "/_audit.html", s);
+  writeFileSync(file + "/" + out, s);
 }
 
 make("settings", "settings",
@@ -103,4 +104,27 @@ make("admin/finance", "admin",
                { id:"t3", happened_on:"2026-11-15", kind:"transfer", amount:2000, currency:"TWD", amount_twd:2000, account_id:"a1", to_account_id:"a2", term_id:"2026-27" },
                { id:"t5", happened_on:"2026-12-01", kind:"income", amount:1234.5, currency:"USD", fx_rate:32.15, amount_twd:39689.18, account_id:"a1", category_id:"c1", counterparty:"Overseas alumni donation", term_id:"2026-27" },
                { id:"t6", happened_on:"2026-11-25", kind:"expense", amount:999, currency:"TWD", amount_twd:999, account_id:"a1", category_id:"c3", voided_at:"2026-11-26T00:00:00Z", void_reason:"重複登了，跟 11/12 那一筆是同一張發票", term_id:"2026-27" }];`);
+// 行銷需求單第二版（2026-11-09）：送單頁拿最長的草稿量（11 格全填、一定要有的資訊三列、視覺參考兩列、九個 Fragment、
+// 發布日不到 7 天的黃色警告開著），佇列拿打開一張的那一頁（拍攝表、處理那一塊全開）。
+const RQ_PEOPLE = `const PEOPLE = [{ id:"u2", name_zh:"林育安", name_en:"Yu-An Lin", team:"Curriculum Team, Internship Team", board_role:"director" },
+                    { id:"u3", name_zh:"陳柏諺", name_en:"Po-Yen Chen", team:"Curriculum Team", board_role:"member" },
+                    { id:"u5", name_zh:"行銷長", name_en:"Marketing Director", team:"Marketing Team", board_role:"director" }];
+   const SHOTS = Array.from({ length: 9 }, (_, i) => ({ who: "拍攝者 " + "ABCDEFGHI"[i], what: "先縮時做事或通話，開頭要有看鏡頭揮手之類的示意畫面，約二十秒", seconds: "20", note: "原速或縮時，轉場用淡入" }));
+   const D = Object.assign(UI.rqBlank(), { title: "C-2 bootcamp 報名倒數第三則（系列共五則，這一則講住宿與交通）", owner_team: "Curriculum Team", owner_id: "u2",
+     goal_cta: "讓還沒報名的高中生點 bio 連結報名，已報名的轉發給同學", platforms: ["ig_carousel", "ig_story", "other"], platform_other: "LINE 社群公告",
+     key_line: "報名只剩最後三天，名額 40 人", must: [{ text: "截止 12/1 23:59（台灣時間）", confirmed_by: "Yu-An Lin" }, { text: "https://beyondtaiwannpo.com/apply/c-2-bootcamp-2027", confirmed_by: "" }, { text: "地點：台北市大安區", confirmed_by: "陳柏諺" }],
+     draft: "- 報名到 12/1\n- 免費\n- 名額 40 人", draft_doc_url: "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit",
+     refs: [{ url: "https://www.instagram.com/p/C1234567890abcdef/", note: "字的排法與留白" }, { url: "https://drive.google.com/drive/folders/1AbCdEfGhIjKlMn", note: "去年的照片" }],
+     publish_on: "2026-11-30", other_notes: "週末前發比較好，限動要加報名連結貼紙", shots: SHOTS, closing: { who: "全體幹部", seconds: "8", note: "室內" } });`;
+make("admin", "admin",
+  `UI.shellHTML("", UI.railHTML("forms", "request", { role:"cadre", board:"director", team:"Curriculum Team", name:"林育安", ws:{} }),
+     UI.requestPageHTML({ id:"u2" }, [{ id:"r1", title:D.title, requester:"u2", status:"in_review", reply:"初稿在 Canva，週四前回覆", created_at:"2026-11-20T00:00:00Z", platforms:D.platforms, platform_other:D.platform_other, publish_on:"2026-11-30", assignee:"u5" }], D, "", false, PEOPLE, "2026-11-28"))`,
+  `import * as UI from "./src/ui.js";
+   ${RQ_PEOPLE}`, "_audit-rq.html");
+make("admin", "admin",
+  `UI.shellHTML("", UI.railHTML("forms", "requests", { role:"cadre", board:"director", team:"Marketing Team", name:"行銷長", ws:{ "custom:marketing-requests":"manage" } }),
+     UI.requestsQueueHTML([R], PEOPLE, {}, "r1", true, "", false, { assignees:[{ id:"u5", name_zh:"行銷長", name_en:"Marketing Director" }], today:"2026-11-28", me:{ id:"u5" } }))`,
+  `import * as UI from "./src/ui.js";
+   ${RQ_PEOPLE}
+   const R = Object.assign({ id:"r1", requester:"u2", status:"in_progress", reply:"", created_at:"2026-11-20T00:00:00Z", assignee:"u5" }, UI.rqPayload(D));`, "_audit-rqq.html");
 console.log("ok");

@@ -772,6 +772,7 @@ export const MAIL_KINDS = [
   // 2026-10-29 邀請信：五個代換符號 {name} {position} {term} {link} {sender}，不是 {姓名} {活動名稱}。
   { v: "invite",    label: "mail.invite",    when: "mail.invite.when" },
   // 2026-10-31 行銷需求單：兩封，代換符號 {requester} {title} {needed_by} {link} {reply}。
+  // 2026-11-09 第二版：request_done 那封畫面上叫「已發布」（狀態改成 Sheet 的四個），代號不改名（舊的寄信紀錄、信件版型都認它）；{needed_by} 現在是預計發布日。
   { v: "request_new",  label: "mail.request_new",  when: "mail.request_new.when" },
   { v: "request_done", label: "mail.request_done", when: "mail.request_done.when" },
   // 2026-11-02 會議：兩封，代換符號 {name} {title} {when} {agenda} {doc} {link}。
@@ -785,7 +786,7 @@ export function fillMeeting(text, s) {
     .split("{name}").join(v.name).split("{title}").join(v.title).split("{when}").join(v.when)
     .split("{agenda}").join(v.agenda).split("{doc}").join(v.doc).split("{link}").join(v.link);
 }
-export const REQUEST_SAMPLE = { requester: "Mei Wu", title: "2027 冬令營報名海報", needed_by: "2026-12-01", link: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", reply: "做好了，檔在 Drive 的 2027 冬令營資料夾。" };
+export const REQUEST_SAMPLE = { requester: "Mei Wu", title: "C-2 bootcamp 報名倒數", needed_by: "2026-12-01", link: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", reply: "發了，連結在 IG 限動精選。" };
 export function fillRequest(text, s) {
   const v = Object.assign({}, REQUEST_SAMPLE, s || {});
   return String(text == null ? "" : text)

@@ -1005,8 +1005,9 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
   // 2026-10-31 行銷需求單：rq 是 loadRequests() 回的（RLS 決定看得到哪些）。工作區「改」以上看等處理的數；送單的人看自己最近一張還在跑的。
   const rq = t.requests;
   if (rq !== undefined && canEditWs(me, "custom:marketing-requests")) {
-    const waiting = rq === null ? null : (rq || []).filter(r => r.status === "new" || r.status === "in_progress").length;
-    cards.push({ n: waiting, label: T("card.rq"), unit: T("card.rq.unit"), hint: waiting ? T("card.rq.hint", { n: (rq || []).filter(r => r.status === "new").length }) : T("card.rq.none"),
+    const open = rq === null ? null : (rq || []).filter(r => RQ_OPEN.includes(rqStatus(r.status)));
+    cards.push({ n: open === null ? null : open.length, label: T("card.rq"), unit: T("card.rq.unit"),
+      hint: open && open.length ? T("card.rq.hint", { n: open.filter(r => !r.assignee).length }) : T("card.rq.none"),
       href: "#requests", go: T("card.rq.go") });
   }
   // 2026-11-02 會議：每一位幹部看「下一場會議」（自己在名單上的、還沒開的第一場）。
@@ -1024,10 +1025,10 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
     const ready = ev === null ? null : (ev || []).filter(e => e.status === "ready").length;
     cards.push({ n: ready, label: T("card.ev"), unit: T("card.ev.unit"), hint: ready ? T("card.ev.hint") : T("card.ev.none"), href: "#events", go: T("card.ev.go") });
   }
-  const myOpen = (rq || []).filter(r => me && r.requester === me.id && (r.status === "new" || r.status === "in_progress"));
+  const myOpen = (rq || []).filter(r => me && r.requester === me.id && RQ_OPEN.includes(rqStatus(r.status)));
   if (myOpen.length) {
     const r = myOpen[0];
-    cards.push({ n: myOpen.length, label: T("card.myrq"), unit: T("card.rq.unit"), hint: T("card.myrq.hint", { title: esc(r.title), status: T("rq.st." + r.status) }), href: "#request", go: T("card.myrq.go") });
+    cards.push({ n: myOpen.length, label: T("card.myrq"), unit: T("card.rq.unit"), hint: T("card.myrq.hint", { title: esc(r.title), status: T("rq.st." + rqStatus(r.status)) }), href: "#request", go: T("card.myrq.go") });
   }
   if (pres) {
     const ro = t.roster;
@@ -1163,83 +1164,219 @@ export function downHTML(err) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 行銷需求單（2026-10-31，docs/2026-10-24-行銷需求單.md）
+// 行銷需求單（2026-10-31 第一版；2026-11-09 第二版，docs/2026-11-08-行銷需求單-第二版欄位.md）
 // ═══════════════════════════════════════════════════════════════════════
-// 兩頁：每一位幹部的「跟 Marketing 提需求」（表單加我送過的），Marketing 需求工作區的「行銷需求單」佇列。
+// 兩頁：每一位幹部的「跟 Marketing 提需求」（Sheet 的 11 格加拍攝指示，下面是我送過的），Marketing 需求工作區的「行銷需求單」佇列。
 // 資料都從 loadRequests() 來（RLS 決定看得到哪些），這裡只畫。
-export const RQ_KINDS = ["poster", "post", "video", "other"];
-export const RQ_STATUS = ["new", "in_progress", "done", "withdrawn"];
+// 第一版的舊單（沒有新欄位、狀態還是 new／done）照樣畫得出來：狀態走 rqStatus() 對照，第一版的欄有值就印。
+export const RQ_STATUS = ["submitted", "in_progress", "in_review", "published", "withdrawn"];
+export const RQ_OPEN = ["submitted", "in_progress", "in_review"];
+export const RQ_PLATFORMS = ["ig_carousel", "ig_story", "fb_single", "threads_text", "other"];
+export const RQ_SHOT_ROWS = 7;   // Sheet 先給七列 Fragment，可以再加
+// 舊狀態對照（資料庫的第二版遷移檔也照這張表搬）：new → 已送出、done → 已發布。
+export function rqStatus(s) { return !s || s === "new" ? "submitted" : s === "done" ? "published" : s; }
 const rqDate = d => d ? String(d).slice(0, 10) : "";
-const rqLinks = s => String(s || "").split(/\n/).map(x => x.trim()).filter(Boolean);
+const rqDay = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || "").slice(0, 10)); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null; };
+// 7 天規則（Paul 2026-11-08 拍板：只警告，不擋送出）：預計發布日早於今天加 7 天就警告。
+export function rqTooSoon(date, today) { const a = rqDay(date), t = rqDay(today); return a !== null && t !== null && a < t + 7 * 86400000; }
+export function rqToday(now) { const d = now || new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+// 草稿存在這台電腦的 localStorage，一人一格（同一台電腦換人登入不會看到別人的草稿）。送出才清。
+export function rqDraftKey(me) { return "bt.admin.rqDraft.v2." + ((me && me.id) || "anon"); }
+export function rqBlank() {
+  return { title: "", owner_team: "", owner_id: "", goal_cta: "", platforms: [], platform_other: "", key_line: "",
+    must: [{ text: "", confirmed_by: "" }], draft: "", draft_doc_url: "", refs: [{ url: "", note: "" }], publish_on: "", other_notes: "",
+    shots: Array.from({ length: RQ_SHOT_ROWS }, () => ({ who: "", what: "", seconds: "", note: "" })), closing: { who: "", seconds: "", note: "" } };
+}
+// 草稿變成送給 submit_request(jsonb) 的那一包。空列丟掉；有拍攝指示（或結尾話填了人）才帶結尾話那一列，放最後。
+// **不帶 assignee**：接的人是 Marketing 那一邊指定的（資料庫也不收）。
+export function rqPayload(d) {
+  const v = Object.assign(rqBlank(), d || {});
+  const s = x => String(x == null ? "" : x).trim();
+  const shots = (v.shots || []).map(r => ({ who: s(r.who), what: s(r.what), seconds: s(r.seconds), note: s(r.note), is_closing: false })).filter(r => r.who || r.what);
+  const c = v.closing || {};
+  if (shots.length || s(c.who)) shots.push({ who: s(c.who), what: T("rq.closingWhat"), seconds: s(c.seconds), note: s(c.note), is_closing: true });
+  return {
+    title: s(v.title), owner_team: s(v.owner_team), owner_id: s(v.owner_id), goal_cta: s(v.goal_cta),
+    platforms: RQ_PLATFORMS.filter(p => (v.platforms || []).includes(p)), platform_other: s(v.platform_other), key_line: s(v.key_line),
+    must_have: (v.must || []).map(r => ({ text: s(r.text), confirmed_by: s(r.confirmed_by) })).filter(r => r.text),
+    draft: String(v.draft || "").trim(), draft_doc_url: s(v.draft_doc_url),
+    visual_refs: (v.refs || []).map(r => ({ url: s(r.url), note: s(r.note) })).filter(r => r.url),
+    publish_on: s(v.publish_on), other_notes: String(v.other_notes || "").trim(), shots,
+  };
+}
 export function rqMine(rows, me) { return (rows || []).filter(r => me && r.requester === me.id); }
-// 送單的表單加「我送過的」。d 是填到一半的值；mine 是我的單。
-export function requestPageHTML(me, mine, d, msg, busy) {
-  const v = d || {};
+// 名單上的 team（一個人可能有兩個 team，兩邊都算）。
+function rqTeams(cadres) {
+  const set = new Set();
+  for (const p of cadres || []) for (const t of splitTeams(p.team)) set.add(t);
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+const rqPerson = (id, ...lists) => { for (const l of lists) { const p = (l || []).find(x => x.id === id); if (p) return mpName(p); } return ""; };
+const rqTagCls = st => st === "published" ? " open" : st === "in_progress" || st === "in_review" ? " warn" : "";
+// 平台那一格的字：「IG 輪播、其他：LINE 群組」。舊單沒有平台就印第一版的種類。
+function rqPlatformText(r) {
+  const pf = (r.platforms || []).map(p => p === "other" && r.platform_other ? T("rq.pf.otherWith", { v: r.platform_other }) : T("rq.pf." + p));
+  return pf.length ? pf.join("、") : (r.kind ? T("rq.kind." + r.kind) : "");
+}
+const rqPub = r => r.publish_on || r.needed_by || "";
+const rqSoonTag = (r, today) => today && !["published", "withdrawn"].includes(rqStatus(r.status)) && rqTooSoon(rqPub(r), today) ? ` <span class="tag warn">${esc(T("rq.soonTag"))}</span>` : "";
+
+// 送單的表單加「我送過的」。d 是草稿（null 就是空白表單），mine 是我的單，cadres 是幹部名單（選負責人、印名字），today 判斷 7 天。
+export function requestPageHTML(me, mine, d, msg, busy, cadres, today) {
+  const v = Object.assign(rqBlank(), d || {});
   const dis = busy ? " disabled" : "";
-  const opt = (k, cur) => RQ_KINDS.map(x => `<option value="${x}"${(cur || "poster") === x ? " selected" : ""}>${esc(T("rq.kind." + x))}</option>`).join("");
-  const row = r => `<li class="rq-row${r.status === "withdrawn" ? " off" : ""}">
-      <div class="fhead"><b>${esc(r.title)}</b> <span class="tag${r.status === "done" ? " open" : r.status === "in_progress" ? " warn" : ""}">${esc(T("rq.st." + r.status))}</span> <span class="mini">${esc(T("rq.kind." + r.kind))}${r.needed_by ? `・${esc(T("rq.by", { d: rqDate(r.needed_by) }))}` : ""}</span></div>
+  const td = today || rqToday();
+  const val = x => esc(x == null ? "" : String(x));
+  const ph = k => ` placeholder="${esc(T(k))}"`;
+  const fld = (n, label, help, body) => `<div class="rq-f" data-n="${n}"><div class="rq-fl"><b class="rq-n">${n}</b> <span>${label}</span><div class="rq-help">${help}</div></div><div class="rq-fi">${body}</div></div>`;
+  const del = (act, i) => `<button class="lnk rq-del" data-act="${act}" data-i="${i}" aria-label="${esc(T("rq.delRow"))}"${dis}>${T("rq.delRow")}</button>`;
+  const teams = rqTeams(cadres);
+  const inTeam = v.owner_team ? (cadres || []).filter(p => splitTeams(p.team).includes(v.owner_team)) : [];
+  const soon = rqTooSoon(v.publish_on, td);
+  const form = `<div class="rq-form">`
+    + fld(1, T("rq.f1"), T("rq.h1"), `<input id="rq-title" value="${val(v.title)}"${ph("rq.p1")}${dis}>`)
+    + fld(2, T("rq.f2"), T("rq.h2"), `<div class="rq-pair">
+        <label><span class="sr">${T("rq.ownerTeam")}</span><select id="rq-owner-team"${dis}><option value="">${T("rq.pickTeam")}</option>${teams.map(t => `<option value="${esc(t)}"${v.owner_team === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+        <label><span class="sr">${T("rq.ownerPerson")}</span><select id="rq-owner"${!v.owner_team || busy ? " disabled" : ""}><option value="">${T("rq.pickPerson")}</option>${inTeam.map(p => `<option value="${esc(p.id)}"${v.owner_id === p.id ? " selected" : ""}>${esc(mpName(p))}</option>`).join("")}</select></label></div>`)
+    + fld(3, T("rq.f3"), T("rq.h3"), `<input id="rq-goal" value="${val(v.goal_cta)}"${ph("rq.p3")}${dis}>`)
+    + fld(4, T("rq.f4"), T("rq.h4"), `<div class="rq-pf">${RQ_PLATFORMS.map(p => `<label class="check"><input type="checkbox" id="rq-pf-${p}"${(v.platforms || []).includes(p) ? " checked" : ""}${dis}> ${esc(T("rq.pf." + p))}</label>`).join("")}</div>
+        <input id="rq-pf-note" value="${val(v.platform_other)}"${ph("rq.pOther")}${dis}>`)
+    + fld(5, T("rq.f5"), T("rq.h5"), `<input id="rq-key" value="${val(v.key_line)}"${ph("rq.p5")}${dis}>`)
+    + fld(6, T("rq.f6"), T("rq.h6"), `<div class="rq-rows">${(v.must || []).map((r, i) => `<div class="rq-rowin">
+          <input id="rq-must-text-${i}" value="${val(r.text)}"${i === 0 ? ph("rq.p6") : ""} aria-label="${esc(T("rq.mustText"))}"${dis}>
+          <input id="rq-must-by-${i}" value="${val(r.confirmed_by)}"${ph("rq.p6by")} aria-label="${esc(T("rq.mustBy"))}"${dis}>${del("rq-del-must", i)}</div>`).join("")}</div>
+        <button class="btn quiet sm" data-act="rq-add-must"${dis}>${T("rq.addMust")}</button>`)
+    + fld(7, T("rq.f7"), T("rq.h7"), `<textarea id="rq-draft" style="min-height:120px"${ph("rq.p7")}${dis}>${val(v.draft)}</textarea>
+        <input id="rq-doc" value="${val(v.draft_doc_url)}"${ph("rq.p7doc")}${dis}>`)
+    + fld(8, T("rq.f8"), T("rq.h8"), `<div class="rq-rows">${(v.refs || []).map((r, i) => `<div class="rq-rowin">
+          <input id="rq-ref-url-${i}" value="${val(r.url)}"${ph("rq.p8url")} aria-label="${esc(T("rq.refUrl"))}"${dis}>
+          <input id="rq-ref-note-${i}" value="${val(r.note)}"${ph("rq.p8note")} aria-label="${esc(T("rq.refNote"))}"${dis}>${del("rq-del-ref", i)}</div>`).join("")}</div>
+        <button class="btn quiet sm" data-act="rq-add-ref"${dis}>${T("rq.addRef")}</button>`)
+    + fld(9, T("rq.f9"), T("rq.h9"), `<input id="rq-publish" type="date" value="${val(v.publish_on)}"${dis}>
+        <div class="rq-warn" id="rq-publish-warn" role="status"${soon ? "" : " hidden"}>${T("rq.soonWarn")}</div>`)
+    + fld(10, T("rq.f10"), T("rq.h10"), `<textarea id="rq-notes" style="min-height:72px"${ph("rq.p10")}${dis}>${val(v.other_notes)}</textarea>`)
+    + fld(11, T("rq.f11"), T("rq.h11"), `<div class="mini">${T("rq.f11note")}</div>`)
+    + `</div>`;
+  const shotRow = (r, i) => `<tr><th scope="row">F${i + 1}</th>
+      <td data-l="${esc(T("rq.sWho"))}"><input id="rq-shot-who-${i}" value="${val(r.who)}"${i === 0 ? ph("rq.exWho") : ""} aria-label="F${i + 1} ${esc(T("rq.sWho"))}"${dis}></td>
+      <td data-l="${esc(T("rq.sWhat"))}"><input id="rq-shot-what-${i}" value="${val(r.what)}"${i === 0 ? ph("rq.exWhat") : ""} aria-label="F${i + 1} ${esc(T("rq.sWhat"))}"${dis}></td>
+      <td data-l="${esc(T("rq.sSec"))}"><input id="rq-shot-sec-${i}" type="number" min="0" max="600" inputmode="numeric" value="${val(r.seconds)}"${i === 0 ? ph("rq.exSec") : ""} aria-label="F${i + 1} ${esc(T("rq.sSec"))}"${dis}></td>
+      <td data-l="${esc(T("rq.sNote"))}"><input id="rq-shot-note-${i}" value="${val(r.note)}"${i === 0 ? ph("rq.exNote") : ""} aria-label="F${i + 1} ${esc(T("rq.sNote"))}"${dis}></td>
+      <td class="rq-x">${del("rq-del-shot", i)}</td></tr>`;
+  const c = v.closing || {};
+  const shots = `<p class="mini rq-shots-note">${T("rq.shotsNote")}</p>
+    <table class="rq-shots rq-shots-edit"><thead><tr><th scope="col">Fragment</th><th scope="col">${T("rq.sWho")}</th><th scope="col">${T("rq.sWhat")}</th><th scope="col">${T("rq.sSec")}</th><th scope="col">${T("rq.sNote")}</th><th scope="col"><span class="sr">${T("rq.delRow")}</span></th></tr></thead>
+    <tbody>${(v.shots || []).map(shotRow).join("")}
+    <tr class="rq-closing"><th scope="row">${T("rq.closing")}</th>
+      <td data-l="${esc(T("rq.sWho"))}"><input id="rq-close-who" value="${val(c.who)}"${ph("rq.closeWhoPh")} aria-label="${esc(T("rq.closing"))} ${esc(T("rq.sWho"))}"${dis}></td>
+      <td data-l="${esc(T("rq.sWhat"))}" class="rq-fixed">${T("rq.closingWhat")}</td>
+      <td data-l="${esc(T("rq.sSec"))}"><input id="rq-close-sec" type="number" min="0" max="600" inputmode="numeric" value="${val(c.seconds)}" aria-label="${esc(T("rq.closing"))} ${esc(T("rq.sSec"))}"${dis}></td>
+      <td data-l="${esc(T("rq.sNote"))}"><input id="rq-close-note" value="${val(c.note)}" aria-label="${esc(T("rq.closing"))} ${esc(T("rq.sNote"))}"${dis}></td><td></td></tr>
+    </tbody></table>
+    <button class="btn quiet sm" data-act="rq-add-shot"${dis}>${T("rq.addShot")}</button>`;
+  const row = r => {
+    const st = rqStatus(r.status);
+    const who = r.assignee ? rqPerson(r.assignee, cadres) : "";
+    const pub = rqPub(r);
+    return `<li class="rq-row${st === "withdrawn" ? " off" : ""}">
+      <div class="fhead"><b>${esc(r.title)}</b> <span class="tag${rqTagCls(st)}">${esc(T("rq.st." + st))}</span> <span class="mini">${esc(rqPlatformText(r))}${pub ? `・${esc(T("rq.pubOn", { d: rqDate(pub) }))}` : ""}</span></div>
       ${r.reply ? `<div class="fmeta rq-reply"><i>${T("rq.replyLabel")}</i>${esc(r.reply)}</div>` : ""}
-      <div class="fmeta">${esc(T("rq.sent", { d: rqDate(r.created_at) }))}${r.status === "new" ? ` <button class="lnk" data-act="rq-withdraw" data-id="${esc(r.id)}"${dis}>${T("rq.withdraw")}</button>` : ""}</div>
+      ${who ? `<div class="fmeta">${esc(T("rq.assigneeLine", { v: who }))}</div>` : ""}
+      <div class="fmeta">${esc(T("rq.sent", { d: rqDate(r.created_at) }))}${st === "submitted" ? ` <button class="lnk" data-act="rq-withdraw" data-id="${esc(r.id)}"${dis}>${T("rq.withdraw")}</button>` : ""}</div>
     </li>`;
+  };
   return pageHead(T("rq.title"), T("rq.lede"))
     + msgHTML(msg)
-    + sectionHTML(T("rq.formTitle"), `<div class="two">
-        <label><i>${T("rq.kind")}</i><select id="rq-kind"${dis}>${opt("kind", v.kind)}</select></label>
-        <label><i>${T("rq.needed")}</i><input id="rq-needed" type="date" value="${esc(v.needed_by || "")}"${dis}></label>
-        <label class="wide"><i>${T("rq.titleF")}</i><input id="rq-title" value="${esc(v.title || "")}" placeholder="${esc(T("rq.titlePh"))}"${dis}></label>
-        <label class="wide"><i>${T("rq.purpose")}</i><input id="rq-purpose" value="${esc(v.purpose || "")}" placeholder="${esc(T("rq.purposePh"))}"${dis}></label>
-        <label class="wide"><i>${T("rq.brief")}</i><textarea id="rq-brief" style="min-height:120px" placeholder="${esc(T("rq.briefPh"))}"${dis}>${esc(v.brief || "")}</textarea></label>
-        <label class="wide"><i>${T("rq.links")}</i><textarea id="rq-links" style="min-height:64px" placeholder="${esc(T("rq.linksPh"))}"${dis}>${esc(v.links || "")}</textarea></label>
-        <label><i>${T("rq.contact")}</i><input id="rq-contact" value="${esc(v.contact || "")}" placeholder="${esc(T("rq.contactPh"))}"${dis}></label>
-      </div>
-      <div class="form-foot"><button class="btn" data-act="rq-submit"${dis}>${busy ? T("common.saving") : T("rq.submit")}</button><span class="mini">${T("rq.submitNote")}</span></div>`, { id: "rq-form" })
+    + sectionHTML(T("rq.formTitle"), form, { id: "rq-form" })
+    + sectionHTML(T("rq.shotsTitle"), shots, { id: "rq-shots" })
+    + `<div class="form-foot rq-send"><button class="btn" data-act="rq-submit"${dis}>${busy ? T("common.saving") : T("rq.submit")}</button><span class="mini">${T("rq.submitNote")} ${T("rq.draftNote")}</span></div>`
     + sectionHTML(T("rq.mineTitle"), (mine || []).length ? `<ul class="flist">${mine.map(row).join("")}</ul>` : emptyHTML(T("rq.mineNone"), T("rq.mineNoneHint")), { id: "rq-mine" });
 }
-// Marketing 的佇列。f = { status: "open"|"done"|"all", kind, q }，sel 是打開的那一張，canEdit 是「改」以上。
+
+// Marketing 的佇列。f = { status: "open"|"published"|"withdrawn"|"all", mine: 我的 id（只看我接的）, q }。
 export function rqFilter(rows, f) {
-  const o = Object.assign({ status: "open", kind: "", q: "" }, f || {});
+  const o = Object.assign({ status: "open", mine: "", q: "" }, f || {});
   const q = String(o.q || "").trim().toLowerCase();
-  return (rows || []).filter(r => (o.status === "all" || (o.status === "done" ? r.status === "done" : o.status === "withdrawn" ? r.status === "withdrawn" : (r.status === "new" || r.status === "in_progress")))
-    && (!o.kind || r.kind === o.kind)
-    && (!q || String(r.title || "").toLowerCase().includes(q) || String(r.purpose || "").toLowerCase().includes(q)));
+  const has = x => String(x || "").toLowerCase().includes(q);
+  return (rows || []).filter(r => {
+    const st = rqStatus(r.status);
+    return (o.status === "all" || (o.status === "open" ? RQ_OPEN.includes(st) : st === o.status))
+      && (!o.mine || r.assignee === o.mine)
+      && (!q || has(r.title) || has(r.key_line) || has(r.goal_cta) || has(r.purpose));
+  });
 }
-export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy) {
-  const o = Object.assign({ status: "open", kind: "", q: "" }, f || {});
+// opts = { assignees: request_assignees() 回的名單, today, me }。sel 是打開的那一張，canEdit 是「改」以上。
+export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy, opts) {
+  const o = Object.assign({ status: "open", mine: "", q: "" }, f || {});
+  const x = opts || {};
+  const td = x.today || rqToday();
   const dis = busy ? " disabled" : "";
-  const who = id => { const p = (people || []).find(x => x.id === id); return p ? mpName(p) : T("rq.someone"); };
+  const who = id => rqPerson(id, people, x.assignees) || T("rq.someone");
+  const owner = r => [r.owner_team, r.owner_id ? who(r.owner_id) : ""].filter(Boolean).join("・");
   const open = sel ? (rows || []).find(r => r.id === sel) : null;
   if (open) {
-    const r = open;
-    return pageHead(esc(r.title), esc(T("rq.oneLede", { who: who(r.requester), d: rqDate(r.created_at) })), [], { act: "rq-back", label: T("rq.back") })
-      + msgHTML(msg)
-      + sectionHTML(T("rq.details"), `<dl class="rq-dl">
-          <dt>${T("rq.kind")}</dt><dd>${esc(T("rq.kind." + r.kind))}</dd>
-          <dt>${T("rq.needed")}</dt><dd>${r.needed_by ? esc(rqDate(r.needed_by)) : T("value.none")}</dd>
-          <dt>${T("rq.purpose")}</dt><dd>${r.purpose ? esc(r.purpose) : T("value.none")}</dd>
-          <dt>${T("rq.brief")}</dt><dd class="pre">${r.brief ? esc(r.brief) : T("value.none")}</dd>
-          <dt>${T("rq.links")}</dt><dd>${(r.asset_links || []).length ? (r.asset_links || []).map(l => `<a href="${esc(l)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("<br>") : T("value.none")}</dd>
-          <dt>${T("rq.contact")}</dt><dd>${r.contact ? esc(r.contact) : T("value.none")}</dd>
-        </dl>`)
-      // 2026-11-06 自動儲存：狀態與回覆改了就存（data-autosave="rq-save"）。「標成做完」還是按鈕，因為它會寄一封信給送單的人，
-      // 按之前要問一次；所以還沒做完的單，下拉裡不給選「做完」，要走那顆鈕。做完的單下拉才有「做完」（可以退回處理中）。
-      + sectionHTML(T("rq.handle"), r.status === "withdrawn" ? `<div class="note">${T("rq.withdrawnNote")}</div>` : canEdit ? `<div class="two" data-autosave="rq-save" data-id="${esc(r.id)}">
-          <label><i>${T("rq.status")}</i><select id="rq-status" name="status"${dis}>${(r.status === "done" ? ["new", "in_progress", "done"] : ["new", "in_progress"]).map(s => `<option value="${s}"${r.status === s ? " selected" : ""}>${esc(T("rq.st." + s))}</option>`).join("")}</select></label>
+    const r = open, st = rqStatus(r.status);
+    const none = T("value.none");
+    const txt = s => s ? esc(s) : none;
+    const link = u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`;
+    const must = (r.must_have || []).length ? `<ul class="rq-ul">${r.must_have.map(m => `<li>${esc(m.text)}${m.confirmed_by ? ` <span class="mini">${esc(T("rq.confirmedBy", { v: m.confirmed_by }))}</span>` : ""}</li>`).join("")}</ul>` : none;
+    const refs = (r.visual_refs || []).length ? `<ul class="rq-ul">${r.visual_refs.map(v => `<li>${link(v.url)}${v.note ? ` <span class="mini">${esc(T("rq.refFor", { v: v.note }))}</span>` : ""}</li>`).join("")}</ul>` : none;
+    const pub = rqPub(r);
+    // 第一版的欄：舊單才有值，有值才印。
+    const v1 = [["rq.v1.purpose", r.purpose], ["rq.v1.brief", r.brief, true], ["rq.v1.links", (r.asset_links || []).length ? r.asset_links : ""], ["rq.v1.contact", r.contact]].filter(a => a[1] && a[1].length);
+    const shots = r.shots || [];
+    let fn = 0;
+    const shotTable = shots.length ? `<h3 class="rq-h3">${T("rq.shotsTitle")}</h3><p class="mini">${T("rq.shotsNote")}</p>
+      <table class="rq-shots"><thead><tr><th scope="col">Fragment</th><th scope="col">${T("rq.sWho")}</th><th scope="col">${T("rq.sWhat")}</th><th scope="col">${T("rq.sSec")}</th><th scope="col">${T("rq.sNote")}</th></tr></thead><tbody>${
+        shots.map(s => `<tr${s.is_closing ? ` class="rq-closing"` : ""}><th scope="row">${s.is_closing ? T("rq.closing") : `F${++fn}`}</th><td>${esc(s.who || "")}</td><td>${s.is_closing ? T("rq.closingWhat") : esc(s.what || "")}</td><td>${s.seconds == null ? "" : esc(String(s.seconds))}</td><td>${esc(s.note || "")}</td></tr>`).join("")
+      }</tbody></table>` : "";
+    const details = `<div class="rq-print"><dl class="rq-dl">
+        <dt>${T("rq.f1")}</dt><dd>${esc(r.title)}</dd>
+        <dt>${T("rq.f2")}</dt><dd>${owner(r) ? esc(owner(r)) : none}</dd>
+        <dt>${T("rq.f3")}</dt><dd>${txt(r.goal_cta)}</dd>
+        <dt>${T("rq.f4")}</dt><dd>${(r.platforms || []).length ? esc(rqPlatformText(r)) : none}</dd>
+        <dt>${T("rq.f5")}</dt><dd>${txt(r.key_line)}</dd>
+        <dt>${T("rq.f6")}</dt><dd>${must}</dd>
+        <dt>${T("rq.f7")}</dt><dd class="pre">${txt(r.draft)}</dd>
+        ${r.draft_doc_url ? `<dt>${T("rq.docLabel")}</dt><dd>${link(r.draft_doc_url)}</dd>` : ""}
+        <dt>${T("rq.f8")}</dt><dd>${refs}</dd>
+        <dt>${T("rq.f9")}</dt><dd>${pub ? esc(rqDate(pub)) + rqSoonTag(r, td) : none}</dd>
+        <dt>${T("rq.f10")}</dt><dd class="pre">${txt(r.other_notes)}</dd>
+        <dt>${T("rq.f11")}</dt><dd>${esc(T("rq.st." + st))}・${esc(r.assignee ? T("rq.assigneeLine", { v: who(r.assignee) }) : T("rq.nobody"))}</dd>
+        ${v1.map(([k, val, pre]) => `<dt>${T(k)}</dt><dd${pre ? ` class="pre"` : ""}>${Array.isArray(val) ? val.map(link).join("<br>") : esc(val)}</dd>`).join("")}
+        ${r.reply ? `<dt>${T("rq.reply")}</dt><dd class="pre">${esc(r.reply)}</dd>` : ""}
+      </dl>${shotTable}</div>`;
+    const as = (x.assignees || []).slice();
+    if (r.assignee && !as.some(a => a.id === r.assignee)) as.push({ id: r.assignee, name_zh: who(r.assignee) });
+    const stOpts = st === "published" ? RQ_OPEN.concat("published") : RQ_OPEN;
+    // 狀態、接的人、回覆改了就存（data-autosave="rq-save"）。「已發布」是按鈕，因為它會寄一封信給送單的人，
+    // 按之前要問一次；所以還沒發布的單，下拉裡不給選「已發布」。已發布的單下拉才有它（可以退回，信不會重寄）。
+    const handle = st === "withdrawn" ? `<div class="note">${T("rq.withdrawnNote")}</div>` : canEdit ? `<div class="two" data-autosave="rq-save" data-id="${esc(r.id)}">
+          <label><i>${T("rq.assignee")}</i><select id="rq-assignee" name="assignee"${dis}><option value="">${T("rq.nobodyOpt")}</option>${as.map(a => `<option value="${esc(a.id)}"${r.assignee === a.id ? " selected" : ""}>${esc(mpName(a))}</option>`).join("")}</select></label>
+          <label><i>${T("rq.status")}</i><select id="rq-status" name="status"${dis}>${stOpts.map(s => `<option value="${s}"${st === s ? " selected" : ""}>${esc(T("rq.st." + s))}</option>`).join("")}</select></label>
           <label class="wide"><i>${T("rq.reply")}</i><textarea id="rq-reply" name="reply" style="min-height:90px" placeholder="${esc(T("rq.replyPh"))}"${dis}>${esc(r.reply || "")}</textarea></label>
         </div>
         <div class="form-foot">${autosaveHint("rq-save", `data-id="${esc(r.id)}"`)}
-          ${r.status !== "done" ? `<button class="btn ghost" data-act="rq-done" data-id="${esc(r.id)}"${dis}>${T("rq.markDone")}</button>` : ""}
-          <span class="mini">${T("rq.doneNote")}</span></div>` : `<div class="note">${T("rq.viewOnly")}</div>`);
+          ${st !== "published" ? `<button class="btn" data-act="rq-publish" data-id="${esc(r.id)}"${dis}>${T("rq.markPublished")}</button>` : ""}
+          <span class="mini">${T("rq.publishNote")}</span></div>` : `<div class="note">${T("rq.viewOnly")}</div>`;
+    return pageHead(esc(r.title), esc(T("rq.oneLede", { who: who(r.requester), d: rqDate(r.created_at) })), [{ act: "rq-print", label: T("rq.print") }], { act: "rq-back", label: T("rq.back") })
+      + msgHTML(msg)
+      + sectionHTML(T("rq.details"), details)
+      + `<div class="no-print">${sectionHTML(T("rq.handle"), handle)}</div>`;
   }
   const shown = rqFilter(rows, o);
-  const groups = [["new", shown.filter(r => r.status === "new")], ["in_progress", shown.filter(r => r.status === "in_progress")], ["done", shown.filter(r => r.status === "done")], ["withdrawn", shown.filter(r => r.status === "withdrawn")]].filter(g => g[1].length);
+  const groups = RQ_STATUS.map(s => [s, shown.filter(r => rqStatus(r.status) === s)]).filter(g => g[1].length);
   const chip = (act, v, label, on) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-v="${esc(v)}">${esc(label)}</button>`;
-  const row = r => `<li class="rq-row"><div class="fhead"><b><a href="#requests/${esc(r.id)}" data-act="rq-open" data-id="${esc(r.id)}">${esc(r.title)}</a></b> <span class="mini">${esc(T("rq.kind." + r.kind))}</span></div>
-      <div class="fmeta">${esc(who(r.requester))}・${esc(T("rq.sent", { d: rqDate(r.created_at) }))}${r.needed_by ? `・${esc(T("rq.by", { d: rqDate(r.needed_by) }))}` : ""}${r.purpose ? `・${esc(r.purpose)}` : ""}</div></li>`;
+  const row = r => {
+    const pub = rqPub(r), ow = owner(r), pf = rqPlatformText(r);
+    return `<li class="rq-row"><div class="fhead"><b><a href="#requests/${esc(r.id)}" data-act="rq-open" data-id="${esc(r.id)}">${esc(r.title)}</a></b>${pf ? ` <span class="mini">${esc(pf)}</span>` : ""}</div>
+      <div class="fmeta">${[ow ? esc(T("rq.ownerLine", { v: ow })) : "", pub ? esc(T("rq.pubOn", { d: rqDate(pub) })) + rqSoonTag(r, td) : "", esc(r.assignee ? T("rq.assigneeLine", { v: who(r.assignee) }) : T("rq.nobody"))].filter(Boolean).join("・")}</div>
+      <div class="fmeta">${esc(T("rq.oneLede", { who: who(r.requester), d: rqDate(r.created_at) }))}</div></li>`;
+  };
   return pageHead(T("rq.queueTitle"), T("rq.queueLede"))
     + msgHTML(msg)
-    + `<div class="chips" style="margin-bottom:8px">${[["open", T("rq.f.open")], ["done", T("rq.f.done")], ["withdrawn", T("rq.f.withdrawn")], ["all", T("rq.f.all")]].map(([v, l]) => chip("rq-fstatus", v, l, o.status === v)).join("")}</div>
-       <div class="chips" style="margin-bottom:10px">${chip("rq-fkind", "", T("rq.f.anyKind"), !o.kind)}${RQ_KINDS.map(k => chip("rq-fkind", k, T("rq.kind." + k), o.kind === k)).join("")}</div>
+    + `<div class="chips" style="margin-bottom:10px">${[["open", T("rq.f.open")], ["published", T("rq.f.published")], ["withdrawn", T("rq.f.withdrawn")], ["all", T("rq.f.all")]].map(([v, l]) => chip("rq-fstatus", v, l, o.status === v)).join("")}${
+        x.me ? chip("rq-fmine", x.me.id, T("rq.f.mine"), !!o.mine) : ""}</div>
        <div class="ro-search"><input id="rq-q" type="search" value="${esc(o.q || "")}" placeholder="${esc(T("rq.findPh"))}" autocomplete="off"></div>`
     + (groups.length ? groups.map(([st, rs]) => sectionHTML(`${esc(T("rq.st." + st))}<span class="hint">${rs.length}</span>`, `<ul class="flist">${rs.map(row).join("")}</ul>`)).join("")
         : emptyHTML(T("rq.queueNone"), T("rq.queueNoneHint")));

@@ -31,6 +31,7 @@ const PAGES = [
   "app/index.html", "reset/index.html",
   "passport/_audit.html", "availability/_audit.html", "admin/_audit.html", "settings/_audit.html",
   "intern-passport/_audit.html", "admin/people/_audit.html", "admin/finance/_audit.html",
+  "admin/_audit-rq.html", "admin/_audit-rqq.html",
 ];
 
 // ── 在頁面裡跑的那一段 ────────────────────────────────────────────────
@@ -142,7 +143,7 @@ async function main() {
   // 四頁假資料自己產生、自己刪掉（見 scripts/mobile-fixtures.mjs）。
   const fx = spawnSync("node", ["scripts/mobile-fixtures.mjs"], { encoding: "utf8" });
   if (fx.status !== 0) { console.log("BAD 產生假頁面失敗：\n" + (fx.stderr || fx.stdout)); return 1; }
-  const FIXTURES = PAGES.filter(p => p.endsWith("_audit.html"));
+  const FIXTURES = PAGES.filter(p => /\/_audit[^/]*\.html$/.test(p));
 
   const profile = mkdtempSync(join(tmpdir(), "bt-mobile-"));
   const server = spawn("python3", ["-m", "http.server", String(PORT)], { stdio: "ignore" });

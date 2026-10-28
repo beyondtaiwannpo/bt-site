@@ -14,7 +14,10 @@ export async function loadMe(userId) {
   //（理由與清除時機寫在那裡）。這裡只負責把那一列整理成這一組要的形狀。
   const { row: data, ws } = await whoAmI(userId);
   if (!data) return null;
+  // id 一定要帶（2026-11-09 補）：之前沒帶，r.requester === me.id 那幾處永遠對不上，
+  // 「我送過的」需求單、總覽的「你送的需求單」與「下一場會議」兩張卡都是空的，需求單的草稿也變成大家共用一格。
   return {
+    id: userId,
     role: data.role,
     board: data.board_role || "member",
     team: data.team || "",
@@ -326,8 +329,13 @@ const SAYS = [
   ["already_started", "Marketing 已經在做了，收不回；直接跟他們講。", "Marketing has already started; it cannot be withdrawn. Talk to them directly."],
   ["not_yours", "這不是你送的單。", "This is not your request."],
   ["withdrawn", "這張單已經收回了。", "This request was withdrawn."],
-  ["bad_kind", "種類要選海報、貼文、影片或其他。", "Pick poster, post, video or other."],
   ["no_such_request", "找不到這張單，重新整理再試一次。", "Request not found. Refresh and try again."],
+  // 第二版（2026-11-09）
+  ["not_in_workspace", "接的人只能選需求工作區裡的人，要先在 People 的 Workspaces 把他加進來。", "The assignee must be in the Marketing requests workspace. Add them under People, Workspaces first."],
+  ["bad_platform", "平台只能勾表單上那五個。", "Pick platforms from the five on the form."],
+  ["bad_owner", "需求負責人要是幹部，重新選一次。", "The request owner must be a cadre. Pick again."],
+  ["bad_date", "預計發布日的格式不對。", "The publish date is not a valid date."],
+  ["bad_status", "狀態只能是已送出、進行中、待審核、已發布。", "Status must be Submitted, In progress, In review or Published."],
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
   // 2026-09-08：Paul 照步驟設定了，但名字打成「Resend API」，
   // 而畫面上顯示的是這裡寫死的一句話 —— 看起來像他什麼都沒做。
@@ -381,23 +389,41 @@ export function says(err) {
   return m;
 }
 
-// ── 行銷需求單（2026-10-31）──────────────────────────────────────────────
-// 讀 requests（RLS：送單的人自己的、需求工作區「看」以上全部）；寫一律走三支函式。
+// ── 行銷需求單（2026-10-31，第二版 2026-11-09）──────────────────────────
+// 讀 requests（RLS：送單的人自己的、需求工作區「看」以上全部）；寫一律走函式。
+// 第二版的欄要等 2026-11-09 那支遷移檔跑過才有。網站比資料庫先上線的那段時間，讀新欄會整句失敗（欄位不存在），
+// 所以失敗時退回第一版的欄再讀一次，舊的清單至少看得到。
+const RQ_V1 = "id, kind, title, purpose, needed_by, brief, asset_links, contact, requester, status, reply, created_at, updated_at";
+const RQ_V2 = RQ_V1 + ", owner_id, owner_team, goal_cta, platforms, platform_other, key_line, must_have, draft, draft_doc_url, visual_refs, publish_on, other_notes, assignee, shots, published_at";
 export async function loadRequests() {
   need();
-  const { data, error } = await supabase.from("requests")
-    .select("id, kind, title, purpose, needed_by, brief, asset_links, contact, requester, status, reply, created_at, updated_at")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data || [];
+  let r = await supabase.from("requests").select(RQ_V2).order("created_at", { ascending: false });
+  if (r.error && /column|42703/.test(String(r.error.code || "") + String(r.error.message || ""))) {
+    r = await supabase.from("requests").select(RQ_V1).order("created_at", { ascending: false });
+  }
+  if (r.error) throw r.error;
+  return r.data || [];
 }
-export async function submitRequest(d) {
+// p 是 UI.rqPayload() 整理好的那一包（沒有 assignee，資料庫也不收）。
+export async function submitRequest(p) {
   need();
-  const { data, error } = await supabase.rpc("submit_request", {
-    p_kind: d.kind, p_title: d.title, p_purpose: d.purpose || "", p_needed_by: d.needed_by || null,
-    p_brief: d.brief || "", p_asset_links: d.links || [], p_contact: d.contact || "" });
+  const { data, error } = await supabase.rpc("submit_request", { p_req: p });
   if (error) throw error;
   return data;
+}
+// 接的人：只有需求工作區「改」以上叫得動，只能指定工作區裡的人（null 是清空）。
+export async function setRequestAssignee(id, uid) {
+  need();
+  const { data, error } = await supabase.rpc("set_request_assignee", { p_id: id, p_assignee: uid || null });
+  if (error) throw error;
+  return data;
+}
+// 「接的人」下拉的名單：需求工作區的成員。「看」以上拿得到，拿不到回空的（下拉只剩「還沒有人接」）。
+export async function loadAssignees() {
+  need();
+  const { data, error } = await supabase.rpc("request_assignees");
+  if (error) throw error;
+  return data || [];
 }
 export async function setRequestStatus(id, status, reply) {
   need();

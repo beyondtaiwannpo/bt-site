@@ -345,6 +345,67 @@ a.btn{text-decoration:none}
 .rq-reply i{font-style:normal;font-weight:600;margin-right:4px}
 .two label.wide{grid-column:1/-1}
 @media (max-width:720px){ .rq-dl{grid-template-columns:1fr;gap:2px 0} .rq-dl dd{margin-bottom:8px} }
+/* 行銷需求單第二版（2026-11-09）：Sheet 的 11 格。桌機左邊是編號、欄名與說明，右邊是填的格子；手機疊起來。 */
+.rq-f{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr);gap:6px 24px;padding:14px 0;border-top:1px solid rgba(16,42,134,.12)}
+.rq-f:first-child{border-top:0;padding-top:4px}
+.rq-fl{font-weight:600;font-size:14.5px;line-height:1.4}
+.rq-n{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:4px;border-radius:50%;background:rgba(16,42,134,.08);
+  font-family:var(--display);font-size:12.5px;font-weight:700;color:var(--bt-navy)}
+.rq-help{font-weight:400;font-size:13px;line-height:1.5;color:rgba(16,42,134,.72);margin-top:4px}
+.rq-fi > input,.rq-fi > textarea,.rq-fi > select{margin-bottom:8px}
+.rq-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rq-pair label{margin:0}
+.rq-pf{display:flex;flex-wrap:wrap;gap:4px 18px}
+.rq-pf .check{margin:0 0 6px}
+.rq-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.rq-rowin{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr) auto;gap:8px;align-items:center}
+.rq-rowin input{margin:0}
+/* 7 天警告：黃色、一行說清楚，只警告不擋（Paul 2026-11-08）。 */
+.rq-warn{padding:9px 12px;border-radius:12px;background:rgba(255,196,108,.42);font-size:13.5px;line-height:1.5}
+.rq-warn[hidden]{display:none}
+.rq-send{margin:4px 0 28px}
+/* 拍攝指示：桌機是一張表，手機每一列變一張小卡（欄名用 data-l 印在格子前面）。 */
+.rq-shots{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0 10px}
+.rq-shots th,.rq-shots td{text-align:left;vertical-align:top;padding:6px 6px;border-bottom:1px solid rgba(16,42,134,.12)}
+.rq-shots thead th{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,42,134,.7)}
+.rq-shots tbody th{font-family:var(--display);font-weight:700;white-space:nowrap;color:var(--bt-navy)}
+.rq-shots input{margin:0;min-width:0;width:100%}
+.rq-shots-edit td:nth-child(4){width:84px}
+.rq-shots .rq-closing{background:rgba(16,42,134,.04)}
+.rq-fixed{font-size:13.5px;color:rgba(16,42,134,.8)}
+.rq-x{width:1%;white-space:nowrap}
+.rq-ul{margin:0;padding-left:18px}
+.rq-h3{font-family:var(--display);font-size:15px;font-weight:700;margin:18px 0 2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media (max-width:720px){
+  .rq-f{grid-template-columns:1fr}
+  .rq-pair,.rq-rowin{grid-template-columns:1fr}
+  .rq-rowin .rq-del{justify-self:start}
+  .rq-shots-edit thead{display:none}
+  /* 一列一張小卡：Fragment 編號一行，誰拍與秒數並排，拍什麼與備註各一整行，刪掉鈕放右上。 */
+  .rq-shots-edit tr{display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:4px 10px;padding:10px 0;border-bottom:1px solid rgba(16,42,134,.16);position:relative}
+  .rq-shots-edit th,.rq-shots-edit td{display:block;border:0;padding:0;width:auto}
+  .rq-shots-edit tbody th{grid-column:1/-1}
+  .rq-shots-edit td:nth-child(3),.rq-shots-edit td:nth-child(5){grid-column:1/-1}
+  .rq-shots-edit td:nth-child(4){grid-column:2;grid-row:2;width:auto}
+  .rq-shots-edit td:nth-child(2){grid-column:1;grid-row:2}
+  .rq-shots-edit .rq-x{position:absolute;top:10px;right:0}
+  .rq-shots-edit tr > td:last-child:empty{display:none}
+  .rq-shots-edit td[data-l]::before{content:attr(data-l);display:block;font-size:11.5px;font-weight:700;color:rgba(16,42,134,.7);margin-bottom:2px}
+}
+/* 列印（2026-11-09）：佇列裡打開一張按「列印」，只印那一張單，側欄、頂欄、按鈕、處理那一塊都不印。 */
+@media print {
+  body{background:#fff}
+  body::before,.rail,.rail-burger,.btnav,.back,.page-head .actions,.no-print,.toasts,.toast,.msg{display:none !important}
+  .shell{display:block}
+  .main{max-width:none}
+  #bt-root{max-width:none;padding:0}
+  .section{box-shadow:none;border:0;padding:0;break-inside:auto}
+  .rq-dl{grid-template-columns:150px minmax(0,1fr);font-size:12pt}
+  .rq-shots{font-size:11pt}
+  .rq-shots tr{break-inside:avoid}
+  a{color:inherit;text-decoration:underline}
+}
 /* 兩行的名字（2026-10-24）：中文一行、英文淡字一行，永遠兩行，列高才齊；名字欄不縮、不裁，讓旁邊的 team 淡字先讓。 */
 .nm{display:inline-flex;flex-direction:column;align-items:flex-start;text-align:left;line-height:1.2;flex:0 0 auto;vertical-align:middle}
 .nm b{white-space:nowrap}

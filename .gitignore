@@ -3,3 +3,4 @@
 
 # scripts/check-mobile.mjs 產生的暫時頁面，跑完就刪；不要 commit。
 */_audit.html
+*/_audit-*.html
