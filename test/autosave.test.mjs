@@ -86,7 +86,7 @@ test("★ signOut 會清掉分頁快取；settings 與 app 存完資料會清", 
 });
 
 test("★ 四個後台 main.js 開頁先畫外殼（paintShell）再等資料，不再一個接一個 await", () => {
-  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/people/src/main.js", "admin/passports/src/main.js"]) {
+  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/people/src/main.js", "admin/passports/src/main.js", "admin/finance/src/main.js"]) {
     const s = readFileSync(f, "utf8");
     assert.match(s, /function paintShell\(/, f);
     assert.match(s, /paintShell\(/, f);
@@ -99,7 +99,7 @@ test("★ 四個後台 main.js 開頁先畫外殼（paintShell）再等資料，
 });
 
 test("★ 四個後台 index.html 一開始就有骨架側欄，importmap 與 meta 版本在", () => {
-  for (const f of ["admin/index.html", "admin/site/index.html", "admin/people/index.html", "admin/passports/index.html"]) {
+  for (const f of ["admin/index.html", "admin/site/index.html", "admin/people/index.html", "admin/passports/index.html", "admin/finance/index.html"]) {
     const h = readFileSync(f, "utf8");
     assert.match(h, /<nav class="rail skel"/, f);
     assert.match(h, /<meta name="bt-version" content="[^"]+">/, f);

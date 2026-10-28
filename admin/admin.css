@@ -549,3 +549,87 @@ select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-st
 .attach .check{margin:0;min-height:44px;align-items:center;justify-content:flex-start;text-align:left}
 .attach .check input[type="radio"]{width:18px;height:18px;flex:none;margin:0;accent-color:var(--bt-navy);cursor:pointer}
 .attach .check span{flex:1;min-width:0}
+
+/* ═════════ 財務（2026-11-08，/admin/finance/）═════════ */
+/* 標題那一張：現在全部的錢。比首頁的 kpi 大一號，整排寬。 */
+.fin-total{margin:0 0 22px;min-height:0}
+.fin-total .kpi-n{font-size:56px}
+.fin-four .kpi{min-height:0}
+.fin-four .kpi-n{font-size:30px}
+.fin-accs .kpi{min-height:0}
+.fin-accs .kpi-n{font-size:32px}
+.kpi.neg .kpi-n{color:var(--bt-orange)}
+/* 自己畫的 SVG 長條圖：收入深藍、支出橘，軸線淡藍，月份小字。 */
+.fin-chart-box{overflow-x:auto;padding-bottom:4px}
+.fin-chart{display:block;height:170px;width:auto;max-width:100%}  /* 固定高度、寬跟月數走，不拉到整頁寬 */
+.fin-chart rect.in{fill:var(--bt-navy)}
+.fin-chart rect.out{fill:var(--bt-orange)}
+.fin-chart line.axis{stroke:rgba(16,42,134,.3);stroke-width:1}
+.fin-chart text{font-family:var(--body);font-size:9px;fill:rgba(16,42,134,.8)}
+.fin-legend{display:flex;gap:14px;margin-top:6px}
+.fin-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.fin-legend i.in{background:var(--bt-navy)}
+.fin-legend i.out{background:var(--bt-orange)}
+/* 類別與預算的長條：名字、條、數字三欄，一列一行。超過預算整條變橘的。 */
+.fbar{display:grid;grid-template-columns:minmax(80px,140px) minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;font-size:14px}
+.fbar-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbar-t{display:block;height:12px;border-radius:6px;background:rgba(16,42,134,.1);overflow:hidden}
+.fbar-t i{display:block;height:100%;border-radius:6px;background:var(--bt-navy)}
+.fbar.over .fbar-t i{background:var(--bt-orange)}
+.fbar.over .fbar-n{color:var(--ink);font-weight:600}
+.fbar-n{font-family:var(--display);font-size:15px;font-weight:700;white-space:nowrap}
+.fbar-n .mini{font-family:var(--body);font-weight:400}
+/* 篩選列：幾個下拉加一個搜尋框，排成一行，放不下就換行。 */
+.fin-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.fin-filters select{min-width:0;max-width:200px}
+.fin-filters input[type="search"]{width:auto;flex:1;min-width:160px}
+.fin-count{flex-basis:100%}
+/* 表單格：日期、種類、金額…一格一欄，桌機四欄。 */
+.fin-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 14px}
+.fin-grid label{margin-bottom:12px;min-width:0}
+.fin-grid label[hidden]{display:none}
+.fin-grid label.wide,.fin-grid .row,.fin-grid div.wide{grid-column:1 / -1}
+.fin-grid .row{margin-top:0;padding:0 0 10px}
+.fin-grid.acc,.fin-grid.cat{grid-template-columns:repeat(3,minmax(0,1fr))}
+.fin-grid.bu{grid-template-columns:200px auto;align-items:end;gap:0 12px;margin:6px 0 2px}
+.fin-grid.bu .autosave{margin-bottom:18px}
+.fin-grid select,.fin-grid input[type="number"]{width:100%}
+.fin-grid input[type="number"]{font-variant-numeric:tabular-nums}
+.fin-new .form-foot .mini{flex:1;min-width:200px;line-height:1.5}
+/* 收支表：日期那一欄是主欄，台幣靠右，作廢的整列變灰。 */
+.fin-tx td.t-amt{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fin-tx td.t-amt b{font-family:var(--display);font-size:18px;font-weight:700}
+.fin-tx td.t-amt b.income{color:var(--bt-navy)}
+.fin-tx td.t-amt b.expense{color:var(--ink)}
+.fin-tx td.t-amt b.transfer{color:rgba(16,42,134,.7)}
+.fin-tx td.t-rcpt{white-space:nowrap}
+.fin-tx tr.void td{color:rgba(16,42,134,.55)}
+.fin-tx tr.void td.t-amt b{color:rgba(16,42,134,.55);text-decoration:line-through}
+.fin-tx tr.open td{background:rgba(255,232,197,.35)}
+.fin-tx tr.tx-editor td{padding:4px 10px 10px;background:rgba(255,232,197,.35)}
+.fin-tx .tag.income{background:rgba(107,198,187,.42)}
+.fin-tx .tag.expense{background:rgba(255,196,108,.42)}
+.fin-tx .tag.transfer{background:rgba(16,42,134,.12)}
+.fin-tx .fmeta .warn{color:var(--ink);border-bottom:2px solid var(--bt-orange)}
+.fin-tx .lnk.up{cursor:pointer}
+.fin-tx .void-ask .ask{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fin-tx .void-ask .ask input{width:auto;flex:1;min-width:160px}
+.fin-h3{font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:.03em;margin:0 0 6px}
+.fin-cats li.off,.fin-accs-list li.off{color:rgba(16,42,134,.6)}
+.fin-cats .fin-grid.cat{grid-template-columns:1fr 1fr}
+@media (max-width:720px){
+  .fin-total .kpi-n{font-size:42px}
+  .fin-four{grid-template-columns:1fr 1fr}
+  .fin-four .kpi-n{font-size:24px}
+  .fin-accs .kpi-n{font-size:26px}
+  .fin-grid,.fin-grid.acc,.fin-grid.cat,.fin-cats .fin-grid.cat{grid-template-columns:1fr 1fr}
+  .fin-grid.bu{grid-template-columns:1fr}
+  .fin-filters select,.fin-filters input[type="search"]{max-width:none;flex-basis:calc(50% - 4px)}
+  .fin-filters input[type="search"]{flex-basis:100%}
+  .fbar{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l n" "t t"}
+  .fbar-l{grid-area:l}.fbar-t{grid-area:t}.fbar-n{grid-area:n}
+  /* 表格變成一列一張（.table 本來就會），台幣與收據那兩格靠左、動作那一格一排。 */
+  .fin-tx td.t-amt{text-align:left;padding-top:4px}
+  .fin-tx td.t-act{padding-top:6px}
+  .fin-tx tr.tx-editor td{padding:4px 0 10px}
+}

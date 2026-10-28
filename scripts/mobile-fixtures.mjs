@@ -88,4 +88,19 @@ make("admin/people", "admin",
      positions:[{ term:"2026-27", title_zh:"Curriculum 的 Director", title_en:"Director, Curriculum Team", team:"Curriculum Team" },
                 { term:"2025-26", title_en:"Associate, Curriculum Team", team:"Curriculum Team" }],
      workspaces:[{ id:"apps:Curriculum Team", level:"manage" }, { id:"res:Curriculum Team", level:"manage" }, { id:"intern-passport", level:"edit" }], maybe_dup:null };`);
+// 財務（2026-11-08）：收支那一頁最長（篩選列、新的一筆表單、一筆展開在改、一筆在問作廢原因、作廢過的一筆、美金的一筆）。
+make("admin/finance", "admin",
+  `UI.shellHTML("", UI.railHTML("finance", "tx", { role:"cadre", board:"president", team:"", name:"王平" }),
+     UI.txPageHTML(UI.sortTx(TX), { terms:TERMS, accounts:ACC, categories:CAT, budgets:[], term:TERMS[0], today:"2026-11-28", open:"t2", voiding:"t1" }, { term:"2026-27", month:"", kind:"", account:"", category:"", q:"" },
+       { role:"cadre", board:"president", ws:{} }, "", false, { happened_on:"2026-11-28", kind:"transfer", currency:"USD", amount:"1200", fx_rate:"" }, {}))`,
+  `import * as UI from "./src/ui.js";
+   const TERMS = [{ id:"2026-27", starts_on:"2026-08-01", ends_on:"2027-07-31", status:"current" }];
+   const ACC = [{ id:"a1", name_zh:"玉山活存帳戶（協會）", name_en:"E.Sun checking (association)", kind:"bank", currency:"TWD", opening_balance:100000, opening_on:"2026-11-08", sort:10 },
+                { id:"a2", name_zh:"現金", name_en:"Cash box", kind:"cash", currency:"TWD", opening_balance:5000, opening_on:"2026-11-08", sort:20 }];
+   const CAT = [{ id:"c1", kind:"income", name_zh:"贊助", name_en:"Sponsorship", sort:10 }, { id:"c3", kind:"expense", name_zh:"場地", name_en:"Venue", sort:10 }];
+   const TX = [{ id:"t1", happened_on:"2026-11-10", kind:"income", amount:30000, currency:"TWD", amount_twd:30000, account_id:"a1", category_id:"c1", counterparty:"台積電慈善基金會（2026 年度探索營贊助）", note:"匯款單在 Drive 的 2026 贊助資料夾", receipt_path:"t1/x.pdf", term_id:"2026-27" },
+               { id:"t2", happened_on:"2026-11-12", kind:"expense", amount:8000, currency:"TWD", amount_twd:8000, account_id:"a1", category_id:"c3", counterparty:"松山文創園區", note:"", term_id:"2026-27" },
+               { id:"t3", happened_on:"2026-11-15", kind:"transfer", amount:2000, currency:"TWD", amount_twd:2000, account_id:"a1", to_account_id:"a2", term_id:"2026-27" },
+               { id:"t5", happened_on:"2026-12-01", kind:"income", amount:1234.5, currency:"USD", fx_rate:32.15, amount_twd:39689.18, account_id:"a1", category_id:"c1", counterparty:"Overseas alumni donation", term_id:"2026-27" },
+               { id:"t6", happened_on:"2026-11-25", kind:"expense", amount:999, currency:"TWD", amount_twd:999, account_id:"a1", category_id:"c3", voided_at:"2026-11-26T00:00:00Z", void_reason:"重複登了，跟 11/12 那一筆是同一張發票", term_id:"2026-27" }];`);
 console.log("ok");

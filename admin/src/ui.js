@@ -396,6 +396,9 @@ export const GROUPS = [
   { key: "site",      label: { zh: "對外",     en: "Public site" },  href: "/admin/site/",      who: "cadre",        hint: { zh: "資源、團隊頁、校友頁、信件文案、歷史之路", en: "Resources, team page, alumni page, email copy, history" } },
   { key: "passports", label: { zh: "護照",     en: "Passports" },    href: "/admin/passports/", who: "ws:passport|intern-passport", hint: { zh: "兩本護照的格子", en: "Boxes in both passports" } },
   { key: "people",    label: { zh: "人與權限", en: "People" },       href: "/admin/people/",    who: "senior",       hint: { zh: "名單、職級、工作區、屆別、邀請碼", en: "Roster, ranks, workspaces, terms, invite codes" } },
+  // 2026-11-08 財務：錢的事只給 Co-President、Senior Adviser 與 Sponsorship 的 Director（這一屆有那個職位的人）。
+  // who 是 "ws:finance"：my_access() 會在 finance 那一格填 view 或 edit（2026-11-08-finance.sql），不是真的工作區，只是借同一條路。
+  { key: "finance",   label: { zh: "財務",     en: "Finance" },      href: "/admin/finance/",   who: "ws:finance",   hint: { zh: "帳戶、收支、預算、匯出", en: "Accounts, income & expenses, budget, export" } },
 ];
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
 // 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
@@ -426,8 +429,14 @@ export const ITEMS = [
   // 2026-10-29 邀請信：打 email 與職位寄一封信。Co-President 與 Senior Adviser 都邀得了（撤銷只有 Co-President，門在資料庫）。
   { group: "people",    key: "invites",    label: { zh: "邀請",     en: "Invites" },         who: "senior" },
   { group: "people",    key: "changes",    label: { zh: "變動紀錄", en: "Change log" },      who: "senior" },
+  // 2026-11-08 財務：五個分頁都是同一群人（看的人五個都看得到，改得動的人才有新增與作廢那幾顆，門在資料庫）。
+  { group: "finance",   key: "overview",   label: { zh: "總覽",     en: "Overview" },        who: "ws:finance" },
+  { group: "finance",   key: "tx",         label: { zh: "收支",     en: "Transactions" },    who: "ws:finance" },
+  { group: "finance",   key: "accounts",   label: { zh: "帳戶與類別", en: "Accounts & categories" }, who: "ws:finance" },
+  { group: "finance",   key: "budget",     label: { zh: "預算",     en: "Budget" },          who: "ws:finance" },
+  { group: "finance",   key: "export",     label: { zh: "匯出",     en: "Export" },          who: "ws:finance" },
 ];
-const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports" };
+const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports", "ws:finance": "why.finance" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
 function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
@@ -892,6 +901,7 @@ export function wsCellLabel(w) {
   if (id === "intern-passport") return T("ws.long.intern");
   if (id === "apps" || id.startsWith("apps:")) return T("ws.long.apps");
   if (id.startsWith("res:")) return T("ws.long.res");
+  if (id === "finance") return T("ws.long.finance");
   return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
 }
 export function wsCellHref(w) {
@@ -902,6 +912,7 @@ export function wsCellHref(w) {
   if (id.startsWith("res:")) return "/admin/site/#res";
   if (id === "custom:marketing-requests") return "/admin/#requests";
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
+  if (id === "finance") return "/admin/finance/#overview";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。

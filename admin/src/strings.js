@@ -47,6 +47,8 @@ export const COMMON = {
   // 2026-10-28 第五級：跟著一個 team 的顧問，職級本身不帶權限（跟 Director、Associate 一樣看指派）。中文畫面叫「顧問」。
   "board.adviser":    { zh: "顧問", en: "Adviser" },
   "why.senior":       { zh: "只有 Co-President 與 Senior Adviser 進得去", en: "Co-Presidents and Senior Advisers only" },
+  // 2026-11-08 財務：錢的事。
+  "why.finance":      { zh: "只有 Co-President、Senior Adviser 與 Sponsorship 的 Director 進得去", en: "Co-Presidents, Senior Advisers and the Sponsorship Director only" },
   // 走錯地方、連不上
   "notCadre.title":   { zh: "這一頁是給幹部用的", en: "This page is for cadres" },
   "notCadre.lede":    { zh: "你的帳號是學員，後台看不到。", en: "Your account is a student account, so the admin is not available." },
@@ -65,6 +67,7 @@ export const COMMON = {
   "ws.long.intern":   { zh: "實習護照（格子與棋盤）", en: "Intern passport (boxes & board)" },
   "ws.long.apps":     { zh: "申請（表單與審核）", en: "Applications (forms & review)" },
   "ws.long.res":      { zh: "資源", en: "Resources" },
+  "ws.long.finance":  { zh: "財務（帳戶、收支、預算）", en: "Finance (accounts, transactions, budget)" },
   "ws.board":         { zh: "整個 BT", en: "Board (whole BT)" },
   "ws.playNote":      { zh: "玩護照是身分帶來的（每位幹部有自己的、每位實習生有自己的），這幾格只管誰能改格子。", en: "Playing a passport comes with the role (every cadre has theirs, every intern theirs); these cells only control who edits the boxes." },
   "ws.availNote":     { zh: "時間看板沒有指派，每位幹部都用。", en: "Availability has no assignments: every cadre uses it." },

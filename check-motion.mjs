@@ -29,6 +29,8 @@ const PAGES = [
   "reset/index.html", "join/index.html", "intern-passport/index.html", "history/index.html",
   // 2026-10-15 後台拆成四個資料夾。
   "admin/site/index.html", "admin/passports/index.html", "admin/people/index.html",
+  // 2026-11-08 財務。
+  "admin/finance/index.html",
 ];
 const files = fs.readdirSync(".", { recursive: true })
   .filter(f => f.endsWith("index.html") && !f.includes("node_modules"));

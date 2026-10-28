@@ -460,10 +460,10 @@ done
 mp_n=$(grep -l 'rel="modulepreload"' */index.html admin/*/index.html 2>/dev/null | wc -l | tr -d ' ')
 if [ -n "$mp_bad" ]; then
   bad "modulepreload 指到不存在的檔案（那一行等於白寫，而畫面不會有任何異狀）：${mp_bad}"
-elif [ "$mp_n" -lt "9" ]; then
-  bad "有登入後的頁面沒有 modulepreload（只有 ${mp_n} 頁有，應該是 9 頁：六頁加後台的三個子資料夾）"
+elif [ "$mp_n" -lt "10" ]; then
+  bad "有登入後的頁面沒有 modulepreload（只有 ${mp_n} 頁有，應該是 10 頁：六頁加後台的四個子資料夾）"
 else
-  ok "九個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
+  ok "十個登入後的頁面都有 modulepreload，而且每一個都指到真的存在的檔案"
 fi
 
 # 版本號（2026-11-06，後台速度）：九個登入後頁面的 ?v= 與 <meta name="bt-version"> 要跟 version.json 一樣，
@@ -477,10 +477,10 @@ else
 fi
 # 版本提示：四個後台 main.js 開頁都要問一次線上的 version.json（不問的話側欄「重整就不見」那件事會回來）。
 ver_missing=""
-for f in admin/src/main.js admin/site/src/main.js admin/people/src/main.js admin/passports/src/main.js settings/src/main.js passport/src/main.js intern-passport/src/main.js availability/src/main.js; do
+for f in admin/src/main.js admin/site/src/main.js admin/people/src/main.js admin/passports/src/main.js admin/finance/src/main.js settings/src/main.js passport/src/main.js intern-passport/src/main.js availability/src/main.js; do
   grep -q 'checkVersion(' "$f" || ver_missing="$ver_missing $f"
 done
-if [ -n "$ver_missing" ]; then bad "開頁沒有問線上版本（checkVersion）：$ver_missing"; else ok "八個登入後頁面開頁都會問一次線上版本"; fi
+if [ -n "$ver_missing" ]; then bad "開頁沒有問線上版本（checkVersion）：$ver_missing"; else ok "九個登入後頁面開頁都會問一次線上版本"; fi
 
 # 會動的東西只准出現在 motion() 裡面
 #
@@ -872,7 +872,7 @@ SHARED_UP=$(grep -lE '^\s*import .*/(passport|availability|app)/' shared/*.js 2>
 # 後台的四個資料夾互不 import（2026-10-15，後台拆資料夾時加）。
 # admin/site/ 壞掉不該讓 /admin/ 的申請審核打不開，反過來也一樣。
 # 只看 import 不看字串：分組列裡的連結目的地本來就會寫到別的資料夾。
-ADMIN_X=$(grep -lE '^\s*import .*(\.\./src/|/admin/|\.\./(site|passports|people)/)' admin/src/*.js admin/*/src/*.js 2>/dev/null | tr '\n' ' ')
+ADMIN_X=$(grep -lE '^\s*import .*(\.\./src/|/admin/|\.\./(site|passports|people|finance)/)' admin/src/*.js admin/*/src/*.js 2>/dev/null | tr '\n' ' ')
 if [ -z "$ADMIN_X" ]; then
   ok "後台的四個資料夾互不 import（只 import 自己的 ./ 與 shared/）"
 else

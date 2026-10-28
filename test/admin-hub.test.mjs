@@ -11,8 +11,9 @@ import * as FORMS from "../admin/src/ui.js";
 import * as SITE from "../admin/site/src/ui.js";
 import * as PASS from "../admin/passports/src/ui.js";
 import * as PEOPLE from "../admin/people/src/ui.js";
+import * as FIN from "../admin/finance/src/ui.js";
 
-const IMPL = [["admin", FORMS], ["admin/site", SITE], ["admin/passports", PASS], ["admin/people", PEOPLE]];
+const IMPL = [["admin", FORMS], ["admin/site", SITE], ["admin/passports", PASS], ["admin/people", PEOPLE], ["admin/finance", FIN]];
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支大部分斷言的是中文，所以先切成中文。英文那幾條自己切。
 for (const [, M] of IMPL) M.setLang("zh");
 
@@ -23,6 +24,7 @@ const ME = {
   senior:   { role: "cadre",   board: "senior_adviser", team: "" },
   pdir:     { role: "cadre",   board: "director",  team: "Curriculum Team", ws: { "apps:Curriculum Team": "manage", "passport": "edit" } },
   pres:     { role: "cadre",   board: "president", team: "" },
+  sdir:     { role: "cadre",   board: "director",  team: "Sponsorship Team", ws: { finance: "edit" } },
   student:  { role: "student", board: "president", team: "Internship Team" },
   intern:   { role: "intern",  board: "member",    team: "Internship Team" },
 };
@@ -31,21 +33,23 @@ test("★ 四個資料夾的 GROUPS 一字不差", () => {
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.GROUPS, FORMS.GROUPS, `${label} 的 GROUPS 跟 admin/ 不一樣`);
   }
-  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["forms", "site", "passports", "people"]);
+  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["forms", "site", "passports", "people", "finance"]);
   for (const g of FORMS.GROUPS) assert.match(g.href, /^\/admin\//, "每一組都在 /admin/ 底下");
 });
 
 test("★ 四份 canEnter 對同一個人講一樣的話", () => {
   const want = {
-    member:   { forms: true, site: true, passports: false, people: false },
-    director: { forms: true, site: true, passports: false, people: false },
-    istaff:   { forms: true, site: true, passports: true,  people: false },
-    senior:   { forms: true, site: true, passports: true,  people: true },
-    pdir:     { forms: true, site: true, passports: true,  people: false },
-    pres:     { forms: true, site: true, passports: true,  people: true },
+    // 2026-11-08 財務：senior 與 my_access 給了 finance 那一格的人（sdir）。
+    member:   { forms: true, site: true, passports: false, people: false, finance: false },
+    director: { forms: true, site: true, passports: false, people: false, finance: false },
+    istaff:   { forms: true, site: true, passports: true,  people: false, finance: false },
+    senior:   { forms: true, site: true, passports: true,  people: true,  finance: true },
+    pdir:     { forms: true, site: true, passports: true,  people: false, finance: false },
+    sdir:     { forms: true, site: true, passports: false, people: false, finance: true },
+    pres:     { forms: true, site: true, passports: true,  people: true,  finance: true },
     // 學員與 intern 什麼都進不去，就算 board_role 或 team 被誤設也一樣。
-    student:  { forms: false, site: false, passports: false, people: false },
-    intern:   { forms: false, site: false, passports: false, people: false },
+    student:  { forms: false, site: false, passports: false, people: false, finance: false },
+    intern:   { forms: false, site: false, passports: false, people: false, finance: false },
   };
   for (const [label, M] of IMPL) {
     for (const [who, me] of Object.entries(ME)) {
@@ -107,7 +111,7 @@ test("訊息：沒做成是橘的留在頁首、做成了不畫在頁首（走 t
 
 // 2026-10-23 批 1：十處瀏覽器原生 confirm() 全換成 inline confirm（needAsk）。跟守 prompt( 那條同一個做法。
 test("★ 四個 main.js 不准再用瀏覽器的 confirm()，會丟東西的按鈕走 needAsk", () => {
-  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/passports/src/main.js", "admin/people/src/main.js"]) {
+  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/passports/src/main.js", "admin/people/src/main.js", "admin/finance/src/main.js"]) {
     const body = readFileSync(f, "utf8");
     assert.doesNotMatch(body, /(^|[^.\w])confirm\(/m, `${f} 還在用 confirm()`);
     assert.match(body, /UI\.afterRender\(S, el\)/, `${f} 的 render() 沒有叫 afterRender（toast、inline confirm、捲回最上面都靠它）`);
@@ -308,7 +312,8 @@ import * as FORMS_S from "../admin/src/strings.js";
 import * as SITE_S from "../admin/site/src/strings.js";
 import * as PASS_S from "../admin/passports/src/strings.js";
 import * as PEOPLE_S from "../admin/people/src/strings.js";
-const STR = [["admin", FORMS_S], ["admin/site", SITE_S], ["admin/passports", PASS_S], ["admin/people", PEOPLE_S]];
+import * as FIN_S from "../admin/finance/src/strings.js";
+const STR = [["admin", FORMS_S], ["admin/site", SITE_S], ["admin/passports", PASS_S], ["admin/people", PEOPLE_S], ["admin/finance", FIN_S]];
 
 test("★ 四份字典的 COMMON 與機制（T、pickLang、withLang、isErr）逐字一樣", () => {
   for (const [label, S] of STR) {

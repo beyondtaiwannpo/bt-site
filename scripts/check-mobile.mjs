@@ -30,7 +30,7 @@ const PAGES = [
   "resources/index.html", "alumni/index.html", "history/index.html", "privacy/index.html",
   "app/index.html", "reset/index.html",
   "passport/_audit.html", "availability/_audit.html", "admin/_audit.html", "settings/_audit.html",
-  "intern-passport/_audit.html", "admin/people/_audit.html",
+  "intern-passport/_audit.html", "admin/people/_audit.html", "admin/finance/_audit.html",
 ];
 
 // ── 在頁面裡跑的那一段 ────────────────────────────────────────────────

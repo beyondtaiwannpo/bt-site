@@ -21,7 +21,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-FOLDERS="admin admin/site admin/people admin/passports settings passport intern-passport availability app"
+FOLDERS="admin admin/site admin/people admin/passports admin/finance settings passport intern-passport availability app"
 # 每一頁都會 import 的共用模組。它們也走 importmap，這樣 shared/auth.js 裡的 "./supabase.js" 跟
 # data.js 裡的 "../../shared/supabase.js" 會對到**同一個**網址，瀏覽器只建一份 client（shared/supabase.js 檔頭的要求）。
 SHARED="/shared/auth.js /shared/supabase.js /shared/supabase-config.js /shared/nav.js /vendor/supabase-js.js"
