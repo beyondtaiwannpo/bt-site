@@ -7,15 +7,19 @@ import * as SITE from "../admin/site/src/ui.js";
 SITE.setLang("zh");
 const SQL = readFileSync("supabase/migrations/2026-11-05-email-layout.sql", "utf8");
 const MARKERS = [
-  'width="600"', 'max-width:600px', 'background:#EDE5D8', 'https://beyondtaiwannpo.com/shared/logo.png', '/photos/',
+  'width="600"', 'max-width:600px', 'background:#EDE5D8', 'https://beyondtaiwannpo.com/shared/logo.png',
   "'Barlow Condensed'", "background:#FFC46C", "line-height:48px", "border-radius:999px", "class=\"bt-btn\"", "@media only screen and (max-width:620px)",
   "beyondtaiwan2020@gmail.com", "Beyond Taiwan · beyondtaiwannpo.com", "role=\"presentation\"",
 ];
 
-test("★ 版型：table 排版、600 寬、紙色底、logo 絕對網址、每種信一張照片、一顆橘色按鈕 48 高、手機全寬、信尾；JS 與 SQL 同一套記號", () => {
+test("★ 版型：table 排版、600 寬、紙色底、logo 絕對網址、照片預設沒有（2026-11-16）、一顆橘色按鈕 48 高、手機全寬、信尾；JS 與 SQL 同一套記號", () => {
   const h = SITE.mailHtml({ kind: "invite", lang: "zh", subject: "主旨", body: "第一段\n\n第二段", buttonUrl: "https://beyondtaiwannpo.com/app/?invite=x" });
   for (const m of MARKERS) { assert.ok(h.includes(m), "JS 少了 " + m); assert.ok(SQL.includes(m.replace(/'/g, "''")) || SQL.includes(m), "SQL 少了 " + m); }
-  assert.match(h, /<img src="https:\/\/beyondtaiwannpo\.com\/photos\/group-photo\.jpg" width="600"/, "邀請信用團體照");
+  assert.equal((h.match(/<img /g) || []).length, 1, "預設只有 logo 一張圖");
+  const withPhoto = SITE.mailHtml({ kind: "invite", lang: "zh", subject: "s", body: "b", buttonUrl: "https://x", hero: "https://x.supabase.co/storage/v1/object/public/mail-photos/invite/1.jpg" });
+  assert.match(withPhoto, /<img src="https:\/\/x\.supabase\.co\/storage\/v1\/object\/public\/mail-photos\/invite\/1\.jpg" width="600"/, "放了照片才印");
+  const SQL16 = readFileSync("supabase/migrations/2026-11-16-mail-language-photo.sql", "utf8");
+  assert.match(SQL16, /case when v_hero is not null then/, "資料庫那一份也是有照片才印");
   assert.match(h, /<a class="bt-btn" href="https:\/\/beyondtaiwannpo\.com\/app\/\?invite=x"[^>]*>接受邀請<\/a>/);
   assert.match(h, /<p style="[^"]*">第一段<\/p><p style="[^"]*">第二段<\/p>/, "空行分段");
   assert.ok(h.length < 100000, "Gmail 102KB 會剪");
@@ -53,4 +57,17 @@ test("信件文案頁：中英兩份、按鈕的字、預覽是包好的 iframe�
   assert.match(h, /class="chip on" data-act="mail-prev-lang" data-v="en"/); assert.match(h, /class="chip on" data-act="mail-prev-w" data-v="375"/);
   assert.match(h, /&lt;h1 [\s\S]*?&gt;Subject&lt;\/h1&gt;/, "英文預覽用英文主旨");
   assert.match(h, /placeholder="Accept invitation"/, "按鈕空著就顯示預設當提示");
+});
+
+test("每一封信自己選語言（2026-11-16）：四個選項、選了只寄一種時預覽固定那一種、有照片的上傳與拿掉", () => {
+  SITE.setLang("zh");
+  const t = { kind: "invite", subject: "s", body: "b", lang_mode: "en", hero_url: "https://x.supabase.co/storage/v1/object/public/mail-photos/invite/1.jpg" };
+  const h = SITE.mailEditHTML("invite", t, "", false, { lang: "zh", w: 600 });
+  for (const m of ["auto", "zh", "en", "both"]) assert.match(h, new RegExp(`<option value="${m}"`));
+  assert.match(h, /<option value="en" selected>/);
+  assert.doesNotMatch(h, /data-act="mail-prev-lang"/, "只寄英文就不給切預覽語言");
+  assert.match(h, /lang=&quot;en&quot;/, "預覽是英文那一份");
+  assert.match(h, /id="mphoto"[^>]*data-noauto="1"/); assert.match(h, /data-act="mail-photo-del"/);
+  const plain = SITE.mailEditHTML("invite", { kind: "invite", subject: "s", body: "b" }, "", false, null);
+  assert.match(plain, /<option value="auto" selected>/); assert.doesNotMatch(plain, /mail-photo-del/);
 });

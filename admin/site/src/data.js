@@ -126,10 +126,32 @@ export async function setStoryApproved(id, ok) {
 // ── 信件文案（2026-09-08）──────────────────────────────────────────────
 export async function loadTemplates() {
   need();
-  const { data, error } = await supabase.from("mail_templates")
-    .select("kind, subject:subject_zh, body:body_zh, subject_en, body_en, button_label, button_label_en, updated_at").order("kind");   // subject / body 在資料庫是合併欄，後台改的是中文那兩欄
+  let { data, error } = await supabase.from("mail_templates")
+    .select("kind, subject:subject_zh, body:body_zh, subject_en, body_en, button_label, button_label_en, updated_at, lang_mode, hero_url").order("kind");   // subject / body 在資料庫是合併欄，後台改的是中文那兩欄
+  // 2026-11-16 那兩欄（語言、照片）還沒跑遷移檔的話，少那兩欄再讀一次。
+  if (error && error.code === "42703")
+    ({ data, error } = await supabase.from("mail_templates")
+      .select("kind, subject:subject_zh, body:body_zh, subject_en, body_en, button_label, button_label_en, updated_at").order("kind"));
   if (error) throw error;
   return data || [];
+}
+
+// 一封信寄哪一種語言、放哪張照片（2026-11-16）。mode：auto（照收信的人）、zh、en、both。url 空的就是只有 logo。
+export async function setMailOptions(kind, mode, url) {
+  need();
+  const { error } = await supabase.rpc("set_mail_options", { p_kind: kind, p_lang_mode: mode || "auto", p_hero_url: url || null });
+  if (error) throw error;
+}
+export async function uploadMailPhoto(kind, blob) {
+  need();
+  const name = `${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage.from("mail-photos").upload(name, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+  if (error) throw error;
+  return supabase.storage.from("mail-photos").getPublicUrl(name).data.publicUrl;
+}
+export async function removeMailPhoto(url) {
+  const m = /\/object\/public\/mail-photos\/(.+)$/.exec(String(url || ""));
+  if (m) { try { await supabase.storage.from("mail-photos").remove([decodeURIComponent(m[1])]); } catch (e) { /* 檔留著，不擋 */ } }
 }
 
 // 2026-11-05 起七個參數：中英各一份主旨與內文、按鈕的字中英（空的用每種信的預設）。

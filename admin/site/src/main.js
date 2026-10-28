@@ -275,9 +275,22 @@ async function onAutosave(act, box) {
     } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
     return;
   }
+  if (act === "mail-save" && field && field.name === "lang_mode") {
+    // 寄哪一種語言（2026-11-16）：選了就存，重畫預覽。
+    const kind = box.dataset.k, cur = S.tpls.find(x => x.kind === kind);
+    UI.autosaveState(box, "saving");
+    try {
+      await D.setMailOptions(kind, v.lang_mode, cur ? cur.hero_url : null);
+      if (cur) cur.lang_mode = v.lang_mode;
+      if (S.tplDraft) S.tplDraft.lang_mode = v.lang_mode;
+      saved(T("msg.tplSaved")); render();
+    } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
+    return;
+  }
   if (act === "mail-save") {
     const kind = box.dataset.k;
-    const t = { kind, subject: v.subject, body: v.body, subject_en: v.subject_en, body_en: v.body_en, button_label: v.button_label, button_label_en: v.button_label_en };
+    const was = S.tpls.find(x => x.kind === kind) || {};
+    const t = { kind, subject: v.subject, body: v.body, subject_en: v.subject_en, body_en: v.body_en, button_label: v.button_label, button_label_en: v.button_label_en, lang_mode: was.lang_mode, hero_url: was.hero_url };
     S.tplDraft = t;   // 切預覽重畫時拿這一份，打到一半的字不會不見
     if (!t.subject || !t.body) { autosaveFail(box, T("err.mailBoth")); return; }
     UI.autosaveState(box, "saving");
@@ -388,6 +401,18 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "mail-back") { await openMail(); return; }
+  if (act === "mail-photo-del") {
+    const cur = S.tpls.find(x => x.kind === b.dataset.k); if (!cur) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const old = cur.hero_url;
+      await D.setMailOptions(cur.kind, cur.lang_mode || "auto", null);
+      cur.hero_url = null; if (S.tplDraft) S.tplDraft.hero_url = null;
+      await D.removeMailPhoto(old);
+      S.busy = false; S.msg = T("msg.mailPhotoGone");
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
+    render(); return;
+  }
   if (act === "mail-edit") { S.tplKind = b.dataset.k; S.tplDraft = null; S.view = "mail-edit"; S.msg = ""; render(); return; }
   if (act === "mail-prev-lang" || act === "mail-prev-w") { S.mailPrev = Object.assign({ lang: "zh", w: 600 }, S.mailPrev, act === "mail-prev-lang" ? { lang: b.dataset.v } : { w: +b.dataset.v }); readMailForm(); render(); return; }
   // mail-save 那顆鈕 2026-11-06 拿掉了，三封信的六格改了就存（onAutosave）。
@@ -544,6 +569,22 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 信的照片（2026-11-16）：選了就縮圖、上傳、存進那一封信。
+  const mph = e.target.closest("#mphoto");
+  if (mph && S.view === "mail-edit") {
+    const file = mph.files && mph.files[0]; if (!file) return;
+    const kind = mph.dataset.k, cur = S.tpls.find(x => x.kind === kind); if (!cur) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const url = await D.uploadMailPhoto(kind, await shrinkImage(file));
+      const old = cur.hero_url;
+      await D.setMailOptions(kind, cur.lang_mode || "auto", url);
+      cur.hero_url = url; if (S.tplDraft) S.tplDraft.hero_url = url;
+      if (old) await D.removeMailPhoto(old);
+      S.busy = false; S.msg = T("msg.mailPhotoSaved");
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
+    render(); return;
+  }
   // 歷史之路（2026-11-06）：勾同意立刻送（這一格是上架的門，不該等人按存）；選了檔就縮圖上傳。
   const consent = e.target.closest('[data-act="hi-ph-consent"]');
   if (consent && S.view === "history-edit") {

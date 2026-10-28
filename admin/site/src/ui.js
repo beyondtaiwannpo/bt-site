@@ -848,6 +848,7 @@ export function mailListHTML(items, msg) {
         <div class="fhead"><b>${esc(T(k.label))}</b></div>
         <div class="fmeta">${esc(T("mail.whenList", { when: T(k.when) }))}</div>
         <div class="fmeta">${T("mail.subject", { s: esc((t && t.subject) || T("mail.noSubject")) })}</div>
+        <div class="fmeta">${T("mail.listMode", { m: T("mail.mode." + ((t && t.lang_mode) || "auto")) })}・${t && t.hero_url ? T("mail.listPhoto") : T("mail.listLogo")}</div>
         <div class="row">
           <button class="btn ghost sm" data-act="mail-edit" data-k="${esc(k.v)}">${T("mail.editThis")}</button>
         </div>
@@ -865,6 +866,9 @@ export function mailEditHTML(kind, t, msg, busy, prev) {
   const NAME = "陳小安", TITLE = "2027 暑期探索營";
   // 預覽預設照後台現在的語言看（切成英文的人先看英文版），可以再用 chip 換。
   const pv = Object.assign({ lang: lang() === "en" ? "en" : "zh", w: 600 }, prev || {});
+  // 2026-11-16：這一封選了只寄一種語言，預覽就固定看那一種。
+  const mode = (t && t.lang_mode) || "auto", hero = (t && t.hero_url) || "";
+  if (mode === "zh" || mode === "en") pv.lang = mode;
   const subject = t ? t.subject : "";
   const body = t ? t.body : "";
   const subjectEn = (t && t.subject_en) || "", bodyEn = (t && t.body_en) || "";
@@ -885,12 +889,17 @@ export function mailEditHTML(kind, t, msg, busy, prev) {
     <label><i>${T("mail.bodyEn")}</i><textarea id="mbody-en" name="body_en" style="min-height:180px">${esc(bodyEn)}</textarea></label>
     <label><i>${T("mail.buttonEn")}</i><input id="mbtn-en" name="button_label_en" value="${esc(btnEn)}" placeholder="${esc(mailButtonLabel(kind, "en"))}"></label></div></details>
 
+    <label><i>${T("mail.langMode")}</i><select id="mlang" name="lang_mode">${["auto", "zh", "en", "both"].map(m => `<option value="${m}"${mode === m ? " selected" : ""}>${T("mail.mode." + m)}</option>`).join("")}</select></label>
+    <div class="exbox"><i>${T("mail.photo")}</i>
+      ${hero ? `<img src="${esc(hero)}" alt="" class="exprev"><button class="btn quiet danger sm" data-act="mail-photo-del" data-k="${esc(kind)}"${busy ? " disabled" : ""}>${T("mail.photoDel")}</button>` : `<span class="fmeta">${T("mail.photoNone")}</span>`}
+      <input type="file" id="mphoto" accept="image/*" data-noauto="1" data-k="${esc(kind)}"${busy ? " disabled" : ""}>
+    </div>
     <div class="form-foot">
       ${autosaveHint("mail-save")}
     </div></div>`)
     + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : isRequest ? T("mail.sampleRequest", { name: esc(REQUEST_SAMPLE.requester), title: esc(REQUEST_SAMPLE.title) }) : isMeeting ? T("mail.sampleMeeting", { name: esc(MEETING_SAMPLE.name), title: esc(MEETING_SAMPLE.title) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
-    <div class="chips" style="margin-bottom:8px"><button class="chip${pv.lang === "zh" ? " on" : ""}" data-act="mail-prev-lang" data-v="zh">${T("mail.langZh")}</button><button class="chip${pv.lang === "en" ? " on" : ""}" data-act="mail-prev-lang" data-v="en">${T("mail.langEn")}</button><span class="sp"></span><button class="chip${pv.w === 600 ? " on" : ""}" data-act="mail-prev-w" data-v="600">${T("mail.desktop")}</button><button class="chip${pv.w === 375 ? " on" : ""}" data-act="mail-prev-w" data-v="375">${T("mail.phone")}</button></div>
-    <iframe class="mailframe" title="${esc(T("mail.previewTitle"))}" style="width:${pv.w}px" srcdoc="${esc(mailHtml({ kind, lang: pv.lang, subject: fill(pv.lang === "en" && subjectEn ? subjectEn : subject), body: fill(pv.lang === "en" && bodyEn ? bodyEn : body) + (pv.lang === "en" ? "" : extra), buttonLabel: pv.lang === "en" ? btnEn : btnZh, buttonUrl: MAIL_SAMPLE_URL[kind] || "https://beyondtaiwannpo.com/apply/" }))}"></iframe>
+    <div class="chips" style="margin-bottom:8px">${mode === "zh" || mode === "en" ? "" : `<button class="chip${pv.lang === "zh" ? " on" : ""}" data-act="mail-prev-lang" data-v="zh">${T("mail.langZh")}</button><button class="chip${pv.lang === "en" ? " on" : ""}" data-act="mail-prev-lang" data-v="en">${T("mail.langEn")}</button><span class="sp"></span>`}<button class="chip${pv.w === 600 ? " on" : ""}" data-act="mail-prev-w" data-v="600">${T("mail.desktop")}</button><button class="chip${pv.w === 375 ? " on" : ""}" data-act="mail-prev-w" data-v="375">${T("mail.phone")}</button></div>
+    <iframe class="mailframe" title="${esc(T("mail.previewTitle"))}" style="width:${pv.w}px" srcdoc="${esc(mailHtml({ kind, lang: pv.lang, subject: fill(pv.lang === "en" && subjectEn ? subjectEn : subject), body: fill(pv.lang === "en" && bodyEn ? bodyEn : body) + (pv.lang === "en" ? "" : extra), buttonLabel: pv.lang === "en" ? btnEn : btnZh, buttonUrl: MAIL_SAMPLE_URL[kind] || "https://beyondtaiwannpo.com/apply/", hero }))}"></iframe>
     <div class="mini" style="margin:6px 0 0">
       ${T("mail.layoutNote")}</div>`) + `</div>`;
 }
@@ -910,7 +919,6 @@ export function downHTML(err) {
 // 信長什麼樣（2026-11-05）：純文字包成 HTML 的版型。**跟資料庫的 mail_html() 同一個形狀**（test/mail-layout.test.mjs 比對記號），
 // 這一份只給後台的即時預覽；真的寄出去的是資料庫那一份。
 // ═══════════════════════════════════════════════════════════════════════
-export const MAIL_PHOTOS = { invite: "group-photo.jpg", meeting_invite: "talking-laptop.jpg", meeting_reminder: "talking-laptop.jpg", request_new: "sharing-mic.jpg", request_done: "sharing-mic.jpg", guardian: "hero-listening.jpg", accepted: "three-at-laptop.jpg" };
 export const MAIL_BUTTON = {
   invite: { zh: "接受邀請", en: "Accept invitation" }, meeting_invite: { zh: "回覆出席", en: "Reply" }, meeting_reminder: { zh: "回覆出席", en: "Reply" },
   request_new: { zh: "打開需求單", en: "Open request" }, request_done: { zh: "看回覆", en: "Open request" }, interview: { zh: "挑一個時段", en: "Pick a time" },
@@ -926,7 +934,8 @@ export function mailButtonLabel(kind, lang, custom) {
 }
 export function mailHtml(o) {
   const lang = o.lang === "en" ? "en" : "zh", kind = o.kind || "", url = o.buttonUrl || "";
-  const hero = "https://beyondtaiwannpo.com/photos/" + (MAIL_PHOTOS[kind] || "hero-listening.jpg");
+  // 2026-11-16：照片預設沒有（只有 logo），那一封信放了照片才印（o.hero）。
+  const hero = String(o.hero || "").trim();
   const label = mailButtonLabel(kind, lang, o.buttonLabel);
   const paras = String(o.body || "").split(/\n\s*\n/).map(p => p.trim()).filter(p => p && !(url && p === url))
     .map(p => `<p style="margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.7;color:#102A86;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
@@ -939,7 +948,7 @@ export function mailHtml(o) {
     + `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#EDE5D8;"><tr><td align="center" style="padding:24px 12px;">`
     + `<table role="presentation" class="bt-wrap" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:16px;overflow:hidden;">`
     + `<tr><td align="left" style="padding:24px 32px 8px;"><img src="https://beyondtaiwannpo.com/shared/logo.png" width="140" alt="Beyond Taiwan" style="display:block;width:140px;height:auto;border:0;"></td></tr>`
-    + `<tr><td style="padding:0;"><img src="${hero}" width="600" alt="" style="display:block;width:100%;height:auto;border:0;"></td></tr>`
+    + (hero ? `<tr><td style="padding:0;"><img src="${esc(hero)}" width="600" alt="" style="display:block;width:100%;height:auto;border:0;"></td></tr>` : "")
     + `<tr><td class="bt-pad" style="padding:28px 32px 8px;"><h1 style="margin:0 0 16px;font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;font-size:30px;line-height:1.15;font-weight:700;color:#102A86;">${esc(o.subject)}</h1>${paras}</td></tr>`
     + (url ? `<tr><td class="bt-pad" align="left" style="padding:8px 32px 28px;"><a class="bt-btn" href="${esc(url)}" style="display:inline-block;background:#FFC46C;color:#102A86;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;line-height:48px;height:48px;padding:0 32px;border-radius:999px;">${esc(label)}</a>`
       + `<p style="margin:12px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#6B6B6B;word-break:break-all;">${esc(url)}</p></td></tr>` : "")

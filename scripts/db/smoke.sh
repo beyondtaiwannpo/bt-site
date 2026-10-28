@@ -2248,6 +2248,37 @@ psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-15-box-time-and-examp
 bx2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-15-box-time-and-example.sql 2>&1 || true)
 if echo "${bx2}" | grep -q "OVERALL.*PASS"; then echo "  ok   格子那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 格子那支重跑沒過"; fail=$((fail+1)); fi
 
+echo "── 信的語言、照片、刪會不寄信（2026-11-16-mail-language-photo.sql）──"
+mlgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-16-mail-language-photo.sql 2>&1 || true)
+if echo "${mlgot}" | grep -q "OVERALL.*PASS" && ! echo "${mlgot}" | grep -q "|FAIL"; then echo "  ok   信那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 信那支驗收表："; echo "${mlgot}" | head -12; fail=$((fail+1)); fi
+chk "★ 預設沒有照片：版型裡只有 logo 一張圖" "1" "select (length(h) - length(replace(h, '<img', ''))) / 4 from (select public.mail_html('invite', 's', 'b', null, 'https://x', 'zh') as h) t"
+chk "預設照收信的人（auto）" "auto" "select lang_mode from public.mail_templates where kind='invite'"
+chkraise "★ Associate 改不了信的選項" "not_senior" "perform set_config('test.uid','${ASSOC}',true); perform public.set_mail_options('invite','en',null);"
+chkraise "語言只收四種" "bad_lang_mode" "perform set_config('test.uid','${PAUL}',true); perform public.set_mail_options('invite','jp',null);"
+chkraise "★ 別的網址的照片擋掉" "bad_photo_url" "perform set_config('test.uid','${PAUL}',true); perform public.set_mail_options('invite','auto','https://evil.example.com/a.jpg');"
+MPU="https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/mail-photos/invite/1-a.jpg"
+chkas "${PAUL}" "邀請信只寄英文、放一張照片" "invite" "select public.set_mail_options('invite','en','${MPU}')"
+chk "★ 只寄英文：不管收信的人是誰都是 en" "en" "select public.mail_lang_pick('invite', 'nobody@x.test', 'zh')"
+chk "★ 放了照片就印那一張" "t" "select position('${MPU}' in public.mail_html('invite', 's', 'b', null, 'https://x', 'en')) > 0"
+chkas "${PAUL}" "改回照收信的人、拿掉照片" "invite" "select public.set_mail_options('invite','auto','')"
+chk "改回來了" "auto|t" "select lang_mode||'|'||(hero_url is null)::text::char(1) from public.mail_templates where kind='invite'"
+MTG=$(psql -d "${DB}" -X -A -t -q -c "insert into public.meetings (scope, title, starts_at, ends_at) values ('board','刪掉的會', now() + interval '1 day', now() + interval '1 day 1 hour') returning id;" | head -1 | tr -d ' ')
+psql -d "${DB}" -X -A -t -q -c "insert into public.mail_outbox (to_email, subject, body, kind, meeting_id) values ('gone1@x.test','s','b','meeting_reminder','${MTG}'), ('gone2@x.test','s','b','meeting_invite','${MTG}');
+  insert into public.mail_outbox (to_email, subject, body, kind, meeting_id, sent_at) values ('sent@x.test','s','b','meeting_invite','${MTG}', now());" >/dev/null
+chkas "${PAUL}" "刪掉這場會" "deleted" "select public.delete_meeting('${MTG}')"
+chk "★ 還沒寄的兩封一起拿掉，寄過的那封留著當紀錄" "0|1" "select (select count(*) from public.mail_outbox where to_email in ('gone1@x.test','gone2@x.test'))||'|'||(select count(*) from public.mail_outbox where to_email='sent@x.test')"
+ml2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-16-mail-language-photo.sql 2>&1 || true)
+if echo "${ml2}" | grep -q "OVERALL.*PASS"; then echo "  ok   信那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 信那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/  delete from mail_outbox where meeting_id = p_id and sent_at is null;//" supabase/migrations/2026-11-16-mail-language-photo.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：刪會不拿掉信，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 刪會不拿掉信驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-16-mail-language-photo.sql >/dev/null 2>&1 || true
+psql -d "${DB}" -X -A -t -q -c "insert into public.mail_outbox (to_email, subject, body, kind) values ('after@x.test', 's', 'b', 'invite');" >/dev/null
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false); select public.send_pending_mail(50);" >/dev/null 2>&1 || true
+chk "★ 重建之後信照樣寄得出去" "t" "select (sent_at is not null and error is null)::text::char(1) from public.mail_outbox where to_email='after@x.test'"
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
