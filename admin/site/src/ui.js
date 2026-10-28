@@ -178,7 +178,7 @@ export function toast(msg, undo, opts) {
   for (const t of box.children) if (t.dataset.text === String(msg)) return t;
   const el = document.createElement("div");
   el.className = "toast " + kind; el.dataset.text = String(msg); el.setAttribute("role", kind === "err" ? "alert" : "status");
-  el.innerHTML = `<span class="toast-k">${kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
+  el.innerHTML = `<span class="toast-k">${opts && opts.tag ? esc(opts.tag) : kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
     u ? `<button type="button" class="toast-undo">${esc(u.label)}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
   const gone = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
   el.querySelector(".toast-x").addEventListener("click", gone);
@@ -364,7 +364,7 @@ export async function checkVersion(rootUrl) {
     if (!r.ok) return false;
     const j = await r.json();
     if (!versionDiffers(loadedVersion(), j && j.v)) return false;
-    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true });
+    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true, tag: T("ver.tag") });
     return true;
   } catch (e) { return false; }
 }
@@ -709,34 +709,44 @@ export function resListHTML(items, canEdit, msg, isPresident, mpItems) {
 
 export function resEditHTML(r, msg, busy) {
   const cur = r || { title: "", blurb: "", kind: "pdf", url: "", team: "", status: "draft", ord: 100 };
-  return pageHead(r ? T("res.editTitle") : T("res.newTitle"), "", [], { act: "res-back", label: T("res.back") })
-    + msgHTML(msg)
-    + sectionHTML("", `<label><i>${T("res.name")}</i><input id="rtitle" value="${esc(cur.title)}" placeholder="${esc(T("res.namePh"))}"></label>
+  const isNew = !r;
+  // 2026-11-06 自動儲存：既有的資源改了就存（容器 data-autosave="res-save"，main.js 的 onAutosave 接）。
+  // 新的那一筆還沒有 id，留一顆「新增」鈕，建立之後進編輯就自動存。
+  // 上架與下架留一顆鈕，不放進自動存：它決定外面看不看得到，不該在打字停頓的那 0.8 秒就發生。新的一筆還是用下拉選。
+  const statusCtl = isNew ? `<label><i>${T("res.status")}</i><select id="rstatus" name="status">
+        <option value="draft"${cur.status === "draft" ? " selected" : ""}>${T("res.draftOpt")}</option>
+        <option value="published"${cur.status === "published" ? " selected" : ""}>${T("res.publishedOpt")}</option>
+      </select></label>`
+    : `<label><i>${T("res.status")}</i><span class="tag${cur.status === "published" ? " open" : " draft"}">${cur.status === "published" ? T("res.published") : T("res.draft")}</span></label>`;
+  const statusBtn = isNew ? "" : `<button class="btn ghost" data-act="res-status" data-id="${esc(r.id)}" data-to="${cur.status === "published" ? "draft" : "published"}"${busy ? " disabled" : ""}>${
+          cur.status === "published" ? T("res.unpublish") : T("res.publish")}</button>`;
+  const form = `<label><i>${T("res.name")}</i><input id="rtitle" name="title" value="${esc(cur.title)}" placeholder="${esc(T("res.namePh"))}"></label>
     <!-- ⚠ 介紹是**搜尋引擎唯一看得到的東西**（連結那一欄要登入才讀得到）。
          所以這一格要寫得像一句對高中生講的話，不是一行檔名。 -->
     <label><i>${T("res.blurb")}</i>
-      <textarea id="rblurb" placeholder="${esc(T("res.blurbPh"))}">${esc(cur.blurb || "")}</textarea></label>
+      <textarea id="rblurb" name="blurb" placeholder="${esc(T("res.blurbPh"))}">${esc(cur.blurb || "")}</textarea></label>
     <div class="two">
-      <label><i>${T("res.kind")}</i><select id="rkind">
+      <label><i>${T("res.kind")}</i><select id="rkind" name="kind">
         ${RES_KINDS.map(k => `<option value="${k.v}"${cur.kind === k.v ? " selected" : ""}>${esc(T(k.label))}</option>`).join("")}
       </select></label>
-      <label><i>${T("res.ord")}</i><input id="rord" type="number" value="${esc(String(cur.ord))}"></label>
-      <label><i>${T("res.team")}</i><input id="rteam" value="${esc(cur.team || "")}"></label>
-      <label><i>${T("res.status")}</i><select id="rstatus">
-        <option value="draft"${cur.status === "draft" ? " selected" : ""}>${T("res.draftOpt")}</option>
-        <option value="published"${cur.status === "published" ? " selected" : ""}>${T("res.publishedOpt")}</option>
-      </select></label>
+      <label><i>${T("res.ord")}</i><input id="rord" name="ord" type="number" value="${esc(String(cur.ord))}"></label>
+      <label><i>${T("res.team")}</i><input id="rteam" name="team" value="${esc(cur.team || "")}"></label>
+      ${statusCtl}
     </div>
     <label><i>${T("res.url")}</i>
-      <input id="rurl" value="${esc(cur.url)}" placeholder="https://..."></label>
+      <input id="rurl" name="url" value="${esc(cur.url)}" placeholder="https://..."></label>
     <!-- 這一句是人的流程，不是程式。Drive 的分享權限設錯，網站看不出來，
          而使用者看到的是一頁「你需要存取權」。 -->
     <div class="note">${T("res.urlNote")}</div>
     <div class="form-foot">
-      <button class="btn" data-act="res-save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("common.save")}</button>
-      <button class="btn ghost" data-act="res-back">${T("common.cancel")}</button>
+      ${isNew ? `<button class="btn" data-act="res-save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("res.create")}</button>` : autosaveHint("res-save")}
+      ${statusBtn}
+      <button class="btn ghost" data-act="res-back">${isNew ? T("common.cancel") : T("res.back")}</button>
       ${r ? `<span class="sp"></span><button class="btn quiet danger" data-act="res-del" data-id="${esc(r.id)}">${T("common.delete")}</button>` : ""}
-    </div>`);
+    </div>`;
+  return pageHead(r ? T("res.editTitle") : T("res.newTitle"), "", [], { act: "res-back", label: T("res.back") })
+    + msgHTML(msg)
+    + sectionHTML("", isNew ? form : `<div data-autosave="res-save" data-id="${esc(r.id)}">${form}</div>`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -834,20 +844,20 @@ export function mailEditHTML(kind, t, msg, busy, prev) {
   const fill = s => isInvite ? fillInvite(s) : isRequest ? fillRequest(s) : isMeeting ? fillMeeting(s) : fillMail(s, NAME, TITLE);
   return pageHead(esc(T(k.label)), esc(T("mail.editLede", { when: T(k.when) })), [], { act: "mail-back", label: T("mail.back") })
     + msgHTML(msg)
-    + `<div class="cols">` + sectionHTML("", `<label><i>${T("mail.subjectLabel")}</i><input id="msub" value="${esc(subject)}"></label>
-    <label><i>${T("mail.body")}</i><textarea id="mbody" style="min-height:230px">${esc(body)}</textarea></label>
-    <label><i>${T("mail.button")}</i><input id="mbtn" value="${esc(btnZh)}" placeholder="${esc(mailButtonLabel(kind, "zh"))}"></label>
+    // 2026-11-06 自動儲存：六格都在 data-autosave="mail-save" 的容器裡（data-k 是哪一封），停下來就存，沒有「存起來」鈕了。
+    + `<div class="cols">` + sectionHTML("", `<div data-autosave="mail-save" data-k="${esc(kind)}"><label><i>${T("mail.subjectLabel")}</i><input id="msub" name="subject" value="${esc(subject)}"></label>
+    <label><i>${T("mail.body")}</i><textarea id="mbody" name="body" style="min-height:230px">${esc(body)}</textarea></label>
+    <label><i>${T("mail.button")}</i><input id="mbtn" name="button_label" value="${esc(btnZh)}" placeholder="${esc(mailButtonLabel(kind, "zh"))}"></label>
     <div class="mini" style="margin:-6px 0 14px">
       ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
     <details class="fold"><summary><span class="chev" aria-hidden="true"></span><b>${T("mail.enTitle")}</b><span class="mini">${T("mail.enHint")}</span></summary><div class="fold-body">
-    <label><i>${T("mail.subjectEn")}</i><input id="msub-en" value="${esc(subjectEn)}"></label>
-    <label><i>${T("mail.bodyEn")}</i><textarea id="mbody-en" style="min-height:180px">${esc(bodyEn)}</textarea></label>
-    <label><i>${T("mail.buttonEn")}</i><input id="mbtn-en" value="${esc(btnEn)}" placeholder="${esc(mailButtonLabel(kind, "en"))}"></label></div></details>
+    <label><i>${T("mail.subjectEn")}</i><input id="msub-en" name="subject_en" value="${esc(subjectEn)}"></label>
+    <label><i>${T("mail.bodyEn")}</i><textarea id="mbody-en" name="body_en" style="min-height:180px">${esc(bodyEn)}</textarea></label>
+    <label><i>${T("mail.buttonEn")}</i><input id="mbtn-en" name="button_label_en" value="${esc(btnEn)}" placeholder="${esc(mailButtonLabel(kind, "en"))}"></label></div></details>
 
     <div class="form-foot">
-      <button class="btn" data-act="mail-save" data-k="${esc(kind)}" ${busy ? "disabled" : ""}>${
-        busy ? T("common.saving") : T("common.save")}</button>
-    </div>`)
+      ${autosaveHint("mail-save")}
+    </div></div>`)
     + sectionHTML(T("mail.previewTitle"), `<div class="mini" style="margin-bottom:8px">${isInvite ? T("mail.sampleInvite", { name: esc(INVITE_SAMPLE.name), position: esc(INVITE_SAMPLE.position) }) : isRequest ? T("mail.sampleRequest", { name: esc(REQUEST_SAMPLE.requester), title: esc(REQUEST_SAMPLE.title) }) : isMeeting ? T("mail.sampleMeeting", { name: esc(MEETING_SAMPLE.name), title: esc(MEETING_SAMPLE.title) }) : T("mail.sample", { name: esc(NAME), title: esc(TITLE) })}</div>
     <div class="chips" style="margin-bottom:8px"><button class="chip${pv.lang === "zh" ? " on" : ""}" data-act="mail-prev-lang" data-v="zh">${T("mail.langZh")}</button><button class="chip${pv.lang === "en" ? " on" : ""}" data-act="mail-prev-lang" data-v="en">${T("mail.langEn")}</button><span class="sp"></span><button class="chip${pv.w === 600 ? " on" : ""}" data-act="mail-prev-w" data-v="600">${T("mail.desktop")}</button><button class="chip${pv.w === 375 ? " on" : ""}" data-act="mail-prev-w" data-v="375">${T("mail.phone")}</button></div>
     <iframe class="mailframe" title="${esc(T("mail.previewTitle"))}" style="width:${pv.w}px" srcdoc="${esc(mailHtml({ kind, lang: pv.lang, subject: fill(pv.lang === "en" && subjectEn ? subjectEn : subject), body: fill(pv.lang === "en" && bodyEn ? bodyEn : body) + (pv.lang === "en" ? "" : extra), buttonLabel: pv.lang === "en" ? btnEn : btnZh, buttonUrl: MAIL_SAMPLE_URL[kind] || "https://beyondtaiwannpo.com/apply/" }))}"></iframe>
@@ -979,24 +989,29 @@ export function historyEditHTML(m, me, msg, busy, up) {
       ${st === "published" && sen ? `<button class="btn ghost" data-act="hi-unpublish" data-id="${esc(v.id)}"${dis}>${T("hi.unpublish")}</button>` : ""}
       ${st === "published" ? `<a class="btn ghost sm" href="/history/#${esc(v.slug)}" target="_blank" rel="noopener">${T("hi.seePublic")}</a>` : ""}
     </div>`);
-  const content = sectionHTML(T("hi.content"), `<div class="two">
-      <label><i>${T("hi.titleZh")}</i><input id="hi-tzh" value="${esc(v.title_zh)}"${ro}${dis}></label>
-      <label><i>${T("hi.titleEn")}</i><input id="hi-ten" value="${esc(v.title_en)}"${ro}${dis}></label>
-      <label><i>${T("hi.sumZh")}</i><input id="hi-szh" value="${esc(v.summary_zh)}"${ro}${dis}></label>
-      <label><i>${T("hi.sumEn")}</i><input id="hi-sen" value="${esc(v.summary_en)}"${ro}${dis}></label>
-      <label class="wide"><i>${T("hi.bodyZh")}</i><textarea id="hi-bzh" style="min-height:120px"${ro}${dis}>${esc(v.body_zh)}</textarea></label>
-      <label class="wide"><i>${T("hi.bodyEn")}</i><textarea id="hi-ben" style="min-height:120px"${ro}${dis}>${esc(v.body_en)}</textarea></label>
-      <label><i>${T("hi.date")}</i><input id="hi-date" type="date" value="${esc(v.happened_on)}"${ro}${dis}><span class="mini">${T("hi.dateNote")}</span></label>
-      <label><i>${T("hi.slug")}</i><input id="hi-slug" value="${esc(v.slug)}" placeholder="2023-first-bootcamp" autocomplete="off"${ro}${dis}><span class="mini">${T("hi.slugNote")}</span></label>
+  // 2026-11-06 自動儲存：既有的一站八格在 data-autosave="hi-save" 的容器裡，改了就存；新的一站還沒有 id，
+  // 留一顆「存起來」鈕（存過才有 id 可以掛照片，那句提示只在這裡）。不能編的人看到的是唯讀，沒有容器。
+  const fields = `<div class="two">
+      <label><i>${T("hi.titleZh")}</i><input id="hi-tzh" name="title_zh" value="${esc(v.title_zh)}"${ro}${dis}></label>
+      <label><i>${T("hi.titleEn")}</i><input id="hi-ten" name="title_en" value="${esc(v.title_en)}"${ro}${dis}></label>
+      <label><i>${T("hi.sumZh")}</i><input id="hi-szh" name="summary_zh" value="${esc(v.summary_zh)}"${ro}${dis}></label>
+      <label><i>${T("hi.sumEn")}</i><input id="hi-sen" name="summary_en" value="${esc(v.summary_en)}"${ro}${dis}></label>
+      <label class="wide"><i>${T("hi.bodyZh")}</i><textarea id="hi-bzh" name="body_zh" style="min-height:120px"${ro}${dis}>${esc(v.body_zh)}</textarea></label>
+      <label class="wide"><i>${T("hi.bodyEn")}</i><textarea id="hi-ben" name="body_en" style="min-height:120px"${ro}${dis}>${esc(v.body_en)}</textarea></label>
+      <label><i>${T("hi.date")}</i><input id="hi-date" name="happened_on" type="date" value="${esc(v.happened_on)}"${ro}${dis}><span class="mini">${T("hi.dateNote")}</span></label>
+      <label><i>${T("hi.slug")}</i><input id="hi-slug" name="slug" value="${esc(v.slug)}" placeholder="2023-first-bootcamp" autocomplete="off"${ro}${dis}><span class="mini">${T("hi.slugNote")}</span></label>
     </div>
-    ${can ? `<div class="form-foot"><button class="btn" data-act="hi-save" data-id="${esc(v.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>${isNew ? `<span class="mini">${T("hi.saveFirst")}</span>` : ""}</div>` : ""}`);
+    ${can ? `<div class="form-foot">${isNew ? `<button class="btn" data-act="hi-save" data-id=""${dis}>${busy ? T("common.saving") : T("common.save")}</button><span class="mini">${T("hi.saveFirst")}</span>` : autosaveHint("hi-save")}</div>` : ""}`;
+  const content = sectionHTML(T("hi.content"), can && !isNew ? `<div data-autosave="hi-save" data-id="${esc(v.id)}">${fields}</div>` : fields);
+  // 照片說明兩格也是改了就存（data-autosave="hi-ph-save"，data-id 是那張照片）。同意勾選本來就是勾了就送（main.js 接 change），
+  // 標 data-noauto 讓自動儲存不再送第二次。刪掉這張留鈕。
   const photoCard = p => `<li class="hi-photo">
       <img src="${esc(p.url)}" alt="" loading="lazy">
-      <div class="hi-photo-f">
-        <label><i>${T("hi.capZh")}</i><input id="hi-ph-czh-${esc(p.id)}" value="${esc(p.caption_zh || "")}"${ro}${dis}></label>
-        <label><i>${T("hi.capEn")}</i><input id="hi-ph-cen-${esc(p.id)}" value="${esc(p.caption_en || "")}"${ro}${dis}></label>
-        <label class="check"><input type="checkbox" data-act="hi-ph-consent" data-id="${esc(p.id)}"${p.consent ? " checked" : ""}${can ? "" : " disabled"}${dis}><span>${T("hi.consent")}</span></label>
-        ${can ? `<div class="row"><button class="btn ghost sm" data-act="hi-ph-save" data-id="${esc(p.id)}"${dis}>${T("hi.savePhotos")}</button><button class="btn quiet danger sm" data-act="hi-ph-del" data-id="${esc(p.id)}"${dis}>${T("hi.delPhoto")}</button></div>` : ""}
+      <div class="hi-photo-f"${can ? ` data-autosave="hi-ph-save" data-id="${esc(p.id)}"` : ""}>
+        <label><i>${T("hi.capZh")}</i><input id="hi-ph-czh-${esc(p.id)}" name="caption_zh" value="${esc(p.caption_zh || "")}"${ro}${dis}></label>
+        <label><i>${T("hi.capEn")}</i><input id="hi-ph-cen-${esc(p.id)}" name="caption_en" value="${esc(p.caption_en || "")}"${ro}${dis}></label>
+        <label class="check"><input type="checkbox" data-act="hi-ph-consent" data-noauto="1" data-id="${esc(p.id)}"${p.consent ? " checked" : ""}${can ? "" : " disabled"}${dis}><span>${T("hi.consent")}</span></label>
+        ${can ? `<div class="row">${autosaveHint("hi-ph-save")}<button class="btn quiet danger sm" data-act="hi-ph-del" data-id="${esc(p.id)}"${dis}>${T("hi.delPhoto")}</button></div>` : ""}
       </div></li>`;
   const photos = isNew ? "" : sectionHTML(`${T("hi.photosSec")}<span class="hint">${(v.photos || []).length}</span>`, `<div class="note">${T("hi.photoNote")}</div>
       ${(v.photos || []).length ? `<ul class="hi-photos">${v.photos.map(photoCard).join("")}</ul>` : ""}

@@ -24,6 +24,7 @@ export const COMMON = {
   // 版本提示與自動儲存（2026-11-06）。九份 strings.js 的 COMMON 要一模一樣（test/lang.test.mjs、test/admin-hub.test.mjs 逐字比對）。
   "ver.newer":        { zh: "網站有新版本了，重新整理一下就會換成新的。", en: "A newer version is live. Reload to get it." },
   "ver.reload":       { zh: "重新整理", en: "Reload" },
+  "ver.tag":          { zh: "更新", en: "Update" },
   "auto.saving":      { zh: "存檔中…", en: "Saving…" },
   "auto.saved":       { zh: "存好了", en: "Saved" },
   "auto.hint":        { zh: "改了就存", en: "saves as you change it" },
@@ -65,8 +66,8 @@ export const MINE = {
   "s.grade":          { zh: "年級", en: "Grade" },
   "s.pick":           { zh: "請選擇", en: "Choose" },
   "s.newsletter":     { zh: "我願意收 BT 的活動通知與資源更新。每一封都有取消訂閱的連結。", en: "I would like BT's event notices and resource updates. Every email has an unsubscribe link." },
-  "s.save":           { zh: "存起來", en: "Save" },
-  "s.saveNote":       { zh: "這一頁上面的變更會一起存起來。", en: "Everything above on this page is saved together." },
+  // 2026-11-06 自動儲存：整頁的「存起來」鈕拿掉了，改成每一格改了就存。
+  "s.autoNote":       { zh: "改了哪一格就存哪一格，不用再按儲存。", en: "Each field saves as you change it. There is no Save button." },
   "s.passport":       { zh: "護照", en: "Passport" },
   "s.passportNote":   { zh: "個人標語、蓋章紀錄、心得與照片都在護照裡面。", en: "Your motto, stamps, notes and photos are in the passport." },
   "s.goPassport":     { zh: "去護照", en: "Go to passport" },
@@ -124,7 +125,7 @@ export const MINE = {
   "del.do":           { zh: "永久刪除我的帳號", en: "Permanently delete my account" },
   "del.no":           { zh: "先不要", en: "Not now" },
   // 存檔失敗、連不上
-  "sf.half":          { zh: "你的資料存起來了，但「我的故事」那一段沒有存進去：{why}。再按一次「存起來」會重試那一段。", en: "Your details were saved, but the \"My story\" part was not: {why}. Press \"Save\" again to retry that part." },
+  "sf.half":          { zh: "你的資料存起來了，但「我的故事」那一段沒有存進去：{why}。再改一下那一段就會再存一次。", en: "Your details were saved, but the \"My story\" part was not: {why}. Edit that part again and it will retry." },
   "err.save":         { zh: "存不起來：{why}", en: "Could not save: {why}" },
   "down.title":       { zh: "資料庫休眠中", en: "Database is asleep" },
   "down.lede":        { zh: "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。", en: "We cannot reach the database right now. Email beyondtaiwan2020@gmail.com to have it woken up." },

@@ -727,30 +727,40 @@ export function downHTML() {
   </div>`;
 }
 
+// 2026-11-06 自動儲存：這張表單有兩種時候。
+//   - 第一次領護照（p.id 還沒有）、或清除護照之後名字空著：留「核發護照 / 儲存」那顆鈕，
+//     因為按下去畫面會整個換掉（boot() 重讀、進到護照那一頁），那種動作不走自動存。
+//   - 已經有護照、有名字，從資料頁按「編輯資料」進來：每一格改了就存（data-autosave="issue"），
+//     鈕換成小字「改了就存」，旁邊留一顆「回到護照」。
 export function setupHTML(p, user) {
   p = p || {};
+  const editing = !!p.id && !!(p.name_zh || p.name_en);
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>${p.id ? T("setup.edit") : T("setup.apply")}</h2>
     <div class="sub">${p.id ? T("setup.editSub") : T("setup.applySub")}</div>
-    <label><i>${T("setup.nameZh")}</i><input id="fz" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>
-    <label><i>${T("setup.nameEn")}</i><input id="fe" value="${esc(p.name_en || "")}" placeholder="Ming Wang" maxlength="30"></label>
+    <div${editing ? ` data-autosave="issue" data-id="${esc(p.id)}"` : ""}>
+    <label><i>${T("setup.nameZh")}</i><input id="fz" name="name_zh" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>
+    <label><i>${T("setup.nameEn")}</i><input id="fe" name="name_en" value="${esc(p.name_en || "")}" placeholder="Ming Wang" maxlength="30"></label>
     <!-- ⚠ **本來就存在、但不在 TEAMS 裡的值要原樣留著當一個選項，而且是選起來的。**
          2026-09-10 起一個人可以在好幾個 team（存成「A Team, B Team」這種逗號字串，
          在 /settings/ 用勾的）。這個 select 只選得了一個，
          少了下面那個 extra，那種人一按儲存就會被悄悄改成清單的第一個 ——
          而他不會發現，因為畫面上顯示的本來就是那一個。
          **這一頁刻意不做複選**：要選好幾個到設定頁，那裡才是改資料的地方。 -->
-    <label><i>${T("setup.team")}</i><select id="ft">${
+    <label><i>${T("setup.team")}</i><select id="ft" name="team">${
       TEAMS.map(t => `<option ${p.team === t ? "selected" : ""}>${t}</option>`).join("")
     }${p.team && !TEAMS.includes(p.team)
       ? `<option selected>${esc(p.team)}</option>` : ""}</select>
       <span class="fnote">${T("setup.teamNote")}</span></label>
-    <label><i>${T("setup.motto")}</i><textarea id="fm" maxlength="60" placeholder="${esc(T("setup.mottoPh"))}">${esc(p.motto || "")}</textarea></label>
+    <label><i>${T("setup.motto")}</i><textarea id="fm" name="motto" maxlength="60" placeholder="${esc(T("setup.mottoPh"))}">${esc(p.motto || "")}</textarea></label>
+    </div>
     <div class="wnote" style="margin:0 0 16px">${T("setup.note")}</div>
     <div class="row">
-      <button class="btn" data-act="issue">${p.id ? T("common.save") : T("setup.issue")}</button>
-      ${p.id ? `<button class="btn ghost" data-act="cancel">${T("common.cancel")}</button>` : ""}
+      ${editing
+        ? `${autosaveHint("issue")}<button class="btn ghost" data-act="cancel">${T("setup.done")}</button>`
+        : `<button class="btn" data-act="issue">${p.id ? T("common.save") : T("setup.issue")}</button>
+      ${p.id ? `<button class="btn ghost" data-act="cancel">${T("common.cancel")}</button>` : ""}`}
       <!-- 沒有名字 = 這個人現在**到不了資料頁**，而匯入還原的另一顆按鈕就在資料頁上。
            不放這一顆的話，spec §11-10 的「匯出 → 清除護照 → 匯入還原」根本走不完：
            清完之後畫面就停在這一頁，只有「核發護照」跟「登出」，備份檔沒有地方可以餵進去。
@@ -765,4 +775,100 @@ export function setupHTML(p, user) {
       ${user ? `<button class="btn ghost sm" data-act="signout" style="margin-left:auto">${T("common.signout")}</button>` : ""}
     </div>
   </div>`;
+}
+
+// ── 自動儲存（2026-11-06，Paul：「希望每一格都像 Workspaces 那一頁一樣，改了就存」）。四份一模一樣（測試逐字比對）。 ──
+// 規矩：打字的欄位（text、textarea）停 800 毫秒或離開欄位就存；選的（select、checkbox、radio、date）改了馬上存。
+// 存的時候左下角照樣是 toast（存好了／存不起來），欄位旁邊多一個小字「存檔中…／存好了」。
+// 存失敗**不重畫**，剛打的字留在格子裡，再改一下就會再存一次。
+// 還留著按鈕的只有會「送出去、丟東西、花錢」的動作：上架與下架、標成可以用、移出成員、結束這一屆、刪掉、寄邀請、排會議、上傳。
+//
+// 怎麼接（每一個表單三步）：
+//   1. ui.js：表單的容器加 data-autosave="<act>"（加 data-id 之類的辨識），欄位要有 name；拿掉「存起來」那顆鈕，
+//      放 <span class="autosave" data-for="<act>">改了就存</span>（autosaveHint()）。
+//   2. main.js：boot 時 UI.bindAutosave(root(), onAutosave) 一次；onAutosave(act, box, field) 讀 UI.formValues(box) 去存。
+//   3. 存的時候 UI.autosaveState(box, "saving") → 成功 "saved" 加 toast → 失敗 "failed" 加錯誤 toast，**不 render()**。
+export function debounce(fn, ms) {
+  let t = null;
+  const d = (...a) => { clearTimeout(t); t = setTimeout(() => { t = null; fn(...a); }, ms); };
+  d.flush = (...a) => { clearTimeout(t); t = null; fn(...a); };
+  d.cancel = () => { clearTimeout(t); t = null; };
+  return d;
+}
+export const AUTOSAVE_MS = 800;
+// 這一格要怎麼存："now"（選的）、"typed"（打字的）、null（不在 data-autosave 容器裡、或標了 data-noauto）。
+export function saveMode(el) {
+  if (!el || !el.closest || !el.closest("[data-autosave]")) return null;
+  if (el.dataset && el.dataset.noauto) return null;
+  const tag = String(el.tagName || "").toUpperCase(), type = String(el.type || "").toLowerCase();
+  if (tag === "SELECT") return "now";
+  if (tag === "TEXTAREA") return "typed";
+  if (tag !== "INPUT") return null;
+  if (["checkbox", "radio", "date", "time", "datetime-local", "month", "week", "color", "range", "number"].includes(type)) return "now";
+  if (["button", "submit", "file", "hidden", "reset", "image"].includes(type)) return null;
+  return "typed";
+}
+// 記每一格最後存成功的值，一樣就不再送一次（離開欄位又停 800 毫秒會觸發兩次）。
+export function dirtyTracker() {
+  const last = new Map();
+  return {
+    changed: (key, value) => !last.has(key) || last.get(key) !== value,
+    mark: (key, value) => { last.set(key, value); },
+    forget: key => { last.delete(key); },
+  };
+}
+// 容器裡每一格讀成 { name: value }：文字去頭尾空白、checkbox 是布林、radio 取選到的、沒有 name 的不讀。
+export function formValues(box) {
+  const out = {};
+  for (const f of box.querySelectorAll("input, select, textarea")) {
+    const name = f.name || (f.dataset && f.dataset.name) || "";
+    if (!name) continue;
+    const type = String(f.type || "").toLowerCase();
+    if (type === "checkbox") out[name] = !!f.checked;
+    else if (type === "radio") { if (f.checked) out[name] = f.value; else if (!(name in out)) out[name] = out[name]; }
+    else out[name] = typeof f.value === "string" ? f.value.trim() : f.value;
+  }
+  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
+  return out;
+}
+export function autosaveHint(act, extra) { return `<span class="autosave" data-for="${esc(act)}"${extra ? ` ${extra}` : ""}>${esc(T("auto.hint"))}</span>`; }
+// 欄位旁邊那個小字：saving → 「存檔中…」、saved → 「存好了」（兩秒後回到「改了就存」）、failed → 「沒存進去…」。
+export function autosaveState(box, state) {
+  if (!box || !box.querySelector) return;
+  const el = box.querySelector(".autosave");
+  if (!el) return;
+  clearTimeout(el._t);
+  el.classList.remove("saving", "saved", "failed");
+  if (state === "saving") { el.classList.add("saving"); el.textContent = T("auto.saving"); }
+  else if (state === "saved") { el.classList.add("saved"); el.textContent = T("auto.saved"); el._t = setTimeout(() => { el.classList.remove("saved"); el.textContent = T("auto.hint"); }, 2000); }
+  else if (state === "failed") { el.classList.add("failed"); el.textContent = T("auto.failed"); }
+  else el.textContent = T("auto.hint");
+}
+// 掛一次在 #bt-root 上（它不會被換掉，裡面的 innerHTML 才會）。onSave(act, box, field) 回 Promise。
+// 同一個容器一次只跑一個存檔；跑的時候又改了，跑完再存一次（不丟掉後面那一次改動）。
+export function bindAutosave(root, onSave) {
+  if (!root || typeof document === "undefined" || root.dataset.autosave === "1") return;
+  root.dataset.autosave = "1";
+  const timers = new Map(), running = new Map(), again = new Map();
+  const run = async (box, field) => {
+    const act = box.dataset.autosave;
+    if (running.get(box)) { again.set(box, field); return; }
+    running.set(box, true);
+    try { await onSave(act, box, field); }
+    finally {
+      running.delete(box);
+      const f = again.get(box);
+      if (f) { again.delete(box); run(box, f); }
+    }
+  };
+  const schedule = (field, now) => {
+    const box = field.closest("[data-autosave]");
+    if (!box) return;
+    let d = timers.get(box);
+    if (!d) { d = debounce(f => run(box, f), AUTOSAVE_MS); timers.set(box, d); }
+    if (now) d.flush(field); else d(field);
+  };
+  root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });
+  root.addEventListener("change", e => { const m = saveMode(e.target); if (m === "now") schedule(e.target, true); else if (m === "typed") schedule(e.target, true); });
+  root.addEventListener("focusout", e => { const m = saveMode(e.target); if (m === "typed") { const d = timers.get(e.target.closest("[data-autosave]")); if (d) d.flush(e.target); } });
 }

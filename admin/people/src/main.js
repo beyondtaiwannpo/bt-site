@@ -82,6 +82,8 @@ async function boot(retried) {
     // ?tab= 或 #key 直接開某個分頁（README 的連結用得到）。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     paintShell(String(want || "").split("=")[0]);
+    // 自動儲存（2026-11-06）掛在 #bt-root 上一次，之後 render() 只換裡面的 innerHTML，監聽還在。
+    UI.bindAutosave(root(), onAutosave);
     await openTab(want);
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-people"); return; }
@@ -215,13 +217,119 @@ function readPersonForm(p) {
   };
 }
 
+// ── 自動儲存（2026-11-06，Paul：「每一格都像 Workspaces 那一頁一樣，改了就存」）────────────────
+// 這個資料夾只有一張表單走自動儲存：改一個人（person-save）。bindAutosave 在 boot 掛一次，欄位停下來就進這裡。
+// 規矩在 ui.js 那一段：讀表單、叫原本那幾支 D.xxx（資料層一行沒改）、成功只改 S **不 render()**（人可能還在打字）、
+// 小字變「存好了」加左下角 toast；失敗小字變「沒存進去」加錯誤 toast，欄位不清。
+// 容器會在存的途中被 render() 換掉（職位下拉一換就重畫一次），所以回報狀態時用 act 再找一次現在畫面上那一個。
+const dirty = UI.dirtyTracker();
+function liveBox(box) {
+  const el = root() ? root().querySelector(`[data-autosave="${box.dataset.autosave}"]` + (box.dataset.id ? `[data-id="${box.dataset.id}"]` : "")) : null;
+  return el || box;
+}
+async function onAutosave(act, box) {
+  if (act !== "person-save") return;
+  const p = findPerson(box.dataset.id); if (!p) return;
+  await savePerson(p, box, false);
+}
+// 改一個人那張表單要做的事，跟原本那顆鈕同樣幾步、同樣的訊息（職級、名字、職位、team 標籤，照順序，每一步記進變動紀錄）。
+// 差別只有三件：沒改到東西就安靜地不送（不再印「沒有改到任何東西」）；一列職位選了「自訂」還沒打名稱先跳過，不當錯誤
+// （打字打到一半是正常的）；做完**不 render()**，只把名單重讀進 S 並把表單列上的 data-orig 對上新值，下一次比對才不會再做一次。
+async function savePerson(p, box, confirmed) {
+  const f = readPersonForm(p);
+  S.personDraft = f;
+  const key = "person-save:" + p.person_id, serial = JSON.stringify({ board_role: f.board_role, name_zh: f.name_zh, name_en: f.name_en, term: f.term, rows: f.rows, team: f.team });
+  if (!dirty.changed(key, serial)) return;
+  const fail = text => { UI.autosaveState(liveBox(box), "failed"); UI.toast(text); };
+  const cadre = !!p.profile_id && p.role === "cadre";
+  const roleChanged = cadre && f.board_role !== (p.board_role || "member");
+  const nameChanged = f.name_zh !== (p.name_zh || "") || f.name_en !== (p.name_en || "");
+  // 職位清單的差異：原本那一筆（orig）改了名稱或換了 team，或新加的一列有填。
+  // 換了 team 等於「刪舊的那一筆、存一筆新的」，因為唯一鍵是 人 × 屆 × team。
+  const posOps = [], savedRows = [];
+  const seenTeams = new Set();
+  for (let i = 0; i < f.rows.length; i++) {
+    const r = f.rows[i];
+    if (!r.title_zh && !r.title_en) continue;
+    if (seenTeams.has(r.team)) { fail(T("err.posTeamDup")); return; }
+    seenTeams.add(r.team);
+    const before = r.orig == null ? null : UI.positionsFor(p, f.term).find(x => (x.team || "") === r.orig);
+    const same = before && (before.title_zh || "") === r.title_zh && (before.title_en || "") === r.title_en && (before.team || "") === r.team;
+    if (same) continue;
+    if (before && (before.team || "") !== r.team) posOps.push({ del: r.orig });
+    posOps.push({ set: r }); savedRows.push(i);
+  }
+  const teamChanged = cadre && UI.parseTeams(f.team).join("|") !== UI.parseTeams(p.team).join("|");
+  if (!roleChanged && !nameChanged && !posOps.length && !teamChanged) { dirty.mark(key, serial); return; }
+  if (nameChanged && !f.name_zh && !f.name_en) { fail(T("err.nameRequired")); return; }
+  // ⚠ 升成 Co-President 等於把整個後台給他，包括把你降級。畫面多問一次（掛在職級下拉旁邊那個錨上），資料庫那一側刻意不擋（換屆要用）。
+  if (roleChanged && f.board_role === "president" && !confirmed) {
+    S.ask = { act: "person-promote", id: p.person_id, text: T("confirm.promote", { name: pname(p) }) };
+    UI.mountAsk(root(), S.ask);
+    return;
+  }
+  UI.autosaveState(box, "saving");
+  const done = [];
+  let undo = null;
+  try {
+    if (roleChanged) { await D.setBoardRole(p.profile_id, f.board_role); done.push(T("msg.roleTo", { role: UI.boardLabel(f.board_role) })); }
+    if (nameChanged) { await D.renamePerson(p.person_id, f.name_zh, f.name_en); done.push(T("msg.nameTo", { name: f.name_zh || f.name_en })); }
+    for (const op of posOps) {
+      if (op.del != null) { await D.deletePosition(p.person_id, f.term, op.del); done.push(T("msg.positionGone", { term: f.term })); }
+      else { await D.setPosition(p.person_id, f.term, op.set.title_zh, op.set.title_en, op.set.team); done.push(T("msg.positionTo", { term: f.term, title: op.set.title_en || op.set.title_zh })); }
+    }
+    if (teamChanged) { await D.setTeam(p.profile_id, f.team); done.push(T("msg.teamTo", { team: f.team || T("value.none") })); }
+    // 存了一筆帶 team 的 Director 職位（Paul 2026-10-23 第 4 題）：問一句、一顆鈕同時給那個 team 的申請與資源「管」。不自動送，
+    // 因為一個打錯 team 的職位會送出兩筆權限。只問最後一筆；他已經兩個都是「管」就不問。
+    const dirTeam = f.board_role === "director" ? (posOps.filter(op => op.set && op.set.team).map(op => op.set.team).pop() || "") : "";
+    // 2026-10-30 起申請是整個 BT 一個工作區：Director 配的是那個 team 的資源「管」加整個申請「改」。
+    const hasBoth = t => (p.workspaces || []).some(w => w.id === "res:" + t && w.level === "manage") && (p.workspaces || []).some(w => w.id === "apps" && ["edit", "manage"].includes(w.level));
+    if (dirTeam && !hasBoth(dirTeam)) {
+      const who = f.name_zh || f.name_en || pname(p), pid = p.profile_id, personId = p.person_id;
+      undo = { label: T("pe.grantBoth", { team: dirTeam }), fn: async () => {
+        const r = await run("err.assign", async () => { await D.assign(pid, "res:" + dirTeam, "manage"); await D.assign(pid, "apps", "edit"); return true; });
+        if (r !== undefined) await reopenPerson(personId, T("msg.grantedBoth", { name: who, team: dirTeam }));
+      } };
+    }
+    await syncPerson(p.person_id, f, savedRows);
+    dirty.mark(key, serial);
+    UI.autosaveState(liveBox(box), "saved");
+    UI.toast(T("msg.personSaved", { name: f.name_zh || f.name_en || pname(p), done: done.join(T("punct.list")) }), undo);
+  } catch (err) {
+    // 前面幾步做好了、後面那一步沒做到要講清楚，不然他會把做好的那一半再做一次。
+    UI.autosaveState(liveBox(box), "failed");
+    UI.toast((done.length ? T("msg.partial", { done: done.join(T("punct.list")) }) : "") + T("err.save") + D.says(err));
+    if (done.length) { try { await syncPerson(p.person_id, f, []); } catch (x) { /* 名單重讀不到，下一次存會再比一次 */ } }
+  }
+}
+// 存完把 S 跟上（名單、變動紀錄重讀，S.person 換成新的那一筆），不重畫。
+// 表單上每一列職位的 data-orig 要對上剛存進去的 team，S.personDraft.rows 也是，不然下一次比對會以為又換了 team。
+async function syncPerson(personId, f, savedRows) {
+  await loadCore(true);
+  if (!S.person || S.person.person_id !== personId) return;
+  const live = root() ? root().querySelector('[data-autosave="person-save"]') : null;
+  // 職位下拉一換，document 那邊的 change 會再讀一次表單換掉 S.personDraft，所以兩份都對：讀進來那一份 f，與現在的 S.personDraft。
+  const draftRows = (S.personDraft && Array.isArray(S.personDraft.rows)) ? S.personDraft.rows : [];
+  for (const i of savedRows) {
+    const r = f.rows[i]; if (!r) continue;
+    r.orig = r.team;
+    if (draftRows[i] && draftRows[i] !== r) draftRows[i].orig = r.team;
+    const el = live ? live.querySelector(`[data-posrow="${i}"]`) : null;
+    if (el) { el.dataset.orig = r.team; el.dataset.isnew = "0"; }
+  }
+}
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act;
 
   if (act === "retry") { location.reload(); return; }
-  if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
+  if (act === "ask-cancel") {
+    // 升 Co-President 那一問按了取消（2026-11-06）：下拉選單要退回原本的職級，不然畫面上是「Co-President」但沒存。
+    if (S.ask && S.ask.act === "person-promote" && S.person) { const r = document.getElementById("pk-role"); if (r) r.value = S.person.board_role || "member"; }
+    UI.cancelAsk(S, root()); return;
+  }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") {
@@ -244,65 +352,14 @@ document.addEventListener("click", async e => {
     render();
     loadEmail(p); return;
   }
-  if (act === "person-save") {
-    const p = findPerson(b.dataset.id);
-    if (!p) { S.msg = T("err.noPerson"); render(); return; }
-    const f = readPersonForm(p);
-    S.personDraft = f;
-    const cadre = !!p.profile_id && p.role === "cadre";
-    const roleChanged = cadre && f.board_role !== (p.board_role || "member");
-    const nameChanged = f.name_zh !== (p.name_zh || "") || f.name_en !== (p.name_en || "");
-    // 職位清單的差異：原本那一筆（orig）改了名稱或換了 team，或新加的一列有填。
-    // 換了 team 等於「刪舊的那一筆、存一筆新的」，因為唯一鍵是 人 × 屆 × team。
-    const posOps = [];
-    const seenTeams = new Set();
-    for (const r of f.rows) {
-      const empty = !r.title_zh && !r.title_en;
-      if (r.orig == null && empty) continue;
-      if (seenTeams.has(r.team)) { S.msg = T("err.posTeamDup"); render(); return; }
-      seenTeams.add(r.team);
-      if (empty) { S.msg = T("err.titleRequired"); render(); return; }
-      const before = r.orig == null ? null : UI.positionsFor(p, f.term).find(x => (x.team || "") === r.orig);
-      const same = before && (before.title_zh || "") === r.title_zh && (before.title_en || "") === r.title_en && (before.team || "") === r.team;
-      if (same) continue;
-      if (before && (before.team || "") !== r.team) posOps.push({ del: r.orig });
-      posOps.push({ set: r });
-    }
-    const posChanged = posOps.length > 0;
-    const teamChanged = cadre && UI.parseTeams(f.team).join("|") !== UI.parseTeams(p.team).join("|");
-    if (!roleChanged && !nameChanged && !posChanged && !teamChanged) { S.msg = T("err.nothingChanged"); render(); return; }
-    if (nameChanged && !f.name_zh && !f.name_en) { S.msg = T("err.nameRequired"); render(); return; }
-    // ⚠ 升成 Co-President 等於把整個後台給他，包括把你降級。畫面多問一次，資料庫那一側刻意不擋（換屆要用）。
-    if (roleChanged && f.board_role === "president" && UI.needAsk(S, b, T("confirm.promote", { name: pname(p) }))) return;
-    S.busy = true; S.msg = ""; render();
-    const done = [];
-    try {
-      if (roleChanged) { await D.setBoardRole(p.profile_id, f.board_role); done.push(T("msg.roleTo", { role: UI.boardLabel(f.board_role) })); }
-      if (nameChanged) { await D.renamePerson(p.person_id, f.name_zh, f.name_en); done.push(T("msg.nameTo", { name: f.name_zh || f.name_en })); }
-      for (const op of posOps) {
-        if (op.del != null) { await D.deletePosition(p.person_id, f.term, op.del); done.push(T("msg.positionGone", { term: f.term })); }
-        else { await D.setPosition(p.person_id, f.term, op.set.title_zh, op.set.title_en, op.set.team); done.push(T("msg.positionTo", { term: f.term, title: op.set.title_en || op.set.title_zh })); }
-      }
-      if (teamChanged) { await D.setTeam(p.profile_id, f.team); done.push(T("msg.teamTo", { team: f.team || T("value.none") })); }
-      // 存了一筆帶 team 的 Director 職位（Paul 2026-10-23 第 4 題）：問一句、一顆鈕同時給那個 team 的申請與資源「管」。不自動送，
-      // 因為一個打錯 team 的職位會送出兩筆權限。只問最後一筆；他已經兩個都是「管」就不問。
-      const dirTeam = f.board_role === "director" ? (posOps.filter(op => op.set && op.set.team).map(op => op.set.team).pop() || "") : "";
-      // 2026-10-30 起申請是整個 BT 一個工作區：Director 配的是那個 team 的資源「管」加整個申請「改」。
-      const hasBoth = t => (p.workspaces || []).some(w => w.id === "res:" + t && w.level === "manage") && (p.workspaces || []).some(w => w.id === "apps" && ["edit", "manage"].includes(w.level));
-      if (dirTeam && !hasBoth(dirTeam)) {
-        const who = f.name_zh || f.name_en || pname(p), pid = p.profile_id, personId = p.person_id;
-        S.undo = { label: T("pe.grantBoth", { team: dirTeam }), fn: async () => {
-          const r = await run("err.assign", async () => { await D.assign(pid, "res:" + dirTeam, "manage"); await D.assign(pid, "apps", "edit"); return true; });
-          if (r !== undefined) await reopenPerson(personId, T("msg.grantedBoth", { name: who, team: dirTeam }));
-        } };
-      }
-      await reopenPerson(p.person_id, T("msg.personSaved", { name: f.name_zh || f.name_en || pname(p), done: done.join(T("punct.list")) }));
-    } catch (err) {
-      // 前面幾步做好了、後面那一步沒做到要講清楚，不然他會把做好的那一半再做一次。
-      S.busy = false;
-      S.msg = (done.length ? T("msg.partial", { done: done.join(T("punct.list")) }) : "") + T("err.save") + D.says(err);
-      render();
-    }
+  // person-save 那顆鈕 2026-11-06 拿掉了，改一個人那張表單改了就存（onAutosave → savePerson）。
+  // 只剩升成 Co-President 那一問：按了「確定」從這裡進來，帶 data-confirmed="1"。
+  if (act === "person-promote") {
+    if (b.dataset.confirmed !== "1") return;
+    S.ask = null;
+    const p = findPerson(b.dataset.id); if (!p) return;
+    const box = root() ? root().querySelector('[data-autosave="person-save"]') : null;
+    if (box) await savePerson(p, box, true);
     return;
   }
   if (act === "position-delete") {

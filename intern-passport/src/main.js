@@ -371,8 +371,36 @@ async function checkVersion(rootUrl) {
   } catch (e) { return false; }
 }
 
+// ── 自動儲存（2026-11-06）：已經有名字的實習生編輯資料頁那張表單，每一格改了就存。──
+// 第一次領護照仍然是上面那顆鈕（存完要 boot() 重讀、換到護照那一頁，不走自動存）。
+// 存成功只更新 S.profile，**不 render()**：使用者可能還在打字。按「回到護照」才重畫。
+const dirty = UI.dirtyTracker();
+async function onAutosave(act, box) {
+  if (act !== "issue" || !S.user) return;
+  const name_zh = (document.getElementById("fz") || { value: "" }).value.trim();
+  const name_en = (document.getElementById("fe") || { value: "" }).value.trim();
+  if (!name_zh && !name_en) { UI.autosaveState(box, "failed"); toast(T("m.needName")); return; }
+  const p = { name_zh, name_en: name_en || name_zh, motto: document.getElementById("fm").value.trim() };
+  const key = "issue:" + S.user.id, fp = JSON.stringify(p);
+  if (!dirty.changed(key, fp)) return;
+  UI.autosaveState(box, "saving");
+  try {
+    await DATA.saveProfile(p);
+    dirty.mark(key, fp);
+    S.profile = { ...(S.profile || {}), ...p };
+    UI.autosaveState(box, "saved");
+    toast(T("m.updated"));
+  } catch (e) {
+    console.error("自動存檔失敗。真正的原因：", e);
+    UI.autosaveState(box, "failed");
+    toast(T("m.notSaved"));
+  }
+}
+
 export async function boot() {
   checkVersion("../");
+  // 自動儲存掛一次在 #bt-root 上（它不會被換掉，裡面的 innerHTML 才會）。
+  UI.bindAutosave(root(), onAutosave);
   try {
     const who = await DATA.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }

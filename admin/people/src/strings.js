@@ -123,6 +123,7 @@ export const COMMON = {
   // 版本提示與自動儲存（2026-11-06）。九份 strings.js 的 COMMON 要一模一樣（test/lang.test.mjs、test/admin-hub.test.mjs 逐字比對）。
   "ver.newer":        { zh: "網站有新版本了，重新整理一下就會換成新的。", en: "A newer version is live. Reload to get it." },
   "ver.reload":       { zh: "重新整理", en: "Reload" },
+  "ver.tag":          { zh: "更新", en: "Update" },
   "auto.saving":      { zh: "存檔中…", en: "Saving…" },
   "auto.saved":       { zh: "存好了", en: "Saved" },
   "auto.hint":        { zh: "改了就存", en: "saves as you change it" },
@@ -225,7 +226,6 @@ export const MINE = {
   "pe.teams":         { zh: "team 標籤（可以選好幾個）", en: "Team labels (pick as many as apply)" },
   "pe.teamsNote":     { zh: "只是標籤：時間看板篩選、團隊頁分組用。不長出任何權限，本人在設定頁也勾得了。", en: "Labels only: for the availability filter and team page grouping. They grant nothing; the person can tick them under Settings too." },
   "pe.ws":            { zh: "在哪幾個工作區", en: "Workspaces" },
-  "pe.wsHint":        { zh: "改了就存", en: "saves as you change it" },
   "pe.noWs":          { zh: "沒有被派進任何工作區，後台只看得到首頁與自己的東西。", en: "Not in any workspace; the admin shows only the home page and their own things." },
   "pe.dup":           { zh: "可能是同一個人", en: "Possible duplicate" },
   "pe.dupNote":       { zh: "名單上另有一筆英文名一樣的紀錄。真的是同一個人就合併：另一筆的歷屆職位搬到這一筆，另一筆刪掉。不是就不用理。", en: "Another record has the same English name. If it is the same person, merge: the other record's past positions move here and it is deleted. If not, ignore this." },

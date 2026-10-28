@@ -107,6 +107,8 @@ async function boot(retried) {
     // ?tab=cadre 直接開幹部護照（README 的連結用得到）。不是 Co-President 的回到實習護照。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     paintShell(want);
+    // 2026-11-06 自動儲存：掛一次在 #bt-root（它不會被換掉）。哪些表單會走到這裡見 onAutosave。
+    UI.bindAutosave(root(), onAutosave);
     S.workspaces = await wsP;
     await openTab(want);
   } catch (e) {
@@ -115,6 +117,59 @@ async function boot(retried) {
     if (!retried) return retryBoot();
     S.downErr = String(e && e.message || e); S.down = true; render();
   }
+}
+
+// ── 自動儲存（2026-11-06，Paul：每一格都像 Workspaces 那一頁「改了就存」）────────────────
+// 走到這裡的五個表單都是「改既有的」：幹部護照的一格（act-save）、月份的時刻（month-save）、城市的名字（dest-save）、
+// 實習的一屆（intern-term-save）、實習的一格（intern-task-save）。新增（還沒有 id）的那幾張表單還是按鈕，
+// 走下面 handle() 原本那幾個分支；存成功之後進入編輯就自動存。
+// 規矩：成功**不 render()**（人可能還在打字，畫面上已經是他打的字），只把 S 裡那一筆改成新值、欄位旁的小字變「存好了」、
+// 左下角 toast 一句；失敗也不 render、不清欄位，小字變「沒存進去」加一句錯在哪。
+// 驗證跟原本按鈕一樣（標題要有、五格要填），不過就當失敗處理，不送。
+// dirty：同一格的值沒變就不再送（離開欄位又停 800 毫秒會觸發兩次）。
+const dirty = UI.dirtyTracker();
+async function onAutosave(act, box, field) {
+  const v = UI.formValues(box), ds = box.dataset;
+  const fname = (field && field.name) || "", fval = fname ? v[fname] : undefined;
+  const key = act + ":" + (ds.id || ds.seq || ds.code || "") + ":" + fname;
+  if (fname && !dirty.changed(key, fval)) return;
+  const fail = msg => { UI.autosaveState(box, "failed"); UI.toast(msg); };
+  UI.autosaveState(box, "saving");
+  try {
+    let done = "";
+    if (act === "act-save") {
+      const a = { id: ds.id, month: v.month || S.actMonth, category: v.category, title_zh: v.title_zh, title_en: v.title_en,
+                  description: v.description, needs_host: !!v.needs_host, callback_to: String(v.callback_to || "").toUpperCase() };
+      if (!a.title_zh || !a.title_en) return fail(T("err.titles"));
+      await D.saveActivity(a);
+      const cur = S.pass.activities.find(x => x.id === a.id); if (cur) Object.assign(cur, a);
+      done = T("msg.actEdited", { t: a.title_zh });
+    } else if (act === "month-save") {
+      await D.saveMonthTheme(ds.seq, v.theme_zh, v.theme_en);
+      const cur = S.pass.months.find(x => String(x.seq) === ds.seq); if (cur) Object.assign(cur, { theme_zh: v.theme_zh, theme_en: v.theme_en });
+      done = T("msg.themeSaved", { m: UI.monthLabel(cur ? cur.month : ds.month) });
+    } else if (act === "dest-save") {
+      if (!v.city) return fail(T("err.cityBoth"));
+      await D.saveDestination(ds.code, v.city, ds.active !== "0");
+      const cur = S.pass.destinations.find(x => x.code === ds.code); if (cur) cur.city = v.city;
+      done = T("msg.cityEdited", { c: v.city });
+    } else if (act === "intern-term-save") {
+      const t = { id: ds.id, title_zh: v.title_zh, title_en: v.title_en, starts_on: v.starts_on, ends_on: v.ends_on };
+      if (!t.id || !t.title_zh || !t.title_en || !t.starts_on || !t.ends_on) return fail(T("err.termFive"));
+      await D.saveInternTerm(t);
+      const cur = S.intern.terms.find(x => x.id === t.id); if (cur) Object.assign(cur, t);
+      done = T("msg.termEdited", { t: t.title_zh });
+    } else if (act === "intern-task-save") {
+      const t = { id: ds.id, term: ds.term, seq: v.seq, category: v.category, title_zh: v.title_zh, title_en: v.title_en, description: v.description };
+      if (!t.id || !t.title_zh || !t.title_en) return fail(T("err.taskThree"));
+      await D.saveInternTask(t);
+      const cur = S.intern.tasks.find(x => x.id === t.id); if (cur) Object.assign(cur, { ...t, seq: Number(t.seq) || cur.seq });
+      done = T("msg.taskEdited", { t: t.title_zh });
+    } else return;
+    if (fname) dirty.mark(key, fval);
+    UI.autosaveState(box, "saved");
+    UI.toast(done);
+  } catch (err) { fail(T("err.save") + D.says(err)); }
 }
 
 // 哪一個分頁：不是 Co-President 的回到實習護照。側欄、上一頁、網址列改 # 都走這裡。
@@ -345,6 +400,7 @@ document.addEventListener("click", async e => {
     if (!a) { S.msg = T("err.noTask"); render(); return; }
     S.actEditing = a; S.actDraft = null; S.actMonth = a.month; S.view = "act-edit"; S.msg = ""; render(); return;
   }
+  // 2026-11-06 起這個分支只剩「加一格」（既有的格子改了就自動存，見 onAutosave）。
   if (act === "act-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const host = document.getElementById("ak-host");
@@ -390,6 +446,7 @@ document.addEventListener("click", async e => {
     if (!m) { S.msg = T("err.noMonth"); render(); return; }
     S.monthEditing = m; S.monthDraft = null; S.view = "month-edit"; S.msg = ""; render(); return;
   }
+  // 2026-11-06 起月份頁沒有鈕了（改了就自動存，見 onAutosave）。這個分支留著給測試與鍵盤：有人用舊畫面按到也照存。
   if (act === "month-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const d = { ...(S.monthEditing || {}), theme_zh: val("mk-zh"), theme_en: val("mk-en") };
@@ -409,6 +466,7 @@ document.addEventListener("click", async e => {
     if (!d) { S.msg = T("err.noCity"); render(); return; }
     S.destEditing = d; S.destDraft = null; S.view = "dest-edit"; S.msg = ""; render(); return;
   }
+  // 2026-11-06 起這個分支只剩「加一個城市」（既有的城市改名字就自動存，見 onAutosave）。
   if (act === "dest-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const d = { code: b.dataset.code || val("dk-code"), city: val("dk-city"), active: b.dataset.active !== "0" };
@@ -446,6 +504,7 @@ document.addEventListener("click", async e => {
     S.internTermEditing = S.intern.terms.find(t => t.id === id) || null; S.internTermDraft = null;
     S.view = "intern-term"; S.msg = ""; render(); return;
   }
+  // 2026-11-06 起這個分支只剩「開新的一屆」（既有的一屆改了就自動存，見 onAutosave）。
   if (act === "intern-term-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const t = { id: id || val("it-id"), title_zh: val("it-zh"), title_en: val("it-en"),
@@ -484,6 +543,7 @@ document.addEventListener("click", async e => {
     if (!t) { S.msg = T("err.noTask"); render(); return; }
     S.internTaskEditing = t; S.internTaskDraft = null; S.internTaskTerm = t.term; S.view = "intern-task"; S.msg = ""; render(); return;
   }
+  // 2026-11-06 起這個分支只剩「加一格」（既有的格子改了就自動存，見 onAutosave）。
   if (act === "intern-task-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const t = { id: id || val("ik-id"), term: b.dataset.term, seq: val("ik-seq"), category: val("ik-cat"),

@@ -133,7 +133,12 @@ test("領護照的表單沒有 team 那一格，而且說清楚誰看得到什�
   assert.ok(!h.includes('id="ft"'), "實習生不屬於任何 team，不該有 team 選單");
   assert.ok(h.includes("誰都看不到"));
   assert.ok(h.includes("領護照"));
-  assert.ok(setupHTML(PROFILE, { id: "u" }).includes("儲存"));
+  // 2026-11-06 自動儲存：有名字之後再開這張表單，沒有「儲存」鈕，欄位在 data-autosave 容器裡、旁邊是「改了就存」的小字。
+  const e = setupHTML(PROFILE, { id: "u" });
+  assert.match(e, /data-autosave="issue"/);
+  assert.match(e, /class="autosave" data-for="issue"/);
+  assert.equal(/data-act="issue"/.test(e), false, "編輯模式不該還有那顆鈕");
+  assert.ok(e.includes("回到護照"));
 });
 
 test("說明頁三張卡照 SLOT_ORDER，而且講了隱私界線", () => {

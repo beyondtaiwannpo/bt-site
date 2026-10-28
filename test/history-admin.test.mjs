@@ -95,14 +95,19 @@ test("清單：每一站有日期、標題、狀態、照片數；能編的人�
 test("一站：欄位、代號自動算的提示、照片卡（同意勾選、刪除、說明）、上傳格；狀態按鈕照角色", () => {
   const draft = SITE.historyEditHTML(M1, MKT, "", false, null);
   for (const id of ["hi-tzh", "hi-ten", "hi-szh", "hi-sen", "hi-bzh", "hi-ben", "hi-date", "hi-slug"]) assert.match(draft, new RegExp(`id="${id}"`), id);
-  assert.match(draft, /<input id="hi-date" type="date" value="2023-06-01"/);
-  assert.match(draft, /<input id="hi-slug" value="2023-first-college-bootcamp"/);
-  assert.match(draft, /data-act="hi-save" data-id="m1"/);
+  assert.match(draft, /<input id="hi-date" name="happened_on" type="date" value="2023-06-01"/);
+  assert.match(draft, /<input id="hi-slug" name="slug" value="2023-first-college-bootcamp"/);
+  // 2026-11-06 自動儲存：既有的一站沒有「存起來」鈕，八格在 data-autosave 容器裡，旁邊是那個小字。
+  assert.match(draft, /<div data-autosave="hi-save" data-id="m1">/); assert.doesNotMatch(draft, /data-act="hi-save"/);
+  assert.match(draft, /<span class="autosave" data-for="hi-save">/);
   assert.match(draft, /data-act="hi-ready" data-id="m1"/); assert.doesNotMatch(draft, /hi-publish/);
   assert.match(draft, /<input type="file" id="hi-file" accept="image\/\*"/);
-  assert.match(draft, /data-act="hi-ph-consent" data-id="p1" checked/);
   assert.match(draft, /data-act="hi-ph-del" data-id="p1"/);
-  assert.match(draft, /id="hi-ph-czh-p1" value="第一屆"/); assert.match(draft, /id="hi-ph-cen-p1" value="First camp"/);
+  // 照片說明兩格改了就存（容器是那張卡，data-id 是照片），同意勾選標 data-noauto（它本來就是勾了就送），「存照片說明」鈕沒有了。
+  assert.match(draft, /<div class="hi-photo-f" data-autosave="hi-ph-save" data-id="p1">/); assert.doesNotMatch(draft, /hi-ph-save"[^>]*>存/);
+  assert.match(draft, /data-act="hi-ph-consent" data-noauto="1" data-id="p1" checked/);
+  assert.match(draft, /<span class="autosave" data-for="hi-ph-save">/);
+  assert.match(draft, /id="hi-ph-czh-p1" name="caption_zh" value="第一屆"/); assert.match(draft, /id="hi-ph-cen-p1" name="caption_en" value="First camp"/);
   assert.match(draft, /<img[^>]*src="https:\/\/x\.supabase\.co\/storage\/v1\/object\/public\/history\/m1\/a\.jpg"[^>]*alt=""/, "照片不標名字，alt 留空");
   const ready = SITE.historyEditHTML({ ...M1, status: "ready" }, MKT, "", false, null);
   assert.match(ready, /data-act="hi-unready"/); assert.doesNotMatch(ready, /hi-publish/); assert.match(ready, /等 Co-President/);
@@ -121,10 +126,12 @@ test("一站：欄位、代號自動算的提示、照片卡（同意勾選、�
   // 不能編的人：唯讀、沒有上傳、沒有刪除、沒有存。
   const ro = SITE.historyEditHTML(M1, ASSOC, "", false, null);
   assert.doesNotMatch(ro, /hi-file/); assert.doesNotMatch(ro, /hi-ph-del/); assert.doesNotMatch(ro, /hi-save/); assert.doesNotMatch(ro, /hi-ready/);
-  assert.match(ro, /<input id="hi-tzh" value="第一屆探索營，超過 80 人" readonly/);
-  // 新的一站：沒有照片區（要先存才有 id 可以掛照片），存的按鈕沒有 data-id。
+  assert.doesNotMatch(ro, /data-autosave/, "不能編的人沒有自動儲存的容器");
+  assert.match(ro, /<input id="hi-tzh" name="title_zh" value="第一屆探索營，超過 80 人" readonly/);
+  // 新的一站：沒有照片區（要先存才有 id 可以掛照片），留一顆「存起來」鈕（沒有 data-id），不自動存；「先存一次」那句只在這裡。
   const fresh = SITE.historyEditHTML(null, MKT, "", false, null);
   assert.match(fresh, /data-act="hi-save" data-id=""/); assert.doesNotMatch(fresh, /hi-file/); assert.match(fresh, /先存一次/);
+  assert.doesNotMatch(fresh, /data-autosave/); assert.doesNotMatch(draft, /先存一次/);
   // 上傳中：進度條。
   const up = SITE.historyEditHTML(M1, MKT, "", true, { pct: 40, name: "IMG_1.jpg" });
   assert.match(up, /<progress[^>]*value="40"[^>]*max="100"/); assert.match(up, /IMG_1\.jpg/);

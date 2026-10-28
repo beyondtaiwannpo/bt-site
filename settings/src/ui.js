@@ -131,45 +131,46 @@ export function settingsHTML(me, msg, busy, story) {
   const teller = cadre || alumni;                // 誰有「我的故事」
   const named = teller || intern;                // 誰的「我的資料」是中英文名兩格
   const v = k => esc(me[k] || "");
+  // 2026-11-06 自動儲存：整頁那顆「存起來」拿掉了，改成兩個各自會存的區塊。
+  //   - data-autosave="profile"：「我的資料」加大頭照那一區的公開勾選（存進 profiles）。
+  //   - data-autosave="story"：「我的故事」（存進 alumni_stories，另一張表，另一個請求）。
+  // 分成兩個容器的理由：改一個名字不該連故事那張表也送一次。大頭照上傳與刪帳號仍然是按鈕
+  //（上傳是「丟東西」、刪帳號是不可逆的）。busy 這個參數留著不用，呼叫的地方與測試都還傳它。
   return `<div class="card">
     <h2>${T("s.title")}</h2>
     <div class="sub">${esc(me.email || "")}</div>
     ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
 
     ${langSwitchHTML()}
+    <div data-autosave="profile" data-id="${esc(me.id || "")}">
     <h3 class="sec-h">${T("s.me")}</h3>
     ${named ? `<div class="two">
-      <label><i>${T("s.nameZh")}</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
-      <label><i>${T("s.nameEn")}</i><input id="nen" value="${v("name_en")}" autocomplete="name"></label>
+      <label><i>${T("s.nameZh")}</i><input id="nzh" name="name_zh" value="${v("name_zh")}" autocomplete="name"></label>
+      <label><i>${T("s.nameEn")}</i><input id="nen" name="name_en" value="${v("name_en")}" autocomplete="name"></label>
     </div>
     ${cadre ? teamPickHTML(me.team) : ""}`
-    : `<label><i>${T("s.name")}</i><input id="nzh" value="${v("name_zh")}" autocomplete="name"></label>
+    : `<label><i>${T("s.name")}</i><input id="nzh" name="name_zh" value="${v("name_zh")}" autocomplete="name"></label>
     <div class="two">
-      <label><i>${T("s.school")}</i><input id="school" list="schools" value="${v("school")}"
+      <label><i>${T("s.school")}</i><input id="school" name="school" list="schools" value="${v("school")}"
         autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
         placeholder="${esc(T("s.schoolPh"))}"></label>
-      <label><i>${T("s.grade")}</i><select id="grade">
+      <label><i>${T("s.grade")}</i><select id="grade" name="grade">
         <option value="">${T("s.pick")}</option>
         ${GRADES.map(g => `<option value="${esc(g)}"${me.grade === g ? " selected" : ""}>${esc(gradeLabel(g))}</option>`).join("")}
       </select></label>
     </div>
     <datalist id="schools"></datalist>
     <label class="check">
-      <input id="nl" type="checkbox"${me.newsletter_opt_in ? " checked" : ""}>
+      <input id="nl" name="newsletter_opt_in" type="checkbox"${me.newsletter_opt_in ? " checked" : ""}>
       <span>${T("s.newsletter")}</span>
     </label>`}
 
     ${named ? avatarHTML(me, cadre, intern) : ""}
-    ${teller ? storyHTML(me, story) : ""}
-
-    <!-- 2026-09-10：儲存列。Paul 的原話：「下面的存起來現在看起來不像整頁的儲存按鈕，
-         比較像大頭照那邊的」——他是對的，它原本就緊貼在大頭照那一塊底下，
-         看起來像那一區的按鈕。現在它自己是一條橫跨整張卡片的列，
-         上面一條線把它跟上面的內容分開，旁邊一句話說清楚它存的是整頁。 -->
-    <div class="saverow">
-      <button class="btn" data-act="save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("s.save")}</button>
-      <span class="savenote">${T("s.saveNote")}</span>
+    <div class="autorow">${autosaveHint("profile")}<span class="savenote">${T("s.autoNote")}</span></div>
     </div>
+    ${teller ? `<div data-autosave="story" data-id="${esc(me.id || "")}">${storyHTML(me, story)}
+    <div class="autorow">${autosaveHint("story")}</div>
+    </div>` : ""}
 
     ${cadre ? `<h3 class="sec-h">${T("s.passport")}</h3>
     <p class="sec-note">${T("s.passportNote")}</p>
@@ -236,11 +237,17 @@ function avatarHTML(me, cadre, intern) {
       </div>
     </div>
     <label class="check">
-      <input id="pub" type="checkbox"${on ? " checked" : ""}>
+      <input id="pub" name="public_profile" type="checkbox"${on ? " checked" : ""}>
       <span>${T("av.consent")}</span>
     </label>
-    ${on ? `<p class="sec-note">${me.title ? T("av.titleIs", { title: esc(me.title) }) : T("av.noTitle")}</p>
-    <p class="sec-note">${me.public_approved ? T("av.approved") : T("av.pending")}</p>` : ""}`;
+    <p class="sec-note" data-pub-note>${pubNote(me)}</p>`;
+}
+
+// 公開勾選底下那兩句（頭銜、核可了沒）。2026-11-06 起勾了就自動存、不重畫整頁，
+// 所以這一段獨立出來，存好之後 main.js 只換這一段的字（data-pub-note）。沒勾就是空字串。
+export function pubNote(me) {
+  if (!me.public_profile) return "";
+  return `${me.title ? T("av.titleIs", { title: esc(me.title) }) : T("av.noTitle")}<br>${me.public_approved ? T("av.approved") : T("av.pending")}`;
 }
 
 // 「我的故事」。幹部與校友都有，學員沒有（高中生還沒出發）。
@@ -253,44 +260,44 @@ export function storyHTML(me, story) {
   const on = !!s.public_story;
   return `<h3 class="sec-h">${T("st.title")}</h3>
     <p class="sec-note">${T("st.lede")}</p>
-    <label><i>${T("st.name")}</i><input id="sname" value="${v("display_name")}"
+    <label><i>${T("st.name")}</i><input id="sname" name="display_name" value="${v("display_name")}"
       placeholder="${esc(me.name_zh || me.name_en || "")}">
       </label>
     <p class="sec-note">${T("st.nameNote")}</p>
     <div class="two">
-      <label><i>${T("st.school")}</i><input id="sschool" list="schools" value="${v("school")}"
+      <label><i>${T("st.school")}</i><input id="sschool" name="school" list="schools" value="${v("school")}"
         autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
         placeholder="${esc(T("s.schoolPh"))}"></label>
-      <label><i>${T("st.county")}</i><select id="scounty">
+      <label><i>${T("st.county")}</i><select id="scounty" name="county">
         <option value="">${T("s.pick")}</option>
         ${COUNTIES.map(c => `<option${s.county === c ? " selected" : ""}>${esc(c)}</option>`).join("")}
       </select></label>
     </div>
     <p class="sec-note">${T("st.countyNote")}</p>
     <div class="two">
-      <label><i>${T("st.city")}</i><input id="scity" value="${v("city")}" placeholder="Vancouver"></label>
-      <label><i>${T("st.country")}</i><input id="scountry" value="${v("country")}" placeholder="${esc(T("st.countryPh"))}"></label>
+      <label><i>${T("st.city")}</i><input id="scity" name="city" value="${v("city")}" placeholder="Vancouver"></label>
+      <label><i>${T("st.country")}</i><input id="scountry" name="country" value="${v("country")}" placeholder="${esc(T("st.countryPh"))}"></label>
     </div>
-    <label><i>${T("st.place")}</i><input id="splace" value="${v("place")}" placeholder="UBC"></label>
-    <label><i>${T("st.quote")}</i><input id="squote" value="${v("quote")}"
+    <label><i>${T("st.place")}</i><input id="splace" name="place" value="${v("place")}" placeholder="UBC"></label>
+    <label><i>${T("st.quote")}</i><input id="squote" name="quote" value="${v("quote")}"
       placeholder="${esc(T("st.quotePh"))}"></label>
     <p class="sec-note">${T("st.quoteNote")}</p>
-    <label><i>${T("st.note")}</i><input id="snote" value="${v("note")}"
+    <label><i>${T("st.note")}</i><input id="snote" name="note" value="${v("note")}"
       placeholder="${esc(T("st.notePh"))}"></label>
     <details class="enfold"><summary>${T("st.en")}</summary>
       <p class="sec-note">${T("st.enNote")}</p>
       <div class="two">
-        <label><i>${T("st.schoolEn")}</i><input id="sschoolen" value="${v("school_en")}"></label>
-        <label><i>${T("st.countryEn")}</i><input id="scountryen" value="${v("country_en")}"></label>
+        <label><i>${T("st.schoolEn")}</i><input id="sschoolen" name="school_en" value="${v("school_en")}"></label>
+        <label><i>${T("st.countryEn")}</i><input id="scountryen" name="country_en" value="${v("country_en")}"></label>
       </div>
-      <label><i>${T("st.quoteEn")}</i><input id="squoteen" value="${v("quote_en")}"></label>
-      <label><i>${T("st.noteEn")}</i><input id="snoteen" value="${v("note_en")}"></label>
+      <label><i>${T("st.quoteEn")}</i><input id="squoteen" name="quote_en" value="${v("quote_en")}"></label>
+      <label><i>${T("st.noteEn")}</i><input id="snoteen" name="note_en" value="${v("note_en")}"></label>
     </details>
     <label class="check">
-      <input id="spub" type="checkbox"${on ? " checked" : ""}>
+      <input id="spub" name="public_story" type="checkbox"${on ? " checked" : ""}>
       <span>${T("st.consent")}</span>
     </label>
-    <p class="sec-note">${esc(storyStatus(s))}</p>`;
+    <p class="sec-note" data-story-status>${esc(storyStatus(s))}</p>`;
 }
 
 // 刪除帳號的確認。**打字確認，不是按兩次。**
@@ -333,4 +340,115 @@ export function downHTML() {
     <div class="wnote big" style="margin-top:16px">${T("down.lede")}</div>
     <div class="row"><button class="btn ghost" data-act="retry">${T("common.retry")}</button></div>
   </div>`;
+}
+
+// toast（2026-11-06 自動儲存）：畫面底下一小條字，掛在 <body> 上不在 #bt-root 裡，所以重畫不會洗掉它。
+// 自動存的結果走這裡而不是卡片最上面那條 wnote：那條要 render() 才看得到，
+// 而自動存的時候**不重畫**（使用者可能還在打字，重畫會把他的游標與剛打的字洗掉）。
+// 跟 passport/src/main.js 的 toast 同一個形狀，CSS 在 index.html 的 .toast。
+let toastT;
+export function toast(msg) {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll(".toast").forEach(n => n.remove());
+  const d = document.createElement("div");
+  d.className = "toast"; d.textContent = msg; d.setAttribute("role", "status");
+  document.body.appendChild(d);
+  clearTimeout(toastT);
+  toastT = setTimeout(() => d.remove(), 4000);
+}
+
+// ── 自動儲存（2026-11-06，Paul：「希望每一格都像 Workspaces 那一頁一樣，改了就存」）。四份一模一樣（測試逐字比對）。 ──
+// 規矩：打字的欄位（text、textarea）停 800 毫秒或離開欄位就存；選的（select、checkbox、radio、date）改了馬上存。
+// 存的時候左下角照樣是 toast（存好了／存不起來），欄位旁邊多一個小字「存檔中…／存好了」。
+// 存失敗**不重畫**，剛打的字留在格子裡，再改一下就會再存一次。
+// 還留著按鈕的只有會「送出去、丟東西、花錢」的動作：上架與下架、標成可以用、移出成員、結束這一屆、刪掉、寄邀請、排會議、上傳。
+//
+// 怎麼接（每一個表單三步）：
+//   1. ui.js：表單的容器加 data-autosave="<act>"（加 data-id 之類的辨識），欄位要有 name；拿掉「存起來」那顆鈕，
+//      放 <span class="autosave" data-for="<act>">改了就存</span>（autosaveHint()）。
+//   2. main.js：boot 時 UI.bindAutosave(root(), onAutosave) 一次；onAutosave(act, box, field) 讀 UI.formValues(box) 去存。
+//   3. 存的時候 UI.autosaveState(box, "saving") → 成功 "saved" 加 toast → 失敗 "failed" 加錯誤 toast，**不 render()**。
+export function debounce(fn, ms) {
+  let t = null;
+  const d = (...a) => { clearTimeout(t); t = setTimeout(() => { t = null; fn(...a); }, ms); };
+  d.flush = (...a) => { clearTimeout(t); t = null; fn(...a); };
+  d.cancel = () => { clearTimeout(t); t = null; };
+  return d;
+}
+export const AUTOSAVE_MS = 800;
+// 這一格要怎麼存："now"（選的）、"typed"（打字的）、null（不在 data-autosave 容器裡、或標了 data-noauto）。
+export function saveMode(el) {
+  if (!el || !el.closest || !el.closest("[data-autosave]")) return null;
+  if (el.dataset && el.dataset.noauto) return null;
+  const tag = String(el.tagName || "").toUpperCase(), type = String(el.type || "").toLowerCase();
+  if (tag === "SELECT") return "now";
+  if (tag === "TEXTAREA") return "typed";
+  if (tag !== "INPUT") return null;
+  if (["checkbox", "radio", "date", "time", "datetime-local", "month", "week", "color", "range", "number"].includes(type)) return "now";
+  if (["button", "submit", "file", "hidden", "reset", "image"].includes(type)) return null;
+  return "typed";
+}
+// 記每一格最後存成功的值，一樣就不再送一次（離開欄位又停 800 毫秒會觸發兩次）。
+export function dirtyTracker() {
+  const last = new Map();
+  return {
+    changed: (key, value) => !last.has(key) || last.get(key) !== value,
+    mark: (key, value) => { last.set(key, value); },
+    forget: key => { last.delete(key); },
+  };
+}
+// 容器裡每一格讀成 { name: value }：文字去頭尾空白、checkbox 是布林、radio 取選到的、沒有 name 的不讀。
+export function formValues(box) {
+  const out = {};
+  for (const f of box.querySelectorAll("input, select, textarea")) {
+    const name = f.name || (f.dataset && f.dataset.name) || "";
+    if (!name) continue;
+    const type = String(f.type || "").toLowerCase();
+    if (type === "checkbox") out[name] = !!f.checked;
+    else if (type === "radio") { if (f.checked) out[name] = f.value; else if (!(name in out)) out[name] = out[name]; }
+    else out[name] = typeof f.value === "string" ? f.value.trim() : f.value;
+  }
+  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
+  return out;
+}
+export function autosaveHint(act, extra) { return `<span class="autosave" data-for="${esc(act)}"${extra ? ` ${extra}` : ""}>${esc(T("auto.hint"))}</span>`; }
+// 欄位旁邊那個小字：saving → 「存檔中…」、saved → 「存好了」（兩秒後回到「改了就存」）、failed → 「沒存進去…」。
+export function autosaveState(box, state) {
+  if (!box || !box.querySelector) return;
+  const el = box.querySelector(".autosave");
+  if (!el) return;
+  clearTimeout(el._t);
+  el.classList.remove("saving", "saved", "failed");
+  if (state === "saving") { el.classList.add("saving"); el.textContent = T("auto.saving"); }
+  else if (state === "saved") { el.classList.add("saved"); el.textContent = T("auto.saved"); el._t = setTimeout(() => { el.classList.remove("saved"); el.textContent = T("auto.hint"); }, 2000); }
+  else if (state === "failed") { el.classList.add("failed"); el.textContent = T("auto.failed"); }
+  else el.textContent = T("auto.hint");
+}
+// 掛一次在 #bt-root 上（它不會被換掉，裡面的 innerHTML 才會）。onSave(act, box, field) 回 Promise。
+// 同一個容器一次只跑一個存檔；跑的時候又改了，跑完再存一次（不丟掉後面那一次改動）。
+export function bindAutosave(root, onSave) {
+  if (!root || typeof document === "undefined" || root.dataset.autosave === "1") return;
+  root.dataset.autosave = "1";
+  const timers = new Map(), running = new Map(), again = new Map();
+  const run = async (box, field) => {
+    const act = box.dataset.autosave;
+    if (running.get(box)) { again.set(box, field); return; }
+    running.set(box, true);
+    try { await onSave(act, box, field); }
+    finally {
+      running.delete(box);
+      const f = again.get(box);
+      if (f) { again.delete(box); run(box, f); }
+    }
+  };
+  const schedule = (field, now) => {
+    const box = field.closest("[data-autosave]");
+    if (!box) return;
+    let d = timers.get(box);
+    if (!d) { d = debounce(f => run(box, f), AUTOSAVE_MS); timers.set(box, d); }
+    if (now) d.flush(field); else d(field);
+  };
+  root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });
+  root.addEventListener("change", e => { const m = saveMode(e.target); if (m === "now") schedule(e.target, true); else if (m === "typed") schedule(e.target, true); });
+  root.addEventListener("focusout", e => { const m = saveMode(e.target); if (m === "typed") { const d = timers.get(e.target.closest("[data-autosave]")); if (d) d.flush(e.target); } });
 }

@@ -24,6 +24,7 @@ export const COMMON = {
   // 版本提示與自動儲存（2026-11-06）。九份 strings.js 的 COMMON 要一模一樣（test/lang.test.mjs、test/admin-hub.test.mjs 逐字比對）。
   "ver.newer":        { zh: "網站有新版本了，重新整理一下就會換成新的。", en: "A newer version is live. Reload to get it." },
   "ver.reload":       { zh: "重新整理", en: "Reload" },
+  "ver.tag":          { zh: "更新", en: "Update" },
   "auto.saving":      { zh: "存檔中…", en: "Saving…" },
   "auto.saved":       { zh: "存好了", en: "Saved" },
   "auto.hint":        { zh: "改了就存", en: "saves as you change it" },
@@ -102,7 +103,8 @@ export const MINE = {
   // 申請／編輯護照資料
   "setup.edit":       { zh: "編輯護照資料", en: "Edit passport details" },
   "setup.apply":      { zh: "申請你的 BT 護照", en: "Get your BT passport" },
-  "setup.editSub":    { zh: "改完按儲存，章不會消失。", en: "Press Save when you are done. Your stamps stay." },
+  "setup.editSub":    { zh: "改了哪一格就存哪一格，不用按儲存，章不會消失。", en: "Each field saves as you change it. No Save button, and your stamps stay." },
+  "setup.done":       { zh: "回到護照", en: "Back to the passport" },
   "setup.applySub":   { zh: "一年 33 格，每個月三個。蓋滿的人，年底會有一整本回憶。", en: "33 boxes a year, three a month. Fill them all and you have a whole book of memories by the end of the year." },
   "setup.nameZh":     { zh: "中文名 / Name", en: "Chinese name" },
   "setup.nameEn":     { zh: "英文名 / Name in English（會印在機讀碼上）", en: "English name (printed in the machine-readable zone)" },

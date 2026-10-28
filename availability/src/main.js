@@ -303,6 +303,95 @@ function syncWeekMine() {
   S.weekTouched = false;
 }
 
+// ── 自動儲存（2026-11-06，Paul：「希望每一格都像 Workspaces 那一頁一樣，改了就存」）──
+// 格子是點一下切換，而且一次會連點很多格，所以不是每一下都存：點了之後 800 毫秒沒再點就存一次
+//（UI.debounce，跟後台欄位的停頓時間同一個數字）。套用整段、複製整天那種批次動作也走同一條。
+// 「儲存」鈕沒有了，底下那行小字（.autosave）顯示存檔中／存好了／沒存進去，結果那一句仍然寫在 S.mineMsg
+// 那個位置（.mini），但**不 render()**：336 個格子重畫會讓捲動位置跳掉，使用者正在格線中間微調。
+//
+// 兩條規矩：
+//   1. 一次只跑一個存檔；跑的時候又點了格子，跑完再存一次（不丟掉後面那一次改動）。
+//      saveMine / saveWeek 是算差集寫入的，兩個重疊著跑會把同一格寫兩次（主鍵撞到就報錯）。
+//   2. 換模式、翻週、換分頁、取消某一週、登出之前先把還沒存的存完（flushSave）。
+//      存的是哪一份表（平常的 S.mine 還是某一週的 S.weekMine）在開始存的那一刻就定下來，
+//      存完回來只動那一份對應的東西，不碰使用者已經切過去的另一份。
+let savePending = false, saveRunning = null, saveAgain = false;
+const saveDebounced = UI.debounce(() => { savePending = false; saveNow(); }, UI.AUTOSAVE_MS);
+function scheduleSave() { savePending = true; saveDebounced(); }
+async function flushSave() {
+  if (savePending) { savePending = false; saveDebounced.cancel(); await saveNow(); }
+  else if (saveRunning) await saveRunning;
+}
+const mineBox = () => document.querySelector('[data-autosave="save"]');
+function sayMine(text) {
+  S.mineMsg = text;
+  const box = mineBox();
+  const el = box && box.querySelector(".mini");
+  if (el) el.textContent = text;
+}
+function saveNow() {
+  if (saveRunning) { saveAgain = true; return saveRunning; }
+  saveRunning = (async () => {
+    try { await saveOnce(); }
+    finally {
+      saveRunning = null;
+      if (saveAgain) { saveAgain = false; saveNow(); }
+    }
+  })();
+  return saveRunning;
+}
+async function saveOnce() {
+  if (!S.user) return;
+  readBatch();
+  UI.autosaveState(mineBox(), "saving");
+  // 「某一週」模式存的是 availability_week，不是 availability，
+  // 走完全不同的一支（差集也是另外兩份 Set）。
+  if (S.mineMode === "week") {
+    const wk = weekKeyOf(S.weekStart, S.myTz);
+    const wanted = new Set(S.weekMine), current = new Set(S.weekSaved);
+    try {
+      const r = await DATA.saveWeek(S.user.id, wk, wanted, current);
+      // 還停在同一週才動 weekSaved；翻走了的話那一份已經是別週的。
+      if (S.mineMode === "week" && weekKeyOf(S.weekStart, S.myTz) === wk) S.weekSaved = new Set(wanted);
+      S.weekMarksMine.add(wk);
+      // 團隊看板讀 S.weekSlots / S.weekMarks（全部人的那一份），
+      // 存好也要一起同步，不然要重新整頁才看得到自己剛存的例外。
+      if (!S.weekSlots.has(S.user.id)) S.weekSlots.set(S.user.id, new Map());
+      S.weekSlots.get(S.user.id).set(wk, new Set(wanted));
+      if (!S.weekMarks.has(S.user.id)) S.weekMarks.set(S.user.id, new Set());
+      S.weekMarks.get(S.user.id).add(wk);
+      // 剛存的是某一週，平常的時間有沒有還沒存是另一件事 ——
+      // 重新問一次兩邊是不是還一樣，不能直接寫 false。
+      recomputeDirty();
+      UI.autosaveState(mineBox(), "saved");
+      sayMine(r.add || r.del ? T("m.savedDiff", { a: r.add, d: r.del }) : T("m.noChange"));
+    } catch (err) {
+      console.error("某一週存檔失敗：", err);
+      S.dirty = true;
+      UI.autosaveState(mineBox(), "failed");
+      sayMine(DATA.authMessage(err));
+    }
+    return;
+  }
+  const wanted = new Set(S.mine), current = new Set(S.saved);
+  try {
+    const r = await DATA.saveMine(S.user.id, wanted, current);
+    S.saved = new Set(wanted);
+    S.slots.set(S.user.id, new Set(wanted));
+    // 反過來同一個道理：剛存的是平常的時間，某一週那邊有沒有還沒存要重新問一次。
+    recomputeDirty();
+    const me = S.members.find(m => m.id === S.user.id);
+    if (me) me.updatedAt = new Date().toISOString();
+    UI.autosaveState(mineBox(), "saved");
+    sayMine(r.add || r.del ? T("m.savedDiff", { a: r.add, d: r.del }) : T("m.noChange"));
+  } catch (err) {
+    console.error("存檔失敗：", err);
+    S.dirty = true;
+    UI.autosaveState(mineBox(), "failed");
+    sayMine(DATA.authMessage(err));
+  }
+}
+
 // ── 事件 ────────────────────────────────────────────────────────────
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
@@ -311,8 +400,8 @@ document.addEventListener("click", async e => {
 
   if (act === "retry") { location.reload(); return; }
   // 頂欄的登出。這一頁之前沒有登出（只有「回入口」），現在頂欄有了就要接。
-  if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
-  if (act === "tab") { S.tab = b.dataset.t; S.peek = null; S.mineScrolled = false; render(); return; }
+  if (act === "signout") { await flushSave(); await AUTH.signOut(); location.replace("../app/"); return; }
+  if (act === "tab") { await flushSave(); S.tab = b.dataset.t; S.peek = null; S.mineScrolled = false; render(); return; }
   // team 篩選。**彈窗要一起關掉** —— 它裡面那份「有空／沒空」是用舊的篩選算的，
   // 留著的話畫面上會同時有兩種篩選的結果，而且看不出來哪一份是舊的。
   if (act === "team") { S.team = b.dataset.team || ""; S.peek = null; render(); return; }
@@ -329,6 +418,7 @@ document.addEventListener("click", async e => {
       render(); return;
     }
     S.msg = "";
+    await flushSave();     // 正在編某一週而且還沒存的，先存完再翻週
     setWeek(next);
     // 兩個分頁共用同一個 handler、同一份 S.weekStart（Paul 2026-09-12 裁定，
     // 不依分頁分流）：翻週的時候如果正在編某一週，起點要跟著換到新的那一週。
@@ -373,6 +463,7 @@ document.addEventListener("click", async e => {
 
   // 「我的時間」的兩個模式：平常的時間 ／ 某一週。
   if (act === "mine-mode") {
+    await flushSave();     // 還沒存的先存完再換模式，不然等一下存的是另一份表
     S.mineMode = b.dataset.m; S.mineMsg = "";
     // 換了模式就是換了一份表，捲動要重新對位。
     S.mineScrolled = false;
@@ -387,6 +478,7 @@ document.addEventListener("click", async e => {
   // 不限於現在正在看的那一週。
   if (act === "clear-week") {
     if (S.busy) return;
+    await flushSave();
     const wk = b.dataset.w;
     S.busy = true; S.mineMsg = ""; render();
     try {
@@ -438,7 +530,7 @@ document.addEventListener("click", async e => {
     const n = r.changed;
     S.dirty = true;
     S.mineMsg = T(add ? "m.added" : "m.removed", { n });
-    render(); return;
+    render(); scheduleSave(); return;
   }
 
   if (act === "copyday") {
@@ -450,7 +542,7 @@ document.addEventListener("click", async e => {
     setMineTarget(r.set);
     S.dirty = true;
     S.mineMsg = T("m.copied", { n: r.changed });
-    render(); return;
+    render(); scheduleSave(); return;
   }
 
   // 單格微調**不整頁重畫**：336 個格子重畫會讓捲動位置跳掉，
@@ -463,58 +555,11 @@ document.addEventListener("click", async e => {
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", String(on));
     S.dirty = true;
-    const save = document.querySelector('[data-act="save"]');
-    if (save) { save.disabled = false; save.textContent = T("mn.save"); }
+    scheduleSave();
     return;
   }
 
-  if (act === "save") {
-    readBatch();
-    // 「某一週」模式存的是 availability_week，不是 availability，
-    // 走完全不同的一支（差集也是另外兩份 Set）。
-    if (S.mineMode === "week") {
-      const wk = weekKeyOf(S.weekStart, S.myTz);
-      b.disabled = true; b.textContent = T("m.savingBtn");
-      try {
-        const r = await DATA.saveWeek(S.user.id, wk, S.weekMine, S.weekSaved);
-        S.weekSaved = new Set(S.weekMine);
-        S.weekMarksMine.add(wk);
-        // 團隊看板讀 S.weekSlots / S.weekMarks（全部人的那一份），
-        // 存好也要一起同步，不然要重新整頁才看得到自己剛存的例外。
-        if (!S.weekSlots.has(S.user.id)) S.weekSlots.set(S.user.id, new Map());
-        S.weekSlots.get(S.user.id).set(wk, new Set(S.weekMine));
-        if (!S.weekMarks.has(S.user.id)) S.weekMarks.set(S.user.id, new Set());
-        S.weekMarks.get(S.user.id).add(wk);
-        // 剛存的是某一週，平常的時間有沒有還沒存是另一件事 ——
-        // 重新問一次 S.mine 跟 S.saved 是不是還一樣，不能直接寫 false，
-        // 不然平常那邊沒存的編輯會被這次存檔悄悄標成「已儲存」。
-        S.dirty = !setsEqual(S.mine, S.saved);
-        S.mineMsg = r.add || r.del ? T("m.savedDiff", { a: r.add, d: r.del }) : T("m.noChange");
-      } catch (err) {
-        console.error("某一週存檔失敗：", err);
-        S.mineMsg = DATA.authMessage(err);
-        S.dirty = true;
-      }
-      render(); return;
-    }
-    b.disabled = true; b.textContent = T("m.savingBtn");
-    try {
-      const r = await DATA.saveMine(S.user.id, S.mine, S.saved);
-      S.saved = new Set(S.mine);
-      S.slots.set(S.user.id, new Set(S.mine));
-      // 反過來同一個道理：剛存的是平常的時間，某一週那邊有沒有還沒存
-      // 要重新問一次，不能直接寫 false（見上面那一支的註解）。
-      S.dirty = S.weekTouched && !setsEqual(S.weekMine, S.weekSaved);
-      S.mineMsg = r.add || r.del ? T("m.savedDiff", { a: r.add, d: r.del }) : T("m.noChange");
-      const me = S.members.find(m => m.id === S.user.id);
-      if (me) me.updatedAt = new Date().toISOString();
-    } catch (err) {
-      console.error("存檔失敗：", err);
-      S.mineMsg = DATA.authMessage(err);
-      S.dirty = true;
-    }
-    render(); return;
-  }
+  // 2026-11-06：「儲存」鈕沒有了，存檔走上面的 saveNow()（點格子之後 800 毫秒沒再動就存）。
 
   if (act === "confirm-same") {
     // 一樣會打網路，一樣要先講話再等。

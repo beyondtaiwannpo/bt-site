@@ -47,12 +47,12 @@ test("清單：照狀態分段（準備好了、草稿、在對外頁上、過�
 test("一場活動：草稿時「管」有準備好了、ready 時 senior 有放上對外頁而「管」只看到等一句、published 有撤下與看對外頁；「看」的人唯讀；報名入口三個", () => {
   const draft = F.eventEditHTML(EV, FORM, 3, DIR, "", false);
   assert.match(draft, /data-act="ev-ready" data-id="e1"/); assert.doesNotMatch(draft, /ev-publish/);
-  assert.match(draft, /<input id="ev-cover" value="https:\/\/drive.google.com\/cover.jpg"/); assert.match(draft, /id="ev-consent" checked/);
+  assert.match(draft, /<input id="ev-cover" name="cover_url" value="https:\/\/drive.google.com\/cover.jpg"/); assert.match(draft, /id="ev-consent" name="cover_consent" checked/);
   assert.match(draft, /<img class="ev-cover" src="https:\/\/drive.google.com\/cover.jpg"/);
   assert.match(draft, /data-act="open-form" data-id="f1"/); assert.match(draft, /data-act="open-apps" data-id="f1">報名的人：3<\/a> \/ 40/);
   assert.match(draft, /data-act="open-checkin" data-id="f1"/); assert.match(draft, /data-act="open-notice" data-id="f1"/);
   assert.match(draft, /data-act="members-open" data-ws="custom:event-winter-camp-2027"/);
-  assert.match(draft, /data-act="ev-save" data-id="e1"/);
+  assert.match(draft, /data-autosave="ev-save" data-id="e1"/); assert.match(draft, /class="autosave" data-for="ev-save"/, "2026-11-06 起內容改了就存，沒有存起來那顆鈕"); assert.doesNotMatch(draft, /data-act="ev-save"/);
   const ready = { ...EV, status: "ready" };
   assert.match(F.eventEditHTML(ready, FORM, 0, DIR, "", false), /等 Co-President 放上去/);
   assert.doesNotMatch(F.eventEditHTML(ready, FORM, 0, DIR, "", false), /ev-publish/, "「管」自己放不上去");
@@ -61,9 +61,9 @@ test("一場活動：草稿時「管」有準備好了、ready 時 senior 有放
   const live = F.eventEditHTML({ ...EV, status: "published" }, FORM, 0, PRES, "", false);
   assert.match(live, /data-act="ev-unpublish"/); assert.match(live, /href="\/events\/\?e=winter-camp-2027"/);
   const view = F.eventEditHTML(EV, FORM, 0, ASSOC, "", false);
-  assert.match(view, /<input id="ev-tzh" value="2027 冬令營" readonly/); assert.doesNotMatch(view, /ev-save|ev-ready|members-open/); assert.match(view, /改不動/);
+  assert.match(view, /<input id="ev-tzh" name="title_zh" value="2027 冬令營" readonly/); assert.doesNotMatch(view, /ev-save|ev-ready|members-open/); assert.match(view, /改不動/);
   const editor = F.eventEditHTML(EV, FORM, 0, EDITOR, "", false);
-  assert.match(editor, /data-act="ev-save"/); assert.doesNotMatch(editor, /ev-ready/, "「改」存得了但按不了準備好了");
+  assert.match(editor, /data-autosave="ev-save"/); assert.doesNotMatch(editor, /ev-ready/, "「改」存得了但按不了準備好了");
   assert.match(F.eventEditHTML({ ...EV, form_id: null }, null, null, DIR, "", false), /這場不開放報名/);
 });
 
@@ -98,5 +98,5 @@ test("封面網址像不像一張圖（存檔前先擋）：空的可以、https
   for (const ok of ["", "https://x/y.jpg", "https://x/y.PNG?w=800", "https://x/a/b.webp", "https://drive.google.com/uc?id=abc", "https://drive.google.com/file/d/abc/view", "https://lh3.googleusercontent.com/d/abc", "https://res.cloudinary.com/bt/image/upload/v1/a.jpg", "https://images.unsplash.com/photo-1"]) assert.ok(F.evCoverOk(ok), ok);
   for (const bad of ["http://x/y", "https://drive.google.com/drive/folders/abc", "https://x/page.html", "ftp://x/y.jpg", "x.jpg", "https://docs.google.com/document/d/abc"]) assert.ok(!F.evCoverOk(bad), bad);
   const m = readFileSync("admin/src/main.js", "utf8");
-  assert.match(m, /if \(!UI\.evCoverOk\(patch\.cover_url\)\) \{ S\.msg = T\("err\.evCover"\)/);
+  assert.match(m, /if \(!UI\.evCoverOk\(patch\.cover_url\)\) return fail\(T\("err\.evCover"\)\)/, "2026-11-06 起封面那一關在 onAutosave 裡擋");
 });

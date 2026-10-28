@@ -165,7 +165,7 @@ export function toast(msg, undo, opts) {
   for (const t of box.children) if (t.dataset.text === String(msg)) return t;
   const el = document.createElement("div");
   el.className = "toast " + kind; el.dataset.text = String(msg); el.setAttribute("role", kind === "err" ? "alert" : "status");
-  el.innerHTML = `<span class="toast-k">${kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
+  el.innerHTML = `<span class="toast-k">${opts && opts.tag ? esc(opts.tag) : kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
     u ? `<button type="button" class="toast-undo">${esc(u.label)}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
   const gone = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
   el.querySelector(".toast-x").addEventListener("click", gone);
@@ -351,7 +351,7 @@ export async function checkVersion(rootUrl) {
     if (!r.ok) return false;
     const j = await r.json();
     if (!versionDiffers(loadedVersion(), j && j.v)) return false;
-    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true });
+    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true, tag: T("ver.tag") });
     return true;
   } catch (e) { return false; }
 }
@@ -683,48 +683,52 @@ export function internAdminHTML(data, sel, msg, busy, isPresident, previewCat, m
 // 改或開一屆。id 建了就不能改（格子與護照靠它對應），所以改的時候那一格鎖住。
 // draft（2026-10-18 端對端測試抓到的）：存檔被擋之後畫面會重畫，沒有 draft 的話
 // 剛填的五格全部洗掉，使用者看到一句錯誤訊息跟一張空表單。畫面上的東西要留在畫面上。
+// 2026-11-06 自動儲存：既有的一屆改了就存（容器 data-autosave，欄位有 name），開新的一屆還是一顆鈕（沒有 id 之前沒東西可以存）。
 export function internTermEditHTML(t, msg, busy, draft) {
   const cur = draft || t || { id: "", title_zh: "", title_en: "", starts_on: "", ends_on: "" };
   const dis = busy ? " disabled" : "";
+  const auto = !!t;
   return pageHead(t ? T("it.editTitle") : T("it.newTitle"), "", [], { act: "intern-back", label: T("it.back") })
     + msgHTML(msg)
-    + sectionHTML("", `<label><i>${T("it.id")}</i>
-      <input id="it-id" value="${esc(cur.id)}" placeholder="2027-28"${t ? " disabled" : dis}></label>
+    + sectionHTML("", `<div${auto ? ` data-autosave="intern-term-save" data-id="${esc(t.id)}"` : ""}><label><i>${T("it.id")}</i>
+      <input id="it-id" name="id" value="${esc(cur.id)}" placeholder="2027-28"${t ? " disabled" : dis}></label>
     <div class="two">
-      <label><i>${T("it.zh")}</i><input id="it-zh" value="${esc(cur.title_zh)}" placeholder="2027-28 實習"${dis}></label>
-      <label><i>${T("it.en")}</i><input id="it-en" value="${esc(cur.title_en)}" placeholder="INTERNSHIP 2027-28"${dis}></label>
-      <label><i>${T("it.start")}</i><input id="it-start" type="date" value="${esc(String(cur.starts_on || "").slice(0, 10))}"${dis}></label>
-      <label><i>${T("it.end")}</i><input id="it-end" type="date" value="${esc(String(cur.ends_on || "").slice(0, 10))}"${dis}></label>
+      <label><i>${T("it.zh")}</i><input id="it-zh" name="title_zh" value="${esc(cur.title_zh)}" placeholder="2027-28 實習"${dis}></label>
+      <label><i>${T("it.en")}</i><input id="it-en" name="title_en" value="${esc(cur.title_en)}" placeholder="INTERNSHIP 2027-28"${dis}></label>
+      <label><i>${T("it.start")}</i><input id="it-start" name="starts_on" type="date" value="${esc(String(cur.starts_on || "").slice(0, 10))}"${dis}></label>
+      <label><i>${T("it.end")}</i><input id="it-end" name="ends_on" type="date" value="${esc(String(cur.ends_on || "").slice(0, 10))}"${dis}></label>
     </div>
     <div class="note">${T("it.note")}</div>
     <div class="form-foot">
-      <button class="btn" data-act="intern-term-save"${t ? ` data-id="${esc(t.id)}"` : ""}${dis}>${busy ? T("common.saving") : T("common.save")}</button>
-      <button class="btn ghost" data-act="intern-back"${dis}>${T("common.cancel")}</button>
-    </div>`);
+      ${auto ? autosaveHint("intern-term-save") : `<button class="btn" data-act="intern-term-save"${dis}>${busy ? T("common.saving") : T("it.new")}</button>`}
+      <button class="btn ghost" data-act="intern-back"${dis}>${auto ? T("it.back") : T("common.cancel")}</button>
+    </div></div>`);
 }
 
 // 改或加一格。id 與屆別建了就不能改。
+// 2026-11-06 自動儲存：既有的格子改了就存，新的一格還是一顆鈕（代號建了才有東西可以對）。
 export function internTaskEditHTML(t, termId, suggestedId, msg, busy, draft) {
   const cur = draft || t || { id: suggestedId || "", term: termId, seq: "", category: "project", title_zh: "", title_en: "", description: "" };
   const dis = busy ? " disabled" : "";
+  const auto = !!t;
   return pageHead(t ? T("ik.editTitle") : T("ik.newTitle"), T("ik.termLede", { t: esc(cur.term) }), [], { act: "intern-back", label: T("it.back") })
     + msgHTML(msg)
-    + sectionHTML("", `<div class="two">
+    + sectionHTML("", `<div${auto ? ` data-autosave="intern-task-save" data-id="${esc(t.id)}" data-term="${esc(cur.term)}"` : ""}><div class="two">
       <label><i>${T("ik.id")}</i>
-        <input id="ik-id" value="${esc(cur.id)}"${t ? " disabled" : dis}></label>
-      <label><i>${T("ik.cat")}</i><select id="ik-cat"${dis}>
+        <input id="ik-id" name="id" value="${esc(cur.id)}"${t ? " disabled" : dis}></label>
+      <label><i>${T("ik.cat")}</i><select id="ik-cat" name="category"${dis}>
         ${INTERN_CATS.map(c => `<option value="${c.v}"${cur.category === c.v ? " selected" : ""}>${esc(T(c.label))}（${esc(T(c.hint))}）</option>`).join("")}
       </select></label>
-      <label><i>${T("ik.zh")}</i><input id="ik-zh" value="${esc(cur.title_zh)}" placeholder="第一個任務" maxlength="30"${dis}></label>
-      <label><i>${T("ik.en")}</i><input id="ik-en" value="${esc(cur.title_en)}" placeholder="FIRST TASK" maxlength="30"${dis}></label>
-      <label><i>${T("ik.seqLabel")}</i><input id="ik-seq" type="number" value="${esc(String(cur.seq || ""))}" placeholder="10"${dis}></label>
+      <label><i>${T("ik.zh")}</i><input id="ik-zh" name="title_zh" value="${esc(cur.title_zh)}" placeholder="第一個任務" maxlength="30"${dis}></label>
+      <label><i>${T("ik.en")}</i><input id="ik-en" name="title_en" value="${esc(cur.title_en)}" placeholder="FIRST TASK" maxlength="30"${dis}></label>
+      <label><i>${T("ik.seqLabel")}</i><input id="ik-seq" name="seq" type="number" value="${esc(String(cur.seq || ""))}" placeholder="10"${dis}></label>
     </div>
     <label><i>${T("ik.desc")}</i>
-      <textarea id="ik-desc" placeholder="${esc(T("ik.descPh"))}" maxlength="120"${dis}>${esc(cur.description || "")}</textarea></label>
+      <textarea id="ik-desc" name="description" placeholder="${esc(T("ik.descPh"))}" maxlength="120"${dis}>${esc(cur.description || "")}</textarea></label>
     <div class="form-foot">
-      <button class="btn" data-act="intern-task-save" data-term="${esc(cur.term)}"${t ? ` data-id="${esc(t.id)}"` : ""}${dis}>${busy ? T("common.saving") : T("common.save")}</button>
-      <button class="btn ghost" data-act="intern-back"${dis}>${T("common.cancel")}</button>
-    </div>`);
+      ${auto ? autosaveHint("intern-task-save") : `<button class="btn" data-act="intern-task-save" data-term="${esc(cur.term)}"${dis}>${busy ? T("common.saving") : T("ik.new")}</button>`}
+      <button class="btn ghost" data-act="intern-back"${dis}>${auto ? T("it.back") : T("common.cancel")}</button>
+    </div></div>`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -853,68 +857,75 @@ export function citiesHTML(data, msg, busy) {
 
 // 改或加一格。編號是標籤不是輸入框；改既有的格子時月份也鎖住。
 // draft：存檔被擋之後畫面會重畫，沒有 draft 的話剛填的東西全部洗掉（實習護照那邊 2026-10-18 抓過同一件事）。
+// 2026-11-06 自動儲存：既有的格子（有 id）改了就存，新的一格還是一顆「加一格」鈕（編號要由資料庫算出來才有東西可以對）。
 export function activityEditHTML(a, month, months, msg, busy, draft) {
   const cur = draft || a || { id: "", month, category: "gather", title_zh: "", title_en: "", description: "", needs_host: false, callback_to: "" };
   const dis = busy ? " disabled" : "";
   const lock = a ? " disabled" : dis;
+  const auto = !!a;
   return pageHead(a ? T("ak.editTitle") : T("ak.newTitle"), a ? T("ak.idLocked", { id: esc(a.id) }) : T("ak.idAuto"), [], { act: "cadre-back", label: T("ak.back") })
     + msgHTML(msg)
-    + sectionHTML("", `<div class="two">
-      <label><i>${T("ak.month")}${a ? T("ak.monthLocked") : ""}</i><select id="ak-month"${lock}>
+    + sectionHTML("", `<div${auto ? ` data-autosave="act-save" data-id="${esc(a.id)}"` : ""}><div class="two">
+      <label><i>${T("ak.month")}${a ? T("ak.monthLocked") : ""}</i><select id="ak-month" name="month"${lock}>
         ${(months || []).map(m => `<option value="${esc(String(m.month))}"${String(cur.month) === String(m.month) ? " selected" : ""}>${esc(monthLabel(m.month))}</option>`).join("")}
       </select></label>
-      <label><i>${T("ik.cat")}</i><select id="ak-cat"${dis}>
+      <label><i>${T("ik.cat")}</i><select id="ak-cat" name="category"${dis}>
         ${ACT_CATS.map(c => `<option value="${c.v}"${cur.category === c.v ? " selected" : ""}>${esc(T(c.label))}（${esc(T(c.hint))}）</option>`).join("")}
       </select></label>
-      <label><i>${T("ik.zh")}</i><input id="ak-zh" value="${esc(cur.title_zh)}" placeholder="開學電影夜" maxlength="30"${dis}></label>
-      <label><i>${T("ik.en")}</i><input id="ak-en" value="${esc(cur.title_en)}" placeholder="OPENING NIGHT" maxlength="30"${dis}></label>
+      <label><i>${T("ik.zh")}</i><input id="ak-zh" name="title_zh" value="${esc(cur.title_zh)}" placeholder="開學電影夜" maxlength="30"${dis}></label>
+      <label><i>${T("ik.en")}</i><input id="ak-en" name="title_en" value="${esc(cur.title_en)}" placeholder="OPENING NIGHT" maxlength="30"${dis}></label>
     </div>
     <label><i>${T("ik.desc")}</i>
-      <textarea id="ak-desc" placeholder="${esc(T("ak.descPh"))}" maxlength="200"${dis}>${esc(cur.description || "")}</textarea></label>
+      <textarea id="ak-desc" name="description" placeholder="${esc(T("ak.descPh"))}" maxlength="200"${dis}>${esc(cur.description || "")}</textarea></label>
     <div class="two">
       <label class="check" style="display:flex;gap:10px;align-items:center;font-size:14.5px">
-        <input id="ak-host" type="checkbox" style="width:18px;height:18px"${cur.needs_host ? " checked" : ""}${dis}>
+        <input id="ak-host" name="needs_host" type="checkbox" style="width:18px;height:18px"${cur.needs_host ? " checked" : ""}${dis}>
         <span>${T("ak.host")}</span></label>
       <label><i>${T("ak.cb")}</i>
-        <input id="ak-cb" value="${esc(cur.callback_to || "")}" placeholder="09B" maxlength="4"${dis}></label>
+        <input id="ak-cb" name="callback_to" value="${esc(cur.callback_to || "")}" placeholder="09B" maxlength="4"${dis}></label>
     </div>
     <div class="form-foot">
-      <button class="btn" data-act="act-save"${a ? ` data-id="${esc(a.id)}"` : ""}${dis}>${busy ? T("common.saving") : T("common.save")}</button>
-      <button class="btn ghost" data-act="cadre-back"${dis}>${T("common.cancel")}</button>
-    </div>`);
+      ${auto ? autosaveHint("act-save") : `<button class="btn" data-act="act-save"${dis}>${busy ? T("common.saving") : T("ak.newTitle")}</button>`}
+      <button class="btn ghost" data-act="cadre-back"${dis}>${auto ? T("ak.back") : T("common.cancel")}</button>
+    </div></div>`);
 }
 
 // 改一個月右上角的時刻。seq 與月份不給改，只有那一串字。
+// 2026-11-06 自動儲存：月份一定已經存在（seq 是鎖住的），所以兩格改了就存，沒有鈕。
 export function monthEditHTML(m, msg, busy, draft) {
   const cur = draft || m || { seq: "", month: "", theme_zh: "", theme_en: "" };
   const dis = busy ? " disabled" : "";
   return pageHead(T("mk.title", { m: esc(monthLabel(cur.month)) }), T("mk.lede"), [], { act: "cadre-back", label: T("ak.back") })
     + msgHTML(msg)
-    + sectionHTML("", `<div class="two">
-      <label><i>${T("mk.zh")}</i><input id="mk-zh" value="${esc(cur.theme_zh || "")}" placeholder="07:00" maxlength="20"${dis}></label>
-      <label><i>${T("mk.en")}</i><input id="mk-en" value="${esc(cur.theme_en || "")}" maxlength="40"${dis}></label>
+    + sectionHTML("", `<div data-autosave="month-save" data-seq="${esc(String(cur.seq))}" data-month="${esc(String(cur.month))}"><div class="two">
+      <label><i>${T("mk.zh")}</i><input id="mk-zh" name="theme_zh" value="${esc(cur.theme_zh || "")}" placeholder="07:00" maxlength="20"${dis}></label>
+      <label><i>${T("mk.en")}</i><input id="mk-en" name="theme_en" value="${esc(cur.theme_en || "")}" maxlength="40"${dis}></label>
     </div>
     <div class="form-foot">
-      <button class="btn" data-act="month-save" data-seq="${esc(String(cur.seq))}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
-      <button class="btn ghost" data-act="cadre-back"${dis}>${T("common.cancel")}</button>
-    </div>`);
+      ${autosaveHint("month-save")}
+      <button class="btn ghost" data-act="cadre-back"${dis}>${T("ak.back")}</button>
+    </div></div>`);
 }
 
 // 加一個城市或改名字。代碼建了就不能改（visas 靠它）。
+// 2026-11-06 自動儲存：既有的城市改名字就存（data-active 跟著容器走，save_destination 要帶它），新的城市還是一顆鈕。
+// 停用與恢復留在城市清單那一頁的按鈕（會改清單的排法與狀態，不走自動存）。
 export function destinationEditHTML(d, msg, busy, draft) {
   const cur = draft || d || { code: "", city: "", active: true };
   const dis = busy ? " disabled" : "";
+  const auto = !!d;
+  const active = cur.active === false ? "0" : "1";
   return pageHead(d ? T("dk.editTitle") : T("dk.newTitle"), T("dk.lede"), [], { act: "cities-back", label: T("dk.back") })
     + msgHTML(msg)
-    + sectionHTML("", `<div class="two">
+    + sectionHTML("", `<div${auto ? ` data-autosave="dest-save" data-code="${esc(d.code)}" data-active="${active}"` : ""}><div class="two">
       <label><i>${T("dk.code", { locked: d ? T("dk.codeLocked") : "" })}</i>
-        <input id="dk-code" value="${esc(cur.code)}" placeholder="TPE" maxlength="8"${d ? " disabled" : dis}></label>
-      <label><i>${T("dk.city")}</i><input id="dk-city" value="${esc(cur.city)}" placeholder="TAIPEI" maxlength="40"${dis}></label>
+        <input id="dk-code" name="code" value="${esc(cur.code)}" placeholder="TPE" maxlength="8"${d ? " disabled" : dis}></label>
+      <label><i>${T("dk.city")}</i><input id="dk-city" name="city" value="${esc(cur.city)}" placeholder="TAIPEI" maxlength="40"${dis}></label>
     </div>
     <div class="form-foot">
-      <button class="btn" data-act="dest-save"${d ? ` data-code="${esc(d.code)}"` : ""} data-active="${cur.active === false ? "0" : "1"}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
-      <button class="btn ghost" data-act="cities-back"${dis}>${T("common.cancel")}</button>
-    </div>`);
+      ${auto ? autosaveHint("dest-save") : `<button class="btn" data-act="dest-save" data-active="${active}"${dis}>${busy ? T("common.saving") : T("ct.new")}</button>`}
+      <button class="btn ghost" data-act="cities-back"${dis}>${auto ? T("dk.back") : T("common.cancel")}</button>
+    </div></div>`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -145,51 +145,53 @@ export function formHTML(form, questions, canEdit, teams, msg, busy) {
   </li>`).join("");
 
   const teamPick = teams && teams.length
-    ? `<label><i>${T("form.team")}</i><select id="fteam"${canEdit ? "" : " disabled"}>
+    ? `<label><i>${T("form.team")}</i><select id="fteam" name="team"${canEdit ? "" : " disabled"}>
         ${teams.map(t => `<option${t === form.team ? " selected" : ""}>${esc(t)}</option>`).join("")}
       </select></label>`
     : "";
 
   return formHeadHTML(form, "form")
     + msgHTML(msg)
-    + sectionHTML(T("form.settings"), `
-    <label><i>${T("form.name")}</i><input id="ftitle" value="${esc(form.title)}"${canEdit ? "" : " disabled"}></label>
+    // 2026-11-06 自動儲存：整區包在 data-autosave="save-form" 裡，每一格有 name，改了就存（main.js 的 onAutosave）。
+    // 「刪掉這份表單」還是按鈕，會丟東西的不自動。
+    + sectionHTML(T("form.settings"), `<div data-autosave="save-form" data-id="${esc(form.id)}">
+    <label><i>${T("form.name")}</i><input id="ftitle" name="title" value="${esc(form.title)}"${canEdit ? "" : " disabled"}></label>
     <label><i>${T("form.intro")}</i>
-      <textarea id="fintro"${canEdit ? "" : " disabled"}>${esc(form.intro || "")}</textarea></label>
+      <textarea id="fintro" name="intro"${canEdit ? "" : " disabled"}>${esc(form.intro || "")}</textarea></label>
     <div class="two">
-      <label><i>${T("form.kind")}</i><select id="fkind"${canEdit ? "" : " disabled"}>
+      <label><i>${T("form.kind")}</i><select id="fkind" name="kind"${canEdit ? "" : " disabled"}>
         <option value="program"${form.kind === "program" ? " selected" : ""}>${T("kind.program")}</option>
         <option value="board"${form.kind === "board" ? " selected" : ""}>${T("kind.board")}</option>
       </select></label>
       <!-- 一份表單一種語言，題目沒有雙語欄位（2026-09-07 拍板）。
            要中英都收就開兩份表單。理由見 forms.lang 那條欄位註解。 -->
-      <label><i>${T("form.lang")}</i><select id="flang"${canEdit ? "" : " disabled"}>
+      <label><i>${T("form.lang")}</i><select id="flang" name="lang"${canEdit ? "" : " disabled"}>
         <option value="zh"${form.lang === "zh" ? " selected" : ""}>${T("lang.zh")}</option>
         <option value="en"${form.lang === "en" ? " selected" : ""}>${T("lang.en")}</option>
       </select></label>
       <label><i>${T("form.opens")}</i>
-        <input id="fopen" type="datetime-local" value="${esc(dtVal(form.opens_at))}"${canEdit ? "" : " disabled"}></label>
+        <input id="fopen" name="opens_at" type="datetime-local" value="${esc(dtVal(form.opens_at))}"${canEdit ? "" : " disabled"}></label>
       <label><i>${T("form.closes")}</i>
-        <input id="fclose" type="datetime-local" value="${esc(dtVal(form.closes_at))}"${canEdit ? "" : " disabled"}></label>
+        <input id="fclose" name="closes_at" type="datetime-local" value="${esc(dtVal(form.closes_at))}"${canEdit ? "" : " disabled"}></label>
       <!-- 預計通知日：申請人的狀態會顯示成「已收到，X 月 X 日前會通知你」。
            2026-09-07 Paul 選了這句而不是「審核中」。**沒填就只剩「已收到」**，
            不要編一個日期出來。 -->
       <label><i>${T("form.notify")}</i>
-        <input id="fnotify" type="date" value="${esc(dateVal(form.notify_by))}"${canEdit ? "" : " disabled"}></label>
+        <input id="fnotify" name="notify_by" type="date" value="${esc(dateVal(form.notify_by))}"${canEdit ? "" : " disabled"}></label>
       ${teamPick}
     </div>
     <label><i>${T("form.cal")}</i>
-      <input id="fcal" value="${esc(form.interview_url || "")}" placeholder="https://cal.com/..."${canEdit ? "" : " disabled"}></label>
+      <input id="fcal" name="interview_url" value="${esc(form.interview_url || "")}" placeholder="https://cal.com/..."${canEdit ? "" : " disabled"}></label>
 
-    <label><i>${T("form.status")}</i><select id="fstatus"${canEdit ? "" : " disabled"}>
+    <label><i>${T("form.status")}</i><select id="fstatus" name="status"${canEdit ? "" : " disabled"}>
       ${STATUSES.map(s => `<option value="${s.v}"${form.status === s.v ? " selected" : ""}>${esc(T(s.label))}</option>`).join("")}
     </select></label>
     <div class="mini" style="margin:-6px 0 16px">${esc(T(st.hint))}</div>
     ${canEdit ? `<div class="form-foot">
-      <button class="btn" data-act="save-form" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("common.save")}</button>
+      ${autosaveHint("save-form")}
       <span class="sp"></span>
       <button class="btn quiet" data-act="del-form">${T("form.deleteForm")}</button>
-    </div>` : ""}`)
+    </div>` : ""}</div>`)
     + sectionHTML(T("form.questions"), `<div class="mini" style="margin-bottom:10px">
       ${T("form.qNote")}</div>
     ${questions.length ? `<ul class="qlist">${qs}</ul>`
@@ -201,15 +203,17 @@ export function formHTML(form, questions, canEdit, teams, msg, busy) {
 
 // ── 一題 ──────────────────────────────────────────────────────────────
 // q 是 null 代表新增。
+// 2026-11-06 自動儲存：既有的題（有 id）包在 data-autosave="q-save" 裡改了就存；新題還沒有 id，留「加這一題」那顆鈕，
+// 加進去之後回到表單（新題的驗證與存法在 main.js 的 q-save 分支）。
 export function questionHTML(q, msg, busy) {
   const cur = q || { label: "", help: "", type: "short", required: false, options: [] };
   return pageHead(q ? T("q.editTitle") : T("q.newTitle"), T("q.lede"), [], { act: "q-cancel", label: T("q.back") })
     + msgHTML(msg)
-    + sectionHTML("", `
-    <label><i>${T("q.label")}</i><input id="qlabel" value="${esc(cur.label)}" placeholder="${esc(T("q.labelPh"))}"></label>
+    + sectionHTML("", `${q ? `<div data-autosave="q-save" data-id="${esc(q.id)}">` : "<div>"}
+    <label><i>${T("q.label")}</i><input id="qlabel" name="label" value="${esc(cur.label)}" placeholder="${esc(T("q.labelPh"))}"></label>
     <label><i>${T("q.help")}</i>
-      <input id="qhelp" value="${esc(cur.help || "")}" placeholder="${esc(T("q.helpPh"))}"></label>
-    <label><i>${T("q.type")}</i><select id="qtype">
+      <input id="qhelp" name="help" value="${esc(cur.help || "")}" placeholder="${esc(T("q.helpPh"))}"></label>
+    <label><i>${T("q.type")}</i><select id="qtype" name="type">
       ${TYPES.map(t => `<option value="${t.v}"${cur.type === t.v ? " selected" : ""}>${esc(T(t.label))}</option>`).join("")}
     </select></label>
     <div class="mini" style="margin:-6px 0 14px">${TYPES.map(t =>
@@ -217,15 +221,15 @@ export function questionHTML(q, msg, busy) {
     <!-- 選項一行一個。**不做「按一下加一格」那種介面**：
          一行一個是所有人都會的操作，而且複製貼上一整串選項只要一次。 -->
     <label><i>${T("q.opts")}</i>
-      <textarea id="qopts" placeholder="${T("q.optsPh")}">${esc((cur.options || []).join("\n"))}</textarea></label>
+      <textarea id="qopts" name="options" placeholder="${T("q.optsPh")}">${esc((cur.options || []).join("\n"))}</textarea></label>
     <label class="check" style="display:flex;gap:10px;align-items:center;font-size:14.5px">
-      <input id="qreq" type="checkbox" style="width:18px;height:18px"${cur.required ? " checked" : ""}>
+      <input id="qreq" name="required" type="checkbox" style="width:18px;height:18px"${cur.required ? " checked" : ""}>
       <span>${T("q.req")}</span>
     </label>
     <div class="form-foot">
-      <button class="btn" data-act="q-save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("q.save")}</button>
-      <button class="btn ghost" data-act="q-cancel">${T("common.cancel")}</button>
-    </div>`);
+      ${q ? autosaveHint("q-save") : `<button class="btn" data-act="q-save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("q.add")}</button>`}
+      <button class="btn ghost" data-act="q-cancel">${q ? T("q.back") : T("common.cancel")}</button>
+    </div></div>`);
 }
 
 
@@ -533,7 +537,7 @@ export function toast(msg, undo, opts) {
   for (const t of box.children) if (t.dataset.text === String(msg)) return t;
   const el = document.createElement("div");
   el.className = "toast " + kind; el.dataset.text = String(msg); el.setAttribute("role", kind === "err" ? "alert" : "status");
-  el.innerHTML = `<span class="toast-k">${kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
+  el.innerHTML = `<span class="toast-k">${opts && opts.tag ? esc(opts.tag) : kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
     u ? `<button type="button" class="toast-undo">${esc(u.label)}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
   const gone = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
   el.querySelector(".toast-x").addEventListener("click", gone);
@@ -719,7 +723,7 @@ export async function checkVersion(rootUrl) {
     if (!r.ok) return false;
     const j = await r.json();
     if (!versionDiffers(loadedVersion(), j && j.v)) return false;
-    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true });
+    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true, tag: T("ver.tag") });
     return true;
   } catch (e) { return false; }
 }
@@ -1206,11 +1210,13 @@ export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy) {
           <dt>${T("rq.links")}</dt><dd>${(r.asset_links || []).length ? (r.asset_links || []).map(l => `<a href="${esc(l)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("<br>") : T("value.none")}</dd>
           <dt>${T("rq.contact")}</dt><dd>${r.contact ? esc(r.contact) : T("value.none")}</dd>
         </dl>`)
-      + sectionHTML(T("rq.handle"), r.status === "withdrawn" ? `<div class="note">${T("rq.withdrawnNote")}</div>` : canEdit ? `<div class="two">
-          <label><i>${T("rq.status")}</i><select id="rq-status"${dis}>${["new", "in_progress", "done"].map(s => `<option value="${s}"${r.status === s ? " selected" : ""}>${esc(T("rq.st." + s))}</option>`).join("")}</select></label>
-          <label class="wide"><i>${T("rq.reply")}</i><textarea id="rq-reply" style="min-height:90px" placeholder="${esc(T("rq.replyPh"))}"${dis}>${esc(r.reply || "")}</textarea></label>
+      // 2026-11-06 自動儲存：狀態與回覆改了就存（data-autosave="rq-save"）。「標成做完」還是按鈕，因為它會寄一封信給送單的人，
+      // 按之前要問一次；所以還沒做完的單，下拉裡不給選「做完」，要走那顆鈕。做完的單下拉才有「做完」（可以退回處理中）。
+      + sectionHTML(T("rq.handle"), r.status === "withdrawn" ? `<div class="note">${T("rq.withdrawnNote")}</div>` : canEdit ? `<div class="two" data-autosave="rq-save" data-id="${esc(r.id)}">
+          <label><i>${T("rq.status")}</i><select id="rq-status" name="status"${dis}>${(r.status === "done" ? ["new", "in_progress", "done"] : ["new", "in_progress"]).map(s => `<option value="${s}"${r.status === s ? " selected" : ""}>${esc(T("rq.st." + s))}</option>`).join("")}</select></label>
+          <label class="wide"><i>${T("rq.reply")}</i><textarea id="rq-reply" name="reply" style="min-height:90px" placeholder="${esc(T("rq.replyPh"))}"${dis}>${esc(r.reply || "")}</textarea></label>
         </div>
-        <div class="form-foot"><button class="btn" data-act="rq-save" data-id="${esc(r.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
+        <div class="form-foot">${autosaveHint("rq-save", `data-id="${esc(r.id)}"`)}
           ${r.status !== "done" ? `<button class="btn ghost" data-act="rq-done" data-id="${esc(r.id)}"${dis}>${T("rq.markDone")}</button>` : ""}
           <span class="mini">${T("rq.doneNote")}</span></div>` : `<div class="note">${T("rq.viewOnly")}</div>`);
   }
@@ -1300,23 +1306,25 @@ export function eventEditHTML(e, form, signed, me, msg, busy) {
   return pageHead(esc(evTitle(e)), `${esc(e.team.replace(/\s*Team$/i, ""))}・${esc(e.slug)}`, [], { act: "ev-back", label: T("ev.back") })
     + msgHTML(msg)
     + sectionHTML(T("ev.status"), `<div class="note">${statusLine}</div>${keys}`)
-    + sectionHTML(T("ev.content"), `<div class="two">
-        <label><i>${T("ev.titleZh")}</i><input id="ev-tzh" value="${esc(e.title_zh || "")}"${ro}${dis}></label>
-        <label><i>${T("ev.titleEn")}</i><input id="ev-ten" value="${esc(e.title_en || "")}"${ro}${dis}></label>
-        <label><i>${T("ev.sumZh")}</i><input id="ev-szh" value="${esc(e.summary_zh || "")}" placeholder="${esc(T("ev.sumPh"))}"${ro}${dis}></label>
-        <label><i>${T("ev.sumEn")}</i><input id="ev-sen" value="${esc(e.summary_en || "")}"${ro}${dis}></label>
-        <label class="wide"><i>${T("ev.bodyZh")}</i><textarea id="ev-bzh" style="min-height:120px"${ro}${dis}>${esc(e.body_zh || "")}</textarea></label>
-        <label class="wide"><i>${T("ev.bodyEn")}</i><textarea id="ev-ben" style="min-height:120px"${ro}${dis}>${esc(e.body_en || "")}</textarea></label>
-        <label><i>${T("ev.starts")}</i><input id="ev-starts" type="datetime-local" value="${esc(evLocal(e.starts_at))}"${ro}${dis}></label>
-        <label><i>${T("ev.ends")}</i><input id="ev-ends" type="datetime-local" value="${esc(evLocal(e.ends_at))}"${ro}${dis}></label>
-        <label><i>${T("ev.place")}</i><input id="ev-place" value="${esc(e.place || "")}"${ro}${dis}></label>
-        <label><i>${T("ev.capacity")}</i><input id="ev-cap" type="number" min="0" value="${esc(String(e.capacity || 0))}"${ro}${dis}></label>
-        <label class="wide"><i>${T("ev.cover")}</i><input id="ev-cover" value="${esc(e.cover_url || "")}" placeholder="https://…"${ro}${dis}></label>
+    // 2026-11-06 自動儲存：內容那一區包在 data-autosave="ev-save" 裡（只有「改」以上的人有；唯讀的沒有容器也沒有事件）。
+    // 準備好了、退回、放上、撤下都會改狀態與畫面結構，留按鈕。
+    + sectionHTML(T("ev.content"), `${canEdit ? `<div data-autosave="ev-save" data-id="${esc(e.id)}">` : "<div>"}<div class="two">
+        <label><i>${T("ev.titleZh")}</i><input id="ev-tzh" name="title_zh" value="${esc(e.title_zh || "")}"${ro}${dis}></label>
+        <label><i>${T("ev.titleEn")}</i><input id="ev-ten" name="title_en" value="${esc(e.title_en || "")}"${ro}${dis}></label>
+        <label><i>${T("ev.sumZh")}</i><input id="ev-szh" name="summary_zh" value="${esc(e.summary_zh || "")}" placeholder="${esc(T("ev.sumPh"))}"${ro}${dis}></label>
+        <label><i>${T("ev.sumEn")}</i><input id="ev-sen" name="summary_en" value="${esc(e.summary_en || "")}"${ro}${dis}></label>
+        <label class="wide"><i>${T("ev.bodyZh")}</i><textarea id="ev-bzh" name="body_zh" style="min-height:120px"${ro}${dis}>${esc(e.body_zh || "")}</textarea></label>
+        <label class="wide"><i>${T("ev.bodyEn")}</i><textarea id="ev-ben" name="body_en" style="min-height:120px"${ro}${dis}>${esc(e.body_en || "")}</textarea></label>
+        <label><i>${T("ev.starts")}</i><input id="ev-starts" name="starts_at" type="datetime-local" value="${esc(evLocal(e.starts_at))}"${ro}${dis}></label>
+        <label><i>${T("ev.ends")}</i><input id="ev-ends" name="ends_at" type="datetime-local" value="${esc(evLocal(e.ends_at))}"${ro}${dis}></label>
+        <label><i>${T("ev.place")}</i><input id="ev-place" name="place" value="${esc(e.place || "")}"${ro}${dis}></label>
+        <label><i>${T("ev.capacity")}</i><input id="ev-cap" name="capacity" type="number" min="0" value="${esc(String(e.capacity || 0))}"${ro}${dis}></label>
+        <label class="wide"><i>${T("ev.cover")}</i><input id="ev-cover" name="cover_url" value="${esc(e.cover_url || "")}" placeholder="https://…"${ro}${dis}></label>
       </div>
       ${e.cover_url ? `<img class="ev-cover" src="${esc(e.cover_url)}" alt="">` : ""}
-      <label class="check"><input type="checkbox" id="ev-consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label>
+      <label class="check"><input type="checkbox" id="ev-consent" name="cover_consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label>
       <div class="mini">${T("ev.coverNote")}</div>
-      ${canEdit ? `<div class="form-foot"><button class="btn" data-act="ev-save" data-id="${esc(e.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button></div>` : `<div class="mini">${T("ev.readOnly")}</div>`}`)
+      ${canEdit ? `<div class="form-foot">${autosaveHint("ev-save", `data-id="${esc(e.id)}"`)}</div>` : `<div class="mini">${T("ev.readOnly")}</div>`}</div>`)
     + sectionHTML(T("ev.signup"), links);
 }
 
@@ -1352,17 +1360,19 @@ export function meetingFormHTML(m, d, scopes, people, busy) {
   const v = Object.assign({ scope: scopes[0] || "board", title: "", starts_at: "", ends_at: "", agenda: "", doc_url: "" }, m || {}, d || {});
   const dis = busy ? " disabled" : "";
   const pk = (d && d.pk) || { ticked: (m ? (m.attendees || []).map(a => a.user_id) : []), q: "", mq: "", teams: [], level: "view" };
-  return sectionHTML(m ? T("mt.edit") : T("mt.new"), `<div class="two">
-      <label><i>${T("mt.scope")}</i><select id="mt-scope"${dis}>${scopes.map(s => `<option value="${esc(s)}"${v.scope === s ? " selected" : ""}>${esc(mtScope(s))}</option>`).join("")}</select></label>
-      <label><i>${T("mt.titleF")}</i><input id="mt-title" value="${esc(v.title)}" placeholder="BT 會議"${dis}></label>
-      <label><i>${T("mt.starts")}</i><input id="mt-starts" type="datetime-local" value="${esc(mtLocal(v.starts_at))}"${dis}></label>
-      <label><i>${T("mt.ends")}</i><input id="mt-ends" type="datetime-local" value="${esc(mtLocal(v.ends_at))}"${dis}></label>
-      <label class="wide"><i>${T("mt.agenda")}</i><input id="mt-agenda" value="${esc(v.agenda || "")}"${dis}></label>
-      <label class="wide"><i>${T("mt.docF")}</i><input id="mt-doc" value="${esc(v.doc_url || "")}" placeholder="https://docs.google.com/…"${dis}></label>
+  // 2026-11-06 自動儲存：既有那一場（m 有 id）的六格包在 data-autosave="mt-save" 裡改了就存；勾人那一塊在容器外面，
+  // 勾了會先重畫（pk 的狀態在 S.mtDraft），main.js 重畫之後再補存一次。新開一場還沒有 id，留「記下來」那顆鈕。
+  return sectionHTML(m ? T("mt.edit") : T("mt.new"), `<div class="two"${m ? ` data-autosave="mt-save" data-id="${esc(m.id)}"` : ""}>
+      <label><i>${T("mt.scope")}</i><select id="mt-scope" name="scope"${dis}>${scopes.map(s => `<option value="${esc(s)}"${v.scope === s ? " selected" : ""}>${esc(mtScope(s))}</option>`).join("")}</select></label>
+      <label><i>${T("mt.titleF")}</i><input id="mt-title" name="title" value="${esc(v.title)}" placeholder="BT 會議"${dis}></label>
+      <label><i>${T("mt.starts")}</i><input id="mt-starts" name="starts_at" type="datetime-local" value="${esc(mtLocal(v.starts_at))}"${dis}></label>
+      <label><i>${T("mt.ends")}</i><input id="mt-ends" name="ends_at" type="datetime-local" value="${esc(mtLocal(v.ends_at))}"${dis}></label>
+      <label class="wide"><i>${T("mt.agenda")}</i><input id="mt-agenda" name="agenda" value="${esc(v.agenda || "")}"${dis}></label>
+      <label class="wide"><i>${T("mt.docF")}</i><input id="mt-doc" name="doc_url" value="${esc(v.doc_url || "")}" placeholder="https://docs.google.com/…"${dis}></label>
     </div>
     <h3 class="sec-h">${T("mt.attendees")}</h3>
     ${membersAreaHTML("mt", { people: people || [], pk, busy, draft: true, all: true, titleLeft: n => T("mt.ticked", { n }) })}
-    <div class="form-foot"><button class="btn" data-act="mt-save" data-id="${esc(m ? m.id : "")}"${dis}>${busy ? T("common.saving") : (m ? T("common.save") : T("mt.createGo"))}</button>
+    <div class="form-foot">${m ? autosaveHint("mt-save", `data-id="${esc(m.id)}"`) : `<button class="btn" data-act="mt-save" data-id=""${dis}>${busy ? T("common.saving") : T("mt.createGo")}</button>`}
       ${m ? `<button class="btn ghost" data-act="mt-delete" data-id="${esc(m.id)}"${dis}>${T("mt.delete")}</button>` : ""}
       <span class="mini">${m ? T("mt.editNote") : T("mt.newNote")}</span></div>`, { id: "mt-form" });
 }

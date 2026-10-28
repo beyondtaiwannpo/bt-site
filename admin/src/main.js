@@ -146,6 +146,7 @@ async function boot(retried) {
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     paintShell();
+    UI.bindAutosave(root(), onAutosave);
     const [forms, pendingAll, teams, todo, workspaces, requests, events, meetings] = await Promise.all([
       formsP, pendingP,
       D.loadTeams().catch(() => []),
@@ -274,6 +275,104 @@ function readForm() {
   };
 }
 
+// ── 自動儲存（2026-11-06，Paul：「每一格都像 Workspaces 那一頁一樣，改了就存」）──
+// bindAutosave 在 boot 掛一次；哪一格改了就把那一個容器整份讀出來、叫原本那顆「存起來」鈕用的資料層函式，資料層一行都沒改。
+// 成功：更新 S 裡那一筆、小字變「存好了」、左下角 toast；**不重畫**（使用者可能還在打字，畫面上已經是他打的字）。
+// 失敗（含驗證不過）：小字變「沒存進去」、toast 講原因，欄位留著不清。
+// 同一格同一個值不重送（離開欄位又停 800 毫秒會觸發兩次）。
+const dirty = UI.dirtyTracker();
+const fieldVal = f => !f ? null : String(f.type || "").toLowerCase() === "checkbox" ? String(!!f.checked) : String(f.value);
+async function onAutosave(act, box, field) {
+  const id = box.dataset.id || "";
+  const key = act + "|" + id + "|" + (field ? (field.name || field.id || "") : "*");
+  const val = fieldVal(field);
+  if (field && !dirty.changed(key, val)) return;
+  const fail = msg => { UI.autosaveState(box, "failed"); UI.toast(msg); };
+  UI.autosaveState(box, "saving");
+  try {
+    if (act === "save-form") {
+      if (!S.form || S.form.id !== id) return;
+      const patch = readForm();
+      if (!patch.title) return fail(T("err.formName"));
+      // 開放之前先擋一次：一份沒有題目的表單開出去，申請人看到的是一個空表單，而他會以為是網站壞了。
+      // 下拉是選的不是打的，擋下來就把它撥回原本的狀態，不然畫面寫「開放中」其實還是草稿。
+      if (patch.status === "open" && S.questions.length === 0) {
+        const st = document.getElementById("fstatus"); if (st) st.value = S.form.status;
+        return fail(T("err.noQuestions"));
+      }
+      await D.saveForm(id, patch);
+      Object.assign(S.form, patch);
+      const row = (S.forms || []).find(f => f.id === id); if (row) Object.assign(row, patch);
+      dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.saved"));
+      // 狀態（草稿／開放／關閉）改了頁首的標籤與下拉底下那一句要跟著換，而下拉是選的不是打的，重畫不會吃掉誰打到一半的字。
+      if (field && field.id === "fstatus") render();
+      return;
+    }
+    if (act === "q-save") {
+      if (!S.qEditing || S.qEditing.id !== id) return;
+      const q = readQuestion();
+      if (!q.label) return fail(T("err.qEmpty"));
+      if ((q.type === "single" || q.type === "multi") && q.options.length < 2) return fail(T("err.qOpts"));
+      await D.saveQuestion(id, q);
+      Object.assign(S.qEditing, q);
+      const row = (S.questions || []).find(x => x.id === id); if (row) Object.assign(row, q);
+      dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.saved"));
+      return;
+    }
+    if (act === "rq-save") {
+      const r = (S.requests || []).find(x => x.id === id); if (!r) return;
+      const v = UI.formValues(box);
+      // 「做完」不走這裡：那會寄信，要按「標成做完」那顆鈕先問一次（下拉裡本來就沒給選）。
+      if (v.status === "done" && r.status !== "done") { const st = document.getElementById("rq-status"); if (st) st.value = r.status; return fail(T("err.rqDoneBtn")); }
+      await D.setRequestStatus(id, v.status || r.status, v.reply != null ? v.reply : r.reply);
+      r.status = v.status || r.status; r.reply = v.reply != null ? v.reply : r.reply;
+      dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.rqSaved"));
+      return;
+    }
+    if (act === "ev-save") {
+      const ev = (S.events || []).find(x => x.id === id); if (!ev) return;
+      const patch = readEvent();
+      if (!UI.evCoverOk(patch.cover_url)) return fail(T("err.evCover"));
+      await D.saveEvent(id, patch);
+      Object.assign(ev, patch);
+      dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.evSaved"));
+      return;
+    }
+    if (act === "mt-save") {
+      const m = (S.meetings || []).find(x => x.id === id); if (!m) return;
+      const d = readMeeting(); S.mtDraft = Object.assign({}, S.mtDraft, d);
+      if (!d.title) return fail(T("err.mtTitle"));
+      if (!d.starts_at || !d.ends_at) return fail(T("err.mtTime"));
+      await D.saveMeeting(id, d);
+      await reloadMeetings();
+      dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.mtSaved"));
+      return;
+    }
+  } catch (e) {
+    fail((act === "ev-save" ? T("err.evSave") : act === "mt-save" ? T("err.mtSave") : act === "rq-save" ? T("err.rqSave") : T("err.save")) + D.says(e));
+  }
+}
+// 一場既有會議的勾人那一塊在 data-autosave 容器外面（勾了要先重畫，pk 的狀態在 S.mtDraft）；重畫完這裡補存一次。
+function autosaveMeeting() {
+  if (S.view !== "meeting" || !S.mtSel) return;
+  const box = document.querySelector('[data-autosave="mt-save"]'); if (!box) return;
+  onAutosave("mt-save", box, null);
+}
+// 一題的欄位讀出來（既有的題自動存、新題按「加這一題」都用這一份）。
+function readQuestion() {
+  const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+  const type = val("qtype");
+  const options = val("qopts").split("\n").map(x => x.trim()).filter(Boolean);
+  return {
+    label: val("qlabel"),
+    help: val("qhelp") || null,
+    type,
+    required: !!(document.getElementById("qreq") || {}).checked,
+    // 短答與長答不留選項。留著的話改題型改回來會冒出舊選項，而那些選項沒有人記得是誰打的。
+    options: (type === "single" || type === "multi") ? options : [],
+  };
+}
+
 async function openForm(id) {
   S.busy = true; S.msg = ""; render();
   try {
@@ -340,18 +439,18 @@ document.addEventListener("click", async e => {
   if (act === "mt-open") { e.preventDefault(); history.pushState(null, "", "#meetings/" + id); await openTab("meetings/" + id); return; }
   if (act === "mt-back") { history.pushState(null, "", "#meetings"); await openTab("meetings"); return; }
   if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && (S.view === "meetings" || S.view === "meeting")) {
-    S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], b, true) }); render(); return;
+    S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], b, true) }); render(); autosaveMeeting(); return;
   }
+  // 「記下來」只剩新開一場（2026-11-06 起既有那一場改了就存，見 onAutosave）。
   if (act === "mt-save") {
     const d = readMeeting(); S.mtDraft = Object.assign({}, S.mtDraft, d);
     if (!d.title) { S.msg = T("err.mtTitle"); render(); return; }
     if (!d.starts_at || !d.ends_at) { S.msg = T("err.mtTime"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try {
-      const newId = await D.saveMeeting(id || null, d);
-      S.busy = false; S.msg = id ? T("msg.mtSaved") : T("msg.mtCreated", { title: d.title });
-      if (!id) { S.mtDraft = null; history.pushState(null, "", "#meetings/" + newId); await openTab("meetings/" + newId); return; }
-      await reloadMeetings(); render();
+      const newId = await D.saveMeeting(null, d);
+      S.busy = false; S.msg = T("msg.mtCreated", { title: d.title });
+      S.mtDraft = null; history.pushState(null, "", "#meetings/" + newId); await openTab("meetings/" + newId);
     } catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
     return;
   }
@@ -382,14 +481,7 @@ document.addEventListener("click", async e => {
     } catch (e) { S.busy = false; S.msg = T("err.evCreate") + D.says(e); render(); }
     return;
   }
-  if (act === "ev-save") {
-    const patch = readEvent();
-    if (!UI.evCoverOk(patch.cover_url)) { S.msg = T("err.evCover"); render(); return; }
-    S.busy = true; S.msg = ""; render();
-    try { await D.saveEvent(id, patch); S.busy = false; S.msg = T("msg.evSaved"); await reloadEvents(S.evSel); render(); }
-    catch (e) { S.busy = false; S.msg = T("err.evSave") + D.says(e); render(); }
-    return;
-  }
+  // ev-save 那顆鈕 2026-11-06 拿掉了，內容改了就存（onAutosave 的 "ev-save"）；準備好了、放上、撤下還是鈕。
   if (act === "ev-ready" || act === "ev-unready" || act === "ev-publish" || act === "ev-unpublish") {
     const ev = (S.events || []).find(x => x.id === id); if (!ev) return;
     const title = UI.evTitle(ev);
@@ -436,15 +528,16 @@ document.addEventListener("click", async e => {
   if (act === "rq-back") { S.rqSel = null; S.msg = ""; history.pushState(null, "", "#requests"); render(); return; }
   if (act === "rq-fstatus") { S.rqF = Object.assign({}, S.rqF, { status: b.dataset.v }); render(); return; }
   if (act === "rq-fkind") { S.rqF = Object.assign({}, S.rqF, { kind: b.dataset.v }); render(); return; }
-  if (act === "rq-save" || act === "rq-done") {
+  // 狀態與回覆 2026-11-06 起改了就存（onAutosave 的 "rq-save"）；「標成做完」會寄信，留鈕、先問一次。回覆框裡的字一起帶過去。
+  if (act === "rq-done") {
     const r = (S.requests || []).find(x => x.id === id); if (!r) return;
-    const st = document.getElementById("rq-status"), rp = document.getElementById("rq-reply");
-    const status = act === "rq-done" ? "done" : (st ? st.value : r.status), reply = rp ? rp.value.trim() : r.reply;
-    if (status === "done" && r.status !== "done" && UI.needAsk(S, b, T("confirm.rqDone", { title: r.title }))) return;
+    const rp = document.getElementById("rq-reply");
+    const reply = rp ? rp.value.trim() : r.reply;
+    if (r.status !== "done" && UI.needAsk(S, b, T("confirm.rqDone", { title: r.title }))) return;
     S.busy = true; S.msg = ""; render();
     try {
-      await D.setRequestStatus(id, status, reply);
-      S.busy = false; S.msg = status === "done" && r.status !== "done" ? T("msg.rqDone", { title: r.title }) : T("msg.rqSaved");
+      await D.setRequestStatus(id, "done", reply);
+      S.busy = false; S.msg = T("msg.rqDone", { title: r.title });
       await reloadRequests(); render();
     } catch (e) { S.busy = false; S.msg = T("err.rqSave") + D.says(e); render(); }
     return;
@@ -681,23 +774,7 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  if (act === "save-form") {
-    const patch = readForm();
-    if (!patch.title) { S.msg = T("err.formName"); render(); return; }
-    // 開放之前先擋一次：一份沒有題目的表單開出去，申請人看到的是一個空表單，
-    // 而他會以為是網站壞了。**這是唯一一個前端擋得住、而且該擋的狀態**。
-    if (patch.status === "open" && S.questions.length === 0) {
-      S.msg = T("err.noQuestions"); render(); return;
-    }
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.saveForm(S.form.id, patch);
-      const { form, questions } = await D.loadForm(S.form.id);
-      S.form = form; S.questions = questions; S.busy = false; S.msg = T("msg.saved");
-    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
-    render();
-    return;
-  }
+  // save-form 那顆鈕 2026-11-06 拿掉了，設定改了就存（onAutosave 的 "save-form"，驗證也搬過去）。
 
   if (act === "del-form") {
     const n = S.forms.find(f => f.id === S.form.id);
@@ -721,28 +798,16 @@ document.addEventListener("click", async e => {
     S.view = "question"; S.msg = ""; render(); return;
   }
 
+  // 「加這一題」只剩新題（2026-11-06 起既有的題改了就存，見 onAutosave 的 "q-save"）。
   if (act === "q-save") {
-    const label = document.getElementById("qlabel").value.trim();
-    if (!label) { S.msg = T("err.qEmpty"); render(); return; }
-    const type = document.getElementById("qtype").value;
-    const options = document.getElementById("qopts").value
-      .split("\n").map(x => x.trim()).filter(Boolean);
-    if ((type === "single" || type === "multi") && options.length < 2) {
+    const q = readQuestion();
+    if (!q.label) { S.msg = T("err.qEmpty"); render(); return; }
+    if ((q.type === "single" || q.type === "multi") && q.options.length < 2) {
       S.msg = T("err.qOpts"); render(); return;
     }
-    const q = {
-      label,
-      help: document.getElementById("qhelp").value.trim() || null,
-      type,
-      required: document.getElementById("qreq").checked,
-      // 短答與長答不留選項。留著的話改題型改回來會冒出舊選項，
-      // 而那些選項沒有人記得是誰打的。
-      options: (type === "single" || type === "multi") ? options : [],
-    };
     S.busy = true; S.msg = ""; render();
     try {
-      if (S.qEditing) await D.saveQuestion(S.qEditing.id, q);
-      else await D.addQuestion(S.form.id, q, S.questions);
+      await D.addQuestion(S.form.id, q, S.questions);
       const r = await D.loadForm(S.form.id);
       S.questions = r.questions; S.busy = false; S.view = "form"; S.qEditing = null; S.msg = "";
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
@@ -802,7 +867,7 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 document.addEventListener("change", async e => {
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
-  if (pkEl && (S.view === "meetings" || S.view === "meeting")) { S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); return; }
+  if (pkEl && (S.view === "meetings" || S.view === "meeting")) { S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); autosaveMeeting(); return; }
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
   const el = e.target.closest('[data-act="members-level"]');
   if (!el || !S.mp || S.view !== "members") return;

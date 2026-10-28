@@ -99,20 +99,28 @@ test("★ 變動紀錄：指派、刪人、換屆都翻成人話，刪了帳號�
 
 test("★ 改一個人：自己的職級關著；Senior Adviser 改不了職級與名字；沒帳號的人沒有職級、有發碼與刪紀錄", () => {
   const me = personEditHTML(PEOPLE[0], TERMS, ME, true, "", false, null, PEOPLE, null);
-  assert.match(me, /<select id="pk-role" disabled>/);
+  assert.match(me, /<select id="pk-role" name="board_role" disabled>/);
   assert.match(me, /不能自我降級/);
   assert.doesNotMatch(me, /data-act="member-remove"/, "不能刪自己");
   const other = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, null, PEOPLE, null);
-  assert.match(other, /<select id="pk-role">/);
+  assert.match(other, /<select id="pk-role" name="board_role">/);
   assert.match(other, /value="director" selected/);
   assert.match(other, /value="senior_adviser"/);
   assert.match(other, /value="Curriculum Team" checked/);
-  assert.match(other, /id="pk-ten-0" value="Director, Curriculum Team"/, "這一屆的職位帶進表單");
+  assert.match(other, /id="pk-ten-0" name="title_en_0" value="Director, Curriculum Team"/, "這一屆的職位帶進表單");
   assert.match(other, /data-act="position-row-add"/, "可以再加一個職位");
   assert.match(other, /data-act="position-delete" data-id="p2" data-term="2026-27" data-team="Curriculum Team"/);
   assert.match(other, /歷屆：/);
   assert.match(other, /data-act="member-remove" data-id="p2"/);
-  assert.match(other, /data-act="person-save" data-id="p2"/);
+  // 2026-11-06 自動儲存：職級、名字、職位、team 標籤在 data-autosave="person-save" 容器裡，改了就存；「存起來」鈕沒有了。
+  // 屆別下拉標 data-noauto（換屆別是換表單看哪一屆，不是改資料）；升 Co-President 的確認掛在職級旁那個看不見的錨上。
+  assert.match(other, /<div data-autosave="person-save" data-id="p2">/); assert.doesNotMatch(other, /data-act="person-save"/);
+  assert.match(other, /<span class="autosave" data-for="person-save">/);
+  assert.match(other, /<select id="pk-term" data-act="person-term" data-noauto="1">/);
+  assert.match(other, /<select id="pk-role" name="board_role">/); assert.match(other, /<span data-act="person-promote" data-id="p2" hidden><\/span>/);
+  assert.match(other, /<input id="pk-zh" name="name_zh" value="小安">/);
+  const autoBox = other.slice(other.indexOf('data-autosave="person-save"'), other.indexOf('class="table grid"'));
+  assert.doesNotMatch(autoBox.slice(autoBox.lastIndexOf("</div>")), /data-autosave/, "存取格不在自動儲存的容器裡（它本來就一格一格送）");
   // 2026-10-23 批 2：工作區那一塊是改得動的存取格，一格一個下拉，改了就存（main.js 接 grid-level）。
   const grid = other.slice(other.indexOf('class="table grid"'), other.indexOf("</table>", other.indexOf('class="table grid"')));
   assert.match(grid, /data-act="grid-level" data-id="22222222-2222-2222-2222-222222222222" data-ws="apps"[^>]*><option value="">無<\/option><option value="view">看<\/option><option value="edit">改<\/option><option value="manage" selected>管/);
@@ -121,8 +129,8 @@ test("★ 改一個人：自己的職級關著；Senior Adviser 改不了職級�
   assert.match(grid, /data-ws="passport"/); assert.match(grid, /data-ws="intern-passport"/);
   assert.doesNotMatch(other, /data-act="tab" data-t="workspaces"/, "不再叫人去工作區那一頁改");
   const sa = personEditHTML(PEOPLE[1], TERMS, ME, false, "", false, null, PEOPLE, null);
-  assert.match(sa, /<select id="pk-role" disabled>/);
-  assert.match(sa, /<input id="pk-zh" value="小安" disabled>/);
+  assert.match(sa, /<select id="pk-role" name="board_role" disabled>/);
+  assert.match(sa, /<input id="pk-zh" name="name_zh" value="小安" disabled>/);
   assert.doesNotMatch(sa, /data-act="member-remove"/);
   assert.match(sa, /id="pk-ten-0"/, "職位 Senior Adviser 改得了");
   const old = personEditHTML(PEOPLE[3], TERMS, ME, true, "", false, null, PEOPLE, null);
@@ -147,12 +155,12 @@ test("存檔被擋之後剛填的東西要留在畫面上，換屆別表單換�
   assert.match(h, /value="president" selected/);
   assert.match(h, /value="Marketing Team" checked/);
   assert.doesNotMatch(h, /value="Curriculum Team" checked/);
-  assert.match(h, /id="pk-ten-0" value="Boss"/);
+  assert.match(h, /id="pk-ten-0" name="title_en_0" value="Boss"/);
   assert.match(h, /data-posrow="1" data-orig="" data-isnew="1"/, "新加的那一列也留著");
   assert.match(h, /data-act="position-row-drop" data-i="1"/);
   const past = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, { term: "2025-26" }, PEOPLE, null);
   assert.match(past, /<option value="2025-26" selected>/);
-  assert.match(past, /id="pk-ten-0" value="Associate, Curriculum Team"/);
+  assert.match(past, /id="pk-ten-0" name="title_en_0" value="Associate, Curriculum Team"/);
   assert.equal(positionFor(PEOPLE[1], "2025-26").title_en, "Associate, Curriculum Team");
   assert.equal(currentTerm(TERMS).id, "2026-27");
 });
@@ -260,8 +268,10 @@ test("純函式：貼上解析、下一屆代號", () => {
 
 test("★ 主程式：升成 Co-President 先問一次；刪人要名字打一樣；結束這一屆要代號打一樣；自己永遠在留下的名單裡", () => {
   const src = readFileSync("admin/people/src/main.js", "utf8");
-  const save = src.slice(src.indexOf('act === "person-save"'), src.indexOf('act === "position-delete"'));
-  assert.match(save, /f\.board_role === "president" && UI\.needAsk\(S, b, /, "升成 Co-President 要先問一次（inline confirm）");
+  // 2026-11-06 自動儲存：那幾步從 person-save 那顆鈕搬到 savePerson()，升 Co-President 改成掛在職級旁的錨上問，確認從 person-promote 進來。
+  const save = src.slice(src.indexOf("async function savePerson"), src.indexOf("async function syncPerson"));
+  assert.match(save, /f\.board_role === "president" && !confirmed/, "升成 Co-President 要先問一次（inline confirm）");
+  assert.match(save, /S\.ask = \{ act: "person-promote"/); assert.match(src, /act === "person-promote"[\s\S]*b\.dataset\.confirmed !== "1"/);
   assert.match(save, /done\.length \? T\("msg\.partial"/, "一半成功一半失敗要講出哪一半");
   const rm = src.slice(src.indexOf('act === "member-remove-go"'), src.indexOf('act === "person-merge"'));
   assert.match(rm, /typed !== b\.dataset\.name/);
@@ -354,7 +364,7 @@ test("★ 同一屆好幾個職位：名單接成一句、改一個人一列一�
   assert.match(personEditHTML(two, TERMS, ME, true, "", false, null, [two], null, undefined), /載入中/);
   assert.match(personEditHTML(PEOPLE[3], TERMS, ME, true, "", false, null, PEOPLE, null, null), /註冊用的 email：沒有帳號/);
   const src = readFileSync("admin/people/src/main.js", "utf8");
-  const save = src.slice(src.indexOf('act === "person-save"'), src.indexOf('act === "position-delete"'));
+  const save = src.slice(src.indexOf("async function savePerson"), src.indexOf("async function syncPerson"));
   assert.match(save, /before\.team \|\| ""\) !== r\.team\) posOps\.push\(\{ del: r\.orig \}\)/, "換了 team 要先刪舊的那一筆");
   assert.match(save, /err\.posTeamDup/, "同一個 team 兩筆要擋");
   assert.match(src, /D\.personEmail\(/);
@@ -396,8 +406,9 @@ test("★ 主程式：存取格改了就送、送反向的那一筆當復原；�
   assert.match(grid, /D\.unassign\(id, ws\)/); assert.match(grid, /D\.assign\(id, ws, lv\)/);
   assert.match(grid, /S\.undo = /, "存取格要有復原");
   assert.match(src, /T\("pe\.grantBoth"/, "Director 職位存完要問配兩個工作區");
-  assert.doesNotMatch(src.slice(src.indexOf("const dirTeam"), src.indexOf("S.undo = { label: T(\"pe.grantBoth\"")), /await D\.assign/, "配工作區不能自動送，要等他按");
-  assert.match(src.slice(src.indexOf("S.undo = { label: T(\"pe.grantBoth\""), src.indexOf("await reopenPerson(p.person_id, T(\"msg.personSaved\"")), /fn: async \(\) => \{[\s\S]*await D\.assign\(pid, "res:" \+ dirTeam, "manage"\); await D\.assign\(pid, "apps", "edit"\)/, "按了那顆鈕才送兩筆：那個 team 的資源管、整個申請改（2026-10-30）");
+  assert.doesNotMatch(src.slice(src.indexOf("const dirTeam"), src.indexOf("undo = { label: T(\"pe.grantBoth\"")), /await D\.assign/, "配工作區不能自動送，要等他按");
+  assert.match(src.slice(src.indexOf("undo = { label: T(\"pe.grantBoth\""), src.indexOf("await syncPerson(p.person_id, f, savedRows)")), /fn: async \(\) => \{[\s\S]*await D\.assign\(pid, "res:" \+ dirTeam, "manage"\); await D\.assign\(pid, "apps", "edit"\)/, "按了那顆鈕才送兩筆：那個 team 的資源管、整個申請改（2026-10-30）");
+  assert.match(src.slice(src.indexOf("await syncPerson(p.person_id, f, savedRows)")), /UI\.toast\(T\("msg\.personSaved"[^\n]*, undo\)/, "存好的 toast 帶那顆鈕");
   assert.match(src, /"#ws=" \+ encodeURIComponent/); assert.match(src, /"#person=" \+ encodeURIComponent/);
   assert.match(src, /key\.startsWith\("ws="\)/); assert.match(src, /key\.startsWith\("person="\)/);
 });
@@ -429,10 +440,10 @@ test("★ 職位下拉：四級有 team 沒 team 推出來的字；既有紀錄�
   // 畫面：對得上的列下拉預選、文字框藏著（值還在）；對不上的列選「自訂」、文字框露出來。
   const other = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, null, PEOPLE, null);
   assert.match(other, /<select id="pk-rank-0" data-act="pos-rank"[^>]*>[\s\S]*?<option value="director" selected>Director/);
-  assert.match(other, /<div class="two" hidden>\s*<label><i>[^<]*<\/i><input id="pk-ten-0" value="Director, Curriculum Team"/);
+  assert.match(other, /<div class="two" hidden>\s*<label><i>[^<]*<\/i><input id="pk-ten-0" name="title_en_0" value="Director, Curriculum Team"/);
   const custom = personEditHTML(PEOPLE[1], TERMS, ME, true, "", false, { rows: [{ orig: "Curriculum Team", title_zh: "", title_en: "Boss", team: "Curriculum Team" }] }, PEOPLE, null);
   assert.match(custom, /<option value="custom" selected>/);
-  assert.match(custom, /<div class="two">\s*<label><i>[^<]*<\/i><input id="pk-ten-0" value="Boss"/, "自訂的文字框露出來、值還在");
+  assert.match(custom, /<div class="two">\s*<label><i>[^<]*<\/i><input id="pk-ten-0" name="title_en_0" value="Boss"/, "自訂的文字框露出來、值還在");
   assert.match(personNewHTML(TERMS, "", false, null), /<select id="pn-rank" data-act="pos-rank"/);
   // 主程式：下拉選了職級就推標題，自訂才讀文字框。
   const src = readFileSync("admin/people/src/main.js", "utf8");

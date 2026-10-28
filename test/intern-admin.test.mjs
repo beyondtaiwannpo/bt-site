@@ -97,22 +97,33 @@ test("沒有任何一屆時說清楚下一步", () => {
 
 test("改一屆：代號鎖住；開新的一屆：代號可以填", () => {
   const edit = internTermEditHTML(DATA.terms[0], "", false);
-  assert.match(edit, /id="it-id" value="2026-27"[^>]*disabled/);
-  assert.match(edit, /data-act="intern-term-save" data-id="2026-27"/);
+  assert.match(edit, /id="it-id" name="id" value="2026-27"[^>]*disabled/);
+  // 2026-11-06 自動儲存：既有的一屆沒有「存起來」鈕，容器帶 data-autosave 與 data-id；開新的一屆還是一顆鈕。
+  assert.match(edit, /data-autosave="intern-term-save" data-id="2026-27"/);
+  assert.doesNotMatch(edit, /data-act="intern-term-save"/);
+  assert.match(edit, /<span class="autosave" data-for="intern-term-save">/);
+  for (const n of ["title_zh", "title_en", "starts_on", "ends_on"]) assert.match(edit, new RegExp(` name="${n}"`), `${n} 沒有 name，formValues 讀不到`);
   const fresh = internTermEditHTML(null, "", false);
-  assert.match(fresh, /id="it-id" value=""/);
-  assert.doesNotMatch(fresh, /id="it-id" value=""[^>]*disabled/);
-  assert.match(fresh, /開新的一屆/);
+  assert.match(fresh, /id="it-id" name="id" value=""/);
+  assert.doesNotMatch(fresh, /id="it-id" name="id" value=""[^>]*disabled/);
+  assert.doesNotMatch(fresh, /data-autosave=/);
+  assert.match(fresh, /<button class="btn" data-act="intern-term-save">開新的一屆<\/button>/);
 });
 
 test("改一格：代號鎖住、分類選到對的、存檔中按鈕變字", () => {
   const edit = internTaskEditHTML(DATA.tasks[0], "2026-27", "T2627-05", "", false);
-  assert.match(edit, /id="ik-id" value="T2627-01" disabled/);
+  assert.match(edit, /id="ik-id" name="id" value="T2627-01" disabled/);
   assert.match(edit, /<option value="onboard" selected>/);
-  assert.match(edit, /data-act="intern-task-save" data-term="2026-27" data-id="T2627-01"/);
+  // 2026-11-06 自動儲存：既有的格子沒有「存起來」鈕，容器帶 data-autosave、data-id、data-term；新的一格還是一顆鈕。
+  assert.match(edit, /data-autosave="intern-task-save" data-id="T2627-01" data-term="2026-27"/);
+  assert.doesNotMatch(edit, /data-act="intern-task-save"/);
+  assert.match(edit, /<span class="autosave" data-for="intern-task-save">/);
+  for (const n of ["category", "title_zh", "title_en", "seq", "description"]) assert.match(edit, new RegExp(` name="${n}"`), `${n} 沒有 name，formValues 讀不到`);
   const busy = internTaskEditHTML(null, "2026-27", "T2627-05", "", true);
   assert.match(busy, /存檔中…/);
-  assert.match(busy, /id="ik-id" value="T2627-05"/, "新格子要先填好建議的代號");
+  assert.match(busy, /id="ik-id" name="id" value="T2627-05"/, "新格子要先填好建議的代號");
+  assert.match(busy, /data-act="intern-task-save" data-term="2026-27" disabled/, "新的一格留鈕，忙的時候按不下去");
+  assert.doesNotMatch(busy, /data-autosave=/);
 });
 
 test("建議的代號：屆別四個數字加流水號，跳過已經用掉的", () => {

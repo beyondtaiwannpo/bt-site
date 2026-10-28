@@ -96,6 +96,8 @@ async function boot(retried) {
     // Co-President 專用的分頁對其他人回到資源，不報錯。
     const want = location.hash.slice(1) || new URLSearchParams(location.search).get("tab");
     paintShell(want);
+    // 自動儲存（2026-11-06）掛在 #bt-root 上一次，之後 render() 只換裡面的 innerHTML，監聽還在。
+    UI.bindAutosave(root(), onAutosave);
     S.workspaces = await wsP;
     await openTab(want);
   } catch (e) {
@@ -228,6 +230,77 @@ async function reloadMembers(msg) {
   S.busy = false; render();
 }
 
+// ── 自動儲存（2026-11-06，Paul：「每一格都像 Workspaces 那一頁一樣，改了就存」）────────────────
+// 四個表單共用這一個入口：資源（res-save）、三封信的文案（mail-save，data-k 是哪一封）、歷史之路的一站（hi-save）、
+// 照片說明（hi-ph-save）。bindAutosave 在 boot 掛一次，欄位停下來就進這裡。
+// 規矩在 ui.js 那一段：讀容器裡的值、叫原本那支 D.saveX（資料層一行沒改）、成功只改 S **不 render()**（人可能還在打字，
+// 畫面上已經是他打的字）、小字變「存好了」加左下角 toast；失敗小字變「沒存進去」加錯誤 toast，欄位不清。
+// 容器可能在存的途中被 render() 換掉（例如照片勾同意會重畫整頁），所以回報狀態時用 act 與 id 再找一次現在畫面上那一個。
+// dirty 記每一個容器最後存成功的整組值，一樣就不再送（離開欄位又停 800 毫秒會觸發兩次）。
+const dirty = UI.dirtyTracker();
+function liveBox(box) {
+  const d = box.dataset, sel = `[data-autosave="${d.autosave}"]` + (d.id ? `[data-id="${d.id}"]` : "") + (d.k ? `[data-k="${d.k}"]` : "");
+  const el = root() ? root().querySelector(sel) : null;
+  return el || box;
+}
+function autosaveFail(box, text) { UI.autosaveState(liveBox(box), "failed"); UI.toast(text); }
+async function onAutosave(act, box) {
+  const v = UI.formValues(box), id = box.dataset.id || "";
+  const key = act + ":" + (id || box.dataset.k || ""), serial = JSON.stringify(v);
+  if (!dirty.changed(key, serial)) return;
+  const saved = (text) => { dirty.mark(key, serial); UI.autosaveState(liveBox(box), "saved"); UI.toast(text); };
+
+  if (act === "res-save") {
+    const patch = { title: v.title, blurb: v.blurb, kind: v.kind, url: v.url, team: v.team || null, ord: Number(v.ord) || 100 };
+    UI.autosaveState(box, "saving");
+    try {
+      await D.saveResource(id, patch);   // 名稱與連結空的，資料層會丟 err.resName / err.resUrl
+      const r = S.res.find(x => x.id === id); if (r) Object.assign(r, patch);
+      if (S.resEditing && S.resEditing.id === id) Object.assign(S.resEditing, patch);
+      saved(T("msg.saved"));
+    } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
+    return;
+  }
+  if (act === "mail-save") {
+    const kind = box.dataset.k;
+    const t = { kind, subject: v.subject, body: v.body, subject_en: v.subject_en, body_en: v.body_en, button_label: v.button_label, button_label_en: v.button_label_en };
+    S.tplDraft = t;   // 切預覽重畫時拿這一份，打到一半的字不會不見
+    if (!t.subject || !t.body) { autosaveFail(box, T("err.mailBoth")); return; }
+    UI.autosaveState(box, "saving");
+    try {
+      await D.saveTemplate(kind, t);
+      const cur = S.tpls.find(x => x.kind === kind);
+      if (cur) Object.assign(cur, t); else S.tpls.push(Object.assign({}, t));
+      saved(T("msg.tplSaved"));
+    } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
+    return;
+  }
+  if (act === "hi-save") {
+    const patch = { title_zh: v.title_zh, title_en: v.title_en, summary_zh: v.summary_zh, summary_en: v.summary_en,
+      body_zh: v.body_zh, body_en: v.body_en, happened_on: v.happened_on, slug: v.slug };
+    if (!patch.title_zh && !patch.title_en) { autosaveFail(box, T("err.hiTitle")); return; }
+    if (!patch.happened_on) { autosaveFail(box, T("err.hiDate")); return; }
+    if (!patch.slug) patch.slug = UI.hiSlug(patch.title_en, patch.happened_on);
+    if (!UI.hiSlugOk(patch.slug)) { autosaveFail(box, T("err.hiSlug")); return; }
+    UI.autosaveState(box, "saving");
+    try {
+      await D.upsertMilestone(Object.assign({ id }, patch));
+      const m = S.hist.find(x => x.id === id); if (m) Object.assign(m, patch);
+      saved(T("msg.hiSaved"));
+    } catch (err) { autosaveFail(box, T("err.hiSave") + D.says(err)); }
+    return;
+  }
+  if (act === "hi-ph-save") {
+    const patch = { caption_zh: v.caption_zh, caption_en: v.caption_en };
+    UI.autosaveState(box, "saving");
+    try {
+      await D.updatePhoto(id, patch);
+      for (const m of S.hist) { const p = (m.photos || []).find(x => x.id === id); if (p) Object.assign(p, patch); }
+      saved(T("msg.hiPhotoSaved"));
+    } catch (err) { autosaveFail(box, T("err.hiPhoto") + D.says(err)); }
+  }
+}
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -303,18 +376,7 @@ document.addEventListener("click", async e => {
   if (act === "mail-back") { await openMail(); return; }
   if (act === "mail-edit") { S.tplKind = b.dataset.k; S.tplDraft = null; S.view = "mail-edit"; S.msg = ""; render(); return; }
   if (act === "mail-prev-lang" || act === "mail-prev-w") { S.mailPrev = Object.assign({ lang: "zh", w: 600 }, S.mailPrev, act === "mail-prev-lang" ? { lang: b.dataset.v } : { w: +b.dataset.v }); readMailForm(); render(); return; }
-  if (act === "mail-save") {
-    const t = readMailForm();
-    if (!t.subject || !t.body) { S.msg = T("err.mailBoth"); render(); return; }
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.saveTemplate(b.dataset.k, t);
-      S.tpls = await D.loadTemplates(); S.tplDraft = null;
-      S.busy = false; S.msg = T("msg.tplSaved");
-    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
-    render();
-    return;
-  }
+  // mail-save 那顆鈕 2026-11-06 拿掉了，三封信的六格改了就存（onAutosave）。
 
   if (act === "approve") {
     const ok = b.checked;
@@ -348,6 +410,7 @@ document.addEventListener("click", async e => {
   if (act === "hi-open") { e.preventDefault(); history.pushState(null, "", "#history/" + id); await openHistory(id); return; }
   if (act === "hi-back") { history.pushState(null, "", "#history"); await openHistory(null); return; }
   if (act === "hi-new") { history.pushState(null, "", "#history/new"); S.hiSel = "new"; S.view = "history-edit"; S.msg = ""; render(); return; }
+  // hi-save 這顆鈕 2026-11-06 起只有新的一站才有（要先存一次才有 id 掛照片）；既有的一站改了就存（onAutosave）。
   if (act === "hi-save") {
     const patch = readMilestone(); if (!patch) return;
     if (!patch.title_zh && !patch.title_en) { S.msg = T("err.hiTitle"); render(); return; }
@@ -383,13 +446,7 @@ document.addEventListener("click", async e => {
     } catch (err) { S.busy = false; S.msg = T("err.hiStatus") + D.says(err); render(); }
     return;
   }
-  if (act === "hi-ph-save") {
-    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
-    S.busy = true; S.msg = ""; render();
-    try { await D.updatePhoto(id, { caption_zh: val("hi-ph-czh-" + id), caption_en: val("hi-ph-cen-" + id) }); await reloadHistory(T("msg.hiPhotoSaved")); }
-    catch (err) { S.busy = false; S.msg = T("err.hiPhoto") + D.says(err); render(); }
-    return;
-  }
+  // hi-ph-save（存照片說明）那顆鈕 2026-11-06 拿掉了，兩格說明改了就存（onAutosave）。
   if (act === "hi-ph-del") {
     if (UI.needAsk(S, b, T("confirm.hiDelPhoto"))) return;
     S.busy = true; S.msg = ""; render();
@@ -404,6 +461,7 @@ document.addEventListener("click", async e => {
     S.resEditing = S.res.find(r => r.id === id) || null;
     S.view = "res-edit"; S.msg = ""; render(); return;
   }
+  // res-save 這顆鈕 2026-11-06 起只有新的一筆才有（還沒有 id）；建立之後留在編輯頁，接下來改了就存（onAutosave）。
   if (act === "res-save") {
     const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
     const patch = {
@@ -413,9 +471,26 @@ document.addEventListener("click", async e => {
     };
     S.busy = true; S.msg = ""; render();
     try {
-      await D.saveResource(S.resEditing ? S.resEditing.id : null, patch);
-      S.busy = false; S.resEditing = null;
-      await openRes();
+      const newId = await D.saveResource(null, patch);
+      S.res = await D.loadResources();
+      S.resEditing = S.res.find(r => r.id === newId) || null;
+      S.busy = false; S.msg = T("msg.saved"); S.view = S.resEditing ? "res-edit" : "res"; render();
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
+  // 上架與下架（2026-11-06）留一顆鈕：它決定外面看不看得到。送的是整張表單加新狀態（資料層要有名稱與連結才收），
+  // 所以打到一半還沒自動存的字也一起存進去。
+  if (act === "res-status") {
+    const box = b.closest("[data-autosave]"), v = box ? UI.formValues(box) : {}, to = b.dataset.to;
+    const cur = S.res.find(r => r.id === id) || S.resEditing || {};
+    const patch = { title: v.title || cur.title, blurb: v.blurb != null ? v.blurb : cur.blurb, kind: v.kind || cur.kind, url: v.url || cur.url,
+      team: (v.team != null ? v.team : cur.team) || null, ord: Number(v.ord != null ? v.ord : cur.ord) || 100, status: to };
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.saveResource(id, patch);
+      const r = S.res.find(x => x.id === id); if (r) Object.assign(r, patch);
+      if (S.resEditing && S.resEditing.id === id) Object.assign(S.resEditing, patch);
+      S.busy = false; S.msg = T(to === "published" ? "msg.resPublished" : "msg.resUnpublished"); render();
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }

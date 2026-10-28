@@ -337,10 +337,8 @@ document.addEventListener("click", async e => {
       render();
       toast(T("m.issued"));
     } catch (e) {
-      // 講清楚是哪一種沒存：0 列（沒有那一列或 RLS 擋掉）跟網路或權限錯誤是兩回事，讓 Paul 查得到。
-      const m = String(e && e.message || "");
       console.error("存檔失敗。真正的原因：", e);
-      toast(m === "profile_missing" ? T("m.noProfileRow") : m === "passport_missing" ? T("m.noPassportRow") : T("m.notSaved"));
+      toast(saveFailText(e));
     }
     return;
   }
@@ -509,8 +507,48 @@ async function checkVersion(rootUrl) {
   } catch (e) { return false; }
 }
 
+// 講清楚是哪一種沒存：0 列（沒有那一列或 RLS 擋掉）跟網路或權限錯誤是兩回事，讓 Paul 查得到。
+// 第一次核發那顆鈕與編輯時的自動存都用這一句（test/passport-save.test.mjs 守著三種分法）。
+function saveFailText(e) {
+  const m = String(e && e.message || "");
+  return m === "profile_missing" ? T("m.noProfileRow") : m === "passport_missing" ? T("m.noPassportRow") : T("m.notSaved");
+}
+
+// ── 自動儲存（2026-11-06）：已經有護照的人編輯資料頁那張表單，每一格改了就存。──
+// 第一次核發仍然是上面那顆鈕（存完要 boot() 重讀、換到護照那一頁，畫面結構會變，不走自動存）。
+// 存成功只更新 S.profile，**不 render()**：使用者可能還在打字。按「回到護照」才重畫。
+// 存失敗不重畫、不清欄位，小字變「沒存進去」加一條 toast，再改一下就會再存一次。
+const dirty = UI.dirtyTracker();
+async function onAutosave(act, box) {
+  if (act !== "issue" || !S.user) return;
+  const name_zh = (document.getElementById("fz") || { value: "" }).value.trim();
+  const name_en = (document.getElementById("fe") || { value: "" }).value.trim();
+  if (!name_zh && !name_en) { UI.autosaveState(box, "failed"); toast(T("m.needName")); return; }
+  const p = {
+    name_zh, name_en: name_en || name_zh,
+    team: document.getElementById("ft").value,
+    motto: document.getElementById("fm").value.trim()
+  };
+  const key = "issue:" + S.user.id, fp = JSON.stringify(p);
+  if (!dirty.changed(key, fp)) return;     // 值沒變就不送（離開欄位又停 800 毫秒會觸發兩次）
+  UI.autosaveState(box, "saving");
+  try {
+    await DATA.saveProfile(p);
+    dirty.mark(key, fp);
+    S.profile = { ...(S.profile || {}), ...p };
+    UI.autosaveState(box, "saved");
+    toast(T("m.updated"));
+  } catch (e) {
+    console.error("自動存檔失敗。真正的原因：", e);
+    UI.autosaveState(box, "failed");
+    toast(saveFailText(e));
+  }
+}
+
 export async function boot() {
   checkVersion("../");
+  // 自動儲存掛一次在 #bt-root 上（它不會被換掉，裡面的 innerHTML 才會）。
+  UI.bindAutosave(root(), onAutosave);
   try {
     // 先問「現在是誰」。沒有人登入就導去 /app/，不去讀護照內容
     //（讀了也只會被 RLS 擋掉）。

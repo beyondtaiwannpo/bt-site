@@ -123,6 +123,7 @@ export const COMMON = {
   // 版本提示與自動儲存（2026-11-06）。九份 strings.js 的 COMMON 要一模一樣（test/lang.test.mjs、test/admin-hub.test.mjs 逐字比對）。
   "ver.newer":        { zh: "網站有新版本了，重新整理一下就會換成新的。", en: "A newer version is live. Reload to get it." },
   "ver.reload":       { zh: "重新整理", en: "Reload" },
+  "ver.tag":          { zh: "更新", en: "Update" },
   "auto.saving":      { zh: "存檔中…", en: "Saving…" },
   "auto.saved":       { zh: "存好了", en: "Saved" },
   "auto.hint":        { zh: "改了就存", en: "saves as you change it" },
@@ -184,6 +185,12 @@ export const MINE = {
   "res.status":       { zh: "狀態", en: "Status" },
   "res.draftOpt":     { zh: "還在寫（外面看不到）", en: "Draft (not public)" },
   "res.publishedOpt": { zh: "已發布", en: "Published" },
+  // 2026-11-06 自動儲存：既有的資源改了就存，剩下的鈕只有「新增」（新的一筆）與上架、下架。
+  "res.create":       { zh: "新增", en: "Add" },
+  "res.publish":      { zh: "上架", en: "Publish" },
+  "res.unpublish":    { zh: "下架", en: "Unpublish" },
+  "msg.resPublished": { zh: "上架了。外面的 /resources/ 現在看得到。", en: "Published. It is now on /resources/." },
+  "msg.resUnpublished": { zh: "下架了。外面看不到，這裡還留著。", en: "Unpublished. Hidden from the public page, still here." },
   "res.url":          { zh: "連結（Google Drive、YouTube、Canva…）", en: "Link (Google Drive, YouTube, Canva…)" },
   "res.urlNote":      { zh: "發布之前，<b>用無痕視窗打開這條連結自己點一次</b>。\n      Drive 的分享權限如果設成「只有我」，這裡完全看不出來，\n      而學生看到的會是一頁「你需要存取權」。",
                         en: "Before publishing, <b>open the link in a private window and click it yourself</b>. If the Drive share setting is \"only me\" nothing here will show it, and students will see a \"you need access\" page." },
@@ -310,7 +317,6 @@ export const MINE = {
   "hi.capEn":         { zh: "說明（英）", en: "Caption (en)" },
   "hi.consent":       { zh: "拍攝同意已確認（這張照片裡每一個人）", en: "Photo consent confirmed (everyone in this photo)" },
   "hi.delPhoto":      { zh: "刪掉這張", en: "Delete photo" },
-  "hi.savePhotos":    { zh: "存照片說明", en: "Save captions" },
   "hi.seePublic":     { zh: "看對外那一頁", en: "View public page" },
   "msg.hiSaved":      { zh: "存好了。", en: "Saved." },
   "msg.hiCreated":    { zh: "「{title}」加好了，現在可以掛照片。", en: "\"{title}\" added. You can add photos now." },

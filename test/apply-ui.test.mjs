@@ -323,8 +323,13 @@ test("信件文案那個分頁只有 Co-President 看得到", () => {
   assert.match(SITE.tabsHTML("res", true), /data-t="mail"/);
 });
 
-test("存檔中會鎖住按鈕", () => {
-  assert.match(SITE.mailEditHTML("accepted", tpl, "", true), /data-act="mail-save"[^>]*disabled/);
+// 2026-11-06 自動儲存：信件文案沒有「存起來」鈕了，六格在 data-autosave="mail-save" 容器裡（data-k 是哪一封），改了就存。
+test("信件文案：六格在自動儲存的容器裡，沒有存起來鈕", () => {
+  const h = SITE.mailEditHTML("accepted", tpl, "", false);
+  assert.match(h, /<div data-autosave="mail-save" data-k="accepted">/);
+  assert.doesNotMatch(h, /data-act="mail-save"/);
+  assert.match(h, /<span class="autosave" data-for="mail-save">/);
+  for (const n of ["subject", "body", "button_label", "subject_en", "body_en", "button_label_en"]) assert.match(h, new RegExp(`name="${n}"`), n);
 });
 
 // 2026-10-29 邀請信在信件文案裡是第五種，五個代換符號，預覽用範例填。

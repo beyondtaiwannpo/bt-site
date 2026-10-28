@@ -175,7 +175,7 @@ export function toast(msg, undo, opts) {
   for (const t of box.children) if (t.dataset.text === String(msg)) return t;
   const el = document.createElement("div");
   el.className = "toast " + kind; el.dataset.text = String(msg); el.setAttribute("role", kind === "err" ? "alert" : "status");
-  el.innerHTML = `<span class="toast-k">${kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
+  el.innerHTML = `<span class="toast-k">${opts && opts.tag ? esc(opts.tag) : kind === "err" ? T("msg.err") : T("msg.ok")}</span><span class="toast-t">${esc(msg)}</span>${
     u ? `<button type="button" class="toast-undo">${esc(u.label)}</button>` : ""}<button type="button" class="toast-x" aria-label="${esc(T("toast.close"))}">×</button>`;
   const gone = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
   el.querySelector(".toast-x").addEventListener("click", gone);
@@ -361,7 +361,7 @@ export async function checkVersion(rootUrl) {
     if (!r.ok) return false;
     const j = await r.json();
     if (!versionDiffers(loadedVersion(), j && j.v)) return false;
-    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true });
+    toast(T("ver.newer"), { label: T("ver.reload"), fn: () => location.reload() }, { sticky: true, tag: T("ver.tag") });
     return true;
   } catch (e) { return false; }
 }
@@ -920,9 +920,11 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
     <input type="checkbox" name="team" value="${esc(t)}"${picked.includes(t) ? " checked" : ""}${dis}>
     <span>${esc(t.replace(/\s*Team$/i, ""))}</span></label>`;
   const lede = !hasAccount(p) ? T("pe.ledeNoAccount") : cadre ? T("pe.lede", { role: esc(boardLabel(p.board_role)) }) : T("pe.ledeOther", { role: esc(ROLE_NAME[p.role] ? T(ROLE_NAME[p.role]) : p.role) });
-  const rankSec = cadre ? sectionHTML(T("pe.rank"), `<label><i>${T("pe.rank")}</i><select id="pk-role"${self || !isPres ? " disabled" : dis}>
+  // 2026-11-06 自動儲存：職級一選就存。選到 Co-President 要先確認（main.js 把那一行「真的要？」掛在這個看不見的錨上，
+  // 因為 mountAsk 要一個 data-act 的元素才知道掛哪裡，而下拉選單不能藏起來）。
+  const rankSec = cadre ? sectionHTML(T("pe.rank"), `<label><i>${T("pe.rank")}</i><select id="pk-role" name="board_role"${self || !isPres ? " disabled" : dis}>
       ${BOARD_ROLES.map(r => `<option value="${r.v}"${v.board_role === r.v ? " selected" : ""}>${esc(T(r.label))}（${esc(T(r.hint))}）</option>`).join("")}
-    </select></label>
+    </select><span data-act="person-promote" data-id="${esc(p.person_id)}" hidden></span></label>
     ${self ? `<div class="mini" style="margin:-6px 0 14px">${T("pe.selfNote")}</div>` : !isPres ? `<div class="mini" style="margin:-6px 0 14px">${T("pe.presOnly")}</div>` : `<div class="mini" style="margin:-6px 0 14px">${T("pe.rankNote")}</div>`}`) : "";
   // 註冊用的 email（2026-10-26）：唯讀，一顆複製。只在這一頁，名單表格上不印。email 是 person_email() 回的，
   // undefined 表示還在載或載不到，null 表示沒有帳號。
@@ -931,8 +933,8 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
     : `<div class="row" style="margin-bottom:14px"><span class="mini">${T("pe.email")}${T("punct.colon")}<b>${esc(email || "")}</b></span>
        ${email ? `<button class="btn quiet sm" data-act="copy-email" data-email="${esc(email)}"${dis}>${T("pe.emailCopy")}</button>` : ""}</div>`;
   const nameSec = sectionHTML(T("pe.name"), `<div class="two">
-      <label><i>${T("pe.nameZh")}</i><input id="pk-zh" value="${esc(v.name_zh)}"${isPres ? dis : " disabled"}></label>
-      <label><i>${T("pe.nameEn")}</i><input id="pk-en" value="${esc(v.name_en)}"${isPres ? dis : " disabled"}></label>
+      <label><i>${T("pe.nameZh")}</i><input id="pk-zh" name="name_zh" value="${esc(v.name_zh)}"${isPres ? dis : " disabled"}></label>
+      <label><i>${T("pe.nameEn")}</i><input id="pk-en" name="name_en" value="${esc(v.name_en)}"${isPres ? dis : " disabled"}></label>
     </div>${emailLine}${!isPres ? `<div class="mini">${T("pe.presOnly")}</div>` : ""}`);
   const posRow = (r, i) => { const rank = r.rank != null ? r.rank : rankOfTitle(r.title_en, r.team); return `<div class="card posrow" data-posrow="${i}" data-orig="${r.orig == null ? "" : esc(r.orig)}" data-isnew="${r.orig == null ? "1" : "0"}">
       <div class="two">
@@ -940,15 +942,16 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
         <label><i>${T("pe.posTeam")}</i>${teamSelect(`pk-pteam-${i}`, r.team, dis, isOrgWide(rank))}</label>
       </div>
       <div class="two"${rank === "custom" ? "" : " hidden"}>
-        <label><i>${T("pe.titleEn")}</i><input id="pk-ten-${i}" value="${esc(r.title_en)}" placeholder="Director, Curriculum Team"${dis}></label>
-        <label><i>${T("pe.titleZh")}</i><input id="pk-tzh-${i}" value="${esc(r.title_zh)}" placeholder="${esc(T("pe.titleZhPh"))}"${dis}></label>
+        <label><i>${T("pe.titleEn")}</i><input id="pk-ten-${i}" name="title_en_${i}" value="${esc(r.title_en)}" placeholder="Director, Curriculum Team"${dis}></label>
+        <label><i>${T("pe.titleZh")}</i><input id="pk-tzh-${i}" name="title_zh_${i}" value="${esc(r.title_zh)}" placeholder="${esc(T("pe.titleZhPh"))}"${dis}></label>
       </div>
       <div class="row">${r.orig == null
         ? `<button class="btn ghost sm" data-act="position-row-drop" data-i="${i}"${dis}>${T("pe.posRowDrop")}</button>`
         : `<button class="btn ghost sm" data-act="position-delete" data-id="${esc(p.person_id)}" data-term="${esc(termId)}" data-team="${esc(r.orig)}"${dis}>${T("pe.posDelete")}</button>`}</div>
     </div>`; };
   const otherTerms = [...new Set((p.positions || []).map(x => x.term).filter(t => t !== termId))];
-  const posSec = sectionHTML(T("pe.position"), `<label><i>${T("pe.term")}</i><select id="pk-term" data-act="person-term"${dis}>${
+  // 屆別下拉是換表單看哪一屆，不是改資料，標 data-noauto 讓自動儲存不理它。
+  const posSec = sectionHTML(T("pe.position"), `<label><i>${T("pe.term")}</i><select id="pk-term" data-act="person-term" data-noauto="1"${dis}>${
       (terms || []).map(t => `<option value="${esc(t.id)}"${termId === t.id ? " selected" : ""}>${esc(t.id)}${t.status === "current" ? T("ro.curMark") : ""}</option>`).join("")}</select></label>
     ${rows.length ? rows.map(posRow).join("") : `<div class="mini" style="margin-bottom:10px">${T("pe.posNone", { term: esc(termId) })}</div>`}
     <div class="row"><button class="btn ghost sm" data-act="position-row-add"${dis}>${T("pe.posAdd")}</button></div>
@@ -961,7 +964,7 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
       (p.board_role === "president" || p.board_role === "senior_adviser" ? `<div class="note">${T("pe.wsSenior")}</div>` : "")
       + accessGridHTML(p, workspaces, busy, people)
       + `<div class="mini" style="margin-top:8px">${T("pe.wsNote")}${ws.length ? "" : " " + T("pe.noWs")}</div>`,
-    { hint: T("pe.wsHint") }) : "";
+    { hint: T("auto.hint") }) : "";
   const dupSec = dups.length ? sectionHTML(T("pe.dup"), `<div class="note">${T("pe.dupNote")}</div>${
     dups.map(o => `<div class="row"><b>${esc(personName(o).name)}</b>${hasAccount(o) ? ` <span class="tag">${T("pe.dupHasAccount")}</span>` : ` <span class="tag draft">${T("ro.noAccount")}</span>`}
       ${isPres ? `<button class="btn ghost sm" data-act="person-merge" data-keep="${esc(p.person_id)}" data-drop="${esc(o.person_id)}"${dis}>${T("pe.mergeInto")}</button>` : ""}</div>`).join("")}`) : "";
@@ -985,12 +988,15 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
            <div class="mini">${T("pe.removeNote")}</div>`);
     }
   }
+  // 2026-11-06 自動儲存：職級、名字、這一屆的職位、team 標籤四塊在同一個 data-autosave="person-save" 容器裡，
+  // 改了就存（main.js 的 onAutosave 走跟原本那顆鈕一樣的幾步：職級、名字、職位、標籤，照樣記進變動紀錄）。
+  // 存取格（wsSec）本來就是一格一格改了就送（grid-level），不放進容器。「存起來」鈕拿掉了，換成那個小字。
   return pageHead(`${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}`, lede, [], { act: "roster-back", label: T("pe.back") })
     + msgHTML(msg)
-    + rankSec + nameSec + posSec + teamSec + wsSec
+    + `<div data-autosave="person-save" data-id="${esc(p.person_id)}">` + rankSec + nameSec + posSec + teamSec + `</div>` + wsSec
     + `<div class="form-foot" style="margin-bottom:28px">
-      <button class="btn" data-act="person-save" data-id="${esc(p.person_id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button>
-      <button class="btn ghost" data-act="roster-back"${dis}>${T("common.cancel")}</button>
+      ${autosaveHint("person-save")}
+      <button class="btn ghost" data-act="roster-back"${dis}>${T("pe.back")}</button>
     </div>`
     + dupSec + danger;
 }

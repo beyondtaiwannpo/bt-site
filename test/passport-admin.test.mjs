@@ -71,13 +71,19 @@ test("★ 編號不是輸入框：新增時說由系統算，改既有的時只�
   const add = activityEditHTML(null, 9, DATA.months, "", false, null);
   assert.doesNotMatch(add, /id="ak-id"/);
   assert.match(add, /由系統照月份算/);
-  assert.match(add, /<select id="ak-month">/, "新增時月份選得了");
+  assert.match(add, /<select id="ak-month" name="month">/, "新增時月份選得了");
+  assert.doesNotMatch(add, /data-autosave=/, "新的一格還沒有編號，沒東西可以自動存，要留「加一格」鈕");
+  assert.match(add, /<button class="btn" data-act="act-save">加一格<\/button>/);
   const edit = activityEditHTML(DATA.activities[0], 9, DATA.months, "", false, null);
   assert.doesNotMatch(edit, /id="ak-id"/);
   assert.match(edit, /編號 <b>09A<\/b>（不能改/);
-  assert.match(edit, /<select id="ak-month" disabled>/, "改既有的時月份鎖住");
-  assert.match(edit, /data-act="act-save" data-id="09A"/);
-  assert.match(edit, /id="ak-host" type="checkbox"[^>]*checked/);
+  assert.match(edit, /<select id="ak-month" name="month" disabled>/, "改既有的時月份鎖住");
+  // 2026-11-06 自動儲存：既有的格子沒有「存起來」鈕，容器帶 data-autosave 與 data-id，欄位旁一個小字。
+  assert.match(edit, /data-autosave="act-save" data-id="09A"/);
+  assert.doesNotMatch(edit, /data-act="act-save"/);
+  assert.match(edit, /<span class="autosave" data-for="act-save">/);
+  for (const n of ["month", "category", "title_zh", "title_en", "description", "needs_host", "callback_to"]) assert.match(edit, new RegExp(` name="${n}"`), `${n} 沒有 name，formValues 讀不到`);
+  assert.match(edit, /id="ak-host" name="needs_host" type="checkbox"[^>]*checked/);
 });
 
 test("存檔被擋之後剛填的東西要留在畫面上（draft 優先於原值）", () => {
@@ -94,15 +100,25 @@ test("存檔被擋之後剛填的東西要留在畫面上（draft 優先於原�
 test("月份那一頁不給改 seq 與月份，只有時刻", () => {
   const h = monthEditHTML(DATA.months[0], "", false, null);
   assert.doesNotMatch(h, /id="mk-seq"|id="mk-month"/);
-  assert.match(h, /data-act="month-save" data-seq="1"/);
+  // 2026-11-06 自動儲存：月份一定已經存在，兩格改了就存，沒有鈕。
+  assert.match(h, /data-autosave="month-save" data-seq="1"/);
+  assert.doesNotMatch(h, /data-act="month-save"/);
+  assert.match(h, /<span class="autosave" data-for="month-save">/);
+  assert.match(h, /name="theme_zh"/); assert.match(h, /name="theme_en"/);
   assert.match(h, /9 月的時刻/);
 });
 
 test("城市代碼建了就不能改", () => {
   const h = destinationEditHTML(DATA.destinations[0], "", false, null);
-  assert.match(h, /id="dk-code" value="TPE"[^>]*disabled/);
-  assert.match(h, /data-act="dest-save" data-code="TPE"/);
-  assert.doesNotMatch(destinationEditHTML(null, "", false, null), /id="dk-code" value=""[^>]*disabled/);
+  assert.match(h, /id="dk-code" name="code" value="TPE"[^>]*disabled/);
+  // 2026-11-06 自動儲存：既有的城市改名字就存，data-active 跟著容器走；新的城市留「加一個城市」鈕。
+  assert.match(h, /data-autosave="dest-save" data-code="TPE" data-active="1"/);
+  assert.doesNotMatch(h, /data-act="dest-save"/);
+  assert.match(h, /<span class="autosave" data-for="dest-save">/);
+  const fresh = destinationEditHTML(null, "", false, null);
+  assert.doesNotMatch(fresh, /id="dk-code" name="code" value=""[^>]*disabled/);
+  assert.doesNotMatch(fresh, /data-autosave=/);
+  assert.match(fresh, /<button class="btn" data-act="dest-save" data-active="1">加一個城市<\/button>/);
 });
 
 test("★ 每一種錯誤碼都翻成人話，而且指到對的遷移檔", () => {
@@ -116,6 +132,7 @@ test("★ 每一種錯誤碼都翻成人話，而且指到對的遷移檔", () =
   assert.match(says(new Error("Could not find the function public.save_intern_task")), /2026-10-18-intern-admin\.sql/, "實習護照那條不能被蓋掉");
 });
 
+// 2026-11-06 自動儲存：act-save、month-save、dest-save 三個分支還在（新增那幾張表單仍是按鈕），既有的走 onAutosave。
 test("★ 主程式每一個幹部護照的動作成功或失敗都會寫 S.msg（畫面要有回饋）", () => {
   const src = readFileSync("admin/passports/src/main.js", "utf8");
   for (const act of ["act-save", "act-off", "act-del", "month-save", "dest-save", "dest-off"]) {

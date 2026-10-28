@@ -61,7 +61,7 @@ test("佇列：預設只列還沒做完的、照狀態分段、篩種類與找�
   assert.match(one, /<dd class="pre">A2 直式\n要 QR code<\/dd>/, "說明保留換行");
   assert.match(one, /<a href="https:\/\/drive.google.com\/x" target="_blank" rel="noopener">/);
   assert.match(one, /<select id="rq-status"[^>]*><option value="new" selected>/); assert.match(one, /<textarea id="rq-reply"/);
-  assert.match(one, /data-act="rq-save"/); assert.match(one, /data-act="rq-done"/);
+  assert.match(one, /data-autosave="rq-save"/); assert.match(one, /class="autosave" data-for="rq-save"/, "2026-11-06 起狀態與回覆改了就存"); assert.doesNotMatch(one, /data-act="rq-save"/); assert.match(one, /data-act="rq-done"/); assert.doesNotMatch(one, /<option value="done"/, "還沒做完的單，下拉不給選做完（要按那顆鈕，會寄信）");
   const view = F.requestsQueueHTML(R, PEOPLE, {}, R[0].id, false, "", false);
   assert.doesNotMatch(view, /rq-status|rq-done/); assert.match(view, /改狀態要「改」以上/);
   const done = F.requestsQueueHTML(R, PEOPLE, {}, R[1].id, true, "", false);

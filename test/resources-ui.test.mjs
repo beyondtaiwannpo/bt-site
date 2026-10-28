@@ -76,6 +76,21 @@ test("★ 編輯頁一定要有那句「用無痕視窗自己點一次」", () =
   assert.match(h, /你需要存取權/);
 });
 
+// 2026-11-06 自動儲存：既有的資源改了就存，狀態變成一顆上架／下架鈕；新的一筆還是一顆「新增」鈕加狀態下拉。
+test("編輯頁：既有的在自動儲存容器裡、留上架下架與刪掉；新的留新增鈕", () => {
+  const old = M.resEditHTML(items[0], "", false);
+  assert.match(old, /<div data-autosave="res-save" data-id="1">/);
+  assert.doesNotMatch(old, /data-act="res-save"/); assert.doesNotMatch(old, /id="rstatus"/);
+  assert.match(old, /<span class="autosave" data-for="res-save">/);
+  assert.match(old, /data-act="res-status" data-id="1" data-to="published"/, "草稿那一筆的鈕是上架");
+  assert.match(M.resEditHTML({ ...items[0], status: "published" }, "", false), /data-act="res-status" data-id="1" data-to="draft"/, "上架的那一筆是下架");
+  assert.match(old, /data-act="res-del" data-id="1"/);
+  for (const n of ["title", "blurb", "kind", "ord", "team", "url"]) assert.match(old, new RegExp(`name="${n}"`), n);
+  const fresh = M.resEditHTML(null, "", false);
+  assert.match(fresh, /data-act="res-save"/); assert.match(fresh, /id="rstatus" name="status"/);
+  assert.doesNotMatch(fresh, /data-autosave/); assert.doesNotMatch(fresh, /res-status/);
+});
+
 test("編輯頁講清楚介紹是公開的（那是搜尋引擎唯一看得到的東西）", () => {
   assert.match(M.resEditHTML(null, "", false), /Google 也看得到/);
 });

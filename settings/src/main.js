@@ -77,7 +77,11 @@ document.addEventListener("change", e => {
   const sel = document.getElementById("scounty");
   if (!sel || sel.value) return;          // 他自己選過就不要蓋掉
   const c = countyOf(e.target.value);
-  if (c) sel.value = c;
+  if (!c) return;
+  sel.value = c;
+  // 2026-11-06 自動儲存：程式幫他選的縣市不會自己觸發 change，補發一次，
+  // 不然高中存了、縣市要等他再改別格才會跟著存。
+  sel.dispatchEvent(new Event("change", { bubbles: true }));
 });
 
 // 版本提示（2026-11-06，後台速度）：開頁問一次線上的 version.json（cache: no-store，繞過 GitHub Pages 的 10 分鐘快取），
@@ -105,6 +109,8 @@ async function checkVersion(rootUrl) {
 
 async function boot() {
   checkVersion("../");
+  // 自動儲存掛一次在 #bt-root 上（它不會被換掉，裡面的 innerHTML 才會）。
+  UI.bindAutosave(root(), onAutosave);
   try {
     const who = await AUTH.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }
@@ -291,23 +297,57 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  if (act === "save") {
-    // ⚠ **三種人，不是兩種**（總審查 C1，2026-09-11）。原本只有
-    // cadre / 不是 cadre 兩分法，校友掉進「不是 cadre」那一條，
-    // 那一條問的是「姓名、學校、年級」——校友的畫面上根本沒有那三格，
-    // 於是校友的故事一個字都存不進去。ui.js 已經是三分法，這裡要跟上。
-    const cadre = S.me.role === "cadre";
-    const alumni = S.me.role === "alumni";
-    // 2026-10-17：實習生的「我的資料」跟校友一樣只有中英文名兩格，存檔走校友那一句；
-    // 但他沒有「我的故事」，下面那一段不走。
-    const intern = S.me.role === "intern";
-    // **只送這一頁真的有那一格的欄位。** 多送一個沒有權限的欄位，
-    // 整句 update 都會被拒（2026-09-01 profiles.team 那個坑）。
-    //
-    // ⚠ **三條路各寫一句字面的 update，不要組一個 patch 物件再送。**
-    // check.sh 有一條守門在對「前端寫進 profiles 的欄位」與資料庫發出去的
-    // 欄位權限，而它是用比對式讀原始碼的 —— `.update(patch)` 它看不懂，
-    // 會靜靜地漏掉這幾條寫入路徑。**寫成看得懂的樣子，是為了讓守門守得到。**
+  // 2026-11-06：「存起來」那顆鈕沒有了，存檔走下面的 onAutosave（每一格改了就存）。
+
+  if (act === "do-delete") {
+    if (!UI.typedDelete(val("dc"))) { S.msg = T("m.typeDelete"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const { error } = await supabase.rpc("delete_my_account");
+      if (error) throw error;
+      // 帳號沒了，本機的 session 也要清掉，不然下一次載入會拿著一張
+      // 指向不存在的人的票。
+      await AUTH.signOut();
+      location.replace("../");
+    } catch (err) {
+      S.busy = false; S.msg = T("m.delFail") + (err.message || err); render();
+    }
+    return;
+  }
+});
+
+// ── 自動儲存（2026-11-06，Paul：「希望每一格都像 Workspaces 那一頁一樣，改了就存」）──
+// 兩個容器各自存：data-autosave="profile" 存 profiles、data-autosave="story" 存 alumni_stories。
+// 讀欄位仍然照 id（val / pickedTeams / getElementById），不用 formValues：team 那幾個 checkbox 同名，
+// formValues 會把它們收成一個布林，而 pickedTeams() 本來就是為這件事寫的。
+//
+// ⚠ **三種人，不是兩種**（總審查 C1，2026-09-11）。原本只有
+// cadre / 不是 cadre 兩分法，校友掉進「不是 cadre」那一條，
+// 那一條問的是「姓名、學校、年級」——校友的畫面上根本沒有那三格，
+// 於是校友的故事一個字都存不進去。ui.js 已經是三分法，這裡要跟上。
+//
+// **只送這一頁真的有那一格的欄位。** 多送一個沒有權限的欄位，
+// 整句 update 都會被拒（2026-09-01 profiles.team 那個坑）。
+//
+// ⚠ **三條路各寫一句字面的 update，不要組一個 patch 物件再送。**
+// check.sh 有一條守門在對「前端寫進 profiles 的欄位」與資料庫發出去的
+// 欄位權限，而它是用比對式讀原始碼的 —— `.update(patch)` 它看不懂，
+// 會靜靜地漏掉這幾條寫入路徑。**寫成看得懂的樣子，是為了讓守門守得到。**
+//
+// 存成功**不 render()**：使用者可能還在打字，畫面上已經是他打的字。只換兩個小地方的字
+//（公開勾選底下那兩句 data-pub-note、故事狀態那一句 data-story-status）加左下角一條 toast。
+// 存失敗也不重畫、不清欄位，小字變「沒存進去」，再改一下就會再存一次。
+const dirty = UI.dirtyTracker();
+async function onAutosave(act, box) {
+  if (!S.user || !S.me) return;
+  const cadre = S.me.role === "cadre";
+  const alumni = S.me.role === "alumni";
+  // 2026-10-17：實習生的「我的資料」跟校友一樣只有中英文名兩格，存檔走校友那一句；
+  // 但他沒有「我的故事」，那個容器根本不畫。
+  const intern = S.me.role === "intern";
+  const key = act + ":" + S.user.id;
+
+  if (act === "profile") {
     let patch;
     if (cadre) {
       patch = {
@@ -326,7 +366,8 @@ document.addEventListener("click", async e => {
       };
     } else {
       const name = val("nzh"), school = val("school"), grade = val("grade");
-      if (!name || !school || !grade) { S.msg = T("m.three"); render(); return; }
+      // 學員三格必填，少一格就不存（照舊）。小字變「沒存進去」加一句說哪三格，他填齊下一格就會再存。
+      if (!name || !school || !grade) { UI.autosaveState(box, "failed"); UI.toast(T("m.three")); return; }
       patch = {
         name_zh: name,
         school: school,
@@ -334,8 +375,9 @@ document.addEventListener("click", async e => {
         newsletter_opt_in: !!(document.getElementById("nl") || {}).checked,
       };
     }
-    S.busy = true; S.msg = ""; render();
-    let profileSaved = false;
+    const fp = JSON.stringify(patch);
+    if (!dirty.changed(key, fp)) return;          // 值沒變就不送（離開欄位又停 800 毫秒會觸發兩次）
+    UI.autosaveState(box, "saving");
     try {
       const { error } = cadre
         ? await supabase.from("profiles").update({
@@ -351,109 +393,100 @@ document.addEventListener("click", async e => {
             newsletter_opt_in: patch.newsletter_opt_in,
           }).eq("id", S.user.id);
       if (error) throw error;
-      profileSaved = true;
+      dirty.mark(key, fp);
       S.me = { ...S.me, ...patch };
-
-      // 「我的故事」。**另一張表，所以是第二個 API 呼叫。**學員與實習生沒有這一區。
-      if (cadre || alumni) {
-        const fields = {
-          display_name: val("sname") || null,
-          school: val("sschool") || null,
-          county: (document.getElementById("scounty") || {}).value || null,
-          city: val("scity") || null,
-          country: val("scountry") || null,
-          place: val("splace") || null,
-          quote: val("squote") || null,
-          note: val("snote") || null,
-          school_en: val("sschoolen") || null,
-          country_en: val("scountryen") || null,
-          quote_en: val("squoteen") || null,
-          note_en: val("snoteen") || null,
-          public_story: !!(document.getElementById("spub") || {}).checked,
-        };
-        // 勾了同意才要求填齊。還沒勾的人是在慢慢填，不要擋他存檔。
-        const missing = UI.storyMissing(fields);
-        if (fields.public_story && missing.length) {
-          S.busy = false;
-          S.msg = T("m.storyMissing") + missing.join(T("punct.list"));
-          render(); return;
-        }
-        // ⚠ **不可以用 .upsert()**：alumni_stories 是欄位層級授權，id 只有
-        // INSERT 權限、沒有 UPDATE 權限（Task 4 的遷移檔刻意這樣發，本人才
-        // 改不動「這是誰的故事」）。upsert 展開成
-        // `insert ... on conflict (id) do update set <payload 每一欄>`，
-        // id 會被塞進那份 SET 清單，整句被資料庫拒絕 —— 症狀是「按了存起來，
-        // 畫面什麼都沒發生」，這個 repo 2026-09-02 已經被同一件事咬過一次
-        // （時間看板的知情同意按鈕）。所以分成兩條明確的路：
-        // boot() 已經知道有沒有那一列（S.story 是 null 或物件）。
-        // 兩句都寫成字面物件，理由跟上面 profiles 那幾句一樣 ——
-        // check.sh 的欄位對帳守門是用比對式讀原始碼的，讀得懂才守得到。
-        try {
-          const { error: e3 } = S.story
-            ? await supabase.from("alumni_stories").update({
-                display_name: fields.display_name, school: fields.school, county: fields.county,
-                city: fields.city, country: fields.country, place: fields.place,
-                quote: fields.quote, note: fields.note,
-                school_en: fields.school_en, country_en: fields.country_en,
-                quote_en: fields.quote_en, note_en: fields.note_en,
-                public_story: fields.public_story,
-              }).eq("id", S.user.id)
-            : await supabase.from("alumni_stories").insert({
-                id: S.user.id,
-                display_name: fields.display_name, school: fields.school, county: fields.county,
-                city: fields.city, country: fields.country, place: fields.place,
-                quote: fields.quote, note: fields.note,
-                school_en: fields.school_en, country_en: fields.country_en,
-                quote_en: fields.quote_en, note_en: fields.note_en,
-                public_story: fields.public_story,
-              });
-          if (e3) throw e3;
-          // insert 成功之後 S.story 會變成物件，同一次載入裡按第二次存檔
-          // 就會走 update 那條，正確。
-          S.story = { ...(S.story || {}), ...fields };
-        } catch (err) {
-          // ⚠ 「我的資料」已經存好了，這裡才失敗——不能只說「存不起來」，
-          // 那會讓他以為整頁都沒存到，於是把已經存好的東西再改一次，
-          // 而真正失敗的那一半他完全不知道（小問題 8，總審查）。
-          S.busy = false;
-          S.msg = UI.saveFailMessage(true, err);
-          render();
-          return;
-        }
-      }
-
-      S.busy = false;
       AUTH.forgetMe(); // 名字、team、公開勾選改了，別的頁面的側欄要跟著變
+      const note = box.querySelector("[data-pub-note]");
+      if (note) note.innerHTML = UI.pubNote(S.me);
+      UI.autosaveState(box, "saved");
       const notes = [];
-      if (cadre && patch.public_profile && !S.me.public_approved)
-        notes.push(T("m.pendingTeam"));
-      if (S.story && S.story.public_story && !S.story.story_approved)
-        notes.push(T("m.pendingStory"));
-      S.msg = T("m.saved", { notes: notes.join(T("punct.sent")) }).trim();
+      if (cadre && patch.public_profile && !S.me.public_approved) notes.push(T("m.pendingTeam"));
+      UI.toast(T("m.saved", { notes: notes.join(T("punct.sent")) }).trim());
     } catch (err) {
-      // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再按一次。
-      S.busy = false; S.msg = UI.saveFailMessage(profileSaved, err);
+      // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再改一次。
+      console.error("設定頁自動存檔失敗（我的資料）：", err);
+      UI.autosaveState(box, "failed");
+      UI.toast(UI.saveFailMessage(false, err));
     }
-    render();
     return;
   }
 
-  if (act === "do-delete") {
-    if (!UI.typedDelete(val("dc"))) { S.msg = T("m.typeDelete"); render(); return; }
-    S.busy = true; S.msg = ""; render();
-    try {
-      const { error } = await supabase.rpc("delete_my_account");
-      if (error) throw error;
-      // 帳號沒了，本機的 session 也要清掉，不然下一次載入會拿著一張
-      // 指向不存在的人的票。
-      await AUTH.signOut();
-      location.replace("../");
-    } catch (err) {
-      S.busy = false; S.msg = T("m.delFail") + (err.message || err); render();
+  if (act === "story" && (cadre || alumni)) {
+    // 「我的故事」。**另一張表，所以是獨立的 API 呼叫。**學員與實習生沒有這一區。
+    const fields = {
+      display_name: val("sname") || null,
+      school: val("sschool") || null,
+      county: (document.getElementById("scounty") || {}).value || null,
+      city: val("scity") || null,
+      country: val("scountry") || null,
+      place: val("splace") || null,
+      quote: val("squote") || null,
+      note: val("snote") || null,
+      school_en: val("sschoolen") || null,
+      country_en: val("scountryen") || null,
+      quote_en: val("squoteen") || null,
+      note_en: val("snoteen") || null,
+      public_story: !!(document.getElementById("spub") || {}).checked,
+    };
+    // 勾了同意才要求填齊。還沒勾的人是在慢慢填，不要擋他存檔。
+    const missing = UI.storyMissing(fields);
+    if (fields.public_story && missing.length) {
+      UI.autosaveState(box, "failed");
+      UI.toast(T("m.storyMissing") + missing.join(T("punct.list")));
+      return;
     }
-    return;
+    const ff = JSON.stringify(fields);
+    if (!dirty.changed(key, ff)) return;
+    UI.autosaveState(box, "saving");
+    // ⚠ **不可以用 .upsert()**：alumni_stories 是欄位層級授權，id 只有
+    // INSERT 權限、沒有 UPDATE 權限（Task 4 的遷移檔刻意這樣發，本人才
+    // 改不動「這是誰的故事」）。upsert 展開成
+    // `insert ... on conflict (id) do update set <payload 每一欄>`，
+    // id 會被塞進那份 SET 清單，整句被資料庫拒絕 —— 症狀是「存了，
+    // 畫面什麼都沒發生」，這個 repo 2026-09-02 已經被同一件事咬過一次
+    // （時間看板的知情同意按鈕）。所以分成兩條明確的路：
+    // boot() 已經知道有沒有那一列（S.story 是 null 或物件）。
+    // 兩句都寫成字面物件，理由跟上面 profiles 那幾句一樣 ——
+    // check.sh 的欄位對帳守門是用比對式讀原始碼的，讀得懂才守得到。
+    try {
+      const { error: e3 } = S.story
+        ? await supabase.from("alumni_stories").update({
+            display_name: fields.display_name, school: fields.school, county: fields.county,
+            city: fields.city, country: fields.country, place: fields.place,
+            quote: fields.quote, note: fields.note,
+            school_en: fields.school_en, country_en: fields.country_en,
+            quote_en: fields.quote_en, note_en: fields.note_en,
+            public_story: fields.public_story,
+          }).eq("id", S.user.id)
+        : await supabase.from("alumni_stories").insert({
+            id: S.user.id,
+            display_name: fields.display_name, school: fields.school, county: fields.county,
+            city: fields.city, country: fields.country, place: fields.place,
+            quote: fields.quote, note: fields.note,
+            school_en: fields.school_en, country_en: fields.country_en,
+            quote_en: fields.quote_en, note_en: fields.note_en,
+            public_story: fields.public_story,
+          });
+      if (e3) throw e3;
+      dirty.mark(key, ff);
+      // insert 成功之後 S.story 會變成物件，同一次載入裡再改一格就會走 update 那條，正確。
+      // 改了那一句話或介紹，資料庫那邊的 trigger 會把 story_approved 放掉（等重新核可）；
+      // 這裡不猜它的值，只在勾了同意的時候把狀態那一句改成「已送出，等核可」。
+      S.story = { ...(S.story || {}), ...fields };
+      if (fields.public_story) S.story.story_approved = false;
+      const st = box.querySelector("[data-story-status]");
+      if (st) st.textContent = UI.storyStatus(S.story);
+      UI.autosaveState(box, "saved");
+      const notes = [];
+      if (S.story.public_story && !S.story.story_approved) notes.push(T("m.pendingStory"));
+      UI.toast(T("m.saved", { notes: notes.join(T("punct.sent")) }).trim());
+    } catch (err) {
+      console.error("設定頁自動存檔失敗（我的故事）：", err);
+      UI.autosaveState(box, "failed");
+      UI.toast(UI.saveFailMessage(false, err));
+    }
   }
-});
+}
 
 // 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
 // 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。

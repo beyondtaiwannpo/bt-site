@@ -123,6 +123,7 @@ export const COMMON = {
   // 版本提示與自動儲存（2026-11-06）。九份 strings.js 的 COMMON 要一模一樣（test/lang.test.mjs、test/admin-hub.test.mjs 逐字比對）。
   "ver.newer":        { zh: "網站有新版本了，重新整理一下就會換成新的。", en: "A newer version is live. Reload to get it." },
   "ver.reload":       { zh: "重新整理", en: "Reload" },
+  "ver.tag":          { zh: "更新", en: "Update" },
   "auto.saving":      { zh: "存檔中…", en: "Saving…" },
   "auto.saved":       { zh: "存好了", en: "Saved" },
   "auto.hint":        { zh: "改了就存", en: "saves as you change it" },
@@ -215,6 +216,8 @@ export const MINE = {
   "q.optsPh":         { zh: "第一個選項&#10;第二個選項", en: "First option&#10;Second option" },
   "q.req":            { zh: "這一題必填", en: "Required" },
   "q.save":           { zh: "存這一題", en: "Save question" },
+  // 2026-11-06 自動儲存：新題才有這顆鈕，既有的題改了就存。
+  "q.add":            { zh: "加這一題", en: "Add this question" },
   // 審核
   "app.received":     { zh: "還沒處理", en: "Waiting" },
   "app.interview":    { zh: "邀請面試", en: "Interview" },
@@ -480,6 +483,7 @@ export const MINE = {
   "err.rqSubmit":     { zh: "送不出去：", en: "Could not send: " },
   "err.rqWithdraw":   { zh: "收不回：", en: "Could not withdraw: " },
   "err.rqSave":       { zh: "存不起來：", en: "Could not save: " },
+  "err.rqDoneBtn":    { zh: "要標成做完請按「標成做完」那顆鈕，它會寄一封信給送單的人。", en: "To mark it done, use the Mark done button; it emails the requester." },
   "hub.goRes":        { zh: "去資源", en: "Open resources" },
   "hub.goWall":       { zh: "進度牆", en: "Progress wall" },
   "hub.goAdmin":      { zh: "後台", en: "Admin" },

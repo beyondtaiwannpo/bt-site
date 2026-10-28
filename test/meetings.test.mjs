@@ -48,7 +48,7 @@ test("一場會議：議程、紀錄、出席分三欄（會到、還沒回、�
   assert.match(h, /<i>會到（1）<\/i><ul class="plain"><li><span class="nm"><b>王平<\/b>/);
   assert.match(h, /<i>還沒回（1）<\/i>[\s\S]*?<b>小安<\/b>[\s\S]*?這是你/);
   assert.match(h, /<i>不能到（1）<\/i>[\s\S]*?<b>雅婷<\/b>/);
-  assert.match(h, /data-act="mt-save" data-id="11111111-1111-4111-8111-111111111111"/); assert.match(h, /data-act="mt-delete"/);
+  assert.match(h, /data-autosave="mt-save" data-id="11111111-1111-4111-8111-111111111111"/); assert.match(h, /class="autosave" data-for="mt-save"/, "2026-11-06 起既有那一場改了就存"); assert.doesNotMatch(h, /data-act="mt-save"/); assert.match(h, /data-act="mt-delete"/);
   assert.match(h, /在名單上（3）/, "名單那一塊預勾現有的三位，Co-President 也勾得到");
   const ro = F.meetingHTML(M[1], ME, PEOPLE, false, [], null, "", false);
   assert.doesNotMatch(ro, /mt-save|mt-delete/); assert.match(ro, /還沒貼（開完會把 Docs 連結貼上）/);
