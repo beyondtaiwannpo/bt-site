@@ -1794,6 +1794,183 @@ if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAI
 chk "重跑不動資料：紀錄上的 email 還在" "two2@example.com" "select email from public.people where id='${IB2}'"
 chkas "${PAUL}" "★ 名單上 pending_code 不再抓邀請信那組碼（IB4 綁著的是邀請信，印空的）" "" "select coalesce(pending_code,'') from public.roster() where person_id='${IB4}'"
 
+echo "財務（2026-11-08）："
+# 這時候：PAUL Co-President、OTHER Senior Adviser、MEMBER 校友、STU 學員，當屆是 2027-28（上面結束這一屆那一段切過去的）。
+# 另外建兩個人：SD 是這一屆 Sponsorship Team 的 Director（看得到、改得動）、ASSOC 是一般幹部（什麼都碰不到）。
+SD=66660000-0000-0000-0000-000000000001
+ASSOC=77770000-0000-0000-0000-000000000001
+SDP=66660000-0000-0000-0000-0000000000a1
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${SD}','sponsor@example.com'), ('${ASSOC}','assoc@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values
+  ('${SD}','贊助長','Sponsor Lee','Sponsorship Team','cadre','director'),
+  ('${ASSOC}','小幹部','Assoc Wu','Sponsorship Team','cadre','member');
+insert into public.people (id,name_zh,name_en,profile_id) values ('${SDP}','贊助長','Sponsor Lee','${SD}');
+insert into public.positions (person_id,term_id,title_zh,title_en,team) values ('${SDP}','2027-28','Sponsorship 的 Director','Director, Sponsorship Team','Sponsorship Team');
+SQL
+rwgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-08-finance.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then
+  echo "  ok   財務那支遷移檔跑過，驗收表全部 PASS"; pass=$((pass+1))
+else
+  echo "  FAIL 財務那支遷移檔沒過："; echo "${rwgot}" | grep -i "FAIL\|error\|LINE" | head -8; fail=$((fail+1))
+fi
+# ── 兩道門 ──
+chkas "${PAUL}"  "Co-President：看得到、改得動" "true|true" "select public.can_view_finance()||'|'||public.can_edit_finance()"
+chkas "${OTHER}" "★ Senior Adviser：看得到、改不動" "true|false" "select public.can_view_finance()||'|'||public.can_edit_finance()"
+chkas "${SD}"    "★ Sponsorship 的 Director：看得到、改得動" "true|true" "select public.can_view_finance()||'|'||public.can_edit_finance()"
+chkas "${ASSOC}" "★ 一般幹部：都不行" "false|false" "select public.can_view_finance()||'|'||public.can_edit_finance()"
+chkas "${STU}"   "學員：都不行" "false|false" "select public.can_view_finance()||'|'||public.can_edit_finance()"
+chkas "${SD}"    "★ my_access() 給 Director 一格 finance = edit（側欄靠它）" "edit" "select w->>'level' from public.my_access() a, jsonb_array_elements(a->'workspaces') w where w->>'id'='finance'"
+chkas "${OTHER}" "my_access() 給 Senior Adviser 一格 finance = view" "view" "select w->>'level' from public.my_access() a, jsonb_array_elements(a->'workspaces') w where w->>'id'='finance'"
+chkas "${ASSOC}" "★ my_access() 不給一般幹部 finance 那一格" "0" "select count(*) from public.my_access() a, jsonb_array_elements(a->'workspaces') w where w->>'id'='finance'"
+chkas "${DIR}"   "別的 team 的 Director 也沒有" "0" "select count(*) from public.my_access() a, jsonb_array_elements(a->'workspaces') w where w->>'id'='finance'"
+# ── 帳戶 ──
+FA1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_upsert_account('{\"name_zh\":\"玉山活存\",\"name_en\":\"E.Sun checking\",\"kind\":\"bank\",\"opening_balance\":100000,\"opening_on\":\"2027-09-08\"}'::jsonb)" | tail -1 | tr -d ' \n')
+FA2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_upsert_account('{\"name_zh\":\"現金\",\"name_en\":\"Cash box\",\"kind\":\"cash\",\"opening_balance\":5000,\"opening_on\":\"2027-09-08\"}'::jsonb)" | tail -1 | tr -d ' \n')
+chk "★ Sponsorship 的 Director 開了兩個帳戶（開帳餘額與開帳日都在）" "2|100000.00|2027-09-08" \
+  "select (select count(*) from public.fin_accounts)||'|'||(select opening_balance from public.fin_accounts where id='${FA1}')||'|'||(select opening_on from public.fin_accounts where id='${FA1}')"
+chkraise "★ 破壞測試：Senior Adviser 開不了帳戶（not_finance_editor）" "not_finance_editor" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.fin_upsert_account('{\"name_zh\":\"x\"}'::jsonb);"
+chkraise "★ 破壞測試：一般幹部開不了帳戶（not_finance_editor）" "not_finance_editor" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.fin_upsert_account('{\"name_zh\":\"x\"}'::jsonb);"
+chkraise "沒有名字擋（need_name）" "need_name" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_upsert_account('{\"kind\":\"cash\"}'::jsonb);"
+chkas "${PAUL}" "Co-President 改名字、改開帳餘額（改了就存那條路）" "玉山活存（協會）|100500.00" \
+  "select public.fin_upsert_account('{\"id\":\"${FA1}\",\"name_zh\":\"玉山活存（協會）\",\"opening_balance\":100500}'::jsonb); select name_zh||'|'||opening_balance from public.fin_accounts where id='${FA1}'"
+# ── 類別 ──
+CI=$(psql -d "${DB}" -X -A -t -q -c "select id from public.fin_categories where code='sponsorship'" | tr -d ' \n')
+CC=$(psql -d "${DB}" -X -A -t -q -c "select id from public.fin_categories where code='crowdfunding'" | tr -d ' \n')
+CE=$(psql -d "${DB}" -X -A -t -q -c "select id from public.fin_categories where code='venue'" | tr -d ' \n')
+CF=$(psql -d "${DB}" -X -A -t -q -c "select id from public.fin_categories where code='food'" | tr -d ' \n')
+chk "類別 seed：收入五種、支出八種" "5|8" "select (select count(*) from public.fin_categories where kind='income')||'|'||(select count(*) from public.fin_categories where kind='expense')"
+chkas "${SD}" "改一個類別的名字（code 留著，重跑 seed 不會蓋回去）" "場地租借|venue" \
+  "select public.fin_upsert_category('{\"id\":\"${CE}\",\"name_zh\":\"場地租借\"}'::jsonb); select name_zh||'|'||code from public.fin_categories where id='${CE}'"
+# ── 收支 ──
+T1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_add_transaction('{\"happened_on\":\"2027-09-10\",\"kind\":\"income\",\"amount\":30000,\"currency\":\"TWD\",\"account_id\":\"${FA1}\",\"category_id\":\"${CI}\",\"counterparty\":\"台積電慈善基金會\"}'::jsonb)" | tail -1 | tr -d ' \n')
+T2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_add_transaction('{\"happened_on\":\"2027-09-12\",\"kind\":\"expense\",\"amount\":8000,\"currency\":\"TWD\",\"account_id\":\"${FA1}\",\"category_id\":\"${CE}\",\"counterparty\":\"松菸\"}'::jsonb)" | tail -1 | tr -d ' \n')
+T3=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_add_transaction('{\"happened_on\":\"2027-09-15\",\"kind\":\"transfer\",\"amount\":2000,\"currency\":\"TWD\",\"account_id\":\"${FA1}\",\"to_account_id\":\"${FA2}\"}'::jsonb)" | tail -1 | tr -d ' \n')
+T4=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.fin_add_transaction('{\"happened_on\":\"2027-09-20\",\"kind\":\"expense\",\"amount\":500,\"currency\":\"TWD\",\"account_id\":\"${FA2}\",\"category_id\":\"${CF}\",\"note\":\"便當\"}'::jsonb)" | tail -1 | tr -d ' \n')
+T5=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"income\",\"amount\":100,\"currency\":\"USD\",\"fx_rate\":32,\"account_id\":\"${FA1}\",\"category_id\":\"${CI}\"}'::jsonb)" | tail -1 | tr -d ' \n')
+T7=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_add_transaction('{\"happened_on\":\"2027-05-01\",\"kind\":\"income\",\"amount\":777,\"currency\":\"TWD\",\"account_id\":\"${FA1}\",\"category_id\":\"${CC}\",\"counterparty\":\"嘖嘖\"}'::jsonb)" | tail -1 | tr -d ' \n')
+chk "★ 六筆進去了：屆由日期算（9、10 月是 2027-28，5 月那筆是 2026-27）、誰登的有記" "6|2027-28|2026-27|${SD}|${PAUL}" \
+  "select (select count(*) from public.fin_transactions)||'|'||(select term_id from public.fin_transactions where id='${T1}')||'|'||(select term_id from public.fin_transactions where id='${T7}')||'|'||(select entered_by from public.fin_transactions where id='${T1}')||'|'||(select entered_by from public.fin_transactions where id='${T4}')"
+chk "★ 美金那筆：存了匯率，台幣 = 100 × 32 = 3200" "100.00|32.000000|3200.00|USD" \
+  "select amount||'|'||fx_rate||'|'||amount_twd||'|'||currency from public.fin_transactions where id='${T5}'"
+chkraise "★ 破壞測試：美金沒匯率擋（need_fx_rate）" "need_fx_rate" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"income\",\"amount\":100,\"currency\":\"USD\",\"account_id\":\"${FA1}\",\"category_id\":\"${CI}\"}'::jsonb);"
+chkraise "破壞測試：轉帳轉給自己擋（same_account）" "same_account" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"transfer\",\"amount\":100,\"account_id\":\"${FA1}\",\"to_account_id\":\"${FA1}\"}'::jsonb);"
+chkraise "破壞測試：轉帳少轉入帳戶擋（transfer_needs_two_accounts）" "transfer_needs_two_accounts" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"transfer\",\"amount\":100,\"account_id\":\"${FA1}\"}'::jsonb);"
+chkraise "破壞測試：金額 0 擋（bad_amount）" "bad_amount" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"expense\",\"amount\":0,\"account_id\":\"${FA1}\",\"category_id\":\"${CE}\"}'::jsonb);"
+chkraise "破壞測試：收入選了支出的類別擋（category_kind_mismatch）" "category_kind_mismatch" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"income\",\"amount\":10,\"account_id\":\"${FA1}\",\"category_id\":\"${CE}\"}'::jsonb);"
+chkraise "破壞測試：支出沒選類別擋（need_category）" "need_category" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"expense\",\"amount\":10,\"account_id\":\"${FA1}\"}'::jsonb);"
+chkraise "★ 破壞測試：Senior Adviser 加不了（not_finance_editor）" "not_finance_editor" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"expense\",\"amount\":10,\"account_id\":\"${FA1}\",\"category_id\":\"${CE}\"}'::jsonb);"
+chkraise "★ 破壞測試：一般幹部加不了（not_finance_editor）" "not_finance_editor" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.fin_add_transaction('{\"happened_on\":\"2027-10-01\",\"kind\":\"expense\",\"amount\":10,\"account_id\":\"${FA1}\",\"category_id\":\"${CE}\"}'::jsonb);"
+# ── 餘額的算法（跟 test/finance.test.mjs 的 overview 同一條公式）──
+chkas "${OTHER}" "★ 餘額：玉山 = 100500 + 30000 − 8000 − 2000 + 3200（5 月那筆在開帳日之前不算）、現金 = 5000 + 2000 − 500" "123700.00|6500.00|130200.00" \
+  "select (o->'balances'->0->>'balance')||'|'||(o->'balances'->1->>'balance')||'|'||(o->>'total') from (select public.fin_overview('2027-28') o) x"
+chkas "${OTHER}" "★ 這一屆的收入與支出：收入 30000 + 3200、支出 8000 + 500；轉帳兩邊都不算" "33200.00|8500.00" \
+  "select (o->>'income')||'|'||(o->>'expense') from (select public.fin_overview('2027-28') o) x"
+chkas "${OTHER}" "上一屆只有嘖嘖那 777" "777.00|0" \
+  "select (o->>'income')||'|'||(o->>'expense') from (select public.fin_overview('2026-27') o) x"
+chkas "${OTHER}" "每月：9 月 30000 / 8500、10 月 3200 / 0" "2027-09|30000.00|8500.00|2027-10|3200.00|0" \
+  "select (o->'months'->0->>'ym')||'|'||(o->'months'->0->>'income')||'|'||(o->'months'->0->>'expense')||'|'||(o->'months'->1->>'ym')||'|'||(o->'months'->1->>'income')||'|'||(o->'months'->1->>'expense') from (select public.fin_overview('2027-28') o) x"
+chkas "${OTHER}" "照類別：場地租借 8000、餐飲 500" "8000.00|500.00" \
+  "select (select c->>'amount' from jsonb_array_elements(o->'categories') c where c->>'category_id'='${CE}')||'|'||(select c->>'amount' from jsonb_array_elements(o->'categories') c where c->>'category_id'='${CF}') from (select public.fin_overview('2027-28') o) x"
+chkraise "★ 破壞測試：一般幹部拿不到總覽（not_finance_viewer）" "not_finance_viewer" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.fin_overview('2027-28');"
+chkraise "★ 破壞測試：一般幹部拿不到 bootstrap（not_finance_viewer）" "not_finance_viewer" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.fin_bootstrap();"
+chkas "${SD}" "bootstrap：兩個帳戶、十三個類別、can_edit = true" "2|13|true" \
+  "select jsonb_array_length(b->'accounts')||'|'||jsonb_array_length(b->'categories')||'|'||(b->>'can_edit') from (select public.fin_bootstrap() b) x"
+chkas "${OTHER}" "bootstrap 給 Senior Adviser：can_edit = false" "false" "select b->>'can_edit' from (select public.fin_bootstrap() b) x"
+# ── RLS：表本身 ──
+chkrole authenticated "${OTHER}" "★ Senior Adviser 直接讀表讀得到六筆" "6" "select count(*) from public.fin_transactions"
+chkrole authenticated "${ASSOC}" "★ 一般幹部直接讀表是 0 筆（RLS）" "0" "select count(*) from public.fin_transactions"
+chkrole authenticated "${ASSOC}" "一般幹部讀帳戶、類別、預算、紀錄全部 0" "0|0|0|0" \
+  "select (select count(*) from public.fin_accounts)||'|'||(select count(*) from public.fin_categories)||'|'||(select count(*) from public.fin_budgets)||'|'||(select count(*) from public.fin_log)"
+chkrole authenticated "${STU}" "學員也是 0" "0" "select count(*) from public.fin_transactions"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.fin_transactions" 2>&1 | tr -d ' \n' || true)
+case "${angot}" in *"permissiondenied"*) echo "  ok   ★ anon 讀表被擋（permission denied）"; pass=$((pass+1));; *) echo "  FAIL anon 讀表沒被擋：${angot}"; fail=$((fail+1));; esac
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role authenticated; select set_config('test.uid','${SD}',false); insert into public.fin_transactions (happened_on,kind,amount,amount_twd,account_id,category_id) values ('2027-10-01','expense',1,1,'${FA1}','${CE}')" 2>&1 | tr -d ' \n' || true)
+case "${angot}" in *"permissiondenied"*) echo "  ok   ★ 能改的人也不能直接 insert 表（只能走函式）"; pass=$((pass+1));; *) echo "  FAIL 直接 insert 沒被擋：${angot}"; fail=$((fail+1));; esac
+# ── 改與作廢 ──
+chkas "${SD}" "改一筆：對象與備註" "松山文創園區|發票在Drive" \
+  "select public.fin_update_transaction('${T2}','{\"counterparty\":\"松山文創園區\",\"note\":\"發票在 Drive\"}'::jsonb); select counterparty||'|'||note from public.fin_transactions where id='${T2}'"
+chkas "${SD}" "改一筆：換成美金就重算台幣、換日期就重算屆" "50.00|USD|1600.00|2026-27" \
+  "select public.fin_update_transaction('${T4}','{\"amount\":50,\"currency\":\"USD\",\"fx_rate\":32,\"happened_on\":\"2027-06-01\"}'::jsonb); select amount||'|'||currency||'|'||amount_twd||'|'||term_id from public.fin_transactions where id='${T4}'"
+chkas "${SD}" "改回來" "500.00|TWD|500.00|2027-28" \
+  "select public.fin_update_transaction('${T4}','{\"amount\":500,\"currency\":\"TWD\",\"happened_on\":\"2027-09-20\"}'::jsonb); select amount||'|'||currency||'|'||amount_twd||'|'||term_id from public.fin_transactions where id='${T4}'"
+chkas "${SD}" "收據：寫路徑" "${T2}/1.pdf" \
+  "select public.fin_update_transaction('${T2}','{\"receipt_path\":\"${T2}/1.pdf\"}'::jsonb); select receipt_path from public.fin_transactions where id='${T2}'"
+chkas "${SD}" "收據：再拿掉（patch 帶 null）" "" \
+  "select public.fin_update_transaction('${T2}','{\"receipt_path\":null}'::jsonb); select coalesce(receipt_path,'') from public.fin_transactions where id='${T2}'"
+T6=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SD}',false);" -c "select public.fin_add_transaction('{\"happened_on\":\"2027-09-25\",\"kind\":\"expense\",\"amount\":999,\"currency\":\"TWD\",\"account_id\":\"${FA1}\",\"category_id\":\"${CE}\"}'::jsonb)" | tail -1 | tr -d ' \n')
+chkas "${OTHER}" "多登了一筆 999，總覽跟著變" "9499.00" "select o->>'expense' from (select public.fin_overview('2027-28') o) x"
+chkraise "★ 破壞測試：作廢不寫原因擋（need_reason）" "need_reason" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_void_transaction('${T6}','  ');"
+chkraise "★ 破壞測試：Senior Adviser 作廢不了（not_finance_editor）" "not_finance_editor" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.fin_void_transaction('${T6}','x');"
+chkas "${PAUL}" "★ Co-President 作廢那一筆：留著、標了時間、誰、原因" "true|${PAUL}|重複登了" \
+  "select public.fin_void_transaction('${T6}','重複登了'); select (voided_at is not null)||'|'||voided_by||'|'||void_reason from public.fin_transactions where id='${T6}'"
+chkas "${OTHER}" "★ 作廢的不算：總覽回到 8500、餘額不變" "8500.00|123700.00" \
+  "select (o->>'expense')||'|'||(o->'balances'->0->>'balance') from (select public.fin_overview('2027-28') o) x"
+chkraise "★★ 破壞測試：作廢過的不能再改（tx_voided）" "tx_voided" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_update_transaction('${T6}','{\"amount\":1}'::jsonb);"
+chkraise "作廢過的不能再作廢（tx_voided）" "tx_voided" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_void_transaction('${T6}','再一次');"
+# ── 紀錄 ──
+chk "★ fin_log：每一次新增、改、作廢都有一列，前後值都在" "7|true|true" \
+  "select (select count(*) from public.fin_log where table_name='fin_transactions' and action='insert')||'|'||(select count(*)=1 from public.fin_log where table_name='fin_transactions' and action='void' and row_id='${T6}' and before->>'voided_at' is null and after->>'void_reason'='重複登了')||'|'||(select count(*)>=4 from public.fin_log where table_name='fin_transactions' and action='update' and row_id in ('${T2}','${T4}'))"
+chk "fin_log 記了帳戶與類別的改動與誰改的" "true|true" \
+  "select (select count(*)=1 from public.fin_log where table_name='fin_accounts' and action='update' and row_id='${FA1}' and who='${PAUL}' and after->>'name_zh'='玉山活存（協會）')||'|'||(select count(*)=1 from public.fin_log where table_name='fin_categories' and action='update' and row_id='${CE}')"
+# ── 預算 ──
+chkas "${SD}" "設這一屆場地的預算 20000" "20000.00" "select public.fin_set_budget('2027-28','${CE}',20000); select amount_twd from public.fin_budgets where term_id='2027-28' and category_id='${CE}'"
+chkas "${SD}" "再設一次是改不是多一列" "1|25000.00" "select public.fin_set_budget('2027-28','${CE}',25000); select (select count(*) from public.fin_budgets)||'|'||(select amount_twd from public.fin_budgets where category_id='${CE}')"
+chkraise "★ 破壞測試：Senior Adviser 設不了預算（not_finance_editor）" "not_finance_editor" \
+  "perform set_config('test.uid','${OTHER}',true); perform public.fin_set_budget('2027-28','${CE}',1);"
+chkraise "收入的類別不能有預算（no_such_category）" "no_such_category" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_set_budget('2027-28','${CI}',1);"
+chkas "${OTHER}" "總覽的預算對花掉：場地 25000 對 8000" "25000.00|8000.00" \
+  "select (b->>'budget')||'|'||(b->>'spent') from (select public.fin_overview('2027-28') o) x, jsonb_array_elements(o->'budget') b where b->>'category_id'='${CE}'"
+# ── 匯出 ──
+chkas "${OTHER}" "★ 匯出這一屆：六筆（含作廢的那筆），帶帳戶與類別名字、作廢欄" "6|1|玉山活存（協會）|場地租借" \
+  "select (select count(*) from public.fin_export('2027-28'))||'|'||(select count(*) from public.fin_export('2027-28') where voided)||'|'||(select account_zh from public.fin_export('2027-28') where happened_on='2027-09-12')||'|'||(select category_zh from public.fin_export('2027-28') where happened_on='2027-09-12')"
+chkas "${OTHER}" "匯出全部、匯出一段日期" "7|2" \
+  "select (select count(*) from public.fin_export(null))||'|'||(select count(*) from public.fin_export('2027-28','2027-09-15','2027-09-20'))"
+chkraise "★ 破壞測試：一般幹部匯不出（not_finance_viewer）" "not_finance_viewer" \
+  "perform set_config('test.uid','${ASSOC}',true); perform count(*) from public.fin_export(null);"
+# ── 帳戶封存 ──
+chkas "${SD}" "封存現金帳戶：總覽不列它、總額只剩玉山" "true|1|123700.00" \
+  "select public.fin_upsert_account('{\"id\":\"${FA2}\",\"archived\":true}'::jsonb); select (select archived_at is not null from public.fin_accounts where id='${FA2}')||'|'||(select jsonb_array_length(o->'balances') from (select public.fin_overview('2027-28') o) x)||'|'||(select o->>'total' from (select public.fin_overview('2027-28') o) x)"
+chkas "${SD}" "恢復" "f" "select public.fin_upsert_account('{\"id\":\"${FA2}\",\"archived\":false}'::jsonb); select archived_at is not null from public.fin_accounts where id='${FA2}'"
+# ── Storage（替身）──
+chk "bucket receipts 是私人的、5 MB、只收圖與 PDF" "false|5242880|4" "select public||'|'||file_size_limit||'|'||array_length(allowed_mime_types,1) from storage.buckets where id='receipts'"
+chkrole authenticated "${SD}" "★ Sponsorship 的 Director 傳得上收據" "1" "insert into storage.objects (bucket_id,name,owner) values ('receipts','${T2}/r.pdf','${SD}'); select count(*) from storage.objects where bucket_id='receipts'"
+chkrole authenticated "${OTHER}" "★ Senior Adviser 讀得到收據的列" "1" "select count(*) from storage.objects where bucket_id='receipts'"
+stgot=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${OTHER}',false);" -c "set role authenticated; insert into storage.objects (bucket_id,name,owner) values ('receipts','${T2}/x.pdf','${OTHER}')" 2>&1 | tr -d ' \n' || true)
+case "${stgot}" in *"row-levelsecurity"*) echo "  ok   ★ 破壞測試：Senior Adviser 傳收據被 RLS 擋"; pass=$((pass+1));; *) echo "  FAIL Senior Adviser 傳收據沒被擋：${stgot}"; fail=$((fail+1));; esac
+chkrole authenticated "${ASSOC}" "★ 一般幹部看不到任何收據" "0" "select count(*) from storage.objects where bucket_id='receipts'"
+chkrole anon "" "★ anon 看不到任何收據" "0" "select count(*) from storage.objects where bucket_id='receipts'"
+# ── 破壞測試：把「作廢過的擋」拿掉，驗收表要變紅；重跑裝回去、資料不動 ──
+BROKEN=$(mktemp)
+sed "s/if t.voided_at is not null then raise exception 'tx_voided' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-08-finance.sql > "${BROKEN}"
+bkgot=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bkgot}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「作廢過的擋」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉「作廢過的擋」驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+rwgot=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-08-finance.sql 2>&1 || true)
+if echo "${rwgot}" | grep -q "OVERALL.*PASS" && ! echo "${rwgot}" | grep -q "FAIL"; then echo "  ok   財務那支可以重跑（裝回那一道門）"; pass=$((pass+1)); else echo "  FAIL 財務那支重跑沒過："; echo "${rwgot}" | grep -i "FAIL\|error" | head -4; fail=$((fail+1)); fi
+chk "★ 重跑不動資料：七筆、兩個帳戶、改過的類別名字還在、seed 沒多" "7|2|場地租借|13" \
+  "select (select count(*) from public.fin_transactions)||'|'||(select count(*) from public.fin_accounts)||'|'||(select name_zh from public.fin_categories where code='venue')||'|'||(select count(*) from public.fin_categories)"
+chkraise "重跑之後作廢過的還是不能改（tx_voided）" "tx_voided" \
+  "perform set_config('test.uid','${SD}',true); perform public.fin_update_transaction('${T6}','{\"amount\":1}'::jsonb);"
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
