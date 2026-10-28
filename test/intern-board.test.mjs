@@ -83,7 +83,7 @@ test("★ 英文畫出來不剩中文", () => {
 
 test("★ 側欄四份都有「棋盤」，而且資料層只讀 intern_boards 與 intern_squares、不碰 entries", () => {
   for (const f of ["admin/src/ui.js", "admin/site/src/ui.js", "admin/passports/src/ui.js", "admin/people/src/ui.js"]) {
-    assert.match(readFileSync(f, "utf8"), /key: "board",\s+label: \{ zh: "棋盤"/, f);
+    assert.match(readFileSync(f, "utf8"), /key: "board",\s+sec: "pass",\s+label: \{ zh: "實習的蛇梯棋"/, f);
   }
   const d = readFileSync("admin/passports/src/data.js", "utf8");
   assert.match(d, /rpc\("save_board"/);

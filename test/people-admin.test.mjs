@@ -523,7 +523,7 @@ test("★ 邀請頁：表單六格、職位下拉共用、清單五種狀態、�
   // 側欄：邀請那一行 Senior Adviser 也看得到。
   const { ITEMS, canSee } = await import("../admin/people/src/ui.js");
   const row = ITEMS.find(i => i.key === "invites");
-  assert.equal(row.who, "senior"); assert.equal(T(row.label), "邀請");
+  assert.equal(row.who, "senior"); assert.equal(T(row.label), "邀請新的人");
   assert.equal(canSee(row, { role: "cadre", board: "senior_adviser" }), true);
   assert.equal(canSee(row, { role: "cadre", board: "director" }), false);
 });

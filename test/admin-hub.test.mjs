@@ -60,15 +60,19 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
   }
 });
 
-test("★ 側欄：進得去的是連結、進不去的整組淡掉並說為什麼、當前那一行有標記", () => {
+test("★ 側欄：進得去的是連結、進不去的整段淡掉並說為什麼、當前那一行有標記、只有現在這一段打開", () => {
   for (const [label, M] of IMPL) {
     const rail = M.railHTML("site", "res", { ...ME.member, name: "王平" });
-    assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page">資源/, label);
-    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms">申請表/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
-    // 2026-10-23 批 4：「首頁」改叫「總覽」；進不去的組只留組名變淡，為什麼放在 title（滑過去才看得到），不再是一段灰字。
-    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home">總覽/, label);
-    assert.match(rail, /class="rail-group off" title="只有被派進護照工作區[^"]*">護照<\/div>/, label);
-    assert.match(rail, /class="rail-group off" title="只有 Co-President[^"]*">人與權限<\/div>/, label);
+    assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page"><span class="rail-txt"><b>資源庫<\/b><small>/, label);
+    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms"><span class="rail-txt"><b>申請表/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
+    // 2026-10-23 批 4：「首頁」改叫「總覽」；進不去的段只留段名變淡，為什麼放在 title（滑過去才看得到），不再是一段灰字。
+    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home"><span class="rail-txt"><b>總覽/, label);
+    // 2026-10-28：一行都進不去的段整段不畫（側欄只留這個人用得到的）。進得去哪些在總覽「你的存取」講。
+    assert.doesNotMatch(rail, /<span>護照<\/span>/, label);
+    assert.doesNotMatch(rail, /<span>錢<\/span>/, label);
+    // 2026-10-28：現在這一頁所在的那一段打開，其他段收起來。
+    assert.equal((rail.match(/<details class="rail-sec-box" open>/g) || []).length, 1, `${label}：只有一段打開`);
+    assert.match(rail, /<details class="rail-sec-box" open><summary class="rail-sec here">.*?<span>對外網站<\/span>/, label);
     assert.doesNotMatch(rail, /class="why"/, `${label}：側欄不再有灰色長文`);
     assert.doesNotMatch(rail, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
     assert.doesNotMatch(rail, /data-t="team"/, `${label}：一般幹部看不到團隊頁那一行`);

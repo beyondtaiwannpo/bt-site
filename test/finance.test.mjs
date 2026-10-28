@@ -57,11 +57,11 @@ test("★ 側欄：五個資料夾都有「財務」這一組，看得到的只�
     assert.equal(M.canEnter(g, { role: "cadre", board: "president", team: "", ws: {} }), true, label);
     assert.equal(M.canEnter(g, { role: "student", board: "president", ws: { finance: "edit" } }), false, `${label}：學員就算有那一格也不行`);
     const rail = M.railHTML("forms", "home", { ...assoc, name: "小安" });
-    assert.match(rail, /class="rail-group off"[^>]*>財務<\/div>/, `${label}：看不到的人整組淡掉`);
+    assert.doesNotMatch(rail, /<span>錢<\/span>/, `${label}：看不到的人側欄上沒有「錢」那一段（2026-10-28）`);
     assert.doesNotMatch(rail, /href="\/admin\/finance\/"/, label);
     const railOk = M.railHTML("forms", "home", { ...assoc, name: "小安", ws: { finance: "edit" } });
-    assert.match(railOk, /href="\/admin\/finance\/\?lang=zh#overview">總覽/, `${label}：看得到的人五行都是連結`);
-    assert.match(railOk, /href="\/admin\/finance\/\?lang=zh#export">匯出/, label);
+    assert.match(railOk, /href="\/admin\/finance\/\?lang=zh#overview"><span class="rail-txt"><b>錢的總覽/, `${label}：看得到的人五行都是連結`);
+    assert.match(railOk, /href="\/admin\/finance\/\?lang=zh#export"><span class="rail-txt"><b>匯出/, label);
     // 總覽的「你的存取」那一塊會印 finance 那一格：名字是「財務」、連去 /admin/finance/
     assert.equal(M.wsCellLabel({ id: "finance" }), "財務（帳戶、收支、預算）", label);
     assert.equal(M.wsCellHref({ id: "finance" }), "/admin/finance/#overview", label);
