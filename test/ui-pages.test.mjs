@@ -22,34 +22,34 @@ const S = page => ({
 const dotCount = html => (html.match(/data-act="go"/g) || []).length;
 
 test("每頁右下角有頁碼，1 起算補零，總數來自 pagesOf", () => {
-  assert.match(bookHTML(S(0)), /PAGE 01 \/ 4/);
-  assert.match(bookHTML(S(1)), /PAGE 02 \/ 4/);
-  assert.match(bookHTML(S(3)), /PAGE 04 \/ 4/);
+  assert.match(bookHTML(S(0)), /PAGE 01 \/ 3/);
+  assert.match(bookHTML(S(1)), /PAGE 02 \/ 3/);
+  assert.match(bookHTML(S(2)), /PAGE 03 \/ 3/);
 });
 
 test("頁碼的總數不是寫死的 —— 月份變少就跟著變", () => {
   // 這條擋的是「直接寫 13」。月份資料是從資料庫來的，停用一整個月的時候
   // 總數要跟著變，否則頁碼會說謊。
   const two = { ...S(0), months: months.slice(0, 1) };
-  assert.match(bookHTML(two), /PAGE 01 \/ 3/);
+  assert.match(bookHTML(two), /PAGE 01 \/ 2/);
 });
 
-test("pagesOf：資料頁 → 說明頁 → 月份，九月在索引 2", () => {
+test("pagesOf：資料頁 → 月份，九月在索引 1（說明頁 2026-10-28 拿掉了）", () => {
   const pages = pagesOf(S(0));
   assert.equal(pages[0].kind, "id");
-  assert.equal(pages[1].kind, "guide");
-  assert.equal(pages[2].kind, "month");
-  assert.equal(pages[2].month.month, 9);
-  assert.equal(pages.length, months.length + 2);
+  assert.equal(pages[1].kind, "month");
+  assert.equal(pages[1].month.month, 9);
+  assert.ok(!pages.some(p => p.kind === "guide"), "書裡沒有說明頁");
+  assert.equal(pages.length, months.length + 1);
 });
 
-test("圓點數等於 pagesOf 的長度，而且就是 months + 2 顆", () => {
+test("圓點數等於 pagesOf 的長度，而且就是 months + 1 顆", () => {
   // 兩個斷言缺一不可：
   // 第一個確認 bookHTML 的圓點迴圈跟 pagesOf 的陣列一一對應（抓 bookHTML 漏畫）。
   // 第二個釘住字面數字（抓 pagesOf 自己少一項）—— 只有第一個的話兩邊同源，
   // pagesOf 少掉資料頁或說明頁時它會一起變小而不會紅。
   assert.equal(dotCount(bookHTML(S(1))), pagesOf(S(1)).length);
-  assert.equal(dotCount(bookHTML(S(1))), months.length + 2);
+  assert.equal(dotCount(bookHTML(S(1))), months.length + 1);
 });
 
 test("圓點的 data-p 是 0 起算的連號", () => {
@@ -159,8 +159,9 @@ test("說明頁用的是 .slot 而不是可點的 button", () => {
     "說明頁的 .slots 要帶 guide 修飾詞，桌機的 min-height 靠它拿掉");
 });
 
-test("翻到說明頁時 bookHTML 畫的是說明頁", () => {
-  assert.ok(bookHTML(S(1)).includes(guideCardsHTML()));
+test("書裡翻不到說明頁（2026-10-28 拿掉），第一次打開的說明彈窗還在", () => {
+  for (let i = 0; i < pagesOf(S(0)).length; i++) assert.ok(!bookHTML(S(i)).includes(guideCardsHTML()), "第 " + i + " 頁");
+  assert.ok(introHTML().includes(guideCardsHTML()));
 });
 
 test("引導頁與說明頁用的是同一份三張卡", () => {

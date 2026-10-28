@@ -462,6 +462,19 @@ document.addEventListener("click", async e => {
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
+  // 揭曉或蓋回去一個月（2026-11-12）。兩個方向都先問：揭曉是全體幹部當下看得到，蓋回去是大家看過的那一頁不見。
+  if (act === "month-reveal") {
+    const reveal = b.dataset.reveal === "1";
+    const label = UI.monthLabel(Number(b.dataset.month));
+    if (UI.needAsk(S, b, T(reveal ? "confirm.revealMonth" : "confirm.coverMonth", { m: label }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.setMonthRevealed(b.dataset.month, reveal);
+      S.msg = T(reveal ? "msg.monthRevealed" : "msg.monthCovered", { m: label });
+      await openCadre(true);
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
   if (act === "month-edit") {
     const m = S.pass.months.find(x => String(x.seq) === b.dataset.seq);
     if (!m) { S.msg = T("err.noMonth"); render(); return; }

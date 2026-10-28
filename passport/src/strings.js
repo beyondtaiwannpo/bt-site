@@ -85,6 +85,9 @@ export const MINE = {
   "cb.wroteWhen":     { zh: "你在{when}寫的", en: "What you wrote in {when}" },
   "cb.wrote":         { zh: "你之前寫的", en: "What you wrote before" },
   // 說明頁、引導頁
+  "veil.seal":        { zh: "未揭曉", en: "SEALED" },
+  "veil.title":       { zh: "這個月還沒揭曉", en: "Not revealed yet" },
+  "veil.note":        { zh: "在群組公布之後，這一頁才會打開。", en: "This page opens once it's announced in the group." },
   "guide.title":      { zh: "怎麼用這本護照", en: "How to use this passport" },
   "intro.sub":        { zh: "一年 33 格，每個月三格。這一頁之後在護照裡隨時翻得到。", en: "33 boxes a year, three a month. You can find this page in the passport any time." },
   "intro.start":      { zh: "開始蓋章", en: "Start stamping" },

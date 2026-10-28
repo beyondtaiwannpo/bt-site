@@ -273,23 +273,28 @@ export function barHTML(S) {
 // 只濾畫面，不刪資料：打開就回來。main.js 載完資料呼叫一次。
 export function visibleOf(months, activities) {
   const ms = (months || []).filter(m => !m.hidden);
-  const keep = new Set(ms.map(m => m.month));
+  // 還沒揭曉的月份（2026-11-12）：那一頁留著（蓋起來），但格子拿掉，不算進總數、不發入境章。
+  const keep = new Set(ms.filter(m => !isCovered(m)).map(m => m.month));
   return { months: ms, activities: (activities || []).filter(a => keep.has(a.month)) };
 }
 // 藏起來那幾個月蓋過的章，不進 S.stamps（stampCount 數的是 S.stamps，不濾的話「N / 總數」會超過總數）。
 // 回一份新的物件，資料庫裡的章不動。allActs 是濾之前的全部格子，用來知道每一個章屬於哪個月。
 export function stampsShown(stamps, allActs, months) {
-  const hiddenM = new Set((months || []).filter(m => m.hidden).map(m => m.month));
+  const hiddenM = new Set((months || []).filter(m => m.hidden || isCovered(m)).map(m => m.month));
   const hiddenIds = new Set((allActs || []).filter(a => hiddenM.has(a.month)).map(a => a.id));
   const out = {};
   for (const k of Object.keys(stamps || {})) if (!hiddenIds.has(k)) out[k] = stamps[k];
   return out;
 }
 
+// 這個月還沒揭曉（2026-11-12）。revealed 沒有這一欄（遷移檔還沒跑）的時候當作已揭曉，畫面跟以前一樣。
+export const isCovered = m => !!m && m.revealed === false;
+
+// 「怎麼用這本護照」那一頁 2026-10-28 Paul 說拿掉，書裡只剩資料頁加月份。
+// 第一次打開的說明彈窗（introHTML）還在，內容是同一份 guideCardsHTML。
 export function pagesOf(S) {
   return [
     { kind: "id", label: T("page.id") },
-    { kind: "guide", label: T("page.guide") },
     ...S.months.map(m => ({
       kind: "month", month: m, label: monthName(m.month)
     }))
@@ -467,6 +472,7 @@ function entryStampHTML(dest, date, angle, month) {
 // 活動的月份，圓點說未蓋滿、頁面卻蓋著 MONTH CLEARED。
 // 判斷「全部完成」的時候，先問「有沒有東西可以完成」。
 export function monthPageHTML(S, m) {
+  if (isCovered(m)) return coveredPageHTML(m);
   const acts = orderSlots(S.activities.filter(a => a.month === m.month));
   const full = acts.length > 0 && acts.every(a => S.stamps[a.id]);
   const dest = full ? visasOf(S)[m.month] : null;
@@ -480,6 +486,19 @@ export function monthPageHTML(S, m) {
       ${m.theme_zh ? `<div class="mtheme clock"><b>${esc(m.theme_zh)}</b>${m.theme_en ? `<span>${esc(m.theme_en)}</span>` : ""}</div>` : ""}
     </div>
     <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
+}
+
+// 還沒揭曉的月份：只有月份的數字與名字，主題與格子都不給（那是驚喜的部分）。
+export function coveredPageHTML(m) {
+  return `<div class="mhead">
+      <div class="mnum">${String(m.month).padStart(2, "0")}</div>
+      <div class="mzh">${esc(monthName(m.month))}</div>
+    </div>
+    <div class="veil">
+      <div class="seal">${T("veil.seal")}</div>
+      <b>${T("veil.title")}</b>
+      <span>${T("veil.note")}</span>
+    </div>`;
 }
 
 // 07B 的回望（spec §7.3）。由 activities.callback_to 驅動，**不寫死 07B** ——
@@ -711,7 +730,7 @@ export function wallHTML(S) {
           ${av}
           <b>${nameHTML(p)}</b>
           <span class="team">${esc(p.team || "")}</span>
-          <div class="track">${S.months.map(m => {
+          <div class="track">${S.months.filter(m => !isCovered(m)).map(m => {
             const acts = S.activities.filter(a => a.month === m.month);
             const got = acts.filter(a => on.has(a.id)).length;
             const op = got === 0 ? 1 : (0.34 + 0.66 * got / acts.length);

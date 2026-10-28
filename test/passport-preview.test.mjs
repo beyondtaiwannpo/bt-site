@@ -12,9 +12,9 @@ internLang("zh");
 const S = { months: [{ seq: 1, month: 9 }, { seq: 2, month: 10 }, { seq: 3, month: 11 }] };
 const DATA = { months: S.months, activities: [], destinations: [], stamped: {} };
 
-test("?month 對到正確的頁：前面有資料頁與怎麼用兩頁", () => {
-  assert.equal(pageForMonth(S, "9"), 2);
-  assert.equal(pageForMonth(S, "11"), 4);
+test("?month 對到正確的頁：前面只有資料頁一頁（說明頁 2026-10-28 拿掉）", () => {
+  assert.equal(pageForMonth(S, "9"), 1);
+  assert.equal(pageForMonth(S, "11"), 3);
 });
 
 test("沒帶、亂帶、不存在的月份都開在資料頁", () => {

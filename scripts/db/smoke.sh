@@ -2118,6 +2118,31 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-11-fix-mail-send.sql >/dev/null 2>&1 || true
 
+echo "── 護照一個月一個月揭曉（2026-11-12-reveal-months.sql）──"
+rvgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-12-reveal-months.sql 2>&1 || true)
+if echo "${rvgot}" | grep -q "OVERALL.*PASS" && ! echo "${rvgot}" | grep -q "|FAIL"; then echo "  ok   揭曉那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 揭曉那支驗收表："; echo "${rvgot}" | head -12; fail=$((fail+1)); fi
+chk "第一次跑完揭曉的是九、十、十一月" "9,10,11" "select string_agg(month::text, ',' order by seq) from public.months where revealed"
+chkraise "★ Associate 揭曉不了" "not_ws_edit" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.set_month_revealed(12, true);"
+chkraise "★ 學員揭曉不了" "not_ws_edit" \
+  "perform set_config('test.uid','${STU}',true); perform public.set_month_revealed(12, true);"
+chkraise "沒有這個月" "bad_month" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_month_revealed(13, true);"
+chkas "${PAUL}" "Co-President 揭曉十二月" "" "select public.set_month_revealed(12, true)"
+chk "十二月揭曉了" "9,10,11,12" "select string_agg(month::text, ',' order by seq) from public.months where revealed"
+rv2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-12-reveal-months.sql 2>&1 || true)
+if echo "${rv2}" | grep -q "OVERALL.*PASS"; then echo "  ok   揭曉那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 揭曉那支重跑沒過"; fail=$((fail+1)); fi
+chk "★ 重跑不會把揭曉的十二月蓋回去" "9,10,11,12" "select string_agg(month::text, ',' order by seq) from public.months where revealed"
+chk "藏起來那一欄沒被動到" "10" "select string_agg(month::text, ',' order by seq) from public.months where hidden"
+BROKEN=$(mktemp)
+sed "s/  perform public.require_ws_edit('passport');//" supabase/migrations/2026-11-12-reveal-months.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 require_ws_edit，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 require_ws_edit 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-12-reveal-months.sql >/dev/null 2>&1 || true
+chkraise "裝回去之後 Associate 還是揭曉不了" "not_ws_edit" \
+  "perform set_config('test.uid','${ASSOC}',true); perform public.set_month_revealed(12, true);"
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -825,12 +825,16 @@ export function passportAdminHTML(data, msg, busy, previewMonth, mpItems) {
     const rows = acts.filter(a => a.month === m.month);
     // 藏起來的月份（2026-11-10）：護照上沒有這一頁、格子不算，標題旁邊寫清楚，一顆鈕打開。
     const hidTag = m.hidden ? `<span class="tag warn">${T("pa.hiddenTag")}</span> ` : "";
+    // 還沒揭曉的月份（2026-11-12）：護照上那一頁蓋起來。revealed 沒有這一欄（遷移檔還沒跑）當作已揭曉。
+    const covered = !m.hidden && m.revealed === false;
+    const covTag = covered ? `<span class="tag warn">${T("pa.coveredTag")}</span> ` : "";
     return sectionHTML(esc(monthLabel(m.month)),
-      `${m.hidden ? `<div class="note">${T("pa.hiddenNote")}</div>` : ""}
+      `${m.hidden ? `<div class="note">${T("pa.hiddenNote")}</div>` : ""}${covered ? `<div class="note">${T("pa.coveredNote")}</div>` : ""}
       ${rows.length ? `<ul class="flist">${rows.map(actRow).join("")}</ul>` : `<div class="empty sm">${T("pa.emptyMonth")}</div>`}
       <div class="row" style="margin:4px 0 0"><button class="btn ghost sm" data-act="act-new" data-month="${esc(String(m.month))}"${dis}>${T("pa.addIn", { m: esc(monthLabel(m.month)) })}</button></div>`,
-      { id: `m${m.month}`, hint: hidTag + T("pa.theme", { t: m.theme_zh ? esc(m.theme_zh) : T("pa.themeEmpty") }),
+      { id: `m${m.month}`, hint: hidTag + covTag + T("pa.theme", { t: m.theme_zh ? esc(m.theme_zh) : T("pa.themeEmpty") }),
         actions: [{ act: "month-edit", label: T("pa.editTheme"), seq: String(m.seq), disabled: busy },
+                  ...(m.hidden ? [] : [{ act: "month-reveal", label: covered ? T("pa.revealMonth") : T("pa.coverMonth"), month: String(m.month), reveal: covered ? "1" : "0", disabled: busy }]),
                   { act: "month-hide", label: m.hidden ? T("pa.showMonth") : T("pa.hideMonth"), month: String(m.month), hide: m.hidden ? "0" : "1", disabled: busy },
                   ...(m.hidden ? [] : [{ act: "preview", label: T("pa.preview"), month: String(m.month) }])] });
   }).join("");
