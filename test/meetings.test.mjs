@@ -131,7 +131,12 @@ test("勾或取消出席的人，人數與送出鈕的數字跟著變（Paul 202
   assert.ok(i > 0, "有 change 監聽");
   const body = m.slice(i, i + 600);
   assert.match(body, /sch-member/); assert.match(body, /readSch\(\)/);
-  assert.match(body, /sch-who-n/); assert.match(body, /T\("sch\.send"/); assert.match(body, /btn\.disabled = !n/);
+  assert.match(body, /schCount\(\)/);
+  const f = m.slice(m.indexOf("function schCount()"), m.indexOf("function schCount()") + 500);
+  assert.match(f, /sch-who-n/); assert.match(f, /T\("sch\.send"/); assert.match(f, /btn\.disabled = !n/);
+  const all = m.slice(m.indexOf('act === "sch-all" || act === "sch-none"'), m.indexOf('act === "sch-all" || act === "sch-none"') + 700);
+  assert.match(all, /x\.checked = on\.has\(x\.value\)/, "全勾／全取消只改勾選框");
+  assert.doesNotMatch(all.slice(0, all.indexOf("return;", all.indexOf("schCount()")) ), /render\(\)/, "全勾／全取消不重畫，彈窗不跳回最上面");
 });
 
 test("寄信修好：send_pending_mail 的 r 是 mail_outbox 的型別（11-05 那一版用 record，每封信都 cannot cast）", () => {

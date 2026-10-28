@@ -579,10 +579,14 @@ document.addEventListener("click", async e => {
   // ── 排一場會（2026-11-02）──
   if (act === "sch-open") { S.sch = { ticked: (S.peekFree || []).slice(), q: "", title: S.evTitle || T("cal.title"), minutes: 60, scope: scopes()[0] }; buildPeek(); render(); return; }
   if (act === "sch-cancel") { S.sch = null; buildPeek(); render(); return; }
+  // 全勾／全取消只改勾選框，不重畫彈窗（重畫會把彈窗捲回最上面，Paul 2026-10-28 回報）。
   if (act === "sch-all" || act === "sch-none") {
+    if (!S.sch) return;
     readSch();
     S.sch.ticked = act === "sch-all" ? [...new Set(S.sch.ticked.concat(SCH.shown(view().members, S.sch.q).map(m => m.id)))] : [];
-    buildPeek(); render(); return;
+    const on = new Set(S.sch.ticked);
+    document.querySelectorAll('input[name="sch-member"]').forEach(x => { x.checked = on.has(x.value); });
+    schCount(); return;
   }
   if (act === "sch-send") {
     readSch();
@@ -644,11 +648,14 @@ document.addEventListener("click", async e => {
 // 不重畫整個彈窗，名單捲到一半的位置才不會跳回最上面。
 document.addEventListener("change", e => {
   if (e.target.name !== "sch-member" || !S.sch) return;
-  readSch();
-  const n = S.sch.ticked.length;
+  readSch(); schCount();
+});
+// 人數那一行與送出鈕上的數字照 S.sch.ticked 當下改（不重畫）。
+function schCount() {
+  const n = S.sch ? S.sch.ticked.length : 0;
   const lab = document.getElementById("sch-who-n"); if (lab) lab.textContent = T("sch.who", { n });
   const btn = document.getElementById("sch-send"); if (btn && !S.busy) { btn.textContent = T("sch.send", { n }); btn.disabled = !n; }
-});
+}
 
 document.addEventListener("input", e => {
   // 標題改了就跟著改連結的 href。**不重畫整個彈窗** ——
@@ -663,8 +670,11 @@ document.addEventListener("input", e => {
     return;
   }
   if (e.target.id === "sch-q") {
+    // 找名字要重畫名單；重畫前記下彈窗捲到哪，重畫後放回去，不讓 focus() 把彈窗捲走（2026-10-28）。
+    const md = document.querySelector(".modal"), st = md ? md.scrollTop : 0;
     readSch(); S.sch.q = e.target.value; buildPeek(); render();
-    const again = document.getElementById("sch-q"); if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* 有的瀏覽器不給 */ } }
+    const again = document.getElementById("sch-q"); if (again) { again.focus({ preventScroll: true }); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* 有的瀏覽器不給 */ } }
+    const md2 = document.querySelector(".modal"); if (md2) md2.scrollTop = st;
     return;
   }
   if (e.target.id === "tzq") {
