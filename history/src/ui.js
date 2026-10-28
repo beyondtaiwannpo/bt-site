@@ -77,13 +77,15 @@ export function photosHTML(stop, lang) {
 // 覆蓋層：日期、標題、一句話、說明、照片、回到路上。
 export function overlayHTML(stop, lang) {
   const title = pick(stop, "title", lang), summary = pick(stop, "summary", lang), body = pick(stop, "body", lang);
-  return `<div class="panel-head"><button type="button" class="back" data-close>` +
-    `<span aria-hidden="true">←</span> ${esc(t("back", lang))}</button></div>` +
+  // 2026-11-07 Paul：不要貼在右邊，要像參考站那樣在正中間、大一點、後面的場景還看得到一點。
+  // .panel 本身是整個螢幕的底（模糊加一點深藍），卡在中間，點卡外面也關。
+  return `<div class="panel-card"><div class="panel-head"><button type="button" class="back" data-close aria-label="${esc(t("back", lang))}">` +
+    `<span aria-hidden="true">×</span></button></div>` +
     `<article class="panel-body"><p class="panel-date">${dateText(stop.happened_on, lang)}</p>` +
     `<h2 class="panel-title" id="panel-title">${esc(title)}</h2>` +
     (summary ? `<p class="panel-summary">${esc(summary)}</p>` : "") +
     (body ? `<div class="panel-text">${paras(body)}</div>` : "") +
-    `<h3 class="panel-photos-h">${esc(t("photos", lang))}</h3>${photosHTML(stop, lang)}</article>`;
+    `<h3 class="panel-photos-h">${esc(t("photos", lang))}</h3>${photosHTML(stop, lang)}</article></div>`;
 }
 
 // 減少動態效果、或 GSAP 載不到：同樣的站排成直立時間軸，卡一樣，點了一樣打開覆蓋層。

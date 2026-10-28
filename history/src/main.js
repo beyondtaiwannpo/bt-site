@@ -212,7 +212,7 @@ addEventListener("keydown", e => {
 document.addEventListener("click", e => {
   const card = e.target.closest(".card"); if (card) { openStop(+card.dataset.i, card); return; }
   const strip = e.target.closest(".strip-stop"); if (strip) { stopPlay(); goTo(+strip.dataset.i); return; }
-  if (e.target.closest("[data-close]")) { closePanel(); return; }
+  if (e.target.closest("[data-close]") || e.target === $("panel")) { closePanel(); return; }
   const shot = e.target.closest(".shot-btn"); if (shot) { if (matchMedia("(min-width: 760px)").matches) openLightbox(shot); return; }
   if (e.target.closest("[data-lb-close]") || e.target === $("lightbox")) { closeLightbox(); return; }
 });
