@@ -699,6 +699,82 @@ Paul 2026-11-07 看了改一個人那一頁最底下的「校友碼與刪除紀�
 **上線前要跑** `supabase/migrations/2026-11-07-alumni-invite-back.sql`，接在 `2026-11-06-history-milestones.sql` 後面，9 項 PASS，可以重跑、不動既有資料。它多了 `people.email`、`profiles.alumni_welcome_dismissed_at` 兩欄，五支函式（`invite_back`、`invite_back_many`、`roster_invites`、`dismiss_alumni_welcome`、十三參數的 `invite_person`），改了 `delete_person` 與 `roster()`（pending_code 只算手發的碼），`role_changes.field` 多一種 `invite_back`（單筆與批次都記在變動紀錄）。**重跑 2026-10-29 那支之後要再跑這一支**（它會把 field 的限制建回沒有 invite_back 的版本）。沒跑之前：名單照畫但沒有徽章（狀態載不到會在上面講一句）、「寄邀請信」會說函式不在。`claim_invite()` 一個字沒動。
 本機 `./scripts/db/smoke.sh` 多一段 36 項（607 項全過）：請回來、同一筆再按回同一組、有帳號擋、email 已是登入擋、校友叫不動、綁著活的邀請的紀錄刪不掉、一批三列一列壞只紅那一列、錯的 email 認領被擋、對的 email 認領拿回紀錄與職位、邀請頁同名剛好一筆就掛、好幾筆就問、畫面選定帶 id、全零 uuid 一定建新的、歡迎卡關掉記時間、拿掉「有帳號擋」驗收表變紅。前端 `test/alumni-invite.test.mjs` 13 條（徽章、批次面板、選擇器、歡迎卡、字典中英都有）。截圖 `docs/admin-redesign/alumni-invite/`。
 
+## 財務（2026-11-08）
+
+Paul 2026-11-07 要的：「總共多少錢、花在哪、收入，全部」。後台多一組 **財務**（網址 `/admin/finance/`），五個分頁：總覽、收支、帳戶與類別、預算、匯出。
+設計與每一個決定的理由在 `docs/2026-11-08-財務設計.md`。截圖在 `docs/admin-redesign/finance/`（本機 Supabase 真的登入拍的，桌機與 375px）。
+
+### 誰看得到、誰改得動
+
+| 誰 | 看 | 改 |
+|---|---|---|
+| Co-President | 可以 | 可以 |
+| Senior Adviser | 可以 | 不行（畫面上沒有加一筆、作廢、改了就存） |
+| Sponsorship Team 的 Director（這一屆職位寫「Director, Sponsorship Team」的人） | 可以 | 可以 |
+| 其他幹部、學員、校友、沒登入 | 不行（側欄「財務」整組淡掉；直接打網址看到一頁說只有誰進得來；資料庫一列都不給） | 不行 |
+
+門在資料庫：`can_view_finance()`、`can_edit_finance()` 兩支，五張表只有能看的人讀得到、**沒有任何人能直接寫表**，寫一律走函式而每一支第一句都問 `can_edit_finance()`。畫面少畫一顆按鈕不是安全機制。
+Sponsorship 的 Director 換人：Co-President 到人與權限把新的人這一屆的職位填成「Director, Sponsorship Team」，他下次登入（或十分鐘內）就看得到財務；舊的人職位一拿掉就看不到。
+
+### 第一天要做的事（Paul 或 Sponsorship 的 Director）
+
+1. 先在 Supabase 跑 `supabase/migrations/2026-11-08-finance.sql`（見下面「資料庫」）。
+2. 登入後 **後台 → 財務 → 帳戶與類別**。按 **加一個帳戶**：中文名（例如「玉山活存」）、種類（銀行／現金／平台）、**開帳餘額填今天帳戶裡的數字**、**開帳日填今天**。每一個放錢的地方各加一個（銀行、現金盒、嘖嘖之類的平台各一個）。
+3. 之前的收支**不補登**。餘額從開帳那天的數字起算，開帳日之前的筆就算登了也不算進餘額（Paul 2026-11-07 拍板：從今天的餘額開始）。
+4. 類別已經有十三個（收入：贊助、捐款、募資、補助、其他；支出：場地、餐飲、印刷、軟體與網域、交通、回饋品與寄送、手續費、其他）。要改名直接改，改了就存；不用的按封存，不刪。
+5. 回到 **總覽**，標題那個大數字就是現在全部的錢。
+
+### 怎麼登一筆
+
+到 **收支**，按右上角 **加一筆**，填完按 **加進去**（新的一筆要按鈕，已經在清單上的改了就存）。
+- **收入**：日期、金額、帳戶（錢進哪裡）、類別（贊助／捐款／募資…）、對象（誰給的）。
+- **支出**：一樣，類別選支出的那幾種，對象寫付給誰。
+- **轉帳**（例如從銀行領現金放進現金盒）：種類選轉帳、帳戶是轉出的、轉入帳戶是進去的。轉帳**不是收入也不是支出**，總覽的收支數字不會動，只有兩個帳戶的餘額一邊減一邊加。
+- **美金**：幣別選 USD，會多一格「匯率」（1 美金換幾塊台幣，照入帳那天銀行給的數字）。資料庫存原幣、匯率、換算後的台幣，清單上兩個都印，總覽一律用台幣。
+- **嘖嘖撥款**：整筆進來當**一筆收入**，類別「募資」、帳戶選錢真的進的那個銀行帳戶、對象寫「嘖嘖」。平台手續費另外登一筆支出，類別「手續費」。
+- **收據**：那一筆右邊按 **傳收據**，選圖（jpg、png、webp）或 PDF，5 MB 以內。傳好變成「看收據」，點了開新分頁（十分鐘有效的簽名網址）。收據放在**私人**的 bucket，沒有公開網址，只有看得到財務的人開得了。
+- **登錯了**：不刪。按 **作廢**，寫一句為什麼（例如「重複登了」），那一筆會變灰留在清單上、數字不算。作廢過的不能再改也不能再作廢，要修正就重新加一筆。
+- 每一次新增、改、作廢資料庫都記一列前後值（`fin_log`），誰在什麼時候改了什麼都查得到。
+
+### 怎麼讀總覽
+
+- **現在全部的錢**：每個沒封存的帳戶現在的餘額加起來。餘額 = 開帳餘額 + 開帳日起的收入 − 支出 − 轉出 + 轉入，作廢的不算。
+- **每個帳戶**：一個帳戶一張卡。
+- **這一屆**（可以切屆）：收入、支出、淨額、這個月的收支。屆是照日期算的（8 月到隔年 7 月），一筆登在哪一屆由它的日期決定。
+- **每月收入與支出**：一個月兩根（深藍收入、橘支出），滑過去看數字。自己畫的 SVG，沒有圖表函式庫。
+- **支出照類別、收入照類別**：最大那一條滿，其他照比例。沒選類別的筆會在上面提醒。
+- **預算與花掉的**：到 **預算** 那一頁給每一類支出填這一屆打算花多少（改了就存），這裡畫進度條，超過變橘的。只是提醒，不會擋。
+
+### 匯出
+
+**匯出** 那一頁選屆（或某個月）按 **下載 CSV**。檔案開頭帶 UTF-8 BOM，Excel 直接開中文不會亂碼；欄位：日期、種類、金額、幣別、匯率、台幣、帳戶、轉入帳戶、類別、對象、備註、收據、作廢、作廢原因。作廢的列也在，最後兩欄標著。要更細的篩選（帳戶、類別、文字）先到收支那一頁篩好再到匯出，篩選會跟著。
+
+### 資料庫（`supabase/migrations/2026-11-08-finance.sql`）
+
+接在 `2026-11-07-alumni-invite-back.sql` 後面跑，可以重跑、不動既有資料，PASS 表 14 項（本機沒有 storage schema 時最後兩項印 SKIP，正式站要是 PASS）。
+- 五張表：`fin_accounts`、`fin_categories`（seed 十三個，`code` 欄給 seed 認、重跑不蓋改過的名字）、`fin_transactions`、`fin_budgets`、`fin_log`（trigger 寫，每一次新增、改、作廢的前後值）。
+- 兩道門：`can_view_finance()` = `is_senior()` 或 `is_sponsorship_director()`（這一屆 positions 裡 team 是 Sponsorship、title_en 含 director 的人）；`can_edit_finance()` = `is_president()` 或那位 Director。
+- **改了 `my_access()`**：能看的人多一格 `{ id: "finance", level: "view" | "edit" }`，側欄「財務」那一組靠它亮。**重跑 2026-10-24 那支之後要再跑這一支**，不然側欄的財務會不見。
+- 寫：`fin_upsert_account`、`fin_upsert_category`、`fin_add_transaction`、`fin_update_transaction`（作廢過的擋 `tx_voided`）、`fin_void_transaction`（要原因）、`fin_set_budget`。台幣由資料庫算（金額 × 匯率，四捨五入到分），屆由日期算。
+- 讀：`fin_bootstrap()`（屆、帳戶、類別、預算一趟）、`fin_overview(屆)`（每個帳戶餘額、每月、每類、預算對花掉；跟前端 `UI.overview()` 同一條公式，smoke 驗 SQL、node 驗 JS）、`fin_export(屆, 從, 到)`。筆本身前端直接讀 `fin_transactions`（RLS）。
+- Storage bucket `receipts`：**私人**、5 MB、只收 jpeg／png／webp／pdf。讀給能看的人、傳改刪給能改的人。路徑 `<筆的 id>/<時間>-<亂數>.<副檔名>`，不用原檔名。
+- `scripts/db/smoke.sh` 多一段 69 項（688 項全過）：五種身分的兩道門、my_access 的那一格、Senior Adviser 與一般幹部開不了帳戶（破壞）、美金沒匯率擋、轉給自己擋、金額 0 擋、類別種類對不上擋、餘額的算法（開帳日之前的不算、轉帳兩邊）、每月每類、一般幹部直接讀表 0 筆、anon 讀表被擋、能改的人也不能直接 insert、改一筆重算台幣與屆、收據路徑寫進去再拿掉、作廢不寫原因擋、Senior Adviser 作廢不了、作廢後總覽不算它、**作廢過的不能再改（破壞）**、fin_log 有前後值、預算、匯出含作廢列、封存帳戶不列、Storage 能改的人傳得上、Senior Adviser 傳不上（RLS）、anon 看不到、**拿掉「作廢過的擋」驗收表變紅（破壞）**、重跑不動資料。
+
+### 後台（`/admin/finance/`）
+
+- 第五個後台資料夾，跟其他四個同一套外殼：`index.html` 加 `src/{data,ui,main,strings}.js`，側欄與共用零件五份一模一樣（`test/admin-hub.test.mjs` 逐字比對），中英字典 `fin.*` 在 `strings.js`。四個舊資料夾的 `GROUPS`、`ITEMS`、`wsCellLabel`、`wsCellHref` 一起加了財務。
+- 自動儲存：既有的一筆按「改」展開之後改了就存；帳戶、類別、預算每一格改了就存。按鈕只留新增（加進去）、作廢、封存、傳收據、下載 CSV。
+- 375px：表格變成一列一張，篩選列兩格一排，長條圖名字與數字一行、條在下一行。
+- 守門清單都加了它：`scripts/bump-version.sh`、`scripts/pre-commit-bump.sh`、`check-motion.mjs`、`scripts/check-mobile.mjs`（`scripts/mobile-fixtures.mjs` 多一張收支頁）、`check.sh`（modulepreload 十頁、版本提示九支）。
+- 前端純函式 `test/finance.test.mjs` 15 條：側欄五份、誰改得動、金額格式、美金換算、哪一屆、總覽的算法、篩選與排序、CSV（BOM、跳脫）、SVG 長條圖、類別與預算條、五個畫面中英、收據路徑與檔案檢查、錯誤翻人話、守門清單。
+
+### 還沒做、要 Paul 做的
+
+- **遷移檔沒在正式 Supabase 上跑過。** 跑 `2026-11-08-finance.sql`，看 PASS 表 14 項（Storage 那兩項要是 PASS）。SQL Editor 對 `storage.objects` 建政策被擋的話，到 Storage 手動建一個叫 `receipts` 的**私人** bucket（5 MB、jpeg／png／webp／pdf），再把遷移檔第 6 段那四條政策貼進 Policies。
+- 跑完照上面「第一天要做的事」開帳戶、填今天的餘額。
+- 這一屆 Sponsorship 的 Director 是誰，人與權限那邊職位要寫成「Director, Sponsorship Team」他才看得到；沒有這個人的話只有 Co-President 與 Senior Adviser 看得到。
+- 幣別目前只有 TWD 與 USD 兩個選項（`ui.js` 的 `CURRENCIES`），要加別的幣別是改一行。
+
 ## 怎麼發新邀請碼（批次碼，2026-10-29 起收在邀請頁最底下的摺疊裡）
 
 沒有邀請碼就沒辦法註冊，這是擋住外人的唯一一道門。一次要給一整批人同一組碼才用這個；一個一個請人進來用上面那一節。
