@@ -258,7 +258,7 @@ function liveBox(box) {
   return el || box;
 }
 function autosaveFail(box, text) { UI.autosaveState(liveBox(box), "failed"); UI.toast(text); }
-async function onAutosave(act, box) {
+async function onAutosave(act, box, field) {
   const v = UI.formValues(box), id = box.dataset.id || "";
   const key = act + ":" + (id || box.dataset.k || ""), serial = JSON.stringify(v);
   if (!dirty.changed(key, serial)) return;

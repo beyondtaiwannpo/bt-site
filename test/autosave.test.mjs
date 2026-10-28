@@ -107,3 +107,17 @@ test("★ 四個後台 index.html 一開始就有骨架側欄，importmap 與 me
     assert.match(h, /src="\.\/src\/main\.js\?v=/, f);
   }
 });
+
+// 2026-10-28：/admin/site/ 的 onAutosave 少收 field，函式裡卻用了 field，
+// 一選「寄哪一種語言」就丟 ReferenceError，什麼都沒存，畫面也不報錯。
+// 九份 onAutosave 只要函式本體提到 field，參數就一定要有 field。
+test("onAutosave 用到 field 就一定要收 field", () => {
+  const dirs = ["admin", "admin/site", "admin/people", "admin/passports", "admin/finance", "passport", "intern-passport", "settings", "availability"];
+  for (const d of dirs) {
+    let src; try { src = readFileSync(new URL(`../${d}/src/main.js`, import.meta.url), "utf8"); } catch { continue; }
+    const m = src.match(/async function onAutosave\(([^)]*)\)\s*\{([\s\S]*?)\n\}/);
+    if (!m) continue;
+    const params = m[1].split(",").map(s => s.trim());
+    if (/\bfield\b/.test(m[2])) assert.ok(params.includes("field"), `${d}/src/main.js 的 onAutosave 用了 field 卻沒收`);
+  }
+});

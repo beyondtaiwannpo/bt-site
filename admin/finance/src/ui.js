@@ -364,7 +364,7 @@ export function bindAutosave(root, onSave) {
   };
   const schedule = (field, now) => {
     const box = field.closest("[data-autosave]");
-    if (!box) return;
+    if (!box || box === root) return;   // 不在任何存檔框裡（例如找名字的搜尋框）就不存；root 自己也掛著 data-autosave="1"
     let d = timers.get(box);
     if (!d) { d = debounce(f => run(box, f), TYPED_MS); timers.set(box, d); }
     if (now) d.flush(field); else d(field);
@@ -897,10 +897,27 @@ const txFields = (t, ctx, prefix) => {
     <label class="fx"${nonTwd ? "" : " hidden"}><i>${T("f.rate")}</i><input type="number" name="fx_rate" inputmode="decimal" min="0.0001" step="0.0001" value="${esc(t.fx_rate == null ? "" : t.fx_rate)}"${nonTwd ? " required" : ""} placeholder="32.1"><span class="mini">${esc(T("f.rateHint"))}</span></label>
     <label><i>${isT ? T("f.account") + " →" : T("f.account")}</i><select name="account_id">${opt("", T("f.pickCategory").replace(T("f.category"), T("f.account")), t.account_id)}${accs.map(a => opt(a.id, nameOf(a), t.account_id)).join("")}</select></label>
     <label class="to"${isT ? "" : " hidden"}><i>${T("f.toAccount")}</i><select name="to_account_id">${opt("", T("f.none"), t.to_account_id)}${accs.map(a => opt(a.id, nameOf(a), t.to_account_id)).join("")}</select></label>
-    <label class="cat"${isT ? " hidden" : ""}><i>${T("f.category")}</i><select name="category_id">${opt("", T("f.pickCategory"), t.category_id)}${cats.map(c => opt(c.id, nameOf(c), t.category_id)).join("")}</select></label>
+    <label class="cat"${isT ? " hidden" : ""}><i>${T("f.category")}</i><select name="category_id" data-kind="${esc(t.kind)}">${opt("", T("f.pickCategory"), t.category_id)}${cats.map(c => opt(c.id, nameOf(c), t.category_id)).join("")}</select></label>
     <label><i>${T("f.counterparty")}</i><input name="counterparty" value="${esc(t.counterparty || "")}" placeholder="${esc(T("f.counterpartyPh"))}" maxlength="120"></label>
     <label class="wide"><i>${T("f.note")}</i><input name="note" value="${esc(t.note || "")}" maxlength="500"></label>`;
 };
+// 既有的一筆改了種類或幣別（2026-10-28）：自動存不重畫整頁（人可能還在打字），
+// 所以這裡就地把轉入帳戶、匯率、類別那幾格顯示或藏掉，類別的選項換成新種類的。
+// 不這樣做，改成「轉帳」之後轉入帳戶那一格藏著，永遠填不了、永遠存不進去。
+export function syncTxShape(box, ctx) {
+  if (!box || !box.querySelector) return;
+  const kind = (box.querySelector('[name="kind"]') || {}).value, cur = (box.querySelector('[name="currency"]') || {}).value || "TWD";
+  const isT = kind === "transfer", show = (sel, on) => { const el = box.querySelector(sel); if (el) el.hidden = !on; };
+  show("label.fx", cur !== "TWD"); show("label.to", isT); show("label.cat", !isT);
+  const fx = box.querySelector('[name="fx_rate"]'); if (fx) fx.required = cur !== "TWD";
+  const cat = box.querySelector('[name="category_id"]');
+  if (cat && cat.dataset.kind !== kind) {
+    const was = cat.value, cats = ((ctx && ctx.categories) || []).filter(c => c.kind === kind && !c.archived_at);
+    const keep = cats.some(c => c.id === was) ? was : "";
+    cat.innerHTML = opt("", T("f.pickCategory"), keep) + cats.map(c => opt(c.id, nameOf(c), keep)).join("");
+    cat.dataset.kind = kind;
+  }
+}
 export function txFiltersHTML(f, ctx, n, rows) {
   const term = f.term || "all";
   const t = (ctx.terms || []).find(x => x.id === term);

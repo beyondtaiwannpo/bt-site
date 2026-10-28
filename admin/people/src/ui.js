@@ -364,7 +364,7 @@ export function bindAutosave(root, onSave) {
   };
   const schedule = (field, now) => {
     const box = field.closest("[data-autosave]");
-    if (!box) return;
+    if (!box || box === root) return;   // 不在任何存檔框裡（例如找名字的搜尋框）就不存；root 自己也掛著 data-autosave="1"
     let d = timers.get(box);
     if (!d) { d = debounce(f => run(box, f), TYPED_MS); timers.set(box, d); }
     if (now) d.flush(field); else d(field);

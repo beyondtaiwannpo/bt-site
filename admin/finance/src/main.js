@@ -150,6 +150,7 @@ async function onAutosave(act, box) {
   const fail = text => { UI.autosaveState(liveBox(box), "failed"); UI.toast(text); };
   if (act === "tx-save") {
     const t = findTx(id); if (!t) return;
+    UI.syncTxShape(box, ctx());   // 種類或幣別換了，先把該出現的格子打開
     const p = readTxForm(box);
     const key = "tx:" + id, serial = JSON.stringify(p);
     if (!dirty.changed(key, serial)) return;

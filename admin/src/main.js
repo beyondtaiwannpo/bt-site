@@ -365,6 +365,8 @@ async function onAutosave(act, box, field) {
       const patch = readEvent();
       if (!UI.evCoverOk(patch.cover_url)) return fail(T("err.evCover"));
       await D.saveEvent(id, patch);
+      // 換了封面，資料庫會把同意改回沒勾（同意是對那一張照片的）。畫面跟著改，不然勾勾還在、資料庫卻是沒同意。
+      if ((patch.cover_url || "") !== (ev.cover_url || "")) { patch.cover_consent = false; const c = document.getElementById("ev-consent"); if (c) c.checked = false; }
       Object.assign(ev, patch);
       dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.evSaved"));
       return;
