@@ -124,6 +124,13 @@ async function loadWall() {
   }
 }
 
+function showExample(id) {
+  const a = S.activities.find(x => x.id === id); if (!a) return;
+  document.querySelectorAll(".lightbox").forEach(x => x.remove());
+  const box = document.createElement("div"); box.innerHTML = UI.exampleLightboxHTML(a);
+  document.body.appendChild(box.firstElementChild);
+  const x = document.querySelector(".lightbox .lb-x"); if (x) x.focus();
+}
 /* ---------- modal ---------- */
 function openModal(id) {
   const a = S.activities.find(x => x.id === id); if (!a) return;
@@ -131,12 +138,12 @@ function openModal(id) {
   const entry = S.entries[id] || {};
   const d = document.createElement("div");
   d.className = "scrim"; d.id = "scrim";
-  d.innerHTML = `<div class="modal${UI.exampleUrls(a).length ? " hascover" : ""}" role="dialog" aria-modal="true" aria-label="${UI.esc(a.title_zh)}">
-    ${UI.coverHTML(UI.exampleUrls(a))}
+  d.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${UI.esc(a.title_zh)}">
     <div class="mt">${UI.esc(UI.CATNAME[a.category] ? T(UI.CATNAME[a.category]) : "")} · ${UI.esc(UI.monthName(a.month))}</div>
     <h3>${UI.esc(a.title_zh)}</h3>
     <div class="men">${UI.esc(a.title_en)}</div>
     <p class="mdesc">${UI.esc(a.description)}</p>
+    ${UI.exampleUrls(a).length ? `<div class="exrow"><button type="button" class="exbtn" data-act="example" data-id="${UI.esc(a.id)}">${T("slot.seeExample")}</button></div>` : ""}
     ${UI.sessionsOf(a).length ? `<div class="msess"><i>${T("md.sessions")}</i>${UI.sessionsHTML(a, { cal: true })}</div>` : ""}
     <!-- 回望區塊的位置：在活動說明之後、要填的東西之前（spec §7.3「顯示在題目上方」）。
          這個順序是有意義的 —— 先看到自己九月寫的，接著就是今天要寫的那一格，
@@ -283,6 +290,9 @@ document.addEventListener("click", async e => {
   // 邊界問 pagesOf，不要自己算 months.length —— 書裡不是只有月份頁。
   if (act === "next") { S.page = Math.min(UI.pagesOf(S).length - 1, S.page + 1); render(); return; }
   if (act === "go") { S.page = Number(b.dataset.p); render(); return; }
+  // 看範例（2026-10-29）：照片跳到畫面中間。疊在打開的那一格上面也行。
+  if (act === "example") { showExample(b.dataset.id); return; }
+  if (act === "lb-close") { if (e.target === b || b.classList.contains("lb-x")) document.querySelectorAll(".lightbox").forEach(x => x.remove()); return; }
   if (act === "open") { openModal(b.dataset.id); return; }
   if (act === "close") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
   if (act === "stamp") { doStamp(b.dataset.id); return; }
@@ -449,7 +459,11 @@ document.addEventListener("click", async e => {
 });
 
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
+  if (e.key === "Escape") {
+    // 範例照片疊在最上面就先關它，再按一次才關打開的那一格。
+    const lb = document.querySelector(".lightbox"); if (lb) { lb.remove(); return; }
+    const d = document.getElementById("scrim"); if (d) d.remove(); return;
+  }
   if (document.getElementById("scrim") || !S.profile) return;
   if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (S.view !== "passport") return;

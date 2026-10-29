@@ -2,7 +2,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotHTML, monthPageHTML, sessionsOf, sessionsHTML, sessionCalUrl, coverHTML, setLang } from "../passport/src/ui.js";
+import { slotHTML, monthPageHTML, sessionsOf, sessionsHTML, sessionCalUrl, exampleLightboxHTML, setLang } from "../passport/src/ui.js";
 // 護照有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
 
@@ -41,12 +41,11 @@ test("蓋過章、沒放照片：章當主角蓋在中間，心得印在卡片�
   assert.ok(html.includes("2026.09.05"), "底下印入境日期");
 });
 
-test("蓋過章、有照片：自己的照片當封面（標「我的」），章在底下", () => {
+test("蓋過章、有照片：章照樣在中間，照片是旁邊一張小拍立得，不當封面", () => {
   const html = slotHTML(state(ONE, { "09A": { note: "", photo: "data:image/jpeg;base64,AAAA" } }), act);
-  assert.match(html, /class="slot done c-gather"/);
-  assert.match(html, /<span class="cover"><img src="data:image\/jpeg;base64,AAAA"/);
-  assert.match(html, /class="lbl mine">我的</);
-  assert.match(html, /<div class="foot"><div class="stampwrap">/);
+  assert.match(html, /class="slot done withphoto c-gather"/);
+  assert.match(html, /<div class="hero"><div class="stampwrap">[\s\S]*<img class="polaroid" src="data:image\/jpeg;base64,AAAA"/);
+  assert.ok(!html.includes('class="cover'));
   assert.ok(!html.includes('class="note"'), "沒寫心得就不印空的框");
 });
 
@@ -60,15 +59,18 @@ test("一格只有一個 .slot", () => {
   assert.equal((slotHTML(state(ONE), act).match(/class="slot[ "]/g) || []).length, 1);
 });
 
-test("範例照片當封面：一張滿版、兩張對開、標「範例」；蓋過章就換成自己的照片或不放", () => {
+test("★ 範例照片不當封面：卡片上一顆「看範例」，不在 faceopen 按鈕裡；按了跳出放大", () => {
   const one = slotHTML(state(), { ...act, example_url: "https://x/a.jpg" });
-  assert.match(one, /<span class="cover"><img src="https:\/\/x\/a\.jpg"/);
-  assert.match(one, /class="lbl">範例</);
-  const two = slotHTML(state(), { ...act, example_url: "https://x/a.jpg", example_url_2: "https://x/b.jpg" });
-  assert.match(two, /class="cover two"/);
-  assert.equal((two.match(/<img /g) || []).length, 2);
-  assert.ok(!slotHTML(state(ONE), { ...act, example_url: "https://x/a.jpg" }).includes("x/a.jpg"));
-  assert.equal(coverHTML([]), "");
+  assert.ok(!one.includes("x/a.jpg"), "卡片上不放照片本身");
+  assert.match(one, /<button type="button" class="exbtn" data-act="example" data-id="09A">看範例<\/button>/);
+  const open = one.indexOf('<button class="faceopen"'), close = one.indexOf("</button>", open);
+  assert.ok(one.indexOf('class="exbtn"') > close, "按鈕不能巢狀");
+  assert.ok(!slotHTML(state(), act).includes("exbtn"), "沒有範例就沒有那顆");
+  assert.ok(!slotHTML(state(ONE), { ...act, example_url: "https://x/a.jpg" }).includes("exbtn"), "蓋過章就不給");
+  const lb = exampleLightboxHTML({ ...act, example_url: "https://x/a.jpg", example_url_2: "https://x/b.jpg" });
+  assert.match(lb, /class="lightbox"/); assert.match(lb, /class="lb-inner two"/);
+  assert.equal((lb.match(/<img /g) || []).length, 2);
+  assert.equal(exampleLightboxHTML(act), "");
 });
 
 test("場次：sessions 優先，沒有就用 happens_at，排好序、丟掉壞的", () => {

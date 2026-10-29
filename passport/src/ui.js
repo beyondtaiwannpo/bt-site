@@ -560,10 +560,16 @@ export function sessionCalUrl(a, iso) {
   if (a.description) p.push("details=" + encodeURIComponent(a.description));
   return "https://calendar.google.com/calendar/render?" + p.join("&");
 }
-// 封面：範例照片（標「範例」）或自己的照片（標「我的」）。一張滿版、兩張對開。
-export function coverHTML(urls, mine) {
-  if (!urls || !urls.length) return "";
-  return `<span class="cover${urls.length > 1 ? " two" : ""}">${urls.map(u => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}<span class="lbl${mine ? " mine" : ""}">${esc(T(mine ? "slot.mine" : "slot.example"))}</span></span>`;
+// 範例照片放大（按了「看範例」）：畫面中間一張大圖，兩張就並排；點背景或 × 關掉。
+export function exampleLightboxHTML(a) {
+  const urls = exampleUrls(a); if (!urls.length) return "";
+  return `<div class="lightbox" role="dialog" aria-modal="true" aria-label="${esc(T("slot.example"))}" data-act="lb-close">
+    <div class="lb-inner${urls.length > 1 ? " two" : ""}">
+      <div class="lb-head"><span class="lbl">${esc(T("slot.example"))}</span><b>${esc(a.title_zh)}</b><button type="button" class="lb-x" data-act="lb-close" aria-label="${esc(T("common.close"))}">×</button></div>
+      <div class="lb-imgs">${urls.map(u => `<img src="${esc(u)}" alt="">`).join("")}</div>
+      ${a.description ? `<p class="lb-desc">${esc(a.description)}</p>` : ""}
+    </div>
+  </div>`;
 }
 function headHTML(a) {
   return `<span class="tagrow"><span class="cat">${esc(CATNAME[a.category] ? T(CATNAME[a.category]) : "")}</span><span class="aid">${esc(a.id)}</span></span>
@@ -578,12 +584,15 @@ export function slotHTML(S, a) {
   const tearing = !!st && S.tearing === a.id;
   const cat = SLOT_ORDER.includes(a.category) ? ` c-${a.category}` : "";
   if (!st) {
+    // 範例照片（2026-10-29 Paul：「封面太大很難看」）：卡片維持原本大小，只放一顆醒目的「看範例」，
+    // 按了照片跳到畫面中間放大（main.js 的 showExample）。按鈕不能放進 .faceopen 裡（按鈕不能巢狀）。
+    const ex = exampleUrls(a).length ? `<div class="exrow"><button type="button" class="exbtn" data-act="example" data-id="${a.id}">${esc(T("slot.seeExample"))}</button></div>` : "";
     return `<div class="slot${cat}" data-act="open" data-id="${a.id}" data-done="0">
     <button class="faceopen" data-act="open" data-id="${a.id}">
-      ${coverHTML(exampleUrls(a))}
       <span class="body">${headHTML(a)}${sessionsHTML(a)}<span class="hint">${esc(a.description)}</span></span>
-      <span class="foot"><span class="spot">${esc(T("slot.spot"))}</span><span class="cta">${T("slot.cta")}<small>${esc(T("slot.open"))}</small></span></span>
     </button>
+    ${ex}
+    <div class="foot"><span class="spot">${esc(T("slot.spot"))}</span><span class="cta">${T("slot.cta")}<small>${esc(T("slot.open"))}</small></span></div>
   </div>`;
   }
   const photo = entry.photo ? [entry.photo] : [];
@@ -596,9 +605,11 @@ export function slotHTML(S, a) {
     ${note}<div class="foot">${done}</div>
   </div>`;
   }
-  return `<div class="slot done${cat}" data-act="open" data-id="${a.id}" data-done="1">
-    <button class="faceopen" data-act="open" data-id="${a.id}">${coverHTML(photo, true)}<span class="body">${headHTML(a)}</span></button>
-    ${note}<div class="foot">${stampHTML(a, st, anim, tearing)}${done}</div>
+  // 有放照片：章照樣大大蓋在中間，照片是旁邊一張小小的拍立得（2026-10-29 Paul：封面太大很難看）。
+  return `<div class="slot done withphoto${cat}" data-act="open" data-id="${a.id}" data-done="1">
+    <button class="faceopen" data-act="open" data-id="${a.id}"><span class="body">${headHTML(a)}</span></button>
+    <div class="hero">${stampHTML(a, st, anim, tearing)}<img class="polaroid" src="${esc(photo[0])}" alt="${esc(T("slot.mine"))}" loading="lazy"></div>
+    ${note}<div class="foot">${done}</div>
   </div>`;
 }
 

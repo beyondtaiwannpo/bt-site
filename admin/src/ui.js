@@ -1582,6 +1582,25 @@ export function meetingFormHTML(m, d, scopes, people, busy) {
       ${m ? `<button class="btn ghost" data-act="mt-delete" data-id="${esc(m.id)}"${dis}>${T("mt.delete")}</button>` : ""}
       <span class="mini">${m ? T("mt.editNote") : T("mt.newNote")}</span></div>`, { id: "mt-form" });
 }
+// Google 日曆那一列（2026-11-23）：在不在 Google 日曆上、Meet 連結、上次拉回覆的時間、送不上的原因與「再送一次」。
+// 欄位不在（遷移檔還沒跑）就整列不畫。
+export function gcalRowHTML(m, canEdit, busy) {
+  if (!m || !("gcal_event_id" in m)) return "";
+  const dis = busy ? " disabled" : "";
+  const retry = canEdit && m.gcal_event_id ? ` <button class="btn ghost sm" data-act="mt-gcal" data-id="${esc(m.id)}"${dis}>${T(m.gcal_error ? "mt.gcalRetry" : "mt.gcalSync")}</button>` : "";
+  let v;
+  if (m.gcal_event_id && !m.gcal_error) {
+    v = `<span class="tag open">${T("mt.gcalOn")}</span>${m.meet_url ? ` <a href="${esc(m.meet_url)}" target="_blank" rel="noopener">${T("mt.gcalMeet")}</a>` : ""}`
+      + `<div class="mini">${m.gcal_pulled_at ? T("mt.gcalPulled", { t: esc(mtWhen(m.gcal_pulled_at)) }) : T("mt.gcalNotPulled")}</div>`;
+  } else if (m.gcal_event_id) {
+    v = `<span class="tag warn">${T("mt.gcalFailed")}</span><div class="mini gcal-err">${esc(m.gcal_error)}</div>`;
+  } else if (m.gcal_error) {
+    v = `<span class="tag warn">${T("mt.gcalNever")}</span><div class="mini gcal-err">${esc(m.gcal_error)}</div><div class="mini">${T("mt.gcalNeverHint")}</div>`;
+  } else {
+    v = `<span class="tag">${T("mt.gcalOff")}</span><div class="mini">${T("mt.gcalOffHint")}</div>`;
+  }
+  return `<dt>${T("mt.gcal")}</dt><dd>${v}${retry}</dd>`;
+}
 // 一場會議：出席與回覆、連結、議程；能排的人底下可以改。
 export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
   const who = id => { const p = (people || []).find(x => x.id === id); return p ? mpName(p) : T("rq.someone"); };
@@ -1595,6 +1614,7 @@ export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
         <dt>${T("mt.agenda")}</dt><dd>${m.agenda ? esc(m.agenda) : T("value.none")}</dd>
         <dt>${T("mt.doc")}</dt><dd>${m.doc_url ? `<a href="${esc(m.doc_url)}" target="_blank" rel="noopener">${esc(m.doc_url)}</a>` : T("mt.noDoc")}</dd>
         <dt>${T("mt.when")}</dt><dd>${esc(mtWhen(m.starts_at))}–${esc(mtWhen(m.ends_at).slice(11))} <span class="mini">${T("mt.tzNote")}</span></dd>
+        ${gcalRowHTML(m, canEdit, busy)}
       </dl>`)
     + sectionHTML(`${T("mt.attendees")}<span class="hint">${at.length}</span>`, at.length ? `<div class="mt-rsvp">
         <div><i>${T("mt.st.accepted")}（${grp("accepted").length}）</i><ul class="plain">${grp("accepted").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>

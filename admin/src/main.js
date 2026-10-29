@@ -165,6 +165,8 @@ async function boot(retried) {
     S.meetings = meetings; if (S.todo) S.todo.meetings = S.meetings;
     // 提醒信的退路（2026-11-02）：開頁叫一次 tick_mail()，Resend 沒設好也不會讓頁面壞。
     D.tickMail().catch(() => {});
+    // 開頁拉一次大家在 Google 日曆上的回覆，有人改了就重讀會議。
+    D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     else if (/^(requests?|events|meetings)(\/|$)/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
@@ -486,6 +488,13 @@ document.addEventListener("click", async e => {
       S.busy = false; S.msg = T("msg.mtCreated", { title: d.title });
       S.mtDraft = null; history.pushState(null, "", "#meetings/" + newId); await openTab("meetings/" + newId);
     } catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
+    return;
+  }
+  // Google 日曆（2026-11-23）：再送一次，或現在同步回覆。
+  if (act === "mt-gcal") {
+    S.busy = true; S.msg = ""; render();
+    try { const r = await D.gcalRetry(id); await reloadMeetings(); S.busy = false; S.msg = T(r === "ok" ? "msg.gcalOk" : "msg.gcalFail"); render(); }
+    catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
     return;
   }
   if (act === "mt-delete") {

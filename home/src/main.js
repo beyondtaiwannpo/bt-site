@@ -146,6 +146,8 @@ async function boot() {
     S.cal.at = UI.dayKey(new Date(), S.tz);
     S.ready = true; render();
     if (S.linked) { const n = document.getElementById("m-" + S.linked); if (n) n.scrollIntoView({ block: "start" }); }
+    // Google 日曆（2026-11-23）：畫好之後在背景拉一次大家在 Google 的回覆，有人改了就重畫。
+    if (S.role === "cadre") D.gcalRefresh().then(async n => { if (n > 0) { await reload(); render(); } }).catch(() => {});
   } catch (e) {
     if (AUTH.sessionGone && AUTH.sessionGone(e)) { await AUTH.signOut().catch(() => {}); location.replace("../app/?next=home"); return; }
     S.down = true; S.ready = true; render();

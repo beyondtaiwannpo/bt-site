@@ -82,6 +82,8 @@ export const MINE = {
   "slot.next":        { zh: "下一場", en: "Next" },
   "slot.addCal":      { zh: "加進日曆", en: "Add to calendar" },
   "slot.mine":        { zh: "我的", en: "Mine" },
+  "slot.seeExample":  { zh: "看範例", en: "See example" },
+  "common.close":     { zh: "關掉", en: "Close" },
   "slot.done":        { zh: "已入境", en: "Entered" },
   "md.sessions":      { zh: "場次", en: "Sessions" },
   // 回望（spec §7.3，兩句文案逐字抄自 spec）

@@ -66,3 +66,11 @@ export function says(err, zh) {
   for (const r of SAYS) if (m.includes(r[0])) return zh ? r[1] : r[2];
   return m;
 }
+
+// Google 日曆（2026-11-23）：開頁拉一次大家在 Google 的回覆（同一場 2 分鐘內不重拉），回改了幾個人。還沒跑那支就當 0。
+export async function gcalRefresh() {
+  need();
+  const { data, error } = await supabase.rpc("gcal_refresh");
+  if (error) return 0;
+  return Number(data) || 0;
+}

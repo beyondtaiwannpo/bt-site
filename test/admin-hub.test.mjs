@@ -823,3 +823,16 @@ test("★ 自動儲存：表單設定與既有的題改了就存，刪表單、�
   assert.doesNotMatch(m, /act === "rq-save" \|\| act === "rq-done"/, "rq-save 不再是按鈕");
   assert.match(m, /if \(patch\.status === "open" && S\.questions\.length === 0\) \{\s*const st = document\.getElementById\("fstatus"\)/, "沒題目不能開放那一關搬進 onAutosave，而且會把下拉撥回去");
 });
+
+// 2026-11-23 Google 日曆那一列：在 Google 上、送不上、沒建到、不在 Google 上四種；欄位不在就不畫。
+test("★ 後台會議頁的 Google 日曆那一列", () => {
+  const base = { id: "m1", scope: "board", title: "遊戲夜", starts_at: "2099-01-01T12:00:00Z", ends_at: "2099-01-01T13:00:00Z" };
+  assert.equal(FORMS.gcalRowHTML(base, true, false), "", "舊資料庫沒有那幾欄就不畫");
+  const on = FORMS.gcalRowHTML({ ...base, gcal_event_id: "e1", gcal_error: null, meet_url: "https://meet.google.com/x", gcal_pulled_at: null }, true, false);
+  assert.match(on, /https:\/\/meet\.google\.com\/x/); assert.match(on, /data-act="mt-gcal"/);
+  const failed = FORMS.gcalRowHTML({ ...base, gcal_event_id: "e1", gcal_error: "HTTP 500: <b>x</b>" }, true, false);
+  assert.match(failed, /class="tag warn"/); assert.match(failed, /&lt;b&gt;x&lt;\/b&gt;/, "原因要跳脫");
+  const never = FORMS.gcalRowHTML({ ...base, gcal_event_id: null, gcal_error: "timeout" }, true, false);
+  assert.doesNotMatch(never, /data-act="mt-gcal"/, "沒有 Google 事件就不給再送一次");
+  assert.doesNotMatch(FORMS.gcalRowHTML({ ...base, gcal_event_id: "e1", gcal_error: null }, false, false), /data-act="mt-gcal"/, "改不了這場的人沒有那顆鈕");
+});

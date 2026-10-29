@@ -311,6 +311,9 @@ const SAYS = [
   ["bad_doc_url", "會議紀錄的連結要是 Google Docs 或 Drive 的。", "The notes link must be a Google Docs or Drive link."],
   ["bad_time", "結束要在開始之後。", "The end must be after the start."],
   ["no_such_meeting", "找不到這場會，可能已經刪了。", "Meeting not found; it may have been deleted."],
+  ["gcal_no_event", "這場會沒有在 Google 日曆上（排的時候 Google 連不上，邀請是用信裡的日曆檔寄的），不能再送一次。", "This meeting isn't on Google Calendar (Google was unreachable when it was scheduled, so invites went out as calendar files). It can't be resent."],
+  ["gcal_not_ready", "Google 日曆還沒設定好（Vault 少了值，或 http 擴充沒開），見 docs/2026-10-29-google-calendar-setup.md。", "Google Calendar isn't set up (Vault values or the http extension are missing). See docs/2026-10-29-google-calendar-setup.md."],
+  ["gcal_retry", "再送一次要等資料庫更新（2026-11-23 那支遷移檔）跑完。", "Resending needs the 2026-11-23 database update to be run first."],
   // 活動上架（2026-11-01）
   ["not_team_manager", "開活動要是那個 team 的 Director（資源工作區「管」）或 Co-President。", "Creating an event needs that team's Director (Manage on its resources) or a Co-President."],
   ["slug_taken", "這個代號已經有活動用了，換一個。", "That slug is already used by another event."],
@@ -487,10 +490,12 @@ export async function loadMeetings() {
   // 還沒跑 2026-11-17-meetings-home.sql 的資料庫沒有那一欄與那張表，退回舊的查法。
   const COLS = "id, scope, title, starts_at, ends_at, agenda, doc_url, reminded_at, created_by";
   let [m, a, n] = await Promise.all([
-    supabase.from("meetings").select(COLS + ", required").order("starts_at", { ascending: false }),
+    supabase.from("meetings").select(COLS + ", required, meet_url, gcal_event_id, gcal_error, gcal_pulled_at").order("starts_at", { ascending: false }),
     supabase.from("meeting_attendees").select("meeting_id, user_id, status, replied_at"),
     supabase.from("meeting_rsvp_notes").select("meeting_id, user_id, note"),
   ]);
+  // 2026-11-22／11-23 的 Google 日曆欄位還沒跑就少那幾欄再讀，再不行才連 required 一起少。
+  if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(COLS + ", required").order("starts_at", { ascending: false });
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(COLS).order("starts_at", { ascending: false });
   if (m.error) throw m.error;
   if (a.error) throw a.error;
@@ -508,6 +513,20 @@ export async function saveMeeting(id, d) {
 export async function deleteMeeting(id) {
   need();
   const { data, error } = await supabase.rpc("delete_meeting", { p_id: id });
+  if (error) throw error;
+  return data;
+}
+// Google 日曆（2026-11-23）：開頁拉一次大家在 Google 的回覆（同一場 2 分鐘內不重拉），回改了幾個人。
+export async function gcalRefresh() {
+  need();
+  const { data, error } = await supabase.rpc("gcal_refresh");
+  if (error) throw error;
+  return Number(data) || 0;
+}
+// 後台「再送一次」：把這場會重新送到 Google（上次失敗才通知大家，不然只同步回覆）。
+export async function gcalRetry(id) {
+  need();
+  const { data, error } = await supabase.rpc("gcal_retry", { p_meeting: id });
   if (error) throw error;
   return data;
 }

@@ -2454,6 +2454,34 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-22-google-calendar.sql >/dev/null 2>&1 || true
 
+echo "── 回覆跟 Google 雙向同步（2026-11-23-gcal-rsvp.sql）：本機沒有 http 擴充，測規則與退回 ──"
+grgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-23-gcal-rsvp.sql 2>&1 || true)
+if echo "${grgot}" | grep -q "OVERALL.*PASS" && ! echo "${grgot}" | grep -q "|FAIL"; then echo "  ok   回覆同步那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 回覆同步那支驗收表："; echo "${grgot}" | head -12; fail=$((fail+1)); fi
+GRM=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',true); select public.schedule_meeting('board','回覆同步測試', now() + interval '3 days', now() + interval '3 days 1 hour', '', null, array['${PAUL}']::uuid[], true);" 2>/dev/null | tail -1)
+psql -d "${DB}" -X -A -t -q -c "update public.meetings set gcal_event_id = 'evt-rsvp' where id = '${GRM}'; update public.meeting_attendees set gcal_status = 'accepted' where meeting_id = '${GRM}'" >/dev/null 2>&1
+chkas "${PAUL}" "★ 有 Google 事件也照樣在網站回覆（送不上 Google 不擋）" "accepted" "select public.set_rsvp('${GRM}','accepted')"
+chk "★ 送 Google 的內容帶著每個人的回覆（不會把 Google 洗成還沒回）" "accepted" "select x->>'responseStatus' from jsonb_array_elements(public.gcal_body('${GRM}', false)->'attendees') x limit 1"
+psql -d "${DB}" -X -A -t -q -c "update public.meeting_attendees set status = 'invited' where meeting_id = '${GRM}'" >/dev/null 2>&1
+chk "網站還沒回、Google 上次是參加：送過去還是參加" "accepted" "select x->>'responseStatus' from jsonb_array_elements(public.gcal_body('${GRM}', false)->'attendees') x limit 1"
+chkraise "★ 開頁拉回覆只給幹部" "not_cadre" "perform set_config('test.uid','${STU}',true); perform public.gcal_refresh();"
+chkas "${PAUL}" "幹部開頁拉回覆：沒設定 Google 就是 0" "0" "select public.gcal_refresh()"
+chkraise "★ 再送一次：排不了這場會的人擋下來" "not_allowed" "perform set_config('test.uid','${ASSOC}',true); perform public.gcal_retry('${GRM}');"
+chkraise "再送一次：Google 沒設定說清楚" "gcal_not_ready" "perform set_config('test.uid','${PAUL}',true); perform public.gcal_retry('${GRM}');"
+psql -d "${DB}" -X -A -t -q -c "update public.meetings set title = '改了' , cal_dirty_at = now() - interval '1 hour' where id = '${GRM}'" >/dev/null 2>&1
+psql -d "${DB}" -X -A -t -q -c "delete from public.mail_outbox where meeting_id = '${GRM}'" >/dev/null 2>&1
+psql -d "${DB}" -X -A -t -q -c "select public.meeting_flush_calendar('${GRM}')" >/dev/null 2>&1
+chk "★ 有 Google 事件送不上：不退回寄日曆檔，記號留著等下一輪" "0|t" "select (select count(*) from public.mail_outbox where meeting_id = '${GRM}')::text||'|'||(cal_dirty_at is not null)::text::char(1) from public.meetings where id = '${GRM}'"
+chkas "${PAUL}" "刪會：Google 刪不掉就排進待刪" "deleted" "select public.delete_meeting('${GRM}')"
+chk "待刪清單有它、沒寄日曆檔取消" "1|0" "select (select count(*) from public.gcal_pending_deletes where event_id = 'evt-rsvp')::text||'|'||(select count(*) from public.mail_outbox where kind = 'meeting_cancel' and subject like '%回覆同步測試%')::text"
+gr2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-23-gcal-rsvp.sql 2>&1 || true)
+if echo "${gr2}" | grep -q "OVERALL.*PASS"; then echo "  ok   回覆同步那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 回覆同步那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/      if v_new is null or v_new is not distinct from r.gcal_status then continue; end if;/      if v_new is null then continue; end if;/" supabase/migrations/2026-11-23-gcal-rsvp.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：Google 沒變也蓋過網站，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉只看變化那條驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-23-gcal-rsvp.sql >/dev/null 2>&1 || true
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

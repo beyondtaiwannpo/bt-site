@@ -53,18 +53,18 @@ test("改格子：主持人那個勾拿掉、多時間、範例照片、到看�
   assert.doesNotMatch(ten, /data-act="ak-sess-add"/, "10 場就不能再加");
 });
 
-test("護照：格子上印場次與範例封面，蓋過章就不印", () => {
+test("護照：格子上印場次與「看範例」，蓋過章就不印", () => {
   const a = { id: "11C", month: 11, category: "frame", title_zh: "天空", title_en: "SKY", description: "", happens_at: "2026-11-22T12:00:00Z", example_url: "https://x/y.jpg" };
   const S = { months: MONTHS, activities: [a], stamps: {}, entries: {}, profile: { id: "u" } };
   const h = PASS.slotHTML(S, a);
-  assert.match(h, /class="sess"/); assert.match(h, /<span class="cover"><img src="https:\/\/x\/y\.jpg"/);
-  const two = PASS.slotHTML(S, { ...a, example_url_2: "https://x/z.jpg" });
-  assert.equal((two.match(/<img /g) || []).length, 2, "兩張都印在封面上");
+  assert.match(h, /class="sess"/); assert.match(h, /class="exbtn" data-act="example"/);
+  const two = PASS.exampleLightboxHTML({ ...a, example_url_2: "https://x/z.jpg" });
+  assert.equal((two.match(/<img /g) || []).length, 2, "放大時兩張都在");
   assert.deepEqual(PASS.exampleUrls({ example_url_2: "b" }), ["b"]); assert.deepEqual(PASS.exampleUrls({}), []);
   assert.equal(PASS.whenText("2026-11-22T12:00:00Z", "Asia/Taipei").includes("20:00"), true);
   assert.equal(PASS.whenText(""), "");
   const done = PASS.slotHTML({ ...S, stamps: { "11C": { date: "2026-11-22" } } }, a);
-  assert.ok(!done.includes("x/y.jpg") && !done.includes('class="sess"'));
+  assert.ok(!done.includes("exbtn") && !done.includes('class="sess"'));
 });
 
 test("看板：從那條連結帶的時間，找得到是這一週的哪一格", () => {
