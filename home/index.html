@@ -113,7 +113,8 @@
   .tag.req{background:var(--bt-navy);color:var(--bt-cream)}
   .tag.opt{background:none;color:var(--bt-navy)}
   .tag.ev{background:var(--bt-orange);border-color:var(--bt-orange);color:var(--bt-navy)}
-  .tag.org{border-style:dashed}
+  /* 「你排的」不是狀態，是一句提示：不用框，淡橘底、一般字體，跟必到那顆標籤分得開。 */
+  .tag.org{border:none;background:rgba(255,196,108,.4);color:var(--bt-navy);font-family:var(--body);font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 10px}
   /* 回覆鈕：要大、要一眼看得出是要按的（Paul：「上面那一塊我會不會到不夠明顯」）。 */
   .rsvp-btns{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 2px}
   .rsvp-btns .btn{font-size:18px;padding:13px 26px;min-width:150px;text-align:center}
