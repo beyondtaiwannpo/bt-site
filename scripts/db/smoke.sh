@@ -2364,6 +2364,30 @@ chk "★ 破壞測試：不加 BT 主帳號就只剩一封（證明上面那條�
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-18-calendar-invites.sql >/dev/null 2>&1 || true
 
+echo "── 需求單分三種：貼文、限動、影片（2026-11-19-request-kinds.sql）──"
+rkgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-19-request-kinds.sql 2>&1 || true)
+if echo "${rkgot}" | grep -q "OVERALL.*PASS" && ! echo "${rkgot}" | grep -q "|FAIL"; then echo "  ok   需求單分三種那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 需求單分三種那支驗收表："; echo "${rkgot}" | head -10; fail=$((fail+1)); fi
+RK1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" -c "select public.submit_request('{\"kind\":\"post\",\"title\":\"貼文\",\"platforms\":[\"ig_carousel\",\"fb_single\"],\"shots\":[{\"who\":\"A\",\"what\":\"不該留下來\",\"seconds\":\"5\"}]}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 選貼文就存成貼文" "post" "select kind from public.requests where id='${RK1}'"
+chk "★ 貼文的拍攝指示丟掉" "0" "select jsonb_array_length(shots) from public.requests where id='${RK1}'"
+RK2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" -c "select public.submit_request('{\"kind\":\"story\",\"title\":\"限動\",\"platforms\":[\"threads_text\"]}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 限動的平台固定是 IG 限動" "story|{ig_story}" "select kind || '|' || platforms::text from public.requests where id='${RK2}'"
+RK3=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" -c "select public.submit_request('{\"kind\":\"video\",\"title\":\"影片\",\"platforms\":[\"ig_reels\",\"long_video\"],\"shots\":[{\"who\":\"A\",\"what\":\"縮時\",\"seconds\":\"20\"}]}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 影片：平台與拍攝指示都留著" "video|2|1" "select kind || '|' || cardinality(platforms) || '|' || jsonb_array_length(shots) from public.requests where id='${RK3}'"
+chkraise "★ 貼文選了影片的平台擋下來" "bad_platform" "perform set_config('test.uid','${RQR}',true); perform public.submit_request('{\"kind\":\"post\",\"title\":\"x\",\"platforms\":[\"ig_reels\"]}'::jsonb);"
+chkraise "影片選了貼文的平台擋下來" "bad_platform" "perform set_config('test.uid','${RQR}',true); perform public.submit_request('{\"kind\":\"video\",\"title\":\"x\",\"platforms\":[\"ig_carousel\"]}'::jsonb);"
+chkraise "亂給種類擋下來" "bad_kind" "perform set_config('test.uid','${RQR}',true); perform public.submit_request('{\"kind\":\"poster\",\"title\":\"x\"}'::jsonb);"
+RK4=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" -c "select public.submit_request('{\"title\":\"舊頁面\",\"platforms\":[\"ig_story\"],\"shots\":[{\"who\":\"A\",\"what\":\"拍\",\"seconds\":\"3\"}]}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "沒帶種類的舊頁面照第二版的猜法" "video" "select kind from public.requests where id='${RK4}'"
+rk2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-19-request-kinds.sql 2>&1 || true)
+if echo "${rk2}" | grep -q "OVERALL.*PASS"; then echo "  ok   需求單分三種那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 需求單分三種那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/    v_shots := '\[\]'::jsonb;//" supabase/migrations/2026-11-19-request-kinds.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：貼文收下拍攝指示，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉丟拍攝指示驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-19-request-kinds.sql >/dev/null 2>&1 || true
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

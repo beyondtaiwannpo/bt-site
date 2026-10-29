@@ -258,6 +258,7 @@ function readRequest() {
   const count = pre => document.querySelectorAll(`[id^="${pre}"]`).length;
   const d = UI.rqBlank();
   Object.assign(d, {
+    kind: (S.rqDraft && S.rqDraft.kind) || "",
     title: val("rq-title"), owner_team: val("rq-owner-team"), owner_id: val("rq-owner"), goal_cta: val("rq-goal"),
     platforms: UI.RQ_PLATFORMS.filter(p => { const el = document.getElementById("rq-pf-" + p); return el && el.checked; }),
     platform_other: val("rq-pf-note"), key_line: val("rq-key"), draft: val("rq-draft"), draft_doc_url: val("rq-doc"),
@@ -539,9 +540,15 @@ document.addEventListener("click", async e => {
     return;
   }
   // ── 行銷需求單（2026-10-31）──
+  // 第一步選種類（2026-10-28）：先把畫面上打的字讀回草稿再換，換種類不會把已經填的欄位清掉。
+  if (act === "rq-kind") {
+    S.rqDraft = Object.assign(document.getElementById("rq-title") ? readRequest() : (S.rqDraft || UI.rqBlank()), { kind: b.dataset.v });
+    rqDraftSave(); render(); return;
+  }
   if (act === "rq-submit") {
     S.rqDraft = readRequest(); rqDraftSave();
     const p = UI.rqPayload(S.rqDraft);
+    if (!p.kind) { S.msg = T("err.rqKind"); render(); return; }
     if (!p.title) { S.msg = T("err.rqTitle"); render(); return; }
     if (!p.owner_id) { S.msg = T("err.rqOwner"); render(); return; }
     S.busy = true; S.msg = ""; render();

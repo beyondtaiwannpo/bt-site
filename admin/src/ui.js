@@ -413,7 +413,7 @@ export const ITEMS = [
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
   { group: "forms",     key: "events",   sec: "meet",     label: { zh: "活動",     en: "Events" },            hint: { zh: "上到對外首頁的活動", en: "Events on the public site" }, who: "cadre" },
   // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
-  { group: "forms",     key: "request",  sec: "mkt",      label: { zh: "請 Marketing 做貼文", en: "Ask Marketing for a post" }, hint: { zh: "送一張需求單", en: "Send a request" }, who: "cadre" },
+  { group: "forms",     key: "request",  sec: "mkt",      label: { zh: "請 Marketing 做貼文或影片", en: "Ask Marketing for a post or video" }, hint: { zh: "送一張需求單", en: "Send a request" }, who: "cadre" },
   { group: "forms",     key: "requests", sec: "mkt",      label: { zh: "Marketing 的待辦", en: "Marketing's queue" }, hint: { zh: "大家送來的需求單", en: "Requests sent to Marketing" }, who: "ws:custom:marketing-requests" },
   { group: "forms",     key: "forms",    sec: "apply",    label: { zh: "申請表",   en: "Application forms" }, hint: { zh: "報名表、審核、簽到", en: "Sign-up forms, review, check-in" }, who: "cadre" },
   { group: "passports", key: "cadre",    sec: "pass",     label: { zh: "幹部護照", en: "Cadre passport" },    hint: { zh: "月份、格子、揭曉", en: "Months, boxes, reveals" }, who: "ws:passport" },
@@ -1203,7 +1203,12 @@ export function downHTML(err) {
 // 第一版的舊單（沒有新欄位、狀態還是 new／done）照樣畫得出來：狀態走 rqStatus() 對照，第一版的欄有值就印。
 export const RQ_STATUS = ["submitted", "in_progress", "in_review", "published", "withdrawn"];
 export const RQ_OPEN = ["submitted", "in_progress", "in_review"];
-export const RQ_PLATFORMS = ["ig_carousel", "ig_story", "fb_single", "threads_text", "other"];
+// 2026-10-28 Paul：「先選這是貼文還是影片，需求單長得不一樣，貼文不需要拍攝指示。」三種：貼文、限動、影片。
+// 限動不用選平台（固定是 IG 限動）；影片才有拍攝指示。資料庫 submit_request() 照同一張表檢查（2026-11-19-request-kinds.sql）。
+export const RQ_KINDS = ["post", "story", "video"];
+export const RQ_KIND_PF = { post: ["ig_carousel", "fb_single", "threads_text", "other"], story: [], video: ["long_video", "ig_reels", "ig_story_video", "other"] };
+// 所有代號（舊單的 ig_story 也在），讀畫面上有哪幾格勾了用這一份。
+export const RQ_PLATFORMS = ["ig_carousel", "ig_story", "fb_single", "threads_text", "long_video", "ig_reels", "ig_story_video", "other"];
 export const RQ_SHOT_ROWS = 7;   // Sheet 先給七列 Fragment，可以再加
 // 舊狀態對照（資料庫的第二版遷移檔也照這張表搬）：new → 已送出、done → 已發布。
 export function rqStatus(s) { return !s || s === "new" ? "submitted" : s === "done" ? "published" : s; }
@@ -1215,7 +1220,7 @@ export function rqToday(now) { const d = now || new Date(); return `${d.getFullY
 // 草稿存在這台電腦的 localStorage，一人一格（同一台電腦換人登入不會看到別人的草稿）。送出才清。
 export function rqDraftKey(me) { return "bt.admin.rqDraft.v2." + ((me && me.id) || "anon"); }
 export function rqBlank() {
-  return { title: "", owner_team: "", owner_id: "", goal_cta: "", platforms: [], platform_other: "", key_line: "",
+  return { kind: "", title: "", owner_team: "", owner_id: "", goal_cta: "", platforms: [], platform_other: "", key_line: "",
     must: [{ text: "", confirmed_by: "" }], draft: "", draft_doc_url: "", refs: [{ url: "", note: "" }], publish_on: "", other_notes: "",
     shots: Array.from({ length: RQ_SHOT_ROWS }, () => ({ who: "", what: "", seconds: "", note: "" })), closing: { who: "", seconds: "", note: "" } };
 }
@@ -1224,12 +1229,16 @@ export function rqBlank() {
 export function rqPayload(d) {
   const v = Object.assign(rqBlank(), d || {});
   const s = x => String(x == null ? "" : x).trim();
-  const shots = (v.shots || []).map(r => ({ who: s(r.who), what: s(r.what), seconds: s(r.seconds), note: s(r.note), is_closing: false })).filter(r => r.who || r.what);
+  const kind = RQ_KINDS.includes(v.kind) ? v.kind : "";
+  // 拍攝指示只有影片有；選了貼文或限動，草稿裡留著的那幾列不送。
+  const shots = kind === "video" || !kind ? (v.shots || []).map(r => ({ who: s(r.who), what: s(r.what), seconds: s(r.seconds), note: s(r.note), is_closing: false })).filter(r => r.who || r.what) : [];
   const c = v.closing || {};
-  if (shots.length || s(c.who)) shots.push({ who: s(c.who), what: T("rq.closingWhat"), seconds: s(c.seconds), note: s(c.note), is_closing: true });
+  if ((kind === "video" || !kind) && (shots.length || s(c.who))) shots.push({ who: s(c.who), what: T("rq.closingWhat"), seconds: s(c.seconds), note: s(c.note), is_closing: true });
+  const allowed = kind ? RQ_KIND_PF[kind] : RQ_PLATFORMS;
   return {
+    ...(kind ? { kind } : {}),
     title: s(v.title), owner_team: s(v.owner_team), owner_id: s(v.owner_id), goal_cta: s(v.goal_cta),
-    platforms: RQ_PLATFORMS.filter(p => (v.platforms || []).includes(p)), platform_other: s(v.platform_other), key_line: s(v.key_line),
+    platforms: kind === "story" ? ["ig_story"] : allowed.filter(p => (v.platforms || []).includes(p)), platform_other: s(v.platform_other), key_line: s(v.key_line),
     must_have: (v.must || []).map(r => ({ text: s(r.text), confirmed_by: s(r.confirmed_by) })).filter(r => r.text),
     draft: String(v.draft || "").trim(), draft_doc_url: s(v.draft_doc_url),
     visual_refs: (v.refs || []).map(r => ({ url: s(r.url), note: s(r.note) })).filter(r => r.url),
@@ -1250,6 +1259,8 @@ function rqPlatformText(r) {
   const pf = (r.platforms || []).map(p => p === "other" && r.platform_other ? T("rq.pf.otherWith", { v: r.platform_other }) : T("rq.pf." + p));
   return pf.length ? pf.join("、") : (r.kind ? T("rq.kind." + r.kind) : "");
 }
+// 種類的小標籤（貼文／限動／影片）。舊單的 poster、other 照第一版的字。
+const rqKindTag = r => r && r.kind ? `<span class="tag rq-kind">${esc(T("rq.kind." + r.kind))}</span> ` : "";
 const rqPub = r => r.publish_on || r.needed_by || "";
 const rqSoonTag = (r, today) => today && !["published", "withdrawn"].includes(rqStatus(r.status)) && rqTooSoon(rqPub(r), today) ? ` <span class="tag warn">${esc(T("rq.soonTag"))}</span>` : "";
 
@@ -1265,29 +1276,35 @@ export function requestPageHTML(me, mine, d, msg, busy, cadres, today) {
   const teams = rqTeams(cadres);
   const inTeam = v.owner_team ? (cadres || []).filter(p => splitTeams(p.team).includes(v.owner_team)) : [];
   const soon = rqTooSoon(v.publish_on, td);
+  const kind = RQ_KINDS.includes(v.kind) ? v.kind : "";
+  const pfs = kind ? RQ_KIND_PF[kind] : [];
+  // 第一步：選種類。選了才出現下面的欄位，號碼照現在出現的欄位重排。
+  const picker = `<div class="rq-kinds" role="radiogroup" aria-label="${esc(T("rq.kindPick"))}">${RQ_KINDS.map(k => `<button type="button" class="rq-kindbtn${kind === k ? " on" : ""}" role="radio" aria-checked="${kind === k}" data-act="rq-kind" data-v="${k}"${dis}>
+      <b>${T("rq.kind." + k)}</b><span>${T("rq.kindHint." + k)}</span></button>`).join("")}</div>`;
+  let n = 0; const nf = (label, help, body) => fld(++n, label, help, body);
   const form = `<div class="rq-form">`
-    + fld(1, T("rq.f1"), T("rq.h1"), `<input id="rq-title" value="${val(v.title)}"${ph("rq.p1")}${dis}>`)
-    + fld(2, T("rq.f2"), T("rq.h2"), `<div class="rq-pair">
+    + nf(T("rq.f1"), T("rq.h1"), `<input id="rq-title" value="${val(v.title)}"${ph("rq.p1")}${dis}>`)
+    + nf(T("rq.f2"), T("rq.h2"), `<div class="rq-pair">
         <label><span class="sr">${T("rq.ownerTeam")}</span><select id="rq-owner-team"${dis}><option value="">${T("rq.pickTeam")}</option>${teams.map(t => `<option value="${esc(t)}"${v.owner_team === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
         <label><span class="sr">${T("rq.ownerPerson")}</span><select id="rq-owner"${!v.owner_team || busy ? " disabled" : ""}><option value="">${T("rq.pickPerson")}</option>${inTeam.map(p => `<option value="${esc(p.id)}"${v.owner_id === p.id ? " selected" : ""}>${esc(mpName(p))}</option>`).join("")}</select></label></div>`)
-    + fld(3, T("rq.f3"), T("rq.h3"), `<input id="rq-goal" value="${val(v.goal_cta)}"${ph("rq.p3")}${dis}>`)
-    + fld(4, T("rq.f4"), T("rq.h4"), `<div class="rq-pf">${RQ_PLATFORMS.map(p => `<label class="check"><input type="checkbox" id="rq-pf-${p}"${(v.platforms || []).includes(p) ? " checked" : ""}${dis}> ${esc(T("rq.pf." + p))}</label>`).join("")}</div>
-        <input id="rq-pf-note" value="${val(v.platform_other)}"${ph("rq.pOther")}${dis}>`)
-    + fld(5, T("rq.f5"), T("rq.h5"), `<input id="rq-key" value="${val(v.key_line)}"${ph("rq.p5")}${dis}>`)
-    + fld(6, T("rq.f6"), T("rq.h6"), `<div class="rq-rows">${(v.must || []).map((r, i) => `<div class="rq-rowin">
+    + nf(T("rq.f3"), T("rq.h3"), `<input id="rq-goal" value="${val(v.goal_cta)}"${ph("rq.p3")}${dis}>`)
+    + (pfs.length ? nf(T("rq.f4"), T("rq.h4"), `<div class="rq-pf">${pfs.map(p => `<label class="check"><input type="checkbox" id="rq-pf-${p}"${(v.platforms || []).includes(p) ? " checked" : ""}${dis}> ${esc(T("rq.pf." + p))}</label>`).join("")}</div>
+        <input id="rq-pf-note" value="${val(v.platform_other)}"${ph("rq.pOther")}${dis}>`) : "")
+    + nf(T("rq.f5"), T("rq.h5"), `<input id="rq-key" value="${val(v.key_line)}"${ph("rq.p5")}${dis}>`)
+    + nf(T("rq.f6"), T("rq.h6"), `<div class="rq-rows">${(v.must || []).map((r, i) => `<div class="rq-rowin">
           <input id="rq-must-text-${i}" value="${val(r.text)}"${i === 0 ? ph("rq.p6") : ""} aria-label="${esc(T("rq.mustText"))}"${dis}>
           <input id="rq-must-by-${i}" value="${val(r.confirmed_by)}"${ph("rq.p6by")} aria-label="${esc(T("rq.mustBy"))}"${dis}>${del("rq-del-must", i)}</div>`).join("")}</div>
         <button class="btn quiet sm" data-act="rq-add-must"${dis}>${T("rq.addMust")}</button>`)
-    + fld(7, T("rq.f7"), T("rq.h7"), `<textarea id="rq-draft" style="min-height:120px"${ph("rq.p7")}${dis}>${val(v.draft)}</textarea>
+    + nf(T("rq.f7"), T("rq.h7"), `<textarea id="rq-draft" style="min-height:120px"${ph("rq.p7")}${dis}>${val(v.draft)}</textarea>
         <input id="rq-doc" value="${val(v.draft_doc_url)}"${ph("rq.p7doc")}${dis}>`)
-    + fld(8, T("rq.f8"), T("rq.h8"), `<div class="rq-rows">${(v.refs || []).map((r, i) => `<div class="rq-rowin">
+    + nf(T("rq.f8"), T("rq.h8"), `<div class="rq-rows">${(v.refs || []).map((r, i) => `<div class="rq-rowin">
           <input id="rq-ref-url-${i}" value="${val(r.url)}"${ph("rq.p8url")} aria-label="${esc(T("rq.refUrl"))}"${dis}>
           <input id="rq-ref-note-${i}" value="${val(r.note)}"${ph("rq.p8note")} aria-label="${esc(T("rq.refNote"))}"${dis}>${del("rq-del-ref", i)}</div>`).join("")}</div>
         <button class="btn quiet sm" data-act="rq-add-ref"${dis}>${T("rq.addRef")}</button>`)
-    + fld(9, T("rq.f9"), T("rq.h9"), `<input id="rq-publish" type="date" value="${val(v.publish_on)}"${dis}>
+    + nf(T("rq.f9"), T("rq.h9"), `<input id="rq-publish" type="date" value="${val(v.publish_on)}"${dis}>
         <div class="rq-warn" id="rq-publish-warn" role="status"${soon ? "" : " hidden"}>${T("rq.soonWarn")}</div>`)
-    + fld(10, T("rq.f10"), T("rq.h10"), `<textarea id="rq-notes" style="min-height:72px"${ph("rq.p10")}${dis}>${val(v.other_notes)}</textarea>`)
-    + fld(11, T("rq.f11"), T("rq.h11"), `<div class="mini">${T("rq.f11note")}</div>`)
+    + nf(T("rq.f10"), T("rq.h10"), `<textarea id="rq-notes" style="min-height:72px"${ph("rq.p10")}${dis}>${val(v.other_notes)}</textarea>`)
+    + nf(T("rq.f11"), T("rq.h11"), `<div class="mini">${T("rq.f11note")}</div>`)
     + `</div>`;
   const shotRow = (r, i) => `<tr><th scope="row">F${i + 1}</th>
       <td data-l="${esc(T("rq.sWho"))}"><input id="rq-shot-who-${i}" value="${val(r.who)}"${i === 0 ? ph("rq.exWho") : ""} aria-label="F${i + 1} ${esc(T("rq.sWho"))}"${dis}></td>
@@ -1311,7 +1328,7 @@ export function requestPageHTML(me, mine, d, msg, busy, cadres, today) {
     const who = r.assignee ? rqPerson(r.assignee, cadres) : "";
     const pub = rqPub(r);
     return `<li class="rq-row${st === "withdrawn" ? " off" : ""}">
-      <div class="fhead"><b>${esc(r.title)}</b> <span class="tag${rqTagCls(st)}">${esc(T("rq.st." + st))}</span> <span class="mini">${esc(rqPlatformText(r))}${pub ? `・${esc(T("rq.pubOn", { d: rqDate(pub) }))}` : ""}</span></div>
+      <div class="fhead">${rqKindTag(r)}<b>${esc(r.title)}</b> <span class="tag${rqTagCls(st)}">${esc(T("rq.st." + st))}</span> <span class="mini">${esc(rqPlatformText(r))}${pub ? `・${esc(T("rq.pubOn", { d: rqDate(pub) }))}` : ""}</span></div>
       ${r.reply ? `<div class="fmeta rq-reply"><i>${T("rq.replyLabel")}</i>${esc(r.reply)}</div>` : ""}
       ${who ? `<div class="fmeta">${esc(T("rq.assigneeLine", { v: who }))}</div>` : ""}
       <div class="fmeta">${esc(T("rq.sent", { d: rqDate(r.created_at) }))}${st === "submitted" ? ` <button class="lnk" data-act="rq-withdraw" data-id="${esc(r.id)}"${dis}>${T("rq.withdraw")}</button>` : ""}</div>
@@ -1319,9 +1336,10 @@ export function requestPageHTML(me, mine, d, msg, busy, cadres, today) {
   };
   return pageHead(T("rq.title"), T("rq.lede"))
     + msgHTML(msg)
-    + sectionHTML(T("rq.formTitle"), form, { id: "rq-form" })
-    + sectionHTML(T("rq.shotsTitle"), shots, { id: "rq-shots" })
-    + `<div class="form-foot rq-send"><button class="btn" data-act="rq-submit"${dis}>${busy ? T("common.saving") : T("rq.submit")}</button><span class="mini">${T("rq.submitNote")} ${T("rq.draftNote")}</span></div>`
+    + sectionHTML(T("rq.kindPick"), picker + (kind ? "" : `<p class="mini">${T("rq.kindFirst")}</p>`), { id: "rq-kind" })
+    + (kind ? sectionHTML(T("rq.formTitle"), form, { id: "rq-form" }) : "")
+    + (kind === "video" ? sectionHTML(T("rq.shotsTitle"), shots, { id: "rq-shots" }) : "")
+    + (!kind ? "" : `<div class="form-foot rq-send"><button class="btn" data-act="rq-submit"${dis}>${busy ? T("common.saving") : T("rq.submit")}</button><span class="mini">${T("rq.submitNote")} ${T("rq.draftNote")}</span></div>`)
     + sectionHTML(T("rq.mineTitle"), (mine || []).length ? `<ul class="flist">${mine.map(row).join("")}</ul>` : emptyHTML(T("rq.mineNone"), T("rq.mineNoneHint")), { id: "rq-mine" });
 }
 
@@ -1363,6 +1381,7 @@ export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy, opts
         shots.map(s => `<tr${s.is_closing ? ` class="rq-closing"` : ""}><th scope="row">${s.is_closing ? T("rq.closing") : `F${++fn}`}</th><td>${esc(s.who || "")}</td><td>${s.is_closing ? T("rq.closingWhat") : esc(s.what || "")}</td><td>${s.seconds == null ? "" : esc(String(s.seconds))}</td><td>${esc(s.note || "")}</td></tr>`).join("")
       }</tbody></table>` : "";
     const details = `<div class="rq-print"><dl class="rq-dl">
+        <dt>${T("rq.kindLabel")}</dt><dd>${r.kind ? esc(T("rq.kind." + r.kind)) : none}</dd>
         <dt>${T("rq.f1")}</dt><dd>${esc(r.title)}</dd>
         <dt>${T("rq.f2")}</dt><dd>${owner(r) ? esc(owner(r)) : none}</dd>
         <dt>${T("rq.f3")}</dt><dd>${txt(r.goal_cta)}</dd>
@@ -1401,7 +1420,7 @@ export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy, opts
   const chip = (act, v, label, on) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-v="${esc(v)}">${esc(label)}</button>`;
   const row = r => {
     const pub = rqPub(r), ow = owner(r), pf = rqPlatformText(r);
-    return `<li class="rq-row"><div class="fhead"><b><a href="#requests/${esc(r.id)}" data-act="rq-open" data-id="${esc(r.id)}">${esc(r.title)}</a></b>${pf ? ` <span class="mini">${esc(pf)}</span>` : ""}</div>
+    return `<li class="rq-row"><div class="fhead">${rqKindTag(r)}<b><a href="#requests/${esc(r.id)}" data-act="rq-open" data-id="${esc(r.id)}">${esc(r.title)}</a></b>${pf ? ` <span class="mini">${esc(pf)}</span>` : ""}</div>
       <div class="fmeta">${[ow ? esc(T("rq.ownerLine", { v: ow })) : "", pub ? esc(T("rq.pubOn", { d: rqDate(pub) })) + rqSoonTag(r, td) : "", esc(r.assignee ? T("rq.assigneeLine", { v: who(r.assignee) }) : T("rq.nobody"))].filter(Boolean).join("・")}</div>
       <div class="fmeta">${esc(T("rq.oneLede", { who: who(r.requester), d: rqDate(r.created_at) }))}</div></li>`;
   };

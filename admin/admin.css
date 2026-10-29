@@ -378,6 +378,17 @@ a.btn{text-decoration:none}
 .rq-fi > input,.rq-fi > textarea,.rq-fi > select{margin-bottom:8px}
 .rq-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .rq-pair label{margin:0}
+/* 需求單第一步：選種類（2026-10-28）。三張卡，選到的那張深藍。 */
+.rq-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rq-kindbtn{display:block;text-align:left;padding:14px 16px;border:1.5px solid rgba(16,42,134,.22);border-radius:16px;background:rgba(255,255,255,.6);color:var(--ink);font-family:var(--body)}
+.rq-kindbtn b{display:block;font-family:var(--display);font-size:20px;letter-spacing:.03em;margin-bottom:2px}
+.rq-kindbtn span{font-size:13px;color:rgba(16,42,134,.8)}
+.rq-kindbtn:hover{border-color:var(--bt-orange)}
+.rq-kindbtn.on{background:var(--bt-navy);border-color:var(--bt-navy);color:var(--bt-cream)}
+.rq-kindbtn.on span{color:var(--bt-cream);opacity:.85}
+#rq-kind .mini{margin:10px 0 0}
+.tag.rq-kind{background:rgba(255,196,108,.4);border-color:transparent}
+@media (max-width:600px){.rq-kinds{grid-template-columns:1fr}}
 .rq-pf{display:flex;flex-wrap:wrap;gap:4px 18px}
 .rq-pf .check{margin:0 0 6px}
 .rq-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}

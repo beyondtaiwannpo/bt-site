@@ -41,7 +41,7 @@ export const MINE = {
   "home.nothing":     { zh: "接下來沒有排給你的會。", en: "Nothing scheduled for you yet." },
   "home.allClear":    { zh: "都回覆完了。", en: "All replied." },
   "home.do":          { zh: "我要…", en: "I want to…" },
-  "home.doRequest":   { zh: "請 Marketing 做貼文", en: "Ask Marketing for a post" },
+  "home.doRequest":   { zh: "請 Marketing 做貼文或影片", en: "Ask Marketing for a post or video" },
   "home.doRequestSub":{ zh: "送一張需求單，進度在同一頁看。", en: "Send a request and follow it on the same page." },
   "home.doTime":      { zh: "填我有空的時間", en: "Fill in when I'm free" },
   "home.doTimeSub":   { zh: "排會的人照這個挑時間。", en: "Organizers pick times from this." },

@@ -66,7 +66,7 @@ test("★ 7 天規則：預計發布日早於今天加 7 天就警告（只警�
 });
 
 test("★ 送單的表單：11 格照 Sheet 的順序、每一格旁邊有說明、拍攝指示 F1 到 F7 加固定的結尾話、範例是灰字、送出是按鈕", () => {
-  const h = F.requestPageHTML(ME, [], F.rqBlank(), "", false, PEOPLE, TODAY);
+  const h = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "video" }), "", false, PEOPLE, TODAY);
   const ns = [...h.matchAll(/class="rq-f" data-n="(\d+)"/g)].map(m => +m[1]);
   assert.deepEqual(ns, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "11 格、照順序");
   const labels = ["Tag 與貼文名稱", "需求負責人", "目標與 CTA", "平台與類型", "一句話重點", "一定要有的資訊", "文案草稿或 bullet", "視覺參考", "預計發布日", "其他備註", "狀態"];
@@ -76,8 +76,8 @@ test("★ 送單的表單：11 格照 Sheet 的順序、每一格旁邊有說明
   assert.match(h, /例：C-2 bootcamp 報名倒數。系列的話寫第幾則/); assert.match(h, /Marketing 只找這一個人/);
   assert.match(h, /看的人只會記得一句，是哪句/);
   for (const id of ["rq-title", "rq-owner-team", "rq-owner", "rq-goal", "rq-pf-other", "rq-key", "rq-draft", "rq-doc", "rq-publish", "rq-notes"]) assert.match(h, new RegExp(`id="${id}"`), id);
-  for (const p of F.RQ_PLATFORMS) assert.match(h, new RegExp(`type="checkbox" id="rq-pf-${p}"`), `平台 ${p} 是勾選框`);
-  assert.match(h, /IG 輪播/); assert.match(h, /Threads 純文字/);
+  for (const p of F.RQ_KIND_PF.video) assert.match(h, new RegExp(`type="checkbox" id="rq-pf-${p}"`), `平台 ${p} 是勾選框`);
+  assert.match(h, /IG Reels/); assert.match(h, /長影片/); assert.doesNotMatch(h, /id="rq-pf-ig_carousel"/, "影片不出現貼文的平台");
   assert.match(h, /id="rq-must-text-0"/); assert.match(h, /id="rq-must-by-0"/); assert.match(h, /data-act="rq-add-must"/);
   assert.match(h, /id="rq-ref-url-0"/); assert.match(h, /id="rq-ref-note-0"/); assert.match(h, /data-act="rq-add-ref"/);
   for (let i = 1; i <= 7; i++) assert.match(h, new RegExp(`<th scope="row">F${i}</th>`), `F${i}`);
@@ -94,28 +94,28 @@ test("★ 送單的表單：11 格照 Sheet 的順序、每一格旁邊有說明
 });
 
 test("★ 7 天警告：發布日太近，黃色警告顯示出來，送出鈕還是按得了", () => {
-  const h = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { title: "x", publish_on: "2026-11-12" }), "", false, PEOPLE, TODAY);
+  const h = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post", title: "x", publish_on: "2026-11-12" }), "", false, PEOPLE, TODAY);
   assert.match(h, /<div class="rq-warn" id="rq-publish-warn" role="status">/);
   assert.match(h, /至少要在送單後 7 天/);
   assert.match(h, /<button class="btn" data-act="rq-submit">/, "不擋送出");
-  const ok = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { publish_on: "2026-11-30" }), "", false, PEOPLE, TODAY);
+  const ok = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post", publish_on: "2026-11-30" }), "", false, PEOPLE, TODAY);
   assert.match(ok, /id="rq-publish-warn"[^>]*hidden/);
 });
 
 test("負責人：先選 team（從名單抓）再選人（只列那個 team 的人）；一個人有兩個 team 兩邊都列", () => {
-  const none = F.requestPageHTML(ME, [], F.rqBlank(), "", false, PEOPLE, TODAY);
+  const none = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post" }), "", false, PEOPLE, TODAY);
   assert.match(none, /<option value="Curriculum Team">/); assert.match(none, /<option value="Mentorship Team">/);
   assert.match(none, /<select id="rq-owner" disabled>/, "還沒選 team，人那一格不能選");
-  const cur = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { owner_team: "Curriculum Team", owner_id: "u3" }), "", false, PEOPLE, TODAY);
+  const cur = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post", owner_team: "Curriculum Team", owner_id: "u3" }), "", false, PEOPLE, TODAY);
   assert.match(cur, /<option value="Curriculum Team" selected>/);
   assert.match(cur, /<option value="u3" selected>阿哲 \(Jay\)<\/option>/); assert.match(cur, /<option value="u2">/);
   assert.doesNotMatch(cur, /<option value="u5"/, "Marketing 的人不在 Curriculum 底下");
-  const men = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { owner_team: "Mentorship Team" }), "", false, PEOPLE, TODAY);
+  const men = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post", owner_team: "Mentorship Team" }), "", false, PEOPLE, TODAY);
   assert.match(men, /<option value="u3">/); assert.doesNotMatch(men, /<option value="u2">/);
 });
 
 test("可以多列的三塊：畫出幾列就是幾列，每列有刪掉鈕，第 8 列以後的 Fragment 自動編號", () => {
-  const d = Object.assign(F.rqBlank(), {
+  const d = Object.assign(F.rqBlank(), { kind: "video",
     must: [{ text: "日期", confirmed_by: "Jay" }, { text: "地點", confirmed_by: "" }, { text: "", confirmed_by: "" }],
     refs: [{ url: "https://a", note: "顏色" }, { url: "", note: "" }],
     shots: Array.from({ length: 9 }, (_, i) => ({ who: i === 0 ? "A" : "", what: "", seconds: "", note: "" })),
@@ -270,4 +270,26 @@ test("★ 英文畫出來不剩中文（送單頁、佇列、一張單）", () =
     assert.doesNotMatch(ph, /[一-鿿]/, "英文模式的灰字範例也要是英文：" + ph);
   }
   F.setLang("zh");
+});
+
+// 2026-10-28 Paul：「先選貼文還是影片，需求單長得不一樣，貼文不需要拍攝指示。」
+test("★ 需求單先選種類：沒選只看得到三張卡；貼文沒有拍攝指示、限動也沒有平台、影片兩樣都有；送出那一包帶種類", () => {
+  const blank = F.requestPageHTML(ME, [], F.rqBlank(), "", false, PEOPLE, TODAY);
+  for (const k of ["post", "story", "video"]) assert.match(blank, new RegExp(`data-act="rq-kind" data-v="${k}"`));
+  assert.doesNotMatch(blank, /id="rq-title"/, "沒選種類不出現表單"); assert.doesNotMatch(blank, /data-act="rq-submit"/);
+  const post = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post" }), "", false, PEOPLE, TODAY);
+  assert.match(post, /class="rq-kindbtn on"[^>]*data-v="post"/);
+  assert.doesNotMatch(post, /id="rq-shots"/, "貼文沒有拍攝指示"); assert.match(post, /id="rq-pf-ig_carousel"/); assert.doesNotMatch(post, /id="rq-pf-ig_reels"/);
+  const story = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "story" }), "", false, PEOPLE, TODAY);
+  assert.doesNotMatch(story, /id="rq-shots"/); assert.doesNotMatch(story, /class="rq-pf"/, "限動不用選平台");
+  assert.deepEqual([...story.matchAll(/class="rq-f" data-n="(\d+)"/g)].map(m => +m[1]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "少了平台那一格，號碼照順序重排");
+  const video = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "video" }), "", false, PEOPLE, TODAY);
+  assert.match(video, /id="rq-shots"/);
+  const pp = F.rqPayload(Object.assign(F.rqBlank(), { kind: "post", title: "x", platforms: ["ig_carousel", "ig_reels"], shots: [{ who: "A", what: "拍", seconds: "3", note: "" }] }));
+  assert.equal(pp.kind, "post"); assert.deepEqual(pp.platforms, ["ig_carousel"], "貼文不送影片的平台"); assert.deepEqual(pp.shots, [], "貼文不送拍攝指示");
+  assert.deepEqual(F.rqPayload(Object.assign(F.rqBlank(), { kind: "story", title: "x" })).platforms, ["ig_story"]);
+  const vp = F.rqPayload(Object.assign(F.rqBlank(), { kind: "video", title: "x", platforms: ["ig_reels"], shots: [{ who: "A", what: "拍", seconds: "3", note: "" }] }));
+  assert.equal(vp.shots.length, 2, "影片帶拍攝指示加結尾話");
+  const sql = readFileSync("supabase/migrations/2026-11-19-request-kinds.sql", "utf8");
+  for (const k of ["post", "video"]) for (const p of F.RQ_KIND_PF[k].filter(x => x !== "other")) assert.ok(sql.includes(`'${p}'`), `資料庫認得 ${p}`);
 });

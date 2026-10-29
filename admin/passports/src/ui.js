@@ -41,7 +41,7 @@ export const ITEMS = [
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
   { group: "forms",     key: "events",   sec: "meet",     label: { zh: "活動",     en: "Events" },            hint: { zh: "上到對外首頁的活動", en: "Events on the public site" }, who: "cadre" },
   // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
-  { group: "forms",     key: "request",  sec: "mkt",      label: { zh: "請 Marketing 做貼文", en: "Ask Marketing for a post" }, hint: { zh: "送一張需求單", en: "Send a request" }, who: "cadre" },
+  { group: "forms",     key: "request",  sec: "mkt",      label: { zh: "請 Marketing 做貼文或影片", en: "Ask Marketing for a post or video" }, hint: { zh: "送一張需求單", en: "Send a request" }, who: "cadre" },
   { group: "forms",     key: "requests", sec: "mkt",      label: { zh: "Marketing 的待辦", en: "Marketing's queue" }, hint: { zh: "大家送來的需求單", en: "Requests sent to Marketing" }, who: "ws:custom:marketing-requests" },
   { group: "forms",     key: "forms",    sec: "apply",    label: { zh: "申請表",   en: "Application forms" }, hint: { zh: "報名表、審核、簽到", en: "Sign-up forms, review, check-in" }, who: "cadre" },
   { group: "passports", key: "cadre",    sec: "pass",     label: { zh: "幹部護照", en: "Cadre passport" },    hint: { zh: "月份、格子、揭曉", en: "Months, boxes, reveals" }, who: "ws:passport" },
