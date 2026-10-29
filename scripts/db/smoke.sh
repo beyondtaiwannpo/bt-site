@@ -2483,5 +2483,37 @@ rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-23-gcal-rsvp.sql >/dev/null 2>&1 || true
 
 echo
+echo "── 需求單接下與退件（2026-11-24-request-accept-reject.sql）──"
+argot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-24-request-accept-reject.sql 2>&1 || true)
+if echo "${argot}" | grep -q "OVERALL.*PASS" && ! echo "${argot}" | grep -q "|FAIL"; then echo "  ok   接下與退件那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 接下與退件那支驗收表："; echo "${argot}" | head -14; fail=$((fail+1)); fi
+AR1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" -c "select public.submit_request('{\"title\":\"要接的單\",\"owner_id\":\"${RQR}\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+AR2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${RQR}',false);" -c "select public.submit_request('{\"title\":\"要退的單\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chkraise "★ 破壞測試：送單的人自己接不了（not_allowed）" "not_allowed" "perform set_config('test.uid','${RQR}',true); perform public.accept_request('${AR1}');"
+chkraise "★ 破壞測試：別的 team 的幹部退不了（not_allowed）" "not_allowed" "perform set_config('test.uid','${OUTC}',true); perform public.reject_request('${AR2}','不要');"
+chkas "${MKE}" "Marketing 接下，狀態變進行中" "in_progress" "select public.accept_request('${AR1}')"
+chk "★ 接下的人沒人接就記成接的人" "${MKE}" "select assignee from public.requests where id='${AR1}'"
+chkraise "接過的不能再接（not_submitted）" "not_submitted" "perform set_config('test.uid','${MKE}',true); perform public.accept_request('${AR1}');"
+chkraise "★ 退件沒寫回覆擋下來（empty_reply）" "empty_reply" "perform set_config('test.uid','${MKE}',true); perform public.reject_request('${AR2}','   ');"
+chkas "${MKE}" "退件，寫回覆" "rejected" "select public.reject_request('${AR2}','這週排滿了，下週再送')"
+chk "★ 退件寄一封 request_rejected 給送單的人，信裡有回覆與送單人那一頁的連結" "1|rqr@example.com|true|true" \
+  "select count(*)||'|'||min(to_email)||'|'||bool_and(body like '%這週排滿了%')||'|'||bool_and(body like '%/admin/#request/${AR2}%') from public.mail_outbox where kind='request_rejected' and request_id='${AR2}'"
+chk "退件的信按鈕連到送單人那一頁" "https://beyondtaiwannpo.com/admin/#request/${AR2}" "select public.mail_button_url(o) from public.mail_outbox o where kind='request_rejected' and request_id='${AR2}' limit 1"
+chkraise "退過的不能再退（not_open）" "not_open" "perform set_config('test.uid','${MKE}',true); perform public.reject_request('${AR2}','再退');"
+chkraise "★ 退件的送單人收不回（already_started）" "already_started" "perform set_config('test.uid','${RQR}',true); perform public.withdraw_request('${AR2}');"
+chkas "${MKE}" "按錯了：退件改回進行中" "in_progress" "select public.set_request_status('${AR2}','in_progress',null)"
+chkas "${MKE}" "進行中也退得了" "rejected" "select public.reject_request('${AR1}','跟另一張重複了')"
+chkraise "已發布的不能退（not_open）" "not_open" "perform set_config('test.uid','${MKE}',true); perform public.reject_request('${RQ3}','x');"
+chkrole authenticated "${RQR}" "送單的人讀得到自己退件的單與回覆" "rejected|跟另一張重複了" "select status||'|'||reply from public.requests where id='${AR1}'"
+ar2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-24-request-accept-reject.sql 2>&1 || true)
+if echo "${ar2}" | grep -q "OVERALL.*PASS"; then echo "  ok   接下與退件那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 接下與退件那支重跑沒過"; fail=$((fail+1)); fi
+chk "重跑不動資料：一張退件、一張改回進行中" "rejected|in_progress" "select (select status from public.requests where id='${AR1}')||'|'||(select status from public.requests where id='${AR2}')"
+BROKEN=$(mktemp)
+sed "s/  if v_reply = '' then raise exception 'empty_reply' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-24-request-accept-reject.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「退件一定要寫回覆」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉「退件要寫回覆」驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-24-request-accept-reject.sql >/dev/null 2>&1 || true
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

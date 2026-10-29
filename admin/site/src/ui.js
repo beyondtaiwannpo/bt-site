@@ -811,6 +811,8 @@ export const MAIL_KINDS = [
   // 2026-11-09 第二版：request_done 那封畫面上叫「已發布」（狀態改成 Sheet 的四個），代號不改名（舊的寄信紀錄、信件版型都認它）；{needed_by} 現在是預計發布日。
   { v: "request_new",  label: "mail.request_new",  when: "mail.request_new.when" },
   { v: "request_done", label: "mail.request_done", when: "mail.request_done.when" },
+  // 2026-11-24 退件：Marketing 退件時寄給送單的人，{reply} 是退件原因。
+  { v: "request_rejected", label: "mail.request_rejected", when: "mail.request_rejected.when" },
   // 2026-11-02 會議：兩封，代換符號 {name} {title} {when} {agenda} {doc} {link}。
   { v: "meeting_invite",   label: "mail.meeting_invite",   when: "mail.meeting_invite.when" },
   { v: "meeting_reminder", label: "mail.meeting_reminder", when: "mail.meeting_reminder.when" },
@@ -946,11 +948,11 @@ export function downHTML(err) {
 // ═══════════════════════════════════════════════════════════════════════
 export const MAIL_BUTTON = {
   invite: { zh: "接受邀請", en: "Accept invitation" }, meeting_invite: { zh: "回覆出席", en: "Reply" }, meeting_reminder: { zh: "回覆出席", en: "Reply" }, meeting_summary: { zh: "看這場會", en: "Open meeting" }, meeting_update: { zh: "回覆出席", en: "Reply" },
-  request_new: { zh: "打開需求單", en: "Open request" }, request_done: { zh: "看回覆", en: "Open request" }, interview: { zh: "挑一個時段", en: "Pick a time" },
+  request_new: { zh: "打開需求單", en: "Open request" }, request_done: { zh: "看回覆", en: "Open request" }, request_rejected: { zh: "看說明", en: "Read the note" }, interview: { zh: "挑一個時段", en: "Pick a time" },
 };
 export const MAIL_SAMPLE_URL = {
   invite: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", meeting_invite: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_reminder: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_summary: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_update: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_cancel: "",
-  request_new: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", request_done: "https://beyondtaiwannpo.com/admin/#request/9f2c…", interview: "https://cal.com/beyondtaiwan/interview",
+  request_new: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", request_done: "https://beyondtaiwannpo.com/admin/#request/9f2c…", request_rejected: "https://beyondtaiwannpo.com/admin/#request/9f2c…", interview: "https://cal.com/beyondtaiwan/interview",
 };
 export function mailButtonLabel(kind, lang, custom) {
   if (custom && String(custom).trim()) return String(custom).trim();

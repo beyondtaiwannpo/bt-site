@@ -1205,7 +1205,10 @@ export function downHTML(err) {
 // 兩頁：每一位幹部的「跟 Marketing 提需求」（Sheet 的 11 格加拍攝指示，下面是我送過的），Marketing 需求工作區的「行銷需求單」佇列。
 // 資料都從 loadRequests() 來（RLS 決定看得到哪些），這裡只畫。
 // 第一版的舊單（沒有新欄位、狀態還是 new／done）照樣畫得出來：狀態走 rqStatus() 對照，第一版的欄有值就印。
-export const RQ_STATUS = ["submitted", "in_progress", "in_review", "published", "withdrawn"];
+// 2026-10-29 Paul：Marketing 要能退件（rejected，一定附回覆、會寄信），所以狀態多一個。
+export const RQ_STATUS = ["submitted", "in_progress", "in_review", "published", "rejected", "withdrawn"];
+// 接下之後才改得到的進度（已送出的單先按「接下」或「退件」）。
+export const RQ_WORKING = ["in_progress", "in_review"];
 export const RQ_OPEN = ["submitted", "in_progress", "in_review"];
 // 2026-10-28 Paul：「先選這是貼文還是影片，需求單長得不一樣，貼文不需要拍攝指示。」三種：貼文、限動、影片。
 // 限動不用選平台（固定是 IG 限動）；影片才有拍攝指示。資料庫 submit_request() 照同一張表檢查（2026-11-19-request-kinds.sql）。
@@ -1250,14 +1253,10 @@ export function rqPayload(d) {
   };
 }
 export function rqMine(rows, me) { return (rows || []).filter(r => me && r.requester === me.id); }
-// 名單上的 team（一個人可能有兩個 team，兩邊都算）。
-function rqTeams(cadres) {
-  const set = new Set();
-  for (const p of cadres || []) for (const t of splitTeams(p.team)) set.add(t);
-  return [...set].sort((a, b) => a.localeCompare(b));
-}
 const rqPerson = (id, ...lists) => { for (const l of lists) { const p = (l || []).find(x => x.id === id); if (p) return mpName(p); } return ""; };
-const rqTagCls = st => st === "published" ? " open" : st === "in_progress" || st === "in_review" ? " warn" : "";
+const rqTagCls = st => st === "published" ? " open" : st === "in_progress" || st === "in_review" ? " warn" : st === "rejected" ? " bad" : "";
+// 需求負責人就是登入的人（Paul 2026-10-29：「誰登入就是誰，不用選」）。一個人有兩個 team 才給選是哪一個。
+export function rqMyTeams(me) { return splitTeams(me && me.team); }
 // 平台那一格的字：「IG 輪播、其他：LINE 群組」。舊單沒有平台就印第一版的種類。
 function rqPlatformText(r) {
   const pf = (r.platforms || []).map(p => p === "other" && r.platform_other ? T("rq.pf.otherWith", { v: r.platform_other }) : T("rq.pf." + p));
@@ -1277,8 +1276,7 @@ export function requestPageHTML(me, mine, d, msg, busy, cadres, today) {
   const ph = k => ` placeholder="${esc(T(k))}"`;
   const fld = (n, label, help, body) => `<div class="rq-f" data-n="${n}"><div class="rq-fl"><b class="rq-n">${n}</b> <span>${label}</span><div class="rq-help">${help}</div></div><div class="rq-fi">${body}</div></div>`;
   const del = (act, i) => `<button class="lnk rq-del" data-act="${act}" data-i="${i}" aria-label="${esc(T("rq.delRow"))}"${dis}>${T("rq.delRow")}</button>`;
-  const teams = rqTeams(cadres);
-  const inTeam = v.owner_team ? (cadres || []).filter(p => splitTeams(p.team).includes(v.owner_team)) : [];
+  const myTeams = rqMyTeams(me);
   const soon = rqTooSoon(v.publish_on, td);
   const kind = RQ_KINDS.includes(v.kind) ? v.kind : "";
   const pfs = kind ? RQ_KIND_PF[kind] : [];
@@ -1288,9 +1286,9 @@ export function requestPageHTML(me, mine, d, msg, busy, cadres, today) {
   let n = 0; const nf = (label, help, body) => fld(++n, label, help, body);
   const form = `<div class="rq-form">`
     + nf(T("rq.f1"), T("rq.h1"), `<input id="rq-title" value="${val(v.title)}"${ph("rq.p1")}${dis}>`)
-    + nf(T("rq.f2"), T("rq.h2"), `<div class="rq-pair">
-        <label><span class="sr">${T("rq.ownerTeam")}</span><select id="rq-owner-team"${dis}><option value="">${T("rq.pickTeam")}</option>${teams.map(t => `<option value="${esc(t)}"${v.owner_team === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
-        <label><span class="sr">${T("rq.ownerPerson")}</span><select id="rq-owner"${!v.owner_team || busy ? " disabled" : ""}><option value="">${T("rq.pickPerson")}</option>${inTeam.map(p => `<option value="${esc(p.id)}"${v.owner_id === p.id ? " selected" : ""}>${esc(mpName(p))}</option>`).join("")}</select></label></div>`)
+    + nf(T("rq.f2"), T("rq.h2"), `<div class="rq-owner"><b>${esc(T("rq.ownerYou", { v: (me && me.name) || "" }))}</b>${
+        myTeams.length > 1 ? ` <label><span class="sr">${T("rq.ownerTeam")}</span><select id="rq-owner-team"${dis}>${myTeams.map(t => `<option value="${esc(t)}"${(v.owner_team || myTeams[0]) === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`
+        : myTeams.length ? ` <span class="mini">${esc(myTeams[0])}</span>` : ""}</div>`)
     + nf(T("rq.f3"), T("rq.h3"), `<input id="rq-goal" value="${val(v.goal_cta)}"${ph("rq.p3")}${dis}>`)
     + (pfs.length ? nf(T("rq.f4"), T("rq.h4"), `<div class="rq-pf">${pfs.map(p => `<label class="check"><input type="checkbox" id="rq-pf-${p}"${(v.platforms || []).includes(p) ? " checked" : ""}${dis}> ${esc(T("rq.pf." + p))}</label>`).join("")}</div>
         <input id="rq-pf-note" value="${val(v.platform_other)}"${ph("rq.pOther")}${dis}>`) : "")
@@ -1403,17 +1401,30 @@ export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy, opts
       </dl>${shotTable}</div>`;
     const as = (x.assignees || []).slice();
     if (r.assignee && !as.some(a => a.id === r.assignee)) as.push({ id: r.assignee, name_zh: who(r.assignee) });
-    const stOpts = st === "published" ? RQ_OPEN.concat("published") : RQ_OPEN;
-    // 狀態、接的人、回覆改了就存（data-autosave="rq-save"）。「已發布」是按鈕，因為它會寄一封信給送單的人，
-    // 按之前要問一次；所以還沒發布的單，下拉裡不給選「已發布」。已發布的單下拉才有它（可以退回，信不會重寄）。
-    const handle = st === "withdrawn" ? `<div class="note">${T("rq.withdrawnNote")}</div>` : canEdit ? `<div class="two" data-autosave="rq-save" data-id="${esc(r.id)}">
-          <label><i>${T("rq.assignee")}</i><select id="rq-assignee" name="assignee"${dis}><option value="">${T("rq.nobodyOpt")}</option>${as.map(a => `<option value="${esc(a.id)}"${r.assignee === a.id ? " selected" : ""}>${esc(mpName(a))}</option>`).join("")}</select></label>
-          <label><i>${T("rq.status")}</i><select id="rq-status" name="status"${dis}>${stOpts.map(s => `<option value="${s}"${st === s ? " selected" : ""}>${esc(T("rq.st." + s))}</option>`).join("")}</select></label>
-          <label class="wide"><i>${T("rq.reply")}</i><textarea id="rq-reply" name="reply" style="min-height:90px" placeholder="${esc(T("rq.replyPh"))}"${dis}>${esc(r.reply || "")}</textarea></label>
-        </div>
+    // 2026-10-29 Paul：已送出的單先「接下」或「退件」，接下之後才有進度可以改。
+    //   已送出：接的人、回覆、「接下」「退件」兩顆鈕。
+    //   進行中／待審核：接的人、進度（這兩個）、回覆；「已發出，通知送單的人」與「退件」。
+    //   已發布：進度下拉多「已發布」（可以退回，信不會重寄）。
+    //   退件：說明已經寄給送單的人，可以「改回進行中」（按錯了救得回來）。
+    // 進度、接的人、回覆改了就存（data-autosave="rq-save"）。會寄信的三件事（發布、退件）是按鈕，按之前問一次。
+    const reply = `<label class="wide"><i>${T(st === "submitted" ? "rq.replyFirst" : "rq.reply")}</i><textarea id="rq-reply" name="reply" style="min-height:90px" placeholder="${esc(T(st === "submitted" ? "rq.replyFirstPh" : "rq.replyPh"))}"${dis}>${esc(r.reply || "")}</textarea></label>`;
+    const assignee = `<label><i>${T("rq.assignee")}</i><select id="rq-assignee" name="assignee"${dis}><option value="">${T("rq.nobodyOpt")}</option>${as.map(a => `<option value="${esc(a.id)}"${r.assignee === a.id ? " selected" : ""}>${esc(mpName(a))}</option>`).join("")}</select></label>`;
+    const stOpts = st === "published" ? RQ_WORKING.concat("published") : RQ_WORKING;
+    const status = `<label><i>${T("rq.status")}</i><select id="rq-status" name="status"${dis}>${stOpts.map(s => `<option value="${s}"${st === s ? " selected" : ""}>${esc(T("rq.st." + s))}</option>`).join("")}</select></label>`;
+    const rejectBtn = `<button class="btn ghost" data-act="rq-reject" data-id="${esc(r.id)}"${dis}>${T("rq.reject")}</button>`;
+    let handle;
+    if (st === "withdrawn") handle = `<div class="note">${T("rq.withdrawnNote")}</div>`;
+    else if (!canEdit) handle = `<div class="note">${T("rq.viewOnly")}</div>`;
+    else if (st === "rejected") handle = `<div class="note">${T("rq.rejectedNote")}</div>
+        <div class="form-foot"><button class="btn ghost" data-act="rq-reopen" data-id="${esc(r.id)}"${dis}>${T("rq.reopen")}</button><span class="mini">${T("rq.reopenNote")}</span></div>`;
+    else if (st === "submitted") handle = `<p class="mini">${T("rq.decideLede")}</p><div class="two" data-autosave="rq-save" data-id="${esc(r.id)}">${assignee}${reply}</div>
         <div class="form-foot">${autosaveHint("rq-save", `data-id="${esc(r.id)}"`)}
-          ${st !== "published" ? `<button class="btn" data-act="rq-publish" data-id="${esc(r.id)}"${dis}>${T("rq.markPublished")}</button>` : ""}
-          <span class="mini">${T("rq.publishNote")}</span></div>` : `<div class="note">${T("rq.viewOnly")}</div>`;
+          <button class="btn" data-act="rq-accept" data-id="${esc(r.id)}"${dis}>${T("rq.accept")}</button>${rejectBtn}
+          <span class="mini">${T("rq.decideNote")}</span></div>`;
+    else handle = `<div class="two" data-autosave="rq-save" data-id="${esc(r.id)}">${assignee}${status}${reply}</div>
+        <div class="form-foot">${autosaveHint("rq-save", `data-id="${esc(r.id)}"`)}
+          ${st !== "published" ? `<button class="btn" data-act="rq-publish" data-id="${esc(r.id)}"${dis}>${T("rq.markPublished")}</button>${rejectBtn}` : ""}
+          <span class="mini">${T(st === "published" ? "rq.publishedNote" : "rq.publishNote")}</span></div>`;
     return pageHead(esc(r.title), esc(T("rq.oneLede", { who: who(r.requester), d: rqDate(r.created_at) })), [{ act: "rq-print", label: T("rq.print") }], { act: "rq-back", label: T("rq.back") })
       + msgHTML(msg)
       + sectionHTML(T("rq.details"), details)
@@ -1430,7 +1441,7 @@ export function requestsQueueHTML(rows, people, f, sel, canEdit, msg, busy, opts
   };
   return pageHead(T("rq.queueTitle"), T("rq.queueLede"))
     + msgHTML(msg)
-    + `<div class="chips" style="margin-bottom:10px">${[["open", T("rq.f.open")], ["published", T("rq.f.published")], ["withdrawn", T("rq.f.withdrawn")], ["all", T("rq.f.all")]].map(([v, l]) => chip("rq-fstatus", v, l, o.status === v)).join("")}${
+    + `<div class="chips" style="margin-bottom:10px">${[["open", T("rq.f.open")], ["published", T("rq.f.published")], ["rejected", T("rq.f.rejected")], ["withdrawn", T("rq.f.withdrawn")], ["all", T("rq.f.all")]].map(([v, l]) => chip("rq-fstatus", v, l, o.status === v)).join("")}${
         x.me ? chip("rq-fmine", x.me.id, T("rq.f.mine"), !!o.mine) : ""}</div>
        <div class="ro-search"><input id="rq-q" type="search" value="${esc(o.q || "")}" placeholder="${esc(T("rq.findPh"))}" autocomplete="off"></div>`
     + (groups.length ? groups.map(([st, rs]) => sectionHTML(`${esc(T("rq.st." + st))}<span class="hint">${rs.length}</span>`, `<ul class="flist">${rs.map(row).join("")}</ul>`)).join("")

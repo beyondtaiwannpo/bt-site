@@ -160,6 +160,8 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 .tag.open,.tag.done{background:rgba(107,198,187,.42)}
 .tag.draft{background:rgba(198,198,198,.5)}
 .tag.closed,.tag.warn{background:rgba(255,196,108,.42)}
+/* 退件：實心深藍白字，一眼看得出不是在做的。 */
+.tag.bad{background:rgba(16,42,134,.9);color:#fff}
 /* 一列裡的動作：靠右不靠右都可以，但一列最多三顆，第一顆框線、其他底線字。 */
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .empty{padding:22px 0 10px;color:rgba(16,42,134,.82);font-size:14px;line-height:1.6}
@@ -382,6 +384,9 @@ a.btn{text-decoration:none}
 .rq-fi > input,.rq-fi > textarea,.rq-fi > select{margin-bottom:8px}
 .rq-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .rq-pair label{margin:0}
+/* 需求負責人：登入的人，兩個 team 才多一個下拉。 */
+.rq-owner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-height:44px}
+.rq-owner label{margin:0}
 /* 需求單第一步：選種類（2026-10-28）。三張卡，選到的那張深藍。 */
 .rq-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .rq-kindbtn{display:block;text-align:left;padding:14px 16px;border:1.5px solid rgba(16,42,134,.22);border-radius:16px;background:rgba(255,255,255,.6);color:var(--ink);font-family:var(--body)}

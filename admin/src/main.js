@@ -261,7 +261,8 @@ function readRequest() {
   const d = UI.rqBlank();
   Object.assign(d, {
     kind: (S.rqDraft && S.rqDraft.kind) || "",
-    title: val("rq-title"), owner_team: val("rq-owner-team"), owner_id: val("rq-owner"), goal_cta: val("rq-goal"),
+    // 需求負責人就是登入的人；有兩個 team 才讀下拉，一個 team 直接用那一個。
+    title: val("rq-title"), owner_team: val("rq-owner-team") || UI.rqMyTeams(S.me)[0] || "", owner_id: (S.me && S.me.id) || "", goal_cta: val("rq-goal"),
     platforms: UI.RQ_PLATFORMS.filter(p => { const el = document.getElementById("rq-pf-" + p); return el && el.checked; }),
     platform_other: val("rq-pf-note"), key_line: val("rq-key"), draft: val("rq-draft"), draft_doc_url: val("rq-doc"),
     publish_on: val("rq-publish"), other_notes: val("rq-notes"),
@@ -270,8 +271,6 @@ function readRequest() {
     shots: Array.from({ length: count("rq-shot-who-") }, (_, i) => ({ who: val("rq-shot-who-" + i), what: val("rq-shot-what-" + i), seconds: val("rq-shot-sec-" + i), note: val("rq-shot-note-" + i) })),
     closing: { who: val("rq-close-who"), seconds: val("rq-close-sec"), note: val("rq-close-note") },
   });
-  // 負責人不在選的 team 裡（剛換 team）就清掉，不然送出去的是上一個 team 的人。
-  if (d.owner_id && !(S.cadres || []).some(p => p.id === d.owner_id && String(p.team || "").split(/[,、;；]/).map(x => x.trim()).includes(d.owner_team))) d.owner_id = "";
   return d;
 }
 // 草稿存在 localStorage（Paul 的規格：送出之前都留著）。讀寫都包 try：私密瀏覽或被擋的時候照樣能填，只是不留。
@@ -559,7 +558,8 @@ document.addEventListener("click", async e => {
     const p = UI.rqPayload(S.rqDraft);
     if (!p.kind) { S.msg = T("err.rqKind"); render(); return; }
     if (!p.title) { S.msg = T("err.rqTitle"); render(); return; }
-    if (!p.owner_id) { S.msg = T("err.rqOwner"); render(); return; }
+    // 草稿可能是改版前存的（那時候負責人是選的），送出一律換成自己。
+    p.owner_id = S.me.id; if (!UI.rqMyTeams(S.me).includes(p.owner_team)) p.owner_team = UI.rqMyTeams(S.me)[0] || "";
     S.busy = true; S.msg = ""; render();
     try {
       await D.submitRequest(p);
@@ -605,6 +605,25 @@ document.addEventListener("click", async e => {
     try {
       await D.setRequestStatus(id, "published", reply);
       S.busy = false; S.msg = T("msg.rqPublished", { title: r.title });
+      await reloadRequests(); render();
+    } catch (e) { S.busy = false; S.msg = T("err.rqSave") + D.says(e); render(); }
+    return;
+  }
+  // 接下、退件、改回進行中（2026-10-29 Paul）。退件會寄信，先問一次，而且回覆一定要寫。
+  if (act === "rq-accept" || act === "rq-reject" || act === "rq-reopen") {
+    const r = (S.requests || []).find(x => x.id === id); if (!r) return;
+    const rp = document.getElementById("rq-reply");
+    const reply = rp ? rp.value.trim() : (r.reply || "");
+    if (act === "rq-reject") {
+      if (!reply) { S.msg = T("err.rqReplyNeeded"); render(); const el = document.getElementById("rq-reply"); if (el) el.focus(); return; }
+      if (UI.needAsk(S, b, T("confirm.rqReject", { title: r.title }))) return;
+    }
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (act === "rq-accept") { await D.acceptRequest(id); if (reply !== (r.reply || "")) await D.setRequestStatus(id, "in_progress", reply); }
+      else if (act === "rq-reject") await D.rejectRequest(id, reply);
+      else await D.setRequestStatus(id, "in_progress", null);
+      S.busy = false; S.msg = T(act === "rq-accept" ? "msg.rqAccepted" : act === "rq-reject" ? "msg.rqRejected" : "msg.rqReopened", { title: r.title });
       await reloadRequests(); render();
     } catch (e) { S.busy = false; S.msg = T("err.rqSave") + D.says(e); render(); }
     return;
@@ -933,9 +952,7 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
   // 行銷需求單：換了負責人的 team，人那一格要換成那個 team 的人，所以重畫。
-  if (S.view === "request" && e.target && (e.target.id === "rq-owner-team" || e.target.id === "rq-owner")) {
-    S.rqDraft = readRequest(); rqDraftSave(); if (e.target.id === "rq-owner-team") render(); return;
-  }
+  if (S.view === "request" && e.target && e.target.id === "rq-owner-team") { S.rqDraft = readRequest(); rqDraftSave(); return; }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
   if (pkEl && (S.view === "meetings" || S.view === "meeting")) { S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); autosaveMeeting(); return; }

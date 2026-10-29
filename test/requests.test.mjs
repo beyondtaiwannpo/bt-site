@@ -50,8 +50,8 @@ test("★ 側欄：每一位幹部有「跟 Marketing 提需求」；佇列只�
   }
 });
 
-test("★ 狀態對照：舊的 new／done 讀成已送出／已發布，四個新狀態加收回原樣", () => {
-  assert.deepEqual(F.RQ_STATUS, ["submitted", "in_progress", "in_review", "published", "withdrawn"]);
+test("★ 狀態對照：舊的 new／done 讀成已送出／已發布，四個新狀態加退件、收回原樣", () => {
+  assert.deepEqual(F.RQ_STATUS, ["submitted", "in_progress", "in_review", "published", "rejected", "withdrawn"]);
   assert.equal(F.rqStatus("new"), "submitted"); assert.equal(F.rqStatus("done"), "published");
   for (const s of F.RQ_STATUS) assert.equal(F.rqStatus(s), s);
   assert.equal(F.rqStatus(undefined), "submitted");
@@ -73,9 +73,9 @@ test("★ 送單的表單：11 格照 Sheet 的順序、每一格旁邊有說明
   let at = 0;
   for (const l of labels) { const i = h.indexOf(l, at); assert.ok(i > at, `「${l}」要照順序出現`); at = i; }
   assert.equal((h.match(/class="rq-help"/g) || []).length, 11, "每一格一段說明");
-  assert.match(h, /例：C-2 bootcamp 報名倒數。系列的話寫第幾則/); assert.match(h, /Marketing 只找這一個人/);
+  assert.match(h, /例：C-2 bootcamp 報名倒數。系列的話寫第幾則/); assert.match(h, /Marketing 有問題只找你/);
   assert.match(h, /看的人只會記得一句，是哪句/);
-  for (const id of ["rq-title", "rq-owner-team", "rq-owner", "rq-goal", "rq-pf-other", "rq-key", "rq-draft", "rq-doc", "rq-publish", "rq-notes"]) assert.match(h, new RegExp(`id="${id}"`), id);
+  for (const id of ["rq-title", "rq-goal", "rq-pf-other", "rq-key", "rq-draft", "rq-doc", "rq-publish", "rq-notes"]) assert.match(h, new RegExp(`id="${id}"`), id);
   for (const p of F.RQ_KIND_PF.video) assert.match(h, new RegExp(`type="checkbox" id="rq-pf-${p}"`), `平台 ${p} 是勾選框`);
   assert.match(h, /IG Reels/); assert.match(h, /長影片/); assert.doesNotMatch(h, /id="rq-pf-ig_carousel"/, "影片不出現貼文的平台");
   assert.match(h, /id="rq-must-text-0"/); assert.match(h, /id="rq-must-by-0"/); assert.match(h, /data-act="rq-add-must"/);
@@ -102,16 +102,13 @@ test("★ 7 天警告：發布日太近，黃色警告顯示出來，送出鈕�
   assert.match(ok, /id="rq-publish-warn"[^>]*hidden/);
 });
 
-test("負責人：先選 team（從名單抓）再選人（只列那個 team 的人）；一個人有兩個 team 兩邊都列", () => {
-  const none = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post" }), "", false, PEOPLE, TODAY);
-  assert.match(none, /<option value="Curriculum Team">/); assert.match(none, /<option value="Mentorship Team">/);
-  assert.match(none, /<select id="rq-owner" disabled>/, "還沒選 team，人那一格不能選");
-  const cur = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post", owner_team: "Curriculum Team", owner_id: "u3" }), "", false, PEOPLE, TODAY);
-  assert.match(cur, /<option value="Curriculum Team" selected>/);
-  assert.match(cur, /<option value="u3" selected>阿哲 \(Jay\)<\/option>/); assert.match(cur, /<option value="u2">/);
-  assert.doesNotMatch(cur, /<option value="u5"/, "Marketing 的人不在 Curriculum 底下");
-  const men = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post", owner_team: "Mentorship Team" }), "", false, PEOPLE, TODAY);
-  assert.match(men, /<option value="u3">/); assert.doesNotMatch(men, /<option value="u2">/);
+test("★ 負責人就是登入的人：不給選人；一個 team 直接印，兩個 team 才給選是哪一個", () => {
+  const one = F.requestPageHTML(ME, [], Object.assign(F.rqBlank(), { kind: "post" }), "", false, PEOPLE, TODAY);
+  assert.match(one, /<div class="rq-owner"><b>小安（你）<\/b> <span class="mini">Curriculum Team<\/span><\/div>/);
+  assert.doesNotMatch(one, /id="rq-owner"[ >]/, "沒有選人的下拉"); assert.doesNotMatch(one, /id="rq-owner-team"/, "一個 team 不用選");
+  const two = F.requestPageHTML({ ...ME, team: "Curriculum Team, Marketing Team" }, [], Object.assign(F.rqBlank(), { kind: "post", owner_team: "Marketing Team" }), "", false, PEOPLE, TODAY);
+  assert.match(two, /<select id="rq-owner-team"><option value="Curriculum Team">Curriculum Team<\/option><option value="Marketing Team" selected>/);
+  assert.deepEqual(F.rqMyTeams({ team: "A、B" }), ["A", "B"]); assert.deepEqual(F.rqMyTeams(null), []);
 });
 
 test("可以多列的三塊：畫出幾列就是幾列，每列有刪掉鈕，第 8 列以後的 Fragment 自動編號", () => {
@@ -196,19 +193,28 @@ test("★ 打開一張：每一格都印出來（含拍攝表與結尾話）、�
   assert.match(one, /data-act="rq-print"/);
   assert.match(one, /class="rq-print"/, "列印的那一塊有自己的 class，列印樣式靠它");
   assert.match(one, /<select id="rq-assignee" name="assignee"><option value="">（還沒有人接）<\/option><option value="u5">行銷<\/option><option value="u7">小美 \(Mei\)<\/option>/);
-  assert.match(one, /<select id="rq-status" name="status"><option value="submitted" selected>已送出<\/option><option value="in_progress">進行中<\/option><option value="in_review">待審核<\/option><\/select>/, "還沒發布的，下拉不給選已發布（要按鈕，會寄信）");
+  // 已送出：先接下或退件，還沒有進度下拉、也沒有發布鈕。
+  assert.doesNotMatch(one, /id="rq-status"/, "還沒接下不能改進度"); assert.doesNotMatch(one, /data-act="rq-publish"/);
+  assert.match(one, /data-act="rq-accept"/); assert.match(one, /data-act="rq-reject"/); assert.match(one, /退件的話一定要寫原因/);
   assert.match(one, /data-autosave="rq-save"/); assert.match(one, /<textarea id="rq-reply" name="reply"/);
-  assert.match(one, /data-act="rq-publish"/); assert.match(one, /標成已發布/);
+  // 接下之後（進行中）：進度只有進行中、待審核兩個；發布是按鈕（會寄信），也還能退件。
+  const work = F.requestsQueueHTML(R, PEOPLE, {}, R[2].id, true, "", false, { assignees: ASSIGNEES, today: TODAY, me: MKT });
+  assert.match(work, /<select id="rq-status" name="status"><option value="in_progress" selected>進行中<\/option><option value="in_review">待審核<\/option><\/select>/, "下拉不給選已發布（要按鈕，會寄信）");
+  assert.match(work, /data-act="rq-publish"/); assert.match(work, /已發出，通知送單的人/); assert.match(work, /data-act="rq-reject"/); assert.doesNotMatch(work, /data-act="rq-accept"/);
+  // 退件：說明信寄了，可以改回進行中，沒有其他鈕。
+  const rej = F.requestsQueueHTML([{ ...R[2], status: "rejected", reply: "重複了" }], PEOPLE, {}, R[2].id, true, "", false, { assignees: ASSIGNEES, today: TODAY });
+  assert.match(rej, /原因已經寄給送單的人/); assert.match(rej, /data-act="rq-reopen"/); assert.doesNotMatch(rej, /rq-status|rq-publish|rq-accept|rq-reject"/);
+  assert.match(rej, /<dd>退件・/);
   const pub = F.requestsQueueHTML(R, PEOPLE, {}, R[1].id, true, "", false, { assignees: ASSIGNEES, today: TODAY, me: MKT });
   assert.doesNotMatch(pub, /data-act="rq-publish"/); assert.match(pub, /<option value="published" selected>已發布<\/option>/, "已發布的可以退回");
   assert.match(pub, /<option value="u5" selected>/);
   const view = F.requestsQueueHTML(R, PEOPLE, {}, R[0].id, false, "", false, { assignees: ASSIGNEES, today: TODAY });
-  assert.doesNotMatch(view, /rq-status|rq-publish|rq-assignee/); assert.match(view, /改狀態要「改」以上/);
+  assert.doesNotMatch(view, /rq-status|rq-publish|rq-assignee|rq-accept|rq-reject/); assert.match(view, /改狀態要「改」以上/);
   assert.match(view, /data-act="rq-print"/, "只有「看」的人也能列印");
   assert.match(F.requestsQueueHTML(R, PEOPLE, {}, R[3].id, true, "", false, {}), /送單的人收回了/);
   const old = F.requestsQueueHTML(R, PEOPLE, {}, R[5].id, true, "", false, { assignees: ASSIGNEES, today: TODAY });
   for (const s of ["2027 冬令營", "A2 直式", "LINE: ann", "https://drive.google.com/x", "2026-12-01"]) assert.ok(old.includes(s), "舊單的第一版欄位也印出來：" + s);
-  assert.match(old, /<option value="submitted" selected>/, "舊的 new 讀成已送出");
+  assert.match(old, /data-act="rq-accept"/, "舊的 new 讀成已送出，一樣先接下或退件");
 });
 
 test("★ 列印樣式：@media print 把側欄、頂欄、按鈕、處理那一塊藏起來，只印那一張單", () => {

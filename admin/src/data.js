@@ -333,6 +333,10 @@ const SAYS = [
   ["not_yours", "這不是你送的單。", "This is not your request."],
   ["withdrawn", "這張單已經收回了。", "This request was withdrawn."],
   ["no_such_request", "找不到這張單，重新整理再試一次。", "Request not found. Refresh and try again."],
+  // 接下與退件（2026-11-24）
+  ["not_submitted", "這張單已經有人接下或處理過了，重新整理看看。", "Someone already accepted or handled this one. Refresh to see."],
+  ["empty_reply", "退件要先寫原因。", "Write a reason before rejecting."],
+  ["not_open", "這張單已經發布、收回或退件了，不能再退。", "This request is already published, withdrawn or rejected."],
   // 第二版（2026-11-09）
   ["not_in_workspace", "接的人只能選需求工作區裡的人，要先在 People 的 Workspaces 把他加進來。", "The assignee must be in the Marketing requests workspace. Add them under People, Workspaces first."],
   ["bad_platform", "平台只能勾表單上那五個。", "Pick platforms from the five on the form."],
@@ -431,6 +435,19 @@ export async function loadAssignees() {
 export async function setRequestStatus(id, status, reply) {
   need();
   const { data, error } = await supabase.rpc("set_request_status", { p_id: id, p_status: status, p_reply: reply == null ? null : reply });
+  if (error) throw error;
+  return data;
+}
+// 接下與退件（2026-11-24-request-accept-reject.sql）。退件一定要帶回覆，資料庫會寄給送單的人。
+export async function acceptRequest(id) {
+  need();
+  const { data, error } = await supabase.rpc("accept_request", { p_id: id });
+  if (error) throw error;
+  return data;
+}
+export async function rejectRequest(id, reply) {
+  need();
+  const { data, error } = await supabase.rpc("reject_request", { p_id: id, p_reply: reply });
   if (error) throw error;
   return data;
 }

@@ -224,6 +224,8 @@ export const MINE = {
   "mail.request_new.when": { zh: "有幹部送了一張行銷需求單的時候，寄給需求工作區裡每一個「管」的人", en: "when a cadre sends a Marketing request; goes to everyone with Manage on the requests workspace" },
   "mail.request_done": { zh: "需求單：已發布", en: "Request: published" },
   "mail.request_done.when": { zh: "Marketing 把一張需求單標成已發布的時候，寄給送單的人", en: "when Marketing marks a request published; goes to the requester" },
+  "mail.request_rejected": { zh: "需求單：退件", en: "Request: rejected" },
+  "mail.request_rejected.when": { zh: "Marketing 退件的時候，寄給送單的人，信裡帶退件原因", en: "when Marketing rejects a request; goes to the requester with the reason" },
   "mail.varsRequest":  { zh: "可以用的代換符號：{requester} 送單的人、{title} 標題、{needed_by} 預計發布日、{link} 直達那張單、{reply} 回覆（已發布那封才有）。", en: "Placeholders: {requester}, {title}, {needed_by} (planned publish date), {link} (opens the request), {reply} (Published email only)." },
   "mail.sampleRequest":{ zh: "預覽用的範例：{name} 送的「{title}」。", en: "Preview sample: \"{title}\" sent by {name}." },
   "mail.invite.when": { zh: "你在「人與權限 → 邀請」寄邀請的時候", en: "when you send an invite under People → Invites" },
