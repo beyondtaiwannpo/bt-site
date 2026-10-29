@@ -114,14 +114,17 @@ export async function loadPassportAdmin() {
   need();
   const [mo, ac, de, st] = await Promise.all([
     supabase.from("months").select("seq, month, theme_zh, theme_en, hidden, revealed").order("seq"),
-    supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active, happens_at, example_url")
+    supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active, happens_at, example_url, example_url_2")
       .order("seq").order("id"),
     supabase.from("destinations").select("code, city, active").order("code"),
     supabase.from("stamps").select("act_id"),
   ]);
   // 2026-11-15 的兩欄（時間、範例照片）還沒跑遷移檔的話，少那兩欄再讀一次，後台照樣打得開。
   let acts = ac;
+  // 第二張照片（2026-11-20）那一欄還沒跑的話，先少它一欄再讀；再不行才連 11-15 的兩欄一起少。
   if (ac.error && ac.error.code === "42703")
+    acts = await supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active, happens_at, example_url").order("seq").order("id");
+  if (acts.error && acts.error.code === "42703")
     acts = await supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active").order("seq").order("id");
   for (const r of [mo, acts, de, st]) if (r.error) throw r.error;
   const stamped = {};
@@ -134,6 +137,12 @@ export async function loadPassportAdmin() {
 export async function setActivityExtras(id, iso, url) {
   need();
   const { error } = await supabase.rpc("set_activity_extras", { p_id: id, p_happens_at: iso || null, p_example_url: url || null });
+  if (error) throw error;
+}
+// 第二張範例照片（2026-11-20）。url 是空就是拿掉。
+export async function setActivityExample2(id, url) {
+  need();
+  const { error } = await supabase.rpc("set_activity_example_2", { p_id: id, p_url: url || null });
   if (error) throw error;
 }
 // 範例照片傳到 passport-examples bucket，回公開網址。路徑 <格子>/<時間>-<亂數>.jpg，不用原檔名。
@@ -341,6 +350,7 @@ const SAYS = [
   ["bad_callback", "回望要指向另一個存在的格子編號，例如 09B，不能指向自己。", "Looks back must point to another existing box id, for example 09B, not to itself."],
   ["group_has_tasks", "這個分類底下還有格子（任何一屆都算），刪不掉。先把格子換到別的分類或刪掉。", "This group still has boxes (in any term). Move them to another group or delete them first."],
   ["no_such_group", "找不到這個分類，可能被別人刪了。重新整理再試一次。", "That group no longer exists; someone may have deleted it. Refresh and try again."],
+  ["set_activity_example_2", "第二張照片要等資料庫更新（2026-11-20 那支遷移檔）跑完才放得上去。", "The second photo needs the 2026-11-20 database update to be run first."],
   ["bad_example_url", "範例照片要從這一頁上傳，不能貼外面的網址。", "Upload the example photo on this page; outside links are not accepted."],
   ["month_exists", "護照裡已經有這個月了。", "The passport already has this month."],
   ["month_has_boxes", "這個月還有格子，刪不掉。先把格子搬到別的月份或刪掉。", "This month still has boxes. Move them to another month or delete them first."],

@@ -28,8 +28,13 @@ test("改格子：主持人那個勾拿掉、多時間、範例照片、到看�
   const a = { ...ACTS[0], happens_at: "2026-11-22T12:00:00.000Z", example_url: "https://x.supabase.co/storage/v1/object/public/passport-examples/09B/1.jpg" };
   const h = activityEditHTML(a, 11, MONTHS, "", false, null);
   assert.doesNotMatch(h, /needs_host/); assert.match(h, /type="datetime-local"/);
-  assert.match(h, /id="ak-photo"[^>]*data-noauto="1"/, "選照片不走自動存");
-  assert.match(h, /class="exprev"/); assert.match(h, /data-act="ak-photo-del"/);
+  assert.match(h, /class="exprev"/); assert.match(h, /data-act="ak-photo-del"[^>]*data-slot="1"/);
+  // 兩張（2026-10-28）：第一張有圖，第二格是選檔案；第一張空著就不給第二格。
+  assert.match(h, /class="ak-photo"[^>]*data-noauto="1"[^>]*data-slot="2"/, "第二張可以選，而且不走自動存");
+  const none = activityEditHTML({ ...a, example_url: null }, 11, MONTHS, "", false, null);
+  assert.match(none, /class="ak-photo"[^>]*data-slot="1"/); assert.doesNotMatch(none, /data-slot="2"/, "第一張空著不給第二格");
+  const both = activityEditHTML({ ...a, example_url_2: a.example_url.replace("1.jpg", "2.jpg") }, 11, MONTHS, "", false, null);
+  assert.equal((both.match(/class="exprev"/g) || []).length, 2); assert.doesNotMatch(both, /class="ak-photo"/, "兩張都滿就沒有選檔案");
   const link = boardLink(a);
   assert.match(link, /^\.\.\/\.\.\/availability\/\?title=/); assert.match(link, /at=2026-11-22T12%3A00%3A00\.000Z/);
   assert.equal(localInput(""), "");
@@ -42,6 +47,9 @@ test("護照：格子上印時間與範例縮圖，蓋過章就不印", () => {
   const S = { months: MONTHS, activities: [a], stamps: {}, entries: {}, flipped: {}, profile: { id: "u" } };
   const h = PASS.slotHTML(S, a);
   assert.match(h, /class="when"/); assert.match(h, /class="example" src="https:\/\/x\/y\.jpg"/);
+  const two = PASS.slotHTML(S, { ...a, example_url_2: "https://x/z.jpg" });
+  assert.equal((two.match(/class="example"/g) || []).length, 2, "兩張都印在格子上");
+  assert.deepEqual(PASS.exampleUrls({ example_url_2: "b" }), ["b"]); assert.deepEqual(PASS.exampleUrls({}), []);
   assert.equal(PASS.whenText("2026-11-22T12:00:00Z", "Asia/Taipei").includes("20:00"), true);
   assert.equal(PASS.whenText(""), "");
 });

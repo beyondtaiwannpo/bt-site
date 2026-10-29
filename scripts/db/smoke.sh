@@ -2388,6 +2388,29 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-19-request-kinds.sql >/dev/null 2>&1 || true
 
+echo "── 格子的第二張範例照片（2026-11-20-example-photo-2.sql）──"
+e2got=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-20-example-photo-2.sql 2>&1 || true)
+if echo "${e2got}" | grep -q "OVERALL.*PASS" && ! echo "${e2got}" | grep -q "|FAIL"; then echo "  ok   第二張照片那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 第二張照片那支驗收表："; echo "${e2got}" | head -10; fail=$((fail+1)); fi
+EXU2="https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/passport-examples/09B/2-b.jpg"
+chkas "${PAUL}" "存第一張" "09B" "select public.set_activity_extras('09B', null, '${EXU}')"
+chkas "${PAUL}" "存第二張" "09B" "select public.set_activity_example_2('09B', '${EXU2}')"
+chk "兩張都在，互不覆蓋" "true|true" "select (example_url = '${EXU}')::text||'|'||(example_url_2 = '${EXU2}')::text from public.activities where id='09B'"
+chkas "${PAUL}" "改第一張不動第二張" "09B" "select public.set_activity_extras('09B', null, null)"
+chk "第二張還在" "t|t" "select (example_url is null)::text::char(1)||'|'||(example_url_2 = '${EXU2}')::text::char(1) from public.activities where id='09B'"
+chkraise "★ 第二張也擋別的網站" "bad_example_url" "perform set_config('test.uid','${PAUL}',true); perform public.set_activity_example_2('09B', 'https://evil.example.com/a.jpg');"
+chkraise "★ Associate 改不了第二張" "not_ws_edit" "perform set_config('test.uid','${ASSOC}',true); perform public.set_activity_example_2('09B', null);"
+chkraise "沒有這一格" "no_such_activity" "perform set_config('test.uid','${PAUL}',true); perform public.set_activity_example_2('ZZZ', null);"
+chkas "${PAUL}" "拿掉第二張" "09B" "select public.set_activity_example_2('09B', ' ')"
+chk "拿掉了" "t" "select (example_url_2 is null)::text::char(1) from public.activities where id='09B'"
+e22=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-20-example-photo-2.sql 2>&1 || true)
+if echo "${e22}" | grep -q "OVERALL.*PASS"; then echo "  ok   第二張照片那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 第二張照片那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/  perform public.require_ws_edit('passport');//" supabase/migrations/2026-11-20-example-photo-2.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 require_ws_edit，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 require_ws_edit 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-20-example-photo-2.sql >/dev/null 2>&1 || true
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

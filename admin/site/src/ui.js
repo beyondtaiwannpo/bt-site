@@ -216,7 +216,10 @@ export function toast(msg, undo, opts) {
 // 按了「確定」再進來時 b.dataset.confirmed 是 "1"，回 false，動作照做。
 export function needAsk(S, b, text) {
   if (b.dataset.confirmed === "1") { S.ask = null; return false; }
-  S.ask = { act: b.dataset.act, id: b.dataset.id || "", text: String(text || "") };
+  // data 記住原按鈕全部的 data-*（2026-10-28）：只靠 act 加 id 的話，用 data-month 分的「刪這個月」會找到頁面上第一顆，
+  // 按 10 月的刪除，確認框卻掛在 9 月底下，按「確定」刪的是 9 月。
+  const data = {}; for (const [k, v] of Object.entries(b.dataset)) if (k !== "confirmed") data[k] = String(v);
+  S.ask = { act: b.dataset.act, id: b.dataset.id || "", text: String(text || ""), data };
   if (typeof document !== "undefined") mountAsk(document, S.ask);
   return true;
 }
@@ -224,7 +227,8 @@ export function mountAsk(root, ask) {
   if (!ask || !root) return;
   for (const old of root.querySelectorAll(".ask")) old.remove();
   const sel = `[data-act="${ask.act}"]` + (ask.id ? `[data-id="${ask.id}"]` : "");
-  const b = [...root.querySelectorAll(sel)].find(x => x.dataset.confirmed !== "1" && !x.closest(".ask"));
+  const same = x => Object.entries(ask.data || {}).every(([k, v]) => x.dataset[k] === v);
+  const b = [...root.querySelectorAll(sel)].find(x => x.dataset.confirmed !== "1" && !x.closest(".ask") && same(x));
   if (!b) return;
   const row = document.createElement("span");
   row.className = "ask";

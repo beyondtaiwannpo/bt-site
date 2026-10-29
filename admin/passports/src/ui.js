@@ -203,7 +203,10 @@ export function toast(msg, undo, opts) {
 // 按了「確定」再進來時 b.dataset.confirmed 是 "1"，回 false，動作照做。
 export function needAsk(S, b, text) {
   if (b.dataset.confirmed === "1") { S.ask = null; return false; }
-  S.ask = { act: b.dataset.act, id: b.dataset.id || "", text: String(text || "") };
+  // data 記住原按鈕全部的 data-*（2026-10-28）：只靠 act 加 id 的話，用 data-month 分的「刪這個月」會找到頁面上第一顆，
+  // 按 10 月的刪除，確認框卻掛在 9 月底下，按「確定」刪的是 9 月。
+  const data = {}; for (const [k, v] of Object.entries(b.dataset)) if (k !== "confirmed") data[k] = String(v);
+  S.ask = { act: b.dataset.act, id: b.dataset.id || "", text: String(text || ""), data };
   if (typeof document !== "undefined") mountAsk(document, S.ask);
   return true;
 }
@@ -211,7 +214,8 @@ export function mountAsk(root, ask) {
   if (!ask || !root) return;
   for (const old of root.querySelectorAll(".ask")) old.remove();
   const sel = `[data-act="${ask.act}"]` + (ask.id ? `[data-id="${ask.id}"]` : "");
-  const b = [...root.querySelectorAll(sel)].find(x => x.dataset.confirmed !== "1" && !x.closest(".ask"));
+  const same = x => Object.entries(ask.data || {}).every(([k, v]) => x.dataset[k] === v);
+  const b = [...root.querySelectorAll(sel)].find(x => x.dataset.confirmed !== "1" && !x.closest(".ask") && same(x));
   if (!b) return;
   const row = document.createElement("span");
   row.className = "ask";
@@ -1011,8 +1015,14 @@ export function activityEditHTML(a, month, months, msg, busy, draft) {
         <input id="ak-cb" name="callback_to" value="${esc(cur.callback_to || "")}" placeholder="09B" maxlength="4"${dis}></label>
     </div>
     ${a ? `<div class="exbox"><i>${T("ak.example")}</i>
-      ${cur.example_url ? `<img src="${esc(cur.example_url)}" alt="" class="exprev"><button class="btn quiet danger sm" data-act="ak-photo-del" data-id="${esc(a.id)}"${dis}>${T("ak.exampleDel")}</button>` : ""}
-      <input type="file" id="ak-photo" accept="image/*" data-noauto="1" data-id="${esc(a.id)}"${dis}>
+      <div class="exslots">${["1", "2"].map(n => {
+        // 兩張（2026-10-28 Paul）：每一格自己一張圖加「拿掉」，空的那格是選檔案。第二格要等第一格有圖才出現，不會有「只有第二張」。
+        const url = n === "1" ? cur.example_url : cur.example_url_2;
+        if (n === "2" && !cur.example_url && !url) return "";
+        return `<div class="exslot"><span class="fmeta">${T("ak.exampleN", { n })}</span>${url
+          ? `<img src="${esc(url)}" alt="" class="exprev"><button class="btn quiet danger sm" data-act="ak-photo-del" data-id="${esc(a.id)}" data-slot="${n}"${dis}>${T("ak.exampleDel")}</button>`
+          : `<input type="file" class="ak-photo" accept="image/*" data-noauto="1" data-id="${esc(a.id)}" data-slot="${n}"${dis}>`}</div>`;
+      }).join("")}</div>
       <span class="fmeta">${T("ak.exampleHint")}</span></div>` : ""}
     <div class="form-foot">
       ${auto ? autosaveHint("act-save") : `<button class="btn" data-act="act-save"${dis}>${busy ? T("common.saving") : T("ak.newTitle")}</button>`}

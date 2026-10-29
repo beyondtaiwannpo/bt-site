@@ -129,10 +129,29 @@ test("needAsk：第一次問、第二次放行", () => {
   const S = {};
   const b = { dataset: { act: "ws-unassign", id: "u1" } };
   assert.equal(FORMS.needAsk(S, b, "真的要移出？"), true);
-  assert.deepEqual(S.ask, { act: "ws-unassign", id: "u1", text: "真的要移出？" });
+  assert.deepEqual(S.ask, { act: "ws-unassign", id: "u1", text: "真的要移出？", data: { act: "ws-unassign", id: "u1" } });
   const yes = { dataset: { act: "ws-unassign", id: "u1", confirmed: "1" } };
   assert.equal(FORMS.needAsk(S, yes, "真的要移出？"), false);
   assert.equal(S.ask, null);
+});
+
+// 2026-10-28：沒有 data-id、靠 data-month 分的按鈕（刪月份），確認框要掛在按的那一顆旁邊，「確定」帶的也是那個月。
+test("★ mountAsk 認得是哪一顆：按 10 月的刪除不會掛到 9 月", () => {
+  const mk = m => ({ dataset: { act: "month-del", month: m }, closest: () => null, hidden: false, after: null,
+    insertAdjacentElement(_, el) { this.after = el; } });
+  const sep = mk("9"), oct = mk("10");
+  const yesBtn = { dataset: {} };
+  const row = { className: "", set innerHTML(v) {}, querySelector: () => yesBtn };
+  const root = { querySelectorAll: q => q === ".ask" ? [] : [sep, oct] };
+  const saved = globalThis.document; globalThis.document = { createElement: () => row, querySelectorAll: root.querySelectorAll };
+  try {
+    const S = {};
+    FORMS.needAsk(S, oct, "刪 10 月？");
+    FORMS.mountAsk(root, S.ask);
+    assert.equal(sep.hidden, false, "9 月那顆不該被換掉");
+    assert.equal(oct.hidden, true); assert.equal(oct.after, row);
+    assert.equal(yesBtn.dataset.month, "10", "「確定」要帶 10 月");
+  } finally { globalThis.document = saved; }
 });
 
 test("頁首：標題、說明、動作、返回；空狀態三段", () => {

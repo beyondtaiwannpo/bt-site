@@ -106,7 +106,11 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 .msg{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;
   padding:11px 14px;border-radius:12px;margin:0 0 18px;border:1px solid transparent}
 .msg.ok{background:rgba(107,198,187,.26);border-color:rgba(107,198,187,.6)}
-.msg.err{background:rgba(255,196,108,.3);border-color:rgba(255,196,108,.85)}
+/* 沒做成要一眼看到（Paul 2026-10-28：原本的淡橘看不出來）。品牌沒有紅色，所以用七色裡對比最強的：深藍實心底、米白字、主橘標籤。 */
+.msg.err{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy);font-size:15px;font-weight:600;
+  padding:14px 16px;box-shadow:0 8px 24px rgba(16,42,134,.28)}
+.msg.err .msg-k{background:var(--bt-orange);color:var(--bt-navy);padding:1px 10px;border-radius:999px;text-transform:uppercase}
+.msg.err a{color:var(--bt-sand)}
 .msg.info{background:rgba(255,255,255,.55);border-color:rgba(16,42,134,.16)}
 .msg .msg-k{font-family:var(--display);font-weight:700;letter-spacing:.06em;white-space:nowrap}
 /* 提醒（核可前確認三件事這一類）：淡沙色底、左邊一條深藍線。一頁最多一個，收在區塊的 h2 底下。 */
@@ -503,7 +507,11 @@ a.btn{text-decoration:none}
 .toast{display:flex;gap:10px;align-items:flex-start;padding:11px 12px 11px 14px;border-radius:14px;font-size:14px;line-height:1.5;color:var(--ink);
   background:var(--bt-cream);border:1px solid rgba(16,42,134,.18);border-left:4px solid rgba(107,198,187,.95);box-shadow:0 10px 30px rgba(16,42,134,.14);
   animation:toast-in .15s ease-out}
-.toast.err{border-left-color:var(--bt-orange)}
+.toast.err{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy);border-left:6px solid var(--bt-orange);
+  font-size:15px;font-weight:600;box-shadow:0 12px 34px rgba(16,42,134,.35)}
+.toast.err .toast-k{background:var(--bt-orange);color:var(--bt-navy);padding:1px 8px;border-radius:999px}
+.toast.err .toast-x{color:var(--bt-cream)}
+.toast.err .toast-x:hover{color:var(--bt-orange)}
 .toast.out{opacity:0;transform:translateY(6px);transition:opacity var(--dur-2) var(--ease),transform var(--dur-2) var(--ease)}
 .toast-k{font-family:var(--display);font-weight:700;letter-spacing:.06em;white-space:nowrap;text-transform:uppercase;font-size:12.5px;padding-top:2px}
 .toast-t{flex:1;min-width:0;overflow-wrap:anywhere}
@@ -515,9 +523,14 @@ a.btn{text-decoration:none}
 @keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.toast{animation:none}.toast.out{transition:none}}
 /* inline confirm：原按鈕藏起來，原地一行字加「確定／取消」。橘框，跟 .btn.danger 同一個意思：會丟東西。 */
-.ask{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;border-radius:12px;
-  background:rgba(255,196,108,.22);border:1px solid rgba(255,196,108,.9);font-size:13.5px;line-height:1.45;vertical-align:middle}
+/* 2026-10-28 Paul：確認框太淡找不到。改成整塊主橘、深藍粗框、字加粗，「確定」是深藍實心鈕。 */
+.ask{display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-radius:12px;
+  background:var(--bt-orange);border:2px solid var(--bt-navy);color:var(--bt-navy);font-size:14.5px;font-weight:600;line-height:1.45;
+  vertical-align:middle;box-shadow:0 8px 22px rgba(16,42,134,.22)}
 .ask-t{max-width:34em}
+.ask .btn.danger{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.ask .btn.danger:hover{background:var(--bt-cream);color:var(--bt-navy)}
+.ask .btn.ghost{background:rgba(255,255,255,.7);border-color:var(--bt-navy)}
 @media (max-width:720px){.toasts{left:10px;right:10px;bottom:10px;max-width:none}}
 
 /* ───────── 13. 從人管人（2026-10-23，第三次重整批 2）───────── */
@@ -737,3 +750,5 @@ select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-st
 .exbox i{font-style:normal;font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(16,42,134,.7)}
 .exbox .exprev{max-width:220px;max-height:160px;object-fit:cover;border-radius:6px;border:1px solid rgba(16,42,134,.15)}
 .exbox .btn{align-self:flex-start}
+.exslots{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.exslot{display:flex;flex-direction:column;gap:6px;min-width:0}

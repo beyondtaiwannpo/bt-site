@@ -482,9 +482,18 @@ document.addEventListener("click", async e => {
     const cur = S.pass.activities.find(x => x.id === b.dataset.id); if (!cur) return;
     S.busy = true; S.msg = ""; render();
     try {
-      const old = cur.example_url;
-      await D.setActivityExtras(cur.id, cur.happens_at, null);
-      cur.example_url = null; await D.removeExample(old);
+      // 兩張（2026-10-28）：拿掉第一張而第二張還在，第二張往前補成第一張，不留一個空的第一格。
+      if (b.dataset.slot === "2") {
+        const old = cur.example_url_2;
+        await D.setActivityExample2(cur.id, null);
+        cur.example_url_2 = null; await D.removeExample(old);
+      } else {
+        const old = cur.example_url, next = cur.example_url_2 || null;
+        await D.setActivityExtras(cur.id, cur.happens_at, next);
+        cur.example_url = next;
+        if (next) { await D.setActivityExample2(cur.id, null); cur.example_url_2 = null; }
+        await D.removeExample(old);
+      }
       S.busy = false; S.actEditing = cur; S.msg = T("msg.exampleGone");
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render(); return;
@@ -720,16 +729,23 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
   // 範例照片（2026-11-15）：選了就縮圖、上傳、存進那一格。
-  if (e.target && e.target.id === "ak-photo") {
+  if (e.target && e.target.classList && e.target.classList.contains("ak-photo")) {
     const file = e.target.files && e.target.files[0]; if (!file) return;
     const cur = S.pass.activities.find(x => x.id === e.target.dataset.id); if (!cur) return;
+    const two = e.target.dataset.slot === "2";
     S.busy = true; S.msg = ""; render();
     try {
       const blob = await shrinkImage(file);
       const url = await D.uploadExample(cur.id, blob);
-      const old = cur.example_url;
-      await D.setActivityExtras(cur.id, cur.happens_at, url);
-      cur.example_url = url; if (old) await D.removeExample(old);
+      if (two) {
+        const old = cur.example_url_2;
+        try { await D.setActivityExample2(cur.id, url); } catch (err) { await D.removeExample(url); throw err; }
+        cur.example_url_2 = url; if (old) await D.removeExample(old);
+      } else {
+        const old = cur.example_url;
+        await D.setActivityExtras(cur.id, cur.happens_at, url);
+        cur.example_url = url; if (old) await D.removeExample(old);
+      }
       S.busy = false; S.actEditing = cur; S.msg = T("msg.exampleSaved");
     } catch (err) { S.busy = false; S.msg = T("err.save") + (err && err.message === "bad_file" ? T("err.exampleFile") : D.says(err)); }
     render(); return;

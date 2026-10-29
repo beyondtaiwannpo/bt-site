@@ -572,6 +572,8 @@ export function whenText(iso, tz) {
   return new Intl.DateTimeFormat(lang() === "en" ? "en-US" : "zh-TW", o).format(d);
 }
 
+// 範例照片最多兩張（2026-10-28）：第一張、第二張，空的跳過。example_url_2 沒有這一欄（遷移檔還沒跑）就只有一張。
+export function exampleUrls(a) { return [a && a.example_url, a && a.example_url_2].filter(Boolean); }
 export function slotHTML(S, a) {
   const st = S.stamps[a.id];
   const entry = S.entries[a.id] || {};
@@ -600,7 +602,7 @@ export function slotHTML(S, a) {
       <button class="faceopen" data-act="open" data-id="${a.id}">
         <span class="cat">${esc(CATNAME[a.category] ? T(CATNAME[a.category]) : "")}</span>
         <span class="ttl">${esc(a.title_zh)}</span>
-        ${st ? "" : `<span class="en">${esc(a.title_en)}</span>${a.happens_at ? `<span class="when">${esc(whenText(a.happens_at))}</span>` : ""}<span class="hint">${esc(a.description)}</span>${a.example_url ? `<img class="example" src="${esc(a.example_url)}" alt="${esc(T("slot.example"))}" loading="lazy">` : ""}<span class="cta">${T("slot.cta")}</span>`}
+        ${st ? "" : `<span class="en">${esc(a.title_en)}</span>${a.happens_at ? `<span class="when">${esc(whenText(a.happens_at))}</span>` : ""}<span class="hint">${esc(a.description)}</span>${exampleUrls(a).length ? `<span class="examples">${exampleUrls(a).map(u => `<img class="example" src="${esc(u)}" alt="${esc(T("slot.example"))}" loading="lazy">`).join("")}</span>` : ""}<span class="cta">${T("slot.cta")}</span>`}
       </button>
       ${st ? stampHTML(a, st, anim, tearing) + flipBtnHTML(a.id, "back") : ""}
     </div>`;
