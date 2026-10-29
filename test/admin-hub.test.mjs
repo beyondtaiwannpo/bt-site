@@ -268,7 +268,7 @@ test("子資料夾的 shared 路徑是三層、admin/ 是兩層（路徑寫錯�
     }
     const html = readFileSync(`${f}/index.html`, "utf8");
     assert.ok(!/href="\.\.\/shared\//.test(html), `${f}/index.html 還留著兩層的 shared 路徑`);
-    assert.ok(/href="\.\.\/\.\.\/shared\/brand\.css"/.test(html), `${f}/index.html 沒有讀 brand.css`);
+    assert.ok(/href="\.\.\/\.\.\/shared\/brand\.css(\?v=[A-Za-z0-9-]+)?"/.test(html), `${f}/index.html 沒有讀 brand.css`);
   }
   for (const s of ["admin/src/data.js", "admin/src/main.js"]) {
     assert.ok(/from "\.\.\/\.\.\/shared\//.test(readFileSync(s, "utf8")), `${s} 的 shared 路徑不是 ../../`);

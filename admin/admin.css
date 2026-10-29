@@ -752,3 +752,35 @@ select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-st
 .exbox .btn{align-self:flex-start}
 .exslots{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
 .exslot{display:flex;flex-direction:column;gap:6px;min-width:0}
+
+/* ───────── 滑過與按下，補齊（2026-10-28）─────────
+   Paul：「每個能按的東西都要有效果，看起來要像按鈕」。按鈕本身各頁的「點下去要有回饋」那段已經有；
+   這一段補那段抓不到的：連結形狀的按鈕、<label>、側欄、選檔案、需求單的種類卡片。
+   顏色規則跟那段一樣：滑過是淺橘，按下是深一點的主橘。 */
+.lnk:hover{text-decoration-color:var(--bt-orange);color:var(--bt-navy)}
+.lnk.up:active{background:rgba(255,196,108,.26);border-radius:6px}
+.back{text-decoration:underline;text-decoration-color:rgba(16,42,134,.3);text-underline-offset:3px}
+.back:hover{text-decoration-color:var(--bt-orange)}
+.check:hover,.ma-row.pick:hover{background:rgba(255,232,197,.5);border-radius:10px}
+.ma-row.pick:active,.tick:active,.apick:active{background:rgba(255,196,108,.26);border-radius:8px}
+.apick:hover input,.tick:hover input{outline:2px solid rgba(255,196,108,.6);outline-offset:1px}
+.lang:not(.on):hover{background:rgba(255,255,255,.9);border-color:var(--bt-navy)}
+a.rail-item:not(.on):active{background:rgba(255,196,108,.38)}
+a.rail-item.on:active{filter:brightness(1.15)}
+.rail-burger:hover{background:rgba(255,255,255,.9)}
+.rail-burger:active{background:rgba(255,196,108,.38);transform:scale(.97)}
+a.glabel:active,.feat a:active,.rq-row .fhead a:active,.teamblk a:active{color:var(--bt-navy);text-decoration-color:var(--bt-orange);border-bottom-color:var(--bt-orange)}
+.feat a:hover{border-bottom-color:var(--bt-orange)}
+/* 需求單的三種：要看起來像三顆可以按的大按鈕。 */
+.rq-kindbtn{cursor:pointer;box-shadow:0 2px 0 rgba(16,42,134,.08);transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease)}
+.rq-kindbtn:not(.on):hover{background:rgba(255,232,197,.7);border-color:var(--bt-orange);box-shadow:0 8px 20px rgba(16,42,134,.12)}
+.rq-kindbtn:not(.on):active{background:rgba(255,196,108,.45)}
+.rq-kindbtn.on{box-shadow:0 6px 16px rgba(16,42,134,.22)}
+.rq-kindbtn.on:active{filter:brightness(1.15)}
+/* 選檔案：瀏覽器內建那顆灰色的「Choose File」換成跟 .btn.ghost 同一個樣子。 */
+input[type=file]{cursor:pointer}
+input[type=file]::file-selector-button{font-family:var(--display);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:7px 16px;margin-right:12px;border:1px solid rgba(16,42,134,.35);border-radius:999px;background:rgba(255,255,255,.9);color:var(--bt-navy);cursor:pointer}
+input[type=file]:hover::file-selector-button{background:var(--bt-orange);border-color:var(--bt-orange)}
+input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
+@media (prefers-reduced-motion:reduce){.rq-kindbtn{transition:none}}
