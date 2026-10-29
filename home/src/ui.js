@@ -84,6 +84,7 @@ export function itemsOf(meetings, events, me) {
     out.push({ kind: "meeting", id: m.id, title: m.title, start: new Date(m.starts_at), end: new Date(m.ends_at),
       required: !!m.required, scope: m.scope || "board", agenda: m.agenda || "", doc_url: m.doc_url || "",
       created_by: m.created_by, attendees: m.attendees || [], notes: m.notes || [],
+      meet_url: /^https:\/\/meet\.google\.com\//.test(m.meet_url || "") ? m.meet_url : "", on_gcal: !!m.gcal_event_id,
       invited: !!mine, status: mine ? mine.status : null, organizer: m.created_by === me });
   }
   for (const e of events || []) {
@@ -221,15 +222,17 @@ export function itemCardHTML(it, ctx, opts) {
       ${it.agenda ? `<div><dt>${T("m.agenda")}</dt><dd>${esc(it.agenda)}</dd></div>` : ""}
       <div><dt>${T("m.notes")}</dt><dd>${it.doc_url ? `<a href="${esc(it.doc_url)}" target="_blank" rel="noopener">${T("m.openNotes")}</a>` : `<span class="muted">${T("m.noNotes")}</span>`}</dd></div>
     </dl>` : (it.agenda ? `<p class="agenda">${esc(it.agenda)}</p>` : "");
+  // 2026-11-22：Google 日曆那邊已經有這場（BT 主帳號建的、Google 寄了邀請），就不再給「加到日曆」，免得同一場出現兩次。
   const links = o.full ? `<div class="links">
-      <a href="${esc(googleCalUrl(it))}" target="_blank" rel="noopener">${T("m.gcal")}</a>
-      <a download="bt-meeting.ics" href="data:text/calendar;charset=utf-8,${encodeURIComponent(icsText(it))}">${T("m.ics")}</a>
+      ${it.on_gcal ? `<span class="muted">${T("m.onGcal")}</span>` : `<a href="${esc(googleCalUrl(it))}" target="_blank" rel="noopener">${T("m.gcal")}</a>
+      <a download="bt-meeting.ics" href="data:text/calendar;charset=utf-8,${encodeURIComponent(icsText(it))}">${T("m.ics")}</a>`}
       ${canSeeReplies(it, ctx.me, ctx.senior, ctx.ws) ? `<a href="../admin/#meetings/${esc(it.id)}">${T("m.edit")}</a>` : ""}
     </div>` : "";
   return `<article class="item ${it.required ? "req" : "opt"}${o.full ? " full" : ""}${o.hi ? " hi" : ""}" id="m-${esc(it.id)}">
     <div class="tags">${tagsHTML(it)}</div>
     <h3><button type="button" class="lnk" data-act="open" data-id="${esc(it.id)}">${esc(it.title)}</button></h3>
     <p class="when">${when}<span class="scope">${scopeLabel(it.scope)}</span></p>
+    ${it.meet_url && it.end.getTime() > Date.now() ? `<a class="btn sm meet" href="${esc(it.meet_url)}" target="_blank" rel="noopener">${T("m.join")}</a>` : ""}
     ${info}
     ${myReplyHTML(it, ctx)}
     ${repliesHTML(it, ctx)}

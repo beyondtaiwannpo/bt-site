@@ -4047,6 +4047,21 @@ Paul：「排會應該要把 BT 主帳號也加進去。大家在網站上按接
 - 遷移檔 `2026-11-18-calendar-invites.sql`。跑過之後**不要再重跑 2026-11-17 那支**（會把寄信函式蓋回舊版）。smoke 多 29 項（889），破壞測試兩條：拿掉「改了記下來」驗收表變紅、不加 BT 主帳號邀請只剩一封。
 - 日曆檔讀得到每個人的信箱，所以 `meeting_ics()` 與照信箱寄信那支只給資料庫內部叫，網站上的人叫不到（驗收表第 11 條）。
 
+## 會議接 Google 日曆 API（2026-10-29，推翻上一節「不接 API」）
+
+Paul：信裡附日曆檔還是要每個人自己加，而且沒有 Meet 連結；他要「像在 Google 日曆排 Google Meet 一樣」。
+
+- **一次性設定**：照 [docs/2026-10-29-google-calendar-setup.md](docs/2026-10-29-google-calendar-setup.md) 做（英文）。Google Cloud 專案、同意畫面要發布成「In production」（停在 Testing 的話 refresh token 七天就失效）、OAuth client、在 OAuth Playground 用 BT 主帳號拿 refresh token，最後在 Supabase 打開 http 擴充、Vault 存 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_REFRESH_TOKEN`。
+- **遷移檔 `2026-11-22-google-calendar.sql`**（PASS 表 8 列，最後兩列是真的去連 Google）：
+  - 從看板排會：先在 **BT 主帳號**的日曆建事件（主辦人是 BT 主帳號，來賓是名單加排會的人），自動產生 Meet 連結，`sendUpdates=all` 讓 Google 寄邀請。會議自動出現在每個人的日曆。
+  - 網站照樣寄自己的邀請信（大家登入回覆），但**不再附日曆檔**（不然日曆上會有兩場），信尾多一行 Meet 連結。
+  - 改會：停手 10 分鐘（24 小時內的會馬上）改 Google 事件，Google 通知所有人；網站只寄邀請信給新加的人。刪會：刪 Google 事件，Google 寄取消。
+  - **Google 連不上就退回上一節的做法**（信裡附日曆檔），不會排不了會；原因記在 `meetings.gcal_error`。這支之前排的會一直走舊的做法。
+  - 叫 Google 是在資料庫裡用 http 擴充直接叫（跟寄信用 Vault 同一套），沒有 Edge Function。通行證快取在 `gcal_token`，任何角色都讀不到。
+- **首頁的會議卡**：有 Meet 連結就多一顆「加入 Google Meet」（只收 `meet.google.com` 的連結）；已經在 Google 日曆上的會不再給「加到 Google 日曆」與下載 .ics。
+- 還沒做：在 Google 日曆按「參加」不會同步回網站的回覆（API 讀得到，之後可以補）；後台還看不到 `gcal_error`。
+- smoke 多 9 項（934，本機沒有 http 擴充，測的是退回的路），`test/home.test.mjs` 多一條。
+
 ## 後台速度（2026-11-06）
 
 Paul 2026-11-06 說後台換頁很慢，而且剛上線的側欄新項目重整一下就不見。量了之後兩件事都有解，數字在 `docs/2026-11-06-後台速度與自動儲存.md`。

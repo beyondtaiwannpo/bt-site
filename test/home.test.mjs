@@ -103,3 +103,19 @@ test("首頁下載的 .ics 跟資料庫的日曆邀請同一個 UID", async () =
   const sql = readFileSync(new URL("../supabase/migrations/2026-11-18-calendar-invites.sql", import.meta.url), "utf8");
   assert.ok(sql.includes("'UID:meeting-' || m.id::text || '@beyondtaiwannpo.com'"));
 });
+
+// 2026-11-22 Google 日曆：有 Meet 連結就有「加入 Google Meet」；已經在 Google 日曆上就不給「加到日曆」，免得出現兩場。
+test("★ Meet 連結與已在 Google 日曆上", () => {
+  const base = { id: "m1", title: "遊戲夜", starts_at: "2099-01-01T12:00:00Z", ends_at: "2099-01-01T13:00:00Z", attendees: [] };
+  const [it] = UI.itemsOf([{ ...base, meet_url: "https://meet.google.com/abc-defg-hij", gcal_event_id: "e1" }], [], "me");
+  const ctx = { tz: "Asia/Taipei", me: "me", senior: false, ws: [] };
+  const h = UI.itemCardHTML(it, ctx, { full: true });
+  assert.match(h, /class="btn sm meet" href="https:\/\/meet\.google\.com\/abc-defg-hij"/);
+  assert.doesNotMatch(h, /calendar\.google\.com\/calendar\/render/);
+  assert.doesNotMatch(h, /download="bt-meeting\.ics"/);
+  const [old] = UI.itemsOf([{ ...base }], [], "me");
+  const h2 = UI.itemCardHTML(old, ctx, { full: true });
+  assert.doesNotMatch(h2, /class="btn sm meet"/); assert.match(h2, /download="bt-meeting\.ics"/);
+  const [bad] = UI.itemsOf([{ ...base, meet_url: "https://evil.example.com/x" }], [], "me");
+  assert.equal(bad.meet_url, "", "只收 meet.google.com 的連結");
+});

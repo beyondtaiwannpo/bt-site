@@ -264,6 +264,8 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 /* 整行可以點的東西（單選、多選、勾選框）：按著的時候整行變色。
    這些是 <label> 不是 <button>，上面那條抓不到，而它們是**手機上最常按的東西**。 */
 label.opt:active, .check:active{background:rgba(255,196,108,.26);border-radius:10px}
+  /* 加入 Google Meet（2026-11-22）：時間那一行底下一顆實心鈕。 */
+  .item .meet{margin:2px 0 10px;align-self:flex-start}
   /* ── 滑過與按下，補齊（2026-10-28 Paul：每個能按的東西都要有效果）。滑過淺橘、按下主橘。 ── */
   .btn.quiet:hover{background:none;box-shadow:none}
   .seg button:not([aria-current]):hover{background:rgba(255,232,197,.7);color:var(--bt-navy)}

@@ -11,6 +11,8 @@ import { supabase } from "../../shared/supabase.js";
 function need() { if (!supabase) throw new Error("offline"); }
 
 // 還沒跑 2026-11-17-meetings-home.sql 的資料庫沒有 required 欄與理由表，退回舊的查法（全部當選擇參加），頁面不壞。
+// 2026-11-22 Google 日曆：多 meet_url 與 gcal_event_id。還沒跑那支就先少這兩欄再讀。
+const MEET_COLS_G = "id, scope, title, starts_at, ends_at, agenda, doc_url, created_by, required, meet_url, gcal_event_id";
 const MEET_COLS = "id, scope, title, starts_at, ends_at, agenda, doc_url, created_by, required";
 const MEET_COLS_OLD = "id, scope, title, starts_at, ends_at, agenda, doc_url, created_by";
 const since = () => new Date(Date.now() - 180 * 86400000).toISOString();
@@ -18,12 +20,13 @@ const since = () => new Date(Date.now() - 180 * 86400000).toISOString();
 export async function loadHome() {
   need();
   let [m, a, n, p, e] = await Promise.all([
-    supabase.from("meetings").select(MEET_COLS).gte("ends_at", since()).order("starts_at"),
+    supabase.from("meetings").select(MEET_COLS_G).gte("ends_at", since()).order("starts_at"),
     supabase.from("meeting_attendees").select("meeting_id, user_id, status, replied_at"),
     supabase.from("meeting_rsvp_notes").select("meeting_id, user_id, note"),
     supabase.from("profiles").select("id, name_zh, name_en, team").eq("role", "cadre"),
     Promise.resolve(supabase.rpc("public_events")).catch(() => ({ data: [] })),
   ]);
+  if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(MEET_COLS).gte("ends_at", since()).order("starts_at");
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(MEET_COLS_OLD).gte("ends_at", since()).order("starts_at");
   if (m.error) throw m.error;
   if (a.error) throw a.error;

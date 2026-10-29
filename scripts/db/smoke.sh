@@ -2433,6 +2433,27 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-21-activity-sessions.sql >/dev/null 2>&1 || true
 
+echo "── 會議接 Google 日曆（2026-11-22-google-calendar.sql）：本機沒有 http 擴充，走退回的路 ──"
+gcgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-22-google-calendar.sql 2>&1 || true)
+if echo "${gcgot}" | grep -q "OVERALL.*PASS" && ! echo "${gcgot}" | grep -q "|FAIL"; then echo "  ok   Google 日曆那支驗收表全 PASS（連線那兩列 SKIP）"; pass=$((pass+1)); else echo "  FAIL Google 日曆那支驗收表："; echo "${gcgot}" | head -12; fail=$((fail+1)); fi
+chk "沒設定時 gcal_ready 是 false、gcal_sync 回 off" "f|off" "select public.gcal_ready()::text::char(1)||'|'||public.gcal_sync(gen_random_uuid())"
+chkrole anon "" "★ 沒登入叫不動 gcal_sync" "denied" "select case when has_function_privilege('anon','public.gcal_sync(uuid)','execute') then 'open' else 'denied' end"
+chkrole authenticated "${PAUL}" "★ 幹部也叫不動 gcal_sync（只給資料庫內部）" "denied" "select case when has_function_privilege('authenticated','public.gcal_sync(uuid)','execute') then 'open' else 'denied' end"
+GCM=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',true); select public.schedule_meeting('board','Google 測試會', now() + interval '3 days', now() + interval '3 days 1 hour', '', null, array['${PAUL}']::uuid[], false);" 2>/dev/null | tail -1)
+chk "Google 沒設定：排會照舊寄信、信裡附日曆檔" "t" "select (count(*) > 0 and bool_and(ics is not null))::text::char(1) from public.mail_outbox where meeting_id = '${GCM}' and kind = 'meeting_invite'"
+psql -d "${DB}" -X -A -t -q -c "update public.meetings set gcal_event_id = 'evt-test', meet_url = 'https://meet.google.com/abc-defg-hij' where id = '${GCM}'" >/dev/null 2>&1
+psql -d "${DB}" -X -A -t -q -c "select public.queue_meeting_mail_to('meeting_reminder','${GCM}','x@example.com')" >/dev/null 2>&1
+chk "★ 有 Google 事件：信不附日曆檔、附 Meet 連結" "t" "select (ics is null and body like '%Google Meet: https://meet.google.com/abc-defg-hij%')::text::char(1) from public.mail_outbox where meeting_id = '${GCM}' and to_email = 'x@example.com'"
+chkas "${PAUL}" "刪會：Google 連不上就照舊寄取消" "deleted" "select public.delete_meeting('${GCM}')"
+gc2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-22-google-calendar.sql 2>&1 || true)
+if echo "${gc2}" | grep -q "OVERALL.*PASS"; then echo "  ok   Google 日曆那支可以重跑"; pass=$((pass+1)); else echo "  FAIL Google 日曆那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/          case when m.gcal_event_id is not null then null/          case when false then null/" supabase/migrations/2026-11-22-google-calendar.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：有 Google 事件還附日曆檔，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉不附日曆檔那條驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-22-google-calendar.sql >/dev/null 2>&1 || true
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

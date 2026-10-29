@@ -91,6 +91,8 @@ export const MINE = {
   "m.openNotes":      { zh: "打開會議紀錄", en: "Open the notes" },
   "m.noNotes":        { zh: "還沒有會議紀錄的連結。", en: "No notes link yet." },
   "m.gcal":           { zh: "加到 Google 日曆", en: "Add to Google Calendar" },
+  "m.join":           { zh: "加入 Google Meet", en: "Join Google Meet" },
+  "m.onGcal":         { zh: "已在你的 Google 日曆上", en: "Already on your Google Calendar" },
   "m.ics":            { zh: "下載 .ics", en: "Download .ics" },
   "m.place":          { zh: "地點", en: "Where" },
   "m.openEvent":      { zh: "看活動頁", en: "Open the event page" },
