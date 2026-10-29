@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
+FILES="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -277,7 +277,7 @@ fi
 # 這一層是舊版完全沒有的。它同時做掉兩件事：
 #   「最多幾種字體」變成「只有一個地方能決定用哪幾種」——比數數字可靠，
 #   而且下一個人想換字體時，找得到唯一該改的檔案。
-famraw=$(grep -rhIoE 'font-family:[^;}]*' index.html history privacy reset app availability passport/index.html passport/src intern-passport 2>/dev/null | sort -u)
+famraw=$(grep -rhIoE 'font-family:[^;}]*' index.html history privacy reset app availability passport/index.html passport/src intern-passport home 2>/dev/null | sort -u)
 famhard=$(printf '%s\n' "$famraw" | grep -v '^$' | grep -vE '^font-family:var\(--(display|body|han|hand)\)$')
 if [ -n "$famhard" ]; then
   bad "§11-15 有地方寫死了字體家族（只准 var(--display|--body|--han|--hand)）："
@@ -1622,7 +1622,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src"
+placeholder_scope="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}

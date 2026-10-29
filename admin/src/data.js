@@ -483,19 +483,25 @@ export async function publishEvent(id, on) {
 // 讀兩張表（幹部都讀得到）；寫走 save_meeting / delete_meeting。tick_mail() 開頁叫一次：排 24 小時內的提醒信並把 outbox 寄出去（pg_cron 沒開的退路）。
 export async function loadMeetings() {
   need();
-  const [m, a] = await Promise.all([
-    supabase.from("meetings").select("id, scope, title, starts_at, ends_at, agenda, doc_url, reminded_at, created_by").order("starts_at", { ascending: false }),
+  // 2026-10-28：多讀 required（必到）與不能到的理由（meeting_rsvp_notes，RLS 只給本人與排會的人）。
+  // 還沒跑 2026-11-17-meetings-home.sql 的資料庫沒有那一欄與那張表，退回舊的查法。
+  const COLS = "id, scope, title, starts_at, ends_at, agenda, doc_url, reminded_at, created_by";
+  let [m, a, n] = await Promise.all([
+    supabase.from("meetings").select(COLS + ", required").order("starts_at", { ascending: false }),
     supabase.from("meeting_attendees").select("meeting_id, user_id, status, replied_at"),
+    supabase.from("meeting_rsvp_notes").select("meeting_id, user_id, note"),
   ]);
+  if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(COLS).order("starts_at", { ascending: false });
   if (m.error) throw m.error;
   if (a.error) throw a.error;
-  const by = new Map();
+  const by = new Map(), notes = new Map();
   for (const x of a.data || []) { if (!by.has(x.meeting_id)) by.set(x.meeting_id, []); by.get(x.meeting_id).push(x); }
-  return (m.data || []).map(x => Object.assign({}, x, { attendees: by.get(x.id) || [] }));
+  for (const x of (n && !n.error && n.data) || []) { if (!notes.has(x.meeting_id)) notes.set(x.meeting_id, []); notes.get(x.meeting_id).push(x); }
+  return (m.data || []).map(x => Object.assign({}, x, { attendees: by.get(x.id) || [], notes: notes.get(x.id) || [] }));
 }
 export async function saveMeeting(id, d) {
   need();
-  const { data, error } = await supabase.rpc("save_meeting", { p_id: id || null, p_scope: d.scope, p_title: d.title, p_starts: d.starts_at, p_ends: d.ends_at, p_agenda: d.agenda || "", p_doc_url: d.doc_url || null, p_attendees: d.attendees || [] });
+  const { data, error } = await supabase.rpc("save_meeting", { p_id: id || null, p_scope: d.scope, p_title: d.title, p_starts: d.starts_at, p_ends: d.ends_at, p_agenda: d.agenda || "", p_doc_url: d.doc_url || null, p_attendees: d.attendees || [], p_required: d.required == null ? null : !!d.required });
   if (error) throw error;
   return data;
 }

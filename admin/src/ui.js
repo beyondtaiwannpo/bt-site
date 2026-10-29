@@ -1513,7 +1513,7 @@ export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy)
   const up = (meetings || []).filter(m => new Date(m.ends_at) >= now).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const past = (meetings || []).filter(m => new Date(m.ends_at) < now).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
   const row = m => { const at = m.attendees || [], yes = at.filter(a => a.status === "accepted").length;
-    return `<li><div class="fhead"><b><a href="#meetings/${esc(m.id)}" data-act="mt-open" data-id="${esc(m.id)}">${esc(m.title)}</a></b> <span class="mini">${esc(mtScope(m.scope))}</span></div>
+    return `<li><div class="fhead"><b><a href="#meetings/${esc(m.id)}" data-act="mt-open" data-id="${esc(m.id)}">${esc(m.title)}</a></b> <span class="tag${m.required ? " open" : ""}">${T(m.required ? "mt.req1" : "mt.req0")}</span> <span class="mini">${esc(mtScope(m.scope))}</span></div>
       <div class="fmeta">${esc(mtWhen(m.starts_at))}・${esc(T("mt.people", { n: at.length, yes }))}${m.doc_url ? `・<a href="${esc(m.doc_url)}" target="_blank" rel="noopener">${T("mt.doc")}</a>` : ""}${me && at.some(a => a.user_id === me.id) ? `・<span class="tag${at.find(a => a.user_id === me.id).status === "accepted" ? " open" : ""}">${esc(T("mt.st." + at.find(a => a.user_id === me.id).status))}</span>` : ""}</div></li>`; };
   return pageHead(T("mt.title"), T("mt.lede"))
     + msgHTML(msg)
@@ -1524,12 +1524,15 @@ export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy)
 // 記一場會議 / 改一場：m 是現有那一場（null 是新的），d 是填到一半的值（含 pk 勾人的狀態）。
 export function meetingFormHTML(m, d, scopes, people, busy) {
   const v = Object.assign({ scope: scopes[0] || "board", title: "", starts_at: "", ends_at: "", agenda: "", doc_url: "" }, m || {}, d || {});
+  // 必到：既有的一場照資料庫（沒有這一欄的舊資料庫當選擇參加）；新的一場預設必到。
+  v.required = d && d.required != null ? d.required : m ? !!m.required : true;
   const dis = busy ? " disabled" : "";
   const pk = (d && d.pk) || { ticked: (m ? (m.attendees || []).map(a => a.user_id) : []), q: "", mq: "", teams: [], level: "view" };
   // 2026-11-06 自動儲存：既有那一場（m 有 id）的六格包在 data-autosave="mt-save" 裡改了就存；勾人那一塊在容器外面，
   // 勾了會先重畫（pk 的狀態在 S.mtDraft），main.js 重畫之後再補存一次。新開一場還沒有 id，留「記下來」那顆鈕。
   return sectionHTML(m ? T("mt.edit") : T("mt.new"), `<div class="two"${m ? ` data-autosave="mt-save" data-id="${esc(m.id)}"` : ""}>
       <label><i>${T("mt.scope")}</i><select id="mt-scope" name="scope"${dis}>${scopes.map(s => `<option value="${esc(s)}"${v.scope === s ? " selected" : ""}>${esc(mtScope(s))}</option>`).join("")}</select></label>
+      <label><i>${T("mt.required")}</i><select id="mt-required" name="required"${dis}><option value="1"${v.required !== false && v.required !== "0" ? " selected" : ""}>${T("mt.req1")}</option><option value="0"${v.required === false || v.required === "0" ? " selected" : ""}>${T("mt.req0")}</option></select></label>
       <label><i>${T("mt.titleF")}</i><input id="mt-title" name="title" value="${esc(v.title)}" placeholder="BT 會議"${dis}></label>
       <label><i>${T("mt.starts")}</i><input id="mt-starts" name="starts_at" type="datetime-local" value="${esc(mtLocal(v.starts_at))}"${dis}></label>
       <label><i>${T("mt.ends")}</i><input id="mt-ends" name="ends_at" type="datetime-local" value="${esc(mtLocal(v.ends_at))}"${dis}></label>
@@ -1547,8 +1550,9 @@ export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
   const who = id => { const p = (people || []).find(x => x.id === id); return p ? mpName(p) : T("rq.someone"); };
   const at = m.attendees || [];
   const grp = st => at.filter(a => a.status === st);
-  const li = a => `<li>${nameBlock((people || []).find(x => x.id === a.user_id) || { name_en: who(a.user_id) })}${a.user_id === (me && me.id) ? ` <span class="tag">${T("mp.you")}</span>` : ""}</li>`;
-  return pageHead(esc(m.title), `${esc(mtScope(m.scope))}・${esc(mtWhen(m.starts_at))}–${esc(mtWhen(m.ends_at).slice(11))}`, [], { act: "mt-back", label: T("mt.back") })
+  const noteOf = id => { const n = (m.notes || []).find(x => x.user_id === id); return n ? n.note : ""; };
+  const li = a => `<li>${nameBlock((people || []).find(x => x.id === a.user_id) || { name_en: who(a.user_id) })}${a.user_id === (me && me.id) ? ` <span class="tag">${T("mp.you")}</span>` : ""}${noteOf(a.user_id) ? `<div class="mini">「${esc(noteOf(a.user_id))}」</div>` : ""}</li>`;
+  return pageHead(esc(m.title), `${T(m.required ? "mt.req1" : "mt.req0")}・${esc(mtScope(m.scope))}・${esc(mtWhen(m.starts_at))}–${esc(mtWhen(m.ends_at).slice(11))}`, [], { act: "mt-back", label: T("mt.back") })
     + msgHTML(msg)
     + sectionHTML(T("mt.details"), `<dl class="rq-dl">
         <dt>${T("mt.agenda")}</dt><dd>${m.agenda ? esc(m.agenda) : T("value.none")}</dd>

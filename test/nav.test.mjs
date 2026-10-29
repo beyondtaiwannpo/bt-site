@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { FEATURES, featuresFor, navHTML } from "../shared/nav.js";
+import { FEATURES, featuresFor, navHTML, withLang } from "../shared/nav.js";
 // 頂欄 2026-10-19 起中英兩版，連結帶 ?lang=；這一支斷言中文，所以每一次都傳 lang: "zh"。
 
 const count = (h, re) => (h.match(re) || []).length;
@@ -21,8 +21,9 @@ test("FEATURES 每一筆都有 key / label / href / roles / title / desc", () =>
 // 寫錯路徑不會報錯，只會多一個點了 404 的入口。
 test("FEATURES 的 href 都指到存在的資料夾", () => {
   for (const f of FEATURES) {
-    assert.match(f.href, /^\/[a-z-]+\/$/, `${f.key} 的 href 不是 /xxx/ 的形狀：${f.href}`);
-    assert.ok(existsSync("." + f.href + "index.html"), `${f.href} 沒有 index.html`);
+    // 2026-10-28：行事曆是 /home/#calendar（同一個資料夾的另一個畫面），所以後面可以帶 #xxx。
+    assert.match(f.href, /^\/[a-z-]+\/(#[a-z-]+)?$/, `${f.key} 的 href 不是 /xxx/ 的形狀：${f.href}`);
+    assert.ok(existsSync("." + f.href.replace(/#.*$/, "") + "index.html"), `${f.href} 沒有 index.html`);
   }
 });
 
@@ -33,8 +34,8 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
 test("★ 幹部看到 FEATURES 上所有屬於他的項目，當前的那一項有標記", () => {
   const h = navHTML({ current: "availability", role: "cadre", name: "王平", lang: "zh" });
   const mine = FEATURES.filter(f => f.roles.includes("cadre"));
-  assert.equal(count(h, /<a href="\/[a-z-]+\/\?lang=zh"/g), mine.length);
-  for (const f of mine) assert.ok(h.includes(`href="${f.href}?lang=zh"`), `頂欄少了 ${f.key}`);
+  assert.equal(count(h, /<a href="\/[a-z-]+\/\?lang=zh(#[a-z-]+)?"/g), mine.length);
+  for (const f of mine) assert.ok(h.includes(`href="${withLang(f.href, "zh")}"`), `頂欄少了 ${f.key}`);
   assert.match(h, /href="\/availability\/\?lang=zh" aria-current="page"/, "當前項沒有 aria-current");
   assert.ok(!/href="\/passport\/\?lang=zh" aria-current/.test(h), "不是當前的項被標了");
 });
@@ -135,6 +136,6 @@ test("★ 功能項只有一份，不是寬窄各一份", () => {
   const h = navHTML({ current: "passport", role: "cadre", name: "王平", lang: "zh" });
   assert.equal((h.match(/class="btnav-items"/g) || []).length, 1);
   for (const f of FEATURES.filter(x => x.roles.includes("cadre")))
-    assert.equal((h.match(new RegExp(`href="${f.href}\\?lang=zh"`, "g")) || []).length, 1,
+    assert.equal(h.split(`href="${withLang(f.href, "zh")}"`).length - 1, 1,
       `${f.key} 出現了不只一次`);
 });

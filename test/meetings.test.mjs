@@ -73,15 +73,10 @@ test("看板上排一場會：有空的人預勾、找名字、全勾只勾篩�
   assert.deepEqual(SCH.shown(members, "tina").map(m => m.id), ["u5"]);
   assert.match(SCH.scheduleHTML({ ticked: [], q: "zzz" }, ctx, false), /data-act="sch-send" disabled/);
   const m = readFileSync("availability/src/main.js", "utf8");
-  assert.match(m, /DATA\.scheduleMeeting\(/); assert.match(m, /act === "sch-open"/); assert.match(m, /act === "rsvp"/);
+  assert.match(m, /DATA\.scheduleMeeting\(/); assert.match(m, /act === "sch-open"/);
+  // 2026-10-28：回覆搬到 /home/，看板收到 ?meeting= 就轉過去。
+  assert.match(m, /location\.replace\("\.\.\/home\/\?meeting="/); assert.doesNotMatch(m, /act === "rsvp"/);
   assert.match(readFileSync("availability/src/ui.js", "utf8"), /ctx\.canSchedule && !ctx\.schedule \? `<button class="btn ghost" data-act="sch-open">/);
-});
-
-test("回覆那一塊：兩顆按鈕照目前的回覆亮、Google 日曆連結、下載 .ics", () => {
-  const h = SCH.rsvpHTML({ id: "m1", title: "Marketing 週會", scope: "Marketing Team", agenda: "海報", doc_url: "https://docs.google.com/document/d/abc", my_status: "accepted" }, "2027-03-01 10:00–11:00（Asia/Taipei）", "https://calendar.google.com/x", "data:text/calendar,x", false);
-  assert.match(h, /<button class="btn" data-act="rsvp" data-v="accepted">會到 ✓<\/button>/);
-  assert.match(h, /<button class="btn ghost" data-act="rsvp" data-v="declined">不能到<\/button>/);
-  assert.match(h, /href="https:\/\/calendar.google.com\/x"/); assert.match(h, /download="meeting.ics"/);
 });
 
 test("★ .ics 照 RFC 5545 的基本規矩：CRLF、必要欄位、UTC Z、跳脫、折行不超過 75 個位元組；跟資料庫那一份同一個形狀", () => {
@@ -110,11 +105,11 @@ test("信件文案多兩種；admin 開頁叫 tick_mail；資料層只走函式"
   assert.match(m, /UI\.needAsk\(S, b, T\("confirm\.mtDelete"/);
 });
 
-test("★ 英文畫出來不剩中文（會議清單、一場會議、看板排會、回覆）", () => {
+test("★ 英文畫出來不剩中文（會議清單、一場會議、看板排會）", () => {
   F.setLang("en"); AV.setLang("en");
   const members = [{ id: "u1", name: "Paul", alt: "" }];
   for (const h of [F.meetingsListHTML(M, ME, ["Marketing Team"], null, PEOPLE, "", false), F.meetingHTML(M[0], ME, PEOPLE, true, ["Marketing Team"], null, "", false),
-    SCH.scheduleHTML({ ticked: [] }, { scopes: ["board"], members, free: [], when: "Mon 10:00" }, false), SCH.rsvpHTML({ id: "x", title: "T", scope: "board", agenda: "", my_status: null }, "w", "#", "#", false)]) {
+    SCH.scheduleHTML({ ticked: [] }, { scopes: ["board"], members, free: [], when: "Mon 10:00" }, false)]) {
     const text = h.replace(/<[^>]+>/g, " ").replace(/Marketing 週會|Board 月會|海報進度|王平|小安|雅婷/g, "");
     assert.doesNotMatch(text, /[一-鿿]/, "英文模式不該剩中文：" + (text.match(/[^\s]*[一-鿿]+[^\s]*/) || [""])[0]);
   }

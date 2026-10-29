@@ -48,7 +48,8 @@ function render() {
   // 盤點時 Director、Associate、新人每一件事都多一下「點 Admin」。校友照舊進設定（他的東西在那裡）。
   if (S.role === "cadre") {
     el.innerHTML = `<div class="empty">${T("m.taking")}</div>`;
-    location.replace(S.profile && S.profile.name ? "../admin/" : "../settings/");
+    // 2026-10-28 改：幹部先到首頁（等他回覆的會、接下來的會），不再直接進後台。
+    location.replace(S.profile && S.profile.name ? "../home/" : "../settings/");
     return;
   }
   if (S.role === "alumni") {

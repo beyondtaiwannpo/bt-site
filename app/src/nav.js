@@ -10,7 +10,7 @@
 // 要加新的目的地就在這張表加一列，不要改成「如果是相對路徑就放行」。
 // 2026-10-15：後台的四個資料夾也進表。在這之前 /admin/ 送的是一條路徑（"/admin/"），
 // 對不到表，所以從後台被踢去登入的人登入完會停在設定頁，不是回後台。
-export const NEXT = { passport: "../passport/", availability: "../availability/", "intern-passport": "../intern-passport/",
+export const NEXT = { home: "../home/", passport: "../passport/", availability: "../availability/", "intern-passport": "../intern-passport/",
   admin: "../admin/", "admin-site": "../admin/site/", "admin-passports": "../admin/passports/", "admin-people": "../admin/people/" };
 
 const KEY = "bt-next";

@@ -17,7 +17,7 @@ export const PAGES = ["index.html", "about/index.html", "programs/index.html", "
                       "impact/index.html", "partner/index.html",
                       "apply/index.html", "admin/index.html", "resources/index.html",
                       "settings/index.html",
-                      "app/index.html", "availability/index.html",
+                      "app/index.html", "availability/index.html", "home/index.html",
                       "passport/index.html", "privacy/index.html", "reset/index.html",
                       "intern-passport/index.html"];
 export const NEEDED = ["favicon-32.png", "apple-touch-icon.png", "site.webmanifest"];

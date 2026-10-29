@@ -730,7 +730,7 @@ test("★ 總覽「你的存取」：被派的人一行一個工作區加直達�
   // 只能看的人，卡上寫「去看」不寫「去審」。
   const view = FORMS.hubHTML({ ...ME.member, name: "a", team: "Curriculum Team", ws: { "apps:Curriculum Team": "view" } }, [], false, false, FORMS_DATA, { resources: [], roster: [] });
   assert.match(view, /data-act="open-apps" data-id="f1">去看/);
-  assert.match(readFileSync("app/src/main.js", "utf8"), /S\.profile && S\.profile\.name \? "\.\.\/admin\/" : "\.\.\/settings\/"/, "幹部登入後進總覽，沒名字的才進設定");
+  assert.match(readFileSync("app/src/main.js", "utf8"), /S\.profile && S\.profile\.name \? "\.\.\/home\/" : "\.\.\/settings\/"/, "幹部登入後進首頁（2026-10-28），沒名字的才進設定");
 });
 
 test("成員分頁：Co-President 與 Senior Adviser 置頂標「依職級」，沒有下拉與移出", () => {

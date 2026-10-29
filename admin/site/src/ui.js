@@ -796,13 +796,17 @@ export const MAIL_KINDS = [
   // 2026-11-02 會議：兩封，代換符號 {name} {title} {when} {agenda} {doc} {link}。
   { v: "meeting_invite",   label: "mail.meeting_invite",   when: "mail.meeting_invite.when" },
   { v: "meeting_reminder", label: "mail.meeting_reminder", when: "mail.meeting_reminder.when" },
+  // 2026-10-28 給排會的人的總表：代換符號 {name} {title} {when} {yes} {no} {pending} {link}。
+  { v: "meeting_summary",  label: "mail.meeting_summary",  when: "mail.meeting_summary.when" },
 ];
-export const MEETING_SAMPLE = { name: "Mei Wu", title: "Marketing 週會", when: "2027-03-01 10:00–11:00（Asia/Taipei）", agenda: "海報進度、嘖嘖頁分工", doc: "https://docs.google.com/document/d/…", link: "https://beyondtaiwannpo.com/availability/?meeting=9f2c…" };
+export const MEETING_SAMPLE = { name: "Mei Wu", title: "Marketing 週會", when: "2027-03-01 10:00–11:00（Asia/Taipei）", agenda: "海報進度、嘖嘖頁分工", doc: "https://docs.google.com/document/d/…", link: "https://beyondtaiwannpo.com/home/?meeting=9f2c…",
+  yes: "Mei Wu、小安", no: "Tina（那天要考試）", pending: "王平" };
 export function fillMeeting(text, s) {
   const v = Object.assign({}, MEETING_SAMPLE, s || {});
   return String(text == null ? "" : text)
     .split("{name}").join(v.name).split("{title}").join(v.title).split("{when}").join(v.when)
-    .split("{agenda}").join(v.agenda).split("{doc}").join(v.doc).split("{link}").join(v.link);
+    .split("{agenda}").join(v.agenda).split("{doc}").join(v.doc).split("{link}").join(v.link)
+    .split("{yes}").join(v.yes).split("{no}").join(v.no).split("{pending}").join(v.pending);
 }
 export const REQUEST_SAMPLE = { requester: "Mei Wu", title: "C-2 bootcamp 報名倒數", needed_by: "2026-12-01", link: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", reply: "發了，連結在 IG 限動精選。" };
 export function fillRequest(text, s) {
@@ -883,7 +887,7 @@ export function mailEditHTML(kind, t, msg, busy, prev) {
     <label><i>${T("mail.body")}</i><textarea id="mbody" name="body" style="min-height:230px">${esc(body)}</textarea></label>
     <label><i>${T("mail.button")}</i><input id="mbtn" name="button_label" value="${esc(btnZh)}" placeholder="${esc(mailButtonLabel(kind, "zh"))}"></label>
     <div class="mini" style="margin:-6px 0 14px">
-      ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
+      ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : kind === "meeting_summary" ? T("mail.varsSummary") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
     <details class="fold"><summary><span class="chev" aria-hidden="true"></span><b>${T("mail.enTitle")}</b><span class="mini">${T("mail.enHint")}</span></summary><div class="fold-body">
     <label><i>${T("mail.subjectEn")}</i><input id="msub-en" name="subject_en" value="${esc(subjectEn)}"></label>
     <label><i>${T("mail.bodyEn")}</i><textarea id="mbody-en" name="body_en" style="min-height:180px">${esc(bodyEn)}</textarea></label>
@@ -920,11 +924,11 @@ export function downHTML(err) {
 // 這一份只給後台的即時預覽；真的寄出去的是資料庫那一份。
 // ═══════════════════════════════════════════════════════════════════════
 export const MAIL_BUTTON = {
-  invite: { zh: "接受邀請", en: "Accept invitation" }, meeting_invite: { zh: "回覆出席", en: "Reply" }, meeting_reminder: { zh: "回覆出席", en: "Reply" },
+  invite: { zh: "接受邀請", en: "Accept invitation" }, meeting_invite: { zh: "回覆出席", en: "Reply" }, meeting_reminder: { zh: "回覆出席", en: "Reply" }, meeting_summary: { zh: "看這場會", en: "Open meeting" },
   request_new: { zh: "打開需求單", en: "Open request" }, request_done: { zh: "看回覆", en: "Open request" }, interview: { zh: "挑一個時段", en: "Pick a time" },
 };
 export const MAIL_SAMPLE_URL = {
-  invite: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", meeting_invite: "https://beyondtaiwannpo.com/availability/?meeting=9f2c…", meeting_reminder: "https://beyondtaiwannpo.com/availability/?meeting=9f2c…",
+  invite: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", meeting_invite: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_reminder: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_summary: "https://beyondtaiwannpo.com/home/?meeting=9f2c…",
   request_new: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", request_done: "https://beyondtaiwannpo.com/admin/#request/9f2c…", interview: "https://cal.com/beyondtaiwan/interview",
 };
 export function mailButtonLabel(kind, lang, custom) {

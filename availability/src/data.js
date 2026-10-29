@@ -219,25 +219,11 @@ export async function loadAccess() {
   return ws;
 }
 export async function scheduleMeeting(d) {
-  const { data, error } = await supabase.rpc("schedule_meeting", { p_scope: d.scope, p_title: d.title, p_starts: d.starts, p_ends: d.ends, p_agenda: d.agenda || "", p_doc_url: d.doc || null, p_attendees: d.attendees });
+  const { data, error } = await supabase.rpc("schedule_meeting", { p_scope: d.scope, p_title: d.title, p_starts: d.starts, p_ends: d.ends, p_agenda: d.agenda || "", p_doc_url: d.doc || null, p_attendees: d.attendees, p_required: !!d.required });
   if (error) throw error;
   return data;
 }
 // 一場會議加我自己那一筆（回覆那一頁用）。RLS：幹部讀得到。
-export async function loadMeeting(id, userId) {
-  const [m, a] = await Promise.all([
-    supabase.from("meetings").select("id, scope, title, starts_at, ends_at, agenda, doc_url").eq("id", id).maybeSingle(),
-    supabase.from("meeting_attendees").select("status").eq("meeting_id", id).eq("user_id", userId).maybeSingle(),
-  ]);
-  if (m.error) throw m.error;
-  if (!m.data) return null;
-  return Object.assign({}, m.data, { my_status: a.data ? a.data.status : null });
-}
-export async function setRsvp(id, status) {
-  const { data, error } = await supabase.rpc("set_rsvp", { p_meeting: id, p_status: status });
-  if (error) throw error;
-  return data;
-}
 const SAYS2 = [
   ["not_allowed", "你排不了這個範圍的會：整個 BT 的要 Co-President 或 Senior Adviser，team 的要那個 team 的 Director。", "You can't schedule for this scope: BT-wide needs a Co-President or Senior Adviser; a team needs that team's Director."],
   ["not_invited", "這場會的名單上沒有你。", "You are not on this meeting's list."],

@@ -19,6 +19,13 @@
 // （它只是導覽），語言照使用者在 /settings/ 或後台選的那一個（navLang()，見下面）。
 // 字典寫在這個檔案裡面，不另開檔：shared/ 要保持極小。
 export const FEATURES = [
+  // 2026-10-28：首頁與行事曆排在最前面（Paul：「什麼都在後台，team 不知道東西在哪」）。
+  // 幹部登入後先到首頁：等他回覆的會、接下來的會與活動、「我要…」的捷徑。後台只給要管東西的人用。
+  // 兩筆指到同一個資料夾，行事曆是 #calendar。推翻 2026-10-23「頂欄一行不改」，理由記在 Anson decisions。
+  { key: "home",         label: { zh: "首頁", en: "Home" },         href: "/home/",         roles: ["cadre"],
+    title: { zh: "首頁", en: "Home" },           desc: { zh: "等你回覆的會、接下來的會與活動", en: "Meetings waiting for your reply, what's coming up" } },
+  { key: "calendar",     label: { zh: "行事曆", en: "Calendar" },   href: "/home/#calendar", roles: ["cadre"],
+    title: { zh: "行事曆", en: "Calendar" },     desc: { zh: "整個月的會議與活動", en: "Meetings and events by month and week" } },
   { key: "passport",     label: { zh: "護照", en: "Passport" },     href: "/passport/",     roles: ["cadre"],
     title: { zh: "幹部護照", en: "Cadre passport" },     desc: { zh: "這一年的活動、章、心得與照片", en: "This year's activities, stamps, notes and photos" } },
   { key: "availability", label: { zh: "時間看板", en: "Availability" }, href: "/availability/", roles: ["cadre"],

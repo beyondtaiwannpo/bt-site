@@ -2279,6 +2279,41 @@ psql -d "${DB}" -X -A -t -q -c "insert into public.mail_outbox (to_email, subjec
 psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false); select public.send_pending_mail(50);" >/dev/null 2>&1 || true
 chk "★ 重建之後信照樣寄得出去" "t" "select (sent_at is not null and error is null)::text::char(1) from public.mail_outbox where to_email='after@x.test'"
 
+echo "── 必到、不能到的理由、主辦人總表（2026-11-17-meetings-home.sql）──"
+mhgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-17-meetings-home.sql 2>&1 || true)
+if echo "${mhgot}" | grep -q "OVERALL.*PASS" && ! echo "${mhgot}" | grep -q "|FAIL"; then echo "  ok   首頁那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 首頁那支驗收表："; echo "${mhgot}" | head -14; fail=$((fail+1)); fi
+MH=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.schedule_meeting('board','必到的會', now() + interval '2 days', now() + interval '2 days 1 hour', '', null, array['${DIR}','${ASSOC}']::uuid[], true);" 2>&1 | tail -1 | tr -d ' ')
+chk "排會時勾必到就存成必到" "t" "select required::text::char(1) from public.meetings where id='${MH}'"
+chkraise "★ 必到的會不能到沒填理由擋下來" "need_reason" "perform set_config('test.uid','${DIR}',true); perform public.set_rsvp('${MH}','declined');"
+chkas "${DIR}" "填了理由就能回不能到" "declined" "select public.set_rsvp('${MH}','declined','那天要考試')"
+chkas "${ASSOC}" "舊的兩參數叫法照樣能用" "accepted" "select public.set_rsvp('${MH}','accepted')"
+chkrole authenticated "${ASSOC}" "★ 其他幹部看不到別人的理由" "0" "select count(*) from public.meeting_rsvp_notes where meeting_id='${MH}'"
+chkrole authenticated "${DIR}" "本人看得到自己的理由" "1" "select count(*) from public.meeting_rsvp_notes where meeting_id='${MH}'"
+chkrole authenticated "${PAUL}" "排會的人看得到理由" "1" "select count(*) from public.meeting_rsvp_notes where meeting_id='${MH}'"
+chkas "${PAUL}" "改會沒給必到" "${MH}" "select public.save_meeting('${MH}','board','必到的會（改）', now() + interval '20 hours', now() + interval '21 hours', '', null, array['${DIR}','${ASSOC}']::uuid[])"
+chk "★ 舊的後台存一次不會把必到洗掉" "t" "select required::text::char(1) from public.meetings where id='${MH}'"
+chkas "${DIR}" "改成會到，理由一起拿掉" "accepted" "select public.set_rsvp('${MH}','accepted')"
+chk "理由拿掉了" "0" "select count(*) from public.meeting_rsvp_notes where meeting_id='${MH}'"
+chkas "${DIR}" "再改回不能到" "declined" "select public.set_rsvp('${MH}','declined','臨時要上班')"
+psql -d "${DB}" -X -A -t -q -c "select public.queue_meeting_reminders();" >/dev/null 2>&1 || true
+chk "★ 24 小時內：主辦人收到一封總表" "1" "select count(*) from public.mail_outbox where kind='meeting_summary' and meeting_id='${MH}'"
+chk "★ 總表寫著誰不能到與理由" "t" "select (position('臨時要上班' in body) > 0)::text::char(1) from public.mail_outbox where kind='meeting_summary' and meeting_id='${MH}'"
+chk "總表的按鈕到首頁" "t" "select (public.mail_button_url(o) like 'https://beyondtaiwannpo.com/home/?meeting=%')::text::char(1) from public.mail_outbox o where kind='meeting_summary' and meeting_id='${MH}'"
+psql -d "${DB}" -X -A -t -q -c "select public.queue_meeting_reminders();" >/dev/null 2>&1 || true
+chk "一場只寄一次總表" "1" "select count(*) from public.mail_outbox where kind='meeting_summary' and meeting_id='${MH}'"
+mh2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-17-meetings-home.sql 2>&1 || true)
+if echo "${mh2}" | grep -q "OVERALL.*PASS"; then echo "  ok   首頁那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 首頁那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/  if p_status = 'declined' and v_req and v_note is null then raise exception 'need_reason' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-17-meetings-home.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉理由檢查，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉理由檢查驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/  using (user_id = auth.uid()/  using (true or user_id = auth.uid()/" supabase/migrations/2026-11-17-meetings-home.sql > "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f "${BROKEN}" >/dev/null 2>&1 || true
+chkrole authenticated "${ASSOC}" "★ 破壞測試：政策放寬就看得到別人的理由（證明上面那條真的在測 RLS）" "1" "select count(*) from public.meeting_rsvp_notes where meeting_id='${MH}'"
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-17-meetings-home.sql >/dev/null 2>&1 || true
+chkrole authenticated "${ASSOC}" "跑回正確版本又看不到了" "0" "select count(*) from public.meeting_rsvp_notes where meeting_id='${MH}'"
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

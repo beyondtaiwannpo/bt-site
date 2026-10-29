@@ -174,7 +174,7 @@ export const MINE = {
   "sch.none":         { zh: "全部取消", en: "Untick all" },
   "sch.isFree":       { zh: "有空", en: "free" },
   "sch.send":         { zh: "排會並寄邀請（{n} 人）", en: "Schedule and send invites ({n})" },
-  "sch.note":         { zh: "每一位會收到一封信：他自己時區的時間、議程、一個 .ics 檔（點開就進日曆）、「會到／不能到」的連結。開會前 24 小時再提醒一次。", en: "Each person gets an email: the time in their own time zone, the agenda, an .ics file (opens straight into their calendar) and a reply link. A reminder goes out 24 hours before." },
+  "sch.note":         { zh: "每一位會收到一封信：他自己時區的時間、議程、一個 .ics 檔（點開就進日曆）、回覆會不會到的連結（必到的會不能到要寫理由）。開會前 24 小時再提醒一次，你會收到一封誰會到的總表。", en: "Each person gets an email: the time in their own time zone, the agenda, an .ics file (opens straight into their calendar) and a reply link (for a required meeting, saying no needs a reason). A reminder goes out 24 hours before, and you get a summary of who is coming." },
   "sch.needPeople":   { zh: "至少勾一個人。", en: "Tick at least one person." },
   "sch.sent":         { zh: "排好了，{n} 封邀請寄出去了。", en: "Scheduled; {n} invites sent." },
   "rsvp.doc":         { zh: "會議紀錄", en: "Meeting notes" },
@@ -182,6 +182,9 @@ export const MINE = {
   "rsvp.no":          { zh: "不能到", en: "Can't make it" },
   "rsvp.ics":         { zh: "下載 .ics", en: "Download .ics" },
   "rsvp.gone":        { zh: "找不到這場會，可能已經取消了。", en: "Meeting not found; it may have been cancelled." },
+  "sch.required":     { zh: "這場是", en: "This meeting is" },
+  "sch.req1":         { zh: "必到", en: "Required" },
+  "sch.req0":         { zh: "選擇參加", en: "Optional" },
   "rsvp.saidYes":     { zh: "記下來了：會到。", en: "Noted: you'll be there." },
   "rsvp.saidNo":      { zh: "記下來了：不能到。", en: "Noted: you can't make it." },
 };

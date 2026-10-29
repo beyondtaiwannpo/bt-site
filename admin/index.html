@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="bt-version" content="2026-10-28-1846">
+<meta name="bt-version" content="2026-10-28-1902">
 <!-- 版本號與 importmap（2026-11-06）：這一段由 scripts/bump-version.sh 整段改寫，不要手改。
      importmap 把「./src/ui.js」這種乾淨的模組名稱對到帶版本號的網址，所以 .js 裡的 import 不用帶版本號，
      而 GitHub Pages 的 10 分鐘快取不會讓新舊模組混著用。為什麼要這樣見 README「後台速度」。 -->
 <!-- bt-importmap -->
-<script type="importmap">{ "imports": { "/admin/src/data.js": "/admin/src/data.js?v=2026-10-28-1846", "/admin/src/main.js": "/admin/src/main.js?v=2026-10-28-1846", "/admin/src/strings.js": "/admin/src/strings.js?v=2026-10-28-1846", "/admin/src/ui.js": "/admin/src/ui.js?v=2026-10-28-1846", "/shared/auth.js": "/shared/auth.js?v=2026-10-28-1846", "/shared/supabase.js": "/shared/supabase.js?v=2026-10-28-1846", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-10-28-1846", "/shared/nav.js": "/shared/nav.js?v=2026-10-28-1846", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-10-28-1846" } }</script>
+<script type="importmap">{ "imports": { "/admin/src/data.js": "/admin/src/data.js?v=2026-10-28-1902", "/admin/src/main.js": "/admin/src/main.js?v=2026-10-28-1902", "/admin/src/strings.js": "/admin/src/strings.js?v=2026-10-28-1902", "/admin/src/ui.js": "/admin/src/ui.js?v=2026-10-28-1902", "/shared/auth.js": "/shared/auth.js?v=2026-10-28-1902", "/shared/supabase.js": "/shared/supabase.js?v=2026-10-28-1902", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-10-28-1902", "/shared/nav.js": "/shared/nav.js?v=2026-10-28-1902", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-10-28-1902" } }</script>
 <!-- /bt-importmap -->
 <title>BT 後台</title>
 <link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
@@ -28,19 +28,19 @@
      modulepreload 讓瀏覽器一開始就同時去抓，不用一層一層發現。
      ⚠ 這不是快取或打包工具，是瀏覽器原生的一行 HTML —— 沒有 build step。
      ⚠ 路徑改動的話這幾行要跟著改，否則瀏覽器會抓一個 404 回來（不會壞，但白費一次請求）。 -->
-<link rel="modulepreload" href="../shared/auth.js?v=2026-10-28-1846">
-<link rel="modulepreload" href="../shared/supabase.js?v=2026-10-28-1846">
-<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-10-28-1846">
-<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-10-28-1846">
+<link rel="modulepreload" href="../shared/auth.js?v=2026-10-28-1902">
+<link rel="modulepreload" href="../shared/supabase.js?v=2026-10-28-1902">
+<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-10-28-1902">
+<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-10-28-1902">
 <!-- 這一頁自己的模組。上面三行解決的是共用那一層，這幾行解決第二層：
      瀏覽器要先把 src/main.js 下載完、解析完，才知道它還要 ./src/ui.js 之類的東西，
      那又是一次完整的網路來回疊在「載入中…」後面。這幾行讓它一開始就一起抓。
      ⚠ 檔名改了、或這一頁不再 import 某一支，這裡要跟著改 ——
      check.sh 會檢查每一個 modulepreload 指到的檔案真的存在。 -->
-<link rel="modulepreload" href="./src/ui.js?v=2026-10-28-1846">
-<link rel="modulepreload" href="./src/data.js?v=2026-10-28-1846">
-<link rel="modulepreload" href="./src/strings.js?v=2026-10-28-1846">
-<link rel="modulepreload" href="../shared/nav.js?v=2026-10-28-1846">
+<link rel="modulepreload" href="./src/ui.js?v=2026-10-28-1902">
+<link rel="modulepreload" href="./src/data.js?v=2026-10-28-1902">
+<link rel="modulepreload" href="./src/strings.js?v=2026-10-28-1902">
+<link rel="modulepreload" href="../shared/nav.js?v=2026-10-28-1902">
 <link rel="stylesheet" href="../shared/nav.css">
 <link rel="stylesheet" href="./admin.css">
 <style>
@@ -104,6 +104,6 @@ summary{cursor:pointer}
      真的側欄與內容由 src/main.js 整個換掉。四個後台資料夾各一份一模一樣（test/admin-hub.test.mjs 逐字比對）。
      改前這裡只有一句「載入中…」，而它要等所有資料回來才被換掉（總覽實測 3.6 秒）。 -->
 <div class="shell"><nav class="rail skel" aria-hidden="true"><div class="rail-me"><i class="sk" style="width:60%"></i><i class="sk" style="width:80%"></i></div><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></nav><main class="main"><div class="skeleton" aria-label="Loading… 載入中…"><i></i><i></i><i></i></div></main></div></div>
-<script type="module" src="./src/main.js?v=2026-10-28-1846"></script>
+<script type="module" src="./src/main.js?v=2026-10-28-1902"></script>
 </body>
 </html>

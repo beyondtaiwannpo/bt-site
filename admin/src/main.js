@@ -216,7 +216,7 @@ function readMeeting() {
   const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
   const iso = v => v ? new Date(v).toISOString() : "";
   const pk = (S.mtDraft && S.mtDraft.pk) || { ticked: [] };
-  return { scope: val("mt-scope") || "board", title: val("mt-title"), starts_at: iso(val("mt-starts")), ends_at: iso(val("mt-ends")), agenda: val("mt-agenda"), doc_url: val("mt-doc"), attendees: UI.pkPicked(S.cadres, [], pk, true) };
+  return { scope: val("mt-scope") || "board", required: val("mt-required") !== "0", title: val("mt-title"), starts_at: iso(val("mt-starts")), ends_at: iso(val("mt-ends")), agenda: val("mt-agenda"), doc_url: val("mt-doc"), attendees: UI.pkPicked(S.cadres, [], pk, true) };
 }
 async function openTab(t) {
   // 會議（2026-11-02）：#meetings 清單，#meetings/<id> 一場。

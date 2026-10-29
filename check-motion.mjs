@@ -25,7 +25,7 @@ const PAGES = [
   "index.html", "about/index.html", "programs/index.html", "team/index.html", "events/index.html",
   "impact/index.html", "partner/index.html", "apply/index.html", "resources/index.html",
   "alumni/index.html", "app/index.html", "admin/index.html", "settings/index.html",
-  "availability/index.html", "passport/index.html", "privacy/index.html",
+  "availability/index.html", "home/index.html", "passport/index.html", "privacy/index.html",
   "reset/index.html", "join/index.html", "intern-passport/index.html", "history/index.html",
   // 2026-10-15 後台拆成四個資料夾。
   "admin/site/index.html", "admin/passports/index.html", "admin/people/index.html",
