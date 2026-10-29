@@ -94,3 +94,12 @@ test("行事曆月與週都畫得出來", () => {
   assert.match(UI.calendarHTML(items, c, { view: "month", at: "2026-11-10", mode: "mine" }), /遊戲夜/);
   assert.match(UI.calendarHTML(items, c, { view: "week", at: "2026-11-12", mode: "mine" }), /class="slot"/);
 });
+
+// 2026-11-18：首頁下載的 .ics 跟邀請信附的日曆邀請要同一個 UID，不然先收邀請再下載會在日曆上變成兩筆。
+test("首頁下載的 .ics 跟資料庫的日曆邀請同一個 UID", async () => {
+  const { readFileSync } = await import("node:fs");
+  const ics = UI.icsText({ id: "abc", title: "t", start: new Date(0), end: new Date(3600000) });
+  assert.match(ics, /\r\nUID:meeting-abc@beyondtaiwannpo\.com\r\n/);
+  const sql = readFileSync(new URL("../supabase/migrations/2026-11-18-calendar-invites.sql", import.meta.url), "utf8");
+  assert.ok(sql.includes("'UID:meeting-' || m.id::text || '@beyondtaiwannpo.com'"));
+});

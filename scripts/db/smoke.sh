@@ -2314,6 +2314,56 @@ rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-17-meetings-home.sql >/dev/null 2>&1 || true
 chkrole authenticated "${ASSOC}" "跑回正確版本又看不到了" "0" "select count(*) from public.meeting_rsvp_notes where meeting_id='${MH}'"
 
+echo "── 會議變成真正的日曆邀請（2026-11-18-calendar-invites.sql）──"
+cigot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-18-calendar-invites.sql 2>&1 || true)
+if echo "${cigot}" | grep -q "OVERALL.*PASS" && ! echo "${cigot}" | grep -q "|FAIL"; then echo "  ok   日曆邀請那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 日曆邀請那支驗收表："; echo "${cigot}" | head -16; fail=$((fail+1)); fi
+CI=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.schedule_meeting('board','日曆測試', now() + interval '3 days', now() + interval '3 days 1 hour', '議程；第一項, 第二項', null, array['${DIR}','${ASSOC}']::uuid[], true);" 2>&1 | tail -1 | tr -d ' ')
+chk "★ 看板排會：名單兩個人加 BT 主帳號，三封邀請" "3" "select count(*) from public.mail_outbox where kind='meeting_invite' and meeting_id='${CI}'"
+chk "★ BT 主帳號收到邀請" "1" "select count(*) from public.mail_outbox where kind='meeting_invite' and meeting_id='${CI}' and to_email='beyondtaiwan2020@gmail.com'"
+chk "★ 邀請的日曆檔是 REQUEST、主辦人是排會的人" "t" "select (ics like '%METHOD:REQUEST%' and ics like '%ORGANIZER;CN=\"王平\":mailto:paul@example.com%')::text::char(1) from public.mail_outbox where kind='meeting_invite' and meeting_id='${CI}' and to_email='director@example.com'"
+chk "★ 來賓名單有名單上的人與 BT 主帳號" "t" "select (ics like '%mailto:director@example.com%' and ics like '%mailto:beyondtaiwan2020@gmail.com%' and ics like '%ROLE=REQ-PARTICIPANT%')::text::char(1) from public.mail_outbox where kind='meeting_invite' and meeting_id='${CI}' and to_email='director@example.com'"
+chk "日曆檔每一行都不超過 75 個位元組（中文照位元組折行）" "t" "select bool_and(octet_length(l) <= 75)::text::char(1) from public.mail_outbox o, regexp_split_to_table(o.ics, E'\r\n') l where kind='meeting_invite' and meeting_id='${CI}'"
+chk "日曆檔版本號從 0 開始" "t" "select (ics like '%SEQUENCE:0%')::text::char(1) from public.mail_outbox where kind='meeting_invite' and meeting_id='${CI}' and to_email='director@example.com'"
+chkrole authenticated "${PAUL}" "★ 網站上的人叫不到 meeting_ics（讀得到每個人的信箱）" "f" "select has_function_privilege('public.meeting_ics(uuid, text)', 'execute')::text::char(1)"
+psql -d "${DB}" -X -A -t -q -c "update public.mail_outbox set sent_at = now() where meeting_id='${CI}';" >/dev/null
+CIS=$(psql -d "${DB}" -X -A -t -q -c "select to_char(starts_at, 'YYYY-MM-DD HH24:MI:SS.US TZ') from public.meetings where id='${CI}'" | tr -d '\n')
+chkas "${PAUL}" "原樣存一次" "${CI}" "select public.save_meeting('${CI}','board','日曆測試', (select starts_at from public.meetings where id='${CI}'), (select ends_at from public.meetings where id='${CI}'), '議程；第一項, 第二項', null, array['${DIR}','${ASSOC}']::uuid[])"
+chk "★ 什麼都沒改就不記更新" "t" "select (cal_dirty_at is null)::text::char(1) from public.meetings where id='${CI}'"
+chkas "${PAUL}" "改時間、拿掉一個人" "${CI}" "select public.save_meeting('${CI}','board','日曆測試', now() + interval '4 days', now() + interval '4 days 1 hour', '議程；第一項, 第二項', null, array['${DIR}']::uuid[])"
+chk "★ 改了先記下來" "t" "select (cal_dirty_at is not null)::text::char(1) from public.meetings where id='${CI}'"
+chk "★ 改完不馬上寄（後台改了就存，馬上寄會一格一封）" "0" "select count(*) from public.mail_outbox where kind in ('meeting_update','meeting_cancel') and meeting_id='${CI}'"
+psql -d "${DB}" -X -A -t -q -c "select public.queue_meeting_reminders();" >/dev/null 2>&1 || true
+chk "停手不到 10 分鐘、離開會還很久：排程跑過也還沒寄" "0" "select count(*) from public.mail_outbox where kind in ('meeting_update','meeting_cancel') and meeting_id='${CI}'"
+psql -d "${DB}" -X -A -t -q -c "update public.meetings set cal_dirty_at = now() - interval '11 minutes' where id='${CI}'; select public.queue_meeting_reminders();" >/dev/null 2>&1 || true
+chk "★ 停手 10 分鐘後：還在名單上的人與 BT 主帳號各一封更新" "2" "select count(*) from public.mail_outbox where kind='meeting_update' and meeting_id='${CI}'"
+chk "★ 被拿掉的人收到取消" "1" "select count(*) from public.mail_outbox where kind='meeting_cancel' and meeting_id='${CI}' and to_email in (select lower(email) from auth.users where id='${ASSOC}')"
+chk "更新的版本號加一、取消的日曆檔是 CANCEL" "t" "select (bool_and(case when kind='meeting_update' then ics like '%SEQUENCE:1%' and ics like '%METHOD:REQUEST%' else ics like '%METHOD:CANCEL%' and ics like '%STATUS:CANCELLED%' end))::text::char(1) from public.mail_outbox where kind in ('meeting_update','meeting_cancel') and meeting_id='${CI}'"
+chk "寄完記號清掉" "t" "select (cal_dirty_at is null)::text::char(1) from public.meetings where id='${CI}'"
+chk "取消信沒有按鈕（會可能已經刪了）" "" "select public.mail_button_url(o) from public.mail_outbox o where kind='meeting_cancel' and meeting_id='${CI}'"
+psql -d "${DB}" -X -A -t -q -c "update public.mail_outbox set sent_at = now() where meeting_id='${CI}';" >/dev/null
+chkas "${PAUL}" "把人加回來" "${CI}" "select public.save_meeting('${CI}','board','日曆測試', (select starts_at from public.meetings where id='${CI}'), (select ends_at from public.meetings where id='${CI}'), '議程；第一項, 第二項', null, array['${DIR}','${ASSOC}']::uuid[])"
+psql -d "${DB}" -X -A -t -q -c "select public.meeting_flush_calendar('${CI}');" >/dev/null 2>&1 || true
+chk "★ 被拿掉又加回來的人收到的是邀請，不是更新" "2" "select count(*) from public.mail_outbox where kind='meeting_invite' and meeting_id='${CI}' and to_email in (select lower(email) from auth.users where id='${ASSOC}')"
+psql -d "${DB}" -X -A -t -q -c "update public.mail_outbox set sent_at = now() where meeting_id='${CI}';" >/dev/null
+chkas "${PAUL}" "刪掉這場會" "deleted" "select public.delete_meeting('${CI}')"
+chk "★ 刪會：日曆上有這場的三個信箱各收到取消（加回來的那位是第二封）" "assoc@example.com:2,beyondtaiwan2020@gmail.com:1,director@example.com:1" "select string_agg(to_email || ':' || n, ',' order by to_email) from (select to_email, count(*) n from public.mail_outbox where kind='meeting_cancel' and meeting_id is null and subject like '%日曆測試%' group by to_email) x"
+chk "★ BT 主帳號也收到取消" "1" "select count(*) from public.mail_outbox where kind='meeting_cancel' and meeting_id is null and subject like '%日曆測試%' and to_email='beyondtaiwan2020@gmail.com'"
+CJ=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.save_meeting(null,'board','後台新增的會', now() + interval '5 days', now() + interval '5 days 1 hour', '', null, array['${DIR}']::uuid[]);" 2>&1 | tail -1 | tr -d ' ')
+chkas "${PAUL}" "後台新增的會改時間" "${CJ}" "select public.save_meeting('${CJ}','board','後台新增的會', now() + interval '6 days', now() + interval '6 days 1 hour', '', null, array['${DIR}']::uuid[])"
+chk "從來沒寄過邀請的會，改了也不記更新" "t" "select (cal_dirty_at is null)::text::char(1) from public.meetings where id='${CJ}'"
+ci2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-18-calendar-invites.sql 2>&1 || true)
+if echo "${ci2}" | grep -q "OVERALL.*PASS"; then echo "  ok   日曆邀請那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 日曆邀請那支重跑沒過"; echo "${ci2}" | head -5; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/      update meetings set cal_dirty_at = now() where id = v_id;//" supabase/migrations/2026-11-18-calendar-invites.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「改了記下來」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉「改了記下來」驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/  select public.meeting_main_email() where public.meeting_main_email() is not null/  select null::text where false/" supabase/migrations/2026-11-18-calendar-invites.sql > "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f "${BROKEN}" >/dev/null 2>&1 || true
+CK=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.schedule_meeting('board','破壞測試', now() + interval '3 days', now() + interval '3 days 1 hour', '', null, array['${DIR}']::uuid[], false);" 2>&1 | tail -1 | tr -d ' ')
+chk "★ 破壞測試：不加 BT 主帳號就只剩一封（證明上面那條真的在測）" "1" "select count(*) from public.mail_outbox where kind='meeting_invite' and meeting_id='${CK}'"
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-18-calendar-invites.sql >/dev/null 2>&1 || true
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

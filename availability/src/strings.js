@@ -174,7 +174,7 @@ export const MINE = {
   "sch.none":         { zh: "全部取消", en: "Untick all" },
   "sch.isFree":       { zh: "有空", en: "free" },
   "sch.send":         { zh: "排會並寄邀請（{n} 人）", en: "Schedule and send invites ({n})" },
-  "sch.note":         { zh: "每一位會收到一封信：他自己時區的時間、議程、一個 .ics 檔（點開就進日曆）、回覆會不會到的連結（必到的會不能到要寫理由）。開會前 24 小時再提醒一次，你會收到一封誰會到的總表。", en: "Each person gets an email: the time in their own time zone, the agenda, an .ics file (opens straight into their calendar) and a reply link (for a required meeting, saying no needs a reason). A reminder goes out 24 hours before, and you get a summary of who is coming." },
+  "sch.note":         { zh: "每一位會收到一封信：他自己時區的時間、議程、一份日曆邀請（Gmail 會問要不要參加，並放進 Google 日曆）、回覆會不會到的連結（必到的會不能到要寫理由）。BT 主帳號也會收到邀請。之後在後台改時間，大家日曆上那一筆會跟著改。開會前 24 小時再提醒一次，你會收到一封誰會到的總表。", en: "Each person gets an email: the time in their own time zone, the agenda, a calendar invite (Gmail asks if they are going and adds it to Google Calendar) and a reply link (for a required meeting, saying no needs a reason). The BT main account is invited too. If you later change the time in Admin, the calendar entry updates for everyone. A reminder goes out 24 hours before, and you get a summary of who is coming." },
   "sch.needPeople":   { zh: "至少勾一個人。", en: "Tick at least one person." },
   "sch.sent":         { zh: "排好了，{n} 封邀請寄出去了。", en: "Scheduled; {n} invites sent." },
   "rsvp.doc":         { zh: "會議紀錄", en: "Meeting notes" },

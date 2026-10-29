@@ -143,9 +143,11 @@ function icsFold(line) {
   for (const ch of line) { if (enc.encode(cur + ch).length > 75) { out.push(cur); cur = " " + ch; } else cur += ch; }
   out.push(cur); return out.join("\r\n");
 }
+// UID 跟資料庫 meeting_ics() 一樣是 meeting-<id>@網域（2026-11-18），先收邀請再下載才不會變成兩筆。
+const UID_DOMAIN = "beyondtaiwannpo.com";
 export function icsText(it, now) {
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Beyond Taiwan//bt-site//EN", "METHOD:PUBLISH", "BEGIN:VEVENT",
-    "UID:meeting-" + it.id, "DTSTAMP:" + stamp(now || new Date()), "DTSTART:" + stamp(it.start), "DTEND:" + stamp(it.end), "SUMMARY:" + icsEscape(it.title)];
+    "UID:meeting-" + it.id + "@" + UID_DOMAIN, "DTSTAMP:" + stamp(now || new Date()), "DTSTART:" + stamp(it.start), "DTEND:" + stamp(it.end), "SUMMARY:" + icsEscape(it.title)];
   if (it.agenda) lines.push("DESCRIPTION:" + icsEscape(it.agenda));
   if (it.doc_url) lines.push("URL:" + it.doc_url);
   lines.push("END:VEVENT", "END:VCALENDAR");
