@@ -737,9 +737,9 @@ function buildPeek() {
   const sc = scopes();
   S.peek = UI.peekHTML(V, {
     canSchedule: sc.length > 0,
-    schedule: S.sch ? SCH.scheduleHTML(S.sch, { scopes: sc, members: V.members, free, when: `${UI.dayFull(UI.COL_ORDER[col])} ${UI.hhmm(min)}` }, S.busy) : "",
+    schedule: S.sch ? SCH.scheduleHTML(S.sch, { scopes: sc, members: V.members, free, when: `${UI.dateLabel(inst, S.myTz) || UI.dayFull(UI.COL_ORDER[col])} ${UI.hhmm(min)}` }, S.busy) : "",
     free, minute: min,
-    dayLabel: UI.dayFull(UI.COL_ORDER[col]),
+    dayLabel: UI.dateLabel(inst, S.myTz) || UI.dayFull(UI.COL_ORDER[col]),
     lines: S.peekLines,
     calUrl: googleCalUrl(inst, undefined, S.evTitle),
     title: S.evTitle,

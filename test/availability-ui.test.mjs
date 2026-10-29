@@ -302,3 +302,14 @@ test("★ 在兩個 team 的人，兩個 team 的選項都有，篩哪一邊都�
   assert.deepEqual(filterByTeam(MULTI, "Curriculum Team").map(m => m.id), ["m"]);
   assert.deepEqual(filterByTeam(MULTI, "Marketing Team").map(m => m.id), ["m", "s"]);
 });
+
+test("★ 排會與格子彈窗寫出日期，不只星期（照看的人的時區）", async () => {
+  const U = await import("../availability/src/ui.js");
+  const d = new Date("2026-11-01T13:00:00Z");
+  assert.equal(U.dateLabel(d, "Asia/Taipei", "en"), "Sunday, Nov 1");
+  assert.equal(U.dateLabel(d, "Asia/Taipei", "zh"), "11月1日（星期日）");
+  assert.equal(U.dateLabel(new Date("2026-11-01T02:00:00Z"), "America/Los_Angeles", "en"), "Saturday, Oct 31", "照時區換日");
+  assert.equal(U.dateLabel("not a date", "Asia/Taipei", "en"), "");
+  const main = (await import("node:fs")).readFileSync("availability/src/main.js", "utf8");
+  assert.equal((main.match(/UI\.dateLabel\(inst, S\.myTz\)/g) || []).length, 2, "彈窗標題與排會那一行都用它");
+});

@@ -13,6 +13,18 @@ export const DAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 // 畫面上的星期（短、長）。DAY_ZH 留著當常數與測試的契約，畫面一律走這兩支。
 export const dayShort = wd => T("day." + wd);
 export const dayFull = wd => T("dayFull." + wd);
+// 那一格是哪一天（2026-10-29 Paul：「只寫星期日 21:00，看不出是哪一天」）。照看的人自己的時區算，
+// 跟格子同一個時區：中文「11月2日（星期日）」，英文「Sunday, Nov 2」。inst 是 Date，壞掉就退回只有星期。
+export function dateLabel(inst, tz, lng) {
+  const d = inst instanceof Date ? inst : new Date(inst);
+  if (isNaN(d)) return "";
+  const zh = (lng || lang()) === "zh";
+  try {
+    const o = { timeZone: tz || undefined, month: zh ? "numeric" : "short", day: "numeric", weekday: "long" };
+    const p = Object.fromEntries(new Intl.DateTimeFormat(zh ? "zh-TW" : "en-US", o).formatToParts(d).map(x => [x.type, x.value]));
+    return zh ? `${p.month}月${p.day}日（${p.weekday}）` : `${p.weekday}, ${p.month} ${p.day}`;
+  } catch { return ""; }
+}
 export const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
 
 // 一週的欄位順序。看板從星期一排到星期日（台灣人習慣），
