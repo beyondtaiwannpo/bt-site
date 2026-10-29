@@ -161,11 +161,11 @@ function tagsHTML(it) {
 }
 function myReplyHTML(it, ctx) {
   if (it.kind !== "meeting") return "";
-  if (!it.invited) return `<p class="mini">${T("me.notInvited")}</p>`;
+  if (!it.invited) return `<p class="ask muted">${T("me.notInvited")}</p>`;
   if (it.end <= ctx.now) return `<p class="mini">${T("home.past")}</p>`;
   const busy = ctx.busy ? " disabled" : "";
   if (ctx.reasonFor === it.id) {
-    return `<div class="reason" data-reason="${esc(it.id)}">
+    return `<div class="ask reason" data-reason="${esc(it.id)}">
       <label><i>${T("me.reason")}</i><textarea id="reason-${esc(it.id)}" maxlength="300" rows="2" placeholder="${esc(T("me.reasonPh"))}">${esc(ctx.reasonDraft || "")}</textarea></label>
       <p class="mini">${T("me.reasonNote")}</p>
       <div class="row"><button type="button" class="btn no" data-act="rsvp-send" data-id="${esc(it.id)}"${busy}>${T("me.send")}</button>
@@ -174,12 +174,12 @@ function myReplyHTML(it, ctx) {
   }
   const mine = (it.notes || []).find(n => n.user_id === ctx.me);
   if (it.status === "invited" || ctx.changing === it.id) {
-    return `<div class="rsvp-btns">
+    return `<div class="ask"><p class="askq">${T("me.ask")}</p><div class="rsvp-btns">
       <button type="button" class="btn yes${it.status === "accepted" ? " on" : ""}" data-act="rsvp" data-st="accepted" data-id="${esc(it.id)}"${busy}>${T("me.yes")}</button>
       <button type="button" class="btn no${it.status === "declined" ? " on" : ""}" data-act="rsvp" data-st="declined" data-id="${esc(it.id)}"${busy}>${T("me.no")}</button>
-    </div>`;
+    </div></div>`;
   }
-  return `<div class="said ${it.status === "accepted" ? "yes" : "no"}"><b>${T(it.status === "accepted" ? "me.saidYes" : "me.saidNo")}</b>
+  return `<div class="ask said ${it.status === "accepted" ? "yes" : "no"}"><b>${T(it.status === "accepted" ? "me.saidYes" : "me.saidNo")}</b>
     <button type="button" class="btn quiet" data-act="rsvp-change" data-id="${esc(it.id)}"${busy}>${T("me.change")}</button>
     ${mine ? `<span class="mini">${T("me.yourReason", { note: esc(mine.note) })}</span>` : ""}</div>`;
 }
@@ -206,26 +206,32 @@ export function itemCardHTML(it, ctx, opts) {
   const when = esc(whenText(it.start, it.end, ctx.tz));
   if (it.kind === "event") {
     return `<article class="item ev${o.full ? " full" : ""}">
-      <div class="ihead"><h3>${esc(it.title)}</h3>${tagsHTML(it)}</div>
-      <p class="when">${when}${it.place ? `・${esc(it.place)}` : ""}</p>
+      <div class="tags">${tagsHTML(it)}</div>
+      <h3>${esc(it.title)}</h3>
+      <p class="when">${when}${it.place ? `<span class="scope">${esc(it.place)}</span>` : ""}</p>
       ${it.summary && o.full ? `<p>${esc(it.summary)}</p>` : ""}
       <div class="row"><a class="btn ghost sm" href="../events/#${encodeURIComponent(it.slug || "")}">${T("m.openEvent")}</a></div>
     </article>`;
   }
-  const extra = o.full ? `
-      ${it.agenda ? `<p><i class="k">${T("m.agenda")}</i>${esc(it.agenda)}</p>` : ""}
-      <p><i class="k">${T("m.notes")}</i>${it.doc_url ? `<a href="${esc(it.doc_url)}" target="_blank" rel="noopener">${T("m.openNotes")}</a>` : `<span class="mini">${T("m.noNotes")}</span>`}</p>
-      <div class="row">
-        <a class="btn ghost sm" href="${esc(googleCalUrl(it))}" target="_blank" rel="noopener">${T("m.gcal")}</a>
-        <a class="btn ghost sm" download="bt-meeting.ics" href="data:text/calendar;charset=utf-8,${encodeURIComponent(icsText(it))}">${T("m.ics")}</a>
-        ${canSeeReplies(it, ctx.me, ctx.senior, ctx.ws) ? `<a class="btn quiet" href="../admin/#meetings/${esc(it.id)}">${T("m.edit")}</a>` : ""}
-      </div>` : (it.agenda ? `<p class="agenda">${esc(it.agenda)}</p>` : "");
+  // 2026-10-28 改版（Paul：「看起來很糟」）：標籤在標題上面、時間一行、議程與紀錄兩格、回覆放在一塊淡底的框裡，
+  // 加日曆與後台改成最底下一排小字連結，不再跟回覆鈕搶。
+  const info = o.full ? `<dl class="info">
+      ${it.agenda ? `<div><dt>${T("m.agenda")}</dt><dd>${esc(it.agenda)}</dd></div>` : ""}
+      <div><dt>${T("m.notes")}</dt><dd>${it.doc_url ? `<a href="${esc(it.doc_url)}" target="_blank" rel="noopener">${T("m.openNotes")}</a>` : `<span class="muted">${T("m.noNotes")}</span>`}</dd></div>
+    </dl>` : (it.agenda ? `<p class="agenda">${esc(it.agenda)}</p>` : "");
+  const links = o.full ? `<div class="links">
+      <a href="${esc(googleCalUrl(it))}" target="_blank" rel="noopener">${T("m.gcal")}</a>
+      <a download="bt-meeting.ics" href="data:text/calendar;charset=utf-8,${encodeURIComponent(icsText(it))}">${T("m.ics")}</a>
+      ${canSeeReplies(it, ctx.me, ctx.senior, ctx.ws) ? `<a href="../admin/#meetings/${esc(it.id)}">${T("m.edit")}</a>` : ""}
+    </div>` : "";
   return `<article class="item ${it.required ? "req" : "opt"}${o.full ? " full" : ""}${o.hi ? " hi" : ""}" id="m-${esc(it.id)}">
-    <div class="ihead"><h3><button type="button" class="lnk" data-act="open" data-id="${esc(it.id)}">${esc(it.title)}</button></h3>${tagsHTML(it)}</div>
-    <p class="when">${when}・${scopeLabel(it.scope)}</p>
-    ${extra}
+    <div class="tags">${tagsHTML(it)}</div>
+    <h3><button type="button" class="lnk" data-act="open" data-id="${esc(it.id)}">${esc(it.title)}</button></h3>
+    <p class="when">${when}<span class="scope">${scopeLabel(it.scope)}</span></p>
+    ${info}
     ${myReplyHTML(it, ctx)}
     ${repliesHTML(it, ctx)}
+    ${links}
   </article>`;
 }
 

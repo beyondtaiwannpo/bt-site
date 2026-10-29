@@ -61,6 +61,7 @@ export const MINE = {
   "tag.organizer":    { zh: "你排的", en: "You organized" },
   "scope.board":      { zh: "全體 BT", en: "Whole BT" },
 
+  "me.ask":           { zh: "你會到嗎？", en: "Can you make it?" },
   "me.yes":           { zh: "我會到", en: "I'll be there" },
   "me.no":            { zh: "不能到", en: "Can't make it" },
   "me.saidYes":       { zh: "你會到", en: "You're coming" },

@@ -84,7 +84,8 @@
   .block{margin:0 0 26px}
   .count{display:inline-block;min-width:26px;padding:0 8px;border-radius:999px;background:var(--bt-orange);color:var(--bt-navy);
     font-size:15px;text-align:center;vertical-align:3px}
-  .linked{margin:0 0 22px}
+  .linked{margin:0 0 28px}
+  .linked > .mini{font-weight:600;margin-bottom:10px}
   .dos{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
   .do{display:block;padding:14px 16px;border:1px solid rgba(16,42,134,.2);border-radius:16px;background:rgba(255,255,255,.55);
     color:var(--ink);text-decoration:none}
@@ -92,52 +93,81 @@
   .do span{font-size:13px;color:rgba(16,42,134,.8)}
   .do:hover{border-color:var(--bt-orange);background:rgba(255,232,197,.6)}
 
-  /* 一場會的卡片。左邊那條色帶就是「必到」：實心深藍；選擇參加是框線；活動是橘色。 */
-  .item{position:relative;background:rgba(255,255,255,.62);border:1px solid rgba(16,42,134,.16);border-radius:16px;
-    padding:14px 16px 14px 20px;margin:0 0 10px;overflow:hidden}
+  /* 一場會的卡片（2026-10-28 改版，Paul：「看起來很糟」）。
+     左邊那條色帶就是「必到」：實心深藍；選擇參加是虛線；活動是橘色。
+     由上往下：標籤、標題、時間、議程與紀錄、回覆那一塊淡底框、誰會到、最底下一排小字連結。 */
+  .item{position:relative;background:rgba(255,255,255,.72);border:1px solid rgba(16,42,134,.12);border-radius:20px;
+    padding:18px 22px 18px 26px;margin:0 0 12px;overflow:hidden;box-shadow:0 1px 2px rgba(16,42,134,.05),0 8px 24px rgba(16,42,134,.06)}
   .item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--bt-navy)}
-  .item.opt::before{background:none;border-left:2px dashed var(--bt-navy);width:0}
+  .item.opt::before{background:none;border-left:2px dashed rgba(16,42,134,.55);width:0;left:2px}
   .item.ev::before{background:var(--bt-orange)}
-  .item.hi{border-color:var(--bt-orange);box-shadow:0 0 0 3px rgba(255,196,108,.45)}
-  .item.full{background:none;border:none;padding:0;margin:0;overflow:visible}
-  .item.full::before{display:none}
-  .ihead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-  .item h3{font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:.02em;margin:0;line-height:1.2}
-  .item.full h3{font-size:28px}
-  .when{font-size:14.5px;font-weight:600;margin:2px 0 6px}
-  .agenda{font-size:14px;margin:0 0 6px;color:rgba(16,42,134,.85)}
-  .item p{font-size:14px;margin:0 0 8px}
+  .item.hi{border-color:rgba(255,196,108,.9);box-shadow:0 0 0 4px rgba(255,196,108,.35),0 12px 32px rgba(16,42,134,.08)}
+  .item.full{padding:24px 28px 20px 32px}
+  .modal .item.full{background:none;border:none;box-shadow:none;padding:4px 0 0;margin:0;overflow:visible}
+  .modal .item.full::before{display:none}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
+  .item h3{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:.02em;margin:0;line-height:1.15}
+  .item h3 .lnk{font-family:var(--display);font-size:inherit;font-weight:inherit;letter-spacing:inherit}
+  .item.full h3{font-size:30px}
+  .when{font-size:15px;font-weight:600;margin:4px 0 0}
+  .when .scope{font-weight:400;color:rgba(16,42,134,.75)}
+  .when .scope::before{content:"·";margin:0 8px;color:rgba(16,42,134,.4)}
+  .agenda{font-size:14px;margin:6px 0 0;color:rgba(16,42,134,.85)}
+  .item p{font-size:14px}
+  .muted{color:rgba(16,42,134,.65)}
+  .info{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 24px;margin:16px 0 0;padding:14px 0 0;border-top:1px solid rgba(16,42,134,.1)}
+  .info dt{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 3px}
+  .info dd{margin:0;font-size:14.5px;white-space:pre-wrap}
   .k{display:block;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.8)}
-  .tag{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-    padding:2px 9px;border-radius:999px;border:1px solid var(--bt-navy)}
+  .tag{display:inline-block;font-family:var(--body);font-size:12px;font-weight:600;letter-spacing:.02em;padding:3px 10px;border-radius:999px;border:1px solid transparent;line-height:1.4;white-space:nowrap}
   .tag.req{background:var(--bt-navy);color:var(--bt-cream)}
-  .tag.opt{background:none;color:var(--bt-navy)}
-  .tag.ev{background:var(--bt-orange);border-color:var(--bt-orange);color:var(--bt-navy)}
-  /* 「你排的」不是狀態，是一句提示：不用框，淡橘底、一般字體，跟必到那顆標籤分得開。 */
-  .tag.org{border:none;background:rgba(255,196,108,.4);color:var(--bt-navy);font-family:var(--body);font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 10px}
-  /* 回覆鈕：要大、要一眼看得出是要按的（Paul：「上面那一塊我會不會到不夠明顯」）。 */
-  .rsvp-btns{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 2px}
-  .rsvp-btns .btn{font-size:18px;padding:13px 26px;min-width:150px;text-align:center}
+  .tag.opt{background:none;color:var(--bt-navy);border-color:rgba(16,42,134,.4)}
+  .tag.ev{background:var(--bt-orange);color:var(--bt-navy)}
+  /* 「你排的」不是狀態，是一句提示：淡橘底、一般字體，跟必到那顆標籤分得開。 */
+  .tag.org{background:rgba(255,196,108,.4);color:var(--bt-navy)}
+  /* 回覆那一塊：淡底框裡一句問句加兩顆大按鈕（Paul：「上面那一塊我會不會到不夠明顯」）。 */
+  .ask{margin:16px 0 0;padding:14px 16px;border-radius:14px;background:rgba(255,232,197,.55)}
+  .ask.muted{font-size:14px}
+  .askq{font-weight:700;font-size:15px;margin:0 0 10px}
+  .rsvp-btns{display:flex;gap:10px;flex-wrap:wrap}
+  .rsvp-btns .btn{font-family:var(--body);text-transform:none;letter-spacing:0;font-size:16px;font-weight:700;padding:12px 24px;min-width:160px;text-align:center}
   .btn.yes{background:var(--bt-navy);color:var(--bt-cream)}
-  .btn.no{background:none;color:var(--ink);border:2px solid var(--bt-navy)}
-  .btn.no:hover{background:rgba(255,196,108,.35);color:var(--ink)}
-  .said{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 2px;font-size:15px}
-  .said b{padding:5px 12px;border-radius:999px}
+  .btn.no{background:rgba(255,255,255,.85);color:var(--ink);border:1.5px solid rgba(16,42,134,.45)}
+  .btn.no:hover{background:#fff;border-color:var(--bt-navy);color:var(--ink)}
+  .said{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:15px}
+  .said b{padding:6px 14px;border-radius:999px}
   .said.yes b{background:var(--bt-navy);color:var(--bt-cream)}
-  .said.no b{border:2px solid var(--bt-navy)}
-  .reason{margin:8px 0 2px;padding:12px;border-radius:12px;background:rgba(255,232,197,.6)}
-  .reason label i{display:block;font-style:normal;font-size:13px;font-weight:600;margin-bottom:6px}
+  .said.no b{background:#fff;border:1.5px solid var(--bt-navy)}
+  .said .mini{margin:0}
+  .reason label i{display:block;font-style:normal;font-size:14px;font-weight:700;margin-bottom:8px}
+  .reason .btn{font-family:var(--body);text-transform:none;letter-spacing:0}
   textarea{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);padding:8px 10px;
-    border:1px solid rgba(16,42,134,.3);border-radius:12px;background:rgba(255,255,255,.8);resize:vertical}
+    border:1px solid rgba(16,42,134,.3);border-radius:12px;background:rgba(255,255,255,.9);resize:vertical}
+  /* 加日曆、下載、後台：最底下一排小字，不跟回覆鈕搶。 */
+  .links{display:flex;gap:6px 20px;flex-wrap:wrap;margin:16px 0 0;font-size:14px;font-weight:600}
+  .links a{color:var(--bt-navy);text-decoration:underline;text-decoration-color:rgba(16,42,134,.3);text-underline-offset:3px}
+  .links a:hover{text-decoration-color:var(--bt-orange)}
   /* 排會的人看的「誰會到」 */
-  .org{margin-top:10px;border-top:1px solid rgba(16,42,134,.14);padding-top:8px}
-  .org summary{font-size:14px;cursor:pointer}
-  .org summary span{color:rgba(16,42,134,.8);margin-left:6px}
-  .orgcols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0}
-  .orgcols i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.8)}
+  details.org{margin:14px 0 0;border:1px solid rgba(16,42,134,.12);border-radius:14px;background:rgba(255,255,255,.5)}
+  .org summary{font-size:14px;cursor:pointer;padding:10px 14px;list-style:none;display:flex;align-items:center;gap:8px}
+  .org summary::-webkit-details-marker{display:none}
+  .org summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--bt-navy);border-bottom:2px solid var(--bt-navy);transform:rotate(-45deg);transition:transform var(--dur-2) var(--ease)}
+  .org[open] summary::before{transform:rotate(45deg)}
+  .org summary{flex-wrap:wrap}
+  .org summary b{white-space:nowrap}
+  .org summary span{color:rgba(16,42,134,.75)}
+  .org > :not(summary){margin-left:14px;margin-right:14px}
+  .orgcols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 8px}
+  .orgcols i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.75)}
   .orgcols ul{margin:4px 0 0;padding-left:18px;font-size:14px}
   .orgcols .note{display:block;font-size:12.5px;color:rgba(16,42,134,.8)}
-  @media (max-width:600px){.orgcols{grid-template-columns:1fr}}
+  .org .mini{margin-bottom:12px}
+  @media (max-width:600px){
+    .orgcols{grid-template-columns:1fr}
+    .item,.item.full{padding:16px 16px 16px 20px}
+    .item.full h3{font-size:25px}
+    .rsvp-btns .btn{flex:1;min-width:0;padding:12px 10px}
+  }
 
   /* 行事曆 */
   .caltitle{margin-bottom:10px}
