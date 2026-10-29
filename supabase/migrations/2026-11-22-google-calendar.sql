@@ -181,7 +181,8 @@ exception when others then return 'error';
 end $$;
 revoke all on function public.gcal_cancel(text) from public, anon, authenticated;
 
--- 設定完跑一次：拿通行證、讀 BT 主帳號的日曆。回 'ok'、'off' 或錯誤原因。
+-- 設定完跑一次：拿通行證、讀 BT 主帳號日曆上的一筆事件。回 'ok'、'off' 或錯誤原因。
+-- ⚠ 不能讀 calendars/primary 本身：那要 calendar 或 calendar.readonly 的範圍，我們只拿 calendar.events（2026-10-29 實測 403）。
 create or replace function public.gcal_ping()
 returns text language plpgsql security definer
 set search_path = public, extensions, pg_temp
@@ -190,7 +191,7 @@ declare v_status int; v_content text;
 begin
   if not public.gcal_ready() then return 'off'; end if;
   select * into v_status, v_content from public.gcal_http('GET',
-    'https://www.googleapis.com/calendar/v3/calendars/primary', null, public.gcal_access_token()) as (s int, c text);
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=1', null, public.gcal_access_token()) as (s int, c text);
   return case when v_status = 200 then 'ok' else 'HTTP ' || v_status || ': ' || left(coalesce(v_content, ''), 200) end;
 exception when others then return left(sqlerrm, 300);
 end $$;
