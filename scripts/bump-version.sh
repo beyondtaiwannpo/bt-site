@@ -38,6 +38,9 @@ if [ "${1:-}" = "--check" ]; then
     if [ -n "$stray" ]; then echo "FAIL  ${f} 的版本號跟 version.json（${v}）不一樣：${stray}"; bad=1; fi
     grep -q "name=\"bt-version\" content=\"$v\"" "$f" || { echo "FAIL  ${f} 的 <meta name=\"bt-version\"> 不是 ${v}"; bad=1; }
     grep -q '<script type="importmap">' "$f" || { echo "FAIL  ${f} 沒有 importmap"; bad=1; }
+    # 自己的 CSS 也要帶版本號（2026-10-28）：沒帶的話改了樣式，瀏覽器照用快取裡的舊檔，新畫面沒有樣式。
+    nov=$(grep -o '<link rel="stylesheet" href="[^"]*\.css"' "$f" || true)
+    if [ -n "$nov" ]; then echo "FAIL  ${f} 的 CSS 沒帶 ?v=：${nov}"; bad=1; fi
     for m in "$d"/src/*.js; do
       grep -q "\"/$m\": \"/$m?v=$v\"" "$f" || { echo "FAIL  ${f} 的 importmap 少了 /${m}"; bad=1; }
     done
