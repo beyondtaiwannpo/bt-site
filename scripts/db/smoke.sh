@@ -2515,5 +2515,14 @@ rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-24-request-accept-reject.sql >/dev/null 2>&1 || true
 
 echo
+echo "── 會議信沒填的行不印（2026-11-25-meeting-mail-empty-lines.sql）──"
+mlgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-25-meeting-mail-empty-lines.sql 2>&1 || true)
+if echo "${mlgot}" | grep -q "OVERALL.*PASS" && ! echo "${mlgot}" | grep -q "|FAIL"; then echo "  ok   會議信那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 會議信那支驗收表："; echo "${mlgot}" | head -8; fail=$((fail+1)); fi
+chk "★ 預設邀請信：沒填會議紀錄，信裡沒有「會議紀錄」那一行" "false|true" \
+  "select (public.meeting_fill(body_zh, 'A', 'T', 'w', '海報', null, 'L') like '%會議紀錄%')::text||'|'||(public.meeting_fill(body_zh, 'A', 'T', 'w', '海報', null, 'L') like '%議程：海報%')::text from public.mail_templates where kind='meeting_invite'"
+ml2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-25-meeting-mail-empty-lines.sql 2>&1 || true)
+if echo "${ml2}" | grep -q "OVERALL.*PASS"; then echo "  ok   會議信那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 會議信那支重跑沒過"; fail=$((fail+1)); fi
+
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

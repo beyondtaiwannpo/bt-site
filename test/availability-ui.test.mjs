@@ -313,3 +313,13 @@ test("★ 排會與格子彈窗寫出日期，不只星期（照看的人的時�
   const main = (await import("node:fs")).readFileSync("availability/src/main.js", "utf8");
   assert.equal((main.match(/UI\.dateLabel\(inst, S\.myTz\)/g) || []).length, 2, "彈窗標題與排會那一行都用它");
 });
+
+test("★ 會議信預覽：議程或會議紀錄沒填，那一行整行拿掉（跟資料庫 meeting_fill 同一套）", async () => {
+  const S = await import("../admin/site/src/ui.js");
+  const tpl = "議程：{agenda}\n會議紀錄：{doc}\n\n{link}";
+  assert.equal(S.fillMeeting(tpl, { agenda: "", doc: " ", link: "L" }), "\nL");
+  assert.equal(S.fillMeeting(tpl, { agenda: "海報", doc: "", link: "L" }), "議程：海報\n\nL");
+  assert.equal(S.fillMeeting(tpl, { agenda: "海報", doc: "D", link: "L" }), "議程：海報\n會議紀錄：D\n\nL");
+  const sql = (await import("node:fs")).readFileSync("supabase/migrations/2026-11-25-meeting-mail-empty-lines.sql", "utf8");
+  assert.match(sql, /\[\^\\n\]\*\\\{doc\\\}\[\^\\n\]\*\\n\?/);
+});

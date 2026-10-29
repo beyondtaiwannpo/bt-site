@@ -826,7 +826,10 @@ export const MEETING_SAMPLE = { name: "Mei Wu", title: "Marketing 週會", when:
   yes: "Mei Wu、小安", no: "Tina（那天要考試）", pending: "王平" };
 export function fillMeeting(text, s) {
   const v = Object.assign({}, MEETING_SAMPLE, s || {});
-  return String(text == null ? "" : text)
+  // 跟資料庫的 meeting_fill() 一樣（2026-11-25）：議程或會議紀錄沒填，有那個符號的那一行整行拿掉。
+  let t = String(text == null ? "" : text);
+  for (const k of ["agenda", "doc"]) if (!String(v[k] || "").trim()) t = t.replace(new RegExp(`[^\\n]*\\{${k}\\}[^\\n]*\\n?`, "g"), "");
+  return t
     .split("{name}").join(v.name).split("{title}").join(v.title).split("{when}").join(v.when)
     .split("{agenda}").join(v.agenda).split("{doc}").join(v.doc).split("{link}").join(v.link)
     .split("{yes}").join(v.yes).split("{no}").join(v.no).split("{pending}").join(v.pending);
