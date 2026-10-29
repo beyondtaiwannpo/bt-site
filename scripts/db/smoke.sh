@@ -2411,6 +2411,28 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-20-example-photo-2.sql >/dev/null 2>&1 || true
 
+echo "── 一格好幾場（2026-11-21-activity-sessions.sql）──"
+psql -d "${DB}" -X -A -t -q -c "update public.activities set happens_at = '2026-11-15 14:00+00' where id = '09B'" >/dev/null 2>&1 || true
+ssgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-21-activity-sessions.sql 2>&1 || true)
+if echo "${ssgot}" | grep -q "OVERALL.*PASS" && ! echo "${ssgot}" | grep -q "|FAIL"; then echo "  ok   好幾場那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 好幾場那支驗收表："; echo "${ssgot}" | head -10; fail=$((fail+1)); fi
+chk "★ 原本的時間搬成第 1 場" "1|true" "select cardinality(sessions)::text||'|'||(sessions[1] = happens_at)::text from public.activities where id='09B'"
+chkas "${PAUL}" "存三場（亂序、一場重複、一個空的）" "09B" "select public.set_activity_sessions('09B', array['2026-11-28 15:30+00','2026-11-15 14:00+00',null,'2026-11-28 15:30+00','2026-11-22 13:00+00']::timestamptz[])"
+chk "排好、去重、去空：三場" "3|2026-11-15T14|2026-11-28T15" "select cardinality(sessions)::text||'|'||to_char(sessions[1] at time zone 'UTC','YYYY-MM-DD\"T\"HH24')||'|'||to_char(sessions[3] at time zone 'UTC','YYYY-MM-DD\"T\"HH24') from public.activities where id='09B'"
+chk "happens_at 跟著是第 1 場" "true" "select (happens_at = sessions[1])::text from public.activities where id='09B'"
+chkraise "★ Associate 改不了" "not_ws_edit" "perform set_config('test.uid','${ASSOC}',true); perform public.set_activity_sessions('09B', null);"
+chkraise "超過 10 場擋下來" "too_many_sessions" "perform set_config('test.uid','${PAUL}',true); perform public.set_activity_sessions('09B', (select array_agg(timestamptz '2026-12-01' + make_interval(hours => g)) from generate_series(1,11) g));"
+chkraise "沒有這一格" "no_such_activity" "perform set_config('test.uid','${PAUL}',true); perform public.set_activity_sessions('ZZZ', null);"
+chkas "${PAUL}" "全部清掉" "09B" "select public.set_activity_sessions('09B', '{}')"
+chk "清掉了，happens_at 也空" "0|t" "select cardinality(sessions)::text||'|'||(happens_at is null)::text::char(1) from public.activities where id='09B'"
+ss2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-21-activity-sessions.sql 2>&1 || true)
+if echo "${ss2}" | grep -q "OVERALL.*PASS"; then echo "  ok   好幾場那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 好幾場那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/  perform public.require_ws_edit('passport');//" supabase/migrations/2026-11-21-activity-sessions.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 require_ws_edit，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 require_ws_edit 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-21-activity-sessions.sql >/dev/null 2>&1 || true
+
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -144,13 +144,7 @@ async function onAutosave(act, box, field) {
                   description: v.description, needs_host: !!v.needs_host, callback_to: String(v.callback_to || "").toUpperCase() };
       const cur = S.pass.activities.find(x => x.id === a.id);
       // 時間那一格（2026-11-15）走自己的函式；主持人那個勾 2026-10-28 從表單拿掉了（護照上沒有地方用到它），值照原本的留著。
-      if (fname === "happens_at") {
-        const iso = v.happens_at ? new Date(v.happens_at).toISOString() : null;
-        await D.setActivityExtras(ds.id, iso, cur ? cur.example_url : null);
-        if (cur) cur.happens_at = iso;
-        const link = box.querySelector('a[href*="availability"]'); if (link && cur) link.href = UI.boardLink(cur);
-        done = T("msg.whenSaved");
-      } else {
+      {
         a.needs_host = cur ? !!cur.needs_host : false;
         if (!a.title_zh || !a.title_en) return fail(T("err.titles"));
         await D.saveActivity(a);
@@ -477,6 +471,17 @@ document.addEventListener("click", async e => {
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
     return;
   }
+  // 場次（2026-11-21）：加一列空的（選了時間才存），或拿掉一場（馬上存）。
+  if (act === "ak-sess-add") {
+    const cur = S.pass.activities.find(x => x.id === b.dataset.id); if (!cur) return;
+    cur._blank = (cur._blank || 0) + 1; S.actEditing = cur; render(); return;
+  }
+  if (act === "ak-sess-del") {
+    const cur = S.pass.activities.find(x => x.id === b.dataset.id); if (!cur) return;
+    const list = UI.sessListOf(cur), i = Number(b.dataset.i);
+    if (i >= list.length) { cur._blank = Math.max(0, (cur._blank || 0) - 1); S.actEditing = cur; render(); return; }
+    await saveSessions(cur, list.filter((_, k) => k !== i)); return;
+  }
   // 範例照片拿掉（2026-11-15）。
   if (act === "ak-photo-del") {
     const cur = S.pass.activities.find(x => x.id === b.dataset.id); if (!cur) return;
@@ -727,7 +732,24 @@ boot();
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
+async function saveSessions(cur, list) {
+  S.busy = true; S.msg = ""; render();
+  try {
+    const sorted = [...new Set(list)].sort();
+    await D.setActivitySessions(cur.id, sorted);
+    cur.sessions = sorted; cur.happens_at = sorted[0] || null; cur._blank = 0;
+    S.busy = false; S.actEditing = cur; S.msg = T("msg.whenSaved");
+  } catch (err) { S.busy = false; S.actEditing = cur; S.msg = T("err.save") + D.says(err); }
+  render();
+}
 document.addEventListener("change", async e => {
+  // 場次：任何一列選了時間，整份清單一次存。
+  if (e.target && e.target.classList && e.target.classList.contains("ak-sess")) {
+    const cur = S.pass.activities.find(x => x.id === e.target.dataset.id); if (!cur) return;
+    const box = e.target.closest(".sessed");
+    const list = [...box.querySelectorAll(".ak-sess")].map(x => x.value).filter(Boolean).map(v => new Date(v)).filter(d => !isNaN(d)).map(d => d.toISOString());
+    await saveSessions(cur, list); return;
+  }
   // 範例照片（2026-11-15）：選了就縮圖、上傳、存進那一格。
   if (e.target && e.target.classList && e.target.classList.contains("ak-photo")) {
     const file = e.target.files && e.target.files[0]; if (!file) return;

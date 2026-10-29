@@ -784,3 +784,11 @@ input[type=file]::file-selector-button{font-family:var(--display);font-size:14px
 input[type=file]:hover::file-selector-button{background:var(--bt-orange);border-color:var(--bt-orange)}
 input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 @media (prefers-reduced-motion:reduce){.rq-kindbtn{transition:none}}
+
+/* 場次編輯（2026-11-21）：一場一列，時間、到看板排會、拿掉；底下「＋ 加一場」。 */
+.sessed{display:flex;flex-direction:column;gap:8px;margin:14px 0}
+.sessed .lab{font-style:normal;font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(16,42,134,.7)}
+.sessed .srow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sessed .srow .n{font-family:var(--display);font-weight:700;font-size:15px;min-width:62px;opacity:.75}
+.sessed .srow input{flex:1;min-width:200px;max-width:320px}
+.sessed > .btn{align-self:flex-start;border-style:dashed}

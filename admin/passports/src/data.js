@@ -110,22 +110,22 @@ export async function deleteInternTask(id) {
 // ⚠ 只讀 stamps 的 act_id，不讀 user_id，**完全不讀 entries**：後台只要知道
 // 「這一格有沒有人蓋過」（刪不刪得掉）與數字，不要知道是誰，更不要知道心得。
 // entries 的 RLS 本來就只給本人，這裡連查都不查，是為了讓「不碰隱私界線」在程式碼裡看得出來。
+// 格子要讀的欄位，從新到舊：2026-11-21 場次、2026-11-20 第二張照片、2026-11-15 時間與第一張照片。
+const ACT_BASE = "id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active";
+const ACT_COLS = [ACT_BASE + ", happens_at, example_url, example_url_2, sessions", ACT_BASE + ", happens_at, example_url, example_url_2",
+                  ACT_BASE + ", happens_at, example_url", ACT_BASE];
+const actsQuery = cols => supabase.from("activities").select(cols).order("seq").order("id");
 export async function loadPassportAdmin() {
   need();
   const [mo, ac, de, st] = await Promise.all([
     supabase.from("months").select("seq, month, theme_zh, theme_en, hidden, revealed").order("seq"),
-    supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active, happens_at, example_url, example_url_2")
-      .order("seq").order("id"),
+    actsQuery(ACT_COLS[0]),
     supabase.from("destinations").select("code, city, active").order("code"),
     supabase.from("stamps").select("act_id"),
   ]);
-  // 2026-11-15 的兩欄（時間、範例照片）還沒跑遷移檔的話，少那兩欄再讀一次，後台照樣打得開。
+  // 還沒跑的遷移檔少哪一欄，就少那一欄再讀一次（新的先拿掉），後台照樣打得開。
   let acts = ac;
-  // 第二張照片（2026-11-20）那一欄還沒跑的話，先少它一欄再讀；再不行才連 11-15 的兩欄一起少。
-  if (ac.error && ac.error.code === "42703")
-    acts = await supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active, happens_at, example_url").order("seq").order("id");
-  if (acts.error && acts.error.code === "42703")
-    acts = await supabase.from("activities").select("id, month, seq, category, title_zh, title_en, description, needs_host, callback_to, active").order("seq").order("id");
+  for (let i = 1; acts.error && acts.error.code === "42703" && i < ACT_COLS.length; i++) acts = await actsQuery(ACT_COLS[i]);
   for (const r of [mo, acts, de, st]) if (r.error) throw r.error;
   const stamped = {};
   for (const r of st.data || []) stamped[r.act_id] = (stamped[r.act_id] || 0) + 1;
@@ -137,6 +137,12 @@ export async function loadPassportAdmin() {
 export async function setActivityExtras(id, iso, url) {
   need();
   const { error } = await supabase.rpc("set_activity_extras", { p_id: id, p_happens_at: iso || null, p_example_url: url || null });
+  if (error) throw error;
+}
+// 場次（2026-11-21）：整份時間清單一次存，資料庫排好序、去重複，第 1 場也寫回 happens_at。
+export async function setActivitySessions(id, isoList) {
+  need();
+  const { error } = await supabase.rpc("set_activity_sessions", { p_id: id, p_times: isoList || [] });
   if (error) throw error;
 }
 // 第二張範例照片（2026-11-20）。url 是空就是拿掉。
@@ -350,6 +356,8 @@ const SAYS = [
   ["bad_callback", "回望要指向另一個存在的格子編號，例如 09B，不能指向自己。", "Looks back must point to another existing box id, for example 09B, not to itself."],
   ["group_has_tasks", "這個分類底下還有格子（任何一屆都算），刪不掉。先把格子換到別的分類或刪掉。", "This group still has boxes (in any term). Move them to another group or delete them first."],
   ["no_such_group", "找不到這個分類，可能被別人刪了。重新整理再試一次。", "That group no longer exists; someone may have deleted it. Refresh and try again."],
+  ["set_activity_sessions", "好幾場要等資料庫更新（2026-11-21 那支遷移檔）跑完才存得進去。", "Multiple sessions need the 2026-11-21 database update to be run first."],
+  ["too_many_sessions", "一格最多 10 場。", "A box can have at most 10 sessions."],
   ["set_activity_example_2", "第二張照片要等資料庫更新（2026-11-20 那支遷移檔）跑完才放得上去。", "The second photo needs the 2026-11-20 database update to be run first."],
   ["bad_example_url", "範例照片要從這一頁上傳，不能貼外面的網址。", "Upload the example photo on this page; outside links are not accepted."],
   ["month_exists", "護照裡已經有這個月了。", "The passport already has this month."],

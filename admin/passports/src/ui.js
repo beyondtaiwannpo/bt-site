@@ -979,14 +979,33 @@ export function localInput(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 // 「到時間看板排會」的連結（2026-11-15）：帶標題；有時間就帶 at，看板直接翻到那一週、打開那一格的排會。
-export function boardLink(a) {
+export function boardLink(a, at) {
   const q = new URLSearchParams();
   if (a && a.title_zh) q.set("title", a.title_zh);
-  if (a && a.happens_at) q.set("at", new Date(a.happens_at).toISOString());
+  const t = at || (a && a.happens_at);
+  if (t) q.set("at", new Date(t).toISOString());
   const s = q.toString();
   return "../../availability/" + (s ? "?" + s : "");
 }
 
+// 場次（2026-11-21，Paul 2026-10-28：「同一個聚會有兩場」）。一場一列：時間、「到時間看板排會」、拿掉。
+// 選了時間就存（不走表單的自動存，整份清單一次送）；「＋ 加一場」先多一列空的，選了時間才存。
+// sessions 沒有這一欄（遷移檔還沒跑）就拿 happens_at 當唯一一場。
+export function sessListOf(a) {
+  const l = a && Array.isArray(a.sessions) && a.sessions.length ? a.sessions : (a && a.happens_at ? [a.happens_at] : []);
+  return l.slice().sort();
+}
+function sessEditHTML(cur, dis) {
+  const list = sessListOf(cur), blanks = Math.max(cur._blank || 0, list.length ? 0 : 1);
+  const rows = [...list, ...Array(blanks).fill("")];
+  return `<div class="sessed" data-id="${esc(cur.id)}"><i class="lab">${T("ak.sessions")}</i>
+    ${rows.map((iso, i) => `<div class="srow"><span class="n">${esc(T("ak.sessN", { n: i + 1 }))}</span>
+      <input type="datetime-local" class="ak-sess" data-noauto="1" data-id="${esc(cur.id)}" value="${esc(localInput(iso))}"${dis}>
+      ${iso ? `<a class="btn ghost sm" target="_blank" rel="noopener" href="${esc(boardLink(cur, iso))}">${T("ak.toBoard")}</a>` : ""}
+      ${iso || i > 0 ? `<button type="button" class="btn quiet sm" data-act="ak-sess-del" data-id="${esc(cur.id)}" data-i="${i}"${dis}>${T("ak.sessDel")}</button>` : ""}</div>`).join("")}
+    ${rows.length < 10 ? `<button type="button" class="btn ghost sm" data-act="ak-sess-add" data-id="${esc(cur.id)}"${dis}>${T("ak.sessAdd")}</button>` : ""}
+    <span class="fmeta">${T("ak.whenHint")}</span></div>`;
+}
 export function activityEditHTML(a, month, months, msg, busy, draft) {
   const cur = draft || a || { id: "", month, category: "gather", title_zh: "", title_en: "", description: "", needs_host: false, callback_to: "" };
   const dis = busy ? " disabled" : "";
@@ -1006,11 +1025,9 @@ export function activityEditHTML(a, month, months, msg, busy, draft) {
     </div>
     <label><i>${T("ik.desc")}</i>
       <textarea id="ak-desc" name="description" placeholder="${esc(T("ak.descPh"))}" maxlength="200"${dis}>${esc(cur.description || "")}</textarea></label>
+    ${a ? sessEditHTML(cur, dis) : ""}
     <div class="two">
-      ${a ? `<label><i>${T("ak.when")}</i><input id="ak-when" name="happens_at" type="datetime-local" value="${esc(localInput(cur.happens_at))}"${dis}>
-        <span class="fmeta">${T("ak.whenHint")}</span>
-        <a class="btn ghost sm" style="margin-top:8px" target="_blank" rel="noopener" href="${esc(boardLink(cur))}">${T("ak.toBoard")}</a></label>`
-        : `<div class="fmeta">${T("ak.extrasLater")}</div>`}
+      ${a ? "" : `<div class="fmeta">${T("ak.extrasLater")}</div>`}
       <label><i>${T("ak.cb")}</i>
         <input id="ak-cb" name="callback_to" value="${esc(cur.callback_to || "")}" placeholder="09B" maxlength="4"${dis}></label>
     </div>

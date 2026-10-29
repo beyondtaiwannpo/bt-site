@@ -22,7 +22,7 @@ const stateWith = acts => ({
 });
 
 const positions = html => ["聚會 GATHER", "題目 PROMPT", "鏡頭 FRAME"].map(n => html.indexOf(n));
-const slotCount = html => html.split('class="slot"').length - 1;
+const slotCount = html => (html.match(/class="slot[ "]/g) || []).length;
 
 test("三格順序固定是 聚會 → 題目 → 鏡頭，不管輸入順序", () => {
   // 刻意用資料庫 order by category 會給的順序餵進去（frame/gather/prompt）。

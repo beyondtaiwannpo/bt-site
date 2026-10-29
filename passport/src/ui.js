@@ -93,7 +93,7 @@ export function stampCount(S) {
 }
 
 // 每個月一枚入境章的城市（spec §三 分配規則、§9.9）。**唯一的定義點** ——
-// 跟 SLOT_ORDER、pagesOf、faceOf、stampCount 同一條原則。
+// 跟 SLOT_ORDER、pagesOf、stampCount 同一條原則。
 //
 // 兩個來源，存下來的贏：
 //   S.visas 有紀錄  → 用它。蓋滿的月份城市從此不動，那是這張表存在的全部理由。
@@ -203,21 +203,6 @@ export function pendingVisasOf(S) {
     return acts.length > 0 && acts.every(a => S.stamps[a.id]);
   }).map(m => want[m.month] && { month: m.month, code: want[m.month].code })
     .filter(Boolean);
-}
-
-// 這一格現在哪一面朝上。**只有這一個定義點** —— slotHTML 與任何之後要知道
-// 面向的地方都問它，不准任何一邊自己再判斷一次。跟 SLOT_ORDER、pagesOf、
-// stampCount 同一條原則：兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊。
-//
-// 一律預設正面 —— 章在那裡（見 spec §1.1）。未蓋章一律回 "front"，
-// 而且**不看 S.flipped** —— 未蓋章的格子根本不產生背面的 DOM
-// （spec §3.1），所以「翻到背面」是一個不存在的狀態，不該讓它表達得出來。
-//
-// S.flipped 只活在 session 裡：不進資料庫、不進備份檔、不進 localStorage。
-// 它是介面狀態不是護照內容（spec §4）。
-export function faceOf(S, a) {
-  if (!S.stamps[a.id]) return "front";
-  return (S.flipped || {})[a.id] === "back" ? "back" : "front";
 }
 
 // 月名是語言常數，不是活動內容，可以留在程式裡（spec §5 只禁止活動內容寫死）。
@@ -395,16 +380,7 @@ export function idPageHTML(S) {
 function stampInner(act, st, extraClass) {
   const ink = act.category === "gather" ? "ink-fill" : "ink-navy";
   const rot = ((act.id.charCodeAt(2) * 7) % 11) - 5;   // 角度由 id 決定，固定不變（spec §7.1）
-  // 2026-09-08：高度也由 id 決定。框拿掉之後三個章直接坐在紙上，
-  // 而三個都停在同一條水平線上讀起來像排版排出來的，不像蓋上去的。
-  // 跟角度同一條規則：由 id 算、固定不變，**不是亂數** ——
-  // 亂數的話同一格每次重繪都跳一次位置，那看起來是壞掉不是手感。
-  // ⚠ 取 [2] 不是 [1]：id 是 09A / 09B / 09C 這種形狀，[1] 是月份的個位數，
-  // 同一個月三格完全一樣，三個章會落在同一個高度（2026-09-08 第一版就是這樣）。
-  // [2] 才是那一格自己的字母。乘數跟角度那條不一樣，不然高低會跟歪斜同步，
-  // 看起來還是有規律。
-  const dy = ((act.id.charCodeAt(2) * 13) % 9) * 7 - 24;
-  return `<div class="stampwrap" style="--dy:${dy}px"><div class="tilt" style="transform:rotate(${rot}deg)">
+  return `<div class="stampwrap"><div class="tilt" style="transform:rotate(${rot}deg)">
     <div class="stamp ${ink}${extraClass ? " " + extraClass : ""}">
       <div class="s1">Beyond Taiwan</div>
       <div class="s2">${esc(act.title_en)}</div>
@@ -485,7 +461,7 @@ export function monthPageHTML(S, m) {
       <div class="mzh">${esc(zh)}</div>
       ${m.theme_zh ? `<div class="mtheme clock"><b>${esc(m.theme_zh)}</b>${m.theme_en ? `<span>${esc(m.theme_en)}</span>` : ""}</div>` : ""}
     </div>
-    <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
+    <div class="slots" data-n="${Math.min(acts.length, 6)}">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
 }
 
 // 還沒揭曉的月份：只有月份的數字與名字，主題與格子都不給（那是驚喜的部分）。
@@ -531,39 +507,7 @@ export function callbackHTML(S, act) {
   </div>`;
 }
 
-// 翻面按鈕。**必須是 .faceopen 的兄弟不是子孫** —— 按鈕不能巢狀（無效的 HTML），
-// 而且既有的事件委派是 e.target.closest("[data-act]")：放在外面的話，
-// 點按鈕會先找到 flip、點面上其他地方會找到 open，天生就對，
-// 不需要 stopPropagation。放進去的話兩者都會變成 open。
-//
-// 44px 的最小點擊區是 spec §3.3 的要求：手機一格佔滿寬度，滑動時很容易誤觸，
-// 所以翻面只能由這顆觸發，不能「點整格就翻」。
-function flipBtnHTML(id, to) {
-  return `<button class="flipbtn" data-act="flip" data-id="${id}" data-to="${to}" aria-label="${esc(to === "back" ? T("flip.back") : T("flip.front"))}">↻</button>`;
-}
-
-// CATNAME 取不到就印空字串。取不到代表有人改了 category 名稱，
-// 那時候該壞的是順序（排到最後），不是在畫面上出現「undefined」四個字。
-//
-// 這段刻意是 JS 註解而不是 template literal 裡的 HTML 註解：
-// 放進 template 的話它會變成輸出的一部分，而 test/ui-order.test.mjs 的
-// mutation 測試斷言的正是「輸出裡不准出現 undefined 這個字」——
-// 註解自己會把那個測試弄紅。另外 slotHTML 每次整頁渲染會被呼叫 33 次，
-// HTML 註解等於同一段文字送 33 份到瀏覽器。
-//
-// 未蓋章**不產生背面的 DOM**（spec §3.1）：沒有東西可以翻到時不該有翻面按鈕，
-// 而一個空的背面只會被讀螢幕的人聽到、被下一個人誤以為是 bug。
-//
-// 2026-08-25 設計改動（spec §1.1）：章移到正面、說明退到背面。已蓋章的正面
-// 是分類、標題、章、翻面按鈕；背面是小字標題、說明、心得、照片。理由是章才是
-// 這本護照的主角，說明是「還沒蓋章時才需要」的東西。
-//
-// 背面那行標題**不是為了讓版面看起來完整**，是為了照片：九月拍月亮、十二月拍
-// 聖誕樹，明年翻回去看的時候一張照片配一行心得，人不會記得那格題目是什麼 ——
-// 而那正是翻回去要找的資訊（使用者 2026-08-25）。用 .btitle 不用 .ttl：
-// 它是標籤，背面的主角是照片與心得。
-// 格子的時間（2026-11-15，activities.happens_at）照看的人自己電腦的時區印：「11/22（六）20:00」。
-// tz 只給測試用；沒給就用瀏覽器的時區。
+// 格子的時間照看的人自己電腦的時區印：「11/22（六）20:00」。tz 只給測試用。
 export function whenText(iso, tz) {
   if (!iso) return "";
   const d = new Date(iso); if (isNaN(d)) return "";
@@ -571,52 +515,90 @@ export function whenText(iso, tz) {
   if (tz) o.timeZone = tz;
   return new Intl.DateTimeFormat(lang() === "en" ? "en-US" : "zh-TW", o).format(d);
 }
-
-// 範例照片最多兩張（2026-10-28）：第一張、第二張，空的跳過。example_url_2 沒有這一欄（遷移檔還沒跑）就只有一張。
+// 範例照片最多兩張：第一張、第二張，空的跳過。
 export function exampleUrls(a) { return [a && a.example_url, a && a.example_url_2].filter(Boolean); }
+
+// ── 格子（2026-10-28 改版，Paul 定的設計稿 ~/Anson/outputs/bt-website/web/2026-10-28-passport-redesign/）──
+// 一格是一張卡：範例照片當封面（16:7，兩張就對開）→ 分類、標題 → 場次 → 說明 → 底下一個虛線圈「蓋在這裡」。
+// 蓋過章之後**不再翻面**（Paul 2026-10-28 同意拿掉）：自己的照片換成封面、章蓋上去、心得前三行直接印在卡片上。
+// 沒放照片的話，章就是主角，大大蓋在卡片中間。
+//
+// 整張卡是 data-act="open" 的 div（章是 <div>，不能放進按鈕裡），裡面的 .faceopen 是真的按鈕，
+// 鍵盤 tab 得到、按 Enter 開得了。CATNAME 取不到就印空字串，不要在畫面上出現 undefined。
+
+// 場次（2026-11-21 那支遷移檔的 activities.sessions）。還沒跑那支的話，用舊的 happens_at 當唯一一場。
+export function sessionsOf(a) {
+  const list = a && Array.isArray(a.sessions) && a.sessions.length ? a.sessions : (a && a.happens_at ? [a.happens_at] : []);
+  return list.filter(x => x && !isNaN(new Date(x))).sort();
+}
+// 一場拆成日曆撕頁要的幾塊：日、月、星期、時間。照看的人自己的時區（tz 只給測試用）。
+export function sessParts(iso, tz) {
+  const d = new Date(iso), loc = lang() === "en" ? "en-US" : "zh-TW";
+  const f = o => new Intl.DateTimeFormat(loc, tz ? { ...o, timeZone: tz } : o).format(d);
+  return { day: f({ day: "numeric" }).replace(/\D/g, ""), mon: new Intl.DateTimeFormat("en-US", tz ? { month: "short", timeZone: tz } : { month: "short" }).format(d),
+           wd: f({ weekday: "short" }), time: f({ hour: "2-digit", minute: "2-digit", hour12: false }) };
+}
+// 場次清單。過去的劃掉淡掉；好幾場的時候，最近要到的那一場標「下一場」。now 只給測試用。
+export function sessionsHTML(a, opts) {
+  const list = sessionsOf(a); if (!list.length) return "";
+  const now = (opts && opts.now) || Date.now(), tz = opts && opts.tz;
+  const next = list.find(x => new Date(x).getTime() > now);
+  return `<span class="sess">${list.map((iso, i) => {
+    const p = sessParts(iso, tz), past = new Date(iso).getTime() <= now;
+    const n = list.length > 1 ? ` · ${esc(T("slot.sessN", { n: i + 1 }))}` : "";
+    const cal = opts && opts.cal && !past ? `<a class="cal" href="${esc(sessionCalUrl(a, iso))}" target="_blank" rel="noopener">${esc(T("slot.addCal"))}</a>` : "";
+    return `<span class="s${past ? " past" : ""}"><span class="d"><b>${esc(p.day)}</b><small>${esc(p.mon)}</small></span><span class="sw"><span class="t">${esc(p.time)}</span> <span class="w">${esc(p.wd)}${n}</span></span>${
+      list.length > 1 && iso === next ? `<span class="tag">${esc(T("slot.next"))}</span>` : ""}${cal}</span>`;
+  }).join("")}</span>`;
+}
+// 一場加進 Google 日曆：預設一小時（格子只有開始時間）。跟首頁會議那顆同一種連結。
+const calStamp = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+export function sessionCalUrl(a, iso) {
+  const s = new Date(iso), e = new Date(s.getTime() + 3600000);
+  const title = a.title_en && a.title_zh !== a.title_en ? `${a.title_zh} ${a.title_en}` : (a.title_zh || "BT");
+  const p = ["action=TEMPLATE", "text=" + encodeURIComponent("BT · " + title), "dates=" + calStamp(s) + "/" + calStamp(e)];
+  if (a.description) p.push("details=" + encodeURIComponent(a.description));
+  return "https://calendar.google.com/calendar/render?" + p.join("&");
+}
+// 封面：範例照片（標「範例」）或自己的照片（標「我的」）。一張滿版、兩張對開。
+export function coverHTML(urls, mine) {
+  if (!urls || !urls.length) return "";
+  return `<span class="cover${urls.length > 1 ? " two" : ""}">${urls.map(u => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}<span class="lbl${mine ? " mine" : ""}">${esc(T(mine ? "slot.mine" : "slot.example"))}</span></span>`;
+}
+function headHTML(a) {
+  return `<span class="tagrow"><span class="cat">${esc(CATNAME[a.category] ? T(CATNAME[a.category]) : "")}</span><span class="aid">${esc(a.id)}</span></span>
+        <span class="ttl">${esc(a.title_zh)}</span><span class="en">${esc(a.title_en)}</span>`;
+}
 export function slotHTML(S, a) {
   const st = S.stamps[a.id];
   const entry = S.entries[a.id] || {};
-  const face = faceOf(S, a);
   const anim = st && S.justStamped === a.id;
   if (anim) S.justStamped = null;
-
-  // 跟 justStamped 同一個模式：讀到就消耗掉，否則每次重繪都會再播一次動畫。
-  const turn = S.justFlipped === a.id;
-  if (turn) S.justFlipped = null;
-
-  // 撕掉這格的動畫（Task 7）。**不讀了就消耗掉** —— 跟 justStamped/justFlipped
-  // 不一樣：S.tearing 要撐過好幾次 render()（動畫播完之前使用者可能翻頁、
-  // main.js 的 animationend/flush 都還沒觸發），提早消耗掉會讓下一次重繪
-  // 看到的又是還沒撕開的完整章，裂口動畫會被打斷、看起來像沒撕。
-  // 真正的一次性保護在 main.js 的 doUnstamp 裡（刪掉 S.stamps[id] 之後
-  // S.tearing 才歸零），不是這裡。
+  // 撕掉這格的動畫：S.tearing 要撐過好幾次 render()，這裡只讀不消耗（見 main.js 的 doUnstamp）。
   const tearing = !!st && S.tearing === a.id;
-
-  // data-act 掛在 .face.front 上而不是只掛在 .faceopen 上：章是 <div>，
-  // 而按鈕的內容模型只允許 phrasing content，所以章不能放進 .faceopen 裡
-  // （跟 .slot 當初從 button 改成 div 是同一個理由）。
-  // 掛在外層 div 上讓「整面可點」保住（spec §10 裁定 4），
-  // 而 .faceopen 仍是真按鈕，鍵盤使用者 tab 得到、按 Enter 開得了。
-  const front = `<div class="face front" data-act="open" data-id="${a.id}" aria-hidden="${face === "back"}">
-      <button class="faceopen" data-act="open" data-id="${a.id}">
-        <span class="cat">${esc(CATNAME[a.category] ? T(CATNAME[a.category]) : "")}</span>
-        <span class="ttl">${esc(a.title_zh)}</span>
-        ${st ? "" : `<span class="en">${esc(a.title_en)}</span>${a.happens_at ? `<span class="when">${esc(whenText(a.happens_at))}</span>` : ""}<span class="hint">${esc(a.description)}</span>${exampleUrls(a).length ? `<span class="examples">${exampleUrls(a).map(u => `<img class="example" src="${esc(u)}" alt="${esc(T("slot.example"))}" loading="lazy">`).join("")}</span>` : ""}<span class="cta">${T("slot.cta")}</span>`}
-      </button>
-      ${st ? stampHTML(a, st, anim, tearing) + flipBtnHTML(a.id, "back") : ""}
-    </div>`;
-
-  const back = !st ? "" : `<div class="face back" aria-hidden="${face === "front"}">
-      <span class="btitle">${esc(a.title_zh)}</span>
-      <span class="hint">${esc(a.description)}</span>
-      ${entry.note ? `<span class="note">${esc(entry.note)}</span>` : ""}
-      ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}
-      ${flipBtnHTML(a.id, "front")}
-    </div>`;
-
-  return `<div class="slot" data-id="${a.id}" data-done="${st ? 1 : 0}" data-face="${face}">
-    <div class="flip${turn ? (face === "back" ? " turning-back" : " turning-front") : ""}">${front}${back}</div>
+  const cat = SLOT_ORDER.includes(a.category) ? ` c-${a.category}` : "";
+  if (!st) {
+    return `<div class="slot${cat}" data-act="open" data-id="${a.id}" data-done="0">
+    <button class="faceopen" data-act="open" data-id="${a.id}">
+      ${coverHTML(exampleUrls(a))}
+      <span class="body">${headHTML(a)}${sessionsHTML(a)}<span class="hint">${esc(a.description)}</span></span>
+      <span class="foot"><span class="spot">${esc(T("slot.spot"))}</span><span class="cta">${T("slot.cta")}<small>${esc(T("slot.open"))}</small></span></span>
+    </button>
+  </div>`;
+  }
+  const photo = entry.photo ? [entry.photo] : [];
+  const note = entry.note ? `<span class="note">${esc(entry.note)}</span>` : "";
+  const done = `<span class="doneline">${esc(T("slot.done"))} <b>${esc(String(st.date).replace(/-/g, "."))}</b></span>`;
+  if (!photo.length) {
+    return `<div class="slot done nophoto${cat}" data-act="open" data-id="${a.id}" data-done="1">
+    <button class="faceopen" data-act="open" data-id="${a.id}"><span class="body">${headHTML(a)}</span></button>
+    <div class="hero">${stampHTML(a, st, anim, tearing)}</div>
+    ${note}<div class="foot">${done}</div>
+  </div>`;
+  }
+  return `<div class="slot done${cat}" data-act="open" data-id="${a.id}" data-done="1">
+    <button class="faceopen" data-act="open" data-id="${a.id}">${coverHTML(photo, true)}<span class="body">${headHTML(a)}</span></button>
+    ${note}<div class="foot">${stampHTML(a, st, anim, tearing)}${done}</div>
   </div>`;
 }
 

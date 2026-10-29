@@ -76,8 +76,14 @@ export const MINE = {
   "id.reset":         { zh: "清除這本護照", en: "Clear this passport" },
   // 格子
   "slot.cta":         { zh: "蓋章 →", en: "Stamp →" },
-  "flip.back":        { zh: "翻到背面", en: "Flip to the back" },
-  "flip.front":       { zh: "翻到正面", en: "Flip to the front" },
+  "slot.spot":        { zh: "蓋在這裡", en: "Stamp here" },
+  "slot.open":        { zh: "打開這一格", en: "Open this box" },
+  "slot.sessN":       { zh: "第 {n} 場", en: "Session {n}" },
+  "slot.next":        { zh: "下一場", en: "Next" },
+  "slot.addCal":      { zh: "加進日曆", en: "Add to calendar" },
+  "slot.mine":        { zh: "我的", en: "Mine" },
+  "slot.done":        { zh: "已入境", en: "Entered" },
+  "md.sessions":      { zh: "場次", en: "Sessions" },
   // 回望（spec §7.3，兩句文案逐字抄自 spec）
   "cb.noneWhen":      { zh: "你{when}沒有寫這格", en: "You did not write this box in {when}" },
   "cb.none":          { zh: "你之前沒有寫這格", en: "You did not write this box before" },
@@ -85,7 +91,7 @@ export const MINE = {
   "cb.wroteWhen":     { zh: "你在{when}寫的", en: "What you wrote in {when}" },
   "cb.wrote":         { zh: "你之前寫的", en: "What you wrote before" },
   // 說明頁、引導頁
-  "slot.example":     { zh: "範例照片", en: "Example photo" },
+  "slot.example":     { zh: "範例", en: "Example" },
   "veil.seal":        { zh: "未揭曉", en: "SEALED" },
   "veil.title":       { zh: "這個月還沒揭曉", en: "Not revealed yet" },
   "veil.note":        { zh: "在群組公布之後，這一頁才會打開。", en: "This page opens once it's announced in the group." },

@@ -40,18 +40,31 @@ test("改格子：主持人那個勾拿掉、多時間、範例照片、到看�
   assert.equal(localInput(""), "");
   assert.match(localInput(a.happens_at), /^\d{4}-\d\d-\d\dT\d\d:\d\d$/);
   assert.doesNotMatch(activityEditHTML(null, 11, MONTHS, "", false, null), /ak-photo/, "新的格子先存才能放照片");
+  // 好幾場（2026-11-21）：每一場一列、各自一條到看板的連結帶那一場的時間；沒有 sessions 欄位就用 happens_at。
+  const multi = activityEditHTML({ ...a, sessions: ["2026-11-28T15:30:00.000Z", "2026-11-15T14:00:00.000Z"] }, 11, MONTHS, "", false, null);
+  assert.equal((multi.match(/class="ak-sess"/g) || []).length, 2);
+  assert.ok(multi.indexOf("2026-11-15T14%3A00") < multi.indexOf("2026-11-28T15%3A30"), "照時間排");
+  assert.equal((multi.match(/data-act="ak-sess-del"/g) || []).length, 2);
+  assert.equal((activityEditHTML(a, 11, MONTHS, "", false, null).match(/class="ak-sess"/g) || []).length, 1, "舊的 happens_at 當第 1 場");
+  const blank = activityEditHTML({ ...a, happens_at: null }, 11, MONTHS, "", false, null);
+  assert.equal((blank.match(/class="ak-sess"/g) || []).length, 1, "一場都沒有也給一列空的");
+  assert.doesNotMatch(blank, /data-act="ak-sess-del"/, "唯一那列空的不用拿掉鈕");
+  const ten = activityEditHTML({ ...a, sessions: Array.from({ length: 10 }, (_, i) => `2026-12-${String(i + 1).padStart(2, "0")}T12:00:00.000Z`) }, 11, MONTHS, "", false, null);
+  assert.doesNotMatch(ten, /data-act="ak-sess-add"/, "10 場就不能再加");
 });
 
-test("護照：格子上印時間與範例縮圖，蓋過章就不印", () => {
+test("護照：格子上印場次與範例封面，蓋過章就不印", () => {
   const a = { id: "11C", month: 11, category: "frame", title_zh: "天空", title_en: "SKY", description: "", happens_at: "2026-11-22T12:00:00Z", example_url: "https://x/y.jpg" };
-  const S = { months: MONTHS, activities: [a], stamps: {}, entries: {}, flipped: {}, profile: { id: "u" } };
+  const S = { months: MONTHS, activities: [a], stamps: {}, entries: {}, profile: { id: "u" } };
   const h = PASS.slotHTML(S, a);
-  assert.match(h, /class="when"/); assert.match(h, /class="example" src="https:\/\/x\/y\.jpg"/);
+  assert.match(h, /class="sess"/); assert.match(h, /<span class="cover"><img src="https:\/\/x\/y\.jpg"/);
   const two = PASS.slotHTML(S, { ...a, example_url_2: "https://x/z.jpg" });
-  assert.equal((two.match(/class="example"/g) || []).length, 2, "兩張都印在格子上");
+  assert.equal((two.match(/<img /g) || []).length, 2, "兩張都印在封面上");
   assert.deepEqual(PASS.exampleUrls({ example_url_2: "b" }), ["b"]); assert.deepEqual(PASS.exampleUrls({}), []);
   assert.equal(PASS.whenText("2026-11-22T12:00:00Z", "Asia/Taipei").includes("20:00"), true);
   assert.equal(PASS.whenText(""), "");
+  const done = PASS.slotHTML({ ...S, stamps: { "11C": { date: "2026-11-22" } } }, a);
+  assert.ok(!done.includes("x/y.jpg") && !done.includes('class="sess"'));
 });
 
 test("看板：從那條連結帶的時間，找得到是這一週的哪一格", () => {

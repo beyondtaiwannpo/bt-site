@@ -15,7 +15,7 @@ let S = {
   profile: null, stamps: {}, entries: {},
   activities: [], months: [], destinations: [], visas: {},
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-  down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null
+  down: false, justStamped: null, tearing: null
 };
 
 function compress(file, maxDim, quality) {
@@ -131,13 +131,13 @@ function openModal(id) {
   const entry = S.entries[id] || {};
   const d = document.createElement("div");
   d.className = "scrim"; d.id = "scrim";
-  d.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${UI.esc(a.title_zh)}">
+  d.innerHTML = `<div class="modal${UI.exampleUrls(a).length ? " hascover" : ""}" role="dialog" aria-modal="true" aria-label="${UI.esc(a.title_zh)}">
+    ${UI.coverHTML(UI.exampleUrls(a))}
     <div class="mt">${UI.esc(UI.CATNAME[a.category] ? T(UI.CATNAME[a.category]) : "")} · ${UI.esc(UI.monthName(a.month))}</div>
     <h3>${UI.esc(a.title_zh)}</h3>
-    <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${UI.esc(a.title_en)}</div>
-    ${a.happens_at ? `<div class="when" style="margin:-4px 0 10px">${UI.esc(UI.whenText(a.happens_at))}</div>` : ""}
-    <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${UI.esc(a.description)}</p>
-    ${UI.exampleUrls(a).length ? `<figure style="margin:0 0 18px"><div style="display:flex;gap:8px;flex-wrap:wrap">${UI.exampleUrls(a).map(u => `<img src="${UI.esc(u)}" alt="" style="max-width:${UI.exampleUrls(a).length > 1 ? "calc(50% - 4px)" : "100%"};max-height:260px;border-radius:6px;display:block;object-fit:cover">`).join("")}</div><figcaption style="font-size:12px;opacity:.65;margin-top:6px">${T("slot.example")}</figcaption></figure>` : ""}
+    <div class="men">${UI.esc(a.title_en)}</div>
+    <p class="mdesc">${UI.esc(a.description)}</p>
+    ${UI.sessionsOf(a).length ? `<div class="msess"><i>${T("md.sessions")}</i>${UI.sessionsHTML(a, { cal: true })}</div>` : ""}
     <!-- 回望區塊的位置：在活動說明之後、要填的東西之前（spec §7.3「顯示在題目上方」）。
          這個順序是有意義的 —— 先看到自己九月寫的，接著就是今天要寫的那一格，
          視線是連續的。放到輸入框下面的話，人已經開始打字了才看到，等於沒有回望。 -->
@@ -230,9 +230,6 @@ async function doUnstamp(id) {
   const entryBackup = S.entries[id];
   delete S.stamps[id];
   delete S.entries[id];
-  // faceOf 對未蓋章一律回 "front"，但 S.flipped[id] 要一起清掉，
-  // 否則留著一個指向不存在的背面的狀態。
-  delete S.flipped[id];
   S.tearing = null;
   render();
   try {
@@ -286,15 +283,6 @@ document.addEventListener("click", async e => {
   // 邊界問 pagesOf，不要自己算 months.length —— 書裡不是只有月份頁。
   if (act === "next") { S.page = Math.min(UI.pagesOf(S).length - 1, S.page + 1); render(); return; }
   if (act === "go") { S.page = Number(b.dataset.p); render(); return; }
-  // 翻面。只改介面狀態，不碰資料庫 —— 哪一面朝上不是護照內容（spec §4）。
-  if (act === "flip") {
-    const id = b.dataset.id;
-    S.flipped[id] = b.dataset.to;
-    S.justFlipped = id;
-    render();
-    return;
-  }
-
   if (act === "open") { openModal(b.dataset.id); return; }
   if (act === "close") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
   if (act === "stamp") { doStamp(b.dataset.id); return; }
@@ -453,7 +441,7 @@ document.addEventListener("click", async e => {
     Object.assign(S, {
       profile: null, stamps: {}, entries: {}, visas: {},
       page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-      down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null
+      down: false, justStamped: null, tearing: null
     });
     render();
     return;
@@ -473,8 +461,8 @@ document.addEventListener("keydown", e => {
 
 // animationend 是撕章動畫的主要觸發點（另一個是上面的 flush）。
 // 三個陷阱都在這裡處理：
-//   1. 冒泡——這一頁每個動畫（.stamp.land、.page.turn、.overprint.land、
-//      .flip.turning-*）都會觸發它，一定要用 e.animationName 過濾，
+//   1. 冒泡——這一頁每個動畫（.stamp.land、.page.turn、.overprint.land）
+//      都會觸發它，一定要用 e.animationName 過濾，
 //      不能用 target 的 class（class 會變）。
 //   2. 兩半（tearL、tearR）各觸發一次——只認 tearL 這一個名字，
 //      另一半的事件會被這條 if 直接濾掉，不會跑到第二次 doUnstamp。

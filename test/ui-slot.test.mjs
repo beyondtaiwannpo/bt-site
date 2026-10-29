@@ -1,9 +1,9 @@
-// 格子在「未蓋章／已蓋章」兩種狀態下該有什麼。
+// 格子在「未蓋章／已蓋章」兩種狀態下該有什麼（2026-10-28 改版：不再翻面，封面、場次、虛線圈）。
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotHTML, faceOf, setLang } from "../passport/src/ui.js";
-// 護照 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
+import { slotHTML, monthPageHTML, sessionsOf, sessionsHTML, sessionCalUrl, coverHTML, setLang } from "../passport/src/ui.js";
+// 護照有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
 
 const act = {
@@ -12,167 +12,95 @@ const act = {
   description: "新學年第一次全員上線，選片權給今年的新幹部"
 };
 const state = (stamps = {}, entries = {}) => ({ stamps, entries, justStamped: null, activities: [act] });
+const ONE = { "09A": { date: "2026-09-05" } };
 
-test("未蓋章的格子有說明與「蓋章 →」", () => {
+test("未蓋章：說明、「蓋章 →」、蓋在這裡的虛線圈都在，沒有章", () => {
   const html = slotHTML(state(), act);
   assert.ok(html.includes(act.description));
   assert.ok(html.includes("蓋章 →"));
-});
-
-test("蓋過章的格子仍然保留活動說明 —— 章不要浮在一片空白中間", () => {
-  // 2026-08-23：蓋章之後說明消失，標題與章之間留下 116.8px 的洞（實測）。
-  // 格子有 min-height:270px 而且同一列由最高的那格決定高度，空間一定得去某個地方，
-  // 所以解法不是把洞變小，是讓內容從上往下連續、餘白落在底部。
-  // 說明用 activities 表裡本來就有的那句，不另外編一份文案。
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  assert.ok(html.includes(act.description), "蓋章後仍要印活動說明");
-  assert.ok(!html.includes("蓋章 →"), "蓋過章就不該再出現「蓋章 →」");
-  assert.ok(html.includes("stampwrap"), "要有章");
-});
-
-test("蓋章後心得與照片仍然照舊顯示", () => {
-  const html = slotHTML(
-    state({ "09A": { date: "2026-09-05" } }, { "09A": { note: "那天我遲到了十分鐘", photo: "data:image/jpeg;base64,AAAA" } }),
-    act
-  );
-  assert.ok(html.includes("那天我遲到了十分鐘"));
-  assert.ok(html.includes("class=\"thumb\""));
-});
-
-test("faceOf：未蓋章一律正面", () => {
-  assert.equal(faceOf(state(), act), "front");
-  // 就算 flipped 說背面也一樣 —— 未蓋章根本沒有背面可以翻到
-  assert.equal(faceOf({ ...state(), flipped: { "09A": "back" } }, act), "front");
-});
-
-test("faceOf：已蓋章預設正面", () => {
-  assert.equal(faceOf(state({ "09A": { date: "2026-09-05" } }), act), "front");
-});
-
-test("faceOf：已蓋章時 flipped 可以覆寫成背面", () => {
-  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "back" } };
-  assert.equal(faceOf(S, act), "back");
-});
-
-test("faceOf：S.flipped 不存在時不炸", () => {
-  // 舊形狀的 state，或還沒有人翻過任何一格
-  const S = state({ "09A": { date: "2026-09-05" } });
-  delete S.flipped;
-  assert.equal(faceOf(S, act), "front");
-});
-
-test("未蓋章：只有正面，沒有背面也沒有翻面按鈕", () => {
-  const html = slotHTML(state(), act);
-  assert.ok(html.includes('class="face front"'));
-  assert.ok(!html.includes('class="face back"'), "未蓋章不該產生背面的 DOM");
-  assert.ok(!html.includes('data-act="flip"'), "沒有東西可以翻到就不該有翻面按鈕");
-  assert.match(html, /data-face="front"/);
-});
-
-test("已蓋章：兩面都在，預設正面朝上，兩面各有翻面按鈕", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  assert.ok(html.includes('class="face front"'));
-  assert.ok(html.includes('class="face back"'));
-  assert.match(html, /data-face="front"/);
-  assert.equal((html.match(/data-act="flip"/g) || []).length, 2, "兩面各一顆");
-});
-
-test("朝外的那一面標 aria-hidden，讀螢幕的人不該聽到兩份內容", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  assert.match(html, /class="face front" data-act="open" data-id="09A" aria-hidden="false"/);
-  assert.match(html, /class="face back" aria-hidden="true"/);
-});
-
-test("翻面按鈕的 aria-label 說得出它要去哪一面", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  assert.ok(html.includes('aria-label="翻到正面"'));
-  assert.ok(html.includes('aria-label="翻到背面"'));
-});
-
-test("翻面按鈕不是 faceopen 的子孫 —— 按鈕不能巢狀", () => {
-  // 巢狀按鈕是無效的 HTML，而且會讓 closest("[data-act]") 的委派失效。
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  const open = html.indexOf('data-act="open"');
-  const closeOpen = html.indexOf("</button>", open);
-  const firstFlip = html.indexOf('data-act="flip"');
-  assert.ok(firstFlip > closeOpen, "翻面按鈕要在 faceopen 關閉之後");
-});
-
-test("一格仍然只有一個 .slot —— 既有的 slotCount 不能被拆成兩個", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  assert.equal(html.split('class="slot"').length - 1, 1);
-});
-
-test("剛翻過的那一格帶動畫 class，而且旗標被消耗掉", () => {
-  // flipped 明確指到背面：預設已經是正面了（見 faceOf），這裡要測的是
-  // 手動翻到背面那個方向的動畫 class，不能靠預設值。
-  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "back" }, justFlipped: "09A" };
-  const html = slotHTML(S, act);
-  assert.match(html, /class="flip turning-back"/);
-  assert.equal(S.justFlipped, null, "旗標要被消耗，否則每次重繪都會再播一次");
-});
-
-test("沒有剛翻過的格子不帶動畫 class", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  assert.ok(!html.includes("turning-"));
-});
-
-test("翻回正面時用的是另一個方向的動畫", () => {
-  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "front" }, justFlipped: "09A" };
-  assert.match(slotHTML(S, act), /class="flip turning-front"/);
-});
-
-test("已蓋章的正面有章、沒有說明", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  const front = html.slice(html.indexOf('class="face front"'), html.indexOf('class="face back"'));
-  assert.ok(front.includes("stampwrap"), "章要在正面");
-  assert.ok(!front.includes(act.description), "說明不該在正面");
-  assert.ok(!front.includes('class="en"'), "英文標題不該在正面（章上已經有了）");
-});
-
-test("已蓋章的背面有說明、沒有章", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  const back = html.slice(html.indexOf('class="face back"'));
-  assert.ok(back.includes(act.description), "說明要在背面");
-  assert.ok(!back.includes("stampwrap"), "章不該在背面");
-});
-
-test("未蓋章的正面維持原樣：說明與蓋章入口都在", () => {
-  const html = slotHTML(state(), act);
-  assert.ok(html.includes(act.description));
-  assert.ok(html.includes("蓋章 →"));
+  assert.ok(html.includes('class="spot"'));
   assert.ok(html.includes('class="en"'));
   assert.ok(!html.includes("stampwrap"));
+  assert.match(html, /data-done="0"/);
 });
 
-test("背面有小字標題 —— 一年後只看照片與心得認不出是哪一格", () => {
-  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  const back = html.slice(html.indexOf('class="face back"'));
-  assert.ok(back.includes(`<span class="btitle">${act.title_zh}</span>`), "背面要有標題");
-  assert.ok(!back.includes('class="ttl"'), "是標籤不是標題，不准沿用正面的 .ttl");
+test("★ 不再有翻面：沒有 flip 按鈕、沒有背面", () => {
+  for (const S of [state(), state(ONE, { "09A": { note: "x" } })]) {
+    const html = slotHTML(S, act);
+    assert.ok(!html.includes('data-act="flip"'));
+    assert.ok(!html.includes("face back"));
+  }
 });
 
-// ── 章的高低錯開（2026-09-08）──────────────────────────────────────────
-// 框拿掉之後三個章直接坐在紙上，高度由 id 決定往上下錯開。
-// ⚠ 第一版取 id 的 [1]，而 id 是 09A / 09B / 09C 這種形狀 ——
-// [1] 是月份的個位數，同一個月三格完全一樣，三個章又停回同一條線上。
-// 那個 bug 不會報錯，只會讓畫面回到「排版排出來的」樣子。
-test("★ 同一個月三格的章高度互不相同（不可以取到月份那一位）", () => {
-  const acts = ["09A", "09B", "09C"].map(id => ({ ...act, id }));
-  const dys = acts.map(a => {
-    const h = slotHTML(state({ [a.id]: { date: "2026-09-12" } }), a);
-    const m = h.match(/--dy:(-?\d+)px/);
-    assert.ok(m, `${a.id} 沒有 --dy`);
-    return m[1];
-  });
-  assert.equal(new Set(dys).size, 3, `三格的 --dy 是 ${dys.join(" / ")}，有重複`);
+test("蓋過章、沒放照片：章當主角蓋在中間，心得印在卡片上，沒有「蓋章 →」", () => {
+  const html = slotHTML(state(ONE, { "09A": { note: "那天我遲到了十分鐘" } }), act);
+  assert.match(html, /class="slot done nophoto c-gather"/);
+  assert.match(html, /<div class="hero"><div class="stampwrap">/);
+  assert.ok(html.includes('<span class="note">那天我遲到了十分鐘</span>'));
+  assert.ok(!html.includes("蓋章 →"));
+  assert.ok(html.includes("2026.09.05"), "底下印入境日期");
 });
 
-// 由 id 算，不是亂數 —— 亂數的話同一格每次重繪都跳一次位置，
-// 那看起來是壞掉不是手感。跟角度（spec §7.1）同一條規則。
-test("★ 章的高低是固定的，同一格畫兩次要一樣", () => {
-  const s = state({ "09A": { date: "2026-09-12" } });
-  const a = slotHTML(s, act).match(/--dy:(-?\d+)px/)[1];
-  const b = slotHTML(state({ "09A": { date: "2026-09-12" } }), act).match(/--dy:(-?\d+)px/)[1];
-  assert.equal(a, b);
+test("蓋過章、有照片：自己的照片當封面（標「我的」），章在底下", () => {
+  const html = slotHTML(state(ONE, { "09A": { note: "", photo: "data:image/jpeg;base64,AAAA" } }), act);
+  assert.match(html, /class="slot done c-gather"/);
+  assert.match(html, /<span class="cover"><img src="data:image\/jpeg;base64,AAAA"/);
+  assert.match(html, /class="lbl mine">我的</);
+  assert.match(html, /<div class="foot"><div class="stampwrap">/);
+  assert.ok(!html.includes('class="note"'), "沒寫心得就不印空的框");
+});
+
+test("章不是按鈕的子孫：按鈕不能巢狀，章也不能放進 <button>", () => {
+  const html = slotHTML(state(ONE), act);
+  const open = html.indexOf('<button class="faceopen"'), close = html.indexOf("</button>", open);
+  assert.ok(html.indexOf("stampwrap") > close);
+});
+
+test("一格只有一個 .slot", () => {
+  assert.equal((slotHTML(state(ONE), act).match(/class="slot[ "]/g) || []).length, 1);
+});
+
+test("範例照片當封面：一張滿版、兩張對開、標「範例」；蓋過章就換成自己的照片或不放", () => {
+  const one = slotHTML(state(), { ...act, example_url: "https://x/a.jpg" });
+  assert.match(one, /<span class="cover"><img src="https:\/\/x\/a\.jpg"/);
+  assert.match(one, /class="lbl">範例</);
+  const two = slotHTML(state(), { ...act, example_url: "https://x/a.jpg", example_url_2: "https://x/b.jpg" });
+  assert.match(two, /class="cover two"/);
+  assert.equal((two.match(/<img /g) || []).length, 2);
+  assert.ok(!slotHTML(state(ONE), { ...act, example_url: "https://x/a.jpg" }).includes("x/a.jpg"));
+  assert.equal(coverHTML([]), "");
+});
+
+test("場次：sessions 優先，沒有就用 happens_at，排好序、丟掉壞的", () => {
+  assert.deepEqual(sessionsOf({ sessions: ["2026-11-28T15:30:00Z", "2026-11-15T14:00:00Z", "壞的"] }), ["2026-11-15T14:00:00Z", "2026-11-28T15:30:00Z"]);
+  assert.deepEqual(sessionsOf({ sessions: [], happens_at: "2026-11-15T14:00:00Z" }), ["2026-11-15T14:00:00Z"]);
+  assert.deepEqual(sessionsOf({}), []);
+});
+
+test("★ 場次：過去的劃掉，好幾場時最近要到的標「下一場」，只有一場就不標", () => {
+  const a = { ...act, sessions: ["2026-11-15T14:00:00Z", "2026-11-28T15:30:00Z"] };
+  const h = sessionsHTML(a, { now: Date.parse("2026-11-20T00:00:00Z"), tz: "Asia/Taipei" });
+  assert.equal((h.match(/class="s past"/g) || []).length, 1);
+  assert.equal((h.match(/下一場/g) || []).length, 1);
+  assert.ok(h.includes("第 1 場") && h.includes("第 2 場"));
+  assert.ok(h.includes("<b>15</b>") && h.includes("22:00"), "照看的人的時區：台北 22:00");
+  const solo = sessionsHTML({ ...act, sessions: ["2026-11-28T15:30:00Z"] }, { now: 0 });
+  assert.ok(!solo.includes("下一場") && !solo.includes("第 1 場"));
+  assert.equal(sessionsHTML(act), "");
+});
+
+test("★ 打開一格的場次：還沒到的每一場有「加進日曆」，過去的沒有", () => {
+  const a = { ...act, sessions: ["2026-11-15T14:00:00Z", "2026-11-28T15:30:00Z"] };
+  const h = sessionsHTML(a, { now: Date.parse("2026-11-20T00:00:00Z"), cal: true });
+  assert.equal((h.match(/class="cal"/g) || []).length, 1);
+  assert.ok(!sessionsHTML(a, { now: 0 }).includes('class="cal"'), "卡片上不放日曆連結");
+  const u = sessionCalUrl(a, "2026-11-28T15:30:00Z");
+  assert.match(u, /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE/);
+  assert.ok(u.includes("dates=20261128T153000Z/20261128T163000Z"), "一小時");
+  assert.ok(u.includes(encodeURIComponent("開學電影夜")));
+});
+
+test("★ 一頁幾格就標幾格（data-n），CSS 照它排，右邊不空一塊", () => {
+  const S = { stamps: {}, entries: {}, activities: [act, { ...act, id: "09B", category: "prompt" }], months: [{ month: 9 }], visas: {}, destinations: [], profile: { id: "u" } };
+  assert.match(monthPageHTML(S, { month: 9 }), /class="slots" data-n="2"/);
 });
