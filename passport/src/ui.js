@@ -905,16 +905,18 @@ export function autosaveState(box, state) {
 export function bindAutosave(root, onSave) {
   if (!root || typeof document === "undefined" || root.dataset.autosave === "1") return;
   root.dataset.autosave = "1";
-  const timers = new Map(), running = new Map(), again = new Map();
+  // waiting：打了字、還在等那 4 秒的那一格。again：存的途中又改了的格子，跑完照順序一格一格補存。
+  const timers = new Map(), running = new Map(), again = new Map(), waiting = new Map();
   const run = async (box, field) => {
+    if (waiting.get(box) === field) waiting.delete(box);
     const act = box.dataset.autosave;
-    if (running.get(box)) { again.set(box, field); return; }
+    if (running.get(box)) { const q = again.get(box) || []; if (!q.includes(field)) q.push(field); again.set(box, q); return; }
     running.set(box, true);
     try { await onSave(act, box, field); }
     finally {
       running.delete(box);
-      const f = again.get(box);
-      if (f) { again.delete(box); run(box, f); }
+      const q = again.get(box);
+      if (q && q.length) { const f = q.shift(); if (!q.length) again.delete(box); run(box, f); }
     }
   };
   const schedule = (field, now) => {
@@ -922,9 +924,21 @@ export function bindAutosave(root, onSave) {
     if (!box || box === root) return;   // 不在任何存檔框裡（例如找名字的搜尋框）就不存；root 自己也掛著 data-autosave="1"
     let d = timers.get(box);
     if (!d) { d = debounce(f => run(box, f), TYPED_MS); timers.set(box, d); }
-    if (now) d.flush(field); else d(field);
+    if (!now) { waiting.set(box, field); d(field); return; }
+    // 2026-10-28：同一個框裡另一格打的字還在等 4 秒，這時候選了下拉，先把打的那一格存掉，不然那幾個字會被下拉蓋過去。
+    const w = waiting.get(box);
+    if (w && w !== field) { waiting.delete(box); d.flush(w); run(box, field); }
+    else d.flush(field);
   };
+  // 打的字還在等、或還在存，人就要離開這一頁（點側欄去別頁、關分頁）：先送出去，再讓瀏覽器問一句「確定要離開嗎」。
+  const flushAll = () => { for (const [box, f] of [...waiting]) { waiting.delete(box); const d = timers.get(box); if (d) d.flush(f); } };
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushAll(); });
+  window.addEventListener("beforeunload", e => {
+    const busy = waiting.size > 0 || running.size > 0;
+    flushAll();
+    if (busy) { e.preventDefault(); e.returnValue = ""; }
+  });
   root.addEventListener("input", e => { const m = saveMode(e.target); if (m === "typed") schedule(e.target, false); });
   root.addEventListener("change", e => { const m = saveMode(e.target); if (m === "now") schedule(e.target, true); else if (m === "typed") schedule(e.target, true); });
-  root.addEventListener("focusout", e => { const m = saveMode(e.target); if (m === "typed") { const d = timers.get(e.target.closest("[data-autosave]")); if (d) d.flush(e.target); } });
+  root.addEventListener("focusout", e => { const m = saveMode(e.target); if (m === "typed") { const box = e.target.closest("[data-autosave]"); const d = timers.get(box); if (d && waiting.get(box) === e.target) { waiting.delete(box); d.flush(e.target); } } });
 }

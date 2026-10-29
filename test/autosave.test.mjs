@@ -121,3 +121,15 @@ test("onAutosave 用到 field 就一定要收 field", () => {
     if (/\bfield\b/.test(m[2])) assert.ok(params.includes("field"), `${d}/src/main.js 的 onAutosave 用了 field 卻沒收`);
   }
 });
+
+// 2026-10-28 Paul：「內文與按鈕的字不會自己存」。九份 bindAutosave 要一模一樣，而且都要有兩道保護：
+// 選下拉時先存同一框裡還在等的字、離開頁面前把還在等的字送出去並問一句。
+test("九份 bindAutosave 一樣，且離開前會先存、選下拉不吃掉打的字", async () => {
+  const { readFileSync } = await import("node:fs");
+  const files = ["availability", "admin", "intern-passport", "settings", "admin/passports", "passport", "admin/people", "admin/finance", "admin/site"].map(d => `${d}/src/ui.js`);
+  const bodies = files.map(f => { const s = readFileSync(new URL(`../${f}`, import.meta.url), "utf8"); const m = s.match(/export function bindAutosave\(root, onSave\) \{[\s\S]*?\n\}/); assert.ok(m, f); return m[0]; });
+  for (const b of bodies) assert.equal(b, bodies[0]);
+  assert.match(bodies[0], /beforeunload/);
+  assert.match(bodies[0], /visibilitychange/);
+  assert.match(bodies[0], /if \(w && w !== field\)/);
+});

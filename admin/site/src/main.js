@@ -44,7 +44,10 @@ function render() {
   if (S.view === "mail") {
     body = UI.mailListHTML(S.tpls, S.msg);
   } else if (S.view === "mail-edit") {
-    body = UI.mailEditHTML(S.tplKind, S.tplDraft || S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy, S.mailPrev);
+    // 英文版那一段打開著就保持打開（重畫不要把人正在改的那一段收起來）。
+    const fold = document.querySelector("details.fold[data-fold=\"mail-en\"]");
+    if (fold) S.mailEnOpen = fold.open;
+    body = UI.mailEditHTML(S.tplKind, S.tplDraft || S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy, Object.assign({}, S.mailPrev, { enOpen: !!S.mailEnOpen }));
   } else if (S.view === "team") {
     body = UI.publicTeamHTML(S.people, S.msg, S.busy);
   } else if (S.view === "stories") {
@@ -123,7 +126,9 @@ async function openTab(want) {
 function readMailForm() {
   const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
   if (val("msub") === undefined) return S.tplDraft || {};
-  S.tplDraft = { kind: S.tplKind, subject: val("msub").trim(), body: val("mbody").trim(), subject_en: (val("msub-en") || "").trim(), body_en: (val("mbody-en") || "").trim(), button_label: (val("mbtn") || "").trim(), button_label_en: (val("mbtn-en") || "").trim() };
+  const cur = S.tpls.find(x => x.kind === S.tplKind);
+  S.tplDraft = { kind: S.tplKind, subject: val("msub").trim(), body: val("mbody").trim(), subject_en: (val("msub-en") || "").trim(), body_en: (val("mbody-en") || "").trim(), button_label: (val("mbtn") || "").trim(), button_label_en: (val("mbtn-en") || "").trim(),
+    lang_mode: val("mlang") || (S.tplDraft && S.tplDraft.lang_mode) || (cur && cur.lang_mode) || "auto", hero_url: cur ? cur.hero_url : null };
   return S.tplDraft;
 }
 async function openMail() {
@@ -275,30 +280,27 @@ async function onAutosave(act, box, field) {
     } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
     return;
   }
-  if (act === "mail-save" && field && field.name === "lang_mode") {
-    // 寄哪一種語言（2026-11-16）：選了就存，重畫預覽。
-    const kind = box.dataset.k, cur = S.tpls.find(x => x.kind === kind);
-    UI.autosaveState(box, "saving");
-    try {
-      await D.setMailOptions(kind, v.lang_mode, cur ? cur.hero_url : null);
-      if (cur) cur.lang_mode = v.lang_mode;
-      if (S.tplDraft) S.tplDraft.lang_mode = v.lang_mode;
-      saved(T("msg.tplSaved")); render();
-    } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
-    return;
-  }
   if (act === "mail-save") {
+    // 2026-10-28 Paul：「內文與按鈕的字不會自己存」。原本選語言跟打字分兩條路，選語言那條只存語言、還把整頁重畫，
+    // 同一個框裡還沒存的字就跟著不見了。現在不管哪一格觸發，都把這個框裡改過的東西一次存完：字有變存字，語言有變存語言。
     const kind = box.dataset.k;
     const was = S.tpls.find(x => x.kind === kind) || {};
-    const t = { kind, subject: v.subject, body: v.body, subject_en: v.subject_en, body_en: v.body_en, button_label: v.button_label, button_label_en: v.button_label_en, lang_mode: was.lang_mode, hero_url: was.hero_url };
+    const t = { kind, subject: v.subject, body: v.body, subject_en: v.subject_en, body_en: v.body_en, button_label: v.button_label, button_label_en: v.button_label_en,
+                lang_mode: v.lang_mode || was.lang_mode || "auto", hero_url: was.hero_url };
     S.tplDraft = t;   // 切預覽重畫時拿這一份，打到一半的字不會不見
-    if (!t.subject || !t.body) { autosaveFail(box, T("err.mailBoth")); return; }
+    const same = k => (t[k] || "") === (was[k] || "");
+    const textChanged = !["subject", "body", "subject_en", "body_en", "button_label", "button_label_en"].every(same);
+    const langChanged = t.lang_mode !== (was.lang_mode || "auto");
+    if (textChanged && (!t.subject || !t.body)) { autosaveFail(box, T("err.mailBoth")); return; }
     UI.autosaveState(box, "saving");
     try {
-      await D.saveTemplate(kind, t);
+      if (textChanged) await D.saveTemplate(kind, t);
+      if (langChanged) await D.setMailOptions(kind, t.lang_mode, was.hero_url || null);
       const cur = S.tpls.find(x => x.kind === kind);
       if (cur) Object.assign(cur, t); else S.tpls.push(Object.assign({}, t));
       saved(T("msg.tplSaved"));
+      // 語言換了預覽要跟著換；重畫用的是 S.tplDraft（剛剛讀的值），畫面上打的字不會被蓋掉。
+      if (langChanged) render();
     } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
     return;
   }
@@ -413,7 +415,7 @@ document.addEventListener("click", async e => {
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render(); return;
   }
-  if (act === "mail-edit") { S.tplKind = b.dataset.k; S.tplDraft = null; S.view = "mail-edit"; S.msg = ""; render(); return; }
+  if (act === "mail-edit") { S.tplKind = b.dataset.k; S.tplDraft = null; S.mailEnOpen = false; S.view = "mail-edit"; S.msg = ""; render(); return; }
   if (act === "mail-prev-lang" || act === "mail-prev-w") { S.mailPrev = Object.assign({ lang: "zh", w: 600 }, S.mailPrev, act === "mail-prev-lang" ? { lang: b.dataset.v } : { w: +b.dataset.v }); readMailForm(); render(); return; }
   // mail-save 那顆鈕 2026-11-06 拿掉了，三封信的六格改了就存（onAutosave）。
 
