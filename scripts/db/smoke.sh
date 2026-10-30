@@ -2524,5 +2524,75 @@ ml2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-25-meeting-mail
 if echo "${ml2}" | grep -q "OVERALL.*PASS"; then echo "  ok   會議信那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 會議信那支重跑沒過"; fail=$((fail+1)); fi
 
 echo
+echo "── 接上 Instagram（2026-11-26-instagram-connect.sql）：本機沒有 http 擴充，裝一個假的 Instagram 來測 ──"
+# 這時候：DIR 與 PAUL 管 res:Marketing Team、MKE 在需求工作區（改）、OUTC 是別的 team 的幹部（什麼都沒被派）、STU 是學員。
+igot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-26-instagram-connect.sql 2>&1 || true)
+if echo "${igot}" | grep -q "OVERALL.*PASS" && ! echo "${igot}" | grep -q "|FAIL"; then echo "  ok   Instagram 那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL Instagram 那支驗收表："; echo "${igot}" | head -14; fail=$((fail+1)); fi
+chkraise "★ 別的 team 的幹部看不到 Instagram 狀態（not_marketing）" "not_marketing" "perform set_config('test.uid','${OUTC}',true); perform public.ig_status();"
+chkraise "★ 學員看不到（not_marketing）" "not_marketing" "perform set_config('test.uid','${STU}',true); perform public.ig_status();"
+chkas "${MKE}" "需求工作區的人看得到：還沒接上、不能按再檢查" "false|false" "select (public.ig_status()->>'ready')||'|'||(public.ig_status()->>'can_manage')"
+chkas "${DIR}" "Marketing 資源工作區「管」的人可以按再檢查" "true" "select public.ig_status()->>'can_manage'"
+chkraise "★ 只在需求工作區的人按不了再檢查（not_marketing_manager）" "not_marketing_manager" "perform set_config('test.uid','${MKE}',true); perform public.ig_check_now();"
+chkraise "還沒設定的時候按再檢查，說清楚（ig_not_ready）" "ig_not_ready" "perform set_config('test.uid','${DIR}',true); perform public.ig_check_now();"
+chkrole authenticated "${PAUL}" "★ 連 Co-President 都不能直接讀 ig_connection" "denied" "select case when has_table_privilege('authenticated','public.ig_connection','select') then 'open' else 'denied' end"
+chkrole authenticated "${PAUL}" "★ 幹部叫不動 ig_get 與 ig_secret（只給資料庫內部）" "denied|denied" "select (case when has_function_privilege('authenticated','public.ig_get(text,text)','execute') then 'open' else 'denied' end)||'|'||(case when has_function_privilege('authenticated','public.ig_secret()','execute') then 'open' else 'denied' end)"
+chkrole anon "" "★ 沒登入叫不動 ig_status" "denied" "select case when has_function_privilege('anon','public.ig_status()','execute') then 'open' else 'denied' end"
+
+# 假的 Instagram：http 擴充套件的替身。網址裡有 refresh_access_token 就給一張新通行證；通行證是 BADTOK 就回過期（code 190），
+# 而且故意把網址（含通行證）塞進錯誤訊息，驗「錯誤訊息裡的通行證會被遮掉」。
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+alter table vault.decrypted_secrets add column if not exists id uuid default gen_random_uuid();
+alter table vault.decrypted_secrets add column if not exists updated_at timestamptz default now();
+create or replace function vault.update_secret(secret_id uuid, new_secret text, new_name text default null, new_description text default null, new_key_id uuid default null)
+  returns void language sql as $$ update vault.decrypted_secrets set decrypted_secret = new_secret, updated_at = now() where id = secret_id $$;
+create schema if not exists extensions;
+create type extensions.http_header as (field varchar, value varchar);
+create type extensions.http_request as (method text, uri varchar, headers extensions.http_header[], content_type varchar, content varchar);
+create table extensions.fake_calls (uri text, at timestamptz default clock_timestamp());
+create function extensions.http_set_curlopt(text, text) returns boolean language sql as $$ select true $$;
+create function extensions.urlencode(text) returns text language sql immutable as $$ select $1 $$;
+create function extensions.http(r extensions.http_request) returns table (status int, content text) language plpgsql as $$
+begin
+  insert into extensions.fake_calls (uri) values (r.uri);
+  if r.uri like '%BADTOK%' then
+    return query select 400, '{"error":{"message":"Error validating access token for ' || r.uri || '","type":"OAuthException","code":190}}';
+  elsif r.uri like '%refresh_access_token%' then
+    return query select 200, '{"access_token":"NEWTOK","token_type":"bearer","expires_in":5184000}';
+  else
+    return query select 200, '{"user_id":"17841400000","username":"beyondtaiwan","account_type":"BUSINESS","followers_count":3999,"media_count":321}';
+  end if;
+end $$;
+insert into vault.decrypted_secrets (name, decrypted_secret, updated_at) values ('INSTAGRAM_TOKEN', 'GOODTOK', now() - interval '2 days');
+SQL
+chkas "${DIR}" "★ 設定好之後按再檢查：讀到帳號、類型、粉絲數" "true|beyondtaiwan|BUSINESS|3999" "select (s->>'ready')||'|'||(s->>'username')||'|'||(s->>'account_type')||'|'||(s->>'followers') from (select public.ig_check_now() s) x"
+chk "人手放的通行證：過期日用放進去那天 + 60 天估、標「大約」，58 天還不換" "GOODTOK|true|58|0" \
+  "select (select decrypted_secret from vault.decrypted_secrets where name='INSTAGRAM_TOKEN')||'|'||token_estimated::text||'|'||round(extract(epoch from token_expires_at - now()) / 86400)::int||'|'||(select count(*) from extensions.fake_calls where uri like '%refresh%') from public.ig_connection"
+psql -d "${DB}" -q -c "update vault.decrypted_secrets set updated_at = now() - interval '15 days' where name='INSTAGRAM_TOKEN'; update public.ig_connection set token_refreshed_at = null;" >/dev/null
+chk "剩不到 50 天：每天那一輪先換再檢查" "ok/ok" "select public.ig_daily()"
+chk "★ 換到的新通行證寫回 Vault，過期日照 Instagram 給的（60 天，不再是估的）" "NEWTOK|false|60" \
+  "select (select decrypted_secret from vault.decrypted_secrets where name='INSTAGRAM_TOKEN')||'|'||(select token_estimated::text||'|'||round(extract(epoch from token_expires_at - now()) / 86400)::int from public.ig_connection)"
+chk "剛換過就不再換" "not_due/ok" "select public.ig_daily()"
+chkas "${DIR}" "★ ig_status 回的東西裡沒有通行證" "false" "select (public.ig_status()::text like '%TOK%')::text"
+psql -d "${DB}" -q -c "update vault.decrypted_secrets set decrypted_secret = 'BADTOK', updated_at = now() - interval '1 hour' where name='INSTAGRAM_TOKEN'; delete from extensions.fake_calls;" >/dev/null
+chk "★ 過期的通行證：記下 code 190，放進去不到 25 小時不去換" "not_due/error|0" "select public.ig_daily()||'|'||(select count(*) from extensions.fake_calls where uri like '%refresh%')"
+chk "★ 錯誤訊息裡的通行證被遮掉" "true|false|true" \
+  "select (check_error like '%code 190%')::text||'|'||(check_error like '%BADTOK%')::text||'|'||(check_error like '%***%')::text from public.ig_connection"
+chk "壞了的時候，上一次讀到的帳號資料還留著" "beyondtaiwan|3999" "select username||'|'||followers_count from public.ig_connection"
+ig2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-26-instagram-connect.sql 2>&1 || true)
+if echo "${ig2}" | grep -q "OVERALL.*PASS"; then echo "  ok   Instagram 那支可以重跑"; pass=$((pass+1)); else echo "  FAIL Instagram 那支重跑沒過"; fail=$((fail+1)); fi
+chk "重跑不動資料" "beyondtaiwan|1" "select username||'|'||(select count(*) from public.ig_connection) from public.ig_connection"
+BROKEN=$(mktemp)
+sed "s/  if not public.ig_can_view() then raise exception 'not_marketing' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-26-instagram-connect.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「看狀態要是 Marketing 的人」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉看狀態的門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/^revoke all on function public.ig_get(text, text) from public, anon, authenticated;/grant execute on function public.ig_get(text, text) to authenticated;/" supabase/migrations/2026-11-26-instagram-connect.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：把 ig_get 開給幹部，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 把 ig_get 開給幹部驗收表沒變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-26-instagram-connect.sql >/dev/null 2>&1 || true
+chkrole authenticated "${PAUL}" "破壞之後重跑正確的那支：ig_get 又關起來" "denied" "select case when has_function_privilege('authenticated','public.ig_get(text,text)','execute') then 'open' else 'denied' end"
+rm -f "${BROKEN}"
+# 假的 Instagram 拆掉，後面要是再加別段，不會以為真的有 http 擴充。
+psql -d "${DB}" -q -c "drop function extensions.http(extensions.http_request); drop function extensions.http_set_curlopt(text, text); drop function extensions.urlencode(text); drop table extensions.fake_calls; drop type extensions.http_request; drop type extensions.http_header; delete from vault.decrypted_secrets where name='INSTAGRAM_TOKEN';" >/dev/null
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
