@@ -775,6 +775,63 @@ Sponsorship 的 Director 換人：Co-President 到人與權限把新的人這一
 - 這一屆 Sponsorship 的 Director 是誰，人與權限那邊職位要寫成「Director, Sponsorship Team」他才看得到；沒有這個人的話只有 Co-President 與 Senior Adviser 看得到。
 - 幣別目前只有 TWD 與 USD 兩個選項（`ui.js` 的 `CURRENCIES`），要加別的幣別是改一行。
 
+## Marketing 區：接上 Instagram（2026-11-26，批 1）
+
+Paul 2026-10-29 要的：後台多一區給 Marketing，看 BT 的 IG 貼文與 Reels 成效，之後也從這裡做「COLLEGE INTRO SERIES」大學介紹貼文、審過再發到 IG。
+整個計畫分六批，寫在 `~/Anson/outputs/bt-website/docs/2026-10-29-marketing-dashboard-plan/plan.md`，Paul 的九個決定記在 `~/Anson/decisions/log.md` 2026-10-29。
+**這一批只做第一步：網站接上 @beyondtaiwan，看得到帳號、粉絲數、貼文數、通行證用到哪天。** 還不讀每篇貼文的成效，也還不能發文。
+
+### 誰看得到
+
+後台側欄「行銷」那一段多一行 **Instagram**（網址 `/admin/marketing/`，第六個後台資料夾）。
+
+| 誰 | 看 | 按「再檢查一次」 |
+|---|---|---|
+| Co-President、Senior Adviser | 可以 | 可以 |
+| Marketing 資源工作區（`res:Marketing Team`）「管」的人 | 可以 | 可以 |
+| Marketing 資源工作區「看」或「改」、行銷需求單工作區（`custom:marketing-requests`）任何等級 | 可以 | 不行 |
+| 其他幹部、學員、校友 | 不行（看到一頁說要找 Co-President 把你加進工作區） | 不行 |
+
+只在個人資料勾了 Marketing Team 不算，要被派進上面其中一個工作區。加人在「人與權限 → 誰能改什麼」。
+
+### 第一次要做的事（Paul 或 Co-President，大約 45 分鐘）
+
+照 `docs/2026-10-29-instagram-setup.md` 做：用 BT 主帳號開一個 Meta app、加 @beyondtaiwan、拿一張通行證、放進 Supabase Vault（名字 `INSTAGRAM_TOKEN`），再跑遷移檔。
+**不用送 Meta 的 App Review，也不用 Facebook 粉專**：網站只碰 BT 自己的帳號，Meta 的 Development 模式就夠（2026-10-29 查過 Meta 的文件）。
+做完到 `/admin/marketing/` 按「再檢查一次」，看得到 @beyondtaiwan 與粉絲數就是接上了。
+
+### 通行證怎麼保持有效
+
+- 通行證 60 天過期。剩不到 50 天、而且放進 Vault 超過 25 小時（Instagram 規定 24 小時內不能換），網站就自己換一張新的寫回 Vault。正常情況大約每 10 天換一次，不會過期。
+- 這件事靠每天 03:17（UTC）跑一次的 pg_cron。**pg_cron 沒開的話**，頁面會說，這時候管的人每個月按一次「再檢查一次」，也會順便換。
+- 人手放進去的通行證不知道確切過期日，頁面寫「大約用到…」（放進去那天加 60 天）。第一次自動換新之後就是確切日期。
+- 頁面上的錯誤都翻成人話：Instagram 說通行證不能用了（code 190，通常是有人改了 @beyondtaiwan 的密碼）就請 Co-President 照設定文件重拿一張；連不上就說明天會再試；沒看過的錯誤原樣印出來，傳給負責網站的人。
+
+### 資料庫（`supabase/migrations/2026-11-26-instagram-connect.sql`）
+
+可以重跑、不動既有資料，PASS 表 11 項（最後兩項是資訊：Vault 有沒有通行證、pg_cron 有沒有開）。RLS 與角色沒有改，只多一張表與幾支函式。
+- 一張只有一列的表 `ig_connection`：帳號、類型、粉絲數、貼文數、最後檢查與錯誤、通行證過期日。**通行證本身不在這張表，只在 Vault。** 這張表任何角色都讀不到（連 Co-President 都不行），畫面走 `ig_status()`。
+- 叫 Instagram 用 Supabase 的 `http` 擴充套件，在資料庫裡直接叫，跟 Google 日曆（2026-11-22）同一套，沒有 Edge Function。網址不帶版本號，換屆的人不用每年改。
+- 內部函式（`ig_secret`、`ig_get`、`ig_check`、`ig_refresh_if_due`、`ig_daily`）網站上的人一支都叫不動。錯誤訊息裡要是出現通行證會換成 `***`。
+- 給畫面的兩支：`ig_status()`（第一句問 `ig_can_view()`）、`ig_check_now()`（第一句問 `ig_can_manage()`）。`ig_status()` 不回通行證。
+- `scripts/db/smoke.sh` 多一段 26 項（993 項全過）。本機沒有 http 擴充，所以裝一個假的 Instagram：驗了誰看得到、誰按得到、表讀不到、人手放的通行證用估的日期、剩不到 50 天會換新並寫回 Vault、剛換過不再換、過期的通行證記下 code 190、25 小時內不去換、錯誤訊息裡的通行證被遮掉、壞了的時候上一次的帳號資料還在、兩個破壞測試（拿掉看狀態的門、把 `ig_get` 開給幹部，驗收表都會變紅）。
+- 另外在本機 Supabase 上用真的 Vault 與真的 Instagram API（假的通行證）跑過一次：讀得到 Vault、Instagram 回 code 190、存下來的錯誤裡沒有通行證、`vault.update_secret` 在函式裡寫得進去。
+
+### 後台（`/admin/marketing/`）
+
+- 第六個後台資料夾，跟其他五個同一套外殼：`index.html` 加 `src/{data,ui,main,strings}.js`，側欄與共用零件六份一模一樣（`test/admin-hub.test.mjs` 逐字比對）。五個舊資料夾的 `GROUPS`、`ITEMS`、`WHY` 與字典的 `why.marketing` 一起加了。
+- 側欄那一組的 `who` 是 `ws:res:Marketing Team|custom:marketing-requests`：被派進兩個工作區其中一個（任何等級）或 senior。跟資料庫的 `ig_can_view()` 同一條規則。
+- 登入頁的 `?next=` 白名單（`app/src/nav.js`）多了 `admin-marketing`，順手補上漏掉的 `admin-finance`（之前從財務被踢去登入的人，登入完會停在設定頁）。
+- 守門清單都加了它：`scripts/bump-version.sh`、`scripts/pre-commit-bump.sh`、`check-motion.mjs`、`scripts/check-mobile.mjs`（`scripts/mobile-fixtures.mjs` 多一張最長的情況）、`check.sh`（modulepreload 十一頁、版本提示十支）、`test/autosave.test.mjs`、`test/passport-control.test.mjs`。
+- 前端 `test/marketing.test.mjs` 7 條：誰進得來、還沒接上、接上了、通行證快過期與過期、錯誤翻人話、英文不剩中文、這一頁的程式碼不碰通行證也不直接叫 Instagram。
+
+### 還沒做、要 Paul 做的
+
+- 照 `docs/2026-10-29-instagram-setup.md` 開 Meta app、拿通行證、放進 Vault。
+- 在正式 Supabase 跑 `2026-11-26-instagram-connect.sql`，PASS 表 11 項。
+- 看一下 Database → Extensions 的 **pg_cron** 有沒有開。沒開的話通行證要靠人每個月按一次「再檢查一次」。
+- 下一批（批 2）：每天記下每篇貼文與 Reels 的觸及、按讚、收藏、分享、留言，加上粉絲成長，做成績效頁。
+
 ## 怎麼發新邀請碼（批次碼，2026-10-29 起收在邀請頁最底下的摺疊裡）
 
 沒有邀請碼就沒辦法註冊，這是擋住外人的唯一一道門。一次要給一整批人同一組碼才用這個；一個一個請人進來用上面那一節。

@@ -89,6 +89,13 @@ make("admin/people", "admin",
      positions:[{ term:"2026-27", title_zh:"Curriculum 的 Director", title_en:"Director, Curriculum Team", team:"Curriculum Team" },
                 { term:"2025-26", title_en:"Associate, Curriculum Team", team:"Curriculum Team" }],
      workspaces:[{ id:"apps:Curriculum Team", level:"manage" }, { id:"res:Curriculum Team", level:"manage" }, { id:"intern-passport", level:"edit" }], maybe_dup:null };`);
+// Marketing（2026-11-26）：Instagram 連線，最長的情況（接上了、通行證快過期、最近一次 190、自動換新失敗、cron 沒開、不是管的人）。
+make("admin/marketing", "admin",
+  `UI.shellHTML("", UI.railHTML("marketing", "ig", { role:"cadre", board:"member", team:"Marketing Team", name:"王平", ws:{ "res:Marketing Team":"view" } }),
+     UI.igPageHTML({ ready:true, username:"beyondtaiwan", account_type:"BUSINESS", followers:3999, media:321, checked_at:"2026-11-26T03:17:00Z",
+       check_error:"HTTP 400 code 190: Error validating access token: Session has expired on Thursday, 26-Nov-26 03:17:00 PST.", expires_at:"2026-12-01T00:00:00Z", estimated:true,
+       refresh_error:"HTTP 400 code 10: Application does not have permission for this action", cron:false, can_manage:false }, "", false, Date.parse("2026-11-26T12:00:00Z")))`,
+  `import * as UI from "./src/ui.js";`);
 // 財務（2026-11-08）：收支那一頁最長（篩選列、新的一筆表單、一筆展開在改、一筆在問作廢原因、作廢過的一筆、美金的一筆）。
 make("admin/finance", "admin",
   `UI.shellHTML("", UI.railHTML("finance", "tx", { role:"cadre", board:"president", team:"", name:"王平" }),

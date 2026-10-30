@@ -109,7 +109,7 @@ test("實習後台：分類一節（加、改、排順序、沒有格子才刪�
 });
 
 test("★ 自動存：打字的欄位停手 4 秒或離開那一格才存，九份一模一樣", () => {
-  const files = ["settings/src/ui.js", "admin/people/src/ui.js", "admin/passports/src/ui.js", "admin/site/src/ui.js", "admin/finance/src/ui.js",
+  const files = ["settings/src/ui.js", "admin/people/src/ui.js", "admin/passports/src/ui.js", "admin/site/src/ui.js", "admin/finance/src/ui.js", "admin/marketing/src/ui.js",
                  "passport/src/ui.js", "admin/src/ui.js", "intern-passport/src/ui.js", "availability/src/ui.js"];
   for (const f of files) {
     const s = readFileSync(f, "utf8");
