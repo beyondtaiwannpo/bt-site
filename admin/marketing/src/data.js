@@ -30,11 +30,69 @@ export async function loadMe(userId) {
 }
 
 export const loadIgStatus = () => rpc("ig_status");
+
+// ── 大學介紹貼文（2026-11-27）──────────────────────────────────────────
+// 讀：mkt_bootstrap()（我能做什麼、每一篇還差什麼、雜湊、人名）加 college_posts 整張表（RLS 只放 Marketing 的人）。
+// 寫：全部走資料庫的函式（mkt_post_*），每一支第一句是門。照片放私人 bucket marketing-media，看用簽名網址。
+export const loadMkt = () => rpc("mkt_bootstrap");
+export async function loadPosts() {
+  need();
+  const { data, error } = await supabase.from("college_posts")
+    .select("id, school, status, data, sources, checks, caption, review_note, created_by, created_at, updated_by, updated_at, submitted_at, approved_by, approved_at, posted_by, posted_at, posted_url")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+export const createPost  = (school, data, sources, caption) => rpc("mkt_post_create", { p_school: school, p_data: data || {}, p_sources: sources || {}, p_caption: caption || "" });
+export const savePost    = (id, data, sources, caption) => rpc("mkt_post_save", { p_id: id, p_data: data, p_sources: sources, p_caption: caption || "" });
+export const checkFact   = (id, key, on) => rpc("mkt_post_check", { p_id: id, p_key: key, p_on: !!on });
+export const submitPost  = id => rpc("mkt_post_submit", { p_id: id });
+export const approvePost = (id, hash) => rpc("mkt_post_approve", { p_id: id, p_hash: hash });
+export const returnPost  = (id, note) => rpc("mkt_post_return", { p_id: id, p_note: note });
+export const markPosted  = (id, url) => rpc("mkt_post_mark_posted", { p_id: id, p_url: url });
+export const archivePost = id => rpc("mkt_post_archive", { p_id: id });
+
+const BUCKET = "marketing-media";
+export async function uploadPhoto(path, blob) {
+  need();
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: "3600", upsert: false });
+  if (error) throw error;
+  return path;
+}
+const urlCache = new Map();
+export async function photoUrl(path) {
+  need();
+  const hit = urlCache.get(path);
+  if (hit && hit.until > Date.now()) return hit.url;
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+  if (error) throw error;
+  urlCache.set(path, { url: data.signedUrl, until: Date.now() + 50 * 60 * 1000 });
+  return data.signedUrl;
+}
 export const igCheckNow = () => rpc("ig_check_now");
 
 // 資料庫回的代碼翻成人話。先命中先贏。
 const SAYS = [
   ["not_marketing_manager", "says.notManager"],
+  ["not_marketing_editor", "says.notEditor"],
+  ["not_approver", "says.notApprover"],
+  ["cannot_approve_own", "says.own"],
+  ["changed_since_viewed", "says.changedViewed"],
+  ["changed_since_approved", "says.changedApproved"],
+  ["already_in_series", "says.already"],
+  ["need_school", "says.needSchool"],
+  ["need_source_url", "says.needUrl"],
+  ["need_instagram_url", "says.needIg"],
+  ["need_note", "says.needNote"],
+  ["not_ready", "says.notReady2"],
+  ["not_draft", "says.notDraft"],
+  ["not_in_review", "says.notInReview"],
+  ["not_approved", "says.notApproved"],
+  ["post_locked", "says.locked"],
+  ["no_such_post", "says.noPost"],
+  ["Bucket not found", "says.noBucket"],
+  ["college_posts", "says.noPostsTable"],
+  ["mkt_bootstrap", "says.noPostsTable"],
   ["not_marketing", "says.notMarketing"],
   ["ig_not_ready", "says.notReady"],
   ["ig_status", "says.noTable"],

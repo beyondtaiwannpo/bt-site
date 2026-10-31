@@ -1,0 +1,361 @@
+{
+ "school": "Vanderbilt University",
+ "data": {
+  "school": "Vanderbilt University",
+  "cover": {
+   "line1": "VANDERBILT",
+   "line1_color": "#CFAE70",
+   "line2": "UNIVERSITY",
+   "line2_color": "#1C1C1C",
+   "zh": "范德堡大學",
+   "accent": "#CFAE70",
+   "pennant": "VANDERBILT",
+   "pennant_text": "#1C1C1C",
+   "tags1": "#16 in US National Universities",
+   "tags2": "#Economics #Engineering #ComputerScience #Math"
+  },
+  "basic": {
+   "ranking": "National 全國 #16",
+   "type": "Private 私立",
+   "setting": "Urban 都市",
+   "enrollment": "大學部 7,366人",
+   "state": "TN",
+   "state_label": "Tennessee\n田納西州"
+  },
+  "apply": {
+   "acceptance": "5.4%",
+   "applicants": "48,196",
+   "gpa": "3.90",
+   "sat": "1510–1560",
+   "act": "34–35",
+   "test_note": "Test-optional 可不送",
+   "toefl": "5",
+   "ielts": "7.0",
+   "duolingo": "130",
+   "footer": "Sources: Vanderbilt Common Data Set 2025-26 (Fall 2025 entering class), Vanderbilt Undergraduate Admissions. Checked 2026-10-31. English scores are recommended minimums, not cutoffs; TOEFL uses the new 1 to 6 scale. Test-optional for Fall 2027 and 2028 entry. Requirements may change. Please refer to the university's official website."
+  },
+  "timeline": {
+   "rows": [
+    {
+     "date": "Aug 1",
+     "en": "Applications Open",
+     "zh": "申請開始"
+    },
+    {
+     "date": "Nov 1",
+     "en": "Early Decision I (ED I)",
+     "zh": "第一輪提前決定截止"
+    },
+    {
+     "date": "Mid-Dec",
+     "en": "ED I Decision Release",
+     "zh": "第一輪結果公佈"
+    },
+    {
+     "date": "Jan 1",
+     "en": "ED II & Regular Decision",
+     "zh": "第二輪提前決定、正規申請截止"
+    },
+    {
+     "date": "Mid-Feb",
+     "en": "ED II Decision Release",
+     "zh": "第二輪結果公佈"
+    },
+    {
+     "date": "Late Mar",
+     "en": "RD Decision Release",
+     "zh": "正規申請結果公佈"
+    },
+    {
+     "date": "May 1",
+     "en": "College Decision Day",
+     "zh": "大學錄取決定日"
+    }
+   ],
+   "footer": "Sources: Vanderbilt Undergraduate Admissions (Fall 2027 entry), Common App. Checked 2026-10-31. Early Decision is binding: if admitted, you must enroll. Deadlines may change. Please refer to the university's official website."
+  },
+  "majors": {
+   "rows": [
+    {
+     "en": "Economics",
+     "zh": "經濟",
+     "rank": "#26  By U.S. News"
+    },
+    {
+     "en": "Engineering",
+     "zh": "工程",
+     "rank": "#26  By U.S. News"
+    },
+    {
+     "en": "Computer Science",
+     "zh": "電腦科學",
+     "rank": "#34  By U.S. News"
+    },
+    {
+     "en": "Mathematics",
+     "zh": "數學",
+     "rank": "#5  By College Factual*"
+    },
+    {
+     "en": "Psychology",
+     "zh": "心理",
+     "rank": "#8  By College Factual*"
+    },
+    {
+     "en": "Political Science",
+     "zh": "政治學",
+     "rank": "#10  By College Factual*"
+    }
+   ],
+   "footnote": "U.S. News Best Colleges 2027 (undergraduate programs). *College Factual 2027: uses core statistics from official government databases, primarily the Integrated Postsecondary Education Data System (IPEDS), under the U.S. Department of Education."
+  },
+  "fun": {
+   "alumni": [
+    {
+     "name": "Muhammad Yunus",
+     "desc": "2006 諾貝爾和平獎"
+    },
+    {
+     "name": "Michael Gernhardt",
+     "desc": "NASA 太空人"
+    }
+   ],
+   "city_en": "Explore Nashville",
+   "city_zh": "城市探索",
+   "city": [
+    {
+     "label": "The Parthenon 帕德嫩神廟"
+    },
+    {
+     "label": "Ryman Auditorium 萊曼禮堂"
+    }
+   ]
+  }
+ },
+ "sources": {
+  "cover_rank": [
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535/overall-rankings",
+    "quote": "#16 in National Universities (tie)"
+   },
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535",
+    "quote": "In the 2027 edition of Best Colleges, Vanderbilt University is ranked No. 16 in National Universities."
+   },
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/education/best-colleges/articles/slideshows/us-news-best-national-universities?slide=20",
+    "quote": "16 (tie). Vanderbilt University (TN)"
+   }
+  ],
+  "rank": [
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535/overall-rankings",
+    "quote": "#16 in National Universities (tie)"
+   },
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535",
+    "quote": "In the 2027 edition of Best Colleges, Vanderbilt University is ranked No. 16 in National Universities."
+   },
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/education/best-colleges/articles/slideshows/us-news-best-national-universities?slide=20",
+    "quote": "16 (tie). Vanderbilt University (TN)"
+   }
+  ],
+  "type": [
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535",
+    "quote": "Vanderbilt University is a private institution that was founded in 1873."
+   },
+   {
+    "kind": "bigfuture",
+    "url": "https://bigfuture.collegeboard.org/colleges/vanderbilt-university",
+    "quote": "4-year • Private"
+   }
+  ],
+  "setting": [
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535",
+    "quote": "its setting is city, and the campus size is 333 acres"
+   },
+   {
+    "kind": "bigfuture",
+    "url": "https://bigfuture.collegeboard.org/colleges/vanderbilt-university",
+    "quote": "is located in a large city in an urban setting"
+   }
+  ],
+  "enrollment": [
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2026/07/CDS_2025-2026.xlsx",
+    "quote": "B1: Total all undergraduates 7366 (as of fall 2025 / October 15, 2025)"
+   },
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535",
+    "quote": "It has a total undergraduate enrollment of 7,366 (fall 2025)"
+   }
+  ],
+  "acceptance": [
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2026/07/CDS_2025-2026.xlsx",
+    "quote": "C1 (Fall 2025): Total first-time, first-year students who applied 48196; who were admitted 2593"
+   },
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2025/11/CDS_2024-2025.xlsx",
+    "quote": "C1 (Fall 2024): Total first-time, first-year who applied 45409; who were admitted 2662"
+   },
+   {
+    "kind": "bigfuture",
+    "url": "https://bigfuture.collegeboard.org/colleges/vanderbilt-university/admissions",
+    "quote": "Acceptance rate 5.86%; 45,409 applicants; 2,662 admitted"
+   }
+  ],
+  "applicants": [
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2026/07/CDS_2025-2026.xlsx",
+    "quote": "C1: Total first-time, first-year students who applied 48196"
+   },
+   {
+    "kind": "bigfuture",
+    "url": "https://bigfuture.collegeboard.org/colleges/vanderbilt-university/admissions",
+    "quote": "45,409"
+   },
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/vandybloggers/2025/04/class-of-2029-regular-decision-summary-statistics/",
+    "quote": "over 48,000 applicants, the largest in Vanderbilt's history"
+   }
+  ],
+  "gpa": [
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2026/07/CDS_2025-2026.xlsx",
+    "quote": "C12: Average high school GPA of all degree-seeking, first-time, first-year students who submitted GPA: 3.895"
+   },
+   {
+    "kind": "bigfuture",
+    "url": "https://bigfuture.collegeboard.org/colleges/vanderbilt-university/admissions",
+    "quote": "3.75+ 89%"
+   }
+  ],
+  "sat": [
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2026/07/CDS_2025-2026.xlsx",
+    "quote": "C9: SAT Composite 25th Percentile 1510; 50th 1530; 75th 1560"
+   },
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2025/11/CDS_2024-2025.xlsx",
+    "quote": "SAT Composite | 1510 | 1540 | 1560"
+   },
+   {
+    "kind": "bigfuture",
+    "url": "https://bigfuture.collegeboard.org/colleges/vanderbilt-university/admissions",
+    "quote": "1500–1570"
+   }
+  ],
+  "act": [
+   {
+    "kind": "cds",
+    "url": "https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2026/07/CDS_2025-2026.xlsx",
+    "quote": "C9: ACT Composite 25th Percentile 34; 50th 35; 75th 35"
+   },
+   {
+    "kind": "bigfuture",
+    "url": "https://bigfuture.collegeboard.org/colleges/vanderbilt-university/admissions",
+    "quote": "34–35"
+   }
+  ],
+  "test_note": [
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/apply/testing-policies/",
+    "quote": "Vanderbilt University will continue its test-optional policy for students applying for undergraduate admission to the classes entering in the fall of 2027 or 2028."
+   },
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/apply/testing-policies/",
+    "quote": "This policy applies to both first-year and transfer students and includes international and homeschool students."
+   },
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/apply/",
+    "quote": "For students applying for fall 2029 entry, test scores will be required."
+   }
+  ],
+  "toefl": [
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/apply/first-year-process/",
+    "quote": "See recommended minimum score chart below. ... TOEFL iBT 5 | TOEFL Essentials 10.5"
+   }
+  ],
+  "ielts": [
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/apply/first-year-process/",
+    "quote": "IELTS 7.0 (Recommended minimum score)"
+   }
+  ],
+  "duolingo": [
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/apply/first-year-process/",
+    "quote": "Duolingo English Test 130 (Recommended minimum score)"
+   }
+  ],
+  "timeline": [
+   {
+    "kind": "school",
+    "url": "https://admissions.vanderbilt.edu/apply/",
+    "quote": "November 1, 2026 Deadline for completed application ... Mid-December Admission decisions available ... December 31, 2026 Deadline for matriculation deposit"
+   },
+   {
+    "kind": "other",
+    "url": "https://www.commonapp.org/blog/common-app-opens-application-launch-2026-27-season/",
+    "quote": "Common App opens application to launch 2026-27 season (posted July 31, 2026)"
+   }
+  ],
+  "majors": [
+   {
+    "kind": "usnews",
+    "url": "https://www.usnews.com/best-colleges/vanderbilt-3535/overall-rankings",
+    "quote": "#26 in Best Undergraduate Engineering Programs (tie) ... #34 in Computer Science (tie) ... #26 in Economics (tie)"
+   },
+   {
+    "kind": "collegefactual",
+    "url": "https://www.collegefactual.com/majors/mathematics-and-statistics/mathematics/rankings/top-ranked/",
+    "quote": "College Factual (MF_RANKING_2025), 2027 edition. The methodology weighs graduation rate, post-graduation earnings, cost, and program quality, drawn primarily from the U.S. Department of Education (IPEDS and College Scorecard)."
+   },
+   {
+    "kind": "collegefactual",
+    "url": "https://www.collegefactual.com/colleges/vanderbilt-university/academic-life/academic-majors/mathematics-and-statistics/mathematics/",
+    "quote": "placing at #6 out of 468 schools nationally"
+   }
+  ],
+  "alumni": [
+   {
+    "kind": "school",
+    "url": "https://www.vanderbilt.edu/trailblazers/person/muhammad-yunus/",
+    "quote": "Yunus earned his doctorate in economics from Vanderbilt in 1971."
+   },
+   {
+    "kind": "other",
+    "url": "https://www.nasa.gov/wp-content/uploads/2016/01/gernhardt_michael.pdf",
+    "quote": "Received a Bachelor of Science degree in physics from Vanderbilt University in 1978"
+   }
+  ]
+ }
+}

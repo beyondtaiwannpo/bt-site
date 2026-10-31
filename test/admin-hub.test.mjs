@@ -28,6 +28,7 @@ const ME = {
   sdir:     { role: "cadre",   board: "director",  team: "Sponsorship Team", ws: { finance: "edit" } },
   mres:     { role: "cadre",   board: "member",    team: "Marketing Team", ws: { "res:Marketing Team": "view" } },
   mreq:     { role: "cadre",   board: "member",    team: "Marketing Team", ws: { "custom:marketing-requests": "edit" } },
+  mapp:     { role: "cadre",   board: "member",    team: "Curriculum Team", ws: { "custom:marketing-approve": "view" } },
   student:  { role: "student", board: "president", team: "Internship Team" },
   intern:   { role: "intern",  board: "member",    team: "Internship Team" },
 };
@@ -53,6 +54,8 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
     // 2026-11-26 Marketing：Marketing 資源工作區或行銷需求單工作區，任何等級。只掛 team 標籤（director）不算，要被派進工作區。
     mres:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true },
     mreq:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true },
+    // 2026-11-27：只被派去核可貼文的人也進得來（Marketing 貼文核可工作區）。
+    mapp:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true },
     // 學員與 intern 什麼都進不去，就算 board_role 或 team 被誤設也一樣。
     student:  { forms: false, site: false, passports: false, people: false, finance: false, marketing: false },
     intern:   { forms: false, site: false, passports: false, people: false, finance: false, marketing: false },

@@ -252,7 +252,18 @@ fi
 # 第二層：Google Fonts 只准要白名單那四種。
 # 第三層：其中兩種是中文字體，只准對外頁去載。
 fontbad=""
+# 唯一的例外：後台 Marketing 的大學介紹貼文（admin/marketing/src/slides.js，2026-11-27）。
+# 那三種字（Barlow、Noto Sans TC、Rye）是**投影片的內容**，照 Paul 給的 UW-Madison 那一套 IG 貼文，不是網站的樣式；
+# 只在 Marketing 的人打開編輯畫面時才載，畫好的圖下載去發 IG。Paul 2026-10-29 同意投影片顏色與字體記為例外。
+# 例外也是寫死的：這一支多要第四種字照樣紅。
+SLIDE_FONTS="Barlow Noto+Sans+TC Rye"
 for f in $(grep -rlI 'fonts.googleapis.com/css2' $FILES 2>/dev/null); do
+  if [ "${f}" = "admin/marketing/src/slides.js" ]; then
+    for fam in $(grep -ohI 'family=[^&"]*' "${f}" | sed 's/^family=//;s/:.*//' | sort -u); do
+      case " $SLIDE_FONTS " in *" ${fam} "*) ;; *) fontbad="${fontbad} ${f} 投影片要了例外以外的字體 ${fam}" ;; esac
+    done
+    continue
+  fi
   for fam in $(grep -ohI 'family=[^&"]*' "${f}" | sed 's/^family=//;s/:.*//' | sort -u); do
     case " $FONT_ALLOWED " in
       *" ${fam} "*) ;;

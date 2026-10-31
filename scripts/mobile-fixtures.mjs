@@ -89,13 +89,14 @@ make("admin/people", "admin",
      positions:[{ term:"2026-27", title_zh:"Curriculum 的 Director", title_en:"Director, Curriculum Team", team:"Curriculum Team" },
                 { term:"2025-26", title_en:"Associate, Curriculum Team", team:"Curriculum Team" }],
      workspaces:[{ id:"apps:Curriculum Team", level:"manage" }, { id:"res:Curriculum Team", level:"manage" }, { id:"intern-passport", level:"edit" }], maybe_dup:null };`);
-// Marketing（2026-11-26）：Instagram 連線，最長的情況（接上了、通行證快過期、最近一次 190、自動換新失敗、cron 沒開、不是管的人）。
+// Marketing（2026-11-27）：大學介紹貼文的編輯畫面最長（送審區的退回框開著、每個數字的來源框、照片、右邊預覽在手機上移到最上面）。
 make("admin/marketing", "admin",
-  `UI.shellHTML("", UI.railHTML("marketing", "ig", { role:"cadre", board:"member", team:"Marketing Team", name:"王平", ws:{ "res:Marketing Team":"view" } }),
-     UI.igPageHTML({ ready:true, username:"beyondtaiwan", account_type:"BUSINESS", followers:3999, media:321, checked_at:"2026-11-26T03:17:00Z",
-       check_error:"HTTP 400 code 190: Error validating access token: Session has expired on Thursday, 26-Nov-26 03:17:00 PST.", expires_at:"2026-12-01T00:00:00Z", estimated:true,
-       refresh_error:"HTTP 400 code 10: Application does not have permission for this action", cron:false, can_manage:false }, "", false, Date.parse("2026-11-26T12:00:00Z")))`,
-  `import * as UI from "./src/ui.js";`);
+  `UI.shellHTML("", UI.railHTML("marketing", "posts", { role:"cadre", board:"director", team:"Marketing Team", name:"王平", ws:{ "res:Marketing Team":"manage" } }),
+     UI.postEditorHTML({ id:"p1", school:"Vanderbilt University", status:"in_review", data:V.data, sources:V.sources, checks:{ rank:{ by:"u", at:"2026-10-31T10:00:00Z" } },
+       caption:"COLLEGE INTRO SERIES | Vanderbilt University", review_note:null, created_by:"u", created_at:"2026-10-31T10:00:00Z" },
+       { can_edit:true, can_approve:true, me:"x", problems:{ p1:["unchecked:sat","photo:mascot"] }, hashes:{}, names:{ u:"王平" } }, "", false, { returning:true }, {}))`,
+  `import * as UI from "./src/ui.js";
+   const V = await fetch("../../test/fixtures/vanderbilt-post.json").then(r => r.json());`);
 // 財務（2026-11-08）：收支那一頁最長（篩選列、新的一筆表單、一筆展開在改、一筆在問作廢原因、作廢過的一筆、美金的一筆）。
 make("admin/finance", "admin",
   `UI.shellHTML("", UI.railHTML("finance", "tx", { role:"cadre", board:"president", team:"", name:"王平" }),

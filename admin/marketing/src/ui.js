@@ -38,7 +38,7 @@ export const GROUPS = [
   // who 是 "ws:finance"：my_access() 會在 finance 那一格填 view 或 edit（2026-11-08-finance.sql），不是真的工作區，只是借同一條路。
   { key: "finance",   label: { zh: "財務",     en: "Finance" },      href: "/admin/finance/",   who: "ws:finance",   hint: { zh: "帳戶、收支、預算、匯出", en: "Accounts, income & expenses, budget, export" } },
   // 2026-11-26 Marketing：Instagram 連線（之後加成效與大學介紹貼文）。Marketing 資源工作區或行銷需求單工作區裡的人，任何等級（Paul 2026-10-29）。
-  { key: "marketing", label: { zh: "Marketing", en: "Marketing" },  href: "/admin/marketing/", who: "ws:res:Marketing Team|custom:marketing-requests", hint: { zh: "Instagram 帳號與成效", en: "Instagram account and results" } },
+  { key: "marketing", label: { zh: "Marketing", en: "Marketing" },  href: "/admin/marketing/", who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve", hint: { zh: "大學介紹貼文、Instagram", en: "College intro posts, Instagram" } },
 ];
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
 // 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
@@ -56,7 +56,9 @@ export const ITEMS = [
   { group: "forms",     key: "request",  sec: "mkt",      label: { zh: "請 Marketing 做貼文或影片", en: "Ask Marketing for a post or video" }, hint: { zh: "送一張需求單", en: "Send a request" }, who: "cadre" },
   { group: "forms",     key: "requests", sec: "mkt",      label: { zh: "Marketing 的待辦", en: "Marketing's queue" }, hint: { zh: "大家送來的需求單", en: "Requests sent to Marketing" }, who: "ws:custom:marketing-requests" },
   // 2026-11-26 Instagram：Marketing 的人看連線狀態與粉絲數；「再檢查一次」要 Marketing 資源工作區「管」或 senior（門在資料庫）。
-  { group: "marketing", key: "ig",       sec: "mkt",      label: { zh: "Instagram", en: "Instagram" },       hint: { zh: "帳號連線、粉絲數", en: "Account connection, followers" }, who: "ws:res:Marketing Team|custom:marketing-requests" },
+  // 2026-11-27 大學介紹貼文：Marketing 的人做、勾來源；核可的人（custom:marketing-approve）核可。門在資料庫（mkt_can_edit／mkt_can_approve）。
+  { group: "marketing", key: "posts",    sec: "mkt",      label: { zh: "大學介紹貼文", en: "College intro posts" }, hint: { zh: "做、審、下載給 Canva", en: "Build, approve, download for Canva" }, who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve" },
+  { group: "marketing", key: "ig",       sec: "mkt",      label: { zh: "Instagram", en: "Instagram" },       hint: { zh: "帳號連線、粉絲數", en: "Account connection, followers" }, who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve" },
   { group: "forms",     key: "forms",    sec: "apply",    label: { zh: "申請表",   en: "Application forms" }, hint: { zh: "報名表、審核、簽到", en: "Sign-up forms, review, check-in" }, who: "cadre" },
   { group: "passports", key: "cadre",    sec: "pass",     label: { zh: "幹部護照", en: "Cadre passport" },    hint: { zh: "月份、格子、揭曉", en: "Months, boxes, reveals" }, who: "ws:passport" },
   { group: "passports", key: "cities",   sec: "pass",     label: { zh: "入境章的城市", en: "Entry-stamp cities" }, hint: { zh: "蓋滿一個月抽到的城市", en: "Cities drawn when a month is full" }, who: "ws:passport" },
@@ -91,7 +93,7 @@ export const SECTIONS = [
   { key: "people", label: { zh: "人",         en: "People" },            icon: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 0 1 6-4.6"/>' },
   { key: "money",  label: { zh: "錢",         en: "Money" },             icon: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>' },
 ];
-const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports", "ws:finance": "why.finance", "ws:res:Marketing Team|custom:marketing-requests": "why.marketing" };
+const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports", "ws:finance": "why.finance", "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve": "why.marketing" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
 function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
@@ -589,6 +591,7 @@ export function wsCellHref(w) {
   if (id === "apps" || id.startsWith("apps:")) return "/admin/#forms";
   if (id.startsWith("res:")) return "/admin/site/#res";
   if (id === "custom:marketing-requests") return "/admin/#requests";
+  if (id === "custom:marketing-approve") return "/admin/marketing/#posts";
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
   if (id === "finance") return "/admin/finance/#overview";
   return "/admin/people/#ws=" + encodeURIComponent(id);
@@ -660,7 +663,7 @@ export function noAccessHTML(me) {
 // 誰看得到：senior，或被派進 Marketing 資源工作區、行銷需求單工作區（任何等級）。跟資料庫的 ig_can_view() 同一條規則。
 // **這只是畫面，門在資料庫每一支函式第一句。**「再檢查一次」那顆鈕看 ig_status() 回的 can_manage，不在這裡算。
 // ═══════════════════════════════════════════════════════════════════════
-export const MKT_WS = ["res:Marketing Team", "custom:marketing-requests"];
+export const MKT_WS = ["res:Marketing Team", "custom:marketing-requests", "custom:marketing-approve"];
 export function canViewMkt(me) {
   if (!me || me.role !== "cadre") return false;
   if (me.board === "president" || me.board === "senior_adviser") return true;
@@ -735,4 +738,200 @@ export function igPageHTML(st, msg, busy, now) {
   }
   body += `<p class="mini">${esc(T("ig.next"))}</p>`;
   return pageHead(T("ig.title"), T("ig.lede"), actions) + msgHTML(msg) + body;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 大學介紹貼文（2026-11-27）。Paul 2026-10-31：「貼文產生器是 Marketing dashboard 裡的一個功能。」
+// 清單（這個系列做過哪幾所）、一篇的編輯畫面（每一張投影片的欄位、每個數字的來源與「我點開看過」、照片與授權、caption），
+// 右邊即時預覽，下載 PNG 與給 Canva 的 .pptx，送審、核可、退回、標成已發。投影片怎麼畫在 ./slides.js。
+// **門在資料庫**（mkt_can_edit / mkt_can_approve，作者不能核可自己的）。這裡藏按鈕只是讓畫面乾淨。
+// ═══════════════════════════════════════════════════════════════════════
+import { FACTS, PHOTO_SLOTS } from "./slides.js";
+export const POST_STATUSES = ["draft", "in_review", "approved", "posted", "archived"];
+export const SOURCE_KINDS = ["cds", "school", "bigfuture", "usnews", "collegefactual", "wikimedia", "wikipedia", "other"];
+export const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+const statusTag = s => `<span class="tag cp-st-${esc(s)}">${esc(T("cp.st." + s))}</span>`;
+const nameOf = (boot, id) => (boot && boot.names && boot.names[id]) || "";
+const when = iso => iso ? fmtWhen(iso) : "";
+export const canEditPost = (p, boot) => !!(boot && boot.can_edit) && !!p && !["posted", "archived"].includes(p.status);
+
+// 一個數字現在的狀態：ok（勾了、還有效）、stale（勾過但後來改了）、todo（有填、還沒勾）、""（沒填，不用勾）。
+export function factState(p, boot, key) {
+  const probs = (boot && boot.problems && boot.problems[p.id]) || [];
+  const chk = p.checks && p.checks[key];
+  if (probs.includes("unchecked:" + key)) return chk ? "stale" : "todo";
+  return chk ? "ok" : "";
+}
+// 整篇有幾個數字要勾、勾好幾個（清單上那一欄）。
+export function factCount(p, boot) {
+  let need = 0, done = 0;
+  for (const [k] of FACTS) { const s = factState(p, boot, k); if (s) { need++; if (s === "ok") done++; } }
+  return { need, done };
+}
+// 最舊的那一個勾是哪一天（清單上提醒：數字查過超過一年就該再查一次）。
+export function oldestCheck(p) {
+  const ds = Object.values(p.checks || {}).map(c => c && c.at).filter(Boolean).sort();
+  return ds[0] || "";
+}
+export const isStale = (iso, now) => !!iso && ((now || Date.now()) - new Date(iso).getTime()) > 365 * 86400000;
+
+export function postsListHTML(posts, boot, msg, busy, showArchived, now) {
+  const rows = (posts || []).filter(p => showArchived || p.status !== "archived");
+  const add = boot && boot.can_edit ? `<div class="card cp-new">
+      <label class="lab" for="cp-school">${esc(T("cp.new.label"))}</label>
+      <div class="row"><input id="cp-school" placeholder="${esc(T("cp.new.ph"))}" data-noauto="1"><button class="btn" data-act="cp-create"${busy ? " disabled" : ""}>${esc(T("cp.new.go"))}</button>
+      <label class="btn ghost sm cp-file">${esc(T("cp.import"))}<input type="file" accept="application/json,.json" data-act="cp-import" hidden></label></div>
+      <p class="mini">${esc(T("cp.new.hint"))}</p></div>` : `<p class="mini">${esc(T("cp.viewOnly"))}</p>`;
+  const body = rows.length ? `<table class="table cp-list"><thead><tr><th>${esc(T("cp.col.school"))}</th><th>${esc(T("cp.col.status"))}</th><th>${esc(T("cp.col.facts"))}</th><th>${esc(T("cp.col.updated"))}</th><th>${esc(T("cp.col.posted"))}</th></tr></thead><tbody>${
+    rows.map(p => {
+      const fc = factCount(p, boot), old = oldestCheck(p);
+      return `<tr${p.status === "archived" ? ' class="off"' : ""}><td class="t-main"><a href="#post/${esc(p.id)}" data-act="tab" data-t="post/${esc(p.id)}"><b>${esc(p.school)}</b></a></td>
+        <td>${statusTag(p.status)}</td>
+        <td>${fc.need ? esc(T("cp.factsDone", { done: fc.done, need: fc.need })) : ""}${old && isStale(old, now) ? `<div class="mini warn">${esc(T("cp.stale", { date: fmtDay(old) }))}</div>` : ""}</td>
+        <td>${esc(when(p.updated_at))}<div class="mini">${esc(nameOf(boot, p.updated_by))}</div></td>
+        <td>${p.posted_url ? `<a href="${esc(p.posted_url)}" target="_blank" rel="noopener">${esc(fmtDay(p.posted_at))}</a>` : ""}</td></tr>`;
+    }).join("")}</tbody></table>` : emptyHTML(T("cp.empty.title"), T("cp.empty.hint"));
+  const arch = (posts || []).some(p => p.status === "archived")
+    ? `<div class="row"><button class="btn quiet sm" data-act="cp-archived">${esc(T(showArchived ? "cp.hideArchived" : "cp.showArchived"))}</button></div>` : "";
+  return pageHead(T("cp.title"), T("cp.lede")) + msgHTML(msg) + add + sectionHTML(T("cp.series"), body + arch);
+}
+
+// ── 一篇 ──
+const v = x => esc(x == null ? "" : x);
+function inp(name, value, o) {
+  o = o || {};
+  const dis = o.disabled ? " disabled" : "";
+  if (o.area) return `<textarea name="${v(name)}" rows="${o.rows || 2}"${o.ph ? ` placeholder="${v(o.ph)}"` : ""}${dis}>${v(value)}</textarea>`;
+  return `<input name="${v(name)}" value="${v(value)}"${o.type ? ` type="${o.type}"` : ""}${o.ph ? ` placeholder="${v(o.ph)}"` : ""}${o.cls ? ` class="${o.cls}"` : ""}${dis}>`;
+}
+const fld = (label, html, hint) => `<label class="cp-f"><span class="lab">${esc(label)}</span>${html}${hint ? `<span class="mini">${esc(hint)}</span>` : ""}</label>`;
+export function factBadge(p, boot, key) {
+  const st = factState(p, boot, key), c = (p.checks || {})[key];
+  if (st === "ok") return `<span class="cp-ok">${esc(T("cp.fact.ok", { who: nameOf(boot, c.by) || "?", date: fmtDay(c.at) }))}</span>`;
+  if (st === "stale") return `<span class="cp-warn">${esc(T("cp.fact.stale"))}</span>`;
+  if (st === "todo") return `<span class="cp-warn">${esc(T("cp.fact.todo"))}</span>`;
+  return "";
+}
+function factBlock(p, boot, key, label, inner, dis) {
+  const srcs = ((p.sources || {})[key] || []).concat([{}]).slice(0, 4);
+  const st = factState(p, boot, key);
+  const rows = srcs.map((s, i) => `<div class="cp-src">
+      <select name="s.${key}.${i}.kind"${dis}>${SOURCE_KINDS.map(k => `<option value="${k}"${(s.kind || "") === k ? " selected" : ""}>${esc(T("cp.src." + k))}</option>`).join("")}</select>
+      ${inp(`s.${key}.${i}.url`, s.url, { ph: T("cp.src.urlPh"), disabled: !!dis })}
+      ${inp(`s.${key}.${i}.quote`, s.quote, { ph: T("cp.src.quotePh"), disabled: !!dis })}
+      ${s.url ? `<a class="mini" href="${v(s.url)}" target="_blank" rel="noopener">${esc(T("cp.src.open"))}</a>` : ""}</div>`).join("");
+  const tick = st ? `<label class="cp-tick"><input type="checkbox" data-act="cp-check" data-key="${key}" data-noauto="1"${st === "ok" ? " checked" : ""}${dis}> ${esc(T("cp.fact.tick"))}</label>` : "";
+  return `<div class="cp-fact" data-fact="${key}"><div class="cp-fact-head"><b>${esc(label)}</b> <span id="fx-${key}">${factBadge(p, boot, key)}</span></div>
+    ${inner}<details class="cp-srcs"${st && st !== "ok" ? " open" : ""}><summary>${esc(T("cp.src.title", { n: ((p.sources || {})[key] || []).length }))}</summary>${rows}</details>${tick}</div>`;
+}
+function photoSlot(p, slot, dis, urls) {
+  const ph = ((p.data || {}).photos || {})[slot] || {};
+  const n = `d.photos.${slot}`;
+  return `<div class="cp-photo" data-slot="${slot}">
+    <div class="cp-thumb">${ph.path && urls && urls[ph.path] ? `<img src="${v(urls[ph.path])}" alt="">` : `<span class="mini">${esc(T("cp.photo.none"))}</span>`}</div>
+    <div class="cp-photo-f"><b>${esc(T("cp.photo." + slot))}</b>
+      <input type="hidden" name="${n}.path" value="${v(ph.path)}">
+      ${dis ? "" : `<div class="row"><label class="btn ghost sm">${esc(T("cp.photo.upload"))}<input type="file" accept="image/jpeg,image/png,image/webp" data-act="cp-photo-file" data-slot="${slot}" hidden></label>
+        <input class="cp-url" placeholder="${esc(T("cp.photo.urlPh"))}" data-noauto="1" data-slot-url="${slot}"><button class="btn ghost sm" data-act="cp-photo-url" data-slot="${slot}">${esc(T("cp.photo.fromUrl"))}</button>
+        ${ph.path ? `<button class="btn quiet sm" data-act="cp-photo-clear" data-slot="${slot}">${esc(T("cp.photo.clear"))}</button>` : ""}</div>`}
+      <div class="cp-2">${fld(T("cp.photo.credit"), inp(`${n}.credit`, ph.credit, { disabled: !!dis }))}${fld(T("cp.photo.license"), inp(`${n}.license`, ph.license, { ph: "CC BY 4.0", disabled: !!dis }))}</div>
+      <div class="cp-2">${fld(T("cp.photo.source"), inp(`${n}.source_url`, ph.source_url, { disabled: !!dis }))}
+        ${fld(T("cp.photo.focus"), `<select name="${n}.focus"${dis}><option value="">${esc(T("cp.photo.center"))}</option><option value="top"${ph.focus === "top" ? " selected" : ""}>${esc(T("cp.photo.top"))}</option></select>`)}</div>
+    </div></div>`;
+}
+// 送審、核可、退回、標成已發、收起來、下載。誰看得到哪顆照資料庫的規則畫（門還是在資料庫）。
+function actionsHTML(p, boot, ui, busy) {
+  const probs = (boot.problems || {})[p.id] || [];
+  const own = p.created_by === boot.me;
+  const b = (act, label, cls, extra) => `<button class="btn${cls ? " " + cls : ""}" data-act="${act}"${busy ? " disabled" : ""}${extra || ""}>${esc(label)}</button>`;
+  let main = "";
+  if (p.status === "draft" && boot.can_edit) main += b("cp-submit", T("cp.act.submit"), "", probs.length ? " disabled" : "");
+  if (p.status === "in_review" && boot.can_approve && !own) main += b("cp-approve", T("cp.act.approve"));
+  if (["in_review", "approved"].includes(p.status) && boot.can_approve) main += b("cp-return-open", T("cp.act.return"), "ghost");
+  if (p.status === "approved" && (boot.can_edit || boot.can_approve)) main += b("cp-posted-open", T("cp.act.posted"));
+  if (["draft", "in_review"].includes(p.status) && boot.can_edit) main += b("cp-archive", T("cp.act.archive"), "quiet");
+  let note = "";
+  if (p.status === "in_review" && own && boot.can_approve) note = T("cp.ownNote");
+  if (p.status === "draft" && probs.length) note = T("cp.needs", { list: probs.map(x => { const [k, w] = x.split(":"); return k === "photo" ? T("cp.photo." + w) : T("cp.fact." + w); }).join(T("cp.sep")) });
+  const ret = ui.returning ? `<div class="cp-inline"><textarea id="cp-return-note" rows="2" placeholder="${esc(T("cp.returnPh"))}" data-noauto="1"></textarea>${b("cp-return", T("cp.act.returnGo"), "danger sm")}${b("cp-inline-cancel", T("common.cancel"), "ghost sm")}</div>` : "";
+  const post = ui.posting ? `<div class="cp-inline"><input id="cp-posted-url" placeholder="https://www.instagram.com/p/…" data-noauto="1">${b("cp-posted", T("cp.act.postedGo"), "sm")}${b("cp-inline-cancel", T("common.cancel"), "ghost sm")}</div>` : "";
+  const dl = `<div class="row">${b("cp-dl-png", T("cp.dl.png"), "ghost sm")}${b("cp-dl-pptx", T("cp.dl.pptx"), "ghost sm")}</div><p class="mini">${esc(T("cp.dl.hint"))}</p>`;
+  const who = [p.created_by && T("cp.by", { who: nameOf(boot, p.created_by), date: fmtDay(p.created_at) }),
+               p.approved_by && T("cp.approvedBy", { who: nameOf(boot, p.approved_by), date: fmtDay(p.approved_at) }),
+               p.posted_url && T("cp.postedAt", { date: fmtDay(p.posted_at) })].filter(Boolean).map(esc).join("　");
+  return `<div class="card cp-status" id="cp-status"><div class="row">${statusTag(p.status)}<span class="mini">${who}</span>${p.posted_url ? `<a class="mini" href="${v(p.posted_url)}" target="_blank" rel="noopener">${esc(T("cp.openIg"))}</a>` : ""}</div>
+    ${p.review_note ? `<div class="msg err">${esc(T("cp.returned"))}${esc(p.review_note)}</div>` : ""}
+    ${main ? `<div class="row">${main}</div>` : ""}${note ? `<p class="mini">${esc(note)}</p>` : ""}${ret}${post}${dl}</div>`;
+}
+export function statusPanel(p, boot, ui, busy) { return actionsHTML(p, boot, ui || {}, busy); }
+
+export function postEditorHTML(p, boot, msg, busy, ui, urls) {
+  const d = p.data || {}, c = d.cover || {}, b = d.basic || {}, a = d.apply || {}, t = d.timeline || {}, m = d.majors || {}, f = d.fun || {};
+  const dis = canEditPost(p, boot) ? "" : " disabled";
+  const DIS = !!dis;
+  const I2 = (name, val, o) => inp(name, val, Object.assign({ disabled: DIS }, o || {}));
+  const sec = (title, inner, hint) => sectionHTML(title, (hint ? `<p class="mini">${esc(hint)}</p>` : "") + inner);
+  const color = (name, val) => `<input type="color" name="${name}" value="${v(val || "#000000")}"${dis}>`;
+  const tlRows = (t.rows || []).map((r, i) => `<div class="cp-3">${I2(`d.timeline.rows.${i}.date`, r.date, { ph: "Nov 1" })}${I2(`d.timeline.rows.${i}.en`, r.en, { ph: "Early Decision I (ED I)" })}${I2(`d.timeline.rows.${i}.zh`, r.zh, { ph: "第一輪提前決定截止" })}${
+    DIS ? "" : `<button class="btn quiet sm" data-act="cp-row-del" data-list="timeline" data-i="${i}" title="${esc(T("cp.row.del"))}">×</button>`}</div>`).join("");
+  const mjRows = (m.rows || []).map((r, i) => `<div class="cp-3">${I2(`d.majors.rows.${i}.en`, r.en, { ph: "Economics" })}${I2(`d.majors.rows.${i}.zh`, r.zh, { ph: "經濟" })}${I2(`d.majors.rows.${i}.rank`, r.rank, { ph: "#26  By U.S. News" })}</div>`).join("");
+  const form = `<div data-autosave="cp-save" data-id="${v(p.id)}" class="cp-form">
+    ${sec(T("cp.s.cover"), `<div class="cp-2">${fld(T("cp.f.school"), I2("d.school", d.school || p.school))}${fld(T("cp.f.zh"), I2("d.cover.zh", c.zh, { ph: "范德堡大學" }))}</div>
+      <div class="cp-2">${fld(T("cp.f.line1"), I2("d.cover.line1", c.line1, { ph: "VANDERBILT" }) + color("d.cover.line1_color", c.line1_color))}${fld(T("cp.f.line2"), I2("d.cover.line2", c.line2, { ph: "UNIVERSITY" }) + color("d.cover.line2_color", c.line2_color))}</div>
+      <div class="cp-2">${fld(T("cp.f.pennant"), I2("d.cover.pennant", c.pennant, { ph: "VANDERBILT" }) + color("d.cover.pennant_text", c.pennant_text))}${fld(T("cp.f.accent"), color("d.cover.accent", c.accent))}</div>
+      ${factBlock(p, boot, "cover_rank", T("cp.fact.cover_rank"), fld(T("cp.f.tags1"), I2("d.cover.tags1", c.tags1, { ph: "#16 in US National Universities" })), dis)}
+      ${fld(T("cp.f.tags2"), I2("d.cover.tags2", c.tags2, { ph: "#Economics #Engineering" }))}`)}
+    ${sec(T("cp.s.basic"), ["rank:ranking:National 全國 #16", "type:type:Private 私立", "setting:setting:Urban 都市", "enrollment:enrollment:大學部 7,366人"].map(s => {
+        const [k, f2, ph] = s.split(":"); return factBlock(p, boot, k, T("cp.fact." + k), I2("d.basic." + f2, b[f2], { ph }), dis); }).join("")
+      + `<div class="cp-2">${fld(T("cp.f.state"), `<select name="d.basic.state"${dis}><option value=""></option>${US_STATES.map(s => `<option${(b.state || "") === s ? " selected" : ""}>${s}</option>`).join("")}</select>`)}${
+        fld(T("cp.f.stateLabel"), I2("d.basic.state_label", b.state_label, { area: true, ph: "Tennessee\n田納西州" }))}</div>`)}
+    ${sec(T("cp.s.apply"), [["acceptance", "5.4%"], ["applicants", "48,196"], ["gpa", "3.90"], ["sat", "1510–1560"], ["act", "34–35"], ["test_note", "Test-optional 可不送"],
+        ["toefl", "5"], ["ielts", "7.0"], ["duolingo", "130"]].map(([k, ph]) => factBlock(p, boot, k, T("cp.fact." + k), I2("d.apply." + k, a[k], { ph }), dis)).join("")
+      + fld(T("cp.f.footer"), I2("d.apply.footer", a.footer, { area: true, rows: 3 })), T("cp.s.applyHint"))}
+    ${sec(T("cp.s.timeline"), factBlock(p, boot, "timeline", T("cp.fact.timeline"), tlRows + (DIS || (t.rows || []).length >= 8 ? "" : `<button class="btn ghost sm" data-act="cp-row-add" data-list="timeline">${esc(T("cp.row.add"))}</button>`), dis)
+      + fld(T("cp.f.footer"), I2("d.timeline.footer", t.footer, { area: true, rows: 3 })), T("cp.s.timelineHint"))}
+    ${sec(T("cp.s.majors"), factBlock(p, boot, "majors", T("cp.fact.majors"), mjRows, dis) + fld(T("cp.f.footnote"), I2("d.majors.footnote", m.footnote, { area: true, rows: 3 })))}
+    ${sec(T("cp.s.fun"), factBlock(p, boot, "alumni", T("cp.fact.alumni"), (f.alumni || [{}, {}]).slice(0, 2).map((x, i) =>
+        `<div class="cp-2">${I2(`d.fun.alumni.${i}.name`, x.name, { ph: "Muhammad Yunus" })}${I2(`d.fun.alumni.${i}.desc`, x.desc, { ph: "2006 諾貝爾和平獎" })}</div>`).join(""), dis)
+      + `<div class="cp-2">${fld(T("cp.f.cityEn"), I2("d.fun.city_en", f.city_en, { ph: "Explore Nashville" }))}${fld(T("cp.f.cityZh"), I2("d.fun.city_zh", f.city_zh, { ph: "城市探索" }))}</div>`
+      + `<div class="cp-2">${(f.city || [{}, {}]).slice(0, 2).map((x, i) => fld(T("cp.f.city" + (i + 1)), I2(`d.fun.city.${i}.label`, x.label, { ph: i ? "Ryman Auditorium 萊曼禮堂" : "The Parthenon 帕德嫩神廟" }))).join("")}</div>`)}
+    ${sec(T("cp.s.photos"), PHOTO_SLOTS.map(s => photoSlot(p, s, dis, urls)).join(""), T("cp.s.photosHint"))}
+    ${sec(T("cp.s.caption"), fld(T("cp.f.caption"), I2("caption", p.caption, { area: true, rows: 14 })) + `<p class="mini" id="cp-cap-count">${esc(captionCount(p.caption))}</p>`)}
+    ${DIS ? "" : `<div class="row">${autosaveHint("cp-save")}</div>`}
+  </div>`;
+  const prev = `<div class="cp-prev">${[0, 1, 2, 3, 4, 5, 6].map(i => `<canvas width="1080" height="1350" data-slide="${i}" data-act="cp-zoom" title="${esc(T("cp.zoom"))}"></canvas>`).join("")}</div>`;
+  return pageHead(esc(p.school), T("cp.editLede"), [], { act: "cp-back", label: T("cp.back") }) + msgHTML(msg)
+    + statusPanel(p, boot, ui, busy) + `<div class="cp-wrap"><div>${form}</div><aside>${prev}</aside></div>`;
+}
+// caption 的字數與 hashtag 數（IG 上限 2,200 字、30 個 hashtag）。
+export function captionCount(text) {
+  const s = String(text || ""), tags = (s.match(/#[^\s#]+/g) || []).length;
+  return T("cp.capCount", { n: [...s].length, tags }) + ([...s].length > 2200 || tags > 30 ? T("cp.capOver") : "");
+}
+// 表單讀回資料：name 是「d.cover.line1」「s.rank.0.url」「caption」這種路徑。
+export function readEditor(values) {
+  const data = {}, sources = {}; let caption = "";
+  const put = (obj, path, val) => {
+    let o = obj;
+    path.forEach((k, i) => {
+      const last = i === path.length - 1, nk = path[i + 1], isIdx = /^\d+$/.test(k);
+      const key = isIdx ? Number(k) : k;
+      if (last) { o[key] = val; return; }
+      if (o[key] == null) o[key] = /^\d+$/.test(nk) ? [] : {};
+      o = o[key];
+    });
+  };
+  for (const [name, val] of Object.entries(values)) {
+    if (name === "caption") caption = String(val || "");
+    else if (name.startsWith("d.")) put(data, name.slice(2).split("."), val);
+    else if (name.startsWith("s.")) put(sources, name.slice(2).split("."), val);
+  }
+  for (const k of Object.keys(sources)) {
+    sources[k] = (sources[k] || []).filter(s => s && (String(s.url || "").trim() || String(s.quote || "").trim()))
+      .map(s => ({ kind: s.kind || "other", url: String(s.url || "").trim(), quote: String(s.quote || "").trim() }));
+    if (!sources[k].length) delete sources[k];
+  }
+  if (data.timeline && data.timeline.rows) data.timeline.rows = data.timeline.rows.filter(Boolean);
+  for (const slot of Object.keys(data.photos || {})) if (!data.photos[slot].path) delete data.photos[slot];
+  return { data, sources, caption };
 }

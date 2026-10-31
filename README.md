@@ -775,6 +775,56 @@ Sponsorship 的 Director 換人：Co-President 到人與權限把新的人這一
 - 這一屆 Sponsorship 的 Director 是誰，人與權限那邊職位要寫成「Director, Sponsorship Team」他才看得到；沒有這個人的話只有 Co-President 與 Senior Adviser 看得到。
 - 幣別目前只有 TWD 與 USD 兩個選項（`ui.js` 的 `CURRENCIES`），要加別的幣別是改一行。
 
+## Marketing 區：大學介紹貼文（2026-11-27）
+
+Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，貼文產生器是裡面的一個功能。」
+後台側欄「行銷」多一行 **大學介紹貼文**（`/admin/marketing/#posts`）。BT 在 IG 上的 COLLEGE INTRO SERIES：一所學校一篇，七張 1080x1350 的圖加一段中英 caption，
+版面照 Paul 給的 UW-Madison 那一套。第一篇 Vanderbilt 的研究、照片與成品在 `~/Anson/outputs/bt-website/social/2026-10-31-vanderbilt-college-intro/`。
+**網站不會自己發文。** 核可之後由人下載、自己發到 IG，再回來貼上連結。
+
+### 一篇怎麼做（給 Marketing）
+
+1. 在清單上打學校英文全名，按 **開一篇**。同一所學校做過就開不了第二篇（收起來的不算）。研究好的檔案（`.json`，格式見 `test/fixtures/vanderbilt-post.json` 加上 `photos`）可以按 **匯入研究檔**，照片會從 Wikimedia 一起抓進來。
+2. 照七張圖的順序填。右邊是即時預覽，點一張放大。改了就存（停手 4 秒或離開那一格）。
+3. **每一個數字都要附來源**（網址加頁面上那一句），點開確認過再勾「我點開來源看過，數字對得上」。勾了之後數字或來源再改，勾會自動失效，要重新確認。
+   數字有 17 個（排名、錄取率、SAT……整個時程、科系、校友），清單在 `admin/marketing/src/slides.js` 的 `FACTS` 與資料庫的 `mkt_facts()`，兩邊一樣（測試比對）。沒填的不用勾。
+4. 照片只用 Wikimedia Commons、學校自己的媒體庫或 BT 自己拍的，**作者與授權一定要填**。不放學生與未成年人。人像的「裁切」選「從上面」。
+5. 數字都勾好、照片都有授權，按 **送去核可**。還差什麼會列在按鈕下面。
+6. 核可之後按 **下載七張 PNG**（直接發）或 **下載給 Canva 的檔案（.pptx）**（拖進 Canva 首頁就是可以改的設計，每個字、框、照片都分開）。發完按 **我已經發到 IG 了**，貼上那一篇的網址。
+
+### 誰能核可
+
+- 核可的人：Co-President、Senior Adviser，加上被派進新的工作區 **Marketing 貼文核可**（`custom:marketing-approve`）的人，任何等級。
+- **加人減人在「人與權限 → 誰能改什麼 → Marketing 貼文核可」**，由 Co-President 管（Paul 2026-10-29：「我要能自己決定誰可以核可」）。建好時 Marketing 的 Director 已經在裡面（等級「看」）。
+- **作者不能核可自己開的那一篇**，就算他有核可權限。核可的是核可的人當下看到的那一版；之後內容改一個字，自動退回「等核可」。
+- 退回一定要寫原因，作者打開那一篇就看得到。
+
+### 資料庫（`supabase/migrations/2026-11-27-college-posts.sql`）
+
+接在 2026-11-26 那支後面跑，可以重跑、不動既有資料，PASS 表 12 項（第 12 項是 Storage，正式站要是 PASS）。RLS 只多一張新表的讀，既有的表都沒動。
+- 表 `college_posts`：學校、狀態（草稿／等核可／核可了／已發／收起來）、投影片上的每個字（`data`）、來源（`sources`）、勾（`checks`，每一個記勾的人、時間與當時數字的雜湊）、caption、核可的人與核可的版本雜湊、IG 網址。**沒有任何寫的政策**，寫一律走 `mkt_post_create/save/check/submit/approve/return/mark_posted/archive`，每一支第一句是門。
+- 三道門：`mkt_can_view()`（senior 或 Marketing 資源、需求單、貼文核可三個工作區任何等級）、`mkt_can_edit()`（senior 或前兩個工作區「改」以上）、`mkt_can_approve()`（senior 或貼文核可工作區）。
+- `mkt_post_problems()` 算「還差什麼」（沒勾或勾失效的數字、缺作者或授權的照片），送審與核可前都檢查；畫面也用它。
+- 私人 bucket `marketing-media`（8 MB、jpeg／png／webp），看用簽名網址。`ig_can_view()` 也認核可工作區。
+- `scripts/db/smoke.sh` 多一段 38 項（1031 項全過）：誰開得了、重複擋、沒來源勾不了、沒勾或缺授權送不了、不是核可的人核可不了、作者核可不了自己的、舊版本核可不了、核可後改內容退回並清掉核可、勾失效、標已發要 IG 網址、發出去鎖住、退回要原因、RLS 讀不到與不能直接寫、收起來之後可以重開、兩個破壞測試（拿掉「作者不能核可」與「沒來源勾不了」，驗收表都變紅）。
+
+### 畫面與投影片（`admin/marketing/`）
+
+- `src/slides.js`：七張投影片的版面（從 Vanderbilt 那一套的 Python 原型照抄座標）、用瀏覽器的 canvas 畫（預覽與 PNG）、用同一份版面寫 `.pptx`。沒有 DOM 也沒有資料庫，版面是純函式。
+- `slides/`：BT logo、交流群 QR code（從 UW 那一套裁下來，換群組的時候換這一張）、美國地圖（Wikimedia Commons，CC0，`us-states.json` 是各州的外框與位置）。
+- `.pptx` 用 **PptxGenJS 3.12.0（MIT）**，釘住版本放在 `vendor/pptxgen.bundle.js`（跟 supabase-js 同一個做法，不從 CDN 即時載入），只有按下載時才載。
+- 投影片的字（Barlow、Noto Sans TC、Rye）與顏色是投影片的內容不是網站的樣式，Google Fonts 只在打開編輯畫面時載。`check.sh` 對 `slides.js` 開了寫死的例外（多要第四種字照樣紅），Paul 2026-10-29 同意。
+- 側欄六份（`GROUPS`、`ITEMS`、`WHY`、`wsCellHref`）一起改：Marketing 那一組多認核可工作區、多一行「大學介紹貼文」。
+- 測試：`test/marketing-posts.test.mjs` 12 條（數字清單跟資料庫一樣、版面、申請資訊空的行不畫、時程與科系換行、中文不斜、裁切、讀回表單、勾的狀態、caption 上限、誰看得到哪顆鈕、英文不剩中文、檔名）。`check-mobile` 的 Marketing 那一頁換成編輯畫面（最長的情況）。
+- 本機 Supabase 加真的 Chrome 走過一遍：匯入 Vanderbilt（五張照片從 Wikimedia 抓進私人 bucket）、勾完 17 個數字、改一個數字勾失效、改回來勾又有效、送審、作者看不到核可、另一個人核可、標成已發之後欄位鎖住、PNG 七張與 `.pptx` 都下載得出來（`.pptx` 打開來是 7 張、1080x1350、字是真的文字、字體 Barlow 與 Noto Sans TC）。
+
+### 還沒做、要 Paul 做的
+
+- 在正式 Supabase 跑 `2026-11-27-college-posts.sql`，PASS 表 12 項。
+- 到「人與權限 → 誰能改什麼 → Marketing 貼文核可」確認誰可以核可。
+- 下一批：**「研究」按鈕**（打學校名字，網站自己去查並附來源）。要 Paul 在 Anthropic 開一把 API key、設每月上限、放進 Vault。在那之前研究用 Claude Code 做，做好用「匯入研究檔」帶進來。
+- 之後：內容行事曆、caption 與 hashtag 範本、行銷需求單一鍵變成一篇貼文、IG 成效（等 BT 的 Facebook 帳號）。
+
 ## Marketing 區：接上 Instagram（2026-11-26，批 1）
 
 Paul 2026-10-29 要的：後台多一區給 Marketing，看 BT 的 IG 貼文與 Reels 成效，之後也從這裡做「COLLEGE INTRO SERIES」大學介紹貼文、審過再發到 IG。
