@@ -24,7 +24,7 @@ Time: about 45 minutes. Do it on a computer, not a phone.
 To make sure the app belongs to BT and not to you, step 4 attaches it to the **Beyond Taiwan business portfolio** (the one you see in Meta Business Suite), and step 6 adds a second admin.
 
 1. Open https://developers.facebook.com/apps, signed in with your personal Facebook account, and click **Create App**. If it asks you to register as a developer first, do that (it is free and takes a minute).
-2. Use case: choose **Other** → Next.
+2. Use case: on the left, click the filter **Content management** (內容管理), tick **Manage messaging & content on Instagram** (管理 Instagram 上的訊息和內容), → Next. Do not pick Facebook Login or the Marketing API. If that use case is missing, pick **Other** (其他) → "Create an app without a use case" instead.
 3. App type: choose **Business** → Next.
 4. App name: `BT Site Instagram`. Contact email: beyondtaiwan2020@gmail.com. Business portfolio: choose **Beyond Taiwan**. If it is not in the list, you can skip and attach it later under App settings → Basic. Click **Create app**.
 5. On the app's dashboard, scroll to **Instagram** and click **Set up**. The page "API setup with Instagram login" appears in the left menu.
