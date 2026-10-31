@@ -51,6 +51,9 @@ export const approvePost = (id, hash) => rpc("mkt_post_approve", { p_id: id, p_h
 export const returnPost  = (id, note) => rpc("mkt_post_return", { p_id: id, p_note: note });
 export const markPosted  = (id, url) => rpc("mkt_post_mark_posted", { p_id: id, p_url: url });
 export const archivePost = id => rpc("mkt_post_archive", { p_id: id });
+// 研究按鈕（2026-11-28）：按下去開五個工作，進度與結果走 mkt_research_status（叫的時候資料庫順便推一次進度）。
+export const startResearch  = id => rpc("mkt_research_start", { p_post: id });
+export const researchStatus = id => rpc("mkt_research_status", { p_post: id });
 
 const BUCKET = "marketing-media";
 export async function uploadPhoto(path, blob) {
@@ -75,6 +78,10 @@ export const igCheckNow = () => rpc("ig_check_now");
 const SAYS = [
   ["not_marketing_manager", "says.notManager"],
   ["not_marketing_editor", "says.notEditor"],
+  ["research_not_ready", "says.rsNotReady"],
+  ["research_running", "says.rsRunning"],
+  ["research_daily_limit", "says.rsLimit"],
+  ["mkt_research", "says.noResearchTable"],
   ["not_approver", "says.notApprover"],
   ["cannot_approve_own", "says.own"],
   ["changed_since_viewed", "says.changedViewed"],

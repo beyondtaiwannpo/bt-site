@@ -23,6 +23,7 @@ let S = {
   posts: [], postId: null, showArchived: false,
   ui: {},            // { returning, posting }：送審區那一行打開了哪一個
   urls: {},          // 照片路徑 → 簽名網址
+  rs: {},            // 貼文 id → mkt_research_status() 回的那一包（研究按鈕，2026-11-28）
 };
 
 const root = () => document.getElementById("bt-root");
@@ -39,11 +40,11 @@ function render() {
   const post = S.view === "post" ? S.posts.find(p => p.id === S.postId) : null;
   if (!S.loaded) body = UI.skeletonHTML();
   else if (S.view === "posts") body = S.mkt ? UI.postsListHTML(S.posts, S.mkt, S.msg, S.busy, S.showArchived) : UI.pageHead(T("cp.title"), "") + UI.msgHTML(S.msg);
-  else if (S.view === "post") body = post && S.mkt ? UI.postEditorHTML(post, S.mkt, S.msg, S.busy, S.ui, S.urls) : UI.pageHead(T("cp.title"), "") + UI.msgHTML(S.msg || T("says.noPost"));
+  else if (S.view === "post") body = post && S.mkt ? UI.postEditorHTML(post, S.mkt, S.msg, S.busy, S.ui, S.urls, S.rs[post.id]) : UI.pageHead(T("cp.title"), "") + UI.msgHTML(S.msg || T("says.noPost"));
   else body = UI.igPageHTML(S.ig, S.msg, S.busy);
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("marketing", S.view === "post" ? "posts" : S.view, S.me), body);
   UI.afterRender(S, el);
-  if (S.view === "post" && post) schedulePreview(0);
+  if (S.view === "post" && post) { schedulePreview(0); if (UI.researchRunning(S.rs[post.id])) schedulePoll(); }
 }
 
 // 側欄與頂欄先畫（後台速度，2026-11-06 那一套）：知道我是誰就先把外殼畫出來，內容那一格放骨架。
@@ -90,7 +91,27 @@ async function loadPosts() {
   const [m, posts] = await Promise.all([D.loadMkt(), D.loadPosts()]);
   S.mkt = m; S.posts = posts;
   const p = S.posts.find(x => x.id === S.postId);
-  if (p) await signPhotos(p);
+  if (p) { await signPhotos(p); await loadResearch(p.id); }
+}
+// 研究的進度。資料表還不在（還沒跑 2026-11-28 那支）就當作沒有這個功能，不擋整頁。
+async function loadResearch(id) {
+  try { S.rs[id] = await D.researchStatus(id); } catch (e) { S.rs[id] = null; }
+}
+// 研究在跑：每 10 秒問一次（資料庫順便推進度）。跑完重拿貼文（研究回來的東西已經寫進去了），整頁重畫。
+let pollT = null;
+function schedulePoll() {
+  if (pollT) return;
+  pollT = setTimeout(async () => {
+    pollT = null;
+    const id = S.postId; if (!id || S.view !== "post") return;
+    const before = S.rs[id];
+    await loadResearch(id);
+    const after = S.rs[id];
+    const doneBefore = ((before && before.jobs) || []).filter(j => j.status === "done" || j.status === "failed").length;
+    const doneAfter = ((after && after.jobs) || []).filter(j => j.status === "done" || j.status === "failed").length;
+    if (doneAfter !== doneBefore) { try { await loadPosts(); } catch (e) { /* 下一輪再拿 */ } }
+    if (S.view === "post" && S.postId === id) render();
+  }, 10000);
 }
 async function signPhotos(p) {
   for (const ph of Object.values((p.data || {}).photos || {})) {
@@ -108,7 +129,7 @@ function openTab(key) {
   S.ask = null; S.ui = {};
   if (S.view === "ig" && !S.ig) { S.loaded = false; render(); load(); return; }
   if (S.view !== "ig" && (before === "ig" || !S.mkt)) { S.loaded = false; render(); load(); return; }
-  if (S.view === "post") { const p = S.posts.find(x => x.id === S.postId); if (p) signPhotos(p).then(render); }
+  if (S.view === "post") { const p = S.posts.find(x => x.id === S.postId); if (p) Promise.all([signPhotos(p), loadResearch(p.id)]).then(render); }
   render();
 }
 
@@ -135,7 +156,7 @@ async function savePost(content) {
 // 自動儲存：存完不重畫整頁（人可能還在打字），只換送審區與每個數字旁邊的勾。
 async function onAutosave(act, box) {
   if (act !== "cp-save") return;
-  const p = curPost(); if (!p || !UI.canEditPost(p, S.mkt)) return;
+  const p = curPost(); if (!p || !UI.canEditPost(p, S.mkt, S.rs[p.id])) return;
   UI.autosaveState(box, "saving");
   try {
     await savePost();
@@ -278,6 +299,15 @@ document.addEventListener("click", async e => {
   if (act === "cp-photo-clear") {
     const c = currentContent(); if (c.data.photos) delete c.data.photos[b.dataset.slot];
     await act2("err.save", () => savePost(c)); return;
+  }
+  if (act === "cp-research") { await act2("err.research", () => D.startResearch(S.postId), T("msg.research")); return; }
+  if (act === "cp-use-photo") {
+    const slot = b.dataset.slot, rs = S.rs[S.postId] || {};
+    const ph = Object.assign({}, ...((rs.jobs || []).map(j => j.photos || {})))[slot];
+    if (!ph || !ph.url) return;
+    await act2("err.photo", async () => putPhoto(slot, await fetchBlob(ph.url),
+      { credit: ph.credit || "", license: ph.license || "", source_url: ph.source_url || "", focus: slot.startsWith("alumni") ? "top" : "" }), T("msg.photo"));
+    return;
   }
   if (act === "cp-submit") { await act2("err.submit", () => D.submitPost(S.postId), T("msg.submitted")); return; }
   if (act === "cp-approve") { await act2("err.approve", () => D.approvePost(S.postId, (S.mkt.hashes || {})[S.postId]), T("msg.approved")); return; }

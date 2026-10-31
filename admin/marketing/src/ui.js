@@ -753,7 +753,27 @@ export const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA"
 const statusTag = s => `<span class="tag cp-st-${esc(s)}">${esc(T("cp.st." + s))}</span>`;
 const nameOf = (boot, id) => (boot && boot.names && boot.names[id]) || "";
 const when = iso => iso ? fmtWhen(iso) : "";
-export const canEditPost = (p, boot) => !!(boot && boot.can_edit) && !!p && !["posted", "archived"].includes(p.status);
+export const canEditPost = (p, boot, rs) => !!(boot && boot.can_edit) && !!p && !["posted", "archived"].includes(p.status) && !researchRunning(rs);
+// 研究（2026-11-28）：五個工作還有沒有在跑。跑的時候表單鎖住（研究回來會寫進空著的格子，人同時在打字會互相蓋掉）。
+export const researchRunning = rs => !!rs && (rs.jobs || []).some(j => j.status === "queued" || j.status === "sent");
+export const RS_GROUPS = ["basic", "admissions", "policy", "majors", "fun"];
+export const RESEARCH_DOC = "https://github.com/beyondtaiwannpo/bt-site/blob/main/docs/2026-10-31-research-setup.md";
+// 一個來源的頁面檢查結果（資料庫自己打開那個網址找那一句）。
+export function sourceCheck(rs, key, s) {
+  const c = ((rs && rs.checks) || []).find(x => x.key === key && x.url === s.url && x.quote === s.quote);
+  return c ? c.status : "";
+}
+// 錯誤翻成人話：逾時、被擋、格式不對、其他。
+export function rsErrorKey(err) {
+  const e = String(err || "");
+  if (/refusal/.test(e)) return "cp.rs.err.refusal";
+  if (/timed out|15 minutes/.test(e)) return "cp.rs.err.timeout";
+  if (/expected JSON|max_tokens/.test(e)) return "cp.rs.err.format";
+  if (/HTTP 401|HTTP 403|authentication|api key/i.test(e)) return "cp.rs.err.key";
+  if (/HTTP 400.*credit|billing|spend/i.test(e)) return "cp.rs.err.money";
+  return "cp.rs.err.other";
+}
+export function researchCost(rs) { return rs && rs.cost_usd != null ? Number(rs.cost_usd) : 0; }
 
 // 一個數字現在的狀態：ok（勾了、還有效）、stale（勾過但後來改了）、todo（有填、還沒勾）、""（沒填，不用勾）。
 export function factState(p, boot, key) {
@@ -812,14 +832,15 @@ export function factBadge(p, boot, key) {
   if (st === "todo") return `<span class="cp-warn">${esc(T("cp.fact.todo"))}</span>`;
   return "";
 }
-function factBlock(p, boot, key, label, inner, dis) {
+function factBlock(p, boot, key, label, inner, dis, rs) {
   const srcs = ((p.sources || {})[key] || []).concat([{}]).slice(0, 4);
   const st = factState(p, boot, key);
   const rows = srcs.map((s, i) => `<div class="cp-src">
       <select name="s.${key}.${i}.kind"${dis}>${SOURCE_KINDS.map(k => `<option value="${k}"${(s.kind || "") === k ? " selected" : ""}>${esc(T("cp.src." + k))}</option>`).join("")}</select>
       ${inp(`s.${key}.${i}.url`, s.url, { ph: T("cp.src.urlPh"), disabled: !!dis })}
       ${inp(`s.${key}.${i}.quote`, s.quote, { ph: T("cp.src.quotePh"), disabled: !!dis })}
-      ${s.url ? `<a class="mini" href="${v(s.url)}" target="_blank" rel="noopener">${esc(T("cp.src.open"))}</a>` : ""}</div>`).join("");
+      ${s.url ? `<a class="mini" href="${v(s.url)}" target="_blank" rel="noopener">${esc(T("cp.src.open"))}</a>` : ""}${
+        s.url && sourceCheck(rs, key, s) ? `<span class="cp-chk cp-chk-${sourceCheck(rs, key, s)}">${esc(T("cp.chk." + sourceCheck(rs, key, s)))}</span>` : ""}</div>`).join("");
   const tick = st ? `<label class="cp-tick"><input type="checkbox" data-act="cp-check" data-key="${key}" data-noauto="1"${st === "ok" ? " checked" : ""}${dis}> ${esc(T("cp.fact.tick"))}</label>` : "";
   return `<div class="cp-fact" data-fact="${key}"><div class="cp-fact-head"><b>${esc(label)}</b> <span id="fx-${key}">${factBadge(p, boot, key)}</span></div>
     ${inner}<details class="cp-srcs"${st && st !== "ok" ? " open" : ""}><summary>${esc(T("cp.src.title", { n: ((p.sources || {})[key] || []).length }))}</summary>${rows}</details>${tick}</div>`;
@@ -865,9 +886,46 @@ function actionsHTML(p, boot, ui, busy) {
 }
 export function statusPanel(p, boot, ui, busy) { return actionsHTML(p, boot, ui || {}, busy); }
 
-export function postEditorHTML(p, boot, msg, busy, ui, urls) {
+// 研究那一塊：還沒設定、按鈕、跑的進度、跑完的筆記與建議照片、花了多少。
+export function researchHTML(p, boot, rs, busy) {
+  if (!rs) return "";
+  const running = researchRunning(rs), jobs = rs.jobs || [];
+  let body = "";
+  if (!rs.ready && p.status === "draft" && boot.can_edit) body += `<p class="mini">${esc(T("cp.rs.notReady"))} <a href="${esc(RESEARCH_DOC)}" target="_blank" rel="noopener">${esc(T("cp.rs.doc"))}</a></p>`;
+  else if (p.status === "draft" && boot.can_edit && !running)
+    body += `<div class="row"><button class="btn" data-act="cp-research"${busy ? " disabled" : ""}>${esc(T(jobs.length ? "cp.rs.again" : "cp.rs.go"))}</button></div>
+      <p class="mini">${esc(T("cp.rs.hint", { today: rs.today || 0, limit: rs.daily_limit || 50 }))}</p>`;
+  if (jobs.length) {
+    body += `<ul class="cp-rs">${RS_GROUPS.map(g => {
+      const j = jobs.find(x => x.grp === g); if (!j) return "";
+      const st = j.status === "failed" ? `<span class="cp-warn">${esc(T(rsErrorKey(j.error)))}</span>` : `<span class="${j.status === "done" ? "cp-ok" : "tag"}">${esc(T("cp.rs.st." + j.status))}</span>`;
+      return `<li><b>${esc(T("cp.rs.g." + g))}</b> ${st}${j.status === "failed" && j.error ? `<span class="mini"> ${esc(j.error)}</span>` : ""}</li>`;
+    }).join("")}</ul>`;
+    if (running) body += `<p class="mini">${esc(T("cp.rs.running"))}</p>`;
+    const cost = researchCost(rs);
+    if (cost) body += `<p class="mini">${esc(T("cp.rs.cost", { usd: cost.toFixed(2) }))}</p>`;
+    const notes = [];
+    for (const j of jobs) {
+      for (const n of (j.notes || [])) if (typeof n === "string" && n.trim()) notes.push([g2(j.grp), n]);
+      for (const [k, f] of Object.entries(j.facts || {})) if (f && typeof f.note === "string" && f.note.trim()) notes.push([T("cp.fact." + k), f.note]);
+    }
+    if (notes.length) body += `<details class="cp-notes"${running ? "" : " open"}><summary>${esc(T("cp.rs.notes", { n: notes.length }))}</summary><ul>${
+      notes.map(([w, n]) => `<li><b>${esc(w)}</b>${esc(T("cp.colon"))}${esc(n)}</li>`).join("")}</ul></details>`;
+    const ph = Object.assign({}, ...(jobs.map(j => j.photos || {})));
+    const have = ((p.data || {}).photos) || {};
+    const slots = Object.keys(ph).filter(k => PHOTO_SLOTS.includes(k) && ph[k] && /^https:\/\/upload\.wikimedia\.org\//.test(ph[k].url || ""));
+    if (slots.length) body += `<div class="cp-sugg">${slots.map(k => `<figure><img src="${v(ph[k].url)}" alt="" loading="lazy"><figcaption><b>${esc(T("cp.photo." + k))}</b><span class="mini">${esc(ph[k].credit || "")}${esc(T("cp.dot"))}${esc(ph[k].license || "")}</span>${
+        have[k] && have[k].path ? `<span class="mini">${esc(T("cp.rs.photoHave"))}</span>` : ""}${canEditPost(p, boot, rs) ? `<button class="btn ghost sm" data-act="cp-use-photo" data-slot="${k}">${esc(T("cp.rs.usePhoto"))}</button>` : ""}</figcaption></figure>`).join("")}</div>`;
+  }
+  if (!body) return "";
+  return `<div class="card cp-research" id="cp-research"><h2>${esc(T("cp.rs.title"))}</h2>${body}</div>`;
+}
+const g2 = g => T("cp.rs.g." + g);
+
+export function postEditorHTML(p, boot, msg, busy, ui, urls, rs) {
   const d = p.data || {}, c = d.cover || {}, b = d.basic || {}, a = d.apply || {}, t = d.timeline || {}, m = d.majors || {}, f = d.fun || {};
-  const dis = canEditPost(p, boot) ? "" : " disabled";
+  const dis = canEditPost(p, boot, rs) ? "" : " disabled";
+  const FB = (key, label, inner) => factBlock(p, boot, key, label, inner, dis, rs);
   const DIS = !!dis;
   const I2 = (name, val, o) => inp(name, val, Object.assign({ disabled: DIS }, o || {}));
   const sec = (title, inner, hint) => sectionHTML(title, (hint ? `<p class="mini">${esc(hint)}</p>` : "") + inner);
@@ -879,19 +937,19 @@ export function postEditorHTML(p, boot, msg, busy, ui, urls) {
     ${sec(T("cp.s.cover"), `<div class="cp-2">${fld(T("cp.f.school"), I2("d.school", d.school || p.school))}${fld(T("cp.f.zh"), I2("d.cover.zh", c.zh, { ph: "范德堡大學" }))}</div>
       <div class="cp-2">${fld(T("cp.f.line1"), I2("d.cover.line1", c.line1, { ph: "VANDERBILT" }) + color("d.cover.line1_color", c.line1_color))}${fld(T("cp.f.line2"), I2("d.cover.line2", c.line2, { ph: "UNIVERSITY" }) + color("d.cover.line2_color", c.line2_color))}</div>
       <div class="cp-2">${fld(T("cp.f.pennant"), I2("d.cover.pennant", c.pennant, { ph: "VANDERBILT" }) + color("d.cover.pennant_text", c.pennant_text))}${fld(T("cp.f.accent"), color("d.cover.accent", c.accent))}</div>
-      ${factBlock(p, boot, "cover_rank", T("cp.fact.cover_rank"), fld(T("cp.f.tags1"), I2("d.cover.tags1", c.tags1, { ph: "#16 in US National Universities" })), dis)}
+      ${FB("cover_rank", T("cp.fact.cover_rank"), fld(T("cp.f.tags1"), I2("d.cover.tags1", c.tags1, { ph: "#16 in US National Universities" })))}
       ${fld(T("cp.f.tags2"), I2("d.cover.tags2", c.tags2, { ph: "#Economics #Engineering" }))}`)}
     ${sec(T("cp.s.basic"), ["rank:ranking:National 全國 #16", "type:type:Private 私立", "setting:setting:Urban 都市", "enrollment:enrollment:大學部 7,366人"].map(s => {
-        const [k, f2, ph] = s.split(":"); return factBlock(p, boot, k, T("cp.fact." + k), I2("d.basic." + f2, b[f2], { ph }), dis); }).join("")
+        const [k, f2, ph] = s.split(":"); return FB(k, T("cp.fact." + k), I2("d.basic." + f2, b[f2], { ph }), dis); }).join("")
       + `<div class="cp-2">${fld(T("cp.f.state"), `<select name="d.basic.state"${dis}><option value=""></option>${US_STATES.map(s => `<option${(b.state || "") === s ? " selected" : ""}>${s}</option>`).join("")}</select>`)}${
         fld(T("cp.f.stateLabel"), I2("d.basic.state_label", b.state_label, { area: true, ph: "Tennessee\n田納西州" }))}</div>`)}
     ${sec(T("cp.s.apply"), [["acceptance", "5.4%"], ["applicants", "48,196"], ["gpa", "3.90"], ["sat", "1510–1560"], ["act", "34–35"], ["test_note", "Test-optional 可不送"],
-        ["toefl", "5"], ["ielts", "7.0"], ["duolingo", "130"]].map(([k, ph]) => factBlock(p, boot, k, T("cp.fact." + k), I2("d.apply." + k, a[k], { ph }), dis)).join("")
+        ["toefl", "5"], ["ielts", "7.0"], ["duolingo", "130"]].map(([k, ph]) => FB(k, T("cp.fact." + k), I2("d.apply." + k, a[k], { ph }), dis)).join("")
       + fld(T("cp.f.footer"), I2("d.apply.footer", a.footer, { area: true, rows: 3 })), T("cp.s.applyHint"))}
-    ${sec(T("cp.s.timeline"), factBlock(p, boot, "timeline", T("cp.fact.timeline"), tlRows + (DIS || (t.rows || []).length >= 8 ? "" : `<button class="btn ghost sm" data-act="cp-row-add" data-list="timeline">${esc(T("cp.row.add"))}</button>`), dis)
+    ${sec(T("cp.s.timeline"), FB("timeline", T("cp.fact.timeline"), tlRows + (DIS || (t.rows || []).length >= 8 ? "" : `<button class="btn ghost sm" data-act="cp-row-add" data-list="timeline">${esc(T("cp.row.add"))}</button>`), dis)
       + fld(T("cp.f.footer"), I2("d.timeline.footer", t.footer, { area: true, rows: 3 })), T("cp.s.timelineHint"))}
-    ${sec(T("cp.s.majors"), factBlock(p, boot, "majors", T("cp.fact.majors"), mjRows, dis) + fld(T("cp.f.footnote"), I2("d.majors.footnote", m.footnote, { area: true, rows: 3 })))}
-    ${sec(T("cp.s.fun"), factBlock(p, boot, "alumni", T("cp.fact.alumni"), (f.alumni || [{}, {}]).slice(0, 2).map((x, i) =>
+    ${sec(T("cp.s.majors"), FB("majors", T("cp.fact.majors"), mjRows, dis) + fld(T("cp.f.footnote"), I2("d.majors.footnote", m.footnote, { area: true, rows: 3 })))}
+    ${sec(T("cp.s.fun"), FB("alumni", T("cp.fact.alumni"), (f.alumni || [{}, {}]).slice(0, 2).map((x, i) =>
         `<div class="cp-2">${I2(`d.fun.alumni.${i}.name`, x.name, { ph: "Muhammad Yunus" })}${I2(`d.fun.alumni.${i}.desc`, x.desc, { ph: "2006 諾貝爾和平獎" })}</div>`).join(""), dis)
       + `<div class="cp-2">${fld(T("cp.f.cityEn"), I2("d.fun.city_en", f.city_en, { ph: "Explore Nashville" }))}${fld(T("cp.f.cityZh"), I2("d.fun.city_zh", f.city_zh, { ph: "城市探索" }))}</div>`
       + `<div class="cp-2">${(f.city || [{}, {}]).slice(0, 2).map((x, i) => fld(T("cp.f.city" + (i + 1)), I2(`d.fun.city.${i}.label`, x.label, { ph: i ? "Ryman Auditorium 萊曼禮堂" : "The Parthenon 帕德嫩神廟" }))).join("")}</div>`)}
@@ -901,7 +959,7 @@ export function postEditorHTML(p, boot, msg, busy, ui, urls) {
   </div>`;
   const prev = `<div class="cp-prev">${[0, 1, 2, 3, 4, 5, 6].map(i => `<canvas width="1080" height="1350" data-slide="${i}" data-act="cp-zoom" title="${esc(T("cp.zoom"))}"></canvas>`).join("")}</div>`;
   return pageHead(esc(p.school), T("cp.editLede"), [], { act: "cp-back", label: T("cp.back") }) + msgHTML(msg)
-    + statusPanel(p, boot, ui, busy) + `<div class="cp-wrap"><div>${form}</div><aside>${prev}</aside></div>`;
+    + statusPanel(p, boot, ui, busy) + researchHTML(p, boot, rs, busy) + `<div class="cp-wrap"><div>${form}</div><aside>${prev}</aside></div>`;
 }
 // caption 的字數與 hashtag 數（IG 上限 2,200 字、30 個 hashtag）。
 export function captionCount(text) {

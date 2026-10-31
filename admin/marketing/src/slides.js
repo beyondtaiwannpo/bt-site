@@ -43,7 +43,7 @@ export function blankPost(school) {
       { date: "", en: "RD Decision Release", zh: "正規申請結果公佈" },
       { date: "May 1", en: "College Decision Day", zh: "大學錄取決定日" }],
       footer: "Sources: the university's admissions website, Common App. Deadlines may change. Please refer to the university's official website." },
-    majors: { rows: [0, 1, 2, 3, 4, 5].map(() => ({ en: "", zh: "", rank: "", zh_below: false })),
+    majors: { rows: [0, 1, 2, 3, 4, 5].map(() => ({ en: "", zh: "", rank: "" })),
               footnote: "*College Factual: uses core statistics from official government databases, primarily the Integrated Postsecondary Education Data System (IPEDS), under the U.S. Department of Education." },
     fun: { alumni: [{ name: "", desc: "" }, { name: "", desc: "" }], city_en: "Explore", city_zh: "城市探索", city: [{ label: "" }, { label: "" }] },
   };

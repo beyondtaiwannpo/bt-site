@@ -775,6 +775,53 @@ Sponsorship 的 Director 換人：Co-President 到人與權限把新的人這一
 - 這一屆 Sponsorship 的 Director 是誰，人與權限那邊職位要寫成「Director, Sponsorship Team」他才看得到；沒有這個人的話只有 Co-President 與 Senior Adviser 看得到。
 - 幣別目前只有 TWD 與 USD 兩個選項（`ui.js` 的 `CURRENCIES`），要加別的幣別是改一行。
 
+## Marketing 區：大學介紹貼文的「幫我研究」按鈕（2026-11-28）
+
+Paul 2026-10-29 決定研究直接做成後台按鈕，2026-10-31 說「Research next」。一篇草稿打開來，按 **幫我研究這所學校**，
+Claude 會上網查那所學校，把**空著的格子**填上數字與來源，再建議 Wikimedia 的照片。大約 3 到 5 分鐘、一所學校大約 3 到 5 美元（Opus 5.5 的價目，2026-10-31 查的，實際花多少畫面上會印）。
+**它不會自動打勾。** 每個數字還是要人點開來源確認再勾，這是整個系列唯一真正重要的規矩。
+
+### 第一次要做的事（Co-President，大約 15 分鐘）
+
+照 `docs/2026-10-31-research-setup.md`：用 BT 主帳號開 Anthropic 帳號、儲值、**設每月上限**、開一把 API key，放進 Supabase Vault（名字 `ANTHROPIC_API_KEY`），再跑遷移檔。
+沒設定之前，按鈕的地方會說「還沒設定」，研究可以用 Claude Code 做、再用「匯入研究檔」帶進來。
+
+### 按下去之後發生什麼
+
+1. 開五個工作同時跑：學校資訊、申請數字、考試政策與時程、熱門科系、Fun facts 與照片。每個工作叫一次 Claude（`claude-opus-5-5`，開網路搜尋與讀網頁）。
+   規矩寫在給 Claude 的話裡（`mkt_research_system()`），跟 `.claude/skills/verify-college-data` 同一套：數字一定要是打開頁面親眼看到的、附網址與頁面上那一句、看不到就空著、學校自己的頁面優先、三種來源都列（Paul「全部」）、有 ED 就寫 ED 不要硬塞 EA、英文成績寫清楚是最低還是建議。
+2. 跑的時候表單鎖住（研究回來會寫進空著的格子，同時打字會互相蓋掉），頁面每 10 秒自己更新。
+3. 回來的東西**只填空著、或還是範本的格子**（新貼文的時程 Aug 1／May 1、來源小字那幾格算範本；範本在 `slides.js` 的 `blankPost()` 與資料庫的 `mkt_template()`，兩邊一樣，測試比對）。人填過的一個字都不動。
+4. 資料庫接著自己打開每一個來源網址，看頁面上找不找得到那一句，每個來源旁邊印一個小牌子：**找得到這一句**、**找到數字但句子不一樣**、**找不到，一定要點開看**、**網站擋了自動檢查，自己點開**（U.S. News 與 Common Data Set 的 .xlsx 都是這一種）。
+   這只是幫忙，不能取代人勾。2026-10-31 拿 Vanderbilt 那一篇的 38 個來源在本機實測：14 個找得到、5 個找到數字、19 個打不開，沒有一個誤報找不到。
+5. 跑完那一塊列出 **Claude 留給你的話**（來源不一致、查不到的、要注意的）、建議的照片（只認 `upload.wikimedia.org`，按「用這張」才放進去，作者與授權一起帶）、這一篇花了多少錢。
+6. 再按一次只補還空著的格子。
+
+### 錢與上限
+
+- 一天最多 50 個工作（十所學校），超過按鈕會擋。真正的上限是 Paul 在 Anthropic 設的每月上限。
+- 錯誤都翻成人話：key 不能用了、額度用完了、等太久、格式不對（再按一次）、Claude 不回答（自己查）。
+
+### 資料庫（`supabase/migrations/2026-11-28-college-research.sql`）
+
+接在 2026-11-27 那支後面跑，可以重跑，PASS 表 11 項（最後三項是資訊：pg_net、金鑰、pg_cron）。只多兩張新表與幾支函式，既有的表與 RLS 都沒動。
+- `mkt_research_jobs`（每個工作的對話、狀態、用量、結果）與 `mkt_source_checks`（每個來源的頁面檢查）。兩張都開 RLS、**任何角色都讀不到**，畫面走 `mkt_research_status()`。
+- 送：`mkt_research_send()` 用 **pg_net**（寄信也是它）在背景送到 `api.anthropic.com/v1/messages`，逾時 10 分鐘，帶 `fallbacks: "default"`（Claude 擋下來時自動換一個模型重試）。金鑰從 Vault 拿，**任何函式都不回金鑰**。
+- 收：`mkt_research_tick()`。pg_cron 有開就每分鐘一次；畫面開著時 `mkt_research_status()` 每 10 秒也推一次。處理 Claude 搜尋太久先停一下（`pause_turn`，原樣接回去再送，最多 6 次）、429／5xx 重送三次、`refusal`、回來不是 JSON。
+- 填：`mkt_research_apply()` 只收白名單（`mkt_facts()` 的 17 個數字加 `mkt_research_fields()` 的 16 格文字），陣列（時程、科系、校友）照規定形狀截長，其他一律丟掉。
+- `scripts/db/smoke.sh` 多一段 21 項（1051 項全過），用假的 Claude 與假的網頁：送出去的內容（模型、工具、金鑰、fallback）、五種回應（正常、pause_turn、429、不是 JSON、refusal）、只填空著的（人填的 SAT 不被蓋掉）、白名單外的不碰、不會自動打勾、用量相加、頁面檢查三種結果、金鑰不外流、一天上限、沒金鑰說還沒設定、破壞測試（拿掉「只填空著的」驗收表變紅）。
+- 本機 Supabase 也用**真的 pg_net 打真的 Anthropic API**（故意用一把假的 key）走過一次：五個工作送出去、Anthropic 回 401、畫面印「API key 不能用了」。**還沒有用真的 key 跑過**，第一所學校就是實測，看一下花了多少錢與研究的品質。
+
+### 畫面
+
+- 編輯畫面多一塊「幫我研究」（送審區下面）。`src/ui.js` 的 `researchHTML()`；每個來源旁邊的牌子是 `sourceCheck()`。
+- 測試：`test/marketing-research.test.mjs` 8 條（範本跟資料庫一樣、白名單每一格編輯畫面都有、還沒設定、按鈕什麼時候有、跑的時候鎖表單、跑完的錯誤／筆記／錢／照片只認 Wikimedia、來源牌子、英文不剩中文）。
+
+### 還沒做、要 Paul 做的
+
+- 照 `docs/2026-10-31-research-setup.md` 開 Anthropic、設上限、放金鑰，跑 `2026-11-28-college-research.sql`。
+- 第一次真的按：挑一所學校，看研究的品質、Claude 留的話、花了多少錢。太貴的話可以改用 Sonnet 5.5（大約一半價錢），那是 Paul 的決定，改 `mkt_research_send()` 裡的一行。
+
 ## Marketing 區：大學介紹貼文（2026-11-27）
 
 Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，貼文產生器是裡面的一個功能。」
