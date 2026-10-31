@@ -2594,5 +2594,62 @@ rm -f "${BROKEN}"
 # 假的 Instagram 拆掉，後面要是再加別段，不會以為真的有 http 擴充。
 psql -d "${DB}" -q -c "drop function extensions.http(extensions.http_request); drop function extensions.http_set_curlopt(text, text); drop function extensions.urlencode(text); drop table extensions.fake_calls; drop type extensions.http_request; drop type extensions.http_header; delete from vault.decrypted_secrets where name='INSTAGRAM_TOKEN';" >/dev/null
 echo
+echo "── 大學介紹貼文（2026-11-27-college-posts.sql）──"
+# 這時候：MKM 是 Marketing 的 Director（需求工作區管）、MKE 需求工作區改、OUTC 別的 team、STU 學員、PAUL Co-President。
+cpgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-27-college-posts.sql 2>&1 || true)
+if echo "${cpgot}" | grep -q "OVERALL.*PASS" && ! echo "${cpgot}" | grep -q "|FAIL"; then echo "  ok   貼文那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 貼文那支驗收表："; echo "${cpgot}" | head -16; fail=$((fail+1)); fi
+chk "★ Marketing 的 Director 建好時就被加進核可工作區（等級看）" "view" "select level from public.assignments where user_id='${MKM}' and workspace_id='custom:marketing-approve'"
+chkraise "★ 別的 team 的幹部開不了貼文（not_marketing_editor）" "not_marketing_editor" "perform set_config('test.uid','${OUTC}',true); perform public.mkt_post_create('Vanderbilt University');"
+chkraise "★ 學員開不了" "not_marketing_editor" "perform set_config('test.uid','${STU}',true); perform public.mkt_post_create('Vanderbilt University');"
+CP=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MKE}',false);" -c "select public.mkt_post_create('Vanderbilt University')" 2>&1 | tail -1 | tr -d ' \n')
+chk "Marketing 的人開一篇，狀態草稿、作者是他" "draft|${MKE}" "select status||'|'||created_by from public.college_posts where id='${CP}'"
+chkraise "★ 同一所學校不能開第二篇（大小寫與符號不算）" "already_in_series" "perform set_config('test.uid','${MKE}',true); perform public.mkt_post_create('vanderbilt-university ');"
+chkraise "沒有來源連結勾不了（need_source_url）" "need_source_url" "perform set_config('test.uid','${MKE}',true); perform public.mkt_post_check('${CP}','rank',true);"
+D1='{"school":"Vanderbilt University","basic":{"ranking":"National 全國 #16"},"photos":{"campus":{"path":"x/campus.jpg","credit":"Jbaker08","license":"Public domain"}}}'
+S1='{"rank":[{"kind":"usnews","url":"https://www.usnews.com/best-colleges/vanderbilt-3535","quote":"#16 in National Universities (tie)"}]}'
+chkas "${MKE}" "存內容與來源" "draft" "select public.mkt_post_save('${CP}','${D1}'::jsonb,'${S1}'::jsonb,'cap')"
+chkas "${MKE}" "勾排名" "true" "select (public.mkt_post_check('${CP}','rank',true) ? 'rank')::text"
+chkas "${MKE}" "還差什麼：空的" "{}" "select public.mkt_post_problems(data,sources,checks)::text from public.college_posts where id='${CP}'"
+D2='{"school":"Vanderbilt University","basic":{"ranking":"National 全國 #16"},"apply":{"acceptance":"5.4%"},"photos":{"campus":{"path":"x/campus.jpg","credit":"Jbaker08","license":""}}}'
+chkas "${MKE}" "多填一個錄取率、照片沒寫授權" "draft" "select public.mkt_post_save('${CP}','${D2}'::jsonb,'${S1}'::jsonb,'cap')"
+chkraise "★ 有沒勾的數字、缺授權的照片就送不了審" "not_ready: photo:campus,unchecked:acceptance" "perform set_config('test.uid','${MKE}',true); perform public.mkt_post_submit('${CP}');"
+chkas "${MKE}" "拿掉錄取率、補上授權" "draft" "select public.mkt_post_save('${CP}','${D1}'::jsonb,'${S1}'::jsonb,'cap')"
+chkas "${MKE}" "★ 排名沒動，之前的勾還有效，送審" "in_review" "select public.mkt_post_submit('${CP}')"
+chkraise "★ 不是核可的人核可不了（not_approver）" "not_approver" "perform set_config('test.uid','${MKE}',true); perform public.mkt_post_approve('${CP}','x');"
+psql -d "${DB}" -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${MKE}','custom:marketing-approve','view') on conflict do nothing;" >/dev/null
+chkraise "★ 作者就算有核可權限也不能核可自己的（cannot_approve_own）" "cannot_approve_own" "perform set_config('test.uid','${MKE}',true); perform public.mkt_post_approve('${CP}', (select public.mkt_post_hash(data,caption) from public.college_posts where id='${CP}'));"
+chkraise "★ 核可的人看到的是舊版本就擋（changed_since_viewed）" "changed_since_viewed" "perform set_config('test.uid','${MKM}',true); perform public.mkt_post_approve('${CP}','oldhash');"
+chkas "${MKM}" "★ 別人核可現在這一版" "approved" "select public.mkt_post_approve('${CP}', (select public.mkt_post_hash(data,caption) from public.college_posts where id='${CP}'))"
+D3='{"school":"Vanderbilt University","basic":{"ranking":"National 全國 #17"},"photos":{"campus":{"path":"x/campus.jpg","credit":"Jbaker08","license":"Public domain"}}}'
+chkas "${MKE}" "★ 核可之後改了排名：自動退回送審" "in_review" "select public.mkt_post_save('${CP}','${D3}'::jsonb,'${S1}'::jsonb,'cap')"
+chk "核可清掉了" "true" "select (approved_by is null and approved_hash is null)::text from public.college_posts where id='${CP}'"
+chkraise "★ 數字改了，之前的勾失效，核可不了" "not_ready: unchecked:rank" "perform set_config('test.uid','${MKM}',true); perform public.mkt_post_approve('${CP}', (select public.mkt_post_hash(data,caption) from public.college_posts where id='${CP}'));"
+chkas "${MKE}" "重新勾" "true" "select (public.mkt_post_check('${CP}','rank',true) ? 'rank')::text"
+chkas "${MKM}" "再核可" "approved" "select public.mkt_post_approve('${CP}', (select public.mkt_post_hash(data,caption) from public.college_posts where id='${CP}'))"
+chkraise "標已發要貼 IG 連結（need_instagram_url）" "need_instagram_url" "perform set_config('test.uid','${MKE}',true); perform public.mkt_post_mark_posted('${CP}','https://example.com/x');"
+chkas "${MKE}" "標成已發" "posted" "select public.mkt_post_mark_posted('${CP}','https://www.instagram.com/p/ABC123/')"
+chkraise "★ 發出去的不能再改（post_locked）" "post_locked" "perform set_config('test.uid','${MKE}',true); perform public.mkt_post_save('${CP}','{}'::jsonb,'{}'::jsonb,'');"
+chkraise "退回一定要寫原因（need_note）" "need_note" "perform set_config('test.uid','${MKM}',true); perform public.mkt_post_return('${CP}','  ');"
+chkrole authenticated "${OUTC}" "★ 別的 team 的幹部讀不到任何一篇" "0" "select count(*) from public.college_posts"
+chkrole authenticated "${MKE}" "Marketing 的人讀得到" "1" "select count(*) from public.college_posts"
+chkrole authenticated "${MKE}" "★ 連 Marketing 的人都不能直接改表" "denied" "select case when has_table_privilege('authenticated','public.college_posts','update') then 'open' else 'denied' end"
+CP2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MKE}',false);" -c "select public.mkt_post_create('Rice University')" 2>&1 | tail -1 | tr -d ' \n')
+chkas "${MKE}" "草稿收起來" "archived" "select public.mkt_post_archive('${CP2}')"
+chkas "${MKE}" "收起來之後同一所可以重開" "1" "select count(*) from (select public.mkt_post_create('Rice University')) x"
+chkas "${MKE}" "bootstrap：改得動、核可得了（被加進去了）、17 個數字" "true|true|17" "select (b->>'can_edit')||'|'||(b->>'can_approve')||'|'||jsonb_array_length(b->'facts') from (select public.mkt_bootstrap() b) x"
+chkraise "★ 別的 team 的幹部拿不到 bootstrap" "not_marketing" "perform set_config('test.uid','${OUTC}',true); perform public.mkt_bootstrap();"
+cp2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-27-college-posts.sql 2>&1 || true)
+if echo "${cp2}" | grep -q "OVERALL.*PASS"; then echo "  ok   貼文那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 貼文那支重跑沒過"; fail=$((fail+1)); fi
+chk "重跑不動資料" "posted|3" "select (select status from public.college_posts where id='${CP}')||'|'||(select count(*) from public.college_posts)"
+BROKEN=$(mktemp)
+sed "s/  if r.created_by = auth.uid() then raise exception 'cannot_approve_own' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-27-college-posts.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「作者不能核可自己的」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉作者不能核可驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/    if not v_ok then raise exception 'need_source_url' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-27-college-posts.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「沒有來源勾不了」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉沒有來源勾不了驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-27-college-posts.sql >/dev/null 2>&1 || true
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
