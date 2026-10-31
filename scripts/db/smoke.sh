@@ -2651,5 +2651,98 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-27-college-posts.sql >/dev/null 2>&1 || true
 echo
+echo "── 大學介紹貼文的研究按鈕（2026-11-28-college-research.sql）：假的 Claude 與假的網頁 ──"
+# 假的 pg_net：記下送了什麼，回應由測試自己塞進 net._http_response。
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+create table if not exists net.fake_req (id bigserial primary key, method text, url text, body jsonb, headers jsonb);
+create table if not exists net._http_response (id bigint, status_code int, content_type text, headers jsonb, content text, timed_out boolean, error_msg text, created timestamptz default now());
+create or replace function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds int)
+  returns bigint language sql as $$ insert into net.fake_req (method, url, body, headers) values ('POST', url, body, headers) returning id $$;
+create or replace function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds int)
+  returns bigint language sql as $$ insert into net.fake_req (method, url, headers) values ('GET', url, headers) returning id $$;
+delete from vault.decrypted_secrets where name = 'ANTHROPIC_API_KEY';
+insert into vault.decrypted_secrets (name, decrypted_secret) values ('ANTHROPIC_API_KEY', 'sk-ant-test-SECRET');
+SQL
+rsgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-28-college-research.sql 2>&1 || true)
+if echo "${rsgot}" | grep -q "OVERALL.*PASS" && ! echo "${rsgot}" | grep -q "|FAIL"; then echo "  ok   研究那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 研究那支驗收表："; echo "${rsgot}" | head -14; fail=$((fail+1)); fi
+TPL=$(node -e 'import("./admin/marketing/src/slides.js").then(S=>{const t=S.blankPost("Duke University");t.apply.sat="1400–1500";process.stdout.write(JSON.stringify(t))})')
+RP=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MKE}',false);" -c "select public.mkt_post_create('Duke University', \$j\$${TPL}\$j\$::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 新貼文的範本跟資料庫的 mkt_template() 一樣（研究才認得哪些格子還沒動過）" "true|true|false" \
+  "select public.mkt_untouched(data, array['timeline','rows'])::text||'|'||public.mkt_untouched(data, array['majors','rows'])::text||'|'||public.mkt_untouched(data, array['apply','sat'])::text from public.college_posts where id='${RP}'"
+chkraise "★ 別的 team 的幹部按不了研究（not_marketing_editor）" "not_marketing_editor" "perform set_config('test.uid','${OUTC}',true); perform public.mkt_research_start('${RP}');"
+chkas "${MKE}" "Marketing 的人按研究：開五個工作" "5" "select public.mkt_research_start('${RP}')"
+chk "★ 五個都送出去了：claude-opus-5-5、開網路搜尋與讀網頁、帶金鑰與 fallback" "5|5|5|5" \
+  "select count(*)||'|'||count(*) filter (where body->>'model'='claude-opus-5-5')||'|'||count(*) filter (where body->'tools'->0->>'type'='web_search_20260209' and body->'tools'->1->>'type'='web_fetch_20260209')||'|'||count(*) filter (where headers->>'x-api-key'='sk-ant-test-SECRET' and headers->>'anthropic-beta'='server-side-fallback-2026-07-01' and body->>'fallbacks'='default') from net.fake_req where method='POST'"
+chkraise "★ 還在跑的時候不能再按（research_running）" "research_running" "perform set_config('test.uid','${MKE}',true); perform public.mkt_research_start('${RP}');"
+# 五個工作各自的回應：basic 正常、admissions 先 pause_turn 再正常、policy 先 429、majors 回的不是 JSON、fun 被擋（refusal）。
+RQ() { psql -d "${DB}" -X -A -t -q -c "select request_id from public.mkt_research_jobs where post_id='${RP}' and grp='$1'" | tr -d ' \n'; }
+R_BASIC=$(RQ basic); R_ADM=$(RQ admissions); R_POL=$(RQ policy); R_MAJ=$(RQ majors); R_FUN=$(RQ fun)
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into net._http_response (id, status_code, content_type, content) values
+ (${R_BASIC}, 200, 'application/json', jsonb_build_object('stop_reason','end_turn','usage',jsonb_build_object('input_tokens',100000,'output_tokens',5000,'server_tool_use',jsonb_build_object('web_search_requests',8)),
+   'content', jsonb_build_array(jsonb_build_object('type','text','text', E'Here you go.\n\`\`\`json\n' || jsonb_build_object(
+     'facts', jsonb_build_object('rank', jsonb_build_object('value','National 全國 #6','sources',jsonb_build_array(jsonb_build_object('kind','usnews','url','https://example.com/rank','quote','#6 in National Universities'))),
+                                 'enrollment', jsonb_build_object('value','大學部 6,640人','sources',jsonb_build_array(jsonb_build_object('kind','cds','url','https://example.com/cds','quote','Total all undergraduates 6,640')))),
+     'fields', jsonb_build_object('cover.zh','杜克大學','cover.accent','#012169','basic.state','NC','evil.path','x'),
+     'notes', jsonb_build_array('U.S. News 2027 edition'))::text || E'\n\`\`\`')))::text),
+ (${R_ADM}, 200, 'application/json', jsonb_build_object('stop_reason','pause_turn','usage',jsonb_build_object('input_tokens',50000,'output_tokens',1000),
+   'content', jsonb_build_array(jsonb_build_object('type','server_tool_use','id','s1','name','web_search','input',jsonb_build_object('query','duke cds'))))::text),
+ (${R_POL}, 429, 'application/json', '{"type":"error","error":{"type":"rate_limit_error","message":"slow down"}}'),
+ (${R_MAJ}, 200, 'application/json', jsonb_build_object('stop_reason','end_turn','usage',jsonb_build_object('input_tokens',10,'output_tokens',10),'content',jsonb_build_array(jsonb_build_object('type','text','text','sorry, no json')))::text),
+ (${R_FUN}, 200, 'application/json', jsonb_build_object('stop_reason','refusal','stop_details',jsonb_build_object('category','general_harms'),'usage',jsonb_build_object('input_tokens',10,'output_tokens',0),'content','[]'::jsonb)::text);
+SQL
+psql -d "${DB}" -X -A -t -q -c "select public.mkt_research_tick()" >/dev/null 2>&1
+chk "★ basic 好了、admissions 接著送（pause_turn，訊息多一段）、policy 429 重送、majors 不是 JSON 失敗、fun 被擋失敗" \
+  "basic:done|admissions:sent:2:2|policy:sent:1|majors:failed:replywasnottheexpectedJSON|fun:failed:stopped:refusal/general_harms" \
+  "select string_agg(x, '|' order by o) from (select 1 o, 'basic:'||status x from public.mkt_research_jobs where post_id='${RP}' and grp='basic'
+     union all select 2, 'admissions:'||status||':'||step||':'||jsonb_array_length(messages) from public.mkt_research_jobs where post_id='${RP}' and grp='admissions'
+     union all select 3, 'policy:'||status||':'||retries from public.mkt_research_jobs where post_id='${RP}' and grp='policy'
+     union all select 4, 'majors:'||status||':'||replace(error,' ','') from public.mkt_research_jobs where post_id='${RP}' and grp='majors'
+     union all select 5, 'fun:'||status||':'||replace(error,' ','') from public.mkt_research_jobs where post_id='${RP}' and grp='fun') t"
+chk "★ 研究結果填進空著的格子（排名、學生數、中文校名、代表色、州），白名單外的不碰" "National全國#6|大學部6,640人|杜克大學|#012169|NC|false" \
+  "select replace(data#>>'{basic,ranking}',' ','')||'|'||replace(data#>>'{basic,enrollment}',' ','')||'|'||(data#>>'{cover,zh}')||'|'||(data#>>'{cover,accent}')||'|'||(data#>>'{basic,state}')||'|'||(data ? 'evil')::text from public.college_posts where id='${RP}'"
+chk "★ 來源跟著放進去，勾一個都沒有（勾一定是人）" "1|1|{}" "select jsonb_array_length(sources->'rank')||'|'||jsonb_array_length(sources->'enrollment')||'|'||checks::text from public.college_posts where id='${RP}'"
+R_ADM2=$(psql -d "${DB}" -X -A -t -q -c "select request_id from public.mkt_research_jobs where post_id='${RP}' and grp='admissions'" | tr -d ' \n')
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into net._http_response (id, status_code, content_type, content) values
+ (${R_ADM2}, 200, 'application/json', jsonb_build_object('stop_reason','end_turn','usage',jsonb_build_object('input_tokens',60000,'output_tokens',3000,'server_tool_use',jsonb_build_object('web_search_requests',4)),
+   'content', jsonb_build_array(jsonb_build_object('type','text','text', jsonb_build_object('facts', jsonb_build_object(
+     'acceptance', jsonb_build_object('value','5.1%','sources',jsonb_build_array(jsonb_build_object('kind','cds','url','https://example.com/c1','quote','applied 54,191; admitted 2,766'))),
+     'sat', jsonb_build_object('value','1510–1570','sources',jsonb_build_array(jsonb_build_object('kind','cds','url','https://example.com/c9','quote','SAT 1510 1570')))),
+     'notes', jsonb_build_array('Fall 2025 class'))::text)))::text);
+SQL
+psql -d "${DB}" -X -A -t -q -c "select public.mkt_research_tick()" >/dev/null 2>&1
+chk "★ 人已經填的 SAT 不被蓋掉；錄取率填進去；用量是兩次加起來" "1400–1500|5.1%|110000" \
+  "select (data#>>'{apply,sat}')||'|'||(data#>>'{apply,acceptance}')||'|'||(select usage->>'input' from public.mkt_research_jobs where post_id='${RP}' and grp='admissions') from public.college_posts where id='${RP}'"
+chk "每一個來源排了一次頁面檢查，送出去了" "3|3" "select count(*)||'|'||count(*) filter (where status='sent') from public.mkt_source_checks where post_id='${RP}'"
+CQ() { psql -d "${DB}" -X -A -t -q -c "select request_id from public.mkt_source_checks where post_id='${RP}' and url='$1'" | tr -d ' \n'; }
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into net._http_response (id, status_code, content_type, content) values
+ ($(CQ https://example.com/rank), 200, 'text/html; charset=utf-8', '<html><body><h2>#6 in <b>National Universities</b> (tie)</h2></body></html>'),
+ ($(CQ https://example.com/cds), 403, 'text/html', 'Forbidden'),
+ ($(CQ https://example.com/c1), 200, 'text/html', '<td>Total first-year applicants</td><td>54,191</td><td>Total admits</td><td>2,766</td>');
+SQL
+psql -d "${DB}" -X -A -t -q -c "select public.mkt_research_tick()" >/dev/null 2>&1
+chk "★ 頁面檢查：整句找得到、只找到數字、打不開" "c1:numbers|cds:unreachable|rank:found" "select string_agg(regexp_replace(url,'.*/','')||':'||status, '|' order by url) from public.mkt_source_checks where post_id='${RP}'"
+chk "頁面比對：句子不在、數字也不在就是找不到" "not_found|found" "select public.mkt_quote_on_page('SAT 1600 1700', '<p>SAT 1510 to 1570</p>')||'|'||public.mkt_quote_on_page('Total all undergraduates 6,640', 'TOTAL ALL UNDERGRADUATES 6640')"
+chkas "${MKE}" "★ 進度：五個工作、花了多少錢（美金）、回給畫面的東西裡沒有金鑰" "5|t|false" \
+  "select jsonb_array_length(s->'jobs')||'|'||((s->>'cost_usd')::numeric > 0)::text::char(1)||'|'||(s::text like '%SECRET%')::text from (select public.mkt_research_status('${RP}') s) x"
+chkraise "★ 別的 team 的幹部看不到進度" "not_marketing" "perform set_config('test.uid','${OUTC}',true); perform public.mkt_research_status('${RP}');"
+chkrole authenticated "${MKE}" "★ 連 Marketing 的人都不能直接讀研究工作表（裡面有整段對話）" "denied" "select case when has_table_privilege('authenticated','public.mkt_research_jobs','select') then 'open' else 'denied' end"
+psql -d "${DB}" -q -c "insert into public.mkt_research_jobs (post_id, grp, status) select '${RP}', 'basic', 'done' from generate_series(1,46)" >/dev/null
+RP2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MKE}',false);" -c "select public.mkt_post_create('Emory University')" 2>&1 | tail -1 | tr -d ' \n')
+chkraise "★ 一天超過 50 個工作就擋（research_daily_limit）" "research_daily_limit" "perform set_config('test.uid','${MKE}',true); perform public.mkt_research_start('${RP2}');"
+psql -d "${DB}" -q -c "delete from vault.decrypted_secrets where name='ANTHROPIC_API_KEY'" >/dev/null
+chkraise "Vault 沒有金鑰就說還沒設定（research_not_ready）" "research_not_ready" "perform set_config('test.uid','${MKE}',true); perform public.mkt_research_start('${RP2}');"
+rs2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-28-college-research.sql 2>&1 || true)
+if echo "${rs2}" | grep -q "OVERALL.*PASS"; then echo "  ok   研究那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 研究那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/    if v is null or not public.mkt_untouched(r.data, f.path) then continue; end if;/    if v is null then continue; end if;/" supabase/migrations/2026-11-28-college-research.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「只填空著的」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉只填空著的驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-28-college-research.sql >/dev/null 2>&1 || true
+psql -d "${DB}" -q -c "drop function net.http_post(text, jsonb, jsonb, jsonb, int); drop function net.http_get(text, jsonb, jsonb, int); drop table net.fake_req; drop table net._http_response;" >/dev/null
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
