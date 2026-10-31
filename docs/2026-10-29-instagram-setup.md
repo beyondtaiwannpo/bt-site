@@ -26,7 +26,7 @@ To make sure the app belongs to BT and not to you, step 4 attaches it to the **B
 1. Open https://developers.facebook.com/apps, signed in with your personal Facebook account, and click **Create App**. If it asks you to register as a developer first, do that (it is free and takes a minute).
 2. Use case: on the left, click the filter **Content management** (內容管理), tick **Manage messaging & content on Instagram** (管理 Instagram 上的訊息和內容), → Next. Do not pick Facebook Login or the Marketing API. If that use case is missing, pick **Other** (其他) → "Create an app without a use case" instead.
 3. App type: choose **Business** → Next.
-4. App name: `BT Site Instagram`. Contact email: beyondtaiwan2020@gmail.com. Business portfolio: choose **Beyond Taiwan**. If it is not in the list, you can skip and attach it later under App settings → Basic. Click **Create app**.
+4. App name: `BT Site Instagram`. Contact email: beyondtaiwan2020@gmail.com. Business portfolio: choose **Beyond Taiwan**. If Beyond Taiwan is not in the list (it only shows portfolios where you are an admin), choose **"I don't want to connect a business portfolio yet"** and attach it later under App settings → Basic. Never pick another organization's portfolio (Pincheng, Kuroshio and so on): the app would belong to them. The connection works without a portfolio. Click **Create app**.
 5. On the app's dashboard, scroll to **Instagram** and click **Set up**. The page "API setup with Instagram login" appears in the left menu.
 6. Left menu: App roles → Roles → **Add people** → Administrator → add the other Co-President (their personal Facebook). At handover, the outgoing admin adds the new Co-President the same way, then removes themselves.
 
