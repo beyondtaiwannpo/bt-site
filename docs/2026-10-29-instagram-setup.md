@@ -4,8 +4,8 @@ Once this is done, the admin's Marketing area (`/admin/marketing/`) shows that i
 
 You only do this once. The site renews the access token by itself every 10 days or so, so it does not expire. At handover, the next person only needs to know three things:
 
-- who holds the BT main account password (beyondtaiwan2020@gmail.com)
-- that the Meta app is called `BT Site Instagram` and is owned by the BT main account
+- who holds the @beyondtaiwan Instagram password
+- that the Meta app is called `BT Site Instagram`, sits in the Beyond Taiwan business portfolio, and has two admins (App roles → Roles)
 - that the token lives in Supabase Vault as `INSTAGRAM_TOKEN`
 
 > ⚠ The access token is the key to the BT Instagram account. Paste it only into Supabase Vault. Never into chat, docs, LINE, email or the repo.
@@ -19,13 +19,16 @@ Time: about 45 minutes. Do it on a computer, not a phone.
 
 ## 1. Create the Meta app
 
-Stay signed in to Facebook as the **BT main account** the whole time (not your personal account). If the BT main account has no Facebook login, create one with beyondtaiwan2020@gmail.com first. The app should belong to BT, not to a person who leaves next year.
+**Sign in with your own personal Facebook account.** There is no "BT Facebook account" to log in to: the Beyond Taiwan Facebook Page and @beyondtaiwan are managed *from* people's personal accounts, which is why searching for a BT login says "no account found". Meta also does not allow shared or fake accounts for developer work, so a personal account is the right one.
 
-1. Open https://developers.facebook.com/apps and click **Create App**. If it asks you to register as a developer first, do that with the BT main account.
+To make sure the app belongs to BT and not to you, step 4 attaches it to the **Beyond Taiwan business portfolio** (the one you see in Meta Business Suite), and step 6 adds a second admin.
+
+1. Open https://developers.facebook.com/apps, signed in with your personal Facebook account, and click **Create App**. If it asks you to register as a developer first, do that (it is free and takes a minute).
 2. Use case: choose **Other** → Next.
 3. App type: choose **Business** → Next.
-4. App name: `BT Site Instagram`. Contact email: beyondtaiwan2020@gmail.com. Business portfolio: skip for now. Click **Create app**.
+4. App name: `BT Site Instagram`. Contact email: beyondtaiwan2020@gmail.com. Business portfolio: choose **Beyond Taiwan**. If it is not in the list, you can skip and attach it later under App settings → Basic. Click **Create app**.
 5. On the app's dashboard, scroll to **Instagram** and click **Set up**. The page "API setup with Instagram login" appears in the left menu.
+6. Left menu: App roles → Roles → **Add people** → Administrator → add the other Co-President (their personal Facebook). At handover, the outgoing admin adds the new Co-President the same way, then removes themselves.
 
 ## 2. Add @beyondtaiwan and get the token
 
@@ -61,7 +64,7 @@ If Supabase has **pg_cron** turned on (Database → Extensions), the site checks
 - **The page says Instagram no longer accepts the token (code 190)**: the token was revoked or expired. Common causes: someone changed the @beyondtaiwan password, removed the app under Instagram's "Apps and websites", or nobody pressed Check again for 60 days while pg_cron was off. Redo step 2 (Generate token), then in Vault **edit** `INSTAGRAM_TOKEN` and paste the new one. Do not add a second secret with the same name. Then press Check again.
 - **"Automatic token renewal failed"**: the old token keeps working until its date. Press Check again the next day. If it keeps failing and the date is less than 10 days away, redo step 2.
 - **Could not reach Instagram**: usually a short network problem. It tries again the next day.
-- **Someone else takes over the BT main account**: nothing to redo, as long as the @beyondtaiwan password stays the same.
+- **An app admin leaves BT**: another admin adds the new person under App roles → Roles, then removes the one leaving. The token keeps working; it belongs to @beyondtaiwan, not to the admin.
 - **Meta changes its rules and asks for App Review**: stop and tell the Co-President. App Review needs a short screen recording and a privacy policy link (`https://beyondtaiwannpo.com/privacy/`). It is a separate decision, not a quick fix.
 
 ## What this connection can and cannot do

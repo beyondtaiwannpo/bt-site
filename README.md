@@ -796,7 +796,7 @@ Paul 2026-10-29 要的：後台多一區給 Marketing，看 BT 的 IG 貼文與 
 
 ### 第一次要做的事（Paul 或 Co-President，大約 45 分鐘）
 
-照 `docs/2026-10-29-instagram-setup.md` 做：用 BT 主帳號開一個 Meta app、加 @beyondtaiwan、拿一張通行證、放進 Supabase Vault（名字 `INSTAGRAM_TOKEN`），再跑遷移檔。
+照 `docs/2026-10-29-instagram-setup.md` 做：用自己的個人 Facebook 開一個 Meta app（BT 沒有可以登入的 Facebook 帳號，粉專是從個人帳號管的），掛在 Beyond Taiwan 的商業資產組合底下、再加另一位 Co-President 當管理員，然後用 @beyondtaiwan 的 Instagram 帳密加進 app、拿一張通行證、放進 Supabase Vault（名字 `INSTAGRAM_TOKEN`），再跑遷移檔。
 **不用送 Meta 的 App Review，也不用 Facebook 粉專**：網站只碰 BT 自己的帳號，Meta 的 Development 模式就夠（2026-10-29 查過 Meta 的文件）。
 做完到 `/admin/marketing/` 按「再檢查一次」，看得到 @beyondtaiwan 與粉絲數就是接上了。
 
