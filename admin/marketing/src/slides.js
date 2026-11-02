@@ -229,6 +229,53 @@ function wrapRuns(ctx, line, maxW) {
   if (cur.trim()) out.push(cur.trim());
   return out.map(t => [{ ...st, t }]);
 }
+// 一個文字元素排成幾行、每一段字放在哪裡。畫圖與 .pptx 共用，所以 Canva 拿到的位置就是預覽上的位置。
+export function layoutText(ctx, e) {
+  let ls = lines(e);
+  if (e.wrap && ls.length === 1 && ls[0].length) ls = wrapRuns(ctx, ls[0], e.w);
+  const lineH = ls.map(l => Math.max(e.size, ...l.map(r => r.size)) * e.lh);
+  const total = lineH.reduce((a, b) => a + b, 0);
+  let y = e.valign === "top" ? e.y : e.valign === "bottom" ? e.y + e.h - total : e.y + (e.h - total) / 2;
+  return ls.map((l, i) => {
+    const widths = l.map(r => { ctx.font = fontOf(r); return ctx.measureText(r.t).width; });
+    const lw = widths.reduce((a, b) => a + b, 0);
+    let x = e.align === "left" ? e.x : e.align === "right" ? e.x + e.w - lw : e.x + (e.w - lw) / 2;
+    const maxS = Math.max(e.size, ...l.map(r => r.size));
+    const items = l.map((r, j) => { const it = { r, x, w: widths[j] }; x += widths[j]; return it; });
+    const out = { top: y, h: lineH[i], base: y + lineH[i] / 2 + maxS * 0.35, items };
+    y += lineH[i];
+    return out;
+  });
+}
+
+// .pptx 的文字框怎麼放（純函式，test/ 有測）。兩個 Canva 的習慣要繞開：
+//   1. 同一行裡每個字都會被改成第一個字的大小。「POPULAR MAJORS」82 px 加「熱門科系」60 px 會一起變 82 px，
+//      太長就換行、第二行被切掉。所以同一行有兩種字級，就拆成一個字級一個框，放在預覽上的位置。
+//   2. Canva 的字比瀏覽器量的寬一點，一行剛好塞滿的字會被換行。所以單行的框往對齊方向留寬，會換行的框多 4%。
+export function pptxTextBoxes(e, layout) {
+  const mixed = layout.some(L => new Set(L.items.map(it => it.r.size)).size > 1);
+  if (!mixed) {
+    let x = e.x, w = e.w;
+    if (!e.wrap) {
+      if (e.align === "left") w = Math.max(w, W - 8 - x);
+      else if (e.align === "right") { w = Math.max(w, x + w - 8); x = Math.min(x, 8); }
+      else { const g = Math.max(0, Math.min(x - 8, W - 8 - (x + w))); x -= g; w += 2 * g; }
+    } else { const g = w * 0.04; if (e.align === "right") x -= g; else if (e.align !== "left") x -= g / 2; w += g; }
+    return [{ x, y: e.y, w, h: e.h, align: e.align, valign: e.valign, lh: e.lh, wrap: !!e.wrap, lines: lines(e) }];
+  }
+  const out = [];
+  for (const L of layout) {
+    let g = null;
+    for (const it of L.items) {
+      if (g && g.size === it.r.size) { g.runs.push(it.r); g.w += it.w; continue; }
+      g = { size: it.r.size, x: it.x, w: it.w, runs: [it.r] }; out.push(g);
+      const h = it.r.size * 1.3; g.y = L.base - it.r.size * 0.35 - h / 2; g.h = h;
+    }
+  }
+  return out.map(g => ({ x: g.x, y: g.y, w: g.w * 1.15 + 10, h: g.h, align: "left", valign: "middle", lh: 1, wrap: false, lines: [g.runs] }));
+}
+
+let measureCtx = null;
 export function drawSlide(ctx, els, images, data) {
   ctx.save(); ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
   for (const e of els) {
@@ -264,20 +311,9 @@ export function drawSlide(ctx, els, images, data) {
       while (ctx.measureText(e.text).width > e.w * 0.62 && size > 20) { size -= 2; ctx.font = `${size}px Rye, serif`; }
       ctx.fillText(e.text, 28, 2); ctx.restore();
     } else if (e.k === "text") {
-      let ls = lines(e);
-      if (e.wrap && ls.length === 1 && ls[0].length) ls = wrapRuns(ctx, ls[0], e.w);
-      const lineH = ls.map(l => Math.max(e.size, ...l.map(r => r.size)) * e.lh);
-      const total = lineH.reduce((a, b) => a + b, 0);
-      let y = e.valign === "top" ? e.y : e.valign === "bottom" ? e.y + e.h - total : e.y + (e.h - total) / 2;
-      ls.forEach((l, i) => {
-        const widths = l.map(r => { ctx.font = fontOf(r); return ctx.measureText(r.t).width; });
-        const lw = widths.reduce((a, b) => a + b, 0);
-        let x = e.align === "left" ? e.x : e.align === "right" ? e.x + e.w - lw : e.x + (e.w - lw) / 2;
-        const maxS = Math.max(e.size, ...l.map(r => r.size));
-        const base = y + lineH[i] / 2 + maxS * 0.35;
-        l.forEach((r, j) => { ctx.font = fontOf(r); ctx.fillStyle = r.color; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(r.t, x, base); x += widths[j]; });
-        y += lineH[i];
-      });
+      for (const L of layoutText(ctx, e)) for (const it of L.items) {
+        ctx.font = fontOf(it.r); ctx.fillStyle = it.r.color; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(it.r.t, it.x, L.base);
+      }
     }
   }
   ctx.restore();
@@ -333,13 +369,16 @@ export function buildPptx(Pptx, slides, images, data) {
         s.addShape(p.ShapeType.triangle, { x: px(e.x + e.w / 2 - e.h / 2), y: px(e.y + e.h / 2 - e.w / 2), w: px(e.h), h: px(e.w), rotate: 84, fill: { color: hex(e.fill) }, line: { type: "none" } });
         s.addText(e.text, { x: px(e.x + 20), y: px(e.y + 10), w: px(e.w * 0.62), h: px(e.h - 20), rotate: -6, fontFace: "Rye", fontSize: pt(e.h * 0.3), color: hex(e.color), margin: 0, valign: "middle" });
       } else if (e.k === "text") {
-        const runs = [];
-        lines(e).forEach((l, i, all) => l.forEach((r, j) => runs.push({ text: r.t, options: {
-          fontFace: r.cjk ? CJK : LATIN, fontSize: pt(r.size), bold: r.weight >= 700, italic: r.italic, color: hex(r.color),
-          breakLine: j === l.length - 1 && i < all.length - 1 } })));
-        if (!runs.length) continue;
-        s.addText(runs, { x: px(e.x), y: px(e.y), w: px(e.w), h: px(e.h), align: e.align, valign: e.valign, margin: 0, fit: "none",
-          lineSpacingMultiple: e.lh, wrap: !!e.wrap });
+        if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
+        for (const b of pptxTextBoxes(e, layoutText(measureCtx, e))) {
+          const runs = [];
+          b.lines.forEach((l, i, all) => l.forEach((r, j) => runs.push({ text: r.t, options: {
+            fontFace: r.cjk ? CJK : LATIN, fontSize: pt(r.size), bold: r.weight >= 700, italic: r.italic, color: hex(r.color),
+            breakLine: j === l.length - 1 && i < all.length - 1 } })));
+          if (!runs.length) continue;
+          s.addText(runs, { x: px(b.x), y: px(b.y), w: px(b.w), h: px(b.h), align: b.align, valign: b.valign, margin: 0, fit: "none",
+            lineSpacingMultiple: b.lh, wrap: b.wrap });
+        }
       }
     }
   }

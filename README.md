@@ -859,6 +859,7 @@ Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，�
 
 - `src/slides.js`：七張投影片的版面（從 Vanderbilt 那一套的 Python 原型照抄座標）、用瀏覽器的 canvas 畫（預覽與 PNG）、用同一份版面寫 `.pptx`。沒有 DOM 也沒有資料庫，版面是純函式。
 - `slides/`：BT logo、交流群 QR code（從 UW 那一套裁下來，換群組的時候換這一張）、美國地圖（Wikimedia Commons，CC0，`us-states.json` 是各州的外框與位置）。
+- **給 Canva 的 `.pptx` 有兩個繞路（2026-11-01 Paul 匯入時發現）**：Canva 會把同一行的字都改成第一個字的大小，所以「POPULAR MAJORS 熱門科系」這種英文大、中文小的標題會一起變大、換行、第二行被切掉。現在同一行有兩種字級就拆成兩個文字框（英文一個、中文一個），放在預覽上的位置；只有一種字級的單行框往對齊的方向留寬，Canva 就不會自己換行。在 Canva 裡標題是兩塊，可以分開改。位置怎麼算在 `src/slides.js` 的 `layoutText()`（預覽也用它，所以兩邊不會對不上）與 `pptxTextBoxes()`，`test/marketing-posts.test.mjs` 有測。PNG 不受影響。
 - `.pptx` 用 **PptxGenJS 3.12.0（MIT）**，釘住版本放在 `vendor/pptxgen.bundle.js`（跟 supabase-js 同一個做法，不從 CDN 即時載入），只有按下載時才載。
 - 投影片的字（Barlow、Noto Sans TC、Rye）與顏色是投影片的內容不是網站的樣式，Google Fonts 只在打開編輯畫面時載。`check.sh` 對 `slides.js` 開了寫死的例外（多要第四種字照樣紅），Paul 2026-10-29 同意。
 - 側欄六份（`GROUPS`、`ITEMS`、`WHY`、`wsCellHref`）一起改：Marketing 那一組多認核可工作區、多一行「大學介紹貼文」。

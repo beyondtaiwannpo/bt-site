@@ -132,3 +132,28 @@ test("檔名：學校名變成小寫英數與連字號", () => {
   assert.equal(SL.slug("Vanderbilt University"), "vanderbilt");
   assert.equal(SL.slug("University of Wisconsin-Madison"), "wisconsin-madison");
 });
+
+// 假的量字工具：每個字寬 0.5 x 字級，夠用來測位置。
+const fakeCtx = { font: "", measureText(t) { const m = this.font.match(/(\d+)px/); return { width: t.length * (m ? +m[1] : 10) * 0.5 }; } };
+const T0 = { k: "text", x: 108, y: 173, w: 900, h: 110, size: 82, weight: 800, italic: true, color: "#000000", align: "left", valign: "middle", lh: 1.15 };
+
+test("★ Canva：同一行有兩種字級就拆成兩個框，位置跟預覽一樣", () => {
+  const e = { ...T0, text: "POPULAR MAJORS <zh>熱門科系</zh>" };
+  const layout = SL.layoutText(fakeCtx, e);
+  const boxes = SL.pptxTextBoxes(e, layout);
+  assert.equal(boxes.length, 2);
+  assert.deepEqual(boxes.map(b => b.lines[0].map(r => r.size)), [[82], [50]]);
+  assert.equal(boxes[0].x, 108);
+  assert.equal(boxes[1].x, layout[0].items.find(it => it.r.cjk).x);        // 中文從預覽上中文開始的地方開始
+  assert.ok(boxes.every(b => !b.wrap));
+});
+
+test("★ Canva：只有一種字級的單行框往對齊方向留寬，不拆", () => {
+  const left = SL.pptxTextBoxes({ ...T0, text: "APPLICATION TIMELINE" }, SL.layoutText(fakeCtx, { ...T0, text: "APPLICATION TIMELINE" }));
+  assert.equal(left.length, 1); assert.equal(left[0].x, 108); assert.equal(left[0].x + left[0].w, SL.W - 8);
+  const c = { ...T0, align: "center", x: 300, w: 480, text: "FUN FACTS" };
+  const mid = SL.pptxTextBoxes(c, SL.layoutText(fakeCtx, c))[0];
+  assert.ok(mid.x < 300 && mid.x + mid.w > 780); assert.equal(mid.x + mid.w / 2, 540);   // 中心不動
+  const wrapped = { ...T0, wrap: true, text: "Sources: a long footnote" };
+  assert.ok(SL.pptxTextBoxes(wrapped, SL.layoutText(fakeCtx, wrapped))[0].w > 900);
+});
