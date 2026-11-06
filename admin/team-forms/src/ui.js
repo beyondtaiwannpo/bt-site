@@ -1,4 +1,4 @@
-// 後台「內部表單」那一組的畫面（2026-11-29）：要填的表單、建表單與看結果、匯入 Tally 的 CSV。
+// 後台「內部表單」那一組的畫面（2026-11-29）：要填的表單、建表單與看結果。
 // 前半段（側欄、外殼、回饋、自動儲存、成員區）2026-11-29 從 admin/finance/src/ui.js 原樣抄過來，七份一模一樣（test/admin-hub.test.mjs 逐字比對）。
 // **esc 是自己的一份**，不從別的資料夾 import。
 // **esc 是自己的一份**，不從別的資料夾 import。
@@ -662,7 +662,7 @@ export function noAccessHTML(me) {
 // 內部表單（2026-11-29）。Paul 2026-11-05：「a internal form for all of us ... like a tally form」，
 // 接著「make everything changeable like who's able to read, sending it out to who, all that」。
 // 資料庫那一半在 supabase/migrations/2026-11-29-team-forms.sql，門在那裡每一支函式的第一句。
-// 這一半：純函式（名單怎麼算、結果怎麼統計、CSV 怎麼讀、名字怎麼對）加畫面。**少畫一顆按鈕不是安全機制。**
+// 這一半：純函式（名單怎麼算、結果怎麼統計、名字怎麼找）加畫面。**少畫一顆按鈕不是安全機制。**
 // ═══════════════════════════════════════════════════════════════════════
 
 export const TYPES = ["short", "long", "single", "multi", "scale"];
@@ -747,112 +747,11 @@ export function csvFilename(title) {
   return `bt-${slug}.csv`;
 }
 
-// ── CSV（讀，Tally 匯出的）。照 RFC 4180：引號包起來的欄位裡可以有逗號、換行、兩個引號代表一個。 ──
-export function parseCSV(text) {
-  const s = String(text || "").replace(/^﻿/, "");
-  const rows = []; let row = [], cell = "", q = false;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (q) {
-      if (c === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else q = false; }
-      else cell += c;
-    } else if (c === '"') q = true;
-    else if (c === ",") { row.push(cell); cell = ""; }
-    else if (c === "\n" || c === "\r") {
-      if (c === "\r" && s[i + 1] === "\n") i++;
-      row.push(cell); cell = "";
-      if (row.some(x => x !== "")) rows.push(row);
-      row = [];
-    } else cell += c;
-  }
-  row.push(cell);
-  if (row.some(x => x !== "")) rows.push(row);
-  return rows;
-}
-// 每一欄猜一個角色與題型。名字、送出時間、Tally 自己的編號照欄名認；其他的照答案猜：
-// 全是小整數 → 量表；不同的值很少而且短 → 單選；有換行或平均很長 → 長答；其他短答。
-export function guessColumns(header, rows) {
-  return (header || []).map((h, idx) => {
-    const name = String(h || "").trim();
-    const vals = (rows || []).map(r => String(r[idx] == null ? "" : r[idx]).trim()).filter(v => v !== "");
-    const sample = vals[0] || "";
-    const col = { idx, header: name, label: name, sample, role: "question", type: "short", options: [], scale_min: 1, scale_max: 5, required: false };
-    if (/^(submission id|respondent id)$/i.test(name)) return { ...col, role: "skip" };
-    if (/^submitted at$/i.test(name)) return { ...col, role: "time" };
-    if (/\bname\b|名字|姓名/i.test(name)) return { ...col, role: "name" };
-    const distinct = [...new Set(vals)];
-    const avg = vals.length ? vals.reduce((s, v) => s + v.length, 0) / vals.length : 0;
-    if (vals.length && vals.every(v => /^\d{1,2}$/.test(v)) && distinct.length <= 11) {
-      const nums = vals.map(Number), lo = Math.min(...nums), hi = Math.max(...nums);
-      return { ...col, type: "scale", scale_min: lo === 0 ? 0 : 1, scale_max: Math.max(hi, 2, lo === 0 ? 1 : 2) };
-    }
-    if (vals.length >= 2 && distinct.length >= 2 && distinct.length <= 8 && avg < 40 && distinct.length < vals.length) {
-      return { ...col, type: "single", options: distinct };
-    }
-    if (vals.some(v => v.includes("\n")) || avg > 60) return { ...col, type: "long" };
-    return col;
-  });
-}
-export function titleFromFile(filename) {
-  return String(filename || "").replace(/\.csv$/i, "").replace(/_Submissions_\d{4}-\d{2}-\d{2}$/i, "").replace(/_/g, " ").trim();
-}
-// Tally 的時間長這樣：2026-10-21 10:30:07（沒有時區，Tally 匯出是 UTC）。tz 是 "utc" 或 "taipei"。
-export function tallyTime(s, tz) {
-  const m = String(s || "").trim().match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)/);
-  if (!m) return "";
-  return `${m[1]}T${m[2].length === 5 ? m[2] + ":00" : m[2]}${tz === "taipei" ? "+08:00" : "Z"}`;
-}
-
-// ── 名字怎麼對 ──
+// ── 名字 ──
 // 小寫、全形轉半形、拿掉標點與多的空白。中文名不分大小寫本來就一樣。
 export function normName(s) {
   return String(s || "").normalize("NFKC").toLowerCase().replace(/[.,'’"()（）\-_/]+/g, " ").replace(/\s+/g, " ").trim();
 }
-// 回 { id, how }：how 是 exact（整個名字對上，只有一個人）、first（只打了名，剛好只有一個人的英文名是它）、""（對不到）。
-export function matchPerson(typed, people) {
-  const t = normName(typed);
-  if (!t) return { id: "", how: "" };
-  const full = p => {
-    const en = normName(p.name_en), parts = en.split(" ").filter(Boolean);
-    return [normName(p.name), normName(p.name_zh), en, parts.length > 1 ? [...parts].reverse().join(" ") : ""].filter(Boolean);
-  };
-  const exact = (people || []).filter(p => full(p).includes(t) || full(p).map(x => x.replace(/ /g, "")).includes(t.replace(/ /g, "")));
-  if (exact.length === 1) return { id: exact[0].id, how: "exact" };
-  if (exact.length > 1) return { id: "", how: "" };
-  if (!t.includes(" ")) {
-    const first = (people || []).filter(p => normName(p.name_en).split(" ")[0] === t);
-    if (first.length === 1) return { id: first[0].id, how: "first" };
-  }
-  return { id: "", how: "" };
-}
-// 匯入的預備：每一列一個 { typed, team, at, pick, how, dup }。同一個人被對到兩次，第二次起不接（dup）。
-export function importRows(cols, rows, people, tz) {
-  const nameCol = (cols || []).find(c => c.role === "name"), timeCol = (cols || []).find(c => c.role === "time");
-  const seen = new Set();
-  return (rows || []).map((r, i) => {
-    const typed = nameCol ? String(r[nameCol.idx] || "").trim() : "";
-    const m = matchPerson(typed, people);
-    const dup = !!m.id && seen.has(m.id);
-    if (m.id && !dup) seen.add(m.id);
-    return { i, typed: typed || T("common.noName"), at: timeCol ? tallyTime(r[timeCol.idx], tz) : "", pick: dup ? "" : m.id, how: dup ? "" : m.how, dup };
-  });
-}
-// 給 tf_import 的列。qids[c.idx] 是那一欄變成的題目 id。
-export function importPayload(cols, rows, plan, qids) {
-  const qs = (cols || []).filter(c => c.role === "question");
-  return (plan || []).map(p => {
-    const r = rows[p.i] || [];
-    const answers = {};
-    for (const c of qs) { const v = String(r[c.idx] == null ? "" : r[c.idx]).trim(); if (v && qids[c.idx]) answers[qids[c.idx]] = v; }
-    return { user_id: p.pick || null, name: p.typed, submitted_at: p.at || null, answers };
-  });
-}
-export function colQuestion(c) {
-  return { type: c.type, label: c.label || c.header, required: false,
-    options: c.type === "single" || c.type === "multi" ? (c.options || []) : [],
-    scale_min: c.scale_min, scale_max: c.scale_max };
-}
-
 // ── 日期 ──
 export function fmtWhen(v) {
   if (!v) return "";
@@ -940,7 +839,7 @@ export function fillHTML(d, msg, busy) {
 // 建表單與看結果：清單。
 export function buildListHTML(boot, msg, busy, newDraft) {
   const b = boot || {}, forms = b.manage || [];
-  const acts = b.can_create && !newDraft ? [{ act: "tf-new", label: T("build.new"), primary: true }, { act: "tf-import", label: T("build.import") }] : [];
+  const acts = b.can_create && !newDraft ? [{ act: "tf-new", label: T("build.new"), primary: true }] : [];
   const nf = newDraft ? `<div class="card inline-form"><h2>${esc(T("build.newTitle"))}</h2>
       <label><i>${esc(T("ed.name"))}</i><input id="tf-new-title" value="${esc(newDraft.title || "")}" placeholder="${esc(T("build.titlePh"))}" maxlength="200"></label>
       <div class="form-foot"><button class="btn" data-act="tf-create"${busy ? " disabled" : ""}>${esc(busy ? T("common.saving") : T("build.create"))}</button>
@@ -1059,10 +958,10 @@ export function audienceHTML(a, people, aud, saved, find, msg, busy) {
   return msgHTML(msg) + ROLES.map(block).join("");
 }
 
-// 結果。r 是 tf_results() 回的；people 給「接到這個人」用（編輯才有）。
-export function resultsHTML(r, people, msg, busy, showAll) {
+// 結果。r 是 tf_results() 回的。
+export function resultsHTML(r, msg, showAll) {
   const f = r.form || {}, qs = r.questions || [], rs = r.responses || [], pending = r.pending || [];
-  const anon = !!f.anonymous, edit = !!r.can_edit;
+  const anon = !!f.anonymous;
   const kpis = `<div class="todo">${[["res.answered", rs.length], ["res.pending", pending.length]].map(([k, n]) => `<div class="kpi"><div class="kpi-n">${n}</div><div class="kpi-l">${esc(T(k))}</div><div class="kpi-h">${esc(T("res.of", { n: r.recipients || 0 }))}</div></div>`).join("")}</div>`;
   if (!rs.length) return msgHTML(msg) + kpis + emptyHTML(T("res.none"), esc(T("res.noneHint"))) + pendingHTML(pending);
   const bar = (label, n, of) => `<div class="tf-bar"><span class="tf-bar-l">${esc(label)}</span><span class="tf-bar-t"><i style="width:${of ? Math.round(n / of * 100) : 0}%"></i></span><b>${n}</b></div>`;
@@ -1082,9 +981,7 @@ export function resultsHTML(r, people, msg, busy, showAll) {
       ${s.texts.length > list.length ? `<button type="button" class="lnk" data-act="res-more" data-id="${esc(s.q.id)}">${esc(T("res.showAll", { n: s.texts.length }))}</button>` : ""}</div>`;
   }).join("");
   const each = `<table class="table tf-each"><thead><tr>${anon ? "" : `<th>${esc(T("res.who"))}</th><th>${esc(T("res.team"))}</th>`}<th>${esc(T("res.when"))}</th></tr></thead><tbody>${rs.map(x => `<tr>
-      ${anon ? "" : `<td class="t-main"><b>${esc(x.name)}</b>${x.source === "import" ? ` <span class="tag">${esc(T("res.imported"))}</span>` : ""}
-        ${!x.user_id ? `<div class="mini">${esc(T("res.notLinked"))}</div>` : (x.typed_name && normName(x.typed_name) !== normName(x.name) ? `<div class="mini">${esc(T("res.typed", { name: x.typed_name }))}</div>` : "")}
-        ${edit && x.source === "import" ? `<label class="mini">${esc(T("res.link"))} <select data-act="res-link" data-id="${esc(x.id)}"${busy ? " disabled" : ""}>${pickOpt("", T("res.linkNone"), x.user_id || "")}${(people || []).map(p => pickOpt(p.id, p.name, x.user_id || "")).join("")}</select></label>` : ""}</td>
+      ${anon ? "" : `<td class="t-main"><b>${esc(x.name)}</b></td>
         <td>${esc(x.team || "")}</td>`}
       <td>${esc(fmtWhen(x.submitted_at))}</td></tr>`).join("")}</tbody></table>`;
   return msgHTML(msg) + kpis
@@ -1104,29 +1001,4 @@ export function logHTML(a) {
   const show = v => v == null ? "" : typeof v === "string" ? v : Array.isArray(v) ? v.map(x => x.kind === "all" ? T("aud.all") : x.kind === "rank" ? T("rank." + x.value) : x.value).join(", ") : JSON.stringify(v);
   return `<ul class="flist">${rows.map(l => `<li><div class="fhead"><b>${esc(T("log." + l.what) || l.what)}</b> <span class="mini">${esc(fmtWhen(l.at))}・${esc(l.who || "")}</span></div>
     <div class="fmeta">${l.before != null ? esc(show(l.before)) + " → " : ""}${esc(show(l.after))}</div></li>`).join("")}</ul>`;
-}
-
-// 匯入。imp = { file, header, rows, cols, plan, title, tz, sentAll }。
-export function importHTML(imp, people, msg, busy) {
-  const head = pageHead(T("imp.title"), T("imp.lede"), [], { act: "back-build", label: T("ed.back") });
-  const pick = `<label class="btn ghost"><input type="file" accept=".csv,text/csv" data-act="imp-file" data-noauto="1" hidden>${esc(T("imp.pick"))}</label>${imp && imp.file ? ` <span class="mini">${esc(imp.file)}</span>` : ""}`;
-  if (!imp || !imp.rows) return head + msgHTML(msg) + `<div class="row">${pick}</div>`;
-  if (!imp.rows.length) return head + msgHTML(msg) + `<div class="row">${pick}</div>` + emptyHTML(T("imp.empty"), "");
-  const colRow = c => `<tr data-col="${c.idx}"><td class="t-main"><b>${esc(c.header)}</b>${c.sample ? `<div class="mini">${esc(T("imp.sample", { v: c.sample.slice(0, 80) }))}</div>` : ""}</td>
-    <td><select data-act="imp-role" data-col="${c.idx}">${["question", "name", "time", "skip"].map(r => pickOpt(r, T("imp.role." + r), c.role)).join("")}</select>
-      ${c.role === "question" ? `<select data-act="imp-type" data-col="${c.idx}">${TYPES.map(t => pickOpt(t, T("type." + t), c.type)).join("")}</select>
-        ${c.type === "scale" ? `<select data-act="imp-max" data-col="${c.idx}" aria-label="${esc(T("q.max"))}">${[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => pickOpt(n, `${c.scale_min} – ${n}`, c.scale_max)).join("")}</select>` : ""}
-        ${c.type === "single" || c.type === "multi" ? `<div class="mini">${esc((c.options || []).join(" / "))}</div>` : ""}` : ""}</td></tr>`;
-  const planRow = p => `<tr><td>${esc(p.typed)}</td><td><select data-act="imp-pick" data-i="${p.i}">${pickOpt("", T("imp.keep"), p.pick)}${(people || []).map(x => pickOpt(x.id, x.name, p.pick)).join("")}</select>
-      ${p.how === "exact" ? `<span class="tag open">${esc(T("imp.exact"))}</span>` : p.how === "first" ? `<span class="tag closed">${esc(T("imp.first"))}</span>` : p.dup ? `<span class="tag warn">${esc(T("imp.dup"))}</span>` : ""}</td>
-      <td class="mini">${esc(fmtWhen(p.at))}</td></tr>`;
-  return head + msgHTML(msg)
-    + `<div class="row">${pick}</div>`
-    + sectionHTML(T("imp.formTitle"), `<input id="imp-title" value="${esc(imp.title || "")}" maxlength="200">`)
-    + sectionHTML(T("imp.cols"), `<div class="mini">${esc(T("imp.colsHint"))}</div><div class="tf-scroll"><table class="table"><tbody>${imp.cols.map(colRow).join("")}</tbody></table></div>
-      <label><i>${esc(T("imp.tz"))}</i><select data-act="imp-tz">${pickOpt("utc", T("imp.tz.utc"), imp.tz)}${pickOpt("taipei", T("imp.tz.taipei"), imp.tz)}</select></label>`)
-    + sectionHTML(T("imp.people"), `<div class="mini">${esc(T("imp.peopleHint"))}</div><div class="tf-scroll"><table class="table"><thead><tr><th>${esc(T("imp.typed"))}</th><th>${esc(T("imp.match"))}</th><th>${esc(T("res.when"))}</th></tr></thead><tbody>${imp.plan.map(planRow).join("")}</tbody></table></div>`)
-    + `<label class="check"><input type="checkbox" data-act="imp-all" data-noauto="1"${imp.sentAll ? " checked" : ""}><span>${esc(T("imp.sentAll"))}</span></label>
-      <div class="mini">${esc(T("imp.after"))}</div>
-      <div class="form-foot"><button class="btn" data-act="imp-go"${busy ? " disabled" : ""}>${esc(busy ? T("imp.going") : T("imp.go", { n: imp.rows.length }))}</button><button class="btn ghost" data-act="back-build">${esc(T("imp.cancel"))}</button></div>`;
 }

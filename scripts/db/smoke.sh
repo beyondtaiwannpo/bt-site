@@ -2860,6 +2860,24 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-29-team-forms.sql >/dev/null 2>&1 || true
 chkraise "破壞測試之後裝回正確版本，一般幹部又建不了了" "not_form_creator" "perform set_config('test.uid','${RQR}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, null);"
+echo "── 內部表單拿掉匯入（2026-11-30-team-forms-no-import.sql）──"
+tfn=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-30-team-forms-no-import.sql 2>&1 || true)
+# 第 4 列是參考：上面那一段測過匯入，所以本機有匯入的列，那一列印「看一下」不算錯。
+if echo "${tfn}" | grep -q "OVERALL.*PASS" && ! echo "${tfn}" | grep -q "|FAIL"; then echo "  ok   拿掉匯入那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 拿掉匯入那支驗收表："; echo "${tfn}" | head -10; fail=$((fail+1)); fi
+chkraise "★ 連 Co-President 都叫不到 tf_import 了" "does not exist" "perform set_config('test.uid','${PAUL}',true); perform public.tf_import('${TF2}', '[]'::jsonb);"
+chkraise "★ tf_link_response 也不在了" "does not exist" "perform set_config('test.uid','${PAUL}',true); perform public.tf_link_response('${TR}', null);"
+chk "拿掉函式不動已經有的答案" "2|4" "select (select count(*) from public.tf_forms)||'|'||(select count(*) from public.tf_responses)"
+chkas "${PAUL}" "結果頁照樣讀得到（tf_results 沒被牽動）" "1" "select count(*) from (select public.tf_results('${TF2}')) x"
+tfn2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-30-team-forms-no-import.sql 2>&1 || true)
+if echo "${tfn2}" | grep -q "OVERALL.*PASS"; then echo "  ok   拿掉匯入那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 拿掉匯入那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "s/^drop function if exists public.tf_import(uuid, jsonb);//" supabase/migrations/2026-11-30-team-forms-no-import.sql > "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-29-team-forms.sql >/dev/null 2>&1 || true
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：漏拿 tf_import，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 漏拿 tf_import 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-30-team-forms-no-import.sql >/dev/null 2>&1 || true
+chk "破壞測試之後裝回來，兩支都不在" "0" "select count(*) from pg_proc where pronamespace='public'::regnamespace and proname in ('tf_import','tf_link_response')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -39,8 +39,6 @@ export const setAudience   = (id, role, items) => rpc("tf_set_audience", { p_for
 export const setStatus     = (id, status) => rpc("tf_set_status", { p_form: id, p_status: status });
 export const deleteForm    = id => rpc("tf_delete_form", { p_form: id });
 export const submit        = (id, answers) => rpc("tf_submit", { p_form: id, p_answers: answers });
-export const importRows    = (id, rows) => rpc("tf_import", { p_form: id, p_rows: rows });
-export const linkResponse  = (id, user) => rpc("tf_link_response", { p_response: id, p_user: user || null });
 
 // 資料庫回的代碼翻成人話。先命中先贏。
 const SAYS = [

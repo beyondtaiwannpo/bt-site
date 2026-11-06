@@ -1,7 +1,7 @@
-// 後台「內部表單」的邏輯（2026-11-29）：要填的表單、建表單與看結果、匯入 Tally 的 CSV。
+// 後台「內部表單」的邏輯（2026-11-29）：要填的表單、建表單與看結果。
 //
 // 網址：#fill（要填的）、#fill/<id>（填一份或看自己的答案）、#build（我管得到的表單）、
-//       #build/<id>/<questions|people|results|log>（一份的四個分頁）、#build/import（匯入）。
+//       #build/<id>/<questions|people|results|log>（一份的四個分頁）。
 // 狀態只有一個 S，畫面只從 S 產生。每一顆按鈕背後都是資料庫的一支函式，門在那裡；這裡少畫一顆按鈕不是安全機制。
 import * as AUTH from "../../../shared/auth.js";
 import { navHTML } from "../../../shared/nav.js";
@@ -19,7 +19,7 @@ let S = {
   admin: null,         // tf_form_admin(id)
   results: null,       // tf_results(id)
   aud: null, audSaved: null, find: {},
-  newDraft: null, more: {}, imp: null,
+  newDraft: null, more: {},
 };
 
 const root = () => document.getElementById("bt-root");
@@ -31,12 +31,11 @@ function body() {
   if (S.view === "fill" && S.id) return S.fill ? UI.fillHTML(S.fill, S.msg, S.busy) : UI.msgHTML(S.msg) + UI.skeletonHTML();
   if (S.view === "fill") return UI.fillListHTML(S.boot, S.msg);
   if (!canBuild()) return UI.noAccessHTML(S.me);
-  if (S.id === "import") return UI.importHTML(S.imp, people(), S.msg, S.busy);
   if (!S.id) return UI.buildListHTML(S.boot, S.msg, S.busy, S.newDraft);
   if (!S.admin) return UI.msgHTML(S.msg) + UI.skeletonHTML();
   const head = UI.editorHeadHTML(S.admin, S.sub);
   if (S.sub === "people") return head + UI.audienceHTML(S.admin, people(), S.aud, S.audSaved, S.find, S.msg, S.busy);
-  if (S.sub === "results") return head + (S.results ? UI.resultsHTML(S.results, S.admin.can_edit ? people() : [], S.msg, S.busy, S.more) : UI.msgHTML(S.msg) + UI.skeletonHTML());
+  if (S.sub === "results") return head + (S.results ? UI.resultsHTML(S.results, S.msg, S.more) : UI.msgHTML(S.msg) + UI.skeletonHTML());
   if (S.sub === "log") return head + UI.msgHTML(S.msg) + UI.logHTML(S.admin);
   return head + UI.questionsEditHTML(S.admin, S.msg, S.busy);
 }
@@ -96,11 +95,10 @@ async function openRoute(keepMsg) {
   if (!keepMsg) S.msg = "";
   S.fill = null; S.results = null;
   if (S.view === "build" && S.id !== S.admin?.form?.id) S.admin = null;
-  if (S.view === "build" && S.id !== "import") S.imp = null;
   render();
   try {
     if (S.view === "fill" && S.id) S.fill = await D.loadFill(S.id);
-    else if (S.view === "build" && S.id && S.id !== "import") {
+    else if (S.view === "build" && S.id) {
       S.admin = await D.loadAdmin(S.id);
       if (!S.aud || S.aud._id !== S.id) resetAud();
       if (S.sub === "results") S.results = await D.loadResults(S.id);
@@ -165,7 +163,7 @@ document.addEventListener("click", async e => {
   if (act === "open-fill") { e.preventDefault(); go("fill/" + b.dataset.id); return; }
   if (act === "back-fill") { go("fill"); await loadBoot(); render(); return; }
   if (act === "open-form") { e.preventDefault(); go("build/" + b.dataset.id); return; }
-  if (act === "back-build") { S.imp = null; go("build"); await loadBoot(); render(); return; }
+  if (act === "back-build") { go("build"); await loadBoot(); render(); return; }
   if (act === "sub") { e.preventDefault(); go(`build/${S.id}/${b.dataset.t}`); return; }
 
   // ── 填 ──
@@ -191,7 +189,6 @@ document.addEventListener("click", async e => {
     if (id === undefined) return;
     S.newDraft = null; await loadBoot(); go("build/" + id); S.msg = T("msg.created"); return;
   }
-  if (act === "tf-import") { S.imp = null; go("build/import"); return; }
 
   // ── 一份：狀態、刪 ──
   if (act === "tf-status") {
@@ -241,27 +238,6 @@ document.addEventListener("click", async e => {
     S.msg = T("msg.csv", { n: r.responses.length }); render(); return;
   }
 
-  // ── 匯入 ──
-  if (act === "imp-go") {
-    const imp = S.imp; if (!imp || !imp.rows || !imp.rows.length) return;
-    imp.title = String((document.getElementById("imp-title") || {}).value || "").trim() || imp.title;
-    if (!imp.title) { S.msg = T("err.import") + T("err.needTitle"); render(); return; }
-    const qcols = imp.cols.filter(c => c.role === "question");
-    const id = await run("err.import", () => D.saveForm(null, { title: imp.title }, qcols.map(UI.colQuestion)));
-    if (id === undefined) return;
-    try {
-      S.busy = true; render();
-      const a = await D.loadAdmin(id);
-      const qids = {}; qcols.forEach((c, k) => { qids[c.idx] = (a.questions[k] || {}).id; });
-      const n = await D.importRows(id, UI.importPayload(imp.cols, imp.rows, imp.plan, qids));
-      if (imp.sentAll) await D.setAudience(id, "recipient", [{ kind: "all", value: "" }]);
-      if (imp.sentAll) await D.setStatus(id, "closed");
-      S.busy = false; S.imp = null; await loadBoot();
-      go(`build/${id}/results`); S.msg = T("msg.imported", { n }); return;
-    } catch (err) {
-      S.busy = false; S.msg = T("err.importHalf") + D.says(err); await loadBoot(); go("build/" + id); return;
-    }
-  }
 });
 // 送不出去時把剛填的答案放回畫面（重畫會洗掉）。
 function keepAnswers(answers) {
@@ -272,52 +248,6 @@ function keepAnswers(answers) {
   render();
 }
 
-document.addEventListener("change", async e => {
-  const el = e.target;
-  if (!el || !el.dataset) return;
-  const act = el.dataset.act;
-  if (act === "res-link") {
-    const ok = await run("err.link", () => D.linkResponse(el.dataset.id, el.value || null));
-    if (ok === undefined) return;
-    S.results = await D.loadResults(S.id); S.msg = T("msg.linked"); render(); return;
-  }
-  if (act === "imp-file") {
-    const file = el.files && el.files[0]; if (!file) return;
-    try {
-      const rows = UI.parseCSV(await file.text());
-      const header = rows[0] || [], data = rows.slice(1);
-      const cols = UI.guessColumns(header, data);
-      S.imp = { file: file.name, header, rows: data, cols, tz: "utc", sentAll: true, title: UI.titleFromFile(file.name) };
-      S.imp.plan = UI.importRows(cols, data, people(), S.imp.tz);
-      S.msg = "";
-    } catch (err) { S.msg = T("err.csvRead") + String(err && err.message || err); }
-    render(); return;
-  }
-  const imp = S.imp;
-  if (imp && act && act.startsWith("imp-")) {
-    const title = document.getElementById("imp-title"); if (title) imp.title = title.value;
-    const col = imp.cols.find(c => String(c.idx) === el.dataset.col);
-    if (act === "imp-role" && col) {
-      // 名字與送出時間各只能有一欄：選了這一欄，原本那一欄改回題目。
-      if (el.value === "name" || el.value === "time") imp.cols.forEach(c => { if (c !== col && c.role === el.value) c.role = "question"; });
-      col.role = el.value;
-      imp.plan = UI.importRows(imp.cols, imp.rows, people(), imp.tz);
-    }
-    if (act === "imp-type" && col) {
-      col.type = el.value;
-      if ((col.type === "single" || col.type === "multi") && !(col.options || []).length) {
-        const vals = imp.rows.map(r => String(r[col.idx] || "").trim()).filter(Boolean);
-        col.options = [...new Set(col.type === "multi" ? vals.flatMap(v => v.split(/\s*,\s*/)) : vals)].slice(0, 30);
-      }
-      if (col.type === "scale") { const n = imp.rows.map(r => Number(r[col.idx])).filter(Number.isFinite); col.scale_min = n.length && Math.min(...n) === 0 ? 0 : 1; col.scale_max = Math.min(10, Math.max(2, ...n)); }
-    }
-    if (act === "imp-max" && col) col.scale_max = Number(el.value);
-    if (act === "imp-tz") { imp.tz = el.value; imp.plan = UI.importRows(imp.cols, imp.rows, people(), imp.tz); }
-    if (act === "imp-pick") { const p = imp.plan[Number(el.dataset.i)]; if (p) { p.pick = el.value; p.how = ""; p.dup = false; } }
-    if (act === "imp-all") imp.sentAll = el.checked;
-    render(); return;
-  }
-});
 // 找人的搜尋框：改 S 再 render()，然後把游標放回去。
 document.addEventListener("input", e => {
   const el = e.target;

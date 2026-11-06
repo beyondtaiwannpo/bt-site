@@ -112,12 +112,12 @@ make("admin/finance", "admin",
                { id:"t3", happened_on:"2026-11-15", kind:"transfer", amount:2000, currency:"TWD", amount_twd:2000, account_id:"a1", to_account_id:"a2", term_id:"2026-27" },
                { id:"t5", happened_on:"2026-12-01", kind:"income", amount:1234.5, currency:"USD", fx_rate:32.15, amount_twd:39689.18, account_id:"a1", category_id:"c1", counterparty:"Overseas alumni donation", term_id:"2026-27" },
                { id:"t6", happened_on:"2026-11-25", kind:"expense", amount:999, currency:"TWD", amount_twd:999, account_id:"a1", category_id:"c3", voided_at:"2026-11-26T00:00:00Z", void_reason:"重複登了，跟 11/12 那一筆是同一張發票", term_id:"2026-27" }];`);
-// 內部表單（2026-11-29）：編輯畫面最長的一頁（設定、四種題目、發給誰三塊、結果含長名字與長答案、匯入的那一筆）。假資料。
+// 內部表單（2026-11-29）：編輯畫面最長的一頁（設定、四種題目、發給誰三塊、結果含長名字與長答案）。假資料。
 make("admin/team-forms", "admin",
   `UI.shellHTML("", UI.railHTML("teamforms", "build", { role:"cadre", board:"president", team:"", name:"測試主席", ws:{ "team-forms":"edit" } }),
      UI.editorHeadHTML(A, "questions") + UI.questionsEditHTML(A, "", false)
      + UI.audienceHTML(A, PEOPLE, AUD, AUD, { recipient:"測" }, "", false)
-     + UI.resultsHTML(R, PEOPLE, "", false, null))`,
+     + UI.resultsHTML(R, "", null))`,
   `import * as UI from "./src/ui.js";
    const PEOPLE = [{ id:"u1", name:"測試甲 Alexandra Montgomery-Wellington", team:"Mentorship Team, Curriculum Team", board:"director" },
                    { id:"u2", name:"測試乙", team:"Marketing Team", board:"member" }, { id:"u3", name:"測試丙", team:"Finance Team", board:"adviser" }];
@@ -133,7 +133,7 @@ make("admin/team-forms", "admin",
    const R = { form:A.form, questions:QS, can_edit:true, recipients:3, pending:[{ id:"u3", name:"測試丙" }],
      responses:[{ id:"r1", name:"測試甲 Alexandra Montgomery-Wellington", team:"Mentorship Team", user_id:"u1", source:"web", submitted_at:"2026-11-20T03:00:00Z",
                   answers:{ q1:"測試甲", q2:LONG, q3:"普通", q4:"探索營, 嘖嘖募資", q5:"8" } },
-                { id:"r2", name:"Typed Name Only", team:"", user_id:null, typed_name:"Typed Name Only", source:"import", submitted_at:"2026-10-21T02:30:07Z",
+                { id:"r2", name:"測試乙", team:"Marketing Team", user_id:"u2", source:"site", submitted_at:"2026-10-21T02:30:07Z",
                   answers:{ q1:"Typed", q2:"短", q3:"很少，因為考試", q4:"社群貼文, 其他自己寫的", q5:"5" } }] };`);
 // 行銷需求單第二版（2026-11-09）：送單頁拿最長的草稿量（11 格全填、一定要有的資訊三列、視覺參考兩列、九個 Fragment、
 // 發布日不到 7 天的黃色警告開著），佇列拿打開一張的那一頁（拍攝表、處理那一塊全開）。
