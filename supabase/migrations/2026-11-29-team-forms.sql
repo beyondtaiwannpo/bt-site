@@ -23,7 +23,8 @@
 --   每一份表單有三張名單，存在 tf_audience，每一列是「誰」：
 --     recipient 填的人、reader 看得到所有人答案的人、editor 改得動這份表單的人。
 --     「誰」有四種寫法：all（全部幹部）、rank（一個職級）、team（一個 team）、person（一個人）。
---   **Co-President 永遠是讀者與編輯**，表單的建立者（owner）也是。其他人一律照名單。
+--   **Co-President 永遠是讀者與編輯**，表單的建立者（owner）也是。
+--   **Senior Adviser 永遠是讀者**（Paul 2026-11-06：「Let them read」），但不是編輯。其他人一律照名單。
 --   誰能「建」新表單：Co-President，加上被派進工作區 custom:team-forms 的人（任何等級）。
 --     Paul 在「人與權限 → 誰能改什麼」加人減人。**Senior Adviser 不自動有**，要被加進去，
 --     因為建立者讀得到自己那份的所有答案。
@@ -202,7 +203,8 @@ create or replace function public.tf_is_reader(p_form uuid)
 returns boolean language sql stable security definer
 set search_path = public, pg_temp
 as $$
-  select public.tf_is_editor(p_form) or (public.tf_is_cadre() and public.tf_in(p_form, 'reader', auth.uid()));
+  -- is_senior()：Co-President 與 Senior Adviser（2026-10-24），裡面已經問了是不是幹部。
+  select public.tf_is_editor(p_form) or public.is_senior() or (public.tf_is_cadre() and public.tf_in(p_form, 'reader', auth.uid()));
 $$;
 create or replace function public.tf_is_recipient(p_form uuid)
 returns boolean language sql stable security definer
@@ -741,11 +743,12 @@ select * from (
            (select regexp_replace(prosrc, '--[^\n]*', '', 'g') like '%not_form_owner%' from pg_proc where proname = 'tf_set_audience' and pronamespace = 'public'::regnamespace) as owner_gate,
            (select regexp_replace(prosrc, '--[^\n]*', '', 'g') !~ 'can_view\(' and prosrc like '%is_president()%' from pg_proc where proname = 'tf_can_create' and pronamespace = 'public'::regnamespace) as create_rule,
            (select prosrc like '%team-forms%' and prosrc like '%finance%' from pg_proc where proname = 'my_access' and pronamespace = 'public'::regnamespace) as access_cell,
+           (select regexp_replace(prosrc, '--[^\n]*', '', 'g') like '%is_senior()%' from pg_proc where proname = 'tf_is_reader' and pronamespace = 'public'::regnamespace) as senior_read,
            exists (select 1 from public.workspaces where id = 'custom:team-forms' and kind = 'custom') as ws_ok
   )
   select 0 ord, 'OVERALL' as 項目, null::text as 應該是, null::text as 實際是,
     case when tables = 6 and rls_on = 6 and pols = 0 and no_table_priv and anon_no_fn and edit_gates = 5 and create_gate and read_gates = 2
-          and submit_gate and once_gate and anon_lock and anon_hide and owner_gate and create_rule and access_cell and ws_ok
+          and submit_gate and once_gate and anon_lock and anon_hide and owner_gate and create_rule and access_cell and senior_read and ws_ok
          then 'PASS' else 'FAIL' end as 結果 from t
   union all select 1,  '★ 六張表在', '6', tables::text, case when tables = 6 then 'PASS' else 'FAIL' end from t
   union all select 2,  '★ 六張表都開 RLS、零條政策（讀寫一律走函式）', '6 / 0', rls_on::text || ' / ' || pols::text, case when rls_on = 6 and pols = 0 then 'PASS' else 'FAIL' end from t
@@ -761,5 +764,6 @@ select * from (
   union all select 12, '★ 改「誰能改這份表單」只有建立者與 Co-President（not_form_owner）', 'true', owner_gate::text, case when owner_gate then 'PASS' else 'FAIL' end from t
   union all select 13, '★ 誰能建表單不靠 can_view（Senior Adviser 不自動有）', 'true', create_rule::text, case when create_rule then 'PASS' else 'FAIL' end from t
   union all select 14, '★ my_access() 有 team-forms 那一格，finance 那一格還在', 'true', access_cell::text, case when access_cell then 'PASS' else 'FAIL' end from t
+  union all select 16, '★ Senior Adviser 讀得到每一份（tf_is_reader 有 is_senior）', 'true', senior_read::text, case when senior_read then 'PASS' else 'FAIL' end from t
   union all select 15, '工作區 custom:team-forms 在', 'true', ws_ok::text, case when ws_ok then 'PASS' else 'FAIL' end from t
 ) x order by ord;

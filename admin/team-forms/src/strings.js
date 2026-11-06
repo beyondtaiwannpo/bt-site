@@ -177,7 +177,7 @@ export const MINE = {
   "fill.see":         { zh: "看我的答案", en: "See my answers" },
   "fill.change":      { zh: "改我的答案", en: "Change my answers" },
   "fill.back":        { zh: "回要填的表單", en: "Back to forms" },
-  "fill.who":         { zh: "誰看得到你的答案：Co-President{more}。", en: "Who can read your answers: the Co-Presidents{more}." },
+  "fill.who":         { zh: "誰看得到你的答案：Co-President、Senior Adviser{more}。", en: "Who can read your answers: the Co-Presidents and Senior Advisers{more}." },
   "fill.whoMore":     { zh: "，加上這份表單的建立者與它設的讀者", en: ", plus this form's creator and the readers it names" },
   "fill.anon":        { zh: "這一份是匿名的：讀答案的人看不到是誰寫的。", en: "This form is anonymous: readers can't see who wrote what." },
   "fill.required":    { zh: "必填", en: "Required" },
@@ -195,7 +195,7 @@ export const MINE = {
 
   // ── 建表單與看結果 ──
   "build.title":      { zh: "建表單與看結果", en: "Build forms & see results" },
-  "build.lede":       { zh: "建一份表單、選要發給誰、選誰看得到答案。Co-President 永遠看得到每一份；其他人要被寫進那一份的讀者才看得到。", en: "Build a form, choose who gets it and who can read the answers. Co-Presidents can always read every form; anyone else has to be named as a reader on that form." },
+  "build.lede":       { zh: "建一份表單、選要發給誰、選誰看得到答案。Co-President 與 Senior Adviser 永遠看得到每一份；其他人要被寫進那一份的讀者才看得到。", en: "Build a form, choose who gets it and who can read the answers. Co-Presidents and Senior Advisers can always read every form; anyone else has to be named as a reader on that form." },
   "build.new":        { zh: "建一份新的", en: "New form" },
   "build.import":     { zh: "匯入 Tally 的 CSV", en: "Import a Tally CSV" },
   "build.none":       { zh: "還沒有你管得到的表單", en: "No forms you can manage yet" },
@@ -256,7 +256,7 @@ export const MINE = {
   "aud.recipient":    { zh: "發給誰（誰要填）", en: "Who gets it (who fills it in)" },
   "aud.recipientHint":{ zh: "打開之後，名單上的人在首頁看得到這一份。", en: "Once open, everyone on this list sees it on their home page." },
   "aud.reader":       { zh: "誰看得到所有人的答案", en: "Who can read everyone's answers" },
-  "aud.readerHint":   { zh: "Co-President 與這份表單的建立者永遠看得到，不用加。", en: "Co-Presidents and this form's creator can always read it. No need to add them." },
+  "aud.readerHint":   { zh: "Co-President、Senior Adviser 與這份表單的建立者永遠看得到，不用加。", en: "Co-Presidents, Senior Advisers and this form's creator can always read it. No need to add them." },
   "aud.readerWarn":   { zh: "注意：選了整個 team 或某一級，裡面每個人都讀得到每一份答案，包括別人寫他的那幾句。", en: "Careful: picking a whole team or rank lets everyone in it read every answer, including what others wrote about them." },
   "aud.editor":       { zh: "誰改得動這份表單", en: "Who can edit this form" },
   "aud.editorHint":   { zh: "改得動的人也看得到所有答案。只有建立者與 Co-President 改得動這一張名單。", en: "Editors can also read every answer. Only the creator and Co-Presidents can change this list." },
@@ -273,7 +273,7 @@ export const MINE = {
   "aud.save":         { zh: "存這一張名單", en: "Save this list" },
   "aud.unsaved":      { zh: "還沒存", en: "Not saved yet" },
   "aud.readonly":     { zh: "只有建立者與 Co-President 改得動這一張。", en: "Only the creator and Co-Presidents can change this list." },
-  "aud.always":       { zh: "永遠看得到：Co-President、建立者 {owner}", en: "Always: Co-Presidents and the creator, {owner}" },
+  "aud.always":       { zh: "永遠看得到：Co-President、Senior Adviser、建立者 {owner}", en: "Always: Co-Presidents, Senior Advisers and the creator, {owner}" },
   "msg.audSaved":     { zh: "名單存好了。", en: "List saved." },
 
   // 結果
@@ -342,7 +342,7 @@ export const MINE = {
   "imp.go":           { zh: "建表單並匯入 {n} 份答案", en: "Create the form and import {n} {n:response|responses}" },
   "imp.going":        { zh: "匯入中…", en: "Importing…" },
   "imp.cancel":       { zh: "不匯了", en: "Cancel" },
-  "imp.after":        { zh: "匯完的表單是「已收起來」；讀者只有 Co-President 與你，要加人到「發給誰、誰看得到」。", en: "The imported form starts closed. Only the Co-Presidents and you can read it; add readers under \"Who gets it, who reads it\"." },
+  "imp.after":        { zh: "匯完的表單是「已收起來」；讀者只有 Co-President、Senior Adviser 與你，要加人到「發給誰、誰看得到」。", en: "The imported form starts closed. Only the Co-Presidents, Senior Advisers and you can read it; add readers under \"Who gets it, who reads it\"." },
   "msg.imported":     { zh: "匯入了 {n} 份答案。", en: "Imported {n} {n:response|responses}." },
   "err.importHalf":   { zh: "表單建好了但答案沒匯進去：", en: "The form was created but the answers weren't imported: " },
 
