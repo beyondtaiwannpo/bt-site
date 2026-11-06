@@ -23,7 +23,7 @@ const CUR = ${JSON.stringify(cur)};
 document.getElementById("bt-root").innerHTML = ${nav} + (${body});
 </script>`;
   let s = readFileSync(file + "/index.html","utf8");
-  s = s.replace(/<script type="module" src="[^"]*main\.js"><\/script>/, boot);
+  s = s.replace(/<script type="module" src="[^"]*main\.js(\?[^"]*)?"><\/script>/, boot);  // 2026-11-06 起 main.js 後面有 ?v= 版本號
   writeFileSync(file + "/" + out, s);
 }
 
@@ -112,6 +112,29 @@ make("admin/finance", "admin",
                { id:"t3", happened_on:"2026-11-15", kind:"transfer", amount:2000, currency:"TWD", amount_twd:2000, account_id:"a1", to_account_id:"a2", term_id:"2026-27" },
                { id:"t5", happened_on:"2026-12-01", kind:"income", amount:1234.5, currency:"USD", fx_rate:32.15, amount_twd:39689.18, account_id:"a1", category_id:"c1", counterparty:"Overseas alumni donation", term_id:"2026-27" },
                { id:"t6", happened_on:"2026-11-25", kind:"expense", amount:999, currency:"TWD", amount_twd:999, account_id:"a1", category_id:"c3", voided_at:"2026-11-26T00:00:00Z", void_reason:"重複登了，跟 11/12 那一筆是同一張發票", term_id:"2026-27" }];`);
+// 內部表單（2026-11-29）：編輯畫面最長的一頁（設定、四種題目、發給誰三塊、結果含長名字與長答案、匯入的那一筆）。假資料。
+make("admin/team-forms", "admin",
+  `UI.shellHTML("", UI.railHTML("teamforms", "build", { role:"cadre", board:"president", team:"", name:"測試主席", ws:{ "team-forms":"edit" } }),
+     UI.editorHeadHTML(A, "questions") + UI.questionsEditHTML(A, "", false)
+     + UI.audienceHTML(A, PEOPLE, AUD, AUD, { recipient:"測" }, "", false)
+     + UI.resultsHTML(R, PEOPLE, "", false, null))`,
+  `import * as UI from "./src/ui.js";
+   const PEOPLE = [{ id:"u1", name:"測試甲 Alexandra Montgomery-Wellington", team:"Mentorship Team, Curriculum Team", board:"director" },
+                   { id:"u2", name:"測試乙", team:"Marketing Team", board:"member" }, { id:"u3", name:"測試丙", team:"Finance Team", board:"adviser" }];
+   const QS = [{ id:"q1", type:"short", label:"你的名字", required:true },
+               { id:"q2", type:"long", label:"這一季你覺得最卡的一件事是什麼？寫越具體越好，例如哪一個流程、哪一個工具、哪一次會議", help:"只有 Co-President 看得到", answered:true },
+               { id:"q3", type:"single", label:"你這一季的投入程度", options:["很多","普通","很少，因為考試"] },
+               { id:"q4", type:"multi", label:"下一季想參與的事", options:["探索營","嘖嘖募資","校友訪談","社群貼文"] },
+               { id:"q5", type:"scale", label:"整體滿意度", scale_min:1, scale_max:10, min_label:"很不滿意", max_label:"非常滿意" }];
+   const A = { form:{ id:"f1", title:"2026-27 第一季幹部回饋（測試）", intro:"假資料", status:"open", anonymous:false, allow_edit:true, owner_name:"測試主席", closes_at:"2026-12-20T15:59:00Z" },
+               questions:QS, can_edit:true, can_edit_editors:true, responses:2, recipients:3 };
+   const AUD = { recipient:[{ kind:"all", value:"" }], reader:[{ kind:"person", value:"u1" }], editor:[] };
+   const LONG = "這是一段很長的假回答，用來看手機寬度會不會撐破版面。".repeat(6);
+   const R = { form:A.form, questions:QS, can_edit:true, recipients:3, pending:[{ id:"u3", name:"測試丙" }],
+     responses:[{ id:"r1", name:"測試甲 Alexandra Montgomery-Wellington", team:"Mentorship Team", user_id:"u1", source:"web", submitted_at:"2026-11-20T03:00:00Z",
+                  answers:{ q1:"測試甲", q2:LONG, q3:"普通", q4:"探索營, 嘖嘖募資", q5:"8" } },
+                { id:"r2", name:"Typed Name Only", team:"", user_id:null, typed_name:"Typed Name Only", source:"import", submitted_at:"2026-10-21T02:30:07Z",
+                  answers:{ q1:"Typed", q2:"短", q3:"很少，因為考試", q4:"社群貼文, 其他自己寫的", q5:"5" } }] };`);
 // 行銷需求單第二版（2026-11-09）：送單頁拿最長的草稿量（11 格全填、一定要有的資訊三列、視覺參考兩列、九個 Fragment、
 // 發布日不到 7 天的黃色警告開著），佇列拿打開一張的那一頁（拍攝表、處理那一塊全開）。
 const RQ_PEOPLE = `const PEOPLE = [{ id:"u2", name_zh:"林育安", name_en:"Yu-An Lin", team:"Curriculum Team, Internship Team", board_role:"director" },

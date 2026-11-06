@@ -24,7 +24,7 @@ const store = () => { try { return window.localStorage; } catch (e) { return nul
 const view = () => (location.hash.replace(/\?.*$/, "") === "#calendar" ? "calendar" : "home");
 
 function ctx() {
-  return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, people: S.data ? S.data.people : [],
+  return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, people: S.data ? S.data.people : [], forms: S.data ? S.data.forms : [],
     busy: S.busy, reasonFor: S.reasonFor, changing: S.changing, linked: S.linked, linkedMsg: S.linkedMsg,
     canSchedule: S.senior || Object.entries(S.ws).some(([k, v]) => k.startsWith("res:") && v === "manage") };
 }

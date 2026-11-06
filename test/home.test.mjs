@@ -119,3 +119,17 @@ test("★ Meet 連結與已在 Google 日曆上", () => {
   const [bad] = UI.itemsOf([{ ...base, meet_url: "https://evil.example.com/x" }], [], "me");
   assert.equal(bad.meet_url, "", "只收 meet.google.com 的連結");
 });
+
+// 內部表單（2026-11-29）：要填的表單那一塊。沒有就不出現；有就連到那一份的填寫頁，標題要跳脫。
+test("首頁：要你填的表單", () => {
+  assert.equal(UI.formsHTML({ forms: [], tz: "Asia/Taipei" }), "");
+  assert.equal(UI.formsHTML({ tz: "Asia/Taipei" }), "");
+  const h = UI.formsHTML({ tz: "Asia/Taipei", forms: [{ id: "f-1", title: "<b>季回饋</b>", closes_at: "2026-12-20T15:59:00Z" }, { id: "f-2", title: "B", closes_at: null }] });
+  assert.match(h, /href="\.\.\/admin\/team-forms\/#fill\/f-1"/);
+  assert.match(h, /&lt;b&gt;季回饋/);
+  assert.doesNotMatch(h, /<b>季回饋/);
+  assert.match(h, /class="count">2</);
+  const now = new Date("2026-11-20T00:00:00Z");
+  assert.match(UI.homeHTML([], { now, tz: "Asia/Taipei", name: "測", forms: [{ id: "x", title: "T" }] }), /team-forms\/#fill\/x/);
+  assert.doesNotMatch(UI.homeHTML([], { now, tz: "Asia/Taipei", name: "測", forms: [] }), /team-forms/);
+});

@@ -29,6 +29,8 @@ export const GROUPS = [
   { key: "finance",   label: { zh: "財務",     en: "Finance" },      href: "/admin/finance/",   who: "ws:finance",   hint: { zh: "帳戶、收支、預算、匯出", en: "Accounts, income & expenses, budget, export" } },
   // 2026-11-26 Marketing：Instagram 連線（之後加成效與大學介紹貼文）。Marketing 資源工作區或行銷需求單工作區裡的人，任何等級（Paul 2026-10-29）。
   { key: "marketing", label: { zh: "Marketing", en: "Marketing" },  href: "/admin/marketing/", who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve", hint: { zh: "大學介紹貼文、Instagram", en: "College intro posts, Instagram" } },
+  // 2026-11-29 內部表單：每一位幹部都進得來（要填的表單在這裡）；建表單與看結果那一頁看 my_access() 的 team-forms 那一格。
+  { key: "teamforms", label: { zh: "內部表單", en: "Team forms" },   href: "/admin/team-forms/", who: "cadre",      hint: { zh: "給幹部填的表單、結果", en: "Forms for members, and results" } },
 ];
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
 // 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
@@ -39,6 +41,9 @@ export const ITEMS = [
   // 2026-10-23 第三次重整批 4：叫「總覽」不叫「首頁」，頂欄那一顆「後台」跟它才不會是同一個地方兩個名字。
   { group: "forms",     key: "home",     sec: "",         label: { zh: "總覽",     en: "Overview" },          hint: { zh: "今天要處理的事", en: "What needs you today" }, who: "cadre" },
   // 2026-11-02 會議紀錄：每一位幹部看得到；排會與記會議的門在資料庫（senior 或那個 team 的 Director）。
+  // 2026-11-29 內部表單：每一位幹部都看得到「要填的表單」；「建表單與看結果」要建得了，或是某一份的讀者（門在資料庫 tf_*）。
+  { group: "teamforms", key: "fill",     sec: "tforms",   label: { zh: "要填的表單", en: "Forms to fill in" }, hint: { zh: "發給你的表單、你填過的", en: "Forms sent to you, your answers" }, who: "cadre" },
+  { group: "teamforms", key: "build",    sec: "tforms",   label: { zh: "建表單與看結果", en: "Build & results" }, hint: { zh: "題目、發給誰、誰看得到", en: "Questions, recipients, readers" }, who: "ws:team-forms" },
   { group: "forms",     key: "meetings", sec: "meet",     label: { zh: "會議",     en: "Meetings" },          hint: { zh: "排過的會、會議紀錄", en: "Scheduled meetings and notes" }, who: "cadre" },
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
   { group: "forms",     key: "events",   sec: "meet",     label: { zh: "活動",     en: "Events" },            hint: { zh: "上到對外首頁的活動", en: "Events on the public site" }, who: "cadre" },
@@ -75,6 +80,7 @@ export const ITEMS = [
 ];
 // 側欄的段落（2026-10-28）。順序照常用到不常用。icon 是 24×24 的線條圖，一段一個，讓眼睛不用讀字就認得出來。
 export const SECTIONS = [
+  { key: "tforms", label: { zh: "內部表單",   en: "Team forms" },        icon: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12l2 2 4-4M9 17h6"/>' },
   { key: "meet",   label: { zh: "會議與活動", en: "Meetings & events" }, icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
   { key: "mkt",    label: { zh: "行銷",       en: "Marketing" },         icon: '<path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/>' },
   { key: "apply",  label: { zh: "申請",       en: "Applications" },      icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>' },
@@ -584,6 +590,7 @@ export function wsCellHref(w) {
   if (id === "custom:marketing-approve") return "/admin/marketing/#posts";
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
   if (id === "finance") return "/admin/finance/#overview";
+  if (id === "custom:team-forms") return "/admin/team-forms/#build";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。

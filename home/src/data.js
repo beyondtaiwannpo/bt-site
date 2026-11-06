@@ -5,6 +5,7 @@
 //   meeting_rsvp_notes：不能到的理由。RLS 只回「我自己的」與「我排的、我能排的那幾場」，其他人的理由這裡拿不到。
 //   profiles：幹部的名字（誰會到那一欄要印名字）。
 //   public_events()：已經放上網站的活動（跟對外的活動頁同一支）。
+//   tf_todo()：發給我、還開著、我還沒填的內部表單（2026-11-29）。只回標題與截止時間，不回任何人的答案。
 // 寫的東西只有一件：set_rsvp（只改自己那一列）。
 import { supabase } from "../../shared/supabase.js";
 
@@ -19,12 +20,14 @@ const since = () => new Date(Date.now() - 180 * 86400000).toISOString();
 
 export async function loadHome() {
   need();
-  let [m, a, n, p, e] = await Promise.all([
+  let [m, a, n, p, e, f] = await Promise.all([
     supabase.from("meetings").select(MEET_COLS_G).gte("ends_at", since()).order("starts_at"),
     supabase.from("meeting_attendees").select("meeting_id, user_id, status, replied_at"),
     supabase.from("meeting_rsvp_notes").select("meeting_id, user_id, note"),
     supabase.from("profiles").select("id, name_zh, name_en, team").eq("role", "cadre"),
     Promise.resolve(supabase.rpc("public_events")).catch(() => ({ data: [] })),
+    // 還沒跑 2026-11-29-team-forms.sql 的資料庫沒有這支，當作沒有表單要填。
+    Promise.resolve(supabase.rpc("tf_todo")).catch(() => ({ data: [] })),
   ]);
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(MEET_COLS).gte("ends_at", since()).order("starts_at");
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(MEET_COLS_OLD).gte("ends_at", since()).order("starts_at");
@@ -39,6 +42,7 @@ export async function loadHome() {
     meetings: (m.data || []).map(x => Object.assign({}, x, { attendees: byA.get(x.id) || [], notes: byN.get(x.id) || [] })),
     people: p.data || [],
     events: (e && Array.isArray(e.data)) ? e.data : [],
+    forms: (f && !f.error && Array.isArray(f.data)) ? f.data : [],
   };
 }
 

@@ -33,6 +33,8 @@ const PAGES = [
   "admin/finance/index.html",
   // 2026-11-26 Marketing。
   "admin/marketing/index.html",
+  // 2026-11-29 內部表單。
+  "admin/team-forms/index.html",
 ];
 const files = fs.readdirSync(".", { recursive: true })
   .filter(f => f.endsWith("index.html") && !f.includes("node_modules"));

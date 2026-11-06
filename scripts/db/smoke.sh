@@ -2743,6 +2743,120 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-28-college-research.sql >/dev/null 2>&1 || true
 psql -d "${DB}" -q -c "drop function net.http_post(text, jsonb, jsonb, jsonb, int); drop function net.http_get(text, jsonb, jsonb, int); drop table net.fake_req; drop table net._http_response;" >/dev/null
+echo "── 內部表單（2026-11-29-team-forms.sql）──"
+# 這時候：PAUL Co-President、OTHER Senior Adviser、MKM Marketing 的 Director、MKE Marketing 的一般幹部、
+# RQR Curriculum 的一般幹部、OUTC Mentorship 的一般幹部、STU 學員。資料全是假的。
+tfgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-11-29-team-forms.sql 2>&1 || true)
+if echo "${tfgot}" | grep -q "OVERALL.*PASS" && ! echo "${tfgot}" | grep -q "|FAIL"; then echo "  ok   內部表單那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 內部表單那支驗收表："; echo "${tfgot}" | head -20; fail=$((fail+1)); fi
+TFQ='[{"type":"single","label":"Which quarter?","required":true,"options":["Q1","Q2","Q1"]},{"type":"scale","label":"Workload","required":true,"scale_min":1,"scale_max":3},{"type":"long","label":"Anything else?"}]'
+chkraise "★ 一般幹部建不了表單（not_form_creator）" "not_form_creator" "perform set_config('test.uid','${OUTC}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, null);"
+chkraise "★ Senior Adviser 沒被加進去也建不了（不自動有）" "not_form_creator" "perform set_config('test.uid','${OTHER}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, null);"
+chkraise "★ 學員建不了" "not_form_creator" "perform set_config('test.uid','${STU}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, null);"
+chkraise "單選少於兩個選項存不了（need_options）" "need_options:1" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, '[{\"type\":\"single\",\"label\":\"a\",\"options\":[\"only\"]}]'::jsonb);"
+chkraise "量表 1 到 11 存不了（bad_scale）" "bad_scale:1" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, '[{\"type\":\"scale\",\"label\":\"a\",\"scale_max\":11}]'::jsonb);"
+TF=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.tf_save_form(null, '{\"title\":\"Quarterly check-in (fake)\",\"intro\":\"hi\"}'::jsonb, '${TFQ}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "Co-President 建一份：草稿、三題、選項去重" "draft|3|Q1,Q2" "select f.status||'|'||(select count(*) from public.tf_questions where form_id=f.id)||'|'||(select array_to_string(options,',') from public.tf_questions where form_id=f.id and ord=1) from public.tf_forms f where f.id='${TF}'"
+TQ1=$(psql -d "${DB}" -X -A -t -q -c "select id from public.tf_questions where form_id='${TF}' and ord=1" | tr -d ' \n')
+TQ2=$(psql -d "${DB}" -X -A -t -q -c "select id from public.tf_questions where form_id='${TF}' and ord=2" | tr -d ' \n')
+TQ3=$(psql -d "${DB}" -X -A -t -q -c "select id from public.tf_questions where form_id='${TF}' and ord=3" | tr -d ' \n')
+chkraise "沒選要給誰就開不了（need_recipients）" "need_recipients" "perform set_config('test.uid','${PAUL}',true); perform public.tf_set_status('${TF}','open');"
+chkas "${PAUL}" "給 Marketing Team（寫成小寫也算）" "1" "select public.tf_set_audience('${TF}','recipient','[{\"kind\":\"team\",\"value\":\"marketing team\"}]'::jsonb)"
+chkas "${PAUL}" "打開" "open" "select public.tf_set_status('${TF}','open')"
+chkas "${MKE}" "★ 名單上的人首頁看得到這一份" "1" "select jsonb_array_length(public.tf_todo())"
+chkas "${RQR}" "★ 不在名單上的人首頁看不到" "0" "select jsonb_array_length(public.tf_todo())"
+chkraise "★ 不在名單上的人打不開（not_for_you）" "not_for_you" "perform set_config('test.uid','${RQR}',true); perform public.tf_fill('${TF}');"
+chkraise "★ 不在名單上的人送不了" "not_for_you" "perform set_config('test.uid','${RQR}',true); perform public.tf_submit('${TF}', '{}'::jsonb);"
+chkas "${MKE}" "名單上的人打得開、送得了" "true|3" "select (x->>'can_submit')||'|'||jsonb_array_length(x->'questions') from (select public.tf_fill('${TF}') x) t"
+chkraise "必填沒填送不了（required）" "required:1" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TF}', '{}'::jsonb);"
+chkraise "選項外的答案送不了（bad_option）" "bad_option:1" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TF}', '{\"${TQ1}\":\"Q9\",\"${TQ2}\":2}'::jsonb);"
+chkraise "量表超出範圍送不了（bad_scale_value）" "bad_scale_value:2" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TF}', '{\"${TQ1}\":\"Q1\",\"${TQ2}\":4}'::jsonb);"
+chkas "${MKE}" "送出" "1" "select count(*) from (select public.tf_submit('${TF}', '{\"${TQ1}\":\"Q1\",\"${TQ2}\":2,\"${TQ3}\":\"fake comment one\"}'::jsonb)) x"
+chk "名字與 team 由伺服器填" "MiaEdit|MarketingTeam|site" "select replace(name,' ','')||'|'||replace(team,' ','')||'|'||source from public.tf_responses where form_id='${TF}' and user_id='${MKE}'"
+chkraise "★ 填過就不能再送（already_submitted）" "already_submitted" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TF}', '{\"${TQ1}\":\"Q2\",\"${TQ2}\":3}'::jsonb);"
+chkas "${MKE}" "★ 自己看得到自己的答案" "fakecommentone|2" "select replace(x#>>'{mine,answers,${TQ3}}',' ','')||'|'||(x#>>'{mine,answers,${TQ2}}') from (select public.tf_fill('${TF}') x) t"
+chkas "${MKE}" "★ 自己的「我填過的」有這一份，首頁那一張卡沒了" "1|0" "select jsonb_array_length(b->'mine')||'|'||jsonb_array_length(b->'todo') from (select public.tf_bootstrap() b) t"
+chkraise "★ 填的人看不到所有人的答案（not_form_reader）" "not_form_reader" "perform set_config('test.uid','${MKE}',true); perform public.tf_results('${TF}');"
+chkraise "★ Senior Adviser 沒被加進讀者也看不到" "not_form_reader" "perform set_config('test.uid','${OTHER}',true); perform public.tf_results('${TF}');"
+chkraise "★ 同一個 team 的 Director 也看不到" "not_form_reader" "perform set_config('test.uid','${MKM}',true); perform public.tf_results('${TF}');"
+chkas "${PAUL}" "★ Co-President 看得到：一份、名字、還沒填的是 MKM" "1|MiaEdit|MarkManage" "select jsonb_array_length(r->'responses')||'|'||replace(r#>>'{responses,0,name}',' ','')||'|'||replace(r#>>'{pending,0,name}',' ','') from (select public.tf_results('${TF}') r) t"
+chkas "${PAUL}" "把 Senior Adviser 這一級加進讀者" "1" "select public.tf_set_audience('${TF}','reader','[{\"kind\":\"rank\",\"value\":\"senior_adviser\"}]'::jsonb)"
+chkas "${OTHER}" "★ 加進讀者之後 Senior Adviser 看得到" "1" "select jsonb_array_length(public.tf_results('${TF}')->'responses')"
+chkraise "★ 讀者改不了表單（not_form_editor）" "not_form_editor" "perform set_config('test.uid','${OTHER}',true); perform public.tf_set_audience('${TF}','reader','[{\"kind\":\"all\"}]'::jsonb);"
+chkas "${PAUL}" "把一個人（RQR）加進讀者，SA 那一級拿掉" "1" "select public.tf_set_audience('${TF}','reader','[{\"kind\":\"person\",\"value\":\"${RQR}\"}]'::jsonb)"
+chkraise "★ 拿掉之後 Senior Adviser 又看不到了" "not_form_reader" "perform set_config('test.uid','${OTHER}',true); perform public.tf_results('${TF}');"
+chkas "${RQR}" "★ 被點名的讀者看得到" "1" "select jsonb_array_length(public.tf_results('${TF}')->'responses')"
+chkas "${RQR}" "讀者的 my_access 有 team-forms（view）" "view" "select e->>'level' from jsonb_array_elements(public.my_access()->'workspaces') e where e->>'id'='team-forms'"
+chkas "${MKE}" "填的人的 my_access 沒有 team-forms" "0" "select count(*) from jsonb_array_elements(public.my_access()->'workspaces') e where e->>'id'='team-forms'"
+chkraise "不存在的人加不進去（bad_person）" "bad_person" "perform set_config('test.uid','${PAUL}',true); perform public.tf_set_audience('${TF}','reader','[{\"kind\":\"person\",\"value\":\"${STU}\"}]'::jsonb);"
+chkraise "編輯名單不收「全部幹部」（editor_not_all）" "editor_not_all" "perform set_config('test.uid','${PAUL}',true); perform public.tf_set_audience('${TF}','editor','[{\"kind\":\"all\"}]'::jsonb);"
+chkas "${PAUL}" "把 OUTC 加成編輯" "1" "select public.tf_set_audience('${TF}','editor','[{\"kind\":\"person\",\"value\":\"${OUTC}\"}]'::jsonb)"
+chkas "${OUTC}" "★ 編輯也是讀者" "1" "select jsonb_array_length(public.tf_results('${TF}')->'responses')"
+chkas "${OUTC}" "編輯改得動要給誰（加上 Curriculum）" "2" "select public.tf_set_audience('${TF}','recipient','[{\"kind\":\"team\",\"value\":\"Marketing Team\"},{\"kind\":\"team\",\"value\":\"Curriculum Team\"}]'::jsonb)"
+chkraise "★ 編輯改不了「誰能改這份」（not_form_owner）" "not_form_owner" "perform set_config('test.uid','${OUTC}',true); perform public.tf_set_audience('${TF}','editor','[{\"kind\":\"person\",\"value\":\"${OUTC}\"},{\"kind\":\"person\",\"value\":\"${MKE}\"}]'::jsonb);"
+chkraise "★ 編輯刪不了整份（not_form_owner）" "not_form_owner" "perform set_config('test.uid','${OUTC}',true); perform public.tf_delete_form('${TF}');"
+chk "每一次改名單都記了一筆" "4" "select count(*) from public.tf_log where form_id='${TF}' and what in ('recipient','reader','editor') and at > now() - interval '1 hour' and what <> 'x' and (what <> 'recipient' or after::text like '%Curriculum%')"
+chkraise "有人答過的題目刪不了（question_has_answers）" "question_has_answers" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form('${TF}', '{}'::jsonb, '[{\"id\":\"${TQ1}\",\"type\":\"single\",\"label\":\"Which quarter?\",\"options\":[\"Q1\",\"Q2\"]}]'::jsonb);"
+chkraise "有人答過的題目不能換題型（question_type_locked）" "question_type_locked:2" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form('${TF}', '{}'::jsonb, '[{\"id\":\"${TQ1}\",\"type\":\"single\",\"label\":\"Q\",\"options\":[\"Q1\",\"Q2\"]},{\"id\":\"${TQ2}\",\"type\":\"short\",\"label\":\"W\"},{\"id\":\"${TQ3}\",\"type\":\"long\",\"label\":\"A\"}]'::jsonb);"
+chkas "${PAUL}" "改字、加一個選項可以，答案還在" "Q1|1" "select count(*) from (select public.tf_save_form('${TF}', '{}'::jsonb, '[{\"id\":\"${TQ1}\",\"type\":\"single\",\"label\":\"Which quarter is this?\",\"required\":true,\"options\":[\"Q1\",\"Q2\",\"Q3\"]},{\"id\":\"${TQ2}\",\"type\":\"scale\",\"label\":\"Workload\",\"required\":true,\"scale_min\":1,\"scale_max\":3},{\"id\":\"${TQ3}\",\"type\":\"long\",\"label\":\"Anything else?\"}]'::jsonb)) x; select (select value from public.tf_answers where question_id='${TQ1}')||'|'||(select count(*) from public.tf_responses where form_id='${TF}')"
+chkas "${PAUL}" "改成匿名" "true" "select count(*)>0 from (select public.tf_save_form('${TF}', '{\"anonymous\":true}'::jsonb, null)) x; select anonymous::text from public.tf_forms where id='${TF}'"
+chkas "${RQR}" "★ 匿名之後讀者看不到名字與帳號" "||" "select (r#>>'{responses,0,name}')||'|'||coalesce(r#>>'{responses,0,user_id}','')||'|'||(r#>>'{responses,0,team}') from (select public.tf_results('${TF}') r) t"
+chkraise "★ 有人填過之後不能改回具名（anonymous_locked）" "anonymous_locked" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form('${TF}', '{\"anonymous\":false}'::jsonb, null);"
+chkraise "★ 有人填過之後不能退回草稿（has_responses）" "has_responses" "perform set_config('test.uid','${PAUL}',true); perform public.tf_set_status('${TF}','draft');"
+chkas "${PAUL}" "收起來" "closed" "select public.tf_set_status('${TF}','closed')"
+chkraise "★ 收起來之後送不了（form_closed）" "form_closed" "perform set_config('test.uid','${MKM}',true); perform public.tf_submit('${TF}', '{\"${TQ1}\":\"Q1\",\"${TQ2}\":2}'::jsonb);"
+chkas "${MKE}" "收起來之後自己的答案還看得到" "Q1" "select public.tf_fill('${TF}')#>>'{mine,answers,${TQ1}}'"
+# 可以改答案的表單、匯入、接到人
+TF2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.tf_save_form(null, '{\"title\":\"Editable (fake)\",\"allow_edit\":true}'::jsonb, '[{\"type\":\"multi\",\"label\":\"Pick\",\"options\":[\"a\",\"b\",\"c\"]},{\"type\":\"short\",\"label\":\"Name\"}]'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+T2Q1=$(psql -d "${DB}" -X -A -t -q -c "select id from public.tf_questions where form_id='${TF2}' and ord=1" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.tf_set_audience('${TF2}','recipient','[{\"kind\":\"all\"}]'::jsonb); select public.tf_set_status('${TF2}','open');" >/dev/null 2>&1
+chkas "${MKM}" "多選送兩個" "1" "select count(*) from (select public.tf_submit('${TF2}', ('{\"${T2Q1}\":[\"c\",\"a\"]}')::jsonb)) x"
+chk "多選存成換行分隔、照選項順序" "a,c" "select replace(value, E'\n', ',') from public.tf_answers a join public.tf_responses r on r.id=a.response_id where r.form_id='${TF2}' and r.user_id='${MKM}' and a.question_id='${T2Q1}'"
+chkas "${MKM}" "★ 開了「可以改」：再送一次是改，不是第二份" "1|b" "select count(*) from (select public.tf_submit('${TF2}', ('{\"${T2Q1}\":[\"b\"]}')::jsonb)) x; select (select count(*) from public.tf_responses where form_id='${TF2}' and user_id='${MKM}')||'|'||(select value from public.tf_answers a join public.tf_responses r on r.id=a.response_id where r.form_id='${TF2}' and r.user_id='${MKM}')"
+IMP="[{\"user_id\":\"${RQR}\",\"name\":\"rae curr\",\"submitted_at\":\"2026-10-28T03:04:05Z\",\"answers\":{\"${T2Q1}\":\"a\"}},{\"user_id\":null,\"name\":\"Typed Person\",\"team\":\"Mentorship\",\"submitted_at\":\"2026-10-29T01:00:00Z\",\"answers\":{\"${T2Q1}\":\"zzz not an option\"}}]"
+chkraise "★ 填的人匯入不了（not_form_editor）" "not_form_editor" "perform set_config('test.uid','${MKE}',true); perform public.tf_import('${TF2}', '${IMP}'::jsonb);"
+chkas "${PAUL}" "匯入兩列（一列對到人、一列留打的名字）" "2" "select public.tf_import('${TF2}', '${IMP}'::jsonb)"
+chk "★ 送出時間照 CSV、來源是 import、對到人的用他的名字" "2026-10-28T03:04:05|import|RaeCurr|raecurr" "select to_char(submitted_at at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS')||'|'||source||'|'||replace(name,' ','')||'|'||replace(typed_name,' ','') from public.tf_responses where form_id='${TF2}' and user_id='${RQR}'"
+chk "對不到人的那一列留打的名字，選項外的值照樣收" "TypedPerson|zzznotanoption" "select replace(name,' ','')||'|'||replace(a.value,' ','') from public.tf_responses r join public.tf_answers a on a.response_id=r.id where r.form_id='${TF2}' and r.user_id is null"
+chkas "${RQR}" "★ 對到的人在「我填過的」看得到匯入的那一份" "a" "select public.tf_fill('${TF2}')#>>'{mine,answers,${T2Q1}}'"
+chkraise "同一個人匯兩次擋（already_answered）" "already_answered" "perform set_config('test.uid','${PAUL}',true); perform public.tf_import('${TF2}', '${IMP}'::jsonb);"
+TR=$(psql -d "${DB}" -X -A -t -q -c "select id from public.tf_responses where form_id='${TF2}' and user_id is null" | tr -d ' \n')
+chkraise "接到一個已經有答案的人擋（already_answered）" "already_answered" "perform set_config('test.uid','${PAUL}',true); perform public.tf_link_response('${TR}','${MKM}');"
+chkas "${PAUL}" "把打的名字接到 OUTC" "OttoOut|TypedPerson" "select count(*) from (select public.tf_link_response('${TR}','${OUTC}')) x; select replace(name,' ','')||'|'||replace(typed_name,' ','') from public.tf_responses where id='${TR}'"
+chkas "${PAUL}" "再拿掉，名字回到打的那個" "TypedPerson" "select count(*) from (select public.tf_link_response('${TR}',null)) x; select replace(name,' ','') from public.tf_responses where id='${TR}'"
+# 誰能建表單：Paul 在人與權限把人加進 custom:team-forms
+psql -d "${DB}" -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${OTHER}','custom:team-forms','view') on conflict do nothing;" >/dev/null
+TF3=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${OTHER}',false);" -c "select public.tf_save_form(null, '{\"title\":\"SA form (fake)\"}'::jsonb, '[{\"type\":\"short\",\"label\":\"q\"}]'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 被加進「誰能建」之後 Senior Adviser 建得了，他是建立者" "${OTHER}" "select owner from public.tf_forms where id='${TF3}'"
+chkas "${OTHER}" "建得了的人 my_access 是 edit" "edit" "select e->>'level' from jsonb_array_elements(public.my_access()->'workspaces') e where e->>'id'='team-forms'"
+chkraise "★ 建得了不等於看得到別人的表單" "not_form_reader" "perform set_config('test.uid','${OTHER}',true); perform public.tf_results('${TF}');"
+chkas "${PAUL}" "★ Co-President 永遠看得到別人建的" "1" "select count(*) from (select public.tf_form_admin('${TF3}')) x"
+chkas "${OTHER}" "建立者改得動自己那份的編輯名單" "1" "select public.tf_set_audience('${TF3}','editor','[{\"kind\":\"person\",\"value\":\"${MKE}\"}]'::jsonb)"
+chkas "${OTHER}" "建立者刪得掉自己那份" "t" "select public.tf_delete_form('${TF3}')"
+chkas "${PAUL}" "bootstrap：建得了、選人名單有人、管得到兩份" "true|t|2" "select (b->>'can_create')||'|'||(jsonb_array_length(b->'people')>0)::text::char(1)||'|'||jsonb_array_length(b->'manage') from (select public.tf_bootstrap() b) t"
+chkas "${MKE}" "★ 填的人的 bootstrap 沒有選人名單" "false|0" "select (b->>'can_create')||'|'||jsonb_array_length(b->'people') from (select public.tf_bootstrap() b) t"
+chkrole authenticated "${PAUL}" "★ 連 Co-President 都不能直接讀答案表（一律走函式）" "denied" "select case when has_table_privilege('authenticated','public.tf_answers','select') then 'open' else 'denied' end"
+chkrole authenticated "${MKE}" "★ 直接 select 答案表被擋" "ERROR:permissiondeniedfortabletf_answers" "select count(*) from public.tf_answers" 
+chkrole anon "" "★ 沒登入的人叫不到結果" "ERROR:permissiondeniedforfunctiontf_results" "select public.tf_results('${TF}')"
+tf2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-29-team-forms.sql 2>&1 || true)
+if echo "${tf2}" | grep -q "OVERALL.*PASS"; then echo "  ok   內部表單那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 內部表單那支重跑沒過"; fail=$((fail+1)); fi
+chk "重跑不動資料" "2|4" "select (select count(*) from public.tf_forms)||'|'||(select count(*) from public.tf_responses)"
+chkas "${OTHER}" "重跑之後 finance 那一格還在（my_access 抄對了）" "1" "select count(*) from jsonb_array_elements(public.my_access()->'workspaces') e where e->>'id'='finance'"
+BROKEN=$(mktemp)
+sed "s/  if not public.tf_is_reader(p_form) then raise exception 'not_form_reader' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-29-team-forms.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「只有讀者看得到結果」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉讀者門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/  if v_old.anonymous and not v_anon and v_has > 0 then raise exception 'anonymous_locked' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-29-team-forms.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「匿名改不回具名」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉匿名鎖驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/  if not public.tf_is_recipient(p_form) then raise exception 'not_for_you' using errcode = 'P0001'; end if;//" supabase/migrations/2026-11-29-team-forms.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「只有名單上的人送得了」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉填的人門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/    or exists (select 1 from public.assignments a where a.workspace_id = 'custom:team-forms' and a.user_id = auth.uid())/    or public.can_view('custom:team-forms')/" supabase/migrations/2026-11-29-team-forms.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：「誰能建」改用 can_view（SA 會自動有），驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 改用 can_view 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-29-team-forms.sql >/dev/null 2>&1 || true
+chkraise "破壞測試之後裝回正確版本，一般幹部又建不了了" "not_form_creator" "perform set_config('test.uid','${RQR}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, null);"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -30,7 +30,7 @@ const PAGES = [
   "resources/index.html", "alumni/index.html", "history/index.html", "privacy/index.html",
   "app/index.html", "reset/index.html",
   "passport/_audit.html", "availability/_audit.html", "admin/_audit.html", "settings/_audit.html",
-  "intern-passport/_audit.html", "admin/people/_audit.html", "admin/finance/_audit.html", "admin/marketing/_audit.html",
+  "intern-passport/_audit.html", "admin/people/_audit.html", "admin/finance/_audit.html", "admin/marketing/_audit.html", "admin/team-forms/_audit.html",
   "admin/_audit-rq.html", "admin/_audit-rqq.html",
 ];
 

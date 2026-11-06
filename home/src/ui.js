@@ -242,6 +242,16 @@ export function itemCardHTML(it, ctx, opts) {
 
 // ── 首頁 ────────────────────────────────────────────────────────────
 // ctx：{ me, tz, now, name, senior, ws, people, busy, reasonFor, reasonDraft, changing, linked, linkedMsg, canSchedule }
+// 內部表單（2026-11-29）：發給我、還沒填的。沒有就整塊不出現，不佔位置。
+export function formsHTML(ctx) {
+  const forms = (ctx && ctx.forms) || [];
+  if (!forms.length) return "";
+  return `<section class="block">
+      <h2>${T("home.forms")} <span class="count">${forms.length}</span></h2>
+      <p class="mini">${T("home.formsLede")}</p>
+      <div class="dos">${forms.map(f => `<a class="do" href="../admin/team-forms/#fill/${encodeURIComponent(f.id)}"><b>${esc(f.title || "")}</b><span>${f.closes_at ? T("home.formCloses", { date: esc(dateLabel(dayKey(new Date(f.closes_at), ctx.tz))) }) : T("home.formOpen")}</span></a>`).join("")}</div>
+    </section>`;
+}
 export function homeHTML(items, ctx) {
   const reply = needsReply(items, ctx.now), next = upcoming(items, ctx.now, 60);
   const linked = ctx.linked ? items.find(i => i.id === ctx.linked) : null;
@@ -258,6 +268,7 @@ export function homeHTML(items, ctx) {
     <header class="hello"><h1>${T("home.hi", { name: esc(ctx.name || "") })}</h1>
       <p class="mini">${T("home.today", { date: esc(dateLabel(dayKey(ctx.now, ctx.tz))), tz: esc(ctx.tz) })}</p></header>
     ${top}
+    ${formsHTML(ctx)}
     <section class="block">
       <h2>${T("home.reply")}${reply.length ? ` <span class="count">${reply.length}</span>` : ""}</h2>
       ${reply.length ? `<p class="mini">${T("home.replyLede")}</p>${reply.filter(i => i !== linked).map(i => itemCardHTML(i, ctx)).join("")}` : `<p class="mini ok">${T("home.allClear")}</p>`}

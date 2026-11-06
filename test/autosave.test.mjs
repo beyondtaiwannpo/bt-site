@@ -86,7 +86,7 @@ test("★ signOut 會清掉分頁快取；settings 與 app 存完資料會清", 
 });
 
 test("★ 四個後台 main.js 開頁先畫外殼（paintShell）再等資料，不再一個接一個 await", () => {
-  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/people/src/main.js", "admin/passports/src/main.js", "admin/finance/src/main.js", "admin/marketing/src/main.js"]) {
+  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/people/src/main.js", "admin/passports/src/main.js", "admin/finance/src/main.js", "admin/marketing/src/main.js", "admin/team-forms/src/main.js"]) {
     const s = readFileSync(f, "utf8");
     assert.match(s, /function paintShell\(/, f);
     assert.match(s, /paintShell\(/, f);
@@ -99,7 +99,7 @@ test("★ 四個後台 main.js 開頁先畫外殼（paintShell）再等資料，
 });
 
 test("★ 四個後台 index.html 一開始就有骨架側欄，importmap 與 meta 版本在", () => {
-  for (const f of ["admin/index.html", "admin/site/index.html", "admin/people/index.html", "admin/passports/index.html", "admin/finance/index.html", "admin/marketing/index.html"]) {
+  for (const f of ["admin/index.html", "admin/site/index.html", "admin/people/index.html", "admin/passports/index.html", "admin/finance/index.html", "admin/marketing/index.html", "admin/team-forms/index.html"]) {
     const h = readFileSync(f, "utf8");
     assert.match(h, /<nav class="rail skel"/, f);
     assert.match(h, /<meta name="bt-version" content="[^"]+">/, f);
@@ -112,7 +112,7 @@ test("★ 四個後台 index.html 一開始就有骨架側欄，importmap 與 me
 // 一選「寄哪一種語言」就丟 ReferenceError，什麼都沒存，畫面也不報錯。
 // 九份 onAutosave 只要函式本體提到 field，參數就一定要有 field。
 test("onAutosave 用到 field 就一定要收 field", () => {
-  const dirs = ["admin", "admin/site", "admin/people", "admin/passports", "admin/finance", "admin/marketing", "passport", "intern-passport", "settings", "availability"];
+  const dirs = ["admin", "admin/site", "admin/people", "admin/passports", "admin/finance", "admin/marketing", "admin/team-forms", "passport", "intern-passport", "settings", "availability"];
   for (const d of dirs) {
     let src; try { src = readFileSync(new URL(`../${d}/src/main.js`, import.meta.url), "utf8"); } catch { continue; }
     const m = src.match(/async function onAutosave\(([^)]*)\)\s*\{([\s\S]*?)\n\}/);
@@ -126,7 +126,7 @@ test("onAutosave 用到 field 就一定要收 field", () => {
 // 選下拉時先存同一框裡還在等的字、離開頁面前把還在等的字送出去並問一句。
 test("九份 bindAutosave 一樣，且離開前會先存、選下拉不吃掉打的字", async () => {
   const { readFileSync } = await import("node:fs");
-  const files = ["availability", "admin", "intern-passport", "settings", "admin/passports", "passport", "admin/people", "admin/finance", "admin/marketing", "admin/site"].map(d => `${d}/src/ui.js`);
+  const files = ["availability", "admin", "intern-passport", "settings", "admin/passports", "passport", "admin/people", "admin/finance", "admin/marketing", "admin/team-forms", "admin/site"].map(d => `${d}/src/ui.js`);
   const bodies = files.map(f => { const s = readFileSync(new URL(`../${f}`, import.meta.url), "utf8"); const m = s.match(/export function bindAutosave\(root, onSave\) \{[\s\S]*?\n\}/); assert.ok(m, f); return m[0]; });
   for (const b of bodies) assert.equal(b, bodies[0]);
   assert.match(bodies[0], /beforeunload/);

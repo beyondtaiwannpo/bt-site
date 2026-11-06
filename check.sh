@@ -488,10 +488,10 @@ else
 fi
 # 版本提示：四個後台 main.js 開頁都要問一次線上的 version.json（不問的話側欄「重整就不見」那件事會回來）。
 ver_missing=""
-for f in admin/src/main.js admin/site/src/main.js admin/people/src/main.js admin/passports/src/main.js admin/finance/src/main.js admin/marketing/src/main.js settings/src/main.js passport/src/main.js intern-passport/src/main.js availability/src/main.js; do
+for f in admin/src/main.js admin/site/src/main.js admin/people/src/main.js admin/passports/src/main.js admin/finance/src/main.js admin/marketing/src/main.js admin/team-forms/src/main.js settings/src/main.js passport/src/main.js intern-passport/src/main.js availability/src/main.js; do
   grep -q 'checkVersion(' "$f" || ver_missing="$ver_missing $f"
 done
-if [ -n "$ver_missing" ]; then bad "開頁沒有問線上版本（checkVersion）：$ver_missing"; else ok "十個登入後頁面開頁都會問一次線上版本"; fi
+if [ -n "$ver_missing" ]; then bad "開頁沒有問線上版本（checkVersion）：$ver_missing"; else ok "十一個登入後頁面開頁都會問一次線上版本"; fi
 
 # 會動的東西只准出現在 motion() 裡面
 #

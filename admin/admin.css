@@ -855,3 +855,53 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .cp-chk{font-size:12px;font-weight:600;border-radius:999px;padding:1px 8px;background:rgba(16,42,134,.08)}
 .cp-chk-found,.cp-chk-numbers{background:rgba(107,198,187,.42)}
 .cp-chk-not_found{background:var(--bt-orange)}
+
+/* ═════════ 內部表單（2026-11-29，/admin/team-forms/）═════════ */
+.tf-card .kpi-l{font-size:16px}
+.tf-tabs{margin:0 0 18px}
+.tf-tabs a.chip{text-decoration:none;display:inline-flex;align-items:center}
+.tf-qlist .qbody{flex:1;min-width:0}
+.tf-qlist .qtop{display:flex;gap:12px;align-items:flex-start}
+.tf-req{align-self:end;margin-bottom:14px}
+.tf-add{gap:6px;flex-wrap:wrap;align-items:center}
+.tf-aud-row{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;align-items:start;margin:10px 0}
+.tf-aud-row > b{font-size:13.5px;padding-top:7px}
+.tf-aud-row .tf-find{grid-column:2;max-width:360px}
+.tf-aud-row .tf-hits{grid-column:2}
+.tf-hits small{font-weight:400;opacity:.75;margin-left:4px}
+.tf-count{margin:6px 0 4px;font-size:13.5px}
+.tf-count .mini{margin-top:6px;line-height:1.7}
+.tf-fqs{margin:0;padding:0;list-style:none}
+.tf-fq{padding:16px 0;border-top:1px solid rgba(16,42,134,.14)}
+.tf-fq .qlabel{font-weight:600;font-size:15.5px;margin-bottom:4px}
+.tf-fq .qsub{font-size:13.5px;margin-bottom:8px;color:rgba(16,42,134,.82)}
+.tf-opts{display:flex;flex-direction:column;gap:2px}
+.tf-opts .opt{display:flex;gap:10px;align-items:center;padding:6px 4px;cursor:pointer;font-size:14.5px}
+.tf-opts .check{margin:0;padding:6px 4px}
+.tf-scale{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tf-num{position:relative}
+.tf-num input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.tf-num span{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:44px;border-radius:12px;
+  border:1px solid rgba(16,42,134,.3);background:rgba(255,255,255,.6);font-weight:700;font-size:16px}
+.tf-num input:checked + span{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.tf-num input:focus-visible + span{outline:2px solid var(--bt-orange);outline-offset:2px}
+.tf-num input:disabled + span{opacity:.6}
+.tf-sum{padding:14px 18px}
+.tf-sq{font-size:15.5px;margin:0 0 10px;font-weight:600;line-height:1.4}
+.tf-avg{font-weight:600;margin:0 0 8px}
+.tf-bar{display:grid;grid-template-columns:minmax(80px,40%) 1fr 32px;gap:10px;align-items:center;font-size:13.5px;margin:4px 0}
+.tf-bar-l{overflow-wrap:anywhere}
+.tf-bar-t{height:10px;border-radius:999px;background:rgba(16,42,134,.08);overflow:hidden}
+.tf-bar-t i{display:block;height:100%;background:var(--bt-navy);border-radius:999px}
+.tf-bar b{text-align:right}
+.tf-texts{margin:8px 0 0;padding:0;list-style:none}
+.tf-texts li{padding:8px 0;border-top:1px solid rgba(16,42,134,.1);font-size:14px;line-height:1.55}
+.tf-texts li .mini{display:block;margin-top:2px}
+.tf-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tf-each select,.tf-scroll select{max-width:220px}
+@media (max-width:700px){
+  .tf-aud-row{grid-template-columns:1fr}
+  .tf-aud-row > b{padding-top:0}
+  .tf-aud-row .tf-find,.tf-aud-row .tf-hits{grid-column:1}
+  .tf-bar{grid-template-columns:minmax(70px,45%) 1fr 28px}
+}
