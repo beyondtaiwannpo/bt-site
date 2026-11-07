@@ -799,6 +799,7 @@ Paul 2026-11-06 要的：「a data set ... especially for alumni, people, and al
 - `forget_person()`：本人要求移除。只有 Co-President；有帳號的先刪帳號。
 - 本機 `./scripts/db/smoke.sh` 多一段 68 項（總共 1212 項全過），含三個破壞測試：拿掉「配對回饋 Senior Adviser 讀不到」、roster 不過濾、多開一支函式給 anon，三個都會讓 PASS 表變紅。
 - 沒跑之前：後台那一組打得開，但會說「紀錄的資料表還不在，要先在 Supabase 跑 2026-12-01-records.sql」。
+- **2026-11-07 Paul 在正式 Supabase 上跑完，全 PASS。**紀錄那一組從這天起正式可用。
 
 ### 還沒做
 - **校友在 `/settings/` 自己填去向**：資料庫函式 `rc_my_outcomes()` / `rc_save_outcome()` 已經在，畫面還沒加（計畫第 8 節 Phase 4）。
