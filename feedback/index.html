@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>回饋 / Beyond Taiwan</title>
+
+<!-- 回饋表的填寫頁（2026-12-01，BT Records）。
+     活動結束後學生、校友、mentee 用連結（?t=token）進來填，**不用登入**。
+     這一頁沒有 nav、沒有連到站內別頁，就是一張表單加資料告知。
+     ── 這一頁不碰 auth ──
+     不判斷登入狀態。題目用 rc_public_form(token) 拿，送出用 rc_public_submit(token, …)，兩支是開給 anon 的。
+     ── 中英兩版 ──
+     文字照表單自己的語言（rc_forms.lang）；網址上有 ?lang= 就照網址。
+     ── 資料告知 ──
+     最上面那一段告知（誰收、為什麼、誰看得到、怎麼要求刪除）是 PDPA 第 8 條要的，寫在 src/ui.js 的 NOTICE，
+     改字要跟 privacy/index.html 的「回饋與紀錄」那一段一致。
+     ⚠ 這一頁不准出現佔位文案，check.sh 有守門。 -->
+
+<meta name="description" content="Beyond Taiwan 活動回饋表。填兩分鐘，幫我們把下一次辦得更好。">
+<meta name="robots" content="noindex">
+<meta property="og:title" content="回饋 / Beyond Taiwan">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#EDE5D8">
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap"></noscript>
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="modulepreload" href="../shared/supabase.js">
+<link rel="modulepreload" href="../vendor/supabase-js.js">
+<link rel="modulepreload" href="../shared/supabase-config.js">
+<link rel="modulepreload" href="./src/ui.js">
+
+<script>
+  /* 語言：網址上的 ?lang= 先；沒有就先照瀏覽器，題目載進來之後再照表單自己的語言（src/main.js）。
+     這個站不在任何人的裝置上存東西（讀者包含未成年人），所以不用 localStorage。 */
+  (function () {
+    var q = new URLSearchParams(location.search).get("lang");
+    document.documentElement.setAttribute("data-lang",
+      q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+  })();
+</script>
+
+<style>
+*{box-sizing:border-box}
+:root{--gut:clamp(20px,5vw,88px)}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+main,footer,.topbar{position:relative;z-index:1}
+.skip{position:absolute;left:-9999px;top:0;z-index:80;background:var(--bt-navy);color:var(--bt-cream);padding:12px 18px;text-decoration:none}
+.skip:focus{left:0}
+:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+.topbar{display:flex;align-items:center;gap:16px;margin:12px var(--gut) 0;padding:9px 10px 9px 16px}
+.topbar .home{display:flex;align-items:center;margin-right:auto}
+.topbar .home img{height:30px;width:auto;display:block}
+.lang{min-width:44px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.12em;border:1px solid rgba(16,42,134,.32);border-radius:999px;padding:6px 13px;background:none;color:var(--ink);cursor:pointer;line-height:1}
+.lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
+main{max-width:720px;margin:0 auto;padding:clamp(20px,4vh,40px) var(--gut) 0}
+h1{font-family:var(--display);font-size:clamp(30px,5vw,44px);line-height:1.05;margin:0 0 8px;color:var(--bt-navy);text-wrap:balance}
+.lead{margin:0 0 20px;max-width:60ch}
+.notice{font-size:14px;line-height:1.65;background:rgba(255,255,255,.55);border:1px solid rgba(16,42,134,.16);border-radius:14px;padding:14px 18px;margin:0 0 22px}
+.notice b{color:var(--bt-navy)}
+.q{margin:0 0 22px}
+.q label.lbl{display:block;font-weight:600;margin-bottom:4px}
+.q .help{font-size:14px;margin:0 0 8px;opacity:.8}
+.q input[type=text],.q input[type=email],.q textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid rgba(16,42,134,.3);border-radius:10px;background:rgba(255,255,255,.7)}
+.q textarea{min-height:110px}
+.opt{display:flex;gap:10px;align-items:center;padding:6px 4px;cursor:pointer}
+.scale{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.num{position:relative}
+.num input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.num span{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:44px;border-radius:12px;border:1px solid rgba(16,42,134,.3);background:rgba(255,255,255,.6);font-weight:700;font-size:16px}
+.num input:checked + span{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.num input:focus-visible + span{outline:2px solid var(--bt-orange);outline-offset:2px}
+.mini{font-size:13.5px;opacity:.78}
+.req{color:var(--bt-navy);font-size:13px;font-weight:600;margin-left:4px}
+.btn{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);border:0;border-radius:999px;padding:12px 26px;font:600 15px/1 var(--body);cursor:pointer}
+.btn[disabled]{opacity:.6;cursor:default}
+.btn:hover{background:var(--bt-orange);color:var(--bt-navy)}
+.warn{background:rgba(255,196,108,.28);border-radius:12px;padding:12px 16px;margin:0 0 18px;font-size:15px}
+.done{text-align:center;padding:40px 0}
+footer{margin-top:clamp(56px,9vh,120px);padding:28px var(--gut) 40px;font-size:13.5px;line-height:1.7;opacity:.85}
+footer p{margin:0 0 6px}
+footer a{color:var(--ink);font-weight:600}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
+/* 點下去要有回饋（2026-09-08 全站規矩）。 */
+button{cursor:pointer}
+button[disabled]{cursor:default}
+button:not([disabled]):active,.opt:active{transform:scale(.97)}
+.btn:not([disabled]):active{background:var(--bt-navy);color:var(--bt-cream);filter:brightness(.88)}
+.lang:active{background:rgba(255,196,108,.38)}
+.opt:active{background:rgba(255,196,108,.26);border-radius:10px}
+footer a:active{text-decoration-color:var(--bt-orange)}
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main"><span class="zh">跳到主要內容</span><span class="en">Skip to content</span></a>
+
+<nav class="topbar" aria-label="網站導覽">
+  <a class="home" href="../" aria-label="Beyond Taiwan 首頁">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <button class="lang" id="lang" type="button">EN</button>
+</nav>
+
+<main id="main">
+  <div id="fb-root"><p class="mini"><span class="zh">載入中…</span><span class="en">Loading…</span></p></div>
+  <noscript><p class="warn"><span class="zh">這一頁要開 JavaScript 才填得了。</span><span class="en">This form needs JavaScript.</span></p></noscript>
+</main>
+
+<footer>
+  <p><a href="../privacy/">隱私政策 / Privacy Policy</a></p>
+  <p>本網站不使用任何追蹤或廣告工具。</p>
+  <p lang="en">This site uses no tracking or advertising tools.</p>
+  <p>beyondtaiwan2020@gmail.com</p>
+  <p>Beyond Taiwan</p>
+</footer>
+
+<script>
+(function () {
+  var html = document.documentElement, btn = document.getElementById("lang");
+  function setLang(l) {
+    html.setAttribute("data-lang", l);
+    html.setAttribute("lang", l === "zh" ? "zh-Hant" : "en");
+    btn.textContent = l === "zh" ? "EN" : "中";
+    btn.setAttribute("aria-label", l === "zh" ? "Switch to English" : "切換為中文");
+  }
+  setLang(html.getAttribute("data-lang") === "en" ? "en" : "zh");
+  btn.addEventListener("click", function () { setLang(html.getAttribute("data-lang") === "zh" ? "en" : "zh"); document.dispatchEvent(new CustomEvent("bt-lang")); });
+  document.addEventListener("bt-lang-set", function (e) { setLang(e.detail === "en" ? "en" : "zh"); });
+})();
+</script>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

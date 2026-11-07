@@ -112,6 +112,22 @@ make("admin/finance", "admin",
                { id:"t3", happened_on:"2026-11-15", kind:"transfer", amount:2000, currency:"TWD", amount_twd:2000, account_id:"a1", to_account_id:"a2", term_id:"2026-27" },
                { id:"t5", happened_on:"2026-12-01", kind:"income", amount:1234.5, currency:"USD", fx_rate:32.15, amount_twd:39689.18, account_id:"a1", category_id:"c1", counterparty:"Overseas alumni donation", term_id:"2026-27" },
                { id:"t6", happened_on:"2026-11-25", kind:"expense", amount:999, currency:"TWD", amount_twd:999, account_id:"a1", category_id:"c3", voided_at:"2026-11-26T00:00:00Z", void_reason:"重複登了，跟 11/12 那一筆是同一張發票", term_id:"2026-27" }];`);
+// BT Records（2026-12-01）：一場活動的頁面最長（四個數字、檢討、場次、出席表、回饋表、留言、配對）。假資料。
+make("admin/records", "admin",
+  `UI.shellHTML("", UI.railHTML("records", "overview", { role:"cadre", board:"president", team:"", name:"測試主席", ws:{ records:"edit" } }),
+     UI.eventHTML(EV, { boot:{ terms:[{ id:"2026-27" }], can_manage:true }, msg:"", busy:false, more:{} }))`,
+  `import * as UI from "./src/ui.js";
+   const N = { registered:42, attended:31, attendance_rate:73.8, recommend_avg:4.21, recommend_n:24, useful_avg:3.95, clarity_avg:3.6, responses:26, response_rate:83.9 };
+   const P = { id:"e0", kind:"bootcamp", title_zh:"2026 夏季探索營", title_en:"Summer Bootcamp 2026", starts_at:"2026-06-06T01:00:00Z", numbers:{ registered:38, attended:30, attendance_rate:78.9, recommend_avg:4.0, recommend_n:20, useful_avg:4.1, responses:22 }, review:{ we_change:"第二天下午縮短一小時，留時間給 Q&A" } };
+   const EV = { event:{ id:"e1", kind:"bootcamp", term_id:"2026-27", team:"Curriculum Team", title_zh:"2027 冬季探索營", title_en:"Winter Bootcamp 2027", starts_at:"2027-01-30T01:00:00Z", source:"site", numbers:N },
+     can_edit:true, previous:P,
+     sessions:[{ id:"s1", ord:1, title:"第一天", starts_at:"2027-01-30T01:00:00Z" }, { id:"s2", ord:2, title:"第二天", starts_at:"2027-01-31T01:00:00Z" }],
+     participation:[{ id:"x1", person_id:"p1", name:"學員甲 Alexandra Montgomery-Wellington", school:"臺北市立第一女子高級中學", role:"student", status:"attended", source:"site" },
+                    { id:"x2", person_id:"p2", name:"學員乙", school:"中山女高", role:"student", status:"no-show", source:"sheet" }, { id:"x3", person_id:"p3", name:"講者丙", role:"speaker", status:"attended", source:"manual" }],
+     forms:[{ id:"f1", title:"2027 冬季探索營回饋", kind:"post-event", status:"open", responses:26, token:"abc123", can_read:true }],
+     scales:[{ key:"recommend", label:"你會不會推薦這場活動給跟你情況一樣的朋友？", avg:4.21, n:24, max:5 }, { key:"useful", label:"今天對你自己的下一步有多有用？", avg:3.95, n:24, max:5 }],
+     comments:[{ key:"change", label:"下一次我們該改什麼？", value:"第二天太長了，下午三點之後大家都在滑手機，建議縮短一個小時然後留 Q&A", form_id:"f1" }, { key:"best", label:"最有用的部分是什麼？", value:"看到學長姐真的送出去的 essay", form_id:"f1" }],
+     pairs:[], review:{ went_well:"校友座談", we_change:"", updated_at:null } };`);
 // 內部表單（2026-11-29）：編輯畫面最長的一頁（設定、四種題目、發給誰三塊、結果含長名字與長答案）。假資料。
 make("admin/team-forms", "admin",
   `UI.shellHTML("", UI.railHTML("teamforms", "build", { role:"cadre", board:"president", team:"", name:"測試主席", ws:{ "team-forms":"edit" } }),

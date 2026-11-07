@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+FILES="index.html about programs team events join impact partner apply feedback resources admin settings alumni history privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html history/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -488,10 +488,10 @@ else
 fi
 # 版本提示：四個後台 main.js 開頁都要問一次線上的 version.json（不問的話側欄「重整就不見」那件事會回來）。
 ver_missing=""
-for f in admin/src/main.js admin/site/src/main.js admin/people/src/main.js admin/passports/src/main.js admin/finance/src/main.js admin/marketing/src/main.js admin/team-forms/src/main.js settings/src/main.js passport/src/main.js intern-passport/src/main.js availability/src/main.js; do
+for f in admin/src/main.js admin/site/src/main.js admin/people/src/main.js admin/passports/src/main.js admin/finance/src/main.js admin/marketing/src/main.js admin/team-forms/src/main.js admin/records/src/main.js settings/src/main.js passport/src/main.js intern-passport/src/main.js availability/src/main.js; do
   grep -q 'checkVersion(' "$f" || ver_missing="$ver_missing $f"
 done
-if [ -n "$ver_missing" ]; then bad "開頁沒有問線上版本（checkVersion）：$ver_missing"; else ok "十一個登入後頁面開頁都會問一次線上版本"; fi
+if [ -n "$ver_missing" ]; then bad "開頁沒有問線上版本（checkVersion）：$ver_missing"; else ok "十二個登入後頁面開頁都會問一次線上版本"; fi
 
 # 會動的東西只准出現在 motion() 裡面
 #
@@ -1633,7 +1633,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team events join impact partner apply resources admin settings alumni history privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+placeholder_scope="index.html about programs team events join impact partner apply feedback resources admin settings alumni history privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
@@ -1949,7 +1949,8 @@ fi
 # 而畫面上**完全看不出來** —— 沒有錯誤、沒有紅字，只是再也沒有人搜得到。
 # 對一個要靠搜尋被找到的對外網站來說，這是最貴的一種靜默失敗。
 # 所以兩個方向都要檢查：名單外的不准有，名單內的不准掉。
-NOINDEX_PAGES="app/index.html reset/index.html"
+# 2026-12-01 加 /feedback/：回饋表的填寫頁，沒有 token 打開是一句「連結不對」，路人從搜尋掉進去跟登入頁一樣用不到。
+NOINDEX_PAGES="app/index.html reset/index.html feedback/index.html"
 noindex_extra=""
 noindex_missing=""
 for f in $(printf '%s\n' index.html */index.html admin/*/index.html); do

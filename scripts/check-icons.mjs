@@ -15,7 +15,7 @@ import fs from "node:fs";
 export const PAGES = ["index.html", "about/index.html", "programs/index.html", "events/index.html",
                       "team/index.html", "join/index.html", "alumni/index.html", "history/index.html",
                       "impact/index.html", "partner/index.html",
-                      "apply/index.html", "admin/index.html", "resources/index.html",
+                      "apply/index.html", "feedback/index.html", "admin/index.html", "resources/index.html",
                       "settings/index.html",
                       "app/index.html", "availability/index.html", "home/index.html",
                       "passport/index.html", "privacy/index.html", "reset/index.html",

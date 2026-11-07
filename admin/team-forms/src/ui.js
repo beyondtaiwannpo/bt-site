@@ -42,6 +42,9 @@ export const GROUPS = [
   { key: "marketing", label: { zh: "Marketing", en: "Marketing" },  href: "/admin/marketing/", who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve", hint: { zh: "大學介紹貼文、Instagram", en: "College intro posts, Instagram" } },
   // 2026-11-29 內部表單：每一位幹部都進得來（要填的表單在這裡）；建表單與看結果那一頁看 my_access() 的 team-forms 那一格。
   { key: "teamforms", label: { zh: "內部表單", en: "Team forms" },   href: "/admin/team-forms/", who: "cadre",      hint: { zh: "給幹部填的表單、結果", en: "Forms for members, and results" } },
+  // 2026-12-01 BT Records：人、活動、出席、回饋、配對、去向收成一個資料集。who 是 "ws:records"：my_access() 的 records 那一格，
+  // 管的人（custom:records 工作區）是 edit，Senior Adviser 與任何一場活動工作區「改」以上的人是 view（2026-12-01-records.sql）。
+  { key: "records",   label: { zh: "紀錄",     en: "Records" },      href: "/admin/records/",   who: "ws:records",   hint: { zh: "活動記分卡、人的時間軸、回饋表、去向", en: "Event scorecards, people, feedback forms, outcomes" } },
 ];
 // 側欄上每一行。要加一個新的後台分頁，就在這裡加一行（四份都要加），
 // 然後在那一組的 ui.js 加一個畫面函式、main.js 接 data-act="tab" data-t="<key>"。
@@ -55,6 +58,11 @@ export const ITEMS = [
   // 2026-11-29 內部表單：每一位幹部都看得到「要填的表單」；「建表單與看結果」要建得了，或是某一份的讀者（門在資料庫 tf_*）。
   { group: "teamforms", key: "fill",     sec: "tforms",   label: { zh: "要填的表單", en: "Forms to fill in" }, hint: { zh: "發給你的表單、你填過的", en: "Forms sent to you, your answers" }, who: "cadre" },
   { group: "teamforms", key: "build",    sec: "tforms",   label: { zh: "建表單與看結果", en: "Build & results" }, hint: { zh: "題目、發給誰、誰看得到", en: "Questions, recipients, readers" }, who: "ws:team-forms" },
+  // 2026-12-01 BT Records：四頁都看 my_access() 的 records 那一格；每一頁裡能改什麼由資料庫的 rc_ 函式決定。
+  { group: "records",   key: "overview", sec: "rec",      label: { zh: "活動記分卡", en: "Event scorecards" }, hint: { zh: "每一場四個數字、下一次改什麼", en: "Four numbers per event, what to change next" }, who: "ws:records" },
+  { group: "records",   key: "forms",    sec: "rec",      label: { zh: "回饋表",     en: "Feedback forms" },   hint: { zh: "活動後、校友年度、配對回饋", en: "Post-event, alumni yearly, pair check-ins" }, who: "ws:records" },
+  { group: "records",   key: "people",   sec: "rec",      label: { zh: "人",         en: "People" },           hint: { zh: "一個人的時間軸、重複的人、去向", en: "One person over time, duplicates, outcomes" }, who: "ws:records" },
+  { group: "records",   key: "yearly",   sec: "rec",      label: { zh: "年度比較",   en: "Year by year" },     hint: { zh: "每一屆每一種活動一列", en: "One row per term and event kind" }, who: "ws:records" },
   { group: "forms",     key: "meetings", sec: "meet",     label: { zh: "會議",     en: "Meetings" },          hint: { zh: "排過的會、會議紀錄", en: "Scheduled meetings and notes" }, who: "cadre" },
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
   { group: "forms",     key: "events",   sec: "meet",     label: { zh: "活動",     en: "Events" },            hint: { zh: "上到對外首頁的活動", en: "Events on the public site" }, who: "cadre" },
@@ -92,6 +100,7 @@ export const ITEMS = [
 // 側欄的段落（2026-10-28）。順序照常用到不常用。icon 是 24×24 的線條圖，一段一個，讓眼睛不用讀字就認得出來。
 export const SECTIONS = [
   { key: "tforms", label: { zh: "內部表單",   en: "Team forms" },        icon: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12l2 2 4-4M9 17h6"/>' },
+  { key: "rec",    label: { zh: "紀錄",       en: "Records" },           icon: '<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3M20 16V6"/>' },
   { key: "meet",   label: { zh: "會議與活動", en: "Meetings & events" }, icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
   { key: "mkt",    label: { zh: "行銷",       en: "Marketing" },         icon: '<path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/>' },
   { key: "apply",  label: { zh: "申請",       en: "Applications" },      icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>' },
@@ -100,7 +109,7 @@ export const SECTIONS = [
   { key: "people", label: { zh: "人",         en: "People" },            icon: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 0 1 6-4.6"/>' },
   { key: "money",  label: { zh: "錢",         en: "Money" },             icon: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>' },
 ];
-const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports", "ws:finance": "why.finance", "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve": "why.marketing" };
+const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports", "ws:finance": "why.finance", "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve": "why.marketing", "ws:records": "why.records" };
 // me = { role, board, team, name }。team 可能是逗號字串（一個人在好幾個 team）。
 function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
@@ -589,6 +598,7 @@ export function wsCellLabel(w) {
   if (id === "apps" || id.startsWith("apps:")) return T("ws.long.apps");
   if (id.startsWith("res:")) return T("ws.long.res");
   if (id === "finance") return T("ws.long.finance");
+  if (id === "records" || id === "custom:records") return T("ws.long.records");
   return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
 }
 export function wsCellHref(w) {
@@ -602,6 +612,7 @@ export function wsCellHref(w) {
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
   if (id === "finance") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
+  if (id === "records" || id === "custom:records") return "/admin/records/#overview";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。

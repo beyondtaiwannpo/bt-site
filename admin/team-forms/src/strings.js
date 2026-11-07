@@ -54,6 +54,8 @@ export const COMMON = {
   "why.finance":      { zh: "只有 Co-President、Senior Adviser 與 Sponsorship 的 Director 進得去", en: "Co-Presidents, Senior Advisers and the Sponsorship Director only" },
   // 2026-11-26 Marketing。
   "why.marketing":    { zh: "只有 Marketing 的人、Co-President 與 Senior Adviser 進得去", en: "Marketing, Co-Presidents and Senior Advisers only" },
+  // 2026-12-01 BT Records。
+  "why.records":      { zh: "只有 Co-President、Senior Adviser、被派進「BT Records」的人，與活動工作區「改」以上的人進得去", en: "Co-Presidents, Senior Advisers, people assigned to BT Records, and event workspace editors only" },
   // 走錯地方、連不上
   "notCadre.title":   { zh: "這一頁是給幹部用的", en: "This page is for cadres" },
   "notCadre.lede":    { zh: "你的帳號是學員，後台看不到。", en: "Your account is a student account, so the admin is not available." },
@@ -73,6 +75,7 @@ export const COMMON = {
   "ws.long.apps":     { zh: "申請（表單與審核）", en: "Applications (forms & review)" },
   "ws.long.res":      { zh: "資源", en: "Resources" },
   "ws.long.finance":  { zh: "財務（帳戶、收支、預算）", en: "Finance (accounts, transactions, budget)" },
+  "ws.long.records":  { zh: "BT Records（人、活動、回饋、去向）", en: "BT Records (people, events, feedback, outcomes)" },
   "ws.board":         { zh: "整個 BT", en: "Board (whole BT)" },
   "ws.playNote":      { zh: "玩護照是身分帶來的（每位幹部有自己的、每位實習生有自己的），這幾格只管誰能改格子。", en: "Playing a passport comes with the role (every cadre has theirs, every intern theirs); these cells only control who edits the boxes." },
   "ws.availNote":     { zh: "時間看板沒有指派，每位幹部都用。", en: "Availability has no assignments: every cadre uses it." },

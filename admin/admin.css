@@ -905,3 +905,20 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
   .tf-aud-row .tf-find,.tf-aud-row .tf-hits{grid-column:1}
   .tf-bar{grid-template-columns:minmax(70px,45%) 1fr 28px}
 }
+
+/* ═════════ BT Records（2026-12-01，/admin/records/）═════════ */
+.rc-nums{margin-bottom:8px}
+.rc-kpi .kpi-h{min-height:1.4em}
+.rc-delta{font-weight:700;margin-left:4px}
+.rc-delta.up{color:#1f6f3f}
+.rc-delta.down{color:#9a3b1c}
+.rc-prev{margin:0 0 18px}
+.rc-table td{vertical-align:top}
+.rc-table .t-main{min-width:160px}
+.rc-table select{max-width:160px}
+.rc-link input{width:100%;max-width:520px;font-size:13px;margin:6px 0}
+.rc-tpl{align-self:end;margin-bottom:14px}
+.rc-pfind{max-width:420px}
+@media (max-width:700px){
+  .rc-nums{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

@@ -746,10 +746,66 @@ Paul 2026-11-06 要的：像 Tally 那樣的表單，由 Co-President 發給全�
 - 本機 `./scripts/db/smoke.sh` 多一段約 85 項（總共 1136 項全過），含五個破壞測試：拿掉讀者的門、拿掉匿名鎖、拿掉送出時「你有沒有被發到」、把「誰能建」換成能看後台就能建、拿掉「Senior Adviser 讀得到」，五個都會讓 PASS 表變紅。
 - `2026-11-30-team-forms-no-import.sql` 接在後面跑：只拿掉 `tf_import` 與 `tf_link_response` 兩支函式，不動任何資料。可以重跑。PASS 表 4 項加 OVERALL，第 4 項是參考（之前匯入過幾列，正式資料庫應該是 0）。smoke.sh 多 8 項（總共 1144 項全過），含一個破壞測試（漏拿 `tf_import` 驗收表變紅）。
 - 沒跑之前：後台那一組打得開，但會說「內部表單的資料表還不在，要先在 Supabase 跑 2026-11-29-team-forms.sql。」首頁那一塊不出現，其他照常。
+- **2026-11-07 Paul 在正式 Supabase 上跑完 11-29 與 11-30 兩支，全 PASS。**內部表單從這天起正式可用。
 
 ### 還沒做
 - **開放時不寄信。** 要寄要 Paul 先說（GOALS「寄信給幹部要先問」）。
 - 沒有跳題、檔案上傳、多語言題目，跟學生申請表單第一版一樣的界線。
+
+## BT Records：人、活動、出席、回饋、配對、去向（2026-12-01）
+
+Paul 2026-11-06 要的：「a data set ... especially for alumni, people, and also events feedback ... is there a way to systematically improve our work through tracking old data」，
+2026-11-07：「build the thing first」。完整計畫（八節、十二個待定）在 `~/Anson/outputs/beyond-taiwan/general/docs/2026-11-06-bt-data-set-plan/`。
+後台多一組 **紀錄**（網址 `/admin/records/`），四頁：**活動記分卡**、**回饋表**、**人**、**年度比較**。對外多一頁 `/feedback/?t=<token>`，學生不登入就能填回饋。
+
+### 這一套在做什麼
+一場活動四個數字（出席率、推薦、有用、回饋份數）加一句「下一次我們改什麼」。數字從出席紀錄與回饋表算，那一句是檢討完人填的。
+下一場同類活動的頁面會把上一場那一句印出來問「改了沒」。年度比較一屆一種活動一列。這整套東西有沒有用，看的是那一句有沒有被填，不是數字有沒有變好。
+
+### 誰看得到什麼
+
+| 誰 | 記分卡（四個數字） | 回饋的留言 | 配對回饋（mentee 寫 mentor） | 人的時間軸、去向 | 建回饋表、合併人、加舊活動 |
+|---|---|---|---|---|---|
+| Co-President | 全部 | 全部 | 全部 | 全部 | 可以 |
+| 被派進「BT Records」工作區的人（任何等級） | 全部 | 全部 | 全部 | 全部 | 可以 |
+| Senior Adviser | 全部 | 全部 | **不行** | 全部 | 不行 |
+| 某場活動工作區「改」以上的人（Director） | 那一場 | 那一場的 | 不行 | 不行 | 那一場的活動後回饋可以建 |
+| 被某一份點名的讀者 | 不行 | 那一份 | 那一份 | 不行 | 不行 |
+| 其他幹部、學員、校友、沒登入 | 不行 | 不行 | 不行 | 不行 | 不行 |
+
+- 配對回饋（`pair-mentee` / `pair-mentor`）的讀者只能一個一個點名，不能整個 team；**mentor 永遠加不進 mentee 那一份的讀者**（`mentor_cannot_read`）。
+- 活動後回饋預設匿名：答案不掛人，除非填的人自己留 email 並勾「可以聯絡我」。有人填過之後不能改回具名。
+- 年齡只問「18 歲以下嗎」，不問生日。結果頁不印 email，只印「有留」。
+- 門在資料庫：十二張 `rc_` 表對登入的人**沒有任何直接權限**，讀寫全走 `rc_` 函式，每一支第一句先問門。`rc_public_form` / `rc_public_submit` 是唯二開給 anon 的。
+
+### 怎麼用（給 Director）
+1. 活動結束當天：後台 → 紀錄 → 活動記分卡 → 點那一場 → **建活動後回饋**（固定題目會先放進去）→ 打開 → 複製填寫連結貼到群組。
+2. 現場簽到過的，按「從報名表抄過來」；沒走網站的人用「加一個人」補。沒來的改成「沒來」。
+3. 下一次幹部會議 15 分鐘：開記分卡、一起讀留言、決定一件事、填進「下一次我們改什麼」、存檢討。
+4. 下一場同類活動辦完，頁面會印上一場那一句，勾「上一場說要改的，這一場改了」。
+
+### 怎麼用（給 Co-President）
+- **人與權限 → 誰能改什麼**：把 Mentorship 的 Director 加進「BT Records」工作區，他才建得了配對回饋與配對。
+- **加一場舊活動**（記分卡頁右上）：以前的探索營、導生學期。建好之後補出席、建回饋表、用 `rc_import_responses` 把舊答案倒進去（Phase 3，見計畫第 7 節）。
+- **人 → 可能是同一個人**：同名提示，先點開看學校與年份再合併。email 一樣的自動是同一個人，名字一樣永遠不自動合。
+- **本人要求移除**：人的頁面最下面「清掉這個人的紀錄」（只有 Co-President）。有帳號的先到人與權限刪除成員，再回來清。
+- 固定題目（計畫第 4 節）寫在 `admin/records/src/ui.js` 的 `TEMPLATES`，中英各一套，題目的 `key`（recommend、useful、best、change…）每一年一樣才比得出來。改字可以，改 key 等於換一題。
+
+### 資料庫（`supabase/migrations/2026-12-01-records.sql`）
+- 接在 `2026-11-30-team-forms-no-import.sql` 後面跑。可以重跑，不動既有資料。最後一段 PASS 表 19 項加 OVERALL。
+- 多一個工作區 `custom:records`；`people` 多三欄（`kind` member / student / guest、`school`、`grad_year`）與 `forgotten_at`；`events` 多 `kind`、`term_id`、`source`；`tf_questions` 多 `key`。
+- 十二張新表：`rc_identities`（一個人出現過的 email、名字）、`rc_sessions`、`rc_participation`、`rc_forms` / `rc_questions` / `rc_audience` / `rc_responses` / `rc_answers`、`rc_pairs`、`rc_outcomes`、`rc_reviews`、`rc_log`。
+- **重新定義了 `roster()`**（只列 `kind = member`，學員不會跑進幹部名單）與 **`my_access()`**（多一格 `records`）。之後重跑 2026-11-07 或 2026-11-29，要再跑一次這一支。
+- `forget_person()`：本人要求移除。只有 Co-President；有帳號的先刪帳號。
+- 本機 `./scripts/db/smoke.sh` 多一段 68 項（總共 1212 項全過），含三個破壞測試：拿掉「配對回饋 Senior Adviser 讀不到」、roster 不過濾、多開一支函式給 anon，三個都會讓 PASS 表變紅。
+- 沒跑之前：後台那一組打得開，但會說「紀錄的資料表還不在，要先在 Supabase 跑 2026-12-01-records.sql」。
+
+### 還沒做
+- **校友在 `/settings/` 自己填去向**：資料庫函式 `rc_my_outcomes()` / `rc_save_outcome()` 已經在，畫面還沒加（計畫第 8 節 Phase 4）。
+- **舊資料倒進來**（Phase 3）：Drive 上 2024 到 2026 的 129 份表單與 168 份回覆表的清單在 `~/Anson/outputs/beyond-taiwan/general/docs/2026-11-06-bt-data-set-plan/BT-records-inventory.csv`，要 Paul 先標同意與留不留。
+- **隱私政策多一段「回饋與紀錄」**：`feedback/src/ui.js` 的 `NOTICE` 那段字要跟 `privacy/index.html` 一致，隱私政策是對外承諾，Paul 過稿才貼。
+- 校友年度問候現在是一份「不登入用連結填」的回饋表（kind `alumni-yearly`），答案不自動寫進去向；要接到登入的校友帳號是計畫的決定 10。
+- 不寄信：回饋表打開不會通知任何人，連結自己貼。
 
 ## 財務（2026-11-08）
 

@@ -2878,6 +2878,114 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-11-30-team-forms-no-import.sql >/dev/null 2>&1 || true
 chk "破壞測試之後裝回來，兩支都不在" "0" "select count(*) from pg_proc where pronamespace='public'::regnamespace and proname in ('tf_import','tf_link_response')"
+echo "── BT Records：人、活動、出席、回饋、配對、去向（2026-12-01-records.sql）──"
+# 這時候：PAUL Co-President、OTHER Senior Adviser、DIR 管 winter-camp-2027 那場活動的工作區、MKE Marketing 的一般幹部、
+# OUTC Mentorship 的一般幹部（沒有任何指派）、EVS1 報過名又被拒的學員。資料全是假的。
+rcgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-01-records.sql 2>&1 || true)
+if echo "${rcgot}" | grep -q "OVERALL.*PASS" && ! echo "${rcgot}" | grep -q "|FAIL"; then echo "  ok   紀錄那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 紀錄那支驗收表："; echo "${rcgot}" | head -20; fail=$((fail+1)); fi
+RCEV=$(psql -d "${DB}" -X -A -t -q -c "select id from public.events where slug='winter-camp-2027'" | tr -d ' \n')
+RCMEM=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select count(*) from public.roster()" 2>/dev/null | tail -1 | tr -d ' \n')
+chkas "${OUTC}" "沒指派的幹部打得開總覽，但管不了、一場活動都看不到" "false|false|0" "select (b->>'can_manage')||'|'||(b->>'can_view')||'|'||jsonb_array_length(b->'events') from (select public.rc_bootstrap() b) t"
+chkas "${DIR}" "★ 活動工作區裡的人看得到自己那一場（不是管的人）" "false|1" "select (b->>'can_manage')||'|'||jsonb_array_length(b->'events') from (select public.rc_bootstrap() b) t"
+chkas "${DIR}" "活動工作區裡的人的 my_access 有 records（view）" "view" "select e->>'level' from jsonb_array_elements(public.my_access()->'workspaces') e where e->>'id'='records'"
+chkas "${OUTC}" "沒指派的幹部 my_access 沒有 records" "0" "select count(*) from jsonb_array_elements(public.my_access()->'workspaces') e where e->>'id'='records'"
+chkas "${PAUL}" "Co-President 管得了，my_access 是 edit" "true|edit" "select public.rc_can_manage()||'|'||(select e->>'level' from jsonb_array_elements(public.my_access()->'workspaces') e where e->>'id'='records')"
+chkraise "★ 活動以外的人改不了活動的種類（not_event_editor）" "not_event_editor" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_event_meta('${RCEV}', '{\"kind\":\"bootcamp\"}'::jsonb);"
+chkas "${DIR}" "Director 把那場標成探索營、2026-27 屆" "bootcamp|2026-27" "select public.rc_save_event_meta('${RCEV}', '{\"kind\":\"bootcamp\",\"term_id\":\"2026-27\"}'::jsonb); select kind||'|'||term_id from public.events where id='${RCEV}'"
+chkraise "沒有的屆別擋（no_such_term）" "no_such_term" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_event_meta('${RCEV}', '{\"term_id\":\"1999-00\"}'::jsonb);"
+chkas "${DIR}" "兩個場次" "2" "select public.rc_set_sessions('${RCEV}', '[{\"title\":\"Day 1\",\"starts_at\":\"2027-01-30T01:00:00Z\"},{\"title\":\"Day 2\",\"starts_at\":\"2027-01-31T01:00:00Z\"}]'::jsonb)"
+chkas "${DIR}" "★ 從報名表抄出席：一份被拒的 → cancelled，學員變成名單上的一個人（kind student、接上帳號）" "1|cancelled|student|true" "select public.rc_sync_event('${RCEV}'); select (select count(*) from public.rc_participation where event_id='${RCEV}')||'|'||(select x.status||'|'||pe.kind||'|'||(pe.profile_id is not null) from public.rc_participation x join public.people pe on pe.id=x.person_id where x.event_id='${RCEV}' and x.application_id is not null)"
+chkas "${PAUL}" "★ 學員不會跑進幹部名單（roster 人數不變）" "${RCMEM}" "select count(*) from public.roster()"
+chkas "${DIR}" "抄兩次不會多一列" "1" "select public.rc_sync_event('${RCEV}'); select count(*) from public.rc_participation where event_id='${RCEV}'"
+chkraise "★ 活動以外的人記不了出席（not_event_editor）" "not_event_editor" "perform set_config('test.uid','${OUTC}',true); perform public.rc_set_participation('${RCEV}', '{\"email\":\"a@example.com\",\"name_zh\":\"甲\"}'::jsonb);"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" \
+  -c "select public.rc_set_participation('${RCEV}', '{\"email\":\"stu-a@example.com\",\"name_zh\":\"學員甲\",\"name_en\":\"Dup Student\",\"school\":\"北一女\",\"grad_year\":2028,\"status\":\"attended\"}'::jsonb)" \
+  -c "select public.rc_set_participation('${RCEV}', '{\"email\":\"stu-b@example.com\",\"name_zh\":\"學員乙\",\"status\":\"attended\"}'::jsonb)" \
+  -c "select public.rc_set_participation('${RCEV}', '{\"email\":\"stu-c@example.com\",\"name_zh\":\"學員丙\",\"status\":\"no-show\"}'::jsonb)" >/dev/null 2>&1
+chkas "${DIR}" "★ 記分卡：報名 3（被拒的不算）、到 2、出席率 66.7" "3|2|66.7" "select (n->>'registered')||'|'||(n->>'attended')||'|'||(n->>'attendance_rate') from (select public.rc_event('${RCEV}')#>'{event,numbers}' n) t"
+chkas "${DIR}" "同一個人同一場再記一次只是改狀態" "3|4" "select public.rc_set_participation('${RCEV}', '{\"email\":\"stu-c@example.com\",\"status\":\"attended\"}'::jsonb); select (select count(*) from public.rc_participation where event_id='${RCEV}' and status='attended')||'|'||(select count(*) from public.rc_participation where event_id='${RCEV}')"
+chkraise "★ 沒指派的幹部建不了回饋表（not_form_creator）" "not_form_creator" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_form(null, '{\"title\":\"x\",\"event_id\":\"${RCEV}\"}'::jsonb, null);"
+chkraise "★ 活動工作區的人建不了配對回饋（只有管的人）" "not_form_creator" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form(null, '{\"title\":\"x\",\"kind\":\"pair-mentee\",\"event_id\":\"${RCEV}\"}'::jsonb, null);"
+RCQ='[{"key":"recommend","type":"scale","label":"How likely are you to recommend this event?","required":true},{"key":"useful","type":"scale","label":"How useful was today?"},{"key":"best","type":"short","label":"Most useful part?"},{"key":"change","type":"long","label":"What should we change?"},{"key":"first_time","type":"single","label":"First BT event?","options":["Yes","No"]}]'
+chkraise "key 只能是小寫字母（bad_key）" "bad_key:1" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form(null, '{\"title\":\"x\",\"event_id\":\"${RCEV}\"}'::jsonb, '[{\"key\":\"Bad Key\",\"type\":\"short\",\"label\":\"a\"}]'::jsonb);"
+RCF=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" -c "select public.rc_save_form(null, '{\"title\":\"Winter camp feedback (fake)\",\"event_id\":\"${RCEV}\"}'::jsonb, '${RCQ}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "活動工作區的人建了一份：草稿、匿名、五題、有 token" "draft|true|5|24" "select f.status||'|'||f.anonymous||'|'||(select count(*) from public.rc_questions where form_id=f.id)||'|'||length(f.token) from public.rc_forms f where f.id='${RCF}'"
+RCTOK=$(psql -d "${DB}" -X -A -t -q -c "select token from public.rc_forms where id='${RCF}'" | tr -d ' \n')
+RQ1=$(psql -d "${DB}" -X -A -t -q -c "select id from public.rc_questions where form_id='${RCF}' and key='recommend'" | tr -d ' \n')
+RQ2=$(psql -d "${DB}" -X -A -t -q -c "select id from public.rc_questions where form_id='${RCF}' and key='useful'" | tr -d ' \n')
+RQ3=$(psql -d "${DB}" -X -A -t -q -c "select id from public.rc_questions where form_id='${RCF}' and key='best'" | tr -d ' \n')
+chkrole anon "" "★ 草稿沒登入的人拿不到" "true" "select (public.rc_public_form('${RCTOK}') is null)::text"
+chkas "${DIR}" "打開" "open" "select public.rc_set_status('${RCF}','open')"
+chkrole anon "" "★ 開了之後沒登入的人用 token 拿得到題目，而且裡面沒有別人的答案也沒有 owner" "5|true|false" "select jsonb_array_length(x->'questions')||'|'||(x#>>'{form,open}')||'|'||(x ? 'responses') from (select public.rc_public_form('${RCTOK}') x) t"
+chkraise "必填沒填送不了（required）" "required:1" "perform public.rc_public_submit('${RCTOK}', '{}'::jsonb, '{}'::jsonb);"
+chkraise "量表超出範圍送不了（bad_scale_value）" "bad_scale_value:1" "perform public.rc_public_submit('${RCTOK}', '{\"${RQ1}\":9}'::jsonb, '{}'::jsonb);"
+chkraise "錯的 token 送不了（form_not_found）" "form_not_found" "perform public.rc_public_submit('nope', '{\"${RQ1}\":5}'::jsonb, '{}'::jsonb);"
+chkrole anon "" "★ 沒登入的人送出一份（18 歲以下、不留聯絡）" "1" "select count(*) from (select public.rc_public_submit('${RCTOK}', '{\"${RQ1}\":5,\"${RQ2}\":4,\"${RQ3}\":\"the alumni panel\"}'::jsonb, '{\"age_band\":\"under18\"}'::jsonb)) x"
+chkrole anon "" "第二份留了 email 而且勾了可以聯絡" "1" "select count(*) from (select public.rc_public_submit('${RCTOK}', '{\"${RQ1}\":3,\"${RQ2}\":2,\"${RQ3}\":\"nothing\"}'::jsonb, '{\"age_band\":\"18plus\",\"contact_ok\":true,\"email\":\"stu-b@example.com\",\"name\":\"學員乙\"}'::jsonb)) x"
+chk "★ 沒留 email 的那份不掛人；留了的那份對到既有的學員乙（同一個人，不是新的一列）" "1|1|學員乙" "select (select count(*) from public.rc_responses where form_id='${RCF}' and person_id is null)||'|'||(select count(*) from public.rc_responses where form_id='${RCF}' and person_id is not null)||'|'||(select pe.name_zh from public.rc_responses r join public.people pe on pe.id=r.person_id where r.form_id='${RCF}' and r.contact_ok)"
+chkraise "留了 email 但格式錯擋（bad_email）" "bad_email" "perform public.rc_public_submit('${RCTOK}', '{\"${RQ1}\":5}'::jsonb, '{\"contact_ok\":true,\"email\":\"not-an-email\"}'::jsonb);"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_results('${RCF}');" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到 rc_results"; pass=$((pass+1)); else echo "  FAIL anon 叫得到 rc_results：${angot}"; fail=$((fail+1)); fi
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.rc_responses;" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 rc_responses 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到 rc_responses：${angot}"; fail=$((fail+1)); fi
+chkraise "★ 沒指派的幹部看不到答案（not_form_reader）" "not_form_reader" "perform set_config('test.uid','${OUTC}',true); perform public.rc_results('${RCF}');"
+chkas "${DIR}" "★ 活動工作區「改」以上的人看得到：兩份、匿名所以沒有名字、留 email 的只印「有留」不印 email" "2||true|false" "select jsonb_array_length(r->'responses')||'|'||(r#>>'{responses,0,name}')||'|'||(select bool_or((e->>'contact_ok')::boolean) from jsonb_array_elements(r->'responses') e)||'|'||(r::text like '%stu-b@example.com%') from (select public.rc_results('${RCF}') r) t"
+chkas "${OTHER}" "★ Senior Adviser 讀得到活動回饋" "2" "select jsonb_array_length(public.rc_results('${RCF}')->'responses')"
+chkas "${DIR}" "★ 記分卡：兩份回饋、推薦平均 4.00、有用 3.00、留言兩則" "2|4.00|3.00|2" "select (x#>>'{event,numbers,responses}')||'|'||(x#>>'{event,numbers,recommend_avg}')||'|'||(x#>>'{event,numbers,useful_avg}')||'|'||jsonb_array_length(x->'comments') from (select public.rc_event('${RCEV}') x) t"
+chkraise "★ 有人填過之後不能從匿名改回具名（anonymous_locked）" "anonymous_locked" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${RCF}', '{\"anonymous\":false}'::jsonb, null);"
+chkraise "★ 沒指派的幹部看不到記分卡（not_event_viewer）" "not_event_viewer" "perform set_config('test.uid','${OUTC}',true); perform public.rc_event('${RCEV}');"
+chkas "${DIR}" "★ 檢討：寫下「下一次我們改什麼」，數字當下抄一份快照" "4.00|2|Shorterday2" "select public.rc_save_review('${RCEV}', '{\"we_change\":\"Shorter day 2\",\"went_well\":\"panel\"}'::jsonb); select recommend_avg||'|'||responses||'|'||we_change from public.rc_reviews where event_id='${RCEV}'"
+chkraise "★ 活動以外的人寫不了檢討（not_event_editor）" "not_event_editor" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_review('${RCEV}', '{\"we_change\":\"x\"}'::jsonb);"
+# 導生學期：管的人建一場舊的 mentorship-term 活動，配對，配對回饋只有管的人與點名的讀者看得到。
+chkraise "★ 沒指派的幹部建不了舊活動（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_add_past_event('{\"slug\":\"f26-mentorship\",\"kind\":\"mentorship-term\"}'::jsonb);"
+RCMT=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_add_past_event('{\"slug\":\"f26-mentorship\",\"kind\":\"mentorship-term\",\"term_id\":\"2026-27\",\"title_en\":\"Fall 2026 Mentorship\",\"team\":\"Mentorship Team\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "舊活動：archived、掛在 custom:records、source import、不上對外頁" "archived|custom:records|import|0" "select e.status||'|'||e.workspace_id||'|'||e.source||'|'||(select count(*) from public.public_events() p where p.slug=e.slug) from public.events e where e.id='${RCMT}'"
+RCPAIR=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_save_pair(null, '{\"event_id\":\"${RCMT}\",\"mentor_email\":\"mke@example.com\",\"mentee_email\":\"mentee-1@example.com\",\"mentee_name_zh\":\"學員丁\",\"mentee_school\":\"中山女高\",\"mentee_grad_year\":2027}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 一對配對：mentor 用 email 對到既有的幹部帳號（名單上原本沒有他那一列，自動建並接上）、mentee 是新的學員，兩個人都算這個學期的出席" "MiaEdit|true|學員丁|2" "select public.rc_person_name(pr.mentor_id)||'|'||(select profile_id='${MKE}' from public.people where id=pr.mentor_id)||'|'||(select name_zh from public.people where id=pr.mentee_id)||'|'||(select count(*) from public.rc_participation where event_id='${RCMT}') from public.rc_pairs pr where pr.id='${RCPAIR}'"
+RCMENTEE=$(psql -d "${DB}" -X -A -t -q -c "select mentee_id from public.rc_pairs where id='${RCPAIR}'" | tr -d ' \n')
+RCPF=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_save_form(null, '{\"title\":\"Mentee check-in (fake)\",\"kind\":\"pair-mentee\",\"event_id\":\"${RCMT}\"}'::jsonb, '[{\"key\":\"comfortable\",\"type\":\"scale\",\"label\":\"Comfortable asking?\"}]'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chkraise "★ mentor 加不進配對回饋的讀者（mentor_cannot_read）" "mentor_cannot_read" "perform set_config('test.uid','${PAUL}',true); perform public.rc_set_audience('${RCPF}','reader','[{\"kind\":\"person\",\"value\":\"${MKE}\"}]'::jsonb);"
+chkraise "★ 配對回饋的讀者只能點名，不能整個 team（pair_readers_by_person）" "pair_readers_by_person" "perform set_config('test.uid','${PAUL}',true); perform public.rc_set_audience('${RCPF}','reader','[{\"kind\":\"team\",\"value\":\"Mentorship Team\"}]'::jsonb);"
+chkas "${PAUL}" "把 Mentorship 的一位幹部（OUTC）點名成讀者" "1" "select public.rc_set_audience('${RCPF}','reader','[{\"kind\":\"person\",\"value\":\"${OUTC}\"}]'::jsonb)"
+chkraise "★ Senior Adviser 讀不到配對回饋（not_form_reader）" "not_form_reader" "perform set_config('test.uid','${OTHER}',true); perform public.rc_results('${RCPF}');"
+chkraise "★ mentor 自己讀不到" "not_form_reader" "perform set_config('test.uid','${MKE}',true); perform public.rc_results('${RCPF}');"
+chkas "${OUTC}" "★ 被點名的讀者讀得到" "0" "select jsonb_array_length(public.rc_results('${RCPF}')->'responses')"
+chkas "${PAUL}" "Co-President 當然讀得到" "0" "select jsonb_array_length(public.rc_results('${RCPF}')->'responses')"
+# 去向
+chkas "${MKE}" "★ 本人替自己填去向（source self）" "self|1" "select public.rc_save_outcome(null, '{\"kind\":\"enrolled\",\"institution\":\"NYU\",\"country\":\"US\",\"major\":\"Econ\",\"year\":2025}'::jsonb); select (select source from public.rc_outcomes o where o.person_id=public.rc_me_person())||'|'||jsonb_array_length(public.rc_my_outcomes())"
+chkraise "★ 一般幹部替別人填不了（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_outcome(null, '{\"person_id\":\"${RCMENTEE}\",\"kind\":\"admitted\"}'::jsonb);"
+chkas "${PAUL}" "管的人替 mentee 填（source mentorship）" "mentorship" "select public.rc_save_outcome(null, '{\"person_id\":\"${RCMENTEE}\",\"kind\":\"admitted\",\"institution\":\"UW\",\"country\":\"US\",\"year\":2027}'::jsonb); select source from public.rc_outcomes where person_id='${RCMENTEE}'"
+chkas "${PAUL}" "★ 一個人的時間軸：出席 1、配對 1、去向 1" "1|1|1|mentee" "select jsonb_array_length(x->'participation')||'|'||jsonb_array_length(x->'pairs')||'|'||jsonb_array_length(x->'outcomes')||'|'||(x#>>'{pairs,0,as}') from (select public.rc_person('${RCMENTEE}') x) t"
+chkraise "★ 沒指派的幹部看不到人的時間軸（not_records_viewer）" "not_records_viewer" "perform set_config('test.uid','${OUTC}',true); perform public.rc_person('${RCMENTEE}');"
+chkas "${OTHER}" "Senior Adviser 看得到時間軸，但看不到 email 那一欄（identities 只給管的人）" "0" "select jsonb_array_length(public.rc_person('${RCMENTEE}')->'identities')"
+# 重複與合併
+RCDUP0=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select jsonb_array_length(public.rc_duplicates())" | tail -1 | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_save_person(null, '{\"name_zh\":\"學員甲二\",\"name_en\":\"Dup Student\",\"school\":\"中山女高\",\"kind\":\"student\"}'::jsonb)" >/dev/null 2>&1
+chkas "${PAUL}" "★ 同英文名、不同學校：只提示（多一組），不自動合併" "$((RCDUP0+1))|1" "select jsonb_array_length(d)||'|'||(select count(*) from jsonb_array_elements(d) e where e->>'a_name'='Dup Student' and e->>'why'='name_en') from (select public.rc_duplicates() d) t"
+RCDA=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Dup Student' and school='北一女'" | tr -d ' \n')
+RCDB=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Dup Student' and school='中山女高'" | tr -d ' \n')
+chkraise "★ 沒指派的幹部合併不了（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_merge_people('${RCDA}','${RCDB}');"
+chkas "${PAUL}" "合併：留一列、出席還在、提示少一組" "1|0|1|${RCDUP0}" "select public.rc_merge_people('${RCDA}','${RCDB}'); select (select count(*) from public.people where id='${RCDA}')||'|'||(select count(*) from public.people where id='${RCDB}')||'|'||(select count(*) from public.rc_participation where person_id='${RCDA}')||'|'||jsonb_array_length(public.rc_duplicates())"
+# 忘記一個人
+chkraise "★ Director 不能忘記一個人（not_president）" "not_president" "perform set_config('test.uid','${DIR}',true); perform public.forget_person('${RCMENTEE}');"
+chkas "${PAUL}" "★ Co-President 忘記 mentee：名字清掉、去向刪掉、配對留空殼、列還在" "|0|true|1" "select public.forget_person('${RCMENTEE}'); select coalesce((select name_zh from public.people where id='${RCMENTEE}'),'')||'|'||(select count(*) from public.rc_outcomes where person_id='${RCMENTEE}')||'|'||(select mentee_id is null from public.rc_pairs where id='${RCPAIR}')||'|'||(select count(*) from public.people where id='${RCMENTEE}')"
+chkas "${PAUL}" "年度比較：2026-27 有 bootcamp 與 mentorship-term 兩列，bootcamp 那列帶著「下一次改什麼」" "2|Shorterday2" "select jsonb_array_length(y)||'|'||(select e->'changes'->0->>'we_change' from jsonb_array_elements(y) e where e->>'kind'='bootcamp') from (select public.rc_yearly() y) t"
+rc2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-12-01-records.sql 2>&1 || true)
+if echo "${rc2}" | grep -q "OVERALL.*PASS"; then echo "  ok   紀錄那支可以重跑，資料還在"; pass=$((pass+1)); else echo "  FAIL 紀錄那支重跑沒過"; fail=$((fail+1)); fi
+chk "重跑之後答案、配對、檢討都還在" "2|1|1" "select (select count(*) from public.rc_responses where form_id='${RCF}')||'|'||(select count(*) from public.rc_pairs)||'|'||(select count(*) from public.rc_reviews)"
+BROKEN=$(mktemp)
+sed "s/      or exists (select 1 from public.rc_forms f where f.id = p_form and f.kind not like 'pair-%' and public.is_senior());/      or public.is_senior();/" supabase/migrations/2026-12-01-records.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「配對回饋 Senior Adviser 讀不到」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉配對規則驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/   where public.is_senior() and pe.kind = 'member'/   where public.is_senior()/" supabase/migrations/2026-12-01-records.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：roster() 不再只列成員，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL roster 不過濾驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/grant execute on function public.rc_public_form(text), public.rc_public_submit(text, jsonb, jsonb) to anon, authenticated;/grant execute on function public.rc_public_form(text), public.rc_public_submit(text, jsonb, jsonb), public.rc_results(uuid) to anon, authenticated;/" supabase/migrations/2026-12-01-records.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：多開一支給 anon，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 多開一支給 anon 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-12-01-records.sql >/dev/null 2>&1 || true
+chkraise "破壞測試之後裝回正確版本，Senior Adviser 又讀不到配對回饋了" "not_form_reader" "perform set_config('test.uid','${OTHER}',true); perform public.rc_results('${RCPF}');"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -14,8 +14,9 @@ import * as PEOPLE from "../admin/people/src/ui.js";
 import * as FIN from "../admin/finance/src/ui.js";
 import * as MKT from "../admin/marketing/src/ui.js";
 import * as TF from "../admin/team-forms/src/ui.js";
+import * as RC from "../admin/records/src/ui.js";
 
-const IMPL = [["admin", FORMS], ["admin/site", SITE], ["admin/passports", PASS], ["admin/people", PEOPLE], ["admin/finance", FIN], ["admin/marketing", MKT], ["admin/team-forms", TF]];
+const IMPL = [["admin", FORMS], ["admin/site", SITE], ["admin/passports", PASS], ["admin/people", PEOPLE], ["admin/finance", FIN], ["admin/marketing", MKT], ["admin/team-forms", TF], ["admin/records", RC]];
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支大部分斷言的是中文，所以先切成中文。英文那幾條自己切。
 for (const [, M] of IMPL) M.setLang("zh");
 
@@ -30,6 +31,8 @@ const ME = {
   mres:     { role: "cadre",   board: "member",    team: "Marketing Team", ws: { "res:Marketing Team": "view" } },
   mreq:     { role: "cadre",   board: "member",    team: "Marketing Team", ws: { "custom:marketing-requests": "edit" } },
   mapp:     { role: "cadre",   board: "member",    team: "Curriculum Team", ws: { "custom:marketing-approve": "view" } },
+  // 2026-12-01：my_access() 給了 records 那一格的人（某場活動工作區「改」以上的 Director）。
+  rrec:     { role: "cadre",   board: "director",  team: "Curriculum Team", ws: { records: "view", "custom:event-x": "manage" } },
   student:  { role: "student", board: "president", team: "Internship Team" },
   intern:   { role: "intern",  board: "member",    team: "Internship Team" },
 };
@@ -38,28 +41,29 @@ test("★ 四個資料夾的 GROUPS 一字不差", () => {
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.GROUPS, FORMS.GROUPS, `${label} 的 GROUPS 跟 admin/ 不一樣`);
   }
-  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["forms", "site", "passports", "people", "finance", "marketing", "teamforms"]);
+  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["forms", "site", "passports", "people", "finance", "marketing", "teamforms", "records"]);
   for (const g of FORMS.GROUPS) assert.match(g.href, /^\/admin\//, "每一組都在 /admin/ 底下");
 });
 
 test("★ 四份 canEnter 對同一個人講一樣的話", () => {
   const want = {
     // 2026-11-08 財務：senior 與 my_access 給了 finance 那一格的人（sdir）。
-    member:   { forms: true, site: true, passports: false, people: false, finance: false, marketing: false, teamforms: true },
-    director: { forms: true, site: true, passports: false, people: false, finance: false, marketing: false, teamforms: true },
-    istaff:   { forms: true, site: true, passports: true,  people: false, finance: false, marketing: false, teamforms: true },
-    senior:   { forms: true, site: true, passports: true,  people: true,  finance: true, marketing: true, teamforms: true },
-    pdir:     { forms: true, site: true, passports: true,  people: false, finance: false, marketing: false, teamforms: true },
-    sdir:     { forms: true, site: true, passports: false, people: false, finance: true, marketing: false, teamforms: true },
-    pres:     { forms: true, site: true, passports: true,  people: true,  finance: true, marketing: true, teamforms: true },
+    member:   { forms: true, site: true, passports: false, people: false, finance: false, marketing: false, teamforms: true, records: false },
+    director: { forms: true, site: true, passports: false, people: false, finance: false, marketing: false, teamforms: true, records: false },
+    istaff:   { forms: true, site: true, passports: true,  people: false, finance: false, marketing: false, teamforms: true, records: false },
+    senior:   { forms: true, site: true, passports: true,  people: true,  finance: true, marketing: true, teamforms: true, records: true },
+    pdir:     { forms: true, site: true, passports: true,  people: false, finance: false, marketing: false, teamforms: true, records: false },
+    sdir:     { forms: true, site: true, passports: false, people: false, finance: true, marketing: false, teamforms: true, records: false },
+    pres:     { forms: true, site: true, passports: true,  people: true,  finance: true, marketing: true, teamforms: true, records: true },
     // 2026-11-26 Marketing：Marketing 資源工作區或行銷需求單工作區，任何等級。只掛 team 標籤（director）不算，要被派進工作區。
-    mres:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true },
-    mreq:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true },
+    mres:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true, records: false },
+    mreq:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true, records: false },
     // 2026-11-27：只被派去核可貼文的人也進得來（Marketing 貼文核可工作區）。
-    mapp:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true },
+    mapp:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true, records: false },
+    rrec:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: false, teamforms: true, records: true },
     // 學員與 intern 什麼都進不去，就算 board_role 或 team 被誤設也一樣。
-    student:  { forms: false, site: false, passports: false, people: false, finance: false, marketing: false, teamforms: false },
-    intern:   { forms: false, site: false, passports: false, people: false, finance: false, marketing: false, teamforms: false },
+    student:  { forms: false, site: false, passports: false, people: false, finance: false, marketing: false, teamforms: false, records: false },
+    intern:   { forms: false, site: false, passports: false, people: false, finance: false, marketing: false, teamforms: false, records: false },
   };
   for (const [label, M] of IMPL) {
     for (const [who, me] of Object.entries(ME)) {
@@ -125,7 +129,7 @@ test("訊息：沒做成是橘的留在頁首、做成了不畫在頁首（走 t
 
 // 2026-10-23 批 1：十處瀏覽器原生 confirm() 全換成 inline confirm（needAsk）。跟守 prompt( 那條同一個做法。
 test("★ 四個 main.js 不准再用瀏覽器的 confirm()，會丟東西的按鈕走 needAsk", () => {
-  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/passports/src/main.js", "admin/people/src/main.js", "admin/finance/src/main.js", "admin/marketing/src/main.js", "admin/team-forms/src/main.js"]) {
+  for (const f of ["admin/src/main.js", "admin/site/src/main.js", "admin/passports/src/main.js", "admin/people/src/main.js", "admin/finance/src/main.js", "admin/marketing/src/main.js", "admin/team-forms/src/main.js", "admin/records/src/main.js"]) {
     const body = readFileSync(f, "utf8");
     assert.doesNotMatch(body, /(^|[^.\w])confirm\(/m, `${f} 還在用 confirm()`);
     assert.match(body, /UI\.afterRender\(S, el\)/, `${f} 的 render() 沒有叫 afterRender（toast、inline confirm、捲回最上面都靠它）`);
@@ -348,7 +352,8 @@ import * as PEOPLE_S from "../admin/people/src/strings.js";
 import * as FIN_S from "../admin/finance/src/strings.js";
 import * as MKT_S from "../admin/marketing/src/strings.js";
 import * as TF_S from "../admin/team-forms/src/strings.js";
-const STR = [["admin", FORMS_S], ["admin/site", SITE_S], ["admin/passports", PASS_S], ["admin/people", PEOPLE_S], ["admin/finance", FIN_S], ["admin/marketing", MKT_S], ["admin/team-forms", TF_S]];
+import * as RC_S from "../admin/records/src/strings.js";
+const STR = [["admin", FORMS_S], ["admin/site", SITE_S], ["admin/passports", PASS_S], ["admin/people", PEOPLE_S], ["admin/finance", FIN_S], ["admin/marketing", MKT_S], ["admin/team-forms", TF_S], ["admin/records", RC_S]];
 
 test("★ 四份字典的 COMMON 與機制（T、pickLang、withLang、isErr）逐字一樣", () => {
   for (const [label, S] of STR) {
