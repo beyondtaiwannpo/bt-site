@@ -808,7 +808,7 @@ Paul 2026-11-06 要的：「a data set ... especially for alumni, people, and al
 
 ### 跟隱私政策對齊（`supabase/migrations/2026-12-02-records-privacy.sql`，2026-11-08）
 
-隱私政策「回饋與紀錄」那一節對外承諾了三件事，這一支把程式改到跟政策一樣。**上線前要在正式 Supabase 跑這一支**（照「發碼前要做的事」那四步，最後印一張 8 列的驗收表，全 PASS 才算）。
+隱私政策「回饋與紀錄」那一節對外承諾了三件事，這一支把程式改到跟政策一樣。**2026-11-08 Paul 在正式 Supabase 上跑完，8 列驗收表全 PASS。**
 
 1. **具名的回饋答案保存三屆（約三年），之後只留匿名的部分。** 新函式 `rc_anonymise_old(p_do)`：只有 Co-President 叫得動；「三屆」照 `terms` 表算，由新到舊第三屆的開始日之前送出的都算舊，屆別不到三個就什麼都不清；`p_do = false` 只算有幾份、界線是哪一天，`p_do = true` 才真的把 `person_id`、`participation_id`、`typed_name`、`contact_ok` 清掉（答案留著），並在 `rc_log` 記一筆 `responses_anonymise`。後台「回饋表」那頁最下面多一張卡「三屆前的具名答案轉匿名」（只畫給管的人），按「算一下有幾份」會把份數與界線掛在按鈕旁邊問一句，再按一次才做。**換屆之後按一次**，這是每年要做的事。⚠ 第一次按會把 2026-11-08 倒進來的 Fall 2022 與 Spring 2023 那幾份具名 check-in 一起轉掉，這是政策要的。
 2. **去向「可以連名字公開」只有本人勾得了，未滿 18 歲不公開名字。** `rc_save_outcome` 多一道門 `public_needs_self`：`visibility = public` 只有在「填的人就是本人」而且本人不是學員（`people.kind = student`）時才過；管的人替任何人填 public 都被擋，替學員填 internal 照樣可以。後台加去向那格多一句提醒。
