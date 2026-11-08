@@ -94,6 +94,7 @@ test("★ /settings/ 每一個畫面用英文畫出來不剩中文", () => {
     cadre: () => SETTINGS.settingsHTML(cadre, "", false, story),
     director: () => SETTINGS.settingsHTML({ ...cadre, board_role: "director", public_approved: true }, "Saved.", true, { ...story, story_approved: true }),
     alumni: () => SETTINGS.settingsHTML({ ...cadre, role: "alumni" }, "", false, null),
+    outcomes: () => SETTINGS.settingsHTML({ ...cadre, role: "alumni" }, "", false, null, [{ id: "o1", kind: "enrolled", institution: "UBC", country: "Canada", major: "Econ", year: 2024, note: "", visibility: "internal", source: "mentorship" }]),
     intern: () => SETTINGS.settingsHTML({ ...cadre, role: "intern" }, "", false, null),
     student: () => SETTINGS.settingsHTML({ role: "student", email: "s@x.io", name_zh: "", school: "", grade: "", newsletter_opt_in: false }, "", false, null),
     del: () => SETTINGS.deleteHTML("", false) + SETTINGS.deleteHTML("x", true),

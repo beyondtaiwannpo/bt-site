@@ -10,7 +10,8 @@ import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 // S.story：`null` 代表「還沒查」或「這個人沒有故事那一列」，`{}` 會讓人以為
 // 查過了但是空的 —— 學員完全不會發那個查詢，所以 `null` 才是誠實的初始值。
-let S = { user: null, me: null, story: null, down: false, busy: false, msg: "", view: "main" };
+// S.outcomes：我的去向（rc_my_outcomes()），學員不查所以是 []。
+let S = { user: null, me: null, story: null, outcomes: [], down: false, busy: false, msg: "", view: "main" };
 const root = () => document.getElementById("bt-root");
 
 function render() {
@@ -27,7 +28,7 @@ function render() {
   if (!S.me) { el.innerHTML = UI.downHTML(); return; }
 
   if (S.view === "delete") { el.innerHTML = nav + UI.deleteHTML(S.msg, S.busy); return; }
-  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story);
+  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes);
 
   // 學校清單學員的 #school 跟幹部/校友「我的故事」那格的 #sschool 共用同一份
   // datalist，兩格都要點進去才載（2026-09-11：故事那一格也接上自動完成）。
@@ -139,13 +140,15 @@ async function boot() {
     //     要看到的是資料庫現在的值；查完它會把新值寫回快取，別的頁面接著用。
     //   - terms 與 positions 不用等 profiles：positions 的 RLS 只給自己那幾列，先全拿回來再挑這一屆的。
     //     學員會多發這兩個查詢（RLS 擋掉，回來是空的），換到的是幹部每次少兩趟往返。
-    const [whoRes, storyRes, termRes, posRes, welRes] = await Promise.all([
+    const [whoRes, storyRes, termRes, posRes, welRes, outRes] = await Promise.all([
       AUTH.whoAmI(S.user.id, true),
       Promise.resolve(storyQ).catch(err => ({ data: null, error: err })),
       Promise.resolve(supabase.from("terms").select("id").eq("status", "current").maybeSingle()).catch(() => ({ data: null })),
       Promise.resolve(supabase.from("positions").select("title_zh, title_en, term_id")).catch(() => ({ data: null })),
       // 2026-11-07 校友的歡迎卡按掉了沒。欄位不在 whoAmI 那一份裡（那一份是六個頁面共用的分頁快取），這裡自己多問一欄；讀不到就當沒按過。
       Promise.resolve(supabase.from("profiles").select("alumni_welcome_dismissed_at").eq("id", S.user.id).maybeSingle()).catch(() => ({ data: null })),
+      // 2026-11-08 我的去向（rc_my_outcomes()，只回本人那幾筆）。紀錄那支遷移檔還沒跑、或讀不到，就當作空的，不擋整頁。
+      Promise.resolve(supabase.rpc("rc_my_outcomes")).catch(() => ({ data: null })),
     ]);
     S.me = { ...(whoRes.row || {}), email: S.user.email, alumni_welcome_dismissed_at: (welRes && welRes.data && welRes.data.alumni_welcome_dismissed_at) || null };
     // 2026-10-24：幹部多讀兩樣，都是「有就有、沒有也不擋整頁」：
@@ -159,6 +162,7 @@ async function boot() {
     }
     // 「我的故事」是另一張表。學員沒有這一區，所以查回來的東西直接丟掉。
     if (S.me.role === "cadre" || S.me.role === "alumni") {
+      S.outcomes = Array.isArray(outRes && outRes.data) ? outRes.data : [];
       const { data: st, error: e2 } = storyRes;
       // 讀不到故事**不擋整頁**：姓名與大頭照照樣要改得動。
       if (e2) console.warn("故事讀不到，先當作還沒填：", e2);
@@ -280,6 +284,31 @@ document.addEventListener("click", async e => {
       S.me = { ...S.me, alumni_welcome_dismissed_at: data || new Date().toISOString() };
     } catch (err) { console.warn("歡迎卡收不起來：", err); UI.toast(T("w.dismissFail")); }
     render(); return;
+  }
+
+  // 我的去向（2026-11-08）：加一筆是先在資料庫建一列空的（kind enrolled、只有內部看得到）再畫出來，
+  // 之後每一格改了就走 onAutosave 的 "outcome" 那條。刪是不可逆的，所以問一句。
+  if (act === "outcome-add") {
+    try {
+      const { data, error } = await supabase.rpc("rc_save_outcome", { p_outcome: null, p: { kind: "enrolled", visibility: "internal" } });
+      if (error) throw error;
+      S.outcomes = [{ id: data, kind: "enrolled", visibility: "internal", source: "self", institution: "", country: "", major: "", year: null, note: "" }, ...S.outcomes];
+      render();
+      const first = document.querySelector('.outcome input[name="institution"]');
+      if (first) first.focus();
+    } catch (err) { console.error("加不了去向：", err); UI.toast(T("o.addFail") + (err.message || err)); }
+    return;
+  }
+  if (act === "outcome-del") {
+    if (!confirm(T("o.removeAsk"))) return;
+    try {
+      const { error } = await supabase.rpc("rc_delete_outcome", { p_outcome: b.dataset.id });
+      if (error) throw error;
+      S.outcomes = S.outcomes.filter(o => o.id !== b.dataset.id);
+      render();
+      UI.toast(T("m.saved", { notes: "" }).trim());
+    } catch (err) { console.error("刪不掉去向：", err); UI.toast(T("o.removeFail") + (err.message || err)); }
+    return;
   }
 
   if (act === "avatar") {
@@ -416,6 +445,31 @@ async function onAutosave(act, box) {
     } catch (err) {
       // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再改一次。
       console.error("設定頁自動存檔失敗（我的資料）：", err);
+      UI.autosaveState(box, "failed");
+      UI.toast(UI.saveFailMessage(false, err));
+    }
+    return;
+  }
+
+  // 我的去向（2026-11-08）：一筆一個容器，整筆讀出來整理（UI.cleanOutcome）再 rc_save_outcome(那一筆, 整筆)。
+  // 函式那邊 p 裡有哪一欄才改哪一欄，整筆送等於整筆寫一次，值沒變的欄位寫回同一個值，沒有副作用。
+  if (act === "outcome" && (cadre || alumni)) {
+    const id = box.dataset.id;
+    if (!id) return;
+    const fields = UI.cleanOutcome(UI.formValues(box));
+    const fo = JSON.stringify(fields);
+    const okey = key + ":" + id;
+    if (!dirty.changed(okey, fo)) return;
+    UI.autosaveState(box, "saving");
+    try {
+      const { error } = await supabase.rpc("rc_save_outcome", { p_outcome: id, p: fields });
+      if (error) throw error;
+      dirty.mark(okey, fo);
+      S.outcomes = S.outcomes.map(o => o.id === id ? { ...o, ...fields } : o);
+      UI.autosaveState(box, "saved");
+      UI.toast(T("m.saved", { notes: "" }).trim());
+    } catch (err) {
+      console.error("設定頁自動存檔失敗（我的去向）：", err);
       UI.autosaveState(box, "failed");
       UI.toast(UI.saveFailMessage(false, err));
     }

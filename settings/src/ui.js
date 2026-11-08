@@ -143,7 +143,7 @@ export function welcomeHTML(me, story) {
     <div class="row"><button class="btn ghost sm" data-act="welcome-dismiss">${T("w.dismiss")}</button></div>
   </div>`;
 }
-export function settingsHTML(me, msg, busy, story) {
+export function settingsHTML(me, msg, busy, story, outcomes) {
   const cadre = me.role === "cadre";
   const alumni = me.role === "alumni";
   // 2026-10-17：第四種人，實習生。名字兩格、大頭照（進度牆要用）、沒有故事、可以刪帳號。
@@ -192,6 +192,7 @@ export function settingsHTML(me, msg, busy, story) {
     ${teller ? `<div data-autosave="story" data-id="${esc(me.id || "")}">${storyHTML(me, story)}
     <div class="autorow">${autosaveHint("story")}</div>
     </div>` : ""}
+    ${teller ? outcomesHTML(outcomes) : ""}
 
     ${cadre ? `<h3 class="sec-h">${T("s.passport")}</h3>
     <p class="sec-note">${T("s.passportNote")}</p>
@@ -319,6 +320,55 @@ export function storyHTML(me, story) {
       <span>${T("st.consent")}</span>
     </label>
     <p class="sec-note" data-story-status>${esc(storyStatus(s))}</p>`;
+}
+
+// ── 我的去向（2026-11-08，BT Records 計畫 Phase 4）──
+// 幹部與校友自己填「現在在哪」。一筆一個 data-autosave="outcome" 容器（data-id 是 rc_outcomes.id），
+// 改了哪一格就 rc_save_outcome(那一筆, {那一格}) 存哪一格；「加一筆」先在資料庫建一列空的再畫出來，
+// 「刪掉這一筆」是不可逆的，所以留按鈕加 confirm。學員沒有這一區：高中生還沒出發，他的去向由 Mentorship 記。
+// 八種狀態與四種可見範圍跟資料庫的 check constraint 一模一樣（supabase/migrations/2026-12-01-records.sql 的 rc_outcomes）。
+export const OUTCOME_KINDS = ["applied", "admitted", "enrolled", "transferred", "graduated", "working", "gap", "other"];
+export const OUTCOME_VIS = ["private", "internal", "aggregate", "public"];
+// 存進去之前把一格的值整理好：year 要是 2000 到 2100 的整數，不然存 null；文字去頭尾空白；選單只收清單裡的值。
+export function cleanOutcome(fields) {
+  const f = fields || {};
+  const out = {};
+  if ("kind" in f) out.kind = OUTCOME_KINDS.includes(f.kind) ? f.kind : "other";
+  if ("visibility" in f) out.visibility = OUTCOME_VIS.includes(f.visibility) ? f.visibility : "internal";
+  for (const k of ["institution", "country", "major", "note"]) if (k in f) out[k] = String(f[k] || "").trim();
+  if ("year" in f) {
+    const y = parseInt(String(f.year || "").trim(), 10);
+    out.year = Number.isInteger(y) && y >= 2000 && y <= 2100 ? y : null;
+  }
+  return out;
+}
+export function outcomeRowHTML(o) {
+  const v = k => esc(o[k] == null ? "" : o[k]);
+  const sel = (name, list, cur, pre) => `<select name="${name}">${list.map(x => `<option value="${esc(x)}"${cur === x ? " selected" : ""}>${esc(T(pre + x))}</option>`).join("")}</select>`;
+  return `<div class="outcome" data-autosave="outcome" data-id="${v("id")}">
+    <div class="two">
+      <label><i>${T("o.kind")}</i>${sel("kind", OUTCOME_KINDS, o.kind || "enrolled", "okind.")}</label>
+      <label><i>${T("o.year")}</i><input name="year" type="number" inputmode="numeric" min="2000" max="2100" value="${v("year")}" placeholder="${esc(String(new Date().getFullYear()))}"></label>
+    </div>
+    <div class="two">
+      <label><i>${T("o.institution")}</i><input name="institution" maxlength="120" value="${v("institution")}" placeholder="UBC"></label>
+      <label><i>${T("o.country")}</i><input name="country" maxlength="60" value="${v("country")}" placeholder="Canada"></label>
+    </div>
+    <div class="two">
+      <label><i>${T("o.major")}</i><input name="major" maxlength="80" value="${v("major")}" placeholder="Economics"></label>
+      <label><i>${T("o.visibility")}</i>${sel("visibility", OUTCOME_VIS, o.visibility || "internal", "ovis.")}</label>
+    </div>
+    <label><i>${T("o.note")}</i><input name="note" maxlength="300" value="${v("note")}"></label>
+    ${o.source && o.source !== "self" ? `<p class="mini">${T("o.byOthers")}</p>` : ""}
+    <div class="autorow">${autosaveHint("outcome")}<span class="sp"></span><button class="btn quiet" data-act="outcome-del" data-id="${v("id")}">${T("o.remove")}</button></div>
+  </div>`;
+}
+export function outcomesHTML(outcomes) {
+  const list = Array.isArray(outcomes) ? outcomes : [];
+  return `<h3 class="sec-h">${T("o.title")}</h3>
+    <p class="sec-note">${T("o.lede")}</p>
+    <div data-outcomes>${list.length ? list.map(outcomeRowHTML).join("") : `<div class="empty sm">${T("o.empty")}</div>`}</div>
+    <div class="row"><button class="btn ghost sm" data-act="outcome-add">${T("o.add")}</button></div>`;
 }
 
 // 刪除帳號的確認。**打字確認，不是按兩次。**
