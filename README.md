@@ -803,7 +803,7 @@ Paul 2026-11-06 要的：「a data set ... especially for alumni, people, and al
 
 ### 還沒做
 - **校友在 `/settings/` 自己填去向**：資料庫函式 `rc_my_outcomes()` / `rc_save_outcome()` 已經在，畫面還沒加（計畫第 8 節 Phase 4）。
-- **舊資料倒進來**（Phase 3）：Drive 上 2024 到 2026 的 129 份表單與 168 份回覆表的清單在 `~/Anson/outputs/beyond-taiwan/general/docs/2026-11-06-bt-data-set-plan/BT-records-inventory.csv`，要 Paul 先標同意與留不留。
+- ~~**舊資料倒進來**（Phase 3）~~ **2026-11-07 到 11-08 做完，Paul 在正式 Supabase 分四批跑完、全 PASS**：A 人的名單（幹部、學員、校友，約 990 人）、B1 七個 mentorship 學期與 282 組配對、B2 十五場舊活動與 788 筆出席、C 三十二份舊回饋表與 check-in（620 份回答、9747 格答案）。規則照計畫：只載名字、email、學校、年級，電話、生日、緊急聯絡人、飲食一律不載；面試與 essay 不載；2025 年以前、表單上沒有同意告知的回饋**不掛人**，只能看彙總；出席、配對、職位是營運紀錄，掛名。載入檔有真人資料，不進 repo，跑完就刪；怎麼產的寫在 `~/Anson/outputs/beyond-taiwan/general/docs/2026-11-06-bt-data-set-plan/BT-all-record-loading-plan.md`。**還沒倒的**：coffee chat 與校友聚會（沒建活動）、Summer Bootcamp 2025 的出席名單（匯出裡沒有）、「人」那頁 `rc_duplicates()` 提示的約 80 組同名要 Paul 自己看過再合併。
 - **隱私政策多一段「回饋與紀錄」**：`feedback/src/ui.js` 的 `NOTICE` 那段字要跟 `privacy/index.html` 一致，隱私政策是對外承諾，Paul 過稿才貼。
 - 校友年度問候現在是一份「不登入用連結填」的回饋表（kind `alumni-yearly`），答案不自動寫進去向；要接到登入的校友帳號是計畫的決定 10。
 - 不寄信：回饋表打開不會通知任何人，連結自己貼。
