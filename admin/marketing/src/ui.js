@@ -675,7 +675,7 @@ export function noAccessHTML(me) {
 // 誰看得到、誰改得動：my_access() 在 finance 那一格填 view 或 edit（can_view_finance / can_edit_finance 算的），
 // Co-President 與 Senior Adviser 本來就看得到（senior），Co-President 改得動。**這只是畫面，門在資料庫每一支函式第一句與 RLS。**
 // ═══════════════════════════════════════════════════════════════════════
-// Marketing（2026-11-26）。批 1：Instagram 連線狀態。計畫在 ~/Anson/outputs/bt-website/docs/2026-10-29-marketing-dashboard-plan/plan.md。
+// Marketing（2026-11-26）。批 1：Instagram 連線狀態。計畫在 ~/Anson/outputs/beyond-taiwan/website/docs/2026-10-29-marketing-dashboard-plan/plan.md。
 // 資料庫那一半在 2026-11-26-instagram-connect.sql，設定步驟在 docs/2026-10-29-instagram-setup.md。
 //
 // 誰看得到：senior，或被派進 Marketing 資源工作區、行銷需求單工作區（任何等級）。跟資料庫的 ig_can_view() 同一條規則。

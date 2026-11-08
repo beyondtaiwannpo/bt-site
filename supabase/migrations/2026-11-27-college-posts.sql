@@ -4,7 +4,7 @@
 -- 要先跑過 2026-10-24-ranks-and-workspaces.sql 與 2026-11-26-instagram-connect.sql。
 --
 -- Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，貼文產生器是裡面的一個功能。」
--- 計畫在 ~/Anson/outputs/bt-website/docs/2026-10-29-marketing-dashboard-plan/plan.md，Paul 的決定記在 ~/Anson/decisions/log.md。
+-- 計畫在 ~/Anson/outputs/beyond-taiwan/website/docs/2026-10-29-marketing-dashboard-plan/plan.md，Paul 的決定記在 ~/Anson/decisions/log.md。
 --
 -- ============================================================================
 -- 這一支在做什麼

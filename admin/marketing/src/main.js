@@ -1,5 +1,5 @@
 // 後台「Marketing」那一組的邏輯（2026-11-26）。批 1 只有一頁：Instagram 連線狀態。
-// 計畫在 ~/Anson/outputs/bt-website/docs/2026-10-29-marketing-dashboard-plan/plan.md，之後的批次在這個資料夾加分頁。
+// 計畫在 ~/Anson/outputs/beyond-taiwan/website/docs/2026-10-29-marketing-dashboard-plan/plan.md，之後的批次在這個資料夾加分頁。
 //
 // 狀態只有一個 S，畫面只從 S 產生。**不在事件處理裡直接改 DOM**，一律改 S 再 render()。
 // 每一顆按鈕背後都是資料庫的一支函式，門在那裡（ig_can_view / ig_can_manage）；這裡少畫一顆按鈕不是安全機制。

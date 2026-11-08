@@ -6,7 +6,7 @@
 -- 要先跑過 2026-10-24-ranks-and-workspaces.sql（用到 can_view、can_manage、is_senior）。
 --
 -- Paul 2026-10-29：後台要有 Marketing 區，看 IG 貼文與 Reels 的成效，之後也從這裡發大學介紹貼文。
--- 計畫在 ~/Anson/outputs/bt-website/docs/2026-10-29-marketing-dashboard-plan/plan.md，決定記在 ~/Anson/decisions/log.md 2026-10-29。
+-- 計畫在 ~/Anson/outputs/beyond-taiwan/website/docs/2026-10-29-marketing-dashboard-plan/plan.md，決定記在 ~/Anson/decisions/log.md 2026-10-29。
 --
 -- ============================================================================
 -- 這一支在做什麼

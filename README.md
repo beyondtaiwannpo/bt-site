@@ -947,7 +947,7 @@ Claude 會上網查那所學校，把**空著的格子**填上數字與來源，
 
 Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，貼文產生器是裡面的一個功能。」
 後台側欄「行銷」多一行 **大學介紹貼文**（`/admin/marketing/#posts`）。BT 在 IG 上的 COLLEGE INTRO SERIES：一所學校一篇，七張 1080x1350 的圖加一段中英 caption，
-版面照 Paul 給的 UW-Madison 那一套。第一篇 Vanderbilt 的研究、照片與成品在 `~/Anson/outputs/bt-website/social/2026-10-31-vanderbilt-college-intro/`。
+版面照 Paul 給的 UW-Madison 那一套。第一篇 Vanderbilt 的研究、照片與成品在 `~/Anson/outputs/beyond-taiwan/website/social/2026-10-31-vanderbilt-college-intro/`。
 **網站不會自己發文。** 核可之後由人下載、自己發到 IG，再回來貼上連結。
 
 ### 一篇怎麼做（給 Marketing）
@@ -997,7 +997,7 @@ Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，�
 ## Marketing 區：接上 Instagram（2026-11-26，批 1）
 
 Paul 2026-10-29 要的：後台多一區給 Marketing，看 BT 的 IG 貼文與 Reels 成效，之後也從這裡做「COLLEGE INTRO SERIES」大學介紹貼文、審過再發到 IG。
-整個計畫分六批，寫在 `~/Anson/outputs/bt-website/docs/2026-10-29-marketing-dashboard-plan/plan.md`，Paul 的九個決定記在 `~/Anson/decisions/log.md` 2026-10-29。
+整個計畫分六批，寫在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-10-29-marketing-dashboard-plan/plan.md`，Paul 的九個決定記在 `~/Anson/decisions/log.md` 2026-10-29。
 **這一批只做第一步：網站接上 @beyondtaiwan，看得到帳號、粉絲數、貼文數、通行證用到哪天。** 還不讀每篇貼文的成效，也還不能發文。
 
 ### 誰看得到
@@ -5104,7 +5104,7 @@ Paul 2026-10-28：「九月、十月可以刪掉，我要能自己加、自己�
    - 護照上那一格印出時間（照看的人自己的時區），範例照片是一張小縮圖，打開格子看大張。蓋過章就不印。
    - 後台改格子那一頁：時間（照你電腦的時區）、一顆「到時間看板排會、寄邀請」（打開看板，翻到那一週、打開那一格的排會表單，標題帶好）、選一張照片馬上縮圖上傳。照片網址只收這個 bucket 的。
    - **第二張範例照片（2026-10-28 Paul：「我想要放兩張」）**：遷移檔 `2026-11-20-example-photo-2.sql`（PASS 表 5 項）多一欄 `example_url_2` 與函式 `set_activity_example_2(格子, 網址)`，規矩跟第一張一樣（passport「改」以上、只收這個 bucket）。後台兩格並排，第一張有圖才出現第二格；拿掉第一張而第二張還在，第二張往前補。護照上兩張小縮圖並排，打開格子兩張大圖。這支沒跑之前後台照樣打得開，只是放第二張會說「要先跑 2026-11-20」。smoke 多 13 項（913）。
-   - **護照格子改版（2026-10-28，Paul 定的設計稿在 `~/Anson/outputs/bt-website/web/2026-10-28-passport-redesign/`）**：
+   - **護照格子改版（2026-10-28，Paul 定的設計稿在 `~/Anson/outputs/beyond-taiwan/website/web/2026-10-28-passport-redesign/`）**：
      - 一頁幾格都不留空：6 欄格線，`.slots` 帶 `data-n`（格子數），1 格整排、2 格對半、3 格三等分、4 格 2×2、5 格上 3 下 2、6 格 3＋3。原本固定三欄，剩兩格時右邊空一塊。
      - **2026-10-29 再改（Paul：封面太大很難看）**：範例照片不當封面，卡片上一顆亮黃的「看範例」，按了照片跳到畫面中間放大（兩張並排，Esc 或點背景關掉）。蓋章時放的照片也不當封面，是章旁邊一張小拍立得。下面這行描述的是第一版。
      - 一格是一張卡：範例照片當 16:7 封面（兩張對開、標「範例」），分類有顏色（聚會主橘、題目淺橘、鏡頭蒂芬妮綠），底下一個「蓋在這裡」的虛線圈。

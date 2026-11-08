@@ -98,7 +98,7 @@ Answer with one JSON object and nothing else, inside a ```json code block, in ex
  "notes": ["anything a human reviewer must know: disagreements, things you could not verify, dates that look stale"]}
 Only use the keys listed in the task. Leave out any key you have nothing verified for.$s$; $$;
 
--- 每一組要查什麼。格式照 Vanderbilt 那一篇（~/Anson/outputs/bt-website/social/2026-10-31-vanderbilt-college-intro/）。
+-- 每一組要查什麼。格式照 Vanderbilt 那一篇（~/Anson/outputs/beyond-taiwan/website/social/2026-10-31-vanderbilt-college-intro/）。
 create or replace function public.mkt_research_task(p_grp text, p_school text)
 returns text language sql immutable
 set search_path = public, pg_temp

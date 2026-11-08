@@ -518,7 +518,7 @@ export function whenText(iso, tz) {
 // 範例照片最多兩張：第一張、第二張，空的跳過。
 export function exampleUrls(a) { return [a && a.example_url, a && a.example_url_2].filter(Boolean); }
 
-// ── 格子（2026-10-28 改版，Paul 定的設計稿 ~/Anson/outputs/bt-website/web/2026-10-28-passport-redesign/）──
+// ── 格子（2026-10-28 改版，Paul 定的設計稿 ~/Anson/outputs/beyond-taiwan/website/web/2026-10-28-passport-redesign/）──
 // 一格是一張卡：範例照片當封面（16:7，兩張就對開）→ 分類、標題 → 場次 → 說明 → 底下一個虛線圈「蓋在這裡」。
 // 蓋過章之後**不再翻面**（Paul 2026-10-28 同意拿掉）：自己的照片換成封面、章蓋上去、心得前三行直接印在卡片上。
 // 沒放照片的話，章就是主角，大大蓋在卡片中間。

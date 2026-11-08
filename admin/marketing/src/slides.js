@@ -3,7 +3,7 @@
 // 一份版面，兩種輸出：
 //   - drawSlide()：瀏覽器自己的 canvas 畫 1080x1350，預覽與下載 PNG 都是它。
 //   - buildPptx()：同一份版面寫成 PowerPoint（vendor/pptxgen.bundle.js），拖進 Canva 每一個字、框、照片都改得到。
-// 版面座標是照 Paul 給的 UW-Madison 那一套量的（~/Anson/outputs/bt-website/social/2026-10-31-vanderbilt-college-intro/work/reference/），
+// 版面座標是照 Paul 給的 UW-Madison 那一套量的（~/Anson/outputs/beyond-taiwan/website/social/2026-10-31-vanderbilt-college-intro/work/reference/），
 // 原型是那個資料夾的 work/build/build.py（Python 版，第一篇 Vanderbilt 就是它做的）。這一支照抄它的座標。
 //
 // 這一支**只**有投影片：沒有 DOM、沒有資料庫。layout() 是純函式（test/marketing-slides.test.mjs 驗），
