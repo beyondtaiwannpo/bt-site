@@ -804,7 +804,17 @@ Paul 2026-11-06 要的：「a data set ... especially for alumni, people, and al
 ### 還沒做
 - ~~**校友在 `/settings/` 自己填去向**~~ **2026-11-08 做了**：幹部與校友的設定頁多一區「我的去向」（學員與實習生沒有，高中生還沒出發，他的去向由 Mentorship 在後台記）。一筆一張小卡：狀態（申請中、錄取了、就讀中、轉學了、畢業了、工作中、Gap year、其他）、哪一年、學校或公司、國家、科系、一句補充、誰看得到（只有我自己、BT 內部管紀錄的人、可以算進對外的總數、可以連名字公開，預設第二種）。改了哪一格就存哪一格（走 `rc_save_outcome(那一筆, {那一格})`），「加一筆」先在資料庫建一列空的再畫，「刪掉這一筆」要確認。Mentorship 幫他記的那幾筆他也看得到、改得了、刪得掉，卡上標一句「這一筆是 Mentorship 幫你記的」。前端只走 `rc_my_outcomes` / `rc_save_outcome` / `rc_delete_outcome` 三支函式，`rc_outcomes` 那張表對登入的人零直接權限（`test/settings-outcomes.test.mjs` 守著，也對了八種狀態與四種可見範圍跟遷移檔一致）。後台「人」那頁的去向清單沒有動，本人填的在那裡顯示「本人填的」。
 - ~~**舊資料倒進來**（Phase 3）~~ **2026-11-07 到 11-08 做完，Paul 在正式 Supabase 分四批跑完、全 PASS**：A 人的名單（幹部、學員、校友，約 990 人）、B1 七個 mentorship 學期與 282 組配對、B2 十五場舊活動與 788 筆出席、C 三十二份舊回饋表與 check-in（620 份回答、9747 格答案）。規則照計畫：只載名字、email、學校、年級，電話、生日、緊急聯絡人、飲食一律不載；面試與 essay 不載；2025 年以前、表單上沒有同意告知的回饋**不掛人**，只能看彙總；出席、配對、職位是營運紀錄，掛名。載入檔有真人資料，不進 repo，跑完就刪；怎麼產的寫在 `~/Anson/outputs/beyond-taiwan/general/docs/2026-11-06-bt-data-set-plan/BT-all-record-loading-plan.md`。**還沒倒的**：coffee chat 與校友聚會（沒建活動）、Summer Bootcamp 2025 的出席名單（匯出裡沒有）、「人」那頁 `rc_duplicates()` 提示的約 80 組同名要 Paul 自己看過再合併。
-- **隱私政策多一段「回饋與紀錄」**：`feedback/src/ui.js` 的 `NOTICE` 那段字要跟 `privacy/index.html` 一致，隱私政策是對外承諾，Paul 過稿才貼。
+- ~~**隱私政策多一段「回饋與紀錄」**~~ **2026-11-08 Paul 過稿，貼上去了**：`privacy/index.html` 中英各多一節「回饋與紀錄」（放在「學員與申請人的資料」之後）加可見範圍表三列，最後更新日期改成 2026-11-08。草稿與過稿紀錄在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-08-privacy-records-paragraph/`。政策寫了三件程式原本沒做到的事，同一天用 `2026-12-02-records-privacy.sql` 補齊，見下面「跟隱私政策對齊」。
+
+### 跟隱私政策對齊（`supabase/migrations/2026-12-02-records-privacy.sql`，2026-11-08）
+
+隱私政策「回饋與紀錄」那一節對外承諾了三件事，這一支把程式改到跟政策一樣。**上線前要在正式 Supabase 跑這一支**（照「發碼前要做的事」那四步，最後印一張 8 列的驗收表，全 PASS 才算）。
+
+1. **具名的回饋答案保存三屆（約三年），之後只留匿名的部分。** 新函式 `rc_anonymise_old(p_do)`：只有 Co-President 叫得動；「三屆」照 `terms` 表算，由新到舊第三屆的開始日之前送出的都算舊，屆別不到三個就什麼都不清；`p_do = false` 只算有幾份、界線是哪一天，`p_do = true` 才真的把 `person_id`、`participation_id`、`typed_name`、`contact_ok` 清掉（答案留著），並在 `rc_log` 記一筆 `responses_anonymise`。後台「回饋表」那頁最下面多一張卡「三屆前的具名答案轉匿名」（只畫給管的人），按「算一下有幾份」會把份數與界線掛在按鈕旁邊問一句，再按一次才做。**換屆之後按一次**，這是每年要做的事。⚠ 第一次按會把 2026-11-08 倒進來的 Fall 2022 與 Spring 2023 那幾份具名 check-in 一起轉掉，這是政策要的。
+2. **去向「可以連名字公開」只有本人勾得了，未滿 18 歲不公開名字。** `rc_save_outcome` 多一道門 `public_needs_self`：`visibility = public` 只有在「填的人就是本人」而且本人不是學員（`people.kind = student`）時才過；管的人替任何人填 public 都被擋，替學員填 internal 照樣可以。後台加去向那格多一句提醒。
+3. **學員自己刪帳號時，紀錄那邊一併清掉。** `delete_my_account` 重寫：先找 `people.profile_id` 是本人的那一列，用新的內部函式 `rc_forget_rows`（跟 `forget_person` 同一套清法：名字、email、出席、去向刪掉，配對留空格，答案留著但不掛人，列留著讓人數不變）清掉，再刪帳號。幹部仍然擋 `cadre_must_ask`。`forget_person` 改成叫同一支 `rc_forget_rows`，行為不變。
+
+`scripts/db/smoke.sh` 多一段 16 項含一個破壞測試（拿掉 public 那道門驗收表變紅），1228 全過。
 - 校友年度問候現在是一份「不登入用連結填」的回饋表（kind `alumni-yearly`），答案不自動寫進去向；要接到登入的校友帳號是計畫的決定 10。
 - 不寄信：回饋表打開不會通知任何人，連結自己貼。
 

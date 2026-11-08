@@ -2986,6 +2986,37 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-12-01-records.sql >/dev/null 2>&1 || true
 chkraise "破壞測試之後裝回正確版本，Senior Adviser 又讀不到配對回饋了" "not_form_reader" "perform set_config('test.uid','${OTHER}',true); perform public.rc_results('${RCPF}');"
+echo "── 紀錄跟隱私政策對齊（2026-12-02-records-privacy.sql）──"
+rpgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-02-records-privacy.sql 2>&1 || true)
+if echo "${rpgot}" | grep -q "OVERALL.*PASS" && ! echo "${rpgot}" | grep -q "|FAIL"; then echo "  ok   隱私那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 隱私那支驗收表："; echo "${rpgot}" | head -20; fail=$((fail+1)); fi
+# 去向 public 只有本人；學員誰填都不行。RCDA 是合併後留下的那位學員，MKE 上面替自己填過一筆。
+chkraise "★ 管的人替學員填「可以連名字公開」被擋（public_needs_self）" "public_needs_self" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_outcome(null, '{\"person_id\":\"${RCDA}\",\"kind\":\"admitted\",\"visibility\":\"public\"}'::jsonb);"
+RCMKO=$(psql -d "${DB}" -X -A -t -q -c "select o.id from public.rc_outcomes o join public.people pe on pe.id=o.person_id where pe.profile_id='${MKE}' limit 1" | tr -d ' \n')
+chkraise "★ 管的人把別人（幹部）的去向改成 public 也被擋" "public_needs_self" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_outcome('${RCMKO}', '{\"visibility\":\"public\"}'::jsonb);"
+chkas "${MKE}" "本人自己勾 public 可以" "public" "select public.rc_save_outcome('${RCMKO}', '{\"visibility\":\"public\"}'::jsonb); select visibility from public.rc_outcomes where id='${RCMKO}'"
+chkas "${PAUL}" "管的人替學員填 internal 照樣可以" "internal" "select public.rc_save_outcome(null, '{\"person_id\":\"${RCDA}\",\"kind\":\"admitted\",\"institution\":\"UBC\",\"year\":2028}'::jsonb); select visibility from public.rc_outcomes where person_id='${RCDA}' order by recorded_at desc limit 1"
+# 三屆前的具名答案轉匿名：補兩個舊屆別，把 RCF 那份留了 email 的答案改成 2020 年送出的。
+psql -d "${DB}" -X -A -t -q -c "insert into public.terms (id, starts_on, ends_on, status) values ('2023-24','2023-08-01','2024-07-31','ended'), ('2024-25','2024-08-01','2025-07-31','ended') on conflict (id) do nothing; update public.rc_responses set submitted_at='2020-11-28T12:00:00+08:00' where form_id='${RCF}' and person_id is not null;" >/dev/null 2>&1
+chkraise "★ Director 按不了轉匿名（not_president）" "not_president" "perform set_config('test.uid','${DIR}',true); perform public.rc_anonymise_old(false);"
+chkas "${PAUL}" "★ 先算：1 份、還沒做、人還掛著" "1|false|1" "select (a->>'n')||'|'||(a->>'done')||'|'||(select count(*) from public.rc_responses where form_id='${RCF}' and person_id is not null) from (select public.rc_anonymise_old(false) a) t"
+# ⚠ 函式與數的那幾句要分兩個 statement：同一句裡的子查詢用的是函式跑之前的快照，數出來永遠是舊的。
+chkas "${PAUL}" "★ 真的做：回 1 份、done" "1|true" "select (a->>'n')||'|'||(a->>'done') from (select public.rc_anonymise_old(true) a) t"
+chk "★ 做完：答案還在、人拆掉、有留紀錄" "0|2|1" "select (select count(*) from public.rc_responses where form_id='${RCF}' and person_id is not null)||'|'||(select count(*) from public.rc_responses where form_id='${RCF}')||'|'||(select count(*) from public.rc_log where what='responses_anonymise')"
+chkas "${PAUL}" "再按一次：0 份、不做" "0|false" "select (a->>'n')||'|'||(a->>'done') from (select public.rc_anonymise_old(true) a) t"
+# 學員刪帳號一併清紀錄：EVS1 是報過名的學員，rc_sync_event 之後名單上有他那一列。
+RCEVP=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where profile_id='${EVS1}'" | tr -d ' \n')
+chk "刪之前：EVS1 在名單上、有一筆出席" "1|1" "select (select count(*) from public.people where id='${RCEVP}' and forgotten_at is null)||'|'||(select count(*) from public.rc_participation where person_id='${RCEVP}')"
+chkraise "幹部仍然不能自己刪帳號（cadre_must_ask）" "cadre_must_ask" "perform set_config('test.uid','${DIR}',true); perform public.delete_my_account();"
+chkas "${EVS1}" "★ 學員刪帳號：名字清掉、出席刪掉、列留著、帳號拆開" "true|0|1|true" "select public.delete_my_account(); select (select name_zh is null and forgotten_at is not null from public.people where id='${RCEVP}')||'|'||(select count(*) from public.rc_participation where person_id='${RCEVP}')||'|'||(select count(*) from public.people where id='${RCEVP}')||'|'||(select profile_id is null from public.people where id='${RCEVP}')"
+rp2=$(psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-12-02-records-privacy.sql 2>&1 || true)
+if echo "${rp2}" | grep -q "OVERALL.*PASS"; then echo "  ok   隱私那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 隱私那支重跑沒過"; fail=$((fail+1)); fi
+BROKEN=$(mktemp)
+sed "/raise exception 'public_needs_self'/d" supabase/migrations/2026-12-02-records-privacy.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「去向 public 只有本人」那道門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 public 那道門驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-12-02-records-privacy.sql >/dev/null 2>&1 || true
+chkraise "破壞測試之後裝回正確版本，那道門又在了" "public_needs_self" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_outcome(null, '{\"person_id\":\"${RCDA}\",\"kind\":\"admitted\",\"visibility\":\"public\"}'::jsonb);"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

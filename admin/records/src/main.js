@@ -293,6 +293,19 @@ document.addEventListener("click", async e => {
     if (ok === undefined) return;
     S.results = null; S.msg = T("msg.deleted"); await loadBoot(); go("forms"); return;
   }
+  // 三屆前的具名答案轉匿名（2026-12-02）：先問資料庫有幾份、界線是哪一天，數字放進 needAsk 那一行，再按一次才真的清（後台不用瀏覽器的 confirm）。
+  if (act === "anonymise") {
+    const peek = await run("err.anon", () => D.anonymiseOld(false));
+    if (peek === undefined) return;
+    if (!peek || !peek.cutoff) { UI.toast(T("anon.noTerms")); render(); return; }
+    const n = Number(peek.n || 0);
+    if (!n) { UI.toast(T("anon.none", { cutoff: peek.cutoff })); render(); return; }
+    render();
+    if (UI.needAsk(S, b, T("anon.ask", { n, cutoff: peek.cutoff }))) return;   // 第一次按：把數字掛在按鈕旁邊問一句；第二次才做
+    const done = await run("err.anon", () => D.anonymiseOld(true));
+    if (done === undefined) return;
+    S.msg = T("anon.done", { n: Number(done.n || 0) }); await loadBoot(); render(); return;
+  }
   if (act === "copy-link") {
     const el = document.getElementById("rc-link"); if (!el) return;
     try { await navigator.clipboard.writeText(el.value); UI.toast(T("msg.copied")); } catch (x) { el.select(); }

@@ -50,6 +50,7 @@ export const saveReview    = (id, p) => rpc("rc_save_review", { p_event: id, p }
 export const savePerson    = (id, p) => rpc("rc_save_person", { p_person: id || null, p });
 export const mergePeople   = (keep, drop) => rpc("rc_merge_people", { p_keep: keep, p_drop: drop });
 export const forgetPerson  = id => rpc("forget_person", { p_person: id });
+export const anonymiseOld  = doIt => rpc("rc_anonymise_old", { p_do: !!doIt });
 
 // 資料庫回的代碼翻成人話。先命中先贏。
 const SAYS = [
