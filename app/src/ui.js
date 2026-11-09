@@ -36,7 +36,8 @@ export function inviteBannerHTML(inv) {
   if (st === "expired" || st === "revoked") return `<div class="wnote" style="margin:0 0 16px">${T("inv.bannerDead")}</div>`;
   return `<div class="note" style="margin:0 0 16px">${inv.email_hint ? T("inv.banner", { email: esc(inv.email_hint) }) : T("inv.bannerNoHint")}</div>`;
 }
-export function authHTML(mode, msg, email, busy, invite) {
+export function authHTML(mode, msg, email, busy, invite, student) {
+  // student：從申請、資源、活動頁被導來的（app/src/nav.js 的 isPublicNext）。副標與 Google 那句不講邀請碼。
   const up = mode === "up";
 
   // ── 忘記密碼：輸入 email ──
@@ -88,7 +89,7 @@ export function authHTML(mode, msg, email, busy, invite) {
          自己填的東西有作用，打錯了還會以為是自己的問題，而實際上不管填什麼都會
          註冊成功、身分都是 student。**沒有作用的輸入框比沒有輸入框更糟。**
          邀請碼現在在登入之後那一頁輸入（notCadreHTML）。 -->
-    <div class="sub">${invite ? T("inv.sub") : up ? T("auth.subUp") : T("auth.subIn")}</div>
+    <div class="sub">${invite ? T("inv.sub") : up ? T(student ? "auth.subUpStudent" : "auth.subUp") : T(student ? "auth.subInStudent" : "auth.subIn")}</div>
     ${inviteBannerHTML(invite)}
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     ${invite ? `<div class="stack" style="margin-bottom:14px"><button class="btn" data-act="do-google">${T("inv.google")}</button></div><div class="mini" style="margin:0 0 14px">${T("inv.orEmail")}</div>` : ""}
@@ -142,7 +143,7 @@ export function authHTML(mode, msg, email, busy, invite) {
       ${invite ? "" : `<button class="btn ghost" data-act="do-google">${T("auth.google")}</button>`}
     </div>
     <div class="nav"><button class="link" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? T("auth.haveAccount") : T("auth.noAccount")}</button></div>
-    <div class="note">${invite ? T("inv.googleNote") : T("auth.googleNote")}</div>
+    <div class="note">${invite ? T("inv.googleNote") : T(student ? "auth.googleNoteStudent" : "auth.googleNote")}</div>
     <!-- 2026-09-01：寄信接好之後，忘記密碼改成自助為主、組織信箱為輔。
          **組織信箱那條不要刪** —— 自助那條路需要「還記得自己用哪個 email」，
          而連 email 都想不起來的人（換過信箱、當初用學校信箱註冊）沒有別的出口。

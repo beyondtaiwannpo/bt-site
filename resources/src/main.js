@@ -52,8 +52,8 @@ async function boot() {
 document.addEventListener("click", e => {
   const b = e.target.closest('[data-act="signin"]');
   if (!b) return;
-  const back = location.pathname + location.search;
-  location.href = "../app/?next=" + encodeURIComponent(back);
+  // 2026-11-09：鑰匙「resources」（app/src/nav.js），不送整條路徑（對不到表，登入完會停在 dashboard）。
+  location.href = "../app/?next=resources" + (isEn() ? "&lang=en" : "");
 });
 
 // 語言按鈕改 data-lang，這一區的字是 JavaScript 畫的，要自己跟著換。

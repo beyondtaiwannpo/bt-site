@@ -104,7 +104,7 @@ export const MINE = {
   "m.pleaseLogin":     { zh: "請先登入。<a href=\"../app/\">去登入頁</a>", en: "Please sign in first. <a href=\"../app/\">Go to sign in</a>" },
   "m.internOnly":      { zh: "這裡只開放給 BT 的實習生。<a href=\"../app/\">回到入口</a>", en: "This is for BT interns only. <a href=\"../app/\">Back to the entrance</a>" },
   "m.notReadyTitle":   { zh: "護照還沒準備好", en: "The passport is not ready yet" },
-  "m.notReady":        { zh: "你的帳號已經是實習生了，但護照那一頁的資料表還沒建好。請管理者跑完 2026-10-17 那支遷移檔，再重新整理。", en: "Your account is an intern account, but the passport table has not been created yet. Ask the administrator to run the 2026-10-17 migration, then refresh." },
+  "m.notReady":        { zh: "你的帳號已經是實習生了，但這一期的實習護照上還沒有你。請 Internship team 的幹部把你加進這一期（用邀請碼登記就會有）；整頁都是新的話，請管理者先跑完 2026-10-17 那支遷移檔，再重新整理。", en: "Your account is an intern account, but you are not on this term's intern passport yet. Ask the Internship team to add you to this term (claiming an invite code does this); if the whole page is new, the administrator has to run the 2026-10-17 migration first, then refresh." },
   "m.slow":            { zh: "還在連資料庫…<br>如果一直停在這裡，可能是資料庫休眠了。", en: "Still connecting to the database…<br>If this does not move, the database may be asleep." },
   "m.reconnect":       { zh: "正在重新連線…", en: "Reconnecting…" },
   "md.date":           { zh: "日期 / Date", en: "Date" },

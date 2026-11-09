@@ -463,7 +463,7 @@ export async function withdrawRequest(id) {
 export async function loadEvents() {
   need();
   const { data, error } = await supabase.from("events")
-    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at")
+    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind")
     .order("starts_at", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return data || [];

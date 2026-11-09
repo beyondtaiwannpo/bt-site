@@ -56,6 +56,14 @@ async function boot() {
     S.forms = (data || []).filter(f =>
       (!f.opens_at || new Date(f.opens_at).getTime() <= now) &&
       (!f.closes_at || new Date(f.closes_at).getTime() >= now));
+    // 英文畫面：表單只有一個 title（多半是中文），改用那場活動的 title_en 與 summary_en（public_events() 誰都叫得到）。沒對到就照舊。
+    if (isEn()) {
+      try {
+        const { data: evs } = await supabase.rpc("public_events");
+        const byForm = {}; for (const e of evs || []) if (e.form_id) byForm[e.form_id] = e;
+        S.forms = S.forms.map(f => byForm[f.id] ? { ...f, title: byForm[f.id].title_en || f.title, intro: byForm[f.id].summary_en || f.intro } : f);
+      } catch (e) { /* 對不到就用表單自己的標題 */ }
+    }
 
     // 登入狀態是**加分項**，拿不到就當沒登入，不要讓整頁掛掉。
     try {
@@ -136,8 +144,9 @@ document.addEventListener("click", async e => {
   if (act === "signin" ) {
     // 登入完帶他回這一份表單。next 的白名單與存放方式在 app/src/nav.js，
     // 這裡只負責把去處寫進網址。
-    const back = location.pathname + location.search;
-    location.href = "../app/?next=" + encodeURIComponent(back);
+    // 2026-11-09：鑰匙是「apply:<表單 id>」（app/src/nav.js 的 resolveKey 只收 uuid 的形狀），不再送整條路徑（那對不到表，登入完會停在 dashboard）。
+    const id = formId();
+    location.href = "../app/?next=" + encodeURIComponent(id ? "apply:" + id : "apply") + (isEn() ? "&lang=en" : "");
     return;
   }
 

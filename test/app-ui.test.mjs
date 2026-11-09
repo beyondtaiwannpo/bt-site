@@ -382,3 +382,25 @@ test("★ 有邀請連結的登入頁：Google 第一顆、印遮過的 email、
   assert.match(src, /invite_wrong_email/);
   assert.doesNotMatch(src, /document\.getElementById\("ci"\)\.value[\s\S]*?S\.invite/, "邀請連結那條路沒有輸入框");
 });
+
+// 2026-11-09：對外三頁（申請、資源、活動）也進表；申請帶表單 id 的鑰匙「apply:<uuid>」只收 uuid 的形狀。
+test("★ 學員的去處：apply:<uuid>、resources、events 對得到；apply: 後面不是 uuid 的對不到；路徑仍然對不到", async () => {
+  const { resolveKey, isPublicNext } = await import("../app/src/nav.js");
+  assert.equal(resolveKey("apply:ca994f91-68b8-4eac-b079-599740e3563b"), "../apply/?f=ca994f91-68b8-4eac-b079-599740e3563b");
+  assert.equal(resolveKey("apply"), "../apply/"); assert.equal(resolveKey("resources"), "../resources/"); assert.equal(resolveKey("events"), "../events/");
+  assert.equal(resolveKey("apply:../../evil"), null); assert.equal(resolveKey("apply:ca994f91"), null); assert.equal(resolveKey("apply:<script>"), null);
+  assert.equal(resolveNext("?next=" + encodeURIComponent("/apply/?f=ca994f91-68b8-4eac-b079-599740e3563b")), null, "整條路徑仍然對不到表");
+  assert.equal(isPublicNext("../apply/?f=x"), true); assert.equal(isPublicNext("../resources/"), true); assert.equal(isPublicNext("../passport/"), false); assert.equal(isPublicNext(null), false);
+  const st = fakeStore();
+  stashNext("?next=apply%3Aca994f91-68b8-4eac-b079-599740e3563b", st);
+  assert.equal(takeNext("", st), "../apply/?f=ca994f91-68b8-4eac-b079-599740e3563b", "Google 那條路也帶得回申請表");
+});
+
+test("登入頁：從申請頁來的人看到的是學生的副標，不講邀請碼", async () => {
+  const UI = await import("../app/src/ui.js");
+  UI.setLang("en");
+  const student = UI.authHTML("up", "", "", false, null, true), plain = UI.authHTML("up", "", "", false, null, false);
+  assert.match(student, /no code needed/i); assert.doesNotMatch(student, /invite code/i);
+  assert.match(plain, /invite code/i);
+  UI.setLang("zh");
+});

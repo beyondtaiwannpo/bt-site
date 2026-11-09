@@ -64,6 +64,10 @@ export const MINE = {
   "auth.signin":      { zh: "登入", en: "Sign in" },
   "auth.subUp":       { zh: "先開帳號，之後再輸入邀請碼升級成幹部。", en: "Create an account first. Enter an invite code later to become a cadre." },
   "auth.subIn":       { zh: "用你註冊時的 email 登入。", en: "Sign in with the email you signed up with." },
+  // 從申請、資源、活動頁被導來的（多半是學生）：不講邀請碼、不講幹部（2026-11-09）。
+  "auth.subUpStudent": { zh: "開一個免費的帳號就能送出申請，兩分鐘，不用任何代碼。", en: "A free account is all you need to apply. Two minutes, no code needed." },
+  "auth.subInStudent": { zh: "用你註冊時的 email 登入，登入完就帶你回去。", en: "Sign in with the email you signed up with. We will take you straight back." },
+  "auth.googleNoteStudent": { zh: "用 Google 進來的話不需要密碼，登入完一樣帶你回去。", en: "With Google you do not need a password. You are taken straight back after signing in." },
   "auth.pw":          { zh: "密碼 / Password", en: "Password" },
   "auth.pwMin":       { zh: "（至少 6 個字）", en: " (at least 6 characters)" },
   "auth.busy":        { zh: "處理中…", en: "Working…" },

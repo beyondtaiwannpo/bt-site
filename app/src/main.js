@@ -17,11 +17,11 @@ import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 // invite（2026-10-29 邀請信）：網址 ?invite=碼 收進 sessionStorage（跟 next 同一招，網址上的東西不當網址用），
 // 登入或註冊成功後自動認領，他不用打碼。info 是 invite_peek() 回的 { grants, email_hint, status }，登入頁印給他看。
 let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false, invite: "", inviteInfo: null,
-          profile: null, view: null, busy: false, apps: [], opens: [] };
+          profile: null, view: null, busy: false, apps: [], opens: [], after: null };
 
 // 登入之後送他回原本要去的地方。白名單、為什麼要存起來、為什麼包 try/catch，
 // 全部在 nav.js —— 抽出去是為了測得到（main.js 一 import 就會跑 boot()）。
-import { stashNext, takeNext } from "./nav.js";
+import { stashNext, takeNext, peekNext, isPublicNext } from "./nav.js";
 const store = () => { try { return window.sessionStorage; } catch (e) { return null; } };
 
 const root = () => document.getElementById("bt-root");
@@ -32,7 +32,8 @@ function render() {
   // 連不上要排在最前面：那時候 S.user 是空的，掉到登入頁等於對一個
   // 明明登入著的人說「請登入」（跟護照那邊同一個道理，spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
-  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail, S.busy, S.invite ? S.inviteInfo || {} : null); return; }
+  // 從申請、資源、活動頁被導來的人多半是學生：登入頁不要跟他講邀請碼與幹部（2026-11-09 走一遍學生流程時撞到的）。
+  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail, S.busy, S.invite ? S.inviteInfo || {} : null, isPublicNext(peekNext(location.search, store()))); return; }
   // 2026-09-08：幹部登入後**不再停在一頁選單**，直接送進 /settings/。
   // Paul 的原話：「後面那一頁其實不用有了，就直接登入進到第 1 張圖就好」。
   // 那一頁的工作（一個功能的樞紐）現在由登入後的頂欄做，
@@ -109,6 +110,18 @@ async function fillSchools() {
 //
 // ⚠ **這兩句失敗不可以讓整頁掛掉。** 它們是 dashboard 上的兩區，
 // 而 dashboard 最重要的是「我的資料」與「刪除帳號」那兩件事。
+// 送回對外頁面時把語言帶著（對外頁看 ?lang=），不然英文畫面登入完回去變中文。
+function withLang(url) { return url + (url.includes("?") ? "&" : "?") + "lang=" + lang(); }
+// 英文畫面：表單 id → 那場活動的英文標題。中文畫面或讀不到就回空物件（畫面照舊用表單的 title）。
+async function englishTitles() {
+  if (lang() !== "en") return {};
+  try {
+    const { data } = await supabase.rpc("public_events");
+    const out = {};
+    for (const e of data || []) if (e.form_id && e.title_en) out[e.form_id] = e.title_en;
+    return out;
+  } catch (e) { return {}; }
+}
 // 讀不到申請就少畫兩區，不要讓一個人因為這個而連自己的資料都看不到。
 async function loadStudentBits() {
   try {
@@ -122,16 +135,18 @@ async function loadStudentBits() {
     ]);
     if (ap.error) throw ap.error;
     if (op.error) throw op.error;
+    // 表單只有一個 title（多半是中文）；英文畫面用那場活動的 title_en（public_events() 誰都叫得到）。沒有對到就照舊。
+    const en = await englishTitles();
     S.apps = (ap.data || []).map(a => ({
       id: a.id, form_id: a.form_id, status: a.status,
-      title: (a.forms && a.forms.title) || T("m.formGone"),
+      title: en[a.form_id] || (a.forms && a.forms.title) || T("m.formGone"),
       notify_by: a.forms && a.forms.notify_by,
       interview_url: a.forms && a.forms.interview_url,
     }));
     const now = Date.now();
     S.opens = (op.data || []).filter(f =>
       (!f.opens_at || new Date(f.opens_at).getTime() <= now) &&
-      (!f.closes_at || new Date(f.closes_at).getTime() >= now));
+      (!f.closes_at || new Date(f.closes_at).getTime() >= now)).map(f => ({ ...f, title: en[f.id] || f.title }));
   } catch (e) {
     console.warn("讀不到申請，dashboard 少畫兩區。", e);
     S.apps = []; S.opens = [];
@@ -220,12 +235,16 @@ async function boot() {
     // takeNext 會同時看網址與存起來的鑰匙，而且拿完就丟掉。
     // 兩條路（原地登入 / 繞完 Google 回來）走的是同一行，所以行為一致是構造上的，
     // 不是碰巧的。
-    const n = S.role === "cadre" && takeNext(location.search, store());
-    if (n) {
+    // 2026-11-09：學員也會被送回去，但只有對外的頁面（申請、資源、活動）；登入後的頁面仍然只送幹部。
+    // 資料還沒填齊的學員先補資料，存好再送（S.after）。
+    const dest = takeNext(location.search, store());
+    const n = dest && (S.role === "cadre" || isPublicNext(dest)) ? dest : null;
+    if (n && S.role !== "cadre" && S.role !== "intern" && !UI.profileComplete(S.profile)) { S.after = n; }
+    else if (n) {
       root().innerHTML = `<div class="empty">${T("m.takingOver")}</div>`;
       // replace 不留下歷史紀錄。用 href 的話，他從護照按上一頁會回到這裡，
       // 而這裡又會立刻把他送回護照 —— 上一頁就變成按不動的。
-      location.replace(n);
+      location.replace(isPublicNext(n) ? withLang(n) : n);
       return;
     }
     render();
@@ -357,7 +376,10 @@ document.addEventListener("click", async e => {
       AUTH.forgetMe();
       S.profile = { name, school, grade, newsletter };
       S.name = name;
-      S.busy = false; S.view = null; render();
+      S.busy = false; S.view = null;
+      // 他本來是要去某份申請表或資源頁的：補完資料就送過去，不要讓他再找一次。
+      if (S.after && isPublicNext(S.after)) { const to = withLang(S.after); S.after = null; root().innerHTML = `<div class="empty">${T("m.takingOver")}</div>`; location.replace(to); return; }
+      render();
     } catch (err) {
       // ⚠ 失敗一定要說話。存檔失敗卻畫出一模一樣的畫面，使用者會再按一次、
       // 按五次、然後關掉（看板那一輪學到的同一件事）。
@@ -378,7 +400,7 @@ document.addEventListener("click", async e => {
       await AUTH.signOut();
       S = { user: null, role: null, name: "", authMode: "in",
             authMsg: T("m.deleted"), authEmail: "", down: false,
-            profile: null, view: null, busy: false, apps: [], opens: [] };
+            profile: null, view: null, busy: false, apps: [], opens: [], after: null };
       render();
     } catch (err) {
       S.busy = false; S.authMsg = T("m.delFail") + (err.message || err); render();
@@ -389,7 +411,7 @@ document.addEventListener("click", async e => {
   if (act === "signout") {
     await AUTH.signOut();
     S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false,
-          profile: null, view: null, busy: false, apps: [], opens: [] };
+          profile: null, view: null, busy: false, apps: [], opens: [], after: null };
     render();
     return;
   }

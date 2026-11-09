@@ -55,7 +55,7 @@ export const COMMON = {
   "why.records":      { zh: "只有 Co-President、Senior Adviser、被派進「BT Records」的人，與活動工作區「改」以上的人進得去", en: "Co-Presidents, Senior Advisers, people assigned to BT Records, and event workspace editors only" },
   // 走錯地方、連不上
   "notCadre.title":   { zh: "這一頁是給幹部用的", en: "This page is for cadres" },
-  "notCadre.lede":    { zh: "你的帳號是學員，後台看不到。", en: "Your account is a student account, so the admin is not available." },
+  "notCadre.lede":    { zh: "你的帳號不是幹部帳號（學員、校友、實習生都一樣），後台看不到。", en: "Your account is not a cadre account (students, alumni and interns alike), so the admin is not available." },
   "notCadre.back":    { zh: "回我的帳號", en: "Back to my account" },
   "down.title":       { zh: "資料庫休眠中", en: "Database is asleep" },
   "down.lede":        { zh: "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。",
@@ -365,6 +365,8 @@ export const MINE = {
   "ev.g.draft":       { zh: "草稿", en: "Drafts" },
   "ev.g.published":   { zh: "在對外頁上", en: "Live" },
   "ev.g.past":        { zh: "過去的與撤下的", en: "Past and unpublished" },
+  "ev.g.records":     { zh: "只在紀錄裡的舊活動（從沒上過網站）", en: "Records only (past events never listed on the site)" },
+  "ev.st.records":    { zh: "紀錄", en: "Records" },
   "ev.st.draft":      { zh: "草稿", en: "Draft" },
   "ev.st.ready":      { zh: "準備好了", en: "Ready" },
   "ev.st.published":  { zh: "對外中", en: "Live" },

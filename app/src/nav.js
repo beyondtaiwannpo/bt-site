@@ -16,10 +16,34 @@ export const NEXT = { home: "../home/", passport: "../passport/", availability: 
 
 const KEY = "bt-next";
 
+// 2026-11-09：對外三頁（申請、資源、活動）也進表。申請那一頁要帶表單 id，所以多一種鑰匙「apply:<uuid>」：
+// 冒號後面只收 uuid 的形狀，其他一律對不到；拼出來的網址是我們自己寫死的 ../apply/?f=，值只進 query。
+// 在這之前 /apply/ 送的是一條路徑（"/apply/?f=…"），對不到表，所以學員登入完停在 dashboard，要自己再找一次那份表單。
+const PUBLIC_NEXT = { apply: "../apply/", resources: "../resources/", events: "../events/" };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// 一把鑰匙對到一條網址；對不到回 null。
+export function resolveKey(k) {
+  if (!k) return null;
+  if (Object.prototype.hasOwnProperty.call(NEXT, k)) return NEXT[k];
+  if (Object.prototype.hasOwnProperty.call(PUBLIC_NEXT, k)) return PUBLIC_NEXT[k];
+  const m = /^apply:(.+)$/.exec(k);
+  if (m && UUID.test(m[1])) return PUBLIC_NEXT.apply + "?f=" + encodeURIComponent(m[1]);
+  return null;
+}
+// 這條去處是對外的頁面（學員也去得了）還是登入後的頁面（只有幹部會被送過去）。
+export function isPublicNext(url) {
+  return !!url && Object.values(PUBLIC_NEXT).some(p => url === p || url.startsWith(p + "?"));
+}
 // search 是 location.search 那種字串（"?next=passport"）。對不到表就回 null。
 export function resolveNext(search) {
   const k = new URLSearchParams(search || "").get("next");
-  return (k && Object.prototype.hasOwnProperty.call(NEXT, k)) ? NEXT[k] : null;
+  return resolveKey(k);
+}
+// 只看不拿：登入頁要知道這個人是從哪裡來的（學員從申請頁來就不要跟他講邀請碼）。
+export function peekNext(search, storage) {
+  const fromUrl = resolveNext(search);
+  if (fromUrl) return fromUrl;
+  try { return resolveKey(storage && storage.getItem(KEY)); } catch (e) { return null; }
 }
 
 // ── 為什麼要把 next 存起來，而不是只靠網址 ──
@@ -60,7 +84,7 @@ function take(storage) {
 // 離開去 Google 之前呼叫。只收白名單裡的鑰匙，別的一律不存。
 export function stashNext(search, storage) {
   const k = new URLSearchParams(search || "").get("next");
-  if (k && Object.prototype.hasOwnProperty.call(NEXT, k)) put(storage, k);
+  if (k && resolveKey(k)) put(storage, k);
 }
 
 // 回來（或原地登入完）之後呼叫。**它會順手把存起來的鑰匙丟掉**，
@@ -69,5 +93,5 @@ export function takeNext(search, storage) {
   const stashed = take(storage);
   const fromUrl = resolveNext(search);
   if (fromUrl) return fromUrl;
-  return (stashed && Object.prototype.hasOwnProperty.call(NEXT, stashed)) ? NEXT[stashed] : null;
+  return resolveKey(stashed);
 }

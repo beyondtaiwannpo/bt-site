@@ -752,6 +752,26 @@ Paul 2026-11-06 要的：像 Tally 那樣的表單，由 Co-President 發給全�
 - **開放時不寄信。** 要寄要 Paul 先說（GOALS「寄信給幹部要先問」）。
 - 沒有跳題、檔案上傳、多語言題目，跟學生申請表單第一版一樣的界線。
 
+## 用八種身分走一遍網站（2026-11-09）
+
+Paul 2026-11-09：「go test out our website and be different person… test out their basic usage, every UI UX effect, is there any bug, fix any bugs, run the test 3 or 4 times」。在本機 Supabase 上用假帳號各走一遍：陌生人（看活動、註冊）、學員（補資料、送申請、看狀態）、Co-President（審申請、簽到、辦活動、合併重複）、一般幹部（首頁、護照蓋章、時間看板、設定）、Senior Adviser（後台）、校友（設定、歡迎卡）、實習生（實習護照）、不登入填回饋表、Mentorship Director（開學期、配對）。找到的東西與改法：
+
+**修掉的 bug**
+- `/app/` 從申請頁、資源頁被導去登入的人，登入完**停在 dashboard**，要自己再找一次那份表單（送的是一條路徑 `/apply/?f=…`，對不到 `app/src/nav.js` 的白名單；幹部與學員都中）。改成三把鑰匙 `apply:<表單 uuid>`、`resources`、`events`（`resolveKey` 只收 uuid 的形狀，值只進 query），學員也會被送回去，資料還沒填齊的先補資料、存好再送（`S.after`），語言跟著帶（`withLang`）。登入後的頁面仍然只送幹部。`test/app-ui.test.mjs` 多兩條。
+- `/apply/` 送出之後那顆「去我的帳號」是深藍字在深藍底上（`.body a` 蓋掉 `.btn` 的字色）。`apply/`、`events/`、`resources/` 三頁補 `.body a.btn{color:var(--bt-cream)}`。
+- `/availability/` 第一次設完時區，看板還說「還沒有人設定時區」、剛填的時間畫不出來（members 是設時區之前載的，自己那一列的 tz 是空的）。設完把自己那一列補上，第一次直接到「我的時間」。
+- `/admin/#events` 把紀錄倒進來的舊活動（source import）列在「過去的與撤下的」，像是有人把它們撤下。另成一組「只在紀錄裡的舊活動」、標「紀錄」。
+
+**改掉的字**
+- 登入頁：從申請、資源、活動頁來的人（多半是學生）看到的副標與 Google 那句不再講「邀請碼」「升級成幹部」（`authHTML` 多一個 `student` 參數，`isPublicNext(peekNext())` 決定）。
+- `/apply/` 與學員 dashboard 的英文畫面：表單只有一個中文 title，改用那場活動的 `title_en`／`summary_en`（`public_events()`），對不到就照舊。
+- 後台對非幹部的那句「你的帳號是學員」：校友、實習生也會看到，改成「不是幹部帳號」（八份 strings.js）。
+- 實習護照「資料表還沒建好，請管理者跑遷移檔」：真正的原因多半是這一期名單上還沒有他，兩種原因都寫。
+
+**沒改、留給 Paul 看的**（完整清單在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-09-persona-walkthrough/`）：活動卡沒有封面時是一塊空的米色；回饋表中英同時印、字太多；後台總覽一開頁打 16 到 20 次資料庫；簽到那一頁沒有自己的網址（重整回活動清單）；英文畫面的日期格式 2026/11/8；Senior Adviser 的總覽寫「看得到也改得了所有工作區」但紀錄對他是唯讀。
+
+驗證：812 條測試、check.sh、check-mobile 27 頁，smoke 1254 項，每一條流程在本機真的瀏覽器走過，修完的三條（學員回到申請表、時間看板、按鈕字色）再走一次。
+
 ## BT Records：人、活動、出席、回饋、配對、去向（2026-12-01）
 
 Paul 2026-11-06 要的：「a data set ... especially for alumni, people, and also events feedback ... is there a way to systematically improve our work through tracking old data」，

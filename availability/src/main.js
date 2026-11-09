@@ -469,6 +469,11 @@ document.addEventListener("click", async e => {
       await DATA.saveTz(S.user.id, b.dataset.tz);
       AUTH.forgetMe(); // 時區在「我是誰」的分頁快取裡，存了就讓下一頁重讀
       S.myTz = b.dataset.tz; S.needTz = false; S.msg = ""; S.busy = false;
+      // 2026-11-09 走一遍新幹部的流程撞到的：members 是設時區之前載的，我那一列的 tz 還是空的，
+      // 看板於是說「還沒有人設定時區」、我填的時間也畫不出來。把自己那一列補上；第一次設完直接到「我的時間」，那才是接下來要做的事。
+      const me = S.members.find(m => m.id === S.user.id);
+      if (me) me.tz = b.dataset.tz; else { try { const all = await DATA.loadAll(); S.members = all.members; S.slots = all.slots; } catch (e) { /* 下一次重整就有了 */ } }
+      if (!(S.slots.get(S.user.id) || new Set()).size) S.tab = "mine";
       setWeek(S.weekOffset); render();
     } catch (err) {
       console.error("設定時區失敗。真正的原因：", err);

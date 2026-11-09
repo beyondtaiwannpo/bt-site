@@ -1500,9 +1500,12 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
   const dis = busy ? " disabled" : "";
   const d = draft || {};
   const ev = events || [];
-  const groups = [["ready", ev.filter(e => e.status === "ready")], ["draft", ev.filter(e => e.status === "draft")],
-    ["published", ev.filter(e => e.status === "published" && !evPast(e))], ["past", ev.filter(e => e.status === "archived" || (e.status === "published" && evPast(e)))]].filter(g => g[1].length);
-  const row = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(T("ev.st." + e.status))}</span></div>
+  // 2026-11-09：紀錄那邊倒進來的舊活動（source import）另成一組，不跟「撤下的」混在一起。它們從來沒上過網站，只是出席與回饋的掛鉤。
+  const imported = e => e.source === "import";
+  const groups = [["ready", ev.filter(e => e.status === "ready")], ["draft", ev.filter(e => e.status === "draft" && !imported(e))],
+    ["published", ev.filter(e => e.status === "published" && !evPast(e))], ["past", ev.filter(e => !imported(e) && (e.status === "archived" || (e.status === "published" && evPast(e))))],
+    ["records", ev.filter(imported)]].filter(g => g[1].length);
+  const row = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(e.source === "import" ? T("ev.st.records") : T("ev.st." + e.status))}</span></div>
       <div class="fmeta">${esc(e.team.replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
   const create = (canCreateTeams || []).length ? sectionHTML(T("ev.new"), `<div class="note">${T("ev.newWhat")}</div><div class="two">
       <label><i>${T("ev.team")}</i><select id="ev-team"${dis}>${canCreateTeams.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>

@@ -58,7 +58,7 @@ export const COMMON = {
   "why.records":      { zh: "只有 Co-President、Senior Adviser、被派進「BT Records」的人，與活動工作區「改」以上的人進得去", en: "Co-Presidents, Senior Advisers, people assigned to BT Records, and event workspace editors only" },
   // 走錯地方、連不上
   "notCadre.title":   { zh: "這一頁是給幹部用的", en: "This page is for cadres" },
-  "notCadre.lede":    { zh: "你的帳號是學員，後台看不到。", en: "Your account is a student account, so the admin is not available." },
+  "notCadre.lede":    { zh: "你的帳號不是幹部帳號（學員、校友、實習生都一樣），後台看不到。", en: "Your account is not a cadre account (students, alumni and interns alike), so the admin is not available." },
   "notCadre.back":    { zh: "回我的帳號", en: "Back to my account" },
   "down.title":       { zh: "資料庫休眠中", en: "Database is asleep" },
   "down.lede":        { zh: "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。",
