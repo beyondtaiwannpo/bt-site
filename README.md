@@ -776,7 +776,7 @@ Paul 2026-11-09：「go test out our website and be different person… test out
 - Senior Adviser 的總覽那句改成「看得到每個工作區；紀錄與配對回饋對你是唯讀」。
 - 沒有封面的活動卡：矮一半、淡斜紋加橘色底邊，不再是一塊空的米色。
 
-**第三輪：mentor 與 mentee 登入後有自己的東西了**（`supabase/migrations/2026-12-07-records-my-pairs.sql`，**上線前要跑**，3 列驗收表）。走了一遍才發現 mentor 登入後網站上沒有任何一頁看得到自己帶的是誰，mentee 也一樣（配對只在紀錄後台）。新函式 `rc_my_pairs()` 只回本人在裡面的配對：另一邊的名字、那個學期、配對日、還開著的 check-in 連結（mentor 拿 pair-mentor 的、mentee 拿 pair-mentee 的）與填過了沒；不回 email、不回別人的答案。幹部首頁多一區「我帶的 mentee」（`home/src/ui.js` 的 `pairsHTML`），學員 dashboard 多一區「我的 mentor」（`app/src/ui.js`）：一列一人，check-in 沒填是連結、填過打勾。本機瀏覽器以 mentor（一般幹部）與 mentee（學員帳號）登入各走三次：看到對方、按連結填 check-in、回來看到打勾。smoke 多 3 項。
+**第三輪：mentor 與 mentee 登入後有自己的東西了**（`supabase/migrations/2026-12-07-records-my-pairs.sql`，Paul 2026-11-09 已在正式 Supabase 跑過全 PASS，4 列驗收表）。走了一遍才發現 mentor 登入後網站上沒有任何一頁看得到自己帶的是誰，mentee 也一樣（配對只在紀錄後台）。新函式 `rc_my_pairs()` 只回本人在裡面的配對：另一邊的名字、那個學期、配對日、還開著的 check-in 連結（mentor 拿 pair-mentor 的、mentee 拿 pair-mentee 的）與填過了沒；不回 email、不回別人的答案。幹部首頁多一區「我帶的 mentee」（`home/src/ui.js` 的 `pairsHTML`），學員 dashboard 多一區「我的 mentor」（`app/src/ui.js`）：一列一人，check-in 沒填是連結、填過打勾。本機瀏覽器以 mentor（一般幹部）與 mentee（學員帳號）登入各走三次：看到對方、按連結填 check-in、回來看到打勾。smoke 多 3 項。
 
 **第四輪再做掉的**：(1) 後台換頁淡入：`admin.css` 多一個只動透明度的 `.main.swap`（140 毫秒），`admin/src/main.js` 與 `admin/records/src/main.js` 的 render 只在 `S.view` 變了才加，自動儲存那種重畫不加；reduce 會關掉。(2) 「該填的回饋」：同一支遷移檔多 `rc_my_feedback()`（本人參加過的活動還開著的活動後回饋表、填過了沒），學員 dashboard 與幹部首頁各一區，連結直接到 `/feedback/?t=`。(3) 後台總覽效率：沒有任何工作區、職級是一般成員的幹部，工作區、需求單、活動、會議、待寄的信對他全是空的，開頁不再問（`light`），實測 16 次查詢降到 8 次；有指派或職級的人照舊。
 
