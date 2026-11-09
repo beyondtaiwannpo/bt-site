@@ -4495,6 +4495,13 @@ Paul 2026-11-06 說後台換頁很慢，而且剛上線的側欄新項目重整�
 本機用一個每趟加 300 毫秒的代理重現台北到新加坡的距離，改前改後同一個帳號同一個資料庫：
 總覽內容出現從 5.4 秒變 1.9 秒，對外那一組 2.0 秒變 0.7 秒，護照後台 1.9 秒變 0.65 秒，名單那一組側欄從 0.68 秒變成開頁就在。
 
+### 推上去了但網站沒換：GitHub Pages 的 deploy 卡住
+
+push 之後幾分鐘網站還是舊版（`https://beyondtaiwannpo.com/version.json` 的版本號跟 `version.json` 不一樣），先看 GitHub 的 Actions 分頁那條「pages build and deployment」。
+2026-11-09 遇過兩次：build 那一步綠的，deploy 那一步在「syncing_files」停十分鐘然後 Timeout。這不是程式的問題，是 GitHub 那一邊卡住。
+**重跑那條 workflow 沒有用**（試了兩次，還從 Pages API 要了一次新 build，三次都一樣）：Pages 的 deployment ID 就是那個 commit 的 SHA，卡住的那筆每次重跑都被拿回來用。
+**解法是再推一個新的 commit**，哪怕只是改一行文件，新的 SHA 就是新的一筆。同一天早上 75a369d 卡住、接著的 3e88a53 一推就好，就是這樣。
+
 ### 版本號：為什麼側欄新項目重整會不見
 
 GitHub Pages 把每個檔案快取 10 分鐘。改了程式推上去的十分鐘內，你的瀏覽器可能拿到**新的 index.html 配舊的 ui.js**（或反過來），
