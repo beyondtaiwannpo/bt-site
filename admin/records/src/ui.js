@@ -1165,12 +1165,25 @@ export function dirMatch(list, label) { const l = String(label || "").trim(); if
 // 一組同名的人，一張卡 N 欄（2026-12-06；12-05 那版是兩兩一組，三個同名會變三張卡，Paul 問「第一張的左邊要跟第二張的右邊合怎麼辦」）。
 // 每一欄：radio「留這一欄」（預設建議的那欄）、checkbox「併進留的那一欄」（預設勾，除了留的那欄、跟說過「不是同一個人」的）。
 // 底下兩顆鈕：把勾起來的併進去；勾起來的不是留的那個人。沒有摘要（遷移檔還沒跑）就退回只印名字。
+// 兩欄「可能是不同人」：兩邊都有 email 而且沒有一個相同，而且兩邊都有中文名而且不一樣（Paul 2026-11-09：
+// 「if they have different emails and Chinese names they are probably different people」）。只有一邊有 email 或中文名的不算，資訊不夠。
+export function likelyOther(m, k) {
+  if (!m || !k || m.id === k.id) return false;
+  const em = x => new Set((x.emails || []).map(e => String(e).trim().toLowerCase()).filter(Boolean));
+  const zh = x => String(x.name_zh || "").replace(/\s+/g, "");
+  const a = em(m), b = em(k);
+  const emailDiff = a.size > 0 && b.size > 0 && ![...a].some(e => b.has(e));
+  const zhDiff = zh(m) && zh(k) && zh(m) !== zh(k);
+  return Boolean(emailDiff && zhDiff);
+}
 export function dupGroupHTML(g, busy) {
   const members = Array.isArray(g.members) && g.members.length ? g.members : [
     { id: g.a, name: g.a_name, kind: g.a_kind, school: g.a_school }, { id: g.b, name: g.b_name, kind: g.b_kind, school: g.b_school }].filter(m => m.id);
   const keep = g.suggest && members.some(m => m.id === g.suggest) ? g.suggest : (g.suggest === "b" && members[1] ? members[1].id : members[0].id);
   const notSame = new Set((g.not_same || []).map(([a, b]) => `${a}|${b}`));
   const isNotSame = (x, y) => notSame.has(`${x}|${y}`) || notSame.has(`${y}|${x}`);
+  const keepM = members.find(m => m.id === keep);
+  const isLikelyOther = m => likelyOther(m, keepM);
   const key = g.key || members.map(m => m.id).join(",");
   const evs = m => (m.events || []).map(e => `${esc(e.title)}${e.year ? ` ${esc(String(e.year))}` : ""}・${esc(T("prole." + e.role))}`).join("<br>");
   const rows = [
@@ -1192,9 +1205,9 @@ export function dupGroupHTML(g, busy) {
     if (allEmpty) return "";
     const lab = k === "dup.events" ? T(k, { n: "" }).replace(/\s*[（(].*$/, "") : T(k);
     return `<tr${diff ? ' class="diff"' : ""}><th>${esc(lab)}</th>${cells.map(c => `<td>${c}</td>`).join("")}</tr>`; };
-  const head = m => `<th class="${m.id === keep ? "kept" : ""}"><a href="#people/${esc(m.id)}" data-act="open-person" data-id="${esc(m.id)}"><b>${esc(m.name || T("common.noName"))}</b></a>${m.id === keep && members.length > 1 ? ` <span class="tag open">${esc(T("dup.suggest"))}</span>` : ""}</th>`;
+  const head = m => `<th class="${m.id === keep ? "kept" : isLikelyOther(m) ? "other" : ""}"><a href="#people/${esc(m.id)}" data-act="open-person" data-id="${esc(m.id)}"><b>${esc(m.name || T("common.noName"))}</b></a>${m.id === keep && members.length > 1 ? ` <span class="tag open">${esc(T("dup.suggest"))}</span>` : isLikelyOther(m) ? ` <span class="tag" title="${esc(T("dup.likelyOther"))}">${esc(T("dup.likelyTag"))}</span>` : ""}</th>`;
   const pick = m => `<td><label class="check"><input type="radio" name="keep-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id === keep ? " checked" : ""}><span>${esc(T("dup.keepRadio"))}</span></label>
-      <label class="check"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !isNotSame(m.id, keep) ? " checked" : ""}${m.id === keep ? " disabled" : ""}><span>${esc(T("dup.mergeCheck"))}</span>${isNotSame(m.id, keep) ? ` <span class="mini">${esc(T("dup.notSameTag"))}</span>` : ""}</label></td>`;
+      <label class="check"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !isNotSame(m.id, keep) && !isLikelyOther(m) ? " checked" : ""}${m.id === keep ? " disabled" : ""}><span>${esc(T("dup.mergeCheck"))}</span>${isNotSame(m.id, keep) ? ` <span class="mini">${esc(T("dup.notSameTag"))}</span>` : isLikelyOther(m) ? ` <span class="mini">${esc(T("dup.likelyOther"))}</span>` : ""}</label></td>`;
   return `<div class="card dup" data-dup="${esc(key)}">
     <div class="tf-scroll"><table class="table rc-table rc-dup"><thead><tr><th></th>${members.map(head).join("")}</tr></thead>
     <tbody>${rows.map(tr).join("")}</tbody>

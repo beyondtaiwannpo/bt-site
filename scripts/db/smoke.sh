@@ -3077,6 +3077,23 @@ chkas "${MKE}" "★ mentor 看得到自己那一組（as mentor、那個學期�
 chkas "${OUTC}" "沒配對的幹部拿到空的" "0" "select jsonb_array_length(public.rc_my_pairs())"
 angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_my_pairs();" 2>&1 || true)
 if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   anon 叫不到我的配對"; pass=$((pass+1)); else echo "  FAIL anon 叫得到我的配對：${angot}"; fail=$((fail+1)); fi
+echo "── 合併時備註接在一起、可能重複的 email 三個來源都看（2026-12-08-records-merge-notes.sql）──"
+rmn=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-08-records-merge-notes.sql 2>&1 || true)
+if echo "${rmn}" | grep -q "OVERALL.*PASS" && ! echo "${rmn}" | grep -q "|FAIL"; then echo "  ok   合併留備註那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 合併留備註那支驗收表："; echo "${rmn}" | head -12; fail=$((fail+1)); fi
+# 四個同英文名的人：甲乙有 identities 的 email 與不同備註；丙只有 people.email（沒有 identities 那一列）；丁跟甲備註一模一樣
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_save_person(null, '{\"name_zh\":\"備註甲\",\"name_en\":\"Note Twin\",\"email\":\"note-a@example.com\",\"kind\":\"student\"}'::jsonb)" -c "select public.rc_save_person(null, '{\"name_zh\":\"備註乙\",\"name_en\":\"Note Twin\",\"email\":\"note-b@example.com\",\"kind\":\"student\"}'::jsonb)" >/dev/null 2>&1
+psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_zh, name_en, kind, email) values ('備註丙', 'Note Twin', 'student', 'Note-C@example.com'), ('備註丁', 'Note Twin', 'student', null);" -c "update public.people set note = case name_zh when '備註甲' then 'first note' when '備註乙' then 'second note' when '備註丁' then ' first note ' end where name_en = 'Note Twin';" >/dev/null 2>&1
+RCNA=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Note Twin' and name_zh='備註甲'" | tr -d ' \n')
+RCNB=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Note Twin' and name_zh='備註乙'" | tr -d ' \n')
+RCNC=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Note Twin' and name_zh='備註丙'" | tr -d ' \n')
+RCND=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Note Twin' and name_zh='備註丁'" | tr -d ' \n')
+chkas "${PAUL}" "★ 可能重複那張卡四欄：email 欄 identities 的看得到，只在 people.email 的（丙）也看得到而且小寫，沒 email 的（丁）是空的；中文名照字碼排是丁丙乙甲" "4|-|note-c@example.com|note-b@example.com|note-a@example.com" "select jsonb_array_length(g->'members')||'|'||(select string_agg(coalesce(m->'emails'->>0,'-'), '|' order by m->>'name_zh') from jsonb_array_elements(g->'members') m) from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Note Twin'"
+chkas "${PAUL}" "★ 乙併進甲：兩邊備註接在一起、乙的 email 搬過來、乙那一列沒了" "firstnote/secondnote|2|0" "select public.rc_merge_people('${RCNA}','${RCNB}'); select (select note from public.people where id='${RCNA}')||'|'||(select count(*) from public.rc_identities where person_id='${RCNA}' and kind='email')||'|'||(select count(*) from public.people where id='${RCNB}')"
+chkas "${PAUL}" "丁併進丙（丙沒備註）：直接拿丁的，前後空白去掉" "firstnote" "select public.rc_merge_people('${RCNC}','${RCND}'); select note from public.people where id='${RCNC}'"
+chkas "${PAUL}" "丙再併進甲：丙的備註跟甲開頭那句一樣但整句不同，所以接上；一模一樣才只留一份（下一條）" "firstnote/secondnote/firstnote" "select public.rc_merge_people('${RCNA}','${RCNC}'); select note from public.people where id='${RCNA}'"
+psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_zh, name_en, kind, note) values ('備註戊', 'Note Twin', 'student', 'first note / second note / first note');" >/dev/null 2>&1
+RCNE=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Note Twin' and name_zh='備註戊'" | tr -d ' \n')
+chkas "${PAUL}" "★ 戊的備註跟甲一模一樣：併進來只留一份、不重複接" "firstnote/secondnote/firstnote" "select public.rc_merge_people('${RCNA}','${RCNE}'); select note from public.people where id='${RCNA}'"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

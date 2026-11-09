@@ -179,6 +179,19 @@ test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留
   // dupPick 用假的 DOM
   const fake = { querySelector: sel => sel.includes("radio") ? { value: "y" } : null, querySelectorAll: () => [{ value: "x" }, { value: "z" }, { value: "y" }] };
   assert.deepEqual(UI.dupPick(fake), { keep: "y", drops: ["x", "z"] });
+  // email 跟中文名都不一樣的那一欄：標「可能是不同人」、不預設勾（Paul 2026-11-09）；只有其中一樣不同的照舊勾
+  const g2 = { key: "k2", suggest: "y", members: [
+      { id: "y", name: "Anika", name_zh: "安妮卡", emails: ["anika@a.io"] },
+      { id: "p", name: "Anika", name_zh: "安妮可", emails: ["other@b.io"] },          // 兩樣都不同 → 不勾
+      { id: "q", name: "Anika", name_zh: "安妮卡", emails: ["other@b.io"] },          // 只有 email 不同 → 勾
+      { id: "r", name: "Anika", name_zh: "安妮可", emails: ["ANIKA@a.io "] },         // 只有中文名不同（email 一樣，忽略大小寫空白）→ 勾
+      { id: "s", name: "Anika", name_zh: "安妮可", emails: [] },                      // 沒 email，資訊不夠 → 勾
+    ] };
+  const h2 = UI.dupGroupHTML(g2, false);
+  assert.match(h2, /name="merge-k2" value="p" data-noauto="1">/, "p 不預設勾"); assert.match(h2, /probably another person|可能是不同人/);
+  assert.match(h2, /name="merge-k2" value="q" data-noauto="1" checked/); assert.match(h2, /name="merge-k2" value="r" data-noauto="1" checked/); assert.match(h2, /name="merge-k2" value="s" data-noauto="1" checked/);
+  assert.equal((h2.match(/class="other"/g) || []).length, 1);
+  assert.equal(UI.likelyOther(g2.members[1], g2.members[0]), true); assert.equal(UI.likelyOther(g2.members[3], g2.members[0]), false); assert.equal(UI.likelyOther(g2.members[0], g2.members[0]), false);
   const plain = UI.dupGroupHTML({ a: "x", b: "y", a_name: "N", b_name: "N", a_kind: "student", b_kind: "guest" }, false);
   assert.match(plain, /data-act="dup-merge"/); assert.match(plain, /name="keep-x,y" value="x"[^>]*checked/);
 });
