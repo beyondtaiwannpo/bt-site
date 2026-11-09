@@ -3094,6 +3094,25 @@ chkas "${PAUL}" "丙再併進甲：丙的備註跟甲開頭那句一樣但整句
 psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_zh, name_en, kind, note) values ('備註戊', 'Note Twin', 'student', 'first note / second note / first note');" >/dev/null 2>&1
 RCNE=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Note Twin' and name_zh='備註戊'" | tr -d ' \n')
 chkas "${PAUL}" "★ 戊的備註跟甲一模一樣：併進來只留一份、不重複接" "firstnote/secondnote/firstnote" "select public.rc_merge_people('${RCNA}','${RCNE}'); select note from public.people where id='${RCNA}'"
+echo "── 可能重複自己先判斷像不像同一個人（2026-12-09-records-dedupe-verdict.sql）──"
+rdv=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-09-records-dedupe-verdict.sql 2>&1 || true)
+if echo "${rdv}" | grep -q "OVERALL.*PASS" && ! echo "${rdv}" | grep -q "|FAIL"; then echo "  ok   判斷那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 判斷那支驗收表："; echo "${rdv}" | head -12; fail=$((fail+1)); fi
+# 四個同英文名：甲乙中文名一樣、email 不同；丙中文名不同、email 不同、學校不同；丁什麼都沒有
+psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_zh, name_en, kind, email, school) values ('判一', 'Verdict Twin', 'student', 'v-a@example.com', '北一女'), ('判一', 'Verdict Twin', 'student', 'v-b@example.com', null), ('判二', 'Verdict Twin', 'student', 'v-c@example.com', '中山女高'), (null, 'Verdict Twin', 'student', null, null);" -c "insert into public.rc_identities (person_id, kind, value, source) select id, 'email', email, 'admin' from public.people where name_en='Verdict Twin' and email is not null on conflict do nothing;" >/dev/null 2>&1
+RCVA=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Verdict Twin' and email='v-a@example.com'" | tr -d ' \n')
+RCVB=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Verdict Twin' and email='v-b@example.com'" | tr -d ' \n')
+RCVC=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Verdict Twin' and email='v-c@example.com'" | tr -d ' \n')
+RCVD=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Verdict Twin' and email is null and name_zh is null" | tr -d ' \n')
+chk "★ 甲乙：中文名一樣、email 不同 → 像同一個人（證據 zh_same、相反 email_disjoint）" "same|zh_same|email_disjoint" "select v->>'verdict'||'|'||(v->'same'->>0)||'|'||(v->'diff'->>0) from (select public.rc_dup_verdict('${RCVA}','${RCVB}') v) t"
+chk "★ 甲丙：email 不同而且中文名不同 → 像兩個人" "different|3" "select v->>'verdict'||'|'||jsonb_array_length(v->'diff') from (select public.rc_dup_verdict('${RCVA}','${RCVC}') v) t"
+chk "甲丁：丁什麼資料都沒有 → 不夠判斷" "unsure|0|0" "select v->>'verdict'||'|'||jsonb_array_length(v->'same')||'|'||jsonb_array_length(v->'diff') from (select public.rc_dup_verdict('${RCVA}','${RCVD}') v) t"
+chkas "${PAUL}" "★ 卡上只剩甲乙丁（丙跟誰都像兩個人，拿掉）、建議留甲（有學校）、乙 same、丁 unsure；set_aside 兩對都是丙" "3|-,判一,判一|unsure,same|2|2" "select jsonb_array_length(g->'members')||'|'||(select string_agg(coalesce(m->>'name_zh','-'), ',' order by (coalesce(m->>'name_zh','')='')::int desc) from jsonb_array_elements(g->'members') m)||'|'||(select string_agg(m->'vs_keep'->>'verdict', ',' order by (coalesce(m->>'name_zh','')='')::int desc) from jsonb_array_elements(g->'members') m where m->>'id'<>(g->>'suggest'))||'|'||jsonb_array_length(g->'set_aside')||'|'||(select count(*) from jsonb_array_elements(g->'set_aside') s where s->>'a'='${RCVC}' or s->>'b'='${RCVC}') from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Verdict Twin'"
+chkas "${PAUL}" "建議留的是甲" "t" "select (g->>'suggest')='${RCVA}' from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Verdict Twin'"
+psql -d "${DB}" -X -A -t -q -c "insert into public.rc_participation (person_id, event_id, role, status, source) values ('${RCVA}', '${RCMT}', 'mentee', 'attended', 'import'), ('${RCVD}', '${RCMT}', 'mentee', 'attended', 'import');" >/dev/null 2>&1
+chk "★ 甲丁都在同一場活動同一身分的名單上 → 像同一個人（roster_twice）" "same|roster_twice" "select v->>'verdict'||'|'||(v->'same'->>0) from (select public.rc_dup_verdict('${RCVA}','${RCVD}') v) t"
+chkas "${PAUL}" "說過丙跟甲不是同一個人之後，set_aside 只剩丙乙那一對" "1" "select public.rc_mark_not_same('${RCVA}','${RCVC}'); select jsonb_array_length(g->'set_aside') from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Verdict Twin'"
+chkas "${PAUL}" "★ 從 set_aside 直接併：丙併進乙，卡上剩甲乙丁、set_aside 空" "3|0|0" "select public.rc_merge_people('${RCVB}','${RCVC}'); select jsonb_array_length(g->'members')||'|'||jsonb_array_length(g->'set_aside')||'|'||(select count(*) from public.people where id='${RCVC}') from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Verdict Twin'"
+chkas "${OUTC}" "沒指派的幹部拿到空的" "0" "select jsonb_array_length(public.rc_duplicates())"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

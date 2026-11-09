@@ -442,6 +442,14 @@ let findTimer = null;
 document.addEventListener("change", e => {
   const el = e.target;
   if (!el || !el.classList) return;
+  // 可能重複那張卡：改了留哪欄或勾了誰，合併鈕的字跟著變（「把勾起來的 2 欄併進第 3 欄」）；留的那欄自己的勾選框關掉。
+  const dupBox = el.closest && el.closest("[data-dup]");
+  if (dupBox) {
+    const keep = (dupBox.querySelector('input[type="radio"]:checked') || {}).value;
+    dupBox.querySelectorAll('input[type="checkbox"]').forEach(c => { c.disabled = c.value === keep; if (c.disabled) c.checked = false; });
+    const btn = dupBox.querySelector('[data-act="dup-merge"]'); if (btn) btn.textContent = UI.dupBtnLabel(dupBox);
+    return;
+  }
   if (el.classList.contains("rc-yfilter")) { S.yf = { ...(S.yf || {}), [el.name]: el.value }; render(); return; }
   if (!el.classList.contains("rc-dfilter")) return;
   S.df = { ...(S.df || {}), [el.name]: el.value }; S.dirN = 0; render();

@@ -160,12 +160,12 @@ test("★ 年度比較：每屆每種一列加權平均、合計、篩選、比�
 });
 
 // 可能重複兩欄並排、一個人的頁面加進活動、活動頁從名單選人（2026-12-05）。假資料。
-test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留的那欄有 tag、radio 留哪欄、checkbox 預設勾其他的但說過不是的不勾；dupPick 讀得回來；沒有摘要退回名字", () => {
+test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留的那欄有 tag、radio 留哪欄、checkbox 預設只勾判成 same 的（說過不是的不勾）；dupPick 讀得回來；沒有摘要退回名字", () => {
   const g = { key: "k", name: "Same Name", suggest: "y", not_same: [["x", "z"]],
     members: [
-      { id: "x", name: "Same Name", name_en: "Same Name", kind: "student", school: "TFG", grad_year: 2027, has_account: false, emails: ["a@x.io"], n_events: 1, events: [{ title: "Camp", year: 2025, role: "student" }], n_pairs: 0, n_outcomes: 0, n_answers: 0, created_at: "2026-11-07T00:00:00Z" },
+      { id: "x", name: "Same Name", name_en: "Same Name", kind: "student", school: "TFG", grad_year: 2027, has_account: false, emails: ["a@x.io"], vs_keep: { verdict: "same", same: ["school_same"], diff: [] }, n_events: 1, events: [{ title: "Camp", year: 2025, role: "student" }], n_pairs: 0, n_outcomes: 0, n_answers: 0, created_at: "2026-11-07T00:00:00Z" },
       { id: "y", name: "Same Name", name_zh: "同名", name_en: "Same Name", kind: "member", school: "TFG", has_account: true, role: "cadre", emails: [], n_events: 3, events: [], n_pairs: 1, n_outcomes: 1, n_answers: 2, created_at: "2026-11-01T00:00:00Z" },
-      { id: "z", name: "same name", name_en: "same name", kind: "guest", school: "Wagor", has_account: false, emails: ["b@x.io", "c@x.io"], n_events: 0, events: [], n_pairs: 0, n_outcomes: 0, n_answers: 0, created_at: "2026-11-08T00:00:00Z" },
+      { id: "z", name: "same name", name_en: "same name", kind: "guest", school: "Wagor", has_account: false, emails: ["b@x.io", "c@x.io"], vs_keep: { verdict: "same", same: ["roster_twice"], diff: [] }, n_events: 0, events: [], n_pairs: 0, n_outcomes: 0, n_answers: 0, created_at: "2026-11-08T00:00:00Z" },
     ] };
   const h = UI.dupGroupHTML(g, false);
   assert.equal((h.match(/<thead><tr><th><\/th>(<th[\s\S]*?<\/th>){3}<\/tr>/g) || []).length, 1, "三欄");
@@ -179,19 +179,37 @@ test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留
   // dupPick 用假的 DOM
   const fake = { querySelector: sel => sel.includes("radio") ? { value: "y" } : null, querySelectorAll: () => [{ value: "x" }, { value: "z" }, { value: "y" }] };
   assert.deepEqual(UI.dupPick(fake), { keep: "y", drops: ["x", "z"] });
-  // email 跟中文名都不一樣的那一欄：標「可能是不同人」、不預設勾（Paul 2026-11-09）；只有其中一樣不同的照舊勾
+  // 2026-12-09：每欄跟建議留的那欄比的結果（資料庫的 vs_keep）決定預設勾不勾：same 勾、unsure 與 different 不勾；
+  // 沒有 vs_keep（遷移檔還沒跑）退回瀏覽器的粗略版：email 跟中文名都不同算 different，中文名一樣算 same，其他 unsure。
   const g2 = { key: "k2", suggest: "y", members: [
       { id: "y", name: "Anika", name_zh: "安妮卡", emails: ["anika@a.io"] },
-      { id: "p", name: "Anika", name_zh: "安妮可", emails: ["other@b.io"] },          // 兩樣都不同 → 不勾
-      { id: "q", name: "Anika", name_zh: "安妮卡", emails: ["other@b.io"] },          // 只有 email 不同 → 勾
-      { id: "r", name: "Anika", name_zh: "安妮可", emails: ["ANIKA@a.io "] },         // 只有中文名不同（email 一樣，忽略大小寫空白）→ 勾
-      { id: "s", name: "Anika", name_zh: "安妮可", emails: [] },                      // 沒 email，資訊不夠 → 勾
+      { id: "p", name: "Anika", name_zh: "安妮可", emails: ["other@b.io"] },          // 兩樣都不同 → different，不勾
+      { id: "q", name: "Anika", name_zh: "安妮卡", emails: ["other@b.io"] },          // 中文名一樣 → same，勾
+      { id: "r", name: "Anika", name_zh: "安妮可", emails: ["ANIKA@a.io "] },         // 粗略版看不出 → unsure，不勾
+      { id: "s", name: "Anika", name_zh: "安妮可", emails: [] },                      // 資料不夠 → unsure，不勾
+      { id: "t", name: "Anika", emails: [], vs_keep: { verdict: "same", same: ["roster_twice", "school_same"], diff: [] } },   // 資料庫說 same → 勾
     ] };
   const h2 = UI.dupGroupHTML(g2, false);
-  assert.match(h2, /name="merge-k2" value="p" data-noauto="1" aria-label/, "p 不預設勾"); assert.match(h2, /probably another person|可能是不同人/);
-  assert.match(h2, /name="merge-k2" value="q" data-noauto="1" checked/); assert.match(h2, /name="merge-k2" value="r" data-noauto="1" checked/); assert.match(h2, /name="merge-k2" value="s" data-noauto="1" checked/);
+  assert.match(h2, /name="merge-k2" value="p" data-noauto="1" aria-label/, "p 不預設勾");
+  assert.match(h2, /name="merge-k2" value="q" data-noauto="1" checked/); assert.match(h2, /name="merge-k2" value="t" data-noauto="1" checked/);
+  assert.match(h2, /name="merge-k2" value="r" data-noauto="1" aria-label/); assert.match(h2, /name="merge-k2" value="s" data-noauto="1" aria-label/);
   assert.equal((h2.match(/class="other"/g) || []).length, 1);
-  assert.equal(UI.likelyOther(g2.members[1], g2.members[0]), true); assert.equal(UI.likelyOther(g2.members[3], g2.members[0]), false); assert.equal(UI.likelyOther(g2.members[0], g2.members[0]), false);
+  assert.match(h2, /looks like someone else|像兩個人/); assert.match(h2, /not enough to tell|資料不夠判斷/); assert.match(h2, /on the same roster twice|同一場活動同一身分出現兩次/);
+  assert.match(h2, /class="rc-verdict">2 columns look like the same person|class="rc-verdict">2 欄像同一個人/);
+  assert.match(h2, /Column 4, 5 has too little data|第 4、5 欄資料不夠/); assert.match(h2, /Column 2 looks like someone else|第 2 欄像是別人/);
+  assert.match(h2, /Merge 2 ticked columns into column 1|把勾起來的 2 欄併進第 1 欄/);
+  assert.equal(UI.verdictOf(g2.members[1], g2.members[0]).verdict, "different"); assert.equal(UI.verdictOf(g2.members[5], g2.members[0]).verdict, "same"); assert.equal(UI.verdictOf(g2.members[0], g2.members[0]).verdict, "keep");
+  assert.equal(UI.likelyOther(g2.members[1], g2.members[0]), true); assert.equal(UI.likelyOther(g2.members[3], g2.members[0]), false);
+  // 鈕的字跟著勾選變；沒勾就叫人先勾
+  const fakeBox = (ki, n) => ({ querySelectorAll: sel => sel.includes("radio") ? [{ checked: ki === 0, value: "y" }, { checked: ki === 1, value: "p" }, { checked: ki === 2, value: "q" }] : Array.from({ length: n }, (_, i) => ({ value: "d" + i })) });
+  assert.match(UI.dupBtnLabel(fakeBox(2, 1)), /Merge 1 ticked column into column 3|把勾起來的 1 欄併進第 3 欄/);
+  assert.match(UI.dupBtnLabel(fakeBox(0, 0)), /Tick a column to merge in first|先勾要併進去的那一欄/);
+  // 判成兩個人的那幾對列在最下面，有「其實是同一個人」那顆鈕（act merge，左邊留）；只剩 set_aside 的群不算一張卡
+  const aside = UI.dupAsideHTML([{ key: "k3", members: [], set_aside: [{ a: "m", b: "n", a_name: "Anika", b_name: "Anika", a_zh: "安一", b_zh: "安二", a_school: "TFG", b_school: null, a_emails: ["a@x.io"], b_emails: ["c@x.io"], why: ["email_disjoint", "zh_diff"] }] }], false);
+  assert.match(aside, /data-act="merge" data-keep="m" data-drop="n"/); assert.match(aside, /different email|email 不同/); assert.match(aside, /安一/); assert.match(aside, /c@x\.io/);
+  assert.equal(UI.dupAsideHTML([{ members: [], set_aside: [] }], false), "");
+  const pp = UI.peopleHTML({ duplicates: [{ key: "k3", members: [], set_aside: [{ a: "m", b: "n", a_name: "A", b_name: "A", why: [] }] }], counts: {}, can_manage: true }, { ptab: "dups", dir: [] });
+  assert.match(pp, /Possible duplicates \(0\)|可能重複（0）/); assert.match(pp, /kept apart \(1\)|沒放在一起（1 對）/);
   const plain = UI.dupGroupHTML({ a: "x", b: "y", a_name: "N", b_name: "N", a_kind: "student", b_kind: "guest" }, false);
   assert.match(plain, /data-act="dup-merge"/); assert.match(plain, /name="keep-x,y" value="x"[^>]*checked/);
 });
