@@ -884,7 +884,9 @@ Paul 看到三個同名 Anika 的卡問了兩件事：合併是不是把另一�
 - **卡上標「可能是不同人」**：同名只是提示，`rc_duplicates()` 只比名字。現在一欄的 email 跟留的那欄一個都不同、而且兩邊的中文名也不一樣，表頭標「可能是不同人」（虛線底）、「併進留的那一欄」**不預設勾**，勾不勾由人決定。只有一樣不同（例如中文名一樣、email 不同，多半是換信箱）照舊預設勾；缺 email 或缺中文名的資訊不夠，也照舊勾。這一段在 `admin/records/src/ui.js` 的 `likelyOther()`，純前端，測試在 `test/records.test.mjs`。
 - email 那一欄原本只看 `rc_identities`；現在 `people.email` 與登入帳號的 email 也算進去（去重、小寫），不然用舊名單倒進來、只有 `people.email` 的人在卡上會像沒有 email。
 
-驗證：本機 Supabase 塞三個同名（兩個同中文名不同 email、一個 email 與中文名都不同），卡上第三欄標了、沒預設勾；手動勾起來按合併，留的那列備註變成兩句接起來、三個 email 都在。smoke 多 6 項（1264）。**遷移檔要 Paul 在正式 Supabase 跑。**
+- **卡底下那兩列重排**（同日 Paul 截圖：三欄各自擠著「Keep this one」「Merge into the kept one」還換行，圓圈沒對齊）。原因有兩個：radio 吃到 `admin.css` 給所有 input 的 `width:100%` 與 padding（只有 `.attach` 的 radio 另外設過大小），以及每格都放整句文字。現在是兩列：「留這一欄」一列放 radio、「併進去」一列放 checkbox，文字只在最左邊的表頭，格子裡只有那一顆（20px），「可能是不同人」那句放在那一格的 checkbox 底下。`.check input[type="radio"]` 的大小改成全站通用。
+
+驗證：本機 Supabase 塞三個同名（兩個同中文名不同 email、一個 email 與中文名都不同），卡上第三欄標了、沒預設勾；三欄的圈圈與方框量過都是 20px、同一列同一個 y、各自在欄表頭左邊往內 10px；手動勾起來按合併，留的那列備註變成兩句接起來、三個 email 都在。smoke 多 6 項（1264）。**遷移檔要 Paul 在正式 Supabase 跑。**
 
 ### 年度比較改版（2026-11-08）
 

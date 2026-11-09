@@ -1206,12 +1206,15 @@ export function dupGroupHTML(g, busy) {
     const lab = k === "dup.events" ? T(k, { n: "" }).replace(/\s*[（(].*$/, "") : T(k);
     return `<tr${diff ? ' class="diff"' : ""}><th>${esc(lab)}</th>${cells.map(c => `<td>${c}</td>`).join("")}</tr>`; };
   const head = m => `<th class="${m.id === keep ? "kept" : isLikelyOther(m) ? "other" : ""}"><a href="#people/${esc(m.id)}" data-act="open-person" data-id="${esc(m.id)}"><b>${esc(m.name || T("common.noName"))}</b></a>${m.id === keep && members.length > 1 ? ` <span class="tag open">${esc(T("dup.suggest"))}</span>` : isLikelyOther(m) ? ` <span class="tag" title="${esc(T("dup.likelyOther"))}">${esc(T("dup.likelyTag"))}</span>` : ""}</th>`;
-  const pick = m => `<td><label class="check"><input type="radio" name="keep-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id === keep ? " checked" : ""}><span>${esc(T("dup.keepRadio"))}</span></label>
-      <label class="check"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !isNotSame(m.id, keep) && !isLikelyOther(m) ? " checked" : ""}${m.id === keep ? " disabled" : ""}><span>${esc(T("dup.mergeCheck"))}</span>${isNotSame(m.id, keep) ? ` <span class="mini">${esc(T("dup.notSameTag"))}</span>` : isLikelyOther(m) ? ` <span class="mini">${esc(T("dup.likelyOther"))}</span>` : ""}</label></td>`;
+  // 底下兩列：一列 radio「留這一欄」、一列 checkbox「併進去」，格子只放那一顆（文字在最左邊的表頭），圈圈才對得齊
+  // （2026-11-09 Paul 截圖：三欄各自「Keep this one」「Merge into the kept one」擠在格子裡換行，圓圈沒對齊；radio 還吃到 input 的 width:100%）。
+  const rad = m => `<td><label class="pick"><input type="radio" name="keep-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id === keep ? " checked" : ""} aria-label="${esc(T("dup.keepRadio"))}: ${esc(m.name || T("common.noName"))}"></label></td>`;
+  const box = m => { const ns = isNotSame(m.id, keep), lo = !ns && isLikelyOther(m);
+    return `<td><label class="pick"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !ns && !lo ? " checked" : ""}${m.id === keep ? " disabled" : ""} aria-label="${esc(T("dup.mergeCheck"))}: ${esc(m.name || T("common.noName"))}"></label>${ns ? `<div class="mini">${esc(T("dup.notSameTag"))}</div>` : lo ? `<div class="mini">${esc(T("dup.likelyOther"))}</div>` : ""}</td>`; };
   return `<div class="card dup" data-dup="${esc(key)}">
     <div class="tf-scroll"><table class="table rc-table rc-dup"><thead><tr><th></th>${members.map(head).join("")}</tr></thead>
     <tbody>${rows.map(tr).join("")}</tbody>
-    <tfoot><tr><th></th>${members.map(pick).join("")}</tr></tfoot></table></div>
+    <tfoot><tr><th>${esc(T("dup.keepRadio"))}</th>${members.map(rad).join("")}</tr><tr><th>${esc(T("dup.mergeCheck"))}</th>${members.map(box).join("")}</tr></tfoot></table></div>
     <div class="form-foot"><button class="btn sm" data-act="dup-merge" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(T("dup.mergeBtn"))}</button><button class="btn quiet sm" data-act="dup-not-same" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(T("dup.notSameBtn"))}</button></div>
   </div>`;
 }

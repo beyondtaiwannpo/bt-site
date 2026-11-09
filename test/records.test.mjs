@@ -188,7 +188,7 @@ test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留
       { id: "s", name: "Anika", name_zh: "安妮可", emails: [] },                      // 沒 email，資訊不夠 → 勾
     ] };
   const h2 = UI.dupGroupHTML(g2, false);
-  assert.match(h2, /name="merge-k2" value="p" data-noauto="1">/, "p 不預設勾"); assert.match(h2, /probably another person|可能是不同人/);
+  assert.match(h2, /name="merge-k2" value="p" data-noauto="1" aria-label/, "p 不預設勾"); assert.match(h2, /probably another person|可能是不同人/);
   assert.match(h2, /name="merge-k2" value="q" data-noauto="1" checked/); assert.match(h2, /name="merge-k2" value="r" data-noauto="1" checked/); assert.match(h2, /name="merge-k2" value="s" data-noauto="1" checked/);
   assert.equal((h2.match(/class="other"/g) || []).length, 1);
   assert.equal(UI.likelyOther(g2.members[1], g2.members[0]), true); assert.equal(UI.likelyOther(g2.members[3], g2.members[0]), false); assert.equal(UI.likelyOther(g2.members[0], g2.members[0]), false);

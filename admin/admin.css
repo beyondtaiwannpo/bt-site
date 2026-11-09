@@ -660,7 +660,8 @@ select.byrank{color:rgba(16,42,134,.6);background:rgba(255,255,255,.4);border-st
 .bk-row .two label i{white-space:normal}
 /* 邀請頁「掛到名單上已經有的紀錄」那個選擇器（2026-11-07）：單選鈕靠左、字靠左，一列 44px 高。 */
 .attach .check{margin:0;min-height:44px;align-items:center;justify-content:flex-start;text-align:left}
-.attach .check input[type="radio"]{width:18px;height:18px;flex:none;margin:0;accent-color:var(--bt-navy);cursor:pointer}
+/* .check 裡的 radio 跟 checkbox 一樣是一顆，不吃上面 input 的 width:100% 與 padding（2026-11-09 之前只有 .attach 有這條，紀錄的卡上圓圈被撐到整格寬） */
+.check input[type="radio"]{width:18px;height:18px;flex:none;margin:2px 0 0;padding:0;accent-color:var(--bt-navy);cursor:pointer}
 .attach .check span{flex:1;min-width:0}
 
 /* ═════════ 財務（2026-11-08，/admin/finance/）═════════ */
@@ -925,12 +926,16 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 /* 紀錄 > 人 > 可能重複（2026-12-05）：兩欄並排，不一樣的格子淺橘，建議留的那一欄標題多一個 tag。 */
 .rc-dup th:first-child{width:120px;color:rgba(16,42,134,.75);font-weight:600}
 .rc-dup tr.diff td{background:rgba(255,196,108,.22)}
-.rc-dup tfoot td{padding-top:10px}
+.rc-dup tfoot th{color:rgba(16,42,134,.75);font-weight:600;font-size:13px;vertical-align:middle}
+.rc-dup tfoot td{padding-top:10px;vertical-align:top}
+.rc-dup .pick{display:inline-flex;align-items:center;margin:0;padding:0;cursor:pointer}
+.rc-dup .pick input{width:20px;height:20px;margin:0;padding:0;flex:none;accent-color:var(--bt-navy);cursor:pointer}
+.rc-dup .pick input:disabled{opacity:.35;cursor:default}
+.rc-dup tfoot .mini{margin-top:6px;max-width:240px;line-height:1.4}
 .dup.sug-left thead th:nth-child(2),.dup.sug-right thead th:nth-child(3){border-bottom:3px solid var(--bt-orange)}
 .rc-dup thead th.kept{border-bottom:3px solid var(--bt-orange)}
 .rc-dup thead th.other{border-bottom:3px dashed rgba(16,42,134,.35)}
 .rc-dup thead th.other .tag{background:rgba(16,42,134,.08);color:rgba(16,42,134,.85)}
-.rc-dup tfoot .check{margin:0 0 6px;font-size:13px}
 /* 換頁淡入（2026-11-09）：側欄換到另一頁時整塊 main 從 0 淡到 1，140 毫秒，只動透明度（check-motion 的規矩：transition 不動位置）。
    只在「換了哪一頁」的時候加 .swap（main.js 的 render 看 S.view 有沒有變），自動儲存那種重畫不加，不會閃。各頁 index.html 的 reduce 區塊會把 animation 關掉。 */
 @keyframes bt-main-in{from{opacity:0}to{opacity:1}}
