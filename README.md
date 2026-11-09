@@ -814,7 +814,7 @@ Paul 2026-11-08 點進後台「人」那頁，只看到同名提示與「加一�
 - **可能重複（n）**：原本那份同名提示與合併鈕，原樣搬到這一頁。
 - **加一個人**：原本那張表單，只有管的人看得到。
 
-資料從一支新函式 `rc_directory()` 整份拿回來（一千多個人的 JSON 幾百 KB，拿一次比每打一個字問一次快），搜尋與篩選都在瀏覽器裡做（`filterDirectory`、`dirOptions` 是純函式，`test/records.test.mjs` 用假資料測）。誰拿得到：`rc_can_view()`，也就是管紀錄的人與 Senior Adviser；只在某場活動工作區的人拿到空的（名錄是整個紀錄的，不是一場的）。名錄裡**沒有 email**，去向只算 visibility 不是「只有本人」的（管的人除外），被移除的人不在上面。**上線前要在正式 Supabase 跑這一支**（6 列驗收表全 PASS）；沒跑的話名錄分頁會說「要先跑 2026-12-03-records-directory.sql」，另外兩個分頁照常。smoke 多 6 項。
+資料從一支新函式 `rc_directory()` 整份拿回來（一千多個人的 JSON 幾百 KB，拿一次比每打一個字問一次快），搜尋與篩選都在瀏覽器裡做（`filterDirectory`、`dirOptions` 是純函式，`test/records.test.mjs` 用假資料測）。誰拿得到：`rc_can_view()`，也就是管紀錄的人與 Senior Adviser；只在某場活動工作區的人拿到空的（名錄是整個紀錄的，不是一場的）。名錄裡**沒有 email**，去向只算 visibility 不是「只有本人」的（管的人除外），被移除的人不在上面。**2026-11-08 Paul 在正式 Supabase 上跑完，6 列驗收表全 PASS**；同一天也跑了那支合併腳本。沒跑的話名錄分頁會說「要先跑 2026-12-03-records-directory.sql」，另外兩個分頁照常。smoke 多 6 項。
 
 同一天 Paul 要求把「很確定是同一個人」的同名列先合併掉：名字只差空格或大小寫、同名又同學校、同名又同畢業年這三種，用一支不進 repo 的 SQL（結果表會印真名）跑在正式庫上；學校不同、或兩邊都沒有學校與畢業年可以對的，留在「可能重複」那頁給人看。
 
@@ -835,7 +835,7 @@ Paul 2026-11-08：「most of the student did come to events so put them as atten
 2. 從報名表抄出席（`rc_sync_event`）：錄取的人在**活動結束之後**算 `attended`；還沒辦的活動仍然是 `registered`，被拒的仍然 `cancelled`，有簽到的照簽到。
 3. 一次性把舊資料改過來：`rc_attendance_default(p_do)`，只有 Co-President。`false` 只數「已經結束的活動裡還是 registered 的」有幾列、在哪幾場；`true` 才改成 `attended`，`no-show` 與 `cancelled` 不動，`rc_log` 記一筆。遷移檔的驗收表底下直接印這份預覽（場名與數字，沒有名字），Paul 看過數字再跑 `flip-attendance.sql`（不進 repo 的兩行腳本，只是叫 `rc_attendance_default(true)`）。之後個別的 no-show 到那場活動頁面的出席表改狀態就好，那裡本來就有每一列的下拉。
 
-**上線前要在正式 Supabase 跑 2026-12-04 那支**（5 列驗收表全 PASS，底下接預覽），再決定要不要跑 flip。smoke 多 8 項含一個「再按一次是 0」。
+**2026-11-08 Paul 在正式 Supabase 上跑完 2026-12-04 那支與 flip-attendance.sql，全 PASS**：已結束活動裡的 registered 都改成 attended 了。smoke 多 8 項含一個「再按一次是 0」。
 
 ### 跟隱私政策對齊（`supabase/migrations/2026-12-02-records-privacy.sql`，2026-11-08）
 
