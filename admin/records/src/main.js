@@ -108,7 +108,7 @@ async function openRoute(keepMsg) {
   if (S.view !== "people" || !S.id) S.person = null;
   render();
   try {
-    if (S.view === "overview" && S.id) S.event = await D.loadEvent(S.id);
+    if (S.view === "overview" && S.id) { S.event = await D.loadEvent(S.id); if (S.event && S.event.can_edit && !Array.isArray(S.dir)) { await loadDir(); } }
     else if (S.view === "forms" && S.id) { S.results = await D.loadResults(S.id); if (!S.aud || S.aud._id !== S.id) resetAud(); }
     else if (S.view === "people" && S.id) S.person = await D.loadPerson(S.id);
     else if (S.view === "people" && !Array.isArray(S.dir)) await loadDir();
@@ -229,8 +229,9 @@ document.addEventListener("click", async e => {
   }
   if (act === "part-add") {
     const v = vals("[data-partadd]");
-    if (!String(v.name_zh || v.name_en || v.email || "").trim()) { S.msg = T("err.save") + T("err.needName"); render(); return; }
-    const ok = await run("err.save", () => D.setParticipation(S.id, { name_zh: v.name_zh, name_en: v.name_en, email: v.email, school: v.school, role: v.role, status: v.status }));
+    const picked = UI.dirMatch(S.dir, v.who);   // 從名單清單選到的人：直接用那一列，不建新的
+    if (!picked && !String(v.name_zh || v.name_en || v.email || "").trim()) { S.msg = T("err.save") + T("err.needName"); render(); return; }
+    const ok = await run("err.save", () => D.setParticipation(S.id, picked ? { person_id: picked.id, role: v.role, status: v.status } : { name_zh: v.name_zh, name_en: v.name_en, email: v.email, school: v.school, role: v.role, status: v.status }));
     if (ok === undefined) return;
     await refreshEvent(); await loadBoot(); S.msg = T("msg.saved"); render(); return;
   }
@@ -256,7 +257,11 @@ document.addEventListener("click", async e => {
   }
   if (act === "pair-add") {
     const v = vals("[data-pairadd]");
-    const ok = await run("err.save", () => D.savePair(null, { event_id: S.id, mentor_name_en: v.mentor_name_en, mentor_email: v.mentor_email, mentee_name_zh: v.mentee_name_zh, mentee_email: v.mentee_email, mentee_school: v.mentee_school, matched_on: v.matched_on || "" }));
+    // 從名單清單選到的人直接用那一列（mentor_id / mentee_id）；沒選的才照 email 與名字建或對。
+    const mentor = UI.dirMatch(S.dir, v.mentor_who), mentee = UI.dirMatch(S.dir, v.mentee_who);
+    if (!mentor && !String(v.mentor_name_en || v.mentor_email || "").trim()) { S.msg = T("err.save") + T("err.needName"); render(); return; }
+    if (!mentee && !String(v.mentee_name_zh || v.mentee_email || "").trim()) { S.msg = T("err.save") + T("err.needName"); render(); return; }
+    const ok = await run("err.save", () => D.savePair(null, { event_id: S.id, mentor_id: mentor ? mentor.id : "", mentee_id: mentee ? mentee.id : "", mentor_name_en: v.mentor_name_en, mentor_email: v.mentor_email, mentee_name_zh: v.mentee_name_zh, mentee_email: v.mentee_email, mentee_school: v.mentee_school, matched_on: v.matched_on || "" }));
     if (ok === undefined) return;
     await refreshEvent(); await loadBoot(); S.msg = T("msg.saved"); render(); return;
   }
@@ -353,6 +358,19 @@ document.addEventListener("click", async e => {
   if (act === "ptab") { S.ptab = b.dataset.t; S.msg = ""; render(); return; }
   if (act === "dir-clear") { S.df = {}; S.pq = ""; S.people = []; S.dirN = 0; render(); return; }
   if (act === "dir-more") { S.dirN = (S.dirN || UI.DIR_PAGE) + UI.DIR_PAGE; render(); return; }
+  if (act === "person-add-event") {
+    const v = vals("[data-paddev]");
+    if (!v.event_id) { S.msg = T("err.save") + T("err.needEvent"); render(); return; }
+    const ok = await run("err.save", () => D.setParticipation(v.event_id, { person_id: S.id, role: v.role, status: v.status }));
+    if (ok === undefined) return;
+    S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.saved"); render(); return;
+  }
+  if (act === "not-same") {
+    if (UI.needAsk(S, b, T("dup.notSameAsk"))) return;
+    const ok = await run("err.notSame", () => D.markNotSame(b.dataset.a, b.dataset.b));
+    if (ok === undefined) return;
+    await loadBoot(); S.msg = T("msg.notSame"); render(); return;
+  }
   if (act === "person-add") {
     const v = vals("[data-padd]");
     if (!String(v.name_zh || v.name_en || v.email || "").trim()) { S.msg = T("err.save") + T("err.needName"); render(); return; }

@@ -158,3 +158,46 @@ test("★ 年度比較：每屆每種一列加權平均、合計、篩選、比�
   const one = UI.yearlyHTML({ boot: { events: EV.slice(0, 2) }, yf: {}, msg: "" });
   assert.doesNotMatch(one, /class="total"/, "只有一列就不印合計"); assert.doesNotMatch(one, /rc-compare/, "只有一屆沒有東西可以比");
 });
+
+// 可能重複兩欄並排、一個人的頁面加進活動、活動頁從名單選人（2026-12-05）。假資料。
+test("★ 重複那一組：兩欄並排、不一樣的格子標 diff、建議留的那一邊有 tag、兩顆留哪邊的鈕加「不是同一個人」；沒有摘要就退回名字", () => {
+  const d = { a: "x", b: "y", a_name: "Same Name", b_name: "Same Name", suggest: "b", same_school: true,
+    left: { id: "x", name: "Same Name", kind: "student", school: "TFG", grad_year: 2027, has_account: false, n_events: 1, events: [{ title: "Camp", year: 2025, role: "student", status: "attended" }], n_pairs: 0, n_outcomes: 0, n_emails: 0, n_answers: 0, created_at: "2026-11-07T00:00:00Z" },
+    right: { id: "y", name: "Same Name", kind: "member", school: "TFG", grad_year: 2027, has_account: true, role: "cadre", n_events: 3, events: [], n_pairs: 1, n_outcomes: 1, n_emails: 1, n_answers: 2, created_at: "2026-11-01T00:00:00Z" } };
+  const h = UI.dupCardHTML(d, false);
+  assert.match(h, /class="card dup sug-right"/); assert.match(h, /Suggested to keep|建議留這一邊/);
+  assert.match(h, /data-act="merge" data-keep="x" data-drop="y"/); assert.match(h, /data-act="merge" data-keep="y" data-drop="x"/);
+  assert.match(h, /data-act="not-same" data-a="x" data-b="y"/);
+  assert.match(h, /same school|同學校/);
+  const diffRows = (h.match(/<tr class="diff">/g) || []).length;
+  assert.ok(diffRows >= 6, "身分、帳號、活動、配對、去向、email、回饋、建立日都不一樣，學校與畢業年一樣");
+  assert.match(h, /Camp 2025/);
+  const plain = UI.dupCardHTML({ a: "x", b: "y", a_name: "N", b_name: "N", a_kind: "student", b_kind: "guest" }, false);
+  assert.match(plain, /data-act="merge"/); assert.match(plain, /sug-left/);
+});
+
+test("★ 一個人的頁面：管的人有「加進一場活動」（活動、身分、狀態），成員預設講者；看的人沒有", () => {
+  const boot = { can_manage: true, events: [{ id: "e1", title_en: "Camp", term_id: "2025-26", starts_at: "2025-06-01" }, { id: "e2", title_en: "Fair", term_id: "2026-27", starts_at: "2026-06-01" }] };
+  const h = UI.personHTML({ person: { id: "p1", name: "Someone", kind: "member" }, participation: [], pairs: [], outcomes: [], responses: [] }, { boot, me: { pres: true }, msg: "" });
+  assert.match(h, /data-paddev/); assert.match(h, /data-act="person-add-event"/); assert.match(h, /<option value="speaker" selected>/);
+  assert.ok(h.indexOf('value="e2"') < h.indexOf('value="e1"'), "活動照日期新到舊");
+  const v = UI.personHTML({ person: { id: "p1", name: "Someone", kind: "student" }, participation: [], pairs: [], outcomes: [], responses: [] }, { boot: { ...boot, can_manage: false }, me: {}, msg: "" });
+  assert.doesNotMatch(v, /data-paddev/);
+});
+
+test("★ 活動頁加人：先有「名單上已經有的人」的清單，選到那一行就對得回 id", () => {
+  const dir = [{ id: "a", name: "Ann Chen", kind: "student", school: "TFG", grad_year: 2027 }, { id: "b", name: "Ann Chen", kind: "guest", school: "Wagor" }, { id: "c", name: "No School", kind: "member" }];
+  assert.equal(UI.dirLabel(dir[0]), "Ann Chen · TFG · 2027"); assert.equal(UI.dirLabel(dir[2]), "No School · Member");
+  assert.equal(UI.dirMatch(dir, "Ann Chen · Wagor").id, "b"); assert.equal(UI.dirMatch(dir, "Ann Chen"), null, "只打名字沒選到不算（兩個 Ann Chen）");
+  const ev = { event: { id: "e1", kind: "bootcamp", title_en: "Camp" }, can_edit: true, participation: [], forms: [], sessions: [] };
+  const h = UI.eventHTML(ev, { boot: { terms: [], events: [] }, dir, msg: "", busy: false });
+  assert.match(h, /list="rc-dir-list"/); assert.match(h, /<option value="Ann Chen · TFG · 2027">/);
+});
+
+test("★ 配對表單也有名單清單：mentor 與 mentee 各一格，選到就帶 id", () => {
+  const dir = [{ id: "m", name: "Mentor One", kind: "member" }, { id: "s", name: "Student One", kind: "student", school: "TFG" }];
+  const ev = { event: { id: "t1", kind: "mentorship-term", title_en: "Fall" }, can_edit: true, participation: [], forms: [], sessions: [], pairs: [] };
+  const h = UI.eventHTML(ev, { boot: { terms: [], events: [], can_manage: true }, dir, msg: "", busy: false });
+  assert.match(h, /name="mentor_who"[^>]*list="rc-dir-list"/); assert.match(h, /name="mentee_who"/);
+  assert.equal(UI.dirMatch(dir, "Mentor One · Member").id, "m");
+});

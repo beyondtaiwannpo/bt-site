@@ -3043,6 +3043,24 @@ chkas "${PAUL}" "再按一次：0" "0|false" "select (r->>'n')||'|'||(r->>'done'
 # 從報名表抄的那條規則（錄取的人活動結束後算 attended）：唯一的一份申請在上面「學員刪帳號」那一步跟著帳號消失了，
 # 這裡只能驗函式裡有那條規則（驗收表第 2 列），行為在正式站第一次換屆後的 sync 會看到。
 chk "★ rc_sync_event 裡有「錄取且活動已結束 → attended」那一條" "t" "select regexp_replace(prosrc, '--[^\n]*', '', 'g') like '%v_ended then ''attended''%' from pg_proc where proname='rc_sync_event' and pronamespace='public'::regnamespace"
+echo "── 可能重複看得出該留哪邊（2026-12-05-records-dedupe.sql）──"
+rdd=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-05-records-dedupe.sql 2>&1 || true)
+if echo "${rdd}" | grep -q "OVERALL.*PASS" && ! echo "${rdd}" | grep -q "|FAIL"; then echo "  ok   重複那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 重複那支驗收表："; echo "${rdd}" | head -12; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_save_person(null, '{\"name_en\":\"Twin Person\",\"kind\":\"student\",\"school\":\"A High\"}'::jsonb)" -c "select public.rc_save_person(null, '{\"name_en\":\"Twin Person\",\"kind\":\"guest\",\"school\":\"B High\",\"grad_year\":2024}'::jsonb)" >/dev/null 2>&1
+RCTA=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Twin Person' and school='A High'" | tr -d ' \n')
+RCTB=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Twin Person' and school='B High'" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_set_participation('${RCOLD}', '{\"person_id\":\"${RCTB}\",\"role\":\"speaker\"}'::jsonb)" >/dev/null 2>&1
+chkas "${PAUL}" "★ 同名那一組帶兩邊的摘要與建議：B 那邊有一場活動所以建議留 B、沒有 email 的值、不同學校" "b|1|0|false|speaker|false" "select (d->>'suggest')||'|'||(d#>>'{right,n_events}')||'|'||(d#>>'{left,n_events}')||'|'||(d->>'same_school')||'|'||(d#>>'{right,events,0,role}')||'|'||(d::text like '%@example.com%') from jsonb_array_elements(public.rc_duplicates()) d where d->>'a_name'='Twin Person' limit 1"
+chkraise "★ 沒指派的幹部記不了「不是同一個人」（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_mark_not_same('${RCTA}','${RCTB}');"
+chkas "${PAUL}" "★ 記了「不是同一個人」之後那一組不再出現，兩列都還在" "0|2" "select public.rc_mark_not_same('${RCTA}','${RCTB}'); select (select count(*) from jsonb_array_elements(public.rc_duplicates()) d where d->>'a_name'='Twin Person')||'|'||(select count(*) from public.people where name_en='Twin Person' and forgotten_at is null)"
+chk "★ 有帳號的幹部都在名單上（回填），OUTC 也有一列而且是 member" "0|1|member" "select (select count(*) from public.profiles p where p.role in ('cadre','alumni','intern') and not exists (select 1 from public.people pe where pe.profile_id=p.id))||'|'||(select count(*) from public.people where profile_id='${OUTC}')||'|'||(select kind from public.people where profile_id='${OUTC}')"
+# 學員變幹部：stu-a@example.com 是上面某場活動的學員（名單上有一列、有 email）。同一個 email 開了幹部帳號，接上那一列、身分變 member，不另開。
+RCSTUA=$(psql -d "${DB}" -X -A -t -q -c "select person_id from public.rc_identities where kind='email' and value='stu-a@example.com' limit 1" | tr -d ' \n')
+RCN0=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.people where forgotten_at is null" | tr -d ' \n')
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 -c "insert into auth.users (id,email) values ('99990000-0000-0000-0000-00000000000a','stu-a@example.com'); insert into public.profiles (id,name_zh,name_en,team,role,board_role) values ('99990000-0000-0000-0000-00000000000a','學員甲','Dup Student','Curriculum Team','cadre','member');" >/dev/null 2>&1
+chk "★ 學員變幹部：同一個 email 開帳號就接上原本那一列、身分變 member、名單人數不變" "${RCSTUA}|member|${RCN0}" "select (select id::text from public.people where profile_id='99990000-0000-0000-0000-00000000000a')||'|'||(select kind from public.people where profile_id='99990000-0000-0000-0000-00000000000a')||'|'||(select count(*) from public.people where forgotten_at is null)"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role authenticated; select count(*) from public.rc_not_same;" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   登入的人直接讀不到 rc_not_same 表"; pass=$((pass+1)); else echo "  FAIL 登入的人讀得到 rc_not_same：${angot}"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
