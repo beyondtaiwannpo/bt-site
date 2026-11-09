@@ -48,6 +48,9 @@ export const savePair      = (id, p) => rpc("rc_save_pair", { p_pair: id || null
 export const deletePair    = id => rpc("rc_delete_pair", { p_pair: id });
 export const saveOutcome   = (id, p) => rpc("rc_save_outcome", { p_outcome: id || null, p });
 export const deleteOutcome = id => rpc("rc_delete_outcome", { p_outcome: id });
+export const saveSchool    = (id, p) => rpc("rc_save_school", { p_school: id || null, p });
+export const deleteSchool  = id => rpc("rc_delete_school", { p_school: id });
+export const setCurrentSchool = id => rpc("rc_set_current_school", { p_school: id });
 export const saveReview    = (id, p) => rpc("rc_save_review", { p_event: id, p });
 export const savePerson    = (id, p) => rpc("rc_save_person", { p_person: id || null, p });
 export const mergePeople   = (keep, drop) => rpc("rc_merge_people", { p_keep: keep, p_drop: drop });
@@ -59,7 +62,7 @@ const SAYS = [
   ["not_records_manager", "says.notManager"], ["not_records_viewer", "says.notViewer"],
   ["not_event_editor", "says.notEventEditor"], ["not_event_viewer", "says.notEventViewer"],
   ["not_form_creator", "says.notCreator"], ["not_form_editor", "says.notEditor"], ["not_form_owner", "says.notOwner"], ["not_form_reader", "says.notReader"],
-  ["form_not_found", "says.notFound"], ["no_such_person", "says.noPerson"], ["no_such_event", "says.noEvent"], ["no_such_term", "says.noTerm"], ["no_such_pair", "says.notFound"],
+  ["form_not_found", "says.notFound"], ["no_such_person", "says.noPerson"], ["no_such_school", "says.notFound"], ["need_school", "says.needSchool"], ["years_backwards", "says.yearsBackwards"], ["no_such_event", "says.noEvent"], ["no_such_term", "says.noTerm"], ["no_such_pair", "says.notFound"],
   ["need_title", "says.needTitle"], ["need_question_label", "says.needLabel"], ["need_options", "says.needOptions"], ["bad_scale", "says.badScaleDef"], ["bad_key", "says.badKey"],
   ["question_type_locked", "says.typeLocked"], ["question_has_answers", "says.hasAnswers"], ["anonymous_locked", "says.anonLocked"],
   ["need_questions", "says.needQuestions"], ["has_responses", "says.hasResponses"], ["bad_person", "says.badPerson"],

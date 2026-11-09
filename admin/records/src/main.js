@@ -429,6 +429,24 @@ document.addEventListener("click", async e => {
     if (ok === undefined) return;
     S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
   }
+  if (act === "school-add") {
+    const v = vals("[data-sadd]");
+    if (!String(v.school || "").trim()) { S.msg = T("err.save") + T("says.needSchool"); render(); return; }
+    const mc = document.querySelector('[data-sadd] input[name="make_current"]');
+    const ok = await run("err.save", () => D.saveSchool(null, { person_id: S.id, school: v.school, year_from: v.year_from || "", year_to: v.year_to || "", note: v.note || "", make_current: !!(mc && mc.checked) }));
+    if (ok === undefined) return;
+    S.dir = null; S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+  }
+  if (act === "school-del") {
+    const ok = await run("err.delete", () => D.deleteSchool(b.dataset.id));
+    if (ok === undefined) return;
+    S.dir = null; S.person = await D.loadPerson(S.id); render(); return;
+  }
+  if (act === "school-current") {
+    const ok = await run("err.save", () => D.setCurrentSchool(b.dataset.id));
+    if (ok === undefined) return;
+    S.dir = null; S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+  }
   if (act === "out-del") {
     const ok = await run("err.delete", () => D.deleteOutcome(b.dataset.id));
     if (ok === undefined) return;

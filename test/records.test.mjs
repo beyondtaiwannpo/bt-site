@@ -106,6 +106,11 @@ test("★ 名錄：搜尋忽略大小寫與空格；篩選身分、帳號、team
   assert.deepEqual(ids("", { role: "none" }), ["a"]); assert.deepEqual(ids("", { role: "alumni" }), ["c"]);
   assert.deepEqual(ids("", { team: "Marketing Team" }), ["b"]);
   assert.deepEqual(ids("", { school: "TFG" }), ["a"]); assert.deepEqual(ids("", { grad: "2027" }), ["a"]);
+  // 2026-12-10：別名找得到、讀過的學校篩得到、學校選項連舊學校一起算（同一人同一所只算一次）
+  const L2 = L.concat([{ id: "d", name: "Yun Tsai", name_en: "Yun Tsai", name_zh: "蔡昀蓁", kind: "student", school: "UWC Costa Rica", schools: ["UWC Costa Rica", "TFG"], aliases: ["Alecia Tsai"], terms: [], events: [], countries: [], n: 1 }]);
+  const ids2 = (q, f) => UI.filterDirectory(L2, q, f).map(p => p.id);
+  assert.deepEqual(ids2("alecia"), ["d"]); assert.deepEqual(ids2("", { school: "TFG" }), ["a", "d"]); assert.deepEqual(ids2("", { school: "UWC Costa Rica" }), ["d"]);
+  assert.deepEqual(UI.dirOptions(L2, []).school.find(([k]) => k === "TFG"), ["TFG", 2]); assert.deepEqual(UI.dirOptions(L2, []).school.find(([k]) => k === "UWC Costa Rica"), ["UWC Costa Rica", 1]);
   assert.deepEqual(ids("", { term: "2025-26" }), ["a", "b"]); assert.deepEqual(ids("", { event: "e2" }), ["b"]);
   assert.deepEqual(ids("", { country: "US" }), ["b", "c"]); assert.deepEqual(ids("ann", { country: "Canada" }), []);
   const o = UI.dirOptions(L, [{ id: "e1", slug: "camp", title_en: "Camp" }, { id: "e2", slug: "fair", title_en: "Fair" }]);
@@ -210,6 +215,9 @@ test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留
   assert.equal(UI.dupAsideHTML([{ members: [], set_aside: [] }], false), "");
   const pp = UI.peopleHTML({ duplicates: [{ key: "k3", members: [], set_aside: [{ a: "m", b: "n", a_name: "A", b_name: "A", why: [] }] }], counts: {}, can_manage: true }, { ptab: "dups", dir: [] });
   assert.match(pp, /Possible duplicates \(0\)|可能重複（0）/); assert.match(pp, /kept apart \(1\)|沒放在一起（1 對）/);
+  // 卡上多一列「讀過的學校」（不重印現在那一所）
+  const h3 = UI.dupGroupHTML({ key: "k4", suggest: "y", members: [{ id: "y", name: "A", school: "UWC", schools: ["UWC", "TFG"] }, { id: "z", name: "A", school: "", schools: [] }] }, false);
+  assert.match(h3, /Schools over time|讀過的學校/); assert.match(h3, /<td>TFG<\/td>/); assert.doesNotMatch(h3, /<td>UWC<br>TFG<\/td>/);
   const plain = UI.dupGroupHTML({ a: "x", b: "y", a_name: "N", b_name: "N", a_kind: "student", b_kind: "guest" }, false);
   assert.match(plain, /data-act="dup-merge"/); assert.match(plain, /name="keep-x,y" value="x"[^>]*checked/);
 });
@@ -238,4 +246,20 @@ test("★ 配對表單也有名單清單：mentor 與 mentee 各一格，選到�
   const h = UI.eventHTML(ev, { boot: { terms: [], events: [], can_manage: true }, dir, msg: "", busy: false });
   assert.match(h, /name="mentor_who"[^>]*list="rc-dir-list"/); assert.match(h, /name="mentee_who"/);
   assert.equal(UI.dirMatch(dir, "Mentor One · Member").id, "m");
+});
+
+// 讀過的學校（2026-12-10）：一所一列、現在的有標記、年份、來源；管的人有「設成現在的」「刪掉」與加一所的表單；看的人只看得到清單；別名印在名字底下
+test("★ 一個人的頁面：讀過的學校清單與別名", () => {
+  const d = { person: { id: "p1", name: "Yun Tsai", kind: "student", school: "UWC Costa Rica" }, participation: [], pairs: [], outcomes: [], responses: [],
+    schools: [{ id: "s1", school: "Taipei First Girls High School", year_from: 2020, year_to: 2022, source: "merge", note: "", current: false }, { id: "s2", school: "UWC Costa Rica", year_from: 2022, year_to: null, source: "backfill", note: "IB", current: true }],
+    aliases: ["Alecia Tsai"] };
+  const h = UI.personHTML(d, { boot: { can_manage: true }, me: { pres: true }, msg: "" });
+  assert.match(h, /Schools over time \(2\)|讀過的學校（2）/); assert.match(h, /Taipei First Girls High School/); assert.match(h, /2020 to 2022|2020 到 2022/); assert.match(h, /from 2022|2022 起/);
+  assert.match(h, /data-act="school-current" data-id="s1"/); assert.doesNotMatch(h, /data-act="school-current" data-id="s2"/);
+  assert.match(h, /data-act="school-del" data-id="s2"/); assert.match(h, /data-sadd/); assert.match(h, /data-act="school-add"/);
+  assert.match(h, /Also known as|也叫/); assert.match(h, /Alecia Tsai/); assert.match(h, /from a merge|合併帶進來/);
+  const v = UI.personHTML(d, { boot: { can_manage: false }, me: {}, msg: "" });
+  assert.match(v, /Taipei First Girls High School/); assert.doesNotMatch(v, /data-act="school-/); assert.doesNotMatch(v, /data-sadd/);
+  const none = UI.personHTML({ ...d, schools: [], aliases: [] }, { boot: { can_manage: true }, me: {}, msg: "" });
+  assert.match(none, /No schools recorded yet|還沒有學校紀錄/); assert.match(none, /name="make_current" data-noauto="1" checked/); assert.doesNotMatch(none, /Also known as|也叫/);
 });

@@ -1102,11 +1102,12 @@ const norm = v => String(v == null ? "" : v).toLowerCase().replace(/\s+/g, "");
 export function filterDirectory(list, q, f) {
   const qq = norm(q); const x = f || {};
   return (Array.isArray(list) ? list : []).filter(p => {
-    if (qq && !(norm(p.name).includes(qq) || norm(p.name_zh).includes(qq) || norm(p.name_en).includes(qq) || norm(p.school).includes(qq))) return false;
+    if (qq && !(norm(p.name).includes(qq) || norm(p.name_zh).includes(qq) || norm(p.name_en).includes(qq) || norm(p.school).includes(qq)
+      || (p.aliases || []).some(a => norm(a).includes(qq)) || (p.schools || []).some(a => norm(a).includes(qq)))) return false;
     if (x.kind && p.kind !== x.kind) return false;
     if (x.role === "none" ? p.has_account : (x.role && p.role !== x.role)) return false;
     if (x.team && !parseTeamsLoose(p.team).includes(x.team)) return false;
-    if (x.school && (p.school || "") !== x.school) return false;
+    if (x.school && (p.school || "") !== x.school && !(p.schools || []).includes(x.school)) return false;   // 讀過的學校也算（2026-12-10）
     if (x.grad && String(p.grad_year || "") !== String(x.grad)) return false;
     if (x.term && !(p.terms || []).includes(x.term)) return false;
     if (x.event && !(p.events || []).includes(x.event)) return false;
@@ -1125,7 +1126,7 @@ export function dirOptions(list, events) {
     kind: count(p => [p.kind]),
     role: count(p => [p.has_account ? p.role : "none"]),
     team: count(p => parseTeamsLoose(p.team)),
-    school: count(p => [p.school]),
+    school: count(p => [...new Set([p.school, ...(p.schools || [])].filter(Boolean))]),
     grad: count(p => [p.grad_year ? String(p.grad_year) : ""]).sort((a, b) => b[0].localeCompare(a[0])),
     term: count(p => p.terms || []).sort((a, b) => b[0].localeCompare(a[0])),
     event: count(p => p.events || []).map(([id, n]) => [id, n, evTitle(id)]).filter(x => x[2]),
@@ -1224,6 +1225,7 @@ export function dupGroupHTML(g, busy) {
     ["person.kind", m => esc(T("pkind." + (m.kind || "student")))],
     ["dup.account", m => esc(m.has_account ? T("acct." + (m.role || "student")) : T("dup.noAccount"))],
     ["person.school", m => esc(m.school || "")],
+    ["dup.schools", m => (m.schools || []).filter(x => (x || "").toLowerCase() !== (m.school || "").toLowerCase()).map(esc).join("<br>")],
     ["person.gradYear", m => esc(m.grad_year ? String(m.grad_year) : "")],
     ["dup.events", m => evs(m)],
     ["dup.pairs", m => m.n_pairs == null ? "" : esc(String(m.n_pairs))],
@@ -1300,6 +1302,17 @@ export function personHTML(d, S) {
       <label><i>${esc(T("person.note"))}</i><input name="note" value="${esc(p.note || "")}" maxlength="500"></label>
       <div class="form-foot"><button class="btn sm" data-act="person-save"${S.busy ? " disabled" : ""}>${esc(T("common.save"))}</button></div></div>
     ${(d.identities || []).length ? `<div class="mini">${esc(T("person.identities"))}${esc(T("punct.colon"))}${d.identities.map(i => `${esc(i.kind)} ${esc(i.value)}${i.verified ? " ✓" : ""}`).join(esc(T("punct.list")))}</div>` : ""}`) : "";
+  // 讀過的學校（2026-12-10）：一所一列，現在那一所有標記；管的人可以加、刪、設成現在的。合併帶進來的也在這裡。
+  const sch = (d.schools || []).slice();
+  const yrs = x => x.year_from && x.year_to ? T("school.years", { from: x.year_from, to: x.year_to }) : x.year_from ? T("school.from", { from: x.year_from }) : x.year_to ? T("school.to", { to: x.year_to }) : "";
+  const schList = sch.length ? `<ul class="flist">${sch.map(x => `<li><div class="fhead"><b>${esc(x.school)}</b>${x.current ? ` <span class="tag open">${esc(T("school.current"))}</span>` : ""}${yrs(x) ? ` <span class="mini">${esc(yrs(x))}</span>` : ""}</div><div class="fmeta">${[x.note, T("ssrc." + (x.source || "admin"))].filter(Boolean).map(esc).join("・")}${manage && !p.forgotten_at ? `${x.current ? "" : ` <button class="btn ghost sm" data-act="school-current" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("school.setCurrent"))}</button>`} <button class="btn quiet sm" data-act="school-del" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : ""}</div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("person.noSchools"))}</div>`;
+  const schAdd = manage && !p.forgotten_at ? `<div class="card inline-form" data-sadd><h2>${esc(T("school.add"))}</h2>
+      <div class="two"><label><i>${esc(T("school.name"))}</i><input name="school" maxlength="80"></label><label><i>${esc(T("school.note"))}</i><input name="note" maxlength="200"></label></div>
+      <div class="two"><label><i>${esc(T("school.yearFrom"))}</i><input name="year_from" type="number" min="2000" max="2100"></label><label><i>${esc(T("school.yearTo"))}</i><input name="year_to" type="number" min="2000" max="2100"></label></div>
+      <label class="check"><input type="checkbox" name="make_current" data-noauto="1"${sch.length ? "" : " checked"}><span>${esc(T("school.makeCurrent"))}</span></label>
+      <div class="form-foot"><button class="btn sm" data-act="school-add"${S.busy ? " disabled" : ""}>${esc(T("school.addBtn"))}</button><span class="mini">${esc(T("school.addHint"))}</span></div></div>` : "";
+  const schHTML = sectionHTML(T("person.schools", { n: sch.length }), schList + schAdd);
+  const aliasHTML = (d.aliases || []).length ? `<div class="mini rc-alias">${esc(T("person.aliases"))}${esc(T("punct.colon"))}${d.aliases.map(esc).join(esc(T("punct.list")))}</div>` : "";
   const pos = (d.positions || []);
   const posHTML = pos.length ? sectionHTML(T("person.positions"), `<ul class="flist">${pos.map(x => `<li><b>${esc(x.term)}</b>・${esc((lang() === "zh" ? x.title_zh : x.title_en) || x.title_en || x.title_zh || "")}${x.team ? "・" + esc(x.team) : ""}</li>`).join("")}</ul>`) : "";
   const parts = d.participation || [];
@@ -1320,7 +1333,7 @@ export function personHTML(d, S) {
   const resp = d.responses || [];
   const respHTML = resp.length ? sectionHTML(T("person.responses", { n: resp.length }), `<ul class="flist">${resp.map(r => `<li><div class="fhead"><a href="#forms/${esc(r.form_id)}/results" data-act="open-form" data-id="${esc(r.form_id)}"><b>${esc(r.title)}</b></a> <span class="mini">${esc(fmtWhen(r.submitted_at))}</span></div><div class="fmeta">${(r.answers || []).map(a => `${esc(a.key || a.label)}: ${esc(a.value)}`).join("・")}</div></li>`).join("")}</ul>`) : "";
   const forget = pres && !p.forgotten_at ? sectionHTML(T("person.remove"), `<div class="mini">${esc(T(p.has_account ? "person.removeAccount" : "person.removeHint"))}</div>${p.has_account ? "" : `<div class="form-foot"><button class="btn quiet sm" data-act="forget" data-id="${esc(p.id)}">${esc(T("person.forget"))}</button></div>`}`) : "";
-  return head + msgHTML(S.msg) + edit + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
+  return head + aliasHTML + msgHTML(S.msg) + edit + schHTML + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
 }
 // 年度比較。
 // ── 年度比較（2026-12-04 改版，Paul：「it looks really messy and pointless, make filters」）──

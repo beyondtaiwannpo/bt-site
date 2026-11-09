@@ -902,6 +902,20 @@ Paul 看完上一版的卡說還是不知道怎麼按，而且「你覺得不是
 
 驗證：本機塞四個同名（兩個同中文名不同 email、一個 email 與中文名都不同、一個什麼都沒有）：卡上三欄（像兩個人的那個在最下面那一區，理由寫「email 不同、中文名不同」）、第二欄預設勾、第三欄沒勾、改留第 2 欄再勾第 3 欄鈕的字變「併進第 2 欄」。smoke 多 10 項。**遷移檔要 Paul 在正式 Supabase 跑**，沒跑之前卡照舊（瀏覽器退回粗略版：email 跟中文名都不同算像兩個人，中文名一樣算像同一個人）。
 
+### 讀過的學校有紀錄（`supabase/migrations/2026-12-10-records-school-history.sql`，2026-11-09）
+
+Paul 合併三列蔡昀蓁時問：她先讀北一女、第二年轉 UWC Costa Rica，怎麼記？之前一個人只有一格「學校」，合併只留一邊的學校，另一邊的學校跟英文名就不見了。
+
+- **新表 `rc_schools`**：一個人一列一所學校，哪一年起、哪一年止（可以空著）、來源、備註。`people.school` 還在，意思變成「現在或最後的學校」，名錄篩選與對外的公立高中統計照舊用它。
+- **不會漏**：上線那一刻先把每個有學校的人補成一列（backfill）。之後 `people.school` 一改，不管是誰改的、哪條路改的（基本資料、合併、學生自己填、匯入），trigger 自動補一列，同一所不重複。
+- **合併不再丟東西**：被併那列的學校進紀錄（來源「合併帶進來」），英文名或中文名不一樣的進 `rc_identities` 當別名。找人打別名也找得到（`rc_find_people` 本來就查 identities），名錄搜尋也會比對別名。
+- **一個人的頁面**（`admin/records/src/ui.js`）：名字底下「也叫：Alecia Tsai」；一區「讀過的學校（N）」照年份排，現在那一所標 current，每列有來源；管的人可以「設成現在的」（寫回 `people.school`）、刪掉、加一所（學校、起迄年、備註、勾不勾「這是現在的學校」）。看的人只看得到清單。
+- **名錄**：用學校篩會連讀過的學校一起算（她在北一女的清單裡、也在 UWC 的清單裡）；學校選項的人數跟著算。可能重複那張卡多一列「讀過的學校」。
+- **隱私**：`rc_forget_rows` 連學校紀錄一起刪（忘記一個人、本人刪帳號都走它）。表只開給函式，前端直接讀不到。
+- 三支函式：`rc_save_school(id, {person_id, school, year_from, year_to, note, make_current})`、`rc_delete_school(id)`（刪的是現在那一所就把 `people.school` 也清掉，不然 trigger 又補回來）、`rc_set_current_school(id)`。都只給管紀錄的人。
+
+驗證：本機兩個同中文名的人（UWC Costa Rica／Taipei First Girls，英文名 Yun／Alecia）從可能重複那張卡併起來：頁面上兩所學校都在、「也叫：Alecia」、再加一所 2018 到 2020 的建國中學排在最前面、把 Taipei 設成現在的之後頁首跟基本資料那格都換了。smoke 多 13 項（1287）。**遷移檔要 Paul 在正式 Supabase 跑**（沒跑之前頁面上那一區會是空的、加學校會報錯）。
+
 ### 年度比較改版（2026-11-08）
 
 Paul 2026-11-08：「year by year now it looks really messy and pointless, can you make filters and stuff」。改成跟「人」同一套：上面一格篩選（屆別、活動種類、team，每個選項帶場數）加「比什麼」（到的人數、報名人數、出席率、回饋份數、推薦平均、有用平均、幾場），下面兩張表：
