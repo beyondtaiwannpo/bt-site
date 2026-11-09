@@ -78,3 +78,10 @@ export async function gcalRefresh() {
   if (error) return 0;
   return Number(data) || 0;
 }
+
+// 我帶的 mentee／我的 mentor（2026-12-07）：rc_my_pairs() 只回本人在裡面的配對（另一邊只有名字、那個學期、開著的 check-in 連結）。
+export async function myPairs() {
+  const { data, error } = await supabase.rpc("rc_my_pairs");
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}

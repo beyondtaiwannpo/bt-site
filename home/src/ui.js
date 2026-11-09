@@ -277,11 +277,24 @@ export function homeHTML(items, ctx) {
       <h2>${T("home.next")}</h2>
       ${next.length ? next.filter(i => i !== linked).map(i => itemCardHTML(i, ctx)).join("") : `<p class="mini">${T("home.nothing")}</p>`}
     </section>
+    ${pairsHTML(ctx.pairs)}
     <section class="block">
       <h2>${T("home.do")}</h2>
       <div class="dos">${dos.map(d => `<a class="do" href="${d.href}"><b>${T(d.t)}</b><span>${T(d.s)}</span></a>`).join("")}</div>
     </section>
   </div>`;
+}
+// 我帶的 mentee／我的 mentor（2026-12-07）。pairs 是 rc_my_pairs() 回的：as、with、event、term_id、matched_on、ended_on、forms[{title, token, done}]。
+// 沒有配對就不畫（一個空的區塊只是在說「這裡本來該有東西」）。check-in 連結指到 /feedback/?t=（不登入也能填，填過的打勾）。
+export function pairsHTML(pairs) {
+  const L = Array.isArray(pairs) ? pairs : [];
+  if (!L.length) return "";
+  const asMentor = L.filter(p => p.as === "mentor"), asMentee = L.filter(p => p.as === "mentee");
+  const row = p => `<li class="pair${p.ended_on ? " ended" : ""}"><b>${esc(p.with || "")}</b>
+      <span class="mini">${esc(T("home.pairTerm", { event: lang() === "zh" ? (p.event_zh || p.event) : p.event, term: p.term_id || "" }))}${p.matched_on ? "・" + esc(T("home.pairSince", { d: p.matched_on })) : ""}${p.ended_on ? "・" + esc(T("home.pairEnded", { d: p.ended_on })) : ""}</span>
+      ${(p.forms || []).map(f => f.done ? `<span class="mini ok">✓ ${esc(T("home.filled", { title: f.title }))}</span>` : `<a class="lnk" href="../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}">${esc(T("home.fill", { title: f.title }))}</a>`).join(" ")}</li>`;
+  const block = (title, list) => list.length ? `<section class="block pairs"><h2>${T(title)}${list.length > 1 ? ` <span class="count">${list.length}</span>` : ""}</h2><ul class="pairlist">${list.map(row).join("")}</ul><p class="mini">${T("home.pairHint")}</p></section>` : "";
+  return block("home.mentees", asMentor) + block("home.myMentor", asMentee);
 }
 
 // ── 行事曆 ──────────────────────────────────────────────────────────

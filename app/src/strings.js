@@ -130,6 +130,12 @@ export const MINE = {
   "sd.book":          { zh: "約面試時間", en: "Book an interview time" },
   "sd.notBooked":     { zh: "你還沒約時間", en: "You have not booked a time" },
   "sd.open":          { zh: "現在開放", en: "Open now" },
+  // 我的 mentor（2026-12-07）：配對只在紀錄後台，mentee 自己看不到配給誰。從 rc_my_pairs() 來。
+  "sd.mentor":        { zh: "我的 mentor", en: "My mentor" },
+  "sd.pairTerm":      { zh: "{event}（{term}）", en: "{event} ({term})" },
+  "sd.fill":          { zh: "填 {title}", en: "Fill in {title}" },
+  "sd.filled":        { zh: "{title}：填過了", en: "{title}: done" },
+  "sd.pairHint":      { zh: "check-in 的連結在這裡，填過的會打勾。你寫的只有 Mentorship 的負責幹部看得到，mentor 看不到。", en: "Your check-in links are here; filled ones are ticked. Only the Mentorship cadres read what you write, never your mentor." },
   "sd.look":          { zh: "看看這一個", en: "Take a look" },
   "sd.account":       { zh: "你的帳號", en: "Your account" },
   "sd.me":            { zh: "我的資料", en: "My details" },

@@ -333,7 +333,7 @@ export function fmtDay(v) {
 // 而且會有人來問什麼時候好。對外首頁的那條規矩在這裡一樣成立。
 // 批 3 會在這裡長出「我的申請」與「現在開放的申請」，批 5 會長出資源。
 // 在那之前不放灰掉的入口 —— 點不下去的東西看起來像壞掉，而且會有人來問。
-export function studentHTML(p, msg, apps, opens) {
+export function studentHTML(p, msg, apps, opens, pairs) {
   const row = (k, val) => `<li><b>${esc(k)}</b>${
     val ? `<span>${esc(val)}</span>` : `<span class="empty-v">${T("sd.empty")}</span>`}</li>`;
 
@@ -359,11 +359,23 @@ export function studentHTML(p, msg, apps, opens) {
       <div class="st-more"><a href="../apply/?f=${encodeURIComponent(f.id)}">${T("sd.look")}</a></div>
     </li>`).join("")}</ul>` : "";
 
+  // 我的 mentor（2026-12-07）：有配對才畫。check-in 連結指到 /feedback/?t=，填過的打勾。
+  const myPairs = (pairs || []).filter(x => x.as === "mentee");
+  const mentor = myPairs.length ? `
+    <h3 class="sec-h">${T("sd.mentor")}</h3>
+    <ul class="applist">${myPairs.map(x => `<li>
+      <b>${esc(x.with || "")}</b>
+      <span class="st">${esc(T("sd.pairTerm", { event: lang() === "zh" ? (x.event_zh || x.event) : x.event, term: x.term_id || "" }))}</span>
+      ${(x.forms || []).length ? `<div class="st-more">${x.forms.map(f => f.done ? `<span class="empty-v">✓ ${esc(T("sd.filled", { title: f.title }))}</span>` : `<a href="../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}">${esc(T("sd.fill", { title: f.title }))}</a>`).join(" ")}</div>` : ""}
+    </li>`).join("")}</ul>
+    <p class="note">${T("sd.pairHint")}</p>` : "";
+
   return `<div class="card">
     <h2>${esc((p && p.name) || T("sd.account"))}</h2>
     <div class="sub">Beyond Taiwan</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     ${mine}
+    ${mentor}
     ${now}
     <h3 class="sec-h">${T("sd.me")}</h3>
     <ul class="kv">

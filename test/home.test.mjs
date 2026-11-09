@@ -133,3 +133,14 @@ test("首頁：要你填的表單", () => {
   assert.match(UI.homeHTML([], { now, tz: "Asia/Taipei", name: "測", forms: [{ id: "x", title: "T" }] }), /team-forms\/#fill\/x/);
   assert.doesNotMatch(UI.homeHTML([], { now, tz: "Asia/Taipei", name: "測", forms: [] }), /team-forms/);
 });
+
+// 我帶的 mentee／我的 mentor（2026-12-07）
+test("★ 首頁：有配對才畫「我帶的 mentee」，一列一人、沒填的 check-in 是連結、填過的打勾；沒配對不畫", async () => {
+  const UI2 = await import("../home/src/ui.js");
+  const pairs = [{ id: "p1", as: "mentor", with: "學員甲", event: "Fall 2026 Mentorship", event_zh: "2026 秋季導生", term_id: "2026-27", matched_on: "2026-09-01", forms: [{ title: "Mentor check-in 1", token: "tok1", done: false }, { title: "Final", token: "tok2", done: true }] }];
+  const h = UI2.pairsHTML(pairs);
+  assert.match(h, /My mentees|我帶的 mentee/); assert.match(h, /學員甲/); assert.match(h, /feedback\/\?t=tok1/); assert.doesNotMatch(h, /feedback\/\?t=tok2/); assert.match(h, /✓/);
+  assert.equal(UI2.pairsHTML([]), ""); assert.equal(UI2.pairsHTML(null), "");
+  const m = UI2.pairsHTML([{ id: "p2", as: "mentee", with: "Mentor One", event: "Fall", term_id: "2026-27", forms: [] }]);
+  assert.match(m, /My mentor|我的 mentor/); assert.doesNotMatch(m, /My mentees|我帶的 mentee/);
+});

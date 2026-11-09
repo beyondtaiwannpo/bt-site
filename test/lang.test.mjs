@@ -108,7 +108,7 @@ test("★ /app/ 每一個畫面用英文畫出來不剩中文", () => {
     auth: () => ["in", "up", "forgot", "sent", "check"].map(m => APP.authHTML(m, "msg", "a@x.io", false)).join("") + APP.authHTML("in", "", "", true),
     notCadre: () => APP.notCadreHTML("msg") + APP.downHTML(),
     complete: () => APP.completeHTML(p, "", false) + APP.completeHTML(null, "x", true),
-    student: () => APP.studentHTML(p, "", [{ id: "a1", form_id: "f1", status: "interview", title: "Camp", notify_by: "2026-12-15", interview_url: "https://cal.com/x" }, { id: "a2", form_id: "f2", status: "received", title: "Other", notify_by: "2026-12-15" }], [{ id: "f3", title: "New" }]) + APP.studentHTML(p, "", [], []) + APP.studentHTML({ name: "", school: "", grade: "", newsletter: false }, "", [], []),
+    student: () => APP.studentHTML(p, "", [{ id: "a1", form_id: "f1", status: "interview", title: "Camp", notify_by: "2026-12-15", interview_url: "https://cal.com/x" }, { id: "a2", form_id: "f2", status: "received", title: "Other", notify_by: "2026-12-15" }], [{ id: "f3", title: "New" }], [{ id: "pr1", as: "mentee", with: "Mentor One", event: "Fall 2026 Mentorship", term_id: "2026-27", forms: [{ title: "Check-in 1", token: "abc", done: false }, { title: "Final", token: "def", done: true }] }]) + APP.studentHTML(p, "", [], []) + APP.studentHTML({ name: "", school: "", grade: "", newsletter: false }, "", [], []),
     del: () => APP.deleteHTML("", false) + APP.deleteHTML("x", true),
     status: () => ["interview", "accepted", "rejected", "received"].map(s => APP.statusLine({ status: s, notify_by: "2026-12-15" })).join("|") + APP.fmtDay("2026-12-15"),
   });

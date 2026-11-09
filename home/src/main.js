@@ -24,7 +24,7 @@ const store = () => { try { return window.localStorage; } catch (e) { return nul
 const view = () => (location.hash.replace(/\?.*$/, "") === "#calendar" ? "calendar" : "home");
 
 function ctx() {
-  return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, people: S.data ? S.data.people : [], forms: S.data ? S.data.forms : [],
+  return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, people: S.data ? S.data.people : [], forms: S.data ? S.data.forms : [], pairs: S.pairs || [],
     busy: S.busy, reasonFor: S.reasonFor, changing: S.changing, linked: S.linked, linkedMsg: S.linkedMsg,
     canSchedule: S.senior || Object.entries(S.ws).some(([k, v]) => k.startsWith("res:") && v === "manage") };
 }
@@ -139,6 +139,8 @@ async function boot() {
     S.senior = ["president", "senior_adviser"].includes(row.board_role);
     if (S.role === "cadre") {
       await reload();
+      // 我帶的 mentee（2026-12-07）：rc_my_pairs() 只回本人的配對；函式還不在（遷移檔沒跑）就當沒有。
+      try { S.pairs = await D.myPairs(); } catch (e) { S.pairs = []; }
       let mid = qMeeting;
       if (!mid) try { mid = sessionStorage.getItem(LINK_KEY); sessionStorage.removeItem(LINK_KEY); } catch (e) { /* 隱私模式 */ }
       if (mid) { if (S.items.some(i => i.id === mid)) S.linked = mid; else S.linkedMsg = T("home.gone"); }

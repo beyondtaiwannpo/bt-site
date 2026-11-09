@@ -3070,6 +3070,13 @@ psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" 
 chkas "${PAUL}" "★ 三個同名一群三欄、建議留資料最多那欄（B：有活動、學校、畢業年）、帶說過不是的那一對、email 的值在欄裡" "3|BHigh|1|true|1" "select jsonb_array_length(g->'members')||'|'||coalesce((select m->>'school' from jsonb_array_elements(g->'members') m where m->>'id'=(g->>'suggest')),'-')||'|'||jsonb_array_length(g->'not_same')||'|'||coalesce((g->'not_same'->0)::text like '%${RCTA}%', false)||'|'||(select count(*) from jsonb_array_elements(g->'members') m where m->'emails' ? 'twin-c@example.com') from jsonb_array_elements(public.rc_duplicates()) g where g->>'name' like 'Twin%'"
 chkas "${PAUL}" "說過不是的那兩個如果只剩彼此就不印：Twin A 跟 C 也說不是之後，群只剩 B 與 C" "2" "select public.rc_mark_not_same('${RCTA}', (select person_id from public.rc_identities where value='twin-c@example.com')); select jsonb_array_length(g->'members') from jsonb_array_elements(public.rc_duplicates()) g where g->>'name' like 'Twin%'"
 chkas "${OUTC}" "沒指派的幹部拿到空的" "0" "select jsonb_array_length(public.rc_duplicates())"
+echo "── 我帶的 mentee、我的 mentor（2026-12-07-records-my-pairs.sql）──"
+rmp=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-07-records-my-pairs.sql 2>&1 || true)
+if echo "${rmp}" | grep -q "OVERALL.*PASS" && ! echo "${rmp}" | grep -q "|FAIL"; then echo "  ok   我的配對那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 我的配對那支驗收表："; echo "${rmp}" | head -12; fail=$((fail+1)); fi
+chkas "${MKE}" "★ mentor 看得到自己那一組（as mentor、那個學期、那份開著的 mentor check-in 的 token），看不到 email" "1|mentor|Fall 2026 Mentorship|false" "select jsonb_array_length(x)||'|'||(x->0->>'as')||'|'||(x->0->>'event')||'|'||(x::text like '%@example.com%') from (select public.rc_my_pairs() x) t"
+chkas "${OUTC}" "沒配對的幹部拿到空的" "0" "select jsonb_array_length(public.rc_my_pairs())"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_my_pairs();" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   anon 叫不到我的配對"; pass=$((pass+1)); else echo "  FAIL anon 叫得到我的配對：${angot}"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

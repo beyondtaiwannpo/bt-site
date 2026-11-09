@@ -776,7 +776,11 @@ Paul 2026-11-09：「go test out our website and be different person… test out
 - Senior Adviser 的總覽那句改成「看得到每個工作區；紀錄與配對回饋對你是唯讀」。
 - 沒有封面的活動卡：矮一半、淡斜紋加橘色底邊，不再是一塊空的米色。
 
-驗證：812 條測試、check.sh、check-mobile 27 頁，smoke 1254 項，每一條流程在本機真的瀏覽器走過，修完的三條（學員回到申請表、時間看板、按鈕字色）再走一次。
+**第三輪：mentor 與 mentee 登入後有自己的東西了**（`supabase/migrations/2026-12-07-records-my-pairs.sql`，**上線前要跑**，3 列驗收表）。走了一遍才發現 mentor 登入後網站上沒有任何一頁看得到自己帶的是誰，mentee 也一樣（配對只在紀錄後台）。新函式 `rc_my_pairs()` 只回本人在裡面的配對：另一邊的名字、那個學期、配對日、還開著的 check-in 連結（mentor 拿 pair-mentor 的、mentee 拿 pair-mentee 的）與填過了沒；不回 email、不回別人的答案。幹部首頁多一區「我帶的 mentee」（`home/src/ui.js` 的 `pairsHTML`），學員 dashboard 多一區「我的 mentor」（`app/src/ui.js`）：一列一人，check-in 沒填是連結、填過打勾。本機瀏覽器以 mentor（一般幹部）與 mentee（學員帳號）登入各走三次：看到對方、按連結填 check-in、回來看到打勾。smoke 多 3 項。
+
+**沒改、留給 Paul 看的**（完整清單在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-09-persona-walkthrough/`）：後台總覽一開頁打 16 到 20 次資料庫；首頁開場桌機版可以早一點露出標題（Paul 2026-09-07 決定留著動畫，所以沒動）；護照蓋章時集章數可以跳一下（護照的檔另一個 session 正在改，沒碰）；後台換頁可以淡入；學員 dashboard 可以直接放活動後的回饋連結。
+
+驗證：812 條測試跑了 4 次、check.sh 4 次、check-motion 3 次（exit 0）、check-mobile 4 次、smoke 1254 項跑了 5 次；九種身分在本機瀏覽器走過，修完的三條流程（學員回到申請表、時間看板、按鈕字色）各再走 3 到 4 次。
 
 ## BT Records：人、活動、出席、回饋、配對、去向（2026-12-01）
 
