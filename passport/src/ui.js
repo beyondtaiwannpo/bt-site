@@ -239,7 +239,7 @@ export function barHTML(S) {
       <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">${T("bar.wall")}</button>
     </div>
     <div class="sp"></div>
-    <div class="prog"><small>${T("bar.stamps")}</small>${done} <span style="opacity:.4">/ ${S.activities.length}</span></div>
+    <div class="prog"><small>${T("bar.stamps")}</small><b class="pcount${S.justStamped ? " bump" : ""}">${done}</b> <span style="opacity:.4">/ ${S.activities.length}</span></div>
   </div>`;
 }
 

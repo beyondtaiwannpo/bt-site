@@ -21,7 +21,7 @@ test("頂欄顯示的數字等於 stampCount", () => {
   // 改由 check.sh 用 grep 守（見該檔案「章的數量」那條）。
   for (const n of [0, 1, 5, 17, 33]) {
     const S = { ...stateWith(n), activities: [], view: "passport" };
-    const shown = barHTML(S).match(/<\/small>(\d+) <span/);
+    const shown = barHTML(S).match(/<\/small>(?:<b class="pcount[^"]*">)?(\d+)(?:<\/b>)? <span/);
     assert.ok(shown, `barHTML 的數字抓不到（n=${n}），格式可能被改了`);
     assert.equal(Number(shown[1]), stampCount(S), `n=${n} 顯示的數字跟 stampCount 不一致`);
   }
