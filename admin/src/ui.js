@@ -250,6 +250,8 @@ export function fmtWhen(v) {
   if (!v) return "";
   const d = new Date(v);
   if (isNaN(d)) return "";
+  // 2026-11-09：英文畫面用「8 Nov 2026」，中文照舊 2026/11/8。
+  if (lang() === "en") { try { return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); } catch (e) { /* 舊瀏覽器退回下面 */ } }
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
@@ -1178,7 +1180,7 @@ export function accessHTML(me, todo, features) {
   };
   const feat = (features || []).length ? `<ul class="feat">${features.map(f => `<li><a href="${withLang(f.href)}">${esc(f.label)}</a>${T("punct.colon")}${esc(f.desc)}</li>`).join("")}</ul>` : "";
   let body;
-  if (senior(me)) body = `<div class="row" style="margin:0 0 6px"><span class="tag open">${T("grid.byRank")}</span><span class="mini">${T("hub.accessSenior")}</span></div>`;
+  if (senior(me)) body = `<div class="row" style="margin:0 0 6px"><span class="tag open">${T("grid.byRank")}</span><span class="mini">${T(me.board_role === "senior_adviser" ? "hub.accessSeniorAdviser" : "hub.accessSenior")}</span></div>`;
   else {
     const mine = Object.entries((me && me.ws) || {});
     if (mine.length) {

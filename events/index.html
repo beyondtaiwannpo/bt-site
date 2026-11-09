@@ -356,6 +356,8 @@ summary{cursor:pointer}
 .ev-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1px solid rgba(16,42,134,.16);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.45);transition:border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
 .ev-card:hover{border-color:var(--bt-navy);box-shadow:0 10px 26px rgba(16,42,134,.1)}
 .ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:rgba(255,196,108,.35)}
+/* 沒有封面的活動卡（2026-11-09）：不要一塊空的米色，矮一點、淡淡的斜紋加品牌橘的邊，看得出是刻意留白。 */
+.ev-noimg{aspect-ratio:3/1;background:repeating-linear-gradient(135deg,rgba(255,196,108,.22) 0 6px,rgba(255,232,197,.35) 6px 14px);border-bottom:3px solid var(--bt-orange)}
 .ev-body{display:flex;flex-direction:column;gap:5px;padding:14px 16px 16px}
 .ev-body b{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:.01em}
 .ev-when{font-size:13px;color:rgba(16,42,134,.78)}

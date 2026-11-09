@@ -169,7 +169,7 @@ async function boot(retried) {
     D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
-    else if (/^(requests?|events|meetings)(\/|$)/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    else if (/^(requests?|events|meetings|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -221,6 +221,13 @@ function readMeeting() {
   return { scope: val("mt-scope") || "board", required: val("mt-required") !== "0", title: val("mt-title"), starts_at: iso(val("mt-starts")), ends_at: iso(val("mt-ends")), agenda: val("mt-agenda"), doc_url: val("mt-doc"), attendees: UI.pkPicked(S.cadres, [], pk, true) };
 }
 async function openTab(t) {
+  // 2026-11-09：#forms/<id>/checkin 與 #forms/<id>/notice 有自己的網址（重整不會掉回清單；簽到當天手機上重整是常有的事）。
+  const fm = /^forms\/([0-9a-f-]{36})(?:\/(checkin|notice))?$/.exec(t || "");
+  if (fm) {
+    await openApps(fm[1]);
+    if (fm[2]) { S.view = fm[2]; S.msg = ""; render(); }
+    return;
+  }
   // 會議（2026-11-02）：#meetings 清單，#meetings/<id> 一場。
   const mt = /^meetings(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
   if (mt) {
@@ -691,7 +698,9 @@ document.addEventListener("click", async e => {
     // apps 已經在手上就不用再查一次。從清單直接點進來的情況才要查。
     if (!S.form || S.form.id !== id || !S.apps.length) await openApps(id);
     S.view = act === "open-checkin" ? "checkin" : "notice";
-    S.msg = ""; render();
+    S.msg = "";
+    try { history.replaceState(null, "", "#forms/" + id + "/" + S.view); } catch (e) { /* 沒有 history 也照樣能用 */ }
+    render();
     return;
   }
 

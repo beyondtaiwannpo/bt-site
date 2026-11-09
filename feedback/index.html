@@ -54,6 +54,9 @@
 <style>
 *{box-sizing:border-box}
 :root{--gut:clamp(20px,5vw,88px)}
+/* 一次只印一種語言（2026-11-09 走一遍不登入填回饋的人撞到的：兩種語言一直同時印，每一題兩倍長）。
+   src/ui.js 的 both() 把兩版都寫出來、各掛 .zh 與 .en，這裡照 <html data-lang> 藏另一版；右上角那顆鈕切換。 */
+html[data-lang="en"] .zh,html[data-lang="zh"] .en{display:none}
 html{scroll-behavior:smooth;overflow-x:clip}
 body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}

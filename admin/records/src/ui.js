@@ -1081,7 +1081,9 @@ export function resultsHTML(r, msg, showAll) {
       ${s.texts.length > list.length ? `<button type="button" class="lnk" data-act="res-more" data-id="${esc(s.q.id)}">${esc(T("res.showAll", { n: s.texts.length }))}</button>` : ""}</div>`;
   }).join("");
   const each = `<table class="table tf-each"><thead><tr>${anon ? "" : `<th>${esc(T("res.who"))}</th>`}<th>${esc(T("res.when"))}</th><th>${esc(T("res.age"))}</th><th>${esc(T("res.contact"))}</th></tr></thead><tbody>${rs.map(x => `<tr>${anon ? "" : `<td class="t-main">${x.person_id ? `<a href="#people/${esc(x.person_id)}" data-act="open-person" data-id="${esc(x.person_id)}"><b>${esc(x.name || T("common.noName"))}</b></a>` : `<b>${esc(x.name || "")}</b>`}</td>`}<td>${esc(fmtWhen(x.submitted_at))}</td><td>${esc(T("age." + (x.age_band || "unknown")))}</td><td>${x.contact_ok ? "✓" : ""}</td></tr>`).join("")}</tbody></table>`;
-  return msgHTML(msg) + kpis + (anon ? `<div class="note">${esc(T("res.anon"))}</div>` : "") + `<div class="note">${esc(T("res.minors"))}</div>`
+  // 2026-11-09：「多半是未成年」那一句只在真的有未成年、或多數沒說的時候印；一份全是成年人的結果頁上印這句是自打嘴巴。
+  const minorsLikely = bands[0][1] > 0 || bands[2][1] >= bands[1][1];
+  return msgHTML(msg) + kpis + (anon ? `<div class="note">${esc(T("res.anon"))}</div>` : "") + (minorsLikely ? `<div class="note">${esc(T("res.minors"))}</div>` : "")
     + `<div class="row"><span class="sp"></span><button class="btn ghost sm" data-act="res-csv">${esc(T("res.csv"))}</button></div>`
     + sectionHTML(T("res.summary"), sums) + sectionHTML(T("res.each"), `<div class="tf-scroll">${each}</div>`);
 }

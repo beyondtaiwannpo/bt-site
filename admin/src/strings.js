@@ -285,6 +285,7 @@ export const MINE = {
   // 2026-10-23 批 4：你的存取、頂欄四項是什麼
   "hub.access":       { zh: "你的存取", en: "Your access" },
   "hub.accessSenior": { zh: "你看得到、改得動後台每一個工作區，不用派。", en: "You can see and change every workspace in the admin; no assignment needed." },
+  "hub.accessSeniorAdviser": { zh: "你看得到後台每一個工作區，不用派；紀錄與配對回饋對你是唯讀的。", en: "You can see every workspace in the admin, no assignment needed; Records and pair check-ins are read-only for you." },
   "hub.accessNone":   { zh: "你還沒被派進任何工作區，所以後台只有這一頁跟你自己的東西。找你的 Director 或 Co-President，他們在自己的頁面上就能把你加進去。", en: "You are not assigned to any workspace yet, so the admin shows only this page and your own things. Ask your Director or a Co-President; they can add you from their own page." },
   "hub.accessNoDirs": { zh: "各 team 的 Director 還沒有人公開在團隊頁上，直接問 Co-President。", en: "No Director is published on the team page yet; ask a Co-President directly." },
   "hub.goForms":      { zh: "去申請表", en: "Open forms" },
