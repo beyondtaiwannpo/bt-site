@@ -11,7 +11,8 @@ import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 // S.story：`null` 代表「還沒查」或「這個人沒有故事那一列」，`{}` 會讓人以為
 // 查過了但是空的 —— 學員完全不會發那個查詢，所以 `null` 才是誠實的初始值。
 // S.outcomes：我的去向（rc_my_outcomes()），學員不查所以是 []。
-let S = { user: null, me: null, story: null, outcomes: [], down: false, busy: false, msg: "", view: "main" };
+let S = { user: null, me: null, story: null, outcomes: [], down: false, busy: false, msg: "", view: "main",
+  tz: { edit: false, q: "", results: [], guess: null } };   // 時區選擇的狀態（2026-11-08）
 const root = () => document.getElementById("bt-root");
 
 function render() {
@@ -28,7 +29,7 @@ function render() {
   if (!S.me) { el.innerHTML = UI.downHTML(); return; }
 
   if (S.view === "delete") { el.innerHTML = nav + UI.deleteHTML(S.msg, S.busy); return; }
-  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes);
+  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes, S.tz);
 
   // 學校清單學員的 #school 跟幹部/校友「我的故事」那格的 #sschool 共用同一份
   // datalist，兩格都要點進去才載（2026-09-11：故事那一格也接上自動完成）。
@@ -266,6 +267,16 @@ function pickedTeams() {
   return [...boxes].map(b => b.value.trim()).filter(Boolean).join(", ");
 }
 
+// 時區搜尋：打字就換清單（只換清單那一塊，不重畫整頁，不然輸入框會失焦）。
+document.addEventListener("input", e => {
+  if (!e.target || e.target.id !== "tzq") return;
+  S.tz.q = e.target.value; S.tz.results = UI.searchTz(S.tz.q);
+  const list = document.querySelector(".tzlist");
+  if (list) list.innerHTML = UI.tzListHTML(S.tz.results, S.tz.q);
+});
+// 瀏覽器猜到的時區。猜不到就回 null，**不要退回一個預設值**（理由見 availability/src/tz.js 同名函式）。
+function detectTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { return null; } }
+
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -276,6 +287,22 @@ document.addEventListener("click", async e => {
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
   if (act === "back") { S.view = "main"; S.msg = ""; render(); return; }
   if (act === "ask-delete") { S.view = "delete"; S.msg = ""; render(); return; }
+  // 時區（2026-11-08 從看板搬過來）：選了就存進 profiles.tz，存完清掉「我是誰」的快取，看板下一次開就讀到新的。
+  if (act === "tz-change") { S.tz = { edit: true, q: "", results: [], guess: detectTz() }; render(); const q = document.getElementById("tzq"); if (q) q.focus(); return; }
+  if (act === "tz-cancel") { S.tz = { edit: false, q: "", results: [], guess: null }; render(); return; }
+  if (act === "tz-pick") {
+    if (S.busy) return;
+    S.busy = true;
+    try {
+      const { error } = await supabase.from("profiles").update({ tz: b.dataset.tz }).eq("id", S.user.id);
+      if (error) throw error;
+      S.me = { ...S.me, tz: b.dataset.tz };
+      AUTH.forgetMe();
+      S.tz = { edit: false, q: "", results: [], guess: null }; S.busy = false; render();
+      UI.toast(T("tz.saved", { tz: UI.labelOf(b.dataset.tz) }));
+    } catch (err) { console.error("設定時區失敗。真正的原因：", err); S.busy = false; UI.toast(T("tz.fail") + (err.message || err)); }
+    return;
+  }
   // 校友的歡迎卡（2026-11-07）：按掉就記在帳號上（dismiss_alumni_welcome()，只寫自己那一列），換裝置也不會再跳出來。
   if (act === "welcome-dismiss") {
     try {

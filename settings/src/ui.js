@@ -12,6 +12,7 @@
 // 2026-10-19 起畫面上的字全部從 ./strings.js 的字典來（T("鍵")），中英兩版並排在那一支裡。
 // 這一頁也是中英切換鈕的家（langSwitchHTML，在「我的資料」上面），其他登入後的頁面跟著這裡選的走。
 import { T, lang, setLang } from "./strings.js";
+import { labelOf, searchTz } from "./tz-alias.js";
 export { T, lang, setLang };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -143,7 +144,34 @@ export function welcomeHTML(me, story) {
     <div class="row"><button class="btn ghost sm" data-act="welcome-dismiss">${T("w.dismiss")}</button></div>
   </div>`;
 }
-export function settingsHTML(me, msg, busy, story, outcomes) {
+// 時區（2026-11-08，Paul：時區從看板搬到設定）。幹部才有：看板、會議信的「你的時區」都讀 profiles.tz。
+// 選了就存（不走 autosave 容器，它是自己一個請求）。tz = { edit, q, results, guess }。
+// **不給預設值**：猜錯的話他整週的時間會被安靜地畫到別的地方（看板那邊同一句話）。
+export function tzHTML(me, tz) {
+  const t = Object.assign({ edit: false, q: "", results: [], guess: null }, tz || {});
+  const cur = me.tz || "";
+  if (!t.edit) {
+    return `<h3 class="sec-h">${T("tz.title")}</h3>
+    <div class="tzrow"><span>${cur ? T("tz.current", { tz: esc(labelOf(cur)) }) : T("tz.unset")}</span>
+      <button class="btn ghost sm" data-act="tz-change">${T(cur ? "tz.change" : "tz.set")}</button></div>
+    <p class="sec-note">${T("tz.note")}</p>`;
+  }
+  return `<h3 class="sec-h">${T("tz.title")}</h3>
+    ${t.guess && t.guess !== cur ? `<div class="wnote">${T("tz.guess", { place: esc(labelOf(t.guess)) })}
+      <button class="btn sm" data-act="tz-pick" data-tz="${esc(t.guess)}">${T("tz.here")}</button></div>` : ""}
+    <label><i>${T("tz.search")}</i>
+      <input id="tzq" value="${esc(t.q || "")}" autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" placeholder="${esc(T("tz.searchPh"))}"></label>
+    <div class="tzlist">${tzListHTML(t.results, t.q)}</div>
+    ${cur ? `<div class="row"><button class="btn quiet sm" data-act="tz-cancel">${T("tz.cancel")}</button></div>` : ""}`;
+}
+export function tzListHTML(results, q) {
+  return (results || []).map(r => `<button class="tzitem" data-act="tz-pick" data-tz="${esc(r.tz)}"><b>${esc(r.label)}</b><span>${esc(r.tz)}</span></button>`).join("")
+    || (q ? `<div class="empty sm">${T("tz.none", { q: esc(q) })}</div>` : "");
+}
+export { searchTz, labelOf };
+
+export function settingsHTML(me, msg, busy, story, outcomes, tz) {
   const cadre = me.role === "cadre";
   const alumni = me.role === "alumni";
   // 2026-10-17：第四種人，實習生。名字兩格、大頭照（進度牆要用）、沒有故事、可以刪帳號。
@@ -189,6 +217,7 @@ export function settingsHTML(me, msg, busy, story, outcomes) {
     ${named ? avatarHTML(me, cadre, intern) : ""}
     <div class="autorow">${autosaveHint("profile")}<span class="savenote">${T("s.autoNote")}</span></div>
     </div>
+    ${cadre ? tzHTML(me, tz) : ""}
     ${teller ? `<div data-autosave="story" data-id="${esc(me.id || "")}">${storyHTML(me, story)}
     <div class="autorow">${autosaveHint("story")}</div>
     </div>` : ""}

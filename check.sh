@@ -1100,7 +1100,8 @@ done
 # 2026-09-11：settings/src/main.js 從 3 個寫入點變成 4 個 —— C1 加了校友
 # 那一條路（只寫 name_zh / name_en，不碰 school / grade）。刻意的摩擦，
 # 改動寫入路徑的人要回來改這一行，理由見上面。
-PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:1 settings/src/main.js:4"
+# 2026-11-08：settings 從 4 變 5，時區選擇從看板搬過來（只寫 tz 那一句）。
+PROFILE_WRITE_FILES="passport/src/data.js:4 app/src/main.js:1 settings/src/main.js:5"
 
 profileCols=$(node -e '
   const fs = require("fs");
@@ -1979,6 +1980,13 @@ elif [ -n "$noindex_missing" ]; then
   bad "這些登入相關頁面少了 noindex：${noindex_missing}"
 else
   ok "noindex 只在登入相關的兩頁（app、reset），對外頁面一個都沒有"
+fi
+
+# 時區地名別名有兩份（availability 與 settings，資料夾之間不 import），從 TZ_ALIAS 那一行起要一模一樣（2026-11-08）。
+if diff -q <(sed -n '/^export const TZ_ALIAS/,$p' availability/src/tz-alias.js) <(sed -n '/^export const TZ_ALIAS/,$p' settings/src/tz-alias.js) >/dev/null; then
+  ok "時區地名別名：availability 與 settings 兩份一模一樣"
+else
+  bad "時區地名別名兩份不一樣：availability/src/tz-alias.js 與 settings/src/tz-alias.js 要一起改"
 fi
 
 [ $fail -eq 0 ] && say "" && say "全部通過。" || { say ""; say "有項目未通過。"; }

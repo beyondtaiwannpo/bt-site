@@ -160,8 +160,8 @@ test("★ 存檔有三條路，校友那一句只寫姓名，不碰 school / gra
   const src = readFileSync(new URL("../settings/src/main.js", import.meta.url), "utf8")
     .split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
   const sites = src.match(/\.from\("profiles"\)[\s\S]{0,80}?\.update\(\{[\s\S]*?\}\)/g) || [];
-  assert.equal(sites.length, 4,
-    "profiles 的寫入點應該是四個：大頭照、幹部、校友、學員");
+  assert.equal(sites.length, 5,
+    "profiles 的寫入點應該是五個：大頭照、幹部、校友、學員、時區（2026-11-08 從看板搬來）");
   const alum = sites.find(s => /name_en/.test(s) && !/public_profile/.test(s));
   assert.ok(alum, "找不到校友那條存檔路徑（只寫中文姓名與英文姓名的那一句）");
   assert.equal(/school|grade|newsletter/.test(alum), false,

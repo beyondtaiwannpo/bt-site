@@ -476,7 +476,7 @@ document.addEventListener("click", async e => {
     }
     return;
   }
-  if (act === "change-tz") { S.needTz = true; S.tzQuery = ""; S.tzResults = []; render(); return; }
+  // 2026-11-08：「改時區」搬到設定頁（settings/），這裡只剩第一次沒有時區時的那一張。
 
   // 「我的時間」的兩個模式：平常的時間 ／ 某一週。
   if (act === "mine-mode") {

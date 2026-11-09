@@ -353,7 +353,7 @@ export function mineHTML(S) {
       <span class="mini">${esc(S.mineMsg || "")}</span>
     </div>
     <div class="wnote" style="margin-top:14px">${T("mn.tz", { tz: esc(labelOf(S.myTz)) })}
-      <button class="btn quiet sm" data-act="change-tz">${T("mn.change")}</button><br>
+      <a class="btn quiet sm" href="../settings/">${T("mn.changeIn")}</a><br>
       ${T("mn.tzNote")}</div>
   </div>`;
 }

@@ -66,7 +66,7 @@ export const MINE = {
   "n.no":             { zh: "先不要", en: "Not now" },
   // 時區
   "tz.title":         { zh: "你在哪裡？", en: "Where are you?" },
-  "tz.sub":           { zh: "用來把你的時間換算給其他人看。之後可以改。", en: "Used to convert your times for everyone else. You can change it later." },
+  "tz.sub":           { zh: "用來把你的時間換算給其他人看。之後在設定頁可以改。", en: "Used to convert your times for everyone else. You can change it later in Settings." },
   "tz.guess":         { zh: "看起來你在 <b>{place}</b>。", en: "It looks like you are in <b>{place}</b>." },
   "tz.here":          { zh: "就是這裡", en: "That is right" },
   "tz.search":        { zh: "搜尋城市（中英文都可以）", en: "Search for a city (Chinese or English)" },
@@ -120,8 +120,8 @@ export const MINE = {
   "mn.revert":        { zh: "回到平常的時間", en: "Back to usual times" },
   "mn.confirmSame":   { zh: "我確認過了，沒有變", en: "I checked, nothing changed" },
   "mn.tz":            { zh: "時區：<b>{tz}</b>", en: "Time zone: <b>{tz}</b>" },
-  "mn.change":        { zh: "改", en: "Change" },
-  "mn.tzNote":        { zh: "填的是這個時區的當地時間。搬家的話記得回來改 —— 改完你所有的時段都會照新的時區重新解讀。", en: "Times are local to this time zone. If you move, come back and change it. All your slots are then read in the new zone." },
+  "mn.changeIn":      { zh: "到設定頁改", en: "Change in Settings" },
+  "mn.tzNote":        { zh: "填的是這個時區的當地時間。搬家的話到設定頁改，改完你所有的時段都會照新的時區重新解讀。", en: "Times are local to this time zone. If you move, change it in Settings. All your slots are then read in the new zone." },
   // 成員
   "mb.title":         { zh: "成員", en: "Members" },
   "mb.sub":           { zh: "超過 30 天沒更新的標紅。看板要問的是「這份資料還可信嗎」，\n      所以沒有變的人也可以按「我確認過了」把時間往前推。", en: "Anyone who has not updated in 30 days is marked red. The board's question is \"can this still be trusted\", so even if nothing changed you can press \"I checked\" to bump the date." },
