@@ -86,3 +86,42 @@ test("畫面：結果頁匿名不印名字、印未成年提醒；人的頁面�
   const y = UI.yearlyHTML([{ term_id: "2026-27", kind: "bootcamp", events: 2, registered: 70, attended: 50, responses: 40, recommend_avg: 4.1, useful_avg: 3.8, changes: [{ event: "W", we_change: "a", change_happened: true }, { event: "S", we_change: "b", change_happened: false }] }], "");
   assert.match(y, /a ✓/); assert.match(y, /b ✗/); assert.match(y, /50\/70/);
 });
+
+// 名錄（2026-12-03）：搜尋與篩選是純函式，假資料，沒有真人。
+test("★ 名錄：搜尋忽略大小寫與空格；篩選身分、帳號、team、學校、畢業年、屆別、活動、國家；選項帶人數", () => {
+  const L = [
+    { id: "a", name: "En Lo", name_en: "En Lo", kind: "student", school: "TFG", grad_year: 2027, has_account: false, role: null, team: null, terms: ["2025-26"], events: ["e1"], countries: [], n: 1 },
+    { id: "b", name: "Ann Chen", name_en: "Ann Chen", name_zh: "陳安", kind: "member", school: "", has_account: true, role: "cadre", team: "Curriculum Team, Marketing Team", terms: ["2025-26", "2026-27"], events: ["e1", "e2"], countries: ["US"], n: 2 },
+    { id: "c", name: "Guest One", name_en: "Guest One", kind: "guest", school: "Wagor", has_account: true, role: "alumni", team: "", terms: ["2024-25"], events: [], countries: ["US", "Canada"], n: 0 },
+  ];
+  const ids = (q, f) => UI.filterDirectory(L, q, f).map(p => p.id);
+  assert.deepEqual(ids("enlo"), ["a"]); assert.deepEqual(ids("陳"), ["b"]); assert.deepEqual(ids("wag"), ["c"]);
+  assert.deepEqual(ids("", { kind: "member" }), ["b"]);
+  assert.deepEqual(ids("", { role: "none" }), ["a"]); assert.deepEqual(ids("", { role: "alumni" }), ["c"]);
+  assert.deepEqual(ids("", { team: "Marketing Team" }), ["b"]);
+  assert.deepEqual(ids("", { school: "TFG" }), ["a"]); assert.deepEqual(ids("", { grad: "2027" }), ["a"]);
+  assert.deepEqual(ids("", { term: "2025-26" }), ["a", "b"]); assert.deepEqual(ids("", { event: "e2" }), ["b"]);
+  assert.deepEqual(ids("", { country: "US" }), ["b", "c"]); assert.deepEqual(ids("ann", { country: "Canada" }), []);
+  const o = UI.dirOptions(L, [{ id: "e1", slug: "camp", title_en: "Camp" }, { id: "e2", slug: "fair", title_en: "Fair" }]);
+  assert.deepEqual(o.team, [["Curriculum Team", 1], ["Marketing Team", 1]]);
+  assert.deepEqual(o.event.map(x => [x[0], x[1], x[2]]), [["e1", 2, "Camp"], ["e2", 1, "Fair"]]);
+  assert.deepEqual(o.role, [["alumni", 1], ["cadre", 1], ["none", 1]], "人數一樣就照字母排");
+  assert.deepEqual(o.country, [["US", 2], ["Canada", 1]]);
+});
+
+test("★ 名錄是主畫面：三個分頁帶人數，重複的在自己那頁，篩選下拉與人數都在；沒跑遷移檔時說哪一支", () => {
+  const dir = [{ id: "a", name: "Someone", kind: "student", school: "S", has_account: false, terms: [], events: [], countries: [], n: 0 }];
+  const boot = { can_manage: true, duplicates: [{ a: "x", a_name: "A", a_kind: "student", b: "y", b_name: "A", b_kind: "guest" }], events: [], counts: { people: 1 } };
+  const h = UI.peopleHTML(boot, { boot, dir, df: {}, pq: "", msg: "", ptab: "dir" });
+  assert.match(h, /data-act="ptab" data-t="dups"/); assert.match(h, /Directory \(1\)|名錄（1）/); assert.match(h, /duplicates \(1\)|可能重複（1）/);
+  assert.match(h, /class="rc-dfilter"/); assert.match(h, /data-dir-count/); assert.match(h, /data-act="open-person" data-id="a"/);
+  assert.doesNotMatch(h, /data-act="merge"/, "重複那一組不在名錄分頁上");
+  const d = UI.peopleHTML(boot, { boot, dir, df: {}, pq: "", msg: "", ptab: "dups" });
+  assert.match(d, /data-act="merge"/); assert.doesNotMatch(d, /rc-dfilter/);
+  const v = UI.peopleHTML({ ...boot, can_manage: false }, { boot: { ...boot, can_manage: false }, dir, df: {}, pq: "", msg: "", ptab: "dir" });
+  assert.doesNotMatch(v, /data-t="add"/, "看的人沒有「加一個人」");
+  const e = UI.peopleHTML(boot, { boot, dir: null, dirErr: UI.T("dir.noFn"), df: {}, pq: "", msg: "", ptab: "dir" });
+  assert.match(e, /2026-12-03-records-directory\.sql/);
+  const f = UI.peopleHTML(boot, { boot, dir, df: { kind: "member" }, pq: "", msg: "", ptab: "dir" });
+  assert.match(f, /data-act="dir-clear"/); assert.match(f, /0 of 1|0 個人（全部 1）/);
+});

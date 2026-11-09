@@ -1091,18 +1091,83 @@ export function logHTML(r) {
 }
 
 // 人：找、重複、加。
+// ── 名錄（2026-12-03）：rc_directory() 整份拿回來，搜尋與篩選都在瀏覽器裡做（一千多個人的 JSON 幾百 KB，一次拿比每打一個字問一次快）。 ──
+// 篩選的鍵跟 rc_directory 回的欄位一一對應。純函式，test/records.test.mjs 用假資料測。
+export const DIR_FILTERS = ["kind", "role", "team", "school", "grad", "term", "event", "country"];
+const norm = v => String(v == null ? "" : v).toLowerCase().replace(/\s+/g, "");
+export function filterDirectory(list, q, f) {
+  const qq = norm(q); const x = f || {};
+  return (Array.isArray(list) ? list : []).filter(p => {
+    if (qq && !(norm(p.name).includes(qq) || norm(p.name_zh).includes(qq) || norm(p.name_en).includes(qq) || norm(p.school).includes(qq))) return false;
+    if (x.kind && p.kind !== x.kind) return false;
+    if (x.role === "none" ? p.has_account : (x.role && p.role !== x.role)) return false;
+    if (x.team && !parseTeamsLoose(p.team).includes(x.team)) return false;
+    if (x.school && (p.school || "") !== x.school) return false;
+    if (x.grad && String(p.grad_year || "") !== String(x.grad)) return false;
+    if (x.term && !(p.terms || []).includes(x.term)) return false;
+    if (x.event && !(p.events || []).includes(x.event)) return false;
+    if (x.country && !(p.countries || []).includes(x.country)) return false;
+    return true;
+  });
+}
+// profiles.team 是逗號字串（一個人可以在好幾個 team），這裡只拆不驗。
+function parseTeamsLoose(raw) { return String(raw || "").split(/[,、;；]/).map(t => t.trim().replace(/\s+/g, " ")).filter(Boolean); }
+// 下拉的選項從名錄本身長出來（有人在那個學校才有那個學校），每一個都帶人數。
+export function dirOptions(list, events) {
+  const L = Array.isArray(list) ? list : [];
+  const count = (pick) => { const m = new Map(); for (const p of L) for (const v of pick(p)) if (v) m.set(v, (m.get(v) || 0) + 1); return [...m].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]))); };
+  const evTitle = id => { const e = (events || []).find(e => e.id === id); return e ? ((lang() === "zh" ? e.title_zh : e.title_en) || e.title_en || e.title_zh || e.slug) : null; };
+  return {
+    kind: count(p => [p.kind]),
+    role: count(p => [p.has_account ? p.role : "none"]),
+    team: count(p => parseTeamsLoose(p.team)),
+    school: count(p => [p.school]),
+    grad: count(p => [p.grad_year ? String(p.grad_year) : ""]).sort((a, b) => b[0].localeCompare(a[0])),
+    term: count(p => p.terms || []).sort((a, b) => b[0].localeCompare(a[0])),
+    event: count(p => p.events || []).map(([id, n]) => [id, n, evTitle(id)]).filter(x => x[2]),
+    country: count(p => p.countries || []),
+  };
+}
+export const DIR_PAGE = 100;
+export function directoryHTML(S) {
+  const boot = S.boot || {}, dir = S.dir, f = S.df || {}, events = boot.events || [];
+  if (S.dirErr) return `<div class="msg err" role="status"><span class="msg-k">${esc(T("msg.err"))}</span><span>${esc(S.dirErr)}</span></div>`;   // 不走 msgHTML：它只畫 err. 開頭的句子，這一句是「還沒跑遷移檔」
+  if (!Array.isArray(dir)) return `<div class="mini">${esc(T("dir.loading"))}</div>`;
+  const opts = dirOptions(dir, events);
+  const hits = filterDirectory(dir, S.pq, f);
+  const shown = hits.slice(0, S.dirN || DIR_PAGE);
+  const optLabel = (key, v) => key === "kind" ? T("pkind." + v) : key === "role" ? (v === "none" ? T("dir.noAccount") : T("acct." + v)) : v;
+  const box = (key, labelKey, anyKey) => `<label><i>${esc(T(labelKey))}</i><select name="${key}" class="rc-dfilter" data-noauto="1">${pickOpt("", T(anyKey), f[key] || "")}${(opts[key] || []).map(([v, n, title]) => pickOpt(v, `${title || optLabel(key, v)} (${n})`, f[key] || "")).join("")}</select></label>`;
+  const active = DIR_FILTERS.filter(k => f[k]).length + (S.pq ? 1 : 0);
+  const dbHits = S.pq && S.pq.includes("@") && boot.can_manage ? (S.people || []) : null;
+  const row = p => `<li><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> <span class="tag">${esc(T("pkind." + p.kind))}</span>${p.has_account ? ` <span class="tag open">${esc(T("acct." + (p.role || "student")))}</span>` : ""}</div>
+      <div class="fmeta">${[p.school, p.grad_year, p.team, (p.terms || []).slice().sort().reverse().join(" "), p.n ? T("dir.events", { n: p.n }) : "", p.latest, (p.countries || []).join(" ")].filter(Boolean).map(v => esc(String(v))).join("・")}</div></li>`;
+  return `<div class="card">
+    <label><i>${esc(T("dir.search"))}</i><input type="search" id="rc-pfind" class="rc-pfind" value="${esc(S.pq || "")}" placeholder="${esc(T("dir.searchPh"))}" autocomplete="off" data-noauto="1"></label>
+    <div class="two">${box("kind", "dir.kind", "dir.anyKind")}${box("role", "dir.role", "dir.anyRole")}</div>
+    <div class="two">${box("team", "dir.team", "dir.anyTeam")}${box("school", "dir.school", "dir.anySchool")}</div>
+    <div class="two">${box("grad", "dir.grad", "dir.anyGrad")}${box("term", "dir.term", "dir.anyTerm")}</div>
+    <div class="two">${box("event", "dir.event", "dir.anyEvent")}${box("country", "dir.country", "dir.anyCountry")}</div>
+    <div class="row"><b data-dir-count>${esc(active ? T("dir.countOf", { n: hits.length, total: dir.length }) : T("dir.count", { n: dir.length }))}</b>${active ? ` <button class="btn quiet sm" data-act="dir-clear">${esc(T("dir.clear"))}</button>` : ""}</div>
+    ${dbHits ? (dbHits.length ? `<ul class="flist">${dbHits.map(p => row({ ...p, terms: [], countries: [] })).join("")}</ul>` : `<div class="mini">${esc(T("pp.noHit"))}</div>`)
+      : hits.length ? `<ul class="flist">${shown.map(row).join("")}</ul>${hits.length > shown.length ? `<div class="form-foot"><button class="btn ghost sm" data-act="dir-more">${esc(T("dir.more", { n: Math.min(DIR_PAGE, hits.length - shown.length) }))}</button></div>` : ""}`
+      : `<div class="mini">${esc(T("dir.empty"))}</div>`}
+  </div>`;
+}
+// 「人」那一頁：三個分頁，名錄是主畫面，「可能重複」與「加一個人」在後面（2026-12-03 之前只有後兩樣，Paul 點進來以為壞了）。
 export function peopleHTML(boot, S) {
-  const b = boot || {}, dups = b.duplicates || [], hits = S.people || [];
-  const search = `<div class="card"><label><i>${esc(T("pp.find"))}</i><input type="search" id="rc-pfind" class="rc-pfind" value="${esc(S.pq || "")}" placeholder="${esc(T("pp.findPh"))}" autocomplete="off" data-noauto="1"></label>
-    ${S.pq && !hits.length ? `<div class="mini">${esc(T("pp.noHit"))}</div>` : ""}
-    ${hits.length ? `<ul class="flist">${hits.map(p => `<li><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> <span class="tag">${esc(T("pkind." + p.kind))}</span>${p.has_account ? ` <span class="tag open">${esc(T("pp.hasAccount"))}</span>` : ""}</div><div class="fmeta">${esc(p.school || "")}${p.grad_year ? "・" + esc(String(p.grad_year)) : ""}</div></li>`).join("")}</ul>` : ""}</div>`;
+  const b = boot || {}, dups = b.duplicates || [];
+  const tab = S.ptab === "dups" || S.ptab === "add" ? S.ptab : "dir";
+  const n = Array.isArray(S.dir) ? S.dir.length : ((b.counts || {}).people || 0);
+  const tabs = [["dir", T("dir.tab", { n })], ["dups", T("dir.dupTab", { n: dups.length })]].concat(b.can_manage ? [["add", T("dir.addTab")]] : []);
+  const tabHTML = `<div class="chips tf-tabs" role="tablist">${tabs.map(([k, l]) => `<button class="chip${k === tab ? " on" : ""}" role="tab" aria-selected="${k === tab}" data-act="ptab" data-t="${k}">${esc(l)}</button>`).join("")}</div>`;
   const dupHTML = sectionHTML(T("pp.dups", { n: dups.length }), dups.length ? `<div class="mini">${esc(T("pp.dupsHint"))}</div><ul class="flist">${dups.map(d => `<li><div class="fhead"><b>${esc(d.a_name)}</b> <span class="mini">${esc(T("pkind." + d.a_kind))}${d.a_school ? "・" + esc(d.a_school) : ""}</span> ＝? <b>${esc(d.b_name)}</b> <span class="mini">${esc(T("pkind." + d.b_kind))}${d.b_school ? "・" + esc(d.b_school) : ""}</span></div>
       <div class="fmeta"><button class="btn ghost sm" data-act="merge" data-keep="${esc(d.a)}" data-drop="${esc(d.b)}"${S.busy ? " disabled" : ""}>${esc(T("pp.mergeInto", { name: d.a_name }))}</button> <button class="btn ghost sm" data-act="merge" data-keep="${esc(d.b)}" data-drop="${esc(d.a)}"${S.busy ? " disabled" : ""}>${esc(T("pp.mergeInto", { name: d.b_name }))}</button> <a class="lnk" href="#people/${esc(d.a)}" data-act="open-person" data-id="${esc(d.a)}">${esc(T("pp.look"))}</a></div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("pp.noDups"))}</div>`);
   const add = b.can_manage ? sectionHTML(T("pp.add"), `<div data-padd><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.email"))}</i><input name="email" type="email" maxlength="120"></label><label><i>${esc(T("person.kind"))}</i>${sel("kind", ["student", "guest", "member"].map(k => [k, T("pkind." + k)]), "student")}</label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100"></label></div>
       <div class="form-foot"><button class="btn sm" data-act="person-add"${S.busy ? " disabled" : ""}>${esc(T("pp.addBtn"))}</button><span class="mini">${esc(T("pp.addHint"))}</span></div></div>`) : "";
-  return pageHead(T("pp.title"), T("pp.lede"), []) + msgHTML(S.msg) + search + dupHTML + add;
+  return pageHead(T("pp.title"), T("pp.lede"), []) + msgHTML(S.msg) + tabHTML + (tab === "dups" ? dupHTML : tab === "add" ? add : directoryHTML(S));
 }
 // 一個人的時間軸。
 export function personHTML(d, S) {

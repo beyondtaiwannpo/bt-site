@@ -16,6 +16,7 @@ let S = {
   view: "overview", id: null, sub: "questions",
   boot: null, event: null, results: null, person: null, yearly: null,
   people: [], pq: "", pastDraft: null, newDraft: null,
+  dir: null, dirErr: "", df: {}, dirN: 0, ptab: "dir",   // 名錄（2026-12-03）：整份、載入失敗的訊息、篩選、目前印到第幾個、哪個分頁
   aud: null, audSaved: null, find: {}, more: {},
 };
 
@@ -88,6 +89,12 @@ function parseHash() {
   S.id = parts[1] || null;
   S.sub = UI.SUBS.includes(parts[2]) ? parts[2] : "questions";
 }
+// 名錄整份拿回來。函式還不在（遷移檔沒跑）就在那一頁說一句，別的分頁照樣能用。
+async function loadDir() {
+  S.dirErr = "";
+  try { S.dir = await D.loadDirectory(); }
+  catch (e) { S.dir = null; S.dirErr = /rc_directory/.test(String(e && e.message || e)) ? T("dir.noFn") : T("err.load") + D.says(e); }
+}
 async function loadBoot() {
   try { S.boot = await D.loadBootstrap(); }
   catch (e) { S.boot = { events: [], forms: [], terms: [], people: [], duplicates: [], counts: {}, can_manage: false, can_view: false }; S.msg = T("err.load") + D.says(e); }
@@ -103,6 +110,7 @@ async function openRoute(keepMsg) {
     if (S.view === "overview" && S.id) S.event = await D.loadEvent(S.id);
     else if (S.view === "forms" && S.id) { S.results = await D.loadResults(S.id); if (!S.aud || S.aud._id !== S.id) resetAud(); }
     else if (S.view === "people" && S.id) S.person = await D.loadPerson(S.id);
+    else if (S.view === "people" && !Array.isArray(S.dir)) await loadDir();
     else if (S.view === "yearly") S.yearly = await D.loadYearly();
   } catch (e) { S.msg = T("err.load") + D.says(e); }
   S.busy = false;
@@ -341,30 +349,33 @@ document.addEventListener("click", async e => {
   if (act === "yr-csv") { download(UI.yearlyCSV(S.yearly || []), "bt-yearly.csv"); return; }
 
   // ── 人 ──
+  if (act === "ptab") { S.ptab = b.dataset.t; S.msg = ""; render(); return; }
+  if (act === "dir-clear") { S.df = {}; S.pq = ""; S.people = []; S.dirN = 0; render(); return; }
+  if (act === "dir-more") { S.dirN = (S.dirN || UI.DIR_PAGE) + UI.DIR_PAGE; render(); return; }
   if (act === "person-add") {
     const v = vals("[data-padd]");
     if (!String(v.name_zh || v.name_en || v.email || "").trim()) { S.msg = T("err.save") + T("err.needName"); render(); return; }
     const id = await run("err.save", () => D.savePerson(null, { name_zh: v.name_zh, name_en: v.name_en, email: v.email, kind: v.kind, school: v.school, grad_year: v.grad_year || "" }));
     if (id === undefined) return;
-    await loadBoot(); go("people/" + id); return;
+    S.dir = null; await loadBoot(); go("people/" + id); return;
   }
   if (act === "person-save") {
     const v = vals("[data-pedit]");
     const ok = await run("err.save", () => D.savePerson(S.id, { name_zh: v.name_zh, name_en: v.name_en, school: v.school, grad_year: v.grad_year || "", kind: v.kind, note: v.note, email: v.email || "" }));
     if (ok === undefined) return;
-    S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.saved"); render(); return;
+    S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "merge") {
     if (UI.needAsk(S, b, T("merge.ask"))) return;
     const ok = await run("err.merge", () => D.mergePeople(b.dataset.keep, b.dataset.drop));
     if (ok === undefined) return;
-    await loadBoot(); S.msg = T("msg.merged"); if (S.pq) S.people = await D.findPeople(S.pq); render(); return;
+    S.dir = null; await loadBoot(); await loadDir(); S.msg = T("msg.merged"); render(); return;
   }
   if (act === "forget") {
     if (UI.needAsk(S, b, T("person.forgetAsk"))) return;
     const ok = await run("err.forget", () => D.forgetPerson(b.dataset.id));
     if (ok === undefined) return;
-    S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.forgot"); render(); return;
+    S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.forgot"); render(); return;
   }
   if (act === "out-add") {
     const v = vals("[data-oadd]");
@@ -381,14 +392,21 @@ document.addEventListener("click", async e => {
 
 // 搜尋框：找人（打字停 300 毫秒才問資料庫）、找幹部加進名單。
 let findTimer = null;
+// 名錄的篩選下拉：改了就重畫（不存資料庫，data-noauto 讓自動儲存不接手）。
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains("rc-dfilter")) return;
+  S.df = { ...(S.df || {}), [el.name]: el.value }; S.dirN = 0; render();
+});
 document.addEventListener("input", e => {
   const el = e.target;
   if (!el || !el.classList) return;
   if (el.classList.contains("rc-pfind")) {
-    S.pq = el.value;
+    S.pq = el.value; S.dirN = 0;
     clearTimeout(findTimer);
     findTimer = setTimeout(async () => {
-      try { S.people = S.pq.trim() ? await D.findPeople(S.pq) : []; } catch (x) { S.msg = T("err.load") + D.says(x); }
+      // 名字與學校在瀏覽器裡篩（名錄已經整份在手上）；打 email 的才去資料庫找（只有管的人找得到 email）。
+      try { S.people = S.pq.includes("@") && S.boot && S.boot.can_manage ? await D.findPeople(S.pq) : []; } catch (x) { S.msg = T("err.load") + D.says(x); }
       render();
       const again = document.getElementById("rc-pfind");
       if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* search 型的欄位有的瀏覽器不給 */ } }

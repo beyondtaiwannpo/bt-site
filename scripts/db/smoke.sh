@@ -3017,6 +3017,17 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-12-02-records-privacy.sql >/dev/null 2>&1 || true
 chkraise "破壞測試之後裝回正確版本，那道門又在了" "public_needs_self" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_outcome(null, '{\"person_id\":\"${RCDA}\",\"kind\":\"admitted\",\"visibility\":\"public\"}'::jsonb);"
+echo "── 名錄（2026-12-03-records-directory.sql）──"
+rdgot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-03-records-directory.sql 2>&1 || true)
+if echo "${rdgot}" | grep -q "OVERALL.*PASS" && ! echo "${rdgot}" | grep -q "|FAIL"; then echo "  ok   名錄那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 名錄那支驗收表："; echo "${rdgot}" | head -12; fail=$((fail+1)); fi
+RCALIVE=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.people where forgotten_at is null" | tr -d ' \n')
+chkas "${PAUL}" "★ 管的人拿到名錄：每一個還在的人一列、沒有 email 欄、有活動與屆別" "${RCALIVE}|false|true" "select jsonb_array_length(d)||'|'||(d::text like '%@example.com%')||'|'||(select bool_or(jsonb_array_length(e->'events') > 0 and jsonb_array_length(e->'terms') > 0) from jsonb_array_elements(d) e) from (select public.rc_directory() d) t"
+chkas "${OTHER}" "Senior Adviser（看的人）也拿得到名錄" "${RCALIVE}" "select jsonb_array_length(public.rc_directory())"
+chkas "${DIR}" "★ 只在某場活動工作區的人拿到空的（名錄是整個紀錄的，不是一場的）" "0" "select jsonb_array_length(public.rc_directory())"
+chkas "${OUTC}" "★ 沒指派的幹部拿到空的" "0" "select jsonb_array_length(public.rc_directory())"
+chkas "${PAUL}" "被移除的人不在名錄上" "0" "select count(*) from jsonb_array_elements(public.rc_directory()) e where e->>'id'='${RCEVP}'"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_directory();" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   anon 叫不到名錄"; pass=$((pass+1)); else echo "  FAIL anon 叫得到名錄：${angot}"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

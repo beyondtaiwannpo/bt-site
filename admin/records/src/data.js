@@ -31,6 +31,7 @@ export const loadEvent     = id => rpc("rc_event", { p_event: id });
 export const loadResults   = id => rpc("rc_results", { p_form: id });
 export const loadPerson    = id => rpc("rc_person", { p_person: id });
 export const findPeople    = q => rpc("rc_find_people", { p_q: q || "" });
+export const loadDirectory = () => rpc("rc_directory");
 export const loadYearly    = () => rpc("rc_yearly");
 export const saveEventMeta = (id, p) => rpc("rc_save_event_meta", { p_event: id, p });
 export const setSessions   = (id, sessions) => rpc("rc_set_sessions", { p_event: id, p_sessions: sessions || [] });
