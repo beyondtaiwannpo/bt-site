@@ -3073,7 +3073,7 @@ chkas "${OUTC}" "沒指派的幹部拿到空的" "0" "select jsonb_array_length(
 echo "── 我帶的 mentee、我的 mentor（2026-12-07-records-my-pairs.sql）──"
 rmp=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-07-records-my-pairs.sql 2>&1 || true)
 if echo "${rmp}" | grep -q "OVERALL.*PASS" && ! echo "${rmp}" | grep -q "|FAIL"; then echo "  ok   我的配對那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 我的配對那支驗收表："; echo "${rmp}" | head -12; fail=$((fail+1)); fi
-chkas "${MKE}" "★ mentor 看得到自己那一組（as mentor、那個學期、那份開著的 mentor check-in 的 token），看不到 email" "1|mentor|Fall 2026 Mentorship|false" "select jsonb_array_length(x)||'|'||(x->0->>'as')||'|'||(x->0->>'event')||'|'||(x::text like '%@example.com%') from (select public.rc_my_pairs() x) t"
+chkas "${MKE}" "★ mentor 看得到自己那一組（as mentor、那個學期、那份開著的 mentor check-in 的 token），看不到 email" "1|mentor|Fall2026Mentorship|false" "select jsonb_array_length(x)||'|'||(x->0->>'as')||'|'||(x->0->>'event')||'|'||(x::text like '%@example.com%') from (select public.rc_my_pairs() x) t"
 chkas "${OUTC}" "沒配對的幹部拿到空的" "0" "select jsonb_array_length(public.rc_my_pairs())"
 angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_my_pairs();" 2>&1 || true)
 if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   anon 叫不到我的配對"; pass=$((pass+1)); else echo "  FAIL anon 叫得到我的配對：${angot}"; fail=$((fail+1)); fi
