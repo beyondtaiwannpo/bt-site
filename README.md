@@ -829,7 +829,7 @@ Paul 2026-11-08 看了正式站的「人」那頁：「look first 沒用，你�
 
 三種身分走過（本機 Supabase，假資料）：Co-President 找到自己、加成講者、兩欄並排合併一組重複、活動頁從清單選人加成工作人員；Mentorship 的 Director（被派進紀錄工作區）開一個導生學期、從清單選 mentor 與 mentee 配對；沒指派的幹部拿到空的名錄（smoke）。
 
-**上線前要在正式 Supabase 跑這一支**（8 列驗收表全 PASS，第 7 列「有帳號卻不在名單上的成員」要是 0）。smoke 多 6 項。
+**2026-11-08 Paul 在正式 Supabase 上跑完，8 列驗收表全 PASS。** smoke 多 6 項。
 
 ### 年度比較改版（2026-11-08）
 
