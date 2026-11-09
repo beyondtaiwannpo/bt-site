@@ -45,7 +45,7 @@ test("結果統計：分數題平均與分布、單選計票、文字題列出�
   assert.doesNotMatch(csv, /Who/);
   assert.match(csv, /Under 18/); assert.match(csv, /yes/);
   assert.equal(UI.csvFilename("Winter Bootcamp 2027 · feedback"), "bt-winter-bootcamp-2027-feedback.csv");
-  assert.match(UI.yearlyCSV([{ term_id: "2026-27", kind: "bootcamp", events: 1, registered: 40, attended: 30, responses: 22, recommend_avg: 4.3, useful_avg: null, changes: [{ event: "Winter", we_change: "shorter" }] }]), /2026-27,bootcamp,1,40,30,22,4.3,,Winter: shorter/);
+  assert.match(UI.yearlyCSV([{ term_id: "2026-27", kind: "bootcamp", title_en: "Winter", numbers: { registered: 40, attended: 30, responses: 22, recommend_avg: 4.3, recommend_n: 20 }, review: { we_change: "shorter" } }]), /2026-27,bootcamp,1,40,30,75,22,4.3,,Winter: shorter/);
 });
 
 test("名單：配對回饋只點名；名單的開關與比對跟內部表單一樣", () => {
@@ -83,8 +83,14 @@ test("畫面：結果頁匿名不印名字、印未成年提醒；人的頁面�
   assert.match(UI.formHeadHTML(r, "results"), /\/feedback\/\?t=abc/);
   const p = UI.personHTML({ person: { id: "p1", name: "學員丁", kind: "student", school: "中山女高" }, participation: [], pairs: [], outcomes: [{ id: "o1", kind: "admitted", institution: "UW", year: 2027, visibility: "internal", source: "mentorship" }], responses: [] }, { boot: { can_manage: true }, me: { pres: true }, msg: "" });
   assert.match(p, /UW/); assert.match(p, /data-act="forget"/); assert.match(p, /data-oadd/);
-  const y = UI.yearlyHTML([{ term_id: "2026-27", kind: "bootcamp", events: 2, registered: 70, attended: 50, responses: 40, recommend_avg: 4.1, useful_avg: 3.8, changes: [{ event: "W", we_change: "a", change_happened: true }, { event: "S", we_change: "b", change_happened: false }] }], "");
-  assert.match(y, /a ✓/); assert.match(y, /b ✗/); assert.match(y, /50\/70/);
+  const EV = [
+    { id: "w", term_id: "2026-27", kind: "bootcamp", team: "Curriculum Team", title_en: "W", numbers: { registered: 40, attended: 30, responses: 25, recommend_avg: 4.0, recommend_n: 20 }, review: { we_change: "a", change_happened: true } },
+    { id: "s", term_id: "2026-27", kind: "bootcamp", team: "Curriculum Team", title_en: "S", numbers: { registered: 30, attended: 20, responses: 15, recommend_avg: 4.5, recommend_n: 10 }, review: { we_change: "b", change_happened: false } },
+    { id: "f", term_id: "2025-26", kind: "bootcamp", team: "Curriculum Team", title_en: "F", numbers: { registered: 20, attended: 10, responses: 0 } },
+    { id: "m", term_id: "2025-26", kind: "mentorship-term", team: "Mentorship Team", title_en: "M", numbers: { registered: 12, attended: 12 } },
+  ];
+  const y = UI.yearlyHTML({ boot: { events: EV }, yf: {}, msg: "" });
+  assert.match(y, /a ✓/); assert.match(y, /b ✗/); assert.match(y, /50\/70/); assert.match(y, /10\/20/);
 });
 
 // 名錄（2026-12-03）：搜尋與篩選是純函式，假資料，沒有真人。
@@ -124,4 +130,31 @@ test("★ 名錄是主畫面：三個分頁帶人數，重複的在自己那頁�
   assert.match(e, /2026-12-03-records-directory\.sql/);
   const f = UI.peopleHTML(boot, { boot, dir, df: { kind: "member" }, pq: "", msg: "", ptab: "dir" });
   assert.match(f, /data-act="dir-clear"/); assert.match(f, /0 of 1|0 個人（全部 1）/);
+});
+
+// 年度比較（2026-12-04 改版）：篩選、每屆每種一列、合計、同一種活動一屆一欄；空的列與欄不印。
+test("★ 年度比較：每屆每種一列加權平均、合計、篩選、比較表只留有數字的欄", () => {
+  const EV = [
+    { id: "w", term_id: "2026-27", kind: "bootcamp", team: "Curriculum Team", title_en: "W", numbers: { registered: 40, attended: 30, responses: 25, recommend_avg: 4.0, recommend_n: 20 }, review: { we_change: "a", change_happened: true } },
+    { id: "s", term_id: "2026-27", kind: "bootcamp", team: "Curriculum Team", title_en: "S", numbers: { registered: 30, attended: 20, responses: 15, recommend_avg: 4.5, recommend_n: 10 } },
+    { id: "f", term_id: "2025-26", kind: "bootcamp", team: "Curriculum Team", title_en: "F", numbers: { registered: 20, attended: 10, responses: 0 } },
+    { id: "m", term_id: "2025-26", kind: "mentorship-term", team: "Mentorship Team", title_en: "M", numbers: { registered: 12, attended: 12 } },
+    { id: "x", term_id: "", kind: "other", team: "", title_en: "X", numbers: {} },
+  ];
+  const rows = UI.yearlyRows(EV);
+  assert.deepEqual(rows.map(r => [r.term_id, r.kind, r.events, r.registered, r.attended, r.rate, r.recommend_avg]), [
+    ["2026-27", "bootcamp", 2, 70, 50, 71.4, 4.17], ["2025-26", "bootcamp", 1, 20, 10, 50, null], ["2025-26", "mentorship-term", 1, 12, 12, 100, null], ["", "other", 1, 0, 0, null, null]]);
+  const t = UI.yearlyTotals(rows); assert.equal(t.events, 5); assert.equal(t.registered, 102); assert.equal(t.rate, 70.6);
+  assert.deepEqual(UI.yearlyFilter(EV, { team: "Mentorship Team" }).map(e => e.id), ["m"]);
+  assert.deepEqual(UI.yearlyFilter(EV, { term: "2026-27", kind: "bootcamp" }).map(e => e.id), ["w", "s"]);
+  const c = UI.compareTable(rows, "attended");
+  assert.deepEqual(c.terms, ["2026-27", "2025-26", ""]); assert.deepEqual(c.kinds, ["bootcamp", "mentorship-term", "other"]);
+  assert.deepEqual(c.cells, [[50, 10, null], [null, 12, null], [null, null, 0]]);
+  const r = UI.compareTable(rows, "recommend");
+  assert.deepEqual(r.terms, ["2026-27"], "沒有推薦分數的屆別不印那一欄"); assert.deepEqual(r.kinds, ["bootcamp"]); assert.deepEqual(r.cells, [[4.17]]);
+  const h = UI.yearlyHTML({ boot: { events: EV }, yf: { kind: "bootcamp", metric: "rate" }, msg: "" });
+  assert.match(h, /class="rc-yfilter"/); assert.match(h, /data-act="yr-clear"/); assert.match(h, /3 events in this view|3 場活動/); assert.match(h, /class="total"/);
+  assert.match(h, /rc-compare/); assert.match(h, /71\.4/); assert.doesNotMatch(h, /<td><span class="tag">Mentorship term/, "篩掉的種類不在表裡（下拉裡還在）");
+  const one = UI.yearlyHTML({ boot: { events: EV.slice(0, 2) }, yf: {}, msg: "" });
+  assert.doesNotMatch(one, /class="total"/, "只有一列就不印合計"); assert.doesNotMatch(one, /rc-compare/, "只有一屆沒有東西可以比");
 });

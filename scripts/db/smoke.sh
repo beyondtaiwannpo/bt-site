@@ -3028,6 +3028,21 @@ chkas "${OUTC}" "★ 沒指派的幹部拿到空的" "0" "select jsonb_array_len
 chkas "${PAUL}" "被移除的人不在名錄上" "0" "select count(*) from jsonb_array_elements(public.rc_directory()) e where e->>'id'='${RCEVP}'"
 angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_directory();" 2>&1 || true)
 if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   anon 叫不到名錄"; pass=$((pass+1)); else echo "  FAIL anon 叫得到名錄：${angot}"; fail=$((fail+1)); fi
+echo "── 出席預設到了（2026-12-04-records-attendance.sql）──"
+ragot=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-04-records-attendance.sql 2>&1 || true)
+if echo "${ragot}" | grep -q "OVERALL.*PASS" && ! echo "${ragot}" | grep -q "|FAIL"; then echo "  ok   出席那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 出席那支驗收表："; echo "${ragot}" | head -12; fail=$((fail+1)); fi
+# RCEV（winter-camp-2027）是 2027 年的活動，還沒辦：registered 的要留著。另外建一場已經結束的來試。
+RCOLD=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_add_past_event('{\"slug\":\"old-camp-2024\",\"kind\":\"bootcamp\",\"term_id\":\"2024-25\",\"title_en\":\"Old Camp 2024\",\"team\":\"Curriculum Team\",\"starts_at\":\"2024-07-06T01:00:00Z\",\"ends_at\":\"2024-07-07T09:00:00Z\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chkas "${PAUL}" "★ 手動加的人沒說狀態就是 attended" "attended" "select public.rc_set_participation('${RCOLD}', '{\"email\":\"old-a@example.com\",\"name_en\":\"Old A\"}'::jsonb); select x.status from public.rc_participation x join public.people pe on pe.id=x.person_id where x.event_id='${RCOLD}' and pe.name_en='Old A'"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_set_participation('${RCOLD}', '{\"email\":\"old-b@example.com\",\"name_en\":\"Old B\",\"status\":\"registered\"}'::jsonb)" -c "select public.rc_set_participation('${RCOLD}', '{\"email\":\"old-c@example.com\",\"name_en\":\"Old C\",\"status\":\"no-show\"}'::jsonb)" -c "select public.rc_set_participation('${RCEV}', '{\"email\":\"new-d@example.com\",\"name_en\":\"New D\",\"status\":\"registered\"}'::jsonb)" >/dev/null 2>&1
+chkraise "★ Director 按不了一次性改狀態（not_president）" "not_president" "perform set_config('test.uid','${DIR}',true); perform public.rc_attendance_default(false);"
+chkas "${PAUL}" "★ 先數：已結束的那場 1 列會改，2027 那場不算" "1|1|OldCamp2024" "select (r->>'n')||'|'||jsonb_array_length(r->'rows')||'|'||(r#>>'{rows,0,title}') from (select public.rc_attendance_default(false) r) t"
+chkas "${PAUL}" "★ 真的改：registered → attended，no-show 不動，2027 那場的 registered 留著" "1|true" "select (r->>'n')||'|'||(r->>'done') from (select public.rc_attendance_default(true) r) t"
+chk "改完的樣子" "attended|no-show|registered" "select (select status from public.rc_participation x join public.people pe on pe.id=x.person_id where x.event_id='${RCOLD}' and pe.name_en='Old B')||'|'||(select status from public.rc_participation x join public.people pe on pe.id=x.person_id where x.event_id='${RCOLD}' and pe.name_en='Old C')||'|'||(select status from public.rc_participation x join public.people pe on pe.id=x.person_id where x.event_id='${RCEV}' and pe.name_en='New D')"
+chkas "${PAUL}" "再按一次：0" "0|false" "select (r->>'n')||'|'||(r->>'done') from (select public.rc_attendance_default(true) r) t"
+# 從報名表抄的那條規則（錄取的人活動結束後算 attended）：唯一的一份申請在上面「學員刪帳號」那一步跟著帳號消失了，
+# 這裡只能驗函式裡有那條規則（驗收表第 2 列），行為在正式站第一次換屆後的 sync 會看到。
+chk "★ rc_sync_event 裡有「錄取且活動已結束 → attended」那一條" "t" "select regexp_replace(prosrc, '--[^\n]*', '', 'g') like '%v_ended then ''attended''%' from pg_proc where proname='rc_sync_event' and pronamespace='public'::regnamespace"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

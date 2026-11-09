@@ -811,12 +811,6 @@ export function csvFilename(title) {
   return `bt-${slug}.csv`;
 }
 // 年度比較也能下載。
-export function yearlyCSV(rows) {
-  const head = ["term", "kind", "events", "registered", "attended", "responses", "recommend_avg", "useful_avg", "changes"];
-  const body = (rows || []).map(r => [r.term_id || "", r.kind, r.events, r.registered, r.attended, r.responses, r.recommend_avg == null ? "" : r.recommend_avg, r.useful_avg == null ? "" : r.useful_avg,
-    (r.changes || []).map(c => `${c.event}: ${c.we_change}`).join(" | ")]);
-  return "﻿" + [head, ...body].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
-}
 
 // ── 日期 ──
 export function fmtWhen(v) {
@@ -1198,12 +1192,70 @@ export function personHTML(d, S) {
   return head + msgHTML(S.msg) + edit + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
 }
 // 年度比較。
-export function yearlyHTML(rows, msg) {
-  const rs = rows || [];
-  const body = rs.map(r => `<tr><td><b>${esc(r.term_id || T("ov.noTerm"))}</b></td><td>${kindTag(r.kind)}</td><td>${r.events}</td><td>${r.attended}/${r.registered}</td><td>${r.responses}</td><td>${esc(fmtNum(r.recommend_avg))}</td><td>${esc(fmtNum(r.useful_avg))}</td>
-    <td>${(r.changes || []).map(c => `<div class="mini"><b>${esc(c.event)}</b>: ${esc(c.we_change)}${c.change_happened === true ? " ✓" : c.change_happened === false ? " ✗" : ""}</div>`).join("")}</td></tr>`).join("");
-  return pageHead(T("yr.title"), T("yr.lede"), rs.length ? [{ act: "yr-csv", label: T("res.csv") }] : []) + msgHTML(msg)
-    + (rs.length ? `<div class="tf-scroll"><table class="table rc-table"><thead><tr><th>${esc(T("ev.term"))}</th><th>${esc(T("ev.kind"))}</th><th>${esc(T("yr.events"))}</th><th>${esc(T("num.attendance"))}</th><th>${esc(T("num.responses"))}</th><th>${esc(T("num.recommend"))}</th><th>${esc(T("num.useful"))}</th><th>${esc(T("yr.changes"))}</th></tr></thead><tbody>${body}</tbody></table></div>`
-      : emptyHTML(T("yr.none"), esc(T("yr.noneHint"))))
+// ── 年度比較（2026-12-04 改版，Paul：「it looks really messy and pointless, make filters」）──
+// 資料從 boot.events 來（每一場的記分卡數字 rc_event_card 都在手上），不再另外問 rc_yearly()。
+// yearlyRows：篩完的活動，每一屆、每一種一列，加上每一屆的小計；compareTable：種類 × 屆別的格子，空的列與欄不印。純函式，有測試。
+export const YR_FILTERS = ["term", "kind", "team"];
+export const YR_METRICS = ["attended", "registered", "rate", "responses", "recommend", "useful", "events"];
+export function yearlyFilter(events, f) {
+  const x = f || {};
+  return (events || []).filter(e => (!x.term || (e.term_id || "") === x.term) && (!x.kind || e.kind === x.kind) && (!x.team || (e.team || "") === x.team));
+}
+export function yearlyRows(events) {
+  const g = new Map();
+  for (const e of events || []) {
+    const n = e.numbers || {}; const key = `${e.term_id || ""}\u0000${e.kind || "other"}`;
+    const r = g.get(key) || { term_id: e.term_id || "", kind: e.kind || "other", events: 0, registered: 0, attended: 0, responses: 0, rec_sum: 0, rec_n: 0, use_sum: 0, use_n: 0, changes: [] };
+    r.events += 1; r.registered += Number(n.registered || 0); r.attended += Number(n.attended || 0); r.responses += Number(n.responses || 0);
+    if (n.recommend_avg != null) { const w = Number(n.recommend_n || 1); r.rec_sum += Number(n.recommend_avg) * w; r.rec_n += w; }
+    if (n.useful_avg != null) { const w = Number(n.responses || 1); r.use_sum += Number(n.useful_avg) * w; r.use_n += w; }
+    if (e.review && e.review.we_change) r.changes.push({ event: evTitle(e), we_change: e.review.we_change, change_happened: e.review.change_happened });
+    g.set(key, r);
+  }
+  return [...g.values()].map(r => ({ ...r, rate: r.registered ? Math.round(1000 * r.attended / r.registered) / 10 : null,
+    recommend_avg: r.rec_n ? Math.round(100 * r.rec_sum / r.rec_n) / 100 : null, useful_avg: r.use_n ? Math.round(100 * r.use_sum / r.use_n) / 100 : null }))
+    .sort((a, b) => (b.term_id || "").localeCompare(a.term_id || "") || EKINDS.indexOf(a.kind) - EKINDS.indexOf(b.kind));
+}
+export function yearlyTotals(rows) {
+  const t = { events: 0, registered: 0, attended: 0, responses: 0, rec_sum: 0, rec_n: 0, use_sum: 0, use_n: 0 };
+  for (const r of rows || []) { t.events += r.events; t.registered += r.registered; t.attended += r.attended; t.responses += r.responses; t.rec_sum += r.rec_sum || 0; t.rec_n += r.rec_n || 0; t.use_sum += r.use_sum || 0; t.use_n += r.use_n || 0; }
+  return { ...t, rate: t.registered ? Math.round(1000 * t.attended / t.registered) / 10 : null, recommend_avg: t.rec_n ? Math.round(100 * t.rec_sum / t.rec_n) / 100 : null, useful_avg: t.use_n ? Math.round(100 * t.use_sum / t.use_n) / 100 : null };
+}
+const metricOf = (r, m) => m === "rate" ? r.rate : m === "recommend" ? r.recommend_avg : m === "useful" ? r.useful_avg : r[m];
+export function compareTable(rows, metric) {
+  const m = YR_METRICS.includes(metric) ? metric : "attended";
+  const terms = [...new Set((rows || []).map(r => r.term_id || ""))].sort((a, b) => b.localeCompare(a));
+  const kinds = EKINDS.filter(k => (rows || []).some(r => r.kind === k && metricOf(r, m) != null));
+  const cols = terms.filter(t => (rows || []).some(r => (r.term_id || "") === t && metricOf(r, m) != null));
+  const cell = (k, t) => { const r = (rows || []).find(x => x.kind === k && (x.term_id || "") === t); return r ? metricOf(r, m) : null; };
+  return { metric: m, terms: cols, kinds, cells: kinds.map(k => cols.map(t => cell(k, t))) };
+}
+export function yearlyCSV(events, f) {
+  const rows = yearlyRows(yearlyFilter(events, f));
+  const head = ["term", "kind", "events", "registered", "attended", "attendance_pct", "responses", "recommend_avg", "useful_avg", "changes"];
+  const body = rows.map(r => [r.term_id || "", r.kind, r.events, r.registered, r.attended, r.rate == null ? "" : r.rate, r.responses, r.recommend_avg == null ? "" : r.recommend_avg, r.useful_avg == null ? "" : r.useful_avg,
+    (r.changes || []).map(c => `${c.event}: ${c.we_change}`).join(" | ")]);
+  return "\ufeff" + [head, ...body].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}
+export function yearlyHTML(S) {
+  const boot = S.boot || {}, all = boot.events || [], f = S.yf || {}, metric = YR_METRICS.includes(f.metric) ? f.metric : "attended";
+  const evs = yearlyFilter(all, f), rows = yearlyRows(evs), tot = yearlyTotals(rows), cmp = compareTable(rows, metric);
+  const count = pick => { const m = new Map(); for (const e of all) for (const v of pick(e)) if (v) m.set(v, (m.get(v) || 0) + 1); return [...m]; };
+  const terms = count(e => [e.term_id]).sort((a, b) => b[0].localeCompare(a[0]));
+  const kinds = EKINDS.map(k => [k, count(e => [e.kind]).find(x => x[0] === k)]).filter(x => x[1]).map(([k, x]) => [k, x[1]]);
+  const teams = count(e => [e.team]).sort((a, b) => b[1] - a[1]);
+  const box = (key, labelKey, anyKey, opts, label) => `<label><i>${esc(T(labelKey))}</i><select name="${key}" class="rc-yfilter" data-noauto="1">${pickOpt("", T(anyKey), f[key] || "")}${opts.map(([v, n]) => pickOpt(v, `${label ? label(v) : v} (${n})`, f[key] || "")).join("")}</select></label>`;
+  const active = YR_FILTERS.filter(k => f[k]).length;
+  const hasRec = rows.some(r => r.recommend_avg != null), hasUse = rows.some(r => r.useful_avg != null), hasResp = rows.some(r => r.responses), hasChg = rows.some(r => r.changes.length);
+  const num = v => v == null ? "" : esc(String(v));
+  const tr = (r, bold) => `<tr${bold ? ' class="total"' : ""}><td>${bold ? `<b>${esc(T("yr.total"))}</b>` : `<b>${esc(r.term_id || T("ov.noTerm"))}</b>`}</td><td>${bold ? "" : kindTag(r.kind)}</td><td>${r.events}</td><td>${r.attended}/${r.registered}</td><td>${num(r.rate)}</td>${hasResp ? `<td>${r.responses}</td>` : ""}${hasRec ? `<td>${num(r.recommend_avg)}</td>` : ""}${hasUse ? `<td>${num(r.useful_avg)}</td>` : ""}${hasChg ? `<td>${bold ? "" : (r.changes || []).map(c => `<div class="mini"><b>${esc(c.event)}</b>: ${esc(c.we_change)}${c.change_happened === true ? " ✓" : c.change_happened === false ? " ✗" : ""}</div>`).join("")}</td>` : ""}</tr>`;
+  const table1 = rows.length ? `<div class="tf-scroll"><table class="table rc-table"><thead><tr><th>${esc(T("ev.term"))}</th><th>${esc(T("ev.kind"))}</th><th>${esc(T("yr.events"))}</th><th>${esc(T("num.attendance"))}</th><th>${esc(T("yr.rate"))}</th>${hasResp ? `<th>${esc(T("num.responses"))}</th>` : ""}${hasRec ? `<th>${esc(T("num.recommend"))}</th>` : ""}${hasUse ? `<th>${esc(T("num.useful"))}</th>` : ""}${hasChg ? `<th>${esc(T("yr.changesHead"))}</th>` : ""}</tr></thead><tbody>${rows.map(r => tr(r)).join("")}${rows.length > 1 ? tr(tot, true) : ""}</tbody></table></div>` : emptyHTML(T("yr.none"), esc(T("yr.noneHint")));
+  const table2 = cmp.kinds.length && cmp.terms.length > 1 ? `<div class="tf-scroll"><table class="table rc-table rc-compare"><thead><tr><th>${esc(T("ev.kind"))}</th>${cmp.terms.map(t => `<th>${esc(t || T("ov.noTerm"))}</th>`).join("")}</tr></thead><tbody>${cmp.kinds.map((k, i) => `<tr><td>${kindTag(k)}</td>${cmp.cells[i].map(v => `<td>${num(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : `<div class="mini">${esc(T("yr.noneHint"))}</div>`;
+  return pageHead(T("yr.title"), T("yr.lede"), all.length ? [{ act: "yr-csv", label: T("res.csv") }] : []) + msgHTML(S.msg)
+    + `<div class="card"><div class="two">${box("term", "yr.term", "yr.anyTerm", terms)}${box("kind", "yr.kind", "yr.anyKind", kinds, k => T("ekind." + k))}</div>
+      <div class="two">${box("team", "yr.team", "yr.anyTeam", teams)}<label><i>${esc(T("yr.metric"))}</i><select name="metric" class="rc-yfilter" data-noauto="1">${YR_METRICS.map(m => pickOpt(m, T("yr.m." + m), metric)).join("")}</select></label></div>
+      <div class="row"><b data-yr-count>${esc(T("yr.filtered", { n: evs.length }))}</b>${active ? ` <button class="btn quiet sm" data-act="yr-clear">${esc(T("yr.clear"))}</button>` : ""}</div></div>`
+    + sectionHTML(T("yr.byTerm"), table1)
+    + sectionHTML(T("yr.compare") + "・" + T("yr.m." + metric), table2)
     + `<div class="note">${esc(T("yr.note"))}</div>`;
 }

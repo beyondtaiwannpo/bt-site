@@ -16,7 +16,8 @@ let S = {
   view: "overview", id: null, sub: "questions",
   boot: null, event: null, results: null, person: null, yearly: null,
   people: [], pq: "", pastDraft: null, newDraft: null,
-  dir: null, dirErr: "", df: {}, dirN: 0, ptab: "dir",   // 名錄（2026-12-03）：整份、載入失敗的訊息、篩選、目前印到第幾個、哪個分頁
+  dir: null, dirErr: "", df: {}, dirN: 0, ptab: "dir",
+  yf: {},                                                   // 年度比較的篩選與「比什麼」   // 名錄（2026-12-03）：整份、載入失敗的訊息、篩選、目前印到第幾個、哪個分頁
   aud: null, audSaved: null, find: {}, more: {},
 };
 
@@ -40,7 +41,7 @@ function body() {
   if (S.view === "forms") return UI.formsListHTML(S.boot, S.msg, S.busy, S.newDraft);
   if (S.view === "people" && S.id) return S.person ? UI.personHTML(S.person, S) : UI.msgHTML(S.msg) + UI.skeletonHTML();
   if (S.view === "people") return UI.peopleHTML(S.boot, S);
-  if (S.view === "yearly") return S.yearly ? UI.yearlyHTML(S.yearly, S.msg) : UI.msgHTML(S.msg) + UI.skeletonHTML();
+  if (S.view === "yearly") return UI.yearlyHTML(S);   // 2026-12-04：從 boot.events 算，不另外問資料庫
   return UI.overviewHTML(S.boot, S.msg);
 }
 function render() {
@@ -111,7 +112,6 @@ async function openRoute(keepMsg) {
     else if (S.view === "forms" && S.id) { S.results = await D.loadResults(S.id); if (!S.aud || S.aud._id !== S.id) resetAud(); }
     else if (S.view === "people" && S.id) S.person = await D.loadPerson(S.id);
     else if (S.view === "people" && !Array.isArray(S.dir)) await loadDir();
-    else if (S.view === "yearly") S.yearly = await D.loadYearly();
   } catch (e) { S.msg = T("err.load") + D.says(e); }
   S.busy = false;
   render();
@@ -346,7 +346,8 @@ document.addEventListener("click", async e => {
     download(UI.resultsCSV(r.questions, r.responses, r.form.anonymous), UI.csvFilename(r.form.title));
     S.msg = T("msg.csv", { n: r.responses.length }); render(); return;
   }
-  if (act === "yr-csv") { download(UI.yearlyCSV(S.yearly || []), "bt-yearly.csv"); return; }
+  if (act === "yr-csv") { download(UI.yearlyCSV((S.boot || {}).events || [], S.yf), "bt-yearly.csv"); return; }
+  if (act === "yr-clear") { S.yf = { metric: (S.yf || {}).metric }; render(); return; }
 
   // ── 人 ──
   if (act === "ptab") { S.ptab = b.dataset.t; S.msg = ""; render(); return; }
@@ -395,7 +396,9 @@ let findTimer = null;
 // 名錄的篩選下拉：改了就重畫（不存資料庫，data-noauto 讓自動儲存不接手）。
 document.addEventListener("change", e => {
   const el = e.target;
-  if (!el || !el.classList || !el.classList.contains("rc-dfilter")) return;
+  if (!el || !el.classList) return;
+  if (el.classList.contains("rc-yfilter")) { S.yf = { ...(S.yf || {}), [el.name]: el.value }; render(); return; }
+  if (!el.classList.contains("rc-dfilter")) return;
   S.df = { ...(S.df || {}), [el.name]: el.value }; S.dirN = 0; render();
 });
 document.addEventListener("input", e => {

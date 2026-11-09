@@ -818,6 +818,25 @@ Paul 2026-11-08 點進後台「人」那頁，只看到同名提示與「加一�
 
 同一天 Paul 要求把「很確定是同一個人」的同名列先合併掉：名字只差空格或大小寫、同名又同學校、同名又同畢業年這三種，用一支不進 repo 的 SQL（結果表會印真名）跑在正式庫上；學校不同、或兩邊都沒有學校與畢業年可以對的，留在「可能重複」那頁給人看。
 
+### 年度比較改版（2026-11-08）
+
+Paul 2026-11-08：「year by year now it looks really messy and pointless, can you make filters and stuff」。改成跟「人」同一套：上面一格篩選（屆別、活動種類、team，每個選項帶場數）加「比什麼」（到的人數、報名人數、出席率、回饋份數、推薦平均、有用平均、幾場），下面兩張表：
+
+- **每一屆、每一種**：一列一屆一種，幾場、到／報名、出席率、回饋份數、推薦、有用、說要改的；**空的列不印，整欄都空的欄不印**（沒有回饋就沒有回饋那幾欄）；超過一列就有一列合計。
+- **同一種活動，一屆一欄**：種類 × 屆別的格子，填的是上面選的「比什麼」，整欄或整列都空的不印；只有一屆的時候不印這張表。
+
+資料從 `boot.events`（每一場的記分卡數字）在瀏覽器裡算，不再另外問 `rc_yearly()`（函式留著沒刪）。推薦平均照打分數的人數加權、有用平均照回饋份數加權。`yearlyFilter`、`yearlyRows`、`yearlyTotals`、`compareTable` 是純函式，`test/records.test.mjs` 有假資料的測試。CSV 跟著篩選走，多一欄出席率。
+
+### 出席預設「到了」（`supabase/migrations/2026-12-04-records-attendance.sql`，2026-11-08）
+
+Paul 2026-11-08：「most of the student did come to events so put them as attended」。三件事：
+
+1. 後台手動加的人沒說狀態就是 `attended`（原本 `registered`；畫面上那個下拉本來就預設到了，現在資料庫那端也一樣）。
+2. 從報名表抄出席（`rc_sync_event`）：錄取的人在**活動結束之後**算 `attended`；還沒辦的活動仍然是 `registered`，被拒的仍然 `cancelled`，有簽到的照簽到。
+3. 一次性把舊資料改過來：`rc_attendance_default(p_do)`，只有 Co-President。`false` 只數「已經結束的活動裡還是 registered 的」有幾列、在哪幾場；`true` 才改成 `attended`，`no-show` 與 `cancelled` 不動，`rc_log` 記一筆。遷移檔的驗收表底下直接印這份預覽（場名與數字，沒有名字），Paul 看過數字再跑 `flip-attendance.sql`（不進 repo 的兩行腳本，只是叫 `rc_attendance_default(true)`）。之後個別的 no-show 到那場活動頁面的出席表改狀態就好，那裡本來就有每一列的下拉。
+
+**上線前要在正式 Supabase 跑 2026-12-04 那支**（5 列驗收表全 PASS，底下接預覽），再決定要不要跑 flip。smoke 多 8 項含一個「再按一次是 0」。
+
 ### 跟隱私政策對齊（`supabase/migrations/2026-12-02-records-privacy.sql`，2026-11-08）
 
 隱私政策「回饋與紀錄」那一節對外承諾了三件事，這一支把程式改到跟政策一樣。**2026-11-08 Paul 在正式 Supabase 上跑完，8 列驗收表全 PASS。**
