@@ -132,6 +132,10 @@ export const MINE = {
   "sd.open":          { zh: "現在開放", en: "Open now" },
   // 我的 mentor（2026-12-07）：配對只在紀錄後台，mentee 自己看不到配給誰。從 rc_my_pairs() 來。
   "sd.mentor":        { zh: "我的 mentor", en: "My mentor" },
+  // 我該填的活動回饋（2026-12-07）：參加過的活動還開著的回饋表，直接放連結。
+  "sd.feedback":      { zh: "該填的回饋", en: "Feedback to fill in" },
+  "sd.fbFor":         { zh: "{event}", en: "{event}" },
+  "sd.fbHint":        { zh: "填過的會打勾。答案只有那場活動的負責幹部與 Co-President 看得到。", en: "Filled ones are ticked. Only the cadres running that event and the Co-Presidents read the answers." },
   "sd.pairTerm":      { zh: "{event}（{term}）", en: "{event} ({term})" },
   "sd.fill":          { zh: "填 {title}", en: "Fill in {title}" },
   "sd.filled":        { zh: "{title}：填過了", en: "{title}: done" },

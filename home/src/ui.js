@@ -277,6 +277,7 @@ export function homeHTML(items, ctx) {
       <h2>${T("home.next")}</h2>
       ${next.length ? next.filter(i => i !== linked).map(i => itemCardHTML(i, ctx)).join("") : `<p class="mini">${T("home.nothing")}</p>`}
     </section>
+    ${feedbackHTML(ctx.feedback)}
     ${pairsHTML(ctx.pairs)}
     <section class="block">
       <h2>${T("home.do")}</h2>
@@ -295,6 +296,12 @@ export function pairsHTML(pairs) {
       ${(p.forms || []).map(f => f.done ? `<span class="mini ok">✓ ${esc(T("home.filled", { title: f.title }))}</span>` : `<a class="lnk" href="../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}">${esc(T("home.fill", { title: f.title }))}</a>`).join(" ")}</li>`;
   const block = (title, list) => list.length ? `<section class="block pairs"><h2>${T(title)}${list.length > 1 ? ` <span class="count">${list.length}</span>` : ""}</h2><ul class="pairlist">${list.map(row).join("")}</ul><p class="mini">${T("home.pairHint")}</p></section>` : "";
   return block("home.mentees", asMentor) + block("home.myMentor", asMentee);
+}
+// 該填的活動回饋（2026-12-07）：rc_my_feedback() 回的，有才畫。
+export function feedbackHTML(list) {
+  const L = Array.isArray(list) ? list : [];
+  if (!L.length) return "";
+  return `<section class="block pairs feedback"><h2>${T("home.feedback")}${L.length > 1 ? ` <span class="count">${L.length}</span>` : ""}</h2><ul class="pairlist">${L.map(f => `<li class="pair"><b>${esc(lang() === "zh" ? (f.event_zh || f.event) : f.event)}</b>${f.done ? `<span class="mini ok">✓ ${esc(T("home.filled", { title: f.title }))}</span>` : `<a class="lnk" href="../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}">${esc(T("home.fill", { title: f.title }))}</a>`}</li>`).join("")}</ul><p class="mini">${T("home.fbHint")}</p></section>`;
 }
 
 // ── 行事曆 ──────────────────────────────────────────────────────────

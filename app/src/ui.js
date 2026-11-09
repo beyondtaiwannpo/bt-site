@@ -333,7 +333,7 @@ export function fmtDay(v) {
 // 而且會有人來問什麼時候好。對外首頁的那條規矩在這裡一樣成立。
 // 批 3 會在這裡長出「我的申請」與「現在開放的申請」，批 5 會長出資源。
 // 在那之前不放灰掉的入口 —— 點不下去的東西看起來像壞掉，而且會有人來問。
-export function studentHTML(p, msg, apps, opens, pairs) {
+export function studentHTML(p, msg, apps, opens, pairs, feedback) {
   const row = (k, val) => `<li><b>${esc(k)}</b>${
     val ? `<span>${esc(val)}</span>` : `<span class="empty-v">${T("sd.empty")}</span>`}</li>`;
 
@@ -370,11 +370,22 @@ export function studentHTML(p, msg, apps, opens, pairs) {
     </li>`).join("")}</ul>
     <p class="note">${T("sd.pairHint")}</p>` : "";
 
+  // 該填的回饋（2026-12-07）：rc_my_feedback() 回的，參加過的活動還開著的回饋表。有才畫。
+  const fb = (feedback || []).length ? `
+    <h3 class="sec-h">${T("sd.feedback")}</h3>
+    <ul class="applist">${feedback.map(f => `<li>
+      <b>${esc(f.title)}</b>
+      <span class="st">${esc(T("sd.fbFor", { event: lang() === "zh" ? (f.event_zh || f.event) : f.event }))}</span>
+      <div class="st-more">${f.done ? `<span class="empty-v">✓ ${esc(T("sd.filled", { title: f.title }))}</span>` : `<a href="../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}">${esc(T("sd.fill", { title: f.title }))}</a>`}</div>
+    </li>`).join("")}</ul>
+    <p class="note">${T("sd.fbHint")}</p>` : "";
+
   return `<div class="card">
     <h2>${esc((p && p.name) || T("sd.account"))}</h2>
     <div class="sub">Beyond Taiwan</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     ${mine}
+    ${fb}
     ${mentor}
     ${now}
     <h3 class="sec-h">${T("sd.me")}</h3>

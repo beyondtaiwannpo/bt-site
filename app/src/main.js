@@ -77,7 +77,7 @@ function render() {
     if (sc) sc.addEventListener("focus", fillSchools, { once: true });
     return;
   }
-  el.innerHTML = UI.studentHTML(S.profile, S.authMsg, S.apps, S.opens, S.pairs);
+  el.innerHTML = UI.studentHTML(S.profile, S.authMsg, S.apps, S.opens, S.pairs, S.feedback);
 }
 
 
@@ -125,7 +125,7 @@ async function englishTitles() {
 // 讀不到申請就少畫兩區，不要讓一個人因為這個而連自己的資料都看不到。
 async function loadStudentBits() {
   try {
-    const [ap, op, pr] = await Promise.all([
+    const [ap, op, pr, fb] = await Promise.all([
       // forms 那一段是 PostgREST 的關聯查詢：applications 有 form_id 外鍵，
       // 所以拿得到那一份表單的標題與預計通知日，不用再打一次。
       supabase.from("applications")
@@ -134,8 +134,10 @@ async function loadStudentBits() {
       supabase.from("forms").select("id, title, opens_at, closes_at").eq("status", "open"),
       // 我的 mentor（2026-12-07）：rc_my_pairs() 只回本人的配對；函式還不在就當沒有。
       Promise.resolve(supabase.rpc("rc_my_pairs")).catch(() => ({ data: [] })),
+      Promise.resolve(supabase.rpc("rc_my_feedback")).catch(() => ({ data: [] })),
     ]);
     S.pairs = Array.isArray(pr && pr.data) ? pr.data : [];
+    S.feedback = Array.isArray(fb && fb.data) ? fb.data : [];
     if (ap.error) throw ap.error;
     if (op.error) throw op.error;
     // 表單只有一個 title（多半是中文）；英文畫面用那場活動的 title_en（public_events() 誰都叫得到）。沒有對到就照舊。

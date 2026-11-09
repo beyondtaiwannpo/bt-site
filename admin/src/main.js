@@ -45,6 +45,13 @@ const root = () => document.getElementById("bt-root");
 const canEdit = () => UI.canEditWs(S.me, "apps");
 const isPres = () => !!S.me && !!S.me.senior;
 
+// 換頁淡入（2026-11-09）：S.view 跟上一次畫的不一樣才加 .swap，自動儲存那種重畫不加。CSS 在 admin.css。
+let lastView = null;
+function swapIn(el) {
+  const main = el.querySelector("main.main");
+  if (!main) return;
+  if (lastView !== S.view) { main.classList.add("swap"); lastView = S.view; }
+}
 function render() {
   const el = root();
   if (!el) return;
@@ -115,6 +122,7 @@ function render() {
   const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : "forms";
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body);
   UI.afterRender(S, el);
+  swapIn(el);
 }
 
 // 側欄與頂欄先畫（2026-11-06）：知道我是誰就先把外殼畫出來，內容那一格放骨架，資料回來 render() 整個換掉。
@@ -144,29 +152,33 @@ async function boot(retried) {
     //      所以從別的後台頁換過來這一步幾乎不花時間），側欄與頂欄**立刻畫**，內容先是骨架；
     //   3. 首頁要的六樣東西一起等（teams、todo、workspaces、requests、events、meetings），改前是一個接一個 await，
     //      每個 300 毫秒排隊，實測總覽 3.6 秒才有畫面。載不到的各自接住，不讓整頁打不開。
-    const formsP = D.loadForms(), pendingP = D.loadPendingAll().catch(() => []);
+    const formsP = D.loadForms();
     formsP.catch(() => {});
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     paintShell();
     UI.bindAutosave(root(), onAutosave);
+    // 2026-11-09 效率：沒有任何工作區、也不是 Co-President／Senior Adviser／Director 的幹部，總覽只會印「今天沒有要處理的」加自己的 team，
+    // 工作區、需求單、活動、會議、待寄的信對他全是空的（RLS），不用問（實測從 16 次查詢降到 9 次）。有指派或職級的人照舊全抓。
+    const light = !S.me.senior && S.me.board === "member" && !Object.keys(S.me.ws || {}).length;
+    const pendingP = light ? Promise.resolve([]) : D.loadPendingAll().catch(() => []);
     const [forms, pendingAll, teams, todo, workspaces, requests, events, meetings] = await Promise.all([
       formsP, pendingP,
       D.loadTeams().catch(() => []),
       D.loadTodo(S.me).catch(() => ({})),
-      D.loadWorkspaces().catch(() => []),
-      D.loadRequests().catch(() => null),
-      D.loadEvents().catch(() => null),
-      D.loadMeetings().catch(() => null),
+      light ? [] : D.loadWorkspaces().catch(() => []),
+      light ? null : D.loadRequests().catch(() => null),
+      light ? null : D.loadEvents().catch(() => null),
+      light ? null : D.loadMeetings().catch(() => null),
     ]);
     S.forms = forms; S.pendingAll = pendingAll; S.teams = teams; S.todo = todo; S.workspaces = workspaces;
     S.requests = requests; if (S.todo) S.todo.requests = S.requests;
     S.events = events; if (S.todo) S.todo.events = S.events;
     S.meetings = meetings; if (S.todo) S.todo.meetings = S.meetings;
     // 提醒信的退路（2026-11-02）：開頁叫一次 tick_mail()，Resend 沒設好也不會讓頁面壞。
-    D.tickMail().catch(() => {});
+    if (!light) D.tickMail().catch(() => {});
     // 開頁拉一次大家在 Google 日曆上的回覆，有人改了就重讀會議。
-    D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
+    if (!light) D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     else if (/^(requests?|events|meetings|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }

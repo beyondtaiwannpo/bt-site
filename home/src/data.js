@@ -85,3 +85,8 @@ export async function myPairs() {
   if (error) throw error;
   return Array.isArray(data) ? data : [];
 }
+export async function myFeedback() {
+  const { data, error } = await supabase.rpc("rc_my_feedback");
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}

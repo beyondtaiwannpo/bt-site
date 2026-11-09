@@ -778,7 +778,9 @@ Paul 2026-11-09：「go test out our website and be different person… test out
 
 **第三輪：mentor 與 mentee 登入後有自己的東西了**（`supabase/migrations/2026-12-07-records-my-pairs.sql`，**上線前要跑**，3 列驗收表）。走了一遍才發現 mentor 登入後網站上沒有任何一頁看得到自己帶的是誰，mentee 也一樣（配對只在紀錄後台）。新函式 `rc_my_pairs()` 只回本人在裡面的配對：另一邊的名字、那個學期、配對日、還開著的 check-in 連結（mentor 拿 pair-mentor 的、mentee 拿 pair-mentee 的）與填過了沒；不回 email、不回別人的答案。幹部首頁多一區「我帶的 mentee」（`home/src/ui.js` 的 `pairsHTML`），學員 dashboard 多一區「我的 mentor」（`app/src/ui.js`）：一列一人，check-in 沒填是連結、填過打勾。本機瀏覽器以 mentor（一般幹部）與 mentee（學員帳號）登入各走三次：看到對方、按連結填 check-in、回來看到打勾。smoke 多 3 項。
 
-**沒改、留給 Paul 看的**（完整清單在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-09-persona-walkthrough/`）：後台總覽一開頁打 16 到 20 次資料庫；首頁開場桌機版可以早一點露出標題（Paul 2026-09-07 決定留著動畫，所以沒動）；護照蓋章時集章數可以跳一下（護照的檔另一個 session 正在改，沒碰）；後台換頁可以淡入；學員 dashboard 可以直接放活動後的回饋連結。
+**第四輪再做掉的**：(1) 後台換頁淡入：`admin.css` 多一個只動透明度的 `.main.swap`（140 毫秒），`admin/src/main.js` 與 `admin/records/src/main.js` 的 render 只在 `S.view` 變了才加，自動儲存那種重畫不加；reduce 會關掉。(2) 「該填的回饋」：同一支遷移檔多 `rc_my_feedback()`（本人參加過的活動還開著的活動後回饋表、填過了沒），學員 dashboard 與幹部首頁各一區，連結直接到 `/feedback/?t=`。(3) 後台總覽效率：沒有任何工作區、職級是一般成員的幹部，工作區、需求單、活動、會議、待寄的信對他全是空的，開頁不再問（`light`），實測 16 次查詢降到 8 次；有指派或職級的人照舊。
+
+**沒動、要 Paul 決定的兩件**（完整清單在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-09-persona-walkthrough/`）：首頁開場桌機版早一點露出標題（Paul 2026-09-07 決定留著這段動畫，改節奏要他點頭）；護照蓋章時集章數跳一下（護照的檔另一個 session 正在改，這一輪不碰）。
 
 驗證：812 條測試跑了 4 次、check.sh 4 次、check-motion 3 次（exit 0）、check-mobile 4 次、smoke 1254 項跑了 5 次；九種身分在本機瀏覽器走過，修完的三條流程（學員回到申請表、時間看板、按鈕字色）各再走 3 到 4 次。
 

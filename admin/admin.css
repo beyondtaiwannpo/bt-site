@@ -929,3 +929,7 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .dup.sug-left thead th:nth-child(2),.dup.sug-right thead th:nth-child(3){border-bottom:3px solid var(--bt-orange)}
 .rc-dup thead th.kept{border-bottom:3px solid var(--bt-orange)}
 .rc-dup tfoot .check{margin:0 0 6px;font-size:13px}
+/* 換頁淡入（2026-11-09）：側欄換到另一頁時整塊 main 從 0 淡到 1，140 毫秒，只動透明度（check-motion 的規矩：transition 不動位置）。
+   只在「換了哪一頁」的時候加 .swap（main.js 的 render 看 S.view 有沒有變），自動儲存那種重畫不加，不會閃。各頁 index.html 的 reduce 區塊會把 animation 關掉。 */
+@keyframes bt-main-in{from{opacity:0}to{opacity:1}}
+.main.swap{animation:bt-main-in .14s ease-out}

@@ -47,6 +47,8 @@ export const MINE = {
   "home.do":          { zh: "我要…", en: "I want to…" },
   // 我帶的 mentee（2026-12-07）：配對只在紀錄後台，mentor 自己在網站上看不到帶的是誰。這一區從 rc_my_pairs() 來。
   "home.mentees":     { zh: "我帶的 mentee", en: "My mentees" },
+  "home.feedback":    { zh: "該填的回饋", en: "Feedback to fill in" },
+  "home.fbHint":      { zh: "你參加過的活動還開著的回饋表。填過的打勾。", en: "Open feedback forms for events you were at. Filled ones are ticked." },
   "home.myMentor":    { zh: "我的 mentor", en: "My mentor" },
   "home.pairTerm":    { zh: "{event}（{term}）", en: "{event} ({term})" },
   "home.pairSince":   { zh: "配對日 {d}", en: "paired {d}" },

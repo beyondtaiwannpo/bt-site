@@ -44,6 +44,13 @@ function body() {
   if (S.view === "yearly") return UI.yearlyHTML(S);   // 2026-12-04：從 boot.events 算，不另外問資料庫
   return UI.overviewHTML(S.boot, S.msg);
 }
+// 換頁淡入（2026-11-09）：S.view 跟上一次畫的不一樣才加 .swap，自動儲存那種重畫不加。CSS 在 admin.css。
+let lastView = null;
+function swapIn(el) {
+  const main = el.querySelector("main.main");
+  if (!main) return;
+  if (lastView !== S.view) { main.classList.add("swap"); lastView = S.view; }
+}
 function render() {
   const el = root();
   if (!el) return;
@@ -53,6 +60,7 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
   el.innerHTML = UI.shellHTML(nav, UI.railHTML("records", S.view, S.me), body());
   UI.afterRender(S, el);
+  swapIn(el);
 }
 function paintShell(tab) {
   const el = root();
