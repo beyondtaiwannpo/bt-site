@@ -365,6 +365,25 @@ document.addEventListener("click", async e => {
     if (ok === undefined) return;
     S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.saved"); render(); return;
   }
+  // 同名一群一張卡（2026-12-06）：radio 留哪欄、checkbox 勾哪幾欄，一顆鈕併，一顆鈕記「不是同一個人」。
+  if (act === "dup-merge" || act === "dup-not-same") {
+    const box = b.closest("[data-dup]"); if (!box) return;
+    const { keep, drops } = UI.dupPick(box);
+    if (!keep || !drops.length) { UI.toast(T("dup.needPick")); return; }
+    const name = (box.querySelector("thead th.kept b") || {}).textContent || "";
+    if (UI.needAsk(S, b, T(act === "dup-merge" ? "dup.mergeAsk" : "dup.notSameAsk2", { n: drops.length, name }))) return;
+    S.busy = true; S.msg = ""; render();
+    let done = 0;
+    try {
+      for (const d of drops) { if (act === "dup-merge") await D.mergePeople(keep, d); else await D.markNotSame(keep, d); done++; }
+      S.busy = false; S.dir = null; await loadBoot(); if (act === "dup-merge") await loadDir();
+      S.msg = act === "dup-merge" ? T("msg.mergedN", { n: done }) : T("msg.notSame"); render();
+    } catch (err) {
+      S.busy = false; S.dir = null; await loadBoot();
+      S.msg = T(act === "dup-merge" ? "err.merge" : "err.notSame") + D.says(err) + (done ? ` (${done}/${drops.length})` : ""); render();
+    }
+    return;
+  }
   if (act === "not-same") {
     if (UI.needAsk(S, b, T("dup.notSameAsk"))) return;
     const ok = await run("err.notSame", () => D.markNotSame(b.dataset.a, b.dataset.b));

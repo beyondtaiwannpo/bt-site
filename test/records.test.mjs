@@ -121,9 +121,9 @@ test("★ 名錄是主畫面：三個分頁帶人數，重複的在自己那頁�
   const h = UI.peopleHTML(boot, { boot, dir, df: {}, pq: "", msg: "", ptab: "dir" });
   assert.match(h, /data-act="ptab" data-t="dups"/); assert.match(h, /Directory \(1\)|名錄（1）/); assert.match(h, /duplicates \(1\)|可能重複（1）/);
   assert.match(h, /class="rc-dfilter"/); assert.match(h, /data-dir-count/); assert.match(h, /data-act="open-person" data-id="a"/);
-  assert.doesNotMatch(h, /data-act="merge"/, "重複那一組不在名錄分頁上");
+  assert.doesNotMatch(h, /data-act="dup-merge"/, "重複那一組不在名錄分頁上");
   const d = UI.peopleHTML(boot, { boot, dir, df: {}, pq: "", msg: "", ptab: "dups" });
-  assert.match(d, /data-act="merge"/); assert.doesNotMatch(d, /rc-dfilter/);
+  assert.match(d, /data-act="dup-merge"/); assert.doesNotMatch(d, /rc-dfilter/);
   const v = UI.peopleHTML({ ...boot, can_manage: false }, { boot: { ...boot, can_manage: false }, dir, df: {}, pq: "", msg: "", ptab: "dir" });
   assert.doesNotMatch(v, /data-t="add"/, "看的人沒有「加一個人」");
   const e = UI.peopleHTML(boot, { boot, dir: null, dirErr: UI.T("dir.noFn"), df: {}, pq: "", msg: "", ptab: "dir" });
@@ -160,20 +160,27 @@ test("★ 年度比較：每屆每種一列加權平均、合計、篩選、比�
 });
 
 // 可能重複兩欄並排、一個人的頁面加進活動、活動頁從名單選人（2026-12-05）。假資料。
-test("★ 重複那一組：兩欄並排、不一樣的格子標 diff、建議留的那一邊有 tag、兩顆留哪邊的鈕加「不是同一個人」；沒有摘要就退回名字", () => {
-  const d = { a: "x", b: "y", a_name: "Same Name", b_name: "Same Name", suggest: "b", same_school: true,
-    left: { id: "x", name: "Same Name", kind: "student", school: "TFG", grad_year: 2027, has_account: false, n_events: 1, events: [{ title: "Camp", year: 2025, role: "student", status: "attended" }], n_pairs: 0, n_outcomes: 0, n_emails: 0, n_answers: 0, created_at: "2026-11-07T00:00:00Z" },
-    right: { id: "y", name: "Same Name", kind: "member", school: "TFG", grad_year: 2027, has_account: true, role: "cadre", n_events: 3, events: [], n_pairs: 1, n_outcomes: 1, n_emails: 1, n_answers: 2, created_at: "2026-11-01T00:00:00Z" } };
-  const h = UI.dupCardHTML(d, false);
-  assert.match(h, /class="card dup sug-right"/); assert.match(h, /Suggested to keep|建議留這一邊/);
-  assert.match(h, /data-act="merge" data-keep="x" data-drop="y"/); assert.match(h, /data-act="merge" data-keep="y" data-drop="x"/);
-  assert.match(h, /data-act="not-same" data-a="x" data-b="y"/);
-  assert.match(h, /same school|同學校/);
-  const diffRows = (h.match(/<tr class="diff">/g) || []).length;
-  assert.ok(diffRows >= 6, "身分、帳號、活動、配對、去向、email、回饋、建立日都不一樣，學校與畢業年一樣");
-  assert.match(h, /Camp 2025/);
-  const plain = UI.dupCardHTML({ a: "x", b: "y", a_name: "N", b_name: "N", a_kind: "student", b_kind: "guest" }, false);
-  assert.match(plain, /data-act="merge"/); assert.match(plain, /sug-left/);
+test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留的那欄有 tag、radio 留哪欄、checkbox 預設勾其他的但說過不是的不勾；dupPick 讀得回來；沒有摘要退回名字", () => {
+  const g = { key: "k", name: "Same Name", suggest: "y", not_same: [["x", "z"]],
+    members: [
+      { id: "x", name: "Same Name", name_en: "Same Name", kind: "student", school: "TFG", grad_year: 2027, has_account: false, emails: ["a@x.io"], n_events: 1, events: [{ title: "Camp", year: 2025, role: "student" }], n_pairs: 0, n_outcomes: 0, n_answers: 0, created_at: "2026-11-07T00:00:00Z" },
+      { id: "y", name: "Same Name", name_zh: "同名", name_en: "Same Name", kind: "member", school: "TFG", has_account: true, role: "cadre", emails: [], n_events: 3, events: [], n_pairs: 1, n_outcomes: 1, n_answers: 2, created_at: "2026-11-01T00:00:00Z" },
+      { id: "z", name: "same name", name_en: "same name", kind: "guest", school: "Wagor", has_account: false, emails: ["b@x.io", "c@x.io"], n_events: 0, events: [], n_pairs: 0, n_outcomes: 0, n_answers: 0, created_at: "2026-11-08T00:00:00Z" },
+    ] };
+  const h = UI.dupGroupHTML(g, false);
+  assert.equal((h.match(/<thead><tr><th><\/th>(<th[\s\S]*?<\/th>){3}<\/tr>/g) || []).length, 1, "三欄");
+  assert.match(h, /class="kept"[^>]*><a href="#people\/y"/); assert.match(h, /Suggested to keep|建議留這一欄/);
+  assert.match(h, /name="keep-k" value="y"[^>]*checked/); assert.match(h, /name="merge-k" value="x"[^>]*checked/);
+  assert.match(h, /name="merge-k" value="z" data-noauto="1" checked/);
+  assert.match(h, /name="merge-k" value="y"[^>]*disabled/);
+  assert.match(h, /a@x\.io/); assert.match(h, /b@x\.io<br>c@x\.io/); assert.match(h, /同名/);
+  assert.match(h, /data-act="dup-merge" data-group="k"/); assert.match(h, /data-act="dup-not-same" data-group="k"/);
+  assert.ok((h.match(/<tr class="diff">/g) || []).length >= 6);
+  // dupPick 用假的 DOM
+  const fake = { querySelector: sel => sel.includes("radio") ? { value: "y" } : null, querySelectorAll: () => [{ value: "x" }, { value: "z" }, { value: "y" }] };
+  assert.deepEqual(UI.dupPick(fake), { keep: "y", drops: ["x", "z"] });
+  const plain = UI.dupGroupHTML({ a: "x", b: "y", a_name: "N", b_name: "N", a_kind: "student", b_kind: "guest" }, false);
+  assert.match(plain, /data-act="dup-merge"/); assert.match(plain, /name="keep-x,y" value="x"[^>]*checked/);
 });
 
 test("★ 一個人的頁面：管的人有「加進一場活動」（活動、身分、狀態），成員預設講者；看的人沒有", () => {

@@ -1157,36 +1157,54 @@ export function directoryHTML(S) {
       : `<div class="mini">${esc(T("dir.empty"))}</div>`}
   </div>`;
 }
-// 一組可能重複的人，兩欄並排（2026-12-05）。沒有摘要（遷移檔還沒跑）就退回只印名字與學校。
 // 名錄裡一個人在下拉清單上的那一行：名字 · 學校或身分 · 畢業年。選到之後用這一行反查 id（dirMatch）。
 export const dirLabel = x => [x.name || T("common.noName"), x.school || T("pkind." + (x.kind || "student")), x.grad_year || ""].filter(Boolean).join(" · ");
 export function dirMatch(list, label) { const l = String(label || "").trim(); if (!l) return null; return (list || []).find(x => dirLabel(x) === l) || null; }
-export function dupCardHTML(d, busy) {
-  const L = d.left || { id: d.a, name: d.a_name, kind: d.a_kind, school: d.a_school }, R = d.right || { id: d.b, name: d.b_name, kind: d.b_kind, school: d.b_school };
-  const sug = d.suggest === "b" ? "right" : "left";
-  const evs = side => (side.events || []).map(e => `${e.title}${e.year ? ` ${e.year}` : ""}・${T("prole." + e.role)}`).join("<br>") || "";
+// 一組同名的人，一張卡 N 欄（2026-12-06；12-05 那版是兩兩一組，三個同名會變三張卡，Paul 問「第一張的左邊要跟第二張的右邊合怎麼辦」）。
+// 每一欄：radio「留這一欄」（預設建議的那欄）、checkbox「併進留的那一欄」（預設勾，除了留的那欄、跟說過「不是同一個人」的）。
+// 底下兩顆鈕：把勾起來的併進去；勾起來的不是留的那個人。沒有摘要（遷移檔還沒跑）就退回只印名字。
+export function dupGroupHTML(g, busy) {
+  const members = Array.isArray(g.members) && g.members.length ? g.members : [
+    { id: g.a, name: g.a_name, kind: g.a_kind, school: g.a_school }, { id: g.b, name: g.b_name, kind: g.b_kind, school: g.b_school }].filter(m => m.id);
+  const keep = g.suggest && members.some(m => m.id === g.suggest) ? g.suggest : (g.suggest === "b" && members[1] ? members[1].id : members[0].id);
+  const notSame = new Set((g.not_same || []).map(([a, b]) => `${a}|${b}`));
+  const isNotSame = (x, y) => notSame.has(`${x}|${y}`) || notSame.has(`${y}|${x}`);
+  const key = g.key || members.map(m => m.id).join(",");
+  const evs = m => (m.events || []).map(e => `${esc(e.title)}${e.year ? ` ${esc(String(e.year))}` : ""}・${esc(T("prole." + e.role))}`).join("<br>");
   const rows = [
-    ["person.kind", s => T("pkind." + (s.kind || "student"))],
-    ["dup.account", s => s.has_account ? T("acct." + (s.role || "student")) : T("dup.noAccount")],
-    ["person.school", s => s.school || ""],
-    ["person.gradYear", s => s.grad_year ? String(s.grad_year) : ""],
-    ["dup.events", s => evs(s), s => s.n_events == null ? "" : String(s.n_events)],
-    ["dup.pairs", s => s.n_pairs == null ? "" : String(s.n_pairs)],
-    ["dup.outcomes", s => s.n_outcomes == null ? "" : String(s.n_outcomes)],
-    ["dup.emails", s => s.n_emails == null ? "" : String(s.n_emails)],
-    ["dup.answers", s => s.n_answers == null ? "" : String(s.n_answers)],
-    ["dup.created", s => s.created_at ? fmtDay(s.created_at) : ""],
+    ["person.nameZh", m => esc(m.name_zh || "")],
+    ["person.nameEn", m => esc(m.name_en || "")],
+    ["dup.email", m => (m.emails || []).map(esc).join("<br>")],
+    ["person.kind", m => esc(T("pkind." + (m.kind || "student")))],
+    ["dup.account", m => esc(m.has_account ? T("acct." + (m.role || "student")) : T("dup.noAccount"))],
+    ["person.school", m => esc(m.school || "")],
+    ["person.gradYear", m => esc(m.grad_year ? String(m.grad_year) : "")],
+    ["dup.events", m => evs(m)],
+    ["dup.pairs", m => m.n_pairs == null ? "" : esc(String(m.n_pairs))],
+    ["dup.outcomes", m => m.n_outcomes == null ? "" : esc(String(m.n_outcomes))],
+    ["dup.answers", m => m.n_answers == null ? "" : esc(String(m.n_answers))],
+    ["dup.note", m => esc(m.note || "")],
+    ["dup.created", m => esc(m.created_at ? fmtDay(m.created_at) : "")],
   ];
-  const tr = ([key, fn, cnt]) => { const a = fn(L), b = fn(R); const diff = a !== b; const lab = key === "dup.events" ? T(key, { n: (L.n_events || 0) + "/" + (R.n_events || 0) }).replace(/\s*\(.*\)$/, "") : T(key);
-    return `<tr${diff ? ' class="diff"' : ""}><th>${esc(lab)}</th><td>${a}</td><td>${b}</td></tr>`; };
-  const head = side => `<th><a href="#people/${esc(side.id)}" data-act="open-person" data-id="${esc(side.id)}"><b>${esc(side.name || T("common.noName"))}</b></a>${(d.suggest === "b") === (side === R) ? ` <span class="tag open">${esc(T("dup.suggest"))}</span>` : ""}</th>`;
-  const btn = (keep, drop) => `<button class="btn ghost sm" data-act="merge" data-keep="${esc(keep)}" data-drop="${esc(drop)}"${busy ? " disabled" : ""}>${esc(T("dup.keep"))}</button>`;
-  return `<div class="card dup${sug === "right" ? " sug-right" : " sug-left"}" data-dup="${esc(L.id)}:${esc(R.id)}">
-    <div class="tf-scroll"><table class="table rc-table rc-dup"><thead><tr><th>${d.same_school ? `<span class="tag">${esc(T("dup.sameSchool"))}</span>` : ""}</th>${head(L)}${head(R)}</tr></thead>
+  const tr = ([k, fn]) => { const cells = members.map(fn); const diff = new Set(cells).size > 1; const allEmpty = cells.every(c => !c);
+    if (allEmpty) return "";
+    const lab = k === "dup.events" ? T(k, { n: "" }).replace(/\s*[（(].*$/, "") : T(k);
+    return `<tr${diff ? ' class="diff"' : ""}><th>${esc(lab)}</th>${cells.map(c => `<td>${c}</td>`).join("")}</tr>`; };
+  const head = m => `<th class="${m.id === keep ? "kept" : ""}"><a href="#people/${esc(m.id)}" data-act="open-person" data-id="${esc(m.id)}"><b>${esc(m.name || T("common.noName"))}</b></a>${m.id === keep && members.length > 1 ? ` <span class="tag open">${esc(T("dup.suggest"))}</span>` : ""}</th>`;
+  const pick = m => `<td><label class="check"><input type="radio" name="keep-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id === keep ? " checked" : ""}><span>${esc(T("dup.keepRadio"))}</span></label>
+      <label class="check"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !isNotSame(m.id, keep) ? " checked" : ""}${m.id === keep ? " disabled" : ""}><span>${esc(T("dup.mergeCheck"))}</span>${isNotSame(m.id, keep) ? ` <span class="mini">${esc(T("dup.notSameTag"))}</span>` : ""}</label></td>`;
+  return `<div class="card dup" data-dup="${esc(key)}">
+    <div class="tf-scroll"><table class="table rc-table rc-dup"><thead><tr><th></th>${members.map(head).join("")}</tr></thead>
     <tbody>${rows.map(tr).join("")}</tbody>
-    <tfoot><tr><th></th><td>${btn(L.id, R.id)}</td><td>${btn(R.id, L.id)}</td></tr></tfoot></table></div>
-    <div class="form-foot"><button class="btn quiet sm" data-act="not-same" data-a="${esc(L.id)}" data-b="${esc(R.id)}"${busy ? " disabled" : ""}>${esc(T("dup.notSame"))}</button></div>
+    <tfoot><tr><th></th>${members.map(pick).join("")}</tr></tfoot></table></div>
+    <div class="form-foot"><button class="btn sm" data-act="dup-merge" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(T("dup.mergeBtn"))}</button><button class="btn quiet sm" data-act="dup-not-same" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(T("dup.notSameBtn"))}</button></div>
   </div>`;
+}
+// 從卡上讀「留哪欄、勾了哪幾欄」。純函式：box 是那張卡的 DOM（或假的 querySelectorAll）。
+export function dupPick(box) {
+  const keep = box.querySelector('input[type="radio"]:checked'); const k = keep ? keep.value : "";
+  const drops = [...box.querySelectorAll('input[type="checkbox"]:checked')].map(c => c.value).filter(v => v && v !== k);
+  return { keep: k, drops };
 }
 // 「人」那一頁：三個分頁，名錄是主畫面，「可能重複」與「加一個人」在後面（2026-12-03 之前只有後兩樣，Paul 點進來以為壞了）。
 export function peopleHTML(boot, S) {
@@ -1195,7 +1213,7 @@ export function peopleHTML(boot, S) {
   const n = Array.isArray(S.dir) ? S.dir.length : ((b.counts || {}).people || 0);
   const tabs = [["dir", T("dir.tab", { n })], ["dups", T("dir.dupTab", { n: dups.length })]].concat(b.can_manage ? [["add", T("dir.addTab")]] : []);
   const tabHTML = `<div class="chips tf-tabs" role="tablist">${tabs.map(([k, l]) => `<button class="chip${k === tab ? " on" : ""}" role="tab" aria-selected="${k === tab}" data-act="ptab" data-t="${k}">${esc(l)}</button>`).join("")}</div>`;
-  const dupHTML = sectionHTML(T("pp.dups", { n: dups.length }), dups.length ? `<div class="mini">${esc(T("pp.dupsHint"))}</div>${dups.map(d => dupCardHTML(d, S.busy)).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`);
+  const dupHTML = sectionHTML(T("pp.dups", { n: dups.length }), dups.length ? `<div class="mini">${esc(T("pp.dupsHint"))} ${esc(T("dup.groupHint"))}</div>${dups.map(d => dupGroupHTML(d, S.busy)).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`);
   const add = b.can_manage ? sectionHTML(T("pp.add"), `<div data-padd><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.email"))}</i><input name="email" type="email" maxlength="120"></label><label><i>${esc(T("person.kind"))}</i>${sel("kind", ["student", "guest", "member"].map(k => [k, T("pkind." + k)]), "student")}</label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100"></label></div>

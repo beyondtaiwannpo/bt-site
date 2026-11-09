@@ -927,3 +927,5 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .rc-dup tr.diff td{background:rgba(255,196,108,.22)}
 .rc-dup tfoot td{padding-top:10px}
 .dup.sug-left thead th:nth-child(2),.dup.sug-right thead th:nth-child(3){border-bottom:3px solid var(--bt-orange)}
+.rc-dup thead th.kept{border-bottom:3px solid var(--bt-orange)}
+.rc-dup tfoot .check{margin:0 0 6px;font-size:13px}

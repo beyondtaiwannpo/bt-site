@@ -3050,7 +3050,8 @@ psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" 
 RCTA=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Twin Person' and school='A High'" | tr -d ' \n')
 RCTB=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Twin Person' and school='B High'" | tr -d ' \n')
 psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_set_participation('${RCOLD}', '{\"person_id\":\"${RCTB}\",\"role\":\"speaker\"}'::jsonb)" >/dev/null 2>&1
-chkas "${PAUL}" "★ 同名那一組帶兩邊的摘要與建議：B 那邊有一場活動所以建議留 B、沒有 email 的值、不同學校" "b|1|0|false|speaker|false" "select (d->>'suggest')||'|'||(d#>>'{right,n_events}')||'|'||(d#>>'{left,n_events}')||'|'||(d->>'same_school')||'|'||(d#>>'{right,events,0,role}')||'|'||(d::text like '%@example.com%') from jsonb_array_elements(public.rc_duplicates()) d where d->>'a_name'='Twin Person' limit 1"
+# ⚠ 哪一邊是 a 哪一邊是 b 看 uuid 大小，隨機；所以只看「建議留的那一邊」是不是有活動的那一邊，不看左右。
+chkas "${PAUL}" "★ 同名那一組帶兩邊的摘要與建議：建議留有一場活動（講者）的那邊、另一邊 0 場、不同學校、沒有 email 的值" "1|speaker|0|false|false" "select (k#>>'{n_events}')||'|'||(k#>>'{events,0,role}')||'|'||(o#>>'{n_events}')||'|'||(d->>'same_school')||'|'||(d::text like '%@example.com%') from (select d, case when d->>'suggest'='a' then d->'left' else d->'right' end k, case when d->>'suggest'='a' then d->'right' else d->'left' end o from jsonb_array_elements(public.rc_duplicates()) d where d->>'a_name'='Twin Person' limit 1) t"
 chkraise "★ 沒指派的幹部記不了「不是同一個人」（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_mark_not_same('${RCTA}','${RCTB}');"
 chkas "${PAUL}" "★ 記了「不是同一個人」之後那一組不再出現，兩列都還在" "0|2" "select public.rc_mark_not_same('${RCTA}','${RCTB}'); select (select count(*) from jsonb_array_elements(public.rc_duplicates()) d where d->>'a_name'='Twin Person')||'|'||(select count(*) from public.people where name_en='Twin Person' and forgotten_at is null)"
 chk "★ 有帳號的幹部都在名單上（回填），OUTC 也有一列而且是 member" "0|1|member" "select (select count(*) from public.profiles p where p.role in ('cadre','alumni','intern') and not exists (select 1 from public.people pe where pe.profile_id=p.id))||'|'||(select count(*) from public.people where profile_id='${OUTC}')||'|'||(select kind from public.people where profile_id='${OUTC}')"
@@ -3061,6 +3062,14 @@ psql -d "${DB}" -q -v ON_ERROR_STOP=1 -c "insert into auth.users (id,email) valu
 chk "★ 學員變幹部：同一個 email 開帳號就接上原本那一列、身分變 member、名單人數不變" "${RCSTUA}|member|${RCN0}" "select (select id::text from public.people where profile_id='99990000-0000-0000-0000-00000000000a')||'|'||(select kind from public.people where profile_id='99990000-0000-0000-0000-00000000000a')||'|'||(select count(*) from public.people where forgotten_at is null)"
 angot=$(psql -d "${DB}" -X -A -t -q -c "set role authenticated; select count(*) from public.rc_not_same;" 2>&1 || true)
 if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   登入的人直接讀不到 rc_not_same 表"; pass=$((pass+1)); else echo "  FAIL 登入的人讀得到 rc_not_same：${angot}"; fail=$((fail+1)); fi
+echo "── 同名一群一張卡（2026-12-06-records-dedupe-groups.sql）──"
+rdg=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-06-records-dedupe-groups.sql 2>&1 || true)
+if echo "${rdg}" | grep -q "OVERALL.*PASS" && ! echo "${rdg}" | grep -q "|FAIL"; then echo "  ok   同名一群那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 同名一群那支驗收表："; echo "${rdg}" | head -12; fail=$((fail+1)); fi
+# Twin Person：A 與 B 上面說過不是同一個人。再加一個 C（同名、有 email、有一場活動）：三個都跟某個其他人沒說過不是，所以一群三欄；建議留 C（有活動）；not_same 帶 [A,B]。
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_set_participation('${RCOLD}', '{\"email\":\"twin-c@example.com\",\"name_en\":\"Twin  Person\",\"role\":\"student\"}'::jsonb)" >/dev/null 2>&1
+chkas "${PAUL}" "★ 三個同名一群三欄、建議留資料最多那欄（B：有活動、學校、畢業年）、帶說過不是的那一對、email 的值在欄裡" "3|BHigh|1|true|1" "select jsonb_array_length(g->'members')||'|'||coalesce((select m->>'school' from jsonb_array_elements(g->'members') m where m->>'id'=(g->>'suggest')),'-')||'|'||jsonb_array_length(g->'not_same')||'|'||coalesce((g->'not_same'->0)::text like '%${RCTA}%', false)||'|'||(select count(*) from jsonb_array_elements(g->'members') m where m->'emails' ? 'twin-c@example.com') from jsonb_array_elements(public.rc_duplicates()) g where g->>'name' like 'Twin%'"
+chkas "${PAUL}" "說過不是的那兩個如果只剩彼此就不印：Twin A 跟 C 也說不是之後，群只剩 B 與 C" "2" "select public.rc_mark_not_same('${RCTA}', (select person_id from public.rc_identities where value='twin-c@example.com')); select jsonb_array_length(g->'members') from jsonb_array_elements(public.rc_duplicates()) g where g->>'name' like 'Twin%'"
+chkas "${OUTC}" "沒指派的幹部拿到空的" "0" "select jsonb_array_length(public.rc_duplicates())"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
