@@ -916,6 +916,19 @@ Paul 合併三列蔡昀蓁時問：她先讀北一女、第二年轉 UWC Costa R
 
 驗證：本機兩個同中文名的人（UWC Costa Rica／Taipei First Girls，英文名 Yun／Alecia）從可能重複那張卡併起來：頁面上兩所學校都在、「也叫：Alecia」、再加一所 2018 到 2020 的建國中學排在最前面、把 Taipei 設成現在的之後頁首跟基本資料那格都換了。smoke 多 13 項（1287）。**遷移檔要 Paul 在正式 Supabase 跑**（沒跑之前頁面上那一區會是空的、加學校會報錯）。
 
+### 合併撞到的兩件事：別名撞唯一索引、一個人兩個登入（`supabase/migrations/2026-12-11-records-merge-accounts.sql`，2026-11-10）
+
+Paul 在可能重複那張卡上遇到：一個人三列（幹部帳號 gmail、學員帳號 nyu.edu、2023 營隊沒帳號的一列），留學員帳號、勾另外兩列，跳出兩個訊息：「duplicate key value violates unique constraint rc_identities_one」與「Both have accounts; they cannot be merged」。
+
+- **那串 SQL 原文從哪來**：`rc_identities` 的唯一索引是全表的（同一種 kind 同一個值只能屬於一個人）。2026-12-10 合併時把被併那列的英文名、中文名寫進去當別名，只檢查了留的那個人有沒有，沒檢查別人有沒有，第三列身上有同名的 identity 就撞。現在一律 `on conflict (kind, lower(value)) do nothing`。搬紀錄那一段抽成 `rc_move_records()`，合併人與合併帳號共用；帳號與權限都在搬任何東西之前檢查。
+- **資料庫原文不再給人看**：`admin/records/src/data.js` 的 `says()` 看到 duplicate key、violates、constraint 這類字就翻成一句人話（「資料庫擋下來了，什麼都沒改，把這張卡的名字告訴 Paul」）。
+- **一個人兩個登入帳號**：新函式 `rc_merge_accounts(留, 併)`，只有 Co-President。被併那個帳號的出席、配對、去向、答案、學校紀錄、職位、邀請碼全部搬到留的帳號，那個 email 留在這個人身上當 identity（之後名單、報名用那個 email 還對得到他），然後**把那個登入刪掉**（跟「刪除成員」`remove_member` 一樣直接刪 `auth.users`；那個 email 從此登不進來，重新註冊也接不回帳號，不會再生出一列）。不能併自己正在用的帳號、不能併 Co-President 的帳號、有沒用過的邀請碼先作廢。`rc_log` 記 `account_merge`，`role_changes` 記 `merged`。
+- **卡先講清楚再按**（`admin/records/src/ui.js` 的 `dupBlocker()`）：每一欄跟留的那欄比，兩邊都有登入帳號：Co-President 看到「登入會刪掉」的標籤與那個 email，最上面那一句寫明會發生什麼；不是 Co-President 看到「你併不了」，那欄不勾、勾不了。這欄是幹部或有帳號、留的那欄沒有：也要 Co-President；是的話寫「留的那列接手這個登入」。換「留這一欄」的 radio，這些說明跟著換（`main.js` 的 change 事件）。按下去的確認文字列出會刪掉的 email。
+- **停在第一個出錯的**：一次勾好幾欄，哪一欄失敗就停，訊息寫「停在第 N 欄，前面的已經併好，這一欄跟後面的沒動」，卡重載一次對齊資料庫。
+- **建議留**改成有幹部帳號的那一欄優先（原本只看有沒有帳號與出席多寡；沒帳號那列的分數原本會變成 null 排到最前面，一併修掉）。
+
+驗證：本機三列（member1 幹部帳號、stranger1 學員帳號、一列沒帳號）：Director 登入看到第二欄「你併不了」且勾不了；Co-President 看到「登入會刪掉 stranger1@example.com」、確認文字列出那個 email，併完卡消失、stranger1 的登入沒了、三場出席與兩個 email 都在 member1 身上、`rc_log` 有一筆。smoke 多 13 項。**遷移檔要 Paul 在正式 Supabase 跑**（沒跑之前兩個登入的那一欄按下去還是會被擋，但訊息已經是人話）。
+
 ### 年度比較改版（2026-11-08）
 
 Paul 2026-11-08：「year by year now it looks really messy and pointless, can you make filters and stuff」。改成跟「人」同一套：上面一格篩選（屆別、活動種類、team，每個選項帶場數）加「比什麼」（到的人數、報名人數、出席率、回饋份數、推薦平均、有用平均、幾場），下面兩張表：

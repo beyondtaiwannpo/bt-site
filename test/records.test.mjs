@@ -210,6 +210,20 @@ test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留
   assert.match(UI.dupBtnLabel(fakeBox(2, 1)), /Merge 1 ticked column into column 3|把勾起來的 1 欄併進第 3 欄/);
   assert.match(UI.dupBtnLabel(fakeBox(0, 0)), /Tick a column to merge in first|先勾要併進去的那一欄/);
   // 判成兩個人的那幾對列在最下面，有「其實是同一個人」那顆鈕（act merge，左邊留）；只剩 set_aside 的群不算一張卡
+  // 2026-12-11：登入帳號。兩邊都有：不是 Co-President 就擋（不勾、勾不了、標「needs Co-President」）；是 Co-President 就標「login retired」、說明會刪登入；只有這欄有：留的那列接手
+  const g3 = { key: "k5", suggest: "a", members: [
+      { id: "a", name: "Yun", name_zh: "蔡", has_account: true, role: "cadre", kind: "member", emails: ["yun@gmail.com"], vs_keep: { verdict: "same", same: ["zh_same"], diff: [] } },
+      { id: "b", name: "Yun", name_zh: "蔡", has_account: true, role: "student", kind: "student", emails: ["yun@nyu.edu"], vs_keep: { verdict: "same", same: ["zh_same"], diff: [] } },
+      { id: "c", name: "Yun", name_zh: "蔡", has_account: false, kind: "student", emails: [], vs_keep: { verdict: "same", same: ["zh_same"], diff: [] } },
+    ] };
+  const hm = UI.dupGroupHTML(g3, false, false);   // 一般管紀錄的人
+  assert.match(hm, /name="merge-k5" value="b" data-noauto="1" disabled/); assert.match(hm, /name="merge-k5" value="c" data-noauto="1" checked/);
+  assert.match(hm, /needs Co-President|你併不了/); assert.match(hm, /Column 2 cannot be merged by you|第 2 欄你併不了/); assert.match(hm, /class="rc-verdict">1 column looks like the same person|class="rc-verdict">1 欄像同一個人/); assert.match(hm, /Merge 1 ticked column into column 1|把勾起來的 1 欄併進第 1 欄/);
+  const hp = UI.dupGroupHTML(g3, false, true);    // Co-President
+  assert.match(hp, /name="merge-k5" value="b" data-noauto="1" checked/); assert.match(hp, /login retired|登入會刪掉/); assert.match(hp, /yun@nyu\.edu/);
+  assert.match(hp, /Column 2 has a login \(yun@nyu\.edu\): merging retires that login|第 2 欄有登入帳號（yun@nyu\.edu）/); assert.match(hp, /Merge 2 ticked columns into column 1|把勾起來的 2 欄併進第 1 欄/);
+  assert.equal(UI.dupBlocker(g3.members[1], g3.members[0], false).kind, "block"); assert.equal(UI.dupBlocker(g3.members[1], g3.members[0], true).kind, "retire");
+  assert.equal(UI.dupBlocker(g3.members[2], g3.members[0], false), null); assert.equal(UI.dupBlocker(g3.members[0], g3.members[2], true).kind, "takeover"); assert.equal(UI.dupBlocker(g3.members[0], g3.members[2], false).kind, "block");
   const aside = UI.dupAsideHTML([{ key: "k3", members: [], set_aside: [{ a: "m", b: "n", a_name: "Anika", b_name: "Anika", a_zh: "安一", b_zh: "安二", a_school: "TFG", b_school: null, a_emails: ["a@x.io"], b_emails: ["c@x.io"], why: ["email_disjoint", "zh_diff"] }] }], false);
   assert.match(aside, /data-act="merge" data-keep="m" data-drop="n"/); assert.match(aside, /different email|email 不同/); assert.match(aside, /安一/); assert.match(aside, /c@x\.io/);
   assert.equal(UI.dupAsideHTML([{ members: [], set_aside: [] }], false), "");

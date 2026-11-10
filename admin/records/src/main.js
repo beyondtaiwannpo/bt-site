@@ -378,17 +378,32 @@ document.addEventListener("click", async e => {
     const box = b.closest("[data-dup]"); if (!box) return;
     const { keep, drops } = UI.dupPick(box);
     if (!keep || !drops.length) { UI.toast(T("dup.needPick")); return; }
+    // 哪幾欄有登入帳號：兩邊都有就走合併帳號（Co-President，刪掉被併的登入）；併不了的先擋，不等資料庫報錯（2026-12-11）
+    const grp = ((S.boot && S.boot.duplicates) || []).find(d => d.key === b.dataset.group) || {};
+    const members = grp.members || [], keepM = members.find(m => m.id === keep) || {}, pres = !!(S.me && S.me.pres);
+    const memberOf = id => members.find(m => m.id === id) || { id };
+    const blockers = drops.map(id => UI.dupBlocker(memberOf(id), keepM, pres)).filter(Boolean);
+    if (act === "dup-merge" && blockers.some(x => x.kind === "block")) { S.msg = T("err.merge") + T("says.notPresident"); render(); return; }
+    const retiring = act === "dup-merge" ? drops.map(memberOf).filter(m => m.has_account && keepM.has_account) : [];
+    const retireEmails = retiring.flatMap(m => m.emails || []).join(", ");
     const name = (box.querySelector("thead th.kept b") || {}).textContent || "";
-    if (UI.needAsk(S, b, T(act === "dup-merge" ? "dup.mergeAsk" : "dup.notSameAsk2", { n: drops.length, name }))) return;
+    if (UI.needAsk(S, b, T(act === "dup-not-same" ? "dup.notSameAsk2" : retiring.length ? "dup.mergeAskAcct" : "dup.mergeAsk", { n: drops.length, name, emails: retireEmails }))) return;
     S.busy = true; S.msg = ""; render();
     let done = 0;
     try {
-      for (const d of drops) { if (act === "dup-merge") await D.mergePeople(keep, d); else await D.markNotSame(keep, d); done++; }
+      for (const d of drops) {
+        if (act === "dup-merge") { const m = memberOf(d); if (m.has_account && keepM.has_account) await D.mergeAccounts(keep, d); else await D.mergePeople(keep, d); }
+        else await D.markNotSame(keep, d);
+        done++;
+      }
       S.busy = false; S.dir = null; await loadBoot(); if (act === "dup-merge") await loadDir();
       S.msg = act === "dup-merge" ? T("msg.mergedN", { n: done }) : T("msg.notSame"); render();
     } catch (err) {
       S.busy = false; S.dir = null; await loadBoot();
-      S.msg = T(act === "dup-merge" ? "err.merge" : "err.notSame") + D.says(err) + (done ? ` (${done}/${drops.length})` : ""); render();
+      // 停在第一個出錯的：前面併好的留著，這一欄跟後面的沒動。重載一次卡，畫面才對得上資料庫。
+      const failedCol = members.findIndex(m => m.id === drops[done]) + 1;
+      S.busy = false; S.dir = null; try { await loadBoot(); } catch (x) { /* 重載失敗就照舊畫 */ }
+      S.msg = T(act === "dup-merge" ? "err.merge" : "err.notSame") + D.says(err) + (drops.length > 1 && failedCol ? " " + T("dup.failedAt", { col: failedCol }) : ""); render();
     }
     return;
   }
@@ -464,7 +479,13 @@ document.addEventListener("change", e => {
   const dupBox = el.closest && el.closest("[data-dup]");
   if (dupBox) {
     const keep = (dupBox.querySelector('input[type="radio"]:checked') || {}).value;
-    dupBox.querySelectorAll('input[type="checkbox"]').forEach(c => { c.disabled = c.value === keep; if (c.disabled) c.checked = false; });
+    const grp = ((S.boot && S.boot.duplicates) || []).find(d => d.key === dupBox.dataset.dup) || {}; const members = grp.members || [];
+    const keepM = members.find(m => m.id === keep) || { id: keep }, pres = !!(S.me && S.me.pres);
+    dupBox.querySelectorAll('input[type="checkbox"]').forEach(c => {
+      const m = members.find(x => x.id === c.value) || { id: c.value }; const bk = UI.dupBlocker(m, keepM, pres); const blocked = !!(bk && bk.kind === "block");
+      c.disabled = c.value === keep || blocked; if (c.disabled) c.checked = false;
+      const note = dupBox.querySelector(`[data-blk="${c.value}"]`); if (note && !/說過不是|marked not the same/.test(note.textContent)) note.textContent = bk ? bk.text : "";
+    });
     const btn = dupBox.querySelector('[data-act="dup-merge"]'); if (btn) btn.textContent = UI.dupBtnLabel(dupBox);
     return;
   }

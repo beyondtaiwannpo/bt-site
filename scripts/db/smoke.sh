@@ -3133,6 +3133,31 @@ chkas "${PAUL}" "一個人的頁面帶別名；名錄那一列帶 schools 三所
 chkas "${OTHER}" "Senior Adviser 看得到學校紀錄與別名（不是聯絡方式），identities 還是空的" "3|1|0" "select jsonb_array_length(x->'schools')||'|'||jsonb_array_length(x->'aliases')||'|'||jsonb_array_length(x->'identities') from (select public.rc_person('${RCSA}') x) t"
 chkas "${PAUL}" "刪掉建中那一列：剩兩列" "2" "select public.rc_delete_school('${RCS_CK}'); select count(*) from public.rc_schools where person_id='${RCSA}'"
 chkas "${PAUL}" "★ 忘記一個人連學校紀錄一起清" "0|true" "select public.forget_person('${RCSA}'); select (select count(*) from public.rc_schools where person_id='${RCSA}')||'|'||(select school is null from public.people where id='${RCSA}')"
+echo "── 合併撞到的兩件事：別名撞唯一索引、一個人兩個登入（2026-12-11-records-merge-accounts.sql）──"
+rma=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-11-records-merge-accounts.sql 2>&1 || true)
+if echo "${rma}" | grep -q "OVERALL.*PASS" && ! echo "${rma}" | grep -q "|FAIL"; then echo "  ok   合併帳號那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 合併帳號那支驗收表："; echo "${rma}" | head -12; fail=$((fail+1)); fi
+# 同一個人三列：幹部帳號（A）、學員帳號（B，出席比較多）、2023 營隊沒帳號的一列（C，身上有 name_en 的 identity，跟 B 同名）
+ACCA=77770000-0000-0000-0000-0000000000a1
+ACCB=77770000-0000-0000-0000-0000000000b1
+psql -d "${DB}" -X -A -t -q -c "insert into auth.users (id,email) values ('${ACCA}','two-a@example.com'), ('${ACCB}','two-b@example.com');" -c "insert into public.profiles (id,name_zh,name_en,team,role) values ('${ACCA}','雙帳','Two Login','Curriculum','cadre'), ('${ACCB}','雙帳','Two Login',null,'student');" -c "select public.rc_ensure_person('${ACCB}');" 2>&1 | grep -i "error" || true
+RCAA=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where profile_id='${ACCA}'" | tr -d ' \n')
+RCAB=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where profile_id='${ACCB}'" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "update public.people set name_en='Two Login' where id in ('${RCAA}','${RCAB}');" -c "insert into public.people (name_zh, name_en, kind, note) values ('雙帳', 'Two Login', 'student', '2023 bootcamp');" -c "insert into public.rc_identities (person_id, kind, value, source) values ('${RCAB}', 'name_en', 'Two Login', 'import') on conflict do nothing;" -c "insert into public.rc_participation (person_id, event_id, role, status, source) values ('${RCAB}', '${RCMT}', 'mentee', 'attended', 'import'), ('${RCAB}', '${RCMT}', 'student', 'attended', 'import');" -c "insert into public.positions (person_id, term_id, title_zh, title_en, team) values ('${RCAB}', '2026-27', '學員代表', 'Student Rep', 'Curriculum Team') on conflict do nothing;" 2>&1 | grep -i "error" || true
+RCAC=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Two Login' and profile_id is null" | tr -d ' \n')
+chk "三列都在：A 幹部帳號、B 學員帳號（2 場）、C 沒帳號且 B 身上有同名的 name_en identity" "3|2|1" "select (select count(*) from public.people where name_en='Two Login')||'|'||(select count(*) from public.rc_participation where person_id='${RCAB}')||'|'||(select count(*) from public.rc_identities where kind='name_en' and lower(value)='two login')"
+chkas "${PAUL}" "★ 建議留有幹部帳號的 A，就算學員帳號 B 出席比較多" "t" "select (g->>'suggest')='${RCAA}' from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Two Login'"
+chkraise "★ 兩邊都有帳號，一般合併先擋（both_have_accounts），不會先撞唯一索引" "both_have_accounts" "perform set_config('test.uid','${PAUL}',true); perform public.rc_merge_people('${RCAA}','${RCAB}');"
+chkas "${PAUL}" "★ C（沒帳號、同名）併進 A：以前這裡撞 rc_identities_one，現在過，別名不重複寫" "1|2|1" "select public.rc_merge_people('${RCAA}','${RCAC}'); select (select count(*) from public.people where id='${RCAA}')||'|'||(select count(*) from public.people where name_en='Two Login')||'|'||(select count(*) from public.rc_identities where kind='name_en' and lower(value)='two login')"
+chkraise "★ 沒指派的幹部併不了帳號（not_president）" "not_president" "perform set_config('test.uid','${OUTC}',true); perform public.rc_merge_accounts('${RCAA}','${RCAB}');"
+chkraise "★ Director 也併不了帳號（not_president）" "not_president" "perform set_config('test.uid','${DIR}',true); perform public.rc_merge_accounts('${RCAA}','${RCAB}');"
+PAULP=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where profile_id='${PAUL}'" | tr -d ' \n')
+chkraise "★ 不能併掉自己正在用的帳號（cannot_remove_self）" "cannot_remove_self" "perform set_config('test.uid','${PAUL}',true); perform public.rc_merge_accounts('${RCAA}','${PAULP}');"
+psql -d "${DB}" -X -A -t -q -c "update public.profiles set board_role='president' where id='${ACCB}';" 2>&1 | grep -i "error" || true
+chkraise "★ 不能併掉 Co-President 的帳號（cannot_retire_president）" "cannot_retire_president" "perform set_config('test.uid','${PAUL}',true); perform public.rc_merge_accounts('${RCAA}','${RCAB}');"
+psql -d "${DB}" -X -A -t -q -c "update public.profiles set board_role='member' where id='${ACCB}';" 2>&1 | grep -i "error" || true
+chkraise "只有一邊有帳號不能走合併帳號（not_both_accounts）" "not_both_accounts" "perform set_config('test.uid','${PAUL}',true); perform public.rc_merge_accounts('${RCAA}', '${RCVA}');"
+chkas "${PAUL}" "★ Co-President 把 B 併進 A：B 的列與登入都沒了、兩場出席與職位到 A、B 的 email 留在 A 身上、有紀錄" "1|0|0|2|1|two-b@example.com|1" "select public.rc_merge_accounts('${RCAA}','${RCAB}'); select (select count(*) from public.people where id='${RCAA}')||'|'||(select count(*) from public.people where id='${RCAB}')||'|'||(select count(*) from auth.users where id='${ACCB}')||'|'||(select count(*) from public.rc_participation where person_id='${RCAA}')||'|'||(select count(*) from public.positions where person_id='${RCAA}' and title_en='Student Rep')||'|'||(select value from public.rc_identities where person_id='${RCAA}' and kind='email' and value='two-b@example.com')||'|'||(select count(*) from public.rc_log where what='account_merge' and ref='${RCAA}')"
+chkas "${PAUL}" "併完卡上這一組不見了" "0" "select count(*) from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Two Login' and jsonb_array_length(g->'members')>=2"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -54,6 +54,7 @@ export const setCurrentSchool = id => rpc("rc_set_current_school", { p_school: i
 export const saveReview    = (id, p) => rpc("rc_save_review", { p_event: id, p });
 export const savePerson    = (id, p) => rpc("rc_save_person", { p_person: id || null, p });
 export const mergePeople   = (keep, drop) => rpc("rc_merge_people", { p_keep: keep, p_drop: drop });
+export const mergeAccounts = (keep, drop) => rpc("rc_merge_accounts", { p_keep: keep, p_drop: drop });
 export const forgetPerson  = id => rpc("forget_person", { p_person: id });
 export const anonymiseOld  = doIt => rpc("rc_anonymise_old", { p_do: !!doIt });
 
@@ -68,12 +69,14 @@ const SAYS = [
   ["need_questions", "says.needQuestions"], ["has_responses", "says.hasResponses"], ["bad_person", "says.badPerson"],
   ["mentor_cannot_read", "says.mentorRead"], ["pair_readers_by_person", "says.pairByPerson"],
   ["same_person", "says.samePerson"], ["both_have_accounts", "says.bothAccounts"], ["has_account", "says.hasAccount"], ["email_taken", "says.emailTaken"],
-  ["slug_taken", "says.slugTaken"], ["bad_slug", "says.badSlug"], ["not_president", "says.notPresident"], ["need_name_or_email", "err.needName"],
+  ["slug_taken", "says.slugTaken"], ["bad_slug", "says.badSlug"], ["not_president", "says.notPresident"], ["both_have_accounts", "says.bothAccounts"], ["not_both_accounts", "says.notBothAccounts"], ["has_unused_invite", "says.unusedInvite"], ["cannot_remove_self", "says.cannotSelf"], ["cannot_retire_president", "says.cannotPresident"], ["need_name_or_email", "err.needName"],
   ["rc_bootstrap", "says.noTables"], ["rc_event", "says.noTables"],
 ];
 export function says(err) {
   const m = String((err && err.message) || err || "");
   for (const [code, key] of SAYS) if (m.includes(code)) return T(key);
   if (m.includes("not_signed_in")) return lang() === "zh" ? "你的登入已經過期了，重新登入一次就好。" : "Your sign-in has expired. Sign in again.";
+  // 資料庫的原文（duplicate key、violates…）不給人看：翻成一句人話（2026-12-11，Paul 看到 rc_identities_one 那串）
+  if (/duplicate key|violates|constraint|syntax error|null value in column/i.test(m)) return T("says.dbClash");
   return m;
 }

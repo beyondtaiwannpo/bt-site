@@ -1188,16 +1188,36 @@ export function verdictOf(m, k) {
   return { verdict: "unsure", same: [], diff: [] };
 }
 const evText = codes => (codes || []).map(c => T("dup.ev." + c)).join(T("dup.listSep"));
-// 卡最上面那一句：這幾欄像不像同一個人、接下來按什麼。
-export function dupVerdictLine(members, keep) {
+// 一欄能不能併進留的那欄、併了會怎樣（2026-12-11）。回 null（沒事）或 { kind, text }：
+//   block：這個人併不了（兩邊都有登入帳號、或這欄是幹部／有帳號，而現在的人不是 Co-President）；不勾、勾不了。
+//   retire：兩邊都有登入帳號而且是 Co-President：併進去會把這欄的登入刪掉（rc_merge_accounts）。
+//   takeover：這欄有登入、留的那欄沒有：留的那列接手這個登入（merge_people 那條路）。
+export function dupBlocker(m, k, pres) {
+  if (!m || !k || m.id === k.id) return null;
+  const emails = (m.emails || []).join(", ");
+  const mHas = !!m.has_account, kHas = !!k.has_account;
+  if (mHas && kHas) return pres ? { kind: "retire", text: T("dup.retire", { emails }) } : { kind: "block", text: T("dup.needPresAcct") };
+  if ((mHas || m.kind === "member") && !pres) return { kind: "block", text: T("dup.needPresMember") };
+  if (mHas && !kHas) return { kind: "takeover", text: T("dup.takeover") };
+  return null;
+}
+// 卡最上面那一句：這幾欄像不像同一個人、哪幾欄併不了或會刪登入、接下來按什麼。
+export function dupVerdictLine(members, keep, pres) {
   const keepM = members.find(m => m.id === keep); if (!keepM || members.length < 2) return "";
   const col = m => members.indexOf(m) + 1;
-  const others = members.filter(m => m.id !== keep).map(m => ({ m, v: verdictOf(m, keepM) }));
-  const same = others.filter(o => o.v.verdict === "same"), unsure = others.filter(o => o.v.verdict === "unsure"), diff = others.filter(o => o.v.verdict === "different");
+  const others = members.filter(m => m.id !== keep).map(m => ({ m, v: verdictOf(m, keepM), b: dupBlocker(m, keepM, pres) }));
+  const blocked = o => !!(o.b && o.b.kind === "block");
+  // 「像同一個人、已經勾好」只數真的勾得了的；併不了的那幾欄另外一句講
+  const same = others.filter(o => o.v.verdict === "same" && !blocked(o)), unsure = others.filter(o => o.v.verdict === "unsure" && !blocked(o)), diff = others.filter(o => o.v.verdict === "different" && !blocked(o));
   const parts = [];
   if (same.length) parts.push(T("dup.vSame", { n: same.length, ev: evText([...new Set(same.flatMap(o => o.v.same))]) }));
   if (unsure.length) parts.push(T("dup.vUnsure", { cols: unsure.map(o => col(o.m)).join(T("dup.listSep")) }));
   if (diff.length) parts.push(T("dup.vDiff", { cols: diff.map(o => col(o.m)).join(T("dup.listSep")), ev: evText([...new Set(diff.flatMap(o => o.v.diff))]) }));
+  const bl = others.filter(o => o.b);
+  const retire = bl.filter(o => o.b.kind === "retire"), block = bl.filter(o => o.b.kind === "block"), take = bl.filter(o => o.b.kind === "takeover");
+  if (retire.length) parts.push(T("dup.vRetire", { cols: retire.map(o => col(o.m)).join(T("dup.listSep")), emails: retire.flatMap(o => o.m.emails || []).join(", ") }));
+  if (block.length) parts.push(T("dup.vBlock", { cols: block.map(o => col(o.m)).join(T("dup.listSep")) }));
+  if (take.length) parts.push(T("dup.vTakeover", { cols: take.map(o => col(o.m)).join(T("dup.listSep")) }));
   parts.push(T("dup.how", { col: col(keepM) }));
   return parts.join(" ");
 }
@@ -1208,7 +1228,7 @@ export function dupBtnLabel(box) {
   const n = [...box.querySelectorAll('input[type="checkbox"]:checked')].filter(c => c.value && c.value !== k).length;
   return n ? T("dup.mergeBtnN", { n, col: ki + 1 }) : T("dup.mergeBtn0");
 }
-export function dupGroupHTML(g, busy) {
+export function dupGroupHTML(g, busy, pres) {
   const members = Array.isArray(g.members) && g.members.length ? g.members : [
     { id: g.a, name: g.a_name, kind: g.a_kind, school: g.a_school }, { id: g.b, name: g.b_name, kind: g.b_kind, school: g.b_school }].filter(m => m.id);
   const keep = g.suggest && members.some(m => m.id === g.suggest) ? g.suggest : (g.suggest === "b" && members[1] ? members[1].id : members[0].id);
@@ -1216,6 +1236,7 @@ export function dupGroupHTML(g, busy) {
   const isNotSame = (x, y) => notSame.has(`${x}|${y}`) || notSame.has(`${y}|${x}`);
   const keepM = members.find(m => m.id === keep);
   const vOf = m => verdictOf(m, keepM);
+  const blk = m => dupBlocker(m, keepM, !!pres);
   const key = g.key || members.map(m => m.id).join(",");
   const evs = m => (m.events || []).map(e => `${esc(e.title)}${e.year ? ` ${esc(String(e.year))}` : ""}・${esc(T("prole." + e.role))}`).join("<br>");
   const rows = [
@@ -1240,20 +1261,21 @@ export function dupGroupHTML(g, busy) {
     return `<tr${diff ? ' class="diff"' : ""}><th>${esc(lab)}</th>${cells.map(c => `<td>${c}</td>`).join("")}</tr>`; };
   // 表頭：建議留的那欄橘底線加「建議留這一欄」；其他欄照跟它比的結果掛一個小標籤（像同一個人／資料不夠／像不同人）加證據。
   const tagOf = m => { if (m.id === keep) return members.length > 1 ? ` <span class="tag open">${esc(T("dup.suggest"))}</span>` : "";
-    const v = vOf(m); const ev = v.verdict === "different" ? evText(v.diff) : evText(v.same);
+    const v = vOf(m); const ev = v.verdict === "different" ? evText(v.diff) : evText(v.same); const b = blk(m);
     const cls = v.verdict === "same" ? "ok" : v.verdict === "different" ? "warn" : "draft";
-    return ` <span class="tag ${cls}" title="${esc(ev)}">${esc(T("dup.v." + v.verdict))}</span>${ev ? `<div class="mini">${esc(ev)}</div>` : ""}`; };
+    const extra = b && b.kind === "block" ? ` <span class="tag closed">${esc(T("dup.tagBlock"))}</span>` : b && b.kind === "retire" ? ` <span class="tag warn">${esc(T("dup.tagRetire"))}</span>` : "";
+    return ` <span class="tag ${cls}" title="${esc(ev)}">${esc(T("dup.v." + v.verdict))}</span>${extra}${ev ? `<div class="mini">${esc(ev)}</div>` : ""}`; };
   const head = m => `<th class="${m.id === keep ? "kept" : vOf(m).verdict === "different" ? "other" : ""}"><a href="#people/${esc(m.id)}" data-act="open-person" data-id="${esc(m.id)}"><b>${esc(m.name || T("common.noName"))}</b></a>${tagOf(m)}</th>`;
   // 底下兩列：一列 radio「留這一欄」、一列 checkbox「併進去」，格子只放那一顆（文字在最左邊的表頭），圈圈才對得齊
   // （2026-11-09 Paul 截圖：三欄各自「Keep this one」「Merge into the kept one」擠在格子裡換行，圓圈沒對齊；radio 還吃到 input 的 width:100%）。
   // 預設只勾「像同一個人」的那幾欄；資料不夠、像不同人、說過不是的都不勾。
   const rad = m => `<td><label class="pick"><input type="radio" name="keep-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id === keep ? " checked" : ""} aria-label="${esc(T("dup.keepRadio"))}: ${esc(m.name || T("common.noName"))}"></label></td>`;
-  const box = m => { const ns = isNotSame(m.id, keep), v = vOf(m).verdict;
-    return `<td><label class="pick"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !ns && v === "same" ? " checked" : ""}${m.id === keep ? " disabled" : ""} aria-label="${esc(T("dup.mergeCheck"))}: ${esc(m.name || T("common.noName"))}"></label>${ns ? `<div class="mini">${esc(T("dup.notSameTag"))}</div>` : ""}</td>`; };
-  const n0 = members.filter(m => m.id !== keep && !isNotSame(m.id, keep) && vOf(m).verdict === "same").length;
+  const box = m => { const ns = isNotSame(m.id, keep), v = vOf(m).verdict, b = blk(m), blocked = !!(b && b.kind === "block");
+    return `<td><label class="pick"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !ns && !blocked && v === "same" ? " checked" : ""}${m.id === keep || blocked ? " disabled" : ""} aria-label="${esc(T("dup.mergeCheck"))}: ${esc(m.name || T("common.noName"))}"></label><div class="mini" data-blk="${esc(m.id)}">${ns ? esc(T("dup.notSameTag")) : b ? esc(b.text) : ""}</div></td>`; };
+  const n0 = members.filter(m => m.id !== keep && !isNotSame(m.id, keep) && vOf(m).verdict === "same" && !(blk(m) && blk(m).kind === "block")).length;
   const btn = n0 ? T("dup.mergeBtnN", { n: n0, col: members.indexOf(keepM) + 1 }) : T("dup.mergeBtn0");
   return `<div class="card dup" data-dup="${esc(key)}">
-    <p class="rc-verdict">${esc(dupVerdictLine(members, keep))}</p>
+    <p class="rc-verdict">${esc(dupVerdictLine(members, keep, !!pres))}</p>
     <div class="tf-scroll"><table class="table rc-table rc-dup"><thead><tr><th></th>${members.map(head).join("")}</tr></thead>
     <tbody>${rows.map(tr).join("")}</tbody>
     <tfoot><tr><th>${esc(T("dup.keepRadio"))}</th>${members.map(rad).join("")}</tr><tr><th>${esc(T("dup.mergeCheck"))}</th>${members.map(box).join("")}</tr></tfoot></table></div>
@@ -1284,7 +1306,7 @@ export function peopleHTML(boot, S) {
   const tabs = [["dir", T("dir.tab", { n })], ["dups", T("dir.dupTab", { n: dups.filter(d => (Array.isArray(d.members) ? d.members.length >= 2 : !!d.a)).length })]].concat(b.can_manage ? [["add", T("dir.addTab")]] : []);
   const tabHTML = `<div class="chips tf-tabs" role="tablist">${tabs.map(([k, l]) => `<button class="chip${k === tab ? " on" : ""}" role="tab" aria-selected="${k === tab}" data-act="ptab" data-t="${k}">${esc(l)}</button>`).join("")}</div>`;
   const cards = dups.filter(d => (Array.isArray(d.members) ? d.members.length >= 2 : !!d.a));   // 只剩 set_aside 的群不算一張卡
-  const dupHTML = sectionHTML(T("pp.dups", { n: cards.length }), cards.length ? `<div class="mini">${esc(T("pp.dupsHint"))} ${esc(T("dup.groupHint"))}</div>${cards.map(d => dupGroupHTML(d, S.busy)).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`) + dupAsideHTML(dups, S.busy);
+  const dupHTML = sectionHTML(T("pp.dups", { n: cards.length }), cards.length ? `<div class="mini">${esc(T("pp.dupsHint"))} ${esc(T("dup.groupHint"))}</div>${cards.map(d => dupGroupHTML(d, S.busy, !!(S.me && S.me.pres))).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`) + dupAsideHTML(dups, S.busy);
   const add = b.can_manage ? sectionHTML(T("pp.add"), `<div data-padd><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.email"))}</i><input name="email" type="email" maxlength="120"></label><label><i>${esc(T("person.kind"))}</i>${sel("kind", ["student", "guest", "member"].map(k => [k, T("pkind." + k)]), "student")}</label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100"></label></div>
