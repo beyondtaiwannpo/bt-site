@@ -963,6 +963,10 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 
 /* 場地（2026-11-10） */
 .vn-find{display:block;margin:0 0 10px}
+/* 活動清單的搜尋與 team 篩選同一排（2026-11-11），窄螢幕自己換行。 */
+.ev-find{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
+.ev-find .ro-search{margin:0;flex:1 1 240px}
+.ev-find select{width:auto;max-width:100%}
 .vn-dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0}
 .vn-dl dt{font-weight:600}
 .vn-dl dd{margin:0;min-width:0;overflow-wrap:anywhere}

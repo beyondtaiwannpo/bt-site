@@ -1265,13 +1265,15 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
     <div class="note">${T("ws.levels")} ${T("ws.addNote")}</div>
     ${membersAreaHTML("ws", { rows: members || [], people: pkPeople, pk: d.pk, busy, acts: { level: "ws-level", remove: "ws-unassign", cleanup: "ws-cleanup" }, canCleanup: !!canCreate, go: { act: "ws-assign", ws: w.id } })}`;
   // 新增工作區（2026-10-23 批 2）：一張表單做完，名稱、擁有人、代號（從英文名稱自動算）、一開始就放進去的人各自一個等級。
-  // 不再收在摺疊裡。main.js 的 ws-create 先建工作區，再把勾起來的人一個一個派進去。
+  // 2026-11-11 Paul：又收回摺疊，放在最上面（一直開著放在最底下，清單長了看不到，也很干擾）。填到一半重畫後還開著。
+  // main.js 的 ws-create 先建工作區，再把勾起來的人一個一個派進去。
   // 一開始就放進去的人（2026-10-24 改成同一塊多選）：一個等級套全部，建立鈕上算人數。
   const nNew = pkPicked(pkPeople, [], d.npk).length;
   // 先選 team（2026-10-24）：新的那一格會出現在那個 team 的那一列底下。表上沒有欄位存 team，靠擁有人勾的 team 推，
   // 所以擁有人只列那個 team 的人；沒選 team 的放在「整個 BT」那一列。
   const ownerPool = d.team ? cadres.filter(p => parseTeams(p.team).includes(d.team)) : cadres;
-  const create = canCreate ? sectionHTML(T("ws.new"), `<div class="note">${T("ws.newWhat")}</div><div class="two">
+  const newOpen = !!(d.team || d.slug || d.title_zh || d.title_en || d.owner || nNew);
+  const create = canCreate ? peFold("ws-new", T("ws.new"), "", `<div class="note">${T("ws.newWhat")}</div><div class="two">
       <label><i>${T("ws.team")}</i><select id="wsn-team" data-act="wsn-team"${dis}><option value="">${T("ws.board")}</option>${TEAMS.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>
       <label><i>${T("ws.ownerPick")}</i><select id="wsn-owner"${dis}><option value="">${T("value.none")}</option>${ownerPool.map(p => `<option value="${esc(p.profile_id)}"${d.owner === p.profile_id ? " selected" : ""}>${esc(pickName(p))}</option>`).join("")}</select></label>
       <label><i>${T("ws.titleEn")}</i><input id="wsn-en" value="${esc(d.title_en || "")}" placeholder="Winter camp 2027"${dis}></label>
@@ -1282,11 +1284,11 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
     <h3 class="sec-h" style="margin-top:16px">${T("ws.newMembers")}</h3>
     ${membersAreaHTML("wsn", { people: pkPeople, pk: d.npk, busy, draft: true })}
     <div class="row" style="margin-top:14px"><button class="btn" data-act="ws-create"${dis}>${busy ? T("common.saving") : (nNew ? T("ws.createGoN", { n: nNew }) : T("ws.createGo"))}</button></div>
-    <div class="mini">${T("ws.newNote")}</div>`, { id: "ws-new" }) : "";
+    <div class="mini">${T("ws.newNote")}</div>`, newOpen) : "";
   return pageHead(T("ws.title"), T("ws.lede"))
     + msgHTML(msg)
-    + `<div class="cols cols-slim"><section class="section">${left}</section><section class="section">${right}</section></div>`
-    + create;
+    + create
+    + `<div class="cols cols-slim"><section class="section">${left}</section><section class="section">${right}</section></div>`;
 }
 
 // 屆別：清單加人數、補過去的一屆、貼一整屆、結束這一屆（三步）。
@@ -1301,7 +1303,8 @@ export function termsHTML(terms, people, meId, isPres, msg, busy, draft, end) {
   const rows = (terms || []).map(t => `<li><div class="fhead"><b>${esc(t.id)}</b>${t.status === "current" ? `<span class="tag open">${T("tm.current")}</span>` : `<span class="tag draft">${T("tm.ended")}</span>`}</div>
     <div class="fmeta">${esc((lang() === "zh" ? (t.title_zh || t.title_en) : (t.title_en || t.title_zh)) || "")}・${esc(t.starts_on)} → ${esc(t.ends_on)}・${T("tm.count", { n: count(t), m: noAcc(t) })}</div></li>`).join("");
   const listSec = sectionHTML(T("tm.list"), rows ? `<ul class="flist">${rows}</ul>` : emptyHTML(T("tm.empty"), T("tm.emptyHint")));
-  const newSec = sectionHTML(T("tm.new"), `<div class="two">
+  // 補一屆、貼一整屆一年用不到幾次，收成一行（2026-11-11）。填到一半或預覽中重畫後還開著。
+  const newSec = peFold("tm-new", T("tm.new"), "", `<div class="two">
       <label><i>${T("tm.id")}</i><input id="tm-id" value="${esc(nw.id || "")}" placeholder="2024-25"${dis}></label>
       <span></span>
       <label><i>${T("ws.titleZh")}</i><input id="tm-zh" value="${esc(nw.zh || "")}" placeholder="2024-25 屆"${dis}></label>
@@ -1310,15 +1313,15 @@ export function termsHTML(terms, people, meId, isPres, msg, busy, draft, end) {
       <label><i>${T("tm.ends")}</i><input id="tm-ends" type="date" value="${esc(nw.ends || "")}"${dis}></label>
     </div>
     <div class="row"><button class="btn ghost" data-act="term-create"${dis}>${T("tm.createGo")}</button></div>
-    <div class="mini">${T("tm.newNote")}</div>`);
-  const pasteSec = sectionHTML(T("tm.paste"), `<label><i>${T("pe.term")}</i><select id="tp-term"${dis}>${(terms || []).map(t => `<option value="${esc(t.id)}"${(ps.term || (cur && cur.id)) === t.id ? " selected" : ""}>${esc(t.id)}</option>`).join("")}</select></label>
+    <div class="mini">${T("tm.newNote")}</div>`, !!(nw.id || nw.zh || nw.en || nw.starts || nw.ends));
+  const pasteSec = peFold("tm-paste", T("tm.paste"), "", `<label><i>${T("pe.term")}</i><select id="tp-term"${dis}>${(terms || []).map(t => `<option value="${esc(t.id)}"${(ps.term || (cur && cur.id)) === t.id ? " selected" : ""}>${esc(t.id)}</option>`).join("")}</select></label>
     <label><i>${T("tm.pasteBox")}</i><textarea id="tp-text" rows="6" placeholder="${esc(T("tm.pastePh"))}"${dis}>${esc(ps.text || "")}</textarea></label>${
     ps.preview ? `<div class="note">${T("tm.pastePreview", { n: ps.preview.rows.length, bad: ps.preview.bad.length ? T("tm.pasteBad", { lines: ps.preview.bad.join(", ") }) : "" })}</div>
       <table class="table"><thead><tr><th>${T("pe.nameZh")}</th><th>${T("pe.nameEn")}</th><th>${T("ro.position")}</th><th>${T("ro.team")}</th></tr></thead><tbody>${
         ps.preview.rows.map(r => `<tr><td>${esc(r.name_zh)}</td><td>${esc(r.name_en)}</td><td>${esc(r.title_en)}</td><td>${esc(r.team)}</td></tr>`).join("")}</tbody></table>
       <div class="row"><button class="btn" data-act="paste-go"${dis}>${T("tm.pasteGo", { n: ps.preview.rows.length })}</button><button class="btn ghost" data-act="paste-cancel"${dis}>${T("common.cancel")}</button></div>`
     : `<div class="row"><button class="btn ghost" data-act="paste-preview"${dis}>${T("tm.pastePreviewGo")}</button></div>`}
-    <div class="mini">${T("tm.pasteNote")}</div>`);
+    <div class="mini">${T("tm.pasteNote")}</div>`, !!(ps.text || ps.preview));
   let endSec = "";
   if (isPres && cur) {
     if (!end) {
@@ -1352,7 +1355,7 @@ export function termsHTML(terms, people, meId, isPres, msg, busy, draft, end) {
   }
   return pageHead(T("tm.title"), T("tm.lede"))
     + msgHTML(msg)
-    + listSec + endSec + newSec + pasteSec;
+    + newSec + pasteSec + listSec + endSec;
 }
 
 // 只有 Co-President 與 Senior Adviser 進得來。真正的門在資料庫那幾支函式的第一句，
@@ -1491,6 +1494,10 @@ export function inviteFormNewHTML(draft, terms, busy, people) {
 }
 let inviteFoldOpen = false;
 export function setInviteFold(open) { inviteFoldOpen = !!open; }
+// 其他收起來的「加一個…」表單（2026-11-11：新工作區、補一屆、貼一整屆）開著沒。main.js 聽 toggle 記。
+const FOLDS_OPEN = new Set();
+export function setFoldOpen(id, open) { if (open) FOLDS_OPEN.add(id); else FOLDS_OPEN.delete(id); }
+const peFold = (id, title, hint, body, open) => `<details class="fold rc-fold" id="${esc(id)}"${open || FOLDS_OPEN.has(id) ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${esc(title)}</b>${hint ? `<span class="mini">${hint}</span>` : ""}</summary><div class="fold-body">${body}</div></details>`;
 const ST_TAG = { queued: "", sent: "open", failed: "warn", opened: "open", claimed: "done", expired: "draft", revoked: "draft" };
 // batchOpen：上次有沒有展開（main.js 從 localStorage 讀），預設收著。
 export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft, isPres, batchOpen, people) {

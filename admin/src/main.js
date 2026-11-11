@@ -33,6 +33,8 @@ let S = {
   events: null, evSel: null, evDraft: null, evSigned: null,
   // 場地（2026-11-10）：venues 是 venues_list() 回的 { can_edit, venues }；venue 是打開的那一個（venue_get）；vnQ 清單的搜尋字；vnOpen 哪個收起來的表單開著。
   venues: null, venue: null, vnSel: null, vnQ: "", vnOpen: {},
+  // 2026-11-11：活動清單的篩選（搜尋字、狀態、team）與會議清單的搜尋字。收起來的表單開著沒一樣記在 vnOpen（ev-new、mt-new）。
+  evF: { q: "", st: "all", team: "" }, mtQ: "",
   // 會議（2026-11-02）：meetings 是 loadMeetings() 回的；mtSel 打開的那一場；mtDraft 表單填到一半（含勾人的 pk）。
   meetings: null, mtSel: null, mtDraft: null,
 };
@@ -90,14 +92,15 @@ function render() {
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else if (S.view === "meetings") {
-    body = UI.meetingsListHTML(S.meetings || [], S.me, UI.mtScopes(S.me, S.teams), S.mtDraft, S.cadres, S.msg, S.busy);
+    body = UI.meetingsListHTML(S.meetings || [], S.me, UI.mtScopes(S.me, S.teams), S.mtDraft, S.cadres, S.msg, S.busy, S.mtQ,
+      !!S.vnOpen["mt-new"] || !!(S.mtDraft && (S.mtDraft.title || ((S.mtDraft.pk || {}).ticked || []).length)));
   } else if (S.view === "meeting" && S.mtSel) {
     const m = (S.meetings || []).find(x => x.id === S.mtSel);
     const scopes = UI.mtScopes(S.me, S.teams);
     body = m ? UI.meetingHTML(m, S.me, S.cadres, scopes.includes(m.scope), scopes, S.mtDraft, S.msg, S.busy)
              : UI.emptyHTML(T("mt.notFound"), "", { act: "mt-back", label: T("mt.back") });
   } else if (S.view === "events") {
-    body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams());
+    body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"]);
   } else if (S.view === "event" && S.evSel) {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
     body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks)
@@ -214,6 +217,13 @@ async function boot(retried) {
 
 // 側欄的兩個分頁：首頁、申請表清單。上一頁與網址列改 # 也走這裡。
 // 能開活動的 team：senior 全部；其他人是自己資源工作區「管」的那幾個 team（門在資料庫的 create_event）。
+// 「開一場活動」那一格有打字就收進 S.evDraft（篩選重畫前叫）。沒打字就不動，免得收起來的空表單被當成填到一半。
+function keepEvDraft() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  if (!document.getElementById("ev-team")) return;
+  const d = { team: val("ev-team"), slug: val("ev-slug"), title_zh: val("ev-tzh"), title_en: val("ev-ten"), with_form: !!(document.getElementById("ev-withform") || {}).checked };
+  if (d.slug || d.title_zh || d.title_en) S.evDraft = d;
+}
 function evTeams() {
   if (!S.me) return [];
   if (S.me.senior) return (S.teams && S.teams.length ? S.teams : UI.TEAM_LABELS);
@@ -544,7 +554,7 @@ document.addEventListener("click", async e => {
     try {
       const newId = await D.saveMeeting(null, d);
       S.busy = false; S.msg = T("msg.mtCreated", { title: d.title });
-      S.mtDraft = null; history.pushState(null, "", "#meetings/" + newId); await openTab("meetings/" + newId);
+      S.mtDraft = null; S.vnOpen["mt-new"] = false; history.pushState(null, "", "#meetings/" + newId); await openTab("meetings/" + newId);
     } catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
     return;
   }
@@ -623,6 +633,12 @@ document.addEventListener("click", async e => {
     catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render(); return;
   }
+  // 活動清單的篩選（2026-11-11）。重畫前先把「開一場活動」填到一半的字收進草稿，不然一按篩選就不見了。
+  if (act === "ev-fst" || act === "ev-fclear") {
+    keepEvDraft();
+    S.evF = act === "ev-fclear" ? { q: "", st: "all", team: "" } : Object.assign({}, S.evF, { st: b.dataset.v });
+    render(); return;
+  }
   if (act === "ev-open") { e.preventDefault(); history.pushState(null, "", "#events/" + b.dataset.slug); await openTab("events/" + b.dataset.slug); return; }
   if (act === "ev-back") { history.pushState(null, "", "#events"); await openTab("events"); return; }
   if (act === "ev-create") {
@@ -634,7 +650,7 @@ document.addEventListener("click", async e => {
     S.busy = true; S.msg = ""; render();
     try {
       await D.createEvent(d.team, d.slug, d.title_zh, d.title_en, d.with_form);
-      S.evDraft = null; S.busy = false; S.msg = T("msg.evCreated", { title: d.title_zh || d.title_en });
+      S.evDraft = null; S.vnOpen["ev-new"] = false; S.busy = false; S.msg = T("msg.evCreated", { title: d.title_zh || d.title_en });
       // 開好直接進那一場。工作區也多了一個，me.ws 要重讀才畫得出「改」的按鈕。
       S.me = await D.loadMe(S.user.id).catch(() => S.me); S.workspaces = await D.loadWorkspaces().catch(() => S.workspaces);
       history.pushState(null, "", "#events/" + d.slug); await openTab("events/" + d.slug);
@@ -1070,11 +1086,12 @@ applyLang(pickLang(location.search, readStored()));
 boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
 // 場地頁兩個收起來的表單開著沒（重畫之後照舊）。
-document.addEventListener("toggle", e => { const t = e.target; if (t && (t.id === "vn-add" || t.id === "vnc-add")) S.vnOpen[t.id] = t.open; }, true);
+document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  if (S.view === "events" && e.target && e.target.id === "ev-fteam") { keepEvDraft(); S.evF = Object.assign({}, S.evF, { team: e.target.value }); render(); return; }
   // 活動頁的「場地」（2026-11-10）：選了就存，地點那一格空的話資料庫順手填場地名字，所以重讀活動。
   if (S.view === "event" && e.target && (e.target.id === "ev-kind" || e.target.id === "ev-term")) {
     const evId = e.target.dataset.id, p = e.target.id === "ev-kind" ? { kind: e.target.value } : { term_id: e.target.value };
@@ -1111,6 +1128,18 @@ document.addEventListener("change", async e => {
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("input", e => {
+  // 活動清單的搜尋（2026-11-11）：分段的數字要跟著變，所以重畫，再把游標放回去。
+  if (S.view === "events" && e.target && e.target.id === "ev-q") {
+    keepEvDraft(); S.evF = Object.assign({}, S.evF, { q: e.target.value }); render();
+    const again = document.getElementById("ev-q"); if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* search 型的欄位有的瀏覽器不給 */ } }
+    return;
+  }
+  // 會議清單的搜尋（2026-11-11）：跟場地一樣不重畫，只藏列（「記一場會議」填到一半的字不會不見）。
+  if (S.view === "meetings" && e.target && e.target.id === "mtl-q") {
+    S.mtQ = e.target.value;
+    for (const li of document.querySelectorAll("[data-mt-row]")) { const m = (S.meetings || []).find(x => x.id === li.dataset.id); li.hidden = !!m && !UI.meetingMatches(m, S.mtQ); }
+    return;
+  }
   // 場地清單的搜尋（2026-11-10）：不重畫，只藏起對不上的那幾列，游標不會跳。
   if (S.view === "venues" && e.target && e.target.id === "vn-q") {
     S.vnQ = e.target.value;

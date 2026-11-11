@@ -1042,6 +1042,11 @@ export function emptyHTML(title, hint, action) {
   return `<div class="empty"><b>${esc(title)}</b>${hint ? `<div>${hint}</div>` : ""}${
     action ? `<div class="row"><button class="btn ghost sm" data-act="${esc(action.act)}"${action.id ? ` data-id="${esc(action.id)}"` : ""}>${esc(action.label)}</button></div>` : ""}</div>`;
 }
+// 篩選用的一顆 chip：data-act 給 main.js 接，data-v 是選的值。
+export const fchip = (act, v, label, on) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-v="${esc(v)}" aria-pressed="${on ? "true" : "false"}">${esc(label)}</button>`;
+// 收成一行的「加一個…／開一個…」表單（2026-11-10、11-11 Paul：一直開著放在清單底下很干擾，清單長了也看不到）。
+// 一律放在頁首底下、清單上面。open 由 main.js 記（toggle 事件），填到一半重畫後還開著。
+export const foldHTML = (id, title, body, open) => `<details class="fold rc-fold" id="${esc(id)}"${open ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${esc(title)}</b></summary><div class="fold-body">${body}</div></details>`;
 // 載入中。
 export function skeletonHTML() { return `<div class="skeleton" aria-label="${esc(T("loading"))}"><i></i><i></i><i></i></div>`; }
 
@@ -1522,31 +1527,59 @@ const evDate = d => d ? String(d).slice(0, 16).replace("T", " ") : "";
 const evLocal = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; };
 export const evPast = e => !!(e && (e.ends_at || e.starts_at) && new Date(e.ends_at || e.starts_at) < new Date());
 export const evTitle = e => (lang() === "zh" ? (e.title_zh || e.title_en) : (e.title_en || e.title_zh)) || e.slug;
-// 清單：照狀態分段（準備好了 → 草稿 → 對外中 → 過去或撤下）。canCreate 是能開活動的人（senior 或某個 team 的資源「管」）。
-export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTeams) {
+// 一場活動在清單上屬於哪一段。紀錄那邊倒進來的舊活動（source import）另成一組，它們從來沒上過網站。
+export function evGroup(e) {
+  if (e.source === "import") return "records";
+  if (e.status === "ready") return "ready";
+  if (e.status === "draft") return "draft";
+  if (e.status === "published" && !evPast(e)) return "published";
+  return "past";
+}
+// 清單的篩選（2026-11-11 Paul：活動一多就找不到，要像名錄那樣能篩）。f = { q, st, team }。
+// st：all 全部、live 在對外頁上、prep 草稿與準備好了、past 過去與撤下、records 只在紀錄裡。純函式，test/events.test.mjs 有測。
+export const EV_FILTERS = ["all", "live", "prep", "past", "records"];
+const EV_FILTER_GROUPS = { live: ["published"], prep: ["ready", "draft"], past: ["past"], records: ["records"] };
+export function eventMatches(e, f) {
+  const x = f || {};
+  if (x.st && x.st !== "all" && !(EV_FILTER_GROUPS[x.st] || []).includes(evGroup(e))) return false;
+  if (x.team && (e.team || "") !== x.team) return false;
+  const n = s => String(s || "").toLowerCase().replace(/\s+/g, "");
+  const q = n(x.q);
+  return !q || [e.title_zh, e.title_en, e.slug, e.place, String(e.team || "").replace(/\s*Team$/i, "")].some(v => n(v).includes(q));
+}
+// 清單：最上面是收起來的「開一場活動」，接著搜尋與篩選，再照狀態分段（準備好了 → 草稿 → 對外中 → 過去或撤下 → 只在紀錄裡）。
+// canCreateTeams 是能開活動的 team（senior 或某個 team 的資源「管」）。newOpen：開活動那一格開著沒（main.js 記）。
+export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTeams, f, newOpen) {
   const dis = busy ? " disabled" : "";
   const d = draft || {};
   const ev = events || [];
-  // 2026-11-09：紀錄那邊倒進來的舊活動（source import）另成一組，不跟「撤下的」混在一起。它們從來沒上過網站，只是出席與回饋的掛鉤。
-  const imported = e => e.source === "import";
-  const groups = [["ready", ev.filter(e => e.status === "ready")], ["draft", ev.filter(e => e.status === "draft" && !imported(e))],
-    ["published", ev.filter(e => e.status === "published" && !evPast(e))], ["past", ev.filter(e => !imported(e) && (e.status === "archived" || (e.status === "published" && evPast(e))))],
-    ["records", ev.filter(imported)]].filter(g => g[1].length);
+  const fx = Object.assign({ q: "", st: "all", team: "" }, f || {});
+  const shown = ev.filter(e => eventMatches(e, fx));
+  const groups = ["ready", "draft", "published", "past", "records"].map(k => [k, shown.filter(e => evGroup(e) === k)]).filter(g => g[1].length);
   const row = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(e.source === "import" ? T("ev.st.records") : T("ev.st." + e.status))}</span></div>
-      <div class="fmeta">${esc(e.team.replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
-  const create = (canCreateTeams || []).length ? sectionHTML(T("ev.new"), `<div class="note">${T("ev.newWhat")}</div><div class="two">
+      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
+  // 開一場活動：收成一行放在最上面（2026-11-11 Paul：以前一直開著放在最底下，清單長了根本看不到）。填到一半或剛打開過，重畫後還開著。
+  const create = (canCreateTeams || []).length ? foldHTML("ev-new", T("ev.new"), `<div class="note">${T("ev.newWhat")}</div><div class="two">
       <label><i>${T("ev.team")}</i><select id="ev-team"${dis}>${canCreateTeams.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>
       <label><i>${T("ev.slug")}</i><input id="ev-slug" value="${esc(d.slug || "")}" placeholder="winter-camp-2027" autocomplete="off"${dis}></label>
       <label><i>${T("ev.titleZh")}</i><input id="ev-tzh" value="${esc(d.title_zh || "")}" placeholder="2027 冬令營"${dis}></label>
       <label><i>${T("ev.titleEn")}</i><input id="ev-ten" value="${esc(d.title_en || "")}" placeholder="Winter Camp 2027"${dis}></label>
     </div>
     <label class="check"><input type="checkbox" id="ev-withform"${d.with_form === false ? "" : " checked"}${dis}><span>${T("ev.withForm")}</span></label>
-    <div class="row"><button class="btn" data-act="ev-create"${dis}>${busy ? T("common.saving") : T("ev.createGo")}</button><span class="mini">${T("ev.createNote")}</span></div>`, { id: "ev-new" }) : "";
+    <div class="row"><button class="btn" data-act="ev-create"${dis}>${busy ? T("common.saving") : T("ev.createGo")}</button><span class="mini">${T("ev.createNote")}</span></div>`, newOpen || !!draft) : "";
+  const cnt = k => k === "all" ? ev.length : ev.filter(e => (EV_FILTER_GROUPS[k] || []).includes(evGroup(e))).length;
+  const teamsHere = [...new Set(ev.map(e => e.team || "").filter(Boolean))].sort();
+  const filters = ev.length ? `<div class="chips" style="margin-bottom:10px">${EV_FILTERS.filter(k => k === "all" || cnt(k)).map(k => fchip("ev-fst", k, `${T("ev.f." + k)} ${cnt(k)}`, fx.st === k)).join("")}</div>
+      <div class="ev-find"><div class="ro-search"><input id="ev-q" type="search" value="${esc(fx.q)}" placeholder="${esc(T("ev.findPh"))}" autocomplete="off"></div>${
+        teamsHere.length > 1 ? `<select id="ev-fteam" aria-label="${esc(T("ev.team"))}"><option value="">${T("ev.fAllTeams")}</option>${teamsHere.map(t => `<option value="${esc(t)}"${fx.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select>` : ""}</div>` : "";
+  const filtered = fx.q || fx.team || fx.st !== "all";
   return pageHead(T("ev.title"), T("ev.lede"))
     + msgHTML(msg)
+    + create
+    + filters
     + (groups.length ? groups.map(([k, es]) => sectionHTML(`${esc(T("ev.g." + k))}<span class="hint">${es.length}</span>`, `<ul class="flist">${es.map(row).join("")}</ul>`)).join("")
-        : emptyHTML(T("ev.none"), (canCreateTeams || []).length ? T("ev.noneHint") : T("ev.noneHintNo")))
-    + create;
+        : ev.length && filtered ? emptyHTML(T("ev.noMatch"), T("ev.noMatchHint"), { act: "ev-fclear", label: T("ev.fClear") })
+        : emptyHTML(T("ev.none"), (canCreateTeams || []).length ? T("ev.noneHint") : T("ev.noneHintNo")));
 }
 // 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
 // canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
@@ -1641,21 +1674,31 @@ export function mtScopes(me, teams) {
   return Object.entries((me && me.ws) || {}).filter(([id, lv]) => id.startsWith("res:") && lv === "manage").map(([id]) => id.slice(4));
 }
 // meetings：[{ id, scope, title, starts_at, ends_at, agenda, doc_url, attendees: [{ user_id, status }] }]
-export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy) {
+// 會議清單的搜尋：標題、議程、範圍、日期都算（2026-11-11）。純函式，test/meetings.test.mjs 有測。
+export function meetingMatches(m, q) {
+  const n = s => String(s || "").toLowerCase().replace(/\s+/g, "");
+  const qq = n(q); if (!qq) return true;
+  return [m.title, m.agenda, mtScope(m.scope), mtWhen(m.starts_at)].some(x => n(x).includes(qq));
+}
+// newOpen：「記一場會議」那一格開著沒（main.js 記）。q：搜尋字（不重畫，main.js 只藏起對不上的列）。
+export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy, q, newOpen) {
   const now = new Date();
   const up = (meetings || []).filter(m => new Date(m.ends_at) >= now).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const past = (meetings || []).filter(m => new Date(m.ends_at) < now).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
   const row = m => { const at = m.attendees || [], yes = at.filter(a => a.status === "accepted").length;
-    return `<li><div class="fhead"><b><a href="#meetings/${esc(m.id)}" data-act="mt-open" data-id="${esc(m.id)}">${esc(m.title)}</a></b> <span class="tag${m.required ? " open" : ""}">${T(m.required ? "mt.req1" : "mt.req0")}</span> <span class="mini">${esc(mtScope(m.scope))}</span></div>
+    return `<li data-mt-row data-id="${esc(m.id)}"${meetingMatches(m, q) ? "" : " hidden"}><div class="fhead"><b><a href="#meetings/${esc(m.id)}" data-act="mt-open" data-id="${esc(m.id)}">${esc(m.title)}</a></b> <span class="tag${m.required ? " open" : ""}">${T(m.required ? "mt.req1" : "mt.req0")}</span> <span class="mini">${esc(mtScope(m.scope))}</span></div>
       <div class="fmeta">${esc(mtWhen(m.starts_at))}・${esc(T("mt.people", { n: at.length, yes }))}${m.doc_url ? `・<a href="${esc(m.doc_url)}" target="_blank" rel="noopener">${T("mt.doc")}</a>` : ""}${me && at.some(a => a.user_id === me.id) ? `・<span class="tag${at.find(a => a.user_id === me.id).status === "accepted" ? " open" : ""}">${esc(T("mt.st." + at.find(a => a.user_id === me.id).status))}</span>` : ""}</div></li>`; };
+  const all = (meetings || []).length;
   return pageHead(T("mt.title"), T("mt.lede"))
     + msgHTML(msg)
+    + (scopes.length ? foldHTML("mt-new", T("mt.new"), meetingFormHTML(null, draft, scopes, people, busy, true), newOpen) : "")
+    + (all > 3 ? `<label class="vn-find"><i>${T("mt.find")}</i><input type="search" id="mtl-q" value="${esc(q || "")}" placeholder="${esc(T("mt.findPh"))}" autocomplete="off"></label>` : "")
     + sectionHTML(`${T("mt.upcoming")}<span class="hint">${up.length}</span>`, up.length ? `<ul class="flist">${up.map(row).join("")}</ul>` : emptyHTML(T("mt.noneUp"), T("mt.noneUpHint")))
-    + (past.length ? sectionHTML(`${T("mt.past")}<span class="hint">${past.length}</span>`, `<ul class="flist">${past.map(row).join("")}</ul>`) : "")
-    + (scopes.length ? meetingFormHTML(null, draft, scopes, people, busy) : "");
+    + (past.length ? sectionHTML(`${T("mt.past")}<span class="hint">${past.length}</span>`, `<ul class="flist">${past.map(row).join("")}</ul>`) : "");
 }
 // 記一場會議 / 改一場：m 是現有那一場（null 是新的），d 是填到一半的值（含 pk 勾人的狀態）。
-export function meetingFormHTML(m, d, scopes, people, busy) {
+// bare：只回表單本身（清單頁把它包進收起來的那一格，不要再一個標題）。
+export function meetingFormHTML(m, d, scopes, people, busy, bare) {
   const v = Object.assign({ scope: scopes[0] || "board", title: "", starts_at: "", ends_at: "", agenda: "", doc_url: "" }, m || {}, d || {});
   // 必到：既有的一場照資料庫（沒有這一欄的舊資料庫當選擇參加）；新的一場預設必到。
   v.required = d && d.required != null ? d.required : m ? !!m.required : true;
@@ -1663,7 +1706,7 @@ export function meetingFormHTML(m, d, scopes, people, busy) {
   const pk = (d && d.pk) || { ticked: (m ? (m.attendees || []).map(a => a.user_id) : []), q: "", mq: "", teams: [], level: "view" };
   // 2026-11-06 自動儲存：既有那一場（m 有 id）的六格包在 data-autosave="mt-save" 裡改了就存；勾人那一塊在容器外面，
   // 勾了會先重畫（pk 的狀態在 S.mtDraft），main.js 重畫之後再補存一次。新開一場還沒有 id，留「記下來」那顆鈕。
-  return sectionHTML(m ? T("mt.edit") : T("mt.new"), `<div class="two"${m ? ` data-autosave="mt-save" data-id="${esc(m.id)}"` : ""}>
+  const body = `<div class="two"${m ? ` data-autosave="mt-save" data-id="${esc(m.id)}"` : ""}>
       <label><i>${T("mt.scope")}</i><select id="mt-scope" name="scope"${dis}>${scopes.map(s => `<option value="${esc(s)}"${v.scope === s ? " selected" : ""}>${esc(mtScope(s))}</option>`).join("")}</select></label>
       <label><i>${T("mt.required")}</i><select id="mt-required" name="required"${dis}><option value="1"${v.required !== false && v.required !== "0" ? " selected" : ""}>${T("mt.req1")}</option><option value="0"${v.required === false || v.required === "0" ? " selected" : ""}>${T("mt.req0")}</option></select></label>
       <label><i>${T("mt.titleF")}</i><input id="mt-title" name="title" value="${esc(v.title)}" placeholder="BT 會議"${dis}></label>
@@ -1676,7 +1719,8 @@ export function meetingFormHTML(m, d, scopes, people, busy) {
     ${membersAreaHTML("mt", { people: people || [], pk, busy, draft: true, all: true, titleLeft: n => T("mt.ticked", { n }) })}
     <div class="form-foot">${m ? autosaveHint("mt-save", `data-id="${esc(m.id)}"`) : `<button class="btn" data-act="mt-save" data-id=""${dis}>${busy ? T("common.saving") : T("mt.createGo")}</button>`}
       ${m ? `<button class="btn ghost" data-act="mt-delete" data-id="${esc(m.id)}"${dis}>${T("mt.delete")}</button>` : ""}
-      <span class="mini">${m ? T("mt.editNote") : T("mt.newNote")}</span></div>`, { id: "mt-form" });
+      <span class="mini">${m ? T("mt.editNote") : T("mt.newNote")}</span></div>`;
+  return bare ? `<div id="mt-form">${body}</div>` : sectionHTML(m ? T("mt.edit") : T("mt.new"), body, { id: "mt-form" });
 }
 // Google 日曆那一列（2026-11-23）：在不在 Google 日曆上、Meet 連結、上次拉回覆的時間、送不上的原因與「再送一次」。
 // 欄位不在（遷移檔還沒跑）就整列不畫。
@@ -1727,7 +1771,7 @@ export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
 export const VENUE_KINDS = ["school", "university", "coworking", "cafe", "company", "government", "hotel", "online", "other"];
 const vnDate = d => d ? String(d).slice(0, 10) : "";
 // 加場地、加聯絡人的表單收成一行（2026-11-10 Paul：一直開著很干擾）。
-const vnFold = (id, title, body, open) => `<details class="fold rc-fold" id="${esc(id)}"${open ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${esc(title)}</b></summary><div class="fold-body">${body}</div></details>`;
+const vnFold = foldHTML;
 // 搜尋：名字、城市、地址、種類、聯絡人名字都算（清單那一頁只有前四樣）。純函式，test/venues.test.mjs 有測。
 export function venueMatches(v, q) {
   const n = s => String(s || "").toLowerCase().replace(/\s+/g, "");
@@ -1756,10 +1800,10 @@ export function venuesListHTML(r, q, msg, busy, addOpen) {
   const add = canEdit ? vnFold("vn-add", T("vn.add"), `${venueFields(null, dis, "vn-new")}<div class="row"><button class="btn" data-act="vn-create"${dis}>${busy ? T("common.saving") : T("vn.addGo")}</button><span class="mini">${T("vn.addNote")}</span></div>`, addOpen) : "";
   return pageHead(T("vn.title"), T("vn.lede"))
     + msgHTML(msg)
+    + add
     + (list.length ? `<label class="vn-find"><i>${T("vn.search")}</i><input type="search" id="vn-q" value="${esc(q || "")}" placeholder="${esc(T("vn.searchPh"))}" autocomplete="off"></label>
         <ul class="flist" id="vn-list">${list.map(row).join("")}</ul>`
       : emptyHTML(T("vn.none"), canEdit ? T("vn.noneHint") : T("vn.noneHintNo")))
-    + add
     + (canEdit ? "" : `<div class="mini">${T("vn.readOnly")}</div>`);
 }
 const vnLink = (href, text) => href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text);

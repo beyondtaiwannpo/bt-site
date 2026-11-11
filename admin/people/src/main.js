@@ -577,7 +577,7 @@ document.addEventListener("click", async e => {
         await openWorkspaces(id, true); return;
       }
     }
-    S.wsDraft = null; S.msg = T("msg.wsCreatedWith", { name: d.title_en || d.title_zh || id, n });
+    UI.setFoldOpen("ws-new", false); S.wsDraft = null; S.msg = T("msg.wsCreatedWith", { name: d.title_en || d.title_zh || id, n });
     await openWorkspaces(id, true);
     return;
   }
@@ -587,7 +587,7 @@ document.addEventListener("click", async e => {
     const nw = { id: val("tm-id"), zh: val("tm-zh"), en: val("tm-en"), starts: val("tm-starts"), ends: val("tm-ends") };
     S.termDraft = Object.assign({}, S.termDraft, { new: nw });
     const id = await run("err.createTerm", () => D.createTerm(nw.id, nw.zh, nw.en, nw.starts || null, nw.ends || null));
-    if (id !== undefined) { S.termDraft = Object.assign({}, S.termDraft, { new: null }); S.msg = T("msg.termCreated", { id }); await openTerms(true); }
+    if (id !== undefined) { UI.setFoldOpen("tm-new", false); S.termDraft = Object.assign({}, S.termDraft, { new: null }); S.msg = T("msg.termCreated", { id }); await openTerms(true); }
     return;
   }
   if (act === "paste-preview" || act === "paste-cancel") {
@@ -602,7 +602,7 @@ document.addEventListener("click", async e => {
     const ps = (S.termDraft && S.termDraft.paste) || {};
     if (!ps.preview || !ps.preview.rows.length) { S.msg = T("err.pasteEmpty"); render(); return; }
     const n = await run("err.paste", () => D.importPositions(ps.term, ps.preview.rows));
-    if (n !== undefined) { S.termDraft = Object.assign({}, S.termDraft, { paste: null }); S.msg = T("msg.pasted", { n, term: ps.term }); await openTerms(true); }
+    if (n !== undefined) { UI.setFoldOpen("tm-paste", false); S.termDraft = Object.assign({}, S.termDraft, { paste: null }); S.msg = T("msg.pasted", { n, term: ps.term }); await openTerms(true); }
     return;
   }
   // 結束這一屆：三步。每一步都把填的東西收進 S.end，重畫不會掉。
@@ -833,6 +833,7 @@ function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e
 function batchOpen() { try { return localStorage.getItem("bt-batch-open") === "1"; } catch (e) { return false; } }
 document.addEventListener("toggle", e => {
   if (e.target && e.target.id === "invite-fold") UI.setInviteFold(e.target.open);
+  if (e.target && ["ws-new", "tm-new", "tm-paste"].includes(e.target.id)) UI.setFoldOpen(e.target.id, e.target.open);
   if (e.target && e.target.id === "batch") { try { localStorage.setItem("bt-batch-open", e.target.open ? "1" : "0"); } catch (x) { /* 無痕視窗存不了 */ } }
 }, true);
 function applyLang(l) {

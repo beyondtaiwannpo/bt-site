@@ -135,3 +135,43 @@ test("需求單：從活動頁帶過來的 event_id 跟著送出，沒有就不�
   assert.equal(F.rqPayload({ ...F.rqBlank(), kind: "post", title: "x", event_id: "e1" }).event_id, "e1");
   assert.ok(!("event_id" in F.rqPayload({ ...F.rqBlank(), kind: "post", title: "x" })));
 });
+
+// 2026-11-11 Paul：活動清單要能篩，「開一場活動」收成一行放最上面。
+test("活動清單：搜尋、狀態與 team 篩選，開活動收在最上面", async () => {
+  const { eventsListHTML, eventMatches, evGroup } = await import("../admin/src/ui.js");
+  const later = new Date(Date.now() + 864e5 * 30).toISOString(), before = new Date(Date.now() - 864e5 * 30).toISOString();
+  const evs = [
+    { slug: "winter-camp", title_zh: "冬令營", title_en: "Winter Camp", team: "Curriculum Team", status: "published", starts_at: later, form_id: "f1" },
+    { slug: "talk-2025", title_zh: "講座", title_en: "Talk", team: "Community Relations Team", status: "published", starts_at: before, place: "台大" },
+    { slug: "draft-one", title_zh: "草稿活動", title_en: "", team: "Curriculum Team", status: "draft" },
+    { slug: "old-camp", title_zh: "舊營隊", title_en: "Old camp", team: "Curriculum Team", status: "archived", source: "import" },
+  ];
+  assert.deepEqual(evs.map(evGroup), ["published", "past", "draft", "records"]);
+  assert.ok(eventMatches(evs[1], { q: "台大" }), "地點也找得到");
+  assert.ok(eventMatches(evs[0], { q: "winter camp" }), "空白不算");
+  assert.ok(!eventMatches(evs[0], { st: "past" }));
+  assert.ok(eventMatches(evs[2], { st: "prep", team: "Curriculum Team" }));
+  assert.ok(!eventMatches(evs[1], { team: "Curriculum Team" }));
+  const h = eventsListHTML(evs, {}, [], null, "", false, ["Curriculum Team"], { q: "", st: "all", team: "" }, false);
+  assert.ok(h.indexOf('id="ev-new"') < h.indexOf('id="ev-q"'), "開活動在搜尋上面");
+  assert.match(h, /<details class="fold rc-fold" id="ev-new"><summary>/, "預設收著");
+  assert.match(h, /data-act="ev-fst" data-v="all" aria-pressed="true">全部 4</);
+  assert.match(h, /<select id="ev-fteam"/, "兩個以上的 team 才有 team 篩選");
+  const f = eventsListHTML(evs, {}, [], null, "", false, ["Curriculum Team"], { q: "冬", st: "all", team: "" }, false);
+  assert.match(f, /冬令營/); assert.doesNotMatch(f, /草稿活動/);
+  const none = eventsListHTML(evs, {}, [], null, "", false, [], { q: "zzz", st: "all", team: "" }, false);
+  assert.match(none, /data-act="ev-fclear"/, "篩到沒有給一顆清掉");
+  assert.doesNotMatch(none, /id="ev-new"/, "不能開活動的人沒有那一格");
+  assert.match(eventsListHTML(evs, {}, [], { title_zh: "x" }, "", false, ["Curriculum Team"], {}, false), /id="ev-new" open/, "填到一半還開著");
+});
+
+test("會議清單：記一場會議收在最上面，搜尋只藏列", async () => {
+  const { meetingsListHTML, meetingMatches } = await import("../admin/src/ui.js");
+  const mk = (id, title, d) => ({ id, title, scope: "board", starts_at: d, ends_at: d, attendees: [] });
+  const ms = [mk("a", "BT 會議", "2026-12-01T10:00:00Z"), mk("b", "Curriculum 討論", "2026-12-02T10:00:00Z"), mk("c", "年度回顧", "2025-01-01T10:00:00Z"), mk("d", "其他", "2025-02-01T10:00:00Z")];
+  assert.ok(meetingMatches(ms[1], "curriculum")); assert.ok(!meetingMatches(ms[0], "curriculum"));
+  const h = meetingsListHTML(ms, null, ["board"], null, [], "", false, "回顧", false);
+  assert.ok(h.indexOf('id="mt-new"') < h.indexOf('id="mtl-q"'), "記一場會議在上面");
+  assert.match(h, /<li data-mt-row data-id="a" hidden>/); assert.match(h, /<li data-mt-row data-id="c">/);
+  assert.doesNotMatch(h, /<h2>記一場會議/, "收起來那一格裡不再有第二個標題");
+});
