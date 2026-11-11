@@ -950,6 +950,15 @@ Paul 2026-11-10：加學校、加聯絡方式這些表單一直開著，找資�
 
 驗證：本機一個人的頁面四個表單都收著，打開加電話、加完還開著；活動頁兩個收著；邀請頁收著。加一筆「就讀中 National Taiwan University 2027」，學校紀錄多一列「from 2027・從去向帶進來」。smoke 多 5 項（1321 全過），單元測試 818，check.sh、check-motion、check-mobile 全過（箭頭在 360px 原本超出 2px，`.fold .chev` 左邊多 3px）。**遷移檔要 Paul 在正式 Supabase 跑。**
 
+### 後台左邊的選單自己捲（2026-11-10）
+
+Paul 2026-11-10：在 Records 的「人」那頁往下看名錄，要點左邊下面的 People，得先把整頁捲到名錄最後面。原因是左邊選單比螢幕還高，它雖然會黏在畫面上（sticky），但最下面那幾段要等整頁捲到底才露出來。
+
+- `admin/admin.css` 的 `.rail` 加 `max-height:calc(100vh - 112px)` 與 `overflow-y:auto`：選單比螢幕高時自己捲，滑鼠移到選單上捲的是選單，不是整頁。手機版（選單收成一顆按鈕）不變。
+- 每次重畫，選單整個換掉，捲的位置會跳回最上面。所以八個後台資料夾的 `ui.js` 各多 `railBefore()`、`railAfter()`，`main.js` 畫外殼的那幾行前後各叫一次：捲到哪記著再放回去；換頁進來時，現在這一頁那一項不在看得到的地方就自動捲過去。八份是照這個 repo 一個資料夾自己一份的規矩複製的，改一份要記得其他七份。
+
+驗證：本機 1280×700，邀請頁一進來選單就捲到「Invite people」；「人」那頁把選單捲到底、切分頁重畫後位置不變；名錄捲到最下面時 People、Money 還在畫面上。check.sh、check-motion、check-mobile、單元測試 818 全過。
+
 ### 年度比較改版（2026-11-08）
 
 Paul 2026-11-08：「year by year now it looks really messy and pointless, can you make filters and stuff」。改成跟「人」同一套：上面一格篩選（屆別、活動種類、team，每個選項帶場數）加「比什麼」（到的人數、報名人數、出席率、回饋份數、推薦平均、有用平均、幾場），下面兩張表：

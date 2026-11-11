@@ -45,7 +45,9 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 .main{min-width:0;max-width:900px}
 .shell.solo{display:block}
 .rail{position:sticky;top:96px;display:flex;flex-direction:column;gap:2px;
-  padding:6px 0 20px;font-size:14.5px}
+  padding:6px 0 20px;font-size:14.5px;
+  /* 比螢幕高的時候自己捲，不用把整頁捲到底才看得到最下面那幾段（2026-11-10） */
+  max-height:calc(100vh - 112px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(16,42,134,.25) transparent}
 .rail-toggle,.rail-burger{display:none}
 /* 你是誰、管到哪。這一行是「我有什麼權限」的唯一來源。 */
 .rail-me{padding:8px 12px 14px;margin-bottom:6px;border-bottom:1px solid rgba(16,42,134,.14)}
@@ -304,7 +306,7 @@ a.btn{text-decoration:none}
   .rail-toggle{display:block;position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0}
   .rail-toggle:checked ~ .rail-burger{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
   .rail-toggle:focus-visible ~ .rail-burger{outline:var(--ring);outline-offset:var(--ring-gap)}
-  .rail{display:none;position:static;padding:4px 0 16px;margin:0 0 10px;border-bottom:1px solid rgba(16,42,134,.14)}
+  .rail{display:none;position:static;max-height:none;overflow:visible;padding:4px 0 16px;margin:0 0 10px;border-bottom:1px solid rgba(16,42,134,.14)}
   .rail-toggle:checked ~ .rail{display:flex}
   .page-head h1{font-size:28px}
   .two{grid-template-columns:1fr}

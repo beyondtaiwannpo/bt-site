@@ -58,7 +58,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-records"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("records", S.view, S.me), body());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("records", S.view, S.me), body()); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
 }
@@ -66,7 +66,7 @@ function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("records", tab || "overview", S.me), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("records", tab || "overview", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   UI.checkVersion("../../");
 }

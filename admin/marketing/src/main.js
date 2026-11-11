@@ -35,14 +35,14 @@ function render() {
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-marketing"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
-  if (!UI.canViewMkt(S.me)) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("marketing", "", S.me), UI.noAccessHTML(S.me)); return; }
+  if (!UI.canViewMkt(S.me)) { UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("marketing", "", S.me), UI.noAccessHTML(S.me)); UI.railAfter(el); return; }
   let body;
   const post = S.view === "post" ? S.posts.find(p => p.id === S.postId) : null;
   if (!S.loaded) body = UI.skeletonHTML();
   else if (S.view === "posts") body = S.mkt ? UI.postsListHTML(S.posts, S.mkt, S.msg, S.busy, S.showArchived) : UI.pageHead(T("cp.title"), "") + UI.msgHTML(S.msg);
   else if (S.view === "post") body = post && S.mkt ? UI.postEditorHTML(post, S.mkt, S.msg, S.busy, S.ui, S.urls, S.rs[post.id]) : UI.pageHead(T("cp.title"), "") + UI.msgHTML(S.msg || T("says.noPost"));
   else body = UI.igPageHTML(S.ig, S.msg, S.busy);
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("marketing", S.view === "post" ? "posts" : S.view, S.me), body);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("marketing", S.view === "post" ? "posts" : S.view, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
   if (S.view === "post" && post) { schedulePreview(0); if (UI.researchRunning(S.rs[post.id])) schedulePoll(); }
 }
@@ -52,7 +52,7 @@ function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("marketing", tab || "", S.me), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("marketing", tab || "", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   UI.checkVersion("../../");
 }

@@ -543,6 +543,17 @@ export function langSwitchHTML() {
 }
 
 // 整頁的外殼：頂欄在上，底下左側欄、右內容。
+// 側欄比螢幕矮的時候自己捲（admin.css 的 .rail，2026-11-10 Paul：要往下到 People 得先把整頁捲到底）。
+// 重畫會把側欄整個換掉，捲到哪先記著再放回去；現在這一頁那一項不在看得到的地方就捲過去。
+let railY = 0;
+export function railBefore(root) { const r = root && root.querySelector(".rail"); if (r) railY = r.scrollTop; }
+export function railAfter(root) {
+  const r = root && root.querySelector(".rail");
+  if (!r || r.scrollHeight <= r.clientHeight) return;
+  r.scrollTop = railY;
+  const on = r.querySelector(".rail-item.on"), b = r.getBoundingClientRect();
+  if (on) { const a = on.getBoundingClientRect(); if (a.top < b.top || a.bottom > b.bottom) r.scrollTop += a.top - b.top - 48; }
+}
 export function shellHTML(nav, rail, body) {
   return `${nav}<div class="shell${rail ? "" : " solo"}">${rail || ""}<main class="main">${body}</main></div>`;
 }

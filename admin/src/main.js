@@ -120,7 +120,7 @@ function render() {
   };
   // 側欄亮哪一行：總覽、需求單那兩頁各自亮，其他全部算在「申請表」底下。
   const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : "forms";
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
 }
@@ -131,7 +131,7 @@ function paintShell() {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", "home", S.me, {}), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", "home", S.me, {}), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（GitHub Pages 快取 10 分鐘，四個資料夾各一份側欄，哪一份先過期哪一份先換新；
   // Paul 2026-11-06 遇到的「側欄新項目重整就不見」就是這個）。讀到不一樣就在左下角提醒重整。

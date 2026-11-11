@@ -47,7 +47,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-passports"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
-  if (!internStaff() && !isPres()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); return; }
+  if (!internStaff() && !isPres()) { UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", "", S.me), UI.noAccessHTML(S.me)); UI.railAfter(el); return; }
 
   let body;
   if (S.view === "members" && S.mp) {
@@ -78,7 +78,7 @@ function render() {
   // 側欄亮哪一行：幹部護照的三個編輯畫面算在「幹部護照」底下，其餘算「實習護照」。
   const tab = S.view === "board" ? "board" : (S.view === "members" && S.mp && S.mp.ws === "passport") ? "cadre" : ["cities", "dest-edit"].includes(S.view) ? "cities"
     : ["cadre", "act-edit", "month-edit"].includes(S.view) ? "cadre" : "interns";
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab, S.me), body);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
 
@@ -88,7 +88,7 @@ function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab || "", S.me), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab || "", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（理由見 admin/src/main.js 同一段）。
   UI.checkVersion("../../");

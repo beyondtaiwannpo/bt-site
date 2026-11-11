@@ -44,7 +44,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-people"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
-  if (!isSenior()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", "", S.me), UI.noAccessHTML(S.me)); return; }
+  if (!isSenior()) { UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", "", S.me), UI.noAccessHTML(S.me)); UI.railAfter(el); return; }
 
   const filter = { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all", team: S.filter.team, noacc: !!S.filter.noacc };
   let body, tab = "roster";
@@ -55,7 +55,7 @@ function render() {
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces);
   else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd, S.bulk);
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
 
@@ -65,7 +65,7 @@ function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab || "", S.me), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab || "", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（理由見 admin/src/main.js 同一段）。
   UI.checkVersion("../../");

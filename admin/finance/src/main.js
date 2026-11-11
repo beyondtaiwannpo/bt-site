@@ -43,7 +43,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-finance"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
-  if (!canView()) { el.innerHTML = UI.shellHTML(nav, UI.railHTML("finance", "", S.me), UI.noAccessHTML(S.me)); return; }
+  if (!canView()) { UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("finance", "", S.me), UI.noAccessHTML(S.me)); UI.railAfter(el); return; }
   let body;
   if (!S.loaded) body = UI.skeletonHTML();
   else {
@@ -54,7 +54,7 @@ function render() {
     else if (S.view === "export") body = UI.exportHTML(filterNow(), c, rowsNow().length, S.msg);
     else body = UI.overviewHTML(o, c, S.me, S.msg);
   }
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("finance", S.view, S.me), body);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("finance", S.view, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
 
@@ -63,7 +63,7 @@ function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("finance", tab || "", S.me), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("finance", tab || "", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   UI.checkVersion("../../");
 }

@@ -47,14 +47,14 @@ function render() {
   if (!S.user) { location.replace("../../app/?next=admin-team-forms"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
   const counts = S.boot ? { fill: (S.boot.todo || []).length } : {};
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("teamforms", S.view === "fill" ? "fill" : "build", S.me, counts), body());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("teamforms", S.view === "fill" ? "fill" : "build", S.me, counts), body()); UI.railAfter(el);
   UI.afterRender(S, el);
 }
 function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("teamforms", tab || "fill", S.me), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("teamforms", tab || "fill", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   UI.checkVersion("../../");
 }

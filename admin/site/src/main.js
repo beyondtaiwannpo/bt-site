@@ -67,7 +67,7 @@ function render() {
   }
   // 側欄亮哪一行：編輯畫面算在它所屬的那個分頁底下。
   const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res", "history-edit": "history" }[S.view] || S.view;
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab, S.me), body);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
 
@@ -77,7 +77,7 @@ function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab || "", S.me), UI.skeletonHTML());
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab || "", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（理由見 admin/src/main.js 同一段）。
   UI.checkVersion("../../");
