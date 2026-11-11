@@ -246,6 +246,8 @@ a.btn{text-decoration:none}
 .fold > summary:hover{background:rgba(16,42,134,.04);border-radius:14px}
 .fold-body{padding:4px 16px 16px;border-top:1px solid rgba(16,42,134,.12)}
 .rc-fold{margin-top:14px}
+/* 清單頁最上面那一格「開一個／加一個」（2026-11-11）：跟底下的篩選、清單隔開，不要黏在一起。 */
+main > .fold{margin-bottom:24px}
 .rc-fold > .fold-body{padding-top:12px}
 /* 名單的職位欄（2026-11-03）：一筆一行、team 用「·」接在同一行、欄位不折到兩行。 */
 .table td.t-pos{min-width:240px}
