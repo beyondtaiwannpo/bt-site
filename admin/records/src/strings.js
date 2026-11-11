@@ -579,7 +579,7 @@ export const MINE = {
   "contact.login":    { zh: "登入用", en: "Sign-in" },
   "contact.fromNote": { zh: "從備註搬過來的", en: "Moved from the note" },
   "ckind.email":      { zh: "Email", en: "Email" },
-  "ckind.line":       { zh: "LINE ID", en: "LINE ID" },
+  "ckind.line":       { zh: "LINE", en: "LINE" },
   "ckind.phone":      { zh: "電話", en: "Phone" },
   "ckind.ig":         { zh: "Instagram", en: "Instagram" },
   "ckind.linkedin":   { zh: "LinkedIn", en: "LinkedIn" },
