@@ -163,6 +163,11 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 .tag.draft{background:rgba(198,198,198,.5)}
 .tag.closed,.tag.warn{background:rgba(255,196,108,.42)}
 .tag.ok{background:rgba(107,198,187,.28)}
+/* 名錄上「當過什麼」的標籤（2026-11-10） */
+.tag.who-mentor{background:var(--bt-navy);color:var(--bt-cream)}
+.tag.who-mentee{background:rgba(107,198,187,.5)}
+.tag.who-intern{background:rgba(255,196,108,.7)}
+.tag.who-student{background:var(--bt-sand)}
 /* 退件：實心深藍白字，一眼看得出不是在做的。 */
 .tag.bad{background:rgba(16,42,134,.9);color:#fff}
 /* 一列裡的動作：靠右不靠右都可以，但一列最多三顆，第一顆框線、其他底線字。 */

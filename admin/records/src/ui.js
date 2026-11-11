@@ -1108,7 +1108,17 @@ export function logHTML(r) {
 // 人：找、重複、加。
 // ── 名錄（2026-12-03）：rc_directory() 整份拿回來，搜尋與篩選都在瀏覽器裡做（一千多個人的 JSON 幾百 KB，一次拿比每打一個字問一次快）。 ──
 // 篩選的鍵跟 rc_directory 回的欄位一一對應。純函式，test/records.test.mjs 用假資料測。
-export const DIR_FILTERS = ["kind", "role", "team", "school", "grad", "term", "event", "country"];
+export const DIR_FILTERS = ["kind", "who", "role", "team", "school", "grad", "term", "event", "country"];
+// 這個人在 BT 當過什麼（2026-11-10 Paul：名錄上用標籤，mentor 標 Mentor、mentee 標 Mentee、實習生標 Intern、其他參加活動的標 Student）。
+// roles 是 rc_participation 的角色，account 是登入帳號的身分（intern 就是實習生）。講者、工作人員、志工、校友來賓照自己的名字標，
+// 那些多半是幹部或外面的人，標成學員會錯。
+export const WHO_ORDER = ["intern", "mentor", "mentee", "student", "speaker", "organizer", "volunteer", "alumni"];
+export function whoTags(roles, account) {
+  const have = new Set(roles || []);
+  if (account === "intern") have.add("intern");
+  return WHO_ORDER.filter(k => have.has(k));
+}
+export function whoTagsHTML(tags) { return tags.map(k => `<span class="tag who-${esc(k)}">${esc(T(k === "intern" ? "who.intern" : "prole." + k))}</span>`).join(" "); }
 const norm = v => String(v == null ? "" : v).toLowerCase().replace(/\s+/g, "");
 export function filterDirectory(list, q, f) {
   const qq = norm(q); const x = f || {};
@@ -1116,6 +1126,7 @@ export function filterDirectory(list, q, f) {
     if (qq && !(norm(p.name).includes(qq) || norm(p.name_zh).includes(qq) || norm(p.name_en).includes(qq) || norm(p.school).includes(qq)
       || (p.aliases || []).some(a => norm(a).includes(qq)) || (p.schools || []).some(a => norm(a).includes(qq)))) return false;
     if (x.kind && p.kind !== x.kind) return false;
+    if (x.who && !whoTags(p.roles, p.role).includes(x.who)) return false;
     if (x.role === "none" ? p.has_account : (x.role && p.role !== x.role)) return false;
     if (x.team && !parseTeamsLoose(p.team).includes(x.team)) return false;
     if (x.school && (p.school || "") !== x.school && !(p.schools || []).includes(x.school)) return false;   // 讀過的學校也算（2026-12-10）
@@ -1135,6 +1146,7 @@ export function dirOptions(list, events) {
   const evTitle = id => { const e = (events || []).find(e => e.id === id); return e ? ((lang() === "zh" ? e.title_zh : e.title_en) || e.title_en || e.title_zh || e.slug) : null; };
   return {
     kind: count(p => [p.kind]),
+    who: count(p => whoTags(p.roles, p.role)).sort((a, b) => WHO_ORDER.indexOf(a[0]) - WHO_ORDER.indexOf(b[0])),
     role: count(p => [p.has_account ? p.role : "none"]),
     team: count(p => parseTeamsLoose(p.team)),
     school: count(p => [...new Set([p.school, ...(p.schools || [])].filter(Boolean))]),
@@ -1145,6 +1157,17 @@ export function dirOptions(list, events) {
   };
 }
 export const DIR_PAGE = 100;
+// 有帳號那個標籤：實習生、學員前面已經有 Intern、Student 標籤了，這裡只說「有帳號」，不再重複一次身分。
+export function acctTag(p) {
+  const role = p.role || "student", tags = whoTags(p.roles, p.role);
+  return (role === "intern" && tags.includes("intern")) || (role === "student" && (tags.includes("student") || p.kind === "student")) ? T("acct.has") : T("acct." + role);
+}
+// 名字旁邊那排標籤：當過什麼在前；身分（成員、來賓、學員）只在跟後面重複時不印（學員又有 Student 標籤就只印一個）。
+export function rowTags(p) {
+  const tags = whoTags(p.roles, p.role);
+  const kind = p.kind === "student" && tags.includes("student") ? "" : `<span class="tag">${esc(T("pkind." + p.kind))}</span>`;
+  return [kind, whoTagsHTML(tags)].filter(Boolean).join(" ");
+}
 export function directoryHTML(S) {
   const boot = S.boot || {}, dir = S.dir, f = S.df || {}, events = boot.events || [];
   if (S.dirErr) return `<div class="msg err" role="status"><span class="msg-k">${esc(T("msg.err"))}</span><span>${esc(S.dirErr)}</span></div>`;   // 不走 msgHTML：它只畫 err. 開頭的句子，這一句是「還沒跑遷移檔」
@@ -1152,19 +1175,19 @@ export function directoryHTML(S) {
   const opts = dirOptions(dir, events);
   const hits = filterDirectory(dir, S.pq, f);
   const shown = hits.slice(0, S.dirN || DIR_PAGE);
-  const optLabel = (key, v) => key === "kind" ? T("pkind." + v) : key === "role" ? (v === "none" ? T("dir.noAccount") : T("acct." + v)) : v;
+  const optLabel = (key, v) => key === "kind" ? T("pkind." + v) : key === "who" ? T(v === "intern" ? "who.intern" : "prole." + v) : key === "role" ? (v === "none" ? T("dir.noAccount") : T("acct." + v)) : v;
   const box = (key, labelKey, anyKey) => `<label><i>${esc(T(labelKey))}</i><select name="${key}" class="rc-dfilter" data-noauto="1">${pickOpt("", T(anyKey), f[key] || "")}${(opts[key] || []).map(([v, n, title]) => pickOpt(v, `${title || optLabel(key, v)} (${n})`, f[key] || "")).join("")}</select></label>`;
   const active = DIR_FILTERS.filter(k => f[k]).length + (S.pq ? 1 : 0);
   const dbHits = S.pq && S.pq.includes("@") && boot.can_manage ? (S.people || []) : null;
-  const row = p => `<li><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> <span class="tag">${esc(T("pkind." + p.kind))}</span>${p.has_account ? ` <span class="tag open">${esc(T("acct." + (p.role || "student")))}</span>` : ""}</div>
-      <div class="fmeta">${[p.school, p.grad_year, p.team, (p.terms || []).slice().sort().reverse().join(" "), p.n ? T("dir.events", { n: p.n }) : "", p.latest, (p.countries || []).join(" ")].filter(Boolean).map(v => esc(String(v))).join("・")}${
-        (p.roles || []).length ? `<div class="mini">${esc(T("dir.history", { roles: (p.roles || []).map(r => T("prole." + r)).join(T("punct.list")) }))}</div>` : ""}</div></li>`;
+  const row = p => `<li><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> ${rowTags(p)}${p.has_account ? ` <span class="tag open">${esc(acctTag(p))}</span>` : ""}</div>
+      <div class="fmeta">${[p.school, p.grad_year, p.team, (p.terms || []).slice().sort().reverse().join(" "), p.n ? T("dir.events", { n: p.n }) : "", p.latest, (p.countries || []).join(" ")].filter(Boolean).map(v => esc(String(v))).join("・")}</div></li>`;
   return `<div class="card">
     <label><i>${esc(T("dir.search"))}</i><input type="search" id="rc-pfind" class="rc-pfind" value="${esc(S.pq || "")}" placeholder="${esc(T("dir.searchPh"))}" autocomplete="off" data-noauto="1"></label>
-    <div class="two">${box("kind", "dir.kind", "dir.anyKind")}${box("role", "dir.role", "dir.anyRole")}</div>
-    <div class="two">${box("team", "dir.team", "dir.anyTeam")}${box("school", "dir.school", "dir.anySchool")}</div>
-    <div class="two">${box("grad", "dir.grad", "dir.anyGrad")}${box("term", "dir.term", "dir.anyTerm")}</div>
-    <div class="two">${box("event", "dir.event", "dir.anyEvent")}${box("country", "dir.country", "dir.anyCountry")}</div>
+    <div class="two">${box("kind", "dir.kind", "dir.anyKind")}${box("who", "dir.who", "dir.anyWho")}</div>
+    <div class="two">${box("role", "dir.role", "dir.anyRole")}${box("team", "dir.team", "dir.anyTeam")}</div>
+    <div class="two">${box("school", "dir.school", "dir.anySchool")}${box("grad", "dir.grad", "dir.anyGrad")}</div>
+    <div class="two">${box("term", "dir.term", "dir.anyTerm")}${box("event", "dir.event", "dir.anyEvent")}</div>
+    <div class="two">${box("country", "dir.country", "dir.anyCountry")}<span></span></div>
     <div class="row"><b data-dir-count>${esc(active ? T("dir.countOf", { n: hits.length, total: dir.length }) : T("dir.count", { n: dir.length }))}</b>${active ? ` <button class="btn quiet sm" data-act="dir-clear">${esc(T("dir.clear"))}</button>` : ""}</div>
     ${dbHits ? (dbHits.length ? `<ul class="flist">${dbHits.map(p => row({ ...p, terms: [], countries: [] })).join("")}</ul>` : `<div class="mini">${esc(T("pp.noHit"))}</div>`)
       : hits.length ? `<ul class="flist">${shown.map(row).join("")}</ul>${hits.length > shown.length ? `<div class="form-foot"><button class="btn ghost sm" data-act="dir-more">${esc(T("dir.more", { n: Math.min(DIR_PAGE, hits.length - shown.length) }))}</button></div>` : ""}`
@@ -1365,7 +1388,7 @@ export function contactHref(kind, value) {
 // 一個人的時間軸。
 export function personHTML(d, S) {
   const p = d.person || {}, manage = !!(S.boot && S.boot.can_manage), pres = !!(S.me && S.me.pres);
-  const head = pageHead(`${esc(p.name || T("common.noName"))} <span class="tag">${esc(T("pkind." + p.kind))}</span>${p.forgotten_at ? ` <span class="tag closed">${esc(T("person.forgotten"))}</span>` : ""}`,
+  const head = pageHead(`${esc(p.name || T("common.noName"))} ${rowTags({ kind: p.kind, role: p.role, roles: [...new Set((d.participation || []).map(x => x.role).concat((d.pairs || []).map(x => x.as)))] })}${p.forgotten_at ? ` <span class="tag closed">${esc(T("person.forgotten"))}</span>` : ""}`,
     `${p.name_zh && p.name_en ? esc(p.name_zh) + "・" : ""}${esc(p.school || "")}${p.grad_year ? "・" + esc(String(p.grad_year)) : ""}${p.has_account ? "・" + esc(T("pp.hasAccount")) + (p.role ? ` (${esc(p.role)})` : "") : ""}`, [], { act: "back-people", label: T("person.back") });
   const edit = manage && !p.forgotten_at ? sectionHTML(T("person.edit"), `<div data-pedit><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" value="${esc(p.name_zh || "")}" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" value="${esc(p.name_en || "")}" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" value="${esc(p.school || "")}" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100" value="${esc(p.grad_year || "")}"></label></div>

@@ -331,3 +331,26 @@ test("add forms on the person page are folded by default and stay open once open
   assert.doesNotMatch(UI.personHTML(d, { ...S, id: "p2" }), /data-cadd data-fold="[^"]*" open/);
   UI.setFold(UI.foldKey("cadd", S), false);
 });
+
+// 2026-11-10 名錄上的「當過什麼」標籤
+test("whoTags: intern from the account, mentor, mentee, student from events, in a fixed order", () => {
+  assert.deepEqual(UI.whoTags(["student", "mentor", "mentee"], "student"), ["mentor", "mentee", "student"]);
+  assert.deepEqual(UI.whoTags(["student"], "intern"), ["intern", "student"]);
+  assert.deepEqual(UI.whoTags(["organizer"], "cadre"), ["organizer"]);
+  assert.deepEqual(UI.whoTags([], null), []);
+});
+test("rowTags: no double Student tag; members keep Member", () => {
+  const a = UI.rowTags({ kind: "student", roles: ["student", "mentee"] });
+  assert.equal((a.match(/>Student</g) || []).length, 1);
+  assert.match(a, /who-mentee/);
+  const b = UI.rowTags({ kind: "member", role: "cadre", roles: ["mentor"] });
+  assert.match(b, />Member</); assert.match(b, /who-mentor/);
+  const c = UI.rowTags({ kind: "student", roles: [] });
+  assert.match(c, />Student</);
+});
+test("directory filter by who", () => {
+  const L = [{ id: 1, name: "A", kind: "student", roles: ["mentee"] }, { id: 2, name: "B", kind: "member", role: "intern", roles: [] }, { id: 3, name: "C", kind: "student", roles: ["student"] }];
+  assert.deepEqual(UI.filterDirectory(L, "", { who: "mentee" }).map(p => p.id), [1]);
+  assert.deepEqual(UI.filterDirectory(L, "", { who: "intern" }).map(p => p.id), [2]);
+  assert.deepEqual(UI.dirOptions(L, []).who.map(x => x[0]), ["intern", "mentee", "student"]);
+});
