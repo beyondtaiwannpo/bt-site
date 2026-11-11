@@ -78,7 +78,7 @@ test("★ 側欄：進得去的是連結、進不去的整段淡掉並說為什�
   for (const [label, M] of IMPL) {
     const rail = M.railHTML("site", "res", { ...ME.member, name: "王平" });
     assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page"><span class="rail-txt"><b>資源庫<\/b><small>/, label);
-    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms"><span class="rail-txt"><b>申請表/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
+    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms"><span class="rail-txt"><b>其他申請/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
     // 2026-10-23 批 4：「首頁」改叫「總覽」；進不去的段只留段名變淡，為什麼放在 title（滑過去才看得到），不再是一段灰字。
     assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home"><span class="rail-txt"><b>總覽/, label);
     // 2026-10-28：一行都進不去的段整段不畫（側欄只留這個人用得到的）。進得去哪些在總覽「你的存取」講。

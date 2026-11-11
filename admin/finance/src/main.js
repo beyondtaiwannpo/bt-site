@@ -30,7 +30,7 @@ const canView = () => UI.canViewFin(S.me);
 const canEdit = () => UI.canEditFin(S.me);
 const today = () => new Date().toISOString().slice(0, 10);
 const termSel = () => S.term || UI.currentTerm(S.terms);
-const ctx = () => ({ terms: S.terms, accounts: S.accounts, categories: S.categories, budgets: S.budgets, term: termSel(), today: today(), open: S.open, voiding: S.voiding });
+const ctx = () => ({ events: S.events || [], terms: S.terms, accounts: S.accounts, categories: S.categories, budgets: S.budgets, term: termSel(), today: today(), open: S.open, voiding: S.voiding });
 const filterNow = () => Object.assign({}, S.filter, { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all" });
 const rowsNow = () => UI.sortTx(UI.filterTx(S.tx, filterNow()));
 const findTx = id => S.tx.find(t => t.id === id);
@@ -94,7 +94,8 @@ const VIEWS = ["overview", "tx", "accounts", "budget", "export"];
 async function load(keepMsg) {
   if (!keepMsg) S.msg = "";
   try {
-    const [b, tx] = await Promise.all([D.loadBootstrap(), D.loadTx()]);
+    const [b, tx, evs] = await Promise.all([D.loadBootstrap(), D.loadTx(), D.loadEventOptions()]);
+    S.events = evs || [];
     S.terms = (b && b.terms) || []; S.accounts = (b && b.accounts) || []; S.categories = (b && b.categories) || []; S.budgets = (b && b.budgets) || [];
     S.tx = tx || [];
     if (S.term && !S.terms.some(t => t.id === S.term.id)) S.term = null;
@@ -125,6 +126,7 @@ function readTxForm(box) {
     account_id: v.account_id || null, to_account_id: kind === "transfer" ? (v.to_account_id || null) : null,
     category_id: kind === "transfer" ? null : (v.category_id || null),
     counterparty: v.counterparty || "", note: v.note || "",
+    event_id: kind === "transfer" ? null : (v.event_id || null),
   };
 }
 // 送出去之前先在畫面上擋一次，訊息講人話（資料庫也會擋，那是第二道）。

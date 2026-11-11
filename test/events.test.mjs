@@ -64,7 +64,7 @@ test("一場活動：草稿時「管」有準備好了、ready 時 senior 有放
   assert.match(view, /<input id="ev-tzh" name="title_zh" value="2027 冬令營" readonly/); assert.doesNotMatch(view, /ev-save|ev-ready|members-open/); assert.match(view, /改不動/);
   const editor = F.eventEditHTML(EV, FORM, 0, EDITOR, "", false);
   assert.match(editor, /data-autosave="ev-save"/); assert.doesNotMatch(editor, /ev-ready/, "「改」存得了但按不了準備好了");
-  assert.match(F.eventEditHTML({ ...EV, form_id: null }, null, null, DIR, "", false), /這場不開放報名/);
+  assert.match(F.eventEditHTML({ ...EV, form_id: null }, null, null, DIR, "", false), /這場還沒有報名表/);
 });
 
 test("總覽的卡：senior 看「等上線的活動」數（ready 的）；一般幹部沒有這張卡", () => {
@@ -99,4 +99,39 @@ test("封面網址像不像一張圖（存檔前先擋）：空的可以、https
   for (const bad of ["http://x/y", "https://drive.google.com/drive/folders/abc", "https://x/page.html", "ftp://x/y.jpg", "x.jpg", "https://docs.google.com/document/d/abc"]) assert.ok(!F.evCoverOk(bad), bad);
   const m = readFileSync("admin/src/main.js", "utf8");
   assert.match(m, /if \(!UI\.evCoverOk\(patch\.cover_url\)\) return fail\(T\("err\.evCover"\)\)/, "2026-11-06 起封面那一關在 onAutosave 裡擋");
+});
+
+// 2026-11-10 Paul：「application should live under events」，活動、報名、紀錄、行銷、錢接成一條。
+test("★ 其他申請：綁著活動的報名表移到最下面一段，點了回那場活動；其他表單照 team 分", () => {
+  const forms = [{ id: "f1", team: "Marketing Team", kind: "program", title: "2027 冬令營", status: "open", counts: { total: 3, received: 1 } },
+    { id: "f9", team: "Curriculum Team", kind: "program", title: "導生計畫", status: "open", counts: { total: 5, received: 0 } }];
+  const h = F.listHTML(forms, true, "", true, null, [], "", false, [], [EV]);
+  assert.match(h, /<h2>活動的報名表/); assert.match(h, /data-act="ev-open" data-slug="winter-camp-2027">2027 冬令營<\/a>/);
+  assert.match(h, /導生計畫/); assert.doesNotMatch(h, /data-act="open-apps" data-id="f1"/, "活動的報名表不再從這裡審");
+  assert.doesNotMatch(F.listHTML(forms, true, "", true, null, [], "", false, [], []), /<h2>活動的報名表/, "沒有活動就沒有那一段");
+});
+test("★ 報名表的頁首：屬於活動就寫「某某的報名表」，返回鍵回那場活動", () => {
+  const h = F.formHeadHTML({ ...FORM, status: "open", _ev: { ...EV, status: "draft" } }, "apps", 2);
+  assert.match(h, /「2027 冬令營」的報名表/); assert.match(h, /data-act="ev-back-to" data-id="winter-camp-2027"/);
+  assert.match(h, /活動上架之後報名表才會出現在 \/apply\//, "活動還沒上架、表單開著，提醒一句");
+  assert.match(F.formHeadHTML(FORM, "apps", 2), /data-act="back-list"/, "不屬於活動的照舊回清單");
+});
+test("★ 活動頁：沒有報名表時「改」的人有「加一張報名表」；紀錄那一段有種類、屆別、記分卡連結", () => {
+  const noForm = { ...EV, form_id: null, kind: "workshop", term_id: "2026-27" };
+  assert.match(F.eventEditHTML(noForm, null, 0, EDITOR, "", false, [], []), /data-act="ev-attach-form" data-id="e1"/);
+  assert.doesNotMatch(F.eventEditHTML(noForm, null, 0, ASSOC, "", false, [], []), /ev-attach-form/, "只有「看」的人沒有那顆");
+  const h = F.eventEditHTML(noForm, null, 0, EDITOR, "", false, [], [{ id: "2026-27" }, { id: "2025-26" }]);
+  assert.match(h, /<option value="workshop" selected>/); assert.match(h, /<option value="2026-27" selected>/);
+  assert.match(h, /href="\/admin\/records\/#overview\/e1"/);
+  assert.match(F.eventEditHTML(noForm, null, 0, ASSOC, "", false, [], []), /<select id="ev-kind" data-id="e1" disabled>/);
+});
+test("★ 行銷與錢：需求單列出來；錢只有拿得到的人才畫（money 是 null 就沒有那一行）", () => {
+  const withMoney = F.eventLinksHTML(EV, { money: { income: 0, expense: 8000, n: 2 }, requests: [{ id: "r1", title: "冬令營海報", kind: "post", status: "in_progress" }] }, false);
+  assert.match(withMoney, /冬令營海報/); assert.match(withMoney, /支出 NT\$8,000/); assert.match(withMoney, /data-act="ev-ask-mkt" data-id="e1"/);
+  const noMoney = F.eventLinksHTML(EV, { money: null, requests: [] }, false);
+  assert.doesNotMatch(noMoney, /NT\$|收支/); assert.match(noMoney, /還沒有掛在這場的需求單/);
+});
+test("需求單：從活動頁帶過來的 event_id 跟著送出，沒有就不帶", () => {
+  assert.equal(F.rqPayload({ ...F.rqBlank(), kind: "post", title: "x", event_id: "e1" }).event_id, "e1");
+  assert.ok(!("event_id" in F.rqPayload({ ...F.rqBlank(), kind: "post", title: "x" })));
 });

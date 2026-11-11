@@ -335,6 +335,7 @@ const SAYS = [
   ["already_published", "已經在對外頁上了，要改先請 Co-President 撤下來。", "Already published; ask a Co-President to unpublish first."],
   ["not_ready", "要先按「準備好了」。", "Mark it ready first."],
   ["not_published", "這場活動不在對外頁上。", "This event is not published."],
+  ["not_event_editor", "你對這場活動只有「看」，改不動。", "You can only view this event, so you can't change it."],
   ["no_such_event", "找不到這場活動，重新整理再試一次。", "Event not found. Refresh and try again."],
   ["full", "額滿了。", "Full."],
   // 行銷需求單（2026-10-31）
@@ -473,13 +474,25 @@ export async function withdrawRequest(id) {
 export async function loadEvents() {
   need();
   const { data, error } = await supabase.from("events")
-    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind, venue_id")
+    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind, venue_id, term_id")
     .order("starts_at", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return data || [];
 }
 // ── 場地（2026-11-10）────────────────────────────────────────────────
 // 兩張表不開給前端，一律走函式：每一位幹部讀得到，改只有 Co-President 與紀錄工作區的人（2026-12-14-venues.sql）。
+export const attachEventForm = id => rpcV("attach_event_form", { p_event: id });
+// 2026-11-10：活動頁也能標種類與屆別（年度比較靠這兩個），報名的人自動抄進 Records（rc_sync_event，那場看得到就叫得動）。
+export const saveEventMeta = (id, p) => rpcV("rc_save_event_meta", { p_event: id, p });
+export const syncEvent = id => rpcV("rc_sync_event", { p_event: id });
+// 活動頁底下的「行銷與錢」：掛在這場的需求單（看得到這場的人）、這場的收支加總（只有看得到財務的人，其他人是 null）。2026-12-16-event-links.sql。
+export const loadEventLinks = id => rpcV("event_links", { p_event: id });
+export async function loadTerms() {
+  need();
+  const { data, error } = await supabase.from("terms").select("id, title_zh, title_en, status, starts_on").order("starts_on", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
 async function rpcV(name, args) { need(); const { data, error } = await supabase.rpc(name, args); if (error) throw error; return data; }
 export const loadVenues        = () => rpcV("venues_list", {});
 export const loadVenue         = id => rpcV("venue_get", { p_id: id });

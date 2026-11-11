@@ -45,6 +45,11 @@ const root = () => document.getElementById("bt-root");
 // Co-President 與 Senior Adviser（senior）看得到所有 team 的表單與 team 選單。
 // 2026-10-30 起申請是整個 BT 一個工作區 apps：改得動的人是被派成改或管的人（senior 靠職級）。
 const canEdit = () => UI.canEditWs(S.me, "apps");
+// 2026-11-10（2026-12-15-event-signups.sql）：綁著活動的報名表，那場活動「改」以上的人也改得動、審得了、簽得了到。門一樣在資料庫（form_can_edit）。
+const formEv = f => (f && (S.events || []).find(e => e.form_id === f.id)) || null;
+// 審核或簽到之後，那場活動的報名抄進 Records（人與出席）。在背景跑，失敗不擋畫面（Records 那邊還有手動按鈕）。
+const syncRecords = () => { const ev = formEv(S.form); if (ev) D.syncEvent(ev.id).catch(() => {}); };
+const canEditForm = f => canEdit() || (!!formEv(f) && UI.canEditWs(S.me, formEv(f).workspace_id));
 const isPres = () => !!S.me && !!S.me.senior;
 
 // 換頁淡入（2026-11-09）：S.view 跟上一次畫的不一樣才加 .swap，自動儲存那種重畫不加。CSS 在 admin.css。
@@ -69,17 +74,18 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
 
   let body;
+  if (S.form) S.form._ev = formEv(S.form);
   if (S.view === "checkin" && S.form) {
-    body = UI.checkinHTML(S.form, S.apps, canEdit(), S.msg, S.busy);
+    body = UI.checkinHTML(S.form, S.apps, canEditForm(S.form), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
     body = UI.noticeHTML(S.form, S.apps, S.noticeTo, S.msg, S.busy);
   } else if (S.view === "apps" && S.form) {
-    body = UI.appsHTML(S.form, S.apps, S.questions, canEdit(),
+    body = UI.appsHTML(S.form, S.apps, S.questions, canEditForm(S.form),
       S.sel, S.filter, S.pending, S.msg, S.busy);
   } else if (S.view === "question") {
     body = UI.questionHTML(S.qEditing, S.msg, S.busy);
   } else if (S.view === "form" && S.form) {
-    body = UI.formHTML(S.form, S.questions, canEdit(),
+    body = UI.formHTML(S.form, S.questions, canEditForm(S.form),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy);
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
@@ -94,7 +100,7 @@ function render() {
     body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams());
   } else if (S.view === "event" && S.evSel) {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
-    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues)
+    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks)
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
   } else if (S.view === "venues") {
     body = UI.venuesListHTML(S.venues, S.vnQ, S.msg, S.busy, !!S.vnOpen["vn-add"]);
@@ -109,7 +115,7 @@ function render() {
   } else if (S.view === "list") {
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
       S.teams.length ? S.teams : UI.TEAM_LABELS, S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy,
-      UI.mpItems(S.me, "apps", S.workspaces));
+      UI.mpItems(S.me, "apps", S.workspaces), S.events);
   } else {
     // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
     // 頂欄那幾項各是什麼（shared/nav.js 的 FEATURES 本來就有一句 desc，9-08 刪掉選單頁之後沒地方印；總覽印一次）。
@@ -119,13 +125,16 @@ function render() {
   // 側欄亮哪一行：首頁亮「首頁」，其他全部算在「申請表」底下。
   // 側欄右邊的小數字：待審的申請、等核可的人。**只在 /admin/ 這一組算**（別組沒有 loadTodo），有才顯示。
   const t = S.todo || {};
+  const evForms = new Set((S.events || []).map(e => e.form_id).filter(Boolean));
   const counts = {
-    forms: S.forms.reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0),
+    // 2026-11-10：活動報名表的待審算在「活動」那一行，其他申請算在「其他申請」。
+    forms: S.forms.filter(f => !evForms.has(f.id)).reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0),
+    events: S.forms.filter(f => evForms.has(f.id)).reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0),
     team: (t.team || []).length,
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
-  // 側欄亮哪一行：總覽、需求單那兩頁各自亮，其他全部算在「申請表」底下。
-  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : "forms";
+  // 側欄亮哪一行：總覽、需求單、活動、場地、會議各自亮；活動的報名表亮「活動」，其他申請亮「其他申請」。
+  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -267,7 +276,15 @@ async function openTab(t) {
   const ev = /^events(?:\/([a-z0-9-]+))?$/.exec(t || "");
   if (ev) {
     S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = "";
-    await Promise.all([reloadEvents(ev[1]), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null]); render(); return;
+    await Promise.all([reloadEvents(ev[1]), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null,
+      ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
+    S.evLinks = null;
+    { const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]); if (one) S.evLinks = await D.loadEventLinks(one.id).catch(() => null); }
+    render();
+    // 活動結束之後打開，順手把報名的人抄進 Records 一次（錄取的人結束後算到了）。失敗不吵。
+    const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]);
+    if (one && one.form_id && new Date(one.ends_at || one.starts_at || 0) < new Date()) D.syncEvent(one.id).catch(() => {});
+    return;
   }
   // 場地（2026-11-10）：#venues 清單，#venues/<id> 一個。
   const vn = /^venues(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
@@ -302,6 +319,7 @@ function readRequest() {
   const d = UI.rqBlank();
   Object.assign(d, {
     kind: (S.rqDraft && S.rqDraft.kind) || "",
+    event_id: (S.rqDraft && S.rqDraft.event_id) || "", event_title: (S.rqDraft && S.rqDraft.event_title) || "",
     // 需求負責人就是登入的人；有兩個 team 才讀下拉，一個 team 直接用那一個。
     title: val("rq-title"), owner_team: val("rq-owner-team") || UI.rqMyTeams(S.me)[0] || "", owner_id: (S.me && S.me.id) || "", goal_cta: val("rq-goal"),
     platforms: UI.RQ_PLATFORMS.filter(p => { const el = document.getElementById("rq-pf-" + p); return el && el.checked; }),
@@ -591,6 +609,20 @@ document.addEventListener("click", async e => {
     return;
   }
   // ── 活動上架（2026-11-01）──
+  if (act === "ev-ask-mkt") {
+    const one = (S.events || []).find(x => x.id === id); if (!one) return;
+    S.rqDraft = Object.assign(rqDraftLoad(), { event_id: one.id, event_title: UI.evTitle(one) });
+    if (!S.rqDraft.title) S.rqDraft.title = UI.evTitle(one);
+    rqDraftSave(); history.pushState(null, "", "#request"); await openTab("request"); return;
+  }
+  if (act === "rq-ev-clear") { S.rqDraft = Object.assign(readRequest(), { event_id: "", event_title: "" }); rqDraftSave(); render(); return; }
+  if (act === "ev-back-to") { S.form = null; history.pushState(null, "", "#events/" + id); await openTab("events/" + id); return; }
+  if (act === "ev-attach-form") {
+    S.busy = true; render();
+    try { await D.attachEventForm(id); S.busy = false; await reloadList(); await reloadEvents(S.evSel); S.msg = T("msg.evFormAdded"); }
+    catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
+    render(); return;
+  }
   if (act === "ev-open") { e.preventDefault(); history.pushState(null, "", "#events/" + b.dataset.slug); await openTab("events/" + b.dataset.slug); return; }
   if (act === "ev-back") { history.pushState(null, "", "#events"); await openTab("events"); return; }
   if (act === "ev-create") {
@@ -794,6 +826,7 @@ document.addEventListener("click", async e => {
       // 每點一個就重讀一百列，網路不好的場地會變成點一下等三秒。
       if (a) a.checked_in_at = present ? new Date().toISOString() : null;
       S.busy = false;
+      syncRecords();
     } catch (err) { S.busy = false; S.msg = T("err.checkin") + D.says(err); }
     render();
     return;
@@ -890,6 +923,7 @@ document.addEventListener("click", async e => {
     S.busy = true; S.msg = ""; render();
     try {
       const n = await D.decide(ids, status);
+      syncRecords();
       // 改完立刻試著把信寄出去。失敗不影響狀態（狀態已經改好了），
       // 只會留在 outbox 裡，畫面上看得到。
       let mailNote = "";
@@ -1042,6 +1076,13 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
   // 活動頁的「場地」（2026-11-10）：選了就存，地點那一格空的話資料庫順手填場地名字，所以重讀活動。
+  if (S.view === "event" && e.target && (e.target.id === "ev-kind" || e.target.id === "ev-term")) {
+    const evId = e.target.dataset.id, p = e.target.id === "ev-kind" ? { kind: e.target.value } : { term_id: e.target.value };
+    S.busy = true; S.msg = ""; render();
+    try { await D.saveEventMeta(evId, p); S.busy = false; await reloadEvents(S.evSel); S.msg = T("ev.metaSaved"); render(); }
+    catch (x) { S.busy = false; S.msg = T("err.save") + D.says(x); render(); }
+    return;
+  }
   if (S.view === "event" && e.target && e.target.id === "ev-venue") {
     const evId = e.target.dataset.id, vid = e.target.value || null;
     S.busy = true; S.msg = ""; render();

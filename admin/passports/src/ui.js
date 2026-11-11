@@ -20,7 +20,7 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 // 以及資料庫的函式與 RLS。**
 // label 與 hint 中英並排（2026-10-19 中英切換），畫的時候 T() 挑一句。
 export const GROUPS = [
-  { key: "forms",     label: { zh: "申請",     en: "Applications" }, href: "/admin/",           who: "cadre",        hint: { zh: "申請表、審核、簽到、行前信", en: "Forms, review, check-in, notices" } },
+  { key: "forms",     label: { zh: "活動與申請", en: "Events & applications" }, href: "/admin/", who: "cadre",        hint: { zh: "總覽、活動、報名與審核、場地、會議、行銷需求", en: "Overview, events, sign-ups and review, venues, meetings, Marketing requests" } },
   { key: "site",      label: { zh: "對外",     en: "Public site" },  href: "/admin/site/",      who: "cadre",        hint: { zh: "資源、團隊頁、校友頁、信件文案、歷史之路", en: "Resources, team page, alumni page, email copy, history" } },
   { key: "passports", label: { zh: "護照",     en: "Passports" },    href: "/admin/passports/", who: "ws:passport|intern-passport", hint: { zh: "兩本護照的格子", en: "Boxes in both passports" } },
   { key: "people",    label: { zh: "人與權限", en: "People" },       href: "/admin/people/",    who: "senior",       hint: { zh: "名單、職級、工作區、屆別、邀請碼", en: "Roster, ranks, workspaces, terms, invite codes" } },
@@ -30,7 +30,7 @@ export const GROUPS = [
   // 2026-11-26 Marketing：Instagram 連線（之後加成效與大學介紹貼文）。Marketing 資源工作區或行銷需求單工作區裡的人，任何等級（Paul 2026-10-29）。
   { key: "marketing", label: { zh: "Marketing", en: "Marketing" },  href: "/admin/marketing/", who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve", hint: { zh: "大學介紹貼文、Instagram", en: "College intro posts, Instagram" } },
   // 2026-11-29 內部表單：每一位幹部都進得來（要填的表單在這裡）；建表單與看結果那一頁看 my_access() 的 team-forms 那一格。
-  { key: "teamforms", label: { zh: "內部表單", en: "Team forms" },   href: "/admin/team-forms/", who: "cadre",      hint: { zh: "給幹部填的表單、結果", en: "Forms for members, and results" } },
+  { key: "teamforms", label: { zh: "內部表單", en: "Internal forms" }, href: "/admin/team-forms/", who: "cadre",    hint: { zh: "只給幹部填的表單、結果（不對外）", en: "Forms for cadres only, and results (never public)" } },
   // 2026-12-01 BT Records：人、活動、出席、回饋、配對、去向收成一個資料集。who 是 "ws:records"：my_access() 的 records 那一格，
   // 管的人（custom:records 工作區）是 edit，Senior Adviser 與任何一場活動工作區「改」以上的人是 view（2026-12-01-records.sql）。
   { key: "records",   label: { zh: "紀錄",     en: "Records" },      href: "/admin/records/",   who: "ws:records",   hint: { zh: "活動記分卡、人的時間軸、回饋表、去向", en: "Event scorecards, people, feedback forms, outcomes" } },
@@ -45,18 +45,20 @@ export const ITEMS = [
   { group: "forms",     key: "home",     sec: "",         label: { zh: "總覽",     en: "Overview" },          hint: { zh: "今天要處理的事", en: "What needs you today" }, who: "cadre" },
   // 2026-11-02 會議紀錄：每一位幹部看得到；排會與記會議的門在資料庫（senior 或那個 team 的 Director）。
   // 2026-11-29 內部表單：每一位幹部都看得到「要填的表單」；「建表單與看結果」要建得了，或是某一份的讀者（門在資料庫 tf_*）。
-  { group: "teamforms", key: "fill",     sec: "tforms",   label: { zh: "要填的表單", en: "Forms to fill in" }, hint: { zh: "發給你的表單、你填過的", en: "Forms sent to you, your answers" }, who: "cadre" },
-  { group: "teamforms", key: "build",    sec: "tforms",   label: { zh: "建表單與看結果", en: "Build & results" }, hint: { zh: "題目、發給誰、誰看得到", en: "Questions, recipients, readers" }, who: "ws:team-forms" },
+  { group: "teamforms", key: "fill",     sec: "internal", label: { zh: "要填的內部表單", en: "Internal forms to fill in" }, hint: { zh: "發給你的表單、你填過的（只有幹部）", en: "Sent to you, your answers (cadres only)" }, who: "cadre" },
+  { group: "teamforms", key: "build",    sec: "internal", label: { zh: "建內部表單與看結果", en: "Build internal forms" }, hint: { zh: "題目、發給哪些幹部、誰看得到結果", en: "Questions, which cadres, who reads results" }, who: "ws:team-forms" },
   // 2026-12-01 BT Records：四頁都看 my_access() 的 records 那一格；每一頁裡能改什麼由資料庫的 rc_ 函式決定。
   { group: "records",   key: "overview", sec: "rec",      label: { zh: "活動記分卡", en: "Event scorecards" }, hint: { zh: "每一場四個數字、下一次改什麼", en: "Four numbers per event, what to change next" }, who: "ws:records" },
-  { group: "records",   key: "forms",    sec: "rec",      label: { zh: "回饋表",     en: "Feedback forms" },   hint: { zh: "活動後、校友年度、配對回饋", en: "Post-event, alumni yearly, pair check-ins" }, who: "ws:records" },
-  { group: "records",   key: "people",   sec: "rec",      label: { zh: "人",         en: "People" },           hint: { zh: "一個人的時間軸、重複的人、去向", en: "One person over time, duplicates, outcomes" }, who: "ws:records" },
+  { group: "records",   key: "forms",    sec: "rec",      label: { zh: "回饋表",     en: "Feedback forms" },   hint: { zh: "活動後、校友年度、配對回饋（對外連結，不用登入）", en: "Post-event, alumni yearly, pairs (public link, no login)" }, who: "ws:records" },
+  { group: "records",   key: "people",   sec: "rec",      label: { zh: "所有人",     en: "Everyone" },         hint: { zh: "學員、校友、來賓、幹部，每個人的時間軸與去向", en: "Students, alumni, guests and cadres over time" }, who: "ws:records" },
   { group: "records",   key: "yearly",   sec: "rec",      label: { zh: "年度比較",   en: "Year by year" },     hint: { zh: "每一屆每一種活動一列", en: "One row per term and event kind" }, who: "ws:records" },
-  { group: "forms",     key: "meetings", sec: "meet",     label: { zh: "會議",     en: "Meetings" },          hint: { zh: "排過的會、會議紀錄", en: "Scheduled meetings and notes" }, who: "cadre" },
+  { group: "forms",     key: "meetings", sec: "internal", label: { zh: "會議",     en: "Meetings" },          hint: { zh: "排過的會、會議紀錄", en: "Scheduled meetings and notes" }, who: "cadre" },
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
-  { group: "forms",     key: "events",   sec: "meet",     label: { zh: "活動",     en: "Events" },            hint: { zh: "上到對外首頁的活動", en: "Events on the public site" }, who: "cadre" },
+  { group: "forms",     key: "events",   sec: "events",   label: { zh: "活動",     en: "Events" },            hint: { zh: "每一場：報名表、審核、簽到、場地", en: "Each one: sign-up form, review, check-in, venue" }, who: "cadre" },
   // 2026-11-10 場地：每一位幹部看得到（辦活動要找場地），新增與改只有 Co-President 與紀錄工作區的人（門在資料庫 venue_can_edit）。
-  { group: "forms",     key: "venues",   sec: "meet",     label: { zh: "場地",     en: "Venues" },            hint: { zh: "用過的地方與聯絡人", en: "Places we've used, who to call" }, who: "cadre" },
+  { group: "forms",     key: "venues",   sec: "events",   label: { zh: "場地",     en: "Venues" },            hint: { zh: "用過的地方與聯絡人", en: "Places we've used, who to call" }, who: "cadre" },
+  // 2026-11-10 Paul：「application should live under events」。活動的報名表在那場活動底下；這裡只剩不屬於某一場的申請（計畫、招募幹部）。
+  { group: "forms",     key: "forms",    sec: "events",   label: { zh: "其他申請", en: "Other applications" }, hint: { zh: "計畫、招募幹部（不屬於某一場活動）", en: "Programs, recruitment (not one event)" }, who: "cadre" },
   // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
   { group: "forms",     key: "request",  sec: "mkt",      label: { zh: "請 Marketing 做貼文或影片", en: "Ask Marketing for a post or video" }, hint: { zh: "送一張需求單", en: "Send a request" }, who: "cadre" },
   { group: "forms",     key: "requests", sec: "mkt",      label: { zh: "Marketing 的待辦", en: "Marketing's queue" }, hint: { zh: "大家送來的需求單", en: "Requests sent to Marketing" }, who: "ws:custom:marketing-requests" },
@@ -64,7 +66,6 @@ export const ITEMS = [
   // 2026-11-27 大學介紹貼文：Marketing 的人做、勾來源；核可的人（custom:marketing-approve）核可。門在資料庫（mkt_can_edit／mkt_can_approve）。
   { group: "marketing", key: "posts",    sec: "mkt",      label: { zh: "大學介紹貼文", en: "College intro posts" }, hint: { zh: "做、審、下載給 Canva", en: "Build, approve, download for Canva" }, who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve" },
   { group: "marketing", key: "ig",       sec: "mkt",      label: { zh: "Instagram", en: "Instagram" },       hint: { zh: "帳號連線、粉絲數", en: "Account connection, followers" }, who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve" },
-  { group: "forms",     key: "forms",    sec: "apply",    label: { zh: "申請表",   en: "Application forms" }, hint: { zh: "報名表、審核、簽到", en: "Sign-up forms, review, check-in" }, who: "cadre" },
   { group: "passports", key: "cadre",    sec: "pass",     label: { zh: "幹部護照", en: "Cadre passport" },    hint: { zh: "月份、格子、揭曉", en: "Months, boxes, reveals" }, who: "ws:passport" },
   { group: "passports", key: "cities",   sec: "pass",     label: { zh: "入境章的城市", en: "Entry-stamp cities" }, hint: { zh: "蓋滿一個月抽到的城市", en: "Cities drawn when a month is full" }, who: "ws:passport" },
   { group: "passports", key: "interns",  sec: "pass",     label: { zh: "實習護照", en: "Intern passport" },   hint: { zh: "屆別、分類、格子", en: "Terms, groups, boxes" }, who: "ws:intern-passport" },
@@ -90,14 +91,14 @@ export const ITEMS = [
 ];
 // 側欄的段落（2026-10-28）。順序照常用到不常用。icon 是 24×24 的線條圖，一段一個，讓眼睛不用讀字就認得出來。
 export const SECTIONS = [
-  { key: "tforms", label: { zh: "內部表單",   en: "Team forms" },        icon: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12l2 2 4-4M9 17h6"/>' },
+  // 2026-11-10 重排：活動一段（活動、場地、其他申請），內部一段（會議、內部表單，只有幹部），不再混在一起。
+  { key: "events", label: { zh: "活動",       en: "Events" },            icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
+  { key: "internal", label: { zh: "內部", en: "Internal" }, icon: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>' },
   { key: "rec",    label: { zh: "紀錄",       en: "Records" },           icon: '<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3M20 16V6"/>' },
-  { key: "meet",   label: { zh: "會議與活動", en: "Meetings & events" }, icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
   { key: "mkt",    label: { zh: "行銷",       en: "Marketing" },         icon: '<path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/>' },
-  { key: "apply",  label: { zh: "申請",       en: "Applications" },      icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>' },
   { key: "pass",   label: { zh: "護照",       en: "Passports" },         icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M9 17h6"/>' },
   { key: "web",    label: { zh: "對外網站",   en: "Website" },           icon: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>', note: "rail.foot" },
-  { key: "people", label: { zh: "人",         en: "People" },            icon: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 0 1 6-4.6"/>' },
+  { key: "people", label: { zh: "幹部與權限", en: "Cadres & access" },            icon: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 0 1 6-4.6"/>' },
   { key: "money",  label: { zh: "錢",         en: "Money" },             icon: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>' },
 ];
 const WHY = { president: "why.president", senior: "why.senior", "ws:passport|intern-passport": "why.passports", "ws:finance": "why.finance", "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve": "why.marketing", "ws:records": "why.records" };

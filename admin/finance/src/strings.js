@@ -166,6 +166,8 @@ export const MINE = {
   "f.counterparty":   { zh: "對象", en: "Counterparty" },
   "f.counterpartyPh": { zh: "誰給的、付給誰", en: "Who paid, or who was paid" },
   "f.note":           { zh: "備註", en: "Note" },
+  "f.event":          { zh: "哪一場活動（可以不選）", en: "Which event (optional)" },
+  "f.noEvent":        { zh: "不屬於某一場活動", en: "Not for one event" },
   "f.receipt":        { zh: "收據", en: "Receipt" },
   "f.voided":         { zh: "作廢", en: "Voided" },
   "f.voidReason":     { zh: "作廢原因", en: "Void reason" },

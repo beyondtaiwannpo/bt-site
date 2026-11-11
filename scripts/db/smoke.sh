@@ -3213,6 +3213,51 @@ chkas "${DIR}" "★ 活動的負責人可以接場地，地點是空的就填場
 chkas "${OUTC}" "場地頁看得到在這裡辦過的活動，列表有場次數" "1|1" "select jsonb_array_length(public.venue_get('${VN}')->'events')||'|'||(select v->>'n_events' from jsonb_array_elements(public.venues_list()->'venues') v where v->>'id'='${VN}')"
 chkraise "沒指派的幹部刪不了場地（not_venue_editor）" "not_venue_editor" "perform set_config('test.uid','${OUTC}',true); perform public.venue_delete('${VN}');"
 chkas "${PAUL}" "★ 刪場地：聯絡人一起刪、活動留著只是沒有場地、地點的字不動" "0|1|SmokeHall" "select public.venue_delete('${VN}'); select (select count(*) from public.venue_contacts where venue_id='${VN}')||'|'||(select count(*) from public.events where id='${EV}' and venue_id is null)||'|'||(select place from public.events where id='${EV}')"
+echo "── 活動的人審自己那場的報名（2026-12-15-event-signups.sql）──"
+esg=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-15-event-signups.sql 2>&1 || true)
+if echo "${esg}" | grep -q "OVERALL.*PASS" && ! echo "${esg}" | grep -q "|FAIL"; then echo "  ok   活動報名那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 活動報名那支驗收表："; echo "${esg}" | head -10; fail=$((fail+1)); fi
+# EVX：一般幹部，沒有申請工作區，什麼都沒被派。等一下被加進一場活動。
+EVX=88880000-0000-0000-0000-0000000000e1
+STX=88880000-0000-0000-0000-0000000000e2
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${EVX}','evx@example.com'), ('${STX}','stx@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values ('${EVX}','活動員','Eve Event','Mentorship Team','cadre','member');
+insert into public.profiles (id,name_zh,role) values ('${STX}','報名學員','student');
+SQL
+NEV=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('Curriculum Team','smoke-signups','報名測試','Smoke Signups',true)" | tail -1 | tr -d ' \n')
+NEVF=$(psql -d "${DB}" -X -A -t -q -c "select form_id from public.events where id='${NEV}'" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "update public.forms set status='open' where id='${NEVF}';" -c "insert into public.applications (form_id, user_id, applicant_name, applicant_email) values ('${NEVF}','${STX}','報名學員','stx@example.com');" 2>&1 | grep -i "error" || true
+NAPP=$(psql -d "${DB}" -X -A -t -q -c "select id from public.applications where form_id='${NEVF}'" | tr -d ' \n')
+chkrole anon "" "★ 活動還是草稿，報名表就算開著也不對外" "0" "select count(*) from public.forms where id='${NEVF}'"
+chkraise "★ 活動還是草稿，送不出申請（form_closed）" "form_closed" "perform set_config('test.uid','${STX}',true); perform public.submit_application('${NEVF}', '[]'::jsonb, null);"
+chkrole authenticated "${EVX}" "沒被加進活動的幹部看不到這張報名表與申請" "0|0" "select (select count(*) from public.forms where id='${NEVF}')||'|'||(select count(*) from public.applications where form_id='${NEVF}')"
+chkraise "沒被加進活動的幹部不能簽到（not_director_of）" "not_director_of" "perform set_config('test.uid','${EVX}',true); perform public.set_check_in(array['${NAPP}']::uuid[], true);"
+psql -d "${DB}" -X -A -t -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${EVX}','custom:event-smoke-signups','view');" 2>&1 | grep -i "error" || true
+chkrole authenticated "${EVX}" "★ 這場「看」：看得到報名表與申請" "1|1" "select (select count(*) from public.forms where id='${NEVF}')||'|'||(select count(*) from public.applications where form_id='${NEVF}')"
+chkraise "★ 這場「看」：不能簽到、不能審" "not_director_of" "perform set_config('test.uid','${EVX}',true); perform public.decide_applications(array['${NAPP}']::uuid[], 'accepted');"
+psql -d "${DB}" -X -A -t -q -c "update public.assignments set level='edit' where user_id='${EVX}' and workspace_id='custom:event-smoke-signups';" 2>&1 | grep -i "error" || true
+chkas "${EVX}" "★ 這場「改」：簽得了到" "1|true" "select public.set_check_in(array['${NAPP}']::uuid[], true); select '1|'||(checked_in_at is not null)::text from public.applications where id='${NAPP}'"
+chkrole authenticated "${EVX}" "★ 這場「改」：改得動報名表的題目設定（RLS）" "1" "with u as (update public.forms set intro='smoke' where id='${NEVF}' returning 1) select count(*) from u"
+chkrole authenticated "${EVX}" "★ 別場與別的計畫申請照舊看不到（只到自己那場）" "0" "select count(*) from public.applications where form_id<>'${NEVF}'"
+OTHERAPP=$(psql -d "${DB}" -X -A -t -q -c "select id from public.applications where form_id<>'${NEVF}' limit 1" | tr -d ' \n')
+if [ -n "${OTHERAPP}" ]; then chkraise "★ 一次傳兩筆、夾一筆別場的，整批擋下" "not_director_of" "perform set_config('test.uid','${EVX}',true); perform public.set_check_in(array['${NAPP}','${OTHERAPP}']::uuid[], true);"; fi
+psql -d "${DB}" -X -A -t -q -c "update public.events set status='published' where id='${NEV}';" 2>&1 | grep -i "error" || true
+chkrole anon "" "活動上架之後，開著的報名表就對外" "1" "select count(*) from public.forms where id='${NEVF}'"
+NEV2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('Curriculum Team','smoke-noform','沒報名表','No Form',false)" | tail -1 | tr -d ' \n')
+chkraise "沒被加進那場的幹部補不了報名表（not_event_editor）" "not_event_editor" "perform set_config('test.uid','${EVX}',true); perform public.attach_event_form('${NEV2}');"
+chkas "${PAUL}" "★ 補一張報名表：草稿、team 跟活動一樣、活動掛上它；再按一次不會多一張" "draft|CurriculumTeam|true|1" "select public.attach_event_form('${NEV2}'); select public.attach_event_form('${NEV2}'); select f.status||'|'||f.team||'|'||(e.form_id=f.id)::text||'|'||(select count(*) from public.forms where title='沒報名表') from public.events e join public.forms f on f.id=e.form_id where e.id='${NEV2}'"
+echo "── 錢與需求單掛在活動上（2026-12-16-event-links.sql）──"
+elk=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-16-event-links.sql 2>&1 || true)
+if echo "${elk}" | grep -q "OVERALL.*PASS" && ! echo "${elk}" | grep -q "|FAIL"; then echo "  ok   活動連結那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 活動連結那支驗收表："; echo "${elk}" | head -10; fail=$((fail+1)); fi
+chkas "${SD}" "★ 記一筆支出掛在活動上" "true" "select public.fin_add_transaction(jsonb_build_object('happened_on','2027-09-20','kind','expense','amount',500,'currency','TWD','account_id','${FA1}','category_id','${CE}','counterparty','smoke 場地費','event_id','${NEV}')); select (event_id='${NEV}')::text from public.fin_transactions where counterparty='smoke 場地費'"
+chkraise "掛一場不存在的活動（no_such_event）" "no_such_event" "perform set_config('test.uid','${SD}',true); perform public.fin_add_transaction(jsonb_build_object('happened_on','2027-09-20','kind','expense','amount',1,'currency','TWD','account_id','${FA1}','category_id','${CE}','event_id','00000000-0000-0000-0000-000000000009'));"
+chkas "${SD}" "轉帳不掛活動" "x" "select public.fin_add_transaction(jsonb_build_object('happened_on','2027-09-20','kind','transfer','amount',1,'currency','TWD','account_id','${FA1}','to_account_id',(select id from public.fin_accounts where id<>'${FA1}' and archived_at is null limit 1),'counterparty','smoke 轉帳','event_id','${NEV}')); select 'x'||coalesce(event_id::text,'') from public.fin_transactions where counterparty='smoke 轉帳'"
+chkas "${SD}" "★ 看得到財務的人：活動頁有這場的支出" "500.00|1" "select (public.event_links('${NEV}')->'money'->>'expense')||'|'||(public.event_links('${NEV}')->'money'->>'n')"
+chkas "${EVX}" "★ 活動的人看不到錢（money 是 null）" "null" "select coalesce(public.event_links('${NEV}')->'money','null'::jsonb)::text"
+chkraise "★ 不是財務的人拿不到挑活動的清單（not_finance_viewer）" "not_finance_viewer" "perform set_config('test.uid','${EVX}',true); perform public.fin_event_options();"
+chkas "${EVX}" "★ 從活動頁送需求單，掛在那一場，活動頁看得到" "true|1" "select public.submit_request(jsonb_build_object('kind','post','title','Smoke 海報','platforms',jsonb_build_array('ig_carousel'),'event_id','${NEV}')); select (r.event_id='${NEV}')::text||'|'||jsonb_array_length(public.event_links('${NEV}')->'requests') from public.requests r where r.title='Smoke 海報'"
+chkas "${OUTC}" "★ 沒被加進那場、也不在 Marketing 的幹部看不到掛在那場的需求單" "0" "select jsonb_array_length(public.event_links('${NEV}')->'requests')"
+chkraise "送需求單掛不存在的活動（no_such_event）" "no_such_event" "perform set_config('test.uid','${EVX}',true); perform public.submit_request(jsonb_build_object('kind','post','title','x','event_id','00000000-0000-0000-0000-000000000009'));"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -32,12 +32,16 @@ export async function loadMe(userId) {
 
 // 屆、帳戶、類別、預算，一趟。不是能看的人會拿到 not_finance_viewer。
 export const loadBootstrap = () => rpc("fin_bootstrap");
+// 2026-11-10：一筆收支可以掛一場活動。挑活動的清單走函式（財務的人不一定看得到每一場的 events 列）。表還沒建就回空的，畫面照用。
+export const loadEventOptions = () => rpc("fin_event_options").catch(() => []);
 // 所有的筆（含作廢的）。RLS 只放 can_view_finance 的人，別人讀回來是空的（不是錯）。幾百筆一年，整張讀下來比分頁簡單。
 export async function loadTx() {
   need();
-  const { data, error } = await supabase.from("fin_transactions")
-    .select("id, happened_on, kind, amount, currency, amount_twd, fx_rate, account_id, to_account_id, category_id, counterparty, note, receipt_path, term_id, entered_by, created_at, updated_at, voided_at, voided_by, void_reason")
-    .order("happened_on", { ascending: false }).order("created_at", { ascending: false });
+  const cols = "id, happened_on, kind, amount, currency, amount_twd, fx_rate, account_id, to_account_id, category_id, counterparty, note, receipt_path, term_id, entered_by, created_at, updated_at, voided_at, voided_by, void_reason";
+  const q = c => supabase.from("fin_transactions").select(c).order("happened_on", { ascending: false }).order("created_at", { ascending: false });
+  let { data, error } = await q(cols + ", event_id");
+  // event_id 是 2026-12-16-event-links.sql 加的。還沒跑那支就不帶這一欄，頁面照用（只是挑不了活動）。
+  if (error && /event_id/.test(error.message || "")) ({ data, error } = await q(cols));
   if (error) throw error;
   return data || [];
 }

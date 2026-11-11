@@ -274,6 +274,7 @@ export const MINE = {
   "ev.readonly":      { zh: "你看得到這一場，但改不了（要那場活動工作區「改」以上，或被派進 BT Records）。", en: "You can see this event but not change it (needs edit on the event workspace, or BT Records)." },
   "ev.imported":      { zh: "舊活動", en: "past event" },
   "ev.settings":      { zh: "種類與屆別", en: "Kind and term" },
+  "ev.openSite":      { zh: "這場活動的頁面（報名、簽到、場地）", en: "Event page (sign-ups, check-in, venue)" },
   "ev.kind":          { zh: "種類", en: "Kind" },
   "ev.term":          { zh: "屆別", en: "Term" },
   "ev.noTerm":        { zh: "（沒標）", en: "(none)" },
