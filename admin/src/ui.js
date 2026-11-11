@@ -429,6 +429,8 @@ export const ITEMS = [
   { group: "forms",     key: "meetings", sec: "meet",     label: { zh: "會議",     en: "Meetings" },          hint: { zh: "排過的會、會議紀錄", en: "Scheduled meetings and notes" }, who: "cadre" },
   // 2026-11-01 活動上架：每一位幹部看得到活動清單（自己 team 的），開活動要 team 的 Director 或 senior（門在資料庫）。
   { group: "forms",     key: "events",   sec: "meet",     label: { zh: "活動",     en: "Events" },            hint: { zh: "上到對外首頁的活動", en: "Events on the public site" }, who: "cadre" },
+  // 2026-11-10 場地：每一位幹部看得到（辦活動要找場地），新增與改只有 Co-President 與紀錄工作區的人（門在資料庫 venue_can_edit）。
+  { group: "forms",     key: "venues",   sec: "meet",     label: { zh: "場地",     en: "Venues" },            hint: { zh: "用過的地方與聯絡人", en: "Places we've used, who to call" }, who: "cadre" },
   // 2026-10-31 行銷需求單：每一位幹部都能送；佇列只有 Marketing 需求工作區裡的人（與靠職級的兩級）看得到。
   { group: "forms",     key: "request",  sec: "mkt",      label: { zh: "請 Marketing 做貼文或影片", en: "Ask Marketing for a post or video" }, hint: { zh: "送一張需求單", en: "Send a request" }, who: "cadre" },
   { group: "forms",     key: "requests", sec: "mkt",      label: { zh: "Marketing 的待辦", en: "Marketing's queue" }, hint: { zh: "大家送來的需求單", en: "Requests sent to Marketing" }, who: "ws:custom:marketing-requests" },
@@ -1536,7 +1538,7 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
 }
 // 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
 // canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
-export function eventEditHTML(e, form, signed, me, msg, busy) {
+export function eventEditHTML(e, form, signed, me, msg, busy, venues) {
   const dis = busy ? " disabled" : "";
   const canEdit = canEditWs(me, e.workspace_id), canManage = wsLevel(me, e.workspace_id) === "manage", sen = senior(me);
   const ro = canEdit ? "" : " readonly";
@@ -1580,6 +1582,7 @@ export function eventEditHTML(e, form, signed, me, msg, busy) {
       <label class="check"><input type="checkbox" id="ev-consent" name="cover_consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label>
       <div class="mini">${T("ev.coverNote")}</div>
       ${canEdit ? `<div class="form-foot">${autosaveHint("ev-save", `data-id="${esc(e.id)}"`)}</div>` : `<div class="mini">${T("ev.readOnly")}</div>`}</div>`)
+    + eventVenueHTML(e, venues, canEdit, busy)
     + sectionHTML(T("ev.signup"), links);
 }
 
@@ -1674,4 +1677,90 @@ export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
         <div><i>${T("mt.st.declined")}（${grp("declined").length}）</i><ul class="plain">${grp("declined").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>
       </div>` : `<div class="mini">${T("mt.nobody")}</div>`)
     + (canEdit ? meetingFormHTML(m, draft, scopes, people, busy) : "");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 場地（2026-11-10，supabase/migrations/2026-12-14-venues.sql）
+// ═══════════════════════════════════════════════════════════════════════
+// 每一位幹部看得到（辦活動要找場地），新增與改只有 Co-President 與紀錄工作區的人（canEdit 從 venues_list 回的 can_edit，門在資料庫）。
+export const VENUE_KINDS = ["school", "university", "coworking", "cafe", "company", "government", "hotel", "online", "other"];
+const vnDate = d => d ? String(d).slice(0, 10) : "";
+// 加場地、加聯絡人的表單收成一行（2026-11-10 Paul：一直開著很干擾）。
+const vnFold = (id, title, body, open) => `<details class="fold rc-fold" id="${esc(id)}"${open ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${esc(title)}</b></summary><div class="fold-body">${body}</div></details>`;
+// 搜尋：名字、城市、地址、種類、聯絡人名字都算（清單那一頁只有前四樣）。純函式，test/venues.test.mjs 有測。
+export function venueMatches(v, q) {
+  const n = s => String(s || "").toLowerCase().replace(/\s+/g, "");
+  const qq = n(q); if (!qq) return true;
+  return [v.name, v.city, v.address, T("vn.k." + v.kind)].some(x => n(x).includes(qq));
+}
+function venueFields(v, dis, idp) {
+  const x = v || {};
+  return `<div class="two">
+      <label><i>${T("vn.name")}</i><input id="${idp}-name" value="${esc(x.name || "")}" maxlength="120"${dis}></label>
+      <label><i>${T("vn.kind")}</i><select id="${idp}-kind"${dis}>${VENUE_KINDS.map(k => `<option value="${k}"${(x.kind || "other") === k ? " selected" : ""}>${esc(T("vn.k." + k))}</option>`).join("")}</select></label>
+      <label><i>${T("vn.city")}</i><input id="${idp}-city" value="${esc(x.city || "")}" maxlength="60" placeholder="${esc(T("vn.cityPh"))}"${dis}></label>
+      <label><i>${T("vn.address")}</i><input id="${idp}-address" value="${esc(x.address || "")}" maxlength="200"${dis}></label>
+      <label><i>${T("vn.capacity")}</i><input id="${idp}-capacity" type="number" min="0" value="${esc(x.capacity == null ? "" : String(x.capacity))}"${dis}></label>
+      <label><i>${T("vn.cost")}</i><input id="${idp}-cost" value="${esc(x.cost || "")}" maxlength="120" placeholder="${esc(T("vn.costPh"))}"${dis}></label>
+      <label class="wide"><i>${T("vn.url")}</i><input id="${idp}-url" value="${esc(x.url || "")}" maxlength="300" placeholder="https://…"${dis}></label>
+      <label class="wide"><i>${T("vn.notes")}</i><textarea id="${idp}-notes" style="min-height:90px" placeholder="${esc(T("vn.notesPh"))}"${dis}>${esc(x.notes || "")}</textarea></label>
+    </div>`;
+}
+// r = venues_list() 的結果 { can_edit, venues }
+export function venuesListHTML(r, q, msg, busy, addOpen) {
+  const dis = busy ? " disabled" : "";
+  const list = (r && r.venues) || [], canEdit = !!(r && r.can_edit);
+  const row = v => `<li data-vn-row data-q="${esc([v.name, v.city, T("vn.k." + v.kind)].join(" "))}"${venueMatches(v, q) ? "" : " hidden"}><div class="fhead"><b><a href="#venues/${esc(v.id)}" data-act="vn-open" data-id="${esc(v.id)}">${esc(v.name)}</a></b> <span class="tag">${esc(T("vn.k." + v.kind))}</span></div>
+      <div class="fmeta">${[v.city, v.capacity != null ? T("vn.fits", { n: v.capacity }) : "", v.cost, T("vn.nEvents", { n: v.n_events || 0 }), v.last_used ? T("vn.lastUsed", { d: vnDate(v.last_used) }) : "", T("vn.nContacts", { n: v.n_contacts || 0 })].filter(Boolean).map(esc).join("・")}</div></li>`;
+  const add = canEdit ? vnFold("vn-add", T("vn.add"), `${venueFields(null, dis, "vn-new")}<div class="row"><button class="btn" data-act="vn-create"${dis}>${busy ? T("common.saving") : T("vn.addGo")}</button><span class="mini">${T("vn.addNote")}</span></div>`, addOpen) : "";
+  return pageHead(T("vn.title"), T("vn.lede"))
+    + msgHTML(msg)
+    + (list.length ? `<label class="vn-find"><i>${T("vn.search")}</i><input type="search" id="vn-q" value="${esc(q || "")}" placeholder="${esc(T("vn.searchPh"))}" autocomplete="off"></label>
+        <ul class="flist" id="vn-list">${list.map(row).join("")}</ul>`
+      : emptyHTML(T("vn.none"), canEdit ? T("vn.noneHint") : T("vn.noneHintNo")))
+    + add
+    + (canEdit ? "" : `<div class="mini">${T("vn.readOnly")}</div>`);
+}
+const vnLink = (href, text) => href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text);
+// r = venue_get() 的結果 { can_edit, venue, contacts, events }
+export function venueHTML(r, msg, busy, contactOpen) {
+  const dis = busy ? " disabled" : "";
+  const v = r.venue || {}, canEdit = !!r.can_edit, cs = r.contacts || [], evs = r.events || [];
+  const lede = [T("vn.k." + v.kind), v.city].filter(Boolean).map(esc).join("・");
+  const details = canEdit
+    ? `<div data-vn-form>${venueFields(v, dis, "vn-ed")}<div class="row"><button class="btn" data-act="vn-save" data-id="${esc(v.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button></div></div>`
+    : `<dl class="vn-dl">${[["vn.address", esc(v.address)], ["vn.capacity", v.capacity == null ? "" : esc(String(v.capacity))], ["vn.cost", esc(v.cost)],
+        ["vn.url", /^https?:\/\//i.test(v.url || "") ? vnLink(v.url, v.url) : esc(v.url)], ["vn.notes", esc(v.notes).replace(/\n/g, "<br>")]]
+        .filter(([, x]) => x).map(([k, x]) => `<dt>${T(k)}</dt><dd>${x}</dd>`).join("")}</dl>`;
+  const crow = c => {
+    const bits = [c.email ? vnLink("mailto:" + c.email, c.email) : "", c.phone ? vnLink("tel:" + c.phone.replace(/[^\d+]/g, ""), c.phone) : "",
+      c.line ? `LINE ${/^[\w.@-]+$/.test(c.line) ? vnLink("https://line.me/ti/p/~" + encodeURIComponent(c.line), c.line) : esc(c.line)}` : ""].filter(Boolean);
+    return `<li><div class="fhead"><b>${esc(c.name || T("vn.noName"))}</b>${c.role ? ` <span class="mini">${esc(c.role)}</span>` : ""}${canEdit ? ` <button class="btn quiet sm" data-act="vnc-del" data-id="${esc(c.id)}"${dis}>${T("common.delete")}</button>` : ""}</div>
+      <div class="fmeta">${bits.join("・")}${c.note ? `<div class="mini">${esc(c.note)}</div>` : ""}</div></li>`;
+  };
+  const addC = canEdit ? vnFold("vnc-add", T("vnc.add"), `<div class="two">
+      <label><i>${T("vnc.name")}</i><input id="vnc-name" maxlength="80"${dis}></label>
+      <label><i>${T("vnc.role")}</i><input id="vnc-role" maxlength="80" placeholder="${esc(T("vnc.rolePh"))}"${dis}></label>
+      <label><i>Email</i><input id="vnc-email" type="email" maxlength="120"${dis}></label>
+      <label><i>${T("vnc.phone")}</i><input id="vnc-phone" maxlength="40"${dis}></label>
+      <label><i>LINE</i><input id="vnc-line" maxlength="80"${dis}></label>
+      <label><i>${T("vnc.note")}</i><input id="vnc-note" maxlength="200" placeholder="${esc(T("vnc.notePh"))}"${dis}></label>
+    </div><div class="row"><button class="btn" data-act="vnc-create" data-id="${esc(v.id)}"${dis}>${T("vnc.addGo")}</button></div>`, contactOpen) : "";
+  const erow = e => `<li><div class="fhead"><b>${e.source === "import" ? esc(e.title || e.slug) : `<a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(e.title || e.slug)}</a>`}</b></div>
+      <div class="fmeta">${[vnDate(e.starts_at), String(e.team || "").replace(/\s*Team$/i, "")].filter(Boolean).map(esc).join("・")}</div></li>`;
+  return pageHead(esc(v.name || ""), lede, [], { act: "vn-back", label: T("vn.back") })
+    + msgHTML(msg)
+    + sectionHTML(esc(T("vn.details")), details)
+    + sectionHTML(`${esc(T("vn.contacts"))}<span class="hint">${cs.length}</span>`, (cs.length ? `<ul class="flist">${cs.map(crow).join("")}</ul>` : `<div class="mini">${T("vn.noContacts")}</div>`) + addC)
+    + sectionHTML(`${esc(T("vn.events"))}<span class="hint">${evs.length}</span>`, evs.length ? `<ul class="flist">${evs.map(erow).join("")}</ul>` : `<div class="mini">${T("vn.noEvents")}</div>`)
+    + (canEdit ? `<div class="form-foot"><button class="btn danger sm" data-act="vn-del" data-id="${esc(v.id)}"${dis}>${T("vn.delete")}</button><span class="mini">${T("vn.deleteNote")}</span></div>` : "");
+}
+// 活動頁上的「場地」那一格：從清單選一個，選了就存（main.js 聽 #ev-venue 的 change）。venues null 是還沒載到（或資料表還沒建），不畫。
+export function eventVenueHTML(e, venues, canEdit, busy) {
+  if (!Array.isArray(venues)) return "";
+  const cur = venues.find(v => v.id === e.venue_id);
+  const pick = canEdit && venues.length ? `<label><i>${T("vn.pick")}</i><select id="ev-venue" data-id="${esc(e.id)}"${busy ? " disabled" : ""}><option value="">${T("vn.pickNone")}</option>${
+      venues.map(v => `<option value="${esc(v.id)}"${v.id === e.venue_id ? " selected" : ""}>${esc(v.name)}${v.city ? `・${esc(v.city)}` : ""}</option>`).join("")}</select></label>` : "";
+  const now = cur ? `<div class="row"><span>${esc(cur.name)}${cur.city ? `・${esc(cur.city)}` : ""}</span><a class="btn ghost sm" href="#venues/${esc(cur.id)}" data-act="vn-open" data-id="${esc(cur.id)}">${T("vn.openVenue")}</a></div>` : `<div class="mini">${T("vn.eventNone")}</div>`;
+  return sectionHTML(esc(T("vn.eventVenue")), now + pick + `<div class="mini">${T("vn.eventNote")}</div>`);
 }

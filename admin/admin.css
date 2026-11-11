@@ -960,3 +960,9 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
    只在「換了哪一頁」的時候加 .swap（main.js 的 render 看 S.view 有沒有變），自動儲存那種重畫不加，不會閃。各頁 index.html 的 reduce 區塊會把 animation 關掉。 */
 @keyframes bt-main-in{from{opacity:0}to{opacity:1}}
 .main.swap{animation:bt-main-in .14s ease-out}
+
+/* 場地（2026-11-10） */
+.vn-find{display:block;margin:0 0 10px}
+.vn-dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0}
+.vn-dl dt{font-weight:600}
+.vn-dl dd{margin:0;min-width:0;overflow-wrap:anywhere}

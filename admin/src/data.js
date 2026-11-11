@@ -306,6 +306,16 @@ export async function unassign(id, ws) {
 
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
+  // 場地（2026-11-10）
+  ["not_venue_editor", "場地只有 Co-President 與紀錄工作區的人改得動。", "Only Co-Presidents and Records members can change venues."],
+  ["venue_exists", "同一個城市已經有這個名字的場地了，去清單裡找它。", "A venue with this name is already listed in this city. Find it in the list."],
+  ["no_such_venue", "找不到這個場地，可能剛被刪掉了。", "This venue no longer exists. It may have just been deleted."],
+  ["need_contact", "聯絡人至少要有名字、email、電話、LINE 其中一樣。", "A contact needs at least a name, email, phone or LINE."],
+  ["bad_capacity", "容納人數要是數字。", "Capacity must be a number."],
+  ["need_venue_name", "場地要有名字。", "A venue needs a name."],
+  ["not_event_venue_editor", "這場活動要「改」以上才換得了場地。", "You need Edit on this event to change its venue."],
+  ["bad_email", "這看起來不像 email。", "That does not look like an email."],
+  ["venues_list", "場地資料表還沒建，請 Paul 跑 2026-12-14-venues.sql。", "The venue tables are not set up yet. Ask Paul to run 2026-12-14-venues.sql."],
   // 會議（2026-11-02）
   ["not_invited", "這場會的名單上沒有你。", "You are not on this meeting's list."],
   ["bad_doc_url", "會議紀錄的連結要是 Google Docs 或 Drive 的。", "The notes link must be a Google Docs or Drive link."],
@@ -463,11 +473,21 @@ export async function withdrawRequest(id) {
 export async function loadEvents() {
   need();
   const { data, error } = await supabase.from("events")
-    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind")
+    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind, venue_id")
     .order("starts_at", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return data || [];
 }
+// ── 場地（2026-11-10）────────────────────────────────────────────────
+// 兩張表不開給前端，一律走函式：每一位幹部讀得到，改只有 Co-President 與紀錄工作區的人（2026-12-14-venues.sql）。
+async function rpcV(name, args) { need(); const { data, error } = await supabase.rpc(name, args); if (error) throw error; return data; }
+export const loadVenues        = () => rpcV("venues_list", {});
+export const loadVenue         = id => rpcV("venue_get", { p_id: id });
+export const saveVenue         = (id, p) => rpcV("venue_save", { p_id: id || null, p });
+export const deleteVenue       = id => rpcV("venue_delete", { p_id: id });
+export const saveVenueContact  = (id, p) => rpcV("venue_contact_save", { p_id: id || null, p });
+export const deleteVenueContact = id => rpcV("venue_contact_delete", { p_id: id });
+export const setEventVenue     = (eventId, venueId) => rpcV("set_event_venue", { p_event: eventId, p_venue: venueId || null });
 export async function loadSignedUp(formId) {
   need();
   const { count, error } = await supabase.from("applications").select("id", { count: "exact", head: true }).eq("form_id", formId).neq("status", "rejected");

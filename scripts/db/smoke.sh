@@ -3191,6 +3191,28 @@ chkas "${PAUL}" "★ 錄取（admitted）不進學校紀錄" "0" "select public.
 chkas "${PAUL}" "★ 就讀中進學校紀錄，年份填「從」、來源 outcome、不改現在的學校" "SmokeU|2026||outcome|" "select public.rc_save_outcome(null, jsonb_build_object('person_id','${ROS}','kind','enrolled','institution','Smoke U','year','2026','visibility','internal')); select s.school||'|'||coalesce(s.year_from::text,'')||'|'||coalesce(s.year_to::text,'')||'|'||s.source||'|'||coalesce(pe.school,'') from public.rc_schools s join public.people pe on pe.id=s.person_id where s.person_id='${ROS}'"
 chkas "${PAUL}" "畢業那一筆補上「到」，不多一列（大小寫不同也算同一所）" "1|2026|2030" "select public.rc_save_outcome(null, jsonb_build_object('person_id','${ROS}','kind','graduated','institution','smoke u','year','2030','visibility','internal')); select count(*)||'|'||max(year_from)||'|'||max(year_to) from public.rc_schools where person_id='${ROS}'"
 chkas "${PAUL}" "工作中不進學校紀錄" "1" "select public.rc_save_outcome(null, jsonb_build_object('person_id','${ROS}','kind','working','institution','Smoke Corp','year','2031','visibility','internal')); select count(*) from public.rc_schools where person_id='${ROS}'"
+echo "── 場地與聯絡人（2026-12-14-venues.sql）──"
+vng=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-14-venues.sql 2>&1 || true)
+if echo "${vng}" | grep -q "OVERALL.*PASS" && ! echo "${vng}" | grep -q "|FAIL"; then echo "  ok   場地那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 場地那支驗收表："; echo "${vng}" | head -12; fail=$((fail+1)); fi
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.venues;" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人碰不到場地表"; pass=$((pass+1)); else echo "  FAIL 沒登入的人讀得到場地表：${angot}"; fail=$((fail+1)); fi
+chkraise "★ 學員看不到場地（not_cadre）" "not_cadre" "perform set_config('test.uid','${STU}',true); perform public.venues_list();"
+chkraise "★ 沒指派的幹部加不了場地（not_venue_editor）" "not_venue_editor" "perform set_config('test.uid','${OUTC}',true); perform public.venue_save(null, '{\"name\":\"Smoke Hall\",\"city\":\"Taipei\"}'::jsonb);"
+VN=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.venue_save(null, '{\"name\":\"Smoke Hall\",\"kind\":\"university\",\"city\":\"Taipei\",\"capacity\":\"120\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${VN}" in ????????-*) echo "  ok   Co-President 加了一個場地"; pass=$((pass+1));; *) echo "  FAIL 加場地失敗：${VN}"; fail=$((fail+1));; esac
+chkraise "同名同城市加不了第二個（大小寫不同也算，venue_exists）" "venue_exists" "perform set_config('test.uid','${PAUL}',true); perform public.venue_save(null, '{\"name\":\"smoke hall\",\"city\":\"TAIPEI\"}'::jsonb);"
+chkraise "容納人數不是數字（bad_capacity）" "bad_capacity" "perform set_config('test.uid','${PAUL}',true); perform public.venue_save('${VN}', '{\"capacity\":\"lots\"}'::jsonb);"
+chkraise "名字清空不行（need_venue_name）" "need_venue_name" "perform set_config('test.uid','${PAUL}',true); perform public.venue_save('${VN}', '{\"name\":\"  \"}'::jsonb);"
+chkraise "聯絡人什麼都沒填（need_contact）" "need_contact" "perform set_config('test.uid','${PAUL}',true); perform public.venue_contact_save(null, jsonb_build_object('venue_id','${VN}','role','x'));"
+chkraise "聯絡人 email 不像 email（bad_email）" "bad_email" "perform set_config('test.uid','${PAUL}',true); perform public.venue_contact_save(null, jsonb_build_object('venue_id','${VN}','email','nope'));"
+chkas "${PAUL}" "★ 加一位聯絡人，email 轉小寫" "1|lin@example.com" "select public.venue_contact_save(null, jsonb_build_object('venue_id','${VN}','name','Ms. Lin','email','Lin@Example.com','phone','02 1234')); select count(*)||'|'||max(email) from public.venue_contacts where venue_id='${VN}'"
+chkas "${OUTC}" "★ 一般幹部看得到場地與聯絡人，但不能改" "false|1" "select (public.venue_get('${VN}')->>'can_edit')||'|'||jsonb_array_length(public.venue_get('${VN}')->'contacts')"
+psql -d "${DB}" -X -A -t -q -c "update public.events set place='', venue_id=null where id='${EV}';" 2>&1 | grep -i "error" || true
+chkraise "★ 沒指派的幹部不能把活動接到場地（not_event_venue_editor）" "not_event_venue_editor" "perform set_config('test.uid','${OUTC}',true); perform public.set_event_venue('${EV}', '${VN}');"
+chkas "${DIR}" "★ 活動的負責人可以接場地，地點是空的就填場地名" "true|SmokeHall" "select public.set_event_venue('${EV}', '${VN}'); select (venue_id='${VN}')::text||'|'||place from public.events where id='${EV}'"
+chkas "${OUTC}" "場地頁看得到在這裡辦過的活動，列表有場次數" "1|1" "select jsonb_array_length(public.venue_get('${VN}')->'events')||'|'||(select v->>'n_events' from jsonb_array_elements(public.venues_list()->'venues') v where v->>'id'='${VN}')"
+chkraise "沒指派的幹部刪不了場地（not_venue_editor）" "not_venue_editor" "perform set_config('test.uid','${OUTC}',true); perform public.venue_delete('${VN}');"
+chkas "${PAUL}" "★ 刪場地：聯絡人一起刪、活動留著只是沒有場地、地點的字不動" "0|1|SmokeHall" "select public.venue_delete('${VN}'); select (select count(*) from public.venue_contacts where venue_id='${VN}')||'|'||(select count(*) from public.events where id='${EV}' and venue_id is null)||'|'||(select place from public.events where id='${EV}')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

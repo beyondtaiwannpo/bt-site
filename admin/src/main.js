@@ -31,6 +31,8 @@ let S = {
   requests: null, rqDraft: null, rqF: { status: "open", mine: "", q: "" }, rqSel: null, rqAssignees: [], cadres: [],
   // 活動上架（2026-11-01）：events 是 loadEvents() 回的；evSel 打開的那一場（slug）；evDraft 開活動那張表單填到一半的值；evSigned 那一場的報名數。
   events: null, evSel: null, evDraft: null, evSigned: null,
+  // 場地（2026-11-10）：venues 是 venues_list() 回的 { can_edit, venues }；venue 是打開的那一個（venue_get）；vnQ 清單的搜尋字；vnOpen 哪個收起來的表單開著。
+  venues: null, venue: null, vnSel: null, vnQ: "", vnOpen: {},
   // 會議（2026-11-02）：meetings 是 loadMeetings() 回的；mtSel 打開的那一場；mtDraft 表單填到一半（含勾人的 pk）。
   meetings: null, mtSel: null, mtDraft: null,
 };
@@ -92,8 +94,12 @@ function render() {
     body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams());
   } else if (S.view === "event" && S.evSel) {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
-    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy)
+    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues)
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
+  } else if (S.view === "venues") {
+    body = UI.venuesListHTML(S.venues, S.vnQ, S.msg, S.busy, !!S.vnOpen["vn-add"]);
+  } else if (S.view === "venue" && S.vnSel) {
+    body = S.venue ? UI.venueHTML(S.venue, S.msg, S.busy, !!S.vnOpen["vnc-add"]) : UI.msgHTML(S.msg) + UI.skeletonHTML();
   } else if (S.view === "request") {
     if (!S.rqDraft) S.rqDraft = rqDraftLoad();
     body = UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy, S.cadres, UI.rqToday());
@@ -119,7 +125,7 @@ function render() {
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
   // 側欄亮哪一行：總覽、需求單那兩頁各自亮，其他全部算在「申請表」底下。
-  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : "forms";
+  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -181,7 +187,7 @@ async function boot(retried) {
     if (!light) D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
-    else if (/^(requests?|events|meetings|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    else if (/^(requests?|events|venues|meetings|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -222,6 +228,15 @@ function readEvent() {
   return { title_zh: val("ev-tzh"), title_en: val("ev-ten"), summary_zh: val("ev-szh"), summary_en: val("ev-sen"), body_zh: val("ev-bzh"), body_en: val("ev-ben"),
     starts_at: iso(val("ev-starts")), ends_at: iso(val("ev-ends")), place: val("ev-place"), capacity: Number(val("ev-cap") || 0), cover_url: val("ev-cover"), cover_consent: chk("ev-consent") };
 }
+async function reloadVenues(id) {
+  try {
+    if (id) S.venue = await D.loadVenue(id); else S.venues = await D.loadVenues();
+  } catch (e) { S.msg = T("err.vnLoad") + D.says(e); if (id) S.venue = null; }
+}
+function readVenue(idp) {
+  const val = k => { const el = document.getElementById(idp + "-" + k); return el ? el.value.trim() : ""; };
+  return { name: val("name"), kind: val("kind") || "other", city: val("city"), address: val("address"), capacity: val("capacity"), cost: val("cost"), url: val("url"), notes: val("notes") };
+}
 async function reloadMeetings() {
   try { S.meetings = await D.loadMeetings(); if (S.todo) S.todo.meetings = S.meetings; if (!S.cadres.length) S.cadres = await D.loadCadres().catch(() => []); }
   catch (e) { S.msg = T("err.mtLoad") + D.says(e); }
@@ -248,11 +263,18 @@ async function openTab(t) {
     if (mt[1]) { const m = (S.meetings || []).find(x => x.id === mt[1]); if (m) S.mtDraft = { pk: { ticked: (m.attendees || []).map(a => a.user_id), q: "", mq: "", teams: [], level: "view" } }; }
     render(); return;
   }
-  // 活動上架（2026-11-01）：#events 清單，#events/<代號> 一場。
+  // 活動上架（2026-11-01）：#events 清單，#events/<代號> 一場。打開一場時順便載場地清單（「場地」那一格要用；資料表還沒建就不畫）。
   const ev = /^events(?:\/([a-z0-9-]+))?$/.exec(t || "");
   if (ev) {
     S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = "";
-    await reloadEvents(ev[1]); render(); return;
+    await Promise.all([reloadEvents(ev[1]), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null]); render(); return;
+  }
+  // 場地（2026-11-10）：#venues 清單，#venues/<id> 一個。
+  const vn = /^venues(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
+  if (vn) {
+    S.view = vn[1] ? "venue" : "venues"; S.vnSel = vn[1] || null; S.msg = ""; S.venue = null;
+    if (vn[1]) render();
+    await reloadVenues(vn[1]); render(); return;
   }
   // 行銷需求單（2026-10-31）：#request 是送單那一頁（#request/<id> 只是信裡的直達，一樣開那一頁），#requests 是佇列，#requests/<id> 打開那一張。
   const m = /^(requests?)(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
@@ -521,6 +543,51 @@ document.addEventListener("click", async e => {
     S.busy = true; S.msg = ""; render();
     try { await D.deleteMeeting(id); S.busy = false; S.msg = T("msg.mtDeleted", { title: m.title }); history.pushState(null, "", "#meetings"); await openTab("meetings"); }
     catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
+    return;
+  }
+  // ── 場地（2026-11-10）──
+  if (act === "vn-open") { e.preventDefault(); history.pushState(null, "", "#venues/" + id); await openTab("venues/" + id); return; }
+  if (act === "vn-back") { history.pushState(null, "", "#venues"); await openTab("venues"); return; }
+  if (act === "vn-create") {
+    const p = readVenue("vn-new");
+    if (!p.name) { S.msg = T("err.vnSave") + D.says("need_venue_name"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try { const nid = await D.saveVenue(null, p); S.busy = false; S.vnOpen["vn-add"] = false; const m = T("vn.created", { name: p.name }); history.pushState(null, "", "#venues/" + nid); await openTab("venues/" + nid); S.msg = m; render(); }
+    catch (e) { S.busy = false; S.msg = T("err.vnSave") + D.says(e); render(); }
+    return;
+  }
+  if (act === "vn-save") {
+    const p = readVenue("vn-ed");
+    S.busy = true; S.msg = ""; render();
+    try { await D.saveVenue(id, p); S.busy = false; await reloadVenues(id); S.venues = null; S.msg = T("vn.saved"); render(); }
+    catch (e) { S.busy = false; S.msg = T("err.vnSave") + D.says(e); render(); }
+    return;
+  }
+  if (act === "vn-del") {
+    const name = (S.venue && S.venue.venue && S.venue.venue.name) || "";
+    if (UI.needAsk(S, b, T("vn.deleteAsk", { name }))) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.deleteVenue(id); S.busy = false; S.msg = T("vn.deleted", { name }); history.pushState(null, "", "#venues"); const m = S.msg; await openTab("venues"); S.msg = m; render(); }
+    catch (e) { S.busy = false; S.msg = T("err.vnSave") + D.says(e); render(); }
+    return;
+  }
+  if (act === "vnc-create") {
+    const val = k => { const el = document.getElementById("vnc-" + k); return el ? el.value.trim() : ""; };
+    const p = { venue_id: id, name: val("name"), role: val("role"), email: val("email"), phone: val("phone"), line: val("line"), note: val("note") };
+    S.busy = true; S.msg = ""; render();
+    try { await D.saveVenueContact(null, p); S.busy = false; await reloadVenues(id); S.venues = null; S.msg = T("vn.saved"); render(); }
+    catch (e) {
+      S.busy = false; S.msg = T("err.vnSave") + D.says(e); render();
+      // 加失敗：剛剛打的字放回去，不要叫人重打
+      for (const [k, v] of Object.entries(p)) { const el = document.getElementById("vnc-" + k); if (el) el.value = v; }
+    }
+    return;
+  }
+  if (act === "vnc-del") {
+    const vid = S.venue && S.venue.venue && S.venue.venue.id;
+    S.busy = true; S.msg = ""; render();
+    try { await D.deleteVenueContact(id); S.busy = false; await reloadVenues(vid); S.venues = null; S.msg = T("vnc.deleted"); render(); }
+    catch (e) { S.busy = false; S.msg = T("err.vnSave") + D.says(e); render(); }
     return;
   }
   // ── 活動上架（2026-11-01）──
@@ -968,10 +1035,20 @@ function switchLang(l) {
 applyLang(pickLang(location.search, readStored()));
 boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
+// 場地頁兩個收起來的表單開著沒（重畫之後照舊）。
+document.addEventListener("toggle", e => { const t = e.target; if (t && (t.id === "vn-add" || t.id === "vnc-add")) S.vnOpen[t.id] = t.open; }, true);
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 活動頁的「場地」（2026-11-10）：選了就存，地點那一格空的話資料庫順手填場地名字，所以重讀活動。
+  if (S.view === "event" && e.target && e.target.id === "ev-venue") {
+    const evId = e.target.dataset.id, vid = e.target.value || null;
+    S.busy = true; S.msg = ""; render();
+    try { await D.setEventVenue(evId, vid); S.busy = false; await reloadEvents(S.evSel); S.msg = T("vn.saved"); render(); }
+    catch (x) { S.busy = false; S.msg = T("err.vnSave") + D.says(x); render(); }
+    return;
+  }
   // 行銷需求單：換了負責人的 team，人那一格要換成那個 team 的人，所以重畫。
   if (S.view === "request" && e.target && e.target.id === "rq-owner-team") { S.rqDraft = readRequest(); rqDraftSave(); return; }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
@@ -993,6 +1070,15 @@ document.addEventListener("change", async e => {
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("input", e => {
+  // 場地清單的搜尋（2026-11-10）：不重畫，只藏起對不上的那幾列，游標不會跳。
+  if (S.view === "venues" && e.target && e.target.id === "vn-q") {
+    S.vnQ = e.target.value;
+    const list = (S.venues && S.venues.venues) || [];
+    for (const li of document.querySelectorAll("[data-vn-row]")) {
+      const v = list.find(x => li.querySelector(`[data-id="${x.id}"]`)); li.hidden = !!v && !UI.venueMatches(v, S.vnQ);
+    }
+    return;
+  }
   // 會議的勾人那一塊（2026-11-02）：找名字。
   if (e.target && (e.target.dataset.act === "pk-q" || e.target.dataset.act === "pk-mq") && (S.view === "meetings" || S.view === "meeting")) {
     S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], e.target, true) }); render(); UI.pkRefocus("mt", e.target.dataset.act === "pk-mq" ? "mq" : "q"); return;

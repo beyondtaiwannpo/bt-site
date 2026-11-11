@@ -950,6 +950,18 @@ Paul 2026-11-10：加學校、加聯絡方式這些表單一直開著，找資�
 
 驗證：本機一個人的頁面四個表單都收著，打開加電話、加完還開著；活動頁兩個收著；邀請頁收著。加一筆「就讀中 National Taiwan University 2027」，學校紀錄多一列「from 2027・從去向帶進來」。smoke 多 5 項（1321 全過），單元測試 818，check.sh、check-motion、check-mobile 全過（箭頭在 360px 原本超出 2px，`.fold .chev` 左邊多 3px）。**遷移檔要 Paul 在正式 Supabase 跑。**
 
+### 場地與聯絡人（`supabase/migrations/2026-12-14-venues.sql`，2026-11-10）
+
+Paul 2026-11-10：「build a venue database I wanna document all the venue and their point of contacts for future uses」。辦活動借過的地方，跟當時聯絡的人，以前只在某個幹部的 LINE 裡，換屆就不見了。
+
+- 後台左邊「Meetings & events」底下多一項 **Venues**（`/admin/#venues`）。列表可以搜尋（名字、城市、地址、聯絡人都搜得到），每一列有類型、城市、容納人數、辦過幾場、最近一次、幾位聯絡人。
+- 一個場地的頁面：名字、類型（高中、大學、共同工作空間、咖啡廳、公司、政府、飯店、線上、其他）、城市、地址、容納人數、費用（寫字，例如「平日免費、週末 3000」）、網站或地圖連結、備註；底下是**聯絡人**（名字、職稱、email、電話、LINE、備註，一個場地可以有好幾位），再底下是**在這裡辦過的活動**，點了直接到那場活動。
+- 一場活動的頁面多一格「場地」，從列表挑一個就存。活動的「地點」是空的就自動填場地名；對外活動頁只顯示「地點」那幾個字，**聯絡人永遠不會出現在對外頁面**。
+- 誰能做什麼：所有幹部都看得到（找場地時要用）；新增、修改、刪除場地與聯絡人只有 Co-President 跟 Records 工作區的人（跟管紀錄同一批，`venue_can_edit()` 就是 `rc_can_manage()`）。把活動接到場地，那場活動的負責人也可以。
+- 刪一個場地，它的聯絡人一起刪；辦過的活動留著，只是沒有場地，地點的字不動。同名同城市的場地只能有一個（大小寫不算）。
+- 資料表 `venues`、`venue_contacts`，`events` 多一欄 `venue_id`。兩張表直接讀寫都關掉，只能走函式。`scripts/db/smoke.sh` 有一段 17 項守著（沒登入、學員、沒指派的幹部各自被擋，刪除的連帶效果）。
+- 畫面在 `admin/src/ui.js` 的 `venuesListHTML()`、`venueHTML()`、`eventVenueHTML()`。
+
 ### 名錄上的「當過什麼」標籤（2026-11-10）
 
 Paul 2026-11-10：找人的時候要一眼看出誰是誰。名錄每一列名字旁邊原本只有「學員／成員／來賓」，底下一行「Was: Mentee, Mentor, Student」。現在改成一排標籤：
