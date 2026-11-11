@@ -234,10 +234,12 @@ a.btn{text-decoration:none}
 .fold > summary::-webkit-details-marker{display:none}
 .fold > summary b{font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:.02em}
 .fold > summary .mini{flex:1;min-width:0}
-.fold .chev{flex:none;width:9px;height:9px;border-right:2px solid var(--bt-navy);border-bottom:2px solid var(--bt-navy);transform:rotate(-45deg);transition:transform var(--dur-2) var(--ease);margin-right:2px}
+.fold .chev{flex:none;width:9px;height:9px;border-right:2px solid var(--bt-navy);border-bottom:2px solid var(--bt-navy);transform:rotate(-45deg);transition:transform var(--dur-2) var(--ease);margin:0 2px 0 3px}
 .fold[open] .chev{transform:rotate(45deg)}
 .fold > summary:hover{background:rgba(16,42,134,.04);border-radius:14px}
 .fold-body{padding:4px 16px 16px;border-top:1px solid rgba(16,42,134,.12)}
+.rc-fold{margin-top:14px}
+.rc-fold > .fold-body{padding-top:12px}
 /* 名單的職位欄（2026-11-03）：一筆一行、team 用「·」接在同一行、欄位不折到兩行。 */
 .table td.t-pos{min-width:240px}
 .pos-line{white-space:nowrap}

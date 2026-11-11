@@ -315,3 +315,19 @@ test("person page shows contacts to managers only, without the old add-email box
   const viewer = UI.personHTML(d, { boot: { can_manage: false }, me: {} });
   assert.doesNotMatch(viewer, /pinwang/);
 });
+
+// 2026-11-10 加一個…的表單預設收起來
+test("add forms on the person page are folded by default and stay open once opened", () => {
+  const d = { person: { id: "p1", name: "Paul", kind: "member", note: "" }, identities: [], schools: [] };
+  const S = { view: "people", id: "p1", boot: { can_manage: true, events: [{ id: "e", title_en: "Camp", starts_at: "2025-01-01" }] }, me: {} };
+  const h = UI.personHTML(d, S);
+  for (const a of ["data-cadd", "data-sadd", "data-paddev", "data-oadd"]) {
+    const m = h.match(new RegExp(`<details class="fold rc-fold" ${a}[^>]*>`));
+    assert.ok(m, a); assert.doesNotMatch(m[0], / open/);
+  }
+  assert.equal((h.match(/<details/g) || []).length, (h.match(/<\/details>/g) || []).length);
+  UI.setFold(UI.foldKey("cadd", S), true);
+  assert.match(UI.personHTML(d, S), /data-cadd data-fold="[^"]*" open/);
+  assert.doesNotMatch(UI.personHTML(d, { ...S, id: "p2" }), /data-cadd data-fold="[^"]*" open/);
+  UI.setFold(UI.foldKey("cadd", S), false);
+});

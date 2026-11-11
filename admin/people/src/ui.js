@@ -1447,7 +1447,9 @@ export function inviteFormNewHTML(draft, terms, busy, people) {
   const cur = currentTerm(terms);
   const termId = d.term || (cur ? cur.id : "");
   const posRank = d.rank != null ? d.rank : rankOfTitle(d.title_en, d.team);
-  return `<div class="card inline-form" id="invite-new"><h2>${T("in.form")}</h2>
+  // 2026-11-10：預設收起來，下面那張已發的邀請比較好找。填到一半（或剛才打開過）重畫時還開著。
+  const open = inviteFoldOpen || !!(d.email || d.name_zh || d.name_en || d.note || d.line);
+  return `<details class="fold rc-fold" id="invite-fold"${open ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("in.form")}</b></summary><div class="fold-body" id="invite-new">
     <div class="two">
       <label><i>${T("in.email")}</i><input id="in-email" type="email" value="${esc(d.email || "")}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="name@example.com"${dis}></label>
       <label><i>${T("in.who")}</i><select id="in-who"${dis}>${INVITE_WHO.map(v => `<option value="${v}"${who === v ? " selected" : ""}>${esc(whoLabel(v))}</option>`).join("")}</select></label>
@@ -1471,8 +1473,10 @@ export function inviteFormNewHTML(draft, terms, busy, people) {
     </div>
     <div class="row"><button class="btn" data-act="invite-send"${dis}>${busy ? T("in.sending") : T("in.send")}</button></div>
     <div class="mini">${T("in.formNote")}</div>
-  </div>`;
+  </div></details>`;
 }
+let inviteFoldOpen = false;
+export function setInviteFold(open) { inviteFoldOpen = !!open; }
 const ST_TAG = { queued: "", sent: "open", failed: "warn", opened: "open", claimed: "done", expired: "draft", revoked: "draft" };
 // batchOpen：上次有沒有展開（main.js 從 localStorage 讀），預設收著。
 export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft, isPres, batchOpen, people) {

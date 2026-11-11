@@ -174,6 +174,8 @@ function download(text, name) {
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
+// 收起來的「加一個…」表單開著沒（ui.js 的 foldStart），重畫之後照舊。
+document.addEventListener("toggle", e => { const k = e.target && e.target.dataset && e.target.dataset.fold; if (k) UI.setFold(k, e.target.open); }, true);
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;

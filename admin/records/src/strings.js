@@ -614,6 +614,7 @@ export const MINE = {
   "ssrc.backfill":    { zh: "舊欄位補的", en: "from the old field" },
   "ssrc.auto":        { zh: "改學校時自動記", en: "recorded on change" },
   "ssrc.import":      { zh: "匯入", en: "imported" },
+  "ssrc.outcome":     { zh: "從去向帶進來", en: "from an outcome" },
   "says.needSchool":  { zh: "學校名稱不能空。", en: "School name cannot be empty." },
   "says.yearsBackwards": { zh: "「哪一年起」不能晚於「哪一年止」。", en: "From year cannot be after to year." },
   "person.positions": { zh: "幹部職位", en: "Cadre positions" },
@@ -638,7 +639,7 @@ export const MINE = {
   "out.major":        { zh: "科系或領域", en: "Major or field" },
   "out.visibility":   { zh: "可以用在哪", en: "Visibility" },
   "out.addBtn":       { zh: "加進去", en: "Add" },
-  "out.addHint":      { zh: "對外只用五人以上的總數，不用名字，除非本人勾了「可以連名字公開」。", en: "Publicly only totals of five or more, never names, unless the person chose public with name." },
+  "out.addHint":      { zh: "對外只用五人以上的總數，不用名字，除非本人勾了「可以連名字公開」。就讀中、轉學、畢業的學校會自動進「讀過的學校」。", en: "Publicly only totals of five or more, never names, unless the person chose public with name. Enrolled, transferred and graduated schools are added to Schools over time automatically." },
   // 年度
   "yr.title":         { zh: "年度比較", en: "Year by year" },
   "yr.lede":          { zh: "每一屆、每一種活動一列，空的不印。用篩選挑屆別、種類、team；下面那張表把同一種活動排在一起，一屆一欄，看哪一種變好了。看的是趨勢，不是目標。", en: "One row per term and kind of event; empty rows are hidden. Narrow by term, kind or team; the second table lines up each kind across terms so you can see which ones got better. Read it for the trend, not as a target." },

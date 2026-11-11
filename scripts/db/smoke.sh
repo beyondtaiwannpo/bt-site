@@ -3182,6 +3182,15 @@ chkraise "★ 沒指派的幹部刪不了（not_records_manager）" "not_records
 chkas "${PAUL}" "管紀錄的人刪掉 IG，有紀錄" "0|1" "select public.rc_contact_del(${IGID}); select (select count(*) from public.rc_identities where id=${IGID})||'|'||(select count(*) from public.rc_log where what='contact_delete' and ref='${RCN1}')"
 chkas "${PAUL}" "一個人的頁面帶聯絡方式的 id" "t" "select bool_and(i ? 'id') from jsonb_array_elements(public.rc_person('${RCN1}')->'identities') i"
 chkas "${PAUL}" "★ forget_person 連備註備份與聯絡方式一起清" "0|0" "select public.forget_person('${RCN1}'); select (select count(*) from public.rc_note_backup where person_id='${RCN1}')||'|'||(select count(*) from public.rc_identities where person_id='${RCN1}')"
+echo "── 去向是學校就進學校紀錄（2026-12-13-records-outcome-schools.sql）──"
+ros=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-13-records-outcome-schools.sql 2>&1 || true)
+if echo "${ros}" | grep -q "OVERALL.*PASS" && ! echo "${ros}" | grep -q "|FAIL"; then echo "  ok   去向帶學校那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 去向帶學校那支驗收表："; echo "${ros}" | head -10; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_zh, name_en, kind) values ('去向', 'Outcome School', 'student');" 2>&1 | grep -i "error" || true
+ROS=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Outcome School'" | tr -d ' \n')
+chkas "${PAUL}" "★ 錄取（admitted）不進學校紀錄" "0" "select public.rc_save_outcome(null, jsonb_build_object('person_id','${ROS}','kind','admitted','institution','Smoke U','year','2026','visibility','internal')); select count(*) from public.rc_schools where person_id='${ROS}'"
+chkas "${PAUL}" "★ 就讀中進學校紀錄，年份填「從」、來源 outcome、不改現在的學校" "SmokeU|2026||outcome|" "select public.rc_save_outcome(null, jsonb_build_object('person_id','${ROS}','kind','enrolled','institution','Smoke U','year','2026','visibility','internal')); select s.school||'|'||coalesce(s.year_from::text,'')||'|'||coalesce(s.year_to::text,'')||'|'||s.source||'|'||coalesce(pe.school,'') from public.rc_schools s join public.people pe on pe.id=s.person_id where s.person_id='${ROS}'"
+chkas "${PAUL}" "畢業那一筆補上「到」，不多一列（大小寫不同也算同一所）" "1|2026|2030" "select public.rc_save_outcome(null, jsonb_build_object('person_id','${ROS}','kind','graduated','institution','smoke u','year','2030','visibility','internal')); select count(*)||'|'||max(year_from)||'|'||max(year_to) from public.rc_schools where person_id='${ROS}'"
+chkas "${PAUL}" "工作中不進學校紀錄" "1" "select public.rc_save_outcome(null, jsonb_build_object('person_id','${ROS}','kind','working','institution','Smoke Corp','year','2031','visibility','internal')); select count(*) from public.rc_schools where person_id='${ROS}'"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

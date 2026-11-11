@@ -897,14 +897,14 @@ export function eventHTML(d, S) {
       <td>${edit ? `<button class="btn quiet sm" data-act="part-del" data-id="${esc(p.id)}">${esc(T("common.delete"))}</button>` : ""}</td></tr>`;
   // 2026-12-05：先找名單上已經有的人（名錄載進來之後 datalist 有名字），選到就帶 person_id；沒有的再填下面那幾格建新的人。
   const dirList = Array.isArray(S.dir) ? S.dir : [];
-  const addPart = edit ? `<div class="card inline-form" data-partadd><h2>${esc(T("part.add"))}</h2>
+  const addPart = edit ? `${foldStart("partadd", "data-partadd", T("part.add"), S)}
       <label><i>${esc(T("part.who2"))}</i><input name="who" class="rc-who" list="rc-dir-list" autocomplete="off" placeholder="${esc(T("part.whoPh"))}" data-noauto="1"></label>
       <datalist id="rc-dir-list">${dirList.map(x => `<option value="${esc(dirLabel(x))}"></option>`).join("")}</datalist>
       <div class="mini">${esc(T("part.orNew"))}</div>
       <div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.email"))}</i><input name="email" type="email" maxlength="120"></label><label><i>${esc(T("person.school"))}</i><input name="school" maxlength="80"></label></div>
       <div class="two"><label><i>${esc(T("part.role"))}</i>${sel("role", PROLES.map(r => [r, T("prole." + r)]), isTerm ? "mentee" : "student")}</label><label><i>${esc(T("part.status"))}</i>${sel("status", PSTATUS.map(s => [s, T("pstatus." + s)]), "attended")}</label></div>
-      <div class="form-foot"><button class="btn sm" data-act="part-add"${S.busy ? " disabled" : ""}>${esc(T("part.addBtn"))}</button><span class="mini">${esc(T("part.addHint"))}</span></div></div>` : "";
+      <div class="form-foot"><button class="btn sm" data-act="part-add"${S.busy ? " disabled" : ""}>${esc(T("part.addBtn"))}</button><span class="mini">${esc(T("part.addHint"))}</span></div></div></details>` : "";
   const partHTML = sectionHTML(T("ev.participation", { n: parts.length }), `${e.source === "site" ? `<div class="row"><span class="mini">${esc(T("part.syncHint"))}</span><span class="sp"></span><button class="btn ghost sm" data-act="part-sync"${S.busy ? " disabled" : ""}>${esc(T("part.sync"))}</button></div>` : ""}
     ${parts.length ? `<div class="tf-scroll" data-parts><table class="table rc-table"><thead><tr><th>${esc(T("part.who"))}</th><th>${esc(T("part.role"))}</th><th>${esc(T("part.status"))}</th><th>${esc(T("part.source"))}</th><th></th></tr></thead><tbody>${parts.map(prow).join("")}</tbody></table></div>
     ${edit ? `<div class="form-foot"><button class="btn ghost sm" data-act="part-save"${S.busy ? " disabled" : ""}>${esc(T("part.saveStatus"))}</button></div>` : ""}` : `<div class="mini">${esc(T("part.none"))}</div>`}${addPart}`);
@@ -925,14 +925,14 @@ export function eventHTML(d, S) {
         <td>${p.mentee_id ? `<a href="#people/${esc(p.mentee_id)}" data-act="open-person" data-id="${esc(p.mentee_id)}">${esc(p.mentee || T("common.noName"))}</a>` : `<span class="mini">${esc(T("pair.forgotten"))}</span>`}</td>
         <td>${esc(p.matched_on || "")}</td><td>${p.ended_on ? `${esc(p.ended_on)} <span class="mini">${esc(T("pend." + (p.end_reason || "other")))}</span>` : (S.boot && S.boot.can_manage ? `<button class="btn quiet sm" data-act="pair-end" data-id="${esc(p.id)}">${esc(T("pair.endBtn"))}</button>` : "")}</td>
         <td>${S.boot && S.boot.can_manage ? `<button class="btn quiet sm" data-act="pair-del" data-id="${esc(p.id)}">${esc(T("common.delete"))}</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : `<div class="mini">${esc(T("pair.none"))}</div>`}
-    ${S.boot && S.boot.can_manage ? `<div class="card inline-form" data-pairadd><h2>${esc(T("pair.add"))}</h2>
+    ${S.boot && S.boot.can_manage ? `${foldStart("pairadd", "data-pairadd", T("pair.add"), S)}
       <div class="two"><label><i>Mentor・${esc(T("part.who2"))}</i><input name="mentor_who" class="rc-who" list="rc-dir-list" autocomplete="off" placeholder="${esc(T("part.whoPh"))}" data-noauto="1"></label><label><i>Mentee・${esc(T("part.who2"))}</i><input name="mentee_who" class="rc-who" list="rc-dir-list" autocomplete="off" placeholder="${esc(T("part.whoPh"))}" data-noauto="1"></label></div>
       <datalist id="rc-dir-list">${(Array.isArray(S.dir) ? S.dir : []).map(x => `<option value="${esc(dirLabel(x))}"></option>`).join("")}</datalist>
       <div class="mini">${esc(T("part.orNew"))}</div>
       <div class="two"><label><i>Mentor ${esc(T("person.nameEn"))}</i><input name="mentor_name_en" maxlength="60"></label><label><i>Mentor ${esc(T("person.email"))}</i><input name="mentor_email" type="email" maxlength="120"></label></div>
       <div class="two"><label><i>Mentee ${esc(T("person.nameZh"))}</i><input name="mentee_name_zh" maxlength="60"></label><label><i>Mentee ${esc(T("person.email"))}</i><input name="mentee_email" type="email" maxlength="120"></label></div>
       <div class="two"><label><i>Mentee ${esc(T("person.school"))}</i><input name="mentee_school" maxlength="80"></label><label><i>${esc(T("pair.matched"))}</i><input type="date" name="matched_on"></label></div>
-      <div class="form-foot"><button class="btn sm" data-act="pair-add"${S.busy ? " disabled" : ""}>${esc(T("pair.addBtn"))}</button><span class="mini">${esc(T("pair.addHint"))}</span></div></div>` : ""}`) : "";
+      <div class="form-foot"><button class="btn sm" data-act="pair-add"${S.busy ? " disabled" : ""}>${esc(T("pair.addBtn"))}</button><span class="mini">${esc(T("pair.addHint"))}</span></div></div></details>` : ""}`) : "";
   const r = d.review || {};
   const reviewHTML = sectionHTML(T("ev.review"), `<div class="mini">${esc(T("rev.lede"))}</div>
     ${r.updated_at ? `<div class="mini">${esc(T("rev.last", { when: fmtWhen(r.updated_at), who: r.owner || "" }))}</div>` : ""}
@@ -970,8 +970,8 @@ export function formsListHTML(boot, msg, busy, newDraft) {
   const row = f => `<li><div class="fhead"><a href="#forms/${esc(f.id)}" data-act="open-form" data-id="${esc(f.id)}"><b>${esc(f.title)}</b></a> ${statusTag(f.status)} <span class="tag">${esc(T("fkind." + f.kind))}</span></div>
       <div class="fmeta">${f.event_title ? esc(f.event_title) + "・" : ""}${esc(T("form.count", { n: f.responses || 0 }))}${f.closes_at ? "・" + esc(T("fill.closes", { when: fmtWhen(f.closes_at) })) : ""}</div></li>`;
   // 三屆前的具名答案轉匿名（2026-12-02）：只畫給管的人看，按下去資料庫還會再問一次是不是 Co-President。
-  const anon = b.can_manage ? `<div class="card inline-form" data-anon><h2>${esc(T("anon.title"))}</h2><p class="mini">${esc(T("anon.lede"))}</p>
-      <div class="form-foot"><button class="btn ghost sm" data-act="anonymise"${busy ? " disabled" : ""}>${esc(T("anon.btn"))}</button></div></div>` : "";
+  const anon = b.can_manage ? `${foldStart("anon", "data-anon", T("anon.title"), null)}<p class="mini">${esc(T("anon.lede"))}</p>
+      <div class="form-foot"><button class="btn ghost sm" data-act="anonymise"${busy ? " disabled" : ""}>${esc(T("anon.btn"))}</button></div></div></details>` : "";
   return pageHead(T("form.title"), T("form.lede"), acts) + msgHTML(msg) + nf
     + (forms.length ? `<ul class="flist">${forms.map(row).join("")}</ul>` : emptyHTML(T("form.none"), esc(T("form.noneHint"))))
     + anon;
@@ -1313,6 +1313,15 @@ export function peopleHTML(boot, S) {
       <div class="form-foot"><button class="btn sm" data-act="person-add"${S.busy ? " disabled" : ""}>${esc(T("pp.addBtn"))}</button><span class="mini">${esc(T("pp.addHint"))}</span></div></div>`) : "";
   return pageHead(T("pp.title"), T("pp.lede"), []) + msgHTML(S.msg) + tabHTML + (tab === "dups" ? dupHTML : tab === "add" ? add : directoryHTML(S));
 }
+// 收起來的「加一個…」表單（2026-11-10 Paul：加學校、加聯絡方式這些一直開著，找資料的時候很干擾）。
+// 預設收著只剩一行；打開過的在重畫之後還開著（例如加失敗、自動存檔重畫），換到別的人或別頁就是另一把 key。
+const FOLD_OPEN = new Set();
+export function foldKey(name, S) { return `${(S && S.view) || ""}:${(S && S.id) || ""}:${name}`; }
+export function setFold(key, open) { if (open) FOLD_OPEN.add(key); else FOLD_OPEN.delete(key); }
+export function foldStart(name, attr, title, S) {
+  const key = foldKey(name, S);
+  return `<details class="fold rc-fold" ${attr} data-fold="${esc(key)}"${FOLD_OPEN.has(key) ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${esc(title)}</b></summary><div class="fold-body">`;
+}
 // 聯絡方式（2026-12-12）。順序就是加的時候下拉選單的順序。
 export const CONTACT_KINDS = ["line", "email", "phone", "ig", "linkedin", "wechat", "whatsapp", "facebook", "website"];
 // login：登入用的 email（rc_person 的 login_email，或 identities 上 verified 的那個），刪不掉，所以沒有刪除鈕。
@@ -1355,38 +1364,38 @@ export function personHTML(d, S) {
   const cts = contactsOf(d.identities, p.login_email);
   const ctList = cts.length ? `<ul class="flist rc-contacts">${cts.map(c => { const href = contactHref(c.kind, c.value);
       return `<li><div class="fhead"><span class="ckind">${esc(T("ckind." + c.kind))}</span> ${href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(c.value)}</a>` : `<b>${esc(c.value)}</b>`}${c.login ? ` <span class="tag ok">${esc(T("contact.login"))}</span>` : ""}${c.source === "note" ? ` <span class="mini">${esc(T("contact.fromNote"))}</span>` : ""}${!p.forgotten_at && !c.login ? ` <button class="btn quiet sm" data-act="contact-del" data-id="${esc(c.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : ""}</div></li>`; }).join("")}</ul>` : `<div class="mini">${esc(T("person.noContacts"))}</div>`;
-  const ctAdd = !p.forgotten_at ? `<div class="card inline-form" data-cadd><h2>${esc(T("contact.add"))}</h2>
+  const ctAdd = !p.forgotten_at ? `${foldStart("cadd", "data-cadd", T("contact.add"), S)}
       <div class="two"><label><i>${esc(T("contact.kind"))}</i>${sel("kind", CONTACT_KINDS.map(k => [k, T("ckind." + k)]), "line")}</label><label><i>${esc(T("contact.value"))}</i><input name="value" maxlength="200"></label></div>
-      <div class="form-foot"><button class="btn sm" data-act="contact-add"${S.busy ? " disabled" : ""}>${esc(T("contact.addBtn"))}</button><span class="mini">${esc(T("contact.addHint"))}</span></div></div>` : "";
+      <div class="form-foot"><button class="btn sm" data-act="contact-add"${S.busy ? " disabled" : ""}>${esc(T("contact.addBtn"))}</button><span class="mini">${esc(T("contact.addHint"))}</span></div></div></details>` : "";
   const ctHTML = manage ? sectionHTML(T("person.contacts", { n: cts.length }), ctList + ctAdd) : "";
   // 讀過的學校（2026-12-10）：一所一列，現在那一所有標記；管的人可以加、刪、設成現在的。合併帶進來的也在這裡。
   const sch = (d.schools || []).slice();
   const yrs = x => x.year_from && x.year_to ? T("school.years", { from: x.year_from, to: x.year_to }) : x.year_from ? T("school.from", { from: x.year_from }) : x.year_to ? T("school.to", { to: x.year_to }) : "";
   const schList = sch.length ? `<ul class="flist">${sch.map(x => `<li><div class="fhead"><b>${esc(x.school)}</b>${x.current ? ` <span class="tag open">${esc(T("school.current"))}</span>` : ""}${yrs(x) ? ` <span class="mini">${esc(yrs(x))}</span>` : ""}</div><div class="fmeta">${[x.note, T("ssrc." + (x.source || "admin"))].filter(Boolean).map(esc).join("・")}${manage && !p.forgotten_at ? `${x.current ? "" : ` <button class="btn ghost sm" data-act="school-current" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("school.setCurrent"))}</button>`} <button class="btn quiet sm" data-act="school-del" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : ""}</div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("person.noSchools"))}</div>`;
-  const schAdd = manage && !p.forgotten_at ? `<div class="card inline-form" data-sadd><h2>${esc(T("school.add"))}</h2>
+  const schAdd = manage && !p.forgotten_at ? `${foldStart("sadd", "data-sadd", T("school.add"), S)}
       <div class="two"><label><i>${esc(T("school.name"))}</i><input name="school" maxlength="80"></label><label><i>${esc(T("school.note"))}</i><input name="note" maxlength="200"></label></div>
       <div class="two"><label><i>${esc(T("school.yearFrom"))}</i><input name="year_from" type="number" min="2000" max="2100"></label><label><i>${esc(T("school.yearTo"))}</i><input name="year_to" type="number" min="2000" max="2100"></label></div>
       <label class="check"><input type="checkbox" name="make_current" data-noauto="1"${sch.length ? "" : " checked"}><span>${esc(T("school.makeCurrent"))}</span></label>
-      <div class="form-foot"><button class="btn sm" data-act="school-add"${S.busy ? " disabled" : ""}>${esc(T("school.addBtn"))}</button><span class="mini">${esc(T("school.addHint"))}</span></div></div>` : "";
+      <div class="form-foot"><button class="btn sm" data-act="school-add"${S.busy ? " disabled" : ""}>${esc(T("school.addBtn"))}</button><span class="mini">${esc(T("school.addHint"))}</span></div></div></details>` : "";
   const schHTML = sectionHTML(T("person.schools", { n: sch.length }), schList + schAdd);
   const aliasHTML = (d.aliases || []).length ? `<div class="mini rc-alias">${esc(T("person.aliases"))}${esc(T("punct.colon"))}${d.aliases.map(esc).join(esc(T("punct.list")))}</div>` : "";
   const pos = (d.positions || []);
   const posHTML = pos.length ? sectionHTML(T("person.positions"), `<ul class="flist">${pos.map(x => `<li><b>${esc(x.term)}</b>・${esc((lang() === "zh" ? x.title_zh : x.title_en) || x.title_en || x.title_zh || "")}${x.team ? "・" + esc(x.team) : ""}</li>`).join("")}</ul>`) : "";
   const parts = d.participation || [];
   const evs = ((S.boot && S.boot.events) || []).slice().sort((a, b) => String(b.starts_at || "").localeCompare(String(a.starts_at || "")));
-  const addEv = manage && !p.forgotten_at && evs.length ? `<div class="card inline-form" data-paddev><h2>${esc(T("person.addEvent"))}</h2>
+  const addEv = manage && !p.forgotten_at && evs.length ? `${foldStart("paddev", "data-paddev", T("person.addEvent"), S)}
       <label><i>${esc(T("ov.event"))}</i>${sel("event_id", eventOpts(evs), "", false, T("person.pickEvent"))}</label>
       <div class="two"><label><i>${esc(T("part.role"))}</i>${sel("role", PROLES.map(r => [r, T("prole." + r)]), p.kind === "member" ? "speaker" : "student")}</label><label><i>${esc(T("part.status"))}</i>${sel("status", PSTATUS.map(st => [st, T("pstatus." + st)]), "attended")}</label></div>
-      <div class="form-foot"><button class="btn sm" data-act="person-add-event"${S.busy ? " disabled" : ""}>${esc(T("person.addEventBtn"))}</button><span class="mini">${esc(T("person.addEventHint"))}</span></div></div>` : "";
+      <div class="form-foot"><button class="btn sm" data-act="person-add-event"${S.busy ? " disabled" : ""}>${esc(T("person.addEventBtn"))}</button><span class="mini">${esc(T("person.addEventHint"))}</span></div></div></details>` : "";
   const partHTML = sectionHTML(T("person.participation", { n: parts.length }), (parts.length ? `<ul class="flist">${parts.map(x => `<li><div class="fhead"><a href="#overview/${esc(x.event_id)}" data-act="open-event" data-id="${esc(x.event_id)}"><b>${esc(x.event)}</b></a> ${kindTag(x.kind)}</div><div class="fmeta">${esc(fmtDay(x.starts_at))}${x.term_id ? "・" + esc(x.term_id) : ""}・${esc(T("prole." + x.role))}・${esc(T("pstatus." + x.status))}</div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("person.noParts"))}</div>`) + addEv);
   const pairs = d.pairs || [];
   const pairHTML = pairs.length ? sectionHTML(T("person.pairs"), `<ul class="flist">${pairs.map(x => `<li><div class="fhead"><b>${esc(x.event || "")}</b>・${esc(x.as === "mentor" ? "Mentor" : "Mentee")}</div><div class="fmeta">${esc(T("person.pairWith"))} ${x.with_id ? `<a href="#people/${esc(x.with_id)}" data-act="open-person" data-id="${esc(x.with_id)}">${esc(x.with || "")}</a>` : esc(T("pair.forgotten"))}${x.matched_on ? "・" + esc(x.matched_on) : ""}${x.ended_on ? "・" + esc(x.ended_on) + " " + esc(T("pend." + (x.end_reason || "other"))) : ""}</div></li>`).join("")}</ul>`) : "";
   const outs = d.outcomes || [];
   const outHTML = sectionHTML(T("person.outcomes", { n: outs.length }), `${outs.length ? `<ul class="flist">${outs.map(o => `<li><div class="fhead"><b>${esc(T("okind." + o.kind))}</b> ${o.institution ? esc(o.institution) : ""}${o.year ? ` <span class="mini">${esc(String(o.year))}</span>` : ""}</div><div class="fmeta">${[o.country, o.major, o.note].filter(Boolean).map(esc).join("・")}・<span class="mini">${esc(T("vis." + o.visibility))}・${esc(T("osrc." + o.source))}</span>${manage ? ` <button class="btn quiet sm" data-act="out-del" data-id="${esc(o.id)}">${esc(T("common.delete"))}</button>` : ""}</div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("person.noOutcomes"))}</div>`}
-    ${manage && !p.forgotten_at ? `<div class="card inline-form" data-oadd><h2>${esc(T("out.add"))}</h2><div class="two"><label><i>${esc(T("out.kind"))}</i>${sel("kind", OKINDS.map(k => [k, T("okind." + k)]), "admitted")}</label><label><i>${esc(T("out.year"))}</i><input name="year" type="number" min="2000" max="2100"></label></div>
+    ${manage && !p.forgotten_at ? `${foldStart("oadd", "data-oadd", T("out.add"), S)}<div class="two"><label><i>${esc(T("out.kind"))}</i>${sel("kind", OKINDS.map(k => [k, T("okind." + k)]), "admitted")}</label><label><i>${esc(T("out.year"))}</i><input name="year" type="number" min="2000" max="2100"></label></div>
       <div class="two"><label><i>${esc(T("out.institution"))}</i><input name="institution" maxlength="120"></label><label><i>${esc(T("out.country"))}</i><input name="country" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("out.major"))}</i><input name="major" maxlength="80"></label><label><i>${esc(T("out.visibility"))}</i>${sel("visibility", VIS.map(v => [v, T("vis." + v)]), "internal")}</label></div>
-      <div class="form-foot"><button class="btn sm" data-act="out-add"${S.busy ? " disabled" : ""}>${esc(T("out.addBtn"))}</button><span class="mini">${esc(T("out.addHint"))} ${esc(T("out.minorHint"))}</span></div></div>` : ""}`);
+      <div class="form-foot"><button class="btn sm" data-act="out-add"${S.busy ? " disabled" : ""}>${esc(T("out.addBtn"))}</button><span class="mini">${esc(T("out.addHint"))} ${esc(T("out.minorHint"))}</span></div></div></details>` : ""}`);
   const resp = d.responses || [];
   const respHTML = resp.length ? sectionHTML(T("person.responses", { n: resp.length }), `<ul class="flist">${resp.map(r => `<li><div class="fhead"><a href="#forms/${esc(r.form_id)}/results" data-act="open-form" data-id="${esc(r.form_id)}"><b>${esc(r.title)}</b></a> <span class="mini">${esc(fmtWhen(r.submitted_at))}</span></div><div class="fmeta">${(r.answers || []).map(a => `${esc(a.key || a.label)}: ${esc(a.value)}`).join("・")}</div></li>`).join("")}</ul>`) : "";
   const forget = pres && !p.forgotten_at ? sectionHTML(T("person.remove"), `<div class="mini">${esc(T(p.has_account ? "person.removeAccount" : "person.removeHint"))}</div>${p.has_account ? "" : `<div class="form-foot"><button class="btn quiet sm" data-act="forget" data-id="${esc(p.id)}">${esc(T("person.forget"))}</button></div>`}`) : "";

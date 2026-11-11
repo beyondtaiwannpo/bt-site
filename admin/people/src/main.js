@@ -832,6 +832,7 @@ function readStored() { try { return localStorage.getItem(STORE_KEY); } catch (e
 // 邀請頁「批次碼」那一塊上次開著沒（2026-11-03）。
 function batchOpen() { try { return localStorage.getItem("bt-batch-open") === "1"; } catch (e) { return false; } }
 document.addEventListener("toggle", e => {
+  if (e.target && e.target.id === "invite-fold") UI.setInviteFold(e.target.open);
   if (e.target && e.target.id === "batch") { try { localStorage.setItem("bt-batch-open", e.target.open ? "1" : "0"); } catch (x) { /* 無痕視窗存不了 */ } }
 }, true);
 function applyLang(l) {
