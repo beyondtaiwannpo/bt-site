@@ -3158,6 +3158,30 @@ psql -d "${DB}" -X -A -t -q -c "update public.profiles set board_role='member' w
 chkraise "只有一邊有帳號不能走合併帳號（not_both_accounts）" "not_both_accounts" "perform set_config('test.uid','${PAUL}',true); perform public.rc_merge_accounts('${RCAA}', '${RCVA}');"
 chkas "${PAUL}" "★ Co-President 把 B 併進 A：B 的列與登入都沒了、兩場出席與職位到 A、B 的 email 留在 A 身上、有紀錄" "1|0|0|2|1|two-b@example.com|1" "select public.rc_merge_accounts('${RCAA}','${RCAB}'); select (select count(*) from public.people where id='${RCAA}')||'|'||(select count(*) from public.people where id='${RCAB}')||'|'||(select count(*) from auth.users where id='${ACCB}')||'|'||(select count(*) from public.rc_participation where person_id='${RCAA}')||'|'||(select count(*) from public.positions where person_id='${RCAA}' and title_en='Student Rep')||'|'||(select value from public.rc_identities where person_id='${RCAA}' and kind='email' and value='two-b@example.com')||'|'||(select count(*) from public.rc_log where what='account_merge' and ref='${RCAA}')"
 chkas "${PAUL}" "併完卡上這一組不見了" "0" "select count(*) from jsonb_array_elements(public.rc_duplicates()) g where g->>'name'='Two Login' and jsonb_array_length(g->'members')>=2"
+echo "── 聯絡方式：LINE、LinkedIn 從備註搬出來（2026-12-12-records-contacts.sql）──"
+psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_zh, name_en, kind, note) values ('聯絡', 'Contact Note', 'student', 'BT: Mentor; LinkedIn: Line: smoke.line.01; HS dept: 國際部; IG: @smoke.ig; Phone: N/A; status: Student'), ('聯絡二', 'Contact Two', 'student', 'Line: smoke.line.01; since 2024');" 2>&1 | grep -i "error" || true
+rct=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-12-records-contacts.sql 2>&1 || true)
+if echo "${rct}" | grep -q "OVERALL.*PASS" && ! echo "${rct}" | grep -q "|FAIL"; then echo "  ok   聯絡方式那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 聯絡方式那支驗收表："; echo "${rct}" | head -14; fail=$((fail+1)); fi
+RCN1=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Contact Note'" | tr -d ' \n')
+RCN2=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where name_en='Contact Two'" | tr -d ' \n')
+chk "★ 備註裡的 LINE（藏在 LinkedIn: 後面）與 IG 搬出來，空的 Phone 拿掉，其他字留著" "BT:Mentor;HSdept:國際部;status:Student|line:smoke.line.01,ig:smoke.ig" "select coalesce(note,'')||'|'||(select string_agg(kind||':'||value, ',' order by kind desc) from public.rc_identities where person_id='${RCN1}' and source='note') from public.people where id='${RCN1}'"
+chk "同一個 LINE 已經是別人的，那一段留在第二個人的備註裡（可能是同一個人）" "Line:smoke.line.01;since2024" "select note from public.people where id='${RCN2}'"
+chk "原本的備註有備份" "t" "select note like '%LinkedIn: Line: smoke.line.01%' from public.rc_note_backup where person_id='${RCN1}'"
+chk "再跑一次不會再搬" "0" "select (public.rc_notes_to_contacts(false)->>'moved')"
+chkas "${PAUL}" "★ 管紀錄的人加一個 LinkedIn（網址尾巴的斜線拿掉）" "linkedin.com/in/smoke" "select public.rc_contact_add('${RCN1}', 'linkedin', ' linkedin.com/in/smoke/ '); select value from public.rc_identities where person_id='${RCN1}' and kind='linkedin'"
+chkas "${PAUL}" "同一個人加同一個值不會出錯也不會多一列" "1" "select public.rc_contact_add('${RCN1}', 'linkedin', 'LINKEDIN.com/in/smoke'); select count(*) from public.rc_identities where person_id='${RCN1}' and kind='linkedin'"
+chkraise "★ 別人已經有的 LINE 加不上去（contact_taken）" "contact_taken" "perform set_config('test.uid','${PAUL}',true); perform public.rc_contact_add('${RCN2}', 'line', 'smoke.line.01');"
+chkraise "空值加不上去（need_value）" "need_value" "perform set_config('test.uid','${PAUL}',true); perform public.rc_contact_add('${RCN2}', 'phone', ' n/a ');"
+chkraise "不像 email 的加不上去（bad_email）" "bad_email" "perform set_config('test.uid','${PAUL}',true); perform public.rc_contact_add('${RCN2}', 'email', 'not-an-email');"
+chkraise "名字不能從這裡加（bad_contact_kind）" "bad_contact_kind" "perform set_config('test.uid','${PAUL}',true); perform public.rc_contact_add('${RCN2}', 'name_en', 'x');"
+chkraise "★ 沒指派的幹部加不了（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_contact_add('${RCN2}', 'phone', '0912345678');"
+LOGINID=$(psql -d "${DB}" -X -A -t -q -c "select id from public.rc_identities where person_id='${RCAA}' and kind='email' and lower(value)='two-a@example.com' union all select i.id from public.rc_identities i join public.people pe on pe.id=i.person_id join auth.users u on u.id=pe.profile_id where i.kind='email' and lower(i.value)=lower(u.email) limit 1" | head -1 | tr -d ' \n')
+if [ -n "${LOGINID}" ]; then chkraise "★ 登入用的 email 刪不掉（login_email）" "login_email" "perform set_config('test.uid','${PAUL}',true); perform public.rc_contact_del(${LOGINID});"; fi
+IGID=$(psql -d "${DB}" -X -A -t -q -c "select id from public.rc_identities where person_id='${RCN1}' and kind='ig'" | tr -d ' \n')
+chkraise "★ 沒指派的幹部刪不了（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_contact_del(${IGID});"
+chkas "${PAUL}" "管紀錄的人刪掉 IG，有紀錄" "0|1" "select public.rc_contact_del(${IGID}); select (select count(*) from public.rc_identities where id=${IGID})||'|'||(select count(*) from public.rc_log where what='contact_delete' and ref='${RCN1}')"
+chkas "${PAUL}" "一個人的頁面帶聯絡方式的 id" "t" "select bool_and(i ? 'id') from jsonb_array_elements(public.rc_person('${RCN1}')->'identities') i"
+chkas "${PAUL}" "★ forget_person 連備註備份與聯絡方式一起清" "0|0" "select public.forget_person('${RCN1}'); select (select count(*) from public.rc_note_backup where person_id='${RCN1}')||'|'||(select count(*) from public.rc_identities where person_id='${RCN1}')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

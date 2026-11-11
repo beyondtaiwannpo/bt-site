@@ -422,7 +422,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "person-save") {
     const v = vals("[data-pedit]");
-    const ok = await run("err.save", () => D.savePerson(S.id, { name_zh: v.name_zh, name_en: v.name_en, school: v.school, grad_year: v.grad_year || "", kind: v.kind, note: v.note, email: v.email || "" }));
+    const ok = await run("err.save", () => D.savePerson(S.id, { name_zh: v.name_zh, name_en: v.name_en, school: v.school, grad_year: v.grad_year || "", kind: v.kind, note: v.note }));
     if (ok === undefined) return;
     S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.saved"); render(); return;
   }
@@ -451,6 +451,18 @@ document.addEventListener("click", async e => {
     const ok = await run("err.save", () => D.saveSchool(null, { person_id: S.id, school: v.school, year_from: v.year_from || "", year_to: v.year_to || "", note: v.note || "", make_current: !!(mc && mc.checked) }));
     if (ok === undefined) return;
     S.dir = null; S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+  }
+  if (act === "contact-add") {
+    const v = vals("[data-cadd]");
+    if (!String(v.value || "").trim()) { S.msg = T("err.save") + T("says.needValue"); render(); return; }
+    const ok = await run("err.save", () => D.addContact(S.id, v.kind, v.value));
+    if (ok === undefined) return;
+    S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+  }
+  if (act === "contact-del") {
+    const ok = await run("err.delete", () => D.deleteContact(b.dataset.id));
+    if (ok === undefined) return;
+    S.person = await D.loadPerson(S.id); render(); return;
   }
   if (act === "school-del") {
     const ok = await run("err.delete", () => D.deleteSchool(b.dataset.id));

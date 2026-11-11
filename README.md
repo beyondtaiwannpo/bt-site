@@ -929,6 +929,18 @@ Paul 在可能重複那張卡上遇到：一個人三列（幹部帳號 gmail、
 
 驗證：本機三列（member1 幹部帳號、stranger1 學員帳號、一列沒帳號）：Director 登入看到第二欄「你併不了」且勾不了；Co-President 看到「登入會刪掉 stranger1@example.com」、確認文字列出那個 email，併完卡消失、stranger1 的登入沒了、三場出席與兩個 email 都在 member1 身上、`rc_log` 有一筆。smoke 多 13 項。**遷移檔要 Paul 在正式 Supabase 跑**（沒跑之前兩個登入的那一欄按下去還是會被擋，但訊息已經是人話）。
 
+### 一個人的聯絡方式（`supabase/migrations/2026-12-12-records-contacts.sql`，2026-11-10）
+
+Paul 2026-11-10 截圖：LINE、LinkedIn 都塞在「備註」那一格（「LinkedIn: Line: pinwang.0705; HS dept: 國際部…」），要有自己的欄位。
+
+- **一個人的頁面多一節「聯絡方式」**，在基本資料下面：email、LINE、電話、Instagram、LinkedIn、WeChat、WhatsApp、Facebook、網站，一種一列。點得開的就是連結（LINE 開加好友頁、IG 開個人頁、電話撥號、WhatsApp 開對話）；WeChat 沒有公開網址只顯示字。下面一格「加一個聯絡方式」選種類、填值、按加上去；每一列有刪除。**登入用的 email 標「登入用」，沒有刪除鈕**（刪了他就登不進來，資料庫那端也擋 `login_email`）。原本基本資料那一格「加一個 email」拿掉了，email 也從這裡加。
+- **只有管紀錄的人看得到**（Co-President 或被派進 records 工作區的人），跟以前看得到 email 的人一樣，沒有變大。只看不管的人看不到這一節。
+- **存在哪**：還是 `rc_identities`（原本就有 email、LINE、IG 三種，多加 linkedin、phone、wechat、whatsapp、facebook、website）。同一種同一個值只能屬於一個人：加的時候撞到別人，會說「別人身上已經有這個了，多半是同一個人有兩列，去可能重複看」，什麼都沒改。新函式 `rc_contact_add`、`rc_contact_del`，`rc_log` 記 `contact_add`、`contact_delete`。值會整理一下：前後空白拿掉、IG 的 @ 與網址拿掉、LinkedIn 與網站尾巴的斜線拿掉、N/A 與「無」當空的。
+- **備註裡已經有的聯絡方式搬出來**：遷移檔跑的時候直接做一次（`rc_notes_to_contacts`，前端叫不到）。備註用「;」切段，每段開頭是 LINE、LINE ID、LinkedIn、IG、Instagram、Phone、Tel、Mobile、電話、手機、WeChat、微信、WhatsApp、Facebook、FB、Website 的就搬，「LinkedIn: Line: xxx」這種疊兩個的照最後一個算；值是空的或 N/A 那段直接拿掉；值已經是別人的那段留在備註裡（驗收表會印有幾段，那幾個多半是重複的人）。其他字照原順序留著。**搬之前每個人原本的備註整句存進 `rc_note_backup`**，拆錯可以拿回來，前端讀不到，`forget_person` 會一起清。可以重跑，第二次什麼都不會搬。
+- 驗收表最後四列是資訊（備註有聯絡方式的人數、搬了幾筆、拿掉幾段空的、幾段留著因為是別人的），不算 PASS 或 FAIL。
+
+驗證：本機一個人的備註寫成 Paul 截圖那樣，跑完備註剩「BT: Mentor, Board; since S2026; HS dept: 國際部; status: Student」，LINE 與 IG 出現在聯絡方式、標「從備註搬過來的」；在頁面上加 LinkedIn 成功、連結對；加一個別人的 email 跳出那句人話。smoke 多 19 項（1316 全過），單元測試多 3 個（817），check.sh、check-motion、check-mobile 全過。**遷移檔要 Paul 在正式 Supabase 跑。**
+
 ### 年度比較改版（2026-11-08）
 
 Paul 2026-11-08：「year by year now it looks really messy and pointless, can you make filters and stuff」。改成跟「人」同一套：上面一格篩選（屆別、活動種類、team，每個選項帶場數）加「比什麼」（到的人數、報名人數、出席率、回饋份數、推薦平均、有用平均、幾場），下面兩張表：

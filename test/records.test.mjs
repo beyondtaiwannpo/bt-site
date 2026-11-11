@@ -277,3 +277,41 @@ test("★ 一個人的頁面：讀過的學校清單與別名", () => {
   const none = UI.personHTML({ ...d, schools: [], aliases: [] }, { boot: { can_manage: true }, me: {}, msg: "" });
   assert.match(none, /No schools recorded yet|還沒有學校紀錄/); assert.match(none, /name="make_current" data-noauto="1" checked/); assert.doesNotMatch(none, /Also known as|也叫/);
 });
+
+// 2026-12-12 聯絡方式
+test("contactsOf keeps contact kinds only, in menu order, and marks the sign-in email", () => {
+  const c = UI.contactsOf([
+    { id: 1, kind: "name_en", value: "Paul" }, { id: 2, kind: "ig", value: "paul.w" },
+    { id: 3, kind: "email", value: "a@b.co", verified: true }, { id: 4, kind: "line", value: "pinwang.0705", source: "note" },
+    { id: 5, kind: "typed", value: "paul" }, { id: 6, kind: "email", value: "x@y.co" },
+  ]);
+  assert.deepEqual(c.map(x => x.id), [4, 3, 6, 2]);
+  assert.equal(c.find(x => x.id === 3).login, true);
+  assert.equal(c.find(x => x.id === 6).login, false);
+  const withLogin = UI.contactsOf([{ id: 6, kind: "email", value: "X@y.co" }], "x@y.co");
+  assert.equal(withLogin.length, 1); assert.equal(withLogin[0].login, true);
+  const added = UI.contactsOf([], "me@bt.org");
+  assert.deepEqual(added.map(x => [x.value, x.login, x.id]), [["me@bt.org", true, null]]);
+});
+test("contactHref builds a link only when it can", () => {
+  assert.equal(UI.contactHref("line", "pinwang.0705"), "https://line.me/ti/p/~pinwang.0705");
+  assert.equal(UI.contactHref("ig", "paul.w"), "https://www.instagram.com/paul.w/");
+  assert.equal(UI.contactHref("linkedin", "linkedin.com/in/paul"), "https://linkedin.com/in/paul");
+  assert.equal(UI.contactHref("linkedin", "paul-wang-123"), "https://www.linkedin.com/in/paul-wang-123");
+  assert.equal(UI.contactHref("linkedin", "Paul Wang"), "");
+  assert.equal(UI.contactHref("phone", "+886 912-345-678"), "tel:+886912345678");
+  assert.equal(UI.contactHref("whatsapp", "+1 (415) 555-0100"), "https://wa.me/14155550100");
+  assert.equal(UI.contactHref("email", "a@b.co"), "mailto:a@b.co");
+  assert.equal(UI.contactHref("wechat", "paulw"), "");
+  assert.equal(UI.contactHref("website", "bt.org"), "https://bt.org");
+  assert.equal(UI.contactHref("line", "javascript:alert(1)"), "");
+});
+test("person page shows contacts to managers only, without the old add-email box", () => {
+  const d = { person: { id: "p", name: "Paul", kind: "member", note: "" }, identities: [{ id: 9, kind: "line", value: "pinwang.0705" }] };
+  const mgr = UI.personHTML(d, { boot: { can_manage: true }, me: {} });
+  assert.match(mgr, /line\.me\/ti\/p\/~pinwang\.0705/);
+  assert.match(mgr, /data-act="contact-add"/);
+  assert.doesNotMatch(mgr, /name="email"/);
+  const viewer = UI.personHTML(d, { boot: { can_manage: false }, me: {} });
+  assert.doesNotMatch(viewer, /pinwang/);
+});

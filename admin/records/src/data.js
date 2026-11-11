@@ -51,6 +51,8 @@ export const deleteOutcome = id => rpc("rc_delete_outcome", { p_outcome: id });
 export const saveSchool    = (id, p) => rpc("rc_save_school", { p_school: id || null, p });
 export const deleteSchool  = id => rpc("rc_delete_school", { p_school: id });
 export const setCurrentSchool = id => rpc("rc_set_current_school", { p_school: id });
+export const addContact    = (person, kind, value) => rpc("rc_contact_add", { p_person: person, p_kind: kind, p_value: value });
+export const deleteContact = id => rpc("rc_contact_del", { p_id: Number(id) });
 export const saveReview    = (id, p) => rpc("rc_save_review", { p_event: id, p });
 export const savePerson    = (id, p) => rpc("rc_save_person", { p_person: id || null, p });
 export const mergePeople   = (keep, drop) => rpc("rc_merge_people", { p_keep: keep, p_drop: drop });
@@ -70,6 +72,7 @@ const SAYS = [
   ["mentor_cannot_read", "says.mentorRead"], ["pair_readers_by_person", "says.pairByPerson"],
   ["same_person", "says.samePerson"], ["both_have_accounts", "says.bothAccounts"], ["has_account", "says.hasAccount"], ["email_taken", "says.emailTaken"],
   ["slug_taken", "says.slugTaken"], ["bad_slug", "says.badSlug"], ["not_president", "says.notPresident"], ["both_have_accounts", "says.bothAccounts"], ["not_both_accounts", "says.notBothAccounts"], ["has_unused_invite", "says.unusedInvite"], ["cannot_remove_self", "says.cannotSelf"], ["cannot_retire_president", "says.cannotPresident"], ["need_name_or_email", "err.needName"],
+  ["contact_taken", "says.contactTaken"], ["need_value", "says.needValue"], ["bad_email", "says.badEmail"], ["login_email", "says.loginEmail"], ["bad_contact_kind", "says.badContactKind"], ["too_long", "says.tooLong"],
   ["rc_bootstrap", "says.noTables"], ["rc_event", "says.noTables"],
 ];
 export function says(err) {

@@ -1313,6 +1313,35 @@ export function peopleHTML(boot, S) {
       <div class="form-foot"><button class="btn sm" data-act="person-add"${S.busy ? " disabled" : ""}>${esc(T("pp.addBtn"))}</button><span class="mini">${esc(T("pp.addHint"))}</span></div></div>`) : "";
   return pageHead(T("pp.title"), T("pp.lede"), []) + msgHTML(S.msg) + tabHTML + (tab === "dups" ? dupHTML : tab === "add" ? add : directoryHTML(S));
 }
+// 聯絡方式（2026-12-12）。順序就是加的時候下拉選單的順序。
+export const CONTACT_KINDS = ["line", "email", "phone", "ig", "linkedin", "wechat", "whatsapp", "facebook", "website"];
+// login：登入用的 email（rc_person 的 login_email，或 identities 上 verified 的那個），刪不掉，所以沒有刪除鈕。
+export function contactsOf(ids, login) {
+  const lg = String(login || "").toLowerCase();
+  const out = (ids || []).filter(i => CONTACT_KINDS.includes(i.kind))
+    .map(i => ({ id: i.id, kind: i.kind, value: i.value, source: i.source || "", login: i.kind === "email" && (!!i.verified || (!!lg && String(i.value).toLowerCase() === lg)) }));
+  if (lg && !out.some(c => c.kind === "email" && String(c.value).toLowerCase() === lg)) out.push({ id: null, kind: "email", value: lg, source: "login", login: true });
+  return out
+    .sort((a, b) => CONTACT_KINDS.indexOf(a.kind) - CONTACT_KINDS.indexOf(b.kind) || String(a.value).localeCompare(String(b.value)));
+}
+// 點得到的就給連結；WeChat 沒有公開網址，只顯示字。
+export function contactHref(kind, value) {
+  const v = String(value || "").trim();
+  if (!v) return "";
+  const web = x => /^https?:\/\//i.test(x) ? x : /^[\w-]+(\.[\w-]+)+(\/|$)/.test(x) ? "https://" + x : "";
+  const digits = v.replace(/[^\d+]/g, "");
+  switch (kind) {
+    case "email":    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? "mailto:" + v : "";
+    case "phone":    return digits.replace(/\D/g, "").length >= 6 ? "tel:" + digits : "";
+    case "whatsapp": return digits.replace(/\D/g, "").length >= 6 ? "https://wa.me/" + digits.replace(/\D/g, "") : web(v);
+    case "line":     return /^[\w.@-]+$/.test(v) ? "https://line.me/ti/p/~" + encodeURIComponent(v) : web(v);
+    case "ig":       return /^[\w.]+$/.test(v) ? "https://www.instagram.com/" + v + "/" : web(v);
+    case "linkedin": return web(v) || (/^[\w-]+$/.test(v) ? "https://www.linkedin.com/in/" + v : "");
+    case "facebook": return web(v) || (/^[\w.]+$/.test(v) ? "https://www.facebook.com/" + v : "");
+    case "website":  return web(v);
+    default:         return "";
+  }
+}
 // 一個人的時間軸。
 export function personHTML(d, S) {
   const p = d.person || {}, manage = !!(S.boot && S.boot.can_manage), pres = !!(S.me && S.me.pres);
@@ -1320,10 +1349,16 @@ export function personHTML(d, S) {
     `${p.name_zh && p.name_en ? esc(p.name_zh) + "・" : ""}${esc(p.school || "")}${p.grad_year ? "・" + esc(String(p.grad_year)) : ""}${p.has_account ? "・" + esc(T("pp.hasAccount")) + (p.role ? ` (${esc(p.role)})` : "") : ""}`, [], { act: "back-people", label: T("person.back") });
   const edit = manage && !p.forgotten_at ? sectionHTML(T("person.edit"), `<div data-pedit><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" value="${esc(p.name_zh || "")}" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" value="${esc(p.name_en || "")}" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" value="${esc(p.school || "")}" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100" value="${esc(p.grad_year || "")}"></label></div>
-      <div class="two"><label><i>${esc(T("person.kind"))}</i>${sel("kind", ["student", "guest", "member"].map(k => [k, T("pkind." + k)]), p.kind, !!p.has_account)}</label><label><i>${esc(T("person.addEmail"))}</i><input name="email" type="email" maxlength="120"></label></div>
-      <label><i>${esc(T("person.note"))}</i><input name="note" value="${esc(p.note || "")}" maxlength="500"></label>
-      <div class="form-foot"><button class="btn sm" data-act="person-save"${S.busy ? " disabled" : ""}>${esc(T("common.save"))}</button></div></div>
-    ${(d.identities || []).length ? `<div class="mini">${esc(T("person.identities"))}${esc(T("punct.colon"))}${d.identities.map(i => `${esc(i.kind)} ${esc(i.value)}${i.verified ? " ✓" : ""}`).join(esc(T("punct.list")))}</div>` : ""}`) : "";
+      <div class="two"><label><i>${esc(T("person.kind"))}</i>${sel("kind", ["student", "guest", "member"].map(k => [k, T("pkind." + k)]), p.kind, !!p.has_account)}</label><label><i>${esc(T("person.note"))}</i><input name="note" value="${esc(p.note || "")}" maxlength="500"></label></div>
+      <div class="form-foot"><button class="btn sm" data-act="person-save"${S.busy ? " disabled" : ""}>${esc(T("common.save"))}</button></div></div>`) : "";
+  // 聯絡方式（2026-12-12）：email、LINE、LinkedIn 這些一種一列，原本塞在備註裡。只有管紀錄的人看得到（rc_person 只給他們 identities）。
+  const cts = contactsOf(d.identities, p.login_email);
+  const ctList = cts.length ? `<ul class="flist rc-contacts">${cts.map(c => { const href = contactHref(c.kind, c.value);
+      return `<li><div class="fhead"><span class="ckind">${esc(T("ckind." + c.kind))}</span> ${href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(c.value)}</a>` : `<b>${esc(c.value)}</b>`}${c.login ? ` <span class="tag ok">${esc(T("contact.login"))}</span>` : ""}${c.source === "note" ? ` <span class="mini">${esc(T("contact.fromNote"))}</span>` : ""}${!p.forgotten_at && !c.login ? ` <button class="btn quiet sm" data-act="contact-del" data-id="${esc(c.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : ""}</div></li>`; }).join("")}</ul>` : `<div class="mini">${esc(T("person.noContacts"))}</div>`;
+  const ctAdd = !p.forgotten_at ? `<div class="card inline-form" data-cadd><h2>${esc(T("contact.add"))}</h2>
+      <div class="two"><label><i>${esc(T("contact.kind"))}</i>${sel("kind", CONTACT_KINDS.map(k => [k, T("ckind." + k)]), "line")}</label><label><i>${esc(T("contact.value"))}</i><input name="value" maxlength="200"></label></div>
+      <div class="form-foot"><button class="btn sm" data-act="contact-add"${S.busy ? " disabled" : ""}>${esc(T("contact.addBtn"))}</button><span class="mini">${esc(T("contact.addHint"))}</span></div></div>` : "";
+  const ctHTML = manage ? sectionHTML(T("person.contacts", { n: cts.length }), ctList + ctAdd) : "";
   // 讀過的學校（2026-12-10）：一所一列，現在那一所有標記；管的人可以加、刪、設成現在的。合併帶進來的也在這裡。
   const sch = (d.schools || []).slice();
   const yrs = x => x.year_from && x.year_to ? T("school.years", { from: x.year_from, to: x.year_to }) : x.year_from ? T("school.from", { from: x.year_from }) : x.year_to ? T("school.to", { to: x.year_to }) : "";
@@ -1355,7 +1390,7 @@ export function personHTML(d, S) {
   const resp = d.responses || [];
   const respHTML = resp.length ? sectionHTML(T("person.responses", { n: resp.length }), `<ul class="flist">${resp.map(r => `<li><div class="fhead"><a href="#forms/${esc(r.form_id)}/results" data-act="open-form" data-id="${esc(r.form_id)}"><b>${esc(r.title)}</b></a> <span class="mini">${esc(fmtWhen(r.submitted_at))}</span></div><div class="fmeta">${(r.answers || []).map(a => `${esc(a.key || a.label)}: ${esc(a.value)}`).join("・")}</div></li>`).join("")}</ul>`) : "";
   const forget = pres && !p.forgotten_at ? sectionHTML(T("person.remove"), `<div class="mini">${esc(T(p.has_account ? "person.removeAccount" : "person.removeHint"))}</div>${p.has_account ? "" : `<div class="form-foot"><button class="btn quiet sm" data-act="forget" data-id="${esc(p.id)}">${esc(T("person.forget"))}</button></div>`}`) : "";
-  return head + aliasHTML + msgHTML(S.msg) + edit + schHTML + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
+  return head + aliasHTML + msgHTML(S.msg) + edit + ctHTML + schHTML + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
 }
 // 年度比較。
 // ── 年度比較（2026-12-04 改版，Paul：「it looks really messy and pointless, make filters」）──
