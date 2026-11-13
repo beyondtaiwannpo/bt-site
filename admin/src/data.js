@@ -486,6 +486,8 @@ export const attachEventForm = id => rpcV("attach_event_form", { p_event: id });
 export const saveEventMeta = (id, p) => rpcV("rc_save_event_meta", { p_event: id, p });
 export const syncEvent = id => rpcV("rc_sync_event", { p_event: id });
 // 活動頁底下的「行銷與錢」：掛在這場的需求單（看得到這場的人）、這場的收支加總（只有看得到財務的人，其他人是 null）。2026-12-16-event-links.sql。
+// 活動頁上 Records 那一塊（2026-11-13）：rc_event() 回這一場的記分卡數字、回饋表、檢討。看不到（not_event_viewer）就回 null，那一塊只剩連結。
+export const loadRecordsCard = id => rpcV("rc_event", { p_event: id }).catch(() => null);
 export const loadEventLinks = id => rpcV("event_links", { p_event: id });
 export async function loadTerms() {
   need();

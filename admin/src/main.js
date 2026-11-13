@@ -30,7 +30,7 @@ let S = {
   // rqF 佇列的篩選；rqSel 打開的那一張；rqAssignees 「接的人」下拉的名單（需求工作區的成員）。
   requests: null, rqDraft: null, rqF: { status: "open", mine: "", q: "" }, rqSel: null, rqAssignees: [], cadres: [],
   // 活動上架（2026-11-01）：events 是 loadEvents() 回的；evSel 打開的那一場（slug）；evDraft 開活動那張表單填到一半的值；evSigned 那一場的報名數。
-  events: null, evSel: null, evDraft: null, evSigned: null,
+  events: null, evSel: null, evDraft: null, evSigned: null, evRc: undefined,
   // 場地（2026-11-10）：venues 是 venues_list() 回的 { can_edit, venues }；venue 是打開的那一個（venue_get）；vnQ 清單的搜尋字；vnOpen 哪個收起來的表單開著。
   venues: null, venue: null, vnSel: null, vnQ: "", vnOpen: {},
   // 2026-11-11：活動清單的篩選（搜尋字、狀態、team）與會議清單的搜尋字。收起來的表單開著沒一樣記在 vnOpen（ev-new、mt-new）。
@@ -103,7 +103,7 @@ function render() {
     body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"]);
   } else if (S.view === "event" && S.evSel) {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
-    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks)
+    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc)
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
   } else if (S.view === "venues") {
     body = UI.venuesListHTML(S.venues, S.vnQ, S.msg, S.busy, !!S.vnOpen["vn-add"]);
@@ -288,12 +288,17 @@ async function openTab(t) {
     S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = "";
     await Promise.all([reloadEvents(ev[1]), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null,
       ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
-    S.evLinks = null;
-    { const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]); if (one) S.evLinks = await D.loadEventLinks(one.id).catch(() => null); }
-    render();
-    // 活動結束之後打開，順手把報名的人抄進 Records 一次（錄取的人結束後算到了）。失敗不吵。
+    S.evLinks = null; S.evRc = undefined;
     const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]);
-    if (one && one.form_id && new Date(one.ends_at || one.starts_at || 0) < new Date()) D.syncEvent(one.id).catch(() => {});
+    // 2026-11-13：只在紀錄裡的舊活動沒有對外頁、報名、簽到，這裡是空的；直接去它在 Records 的記分卡。
+    if (one && one.source === "import") { location.replace("/admin/records/#overview/" + encodeURIComponent(one.id)); return; }
+    if (one) S.evLinks = await D.loadEventLinks(one.id).catch(() => null);
+    render();
+    if (!one) return;
+    // 活動結束之後打開，先把報名的人抄進 Records 一次（錄取的人結束後算到了），再讀 Records 的數字。失敗不吵。
+    if (one.form_id && new Date(one.ends_at || one.starts_at || 0) < new Date()) await D.syncEvent(one.id).catch(() => {});
+    S.evRc = await D.loadRecordsCard(one.id);
+    if (S.view === "event" && S.evSel === one.slug) render();
     return;
   }
   // 場地（2026-11-10）：#venues 清單，#venues/<id> 一個。

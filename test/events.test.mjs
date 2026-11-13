@@ -155,7 +155,9 @@ test("活動清單：搜尋、狀態與 team 篩選，開活動收在最上面",
   const h = eventsListHTML(evs, {}, [], null, "", false, ["Curriculum Team"], { q: "", st: "all", team: "" }, false);
   assert.ok(h.indexOf('id="ev-new"') < h.indexOf('id="ev-q"'), "開活動在搜尋上面");
   assert.match(h, /<details class="fold rc-fold" id="ev-new"><summary>/, "預設收著");
-  assert.match(h, /data-act="ev-fst" data-v="all" aria-pressed="true">全部 4</);
+  assert.match(h, /data-act="ev-fst" data-v="all" aria-pressed="true">全部 3</, "只在紀錄裡的不算在這裡（2026-11-13）");
+  assert.doesNotMatch(h, /舊營隊/, "只在紀錄裡的舊活動不列");
+  assert.match(h, /另外有 1 場舊活動只在紀錄裡.*href="\/admin\/records\/#overview"/, "一行說它們在 Records");
   assert.match(h, /<select id="ev-fteam"/, "兩個以上的 team 才有 team 篩選");
   const f = eventsListHTML(evs, {}, [], null, "", false, ["Curriculum Team"], { q: "冬", st: "all", team: "" }, false);
   assert.match(f, /冬令營/); assert.doesNotMatch(f, /草稿活動/);
@@ -174,4 +176,22 @@ test("會議清單：記一場會議收在最上面，搜尋只藏列", async ()
   assert.ok(h.indexOf('id="mt-new"') < h.indexOf('id="mtl-q"'), "記一場會議在上面");
   assert.match(h, /<li data-mt-row data-id="a" hidden>/); assert.match(h, /<li data-mt-row data-id="c">/);
   assert.doesNotMatch(h, /<h2>記一場會議/, "收起來那一格裡不再有第二個標題");
+});
+
+test("活動頁：結束了 Records 的數字在最上面，還沒辦放在報名底下", async () => {
+  const { eventEditHTML } = await import("../admin/src/ui.js");
+  const me = { ws: { "custom:event-x": "edit" }, board: "member" };
+  const base = { id: "e1", slug: "x", team: "Curriculum Team", workspace_id: "custom:event-x", status: "published", kind: "bootcamp" };
+  const rc = { event: { numbers: { registered: 40, attended: 32, attendance_rate: 80, responses: 20, response_rate: 62.5, recommend_avg: 8.6, recommend_n: 19, useful_avg: 4.2 } },
+    review: null, forms: [{ id: "f9", title: "營隊回饋", status: "closed", responses: 20 }] };
+  const past = eventEditHTML(Object.assign({}, base, { starts_at: "2025-07-01T00:00:00Z" }), null, 0, me, "", false, null, [], null, rc);
+  assert.ok(past.indexOf('id="ev-after"') < past.indexOf("<h2>上線"), "結束了在最上面，比「上線」還前面");
+  assert.ok(past.indexOf('id="ev-after"') < past.indexOf('data-autosave="ev-save"'), "在內容前面");
+  assert.match(past, /32<span class="kpi-u">\/ 40<\/span>/); assert.match(past, /80%/); assert.match(past, /8\.6/);
+  assert.match(past, /href="\/admin\/records\/#forms\/f9">營隊回饋</);
+  assert.match(past, /還沒檢討/);
+  const soon = eventEditHTML(Object.assign({}, base, { starts_at: new Date(Date.now() + 864e5 * 20).toISOString() }), null, 0, me, "", false, null, [], null, null);
+  assert.ok(soon.indexOf('id="ev-after"') > soon.indexOf('data-autosave="ev-save"'), "還沒辦在後面");
+  assert.doesNotMatch(soon, /class="todo ev-kpis"/, "看不到 Records 就只有連結");
+  assert.match(eventEditHTML(base, null, 0, me, "", false, null, [], null, undefined), /載入中/);
 });

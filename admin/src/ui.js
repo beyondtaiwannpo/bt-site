@@ -1536,8 +1536,9 @@ export function evGroup(e) {
   return "past";
 }
 // 清單的篩選（2026-11-11 Paul：活動一多就找不到，要像名錄那樣能篩）。f = { q, st, team }。
-// st：all 全部、live 在對外頁上、prep 草稿與準備好了、past 過去與撤下、records 只在紀錄裡。純函式，test/events.test.mjs 有測。
-export const EV_FILTERS = ["all", "live", "prep", "past", "records"];
+// st：all 全部、live 在對外頁上、prep 草稿與準備好了、past 過去與撤下。純函式，test/events.test.mjs 有測。
+// 2026-11-13：只在紀錄裡的舊活動（source import）不列在這裡了，它們沒有對外頁、報名、簽到，在這裡點進去是空的；去 Records 看。
+export const EV_FILTERS = ["all", "live", "prep", "past"];
 const EV_FILTER_GROUPS = { live: ["published"], prep: ["ready", "draft"], past: ["past"], records: ["records"] };
 export function eventMatches(e, f) {
   const x = f || {};
@@ -1552,10 +1553,11 @@ export function eventMatches(e, f) {
 export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTeams, f, newOpen) {
   const dis = busy ? " disabled" : "";
   const d = draft || {};
-  const ev = events || [];
+  const ev = (events || []).filter(e => e.source !== "import");
+  const nRec = (events || []).length - ev.length;
   const fx = Object.assign({ q: "", st: "all", team: "" }, f || {});
   const shown = ev.filter(e => eventMatches(e, fx));
-  const groups = ["ready", "draft", "published", "past", "records"].map(k => [k, shown.filter(e => evGroup(e) === k)]).filter(g => g[1].length);
+  const groups = ["ready", "draft", "published", "past"].map(k => [k, shown.filter(e => evGroup(e) === k)]).filter(g => g[1].length);
   const row = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(e.source === "import" ? T("ev.st.records") : T("ev.st." + e.status))}</span></div>
       <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
   // 開一場活動：收成一行放在最上面（2026-11-11 Paul：以前一直開著放在最底下，清單長了根本看不到）。填到一半或剛打開過，重畫後還開著。
@@ -1573,17 +1575,20 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
       <div class="ev-find"><div class="ro-search"><input id="ev-q" type="search" value="${esc(fx.q)}" placeholder="${esc(T("ev.findPh"))}" autocomplete="off"></div>${
         teamsHere.length > 1 ? `<select id="ev-fteam" aria-label="${esc(T("ev.team"))}"><option value="">${T("ev.fAllTeams")}</option>${teamsHere.map(t => `<option value="${esc(t)}"${fx.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select>` : ""}</div>` : "";
   const filtered = fx.q || fx.team || fx.st !== "all";
+  const recLine = nRec ? `<div class="note ev-recline">${T("ev.recOnly", { n: nRec })} <a href="/admin/records/#overview">${T("ev.recGo")}</a></div>` : "";
   return pageHead(T("ev.title"), T("ev.lede"))
     + msgHTML(msg)
     + create
     + filters
     + (groups.length ? groups.map(([k, es]) => sectionHTML(`${esc(T("ev.g." + k))}<span class="hint">${es.length}</span>`, `<ul class="flist">${es.map(row).join("")}</ul>`)).join("")
         : ev.length && filtered ? emptyHTML(T("ev.noMatch"), T("ev.noMatchHint"), { act: "ev-fclear", label: T("ev.fClear") })
-        : emptyHTML(T("ev.none"), (canCreateTeams || []).length ? T("ev.noneHint") : T("ev.noneHintNo")));
+        : emptyHTML(T("ev.none"), (canCreateTeams || []).length ? T("ev.noneHint") : T("ev.noneHintNo")))
+    + recLine;
 }
 // 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
 // canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
-export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evLinks) {
+// rc：Records 那邊這一場的資料（rc_event 回的；undefined 是還在載，null 是看不到或還沒有）。
+export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evLinks, rc) {
   const dis = busy ? " disabled" : "";
   const canEdit = canEditWs(me, e.workspace_id), canManage = wsLevel(me, e.workspace_id) === "manage", sen = senior(me);
   const ro = canEdit ? "" : " readonly";
@@ -1606,8 +1611,12 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
       <li><a href="#" data-act="open-checkin" data-id="${esc(form.id)}">${T("ev.checkin")}</a>・<a href="#" data-act="open-notice" data-id="${esc(form.id)}">${T("ev.notice")}</a></li>` : ""}
       ${canManage ? `<li><button class="lnk" data-act="members-open" data-ws="${esc(e.workspace_id)}" data-name="${esc(evTitle(e))}">${T("ev.members")}</button></li>` : ""}
     </ul>`;
+  // 2026-11-13 Paul：「活動結束了點進來什麼都沒有」。結束了，Records 的數字（出席、回饋）搬到最上面；還沒辦，放在報名底下。
+  const after = eventAfterHTML(e, terms, canEdit, busy, rc);
+  const ended = evPast(e);
   return pageHead(esc(evTitle(e)), `${esc(e.team.replace(/\s*Team$/i, ""))}・${esc(e.slug)}`, [], { act: "ev-back", label: T("ev.back") })
     + msgHTML(msg)
+    + (ended ? after : "")
     + sectionHTML(T("ev.status"), `<div class="note">${statusLine}</div>${keys}`)
     // 2026-11-06 自動儲存：內容那一區包在 data-autosave="ev-save" 裡（只有「改」以上的人有；唯讀的沒有容器也沒有事件）。
     // 準備好了、退回、放上、撤下都會改狀態與畫面結構，留按鈕。
@@ -1630,7 +1639,7 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
       ${canEdit ? `<div class="form-foot">${autosaveHint("ev-save", `data-id="${esc(e.id)}"`)}</div>` : `<div class="mini">${T("ev.readOnly")}</div>`}</div>`)
     + eventVenueHTML(e, venues, canEdit, busy)
     + sectionHTML(T("ev.signup"), links)
-    + eventAfterHTML(e, terms, canEdit, busy)
+    + (ended ? "" : after)
     + eventLinksHTML(e, evLinks, busy);
 }
 // 行銷與錢（2026-11-10）：掛在這場的需求單、這場的收支加總（links.money 是 null 就是這個人看不到財務，那一行不畫）。
@@ -1642,22 +1651,41 @@ export function eventLinksHTML(e, links, busy) {
   const money = m ? `<div class="note">${m.n ? esc(T("ev.money", { in: "NT$" + Number(m.income || 0).toLocaleString("en-US"), out: "NT$" + Number(m.expense || 0).toLocaleString("en-US"), n: m.n })) : esc(T("ev.moneyNone"))} <a href="/admin/finance/#tx">${T("ev.moneyGo")}</a></div>` : "";
   return sectionHTML(T("ev.links"), rq + `<div class="form-foot"><button class="btn ghost sm" data-act="ev-ask-mkt" data-id="${esc(e.id)}"${busy ? " disabled" : ""}>${T("ev.askMkt")}</button></div>` + money);
 }
-// 紀錄與活動之後（2026-11-10）：種類與屆別（年度比較靠這兩個，原本只能在 Records 標），連到 Records 的記分卡與回饋表。
+// Records 的數字（2026-11-13）：rc 是 rc_event() 回的。報名幾人、到了幾人、回饋幾份、推薦與有用的平均、檢討了沒、回饋表。
+export function eventRecordsHTML(e, rc) {
+  if (rc === undefined) return `<div class="mini">${T("loading")}</div>`;
+  if (!rc || !rc.event) return "";
+  const n = (rc.event.numbers) || {}, num = v => (v == null || v === "" ? null : Number(v));
+  const reg = num(n.registered) || 0, att = num(n.attended) || 0, resp = num(n.responses) || 0, rate = num(n.attendance_rate);
+  const fmt = v => v == null ? "–" : Number(v).toFixed(1);
+  const kpi = (big, label, hint, zero) => `<div class="kpi${zero ? " zero" : ""}"><div class="kpi-n">${big}</div><div class="kpi-l">${esc(label)}</div>${hint ? `<div class="kpi-h">${esc(hint)}</div>` : ""}</div>`;
+  const cards = [
+    kpi(esc(String(att)) + (reg ? `<span class="kpi-u">/ ${esc(String(reg))}</span>` : ""), T("ev.rc.came"), rate == null ? "" : T("ev.rc.rate", { p: Math.round(rate) }), !att),
+    kpi(esc(String(resp)), T("ev.rc.responses"), num(n.response_rate) == null ? "" : T("ev.rc.rate", { p: Math.round(num(n.response_rate)) }), !resp),
+    kpi(esc(fmt(num(n.recommend_avg))), T("ev.rc.recommend"), num(n.recommend_n) ? T("ev.rc.nAns", { n: num(n.recommend_n) }) : "", num(n.recommend_avg) == null),
+    kpi(esc(fmt(num(n.useful_avg))), T("ev.rc.useful"), "", num(n.useful_avg) == null),
+  ].join("");
+  const rv = rc.review;
+  const review = rv && rv.we_change ? `<div class="note">${T("ev.rc.reviewed")} ${esc(rv.we_change)}</div>` : `<div class="mini">${T("ev.rc.notReviewed")}</div>`;
+  const forms = rc.forms || [];
+  const fl = forms.length ? `<ul class="plain">${forms.map(f => `<li><a href="/admin/records/#forms/${esc(f.id)}">${esc(f.title || "")}</a>${f.status ? ` <span class="tag${f.status === "open" ? " open" : f.status === "draft" ? " draft" : ""}">${esc(T("status." + f.status))}</span>` : ""}${f.responses != null ? ` <span class="mini">${esc(T("ev.rc.nResp", { n: f.responses }))}</span>` : ""}</li>`).join("")}</ul>`
+    : `<div class="mini">${T("ev.rc.noForms")}</div>`;
+  return `<div class="todo ev-kpis">${cards}</div>${review}<h3 class="sec-h">${T("ev.fbForms")}</h3>${fl}`;
+}
+// 紀錄與活動之後（2026-11-10，11-13 加 Records 的數字）：種類與屆別（年度比較靠這兩個），這一場的出席與回饋，連到 Records 的記分卡。
 export const EV_KINDS = ["bootcamp", "workshop", "roundtable", "meetup", "clinic", "info-session", "mentorship-term", "fair", "other"];
-export function eventAfterHTML(e, terms, canEdit, busy) {
+export function eventAfterHTML(e, terms, canEdit, busy, rc) {
   const dis = (canEdit && !busy) ? "" : " disabled";
   const opt = (v, label, on) => `<option value="${esc(v)}"${on ? " selected" : ""}>${esc(label)}</option>`;
   const kinds = EV_KINDS.map(k => opt(k, T("evk." + k), (e.kind || "other") === k)).join("");
   const ts = opt("", T("ev.noTerm"), !e.term_id) + (terms || []).map(t => opt(t.id, t.id, e.term_id === t.id)).join("");
-  return sectionHTML(T("ev.after"), `<div class="two">
+  return sectionHTML(T("ev.after"), eventRecordsHTML(e, rc) + `
+    <div class="form-foot"><a class="btn ghost sm" href="/admin/records/#overview/${esc(e.id)}">${T("ev.scorecard")}</a></div>
+    <div class="two">
       <label><i>${T("ev.kind")}</i><select id="ev-kind" data-id="${esc(e.id)}"${dis}>${kinds}</select></label>
       <label><i>${T("ev.term")}</i><select id="ev-term" data-id="${esc(e.id)}"${dis}>${ts}</select></label></div>
     <div class="mini">${T("ev.kindHint")}</div>
-    <ul class="plain">
-      <li><a href="/admin/records/#overview/${esc(e.id)}">${T("ev.scorecard")}</a></li>
-      <li><a href="/admin/records/#forms">${T("ev.fbForms")}</a></li>
-    </ul>
-    ${e.form_id ? `<div class="mini">${T("ev.syncNote")}</div>` : ""}`, { hint: T("ev.afterHint") });
+    ${e.form_id ? `<div class="mini">${T("ev.syncNote")}</div>` : ""}`, { hint: T("ev.afterHint"), id: "ev-after" });
 }
 
 // ═══════════════════════════════════════════════════════════════════════

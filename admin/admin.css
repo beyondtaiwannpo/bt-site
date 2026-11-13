@@ -332,6 +332,12 @@ main > .fold{margin-bottom:24px}
 .kpi-l{font-size:14.5px;font-weight:600;margin-top:4px}
 .kpi-h{font-size:12.5px;color:rgba(16,42,134,.78);line-height:1.45}
 .kpi-a{margin-top:auto;padding-top:10px}
+/* 活動頁上 Records 的數字（2026-11-13）：同一種卡，矮一點。 */
+.ev-kpis{margin-bottom:12px}
+.ev-kpis{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.ev-kpis .kpi{min-height:0;padding:12px 14px 10px}
+.ev-kpis .kpi-n{font-size:34px}
+.ev-recline{margin-top:18px}
 /* 0 的卡還是畫，但變淡：它在說「這件事沒有要處理的」，不是「這個功能不存在」。用 rgba 不用 opacity（對比）。 */
 .kpi.zero .kpi-n,.kpi.zero .kpi-l{color:rgba(16,42,134,.62)}
 .kpi.gone .kpi-n{font-size:22px;padding-top:12px;color:rgba(16,42,134,.7)}
