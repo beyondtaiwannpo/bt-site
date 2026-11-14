@@ -19,7 +19,12 @@ let S = {
   dir: null, dirErr: "", df: {}, dirN: 0, ptab: "dir",
   yf: {},                                                   // 年度比較的篩選與「比什麼」   // 名錄（2026-12-03）：整份、載入失敗的訊息、篩選、目前印到第幾個、哪個分頁
   aud: null, audSaved: null, find: {}, more: {},
+  // 題目畫布（2026-11-13，shared/forms.js）：questions 是引擎形狀的題目（從 results.questions 轉），
+  // fx 是 { mode: edit|preview, menuAt: 哪一條「＋」開著, filter: 打在 / 後面的字, logicOpen: 哪幾題的邏輯面板開著 }。
+  questions: [], fx: null,
 };
+const newFx = () => ({ mode: "edit", menuAt: null, filter: "", logicOpen: new Set() });
+S.fx = newFx();
 
 const root = () => document.getElementById("bt-root");
 const canEnter = () => !!UI.rcLevel(S.me) || !!(S.me && S.me.senior) || !!(S.boot && (S.boot.can_view || (S.boot.events || []).length));
@@ -61,6 +66,7 @@ function render() {
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("records", S.view, S.me), body()); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
+  if (S.view === "forms" && S.id && S.sub === "questions" && S.results && S.fx.mode === "preview") mountPreview();
 }
 function paintShell(tab) {
   const el = root();
@@ -82,6 +88,8 @@ async function boot(retried) {
     parseHash();
     paintShell(S.view);
     UI.bindAutosave(root(), onAutosave);
+    UI.F.ensureStyle();
+    UI.F.bindDrag(root(), (from, to) => { if (canEditQs()) restructure(qs => byIds(qs, UI.F.moveId(qs.map(q => q.id), from, to))); });
     await loadBoot();
     await openRoute();
   } catch (e) {
@@ -117,7 +125,7 @@ async function openRoute(keepMsg) {
   render();
   try {
     if (S.view === "overview" && S.id) { S.event = await D.loadEvent(S.id); if (S.event && S.event.can_edit && !Array.isArray(S.dir)) { await loadDir(); } }
-    else if (S.view === "forms" && S.id) { S.results = await D.loadResults(S.id); if (!S.aud || S.aud._id !== S.id) resetAud(); }
+    else if (S.view === "forms" && S.id) { const other = !S.aud || S.aud._id !== S.id; setResults(await D.loadResults(S.id)); if (other) { resetAud(); S.fx = newFx(); } }
     else if (S.view === "people" && S.id) S.person = await D.loadPerson(S.id);
     else if (S.view === "people" && !Array.isArray(S.dir)) await loadDir();
   } catch (e) { S.msg = T("err.load") + D.says(e); }
@@ -136,37 +144,87 @@ async function run(label, fn) {
   try { const r = await fn(); S.busy = false; return r; }
   catch (err) { S.busy = false; S.msg = T(label) + D.says(err); render(); return undefined; }
 }
-async function refreshForm() { S.results = await D.loadResults(S.id); }
+// 一份表單拿回來：題目同時轉成引擎的形狀（S.questions），畫布與預覽都讀那一份。
+function setResults(r) { S.results = r; S.questions = ((r && r.questions) || []).map(UI.fromRow); }
+async function refreshForm() { setResults(await D.loadResults(S.id)); }
 async function refreshEvent() { S.event = await D.loadEvent(S.id); }
 const vals = sel => { const box = root().querySelector(sel); return box ? UI.formValues(box) : {}; };
 
 // ── 題目與設定：改了就存（跟內部表單同一套）。 ──
+// rc_save_form 一次收整份題目（沒列到的題目會被刪），所以每一次存都排進同一條隊伍，一次一個，
+// 每一次都從 S.questions 現在的樣子組整份送出。不排隊的話，兩題同時存，後到的那一份會把先到的改動蓋掉。
+let chain = Promise.resolve();
+const queue = fn => (chain = chain.then(fn, fn));
 const dirty = UI.dirtyTracker();
-async function onAutosave(act, box) {
-  if (act !== "rc-save" || !S.results) return;
-  const { data, questions } = UI.readFormEditor(box, S.results.questions);
-  const key = "rc:" + S.id, serial = JSON.stringify([data, questions]);
-  if (!dirty.changed(key, serial)) return;
-  if (!data.title) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + T("err.needTitle")); return; }
-  const typeChanged = questions.some(q => { const o = S.results.questions.find(x => x.id === q.id); return o && o.type !== q.type; });
-  UI.autosaveState(box, "saving");
-  try {
-    await D.saveForm(S.id, data, questions);
-    dirty.mark(key, serial);
-    await refreshForm();
-    const live = root().querySelector('[data-autosave="rc-save"]') || box;
-    UI.autosaveState(live, "saved"); UI.toast(T("msg.saved"));
-    if (typeChanged) render();
-  } catch (e) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + D.says(e)); }
+const canEditQs = () => S.view === "forms" && S.id && S.sub === "questions" && !!(S.results && S.results.can_edit);
+const byIds = (qs, ids) => ids.map(id => qs.find(q => q.id === id)).filter(Boolean);
+const liveBox = (sel, box) => root().querySelector(sel) || box;
+async function onAutosave(act, box, field) {
+  if (!S.results) return;
+  if (act === "rc-save") {
+    // 表單設定：p_questions 送 null，題目不動。
+    const { data } = UI.readFormEditor(box);
+    const key = "rc:" + S.id, serial = JSON.stringify(data);
+    if (!dirty.changed(key, serial)) return;
+    if (!data.title) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + T("err.needTitle")); return; }
+    UI.autosaveState(box, "saving");
+    return queue(async () => {
+      try {
+        await D.saveForm(S.id, data, null);
+        dirty.mark(key, serial);
+        const before = S.results.form || {};
+        await refreshForm();
+        const after = S.results.form || {};
+        // 匿名與語言改了，畫布上能加的題型與新題的預設字跟著換；兩個都是勾的、選的，重畫不會吃掉打到一半的字。
+        if (before.anonymous !== after.anonymous || before.lang !== after.lang) render();
+        UI.autosaveState(liveBox('[data-autosave="rc-save"]', box), "saved"); UI.toast(T("msg.saved"));
+      } catch (e) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + D.says(e)); }
+    });
+  }
+  if (act === "q-save") {
+    // 畫布上的一塊（shared/forms.js 的 blockHTML）。讀回來、擋兩件事、排進隊伍存；換了題型或改了邏輯面板的下拉要重畫。
+    const id = box.dataset.id, old = (S.questions || []).find(x => x.id === id); if (!old) return;
+    const q = UI.readBlock(box, old);
+    const bad = UI.blockProblem(q);
+    if (bad) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + T(bad)); return; }
+    const key = "q:" + id, serial = JSON.stringify(UI.toRow(q));
+    if (!dirty.changed(key, serial)) return;
+    UI.autosaveState(box, "saving");
+    const redraw = !!(field && field.dataset && field.dataset.fxRedraw);
+    if (redraw && box.querySelector(".fx-logic[open]")) S.fx.logicOpen.add(id);
+    return queue(async () => {
+      const list = S.questions.map(x => x.id === id ? q : x);
+      try {
+        await D.saveForm(S.id, {}, UI.rowsOf(list));
+        S.questions = list; dirty.mark(key, serial);
+        UI.autosaveState(liveBox(`[data-fx-blk="${CSS.escape(id)}"]`, box), "saved"); UI.toast(T("msg.saved"));
+        if (redraw) render();
+      } catch (e) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + D.says(e)); }
+    });
+  }
 }
-async function restructure(fn) {
-  const box = root().querySelector('[data-autosave="rc-save"]'); if (!box) return;
-  const { data, questions } = UI.readFormEditor(box, S.results.questions);
-  const next = fn(questions);
-  const ok = await run("err.save", () => D.saveForm(S.id, data, next));
-  if (ok === undefined) return;
-  dirty.forget("rc:" + S.id);
-  await refreshForm(); render();
+// 加題、複製、刪、重排、套範本：整份送一次、重讀（ord 與「有人答過」以資料庫為準）、重畫。
+// focusAt：存完要把游標放在第幾題的題目那一格（新加的那一題）。
+async function restructure(fn, focusAt) {
+  S.fx.menuAt = null; S.fx.filter = "";
+  await queue(async () => {
+    const next = fn(S.questions.slice());
+    S.busy = true; S.msg = ""; render();
+    try { await D.saveForm(S.id, {}, UI.rowsOf(next)); await refreshForm(); }
+    catch (e) { S.msg = T("err.save") + D.says(e); }
+    S.busy = false; render();
+  });
+  if (focusAt == null) return;
+  const blk = root().querySelectorAll("[data-fx-blk]")[focusAt];
+  const el = blk && blk.querySelector('[name="label"]');
+  if (el) { el.scrollIntoView({ block: "center" }); el.focus(); if (el.select) el.select(); }
+}
+// 新的一題：前端先配一個 uuid（資料庫在任何表單都沒有這個 id 時才用它；還沒跑 2026-12-24 的資料庫不理它，自己配）。
+const fresh = q => Object.assign(UI.withLabel(q, (S.results.form || {}).lang === "en"), { id: UI.newId(), answered: false });
+// 預覽：畫完之後在 #fx-pv 上 mount 引擎（跟 /feedback/ 同一支，條件邏輯照樣會動，送出不會真的送）。
+function mountPreview() {
+  const el = document.getElementById("fx-pv"); if (!el) return;
+  UI.F.mount(el, S.questions, { en: (S.results.form || {}).lang === "en", preview: true, onSubmit: async () => UI.toast(T("msg.previewSent")) });
 }
 function download(text, name) {
   const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
@@ -334,13 +392,48 @@ document.addEventListener("click", async e => {
     try { await navigator.clipboard.writeText(el.value); UI.toast(T("msg.copied")); } catch (x) { el.select(); }
     return;
   }
-  if (act === "q-add") { await restructure(qs => [...qs, UI.newQuestion(b.dataset.t)]); return; }
-  if (act === "q-template") { await restructure(qs => [...qs, ...UI.templateQuestions(S.results.form.kind, S.results.form.lang)]); return; }
-  if (act === "q-del") { const i = Number(b.dataset.i); await restructure(qs => qs.filter((_, k) => k !== i)); return; }
-  if (act === "q-up" || act === "q-down") {
-    const i = Number(b.dataset.i), j = act === "q-up" ? i - 1 : i + 1;
-    await restructure(qs => { const c = [...qs]; if (j < 0 || j >= c.length) return c; [c[i], c[j]] = [c[j], c[i]]; return c; });
+  // ── 題目畫布（2026-11-13，shared/forms.js）──
+  if (act === "q-template") { await restructure(qs => [...qs, ...UI.templateQuestions(S.results.form.kind, S.results.form.lang).map(r => fresh(UI.fromRow(r)))]); return; }
+  if (act === "fx-mode") { S.fx.mode = b.dataset.v === "preview" ? "preview" : "edit"; S.fx.menuAt = null; render(); return; }
+  if (act === "fx-menu") {
+    const at = Number(b.dataset.at);
+    S.fx.menuAt = S.fx.menuAt === at ? null : at; S.fx.filter = ""; render();
+    const first = document.querySelector(".fx-menu .fx-mi"); if (first && S.fx.menuAt != null) first.focus();
     return;
+  }
+  if (act === "fx-insert" && canEditQs()) {
+    const at = Math.max(0, Math.min(Number(b.dataset.at) || 0, S.questions.length));
+    const q = fresh(UI.F.blankBlock(b.dataset.type, (S.results.form || {}).lang === "en"));
+    await restructure(qs => { qs.splice(at, 0, q); return qs; }, at); return;
+  }
+  if (act === "fx-dup" && canEditQs()) {
+    const i = S.questions.findIndex(q => q.id === b.dataset.id); if (i < 0) return;
+    const q = fresh(UI.F.duplicateOf(S.questions[i], (S.results.form || {}).lang === "en"));
+    await restructure(qs => { qs.splice(i + 1, 0, q); return qs; }, i + 1); return;
+  }
+  if (act === "fx-del" && canEditQs()) {
+    if (UI.needAsk(S, b, T("q.delAsk"))) return;
+    const id = b.dataset.id;
+    await restructure(qs => qs.filter(q => q.id !== id)); return;
+  }
+  if ((act === "fx-up" || act === "fx-down") && canEditQs()) {
+    const ids = S.questions.map(q => q.id), i = ids.indexOf(b.dataset.id), j = act === "fx-up" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    await restructure(qs => byIds(qs, UI.F.moveId(ids, ids[i], ids[j]))); return;
+  }
+  if ((act === "fx-add-rule" || act === "fx-add-cond" || act === "fx-del-rule" || act === "fx-del-cond") && canEditQs()) {
+    const id = b.dataset.id, q = S.questions.find(x => x.id === id); if (!q) return;
+    // 先把那一塊畫面上沒存的字讀進來，再改規則（不然剛打的條件值會被蓋掉）。
+    const box = document.querySelector(`[data-fx-blk="${CSS.escape(id)}"]`);
+    const cur = box ? UI.readBlock(box, q) : q;
+    const next = Object.assign(UI.F.logicAction(act, cur, S.questions, Number(b.dataset.rule), Number(b.dataset.cond)), { ord: q.ord, answered: q.answered });
+    S.fx.logicOpen.add(id);
+    await queue(async () => {
+      const list = S.questions.map(x => x.id === id ? next : x);
+      try { await D.saveForm(S.id, {}, UI.rowsOf(list)); S.questions = list; dirty.forget("q:" + id); UI.toast(T("msg.saved")); }
+      catch (err) { S.msg = T("err.save") + D.says(err); }
+    });
+    render(); return;
   }
   if (act === "aud-toggle") {
     const role = b.dataset.role;
@@ -528,6 +621,22 @@ document.addEventListener("input", e => {
     const again = document.getElementById("tf-find-" + role);
     if (again) { again.focus(); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* 同上 */ } }
   }
+});
+
+// 畫布最底下那一格：打 / 打開選單，/ 後面的字篩題型，Enter 加第一個，Esc 收起來。
+document.addEventListener("input", e => {
+  const t = e.target; if (!t || !t.dataset || !t.dataset.fxSlash || !canEditQs()) return;
+  const v = t.value;
+  if (v.startsWith("/")) { S.fx.menuAt = S.questions.length; S.fx.filter = v.slice(1); }
+  else if (S.fx.menuAt === S.questions.length) { S.fx.menuAt = null; S.fx.filter = ""; }
+  render();
+  const again = document.querySelector("[data-fx-slash]");
+  if (again) { again.value = v; again.focus(); again.setSelectionRange(v.length, v.length); }
+});
+document.addEventListener("keydown", e => {
+  const t = e.target; if (!t || !t.dataset || !t.dataset.fxSlash || !canEditQs()) return;
+  if (e.key === "Escape") { S.fx.menuAt = null; S.fx.filter = ""; render(); return; }
+  if (e.key === "Enter") { e.preventDefault(); const first = document.querySelector(".fx-tail .fx-mi"); if (first) first.click(); else { S.fx.menuAt = S.questions.length; render(); } }
 });
 
 // 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。

@@ -9,6 +9,9 @@
 // 這一支只管拼 HTML，不再寫死任何一句給人看的字。怎麼加一句見 README「後台的中英切換」。
 import { T, lang, setLang, withLang, isErr, STRINGS } from "./strings.js";
 export { T, lang, setLang };
+// 表單引擎（2026-11-13，shared/forms.js）：回饋表的題目畫布、條件邏輯面板、預覽、/feedback/ 的填寫都在那裡，三套表單共用。
+import * as F from "../../../shared/forms.js";
+export { F };
 // 一個人在畫面上要顯示的兩個名字。**同一份規則在 admin/site、passport、availability 也各有一份**
 //（資料夾之間不互相 import），test/names.test.mjs 逐項比對。
 export function namesOf(p) {
@@ -526,7 +529,16 @@ export function noAccessHTML() {
 // 這一半：純函式（記分卡怎麼算、結果怎麼統計、名單怎麼算）加畫面。**少畫一顆按鈕不是安全機制。**
 // ═══════════════════════════════════════════════════════════════════════
 
-export const TYPES = ["short", "long", "single", "multi", "scale"];
+// 回饋表收得了的題型（2026-12-24-feedback-engine.sql）：引擎的十五種拿掉「上傳檔案」。
+// 回饋是不登入填的，檔案沒有地方放、也沒有人管得到誰讀得到，所以這一套不開。
+export const TYPES = F.ALL_TYPES.filter(t => t !== "file");
+// 還沒跑那一支的資料庫只收這五種（題目讀回來沒有 config 那一欄就是還沒跑）。
+export const OLD_TYPES = ["short", "long", "single", "multi", "scale"];
+export const isOldDb = questions => (questions || []).length > 0 && !("config" in questions[0]);
+// 不收答案的排版區塊（小標題、一段說明、換頁）：結果頁、CSV、題號都跳過它們。
+export const isLayout = q => !F.isInput(q);
+// 題型的名字：舊的五種用這一組自己的字（跟以前一樣），其他照引擎的。
+export const typeName = t => STRINGS["type." + t] ? T("type." + t) : F.typeLabel(t, lang() === "en");
 export const RANKS = ["president", "senior_adviser", "director", "adviser", "member"];
 export const ROLES = ["reader", "editor"];
 export const EKINDS = ["bootcamp", "workshop", "roundtable", "meetup", "clinic", "info-session", "mentorship-term", "fair", "other"];
@@ -584,6 +596,38 @@ export function templateQuestions(kind, l) {
     options: (pick(q.options) || []), scale_min: q.scale_min, scale_max: q.scale_max, min_label: pick(q.min_label) || "", max_label: pick(q.max_label) || "" }));
 }
 
+// ── 引擎的形狀 ↔ rc_save_form 的形狀 ──
+// 資料庫回的一題（rc_questions_json）變成引擎要的形狀：分數題的兩端收進 config，ord 與「有人答過」留著。
+export function fromRow(row) { return Object.assign(F.normalize(row || {}), { ord: row && row.ord, answered: !!(row && row.answered) }); }
+// 引擎的一題變成 rc_save_form 要的一列：分數題的兩端同時放進舊的四欄（資料庫兩邊寫成一樣）。
+// id 一定帶著：新題是前端先配的 uuid，資料庫在「任何表單都沒有這個 id」的時候才用它（條件邏輯才指得到還沒存的題）。
+export function toRow(q) {
+  const n = F.normalize(q || {}), c = n.config || {};
+  const row = { id: n.id || "", key: n.key || "", type: n.type, label: n.label, help: n.help || "", required: !!n.required,
+    options: n.options || [], config: c, logic: n.logic || [] };
+  if (n.type === "scale") Object.assign(row, { scale_min: c.scale_min, scale_max: c.scale_max, min_label: c.min_label || "", max_label: c.max_label || "" });
+  return row;
+}
+export const rowsOf = qs => (qs || []).map(toRow);
+// 新題目的 id：瀏覽器配一個 uuid（測試的時候沒有 crypto 就自己拼一個同形狀的）。
+export function newId() {
+  try { if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* 舊瀏覽器 */ }
+  const h = n => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${h(8)}-${h(4)}-4${h(3)}-a${h(3)}-${h(12)}`;
+}
+// 新加的一題先給一個題目文字（照表單的語言）：資料庫不收沒有題目的題，而每一次存都是整份送，
+// 一題空著整份都存不進去。加完游標放在那一格、字是選起來的，直接打字就換掉。
+export function withLabel(q, en) {
+  if (!String(q.label || "").trim() && !["text", "page"].includes(q.type)) q.label = en ? "New question" : "新的一題";
+  return q;
+}
+// 一題存檔前的兩道檢查（資料庫也擋，這裡是讓人當下就知道）。回空字串是沒問題，否則回字典的鍵。
+export function blockProblem(q) {
+  if (!String(q.label || "").trim() && !["text", "page"].includes(q.type)) return "says.needLabel";
+  if (F.isChoice(q) && (q.options || []).length < 2) return "says.needOptions";
+  return "";
+}
+
 // ── 名單怎麼算（跟資料庫的 tf_match 同一條規則，畫面上算人數用）──
 const teamsOf = p => String((p && p.team) || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
 export function matchItem(p, it) {
@@ -627,11 +671,14 @@ export function fmtDelta(v, unit) { if (v == null) return ""; const s = v > 0 ? 
 
 // ── 結果怎麼統計（跟內部表單同一套，多一個 key）──
 const splitMulti = v => String(v || "").split("\n").map(s => s.trim()).filter(Boolean);
+// 2026-11-13 起題目可以有排版區塊（小標題、一段說明、換頁），那些不收答案，不列。
+// 下拉跟單選同樣算票；同意勾選算「同意」幾個。
 export function summarize(questions, responses) {
   const rs = responses || [];
-  return (questions || []).map(q => {
+  return (questions || []).filter(q => !isLayout(q)).map(q => {
     const vals = rs.map(r => String(((r.answers || {})[q.id]) || "")).filter(v => v !== "");
-    if (q.type === "single" || q.type === "multi") {
+    if (q.type === "consent") return { q, n: vals.length, counts: [{ option: T("res.agreed"), n: vals.filter(v => v === "yes").length }], other: [] };
+    if (q.type === "single" || q.type === "multi" || q.type === "dropdown") {
       const count = new Map((q.options || []).map(o => [o, 0])), other = new Map();
       for (const v of vals) for (const x of (q.type === "multi" ? splitMulti(v) : [v])) { if (count.has(x)) count.set(x, count.get(x) + 1); else other.set(x, (other.get(x) || 0) + 1); }
       return { q, n: vals.length, counts: [...count].map(([option, n]) => ({ option, n })), other: [...other].map(([option, n]) => ({ option, n })) };
@@ -651,9 +698,11 @@ export function csvCell(v) {
   return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? "'" : "") + s.replace(/"/g, '""')}"` : s;
 }
 export function resultsCSV(questions, responses, anonymous) {
-  const head = [...(anonymous ? [] : [T("res.who")]), T("res.when"), T("res.age"), T("res.contact"), ...(questions || []).map(q => (q.key ? q.key + " · " : "") + q.label)];
+  const qs = (questions || []).filter(q => !isLayout(q));
+  const cell = (q, v) => q.type === "consent" && v === "yes" ? T("res.agreed") : String(v || "").replace(/\n/g, "; ");
+  const head = [...(anonymous ? [] : [T("res.who")]), T("res.when"), T("res.age"), T("res.contact"), ...qs.map(q => (q.key ? q.key + " · " : "") + q.label)];
   const rows = (responses || []).map(r => [...(anonymous ? [] : [r.name || ""]), r.submitted_at || "", T("age." + (r.age_band || "unknown")), r.contact_ok ? "yes" : "",
-    ...(questions || []).map(q => String(((r.answers || {})[q.id]) || "").replace(/\n/g, "; "))]);
+    ...qs.map(q => cell(q, ((r.answers || {})[q.id])))]);
   return "﻿" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
 export function csvFilename(title) {
@@ -841,23 +890,13 @@ export function formHeadHTML(r, sub) {
   return pageHead(`${esc(f.title || "")} ${statusTag(f.status)} <span class="tag">${esc(T("fkind." + f.kind))}</span>`, `${f.event_title ? esc(f.event_title) + "・" : ""}${esc(T("form.count", { n: f.responses || 0 }))}`, acts, { act: "back-forms", label: T("ed.back") })
     + (edit ? "" : `<div class="note">${esc(T("ed.readonly"))}</div>`) + link + tabs;
 }
-// 題目與設定（改了就存，main.js 的 onAutosave rc-save）。
+// 題目與設定。設定那一塊改了就存（main.js 的 onAutosave rc-save，只存設定）；
+// 題目是引擎的畫布（2026-11-13，shared/forms.js 的 canvasHTML）：每一題一塊 data-autosave="q-save"，改字自己存，
+// 兩題之間的「＋」或最底下打 / 加題，拖曳、上下移、複製、刪掉（有人答過的鎖住），條件邏輯，預覽。
+// S.fx：{ mode: edit|preview, menuAt, filter, logicOpen: Set }。S.questions 是引擎形狀的題目（main.js 從 S.results.questions 轉）。
 export function formEditHTML(r, S) {
-  const f = r.form || {}, qs = r.questions || [], edit = !!r.can_edit, dis = edit ? "" : " disabled", events = (S.boot && S.boot.events) || [], terms = (S.boot && S.boot.terms) || [];
+  const f = r.form || {}, edit = !!r.can_edit, dis = edit ? "" : " disabled", events = (S.boot && S.boot.events) || [], terms = (S.boot && S.boot.terms) || [];
   const anonLocked = f.anonymous && (f.responses || 0) > 0;
-  const qEd = (q, i) => { const choice = q.type === "single" || q.type === "multi"; return `<li class="tf-q" data-qid="${esc(q.id)}">
-      <div class="qtop">${edit ? `<div class="qmove"><button type="button" data-act="q-up" data-i="${i}"${i === 0 ? " disabled" : ""} aria-label="${esc(T("q.up"))}">↑</button><button type="button" data-act="q-down" data-i="${i}"${i === qs.length - 1 ? " disabled" : ""} aria-label="${esc(T("q.down"))}">↓</button></div>` : ""}
-        <div class="qbody"><label><i>${esc(T("q.label"))} ${i + 1}</i><input name="label" value="${esc(q.label)}" maxlength="500"${dis}></label>
-          <div class="two"><label><i>${esc(T("q.type"))}</i><select name="type"${dis || (q.answered ? " disabled" : "")}>${TYPES.map(t => pickOpt(t, T("type." + t), q.type)).join("")}</select></label>
-            <label><i>${esc(T("q.key"))}</i><input name="key" value="${esc(q.key || "")}" maxlength="30" placeholder="recommend" pattern="[a-z][a-z0-9_]*"${dis}></label></div>
-          <div class="two"><label class="check tf-req"><input type="checkbox" name="required"${q.required ? " checked" : ""}${dis}><span>${esc(T("q.req"))}</span></label>
-            <label><i>${esc(T("q.help"))}</i><input name="help" value="${esc(q.help || "")}" maxlength="500"${dis}></label></div>
-          ${choice ? `<label><i>${esc(T("q.opts"))}</i><textarea name="options" rows="4"${dis}>${esc((q.options || []).join("\n"))}</textarea></label>` : ""}
-          ${q.type === "scale" ? `<div class="two"><label><i>${esc(T("q.min"))}</i><select name="scale_min"${dis}>${[0, 1].map(n => pickOpt(n, String(n), q.scale_min)).join("")}</select></label>
-            <label><i>${esc(T("q.max"))}</i><select name="scale_max"${dis}>${[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => pickOpt(n, String(n), q.scale_max)).join("")}</select></label>
-            <label><i>${esc(T("q.minLabel"))}</i><input name="min_label" value="${esc(q.min_label || "")}" maxlength="80"${dis}></label><label><i>${esc(T("q.maxLabel"))}</i><input name="max_label" value="${esc(q.max_label || "")}" maxlength="80"${dis}></label></div>` : ""}
-          ${q.answered ? `<span class="tag">${esc(T("q.answered"))}</span>` : ""}</div>
-        ${edit && !q.answered ? `<button type="button" class="btn quiet sm" data-act="q-del" data-i="${i}">${esc(T("q.del"))}</button>` : ""}</div></li>`; };
   return msgHTML(S.msg) + `<div data-autosave="rc-save" data-id="${esc(f.id)}">`
     + sectionHTML(T("ed.settings"), `<div class="tf-settings">
       <label><i>${esc(T("ed.name"))}</i><input name="title" value="${esc(f.title)}" maxlength="200"${dis}></label>
@@ -870,31 +909,40 @@ export function formEditHTML(r, S) {
       ${anonLocked ? `<div class="mini">${esc(T("ed.anonLocked"))}</div>` : ""}
       <div class="mini">${esc(T("form.consentNote"))}</div>
       ${edit ? `<div class="form-foot">${autosaveHint("rc-save")}</div>` : ""}</div>`)
-    + sectionHTML(T("ed.questions"), `<div class="mini" style="margin-bottom:10px">${esc(T("q.keyNote"))}</div>
-      ${qs.length ? `<ul class="qlist tf-qlist">${qs.map(qEd).join("")}</ul>` : emptyHTML(T("ed.noQ"), esc(T("ed.noQHint")))}
-      ${edit ? `<div class="row tf-add"><span class="mini">${esc(T("ed.addQ"))}</span>${TYPES.map(t => `<button type="button" class="btn ghost sm" data-act="q-add" data-t="${t}"${S.busy ? " disabled" : ""}>+ ${esc(T("type." + t))}</button>`).join("")}
-        ${TEMPLATES[f.kind] && !qs.length ? `<button type="button" class="btn ghost sm" data-act="q-template"${S.busy ? " disabled" : ""}>${esc(T("form.fillTemplate"))}</button>` : ""}</div>` : ""}`)
-    + `</div>` + (S.boot && S.boot.can_manage ? sectionHTML("", `<div class="row"><span class="sp"></span><button class="btn quiet sm" data-act="form-delete" data-id="${esc(f.id)}">${esc(T("ed.delete"))}</button></div>`) : "");
+    + `</div>`
+    + sectionHTML(T("ed.questions"), questionsHTML(r, S))
+    + (S.boot && S.boot.can_manage ? sectionHTML("", `<div class="row"><span class="sp"></span><button class="btn quiet sm" data-act="form-delete" data-id="${esc(f.id)}">${esc(T("ed.delete"))}</button></div>`) : "");
 }
-export function readFormEditor(box, questions) {
+// 題目那一區：編輯／預覽切換加畫布。預覽是一個空的框，main.js 在上面 mount 引擎（跟 /feedback/ 同一支，條件邏輯照樣會動）。
+// 每一塊右上多一格「代號」：固定題目的名字（recommend、useful…），年度比較靠它，所以留在畫布上，不收進「進階」。
+export function questionsHTML(r, S) {
+  const f = r.form || {}, edit = !!r.can_edit, qs = S.questions || [], ed = S.fx || {};
+  const en = lang() === "en", old = isOldDb(r.questions);
+  if (!qs.length && !edit) return emptyHTML(T("ed.noQ"), "");
+  const keyBox = q => F.isInput(q) && q.type !== "consent"
+    ? `<label class="rc-key" title="${esc(T("q.keyNote"))}"><span>${esc(T("q.keyShort"))}</span><input name="key" value="${esc(q.key || "")}" maxlength="30" spellcheck="false" autocomplete="off"${edit ? "" : " disabled"}></label>` : "";
+  const top = `<div class="mini" style="margin-bottom:10px">${esc(T("q.keyNote"))}</div>`
+    + (old ? `<div class="note">${esc(T("ed.oldDb"))}</div>` : "")
+    + (edit && TEMPLATES[f.kind] && !qs.length ? `<div class="row" style="margin-bottom:12px"><button type="button" class="btn ghost sm" data-act="q-template"${S.busy ? " disabled" : ""}>${esc(T("form.fillTemplate"))}</button></div>` : "");
+  return top + F.modeHTML(ed.mode, en)
+    + (ed.mode === "preview" ? `<div class="fx-pvbox" id="fx-pv" lang="${f.lang === "en" ? "en" : "zh-Hant"}"></div>`
+      : (qs.length ? "" : `<p class="mini">${esc(T("ed.noQHint"))}</p>`)
+        + F.canvasHTML(qs, { en, canEdit: edit, menuAt: ed.menuAt, filter: ed.filter, logicOpen: ed.logicOpen, prefill: false,
+            types: old ? OLD_TYPES : f.anonymous ? TYPES.filter(t => t !== "email" && t !== "phone") : TYPES, lockedIds: new Set(qs.filter(q => q.answered).map(q => q.id)),
+            hint: q => keyBox(q) + (edit ? autosaveHint("q-save") : "") }));
+}
+// 設定那一塊讀回來（題目各自存，不在這裡）。
+export function readFormEditor(box) {
   const v = formValues(box);
   const data = { title: v.title || "", intro: v.intro || "", event_id: v.event_id || "", term_id: v.term_id || "", lang: v.lang || "zh", closes_at: fromLocal(v.closes_at || ""), anonymous: !!v.anonymous };
-  const qs = [...box.querySelectorAll("li.tf-q")].map(li => {
-    const old = (questions || []).find(q => q.id === li.dataset.qid) || {};
-    const get = n => { const el = li.querySelector(`[name="${n}"]`); return el ? (el.type === "checkbox" ? el.checked : el.value) : undefined; };
-    const type = get("type") || old.type;
-    return { id: li.dataset.qid, type, key: String(get("key") || "").trim().toLowerCase(), label: get("label") || "", help: get("help") || "", required: !!get("required"),
-      options: get("options") != null ? String(get("options")).split("\n").map(s => s.trim()).filter(Boolean) : (old.options || []),
-      scale_min: Number(get("scale_min") != null ? get("scale_min") : (old.scale_min == null ? 1 : old.scale_min)),
-      scale_max: Number(get("scale_max") != null ? get("scale_max") : (old.scale_max == null ? 5 : old.scale_max)),
-      min_label: get("min_label") != null ? get("min_label") : (old.min_label || ""), max_label: get("max_label") != null ? get("max_label") : (old.max_label || "") };
-  });
-  return { data, questions: qs };
+  return { data };
 }
-export function newQuestion(type) {
-  const q = { type, key: "", label: T("ed.newQ"), help: "", required: false, options: [], scale_min: 1, scale_max: 5, min_label: "", max_label: "" };
-  if (type === "single" || type === "multi") q.options = [T("ed.opt1"), T("ed.opt2")];
-  return q;
+// 畫布上讀回一題（引擎的 readBlock），代號照這一組的規矩：小寫英文、數字、底線（資料庫也擋）。
+export function readBlock(box, old) {
+  const q = F.readBlock(box, old);
+  const k = box.querySelector('[name="key"]');
+  if (k) q.key = String(k.value || "").trim().toLowerCase();
+  return Object.assign(q, { ord: old && old.ord, answered: !!(old && old.answered) });
 }
 // 誰讀得到、誰改得動。配對回饋只能點名，mentor 加不進去（資料庫擋）。
 export function audienceHTML(r, people, aud, saved, find, msg, busy) {
@@ -926,7 +974,7 @@ export function resultsHTML(r, msg, showAll) {
   if (!rs.length) return msgHTML(msg) + kpis + emptyHTML(T("res.none"), esc(T("res.noneHint")));
   const bar = (label, n, of) => `<div class="tf-bar"><span class="tf-bar-l">${esc(label)}</span><span class="tf-bar-t"><i style="width:${of ? Math.round(n / of * 100) : 0}%"></i></span><b>${n}</b></div>`;
   const sums = summarize(qs, rs).map((s, i) => {
-    const head = `<h3 class="tf-sq">${i + 1}. ${esc(s.q.label)} <span class="mini">${s.q.key ? esc(s.q.key) + "・" : ""}${esc(T("type." + s.q.type))}</span></h3>`;
+    const head = `<h3 class="tf-sq">${i + 1}. ${esc(s.q.label)} <span class="mini">${s.q.key ? esc(s.q.key) + "・" : ""}${esc(typeName(s.q.type))}</span></h3>`;
     if (s.counts) { const of = Math.max(1, ...s.counts.map(c => c.n), ...s.other.map(c => c.n)); return `<div class="card tf-sum">${head}${s.counts.map(c => bar(c.option, c.n, of)).join("")}${s.other.map(c => bar(c.option + " " + T("res.other"), c.n, of)).join("")}</div>`; }
     if (s.dist) { const of = Math.max(1, ...s.dist.map(d => d.n)); return `<div class="card tf-sum">${head}<div class="tf-avg">${esc(T("res.avg", { avg: s.avg == null ? "–" : s.avg, n: s.n, min: s.q.scale_min, max: s.q.scale_max }))}</div>${s.dist.map(d => bar(String(d.v), d.n, of)).join("")}</div>`; }
     const list = showAll && showAll[s.q.id] ? s.texts : s.texts.slice(0, 6);

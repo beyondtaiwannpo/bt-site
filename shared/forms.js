@@ -56,7 +56,7 @@ const W = {
   fileHint: ["最大 {n} MB，{t}。", "Up to {n} MB, {t}."],
   draftKept: ["這台裝置會先記住你填到哪，重新整理也不會不見；送出之後就清掉。", "This device remembers your answers so a refresh does not lose them. They are cleared once you submit."],
   draftClear: ["清掉這台裝置上的草稿", "Clear the draft on this device"],
-  preview: ["預覽：這是申請人看到的樣子，題目邏輯照樣會動，按送出不會真的送出。", "Preview: this is what applicants see. Logic works; Submit does not send anything."],
+  preview: ["預覽：這是填的人看到的樣子，題目邏輯照樣會動，按送出不會真的送出。", "Preview: this is what people filling it in see. Logic works; Submit does not send anything."],
   previewSent: ["預覽不會送出。真的送出時要填的都填了。", "Preview does not send. Everything required is filled in."],
 };
 const fill = (s, v) => String(s).replace(/\{(\w+)\}/g, (_, k) => (v && v[k] != null ? v[k] : ""));
@@ -675,6 +675,8 @@ export function mount(el, rawItems, opts) {
     }
     st.answers[qid] = readValue(el, it);
     if (st.errs[qid]) { const m = validate(it, st.answers[qid], o.en, ev().required.has(qid)); if (!m) { delete st.errs[qid]; const node = el.querySelector(`[data-fx="${cssq(qid)}"]`); if (node) { node.classList.remove("fx-bad"); const er = node.querySelector(".fx-err"); if (er) er.hidden = true; } } }
+    // 錯的題都改好了，上面那句「有 N 題要再看一下」也跟著拿掉，不用等到再按一次下一頁。
+    if (st.summary && !Object.keys(st.errs).length) { st.summary = ""; const sm = el.querySelector(".fx-sum"); if (sm) sm.remove(); }
     keep(); refresh();
   }
   async function onFile(evt) {
@@ -886,11 +888,11 @@ export function readBlock(box, old) {
     out.config = {};
     if (TYPE[type].choice && !out.options.length) out.options = [];
   }
-  const rules = [...box.querySelectorAll("[data-rule]")];
+  const rules = [...box.querySelectorAll(".fx-rule[data-rule]")];
   if (rules.length || box.querySelector(".fx-logic")) {
     out.logic = rules.map((r, ri) => {
       const g = name => { const el = r.querySelector(`[name="${name}"]`); return el ? el.value : ""; };
-      const when = [...r.querySelectorAll("[data-cond]")].map((cEl, ci) => {
+      const when = [...r.querySelectorAll(".fx-cond[data-cond]")].map((cEl, ci) => {
         const multi = [...cEl.querySelectorAll(`[name="lg-${ri}-c${ci}-v"][type=checkbox]`)];
         const vEl = cEl.querySelector(`[name="lg-${ri}-c${ci}-v"]`);
         return { q: g(`lg-${ri}-c${ci}-q`), op: g(`lg-${ri}-c${ci}-op`) || "is", v: multi.length ? multi.filter(m => m.checked).map(m => m.value) : (vEl ? vEl.value.trim() : "") };

@@ -3452,6 +3452,151 @@ bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
 if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：傳的門拿掉「只能傳進自己的資料夾」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉本人資料夾驗收表沒變紅"; fail=$((fail+1)); fi
 fup3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-22-form-uploads.sql 2>&1 || true)
 if echo "${fup3}" | grep -q "OVERALL.*PASS"; then echo "  ok   破壞測試之後裝回正確的那一版"; pass=$((pass+1)); else echo "  FAIL 裝回正確版沒過：${fup3}" | head -5; fail=$((fail+1)); fi
+echo "── 內部表單換上表單引擎（2026-12-23-team-forms-engine.sql）──"
+# 這時候：PAUL Co-President、MKE 與 MKM 在 Marketing、RQR 在 Curriculum、OUTC 在 Mentorship。資料全是假的。
+tfe=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-23-team-forms-engine.sql 2>&1 || true)
+if echo "${tfe}" | grep -q "OVERALL.*PASS" && ! echo "${tfe}" | grep -q "|FAIL"; then echo "  ok   內部表單引擎那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 內部表單引擎那支驗收表："; echo "${tfe}" | head -25; fail=$((fail+1)); fi
+tfe2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-23-team-forms-engine.sql 2>&1 || true)
+if echo "${tfe2}" | grep -q "OVERALL.*PASS" && ! echo "${tfe2}" | grep -q "|FAIL"; then echo "  ok   內部表單引擎那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 內部表單引擎那支重跑沒過"; echo "${tfe2}" | head -10; fail=$((fail+1)); fi
+chk "重跑不動資料（舊的兩份、四份答案還在）" "2|4" "select (select count(*) from public.tf_forms)||'|'||(select count(*) from public.tf_responses)"
+chk "舊的題目 config 補成空物件、logic 補成空陣列" "0" "select count(*) from public.tf_questions where config is null or logic is null or jsonb_typeof(logic) <> 'array'"
+chkas "${PAUL}" "★ 舊的五種題型照樣讀得到結果（舊表單沒被牽動，三份）" "3" "select jsonb_array_length(public.tf_results('${TF2}')->'responses')"
+# 一份有換頁、條件邏輯、新題型的表單。id 是前端產的（瀏覽器的 crypto.randomUUID），資料庫照用。
+E1=cccccccc-0000-4000-8000-000000000001; E2=cccccccc-0000-4000-8000-000000000002; E3=cccccccc-0000-4000-8000-000000000003
+E4=cccccccc-0000-4000-8000-000000000004; E5=cccccccc-0000-4000-8000-000000000005; E6=cccccccc-0000-4000-8000-000000000006
+EP=cccccccc-0000-4000-8000-000000000007; EH=cccccccc-0000-4000-8000-000000000008; ET=cccccccc-0000-4000-8000-000000000009
+E7=cccccccc-0000-4000-8000-000000000010; E8=cccccccc-0000-4000-8000-000000000011; ES=cccccccc-0000-4000-8000-000000000012
+E9=cccccccc-0000-4000-8000-000000000013
+TEQ="[{\"id\":\"${E1}\",\"type\":\"email\",\"label\":\"Email\",\"required\":true},{\"id\":\"${E2}\",\"type\":\"phone\",\"label\":\"Phone\"},{\"id\":\"${E3}\",\"type\":\"number\",\"label\":\"Hours\",\"config\":{\"min\":1,\"max\":10}},{\"id\":\"${E4}\",\"type\":\"date\",\"label\":\"When\"},{\"id\":\"${E5}\",\"type\":\"consent\",\"label\":\"I agree\",\"required\":true},{\"id\":\"${E6}\",\"type\":\"dropdown\",\"label\":\"Pick\",\"options\":[\"a\",\"b\"],\"logic\":[{\"match\":\"all\",\"when\":[{\"q\":\"${E6}\",\"op\":\"is\",\"v\":\"b\"}],\"do\":\"show\",\"target\":\"${E9}\"}]},{\"id\":\"${EP}\",\"type\":\"page\",\"label\":\"\"},{\"id\":\"${EH}\",\"type\":\"heading\",\"label\":\"Part two\"},{\"id\":\"${ET}\",\"type\":\"text\",\"label\":\"\"},{\"id\":\"${E7}\",\"type\":\"single\",\"label\":\"Role\",\"options\":[\"x\",\"y\"],\"config\":{\"other\":true}},{\"id\":\"${E8}\",\"type\":\"multi\",\"label\":\"Tags\",\"options\":[\"m\",\"n\"]},{\"id\":\"${ES}\",\"type\":\"scale\",\"label\":\"Load\",\"config\":{\"scale_min\":0,\"scale_max\":4,\"min_label\":\"low\"}},{\"id\":\"${E9}\",\"type\":\"short\",\"label\":\"Why b?\",\"required\":true}]"
+TE=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.tf_save_form(null, '{\"title\":\"Engine form (fake)\"}'::jsonb, '${TEQ}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "存得了十三題（新題型、換頁、說明沒有題目字）" "13|2" "select count(*)||'|'||count(*) filter (where label = '') from public.tf_questions where form_id='${TE}'"
+chk "★ 新題目照前端給的 id 存（條件邏輯指得到它）" "13" "select count(*) from public.tf_questions where form_id='${TE}' and id::text like 'cccccccc-0000-4000-8000-%'"
+chk "條件邏輯存起來了，指向第 13 題" "show|${E9}" "select (logic->0->>'do')||'|'||(logic->0->>'target') from public.tf_questions where id='${E6}'"
+chk "分數題只給 config，舊欄位跟著寫（0 到 4）" "0|4|low|4" "select scale_min||'|'||scale_max||'|'||min_label||'|'||(config->>'scale_max') from public.tf_questions where id='${ES}'"
+chk "排版區塊一律不是必填" "0" "select count(*) from public.tf_questions where form_id='${TE}' and type in ('heading','text','page') and required"
+chkraise "下拉只有一個選項存不了（need_options）" "need_options:1" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, '[{\"type\":\"dropdown\",\"label\":\"a\",\"options\":[\"only\"]}]'::jsonb);"
+chkraise "★ 內部表單不收上傳檔案（bad_question_type）" "bad_question_type:1" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, '[{\"type\":\"file\",\"label\":\"cv\"}]'::jsonb);"
+chkraise "收答案的題沒有題目字存不了（need_question_label）" "need_question_label:1" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, '[{\"type\":\"email\",\"label\":\"\"}]'::jsonb);"
+chkraise "同一份清單裡同一個 id 兩次擋（duplicate_question）" "duplicate_question:2" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form(null, '{\"title\":\"x\"}'::jsonb, '[{\"id\":\"dddddddd-0000-4000-8000-000000000001\",\"type\":\"short\",\"label\":\"a\"},{\"id\":\"dddddddd-0000-4000-8000-000000000001\",\"type\":\"short\",\"label\":\"b\"}]'::jsonb);"
+TEX=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.tf_save_form(null, '{\"title\":\"Copy (fake)\"}'::jsonb, '[{\"id\":\"${E1}\",\"type\":\"short\",\"label\":\"steal\"}]'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 別份表單已經用掉的 id 不會被搶走（拿一個新的），原本那題沒被改" "1|0|Email|email" "select (select count(*) from public.tf_questions where form_id='${TEX}')||'|'||(select count(*) from public.tf_questions where form_id='${TEX}' and id='${E1}')||'|'||(select label||'|'||type from public.tf_questions where id='${E1}')"
+chkas "${PAUL}" "給 Marketing Team 並打開" "open" "select public.tf_set_audience('${TE}','recipient','[{\"kind\":\"team\",\"value\":\"Marketing Team\"}]'::jsonb); select public.tf_set_status('${TE}','open')"
+chkas "${MKE}" "填的頁拿得到 config 與 logic" "true|show|4" "select (x->'questions'->0 ? 'config')::text||'|'||(x#>>'{questions,5,logic,0,do}')||'|'||(x#>>'{questions,11,config,scale_max}') from (select public.tf_fill('${TE}') x) t"
+OK1="\"${E1}\":\"a@example.com\",\"${E5}\":\"yes\""
+chkraise "★ email 格式不對送不了（bad_answer）" "bad_answer:1" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{\"${E1}\":\"not-an-email\",\"${E5}\":\"yes\"}'::jsonb);"
+chkraise "★ 電話不是電話送不了" "bad_answer:2" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E2}\":\"call me\"}'::jsonb);"
+chkraise "★ 數字題寫字送不了" "bad_answer:3" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E3}\":\"seven\"}'::jsonb);"
+chkraise "★ 數字超出題目設的範圍送不了" "bad_answer:3" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E3}\":\"20\"}'::jsonb);"
+chkraise "★ 不存在的日期送不了" "bad_answer:4" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E4}\":\"2026-13-40\"}'::jsonb);"
+chkraise "★ 同意題只收 yes" "bad_answer:5" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{\"${E1}\":\"a@example.com\",\"${E5}\":\"no\"}'::jsonb);"
+chkraise "★ 下拉選項外的答案送不了（下拉沒有「其他」）" "bad_option:6" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E6}\":\"zzz\"}'::jsonb);"
+chkraise "★ 多選沒開「其他」，選項外的字送不了" "bad_option:11" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E8}\":[\"m\",\"zzz\"]}'::jsonb);"
+chkraise "★ 開了「其他」的單選，不收 __other__ 這個記號本身" "bad_option:10" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E7}\":\"__other__\"}'::jsonb);"
+chkraise "★ 沒有規則影響的必填照擋（required）" "required:1" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{\"${E5}\":\"yes\"}'::jsonb);"
+chkraise "★ 必填的同意題沒勾照擋" "required:5" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{\"${E1}\":\"a@example.com\"}'::jsonb);"
+chkraise "★ 不在名單上的人送不了（not_for_you）" "not_for_you" "perform set_config('test.uid','${RQR}',true); perform public.tf_submit('${TE}', '{${OK1}}'::jsonb);"
+chkas "${MKE}" "★ 被規則影響的必填（第 13 題）沒填照樣送得出去；「其他」自己寫的收" "1" "select count(*) from (select public.tf_submit('${TE}', '{${OK1},\"${E2}\":\"+886 912 345 678\",\"${E3}\":\"7\",\"${E4}\":\"2026-11-20\",\"${E6}\":\"a\",\"${E7}\":\"my own words\",\"${E8}\":[\"n\",\"m\"],\"${ES}\":\"3\",\"${EP}\":\"x\",\"${EH}\":\"x\",\"${ET}\":\"x\"}'::jsonb)) x"
+chk "存下來的答案：「其他」的字、多選照選項順序、數字與分數" "myownwords|m,n|7|3" "select replace((select value from public.tf_answers where question_id='${E7}'),' ','')||'|'||(select replace(value,E'\n',',') from public.tf_answers where question_id='${E8}')||'|'||(select value from public.tf_answers where question_id='${E3}')||'|'||(select value from public.tf_answers where question_id='${ES}')"
+chk "★ 小標題、說明、換頁送來的值不存" "0|9" "select (select count(*) from public.tf_answers where question_id in ('${EP}','${EH}','${ET}'))||'|'||(select count(*) from public.tf_answers a join public.tf_responses r on r.id=a.response_id where r.form_id='${TE}')"
+chkraise "★ 填過就不能再送（already_submitted）" "already_submitted" "perform set_config('test.uid','${MKE}',true); perform public.tf_submit('${TE}', '{${OK1}}'::jsonb);"
+chkas "${PAUL}" "結果頁的題目帶 config，答案拿得到" "true|a@example.com" "select (r->'questions'->0 ? 'config')::text||'|'||(r#>>'{responses,0,answers,${E1}}') from (select public.tf_results('${TE}') r) t"
+chkraise "★ 有人答過的題目不能換題型（question_type_locked）" "question_type_locked:1" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form('${TE}', '{}'::jsonb, '[{\"id\":\"${E1}\",\"type\":\"short\",\"label\":\"Email\"}]'::jsonb);"
+chkraise "★ 有人答過的題目刪不了（question_has_answers）" "question_has_answers" "perform set_config('test.uid','${PAUL}',true); perform public.tf_save_form('${TE}', '{}'::jsonb, '[{\"id\":\"${E1}\",\"type\":\"email\",\"label\":\"Email\",\"required\":true}]'::jsonb);"
+chkraise "★ 名單上但不是編輯的人改不了表單（not_form_editor）" "not_form_editor" "perform set_config('test.uid','${MKE}',true); perform public.tf_save_form('${TE}', '{\"title\":\"hijack\"}'::jsonb, null);"
+chkas "${PAUL}" "改字、把第 13 題改成至少寫 5 個字可以，答案還在" "Youremail|9" "select count(*) from (select public.tf_save_form('${TE}', '{}'::jsonb, (select jsonb_agg(case when e->>'id'='${E1}' then e || '{\"label\":\"Your email\"}'::jsonb when e->>'id'='${E9}' then e || '{\"config\":{\"min_len\":5}}'::jsonb else e end) from jsonb_array_elements('${TEQ}'::jsonb) e))) x; select (select label from public.tf_questions where id='${E1}')||'|'||(select count(*) from public.tf_answers a join public.tf_responses r on r.id=a.response_id where r.form_id='${TE}')"
+chkraise "第 13 題有最少字數：有寫就照驗，太短送不了（bad_answer）" "bad_answer:13" "perform set_config('test.uid','${MKM}',true); perform public.tf_submit('${TE}', '{${OK1},\"${E9}\":\"no\"}'::jsonb);"
+BROKEN=$(mktemp)
+sed "/if not public.tf_is_recipient(p_form) then raise exception 'not_for_you'/d" supabase/migrations/2026-12-23-team-forms-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：送出拿掉「只有名單上的人送得了」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉填的人門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "/q.type = 'email' and s !~/d" supabase/migrations/2026-12-23-team-forms-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 email 格式的檢查，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 email 檢查驗收表沒變紅"; fail=$((fail+1)); fi
+sed "/raise exception 'question_type_locked:%'/d" supabase/migrations/2026-12-23-team-forms-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「答過的題不能換題型」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉換題型的鎖驗收表沒變紅"; fail=$((fail+1)); fi
+sed "/^        if v_want is not null and not exists/s/not exists (select 1 from public.tf_questions x where x.id = v_want)/true/" supabase/migrations/2026-12-23-team-forms-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：前端給的 id 不管有沒有人用過都照用，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 id 撞號檢查驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+tfe3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-23-team-forms-engine.sql 2>&1 || true)
+if echo "${tfe3}" | grep -q "OVERALL.*PASS"; then echo "  ok   破壞測試之後裝回正確的那一版"; pass=$((pass+1)); else echo "  FAIL 裝回正確版沒過"; echo "${tfe3}" | head -5; fail=$((fail+1)); fi
+chkraise "裝回之後，不在名單上的人又送不了" "not_for_you" "perform set_config('test.uid','${RQR}',true); perform public.tf_submit('${TE}', '{${OK1}}'::jsonb);"
+chkraise "裝回之後，email 格式又有驗" "bad_answer:1" "perform set_config('test.uid','${MKM}',true); perform public.tf_submit('${TE}', '{\"${E1}\":\"nope\",\"${E5}\":\"yes\"}'::jsonb);"
+echo "── 回饋表換上表單引擎（2026-12-24-feedback-engine.sql）──"
+# 這時候：DIR 管 winter-camp-2027（RCEV）那場活動、OUTC 是沒指派的 Mentorship 幹部、STU 是學生、RCF 是那場的匿名回饋表（RQ1 是它的分數題）。資料全是假的。
+FBA0=$(psql -d "${DB}" -X -A -t -q -c "select (select count(*) from public.rc_questions)||'|'||(select count(*) from public.rc_answers)" | tr -d ' \n')
+fbe=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-24-feedback-engine.sql 2>&1 || true)
+if echo "${fbe}" | grep -q "OVERALL.*PASS" && ! echo "${fbe}" | grep -q "|FAIL"; then echo "  ok   回饋表引擎那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 回饋表引擎那支驗收表："; echo "${fbe}" | head -25; fail=$((fail+1)); fi
+fbe2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-24-feedback-engine.sql 2>&1 || true)
+if echo "${fbe2}" | grep -q "OVERALL.*PASS" && ! echo "${fbe2}" | grep -q "|FAIL"; then echo "  ok   回饋表引擎那支可以重跑"; pass=$((pass+1)); else echo "  FAIL 回饋表引擎那支重跑沒過"; echo "${fbe2}" | head -10; fail=$((fail+1)); fi
+chk "重跑不動既有的題目與答案" "${FBA0}" "select (select count(*) from public.rc_questions)||'|'||(select count(*) from public.rc_answers)"
+chk "既有的分數題：config 補上兩端，跟舊欄位一樣" "1|5|1|5" "select scale_min||'|'||scale_max||'|'||(config->>'scale_min')||'|'||(config->>'scale_max') from public.rc_questions where id='${RQ1}'"
+# 一份有換頁、條件邏輯、新題型的表單（具名的，因為裡面有 email 題）。id 是前端產的（瀏覽器的 crypto.randomUUID），資料庫照用。
+G1=dddddddd-0000-4000-8000-000000000001; G2=dddddddd-0000-4000-8000-000000000002; G3=dddddddd-0000-4000-8000-000000000003
+GP=dddddddd-0000-4000-8000-000000000004; GH=dddddddd-0000-4000-8000-000000000005; GT=dddddddd-0000-4000-8000-000000000006
+G4=dddddddd-0000-4000-8000-000000000007; G5=dddddddd-0000-4000-8000-000000000008; G6=dddddddd-0000-4000-8000-000000000009
+G7=dddddddd-0000-4000-8000-000000000010; G8=dddddddd-0000-4000-8000-000000000011; G9=dddddddd-0000-4000-8000-000000000012
+FBQ="[{\"id\":\"${G1}\",\"key\":\"recommend\",\"type\":\"scale\",\"label\":\"Recommend?\",\"required\":true,\"config\":{\"scale_min\":0,\"scale_max\":10}},{\"id\":\"${G2}\",\"type\":\"single\",\"label\":\"Again?\",\"required\":true,\"options\":[\"Yes\",\"No\"],\"config\":{\"other\":true},\"logic\":[{\"match\":\"all\",\"when\":[{\"q\":\"${G2}\",\"op\":\"is\",\"v\":\"No\"}],\"do\":\"show\",\"target\":\"${G3}\"}]},{\"id\":\"${G3}\",\"type\":\"long\",\"label\":\"Why not?\",\"required\":true},{\"id\":\"${GP}\",\"type\":\"page\",\"label\":\"\",\"required\":true},{\"id\":\"${GH}\",\"key\":\"part_two\",\"type\":\"heading\",\"label\":\"Part two\"},{\"id\":\"${GT}\",\"type\":\"text\",\"label\":\"\"},{\"id\":\"${G4}\",\"type\":\"email\",\"label\":\"Email\"},{\"id\":\"${G5}\",\"type\":\"number\",\"label\":\"Hours\",\"config\":{\"min\":1,\"max\":10}},{\"id\":\"${G6}\",\"type\":\"date\",\"label\":\"When\"},{\"id\":\"${G7}\",\"type\":\"dropdown\",\"label\":\"Heard from\",\"options\":[\"IG\",\"Friend\"]},{\"id\":\"${G8}\",\"type\":\"consent\",\"label\":\"I agree\",\"required\":true},{\"id\":\"${G9}\",\"type\":\"multi\",\"label\":\"Tags\",\"options\":[\"m\",\"n\"]}]"
+FBF=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${DIR}',false);" -c "select public.rc_save_form(null, '{\"title\":\"Engine feedback (fake)\",\"event_id\":\"${RCEV}\",\"anonymous\":false}'::jsonb, '${FBQ}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 新建：十二題、前端給的 id 照用、換頁與一段說明可以沒有題目字" "12|${G1}|${GT}" "select (select count(*) from public.rc_questions where form_id='${FBF}')||'|'||(select id from public.rc_questions where form_id='${FBF}' and ord=1)||'|'||(select id from public.rc_questions where form_id='${FBF}' and ord=6 and label='')"
+chk "分數題的兩端同時寫進 config 與舊欄位（0 到 10）" "0|10|0|10" "select scale_min||'|'||scale_max||'|'||(config->>'scale_min')||'|'||(config->>'scale_max') from public.rc_questions where id='${G1}'"
+chk "排版區塊不是必填、沒有代號；非分數題 config 裡沒有分數兩端" "0|0" "select (select count(*) from public.rc_questions where form_id='${FBF}' and type in ('heading','text','page') and (required or key is not null))||'|'||(select count(*) from public.rc_questions where form_id='${FBF}' and type <> 'scale' and config ? 'scale_min')"
+chkas "${DIR}" "★ 拿別份表單的題目 id 來存：那個 id 不給，別份表單的題還在原處" "true|true" "select public.rc_save_form(null, '{\"title\":\"Steal (fake)\",\"event_id\":\"${RCEV}\"}'::jsonb, '[{\"id\":\"${RQ1}\",\"type\":\"short\",\"label\":\"x\"}]'::jsonb); select (select q.id <> '${RQ1}' from public.rc_questions q join public.rc_forms f on f.id=q.form_id where f.title='Steal (fake)')||'|'||(select form_id='${RCF}' from public.rc_questions where id='${RQ1}')"
+chkraise "★ 沒指派的幹部改不了題目（not_form_editor）" "not_form_editor" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[]'::jsonb);"
+chkraise "★ 學生改不了題目（not_form_editor）" "not_form_editor" "perform set_config('test.uid','${STU}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[]'::jsonb);"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_save_form('${FBF}', '{}'::jsonb, '[]'::jsonb);" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到 rc_save_form"; pass=$((pass+1)); else echo "  FAIL anon 叫得到 rc_save_form：${angot}"; fail=$((fail+1)); fi
+chkraise "上傳檔案不收（bad_question_type）" "bad_question_type:1" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[{\"type\":\"file\",\"label\":\"CV\"}]'::jsonb);"
+chkraise "小標題要有題目字（need_question_label）" "need_question_label:1" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[{\"type\":\"heading\",\"label\":\"\"}]'::jsonb);"
+chkraise "下拉至少兩個選項（need_options）" "need_options:1" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[{\"type\":\"dropdown\",\"label\":\"x\",\"options\":[\"a\"]}]'::jsonb);"
+chkraise "★ 匿名的表單不能有 email 題（把有 email 題的表單改成匿名被擋，anon_contact_q）" "anon_contact_q" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${FBF}', '{\"anonymous\":true}'::jsonb, null);"
+chkraise "★ 匿名的表單加不了電話題（anon_contact_q）" "anon_contact_q" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${RCF}', '{}'::jsonb, (select jsonb_agg(x) from (select jsonb_build_object('id', id, 'key', coalesce(key, ''), 'type', type, 'label', label, 'options', to_jsonb(options), 'scale_min', scale_min, 'scale_max', scale_max) x from public.rc_questions where form_id='${RCF}' union all select '{\"type\":\"phone\",\"label\":\"Phone\"}'::jsonb) t));"
+chk "被擋的那兩次什麼都沒改（還是具名、RCF 還是五題）" "false|5" "select (select anonymous from public.rc_forms where id='${FBF}')||'|'||(select count(*) from public.rc_questions where form_id='${RCF}')"
+FBTOK=$(psql -d "${DB}" -X -A -t -q -c "select token from public.rc_forms where id='${FBF}'" | tr -d ' \n')
+chkrole anon "" "★ 草稿沒登入的人拿不到，也送不進" "true" "select (public.rc_public_form('${FBTOK}') is null)::text"
+chkraise "★ 草稿送不進（form_closed）" "form_closed" "perform public.rc_public_submit('${FBTOK}', '{}'::jsonb, '{}'::jsonb);"
+chkas "${DIR}" "打開" "open" "select public.rc_set_status('${FBF}','open')"
+chkrole anon "" "★ 填寫頁拿得到 config 與條件邏輯，沒有別人的答案" "true|1|10|false" "select (x#>>'{questions,1,config,other}')||'|'||jsonb_array_length(x#>'{questions,1,logic}')||'|'||(x#>>'{questions,0,config,scale_max}')||'|'||(x ? 'responses') from (select public.rc_public_form('${FBTOK}') x) t"
+FBOK="\"${G1}\":7,\"${G2}\":\"Yes\",\"${G8}\":\"yes\""
+chkraise "不被規則影響的必填照擋：分數題沒填（required:1）" "required:1" "perform public.rc_public_submit('${FBTOK}', '{\"${G8}\":\"yes\",\"${G2}\":\"Yes\"}'::jsonb, '{}'::jsonb);"
+chkraise "同意題沒勾照擋（required:11）" "required:11" "perform public.rc_public_submit('${FBTOK}', '{\"${G1}\":7,\"${G2}\":\"Yes\"}'::jsonb, '{}'::jsonb);"
+chkraise "同意題只收 yes（bad_answer:11）" "bad_answer:11" "perform public.rc_public_submit('${FBTOK}', '{\"${G1}\":7,\"${G2}\":\"Yes\",\"${G8}\":\"no\"}'::jsonb, '{}'::jsonb);"
+chkraise "分數超出 0 到 10（bad_scale_value:1）" "bad_scale_value:1" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G1}\":11}'::jsonb, '{}'::jsonb);"
+chkraise "★ email 格式錯（bad_answer:7）" "bad_answer:7" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G4}\":\"nope\"}'::jsonb, '{}'::jsonb);"
+chkraise "數字超出範圍（bad_answer:8）" "bad_answer:8" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G5}\":\"11\"}'::jsonb, '{}'::jsonb);"
+chkraise "不存在的日期（bad_answer:9）" "bad_answer:9" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G6}\":\"2027-02-30\"}'::jsonb, '{}'::jsonb);"
+chkraise "下拉不在選項裡（bad_option:10）" "bad_option:10" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G7}\":\"TV\"}'::jsonb, '{}'::jsonb);"
+chkraise "★ 多選沒開「其他」就不收選項以外的字（bad_option:12）" "bad_option:12" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G9}\":[\"m\",\"zzz\"]}'::jsonb, '{}'::jsonb);"
+chkraise "「其他」的代號本身不收（bad_option:2）" "bad_option:2" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G2}\":\"__other__\"}'::jsonb, '{}'::jsonb);"
+chkrole anon "" "★ 被規則影響的必填（Why not? 是 show 規則的目標）伺服器不擋；排版區塊送了也不存" "1" "select count(*) from (select public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G2}\":\"Yes\",\"${GH}\":\"junk\",\"${GT}\":\"junk\",\"${G4}\":\"stu-x@example.com\",\"${G5}\":\"4\",\"${G6}\":\"2027-01-30\",\"${G7}\":\"IG\",\"${G9}\":\"n\\nm\"}'::jsonb, '{\"age_band\":\"under18\"}'::jsonb)) x"
+chkrole anon "" "★ 單選開了「其他」就收自己寫的字" "1" "select count(*) from (select public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G2}\":\"Maybe next year\"}'::jsonb, '{}'::jsonb)) x"
+chk "存下來的：排版區塊零格、多選照選項順序、「其他」原字" "0|m,n|Maybenextyear" "select (select count(*) from public.rc_answers a join public.rc_responses r on r.id=a.response_id where r.form_id='${FBF}' and a.question_id in ('${GH}','${GT}','${GP}'))||'|'||(select replace(value, E'\n', ',') from public.rc_answers where question_id='${G9}')||'|'||(select replace(value,' ','') from public.rc_answers where question_id='${G2}' and value like 'Maybe%')"
+chkraise "★ 沒指派的幹部看不到這份的答案（not_form_reader）" "not_form_reader" "perform set_config('test.uid','${OUTC}',true); perform public.rc_results('${FBF}');"
+chkraise "★ 學生看不到這份的答案（not_form_reader）" "not_form_reader" "perform set_config('test.uid','${STU}',true); perform public.rc_results('${FBF}');"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_results('${FBF}');" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人還是叫不到 rc_results"; pass=$((pass+1)); else echo "  FAIL anon 叫得到 rc_results：${angot}"; fail=$((fail+1)); fi
+chkas "${DIR}" "活動的人看得到兩份，後台的題目也多 config 與條件邏輯" "2|true|1" "select jsonb_array_length(r->'responses')||'|'||(r#>>'{questions,1,config,other}')||'|'||jsonb_array_length(r#>'{questions,1,logic}') from (select public.rc_results('${FBF}') r) t"
+chkraise "★ 有人答過的題不能換題型（question_type_locked）" "question_type_locked" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[{\"id\":\"${G1}\",\"type\":\"short\",\"label\":\"Recommend?\"}]'::jsonb);"
+BROKEN=$(mktemp)
+sed "s/        elsif exists (select 1 from public.rc_questions x where x.id = v_want) then/        elsif false then/" supabase/migrations/2026-12-24-feedback-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「別份表單的題目 id 不給用」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉題目 id 檢查驗收表沒變紅"; fail=$((fail+1)); fi
+sed "/if not public.rc_form_editor(p_form) then raise exception 'not_form_editor'/d" supabase/migrations/2026-12-24-feedback-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 rc_save_form 的改得動那道門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉改得動的門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/x.type in ('email', 'phone')) then/x.type in ('nothing')) then/" supabase/migrations/2026-12-24-feedback-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：匿名表單又收得了 email 題，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉匿名不收 email 題驗收表沒變紅"; fail=$((fail+1)); fi
+sed "/q.type = 'email' and s !~/d" supabase/migrations/2026-12-24-feedback-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉 email 格式檢查，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 email 格式檢查驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+fbe3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-24-feedback-engine.sql 2>&1 || true)
+if echo "${fbe3}" | grep -q "OVERALL.*PASS" && ! echo "${fbe3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
+chkraise "裝回之後，沒指派的幹部又改不了題目" "not_form_editor" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[]'::jsonb);"
+chkraise "裝回之後，email 格式又有驗" "bad_answer:7" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G4}\":\"nope\"}'::jsonb, '{}'::jsonb);"
+chkraise "裝回之後，匿名的表單又不收 email 題" "anon_contact_q" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${FBF}', '{\"anonymous\":true}'::jsonb, null);"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

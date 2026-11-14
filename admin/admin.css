@@ -966,6 +966,10 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .rc-table .t-main{min-width:160px}
 .rc-table select{max-width:160px}
 .rc-link input{width:100%;max-width:520px;font-size:13px;margin:6px 0}
+/* 回饋表單的畫布（2026-11-13）：每一題右上角那一格「代號」，年度比較靠它，所以放在看得到的地方 */
+.rc-key{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--body);color:var(--ink)}
+.rc-key input{width:110px;padding:4px 8px;font:500 12.5px var(--body);border:1px solid rgba(16,42,134,.2);border-radius:8px;background:var(--paper);color:var(--ink)}
+.rc-key input:focus-visible{outline:2px solid var(--bt-navy);outline-offset:1px}
 .rc-tpl{align-self:end;margin-bottom:14px}
 .rc-pfind{max-width:420px}
 @media (max-width:700px){

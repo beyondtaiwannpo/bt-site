@@ -66,6 +66,7 @@ const SAYS = [
   ["not_event_editor", "says.notEventEditor"], ["not_event_viewer", "says.notEventViewer"],
   ["not_form_creator", "says.notCreator"], ["not_form_editor", "says.notEditor"], ["not_form_owner", "says.notOwner"], ["not_form_reader", "says.notReader"],
   ["form_not_found", "says.notFound"], ["no_such_person", "says.noPerson"], ["no_such_school", "says.notFound"], ["need_school", "says.needSchool"], ["years_backwards", "says.yearsBackwards"], ["no_such_event", "says.noEvent"], ["no_such_term", "says.noTerm"], ["no_such_pair", "says.notFound"],
+  ["bad_question_type", "says.badType"], ["bad_logic", "says.badLogic"], ["bad_config", "says.badLogic"], ["anon_contact_q", "says.anonContact"],
   ["need_title", "says.needTitle"], ["need_question_label", "says.needLabel"], ["need_options", "says.needOptions"], ["bad_scale", "says.badScaleDef"], ["bad_key", "says.badKey"],
   ["question_type_locked", "says.typeLocked"], ["question_has_answers", "says.hasAnswers"], ["anonymous_locked", "says.anonLocked"],
   ["need_questions", "says.needQuestions"], ["has_responses", "says.hasResponses"], ["bad_person", "says.badPerson"],
