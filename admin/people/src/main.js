@@ -507,7 +507,12 @@ document.addEventListener("click", async e => {
   }
 
   // ── 工作區與指派 ───────────────────────────────────────────────────
-  if (act === "ws-pick") { e.preventDefault(); S.wsDraft = null; history.pushState(null, "", "#ws=" + encodeURIComponent(b.dataset.ws)); await openWorkspaces(b.dataset.ws); return; }
+  if (act === "ws-pick") {
+    e.preventDefault(); S.wsDraft = null; history.pushState(null, "", "#ws=" + encodeURIComponent(b.dataset.ws)); await openWorkspaces(b.dataset.ws);
+    // 2026-11-14：清單鋪滿整個寬度之後，成員在清單下面；點了直接捲到那裡。
+    const pn = document.getElementById("ws-panel"); if (pn) pn.scrollIntoView({ block: "start" });
+    return;
+  }
   // 多選加人的 chip、全勾、全取消（2026-10-24）：右欄是 pk、新增表單是 npk。打字與勾選走 input / change。
   if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && S.view === "workspaces") { pkApply(b); render(); return; }
   if (act === "ws-assign") {

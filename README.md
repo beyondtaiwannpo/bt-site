@@ -695,7 +695,7 @@ Paul 2026-11-13 說：「Log a meeting 沒有地方打字，不同的會開法�
 | 這場會出席名單上的人、建這場會的人 | 只能選 | 寫得了 |
 | 其他幹部 | 只能選 | 只能看 |
 
-誰能改範本由 Paul 決定：人與權限 → 誰能改什麼 → 會議範本，把人加進去給「改」。會議紀錄跟會議本身一樣，**每一位幹部都看得到**（2026-11-02 定的「紀錄全部幹部看得到」）。不能寫進紀錄的東西（學生個資、評語）不要打在這裡。
+誰能改範本由 Paul 決定：人與權限 → 工作區 → 會議範本，把人加進去給「改」。會議紀錄跟會議本身一樣，**每一位幹部都看得到**（2026-11-02 定的「紀錄全部幹部看得到」）。不能寫進紀錄的東西（學生個資、評語）不要打在這裡。
 
 **資料庫**：新表 `meeting_templates`（標題、適用範圍、段落、封存），`meetings` 多兩欄 `template_id` 與 `minutes`（每段 `{ h, text }`）。**不叫 notes**：前端的 `m.notes` 已經是「不能到的理由」。三支函式 `save_meeting_template`、`archive_meeting_template`、`save_meeting_minutes`，第一句都先問門；表沒有寫的政策，只能走函式。`scripts/db/smoke.sh` 有 20 條守著，包括一條踩過的坑：建會的人是空的（補記的舊會）時，`created_by = auth.uid()` 會得到 null，整句權限判斷變 null，`if` 就不擋了，所以那一句一定要包 `coalesce(…, false)`。
 
@@ -788,6 +788,13 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 - `shared/rail.js`：`GROUPS` 多三個資料夾（`home`、`availability`、`passport`），`ITEMS` 裡 `key` 是空字串的頁就是那個資料夾本身，連結不帶 `#`；`bare: true` 的頁從別的資料夾連過來時也不帶 `#`（首頁）。側欄的小數字只算這個資料夾自己的頁，別的資料夾剛好同名的分頁不算進來。
 - 清單怎麼排、誰看得到哪一行：`home/src/ui.js` 的 `waitingList()`，純函式。讀資料：`home/src/data.js` 的 `loadWaiting()`，只讀、每一項各自接住（讀不到就當沒有），只問看得到的人（不是 senior 不問團隊頁與校友故事）。
 - `test/home-waiting.test.mjs` 11 條守著。**沒有動資料庫**，誰能做什麼一條都沒變。
+
+**同一天第二輪（Paul：「一條很長的線，右邊的空間都沒用到」）**：
+
+- 人與權限的「誰能改什麼」改名「工作區」（分頁、側欄說明、各頁提示裡的「人與權限 → 工作區」一起改）。
+- 工作區那一頁：以前左邊一條 180px 的窄欄（1400px 高）、右邊只有一句「選一個」。現在每個 team 一塊，用報紙那種直欄鋪滿整個寬度（「整個 BT」那一塊可以跨欄，各 team 那幾塊不拆開），點一個之後成員在下面整個寬度，頁面自己捲過去。
+- 整個後台與首頁在大螢幕上變寬：外框最寬 1180px 改 1480px，內容區 900px 改 1200px（`admin/admin.css`、`shared/rail.css`、`home/index.html`）。說明文字自己限 60em，不會變成一行很長。
+- 其他頁面掃過一次（36 頁，找「一長串只用不到一半寬度」的清單），沒有別的同樣問題。
 
 **正式資料庫**：2026-11-14 Paul 把 `2026-12-18-meeting-templates.sql` 到 `2026-12-25-access-model.sql` 八支依序在正式 Supabase 上跑完。
 
@@ -1055,7 +1062,7 @@ Paul 2026-11-06 要的：「a data set ... especially for alumni, people, and al
 4. 下一場同類活動辦完，頁面會印上一場那一句，勾「上一場說要改的，這一場改了」。
 
 ### 怎麼用（給 Co-President）
-- **人與權限 → 誰能改什麼**：把 Mentorship 的 Director 加進「BT Records」工作區，他才建得了配對回饋與配對。
+- **人與權限 → 工作區**：把 Mentorship 的 Director 加進「BT Records」工作區，他才建得了配對回饋與配對。
 - **加一場舊活動**（記分卡頁右上）：以前的探索營、導生學期。建好之後補出席、建回饋表、用 `rc_import_responses` 把舊答案倒進去（Phase 3，見計畫第 7 節）。
 - **人 → 可能是同一個人**：同名提示，先點開看學校與年份再合併。email 一樣的自動是同一個人，名字一樣永遠不自動合。
 - **本人要求移除**：人的頁面最下面「清掉這個人的紀錄」（只有 Co-President）。有帳號的先到人與權限刪除成員，再回來清。
@@ -1489,7 +1496,7 @@ Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，�
 ### 誰能核可
 
 - 核可的人：Co-President、Senior Adviser，加上被派進新的工作區 **Marketing 貼文核可**（`custom:marketing-approve`）的人，任何等級。
-- **加人減人在「人與權限 → 誰能改什麼 → Marketing 貼文核可」**，由 Co-President 管（Paul 2026-10-29：「我要能自己決定誰可以核可」）。建好時 Marketing 的 Director 已經在裡面（等級「看」）。
+- **加人減人在「人與權限 → 工作區 → Marketing 貼文核可」**，由 Co-President 管（Paul 2026-10-29：「我要能自己決定誰可以核可」）。建好時 Marketing 的 Director 已經在裡面（等級「看」）。
 - **作者不能核可自己開的那一篇**，就算他有核可權限。核可的是核可的人當下看到的那一版；之後內容改一個字，自動退回「等核可」。
 - 退回一定要寫原因，作者打開那一篇就看得到。
 
@@ -1516,7 +1523,7 @@ Paul 2026-10-31：「我還是要你把 Marketing dashboard 做在網站上，�
 ### 還沒做、要 Paul 做的
 
 - 在正式 Supabase 跑 `2026-11-27-college-posts.sql`，PASS 表 12 項。
-- 到「人與權限 → 誰能改什麼 → Marketing 貼文核可」確認誰可以核可。
+- 到「人與權限 → 工作區 → Marketing 貼文核可」確認誰可以核可。
 - 下一批：**「研究」按鈕**（打學校名字，網站自己去查並附來源）。要 Paul 在 Anthropic 開一把 API key、設每月上限、放進 Vault。在那之前研究用 Claude Code 做，做好用「匯入研究檔」帶進來。
 - 之後：內容行事曆、caption 與 hashtag 範本、行銷需求單一鍵變成一篇貼文、IG 成效（等 BT 的 Facebook 帳號）。
 
@@ -1537,7 +1544,7 @@ Paul 2026-10-29 要的：後台多一區給 Marketing，看 BT 的 IG 貼文與 
 | Marketing 資源工作區「看」或「改」、行銷需求單工作區（`custom:marketing-requests`）任何等級 | 可以 | 不行 |
 | 其他幹部、學員、校友 | 不行（看到一頁說要找 Co-President 把你加進工作區） | 不行 |
 
-只在個人資料勾了 Marketing Team 不算，要被派進上面其中一個工作區。加人在「人與權限 → 誰能改什麼」。
+只在個人資料勾了 Marketing Team 不算，要被派進上面其中一個工作區。加人在「人與權限 → 工作區」。
 
 ### 第一次要做的事（Paul 或 Co-President，大約 45 分鐘）
 

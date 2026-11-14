@@ -329,7 +329,7 @@ export const MINE = {
   "mtm.none":         { zh: "這場會還沒有人記紀錄。", en: "No minutes yet." },
   "mtm.note":         { zh: "排這種會的人、名單上的人都能寫。換範本不會吃掉已經打的字：小標題一樣的段落字會帶過去，其他的接在最後面。", en: "Anyone who schedules this kind of meeting, or is on the list, can write. Switching templates keeps what you typed: sections with the same heading carry over, the rest move to the end." },
   "mtpl.title":       { zh: "會議範本", en: "Meeting templates" },
-  "mtpl.lede":        { zh: "每一種會開法不一樣：週會、team 會、活動檢討。一份範本是幾段小標題，記會議的時候選一份，每段變成一個打字的框。誰能改範本由 Co-President 在「人與權限 → 誰能改什麼 →會議範本」派。", en: "Each kind of meeting runs differently: weekly board, team, event debrief. A template is a few section headings; pick one when logging a meeting and each section becomes a box to type in. Co-Presidents choose who can edit templates under People → Who can edit what → Meeting templates." },
+  "mtpl.lede":        { zh: "每一種會開法不一樣：週會、team 會、活動檢討。一份範本是幾段小標題，記會議的時候選一份，每段變成一個打字的框。誰能改範本由 Co-President 在「人與權限 → 工作區 → 會議範本」派。", en: "Each kind of meeting runs differently: weekly board, team, event debrief. A template is a few section headings; pick one when logging a meeting and each section becomes a box to type in. Co-Presidents choose who can edit templates under People → Workspaces → Meeting templates." },
   "mtpl.new":         { zh: "新增一份範本", en: "New template" },
   "mtpl.create":      { zh: "建立範本", en: "Create template" },
   "mtpl.edit":        { zh: "改", en: "Edit" },

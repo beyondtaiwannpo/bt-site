@@ -382,7 +382,7 @@ export const MINE = {
   "err.photoUrl":     { zh: "網址要是 https:// 開頭。", en: "The link must start with https://." },
   "err.download":     { zh: "下載不了：", en: "Could not download: " },
   "says.notEditor":   { zh: "要 Marketing 工作區「改」以上才做得了。", en: "This needs Edit or higher in a Marketing workspace." },
-  "says.notApprover": { zh: "你不是核可的人。誰能核可由 Co-President 在「人與權限 → 誰能改什麼」的「Marketing 貼文核可」加人。", en: "You are not an approver. A Co-President adds approvers under People, Who can edit what, Marketing post approvals." },
+  "says.notApprover": { zh: "你不是核可的人。誰能核可由 Co-President 在「人與權限 → 工作區」的「Marketing 貼文核可」加人。", en: "You are not an approver. A Co-President adds approvers under People, Workspaces, Marketing post approvals." },
   "says.own":         { zh: "這一篇是你開的，不能自己核可，要請另一位核可的人。", en: "You started this post, so you cannot approve it. Ask another approver." },
   "says.changedViewed": { zh: "你打開之後這一篇又被改過了，重新整理看最新的版本再核可。", en: "The post changed after you opened it. Refresh, look at the latest version, then approve." },
   "says.changedApproved": { zh: "核可之後內容又改了，要重新核可。", en: "The content changed after approval, so it needs approving again." },

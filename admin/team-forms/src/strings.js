@@ -145,7 +145,7 @@ export const COMMON = {
 export const MINE = {
   // 進不去
   "noAccess.title":   { zh: "這一頁只有建得了表單的人、或某一份表單的讀者看得到", en: "This page is for form builders and readers" },
-  "noAccess.lede":    { zh: "要建表單，請 Co-President 到「人與權限 → 誰能改什麼」把你加進「內部表單（誰能建）」。要看某一份的答案，請那份表單的建立者把你加進讀者。", en: "To build forms, ask a Co-President to add you to \"Team forms (who can create)\" under People, Who can edit what. To read a form's answers, ask its creator to add you as a reader." },
+  "noAccess.lede":    { zh: "要建表單，請 Co-President 到「人與權限 → 工作區」把你加進「內部表單（誰能建）」。要看某一份的答案，請那份表單的建立者把你加進讀者。", en: "To build forms, ask a Co-President to add you to \"Team forms (who can create)\" under People, Workspaces. To read a form's answers, ask its creator to add you as a reader." },
   "noAccess.back":    { zh: "回要填的表單", en: "Back to forms to fill in" },
   // 題型
   // 狀態
@@ -196,7 +196,7 @@ export const MINE = {
   "build.new":        { zh: "建一份新的", en: "New form" },
   "build.none":       { zh: "還沒有你管得到的表單", en: "No forms you can manage yet" },
   "build.noneHint":   { zh: "按「建一份新的」開始。", en: "Start with New form." },
-  "build.cantCreate": { zh: "你看得到下面這幾份，但建不了新的。要建，請 Co-President 到「人與權限 → 誰能改什麼」把你加進「內部表單（誰能建）」。", en: "You can see the forms below but can't create new ones. To create, ask a Co-President to add you to \"Team forms (who can create)\" under People, Who can edit what." },
+  "build.cantCreate": { zh: "你看得到下面這幾份，但建不了新的。要建，請 Co-President 到「人與權限 → 工作區」把你加進「內部表單（誰能建）」。", en: "You can see the forms below but can't create new ones. To create, ask a Co-President to add you to \"Team forms (who can create)\" under People, Workspaces." },
   "build.count":      { zh: "{n} / {of} 人填了", en: "{n} of {of} answered" },
   "build.by":         { zh: "{name} 建的", en: "by {name}" },
   "build.reader":     { zh: "你是讀者", en: "You can read" },
@@ -303,7 +303,7 @@ export const MINE = {
   "err.needTitle":    { zh: "表單要有名稱。", en: "The form needs a title." },
 
   // 資料庫回的代碼
-  "says.notCreator":  { zh: "你還不能建表單。請 Co-President 到「人與權限 → 誰能改什麼」把你加進「內部表單（誰能建）」。", en: "You can't create forms yet. Ask a Co-President to add you to \"Team forms (who can create)\" under People." },
+  "says.notCreator":  { zh: "你還不能建表單。請 Co-President 到「人與權限 → 工作區」把你加進「內部表單（誰能建）」。", en: "You can't create forms yet. Ask a Co-President to add you to \"Team forms (who can create)\" under People." },
   "says.notEditor":   { zh: "你改不動這份表單。", en: "You can't edit this form." },
   "says.notOwner":    { zh: "只有這份表單的建立者與 Co-President 做得了這件事。", en: "Only this form's creator and the Co-Presidents can do that." },
   "says.notReader":   { zh: "你不在這份表單的讀者名單上，看不到答案。", en: "You aren't a reader on this form, so you can't see the answers." },

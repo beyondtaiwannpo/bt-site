@@ -1104,11 +1104,13 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   const KIND = { passport: "ws.kind.passport", "intern-passport": "ws.kind.intern", apps: "ws.kind.apps", res: "ws.kind.res", custom: "ws.kind.custom" };
   const li = x => `<a class="rail-item${x.id === sel ? " on" : ""}" href="#ws=${encodeURIComponent(x.id)}" data-act="ws-pick" data-ws="${esc(x.id)}">${esc(wsCellLabel(x))}<span class="rail-count">${esc(T(KIND[x.kind] || "ws.kind.custom"))}</span></a>`;
   // 左邊照 team 分組（2026-10-24）：整個 BT、六個 team，每一組底下是那個 team 擁有的東西。
-  const left = list.length ? wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="rail-group">${esc(r.label)}</div><div class="wslist">${r.cells.map(li).join("")}</div>`).join("")
+  // 2026-11-14 Paul：「一條很長的線，右邊的空間都沒用到」。以前左邊一條 180px 的清單（1400px 高）、右邊只有一句「選一個」。
+  // 現在每個 team 一塊，排成一格一格鋪滿整個寬度；選中的那一個的成員放在下面整個寬度。
+  const left = list.length ? `<div class="wsgrid">${wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="wsgrp"><div class="rail-group">${esc(r.label)}</div><div class="wslist">${r.cells.map(li).join("")}</div></div>`).join("")}</div>`
     : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
   const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
   // 2026-10-24：兩欄成員區（左「在裡面的」右「還沒在裡面的」，見 membersAreaHTML）。Co-President 與 Senior Adviser 在左欄最上面標「依職級」。
-  const right = !w ? `<div class="empty"><b>${T("ws.pickOne")}</b></div>` : `
+  const right = !w ? "" : `
     <h2>${esc(wsCellLabel(w))}<span class="hint">${esc(wsTeamOf(w, people) || T("ws.board"))}・${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
     <div class="note">${T("ws.levels")} ${T("ws.addNote")}</div>
     ${membersAreaHTML("ws", { rows: members || [], people: pkPeople, pk: d.pk, busy, acts: { level: "ws-level", remove: "ws-unassign", cleanup: "ws-cleanup" }, canCleanup: !!canCreate, go: { act: "ws-assign", ws: w.id } })}`;
@@ -1136,7 +1138,8 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   return pageHead(T("ws.title"), T("ws.lede"))
     + msgHTML(msg)
     + create
-    + `<div class="cols cols-slim"><section class="section">${left}</section><section class="section">${right}</section></div>`;
+    + `<section class="section">${w ? "" : `<p class="mini">${T("ws.pickOne")}</p>`}${left}</section>`
+    + (w ? `<section class="section" id="ws-panel">${right}</section>` : "");
 }
 
 // 屆別：清單加人數、補過去的一屆、貼一整屆、結束這一屆（三步）。

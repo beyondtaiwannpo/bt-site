@@ -187,13 +187,15 @@ test("★ 工作區：左邊清單、右邊誰在裡面與等級、加人只列�
   // 2026-10-24 兩欄成員區（ns "ws"）：右欄只列還沒在裡面的幹部，校友與沒帳號的不在，Co-President 靠職級在左欄。
   // 2026-11-11 新增工作區收成一行放在最上面，所以成員區一路到頁尾。
   const area = h.slice(h.indexOf('<div class="ma picker" data-ns="ws">'));
-  assert.ok(h.indexOf('<details class="fold rc-fold" id="ws-new">') < h.indexOf('class="cols cols-slim"'), "新增工作區在清單上面，收著");
+  assert.ok(h.indexOf('<details class="fold rc-fold" id="ws-new">') < h.indexOf('class="wsgrid"'), "新增工作區在清單上面，收著");
   const pick = area.split('<section class="ma-col">')[2];
-  assert.match(h, /class="cols cols-slim"/, "左邊的工作區清單是窄欄，成員區吃剩下的寬");
+  // 2026-11-14 Paul：以前左邊一條窄欄、右邊空著。現在清單鋪滿整個寬度，選中的那一個的成員在下面（id="ws-panel"）。
+  assert.match(h, /class="wsgrid"/); assert.doesNotMatch(h, /cols-slim/);
+  assert.ok(h.indexOf('class="wsgrid"') < h.indexOf('id="ws-panel"'), "成員在清單下面");
   assert.match(area, /在這個工作區裡（2）/, "算人：王平依職級加小安"); assert.match(pick, /還沒在裡面（1）/);
   assert.doesNotMatch(area, /ws-cleanup/, "沒有多餘的指派就沒有清掉");
   const dup = workspacesHTML(ws, "apps:Curriculum Team", members.concat([{ user_id: ME, name_zh: "王平", name_en: "Paul", board_role: "president", level: "manage" }]), PEOPLE, "", false, null, true);
-  assert.equal((dup.slice(dup.indexOf('class="cols cols-slim"')).match(/王平/g) || []).length, 1, "Co-President 有指派也只畫一列");
+  assert.equal((dup.slice(dup.indexOf('id="ws-panel"')).match(/王平/g) || []).length, 1, "Co-President 有指派也只畫一列");
   assert.match(dup, /data-act="ws-cleanup" data-ids="11111111-1111-1111-1111-111111111111"/);
   assert.match(pick, /<input id="ws-q" class="ma-find" value="" placeholder="打名字，中英都可以" autocomplete="off" data-act="pk-q" data-ns="ws">/);
   assert.match(pick, /name="ws-member" value="33333333-3333-3333-3333-333333333333" data-act="pk-tick" data-ns="ws"/, "Mei 還沒在裡面，勾得到");

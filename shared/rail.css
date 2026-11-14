@@ -4,7 +4,7 @@
    顏色、字體、圓角、時間全部來自 shared/brand.css 的變數。後台自己才有的東西（骨架、成員清單）留在 admin/admin.css。 */
 /* 側欄加內容。側欄 220px 黏在左邊，跟頂欄一起捲；內容區最寬 900px。 */
 .shell{display:grid;grid-template-columns:220px minmax(0,1fr);gap:32px;align-items:start}
-.main{min-width:0;max-width:900px}
+.main{min-width:0;max-width:1200px}
 .shell.solo{display:block}
 .rail{position:sticky;top:96px;display:flex;flex-direction:column;gap:2px;
   padding:6px 0 20px;font-size:14.5px;

@@ -95,7 +95,7 @@ export const AREAS = [
   { key: "marketing", sec: "work", label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
   { key: "website",   sec: "work", label: { zh: "對外網站", en: "Website" },    hint: { zh: "資源、團隊頁、校友故事、信", en: "Resources, team page, stories, emails" } },
   { key: "passports", sec: "work", label: { zh: "護照",     en: "Passports" },  hint: { zh: "幹部護照、實習護照", en: "Cadre and intern passports" } },
-  { key: "people",    sec: "org",  label: { zh: "人與權限", en: "People" },     hint: { zh: "名單、邀請、誰能改什麼", en: "Roster, invites, who can edit what" } },
+  { key: "people",    sec: "org",  label: { zh: "人與權限", en: "People" },     hint: { zh: "名單、邀請、工作區", en: "Roster, invites, workspaces" } },
   { key: "records",   sec: "org",  label: { zh: "紀錄",     en: "Records" },    hint: { zh: "記分卡、每個人、年度比較", en: "Scorecards, everyone, year by year" } },
   { key: "money",     sec: "org",  label: { zh: "錢",       en: "Money" },      hint: { zh: "收支、預算、匯出", en: "Income, spending, budget" } },
 ];
@@ -143,7 +143,7 @@ export const ITEMS = [
   // 人與權限
   { group: "people",    key: "roster",     area: "people",    who: "senior", label: { zh: "幹部名單", en: "Roster" } },
   { group: "people",    key: "invites",    area: "people",    who: "senior", label: { zh: "邀請新的人", en: "Invite people" } },
-  { group: "people",    key: "workspaces", area: "people",    who: "senior", label: { zh: "誰能改什麼", en: "Who can edit what" } },
+  { group: "people",    key: "workspaces", area: "people",    who: "senior", label: { zh: "工作區", en: "Workspaces" } },
   { group: "people",    key: "terms",      area: "people",    who: "senior", label: { zh: "屆別", en: "Years (terms)" } },
   // 變動紀錄：2026-12-25 起 role_changes 的 RLS 也給 Senior Adviser 讀（以前只給 Co-President）。
   { group: "people",    key: "changes",    area: "people",    who: "senior", label: { zh: "誰改了什麼", en: "Change log" } },

@@ -321,7 +321,7 @@ export const MINE = {
   "ws.kind.custom":   { zh: "自訂", en: "custom" },
   "ws.empty":         { zh: "還沒有任何工作區", en: "No workspaces yet" },
   "ws.emptyHint":     { zh: "跑完 2026-10-24 那支遷移檔就會有十四個。", en: "The 2026-10-24 migration creates fourteen." },
-  "ws.pickOne":       { zh: "左邊選一個工作區", en: "Pick a workspace on the left" },
+  "ws.pickOne":       { zh: "點一個工作區，下面會列出誰在裡面、可以加人。", en: "Pick a workspace to see who is in it and add people below." },
   "ws.owner":         { zh: "・擁有人 {name}", en: "・owner {name}" },
   "ws.levels":        { zh: "看：讀得到。改：改得動。管：改得動，而且可以把人加進這個工作區、改等級、移出。Co-President 與 Senior Adviser 不用派，本來就全部都有。", en: "View: can read. Edit: can change. Manage: can change, and can add people to this workspace, change their level, or remove them. Co-Presidents and Senior Advisers need no assignment; they already have everything." },
   "ws.level":         { zh: "等級", en: "Level" },
