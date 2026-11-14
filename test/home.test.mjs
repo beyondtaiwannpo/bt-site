@@ -52,14 +52,15 @@ test("行事曆「只看我的」藏掉沒邀我的會；「整個 BT」全部",
   assert.ok(!UI.visibleItems(items, "mine").some(i => i.id === "notme"));
   assert.ok(UI.visibleItems(items, "all").some(i => i.id === "notme"));
 });
-test("誰會到：排會的人與 senior 看得到，別人看不到；Director 看得到自己 team 的", () => {
+test("誰會到：排會的人與 senior 看得到，別人看不到；team 是「改」以上的看得到自己 team 的（2026-12-25）", () => {
   const mine = items.find(i => i.id === "mine"), other = items.find(i => i.id === "wait");
   assert.equal(UI.canSeeReplies(mine, ME, false, {}), true);
   assert.equal(UI.canSeeReplies(other, ME, false, {}), false);
   assert.equal(UI.canSeeReplies(other, ME, true, {}), true);
   const team = Object.assign({}, other, { scope: "Curriculum" });
   assert.equal(UI.canSeeReplies(team, ME, false, { "res:Curriculum": "manage" }), true);
-  assert.equal(UI.canSeeReplies(team, ME, false, { "res:Curriculum": "edit" }), false);
+  assert.equal(UI.canSeeReplies(team, ME, false, { "res:Curriculum": "edit" }), true);
+  assert.equal(UI.canSeeReplies(team, ME, false, { "res:Curriculum": "view" }), false);
 });
 test("誰會到分三組，不能到的帶理由", () => {
   const g = UI.replyGroups(items.find(i => i.id === "mine"), [{ id: OTHER, name_zh: "小安" }]);

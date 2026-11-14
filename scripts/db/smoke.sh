@@ -3597,6 +3597,81 @@ if echo "${fbe3}" | grep -q "OVERALL.*PASS" && ! echo "${fbe3}" | grep -q "|FAIL
 chkraise "裝回之後，沒指派的幹部又改不了題目" "not_form_editor" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_form('${FBF}', '{}'::jsonb, '[]'::jsonb);"
 chkraise "裝回之後，email 格式又有驗" "bad_answer:7" "perform public.rc_public_submit('${FBTOK}', '{${FBOK},\"${G4}\":\"nope\"}'::jsonb, '{}'::jsonb);"
 chkraise "裝回之後，匿名的表單又不收 email 題" "anon_contact_q" "perform set_config('test.uid','${DIR}',true); perform public.rc_save_form('${FBF}', '{\"anonymous\":true}'::jsonb, null);"
+echo "── 權限三級制：看／改／管到處一樣、team 改得了活動與會、錢可以派（2026-12-25-access-model.sql）──"
+AMT=77770000-0000-0000-0000-0000000000a1; AMV=77770000-0000-0000-0000-0000000000a2; AMX=77770000-0000-0000-0000-0000000000a3
+AMSA=77770000-0000-0000-0000-0000000000a4; AMM=77770000-0000-0000-0000-0000000000a5; AMO=77770000-0000-0000-0000-0000000000a6
+AMTEAM=$(psql -d "${DB}" -X -A -t -q -c "select team from public.workspaces where kind='res' and team is not null order by id limit 1" | tr -d '\n')
+psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 <<SQL 2>&1 | grep -i "error" || true
+insert into auth.users (id,email) values ('${AMT}','amt@example.com'),('${AMV}','amv@example.com'),('${AMX}','amx@example.com'),('${AMSA}','amsa@example.com'),('${AMM}','amm@example.com'),('${AMO}','amo@example.com') on conflict do nothing;
+insert into public.profiles (id,name_zh,role,board_role) values ('${AMT}','三級改','cadre','member'),('${AMV}','三級看','cadre','member'),('${AMX}','三級無','cadre','member'),('${AMSA}','三級顧問','cadre','senior_adviser'),('${AMM}','三級錢','cadre','member'),('${AMO}','三級擁有','cadre','member') on conflict (id) do update set role=excluded.role, board_role=excluded.board_role;
+insert into public.assignments (user_id,workspace_id,level) values ('${AMT}','res:${AMTEAM}','edit'),('${AMV}','res:${AMTEAM}','view'),('${AMV}','custom:records','view'),('${AMV}','custom:team-forms','view') on conflict (user_id,workspace_id) do update set level=excluded.level;
+-- 跑遷移之前就是擁有人、沒有指派的人（舊的形狀）
+insert into public.workspaces (id,kind,title_zh,title_en,owner) values ('custom:am-owned','custom','舊擁有','Old owned','${AMO}') on conflict (id) do update set owner=excluded.owner;
+delete from public.assignments where workspace_id='custom:am-owned';
+SQL
+amx=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-25-access-model.sql 2>&1 || true)
+if echo "${amx}" | grep -q "OVERALL.*PASS" && ! echo "${amx}" | grep -q "|FAIL"; then echo "  ok   權限三級制那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 權限三級制那支驗收表："; echo "${amx}" | head -30; fail=$((fail+1)); fi
+amx2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-25-access-model.sql 2>&1 || true)
+if echo "${amx2}" | grep -q "OVERALL.*PASS"; then echo "  ok   權限三級制那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 權限三級制重跑：${amx2}" | head -5; fail=$((fail+1)); fi
+chk "（前提）有一個 team：${AMTEAM}" "t" "select (length('${AMTEAM}') > 0)::text::char(1)"
+# team：改 = 開活動、排會
+chkas "${AMT}" "★ team 是「改」就開得了這個 team 的活動（以前要「管」）" "1" "select count(*) from (select public.create_event('${AMTEAM}','am-ev-t','三級測試活動','Access test event',false)) x"
+chkraise "★ team 是「看」開不了活動" "not_team_manager" "perform set_config('test.uid','${AMV}',true); perform public.create_event('${AMTEAM}','am-ev-v','不行','No',false);"
+chkas "${AMT}" "★ team 是「改」排得了這個 team 的會" "true" "select public.can_schedule('${AMTEAM}')::text"
+chkas "${AMV}" "★ team 是「看」排不了會" "false" "select public.can_schedule('${AMTEAM}')::text"
+chkas "${AMT}" "★ 誰都排不了全 board 的會（照舊 senior）" "false" "select public.can_schedule('board')::text"
+chkas "${PAUL}" "Co-President 開一場同 team 的活動" "1" "select count(*) from (select public.create_event('${AMTEAM}','am-ev-p','三級測試二','Access test two',false)) x"
+chkas "${AMT}" "★ 別人開的同 team 活動：team 是「改」的人對那一場是「改」" "edit|true|false" "select public.ws_my_level('custom:event-am-ev-p')||'|'||public.can_edit('custom:event-am-ev-p')::text||'|'||public.can_manage('custom:event-am-ev-p')::text"
+chkas "${AMV}" "★ team 是「看」的人不會因此看得到那一場（報名名單有高中生）" "false" "select public.can_view('custom:event-am-ev-p')::text"
+chkas "${AMX}" "★ 不在 team 的幹部對那一場什麼都沒有" "false" "select public.can_view('custom:event-am-ev-p')::text"
+chkas "${AMT}" "my_access 帶出那一場（畫面才知道他改得動）" "edit" "select x->>'level' from jsonb_array_elements(public.my_access()->'workspaces') x where x->>'id'='custom:event-am-ev-p'"
+chkas "${AMT}" "team 是「改」的人改得動場地" "true" "select public.venue_can_edit()::text"
+chkas "${AMX}" "沒有 team 的幹部改不了場地" "false" "select public.venue_can_edit()::text"
+chkraise "★ team 是「改」標不了「可以上網站」（那是「管」）" "not_allowed" "perform set_config('test.uid','${AMT}',true); perform public.set_event_ready((select id from public.events where slug='am-ev-p'), true);"
+# 紀錄、內部表單：看的人真的只能看
+chk "★ 跑遷移前在紀錄與內部表單是「看」的人升成「改」（沒有人少掉今天的權力）" "edit|edit" "select string_agg(level, '|' order by workspace_id) from public.assignments where user_id='${AMV}' and workspace_id in ('custom:records','custom:team-forms')"
+psql -d "${DB}" -X -A -t -q -c "update public.assignments set level='view' where user_id='${AMV}' and workspace_id in ('custom:records','custom:team-forms');" 2>&1 | grep -i "error" || true
+chkas "${AMV}" "★ 紀錄是「看」：讀得到、改不了" "true|false" "select public.rc_can_view()::text||'|'||public.rc_can_manage()::text"
+chkas "${AMV}" "★ 內部表單是「看」：建不了" "false" "select public.tf_can_create()::text"
+# 錢
+chkas "${AMSA}" "★ Senior Adviser：錢讀得到、記不了" "true|false" "select public.can_view_finance()::text||'|'||public.can_edit_finance()::text"
+chkraise "★ Senior Adviser 派不了別人進「錢」" "not_ws_manage" "perform set_config('test.uid','${AMSA}',true); perform public.assign('${AMM}','custom:money','edit');"
+chkas "${AMM}" "還沒被派的人讀不到錢" "false" "select public.can_view_finance()::text"
+chkas "${PAUL}" "Co-President 把一個人派進「錢」是「改」" "edit" "select public.assign('${AMM}','custom:money','edit')"
+chkas "${AMM}" "★ 被派「改」的人記得了錢" "true|true" "select public.can_view_finance()::text||'|'||public.can_edit_finance()::text"
+chkas "${AMM}" "my_access 的財務那一格是 edit（選單才畫得出錢）" "edit" "select x->>'level' from jsonb_array_elements(public.my_access()->'workspaces') x where x->>'id'='finance'"
+chkraise "★「錢」是「改」的人派不了別人" "not_ws_manage" "perform set_config('test.uid','${AMM}',true); perform public.assign('${AMX}','custom:money','view');"
+chkas "${PAUL}" "改成「看」" "view" "select public.assign('${AMM}','custom:money','view')"
+chkas "${AMM}" "★「錢」是「看」：讀得到、記不了" "true|false" "select public.can_view_finance()::text||'|'||public.can_edit_finance()::text"
+chkas "${PAUL}" "移出「錢」" "true" "select public.unassign('${AMM}','custom:money')::text"
+# 擁有人
+chk "★ 舊的擁有人被寫成一筆「管」" "manage" "select level from public.assignments where user_id='${AMO}' and workspace_id='custom:am-owned'"
+chkas "${PAUL}" "★ 擁有人出現在成員名單上" "1" "select count(*) from public.workspace_members('custom:am-owned') where user_id='${AMO}'"
+chkas "${PAUL}" "★ 擁有人移得掉" "true" "select public.unassign('${AMO}','custom:am-owned')::text"
+chkas "${AMO}" "★ 移掉之後他就不再是「管」（擁有人那一欄不再帶權力）" "false" "select public.can_manage('custom:am-owned')::text"
+chkas "${PAUL}" "新建工作區的擁有人寫成一筆「管」" "manage" "select public.create_workspace('am-new','新的','New','${AMX}'); select level from public.assignments where user_id='${AMX}' and workspace_id='custom:am-new'"
+# 行銷核可
+chkas "${PAUL}" "（準備）三級改在 Marketing 是「改」" "edit" "select public.assign('${AMT}','res:Marketing Team','edit')"
+chkas "${AMT}" "★ Marketing 是「改」：核可不了貼文，改得動歷史之路" "false|true" "select public.mkt_can_approve()::text||'|'||public.can_edit_history()::text"
+chkas "${PAUL}" "（準備）升成「管」" "manage" "select public.assign('${AMT}','res:Marketing Team','manage')"
+chkas "${AMT}" "★ Marketing 是「管」：核可得了" "true" "select public.mkt_can_approve()::text"
+# Senior Adviser 的兩個空頁
+chkrole authenticated "${AMSA}" "★ Senior Adviser 讀得到變動紀錄" "t" "select (count(*) > 0)::text::char(1) from public.role_changes"
+chkrole authenticated "${AMX}" "★ Associate 還是讀不到變動紀錄" "0" "select count(*) from public.role_changes"
+chkas "${AMSA}" "Senior Adviser 叫得到校友故事清單（不再是空的那道門）" "t" "select (count(*) >= 0)::text::char(1) from public.stories_for_review()"
+# 破壞測試
+BROKEN=$(mktemp)
+sed "s/a.user_id = auth.uid() and a.level in ('edit', 'manage')$/a.user_id = auth.uid()/" supabase/migrations/2026-12-25-access-model.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：team「看」的人也帶進活動，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉只帶改與管驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/coalesce(public.ws_my_level('custom:money') in ('edit', 'manage'), false)/public.is_senior()/" supabase/migrations/2026-12-25-access-model.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：Senior Adviser 記得了錢，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL Senior Adviser 記錢驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+amx3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-25-access-model.sql 2>&1 || true)
+if echo "${amx3}" | grep -q "OVERALL.*PASS" && ! echo "${amx3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
+chkas "${AMV}" "裝回之後，team 是「看」的人又看不到那一場" "false" "select public.can_view('custom:event-am-ev-p')::text"
+chkas "${AMSA}" "裝回之後，Senior Adviser 又記不了錢" "false" "select public.can_edit_finance()::text"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

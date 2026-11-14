@@ -7,10 +7,10 @@ export const SCOPE_BOARD = "board";
 // 職級的兩個字母（跟後台成員區同一張表：CP SA DR AD AS）。
 export const RANK_TAG = { president: "CP", senior_adviser: "SA", director: "DR", adviser: "AD", member: "AS" };
 export const parseTeams = raw => String(raw || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean);
-// 我能排哪些範圍：senior 全部（整個 BT 加六個 team）；其他人是自己資源工作區「管」的那幾個 team。ws 是 my_access() 回的 { 工作區: 等級 }。
+// 我能排哪些範圍：senior 全部（整個 BT 加六個 team）；其他人是自己在那個 team 是「改」以上的那幾個 team（2026-12-25，跟 can_schedule 同一條）。ws 是 my_access() 回的 { 工作區: 等級 }。
 export function scopesFor(senior, ws, teams) {
   if (senior) return [SCOPE_BOARD].concat(teams || []);
-  return Object.entries(ws || {}).filter(([id, lv]) => id.startsWith("res:") && lv === "manage").map(([id]) => id.slice(4));
+  return Object.entries(ws || {}).filter(([id, lv]) => id.startsWith("res:") && ["edit", "manage"].includes(lv)).map(([id]) => id.slice(4));
 }
 export function shown(members, q) {
   const s = String(q || "").trim().toLowerCase();

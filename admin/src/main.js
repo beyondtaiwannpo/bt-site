@@ -141,7 +141,8 @@ function render() {
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
   // 側欄亮哪一行：總覽、需求單、活動、場地、會議各自亮；活動的報名表亮「活動」，其他申請亮「其他申請」。
-  const tab = S.view === "home" ? "home" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
+  // 從別一區連過來的成員頁（#members=）不屬於這個資料夾的任何一頁，側欄不亮、上面不畫分頁。
+  const tab = (S.view === "members" && S.mp && S.mp.fromLink) ? "" : S.view === "home" ? "home" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -206,6 +207,14 @@ async function boot(retried) {
     // 開頁拉一次大家在 Google 日曆上的回覆，有人改了就重讀會議。
     if (!light) D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
+    // #members=<工作區>（2026-12-25）：每一區的「誰在做」都連到這裡，一頁管所有地方的成員。門在 workspace_members / assign 裡。
+    const mh = location.hash.slice(1).match(/^members=(.+)$/);
+    if (mh) {
+      const ws = decodeURIComponent(mh[1]);
+      const w = (S.workspaces || []).find(x => x.id === ws);
+      const name = w ? (lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || ws : ws;
+      await openMembers(ws, name, "home"); if (S.mp) { S.mp.fromLink = true; S.mp.canBack = document.referrer.startsWith(location.origin); render(); } return;
+    }
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     else if (/^(requests?|events|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     render();
@@ -235,7 +244,8 @@ function keepEvDraft() {
 function evTeams() {
   if (!S.me) return [];
   if (S.me.senior) return (S.teams && S.teams.length ? S.teams : UI.TEAM_LABELS);
-  return Object.entries(S.me.ws || {}).filter(([id, lv]) => id.startsWith("res:") && lv === "manage").map(([id]) => id.slice(4));
+  // 2026-12-25：team 是「改」就開得了這個 team 的活動（create_event 同一條）。
+  return Object.entries(S.me.ws || {}).filter(([id, lv]) => id.startsWith("res:") && ["edit", "manage"].includes(lv)).map(([id]) => id.slice(4));
 }
 async function reloadEvents(slug) {
   try {
@@ -867,7 +877,8 @@ document.addEventListener("click", async e => {
   }
   // ── 成員分頁（2026-10-23，第三次重整批 3）──
   if (act === "members-open") { await openMembers(b.dataset.ws, b.dataset.name); return; }
-  if (act === "members-back") { S.view = (S.mp && S.mp.backView) || "list"; S.msg = ""; render(); return; }
+  // 從別一區的「誰在做」連過來的（#members=），回上一頁就回那一區。
+  if (act === "members-back") { if (S.mp && S.mp.fromLink && S.mp.canBack) { history.back(); return; } S.view = (S.mp && S.mp.backView) || "list"; S.msg = ""; render(); return; }
   // 多選加人的 chip、全勾、全取消（2026-10-24）：改 pk 再重畫。打字與勾選走 input / change。
   if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && S.mp && S.view === "members") {
     S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), b); render(); return;

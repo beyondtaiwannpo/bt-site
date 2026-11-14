@@ -48,7 +48,7 @@ export const COMMON = {
   "board.adviser":    { zh: "顧問", en: "Adviser" },
   "why.senior":       { zh: "只有 Co-President 與 Senior Adviser 進得去", en: "Co-Presidents and Senior Advisers only" },
   // 2026-11-08 財務：錢的事。
-  "why.finance":      { zh: "只有 Co-President、Senior Adviser 與 Sponsorship 的 Director 進得去", en: "Co-Presidents, Senior Advisers and the Sponsorship Director only" },
+  "why.finance":      { zh: "只有 Co-President、Senior Adviser、Sponsorship 的 Director 與被派進「錢」的人進得去", en: "Co-Presidents, Senior Advisers, the Sponsorship Director and people assigned to Money only" },
   // 2026-11-26 Marketing。
   "why.marketing":    { zh: "只有 Marketing 的人、Co-President 與 Senior Adviser 進得去", en: "Marketing, Co-Presidents and Senior Advisers only" },
   // 2026-12-01 BT Records。
@@ -70,13 +70,14 @@ export const COMMON = {
   "ws.long.passport": { zh: "幹部護照（格子與城市）", en: "Cadre passport (boxes & cities)" },
   "ws.long.intern":   { zh: "實習護照（格子與棋盤）", en: "Intern passport (boxes & board)" },
   "ws.long.apps":     { zh: "申請（表單與審核）", en: "Applications (forms & review)" },
-  "ws.long.res":      { zh: "資源", en: "Resources" },
+  "ws.long.res":      { zh: "team（活動、會議、資源）", en: "Team (events, meetings, resources)" },
   "ws.long.finance":  { zh: "財務（帳戶、收支、預算）", en: "Finance (accounts, transactions, budget)" },
+  "ws.long.money":    { zh: "錢（記收支、預算）", en: "Money (record income and spending, budget)" },
   "ws.long.records":  { zh: "BT Records（人、活動、回饋、去向）", en: "BT Records (people, events, feedback, outcomes)" },
   "ws.board":         { zh: "整個 BT", en: "Board (whole BT)" },
   "ws.playNote":      { zh: "玩護照是身分帶來的（每位幹部有自己的、每位實習生有自己的），這幾格只管誰能改格子。", en: "Playing a passport comes with the role (every cadre has theirs, every intern theirs); these cells only control who edits the boxes." },
   "ws.availNote":     { zh: "時間看板沒有指派，每位幹部都用。", en: "Availability has no assignments: every cadre uses it." },
-  "ws.levelLegend":   { zh: "看：讀得到。改：改得動。管：改得動，而且可以在那個東西自己的頁面上加人、改等級、移出。", en: "View: can read. Edit: can change. Manage: can change, and can add, re-level or remove people on that thing's own page." },
+  "ws.levelLegend":   { zh: "看：讀得到，什麼都改不了。改：在那裡新增、修改，大部分的人要的是這一級。管：改，再加上在那裡加人、改等級、移出，通常是 Director。三級在每一個地方意思都一樣。", en: "View: sees it, cannot change anything. Edit: creates and changes things there; most people need this. Manage: Edit, plus adds, re-levels and removes people there; usually the Director. The three levels mean the same thing everywhere." },
   // 成員分頁（2026-10-23，第三次重整批 3）：對一個工作區是「管」的人，在那個東西自己的頁面上加人、改等級、移出。
   "level.view":       { zh: "看", en: "View" },
   "level.edit":       { zh: "改", en: "Edit" },
@@ -85,7 +86,7 @@ export const COMMON = {
   "mp.title":         { zh: "{name}的成員", en: "People on {name}" },
   "mp.lede":          { zh: "被派進這個工作區的人。你對它是「管」，所以可以加人、改等級、移出。每一筆都記在變動紀錄裡。", en: "People assigned to this workspace. You have Manage on it, so you can add people, change levels and remove them. Every change is written to the change log." },
   "mp.back":          { zh: "回上一頁", en: "Back" },
-  "mp.levels":        { zh: "看：讀得到。改：改得動。管：改得動，而且可以在這裡加人、改等級、移出。Co-President 與 Senior Adviser 不用派，本來就全部都有。", en: "View: can read. Edit: can change. Manage: can change, and can add people here, change their level or remove them. Co-Presidents and Senior Advisers need no assignment; they already have everything." },
+  "mp.levels":        { zh: "看：讀得到，什麼都改不了。改：新增、修改。管：改，再加上在這裡加人、改等級、移出。Co-President 與 Senior Adviser 不用派，本來就全部都有（Senior Adviser 記不了錢）。", en: "View: sees it, cannot change anything. Edit: creates and changes things. Manage: Edit, plus adds people here, changes their level or removes them. Co-Presidents and Senior Advisers need no assignment; they already have everything (Senior Advisers cannot record money)." },
   "mp.list":          { zh: "現在在裡面的人", en: "People in it now" },
   "mp.name":          { zh: "名字", en: "Name" },
   "mp.level":         { zh: "等級", en: "Level" },
@@ -143,6 +144,7 @@ export const MINE = {
   "noAccess.title":   { zh: "這一組要被派進護照的工作區才用得到", en: "This section needs a passport workspace assignment" },
   "noAccess.lede":    { zh: "兩本護照的格子由被派進那個工作區的幹部、Co-President 與 Senior Adviser 改。你沒有被派進去，所以這一頁對你是關著的；要進來請找 Co-President 到後台的工作區把你加進去。", en: "Passport boxes are edited by cadres assigned to that workspace, Co-Presidents and Senior Advisers. You are not assigned, so this page is closed to you; ask a Co-President to add you under Workspaces in the admin." },
   "noAccess.back":    { zh: "回後台首頁", en: "Back to admin home" },
+  "ro.note":          { zh: "你在這裡是「看」：讀得到，改不了。要改請找這本護照的「管」或 Co-President 把你升成「改」。", en: "You are a Viewer here: you can see everything but not change it. To edit, ask this passport's Manager or a Co-President to make you an Editor." },
   // 實習護照的分類
   "cat.onboard":      { zh: "入門", en: "Onboarding" },
   "cat.onboard.hint": { zh: "第一個月要做完的", en: "Done in the first month" },

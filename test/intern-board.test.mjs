@@ -82,7 +82,7 @@ test("★ 英文畫出來不剩中文", () => {
 });
 
 test("★ 側欄（shared/rail.js）有「棋盤」，而且資料層只讀 intern_boards 與 intern_squares、不碰 entries", () => {
-  assert.match(readFileSync("shared/rail.js", "utf8"), /key: "board",\s+area: "passports", who: "ws:intern-passport", label: \{ zh: "實習的蛇梯棋"/);
+  assert.match(readFileSync("shared/rail.js", "utf8"), /key: "board",\s+area: "passports", who: "ws:intern-passport",(?: ws: "intern-passport",)?\s+label: \{ zh: "實習的蛇梯棋"/);
   const d = readFileSync("admin/passports/src/data.js", "utf8");
   assert.match(d, /rpc\("save_board"/);
   assert.match(d, /rpc\("set_board_active"/);

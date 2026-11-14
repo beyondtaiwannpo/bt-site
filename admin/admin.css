@@ -105,6 +105,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 .area-tab:hover{background:rgba(255,255,255,.9)}
 .area-tab:active{background:rgba(255,196,108,.38);transform:scale(.98)}
 .area-tab.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.area-tab.area-people{margin-left:auto;border-style:dashed}
 .area-tab:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 
 /* ───────── 2. 頁首與訊息 ───────── */

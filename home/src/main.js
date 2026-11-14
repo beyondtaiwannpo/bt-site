@@ -26,7 +26,7 @@ const view = () => (location.hash.replace(/\?.*$/, "") === "#calendar" ? "calend
 function ctx() {
   return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, people: S.data ? S.data.people : [], forms: S.data ? S.data.forms : [], pairs: S.pairs || [], feedback: S.feedback || [],
     busy: S.busy, reasonFor: S.reasonFor, changing: S.changing, linked: S.linked, linkedMsg: S.linkedMsg,
-    canSchedule: S.senior || Object.entries(S.ws).some(([k, v]) => k.startsWith("res:") && v === "manage") };
+    canSchedule: S.senior || Object.entries(S.ws).some(([k, v]) => k.startsWith("res:") && ["edit", "manage"].includes(v)) };
 }
 
 function render() {

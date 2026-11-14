@@ -370,7 +370,7 @@ const SAYS = [
   ["gcal_not_ready", "Google 日曆還沒設定好（Vault 少了值，或 http 擴充沒開），見 docs/2026-10-29-google-calendar-setup.md。", "Google Calendar isn't set up (Vault values or the http extension are missing). See docs/2026-10-29-google-calendar-setup.md."],
   ["gcal_retry", "再送一次要等資料庫更新（2026-11-23 那支遷移檔）跑完。", "Resending needs the 2026-11-23 database update to be run first."],
   // 活動上架（2026-11-01）
-  ["not_team_manager", "開活動要是那個 team 的 Director（資源工作區「管」）或 Co-President。", "Creating an event needs that team's Director (Manage on its resources) or a Co-President."],
+  ["not_team_manager", "開活動要在那個 team 是「改」以上，或是 Co-President／Senior Adviser。請那個 team 的 Director 把你加進去。", "Creating an event needs Edit or higher on that team, or a Co-President or Senior Adviser. Ask that team's Director to add you."],
   ["slug_taken", "這個代號已經有活動用了，換一個。", "That slug is already used by another event."],
   ["bad_slug", "代號只能用小寫英文、數字和連字號，2 到 40 個字。", "The slug can only use lowercase letters, digits and hyphens, 2 to 40 characters."],
   ["cover_not_https", "封面網址要是 https:// 開頭。", "The cover URL must start with https://."],

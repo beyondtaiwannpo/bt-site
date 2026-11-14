@@ -58,8 +58,8 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
     // 2026-11-26 Marketing：Marketing 資源工作區或行銷需求單工作區，任何等級。只掛 team 標籤（director）不算，要被派進工作區。
     mres:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true, records: false },
     mreq:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true, records: false },
-    // 2026-11-27：只被派去核可貼文的人也進得來（Marketing 貼文核可工作區）。
-    mapp:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: true, teamforms: true, records: false },
+    // 2026-12-25：貼文核可併進 Marketing 的「管」，核可名單停用，只掛在那張名單上的人不再進得來（資料庫已把他們升成 Marketing 的管）。
+    mapp:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: false, teamforms: true, records: false },
     rrec:     { forms: true, site: true, passports: false, people: false, finance: false, marketing: false, teamforms: true, records: true },
     // 學員與 intern 什麼都進不去，就算 board_role 或 team 被誤設也一樣。
     student:  { forms: false, site: false, passports: false, people: false, finance: false, marketing: false, teamforms: false, records: false },
@@ -99,10 +99,11 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     assert.equal((pr.match(/class="rail-item rail-area/g) || []).length, M.AREAS.length, `${label}：Co-President 每一行都在`);
     assert.match(pr, /Co-President・全部 team/, label);
     assert.match(M.railHTML("forms", "home", { ...ME.senior, name: "顧", team: "Marketing Team" }), /Senior Adviser・全部 team/, `${label}：Senior Adviser 就算勾了標籤也印全部 team`);
-    // Senior Adviser 看不到兩個只有 Co-President 讀得到的頁（資料庫只回給 Co-President，進去會是空的）。
+    // 2026-12-25 起 Senior Adviser 讀得到校友故事與變動紀錄（資料庫也開了），兩頁都畫。Associate 照舊沒有。
     const sa = { ...ME.senior, name: "顧" };
-    assert.doesNotMatch(M.shellHTML("", M.railHTML("site", "team", sa), ""), /data-t="stories"/, `${label}：Senior Adviser 沒有校友故事`);
-    assert.doesNotMatch(M.shellHTML("", M.railHTML("people", "roster", sa), ""), /data-t="changes"/, `${label}：Senior Adviser 沒有變動紀錄`);
+    assert.ok(M.canSee(M.ITEMS.find(i => i.key === "stories"), sa), `${label}：Senior Adviser 有校友故事`);
+    assert.ok(M.canSee(M.ITEMS.find(i => i.key === "changes"), sa), `${label}：Senior Adviser 有變動紀錄`);
+    assert.ok(!M.canSee(M.ITEMS.find(i => i.key === "changes"), ME.member || { role: "cadre", board: "member", ws: {} }), `${label}：Associate 沒有變動紀錄`);
   }
 });
 
@@ -765,10 +766,10 @@ test("★ 總覽「你的存取」：被派的人一行一個工作區加直達�
   const blocks = FORMS.teamBlocksHTML({ ...ME.pres }, [], { resources: [], roster: [], workspaces: WS, directors: DIRS });
   assert.match(blocks, /<h3>Community Relations/);
   assert.match(blocks, /Director：林育安/);
-  assert.match(blocks, /href="\/admin\/people\/\?lang=zh#ws=res%3ACurriculum%20Team">誰在這個 team 的工作區/, "2026-10-30 起 team 的工作區只剩資源，連到那裡");
+  assert.match(blocks, /href="\/admin\/\?lang=zh#members=res%3ACurriculum%20Team">這個 team 的人（看／改／管）/, "2026-12-25 起連到 /admin/#members=，Director 自己也進得去");
   const dir = FORMS.teamBlocksHTML({ ...ME.director, team: "", ws: { "res:Marketing Team": "manage" } }, [], { resources: [], roster: [], workspaces: WS, directors: [] });
   assert.match(dir, /<h3>Marketing/, "被派進去的 team 就算沒勾標籤也有一段");
-  assert.match(dir, /誰在做/);
+  assert.match(dir, /#members=res%3AMarketing%20Team">這個 team 的人/, "2026-12-25：team 是「管」的 Director 直接有一條連到自己 team 的成員頁");
   // 只能看的人，卡上寫「去看」不寫「去審」。
   const view = FORMS.hubHTML({ ...ME.member, name: "a", team: "Curriculum Team", ws: { "apps:Curriculum Team": "view" } }, [], false, false, FORMS_DATA, { resources: [], roster: [] });
   assert.match(view, /data-act="open-apps" data-id="f1">去看/);

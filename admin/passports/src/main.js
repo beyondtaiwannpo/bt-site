@@ -38,6 +38,13 @@ const root = () => document.getElementById("bt-root");
 // **這只是畫面。真正的門在資料庫那幾支函式的第一句（require_ws_edit / require_internship_team）。**
 const isPres = () => !!UI.wsLevel(S.me, "passport");
 const internStaff = () => !!S.me && S.me.role === "cadre" && !!UI.wsLevel(S.me, "intern-passport");
+// 「看」的人進得來但改不了（2026-12-25 盤點：看的人以前看得到編輯鈕，按了才被資料庫退回）。
+const CADRE_VIEWS = ["cities", "cadre", "act-edit", "month-edit", "dest-edit"];
+function readOnlyView() {
+  if (S.view === "members") return false;
+  if (CADRE_VIEWS.includes(S.view)) return !UI.canEditWs(S.me, "passport");
+  return !UI.canEditWs(S.me, "intern-passport");
+}
 
 function render() {
   const el = root();
@@ -79,6 +86,7 @@ function render() {
   const tab = S.view === "board" ? "board" : (S.view === "members" && S.mp && S.mp.ws === "passport") ? "cadre" : ["cities", "dest-edit"].includes(S.view) ? "cities"
     : ["cadre", "act-edit", "month-edit"].includes(S.view) ? "cadre" : "interns";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("passports", tab, S.me), body); UI.railAfter(el);
+  if (readOnlyView()) UI.lockReadOnly(el.querySelector(".main"));
   UI.afterRender(S, el);
 }
 

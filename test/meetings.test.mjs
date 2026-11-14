@@ -22,13 +22,13 @@ const M = [
   { id: "22222222-2222-4222-8222-222222222222", scope: "board", title: "Board 月會", starts_at: past, ends_at: pastEnd, agenda: "", doc_url: null, attendees: [{ user_id: "u1", status: "accepted" }] },
 ];
 
-test("★ 側欄四份都有「會議」（幹部都看得到）；誰能排哪些範圍：senior 全部、Director 自己 team、Associate 沒有", () => {
+test("★ 側欄四份都有「會議」（幹部都看得到）；誰能排哪些範圍：senior 全部、team 是「改」以上的那幾個 team、Associate 沒有", () => {
   for (const X of [F, SITE, PA, PE]) { const it = X.ITEMS.find(i => i.key === "meetings"); assert.equal(it.who, "cadre"); assert.ok(X.canSee(it, ME)); }
   assert.deepEqual(F.mtScopes(PRES, ["Marketing Team"]), ["board", "Marketing Team"]);
   assert.deepEqual(F.mtScopes(DIR, []), ["Marketing Team"]);
   assert.deepEqual(F.mtScopes(ME, []), []);
   assert.deepEqual(SCH.scopesFor(true, {}, ["A Team"]), ["board", "A Team"]);
-  assert.deepEqual(SCH.scopesFor(false, { "res:Marketing Team": "manage", "res:Curriculum Team": "edit", apps: "manage" }, []), ["Marketing Team"]);
+  assert.deepEqual(SCH.scopesFor(false, { "res:Marketing Team": "manage", "res:Curriculum Team": "edit", "res:Sponsorship Team": "view", apps: "manage" }, []), ["Marketing Team", "Curriculum Team"]);
 });
 
 test("清單：之後的與過去的分開、每一列人數與會到數、紀錄連結、我的回覆狀態；能排的人才有「記一場會議」", () => {

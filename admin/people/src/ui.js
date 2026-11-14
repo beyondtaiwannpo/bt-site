@@ -447,6 +447,7 @@ export function wsCellLabel(w) {
   if (id === "apps" || id.startsWith("apps:")) return T("ws.long.apps");
   if (id.startsWith("res:")) return T("ws.long.res");
   if (id === "finance") return T("ws.long.finance");
+  if (id === "custom:money") return T("ws.long.money");
   if (id === "records" || id === "custom:records") return T("ws.long.records");
   return (w && ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)))) || id;
 }
@@ -459,14 +460,15 @@ export function wsCellHref(w) {
   if (id === "custom:marketing-requests") return "/admin/#requests";
   if (id === "custom:marketing-approve") return "/admin/marketing/#posts";
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
-  if (id === "finance") return "/admin/finance/#overview";
+  if (id === "finance" || id === "custom:money") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
 export function wsRows(workspaces, teams, people) {
-  const active = (workspaces || []).filter(w => w.active !== false);
+  // 一場一場的活動不列在這裡（2026-12-25）：在那一場自己的「人」分頁改，這張表才不會隨活動越來越長。
+  const active = (workspaces || []).filter(w => w.active !== false && !String(w.id).startsWith("custom:event-"));
   const order = { apps: 0, passport: 1, "intern-passport": 3 };
   const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
   const groups = new Map([["", []]]);
@@ -624,8 +626,13 @@ export function accessGridHTML(p, workspaces, busy, people) {
         ["", ...LEVELS].map(l => `<option value="${l}"${(have[w.id] || "") === l ? " selected" : ""}>${l ? esc(levelLabel(l)) : esc(T("grid.none"))}</option>`).join("")}</select>`;
   const cell = w => `<div class="gcell"><a class="glabel" href="${withLang(wsCellHref(w))}">${esc(wsCellLabel(w))}</a>${sel(w)}</div>`;
   const rows = wsRows(list, TEAMS, people).filter(r => r.cells.length);
+  // 一場一場的活動不畫成格子（2026-12-25），只列他在哪幾場，改要到那一場的「人」分頁。
+  const evs = (Array.isArray(p.workspaces) ? p.workspaces : []).filter(w => String(w.id).startsWith("custom:event-"))
+    .map(w => { const x = (workspaces || []).find(y => y.id === w.id) || w; return `<a href="${withLang(wsCellHref(x))}">${esc(wsCellLabel(x))}</a>${lang() === "zh" ? "（" : " ("}${esc(levelLabel(w.level))}${lang() === "zh" ? "）" : ")"}`; });
   return `<table class="table grid"><tbody>${rows.map(r => `<tr><th scope="row">${esc(r.label)}</th><td><div class="gcells">${r.cells.map(cell).join("")}</div></td></tr>`).join("")}</tbody></table>
     <div class="mini" style="margin-top:8px">${T("ws.levelLegend")}</div>
+    ${evs.length ? `<div class="mini">${T("grid.events", { list: evs.join(T("punct.list")) })}</div>` : ""}
+    <div class="mini">${T("grid.moneyTitle")}</div>
     <div class="mini">${T("ws.playNote")}</div>
     <div class="mini">${T("ws.availNote")}</div>`;
 }

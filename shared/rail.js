@@ -27,6 +27,8 @@ const RT = {
   noTeam:   { zh: "還沒填 team", en: "no team yet" },
   allTeams: { zh: "全部 team", en: "all teams" },
   list:     { zh: "、", en: ", " },
+  people:   { zh: "誰在這裡", en: "People here" },
+  peopleT:  { zh: "這一區的成員：加人、改看／改／管、移出", en: "Who works here: add people, set View / Edit / Manage, remove" },
 };
 const BOARD = {
   member: { zh: "Associate", en: "Associate" }, adviser: { zh: "顧問", en: "Adviser" }, director: { zh: "Director", en: "Director" },
@@ -51,7 +53,7 @@ export const GROUPS = [
   { key: "people",    href: "/admin/people/",     who: "senior" },
   // 財務：my_access() 在 finance 那一格填 view 或 edit（2026-11-08-finance.sql）。
   { key: "finance",   href: "/admin/finance/",    who: "ws:finance" },
-  { key: "marketing", href: "/admin/marketing/",  who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve" },
+  { key: "marketing", href: "/admin/marketing/",  who: "ws:res:Marketing Team|custom:marketing-requests" },
   { key: "teamforms", href: "/admin/team-forms/", who: "cadre" },
   // Records：my_access() 的 records 那一格（2026-12-01-records.sql）。
   { key: "records",   href: "/admin/records/",    who: "ws:records" },
@@ -99,45 +101,45 @@ export const ITEMS = [
   { group: "forms",     key: "forms",      area: "events",    who: "cadre",  label: { zh: "計畫與招募", en: "Programs & recruitment" } },
   { group: "forms",     key: "meetings",   area: "meetings",  who: "cadre",  label: { zh: "會議", en: "Meetings" } },
   // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
-  { group: "forms",     key: "mtemplates", area: "meetings",  who: "ws:custom:meeting-templates", label: { zh: "範本", en: "Templates" } },
+  { group: "forms",     key: "mtemplates", area: "meetings",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "範本", en: "Templates" } },
   // 表單：要填的、內部表單、回饋表放在同一排（2026-11-13 Paul：「建內部表單」與「要填的」並排兩行很亂）
   { group: "teamforms", key: "fill",       area: "forms",     who: "cadre",  label: { zh: "要我填的", en: "To fill" } },
-  { group: "teamforms", key: "build",      area: "forms",     who: "ws:team-forms", label: { zh: "內部表單", en: "Internal forms" } },
-  { group: "records",   key: "forms",      area: "forms",     who: "ws:records",    label: { zh: "回饋表", en: "Feedback forms" } },
+  { group: "teamforms", key: "build",      area: "forms",     who: "ws:team-forms", ws: "custom:team-forms", label: { zh: "內部表單", en: "Internal forms" } },
+  { group: "records",   key: "forms",      area: "forms",     who: "ws:records", ws: "custom:records",    label: { zh: "回饋表", en: "Feedback forms" } },
   // 行銷：需求單一頁（送單、我送的、Marketing 的待辦都在這一頁，2026-11-13 Paul）
-  { group: "forms",     key: "request",    area: "marketing", who: "cadre",  label: { zh: "需求單", en: "Requests" } },
-  { group: "marketing", key: "posts",      area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve", label: { zh: "大學介紹貼文", en: "College intro posts" } },
-  { group: "marketing", key: "ig",         area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests|custom:marketing-approve", label: { zh: "Instagram", en: "Instagram" } },
-  { group: "site",      key: "history",    area: "marketing", who: "cadre",  label: { zh: "BT 歷史之路", en: "History road" } },
+  { group: "forms",     key: "request",    area: "marketing", who: "cadre",  ws: "custom:marketing-requests",  label: { zh: "需求單", en: "Requests" } },
+  { group: "marketing", key: "posts",      area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests", ws: "res:Marketing Team", label: { zh: "大學介紹貼文", en: "College intro posts" } },
+  { group: "marketing", key: "ig",         area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests", ws: "res:Marketing Team", label: { zh: "Instagram", en: "Instagram" } },
+  { group: "site",      key: "history",    area: "marketing", who: "cadre",  ws: "res:Marketing Team",  label: { zh: "BT 歷史之路", en: "History road" } },
   // 對外網站
   { group: "site",      key: "events",     area: "website",   who: "senior", label: { zh: "網站上的活動", en: "Events on the site" } },
   { group: "site",      key: "res",        area: "website",   who: "cadre",  label: { zh: "資源庫", en: "Resources" } },
   { group: "site",      key: "team",       area: "website",   who: "senior", label: { zh: "團隊頁", en: "Team page" } },
-  // 校友故事的清單 stories_for_review() 只回給 Co-President（2026-09-19），Senior Adviser 看到的會是空的，所以這裡也只給 Co-President。
-  { group: "site",      key: "stories",    area: "website",   who: "president", label: { zh: "校友故事", en: "Alumni stories" } },
+  // 校友故事：2026-12-25 起 stories_for_review() 也回給 Senior Adviser（以前只給 Co-President，Senior Adviser 點進去是空的）。
+  { group: "site",      key: "stories",    area: "website",   who: "senior", label: { zh: "校友故事", en: "Alumni stories" } },
   { group: "site",      key: "mail",       area: "website",   who: "senior", label: { zh: "信的文字", en: "Email wording" } },
   // 護照
-  { group: "passports", key: "cadre",      area: "passports", who: "ws:passport",        label: { zh: "幹部護照", en: "Cadre passport" } },
-  { group: "passports", key: "cities",     area: "passports", who: "ws:passport",        label: { zh: "入境章的城市", en: "Entry-stamp cities" } },
-  { group: "passports", key: "interns",    area: "passports", who: "ws:intern-passport", label: { zh: "實習護照", en: "Intern passport" } },
-  { group: "passports", key: "board",      area: "passports", who: "ws:intern-passport", label: { zh: "實習的蛇梯棋", en: "Intern game board" } },
+  { group: "passports", key: "cadre",      area: "passports", who: "ws:passport", ws: "passport",        label: { zh: "幹部護照", en: "Cadre passport" } },
+  { group: "passports", key: "cities",     area: "passports", who: "ws:passport", ws: "passport",        label: { zh: "入境章的城市", en: "Entry-stamp cities" } },
+  { group: "passports", key: "interns",    area: "passports", who: "ws:intern-passport", ws: "intern-passport", label: { zh: "實習護照", en: "Intern passport" } },
+  { group: "passports", key: "board",      area: "passports", who: "ws:intern-passport", ws: "intern-passport", label: { zh: "實習的蛇梯棋", en: "Intern game board" } },
   // 人與權限
   { group: "people",    key: "roster",     area: "people",    who: "senior", label: { zh: "幹部名單", en: "Roster" } },
   { group: "people",    key: "invites",    area: "people",    who: "senior", label: { zh: "邀請新的人", en: "Invite people" } },
   { group: "people",    key: "workspaces", area: "people",    who: "senior", label: { zh: "誰能改什麼", en: "Who can edit what" } },
   { group: "people",    key: "terms",      area: "people",    who: "senior", label: { zh: "屆別", en: "Years (terms)" } },
-  // 變動紀錄 role_changes 的 RLS 只給 Co-President（2026-10-21），Senior Adviser 點進去會是空的。
-  { group: "people",    key: "changes",    area: "people",    who: "president", label: { zh: "誰改了什麼", en: "Change log" } },
+  // 變動紀錄：2026-12-25 起 role_changes 的 RLS 也給 Senior Adviser 讀（以前只給 Co-President）。
+  { group: "people",    key: "changes",    area: "people",    who: "senior", label: { zh: "誰改了什麼", en: "Change log" } },
   // 紀錄
-  { group: "records",   key: "overview",   area: "records",   who: "ws:records", label: { zh: "活動記分卡", en: "Event scorecards" } },
-  { group: "records",   key: "people",     area: "records",   who: "ws:records", label: { zh: "所有人", en: "Everyone" } },
-  { group: "records",   key: "yearly",     area: "records",   who: "ws:records", label: { zh: "年度比較", en: "Year by year" } },
+  { group: "records",   key: "overview",   area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "活動記分卡", en: "Event scorecards" } },
+  { group: "records",   key: "people",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "所有人", en: "Everyone" } },
+  { group: "records",   key: "yearly",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "年度比較", en: "Year by year" } },
   // 錢
-  { group: "finance",   key: "overview",   area: "money",     who: "ws:finance", label: { zh: "總覽", en: "Overview" } },
-  { group: "finance",   key: "tx",         area: "money",     who: "ws:finance", label: { zh: "收支紀錄", en: "Transactions" } },
-  { group: "finance",   key: "accounts",   area: "money",     who: "ws:finance", label: { zh: "帳戶與類別", en: "Accounts & categories" } },
-  { group: "finance",   key: "budget",     area: "money",     who: "ws:finance", label: { zh: "預算", en: "Budget" } },
-  { group: "finance",   key: "export",     area: "money",     who: "ws:finance", label: { zh: "匯出", en: "Export" } },
+  { group: "finance",   key: "overview",   area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "總覽", en: "Overview" } },
+  { group: "finance",   key: "tx",         area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "收支紀錄", en: "Transactions" } },
+  { group: "finance",   key: "accounts",   area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "帳戶與類別", en: "Accounts & categories" } },
+  { group: "finance",   key: "budget",     area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "預算", en: "Budget" } },
+  { group: "finance",   key: "export",     area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "匯出", en: "Export" } },
 ];
 
 // ── 誰看得到 ──────────────────────────────────────────────────────────
@@ -198,16 +200,27 @@ export function railHTML(group, tab, me, counts, L) {
   </nav>`;
 }
 
-// 內容區最上面那一排分頁：現在這一行（area）底下看得到的每一頁。只有一頁就不畫。
+// 「誰在這裡」（2026-12-25，計畫：每一區都有一個「人」的分頁）：這一頁屬於哪個工作區（ITEMS 的 ws），
+// 對它是「管」的人才看得到，連到 /admin/#members=<工作區>（一頁管所有地方的成員，門在 workspace_members / assign）。
+// 錢那一格只有 Co-President 或「錢」是「管」的人派得了人（Senior Adviser 不行，跟 assign() 同一條）。
+export function canManageWs(me, id) {
+  if (!me || me.role !== "cadre" || !id) return false;
+  if (id === "custom:money") return me.board === "president" || String((me.ws || {})[id] || "") === "manage";
+  return senior(me) || String((me.ws || {})[id] || "") === "manage";
+}
+export function peopleHref(id, L) { return withLang(`/admin/#members=${encodeURIComponent(id)}`, L); }
+// 內容區最上面那一排分頁：現在這一行（area）底下看得到的每一頁。只有一頁、也沒有「誰在這裡」就不畫。
 export function areaTabsHTML(group, tab, me, L) {
   const it = itemOf(group, tab);
   if (!it) return "";
   const items = visibleItems(it.area, me);
-  if (items.length < 2) return "";
+  const people = it.ws && canManageWs(me, it.ws)
+    ? `<a class="area-tab area-people" href="${esc(peopleHref(it.ws, L))}" title="${esc(tx(RT.peopleT, L))}">${esc(tx(RT.people, L))}</a>` : "";
+  if (items.length < 2 && !people) return "";
   return `<nav class="area-tabs" aria-label="${esc(tx(RT.tabs, L))}">${items.map(i => {
     const on = i === it;
     return `<a class="area-tab${on ? " on" : ""}" ${linkAttrs(i, group, L)}${on ? ' aria-current="page"' : ""}>${esc(tx(i.label, L))}</a>`;
-  }).join("")}</nav>`;
+  }).join("")}${people}</nav>`;
 }
 
 // 中英切換：兩顆小按鈕，現在的那一顆亮著。字面「中文」「English」刻意不翻。各頁 main.js 接 data-act="lang"。

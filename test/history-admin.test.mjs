@@ -32,9 +32,9 @@ test("★ 側欄四份都有「歷史之路」，在「對外」那一組，幹�
   }
 });
 
-test("誰能編：senior 與 Marketing 資源工作區「管」的人；「改」的人與別的 team 不行（畫面用，門在資料庫）", () => {
+test("誰能編：senior 與 Marketing「改」以上的人；「看」的人與別的 team 不行（2026-12-25 起，畫面用，門在資料庫）", () => {
   assert.ok(SITE.hiCanEdit(PRES)); assert.ok(SITE.hiCanEdit(MKT));
-  assert.ok(!SITE.hiCanEdit(MKT_EDIT)); assert.ok(!SITE.hiCanEdit(ASSOC)); assert.ok(!SITE.hiCanEdit(null));
+  assert.ok(SITE.hiCanEdit(MKT_EDIT)); assert.ok(!SITE.hiCanEdit({ ...MKT_EDIT, ws: { "res:Marketing Team": "view" } })); assert.ok(!SITE.hiCanEdit(ASSOC)); assert.ok(!SITE.hiCanEdit(null));
   assert.equal(SITE.HI_WS, "res:Marketing Team");
 });
 

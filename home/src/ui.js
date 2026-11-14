@@ -109,7 +109,7 @@ export function upcoming(items, now, days) {
 export function canSeeReplies(it, me, senior, ws) {
   if (it.kind !== "meeting") return false;
   if (it.created_by === me || senior) return true;
-  return it.scope !== "board" && String((ws || {})["res:" + it.scope] || "") === "manage";
+  return it.scope !== "board" && ["edit", "manage"].includes(String((ws || {})["res:" + it.scope] || ""));
 }
 export function replyGroups(it, people) {
   const name = id => { const p = (people || []).find(x => x.id === id); return p ? ((lang() === "zh" ? (p.name_zh || p.name_en) : (p.name_en || p.name_zh)) || T("common.noName")) : T("common.noName"); };
