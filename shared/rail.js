@@ -7,7 +7,9 @@
 //     1. 側欄一行 = 一個「東西」（活動、表單、行銷、網站、人……），名字是名詞，跟點進去那一頁的標題一樣。
 //     2. 那個東西底下的頁面變成內容區上方的一排分頁（areaTabsHTML），不再是側欄裡的好幾行。
 //     3. 進不去的那一頁不畫；一頁都進不去的那一行整行不畫。不要給人看一個打不開的東西。
-//     4. 「我自己的」（首頁、行事曆、護照、時間看板）在頂欄（shared/nav.js），側欄只放 BT 的事。
+//     4. 三段（2026-11-14 Paul：「do the new menu and merged home」，計畫第 1 步）：
+//        「我的」（首頁、行事曆、我的護照）在最上面，「BT」是大家一起做的事，「組織」是人、紀錄、錢。
+//        首頁（/home/）也畫這一條側欄，所以這一支的樣式在 shared/rail.css，不在 admin/admin.css。
 //
 // 這一支只決定「畫什麼、連到哪」。**真正的門在每一頁 main.js 開頁第一句，以及資料庫的函式與 RLS。**
 // 依賴方向：這一支不 import 任何東西（純資料與純函式），所以任何頁面都能用它。
@@ -19,9 +21,10 @@ const tx = (row, L) => (row && typeof row === "object") ? (row[L] != null ? row[
 
 // 側欄自己的字。只有這幾句；頁面上的字在各資料夾的 strings.js。
 const RT = {
-  menu:     { zh: "後台選單", en: "Admin menu" },
-  open:     { zh: "展開後台選單", en: "Open the admin menu" },
-  groups:   { zh: "後台", en: "Admin" },
+  // 手機上側欄收成一顆鈕。頂欄自己也有一顆「選單」，所以這一顆不能也叫選單（2026-11-14）。
+  menu:     { zh: "所有頁面", en: "All pages" },
+  open:     { zh: "展開所有頁面", en: "Show all pages" },
+  groups:   { zh: "BT 的選單", en: "BT menu" },
   tabs:     { zh: "這一區的分頁", en: "Pages in this section" },
   lang:     { zh: "語言", en: "Language" },
   noTeam:   { zh: "還沒填 team", en: "no team yet" },
@@ -47,6 +50,10 @@ export function withLang(href, L) {
 
 // 八個資料夾（網址不變）。who 是進不進得了那個資料夾，跟每一頁 main.js 開頁那一句一致。
 export const GROUPS = [
+  // 「我的」那一段（2026-11-14）：首頁與行事曆是 /home/，時間看板與護照各自一個資料夾。這三個資料夾每一位幹部都進得去。
+  { key: "home",         href: "/home/",         who: "cadre" },
+  { key: "availability", href: "/availability/", who: "cadre" },
+  { key: "passport",     href: "/passport/",     who: "cadre" },
   { key: "forms",     href: "/admin/",            who: "cadre" },
   { key: "site",      href: "/admin/site/",       who: "cadre" },
   { key: "passports", href: "/admin/passports/",  who: "ws:passport|intern-passport" },
@@ -61,7 +68,9 @@ export const GROUPS = [
 
 // 側欄上的「東西」。sec 是哪一段（"" 是最上面那一行）。順序就是側欄的順序。
 const ICON = {
-  todo:      '<path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/>',
+  home:      '<path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/>',
+  calendar:  '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M8 17h2"/>',
+  mypassport:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 11l2 2 4-4"/><path d="M9 17h6"/>',
   events:    '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   meetings:  '<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2 20a6 6 0 0 1 12 0M10 20a6 6 0 0 1 12 0"/>',
   forms:     '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
@@ -73,14 +82,15 @@ const ICON = {
   money:     '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>',
 };
 export const SECTIONS = [
-  { key: "",    label: null },
-  { key: "work", label: { zh: "做事", en: "Run BT" } },
+  { key: "me",   label: { zh: "我的", en: "Me" } },
+  { key: "work", label: { zh: "BT", en: "BT" } },
   { key: "org",  label: { zh: "組織", en: "Organisation" } },
 ];
 export const AREAS = [
-  { key: "todo",      sec: "",     label: { zh: "待辦",     en: "To do" },      hint: { zh: "你管的地方有什麼在等你", en: "What's waiting in the areas you run" } },
-  { key: "events",    sec: "work", label: { zh: "活動",     en: "Events" },     hint: { zh: "每一場、場地、計畫與招募", en: "Every event, venues, programs and recruitment" } },
-  { key: "meetings",  sec: "work", label: { zh: "會議",     en: "Meetings" },   hint: { zh: "排過的會、會議紀錄", en: "Scheduled meetings and notes" } },
+  { key: "home",      sec: "me",   label: { zh: "首頁",     en: "Home" },       hint: { zh: "等你處理的事，照日期排", en: "Everything waiting for you, by date" } },
+  { key: "calendar",  sec: "me",   label: { zh: "行事曆",   en: "Calendar" },   hint: { zh: "會議、時間看板、會議範本", en: "Meetings, availability, templates" } },
+  { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
+  { key: "events",    sec: "work", label: { zh: "活動",     en: "Events" },     hint: { zh: "每一場、場地、計畫與招募、各 team", en: "Every event, venues, programs, teams" } },
   { key: "forms",     sec: "work", label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、內部表單、回饋表", en: "To fill, internal forms, feedback forms" } },
   { key: "marketing", sec: "work", label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
   { key: "website",   sec: "work", label: { zh: "對外網站", en: "Website" },    hint: { zh: "資源、團隊頁、校友故事、信", en: "Resources, team page, stories, emails" } },
@@ -93,15 +103,22 @@ export const AREAS = [
 // 每一頁。group 是在哪個資料夾，key 是那個資料夾裡的分頁（#key），area 是側欄上的哪一行。
 // who 決定畫不畫：cadre / president / senior / "ws:a|b"（被派進其中任何一個工作區，或 senior）。
 // 同一個 area 裡的順序就是上方分頁的順序；第一個看得到的是側欄那一行點下去的地方。
+// key 是空字串的那幾頁（時間看板、護照）是那個資料夾本身，連結不帶 #。
 export const ITEMS = [
-  { group: "forms",     key: "home",       area: "todo",      who: "cadre",  label: { zh: "待辦", en: "To do" } },
+  // 我的（2026-11-14）：首頁是 /home/，等你處理的事都在那一頁（以前後台還有一頁「待辦」，兩頁一樣的事，合併了）。
+  { group: "home",      key: "home",       area: "home",      who: "cadre",  bare: true, label: { zh: "首頁", en: "Home" } },
+  { group: "home",      key: "calendar",   area: "calendar",  who: "cadre",  label: { zh: "行事曆", en: "Calendar" } },
+  { group: "forms",     key: "meetings",   area: "calendar",  who: "cadre",  label: { zh: "會議", en: "Meetings" } },
+  { group: "availability", key: "",        area: "calendar",  who: "cadre",  label: { zh: "時間看板", en: "Availability" } },
+  // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
+  { group: "forms",     key: "mtemplates", area: "calendar",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "會議範本", en: "Templates" } },
+  { group: "passport",  key: "",           area: "mypassport", who: "cadre", label: { zh: "我的護照", en: "My passport" } },
   // 活動（2026-11-10 Paul：「application should live under events」）
   { group: "forms",     key: "events",     area: "events",    who: "cadre",  label: { zh: "活動", en: "Events" } },
   { group: "forms",     key: "venues",     area: "events",    who: "cadre",  label: { zh: "場地", en: "Venues" } },
   { group: "forms",     key: "forms",      area: "events",    who: "cadre",  label: { zh: "計畫與招募", en: "Programs & recruitment" } },
-  { group: "forms",     key: "meetings",   area: "meetings",  who: "cadre",  label: { zh: "會議", en: "Meetings" } },
-  // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
-  { group: "forms",     key: "mtemplates", area: "meetings",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "範本", en: "Templates" } },
+  // 各 team（2026-11-14）：以前後台的「待辦」那一頁。待辦搬到首頁之後，這一頁只剩你的權限與每個 team 的東西。
+  { group: "forms",     key: "teams",      area: "events",    who: "cadre",  label: { zh: "各 team", en: "Teams" } },
   // 表單：要填的、內部表單、回饋表放在同一排（2026-11-13 Paul：「建內部表單」與「要填的」並排兩行很亂）
   { group: "teamforms", key: "fill",       area: "forms",     who: "cadre",  label: { zh: "要我填的", en: "To fill" } },
   { group: "teamforms", key: "build",      area: "forms",     who: "ws:team-forms", ws: "custom:team-forms", label: { zh: "內部表單", en: "Internal forms" } },
@@ -167,9 +184,11 @@ export const visibleItems = (area, me) => ITEMS.filter(i => i.area === area && c
 
 // 一個 item 的連結：同一個資料夾用 #key 不重新載入（data-act="tab"），別的資料夾是一般連結。
 function linkAttrs(it, group, L) {
-  if (it.group === group) return `href="#${esc(it.key)}" data-act="tab" data-t="${esc(it.key)}"`;
-  return `href="${esc(withLang(`${GROUPS.find(g => g.key === it.group).href}#${it.key}`, L))}"`;
+  if (it.group === group && it.key) return `href="#${esc(it.key)}" data-act="tab" data-t="${esc(it.key)}"`;
+  const hash = it.key && !it.bare ? "#" + it.key : "";
+  return `href="${esc(withLang(`${GROUPS.find(g => g.key === it.group).href}${hash}`, L))}"`;
 }
+export const itemHref = (it, L) => withLang(`${GROUPS.find(g => g.key === it.group).href}${it.key && !it.bare ? "#" + it.key : ""}`, L);
 
 // ── 側欄 ──────────────────────────────────────────────────────────────
 // group 是現在在哪個資料夾，tab 是哪一頁，counts 是 { <item key>: 數字 }（有才顯示，一個東西的數字是它底下幾頁加起來）。
@@ -181,7 +200,8 @@ export function railHTML(group, tab, me, counts, L) {
     const items = visibleItems(a.key, me);
     if (!items.length) return "";
     const first = items[0], on = a.key === here;
-    const n = items.reduce((s, i) => s + (Number(c[i.key]) || 0), 0);
+    // 數字只算這個資料夾自己的頁（counts 是這一頁算的；別的資料夾剛好有同名的分頁，例如紀錄的 forms，不算進來）。
+    const n = items.filter(i => i.group === group).reduce((s, i) => s + (Number(c[i.key]) || 0), 0);
     return `<a class="rail-item rail-area${on ? " on" : ""}" ${linkAttrs(first, group, L)}${on ? ' aria-current="page"' : ""}>${svg(ICON[a.key] || "")}<span class="rail-txt"><b>${esc(tx(a.label, L))}</b><small>${esc(tx(a.hint, L))}</small></span>${n ? `<span class="rail-count">${esc(String(n))}</span>` : ""}</a>`;
   };
   const body = SECTIONS.map(s => {

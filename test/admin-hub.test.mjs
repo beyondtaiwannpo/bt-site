@@ -41,8 +41,9 @@ test("★ 四個資料夾的 GROUPS 一字不差", () => {
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.GROUPS, FORMS.GROUPS, `${label} 的 GROUPS 跟 admin/ 不一樣`);
   }
-  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["forms", "site", "passports", "people", "finance", "marketing", "teamforms", "records"]);
-  for (const g of FORMS.GROUPS) assert.match(g.href, /^\/admin\//, "每一組都在 /admin/ 底下");
+  // 2026-11-14 側欄多「我的」那一段：首頁（/home/）、時間看板、護照三個資料夾在最前面。
+  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["home", "availability", "passport", "forms", "site", "passports", "people", "finance", "marketing", "teamforms", "records"]);
+  for (const g of FORMS.GROUPS) assert.match(g.href, /^\/(admin|home|availability|passport)\//, "每一組都是站上的一個資料夾");
 });
 
 test("★ 四份 canEnter 對同一個人講一樣的話", () => {
@@ -65,6 +66,8 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
     student:  { forms: false, site: false, passports: false, people: false, finance: false, marketing: false, teamforms: false, records: false },
     intern:   { forms: false, site: false, passports: false, people: false, finance: false, marketing: false, teamforms: false, records: false },
   };
+  // 「我的」那三個資料夾：每一位幹部都進得去（跟 forms 一樣），學員與 intern 不行。
+  for (const w of Object.values(want)) { w.home = w.availability = w.passport = w.forms; }
   for (const [label, M] of IMPL) {
     for (const [who, me] of Object.entries(ME)) {
       for (const g of M.GROUPS) {
@@ -82,7 +85,12 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     assert.match(rail, /<a class="rail-item rail-area on" href="#res" data-act="tab" data-t="res" aria-current="page">.*?<b>對外網站<\/b>/, label);
     // 別的資料夾是帶 ?lang= 與 # 的一般連結。
     assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#events">.*?<b>活動<\/b>/, label);
-    assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#home">.*?<b>待辦<\/b>/, label);
+    // 2026-11-14：「我的」那一段在最上面。首頁連到 /home/（不帶 #），行事曆是 /home/#calendar，護照是 /passport/。
+    assert.match(rail, /<div class="rail-group">我的<\/div><a class="rail-item rail-area" href="\/home\/\?lang=zh">.*?<b>首頁<\/b>/, label);
+    assert.match(rail, /href="\/home\/\?lang=zh#calendar">.*?<b>行事曆<\/b>/, label);
+    assert.match(rail, /href="\/passport\/\?lang=zh">.*?<b>我的護照<\/b>/, label);
+    assert.match(rail, /<div class="rail-group">BT<\/div>[\s\S]*<b>活動<\/b>/, label);
+    assert.doesNotMatch(rail, /<b>待辦<\/b>/, `${label}：後台的待辦併進首頁了`);
     // 一頁都進不去的那一行整行不畫。
     for (const no of ["護照", "錢", "紀錄", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);
     assert.doesNotMatch(rail, /href="\/admin\/people\//, `${label}：一般幹部不該拿到人與權限的連結`);
@@ -95,10 +103,10 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     assert.match(ph, /<a class="area-tab on" href="#team" data-act="tab" data-t="team" aria-current="page">團隊頁<\/a>/, label);
     assert.match(ph, /area-tab" href="#events" data-act="tab" data-t="events">網站上的活動/, label);
     // Co-President：十個東西都在。
-    const pr = M.railHTML("forms", "home", pres);
+    const pr = M.railHTML("forms", "teams", pres);
     assert.equal((pr.match(/class="rail-item rail-area/g) || []).length, M.AREAS.length, `${label}：Co-President 每一行都在`);
     assert.match(pr, /Co-President・全部 team/, label);
-    assert.match(M.railHTML("forms", "home", { ...ME.senior, name: "顧", team: "Marketing Team" }), /Senior Adviser・全部 team/, `${label}：Senior Adviser 就算勾了標籤也印全部 team`);
+    assert.match(M.railHTML("forms", "teams", { ...ME.senior, name: "顧", team: "Marketing Team" }), /Senior Adviser・全部 team/, `${label}：Senior Adviser 就算勾了標籤也印全部 team`);
     // 2026-12-25 起 Senior Adviser 讀得到校友故事與變動紀錄（資料庫也開了），兩頁都畫。Associate 照舊沒有。
     const sa = { ...ME.senior, name: "顧" };
     assert.ok(M.canSee(M.ITEMS.find(i => i.key === "stories"), sa), `${label}：Senior Adviser 有校友故事`);
@@ -202,48 +210,24 @@ const TODO = { resources: [{ id: "r1", team: "Curriculum Team", status: "publish
   team: [{ id: "u2" }], stories: [{ id: "s1", story_approved: false }, { id: "s2", story_approved: true }],
   interns: [{ id: "i1" }, { id: "i2" }], stamps: [{ task_id: "T1" }, { task_id: "T1" }, { task_id: "T2" }] };
 
-test("首頁：Co-President 看到六張卡，每張一個數字、一顆直達的按鈕", () => {
+// 2026-11-14：後台的「總覽」改叫「各 team」，待辦那幾張卡搬到 /home/ 的「等你處理」（test/home-waiting.test.mjs）。
+// 這一頁只留還沒寄出去的信那一張（「現在寄出去」那顆鈕在這裡）、你的存取、你的 team。
+test("各 team：標題、還沒寄出去的信那一張卡、你的存取、你的 team；申請、核可、intern、名單的卡不在這裡了", () => {
   const h = FORMS.hubHTML({ ...ME.pres, name: "王平", team: "Sponsorship Team" }, [{ id: 1, tries: 0 }, { id: 2, tries: 2, error: "boom" }], true, false, FORMS_DATA, TODO);
-  assert.match(h, /王平，Co-President，全部 team/, "總覽那一行：Co-President 印全部 team，不印標籤");
-  assert.match(h, /<div class="kpi-n">3<span class="kpi-u">件<\/span><\/div>\s*<div class="kpi-l">還沒處理的申請/);
-  assert.match(h, /data-act="open-apps" data-id="f1">去審/, "按下去直接到第一份有待審的表單");
+  assert.match(h, /<h1>各 team<\/h1>/);
+  assert.match(h, /王平，Co-President，全部 team/, "那一行：Co-President 印全部 team，不印標籤");
+  assert.match(h, /等你處理的事在<a href="\/home\/">首頁<\/a>/);
   assert.match(h, /<div class="kpi-n">2<span class="kpi-u">封/);
   assert.match(h, /1 封試過但失敗了：boom/);
   assert.match(h, /data-act="send-mail-all"/);
-  assert.match(h, /<div class="kpi-n">1<span class="kpi-u">人<\/span><\/div>\s*<div class="kpi-l">等你核可上團隊頁/);
-  assert.match(h, /href="\/admin\/site\/\?lang=zh#team"/, "直達的連結帶著語言");
-  assert.match(h, /<div class="kpi-n">1<span class="kpi-u">人<\/span><\/div>\s*<div class="kpi-l">等你核可上校友頁/, "只算還沒核可的");
-  assert.match(h, /<div class="kpi-n">2<span class="kpi-u">位<\/span><\/div>\s*<div class="kpi-l">這一屆的 intern/);
-  assert.match(h, /平均蓋了 1\.5 格/);
-  assert.match(h, /<div class="kpi-n">3<span class="kpi-u">位<\/span><\/div>\s*<div class="kpi-l">幹部/);
-  assert.match(h, /其中 1 位還沒填 team/);
-  assert.doesNotMatch(h, /i1|T1/, "intern 那張卡只有數字，不列任何 id 或名字");
-});
-
-test("首頁：一般幹部只看到自己管得到的，沒有核可、沒有幹部名單、沒有寄信那顆按鈕", () => {
-  const h = FORMS.hubHTML({ ...ME.member, name: "左芷君", team: "Marketing Team" }, [{ id: 1, tries: 0 }], false, false, FORMS_DATA, { resources: [], roster: ROSTER });
-  assert.doesNotMatch(h, /核可|這一屆的 intern|幹部<\/div>/);
-  assert.match(h, /還沒寄出去的信/);
-  assert.doesNotMatch(h, /send-mail-all/);
-  // 你的 team：只有自己的那一個。
-  assert.match(h, /<h3>Marketing/);
-  assert.doesNotMatch(h, /<h3>Curriculum/);
-});
-
-test("首頁：Internship team 的一般幹部多一張 intern 的卡", () => {
-  const h = FORMS.hubHTML({ ...ME.istaff, name: "謝卉芸" }, [], false, false, [], { resources: [], roster: ROSTER, interns: [{ id: "i1" }], stamps: [] });
-  assert.match(h, /這一屆的 intern/);
-  assert.match(h, /平均蓋了 0\.0 格/);
-  assert.doesNotMatch(h, /核可/);
-});
-
-test("首頁：載不到寫「載不到」不寫 0；整排都是 0 收成一行", () => {
-  const h = FORMS.hubHTML({ ...ME.pres, name: "王平" }, [], true, false, [], { resources: [], roster: null, team: null, stories: [], interns: [], stamps: [] });
-  assert.match(h, /class="kpi zero"/);
-  assert.match(h, /class="kpi gone"[\s\S]*?載不到/);
+  assert.doesNotMatch(h, /還沒處理的申請|等你核可上團隊頁|這一屆的 intern|kpi-l">幹部/);
+  assert.match(h, /<h2>你的存取/); assert.match(h, /<h2>你的 team/);
+  const m = FORMS.hubHTML({ ...ME.member, name: "左芷君", team: "Marketing Team" }, [{ id: 1, tries: 0 }], false, false, FORMS_DATA, { resources: [], roster: ROSTER });
+  assert.match(m, /還沒寄出去的信/);
+  assert.doesNotMatch(m, /send-mail-all/, "寄不動的人沒有那顆鈕");
+  assert.match(m, /<h3>Marketing/); assert.doesNotMatch(m, /<h3>Curriculum/);
   const z = FORMS.hubHTML({ ...ME.member, name: "a", team: "Marketing Team" }, [], false, false, [], { resources: [], roster: [] });
-  assert.match(z, /今天沒有待辦/);
-  assert.doesNotMatch(z, /class="kpi/);
+  assert.doesNotMatch(z, /class="kpi/, "沒有信等著寄就不畫那一張");
 });
 
 test("首頁：你的 team 每段三行，Co-President 看到全部的 team，Director 的名字從名單來", () => {
@@ -404,15 +388,16 @@ test("語言怎麼決定：網址先、再存的、都沒有就英文；連結�
 
 test("★ 側欄有中英切換的兩顆按鈕，現在的那一顆亮著", () => {
   for (const [label, M] of IMPL) {
-    const rail = M.railHTML("forms", "home", { ...ME.member, name: "a" });
+    const rail = M.railHTML("forms", "teams", { ...ME.member, name: "a" });
     assert.match(rail, /<button class="lang on" data-act="lang" data-lang="zh" aria-pressed="true">中文<\/button><button class="lang" data-act="lang" data-lang="en" aria-pressed="false">English<\/button>/, label);
   }
   FORMS.setLang("en");
   try {
-    const rail = FORMS.railHTML("forms", "home", { ...ME.member, name: "a" });
+    const rail = FORMS.railHTML("forms", "teams", { ...ME.member, name: "a" });
     assert.match(rail, /class="lang" data-act="lang" data-lang="zh"/);
     assert.match(rail, /class="lang on" data-act="lang" data-lang="en"/);
-    assert.match(rail, /Admin menu/);
+    assert.match(rail, />All pages</, "手機上那顆鈕不跟頂欄的「選單」同名");
+    assert.match(rail, /<div class="rail-group">Me<\/div>[\s\S]*<div class="rail-group">BT<\/div>/);
   } finally { FORMS.setLang("zh"); }
 });
 
@@ -761,7 +746,7 @@ test("★ 總覽「你的存取」：被派的人一行一個工作區加直達�
   assert.doesNotMatch(none, /某某/, "Associate 不算 Director");
   assert.match(FORMS.accessHTML({ ...ME.member, ws: {} }, { workspaces: WS, directors: [] }, []), /還沒有人公開在團隊頁上/);
   assert.match(FORMS.accessHTML(ME.pres, {}, []), /不用派/);
-  assert.match(FORMS.hubHTML({ ...ME.pres, name: "王平" }, [], true, false, [], { resources: [], roster: [] }), /<h1>總覽<\/h1>[\s\S]*<h2>你的存取/);
+  assert.match(FORMS.hubHTML({ ...ME.pres, name: "王平" }, [], true, false, [], { resources: [], roster: [] }), /<h1>各 team<\/h1>[\s\S]*<h2>你的存取/);
   // 你的 team 從工作區算：Community Relations 沒有人勾標籤也會出現；Director 讀不到名單時從公開團隊頁算。
   const blocks = FORMS.teamBlocksHTML({ ...ME.pres }, [], { resources: [], roster: [], workspaces: WS, directors: DIRS });
   assert.match(blocks, /<h3>Community Relations/);
@@ -770,9 +755,9 @@ test("★ 總覽「你的存取」：被派的人一行一個工作區加直達�
   const dir = FORMS.teamBlocksHTML({ ...ME.director, team: "", ws: { "res:Marketing Team": "manage" } }, [], { resources: [], roster: [], workspaces: WS, directors: [] });
   assert.match(dir, /<h3>Marketing/, "被派進去的 team 就算沒勾標籤也有一段");
   assert.match(dir, /#members=res%3AMarketing%20Team">這個 team 的人/, "2026-12-25：team 是「管」的 Director 直接有一條連到自己 team 的成員頁");
-  // 只能看的人，卡上寫「去看」不寫「去審」。
-  const view = FORMS.hubHTML({ ...ME.member, name: "a", team: "Curriculum Team", ws: { "apps:Curriculum Team": "view" } }, [], false, false, FORMS_DATA, { resources: [], roster: [] });
-  assert.match(view, /data-act="open-apps" data-id="f1">去看/);
+  // 只能看的人，卡上寫「去看」不寫「去審」（2026-11-14 起那張卡不畫在這一頁，資料照舊從 todoCards 算）。
+  const card = FORMS.todoCards({ ...ME.member, name: "a", team: "Curriculum Team", ws: { "apps:Curriculum Team": "view" } }, FORMS_DATA, [], { resources: [], roster: [] }, false, false).find(c => c.act && c.act.act === "open-apps");
+  assert.equal(card.act.label, "去看");
   assert.match(readFileSync("app/src/main.js", "utf8"), /S\.profile && S\.profile\.name \? "\.\.\/home\/" : "\.\.\/settings\/"/, "幹部登入後進首頁（2026-10-28），沒名字的才進設定");
 });
 

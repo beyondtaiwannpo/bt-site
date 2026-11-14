@@ -1,0 +1,107 @@
+/* 側欄與「這一區的分頁」（2026-11-14 從 admin/admin.css 搬出來）。
+   為什麼搬：/home/ 也要畫同一條側欄（Paul 2026-11-14「做新的選單、首頁合併」，計畫第 1 步）。
+   側欄的 HTML 由 shared/rail.js 畫，樣式就跟著放在 shared/；八個後台資料夾與 /home/ 都讀這一支。
+   顏色、字體、圓角、時間全部來自 shared/brand.css 的變數。後台自己才有的東西（骨架、成員清單）留在 admin/admin.css。 */
+/* 側欄加內容。側欄 220px 黏在左邊，跟頂欄一起捲；內容區最寬 900px。 */
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);gap:32px;align-items:start}
+.main{min-width:0;max-width:900px}
+.shell.solo{display:block}
+.rail{position:sticky;top:96px;display:flex;flex-direction:column;gap:2px;
+  padding:6px 0 20px;font-size:14.5px;
+  /* 比螢幕高的時候自己捲，不用把整頁捲到底才看得到最下面那幾段（2026-11-10） */
+  max-height:calc(100vh - 112px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(16,42,134,.25) transparent}
+.rail-toggle,.rail-burger{display:none}
+/* 你是誰、管到哪。這一行是「我有什麼權限」的唯一來源。 */
+.rail-me{padding:8px 12px 14px;margin-bottom:6px;border-bottom:1px solid rgba(16,42,134,.14)}
+.rail-me b{display:block;font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:.02em;line-height:1.1}
+.rail-me span{display:block;font-size:12.5px;color:rgba(16,42,134,.8);margin-top:4px;line-height:1.45}
+/* 組名：小字全大寫的英文感標籤，但這裡是中文，所以用字距與淡色分出層次。 */
+.rail-group{font-family:var(--display);font-size:12.5px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:rgba(16,42,134,.72);padding:14px 12px 4px}
+.rail-group.off{color:rgba(16,42,134,.42)}
+.rail-group .why{display:block;font-family:var(--body);font-size:11.5px;font-weight:400;
+  letter-spacing:0;text-transform:none;color:rgba(16,42,134,.72);margin-top:2px}
+.rail-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;
+  color:var(--ink);text-decoration:none;font-weight:500;transition:background var(--dur-2) var(--ease)}
+.rail-item:hover{background:rgba(255,255,255,.6);box-shadow:0 4px 14px rgba(16,42,134,.08)}
+.rail-item.on{background:var(--bt-navy);color:var(--bt-cream);font-weight:600}
+.rail-item.off{color:rgba(16,42,134,.45);pointer-events:none}
+.rail-item .rail-count{margin-left:auto;font-family:var(--display);font-size:13px;font-weight:700;
+  min-width:22px;height:22px;padding:0 7px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(255,196,108,.45);color:var(--ink)}
+.rail-item.on .rail-count{background:var(--bt-orange)}
+.rail-foot{margin:6px 0 4px;padding:0 12px 0 44px;font-size:11.5px;color:rgba(16,42,134,.6);line-height:1.45}
+/* 2026-10-28 側欄分段：一段一個 <details>，段名是一顆可以點的列（icon、名字、幾頁），現在這一段打開。
+   每一行兩層：名字（粗）與一句這頁做什麼（小、淡）。名字左邊對齊段名的字，不對齊 icon。 */
+.rail-sec-box{border-radius:14px;margin:2px 0}
+.rail-sec-box[open]{background:rgba(255,255,255,.38);padding-bottom:6px}
+.rail-sec{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;cursor:pointer;list-style:none;
+  font-family:var(--display);font-size:16px;font-weight:700;letter-spacing:.03em;color:var(--ink);
+  transition:background var(--dur-2) var(--ease)}
+.rail-sec::-webkit-details-marker{display:none}
+.rail-sec::after{content:"";margin-left:8px;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;
+  transform:rotate(-45deg);opacity:.5;transition:transform var(--dur-2) var(--ease)}
+.rail-sec-box[open] > .rail-sec::after{transform:rotate(45deg)}
+.rail-sec:hover{background:rgba(255,255,255,.6)}
+.rail-sec:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+.rail-sec.here{color:var(--bt-navy)}
+.rail-sec.off{color:rgba(16,42,134,.4);cursor:default}
+.rail-ico{width:22px;height:22px;flex:none}
+.rail-sec .rail-n{margin-left:auto;font-style:normal;font-family:var(--body);font-size:12px;font-weight:600;color:rgba(16,42,134,.55)}
+.rail-sec-box .rail-item{margin:0 6px 0 6px;padding:7px 10px 7px 38px}
+.rail-txt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.rail-txt b{font-weight:600;line-height:1.25}
+.rail-txt small{font-size:11.5px;font-weight:400;line-height:1.3;color:rgba(16,42,134,.62)}
+.rail-item.on .rail-txt small{color:rgba(237,229,216,.8)}
+.rail > .rail-item{margin-bottom:6px}
+/* 2026-11-13 側欄一行一個「東西」（shared/rail.js）：icon、名字、一句說明。底下的頁變成內容區上方那一排分頁。 */
+.rail-area{gap:10px;padding:8px 10px;margin:1px 0}
+.rail-area .rail-ico{opacity:.8}
+.rail-area.on .rail-ico{opacity:1}
+.rail > .rail-group{padding:16px 12px 4px}
+/* 這一區的分頁：一排圓角膠囊，現在這一頁是深藍。窄螢幕自己換行，不橫向捲。 */
+.area-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px;padding-bottom:12px;border-bottom:1px solid rgba(16,42,134,.14)}
+.area-tab{display:inline-flex;align-items:center;min-height:34px;padding:0 14px;border-radius:999px;border:1px solid rgba(16,42,134,.25);
+  background:rgba(255,255,255,.5);color:var(--ink);text-decoration:none;font-size:14px;font-weight:600;
+  transition:background var(--dur-2) var(--ease)}
+.area-tab:hover{background:rgba(255,255,255,.9)}
+.area-tab:active{background:rgba(255,196,108,.38);transform:scale(.98)}
+.area-tab.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.area-tab.area-people{margin-left:auto;border-style:dashed}
+.area-tab:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+
+/* 側欄的中英切換：兩顆小按鈕，現在那一顆深藍底。 */
+.rail-lang{display:flex;gap:6px;padding:0 12px;margin:0 0 10px}
+.rail-lang .lang{flex:1;min-height:30px;padding:0 10px;border:1px solid rgba(16,42,134,.3);border-radius:999px;
+  background:rgba(255,255,255,.55);color:var(--ink);font:600 13px/1 var(--body);cursor:pointer}
+.rail-lang .lang.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.rail-lang .lang:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+.rail-lang .lang:not(.on):hover{background:rgba(255,255,255,.9);border-color:var(--bt-navy)}
+
+/* 按下去的回饋 */
+a.rail-item:not(.on):active{background:rgba(255,196,108,.38)}
+a.rail-item.on:active{filter:brightness(1.15)}
+.rail-burger:hover{background:rgba(255,255,255,.9)}
+.rail-burger:active{background:rgba(255,196,108,.38);transform:scale(.97)}
+
+/* 手機：側欄收成一顆選單按鈕。開合是 checkbox 加 label 純 CSS，跟 shared/nav.css 的手機選單同一招。 */
+@media (max-width:720px){
+  .shell{display:block}
+  .main{max-width:none}
+  /* 側欄收成一顆「後台選單」。開合是 checkbox 加 label 純 CSS，跟 shared/nav.css 的手機選單同一招。 */
+  .rail-burger{display:inline-flex;align-items:center;gap:8px;font-family:var(--body);font-size:14px;font-weight:600;
+    padding:0 14px;min-height:38px;border:1px solid rgba(16,42,134,.3);border-radius:999px;background:rgba(255,255,255,.7);
+    cursor:pointer;margin:0 0 14px}
+  .rail-burger::before{content:"";width:14px;height:2px;background:currentColor;box-shadow:0 -5px 0 currentColor,0 5px 0 currentColor}
+  .rail-toggle{display:block;position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0}
+  .rail-toggle:checked ~ .rail-burger{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+  .rail-toggle:focus-visible ~ .rail-burger{outline:var(--ring);outline-offset:var(--ring-gap)}
+  .rail{display:none;position:static;max-height:none;overflow:visible;padding:4px 0 16px;margin:0 0 10px;border-bottom:1px solid rgba(16,42,134,.14)}
+  .rail-toggle:checked ~ .rail{display:flex}
+}
+
+@media print{
+  .rail,.rail-burger,.rail-toggle,.area-tabs{display:none !important}
+  .shell{display:block}
+  .main{max-width:none}
+}

@@ -142,7 +142,7 @@ function render() {
   };
   // 側欄亮哪一行：總覽、需求單、活動、場地、會議各自亮；活動的報名表亮「活動」，其他申請亮「其他申請」。
   // 從別一區連過來的成員頁（#members=）不屬於這個資料夾的任何一頁，側欄不亮、上面不畫分頁。
-  const tab = (S.view === "members" && S.mp && S.mp.fromLink) ? "" : S.view === "home" ? "home" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
+  const tab = (S.view === "members" && S.mp && S.mp.fromLink) ? "" : S.view === "home" ? "teams" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -155,7 +155,7 @@ function paintShell() {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", "home", S.me, {}), UI.skeletonHTML()); UI.railAfter(el);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", /^(teams|home)$/.test(location.hash.slice(1)) ? "teams" : "events", S.me, {}), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（GitHub Pages 快取 10 分鐘，四個資料夾各一份側欄，哪一份先過期哪一份先換新；
   // Paul 2026-11-06 遇到的「側欄新項目重整就不見」就是這個）。讀到不一樣就在左下角提醒重整。
@@ -217,6 +217,8 @@ async function boot(retried) {
     }
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     else if (/^(requests?|events|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    // 2026-11-14：/admin/ 沒有 # 的時候開活動（待辦搬到 /home/ 了）。#teams 與舊的 #home 開「各 team」。
+    else if (!/^(teams|home)$/.test(location.hash.slice(1))) { history.replaceState(null, "", location.pathname + location.search + "#events"); await openTab("events"); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -317,6 +319,7 @@ function readMeeting() {
   return { scope: val("mt-scope") || "board", required: val("mt-required") !== "0", title: val("mt-title"), starts_at: iso(val("mt-starts")), ends_at: iso(val("mt-ends")), agenda: val("mt-agenda"), doc_url: val("mt-doc"), attendees: UI.pkPicked(S.cadres, [], pk, true) };
 }
 async function openTab(t) {
+  if (!t) t = "events";
   // 2026-11-09：#forms/<id>/checkin 與 #forms/<id>/notice 有自己的網址（重整不會掉回清單；簽到當天手機上重整是常有的事）。
   const fm = /^forms\/([0-9a-f-]{36})(?:\/(checkin|notice))?$/.exec(t || "");
   if (fm) {
@@ -369,7 +372,8 @@ async function openTab(t) {
     S.view = m[1] === "request" || !queueOk ? "request" : "requests"; S.msg = ""; S.rqSel = m[1] === "requests" && queueOk ? (m[2] || null) : null;
     await reloadRequests(); render(); return;
   }
-  S.view = t === "home" ? "home" : "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render();
+  // 2026-11-14：以前的「待辦」搬到 /home/，這一頁改叫「各 team」（#teams；舊的 #home 也接）。
+  S.view = (t === "teams" || t === "home") ? "home" : "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render();
 }
 async function reloadRequests() {
   try {

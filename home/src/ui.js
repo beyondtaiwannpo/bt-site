@@ -7,6 +7,7 @@
 // 時間一律照「看的人自己的時區」（profiles.tz，沒填就台北）。資料庫存的是絕對時間（timestamptz），
 // 換成哪一天幾點是在這裡用 Intl 算，不自己加減時差（夏令時間會算錯）。
 import { T, lang, setLang } from "./strings.js";
+import { canEditWs, withLang } from "../../shared/rail.js";
 export { T, lang, setLang };
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -252,37 +253,128 @@ export function formsHTML(ctx) {
       <div class="dos">${forms.map(f => `<a class="do" href="../admin/team-forms/#fill/${encodeURIComponent(f.id)}"><b>${esc(f.title || "")}</b><span>${f.closes_at ? T("home.formCloses", { date: esc(dateLabel(dayKey(new Date(f.closes_at), ctx.tz))) }) : T("home.formOpen")}</span></a>`).join("")}</div>
     </section>`;
 }
+// ── 等你處理的事（2026-11-14）────────────────────────────────────────
+// 首頁只有一張清單：每一件要你動手的事，照日期排，最急的在最上面（Paul 2026-11-14，計畫第 1 步）。
+// 以前後台的「待辦」那一頁跟這裡各有一份，兩頁講同一件事；現在後台那一頁改叫「各 team」，待辦都在這裡。
+// 一行一件事，點下去就到那件事的那一頁。等回覆的會照舊直接在這裡按到／不能到。
+// 誰看得到哪一行跟後台那幾頁同一條規則（shared/rail.js 的 canEditWs / canManageWs）；**真正的門在資料庫**，這裡只決定畫不畫。
+// ctx.w 是 data.js 的 loadWaiting() 回的：每一項讀不到是 null，就當沒有。
+const RQ_OPEN = ["submitted", "in_progress", "in_review"];
+const rqSt = s => !s || s === "new" ? "submitted" : s === "done" ? "published" : s;
+const dayStart = d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || "").slice(0, 10)); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 15, 59)) : null; };
+const evTitle = e => (lang() === "zh" ? (e.title_zh || e.title_en) : (e.title_en || e.title_zh)) || e.slug || "";
+const A = (href) => withLang(href, lang());
+export function waitingList(items, ctx) {
+  const now = ctx.now, me = { id: ctx.me, role: "cadre", board: ctx.board || (ctx.senior ? "president" : "member"), ws: ctx.ws || {} };
+  const sen = !!ctx.senior, w = ctx.w || {}, out = [];
+  const push = (o) => out.push(o);
+  // 1. 等你回覆的會：卡片照舊（到／不能到直接按），日期是開會那天。
+  for (const it of needsReply(items, now)) if (it.id !== ctx.linked) push({ kind: "rsvp", due: it.start, it });
+  // 2. 發給你的內部表單（tf_todo）與該填的活動回饋（rc_my_feedback 還沒填的）。
+  for (const f of ctx.forms || []) push({ kind: "form", due: f.closes_at ? new Date(f.closes_at) : null, tag: T("w.form"), title: f.title || "",
+    href: `../admin/team-forms/#fill/${encodeURIComponent(f.id)}`, sub: f.closes_at ? T("home.formCloses", { date: dateLabel(dayKey(new Date(f.closes_at), ctx.tz)) }) : T("home.formOpen") });
+  for (const f of (ctx.feedback || []).filter(x => !x.done)) push({ kind: "fb", due: null, tag: T("w.fb"), title: lang() === "zh" ? (f.event_zh || f.event) : f.event,
+    href: `../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}`, sub: f.title || "" });
+  // 3. 報名等審核：你改得動的那幾份（活動的跟著那一場的工作區或 team，其他申請跟著「計畫與招募」）。
+  const evs = w.events || [], byForm = new Map(evs.filter(e => e.form_id).map(e => [e.form_id, e]));
+  const recv = new Map(); for (const a of w.received || []) recv.set(a.form_id, (recv.get(a.form_id) || 0) + 1);
+  for (const f of w.forms || []) {
+    const n = recv.get(f.id) || 0; if (!n) continue;
+    const ev = byForm.get(f.id);
+    const can = sen || (ev ? (canEditWs(me, ev.workspace_id) || canEditWs(me, "res:" + ev.team)) : canEditWs(me, "apps"));
+    if (!can) continue;
+    push({ kind: "apps", due: ev && ev.starts_at ? new Date(ev.starts_at) : f.closes_at ? new Date(f.closes_at) : null, tag: T("w.apps"),
+      title: ev ? evTitle(ev) : f.title || "", sub: T("w.appsN", { n }), n, href: A(`/admin/#forms/${f.id}`) });
+  }
+  // 4. 行銷需求：派給你的；你是 Marketing（需求工作區改以上）就加上還沒有人接的新單。
+  const rq = w.requests || [], mkt = canEditWs(me, "custom:marketing-requests");
+  for (const r of rq) {
+    const st = rqSt(r.status), due = dayStart(r.publish_on || r.needed_by);
+    if (RQ_OPEN.includes(st) && r.assignee && r.assignee === ctx.me) push({ kind: "rq", due, tag: T("w.rqMine"), title: r.title || "", sub: T("w.rqSt", { st: T("rq.st." + st) }), href: A(`/admin/#requests/${r.id}`) });
+    else if (mkt && st === "submitted" && !r.assignee) push({ kind: "rq", due, tag: T("w.rqNew"), title: r.title || "", sub: T("w.rqNobody"), href: A(`/admin/#requests/${r.id}`) });
+  }
+  // 5. 等你核可的大學介紹貼文（核可的人：senior 或 Marketing 的「管」；自己開的那一篇不能自己核可）。
+  for (const p of w.posts || []) if (p.created_by !== ctx.me) push({ kind: "post", due: null, tag: T("w.post"), title: p.school || "", sub: T("w.postSub"), href: A(`/admin/marketing/#post/${p.id}`) });
+  // 6. 你改得動的活動，七天內開始：簽到在那一場的報名表裡。
+  const week = new Date(now.getTime() + 7 * 86400000);
+  for (const e of evs) {
+    const st = e.starts_at ? new Date(e.starts_at) : null;
+    if (!st || st < now || st > week || ["cancelled", "archived"].includes(e.status)) continue;
+    if (!(sen || canEditWs(me, e.workspace_id) || canEditWs(me, "res:" + e.team))) continue;
+    push({ kind: "event", due: st, tag: T("w.event"), title: evTitle(e), sub: e.form_id ? T("w.eventCheckin") : T("w.eventOpen"),
+      href: A(e.form_id ? `/admin/#forms/${e.form_id}/checkin` : `/admin/#events/${e.slug}`) });
+  }
+  // 7. 你送的需求單：Marketing 接了、在審、或退件（退件兩週內）都要你知道。
+  for (const r of rq) {
+    if (r.requester !== ctx.me) continue;
+    const st = rqSt(r.status), fresh = r.updated_at && (now - new Date(r.updated_at)) < 14 * 86400000;
+    if (!(["in_progress", "in_review"].includes(st) || (st === "rejected" && fresh))) continue;
+    push({ kind: "myrq", due: dayStart(r.publish_on || r.needed_by), tag: T("w.myrq"), title: r.title || "", sub: T("w.rqSt", { st: T("rq.st." + st) }), href: A(`/admin/#request/${r.id}`) });
+  }
+  // 8. senior 才有的：團隊頁、校友故事等核可，活動等上線，寄不出去的信。
+  if (sen) {
+    const tn = (w.team || []).length; if (tn) push({ kind: "team", due: null, tag: T("w.team"), title: T("w.teamT", { n: tn }), sub: T("w.teamSub"), href: A("/admin/site/#team") });
+    const sn = (w.stories || []).filter(r => !r.story_approved).length; if (sn) push({ kind: "stories", due: null, tag: T("w.stories"), title: T("w.storiesT", { n: sn }), sub: T("w.teamSub"), href: A("/admin/site/#stories") });
+    for (const e of evs.filter(x => x.status === "ready")) push({ kind: "ready", due: e.starts_at ? new Date(e.starts_at) : null, tag: T("w.ready"), title: evTitle(e), sub: T("w.readySub"), href: A(`/admin/#events/${e.slug}`) });
+    const nt = (w.roster || []).filter(p => !String(p.team || "").trim()).length; if (nt) push({ kind: "roster", due: null, tag: T("w.roster"), title: T("w.rosterT", { n: nt }), sub: T("w.rosterSub"), href: A("/admin/people/#roster") });
+    const mn = (w.stuck || []).length; if (mn) push({ kind: "mail", due: null, tag: T("w.mail"), title: T("w.mailT", { n: mn }), sub: T("w.mailSub"), href: A("/admin/#teams") });
+  }
+  // 照日期排：有日期的在前、越早越上面；沒有日期的（等核可、回饋）排在後面，照原本的順序。
+  return out.map((o, i) => ({ o, i })).sort((a, b) => {
+    const x = a.o.due ? +a.o.due : Infinity, y = b.o.due ? +b.o.due : Infinity;
+    return x - y || a.i - b.i;
+  }).map(z => z.o);
+}
+function dueText(o, ctx) {
+  if (!o.due) return "";
+  const k = dayKey(o.due, ctx.tz), today = dayKey(ctx.now, ctx.tz), tmr = addDaysKey(today, 1);
+  const d = k === today ? T("w.today") : k === tmr ? T("w.tomorrow") : dateLabel(k);
+  return o.due < ctx.now ? T("w.late", { d }) : d;
+}
+function waitRowHTML(o, ctx) {
+  if (o.kind === "rsvp") return itemCardHTML(o.it, ctx);
+  const due = dueText(o, ctx);
+  return `<a class="wrow w-${esc(o.kind)}${o.due && o.due < ctx.now ? " late" : ""}" href="${esc(o.href)}">
+      <span class="wtag">${esc(o.tag)}</span>
+      <span class="wmain"><b>${esc(o.title)}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ""}</span>
+      ${due ? `<span class="wdue">${esc(due)}</span>` : ""}
+    </a>`;
+}
+// 我的護照：蓋了幾格、一共幾格（stamps 只讀自己的，activities 是大家都一樣的格子）。讀不到就不畫。
+export function passportHTML(w) {
+  const n = w && w.stamps, t = w && w.boxes;
+  if (n == null || !t) return "";
+  const pct = Math.max(0, Math.min(100, Math.round(n / t * 100)));
+  return `<section class="block pp">
+      <h2>${T("home.pp")}</h2>
+      <a class="pprow" href="${esc(A("../passport/"))}">
+        <span class="ppbar" aria-hidden="true"><i style="width:${pct}%"></i></span>
+        <span class="ppn">${esc(T("home.ppN", { n, t }))}</span>
+        <span class="ppgo">${esc(T("home.ppGo"))}</span>
+      </a>
+    </section>`;
+}
 export function homeHTML(items, ctx) {
-  const reply = needsReply(items, ctx.now), next = upcoming(items, ctx.now, 60);
+  const next = upcoming(items, ctx.now, 60);
   const linked = ctx.linked ? items.find(i => i.id === ctx.linked) : null;
   const top = linked ? `<section class="linked"><p class="mini">${T("home.linked")}</p>${itemCardHTML(linked, ctx, { full: true, hi: true })}</section>`
     : ctx.linkedMsg ? `<div class="wnote">${esc(ctx.linkedMsg)}</div>` : "";
-  const dos = [
-    { href: "../admin/#request", t: "home.doRequest", s: "home.doRequestSub" },
-    { href: "../availability/", t: "home.doTime", s: "home.doTimeSub" },
-    ctx.canSchedule ? { href: "../availability/", t: "home.doSchedule", s: "home.doScheduleSub" } : null,
-    { href: "#calendar", t: "home.doCal", s: "home.doCalSub" },
-    { href: "../passport/", t: "home.doPassport", s: "home.doPassportSub" },
-  ].filter(Boolean);
+  const wait = waitingList(items, ctx);
   return `<div class="home">
-    <header class="hello"><h1>${T("home.hi", { name: esc(ctx.name || "") })}</h1>
-      <p class="mini">${T("home.today", { date: esc(dateLabel(dayKey(ctx.now, ctx.tz))), tz: esc(ctx.tz) })}</p></header>
+    <header class="hello"><div class="hello-t"><h1>${T("home.hi", { name: esc(ctx.name || "") })}</h1>
+      <p class="mini">${T("home.today", { date: esc(dateLabel(dayKey(ctx.now, ctx.tz))), tz: esc(ctx.tz) })}</p></div>
+      <a class="btn sm" href="${esc(A("/admin/#request"))}">${T("home.newRq")}</a></header>
     ${top}
-    ${formsHTML(ctx)}
-    <section class="block">
-      <h2>${T("home.reply")}${reply.length ? ` <span class="count">${reply.length}</span>` : ""}</h2>
-      ${reply.length ? `<p class="mini">${T("home.replyLede")}</p>${reply.filter(i => i !== linked).map(i => itemCardHTML(i, ctx)).join("")}` : `<p class="mini ok">${T("home.allClear")}</p>`}
+    <section class="block wait">
+      <h2>${T("home.wait")}${wait.length ? ` <span class="count">${wait.length}</span>` : ""}</h2>
+      ${wait.length ? `<p class="mini">${T("home.waitLede")}</p><div class="wlist">${wait.map(o => waitRowHTML(o, ctx)).join("")}</div>` : `<p class="mini ok">${T("home.waitNone")}</p>`}
     </section>
     <section class="block">
       <h2>${T("home.next")}</h2>
       ${next.length ? next.filter(i => i !== linked).map(i => itemCardHTML(i, ctx)).join("") : `<p class="mini">${T("home.nothing")}</p>`}
     </section>
-    ${feedbackHTML(ctx.feedback)}
+    ${passportHTML(ctx.w)}
     ${pairsHTML(ctx.pairs)}
-    <section class="block">
-      <h2>${T("home.do")}</h2>
-      <div class="dos">${dos.map(d => `<a class="do" href="${d.href}"><b>${T(d.t)}</b><span>${T(d.s)}</span></a>`).join("")}</div>
-    </section>
   </div>`;
 }
 // 我帶的 mentee／我的 mentor（2026-12-07）。pairs 是 rc_my_pairs() 回的：as、with、event、term_id、matched_on、ended_on、forms[{title, token, done}]。

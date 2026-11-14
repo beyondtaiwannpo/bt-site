@@ -1,20 +1,22 @@
 // 幹部首頁與行事曆（2026-10-28，Paul：「我按了會到，主辦人什麼都沒收到；沒有一頁看得到我接下來的會」）。
 //
 // 一個資料夾兩個畫面：
-//   /home/            首頁：等你回覆的會、接下來的會與活動、「我要…」的捷徑。
+//   /home/            首頁：一張「等你處理」的清單（照日期排，2026-11-14 跟後台的「待辦」合併）、接下來的會、我的護照。
 //   /home/#calendar   行事曆：月與週，像 Google 日曆。點一場打開，回覆、看議程與會議紀錄。
 // 信裡的連結是 /home/?meeting=<id>：那一場放在首頁最上面。
 //
 // 回覆只改自己那一列（set_rsvp）。必到的會按「不能到」要寫一句理由，理由只有本人與排會的人看得到（RLS）。
 import * as AUTH from "../../shared/auth.js";
 import { navHTML } from "../../shared/nav.js";
+// 側欄（2026-11-14）：首頁跟後台畫同一條側欄（「我的」「BT」「組織」三段），樣式在 shared/rail.css。
+import * as RAIL from "../../shared/rail.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 const root = () => document.getElementById("bt-root");
 const S = {
-  ready: false, down: false, role: null, me: null, name: "", tz: "Asia/Taipei", senior: false, ws: {},
+  ready: false, down: false, role: null, me: null, name: "", tz: "Asia/Taipei", senior: false, ws: {}, board: "member", team: "", w: null,
   data: null, items: [], busy: false, reasonFor: null, changing: null, open: null,
   linked: null, linkedMsg: "",
   cal: { view: "month", at: null, mode: "mine" },
@@ -24,7 +26,7 @@ const store = () => { try { return window.localStorage; } catch (e) { return nul
 const view = () => (location.hash.replace(/\?.*$/, "") === "#calendar" ? "calendar" : "home");
 
 function ctx() {
-  return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, people: S.data ? S.data.people : [], forms: S.data ? S.data.forms : [], pairs: S.pairs || [], feedback: S.feedback || [],
+  return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, board: S.board, w: S.w, people: S.data ? S.data.people : [], forms: S.data ? S.data.forms : [], pairs: S.pairs || [], feedback: S.feedback || [],
     busy: S.busy, reasonFor: S.reasonFor, changing: S.changing, linked: S.linked, linkedMsg: S.linkedMsg,
     canSchedule: S.senior || Object.entries(S.ws).some(([k, v]) => k.startsWith("res:") && ["edit", "manage"].includes(v)) };
 }
@@ -40,13 +42,25 @@ function render() {
   const c = ctx();
   const body = v === "calendar" ? UI.calendarHTML(S.items, c, S.cal) : UI.homeHTML(S.items, c);
   const open = S.open ? S.items.find(i => i.id === S.open) : null;
-  el.innerHTML = nav + body + (open ? UI.detailHTML(open, c) : "");
+  const rme = railMe();
+  const tab = v === "calendar" ? "calendar" : "home";
+  RAIL.railBefore(el);
+  el.innerHTML = RAIL.shellHTML(nav, RAIL.railHTML("home", tab, rme, {}, lang()), body, RAIL.areaTabsHTML("home", tab, rme, lang())) + (open ? UI.detailHTML(open, c) : "");
+  RAIL.railAfter(el);
   if (v === "calendar" && S.cal.view === "week") {
     const w = document.getElementById("wscroll");
     if (w && !w.dataset.scrolled) { w.scrollTop = 7.5 * 44; w.dataset.scrolled = "1"; }
   }
   const ta = S.reasonFor && document.getElementById("reason-" + S.reasonFor);
   if (ta) ta.focus({ preventScroll: true });
+}
+
+// 側欄要的「我是誰」：跟後台 admin/src/data.js 的 loadMe() 同一個形狀。
+function railMe() { return { id: S.me, role: S.role, board: S.board, team: S.team, name: S.name, ws: S.ws, senior: S.senior }; }
+// Marketing 貼文核可的人：senior 或 Marketing 是「管」（跟資料庫的 mkt_can_approve() 同一條，2026-12-25）。
+const approver = () => RAIL.canManageWs(railMe(), "res:Marketing Team");
+async function loadWaiting() {
+  try { S.w = await D.loadWaiting(railMe(), approver()); } catch (e) { S.w = null; }
 }
 
 async function reload() {
@@ -75,6 +89,22 @@ function onClick(e) {
   if (act === "close-detail" && el.classList.contains("scrim") && e.target.closest("[data-stop]")) return;
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { AUTH.signOut().finally(() => location.replace("../app/")); return; }
+  // 側欄：同一個資料夾的分頁（首頁、行事曆）換 #，不重新載入；語言切換跟後台同一招（存起來、網址帶 ?lang=，名字照新的語言重拿）。
+  if (act === "tab") {
+    e.preventDefault();
+    const t = el.dataset.t;
+    // 首頁不帶 #（網址乾淨），行事曆是 #calendar。上一頁回得去（pushState 換 #，瀏覽器會發 hashchange）。
+    if (t === "home") { if (location.hash) { history.pushState(null, "", location.pathname + location.search); S.open = null; render(); } }
+    else if (location.hash.slice(1) !== t) location.hash = t;
+    return;
+  }
+  if (act === "lang") {
+    setLang(el.dataset.lang); document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+    try { const st = store(); if (st) st.setItem(STORE_KEY, lang()); } catch (e2) { /* 無痕視窗 */ }
+    const u = new URL(location.href); u.searchParams.set("lang", lang()); history.replaceState(null, "", u.pathname + u.search + u.hash);
+    S.name = (lang() === "zh" ? (S.row.name_zh || S.row.name_en) : (S.row.name_en || S.row.name_zh)) || "";
+    render(); return;
+  }
   if (act === "open") { S.open = id; S.reasonFor = null; render(); return; }
   if (act === "close-detail") { S.open = null; S.reasonFor = null; render(); return; }
   if (act === "rsvp") {
@@ -137,8 +167,9 @@ async function boot() {
     S.role = row.role || null; S.tz = row.tz || "Asia/Taipei"; S.ws = w.ws || {};
     S.name = (lang() === "zh" ? (row.name_zh || row.name_en) : (row.name_en || row.name_zh)) || "";
     S.senior = ["president", "senior_adviser"].includes(row.board_role);
+    S.board = row.board_role || "member"; S.team = row.team || ""; S.row = row;
     if (S.role === "cadre") {
-      await reload();
+      await Promise.all([reload(), loadWaiting()]);
       // 我帶的 mentee（2026-12-07）：rc_my_pairs() 只回本人的配對；函式還不在（遷移檔沒跑）就當沒有。
       try { [S.pairs, S.feedback] = await Promise.all([D.myPairs(), D.myFeedback()]); } catch (e) { S.pairs = S.pairs || []; S.feedback = S.feedback || []; }
       let mid = qMeeting;

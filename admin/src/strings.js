@@ -300,7 +300,7 @@ export const MINE = {
   "notice.backCheckin": { zh: "回簽到", en: "Back to check-in" },
   "notice.checkin":   { zh: "簽到", en: "Check-in" },
   // 首頁
-  "hub.title":        { zh: "總覽", en: "Overview" },
+  "hub.title":        { zh: "各 team", en: "Teams" },
   // 2026-10-23 批 4：你的存取、頂欄四項是什麼
   "hub.access":       { zh: "你的存取", en: "Your access" },
   "hub.accessSenior": { zh: "你看得到、改得動後台每一個工作區，不用派。", en: "You can see and change every workspace in the admin; no assignment needed." },
@@ -807,8 +807,8 @@ export const MINE = {
   "card.apps.see":    { zh: "去看", en: "View" },
   "team.people":      { zh: "這個 team 的人（看／改／管）", en: "People on this team (View / Edit / Manage)" },
   "team.peopleHint":  { zh: "成員在申請表或資源那一頁的「誰在做」裡改", en: "Members are managed under \"Who works on\" on the forms or resources page" },
-  "hub.who":          { zh: "{name}，{board}，{teams}。你管得到的事都在這一頁。", en: "{name}, {board}, {teams}. Everything you manage is on this page." },
-  "hub.todo":         { zh: "今天要處理的事", en: "To handle today" },
+  "hub.who":          { zh: "{name}，{board}，{teams}。這一頁是你的權限與每個 team 的東西；等你處理的事在<a href=\"/home/\">首頁</a>。", en: "{name}, {board}, {teams}. This page shows your access and each team's things; what is waiting for you is on <a href=\"/home/\">Home</a>." },
+  "hub.todo":         { zh: "還沒寄出去的信", en: "Emails not sent yet" },
   "hub.none":         { zh: "今天沒有待辦", en: "Nothing to handle today" },
   "hub.noneHint":     { zh: "申請、信件、核可都處理完了。", en: "Applications, emails and approvals are all done." },
   "hub.teams":        { zh: "你的 team", en: "Your teams" },

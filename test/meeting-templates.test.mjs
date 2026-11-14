@@ -82,7 +82,7 @@ test("範本頁：改得動的人有新增與改；改不動的只能看；表�
 });
 test("側欄：範本那一頁只有派進「會議範本」的人與 senior 看得到", () => {
   const it = RAIL.ITEMS.find(i => i.key === "mtemplates");
-  assert.equal(it.area, "meetings");
+  assert.equal(it.area, "calendar", "2026-11-14：會議與範本搬到「我的」那一段的行事曆");
   assert.equal(RAIL.canSee(it, ME), false);
   assert.equal(RAIL.canSee(it, { ...ME, ws: { "custom:meeting-templates": "edit" } }), true);
   assert.equal(RAIL.canSee(it, PRES), true);

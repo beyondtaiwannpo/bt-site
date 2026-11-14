@@ -896,7 +896,7 @@ export function todoCards(me, forms, pendingAll, todo, canSend, busy) {
   cards.push({ n: received, label: T("card.apps"), unit: T("card.apps.unit"),
     hint: received ? `${firstForm ? esc(firstForm.title) : ""}` : T("card.apps.none"),
     act: firstForm ? { act: "open-apps", id: firstForm.id, label: canEditWs(me, "apps") ? T("card.apps.go") : T("card.apps.see") } : null });
-  cards.push({ n: pending.length, label: T("card.mail"), unit: T("card.mail.unit"),
+  cards.push({ mail: true, n: pending.length, label: T("card.mail"), unit: T("card.mail.unit"),
     hint: pending.length ? (stuck.length ? T("mail.stuck", { n: stuck.length, err: esc(stuck[0].error || T("mail.noErr")) }) : T("card.mail.hint")) : T("card.mail.done"),
     act: pending.length && canSend ? { act: "send-mail-all", label: busy ? T("mail.sending") : T("mail.sendNow"), disabled: busy } : null });
   if (pres) {
@@ -1051,12 +1051,11 @@ export function hubHTML(me, pendingAll, canSend, busy, forms, todo, features) {
   const teams = senior(me) ? [T("rail.allTeams")] : splitTeams(me && me.team);
   const who = T("hub.who", { name: esc(me && me.name || ""), board: esc(boardName(me && me.board)),
     teams: teams.length ? esc(teams.join(T("punct.list"))) : T("rail.noTeam") });
-  const cards = todoCards(me, forms, pendingAll, todo, canSend, busy);
-  const allZero = cards.every(c => c.n === 0);
+  // 2026-11-14：待辦搬到 /home/（一張照日期排的清單）。這一頁只留「還沒寄出去的信」那一張卡，因為「現在寄出去」那顆鈕在這裡。
+  const mail = todoCards(me, forms, pendingAll, todo, canSend, busy).filter(c => c.mail && c.n);
   return pageHead(T("hub.title"), who)
+    + (mail.length ? sectionHTML(T("hub.todo"), `<div class="todo">${mail.map(kpiHTML).join("")}</div>`, { id: "todo" }) : "")
     + sectionHTML(T("hub.access"), accessHTML(me, todo, features), { id: "access" })
-    + sectionHTML(T("hub.todo"), allZero ? `<div class="empty"><b>${T("hub.none")}</b><div>${T("hub.noneHint")}</div></div>`
-        : `<div class="todo">${cards.map(kpiHTML).join("")}</div>`, { id: "todo" })
     + sectionHTML(T("hub.teams"), teamBlocksHTML(me, forms, todo), { id: "teams" });
 }
 

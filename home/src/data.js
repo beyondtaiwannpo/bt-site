@@ -90,3 +90,40 @@ export async function myFeedback() {
   if (error) throw error;
   return Array.isArray(data) ? data : [];
 }
+
+// ── 等你處理的事（2026-11-14，Paul：「do the new menu and merged home」）──────────────
+// 以前後台有一頁「待辦」、這裡有一頁首頁，兩頁講同一件事。合併成首頁的一張清單之後，後台那幾張卡要讀的東西搬到這裡。
+// 規矩跟後台那一支（admin/src/data.js 的 loadTodo）一樣：
+//   1. 只問看得到的人。不是 Marketing 核可的人不問貼文，不是 senior 不問團隊頁與校友故事。
+//   2. 每一項各自接住，讀不到是 null，不是 0（資料庫還沒跑那支遷移檔、或 RLS 不給，首頁照樣畫得出來）。
+//   3. 只讀，不寫。只拿畫一行要用的欄位：不讀申請的答案、不讀信寄給誰、不讀需求單的內容。
+// me = { id, role, board, team, ws, senior }，approver 是能不能核可大學介紹貼文（跟 mkt_can_approve() 同一條）。
+const RQ_COLS = "id, title, kind, status, assignee, requester, needed_by, publish_on, updated_at";
+const RQ_COLS_OLD = "id, title, kind, status, requester, needed_by, updated_at";
+export async function loadWaiting(me, approver) {
+  need();
+  const q = {
+    forms: supabase.from("forms").select("id, title, team, closes_at, status"),
+    received: supabase.from("applications").select("form_id").eq("status", "received"),
+    events: supabase.from("events").select("id, slug, team, workspace_id, form_id, title_zh, title_en, starts_at, ends_at, status"),
+    requests: supabase.from("requests").select(RQ_COLS).then(r => (r.error && /column|42703/.test(String(r.error.code || "") + String(r.error.message || ""))) ? supabase.from("requests").select(RQ_COLS_OLD) : r),
+    stamps: supabase.from("stamps").select("act_id", { count: "exact", head: true }).eq("user_id", me.id),
+    boxes: supabase.from("activities").select("id", { count: "exact", head: true }).eq("active", true),
+  };
+  if (approver) q.posts = supabase.from("college_posts").select("id, school, created_by, submitted_at").eq("status", "in_review");
+  if (me.senior) {
+    q.team = supabase.from("profiles").select("id").eq("role", "cadre").eq("public_profile", true).eq("public_approved", false);
+    q.stories = supabase.rpc("stories_for_review");
+    q.stuck = supabase.from("mail_outbox").select("id").is("sent_at", null).gt("tries", 0);
+    q.roster = supabase.from("profiles").select("id, team").eq("role", "cadre");
+  }
+  const keys = Object.keys(q);
+  const rs = await Promise.allSettled(keys.map(k => q[k]));
+  const out = {};
+  keys.forEach((k, i) => {
+    const r = rs[i];
+    const ok = r.status === "fulfilled" && !r.value.error;
+    out[k] = !ok ? null : (k === "stamps" || k === "boxes") ? (r.value.count == null ? null : r.value.count) : (r.value.data || []);
+  });
+  return out;
+}

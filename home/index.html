@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="bt-version" content="2026-11-14-1303">
+<meta name="bt-version" content="2026-11-14-1324">
 <!-- 版本號與 importmap（2026-11-06）：這一段由 scripts/bump-version.sh 整段改寫，不要手改。
      importmap 把「./src/ui.js」這種乾淨的模組名稱對到帶版本號的網址，所以 .js 裡的 import 不用帶版本號，
      而 GitHub Pages 的 10 分鐘快取不會讓新舊模組混著用。為什麼要這樣見 README「後台速度」。 -->
 <!-- bt-importmap -->
-<script type="importmap">{ "imports": { "/home/src/data.js": "/home/src/data.js?v=2026-11-14-1303", "/home/src/main.js": "/home/src/main.js?v=2026-11-14-1303", "/home/src/strings.js": "/home/src/strings.js?v=2026-11-14-1303", "/home/src/ui.js": "/home/src/ui.js?v=2026-11-14-1303", "/shared/auth.js": "/shared/auth.js?v=2026-11-14-1303", "/shared/supabase.js": "/shared/supabase.js?v=2026-11-14-1303", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-11-14-1303", "/shared/nav.js": "/shared/nav.js?v=2026-11-14-1303", "/shared/rail.js": "/shared/rail.js?v=2026-11-14-1303", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-11-14-1303" } }</script>
+<script type="importmap">{ "imports": { "/home/src/data.js": "/home/src/data.js?v=2026-11-14-1324", "/home/src/main.js": "/home/src/main.js?v=2026-11-14-1324", "/home/src/strings.js": "/home/src/strings.js?v=2026-11-14-1324", "/home/src/ui.js": "/home/src/ui.js?v=2026-11-14-1324", "/shared/auth.js": "/shared/auth.js?v=2026-11-14-1324", "/shared/supabase.js": "/shared/supabase.js?v=2026-11-14-1324", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-11-14-1324", "/shared/nav.js": "/shared/nav.js?v=2026-11-14-1324", "/shared/rail.js": "/shared/rail.js?v=2026-11-14-1324", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-11-14-1324" } }</script>
 <!-- /bt-importmap -->
 <title>BT 首頁</title>
 <link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../shared/brand.css?v=2026-11-14-1303">
+<link rel="stylesheet" href="../shared/brand.css?v=2026-11-14-1324">
 <!-- 這四支是登入後每一頁都一定會用到的，而且它們躺在相依鏈的**第三層**：
      瀏覽器要先下載 src/main.js，才知道要 shared/auth.js，再才知道要 vendor/supabase-js.js
      （217KB，這一頁最大的一個檔）。每一層都是一次完整的網路來回，
@@ -28,20 +28,22 @@
      modulepreload 讓瀏覽器一開始就同時去抓，不用一層一層發現。
      ⚠ 這不是快取或打包工具，是瀏覽器原生的一行 HTML —— 沒有 build step。
      ⚠ 路徑改動的話這幾行要跟著改，否則瀏覽器會抓一個 404 回來（不會壞，但白費一次請求）。 -->
-<link rel="modulepreload" href="../shared/auth.js?v=2026-11-14-1303">
-<link rel="modulepreload" href="../shared/supabase.js?v=2026-11-14-1303">
-<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-11-14-1303">
-<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-11-14-1303">
+<link rel="modulepreload" href="../shared/auth.js?v=2026-11-14-1324">
+<link rel="modulepreload" href="../shared/supabase.js?v=2026-11-14-1324">
+<link rel="modulepreload" href="../vendor/supabase-js.js?v=2026-11-14-1324">
+<link rel="modulepreload" href="../shared/supabase-config.js?v=2026-11-14-1324">
+<link rel="modulepreload" href="../shared/rail.js?v=2026-11-14-1324">
 <!-- 這一頁自己的模組。上面三行解決的是共用那一層，這幾行解決第二層：
      瀏覽器要先把 src/main.js 下載完、解析完，才知道它還要 ./src/ui.js 之類的東西，
      那又是一次完整的網路來回疊在「載入中…」後面。這幾行讓它一開始就一起抓。
      ⚠ 檔名改了、或這一頁不再 import 某一支，這裡要跟著改 ——
      check.sh 會檢查每一個 modulepreload 指到的檔案真的存在。 -->
-<link rel="modulepreload" href="./src/main.js?v=2026-11-14-1303">
-<link rel="modulepreload" href="./src/ui.js?v=2026-11-14-1303">
-<link rel="modulepreload" href="./src/data.js?v=2026-11-14-1303">
-<link rel="modulepreload" href="./src/strings.js?v=2026-11-14-1303">
-<link rel="stylesheet" href="../shared/nav.css?v=2026-11-14-1303">
+<link rel="modulepreload" href="./src/main.js?v=2026-11-14-1324">
+<link rel="modulepreload" href="./src/ui.js?v=2026-11-14-1324">
+<link rel="modulepreload" href="./src/data.js?v=2026-11-14-1324">
+<link rel="modulepreload" href="./src/strings.js?v=2026-11-14-1324">
+<link rel="stylesheet" href="../shared/nav.css?v=2026-11-14-1324">
+<link rel="stylesheet" href="../shared/rail.css?v=2026-11-14-1324">
 <style>
   /* 幹部首頁與行事曆（2026-10-28）。色票、字體、圓角全部來自 ../shared/brand.css。 */
   html{overflow-x:clip}
@@ -50,7 +52,9 @@
     background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
   #bt-root{position:relative;z-index:1}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  #bt-root{font-family:var(--body);color:var(--ink);line-height:1.55;max-width:1040px;margin:0 auto;padding:14px 12px 60px}
+  #bt-root{font-family:var(--body);color:var(--ink);line-height:1.55;max-width:1180px;margin:0 auto;padding:14px 16px 60px}
+  /* 2026-11-14 首頁也有側欄（shared/rail.css）：頂欄跟內容一樣寬，跟後台同一條。 */
+  #bt-root .btnav{max-width:none}
   :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
   #bt-root :focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
   h1{font-family:var(--display);font-size:34px;font-weight:700;letter-spacing:.02em;margin:6px 0 2px;line-height:1.1}
@@ -80,7 +84,33 @@
   .lnk:hover{text-decoration:underline;text-decoration-color:var(--bt-orange)}
 
   /* 首頁 */
-  .hello{margin:8px 0 18px}
+  .hello{margin:8px 0 18px;display:flex;gap:12px 16px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+  /* 等你處理（2026-11-14）：一行一件事。左邊一顆小標籤說這是什麼，中間標題與一句話，右邊日期。過期的日期是深藍粗體。 */
+  .wlist{display:flex;flex-direction:column;gap:8px}
+  .wlist .item{margin:0}
+  .wrow{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:4px 14px;align-items:center;padding:12px 16px;
+    border:1px solid rgba(16,42,134,.16);border-radius:16px;background:rgba(255,255,255,.62);color:var(--ink);text-decoration:none;
+    transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
+  .wrow:hover{border-color:var(--bt-orange);background:rgba(255,232,197,.6)}
+  .wrow:active{background:rgba(255,196,108,.38)}
+  .wtag{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(16,42,134,.72)}
+  .wmain{min-width:0}
+  .wmain b{display:block;font-family:var(--display);font-size:18px;letter-spacing:.02em;line-height:1.2;overflow-wrap:anywhere}
+  .wmain span{display:block;font-size:13px;color:rgba(16,42,134,.8)}
+  .wdue{font-size:13px;font-weight:600;white-space:nowrap;padding:3px 10px;border-radius:999px;background:rgba(255,232,197,.8)}
+  .wrow.late .wdue{background:var(--bt-navy);color:var(--bt-cream)}
+  @media (max-width:720px){
+    .wrow{grid-template-columns:minmax(0,1fr) auto}
+    .wtag{grid-column:1 / -1}
+  }
+  /* 我的護照：一條進度條加「蓋了幾格」。 */
+  .pprow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;border:1px solid rgba(16,42,134,.16);border-radius:16px;
+    background:rgba(255,255,255,.62);color:var(--ink);text-decoration:none}
+  .pprow:hover{border-color:var(--bt-orange)}
+  .ppbar{flex:1 1 200px;height:10px;border-radius:999px;background:rgba(16,42,134,.12);overflow:hidden}
+  .ppbar i{display:block;height:100%;background:var(--bt-orange);border-radius:999px}
+  .ppn{font-weight:600;font-size:14px}
+  .ppgo{font-size:13px;text-decoration:underline;text-decoration-color:var(--bt-orange)}
   .block{margin:0 0 26px}
   .count{display:inline-block;min-width:26px;padding:0 8px;border-radius:999px;background:var(--bt-orange);color:var(--bt-navy);
     font-size:15px;text-align:center;vertical-align:3px}
@@ -288,6 +318,6 @@ label.opt:active, .check:active{background:rgba(255,196,108,.26);border-radius:1
 </head>
 <body>
 <div id="bt-root" aria-busy="true"><div class="empty loading">Loading… 載入中…</div></div>
-<script type="module" src="./src/main.js?v=2026-11-14-1303"></script>
+<script type="module" src="./src/main.js?v=2026-11-14-1324"></script>
 </body>
 </html>

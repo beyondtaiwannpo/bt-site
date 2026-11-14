@@ -689,8 +689,13 @@ export function positionFor(p, termId) {
   return (p && Array.isArray(p.positions) ? p.positions : []).find(x => x.term === termId) || null;
 }
 // 同一屆的全部職位（2026-10-26 起一個人一屆可以兼好幾個，例如 Sponsorship 的 Adviser 兼 Curriculum 的 Associate）。
+// 一個人好幾個職位時固定順序（Paul 2026-11-14：兩位 Co-President 的 Associate 一個在上一個在下）：
+// 職級高的在上（Co-President、Senior Adviser、Director、Adviser、Associate），同一級照 team 名字排。
+const POS_ORDER = { president: 0, senior_adviser: 1, director: 2, adviser: 3, member: 4 };
 export function positionsFor(p, termId) {
-  return (p && Array.isArray(p.positions) ? p.positions : []).filter(x => x.term === termId);
+  const rk = x => { const r = POS_ORDER[rankOfTitle(x.title_en, x.team)]; return r == null ? 5 : r; };
+  return (p && Array.isArray(p.positions) ? p.positions : []).filter(x => x.term === termId)
+    .sort((a, b) => rk(a) - rk(b) || String(a.team || "").localeCompare(String(b.team || "")));
 }
 // 同一屆所有職位接成一句：「Adviser, Sponsorship Team · Associate, Curriculum Team」。
 export const positionsLine = (p, termId) => positionsFor(p, termId).map(positionTitle).filter(Boolean).join(" · ");
