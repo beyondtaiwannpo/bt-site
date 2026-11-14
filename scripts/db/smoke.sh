@@ -3300,6 +3300,23 @@ chkas "${ASSOC}" "★ 在出席名單上就寫得了" "1" "select public.save_me
 chkraise "★ 學員寫不了（not_cadre）" "not_cadre" "perform set_config('test.uid','${STU}',true); perform public.save_meeting_minutes('${MTM}', null, '[]'::jsonb);"
 chkraise "不存在的範本（no_such_template）" "no_such_template" "perform set_config('test.uid','${PAUL}',true); perform public.save_meeting_minutes('${MTM}', '00000000-0000-0000-0000-000000000009', '[]'::jsonb);"
 psql -d "${DB}" -X -A -t -q -c "delete from public.meetings where id='${MTM}'; delete from public.meeting_templates where title in ('Smoke 範本','Assoc 範本');" 2>&1 | grep -i "error" || true
+echo "── 權限修正：高職級邀請只有 Co-President 發得出去、幹部都看得到活動清單（2026-12-19-access-fixes.sql）──"
+afx=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-19-access-fixes.sql 2>&1 || true)
+if echo "${afx}" | grep -q "OVERALL.*PASS" && ! echo "${afx}" | grep -q "|FAIL"; then echo "  ok   權限修正那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 權限修正那支驗收表："; echo "${afx}" | head -8; fail=$((fail+1)); fi
+afx2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-19-access-fixes.sql 2>&1 || true)
+if echo "${afx2}" | grep -q "OVERALL.*PASS"; then echo "  ok   權限修正那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 權限修正重跑：${afx2}" | head -5; fail=$((fail+1)); fi
+SAWAS=$(psql -d "${DB}" -X -A -t -q -c "select board_role from public.profiles where id='${OTHER}'" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "update public.profiles set role='cadre', board_role='senior_adviser' where id='${OTHER}';" 2>&1 | grep -i "error" || true
+chkraise "★ Senior Adviser 發不出 Co-President 的邀請（rank_needs_president）" "rank_needs_president" "perform set_config('test.uid','${OTHER}',true); perform public.invite_person('sa-pres@example.com','cadre','president','','','','','','','','','zh',null);"
+chkraise "★ Senior Adviser 也發不出 Senior Adviser 的邀請" "rank_needs_president" "perform set_config('test.uid','${OTHER}',true); perform public.invite_person('sa-sa@example.com','cadre','senior_adviser','','','','','','','','','zh',null);"
+chkas "${OTHER}" "Senior Adviser 照樣發得出 Director 的邀請" "director" "select public.invite_person('sa-dir@example.com','cadre','director','','','','','','','','','zh',null); select rank from public.invite_codes where email='sa-dir@example.com'"
+chkraise "★ Senior Adviser 也不能把一張邀請改成 Co-President" "rank_needs_president" "perform set_config('test.uid','${OTHER}',true); update public.invite_codes set rank='president' where email='sa-dir@example.com';"
+chkas "${PAUL}" "Co-President 發得出 Co-President 的邀請" "president" "select public.invite_person('cp-pres@example.com','cadre','president','','','','','','','','','zh',null); select rank from public.invite_codes where email='cp-pres@example.com'"
+chk "在 SQL Editor 直接改（沒有登入的人）不擋" "1" "update public.invite_codes set rank='senior_adviser' where email='sa-dir@example.com' returning 1"
+psql -d "${DB}" -X -A -t -q -c "delete from public.mail_outbox where invite_code in (select code from public.invite_codes where email in ('sa-dir@example.com','cp-pres@example.com')); delete from public.invite_codes where email in ('sa-dir@example.com','cp-pres@example.com'); update public.profiles set board_role=nullif('${SAWAS}','') where id='${OTHER}';" 2>&1 | grep -i "error" || true
+chk "（前提）測試資料庫裡有活動、而且 ASSOC 沒有被加進任何一場" "t" "select ((select count(*) from public.events) > 0 and not exists (select 1 from public.assignments a join public.events e on e.workspace_id = a.workspace_id where a.user_id = '${ASSOC}'))::text::char(1)"
+chkrole authenticated "${ASSOC}" "★ 沒被加進任何一場的幹部也看得到每一場活動" "$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.events" | tr -d ' \n')" "select count(*) from public.events"
+chkrole authenticated "${STU}" "★ 學員還是看不到活動表（學員看的是對外的 public_events）" "0" "select count(*) from public.events"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

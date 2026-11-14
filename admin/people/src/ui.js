@@ -1290,7 +1290,10 @@ export function whoLabel(v) {
   if (v === "intern") return T("in.who.intern");
   return T("in.who.cadre", { rank: boardLabel(String(v || "").replace(/^cadre:/, "")) });
 }
-export function inviteFormNewHTML(draft, terms, busy, people) {
+// isPres === false（Senior Adviser）：「他會是」不列 Co-President 與 Senior Adviser。資料庫也擋（2026-12-19-access-fixes.sql 的 trigger），
+// 這裡不列是為了不讓人選了才被拒絕。
+export const inviteWhoFor = isPres => isPres === false ? INVITE_WHO.filter(v => !["cadre:president", "cadre:senior_adviser"].includes(v)) : INVITE_WHO;
+export function inviteFormNewHTML(draft, terms, busy, people, isPres) {
   const d = draft || {};
   const dis = busy ? " disabled" : "";
   // 2026-11-07：打的名字對到名單上沒有帳號的人，先問要掛到哪一筆。d.candidates 是資料庫回 ambiguous_person 帶的 id（優先）。
@@ -1305,7 +1308,7 @@ export function inviteFormNewHTML(draft, terms, busy, people) {
   return `<details class="fold rc-fold" id="invite-fold"${open ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("in.form")}</b></summary><div class="fold-body" id="invite-new">
     <div class="two">
       <label><i>${T("in.email")}</i><input id="in-email" type="email" value="${esc(d.email || "")}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="name@example.com"${dis}></label>
-      <label><i>${T("in.who")}</i><select id="in-who"${dis}>${INVITE_WHO.map(v => `<option value="${v}"${who === v ? " selected" : ""}>${esc(whoLabel(v))}</option>`).join("")}</select></label>
+      <label><i>${T("in.who")}</i><select id="in-who"${dis}>${inviteWhoFor(isPres).map(v => `<option value="${v}"${who === v ? " selected" : ""}>${esc(whoLabel(v))}</option>`).join("")}</select></label>
       <label><i>${T("in.position")}</i>${rankSelect("in-rank", posRank, dis)}</label>
       <label><i>${T("pe.posTeam")}</i>${teamSelect("in-team", d.team || "", dis, isOrgWide(posRank))}</label>
     </div>
@@ -1359,7 +1362,7 @@ export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft
   };
   return pageHead(T("in.title"), T("in.lede"))
     + msgHTML(msg)
-    + inviteFormNewHTML(draft, terms, busy, people)
+    + inviteFormNewHTML(draft, terms, busy, people, isPres)
     + sectionHTML(T("in.list"), list.length ? `<ul class="flist">${list.map(item).join("")}</ul>` : emptyHTML(T("in.empty"), T("in.emptyHint")), { id: "invites" })
     // 2026-11-03 Paul 找不到那一行字：改成有框、有箭頭、有一句說明的面板。<details> 原生就吃 Enter 與 aria-expanded，main.js 記住開著沒。
     + (isPres ? `<details class="fold" id="batch"${batchOpen ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("in.batch")}</b><span class="mini">${T("in.batchHint")}</span></summary><div class="fold-body">${inviteFormHTML(batchDraft, busy)}${

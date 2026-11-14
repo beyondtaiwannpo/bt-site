@@ -710,6 +710,16 @@ Paul 2026-11-13 說要讓幹部跟學員用起來是同一種感覺：幹部的�
 - 底下的順序改成：我的申請、該填的回饋、現在開放、我的 mentor、我的資料。
 - 判斷寫在 `app/src/ui.js` 的 `nextStep()`，純函式，`test/student-ui.test.mjs` 有測。沒有動資料庫。
 
+## 兩個權限修正（`supabase/migrations/2026-12-19-access-fixes.sql`，2026-11-13）
+
+2026-11-13 後台盤點時找到的，計畫在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-13-admin-restructure-plan/`。
+
+- **Senior Adviser 發不出 Co-President 或 Senior Adviser 的邀請了。** 之前發邀請的門只問「是不是 senior」，Senior Adviser 過得了；對方用那張邀請註冊就變成 Co-President。可是直接改職級（`set_board_role`）只有 Co-President 做得到，所以這是一條繞過去的路。現在守門放在邀請碼那張表上（trigger，就是「資料寫進去之前一定會先跑的檢查」），不管從哪一支函式寫進來都會擋。Paul 在 SQL Editor 直接改不擋。畫面上 Senior Adviser 的「他會是」下拉也不列這兩個職級。
+- **每一位幹部都看得到每一場活動。** 之前沒被加進任何一場的幹部打開「活動」是空的。活動那一列本來就是要放上網站的內容；**報名名單、表單答案、簽到、錢都沒有放寬**，沒被加進那一場的人在活動頁上看到的是一句「找這個 team 的 Director 把你加進來」。改活動照舊只有被加進那一場「改」以上的人。
+- `scripts/db/smoke.sh` 多 12 條守著，`test/access-fixes.test.mjs` 3 條。
+
+**還沒做的**（計畫第 2 步剩下的，要 Paul 先看過）：看、改、管三級在每個地方意思一樣、team 的「改」就能開活動與排會、錢改成可以派人（現在看職稱）、行銷審核併進 Marketing 的「管」、每個東西底下一頁「誰在這裡」、護照的唯讀模式。這幾件會改到很多人現在能做什麼，所以留到 Paul 醒來確認再動。
+
 ## 怎麼邀請一個人（2026-10-29 起）
 
 後台 → People → **邀請**：打 email、選他會是什麼（幹部五級、校友、實習生）、選填職位與 team 與屆別、選填名字與一句話，按「寄邀請信」。

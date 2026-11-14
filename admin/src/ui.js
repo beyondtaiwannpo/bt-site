@@ -1045,7 +1045,7 @@ export function accessHTML(me, todo, features) {
   };
   const feat = (features || []).length ? `<ul class="feat">${features.map(f => `<li><a href="${withLang(f.href)}">${esc(f.label)}</a>${T("punct.colon")}${esc(f.desc)}</li>`).join("")}</ul>` : "";
   let body;
-  if (senior(me)) body = `<div class="row" style="margin:0 0 6px"><span class="tag open">${T("grid.byRank")}</span><span class="mini">${T(me.board_role === "senior_adviser" ? "hub.accessSeniorAdviser" : "hub.accessSenior")}</span></div>`;
+  if (senior(me)) body = `<div class="row" style="margin:0 0 6px"><span class="tag open">${T("grid.byRank")}</span><span class="mini">${T(me.board === "senior_adviser" ? "hub.accessSeniorAdviser" : "hub.accessSenior")}</span></div>`;
   else {
     const mine = Object.entries((me && me.ws) || {});
     if (mine.length) {
@@ -1449,7 +1449,10 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
       ${st === "published" && sen ? `<button class="btn ghost" data-act="ev-unpublish" data-id="${esc(e.id)}"${dis}>${T("ev.unpublish")}</button>` : ""}
       ${st === "published" ? `<a class="btn ghost sm" href="${esc(publicLink)}" target="_blank" rel="noopener">${T("ev.seePublic")}</a>` : ""}
     </div>`;
-  const links = `<ul class="plain">
+  // 2026-11-13 起每一位幹部都看得到每一場活動（2026-12-19-access-fixes.sql），但報名名單、表單、簽到只給被加進這一場的人。
+  // 沒被加進來的不畫那幾個連結（點進去會是空的），改一句話告訴他找誰。
+  const canView = !!wsLevel(me, e.workspace_id);
+  const links = !canView ? `<div class="note">${T("ev.notOnEvent")}</div>` : `<ul class="plain">
       <li>${form ? `<a href="#" data-act="open-form" data-id="${esc(form.id)}">${T("ev.formEdit")}</a>${T("punct.colon")}${esc(T("status." + form.status))}${form.opens_at ? `・${esc(T("ev.opens", { d: evDate(form.opens_at) }))}` : ""}`
         : `${T("ev.noFormLine")}${canEdit && !e.form_id ? ` <button class="btn ghost sm" data-act="ev-attach-form" data-id="${esc(e.id)}"${dis}>${T("ev.addForm")}</button>` : ""}`}</li>
       ${form ? `<li><a href="#" data-act="open-apps" data-id="${esc(form.id)}">${T("ev.attendees", { n: signed == null ? "?" : signed })}</a>${e.capacity ? ` / ${esc(String(e.capacity))}` : ""}</li>

@@ -304,6 +304,7 @@ export const MINE = {
   "mt.title":         { zh: "會議", en: "Meetings" },
   "mt.lede":          { zh: "開過與要開的會都在這裡：時間、出席的人、會議紀錄。排會在時間看板上點一格；這裡可以補記一場、改名單，打開一場就能選範本直接打紀錄。", en: "Past and upcoming meetings: time, attendees, minutes. Schedule from a slot on the availability board; here you can log one or change the list, and open any meeting to pick a template and type the minutes." },
   // 會議範本與紀錄（2026-11-13）
+  "ev.notOnEvent":    { zh: "你沒有被加進這一場，報名名單、表單和簽到看不到。要幫忙的話，找這個 team 的 Director 把你加進來。", en: "You are not on this event, so the sign-up list, form and check-in are hidden. To help out, ask this team's Director to add you." },
   "mtm.title":        { zh: "會議紀錄", en: "Minutes" },
   "mtm.tpl":          { zh: "用哪一份範本", en: "Template" },
   "mtm.tplNone":      { zh: "不用範本（自己打）", en: "No template (free form)" },

@@ -183,6 +183,7 @@ const SAYS = [
   ["not_director_of:",
    "這裡面有一份不是你這個 team 的申請，所以整批都沒有動。",
    "One of these applications belongs to another team, so nothing was changed."],
+  ["rank_needs_president", "Co-President 與 Senior Adviser 的邀請只有 Co-President 發得出去。", "Only a Co-President can invite someone as Co-President or Senior Adviser."],
   ["not_president", "只有當屆 Co-President 可以做這件事。", "Only this term's Co-Presidents can do this."],
   // set_story_approved() 的第二條失敗路徑（那一列不存在也走這裡）。
   // ⚠ 排在 not_a_cadre / not_cadre **前面**：這張表是「誰先被 includes 命中誰贏」，
