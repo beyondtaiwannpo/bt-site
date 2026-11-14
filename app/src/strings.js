@@ -127,6 +127,14 @@ export const MINE = {
   // 學員的 dashboard
   "sd.empty":         { zh: "還沒填", en: "not filled in" },
   "sd.mine":          { zh: "我的申請", en: "My applications" },
+  // 下一步（2026-11-13）：學員頁最上面只放一件事。
+  "sd.next":          { zh: "下一步", en: "Next step" },
+  "sd.nextBook":      { zh: "「{title}」進到面試了，先約一個時間。", en: "\"{title}\" is at the interview stage. Book a time first." },
+  "sd.nextFb":        { zh: "「{title}」還沒填，花幾分鐘告訴我們這場活動怎麼樣。", en: "\"{title}\" is waiting. Take a few minutes to tell us how the event went." },
+  "sd.nextPair":      { zh: "mentor 的「{title}」還沒填。", en: "Your mentor check-in \"{title}\" is not filled in yet." },
+  "sd.nextOpen1":     { zh: "「{title}」現在開放申請。", en: "\"{title}\" is open for applications now." },
+  "sd.nextOpenN":     { zh: "現在有 {n} 個計畫開放申請。", en: "{n} programs are open for applications now." },
+  "sd.nextSee":       { zh: "看開放的計畫", en: "See open programs" },
   "sd.book":          { zh: "約面試時間", en: "Book an interview time" },
   "sd.notBooked":     { zh: "你還沒約時間", en: "You have not booked a time" },
   "sd.open":          { zh: "現在開放", en: "Open now" },

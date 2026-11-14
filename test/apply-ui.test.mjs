@@ -180,7 +180,10 @@ test("學員頁畫得出我的申請與現在開放的，而且已經申請過�
   assert.match(h, /cal\.com\/bt/, "面試那張卡要放得到 Cal 連結");
   assert.match(h, /你還沒約時間/);
   assert.match(h, /導生配對/);
-  assert.equal((h.match(/探索營/g) || []).length, 1, "已經申請過的又出現在「現在開放」裡");
+  // 2026-11-13 起最上面多了「下一步」（約面試那一件會講名字），所以只數「現在開放」那一段。
+  const openPart = h.slice(h.indexOf('id="sd-open"'));
+  assert.equal((openPart.match(/探索營/g) || []).length, 0, "已經申請過的又出現在「現在開放」裡");
+  assert.match(h.slice(0, h.indexOf('id="sd-open"')), /class="next"[\s\S]*探索營/, "下一步講的是約面試那一件");
 });
 
 // ── /admin/ 審核（批 4）───────────────────────────────────────────────

@@ -115,3 +115,22 @@ test("跳脫：名字裡的角括號不會變成標籤", () => {
   assert.ok(!h.includes("<img src=x"), "名字沒有跳脫");
   assert.match(h, /&lt;img/);
 });
+
+// 下一步（2026-11-13）：學員頁最上面只放一件事，照急的程度挑。
+import { nextStep } from "../app/src/ui.js";
+test("下一步：約面試排第一，接著回饋、mentor check-in、開放的申請；都沒有就不畫", () => {
+  const iv = [{ form_id: "f1", status: "interview", title: "營隊", interview_url: "https://cal.com/x" }];
+  const fb = [{ title: "回饋表", token: "t1", done: false }];
+  const pr = [{ as: "mentee", forms: [{ title: "Check-in 1", token: "p1", done: false }] }];
+  const op = [{ id: "f2", title: "冬令營" }, { id: "f3", title: "講座" }];
+  assert.equal(nextStep(iv, op, pr, fb).href, "https://cal.com/x");
+  assert.match(nextStep([], op, pr, fb).href, /feedback\/\?t=t1/);
+  assert.match(nextStep([], op, pr, []).href, /t=p1/);
+  assert.equal(nextStep([], op, [], []).href, "#sd-open");
+  assert.match(nextStep([], [op[0]], [], []).href, /apply\/\?f=f2/);
+  assert.equal(nextStep([{ form_id: "f2", status: "received" }], [op[0]], [], []), null); // 申請過的不算
+  assert.equal(nextStep([{ form_id: "f1", status: "accepted" }], [], [], [{ title: "x", token: "t", done: true }]), null);
+  const h = studentHTML(full, "", iv, op);
+  assert.ok(h.indexOf('class="next"') < h.indexOf("sd-open") && h.indexOf('class="next"') > 0);
+  assert.doesNotMatch(studentHTML(full, ""), /class="next"/);
+});

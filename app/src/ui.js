@@ -333,6 +333,24 @@ export function fmtDay(v) {
 // 而且會有人來問什麼時候好。對外首頁的那條規矩在這裡一樣成立。
 // 批 3 會在這裡長出「我的申請」與「現在開放的申請」，批 5 會長出資源。
 // 在那之前不放灰掉的入口 —— 點不下去的東西看起來像壞掉，而且會有人來問。
+// 下一步（2026-11-13 Paul：「我要 member 跟 student 用起來是同一種感覺」，後台最上面是「待辦」，學員這一頁最上面也是一件事）。
+// 只挑一件，照急的程度：約面試 → 填回饋 → 填 mentor check-in → 去看開放的申請。都沒有就回 null，不畫。
+// 錄取與沒上不算「下一步」：狀態已經寫在「我的申請」那一列，這裡再講一次只是重複。
+export function nextStep(apps, opens, pairs, feedback) {
+  const iv = (apps || []).find(a => a.status === "interview" && a.interview_url);
+  if (iv) return { text: T("sd.nextBook", { title: iv.title }), href: iv.interview_url, label: T("sd.book") };
+  const fb = (feedback || []).find(f => !f.done && f.token);
+  if (fb) return { text: T("sd.nextFb", { title: fb.title }), href: `../feedback/?t=${encodeURIComponent(fb.token)}&lang=${lang()}`, label: T("sd.fill", { title: fb.title }) };
+  for (const x of (pairs || []).filter(y => y.as === "mentee")) {
+    const f = (x.forms || []).find(y => !y.done && y.token);
+    if (f) return { text: T("sd.nextPair", { title: f.title }), href: `../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}`, label: T("sd.fill", { title: f.title }) };
+  }
+  const applied = new Set((apps || []).map(a => a.form_id));
+  const left = (opens || []).filter(f => !applied.has(f.id));
+  if (left.length === 1) return { text: T("sd.nextOpen1", { title: left[0].title }), href: `../apply/?f=${encodeURIComponent(left[0].id)}`, label: T("sd.look") };
+  if (left.length > 1) return { text: T("sd.nextOpenN", { n: left.length }), href: "#sd-open", label: T("sd.nextSee") };
+  return null;
+}
 export function studentHTML(p, msg, apps, opens, pairs, feedback) {
   const row = (k, val) => `<li><b>${esc(k)}</b>${
     val ? `<span>${esc(val)}</span>` : `<span class="empty-v">${T("sd.empty")}</span>`}</li>`;
@@ -353,7 +371,7 @@ export function studentHTML(p, msg, apps, opens, pairs, feedback) {
   const applied = new Set((apps || []).map(a => a.form_id));
   const left = (opens || []).filter(f => !applied.has(f.id));
   const now = left.length ? `
-    <h3 class="sec-h">${T("sd.open")}</h3>
+    <h3 class="sec-h" id="sd-open">${T("sd.open")}</h3>
     <ul class="applist">${left.map(f => `<li>
       <b>${esc(f.title)}</b>
       <div class="st-more"><a href="../apply/?f=${encodeURIComponent(f.id)}">${T("sd.look")}</a></div>
@@ -380,14 +398,16 @@ export function studentHTML(p, msg, apps, opens, pairs, feedback) {
     </li>`).join("")}</ul>
     <p class="note">${T("sd.fbHint")}</p>` : "";
 
+  const next = nextStep(apps, opens, pairs, feedback);
   return `<div class="card">
     <h2>${esc((p && p.name) || T("sd.account"))}</h2>
     <div class="sub">Beyond Taiwan</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    ${next ? `<div class="next"><i>${T("sd.next")}</i><p>${esc(next.text)}</p><a class="btn sm" href="${esc(next.href)}">${esc(next.label)}</a></div>` : ""}
     ${mine}
     ${fb}
-    ${mentor}
     ${now}
+    ${mentor}
     <h3 class="sec-h">${T("sd.me")}</h3>
     <ul class="kv">
       ${row(T("sd.school"), p && p.school)}
