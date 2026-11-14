@@ -1554,7 +1554,7 @@ export function meetingMatches(m, q) {
   return [m.title, m.agenda, mtScope(m.scope), mtWhen(m.starts_at)].some(x => n(x).includes(qq));
 }
 // newOpen：「記一場會議」那一格開著沒（main.js 記）。q：搜尋字（不重畫，main.js 只藏起對不上的列）。
-export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy, q, newOpen) {
+export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy, q, newOpen, templates) {
   const now = new Date();
   const up = (meetings || []).filter(m => new Date(m.ends_at) >= now).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const past = (meetings || []).filter(m => new Date(m.ends_at) < now).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
@@ -1564,14 +1564,16 @@ export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy,
   const all = (meetings || []).length;
   return pageHead(T("mt.title"), T("mt.lede"))
     + msgHTML(msg)
-    + (scopes.length ? foldHTML("mt-new", T("mt.new"), meetingFormHTML(null, draft, scopes, people, busy, true), newOpen) : "")
+    + (scopes.length ? foldHTML("mt-new", T("mt.new"), meetingFormHTML(null, draft, scopes, people, busy, true,
+        templates ? `<h3 class="sec-h">${T("mtm.title")}</h3>` + minutesEditorHTML("mtn", templates, draft && "tpl" in draft ? draft.tpl : mtDefaultTpl(templates, (draft && draft.scope) || scopes[0]),
+          draft && draft.minutes ? draft.minutes : mtMinutesFrom(mtTplById(templates, draft && "tpl" in draft ? draft.tpl : mtDefaultTpl(templates, (draft && draft.scope) || scopes[0])), []), busy) : ""), newOpen) : "")
     + (all > 3 ? `<label class="vn-find"><i>${T("mt.find")}</i><input type="search" id="mtl-q" value="${esc(q || "")}" placeholder="${esc(T("mt.findPh"))}" autocomplete="off"></label>` : "")
     + sectionHTML(`${T("mt.upcoming")}<span class="hint">${up.length}</span>`, up.length ? `<ul class="flist">${up.map(row).join("")}</ul>` : emptyHTML(T("mt.noneUp"), T("mt.noneUpHint")))
     + (past.length ? sectionHTML(`${T("mt.past")}<span class="hint">${past.length}</span>`, `<ul class="flist">${past.map(row).join("")}</ul>`) : "");
 }
 // 記一場會議 / 改一場：m 是現有那一場（null 是新的），d 是填到一半的值（含 pk 勾人的狀態）。
 // bare：只回表單本身（清單頁把它包進收起來的那一格，不要再一個標題）。
-export function meetingFormHTML(m, d, scopes, people, busy, bare) {
+export function meetingFormHTML(m, d, scopes, people, busy, bare, mins) {
   const v = Object.assign({ scope: scopes[0] || "board", title: "", starts_at: "", ends_at: "", agenda: "", doc_url: "" }, m || {}, d || {});
   // 必到：既有的一場照資料庫（沒有這一欄的舊資料庫當選擇參加）；新的一場預設必到。
   v.required = d && d.required != null ? d.required : m ? !!m.required : true;
@@ -1588,6 +1590,7 @@ export function meetingFormHTML(m, d, scopes, people, busy, bare) {
       <label class="wide"><i>${T("mt.agenda")}</i><input id="mt-agenda" name="agenda" value="${esc(v.agenda || "")}"${dis}></label>
       <label class="wide"><i>${T("mt.docF")}</i><input id="mt-doc" name="doc_url" value="${esc(v.doc_url || "")}" placeholder="https://docs.google.com/…"${dis}></label>
     </div>
+    ${mins || ""}
     <h3 class="sec-h">${T("mt.attendees")}</h3>
     ${membersAreaHTML("mt", { people: people || [], pk, busy, draft: true, all: true, titleLeft: n => T("mt.ticked", { n }) })}
     <div class="form-foot">${m ? autosaveHint("mt-save", `data-id="${esc(m.id)}"`) : `<button class="btn" data-act="mt-save" data-id=""${dis}>${busy ? T("common.saving") : T("mt.createGo")}</button>`}
@@ -1615,7 +1618,7 @@ export function gcalRowHTML(m, canEdit, busy) {
   return `<dt>${T("mt.gcal")}</dt><dd>${v}${retry}</dd>`;
 }
 // 一場會議：出席與回覆、連結、議程；能排的人底下可以改。
-export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
+export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy, templates) {
   const who = id => { const p = (people || []).find(x => x.id === id); return p ? mpName(p) : T("rq.someone"); };
   const at = m.attendees || [];
   const grp = st => at.filter(a => a.status === st);
@@ -1629,12 +1632,112 @@ export function meetingHTML(m, me, people, canEdit, scopes, draft, msg, busy) {
         <dt>${T("mt.when")}</dt><dd>${esc(mtWhen(m.starts_at))}–${esc(mtWhen(m.ends_at).slice(11))} <span class="mini">${T("mt.tzNote")}</span></dd>
         ${gcalRowHTML(m, canEdit, busy)}
       </dl>`)
+    + minutesSectionHTML(m, me, canEdit, templates, draft, busy)
     + sectionHTML(`${T("mt.attendees")}<span class="hint">${at.length}</span>`, at.length ? `<div class="mt-rsvp">
         <div><i>${T("mt.st.accepted")}（${grp("accepted").length}）</i><ul class="plain">${grp("accepted").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>
         <div><i>${T("mt.st.invited")}（${grp("invited").length}）</i><ul class="plain">${grp("invited").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>
         <div><i>${T("mt.st.declined")}（${grp("declined").length}）</i><ul class="plain">${grp("declined").map(li).join("") || `<li class="mini">${T("value.none")}</li>`}</ul></div>
       </div>` : `<div class="mini">${T("mt.nobody")}</div>`)
     + (canEdit ? meetingFormHTML(m, draft, scopes, people, busy) : "");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 會議範本與會議紀錄（2026-11-13，supabase/migrations/2026-12-18-meeting-templates.sql）
+// ═══════════════════════════════════════════════════════════════════════
+// Paul 2026-11-13：「不同的會開法不一樣，我要能編一份範本，記會議的時候選那份範本然後直接打」。
+// 範本是幾段小標題（h）加一句提示（hint）；選了範本，每一段變成一個打字的大框，紀錄存成 [{ h, text }]。
+// templates 是 loadMeetingTemplates() 回的；null 是資料表還沒建（遷移檔還沒跑），整塊不畫。
+export const mtTplById = (templates, id) => (templates || []).find(t => t.id === id) || null;
+// 下拉選單的順序：沒封存的、這種會專用的排前面（board 的會先列 board 的範本），其他照標題。
+export function mtTplOptions(templates, scope, keepId) {
+  const live = (templates || []).filter(t => !t.archived || t.id === keepId);
+  const rank = t => t.scope && t.scope === scope ? 0 : !t.scope ? 1 : 2;
+  return live.slice().sort((a, b) => rank(a) - rank(b) || String(a.title).localeCompare(String(b.title)));
+}
+// 新開一場預設選哪一份：這種會專用的那一份（只有一份的時候）；沒有就不選。
+export function mtDefaultTpl(templates, scope) {
+  const own = (templates || []).filter(t => !t.archived && t.scope && t.scope === scope);
+  return own.length === 1 ? own[0].id : null;
+}
+// 換範本：照新範本的段落排，已經打過字的段落（小標題一樣）把字帶過去；新範本沒有、但已經有字的段落接在最後面，打過的字不會不見。
+export function mtMinutesFrom(tpl, current) {
+  const cur = (current || []).map(x => ({ h: String((x && x.h) || ""), text: String((x && x.text) || "") }));
+  const key = h => String(h || "").trim().toLowerCase();
+  const used = new Set();
+  const out = ((tpl && tpl.sections) || []).map(sec => {
+    const i = cur.findIndex((c, j) => !used.has(j) && key(c.h) === key(sec.h));
+    if (i >= 0) used.add(i);
+    return { h: String(sec.h || ""), hint: String(sec.hint || ""), text: i >= 0 ? cur[i].text : "" };
+  });
+  cur.forEach((c, j) => { if (!used.has(j) && (c.text.trim() || (!tpl && c.h.trim()))) out.push({ h: c.h, hint: "", text: c.text }); });
+  if (!out.length) out.push({ h: "", hint: "", text: "" });
+  return out;
+}
+// 一段一段的打字框。idp：mtm（一場會的頁面）或 mtn（記一場新的）。hint 從範本來（紀錄本身不存 hint）。
+export function minutesEditorHTML(idp, templates, tplId, minutes, busy, scope) {
+  const dis = busy ? " disabled" : "";
+  const tpl = mtTplById(templates, tplId);
+  const hintOf = (h, i) => { const sec = tpl && (tpl.sections || []).find(x => String(x.h || "").trim().toLowerCase() === String(h || "").trim().toLowerCase()); return sec ? sec.hint || "" : (minutes[i] && minutes[i].hint) || ""; };
+  const opts = mtTplOptions(templates, scope, tplId);
+  return `<div class="mtm" id="${idp}-min">
+      <label class="mtm-pick"><i>${T("mtm.tpl")}</i><select id="${idp}-tpl" data-noauto="1"${dis}>
+        <option value="">${T("mtm.tplNone")}</option>
+        ${opts.map(t => `<option value="${esc(t.id)}"${t.id === tplId ? " selected" : ""}>${esc(t.title)}${t.archived ? `（${T("mtpl.archivedTag")}）` : ""}</option>`).join("")}
+      </select></label>
+      ${(minutes || []).map((x, i) => `<div class="mtm-sec" data-mtm-sec>
+        <div class="mtm-top"><input class="mtm-h" name="h${i}" value="${esc(x.h || "")}" placeholder="${esc(T("mtm.hPh"))}" aria-label="${esc(T("mtm.hPh"))}"${dis}>
+          <button class="btn quiet sm" data-act="mtm-del" data-p="${idp}" data-i="${i}" aria-label="${esc(T("mtm.del"))}"${dis}>${T("mtm.del")}</button></div>
+        <textarea class="mtm-t" name="t${i}" rows="5" placeholder="${esc(hintOf(x.h, i) || T("mtm.tPh"))}"${dis}>${esc(x.text || "")}</textarea>
+      </div>`).join("")}
+      <button class="btn ghost sm" data-act="mtm-add" data-p="${idp}"${dis}>${T("mtm.add")}</button>
+    </div>`;
+}
+// 誰寫得了這一場的紀錄：排得了這種會的人、出席名單上的人、建這場會的人（跟資料庫 save_meeting_minutes 同一條）。
+export const mtCanWrite = (m, me, canEdit) => !!m && !!me && (!!canEdit || m.created_by === me.id || (m.attendees || []).some(a => a.user_id === me.id));
+// 一場會的「會議紀錄」那一塊：寫得了就是打字框（data-autosave="mt-min"，改了就存），寫不了就照段落印出來。
+export function minutesSectionHTML(m, me, canEdit, templates, draft, busy) {
+  if (!("minutes" in m)) return "";
+  const has = (m.minutes || []).some(x => String(x.text || "").trim());
+  if (!mtCanWrite(m, me, canEdit) || templates == null) {
+    const body = has ? `<div class="mtm-read">${(m.minutes || []).filter(x => String(x.text || "").trim()).map(x => `${x.h ? `<h4>${esc(x.h)}</h4>` : ""}<p>${esc(x.text).replace(/\n/g, "<br>")}</p>`).join("")}</div>`
+      : `<div class="mini">${T("mtm.none")}</div>`;
+    return sectionHTML(T("mtm.title"), body);
+  }
+  const tplId = draft && "tpl" in draft ? draft.tpl : (m.template_id || (has ? null : mtDefaultTpl(templates, m.scope)));
+  const mins = draft && draft.minutes ? draft.minutes : (has || (m.minutes || []).length ? mtMinutesFrom(null, m.minutes) : mtMinutesFrom(mtTplById(templates, tplId), []));
+  return sectionHTML(T("mtm.title"), `<div data-autosave="mt-min" data-id="${esc(m.id)}">${minutesEditorHTML("mtm", templates, tplId, mins, busy, m.scope)}
+      <div class="form-foot">${autosaveHint("mt-min", `data-id="${esc(m.id)}"`)}<span class="mini">${T("mtm.note")}</span></div></div>`);
+}
+
+// 範本頁（#mtemplates）：清單加一份一份改。ed 是正在改的那一份（{ id, title, scope, sections }，id 空的是新的）。
+export function mtplPageHTML(templates, scopes, ed, msg, busy, canEdit) {
+  const dis = busy ? " disabled" : "";
+  if (templates == null) return pageHead(T("mtpl.title"), T("mtpl.lede")) + emptyHTML(T("mtpl.notReady"), T("mtpl.notReadyHint"));
+  const live = templates.filter(t => !t.archived), gone = templates.filter(t => t.archived);
+  const scopeName = s => s ? mtScope(s) : T("mtpl.anyScope");
+  const editor = x => `<div class="mtpl-ed" id="mtpl-ed" data-id="${esc(x.id || "")}">
+      <div class="two">
+        <label><i>${T("mtpl.name")}</i><input id="mtpl-title" value="${esc(x.title || "")}" maxlength="120" placeholder="${esc(T("mtpl.namePh"))}"${dis}></label>
+        <label><i>${T("mtpl.scope")}</i><select id="mtpl-scope"${dis}><option value="">${T("mtpl.anyScope")}</option>${scopes.map(s => `<option value="${esc(s)}"${x.scope === s ? " selected" : ""}>${esc(mtScope(s))}</option>`).join("")}</select></label>
+      </div>
+      <h3 class="sec-h">${T("mtpl.sections")}</h3>
+      <ol class="mtpl-secs">${(x.sections || []).map((sec, i, all) => `<li data-mtpl-sec>
+        <input class="mtpl-h" value="${esc(sec.h || "")}" maxlength="120" placeholder="${esc(T("mtpl.hPh"))}" aria-label="${esc(T("mtpl.hPh"))}"${dis}>
+        <input class="mtpl-hint" value="${esc(sec.hint || "")}" maxlength="200" placeholder="${esc(T("mtpl.hintPh"))}" aria-label="${esc(T("mtpl.hintPh"))}"${dis}>
+        <span class="mtpl-move"><button class="btn quiet sm" data-act="mtpl-up" data-i="${i}" aria-label="${esc(T("mtpl.up"))}"${i === 0 ? " disabled" : dis}>↑</button><button class="btn quiet sm" data-act="mtpl-down" data-i="${i}" aria-label="${esc(T("mtpl.down"))}"${i === all.length - 1 ? " disabled" : dis}>↓</button><button class="btn quiet sm" data-act="mtpl-del" data-i="${i}"${dis}>${T("mtm.del")}</button></span>
+      </li>`).join("")}</ol>
+      <button class="btn ghost sm" data-act="mtpl-add"${dis}>${T("mtm.add")}</button>
+      <div class="form-foot"><button class="btn" data-act="mtpl-save"${dis}>${busy ? T("common.saving") : T(x.id ? "common.save" : "mtpl.create")}</button>
+        <button class="btn ghost" data-act="mtpl-cancel"${dis}>${T("mtpl.cancel")}</button></div>
+    </div>`;
+  const row = t => ed && ed.id === t.id ? `<li>${editor(ed)}</li>` : `<li><div class="fhead"><b>${esc(t.title)}</b> <span class="mini">${esc(scopeName(t.scope))}</span>
+      ${canEdit ? `<button class="btn quiet sm" data-act="mtpl-edit" data-id="${esc(t.id)}"${dis}>${T("mtpl.edit")}</button><button class="btn quiet sm" data-act="mtpl-archive" data-id="${esc(t.id)}"${dis}>${T("mtpl.archive")}</button>` : ""}</div>
+      <div class="fmeta">${(t.sections || []).map(x => esc(x.h)).join("・")}</div></li>`;
+  return pageHead(T("mtpl.title"), T("mtpl.lede"))
+    + msgHTML(msg)
+    + (canEdit ? (ed && !ed.id ? sectionHTML(T("mtpl.new"), editor(ed)) : `<div class="row" style="margin-bottom:24px"><button class="btn" data-act="mtpl-new"${dis}>${T("mtpl.new")}</button></div>`) : `<div class="mini">${T("mtpl.readOnly")}</div>`)
+    + sectionHTML(`${T("mtpl.live")}<span class="hint">${live.length}</span>`, live.length ? `<ul class="flist">${live.map(row).join("")}</ul>` : emptyHTML(T("mtpl.none"), T("mtpl.noneHint")))
+    + (gone.length ? sectionHTML(`${T("mtpl.gone")}<span class="hint">${gone.length}</span>`, `<ul class="flist">${gone.map(t => `<li><div class="fhead"><b>${esc(t.title)}</b> <span class="mini">${esc(scopeName(t.scope))}</span>${canEdit ? ` <button class="btn quiet sm" data-act="mtpl-restore" data-id="${esc(t.id)}"${dis}>${T("mtpl.restore")}</button>` : ""}</div></li>`).join("")}</ul>`) : "");
 }
 
 // ═══════════════════════════════════════════════════════════════════════

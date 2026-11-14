@@ -37,6 +37,8 @@ let S = {
   evF: { q: "", st: "all", team: "" }, mtQ: "",
   // 會議（2026-11-02）：meetings 是 loadMeetings() 回的；mtSel 打開的那一場；mtDraft 表單填到一半（含勾人的 pk）。
   meetings: null, mtSel: null, mtDraft: null,
+  // 會議範本（2026-11-13）：mtpl 是 loadMeetingTemplates() 回的（null 是資料表還沒建）；mtplEd 範本頁上正在改的那一份。
+  mtpl: null, mtplEd: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -93,11 +95,13 @@ function render() {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else if (S.view === "meetings") {
     body = UI.meetingsListHTML(S.meetings || [], S.me, UI.mtScopes(S.me, S.teams), S.mtDraft, S.cadres, S.msg, S.busy, S.mtQ,
-      !!S.vnOpen["mt-new"] || !!(S.mtDraft && (S.mtDraft.title || ((S.mtDraft.pk || {}).ticked || []).length)));
+      !!S.vnOpen["mt-new"] || !!(S.mtDraft && (S.mtDraft.title || ((S.mtDraft.pk || {}).ticked || []).length)), S.mtpl);
+  } else if (S.view === "mtemplates") {
+    body = UI.mtplPageHTML(S.mtpl, ["board"].concat(S.teams && S.teams.length ? S.teams : UI.TEAM_LABELS), S.mtplEd, S.msg, S.busy, UI.canEditWs(S.me, "custom:meeting-templates"));
   } else if (S.view === "meeting" && S.mtSel) {
     const m = (S.meetings || []).find(x => x.id === S.mtSel);
     const scopes = UI.mtScopes(S.me, S.teams);
-    body = m ? UI.meetingHTML(m, S.me, S.cadres, scopes.includes(m.scope), scopes, S.mtDraft, S.msg, S.busy)
+    body = m ? UI.meetingHTML(m, S.me, S.cadres, scopes.includes(m.scope), scopes, S.mtDraft, S.msg, S.busy, S.mtpl)
              : UI.emptyHTML(T("mt.notFound"), "", { act: "mt-back", label: T("mt.back") });
   } else if (S.view === "events") {
     body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"]);
@@ -137,7 +141,7 @@ function render() {
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
   // 側欄亮哪一行：總覽、需求單、活動、場地、會議各自亮；活動的報名表亮「活動」，其他申請亮「其他申請」。
-  const tab = S.view === "home" ? "home" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
+  const tab = S.view === "home" ? "home" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -199,7 +203,7 @@ async function boot(retried) {
     if (!light) D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
-    else if (/^(requests?|events|venues|meetings|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    else if (/^(requests?|events|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -257,8 +261,40 @@ function readVenue(idp) {
   return { name: val("name"), kind: val("kind") || "other", city: val("city"), address: val("address"), capacity: val("capacity"), cost: val("cost"), url: val("url"), notes: val("notes") };
 }
 async function reloadMeetings() {
-  try { S.meetings = await D.loadMeetings(); if (S.todo) S.todo.meetings = S.meetings; if (!S.cadres.length) S.cadres = await D.loadCadres().catch(() => []); }
+  try {
+    const [ms, tp] = await Promise.all([D.loadMeetings(), D.loadMeetingTemplates().catch(() => null)]);
+    S.meetings = ms; S.mtpl = tp; if (S.todo) S.todo.meetings = S.meetings; if (!S.cadres.length) S.cadres = await D.loadCadres().catch(() => []);
+  }
   catch (e) { S.msg = T("err.mtLoad") + D.says(e); }
+}
+// 會議紀錄的打字框讀出來：[{ h, text }]。idp：mtm（一場會的頁面）或 mtn（記一場新的）。
+function readMinutes(idp) {
+  const box = document.getElementById(idp + "-min"); if (!box) return [];
+  return [...box.querySelectorAll("[data-mtm-sec]")].map(sec => ({ h: ((sec.querySelector(".mtm-h") || {}).value || "").trim(), text: (sec.querySelector(".mtm-t") || {}).value || "" }));
+}
+// 會議頁要重畫之前（勾人、換範本、加一段）先把畫面上打到一半的字收進 S.mtDraft，不然重畫就不見了。
+function keepMtDraft() {
+  if (S.view !== "meetings" && S.view !== "meeting") return;
+  const d = Object.assign({}, S.mtDraft);
+  if (document.getElementById("mt-title")) { const r = readMeeting(); for (const k of ["scope", "required", "title", "starts_at", "ends_at", "agenda", "doc_url"]) d[k] = r[k]; }
+  const idp = S.view === "meeting" ? "mtm" : "mtn";
+  if (document.getElementById(idp + "-min")) { d.minutes = readMinutes(idp); d.tpl = ((document.getElementById(idp + "-tpl") || {}).value) || null; }
+  S.mtDraft = d;
+}
+// 會議頁的紀錄現在存一次（換範本、加一段、拿掉一段是按的不是打的，不會觸發改了就存）。
+function saveMinutesNow() {
+  if (S.view !== "meeting") return;
+  const box = document.querySelector('[data-autosave="mt-min"]'); if (box) onAutosave("mt-min", box, null);
+}
+// 範本頁的編輯框讀出來。
+function readTplEd() {
+  const box = document.getElementById("mtpl-ed"); if (!box) return S.mtplEd;
+  const v = id => ((document.getElementById(id) || {}).value || "").trim();
+  return { id: box.dataset.id || null, title: v("mtpl-title"), scope: v("mtpl-scope"),
+    sections: [...box.querySelectorAll("[data-mtpl-sec]")].map(li => ({ h: ((li.querySelector(".mtpl-h") || {}).value || "").trim(), hint: ((li.querySelector(".mtpl-hint") || {}).value || "").trim() })) };
+}
+async function reloadTemplates() {
+  try { S.mtpl = await D.loadMeetingTemplates(); } catch (e) { S.msg = T("err.mtLoad") + D.says(e); }
 }
 function readMeeting() {
   const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
@@ -274,6 +310,8 @@ async function openTab(t) {
     if (fm[2]) { S.view = fm[2]; S.msg = ""; render(); }
     return;
   }
+  // 會議範本（2026-11-13）：#mtemplates。
+  if (t === "mtemplates") { S.view = "mtemplates"; S.mtplEd = null; S.msg = ""; await reloadTemplates(); render(); return; }
   // 會議（2026-11-02）：#meetings 清單，#meetings/<id> 一場。
   const mt = /^meetings(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
   if (mt) {
@@ -448,6 +486,15 @@ async function onAutosave(act, box, field) {
       dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.evSaved"));
       return;
     }
+    if (act === "mt-min") {
+      const m = (S.meetings || []).find(x => x.id === id); if (!m) return;
+      const mins = readMinutes("mtm"), tplEl = document.getElementById("mtm-tpl"), tpl = tplEl ? (tplEl.value || null) : (m.template_id || null);
+      await D.saveMeetingMinutes(id, tpl, mins);
+      m.minutes = mins.filter(x => x.h.trim() || x.text.trim()); m.template_id = tpl;
+      S.mtDraft = Object.assign({}, S.mtDraft, { minutes: mins, tpl });
+      dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.mtmSaved"));
+      return;
+    }
     if (act === "mt-save") {
       const m = (S.meetings || []).find(x => x.id === id); if (!m) return;
       const d = readMeeting(); S.mtDraft = Object.assign({}, S.mtDraft, d);
@@ -459,7 +506,7 @@ async function onAutosave(act, box, field) {
       return;
     }
   } catch (e) {
-    fail((act === "ev-save" ? T("err.evSave") : act === "mt-save" ? T("err.mtSave") : act === "rq-save" ? T("err.rqSave") : T("err.save")) + D.says(e));
+    fail((act === "ev-save" ? T("err.evSave") : act === "mt-save" ? T("err.mtSave") : act === "mt-min" ? T("err.mtmSave") : act === "rq-save" ? T("err.rqSave") : T("err.save")) + D.says(e));
   }
 }
 // 一場既有會議的勾人那一塊在 data-autosave 容器外面（勾了要先重畫，pk 的狀態在 S.mtDraft）；重畫完這裡補存一次。
@@ -549,7 +596,7 @@ document.addEventListener("click", async e => {
   if (act === "mt-open") { e.preventDefault(); history.pushState(null, "", "#meetings/" + id); await openTab("meetings/" + id); return; }
   if (act === "mt-back") { history.pushState(null, "", "#meetings"); await openTab("meetings"); return; }
   if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && (S.view === "meetings" || S.view === "meeting")) {
-    S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], b, true) }); render(); autosaveMeeting(); return;
+    keepMtDraft(); S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], b, true) }); render(); autosaveMeeting(); return;
   }
   // 「記下來」只剩新開一場（2026-11-06 起既有那一場改了就存，見 onAutosave）。
   if (act === "mt-save") {
@@ -559,10 +606,65 @@ document.addEventListener("click", async e => {
     S.busy = true; S.msg = ""; render();
     try {
       const newId = await D.saveMeeting(null, d);
-      S.busy = false; S.msg = T("msg.mtCreated", { title: d.title });
+      // 新開一場的時候就選了範本或打了字：會建好之後接著存紀錄。紀錄沒存進去不擋建會，訊息講清楚。
+      let minMsg = "";
+      if (document.getElementById("mtn-min")) {
+        const mins = readMinutes("mtn"), tpl = ((document.getElementById("mtn-tpl") || {}).value) || null;
+        if (tpl || mins.some(x => x.text.trim())) { try { await D.saveMeetingMinutes(newId, tpl, mins); } catch (x) { minMsg = " " + T("err.mtmSave") + D.says(x); } }
+      }
+      S.busy = false; S.msg = T("msg.mtCreated", { title: d.title }) + minMsg;
       S.mtDraft = null; S.vnOpen["mt-new"] = false; history.pushState(null, "", "#meetings/" + newId); await openTab("meetings/" + newId);
     } catch (e) { S.busy = false; S.msg = T("err.mtSave") + D.says(e); render(); }
     return;
+  }
+  // 會議紀錄（2026-11-13）：加一段、拿掉一段。
+  if ((act === "mtm-add" || act === "mtm-del") && (S.view === "meetings" || S.view === "meeting")) {
+    const idp = b.dataset.p === "mtm" ? "mtm" : "mtn";
+    keepMtDraft();
+    const mins = (S.mtDraft.minutes || []).slice();
+    if (act === "mtm-add") mins.push({ h: "", text: "" });
+    else {
+      const i = Number(b.dataset.i); const x = mins[i];
+      if (x && String(x.text || "").trim() && UI.needAsk(S, b, T("confirm.mtmDel", { h: x.h || T("mtm.hPh") }))) return;
+      mins.splice(i, 1); if (!mins.length) mins.push({ h: "", text: "" });
+    }
+    S.mtDraft.minutes = mins; render();
+    if (act === "mtm-add") { const hs = document.querySelectorAll(`#${idp}-min .mtm-h`); if (hs.length) hs[hs.length - 1].focus(); }
+    if (idp === "mtm") saveMinutesNow();
+    return;
+  }
+  // 會議範本頁（2026-11-13）
+  if (act && act.startsWith("mtpl-") && S.view === "mtemplates") {
+    if (act === "mtpl-new") { S.mtplEd = { id: null, title: "", scope: "", sections: [{ h: "", hint: "" }] }; S.msg = ""; render(); const t = document.getElementById("mtpl-title"); if (t) t.focus(); return; }
+    if (act === "mtpl-edit") { const t = UI.mtTplById(S.mtpl, id); if (!t) return; S.mtplEd = { id: t.id, title: t.title, scope: t.scope || "", sections: (t.sections || []).map(x => ({ h: x.h || "", hint: x.hint || "" })) }; S.msg = ""; render(); return; }
+    if (act === "mtpl-cancel") { S.mtplEd = null; render(); return; }
+    if (["mtpl-add", "mtpl-del", "mtpl-up", "mtpl-down"].includes(act)) {
+      const ed = readTplEd(); const i = Number(b.dataset.i); const sec = ed.sections;
+      if (act === "mtpl-add") sec.push({ h: "", hint: "" });
+      if (act === "mtpl-del") { sec.splice(i, 1); if (!sec.length) sec.push({ h: "", hint: "" }); }
+      if (act === "mtpl-up" && i > 0) [sec[i - 1], sec[i]] = [sec[i], sec[i - 1]];
+      if (act === "mtpl-down" && i < sec.length - 1) [sec[i + 1], sec[i]] = [sec[i], sec[i + 1]];
+      S.mtplEd = ed; render();
+      if (act === "mtpl-add") { const hs = document.querySelectorAll("#mtpl-ed .mtpl-h"); if (hs.length) hs[hs.length - 1].focus(); }
+      return;
+    }
+    if (act === "mtpl-save") {
+      const ed = readTplEd(); S.mtplEd = ed;
+      if (!ed.title) { S.msg = T("mtpl.needTitle"); render(); return; }
+      const sections = ed.sections.filter(x => x.h);
+      if (!sections.length) { S.msg = T("mtpl.needSec"); render(); return; }
+      S.busy = true; S.msg = ""; render();
+      try { await D.saveMeetingTemplate(ed.id, { title: ed.title, scope: ed.scope, sections }); await reloadTemplates(); S.busy = false; S.mtplEd = null; S.msg = T("mtpl.saved", { title: ed.title }); render(); }
+      catch (x) { S.busy = false; S.msg = T("err.mtplSave") + D.says(x); render(); }
+      return;
+    }
+    if (act === "mtpl-archive" || act === "mtpl-restore") {
+      const t = UI.mtTplById(S.mtpl, id); if (!t) return;
+      S.busy = true; S.msg = ""; render();
+      try { await D.archiveMeetingTemplate(id, act === "mtpl-archive"); await reloadTemplates(); S.busy = false; S.msg = T(act === "mtpl-archive" ? "mtpl.archived" : "mtpl.restored", { title: t.title }); render(); }
+      catch (x) { S.busy = false; S.msg = T("err.mtplSave") + D.says(x); render(); }
+      return;
+    }
   }
   // Google 日曆（2026-11-23）：再送一次，或現在同步回覆。
   if (act === "mt-gcal") {
@@ -1097,6 +1199,16 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 會議紀錄換範本（2026-11-13）：照新範本排段落、打過的字帶過去，重畫；在一場會的頁面上順手存。
+  if ((S.view === "meeting" || S.view === "meetings") && e.target && (e.target.id === "mtm-tpl" || e.target.id === "mtn-tpl")) {
+    const idp = e.target.id.slice(0, 3), tpl = e.target.value || null;
+    const typed = readMinutes(idp);
+    keepMtDraft();
+    S.mtDraft.minutes = UI.mtMinutesFrom(UI.mtTplById(S.mtpl, tpl), typed); S.mtDraft.tpl = tpl;
+    render();
+    if (idp === "mtm") saveMinutesNow();
+    return;
+  }
   if (S.view === "events" && e.target && e.target.id === "ev-fteam") { keepEvDraft(); S.evF = Object.assign({}, S.evF, { team: e.target.value }); render(); return; }
   // 活動頁的「場地」（2026-11-10）：選了就存，地點那一格空的話資料庫順手填場地名字，所以重讀活動。
   if (S.view === "event" && e.target && (e.target.id === "ev-kind" || e.target.id === "ev-term")) {
@@ -1117,7 +1229,7 @@ document.addEventListener("change", async e => {
   if (S.view === "request" && e.target && e.target.id === "rq-owner-team") { S.rqDraft = readRequest(); rqDraftSave(); return; }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
-  if (pkEl && (S.view === "meetings" || S.view === "meeting")) { S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); autosaveMeeting(); return; }
+  if (pkEl && (S.view === "meetings" || S.view === "meeting")) { keepMtDraft(); S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); autosaveMeeting(); return; }
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
   const el = e.target.closest('[data-act="members-level"]');
   if (!el || !S.mp || S.view !== "members") return;
@@ -1157,7 +1269,7 @@ document.addEventListener("input", e => {
   }
   // 會議的勾人那一塊（2026-11-02）：找名字。
   if (e.target && (e.target.dataset.act === "pk-q" || e.target.dataset.act === "pk-mq") && (S.view === "meetings" || S.view === "meeting")) {
-    S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], e.target, true) }); render(); UI.pkRefocus("mt", e.target.dataset.act === "pk-mq" ? "mq" : "q"); return;
+    keepMtDraft(); S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], e.target, true) }); render(); UI.pkRefocus("mt", e.target.dataset.act === "pk-mq" ? "mq" : "q"); return;
   }
   // 行銷需求單的送單頁：打一個字就存草稿（不重畫，游標不會跳）；發布日改了，7 天警告跟著出現或藏起來。
   if (S.view === "request" && e.target && e.target.closest && e.target.closest("#rq-form, #rq-shots")) {

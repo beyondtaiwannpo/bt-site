@@ -3272,6 +3272,34 @@ chkrole authenticated "${PAUL}" "★ 中文名一樣的同名成員：名單照�
 chkrole authenticated "${PAUL}" "★ 中文名不同、學校不同（Records 判成兩個人）：名單不標" "false" "select coalesce('00000000-0000-0000-0000-00000000d202' = any(maybe_dup), false)::text from public.roster() where person_id='00000000-0000-0000-0000-00000000d201'"
 chkrole authenticated "${PAUL}" "★ 按過「不是同一個人」的：名單不標" "false" "select coalesce('00000000-0000-0000-0000-00000000d302' = any(maybe_dup), false)::text from public.roster() where person_id='00000000-0000-0000-0000-00000000d301'"
 psql -d "${DB}" -X -A -t -q -c "delete from public.rc_not_same where a='00000000-0000-0000-0000-00000000d301'; delete from public.people where id in ('00000000-0000-0000-0000-00000000d101','00000000-0000-0000-0000-00000000d102','00000000-0000-0000-0000-00000000d201','00000000-0000-0000-0000-00000000d202','00000000-0000-0000-0000-00000000d301','00000000-0000-0000-0000-00000000d302');" 2>&1 | grep -i "error" || true
+echo "── 會議範本與會議紀錄（2026-12-18-meeting-templates.sql）──"
+mtp=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-18-meeting-templates.sql 2>&1 || true)
+if echo "${mtp}" | grep -q "OVERALL.*PASS" && ! echo "${mtp}" | grep -q "|FAIL"; then echo "  ok   會議範本那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 會議範本那支驗收表："; echo "${mtp}" | head -12; fail=$((fail+1)); fi
+mtp2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-18-meeting-templates.sql 2>&1 || true)
+if echo "${mtp2}" | grep -q "OVERALL.*PASS"; then echo "  ok   會議範本那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 會議範本重跑：${mtp2}" | head -5; fail=$((fail+1)); fi
+chk "重跑不會多塞預設範本" "3" "select count(*) from public.meeting_templates"
+chkas "${PAUL}" "Co-President 建得了範本" "true" "select (public.save_meeting_template(null,'Smoke 範本','board','[{\"h\":\"討論\",\"hint\":\"寫下來\"},{\"h\":\"  \",\"hint\":\"\"}]'::jsonb) is not null)::text"
+chk "空的段落被丟掉" "1" "select jsonb_array_length(sections) from public.meeting_templates where title='Smoke 範本'"
+chkraise "★ 一般幹部不能改範本（not_allowed）" "not_allowed" "perform set_config('test.uid','${ASSOC}',true); perform public.save_meeting_template(null,'x',null,'[{\"h\":\"a\"}]'::jsonb);"
+chkraise "沒有段落的範本存不了（no_sections）" "no_sections" "perform set_config('test.uid','${PAUL}',true); perform public.save_meeting_template(null,'x',null,'[]'::jsonb);"
+psql -d "${DB}" -X -A -t -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${ASSOC}','custom:meeting-templates','edit') on conflict do nothing;" 2>&1 | grep -i "error" || true
+chkas "${ASSOC}" "★ 被派進「會議範本」工作區（edit）之後改得了" "true" "select (public.save_meeting_template(null,'Assoc 範本',null,'[{\"h\":\"a\",\"hint\":\"\"}]'::jsonb) is not null)::text"
+chkas "${ASSOC}" "封存一份範本" "t" "select public.archive_meeting_template((select id from public.meeting_templates where title='Assoc 範本')); select archived::text::char(1) from public.meeting_templates where title='Assoc 範本'"
+psql -d "${DB}" -X -A -t -q -c "delete from public.assignments where user_id='${ASSOC}' and workspace_id='custom:meeting-templates';" 2>&1 | grep -i "error" || true
+chkraise "★ 拿掉之後又改不了" "not_allowed" "perform set_config('test.uid','${ASSOC}',true); perform public.archive_meeting_template((select id from public.meeting_templates where title='Assoc 範本'), false);"
+chkrole authenticated "${ASSOC}" "★ 幹部讀得到範本" "5" "select count(*) from public.meeting_templates"
+chkrole authenticated "${STU}" "★ 學員讀不到範本" "0" "select count(*) from public.meeting_templates"
+mtg=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.meeting_templates;" 2>&1 || true)
+if echo "${mtg}" | grep -qi "permission denied"; then echo "  ok   沒登入讀不到範本表"; pass=$((pass+1)); else echo "  FAIL anon 讀得到範本表：${mtg}"; fail=$((fail+1)); fi
+MTM=$(psql -d "${DB}" -X -A -t -q -c "insert into public.meetings (scope, title, starts_at, ends_at) values ('board','紀錄測試', now() + interval '2 day', now() + interval '2 day 1 hour') returning id;" | head -1 | tr -d ' ')
+chkas "${PAUL}" "★ 排會的人寫得了紀錄（有標題沒內文的段落留著，範本的樣子不會掉）" "3|討論" "select public.save_meeting_minutes('${MTM}', (select id from public.meeting_templates where title='Smoke 範本'), '[{\"h\":\"討論\",\"text\":\"決定了 A\"},{\"h\":\"其他\",\"text\":\"\"},{\"h\":\"\",\"text\":\"沒標題也留\"}]'::jsonb); select jsonb_array_length(minutes)||'|'||(minutes->0->>'h') from public.meetings where id='${MTM}'"
+chk "記住是用哪一份範本" "t" "select (template_id is not null)::text::char(1) from public.meetings where id='${MTM}'"
+chkraise "★ 不在名單上的一般幹部寫不了紀錄，建會的人是空的也一樣（not_allowed）" "not_allowed" "perform set_config('test.uid','${ASSOC}',true); perform public.save_meeting_minutes('${MTM}', null, '[]'::jsonb);"
+psql -d "${DB}" -X -A -t -q -c "insert into public.meeting_attendees (meeting_id, user_id) values ('${MTM}','${ASSOC}') on conflict do nothing;" 2>&1 | grep -i "error" || true
+chkas "${ASSOC}" "★ 在出席名單上就寫得了" "1" "select public.save_meeting_minutes('${MTM}', null, '[{\"h\":\"筆記\",\"text\":\"我記的\"}]'::jsonb); select jsonb_array_length(minutes) from public.meetings where id='${MTM}'"
+chkraise "★ 學員寫不了（not_cadre）" "not_cadre" "perform set_config('test.uid','${STU}',true); perform public.save_meeting_minutes('${MTM}', null, '[]'::jsonb);"
+chkraise "不存在的範本（no_such_template）" "no_such_template" "perform set_config('test.uid','${PAUL}',true); perform public.save_meeting_minutes('${MTM}', '00000000-0000-0000-0000-000000000009', '[]'::jsonb);"
+psql -d "${DB}" -X -A -t -q -c "delete from public.meetings where id='${MTM}'; delete from public.meeting_templates where title in ('Smoke 範本','Assoc 範本');" 2>&1 | grep -i "error" || true
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

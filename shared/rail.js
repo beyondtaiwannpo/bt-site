@@ -98,6 +98,8 @@ export const ITEMS = [
   { group: "forms",     key: "venues",     area: "events",    who: "cadre",  label: { zh: "場地", en: "Venues" } },
   { group: "forms",     key: "forms",      area: "events",    who: "cadre",  label: { zh: "計畫與招募", en: "Programs & recruitment" } },
   { group: "forms",     key: "meetings",   area: "meetings",  who: "cadre",  label: { zh: "會議", en: "Meetings" } },
+  // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
+  { group: "forms",     key: "mtemplates", area: "meetings",  who: "ws:custom:meeting-templates", label: { zh: "範本", en: "Templates" } },
   // 表單：要填的、內部表單、回饋表放在同一排（2026-11-13 Paul：「建內部表單」與「要填的」並排兩行很亂）
   { group: "teamforms", key: "fill",       area: "forms",     who: "cadre",  label: { zh: "要我填的", en: "To fill" } },
   { group: "teamforms", key: "build",      area: "forms",     who: "ws:team-forms", label: { zh: "內部表單", en: "Internal forms" } },

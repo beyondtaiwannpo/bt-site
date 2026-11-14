@@ -316,6 +316,11 @@ const SAYS = [
   ["not_event_venue_editor", "這場活動要「改」以上才換得了場地。", "You need Edit on this event to change its venue."],
   ["bad_email", "這看起來不像 email。", "That does not look like an email."],
   ["venues_list", "場地資料表還沒建，請 Paul 跑 2026-12-14-venues.sql。", "The venue tables are not set up yet. Ask Paul to run 2026-12-14-venues.sql."],
+  // 會議範本與紀錄（2026-11-13）
+  ["no_sections", "範本至少要有一段（一個小標題）。", "A template needs at least one section (a heading)."],
+  ["no_such_template", "找不到這份範本，可能剛被封存或刪掉了。", "This template no longer exists. It may have just been archived."],
+  ["save_meeting_minutes", "記會議紀錄要等資料庫更新（2026-12-18-meeting-templates.sql）跑完。", "Typing minutes needs the 2026-12-18-meeting-templates.sql database update to be run first."],
+  ["save_meeting_template", "會議範本要等資料庫更新（2026-12-18-meeting-templates.sql）跑完。", "Meeting templates need the 2026-12-18-meeting-templates.sql database update to be run first."],
   // 會議（2026-11-02）
   ["not_invited", "這場會的名單上沒有你。", "You are not on this meeting's list."],
   ["bad_doc_url", "會議紀錄的連結要是 Google Docs 或 Drive 的。", "The notes link must be a Google Docs or Drive link."],
@@ -542,11 +547,12 @@ export async function loadMeetings() {
   // 還沒跑 2026-11-17-meetings-home.sql 的資料庫沒有那一欄與那張表，退回舊的查法。
   const COLS = "id, scope, title, starts_at, ends_at, agenda, doc_url, reminded_at, created_by";
   let [m, a, n] = await Promise.all([
-    supabase.from("meetings").select(COLS + ", required, meet_url, gcal_event_id, gcal_error, gcal_pulled_at").order("starts_at", { ascending: false }),
+    supabase.from("meetings").select(COLS + ", required, meet_url, gcal_event_id, gcal_error, gcal_pulled_at, template_id, minutes").order("starts_at", { ascending: false }),
     supabase.from("meeting_attendees").select("meeting_id, user_id, status, replied_at"),
     supabase.from("meeting_rsvp_notes").select("meeting_id, user_id, note"),
   ]);
-  // 2026-11-22／11-23 的 Google 日曆欄位還沒跑就少那幾欄再讀，再不行才連 required 一起少。
+  // 2026-12-18 的會議紀錄兩欄（template_id、minutes）還沒跑就先少那兩欄；2026-11-22／11-23 的 Google 日曆欄位還沒跑就再少那幾欄，再不行才連 required 一起少。
+  if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(COLS + ", required, meet_url, gcal_event_id, gcal_error, gcal_pulled_at").order("starts_at", { ascending: false });
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(COLS + ", required").order("starts_at", { ascending: false });
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(COLS).order("starts_at", { ascending: false });
   if (m.error) throw m.error;
@@ -561,6 +567,32 @@ export async function saveMeeting(id, d) {
   const { data, error } = await supabase.rpc("save_meeting", { p_id: id || null, p_scope: d.scope, p_title: d.title, p_starts: d.starts_at, p_ends: d.ends_at, p_agenda: d.agenda || "", p_doc_url: d.doc_url || null, p_attendees: d.attendees || [], p_required: d.required == null ? null : !!d.required });
   if (error) throw error;
   return data;
+}
+// ── 會議範本與會議紀錄（2026-11-13，supabase/migrations/2026-12-18-meeting-templates.sql）──
+// 範本幹部都讀得到；改範本只有 Co-President、Senior Adviser 與被派進「會議範本」工作區的人（門在資料庫）。
+// 表還沒建（遷移檔還沒跑）回 null，畫面就不畫範本那一塊。
+export async function loadMeetingTemplates() {
+  need();
+  const { data, error } = await supabase.from("meeting_templates").select("id, title, scope, sections, archived, updated_at").order("title");
+  if (error) { if (["42P01", "PGRST205"].includes(String(error.code))) return null; throw error; }
+  return data || [];
+}
+export async function saveMeetingTemplate(id, d) {
+  need();
+  const { data, error } = await supabase.rpc("save_meeting_template", { p_id: id || null, p_title: d.title, p_scope: d.scope || null, p_sections: d.sections || [] });
+  if (error) throw error;
+  return data;
+}
+export async function archiveMeetingTemplate(id, archived) {
+  need();
+  const { error } = await supabase.rpc("archive_meeting_template", { p_id: id, p_archived: archived !== false });
+  if (error) throw error;
+}
+// 會議紀錄：minutes 是 [{ h, text }]，template 是用哪一份範本開的（可以是 null）。
+export async function saveMeetingMinutes(id, template, minutes) {
+  need();
+  const { error } = await supabase.rpc("save_meeting_minutes", { p_id: id, p_template: template || null, p_minutes: minutes || [] });
+  if (error) throw error;
 }
 export async function deleteMeeting(id) {
   need();
