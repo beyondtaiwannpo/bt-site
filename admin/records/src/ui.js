@@ -864,8 +864,9 @@ export function numbersHTML(n, prev) {
 // 總覽：數量、每一屆的活動與四個數字。
 export function overviewHTML(boot, msg) {
   const b = boot || {}, c = b.counts || {}, events = b.events || [];
-  const kpis = b.can_view ? `<div class="todo">${[["ov.people", c.people], ["ov.students", c.students], ["ov.participation", c.participation], ["ov.responses", c.responses], ["ov.pairs", c.pairs], ["ov.outcomes", c.outcomes]]
-    .map(([k, n]) => `<div class="kpi"><div class="kpi-n">${n == null ? "–" : esc(String(n))}</div><div class="kpi-l">${esc(T(k))}</div></div>`).join("")}</div>` : "";
+  // 2026-11-13 Paul：「這些數字放最前面有什麼用？可以收起來嗎」。是整個 Records 的總數，不用處理什麼，收成一行；要看再打開。
+  const kpis = b.can_view ? `${foldStart("ov-totals", "data-totals", T("ov.totals", { n: c.people == null ? "–" : c.people }), null)}<div class="todo">${[["ov.people", c.people], ["ov.students", c.students], ["ov.participation", c.participation], ["ov.responses", c.responses], ["ov.pairs", c.pairs], ["ov.outcomes", c.outcomes]]
+    .map(([k, n]) => `<div class="kpi"><div class="kpi-n">${n == null ? "–" : esc(String(n))}</div><div class="kpi-l">${esc(T(k))}</div></div>`).join("")}</div></div></details>` : "";
   const terms = [...new Set(events.map(e => e.term_id || ""))].sort((x, y) => (y || "").localeCompare(x || ""));
   const row = e => { const n = scorecard(e.numbers); return `<tr>
       <td class="t-main"><a href="#overview/${esc(e.id)}" data-act="open-event" data-id="${esc(e.id)}"><b>${esc(evTitle(e))}</b></a><br>${kindTag(e.kind)} <span class="mini">${esc(fmtDay(e.starts_at))}${e.team ? "・" + esc(e.team) : ""}</span></td>
@@ -1329,7 +1330,8 @@ export function dupAsideHTML(dups, busy) {
   const row = p => `<div class="rc-aside"><div>${side(p, "a")} <span class="vs">${esc(T("dup.vs"))}</span> ${side(p, "b")}</div>
       <div class="mini">${esc(T("dup.asideWhy", { ev: evText(p.why) }))}</div>
       <div><button class="btn ghost sm" data-act="merge" data-keep="${esc(p.a)}" data-drop="${esc(p.b)}"${busy ? " disabled" : ""}>${esc(T("dup.asideMerge"))}</button></div></div>`;
-  return sectionHTML(T("dup.asideTitle", { n: items.length }), `<div class="mini">${esc(T("dup.asideHint"))}</div>${items.map(row).join("")}`);
+  // 2026-11-13 Paul：「為什麼這些不是重複的也列出來？」這一段是系統判斷「同名但是兩個人」的清單，只是給人抓錯，不用處理。收成一行。
+  return `<div class="rc-aside-wrap">${foldStart("dup-aside", "data-aside", T("dup.asideTitle", { n: items.length }), null)}<div class="mini">${esc(T("dup.asideHint"))}</div>${items.map(row).join("")}</div></details></div>`;
 }
 // 從卡上讀「留哪欄、勾了哪幾欄」。純函式：box 是那張卡的 DOM（或假的 querySelectorAll）。
 export function dupPick(box) {

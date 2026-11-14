@@ -3258,6 +3258,20 @@ chkraise "★ 不是財務的人拿不到挑活動的清單（not_finance_viewer
 chkas "${EVX}" "★ 從活動頁送需求單，掛在那一場，活動頁看得到" "true|1" "select public.submit_request(jsonb_build_object('kind','post','title','Smoke 海報','platforms',jsonb_build_array('ig_carousel'),'event_id','${NEV}')); select (r.event_id='${NEV}')::text||'|'||jsonb_array_length(public.event_links('${NEV}')->'requests') from public.requests r where r.title='Smoke 海報'"
 chkas "${OUTC}" "★ 沒被加進那場、也不在 Marketing 的幹部看不到掛在那場的需求單" "0" "select jsonb_array_length(public.event_links('${NEV}')->'requests')"
 chkraise "送需求單掛不存在的活動（no_such_event）" "no_such_event" "perform set_config('test.uid','${EVX}',true); perform public.submit_request(jsonb_build_object('kind','post','title','x','event_id','00000000-0000-0000-0000-000000000009'));"
+echo "── 名單的「可能是同一個人」跟 Records 同一套判斷（2026-12-17-roster-dup-verdict.sql）──"
+rdv=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-17-roster-dup-verdict.sql 2>&1 || true)
+if echo "${rdv}" | grep -q "OVERALL.*PASS" && ! echo "${rdv}" | grep -q "|FAIL"; then echo "  ok   名單判斷那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 名單判斷那支驗收表："; echo "${rdv}" | head -10; fail=$((fail+1)); fi
+# 三對同英文名的成員：一對中文名一樣（像同一個人，要標）、一對中文名不同且學校不同（系統判兩個人，不標）、一對有人按過「不是同一個人」（不標）。
+psql -d "${DB}" -X -A -t -q -c "insert into public.people (id, kind, name_en, name_zh, school) values
+  ('00000000-0000-0000-0000-00000000d101','member','Smoke Twin','煙一','甲高中'),('00000000-0000-0000-0000-00000000d102','member','smoke twin','煙一',null),
+  ('00000000-0000-0000-0000-00000000d201','member','Smoke Apart','煙二','甲高中'),('00000000-0000-0000-0000-00000000d202','member','Smoke Apart','霧二','乙高中'),
+  ('00000000-0000-0000-0000-00000000d301','member','Smoke Said','煙三',null),('00000000-0000-0000-0000-00000000d302','member','Smoke Said','煙三',null)
+  on conflict (id) do nothing;
+  insert into public.rc_not_same (a, b) values ('00000000-0000-0000-0000-00000000d301','00000000-0000-0000-0000-00000000d302') on conflict do nothing;" 2>&1 | grep -i "error" || true
+chkrole authenticated "${PAUL}" "★ 中文名一樣的同名成員：名單照樣標「可能是同一個人」" "true" "select ('00000000-0000-0000-0000-00000000d102' = any(maybe_dup))::text from public.roster() where person_id='00000000-0000-0000-0000-00000000d101'"
+chkrole authenticated "${PAUL}" "★ 中文名不同、學校不同（Records 判成兩個人）：名單不標" "false" "select coalesce('00000000-0000-0000-0000-00000000d202' = any(maybe_dup), false)::text from public.roster() where person_id='00000000-0000-0000-0000-00000000d201'"
+chkrole authenticated "${PAUL}" "★ 按過「不是同一個人」的：名單不標" "false" "select coalesce('00000000-0000-0000-0000-00000000d302' = any(maybe_dup), false)::text from public.roster() where person_id='00000000-0000-0000-0000-00000000d301'"
+psql -d "${DB}" -X -A -t -q -c "delete from public.rc_not_same where a='00000000-0000-0000-0000-00000000d301'; delete from public.people where id in ('00000000-0000-0000-0000-00000000d101','00000000-0000-0000-0000-00000000d102','00000000-0000-0000-0000-00000000d201','00000000-0000-0000-0000-00000000d202','00000000-0000-0000-0000-00000000d301','00000000-0000-0000-0000-00000000d302');" 2>&1 | grep -i "error" || true
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -228,7 +228,7 @@ test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留
   assert.match(aside, /data-act="merge" data-keep="m" data-drop="n"/); assert.match(aside, /different email|email 不同/); assert.match(aside, /安一/); assert.match(aside, /c@x\.io/);
   assert.equal(UI.dupAsideHTML([{ members: [], set_aside: [] }], false), "");
   const pp = UI.peopleHTML({ duplicates: [{ key: "k3", members: [], set_aside: [{ a: "m", b: "n", a_name: "A", b_name: "A", why: [] }] }], counts: {}, can_manage: true }, { ptab: "dups", dir: [] });
-  assert.match(pp, /Possible duplicates \(0\)|可能重複（0）/); assert.match(pp, /kept apart \(1\)|沒放在一起（1 對）/);
+  assert.match(pp, /Possible duplicates \(0\)|可能重複（0）/); assert.match(pp, /different people \(1\)|不是同一個人（1 對）/); assert.match(pp, /<details class="fold rc-fold" data-aside data-fold="[^"]*dup-aside"><summary>/, "收著（2026-11-13）");
   // 卡上多一列「讀過的學校」（不重印現在那一所）
   const h3 = UI.dupGroupHTML({ key: "k4", suggest: "y", members: [{ id: "y", name: "A", school: "UWC", schools: ["UWC", "TFG"] }, { id: "z", name: "A", school: "", schools: [] }] }, false);
   assert.match(h3, /Schools over time|讀過的學校/); assert.match(h3, /<td>TFG<\/td>/); assert.doesNotMatch(h3, /<td>UWC<br>TFG<\/td>/);

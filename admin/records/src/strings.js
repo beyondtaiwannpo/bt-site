@@ -245,6 +245,7 @@ export const MINE = {
   // 總覽
   "ov.title":         { zh: "活動記分卡", en: "Event scorecards" },
   "ov.lede":          { zh: "每一場活動四個數字，加一句「下一次我們改什麼」。點一場看細節。", en: "Four numbers per event, plus one line on what to change next time. Open an event for details." },
+  "ov.totals":        { zh: "Records 裡總共有什麼（{n} 個人）", en: "Totals in Records ({n} people)" },
   "ov.people":        { zh: "名單上的人", en: "People" },
   "ov.students":      { zh: "其中學員", en: "of them students" },
   "ov.participation": { zh: "出席紀錄", en: "Participation rows" },
@@ -528,8 +529,8 @@ export const MINE = {
   "dup.mergeBtnN":    { zh: "把勾起來的 {n} 欄併進第 {col} 欄", en: "Merge {n} ticked {n:column|columns} into column {col}" },
   "dup.mergeBtn0":    { zh: "先勾要併進去的那一欄", en: "Tick a column to merge in first" },
   "dup.vs":           { zh: "跟", en: "and" },
-  "dup.asideTitle":   { zh: "像兩個人，沒放在一起（{n} 對）", en: "Look like two people, kept apart ({n})" },
-  "dup.asideHint":    { zh: "同名但系統比過 email、中文名、學校之後覺得是兩個人，所以不放在上面的卡裡。覺得其實是同一個的，按右邊那顆併起來（左邊那個留著）。", en: "Same name, but after comparing email, Chinese name and school the system thinks these are two people, so they are not on a card above. If you know they are one person, press the button to merge (the left one is kept)." },
+  "dup.asideTitle":   { zh: "同名但不是同一個人（{n} 對），不用處理", en: "Same name, different people ({n}): nothing to do" },
+  "dup.asideHint":    { zh: "這些人英文名一樣，但系統比過 email、中文名、學校之後判斷是兩個不同的人，所以不算重複。列在這裡只是讓你抓錯：萬一其實是同一個人，按右邊那顆併起來（左邊那個留著）。", en: "These people share an English name, but after comparing email, Chinese name and school the system decided they are different people, so they are not duplicates. They are listed only so you can catch a mistake: if two are in fact one person, press the button to merge (the left one is kept)." },
   "dup.asideWhy":     { zh: "為什麼：{ev}", en: "Why: {ev}" },
   "dup.asideMerge":   { zh: "其實是同一個人，併起來", en: "They are one person, merge" },
   "dup.retire":       { zh: "這欄有登入帳號（{emails}）。併進去會把這個登入刪掉，出席、配對、去向、答案、學校紀錄都搬到留的那個帳號；那個 email 從此登不進來。", en: "This column has a login ({emails}). Merging retires that login: its events, pairs, outcomes, answers and schools move to the kept account, and that email can no longer sign in." },
