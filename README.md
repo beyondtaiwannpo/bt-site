@@ -789,6 +789,8 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 - 清單怎麼排、誰看得到哪一行：`home/src/ui.js` 的 `waitingList()`，純函式。讀資料：`home/src/data.js` 的 `loadWaiting()`，只讀、每一項各自接住（讀不到就當沒有），只問看得到的人（不是 senior 不問團隊頁與校友故事）。
 - `test/home-waiting.test.mjs` 11 條守著。**沒有動資料庫**，誰能做什麼一條都沒變。
 
+**正式資料庫**：2026-11-14 Paul 把 `2026-12-18-meeting-templates.sql` 到 `2026-12-25-access-model.sql` 八支依序在正式 Supabase 上跑完。
+
 **同一天順手改的**：人與權限 → 幹部名單，同一屆兼好幾個職位的人，職位照職級排（Co-President、Senior Adviser、Director、Adviser、Associate）。以前照輸入的順序，兩位 Co-President 一位的「Co-President」在第一行、另一位在第二行。`admin/people/src/ui.js` 的 `positionsFor()`；改一個人那一頁的職位列也是這個順序。
 
 ## 表單引擎：申請表單變得像 Tally（`shared/forms.js`、`supabase/migrations/2026-12-20-form-engine.sql`，2026-11-13）
