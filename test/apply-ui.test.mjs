@@ -38,9 +38,14 @@ test("★ 沒登入：題目看得到，但填不了，而且有登入的路", (
   assert.ok((h.match(/disabled/g) || []).length >= 3, "每一格都要鎖住");
 });
 
+// 2026-11-13 起可以填的表單由 shared/forms.js 的引擎畫（main.js mount 在 #fx-run 上），第一頁可以用 F.pageHTML 先畫出來。
+const F = await import("../shared/forms.js");
+const runHTML = (questions, busy, en) => F.pageHTML(F.evaluate(questions, {}), { busy }, { en, bottomHTML: A.guardianHTML("", en), submitLabel: "送出申請" });
+
 test("登入而且資料齊了：填得了、送得出、而且問得到家長信箱", () => {
-  const h = A.formHTML(form, qs, "signedIn", "", false, false);
-  assert.match(h, /data-act="submit"/);
+  const h = A.formHTML(form, qs, "signedIn", "", false, false, runHTML(qs, false, false));
+  assert.match(h, /id="fx-run"/);
+  assert.match(h, /data-fxnav="submit"/);
   assert.match(h, /id="guard"/, "未成年的家長 email 是 2026-09-07 拍板的，不能漏");
   assert.doesNotMatch(h, /disabled/);
 });
@@ -48,33 +53,55 @@ test("登入而且資料齊了：填得了、送得出、而且問得到家長�
 test("資料沒填齊：擋在前面，而且告訴他去哪裡填", () => {
   const h = A.formHTML(form, qs, "needProfile", "", false, false);
   assert.match(h, /姓名、學校、年級/);
-  assert.doesNotMatch(h, /data-act="submit"/);
+  assert.doesNotMatch(h, /data-fxnav="submit"/);
 });
 
 test("已經送過了就說出來，不要讓他再填一次", () => {
   assert.match(A.formHTML(form, qs, "already", "", false, false), /已經送出過/);
 });
 
+test("收滿了、還沒開放：說出來，不畫題目也不畫按鈕", () => {
+  const h = A.formHTML(form, qs, "closed", "", false, false, "", "full");
+  assert.match(h, /收滿/);
+  assert.doesNotMatch(h, /fx-q/);
+  assert.match(A.formHTML(form, qs, "closed", "", false, true, "", "not_yet"), /not open yet/);
+  assert.match(A.listHTML([{ ...form, is_full: true }], false), /已收滿/);
+  assert.doesNotMatch(A.listHTML([{ ...form, is_full: true }], false), /我要申請/);
+});
+
 test("必填有星號，選項畫得出來", () => {
-  const h = A.formHTML(form, qs, "signedIn", "", false, false);
+  const h = runHTML(qs, false, false);
   assert.match(h, /必填/);
   for (const o of qs[1].options) assert.match(h, new RegExp(o));
   assert.match(h, /type="radio"/, "單選要用 radio");
 });
 
 test("多選用 checkbox，長答用 textarea", () => {
-  const h = A.formHTML(form, [{ ...qs[1], type: "multi" }, qs[0]], "signedIn", "", false, false);
+  const h = runHTML([{ ...qs[1], type: "multi" }, qs[0]], false, false);
   assert.match(h, /type="checkbox"/);
   assert.match(h, /<textarea/);
 });
 
 test("送出中的時候鎖住按鈕", () => {
-  assert.match(A.formHTML(form, qs, "signedIn", "", true, false), /data-act="submit" disabled/);
+  assert.match(runHTML(qs, true, false), /data-fxnav="submit" disabled/);
 });
 
-test("★ 失敗一定要說話", () => {
-  assert.match(A.formHTML(form, qs, "signedIn", "這幾題還沒填：你為什麼想參加", false, false),
-    /這幾題還沒填/);
+test("★ 失敗一定要說話，伺服器的錯誤翻成人話", () => {
+  assert.match(A.formHTML(form, qs, "signedIn", "這幾題還沒填：你為什麼想參加", false, false), /這幾題還沒填/);
+  assert.match(A.says({ message: "missing:你為什麼想參加" }, false), /這幾題還沒填：你為什麼想參加/);
+  assert.match(A.says({ message: "bad_answer:Email" }, false), /格式不對：Email/);
+  assert.match(A.says({ message: "email_used" }, false), /這個 email 已經送過/);
+  assert.match(A.says({ message: "full" }, true), /full/);
+  assert.match(A.says({ message: "weird_thing" }, false), /weird_thing/, "沒對到的原樣顯示");
+});
+
+test("有換頁的表單：第一頁只畫第一頁的題，按鈕是下一頁，有進度條", () => {
+  const paged = [qs[0], { id: "p2", type: "page", label: "關於你" }, qs[1]];
+  const h = runHTML(paged, false, false);
+  assert.match(h, /data-fxnav="next"/);
+  assert.doesNotMatch(h, /你想讀什麼/);
+  assert.match(h, /第 1 頁，共 2 頁/);
+  assert.doesNotMatch(h, /id="guard"/, "家長 email 在最後一頁");
 });
 
 test("英文版走英文字串", () => {
@@ -116,10 +143,11 @@ test("表單頁：唯讀的時候每一格都鎖住，也沒有存檔與刪除",
   assert.ok((h.match(/disabled/g) || []).length >= 6);
 });
 
-test("表單頁：四種題型都在，而且說明了哪一種是什麼", () => {
-  const h = M.questionHTML(null, "", false);
-  for (const t of M.TYPES) assert.match(h, new RegExp(`>${M.T(t.label)}</option>`));
+test("表單頁：畫布上每一塊的題型下拉列得出十五種，選項一行一個", () => {
+  const h = M.formHTML(af, [{ id: "a", label: "一", type: "single", required: false, options: ["x", "y"] }], true, [], "", false);
+  for (const t of M.F.TYPES) assert.match(h, new RegExp(`value="${t.v}"`), t.v);
   assert.match(h, /一行一個/, "選項怎麼填要講");
+  assert.match(h, /條件邏輯/);
 });
 
 test("★ 日期格式：datetime-local 與 date 都不能塞整串 ISO 進去", () => {
@@ -133,9 +161,9 @@ test("題目列有上下移動，第一題不能上移、最後一題不能下�
   const h = M.formHTML(af, [{ id: "a", label: "一", type: "short", required: false, options: [] },
                             { id: "b", label: "二", type: "short", required: false, options: [] }],
                        true, [], "", false);
-  const ups = h.match(/data-act="q-up"[^>]*/g);
+  const ups = h.match(/data-act="fx-up"[^>]*/g);
   assert.ok(ups[0].includes("disabled"), "第一題還能往上移");
-  const downs = h.match(/data-act="q-down"[^>]*/g);
+  const downs = h.match(/data-act="fx-down"[^>]*/g);
   assert.ok(downs[1].includes("disabled"), "最後一題還能往下移");
 });
 

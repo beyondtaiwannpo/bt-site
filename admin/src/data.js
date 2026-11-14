@@ -3,6 +3,7 @@
 import { supabase } from "../../shared/supabase.js";
 import { authMessage, whoAmI } from "../../shared/auth.js";
 import { T, lang } from "./strings.js";
+import * as F from "../../shared/forms.js";
 
 const need = () => { if (!supabase) throw new Error(authMessage(null)); };
 
@@ -58,12 +59,13 @@ export async function loadForm(id) {
   need();
   const [f, q] = await Promise.all([
     supabase.from("forms").select("*").eq("id", id).maybeSingle(),
-    supabase.from("form_questions").select("*").eq("form_id", id).order("ord"),
+    supabase.from("form_questions").select("*").eq("form_id", id).order("ord").order("id"),
   ]);
   if (f.error) throw f.error;
   if (q.error) throw q.error;
   if (!f.data) throw new Error(T("err.noForm"));
-  return { form: f.data, questions: q.data || [] };
+  // 引擎要的形狀（config、logic 補預設），ord 留著（排序要用）。
+  return { form: f.data, questions: (q.data || []).map(x => Object.assign(F.normalize(x), { ord: x.ord })) };
 }
 
 // 新表單一律是 draft。**沒有「建立就開放」這條路**：
@@ -80,13 +82,16 @@ export async function createForm(team, title, kind) {
 // 送回一個我們沒有權限寫的欄位（created_at、updated_at）整句會被拒，
 // 而那個拒絕長得像「存檔失敗」，看不出是哪一欄的問題（2026-09-01 的坑）。
 const FORM_FIELDS = ["title", "intro", "kind", "lang", "status",
-                     "opens_at", "closes_at", "notify_by", "interview_url", "team"];
+                     "opens_at", "closes_at", "notify_by", "interview_url", "team",
+                     "max_responses", "hidden_fields"];
 export async function saveForm(id, patch) {
   need();
   const clean = {};
   for (const k of FORM_FIELDS) if (k in patch) clean[k] = patch[k] === "" ? null : patch[k];
   // title 不准變成 null，那會讓清單上出現一份沒有名字的表單。
   if ("title" in clean && !clean.title) throw new Error(T("err.formName"));
+  if ("hidden_fields" in clean) clean.hidden_fields = F.cleanHiddenNames(clean.hidden_fields || "");
+  if ("max_responses" in clean) clean.max_responses = clean.max_responses ? Math.max(1, parseInt(clean.max_responses, 10) || 0) || null : null;
   const { error } = await supabase.from("forms").update(clean).eq("id", id);
   if (error) throw error;
 }
@@ -97,21 +102,39 @@ export async function deleteForm(id) {
   if (error) throw error;
 }
 
-// ord 取現有最大值加一。**不是題目數量加一** ——
-// 中間刪過題目的話數量會跟號碼對不上，新題目就會插到中間。
-export async function addQuestion(formId, q, existing) {
-  need();
-  const ord = existing.reduce((m, x) => Math.max(m, x.ord), 0) + 1;
-  const { error } = await supabase.from("form_questions").insert({ ...q, form_id: formId, ord });
-  if (error) throw error;
+// ── 題目（2026-11-13 起是畫布，shared/forms.js）────────────────────────
+// 一題存回去的欄位。2026-12-20-form-engine.sql 多了 config、logic、key；還沒跑的資料庫（PGRST204 = 沒有這一欄）退回四個舊欄位。
+const qRow = q => ({ label: q.label, help: q.help || null, type: q.type, required: !!q.required, options: q.options || [],
+                     config: q.config || {}, logic: q.logic || [], key: q.key || null });
+const oldRow = q => ({ label: q.label, help: q.help || null, type: q.type, required: !!q.required, options: q.options || [] });
+const colMissing = e => e && (String(e.code) === "PGRST204" || String(e.code) === "42703");
+const typeRefused = e => e && String(e.code) === "23514" && /type/.test(String(e.message || ""));
+function qErr(e) {
+  if (e && String(e.code) === "23505") return new Error(T("err.qKey"));
+  if (typeRefused(e)) return new Error(T("err.oldDb"));
+  return e;
 }
+
+// 在第 at 個位置插一題（at = 題數就是放在最後）。後面的題 ord 往後推一格，只改真的變了的。回新的那一題的 id。
+export async function insertQuestion(formId, q, at, existing) {
+  need();
+  const list = (existing || []).slice().sort((a, b) => a.ord - b.ord);
+  const pos = Math.max(0, Math.min(at == null ? list.length : at, list.length));
+  let r = await supabase.from("form_questions").insert({ ...qRow(q), form_id: formId, ord: pos + 1 }).select("id").single();
+  if (colMissing(r.error)) r = await supabase.from("form_questions").insert({ ...oldRow(q), form_id: formId, ord: pos + 1 }).select("id").single();
+  if (r.error) throw qErr(r.error);
+  const ids = list.map(x => x.id); ids.splice(pos, 0, r.data.id);
+  await reorderQuestions(list.concat([{ id: r.data.id, ord: pos + 1 }]), ids);
+  return r.data.id;
+}
+// 舊的「加這一題」（放在最後）留著給還在用的地方。
+export async function addQuestion(formId, q, existing) { return insertQuestion(formId, q, (existing || []).length, existing); }
 
 export async function saveQuestion(id, q) {
   need();
-  const { error } = await supabase.from("form_questions")
-    .update({ label: q.label, help: q.help, type: q.type, required: q.required, options: q.options })
-    .eq("id", id);
-  if (error) throw error;
+  let r = await supabase.from("form_questions").update(qRow(q)).eq("id", id);
+  if (colMissing(r.error)) r = await supabase.from("form_questions").update(oldRow(q)).eq("id", id);
+  if (r.error) throw qErr(r.error);
 }
 
 export async function deleteQuestion(id) {
@@ -120,10 +143,16 @@ export async function deleteQuestion(id) {
   if (error) throw error;
 }
 
-// 上下移動：跟旁邊那一題交換 ord。
-// **兩句 update，中間會有一瞬間兩題同號** —— 這是可以接受的，
-// 因為 form_questions 刻意沒有 unique(form_id, ord)（見那張表的註解）。
-// 有 unique 的話這裡就要先搬到一個暫時號碼再搬回來，三句換一個沒人在意的性質。
+// 照新的 id 順序把 ord 改成 1、2、3…（只改真的變了的）。拖曳、上下移動、插在中間都走這一支。
+// **一句一句改，中間會有一瞬間兩題同號**，那是可以接受的：form_questions 刻意沒有 unique(form_id, ord)（見那張表的註解）。
+export async function reorderQuestions(items, ids) {
+  need();
+  for (const p of F.reorderPatch(items, ids)) {
+    const { error } = await supabase.from("form_questions").update({ ord: p.ord }).eq("id", p.id);
+    if (error) throw error;
+  }
+}
+// 上下移動：跟旁邊那一題交換 ord（留著給舊的測試與呼叫的地方）。
 export async function swapOrd(a, b) {
   need();
   const r1 = await supabase.from("form_questions").update({ ord: b.ord }).eq("id", a.id);

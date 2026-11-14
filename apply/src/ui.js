@@ -3,6 +3,7 @@
 // 這一頁的外殼是中英雙語，但**表單的內容是單語的** ——
 // 一份表單一種語言（2026-09-07 拍板），題目沒有雙語欄位。
 // 所以：頁面的骨架文字走下面的 T()，題目與說明照原文顯示。
+import * as F from "../../shared/forms.js";
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const DICT = {
@@ -33,6 +34,15 @@ const DICT = {
   profile:  ["先把你的姓名、學校、年級填一下，送出申請要用。",
              "Please fill in your name, school and year first."],
   toProfile:["去填", "Fill it in"],
+  full:     ["這一份已經收滿了，謝謝你的興趣。下一場會先公布在 Instagram。", "This one is full. Thank you for your interest. The next one will be on Instagram first."],
+  notYet:   ["這一份還沒開始收件。", "This one is not open yet."],
+  closed:   ["這一份已經不收了。", "This one is closed."],
+  justClosed:["這一份申請剛剛關閉了。", "This application has just closed."],
+  emailUsed:["這個 email 已經送過這一份了。", "This email has already been used for this application."],
+  missing:  ["這幾題還沒填：", "Still missing: "],
+  badAnswer:["這一題的答案格式不對：", "This answer does not look right: "],
+  sendFail: ["送不出去：", "Could not send: "],
+  fullTag:  ["已收滿", "Full"],
 };
 const T = (k, en) => DICT[k][en ? 1 : 0];
 
@@ -68,55 +78,58 @@ export function listHTML(forms, en) {
         f.closes_at ? esc(T("closesAt", en)) + fmtDate(f.closes_at, en) : "",
         f.notify_by ? esc(T("notify", en)) + fmtDate(f.notify_by, en) + esc(T("notify2", en)) : "",
       ].filter(Boolean).join("・")}</div>
-      <a class="btn sm" href="?f=${encodeURIComponent(f.id)}">${esc(T("apply", en))}</a>
+      ${f.is_full ? `<span class="tagline">${esc(T("fullTag", en))}</span>` : `<a class="btn sm" href="?f=${encodeURIComponent(f.id)}">${esc(T("apply", en))}</a>`}
     </li>`).join("")}</ul>`;
   return block("program", group("program")) + block("board", group("board"));
 }
 
 // ── 一份表單 ──────────────────────────────────────────────────────────
+// 2026-11-13 起題目由 shared/forms.js 畫（三套表單共用的引擎）：十五種題型、條件邏輯、分頁與進度條。
 // state：
-//   signedIn  已登入而且資料齊了 → 畫得出可以填的表單
-//   needIn    沒登入 → 只給預覽加登入按鈕
+//   signedIn    已登入而且資料齊了 → 一頁一頁填的表單（main.js 在 #fx-run 上 mount 引擎）
+//   needIn      沒登入 → 整份攤開給人看過，每一格鎖住，加登入按鈕
 //   needProfile 登入了但姓名／學校／年級沒填完
-//   already   已經送出過
-export function formHTML(form, questions, state, msg, busy, en) {
+//   already     已經送出過
+//   closed      收滿了、還沒開放、或剛剛關了（reason 說是哪一種）
+// run：signedIn 時引擎第一次畫的那一頁（F.pageHTML 的結果），沒給就留一個空的 #fx-run。
+export function formHTML(form, questions, state, msg, busy, en, run, reason) {
   const editable = state === "signedIn";
-  const q = questions.map(x => `<div class="q" data-q="${esc(x.id)}">
-    <label for="q-${esc(x.id)}">${esc(x.label)}${x.required ? ` <span class="req">*${esc(T("required", en))}</span>` : ""}</label>
-    ${x.help ? `<p class="help">${esc(x.help)}</p>` : ""}
-    ${field(x, editable, en)}
-  </div>`).join("");
-
-  return `<p><button class="quiet" data-act="back">${esc(T("back", en))}</button></p>
+  const head = `<p><button class="quiet" data-act="back">${esc(T("back", en))}</button></p>
     <h3 style="font-family:var(--display);font-size:clamp(24px,2.8vw,34px);margin:14px 0 8px">${esc(form.title)}</h3>
-    ${form.intro ? `<p class="note" style="margin-bottom:16px">${esc(form.intro)}</p>` : ""}
+    ${form.intro ? `<p class="note" style="margin-bottom:16px">${esc(form.intro).replace(/\n/g, "<br>")}</p>` : ""}
     ${form.notify_by ? `<p class="when">${esc(T("notify", en))}${fmtDate(form.notify_by, en)}${esc(T("notify2", en))}</p>` : ""}
-    ${msg ? `<div class="warn">${esc(msg)}</div>` : ""}
-    ${state === "already" ? `<div class="warn">${esc(T("already", en))}</div>` : ""}
-    ${state === "needIn" ? `<div class="warn">${esc(T("needIn", en))}<br>${esc(T("preview", en))}</div>
-      <p><button class="btn" data-act="signin">${esc(T("signin", en))}</button></p>` : ""}
-    ${state === "needProfile" ? `<div class="warn">${esc(T("profile", en))}</div>
-      <p><button class="btn" data-act="signin">${esc(T("toProfile", en))}</button></p>` : ""}
-    ${q}
-    ${editable ? `<div class="q">
-      <label for="guard">${esc(T("guardian", en))}</label>
-      <p class="help">${esc(T("guardHelp", en))}</p>
-      <input id="guard" type="text" inputmode="email" autocomplete="off" spellcheck="false">
-    </div>
-    <p><button class="btn" data-act="submit" ${busy ? "disabled" : ""}>${
-      esc(busy ? T("sending", en) : T("submit", en))}</button></p>` : ""}`;
+    ${form.closes_at && state !== "closed" ? `<p class="when">${esc(T("closesAt", en))}${fmtDate(form.closes_at, en)}</p>` : ""}
+    ${msg ? `<div class="warn" role="alert">${esc(msg)}</div>` : ""}`;
+  if (editable) return head + `<div id="fx-run">${run || ""}</div>`;
+  return head
+    + (state === "already" ? `<div class="warn">${esc(T("already", en))}</div>` : "")
+    + (state === "closed" ? `<div class="warn">${esc(T(reason === "full" ? "full" : reason === "not_yet" ? "notYet" : "closed", en))}</div>` : "")
+    + (state === "needIn" ? `<div class="warn">${esc(T("needIn", en))}<br>${esc(T("preview", en))}</div>
+      <p><button class="btn" data-act="signin">${esc(T("signin", en))}</button></p>` : "")
+    + (state === "needProfile" ? `<div class="warn">${esc(T("profile", en))}</div>
+      <p><button class="btn" data-act="signin">${esc(T("toProfile", en))}</button></p>` : "")
+    + (state === "already" || state === "closed" ? "" : F.flatHTML(questions, en));
 }
 
-function field(x, editable, en) {
-  const dis = editable ? "" : " disabled";
-  if (x.type === "long") return `<textarea id="q-${esc(x.id)}"${dis}></textarea>`;
-  if (x.type === "single" || x.type === "multi") {
-    const t = x.type === "single" ? "radio" : "checkbox";
-    return (x.options || []).map((o, i) => `<label class="opt">
-      <input type="${t}" name="o-${esc(x.id)}" value="${esc(o)}"${dis}>
-      <span>${esc(o)}</span></label>`).join("");
-  }
-  return `<input id="q-${esc(x.id)}" type="text"${dis}>`;
+// 最後一頁送出鈕上面那一格：家長或監護人的 email（2026-09-07 拍板，未滿 18 歲請填）。
+export function guardianHTML(value, en) {
+  return `<div class="fx-q">
+      <label class="fx-label" for="guard">${esc(T("guardian", en))}</label>
+      <p class="fx-help">${esc(T("guardHelp", en))}</p>
+      <input id="guard" type="email" inputmode="email" autocomplete="off" spellcheck="false" value="${esc(value || "")}">
+    </div>`;
+}
+
+// 送出時伺服器回的錯誤翻成人話。**沒對到的原樣顯示，不要吞掉。**
+export function says(err, en) {
+  const m = String((err && err.message) || err || "");
+  if (m.startsWith("missing:")) return T("missing", en) + m.slice(8);
+  if (m.startsWith("bad_answer:")) return T("badAnswer", en) + m.slice(11);
+  if (m.includes("form_closed")) return T("justClosed", en);
+  if (m.includes("email_used")) return T("emailUsed", en);
+  if (/\bfull\b/.test(m)) return T("full", en);
+  if (m.includes("profile_incomplete")) return T("profile", en);
+  return T("sendFail", en) + m;
 }
 
 export function doneHTML(en) {

@@ -16,6 +16,8 @@ let S = {
   view: "home",            // home | list | form | question | apps | checkin | notice
   forms: [], teams: [],
   form: null, questions: [], qEditing: null,
+  // 題目畫布（2026-11-13，shared/forms.js）：fx 是 { mode: edit|preview, menuAt: 哪一條「＋」開著, filter: 打在 / 後面的字, logicOpen: Set }。
+  fx: { mode: "edit", menuAt: null, filter: "", logicOpen: new Set() },
   // 批 4
   apps: [], sel: new Set(), filter: "all", pending: [],
   // 首頁那一句「還有 N 封信沒寄出去」（2026-10-15）。一定要有初始值。
@@ -86,11 +88,9 @@ function render() {
   } else if (S.view === "apps" && S.form) {
     body = UI.appsHTML(S.form, S.apps, S.questions, canEditForm(S.form),
       S.sel, S.filter, S.pending, S.msg, S.busy);
-  } else if (S.view === "question") {
-    body = UI.questionHTML(S.qEditing, S.msg, S.busy);
-  } else if (S.view === "form" && S.form) {
+  } else if ((S.view === "form" || S.view === "question") && S.form) {
     body = UI.formHTML(S.form, S.questions, canEditForm(S.form),
-      S.me.board === "president" ? S.teams : [], S.msg, S.busy);
+      S.me.board === "president" ? S.teams : [], S.msg, S.busy, S.fx);
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else if (S.view === "meetings") {
@@ -145,6 +145,7 @@ function render() {
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
+  if ((S.view === "form" || S.view === "question") && S.fx.mode === "preview") mountPreview();
 }
 
 // 側欄與頂欄先畫（2026-11-06）：知道我是誰就先把外殼畫出來，內容那一格放骨架，資料回來 render() 整個換掉。
@@ -180,6 +181,9 @@ async function boot(retried) {
     if (!S.me || S.me.role !== "cadre") { render(); return; }
     paintShell();
     UI.bindAutosave(root(), onAutosave);
+    // 題目畫布的樣式與拖曳排序（shared/forms.js）。拖曳掛在 #bt-root 上一次，它不會被換掉。
+    UI.F.ensureStyle();
+    UI.F.bindDrag(root(), (from, to) => { if (S.form && canEditForm(S.form)) fxReorder(UI.F.moveId(S.questions.map(q => q.id), from, to)); });
     // 2026-11-09 效率：沒有任何工作區、也不是 Co-President／Senior Adviser／Director 的幹部，總覽只會印「今天沒有要處理的」加自己的 team，
     // 工作區、需求單、活動、會議、待寄的信對他全是空的（RLS），不用問（實測從 16 次查詢降到 9 次）。有指派或職級的人照舊全抓。
     const light = !S.me.senior && S.me.board === "member" && !Object.keys(S.me.ws || {}).length;
@@ -412,6 +416,9 @@ function readForm() {
     notify_by: val("fnotify"),
     interview_url: val("fcal"),
     ...(document.getElementById("fteam") ? { team: val("fteam") } : {}),
+    // 2026-12-20-form-engine.sql 的兩欄：那兩格只在資料庫有那兩欄的時候畫（ui.js 看 form 裡有沒有 max_responses）。
+    ...(document.getElementById("fmax") ? { max_responses: val("fmax") } : {}),
+    ...(document.getElementById("fhidden") ? { hidden_fields: val("fhidden") } : {}),
   };
 }
 
@@ -449,14 +456,15 @@ async function onAutosave(act, box, field) {
       return;
     }
     if (act === "q-save") {
-      if (!S.qEditing || S.qEditing.id !== id) return;
-      const q = readQuestion();
-      if (!q.label) return fail(T("err.qEmpty"));
-      if ((q.type === "single" || q.type === "multi") && q.options.length < 2) return fail(T("err.qOpts"));
+      // 畫布上的一塊（shared/forms.js 的 blockHTML）。讀回來、擋兩件事、存；換了題型或改了邏輯面板的下拉要重畫那一塊。
+      const old = (S.questions || []).find(x => x.id === id); if (!old) return;
+      const q = UI.F.readBlock(box, old);
+      if (!q.label && !["page", "text"].includes(q.type)) return fail(T("err.qEmpty"));
+      if (UI.F.isChoice(q) && q.options.length < 2) return fail(T("err.qOpts"));
       await D.saveQuestion(id, q);
-      Object.assign(S.qEditing, q);
-      const row = (S.questions || []).find(x => x.id === id); if (row) Object.assign(row, q);
+      Object.assign(old, q);
       dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.saved"));
+      if (field && field.dataset && field.dataset.fxRedraw) { if (box.querySelector(".fx-logic[open]")) S.fx.logicOpen.add(id); render(); }
       return;
     }
     if (act === "rq-save") {
@@ -515,23 +523,8 @@ function autosaveMeeting() {
   const box = document.querySelector('[data-autosave="mt-save"]'); if (!box) return;
   onAutosave("mt-save", box, null);
 }
-// 一題的欄位讀出來（既有的題自動存、新題按「加這一題」都用這一份）。
-function readQuestion() {
-  const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
-  const type = val("qtype");
-  const options = val("qopts").split("\n").map(x => x.trim()).filter(Boolean);
-  return {
-    label: val("qlabel"),
-    help: val("qhelp") || null,
-    type,
-    required: !!(document.getElementById("qreq") || {}).checked,
-    // 短答與長答不留選項。留著的話改題型改回來會冒出舊選項，而那些選項沒有人記得是誰打的。
-    options: (type === "single" || type === "multi") ? options : [],
-  };
-}
-
 async function openForm(id) {
-  S.busy = true; S.msg = ""; render();
+  S.busy = true; S.msg = ""; S.fx = { mode: "edit", menuAt: null, filter: "", logicOpen: new Set() }; render();
   try {
     const { form, questions } = await D.loadForm(id);
     S.form = form; S.questions = questions; S.view = "form"; S.busy = false; S.msg = "";
@@ -1122,57 +1115,83 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  // ── 題目 ──────────────────────────────────────────────────────────
-  if (act === "q-new")    { S.qEditing = null; S.view = "question"; S.msg = ""; render(); return; }
-  if (act === "q-cancel") { S.view = "form"; S.msg = ""; render(); return; }
-  if (act === "q-edit")   {
-    S.qEditing = S.questions.find(q => q.id === id) || null;
-    S.view = "question"; S.msg = ""; render(); return;
-  }
-
-  // 「加這一題」只剩新題（2026-11-06 起既有的題改了就存，見 onAutosave 的 "q-save"）。
-  if (act === "q-save") {
-    const q = readQuestion();
-    if (!q.label) { S.msg = T("err.qEmpty"); render(); return; }
-    if ((q.type === "single" || q.type === "multi") && q.options.length < 2) {
-      S.msg = T("err.qOpts"); render(); return;
-    }
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.addQuestion(S.form.id, q, S.questions);
-      const r = await D.loadForm(S.form.id);
-      S.questions = r.questions; S.busy = false; S.view = "form"; S.qEditing = null; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
-    render();
+  // ── 題目畫布（2026-11-13，shared/forms.js）────────────────────────
+  // 舊的「一題一頁」那兩顆（q-new、q-edit）改成在畫布上：加一題就是打開「＋」的選單。
+  if (act === "q-new") { S.fx.menuAt = S.questions.length; S.fx.filter = ""; S.fx.mode = "edit"; render(); return; }
+  if (act === "fx-mode") { S.fx.mode = b.dataset.v === "preview" ? "preview" : "edit"; S.fx.menuAt = null; render(); return; }
+  if (act === "fx-menu") {
+    const at = Number(b.dataset.at);
+    S.fx.menuAt = S.fx.menuAt === at ? null : at; S.fx.filter = ""; render();
+    const first = document.querySelector(".fx-menu .fx-mi"); if (first && S.fx.menuAt != null) first.focus();
     return;
   }
-
-  if (act === "q-del") {
+  if (act === "fx-insert") { await fxInsert(UI.F.blankBlock(b.dataset.type, S.form.lang === "en"), Number(b.dataset.at)); return; }
+  if (act === "fx-dup") {
+    const i = S.questions.findIndex(q => q.id === id); if (i < 0) return;
+    await fxInsert(UI.F.duplicateOf(S.questions[i], lang() === "en"), i + 1); return;
+  }
+  if (act === "fx-del") {
     if (UI.needAsk(S, b, T("confirm.delQ"))) return;
     S.busy = true; render();
-    try {
-      await D.deleteQuestion(id);
-      const r = await D.loadForm(S.form.id);
-      S.questions = r.questions; S.busy = false; S.msg = "";
-    } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); }
-    render();
-    return;
+    try { await D.deleteQuestion(id); await reloadQuestions(); S.msg = ""; }
+    catch (err) { S.msg = T("err.delete") + D.says(err); }
+    S.busy = false; render(); return;
   }
-
-  if (act === "q-up" || act === "q-down") {
-    const i = S.questions.findIndex(q => q.id === id);
-    const j = act === "q-up" ? i - 1 : i + 1;
-    if (i < 0 || j < 0 || j >= S.questions.length) return;
-    S.busy = true; render();
-    try {
-      await D.swapOrd(S.questions[i], S.questions[j]);
-      const r = await D.loadForm(S.form.id);
-      S.questions = r.questions; S.busy = false;
-    } catch (err) { S.busy = false; S.msg = T("err.reorder") + D.says(err); }
-    render();
-    return;
+  if (act === "fx-up" || act === "fx-down") {
+    const ids = S.questions.map(q => q.id), i = ids.indexOf(id), j = act === "fx-up" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    await fxReorder(UI.F.moveId(ids, id, ids[j])); return;
+  }
+  if (act === "fx-add-rule" || act === "fx-add-cond" || act === "fx-del-rule" || act === "fx-del-cond") {
+    const q = S.questions.find(x => x.id === id); if (!q) return;
+    // 先把那一塊畫面上沒存的字讀進來，再改規則（不然剛打的條件值會被蓋掉）。
+    const box = document.querySelector(`[data-fx-blk="${CSS.escape(id)}"]`);
+    const cur = box ? UI.F.readBlock(box, q) : q;
+    const next = UI.F.logicAction(act, cur, S.questions, Number(b.dataset.rule), Number(b.dataset.cond));
+    try { await D.saveQuestion(id, next); Object.assign(q, next); S.fx.logicOpen.add(id); UI.toast(T("msg.saved")); }
+    catch (err) { S.msg = T("err.save") + D.says(err); }
+    render(); return;
   }
 });
+
+// 插一題、重排：存完重讀一次題目（ord 以資料庫為準），新的那一題捲到眼前、游標放在題目那一格。
+async function reloadQuestions() { const r = await D.loadForm(S.form.id); S.questions = r.questions; }
+async function fxInsert(q, at) {
+  S.busy = true; S.fx.menuAt = null; S.fx.filter = ""; render();
+  try {
+    const newId = await D.insertQuestion(S.form.id, q, at, S.questions);
+    await reloadQuestions(); S.msg = ""; S.busy = false; render();
+    const el = document.querySelector(`[data-fx-blk="${CSS.escape(newId)}"] [name="label"]`);
+    if (el) { el.scrollIntoView({ block: "center" }); el.focus(); if (el.select) el.select(); }
+  } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+}
+async function fxReorder(ids) {
+  S.busy = true; render();
+  try { await D.reorderQuestions(S.questions, ids); await reloadQuestions(); S.msg = ""; }
+  catch (err) { S.msg = T("err.reorder") + D.says(err); }
+  S.busy = false; render();
+}
+// 畫布最底下那一格：打 / 打開選單，/ 後面的字篩題型，Enter 加第一個，Esc 收起來。
+document.addEventListener("input", e => {
+  const t = e.target; if (!t || !t.dataset || !t.dataset.fxSlash || !S.form) return;
+  const v = t.value;
+  if (v.startsWith("/")) { S.fx.menuAt = S.questions.length; S.fx.filter = v.slice(1); }
+  else if (S.fx.menuAt === S.questions.length) { S.fx.menuAt = null; S.fx.filter = ""; }
+  render();
+  const again = document.querySelector("[data-fx-slash]");
+  if (again) { again.value = v; again.focus(); again.setSelectionRange(v.length, v.length); }
+});
+document.addEventListener("keydown", e => {
+  const t = e.target; if (!t || !t.dataset || !t.dataset.fxSlash || !S.form) return;
+  if (e.key === "Escape") { S.fx.menuAt = null; S.fx.filter = ""; render(); return; }
+  if (e.key === "Enter") { e.preventDefault(); const first = document.querySelector(".fx-tail .fx-mi"); if (first) first.click(); else { S.fx.menuAt = S.questions.length; render(); } }
+});
+// 預覽：畫完之後在 #fx-pv 上 mount 引擎（跟 /apply/ 同一支，條件邏輯照樣會動，送出不會真的送）。
+function mountPreview() {
+  const el = document.getElementById("fx-pv"); if (!el || !S.form) return;
+  UI.F.mount(el, S.questions, { en: S.form.lang === "en", preview: true,
+    onSubmit: async () => UI.toast(T("msg.previewSent")), onUpload: async (q, f) => f.name });
+}
 
 // 語言（2026-10-19 中英切換，做法見 docs/2026-10-19-後台中英切換.md）。
 // 開頁：網址 ?lang= 先、再上次存在 localStorage 的、都沒有就英文（Paul 拍板預設英文）。

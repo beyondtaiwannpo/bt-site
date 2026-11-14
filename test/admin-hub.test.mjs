@@ -458,7 +458,7 @@ test("★ admin/ 每一個畫面用英文畫出來不剩中文", () => {
     listNew: () => FORMS.listHTML([form], true, "", true, { title: "", team: "Marketing Team", kind: "board" }, ["Marketing Team"], "", true),
     form: () => FORMS.formHTML(form, qs, true, ["Marketing Team"], "", true),
     formRo: () => FORMS.formHTML({ ...form, status: "closed" }, [], false, [], "Could not save: x", false),
-    question: () => FORMS.questionHTML(qs[0], "", false) + FORMS.questionHTML(null, "", true),
+    question: () => FORMS.questionsHTML(qs, true, { mode: "edit", menuAt: 0 }) + FORMS.questionsHTML(qs, true, { mode: "preview" }),
     apps: () => FORMS.appsHTML(form, [app, { ...app, id: "a2", status: "received", applicant_school: "X" }], qs, true, new Set(["a1"]), "all", [{ id: 1, tries: 1, error: "" }], "", false),
     appsEmpty: () => FORMS.appsHTML(form, [app], qs, true, new Set(), "rejected", [], "", true) + FORMS.appsHTML(form, [], qs, false, new Set(), "all", [], "", false),
     checkin: () => FORMS.checkinHTML(form, [app, { ...app, id: "a3", checked_in_at: "2026-10-01" }], true, "", false) + FORMS.checkinHTML(form, [], false, "", false),
@@ -833,13 +833,12 @@ test("★ 自動儲存：表單設定與既有的題改了就存，刪表單、�
   for (const n of ["title", "intro", "kind", "lang", "opens_at", "closes_at", "notify_by", "interview_url", "status", "team"]) assert.match(f, new RegExp(` name="${n}"`), `設定少了 name="${n}"`);
   assert.match(f, /data-act="del-form"/, "刪掉這份表單還是鈕");
   assert.doesNotMatch(FORMS.formHTML(AF, [], false, [], "", false), /class="autosave"/, "唯讀的沒有那行小字");
+  // 2026-11-13 起題目是畫布（shared/forms.js）：每一塊各自是 data-autosave="q-save"，打完就存；加新題是「＋」選單，不是按鈕頁。
   const q = { id: "q1", label: "為什麼想來", help: "", type: "long", required: true, options: [] };
-  const edit = FORMS.questionHTML(q, "", false);
-  assert.match(edit, /<div data-autosave="q-save" data-id="q1">/); assert.match(edit, /class="autosave" data-for="q-save"/);
-  assert.doesNotMatch(edit, /data-act="q-save"/); assert.match(edit, /data-act="q-cancel">回這份表單</);
-  for (const n of ["label", "help", "type", "options", "required"]) assert.match(edit, new RegExp(` name="${n}"`), `題目少了 name="${n}"`);
-  const add = FORMS.questionHTML(null, "", false);
-  assert.doesNotMatch(add, /data-autosave/); assert.match(add, /data-act="q-save"[^>]*>加這一題</); assert.match(add, /data-act="q-cancel">取消</);
+  const edit = FORMS.formHTML(AF, [q], true, [], "", false);
+  assert.match(edit, /data-autosave="q-save" data-id="q1"/); assert.match(edit, /class="autosave" data-for="q-save"/);
+  for (const n of ["label", "help", "type", "required"]) assert.match(edit, new RegExp(` name="${n}"`), `題目少了 name="${n}"`);
+  assert.match(edit, /data-act="fx-menu"/, "加一題是「＋」選單");
   const m = readFileSync("admin/src/main.js", "utf8");
   assert.match(m, /UI\.bindAutosave\(root\(\), onAutosave\)/, "boot 掛一次");
   for (const act of ["save-form", "q-save", "rq-save", "ev-save", "mt-save"]) assert.match(m, new RegExp(`act === "${act}"`), `onAutosave 沒接 ${act}`);

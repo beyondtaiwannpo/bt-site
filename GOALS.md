@@ -94,6 +94,11 @@ BT 這一屆的 term 是 2026-08 到 2027-07。
 - **申請表單的第一版只做四種題型**（短答、長答、單選、多選），
   **不做跳題與條件邏輯、不做檔案上傳、不做多語言題目欄位**。
   做完題目編輯器一定會有人想要這些，一開始就做會沒完。要加先問 Paul。
+  （2026-11-13 更新：**這一條大部分被推翻了。** Paul 的原話：「I need it like if the answer to this q is this
+  then show this question… add to all the form editor… specially those going outside I wanna the registration
+  form to look perfect」。理由就是這句：要條件邏輯，要每一個表單編輯器都有，對外的報名表要看起來完美。現在做：十五種題型、條件邏輯與跳頁、
+  換頁與進度條、網址帶入與隱藏欄位、收滿就關、一個 email 一份、送出確認信、檔案上傳（私人儲存空間，只有那份表單的編輯者讀得到）。
+  **多語言題目欄位仍然不做**，一份表單照舊只有一種語言。三套表單共用一支 `shared/forms.js`，見 README「表單引擎」。）
 - **不自己做面試排程。** 掛 Cal.com，這一批只做一條連結不 embed。
   時區與搶位是最容易寫出 bug 又最難自己測的東西，而面試官分布七個國家，
   時區算錯的表現是「學生準時到，沒有人在」，發現的時候已經傷到人了。

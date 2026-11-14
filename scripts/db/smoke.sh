@@ -3317,6 +3317,67 @@ psql -d "${DB}" -X -A -t -q -c "delete from public.mail_outbox where invite_code
 chk "（前提）測試資料庫裡有活動、而且 ASSOC 沒有被加進任何一場" "t" "select ((select count(*) from public.events) > 0 and not exists (select 1 from public.assignments a join public.events e on e.workspace_id = a.workspace_id where a.user_id = '${ASSOC}'))::text::char(1)"
 chkrole authenticated "${ASSOC}" "★ 沒被加進任何一場的幹部也看得到每一場活動" "$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.events" | tr -d ' \n')" "select count(*) from public.events"
 chkrole authenticated "${STU}" "★ 學員還是看不到活動表（學員看的是對外的 public_events）" "0" "select count(*) from public.events"
+echo "── 表單引擎：新題型、伺服器驗證、收滿、一個 email 一份、隱藏欄位（2026-12-20-form-engine.sql）──"
+fen=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-20-form-engine.sql 2>&1 || true)
+if echo "${fen}" | grep -q "OVERALL.*PASS" && ! echo "${fen}" | grep -q "|FAIL"; then echo "  ok   表單引擎那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 表單引擎那支驗收表："; echo "${fen}" | head -14; fail=$((fail+1)); fi
+fen2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-20-form-engine.sql 2>&1 || true)
+if echo "${fen2}" | grep -q "OVERALL.*PASS"; then echo "  ok   表單引擎那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 表單引擎重跑：${fen2}" | head -5; fail=$((fail+1)); fi
+FEF=cccccccc-fe00-0000-0000-000000000001
+FEQ1=cccccccc-fe00-0000-0000-0000000000a1; FEQ2=cccccccc-fe00-0000-0000-0000000000a2; FEQ3=cccccccc-fe00-0000-0000-0000000000a3
+FEQ4=cccccccc-fe00-0000-0000-0000000000a4; FEQ5=cccccccc-fe00-0000-0000-0000000000a5; FEQ6=cccccccc-fe00-0000-0000-0000000000a6
+FEQ7=cccccccc-fe00-0000-0000-0000000000a7; FEQ8=cccccccc-fe00-0000-0000-0000000000a8
+FES1=cccccccc-fe00-0000-0000-0000000000b1; FES2=cccccccc-fe00-0000-0000-0000000000b2; FES3=cccccccc-fe00-0000-0000-0000000000b3
+psql -d "$DB" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${FES1}','fe1@example.com'), ('${FES2}','FE1@Example.com'), ('${FES3}','fe3@example.com');
+insert into public.profiles (id,name_zh,role) values ('${FES1}','引擎一號','student'), ('${FES2}','引擎二號','student'), ('${FES3}','引擎三號','student');
+insert into public.forms (id,team,title,status,hidden_fields) values ('${FEF}','Curriculum','引擎測試表','open','{from}');
+insert into public.form_questions (id,form_id,ord,label,type,required,options,config,logic) values
+ ('${FEQ1}','${FEF}',1,'有沒有參加過','single',true,'{有,沒有}','{}','[{"match":"all","when":[{"q":"${FEQ1}","op":"is","v":"有"}],"do":"show","target":"${FEQ2}"}]'),
+ ('${FEQ2}','${FEF}',2,'參加過哪一場','short',true,'{}','{}','[]'),
+ ('${FEQ3}','${FEF}',3,'聯絡信箱','email',true,'{}','{}','[]'),
+ ('${FEQ4}','${FEF}',4,'幾年級','number',false,'{}','{"min":9,"max":12}','[]'),
+ ('${FEQ5}','${FEF}',5,'哪一天方便','date',false,'{}','{}','[]'),
+ ('${FEQ6}','${FEF}',6,'附件','file',false,'{}','{}','[]'),
+ ('${FEQ7}','${FEF}',7,'關於你','heading',false,'{}','{}','[]'),
+ ('${FEQ8}','${FEF}',8,'怎麼知道我們','dropdown',false,'{IG,朋友}','{}','[]');
+SQL
+fesub() { echo "perform set_config('test.uid','${1}',true); perform public.submit_application('${FEF}', '${2}'::jsonb, null, null);"; }
+chkraise "★ 不受規則影響的必填題留白會被擋（missing:聯絡信箱）" "missing:聯絡信箱" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"}]')"
+chkraise "★ 被條件藏起來的必填題（參加過哪一場）不擋，只報信箱" "missing:聯絡信箱$" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"}]')"
+chkraise "★ 信箱格式不對（bad_answer）" "bad_answer:聯絡信箱" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"not-an-email"}]')"
+chkraise "★ 數字超出範圍（bad_answer）" "bad_answer:幾年級" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"a@b.co"},{"q":"'"${FEQ4}"'","v":"20"}]')"
+chkraise "★ 2 月 30 日轉不成日期（bad_answer，不是資料庫錯誤）" "bad_answer:哪一天方便" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"a@b.co"},{"q":"'"${FEQ5}"'","v":"2027-02-30"}]')"
+chkraise "★ 不在選項裡的單選（bad_answer）" "bad_answer:有沒有參加過" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"也許"},{"q":"'"${FEQ3}"'","v":"a@b.co"}]')"
+chkraise "★ 不在選項裡的下拉（bad_answer）" "bad_answer:怎麼知道我們" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"a@b.co"},{"q":"'"${FEQ8}"'","v":"報紙"}]')"
+chkraise "★ 檔案路徑指到別人的資料夾（bad_answer）" "bad_answer:附件" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"a@b.co"},{"q":"'"${FEQ6}"'","v":"'"${FEF}/${FES3}"'/x.pdf"}]')"
+chkraise "★ 檔案路徑用 .. 跳出自己的資料夾（bad_answer）" "bad_answer:附件" "$(fesub "${FES1}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"a@b.co"},{"q":"'"${FEQ6}"'","v":"'"${FEF}/${FES1}"'/../'"${FES3}"'/x.pdf"}]')"
+FEA=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${FES1}',false);" -c "set role authenticated; select public.submit_application('${FEF}', '[{\"q\":\"${FEQ1}\",\"v\":\"沒有\"},{\"q\":\"${FEQ3}\",\"v\":\"a@b.co\"},{\"q\":\"${FEQ4}\",\"v\":\"11\"},{\"q\":\"${FEQ6}\",\"v\":\"${FEF}/${FES1}/q-1.pdf\"},{\"q\":\"${FEQ7}\",\"v\":\"不該存\"}]'::jsonb, null, '{\"from\":\"ig\",\"evil\":\"x\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n' || true)
+case "${FEA}" in ????????-*) echo "  ok   ★ 填對的一份送得出去（藏起來的必填題沒填也行）"; pass=$((pass+1));; *) echo "  FAIL 填對的一份送不出去：${FEA}"; fail=$((fail+1));; esac
+chk "★ 隱藏欄位只收表單列的名字（from 留著、evil 丟掉）" '{"from":"ig"}' "select meta::text from public.applications where id='${FEA}'"
+chk "★ 小標題那一塊就算前端送了也不存答案；沒送的題沒有那一列" "4|0" "select count(*)||'|'||count(*) filter (where question_id in ('${FEQ7}','${FEQ2}')) from public.application_answers where application_id='${FEA}'"
+chkraise "★ 同一個 email（大小寫不同）用別的帳號送不了第二份（email_used）" "email_used" "$(fesub "${FES2}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"a@b.co"}]')"
+psql -d "${DB}" -X -A -t -q -c "update public.forms set max_responses=1 where id='${FEF}';" 2>&1 | grep -i "error" || true
+chkrole anon "" "★ 沒登入叫得到 form_is_full，收滿是 true" "true" "select public.form_is_full('${FEF}')::text"
+chkraise "★ 收滿了別人送不進來（full）" "full" "$(fesub "${FES3}" '[{"q":"'"${FEQ1}"'","v":"沒有"},{"q":"'"${FEQ3}"'","v":"c@d.co"}]')"
+chkas "${FES1}" "★ 已經送過的人再按一次拿回原本那一筆，不會被「收滿」擋" "${FEA}" "select public.submit_application('${FEF}', '[{\"q\":\"${FEQ1}\",\"v\":\"沒有\"},{\"q\":\"${FEQ3}\",\"v\":\"a@b.co\"}]'::jsonb)"
+fap=$(psql -d "${DB}" -X -A -t -q -c "set role authenticated; select public.form_answer_problem('${FEF}','[]'::jsonb,'${FES1}');" 2>&1 || true)
+if echo "${fap}" | grep -qi "permission denied"; then echo "  ok   ★ 登入的人直接叫不到 form_answer_problem"; pass=$((pass+1)); else echo "  FAIL form_answer_problem 對外開著：${fap}"; fail=$((fail+1)); fi
+fap2=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.submit_application('${FEF}','[]'::jsonb);" 2>&1 || true)
+if echo "${fap2}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入叫不到 submit_application"; pass=$((pass+1)); else echo "  FAIL anon 叫得到 submit_application：${fap2}"; fail=$((fail+1)); fi
+sed "s/    if public.event_is_full(p_form_id) or public.form_is_full(p_form_id) then/    if public.event_is_full(p_form_id) then/" supabase/migrations/2026-12-20-form-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「收滿就關」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉收滿門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/    raise exception 'email_used' using errcode = 'P0001';/    null;/" supabase/migrations/2026-12-20-form-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「一個 email 一份」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 email 門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/  v_bad := public.form_answer_problem(p_form_id, v_ans, v_uid);/  v_bad := null;/" supabase/migrations/2026-12-20-form-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉伺服器驗證，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉伺服器驗證驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/    if q.type = 'file' and (p_uid is null or position(p_form::text || '\/' || p_uid::text || '\/' in v) <> 1 or v like '%..%') then/    if false then/" supabase/migrations/2026-12-20-form-engine.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「檔案只能是自己的」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉檔案路徑門驗收表沒變紅"; fail=$((fail+1)); fi
+fen3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-20-form-engine.sql 2>&1 || true)
+if echo "${fen3}" | grep -q "OVERALL.*PASS"; then echo "  ok   破壞測試之後裝回正確的那一版"; pass=$((pass+1)); else echo "  FAIL 裝回正確版沒過：${fen3}" | head -5; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

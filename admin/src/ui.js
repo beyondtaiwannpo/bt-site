@@ -8,6 +8,9 @@
 // 2026-10-19 起畫面上的字全部從 ./strings.js 的字典來（T("鍵")），中英兩版並排在那一支裡。
 // 這一支只管拼 HTML，不再寫死任何一句給人看的字。怎麼加一句見 README「後台的中英切換」。
 import { T, lang, setLang, withLang, isErr } from "./strings.js";
+// 表單引擎（2026-11-13，shared/forms.js）：題目畫布、條件邏輯面板、預覽都在那裡，三套表單的編輯器共用。
+import * as F from "../../shared/forms.js";
+export { F };
 export { T, lang, setLang };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -133,27 +136,8 @@ export function formHeadHTML(form, view, count) {
 }
 
 // ── 一份表單 ──────────────────────────────────────────────────────────
-export function formHTML(form, questions, canEdit, teams, msg, busy) {
+export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
   const st = statusOf(form.status);
-  const qs = questions.map((q, i) => `<li>
-    <div class="qtop">
-      ${canEdit ? `<div class="qmove">
-        <button data-act="q-up" data-id="${esc(q.id)}" ${i === 0 ? "disabled" : ""} aria-label="${esc(T("q.up"))}">↑</button>
-        <button data-act="q-down" data-id="${esc(q.id)}" ${i === questions.length - 1 ? "disabled" : ""} aria-label="${esc(T("q.down"))}">↓</button>
-      </div>` : ""}
-      <div class="qbody">
-        <div class="qlabel">${esc(q.label)}${q.required ? ` <span class="tag">${T("q.required")}</span>` : ""}</div>
-        <div class="qsub">${esc(T(typeOf(q.type).label))}${q.help ? "・" + esc(q.help) : ""}</div>
-        ${(q.options || []).length
-          ? `<div class="opts">${q.options.map(o => `<span>${esc(o)}</span>`).join("")}</div>` : ""}
-      </div>
-      ${canEdit ? `<div class="row" style="margin:0;flex:none">
-        <button class="btn quiet" data-act="q-edit" data-id="${esc(q.id)}">${T("common.edit")}</button>
-        <button class="btn quiet" data-act="q-del" data-id="${esc(q.id)}">${T("q.del")}</button>
-      </div>` : ""}
-    </div>
-  </li>`).join("");
-
   const teamPick = teams && teams.length
     ? `<label><i>${T("form.team")}</i><select id="fteam" name="team"${canEdit ? "" : " disabled"}>
         ${teams.map(t => `<option${t === form.team ? " selected" : ""}>${esc(t)}</option>`).join("")}
@@ -192,6 +176,11 @@ export function formHTML(form, questions, canEdit, teams, msg, busy) {
     </div>
     <label><i>${T("form.cal")}</i>
       <input id="fcal" name="interview_url" value="${esc(form.interview_url || "")}" placeholder="https://cal.com/..."${canEdit ? "" : " disabled"}></label>
+    ${"max_responses" in form ? `<div class="two">
+      <label><i>${T("form.max")}</i><input id="fmax" name="max_responses" type="number" min="1" step="1" value="${esc(form.max_responses || "")}"${canEdit ? "" : " disabled"}></label>
+      <label><i>${T("form.hidden")}</i><input id="fhidden" name="hidden_fields" value="${esc((form.hidden_fields || []).join(", "))}" spellcheck="false" placeholder="from"${canEdit ? "" : " disabled"}></label>
+    </div>
+    <div class="mini" style="margin:-6px 0 14px">${esc(T("form.hiddenHint"))}</div>` : ""}
 
     <label><i>${T("form.status")}</i><select id="fstatus" name="status"${canEdit ? "" : " disabled"}>
       ${STATUSES.map(s => `<option value="${s.v}"${form.status === s.v ? " selected" : ""}>${esc(T(s.label))}</option>`).join("")}
@@ -204,44 +193,22 @@ export function formHTML(form, questions, canEdit, teams, msg, busy) {
     </div>` : ""}</div>`)
     + sectionHTML(T("form.questions"), `<div class="mini" style="margin-bottom:10px">
       ${T("form.qNote")}</div>
-    ${questions.length ? `<ul class="qlist">${qs}</ul>`
-      : emptyHTML(T("form.noQ"), T("form.noQHint"), canEdit ? { act: "q-new", label: T("form.addQ") } : null)}
-    ${canEdit && questions.length ? `<div class="row">
-      <button class="btn ghost sm" data-act="q-new">${T("form.addQ")}</button>
-    </div>` : ""}`);
+    ${form.status === "open" ? `<div class="mini" style="margin-bottom:10px">${esc(T("form.link"))}：<code>beyondtaiwannpo.com/apply/?f=${esc(form.id)}</code></div>` : ""}
+    ${questionsHTML(questions, canEdit, ed, form.lang === "en")}`);
 }
 
-// ── 一題 ──────────────────────────────────────────────────────────────
-// q 是 null 代表新增。
-// 2026-11-06 自動儲存：既有的題（有 id）包在 data-autosave="q-save" 裡改了就存；新題還沒有 id，留「加這一題」那顆鈕，
-// 加進去之後回到表單（新題的驗證與存法在 main.js 的 q-save 分支）。
-export function questionHTML(q, msg, busy) {
-  const cur = q || { label: "", help: "", type: "short", required: false, options: [] };
-  return pageHead(q ? T("q.editTitle") : T("q.newTitle"), T("q.lede"), [], { act: "q-cancel", label: T("q.back") })
-    + msgHTML(msg)
-    + sectionHTML("", `${q ? `<div data-autosave="q-save" data-id="${esc(q.id)}">` : "<div>"}
-    <label><i>${T("q.label")}</i><input id="qlabel" name="label" value="${esc(cur.label)}" placeholder="${esc(T("q.labelPh"))}"></label>
-    <label><i>${T("q.help")}</i>
-      <input id="qhelp" name="help" value="${esc(cur.help || "")}" placeholder="${esc(T("q.helpPh"))}"></label>
-    <label><i>${T("q.type")}</i><select id="qtype" name="type">
-      ${TYPES.map(t => `<option value="${t.v}"${cur.type === t.v ? " selected" : ""}>${esc(T(t.label))}</option>`).join("")}
-    </select></label>
-    <div class="mini" style="margin:-6px 0 14px">${TYPES.map(t =>
-      `${esc(T(t.label))}：${esc(T(t.hint))}`).join("<br>")}</div>
-    <!-- 選項一行一個。**不做「按一下加一格」那種介面**：
-         一行一個是所有人都會的操作，而且複製貼上一整串選項只要一次。 -->
-    <label><i>${T("q.opts")}</i>
-      <textarea id="qopts" name="options" placeholder="${T("q.optsPh")}">${esc((cur.options || []).join("\n"))}</textarea></label>
-    <label class="check" style="display:flex;gap:10px;align-items:center;font-size:14.5px">
-      <input id="qreq" name="required" type="checkbox" style="width:18px;height:18px"${cur.required ? " checked" : ""}>
-      <span>${T("q.req")}</span>
-    </label>
-    <div class="form-foot">
-      ${q ? autosaveHint("q-save") : `<button class="btn" data-act="q-save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("q.add")}</button>`}
-      <button class="btn ghost" data-act="q-cancel">${q ? T("q.back") : T("common.cancel")}</button>
-    </div></div>`);
+// 題目那一區：編輯／預覽切換，加上畫布（shared/forms.js 的 canvasHTML）。預覽是一個空的框，main.js 在上面 mount 引擎。
+// ed：{ mode: "edit"|"preview", menuAt, filter, logicOpen: Set }。沒給就是編輯、選單都收著。
+export function questionsHTML(questions, canEdit, ed, formEn) {
+  const e = ed || {};
+  const en = lang() === "en";
+  if (!questions.length && !canEdit) return emptyHTML(T("form.noQ"), T("form.noQHint"), null);
+  return F.modeHTML(e.mode, en)
+    + (e.mode === "preview" ? `<div class="fx-pvbox" id="fx-pv" lang="${formEn ? "en" : "zh-Hant"}"></div>`
+      : (questions.length ? "" : `<p class="mini">${esc(T("form.noQHint"))}</p>`)
+        + F.canvasHTML(questions, { en, canEdit, menuAt: e.menuAt, filter: e.filter, logicOpen: e.logicOpen,
+            hint: () => canEdit ? autosaveHint("q-save") : "" }));
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // 批 4：審核
