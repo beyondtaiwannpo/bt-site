@@ -133,6 +133,21 @@ test("側欄的樣式在 shared/rail.css：八個後台資料夾與首頁都讀�
   assert.doesNotMatch(admin, /^\.area-tabs\{|^\.rail\{|^\.shell\{/m);
 });
 
+test("★ 時間看板與我的護照也有側欄（2026-11-14 Paul：add the sidebar to availability and passport too）", () => {
+  for (const [dir, group] of [["availability", "availability"], ["passport", "passport"]]) {
+    assert.match(readFileSync(`${dir}/index.html`, "utf8"), /<link rel="stylesheet" href="\.\.\/shared\/rail\.css\?v=/, dir);
+    const main = readFileSync(`${dir}/src/main.js`, "utf8");
+    assert.ok(main.includes(`RAIL.railHTML("${group}", ""`), `${dir} 畫側欄`);
+    assert.match(main, /act === "lang"/, `${dir} 接得住側欄的中英切換`);
+  }
+  // 後台的護照預覽框（?bare=1）不畫側欄
+  assert.match(readFileSync("passport/src/main.js", "utf8"), /if \(bare\) \{ el\.innerHTML = body; return; \}/);
+  // 側欄在這兩頁展開成對的那一區
+  const me = { role: "cadre", board: "member", team: "", ws: {} };
+  assert.match(RAIL.railHTML("availability", "", me, {}, "en"), /rail-sub on"[^>]*aria-current="page">Availability</);
+  assert.match(RAIL.railHTML("passport", "", me, {}, "en"), /rail-area on"[^>]*aria-current="page">/);
+});
+
 test("後台：沒有 # 開活動；#teams 與舊的 #home 開各 team", () => {
   const main = readFileSync("admin/src/main.js", "utf8");
   assert.match(main, /else if \(!\/\^\(teams\|home\)\$\/\.test\(location\.hash\.slice\(1\)\)\) \{ history\.replaceState\(null, "", location\.pathname \+ location\.search \+ "#events"\); await openTab\("events"\); return; \}/);

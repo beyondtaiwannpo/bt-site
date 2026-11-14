@@ -4,6 +4,8 @@ import { supabase } from "../../shared/supabase.js";
 import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 import { navHTML } from "../../shared/nav.js";
+// 側欄（2026-11-14 Paul：「add the sidebar to availability and passport too」）：跟首頁、後台同一條，樣式在 shared/rail.css。
+import * as RAIL from "../../shared/rail.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays, diff } from "./edit.js";
 import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
@@ -83,8 +85,17 @@ function render() {
   if (!S.ready) { el.innerHTML = `<div class="empty">${T("loading")}</div>`; return; }
   // 未升級的人也有頂欄：對他來說功能項是空的，但 logo、名字、登出都在。
   if (S.role !== "cadre") { el.innerHTML = navHTML({ current: null, role: S.role, name: S.myName, lang: lang() }) + UI.notCadreHTML(); return; }
-  if (S.needNotice) { el.innerHTML = UI.noticeHTML(S.msg, S.busy); return; }
-  if (S.needTz) { el.innerHTML = UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg); return; }
+  // 側欄要的「我是誰」跟後台同一個形狀。S.team 在這一頁是看板的 team 篩選，所以自己的 team 放 S.myTeam。
+  const me = { id: S.user.id, role: S.role, board: S.board, team: S.myTeam, name: S.myName, ws: S.ws, senior: S.senior };
+  const shell = body => {
+    RAIL.railBefore(el);
+    el.innerHTML = RAIL.shellHTML(navHTML({ current: "availability", role: S.role, name: S.myName, lang: lang() }),
+      RAIL.railHTML("availability", "", me, {}, lang()), body, RAIL.areaTabsHTML("availability", "", me, lang()));
+    RAIL.railAfter(el);
+  };
+  // 第一次進來的說明與選時區也在側欄裡：要先離開去別頁的人不用找上一頁。
+  if (S.needNotice) { shell(UI.noticeHTML(S.msg, S.busy)); return; }
+  if (S.needTz) { shell(UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg)); return; }
 
   let inner, label = null;
   const V = view();
@@ -99,8 +110,7 @@ function render() {
   // 「我的時間」是自己的，跟 team 篩選無關，所以用 S 不是 V。
   else if (S.tab === "mine") inner = UI.mineHTML(S);
   else inner = UI.membersHTML(V, Date.now());
-  el.innerHTML = navHTML({ current: "availability", role: S.role, name: S.myName, lang: lang() })
-               + UI.shellHTML(S.tab, inner, label, S.msg);
+  shell(UI.shellHTML(S.tab, inner, label, S.msg));
   if (S.peek) el.insertAdjacentHTML("beforeend", S.peek);
   // 看板一打開停在 00:00，而大家有空的時間多半在傍晚 —— 第一格常常在第 38 列，
   // 也就是容器頂端往下 600 多 px，而容器一次只看得到二十幾列。
@@ -195,6 +205,7 @@ async function boot() {
     // 排會與回覆（2026-11-02）：我能排哪些範圍；信裡的連結 ?meeting=<id> 進來就先把那一場撈出來。
     S.ws = whoRes.ws || {};
     S.senior = !!data && ["president", "senior_adviser"].includes(data.board_role);
+    S.board = (data && data.board_role) || "member"; S.myTeam = (data && data.team) || "";
     // 2026-10-28：回覆搬到幹部首頁。舊信裡的 /availability/?meeting=<id> 直接轉過去，那邊回覆、看誰會到。
     const mid = new URLSearchParams(location.search).get("meeting");
     if (mid) { location.replace("../home/?meeting=" + encodeURIComponent(mid)); return; }
@@ -416,6 +427,13 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act;
 
   if (act === "retry") { location.reload(); return; }
+  // 側欄的中英切換：存起來、網址帶 ?lang=，跟首頁同一招。
+  if (act === "lang") {
+    setLang(b.dataset.lang); document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+    try { localStorage.setItem(STORE_KEY, lang()); } catch (e2) { /* 無痕視窗 */ }
+    const u = new URL(location.href); u.searchParams.set("lang", lang()); history.replaceState(null, "", u.pathname + u.search + u.hash);
+    render(); return;
+  }
   // 頂欄的登出。這一頁之前沒有登出（只有「回入口」），現在頂欄有了就要接。
   if (act === "signout") { await flushSave(); await AUTH.signOut(); location.replace("../app/"); return; }
   if (act === "tab") { await flushSave(); S.tab = b.dataset.t; S.peek = null; S.mineScrolled = false; render(); return; }

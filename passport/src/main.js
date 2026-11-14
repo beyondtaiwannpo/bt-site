@@ -8,6 +8,10 @@
 import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 import { navHTML } from "../../shared/nav.js";
+// 側欄（2026-11-14 Paul：「add the sidebar to availability and passport too」）：跟首頁、後台同一條，樣式在 shared/rail.css。
+// 「我是誰」（職級、team、被派進哪些工作區）走 shared/auth.js 的 whoAmI，分頁快取十分鐘，別頁讀過就不再查。
+import * as AUTH from "../../shared/auth.js";
+import * as RAIL from "../../shared/rail.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 let S = {
@@ -103,9 +107,17 @@ function render() {
   // ?bare=1（2026-10-19，Paul 拍板）：後台的預覽框用的，不畫頂欄與子欄，框裡只有那本護照。
   // 它只改畫面；讀得到什麼仍然是 RLS 決定的，跟 ?month= 同一類。
   const bare = new URLSearchParams(location.search).get("bare") === "1";
-  el.innerHTML = (bare ? "" : navHTML({ current: "passport", role: S.role, lang: lang(),
-                           name: S.profile && (S.profile.name_zh || S.profile.name_en) })
-               + UI.barHTML(S)) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
+  const body = S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S);
+  el.classList.toggle("railed", !bare);
+  if (bare) { el.innerHTML = body; return; }
+  const name = S.profile && (S.profile.name_zh || S.profile.name_en);
+  const w = S.who || {}, row = w.row || {};
+  const me = { id: S.user.id, role: S.role, board: row.board_role || "member", team: row.team || "", name, ws: w.ws || {},
+    senior: ["president", "senior_adviser"].includes(row.board_role) };
+  RAIL.railBefore(el);
+  el.innerHTML = RAIL.shellHTML(navHTML({ current: "passport", role: S.role, lang: lang(), name }),
+    RAIL.railHTML("passport", "", me, {}, lang()), UI.barHTML(S) + body, RAIL.areaTabsHTML("passport", "", me, lang()));
+  RAIL.railAfter(el);
 }
 
 async function loadWall() {
@@ -254,6 +266,13 @@ async function doUnstamp(id) {
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
+  // 側欄的中英切換：存起來、網址帶 ?lang=，跟首頁同一招。
+  if (act === "lang") {
+    setLang(b.dataset.lang); document.documentElement.lang = lang() === "zh" ? "zh-Hant" : "en";
+    try { localStorage.setItem(STORE_KEY, lang()); } catch (e2) { /* 無痕視窗 */ }
+    const u = new URL(location.href); u.searchParams.set("lang", lang()); history.replaceState(null, "", u.pathname + u.search + u.hash);
+    render(); return;
+  }
 
   // flush：撕章動畫還沒播完，使用者已經按了下一個動作（翻頁、開別的卡……）。
   // 那個動作幾乎一定會 render()，把還在動畫的元素連根換掉，animationend
@@ -582,8 +601,11 @@ export async function boot() {
       const el = root();
       if (el) el.innerHTML = `<div class="empty">${T("m.slow")}</div>`;
     }, 2500);
+    // 側欄要的「我是誰」跟護照資料同時發；拿不到就當一般幹部（側欄少幾行，護照照常）。
+    const whoP = AUTH.whoAmI(S.user.id).catch(() => null);
     let all;
     try { all = await DATA.loadAll(); } finally { clearTimeout(slow); }
+    S.who = await whoP;
 
     // **整包裝進去，不要手寫逐欄指派。** 手寫的話 loadAll 每多回傳一個東西，
     // 這裡就要記得加一行 —— 而那件事已經漏過：milestones 從上線起就沒被裝進 S，
