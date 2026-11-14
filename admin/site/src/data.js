@@ -336,3 +336,15 @@ export function says(err) {
   for (const row of SAYS) if (m.includes(row[0])) return row[col];
   return m;
 }
+
+// 網站上的活動（2026-11-13）：對外 /events/ 上現在有什麼、等上架的、草稿。只讀；上架與下架在那場活動的頁面（senior）。
+// 從紀錄匯入的舊活動（source = import）不在網站上，不列。
+export async function loadSiteEvents() {
+  need();
+  const { data, error } = await supabase.from("events")
+    .select("id, slug, team, title_zh, title_en, starts_at, ends_at, place, status, published_at, source")
+    .neq("source", "import").neq("status", "archived")
+    .order("starts_at", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return data || [];
+}

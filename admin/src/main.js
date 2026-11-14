@@ -111,9 +111,9 @@ function render() {
     body = S.venue ? UI.venueHTML(S.venue, S.msg, S.busy, !!S.vnOpen["vnc-add"]) : UI.msgHTML(S.msg) + UI.skeletonHTML();
   } else if (S.view === "request") {
     if (!S.rqDraft) S.rqDraft = rqDraftLoad();
-    body = UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy, S.cadres, UI.rqToday());
+    body = UI.rqSwitchHTML("request", S.me, S.requests) + UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy, S.cadres, UI.rqToday());
   } else if (S.view === "requests") {
-    body = UI.requestsQueueHTML(S.requests || [], S.cadres, S.rqF, S.rqSel, UI.canEditWs(S.me, "custom:marketing-requests"), S.msg, S.busy,
+    body = UI.rqSwitchHTML("requests", S.me, S.requests) + UI.requestsQueueHTML(S.requests || [], S.cadres, S.rqF, S.rqSel, UI.canEditWs(S.me, "custom:marketing-requests"), S.msg, S.busy,
       { assignees: S.rqAssignees, today: UI.rqToday(), me: S.me });
   } else if (S.view === "list") {
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
@@ -137,7 +137,7 @@ function render() {
     stories: (t.stories || []).filter(r => !r.story_approved).length,
   };
   // 側欄亮哪一行：總覽、需求單、活動、場地、會議各自亮；活動的報名表亮「活動」，其他申請亮「其他申請」。
-  const tab = S.view === "home" ? "home" : S.view === "request" ? "request" : S.view === "requests" ? "requests" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
+  const tab = S.view === "home" ? "home" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -312,7 +312,8 @@ async function openTab(t) {
   const m = /^(requests?)(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
   if (m) {
     // 沒被派進需求工作區的人（RLS 只會給他自己的單）直接開他自己那一頁。
-    const queueOk = UI.canSee(UI.ITEMS.find(i => i.key === "requests"), S.me);
+    // 2026-11-13：需求單只剩側欄一行，佇列是那一頁裡的第二個切換（UI.rqQueueOk）。
+    const queueOk = UI.rqQueueOk(S.me);
     S.view = m[1] === "request" || !queueOk ? "request" : "requests"; S.msg = ""; S.rqSel = m[1] === "requests" && queueOk ? (m[2] || null) : null;
     await reloadRequests(); render(); return;
   }

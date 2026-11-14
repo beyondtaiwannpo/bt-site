@@ -247,7 +247,7 @@ test("★ 校友頁分頁只有 Co-President 看得到", () => {
 test("★ 校友頁整頁畫得出側欄（核可完回得去資源）", () => {
   const h = shellHTML("", railHTML("site", "stories", { role: "cadre", board: "president", team: "", name: "王平" }), alumniStoriesHTML([ROW], "", false));
   assert.match(h, /data-act="tab" data-t="res"/);
-  assert.match(h, /class="rail-item on" href="#stories"/);
+  assert.match(h, /class="area-tab on" href="#stories"/);
 });
 
 // ⚠ touch_updated_at() 是 before update 的 trigger，而核可本身也是一句 update，

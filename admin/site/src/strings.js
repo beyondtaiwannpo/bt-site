@@ -139,6 +139,21 @@ export const COMMON = {
 };
 
 export const MINE = {
+  // 網站上的活動（2026-11-13）
+  "se.title":     { zh: "網站上的活動", en: "Events on the site" },
+  "se.lede":      { zh: "對外活動頁 /events/ 現在有哪些。上架與下架在那場活動的頁面裡，Co-President 按。", en: "What the public /events/ page shows right now. Co-Presidents publish and unpublish from each event's page." },
+  "se.open":      { zh: "打開對外活動頁", en: "Open the public events page" },
+  "se.live":      { zh: "正在網站上", en: "Live on the site" },
+  "se.liveNone":  { zh: "現在網站上沒有活動。", en: "Nothing is live on the site right now." },
+  "se.ready":     { zh: "等上架", en: "Waiting to be published" },
+  "se.readyNone": { zh: "沒有等上架的活動。", en: "Nothing is waiting to be published." },
+  "se.draft":     { zh: "草稿", en: "Drafts" },
+  "se.draftNone": { zh: "沒有草稿。", en: "No drafts." },
+  "se.past":      { zh: "結束了，還掛在網站上", en: "Over, still on the site" },
+  "se.view":      { zh: "看對外那一頁", en: "View on the site" },
+  "se.edit":      { zh: "到活動頁", en: "Open the event" },
+  "se.noDate":    { zh: "還沒定日期", en: "No date yet" },
+  "err.seLoad":   { zh: "活動載不到：", en: "Could not load events: " },
   // 資源的類型
   "res.pdf":          { zh: "PDF", en: "PDF" },
   "res.video":        { zh: "影片", en: "Video" },

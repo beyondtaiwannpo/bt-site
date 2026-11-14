@@ -60,6 +60,8 @@ function render() {
     const m = S.hiSel === "new" ? null : S.hist.find(x => x.id === S.hiSel);
     body = (S.hiSel === "new" || m) ? UI.historyEditHTML(m, S.me, S.msg, S.busy, S.hiUp)
       : UI.pageHead(T("hi.notFound"), "", [], { act: "hi-back", label: T("hi.back") }) + UI.msgHTML(S.msg);
+  } else if (S.view === "events") {
+    body = UI.siteEventsHTML(S.siteEvents || [], S.msg);
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else {
@@ -117,6 +119,7 @@ async function openTab(want) {
   // 歷史之路（2026-11-06）：#history 清單，#history/<id> 一站，#history/new 新的一站。幹部都看得到清單。
   const hi = /^history(?:\/([a-z0-9-]+))?$/.exec(want || "");
   if (hi) { await openHistory(hi[1] || null); return; }
+  if (want === "events" && isPres()) { S.busy = true; try { S.siteEvents = await D.loadSiteEvents(); S.view = "events"; S.msg = ""; } catch (e) { S.msg = T("err.seLoad") + D.says(e); } S.busy = false; render(); return; }
   if (want === "team" && isPres()) await openTeam();
   else if (want === "stories" && isPres()) await openStories();
   else if (want === "mail" && isPres()) await openMail();

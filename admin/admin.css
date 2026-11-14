@@ -92,6 +92,20 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 .rail-txt small{font-size:11.5px;font-weight:400;line-height:1.3;color:rgba(16,42,134,.62)}
 .rail-item.on .rail-txt small{color:rgba(237,229,216,.8)}
 .rail > .rail-item{margin-bottom:6px}
+/* 2026-11-13 側欄一行一個「東西」（shared/rail.js）：icon、名字、一句說明。底下的頁變成內容區上方那一排分頁。 */
+.rail-area{gap:10px;padding:8px 10px;margin:1px 0}
+.rail-area .rail-ico{opacity:.8}
+.rail-area.on .rail-ico{opacity:1}
+.rail > .rail-group{padding:16px 12px 4px}
+/* 這一區的分頁：一排圓角膠囊，現在這一頁是深藍。窄螢幕自己換行，不橫向捲。 */
+.area-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px;padding-bottom:12px;border-bottom:1px solid rgba(16,42,134,.14)}
+.area-tab{display:inline-flex;align-items:center;min-height:34px;padding:0 14px;border-radius:999px;border:1px solid rgba(16,42,134,.25);
+  background:rgba(255,255,255,.5);color:var(--ink);text-decoration:none;font-size:14px;font-weight:600;
+  transition:background var(--dur-2) var(--ease)}
+.area-tab:hover{background:rgba(255,255,255,.9)}
+.area-tab:active{background:rgba(255,196,108,.38);transform:scale(.98)}
+.area-tab.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.area-tab:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 
 /* ───────── 2. 頁首與訊息 ───────── */
 .page-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:6px 0 18px}

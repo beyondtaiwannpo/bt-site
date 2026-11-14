@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tabsHTML, railHTML, internAdminHTML, internTermEditHTML, internTaskEditHTML, noAccessHTML, canEnter, GROUPS,
+import { tabsHTML, railHTML, shellHTML, internAdminHTML, internTermEditHTML, internTaskEditHTML, noAccessHTML, canEnter, GROUPS,
          suggestTaskId, INTERN_CATS, setLang, T } from "../admin/passports/src/ui.js";
 // 後台 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 setLang("zh");
@@ -23,8 +23,8 @@ const DATA = {
 };
 
 test("實習護照那一頁的側欄亮在「實習護照」", () => {
-  const h = railHTML("passports", "interns", { role: "cadre", board: "president", team: "", name: "王平" });
-  assert.match(h, /class="rail-item on" href="#interns" data-act="tab" data-t="interns"/);
+  const h = shellHTML("", railHTML("passports", "interns", { role: "cadre", board: "president", team: "", name: "王平" }), "");
+  assert.match(h, /class="area-tab on" href="#interns" data-act="tab" data-t="interns"/);
   assert.match(h, /data-t="cadre"/);
 });
 

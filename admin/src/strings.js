@@ -574,6 +574,8 @@ export const MINE = {
   // 2026-11-09 第二版：Marketing 自己用的 Google Sheet 那 11 格（docs/2026-11-08-行銷需求單-第二版欄位.md），說明照 Sheet 寫。
   // 空的欄位顯示這個（之前沒有這個字，畫面上印出 value.none 這串代號）。
   "value.none":       { zh: "沒有", en: "None" },
+  "rq.sw.mine":       { zh: "送一張、我送的", en: "Send one, mine" },
+  "rq.sw.queue":      { zh: "Marketing 的待辦", en: "Marketing's queue" },
   "rq.title":         { zh: "跟 Marketing 提需求", en: "Request for Marketing" },
   "rq.lede":          { zh: "要貼文、限動、影片，照 Marketing 的需求單填這一張。送出去 Marketing 會收到一封信，發布之後你會收到一封信。", en: "Need a post, a story or a video? Fill in Marketing's request sheet. Marketing gets an email when you send it, and you get one when it is published." },
   "rq.kindPick":      { zh: "這次要做什麼？", en: "What do you need?" },

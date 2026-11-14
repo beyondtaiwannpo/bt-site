@@ -74,29 +74,35 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
   }
 });
 
-test("★ 側欄：進得去的是連結、進不去的整段淡掉並說為什麼、當前那一行有標記、只有現在這一段打開", () => {
+test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西、進不去的不畫、當前那一行有標記、底下的頁是上方一排分頁", () => {
   for (const [label, M] of IMPL) {
-    const rail = M.railHTML("site", "res", { ...ME.member, name: "王平" });
-    assert.match(rail, /<a class="rail-item on" href="#res" data-act="tab" data-t="res" aria-current="page"><span class="rail-txt"><b>資源庫<\/b><small>/, label);
-    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#forms"><span class="rail-txt"><b>其他申請/, `${label}：別組的分頁是帶 ?lang= 與 # 的一般連結`);
-    // 2026-10-23 批 4：「首頁」改叫「總覽」；進不去的段只留段名變淡，為什麼放在 title（滑過去才看得到），不再是一段灰字。
-    assert.match(rail, /<a class="rail-item" href="\/admin\/\?lang=zh#home"><span class="rail-txt"><b>總覽/, label);
-    // 2026-10-28：一行都進不去的段整段不畫（側欄只留這個人用得到的）。進得去哪些在總覽「你的存取」講。
-    assert.doesNotMatch(rail, /<span>護照<\/span>/, label);
-    assert.doesNotMatch(rail, /<span>錢<\/span>/, label);
-    // 2026-10-28：現在這一頁所在的那一段打開，其他段收起來。
-    assert.equal((rail.match(/<details class="rail-sec-box" open>/g) || []).length, 1, `${label}：只有一段打開`);
-    assert.match(rail, /<details class="rail-sec-box" open><summary class="rail-sec here">.*?<span>對外網站<\/span>/, label);
-    assert.doesNotMatch(rail, /class="why"/, `${label}：側欄不再有灰色長文`);
-    assert.doesNotMatch(rail, /href="\/admin\/people\/"/, `${label}：一般幹部不該拿到人與權限的連結`);
-    assert.doesNotMatch(rail, /data-t="team"/, `${label}：一般幹部看不到團隊頁那一行`);
+    const me = { ...ME.member, name: "王平" };
+    const rail = M.railHTML("site", "res", me);
+    // 現在這一行（對外網站）亮著，點下去是這個人看得到的第一頁（一般幹部看不到「網站上的活動」，所以是資源庫）。
+    assert.match(rail, /<a class="rail-item rail-area on" href="#res" data-act="tab" data-t="res" aria-current="page">.*?<b>對外網站<\/b>/, label);
+    // 別的資料夾是帶 ?lang= 與 # 的一般連結。
+    assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#events">.*?<b>活動<\/b>/, label);
+    assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#home">.*?<b>待辦<\/b>/, label);
+    // 一頁都進不去的那一行整行不畫。
+    for (const no of ["護照", "錢", "紀錄", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);
+    assert.doesNotMatch(rail, /href="\/admin\/people\//, `${label}：一般幹部不該拿到人與權限的連結`);
+    assert.doesNotMatch(rail, /rail-item off|<details/, `${label}：不再有淡掉的行與折疊段`);
     assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>Associate・Curriculum Team/, `${label}：側欄上要寫名字、職級、team`);
-    const pres = M.railHTML("forms", "home", { ...ME.pres, name: "王平" });
-    assert.equal((pres.match(/class="rail-item off"/g) || []).length, 0, `${label}：Co-President 沒有任何一行是淡的`);
-    assert.equal((pres.match(/<a class="rail-item/g) || []).length, M.ITEMS.length, `${label}：Co-President 每一行都是連結`);
-    // 2026-10-24：Co-President 與 Senior Adviser 是整個組織的，側欄印「全部 team」，不印標籤也不印「還沒填」。
-    assert.match(pres, /Co-President・全部 team/, label);
+    // 上方那一排分頁：只有看得到的頁；一般幹部在對外網站只有資源庫一頁，就不畫那一排。
+    assert.equal(M.shellHTML("", rail, "B").includes("area-tabs"), false, `${label}：只有一頁就不畫分頁列`);
+    const pres = { ...ME.pres, name: "王平" };
+    const ph = M.shellHTML("", M.railHTML("site", "team", pres), "B");
+    assert.match(ph, /<a class="area-tab on" href="#team" data-act="tab" data-t="team" aria-current="page">團隊頁<\/a>/, label);
+    assert.match(ph, /area-tab" href="#events" data-act="tab" data-t="events">網站上的活動/, label);
+    // Co-President：十個東西都在。
+    const pr = M.railHTML("forms", "home", pres);
+    assert.equal((pr.match(/class="rail-item rail-area/g) || []).length, M.AREAS.length, `${label}：Co-President 每一行都在`);
+    assert.match(pr, /Co-President・全部 team/, label);
     assert.match(M.railHTML("forms", "home", { ...ME.senior, name: "顧", team: "Marketing Team" }), /Senior Adviser・全部 team/, `${label}：Senior Adviser 就算勾了標籤也印全部 team`);
+    // Senior Adviser 看不到兩個只有 Co-President 讀得到的頁（資料庫只回給 Co-President，進去會是空的）。
+    const sa = { ...ME.senior, name: "顧" };
+    assert.doesNotMatch(M.shellHTML("", M.railHTML("site", "team", sa), ""), /data-t="stories"/, `${label}：Senior Adviser 沒有校友故事`);
+    assert.doesNotMatch(M.shellHTML("", M.railHTML("people", "roster", sa), ""), /data-t="changes"/, `${label}：Senior Adviser 沒有變動紀錄`);
   }
 });
 

@@ -228,7 +228,7 @@ test("★ 只有 Co-President 看得到「團隊頁」這個分頁", () => {
 test("★ 團隊頁整頁畫得出側欄（核可完回得去資源）", () => {
   const h = shellHTML("", railHTML("site", "team", { role: "cadre", board: "president", team: "", name: "王平" }), publicTeamHTML([], "", false));
   assert.match(h, /data-act="tab" data-t="res"/);
-  assert.match(h, /class="rail-item on" href="#team"/);
+  assert.match(h, /class="area-tab on" href="#team"/);
   assert.doesNotMatch(publicTeamHTML([], "", false), /data-act="tab"/, "頁面本身不再畫分頁列，分頁只在側欄");
 });
 

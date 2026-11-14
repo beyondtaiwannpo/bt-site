@@ -42,12 +42,15 @@ const R = [
 
 test("★ 側欄：每一位幹部有「跟 Marketing 提需求」；佇列只給需求工作區裡的人與靠職級的兩級；五份 ITEMS 一樣", () => {
   for (const M of [F, SITE, PA, PE, FI]) {
-    const req = M.ITEMS.find(i => i.key === "request"), queue = M.ITEMS.find(i => i.key === "requests");
-    assert.equal(req.who, "cadre"); assert.equal(queue.who, "ws:custom:marketing-requests");
-    assert.ok(M.canSee(req, ME)); assert.ok(!M.canSee(queue, ME), "沒被派的幹部看不到佇列");
-    assert.ok(M.canSee(queue, VIEWER)); assert.ok(M.canSee(queue, { ...ME, board: "senior_adviser" }));
+    // 2026-11-13：側欄只剩「需求單」一行（行銷那一區），佇列是那一頁裡的第二面（F.rqQueueOk）。
+    const req = M.ITEMS.find(i => i.key === "request");
+    assert.equal(req.who, "cadre"); assert.equal(req.area, "marketing"); assert.ok(M.canSee(req, ME));
+    assert.equal(M.ITEMS.find(i => i.key === "requests"), undefined, "佇列不再是側欄的一行");
     assert.equal(M.wsCellHref({ id: "custom:marketing-requests", kind: "custom" }), "/admin/#requests", "Workspaces 那一格連到佇列");
   }
+  assert.ok(!F.rqQueueOk(ME), "沒被派的幹部沒有佇列那一面"); assert.equal(F.rqSwitchHTML("request", ME, []), "");
+  assert.ok(F.rqQueueOk(VIEWER)); assert.ok(F.rqQueueOk({ ...ME, board: "senior_adviser" }));
+  assert.match(F.rqSwitchHTML("requests", VIEWER, []), /class="chip on" href="#requests"/);
 });
 
 test("★ 狀態對照：舊的 new／done 讀成已送出／已發布，四個新狀態加退件、收回原樣", () => {
