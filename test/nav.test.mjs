@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { FEATURES, featuresFor, navHTML, withLang } from "../shared/nav.js";
+import { FEATURES, featuresFor, barFor, navHTML, withLang } from "../shared/nav.js";
 // 頂欄 2026-10-19 起中英兩版，連結帶 ?lang=；這一支斷言中文，所以每一次都傳 lang: "zh"。
 
 const count = (h, re) => (h.match(re) || []).length;
@@ -31,13 +31,24 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
 // **改成對照 FEATURES 本身**：它守的是「頂欄畫出來的項數等於清單上該看到的項數」，
 // 那才是真正會壞的地方（過濾寫錯、或是有人在 navHTML 裡多畫一個寫死的連結）。
 // 順便把 key 列出來對一次，不然「數量對但畫錯項目」抓不到。
-test("★ 幹部看到 FEATURES 上所有屬於他的項目，當前的那一項有標記", () => {
-  const h = navHTML({ current: "availability", role: "cadre", name: "王平", lang: "zh" });
-  const mine = FEATURES.filter(f => f.roles.includes("cadre"));
-  assert.equal(count(h, /<a href="\/[a-z-]+\/\?lang=zh(#[a-z-]+)?"/g), mine.length);
-  for (const f of mine) assert.ok(h.includes(`href="${withLang(f.href, "zh")}"`), `頂欄少了 ${f.key}`);
-  assert.match(h, /href="\/availability\/\?lang=zh" aria-current="page"/, "當前項沒有 aria-current");
-  assert.ok(!/href="\/passport\/\?lang=zh" aria-current/.test(h), "不是當前的項被標了");
+// 2026-11-14 Paul：側欄做好之後頂欄只留首頁與設定（行事曆、護照、時間看板、後台都在側欄），
+// 所以幹部的頂欄對照的是 barFor，不是整份 FEATURES；inSidebar 的那幾項不能出現在頂欄。
+test("★ 幹部的頂欄只畫 barFor 的項目（首頁、設定），側欄有的不重複，當前的那一項有標記", () => {
+  const h = navHTML({ current: "home", role: "cadre", name: "王平", lang: "zh" });
+  const bar = barFor("cadre");
+  assert.deepEqual(bar.map(f => f.key).sort(), ["home", "settings"]);
+  assert.equal(count(h, /<a href="\/[a-z-]+\/\?lang=zh(#[a-z-]+)?"/g), bar.length);
+  for (const f of bar) assert.ok(h.includes(`href="${withLang(f.href, "zh")}"`), `頂欄少了 ${f.key}`);
+  for (const f of FEATURES.filter(x => x.inSidebar && x.roles.includes("cadre")))
+    assert.ok(!h.includes(`href="${withLang(f.href, "zh")}"`), `${f.key} 在側欄，頂欄不該再有`);
+  assert.match(h, /href="\/home\/\?lang=zh" aria-current="page"/, "當前項沒有 aria-current");
+  assert.ok(!/href="\/settings\/\?lang=zh" aria-current/.test(h), "不是當前的項被標了");
+});
+
+// 學員、實習生、校友沒有側欄，頂欄照舊是 featuresFor 的全部。
+test("★ 沒有側欄的角色頂欄不變", () => {
+  for (const role of ["student", "intern", "alumni"])
+    assert.deepEqual(barFor(role).map(f => f.key), featuresFor(role).map(f => f.key), role);
 });
 
 // ★ 學員：列照樣畫，只是功能項是空的。不整條藏起來——他知道自己在這個站裡，
@@ -135,7 +146,7 @@ test("★ 不准改用 <details> 做那顆選單", () => {
 test("★ 功能項只有一份，不是寬窄各一份", () => {
   const h = navHTML({ current: "passport", role: "cadre", name: "王平", lang: "zh" });
   assert.equal((h.match(/class="btnav-items"/g) || []).length, 1);
-  for (const f of FEATURES.filter(x => x.roles.includes("cadre")))
+  for (const f of barFor("cadre"))
     assert.equal(h.split(`href="${withLang(f.href, "zh")}"`).length - 1, 1,
       `${f.key} 出現了不只一次`);
 });

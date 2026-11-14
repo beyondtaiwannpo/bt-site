@@ -796,6 +796,13 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 - 整個後台與首頁在大螢幕上變寬：外框最寬 1180px 改 1480px，內容區 900px 改 1200px（`admin/admin.css`、`shared/rail.css`、`home/index.html`）。說明文字自己限 60em，不會變成一行很長。
 - 其他頁面掃過一次（36 頁，找「一長串只用不到一半寬度」的清單），沒有別的同樣問題。
 
+**同一天第三輪：幹部的頂欄只留首頁與設定（Paul：「Yes, slim it」）**：
+
+- 側欄做好之後，行事曆、護照、時間看板、後台在頂欄和側欄各出現一次。幹部的頂欄現在只剩「首頁」「設定」，右邊照舊是名字與登出。
+- 為什麼留首頁：護照、時間看板、設定這幾頁沒有側欄，從那裡回到側欄要靠頂欄的「首頁」。
+- 做法：`shared/nav.js` 的 FEATURES 在那四項標 `inSidebar: true`，頂欄改用 `barFor(role)`（把這些項拿掉）。`featuresFor` 沒有動，後台「你的存取」的說明照舊列全部。
+- 學員、實習生、校友沒有側欄，頂欄跟以前一樣。之後在側欄加一個頁面，頂欄那一項記得也標 `inSidebar`。
+
 **正式資料庫**：2026-11-14 Paul 把 `2026-12-18-meeting-templates.sql` 到 `2026-12-25-access-model.sql` 八支依序在正式 Supabase 上跑完。
 
 **同一天順手改的**：人與權限 → 幹部名單，同一屆兼好幾個職位的人，職位照職級排（Co-President、Senior Adviser、Director、Adviser、Associate）。以前照輸入的順序，兩位 Co-President 一位的「Co-President」在第一行、另一位在第二行。`admin/people/src/ui.js` 的 `positionsFor()`；改一個人那一頁的職位列也是這個順序。

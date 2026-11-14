@@ -24,11 +24,14 @@ export const FEATURES = [
   // 兩筆指到同一個資料夾，行事曆是 #calendar。推翻 2026-10-23「頂欄一行不改」，理由記在 Anson decisions。
   { key: "home",         label: { zh: "首頁", en: "Home" },         href: "/home/",         roles: ["cadre"],
     title: { zh: "首頁", en: "Home" },           desc: { zh: "等你回覆的會、接下來的會與活動", en: "Meetings waiting for your reply, what's coming up" } },
-  { key: "calendar",     label: { zh: "行事曆", en: "Calendar" },   href: "/home/#calendar", roles: ["cadre"],
+  // inSidebar（2026-11-14 Paul：「menu 換了，頂欄要不要重想」）：這幾項已經在側欄（shared/rail.js 的「我的」「BT」「組織」），
+  // 幹部的頂欄只留首頁與設定，不再畫兩次。首頁留著，因為護照、時間看板、設定這三頁沒有側欄，要有一條回去的路。
+  // 學員、intern、校友沒有側欄，他們的頂欄不受影響。featuresFor() 照舊回全部（後台「你的存取」那一段用它說明每一項）。
+  { key: "calendar",     label: { zh: "行事曆", en: "Calendar" },   href: "/home/#calendar", roles: ["cadre"], inSidebar: true,
     title: { zh: "行事曆", en: "Calendar" },     desc: { zh: "整個月的會議與活動", en: "Meetings and events by month and week" } },
-  { key: "passport",     label: { zh: "護照", en: "Passport" },     href: "/passport/",     roles: ["cadre"],
+  { key: "passport",     label: { zh: "護照", en: "Passport" },     href: "/passport/",     roles: ["cadre"], inSidebar: true,
     title: { zh: "幹部護照", en: "Cadre passport" },     desc: { zh: "這一年的活動、章、心得與照片", en: "This year's activities, stamps, notes and photos" } },
-  { key: "availability", label: { zh: "時間看板", en: "Availability" }, href: "/availability/", roles: ["cadre"],
+  { key: "availability", label: { zh: "時間看板", en: "Availability" }, href: "/availability/", roles: ["cadre"], inSidebar: true,
     title: { zh: "每週時間看板", en: "Weekly availability board" }, desc: { zh: "填自己每週固定有空的時段，約會議時直接挑", en: "Fill in when you are usually free each week, then pick a meeting time from the board" } },
   // 2026-09-08（批 3）。**所有幹部都看得到這個入口，那是對的。**
   // 每個幹部都屬於一個 team，而 2026-09-07 拍板的可見範圍是
@@ -39,7 +42,7 @@ export const FEATURES = [
   // 申請都看不到，而那不是拍板的內容。
   // 2026-10-15：後台拆成四個資料夾（申請、對外、護照、人與權限），這一筆改名「後台」。
   // 子資料夾不進頂欄：誰進得去哪一組由 /admin/ 首頁的分組列帶，這裡仍然不認 board_role。
-  { key: "admin",        label: { zh: "後台", en: "Admin" },     href: "/admin/",        roles: ["cadre"],
+  { key: "admin",        label: { zh: "後台", en: "Admin" },     href: "/admin/",        roles: ["cadre"], inSidebar: true,
     title: { zh: "後台", en: "Admin" },         desc: { zh: "申請表與審核、對外內容、護照的格子、邀請碼", en: "Forms and review, public content, passport boxes, invite codes" } },
   // 2026-09-08：設定。**這是第一個 roles 含 student 的項目。**
   // 這個檔案的檔頭一直寫著「之後開放給學員的功能只要在 roles 加 student，
@@ -90,6 +93,10 @@ const NAV = {
 export function featuresFor(role) {
   return FEATURES.filter(f => f.roles.includes(role));
 }
+// 頂欄真正畫的那幾項：側欄已經有的不再畫（2026-11-14）。
+export function barFor(role) {
+  return featuresFor(role).filter(f => !f.inSidebar);
+}
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -100,7 +107,7 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 // 所以 logo 直接坐在上面，不需要另外墊一塊——它本來就是為這個紙色設計的。
 export function navHTML({ current, role, name, lang }) {
   const L = LANGS.includes(lang) ? lang : navLang();
-  const items = featuresFor(role).map(f =>
+  const items = barFor(role).map(f =>
     `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`).join("");
   const n = String(name || "");
   return `<nav class="btnav" aria-label="${esc(tx(NAV.aria, L))}">
