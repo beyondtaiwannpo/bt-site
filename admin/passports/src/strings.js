@@ -70,7 +70,7 @@ export const COMMON = {
   "ws.long.passport": { zh: "幹部護照（格子與城市）", en: "Cadre passport (boxes & cities)" },
   "ws.long.intern":   { zh: "實習護照（格子與棋盤）", en: "Intern passport (boxes & board)" },
   "ws.long.apps":     { zh: "申請（表單與審核）", en: "Applications (forms & review)" },
-  "ws.long.res":      { zh: "team（活動、會議、資源）", en: "Team (events, meetings, resources)" },
+  "ws.long.res":      { zh: "活動、會議、資源", en: "Events, meetings, resources" },
   "ws.long.finance":  { zh: "財務（帳戶、收支、預算）", en: "Finance (accounts, transactions, budget)" },
   "ws.long.money":    { zh: "錢（記收支、預算）", en: "Money (record income and spending, budget)" },
   "ws.long.records":  { zh: "BT Records（人、活動、回饋、去向）", en: "BT Records (people, events, feedback, outcomes)" },

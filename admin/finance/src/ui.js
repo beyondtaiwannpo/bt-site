@@ -426,6 +426,7 @@ export function membersAreaHTML(ns, a) {
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
 // 一個工作區屬於哪一列（2026-10-24 照 team 分組）：apps:X / res:X 是 X；intern-passport 是 Internship Team；passport 是整個 BT（""）；
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
+const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms"]);
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
   // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
@@ -434,6 +435,10 @@ export function wsTeamOf(w, people) {
   if (id.startsWith("res:")) return id.slice(4);
   if (id === "intern-passport") return "Internship Team";
   if (id === "passport") return "";
+  // 整個 BT 的工具不跟擁有人走（2026-11-14 Paul：「為什麼紀錄、會議範本、team 表單在 Sponsorship 底下」）。
+  // 擁有人通常是 Co-President，他勾的第一個 team 是哪一個，這幾格就掉到哪一列，看起來像那個 team 的東西。
+  if (ORG_WS.has(id)) return "";
+  if (id === "custom:marketing-requests" || id === "custom:marketing-approve") return "Marketing Team";
   if (w && w.team) return w.team;
   const o = w && w.owner && (people || []).find(p => p.profile_id === w.owner || p.id === w.owner);
   const t = o ? String(o.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean)[0] : "";

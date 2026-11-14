@@ -791,6 +791,11 @@ test("★ 工作區屬於哪一列、叫什麼、連到哪（四份一樣）", (
   assert.equal(FORMS.wsTeamOf({ id: "custom:camp", team: "Marketing Team" }), "Marketing Team");
   assert.equal(FORMS.wsTeamOf({ id: "custom:camp", owner: "u2" }, [{ profile_id: "u2", team: "Curriculum Team, Internship Team" }]), "Curriculum Team", "自訂的沒有 team 欄就看擁有人的第一個 team");
   assert.equal(FORMS.wsTeamOf({ id: "custom:camp" }), "", "都沒有就放整個 BT");
+  // 2026-11-14：整個 BT 的工具不跟擁有人勾的 team 走（Co-President 勾了 Sponsorship，紀錄就掉到 Sponsorship 那一列）。
+  const pres = [{ profile_id: "p1", team: "Sponsorship Team" }];
+  for (const id of ["custom:records", "records", "custom:meeting-templates", "custom:team-forms", "custom:money", "finance"])
+    assert.equal(FORMS.wsTeamOf({ id, owner: "p1" }, pres), "", `${id} 在整個 BT`);
+  assert.equal(FORMS.wsTeamOf({ id: "custom:marketing-requests", owner: "p1" }, pres), "Marketing Team");
   assert.equal(FORMS.wsCellLabel({ id: "passport" }), "幹部護照（格子與城市）");
   assert.equal(FORMS.wsCellLabel({ id: "intern-passport" }), "實習護照（格子與棋盤）");
   assert.equal(FORMS.wsCellLabel({ id: "apps:Curriculum Team" }), "申請（表單與審核）");

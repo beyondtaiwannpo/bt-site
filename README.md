@@ -803,6 +803,12 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 - 做法：`shared/nav.js` 的 FEATURES 在那四項標 `inSidebar: true`，頂欄改用 `barFor(role)`（把這些項拿掉）。`featuresFor` 沒有動，後台「你的存取」的說明照舊列全部。
 - 學員、實習生、校友沒有側欄，頂欄跟以前一樣。之後在側欄加一個頁面，頂欄那一項記得也標 `inSidebar`。
 
+**同一天第四輪：工作區的 team 看不清楚、紀錄跑到 Sponsorship 底下（Paul：「why is record, meeting templates, team form under Sponsorship」）**：
+
+- 原因有兩個。第一，「整個 BT」那一塊太長，流到下一欄，下一欄最上面那幾格沒有標題，看起來像是下面那個 team 的。第二，沒有寫 team 的工作區照擁有人勾的第一個 team 分組，擁有人是 Co-President 的話，紀錄、會議範本、team 表單就被分到他勾的那個 team。
+- 現在「整個 BT」橫跨整排、自己排成幾欄；紀錄、會議範本、team 表單、錢、財務固定在「整個 BT」，Marketing 需求與貼文核可固定在 Marketing，不看擁有人（八份 `wsTeamOf` 一起改，`ORG_WS` 那一行）。
+- 每個 team 那一格以前叫「team（活動、會議、資源）」，七格長得一模一樣、還會折行。改叫「活動、會議、資源」，team 名字看塊的標題；標題改成深藍、大一點、底下一條線。
+
 **正式資料庫**：2026-11-14 Paul 把 `2026-12-18-meeting-templates.sql` 到 `2026-12-25-access-model.sql` 八支依序在正式 Supabase 上跑完。
 
 **同一天順手改的**：人與權限 → 幹部名單，同一屆兼好幾個職位的人，職位照職級排（Co-President、Senior Adviser、Director、Adviser、Associate）。以前照輸入的順序，兩位 Co-President 一位的「Co-President」在第一行、另一位在第二行。`admin/people/src/ui.js` 的 `positionsFor()`；改一個人那一頁的職位列也是這個順序。

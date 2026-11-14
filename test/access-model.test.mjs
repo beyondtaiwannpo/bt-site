@@ -57,7 +57,7 @@ test("後台首頁接 #members=<工作區>，回上一頁回到連過來的那�
   assert.match(main, /if \(S\.mp && S\.mp\.fromLink && S\.mp\.canBack\) \{ history\.back\(\); return; \}/);
 });
 
-test("人的那一張卡：錢有一格、活動不畫成格子而是列一行、team 那一格叫 team（活動、會議、資源）", () => {
+test("人的那一張卡：錢有一格、活動不畫成格子而是列一行、team 那一格叫「活動、會議、資源」（team 名字在那一列的列頭）", () => {
   const ws = [{ id: "apps", kind: "apps" }, { id: "passport", kind: "passport" }, { id: "res:Curriculum Team", kind: "res", team: "Curriculum Team" },
     { id: "custom:money", kind: "custom", title_zh: "錢（收支與預算）" }, { id: "custom:event-camp", kind: "custom", team: "Curriculum Team", title_zh: "冬令營" }];
   const p = { profile_id: "u1", board_role: "member", workspaces: [{ id: "custom:event-camp", level: "edit" }, { id: "custom:money", level: "view" }] };
@@ -65,7 +65,7 @@ test("人的那一張卡：錢有一格、活動不畫成格子而是列一行�
   assert.match(h, /data-ws="custom:money"/);
   assert.doesNotMatch(h, /data-ws="custom:event-camp"/);
   assert.match(h, /也在這幾場活動：<a href="\/admin\/\?lang=zh#events\/camp">冬令營<\/a>（改）/);
-  assert.match(h, /team（活動、會議、資源）/);
+  assert.match(h, />活動、會議、資源</);
   assert.match(h, /Sponsorship 的 Director/);
   assert.equal(PE.wsCellHref({ id: "custom:money" }), "/admin/finance/#overview");
 });

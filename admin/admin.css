@@ -438,8 +438,14 @@ main > .fold{margin-bottom:24px}
 /* 用報紙那種直欄（columns）不用 grid：「整個 BT」那一塊比各 team 長很多，grid 每一列會被它撐高、旁邊留白。直欄會一路往下接著排。 */
 .wsgrid{columns:230px;column-gap:20px}
 .wsgrid .rail-item{break-inside:avoid}
-.wsgrp .rail-group{padding:10px 12px 4px;break-after:avoid}
+/* 2026-11-14 Paul：「team 很難看到」。塊的標題改成深藍、大一點、底下一條線，一眼看得出哪一塊是哪個 team。 */
+.wsgrp .rail-group{font-size:15px;color:var(--bt-navy);padding:16px 0 6px;margin:0 12px 4px;
+  border-bottom:1px solid rgba(16,42,134,.18);break-after:avoid}
 .wsgrp:first-child .rail-group{padding-top:0}
+/* 「整個 BT」那一塊橫跨整排、自己排成幾欄。以前它太長會流到下一欄，下一欄最上面那幾格沒有標題，
+   看起來像是下面那個 team 的東西（Paul 看到紀錄、會議範本、team 表單「在 Sponsorship 底下」就是這個）。 */
+.wsgrp:first-child{column-span:all;margin-bottom:14px}
+.wsgrp:first-child .wslist{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));column-gap:20px}
 .wsgrp + .wsgrp{break-inside:avoid} /* 各 team 那幾塊不拆開，免得「Marketing requests」掉到下一欄、上面沒有 team 名字 */
 .wsgrid .rail-count{display:none} /* 種類的 pill：塊的標題與名字已經講了 */
 .wslist .rail-item{justify-content:space-between}
