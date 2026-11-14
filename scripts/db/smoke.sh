@@ -3378,6 +3378,33 @@ bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
 if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「檔案只能是自己的」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉檔案路徑門驗收表沒變紅"; fail=$((fail+1)); fi
 fen3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-20-form-engine.sql 2>&1 || true)
 if echo "${fen3}" | grep -q "OVERALL.*PASS"; then echo "  ok   破壞測試之後裝回正確的那一版"; pass=$((pass+1)); else echo "  FAIL 裝回正確版沒過：${fen3}" | head -5; fail=$((fail+1)); fi
+echo "── 送出確認信（2026-12-21-form-received-mail.sql）──"
+frm=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-21-form-received-mail.sql 2>&1 || true)
+if echo "${frm}" | grep -q "OVERALL.*PASS" && ! echo "${frm}" | grep -q "|FAIL"; then echo "  ok   確認信那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 確認信那支驗收表："; echo "${frm}" | head -10; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "update public.mail_templates set subject_zh='Paul 改過的主旨 {活動名稱}' where kind='received';" 2>&1 | grep -i "error" || true
+frm2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-21-form-received-mail.sql 2>&1 || true)
+if echo "${frm2}" | grep -q "OVERALL.*PASS"; then echo "  ok   確認信那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 確認信重跑：${frm2}" | head -5; fail=$((fail+1)); fi
+chk "★ 重跑不會蓋掉改過的文案" "Paul改過的主旨{活動名稱}" "select subject_zh from public.mail_templates where kind='received'"
+FES4=cccccccc-fe00-0000-0000-0000000000b4; FES5=cccccccc-fe00-0000-0000-0000000000b5
+psql -d "$DB" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${FES4}','fe4@example.com'), ('${FES5}','fe5@example.com');
+insert into public.profiles (id,name_zh,role) values ('${FES4}','引擎四號','student'), ('${FES5}','引擎五號','student');
+update public.forms set max_responses=null, confirm_mail=false where id='${FEF}';
+SQL
+chkas "${FES4}" "表單沒勾：送出不會排確認信" "0" "select public.submit_application('${FEF}', '[{\"q\":\"${FEQ1}\",\"v\":\"沒有\"},{\"q\":\"${FEQ3}\",\"v\":\"secret-answer@x.co\"}]'::jsonb); select count(*) from public.mail_outbox where kind='received'"
+psql -d "${DB}" -X -A -t -q -c "update public.forms set confirm_mail=true where id='${FEF}';" 2>&1 | grep -i "error" || true
+chkas "${FES5}" "★ 表單勾了：排一封寄到申請人自己的登入信箱" "1|fe5@example.com" "select public.submit_application('${FEF}', '[{\"q\":\"${FEQ1}\",\"v\":\"沒有\"},{\"q\":\"${FEQ3}\",\"v\":\"secret-answer@x.co\"}]'::jsonb); select count(*)||'|'||max(to_email) from public.mail_outbox where kind='received'"
+chk "★ 信裡沒有答案，只有姓名與表單名稱" "t|t|f" "select (body like '%引擎五號%')::text::char(1)||'|'||(subject like '%引擎測試表%')::text::char(1)||'|'||(body like '%secret-answer%')::text::char(1) from public.mail_outbox where kind='received'"
+chk "確認信的按鈕連到 /app/" "https://beyondtaiwannpo.com/app/" "select public.mail_button_url(m) from public.mail_outbox m where kind='received'"
+chkas "${FES5}" "同一個人再按一次送出不會多一封" "1" "select public.submit_application('${FEF}', '[{\"q\":\"${FEQ1}\",\"v\":\"沒有\"},{\"q\":\"${FEQ3}\",\"v\":\"secret-answer@x.co\"}]'::jsonb); select count(*) from public.mail_outbox where kind='received'"
+fqm=$(psql -d "${DB}" -X -A -t -q -c "set role authenticated; insert into public.mail_outbox (to_email, subject, body, kind) values ('x@y.co','s','b','received');" 2>&1 || true)
+if echo "${fqm}" | grep -qi "permission denied\|row-level security"; then echo "  ok   ★ 登入的人自己塞不了確認信進 outbox"; pass=$((pass+1)); else echo "  FAIL 登入的人塞得進 outbox：${fqm}"; fail=$((fail+1)); fi
+sed "s/  if not coalesce(v_form.confirm_mail, false) then return new; end if;//" supabase/migrations/2026-12-21-form-received-mail.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「表單有勾才寄」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉開關驗收表沒變紅"; fail=$((fail+1)); fi
+frm3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-21-form-received-mail.sql 2>&1 || true)
+if echo "${frm3}" | grep -q "OVERALL.*PASS"; then echo "  ok   破壞測試之後裝回正確的那一版"; pass=$((pass+1)); else echo "  FAIL 裝回正確版沒過：${frm3}" | head -5; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "update public.forms set confirm_mail=false where id='${FEF}';" 2>&1 | grep -i "error" || true
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

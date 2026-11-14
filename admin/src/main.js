@@ -419,6 +419,8 @@ function readForm() {
     // 2026-12-20-form-engine.sql 的兩欄：那兩格只在資料庫有那兩欄的時候畫（ui.js 看 form 裡有沒有 max_responses）。
     ...(document.getElementById("fmax") ? { max_responses: val("fmax") } : {}),
     ...(document.getElementById("fhidden") ? { hidden_fields: val("fhidden") } : {}),
+    // 2026-12-21-form-received-mail.sql：送出確認信的開關，資料庫沒有那一欄就不畫、不送。
+    ...(document.getElementById("fconfirm") ? { confirm_mail: document.getElementById("fconfirm").checked } : {}),
   };
 }
 

@@ -222,6 +222,8 @@ export const MINE = {
   "mail.guardian.when": { zh: "學生送出申請、而且填了家長信箱的時候", en: "when a student submits and gives a guardian email" },
   "mail.interview":   { zh: "邀請面試", en: "Interview invitation" },
   "mail.interview.when": { zh: "你按下「邀請面試」的時候", en: "when you press \"Interview\"" },
+  "mail.received":    { zh: "申請送出確認", en: "Application received" },
+  "mail.received.when": { zh: "學生送出申請、而且那份表單勾了「寄確認信」的時候，寄給學生自己（信裡不帶答案）", en: "when a student submits a form that has \"email a confirmation\" ticked; goes to the student (no answers in it)" },
   "mail.accepted":    { zh: "錄取通知", en: "Acceptance" },
   "mail.accepted.when": { zh: "你按下「錄取」的時候", en: "when you press \"Accepted\"" },
   "mail.rejected":    { zh: "婉拒", en: "Decline" },

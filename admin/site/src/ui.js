@@ -680,6 +680,8 @@ export const MAIL_KINDS = [
   { v: "interview", label: "mail.interview", when: "mail.interview.when" },
   { v: "accepted",  label: "mail.accepted",  when: "mail.accepted.when" },
   { v: "rejected",  label: "mail.rejected",  when: "mail.rejected.when" },
+  // 2026-12-21 申請送出確認：表單設定勾了才寄，寄給申請人自己。代換符號跟錄取信一樣 {姓名} {活動名稱}，信裡不帶答案。
+  { v: "received",  label: "mail.received",  when: "mail.received.when" },
   // 2026-10-29 邀請信：五個代換符號 {name} {position} {term} {link} {sender}，不是 {姓名} {活動名稱}。
   { v: "invite",    label: "mail.invite",    when: "mail.invite.when" },
   // 2026-10-31 行銷需求單：兩封，代換符號 {requester} {title} {needed_by} {link} {reply}。
@@ -827,10 +829,12 @@ export function downHTML(err) {
 export const MAIL_BUTTON = {
   invite: { zh: "接受邀請", en: "Accept invitation" }, meeting_invite: { zh: "回覆出席", en: "Reply" }, meeting_reminder: { zh: "回覆出席", en: "Reply" }, meeting_summary: { zh: "看這場會", en: "Open meeting" }, meeting_update: { zh: "回覆出席", en: "Reply" },
   request_new: { zh: "打開需求單", en: "Open request" }, request_done: { zh: "看回覆", en: "Open request" }, request_rejected: { zh: "看說明", en: "Read the note" }, interview: { zh: "挑一個時段", en: "Pick a time" },
+  received: { zh: "看我的申請", en: "See my application" },
 };
 export const MAIL_SAMPLE_URL = {
   invite: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", meeting_invite: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_reminder: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_summary: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_update: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_cancel: "",
   request_new: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", request_done: "https://beyondtaiwannpo.com/admin/#request/9f2c…", request_rejected: "https://beyondtaiwannpo.com/admin/#request/9f2c…", interview: "https://cal.com/beyondtaiwan/interview",
+  received: "https://beyondtaiwannpo.com/app/",
 };
 export function mailButtonLabel(kind, lang, custom) {
   if (custom && String(custom).trim()) return String(custom).trim();

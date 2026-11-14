@@ -210,6 +210,8 @@ export const MINE = {
                         en: "Edit right on the canvas, like Tally: click a question to type, use the + between blocks or type / at the bottom to add one, and open Logic to show, hide, require or jump based on an answer. Everything saves as you type. The applicant's name, school, grade and email are collected automatically, <b>so do not ask for them again here</b>." },
   "form.max":         { zh: "收幾份就自己關（不填是不限）", en: "Close after this many responses (blank means no limit)" },
   "form.hidden":      { zh: "隱藏欄位（英文名字，逗號隔開，例如 from）", en: "Hidden fields (names, comma separated, e.g. from)" },
+  "form.confirm":     { zh: "送出之後寄一封確認信給申請人", en: "Email the applicant a confirmation after they submit" },
+  "form.confirmHint": { zh: "寄到申請人登入用的信箱。信裡只有姓名和表單名稱，不帶答案。信的字在「對外網站 → 信的文字 → 申請送出確認」改。", en: "Sent to the applicant's sign-in email. It only has their name and the form title, no answers. Edit the wording under Website → Email wording → Application received." },
   "form.hiddenHint":  { zh: "連結加上 ?from=ig 這種參數，值會跟著那一份申請存起來，申請人看不到。題目「進階」裡的代號可以先幫人填好答案：?q_代號=值。", en: "Add ?from=ig to a link and the value is saved with that application, unseen by the applicant. A question's prefill key (under Advanced) fills an answer in: ?q_key=value." },
   "form.link":        { zh: "對外連結", en: "Public link" },
   "err.qKey":         { zh: "這個代號在這份表單裡已經有一題用了，換一個。", en: "Another question in this form already uses that key." },

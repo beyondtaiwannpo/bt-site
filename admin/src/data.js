@@ -83,7 +83,7 @@ export async function createForm(team, title, kind) {
 // 而那個拒絕長得像「存檔失敗」，看不出是哪一欄的問題（2026-09-01 的坑）。
 const FORM_FIELDS = ["title", "intro", "kind", "lang", "status",
                      "opens_at", "closes_at", "notify_by", "interview_url", "team",
-                     "max_responses", "hidden_fields"];
+                     "max_responses", "hidden_fields", "confirm_mail"];
 export async function saveForm(id, patch) {
   need();
   const clean = {};

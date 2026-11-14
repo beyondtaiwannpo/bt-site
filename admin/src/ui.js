@@ -181,6 +181,8 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
       <label><i>${T("form.hidden")}</i><input id="fhidden" name="hidden_fields" value="${esc((form.hidden_fields || []).join(", "))}" spellcheck="false" placeholder="from"${canEdit ? "" : " disabled"}></label>
     </div>
     <div class="mini" style="margin:-6px 0 14px">${esc(T("form.hiddenHint"))}</div>` : ""}
+    ${"confirm_mail" in form ? `<label class="check"><input type="checkbox" id="fconfirm" name="confirm_mail"${form.confirm_mail ? " checked" : ""}${canEdit ? "" : " disabled"}><span>${T("form.confirm")}</span></label>
+    <div class="mini" style="margin:-6px 0 14px">${esc(T("form.confirmHint"))}</div>` : ""}
 
     <label><i>${T("form.status")}</i><select id="fstatus" name="status"${canEdit ? "" : " disabled"}>
       ${STATUSES.map(s => `<option value="${s.v}"${form.status === s.v ? " selected" : ""}>${esc(T(s.label))}</option>`).join("")}

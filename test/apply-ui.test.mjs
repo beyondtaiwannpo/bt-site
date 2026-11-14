@@ -375,3 +375,16 @@ test("★ 信件文案第五種：邀請信，五個代換符號、預覽有連�
   assert.match(h, /\{link\}/, "提醒裡講 {link} 一定要在");
   assert.doesNotMatch(h, /\{姓名\}/, "邀請信不用舊的兩個符號");
 });
+
+// ── 送出確認信（2026-12-21-form-received-mail.sql）──
+test("確認信：表單設定有開關（資料庫有那一欄才畫），信件文案多一封、按鈕連到 /app/", () => {
+  const base = { id: "f1", team: "Curriculum", title: "探索營", status: "draft", lang: "zh" };
+  assert.doesNotMatch(M.formHTML(base, [], true, [], "", false), /id="fconfirm"/, "舊資料庫沒有那一欄就不畫");
+  const on = M.formHTML({ ...base, max_responses: null, hidden_fields: [], confirm_mail: true }, [], true, [], "", false);
+  assert.match(on, /id="fconfirm"[^>]*checked/);
+  assert.match(on, /不帶答案/);
+  assert.match(M.formHTML({ ...base, confirm_mail: false }, [], false, [], "", false), /id="fconfirm"[^>]* disabled/);
+  assert.ok(SITE.MAIL_KINDS.some(k => k.v === "received"));
+  assert.equal(SITE.mailButtonLabel("received", "zh"), "看我的申請");
+  assert.equal(SITE.MAIL_SAMPLE_URL.received, "https://beyondtaiwannpo.com/app/");
+});
