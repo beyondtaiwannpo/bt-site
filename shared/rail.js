@@ -84,7 +84,7 @@ const ICON = {
 export const SECTIONS = [
   { key: "me",   label: { zh: "我的", en: "Me" } },
   { key: "work", label: { zh: "BT", en: "BT" } },
-  { key: "org",  label: { zh: "組織", en: "Organisation" } },
+  { key: "org",  label: { zh: "組織", en: "Organization" } },
 ];
 export const AREAS = [
   { key: "home",      sec: "me",   label: { zh: "首頁",     en: "Home" },       hint: { zh: "等你處理的事，照日期排", en: "Everything waiting for you, by date" } },
