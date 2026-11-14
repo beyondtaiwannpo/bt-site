@@ -1015,6 +1015,13 @@ document.addEventListener("click", async e => {
   // ── 批 4：審核 ────────────────────────────────────────────────────
   if (act === "filter") { S.filter = b.dataset.f; S.msg = ""; render(); return; }
 
+  if (act === "file-open") {
+    // 先開一個空分頁再填網址：等 await 回來才 window.open 會被瀏覽器當成彈出視窗擋掉。
+    const w = window.open("", "_blank");
+    try { const url = await D.fileUrl(b.dataset.path); if (w) w.location = url; else location.href = url; }
+    catch (err) { if (w) w.close(); S.msg = T("err.file") + D.says(err); render(); }
+    return;
+  }
   if (act === "pick") {
     // checkbox 的預設行為已經把勾打上去了，這裡只同步 S。
     // **不要 preventDefault 再自己畫** —— 那會讓鍵盤操作變成兩套邏輯。

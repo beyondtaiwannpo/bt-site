@@ -3405,6 +3405,53 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 frm3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-21-form-received-mail.sql 2>&1 || true)
 if echo "${frm3}" | grep -q "OVERALL.*PASS"; then echo "  ok   破壞測試之後裝回正確的那一版"; pass=$((pass+1)); else echo "  FAIL 裝回正確版沒過：${frm3}" | head -5; fail=$((fail+1)); fi
 psql -d "${DB}" -X -A -t -q -c "update public.forms set confirm_mail=false where id='${FEF}';" 2>&1 | grep -i "error" || true
+echo "── 申請表單上傳檔案：私人 bucket 與誰讀得到（2026-12-22-form-uploads.sql）──"
+fup=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-22-form-uploads.sql 2>&1 || true)
+if echo "${fup}" | grep -q "OVERALL.*PASS" && ! echo "${fup}" | grep -q "|FAIL"; then echo "  ok   上傳那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 上傳那支驗收表："; echo "${fup}" | head -8; fail=$((fail+1)); fi
+fup2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-22-form-uploads.sql 2>&1 || true)
+if echo "${fup2}" | grep -q "OVERALL.*PASS"; then echo "  ok   上傳那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 上傳重跑：${fup2}" | head -5; fail=$((fail+1)); fi
+FES6=cccccccc-fe00-0000-0000-0000000000b6; FES7=cccccccc-fe00-0000-0000-0000000000b7
+psql -d "$DB" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${FES6}','fe6@example.com'), ('${FES7}','fe7@example.com');
+insert into public.profiles (id,name_zh,role) values ('${FES6}','引擎六號','student'), ('${FES7}','引擎七號','student');
+update public.forms set status='open', max_responses=null where id='${FEF}';
+SQL
+UPF="${FEF}/${FES6}/${FEQ6}-r1.pdf"
+upins() { echo "insert into storage.objects (bucket_id, name, owner) values ('form-uploads', '${1}', '${2}'); select 'inserted'"; }
+updeny() { # updeny 名稱 使用者 路徑
+  local got; got=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${2}',false);" -c "set role authenticated; insert into storage.objects (bucket_id, name, owner) values ('form-uploads', '${3}', '${2}');" 2>&1 || true)
+  if echo "${got}" | grep -qi "row-level security"; then echo "  ok   ${1}"; pass=$((pass+1)); else echo "  FAIL ${1}（沒有被擋：${got}）"; fail=$((fail+1)); fi
+}
+chkrole authenticated "${FES6}" "★ 學生傳得進自己的資料夾（開著的表單、真的有上傳題）" "inserted" "$(upins "${UPF}" "${FES6}")"
+chk "那個檔真的在" "1" "select count(*) from storage.objects where bucket_id='form-uploads' and name='${UPF}'"
+updeny "★ 學生傳不進別人的資料夾" "${FES6}" "${FEF}/${FES7}/${FEQ6}-r2.pdf"
+updeny "★ 路徑指到不是上傳題的題，傳不進去" "${FES6}" "${FEF}/${FES6}/${FEQ3}-r3.pdf"
+updeny "★ 路徑多一層（想繞出自己的資料夾），傳不進去" "${FES6}" "${FEF}/${FES6}/x/${FEQ6}-r4.pdf"
+updeny "★ 路徑有 ..，傳不進去" "${FES6}" "${FEF}/${FES6}/${FEQ6}-..r5.pdf"
+fan=$(psql -d "${DB}" -X -A -t -q -c "set role anon; insert into storage.objects (bucket_id, name) values ('form-uploads', '${FEF}/${FES6}/${FEQ6}-anon.pdf');" 2>&1 || true)
+if echo "${fan}" | grep -qi "row-level security\|permission denied"; then echo "  ok   ★ 沒登入傳不進去"; pass=$((pass+1)); else echo "  FAIL anon 傳得進去：${fan}"; fail=$((fail+1)); fi
+chkrole authenticated "${FES6}" "★ 上傳的人自己讀不回來（只有改得動那份表單的人讀得到）" "0" "select count(*) from storage.objects where bucket_id='form-uploads'"
+chkrole authenticated "${FES1}" "★ 別的學生讀不到別人的檔" "0" "select count(*) from storage.objects where bucket_id='form-uploads'"
+chkrole anon "" "★ 沒登入讀不到" "0" "select count(*) from storage.objects where bucket_id='form-uploads'"
+chkrole authenticated "${ASSOC}" "★ 改不動申請表單的一般幹部也讀不到" "0" "select count(*) from storage.objects where bucket_id='form-uploads'"
+chkrole authenticated "${PAUL}" "★ Co-President（改得動那份表單）讀得到" "1" "select count(*) from storage.objects where bucket_id='form-uploads'"
+chkrole authenticated "${FES6}" "★ 學生改不了檔名（沒有改的政策）" "0" "with u as (update storage.objects set name='${FEF}/${FES6}/${FEQ6}-moved.pdf' where name='${UPF}' returning 1) select count(*) from u"
+chkrole authenticated "${FES6}" "★ 學生刪不了（沒有刪的政策）" "0" "with d as (delete from storage.objects where name='${UPF}' returning 1) select count(*) from d"
+chkas "${FES6}" "帶著自己的檔送出申請" "1" "select public.submit_application('${FEF}', '[{\"q\":\"${FEQ1}\",\"v\":\"沒有\"},{\"q\":\"${FEQ3}\",\"v\":\"f6@x.co\"},{\"q\":\"${FEQ6}\",\"v\":\"${UPF}\"}]'::jsonb); select count(*) from public.application_answers where value='${UPF}'"
+updeny "★ 送出之後就不能再傳" "${FES6}" "${FEF}/${FES6}/${FEQ6}-after.pdf"
+psql -d "${DB}" -X -A -t -q -c "update public.forms set status='closed' where id='${FEF}';" 2>&1 | grep -i "error" || true
+updeny "★ 表單關了就不能傳" "${FES7}" "${FEF}/${FES7}/${FEQ6}-closed.pdf"
+psql -d "${DB}" -X -A -t -q -c "update public.forms set status='open' where id='${FEF}'; insert into storage.objects (bucket_id, name, owner) select 'form-uploads', '${FEF}/${FES7}/${FEQ6}-n' || g || '.pdf', '${FES7}' from generate_series(1,20) g;" 2>&1 | grep -i "error" || true
+updeny "★ 一個人一份表單最多 20 個檔" "${FES7}" "${FEF}/${FES7}/${FEQ6}-n21.pdf"
+psql -d "${DB}" -X -A -t -q -c "delete from storage.objects where bucket_id='form-uploads';" 2>&1 | grep -i "error" || true
+sed "s/  return coalesce((select public.form_can_edit(f.id) from public.forms f/  return coalesce((select true from public.forms f/" supabase/migrations/2026-12-22-form-uploads.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：讀的門拿掉「改得動那份表單」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉讀的門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/  if split_part(p_name, '\/', 2) <> v_uid::text or/  if/" supabase/migrations/2026-12-22-form-uploads.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：傳的門拿掉「只能傳進自己的資料夾」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉本人資料夾驗收表沒變紅"; fail=$((fail+1)); fi
+fup3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-22-form-uploads.sql 2>&1 || true)
+if echo "${fup3}" | grep -q "OVERALL.*PASS"; then echo "  ok   破壞測試之後裝回正確的那一版"; pass=$((pass+1)); else echo "  FAIL 裝回正確版沒過：${fup3}" | head -5; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

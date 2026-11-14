@@ -179,14 +179,25 @@ export async function loadTeams() {
 // **答案一次全部拿回來，不是點開才查。** 一份表單一百多件、每件十題，
 // 是一千多列 —— 對 Postgres 是小事，但「點開才查」會讓審核的人每看一個人
 // 就等一次網路，而審核就是一個一個看。
+// meta（隱藏欄位的值）是 2026-12-20-form-engine.sql 才有的欄。還沒跑那一支的資料庫回 42703，退回不帶它。
+const APP_COLS = "id, user_id, applicant_name, applicant_school, applicant_grade, " +
+                 "applicant_email, guardian_email, status, submitted_at, decided_at, checked_in_at";
+async function appRows(formId) {
+  const q = cols => supabase.from("applications").select(cols).eq("form_id", formId).order("submitted_at", { ascending: true });
+  const r = await q(APP_COLS + ", meta");
+  return r.error && r.error.code === "42703" ? q(APP_COLS) : r;
+}
+// 上傳的檔案：60 秒的簽名網址。Storage 的政策只讓改得動那份表單的人拿得到（2026-12-22-form-uploads.sql）。
+export async function fileUrl(path) {
+  need();
+  const { data, error } = await supabase.storage.from("form-uploads").createSignedUrl(path, 60);
+  if (error) throw error;
+  return data.signedUrl;
+}
 export async function loadApplications(formId) {
   need();
   const [ap, an] = await Promise.all([
-    supabase.from("applications")
-      .select("id, user_id, applicant_name, applicant_school, applicant_grade, " +
-              "applicant_email, guardian_email, status, submitted_at, decided_at, checked_in_at")
-      .eq("form_id", formId)
-      .order("submitted_at", { ascending: true }),
+    appRows(formId),
     supabase.from("application_answers").select("application_id, question_id, value"),
   ]);
   if (ap.error) throw ap.error;

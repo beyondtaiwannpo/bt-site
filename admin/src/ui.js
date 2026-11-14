@@ -239,6 +239,18 @@ export function fmtWhen(v) {
 // ⚠ **答案預設是收起來的，但「展開」不打網路** —— 答案已經在手上了
 // （見 data.js 的 loadApplications）。審核就是一個一個看，
 // 每看一個等一次網路的話，看到第十個就不想看了。
+// 一格答案怎麼畫。小標題、說明、換頁不收答案，上面就濾掉了。
+// 上傳的檔案：答案是私人 bucket 裡的路徑，按鈕去要一個 60 秒的簽名網址才打得開（2026-12-22-form-uploads.sql）。
+// **只有改得動這份表單的人讀得到那個檔**，看得到申請但改不動的人只看到「有檔案」。
+export function answerHTML(q, v, canOpen) {
+  if (!v) return `<span class="mini">${T("apps.blank")}</span>`;
+  if (q.type === "file") return canOpen
+    ? `<button type="button" class="btn ghost sm" data-act="file-open" data-path="${esc(v)}">${T("apps.fileOpen")}</button>`
+    : `<span class="mini">${T("apps.fileLocked")}</span>`;
+  if (q.type === "consent") return v === "yes" ? T("apps.consented") : esc(v);
+  return esc(v).replace(/\n/g, "<br>");
+}
+
 export function appsHTML(form, apps, questions, canDecide, sel, filter, pending, msg, busy) {
   const shown = filter === "all" ? apps : apps.filter(a => a.status === filter);
   const counts = {};
@@ -258,13 +270,11 @@ export function appsHTML(form, apps, questions, canDecide, sel, filter, pending,
           </div>
           <div class="fmeta">${[esc(a.applicant_school || T("apps.noSchool")), esc(a.applicant_grade || ""),
             esc(a.applicant_email), T("apps.submitted", { when: fmtWhen(a.submitted_at) })].filter(Boolean).join("・")}
-            ${a.guardian_email ? "<br>" + T("apps.guardian") + esc(a.guardian_email) : ""}</div>
+            ${a.guardian_email ? "<br>" + T("apps.guardian") + esc(a.guardian_email) : ""}
+            ${a.meta && typeof a.meta === "object" && Object.keys(a.meta).length ? "<br>" + T("apps.meta") + Object.entries(a.meta).map(([k, v]) => esc(k) + " = " + esc(v)).join("、") : ""}</div>
           <details class="ans">
             <summary>${T("apps.answers")}</summary>
-            <dl>${questions.map(q => {
-              const v = a.answers.get ? a.answers.get(q.id) : "";
-              return `<dt>${esc(q.label)}</dt><dd>${v ? esc(v).replace(/\n/g, "<br>") : `<span class="mini">${T("apps.blank")}</span>`}</dd>`;
-            }).join("")}</dl>
+            <dl>${questions.filter(q => F.isInput(q)).map(q => `<dt>${esc(q.label)}</dt><dd>${answerHTML(q, a.answers.get ? a.answers.get(q.id) : "", canDecide)}</dd>`).join("")}</dl>
           </details>
         </div>
       </div>

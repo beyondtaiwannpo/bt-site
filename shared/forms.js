@@ -51,6 +51,7 @@ const W = {
   upload: ["選一個檔案", "Choose a file"],
   uploading: ["上傳中…", "Uploading…"],
   uploaded: ["已經上傳：", "Uploaded: "],
+  uploadedOne: ["檔案已經上傳了。", "Your file is uploaded."],
   replace: ["換一個", "Replace"],
   fileHint: ["最大 {n} MB，{t}。", "Up to {n} MB, {t}."],
   draftKept: ["這台裝置會先記住你填到哪，重新整理也不會不見；送出之後就清掉。", "This device remembers your answers so a refresh does not lose them. They are cleared once you submit."],
@@ -96,7 +97,7 @@ export const FILE_KINDS = {
   doc:   { zh: "PDF 或 Word", en: "PDF or Word", mime: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"], ext: ["pdf", "doc", "docx"] },
   any:   { zh: "PDF、Word 或圖片", en: "PDF, Word or images", mime: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png", "image/webp"], ext: ["pdf", "doc", "docx", "jpg", "jpeg", "png", "webp"] },
 };
-export const FILE_MAX_MB = 10;   // 跟 storage bucket 的 file_size_limit 一樣（2026-12-24-form-uploads.sql）
+export const FILE_MAX_MB = 10;   // 跟 storage bucket 的 file_size_limit 一樣（2026-12-22-form-uploads.sql）
 
 const num = v => (v === "" || v == null || !isFinite(Number(v))) ? null : Number(v);
 // 已經整理過的就不再整理一次（normalize 會補 _n）。
@@ -476,7 +477,7 @@ function fieldHTML(q, value, o, id, errId, reqTag) {
       const k = FILE_KINDS[c.accept] || FILE_KINDS.any;
       const accept = k.mime.concat(k.ext.map(e => "." + e)).join(",");
       return `<div class="fx-file" data-fxfile="${esc(q.id)}">
-        ${v ? `<p class="fx-done">${esc(say("uploaded", en))}<b>${esc(String(v).split("/").pop())}</b></p>` : ""}
+        ${v ? `<p class="fx-done">${o.fileName ? `${esc(say("uploaded", en))}<b>${esc(o.fileName)}</b>` : esc(say("uploadedOne", en))}</p>` : ""}
         <label class="fx-pick${o.uploading ? " busy" : ""}"><input type="file" id="${id}" data-fxup="${esc(q.id)}" accept="${esc(accept)}"${desc}${dis || (o.uploading ? " disabled" : "")}><span>${esc(o.uploading ? say("uploading", en) : v ? say("replace", en) : say("upload", en))}</span></label>
         <p class="fx-help">${esc(say("fileHint", en, { n: c.max_mb, t: en ? k.en : k.zh }))}</p></div>`;
     }
@@ -585,12 +586,12 @@ export function ensureStyle(doc) {
 // ev 是 evaluate() 的結果；st：{ answers, page, errs, busy, summary, uploading }；o 是 mount 的 opts。
 // o.bottomHTML 只畫在最後一頁送出鈕上面（例如家長 email），可以是字串或回字串的函式。
 export function pageHTML(e, st, o) {
-  o = o || {}; st = Object.assign({ answers: {}, page: 0, errs: {}, uploading: {} }, st || {});
+  o = o || {}; st = Object.assign({ answers: {}, page: 0, errs: {}, uploading: {}, names: {} }, st || {});
   const pg = e.pages[st.page] || e.pages[0];
   const step = Math.max(1, e.path.indexOf(st.page) + 1), total = e.path.length;
   const last = step >= total;
   const body = pg.items.map(it => {
-    const h = questionHTML(it, st.answers[it.id], { en: o.en, err: st.errs[it.id], required: e.required.has(it.id), disabled: o.disabled, uploading: st.uploading[it.id] });
+    const h = questionHTML(it, st.answers[it.id], { en: o.en, err: st.errs[it.id], required: e.required.has(it.id), disabled: o.disabled, uploading: st.uploading[it.id], fileName: st.names[it.id] });
     return e.hidden.has(it.id) ? h.replace(/^<div class="fx-q/, '<div hidden class="fx-q') : h;
   }).join("");
   const bottom = typeof o.bottomHTML === "function" ? o.bottomHTML() : (o.bottomHTML || "");
@@ -626,7 +627,8 @@ export function flatHTML(rawItems, en) {
 export function mount(el, rawItems, opts) {
   const o = Object.assign({}, opts || {});
   const items = rawItems.map(normalize);
-  const st = { answers: Object.assign({}, o.answers || {}), page: o.page || 0, errs: {}, busy: !!o.busy, uploading: {}, summary: "" };
+  // names：學生自己選的檔名，只留在這個畫面上給他看（上傳的路徑不帶原本的檔名，那常常是全名）。
+  const st = { answers: Object.assign({}, o.answers || {}), page: o.page || 0, errs: {}, busy: !!o.busy, uploading: {}, names: {}, summary: "" };
   if (st.page && !pages(items)[st.page]) st.page = 0;
   ensureStyle(el.ownerDocument);
   const ev = () => evaluate(items, st.answers);
@@ -683,7 +685,7 @@ export function mount(el, rawItems, opts) {
     if (!o.onUpload) return;
     readPage();
     st.uploading[qid] = true; delete st.errs[qid]; render();
-    try { st.answers[qid] = await o.onUpload(it, f); keep(); }
+    try { st.answers[qid] = await o.onUpload(it, f); st.names[qid] = f.name; keep(); }
     catch (err) { st.errs[qid] = String((err && err.message) || err); }
     delete st.uploading[qid]; render();
   }

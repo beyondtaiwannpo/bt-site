@@ -388,3 +388,18 @@ test("確認信：表單設定有開關（資料庫有那一欄才畫），信�
   assert.equal(SITE.mailButtonLabel("received", "zh"), "看我的申請");
   assert.equal(SITE.MAIL_SAMPLE_URL.received, "https://beyondtaiwannpo.com/app/");
 });
+
+// ── 上傳檔案（2026-12-22-form-uploads.sql）──
+test("審核那一頁：排版區塊不列、檔案題只有改得動的人有按鈕、隱藏欄位列出來", () => {
+  const qs = [{ id: "h", type: "heading", label: "小標題" }, { id: "f", type: "file", label: "成績單" }, { id: "c", type: "consent", label: "同意" }].map(q => M.F.normalize(q));
+  const app = { id: "a1", applicant_name: "測試", applicant_email: "t@example.com", status: "received", submitted_at: "2026-11-13T00:00:00Z",
+                meta: { from: "ig" }, answers: new Map([["f", "form/user/f-x.pdf"], ["c", "yes"]]) };
+  const h = M.appsHTML({ id: "form", title: "x" }, [app], qs, true, new Set(), "all", [], "", false);
+  assert.doesNotMatch(h, /<dt>小標題<\/dt>/);
+  assert.match(h, /data-act="file-open" data-path="form\/user\/f-x.pdf"/);
+  assert.match(h, /from = ig/);
+  assert.match(h, /<dd>同意<\/dd>/);
+  const ro = M.appsHTML({ id: "form", title: "x" }, [app], qs, false, new Set(), "all", [], "", false);
+  assert.doesNotMatch(ro, /file-open/);
+  assert.match(ro, /只有改得動這份表單的人打得開/);
+});
