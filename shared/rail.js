@@ -201,8 +201,20 @@ export function railHTML(group, tab, me, counts, L) {
     if (!items.length) return "";
     const first = items[0], on = a.key === here;
     // 數字只算這個資料夾自己的頁（counts 是這一頁算的；別的資料夾剛好有同名的分頁，例如紀錄的 forms，不算進來）。
-    const n = items.filter(i => i.group === group).reduce((s, i) => s + (Number(c[i.key]) || 0), 0);
-    return `<a class="rail-item rail-area${on ? " on" : ""}" ${linkAttrs(first, group, L)}${on ? ' aria-current="page"' : ""}>${svg(ICON[a.key] || "")}<span class="rail-txt"><b>${esc(tx(a.label, L))}</b><small>${esc(tx(a.hint, L))}</small></span>${n ? `<span class="rail-count">${esc(String(n))}</span>` : ""}</a>`;
+    const cnt = i => i.group === group ? (Number(c[i.key]) || 0) : 0;
+    const n = items.reduce((s, i) => s + cnt(i), 0);
+    // 現在這一區在側欄裡展開，底下列出它的每一頁（2026-11-14 Paul：「I still want the left menu click and show all the stuff in that tab like before」）。
+    // 展開的時候那一區本身是淺底，深藍的是現在這一頁；寬螢幕上內容區上方那一排分頁就不畫了（rail.css），手機上照舊。
+    const it = on ? itemOf(group, tab) : null;
+    const ppl = it && it.ws && canManageWs(me, it.ws)
+      ? `<a class="rail-item rail-sub rail-people" href="${esc(peopleHref(it.ws, L))}" title="${esc(tx(RT.peopleT, L))}">${esc(tx(RT.people, L))}</a>` : "";
+    const open = on && (items.length > 1 || ppl);
+    const subs = open ? `<div class="rail-subs">${items.map(i => {
+      const cur = i === it, k = cnt(i);
+      return `<a class="rail-item rail-sub${cur ? " on" : ""}" ${linkAttrs(i, group, L)}${cur ? ' aria-current="page"' : ""}>${esc(tx(i.label, L))}${k ? `<span class="rail-count">${esc(String(k))}</span>` : ""}</a>`;
+    }).join("")}${ppl}</div>` : "";
+    const cls = open ? " here" : on ? " on" : "";
+    return `<a class="rail-item rail-area${cls}" ${linkAttrs(first, group, L)}${on && !open ? ' aria-current="page"' : ""}>${svg(ICON[a.key] || "")}<span class="rail-txt"><b>${esc(tx(a.label, L))}</b><small>${esc(tx(a.hint, L))}</small></span>${n && !open ? `<span class="rail-count">${esc(String(n))}</span>` : ""}</a>${subs}`;
   };
   const body = SECTIONS.map(s => {
     const rows = AREAS.filter(a => a.sec === s.key).map(row).join("");

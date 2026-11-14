@@ -849,3 +849,21 @@ test("★ 後台會議頁的 Google 日曆那一列", () => {
   assert.doesNotMatch(never, /data-act="mt-gcal"/, "沒有 Google 事件就不給再送一次");
   assert.doesNotMatch(FORMS.gcalRowHTML({ ...base, gcal_event_id: "e1", gcal_error: null }, false, false), /data-act="mt-gcal"/, "改不了這場的人沒有那顆鈕");
 });
+
+// 2026-11-14 Paul：「I still want the left menu click and show all the stuff in that tab like before」。
+// 現在這一區在側欄裡展開，列出它底下的每一頁；那一區本身是淺底（here），深藍的是現在這一頁。
+test("★ 側欄：現在這一區展開成它的每一頁，現在這一頁有標記，只有一頁的不展開", () => {
+  for (const [label, M] of IMPL) {
+    const pres = { role: "cadre", board: "president", team: "Sponsorship Team", name: "P", ws: {} };
+    const rail = M.railHTML("records", "people", pres, {}, "en");
+    assert.match(rail, /<a class="rail-item rail-area here" href="#overview"[^>]*>.*?<b>紀錄<\/b>.*?<\/a><div class="rail-subs">/, label);
+    assert.match(rail, /rail-sub" href="#overview" data-act="tab" data-t="overview">活動記分卡</, label);
+    assert.match(rail, /rail-sub on" href="#people" data-act="tab" data-t="people" aria-current="page">所有人</, label);
+    assert.match(rail, /rail-sub rail-people" href="\/admin\/\?lang=zh#members=custom%3Arecords"/, `${label}：誰在這裡也在側欄`);
+    assert.equal((rail.match(/rail-subs/g) || []).length, 1, `${label}：只有現在這一區展開`);
+    // 一般幹部在對外網站只有資源庫一頁：不展開，那一行自己深藍。
+    const one = M.railHTML("site", "res", { role: "cadre", board: "member", team: "Curriculum Team", ws: {} }, {}, "zh");
+    assert.doesNotMatch(one, /rail-subs/, label);
+    assert.match(one, /rail-area on"/, label);
+  }
+});

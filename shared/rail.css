@@ -59,6 +59,14 @@
 .rail-area .rail-ico{opacity:.8}
 .rail-area.on .rail-ico{opacity:1}
 .rail > .rail-group{padding:16px 12px 4px}
+/* 現在這一區展開（2026-11-14）：那一區淺底，底下一條細線串起它的每一頁，現在這一頁深藍。 */
+.rail-area.here{background:rgba(255,255,255,.55);color:var(--bt-navy);font-weight:600}
+.rail-area.here .rail-ico{opacity:1}
+.rail-subs{display:flex;flex-direction:column;gap:1px;margin:2px 0 8px 21px;padding-left:9px;border-left:2px solid rgba(16,42,134,.16)}
+.rail-sub{padding:6px 10px;font-size:14px;line-height:1.3}
+.rail-sub.rail-people{font-size:13px;color:rgba(16,42,134,.75)}
+/* 寬螢幕上側欄已經列出這一區的每一頁，上方那一排分頁不再畫一次；手機上側欄收起來，那一排照舊。 */
+@media (min-width:721px){ .shell .area-tabs{display:none} }
 /* 這一區的分頁：一排圓角膠囊，現在這一頁是深藍。窄螢幕自己換行，不橫向捲。 */
 .area-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px;padding-bottom:12px;border-bottom:1px solid rgba(16,42,134,.14)}
 .area-tab{display:inline-flex;align-items:center;min-height:34px;padding:0 14px;border-radius:999px;border:1px solid rgba(16,42,134,.25);
