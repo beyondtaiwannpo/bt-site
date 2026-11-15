@@ -945,9 +945,11 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .vn-dl dt{font-weight:600}
 .vn-dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
 /* 整個工作區（2026-12-27）：標題點得下去；加人時要開哪幾樣；誰開了哪幾樣那張表在框裡橫捲，不撐開整頁 */
-a.rail-group.wshead{display:block;text-decoration:none;border-radius:8px}
+a.rail-group.wshead{display:block;text-decoration:none}
 a.rail-group.wshead:hover{text-decoration:underline;text-underline-offset:4px}
-a.rail-group.wshead.on{background:var(--bt-navy);color:var(--paper);padding-left:10px;padding-right:10px;margin-left:2px}
+/* 選中的那一塊（Paul：「it looks bigger than it is」）：標題不變大，只是底下那條線變粗變深，整塊淡淡一層底色，看得出選的是整塊 */
+a.rail-group.wshead.on{border-bottom:3px solid var(--bt-navy)}
+.wsgrp:has(> a.wshead.on){background:rgba(16,42,134,.05);border-radius:12px;box-shadow:0 0 0 8px rgba(16,42,134,.05)}
 .wsg-items{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
 .wsg-items .chip input{margin:0 6px 0 0}
 .wsg-items .chip .mini{margin-left:6px}
