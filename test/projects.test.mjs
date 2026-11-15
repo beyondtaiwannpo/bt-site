@@ -90,3 +90,36 @@ test("★ 工作區的四支小工具八份一樣：專案在它的工作區那�
   const rows = F.wsRows([{ id: "project:a", kind: "project", team: "Curriculum Team", active: true }, { id: "res:Curriculum Team", kind: "res", team: "Curriculum Team", active: true }], ["Curriculum Team"], []);
   assert.deepEqual(rows.find(r => r.team === "Curriculum Team").cells.map(c => c.id), ["res:Curriculum Team", "project:a"]);
 });
+
+// 2026-12-27 Paul：「I should be able to add people into whole BT… I get to pick whatever project I want to add or remove people from」。
+test("★ 整個工作區：標題點得下去；加人時勾要開哪幾樣；一個人一列、每一樣一格開關", async () => {
+  const P = await import("../admin/people/src/ui.js");
+  P.setLang && P.setLang("zh");
+  const WS = [{ id: "res:Curriculum Team", kind: "res", team: "Curriculum Team", active: true },
+    { id: "project:camp", kind: "project", team: "Curriculum Team", title_zh: "冬令營", title_en: "Camp", active: true },
+    { id: "project:fair", kind: "project", team: "Curriculum Team", title_zh: "說明會", title_en: "Fair", active: true },
+    { id: "apps", kind: "apps", active: true }, { id: "custom:money", kind: "custom", active: true }];
+  const cells = P.wsGroupCells(WS, "Curriculum Team", []);
+  assert.deepEqual(cells.map(c => c.id), ["res:Curriculum Team", "project:camp", "project:fair"], "team 自己的工具在前、專案在後");
+  assert.deepEqual(P.wsGroupCells(WS, "", []).map(c => c.id), ["apps", "custom:money"], "整個 BT 那一塊（場地不用派人，不在裡面）");
+  const grp = { "res:Curriculum Team": [{ user_id: "u1", name_zh: "小安", level: "edit" }, { user_id: "u2", name_zh: "小明", level: "view" }],
+    "project:camp": [{ user_id: "u1", name_zh: "小安", level: "manage" }] };
+  const rows = P.grpUnion(cells, grp);
+  assert.deepEqual(rows.map(r => [r.user_id, r.level, Object.keys(r.has).join(",")]), [["u1", "manage", "res:Curriculum Team,project:camp"], ["u2", "view", "res:Curriculum Team"]]);
+  const h = P.wsGroupHTML("Curriculum Team", cells, grp, [], { off: ["project:fair"] }, false);
+  assert.match(h, /<h2>Curriculum<span class="hint">整個工作區・3 樣/);
+  assert.match(h, /data-act="grp-item" value="project:fair">/, "★ 取消勾的那一樣加人時不開");
+  assert.match(h, /data-act="grp-item" value="project:camp" checked>/);
+  assert.match(h, /data-act="grp-cell" data-id="u2" data-ws="project:camp"[^>]*>/, "★ 小明沒有冬令營，那一格可以勾");
+  assert.doesNotMatch(h, /data-id="u2" data-ws="project:camp"[^>]* checked/);
+  assert.match(h, /data-act="grp-cell" data-id="u1" data-ws="project:camp"[^>]* checked>/);
+  assert.match(h, /data-act="grp-assign"[^>]*data-ws="group:Curriculum Team"/);
+  assert.match(h, /data-act="grp-level"/, "左邊的等級一次改全部");
+  const page = P.workspacesHTML(WS, "group:Curriculum Team", rows, [], "", false, {}, true, grp);
+  assert.match(page, /<a class="rail-group wshead on" href="#ws=group%3ACurriculum%20Team" data-act="ws-pick" data-ws="group:Curriculum Team">Curriculum<\/a>/);
+  assert.match(page, /id="ws-panel">[\s\S]*整個工作區/);
+  // 資料庫那一半：team 的「改」不再帶到專案，只有「管」帶。
+  const mig = readFileSync("supabase/migrations/2026-12-27-project-scope.sql", "utf8");
+  assert.match(mig, /a.level = 'manage'[\s\S]*w.kind = 'project'/);
+  assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /2026-12-27-project-scope\.sql/);
+});

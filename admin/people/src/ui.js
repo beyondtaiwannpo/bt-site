@@ -1100,7 +1100,7 @@ export function personNewHTML(terms, msg, busy, draft) {
 // 工作區：左邊清單、右邊這個工作區裡有誰、底下加人。sel 是選中的工作區 id，members 是 workspace_members(sel)。
 // draft = { pk（右欄多選加人的狀態）, npk（新增表單那一塊的）, team, slug, title_zh, title_en, owner }。canCreate 是能不能新增工作區（Co-President 與 Senior Adviser）。
 export function pkPeopleOf(cadres) { return (cadres || []).map(p => ({ id: p.profile_id, name_zh: p.name_zh, name_en: p.name_en, board_role: p.board_role, team: p.team })); }
-export function workspacesHTML(workspaces, sel, members, people, msg, busy, draft, canCreate) {
+export function workspacesHTML(workspaces, sel, members, people, msg, busy, draft, canCreate, grp) {
   const list = (workspaces || []).filter(w => w.active !== false);
   const d = draft || {};
   const dis = busy ? " disabled" : "";
@@ -1122,7 +1122,10 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
     const venue = r.team ? "" : `<a class="rail-item ws-plain" href="/admin/#venues" title="${esc(T("ws.venuesNote"))}">${esc(T("ws.venues"))}</a>`;
     return tools.map(li).join("") + venue + (pjs.length ? `<div class="wssub">${esc(T("ws.projects"))}</div>${pjs.map(li).join("")}` : "");
   };
-  const left = list.length ? `<div class="wsgrid">${wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="wsgrp"><div class="rail-group">${esc(r.label)}</div><div class="wslist">${cellsHTML(r)}</div></div>`).join("")}</div>`
+  // 2026-12-27 Paul：「I should be able to add people into whole BT… or I can add curriculum」。每一塊的標題（整個 BT、Curriculum…）點下去是整個工作區：
+  // 一次加人、勾要開哪幾樣，之後一格一格開關。見 wsGroupHTML。
+  const head = r => `<a class="rail-group wshead${sel === "group:" + r.team ? " on" : ""}" href="#ws=${encodeURIComponent("group:" + r.team)}" data-act="ws-pick" data-ws="${esc("group:" + r.team)}">${esc(r.label)}</a>`;
+  const left = list.length ? `<div class="wsgrid">${wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="wsgrp">${head(r)}<div class="wslist">${cellsHTML(r)}</div></div>`).join("")}</div>`
     : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
   const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
   // 2026-10-24：兩欄成員區（左「在裡面的」右「還沒在裡面的」，見 membersAreaHTML）。Co-President 與 Senior Adviser 在左欄最上面標「依職級」。
@@ -1154,7 +1157,54 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
     + msgHTML(msg)
     + create
     + `<section class="section">${w ? "" : `<p class="mini">${T("ws.pickOne")}</p>`}${left}</section>`
-    + (w ? `<section class="section" id="ws-panel">${right}</section>` : "");
+    + (w ? `<section class="section" id="ws-panel">${right}</section>` : "")
+    + (isGroupSel(sel) ? `<section class="section" id="ws-panel">${wsGroupHTML(sel.slice(6), wsGroupCells(list, sel.slice(6), people), grp, pkPeople, d, busy)}</section>` : "");
+}
+
+// ── 整個工作區（2026-12-27）────────────────────────────────────────
+// Paul 2026-11-14：「when I add people into a workspace, I get to pick whatever project to open up to them. If you're in curriculum and
+// you're in charge for one project, you're not supposed to see the other project. So I can remove you from that project, but you're
+// still in the same workspace.」
+// 所以「在一個工作區」= 在那一塊裡至少有一格；加人時勾要開哪幾樣（預設全部），之後在下面那張表一格一格開關。
+// 資料庫沒有新的函式：一格一支 assign()／unassign()，跟點單一格一樣的那道門。team 的「改」不再自動帶到專案（2026-12-27-project-scope.sql）。
+export const isGroupSel = sel => String(sel || "").startsWith("group:");
+export function wsGroupCells(workspaces, team, people) {
+  const r = wsRows((workspaces || []).filter(w => w.active !== false), TEAMS, people).find(x => x.team === team);
+  return r ? r.cells : [];
+}
+// 每一格的成員併成一個人一列：level 是他在這個工作區最高的那一級，has 是 { 格子 id: 等級 }。
+export function grpUnion(cells, grp) {
+  const R = { view: 1, edit: 2, manage: 3 }, by = new Map();
+  for (const c of cells || []) for (const m of (grp || {})[c.id] || []) {
+    const x = by.get(m.user_id) || { user_id: m.user_id, name_zh: m.name_zh, name_en: m.name_en, board_role: m.board_role, level: m.level, has: {} };
+    if ((R[m.level] || 0) > (R[x.level] || 0)) x.level = m.level;
+    x.has[c.id] = m.level; by.set(m.user_id, x);
+  }
+  return [...by.values()];
+}
+// 表頭用短名字（括號裡的說明拿掉），表才放得下。
+export const grpShort = w => wsCellLabel(w).replace(/\s*[（(].*$/, "");
+export function wsGroupHTML(team, cells, grp, people, draft, busy) {
+  const d = draft || {}, dis = busy ? " disabled" : "";
+  const off = new Set(d.off || []);
+  const rows = grpUnion(cells, grp);
+  const senior = r => ["president", "senior_adviser"].includes(r.board_role);
+  const plain = rows.filter(r => !senior(r));
+  const name = team ? team.replace(/\s*Team$/i, "") : T("ws.board");
+  const tag = c => c.kind === "project" ? `<span class="mini">${esc(T("ws.kind.project"))}</span>` : "";
+  const items = `<div class="wsg-items">${cells.map(c => `<label class="chip sm${off.has(c.id) ? "" : " on"}"><input type="checkbox" data-act="grp-item" value="${esc(c.id)}"${off.has(c.id) ? "" : " checked"}${dis}>${esc(grpShort(c))}${tag(c)}</label>`).join("")}</div>`;
+  const cell = (r, c) => {
+    const lv = r.has[c.id];
+    return `<td><label><input type="checkbox" data-act="grp-cell" data-id="${esc(r.user_id)}" data-ws="${esc(c.id)}" aria-label="${esc(mpName(r) + "・" + grpShort(c))}"${lv ? " checked" : ""}${dis}>${lv ? `<span class="mini">${esc(T("level." + lv))}</span>` : ""}</label></td>`;
+  };
+  const table = plain.length ? `<h3 class="sec-h">${T("ws.grpWhat")}</h3><div class="note">${T("ws.grpWhatNote")}</div>
+    <div class="wsg-wrap"><table class="wsg"><thead><tr><th scope="col">${T("ws.grpPerson")}</th>${cells.map(c => `<th scope="col"><a href="${esc(wsCellHref(c))}">${esc(grpShort(c))}</a>${tag(c)}</th>`).join("")}</tr></thead>
+    <tbody>${plain.map(r => `<tr><th scope="row">${esc(mpName(r))}</th>${cells.map(c => cell(r, c)).join("")}</tr>`).join("")}</tbody></table></div>` : "";
+  return `<h2>${esc(name)}<span class="hint">${T("ws.grpHint", { n: cells.length })}</span></h2>
+    <div class="note">${T("ws.grpNote")}</div>
+    <h3 class="sec-h">${T("ws.grpOpen")}</h3>${items}
+    ${membersAreaHTML("ws", { rows, people, pk: d.pk, busy, acts: { level: "grp-level", remove: "grp-unassign" }, go: { act: "grp-assign", ws: "group:" + team } })}
+    ${table}`;
 }
 
 // 屆別：清單加人數、補過去的一屆、貼一整屆、結束這一屆（三步）。

@@ -20,7 +20,7 @@ let S = {
   filter: { term: null, team: "", q: "" }, // term 為 null 表示「這一屆」（rosterHTML 自己找 current）；q 是找名字
   afterEnd: null,                          // 結束這一屆之後名單最上面那一段 { term, kept: [profile_id…] }
   person: null, personDraft: null, remove: null, newDraft: null,
-  workspaces: [], wsSel: null, members: [], wsDraft: null,
+  workspaces: [], wsSel: null, members: [], wsDraft: null, grp: null,
   termDraft: null, end: null,
   invites: [], inviteDraft: null,
   // 把老幹部請回來（2026-11-07）：名單上勾起來要一起寄的人與每一列填的 email（bulk），邀請狀態 roster_invites() 合進 people 的 invite 欄。
@@ -50,7 +50,7 @@ function render() {
   let body, tab = "roster";
   if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres(), batchOpen(), S.people); tab = "invites"; }
   else if (S.view === "changes") { body = UI.changesHTML(S.changes, S.people, S.msg); tab = "changes"; }
-  else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior()); tab = "workspaces"; }
+  else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior(), S.grp); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces);
@@ -154,14 +154,35 @@ function readInviteForm() {
            // 2026-11-07：掛到名單上哪一筆（某一筆的 id、"__new"、或空的表示還沒選）。candidates 是資料庫回的同名清單，留著重畫還在。
            attach: picked ? picked.value : "", candidates: (S.inviteNew && S.inviteNew.candidates) || null };
 }
+// 整個工作區（2026-12-27）：選中的那一塊有哪幾格、叫什麼。
+const grpTeam = () => String(S.wsSel || "").slice(6);
+const grpCells = () => UI.wsGroupCells(S.workspaces, grpTeam(), S.people);
+const grpName = () => grpTeam() ? grpTeam().replace(/\s*Team$/i, "") : T("ws.board");
+// 一批派與移出，每一筆記原本的等級（沒有 = null），復原就照原本的裝回去。
+async function grpApply(ops) {
+  const was = ops.map(o => ({ id: o.id, ws: o.ws, level: ((S.grp || {})[o.ws] || []).find(m => m.user_id === o.id)?.level || null }));
+  const run1 = o => o.level ? D.assign(o.id, o.ws, o.level) : D.unassign(o.id, o.ws);
+  const out = await Promise.all(ops.map(o => run1(o).then(() => null, e => ({ o, e }))));
+  const failed = out.filter(Boolean);
+  const done = was.filter((w, i) => !out[i]);
+  if (done.length) S.undo = async () => { const r = await run("err.assign", () => Promise.all(done.map(run1))); if (r !== undefined) { S.msg = T("msg.grpUndone"); await openWorkspaces(null, true); } };
+  return failed;
+}
+const grpFailMsg = failed => { const p = S.people.find(x => x.profile_id === failed[0].o.id); return T("err.assignSome") + (p ? pname(p) : "") + T("punct.colon") + D.says(failed[0].e); };
 async function openWorkspaces(ws, keepMsg) {
   S.busy = true; if (!keepMsg) S.msg = ""; render();
   try {
     if (!S.people.length) await loadCore(true);
     S.workspaces = await D.loadWorkspaces();
     if (ws) S.wsSel = ws;
-    if (S.wsSel && !S.workspaces.some(w => w.id === S.wsSel)) S.wsSel = null;
-    S.members = S.wsSel ? await D.loadMembers(S.wsSel).catch(e => { S.msg = T("err.membersLoad") + D.says(e); return []; }) : [];
+    if (S.wsSel && !UI.isGroupSel(S.wsSel) && !S.workspaces.some(w => w.id === S.wsSel)) S.wsSel = null;
+    S.grp = null;
+    if (UI.isGroupSel(S.wsSel)) {
+      // 整個工作區（2026-12-27）：那一塊裡每一格的成員都讀，併成一個人一列。
+      const cells = grpCells(), out = {};
+      await Promise.all(cells.map(c => D.loadMembers(c.id).then(r => { out[c.id] = r || []; }, e => { S.msg = T("err.membersLoad") + D.says(e); out[c.id] = []; })));
+      S.grp = out; S.members = UI.grpUnion(cells, out);
+    } else S.members = S.wsSel ? await D.loadMembers(S.wsSel).catch(e => { S.msg = T("err.membersLoad") + D.says(e); return []; }) : [];
     S.view = "workspaces"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.wsLoad") + D.says(e); S.view = "workspaces"; }
   render();
@@ -537,6 +558,31 @@ document.addEventListener("click", async e => {
     await openWorkspaces(null, true);
     return;
   }
+  if (act === "grp-assign") {
+    const d = S.wsDraft || {}, pk = d.pk || {}, level = pk.level || "view";
+    const off = new Set(d.off || []), items = grpCells().filter(c => !off.has(c.id));
+    const ids = UI.pkPicked(pkPeople(), S.members.map(m => m.user_id), pk);
+    if (!ids.length) { S.msg = T("err.pickPerson"); render(); return; }
+    if (!items.length) { S.msg = T("err.grpNoItems"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    const failed = await grpApply(ids.flatMap(id => items.map(c => ({ id, ws: c.id, level }))));
+    S.wsDraft = Object.assign({}, d, { pk: Object.assign({}, pk, { q: "", ticked: [...new Set(failed.map(f => f.o.id))] }) });
+    S.busy = false;
+    S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpAdded", { n: ids.length, m: items.length, ws: grpName(), level: UI.levelLabel(level) });
+    await openWorkspaces(null, true);
+    return;
+  }
+  if (act === "grp-unassign") {
+    const id = b.dataset.id, p = S.people.find(x => x.profile_id === id), row = S.members.find(m => m.user_id === id);
+    const has = Object.keys((row && row.has) || {});
+    if (UI.needAsk(S, b, T("confirm.grpRemove", { name: p ? pname(p) : "", ws: grpName(), n: has.length }))) return;
+    S.busy = true; S.msg = ""; render();
+    const failed = await grpApply(has.map(ws => ({ id, ws, level: null })));
+    S.busy = false;
+    S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpRemoved", { name: p ? pname(p) : "", ws: grpName() });
+    await openWorkspaces(null, true);
+    return;
+  }
   if (act === "ws-cleanup") {
     // 清掉靠職級就有一切的人身上多餘的指派（2026-10-24）。復原是照原本的等級派回去。
     const ws = S.wsSel, ids = String(b.dataset.ids || "").split(",").filter(Boolean);
@@ -798,6 +844,31 @@ document.addEventListener("change", async e => {
   }
   // 多選加人（2026-10-24）：勾一個人、換等級。
   if (el.dataset.act === "pk-tick" || el.dataset.act === "pk-level") { if (S.view === "workspaces") { pkApply(el); render(); } return; }
+  if (el.dataset.act === "grp-item") {
+    const off = new Set((S.wsDraft || {}).off || []);
+    if (el.checked) off.delete(el.value); else off.add(el.value);
+    S.wsDraft = Object.assign({}, S.wsDraft, { off: [...off] }); render(); return;
+  }
+  if (el.dataset.act === "grp-level" && UI.isGroupSel(S.wsSel)) {
+    const id = el.dataset.id, level = el.value, p = S.people.find(x => x.profile_id === id), row = S.members.find(m => m.user_id === id);
+    S.busy = true; S.msg = ""; render();
+    const failed = await grpApply(Object.keys((row && row.has) || {}).map(ws => ({ id, ws, level })));
+    S.busy = false;
+    S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpLevel", { name: p ? pname(p) : "", ws: grpName(), level: UI.levelLabel(level) });
+    await openWorkspaces(null, true); return;
+  }
+  if (el.dataset.act === "grp-cell" && UI.isGroupSel(S.wsSel)) {
+    const id = el.dataset.id, ws = el.dataset.ws, p = S.people.find(x => x.profile_id === id), row = S.members.find(m => m.user_id === id);
+    const c = grpCells().find(x => x.id === ws), level = el.checked ? ((row && row.level) || "view") : null;
+    S.busy = true; S.msg = ""; render();
+    const failed = await grpApply([{ id, ws, level }]);
+    S.busy = false;
+    const v = { name: p ? pname(p) : "", item: c ? UI.grpShort(c) : ws, level: level ? UI.levelLabel(level) : "" };
+    // 取消的是他在這個工作區的最後一樣，就是整個移出，不要說「還在這個工作區」。
+    const last = !level && row && Object.keys(row.has || {}).length === 1;
+    S.msg = failed.length ? grpFailMsg(failed) : last ? T("msg.grpRemoved", { name: v.name, ws: grpName() }) : T(level ? "msg.grpOn" : "msg.grpOff", v);
+    await openWorkspaces(null, true); return;
+  }
   if (el.dataset.act === "ws-level" && S.wsSel) {
     const p = S.people.find(x => x.profile_id === el.dataset.id);
     const level = el.value, ws = S.wsSel, id = el.dataset.id;
@@ -872,6 +943,6 @@ function pkApply(el) {
 document.addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
   const box = e.target.closest(".picker"); if (!box) return;
-  const go = box.querySelector('[data-act="members-assign"],[data-act="ws-assign"]'); if (!go || go.disabled) return;
+  const go = box.querySelector('[data-act="members-assign"],[data-act="ws-assign"],[data-act="grp-assign"]'); if (!go || go.disabled) return;
   e.preventDefault(); go.click();
 });

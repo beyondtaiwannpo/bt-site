@@ -3,7 +3,8 @@
 --
 -- 用法：整份貼進 Supabase SQL Editor 按一次 Run。可以重跑。最後印一張 PASS / FAIL 表。
 -- 依賴：2026-12-25-access-model.sql（ws_my_level、my_access、create_workspace）、2026-12-15-event-signups.sql（form_can_view / form_can_edit）。
--- ⚠ 之後重跑 2026-12-25-access-model.sql 或 2026-12-15-event-signups.sql 會把這裡改過的 ws_my_level、my_access、form_can_view、form_can_edit 蓋回舊版，那時要再跑這一支。
+-- ⚠ 之後重跑 2026-12-25-access-model.sql 或 2026-12-15-event-signups.sql 會把這裡改過的 ws_my_level、my_access、form_can_view、form_can_edit 蓋回舊版，那時要再跑這一支，再跑 2026-12-27-project-scope.sql。
+-- ⚠ 2026-12-27 起 ws_my_level 以 2026-12-27-project-scope.sql 為準（team 的「改」不再帶到專案）。重跑這一支之後要再跑那一支。
 --
 -- ============================================================================
 -- 這一支在做什麼

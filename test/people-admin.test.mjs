@@ -648,8 +648,8 @@ test("★ 存取格照 team 分組：整個 BT 一列放幹部護照、Internshi
   assert.match(cur, /Winter camp/, "小安是 Curriculum 的人，她擁有的營隊掛在 Curriculum 那一列");
   // Workspaces 頁：左邊分組、右邊標題用長名稱加屬於哪一列；「加一個專案或營隊」先選 team。
   const h = workspacesHTML(ws, "intern-passport", [], PEOPLE, "", false, { team: "Curriculum Team" }, true);
-  assert.match(h, /<div class="rail-group">整個 BT<\/div><div class="wslist">[^]*?幹部護照（格子與城市）/);
-  assert.match(h, /<div class="rail-group">Internship<\/div>/);
+  assert.match(h, /data-ws="group:">整個 BT<\/a><div class="wslist">[^]*?幹部護照（格子與城市）/);
+  assert.match(h, /data-ws="group:Internship Team">Internship<\/a>/);
   assert.match(h, /<h2>實習護照（格子與棋盤）<span class="hint">Internship Team・intern-passport/);
   // 2026-12-26：「開一個專案」先選工作區（存在專案的 team 欄，不再靠擁有人推）。
   assert.match(h, /<summary><span class="chev" aria-hidden="true"><\/span><b>開一個專案<\/b>/); assert.match(h, /<select id="wsn-team" data-act="wsn-team"/);
@@ -658,13 +658,13 @@ test("★ 存取格照 team 分組：整個 BT 一列放幹部護照、Internshi
   assert.doesNotMatch(h, /會排在 Curriculum 那一列底下/, "不再靠擁有人判斷在哪一列");
   assert.match(h, /專案放在一個工作區裡/, "表單上寫專案是什麼");
   // 整個 BT 那一塊有場地（不用派人，只是連結）；專案有自己的小標題，排在那一塊的工具後面。
-  assert.match(h, /<div class="rail-group">整個 BT<\/div><div class="wslist">[^]*?href="\/admin\/#venues"[^>]*>場地（不用派人）/);
+  assert.match(h, /data-ws="group:">整個 BT<\/a><div class="wslist">[^]*?href="\/admin\/#venues"[^>]*>場地（不用派人）/);
   const wsP = ws.concat([{ id: "project:camp-27", kind: "project", team: "Curriculum Team", title_en: "Camp 27", active: true },
     { id: "project:bt-gala", kind: "project", team: null, title_en: "Gala", owner: PEOPLE[1].profile_id, active: true }]);
   const hp = workspacesHTML(wsP, null, [], PEOPLE, "", false, {}, true);
-  const curBlock = hp.slice(hp.indexOf('<div class="rail-group">Curriculum</div>'), hp.indexOf('<div class="rail-group">Mentorship</div>'));
+  const curBlock = hp.slice(hp.indexOf('data-ws="group:Curriculum Team">Curriculum</a>'), hp.indexOf('data-ws="group:Mentorship Team">Mentorship</a>'));
   assert.match(curBlock, /活動、會議、資源[^]*<div class="wssub">專案<\/div>[^]*Camp 27/, "Curriculum 那一塊：先工具，再專案");
-  const btBlock = hp.slice(hp.indexOf('<div class="rail-group">整個 BT</div>'), hp.indexOf('<div class="rail-group">Curriculum</div>'));
+  const btBlock = hp.slice(hp.indexOf('data-ws="group:">整個 BT</a>'), hp.indexOf('data-ws="group:Curriculum Team">Curriculum</a>'));
   assert.match(btBlock, /Gala/, "★ 整個 BT 的專案不看擁有人的 team（小安是 Curriculum 的人，專案還是在整個 BT）");
   assert.match(hp, /href="#ws=project%3Acamp-27"/);
   assert.doesNotMatch(h, /新增工作區/);

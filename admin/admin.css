@@ -944,3 +944,19 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .vn-dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0}
 .vn-dl dt{font-weight:600}
 .vn-dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
+/* 整個工作區（2026-12-27）：標題點得下去；加人時要開哪幾樣；誰開了哪幾樣那張表在框裡橫捲，不撐開整頁 */
+a.rail-group.wshead{display:block;text-decoration:none;border-radius:8px}
+a.rail-group.wshead:hover{text-decoration:underline;text-underline-offset:4px}
+a.rail-group.wshead.on{background:var(--bt-navy);color:var(--paper);padding-left:10px;padding-right:10px;margin-left:2px}
+.wsg-items{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
+.wsg-items .chip input{margin:0 6px 0 0}
+.wsg-items .chip .mini{margin-left:6px}
+.wsg-wrap{overflow-x:auto;max-width:100%;margin-top:8px;border:1px solid rgba(16,42,134,.15);border-radius:10px}
+.wsg{border-collapse:collapse;font-size:14px;min-width:100%}
+.wsg th,.wsg td{padding:8px 10px;border-bottom:1px solid rgba(16,42,134,.1);text-align:left;vertical-align:middle;white-space:nowrap}
+.wsg thead th{font-weight:600;font-size:13px;background:rgba(16,42,134,.04)}
+.wsg thead th .mini{display:block;font-weight:400}
+.wsg tbody th{font-weight:500;position:sticky;left:0;background:var(--paper)}
+.wsg td label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.wsg-items .chip{white-space:nowrap}
+.wsg-items .chip input,.wsg td input{width:auto;flex:none}

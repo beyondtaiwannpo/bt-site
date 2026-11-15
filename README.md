@@ -867,6 +867,29 @@ Paul 2026-11-14：「curriculum, sponsorship, mentorship, and all that is going 
 
 **程式在哪**：`admin/src/ui.js` 的「專案」那一段（`projectsListHTML`、`projectHTML`、`eventProjectHTML`），測試在 `test/projects.test.mjs`；資料庫那一半在 `scripts/db/smoke.sh` 的「工作區 → 專案 → 活動」。八份後台的 `wsTeamOf`、`wsCellHref`、`wsRows` 一起改，`test/admin-hub.test.mjs` 守著八份一樣。
 
+### 同一天第二輪：整個工作區一次加人，專案一個一個開（`supabase/migrations/2026-12-27-project-scope.sql`）
+
+Paul 2026-11-14：「I should be able to add people into whole BT… Or similarly, I can add curriculum and they should be able to have everything in that」，接著補一句：「when I add people into a workspace, I get to pick whatever project to open up to them. If you're in curriculum and you're in charge for one project, you're not supposed to see the other project. So I can remove you from that project, but you're still in the same workspace.」
+
+**畫面**（人與權限 → 工作區）：
+
+- 每一塊的標題（整個 BT、Curriculum、Marketing…）點得下去，打開的是整個工作區。點裡面一格照舊只管那一樣。
+- 「加人時開給他們」：那個工作區的每一樣都列成一顆勾，預設全勾。取消勾某個專案，新加的人就不會拿到它。
+- 中間是熟悉的兩欄：左邊在這個工作區的人（等級下拉一次改他在每一樣的等級、「移出」是整個工作區都移出），右邊挑人加進來。
+- 最下面「誰開了哪幾樣」：一個人一列、每一樣一格。勾起來就是開給他（用他在這個工作區的等級），取消就是只從那一樣移出，他還在這個工作區。取消的是他最後一樣，訊息就說整個移出。
+- 「在一個工作區」的意思是那一塊裡至少有一格。整個 BT 沒有自己一列資料，就是那六樣工具加整個 BT 的專案。場地不用派人，不在裡面。
+- 每一次加、移、改等級都有復原。Co-President 與 Senior Adviser 依職級本來就有全部，不列在那張表。
+- 這些全部是一格一支 `assign()`／`unassign()`，跟點單一格同一道門，沒有新的資料庫函式。程式在 `admin/people/src/ui.js` 的 `wsGroupHTML`、`grpUnion`、`wsGroupCells`。
+
+**權限改了一條**（只有 `ws_my_level`，資料一行都不動）：
+
+- 以前 team 是「改」，就自動看得到、改得動那個 team 的每一個專案。這跟 Paul 要的相反，所以拿掉了。
+- 現在 team 的「看」與「改」只管 team 自己的東西：team 的頁、會、資源、沒有放進專案的活動。專案要另外開給他。
+- team 的「管」（Director 那一級）照舊管得到 team 的每一個專案與專案裡的活動，不然就沒有人派得了人進專案。
+- 專案的「改」帶到專案裡的活動，「看」不往下傳（報名名單裡多是高中生），這兩條不變。
+- 新開的專案不會自動開給工作區裡的人。要開給誰，到那張表勾，或在專案頁的「誰在這個專案」加。
+- ⚠ 重跑 `2026-12-25-access-model.sql` 或 `2026-12-26-projects.sql` 會把 `ws_my_level` 蓋回舊版，那時要再跑這一支。smoke 有一段「專案一個一個開」守著，加一條破壞測試。
+
 ## 表單引擎：申請表單變得像 Tally（`shared/forms.js`、`supabase/migrations/2026-12-20-form-engine.sql`，2026-11-13）
 
 Paul 2026-11-13 說「每一個表單編輯器都要像 Tally」，對外的 `/apply/` 要「看起來完美」。這一節是第一到三批：引擎本身、`/apply/` 與後台的申請表單編輯器換上它。內部表單（`/admin/team-forms/`）與回饋表單（`/admin/records/`、`/feedback/`）2026-11-13 也換成同一套了（第六批），寫在「內部表單」與「BT Records」兩節底下的「換上表單引擎」。

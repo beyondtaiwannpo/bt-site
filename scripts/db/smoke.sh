@@ -3731,6 +3731,31 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 prj3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-26-projects.sql 2>&1 || true)
 if echo "${prj3}" | grep -q "OVERALL.*PASS" && ! echo "${prj3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
+echo "── 專案一個一個開：在工作區裡不等於看得到每一個專案（2026-12-27-project-scope.sql）──"
+psc=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-27-project-scope.sql 2>&1 || true)
+if echo "${psc}" | grep -q "OVERALL.*PASS" && ! echo "${psc}" | grep -q "|FAIL"; then echo "  ok   專案範圍那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 專案範圍那支驗收表："; echo "${psc}" | head -10; fail=$((fail+1)); fi
+chkas "${PAUL}" "（準備）活動放回專案" "ok" "select public.set_event_project((select id from public.events where slug='am-ev-p'),'project:am-proj-p'); select 'ok'"
+chkas "${AMT}" "★ team 是「改」不再自動看得到別人開的專案" "null" "select coalesce(public.ws_my_level('project:am-proj-p'),'null')"
+chkas "${AMT}" "★ 也看不到那個專案裡的活動（報名名單）" "false" "select public.can_view('custom:event-am-ev-p')::text"
+chkas "${AMT}" "my_access 不帶那個專案" "0" "select count(*) from jsonb_array_elements(public.my_access()->'workspaces') x where x->>'id' in ('project:am-proj-p','custom:event-am-ev-p')"
+chkas "${PAUL}" "（準備）別人在同 team 開一場不放進專案的活動" "1" "select count(*) from (select public.create_event('${AMTEAM}','am-ev-loose','散的活動','Loose event',false)) x"
+chkas "${AMT}" "★ 沒放進專案的活動照舊跟 team 走" "edit" "select public.ws_my_level('custom:event-am-ev-loose')"
+chkas "${AMT}" "自己開的專案照舊是「管」" "manage" "select public.ws_my_level('project:am-proj')"
+chkas "${AMX}" "★ 被加進專案的人照舊改得動專案裡的活動" "edit" "select public.ws_my_level('custom:event-am-ev-p')"
+chkas "${PAUL}" "（準備）把 team 是「看」的人升成 team 的「管」" "manage" "select public.assign('${AMV}','res:${AMTEAM}','manage')"
+chkas "${AMV}" "★ team 的「管」（Director）管得到 team 的每一個專案" "manage|manage" "select public.ws_my_level('project:am-proj-p')||'|'||public.ws_my_level('custom:event-am-ev-p')"
+chkas "${AMV}" "★ team 的「管」管不到別隊的專案" "null" "select coalesce(public.ws_my_level('project:am-proj-o'),'null')"
+chkas "${PAUL}" "（還原）降回「看」" "view" "select public.assign('${AMV}','res:${AMTEAM}','view')"
+chkas "${PAUL}" "（準備）把人從專案移出" "ok" "select public.unassign('${AMX}','project:am-proj-p'); select 'ok'"
+chkas "${AMX}" "★ 移出專案之後那場活動就沒有了" "false" "select public.can_view('custom:event-am-ev-p')::text"
+chkas "${PAUL}" "（還原）加回專案" "edit" "select public.assign('${AMX}','project:am-proj-p','edit')"
+BROKEN=$(mktemp)
+sed "s/a.level = 'manage'/a.level in ('edit', 'manage')/" supabase/migrations/2026-12-27-project-scope.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：team 的「改」又帶到每一個專案，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 讓 team 的「改」帶到專案驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psc2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-27-project-scope.sql 2>&1 || true)
+if echo "${psc2}" | grep -q "OVERALL.*PASS" && ! echo "${psc2}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
