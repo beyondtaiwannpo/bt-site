@@ -535,7 +535,7 @@ document.addEventListener("click", async e => {
     return;
   }
   // 多選加人的 chip、全勾、全取消（2026-10-24）：右欄是 pk、新增表單是 npk。打字與勾選走 input / change。
-  if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && S.view === "workspaces") { pkApply(b); render(); return; }
+  if (["pk-team", "pk-all", "pk-none", "pk-untick", "pk-selall", "pk-selnone"].includes(act) && S.view === "workspaces") { pkApply(b); render(); return; }
   if (act === "ws-assign") {
     // 一次加一批（2026-10-24）：每個人一支 assign()（同一道門），同時送；沒有新的資料庫函式。
     const ws = b.dataset.ws, d = S.wsDraft || {}, pk = d.pk || {}, level = pk.level || "view";
@@ -569,6 +569,25 @@ document.addEventListener("click", async e => {
     S.wsDraft = Object.assign({}, d, { pk: Object.assign({}, pk, { q: "", ticked: [...new Set(failed.map(f => f.o.id))] }) });
     S.busy = false;
     S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpAdded", { n: ids.length, m: items.length, ws: grpName(), level: UI.levelLabel(level) });
+    await openWorkspaces(null, true);
+    return;
+  }
+  // 勾起來的人一次改等級或一次移出（2026-12-27，Paul：「I have to change everyone from view to edit, just one by one」）。
+  // 一格（ws-bulk）：那一格的等級；整個工作區（grp-bulk）：他在這個工作區的每一樣。
+  if (act === "ws-bulk" || act === "grp-bulk") {
+    const pk = (S.wsDraft || {}).pk || {}, sel = new Set(pk.sel || []), level = pk.blevel || "edit", op = b.dataset.op;
+    const rows = S.members.filter(m => sel.has(m.user_id));
+    if (!rows.length) return;
+    if (op === "remove" && UI.needAsk(S, b, T("confirm.maRemove", { n: rows.length }))) return;
+    const ops = act === "grp-bulk"
+      ? rows.flatMap(r => Object.keys(r.has || {}).map(ws => ({ id: r.user_id, ws, level: op === "remove" ? null : level })))
+      : rows.map(r => ({ id: r.user_id, ws: S.wsSel, level: op === "remove" ? null : level }));
+    if (act === "ws-bulk") S.grp = { [S.wsSel]: S.members };  // grpApply 從 S.grp 讀原本的等級，復原才裝得回去
+    S.busy = true; S.msg = ""; render();
+    const failed = await grpApply(ops);
+    S.busy = false;
+    S.wsDraft = Object.assign({}, S.wsDraft, { pk: Object.assign({}, pk, { sel: [] }) });
+    S.msg = failed.length ? grpFailMsg(failed) : op === "remove" ? T("msg.maRemoved", { n: rows.length }) : T("msg.maLevel", { n: rows.length, level: UI.levelLabel(level) });
     await openWorkspaces(null, true);
     return;
   }
@@ -843,7 +862,7 @@ document.addEventListener("change", async e => {
     render(); return;
   }
   // 多選加人（2026-10-24）：勾一個人、換等級。
-  if (el.dataset.act === "pk-tick" || el.dataset.act === "pk-level") { if (S.view === "workspaces") { pkApply(el); render(); } return; }
+  if (["pk-tick", "pk-level", "pk-sel", "pk-blevel"].includes(el.dataset.act)) { if (S.view === "workspaces") { pkApply(el); render(); } return; }
   if (el.dataset.act === "grp-item") {
     const off = new Set((S.wsDraft || {}).off || []);
     if (el.checked) off.delete(el.value); else off.add(el.value);

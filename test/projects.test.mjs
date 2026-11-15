@@ -123,3 +123,29 @@ test("★ 整個工作區：標題點得下去；加人時勾要開哪幾樣；�
   assert.match(mig, /a.level = 'manage'[\s\S]*w.kind = 'project'/);
   assert.match(readFileSync("scripts/db/smoke.sh", "utf8"), /2026-12-27-project-scope\.sql/);
 });
+
+// 2026-12-27 Paul：「I have to change everyone from view to edit, just one by one… I want everything to work that way」。
+test("★ 成員區左欄多選：勾、全選、一次改等級、一次移出；八份後台一樣、四個地方接得住", async () => {
+  const P = await import("../admin/people/src/ui.js");
+  P.setLang("en");
+  const people = [{ id: "u1", name_en: "Ann", board_role: "member" }, { id: "u2", name_en: "Bo", board_role: "member" }, { id: "u3", name_en: "Cy", board_role: "president" }];
+  const rows = [{ user_id: "u1", name_en: "Ann", board_role: "member", level: "view" }, { user_id: "u2", name_en: "Bo", board_role: "member", level: "view" }];
+  const acts = { level: "members-level", remove: "members-unassign", bulk: "members-bulk" };
+  let pk = P.pkReduce({}, people, ["u1", "u2"], { dataset: { act: "pk-selall", ids: "u1,u2" } });
+  assert.deepEqual(pk.sel, ["u1", "u2"]);
+  pk = P.pkReduce(pk, people, [], { dataset: { act: "pk-sel" }, value: "u2", checked: false });
+  assert.deepEqual(pk.sel, ["u1"]);
+  pk = P.pkReduce(pk, people, [], { dataset: { act: "pk-blevel" }, value: "manage" });
+  const h = P.membersAreaHTML("mp", { rows, people, pk, busy: false, acts, go: { act: "members-assign", ws: "apps" } });
+  assert.match(h, /data-act="pk-selall" data-ns="mp" data-ids="u1,u2"/, "全選只選一般的人，不選依職級的");
+  assert.match(h, /class="ma-sel" data-act="pk-sel" data-ns="mp" value="u1"[^>]* checked/);
+  assert.doesNotMatch(h, /value="u2"[^>]* checked/);
+  assert.match(h, /<option value="manage" selected>Manage<\/option><\/select>\s*<button type="button" class="btn sm" data-act="members-bulk" data-op="level" data-ns="mp">Set 1 person/);
+  assert.match(h, /data-act="members-bulk" data-op="remove" data-ns="mp">Remove 1 person/);
+  assert.doesNotMatch(P.membersAreaHTML("mp", { rows, people, pk: {}, busy: false, acts: { level: "x", remove: "y" } }), /pk-selall/, "沒給 bulk 就不畫");
+  assert.match(P.membersAreaHTML("mp", { rows, people, pk: {}, busy: false, acts }), /data-op="level" data-ns="mp" disabled/, "沒勾人按鈕是灰的");
+  for (const f of ["admin/src/main.js", "admin/passports/src/main.js", "admin/site/src/main.js"]) assert.match(readFileSync(f, "utf8"), /act === "members-bulk" && S\.mp/, f);
+  const pm = readFileSync("admin/people/src/main.js", "utf8");
+  assert.match(pm, /act === "ws-bulk" \|\| act === "grp-bulk"/);
+  assert.match(readFileSync("admin/people/src/ui.js", "utf8"), /bulk: "grp-bulk"[\s\S]*|bulk: "ws-bulk"/);
+});

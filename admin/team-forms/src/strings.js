@@ -101,6 +101,13 @@ export const COMMON = {
   // 多選加人（2026-10-24）：四份一樣。
   "pk.find":          { zh: "找名字", en: "Find by name" },
   "ma.in":            { zh: "在這個工作區裡（{n}）", en: "In this workspace ({n})" },
+  "ma.selOne":       { zh: "選「{name}」", en: "Select {name}" },
+  "ma.setN":         { zh: "{n} 個人改成這一級", en: "Set {n} {n:person|people}" },
+  "ma.removeN":      { zh: "移出 {n} 個人", en: "Remove {n} {n:person|people}" },
+  "msg.maLevel":     { zh: "{n} 個人改成「{level}」。", en: "{n} {n:person|people} set to {level}." },
+  "msg.maRemoved":   { zh: "{n} 個人移出了。", en: "{n} {n:person|people} removed." },
+  "msg.maUndone":    { zh: "復原了，回到剛剛那樣。", en: "Undone. Back to how it was." },
+  "confirm.maRemove": { zh: "把勾起來的 {n} 個人移出？", en: "Remove the {n} selected {n:person|people}?" },
   "ma.inNone":        { zh: "還沒有人被派進來。右邊勾人加進來。", en: "Nobody assigned yet. Tick people on the right." },
   "ma.out":           { zh: "還沒在裡面（{n}）", en: "Not yet in ({n})" },
   "ma.shown":         { zh: "篩出 {n} 人", en: "{n} shown" },

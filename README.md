@@ -890,6 +890,16 @@ Paul 2026-11-14：「I should be able to add people into whole BT… Or similarl
 - 新開的專案不會自動開給工作區裡的人。要開給誰，到那張表勾，或在專案頁的「誰在這個專案」加。
 - ⚠ 重跑 `2026-12-25-access-model.sql` 或 `2026-12-26-projects.sql` 會把 `ws_my_level` 蓋回舊版，那時要再跑這一支。smoke 有一段「專案一個一個開」守著，加一條破壞測試。
 
+### 同一天第三輪：成員名單可以多選，一次改等級、一次移出
+
+Paul 2026-11-14：「right now I have to change everyone from view to edit, just one by one… I want everything to work that way」。
+
+- 每一個「誰在這裡」的左欄（工作區的一格、整個工作區、後台各區的「誰在這裡」）每一列前面多一個勾。
+- 左欄上面一排：「全勾」（只勾找名字篩出來的，依職級的人不算）、「全取消」、一個等級下拉、「N 個人改成這一級」、「移出 N 個人」。
+- 整個工作區那一頁：改等級是改他在這個工作區的每一樣，移出是整個工作區都移出。
+- 每一次都有復原，照原本的等級裝回去。移出會先問一次。
+- 程式在 `membersAreaHTML` 與 `pkReduce`（八份後台的 `ui.js` 一樣，`test/admin-hub.test.mjs` 守著）；接住按鈕的是 `admin/src`、`admin/passports`、`admin/site` 的 `members-bulk`，人與權限的 `ws-bulk`、`grp-bulk`。資料庫不用改。
+
 ## 表單引擎：申請表單變得像 Tally（`shared/forms.js`、`supabase/migrations/2026-12-20-form-engine.sql`，2026-11-13）
 
 Paul 2026-11-13 說「每一個表單編輯器都要像 Tally」，對外的 `/apply/` 要「看起來完美」。這一節是第一到三批：引擎本身、`/apply/` 與後台的申請表單編輯器換上它。內部表單（`/admin/team-forms/`）與回饋表單（`/admin/records/`、`/feedback/`）2026-11-13 也換成同一套了（第六批），寫在「內部表單」與「BT Records」兩節底下的「換上表單引擎」。

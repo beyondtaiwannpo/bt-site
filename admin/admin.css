@@ -960,3 +960,7 @@ a.rail-group.wshead.on{background:var(--bt-navy);color:var(--paper);padding-left
 .wsg td label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .wsg-items .chip{white-space:nowrap}
 .wsg-items .chip input,.wsg td input{width:auto;flex:none}
+/* 左欄多選（2026-12-27）：每一列前面一個勾，勾起來的人一次改等級或一次移出 */
+.ma-row .ma-sel{margin:0 2px 0 0}
+.ma-row.on{background:rgba(16,42,134,.06)}
+.ma-tools.ma-bulk{flex-wrap:wrap;gap:6px;margin-top:8px}

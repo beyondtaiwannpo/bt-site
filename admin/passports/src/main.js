@@ -286,7 +286,7 @@ document.addEventListener("click", async e => {
   if (act === "members-open") { await openMembers(b.dataset.ws, b.dataset.name); return; }
   if (act === "members-back") { S.view = (S.mp && S.mp.backView) || "interns"; S.msg = ""; render(); return; }
   // 多選加人的 chip、全勾、全取消（2026-10-24）：改 pk 再重畫。打字與勾選走 input / change。
-  if (["pk-team", "pk-all", "pk-none", "pk-untick"].includes(act) && S.mp && S.view === "members") {
+  if (["pk-team", "pk-all", "pk-none", "pk-untick", "pk-selall", "pk-selnone"].includes(act) && S.mp && S.view === "members") {
     S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), b); render(); return;
   }
   if (act === "members-assign" && S.mp) {
@@ -322,6 +322,21 @@ document.addEventListener("click", async e => {
       S.undo = async () => { S.busy = true; render(); try { for (const w of was) await D.assign(w.id, ws, w.level); await reloadMembers(T("msg.uncleaned", { n: was.length })); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
       await reloadMembers(T("msg.cleaned", { n: ids.length }));
     } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); }
+    return;
+  }
+  // 勾起來的人一次改等級或一次移出（2026-12-27，Paul：「I have to change everyone from view to edit, just one by one」）。
+  if (act === "members-bulk" && S.mp) {
+    const sel = new Set((S.mp.pk || {}).sel || []), rows = S.mp.rows.filter(x => sel.has(x.user_id));
+    if (!rows.length) return;
+    const op = b.dataset.op, level = (S.mp.pk || {}).blevel || "edit", ws = S.mp.ws;
+    if (op === "remove" && UI.needAsk(S, b, T("confirm.maRemove", { n: rows.length }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await Promise.all(rows.map(r => op === "remove" ? D.unassign(r.user_id, ws) : D.assign(r.user_id, ws, level)));
+      S.undo = async () => { S.busy = true; render(); try { await Promise.all(rows.map(r => D.assign(r.user_id, ws, r.level))); await reloadMembers(T("msg.maUndone")); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
+      S.mp.pk = Object.assign({}, S.mp.pk, { sel: [] });
+      await reloadMembers(op === "remove" ? T("msg.maRemoved", { n: rows.length }) : T("msg.maLevel", { n: rows.length, level: T("level." + level) }));
+    } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); }
     return;
   }
   if (act === "members-unassign" && S.mp) {
@@ -781,7 +796,7 @@ document.addEventListener("change", async e => {
     render(); return;
   }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。
-  const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"]');
+  const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"],[data-act="pk-sel"],[data-act="pk-blevel"]');
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
   const el = e.target.closest('[data-act="members-level"]');
   if (!el || !S.mp || S.view !== "members") return;

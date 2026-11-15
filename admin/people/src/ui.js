@@ -331,7 +331,12 @@ export function pkPicked(people, inIds, pk, all) { const ok = new Set(pkCandidat
 // 一個事件（打字、勾、換等級、按 chip、全勾、全取消）之後 pk 變成什麼。純函式，四個 main.js 都只呼叫它。
 export function pkReduce(pk, people, inIds, el, all) {
   const a = el && el.dataset ? el.dataset.act : "";
-  const p0 = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view" }, pk || {});
+  const p0 = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view", sel: [], blevel: "edit" }, pk || {});
+  // 左欄「在裡面的」也能多選（2026-12-27，Paul：「I have to change everyone from view to edit, just one by one」）：勾、全選、清掉、一次改的等級。
+  if (a === "pk-sel") { const v = el.value; return Object.assign(p0, { sel: el.checked ? [...new Set(p0.sel.concat(v))] : p0.sel.filter(x => x !== v) }); }
+  if (a === "pk-selall") return Object.assign(p0, { sel: String(el.dataset.ids || "").split(",").filter(Boolean) });
+  if (a === "pk-selnone") return Object.assign(p0, { sel: [] });
+  if (a === "pk-blevel") return Object.assign(p0, { blevel: el.value });
   if (a === "pk-q") return Object.assign(p0, { q: el.value });
   if (a === "pk-mq") return Object.assign(p0, { mq: el.value });
   if (a === "pk-untick") return Object.assign(p0, { ticked: pkToggle(p0, el.dataset.id, false) });
@@ -361,7 +366,7 @@ export const RANK_TAG = { president: "CP", senior_adviser: "SA", director: "DR",
 export const rankTag = board => `<span class="rk" title="${esc(boardName(board))}">${RANK_TAG[board] || "AS"}</span>`;
 export function membersAreaHTML(ns, a) {
   const o = a || {};
-  const pk = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view" }, o.pk || {});
+  const pk = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view", sel: [], blevel: "edit" }, o.pk || {});
   const people = o.people || [], rows = o.rows || [];
   const dis = o.busy ? " disabled" : "";
   const short = t => t.replace(/\s*Team$/i, "");
@@ -389,11 +394,20 @@ export function membersAreaHTML(ns, a) {
     const redundant = rows.filter(r => seniorIds.has(r.user_id));
     const seniorRow = p => `<div class="ma-row byrank">${nameBlock(p)}${rankTag(p.board_role)}<span class="mini">${T("grid.byRank")}</span>${p.id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : ""}<span class="sp"></span><span class="mini">${esc(T("level.manage"))}</span></div>`;
     // 左欄的列不印 team（Paul 定的形狀：名字・職級標・等級・移出），欄位窄的時候才放得下。
-    const row = r => `<div class="ma-row">${nameBlock(r)}${rankTag(r.board_role)}${r.user_id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : ""}<span class="sp"></span>
+    // 2026-12-27：有 acts.bulk 的地方，每一列前面一個勾，勾起來的人可以一次改等級或一次移出。
+    const selSet = new Set(pk.sel || []);
+    const selBox = r => o.acts.bulk ? `<input type="checkbox" class="ma-sel" data-act="pk-sel" data-ns="${esc(ns)}" value="${esc(r.user_id)}" aria-label="${esc(T("ma.selOne", { name: mpName(r) }))}"${selSet.has(r.user_id) ? " checked" : ""}${dis}>` : "";
+    const row = r => `<div class="ma-row${selSet.has(r.user_id) ? " on" : ""}">${selBox(r)}${nameBlock(r)}${rankTag(r.board_role)}${r.user_id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : ""}<span class="sp"></span>
         <select data-act="${esc(o.acts.level)}" data-id="${esc(r.user_id)}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select>
         <button type="button" class="lnk" data-act="${esc(o.acts.remove)}" data-id="${esc(r.user_id)}"${dis}>${T("mp.remove")}</button></div>`;
     const nPeople = seniors.length + plain.length;
-    left = { n: nPeople, title: T("ma.in", { n: nPeople }),
+    const shownPlain = plain.filter(hit), nSel = plain.filter(r => selSet.has(r.user_id)).length;
+    const bulk = o.acts.bulk && plain.length ? `<div class="ma-tools ma-bulk"><button type="button" class="lnk" data-act="pk-selall" data-ns="${esc(ns)}" data-ids="${esc(shownPlain.map(r => r.user_id).join(","))}"${o.busy || !shownPlain.length ? " disabled" : ""}>${T("pk.tickAll")}</button>
+        <button type="button" class="lnk" data-act="pk-selnone" data-ns="${esc(ns)}"${o.busy || !nSel ? " disabled" : ""}>${T("pk.untick")}</button><span class="sp"></span>
+        <select id="${esc(ns)}-blevel" data-act="pk-blevel" data-ns="${esc(ns)}" aria-label="${esc(T("pk.level"))}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${pk.blevel === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select>
+        <button type="button" class="btn sm" data-act="${esc(o.acts.bulk)}" data-op="level" data-ns="${esc(ns)}"${o.busy || !nSel ? " disabled" : ""}>${T("ma.setN", { n: nSel })}</button>
+        <button type="button" class="btn ghost sm" data-act="${esc(o.acts.bulk)}" data-op="remove" data-ns="${esc(ns)}"${o.busy || !nSel ? " disabled" : ""}>${T("ma.removeN", { n: nSel })}</button></div>` : "";
+    left = { n: nPeople, title: T("ma.in", { n: nPeople }), tools: bulk,
       items: seniors.filter(hit).map(seniorRow).concat(plain.filter(hit).map(row)), empty: T("ma.inNone"),
       foot: redundant.length && o.acts.cleanup && o.canCleanup
         ? `<div class="ma-foot mini">${T("ma.redundant", { n: redundant.length })} <button type="button" class="lnk" data-act="${esc(o.acts.cleanup)}" data-ids="${esc(redundant.map(r => r.user_id).join(","))}"${dis}>${T("ma.cleanup", { n: redundant.length })}</button></div>`
@@ -412,7 +426,7 @@ export function membersAreaHTML(ns, a) {
   const levelSel = `<select id="${esc(ns)}-level" data-act="pk-level" data-ns="${esc(ns)}" aria-label="${esc(T("pk.level"))}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${pk.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select>`;
   return `<div class="ma picker" data-ns="${esc(ns)}">
     <section class="ma-col"><div class="ma-head"><div class="ma-title">${left.title}</div>
-        <input id="${esc(ns)}-mq" class="ma-find" value="${esc(pk.mq || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-mq" data-ns="${esc(ns)}"${dis}></div>
+        <input id="${esc(ns)}-mq" class="ma-find" value="${esc(pk.mq || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-mq" data-ns="${esc(ns)}"${dis}>${left.tools || ""}</div>
       <div class="ma-list">${left.items.length ? left.items.join("") : `<div class="ma-empty mini">${left.n ? T("pk.noneShown") : left.empty}</div>`}</div>${left.foot || ""}</section>
     <section class="ma-col"><div class="ma-head"><div class="ma-title">${T("ma.out", { n: cands.length })}${shown.length !== cands.length ? `<span class="mini"> ${T("ma.shown", { n: shown.length })}</span>` : ""}</div>
         <input id="${esc(ns)}-q" class="ma-find" value="${esc(pk.q || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-q" data-ns="${esc(ns)}"${dis}>
@@ -500,7 +514,7 @@ export function membersPanelHTML(mp, msg, busy) {
     + msgHTML(msg)
     + `<div class="note">${T("mp.levels")}</div>`
     + membersAreaHTML("mp", { rows: mp.rows || [], people: mp.cadres || [], pk: mp.pk, busy, meId: mp.meId,
-        acts: { level: "members-level", remove: "members-unassign", cleanup: "members-cleanup" }, canCleanup: !!mp.senior, go: { act: "members-assign", ws: mp.ws } });
+        acts: { level: "members-level", remove: "members-unassign", cleanup: "members-cleanup", bulk: "members-bulk" }, canCleanup: !!mp.senior, go: { act: "members-assign", ws: mp.ws } });
 }
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {
@@ -1132,7 +1146,7 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   const right = !w ? "" : `
     <h2>${esc(wsCellLabel(w))}<span class="hint">${esc(wsTeamOf(w, people) || T("ws.board"))}・${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
     <div class="note">${T("ws.levels")} ${T("ws.addNote")}</div>
-    ${membersAreaHTML("ws", { rows: members || [], people: pkPeople, pk: d.pk, busy, acts: { level: "ws-level", remove: "ws-unassign", cleanup: "ws-cleanup" }, canCleanup: !!canCreate, go: { act: "ws-assign", ws: w.id } })}`;
+    ${membersAreaHTML("ws", { rows: members || [], people: pkPeople, pk: d.pk, busy, acts: { level: "ws-level", remove: "ws-unassign", cleanup: "ws-cleanup", bulk: "ws-bulk" }, canCleanup: !!canCreate, go: { act: "ws-assign", ws: w.id } })}`;
   // 新增工作區（2026-10-23 批 2）：一張表單做完，名稱、擁有人、代號（從英文名稱自動算）、一開始就放進去的人各自一個等級。
   // 2026-11-11 Paul：又收回摺疊，放在最上面（一直開著放在最底下，清單長了看不到，也很干擾）。填到一半重畫後還開著。
   // main.js 的 ws-create 先建工作區，再把勾起來的人一個一個派進去。
@@ -1203,7 +1217,7 @@ export function wsGroupHTML(team, cells, grp, people, draft, busy) {
   return `<h2>${esc(name)}<span class="hint">${T("ws.grpHint", { n: cells.length })}</span></h2>
     <div class="note">${T("ws.grpNote")}</div>
     <h3 class="sec-h">${T("ws.grpOpen")}</h3>${items}
-    ${membersAreaHTML("ws", { rows, people, pk: d.pk, busy, acts: { level: "grp-level", remove: "grp-unassign" }, go: { act: "grp-assign", ws: "group:" + team } })}
+    ${membersAreaHTML("ws", { rows, people, pk: d.pk, busy, acts: { level: "grp-level", remove: "grp-unassign", bulk: "grp-bulk" }, go: { act: "grp-assign", ws: "group:" + team } })}
     ${table}`;
 }
 
