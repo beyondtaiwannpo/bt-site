@@ -216,9 +216,9 @@ test("★ 工作區：左邊清單、右邊誰在裡面與等級、加人只列�
   assert.match(h, /name="wsn-member" value="22222222-2222-2222-2222-222222222222"/, "新增表單那一塊不管誰在哪個工作區，幹部都列");
   assert.match(h, /建好就放進去（0）/, "新增表單那一塊是 draft 模式：左欄是勾起來的人");
   assert.match(h, /<select id="wsn-level" data-act="pk-level" data-ns="wsn"[^>]*>/);
-  assert.match(h, /data-act="ws-create">建立工作區</);
+  assert.match(h, /data-act="ws-create">開專案</);
   assert.match(workspacesHTML(ws, "apps:Curriculum Team", members, PEOPLE, "", false, { npk: { ticked: ["33333333-3333-3333-3333-333333333333", "22222222-2222-2222-2222-222222222222"] } }, true),
-    /data-act="ws-create">建立工作區並放 2 個人進去</, "建立鈕上算人數");
+    /data-act="ws-create">開專案並放 2 個人進去</, "建立鈕上算人數");
   // 2026-11-11 Paul：收回摺疊、放最上面。沒填東西時收著，選了人（填到一半）就開著。
   assert.match(h, /<details class="fold rc-fold" id="ws-new"><summary>/, "新增工作區收成一行");
   assert.match(workspacesHTML(ws, "apps:Curriculum Team", members, PEOPLE, "", false, { npk: { ticked: ["33333333-3333-3333-3333-333333333333"] } }, true),
@@ -651,11 +651,22 @@ test("★ 存取格照 team 分組：整個 BT 一列放幹部護照、Internshi
   assert.match(h, /<div class="rail-group">整個 BT<\/div><div class="wslist">[^]*?幹部護照（格子與城市）/);
   assert.match(h, /<div class="rail-group">Internship<\/div>/);
   assert.match(h, /<h2>實習護照（格子與棋盤）<span class="hint">Internship Team・intern-passport/);
-  assert.match(h, /<summary><span class="chev" aria-hidden="true"><\/span><b>加一個專案或營隊<\/b>/); assert.match(h, /<select id="wsn-team" data-act="wsn-team"/);
+  // 2026-12-26：「開一個專案」先選工作區（存在專案的 team 欄，不再靠擁有人推）。
+  assert.match(h, /<summary><span class="chev" aria-hidden="true"><\/span><b>開一個專案<\/b>/); assert.match(h, /<select id="wsn-team" data-act="wsn-team"/);
   const owners = h.slice(h.indexOf('id="wsn-owner"'), h.indexOf("</select>", h.indexOf('id="wsn-owner"')));
   assert.match(owners, /小安/); assert.doesNotMatch(owners, /Mei/, "選了 Curriculum，擁有人只列 Curriculum 的人");
-  assert.match(h, /會排在 Curriculum 那一列底下/);
-  assert.match(h, /一份成員清單/, "表單上寫它今天是什麼");
+  assert.doesNotMatch(h, /會排在 Curriculum 那一列底下/, "不再靠擁有人判斷在哪一列");
+  assert.match(h, /專案放在一個工作區裡/, "表單上寫專案是什麼");
+  // 整個 BT 那一塊有場地（不用派人，只是連結）；專案有自己的小標題，排在那一塊的工具後面。
+  assert.match(h, /<div class="rail-group">整個 BT<\/div><div class="wslist">[^]*?href="\/admin\/#venues"[^>]*>場地（不用派人）/);
+  const wsP = ws.concat([{ id: "project:camp-27", kind: "project", team: "Curriculum Team", title_en: "Camp 27", active: true },
+    { id: "project:bt-gala", kind: "project", team: null, title_en: "Gala", owner: PEOPLE[1].profile_id, active: true }]);
+  const hp = workspacesHTML(wsP, null, [], PEOPLE, "", false, {}, true);
+  const curBlock = hp.slice(hp.indexOf('<div class="rail-group">Curriculum</div>'), hp.indexOf('<div class="rail-group">Mentorship</div>'));
+  assert.match(curBlock, /活動、會議、資源[^]*<div class="wssub">專案<\/div>[^]*Camp 27/, "Curriculum 那一塊：先工具，再專案");
+  const btBlock = hp.slice(hp.indexOf('<div class="rail-group">整個 BT</div>'), hp.indexOf('<div class="rail-group">Curriculum</div>'));
+  assert.match(btBlock, /Gala/, "★ 整個 BT 的專案不看擁有人的 team（小安是 Curriculum 的人，專案還是在整個 BT）");
+  assert.match(hp, /href="#ws=project%3Acamp-27"/);
   assert.doesNotMatch(h, /新增工作區/);
 });
 

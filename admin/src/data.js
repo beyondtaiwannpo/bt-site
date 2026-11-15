@@ -371,7 +371,15 @@ const SAYS = [
   ["gcal_retry", "再送一次要等資料庫更新（2026-11-23 那支遷移檔）跑完。", "Resending needs the 2026-11-23 database update to be run first."],
   // 活動上架（2026-11-01）
   ["not_team_manager", "開活動要在那個 team 是「改」以上，或是 Co-President／Senior Adviser。請那個 team 的 Director 把你加進去。", "Creating an event needs Edit or higher on that team, or a Co-President or Senior Adviser. Ask that team's Director to add you."],
-  ["slug_taken", "這個代號已經有活動用了，換一個。", "That slug is already used by another event."],
+  ["slug_taken", "這個代號已經有人用了，換一個。", "That slug is already taken. Pick another."],
+  // 專案（2026-12-26）
+  ["not_team_editor", "開專案要在那個 team 是「改」以上，或是 Co-President／Senior Adviser。請那個 team 的 Director 把你加進去。", "Creating a project needs Edit or higher on that team, or a Co-President or Senior Adviser. Ask that team's Director to add you."],
+  ["not_senior", "整個 BT 的專案只有 Co-President 與 Senior Adviser 開得了。", "Only Co-Presidents and Senior Advisers can create a Whole BT project."],
+  ["no_such_team", "找不到這個 team，重新整理再試一次。", "Team not found. Refresh and try again."],
+  ["no_such_project", "找不到這個專案，可能已經收起來了。重新整理再試一次。", "Project not found. It may have been archived. Refresh and try again."],
+  ["other_team", "活動只能放進同一個 team 或整個 BT 的專案。", "An event can only go into a project of the same team or Whole BT."],
+  ["not_site_event", "從紀錄倒進來的舊活動不能放進專案。", "Old events imported into Records cannot go into a project."],
+  ["not_ws_edit", "這裡你只看得到、改不了。請這裡的 Director 把你改成「改」。", "You can view this but not edit it. Ask the Director to give you Edit."],
   ["bad_slug", "代號只能用小寫英文、數字和連字號，2 到 40 個字。", "The slug can only use lowercase letters, digits and hyphens, 2 to 40 characters."],
   ["cover_not_https", "封面網址要是 https:// 開頭。", "The cover URL must start with https://."],
   ["consent_required", "封面有填就要勾「照片裡的人與那場活動都在拍攝同意範圍內」。", "With a cover image you must tick the photo-consent box."],
@@ -434,6 +442,9 @@ const SAYS = [
   ["no_such_task", "找不到這一格，重新整理再試一次。", "Box not found. Refresh and try again."],
   ["term_locked", "已經建好的格子不能換屆。要搬到別屆就另外建一格，這一格停用。", "An existing box cannot move to another term. Create a new box there and disable this one."],
   ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。", "Someone has already stamped this box, so it can only be disabled, not deleted. Their stamp stays. New people will not see the box."],
+  ["projects_list", "專案的函式還不在資料庫裡，要先跑 2026-12-26-projects.sql。", "The project functions are not in the database yet. Run 2026-12-26-projects.sql first."],
+  ["create_project", "專案的函式還不在資料庫裡，要先跑 2026-12-26-projects.sql。", "The project functions are not in the database yet. Run 2026-12-26-projects.sql first."],
+  ["set_event_project", "專案的函式還不在資料庫裡，要先跑 2026-12-26-projects.sql。", "The project functions are not in the database yet. Run 2026-12-26-projects.sql first."],
   ["Could not find the function", "後台的函式還不在資料庫裡，要先跑 2026-10-18-intern-admin.sql。", "The admin functions are not in the database yet. Run 2026-10-18-intern-admin.sql first."],
 ];
 export function says(err) {
@@ -548,6 +559,14 @@ export const deleteVenue       = id => rpcV("venue_delete", { p_id: id });
 export const saveVenueContact  = (id, p) => rpcV("venue_contact_save", { p_id: id || null, p });
 export const deleteVenueContact = id => rpcV("venue_contact_delete", { p_id: id });
 export const setEventVenue     = (eventId, venueId) => rpcV("set_event_venue", { p_event: eventId, p_venue: venueId || null });
+// ── 專案（2026-12-26）──────────────────────────────────────────────────
+// 工作區（team 或整個 BT）→ 專案 → 活動與報名表。專案是 workspaces 的一列（kind = project），所以成員與三級權限跟別的地方一樣。
+// 清單一律走 projects_list()：每一位幹部看得到有哪些專案，表單只回看得到的。遷移檔還沒跑的時候回 null（畫面說要先跑）。
+export const loadProjects     = () => rpcV("projects_list", {}).catch(e => { if (/projects_list|Could not find|does not exist/.test(String(e && e.message))) return null; throw e; });
+export const createProject    = (team, slug, zh, en) => rpcV("create_project", { p_team: team || null, p_slug: slug, p_title_zh: zh, p_title_en: en });
+export const updateProject    = (id, zh, en, active) => rpcV("update_project", { p_id: id, p_title_zh: zh, p_title_en: en, p_active: active });
+export const setEventProject  = (eventId, projectId) => rpcV("set_event_project", { p_event: eventId, p_project: projectId || null });
+export const createProjectForm = (projectId, title) => rpcV("create_project_form", { p_project: projectId, p_title: title });
 export async function loadSignedUp(formId) {
   need();
   const { count, error } = await supabase.from("applications").select("id", { count: "exact", head: true }).eq("form_id", formId).neq("status", "rejected");

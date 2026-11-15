@@ -439,6 +439,8 @@ export function wsTeamOf(w, people) {
   // 擁有人通常是 Co-President，他勾的第一個 team 是哪一個，這幾格就掉到哪一列，看起來像那個 team 的東西。
   if (ORG_WS.has(id)) return "";
   if (id === "custom:marketing-requests" || id === "custom:marketing-approve") return "Marketing Team";
+  // 專案（2026-12-26）的工作區存在 team 欄，空的就是整個 BT，不看擁有人。
+  if (w && w.kind === "project") return w.team || "";
   if (w && w.team) return w.team;
   const o = w && w.owner && (people || []).find(p => p.profile_id === w.owner || p.id === w.owner);
   const t = o ? String(o.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean)[0] : "";
@@ -465,6 +467,7 @@ export function wsCellHref(w) {
   if (id === "custom:marketing-requests") return "/admin/#requests";
   if (id === "custom:marketing-approve") return "/admin/marketing/#posts";
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
+  if (w && w.kind === "project") return "/admin/#projects/" + encodeURIComponent(id);
   if (id === "finance" || id === "custom:money") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
@@ -475,7 +478,8 @@ export function wsRows(workspaces, teams, people) {
   // 一場一場的活動不列在這裡（2026-12-25）：在那一場自己的「人」分頁改，這張表才不會隨活動越來越長。
   const active = (workspaces || []).filter(w => w.active !== false && !String(w.id).startsWith("custom:event-"));
   const order = { apps: 0, passport: 1, "intern-passport": 3 };
-  const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
+  // 專案排在每一列最後（2026-12-26），那個 team 自己的工具在前面。
+  const rank = w => w.kind === "project" ? 10 : w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
   const groups = new Map([["", []]]);
   for (const t of teams || []) groups.set(t, []);
   for (const w of active) { const t = wsTeamOf(w, people); if (!groups.has(t)) groups.set(t, []); groups.get(t).push(w); }
@@ -1106,12 +1110,19 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   const byProfile = Object.fromEntries(cadres.map(p => [p.profile_id, p]));
   // 多選加人要的形狀（跟成員分頁從 profiles 讀的一樣：id 是 profile_id）。
   const pkPeople = pkPeopleOf(cadres);
-  const KIND = { passport: "ws.kind.passport", "intern-passport": "ws.kind.intern", apps: "ws.kind.apps", res: "ws.kind.res", custom: "ws.kind.custom" };
+  const KIND = { passport: "ws.kind.passport", "intern-passport": "ws.kind.intern", apps: "ws.kind.apps", res: "ws.kind.res", custom: "ws.kind.custom", project: "ws.kind.project" };
   const li = x => `<a class="rail-item${x.id === sel ? " on" : ""}" href="#ws=${encodeURIComponent(x.id)}" data-act="ws-pick" data-ws="${esc(x.id)}">${esc(wsCellLabel(x))}<span class="rail-count">${esc(T(KIND[x.kind] || "ws.kind.custom"))}</span></a>`;
   // 左邊照 team 分組（2026-10-24）：整個 BT、六個 team，每一組底下是那個 team 擁有的東西。
   // 2026-11-14 Paul：「一條很長的線，右邊的空間都沒用到」。以前左邊一條 180px 的清單（1400px 高）、右邊只有一句「選一個」。
   // 現在每個 team 一塊，排成一格一格鋪滿整個寬度；選中的那一個的成員放在下面整個寬度。
-  const left = list.length ? `<div class="wsgrid">${wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="wsgrp"><div class="rail-group">${esc(r.label)}</div><div class="wslist">${r.cells.map(li).join("")}</div></div>`).join("")}</div>`
+  // 2026-12-26 Paul：工作區是一個 team 或整個 BT，裡面可以有好幾個專案。每一塊先列那個工作區自己的工具，再列它的專案（一個小標題隔開）。
+  // 場地也是整個 BT 的，但它不用派人（開得了活動的人都改得動），所以那一格只是連結、沒有成員名單。
+  const cellsHTML = r => {
+    const tools = r.cells.filter(x => x.kind !== "project"), pjs = r.cells.filter(x => x.kind === "project");
+    const venue = r.team ? "" : `<a class="rail-item ws-plain" href="/admin/#venues" title="${esc(T("ws.venuesNote"))}">${esc(T("ws.venues"))}</a>`;
+    return tools.map(li).join("") + venue + (pjs.length ? `<div class="wssub">${esc(T("ws.projects"))}</div>${pjs.map(li).join("")}` : "");
+  };
+  const left = list.length ? `<div class="wsgrid">${wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="wsgrp"><div class="rail-group">${esc(r.label)}</div><div class="wslist">${cellsHTML(r)}</div></div>`).join("")}</div>`
     : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
   const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
   // 2026-10-24：兩欄成員區（左「在裡面的」右「還沒在裡面的」，見 membersAreaHTML）。Co-President 與 Senior Adviser 在左欄最上面標「依職級」。
@@ -1124,8 +1135,7 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   // main.js 的 ws-create 先建工作區，再把勾起來的人一個一個派進去。
   // 一開始就放進去的人（2026-10-24 改成同一塊多選）：一個等級套全部，建立鈕上算人數。
   const nNew = pkPicked(pkPeople, [], d.npk).length;
-  // 先選 team（2026-10-24）：新的那一格會出現在那個 team 的那一列底下。表上沒有欄位存 team，靠擁有人勾的 team 推，
-  // 所以擁有人只列那個 team 的人；沒選 team 的放在「整個 BT」那一列。
+  // 先選工作區（2026-12-26 起存在專案的 team 欄，不再靠擁有人推）。擁有人只列那個 team 的人，選了會被派成「管」。
   const ownerPool = d.team ? cadres.filter(p => parseTeams(p.team).includes(d.team)) : cadres;
   const newOpen = !!(d.team || d.slug || d.title_zh || d.title_en || d.owner || nNew);
   const create = canCreate ? peFold("ws-new", T("ws.new"), "", `<div class="note">${T("ws.newWhat")}</div><div class="two">
@@ -1135,7 +1145,7 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
       <label><i>${T("ws.titleZh")}</i><input id="wsn-zh" value="${esc(d.title_zh || "")}" placeholder="2027 冬令營"${dis}></label>
       <label><i>${T("ws.slug")}</i><input id="wsn-slug" value="${esc(d.slug || "")}" placeholder="winter-camp-2027" autocomplete="off"${dis}></label>
     </div>
-    <div class="mini">${T("ws.slugNote")} ${d.team ? T("ws.teamByOwner", { team: esc(d.team.replace(/\s*Team$/i, "")) }) : ""}</div>
+    <div class="mini">${T("ws.slugNote")}</div>
     <h3 class="sec-h" style="margin-top:16px">${T("ws.newMembers")}</h3>
     ${membersAreaHTML("wsn", { people: pkPeople, pk: d.npk, busy, draft: true })}
     <div class="row" style="margin-top:14px"><button class="btn" data-act="ws-create"${dis}>${busy ? T("common.saving") : (nNew ? T("ws.createGoN", { n: nNew }) : T("ws.createGo"))}</button></div>

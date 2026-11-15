@@ -146,6 +146,8 @@ export const loadMembers     = ws => rpc("workspace_members", { p_ws: ws });
 export const assign          = (id, ws, level) => rpc("assign", { p_target: id, p_ws: ws, p_level: level });
 export const unassign        = (id, ws) => rpc("unassign", { p_target: id, p_ws: ws });
 export const createWorkspace = (slug, zh, en, owner) => rpc("create_workspace", { p_slug: slug, p_title_zh: zh, p_title_en: en, p_owner: owner || null });
+// 專案（2026-12-26）：「開一個專案」走這一支，專案存了它在哪個工作區（team 或整個 BT），開的人自動是「管」。
+export const createProject = (team, slug, zh, en) => rpc("create_project", { p_team: team || null, p_slug: slug, p_title_zh: zh, p_title_en: en });
 export const setPosition     = (person, term, zh, en, team) => rpc("set_position", { p_person: person, p_term: term, p_title_zh: zh, p_title_en: en, p_team: team || null });
 export const deletePosition  = (person, term, team) => rpc("delete_position", { p_person: person, p_term: term, p_team: team || null });
 // 註冊用的 email，只有 Co-President 與 Senior Adviser 拿得到（門在函式裡）；沒有帳號回 null。
@@ -247,6 +249,9 @@ const SAYS = [
   ["public.set_team", "人與權限的函式還不在資料庫裡，要先跑 2026-10-21-people-admin.sql。", "The people admin functions are not in the database yet. Run 2026-10-21-people-admin.sql first."],
   ["public.set_board_role", "人與權限的函式還不在資料庫裡，要先跑 2026-10-21-people-admin.sql。", "The people admin functions are not in the database yet. Run 2026-10-21-people-admin.sql first."],
   ["role_changes", "變動紀錄那張表還不在資料庫裡，要先跑 2026-10-21-people-admin.sql。", "The change log table is not in the database yet. Run 2026-10-21-people-admin.sql first."],
+  ["create_project", "專案的函式還不在資料庫裡，要先跑 2026-12-26-projects.sql。", "The project functions are not in the database yet. Run 2026-12-26-projects.sql first."],
+  ["slug_taken", "這個代號已經有人用了，換一個。", "That id is already taken. Pick another."],
+  ["not_senior", "整個 BT 的專案只有 Co-President 與 Senior Adviser 開得了。", "Only Co-Presidents and Senior Advisers can create a Whole BT project."],
   ["Could not find the function", "後台的函式還不在資料庫裡，要先跑 2026-10-18-intern-admin.sql。", "The admin functions are not in the database yet. Run 2026-10-18-intern-admin.sql first."],
 ];
 export function says(err) {

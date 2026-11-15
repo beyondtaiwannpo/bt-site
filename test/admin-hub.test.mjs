@@ -84,12 +84,14 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     // 現在這一行（對外網站）亮著，點下去是這個人看得到的第一頁（一般幹部看不到「網站上的活動」，所以是資源庫）。
     assert.match(rail, /<a class="rail-item rail-area on" href="#res" data-act="tab" data-t="res" aria-current="page">.*?<b>對外網站<\/b>/, label);
     // 別的資料夾是帶 ?lang= 與 # 的一般連結。
-    assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#events">.*?<b>活動<\/b>/, label);
+    // 2026-12-26：「活動」那一行改叫「專案」，點下去是專案清單；場地搬到組織（整個 BT）。
+    assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#projects">.*?<b>專案<\/b>/, label);
+    assert.match(rail, /<div class="rail-group">組織<\/div>[\s\S]*href="\/admin\/\?lang=zh#venues">.*?<b>場地<\/b>/, label);
     // 2026-11-14：「我的」那一段在最上面。首頁連到 /home/（不帶 #），行事曆是 /home/#calendar，護照是 /passport/。
     assert.match(rail, /<div class="rail-group">我的<\/div><a class="rail-item rail-area" href="\/home\/\?lang=zh">.*?<b>首頁<\/b>/, label);
     assert.match(rail, /href="\/home\/\?lang=zh#calendar">.*?<b>行事曆<\/b>/, label);
     assert.match(rail, /href="\/passport\/\?lang=zh">.*?<b>我的護照<\/b>/, label);
-    assert.match(rail, /<div class="rail-group">BT<\/div>[\s\S]*<b>活動<\/b>/, label);
+    assert.match(rail, /<div class="rail-group">BT<\/div>[\s\S]*<b>專案<\/b>/, label);
     assert.doesNotMatch(rail, /<b>待辦<\/b>/, `${label}：後台的待辦併進首頁了`);
     // 一頁都進不去的那一行整行不畫。
     for (const no of ["護照", "錢", "紀錄", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);

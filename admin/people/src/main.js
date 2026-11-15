@@ -569,8 +569,10 @@ document.addEventListener("click", async e => {
     const members = UI.pkPicked(pkPeople(), [], npk).map(id => ({ id, level: npk.level || "view" }));
     const d = Object.assign({}, S.wsDraft, { slug: val("wsn-slug") || UI.slugify(val("wsn-en")), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner"), members });
     S.wsDraft = d;
-    const id = await run("err.createWs", () => D.createWorkspace(d.slug, d.title_zh, d.title_en, d.owner || null));
+    // 2026-12-26：開的是專案（create_project 把它在哪個工作區存起來），不再靠擁有人的 team 推。擁有人另外派成「管」。
+    const id = await run("err.createWs", () => D.createProject(d.team || null, d.slug, d.title_zh, d.title_en));
     if (id === undefined) return;
+    if (d.owner && !members.some(m => m.id === d.owner)) members.unshift({ id: d.owner, level: "manage" });
     // 建好了再派人，一個一個送；中途有人派不進去，講清楚是誰，前面派好的留著。
     let n = 0;
     for (const m of members) {

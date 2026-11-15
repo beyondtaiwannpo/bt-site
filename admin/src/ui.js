@@ -129,8 +129,9 @@ export function formTabsHTML(form, view) {
 export function formHeadHTML(form, view, count) {
   const st = statusOf(form.status), ev = form._ev;
   return pageHead(`${esc(form.title)} <span class="tag ${st.tag}">${esc(T(st.label))}</span>`,
-      `${ev ? esc(T("form.ofEvent", { t: evTitle(ev) })) : esc(form.team || T("forms.noTeam"))}${count != null ? T("form.received", { n: count }) : ""}`, [],
-      ev ? { act: "ev-back-to", id: ev.slug, label: T("form.backEvent", { t: evTitle(ev) }) } : { act: "back-list", label: T("form.back") })
+      `${ev ? esc(T("form.ofEvent", { t: evTitle(ev) })) : form._pj ? esc(T("pj.formOf", { p: pjTitle(form._pj) })) : esc(form.team || T("forms.noTeam"))}${count != null ? T("form.received", { n: count }) : ""}`, [],
+      ev ? { act: "ev-back-to", id: ev.slug, label: T("form.backEvent", { t: evTitle(ev) }) }
+        : form._pj ? { act: "pj-open", id: form._pj.id, label: T("pj.backTo", { t: pjTitle(form._pj) }) } : { act: "back-list", label: T("form.back") })
     + formTabsHTML(form, view)
     + (ev && ev.status !== "published" && form.status === "open" ? `<div class="note">${T("ev.formLive")}</div>` : "");
 }
@@ -792,6 +793,8 @@ export function wsTeamOf(w, people) {
   // 擁有人通常是 Co-President，他勾的第一個 team 是哪一個，這幾格就掉到哪一列，看起來像那個 team 的東西。
   if (ORG_WS.has(id)) return "";
   if (id === "custom:marketing-requests" || id === "custom:marketing-approve") return "Marketing Team";
+  // 專案（2026-12-26）的工作區存在 team 欄，空的就是整個 BT，不看擁有人。
+  if (w && w.kind === "project") return w.team || "";
   if (w && w.team) return w.team;
   const o = w && w.owner && (people || []).find(p => p.profile_id === w.owner || p.id === w.owner);
   const t = o ? String(o.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean)[0] : "";
@@ -818,6 +821,7 @@ export function wsCellHref(w) {
   if (id === "custom:marketing-requests") return "/admin/#requests";
   if (id === "custom:marketing-approve") return "/admin/marketing/#posts";
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
+  if (w && w.kind === "project") return "/admin/#projects/" + encodeURIComponent(id);
   if (id === "finance" || id === "custom:money") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
@@ -828,7 +832,8 @@ export function wsRows(workspaces, teams, people) {
   // 一場一場的活動不列在這裡（2026-12-25）：在那一場自己的「人」分頁改，這張表才不會隨活動越來越長。
   const active = (workspaces || []).filter(w => w.active !== false && !String(w.id).startsWith("custom:event-"));
   const order = { apps: 0, passport: 1, "intern-passport": 3 };
-  const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
+  // 專案排在每一列最後（2026-12-26），那個 team 自己的工具在前面。
+  const rank = w => w.kind === "project" ? 10 : w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
   const groups = new Map([["", []]]);
   for (const t of teams || []) groups.set(t, []);
   for (const w of active) { const t = wsTeamOf(w, people); if (!groups.has(t)) groups.set(t, []); groups.get(t).push(w); }
@@ -1379,7 +1384,7 @@ export function eventMatches(e, f) {
 }
 // 清單：最上面是收起來的「開一場活動」，接著搜尋與篩選，再照狀態分段（準備好了 → 草稿 → 對外中 → 過去或撤下 → 只在紀錄裡）。
 // canCreateTeams 是能開活動的 team（senior 或某個 team 的資源「管」）。newOpen：開活動那一格開著沒（main.js 記）。
-export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTeams, f, newOpen) {
+export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTeams, f, newOpen, projects) {
   const dis = busy ? " disabled" : "";
   const d = draft || {};
   const ev = (events || []).filter(e => e.source !== "import");
@@ -1388,7 +1393,7 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
   const shown = ev.filter(e => eventMatches(e, fx));
   const groups = ["ready", "draft", "published", "past"].map(k => [k, shown.filter(e => evGroup(e) === k)]).filter(g => g[1].length);
   const row = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(e.source === "import" ? T("ev.st.records") : T("ev.st." + e.status))}</span></div>
-      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
+      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${pjOf(projects, e.id) ? `・${esc(T("pj.inProject", { p: pjTitle(pjOf(projects, e.id)) }))}` : ""}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
   // 開一場活動：收成一行放在最上面（2026-11-11 Paul：以前一直開著放在最底下，清單長了根本看不到）。填到一半或剛打開過，重畫後還開著。
   const create = (canCreateTeams || []).length ? foldHTML("ev-new", T("ev.new"), `<div class="note">${T("ev.newWhat")}</div><div class="two">
       <label><i>${T("ev.team")}</i><select id="ev-team"${dis}>${canCreateTeams.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>
@@ -1417,7 +1422,7 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
 // 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
 // canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
 // rc：Records 那邊這一場的資料（rc_event 回的；undefined 是還在載，null 是看不到或還沒有）。
-export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evLinks, rc) {
+export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evLinks, rc, projects) {
   const dis = busy ? " disabled" : "";
   const canEdit = canEditWs(me, e.workspace_id), canManage = wsLevel(me, e.workspace_id) === "manage", sen = senior(me);
   const ro = canEdit ? "" : " readonly";
@@ -1450,6 +1455,7 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
     + msgHTML(msg)
     + (ended ? after : "")
     + sectionHTML(T("ev.status"), `<div class="note">${statusLine}</div>${keys}`)
+    + eventProjectHTML(e, projects, me, busy)
     // 2026-11-06 自動儲存：內容那一區包在 data-autosave="ev-save" 裡（只有「改」以上的人有；唯讀的沒有容器也沒有事件）。
     // 準備好了、退回、放上、撤下都會改狀態與畫面結構，留按鈕。
     + sectionHTML(T("ev.content"), `${canEdit ? `<div data-autosave="ev-save" data-id="${esc(e.id)}">` : "<div>"}<div class="two">
@@ -1518,6 +1524,110 @@ export function eventAfterHTML(e, terms, canEdit, busy, rc) {
       <label><i>${T("ev.term")}</i><select id="ev-term" data-id="${esc(e.id)}"${dis}>${ts}</select></label></div>
     <div class="mini">${T("ev.kindHint")}</div>
     ${e.form_id ? `<div class="mini">${T("ev.syncNote")}</div>` : ""}`, { hint: T("ev.afterHint"), id: "ev-after" });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 專案（2026-12-26，Paul 2026-11-14：「in one workspace, there can be multiple projects. And in one project, there can be multiple forms, registration, records」）
+// ═══════════════════════════════════════════════════════════════════════
+// 工作區是六個 team 加「整個 BT」；專案放在一個工作區裡，底下有好幾場活動、好幾份報名表。
+// projects 是 projects_list() 回的：[{ id, team, title_zh, title_en, active, level, events: [活動 id], forms: [{ id, title, status, received, total }] }]。
+// null 是遷移檔還沒跑（函式不存在）。純函式的部分 test/projects.test.mjs 有測。
+// 括號跟著語言：中文全形（），英文半形加空白。
+export const pjParen = s => (lang() === "zh" ? `（${s}）` : ` (${s})`);
+export const pjTitle = p => (p ? (lang() === "zh" ? (p.title_zh || p.title_en) : (p.title_en || p.title_zh)) || String(p.id).replace(/^(project|custom):/, "") : "");
+export const pjWsName = team => team ? String(team).replace(/\s*Team$/i, "") : T("pj.wholeBT");
+export const pjHref = id => "#projects/" + encodeURIComponent(id);
+export const pjOf = (projects, eventId) => (projects || []).find(p => (p.events || []).includes(eventId)) || null;
+export const pjFormOf = (projects, formId) => (projects || []).find(p => (p.forms || []).some(f => f.id === formId)) || null;
+export const pjCanEdit = p => !!p && ["edit", "manage"].includes(p.level);
+// 一場活動可以放進哪些專案：同一個 team 或整個 BT、還開著、我改得動。現在那一個一定在裡面（就算收起來了），下拉才不會跳掉。
+export function pjChoices(projects, ev, current) {
+  return (projects || []).filter(p => (current && p.id === current.id) || (p.active !== false && pjCanEdit(p) && (!p.team || p.team === (ev && ev.team))));
+}
+// 清單分組：整個 BT 在最前面，接著六個 team 照固定順序，最後是不在固定名單上的 team。收起來的專案排在每一組最後。
+export function pjGroups(projects) {
+  const keys = ["", ...TEAM_LABELS];
+  for (const p of projects || []) if (p.team && !keys.includes(p.team)) keys.push(p.team);
+  return keys.map(k => [k, (projects || []).filter(p => (p.team || "") === k).sort((a, b) => (a.active === false) - (b.active === false))]).filter(g => g[1].length);
+}
+// 一個專案可以加進來的活動：同一個 team（整個 BT 的專案收任何 team 的）、網站上開的（不是紀錄倒進來的）、還沒在別的專案裡、我改得動。
+export function pjAddable(events, projects, p, me) {
+  const taken = new Set((projects || []).flatMap(x => x.events || []));
+  return (events || []).filter(e => e.source !== "import" && !taken.has(e.id) && (!p.team || e.team === p.team) && canEditWs(me, e.workspace_id));
+}
+
+// 專案清單。canCreate 是開得了專案的工作區（"" 是整個 BT，只有 senior）。
+export function projectsListHTML(projects, canCreate, draft, msg, busy, newOpen) {
+  if (projects === null) return pageHead(T("pj.title"), T("pj.lede")) + emptyHTML(T("pj.notReady"), T("pj.notReadyHint"));
+  const dis = busy ? " disabled" : "", d = draft || {};
+  const create = (canCreate || []).length ? foldHTML("pj-new", T("pj.new"), `<div class="note">${T("pj.newWhat")}</div><div class="two">
+      <label><i>${T("pj.ws")}</i><select id="pj-team"${dis}>${canCreate.map(t => `<option value="${esc(t)}"${(d.team || "") === t ? " selected" : ""}>${esc(pjWsName(t))}</option>`).join("")}</select></label>
+      <label><i>${T("ev.slug")}</i><input id="pj-slug" value="${esc(d.slug || "")}" placeholder="winter-camp-2027" autocomplete="off"${dis}></label>
+      <label><i>${T("ev.titleZh")}</i><input id="pj-tzh" value="${esc(d.title_zh || "")}" placeholder="2027 冬令營"${dis}></label>
+      <label><i>${T("ev.titleEn")}</i><input id="pj-ten" value="${esc(d.title_en || "")}" placeholder="Winter Camp 2027"${dis}></label>
+    </div>
+    <div class="row"><button class="btn" data-act="pj-create"${dis}>${busy ? T("common.saving") : T("pj.createGo")}</button><span class="mini">${T("pj.createNote")}</span></div>`, newOpen || !!draft) : "";
+  const row = p => `<li><div class="fhead"><b><a href="${esc(pjHref(p.id))}" data-act="pj-open" data-id="${esc(p.id)}">${esc(pjTitle(p))}</a></b>${p.active === false ? ` <span class="tag">${T("pj.archived")}</span>` : ""}</div>
+      <div class="fmeta">${esc(T("pj.counts", { e: (p.events || []).length, f: (p.forms || []).length }))}</div></li>`;
+  const groups = pjGroups(projects);
+  return pageHead(T("pj.title"), T("pj.lede"))
+    + msgHTML(msg)
+    + create
+    + (groups.length ? groups.map(([k, ps]) => sectionHTML(`${esc(pjWsName(k))}<span class="hint">${ps.length}</span>`, `<ul class="flist">${ps.map(row).join("")}</ul>`)).join("")
+        : emptyHTML(T("pj.none"), (canCreate || []).length ? T("pj.noneHint") : T("pj.noneHintNo")));
+}
+
+// 一個專案：底下的活動、報名表、誰在這裡、設定。
+// events 是 loadEvents() 的全部活動；evTeams 是我開得了活動的 team（「在這個專案開一場活動」用）。
+export function projectHTML(p, projects, events, me, msg, busy, o) {
+  const x = o || {}, dis = busy ? " disabled" : "", edit = pjCanEdit(p), manage = p.level === "manage";
+  const byId = new Map((events || []).map(e => [e.id, e]));
+  const evs = (p.events || []).map(id => byId.get(id)).filter(Boolean);
+  const evRow = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(T("ev.st." + e.status))}</span></div>
+      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}・<a href="/admin/records/#overview/${esc(e.id)}">${T("pj.scorecard")}</a>${edit && canEditWs(me, e.workspace_id) ? `・<button class="lnk" data-act="pj-ev-out" data-id="${esc(e.id)}"${dis}>${T("pj.evOut")}</button>` : ""}</div></li>`;
+  const addable = edit ? pjAddable(events, projects, p, me) : [];
+  const addOld = addable.length ? foldHTML("pj-ev-add", T("pj.evAdd"), `<div class="row"><select id="pj-ev-pick" aria-label="${esc(T("pj.evAdd"))}"${dis}>${addable.map(e => `<option value="${esc(e.id)}">${esc(evTitle(e))}${e.starts_at ? pjParen(esc(evDate(e.starts_at).slice(0, 10))) : ""}</option>`).join("")}</select>
+      <button class="btn" data-act="pj-ev-add" data-id="${esc(p.id)}"${dis}>${T("pj.evAddGo")}</button></div>`, !!x.addOpen) : "";
+  const teams = p.team ? (x.evTeams || []).filter(t => t === p.team) : (x.evTeams || []);
+  const d = x.evDraft || {};
+  const addNew = edit && teams.length ? foldHTML("pj-ev-new", T("pj.evNew"), `<div class="two">
+      <label><i>${T("ev.team")}</i><select id="pj-ev-team"${dis}>${teams.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>
+      <label><i>${T("ev.slug")}</i><input id="pj-ev-slug" value="${esc(d.slug || "")}" placeholder="winter-camp-2027-day1" autocomplete="off"${dis}></label>
+      <label><i>${T("ev.titleZh")}</i><input id="pj-ev-tzh" value="${esc(d.title_zh || "")}"${dis}></label>
+      <label><i>${T("ev.titleEn")}</i><input id="pj-ev-ten" value="${esc(d.title_en || "")}"${dis}></label>
+    </div>
+    <label class="check"><input type="checkbox" id="pj-ev-withform"${d.with_form === false ? "" : " checked"}${dis}><span>${T("ev.withForm")}</span></label>
+    <div class="row"><button class="btn" data-act="pj-ev-create" data-id="${esc(p.id)}"${dis}>${busy ? T("common.saving") : T("ev.createGo")}</button></div>`, !!x.newOpen) : "";
+  const evSec = sectionHTML(`${esc(T("pj.events"))}<span class="hint">${evs.length}</span>`,
+    (evs.length ? `<ul class="flist">${evs.map(evRow).join("")}</ul>` : `<div class="mini">${T("pj.noEvents")}</div>`) + addNew + addOld, { hint: T("pj.eventsHint") });
+  const fRow = f => `<li><div class="fhead"><b><a href="#forms/${esc(f.id)}" data-act="open-apps" data-id="${esc(f.id)}">${esc(f.title || "")}</a></b> <span class="tag ${statusOf(f.status).tag}">${esc(T(statusOf(f.status).label))}</span></div>
+      <div class="fmeta">${esc(T("pj.formCounts", { r: f.received || 0, n: f.total || 0 }))}${edit ? `・<a href="#" data-act="open-form" data-id="${esc(f.id)}">${T("pj.formEdit")}</a>` : ""}</div></li>`;
+  const newForm = edit ? `<div class="row" style="margin-top:10px"><input id="pj-form-title" placeholder="${esc(T("pj.formPh"))}" aria-label="${esc(T("pj.formNew"))}" autocomplete="off"${dis}>
+      <button class="btn ghost" data-act="pj-form-new" data-id="${esc(p.id)}"${dis}>${T("pj.formNew")}</button></div>` : "";
+  const fSec = sectionHTML(`${esc(T("pj.forms"))}<span class="hint">${(p.forms || []).length}</span>`,
+    ((p.forms || []).length ? `<ul class="flist">${p.forms.map(fRow).join("")}</ul>` : `<div class="mini">${T("pj.noForms")}</div>`) + newForm, { hint: T("pj.formsHint") });
+  const people = manage ? `<button class="btn ghost sm" data-act="members-open" data-ws="${esc(p.id)}" data-name="${esc(pjTitle(p))}">${T("pj.members")}</button>` : "";
+  const settings = manage ? sectionHTML(T("pj.settings"), `<div class="two">
+      <label><i>${T("ev.titleZh")}</i><input id="pj-e-tzh" value="${esc(p.title_zh || "")}"${dis}></label>
+      <label><i>${T("ev.titleEn")}</i><input id="pj-e-ten" value="${esc(p.title_en || "")}"${dis}></label></div>
+    <div class="row"><button class="btn" data-act="pj-save" data-id="${esc(p.id)}"${dis}>${T("pj.save")}</button>
+      <button class="btn ghost" data-act="pj-archive" data-id="${esc(p.id)}" data-on="${p.active === false ? "1" : "0"}"${dis}>${p.active === false ? T("pj.unarchive") : T("pj.archive")}</button>${people}</div>
+    <div class="mini">${T("pj.archiveNote")}</div>`) : "";
+  const lede = `${esc(T("pj.inWs", { ws: pjWsName(p.team) }))}${p.active === false ? `・${T("pj.archived")}` : ""}${edit ? "" : `・${T("pj.readOnly")}`}`;
+  return pageHead(esc(pjTitle(p)), lede, [], { act: "pj-back", label: T("pj.back") })
+    + msgHTML(msg) + evSec + fSec + settings;
+}
+
+// 活動頁上的「專案」那一格：在哪個專案、換一個或拿出來（那場活動與那個專案都要「改」以上）。
+export function eventProjectHTML(e, projects, me, busy) {
+  if (projects === null || projects === undefined) return "";
+  const cur = pjOf(projects, e.id);
+  const can = canEditWs(me, e.workspace_id) && e.source !== "import";
+  const choices = can ? pjChoices(projects, e, cur) : [];
+  const now = cur ? `<a href="${esc(pjHref(cur.id))}" data-act="pj-open" data-id="${esc(cur.id)}">${esc(pjTitle(cur))}</a>${pjParen(esc(pjWsName(cur.team)))}` : T("pj.noProject");
+  const pick = can && (choices.length || cur) ? `<label><i>${T("pj.move")}</i><select id="ev-project" data-id="${esc(e.id)}"${busy ? " disabled" : ""}>
+      <option value="">${T("pj.noProjectOpt")}</option>${choices.map(p => `<option value="${esc(p.id)}"${cur && cur.id === p.id ? " selected" : ""}>${esc(pjTitle(p))}${pjParen(esc(pjWsName(p.team)))}</option>`).join("")}</select></label>` : "";
+  return sectionHTML(T("pj.ofEvent"), `<div class="note">${now}</div>${pick}`, { hint: T("pj.ofEventHint") });
 }
 
 // ═══════════════════════════════════════════════════════════════════════

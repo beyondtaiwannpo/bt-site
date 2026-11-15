@@ -101,5 +101,5 @@ test("資源分頁是這一組的第一個分頁，當前的那一個有標記",
   assert.match(M.tabsHTML("res"), /class="rail-item on" href="#res" data-act="tab" data-t="res"/);
   assert.ok(!M.tabsHTML("res", false).includes('data-t="team"'), "一般幹部看不到團隊頁那個分頁");
   const rail = M.railHTML("site", "res", { role: "cadre", board: "member", team: "", name: "王平" });
-  assert.ok(rail.includes('href="/admin/?lang=zh#events"') && rail.includes('class="rail-item rail-area on" href="#res"'), "側欄上有活動與對外網站（點下去是資源庫）");
+  assert.ok(rail.includes('href="/admin/?lang=zh#projects"') && rail.includes('class="rail-item rail-area on" href="#res"'), "側欄上有專案與對外網站（點下去是資源庫）");
 });

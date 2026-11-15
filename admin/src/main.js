@@ -33,6 +33,8 @@ let S = {
   requests: null, rqDraft: null, rqF: { status: "open", mine: "", q: "" }, rqSel: null, rqAssignees: [], cadres: [],
   // 活動上架（2026-11-01）：events 是 loadEvents() 回的；evSel 打開的那一場（slug）；evDraft 開活動那張表單填到一半的值；evSigned 那一場的報名數。
   events: null, evSel: null, evDraft: null, evSigned: null, evRc: undefined,
+  // 專案（2026-12-26）：projects 是 projects_list() 回的（undefined 還沒載，null 是遷移檔還沒跑）；pjSel 打開的那一個（id）；pjDraft 開專案填到一半；pjEvDraft 在專案裡開活動填到一半。
+  projects: undefined, pjSel: null, pjDraft: null, pjEvDraft: null,
   // 場地（2026-11-10）：venues 是 venues_list() 回的 { can_edit, venues }；venue 是打開的那一個（venue_get）；vnQ 清單的搜尋字；vnOpen 哪個收起來的表單開著。
   venues: null, venue: null, vnSel: null, vnQ: "", vnOpen: {},
   // 2026-11-11：活動清單的篩選（搜尋字、狀態、team）與會議清單的搜尋字。收起來的表單開著沒一樣記在 vnOpen（ev-new、mt-new）。
@@ -55,7 +57,9 @@ const canEdit = () => UI.canEditWs(S.me, "apps");
 const formEv = f => (f && (S.events || []).find(e => e.form_id === f.id)) || null;
 // 審核或簽到之後，那場活動的報名抄進 Records（人與出席）。在背景跑，失敗不擋畫面（Records 那邊還有手動按鈕）。
 const syncRecords = () => { const ev = formEv(S.form); if (ev) D.syncEvent(ev.id).catch(() => {}); };
-const canEditForm = f => canEdit() || (!!formEv(f) && UI.canEditWs(S.me, formEv(f).workspace_id));
+// 專案的報名表（2026-12-26）：專案是「改」以上就改得動（跟資料庫的 form_can_edit 同一條）。
+const formPj = f => (f && !formEv(f) && UI.pjFormOf(S.projects, f.id)) || null;
+const canEditForm = f => canEdit() || (!!formEv(f) && UI.canEditWs(S.me, formEv(f).workspace_id)) || UI.pjCanEdit(formPj(f));
 const isPres = () => !!S.me && !!S.me.senior;
 
 // 換頁淡入（2026-11-09）：S.view 跟上一次畫的不一樣才加 .swap，自動儲存那種重畫不加。CSS 在 admin.css。
@@ -80,7 +84,7 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
 
   let body;
-  if (S.form) S.form._ev = formEv(S.form);
+  if (S.form) { S.form._ev = formEv(S.form); S.form._pj = formPj(S.form); }
   if (S.view === "checkin" && S.form) {
     body = UI.checkinHTML(S.form, S.apps, canEditForm(S.form), S.msg, S.busy);
   } else if (S.view === "notice" && S.form) {
@@ -103,11 +107,17 @@ function render() {
     const scopes = UI.mtScopes(S.me, S.teams);
     body = m ? UI.meetingHTML(m, S.me, S.cadres, scopes.includes(m.scope), scopes, S.mtDraft, S.msg, S.busy, S.mtpl)
              : UI.emptyHTML(T("mt.notFound"), "", { act: "mt-back", label: T("mt.back") });
+  } else if (S.view === "projects") {
+    body = UI.projectsListHTML(S.projects, pjTeams(), S.pjDraft, S.msg, S.busy, !!S.vnOpen["pj-new"]);
+  } else if (S.view === "project" && S.pjSel) {
+    const pj = (S.projects || []).find(p => p.id === S.pjSel);
+    body = pj ? UI.projectHTML(pj, S.projects, S.events || [], S.me, S.msg, S.busy, { evTeams: evTeams(), evDraft: S.pjEvDraft, newOpen: !!S.vnOpen["pj-ev-new"], addOpen: !!S.vnOpen["pj-ev-add"] })
+              : S.projects === undefined ? UI.skeletonHTML() : UI.emptyHTML(T("pj.none"), "", { act: "pj-back", label: T("pj.back") });
   } else if (S.view === "events") {
-    body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"]);
+    body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"], S.projects);
   } else if (S.view === "event" && S.evSel) {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
-    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc)
+    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects)
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
   } else if (S.view === "venues") {
     body = UI.venuesListHTML(S.venues, S.vnQ, S.msg, S.busy, !!S.vnOpen["vn-add"]);
@@ -142,7 +152,7 @@ function render() {
   };
   // 側欄亮哪一行：總覽、需求單、活動、場地、會議各自亮；活動的報名表亮「活動」，其他申請亮「其他申請」。
   // 從別一區連過來的成員頁（#members=）不屬於這個資料夾的任何一頁，側欄不亮、上面不畫分頁。
-  const tab = (S.view === "members" && S.mp && S.mp.fromLink) ? "" : S.view === "home" ? "teams" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : "forms";
+  const tab = (S.view === "members" && S.mp && S.mp.fromLink) ? "" : S.view === "home" ? "teams" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "projects" || S.view === "project") ? "projects" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : (S.form && S.form._pj && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "projects" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -216,7 +226,7 @@ async function boot(retried) {
       await openMembers(ws, name, "home"); if (S.mp) { S.mp.fromLink = true; S.mp.canBack = document.referrer.startsWith(location.origin); render(); } return;
     }
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
-    else if (/^(requests?|events|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    else if (/^(requests?|events|projects|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
     // 2026-11-14：/admin/ 沒有 # 的時候開活動（待辦搬到 /home/ 了）。#teams 與舊的 #home 開「各 team」。
     else if (!/^(teams|home)$/.test(location.hash.slice(1))) { history.replaceState(null, "", location.pathname + location.search + "#events"); await openTab("events"); return; }
     render();
@@ -248,6 +258,16 @@ function evTeams() {
   if (S.me.senior) return (S.teams && S.teams.length ? S.teams : UI.TEAM_LABELS);
   // 2026-12-25：team 是「改」就開得了這個 team 的活動（create_event 同一條）。
   return Object.entries(S.me.ws || {}).filter(([id, lv]) => id.startsWith("res:") && ["edit", "manage"].includes(lv)).map(([id]) => id.slice(4));
+}
+// 開得了專案的工作區："" 是整個 BT（只有 senior），其他是 team 是「改」以上的（create_project 同一條）。
+function pjTeams() { return S.me && S.me.senior ? [""].concat(evTeams()) : evTeams(); }
+async function reloadProjects() {
+  try { S.projects = await D.loadProjects(); } catch (e) { S.projects = S.projects || []; S.msg = T("err.pjLoad") + D.says(e); }
+}
+function keepPjDraft() {
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  if (document.getElementById("pj-team")) { const d = { team: val("pj-team"), slug: val("pj-slug"), title_zh: val("pj-tzh"), title_en: val("pj-ten") }; if (d.slug || d.title_zh || d.title_en) S.pjDraft = d; }
+  if (document.getElementById("pj-ev-team")) { const d = { team: val("pj-ev-team"), slug: val("pj-ev-slug"), title_zh: val("pj-ev-tzh"), title_en: val("pj-ev-ten"), with_form: !!(document.getElementById("pj-ev-withform") || {}).checked }; if (d.slug || d.title_zh || d.title_en) S.pjEvDraft = d; }
 }
 async function reloadEvents(slug) {
   try {
@@ -341,7 +361,7 @@ async function openTab(t) {
   const ev = /^events(?:\/([a-z0-9-]+))?$/.exec(t || "");
   if (ev) {
     S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = "";
-    await Promise.all([reloadEvents(ev[1]), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null,
+    await Promise.all([reloadEvents(ev[1]), reloadProjects(), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null,
       ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
     S.evLinks = null; S.evRc = undefined;
     const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]);
@@ -355,6 +375,16 @@ async function openTab(t) {
     S.evRc = await D.loadRecordsCard(one.id);
     if (S.view === "event" && S.evSel === one.slug) render();
     return;
+  }
+  // 專案（2026-12-26）：#projects 清單，#projects/<id> 一個（id 是 project:代號，網址裡編碼過）。
+  const pj = /^projects(?:\/(.+))?$/.exec(t || "");
+  if (pj) {
+    let sel = null; try { sel = pj[1] ? decodeURIComponent(pj[1]) : null; } catch (e) { sel = null; }
+    if (S.pjSel !== sel) { S.pjEvDraft = null; }
+    S.view = sel ? "project" : "projects"; S.pjSel = sel; S.msg = "";
+    render();
+    await Promise.all([reloadProjects(), reloadEvents()]);
+    render(); return;
   }
   // 場地（2026-11-10）：#venues 清單，#venues/<id> 一個。
   const vn = /^venues(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
@@ -743,6 +773,84 @@ document.addEventListener("click", async e => {
     rqDraftSave(); history.pushState(null, "", "#request"); await openTab("request"); return;
   }
   if (act === "rq-ev-clear") { S.rqDraft = Object.assign(readRequest(), { event_id: "", event_title: "" }); rqDraftSave(); render(); return; }
+  // ── 專案（2026-12-26）──
+  if (act === "pj-open") { e.preventDefault(); S.form = null; history.pushState(null, "", UI.pjHref(id)); await openTab("projects/" + encodeURIComponent(id)); return; }
+  if (act === "pj-back") { history.pushState(null, "", "#projects"); await openTab("projects"); return; }
+  if (act === "pj-create") {
+    const val = k => { const el = document.getElementById(k); return el ? el.value.trim() : ""; };
+    const d = { team: val("pj-team"), slug: val("pj-slug") || UI.evSlug(val("pj-ten")), title_zh: val("pj-tzh"), title_en: val("pj-ten") };
+    S.pjDraft = d;
+    if (!d.title_zh && !d.title_en) { S.msg = T("err.pjTitle"); render(); return; }
+    if (!d.slug) { S.msg = T("err.evSlug"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const nid = await D.createProject(d.team, d.slug, d.title_zh, d.title_en);
+      S.pjDraft = null; S.vnOpen["pj-new"] = false; S.busy = false;
+      // 多了一個工作區，me.ws 要重讀才畫得出「改」的按鈕。
+      S.me = await D.loadMe(S.user.id).catch(() => S.me); S.workspaces = await D.loadWorkspaces().catch(() => S.workspaces);
+      history.pushState(null, "", UI.pjHref(nid)); await openTab("projects/" + encodeURIComponent(nid));
+      S.msg = T("msg.pjCreated", { title: UI.pjTitle({ id: nid, title_zh: d.title_zh, title_en: d.title_en }) }); render();
+    } catch (err) { S.busy = false; S.msg = T("err.pjCreate") + D.says(err); render(); }
+    return;
+  }
+  if (act === "pj-ev-add" || act === "pj-ev-out") {
+    keepPjDraft();
+    const pid = act === "pj-ev-add" ? id : null;
+    const evId = act === "pj-ev-add" ? ((document.getElementById("pj-ev-pick") || {}).value || "") : id;
+    const one = (S.events || []).find(x => x.id === evId); if (!one) return;
+    const pjNow = (S.projects || []).find(p => p.id === S.pjSel);
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.setEventProject(evId, pid);
+      S.busy = false; S.vnOpen["pj-ev-add"] = false;
+      S.msg = T("msg.pjEvMoved", { e: UI.evTitle(one), p: pid ? T("msg.pjEvIn", { p: UI.pjTitle(pjNow) }) : T("msg.pjEvOut") });
+      await reloadProjects();
+    } catch (err) { S.busy = false; S.msg = T("err.pjSave") + D.says(err); }
+    render(); return;
+  }
+  if (act === "pj-ev-create") {
+    const val = k => { const el = document.getElementById(k); return el ? el.value.trim() : ""; };
+    const d = { team: val("pj-ev-team"), slug: val("pj-ev-slug") || UI.evSlug(val("pj-ev-ten")), title_zh: val("pj-ev-tzh"), title_en: val("pj-ev-ten"), with_form: !!(document.getElementById("pj-ev-withform") || {}).checked };
+    S.pjEvDraft = d;
+    if (!d.title_zh && !d.title_en) { S.msg = T("err.evTitle"); render(); return; }
+    if (!d.slug) { S.msg = T("err.evSlug"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const evId = await D.createEvent(d.team, d.slug, d.title_zh, d.title_en, d.with_form);
+      await D.setEventProject(evId, id);
+      S.pjEvDraft = null; S.vnOpen["pj-ev-new"] = false; S.busy = false;
+      S.me = await D.loadMe(S.user.id).catch(() => S.me);
+      await Promise.all([reloadProjects(), reloadEvents(), reloadList()]);
+      S.msg = T("msg.evCreated", { title: UI.evTitle(d) });
+    } catch (err) { S.busy = false; S.msg = T("err.evCreate") + D.says(err); }
+    render(); return;
+  }
+  if (act === "pj-form-new") {
+    keepPjDraft();
+    const el = document.getElementById("pj-form-title"), title = el ? el.value.trim() : "";
+    if (!title) { S.msg = T("err.pjFormTitle"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const fid = await D.createProjectForm(id, title);
+      S.busy = false;
+      await Promise.all([reloadProjects(), reloadList()]);
+      await openForm(fid);
+    } catch (err) { S.busy = false; S.msg = T("err.pjSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "pj-save" || act === "pj-archive") {
+    keepPjDraft();
+    const p = (S.projects || []).find(x => x.id === id); if (!p) return;
+    const val = k => { const el = document.getElementById(k); return el ? el.value.trim() : ""; };
+    const zh = act === "pj-save" ? val("pj-e-tzh") : (p.title_zh || ""), en = act === "pj-save" ? val("pj-e-ten") : (p.title_en || "");
+    if (!zh && !en) { S.msg = T("err.pjTitle"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.updateProject(id, zh, en, act === "pj-archive" ? b.dataset.on === "1" : p.active !== false);
+      S.busy = false; S.msg = T("msg.pjSaved"); await reloadProjects();
+    } catch (err) { S.busy = false; S.msg = T("err.pjSave") + D.says(err); }
+    render(); return;
+  }
   if (act === "ev-back-to") { S.form = null; history.pushState(null, "", "#events/" + id); await openTab("events/" + id); return; }
   if (act === "ev-attach-form") {
     S.busy = true; render();
@@ -767,7 +875,7 @@ document.addEventListener("click", async e => {
     S.busy = true; S.msg = ""; render();
     try {
       await D.createEvent(d.team, d.slug, d.title_zh, d.title_en, d.with_form);
-      S.evDraft = null; S.vnOpen["ev-new"] = false; S.busy = false; S.msg = T("msg.evCreated", { title: d.title_zh || d.title_en });
+      S.evDraft = null; S.vnOpen["ev-new"] = false; S.busy = false; S.msg = T("msg.evCreated", { title: UI.evTitle(d) });
       // 開好直接進那一場。工作區也多了一個，me.ws 要重讀才畫得出「改」的按鈕。
       S.me = await D.loadMe(S.user.id).catch(() => S.me); S.workspaces = await D.loadWorkspaces().catch(() => S.workspaces);
       history.pushState(null, "", "#events/" + d.slug); await openTab("events/" + d.slug);
@@ -1237,11 +1345,24 @@ applyLang(pickLang(location.search, readStored()));
 boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
 // 場地頁兩個收起來的表單開著沒（重畫之後照舊）。
-document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
+document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new", "pj-new", "pj-ev-new", "pj-ev-add"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 活動頁的「放進哪個專案」（2026-12-26）：選了就存。
+  if (S.view === "event" && e.target && e.target.id === "ev-project") {
+    const evId = e.target.dataset.id, pid = e.target.value || null;
+    const one = (S.events || []).find(x => x.id === evId); if (!one) return;
+    const to = pid ? (S.projects || []).find(p => p.id === pid) : null;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.setEventProject(evId, pid);
+      S.busy = false; S.msg = T("msg.pjEvMoved", { e: UI.evTitle(one), p: to ? T("msg.pjEvIn", { p: UI.pjTitle(to) }) : T("msg.pjEvOut") });
+      await reloadProjects();
+    } catch (err) { S.busy = false; S.msg = T("err.pjSave") + D.says(err); }
+    render(); return;
+  }
   // 會議紀錄換範本（2026-11-13）：照新範本排段落、打過的字帶過去，重畫；在一場會的頁面上順手存。
   if ((S.view === "meeting" || S.view === "meetings") && e.target && (e.target.id === "mtm-tpl" || e.target.id === "mtn-tpl")) {
     const idp = e.target.id.slice(0, 3), tpl = e.target.value || null;

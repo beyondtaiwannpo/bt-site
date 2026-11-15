@@ -80,6 +80,7 @@ const ICON = {
   people:    '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20a5 5 0 0 1 6-4.6"/>',
   records:   '<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3M20 16V6"/>',
   money:     '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>',
+  venues:    '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
 };
 export const SECTIONS = [
   { key: "me",   label: { zh: "我的", en: "Me" } },
@@ -90,7 +91,8 @@ export const AREAS = [
   { key: "home",      sec: "me",   label: { zh: "首頁",     en: "Home" },       hint: { zh: "等你處理的事，照日期排", en: "Everything waiting for you, by date" } },
   { key: "calendar",  sec: "me",   label: { zh: "行事曆",   en: "Calendar" },   hint: { zh: "會議、時間看板、會議範本", en: "Meetings, availability, templates" } },
   { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
-  { key: "events",    sec: "work", label: { zh: "活動",     en: "Events" },     hint: { zh: "每一場、場地、計畫與招募、各 team", en: "Every event, venues, programs, teams" } },
+  // 2026-12-26 Paul：工作區 → 專案 → 活動。這一行改叫「專案」，點下去是專案清單；活動、計畫與招募、各 team 在它底下。key 留 events（網址與測試都認它）。
+  { key: "events",    sec: "work", label: { zh: "專案",     en: "Projects" },   hint: { zh: "專案、活動、計畫與招募、各 team", en: "Projects, events, programs, teams" } },
   { key: "forms",     sec: "work", label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、內部表單、回饋表", en: "To fill, internal forms, feedback forms" } },
   { key: "marketing", sec: "work", label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
   { key: "website",   sec: "work", label: { zh: "對外網站", en: "Website" },    hint: { zh: "資源、團隊頁、校友故事、信", en: "Resources, team page, stories, emails" } },
@@ -98,6 +100,8 @@ export const AREAS = [
   { key: "people",    sec: "org",  label: { zh: "人與權限", en: "People" },     hint: { zh: "名單、邀請、工作區", en: "Roster, invites, workspaces" } },
   { key: "records",   sec: "org",  label: { zh: "紀錄",     en: "Records" },    hint: { zh: "記分卡、每個人、年度比較", en: "Scorecards, everyone, year by year" } },
   { key: "money",     sec: "org",  label: { zh: "錢",       en: "Money" },      hint: { zh: "收支、預算、匯出", en: "Income, spending, budget" } },
+  // 場地是整個 BT 的（2026-12-26 Paul：「venue, records, money … whole BT」）。誰改得動不變：開得了活動的人照舊改得動。
+  { key: "venues",    sec: "org",  label: { zh: "場地",     en: "Venues" },     hint: { zh: "場地與聯絡人", en: "Places and contacts" } },
 ];
 
 // 每一頁。group 是在哪個資料夾，key 是那個資料夾裡的分頁（#key），area 是側欄上的哪一行。
@@ -114,8 +118,8 @@ export const ITEMS = [
   { group: "forms",     key: "mtemplates", area: "calendar",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "會議範本", en: "Templates" } },
   { group: "passport",  key: "",           area: "mypassport", who: "cadre", label: { zh: "我的護照", en: "My passport" } },
   // 活動（2026-11-10 Paul：「application should live under events」）
+  { group: "forms",     key: "projects",   area: "events",    who: "cadre",  label: { zh: "專案", en: "Projects" } },
   { group: "forms",     key: "events",     area: "events",    who: "cadre",  label: { zh: "活動", en: "Events" } },
-  { group: "forms",     key: "venues",     area: "events",    who: "cadre",  label: { zh: "場地", en: "Venues" } },
   { group: "forms",     key: "forms",      area: "events",    who: "cadre",  label: { zh: "計畫與招募", en: "Programs & recruitment" } },
   // 各 team（2026-11-14）：以前後台的「待辦」那一頁。待辦搬到首頁之後，這一頁只剩你的權限與每個 team 的東西。
   { group: "forms",     key: "teams",      area: "events",    who: "cadre",  label: { zh: "各 team", en: "Teams" } },
@@ -151,6 +155,8 @@ export const ITEMS = [
   { group: "records",   key: "overview",   area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "活動記分卡", en: "Event scorecards" } },
   { group: "records",   key: "people",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "所有人", en: "Everyone" } },
   { group: "records",   key: "yearly",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "年度比較", en: "Year by year" } },
+  // 場地（2026-12-26 從「專案」底下搬到整個 BT）
+  { group: "forms",     key: "venues",     area: "venues",    who: "cadre",  label: { zh: "場地", en: "Venues" } },
   // 錢
   { group: "finance",   key: "overview",   area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "總覽", en: "Overview" } },
   { group: "finance",   key: "tx",         area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "收支紀錄", en: "Transactions" } },

@@ -74,7 +74,7 @@ export const COMMON = {
   "ws.long.finance":  { zh: "財務（帳戶、收支、預算）", en: "Finance (accounts, transactions, budget)" },
   "ws.long.money":    { zh: "錢（記收支、預算）", en: "Money (record income and spending, budget)" },
   "ws.long.records":  { zh: "BT Records（人、活動、回饋、去向）", en: "BT Records (people, events, feedback, outcomes)" },
-  "ws.board":         { zh: "整個 BT", en: "Board (whole BT)" },
+  "ws.board":         { zh: "整個 BT", en: "Whole BT" },
   "ws.playNote":      { zh: "玩護照是身分帶來的（每位幹部有自己的、每位實習生有自己的），這幾格只管誰能改格子。", en: "Playing a passport comes with the role (every cadre has theirs, every intern theirs); these cells only control who edits the boxes." },
   "ws.availNote":     { zh: "時間看板沒有指派，每位幹部都用。", en: "Availability has no assignments: every cadre uses it." },
   "ws.levelLegend":   { zh: "看：讀得到，什麼都改不了。改：在那裡新增、修改，大部分的人要的是這一級。管：改，再加上在那裡加人、改等級、移出，通常是 Director。三級在每一個地方意思都一樣。", en: "View: sees it, cannot change anything. Edit: creates and changes things there; most people need this. Manage: Edit, plus adds, re-levels and removes people there; usually the Director. The three levels mean the same thing everywhere." },

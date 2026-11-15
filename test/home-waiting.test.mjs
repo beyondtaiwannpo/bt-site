@@ -106,7 +106,10 @@ test("首頁的樣子：跟 Marketing 提需求是一顆按鈕、等你處理、
 
 test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段；行事曆底下是行事曆、會議、時間看板、會議範本", () => {
   assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "work", "org"]);
-  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "mypassport", "events", "forms", "marketing", "website", "passports", "people", "records", "money"]);
+  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "mypassport", "events", "forms", "marketing", "website", "passports", "people", "records", "money", "venues"]);
+  // 2026-12-26：專案那一行底下是專案、活動、計畫與招募、各 team；場地是整個 BT 的，自己一行。
+  assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events", "forms", "teams"]);
+  assert.deepEqual(RAIL.visibleItems("venues", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["venues"]);
   const me = { role: "cadre", board: "member", team: "Curriculum Team", name: "a", ws: { "custom:meeting-templates": "edit" } };
   assert.deepEqual(RAIL.visibleItems("calendar", me).map(i => i.label.zh), ["行事曆", "會議", "時間看板", "會議範本"]);
   const tabs = RAIL.areaTabsHTML("forms", "meetings", me, "zh");

@@ -828,6 +828,45 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 
 **同一天順手改的**：人與權限 → 幹部名單，同一屆兼好幾個職位的人，職位照職級排（Co-President、Senior Adviser、Director、Adviser、Associate）。以前照輸入的順序，兩位 Co-President 一位的「Co-President」在第一行、另一位在第二行。`admin/people/src/ui.js` 的 `positionsFor()`；改一個人那一頁的職位列也是這個順序。
 
+## 工作區、專案、活動：三層（`supabase/migrations/2026-12-26-projects.sql`，2026-11-14）
+
+Paul 2026-11-14：「curriculum, sponsorship, mentorship, and all that is going to be workspace. And in one workspace, there can be multiple projects. And in one project, there can be multiple forms, registration, records」。另外「venue, records, money… should be on a separate workspace, because they're like whole BT」。他接著回答三題：一個專案底下可以有好幾場活動、好幾份報名表；場地照舊誰都能改。
+
+**三層長這樣**：
+
+- **工作區**：每個 team 一個（Curriculum、Mentorship、Sponsorship…），加一個「整個 BT」。整個 BT 放全 BT 共用的東西：申請、幹部護照、紀錄、錢、會議範本、team 表單、場地。
+- **專案**：開在某一個工作區底下，例如 Curriculum 的「2027 冬令營」。整個 BT 也可以開專案（例如年會），只有 Co-President 與 Senior Adviser 開得了。
+- **活動與報名表**：一個專案底下可以有好幾場活動、好幾份報名表。紀錄就是每一場活動自己的記分卡，從專案頁一鍵點過去。
+
+**在哪裡操作**：
+
+- 後台側欄的「專案」（原本叫「活動」）點下去是專案清單：整個 BT 在最前面，接著照 team 的固定順序。每一個專案寫幾場活動、幾份報名表。
+- 專案頁可以：把同 team 已經開好的活動加進來、在專案裡直接開一場新的活動、開一份新的報名表、把活動移出專案。管得動的人還看得到「誰在這個專案」與收起來。
+- 活動頁多一格「專案」，可以從下拉換到另一個專案或拿出來。
+- 報名表編輯頁的上方多一行「← 回專案」，標題底下寫是哪個專案的。
+- 人與權限 →「工作區」那一頁：每個 team 一塊，工具在前、「專案」小標題在後。原本「建立工作區」改成「開一個專案」，先選放在哪個工作區。
+- 場地從「活動」那一區搬到側欄「組織」底下自己一行，因為它是整個 BT 的。
+
+**權限怎麼往下傳**（全部在資料庫的 `ws_my_level`，前端不自己算）：
+
+- 在 team 工作區有「改」或「管」，就改得動那個 team 底下所有專案。
+- 在專案有「改」或「管」，就改得動那個專案裡的活動。
+- **「看」不往下傳**，跟權限三級制那一節同一個理由：報名名單裡有高中生。
+- **紀錄倒進來的舊活動不能放進專案**。它們的工作區是「紀錄」本身，如果放得進專案，專案的人就等於拿到整本紀錄。資料庫擋（`not_site_event`），`scripts/db/smoke.sh` 有一條故意去試的測試。
+- 活動只能放進同 team 或整個 BT 的專案（`other_team`）。
+
+**遷移檔做了什麼**：
+
+- `workspaces.kind` 多一種 `project`。原本散在外面的自訂工作區（不是活動、也不是整個 BT 那六個工具）轉成專案，id 不變，成員不動。
+- `events` 與 `forms` 各多一欄 `project_id`。專案刪掉時這一欄變成空的，活動與表單不會跟著消失。
+- 新的函式：`create_project`、`update_project`、`set_event_project`、`create_project_form`、`projects_list`。`form_can_view`、`form_can_edit`、`my_access` 認得專案。
+- 最後一段印 12 項 PASS／FAIL，全 PASS 才算跑完。
+- ⚠ **重跑 `2026-12-25-access-model.sql` 或 `2026-12-15-event-signups.sql` 會把上面那幾支函式蓋回舊版**，要再跑一次這一支。
+
+**遷移檔還沒跑之前**：專案清單寫「要先跑 2026-12-26-projects.sql」，活動頁不畫「專案」那一格，其他頁照常。
+
+**程式在哪**：`admin/src/ui.js` 的「專案」那一段（`projectsListHTML`、`projectHTML`、`eventProjectHTML`），測試在 `test/projects.test.mjs`；資料庫那一半在 `scripts/db/smoke.sh` 的「工作區 → 專案 → 活動」。八份後台的 `wsTeamOf`、`wsCellHref`、`wsRows` 一起改，`test/admin-hub.test.mjs` 守著八份一樣。
+
 ## 表單引擎：申請表單變得像 Tally（`shared/forms.js`、`supabase/migrations/2026-12-20-form-engine.sql`，2026-11-13）
 
 Paul 2026-11-13 說「每一個表單編輯器都要像 Tally」，對外的 `/apply/` 要「看起來完美」。這一節是第一到三批：引擎本身、`/apply/` 與後台的申請表單編輯器換上它。內部表單（`/admin/team-forms/`）與回饋表單（`/admin/records/`、`/feedback/`）2026-11-13 也換成同一套了（第六批），寫在「內部表單」與「BT Records」兩節底下的「換上表單引擎」。

@@ -3672,6 +3672,65 @@ amx3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/202
 if echo "${amx3}" | grep -q "OVERALL.*PASS" && ! echo "${amx3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
 chkas "${AMV}" "裝回之後，team 是「看」的人又看不到那一場" "false" "select public.can_view('custom:event-am-ev-p')::text"
 chkas "${AMSA}" "裝回之後，Senior Adviser 又記不了錢" "false" "select public.can_edit_finance()::text"
+echo "── 工作區 → 專案 → 活動：一個專案好幾場活動、好幾份報名表（2026-12-26-projects.sql）──"
+OTEAM=$(psql -d "${DB}" -X -A -t -q -c "select team from public.workspaces where kind='res' and team is not null and team <> '${AMTEAM}' order by id limit 1" | tr -d '\n')
+prj=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-26-projects.sql 2>&1 || true)
+if echo "${prj}" | grep -q "OVERALL.*PASS" && ! echo "${prj}" | grep -q "|FAIL"; then echo "  ok   專案那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 專案那支驗收表："; echo "${prj}" | head -30; fail=$((fail+1)); fi
+prj2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-26-projects.sql 2>&1 || true)
+if echo "${prj2}" | grep -q "OVERALL.*PASS"; then echo "  ok   專案那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 專案重跑：${prj2}" | head -5; fail=$((fail+1)); fi
+chk "以前「Add a project or camp」建的變成專案（id 不動）" "project|project" "select string_agg(kind, '|' order by id) from public.workspaces where id in ('custom:am-owned','custom:am-new')"
+chk "整個 BT 的工具沒有被轉成專案" "0" "select count(*) from public.workspaces where kind='project' and id in ('custom:records','custom:money','custom:meeting-templates','custom:team-forms','custom:marketing-requests')"
+# 開專案
+chkas "${AMT}" "★ team 是「改」開得了這個 team 的專案" "project:am-proj" "select public.create_project('${AMTEAM}','am-proj','測試專案','Test project')"
+chkas "${AMT}" "開的人是那個專案的「管」" "manage" "select public.ws_my_level('project:am-proj')"
+chkraise "★ team 是「看」開不了專案" "not_team_editor" "perform set_config('test.uid','${AMV}',true); perform public.create_project('${AMTEAM}','am-proj-v','不行','No');"
+chkraise "★ 只有 Co-President 與 Senior Adviser 開得了整個 BT 的專案" "not_senior" "perform set_config('test.uid','${AMT}',true); perform public.create_project(null,'am-proj-bt','不行','No');"
+chkraise "同一個代號不能開兩次" "slug_taken" "perform set_config('test.uid','${PAUL}',true); perform public.create_project('${AMTEAM}','am-proj','重複','Dup');"
+chkas "${PAUL}" "Co-President 開一個同 team 的專案" "project:am-proj-p" "select public.create_project('${AMTEAM}','am-proj-p','測試專案二','Test project two')"
+chkas "${AMT}" "★ 別人開的同 team 專案：team 是「改」的人是「改」" "edit" "select public.ws_my_level('project:am-proj-p')"
+chkas "${AMV}" "★ team 是「看」的人不會因此進專案" "false" "select public.can_view('project:am-proj-p')::text"
+chkas "${AMT}" "my_access 帶出那個專案" "edit" "select x->>'level' from jsonb_array_elements(public.my_access()->'workspaces') x where x->>'id'='project:am-proj-p'"
+# 活動放進專案
+chkas "${AMT}" "★ 把一場活動放進專案" "ok" "select public.set_event_project((select id from public.events where slug='am-ev-p'),'project:am-proj-p'); select 'ok'"
+chkas "${PAUL}" "（準備）三級無在專案是「改」" "edit" "select public.assign('${AMX}','project:am-proj-p','edit')"
+chkas "${AMX}" "★ 專案是「改」→ 專案裡那場活動也是「改」" "edit" "select public.ws_my_level('custom:event-am-ev-p')"
+chkas "${AMX}" "my_access 帶出專案裡那場活動" "edit" "select x->>'level' from jsonb_array_elements(public.my_access()->'workspaces') x where x->>'id'='custom:event-am-ev-p'"
+chkas "${PAUL}" "（準備）降成「看」" "view" "select public.assign('${AMX}','project:am-proj-p','view')"
+chkas "${AMX}" "★ 專案是「看」→ 看不到活動的報名名單（高中生）" "false" "select public.can_view('custom:event-am-ev-p')::text"
+chkas "${PAUL}" "（準備）升回「改」" "edit" "select public.assign('${AMX}','project:am-proj-p','edit')"
+chkas "${PAUL}" "（準備）另一個 team 的專案" "project:am-proj-o" "select public.create_project('${OTEAM}','am-proj-o','別隊','Other team')"
+chkraise "★ 活動不能放進別的 team 的專案" "other_team" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_project((select id from public.events where slug='am-ev-p'),'project:am-proj-o');"
+chkraise "★ 專案只是「看」的人放不進去" "not_ws_edit" "perform set_config('test.uid','${AMV}',true); perform public.set_event_project((select id from public.events where slug='am-ev-t'),'project:am-proj-p');"
+psql -d "${DB}" -X -A -t -q -c "insert into public.events (slug,team,workspace_id,title_zh,title_en,source) values ('am-imported','${AMTEAM}','custom:records','舊活動','Old','import') on conflict (slug) do nothing;" 2>&1 | grep -i "error" || true
+chkraise "★ 紀錄倒進來的舊活動放不進專案（不然專案的人會拿到整個紀錄）" "not_site_event" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_project((select id from public.events where slug='am-imported'),'project:am-proj-p');"
+psql -d "${DB}" -X -A -t -q -c "update public.events set project_id='project:am-proj-p' where slug='am-imported';" 2>&1 | grep -i "error" || true
+chkas "${AMX}" "★ 就算舊活動被直接寫進專案，專案的人也拿不到紀錄" "false" "select public.can_edit('custom:records')::text"
+psql -d "${DB}" -X -A -t -q -c "update public.events set project_id=null where slug='am-imported';" 2>&1 | grep -i "error" || true
+# 專案的報名表
+PF1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMX}',false);" -c "select public.create_project_form('project:am-proj-p','學生報名')" 2>&1 | tail -1 | tr -d ' \n')
+PF2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMX}',false);" -c "select public.create_project_form('project:am-proj-p','Mentor 報名')" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 專案是「改」建得了兩份報名表" "2" "select count(*) from public.forms where project_id='project:am-proj-p'"
+chkas "${AMX}" "★ 那兩份表單他改得動" "true|true" "select public.form_can_edit('${PF1}')::text||'|'||public.form_can_edit('${PF2}')::text"
+chkas "${AMV}" "★ 不在專案的人看不到那兩份表單" "false" "select public.form_can_view('${PF1}')::text"
+chkraise "★ 專案只是「看」建不了表單" "not_ws_edit" "perform set_config('test.uid','${AMV}',true); perform public.create_project_form('project:am-proj-p','不行');"
+chkas "${AMX}" "專案清單：兩場活動之一、兩份表單" "1|2" "select (select jsonb_array_length(x->'events')||'|'||jsonb_array_length(x->'forms') from jsonb_array_elements(public.projects_list()) x where x->>'id'='project:am-proj-p')"
+chkas "${AMV}" "★ 每一位幹部看得到有這個專案，但看不到他看不了的表單" "0" "select (select jsonb_array_length(x->'forms') from jsonb_array_elements(public.projects_list()) x where x->>'id'='project:am-proj-p')"
+chkrole anon "${AMX}" "★ 沒登入叫不到專案清單" "ERROR:permissiondeniedforfunctionprojects_list" "select public.projects_list()"
+chkas "${AMT}" "★ 專案的「管」才改得了名字" "ok" "select public.update_project('project:am-proj','改名','Renamed',true); select 'ok'"
+chkraise "★ 專案只是「改」改不了名字" "not_ws_manage" "perform set_config('test.uid','${AMX}',true); perform public.update_project('project:am-proj-p','x','x',true);"
+chkas "${AMT}" "★ 把活動拿出專案" "null" "select public.set_event_project((select id from public.events where slug='am-ev-p'),null); select coalesce(project_id,'null') from public.events where slug='am-ev-p'"
+chkas "${AMX}" "拿出來之後專案的人就沒有那場了" "false" "select public.can_view('custom:event-am-ev-p')::text"
+# 破壞測試
+BROKEN=$(mktemp)
+sed "s/ and p_ws like 'custom:event-%'$//" supabase/migrations/2026-12-26-projects.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：專案的權限漏到紀錄那邊，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉活動工作區的限制驗收表沒變紅"; fail=$((fail+1)); fi
+sed "/if v_pt is not null and v_pt is distinct from v_ev.team then raise exception 'other_team'/d" supabase/migrations/2026-12-26-projects.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：活動跨 team 進專案，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉跨 team 檢查驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+prj3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-26-projects.sql 2>&1 || true)
+if echo "${prj3}" | grep -q "OVERALL.*PASS" && ! echo "${prj3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

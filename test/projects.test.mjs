@@ -1,0 +1,92 @@
+// 工作區 → 專案 → 活動（2026-12-26，Paul 2026-11-14：「in one workspace, there can be multiple projects.
+// And in one project, there can be multiple forms, registration, records」）。跑法：node --test test/*.test.mjs
+// 資料庫那一半（誰開得了、權限往下傳、跨 team、紀錄的舊活動）在 scripts/db/smoke.sh 的「工作區 → 專案 → 活動」那一段。
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import * as F from "../admin/src/ui.js";
+import * as RAIL from "../shared/rail.js";
+
+F.setLang("zh");
+const ME = { id: "u2", role: "cadre", board: "member", team: "Curriculum Team", name: "小安", senior: false, ws: { "res:Curriculum Team": "edit", "custom:event-camp-day1": "edit", "custom:event-info": "edit" } };
+const EV = (id, slug, team, extra) => ({ id, slug, team, workspace_id: "custom:event-" + slug, title_zh: slug, title_en: slug, status: "draft", source: "site", ...extra });
+const EVENTS = [EV("e1", "camp-day1", "Curriculum Team"), EV("e2", "info", "Curriculum Team"), EV("e3", "mkt-fair", "Marketing Team"),
+  EV("e4", "old", "Curriculum Team", { workspace_id: "custom:records", source: "import" })];
+const P1 = { id: "project:camp-27", team: "Curriculum Team", title_zh: "2027 冬令營", title_en: "Winter Camp 2027", active: true, level: "edit",
+  events: ["e1"], forms: [{ id: "f1", title: "學生報名", status: "open", received: 3, total: 5 }, { id: "f2", title: "Mentor 報名", status: "draft", received: 0, total: 0 }] };
+const P2 = { id: "project:gala", team: null, title_zh: "年會", title_en: "Gala", active: true, level: null, events: [], forms: [] };
+const P3 = { id: "project:mkt", team: "Marketing Team", title_zh: "行銷週", title_en: "Marketing week", active: true, level: "edit", events: ["e3"], forms: [] };
+const PROJECTS = [P1, P2, P3];
+
+test("★ 專案清單：整個 BT 在最前面，接著照 team 的固定順序；每一個寫幾場活動、幾份報名表", () => {
+  assert.deepEqual(F.pjGroups(PROJECTS).map(g => g[0]), ["", "Curriculum Team", "Marketing Team"]);
+  const h = F.projectsListHTML(PROJECTS, ["Curriculum Team"], null, "", false, false);
+  assert.ok(h.indexOf("整個 BT") < h.indexOf("Curriculum") && h.indexOf("Curriculum") < h.indexOf(">Marketing<"), "分組順序");
+  assert.match(h, /href="#projects\/project%3Acamp-27" data-act="pj-open" data-id="project:camp-27">2027 冬令營</);
+  assert.match(h, /1 場活動・2 份報名表/);
+  assert.match(h, /<b>開一個專案<\/b>[\s\S]*<select id="pj-team"><option value="Curriculum Team">Curriculum<\/option><\/select>/, "只列開得了的工作區");
+  assert.doesNotMatch(F.projectsListHTML(PROJECTS, [], null, "", false, false), /開一個專案/, "開不了就不畫那一格");
+  assert.match(F.projectsListHTML(null, [], null, "", false, false), /2026-12-26-projects\.sql/, "★ 遷移檔還沒跑：講清楚要先跑哪一支，不是空白");
+});
+
+test("★ 一個專案：好幾場活動、好幾份報名表；只列得出能加進來的活動", () => {
+  const h = F.projectHTML(P1, PROJECTS, EVENTS, ME, "", false, { evTeams: ["Curriculum Team"] });
+  assert.match(h, /<h1>2027 冬令營<\/h1><div class="lede">工作區：Curriculum/);
+  assert.match(h, /data-act="ev-open" data-slug="camp-day1"/);
+  assert.match(h, /href="\/admin\/records\/#overview\/e1">記分卡/, "紀錄：每一場連到它的記分卡");
+  assert.match(h, /data-act="open-apps" data-id="f1">學生報名[\s\S]*3 份待審・共 5 份/);
+  assert.match(h, /data-act="open-apps" data-id="f2">Mentor 報名/, "★ 兩份報名表");
+  assert.match(h, /data-act="pj-form-new" data-id="project:camp-27"/);
+  // 能加進來的：同 team、網站上開的、還沒在別的專案、改得動。info 可以；camp-day1 已經在裡面；mkt-fair 別隊；old 是紀錄倒進來的。
+  assert.deepEqual(F.pjAddable(EVENTS, PROJECTS, P1, ME).map(e => e.id), ["e2"]);
+  assert.match(h, /<select id="pj-ev-pick"[^>]*><option value="e2">/);
+  assert.match(h, /data-act="pj-ev-create" data-id="project:camp-27"/, "在專案裡開一場活動");
+  assert.doesNotMatch(h, /pj-save|誰在這個專案/, "只是「改」看不到設定與成員");
+  const mgr = F.projectHTML({ ...P1, level: "manage" }, PROJECTS, EVENTS, ME, "", false, {});
+  assert.match(mgr, /data-act="members-open" data-ws="project:camp-27"/);
+  assert.match(mgr, /data-act="pj-archive" data-id="project:camp-27" data-on="0">收起來/);
+  const ro = F.projectHTML({ ...P1, level: null }, PROJECTS, EVENTS, ME, "", false, { evTeams: ["Curriculum Team"] });
+  assert.doesNotMatch(ro, /pj-form-new|pj-ev-pick|pj-ev-create|pj-ev-out/, "看得到、改不了的人沒有任何按鈕");
+  assert.match(ro, /你只看得到，改不了/);
+});
+
+test("★ 活動頁的專案：同 team 或整個 BT、改得動的才列；紀錄的舊活動不能放", () => {
+  const e1 = EVENTS[0];
+  assert.equal(F.pjOf(PROJECTS, "e1"), P1);
+  // 整個 BT 的 Gala 我是 null，不列；別隊的行銷週不列；現在那一個一定在。
+  assert.deepEqual(F.pjChoices(PROJECTS, e1, P1).map(p => p.id), ["project:camp-27"]);
+  const h = F.eventProjectHTML(e1, PROJECTS, ME, false);
+  assert.match(h, /data-act="pj-open" data-id="project:camp-27">2027 冬令營<\/a>（Curriculum）/);
+  assert.match(h, /<select id="ev-project" data-id="e1">\s*<option value="">不放進專案<\/option><option value="project:camp-27" selected>/);
+  assert.doesNotMatch(F.eventProjectHTML(EVENTS[3], PROJECTS, ME, false), /ev-project/, "紀錄倒進來的舊活動沒有下拉");
+  assert.equal(F.eventProjectHTML(e1, null, ME, false), "", "遷移檔還沒跑：不畫那一格");
+  // 收起來的專案不收新的活動
+  assert.deepEqual(F.pjChoices([{ ...P1, active: false }], EVENTS[1], null), []);
+  // 活動清單上寫在哪個專案
+  assert.match(F.eventsListHTML(EVENTS, ME, [], null, "", false, [], null, false, PROJECTS), /專案：2027 冬令營/);
+});
+
+test("專案的報名表：回專案、頁首寫是哪個專案的", () => {
+  const h = F.formHeadHTML({ id: "f2", title: "Mentor 報名", status: "draft", team: "Curriculum Team", _pj: P1 }, "apps", 0);
+  assert.match(h, /data-act="pj-open" data-id="project:camp-27">← 回專案「2027 冬令營」/);
+  assert.match(h, /專案「2027 冬令營」的報名表/);
+});
+
+test("★ 側欄：「專案」那一行點下去是專案清單；場地搬到組織（整個 BT）", () => {
+  const me = { role: "cadre", board: "member", team: "", ws: {} };
+  assert.equal(RAIL.visibleItems("events", me)[0].key, "projects");
+  assert.equal(RAIL.areaOf("forms", "projects"), "events");
+  assert.equal(RAIL.areaOf("forms", "venues"), "venues");
+  assert.equal(RAIL.AREAS.find(a => a.key === "venues").sec, "org");
+  const main = readFileSync("admin/src/main.js", "utf8");
+  assert.match(main, /const pj = \/\^projects\(\?:\\\/\(\.\+\)\)\?\$\/\.exec\(t \|\| ""\);/, "#projects 與 #projects/<id> 有自己的網址");
+  assert.match(main, /\(S\.view === "projects" \|\| S\.view === "project"\) \? "projects"/, "側欄亮「專案」");
+});
+
+test("★ 工作區的四支小工具八份一樣：專案在它的工作區那一列、連到專案頁、排在工具後面", () => {
+  assert.equal(F.wsTeamOf({ id: "project:gala", kind: "project", team: null, owner: "p1" }, [{ profile_id: "p1", team: "Sponsorship Team" }]), "", "整個 BT 的專案不看擁有人");
+  assert.equal(F.wsTeamOf({ id: "custom:old-camp", kind: "project", team: "Curriculum Team" }), "Curriculum Team");
+  assert.equal(F.wsCellHref({ id: "project:camp-27", kind: "project" }), "/admin/#projects/project%3Acamp-27");
+  const rows = F.wsRows([{ id: "project:a", kind: "project", team: "Curriculum Team", active: true }, { id: "res:Curriculum Team", kind: "res", team: "Curriculum Team", active: true }], ["Curriculum Team"], []);
+  assert.deepEqual(rows.find(r => r.team === "Curriculum Team").cells.map(c => c.id), ["res:Curriculum Team", "project:a"]);
+});

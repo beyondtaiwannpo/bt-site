@@ -429,6 +429,8 @@ export function wsTeamOf(w, people) {
   // 擁有人通常是 Co-President，他勾的第一個 team 是哪一個，這幾格就掉到哪一列，看起來像那個 team 的東西。
   if (ORG_WS.has(id)) return "";
   if (id === "custom:marketing-requests" || id === "custom:marketing-approve") return "Marketing Team";
+  // 專案（2026-12-26）的工作區存在 team 欄，空的就是整個 BT，不看擁有人。
+  if (w && w.kind === "project") return w.team || "";
   if (w && w.team) return w.team;
   const o = w && w.owner && (people || []).find(p => p.profile_id === w.owner || p.id === w.owner);
   const t = o ? String(o.team || "").split(/[,、;；]/).map(s => s.trim()).filter(Boolean)[0] : "";
@@ -455,6 +457,7 @@ export function wsCellHref(w) {
   if (id === "custom:marketing-requests") return "/admin/#requests";
   if (id === "custom:marketing-approve") return "/admin/marketing/#posts";
   if (id.startsWith("custom:event-")) return "/admin/#events/" + encodeURIComponent(id.slice(13));
+  if (w && w.kind === "project") return "/admin/#projects/" + encodeURIComponent(id);
   if (id === "finance" || id === "custom:money") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
@@ -465,7 +468,8 @@ export function wsRows(workspaces, teams, people) {
   // 一場一場的活動不列在這裡（2026-12-25）：在那一場自己的「人」分頁改，這張表才不會隨活動越來越長。
   const active = (workspaces || []).filter(w => w.active !== false && !String(w.id).startsWith("custom:event-"));
   const order = { apps: 0, passport: 1, "intern-passport": 3 };
-  const rank = w => w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
+  // 專案排在每一列最後（2026-12-26），那個 team 自己的工具在前面。
+  const rank = w => w.kind === "project" ? 10 : w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
   const groups = new Map([["", []]]);
   for (const t of teams || []) groups.set(t, []);
   for (const w of active) { const t = wsTeamOf(w, people); if (!groups.has(t)) groups.set(t, []); groups.get(t).push(w); }
