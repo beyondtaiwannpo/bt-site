@@ -112,7 +112,7 @@ html[data-lang="zh"] .card-sub{font-family:var(--body);font-weight:600;letter-sp
 .lnk-team{font:700 12.5px/1.2 var(--display);letter-spacing:.06em}
 html[data-lang="zh"] .lnk-team{font-family:var(--body);font-weight:700;letter-spacing:0;font-size:13px}
 .lnk-why{font-size:12.5px;color:rgba(16,42,134,.78)}
-.pp-dot.r-alumni{background:var(--bt-sand);border:1px solid rgba(16,42,134,.3)}
+.pp-dot.r-alumni{background:var(--bt-sand);border:1px solid rgba(16,42,134,.3)}.pp-dot.r-student{background:var(--bt-cream);border:1px solid rgba(16,42,134,.3)}
 .card-note a{color:var(--bt-navy)}
 .card-link{display:inline-block;margin-top:6px;padding:10px 16px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;font:700 13px/1 var(--display);letter-spacing:.08em}
 html[data-lang="zh"] .card-link{font-family:var(--body);font-weight:600;letter-spacing:.02em}

@@ -2,8 +2,8 @@
 import { TEAM_ORDER } from "./layout.js";
 const str = v => (typeof v === "string" ? v : "");
 export const COLOURS = ["orange", "teal", "navy", "yellow", "sand", "cream", "grey"];
-export const KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower", "airport"];
-export const ROLES = ["copresident", "director", "advisor", "associate", "alumni"];
+export const KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower", "airport", "camp"];
+export const ROLES = ["copresident", "director", "advisor", "associate", "alumni", "student"];
 
 export function normalize(raw) {
   const teamsRaw = raw && Array.isArray(raw.teams) ? raw.teams : [];
@@ -11,7 +11,7 @@ export function normalize(raw) {
   for (const id of TEAM_ORDER) {
     const tm = teamsRaw.find(x => x && x.id === id); if (!tm) continue;
     teams.push({
-      id, colour: COLOURS.includes(tm.colour) ? tm.colour : "teal", lead: tm.lead === "a" || tm.lead === "b" ? tm.lead : "",
+      id, colour: COLOURS.includes(tm.colour) ? tm.colour : "teal", lead: tm.lead === "a" || tm.lead === "b" ? tm.lead : "", sea: tm.sea === true,
       name_zh: str(tm.name_zh), name_en: str(tm.name_en) || str(tm.name_zh),
       tagline_zh: str(tm.tagline_zh), tagline_en: str(tm.tagline_en) || str(tm.tagline_zh),
       about_zh: str(tm.about_zh), about_en: str(tm.about_en) || str(tm.about_zh),

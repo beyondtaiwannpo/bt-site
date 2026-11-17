@@ -83,22 +83,34 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   for (const isl of islands) {
     const tm = data.teams.find(x => x.id === isl.id); if (!tm) continue;
     const g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); world.add(g);
-    const body = new THREE.Mesh(hexPrism(isl.r, 2.6), M.cliff); body.position.y = -2.6; body.receiveShadow = true; g.add(body);
-    const top = new THREE.Mesh(hexPrism(isl.r - 0.1, 0.3), M.grass); top.position.y = -0.3; top.receiveShadow = true; top.userData.sel = { kind: "team", team: isl.id }; g.add(top); pickables.push(top);
-    const rim = new THREE.Mesh(new THREE.RingGeometry(isl.r - 1.2, isl.r + 0.1, 6, 1, Math.PI / 6), M.beach); rim.rotation.x = -Math.PI / 2; rim.position.y = 0.02; g.add(rim);
-    const shallow = new THREE.Mesh(new THREE.CircleGeometry(isl.r + 3.5, 6, Math.PI / 6), M.shallow); shallow.rotation.x = -Math.PI / 2; shallow.position.y = -0.5; g.add(shallow);
-    // 旗桿加旗子（team 的顏色）在島的後方。
     const fa = (isl.angle || Math.PI / 2); const fx = Math.cos(fa) * (isl.r * 0.62), fz = Math.sin(fa) * (isl.r * 0.62);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 8), M.dark); pole.position.set(fx, 2.5, fz); pole.castShadow = true; g.add(pole);
-    const flag = new THREE.Mesh(rbox(1.8, 1.0, 0.06, 0.03), M.team[tm.colour]); flag.position.set(fx + 0.95, 4.4, fz); flag.castShadow = true; g.add(flag); flag.userData.flag = true;
+    let flag;
+    if (isl.sea) {
+      // 海上的機場：一塊水泥平台架在柱子上，沒有草、沒有樹、沒有旗，只有一支風向袋。
+      const deck = new THREE.Mesh(rbox(isl.r * 2.3, 1.2, isl.r * 1.5, 0.3), M.road); deck.position.y = -0.6; deck.receiveShadow = true; deck.castShadow = true; deck.userData.sel = { kind: "team", team: isl.id }; g.add(deck); pickables.push(deck);
+      for (const x of [-8, 0, 8]) for (const z of [-5, 5]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 3, 8), M.dark); post.position.set(x, -2.4, z); g.add(post); }
+      const edge_ = new THREE.Mesh(rbox(isl.r * 2.3 + 0.4, 0.2, isl.r * 1.5 + 0.4, 0.1), M.cream); edge_.position.y = -0.05; g.add(edge_);
+      const sock = new THREE.Group(); sock.position.set(isl.r * 0.95, 0, -isl.r * 0.55); g.add(sock);
+      sock.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 3, 6), M.dark).translateY(1.5), new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.4, 8), M.orange).translateY(3.1).rotateZ(-Math.PI / 2).translateY(0.3));
+      flag = sock.children[1];
+    } else {
+      const body = new THREE.Mesh(hexPrism(isl.r, 2.6), M.cliff); body.position.y = -2.6; body.receiveShadow = true; g.add(body);
+      const top = new THREE.Mesh(hexPrism(isl.r - 0.1, 0.3), M.grass); top.position.y = -0.3; top.receiveShadow = true; top.userData.sel = { kind: "team", team: isl.id }; g.add(top); pickables.push(top);
+      const rim = new THREE.Mesh(new THREE.RingGeometry(isl.r - 1.2, isl.r + 0.1, 6, 1, Math.PI / 6), M.beach); rim.rotation.x = -Math.PI / 2; rim.position.y = 0.02; g.add(rim);
+      const shallow = new THREE.Mesh(new THREE.CircleGeometry(isl.r + 3.5, 6, Math.PI / 6), M.shallow); shallow.rotation.x = -Math.PI / 2; shallow.position.y = -0.5; g.add(shallow);
+      // 旗桿加旗子（team 的顏色）在島的後方。聚會所的旗是奶油色。
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 8), M.dark); pole.position.set(fx, 2.5, fz); pole.castShadow = true; g.add(pole);
+      flag = new THREE.Mesh(rbox(1.8, 1.0, 0.06, 0.03), M.team[tm.colour]); flag.position.set(fx + 0.95, 4.4, fz); flag.castShadow = true; g.add(flag);
+    }
+    flag.userData.flag = true;
     // 做的事：一樣一棟。
     const spots = L.programSpots({ id: isl.id, x: 0, z: 0, r: isl.r, angle: isl.angle }, tm.programs.length); const blockers = [{ x: fx, z: fz }];
     tm.programs.forEach((p, k) => { const sp = spots[k]; const b = building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = sp.face; g.add(b); blockers.push({ x: sp.x, z: sp.z });
       b.traverse(o => { if (o.isMesh) { o.userData.sel = { kind: "program", team: tm.id, program: p.id }; pickables.push(o); } });
       const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-prog"; pin.dataset.goProgram = p.id; pin.dataset.team = tm.id; pin.hidden = true; pins.appendChild(pin);
       b.userData.pin = pin; b.userData.program = p; });
-    // 樹與花
-    for (let i = 0; i < (phone ? 5 : 8); i++) { const a = rnd() * TAU, d = isl.r * (0.45 + rnd() * 0.4); const x = Math.cos(a) * d, z = Math.sin(a) * d; if (blockers.some(bk => Math.hypot(x - bk.x, z - bk.z) < 2.6)) continue;
+    // 樹與花（機場沒有）
+    for (let i = 0; i < (isl.sea ? 0 : (phone ? 5 : 8)); i++) { const a = rnd() * TAU, d = isl.r * (0.45 + rnd() * 0.4); const x = Math.cos(a) * d, z = Math.sin(a) * d; if (blockers.some(bk => Math.hypot(x - bk.x, z - bk.z) < 2.6)) continue;
       const sc_ = 0.55 + rnd() * 0.45; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.8, 6), M.trunk); tr.position.set(x, 0.4 * sc_, z); tr.scale.setScalar(sc_); g.add(tr);
       const cr = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 9), M.tree[i % 3]); cr.position.set(x, 1.35 * sc_, z); cr.scale.setScalar(sc_); cr.castShadow = true; g.add(cr); blockers.push({ x, z }); }
     // 島名的牌子（HTML）
@@ -133,6 +145,13 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     else if (kind === "home") { const h = house(3.4, 2.4, 3, M.wall2, roofM); win(h, 2, 1.4, 1.54, 1.4); g.add(h); const chim = new THREE.Mesh(rbox(0.5, 1.0, 0.5, 0.06), M.wall); chim.position.set(1.1, 3.1, -0.6); h.add(chim); }
     else if (kind === "post") { const bx = new THREE.Mesh(rbox(0.9, 1.5, 0.9, 0.2), roofM); bx.position.y = 1.05; bx.castShadow = true; g.add(bx); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8), M.dark); leg.position.y = 0.2; g.add(leg); const sign = new THREE.Mesh(rbox(1.6, 0.9, 0.1, 0.06), M.cream); sign.position.set(1.6, 1.4, 0); sign.castShadow = true; g.add(sign); const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.0, 6), M.dark); sp.position.set(1.6, 0.5, 0); g.add(sp); }
     else if (kind === "pier") { const deck = new THREE.Mesh(rbox(3.6, 0.3, 1.8, 0.08), M.wood); deck.position.y = 0.2; deck.castShadow = true; g.add(deck); const booth = new THREE.Mesh(rbox(1.4, 1.6, 1.2, 0.12), M.wall); booth.position.set(-0.9, 1.1, 0); booth.castShadow = true; g.add(booth); const roof = new THREE.Mesh(rbox(1.8, 0.18, 1.6, 0.05), roofM); roof.position.set(-0.9, 2.0, 0); g.add(roof); const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), M.light); lamp.position.set(1.3, 2.0, -0.5); g.add(lamp); const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.7, 6), M.dark); lp.position.set(1.3, 1.15, -0.5); g.add(lp); }
+    else if (kind === "camp") {
+      // Retreat：一圈石頭圍著營火，四張長凳。
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.18, 6, 12), M.dark); ring.rotation.x = Math.PI / 2; ring.position.y = 0.15; g.add(ring);
+      const fire = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.0, 7), M.light); fire.position.y = 0.6; g.add(fire);
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; const b = new THREE.Mesh(rbox(2.0, 0.3, 0.5, 0.08), M.wood); b.position.set(Math.cos(a) * 2.3, 0.45, Math.sin(a) * 2.3); b.rotation.y = -a + Math.PI / 2; b.castShadow = true; g.add(b); for (const dx of [-0.7, 0.7]) { const leg = new THREE.Mesh(rbox(0.2, 0.3, 0.4, 0.04), M.dark); leg.position.set(Math.cos(a) * 2.3 + Math.cos(a + Math.PI / 2) * dx, 0.15, Math.sin(a) * 2.3 + Math.sin(a + Math.PI / 2) * dx); g.add(leg); } }
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.8, 4), M.teal); tent.position.set(-3.2, 0.9, -1.5); tent.rotation.y = Math.PI / 4; tent.castShadow = true; g.add(tent);
+    }
     else if (kind === "airport") {
       // 一條跑道、一座小塔台、一架停著的小飛機。跑道橫過整座島，所以這一樣東西比別的大。
       const run = new THREE.Mesh(rbox(13, 0.12, 2.6, 0.05), M.road); run.position.y = 0.06; run.receiveShadow = true; g.add(run);
@@ -181,7 +200,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   function addWalker(person, opts) {
     const isl = L.islandOf(person.team); const o = opts || {};
     const g = makePerson({ skin: o.skin != null ? o.skin : walkers.length % 3, hair: o.hair != null ? o.hair : (walkers.length * 7) % 3, shirt: o.shirt != null ? o.shirt : (walkers.length * 5) % 6, pants: walkers.length % 3,
-      hat: person.role === "copresident", pack: person.role === "director", bag: person.role === "advisor" });
+      hat: person.role === "copresident", pack: person.role === "director" || person.role === "student", bag: person.role === "advisor" });
     const start = L.wanderTarget(isl, blockersOf.get(person.team), rnd); g.position.set(start.x, 0, start.z); g.rotation.y = rnd() * TAU; world.add(g);
     g.traverse(m => { if (m.isMesh) { m.userData.sel = { kind: "person", code: person.code }; pickables.push(m); } });
     const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-person" + (o.me ? " is-me" : ""); pin.dataset.goPerson = person.code; pin.hidden = true; pins.appendChild(pin);
@@ -306,13 +325,17 @@ function motion({ cam, placeCam, render, walkers, clouds, pose, blockersOf, rnd 
           // 在路上：走到下一個點；到了終點就換島。
           w.pathI++;
           if (w.pathI < w.path.length) { const [x, z] = w.path[w.pathI]; w.target = { x, z }; }
-          else { w.path = null; w.isl = L.islandOf(w.away ? w.home.id : w.person.goes) || w.home; w.away = !w.away; w.target = L.wanderTarget(w.isl, blockersOf.get(w.isl.id), rnd); w.wait = 3 + rnd() * 5; }
+          else { w.path = null; w.isl = L.islandOf(w.dest) || w.home; w.target = L.wanderTarget(w.isl, blockersOf.get(w.isl.id), rnd); w.wait = 3 + rnd() * 5; }
         }
         else { w.g.userData.moving = false; w.wait -= dt;
           if (w.wait <= 0) {
             w.trips++;
-            // 也參與別座島的人與校友：每逛幾次就走去那座島（或走回家）。
-            if (w.person.goes && w.trips % 4 === 0) { const from = w.isl.id, to = w.away ? w.home.id : w.person.goes; const ids = L.route(from, to); if (ids.length > 1) { w.path = L.routePoints(ids); w.pathI = 0; const [x, z] = w.path[0]; w.target = { x, z }; } }
+            // 不在家就走回家；在家的話，也參與別座島的人與校友每逛幾次走去那座島，每個人偶爾走去中間的聚會所。
+            let to = "";
+            if (w.isl.id !== w.home.id) to = w.home.id;
+            else if (w.person.goes && w.trips % 4 === 0) to = w.person.goes;
+            else if (w.home.id !== "commons" && w.trips % 9 === 5) to = "commons";
+            if (to) { const ids = L.route(w.isl.id, to); if (ids.length > 1) { w.path = L.routePoints(ids); w.pathI = 0; w.dest = to; const [x, z] = w.path[0]; w.target = { x, z }; } }
             if (!w.path) { w.target = L.wanderTarget(w.isl, blockersOf.get(w.isl.id), rnd); w.wait = 2 + rnd() * 6; }
           } }
         pose(w.g, t);

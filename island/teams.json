@@ -3,13 +3,14 @@
     "這一份是 /island/ 的資料：BT 這一屆的組織長什麼樣。八座島：中間是 Co-President，外圍六個 team，再外面一座是校友。每座島上有這個 team 做的事（programs）與人（people），島與島之間有協作線（connections），人會走去他也參與的那座島（also / flow）。",
     "**名字：2026-11-16 Paul 說這一頁還沒 push、還不公開，先用我們自己的名單把人放上去。**名單來自內部的團隊表。**未成年一律只放角色**（named 是 false）。",
     "⚠ push 之前 Paul 要逐一確認願意具名的人；不願意的那一筆把 named 改成 false，畫面就只剩角色。校友十位現在是遮字的範例（林 O 恩 這種），換真人要本人同意。",
-    "  校友那十筆有 sample: true，名字是遮字的範例，不是真人。換真人要本人同意，換完把 sample 拿掉。",
+    "  校友十筆與學員兩筆有 sample: true，名字是遮字的範例，不是真人。換真人要本人同意，換完把 sample 拿掉。兩位 Co-President 住在自己的 team 的島上（都是 Sponsorship）。",
     "",
-    "  teams[]      九個，id 固定：exec sponsorship curriculum internship mentorship marketing cr alumni history。history 是機場那座：按進去走 /history/ 那條路，島上沒有人。",
+    "  teams[]      八個，id 固定：commons sponsorship curriculum internship mentorship marketing cr airport。commons 是中間的聚會所（不屬於任何 team，大家都會走過來）；airport 是海上的機場（sea: true，不是島，沒有草地），校友與學員住在這裡、從這裡走橋到他們要去的島，跑道連到 /history/。",
     "  teams[]      八個，id 固定：exec sponsorship curriculum internship mentorship marketing cr alumni。",
     "    name_zh/en 名字。lead 是哪位 Co-President 帶（a 或 b；exec 與 alumni 沒有）。",
     "    tagline_zh/en 一句話。about_zh/en 兩三句。",
     "    colour     島的主色，只能是 orange teal navy yellow sand cream grey 之一（品牌七色）。",
+    "               role 也可以是 alumni（校友）或 student（學員）：他們住在機場，flow 寫他們要走去哪座島。",
     "    programs[] 這個 team 在做的事。id、name、line（一句話）、detail（兩三句，數字只用事實資料庫有的）、link（官網的頁，可留空）、kind（畫成什麼：hall tent booth desk home post pier tower）。",
     "  connections[] 島跟島怎麼連：a、b 是 team id，why_zh/en 一句話。畫面上是一條線，卡上是一列。",
     "  people[]     一人一筆。code 不重複；team 是他住的那座島；role 是 copresident director advisor associate alumni；named 預設 false；title_zh/en 是角色名。",
@@ -19,36 +20,47 @@
   ],
   "teams": [
     {
-      "id": "exec",
-      "colour": "navy",
+      "id": "commons",
+      "colour": "cream",
       "lead": "",
-      "name_zh": "Co-President",
-      "name_en": "Co-Presidents",
-      "tagline_zh": "兩位，各帶三個 team。",
-      "tagline_en": "Two of them, three teams each.",
-      "about_zh": "整個組織層級的決定在這裡：這一屆要做什麼、錢往哪裡放、哪些事跨到好幾個 team。兩位 Co-President 都是學生，每年換屆。",
-      "about_en": "Organisation-level decisions live here: what this year's group does, where the money goes, anything that crosses several teams. Both Co-Presidents are students, and the group hands over every year.",
+      "name_zh": "聚會所",
+      "name_en": "The Commons",
+      "tagline_zh": "大家都會來的地方。",
+      "tagline_en": "Where everyone comes.",
+      "about_zh": "中間這座不屬於任何一個 team。全員會議、retreat、換屆交接都在這裡，每座島上的人都會走過來。兩位 Co-President 也各自住在自己的 team 的島上，不住這裡。",
+      "about_en": "The island in the middle belongs to no team. All-hands meetings, the retreat and the handover happen here, and people from every island walk over. The two Co-Presidents live on their own team's island, not here.",
       "programs": [
         {
-          "id": "term",
-          "kind": "tower",
-          "name_zh": "這一屆的計畫",
-          "name_en": "This year's plan",
-          "line_zh": "2026 年 8 月到 2027 年 7 月。",
-          "line_en": "August 2026 to July 2027.",
-          "detail_zh": "BT 每年換一批幹部。每一屆開始時定這一年要做的事，結束時交接給下一屆。這個網站本身就是照「下一個人看得懂、改得動」做的。",
-          "detail_en": "A new group takes over every year. Each term starts by deciding what the year is for and ends by handing over. This website is built on the same rule: the next person must be able to read it and change it.",
+          "id": "meeting",
+          "kind": "hall",
+          "name_zh": "全員會議",
+          "name_en": "All-hands",
+          "line_zh": "六個 team 的人在同一個時間看板上找得到彼此。",
+          "line_en": "Six teams find each other on one shared time board.",
+          "detail_zh": "幹部分布七個國家、好幾個時區。每週時間看板讓大家填自己有空的時間，會議才排得出來。",
+          "detail_en": "Organisers are spread across seven countries and several time zones. A weekly time board lets everyone mark when they are free, so meetings can be scheduled at all.",
           "link": "../about/"
         },
         {
-          "id": "handover",
-          "kind": "desk",
-          "name_zh": "換屆交接",
-          "name_en": "Handover",
-          "line_zh": "每年七月，整個組織交給下一屆。",
-          "line_en": "Every July, the whole organisation passes to the next group.",
-          "detail_zh": "護照、看板、後台、這個網站，都是為了交接做的工具：讓一位沒寫過程式的新任幹部自己接得起來。",
-          "detail_en": "The passport, the time board, the admin area and this site are all handover tools, built so a new organiser who has never written code can take over.",
+          "id": "retreat",
+          "kind": "camp",
+          "name_zh": "Retreat",
+          "name_en": "Retreat",
+          "line_zh": "一年一次，所有人在同一個地方。",
+          "line_en": "Once a year, everyone in the same place.",
+          "detail_zh": "校友、學員、幹部都可以來。這一屆走過的事在護照上蓋了章，retreat 的時候拿出來看。",
+          "detail_en": "Alumni, students and organisers all come. What this year's group has done is stamped in the passport, and the retreat is when it comes out.",
+          "link": "../about/"
+        },
+        {
+          "id": "term",
+          "kind": "tower",
+          "name_zh": "這一屆與交接",
+          "name_en": "This year and the handover",
+          "line_zh": "2026 年 8 月到 2027 年 7 月，然後交給下一屆。",
+          "line_en": "August 2026 to July 2027, then it passes on.",
+          "detail_zh": "BT 每年換一批幹部。護照、看板、後台、這個網站，都是為了交接做的工具：讓一位沒寫過程式的新任幹部自己接得起來。",
+          "detail_en": "A new group takes over every year. The passport, the time board, the admin area and this site are all handover tools, built so a new organiser who has never written code can take over.",
           "link": "../history/"
         }
       ]
@@ -264,39 +276,16 @@
       ]
     },
     {
-      "id": "alumni",
-      "colour": "sand",
-      "lead": "",
-      "name_zh": "校友",
-      "name_en": "Alumni",
-      "tagline_zh": "走過這條路的人，回來了。",
-      "tagline_en": "People who walked the road, and came back.",
-      "about_zh": "校友不是一個 team，是每一座島上都有的人：回來當講者、當 mentor、幫忙看文件、把消息帶回母校。2025 年五月校友帳號超過 85 個，超過 20 位校友回來當過講者。這座島上的人會走到他在幫忙的那座島。",
-      "about_en": "Alumni are not a team; they are on every island: coming back as speakers, as mentors, to read essays, to carry the news back to their old schools. More than 85 alumni accounts by May 2025; more than 20 have come back to speak. The people on this island walk over to the island they help.",
-      "programs": [
-        {
-          "id": "come-back",
-          "kind": "pier",
-          "name_zh": "回來",
-          "name_en": "Come back",
-          "line_zh": "講者、mentor、看文件、回母校。",
-          "line_en": "Speakers, mentors, essay readers, school visits.",
-          "detail_zh": "校友自己在設定頁填故事、自己勾同意，就出現在官網的 Alumni 航線圖上。想回來幫忙，從那裡開始。",
-          "detail_en": "Alumni write their own story in settings and give consent themselves, and appear on the Alumni route map. Coming back to help starts there.",
-          "link": "../alumni/"
-        }
-      ]
-    },
-    {
-      "id": "history",
+      "id": "airport",
       "colour": "navy",
       "lead": "",
-      "name_zh": "歷史之路",
-      "name_en": "Our Road",
-      "tagline_zh": "BT 怎麼走過來。從這座機場出發。",
-      "tagline_en": "How BT got here. Depart from this airport.",
-      "about_zh": "2020 年五月七個人開始，到現在近三十位幹部分布七個國家。這座島上沒有人，只有一座機場：按進去，就沿著那條路一站一站走。",
-      "about_en": "Seven people in May 2020, close to thirty organisers across seven countries now. Nobody lives on this island; it is just an airport. Go in and walk the road, one stop at a time.",
+      "sea": true,
+      "name_zh": "機場",
+      "name_en": "Airport",
+      "tagline_zh": "回來的人從這裡上島。",
+      "tagline_en": "People who come back land here.",
+      "about_zh": "海上的一座機場，不是島。校友回來當講者、當 mentor、來 retreat，學員來探索營，都從這裡上岸，走橋到他們要去的那座島。跑道的另一頭接著歷史之路：BT 怎麼走過來。",
+      "about_en": "An airport on the sea, not an island. Alumni coming back to speak, to mentor or for the retreat, and students coming to the bootcamp, all land here and walk the bridges to the island they are heading for. The far end of the runway leads to Our Road: how BT got here.",
       "programs": [
         {
           "id": "road",
@@ -308,6 +297,17 @@
           "detail_zh": "歷史之路是官網上另一頁：捲動就沿著一條路走，每一站可以點開看那一年的說明與照片。後台可以自己加站。",
           "detail_en": "Our Road is another page on the site: scroll to walk a road, open any stop to read about that year. Stops are added from the admin area.",
           "link": "../history/"
+        },
+        {
+          "id": "come-back",
+          "kind": "pier",
+          "name_zh": "回來",
+          "name_en": "Come back",
+          "line_zh": "講者、mentor、幫忙看文件、來 retreat。",
+          "line_en": "Speakers, mentors, essay readers, the retreat.",
+          "detail_zh": "校友自己在設定頁填故事、自己勾同意，就出現在官網的 Alumni 航線圖上。想回來幫忙，從那裡開始。",
+          "detail_en": "Alumni write their own story in settings and give consent themselves, and appear on the Alumni route map. Coming back to help starts there.",
+          "link": "../alumni/"
         }
       ]
     }
@@ -315,41 +315,27 @@
   "people": [
     {
       "code": "paul",
-      "team": "exec",
+      "team": "sponsorship",
       "role": "copresident",
       "named": true,
       "name_zh": "Paul",
       "name_en": "Paul",
-      "title_zh": "Co-President",
-      "title_en": "Co-President",
-      "also": [
-        {
-          "team": "sponsorship",
-          "role": "director",
-          "why_zh": "親自帶 Sponsorship 與嘖嘖募資。",
-          "why_en": "Runs Sponsorship and the crowdfunding campaign himself."
-        }
-      ],
+      "title_zh": "Co-President · Sponsorship Director",
+      "title_en": "Co-President, Sponsorship Director",
+      "also": [],
       "line_zh": "讓組織不再卡在任何一個人身上。",
       "line_en": "Make sure the organisation never depends on one person."
     },
     {
       "code": "alysia",
-      "team": "exec",
+      "team": "sponsorship",
       "role": "copresident",
       "named": true,
       "name_zh": "Alysia",
       "name_en": "Alysia",
       "title_zh": "Co-President",
       "title_en": "Co-President",
-      "also": [
-        {
-          "team": "sponsorship",
-          "role": "associate",
-          "why_zh": "網站與視覺那一塊。",
-          "why_en": "The website and visuals side."
-        }
-      ],
+      "also": [],
       "line_zh": "帶 Mentorship、Marketing、Community Relations 三個 team。",
       "line_en": "Leads Mentorship, Marketing and Community Relations."
     },
@@ -665,7 +651,7 @@
     },
     {
       "code": "al-1",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "林 O 恩",
@@ -685,7 +671,7 @@
     },
     {
       "code": "al-2",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "陳 O 妤",
@@ -705,7 +691,7 @@
     },
     {
       "code": "al-3",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "王 O 翔",
@@ -725,7 +711,7 @@
     },
     {
       "code": "al-4",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "李 O 庭",
@@ -745,7 +731,7 @@
     },
     {
       "code": "al-5",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "張 O 睿",
@@ -765,7 +751,7 @@
     },
     {
       "code": "al-6",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "黃 O 安",
@@ -785,7 +771,7 @@
     },
     {
       "code": "al-7",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "吳 O 柔",
@@ -805,7 +791,7 @@
     },
     {
       "code": "al-8",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "劉 O 宇",
@@ -825,7 +811,7 @@
     },
     {
       "code": "al-9",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "蔡 O 寧",
@@ -845,7 +831,7 @@
     },
     {
       "code": "al-10",
-      "team": "alumni",
+      "team": "airport",
       "role": "alumni",
       "named": true,
       "name_zh": "鄭 O 葳",
@@ -853,15 +839,55 @@
       "title_zh": "校友",
       "title_en": "Alumni",
       "flow": {
-        "to": "exec",
+        "to": "commons",
         "carry_zh": "交接",
         "carry_en": "Handover",
-        "why_zh": "上一屆的 Co-President，交接之後留下來當顧問。",
-        "why_en": "Last year's Co-President, stayed on as an adviser after the handover."
+        "why_zh": "上一屆的 Co-President，retreat 與交接的時候回來。",
+        "why_en": "Last year's Co-President, back for the retreat and the handover."
       },
       "line_zh": "明年這些人也會在這座島上。",
       "line_en": "Next year these people will be on this island too.",
       "sample": true
+    },
+    {
+      "code": "st-1",
+      "team": "airport",
+      "role": "student",
+      "named": true,
+      "sample": true,
+      "name_zh": "學員 A",
+      "name_en": "Student A",
+      "title_zh": "學員",
+      "title_en": "Student",
+      "flow": {
+        "to": "curriculum",
+        "carry_zh": "探索營",
+        "carry_en": "Bootcamp",
+        "why_zh": "高二，第一次來探索營。",
+        "why_en": "A junior, at the bootcamp for the first time."
+      },
+      "line_zh": "原來公立的也可以。",
+      "line_en": "So public school kids can too."
+    },
+    {
+      "code": "st-2",
+      "team": "airport",
+      "role": "student",
+      "named": true,
+      "sample": true,
+      "name_zh": "學員 B",
+      "name_en": "Student B",
+      "title_zh": "學員",
+      "title_en": "Student",
+      "flow": {
+        "to": "mentorship",
+        "carry_zh": "配對",
+        "carry_en": "Pairing",
+        "why_zh": "高三，這學期配到一位 mentor。",
+        "why_en": "A senior, paired with a mentor this semester."
+      },
+      "line_zh": "終於有人可以問。",
+      "line_en": "Finally someone to ask."
     }
   ],
   "connections": [
@@ -909,39 +935,63 @@
     },
     {
       "a": "sponsorship",
-      "b": "exec",
-      "why_zh": "嘖嘖募資由一位 Co-President 親自帶。",
-      "why_en": "A Co-President leads the crowdfunding campaign in person."
+      "b": "commons",
+      "why_zh": "嘖嘖募資的進度在全員會議上報。",
+      "why_en": "The campaign's progress is reported at all-hands."
     },
     {
       "a": "mentorship",
-      "b": "alumni",
-      "why_zh": "Mentor 幾乎都是校友。",
-      "why_en": "Almost every mentor is an alumnus."
+      "b": "airport",
+      "why_zh": "Mentor 幾乎都是校友，從機場回來。",
+      "why_en": "Almost every mentor is an alumnus, landing here."
     },
     {
       "a": "cr",
-      "b": "alumni",
-      "why_zh": "回母校演講的是校友。",
-      "why_en": "The people who go back to speak at their schools are alumni."
+      "b": "airport",
+      "why_zh": "回母校演講的校友從這裡上島。",
+      "why_en": "Alumni who go back to speak at their schools land here."
     },
     {
       "a": "curriculum",
-      "b": "alumni",
-      "why_zh": "探索營的講者與文件範例來自校友。",
-      "why_en": "Bootcamp speakers and sample essays come from alumni."
+      "b": "airport",
+      "why_zh": "探索營的講者與學員都從機場來。",
+      "why_en": "Bootcamp speakers and students both arrive through the airport."
     },
     {
-      "a": "exec",
-      "b": "alumni",
-      "why_zh": "每一屆的 Co-President 下一年就是校友。",
-      "why_en": "Every year's Co-Presidents are next year's alumni."
+      "a": "commons",
+      "b": "airport",
+      "why_zh": "Retreat 的時候校友也回來。",
+      "why_en": "Alumni come back for the retreat too."
     },
     {
-      "a": "history",
-      "b": "exec",
-      "why_zh": "每一屆都是這條路上的一站。",
-      "why_en": "Every year's group is one more stop on the road."
+      "a": "commons",
+      "b": "curriculum",
+      "why_zh": "全員會議與 retreat。",
+      "why_en": "All-hands and the retreat."
+    },
+    {
+      "a": "commons",
+      "b": "internship",
+      "why_zh": "全員會議與 retreat。",
+      "why_en": "All-hands and the retreat."
+    },
+    {
+      "a": "commons",
+      "b": "mentorship",
+      "why_zh": "全員會議與 retreat。",
+      "why_en": "All-hands and the retreat."
+    },
+    {
+      "a": "commons",
+      "b": "marketing",
+      "why_zh": "全員會議與 retreat。",
+      "why_en": "All-hands and the retreat."
+    },
+    {
+      "a": "commons",
+      "b": "cr",
+      "why_zh": "全員會議與 retreat。",
+      "why_en": "All-hands and the retreat."
     }
   ]
 }

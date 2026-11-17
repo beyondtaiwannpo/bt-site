@@ -12,21 +12,24 @@ const d = D.normalize(raw);
 
 test("資料：八座島照固定順序、每個至少一樣在做的事、人都對得到島、協作線兩邊都是島", () => {
   assert.deepEqual(d.teams.map(x => x.id), L.TEAM_ORDER);
-  for (const tm of d.teams) { assert.ok(tm.programs.length >= 1, tm.id); assert.ok(tm.people.length >= 1 || tm.id === "history", tm.id); }
+  for (const tm of d.teams) { assert.ok(tm.programs.length >= 1, tm.id); assert.ok(tm.people.length >= 1 || tm.id === "commons", tm.id); }
   assert.equal(d.people.length, d.teams.reduce((n, tm) => n + tm.people.length, 0));
-  assert.equal(d.teams[0].people.length, 2);   // 兩位 Co-President
-  assert.equal(d.teams[7].people.length, 10);  // 十位校友
+  assert.equal(d.teams[0].people.length, 0);   // 聚會所沒有人住，大家都會走過來
+  assert.equal(d.teams[7].people.length, 12);  // 機場：十位校友加兩位學員
+  assert.ok(d.teams[7].sea);
   assert.ok(d.connections.length >= 10);
   assert.ok(D.connectionsOf(d, "curriculum").length >= 3);
-  // 校友都有走去的島；也參與別座島的人會走過去
+  // 校友與學員都有走去的島；也參與別座島的人會走過去
   for (const p of d.teams[7].people) { assert.ok(p.flow && p.goes, p.code); assert.ok(p.sample); }
   assert.ok(D.visitorsOf(d, "curriculum").length >= 2);
-  assert.ok(d.people.find(p => p.code === "paul").also[0].team === "sponsorship");
+  // 兩位 Co-President 住在自己的 team（Sponsorship）
+  assert.equal(d.people.find(p => p.code === "paul").team, "sponsorship");
+  assert.equal(d.people.find(p => p.code === "alysia").team, "sponsorship");
 });
 
 test("資料：未成年只有角色沒有名字；沒有同意（named 不是 true）就不顯示名字；連結只收站內相對路徑與 https", () => {
   for (const p of d.people.filter(x => /minor/.test(x.code))) { assert.equal(p.named, false); assert.equal(p.name_zh, ""); assert.ok(D.label(p, "zh")); }
-  const x = D.normalize({ teams: [{ id: "exec", name_zh: "E", programs: [{ id: "a", name_zh: "A", link: "javascript:alert(1)" }, { id: "b", name_zh: "B", link: "../programs/" }] }], people: [{ code: "p1", team: "exec", role: "director", named: true, name_zh: "某人" }, { code: "p2", team: "exec", role: "director", named: false, name_zh: "某人" }] });
+  const x = D.normalize({ teams: [{ id: "commons", name_zh: "E", programs: [{ id: "a", name_zh: "A", link: "javascript:alert(1)" }, { id: "b", name_zh: "B", link: "../programs/" }] }], people: [{ code: "p1", team: "commons", role: "director", named: true, name_zh: "某人" }, { code: "p2", team: "commons", role: "director", named: false, name_zh: "某人" }] });
   assert.equal(x.teams[0].programs[0].link, "");
   assert.equal(x.teams[0].programs[1].link, "../programs/");
   assert.equal(D.label(x.people[0], "zh"), "某人");
@@ -49,14 +52,15 @@ test("我：只收稱呼、team、上衣、頭髮；稱呼最多 12 字；壞的
 });
 
 test("位置：八座島不重疊、橋是六條輻條加六條環加校友那一條、走得到每一座；做的事蓋在島上、人走的點也在島上", () => {
-  const isl = L.islands(); assert.equal(isl.length, 9);
-  for (let i = 0; i < 9; i++) for (let j = i + 1; j < 9; j++) assert.ok(Math.hypot(isl[i].x - isl[j].x, isl[i].z - isl[j].z) > isl[i].r + isl[j].r + 2, isl[i].id + " " + isl[j].id);
-  assert.equal(L.bridges().length, 16);
-  assert.equal(L.route("history", "exec").length, 3);
-  assert.ok(L.route("alumni", "cr").length >= 3 && L.route("alumni", "cr").length <= 5);
-  assert.deepEqual(L.route("sponsorship", "mentorship"), ["sponsorship", "exec", "mentorship"]);
-  assert.deepEqual(L.route("exec", "exec"), ["exec"]);
-  const pts = L.routePoints(L.route("alumni", "curriculum")); assert.equal(pts.length, 4);
+  const isl = L.islands(); assert.equal(isl.length, 8);
+  assert.ok(isl[7].sea && isl[7].id === "airport");
+  for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) assert.ok(Math.hypot(isl[i].x - isl[j].x, isl[i].z - isl[j].z) > isl[i].r + isl[j].r + 2, isl[i].id + " " + isl[j].id);
+  assert.equal(L.bridges().length, 14);
+  assert.equal(L.route("airport", "commons").length, 3);
+  assert.deepEqual(L.route("airport", "cr"), ["airport", "cr"]);
+  assert.deepEqual(L.route("sponsorship", "mentorship"), ["sponsorship", "commons", "mentorship"]);
+  assert.deepEqual(L.route("commons", "commons"), ["commons"]);
+  const pts = L.routePoints(L.route("airport", "cr")); assert.equal(pts.length, 4);
   const cu = L.islandOf("curriculum"); const spots = L.programSpots(cu, 3);
   for (const s of spots) assert.ok(Math.hypot(s.x - cu.x, s.z - cu.z) < cu.r - 1.5);
   let seed = 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -67,7 +71,7 @@ test("位置：八座島不重疊、橋是六條輻條加六條環加校友那�
 
 test("清單與卡的 HTML：七個 team、做的事可以點、人用角色不用名字、連結逃脫", () => {
   const idx = UI.indexHTML(d, "zh", { team: "mentorship" });
-  assert.equal((idx.match(/data-go-team="/g) || []).length, 9);
+  assert.equal((idx.match(/data-go-team="/g) || []).length, 8);
   assert.ok(idx.includes('class="tree-team on" data-team="mentorship"'));
   const card = UI.teamCardHTML(d.teams[2], "zh", d);
   assert.ok(card.includes("探索營 College Bootcamp"));
@@ -77,8 +81,8 @@ test("清單與卡的 HTML：七個 team、做的事可以點、人用角色不�
   const en = UI.programCardHTML(d.teams[2].programs[0], d.teams[2], "en");
   assert.ok(en.includes("Twice a year"));
   assert.ok(en.includes('href="../programs/"'));
-  const person = UI.personCardHTML(d.people[0], d.teams[0], "en", d);
-  assert.ok(person.includes("Co-President") && person.includes("Also on"));
+  const person = UI.personCardHTML(d.people.find(p => p.code === "ann-chen"), d.teams[1], "en", d);
+  assert.ok(person.includes("Ann Chen") && person.includes("Also on"));
   const al = UI.personCardHTML(d.teams[7].people[0], d.teams[7], "zh", d);
   assert.ok(al.includes("常走去") && al.includes("遮字的範例"));
   const form = UI.meFormHTML(d, "zh", { name: "<b>", team: "cr", shirt: 1, hair: 2 });

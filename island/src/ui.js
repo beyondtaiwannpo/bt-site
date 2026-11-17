@@ -4,7 +4,7 @@ import { label, connectionsOf, visitorsOf, teamById } from "./data.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const L = (o, k, lang) => esc(o[k + "_" + lang] || o[k + "_zh"] || "");
-const roleKey = r => ({ copresident: "roleCopresident", director: "roleDirector", advisor: "roleAdvisor", associate: "roleAssociate", alumni: "roleAlumni" }[r] || "roleAssociate");
+const roleKey = r => ({ copresident: "roleCopresident", director: "roleDirector", advisor: "roleAdvisor", associate: "roleAssociate", alumni: "roleAlumni", student: "roleStudent" }[r] || "roleAssociate");
 
 // ── 右邊的清單：team 一列，底下做的事 ──
 export function indexHTML(d, lang, selected) {
@@ -25,12 +25,12 @@ export function teamCardHTML(tm, lang, d) {
   const works = links.length ? `<h3 class="card-sub">${esc(t("worksWith", lang))}</h3><ul class="links">${links.map(c => { const o = teamById(d, c.team); return o ? `<li><button type="button" class="lnk" data-go-team="${o.id}"><span class="lnk-team c-${o.colour}">${L(o, "name", lang)}</span><span class="lnk-why">${L(c, "why", lang)}</span></button></li>` : ""; }).join("")}</ul>` : "";
   const vis = d ? visitorsOf(d, tm.id) : [];
   const visitors = vis.length ? `<h3 class="card-sub">${esc(t("visitors", lang))}</h3><ul class="pps">${vis.map(p => `<li><button type="button" class="pp" data-go-person="${p.code}"><span class="pp-dot r-${p.role}"></span>${esc(label(p, lang))}</button></li>`).join("")}</ul>` : "";
-  const note = tm.id === "alumni" ? t("sampleNote", lang) : t("namesNote", lang);
+  const note = tm.id === "airport" ? t("sampleNote", lang) : t("namesNote", lang);
   return `<div class="card-head"><span class="card-kicker c-${tm.colour}">${esc(t("indexHead", lang))}</span><h2 class="card-h">${L(tm, "name", lang)}</h2><p class="card-tag">${L(tm, "tagline", lang)}</p></div>
     ${lead}<p class="card-about">${L(tm, "about", lang)}</p>
     <h3 class="card-sub">${esc(t("programs", lang))}</h3><ul class="progs">${programs}</ul>
     ${works}
-    <h3 class="card-sub">${esc(t("people", lang))} <span class="card-n">${esc(t("countPeople", lang, { n: tm.people.length }))}</span></h3><ul class="pps">${people}</ul>
+    ${tm.people.length ? `<h3 class="card-sub">${esc(t(tm.id === "airport" ? "landed" : "people", lang))} <span class="card-n">${esc(t("countPeople", lang, { n: tm.people.length }))}</span></h3><ul class="pps">${people}</ul>` : ""}
     ${visitors}
     <p class="card-note">${esc(note)} <a href="../team/?lang=${lang}">${esc(t("teamPage", lang))}</a></p>`;
 }
