@@ -3,7 +3,10 @@ import { TEAM_ORDER } from "./layout.js";
 const str = v => (typeof v === "string" ? v : "");
 export const COLOURS = ["orange", "teal", "navy", "yellow", "sand", "cream", "grey"];
 export const KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower", "airport", "camp", "school", "studio", "stage"];
-export const ROLES = ["copresident", "director", "advisor", "associate", "alumni", "student"];
+export const ROLES = ["copresident", "director", "advisor", "associate", "alumni", "student", "intern"];
+// 島的地面與擺設都是 teams.json 說了算（scene.js 裡不准出現 team 的名字）：
+export const GROUNDS = ["grass", "lawn", "patch", "tiles", "grid", "paving", "checker", "brick"];
+export const SCENERIES = ["", "playground", "plaza", "classroom", "school", "garden", "studio", "square"];
 
 export function normalize(raw) {
   const teamsRaw = raw && Array.isArray(raw.teams) ? raw.teams : [];
@@ -12,6 +15,7 @@ export function normalize(raw) {
     const tm = teamsRaw.find(x => x && x.id === id); if (!tm) continue;
     teams.push({
       id, colour: COLOURS.includes(tm.colour) ? tm.colour : "teal", lead: tm.lead === "a" || tm.lead === "b" ? tm.lead : "", sea: tm.sea === true,
+      ground: GROUNDS.includes(tm.ground) ? tm.ground : "grass", scenery: SCENERIES.includes(tm.scenery) ? tm.scenery : "", trees: Number.isInteger(tm.trees) ? Math.max(0, Math.min(20, tm.trees)) : 10,
       name_zh: str(tm.name_zh), name_en: str(tm.name_en) || str(tm.name_zh),
       tagline_zh: str(tm.tagline_zh), tagline_en: str(tm.tagline_en) || str(tm.tagline_zh),
       about_zh: str(tm.about_zh), about_en: str(tm.about_en) || str(tm.about_zh),

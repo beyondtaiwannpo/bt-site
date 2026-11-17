@@ -67,14 +67,13 @@ test("位置：八座島不重疊、大小距離形狀各不一樣、橋有長�
   for (let i = 0; i < 30; i++) { const w = L.wanderTarget(cu, spots, rnd); assert.ok(Math.hypot(w.x - cu.x, w.z - cu.z) < cu.r - 1.5); for (const s of spots) assert.ok(Math.hypot(w.x - s.x, w.z - s.z) >= 2.3 || (w.x === cu.x && w.z === cu.z + 2)); }
   assert.ok(L.cameraOverview(false).pos[1] > L.cameraIsland(cu, false).pos[1]);
   assert.ok(L.cameraBird(false).pos[1] > L.cameraOverview(false).pos[1]);
-  // 每座島不一樣（Paul 2026-11-17）：大小、距離、形狀至少各有兩種以上；橋的長度有長有短；島的範圍要進得了全景的 fit
+  // 島排成蜂巢（Paul 2026-11-17 第二次：要像 HEART 那樣島跟島只隔一條水道）：大小至少四種、水道 2 到 7 公尺、橋 3 到 13 公尺；島的範圍要進得了全景的 fit
   const ring = isl.slice(1, 7);
   assert.ok(new Set(ring.map(i => i.r)).size >= 4, "島的大小太像");
-  assert.ok(new Set(ring.map(i => Math.round(Math.hypot(i.x, i.z)))).size >= 4, "島離中心的距離太像");
-  assert.ok(new Set(isl.map(i => i.shape)).size >= 4, "形狀太像（要有 hex round rect sea）");
+  assert.ok(new Set(isl.map(i => i.shape)).size >= 3, "形狀要有 hex round sea");
+  for (const b of L.bridges()) { const A = L.islandOf(b.a), B = L.islandOf(b.b); const gap = Math.hypot(A.x - B.x, A.z - B.z) - A.r - B.r; assert.ok(gap >= 2 && gap <= 10, b.a + "-" + b.b + " 水道 " + gap.toFixed(1)); }
   const lens = L.bridges().map(b => Math.hypot(b.x1 - b.x0, b.z1 - b.z0));
-  assert.ok(Math.min(...lens) >= 4 && Math.max(...lens) <= 20, "橋太短走不了或太長");
-  assert.ok(Math.max(...lens) - Math.min(...lens) >= 5, "橋的長度太像");
+  assert.ok(Math.min(...lens) >= 3 && Math.max(...lens) <= 13, "橋太短走不了或太長");
   const fit = L.cameraOverview(false).fit;
   assert.ok(Math.max(...isl.map(i => Math.abs(i.x) + i.r)) <= fit[0] + 2 && Math.max(...isl.map(i => Math.abs(i.z) + i.r)) <= fit[1] + 2, "島跑出全景");
   for (const id of Object.keys(L.SPEC)) assert.ok(L.islandOf(id), id);

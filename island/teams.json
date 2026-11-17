@@ -16,7 +16,9 @@
     "  people[]     一人一筆。code 不重複；team 是他住的那座島；role 是 copresident director advisor associate alumni；named 預設 false；title_zh/en 是角色名。",
     "               also[]   他也參與的另一座島：{ team, role, why_zh/en }。他會不時走過去，卡上列出來。",
     "               flow     校友專用：{ to（走去哪座島）, carry_zh/en（帶著什麼，牌子上會寫）, why_zh/en（他為什麼在島上）}。",
-    "               line_zh/en 他自己的一句話（可留空）。"
+    "               line_zh/en 他自己的一句話（可留空）。",
+    "  ground / scenery / trees（2026-11-17）：這座島的地面（grass lawn patch tiles grid paving checker brick）、島上那一套擺設（playground plaza classroom school garden studio square，空的就只有一般的桌椅與路）、幾棵樹。scene.js 照這三個字畫，不認 team 的名字。",
+    "  2026-11-17 另外加了十二個只有角色沒有名字的人（探索營學員、配對中的學員、高中實習生、校園大使、來談合作的夥伴，sample: true）：Paul 要島上看起來有人在做事。他們不是名單上的人，是這一屆真的會在島上出現的那種人。"
   ],
   "teams": [
     {
@@ -63,7 +65,10 @@
           "detail_en": "A new group takes over every year. The passport, the time board, the admin area and this site are all handover tools, built so a new organiser who has never written code can take over.",
           "link": "../history/"
         }
-      ]
+      ],
+      "ground": "patch",
+      "scenery": "playground",
+      "trees": 8
     },
     {
       "id": "sponsorship",
@@ -98,7 +103,10 @@
           "detail_en": "Partners provide venues, speakers and resources. Organisations that want to work with us start on the partner page.",
           "link": "../partner/"
         }
-      ]
+      ],
+      "ground": "paving",
+      "scenery": "plaza",
+      "trees": 12
     },
     {
       "id": "curriculum",
@@ -144,7 +152,10 @@
           "detail_en": "Hosted on Notion, open to anyone. Links and requirements are re-verified once a year.",
           "link": "../resources/"
         }
-      ]
+      ],
+      "ground": "tiles",
+      "scenery": "classroom",
+      "trees": 13
     },
     {
       "id": "internship",
@@ -168,7 +179,10 @@
           "detail_en": "Interns join BT's teams and do real work, tracked in their own intern passport.",
           "link": "../apply/"
         }
-      ]
+      ],
+      "ground": "grid",
+      "scenery": "school",
+      "trees": 9
     },
     {
       "id": "mentorship",
@@ -203,7 +217,10 @@
           "detail_en": "Alumni write their own story in settings, give consent themselves, and appear on the Alumni route map.",
           "link": "../alumni/"
         }
-      ]
+      ],
+      "ground": "lawn",
+      "scenery": "garden",
+      "trees": 16
     },
     {
       "id": "marketing",
@@ -238,7 +255,10 @@
           "detail_en": "The home page island, the Alumni route map, Our Road and this island are all built so the next group can take over.",
           "link": "../"
         }
-      ]
+      ],
+      "ground": "checker",
+      "scenery": "studio",
+      "trees": 12
     },
     {
       "id": "cr",
@@ -273,7 +293,10 @@
           "detail_en": "The first 18 started in October 2021.",
           "link": "../join/"
         }
-      ]
+      ],
+      "ground": "brick",
+      "scenery": "square",
+      "trees": 14
     },
     {
       "id": "airport",
@@ -309,7 +332,10 @@
           "detail_en": "Alumni write their own story in settings and give consent themselves, and appear on the Alumni route map. Coming back to help starts there.",
           "link": "../alumni/"
         }
-      ]
+      ],
+      "ground": "grass",
+      "scenery": "",
+      "trees": 0
     }
   ],
   "people": [
@@ -888,6 +914,138 @@
       },
       "line_zh": "終於有人可以問。",
       "line_en": "Finally someone to ask."
+    },
+    {
+      "code": "cu-stu-1",
+      "team": "curriculum",
+      "role": "student",
+      "named": false,
+      "sample": true,
+      "title_zh": "探索營學員",
+      "title_en": "Bootcamp student",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cu-stu-2",
+      "team": "curriculum",
+      "role": "student",
+      "named": false,
+      "sample": true,
+      "title_zh": "探索營學員",
+      "title_en": "Bootcamp student",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cu-stu-3",
+      "team": "curriculum",
+      "role": "student",
+      "named": false,
+      "sample": true,
+      "title_zh": "探索營學員",
+      "title_en": "Bootcamp student",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cu-stu-4",
+      "team": "curriculum",
+      "role": "student",
+      "named": false,
+      "sample": true,
+      "title_zh": "探索營學員",
+      "title_en": "Bootcamp student",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "me-stu-1",
+      "team": "mentorship",
+      "role": "student",
+      "named": false,
+      "sample": true,
+      "title_zh": "配對中的學員",
+      "title_en": "Mentee",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "me-stu-2",
+      "team": "mentorship",
+      "role": "student",
+      "named": false,
+      "sample": true,
+      "title_zh": "配對中的學員",
+      "title_en": "Mentee",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "me-stu-3",
+      "team": "mentorship",
+      "role": "student",
+      "named": false,
+      "sample": true,
+      "title_zh": "配對中的學員",
+      "title_en": "Mentee",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "in-int-1",
+      "team": "internship",
+      "role": "intern",
+      "named": false,
+      "sample": true,
+      "title_zh": "高中實習生",
+      "title_en": "High-school intern",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "in-int-2",
+      "team": "internship",
+      "role": "intern",
+      "named": false,
+      "sample": true,
+      "title_zh": "高中實習生",
+      "title_en": "High-school intern",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cr-amb-1",
+      "team": "cr",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "校園大使",
+      "title_en": "Campus ambassador",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cr-amb-2",
+      "team": "cr",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "校園大使",
+      "title_en": "Campus ambassador",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "sp-par-1",
+      "team": "sponsorship",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "來談合作的夥伴",
+      "title_en": "Visiting partner",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
     }
   ],
   "connections": [

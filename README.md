@@ -4684,12 +4684,15 @@ Paul：「I posted an event on our website from curriculum team, is that going t
 ### 每座島不一樣（2026-11-17 第三輪）
 
 Paul：「right now every island is the same… make it a little bit different… internship team should have a school… the middle, the playground… bridges can be short… a few airplane at the airport… make the distance between each island different… for marketing team get a few posts from our Instagram」。做了：
-- **大小、距離、形狀都不一樣**：`island/src/layout.js` 的 `SPEC` 一座一行（半徑、離中心多遠、角度微調、形狀 hex／round／rect）。改那一行就好，scene.js 照著畫，測試守「不重疊」「橋 4 到 20 公尺」「進得了全景」。橋從島的邊緣開始，所以距離近橋就短：最短 5.6 公尺（Sponsorship 到 Curriculum），最長 17（機場到 CR）。
-- **每座島自己的東西**（`scene.js` 的 `decorate()`，一座一段）：聚會所是圓的，中間一塊遊樂場（溜滑梯、鞦韆、翹翹板、沙坑、長凳）；Internship 是方的，一棟兩層的學校（新的 `kind: school`）加操場跑道與籃球架；Curriculum 最大，露天教室（黑板加三排長凳）；Mentorship 圓的，兩兩對坐的長凳、燈、四個花圃；Sponsorship 一個鋪面廣場、噴水池、合作夥伴看板；Marketing 攝影棚加貼文牆（`kind: studio`：三塊海報板、腳架相機、環形燈）、四面旗、一個大「讚」；Community Relations 一座涼亭舞台（`kind: stage`）、一排燈籠、佈告欄、郵筒。樹的數量也不一樣。
+- **排成蜂巢，只隔一條水道**（同日第二次，Paul 拿 HEART 的截圖比：「every island is connected… smaller distance… right now our island looks empty」）：`island/src/layout.js` 的 `SPACING` 是 26，六座外圍的島跟中間那座、跟相鄰的兩座都是這個距離；半徑一座一行在 `SPEC`（10 到 12），水道 2.5 到 5.5 公尺，橋 3.7 到 6.7 公尺（機場那兩條 10 到 12）。形狀全部六邊形，聚會所是圓的（Paul：「you can make it the same shape」）。測試守「水道 2 到 10 公尺」「橋 3 到 13 公尺」「進得了全景」。
+- **每座島的地面一種花紋**（`teams.json` 的 `ground`）：聚會所拼布色塊、Sponsorship 石板、Curriculum 磚紅地磚、Internship 球場線、Mentorship 割草條紋、Marketing 棋盤格、CR 紅磚。花紋是 `scene.js` 的 `groundMat()` 在 canvas 上畫出來當貼圖，沒有圖檔，顏色全部從七色混。
+- **每座島都有的東西**（`furnish()`）：從每座橋的橋頭鋪一條路到島心、兩張圓桌各四張凳子、兩張長凳、兩盞燈、兩個花箱、一段圍欄、一圈矮樹、8 到 16 棵樹（`trees`）。**人會去坐**：空著的凳子或長凳挑一個走過去，坐下面向桌子，坐 6 到 14 秒再走（`motion()` 裡的 poi）。
+- **島上多了十二個只有角色沒有名字的人**（探索營學員四位、配對中的學員三位、高中實習生兩位、校園大使兩位、來談合作的夥伴一位，`sample: true`），Paul 要島上看起來有人在做事。他們不是名單上的人，是這一屆真的會在島上出現的那種人；要拿掉就從 `teams.json` 刪。
+- **每座島自己的那一套擺設**（`teams.json` 的 `scenery`，`scene.js` 的 `decorate()` 照那個字畫，scene.js 裡沒有任何 team 的名字）：聚會所是圓的，中間一塊遊樂場（溜滑梯、鞦韆、翹翹板、沙坑、長凳）；Internship 是方的，一棟兩層的學校（新的 `kind: school`）加操場跑道與籃球架；Curriculum 最大，露天教室（黑板加三排長凳）；Mentorship 圓的，兩兩對坐的長凳、燈、四個花圃；Sponsorship 一個鋪面廣場、噴水池、合作夥伴看板；Marketing 攝影棚加貼文牆（`kind: studio`：三塊海報板、腳架相機、環形燈）、四面旗、一個大「讚」；Community Relations 一座涼亭舞台（`kind: stage`）、一排燈籠、佈告欄、郵筒。樹的數量也不一樣。
 - **機場四架飛機**：一架在跑道上來回滑行（`motion()` 裡動，螺旋槳會轉，到底停一下再轉頭）、兩架停機坪、一座機棚、一台行李車。
 - **Marketing 的 Instagram**：點那一棟「Instagram @beyondtaiwan」，卡上列最近的貼文（有縮圖），按了到 Instagram；島上那三塊海報板貼的是最上面三則有圖的貼文（真的圖，Paul 2026-11-17 說「Yes, add images」）。清單在 `island/instagram.json`，Marketing 自己貼連結、一句話說明與圖（檔頭有怎麼縮圖的指令）。**不是自動抓**：抓 Instagram 要 API token 與 instagram.com 的程式，這個 repo 只從 cdnjs 載東西。現在放的九則是 2026-11-17 從 @beyondtaiwan 抓的：六則海報圖卡有圖（都是圖卡，沒有人臉），三則影片只有連結。
   圖在 `island/posts/`，是這一頁唯一的圖檔：`check.sh` 放行這一個資料夾，但守著最多 12 張、每張 80 KB 以內、每張都要在 instagram.json 裡被用到、檔名只能是 Instagram 的代號。**有人的照片要先確認每一位都同意，未成年一律不放臉**，海報與圖卡才直接放。
-- 截圖：`docs/island/2026-11-17-*.jpg`。
+- 截圖：`docs/island/2026-11-17-*.jpg`（`packed-*` 是蜂巢版）。
 
 **黃色那些線**（Paul 問的）：是協作線，`teams.json` 的 `connections` 一條一筆，加上人走去別座島的路。工具列「協作線」開著才全部亮；選了一座島只亮它的。
 
@@ -4716,7 +4719,8 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 
 - 改一個 team 的說明、加一樣在做的事、改連結：`island/teams.json`，檔頭有每個欄位的說明。畫面會自己長出一棟（`kind` 決定長什麼樣：hall tent booth desk home post pier tower camp airport school studio stage）。
 - 換 Marketing 島上的貼文：`island/instagram.json`，一則一筆（連結、一句話中英、日期、post 或 reel、圖），新的放上面；圖縮成 640 px 放進 `island/posts/`（指令在檔頭）。前三則有圖的會貼在島上的板子上。
-- 搬一座島、改大小或形狀：`island/src/layout.js` 的 `SPEC`，一座一行。
+- 改一座島的大小：`island/src/layout.js` 的 `SPEC`，一座一行；島跟島的距離是同一個 `SPACING`。
+- 換一座島的地面花紋、那一套擺設、幾棵樹：`teams.json` 那個 team 的 `ground`（grass lawn patch tiles grid paving checker brick）、`scenery`（playground plaza classroom school garden studio square）、`trees`。
 - 加一個人：`people` 加一筆（`code` 不重複、`team`、`role`、要不要具名）。他也參與別座島就加 `also`；校友與學員 `team` 填 `airport`、加 `flow`（走去哪、帶什麼、為什麼）。島上就多一個小人，他自己會走。
 - 加一條協作線：`connections` 加一筆（`a`、`b`、為什麼）。
 - 介面上的字：`island/src/strings.js`。

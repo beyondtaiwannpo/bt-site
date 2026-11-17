@@ -4,7 +4,7 @@ import { label, connectionsOf, visitorsOf, teamById, eventsOf } from "./data.js"
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const L = (o, k, lang) => esc(o[k + "_" + lang] || o[k + "_zh"] || "");
-const roleKey = r => ({ copresident: "roleCopresident", director: "roleDirector", advisor: "roleAdvisor", associate: "roleAssociate", alumni: "roleAlumni", student: "roleStudent" }[r] || "roleAssociate");
+const roleKey = r => ({ copresident: "roleCopresident", director: "roleDirector", advisor: "roleAdvisor", associate: "roleAssociate", alumni: "roleAlumni", student: "roleStudent", intern: "roleIntern" }[r] || "roleAssociate");
 
 // ── 右邊的清單：team 一列，底下做的事 ──
 export function indexHTML(d, lang, selected) {

@@ -18,6 +18,7 @@ export const STR = {
   goesTo:      { zh: "常走去", en: "Walks over to" },
   roleAlumni:  { zh: "校友，回來幫忙的人", en: "Alumni, back to help" },
   roleStudent: { zh: "學員", en: "Student" },
+  roleIntern:  { zh: "實習生", en: "Intern" },
   landed:      { zh: "從這裡上島的人", en: "Who lands here" },
   events:      { zh: "活動", en: "Events" },
   evOpen:      { zh: "報名中", en: "Sign-up open" },
