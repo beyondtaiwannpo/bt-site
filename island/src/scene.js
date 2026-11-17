@@ -106,6 +106,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       // 沙灘那一圈與淺水：六邊形的島跟著六邊形，圓的跟著圓，方的用淺水就好（操場邊沒有沙灘）。
       const segs = isl.shape === "hex" ? 6 : 40, rot = isl.shape === "hex" ? Math.PI / 6 : 0;
       if (isl.shape !== "rect") { const rim = new THREE.Mesh(new THREE.RingGeometry(isl.r - 1.2, isl.r + 0.1, segs, 1, rot), M.beach); rim.rotation.x = -Math.PI / 2; rim.position.y = 0.02; g.add(rim); }
+      // 島邊一圈白色的浪花（HEART 的島邊都有）
+      { const foam = new THREE.Mesh(new THREE.RingGeometry(isl.r + 0.5, isl.r + 1.2, segs, 1, rot), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.45, depthWrite: false })); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.55; g.add(foam); }
       const shallow = new THREE.Mesh(isl.shape === "rect" ? rectPrism(isl.r + 2.0, 0.01) : new THREE.CircleGeometry(isl.r + 2.2, segs, rot), M.shallow); if (isl.shape !== "rect") shallow.rotation.x = -Math.PI / 2; shallow.position.y = isl.shape === "rect" ? -1.0 : -0.5; g.add(shallow);
       // 旗桿加旗子（team 的顏色）在島的後方。聚會所的旗是奶油色。
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 8), M.dark); pole.position.set(fx, 2.5, fz); pole.castShadow = true; g.add(pole);
@@ -114,7 +116,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     flag.userData.flag = true;
     // 做的事：一樣一棟。
     const spots = L.programSpots({ id: isl.id, x: 0, z: 0, r: isl.r, angle: isl.angle }, tm.programs.length); const blockers = [{ x: fx, z: fz }];
-    tm.programs.forEach((p, k) => { const sp = spots[k]; const b = building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = p.kind === "studio" ? 0.15 : sp.face; g.add(b);   // 貼文牆要面向鏡頭（+z），不是面向島心 blockers.push({ x: sp.x, z: sp.z });
+    tm.programs.forEach((p, k) => { const sp = spots[k]; const b = building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = p.kind === "studio" ? 0.15 : sp.face; if (p.kind !== "airport") b.scale.setScalar(1.2); g.add(b);   // 貼文牆要面向鏡頭（+z），不是面向島心 blockers.push({ x: sp.x, z: sp.z });
       b.traverse(o => { if (o.isMesh) { o.userData.sel = { kind: "program", team: tm.id, program: p.id }; pickables.push(o); } });
       const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-prog"; pin.dataset.goProgram = p.id; pin.dataset.team = tm.id; pin.hidden = true; pins.appendChild(pin);
       b.userData.pin = pin; b.userData.program = p; });
@@ -126,7 +128,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     // 樹（機場沒有）：位置先記下來，所有島的樹最後一次畫完（InstancedMesh）。幾棵看 teams.json 的 trees。
     const treeN = isl.sea ? 0 : Math.round(tm.trees * (phone ? 0.6 : 1));
     for (let i = 0; i < treeN; i++) { const a = rnd() * TAU, d = isl.r * (0.5 + rnd() * 0.4); const x = Math.cos(a) * d, z = Math.sin(a) * d; if (blockers.some(bk => Math.hypot(x - bk.x, z - bk.z) < 2.2)) continue;
-      treePlaces.push([isl.x + x, isl.z + z, 0.8 + rnd() * 0.6, i % 3]); blockers.push({ x, z }); }
+      treePlaces.push([isl.x + x, isl.z + z, 0.95 + rnd() * 0.7, i % 3]); blockers.push({ x, z }); }
     // 島名的牌子（HTML）
     const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-team c-" + tm.colour; pin.dataset.goTeam = tm.id; pins.appendChild(pin);
     isleObjs.set(isl.id, { isl, tm, g, pin, flag, buildings: g.children.filter(c => c.userData.program) }); blockersOf.set(isl.id, blockers);
@@ -153,6 +155,16 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(A.x, 1.2, A.z), mid, new THREE.Vector3(B.x, 1.2, B.z));
     const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.07, 6, false), new THREE.MeshStandardMaterial({ color: P.orange, emissive: P.orange, emissiveIntensity: 0.45, roughness: 0.6, transparent: true, opacity: 0.85 }));
     tube.visible = false; world.add(tube); lines.push({ a: c.a, b: c.b, mesh: tube });
+  }
+  // 小船：水道裡幾艘，慢慢搖（motion() 裡動）。位置隨機但離每座島的邊 3 公尺以上。
+  const boats = [];
+  for (let i = 0; i < 6; i++) {
+    let x = 0, z = 0, ok = false;
+    for (let t = 0; t < 60 && !ok; t++) { const a = rnd() * TAU, d = 14 + rnd() * 40; x = Math.cos(a) * d; z = Math.sin(a) * d; ok = islands.every(il => Math.hypot(x - il.x, z - il.z) > il.r + (il.sea ? 6 : 3)); }
+    if (!ok) continue;
+    const b = new THREE.Group(); b.position.set(x, -0.35, z); b.rotation.y = rnd() * TAU;
+    b.add(new THREE.Mesh(rbox(2.4, 0.5, 1.0, 0.18), [M.white, M.cream, M.teal][i % 3]).translateY(0.1), new THREE.Mesh(rbox(0.9, 0.5, 0.7, 0.08), [M.orange, M.navy, M.yellow][i % 3]).translateY(0.55).translateX(-0.2), new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 5), M.dark).translateY(1.2).translateX(0.5));
+    b.traverse(m => { if (m.isMesh) m.castShadow = true; }); b.userData.phase = rnd() * 6; world.add(b); boats.push(b);
   }
   // 雲
   const clouds = [];
@@ -269,6 +281,9 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   function lamp() { const l = new THREE.Group(); l.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.2, 6), M.dark).translateY(1.1), new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), M.light).translateY(2.3)); return l; }
   function flowerbed(seed) { const f = new THREE.Group(); const rr = mulberry(seed); const bed = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.25, 12), M.trunk); bed.position.y = 0.12; f.add(bed); for (let i = 0; i < 9; i++) { const a = rr() * TAU, d = rr() * 0.8; const fl = new THREE.Mesh(new THREE.SphereGeometry(0.13 + rr() * 0.08, 7, 5), [M.orange, M.yellow, M.white, M.teal][i % 4]); fl.position.set(Math.cos(a) * d, 0.38, Math.sin(a) * d); f.add(fl); } return f; }
   function table(topM) { const t = new THREE.Group(); t.add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), M.dark).translateY(0.35), new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.08, 16), topM || M.wall2).translateY(0.74), new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 8), M.orange).translateY(0.81)); return t; }
+  function parasol(m) { const u = new THREE.Group(); u.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.4, 6), M.dark).translateY(1.2), new THREE.Mesh(new THREE.ConeGeometry(1.5, 0.7, 8), m || M.orange).translateY(2.5)); return u; }
+  function picnic(m) { const t = new THREE.Group(); t.add(new THREE.Mesh(rbox(2.2, 0.12, 0.9, 0.03), m || M.wood).translateY(0.75)); for (const dz of [-0.75, 0.75]) t.add(new THREE.Mesh(rbox(2.2, 0.1, 0.35, 0.03), m || M.wood).translateY(0.45).translateZ(dz)); for (const dx of [-0.8, 0.8]) t.add(new THREE.Mesh(rbox(0.12, 0.72, 1.6, 0.03), M.dark).translateY(0.36).translateX(dx)); return t; }
+  function kiosk(roofM) { const k = new THREE.Group(); k.add(new THREE.Mesh(rbox(1.8, 1.1, 1.0, 0.08), M.wall).translateY(0.55), new THREE.Mesh(rbox(2.2, 0.16, 1.5, 0.05), roofM || M.orange).translateY(2.1)); for (const dx of [-0.9, 0.9]) k.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.0, 6), M.dark).translateY(1.6).translateX(dx).translateZ(0.5)); for (let i = 0; i < 3; i++) k.add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 5), [M.orange, M.yellow, M.teal][i]).translateY(1.25).translateX(-0.5 + i * 0.5)); return k; }
   function planter(m) { const pl = new THREE.Group(); pl.add(new THREE.Mesh(rbox(1.4, 0.5, 0.6, 0.06), m || M.wall).translateY(0.25)); for (let i = 0; i < 4; i++) pl.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 7, 5), [M.orange, M.yellow, M.teal, M.white][i]).translateY(0.6).translateX(-0.45 + i * 0.3)); return pl; }
 
   // 每座島都有的：從每座橋的橋頭鋪一條路到島心、兩張圓桌各四張凳子（人會去坐）、兩張長凳、兩盞燈、兩個花箱、一段圍欄、一圈矮樹。
@@ -281,17 +296,21 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     // 路：橋頭到島心
     for (const br of L.bridges()) { const end = br.a === isl.id ? [br.x0 - isl.x, br.z0 - isl.z] : br.b === isl.id ? [br.x1 - isl.x, br.z1 - isl.z] : null; if (!end) continue;
       const len = Math.hypot(end[0], end[1]) - 1.5; const road = new THREE.Mesh(rbox(len, 0.06, 1.5, 0.02), M.road); road.position.set(end[0] / 2, 0.03, end[1] / 2); road.rotation.y = -Math.atan2(end[1], end[0]); road.receiveShadow = true; g.add(road); }
-    // 兩張圓桌、各四張凳子
-    for (let k = 0; k < 2; k++) { const sp = spot(3.2); if (!sp) break; put(table(k ? M.wall : M.wall2), sp);
+    // 三張圓桌、各四張凳子，一張有陽傘
+    for (let k = 0; k < 3; k++) { const sp = spot(3.2); if (!sp) break; put(table(k ? M.wall : M.wall2), sp); if (k === 0) { const u = parasol([M.orange, M.teal, M.yellow][Math.floor(rr() * 3)]); u.position.set(sp.x, 0, sp.z); g.add(u); }
       for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + sp.a; const x = sp.x + Math.cos(a) * 1.35, z = sp.z + Math.sin(a) * 1.35; stoolPlaces.push([isl.x + x, isl.z + z]); pois.push({ x, z, face: Math.atan2(sp.x - x, sp.z - z), kind: "seat" }); } }
-    // 長凳兩張（坐的人面向長凳的正面）
-    for (let k = 0; k < 2; k++) { const sp = spot(2.6); if (!sp) break; const ry = rr() * TAU; put(bench(k ? M.teal : undefined), sp, ry); pois.push({ x: sp.x + Math.sin(ry) * 0.35, z: sp.z + Math.cos(ry) * 0.35, face: ry, kind: "bench" }); }
-    for (let k = 0; k < 2; k++) { const sp = spot(2.0); if (sp) put(lamp(), sp); }
-    for (let k = 0; k < 2; k++) { const sp = spot(2.2); if (sp) put(planter(k ? M.cream : M.wall), sp, rr() * TAU); }
+    // 一張野餐桌（兩邊各坐兩個人）
+    { const sp = spot(3.0); if (sp) { const ry = rr() * TAU; put(picnic(), sp, ry); for (const side of [-1, 1]) for (const along of [-0.6, 0.6]) { const x = sp.x + Math.cos(ry) * along + Math.sin(ry) * side * 1.0, z = sp.z - Math.sin(ry) * along + Math.cos(ry) * side * 1.0; pois.push({ x, z, face: Math.atan2(sp.x - x, sp.z - z), kind: "seat" }); } } }
+    // 長凳三張（坐的人面向長凳的正面）
+    for (let k = 0; k < 3; k++) { const sp = spot(2.6); if (!sp) break; const ry = rr() * TAU; put(bench(k === 1 ? M.teal : k === 2 ? M.orange : undefined), sp, ry); pois.push({ x: sp.x + Math.sin(ry) * 0.35, z: sp.z + Math.cos(ry) * 0.35, face: ry, kind: "bench" }); }
+    // 一個小攤子
+    { const sp = spot(2.8); if (sp) put(kiosk(rr() < 0.5 ? M.orange : M.teal), sp, sp.a + Math.PI); }
+    for (let k = 0; k < 3; k++) { const sp = spot(2.0); if (sp) put(lamp(), sp); }
+    for (let k = 0; k < 3; k++) { const sp = spot(2.2); if (sp) put(planter(k ? M.cream : M.wall), sp, rr() * TAU); }
     // 圍欄：隨便挑一段島緣
     { const a0 = rr() * TAU, n = 5; const rad = isl.r - 1.1; for (let i = 0; i <= n; i++) { const a = a0 + i * 0.16; postPlaces.push([isl.x + Math.cos(a) * rad, 0.45, isl.z + Math.sin(a) * rad]); if (i < n) { const a1 = a + 0.16; const x0 = Math.cos(a) * rad, z0 = Math.sin(a) * rad, x1 = Math.cos(a1) * rad, z1 = Math.sin(a1) * rad; const rail = new THREE.Mesh(rbox(Math.hypot(x1 - x0, z1 - z0), 0.06, 0.08, 0.02), M.wood); rail.position.set((x0 + x1) / 2, 0.7, (z0 + z1) / 2); rail.rotation.y = -Math.atan2(z1 - z0, x1 - x0); g.add(rail); } } }
     // 矮樹：島緣一圈
-    for (let i = 0; i < 9; i++) { const a = rr() * TAU, d = isl.r - 1.6 - rr() * 1.6; const x = Math.cos(a) * d, z = Math.sin(a) * d; if (blockers.some(b => Math.hypot(x - b.x, z - b.z) < 1.4)) continue; bushPlaces.push([isl.x + x, isl.z + z, 0.6 + rr() * 0.5]); blockers.push({ x, z }); }
+    for (let i = 0; i < 16; i++) { const a = rr() * TAU, d = isl.r - 1.6 - rr() * 1.8; const x = Math.cos(a) * d, z = Math.sin(a) * d; if (blockers.some(b => Math.hypot(x - b.x, z - b.z) < 1.4)) continue; bushPlaces.push([isl.x + x, isl.z + z, 0.6 + rr() * 0.5]); blockers.push({ x, z }); }
   }
 
   // ═══ 每座島自己的那一套（teams.json 的 scenery）═══
@@ -378,6 +397,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     if (o.bag) { const bg = new THREE.Mesh(PG.bag, M.navy); bg.position.set(0.42, 0.21, 0); g.add(bg); }
     if (o.hat) { const h = new THREE.Mesh(PG.hat, M.navy); h.position.y = 1.5; g.add(h); }
     const sh = new THREE.Mesh(PG.shadow, shadowMat); sh.position.y = 0.02; g.add(sh);
+    g.scale.setScalar(1.25);   // 人放大一點（Paul 2026-11-17「push further」：HEART 的人跟島的比例比較大）
     g.userData = { phase: rnd() * 6, moving: false, baseY: 0 };   // 人不投影：陰影貼圖是靜的，走動的人用腳下那一圈就好
     return g;
   }
@@ -465,8 +485,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   const show = { names: false, selectedTeam: "", flows: false };
   function paintLines() { for (const l of lines) l.mesh.visible = show.flows || (!!show.selectedTeam && (l.a === show.selectedTeam || l.b === show.selectedTeam)); }
   function placePins() {
-    for (const o of isleObjs.values()) { putPin(o.pin, project(o.isl.x, 7.2, o.isl.z)); if (o.evPin) putPin(o.evPin, project(o.isl.x, 7.2, o.isl.z), 34); for (const b of o.buildings) { setHidden(b.userData.pin, show.selectedTeam !== o.isl.id); if (!b.userData.pin.hidden) putPin(b.userData.pin, project(o.isl.x + b.position.x, 4.4, o.isl.z + b.position.z)); } }
-    for (const w of walkers) { const on = show.names || w.me || show.selectedTeam === w.person.team; setHidden(w.pin, !on); if (on) putPin(w.pin, project(w.g.position.x, 2.0, w.g.position.z)); }
+    for (const o of isleObjs.values()) { putPin(o.pin, project(o.isl.x, 7.2, o.isl.z)); if (o.evPin) putPin(o.evPin, project(o.isl.x, 7.2, o.isl.z), 34); for (const b of o.buildings) { setHidden(b.userData.pin, show.selectedTeam !== o.isl.id); if (!b.userData.pin.hidden) putPin(b.userData.pin, project(o.isl.x + b.position.x, 5.0, o.isl.z + b.position.z)); } }
+    for (const w of walkers) { const on = show.names || w.me || show.selectedTeam === w.person.team; setHidden(w.pin, !on); if (on) putPin(w.pin, project(w.g.position.x, 2.4, w.g.position.z)); }
   }
   function resize() { const w = stage.clientWidth || 300, h = stage.clientHeight || 200; SW = w; SH = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); for (const pin of pins.children) pin._v = -1; }
   function render(t) { if (shadowsDirty) { renderer.shadowMap.needsUpdate = true; shadowsDirty = false; } renderer.render(scene, camera); placePins(); void t; }
@@ -529,14 +549,14 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       }, undefined, () => {}));
     },
     render: () => render(0),
-    motion() { motionOn = true; return motion({ cam, placeCam, render, walkers, clouds, planes, pose, blockersOf, poisOf, rnd }); },
+    motion() { motionOn = true; return motion({ cam, placeCam, render, walkers, clouds, planes, boats, pose, blockersOf, poisOf, rnd }); },
   };
   return api;
 }
 
 /* ── 這裡面才有動畫。外面不准有每一幀的迴圈。 ──
    鏡頭用阻尼追目標（1 - e^(-dt·k)）；人偶爾走到島上另一個點；雲慢慢飄。暫停就是不呼叫 tick。 */
-function motion({ cam, placeCam, render, walkers, clouds, planes, pose, blockersOf, poisOf, rnd }) {
+function motion({ cam, placeCam, render, walkers, clouds, planes, boats, pose, blockersOf, poisOf, rnd }) {
   // 人會去坐：島上空著的凳子或長凳挑一個走過去，坐下面向桌子，坐 6 到 14 秒。
   const freePoi = isl => { const list = (poisOf.get(isl.id) || []).filter(p => !p.taken); return list.length ? list[Math.floor(rnd() * list.length)] : null; };
   const leave = w => { if (w.poi) { w.poi.taken = false; w.poi = null; } };
@@ -563,14 +583,15 @@ function motion({ cam, placeCam, render, walkers, clouds, planes, pose, blockers
             // 不在家就走回家；在家的話，也參與別座島的人與校友每逛幾次走去那座島，每個人偶爾走去中間的聚會所。
             let to = "";
             if (w.isl.id !== w.home.id) to = w.home.id;
-            else if (w.person.goes && w.trips % 4 === 0) to = w.person.goes;
-            else if (w.home.id !== "commons" && w.trips % 9 === 5) to = "commons";
+            else if (w.person.goes && w.trips % 3 === 0) to = w.person.goes;
+            else if (w.home.id !== "commons" && w.trips % 6 === 4) to = "commons";
             if (to) { const ids = L.route(w.isl.id, to); if (ids.length > 1) { w.path = L.routePoints(ids); w.pathI = 0; w.dest = to; const [x, z] = w.path[0]; w.target = { x, z }; } }
             if (!w.path) { const poi = rnd() < 0.5 ? freePoi(w.isl) : null; if (poi) { poi.taken = true; w.poi = poi; w.target = { x: w.isl.x + poi.x, z: w.isl.z + poi.z }; } else { w.target = L.wanderTarget(w.isl, blockersOf.get(w.isl.id), rnd); w.wait = 2 + rnd() * 6; } }
           } }
         pose(w.g, t);
       }
       for (const c of clouds) c.position.x += c.userData.drift * dt;
+      for (const b of boats) { b.position.y = -0.35 + Math.sin(t * 1.3 + b.userData.phase) * 0.08; b.rotation.z = Math.sin(t * 0.9 + b.userData.phase) * 0.04; b.rotation.y += dt * 0.02; }
       // 機場那架會滑行的飛機：沿跑道走到底，停一下，轉頭再走。螺旋槳一直轉。
       for (const pl of planes) { const tx = pl.userData.taxi; if (!tx) continue; const prop = pl.getObjectByName("prop"); if (prop) prop.rotation.x += dt * 18;
         if (tx.wait > 0) { tx.wait -= dt; continue; }

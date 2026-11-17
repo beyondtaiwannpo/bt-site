@@ -1046,6 +1046,105 @@
       "title_en": "Visiting partner",
       "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
       "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cu-spk-1",
+      "team": "curriculum",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "來講座的講者",
+      "title_en": "Guest speaker",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cu-spk-2",
+      "team": "curriculum",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "來講座的講者",
+      "title_en": "Guest speaker",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "me-mtr-1",
+      "team": "mentorship",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "海外的 mentor",
+      "title_en": "Mentor abroad",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "me-mtr-2",
+      "team": "mentorship",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "海外的 mentor",
+      "title_en": "Mentor abroad",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "in-int-3",
+      "team": "internship",
+      "role": "intern",
+      "named": false,
+      "sample": true,
+      "title_zh": "高中實習生",
+      "title_en": "High-school intern",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cr-tch-1",
+      "team": "cr",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "合作高中的老師",
+      "title_en": "Partner school teacher",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "cr-tch-2",
+      "team": "cr",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "合作高中的老師",
+      "title_en": "Partner school teacher",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "sp-par-2",
+      "team": "sponsorship",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "贊助企業的代表",
+      "title_en": "Sponsor representative",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
+    },
+    {
+      "code": "mk-fan-1",
+      "team": "marketing",
+      "role": "associate",
+      "named": false,
+      "sample": true,
+      "title_zh": "來拍影片的校友",
+      "title_en": "Alumnus filming a vlog",
+      "line_zh": "遮字的範例：這一屆真的有這樣的人在島上，名字不放。",
+      "line_en": "Masked sample: people like this really are on the island this year; no names."
     }
   ],
   "connections": [
