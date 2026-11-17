@@ -31,6 +31,7 @@ function pushLabels() {
   const teams = {}, people = { programs: {} };
   for (const tm of data.teams) { teams[tm.id] = tm["name_" + lang] || tm.name_zh; for (const p of tm.programs) people.programs[p.id] = p["name_" + lang] || p.name_zh; }
   for (const p of data.people) people[p.code] = D.label(p, lang) + (p.flow ? " · " + (p.flow["carry_" + lang] || p.flow.carry_zh) : "");
+  const evs = (data.events || []).filter(e => e.state === "open"); if (scene) scene.events(evs.map(e => ({ team: e.team, title: e["title_" + lang] || e.title_zh, link: e.link })));
   scene.labels({ teams, people, me: me ? me.name + " " + t("meYou", lang) : "" });
 }
 
@@ -126,5 +127,11 @@ async function boot() {
   me = loadMe(); if (me && scene) { scene.me({ ...me, label: me.name + " " + t("meYou", lang) }); $("tb-me").classList.add("on"); }
   pushLabels();
   if (start.kind !== "overview") select(start, true);
+  // 跟官網其他頁接起來：活動（/events/ 那一份）與真的校友（/alumni/ 那一份）。拿不到就當沒有。
+  const [events, alumni] = await Promise.all([D.loadEvents(), D.loadAlumni()]);
+  data.events = events;
+  if (alumni.length) { D.mergeAlumni(data, alumni); if (scene) scene.people(data.people); }
+  if (scene) scene.events(events.filter(e => e.state === "open").map(e => ({ team: e.team, title: e["title_" + lang] || e.title_zh, link: e.link })));
+  pushLabels(); renderIndex(); renderCard();
 }
 boot();

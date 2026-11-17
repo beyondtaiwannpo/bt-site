@@ -96,3 +96,31 @@ test("字典：每一個鍵中英都有；資料裡沒有佔位字", () => {
   assert.equal(t("countPeople", "en", { n: 5 }), "5 people");
   assert.ok(!fs.readFileSync("island/teams.json", "utf8").includes("【待補"));
 });
+
+test("跟官網接起來：活動照 team 字樣對到島、報名開著才給 /apply/ 連結、過期的不列；校友照 title 走去以前的 team，真校友進來 sample 的就讓位", () => {
+  assert.equal(D.teamIdFor("Curriculum Team"), "curriculum");
+  assert.equal(D.teamIdFor("Community Relations"), "cr");
+  assert.equal(D.teamIdFor("CR"), "cr");
+  assert.equal(D.teamIdFor("whatever"), "commons");
+  const soon = new Date(Date.now() + 864e5 * 30).toISOString(), gone = new Date(Date.now() - 864e5 * 30).toISOString();
+  const evs = D.normalizeEvents([
+    { slug: "camp-2027", team: "Curriculum Team", title_zh: "探索營", starts_at: soon, form_id: "f1", signup_open: true, capacity: 80, signed_up: 10 },
+    { slug: "old", team: "Curriculum Team", title_zh: "舊的", starts_at: gone, ends_at: gone, form_id: "f0", signup_open: true },
+    { slug: "talk", team: "CR", title_zh: "講座", starts_at: soon },
+  ]);
+  assert.deepEqual(evs.map(e => e.slug), ["camp-2027", "talk"]);
+  assert.equal(evs[0].state, "open"); assert.equal(evs[0].link, "../apply/?f=f1");
+  assert.equal(evs[1].state, "info"); assert.equal(evs[1].link, "../events/#talk");
+  assert.equal(D.eventsOf(evs, "curriculum").length, 1);
+  const al = D.alumniToPeople([{ id: "x1", name: "某校友", title: "Director, Curriculum Team · 2025-26", quote: "一句話", city: "Madison", country_en: "USA" }, { id: "x2", name: "另一位", title: "" }, { name: "" }]);
+  assert.equal(al.length, 2);
+  assert.equal(al[0].team, "airport"); assert.equal(al[0].goes, "curriculum"); assert.equal(al[0].flow.carry_zh, "Director"); assert.equal(al[0].named, true); assert.equal(al[0].where, "Madison, USA");
+  assert.equal(al[1].goes, "commons");
+  const d2 = D.normalize(JSON.parse(fs.readFileSync("island/teams.json", "utf8")));
+  D.mergeAlumni(d2, al);
+  const airport = d2.teams.find(tm => tm.id === "airport");
+  assert.equal(airport.people.filter(p => p.role === "alumni").length, 2);
+  assert.equal(airport.people.filter(p => p.role === "student").length, 2);
+  const card = UI.teamCardHTML(d2.teams[2], "zh", { ...d2, events: evs });
+  assert.ok(card.includes("報名中") && card.includes('href="../apply/?f=f1"'));
+});

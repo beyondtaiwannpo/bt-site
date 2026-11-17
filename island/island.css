@@ -12,7 +12,8 @@ html[data-lang="zh"] .en,html[data-lang="en"] .zh{display:none}
 .stage{position:fixed;inset:0;z-index:0}
 .scene3d{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .pins{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
-.pin{position:absolute;left:0;top:0;pointer-events:auto;white-space:nowrap;max-width:min(240px,60vw);overflow:hidden;text-overflow:ellipsis;
+/* 牌子每一幀都在動：will-change 讓瀏覽器把它放到自己的圖層，contain 讓它的移動不牽動別人的排版（2026-11-16 實測：48 塊牌子開著從 60 fps 掉到 30，就是這裡）。 */
+.pin{position:absolute;left:0;top:0;pointer-events:auto;white-space:nowrap;will-change:transform;contain:layout paint;backface-visibility:hidden;
   padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--bt-navy);border:1px solid rgba(16,42,134,.14);cursor:pointer;
   box-shadow:0 6px 18px rgba(16,42,134,.14);font:600 12.5px/1.2 var(--body);transition:opacity var(--dur-2) var(--ease),background var(--dur-2) var(--ease)}
 .pin::after{content:"";position:absolute;left:50%;bottom:-5px;width:9px;height:9px;transform:translateX(-50%) rotate(45deg);background:inherit;border-right:1px solid rgba(16,42,134,.14);border-bottom:1px solid rgba(16,42,134,.14)}
@@ -112,6 +113,14 @@ html[data-lang="zh"] .card-sub{font-family:var(--body);font-weight:600;letter-sp
 .lnk-team{font:700 12.5px/1.2 var(--display);letter-spacing:.06em}
 html[data-lang="zh"] .lnk-team{font-family:var(--body);font-weight:700;letter-spacing:0;font-size:13px}
 .lnk-why{font-size:12.5px;color:rgba(16,42,134,.78)}
+.evs{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:6px}
+.ev{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border:1px solid rgba(16,42,134,.14);border-radius:12px;background:rgba(255,255,255,.6);color:var(--ink);text-decoration:none}
+.ev.on{border-color:var(--bt-orange);background:rgba(255,232,197,.6)}
+.ev:hover{border-color:var(--bt-navy)}
+.ev-name{font-weight:600;font-size:14px}
+.ev-meta{font-size:12px;color:rgba(16,42,134,.7)}
+.pin-event{background:var(--bt-orange);border-color:transparent;font-weight:700}
+.pin-team .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bt-orange);margin-left:6px;vertical-align:middle}
 .pp-dot.r-alumni{background:var(--bt-sand);border:1px solid rgba(16,42,134,.3)}.pp-dot.r-student{background:var(--bt-cream);border:1px solid rgba(16,42,134,.3)}
 .card-note a{color:var(--bt-navy)}
 .card-link{display:inline-block;margin-top:6px;padding:10px 16px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;font:700 13px/1 var(--display);letter-spacing:.08em}

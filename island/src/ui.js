@@ -1,6 +1,6 @@
 // /island/ 畫面的純函式：吃資料與語言，吐 HTML 字串。不碰 DOM。
 import { t } from "./strings.js";
-import { label, connectionsOf, visitorsOf, teamById } from "./data.js";
+import { label, connectionsOf, visitorsOf, teamById, eventsOf } from "./data.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const L = (o, k, lang) => esc(o[k + "_" + lang] || o[k + "_zh"] || "");
@@ -17,6 +17,11 @@ export function indexHTML(d, lang, selected) {
 }
 
 // ── 左邊的卡：一座島 ──
+const evKey = st => ({ open: "evOpen", soon: "evSoon", full: "evFull", closed: "evClosed", info: "evInfo" }[st] || "evInfo");
+export function eventsHTML(events, lang) {
+  if (!events.length) return "";
+  return `<h3 class="card-sub">${esc(t("events", lang))}</h3><ul class="evs">${events.map(e => `<li><a class="ev${e.state === "open" ? " on" : ""}" href="${esc(e.link)}"><span class="ev-name">${L(e, "title", lang)}</span><span class="ev-meta">${esc(e.starts_at ? e.starts_at.slice(0, 10) : "")} · ${esc(t(evKey(e.state), lang))}</span></a></li>`).join("")}</ul><p class="card-note">${esc(t("evNote", lang))}</p>`;
+}
 export function teamCardHTML(tm, lang, d) {
   const lead = tm.lead ? `<p class="card-lead">${esc(t("leadBy", lang))}</p>` : "";
   const programs = tm.programs.map(p => `<li><button type="button" class="prog" data-go-program="${p.id}" data-team="${tm.id}"><span class="prog-name">${L(p, "name", lang)}</span><span class="prog-line">${L(p, "line", lang)}</span></button></li>`).join("");
@@ -25,9 +30,10 @@ export function teamCardHTML(tm, lang, d) {
   const works = links.length ? `<h3 class="card-sub">${esc(t("worksWith", lang))}</h3><ul class="links">${links.map(c => { const o = teamById(d, c.team); return o ? `<li><button type="button" class="lnk" data-go-team="${o.id}"><span class="lnk-team c-${o.colour}">${L(o, "name", lang)}</span><span class="lnk-why">${L(c, "why", lang)}</span></button></li>` : ""; }).join("")}</ul>` : "";
   const vis = d ? visitorsOf(d, tm.id) : [];
   const visitors = vis.length ? `<h3 class="card-sub">${esc(t("visitors", lang))}</h3><ul class="pps">${vis.map(p => `<li><button type="button" class="pp" data-go-person="${p.code}"><span class="pp-dot r-${p.role}"></span>${esc(label(p, lang))}</button></li>`).join("")}</ul>` : "";
-  const note = tm.id === "airport" ? t("sampleNote", lang) : t("namesNote", lang);
+  const note = tm.id === "airport" ? (tm.people.some(p => p.db) ? t("alumniDb", lang) : t("sampleNote", lang)) : t("namesNote", lang);
   return `<div class="card-head"><span class="card-kicker c-${tm.colour}">${esc(t("indexHead", lang))}</span><h2 class="card-h">${L(tm, "name", lang)}</h2><p class="card-tag">${L(tm, "tagline", lang)}</p></div>
     ${lead}<p class="card-about">${L(tm, "about", lang)}</p>
+    ${eventsHTML(d && d.events ? eventsOf(d.events, tm.id) : [], lang)}
     <h3 class="card-sub">${esc(t("programs", lang))}</h3><ul class="progs">${programs}</ul>
     ${works}
     ${tm.people.length ? `<h3 class="card-sub">${esc(t(tm.id === "airport" ? "landed" : "people", lang))} <span class="card-n">${esc(t("countPeople", lang, { n: tm.people.length }))}</span></h3><ul class="pps">${people}</ul>` : ""}
@@ -48,7 +54,8 @@ export function personCardHTML(p, tm, lang, d) {
   const links = also || flow ? `<ul class="links">${also}${flow}</ul>` : "";
   return `<div class="card-head"><button type="button" class="card-back" data-go-team="${tm.id}">${L(tm, "name", lang)}</button><h2 class="card-h">${esc(label(p, lang))}</h2><p class="card-tag">${esc(t(roleKey(p.role), lang))}</p></div>
     ${line}<p class="card-about">${L(tm, "tagline", lang)}</p>${links}
-    <p class="card-note">${esc(p.sample ? t("sampleNote", lang) : t("namesNote", lang))}</p>`;
+    ${p.where ? `<p class="card-lead">${esc(p.where)}</p>` : ""}
+    <p class="card-note">${esc(p.db ? t("alumniDb", lang) : p.sample ? t("sampleNote", lang) : t("namesNote", lang))}</p>`;
 }
 // ── 把自己放上去 ──
 export function meFormHTML(d, lang, me) {

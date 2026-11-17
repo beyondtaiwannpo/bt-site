@@ -78,3 +78,68 @@ export function normalizeMe(raw, teams) {
   return { name, team, shirt, hair };
 }
 export async function load(base) { const r = await fetch((base || "./") + "teams.json"); return normalize(await r.json()); }
+
+// ── 跟官網其他頁接起來（2026-11-16 Paul：「I want them to be connected」）──
+// 活動：/events/ 讀的 public_events() 同一份。每一場有 team（例如 "Curriculum Team"），對到這裡的島。
+// 報名開著的活動在島上掛一塊「報名中」的牌子，卡上列出來，按了到 /apply/?f=表單 或 /events/#代號。
+export function teamIdFor(teamText) {
+  const t = String(teamText || "").toLowerCase();
+  if (/community|\bcr\b/.test(t)) return "cr";
+  for (const id of ["sponsorship", "curriculum", "internship", "mentorship", "marketing"]) if (t.includes(id)) return id;
+  return "commons";   // 認不出 team 的活動當成全 BT 的，掛在聚會所
+}
+export function eventState(e) {
+  const now = Date.now();
+  if (e.ends_at ? new Date(e.ends_at) < now : (e.starts_at && new Date(e.starts_at) < now - 864e5)) return "ended";
+  if (!e.form_id) return "info";
+  if (e.capacity && e.signed_up >= e.capacity) return "full";
+  if (e.signup_open) return "open";
+  if (e.signup_opens_at && new Date(e.signup_opens_at) > now) return "soon";
+  return "closed";
+}
+export function normalizeEvents(rows) {
+  return (Array.isArray(rows) ? rows : []).filter(e => e && str(e.slug)).map(e => ({
+    slug: str(e.slug), team: teamIdFor(e.team), title_zh: str(e.title_zh) || str(e.title_en), title_en: str(e.title_en) || str(e.title_zh),
+    starts_at: str(e.starts_at), ends_at: str(e.ends_at), form_id: str(e.form_id), state: eventState(e),
+    link: e.form_id && eventState(e) === "open" ? "../apply/?f=" + encodeURIComponent(str(e.form_id)) : "../events/#" + encodeURIComponent(str(e.slug)),
+  })).filter(e => e.state !== "ended").sort((a, b) => (a.starts_at || "").localeCompare(b.starts_at || ""));
+}
+export const eventsOf = (events, teamId) => (events || []).filter(e => e.team === teamId);
+
+// 校友：/alumni/ 讀的 public_alumni() 同一份（校友自己填、自己勾同意、Co-President 核可才會在裡面）。
+// title 是他最後一屆在 BT 的職位（例如 "Director, Curriculum Team · 2025-26"），用它決定他走去哪座島、帶著什麼。
+// 沒有 title 的走去聚會所。這些人住在機場。真的校友進來之後，teams.json 裡 sample 的那幾筆就不顯示。
+export function alumniToPeople(rows) {
+  const out = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || !str(r.name)) continue;
+    const title = str(r.title), team = title ? teamIdFor(title) : "commons";
+    const role = (title.match(/^(Co-President|Director|Advisor|Associate|Speaker|Mentor|Intern|Ambassador)/i) || [, ""])[1];
+    out.push({ code: "db-" + str(r.id || r.name), team: "airport", role: "alumni", named: true, sample: false, db: true,
+      title_zh: "校友", title_en: "Alumni", name_zh: str(r.name), name_en: str(r.name),
+      line_zh: str(r.quote), line_en: str(r.quote_en) || str(r.quote), also: [],
+      flow: { to: team, carry_zh: role || "回來", carry_en: role || "Back", why_zh: title ? `最後一屆在 BT 是 ${title}。` : "回來看看。", why_en: title ? `Last BT role: ${title}.` : "Back for a visit." },
+      goes: team, where: [str(r.city), str(r.country_en) || str(r.country)].filter(Boolean).join(", ") });
+  }
+  return out;
+}
+// 真的校友進來：換掉機場上 sample 的那幾筆（學員的 sample 留著，他們不是從校友名單來的）。
+export function mergeAlumni(d, dbPeople) {
+  if (!dbPeople.length) return d;
+  const airport = d.teams.find(tm => tm.id === "airport"); if (!airport) return d;
+  const keep = p => !(p.role === "alumni" && p.sample);
+  d.people = d.people.filter(keep).concat(dbPeople); airport.people = airport.people.filter(keep).concat(dbPeople);
+  return d;
+}
+async function rpc(name, timeoutMs) {
+  const cfg = await import("../../shared/supabase-config.js");
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeoutMs || 4000);
+  try {
+    const r = await fetch(`${cfg.SUPABASE_URL}/rest/v1/rpc/${name}`, { method: "POST", signal: ctl.signal, headers: { apikey: cfg.SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${cfg.SUPABASE_PUBLISHABLE_KEY}`, "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+// 兩份都是「拿不到就當沒有」：島照樣畫，只是沒有活動與真校友。
+export const loadEvents = () => rpc("public_events").then(normalizeEvents).catch(() => []);
+export const loadAlumni = () => rpc("public_alumni").then(alumniToPeople).catch(() => []);

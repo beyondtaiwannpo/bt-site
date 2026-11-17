@@ -60,7 +60,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     team: Object.fromEntries(Object.entries(P.team).map(([k, c]) => [k, std(c)])) };
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(phone ? 1.25 : 1.6, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(Math.min(phone ? 1.25 : 1.5, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
   const scene = new THREE.Scene(); scene.background = P.sky.clone(); scene.fog = new THREE.Fog(P.sky.clone(), 170, 380);
@@ -78,7 +78,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), M.water); sea.rotation.x = -Math.PI / 2; sea.position.y = -0.6; sea.receiveShadow = true; world.add(sea);
 
   // ═══ 七座島 ═══
-  const islands = L.islands(); const isleObjs = new Map(); const blockersOf = new Map();
+  const islands = L.islands(); const isleObjs = new Map(); const blockersOf = new Map(); const treePlaces = [];
   const pickables = [];   // 射線打得到的東西：{ obj, sel }
   for (const isl of islands) {
     const tm = data.teams.find(x => x.id === isl.id); if (!tm) continue;
@@ -109,17 +109,24 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       b.traverse(o => { if (o.isMesh) { o.userData.sel = { kind: "program", team: tm.id, program: p.id }; pickables.push(o); } });
       const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-prog"; pin.dataset.goProgram = p.id; pin.dataset.team = tm.id; pin.hidden = true; pins.appendChild(pin);
       b.userData.pin = pin; b.userData.program = p; });
-    // 樹與花（機場沒有）
+    // 樹（機場沒有）：位置先記下來，所有島的樹最後一次畫完（InstancedMesh）。
     for (let i = 0; i < (isl.sea ? 0 : (phone ? 5 : 8)); i++) { const a = rnd() * TAU, d = isl.r * (0.45 + rnd() * 0.4); const x = Math.cos(a) * d, z = Math.sin(a) * d; if (blockers.some(bk => Math.hypot(x - bk.x, z - bk.z) < 2.6)) continue;
-      const sc_ = 0.55 + rnd() * 0.45; const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.8, 6), M.trunk); tr.position.set(x, 0.4 * sc_, z); tr.scale.setScalar(sc_); g.add(tr);
-      const cr = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 9), M.tree[i % 3]); cr.position.set(x, 1.35 * sc_, z); cr.scale.setScalar(sc_); cr.castShadow = true; g.add(cr); blockers.push({ x, z }); }
+      treePlaces.push([isl.x + x, isl.z + z, 0.55 + rnd() * 0.45, i % 3]); blockers.push({ x, z }); }
     // 島名的牌子（HTML）
     const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-team c-" + tm.colour; pin.dataset.goTeam = tm.id; pins.appendChild(pin);
     isleObjs.set(isl.id, { isl, tm, g, pin, flag, buildings: g.children.filter(c => c.userData.program) }); blockersOf.set(isl.id, blockers);
   }
-  // 橋：中間到每一座。
+  { const m = new THREE.Matrix4(), s3 = new THREE.Vector3(), q = new THREE.Quaternion();
+    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.16, 0.8, 6), M.trunk, treePlaces.length);
+    const crowns = [0, 1, 2].map(k => new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 12, 9), M.tree[k], treePlaces.length));
+    const none = new THREE.Matrix4().makeScale(0.001, 0.001, 0.001);
+    treePlaces.forEach(([x, z, sc_, k], i) => { s3.setScalar(sc_); m.compose(new THREE.Vector3(x, 0.4 * sc_, z), q, s3); trunks.setMatrixAt(i, m); crowns.forEach((c, kk) => { if (kk === k) { m.compose(new THREE.Vector3(x, 1.35 * sc_, z), q, s3); c.setMatrixAt(i, m); } else c.setMatrixAt(i, none); }); });
+    trunks.instanceMatrix.needsUpdate = true; world.add(trunks); crowns.forEach(c => { c.instanceMatrix.needsUpdate = true; c.castShadow = true; world.add(c); }); }
+  // 橋：中間到每一座。欄杆的柱子一次畫完（InstancedMesh）。
+  const postPlaces = [];
   for (const br of L.bridges()) { const dx = br.x1 - br.x0, dz = br.z1 - br.z0, len = Math.hypot(dx, dz); const b = new THREE.Mesh(rbox(len, 0.28, 2.2, 0.08), M.wood); b.position.set((br.x0 + br.x1) / 2, 0.1, (br.z0 + br.z1) / 2); b.rotation.y = -Math.atan2(dz, dx); b.castShadow = true; b.receiveShadow = true; world.add(b);
-    for (let s = 2; s < len - 1; s += 3) for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), M.dark); const tt = s / len; post.position.set(br.x0 + dx * tt + (-dz / len) * side * 1.0, 0.5, br.z0 + dz * tt + (dx / len) * side * 1.0); world.add(post); } }
+    for (let s = 2; s < len - 1; s += 3) for (const side of [-1, 1]) { const tt = s / len; postPlaces.push([br.x0 + dx * tt + (-dz / len) * side * 1.0, 0.5, br.z0 + dz * tt + (dx / len) * side * 1.0]); } }
+  { const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), M.dark, postPlaces.length); const m = new THREE.Matrix4(); postPlaces.forEach((pp, i) => { m.makeTranslation(pp[0], pp[1], pp[2]); im.setMatrixAt(i, m); }); im.instanceMatrix.needsUpdate = true; world.add(im); }
   // 協作線：島跟島之間一條拱起來的細管（橘色），全景時收起，開了「協作線」或選了那座島才亮。
   const lines = [];
   for (const c of data.connections || []) {
@@ -185,8 +192,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     if (o.bag) { const bg = new THREE.Mesh(PG.bag, M.navy); bg.position.set(0.42, 0.21, 0); g.add(bg); }
     if (o.hat) { const h = new THREE.Mesh(PG.hat, M.navy); h.position.y = 1.5; g.add(h); }
     const sh = new THREE.Mesh(PG.shadow, shadowMat); sh.position.y = 0.02; g.add(sh);
-    g.traverse(m => { if (m.isMesh && m !== sh) m.castShadow = true; });
-    g.userData = { phase: rnd() * 6, moving: false, baseY: 0 };
+    g.userData = { phase: rnd() * 6, moving: false, baseY: 0 };   // 人不投影：陰影貼圖是靜的，走動的人用腳下那一圈就好
     return g;
   }
   function pose(g, t) {
@@ -257,11 +263,17 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   function setHover(sel) { const key = sel ? JSON.stringify(sel) : ""; if (key === (hoverSel ? JSON.stringify(hoverSel) : "")) return; hoverSel = sel; canvas.style.cursor = sel ? "pointer" : ""; if (onHover) onHover(sel); }
   const v3 = new THREE.Vector3();
   function project(x, y, z) { v3.set(x, y, z).project(camera); const w = stage.clientWidth, h = stage.clientHeight; return { x: (v3.x + 1) / 2 * w, y: (1 - v3.y) / 2 * h, visible: v3.z < 1 && Math.abs(v3.x) < 1.2 && Math.abs(v3.y) < 1.2 }; }
-  function putPin(pin, p, dy) { if (!p.visible) { pin.style.opacity = 0; return; } pin.style.opacity = 1; pin.style.transform = `translate(-50%,-100%) translate(${p.x.toFixed(1)}px,${(p.y + (dy || 0)).toFixed(1)}px)`; }
+  function putPin(pin, p, dy) {
+    if (!p.visible) { if (pin.dataset.v !== "0") { pin.style.opacity = 0; pin.dataset.v = "0"; } return; }
+    const x = Math.round(p.x * 2) / 2, y = Math.round((p.y + (dy || 0)) * 2) / 2;
+    if (pin.dataset.v === "1" && Math.abs(x - (+pin.dataset.x || 0)) < 0.5 && Math.abs(y - (+pin.dataset.y || 0)) < 0.5) return;
+    pin.dataset.v = "1"; pin.dataset.x = x; pin.dataset.y = y; pin.style.opacity = 1;
+    pin.style.transform = `translate(-50%,-100%) translate3d(${x}px,${y}px,0)`;
+  }
   const show = { names: false, selectedTeam: "", flows: false };
   function paintLines() { for (const l of lines) l.mesh.visible = show.flows || (!!show.selectedTeam && (l.a === show.selectedTeam || l.b === show.selectedTeam)); }
   function placePins() {
-    for (const o of isleObjs.values()) { putPin(o.pin, project(o.isl.x, 7.2, o.isl.z)); for (const b of o.buildings) { b.userData.pin.hidden = show.selectedTeam !== o.isl.id; if (!b.userData.pin.hidden) putPin(b.userData.pin, project(o.isl.x + b.position.x, 4.4, o.isl.z + b.position.z)); } }
+    for (const o of isleObjs.values()) { putPin(o.pin, project(o.isl.x, 7.2, o.isl.z)); if (o.evPin) putPin(o.evPin, project(o.isl.x, 7.2, o.isl.z), 34); for (const b of o.buildings) { b.userData.pin.hidden = show.selectedTeam !== o.isl.id; if (!b.userData.pin.hidden) putPin(b.userData.pin, project(o.isl.x + b.position.x, 4.4, o.isl.z + b.position.z)); } }
     for (const w of walkers) { const on = show.names || w.me || show.selectedTeam === w.person.team; w.pin.hidden = !on; if (on) putPin(w.pin, project(w.g.position.x, 2.0, w.g.position.z)); }
   }
   function resize() { const w = stage.clientWidth || 300, h = stage.clientHeight || 200; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
@@ -302,6 +314,18 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       const w = addWalker({ code: "me", team: info.team, role: "associate" }, { me: true, shirt: info.shirt, hair: info.hair, skin: 1 });
       w.pin.textContent = info.label || info.name; if (!motionOn) render(0); return w;
     },
+    // 報名開著的活動：那座島上多一塊橘色的「報名中」牌子，按了直接去報名。
+    events(list) {
+      for (const o of isleObjs.values()) { if (o.evPin) { o.evPin.remove(); o.evPin = null; } }
+      for (const e of list || []) { const o = isleObjs.get(e.team); if (!o || o.evPin) continue; const a = document.createElement("a"); a.className = "pin pin-event"; a.href = e.link; a.textContent = e.title; pins.appendChild(a); o.evPin = a; }
+      placePins();
+    },
+    // 人換了一批（真的校友從資料庫來）：拿掉 sample 的校友、加新的。
+    people(list) {
+      for (const w of walkers.slice()) if (w.person.role === "alumni" && !list.some(p => p.code === w.person.code)) removeWalker(w);
+      for (const p of list) if (!walkers.some(w => w.person.code === p.code)) addWalker(p);
+      if (!motionOn) render(0);
+    },
     render: () => render(0),
     motion() { motionOn = true; return motion({ cam, placeCam, render, walkers, clouds, pose, blockersOf, rnd }); },
   };
@@ -315,7 +339,7 @@ function motion({ cam, placeCam, render, walkers, clouds, pose, blockersOf, rnd 
   function tick() {
     raf = requestAnimationFrame(tick);
     const now = performance.now() / 1000, dt = Math.min(0.2, now - last); last = now; if (document.hidden) return;
-    const k = 1 - Math.exp(-dt * 2.6); cam.pos.lerp(cam.goalPos, k); cam.tgt.lerp(cam.goalTgt, k); placeCam();
+    const k = 1 - Math.exp(-dt * 3.4); cam.pos.lerp(cam.goalPos, k); cam.tgt.lerp(cam.goalTgt, k); placeCam();
     if (!paused) {
       t += dt;
       for (const w of walkers) {
