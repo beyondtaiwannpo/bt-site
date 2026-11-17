@@ -2,7 +2,7 @@
 import { TEAM_ORDER } from "./layout.js";
 const str = v => (typeof v === "string" ? v : "");
 export const COLOURS = ["orange", "teal", "navy", "yellow", "sand", "cream", "grey"];
-export const KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower", "airport", "camp"];
+export const KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower", "airport", "camp", "school", "studio", "stage"];
 export const ROLES = ["copresident", "director", "advisor", "associate", "alumni", "student"];
 
 export function normalize(raw) {
@@ -166,3 +166,15 @@ async function rpc(name, timeoutMs) {
 // 兩份都是「拿不到就當沒有」：島照樣畫，只是沒有活動與真校友。
 export const loadEvents = () => rpc("public_events").then(normalizeEvents).catch(() => []);
 export const loadAlumni = () => rpc("public_alumni").then(alumniToPeople).catch(() => []);
+
+// ── Marketing 的貼文牆（Paul 2026-11-17：「get a few posts from our Instagram and put it up there」）──
+// instagram.json 是 Marketing 自己貼的連結清單（抓 Instagram 要 token 與外站程式，這個 repo 不做）。
+// 只收 https://www.instagram.com/ 開頭的連結；壞的一筆丟掉，整份拿不到就當沒有。
+export function normalizePosts(raw) {
+  const posts = raw && Array.isArray(raw.posts) ? raw.posts : [];
+  return { handle: str(raw && raw.handle).replace(/^@/, ""), profile: /^https:\/\/www\.instagram\.com\//.test(str(raw && raw.profile)) ? str(raw.profile) : "",
+    posts: posts.filter(x => x && /^https:\/\/www\.instagram\.com\/[A-Za-z0-9_./-]+$/.test(str(x.url))).map(x => ({
+      url: str(x.url), kind: x.kind === "reel" ? "reel" : "post", date: str(x.date).slice(0, 10),
+      caption_zh: str(x.caption_zh) || str(x.caption_en), caption_en: str(x.caption_en) || str(x.caption_zh) })).slice(0, 12) };
+}
+export const loadPosts = base => fetch((base || "./") + "instagram.json").then(r => r.json()).then(normalizePosts).catch(() => normalizePosts(null));

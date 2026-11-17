@@ -11,7 +11,7 @@
     "    tagline_zh/en 一句話。about_zh/en 兩三句。",
     "    colour     島的主色，只能是 orange teal navy yellow sand cream grey 之一（品牌七色）。",
     "               role 也可以是 alumni（校友）或 student（學員）：他們住在機場，flow 寫他們要走去哪座島。",
-    "    programs[] 這個 team 在做的事。id、name、line（一句話）、detail（兩三句，數字只用事實資料庫有的）、link（官網的頁，可留空）、kind（畫成什麼：hall tent booth desk home post pier tower）。",
+    "    programs[] 這個 team 在做的事。id、name、line（一句話）、detail（兩三句，數字只用事實資料庫有的）、link（官網的頁，可留空）、kind（畫成什麼：hall tent booth desk home post pier tower camp airport school studio stage）。",
     "  connections[] 島跟島怎麼連：a、b 是 team id，why_zh/en 一句話。畫面上是一條線，卡上是一列。",
     "  people[]     一人一筆。code 不重複；team 是他住的那座島；role 是 copresident director advisor associate alumni；named 預設 false；title_zh/en 是角色名。",
     "               also[]   他也參與的另一座島：{ team, role, why_zh/en }。他會不時走過去，卡上列出來。",
@@ -159,7 +159,7 @@
       "programs": [
         {
           "id": "hs-internship",
-          "kind": "booth",
+          "kind": "school",
           "name_zh": "高中生實習計劃",
           "name_en": "High school internship",
           "line_zh": "每學期收一批，從官網報名。",
@@ -218,7 +218,7 @@
       "programs": [
         {
           "id": "instagram",
-          "kind": "booth",
+          "kind": "studio",
           "name_zh": "Instagram @beyondtaiwan",
           "name_en": "Instagram @beyondtaiwan",
           "line_zh": "每一場活動都先在這裡公布。",
@@ -253,7 +253,7 @@
       "programs": [
         {
           "id": "school-talks",
-          "kind": "hall",
+          "kind": "stage",
           "name_zh": "校園講座",
           "name_en": "School talks",
           "line_zh": "學長姐回自己的高中講怎麼申請。",

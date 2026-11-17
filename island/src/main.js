@@ -41,7 +41,7 @@ function renderCard() {
   const card = $("card"), body = $("card-content");
   if (!sel || !data) { card.hidden = true; body.innerHTML = ""; return; }
   if (sel.kind === "team") { const tm = D.teamById(data, sel.team); if (!tm) return close(); body.innerHTML = UI.teamCardHTML(tm, lang, data); }
-  else if (sel.kind === "program") { const p = D.programById(data, sel.program), tm = p && D.teamById(data, p.team); if (!p) return close(); body.innerHTML = UI.programCardHTML(p, tm, lang); }
+  else if (sel.kind === "program") { const p = D.programById(data, sel.program), tm = p && D.teamById(data, p.team); if (!p) return close(); body.innerHTML = UI.programCardHTML(p, tm, lang, data); }
   else if (sel.kind === "person") { const p = D.personByCode(data, sel.code); if (!p) return close(); body.innerHTML = UI.personCardHTML(p, D.teamById(data, p.team), lang, data); }
   card.hidden = false; card.scrollTop = 0;
 }
@@ -128,7 +128,8 @@ async function boot() {
   pushLabels();
   if (start.kind !== "overview") select(start, true);
   // 跟官網其他頁接起來：活動（/events/ 那一份）與真的校友（/alumni/ 那一份）。拿不到就當沒有。
-  const [events, alumni] = await Promise.all([D.loadEvents(), D.loadAlumni()]);
+  const [events, alumni, instagram] = await Promise.all([D.loadEvents(), D.loadAlumni(), D.loadPosts("./")]);
+  data.instagram = instagram; if (sel && sel.kind === "program") renderCard();
   data.events = events;
   if (alumni.length) { D.mergeAlumni(data, alumni); if (scene) scene.people(data.people); }
   if (scene) scene.events(events.filter(e => e.state === "open").map(e => ({ team: e.team, title: e["title_" + lang] || e.title_zh, link: e.link })));

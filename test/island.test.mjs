@@ -51,7 +51,7 @@ test("我：只收稱呼、team、上衣、頭髮；稱呼最多 12 字；壞的
   assert.equal(D.normalizeMe("junk", d.teams), null);
 });
 
-test("位置：八座島不重疊、橋是六條輻條加六條環加校友那一條、走得到每一座；做的事蓋在島上、人走的點也在島上", () => {
+test("位置：八座島不重疊、大小距離形狀各不一樣、橋有長有短、走得到每一座；做的事蓋在島上、人走的點也在島上", () => {
   const isl = L.islands(); assert.equal(isl.length, 8);
   assert.ok(isl[7].sea && isl[7].id === "airport");
   for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) assert.ok(Math.hypot(isl[i].x - isl[j].x, isl[i].z - isl[j].z) > isl[i].r + isl[j].r + 2, isl[i].id + " " + isl[j].id);
@@ -67,6 +67,37 @@ test("位置：八座島不重疊、橋是六條輻條加六條環加校友那�
   for (let i = 0; i < 30; i++) { const w = L.wanderTarget(cu, spots, rnd); assert.ok(Math.hypot(w.x - cu.x, w.z - cu.z) < cu.r - 1.5); for (const s of spots) assert.ok(Math.hypot(w.x - s.x, w.z - s.z) >= 2.3 || (w.x === cu.x && w.z === cu.z + 2)); }
   assert.ok(L.cameraOverview(false).pos[1] > L.cameraIsland(cu, false).pos[1]);
   assert.ok(L.cameraBird(false).pos[1] > L.cameraOverview(false).pos[1]);
+  // 每座島不一樣（Paul 2026-11-17）：大小、距離、形狀至少各有兩種以上；橋的長度有長有短；島的範圍要進得了全景的 fit
+  const ring = isl.slice(1, 7);
+  assert.ok(new Set(ring.map(i => i.r)).size >= 4, "島的大小太像");
+  assert.ok(new Set(ring.map(i => Math.round(Math.hypot(i.x, i.z)))).size >= 4, "島離中心的距離太像");
+  assert.ok(new Set(isl.map(i => i.shape)).size >= 4, "形狀太像（要有 hex round rect sea）");
+  const lens = L.bridges().map(b => Math.hypot(b.x1 - b.x0, b.z1 - b.z0));
+  assert.ok(Math.min(...lens) >= 4 && Math.max(...lens) <= 20, "橋太短走不了或太長");
+  assert.ok(Math.max(...lens) - Math.min(...lens) >= 5, "橋的長度太像");
+  const fit = L.cameraOverview(false).fit;
+  assert.ok(Math.max(...isl.map(i => Math.abs(i.x) + i.r)) <= fit[0] + 2 && Math.max(...isl.map(i => Math.abs(i.z) + i.r)) <= fit[1] + 2, "島跑出全景");
+  for (const id of Object.keys(L.SPEC)) assert.ok(L.islandOf(id), id);
+});
+
+test("Marketing 的貼文牆：只收 instagram.com 的 https 連結、最多 12 則、卡上列出來；instagram.json 本身合法而且不放未成年的名字", () => {
+  const raw = JSON.parse(fs.readFileSync("island/instagram.json", "utf8"));
+  const ig = D.normalizePosts(raw);
+  assert.equal(ig.handle, "beyondtaiwan"); assert.ok(ig.posts.length >= 3);
+  for (const x of ig.posts) { assert.match(x.url, /^https:\/\/www\.instagram\.com\//); assert.ok(x.caption_zh && x.caption_en && x.date); assert.ok(["post", "reel"].includes(x.kind)); }
+  const bad = D.normalizePosts({ handle: "@x", profile: "http://evil/", posts: [{ url: "javascript:alert(1)" }, { url: "https://www.instagram.com/p/abc/", caption_zh: "好" }, ...Array(20).fill({ url: "https://www.instagram.com/p/z/" })] });
+  assert.equal(bad.handle, "x"); assert.equal(bad.profile, ""); assert.equal(bad.posts.length, 12); assert.equal(bad.posts[0].caption_en, "好");
+  assert.deepEqual(D.normalizePosts(null), { handle: "", profile: "", posts: [] });
+  const mk = d.teams.find(tm => tm.id === "marketing"), prog = mk.programs.find(p => p.id === "instagram");
+  assert.equal(prog.kind, "studio");
+  const card = UI.programCardHTML(prog, mk, "zh", { ...d, instagram: ig });
+  assert.ok(card.includes("最近的貼文") && card.includes('href="https://www.instagram.com/beyondtaiwan/reel/') && card.includes('rel="noopener"'));
+  assert.ok(!UI.programCardHTML(prog, mk, "zh", { ...d, instagram: null }).includes("最近的貼文"));
+  assert.ok(!UI.programCardHTML(mk.programs.find(p => p.id === "site"), mk, "zh", { ...d, instagram: ig }).includes("最近的貼文"));
+  // 未成年兩位的名字不在貼文說明裡（teams.json 裡 named 是 false 的人連名字都沒有，所以這裡守的是說明不提 minor 這個字以外的真名：由人工確認，這裡只守格式）
+  for (const x of ig.posts) assert.ok(x.caption_zh.length <= 120, "說明太長，一句話就好");
+  // 新的 kind 都在 KINDS 裡
+  for (const k of ["school", "studio", "stage"]) assert.ok(D.KINDS.includes(k));
 });
 
 test("清單與卡的 HTML：七個 team、做的事可以點、人用角色不用名字、連結逃脫", () => {

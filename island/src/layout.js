@@ -1,18 +1,32 @@
 // /island/ 的位置：七座島在哪、每座島上做的事蓋在哪、人站哪。純數學，沒有 DOM、沒有 Three。測試直接算。
 // 單位公尺，y 朝上。中間是 Co-President 那座，六個 team 繞一圈。每座島是一個六邊形的平台（跟 HEART 政策島一樣用六邊形）。
 export const TAU = Math.PI * 2;
-export const ISLAND_R = 9.5;       // 六邊形外接圓半徑
-export const CENTER_R = 8.5;       // 中間那座小一點
-export const RING_R = 28;          // 外圍六座的圓心離中心多遠
+export const ISLAND_R = 9.5;       // 預設的六邊形外接圓半徑（沒寫在 SPEC 裡的島用它）
+export const CENTER_R = 8.5;
+export const RING_R = 28;          // 預設的距離（沒寫在 SPEC 裡的島用它）
 export const TEAM_ORDER = ["commons", "sponsorship", "curriculum", "internship", "mentorship", "marketing", "cr", "airport"];
 export const RING = TEAM_ORDER.slice(1, 7);   // 外圍六座的順序
-export const AIRPORT_R = 56, AIRPORT_ANGLE = 0;             // 機場在海上、最右邊，接 Marketing 與 Community Relations
+export const AIRPORT_R = 54, AIRPORT_ANGLE = 0;             // 機場在海上、最右邊，接 Marketing 與 Community Relations
+// 每座島長得不一樣（Paul 2026-11-17：「I want each island to be different」）：
+// 大小（r）、離中心多遠（dist）、角度微調（turn，弧度）、形狀（hex 六邊形、round 圓、rect 方）。
+// 橋從島的邊緣開始，所以 dist 越近橋越短；最短的那幾條約 5 公尺。
+// 改這裡就夠：scene.js 照 islands() 畫，wanderTarget 照 r 算，test/island.test.mjs 守「不重疊」。
+export const SPEC = {
+  commons:     { r: 9.0,  dist: 0,  shape: "round" },   // 聚會所：圓的，中間是遊樂場
+  sponsorship: { r: 10.0, dist: 27, turn: 0.05, shape: "hex" },
+  curriculum:  { r: 11.0, dist: 30, turn: -0.08, shape: "hex" },   // 最大的一座：探索營、講座、資料庫都在這
+  internship:  { r: 8.6,  dist: 25, turn: 0.06, shape: "rect" },   // 學校：方的操場
+  mentorship:  { r: 9.2,  dist: 28, turn: -0.04, shape: "round" },
+  marketing:   { r: 9.6,  dist: 29, turn: 0.07, shape: "hex" },
+  cr:          { r: 8.8,  dist: 24, turn: -0.05, shape: "hex" },   // 最近的一座：社區就在隔壁
+  airport:     { r: 9.5,  dist: 54, shape: "sea" },
+};
 
-// 每座島的圓心與半徑。exec 在中間，其他六個從正下方（+z，面向鏡頭）逆時針排。
+// 每座島的圓心與半徑。commons 在中間，其他六個從正下方（+z，面向鏡頭）逆時針排，各自照 SPEC 的距離與角度微調。
 export function islands() {
-  const out = [{ id: "commons", x: 0, z: 0, r: CENTER_R, angle: 0 }];
-  RING.forEach((id, i) => { const a = Math.PI / 2 + i * TAU / 6; out.push({ id, x: Math.cos(a) * RING_R, z: Math.sin(a) * RING_R, r: ISLAND_R, angle: a }); });
-  out.push({ id: "airport", x: Math.cos(AIRPORT_ANGLE) * AIRPORT_R, z: Math.sin(AIRPORT_ANGLE) * AIRPORT_R, r: ISLAND_R, angle: AIRPORT_ANGLE, sea: true });
+  const c = SPEC.commons; const out = [{ id: "commons", x: 0, z: 0, r: c.r, angle: 0, shape: c.shape }];
+  RING.forEach((id, i) => { const sp = SPEC[id] || { r: ISLAND_R, dist: RING_R }; const a = Math.PI / 2 + i * TAU / 6 + (sp.turn || 0); out.push({ id, x: Math.cos(a) * sp.dist, z: Math.sin(a) * sp.dist, r: sp.r, angle: a, shape: sp.shape || "hex" }); });
+  const ap = SPEC.airport; out.push({ id: "airport", x: Math.cos(AIRPORT_ANGLE) * ap.dist, z: Math.sin(AIRPORT_ANGLE) * ap.dist, r: ap.r, angle: AIRPORT_ANGLE, sea: true, shape: "sea" });
   return out;
 }
 export const islandOf = id => islands().find(i => i.id === id) || null;

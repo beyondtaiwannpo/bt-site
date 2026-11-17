@@ -1,0 +1,26 @@
+{
+  "_readme": [
+    "這一份是 /island/ Marketing 那座島上的「貼文牆」：點 Instagram 那一棟，卡上列出這幾則貼文，按了到 Instagram 看。",
+    "Paul 2026-11-17：「for marketing team… get a few posts from our Instagram and put it up there」。",
+    "為什麼不是自動抓：抓 Instagram 要 API 的 token、而且要從 instagram.com 載程式，這個 repo 不從 cdnjs 以外的地方載東西。所以是 Marketing 自己把連結貼進來，一則一筆，新的放最上面，留五到八則就好。",
+    "欄位：url（只收 https://www.instagram.com/ 開頭）、caption_zh/caption_en（一句話，自己寫，不用抄整段）、date（YYYY-MM-DD）、kind（post 或 reel）。",
+    "⚠ 說明裡不放未成年的名字（CLAUDE.md 的紅線）。貼文本身是 Instagram 上公開的，這裡只放連結，不存圖。",
+    "島上那三塊海報板的顏色是照 kind 與順序畫的，不是真的圖。"
+  ],
+  "handle": "beyondtaiwan",
+  "profile": "https://www.instagram.com/beyondtaiwan/",
+  "posts": [
+    { "url": "https://www.instagram.com/beyondtaiwan/reel/DfYuFyXuikI/", "kind": "reel", "date": "2026-11-05",
+      "caption_zh": "BT Vlog 第三集：跟著 Internship 的 Associate 看 Utah 一所高中的一天。",
+      "caption_en": "BT Vlog, episode 3: a day at a high school in Utah with one of our Internship associates." },
+    { "url": "https://www.instagram.com/beyondtaiwan/reel/De0htb1uvyg/", "kind": "reel", "date": "2026-10-28",
+      "caption_zh": "如果可以重來一次申請大學，你會改變什麼？幾位在海外念書的學長姐回頭給高中的自己的建議。",
+      "caption_en": "If you could apply to college again, what would you change? Alumni studying abroad look back and advise their high-school selves." },
+    { "url": "https://www.instagram.com/beyondtaiwan/reel/Des_DS1uKTI/", "kind": "reel", "date": "2026-10-24",
+      "caption_zh": "BT Vlog 第二集：跟著 Co-President Alysia 看 UW-Madison 的一天。",
+      "caption_en": "BT Vlog, episode 2: a day at UW-Madison with Co-President Alysia." },
+    { "url": "https://www.instagram.com/beyondtaiwan/p/Df1S1BtG_a8/", "kind": "post", "date": "2026-11-16",
+      "caption_zh": "最新的一則貼文。",
+      "caption_en": "The latest post." }
+  ]
+}

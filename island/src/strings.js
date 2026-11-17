@@ -60,6 +60,11 @@ export const STR = {
   no3d:        { zh: "這台裝置畫不出 3D。下面的清單是同一份內容。", en: "This device cannot draw the 3D view. The index below has the same content." },
   hint:        { zh: "拖曳可以轉，滾輪可以放大。", en: "Drag to turn, scroll to zoom." },
   teamPage:    { zh: "團隊頁", en: "Team page" },
+  posts:       { zh: "最近的貼文", en: "Recent posts" },
+  igPost:      { zh: "貼文", en: "Post" },
+  igReel:      { zh: "影片", en: "Reel" },
+  igProfile:   { zh: "到 Instagram 看 @{handle}", en: "See @{handle} on Instagram" },
+  igNote:      { zh: "這幾則是 Marketing 自己挑的，放在 island/instagram.json。", en: "Marketing picks these; they live in island/instagram.json." },
 };
 export function t(key, lang, vars) {
   const e = STR[key]; if (!e) return key;

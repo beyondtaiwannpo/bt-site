@@ -4681,7 +4681,22 @@ Paul：「I posted an event on our website from curriculum team, is that going t
   現在正式庫裡還沒有核可的校友，所以畫面上是範例。
 - 兩份都是「拿不到就當沒有」：Supabase 連不上，島照樣畫。
 
-### 順不順（2026-11-16 第二輪）
+### 每座島不一樣（2026-11-17 第三輪）
+
+Paul：「right now every island is the same… make it a little bit different… internship team should have a school… the middle, the playground… bridges can be short… a few airplane at the airport… make the distance between each island different… for marketing team get a few posts from our Instagram」。做了：
+- **大小、距離、形狀都不一樣**：`island/src/layout.js` 的 `SPEC` 一座一行（半徑、離中心多遠、角度微調、形狀 hex／round／rect）。改那一行就好，scene.js 照著畫，測試守「不重疊」「橋 4 到 20 公尺」「進得了全景」。橋從島的邊緣開始，所以距離近橋就短：最短 5.6 公尺（Sponsorship 到 Curriculum），最長 17（機場到 CR）。
+- **每座島自己的東西**（`scene.js` 的 `decorate()`，一座一段）：聚會所是圓的，中間一塊遊樂場（溜滑梯、鞦韆、翹翹板、沙坑、長凳）；Internship 是方的，一棟兩層的學校（新的 `kind: school`）加操場跑道與籃球架；Curriculum 最大，露天教室（黑板加三排長凳）；Mentorship 圓的，兩兩對坐的長凳、燈、四個花圃；Sponsorship 一個鋪面廣場、噴水池、合作夥伴看板；Marketing 攝影棚加貼文牆（`kind: studio`：三塊海報板、腳架相機、環形燈）、四面旗、一個大「讚」；Community Relations 一座涼亭舞台（`kind: stage`）、一排燈籠、佈告欄、郵筒。樹的數量也不一樣。
+- **機場四架飛機**：一架在跑道上來回滑行（`motion()` 裡動，螺旋槳會轉，到底停一下再轉頭）、兩架停機坪、一座機棚、一台行李車。
+- **Marketing 的 Instagram**：點那一棟「Instagram @beyondtaiwan」，卡上列最近的貼文，按了到 Instagram。清單在 `island/instagram.json`，Marketing 自己貼連結與一句話說明（檔頭有說明）。**不是自動抓**：抓 Instagram 要 API token 與 instagram.com 的程式，這個 repo 只從 cdnjs 載東西。現在放的四則是 2026-11-17 從 @beyondtaiwan 抓的連結（只有連結與自己寫的一句話，沒有圖，未成年不具名）。
+- 截圖：`docs/island/2026-11-17-*.jpg`。
+
+**黃色那些線**（Paul 問的）：是協作線，`teams.json` 的 `connections` 一條一筆，加上人走去別座島的路。工具列「協作線」開著才全部亮；選了一座島只亮它的。
+
+### 順不順（2026-11-16 第二輪，2026-11-17 再修一次）
+
+2026-11-17 又量到名牌全開掉到個位數，這次的兇手是 `project()` 每一塊牌子都去讀 `stage.clientWidth`：前面剛寫了幾十塊牌子的樣式，一讀尺寸瀏覽器就當場重新排版，一幀幾十次。改成尺寸只在 resize 時讀一次、位置記在 JS 屬性不寫 data-* attribute。
+修完在 Claude 的內建瀏覽器量：名牌關 60、開 60、連量四段都是 60。**在裝了 Claude in Chrome 擴充功能的 Chrome 分頁裡名牌開著會慢慢掉到 10 以下**，那是擴充功能在聽每一次 DOM 變動，不是這一頁的問題；要量 fps 用沒裝擴充功能的視窗。
+
 
 Paul 說會卡。本機 Chrome 實測：名牌關著 60 fps，**名牌全開掉到 30 fps**，兇手不是 3D，是 48 塊 HTML 牌子每一幀都在重排版。
 修法：牌子加 `will-change: transform` 與 `contain: layout paint`，位置沒變超過半個像素就不碰它；人不投影（陰影貼圖是靜的，走動的人用腳下那一圈）；橋的欄杆柱子與所有島的樹改 InstancedMesh（少了約 400 個 draw call）；像素密度上限 1.5；鏡頭追得快一點。
@@ -4698,7 +4713,9 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 
 ### 不會寫程式的人怎麼改
 
-- 改一個 team 的說明、加一樣在做的事、改連結：`island/teams.json`，檔頭有每個欄位的說明。畫面會自己長出一棟（`kind` 決定長什麼樣）。
+- 改一個 team 的說明、加一樣在做的事、改連結：`island/teams.json`，檔頭有每個欄位的說明。畫面會自己長出一棟（`kind` 決定長什麼樣：hall tent booth desk home post pier tower camp airport school studio stage）。
+- 換 Marketing 島上的貼文：`island/instagram.json`，一則一筆（連結、一句話中英、日期、post 或 reel），新的放上面。
+- 搬一座島、改大小或形狀：`island/src/layout.js` 的 `SPEC`，一座一行。
 - 加一個人：`people` 加一筆（`code` 不重複、`team`、`role`、要不要具名）。他也參與別座島就加 `also`；校友與學員 `team` 填 `airport`、加 `flow`（走去哪、帶什麼、為什麼）。島上就多一個小人，他自己會走。
 - 加一條協作線：`connections` 加一筆（`a`、`b`、為什麼）。
 - 介面上的字：`island/src/strings.js`。

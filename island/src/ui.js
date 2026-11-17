@@ -41,10 +41,17 @@ export function teamCardHTML(tm, lang, d) {
     <p class="card-note">${esc(note)} <a href="../team/?lang=${lang}">${esc(t("teamPage", lang))}</a></p>`;
 }
 // ── 一件在做的事 ──
-export function programCardHTML(p, tm, lang) {
+// Instagram 那一棟：卡上多一段貼文清單（island/instagram.json，Marketing 自己貼的連結）。
+export function postsHTML(ig, lang) {
+  if (!ig || !ig.posts || !ig.posts.length) return "";
+  return `<h3 class="card-sub">${esc(t("posts", lang))}</h3><ul class="igs">${ig.posts.map(x => `<li><a class="ig" href="${esc(x.url)}" rel="noopener" target="_blank"><span class="ig-kind ig-${x.kind}">${esc(t(x.kind === "reel" ? "igReel" : "igPost", lang))}</span><span class="ig-cap">${L(x, "caption", lang)}</span><span class="ig-date">${esc(x.date)}</span></a></li>`).join("")}</ul>
+    ${ig.profile ? `<a class="card-link" href="${esc(ig.profile)}" rel="noopener" target="_blank">${esc(t("igProfile", lang, { handle: ig.handle }))}</a>` : ""}<p class="card-note">${esc(t("igNote", lang))}</p>`;
+}
+export function programCardHTML(p, tm, lang, d) {
   const link = p.link ? `<a class="card-link" href="${esc(p.link)}"${/^https:/.test(p.link) ? ' rel="noopener"' : ""}>${esc(t("more", lang))}</a>` : "";
+  const posts = p.id === "instagram" && d ? postsHTML(d.instagram, lang) : "";
   return `<div class="card-head"><button type="button" class="card-back" data-go-team="${tm.id}">${L(tm, "name", lang)}</button><h2 class="card-h">${L(p, "name", lang)}</h2><p class="card-tag">${L(p, "line", lang)}</p></div>
-    <p class="card-about">${L(p, "detail", lang)}</p>${link}`;
+    <p class="card-about">${L(p, "detail", lang)}</p>${posts}${link}`;
 }
 // ── 一個人 ──
 export function personCardHTML(p, tm, lang, d) {
