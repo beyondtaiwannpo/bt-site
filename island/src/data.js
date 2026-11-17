@@ -2,8 +2,8 @@
 import { TEAM_ORDER } from "./layout.js";
 const str = v => (typeof v === "string" ? v : "");
 export const COLOURS = ["orange", "teal", "navy", "yellow", "sand", "cream", "grey"];
-export const KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower"];
-export const ROLES = ["copresident", "director", "advisor", "associate"];
+export const KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower", "airport"];
+export const ROLES = ["copresident", "director", "advisor", "associate", "alumni"];
 
 export function normalize(raw) {
   const teamsRaw = raw && Array.isArray(raw.teams) ? raw.teams : [];
@@ -32,13 +32,28 @@ export function normalize(raw) {
     const role = ROLES.includes(p.role) ? p.role : "associate";
     // 只有 named 是 true 而且有名字才顯示名字；不然顯示角色。這是對外頁的紅線。
     const named = p.named === true && !!str(p.name_zh);
-    const person = { code: str(p.code), team: p.team, role, named,
+    const also = (Array.isArray(p.also) ? p.also : []).filter(a => a && byId.has(a.team) && a.team !== p.team).map(a => ({ team: a.team, role: ROLES.includes(a.role) ? a.role : "associate", why_zh: str(a.why_zh), why_en: str(a.why_en) || str(a.why_zh) }));
+    const flow = p.flow && byId.has(p.flow.to) && p.flow.to !== p.team ? { to: p.flow.to, carry_zh: str(p.flow.carry_zh), carry_en: str(p.flow.carry_en) || str(p.flow.carry_zh), why_zh: str(p.flow.why_zh), why_en: str(p.flow.why_en) || str(p.flow.why_zh) } : null;
+    const person = { code: str(p.code), team: p.team, role, named, sample: p.sample === true,
       title_zh: str(p.title_zh) || role, title_en: str(p.title_en) || str(p.title_zh) || role,
-      name_zh: named ? str(p.name_zh) : "", name_en: named ? (str(p.name_en) || str(p.name_zh)) : "" };
+      name_zh: named ? str(p.name_zh) : "", name_en: named ? (str(p.name_en) || str(p.name_zh)) : "",
+      line_zh: str(p.line_zh), line_en: str(p.line_en) || str(p.line_zh), also, flow,
+      // 他會走去哪座島（also 的第一個，或校友的 flow）。沒有就留在自己的島。
+      goes: flow ? flow.to : (also[0] ? also[0].team : "") };
     people.push(person); byId.get(p.team).people.push(person);
   }
-  return { teams, people };
+  const ids = new Set(teams.map(tm => tm.id));
+  const connections = (raw && Array.isArray(raw.connections) ? raw.connections : []).filter(c => c && ids.has(c.a) && ids.has(c.b) && c.a !== c.b)
+    .map(c => ({ a: c.a, b: c.b, why_zh: str(c.why_zh), why_en: str(c.why_en) || str(c.why_zh) }));
+  return { teams, people, connections };
 }
+// 一座島跟誰連：{ team（另一邊）, why }。含島跟島的協作線，加上住在別座島但也參與這座的人、走來這座的校友。
+export function connectionsOf(d, teamId) {
+  const out = [];
+  for (const c of d.connections) { if (c.a === teamId) out.push({ team: c.b, why_zh: c.why_zh, why_en: c.why_en }); else if (c.b === teamId) out.push({ team: c.a, why_zh: c.why_zh, why_en: c.why_en }); }
+  return out;
+}
+export const visitorsOf = (d, teamId) => d.people.filter(p => p.team !== teamId && p.goes === teamId);
 export const label = (p, lang) => (p.named ? p["name_" + lang] || p.name_zh : p["title_" + lang] || p.title_zh);
 export const teamById = (d, id) => d.teams.find(tm => tm.id === id) || null;
 export const programById = (d, id) => { for (const tm of d.teams) for (const p of tm.programs) if (p.id === id) return p; return null; };

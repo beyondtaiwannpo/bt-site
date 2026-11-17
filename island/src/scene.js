@@ -48,7 +48,7 @@ function colours(p) {
   };
 }
 
-export function create({ stage, pins, palette, phone, data, onSelect, onHover, freeCentre }) {
+export function create({ stage, pins, palette, phone, data, onSelect, onHover, freeCentre, freeWidth }) {
   if (!webglOK()) throw new Error("no webgl");
   const canvas = document.createElement("canvas"); canvas.className = "scene3d"; stage.appendChild(canvas);
   const P = colours(palette);
@@ -63,7 +63,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   renderer.setPixelRatio(Math.min(phone ? 1.25 : 1.6, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
-  const scene = new THREE.Scene(); scene.background = P.sky.clone(); scene.fog = new THREE.Fog(P.sky.clone(), 110, 230);
+  const scene = new THREE.Scene(); scene.background = P.sky.clone(); scene.fog = new THREE.Fog(P.sky.clone(), 170, 380);
   const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.5, 500); scene.add(camera);
   scene.add(new THREE.HemisphereLight(P.white.clone().lerp(P.teal, 0.08), P.sand.clone().lerp(P.grey, 0.4), 1.2));
   const sun = new THREE.DirectionalLight(P.cream.clone().lerp(P.white, 0.5), 2.6); sun.position.set(-40, 70, 30); sun.castShadow = true;
@@ -92,7 +92,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 8), M.dark); pole.position.set(fx, 2.5, fz); pole.castShadow = true; g.add(pole);
     const flag = new THREE.Mesh(rbox(1.8, 1.0, 0.06, 0.03), M.team[tm.colour]); flag.position.set(fx + 0.95, 4.4, fz); flag.castShadow = true; g.add(flag); flag.userData.flag = true;
     // 做的事：一樣一棟。
-    const spots = L.programSpots({ x: 0, z: 0, r: isl.r, angle: isl.angle }, tm.programs.length); const blockers = [{ x: fx, z: fz }];
+    const spots = L.programSpots({ id: isl.id, x: 0, z: 0, r: isl.r, angle: isl.angle }, tm.programs.length); const blockers = [{ x: fx, z: fz }];
     tm.programs.forEach((p, k) => { const sp = spots[k]; const b = building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = sp.face; g.add(b); blockers.push({ x: sp.x, z: sp.z });
       b.traverse(o => { if (o.isMesh) { o.userData.sel = { kind: "program", team: tm.id, program: p.id }; pickables.push(o); } });
       const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-prog"; pin.dataset.goProgram = p.id; pin.dataset.team = tm.id; pin.hidden = true; pins.appendChild(pin);
@@ -108,9 +108,18 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   // 橋：中間到每一座。
   for (const br of L.bridges()) { const dx = br.x1 - br.x0, dz = br.z1 - br.z0, len = Math.hypot(dx, dz); const b = new THREE.Mesh(rbox(len, 0.28, 2.2, 0.08), M.wood); b.position.set((br.x0 + br.x1) / 2, 0.1, (br.z0 + br.z1) / 2); b.rotation.y = -Math.atan2(dz, dx); b.castShadow = true; b.receiveShadow = true; world.add(b);
     for (let s = 2; s < len - 1; s += 3) for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), M.dark); const tt = s / len; post.position.set(br.x0 + dx * tt + (-dz / len) * side * 1.0, 0.5, br.z0 + dz * tt + (dx / len) * side * 1.0); world.add(post); } }
+  // 協作線：島跟島之間一條拱起來的細管（橘色），全景時收起，開了「協作線」或選了那座島才亮。
+  const lines = [];
+  for (const c of data.connections || []) {
+    const A = L.islandOf(c.a), B = L.islandOf(c.b); if (!A || !B) continue;
+    const mid = new THREE.Vector3((A.x + B.x) / 2, 4 + Math.hypot(B.x - A.x, B.z - A.z) * 0.14, (A.z + B.z) / 2);
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(A.x, 1.2, A.z), mid, new THREE.Vector3(B.x, 1.2, B.z));
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.14, 6, false), new THREE.MeshStandardMaterial({ color: P.orange, emissive: P.orange, emissiveIntensity: 0.6, roughness: 0.6 }));
+    tube.visible = false; world.add(tube); lines.push({ a: c.a, b: c.b, mesh: tube });
+  }
   // 雲
   const clouds = [];
-  for (let i = 0; i < 8; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 30 + rnd() * 40; g.position.set(Math.cos(a) * d, 22 + rnd() * 8, Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; world.add(g); clouds.push(g); }
+  for (let i = 0; i < 8; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 70 + rnd() * 40; g.position.set(Math.cos(a) * d, 26 + rnd() * 8, Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; world.add(g); clouds.push(g); }
 
   // ═══ 建築 ═══
   function house(w, h, d, wallM, roofM) { const g = new THREE.Group(); const b = new THREE.Mesh(rbox(w, h, d, 0.12), wallM); b.position.y = h / 2; b.castShadow = true; b.receiveShadow = true; g.add(b); const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.78, h * 0.6, 4), roofM); roof.position.y = h + h * 0.3; roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof); return g; }
@@ -124,6 +133,18 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     else if (kind === "home") { const h = house(3.4, 2.4, 3, M.wall2, roofM); win(h, 2, 1.4, 1.54, 1.4); g.add(h); const chim = new THREE.Mesh(rbox(0.5, 1.0, 0.5, 0.06), M.wall); chim.position.set(1.1, 3.1, -0.6); h.add(chim); }
     else if (kind === "post") { const bx = new THREE.Mesh(rbox(0.9, 1.5, 0.9, 0.2), roofM); bx.position.y = 1.05; bx.castShadow = true; g.add(bx); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8), M.dark); leg.position.y = 0.2; g.add(leg); const sign = new THREE.Mesh(rbox(1.6, 0.9, 0.1, 0.06), M.cream); sign.position.set(1.6, 1.4, 0); sign.castShadow = true; g.add(sign); const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.0, 6), M.dark); sp.position.set(1.6, 0.5, 0); g.add(sp); }
     else if (kind === "pier") { const deck = new THREE.Mesh(rbox(3.6, 0.3, 1.8, 0.08), M.wood); deck.position.y = 0.2; deck.castShadow = true; g.add(deck); const booth = new THREE.Mesh(rbox(1.4, 1.6, 1.2, 0.12), M.wall); booth.position.set(-0.9, 1.1, 0); booth.castShadow = true; g.add(booth); const roof = new THREE.Mesh(rbox(1.8, 0.18, 1.6, 0.05), roofM); roof.position.set(-0.9, 2.0, 0); g.add(roof); const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), M.light); lamp.position.set(1.3, 2.0, -0.5); g.add(lamp); const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.7, 6), M.dark); lp.position.set(1.3, 1.15, -0.5); g.add(lp); }
+    else if (kind === "airport") {
+      // 一條跑道、一座小塔台、一架停著的小飛機。跑道橫過整座島，所以這一樣東西比別的大。
+      const run = new THREE.Mesh(rbox(13, 0.12, 2.6, 0.05), M.road); run.position.y = 0.06; run.receiveShadow = true; g.add(run);
+      for (let x = -5.5; x <= 5.5; x += 1.4) { const dash = new THREE.Mesh(rbox(0.7, 0.03, 0.18, 0.01), M.cream); dash.position.set(x, 0.13, 0); g.add(dash); }
+      for (const x of [-6.2, 6.2]) for (const z of [-1.5, 1.5]) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M.light); l.position.set(x, 0.2, z); g.add(l); }
+      const tw = new THREE.Group(); tw.position.set(0, 0, -3.4); g.add(tw);
+      tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 3.2, 10), M.wall).translateY(1.6), new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.8, 0.9, 10), roofM).translateY(3.6), new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 10), M.dark).translateY(4.2));
+      const pl = new THREE.Group(); pl.position.set(2.2, 0.75, 0); g.add(pl);
+      pl.add(new THREE.Mesh(rbox(3.0, 0.75, 0.85, 0.32), M.cream), new THREE.Mesh(rbox(0.9, 0.1, 4.0, 0.05), M.teal).translateY(0.15), new THREE.Mesh(rbox(0.6, 0.75, 0.1, 0.05), M.orange).translateX(-1.3).translateY(0.6), new THREE.Mesh(rbox(0.5, 0.08, 1.5, 0.04), M.orange).translateX(-1.3).translateY(0.25), new THREE.Mesh(rbox(0.7, 0.28, 0.87, 0.1), M.dark).translateX(0.8).translateY(0.12));
+      for (const [x, z] of [[0.9, -0.35], [0.9, 0.35], [-0.6, 0]]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.12, 8), M.dark); wh.rotation.x = Math.PI / 2; wh.position.set(x, -0.5, z); pl.add(wh); }
+      g.traverse(m => { if (m.isMesh) m.castShadow = true; });
+    }
     else { /* tower */ const base = new THREE.Mesh(rbox(2.6, 3.4, 2.6, 0.2), M.wall); base.position.y = 1.7; base.castShadow = true; g.add(base); const cap = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.4, 4), roofM); cap.position.y = 4.1; cap.rotation.y = Math.PI / 4; cap.castShadow = true; g.add(cap); win(base, 2, 2.4, 1.34, 1.0); win(base, 2, 1.2, 1.34, 1.0); const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 16), M.cream); clock.rotation.x = Math.PI / 2; clock.position.set(0, 2.9, 1.36); g.add(clock); }
     return g;
   }
@@ -164,7 +185,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     const start = L.wanderTarget(isl, blockersOf.get(person.team), rnd); g.position.set(start.x, 0, start.z); g.rotation.y = rnd() * TAU; world.add(g);
     g.traverse(m => { if (m.isMesh) { m.userData.sel = { kind: "person", code: person.code }; pickables.push(m); } });
     const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-person" + (o.me ? " is-me" : ""); pin.dataset.goPerson = person.code; pin.hidden = true; pins.appendChild(pin);
-    const w = { person, g, pin, isl, target: start, wait: rnd() * 4 + 1, me: !!o.me, label: "" }; walkers.push(w); shadowsDirty = true; return w;
+    const w = { person, g, pin, isl, home: isl, target: start, wait: rnd() * 4 + 1, me: !!o.me, label: "", trips: 0, path: null, pathI: 0, away: false }; walkers.push(w); shadowsDirty = true; return w;
   }
   for (const p of data.people) addWalker(p);
   function removeWalker(w) { world.remove(w.g); w.pin.remove(); const i = walkers.indexOf(w); if (i >= 0) walkers.splice(i, 1); for (let k = pickables.length - 1; k >= 0; k--) if (pickables[k].userData.sel && pickables[k].userData.sel.code === w.person.code) pickables.splice(k, 1); shadowsDirty = true; }
@@ -174,6 +195,12 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   // 卡在左、清單在右：島要落在中間空出來的那一塊，不是視窗正中央。freeCentre() 回空出來那一塊的中心佔視窗寬的比例（0.5 就是正中央）。
   const setGoal = (c, centre) => {
     cam.goalPos.set(...c.pos); cam.goalTgt.set(...c.target);
+    // 全景：距離照畫面空出來那一塊的長寬算，九座島都要進來（島群橫的半徑約 66、直的約 48，鏡頭斜看直的會縮）。
+    if (c.fit) {
+      const frac = typeof freeWidth === "function" ? freeWidth() : 1, tanH = Math.tan(camera.fov * Math.PI / 360), aspectFree = camera.aspect * frac;
+      const D = Math.max(c.fit[0] / (tanH * aspectFree), c.fit[1] / tanH) * 0.98;
+      const dir = cam.goalPos.clone().sub(cam.goalTgt).normalize(); cam.goalPos.copy(cam.goalTgt).addScaledVector(dir, D);
+    }
     if (centre) {
       const f = (typeof freeCentre === "function" ? freeCentre() : 0.5) - 0.5; if (Math.abs(f) < 0.01) return;
       const dir = cam.goalTgt.clone().sub(cam.goalPos); const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
@@ -181,7 +208,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       const shift = right.multiplyScalar(-f * 2 * halfW); cam.goalPos.add(shift); cam.goalTgt.add(shift);
     }
   };
-  setGoal(L.cameraOverview(phone)); cam.pos.copy(cam.goalPos); cam.tgt.copy(cam.goalTgt);
+  setGoal(L.cameraOverview(phone), true); cam.pos.copy(cam.goalPos); cam.tgt.copy(cam.goalTgt);
   function placeCam() { camera.position.copy(cam.pos); camera.lookAt(cam.tgt); }
   // 拖曳：繞著目標點轉（改 goalPos 的方位角與仰角），滾輪：改距離。
   let drag = null, dragged = false;
@@ -212,7 +239,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   const v3 = new THREE.Vector3();
   function project(x, y, z) { v3.set(x, y, z).project(camera); const w = stage.clientWidth, h = stage.clientHeight; return { x: (v3.x + 1) / 2 * w, y: (1 - v3.y) / 2 * h, visible: v3.z < 1 && Math.abs(v3.x) < 1.2 && Math.abs(v3.y) < 1.2 }; }
   function putPin(pin, p, dy) { if (!p.visible) { pin.style.opacity = 0; return; } pin.style.opacity = 1; pin.style.transform = `translate(-50%,-100%) translate(${p.x.toFixed(1)}px,${(p.y + (dy || 0)).toFixed(1)}px)`; }
-  const show = { names: false, selectedTeam: "" };
+  const show = { names: false, selectedTeam: "", flows: false };
+  function paintLines() { for (const l of lines) l.mesh.visible = show.flows || (!!show.selectedTeam && (l.a === show.selectedTeam || l.b === show.selectedTeam)); }
   function placePins() {
     for (const o of isleObjs.values()) { putPin(o.pin, project(o.isl.x, 7.2, o.isl.z)); for (const b of o.buildings) { b.userData.pin.hidden = show.selectedTeam !== o.isl.id; if (!b.userData.pin.hidden) putPin(b.userData.pin, project(o.isl.x + b.position.x, 4.4, o.isl.z + b.position.z)); } }
     for (const w of walkers) { const on = show.names || w.me || show.selectedTeam === w.person.team; w.pin.hidden = !on; if (on) putPin(w.pin, project(w.g.position.x, 2.0, w.g.position.z)); }
@@ -236,15 +264,17 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       show.selectedTeam = sel && sel.team ? sel.team : (sel && sel.kind === "person" ? (walkers.find(w => w.person.code === sel.code) || {}).person?.team || "" : "");
       for (const o of isleObjs.values()) { const on = o.isl.id === show.selectedTeam; o.pin.classList.toggle("on", on); o.flag.material = on ? M.light : M.team[o.tm.colour]; }
       for (const w of walkers) w.pin.classList.toggle("on", !!(sel && sel.kind === "person" && sel.code === w.person.code));
+      paintLines();
       for (const o of isleObjs.values()) for (const b of o.buildings) b.userData.pin.classList.toggle("on", !!(sel && sel.kind === "program" && sel.program === b.userData.program.id));
       shadowsDirty = true;
-      if (!sel) setGoal(L.cameraOverview(phone));
+      if (!sel) setGoal(L.cameraOverview(phone), true);
       else if (sel.kind === "person") { const w = walkers.find(x => x.person.code === sel.code); if (w) setGoal(L.cameraIsland(w.isl, phone), true); }
       else setGoal(L.cameraIsland(L.islandOf(sel.team), phone), true);
       if (!motionOn) snapCam(); else placePins();
     },
-    overview() { show.selectedTeam = ""; for (const o of isleObjs.values()) { o.pin.classList.remove("on"); o.flag.material = M.team[o.tm.colour]; } setGoal(L.cameraOverview(phone)); if (!motionOn) snapCam(); },
-    bird(on) { setGoal(on ? L.cameraBird(phone) : L.cameraOverview(phone)); if (!motionOn) snapCam(); },
+    flows(on) { show.flows = !!on; paintLines(); if (!motionOn) render(0); },
+    overview() { show.selectedTeam = ""; paintLines(); for (const o of isleObjs.values()) { o.pin.classList.remove("on"); o.flag.material = M.team[o.tm.colour]; } setGoal(L.cameraOverview(phone), true); if (!motionOn) snapCam(); },
+    bird(on) { setGoal(on ? L.cameraBird(phone) : L.cameraOverview(phone), true); if (!motionOn) snapCam(); },
     names(on) { show.names = !!on; placePins(); },
     // 「我」：放一個人到那座島上；再叫一次就換；傳 null 就拿掉。
     me(info) {
@@ -271,8 +301,20 @@ function motion({ cam, placeCam, render, walkers, clouds, pose, blockersOf, rnd 
       t += dt;
       for (const w of walkers) {
         const dx = w.target.x - w.g.position.x, dz = w.target.z - w.g.position.z, d = Math.hypot(dx, dz);
-        if (d > 0.08) { const sp = Math.min(d, 1.1 * dt); w.g.position.x += dx / d * sp; w.g.position.z += dz / d * sp; w.g.rotation.y = Math.atan2(dx, dz); w.g.userData.moving = true; }
-        else { w.g.userData.moving = false; w.wait -= dt; if (w.wait <= 0) { w.target = L.wanderTarget(w.isl, blockersOf.get(w.person.team), rnd); w.wait = 2 + rnd() * 6; } }
+        if (d > 0.08) { const sp = Math.min(d, (w.path ? 1.6 : 1.1) * dt); w.g.position.x += dx / d * sp; w.g.position.z += dz / d * sp; w.g.rotation.y = Math.atan2(dx, dz); w.g.userData.moving = true; }
+        else if (w.path) {
+          // 在路上：走到下一個點；到了終點就換島。
+          w.pathI++;
+          if (w.pathI < w.path.length) { const [x, z] = w.path[w.pathI]; w.target = { x, z }; }
+          else { w.path = null; w.isl = L.islandOf(w.away ? w.home.id : w.person.goes) || w.home; w.away = !w.away; w.target = L.wanderTarget(w.isl, blockersOf.get(w.isl.id), rnd); w.wait = 3 + rnd() * 5; }
+        }
+        else { w.g.userData.moving = false; w.wait -= dt;
+          if (w.wait <= 0) {
+            w.trips++;
+            // 也參與別座島的人與校友：每逛幾次就走去那座島（或走回家）。
+            if (w.person.goes && w.trips % 4 === 0) { const from = w.isl.id, to = w.away ? w.home.id : w.person.goes; const ids = L.route(from, to); if (ids.length > 1) { w.path = L.routePoints(ids); w.pathI = 0; const [x, z] = w.path[0]; w.target = { x, z }; } }
+            if (!w.path) { w.target = L.wanderTarget(w.isl, blockersOf.get(w.isl.id), rnd); w.wait = 2 + rnd() * 6; }
+          } }
         pose(w.g, t);
       }
       for (const c of clouds) c.position.x += c.userData.drift * dt;

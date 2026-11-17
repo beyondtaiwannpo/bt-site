@@ -105,6 +105,14 @@ html[data-lang="zh"] .card-sub{font-family:var(--body);font-weight:600;letter-sp
 .pp-dot{width:8px;height:8px;border-radius:50%;background:var(--bt-grey)}
 .pp-dot.r-copresident{background:var(--bt-navy)}.pp-dot.r-director{background:var(--bt-orange)}.pp-dot.r-advisor{background:var(--bt-teal)}.pp-dot.r-associate{background:var(--bt-yellow)}
 .card-note{margin:14px 0 0;font-size:12.5px;color:rgba(16,42,134,.65)}
+.card-line{margin:0 0 10px;font:400 19px/1.4 var(--hand)}
+.links{list-style:none;margin:0 0 6px;padding:0;display:grid;gap:6px}
+.lnk{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 12px;border:1px solid rgba(16,42,134,.14);border-radius:12px;background:rgba(255,255,255,.6);color:var(--ink);cursor:pointer;font:inherit}
+.lnk:hover{border-color:var(--bt-navy)}
+.lnk-team{font:700 12.5px/1.2 var(--display);letter-spacing:.06em}
+html[data-lang="zh"] .lnk-team{font-family:var(--body);font-weight:700;letter-spacing:0;font-size:13px}
+.lnk-why{font-size:12.5px;color:rgba(16,42,134,.78)}
+.pp-dot.r-alumni{background:var(--bt-sand);border:1px solid rgba(16,42,134,.3)}
 .card-note a{color:var(--bt-navy)}
 .card-link{display:inline-block;margin-top:6px;padding:10px 16px;border-radius:999px;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;font:700 13px/1 var(--display);letter-spacing:.08em}
 html[data-lang="zh"] .card-link{font-family:var(--body);font-weight:600;letter-spacing:.02em}

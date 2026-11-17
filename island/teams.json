@@ -1,194 +1,947 @@
 {
   "_readme": [
-    "這一份是 /island/ 的資料：BT 這一屆的組織長什麼樣。七座島：中間是 Co-President，外圍六個 team。每座島上有這個 team 做的事（programs）與人（people）。",
-    "**現在人全部是代號**（Director、Advisor、Associate），沒有名字。這是 public repo，對外頁放真名一律先問 Paul，未成年一律不放。",
-    "要放名字：在 people 那一筆加 name_zh / name_en，並把 named 改成 true（本人同意之後）。程式只在 named 是 true 時才顯示名字，不然顯示角色。",
+    "這一份是 /island/ 的資料：BT 這一屆的組織長什麼樣。八座島：中間是 Co-President，外圍六個 team，再外面一座是校友。每座島上有這個 team 做的事（programs）與人（people），島與島之間有協作線（connections），人會走去他也參與的那座島（also / flow）。",
+    "**名字：2026-11-16 Paul 說這一頁還沒 push、還不公開，先用我們自己的名單把人放上去。**名單來自內部的團隊表。**未成年一律只放角色**（named 是 false）。",
+    "⚠ push 之前 Paul 要逐一確認願意具名的人；不願意的那一筆把 named 改成 false，畫面就只剩角色。校友十位現在是遮字的範例（林 O 恩 這種），換真人要本人同意。",
+    "  校友那十筆有 sample: true，名字是遮字的範例，不是真人。換真人要本人同意，換完把 sample 拿掉。",
     "",
-    "欄位：",
-    "  teams[]      七個，id 固定：exec sponsorship curriculum internship mentorship marketing cr。",
-    "    name_zh/en 名字。lead 是哪位 Co-President 帶（a 或 b；exec 沒有）。",
+    "  teams[]      九個，id 固定：exec sponsorship curriculum internship mentorship marketing cr alumni history。history 是機場那座：按進去走 /history/ 那條路，島上沒有人。",
+    "  teams[]      八個，id 固定：exec sponsorship curriculum internship mentorship marketing cr alumni。",
+    "    name_zh/en 名字。lead 是哪位 Co-President 帶（a 或 b；exec 與 alumni 沒有）。",
     "    tagline_zh/en 一句話。about_zh/en 兩三句。",
     "    colour     島的主色，只能是 orange teal navy yellow sand cream grey 之一（品牌七色）。",
     "    programs[] 這個 team 在做的事。id、name、line（一句話）、detail（兩三句，數字只用事實資料庫有的）、link（官網的頁，可留空）、kind（畫成什麼：hall tent booth desk home post pier tower）。",
-    "  people[]     一人一筆。code 不重複；team 對到上面；role 是 copresident director advisor associate；named 預設 false。",
-    "               title_zh/en 是顯示的角色名（named 是 false 時畫面就用這個）。",
-    "               role 決定小人的樣子：Co-President 戴帽、Director 背包、Advisor 拿包、Associate 什麼都不拿。"
+    "  connections[] 島跟島怎麼連：a、b 是 team id，why_zh/en 一句話。畫面上是一條線，卡上是一列。",
+    "  people[]     一人一筆。code 不重複；team 是他住的那座島；role 是 copresident director advisor associate alumni；named 預設 false；title_zh/en 是角色名。",
+    "               also[]   他也參與的另一座島：{ team, role, why_zh/en }。他會不時走過去，卡上列出來。",
+    "               flow     校友專用：{ to（走去哪座島）, carry_zh/en（帶著什麼，牌子上會寫）, why_zh/en（他為什麼在島上）}。",
+    "               line_zh/en 他自己的一句話（可留空）。"
   ],
   "teams": [
     {
-      "id": "exec", "colour": "navy", "lead": "",
-      "name_zh": "Co-President", "name_en": "Co-Presidents",
-      "tagline_zh": "兩位，各帶三個 team。", "tagline_en": "Two of them, three teams each.",
+      "id": "exec",
+      "colour": "navy",
+      "lead": "",
+      "name_zh": "Co-President",
+      "name_en": "Co-Presidents",
+      "tagline_zh": "兩位，各帶三個 team。",
+      "tagline_en": "Two of them, three teams each.",
       "about_zh": "整個組織層級的決定在這裡：這一屆要做什麼、錢往哪裡放、哪些事跨到好幾個 team。兩位 Co-President 都是學生，每年換屆。",
       "about_en": "Organisation-level decisions live here: what this year's group does, where the money goes, anything that crosses several teams. Both Co-Presidents are students, and the group hands over every year.",
       "programs": [
-        { "id": "term", "kind": "tower", "name_zh": "這一屆的計畫", "name_en": "This year's plan",
-          "line_zh": "2026 年 8 月到 2027 年 7 月。", "line_en": "August 2026 to July 2027.",
+        {
+          "id": "term",
+          "kind": "tower",
+          "name_zh": "這一屆的計畫",
+          "name_en": "This year's plan",
+          "line_zh": "2026 年 8 月到 2027 年 7 月。",
+          "line_en": "August 2026 to July 2027.",
           "detail_zh": "BT 每年換一批幹部。每一屆開始時定這一年要做的事，結束時交接給下一屆。這個網站本身就是照「下一個人看得懂、改得動」做的。",
           "detail_en": "A new group takes over every year. Each term starts by deciding what the year is for and ends by handing over. This website is built on the same rule: the next person must be able to read it and change it.",
-          "link": "../about/" },
-        { "id": "handover", "kind": "desk", "name_zh": "換屆交接", "name_en": "Handover",
-          "line_zh": "每年七月，整個組織交給下一屆。", "line_en": "Every July, the whole organisation passes to the next group.",
+          "link": "../about/"
+        },
+        {
+          "id": "handover",
+          "kind": "desk",
+          "name_zh": "換屆交接",
+          "name_en": "Handover",
+          "line_zh": "每年七月，整個組織交給下一屆。",
+          "line_en": "Every July, the whole organisation passes to the next group.",
           "detail_zh": "護照、看板、後台、這個網站，都是為了交接做的工具：讓一位沒寫過程式的新任幹部自己接得起來。",
           "detail_en": "The passport, the time board, the admin area and this site are all handover tools, built so a new organiser who has never written code can take over.",
-          "link": "../history/" }
+          "link": "../history/"
+        }
       ]
     },
     {
-      "id": "sponsorship", "colour": "orange", "lead": "a",
-      "name_zh": "Sponsorship", "name_en": "Sponsorship",
-      "tagline_zh": "贊助與合作。讓這一切對學員維持 0 元。", "tagline_en": "Partnerships and funding. Keeps everything free for students.",
+      "id": "sponsorship",
+      "colour": "orange",
+      "lead": "a",
+      "name_zh": "Sponsorship",
+      "name_en": "Sponsorship",
+      "tagline_zh": "贊助與合作。讓這一切對學員維持 0 元。",
+      "tagline_en": "Partnerships and funding. Keeps everything free for students.",
       "about_zh": "找願意一起做這件事的個人、企業與學校。嘖嘖募資也在這裡：2027 年 3 月 23 日上線，4 月 21 日結束。",
       "about_en": "Finds the people, companies and schools willing to build this with us. The Zeczec crowdfunding campaign lives here too: live 23 March 2027, closes 21 April 2027.",
       "programs": [
-        { "id": "zeczec", "kind": "pier", "name_zh": "嘖嘖募資 2027", "name_en": "Zeczec campaign 2027",
-          "line_zh": "一個 30 天的回饋型專案。", "line_en": "A 30-day reward-based campaign.",
+        {
+          "id": "zeczec",
+          "kind": "pier",
+          "name_zh": "嘖嘖募資 2027",
+          "name_en": "Zeczec campaign 2027",
+          "line_zh": "一個 30 天的回饋型專案。",
+          "line_en": "A 30-day reward-based campaign.",
           "detail_zh": "2027 年 1 月 26 日搶先看、3 月 23 日上線、4 月 21 日結束。募得越多，學生拿到的免費資源越多。贊助者主要是家長與校友。",
           "detail_en": "Early look 26 January 2027, live 23 March, closes 21 April. The more it raises, the more free resources students get. Backers are mostly parents and alumni.",
-          "link": "../stories/" },
-        { "id": "partners", "kind": "hall", "name_zh": "企業與學校合作", "name_en": "Partners",
-          "line_zh": "美國在臺協會、EducationUSA、北一女、好伴 café。", "line_en": "AIT, EducationUSA, Taipei First Girls High School, TRÈS BON café.",
+          "link": "../stories/"
+        },
+        {
+          "id": "partners",
+          "kind": "hall",
+          "name_zh": "企業與學校合作",
+          "name_en": "Partners",
+          "line_zh": "美國在臺協會、EducationUSA、北一女、好伴 café。",
+          "line_en": "AIT, EducationUSA, Taipei First Girls High School, TRÈS BON café.",
           "detail_zh": "合作單位提供場地、講者與資源。想一起做這件事的單位，從官網的合作頁找我們。",
           "detail_en": "Partners provide venues, speakers and resources. Organisations that want to work with us start on the partner page.",
-          "link": "../partner/" }
+          "link": "../partner/"
+        }
       ]
     },
     {
-      "id": "curriculum", "colour": "teal", "lead": "a",
-      "name_zh": "Curriculum", "name_en": "Curriculum",
-      "tagline_zh": "活動內容。探索營的每一堂課都是這裡排的。", "tagline_en": "Programme content. Every bootcamp class is scheduled here.",
+      "id": "curriculum",
+      "colour": "teal",
+      "lead": "a",
+      "name_zh": "Curriculum",
+      "name_en": "Curriculum",
+      "tagline_zh": "活動內容。探索營的每一堂課都是這裡排的。",
+      "tagline_en": "Programme content. Every bootcamp class is scheduled here.",
       "about_zh": "探索營、講座、海外大學資料庫。學員看到的每一份教材、每一個講者，都是這個 team 找來的。",
       "about_en": "The bootcamp, the talks, the college database. Every handout a student sees and every speaker they meet was arranged by this team.",
       "programs": [
-        { "id": "bootcamp", "kind": "tent", "name_zh": "探索營 College Bootcamp", "name_en": "College Bootcamp",
-          "line_zh": "每年寒暑假各一場，兩天，免費。", "line_en": "Twice a year, winter and summer. Two days. Free.",
+        {
+          "id": "bootcamp",
+          "kind": "tent",
+          "name_zh": "探索營 College Bootcamp",
+          "name_en": "College Bootcamp",
+          "line_zh": "每年寒暑假各一場，兩天，免費。",
+          "line_en": "Twice a year, winter and summer. Two days. Free.",
           "detail_zh": "學員看學長姐當年真正送出去的申請文書、改自己的，再跟五、六位不同科系的人聊國外的實際生活。第一屆在 2023 年六月，超過 80 位高中生參加。",
           "detail_en": "Students read the essays alumni actually submitted, rewrite one of their own, and talk with five or six people studying different subjects. The first one ran in June 2023 with more than 80 students.",
-          "link": "../programs/" },
-        { "id": "talks", "kind": "hall", "name_zh": "講座", "name_en": "Talks",
-          "line_zh": "不定期，免費，Instagram 先公布。", "line_en": "Through the year, free, announced on Instagram first.",
+          "link": "../programs/"
+        },
+        {
+          "id": "talks",
+          "kind": "hall",
+          "name_zh": "講座",
+          "name_en": "Talks",
+          "line_zh": "不定期，免費，Instagram 先公布。",
+          "line_en": "Through the year, free, announced on Instagram first.",
           "detail_zh": "2021 年六月的線上博覽會有超過 400 人參加。場次都先在 Instagram 公布。",
           "detail_en": "The June 2021 online fair drew more than 400 people. Dates are always announced on Instagram first.",
-          "link": "../events/" },
-        { "id": "database", "kind": "desk", "name_zh": "海外大學資料庫", "name_en": "College database",
-          "line_zh": "112 所學校，七張表，免費公開。", "line_en": "112 schools, seven tables, free and public.",
+          "link": "../events/"
+        },
+        {
+          "id": "database",
+          "kind": "desk",
+          "name_zh": "海外大學資料庫",
+          "name_en": "College database",
+          "line_zh": "112 所學校，七張表，免費公開。",
+          "line_en": "112 schools, seven tables, free and public.",
           "detail_zh": "放在 Notion，任何人都看得到。每年查驗一次官網連結與門檻。",
           "detail_en": "Hosted on Notion, open to anyone. Links and requirements are re-verified once a year.",
-          "link": "../resources/" }
+          "link": "../resources/"
+        }
       ]
     },
     {
-      "id": "internship", "colour": "yellow", "lead": "a",
-      "name_zh": "Internship", "name_en": "Internship",
-      "tagline_zh": "實習。履歷上有真的做過的事。", "tagline_en": "Internships. Real work on a real CV.",
+      "id": "internship",
+      "colour": "yellow",
+      "lead": "a",
+      "name_zh": "Internship",
+      "name_en": "Internship",
+      "tagline_zh": "實習。履歷上有真的做過的事。",
+      "tagline_en": "Internships. Real work on a real CV.",
       "about_zh": "高中生實習計劃：讓公立高中生在申請之前就有一段真的做過的事。實習生有自己的一本護照。",
-          "about_en": "The high school internship programme gives public school students real work experience before they apply. Interns have a passport of their own.",
+      "about_en": "The high school internship programme gives public school students real work experience before they apply. Interns have a passport of their own.",
       "programs": [
-        { "id": "hs-internship", "kind": "booth", "name_zh": "高中生實習計劃", "name_en": "High school internship",
-          "line_zh": "每學期收一批，從官網報名。", "line_en": "One intake a semester, apply on the site.",
+        {
+          "id": "hs-internship",
+          "kind": "booth",
+          "name_zh": "高中生實習計劃",
+          "name_en": "High school internship",
+          "line_zh": "每學期收一批，從官網報名。",
+          "line_en": "One intake a semester, apply on the site.",
           "detail_zh": "實習生進 BT 的各個 team 做真的事，有自己的實習護照記錄做過什麼。",
           "detail_en": "Interns join BT's teams and do real work, tracked in their own intern passport.",
-          "link": "../apply/" }
+          "link": "../apply/"
+        }
       ]
     },
     {
-      "id": "mentorship", "colour": "teal", "lead": "b",
-      "name_zh": "Mentorship", "name_en": "Mentorship",
-      "tagline_zh": "導生配對。配一位走過同一條路的學長姐。", "tagline_en": "Matching and mentoring. One alumnus who has walked the same road.",
+      "id": "mentorship",
+      "colour": "teal",
+      "lead": "b",
+      "name_zh": "Mentorship",
+      "name_en": "Mentorship",
+      "tagline_zh": "導生配對。配一位走過同一條路的學長姐。",
+      "tagline_en": "Matching and mentoring. One alumnus who has walked the same road.",
       "about_zh": "一學期配對一次，每年約 50 對。不幫寫 essay，陪學生把卡住的地方講清楚。有些配對超過兩年還在聯絡。",
       "about_en": "One matching round a semester, about 50 pairs a year. Mentors do not write essays; they help students say what they are stuck on. Some pairs are still in touch two years on.",
       "programs": [
-        { "id": "mentoring", "kind": "home", "name_zh": "導生配對計畫", "name_en": "Mentorship Program",
-          "line_zh": "一學期配對一次，免費。", "line_en": "One round a semester. Free.",
+        {
+          "id": "mentoring",
+          "kind": "home",
+          "name_zh": "導生配對計畫",
+          "name_en": "Mentorship Program",
+          "line_zh": "一學期配對一次，免費。",
+          "line_en": "One round a semester. Free.",
           "detail_zh": "從 2020 年九月開始，第一批 36 人。2020 年至今超過 250 位學員在申請路上有人可以問。",
           "detail_en": "Started September 2020 with 36 students. Since 2020, more than 250 students have had someone to ask.",
-          "link": "../programs/" },
-        { "id": "alumni", "kind": "pier", "name_zh": "校友回來", "name_en": "Alumni come back",
-          "line_zh": "超過 20 位校友回來當講者。", "line_en": "More than 20 alumni have come back to speak.",
+          "link": "../programs/"
+        },
+        {
+          "id": "alumni",
+          "kind": "pier",
+          "name_zh": "校友回來",
+          "name_en": "Alumni come back",
+          "line_zh": "超過 20 位校友回來當講者。",
+          "line_en": "More than 20 alumni have come back to speak.",
           "detail_zh": "校友自己在設定頁填故事、自己勾同意，就出現在官網的 Alumni 航線圖上。",
           "detail_en": "Alumni write their own story in settings, give consent themselves, and appear on the Alumni route map.",
-          "link": "../alumni/" }
+          "link": "../alumni/"
+        }
       ]
     },
     {
-      "id": "marketing", "colour": "orange", "lead": "b",
-      "name_zh": "Marketing", "name_en": "Marketing",
-      "tagline_zh": "對外的內容與視覺。", "tagline_en": "Everything we say and show publicly.",
+      "id": "marketing",
+      "colour": "orange",
+      "lead": "b",
+      "name_zh": "Marketing",
+      "name_en": "Marketing",
+      "tagline_zh": "對外的內容與視覺。",
+      "tagline_en": "Everything we say and show publicly.",
       "about_zh": "Instagram、大學介紹系列、官網的照片與影片。活動公告以 Instagram 為第一管道。",
       "about_en": "Instagram, the college introduction series, the photos and video on this site. Instagram is the first channel for every announcement.",
       "programs": [
-        { "id": "instagram", "kind": "booth", "name_zh": "Instagram @beyondtaiwan", "name_en": "Instagram @beyondtaiwan",
-          "line_zh": "每一場活動都先在這裡公布。", "line_en": "Every event is announced here first.",
+        {
+          "id": "instagram",
+          "kind": "booth",
+          "name_zh": "Instagram @beyondtaiwan",
+          "name_en": "Instagram @beyondtaiwan",
+          "line_zh": "每一場活動都先在這裡公布。",
+          "line_en": "Every event is announced here first.",
           "detail_zh": "大學介紹貼文從後台做：Marketing 寫、Co-President 核可、排程發出。",
           "detail_en": "College introduction posts are made in the admin area: Marketing writes, a Co-President approves, then they go out on schedule.",
-          "link": "https://www.instagram.com/beyondtaiwan" },
-        { "id": "site", "kind": "desk", "name_zh": "官網", "name_en": "This website",
-          "line_zh": "一個資料夾一頁，零建置。", "line_en": "One folder per page, no build step.",
+          "link": "https://www.instagram.com/beyondtaiwan"
+        },
+        {
+          "id": "site",
+          "kind": "desk",
+          "name_zh": "官網",
+          "name_en": "This website",
+          "line_zh": "一個資料夾一頁，零建置。",
+          "line_en": "One folder per page, no build step.",
           "detail_zh": "首頁的島、Alumni 航線圖、歷史之路，到這座島，都是為了讓下一屆接得起來做的。",
           "detail_en": "The home page island, the Alumni route map, Our Road and this island are all built so the next group can take over.",
-          "link": "../" }
+          "link": "../"
+        }
       ]
     },
     {
-      "id": "cr", "colour": "yellow", "lead": "b",
-      "name_zh": "CR", "name_en": "CR",
-      "tagline_zh": "校園關係。走進公立高中。", "tagline_en": "Campus relations. Into public high schools.",
-      "about_zh": "安排學長姐回公立高中演講，讓資訊到達本來到不了的地方。2021 年十月第一批校園大使 18 位。",
-      "about_en": "Arranges alumni talks at public high schools so the information reaches places it never did. The first 18 campus ambassadors started in October 2021.",
+      "id": "cr",
+      "colour": "yellow",
+      "lead": "b",
+      "name_zh": "Community Relations",
+      "name_en": "Community Relations",
+      "tagline_zh": "社群關係。走進公立高中，也顧著學校與社群的關係。",
+      "tagline_en": "Community relations. Into public high schools, and the ties with schools and the wider community.",
+      "about_zh": "安排學長姐回公立高中演講，讓資訊到達本來到不了的地方；校園大使把消息帶進自己的學校。2021 年十月第一批校園大使 18 位。",
+      "about_en": "Arranges alumni talks at public high schools so the information reaches places it never did; campus ambassadors carry the news into their own schools. The first 18 ambassadors started in October 2021.",
       "programs": [
-        { "id": "school-talks", "kind": "hall", "name_zh": "校園講座", "name_en": "School talks",
-          "line_zh": "學長姐回自己的高中講怎麼申請。", "line_en": "Alumni go back to their own high schools to explain how they applied.",
+        {
+          "id": "school-talks",
+          "kind": "hall",
+          "name_zh": "校園講座",
+          "name_en": "School talks",
+          "line_zh": "學長姐回自己的高中講怎麼申請。",
+          "line_en": "Alumni go back to their own high schools to explain how they applied.",
           "detail_zh": "講完把 BT 的 Instagram 留在黑板上。很多學員第一次聽到這條路就是在這一場。",
           "detail_en": "They leave BT's Instagram on the board. For many students this talk is the first time they hear the road exists.",
-          "link": "../impact/" },
-        { "id": "ambassadors", "kind": "post", "name_zh": "校園大使", "name_en": "Campus ambassadors",
-          "line_zh": "在校的高中生，幫 BT 把消息帶進學校。", "line_en": "High school students who carry the news into their schools.",
+          "link": "../impact/"
+        },
+        {
+          "id": "ambassadors",
+          "kind": "post",
+          "name_zh": "校園大使",
+          "name_en": "Campus ambassadors",
+          "line_zh": "在校的高中生，幫 BT 把消息帶進學校。",
+          "line_en": "High school students who carry the news into their schools.",
           "detail_zh": "2021 年十月第一批 18 位。",
           "detail_en": "The first 18 started in October 2021.",
-          "link": "../join/" }
+          "link": "../join/"
+        }
+      ]
+    },
+    {
+      "id": "alumni",
+      "colour": "sand",
+      "lead": "",
+      "name_zh": "校友",
+      "name_en": "Alumni",
+      "tagline_zh": "走過這條路的人，回來了。",
+      "tagline_en": "People who walked the road, and came back.",
+      "about_zh": "校友不是一個 team，是每一座島上都有的人：回來當講者、當 mentor、幫忙看文件、把消息帶回母校。2025 年五月校友帳號超過 85 個，超過 20 位校友回來當過講者。這座島上的人會走到他在幫忙的那座島。",
+      "about_en": "Alumni are not a team; they are on every island: coming back as speakers, as mentors, to read essays, to carry the news back to their old schools. More than 85 alumni accounts by May 2025; more than 20 have come back to speak. The people on this island walk over to the island they help.",
+      "programs": [
+        {
+          "id": "come-back",
+          "kind": "pier",
+          "name_zh": "回來",
+          "name_en": "Come back",
+          "line_zh": "講者、mentor、看文件、回母校。",
+          "line_en": "Speakers, mentors, essay readers, school visits.",
+          "detail_zh": "校友自己在設定頁填故事、自己勾同意，就出現在官網的 Alumni 航線圖上。想回來幫忙，從那裡開始。",
+          "detail_en": "Alumni write their own story in settings and give consent themselves, and appear on the Alumni route map. Coming back to help starts there.",
+          "link": "../alumni/"
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "colour": "navy",
+      "lead": "",
+      "name_zh": "歷史之路",
+      "name_en": "Our Road",
+      "tagline_zh": "BT 怎麼走過來。從這座機場出發。",
+      "tagline_en": "How BT got here. Depart from this airport.",
+      "about_zh": "2020 年五月七個人開始，到現在近三十位幹部分布七個國家。這座島上沒有人，只有一座機場：按進去，就沿著那條路一站一站走。",
+      "about_en": "Seven people in May 2020, close to thirty organisers across seven countries now. Nobody lives on this island; it is just an airport. Go in and walk the road, one stop at a time.",
+      "programs": [
+        {
+          "id": "road",
+          "kind": "airport",
+          "name_zh": "走那條路",
+          "name_en": "Walk the road",
+          "line_zh": "從七個人到七個國家，一站一站。",
+          "line_en": "From seven people to seven countries, one stop at a time.",
+          "detail_zh": "歷史之路是官網上另一頁：捲動就沿著一條路走，每一站可以點開看那一年的說明與照片。後台可以自己加站。",
+          "detail_en": "Our Road is another page on the site: scroll to walk a road, open any stop to read about that year. Stops are added from the admin area.",
+          "link": "../history/"
+        }
       ]
     }
   ],
   "people": [
-    { "code": "exec-1", "team": "exec", "role": "copresident", "named": false, "title_zh": "Co-President", "title_en": "Co-President" },
-    { "code": "exec-2", "team": "exec", "role": "copresident", "named": false, "title_zh": "Co-President", "title_en": "Co-President" },
-
-    { "code": "sp-dir", "team": "sponsorship", "role": "director", "named": false, "title_zh": "Director", "title_en": "Director" },
-    { "code": "sp-adv-1", "team": "sponsorship", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "sp-1", "team": "sponsorship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "sp-2", "team": "sponsorship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "sp-3", "team": "sponsorship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-
-    { "code": "cu-dir", "team": "curriculum", "role": "director", "named": false, "title_zh": "Director", "title_en": "Director" },
-    { "code": "cu-adv-1", "team": "curriculum", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "cu-adv-2", "team": "curriculum", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "cu-1", "team": "curriculum", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "cu-2", "team": "curriculum", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "cu-3", "team": "curriculum", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "cu-4", "team": "curriculum", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-
-    { "code": "in-dir", "team": "internship", "role": "director", "named": false, "title_zh": "Director", "title_en": "Director" },
-    { "code": "in-adv-1", "team": "internship", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "in-1", "team": "internship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "in-2", "team": "internship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "in-3", "team": "internship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-
-    { "code": "me-dir", "team": "mentorship", "role": "director", "named": false, "title_zh": "Director", "title_en": "Director" },
-    { "code": "me-adv-1", "team": "mentorship", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "me-adv-2", "team": "mentorship", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "me-1", "team": "mentorship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "me-2", "team": "mentorship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "me-3", "team": "mentorship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "me-4", "team": "mentorship", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-
-    { "code": "mk-dir", "team": "marketing", "role": "director", "named": false, "title_zh": "Director", "title_en": "Director" },
-    { "code": "mk-adv-1", "team": "marketing", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "mk-1", "team": "marketing", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "mk-2", "team": "marketing", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-    { "code": "mk-3", "team": "marketing", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" },
-
-    { "code": "cr-dir", "team": "cr", "role": "director", "named": false, "title_zh": "Director", "title_en": "Director" },
-    { "code": "cr-adv-1", "team": "cr", "role": "advisor", "named": false, "title_zh": "Advisor", "title_en": "Advisor" },
-    { "code": "cr-1", "team": "cr", "role": "associate", "named": false, "title_zh": "Associate", "title_en": "Associate" }
+    {
+      "code": "paul",
+      "team": "exec",
+      "role": "copresident",
+      "named": true,
+      "name_zh": "Paul",
+      "name_en": "Paul",
+      "title_zh": "Co-President",
+      "title_en": "Co-President",
+      "also": [
+        {
+          "team": "sponsorship",
+          "role": "director",
+          "why_zh": "親自帶 Sponsorship 與嘖嘖募資。",
+          "why_en": "Runs Sponsorship and the crowdfunding campaign himself."
+        }
+      ],
+      "line_zh": "讓組織不再卡在任何一個人身上。",
+      "line_en": "Make sure the organisation never depends on one person."
+    },
+    {
+      "code": "alysia",
+      "team": "exec",
+      "role": "copresident",
+      "named": true,
+      "name_zh": "Alysia",
+      "name_en": "Alysia",
+      "title_zh": "Co-President",
+      "title_en": "Co-President",
+      "also": [
+        {
+          "team": "sponsorship",
+          "role": "associate",
+          "why_zh": "網站與視覺那一塊。",
+          "why_en": "The website and visuals side."
+        }
+      ],
+      "line_zh": "帶 Mentorship、Marketing、Community Relations 三個 team。",
+      "line_en": "Leads Mentorship, Marketing and Community Relations."
+    },
+    {
+      "code": "emily",
+      "team": "sponsorship",
+      "role": "advisor",
+      "named": true,
+      "name_zh": "Emily",
+      "name_en": "Emily",
+      "title_zh": "Advisor",
+      "title_en": "Advisor",
+      "also": [
+        {
+          "team": "mentorship",
+          "role": "advisor",
+          "why_zh": "同時是 Mentorship 的 Advisor。",
+          "why_en": "Also an Advisor on Mentorship."
+        }
+      ],
+      "line_zh": "回饋品與出貨。",
+      "line_en": "Rewards and shipping."
+    },
+    {
+      "code": "ann-chen",
+      "team": "sponsorship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Ann Chen",
+      "name_en": "Ann Chen",
+      "title_zh": "Associate",
+      "title_en": "Associate",
+      "also": [
+        {
+          "team": "curriculum",
+          "role": "advisor",
+          "why_zh": "同時是 Curriculum 的 Advisor。",
+          "why_en": "Also an Advisor on Curriculum."
+        }
+      ],
+      "line_zh": "提案與行銷。",
+      "line_en": "Proposals and marketing."
+    },
+    {
+      "code": "evelyn-kuei",
+      "team": "sponsorship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Evelyn Kuei",
+      "name_en": "Evelyn Kuei",
+      "title_zh": "Associate",
+      "title_en": "Associate",
+      "also": [
+        {
+          "team": "curriculum",
+          "role": "advisor",
+          "why_zh": "同時是 Curriculum 的 Advisor。",
+          "why_en": "Also an Advisor on Curriculum."
+        }
+      ],
+      "line_zh": "故事線與營運治理。",
+      "line_en": "Storyline and operations."
+    },
+    {
+      "code": "ann-lin",
+      "team": "curriculum",
+      "role": "director",
+      "named": true,
+      "name_zh": "Ann Lin",
+      "name_en": "Ann Lin",
+      "title_zh": "Director",
+      "title_en": "Director",
+      "also": [
+        {
+          "team": "internship",
+          "role": "advisor",
+          "why_zh": "同時是 Internship 的 Advisor。",
+          "why_en": "Also an Advisor on Internship."
+        }
+      ],
+      "line_zh": "每一場探索營的課表。",
+      "line_en": "Every bootcamp's schedule."
+    },
+    {
+      "code": "lucy",
+      "team": "curriculum",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Lucy",
+      "name_en": "Lucy",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "pheobe",
+      "team": "curriculum",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Pheobe",
+      "name_en": "Pheobe",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "mina",
+      "team": "curriculum",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Mina",
+      "name_en": "Mina",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "emma",
+      "team": "curriculum",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Emma",
+      "name_en": "Emma",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "sarah",
+      "team": "internship",
+      "role": "director",
+      "named": true,
+      "name_zh": "Sarah",
+      "name_en": "Sarah",
+      "title_zh": "Director",
+      "title_en": "Director",
+      "line_zh": "高中生實習計劃。",
+      "line_en": "The high school internship programme."
+    },
+    {
+      "code": "in-minor-1",
+      "team": "internship",
+      "role": "associate",
+      "named": false,
+      "name_zh": "",
+      "name_en": "",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "eason",
+      "team": "internship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Eason",
+      "name_en": "Eason",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "davi",
+      "team": "internship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Davi",
+      "name_en": "Davi",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "elaine",
+      "team": "mentorship",
+      "role": "advisor",
+      "named": true,
+      "name_zh": "Elaine",
+      "name_en": "Elaine",
+      "title_zh": "Advisor",
+      "title_en": "Advisor"
+    },
+    {
+      "code": "evelyn-chiang",
+      "team": "mentorship",
+      "role": "director",
+      "named": true,
+      "name_zh": "Evelyn Chiang",
+      "name_en": "Evelyn Chiang",
+      "title_zh": "Director",
+      "title_en": "Director",
+      "line_zh": "一學期配對一次。",
+      "line_en": "One matching round a semester."
+    },
+    {
+      "code": "enya",
+      "team": "mentorship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Enya",
+      "name_en": "Enya",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "kathryn",
+      "team": "mentorship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Kathryn",
+      "name_en": "Kathryn",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "kaitlyn",
+      "team": "mentorship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Kaitlyn",
+      "name_en": "Kaitlyn",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "melody",
+      "team": "mentorship",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Melody",
+      "name_en": "Melody",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "sophie",
+      "team": "marketing",
+      "role": "advisor",
+      "named": true,
+      "name_zh": "Sophie",
+      "name_en": "Sophie",
+      "title_zh": "Advisor",
+      "title_en": "Advisor"
+    },
+    {
+      "code": "charity",
+      "team": "marketing",
+      "role": "director",
+      "named": true,
+      "name_zh": "Charity",
+      "name_en": "Charity",
+      "title_zh": "Director",
+      "title_en": "Director",
+      "line_zh": "Instagram 與每一支影片。",
+      "line_en": "Instagram and every video."
+    },
+    {
+      "code": "cynthia",
+      "team": "marketing",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Cynthia",
+      "name_en": "Cynthia",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "mk-minor-1",
+      "team": "marketing",
+      "role": "associate",
+      "named": false,
+      "name_zh": "",
+      "name_en": "",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "sharon",
+      "team": "marketing",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Sharon",
+      "name_en": "Sharon",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "jeremy",
+      "team": "cr",
+      "role": "advisor",
+      "named": true,
+      "name_zh": "Jeremy",
+      "name_en": "Jeremy",
+      "title_zh": "Advisor",
+      "title_en": "Advisor",
+      "line_zh": "協會的理事長。",
+      "line_en": "Chair of the association's board."
+    },
+    {
+      "code": "jean",
+      "team": "cr",
+      "role": "director",
+      "named": true,
+      "name_zh": "Jean",
+      "name_en": "Jean",
+      "title_zh": "Director",
+      "title_en": "Director",
+      "line_zh": "讓學長姐回到公立高中。",
+      "line_en": "Gets alumni back into public high schools."
+    },
+    {
+      "code": "elsa",
+      "team": "cr",
+      "role": "associate",
+      "named": true,
+      "name_zh": "Elsa",
+      "name_en": "Elsa",
+      "title_zh": "Associate",
+      "title_en": "Associate"
+    },
+    {
+      "code": "al-1",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "林 O 恩",
+      "name_en": "林 O 恩",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "cr",
+        "carry_zh": "演講",
+        "carry_en": "Talk",
+        "why_zh": "2024 年回母校演講，講自己怎麼申請。",
+        "why_en": "Went back to speak at his old school in 2024 about how he applied."
+      },
+      "line_zh": "那天台下有一個人，現在是學員。",
+      "line_en": "Someone in that room is a student now.",
+      "sample": true
+    },
+    {
+      "code": "al-2",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "陳 O 妤",
+      "name_en": "陳 O 妤",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "mentorship",
+        "carry_zh": "配對",
+        "carry_en": "Pairing",
+        "why_zh": "2023 年起每學期當 mentor。",
+        "why_en": "A mentor every semester since 2023."
+      },
+      "line_zh": "我只比他們早走兩步。",
+      "line_en": "I am only two steps ahead of them.",
+      "sample": true
+    },
+    {
+      "code": "al-3",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "王 O 翔",
+      "name_en": "王 O 翔",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "curriculum",
+        "carry_zh": "申請文書",
+        "carry_en": "Essays",
+        "why_zh": "2023 年第一屆探索營的學員，現在在國外念大二，把當年的文書借給下一屆看。",
+        "why_en": "Student at the first bootcamp in 2023, now a sophomore abroad; lends his essays to the next group."
+      },
+      "line_zh": "那份文件現在換別人改。",
+      "line_en": "Someone else is editing that essay now.",
+      "sample": true
+    },
+    {
+      "code": "al-4",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "李 O 庭",
+      "name_en": "李 O 庭",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "mentorship",
+        "carry_zh": "故事",
+        "carry_en": "Story",
+        "why_zh": "2022 年的學員，留在台灣念大學，回來告訴學弟妹留下來也是一種選。",
+        "why_en": "A 2022 student who stayed in Taiwan for university; comes back to say staying is a choice too."
+      },
+      "line_zh": "我看完每一扇門才選的。",
+      "line_en": "I chose after seeing every gate.",
+      "sample": true
+    },
+    {
+      "code": "al-5",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "張 O 睿",
+      "name_en": "張 O 睿",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "curriculum",
+        "carry_zh": "講者",
+        "carry_en": "Speaker",
+        "why_zh": "2025 年探索營的講者，講國外的實際生活。",
+        "why_en": "Spoke at the 2025 bootcamp about real life abroad."
+      },
+      "line_zh": "他們問的問題跟我當年一樣。",
+      "line_en": "They ask the same questions I did.",
+      "sample": true
+    },
+    {
+      "code": "al-6",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "黃 O 安",
+      "name_en": "黃 O 安",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "marketing",
+        "carry_zh": "影片",
+        "carry_en": "Video",
+        "why_zh": "前 Marketing 幹部，畢業後還在幫忙剪影片。",
+        "why_en": "Former Marketing cadre, still cuts video after graduating."
+      },
+      "line_zh": "交接的時候我把範本留下來了。",
+      "line_en": "I left the templates behind when I handed over.",
+      "sample": true
+    },
+    {
+      "code": "al-7",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "吳 O 柔",
+      "name_en": "吳 O 柔",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "cr",
+        "carry_zh": "校園大使",
+        "carry_en": "Ambassador",
+        "why_zh": "2021 年第一批校園大使，現在回來帶新的大使。",
+        "why_en": "One of the first campus ambassadors in 2021, now training the new ones."
+      },
+      "line_zh": "消息是人帶進學校的。",
+      "line_en": "News walks into a school with a person.",
+      "sample": true
+    },
+    {
+      "code": "al-8",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "劉 O 宇",
+      "name_en": "劉 O 宇",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "internship",
+        "carry_zh": "實習",
+        "carry_en": "Internship",
+        "why_zh": "2025 年的實習生，現在念大一，回來帶這一屆的實習生。",
+        "why_en": "A 2025 intern, now a freshman, back to guide this year's interns."
+      },
+      "line_zh": "履歷上第一件真的做過的事。",
+      "line_en": "The first real thing on my CV.",
+      "sample": true
+    },
+    {
+      "code": "al-9",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "蔡 O 寧",
+      "name_en": "蔡 O 寧",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "mentorship",
+        "carry_zh": "便宜的門",
+        "carry_en": "The cheap door",
+        "why_zh": "2024 年的學員，走社區大學轉學那條路，回來講這條路真的走得通。",
+        "why_en": "A 2024 student who took the community college road; comes back to show it is real."
+      },
+      "line_zh": "沒有人跟我說過那扇門也是門。",
+      "line_en": "Nobody told me that door was a door.",
+      "sample": true
+    },
+    {
+      "code": "al-10",
+      "team": "alumni",
+      "role": "alumni",
+      "named": true,
+      "name_zh": "鄭 O 葳",
+      "name_en": "鄭 O 葳",
+      "title_zh": "校友",
+      "title_en": "Alumni",
+      "flow": {
+        "to": "exec",
+        "carry_zh": "交接",
+        "carry_en": "Handover",
+        "why_zh": "上一屆的 Co-President，交接之後留下來當顧問。",
+        "why_en": "Last year's Co-President, stayed on as an adviser after the handover."
+      },
+      "line_zh": "明年這些人也會在這座島上。",
+      "line_en": "Next year these people will be on this island too.",
+      "sample": true
+    }
+  ],
+  "connections": [
+    {
+      "a": "curriculum",
+      "b": "mentorship",
+      "why_zh": "探索營結束，學員接著申請配對一位 mentor。",
+      "why_en": "After the bootcamp, students apply to be paired with a mentor."
+    },
+    {
+      "a": "cr",
+      "b": "curriculum",
+      "why_zh": "校園講座聽到的人，下一步就是報名探索營。",
+      "why_en": "Students who hear a school talk sign up for the bootcamp next."
+    },
+    {
+      "a": "sponsorship",
+      "b": "curriculum",
+      "why_zh": "贊助與募資讓探索營對學員維持 0 元。",
+      "why_en": "Sponsorship and the campaign keep the bootcamp free for students."
+    },
+    {
+      "a": "marketing",
+      "b": "curriculum",
+      "why_zh": "每一場探索營都先在 Instagram 公布。",
+      "why_en": "Every bootcamp is announced on Instagram first."
+    },
+    {
+      "a": "marketing",
+      "b": "cr",
+      "why_zh": "校園講座的場次與回顧由 Marketing 發。",
+      "why_en": "Marketing posts the school talks and their recaps."
+    },
+    {
+      "a": "internship",
+      "b": "curriculum",
+      "why_zh": "實習生在探索營現場幫忙。",
+      "why_en": "Interns help run the bootcamp on the day."
+    },
+    {
+      "a": "internship",
+      "b": "marketing",
+      "why_zh": "實習生幫 Marketing 做貼文與影片。",
+      "why_en": "Interns help Marketing with posts and video."
+    },
+    {
+      "a": "sponsorship",
+      "b": "exec",
+      "why_zh": "嘖嘖募資由一位 Co-President 親自帶。",
+      "why_en": "A Co-President leads the crowdfunding campaign in person."
+    },
+    {
+      "a": "mentorship",
+      "b": "alumni",
+      "why_zh": "Mentor 幾乎都是校友。",
+      "why_en": "Almost every mentor is an alumnus."
+    },
+    {
+      "a": "cr",
+      "b": "alumni",
+      "why_zh": "回母校演講的是校友。",
+      "why_en": "The people who go back to speak at their schools are alumni."
+    },
+    {
+      "a": "curriculum",
+      "b": "alumni",
+      "why_zh": "探索營的講者與文件範例來自校友。",
+      "why_en": "Bootcamp speakers and sample essays come from alumni."
+    },
+    {
+      "a": "exec",
+      "b": "alumni",
+      "why_zh": "每一屆的 Co-President 下一年就是校友。",
+      "why_en": "Every year's Co-Presidents are next year's alumni."
+    },
+    {
+      "a": "history",
+      "b": "exec",
+      "why_zh": "每一屆都是這條路上的一站。",
+      "why_en": "Every year's group is one more stop on the road."
+    }
   ]
 }

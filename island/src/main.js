@@ -13,7 +13,7 @@ const ME_KEY = "bt-island-me";
 
 let lang = doc.getAttribute("data-lang") || "zh";
 let data = null, scene = null, loop = null, sel = null, me = null;
-const ui = { names: false, paused: false, bird: false };
+const ui = { names: false, paused: false, bird: false, flows: false };
 
 // ── 語言 ──
 function setLang(l) {
@@ -30,7 +30,7 @@ function pushLabels() {
   if (!scene || !data) return;
   const teams = {}, people = { programs: {} };
   for (const tm of data.teams) { teams[tm.id] = tm["name_" + lang] || tm.name_zh; for (const p of tm.programs) people.programs[p.id] = p["name_" + lang] || p.name_zh; }
-  for (const p of data.people) people[p.code] = D.label(p, lang);
+  for (const p of data.people) people[p.code] = D.label(p, lang) + (p.flow ? " · " + (p.flow["carry_" + lang] || p.flow.carry_zh) : "");
   scene.labels({ teams, people, me: me ? me.name + " " + t("meYou", lang) : "" });
 }
 
@@ -39,9 +39,9 @@ function renderIndex() { if (data) $("tree").innerHTML = UI.indexHTML(data, lang
 function renderCard() {
   const card = $("card"), body = $("card-content");
   if (!sel || !data) { card.hidden = true; body.innerHTML = ""; return; }
-  if (sel.kind === "team") { const tm = D.teamById(data, sel.team); if (!tm) return close(); body.innerHTML = UI.teamCardHTML(tm, lang); }
+  if (sel.kind === "team") { const tm = D.teamById(data, sel.team); if (!tm) return close(); body.innerHTML = UI.teamCardHTML(tm, lang, data); }
   else if (sel.kind === "program") { const p = D.programById(data, sel.program), tm = p && D.teamById(data, p.team); if (!p) return close(); body.innerHTML = UI.programCardHTML(p, tm, lang); }
-  else if (sel.kind === "person") { const p = D.personByCode(data, sel.code); if (!p) return close(); body.innerHTML = UI.personCardHTML(p, D.teamById(data, p.team), lang); }
+  else if (sel.kind === "person") { const p = D.personByCode(data, sel.code); if (!p) return close(); body.innerHTML = UI.personCardHTML(p, D.teamById(data, p.team), lang, data); }
   card.hidden = false; card.scrollTop = 0;
 }
 function select(s, fromHash) {
@@ -67,6 +67,7 @@ $("lang").addEventListener("click", () => setLang(lang === "zh" ? "en" : "zh"));
 $("tb-home").addEventListener("click", () => { ui.bird = false; $("tb-bird").setAttribute("aria-pressed", "false"); select(null); });
 $("tb-names").addEventListener("click", () => { ui.names = !ui.names; $("tb-names").setAttribute("aria-pressed", String(ui.names)); if (scene) scene.names(ui.names); });
 $("tb-pause").addEventListener("click", () => { ui.paused = !ui.paused; $("tb-pause").setAttribute("aria-pressed", String(ui.paused)); $("tb-pause").textContent = t(ui.paused ? "play" : "pause", lang); if (loop) loop.pause(ui.paused); });
+$("tb-flows").addEventListener("click", () => { ui.flows = !ui.flows; $("tb-flows").setAttribute("aria-pressed", String(ui.flows)); if (scene) scene.flows(ui.flows); });
 $("tb-bird").addEventListener("click", () => { ui.bird = !ui.bird; $("tb-bird").setAttribute("aria-pressed", String(ui.bird)); if (scene) scene.bird(ui.bird); });
 $("tb-index").addEventListener("click", () => $("sidebar").classList.toggle("open"));
 $("sidebar-close").addEventListener("click", () => $("sidebar").classList.remove("open"));
@@ -101,6 +102,9 @@ function freeCentre() {
   return ((left + right) / 2) / W;
 }
 
+// 空出來那一塊佔視窗寬的比例（卡與清單之外）。手機上是 1。
+function freeWidth() { const W = innerWidth; if (W < 900) return 1; const card = $("card"), side = $("sidebar"); const left = card.hidden ? 0 : card.getBoundingClientRect().right; return Math.max(0.3, (side.getBoundingClientRect().left - left) / W); }
+
 // ── 開頁 ──
 function paletteFromCSS() { const cs = getComputedStyle(doc), v = k => cs.getPropertyValue(k).trim(); return { navy: v("--bt-navy"), teal: v("--bt-teal"), orange: v("--bt-orange"), sand: v("--bt-sand"), cream: v("--bt-cream"), yellow: v("--bt-yellow"), grey: v("--bt-grey") }; }
 async function boot() {
@@ -112,7 +116,7 @@ async function boot() {
   // 3D：動態 import（Three 從 cdnjs 來）。載不到或沒有 WebGL：留清單與卡，上面印一句。
   const mod = await Promise.race([import("./scene.js").catch(e => { console.warn("3D 載不進來：", e); return null; }), new Promise(r => setTimeout(() => r(null), 10000))]);
   if (mod) {
-    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: () => {}, freeCentre }); }
+    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: () => {}, freeCentre, freeWidth }); }
     catch (e) { console.warn("3D 開不起來：", e); scene = null; }
   }
   if (!scene) { doc.classList.add("no3d"); $("no3d").hidden = false; }

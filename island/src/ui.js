@@ -1,10 +1,10 @@
 // /island/ 畫面的純函式：吃資料與語言，吐 HTML 字串。不碰 DOM。
 import { t } from "./strings.js";
-import { label } from "./data.js";
+import { label, connectionsOf, visitorsOf, teamById } from "./data.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const L = (o, k, lang) => esc(o[k + "_" + lang] || o[k + "_zh"] || "");
-const roleKey = r => ({ copresident: "roleCopresident", director: "roleDirector", advisor: "roleAdvisor", associate: "roleAssociate" }[r] || "roleAssociate");
+const roleKey = r => ({ copresident: "roleCopresident", director: "roleDirector", advisor: "roleAdvisor", associate: "roleAssociate", alumni: "roleAlumni" }[r] || "roleAssociate");
 
 // ── 右邊的清單：team 一列，底下做的事 ──
 export function indexHTML(d, lang, selected) {
@@ -17,15 +17,22 @@ export function indexHTML(d, lang, selected) {
 }
 
 // ── 左邊的卡：一座島 ──
-export function teamCardHTML(tm, lang) {
+export function teamCardHTML(tm, lang, d) {
   const lead = tm.lead ? `<p class="card-lead">${esc(t("leadBy", lang))}</p>` : "";
   const programs = tm.programs.map(p => `<li><button type="button" class="prog" data-go-program="${p.id}" data-team="${tm.id}"><span class="prog-name">${L(p, "name", lang)}</span><span class="prog-line">${L(p, "line", lang)}</span></button></li>`).join("");
   const people = tm.people.map(p => `<li><button type="button" class="pp" data-go-person="${p.code}"><span class="pp-dot r-${p.role}"></span>${esc(label(p, lang))}</button></li>`).join("");
+  const links = d ? connectionsOf(d, tm.id) : [];
+  const works = links.length ? `<h3 class="card-sub">${esc(t("worksWith", lang))}</h3><ul class="links">${links.map(c => { const o = teamById(d, c.team); return o ? `<li><button type="button" class="lnk" data-go-team="${o.id}"><span class="lnk-team c-${o.colour}">${L(o, "name", lang)}</span><span class="lnk-why">${L(c, "why", lang)}</span></button></li>` : ""; }).join("")}</ul>` : "";
+  const vis = d ? visitorsOf(d, tm.id) : [];
+  const visitors = vis.length ? `<h3 class="card-sub">${esc(t("visitors", lang))}</h3><ul class="pps">${vis.map(p => `<li><button type="button" class="pp" data-go-person="${p.code}"><span class="pp-dot r-${p.role}"></span>${esc(label(p, lang))}</button></li>`).join("")}</ul>` : "";
+  const note = tm.id === "alumni" ? t("sampleNote", lang) : t("namesNote", lang);
   return `<div class="card-head"><span class="card-kicker c-${tm.colour}">${esc(t("indexHead", lang))}</span><h2 class="card-h">${L(tm, "name", lang)}</h2><p class="card-tag">${L(tm, "tagline", lang)}</p></div>
     ${lead}<p class="card-about">${L(tm, "about", lang)}</p>
     <h3 class="card-sub">${esc(t("programs", lang))}</h3><ul class="progs">${programs}</ul>
+    ${works}
     <h3 class="card-sub">${esc(t("people", lang))} <span class="card-n">${esc(t("countPeople", lang, { n: tm.people.length }))}</span></h3><ul class="pps">${people}</ul>
-    <p class="card-note">${esc(t("unnamed", lang))} <a href="../team/?lang=${lang}">${esc(t("teamPage", lang))}</a></p>`;
+    ${visitors}
+    <p class="card-note">${esc(note)} <a href="../team/?lang=${lang}">${esc(t("teamPage", lang))}</a></p>`;
 }
 // ── 一件在做的事 ──
 export function programCardHTML(p, tm, lang) {
@@ -34,10 +41,14 @@ export function programCardHTML(p, tm, lang) {
     <p class="card-about">${L(p, "detail", lang)}</p>${link}`;
 }
 // ── 一個人 ──
-export function personCardHTML(p, tm, lang) {
+export function personCardHTML(p, tm, lang, d) {
+  const line = p["line_" + lang] || p.line_zh ? `<p class="card-line">${L(p, "line", lang)}</p>` : "";
+  const also = (p.also || []).map(a => { const o = d ? teamById(d, a.team) : null; return o ? `<li><button type="button" class="lnk" data-go-team="${o.id}"><span class="lnk-team c-${o.colour}">${esc(t("alsoOn", lang))} ${L(o, "name", lang)}</span><span class="lnk-why">${L(a, "why", lang)}</span></button></li>` : ""; }).join("");
+  const flow = p.flow && d ? (() => { const o = teamById(d, p.flow.to); return o ? `<li><button type="button" class="lnk" data-go-team="${o.id}"><span class="lnk-team c-${o.colour}">${esc(t("goesTo", lang))} ${L(o, "name", lang)} · ${L(p.flow, "carry", lang)}</span><span class="lnk-why">${L(p.flow, "why", lang)}</span></button></li>` : ""; })() : "";
+  const links = also || flow ? `<ul class="links">${also}${flow}</ul>` : "";
   return `<div class="card-head"><button type="button" class="card-back" data-go-team="${tm.id}">${L(tm, "name", lang)}</button><h2 class="card-h">${esc(label(p, lang))}</h2><p class="card-tag">${esc(t(roleKey(p.role), lang))}</p></div>
-    <p class="card-about">${L(tm, "tagline", lang)}</p>
-    ${p.named ? "" : `<p class="card-note">${esc(t("unnamed", lang))}</p>`}`;
+    ${line}<p class="card-about">${L(tm, "tagline", lang)}</p>${links}
+    <p class="card-note">${esc(p.sample ? t("sampleNote", lang) : t("namesNote", lang))}</p>`;
 }
 // ── 把自己放上去 ──
 export function meFormHTML(d, lang, me) {

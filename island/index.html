@@ -8,8 +8,9 @@
 <!-- /island/ BT 島（2026-11-16）
 
      Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項）之後定的：
-     用同一種做法把 BT 這一屆的組織畫成一座島：中間是 Co-President，外圍六座島是六個 team，每座島上是這個 team 在做的事（一樣一棟）
-     與島上的人（一個人一個大頭小人，在島上走來走去）。點一座島、一棟房子、一個人，左邊開一張卡；右邊一份清單。
+     用同一種做法把 BT 這一屆的組織畫成一座島：中間是 Co-President，外圍六座島是六個 team，最外面一座是校友，每座島上是這個 team 在做的事（一樣一棟）
+     與島上的人（一個人一個大頭小人，在島上走來走去；也參與別座島的人會走過去，校友會走到他在幫忙的那座島）。島與島之間有協作線。
+     點一座島、一棟房子、一個人，左邊開一張卡；右邊一份清單。
      他還指名要「把自己放上去」：取個稱呼、挑一座島、選顏色，你就站在那座島上（只存在這台裝置的瀏覽器，別人看不到）。
 
      ── 這一頁在做什麼 ──
@@ -28,9 +29,9 @@
      ── 不掛 nav.js ──
      這一頁是一張地圖不是功能清單。左上一個回首頁的 logo 就夠。 -->
 
-<meta name="description" content="Beyond Taiwan 這一屆的組織：七座島、六個 team、近三十個人，點一座島看他們在做什麼。">
+<meta name="description" content="Beyond Taiwan 這一屆的組織：八座島、六個 team、回來的校友，點一座島看他們在做什麼、跟誰連。">
 <meta property="og:title" content="BT 島 / Beyond Taiwan">
-<meta property="og:description" content="七座島，六個 team。點一座島，看他們在做什麼。">
+<meta property="og:description" content="八座島，六個 team，校友。點一座島，看他們在做什麼。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/island/">
 <meta name="theme-color" content="#EDE5D8">
@@ -54,8 +55,8 @@
 <link rel="modulepreload" href="./src/layout.js">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap"></noscript>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
 <link rel="stylesheet" href="../shared/brand.css">
 <link rel="stylesheet" href="./island.css">
 
@@ -84,13 +85,14 @@
   <div class="brand-text">
     <p class="eyebrow" data-t="eyebrow">這一屆的 Beyond Taiwan</p>
     <h1><span class="zh">BT 島</span><span class="en">BT Island</span></h1>
-    <p class="sub"><span class="zh">七座島，六個 team，近三十個人，全部是學生。點一座島，或點島上的人。</span><span class="en">Seven islands, six teams, close to thirty people, all students. Tap an island, or anyone on it.</span></p>
+    <p class="sub"><span class="zh">八座島：六個 team、兩位 Co-President、回來的校友。點一座島，或點島上的人。</span><span class="en">Eight islands: six teams, two Co-Presidents and the alumni who came back. Tap an island, or anyone on it.</span></p>
   </div>
 </header>
 
 <nav class="toolbar" aria-label="地圖操作 / Map controls">
   <button type="button" id="tb-home" data-t="overview">全景</button>
   <button type="button" id="tb-names" class="tg" aria-pressed="false" data-t="names">名牌</button>
+  <button type="button" id="tb-flows" class="tg" aria-pressed="false" data-t="flows">協作線</button>
   <button type="button" id="tb-pause" class="tg" aria-pressed="false">暫停</button>
   <button type="button" id="tb-bird" class="tg" aria-pressed="false" data-t="bird">鳥瞰</button>
   <button type="button" id="tb-me" class="me-btn" data-t="me">把自己放上去</button>
@@ -105,7 +107,7 @@
   <div class="side-head">
     <p class="eyebrow" data-t="indexHead">THE TEAM INDEX</p>
     <h2 data-t="indexTitle">每一座島在做的事。</h2>
-    <p class="side-lead" data-t="indexLead">六個 team、兩位 Co-President。點一個 team 看它在做什麼、有誰。</p>
+    <p class="side-lead" data-t="indexLead">六個 team、兩位 Co-President、校友。點一個看它在做什麼、有誰、跟誰連。</p>
     <button type="button" class="side-close mob-only" id="sidebar-close" aria-label="關閉清單 / Close">×</button>
   </div>
   <main id="tree" class="tree-wrap">
