@@ -56,7 +56,13 @@ function select(s, fromHash) {
 function close() { select(null); }
 
 // ── 點 ──
+// 貼文放大看：按一則先在中間放大，按圖或那顆按鈕才到 Instagram；× 或 Esc 或按旁邊關掉。
+function openPost(id) { const x = data && data.instagram ? data.instagram.posts.find(p => p.id === id) : null; if (!x) return; $("lb-box").innerHTML = UI.postBigHTML(x, lang); $("lb").hidden = false; $("lb-box").querySelector(".lb-go").focus(); }
+function closePost() { $("lb").hidden = true; }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("lb").hidden) closePost(); });
 document.addEventListener("click", e => {
+  const post = e.target.closest("[data-post]"); if (post) { openPost(Number(post.dataset.post)); return; }
+  if (e.target.closest("[data-lb-close]") || (e.target.id === "lb")) { closePost(); return; }
   const tm = e.target.closest("[data-go-team]"); if (tm) { select({ kind: "team", team: tm.dataset.goTeam }); return; }
   const pr = e.target.closest("[data-go-program]"); if (pr) { select({ kind: "program", team: pr.dataset.team, program: pr.dataset.goProgram }); return; }
   const pp = e.target.closest("[data-go-person]"); if (pp) { if (pp.dataset.goPerson === "me") { openMe(); return; } select({ kind: "person", code: pp.dataset.goPerson }); return; }
@@ -74,7 +80,7 @@ $("tb-index").addEventListener("click", () => $("sidebar").classList.toggle("ope
 $("sidebar-close").addEventListener("click", () => $("sidebar").classList.remove("open"));
 $("tb-me").addEventListener("click", openMe);
 addEventListener("hashchange", () => { const s = D.parseHash(location.hash); select(s.kind === "overview" ? null : s, true); });
-addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("me").hidden) closeMe(); else if (sel) close(); } });
+addEventListener("keydown", e => { if (e.key === "Escape" && $("lb").hidden) { if (!$("me").hidden) closeMe(); else if (sel) close(); } });
 
 // ── 把自己放上去（只存在這台裝置）──
 function loadMe() { try { return D.normalizeMe(JSON.parse(localStorage.getItem(ME_KEY) || "null"), data.teams); } catch (e) { return null; } }
@@ -128,9 +134,9 @@ async function boot() {
   pushLabels();
   if (start.kind !== "overview") select(start, true);
   // 跟官網其他頁接起來：活動（/events/ 那一份）與真的校友（/alumni/ 那一份）。拿不到就當沒有。
-  const [events, alumni, instagram] = await Promise.all([D.loadEvents(), D.loadAlumni(), D.loadPosts("./")]);
+  const [events, alumni, instagram] = await Promise.all([D.loadEvents(), D.loadAlumni(), D.loadPosts("./", data.teams)]);
   data.instagram = instagram; if (sel && sel.kind === "program") renderCard();
-  if (scene) scene.posts(instagram.posts.filter(x => x.image).map(x => "./" + x.image));
+  if (scene) scene.posts(D.postsOf(instagram, "instagram").filter(x => x.image).map(x => "./" + x.image));
   data.events = events;
   if (alumni.length) { D.mergeAlumni(data, alumni); if (scene) scene.people(data.people); }
   if (scene) scene.events(events.filter(e => e.state === "open").map(e => ({ team: e.team, title: e["title_" + lang] || e.title_zh, link: e.link })));

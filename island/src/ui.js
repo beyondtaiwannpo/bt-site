@@ -1,6 +1,6 @@
 // /island/ 畫面的純函式：吃資料與語言，吐 HTML 字串。不碰 DOM。
 import { t } from "./strings.js";
-import { label, connectionsOf, visitorsOf, teamById, eventsOf } from "./data.js";
+import { label, connectionsOf, visitorsOf, teamById, eventsOf, postsOf } from "./data.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const L = (o, k, lang) => esc(o[k + "_" + lang] || o[k + "_zh"] || "");
@@ -41,15 +41,23 @@ export function teamCardHTML(tm, lang, d) {
     <p class="card-note">${esc(note)} <a href="../team/?lang=${lang}">${esc(t("teamPage", lang))}</a></p>`;
 }
 // ── 一件在做的事 ──
-// Instagram 那一棟：卡上多一段貼文清單（island/instagram.json，Marketing 自己貼的連結）。
-export function postsHTML(ig, lang) {
-  if (!ig || !ig.posts || !ig.posts.length) return "";
-  return `<h3 class="card-sub">${esc(t("posts", lang))}</h3><ul class="igs">${ig.posts.map(x => `<li><a class="ig${x.image ? " has-img" : ""}" href="${esc(x.url)}" rel="noopener" target="_blank">${x.image ? `<img class="ig-img" src="./${esc(x.image)}" alt="" loading="lazy" width="64" height="64">` : `<span class="ig-kind ig-${x.kind}">${esc(t(x.kind === "reel" ? "igReel" : "igPost", lang))}</span>`}<span class="ig-cap">${L(x, "caption", lang)}</span><span class="ig-date">${esc(t(x.kind === "reel" ? "igReel" : "igPost", lang))} · ${esc(x.date)}</span></a></li>`).join("")}</ul>
-    ${ig.profile ? `<a class="card-link" href="${esc(ig.profile)}" rel="noopener" target="_blank">${esc(t("igProfile", lang, { handle: ig.handle }))}</a>` : ""}<p class="card-note">${esc(t("igNote", lang))}</p>`;
+// 貼文清單（island/posts.json，掛在哪一樣在做的事底下就列在那張卡上）。
+// 一則是一顆按鈕不是連結：按了先在畫面中間放大（main.js 的 lightbox），再按一次才到 Instagram（Paul 2026-11-17）。
+export function postsHTML(posts, lang, ig) {
+  if (!posts || !posts.length) return "";
+  return `<h3 class="card-sub">${esc(t("posts", lang))}</h3><ul class="igs">${posts.map(x => `<li><button type="button" class="ig${x.image ? " has-img" : ""}" data-post="${x.id}">${x.image ? `<img class="ig-img" src="./${esc(x.image)}" alt="" loading="lazy" width="64" height="64">` : `<span class="ig-kind ig-${x.kind}">${esc(t(x.kind === "reel" ? "igReel" : "igPost", lang))}</span>`}<span class="ig-cap">${L(x, "caption", lang)}</span><span class="ig-date">${esc(t(x.kind === "reel" ? "igReel" : "igPost", lang))} · ${esc(x.date)}</span></button></li>`).join("")}</ul>
+    ${ig && ig.profile ? `<a class="card-link" href="${esc(ig.profile)}" rel="noopener" target="_blank">${esc(t("igProfile", lang, { handle: ig.handle }))}</a>` : ""}<p class="card-note">${esc(t("igNote", lang))}</p>`;
+}
+// 放大看一則（畫面中間）。按圖或那顆按鈕才到 Instagram。
+export function postBigHTML(x, lang) {
+  return `<button type="button" class="lb-close" data-lb-close aria-label="${esc(t("close", lang))}">×</button>
+    <a class="lb-pic" href="${esc(x.url)}" rel="noopener" target="_blank">${x.image ? `<img src="./${esc(x.image)}" alt="">` : `<span class="lb-nopic ig-${x.kind}">${esc(t(x.kind === "reel" ? "igReel" : "igPost", lang))}</span>`}</a>
+    <p class="lb-cap">${L(x, "caption", lang)}</p><p class="lb-meta">${esc(t(x.kind === "reel" ? "igReel" : "igPost", lang))} · ${esc(x.date)}</p>
+    <a class="btn-primary lb-go" href="${esc(x.url)}" rel="noopener" target="_blank">${esc(t("igOpen", lang))}</a>`;
 }
 export function programCardHTML(p, tm, lang, d) {
   const link = p.link ? `<a class="card-link" href="${esc(p.link)}"${/^https:/.test(p.link) ? ' rel="noopener"' : ""}>${esc(t("more", lang))}</a>` : "";
-  const posts = p.id === "instagram" && d ? postsHTML(d.instagram, lang) : "";
+  const posts = d ? postsHTML(postsOf(d.instagram, p.id), lang, p.id === "instagram" ? d.instagram : null) : "";
   return `<div class="card-head"><button type="button" class="card-back" data-go-team="${tm.id}">${L(tm, "name", lang)}</button><h2 class="card-h">${L(p, "name", lang)}</h2><p class="card-tag">${L(p, "line", lang)}</p></div>
     <p class="card-about">${L(p, "detail", lang)}</p>${posts}${link}`;
 }

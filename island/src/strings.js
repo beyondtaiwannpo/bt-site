@@ -65,7 +65,8 @@ export const STR = {
   igPost:      { zh: "貼文", en: "Post" },
   igReel:      { zh: "影片", en: "Reel" },
   igProfile:   { zh: "到 Instagram 看 @{handle}", en: "See @{handle} on Instagram" },
-  igNote:      { zh: "這幾則是 Marketing 自己挑的，放在 island/instagram.json。", en: "Marketing picks these; they live in island/instagram.json." },
+  igNote:      { zh: "按一則先放大看，再按一次到 Instagram。清單在 island/posts.json。", en: "Tap one to see it large, tap again to open it on Instagram. The list lives in island/posts.json." },
+  igOpen:      { zh: "到 Instagram 看這一則", en: "Open this on Instagram" },
 };
 export function t(key, lang, vars) {
   const e = STR[key]; if (!e) return key;

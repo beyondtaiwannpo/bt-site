@@ -1,16 +1,19 @@
 {
   "_readme": [
-    "這一份是 /island/ Marketing 那座島上的「貼文牆」：島上三塊海報板貼的是最上面三則有圖的貼文；點 Instagram 那一棟，卡上列出全部，按了到 Instagram 看。",
-    "Paul 2026-11-17：「for marketing team… get a few posts from our Instagram and put it up there」，再說「Yes, add images」。",
-    "為什麼不是自動抓：抓 Instagram 要 API 的 token、而且要從 instagram.com 載程式，這個 repo 不從 cdnjs 以外的地方載東西。所以是 Marketing 自己把連結與圖貼進來，一則一筆，新的放最上面，留五到八則就好。",
-    "欄位：url（只收 https://www.instagram.com/ 開頭）、caption_zh/caption_en（一句話，自己寫，不用抄整段）、date（YYYY-MM-DD）、kind（post 或 reel）、image（可空；posts/代號.jpg，圖放在 island/posts/，640 px 寬、80 KB 以內：sips -Z 640 -s format jpeg -s formatOptions 70 原圖 --out island/posts/代號.jpg）。",
-    "⚠ 圖只放海報、圖卡這類沒有人臉的；有人的照片要先確認每一位都同意，未成年一律不放臉也不放名字（CLAUDE.md 的紅線）。沒有 image 的那一則，板子上畫的是顏色不是圖。",
-    "check.sh 守著：island/posts/ 最多 12 張、每張 80 KB 以內、每張都要在這一份裡被用到。"
+    "這一份是 /island/ 島上的貼文：每一則掛在一樣「在做的事」（program）底下。點那一棟，卡上列出它的貼文；點一則，先在畫面中間放大看，再點一次才到 Instagram。",
+    "Paul 2026-11-17：「press and then it's gonna show up in the middle first, and then once you press it again, it goes to our Instagram」「if bootcamp for curriculum, can there be a post to represent that」。",
+    "為什麼不是自動抓：抓 Instagram 要 API 的 token、而且要從 instagram.com 載程式，這個 repo 不從 cdnjs 以外的地方載東西。所以是人把連結與圖貼進來，一則一筆，新的放最上面。",
+    "欄位：program（teams.json 裡 programs 的 id，例如 instagram、database、bootcamp、talks；填錯的那一則不會出現）、url（只收 https://www.instagram.com/ 開頭）、caption_zh/caption_en（一句話，自己寫，不用抄整段）、date（YYYY-MM-DD）、kind（post 或 reel）、image（可空；posts/代號.jpg，圖放在 island/posts/，640 px 寬、80 KB 以內：sips -Z 640 -s format jpeg -s formatOptions 70 原圖 --out island/posts/代號.jpg）。",
+    "Marketing 那座島的貼文牆（三塊板子）貼的是 program 是 instagram、最上面三則有圖的。",
+    "⚠ 圖只放海報、圖卡這類沒有人臉的；有人的照片要先確認每一位都同意，未成年一律不放臉也不放名字（CLAUDE.md 的紅線）。沒有 image 的那一則，畫面上是顏色不是圖。",
+    "check.sh 守著：island/posts/ 最多 12 張、每張 80 KB 以內、每張都要在這一份裡被用到。",
+    "之後要讓不會寫程式的人在後台貼（不改這個檔）：要一張資料表、後台一個分頁、一支對外的函式，見 README「BT 島」那一節的「還沒做」。"
   ],
   "handle": "beyondtaiwan",
   "profile": "https://www.instagram.com/beyondtaiwan/",
   "posts": [
     {
+      "program": "instagram",
       "url": "https://www.instagram.com/beyondtaiwan/p/Df1S1BtG_a8/",
       "kind": "post",
       "date": "2026-11-16",
@@ -19,6 +22,7 @@
       "caption_en": "The nine stages every international student goes through. Which one are you on?"
     },
     {
+      "program": "database",
       "url": "https://www.instagram.com/beyondtaiwan/p/DfrEFQEFgyp/",
       "kind": "post",
       "date": "2026-11-12",
@@ -27,6 +31,7 @@
       "caption_en": "College intro series: the University of Tokyo. Basics, popular majors, admission routes and dates in one post."
     },
     {
+      "program": "database",
       "url": "https://www.instagram.com/beyondtaiwan/p/DfjQgrzFhRq/",
       "kind": "post",
       "date": "2026-11-09",
@@ -35,6 +40,7 @@
       "caption_en": "Everything to know before applying to universities in Singapore. Save it for later."
     },
     {
+      "program": "instagram",
       "url": "https://www.instagram.com/beyondtaiwan/reel/DfYuFyXuikI/",
       "kind": "reel",
       "date": "2026-11-05",
@@ -42,6 +48,7 @@
       "caption_en": "BT Vlog, episode 3: a day at a high school in Utah with one of our Internship associates."
     },
     {
+      "program": "database",
       "url": "https://www.instagram.com/beyondtaiwan/p/DfOcqipjqju/",
       "kind": "post",
       "date": "2026-11-01",
@@ -50,6 +57,7 @@
       "caption_en": "Applying to universities in Korea? Spring and fall intake timelines, documents and interviews, stage by stage."
     },
     {
+      "program": "instagram",
       "url": "https://www.instagram.com/beyondtaiwan/reel/De0htb1uvyg/",
       "kind": "reel",
       "date": "2026-10-28",
@@ -57,6 +65,7 @@
       "caption_en": "If you could apply to college again, what would you change? Alumni studying abroad look back and advise their high-school selves."
     },
     {
+      "program": "instagram",
       "url": "https://www.instagram.com/beyondtaiwan/reel/Des_DS1uKTI/",
       "kind": "reel",
       "date": "2026-10-24",
@@ -64,6 +73,7 @@
       "caption_en": "BT Vlog, episode 2: a day at UW-Madison with Co-President Alysia."
     },
     {
+      "program": "talks",
       "url": "https://www.instagram.com/beyondtaiwan/p/DemhR1MmwT8/",
       "kind": "post",
       "date": "2026-10-17",
@@ -72,6 +82,7 @@
       "caption_en": "Speakers wanted for Overseas Unpacked, a one-day event in Taipei on 3 January 2027, for anyone who studied abroad and wants to share."
     },
     {
+      "program": "instagram",
       "url": "https://www.instagram.com/beyondtaiwan/p/DdNoIbjjtkQ/",
       "kind": "post",
       "date": "2026-09-12",

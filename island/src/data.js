@@ -174,12 +174,16 @@ export const loadAlumni = () => rpc("public_alumni").then(alumniToPeople).catch(
 // ── Marketing 的貼文牆（Paul 2026-11-17：「get a few posts from our Instagram and put it up there」）──
 // instagram.json 是 Marketing 自己貼的連結清單（抓 Instagram 要 token 與外站程式，這個 repo 不做）。
 // 只收 https://www.instagram.com/ 開頭的連結；壞的一筆丟掉，整份拿不到就當沒有。
-export function normalizePosts(raw) {
+// 每一則掛在一樣「在做的事」底下（program），點那一棟才列出來；program 填錯的那一則不顯示（有 teams 的話對得到才算）。
+export function normalizePosts(raw, teams) {
   const posts = raw && Array.isArray(raw.posts) ? raw.posts : [];
+  const known = teams ? new Set(teams.flatMap(tm => tm.programs.map(p => p.id))) : null;
   return { handle: str(raw && raw.handle).replace(/^@/, ""), profile: /^https:\/\/www\.instagram\.com\//.test(str(raw && raw.profile)) ? str(raw.profile) : "",
-    posts: posts.filter(x => x && /^https:\/\/www\.instagram\.com\/[A-Za-z0-9_./-]+$/.test(str(x.url))).map(x => ({
+    posts: posts.filter(x => x && /^https:\/\/www\.instagram\.com\/[A-Za-z0-9_./-]+$/.test(str(x.url)) && (!known || known.has(str(x.program) || "instagram"))).map((x, i) => ({
+      id: i, program: str(x.program) || "instagram",
       url: str(x.url), kind: x.kind === "reel" ? "reel" : "post", date: str(x.date).slice(0, 10),
       image: /^posts\/[A-Za-z0-9_-]+\.jpg$/.test(str(x.image)) ? str(x.image) : "",   // 只收 island/posts/ 裡的檔名
       caption_zh: str(x.caption_zh) || str(x.caption_en), caption_en: str(x.caption_en) || str(x.caption_zh) })).slice(0, 12) };
 }
-export const loadPosts = base => fetch((base || "./") + "instagram.json").then(r => r.json()).then(normalizePosts).catch(() => normalizePosts(null));
+export const postsOf = (ig, programId) => (ig && ig.posts ? ig.posts : []).filter(x => x.program === programId);
+export const loadPosts = (base, teams) => fetch((base || "./") + "posts.json").then(r => r.json()).then(raw => normalizePosts(raw, teams)).catch(() => normalizePosts(null));

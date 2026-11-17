@@ -1942,19 +1942,19 @@ isThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
     if (!uses && f === "scene.js") bad.push("scene.js 沒有從 importmap 的 three 載");
   }
   // 模型與貼圖一律程式幾何；唯一的例外是 island/posts/：Marketing 貼文牆的縮圖（2026-11-17 Paul 要真的圖），
-  // 檔名只能是 Instagram 的代號、每張不超過 80 KB、最多 12 張，而且每一張都要在 instagram.json 裡被用到。
+  // 檔名只能是 Instagram 的代號、每張不超過 80 KB、最多 12 張，而且每一張都要在 posts.json 裡被用到。
   const bin = fs.readdirSync("island", { recursive: true }).map(String).filter(f => /\.(glb|gltf|obj|fbx|bin|ktx2|hdr|png|jpg|jpeg|webp)$/i.test(f) && !/^posts\//.test(f));
   if (bin.length) bad.push("island/ 裡放了模型或圖檔（全部要用程式幾何，只有 island/posts/ 的貼文縮圖例外）：" + bin.join("、"));
   const posts = fs.existsSync("island/posts") ? fs.readdirSync("island/posts") : [];
-  const ig = JSON.parse(fs.readFileSync("island/instagram.json", "utf8"));
+  const ig = JSON.parse(fs.readFileSync("island/posts.json", "utf8"));
   const used = new Set((ig.posts || []).map(x => x.image).filter(Boolean));
   if (posts.length > 12) bad.push("island/posts/ 超過 12 張（" + posts.length + "）：舊的拿掉，牆上放不下那麼多");
   for (const f of posts) {
     if (!/^[A-Za-z0-9_-]+\.jpg$/.test(f)) bad.push("island/posts/" + f + " 檔名要是 Instagram 的代號加 .jpg");
     const kb = fs.statSync("island/posts/" + f).size / 1024; if (kb > 80) bad.push("island/posts/" + f + " 有 " + Math.round(kb) + " KB，超過 80 KB（sips -Z 640 -s formatOptions 70）");
-    if (!used.has("posts/" + f)) bad.push("island/posts/" + f + " 沒有被 instagram.json 用到（刪掉或補一筆）");
+    if (!used.has("posts/" + f)) bad.push("island/posts/" + f + " 沒有被 posts.json 用到（刪掉或補一筆）");
   }
-  for (const u of used) if (!posts.includes(u.replace(/^posts\//, ""))) bad.push("instagram.json 指到不存在的圖：" + u);
+  for (const u of used) if (!posts.includes(u.replace(/^posts\//, ""))) bad.push("posts.json 指到不存在的圖：" + u);
   const js = fs.readdirSync("island/src").reduce((n, f) => n + fs.statSync("island/src/" + f).size, 0);
   if (js > 250 * 1024) bad.push("island/src 的 JS 加起來 " + Math.round(js / 1024) + " KB，超過 250 KB（不含 Three）");
   // 人全部是角色代號：named 是 true 的那一筆才可以有名字。公開 repo 上不該有未經同意的名字。
