@@ -81,7 +81,18 @@ export function normalizeMe(raw, teams) {
   const shirt = Math.min(5, Math.max(0, parseInt(raw.shirt, 10) || 0)), hair = Math.min(2, Math.max(0, parseInt(raw.hair, 10) || 0));
   return { name, team, shirt, hair };
 }
-export async function load(base) { const r = await fetch((base || "./") + "teams.json"); return normalize(await r.json()); }
+// 島、在做的事、協作線先讀資料庫（後台 /admin/site/#island-map 改的，public_island()），八座島都在就用它；讀不到或不齊就退回 teams.json。
+// 只放角色的範例人（people）永遠從 teams.json 來（資料庫那邊沒有這一份）。
+export async function load(base) {
+  const file = await fetch((base || "./") + "teams.json").then(r => r.json());
+  const db = await rpc("public_island").catch(() => null);
+  return normalize(mergeMap(file, db));
+}
+export function mergeMap(file, db) {
+  const ok = db && Array.isArray(db.teams) && db.teams.length === TEAM_ORDER.length && TEAM_ORDER.every(id => db.teams.some(t => t && t.id === id));
+  if (!ok) return file;
+  return { ...file, teams: db.teams, connections: Array.isArray(db.connections) ? db.connections : [], fromDb: true };
+}
 
 // ── 跟官網其他頁接起來（2026-11-16 Paul：「I want them to be connected」）──
 // 活動：/events/ 讀的 public_events() 同一份。每一場有 team（例如 "Curriculum Team"），對到這裡的島。

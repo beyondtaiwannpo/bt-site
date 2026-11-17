@@ -312,6 +312,23 @@ export async function uploadIslandImage(postId, blob) {
   return data.publicUrl;
 }
 
+// ── BT 島的島、在做的事、協作線（2026-11-17）────────────────────────────
+export async function loadIslandMap() {
+  need();
+  const [t, p, c] = await Promise.all([
+    supabase.from("island_teams").select("id, name_zh, name_en, tagline_zh, tagline_en, about_zh, about_en, colour, lead, sea, ground, scenery, trees, workspace").order("id"),
+    supabase.from("island_programs").select("id, team_id, kind, name_zh, name_en, line_zh, line_en, detail_zh, detail_en, link, sort").order("sort").order("id"),
+    supabase.from("island_connections").select("id, a, b, why_zh, why_en"),
+  ]);
+  for (const r of [t, p, c]) if (r.error) throw r.error;
+  return { teams: t.data || [], programs: p.data || [], connections: c.data || [] };
+}
+export async function upsertIslandTeam(patch) { need(); const { data, error } = await supabase.rpc("upsert_island_team", { p_patch: patch }); if (error) throw error; return data; }
+export async function upsertIslandProgram(patch) { need(); const { data, error } = await supabase.rpc("upsert_island_program", { p_patch: patch }); if (error) throw error; return data; }
+export async function deleteIslandProgram(id) { need(); const { data, error } = await supabase.rpc("delete_island_program", { p_id: id }); if (error) throw error; return data; }
+export async function upsertIslandConnection(patch) { need(); const { data, error } = await supabase.rpc("upsert_island_connection", { p_patch: patch }); if (error) throw error; return data; }
+export async function deleteIslandConnection(id) { need(); const { data, error } = await supabase.rpc("delete_island_connection", { p_id: id }); if (error) throw error; return data; }
+
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
@@ -352,6 +369,10 @@ const SAYS = [
   // 歷史之路（2026-11-06）
   ["consent_required", "有照片還沒勾「拍攝同意已確認」，勾了才上得去。", "A photo is still missing the consent tick; tick it before this can go live."],
   ["bad_program", "沒有選這一則掛在哪一棟。", "Pick which building this post hangs on."],
+  ["bad_slug", "代號要是小寫英文、數字、連字號，2 到 40 字。", "The code has to be lowercase letters, digits and hyphens, 2 to 40 characters."],
+  ["bad_team", "沒有這座島，或兩頭是同一座。", "No such island, or both ends are the same island."],
+  ["bad_link", "連結要是 ../ 開頭的站內路徑，或 https://。", "The link has to be a ../ site path or start with https://."],
+  ["last_program", "一座島至少要留一棟，不能全刪掉。", "An island keeps at least one building; this is the last one."],
   ["url_not_https", "連結要以 https:// 開頭。", "The link has to start with https://."],
   ["need_both_titles", "中文與英文標題都要填才上得去。", "Both the Chinese and English titles are needed to go live."],
   ["need_date", "日期要填。", "The date is required."],

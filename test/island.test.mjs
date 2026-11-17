@@ -270,3 +270,31 @@ test("後台 BT 島的貼文：team 是「改」才貼得了自己那座島、�
   assert.ok(!ro.includes("data-autosave") && !ro.includes('data-act="ip-publish"'));
   assert.equal(typeof loadIslandPrograms, "function");
 });
+
+// 島、在做的事、協作線搬進資料庫（2026-11-17 第七次）：島先讀 public_island()，八座都在才用；後台的清單與一座島的表單畫得出來，權限跟貼文同一條。
+test("島的地圖：資料庫回八座島就用它（範例人仍從 teams.json 來），不齊就退回檔案；後台 BT 島的清單與表單", () => {
+  const file = JSON.parse(fs.readFileSync("island/teams.json", "utf8"));
+  const dbTeams = file.teams.map(t => ({ ...t, tagline_zh: "後台改過的" }));
+  const merged = D.mergeMap(file, { teams: dbTeams, connections: [{ a: "curriculum", b: "internship", why_zh: "x" }] });
+  assert.equal(merged.fromDb, true); assert.equal(merged.teams[0].tagline_zh, "後台改過的"); assert.equal(merged.connections.length, 1); assert.equal(merged.people, file.people);
+  assert.equal(D.mergeMap(file, { teams: dbTeams.slice(0, 7) }), file, "少一座島就退回檔案");
+  assert.equal(D.mergeMap(file, null), file); assert.equal(D.mergeMap(file, { teams: [] }), file);
+  const nd = D.normalize(merged); assert.equal(nd.teams.length, 8); assert.equal(nd.connections.length, 1);
+  SITE.setLang("zh");
+  const map = { teams: file.teams.map(t => ({ id: t.id, name_zh: t.name_zh, name_en: t.name_en, tagline_zh: t.tagline_zh, tagline_en: t.tagline_en, about_zh: t.about_zh, about_en: t.about_en, colour: t.colour, lead: t.lead || "", sea: !!t.sea, ground: t.ground, scenery: t.scenery, trees: t.trees, workspace: t.workspace })),
+    programs: file.teams.flatMap(t => t.programs.map((p, i) => ({ ...p, team_id: t.id, sort: (i + 1) * 10 }))), connections: file.connections.map((c, i) => ({ ...c, id: "c" + i })) };
+  const edit = { role: "cadre", board: "member", ws: { "res:Curriculum Team": "edit" } };
+  const pres = { role: "cadre", board: "president", ws: {} };
+  const list = SITE.islandMapListHTML(map, edit, "", false);
+  assert.ok(list.includes('data-act="im-open" data-id="curriculum"') && list.includes("協作線") && !list.includes('data-act="im-conn-add"'), "team 的人看得到清單，加不了協作線");
+  assert.ok(SITE.islandMapListHTML(map, pres, "", false).includes('data-act="im-conn-add"'));
+  const cu = map.teams.find(t => t.id === "curriculum");
+  const form = SITE.islandTeamEditHTML(cu, map.programs.filter(p => p.team_id === "curriculum"), edit, "", false);
+  assert.ok(form.includes('data-autosave="im-team-save" data-id="curriculum"') && form.includes('data-autosave="im-prog-save" data-id="bootcamp"') && form.includes('data-act="im-prog-add"'));
+  assert.ok(form.includes('<option value="tiles" selected>') && form.includes('<option value="classroom" selected>'));
+  const me = map.teams.find(t => t.id === "mentorship");
+  const ro = SITE.islandTeamEditHTML(me, map.programs.filter(p => p.team_id === "mentorship"), edit, "", false);
+  assert.ok(!ro.includes("data-autosave") && !ro.includes('data-act="im-prog-add"') && ro.includes("改不動"), "別座島只能看");
+  const one = SITE.islandTeamEditHTML(map.teams.find(t => t.id === "internship"), map.programs.filter(p => p.team_id === "internship"), pres, "", false);
+  assert.ok(/data-act="im-prog-del"[^>]*disabled/.test(one), "一座島最後一棟的「拆掉」是灰的");
+});

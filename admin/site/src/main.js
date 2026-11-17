@@ -23,6 +23,8 @@ let S = {
   hist: [], hiSel: null, hiUp: null,
   // BT 島上的貼文（2026-11-17）：ip 是清單；ipSel 打開的那一則 id（"new" 是新的）；ipPrograms 可以掛的那幾棟（讀 /island/teams.json）；ipUp 上傳中。
   ip: [], ipSel: null, ipPrograms: [], ipUp: null,
+  // BT 島的島、在做的事、協作線（2026-11-17）：im 是 loadIslandMap() 的 { teams, programs, connections }；imSel 打開的那座島。
+  im: null, imSel: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -56,6 +58,11 @@ function render() {
     body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
   } else if (S.view === "res-edit") {
     body = UI.resEditHTML(S.resEditing, S.msg, S.busy);
+  } else if (S.view === "island-map") {
+    body = UI.islandMapListHTML(S.im, S.me, S.msg, S.busy);
+  } else if (S.view === "island-map-edit") {
+    const t = S.im && S.im.teams.find(x => x.id === S.imSel);
+    body = t ? UI.islandTeamEditHTML(t, S.im.programs.filter(p => p.team_id === t.id), S.me, S.msg, S.busy) : UI.emptyHTML(T("im.notFound"), "", { act: "im-back", label: T("im.back") });
   } else if (S.view === "island") {
     body = UI.islandListHTML(S.ip, S.me, S.msg, S.busy, S.ipPrograms);
   } else if (S.view === "island-edit") {
@@ -75,7 +82,7 @@ function render() {
     body = UI.resListHTML(S.res, canEdit(), S.msg, isPres(), UI.mpItems(S.me, "res:", S.workspaces));
   }
   // 側欄亮哪一行：編輯畫面算在它所屬的那個分頁底下。
-  const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res", "history-edit": "history", "island-edit": "island" }[S.view] || S.view;
+  const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res", "history-edit": "history", "island-edit": "island", "island-map-edit": "island-map" }[S.view] || S.view;
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
@@ -127,6 +134,8 @@ async function openTab(want) {
   const hi = /^history(?:\/([a-z0-9-]+))?$/.exec(want || "");
   if (hi) { await openHistory(hi[1] || null); return; }
   // BT 島上的貼文（2026-11-17）：#island 清單，#island/<id> 一則，#island/new 新的一則。
+  const im = /^island-map(?:\/([a-z0-9-]+))?$/.exec(want || "");
+  if (im) { await openIslandMap(im[1] || null); return; }
   const ip = /^island(?:\/([a-z0-9-]+))?$/.exec(want || "");
   if (ip) { await openIsland(ip[1] || null); return; }
   if (want === "events" && isPres()) { S.busy = true; try { S.siteEvents = await D.loadSiteEvents(); S.view = "events"; S.msg = ""; } catch (e) { S.msg = T("err.seLoad") + D.says(e); } S.busy = false; render(); return; }
@@ -170,6 +179,19 @@ async function openStories() {
     S.view = "stories"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.storiesLoad") + D.says(e); }
   render();
+}
+
+// ── BT 島的島、在做的事、協作線（2026-11-17）────────────────────────────
+async function openIslandMap(sel) {
+  S.busy = true; render();
+  try { S.im = await D.loadIslandMap(); S.imSel = sel; S.view = sel ? "island-map-edit" : "island-map"; S.busy = false; }
+  catch (e) { S.busy = false; S.msg = T("err.imLoad") + D.says(e); }
+  render();
+}
+async function reloadIslandMap(msg) {
+  S.msg = msg || "";
+  try { S.im = await D.loadIslandMap(); } catch (e) { S.msg = T("err.imLoad") + D.says(e); }
+  S.busy = false; render();
 }
 
 // ── BT 島上的貼文（2026-11-17）────────────────────────────────────────
@@ -316,6 +338,19 @@ async function onAutosave(act, box, field) {
   if (!dirty.changed(key, serial)) return;
   const saved = (text) => { dirty.mark(key, serial); UI.autosaveState(liveBox(box), "saved"); UI.toast(text); };
 
+  if (act === "im-team-save" || act === "im-prog-save" || act === "im-conn-save") {
+    const patch = {};
+    for (const k of Object.keys(v)) patch[k] = (k === "trees" || k === "sort") ? Number(v[k]) : v[k];
+    if (act === "im-prog-save" && patch.link && !/^(\.\.\/|https:\/\/)/.test(patch.link)) { autosaveFail(box, D.says({ message: "bad_link" })); return; }
+    UI.autosaveState(box, "saving");
+    try {
+      if (act === "im-team-save") { await D.upsertIslandTeam(Object.assign({ id }, patch)); const t = S.im.teams.find(x => x.id === id); if (t) Object.assign(t, patch); }
+      else if (act === "im-prog-save") { await D.upsertIslandProgram(Object.assign({ id }, patch)); const p = S.im.programs.find(x => x.id === id); if (p) Object.assign(p, patch); }
+      else { await D.upsertIslandConnection(Object.assign({ id }, patch)); const c = S.im.connections.find(x => x.id === id); if (c) Object.assign(c, patch); }
+      saved(T("msg.imSaved"));
+    } catch (err) { autosaveFail(box, T("err.imSave") + D.says(err)); }
+    return;
+  }
   if (act === "ip-save") {
     const patch = readIslandPost(); if (!patch) return;
     if (!patch.program) { autosaveFail(box, T("err.ipProgram")); return; }
@@ -515,6 +550,40 @@ document.addEventListener("click", async e => {
       S.busy = false; S.msg = "";
     } catch (err) { S.busy = false; S.msg = T("err.change") + D.says(err); }
     render();
+    return;
+  }
+
+  // ── BT 島的島、在做的事、協作線（2026-11-17）──
+  if (act === "im-open") { e.preventDefault(); history.pushState(null, "", "#island-map/" + id); await openIslandMap(id); return; }
+  if (act === "im-back") { history.pushState(null, "", "#island-map"); await openIslandMap(null); return; }
+  if (act === "im-prog-add") {
+    const g = x => document.getElementById(x); const slug = (g("im-new-slug").value || "").trim().toLowerCase();
+    if (!/^[a-z0-9-]{2,40}$/.test(slug)) { S.msg = T("err.imSlug"); render(); return; }
+    const zh = g("im-new-zh").value.trim(), en = g("im-new-en").value.trim(); if (!zh && !en) { S.msg = T("err.imName"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try { await D.upsertIslandProgram({ id: slug, team_id: id, kind: g("im-new-kind").value, name_zh: zh, name_en: en, sort: 100 + S.im.programs.filter(p => p.team_id === id).length * 10 }); await reloadIslandMap(T("msg.imBuilding")); }
+    catch (err) { S.busy = false; S.msg = T("err.imSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "im-prog-del") {
+    if (UI.needAsk(S, b, T("confirm.imDelBuilding"))) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.deleteIslandProgram(id); await reloadIslandMap(T("msg.imBuildingDel")); }
+    catch (err) { S.busy = false; S.msg = T("err.imSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "im-conn-add") {
+    const g = x => document.getElementById(x);
+    S.busy = true; S.msg = ""; render();
+    try { await D.upsertIslandConnection({ a: g("im-conn-a").value, b: g("im-conn-b").value, why_zh: g("im-conn-zh").value.trim(), why_en: g("im-conn-en").value.trim() }); await reloadIslandMap(T("msg.imConn")); }
+    catch (err) { S.busy = false; S.msg = T("err.imSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "im-conn-del") {
+    if (UI.needAsk(S, b, T("confirm.imDelConn"))) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.deleteIslandConnection(id); await reloadIslandMap(T("msg.imConnDel")); }
+    catch (err) { S.busy = false; S.msg = T("err.imSave") + D.says(err); render(); }
     return;
   }
 

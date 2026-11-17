@@ -4699,6 +4699,9 @@ Paul：「right now every island is the same… make it a little bit different�
 - **貼文從後台貼，不改 JSON**（同日第五次，Paul「Yes, build it」）：後台 `/admin/site/#island`「BT 島的貼文」。每一位幹部都看得到清單；**自己 team 那座島的，team 是「改」以上的人就貼得了、自己按「放上去」就在島上**（不用等 Co-President；聚會所的只有 Marketing 的 Director 與 Co-President 貼得了）。一則有：掛在哪一棟（選單讀 `island/teams.json`，每個 team 多一欄 `workspace` 對到後台的工作區）、連結、貼文或影片、一句話中英、日期、一張圖（瀏覽器先縮到 1600 寬再傳到 Storage 的 `island` bucket；**有圖就要勾同意**，沒勾上不了島；換圖或換連結自動退回草稿）。
   資料庫：`supabase/migrations/2026-12-29-island-posts.sql`（`island_posts` 表、`can_edit_island_post(team)` 的門、`upsert_island_post`、`set_island_post_status`、`delete_island_post`、對外的 `public_island_posts()` 只回上架而且沒有圖或同意勾了的）。本機 Postgres `scripts/db/smoke.sh` 驗過（含破壞測試），**正式 Supabase 還沒跑**。
   島讀 `public_island_posts()`，有東西就用它；空的或讀不到就退回 `island/posts.json`（所以跑遷移檔之前畫面不變，貼第一則上去就換成後台的）。
+- **島、在做的事、協作線也從後台改**（同日第七次，Paul「Yes, move them」）：後台 `/admin/site/#island-map`「BT 島」。八座島一列一座，點進去改名字、一句話、說明、主色、地面、擺設、幾棵樹，底下是島上每一棟（代號、畫成什麼、名字、一句話、說明、連結、順序，改了就存；加一棟、拆一棟，最後一棟拆不掉）；清單底下是協作線（兩座島加一句為什麼）。**自己 team 那座島 team 是「改」以上就改得了**；聚會所、機場與協作線只有 Marketing 的 Director 與 Co-President。島的位置與形狀在 `island/src/layout.js`，後台不加減島。
+  資料庫：`supabase/migrations/2026-12-30-island-map.sql`（`island_teams`、`island_programs`、`island_connections` 三張表、`can_edit_island_team(id)`、六支寫的函式、對外的 `public_island()`，seed 是 2026-11-17 那一份 teams.json，重跑不蓋後台改過的字）。本機 smoke.sh 驗過，**正式 Supabase 還沒跑**。
+  島讀 `public_island()`，八座都在就用它；讀不到或不齊就退回 `island/teams.json`。只放角色的範例人永遠從 teams.json 來。
 - **Marketing 的 Instagram**：點那一棟「Instagram @beyondtaiwan」，卡上列最近的貼文（有縮圖）；島上那三塊海報板貼的是最上面三則有圖的貼文（真的圖，Paul 2026-11-17 說「Yes, add images」）。清單在 `island/posts.json`，Marketing 自己貼連結、一句話說明與圖（檔頭有怎麼縮圖的指令）。**不是自動抓**：抓 Instagram 要 API token 與 instagram.com 的程式，這個 repo 只從 cdnjs 載東西。現在放的九則是 2026-11-17 從 @beyondtaiwan 抓的：六則海報圖卡有圖（都是圖卡，沒有人臉），三則影片只有連結。
   圖在 `island/posts/`，是這一頁唯一的圖檔：`check.sh` 放行這一個資料夾，但守著最多 12 張、每張 80 KB 以內、每張都要在 posts.json 裡被用到、檔名只能是 Instagram 的代號。**有人的照片要先確認每一位都同意，未成年一律不放臉**，海報與圖卡才直接放。
 - 截圖：`docs/island/2026-11-17-*.jpg`（`packed-*` 是蜂巢版，`dense-*` 是再加密之後，`alive-*` 是人在做事之後）。
@@ -4733,13 +4736,13 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 
 ### 不會寫程式的人怎麼改
 
-- 改一個 team 的說明、加一樣在做的事、改連結：`island/teams.json`，檔頭有每個欄位的說明。畫面會自己長出一棟（`kind` 決定長什麼樣：hall tent booth desk home post pier tower camp airport school studio stage）。
+- 改一座島的說明、加一樣在做的事、改連結、改協作線：後台 `/admin/site/#island-map`，不改檔。`island/teams.json` 只剩資料庫讀不到時的退路（檔頭有每個欄位的說明；`kind` 決定長什麼樣：hall tent booth desk home post pier tower camp airport school studio stage）。
 - 加一則貼文到某一棟：到後台 `/admin/site/#island` 貼（自己 team 的島，team 是「改」以上就行）。`island/posts.json` 是資料庫空著時的退路，一般不用再改它。Instagram 那一棟前三則有圖的會貼在島上的板子上。
 - 改一座島的大小：`island/src/layout.js` 的 `SPEC`，一座一行；島跟島的距離是同一個 `SPACING`。
-- 換一座島的地面花紋、那一套擺設、幾棵樹：`teams.json` 那個 team 的 `ground`（grass lawn patch tiles grid paving checker brick）、`scenery`（playground plaza classroom school garden studio square）、`trees`。
+- 換一座島的地面花紋、那一套擺設、幾棵樹：後台那座島的「樣子」那一段（地面 grass lawn patch tiles grid paving checker brick；擺設 playground plaza classroom school garden studio square；樹 0 到 20）。
 - 讓一位幹部出現在島上：不改檔。他到 `/settings/` 勾「公開」、傳大頭照，Co-President 到後台團隊頁核可，跟團隊頁同一條路。頭銜照後台的職位。
 - 加一個只放角色的範例人（學員、來訪的人）：`people` 加一筆（`code` 不重複、`team`、`role`、`sample: true`、不具名）。校友與學員 `team` 填 `airport`、加 `flow`（走去哪、帶什麼、為什麼）。
-- 加一條協作線：`connections` 加一筆（`a`、`b`、為什麼）。
+- 加一條協作線：後台「BT 島」清單最底下，選兩座島填一句為什麼。
 - 介面上的字：`island/src/strings.js`。
 - 不用動任何 `.js` 的場景程式。
 

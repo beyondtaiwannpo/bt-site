@@ -1055,6 +1055,78 @@ export function islandEditHTML(r, me, msg, busy, programs, up) {
     + msgHTML(msg) + keys + content + image;
 }
 
+// ── BT 島：島、在做的事、協作線（2026-11-17）──────────────────────────
+export const IM_GROUNDS = ["grass", "lawn", "patch", "tiles", "grid", "paving", "checker", "brick"];
+export const IM_SCENERIES = ["", "playground", "plaza", "classroom", "school", "garden", "studio", "square"];
+export const IM_KINDS = ["hall", "tent", "booth", "desk", "home", "post", "pier", "tower", "airport", "camp", "school", "studio", "stage"];
+export const IM_COLOURS = ["orange", "teal", "navy", "yellow", "sand", "cream", "grey"];
+export const imName = t => (lang() === "en" ? (t.name_en || t.name_zh) : (t.name_zh || t.name_en)) || t.id;
+export const imCanEdit = (me, team) => ipCanEdit(me, team.workspace || "");
+const imOpts = (list, cur, label) => list.map(v => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(label ? label(v) : (v || "—"))}</option>`).join("");
+// 清單：八座島一列（名字、一句話、幾棟）；底下一段協作線（只有 Marketing 管與 senior 改得了）。
+export function islandMapListHTML(map, me, msg, busy) {
+  const teams = (map && map.teams) || [], programs = (map && map.programs) || [], conns = (map && map.connections) || [];
+  const canConn = ipCanEdit(me, ""), dis = busy ? " disabled" : "";
+  const row = t => `<li><div class="fhead"><b><a href="#island-map/${esc(t.id)}" data-act="im-open" data-id="${esc(t.id)}">${esc(imName(t))}</a></b> <span class="tag">${esc(T("im.programs", { n: programs.filter(p => p.team_id === t.id).length }))}</span></div>
+      <div class="fmeta">${esc(lang() === "en" ? (t.tagline_en || t.tagline_zh) : (t.tagline_zh || t.tagline_en))}</div></li>`;
+  const byId = id => teams.find(t => t.id === id);
+  const connRow = c => `<li><div class="fhead"><b>${esc(byId(c.a) ? imName(byId(c.a)) : c.a)} ↔ ${esc(byId(c.b) ? imName(byId(c.b)) : c.b)}</b></div>
+      ${canConn ? `<div class="two" data-autosave="im-conn-save" data-id="${esc(c.id)}">
+        <label><i>${T("im.whyZh")}</i><input name="why_zh" value="${esc(c.why_zh || "")}"${dis}></label>
+        <label><i>${T("im.whyEn")}</i><input name="why_en" value="${esc(c.why_en || "")}"${dis}></label>
+        <div class="row">${autosaveHint("im-conn-save")}<button class="btn quiet danger sm" data-act="im-conn-del" data-id="${esc(c.id)}"${dis}>${T("im.delConn")}</button></div></div>`
+      : `<div class="fmeta">${esc(lang() === "en" ? (c.why_en || c.why_zh) : (c.why_zh || c.why_en))}</div>`}</li>`;
+  const addConn = canConn ? `<div class="two"><label><i>${T("im.a")}</i><select id="im-conn-a"${dis}>${imOpts(teams.map(t => t.id), "", id => imName(byId(id)))}</select></label>
+      <label><i>${T("im.b")}</i><select id="im-conn-b"${dis}>${imOpts(teams.map(t => t.id), teams[1] ? teams[1].id : "", id => imName(byId(id)))}</select></label>
+      <label><i>${T("im.whyZh")}</i><input id="im-conn-zh"${dis}></label><label><i>${T("im.whyEn")}</i><input id="im-conn-en"${dis}></label>
+      <div class="row"><button class="btn" data-act="im-conn-add"${dis}>${T("im.addConn")}</button></div></div>` : "";
+  return pageHead(T("im.title"), T("im.lede"), [{ href: "#island", label: T("ip.title") }])
+    + msgHTML(msg)
+    + sectionHTML("", teams.length ? `<ol class="flist">${teams.map(row).join("")}</ol>` : emptyHTML(T("im.notFound"), ""))
+    + sectionHTML(T("im.connections"), `<div class="note">${T("im.connLede")}</div>${conns.length ? `<ul class="flist">${conns.map(connRow).join("")}</ul>` : ""}${addConn}`);
+}
+// 一座島：字與樣子（自動儲存）、島上每一棟（每一棟一個自動儲存的框）、加一棟。
+export function islandTeamEditHTML(t, programs, me, msg, busy) {
+  const can = imCanEdit(me, t), dis = busy ? " disabled" : "", ro = can ? "" : " readonly", sel = can ? "" : " disabled";
+  const f = (k) => esc(t[k] || "");
+  const island = `<div class="two">
+      <label><i>${T("im.nameZh")}</i><input name="name_zh" value="${f("name_zh")}"${ro}${dis}></label>
+      <label><i>${T("im.nameEn")}</i><input name="name_en" value="${f("name_en")}"${ro}${dis}></label>
+      <label><i>${T("im.tagZh")}</i><input name="tagline_zh" value="${f("tagline_zh")}"${ro}${dis}></label>
+      <label><i>${T("im.tagEn")}</i><input name="tagline_en" value="${f("tagline_en")}"${ro}${dis}></label>
+      <label class="wide"><i>${T("im.aboutZh")}</i><textarea name="about_zh" style="min-height:90px"${ro}${dis}>${f("about_zh")}</textarea></label>
+      <label class="wide"><i>${T("im.aboutEn")}</i><textarea name="about_en" style="min-height:90px"${ro}${dis}>${f("about_en")}</textarea></label>
+    </div>`;
+  const look = t.sea ? "" : `<div class="two">
+      <label><i>${T("im.colour")}</i><select name="colour"${sel}${dis}>${imOpts(IM_COLOURS, t.colour)}</select></label>
+      <label><i>${T("im.ground")}</i><select name="ground"${sel}${dis}>${imOpts(IM_GROUNDS, t.ground)}</select></label>
+      <label><i>${T("im.scenery")}</i><select name="scenery"${sel}${dis}>${imOpts(IM_SCENERIES, t.scenery || "")}</select></label>
+      <label><i>${T("im.trees")}</i><input name="trees" type="number" min="0" max="20" value="${esc(String(t.trees == null ? 10 : t.trees))}"${ro}${dis}></label>
+    </div>`;
+  const prog = p => `<li><div class="two"${can ? ` data-autosave="im-prog-save" data-id="${esc(p.id)}"` : ""}>
+      <label><i>${T("im.slug")}</i><input value="${esc(p.id)}" readonly disabled></label>
+      <label><i>${T("im.kind")}</i><select name="kind"${sel}${dis}>${imOpts(IM_KINDS, p.kind)}</select></label>
+      <label><i>${T("im.nameZh")}</i><input name="name_zh" value="${esc(p.name_zh || "")}"${ro}${dis}></label>
+      <label><i>${T("im.nameEn")}</i><input name="name_en" value="${esc(p.name_en || "")}"${ro}${dis}></label>
+      <label><i>${T("im.lineZh")}</i><input name="line_zh" value="${esc(p.line_zh || "")}"${ro}${dis}></label>
+      <label><i>${T("im.lineEn")}</i><input name="line_en" value="${esc(p.line_en || "")}"${ro}${dis}></label>
+      <label class="wide"><i>${T("im.detailZh")}</i><textarea name="detail_zh"${ro}${dis}>${esc(p.detail_zh || "")}</textarea></label>
+      <label class="wide"><i>${T("im.detailEn")}</i><textarea name="detail_en"${ro}${dis}>${esc(p.detail_en || "")}</textarea></label>
+      <label><i>${T("im.link")}</i><input name="link" value="${esc(p.link || "")}" placeholder="../programs/"${ro}${dis}></label>
+      <label><i>${T("im.sort")}</i><input name="sort" type="number" value="${esc(String(p.sort == null ? 100 : p.sort))}"${ro}${dis}></label>
+      ${can ? `<div class="row">${autosaveHint("im-prog-save")}<button class="btn quiet danger sm" data-act="im-prog-del" data-id="${esc(p.id)}"${programs.length <= 1 || busy ? " disabled" : ""}>${T("im.delBuilding")}</button></div>` : ""}
+    </div></li>`;
+  const add = can ? `<div class="two"><label><i>${T("im.slug")}</i><input id="im-new-slug" placeholder="mock-interview" autocomplete="off"${dis}></label>
+      <label><i>${T("im.kind")}</i><select id="im-new-kind"${dis}>${imOpts(IM_KINDS, "hall")}</select></label>
+      <label><i>${T("im.nameZh")}</i><input id="im-new-zh"${dis}></label><label><i>${T("im.nameEn")}</i><input id="im-new-en"${dis}></label>
+      <div class="row"><button class="btn" data-act="im-prog-add" data-id="${esc(t.id)}"${dis}>${T("im.addBuilding")}</button></div></div>` : "";
+  return pageHead(esc(imName(t)), esc(lang() === "en" ? (t.tagline_en || t.tagline_zh) : (t.tagline_zh || t.tagline_en)), [], { act: "im-back", label: T("im.back") })
+    + msgHTML(msg) + (can ? "" : `<div class="note">${T("im.readonly")}</div>`)
+    + sectionHTML(T("im.island"), can ? `<div data-autosave="im-team-save" data-id="${esc(t.id)}">${island}${look}<div class="form-foot">${autosaveHint("im-team-save")}</div></div>` : island + look)
+    + sectionHTML(T("im.buildings"), `<div class="note">${T("im.buildingNote")}</div><ul class="flist">${programs.map(prog).join("")}</ul>${add}`)
+    + `<div class="row"><a class="btn ghost sm" href="/island/#${esc(t.id)}" target="_blank" rel="noopener">${T("im.seePublic")}</a></div>`;
+}
+
 // ── 網站上的活動（2026-11-13，Paul：「website 應該有一頁看現在有哪些活動在跑」）──────────────
 // 三段：正在網站上的（published，還沒結束）、等上架的（ready）、草稿。每一列兩顆：看對外那一頁、到活動頁改。
 // 純函式分段（test/site-events.test.mjs）：結束了的 published 不算「在網站上跑」，放最後一段。

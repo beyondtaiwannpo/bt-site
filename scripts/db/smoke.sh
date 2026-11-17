@@ -3841,6 +3841,47 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 ipg3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-29-island-posts.sql 2>&1 || true)
 if echo "${ipg3}" | grep -q "OVERALL.*PASS" && ! echo "${ipg3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
+echo "── 島、在做的事、協作線搬進資料庫（2026-12-30-island-map.sql）──"
+# 這時候：PAUL Co-President、AMT 是 AMTEAM 的「改」也是 Marketing 的「管」、AMV 是 AMTEAM 的「看」、ISTAFF 只在 Internship。
+imp=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-30-island-map.sql 2>&1 || true)
+if echo "${imp}" | grep -q "OVERALL.*PASS" && ! echo "${imp}" | grep -q "|FAIL"; then echo "  ok   島那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 島那支驗收表："; echo "${imp}" | head -12; fail=$((fail+1)); fi
+chkas "${PAUL}" "（準備）Curriculum 那座島的工作區是 Curriculum Team" "CurriculumTeam" "select workspace from public.island_teams where id='curriculum'"
+psql -d "${DB}" -X -A -t -q -c "insert into public.assignments (user_id,workspace_id,level) values ('${ISTAFF}','res:Curriculum Team','edit') on conflict (user_id,workspace_id) do update set level='edit';" >/dev/null
+chkas "${ISTAFF}" "Curriculum「改」的人改得了 Curriculum 島的一句話" "curriculum" "select public.upsert_island_team('{\"id\":\"curriculum\",\"tagline_zh\":\"新的一句話\"}'::jsonb)"
+chk "改進去了，別的欄位沒動" "新的一句話|true" "select tagline_zh||'|'||(about_zh<>'')::text from public.island_teams where id='curriculum'"
+chkraise "★ Curriculum「改」的人改不了 Mentorship 島（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_team('{\"id\":\"mentorship\",\"tagline_zh\":\"x\"}'::jsonb);"
+chkraise "★ 聚會所只有 Marketing 管與 senior 改得了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_team('{\"id\":\"commons\",\"tagline_zh\":\"x\"}'::jsonb);"
+chkraise "沒有這座島（not_found）" "not_found" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.upsert_island_team('{\"id\":\"atlantis\"}'::jsonb);"
+chkas "${ISTAFF}" "Curriculum「改」的人在 Curriculum 島加一棟" "mock-interview" "select public.upsert_island_program('{\"id\":\"mock-interview\",\"team_id\":\"curriculum\",\"kind\":\"tent\",\"name_zh\":\"模擬面試\",\"name_en\":\"Mock interviews\",\"link\":\"../programs/\"}'::jsonb)"
+chkraise "★ 在別座島加不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_program('{\"id\":\"x-thing\",\"team_id\":\"mentorship\",\"name_zh\":\"x\"}'::jsonb);"
+chkraise "代號亂填擋（bad_slug）" "bad_slug" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_program('{\"id\":\"Bad Slug\",\"team_id\":\"curriculum\"}'::jsonb);"
+chkraise "連結只收站內相對路徑或 https（bad_link）" "bad_link" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_program('{\"id\":\"mock-interview\",\"link\":\"javascript:alert(1)\"}'::jsonb);"
+chkraise "★ 搬去自己管不到的島不行（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_program('{\"id\":\"mock-interview\",\"team_id\":\"mentorship\"}'::jsonb);"
+chkrole anon "" "★ 對外的 public_island() 看得到新的那一棟" "1" "select count(*) from jsonb_array_elements(public.public_island()->'teams') t, jsonb_array_elements(t->'programs') p where p->>'id'='mock-interview'"
+chkas "${ISTAFF}" "刪掉那一棟" "mock-interview" "select public.delete_island_program('mock-interview')"
+chkraise "★ 一座島最後一棟刪不掉（last_program）" "last_program" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.delete_island_program('hs-internship');"
+chkraise "★ 協作線：team 的人加不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_connection('{\"a\":\"curriculum\",\"b\":\"internship\",\"why_zh\":\"x\"}'::jsonb);"
+IC=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.upsert_island_connection('{\"a\":\"internship\",\"b\":\"sponsorship\",\"why_zh\":\"一起找實習的公司\",\"why_en\":\"Find host companies together\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${IC}" in ????????-*) echo "  ok   Co-President 加了一條協作線（${IC}）"; pass=$((pass+1));; *) echo "  FAIL 加線失敗：${IC}"; fail=$((fail+1));; esac
+chkraise "同一座島連自己擋（bad_team）" "bad_team" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.upsert_island_connection('{\"a\":\"commons\",\"b\":\"commons\"}'::jsonb);"
+chkas "${PAUL}" "刪掉那條線" "true" "select public.delete_island_connection('${IC}')::text"
+chkrole authenticated "${STU}" "學員什麼都讀不到" "0" "select count(*) from public.island_teams"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.island_programs;" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 island_programs 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到表：${angot}"; fail=$((fail+1)); fi
+imp2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-30-island-map.sql 2>&1 || true)
+if echo "${imp2}" | grep -q "OVERALL.*PASS"; then echo "  ok   島那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${imp2}" | head -5; fail=$((fail+1)); fi
+chk "★ 重跑之後後台改過的字沒被 seed 蓋掉" "新的一句話" "select tagline_zh from public.island_teams where id='curriculum'"
+psql -d "${DB}" -X -A -t -q -c "delete from public.assignments where user_id='${ISTAFF}' and workspace_id='res:Curriculum Team';" >/dev/null
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
