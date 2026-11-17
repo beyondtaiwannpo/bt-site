@@ -38,6 +38,7 @@ const PAGES = [
   "admin/records/index.html",
   // 2026-11-16 嘖嘖的互動頁。
   "stories/index.html",
+  "island/index.html",
 ];
 const files = fs.readdirSync(".", { recursive: true })
   .filter(f => f.endsWith("index.html") && !f.includes("node_modules"));

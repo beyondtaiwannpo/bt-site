@@ -27,7 +27,7 @@ const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PAGES = [
   "index.html", "about/index.html", "programs/index.html", "team/index.html",
   "join/index.html", "impact/index.html", "partner/index.html", "apply/index.html", "feedback/index.html",
-  "resources/index.html", "alumni/index.html", "history/index.html", "stories/index.html", "privacy/index.html",
+  "resources/index.html", "alumni/index.html", "history/index.html", "stories/index.html", "island/index.html", "privacy/index.html",
   "app/index.html", "reset/index.html",
   "passport/_audit.html", "availability/_audit.html", "admin/_audit.html", "settings/_audit.html",
   "intern-passport/_audit.html", "admin/people/_audit.html", "admin/finance/_audit.html", "admin/marketing/_audit.html", "admin/team-forms/_audit.html", "admin/records/_audit.html",

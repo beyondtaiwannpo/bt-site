@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+FILES="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories island privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1544,6 +1544,11 @@ leakOut=$(node -e '
                  "這一頁要開 JavaScript 才走得了。"],
       mustHide: ["左上一個回首頁的 logo 就夠。"]
     },
+    // /island/ BT 島（2026-11-16）。本文是 JavaScript 畫的，靜態 HTML 裡只有標題、工具列、清單的標題與 noscript 那一句。
+    "island/index.html": {
+      mustShow: ["跳到主要內容 / Skip to content", "BT 島", "BT Island", "每一座島在做的事。", "這一頁要開 JavaScript 才看得到島。"],
+      mustHide: ["左上一個回首頁的 logo 就夠。"]
+    },
     "privacy/index.html": {
       mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],
       mustHide: ["因為手機上會有人真的從頭讀到尾"]
@@ -1606,7 +1611,7 @@ leakOut=$(node -e '
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html about/index.html programs/index.html team/index.html events/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html history/index.html stories/index.html privacy/index.html reset/index.html 2>&1)
+' index.html about/index.html programs/index.html team/index.html events/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -1642,7 +1647,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+placeholder_scope="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories island privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
@@ -1881,6 +1886,75 @@ if [ $? -eq 0 ]; then
 else
   bad "/stories/ 的 Three 載入方式不對："
   printf '%s\n' "$stThree"
+fi
+
+
+# ════════ /island/ BT 島（2026-11-16）════════
+#
+# 這一頁沒有 GSAP（每一幀的迴圈是 requestAnimationFrame，關在 scene.js 的 motion() 裡，main.js 只在沒開減少動態效果時呼叫）。
+# Three 跟 /history/ /stories/ 同一條：只從 cdnjs 載、importmap 帶正確的雜湊、只有 scene.js import、沒有模型檔、JS 小於 250 KB。
+isMotion=$(node -e '
+  const fs = require("fs");
+  const strip = c => c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const bad = [];
+  const code = strip(fs.readFileSync("island/src/scene.js", "utf8"));
+  const head = code.indexOf("function motion(");
+  if (head < 0) bad.push("scene.js 找不到 function motion(");
+  else {
+    let i = code.indexOf(") {", head) + 2, depth = 0; const from = i; let to = -1;
+    for (; i < code.length; i++) { if (code[i] === "{") depth++; else if (code[i] === "}") { depth--; if (depth === 0) { to = i; break; } } }
+    if (to < 0) bad.push("motion() 的大括號沒有收尾");
+    for (const m of code.matchAll(/requestAnimationFrame\(/g)) if (!(m.index > from && m.index < to)) bad.push("scene.js 在 motion() 外面用了 requestAnimationFrame（第 " + code.slice(0, m.index).split("\n").length + " 行）");
+  }
+  for (const f of fs.readdirSync("island/src")) { if (f === "scene.js") continue; const c = strip(fs.readFileSync("island/src/" + f, "utf8")); if (/requestAnimationFrame\(|\bgsap\./.test(c)) bad.push("island/src/" + f + " 有每一幀的迴圈或 gsap（只准 scene.js 的 motion()）"); }
+  const main = fs.readFileSync("island/src/main.js", "utf8");
+  if (!main.includes("matchMedia(\"(prefers-reduced-motion: reduce)\")")) bad.push("main.js 找不到 prefers-reduced-motion 的判斷");
+  if (!/else if \(!reduce && !motionOff\) loop = scene\.motion\(\);/.test(main)) bad.push("main.js 少了「沒開減少動態效果才呼叫 scene.motion()」那一行");
+  if (!/import\("\.\/scene\.js"\)/.test(main)) bad.push("main.js 要動態 import scene.js（Three 載不到才接得住）");
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "/island/ 的每一幀迴圈全部關在 scene.js 的 motion() 裡，reduce 就不呼叫"
+else
+  bad "/island/ 有動畫跑到 motion() 外面："
+  printf '%s\n' "$isMotion"
+fi
+isThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
+  const fs = require("fs");
+  const bad = [];
+  const html = fs.readFileSync("island/index.html", "utf8");
+  const maps = [...html.matchAll(/<script type="importmap">([\s\S]*?)<\/script>/g)];
+  if (maps.length !== 1) bad.push("island/index.html 要有一個（而且只有一個）importmap，現在 " + maps.length + " 個");
+  else {
+    let map; try { map = JSON.parse(maps[0][1]); } catch (e) { bad.push("importmap 不是合法的 JSON：" + e.message); }
+    if (map) {
+      if (map.imports.three !== process.env.THREE_URL) bad.push("importmap 的 three 不是 " + process.env.THREE_URL);
+      for (const u of Object.values(map.imports || {})) if (!/^https:\/\/cdnjs\.cloudflare\.com\//.test(u)) bad.push("importmap 裡有不是 cdnjs 的網址：" + u);
+      if (!map.integrity || map.integrity[map.imports.three] !== process.env.THREE_SRI) bad.push("importmap 的 integrity 少了、或跟 check.sh 的 THREE_SRI 不一樣");
+    }
+    const firstModule = html.search(/<script type="module"/), mapAt = html.indexOf("<script type=\"importmap\">");
+    if (firstModule >= 0 && mapAt > firstModule) bad.push("importmap 要排在第一個 module script 前面");
+  }
+  for (const f of fs.readdirSync("island/src")) {
+    const c = fs.readFileSync("island/src/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const uses = /from\s+["\x27]three["\x27]/.test(c) || /import\(\s*["\x27]three["\x27]/.test(c);
+    if (uses && f !== "scene.js") bad.push("island/src/" + f + " import 了 three（只准 scene.js）");
+    if (!uses && f === "scene.js") bad.push("scene.js 沒有從 importmap 的 three 載");
+  }
+  const bin = fs.readdirSync("island", { recursive: true }).filter(f => /\.(glb|gltf|obj|fbx|bin|ktx2|hdr|png|jpg|jpeg|webp)$/i.test(String(f)));
+  if (bin.length) bad.push("island/ 裡放了模型或圖檔（全部要用程式幾何）：" + bin.join("、"));
+  const js = fs.readdirSync("island/src").reduce((n, f) => n + fs.statSync("island/src/" + f).size, 0);
+  if (js > 250 * 1024) bad.push("island/src 的 JS 加起來 " + Math.round(js / 1024) + " KB，超過 250 KB（不含 Three）");
+  // 人全部是角色代號：named 是 true 的那一筆才可以有名字。公開 repo 上不該有未經同意的名字。
+  const data = JSON.parse(fs.readFileSync("island/teams.json", "utf8"));
+  for (const p of data.people || []) if (p.named !== true && (p.name_zh || p.name_en)) bad.push("teams.json 的 " + p.code + " 有名字但 named 不是 true（本人同意之後才把 named 改成 true）");
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "/island/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 scene.js import 它、沒有模型檔、人沒有未經同意的名字"
+else
+  bad "/island/ 的 Three 或資料不對："
+  printf '%s\n' "$isThree"
 fi
 
 # 對外頁面不可以漏掉任何一份清單

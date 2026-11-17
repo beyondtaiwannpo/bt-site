@@ -1,0 +1,126 @@
+// /island/ 的主程式：讀 teams.json、畫清單與卡、開 3D、接網址、把自己放上去。這一支碰 DOM；純函式在 data.js、ui.js、layout.js。
+// Three 只在 scene.js（動態 import，載不到就只剩清單與卡，內容一樣）。
+import * as D from "./data.js";
+import * as UI from "./ui.js";
+import { t } from "./strings.js";
+
+const $ = id => document.getElementById(id);
+const doc = document.documentElement;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const motionOff = new URLSearchParams(location.search).get("motion") === "off";
+const phone = matchMedia("(pointer: coarse)").matches && Math.min(innerWidth, innerHeight) < 760;
+const ME_KEY = "bt-island-me";
+
+let lang = doc.getAttribute("data-lang") || "zh";
+let data = null, scene = null, loop = null, sel = null, me = null;
+const ui = { names: false, paused: false, bird: false };
+
+// ── 語言 ──
+function setLang(l) {
+  lang = l; doc.setAttribute("data-lang", l); doc.lang = l === "zh" ? "zh-Hant" : "en";
+  document.title = `${t("title", l)} / Beyond Taiwan`;
+  const u = new URL(location.href); u.searchParams.set("lang", l); history.replaceState(null, "", u);
+  $("lang").textContent = t("lang", l); $("lang").setAttribute("aria-label", t("langLabel", l));
+  const home = $("home"); if (home) home.href = "../?lang=" + l;
+  for (const b of document.querySelectorAll("[data-t]")) b.textContent = t(b.dataset.t, l);
+  $("tb-pause").textContent = t(ui.paused ? "play" : "pause", l);
+  renderIndex(); renderCard(); pushLabels();
+}
+function pushLabels() {
+  if (!scene || !data) return;
+  const teams = {}, people = { programs: {} };
+  for (const tm of data.teams) { teams[tm.id] = tm["name_" + lang] || tm.name_zh; for (const p of tm.programs) people.programs[p.id] = p["name_" + lang] || p.name_zh; }
+  for (const p of data.people) people[p.code] = D.label(p, lang);
+  scene.labels({ teams, people, me: me ? me.name + " " + t("meYou", lang) : "" });
+}
+
+// ── 畫 ──
+function renderIndex() { if (data) $("tree").innerHTML = UI.indexHTML(data, lang, sel || {}); }
+function renderCard() {
+  const card = $("card"), body = $("card-content");
+  if (!sel || !data) { card.hidden = true; body.innerHTML = ""; return; }
+  if (sel.kind === "team") { const tm = D.teamById(data, sel.team); if (!tm) return close(); body.innerHTML = UI.teamCardHTML(tm, lang); }
+  else if (sel.kind === "program") { const p = D.programById(data, sel.program), tm = p && D.teamById(data, p.team); if (!p) return close(); body.innerHTML = UI.programCardHTML(p, tm, lang); }
+  else if (sel.kind === "person") { const p = D.personByCode(data, sel.code); if (!p) return close(); body.innerHTML = UI.personCardHTML(p, D.teamById(data, p.team), lang); }
+  card.hidden = false; card.scrollTop = 0;
+}
+function select(s, fromHash) {
+  sel = s;
+  if (!fromHash) history.replaceState(null, "", location.pathname + location.search + (s ? D.hashFor(s) : ""));
+  renderIndex(); renderCard();
+  if (scene) scene.select(s);
+  doc.classList.toggle("has-card", !!s);
+  if (phone && s) $("sidebar").classList.remove("open");
+}
+function close() { select(null); }
+
+// ── 點 ──
+document.addEventListener("click", e => {
+  const tm = e.target.closest("[data-go-team]"); if (tm) { select({ kind: "team", team: tm.dataset.goTeam }); return; }
+  const pr = e.target.closest("[data-go-program]"); if (pr) { select({ kind: "program", team: pr.dataset.team, program: pr.dataset.goProgram }); return; }
+  const pp = e.target.closest("[data-go-person]"); if (pp) { if (pp.dataset.goPerson === "me") { openMe(); return; } select({ kind: "person", code: pp.dataset.goPerson }); return; }
+  if (e.target.closest("[data-close]")) { close(); return; }
+  if (e.target.closest("[data-me-cancel]")) { closeMe(); return; }
+  if (e.target.closest("[data-me-remove]")) { saveMe(null); closeMe(); return; }
+});
+$("lang").addEventListener("click", () => setLang(lang === "zh" ? "en" : "zh"));
+$("tb-home").addEventListener("click", () => { ui.bird = false; $("tb-bird").setAttribute("aria-pressed", "false"); select(null); });
+$("tb-names").addEventListener("click", () => { ui.names = !ui.names; $("tb-names").setAttribute("aria-pressed", String(ui.names)); if (scene) scene.names(ui.names); });
+$("tb-pause").addEventListener("click", () => { ui.paused = !ui.paused; $("tb-pause").setAttribute("aria-pressed", String(ui.paused)); $("tb-pause").textContent = t(ui.paused ? "play" : "pause", lang); if (loop) loop.pause(ui.paused); });
+$("tb-bird").addEventListener("click", () => { ui.bird = !ui.bird; $("tb-bird").setAttribute("aria-pressed", String(ui.bird)); if (scene) scene.bird(ui.bird); });
+$("tb-index").addEventListener("click", () => $("sidebar").classList.toggle("open"));
+$("sidebar-close").addEventListener("click", () => $("sidebar").classList.remove("open"));
+$("tb-me").addEventListener("click", openMe);
+addEventListener("hashchange", () => { const s = D.parseHash(location.hash); select(s.kind === "overview" ? null : s, true); });
+addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("me").hidden) closeMe(); else if (sel) close(); } });
+
+// ── 把自己放上去（只存在這台裝置）──
+function loadMe() { try { return D.normalizeMe(JSON.parse(localStorage.getItem(ME_KEY) || "null"), data.teams); } catch (e) { return null; } }
+function saveMe(info) {
+  me = info;
+  try { if (info) localStorage.setItem(ME_KEY, JSON.stringify(info)); else localStorage.removeItem(ME_KEY); } catch (e) {}
+  if (scene) { scene.me(info ? { ...info, label: info.name + " " + t("meYou", lang) } : null); if (info) select({ kind: "team", team: info.team }); }
+  $("tb-me").classList.toggle("on", !!info);
+}
+function openMe() { const box = $("me"); $("me-form").innerHTML = UI.meFormHTML(data, lang, me); box.hidden = false; doc.classList.add("me-open"); const f = $("me-name"); if (f) f.focus(); }
+function closeMe() { $("me").hidden = true; doc.classList.remove("me-open"); }
+$("me-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const info = D.normalizeMe({ name: fd.get("name"), team: fd.get("team"), shirt: fd.get("shirt"), hair: fd.get("hair") }, data.teams);
+  if (!info) return;
+  saveMe(info); closeMe();
+});
+$("me").addEventListener("click", e => { if (e.target === $("me")) closeMe(); });
+
+// 畫面中間空出來的那一塊（卡與清單之間）的中心，佔視窗寬的比例。手機上卡與清單都在底下，就是正中央。
+function freeCentre() {
+  const W = innerWidth; if (W < 900) return 0.5;
+  const card = $("card"), side = $("sidebar");
+  const left = card.hidden ? 0 : card.getBoundingClientRect().right, right = side.getBoundingClientRect().left;
+  return ((left + right) / 2) / W;
+}
+
+// ── 開頁 ──
+function paletteFromCSS() { const cs = getComputedStyle(doc), v = k => cs.getPropertyValue(k).trim(); return { navy: v("--bt-navy"), teal: v("--bt-teal"), orange: v("--bt-orange"), sand: v("--bt-sand"), cream: v("--bt-cream"), yellow: v("--bt-yellow"), grey: v("--bt-grey") }; }
+async function boot() {
+  doc.classList.add("js");
+  setLang(lang);
+  try { data = await D.load("./"); } catch (e) { console.error("teams.json 載不到：", e); $("tree").innerHTML = UI.errorHTML(lang); return; }
+  renderIndex();
+  const start = D.parseHash(location.hash);
+  // 3D：動態 import（Three 從 cdnjs 來）。載不到或沒有 WebGL：留清單與卡，上面印一句。
+  const mod = await Promise.race([import("./scene.js").catch(e => { console.warn("3D 載不進來：", e); return null; }), new Promise(r => setTimeout(() => r(null), 10000))]);
+  if (mod) {
+    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: () => {}, freeCentre }); }
+    catch (e) { console.warn("3D 開不起來：", e); scene = null; }
+  }
+  if (!scene) { doc.classList.add("no3d"); $("no3d").hidden = false; }
+  else if (!reduce && !motionOff) loop = scene.motion();
+  else doc.classList.add("still");
+  $("loading").hidden = true;
+  me = loadMe(); if (me && scene) { scene.me({ ...me, label: me.name + " " + t("meYou", lang) }); $("tb-me").classList.add("on"); }
+  pushLabels();
+  if (start.kind !== "overview") select(start, true);
+}
+boot();

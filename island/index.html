@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BT 島 / Beyond Taiwan</title>
+
+<!-- /island/ BT 島（2026-11-16）
+
+     Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項）之後定的：
+     用同一種做法把 BT 這一屆的組織畫成一座島：中間是 Co-President，外圍六座島是六個 team，每座島上是這個 team 在做的事（一樣一棟）
+     與島上的人（一個人一個大頭小人，在島上走來走去）。點一座島、一棟房子、一個人，左邊開一張卡；右邊一份清單。
+     他還指名要「把自己放上去」：取個稱呼、挑一座島、選顏色，你就站在那座島上（只存在這台裝置的瀏覽器，別人看不到）。
+
+     ── 這一頁在做什麼 ──
+     整個視窗是 3D 的舞台（Three.js，全部程式幾何，沒有模型檔），拖曳轉、滾輪縮、點得到島、建築與人。
+     上面一排：全景、名牌、暫停、鳥瞰、清單、把自己放上去、中英。右邊清單是同一份內容的文字版（鍵盤、讀螢幕、3D 開不起來都靠它）。
+     開了減少動態效果或 ?motion=off：人不走、雲不飄、鏡頭直接到位，其他一樣。
+
+     ── 資料 ──
+     teams.json：七個 team、每個在做的事、每個人（**現在全部是角色代號，沒有名字**：這是 public repo，對外頁放真名一律先問 Paul，未成年一律不放）。
+     數字只用事實資料庫有的。
+
+     ── 檔案 ──
+     island.css 版面、src/strings.js 中英字典、src/data.js 讀資料與網址、src/ui.js 畫面的純函式、src/layout.js 七座島在哪（純數學）、
+     src/scene.js Three 的場景與唯一會動的 motion()、src/main.js 接起來。只讀 shared/brand.css。Three 只從 cdnjs 載、帶 integrity。
+
+     ── 不掛 nav.js ──
+     這一頁是一張地圖不是功能清單。左上一個回首頁的 logo 就夠。 -->
+
+<meta name="description" content="Beyond Taiwan 這一屆的組織：七座島、六個 team、近三十個人，點一座島看他們在做什麼。">
+<meta property="og:title" content="BT 島 / Beyond Taiwan">
+<meta property="og:description" content="七座島，六個 team。點一座島，看他們在做什麼。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://beyondtaiwannpo.com/island/">
+<meta name="theme-color" content="#EDE5D8">
+
+<!-- Three.js 只從 cdnjs 載（scene.js 動態 import，載不到就只剩清單與卡）。integrity 是 cdnjs 公布的 sha512，跟 /history/ 與 /stories/ 同一個版本同一個雜湊；
+     升級要同時改三頁的 importmap 與 check.sh 的 THREE_SRI。importmap 一定要排在任何 module script 前面。 -->
+<script type="importmap">
+{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js"},
+ "integrity":{"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js":"sha512-zTnt1Hf43YVf2to5DC6GE6cPRSC/xgPJDf3PLQussTsaDak1uHdbnWtIYnOQiL40AIa2OZfFkayQXVdzL1/DqA=="}}
+</script>
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="modulepreload" href="./src/data.js">
+<link rel="modulepreload" href="./src/ui.js">
+<link rel="modulepreload" href="./src/strings.js">
+<link rel="modulepreload" href="./src/layout.js">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap"></noscript>
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="./island.css">
+
+<!-- 語言要在第一次繪製前決定。順序：網址 ?lang=、再 localStorage 的 bt-lang（只讀不寫）、再瀏覽器語言。 -->
+<script>
+  (function () {
+    var q = null, s = null;
+    try { q = new URLSearchParams(location.search).get("lang"); } catch (e) {}
+    try { s = localStorage.getItem("bt-lang"); } catch (e) {}
+    var l = (q === "zh" || q === "en") ? q : (s === "zh" || s === "en") ? s : (/^en/i.test(navigator.language || "") ? "en" : "zh");
+    document.documentElement.setAttribute("data-lang", l);
+    document.documentElement.lang = l === "zh" ? "zh-Hant" : "en";
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#tree">跳到主要內容 / Skip to content</a>
+
+<!-- 3D 的舞台鋪滿整個視窗；牌子（HTML）貼在上面。 -->
+<div class="stage" id="stage" aria-hidden="true"></div>
+<div class="pins" id="pins" aria-hidden="true"></div>
+
+<header class="brand">
+  <a class="home" id="home" href="../" aria-label="Beyond Taiwan 首頁 / home"><img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
+  <div class="brand-text">
+    <p class="eyebrow" data-t="eyebrow">這一屆的 Beyond Taiwan</p>
+    <h1><span class="zh">BT 島</span><span class="en">BT Island</span></h1>
+    <p class="sub"><span class="zh">七座島，六個 team，近三十個人，全部是學生。點一座島，或點島上的人。</span><span class="en">Seven islands, six teams, close to thirty people, all students. Tap an island, or anyone on it.</span></p>
+  </div>
+</header>
+
+<nav class="toolbar" aria-label="地圖操作 / Map controls">
+  <button type="button" id="tb-home" data-t="overview">全景</button>
+  <button type="button" id="tb-names" class="tg" aria-pressed="false" data-t="names">名牌</button>
+  <button type="button" id="tb-pause" class="tg" aria-pressed="false">暫停</button>
+  <button type="button" id="tb-bird" class="tg" aria-pressed="false" data-t="bird">鳥瞰</button>
+  <button type="button" id="tb-me" class="me-btn" data-t="me">把自己放上去</button>
+  <button type="button" id="tb-index" class="mob-only" data-t="index">清單</button>
+  <button type="button" class="lang" id="lang" aria-label="Switch language">EN</button>
+</nav>
+
+<p class="no3d" id="no3d" hidden><span class="zh">這台裝置畫不出 3D。下面的清單是同一份內容。</span><span class="en">This device cannot draw the 3D view. The index below has the same content.</span></p>
+<p class="loading" id="loading"><span class="zh">正在把島組起來⋯</span><span class="en">Putting the islands together…</span></p>
+
+<aside class="sidebar" id="sidebar" aria-label="清單 / Index">
+  <div class="side-head">
+    <p class="eyebrow" data-t="indexHead">THE TEAM INDEX</p>
+    <h2 data-t="indexTitle">每一座島在做的事。</h2>
+    <p class="side-lead" data-t="indexLead">六個 team、兩位 Co-President。點一個 team 看它在做什麼、有誰。</p>
+    <button type="button" class="side-close mob-only" id="sidebar-close" aria-label="關閉清單 / Close">×</button>
+  </div>
+  <main id="tree" class="tree-wrap">
+    <noscript><p class="state"><span class="zh">這一頁要開 JavaScript 才看得到島。團隊與做的事在首頁與團隊頁也有。</span><span class="en">This page needs JavaScript to draw the island. The teams and programmes are also on the home and team pages.</span></p></noscript>
+  </main>
+</aside>
+
+<article class="card" id="card" hidden aria-label="選取的島、做的事或人 / Selected item">
+  <button type="button" class="card-close" data-close aria-label="關閉 / Close">×</button>
+  <div id="card-content"></div>
+</article>
+
+<div class="me" id="me" hidden role="dialog" aria-modal="true" aria-labelledby="me-h">
+  <form class="me-box" id="me-form"></form>
+</div>
+
+<!-- 主程式：ES module。Three 由 scene.js 透過 importmap 載。這一頁沒有 GSAP（每一幀的迴圈用 requestAnimationFrame，關在 scene.js 的 motion() 裡）。 -->
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

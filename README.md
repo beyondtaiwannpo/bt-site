@@ -4629,6 +4629,55 @@ Paul 看完批 4 第三輪在線上的樣子，否決了 2.5D 的畫法：「飛
 - 頁名、副標、結尾句跟批 4 一樣沒改。
 
 
+## BT 島 `/island/`（2026-11-16）
+
+Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項，還可以把自己放進去）之後定的：
+用同一種做法把 BT 這一屆的組織畫成一座島。他的原話：「one island that's like curriculum team, and then people on it… in the middle there's going to be an exec team… each of those are going to be island… you can press into those island and they have different policies, that can be our program… one thing he did that I really liked is you can put a person of your own inside of it.」
+截圖在 `docs/island/`（全景、team 的卡、人的卡、手機兩張、參考站）。
+
+### 這一頁做什麼
+
+- 整個視窗是 3D：七座六邊形的島在青色的海上，中間是 Co-President，外圍六座是六個 team，木橋從中間連到每一座。
+  每座島上一根旗桿（team 的顏色）、幾棵樹，還有這個 team 在做的事，一樣一棟（探索營是帳篷、嘖嘖是碼頭、Instagram 是攤位、這一屆的計畫是鐘樓）。
+  島上的人一個人一個大頭小人，在島上走來走去：Co-President 戴帽、Director 背包、Advisor 拿包、Associate 什麼都不拿。
+- 拖曳轉、滾輪縮、手機兩指縮。點一座島、一棟房子、一個人（3D 裡點，或點牌子，或點右邊清單），左邊開一張卡：
+  team 的卡有一句話、說明、在做的事（點了看細節與官網連結）、島上的人；做的事的卡有說明與「到官網看這一項」；人的卡有角色。
+- 上面一排：全景、名牌（所有人的牌子全開）、暫停（人不走）、鳥瞰（正上方）、把自己放上去、中英。手機上這一排在底下，清單與卡從底下滑上來。
+- **把自己放上去**：取個稱呼（最多 12 字）、挑一座島、選上衣與頭髮的顏色，你就站在那座島上，牌子寫「某某（你）」。
+  **只存在這台裝置的瀏覽器裡**（localStorage），別人看不到，沒有送到任何地方。再按一次可以改或拿掉。
+- 網址：`#curriculum` 直接到那座島、`#curriculum/bootcamp` 直接開那一樣、`#p/cu-dir` 直接開那個人。
+- 開了減少動態效果或 `?motion=off`：人不走、雲不飄、鏡頭直接到位，其他一樣。沒有 WebGL 或 Three 載不到：只剩清單與卡，內容一樣，上面印一句。
+
+### 人全部是角色代號，沒有名字
+
+這是 public repo，對外頁放真名一律先問 Paul，未成年一律不放。所以 `island/teams.json` 的 `people` 現在每一筆只有 `role` 與 `title_zh/en`（Co-President、Director、Advisor、Associate），
+人數照這一屆真的人數（兩位 Co-President，六個 team 各一位 Director、一到兩位 Advisor、一到四位 Associate，共 34 筆）。
+要放名字：那一筆加 `name_zh` / `name_en`，`named` 改成 `true`（本人同意之後）。程式只在 `named` 是 `true` 時才顯示名字；`check.sh` 守著「有名字但 named 不是 true」。
+做的事與數字只用事實資料庫有的（探索營 2023 年六月第一屆 80+、導生 2020 年九月 36 人、每年約 50 對、250+ 學員、20+ 校友回來、校園大使 18 位、線上博覽會 400+、資料庫 112 所）。
+
+### 不會寫程式的人怎麼改
+
+- 改一個 team 的說明、加一樣在做的事、改連結：`island/teams.json`，檔頭有每個欄位的說明。畫面會自己長出一棟（`kind` 決定長什麼樣）。
+- 加一個人：`people` 加一筆（`code` 不重複、`team`、`role`）。島上就多一個小人。
+- 介面上的字：`island/src/strings.js`。
+- 不用動任何 `.js` 的場景程式。
+
+### 程式在哪、怎麼守
+
+- `island/index.html` 外殼、`island/island.css` 版面、`island/teams.json` 資料、`src/strings.js` 字典、`src/data.js` 讀資料與網址、`src/ui.js` 畫面的純函式、
+  `src/layout.js` 七座島在哪與做的事蓋在哪（純數學）、`src/scene.js` Three 的場景與唯一會動的 `motion()`、`src/main.js` 接起來。只讀 `shared/brand.css`，不掛 `nav.js`。
+- 做法跟 `/stories/` 的島版同一套（照 HEART 政策島的配方：窄鏡頭 fov 32、ACES、圓角盒子、MeshStandard、暖太陽加天光加淡霧、大頭 chibi、鏡頭阻尼追目標）。
+  這一頁沒有 GSAP：每一幀的迴圈是 `requestAnimationFrame`，關在 `scene.js` 的 `motion()` 裡，`main.js` 只在沒開減少動態效果時呼叫。Three 只從 cdnjs 載、帶 integrity，只有 `scene.js` import。
+- 守門：`./check.sh` 多兩條（motion() 與 Three 加「人沒有未經同意的名字」）；新頁補進每一份清單；`test/island.test.mjs` 七條；`check-motion`、`check-mobile` 都綠（2026-11-16）。
+- 本機 Chrome 61 fps。真的手機沒量過。
+
+### 還沒做、要 Paul 決定的
+
+- 哪些人可以具名（一個一個問，問到的把 `named` 改 `true`）。
+- 這一頁要不要放進導覽列、放哪裡。現在首頁與團隊頁都還沒連過來。
+- 「把自己放上去」現在只在自己的瀏覽器。要讓大家都看得到（像 HEART 那樣），要存進資料庫，那是另一個決定（要登入、要同意、要有人核可）。
+- 嘖嘖的互動頁 `/stories/` 跟這一頁是兩件事：Paul 2026-11-16 說募資那一頁「we can think of something else」，先留著。
+
 ## 嘖嘖的互動頁 `/stories/`（2026-11-16，demo）
 
 Paul 2026-10-13 定的：募資的互動內容放官網自己一頁，主線是 three personas：陌生人挑一個公立高中生、走一遍他申請的那一年，最後落到「贊助這個計畫」。

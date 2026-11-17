@@ -1,0 +1,51 @@
+// /island/ 的中英字典。資料（team、做的事、人）在 teams.json，這裡只有介面上的字。
+export const STR = {
+  title:       { zh: "BT 島", en: "BT Island" },
+  eyebrow:     { zh: "這一屆的 Beyond Taiwan", en: "Beyond Taiwan, this year" },
+  sub:         { zh: "七座島，六個 team，近三十個人，全部是學生。點一座島，或點島上的人。", en: "Seven islands, six teams, close to thirty people, all students. Tap an island, or anyone on it." },
+  lang:        { zh: "EN", en: "中" },
+  langLabel:   { zh: "Switch to English", en: "切換成中文" },
+  overview:    { zh: "全景", en: "Overview" },
+  names:       { zh: "名牌", en: "Names" },
+  pause:       { zh: "暫停", en: "Pause" },
+  play:        { zh: "繼續", en: "Play" },
+  bird:        { zh: "鳥瞰", en: "Top" },
+  index:       { zh: "清單", en: "Index" },
+  me:          { zh: "把自己放上去", en: "Put yourself here" },
+  meTitle:     { zh: "把自己放到島上", en: "Put yourself on the island" },
+  meLead:      { zh: "挑一個 team、取一個稱呼、選顏色，你就站在那座島上了。只存在你這台裝置的瀏覽器裡，別人看不到。", en: "Pick a team, a nickname and colours, and you are standing on that island. It stays in this browser only; nobody else sees it." },
+  meName:      { zh: "稱呼（最多 12 字）", en: "Nickname (12 characters max)" },
+  meTeam:      { zh: "哪一座島", en: "Which island" },
+  meShirt:     { zh: "上衣", en: "Shirt" },
+  meHair:      { zh: "頭髮", en: "Hair" },
+  meSave:      { zh: "放上去", en: "Place me" },
+  meRemove:    { zh: "把我拿掉", en: "Remove me" },
+  meCancel:    { zh: "取消", en: "Cancel" },
+  meYou:       { zh: "（你）", en: "(you)" },
+  indexHead:   { zh: "THE TEAM INDEX", en: "THE TEAM INDEX" },
+  indexTitle:  { zh: "每一座島在做的事。", en: "What each island does." },
+  indexLead:   { zh: "六個 team、兩位 Co-President。點一個 team 看它在做什麼、有誰。", en: "Six teams and two Co-Presidents. Tap a team to see what it does and who is on it." },
+  people:      { zh: "島上的人", en: "On this island" },
+  programs:    { zh: "在做的事", en: "What they do" },
+  leadBy:      { zh: "由一位 Co-President 帶", en: "Led by a Co-President" },
+  more:        { zh: "到官網看這一項", en: "See this on the site" },
+  close:       { zh: "關閉", en: "Close" },
+  teamOf:      { zh: "所屬的 team", en: "Team" },
+  roleCopresident: { zh: "Co-President", en: "Co-President" },
+  roleDirector:    { zh: "Director，這個 team 的負責人", en: "Director, runs this team" },
+  roleAdvisor:     { zh: "Advisor，跨組與對外的窗口", en: "Advisor, the contact across teams and outside" },
+  roleAssociate:   { zh: "Associate，做事的人", en: "Associate, does the work" },
+  unnamed:     { zh: "這一屆願意具名的幹部在團隊頁。這裡只放角色。", en: "Organisers who chose to be named are on the Team page. Only roles are shown here." },
+  countPeople: { zh: "{n} 個人", en: "{n} people" },
+  loadFail:    { zh: "島載不進來。重新整理一次，還是不行就晚一點再來。", en: "The island could not load. Refresh once, or come back later." },
+  noscript:    { zh: "這一頁要開 JavaScript 才看得到島。", en: "This page needs JavaScript to draw the island." },
+  no3d:        { zh: "這台裝置畫不出 3D。下面的清單是同一份內容。", en: "This device cannot draw the 3D view. The index below has the same content." },
+  hint:        { zh: "拖曳可以轉，滾輪可以放大。", en: "Drag to turn, scroll to zoom." },
+  teamPage:    { zh: "團隊頁", en: "Team page" },
+};
+export function t(key, lang, vars) {
+  const e = STR[key]; if (!e) return key;
+  let s = e[lang] || e.zh;
+  if (vars) for (const k of Object.keys(vars)) s = s.split("{" + k + "}").join(String(vars[k]));
+  return s;
+}
