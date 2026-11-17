@@ -67,8 +67,10 @@ export function programSpots(island, n) {
 // blockers 是世界座標的圓 { x, z, r }（房子、桌椅、樹）。目標點不可以落在任何一個圓裡。
 export function wanderTarget(island, blockers, rnd) {
   for (let i = 0; i < 40; i++) {
-    const a = rnd() * TAU, d = Math.sqrt(rnd()) * (island.r - 2.0);
-    const x = island.x + Math.cos(a) * d, z = island.z + Math.sin(a) * d;
+    // 機場是長方形的平台（跑道在後半），人只在前面那一條（z 3 到 8.5）走；島是圓的範圍。
+    let x, z;
+    if (island.sea) { x = island.x + (rnd() - 0.5) * 22; z = island.z + 3 + rnd() * 5.5; }
+    else { const a = rnd() * TAU, d = Math.sqrt(rnd()) * (island.r - 2.0); x = island.x + Math.cos(a) * d; z = island.z + Math.sin(a) * d; }
     if ((blockers || []).some(b => Math.hypot(x - b.x, z - b.z) < (b.r || 1.2) + 0.6)) continue;
     return { x, z };
   }
@@ -85,12 +87,26 @@ export function detour(a, b, blockers, depth) {
   if (!hit) return [b];
   const R = (hit.r || 1.2) + 0.7; const px = a.x + dx * hitT, pz = a.z + dz * hitT;
   let nx = px - hit.x, nz = pz - hit.z; const nd = Math.hypot(nx, nz); if (nd < 0.05) { nx = -dz / len; nz = dx / len; } else { nx /= nd; nz /= nd; }
-  const via = { x: hit.x + nx * R, z: hit.z + nz * R };
+  // 往外推的那一點不可以落在別的圓裡（2026-11-17 大家卡在同一點就是這個：目標在圓裡，每一幀被推出來，永遠到不了）。
+  // 落在圓裡就再往外推，推不出來就換另一邊。
+  const inside = q => list.some(c => c !== hit && Math.hypot(q.x - c.x, q.z - c.z) < (c.r || 1.2) + 0.4);
+  let via = { x: hit.x + nx * R, z: hit.z + nz * R };
+  for (let k = 1; k <= 4 && inside(via); k++) via = { x: hit.x + nx * (R + k * 1.2), z: hit.z + nz * (R + k * 1.2) };
+  if (inside(via)) { via = { x: hit.x - nx * R, z: hit.z - nz * R }; for (let k = 1; k <= 4 && inside(via); k++) via = { x: hit.x - nx * (R + k * 1.2), z: hit.z - nz * (R + k * 1.2) }; }
   // 兩段再各自檢查一次（同一個圓也要再看：往外推的點在圓外，但到它的那一段可能還切到圓的邊）。
   return detour(a, via, list, dep - 1).concat(detour(via, b, list, dep - 1));
 }
 // 鏡頭：全景、看一座島、鳥瞰。回 { pos, target }。
 // fit：[橫的半徑, 直的半徑]，scene.js 照畫面的長寬把距離算出來；pos 只給方向。
-export function cameraOverview(phone) { const d = phone ? 125 : 96; return { pos: [0, d * 1.0, d * 0.72], target: [0, 0, 0], fit: [64, 44] }; }
+export function cameraOverview(phone) { const d = phone ? 125 : 96; return { pos: [0, d * 1.0, d * 0.72], target: [0, 0, 0], fit: [68, 48] }; }
+// 海上的裝飾小島（Paul 2026-11-17：「a couple of decorative islands on the side… a few roller coaster around」）：沒有功能、不能點、人不會去。
+// kind 決定畫什麼：coaster 雲霄飛車、lighthouse 燈塔、picnic 幾棵樹一張桌、palm 棕櫚、rock 礁石。位置跟每座島都隔得開（測試守）。
+export const ISLETS = [
+  { id: "coaster", kind: "coaster", x: -52, z: 26, r: 7.5 },
+  { id: "lighthouse", kind: "lighthouse", x: -27, z: -45, r: 4 },
+  { id: "picnic", kind: "picnic", x: 29, z: 41, r: 5 },
+  { id: "palm", kind: "palm", x: -57, z: -17, r: 4 },
+  { id: "rock", kind: "rock", x: 63, z: -31, r: 3.5 },
+];
 export function cameraIsland(island, phone) { const d = phone ? 38 : 32; const ux = island.x || 0, uz = island.z || 1; const n = Math.hypot(ux, uz) || 1; return { pos: [island.x + (ux / n) * d * 0.25, d * 0.78, island.z + d * 0.62 + (uz / n) * d * 0.1], target: [island.x, 0.8, island.z - 1] }; }
 export function cameraBird(phone) { const d = phone ? 135 : 118; return { pos: [0, d, 0.01], target: [0, 0, 0], fit: [70, 70] }; }
