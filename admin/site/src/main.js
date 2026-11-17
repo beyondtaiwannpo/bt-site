@@ -21,6 +21,8 @@ let S = {
   tpls: [], tplKind: null,
   // 歷史之路（2026-11-06）：hist 是 loadMilestones() 整形後的清單；hiSel 打開的那一站 id（"new" 是新的一站）；hiUp 上傳中 { pct, name }。
   hist: [], hiSel: null, hiUp: null,
+  // BT 島上的貼文（2026-11-17）：ip 是清單；ipSel 打開的那一則 id（"new" 是新的）；ipPrograms 可以掛的那幾棟（讀 /island/teams.json）；ipUp 上傳中。
+  ip: [], ipSel: null, ipPrograms: [], ipUp: null,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -54,6 +56,11 @@ function render() {
     body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
   } else if (S.view === "res-edit") {
     body = UI.resEditHTML(S.resEditing, S.msg, S.busy);
+  } else if (S.view === "island") {
+    body = UI.islandListHTML(S.ip, S.me, S.msg, S.busy, S.ipPrograms);
+  } else if (S.view === "island-edit") {
+    const r = S.ipSel === "new" ? null : S.ip.find(x => x.id === S.ipSel);
+    body = (S.ipSel === "new" || r) ? UI.islandEditHTML(r, S.me, S.msg, S.busy, S.ipPrograms, S.ipUp) : UI.emptyHTML(T("ip.notFound"), "", { act: "ip-back", label: T("ip.back") });
   } else if (S.view === "history") {
     body = UI.historyListHTML(S.hist, S.me, S.msg, S.busy);
   } else if (S.view === "history-edit") {
@@ -68,7 +75,7 @@ function render() {
     body = UI.resListHTML(S.res, canEdit(), S.msg, isPres(), UI.mpItems(S.me, "res:", S.workspaces));
   }
   // 側欄亮哪一行：編輯畫面算在它所屬的那個分頁底下。
-  const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res", "history-edit": "history" }[S.view] || S.view;
+  const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res", "history-edit": "history", "island-edit": "island" }[S.view] || S.view;
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
@@ -119,6 +126,9 @@ async function openTab(want) {
   // 歷史之路（2026-11-06）：#history 清單，#history/<id> 一站，#history/new 新的一站。幹部都看得到清單。
   const hi = /^history(?:\/([a-z0-9-]+))?$/.exec(want || "");
   if (hi) { await openHistory(hi[1] || null); return; }
+  // BT 島上的貼文（2026-11-17）：#island 清單，#island/<id> 一則，#island/new 新的一則。
+  const ip = /^island(?:\/([a-z0-9-]+))?$/.exec(want || "");
+  if (ip) { await openIsland(ip[1] || null); return; }
   if (want === "events" && isPres()) { S.busy = true; try { S.siteEvents = await D.loadSiteEvents(); S.view = "events"; S.msg = ""; } catch (e) { S.msg = T("err.seLoad") + D.says(e); } S.busy = false; render(); return; }
   if (want === "team" && isPres()) await openTeam();
   else if (want === "stories" && isPres()) await openStories();
@@ -160,6 +170,40 @@ async function openStories() {
     S.view = "stories"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.storiesLoad") + D.says(e); }
   render();
+}
+
+// ── BT 島上的貼文（2026-11-17）────────────────────────────────────────
+async function openIsland(sel) {
+  S.busy = true; render();
+  try {
+    const [rows, programs] = await Promise.all([D.loadIslandPosts(), S.ipPrograms.length ? S.ipPrograms : D.loadIslandPrograms()]);
+    S.ip = rows; S.ipPrograms = programs; S.ipSel = sel; S.view = sel ? "island-edit" : "island"; S.busy = false;
+  } catch (e) { S.busy = false; S.msg = T("err.ipLoad") + D.says(e); }
+  render();
+}
+async function reloadIsland(msg) {
+  S.msg = msg || "";
+  try { S.ip = await D.loadIslandPosts(); } catch (e) { S.msg = T("err.ipLoad") + D.says(e); }
+  S.busy = false; render();
+}
+// 一則那張表單讀成 patch；哪一棟決定 team（選單上 data-team）。
+function readIslandPost() {
+  const g = id => document.getElementById(id); if (!g("ip-url")) return null;
+  const sel = g("ip-program"), opt = sel && sel.selectedOptions && sel.selectedOptions[0];
+  return { program: sel ? sel.value : "", team: opt ? (opt.dataset.team || "") : "", url: g("ip-url").value.trim(), kind: g("ip-kind") ? g("ip-kind").value : "post",
+           caption_zh: g("ip-czh").value.trim(), caption_en: g("ip-cen").value.trim(), posted_on: g("ip-date").value || "" };
+}
+async function uploadIslandImage(postId, file) {
+  if (!UI.hiFileOk(file)) { S.msg = T("err.hiFile"); render(); return; }
+  S.busy = true; S.msg = ""; S.ipUp = { pct: 10, name: file.name }; render();
+  try {
+    const blob = await shrinkImage(file); S.ipUp = { pct: 45, name: file.name }; render();
+    const cur = S.ip.find(x => x.id === postId); const old = cur ? cur.image_url : "";
+    const url = await D.uploadIslandImage(postId, blob); S.ipUp = { pct: 85, name: file.name }; render();
+    await D.upsertIslandPost({ id: postId, image_url: url });
+    if (old) await D.removeIslandImage(old);
+    S.ipUp = null; await reloadIsland(T("msg.ipImage"));
+  } catch (e) { S.ipUp = null; S.busy = false; S.msg = T("err.ipImage") + D.says(e); render(); }
 }
 
 // ── 歷史之路（2026-11-06）────────────────────────────────────────────
@@ -272,6 +316,15 @@ async function onAutosave(act, box, field) {
   if (!dirty.changed(key, serial)) return;
   const saved = (text) => { dirty.mark(key, serial); UI.autosaveState(liveBox(box), "saved"); UI.toast(text); };
 
+  if (act === "ip-save") {
+    const patch = readIslandPost(); if (!patch) return;
+    if (!patch.program) { autosaveFail(box, T("err.ipProgram")); return; }
+    if (!/^https:\/\//.test(patch.url)) { autosaveFail(box, T("err.ipUrl")); return; }
+    UI.autosaveState(box, "saving");
+    try { await D.upsertIslandPost(Object.assign({ id }, patch)); const r = S.ip.find(x => x.id === id); if (r) Object.assign(r, patch); saved(T("msg.ipSaved")); }
+    catch (err) { autosaveFail(box, T("err.ipSave") + D.says(err)); }
+    return;
+  }
   if (act === "res-save") {
     const patch = { title: v.title, blurb: v.blurb, kind: v.kind, url: v.url, team: v.team || null, ord: Number(v.ord) || 100 };
     UI.autosaveState(box, "saving");
@@ -465,6 +518,46 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  // ── BT 島上的貼文（2026-11-17）──
+  if (act === "ip-open") { e.preventDefault(); history.pushState(null, "", "#island/" + id); await openIsland(id); return; }
+  if (act === "ip-back") { history.pushState(null, "", "#island"); await openIsland(null); return; }
+  if (act === "ip-new") { history.pushState(null, "", "#island/new"); S.ipSel = "new"; S.view = "island-edit"; S.msg = ""; render(); return; }
+  if (act === "ip-save") {
+    const patch = readIslandPost(); if (!patch) return;
+    if (!patch.program) { S.msg = T("err.ipProgram"); render(); return; }
+    if (!/^https:\/\//.test(patch.url)) { S.msg = T("err.ipUrl"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const newId = await D.upsertIslandPost(id ? Object.assign({ id }, patch) : patch);
+      if (!id) { history.replaceState(null, "", "#island/" + newId); S.ipSel = newId; }
+      await reloadIsland(id ? T("msg.ipSaved") : T("msg.ipCreated"));
+    } catch (err) { S.busy = false; S.msg = T("err.ipSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "ip-publish" || act === "ip-unpublish") {
+    if (act === "ip-unpublish" && UI.needAsk(S, b, T("confirm.ipUnpublish"))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (act === "ip-publish") { const patch = readIslandPost(); if (patch && patch.program && /^https:\/\//.test(patch.url)) await D.upsertIslandPost(Object.assign({ id }, patch)); }
+      await D.setIslandPostStatus(id, act === "ip-publish" ? "published" : "archived");
+      await reloadIsland(T(act === "ip-publish" ? "msg.ipPublished" : "msg.ipUnpublished"));
+    } catch (err) { S.busy = false; S.msg = T("err.ipStatus") + D.says(err); render(); }
+    return;
+  }
+  if (act === "ip-del") {
+    if (UI.needAsk(S, b, T("confirm.ipDelete"))) return;
+    S.busy = true; S.msg = ""; render();
+    try { await D.deleteIslandPost(id); history.replaceState(null, "", "#island"); S.ipSel = null; S.view = "island"; await reloadIsland(T("msg.ipDeleted")); }
+    catch (err) { S.busy = false; S.msg = T("err.ipSave") + D.says(err); render(); }
+    return;
+  }
+  if (act === "ip-img-del") {
+    S.busy = true; S.msg = ""; render();
+    try { const cur = S.ip.find(x => x.id === id); await D.upsertIslandPost({ id, image_url: "" }); if (cur && cur.image_url) await D.removeIslandImage(cur.image_url); await reloadIsland(T("msg.ipImageDel")); }
+    catch (err) { S.busy = false; S.msg = T("err.ipSave") + D.says(err); render(); }
+    return;
+  }
+
   // ── 歷史之路（2026-11-06）──
   if (act === "hi-open") { e.preventDefault(); history.pushState(null, "", "#history/" + id); await openHistory(id); return; }
   if (act === "hi-back") { history.pushState(null, "", "#history"); await openHistory(null); return; }
@@ -614,6 +707,16 @@ document.addEventListener("change", async e => {
     catch (err) { S.busy = false; S.msg = T("err.hiPhoto") + D.says(err); render(); }
     return;
   }
+  // BT 島上的貼文（2026-11-17）：勾同意立刻送；選了圖就縮圖上傳。
+  const ipConsent = e.target.closest('[data-act="ip-consent"]');
+  if (ipConsent && S.view === "island-edit") {
+    S.busy = true; S.msg = ""; render();
+    try { await D.upsertIslandPost({ id: ipConsent.dataset.id, consent: ipConsent.checked }); await reloadIsland(T("msg.ipSaved")); }
+    catch (err) { S.busy = false; S.msg = T("err.ipSave") + D.says(err); render(); }
+    return;
+  }
+  const ipFile = e.target.closest("#ip-file");
+  if (ipFile && S.view === "island-edit") { const f = (ipFile.files || [])[0]; if (f) await uploadIslandImage(ipFile.dataset.id, f); return; }
   const fileEl = e.target.closest("#hi-file");
   if (fileEl && S.view === "history-edit") { const fs = Array.from(fileEl.files || []); if (fs.length) await uploadFiles(fileEl.dataset.id, fs); return; }
   // 多選加人（2026-10-24）：勾一個人、換等級，改 pk 再重畫。

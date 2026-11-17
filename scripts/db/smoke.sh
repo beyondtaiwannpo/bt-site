@@ -3789,6 +3789,58 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 abr3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-28-alumni-bt-role.sql 2>&1 || true)
 if echo "${abr3}" | grep -q "OVERALL.*PASS" && ! echo "${abr3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
+echo "── 島上的貼文（2026-12-29-island-posts.sql）──"
+# 這時候：PAUL Co-President、DIR 管 res:Marketing Team、AMT 是某個 team 的「改」（AMTEAM）**而且上面 12-26 那段把他升成了 Marketing 的「管」**、AMV 是那個 team 的「看」、ISTAFF 只在 Internship、STU 學員。
+ipg=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-29-island-posts.sql 2>&1 || true)
+if echo "${ipg}" | grep -q "OVERALL.*PASS" && ! echo "${ipg}" | grep -q "|FAIL"; then echo "  ok   島上的貼文那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 島上的貼文那支驗收表："; echo "${ipg}" | head -12; fail=$((fail+1)); fi
+ipg2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-29-island-posts.sql 2>&1 || true)
+if echo "${ipg2}" | grep -q "OVERALL.*PASS"; then echo "  ok   島上的貼文那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${ipg2}" | head -5; fail=$((fail+1)); fi
+IP1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" \
+  -c "select public.upsert_island_post('{\"program\":\"database\",\"team\":\"${AMTEAM}\",\"url\":\"https://www.instagram.com/p/abc/\",\"kind\":\"post\",\"caption_zh\":\"東大\",\"caption_en\":\"Tokyo\",\"posted_on\":\"2026-11-12\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${IP1}" in ????????-*) echo "  ok   team 是「改」的人貼了一則（${IP1}）"; pass=$((pass+1));; *) echo "  FAIL 貼不了：${IP1}"; fail=$((fail+1));; esac
+chk "新的一則是草稿" "draft|database" "select status||'|'||program from public.island_posts where id='${IP1}'"
+chkraise "★ team 是「看」的人貼不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${AMV}',true); perform public.upsert_island_post('{\"program\":\"database\",\"team\":\"${AMTEAM}\",\"url\":\"https://x/\"}'::jsonb);"
+chkraise "★ 別的 team 的幹部貼不了這個 team 的（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_post('{\"program\":\"database\",\"team\":\"${AMTEAM}\",\"url\":\"https://x/\"}'::jsonb);"
+chkraise "★ 聚會所（team 空）只有 Marketing「管」或 senior 貼得了：Internship 的幹部不行（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.upsert_island_post('{\"program\":\"meeting\",\"team\":\"\",\"url\":\"https://x/\"}'::jsonb);"
+chkas "${DIR}" "Marketing「管」貼得了聚會所的" "1" "select count(*) from (select public.upsert_island_post('{\"program\":\"meeting\",\"team\":\"\",\"url\":\"https://www.instagram.com/p/m/\",\"caption_zh\":\"全員會議\"}'::jsonb)) x"
+chkraise "連結不是 https 擋（url_not_https）" "url_not_https" \
+  "perform set_config('test.uid','${AMT}',true); perform public.upsert_island_post('{\"program\":\"database\",\"team\":\"${AMTEAM}\",\"url\":\"http://x/\"}'::jsonb);"
+chkraise "program 亂填擋（bad_program）" "bad_program" \
+  "perform set_config('test.uid','${AMT}',true); perform public.upsert_island_post('{\"program\":\"Bad Program\",\"team\":\"${AMTEAM}\",\"url\":\"https://x/\"}'::jsonb);"
+chkrole anon "" "★ 草稿對外看不到" "0" "select jsonb_array_length(public.public_island_posts())"
+chkas "${AMT}" "上架（沒有圖，不用同意）" "published" "select public.set_island_post_status('${IP1}','published')"
+chkrole anon "" "★ 對外拿得到那一則，而且沒有 team、status、誰貼的" "1|database|0|0" \
+  "select jsonb_array_length(j)||'|'||(j->0->>'program')||'|'||(select count(*) from jsonb_array_elements(j) e where e ? 'status')||'|'||(select count(*) from jsonb_array_elements(j) e where e ? 'team') from public.public_island_posts() j"
+chkas "${AMT}" "掛一張圖（同意還沒勾）" "${IP1}" "select public.upsert_island_post('{\"id\":\"${IP1}\",\"image_url\":\"https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/island/a.jpg\"}'::jsonb)"
+chk "★ 換了圖就退回草稿、同意歸零" "draft|false" "select status||'|'||consent::text from public.island_posts where id='${IP1}'"
+chkraise "★ 有圖沒勾同意上不了架（consent_required）" "consent_required" \
+  "perform set_config('test.uid','${AMT}',true); perform public.set_island_post_status('${IP1}','published');"
+chkas "${AMT}" "勾了同意" "${IP1}" "select public.upsert_island_post('{\"id\":\"${IP1}\",\"consent\":true}'::jsonb)"
+chkas "${AMT}" "再上架" "published" "select public.set_island_post_status('${IP1}','published')"
+chkrole anon "" "對外那一則帶著圖" "https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/island/a.jpg" "select j->0->>'image' from public.public_island_posts() j"
+psql -d "${DB}" -X -A -t -q -c "update public.island_posts set consent=false where id='${IP1}';" >/dev/null
+chkrole anon "" "★ 破壞測試：直接把同意改掉，對外那一則就不見（函式裡的門）" "0" "select jsonb_array_length(public.public_island_posts())"
+psql -d "${DB}" -X -A -t -q -c "update public.island_posts set consent=true where id='${IP1}';" >/dev/null
+chkraise "★ team 是「看」的人撤不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${AMV}',true); perform public.set_island_post_status('${IP1}','archived');"
+chkrole authenticated "${STU}" "學員什麼都讀不到" "0" "select count(*) from public.island_posts"
+chkrole authenticated "${ISTAFF}" "別的 team 的幹部讀得到清單（後台看得到，改不動）" "2" "select count(*) from public.island_posts"
+angot=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.island_posts;" 2>&1 || true)
+if echo "${angot}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 island_posts 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到表：${angot}"; fail=$((fail+1)); fi
+chkraise "★ 別的 team 的幹部刪不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${ISTAFF}',true); perform public.delete_island_post('${IP1}');"
+chkas "${PAUL}" "Co-President 刪掉，拿回圖的網址" "https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/island/a.jpg" "select public.delete_island_post('${IP1}')"
+chk "刪掉了" "1" "select count(*) from public.island_posts"
+BROKEN=$(mktemp)
+sed "s/if p_status = 'published' and v.image_url is not null and not v.consent then raise exception 'consent_required' using errcode = 'P0001'; end if;//" supabase/migrations/2026-12-29-island-posts.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉同意的門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉同意的門驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+ipg3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-29-island-posts.sql 2>&1 || true)
+if echo "${ipg3}" | grep -q "OVERALL.*PASS" && ! echo "${ipg3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

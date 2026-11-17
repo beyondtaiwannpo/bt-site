@@ -966,3 +966,6 @@ a.rail-group.wshead.on{border-bottom:3px solid var(--bt-navy)}
 .ma-row .ma-sel{margin:0 2px 0 0}
 .ma-row.on{background:rgba(16,42,134,.06)}
 .ma-tools.ma-bulk{flex-wrap:wrap;gap:6px;margin-top:8px}
+
+/* BT 島上的貼文（2026-11-17）：清單上的小縮圖 */
+.ip-thumb{width:32px;height:32px;object-fit:cover;border-radius:6px;margin-left:8px;vertical-align:middle}

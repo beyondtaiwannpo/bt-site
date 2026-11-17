@@ -132,6 +132,8 @@ export const ITEMS = [
   { group: "marketing", key: "posts",      area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests", ws: "res:Marketing Team", label: { zh: "大學介紹貼文", en: "College intro posts" } },
   { group: "marketing", key: "ig",         area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests", ws: "res:Marketing Team", label: { zh: "Instagram", en: "Instagram" } },
   { group: "site",      key: "history",    area: "marketing", who: "cadre",  ws: "res:Marketing Team",  label: { zh: "BT 歷史之路", en: "History road" } },
+  // BT 島上的貼文（2026-11-17）：每個 team 自己貼自己那座島的，所以每一位幹部都看得到這一頁；貼得了哪座島看他的工作區。
+  { group: "site",      key: "island",     area: "marketing", who: "cadre",  label: { zh: "BT 島的貼文", en: "Island posts" } },
   // 對外網站
   { group: "site",      key: "events",     area: "website",   who: "senior", label: { zh: "網站上的活動", en: "Events on the site" } },
   { group: "site",      key: "res",        area: "website",   who: "cadre",  label: { zh: "資源庫", en: "Resources" } },

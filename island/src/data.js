@@ -15,7 +15,7 @@ export function normalize(raw) {
     const tm = teamsRaw.find(x => x && x.id === id); if (!tm) continue;
     teams.push({
       id, colour: COLOURS.includes(tm.colour) ? tm.colour : "teal", lead: tm.lead === "a" || tm.lead === "b" ? tm.lead : "", sea: tm.sea === true,
-      ground: GROUNDS.includes(tm.ground) ? tm.ground : "grass", scenery: SCENERIES.includes(tm.scenery) ? tm.scenery : "", trees: Number.isInteger(tm.trees) ? Math.max(0, Math.min(20, tm.trees)) : 10,
+      workspace: str(tm.workspace), ground: GROUNDS.includes(tm.ground) ? tm.ground : "grass", scenery: SCENERIES.includes(tm.scenery) ? tm.scenery : "", trees: Number.isInteger(tm.trees) ? Math.max(0, Math.min(20, tm.trees)) : 10,
       name_zh: str(tm.name_zh), name_en: str(tm.name_en) || str(tm.name_zh),
       tagline_zh: str(tm.tagline_zh), tagline_en: str(tm.tagline_en) || str(tm.tagline_zh),
       about_zh: str(tm.about_zh), about_en: str(tm.about_en) || str(tm.about_zh),
@@ -182,8 +182,15 @@ export function normalizePosts(raw, teams) {
     posts: posts.filter(x => x && /^https:\/\/www\.instagram\.com\/[A-Za-z0-9_./-]+$/.test(str(x.url)) && (!known || known.has(str(x.program) || "instagram"))).map((x, i) => ({
       id: i, program: str(x.program) || "instagram",
       url: str(x.url), kind: x.kind === "reel" ? "reel" : "post", date: str(x.date).slice(0, 10),
-      image: /^posts\/[A-Za-z0-9_-]+\.jpg$/.test(str(x.image)) ? str(x.image) : "",   // 只收 island/posts/ 裡的檔名
+      image: /^posts\/[A-Za-z0-9_-]+\.jpg$/.test(str(x.image)) || /^https:\/\//.test(str(x.image)) ? str(x.image) : "",   // island/posts/ 裡的檔名，或資料庫那邊 Storage 的 https 網址
       caption_zh: str(x.caption_zh) || str(x.caption_en), caption_en: str(x.caption_en) || str(x.caption_zh) })).slice(0, 12) };
 }
 export const postsOf = (ig, programId) => (ig && ig.posts ? ig.posts : []).filter(x => x.program === programId);
-export const loadPosts = (base, teams) => fetch((base || "./") + "posts.json").then(r => r.json()).then(raw => normalizePosts(raw, teams)).catch(() => normalizePosts(null));
+// 貼文先讀資料庫（後台 /admin/site/#island 貼的，public_island_posts()），有東西就用它；沒有或讀不到就退回 island/posts.json。
+// 兩邊的形狀一樣（program、url、kind、date、caption、image）；資料庫那邊的 image 是 Storage 的 https 網址。
+export async function loadPosts(base, teams) {
+  const file = await fetch((base || "./") + "posts.json").then(r => r.json()).catch(() => null);
+  const db = await rpc("public_island_posts").catch(() => null);
+  const raw = Array.isArray(db) && db.length ? { handle: file && file.handle, profile: file && file.profile, posts: db } : file;
+  return normalizePosts(raw, teams);
+}

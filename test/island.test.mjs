@@ -6,6 +6,8 @@ import * as D from "../island/src/data.js";
 import * as UI from "../island/src/ui.js";
 import * as L from "../island/src/layout.js";
 import { STR, t } from "../island/src/strings.js";
+import * as SITE from "../admin/site/src/ui.js";
+import { loadIslandPrograms } from "../admin/site/src/data.js";
 
 const raw = JSON.parse(fs.readFileSync("island/teams.json", "utf8"));
 const d = D.normalize(raw);
@@ -183,4 +185,46 @@ test("跟官網接起來：活動照 team 字樣對到島、報名開著才給 /
   assert.equal(airport.people.filter(p => p.role === "student").length, 2);
   const card = UI.teamCardHTML(d2.teams[2], "zh", { ...d2, events: evs });
   assert.ok(card.includes("報名中") && card.includes('href="../apply/?f=f1"'));
+});
+
+// 後台「BT 島的貼文」（2026-11-17）：誰貼得了哪座島、清單照哪一棟分段、一則的表單、圖沒勾同意不給「放上去」。
+test("後台 BT 島的貼文：team 是「改」才貼得了自己那座島、聚會所只有 Marketing 管與 senior、清單與表單畫得出來、有圖沒同意不給放上去", async () => {
+  SITE.setLang("zh");
+  // teams.json 每個 team 有 workspace，後台用它決定誰貼得了
+  for (const tm of d.teams) assert.ok(typeof tm.workspace === "string", tm.id);
+  assert.equal(d.teams.find(tm => tm.id === "curriculum").workspace, "Curriculum Team");
+  assert.equal(d.teams.find(tm => tm.id === "commons").workspace, "");
+  const programs = d.teams.flatMap(tm => tm.programs.map(p => ({ id: p.id, teamId: tm.id, team: tm.workspace, island_zh: tm.name_zh, island_en: tm.name_en, name_zh: p.name_zh, name_en: p.name_en })));
+  const edit = { role: "cadre", board: "member", ws: { "res:Curriculum Team": "edit" } };
+  const view = { role: "cadre", board: "member", ws: { "res:Curriculum Team": "view" } };
+  const mk = { role: "cadre", board: "member", ws: { "res:Marketing Team": "manage" } };
+  const pres = { role: "cadre", board: "president", ws: {} };
+  assert.equal(SITE.ipCanEdit(edit, "Curriculum Team"), true);
+  assert.equal(SITE.ipCanEdit(edit, "Mentorship Team"), false);
+  assert.equal(SITE.ipCanEdit(view, "Curriculum Team"), false);
+  assert.equal(SITE.ipCanEdit(edit, ""), false, "聚會所：team 的人貼不了");
+  assert.equal(SITE.ipCanEdit(mk, ""), true); assert.equal(SITE.ipCanEdit(pres, ""), true);
+  assert.equal(SITE.ipCanEditAny(view, programs), false); assert.equal(SITE.ipCanEditAny(edit, programs), true);
+  const rows = [
+    { id: "a1", program: "database", team: "Curriculum Team", url: "https://www.instagram.com/p/x/", kind: "post", caption_zh: "東大", caption_en: "Tokyo", posted_on: "2026-11-12", image_url: "https://x.supabase.co/storage/v1/object/public/island/a1/1.jpg", consent: false, status: "draft" },
+    { id: "a2", program: "instagram", team: "Marketing Team", url: "https://www.instagram.com/reel/y/", kind: "reel", caption_zh: "", caption_en: "Vlog", posted_on: "", image_url: "", consent: false, status: "published" },
+  ];
+  const list = SITE.islandListHTML(rows, edit, "", false, programs);
+  assert.ok(list.includes("Curriculum · 海外大學資料庫") && list.includes("Marketing · Instagram") && list.includes("東大") && list.includes("Vlog") && list.includes('data-act="ip-new"'));
+  assert.ok(list.includes("有圖但還沒勾同意"), "清單上要提醒圖還沒勾同意");
+  assert.ok(!SITE.islandListHTML(rows, view, "", false, programs).includes('data-act="ip-new"'), "只能看的人沒有「貼一則」");
+  assert.ok(SITE.islandListHTML([], edit, "", false, programs).includes("還沒有任何一則"));
+  const form = SITE.islandEditHTML(rows[0], edit, "", false, programs, null);
+  assert.ok(form.includes('data-autosave="ip-save"') && form.includes('value="database" data-team="Curriculum Team" selected') && form.includes('data-act="ip-publish"'));
+  assert.ok(/data-act="ip-publish"[^>]*disabled/.test(form), "有圖沒勾同意，「放上去」要是灰的");
+  assert.ok(form.includes('data-act="ip-consent"') && form.includes('id="ip-file"'));
+  const ok = SITE.islandEditHTML({ ...rows[0], consent: true }, edit, "", false, programs, null);
+  assert.ok(!/data-act="ip-publish"[^>]*disabled/.test(ok));
+  const fresh = SITE.islandEditHTML(null, edit, "", false, programs, null);
+  assert.ok(fresh.includes('data-act="ip-save"') && !fresh.includes('id="ip-file"') && fresh.includes("先存一次"));
+  assert.ok(!fresh.includes('value="mentoring"'), "新的一則只列他貼得了的那幾棟");
+  assert.ok(SITE.islandEditHTML(null, pres, "", false, programs, null).includes('value="mentoring"'));
+  const ro = SITE.islandEditHTML(rows[0], view, "", false, programs, null);
+  assert.ok(!ro.includes("data-autosave") && !ro.includes('data-act="ip-publish"'));
+  assert.equal(typeof loadIslandPrograms, "function");
 });

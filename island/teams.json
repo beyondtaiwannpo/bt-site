@@ -18,7 +18,8 @@
     "               flow     校友專用：{ to（走去哪座島）, carry_zh/en（帶著什麼，牌子上會寫）, why_zh/en（他為什麼在島上）}。",
     "               line_zh/en 他自己的一句話（可留空）。",
     "  ground / scenery / trees（2026-11-17）：這座島的地面（grass lawn patch tiles grid paving checker brick）、島上那一套擺設（playground plaza classroom school garden studio square，空的就只有一般的桌椅與路）、幾棵樹。scene.js 照這三個字畫，不認 team 的名字。",
-    "  2026-11-17 另外加了十二個只有角色沒有名字的人（探索營學員、配對中的學員、高中實習生、校園大使、來談合作的夥伴，sample: true）：Paul 要島上看起來有人在做事。他們不是名單上的人，是這一屆真的會在島上出現的那種人。"
+    "  2026-11-17 另外加了十二個只有角色沒有名字的人（探索營學員、配對中的學員、高中實習生、校園大使、來談合作的夥伴，sample: true）：Paul 要島上看起來有人在做事。他們不是名單上的人，是這一屆真的會在島上出現的那種人。",
+    "  workspace（2026-11-17）：這個 team 在後台的工作區標籤（例如 Curriculum Team）。後台「島上的貼文」用它決定誰貼得了這座島的貼文；聚會所與機場是空的（只有 Marketing「管」與 senior 貼得了）。"
   ],
   "teams": [
     {
@@ -68,7 +69,8 @@
       ],
       "ground": "patch",
       "scenery": "playground",
-      "trees": 8
+      "trees": 8,
+      "workspace": ""
     },
     {
       "id": "sponsorship",
@@ -106,7 +108,8 @@
       ],
       "ground": "paving",
       "scenery": "plaza",
-      "trees": 12
+      "trees": 12,
+      "workspace": "Sponsorship Team"
     },
     {
       "id": "curriculum",
@@ -155,7 +158,8 @@
       ],
       "ground": "tiles",
       "scenery": "classroom",
-      "trees": 13
+      "trees": 13,
+      "workspace": "Curriculum Team"
     },
     {
       "id": "internship",
@@ -182,7 +186,8 @@
       ],
       "ground": "grid",
       "scenery": "school",
-      "trees": 9
+      "trees": 9,
+      "workspace": "Internship Team"
     },
     {
       "id": "mentorship",
@@ -220,7 +225,8 @@
       ],
       "ground": "lawn",
       "scenery": "garden",
-      "trees": 16
+      "trees": 16,
+      "workspace": "Mentorship Team"
     },
     {
       "id": "marketing",
@@ -258,7 +264,8 @@
       ],
       "ground": "checker",
       "scenery": "studio",
-      "trees": 12
+      "trees": 12,
+      "workspace": "Marketing Team"
     },
     {
       "id": "cr",
@@ -296,7 +303,8 @@
       ],
       "ground": "brick",
       "scenery": "square",
-      "trees": 14
+      "trees": 14,
+      "workspace": "Community Relations Team"
     },
     {
       "id": "airport",
@@ -335,7 +343,8 @@
       ],
       "ground": "grass",
       "scenery": "",
-      "trees": 0
+      "trees": 0,
+      "workspace": ""
     }
   ],
   "people": [

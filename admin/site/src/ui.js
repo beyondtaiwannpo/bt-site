@@ -996,6 +996,65 @@ export function historyEditHTML(m, me, msg, busy, up) {
     + msgHTML(msg) + keys + content + photos;
 }
 
+// ── BT 島上的貼文（2026-11-17）──────────────────────────────────────
+// 誰貼得了哪座島：那個 team 的工作區「改」以上、Marketing「管」、senior；聚會所（team 空）只有後兩種。跟資料庫 can_edit_island_post(team) 同一條。
+export function ipCanEdit(me, team) { return senior(me) || wsLevel(me, HI_WS) === "manage" || (!!team && ["edit", "manage"].includes(wsLevel(me, "res:" + team))); }
+export const ipCanEditAny = (me, programs) => senior(me) || wsLevel(me, HI_WS) === "manage" || (programs || []).some(p => p.team && ipCanEdit(me, p.team));
+export const ipProgram = (programs, id) => (programs || []).find(p => p.id === id) || null;
+export const ipProgramLabel = (pr) => pr ? (lang() === "en" ? `${pr.island_en} · ${pr.name_en}` : `${pr.island_zh} · ${pr.name_zh}`) : "";
+const ipTag = st => `<span class="tag${st === "published" ? " open" : st === "archived" ? "" : " draft"}">${esc(T("ip.st." + st))}</span>`;
+export const ipTitle = r => (lang() === "en" ? (r.caption_en || r.caption_zh) : (r.caption_zh || r.caption_en)) || r.url || "";
+// 清單：照哪一棟分段，每一則一列（一句話、狀態、日期、有沒有圖）。
+export function islandListHTML(rows, me, msg, busy, programs) {
+  const can = ipCanEditAny(me, programs); const list = rows || [];
+  const groups = []; for (const r of list) { let g = groups.find(x => x.program === r.program); if (!g) { g = { program: r.program, pr: ipProgram(programs, r.program), rows: [] }; groups.push(g); } g.rows.push(r); }
+  const row = r => `<li><div class="fhead"><b><a href="#island/${esc(r.id)}" data-act="ip-open" data-id="${esc(r.id)}">${esc(ipTitle(r))}</a></b> ${ipTag(r.status)}${r.image_url ? `<img class="ip-thumb" src="${esc(r.image_url)}" alt="" loading="lazy">` : ""}</div>
+      <div class="fmeta">${esc(r.posted_on || "")}・${esc(T("ip.kind." + (r.kind || "post")))}${r.image_url && !r.consent ? `・<span class="hi-warn">${esc(T("ip.consentBlock"))}</span>` : ""}</div></li>`;
+  return pageHead(T("ip.title"), T("ip.lede"), can ? [{ act: "ip-new", label: T("ip.new"), primary: true }] : [])
+    + msgHTML(msg)
+    + (can ? "" : `<div class="note">${T("ip.readonly")}</div>`)
+    + (list.length ? groups.map(g => sectionHTML(esc(ipProgramLabel(g.pr) || g.program), `<ol class="flist">${g.rows.map(row).join("")}</ol>`)).join("")
+                   : sectionHTML("", emptyHTML(T("ip.none"), T("ip.noneHint"), can ? { act: "ip-new", label: T("ip.new") } : null)));
+}
+// 一則：r 是那一列（null 是新的）；programs 是可以掛的那幾棟；up 是上傳中的 { pct, name }。
+export function islandEditHTML(r, me, msg, busy, programs, up) {
+  const v = Object.assign({ id: "", program: "", team: "", url: "", kind: "post", caption_zh: "", caption_en: "", posted_on: "", image_url: "", consent: false, status: "draft" }, r || {});
+  const isNew = !v.id, st = v.status;
+  const can = isNew ? ipCanEditAny(me, programs) : ipCanEdit(me, v.team);
+  const dis = busy ? " disabled" : "", ro = can ? "" : " readonly";
+  const needConsent = !!v.image_url && !v.consent;
+  const statusLine = st === "published" ? T("ip.stLine.published") : st === "archived" ? T("ip.stLine.archived") : T("ip.stLine.draft");
+  const keys = isNew ? "" : sectionHTML(T("ip.status"), `<div class="note">${statusLine}</div>
+      ${needConsent ? `<div class="msg err" role="status"><span class="msg-k">${T("msg.err")}</span><span>${esc(T("ip.consentBlock"))}</span></div>` : ""}
+      <div class="row">
+      ${st !== "published" && can ? `<button class="btn" data-act="ip-publish" data-id="${esc(v.id)}"${needConsent || busy ? " disabled" : ""}>${T("ip.publish")}</button>` : ""}
+      ${st === "published" && can ? `<button class="btn ghost" data-act="ip-unpublish" data-id="${esc(v.id)}"${dis}>${T("ip.unpublish")}</button>` : ""}
+      ${st === "published" ? `<a class="btn ghost sm" href="/island/#${esc((ipProgram(programs, v.program) || {}).teamId || "")}" target="_blank" rel="noopener">${T("ip.seePublic")}</a>` : ""}
+      ${can ? `<button class="btn quiet danger sm" data-act="ip-del" data-id="${esc(v.id)}"${dis}>${T("ip.delete")}</button>` : ""}
+    </div>`);
+  // 只列他貼得了的那幾棟（新的一則）；既有的一則列全部但換到貼不了的那一棟資料庫會擋。
+  const opts = (programs || []).filter(pr => isNew ? ipCanEdit(me, pr.team) : true)
+    .map(pr => `<option value="${esc(pr.id)}" data-team="${esc(pr.team)}"${pr.id === v.program ? " selected" : ""}>${esc(ipProgramLabel(pr))}</option>`).join("");
+  const fields = `<div class="two">
+      <label class="wide"><i>${T("ip.program")}</i><select id="ip-program" name="program"${can ? "" : " disabled"}${dis}><option value="">${T("ip.programPick")}</option>${opts}</select></label>
+      <label class="wide"><i>${T("ip.url")}</i><input id="ip-url" name="url" value="${esc(v.url)}" placeholder="https://www.instagram.com/beyondtaiwan/p/…/" autocomplete="off"${ro}${dis}></label>
+      <label><i>${T("ip.kind")}</i><select id="ip-kind" name="kind"${can ? "" : " disabled"}${dis}>${["post", "reel", "link"].map(k => `<option value="${k}"${k === v.kind ? " selected" : ""}>${esc(T("ip.kind." + k))}</option>`).join("")}</select></label>
+      <label><i>${T("ip.date")}</i><input id="ip-date" name="posted_on" type="date" value="${esc(v.posted_on || "")}"${ro}${dis}></label>
+      <label><i>${T("ip.capZh")}</i><input id="ip-czh" name="caption_zh" value="${esc(v.caption_zh)}"${ro}${dis}></label>
+      <label><i>${T("ip.capEn")}</i><input id="ip-cen" name="caption_en" value="${esc(v.caption_en)}"${ro}${dis}></label>
+    </div>
+    ${can ? `<div class="form-foot">${isNew ? `<button class="btn" data-act="ip-save" data-id=""${dis}>${busy ? T("common.saving") : T("common.save")}</button><span class="mini">${T("ip.saveFirst")}</span>` : autosaveHint("ip-save")}</div>` : ""}`;
+  const content = sectionHTML(T("ip.content"), can && !isNew ? `<div data-autosave="ip-save" data-id="${esc(v.id)}">${fields}</div>` : fields);
+  const image = isNew ? "" : sectionHTML(T("ip.imageSec"), `<div class="note">${T("ip.imageNote")}</div>
+      ${v.image_url ? `<ul class="hi-photos"><li class="hi-photo"><img src="${esc(v.image_url)}" alt="" loading="lazy"><div class="hi-photo-f">
+        <label class="check"><input type="checkbox" data-act="ip-consent" data-noauto="1" data-id="${esc(v.id)}"${v.consent ? " checked" : ""}${can ? "" : " disabled"}${dis}><span>${T("ip.consent")}</span></label>
+        ${can ? `<div class="row"><button class="btn quiet danger sm" data-act="ip-img-del" data-id="${esc(v.id)}"${dis}>${T("ip.delImage")}</button></div>` : ""}</div></li></ul>` : ""}
+      ${can ? (up ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(T("ip.uploading", { name: up.name || "" }))}</span></div>`
+        : `<label class="hi-upload"><i>${T("ip.upload")}</i><input type="file" id="ip-file" accept="image/*" data-id="${esc(v.id)}"${dis}></label>`) : ""}`);
+  return pageHead(isNew ? T("ip.newTitle") : esc(ipTitle(v)), isNew ? "" : esc(ipProgramLabel(ipProgram(programs, v.program)) || v.program), [], { act: "ip-back", label: T("ip.back") })
+    + msgHTML(msg) + keys + content + image;
+}
+
 // ── 網站上的活動（2026-11-13，Paul：「website 應該有一頁看現在有哪些活動在跑」）──────────────
 // 三段：正在網站上的（published，還沒結束）、等上架的（ready）、草稿。每一列兩顆：看對外那一頁、到活動頁改。
 // 純函式分段（test/site-events.test.mjs）：結束了的 published 不算「在網站上跑」，放最後一段。

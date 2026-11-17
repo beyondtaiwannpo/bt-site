@@ -266,6 +266,52 @@ export async function uploadPhoto(milestoneId, blob) {
   return data.publicUrl;
 }
 
+// ── BT 島上的貼文（2026-11-17）────────────────────────────────────────
+// 讀表（RLS：幹部讀全部）；寫一律走函式（門在 can_edit_island_post(team)）。哪幾棟可以掛，讀 /island/teams.json（跟島同一份）。
+export async function loadIslandPosts() {
+  need();
+  const { data, error } = await supabase.from("island_posts")
+    .select("id, program, team, url, kind, caption_zh, caption_en, posted_on, image_url, consent, status, sort, updated_at")
+    .order("sort").order("posted_on", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+export async function loadIslandPrograms() {
+  const r = await fetch("../../island/teams.json"); if (!r.ok) throw new Error("teams.json " + r.status);
+  const d = await r.json();
+  return (d.teams || []).filter(tm => Array.isArray(tm.programs) && tm.programs.length).flatMap(tm => tm.programs.map(p => ({ id: p.id, teamId: tm.id, team: tm.workspace || "", island_zh: tm.name_zh, island_en: tm.name_en || tm.name_zh, name_zh: p.name_zh, name_en: p.name_en || p.name_zh })));
+}
+export async function upsertIslandPost(patch) {
+  need();
+  const { data, error } = await supabase.rpc("upsert_island_post", { p_patch: patch });
+  if (error) throw error;
+  return data;
+}
+export async function setIslandPostStatus(id, status) {
+  need();
+  const { data, error } = await supabase.rpc("set_island_post_status", { p_id: id, p_status: status });
+  if (error) throw error;
+  return data;
+}
+export async function deleteIslandPost(id) {
+  need();
+  const { data: url, error } = await supabase.rpc("delete_island_post", { p_id: id });
+  if (error) throw error;
+  await removeIslandImage(url);
+  return url;
+}
+export function islandStoragePath(url) { const m = /\/object\/public\/island\/(.+)$/.exec(String(url || "")); return m ? decodeURIComponent(m[1]) : ""; }
+export async function removeIslandImage(url) { const path = islandStoragePath(url); if (path) { try { await supabase.storage.from("island").remove([path]); } catch (e) { /* 檔留著，不擋 */ } } }
+// 傳一張已經縮好的圖到 island bucket，回公開網址。路徑 <那一則的 id>/<時間>-<亂數>.jpg。
+export async function uploadIslandImage(postId, blob) {
+  need();
+  const name = `${postId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage.from("island").upload(name, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+  if (error) throw error;
+  const { data } = supabase.storage.from("island").getPublicUrl(name);
+  return data.publicUrl;
+}
+
 // 每一列是 [代碼, 中文, 英文]（2026-10-19 中英切換），says() 看現在的語言挑一句。代碼本身不動。
 const SAYS = [
   // ⚠ mail_not_configured **不在這張表裡，它走下面的特例**。
@@ -305,6 +351,8 @@ const SAYS = [
   ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。", "Someone has already stamped this box, so it can only be disabled, not deleted. Their stamp stays. New people will not see the box."],
   // 歷史之路（2026-11-06）
   ["consent_required", "有照片還沒勾「拍攝同意已確認」，勾了才上得去。", "A photo is still missing the consent tick; tick it before this can go live."],
+  ["bad_program", "沒有選這一則掛在哪一棟。", "Pick which building this post hangs on."],
+  ["url_not_https", "連結要以 https:// 開頭。", "The link has to start with https://."],
   ["need_both_titles", "中文與英文標題都要填才上得去。", "Both the Chinese and English titles are needed to go live."],
   ["need_date", "日期要填。", "The date is required."],
   ["bad_date", "日期的格式不對，用 2023-06-01 這種寫法。", "The date format is wrong; use 2023-06-01."],
