@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>走一遍這一年 / Beyond Taiwan</title>
+
+<!-- /stories/ 嘖嘖募資的互動頁（2026-11-16，demo）
+
+     Paul 2026-10-13 定的：募資的互動內容放官網自己一頁，主線是 three personas，陌生人挑一個公立高中生、走一遍他申請的那一年，
+     最後落到「贊助這個計畫」。2026-11-16 訪談後定了八關、三個學生（一個留台灣、一個社區大學、一個獎學金）、單線、中文優先。
+     計畫在 ~/Anson/outputs/beyond-taiwan/zeczec/web/2026-11-16-persona-page-plan/。
+
+     ── 這一頁在做什麼 ──
+     第一屏三張學生卡。選一個就開始：每一關一個情境、兩個選擇，沒有對錯；選完出現一句真實學員的話、這一關 BT 做了什麼、
+     這時候在你旁邊的人。探索營那一關是便利貼牆，找 mentor 那一關是地圖，放榜之後翻開一封給一年後自己的信。
+     結尾一屏：這一年對學員是 0 元，一顆按鈕回嘖嘖。從嘖嘖來的人（?from=zeczec）只有這條路；別的人多一顆回首頁。
+     上面那一塊是「舞台」，有兩個殼可以比：?shell=lamp 是首頁那座島一盞一盞亮起來；?shell=flight 是 /history/ 那座 3D 機場的登機門。
+     開了減少動態效果、?motion=off、殼載不到：舞台是一張靜的島，內容一字不少。
+
+     ── 資料 ──
+     劇本 script.json、人物 people.json，兩份都在這個資料夾，現在是範例（demo: true）。換真的劇本不用動程式。
+     沒有 consent_date 的人不會出現。未成年不放名字不放臉。
+
+     ── 檔案 ──
+     stories.css 版面、src/strings.js 中英字典、src/data.js 讀資料與網址、src/ui.js 畫面的純函式、src/layout.js 兩個殼的數字（純數學）、
+     src/island.js 島的座標（跟首頁同一份）、src/shell-lamp.js 點燈版、src/shell-flight.js 機場版（Three）、src/plane.js 與 src/person.js 從 /history/ 抄來、
+     src/engine.js 接起來。只讀 shared/brand.css。GSAP 與 Three 只從 cdnjs 載、帶 integrity。
+
+     ── 不掛 nav.js ──
+     這一頁只有兩條路：繼續看，或回嘖嘖。不連 apply、join、team。左上一個回首頁的 logo 就夠。 -->
+
+<meta name="description" content="挑一個公立高中生，走一遍他申請的那一年。三分鐘。Beyond Taiwan 嘖嘖募資。">
+<meta property="og:title" content="走一遍這一年 / Beyond Taiwan">
+<meta property="og:description" content="挑一個公立高中生，走一遍他申請的那一年。三分鐘。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://beyondtaiwannpo.com/stories/">
+<meta name="theme-color" content="#EDE5D8">
+
+<!-- Three.js 只從 cdnjs 載，只有 ?shell=flight 會用到（shell-flight.js 動態 import，載不到就走靜的島）。
+     integrity 是 cdnjs 公布的 sha512，跟 /history/ 同一個版本同一個雜湊；升級要同時改這裡、history/index.html、check.sh 的 THREE_SRI。
+     importmap 一定要排在任何 module script 前面。 -->
+<script type="importmap">
+{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js"},
+ "integrity":{"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js":"sha512-zTnt1Hf43YVf2to5DC6GE6cPRSC/xgPJDf3PLQussTsaDak1uHdbnWtIYnOQiL40AIa2OZfFkayQXVdzL1/DqA=="}}
+</script>
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+
+<!-- GSAP 在頁尾載，這裡先預告。preload 的屬性要跟頁尾那支一字不差。這一頁只要核心那一支（沒有捲動釘住，不用 ScrollTrigger）。 -->
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preload" as="script" crossorigin="anonymous" referrerpolicy="no-referrer"
+      integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+      href="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js">
+<link rel="modulepreload" href="./src/data.js">
+<link rel="modulepreload" href="./src/ui.js">
+<link rel="modulepreload" href="./src/strings.js">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 字體不擋渲染（跟首頁同一招）。這一頁是對外頁，載中文標題字與 Iansui 手寫體（引言與信）。 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="./stories.css">
+
+<!-- 語言要在第一次繪製前決定。順序：網址 ?lang=、再 localStorage 的 bt-lang（只讀不寫）、再瀏覽器語言。這一頁預設中文。 -->
+<script>
+  (function () {
+    var q = null, s = null;
+    try { q = new URLSearchParams(location.search).get("lang"); } catch (e) {}
+    try { s = localStorage.getItem("bt-lang"); } catch (e) {}
+    var l = (q === "zh" || q === "en") ? q : (s === "zh" || s === "en") ? s : (/^en/i.test(navigator.language || "") ? "en" : "zh");
+    document.documentElement.setAttribute("data-lang", l);
+    document.documentElement.lang = l === "zh" ? "zh-Hant" : "en";
+  })();
+</script>
+</head>
+<body>
+
+<a class="skip" href="#story">跳到主要內容 / Skip to content</a>
+
+<header class="top">
+  <a class="home" id="home" href="../" aria-label="Beyond Taiwan 首頁 / home">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <div class="title">
+    <h1><span class="zh">走一遍這一年</span><span class="en">Walk a student's year</span></h1>
+  </div>
+  <div class="tools">
+    <a class="back-btn" id="back-top" href="https://www.zeczec.com/" rel="noopener">贊助這個計畫</a>
+    <button type="button" class="lang" id="lang" aria-label="Switch language">EN</button>
+  </div>
+</header>
+
+<div class="frame">
+  <!-- 舞台：殼（島或機場）畫在這裡。黏在頂端，字在底下捲。 -->
+  <div class="stage-wrap"><div class="stage" id="stage" aria-hidden="true"></div></div>
+  <main id="story" class="story">
+    <noscript><p class="state"><span class="zh">這一頁要開 JavaScript 才走得了。</span><span class="en">This page needs JavaScript to walk the year.</span></p></noscript>
+  </main>
+</div>
+
+<div class="progress" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+  <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+  <span class="progress-label" id="progress-label"></span>
+</div>
+
+<!-- 主程式排在 GSAP 前面、GSAP 加 defer：主程式先跑、先把劇本畫出來，不用等 GSAP。主程式會等它載完（或失敗）再動態 import 殼。
+     GSAP 從 cdnjs 載，integrity 是 cdnjs 公布的雜湊，檔案被換掉就不執行；那時舞台是靜的島，內容不少。 -->
+<script type="module" src="./src/engine.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer
+        integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</body>
+</html>

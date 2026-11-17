@@ -1,0 +1,534 @@
+{
+  "_readme": [
+    "這一份是 /stories/ 的劇本：三個學生，每個八關。**現在全部是範例**，demo 是 true，每一句引言的 meta 都寫著（範例）。",
+    "換成真的劇本：Mentorship 從真實學員抓三個案例、Curriculum 從故事與信裡挑每一關的引言，照下面的欄位填進來，然後把 demo 改成 false。",
+    "程式一行都不用動。畫面上看得到的每一個字都從這裡來（還有 people.json 與 src/strings.js）。",
+    "",
+    "紅線：未成年學員不放姓名、不放學校名、不放錄取結果。引言去識別化。每一句都要有同意。",
+    "",
+    "欄位：",
+    "  personas[]        三個學生。id 就是網址的 #a #b #c。",
+    "    tag_zh/en       卡片上那一句（像標題）。",
+    "    grade_zh/en     年級。",
+    "    start_zh/en     起點：他是誰、卡在哪。兩三句。",
+    "    gate_zh/en      他最後走的那扇門（台灣的大學、社區大學、獎學金）。",
+    "    outcome_zh/en   結尾那一屏他自己說的一句話。",
+    "    letter_zh/en    放榜之後翻開的那封信（探索營寫給一年後自己的信，節錄）。letter_meta_zh/en 是來源，不放名字。",
+    "    scenes[]        八關，順序就是畫面順序。id 固定八個：hall hear camp mentor list family essay result。",
+    "      kind          choice（一般）、wall（便利貼牆）、map（故事地圖）、letter（放榜後的信）。只是畫面提示，選項的結構都一樣。",
+    "      title_zh/en   這一關的名字。",
+    "      situation_zh/en  情境，兩三句，用「你」。",
+    "      choices[2]    兩個選擇，沒有對錯，兩條都走到下一關。",
+    "        label_zh/en 按鈕上的字。",
+    "        quote_zh/en 選完出現的一句真實學員的話。quote_meta_zh/en 寫年份與場合，不寫名字。",
+    "        bt_zh/en    這時候 BT 做了什麼，一行。team 是哪個 team（Curriculum Mentorship Internship CR Sponsorship Marketing）。",
+    "        person      這時候出現在你旁邊的人，對到 people.json 的 code。沒有就留空字串。",
+    "  notes[]           便利貼牆上的便利貼：text_zh/en、session_zh/en（哪一場）。探索營現場收，寫的人同意才放。"
+  ],
+  "demo": true,
+  "personas": [
+    {
+      "id": "a",
+      "tag_zh": "先看完每個登機門",
+      "tag_en": "See every gate first",
+      "grade_zh": "高三 · 公立高中",
+      "grade_en": "Senior, public high school",
+      "start_zh": "成績全校前段，家裡沒有人出過國。以為出國念書是私立學校的事，直到一位學姐回學校演講。",
+      "start_en": "Top of her class. Nobody in the family has studied abroad. She thought going abroad was a private school thing, until an alumna came back to speak.",
+      "gate_zh": "台灣的大學",
+      "gate_en": "A university in Taiwan",
+      "outcome_zh": "我把每一扇門都看過了。這一扇是我自己選的。",
+      "outcome_en": "I saw every gate. This one was mine to choose.",
+      "letter_zh": "一年後的我：不管你人在哪裡，記得你是看過所有選項才決定的。這件事沒有人替你做。",
+      "letter_en": "To me a year from now: wherever you are, remember you chose after seeing every option. Nobody did that for you.",
+      "letter_meta_zh": "探索營 · 給一年後的自己（範例）",
+      "letter_meta_en": "Bootcamp letter to future self (sample)",
+      "scenes": [
+        {
+          "id": "hall", "kind": "choice",
+          "title_zh": "出發大廳", "title_en": "Departure hall",
+          "situation_zh": "高三開學。大廳裡只有一個登機門亮著：學測。所有人都往那裡走。",
+          "situation_en": "Senior year begins. Only one gate in the hall is lit: the entrance exam. Everyone is walking toward it.",
+          "choices": [
+            { "label_zh": "跟著走", "label_en": "Follow everyone",
+              "quote_zh": "我沒想過有別條路。班上沒有人想過。", "quote_en": "I never thought there was another road. Nobody in my class did.",
+              "quote_meta_zh": "真實學員 · 高三（範例）", "quote_meta_en": "Student, senior year (sample)",
+              "bt_zh": "這時候 BT 還沒出現。這就是 BT 要解決的那一刻。", "bt_en": "BT is not here yet. This is the exact moment BT exists for.",
+              "team": "", "person": "" },
+            { "label_zh": "先看看四周", "label_en": "Look around first",
+              "quote_zh": "我只是想知道其他門後面有什麼。沒有要走。", "quote_en": "I just wanted to know what was behind the other gates. Not to go.",
+              "quote_meta_zh": "真實學員 · 高三（範例）", "quote_meta_en": "Student, senior year (sample)",
+              "bt_zh": "這時候 BT 還沒出現。這就是 BT 要解決的那一刻。", "bt_en": "BT is not here yet. This is the exact moment BT exists for.",
+              "team": "", "person": "" }
+          ]
+        },
+        {
+          "id": "hear", "kind": "choice",
+          "title_zh": "第一次聽到", "title_en": "First hearing",
+          "situation_zh": "週會。一位從你們學校畢業、現在在國外念書的學姐回來講她怎麼申請的。演講結束，她說可以留下來問問題。",
+          "situation_en": "Assembly. An alumna from your school, now studying abroad, explains how she applied. When she finishes, she says she will stay for questions.",
+          "choices": [
+            { "label_zh": "留下來問", "label_en": "Stay and ask",
+              "quote_zh": "我問她：你們學校有補習班嗎？她笑說沒有，她也是公立的。", "quote_en": "I asked her if her school had cram classes for this. She laughed and said no, she went to a public school too.",
+              "quote_meta_zh": "真實學員 · 2024 校園講座（範例）", "quote_meta_en": "Student, 2024 school talk (sample)",
+              "bt_zh": "CR team 安排學長姐回公立高中演講。這一場就是他們排的。", "bt_en": "The CR team sends alumni back to public high schools to speak. This talk was one of theirs.",
+              "team": "CR", "person": "p-speaker" },
+            { "label_zh": "趕公車回家", "label_en": "Catch the bus home",
+              "quote_zh": "我沒留下來，但我把她的 IG 記下來了。那天晚上我看了三個小時。", "quote_en": "I did not stay, but I wrote down her Instagram. I read for three hours that night.",
+              "quote_meta_zh": "真實學員 · 2024 校園講座（範例）", "quote_meta_en": "Student, 2024 school talk (sample)",
+              "bt_zh": "CR team 安排學長姐回公立高中演講，講完把 BT 的 IG 留在黑板上。", "bt_en": "The CR team sends alumni back to public high schools to speak, and leaves BT's Instagram on the board.",
+              "team": "CR", "person": "p-speaker" }
+          ]
+        },
+        {
+          "id": "camp", "kind": "wall",
+          "title_zh": "探索營", "title_en": "Bootcamp",
+          "situation_zh": "寒假兩天的探索營。第一天結束前，每個人拿到一張便利貼，貼到牆上。",
+          "situation_en": "Two days of winter bootcamp. Before day one ends, everyone gets a sticky note to put on the wall.",
+          "choices": [
+            { "label_zh": "寫你害怕的", "label_en": "Write what you are afraid of",
+              "quote_zh": "我寫的是：怕爸媽覺得我看不起台灣。", "quote_en": "I wrote: afraid my parents will think I look down on Taiwan.",
+              "quote_meta_zh": "探索營便利貼 · 2025 冬（範例）", "quote_meta_en": "Bootcamp sticky note, winter 2025 (sample)",
+              "bt_zh": "Curriculum team 辦探索營，兩天免費。你看學長姐真的送出去的文件，改自己的。", "bt_en": "The Curriculum team runs the bootcamp, two days, free. You read the essays alumni actually submitted and edit your own.",
+              "team": "Curriculum", "person": "p-curriculum" },
+            { "label_zh": "寫你想要的", "label_en": "Write what you want",
+              "quote_zh": "我寫的是：想知道外面長什麼樣，然後自己決定。", "quote_en": "I wrote: I want to see what is out there, then decide myself.",
+              "quote_meta_zh": "探索營便利貼 · 2025 冬（範例）", "quote_meta_en": "Bootcamp sticky note, winter 2025 (sample)",
+              "bt_zh": "Curriculum team 辦探索營，兩天免費。你看學長姐真的送出去的文件，改自己的。", "bt_en": "The Curriculum team runs the bootcamp, two days, free. You read the essays alumni actually submitted and edit your own.",
+              "team": "Curriculum", "person": "p-curriculum" }
+          ]
+        },
+        {
+          "id": "mentor", "kind": "map",
+          "title_zh": "找一位 mentor", "title_en": "Find a mentor",
+          "situation_zh": "探索營之後可以申請配對一位學長姐，一學期一次。地圖上亮著的是現在在線上的人。挑一個比你早走幾步的。",
+          "situation_en": "After bootcamp you can be paired with an alumnus for a semester. The lights on the map are the people who are around. Pick someone a few steps ahead of you.",
+          "choices": [
+            { "label_zh": "在美國念大二的學姐", "label_en": "A sophomore in the US",
+              "quote_zh": "她第一句話是：你不用現在決定要不要出國。先把文件寫出來再說。", "quote_en": "Her first words: you do not have to decide about leaving yet. Write the documents first.",
+              "quote_meta_zh": "真實學員 · 2025 配對（範例）", "quote_meta_en": "Student, 2025 pairing (sample)",
+              "bt_zh": "Mentorship team 一學期配對一次。不幫你寫 essay，陪你把卡住的地方講清楚。", "bt_en": "The Mentorship team pairs once a semester. They do not write your essay. They help you say what you are stuck on.",
+              "team": "Mentorship", "person": "p-mentor-us" },
+            { "label_zh": "在台灣念大一的學長", "label_en": "A freshman in Taiwan",
+              "quote_zh": "他申請過國外，最後留在台灣。他說：那不是失敗，那是我看完之後選的。", "quote_en": "He had applied abroad and stayed in Taiwan. He said: that was not a failure, that was what I chose after looking.",
+              "quote_meta_zh": "真實學員 · 2025 配對（範例）", "quote_meta_en": "Student, 2025 pairing (sample)",
+              "bt_zh": "Mentorship team 一學期配對一次。配的是走過同一條路的人，不一定在國外。", "bt_en": "The Mentorship team pairs once a semester, with someone who walked the same road, not always someone abroad.",
+              "team": "Mentorship", "person": "p-mentor-tw" }
+          ]
+        },
+        {
+          "id": "list", "kind": "choice",
+          "title_zh": "選校", "title_en": "The list",
+          "situation_zh": "Mentor 給了你十二所學校的名單。你只有時間送六所。",
+          "situation_en": "Your mentor gives you a list of twelve schools. You only have time to apply to six.",
+          "choices": [
+            { "label_zh": "六所都挑有把握的", "label_en": "Six safe ones",
+              "quote_zh": "我那時候全部挑安全的。後來 mentor 問我：那你為什麼要出國？", "quote_en": "I picked all safe schools. Then my mentor asked: so why do you want to go abroad?",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Mentor 陪你把十二所縮成六所。縮的方法比結果重要。", "bt_en": "Your mentor helps you cut twelve to six. How you cut matters more than what is left.",
+              "team": "Mentorship", "person": "p-mentor-us" },
+            { "label_zh": "三所有把握，三所衝", "label_en": "Three safe, three reach",
+              "quote_zh": "衝的那三所我一所都沒上。但我寫那三份文件的時候，才知道自己想要什麼。", "quote_en": "I got into none of the three reach schools. But writing those three essays was when I found out what I wanted.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Mentor 陪你把十二所縮成六所。縮的方法比結果重要。", "bt_en": "Your mentor helps you cut twelve to six. How you cut matters more than what is left.",
+              "team": "Mentorship", "person": "p-mentor-us" }
+          ]
+        },
+        {
+          "id": "family", "kind": "choice",
+          "title_zh": "跟家裡講", "title_en": "Telling the family",
+          "situation_zh": "文件寫到一半。爸媽只知道你在準備學測。",
+          "situation_en": "Halfway through the essays. Your parents only know you are preparing for the entrance exam.",
+          "choices": [
+            { "label_zh": "現在講", "label_en": "Tell them now",
+              "quote_zh": "我媽第一個反應是：那學測呢？我說學測我也考。她就沒再問了。", "quote_en": "My mother's first reaction: what about the exam? I said I was taking it too. She did not ask again.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "探索營有一場給家長的說明。很多家長的問題跟你爸媽一樣。", "bt_en": "The bootcamp has a session for parents. Most parents ask the same questions yours do.",
+              "team": "Curriculum", "person": "p-parent" },
+            { "label_zh": "等放榜再講", "label_en": "Wait until results",
+              "quote_zh": "我拖到放榜。回頭看，早一點講他們反而比較放心。", "quote_en": "I waited until results came out. Looking back, telling them earlier would have put them at ease.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "探索營有一場給家長的說明。很多家長的問題跟你爸媽一樣。", "bt_en": "The bootcamp has a session for parents. Most parents ask the same questions yours do.",
+              "team": "Curriculum", "person": "p-parent" }
+          ]
+        },
+        {
+          "id": "essay", "kind": "choice",
+          "title_zh": "寫完，送出", "title_en": "Write it, submit it",
+          "situation_zh": "最後一篇 essay。題目是「一件改變你的事」。你有兩個版本。",
+          "situation_en": "The last essay. The prompt is \"something that changed you\". You have two drafts.",
+          "choices": [
+            { "label_zh": "寫阿嬤", "label_en": "The one about grandma",
+              "quote_zh": "我寫阿嬤教我種菜。mentor 說：這篇才像你。", "quote_en": "I wrote about my grandmother teaching me to grow vegetables. My mentor said: this one sounds like you.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "送出前一週，Curriculum 開一場 essay 工作坊，學長姐一對一看最後一版。", "bt_en": "The week before the deadline, Curriculum runs an essay workshop. Alumni read the final draft one on one.",
+              "team": "Curriculum", "person": "p-intern" },
+            { "label_zh": "寫機器人社", "label_en": "The one about robotics club",
+              "quote_zh": "我寫社團。mentor 說可以，但問我：你阿嬤那篇為什麼不敢交？", "quote_en": "I wrote about the club. My mentor said fine, then asked: why are you afraid to submit the one about your grandmother?",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "送出前一週，Curriculum 開一場 essay 工作坊，學長姐一對一看最後一版。", "bt_en": "The week before the deadline, Curriculum runs an essay workshop. Alumni read the final draft one on one.",
+              "team": "Curriculum", "person": "p-intern" }
+          ]
+        },
+        {
+          "id": "result", "kind": "letter",
+          "title_zh": "放榜", "title_en": "Results",
+          "situation_zh": "三月。國外的信來了，學測的成績也出來了。兩邊都有門開著。",
+          "situation_en": "March. The letters from abroad arrive, and the exam results are out. Doors are open on both sides.",
+          "choices": [
+            { "label_zh": "打開國外的信", "label_en": "Open the letter from abroad",
+              "quote_zh": "上了一所。我看著那封信很久，然後發現我其實想留下來。", "quote_en": "I got into one. I looked at that letter for a long time, then realised I actually wanted to stay.",
+              "quote_meta_zh": "真實學員 · 2025 放榜（範例）", "quote_meta_en": "Student, 2025 results (sample)",
+              "bt_zh": "放榜那週，mentor 會約一次。不是慶祝，是陪你把兩邊的門看清楚。", "bt_en": "The week results come out, your mentor books one more call. Not to celebrate. To look at both doors with you.",
+              "team": "Mentorship", "person": "p-mentor-tw" },
+            { "label_zh": "先看學測", "label_en": "Check the exam first",
+              "quote_zh": "學測夠上台大。我跟 mentor 講的時候，他說：你知道這是你選的嗎？我說我知道。", "quote_en": "The exam score was enough for the top school here. When I told my mentor, he said: you know this is your choice, right? I said I know.",
+              "quote_meta_zh": "真實學員 · 2025 放榜（範例）", "quote_meta_en": "Student, 2025 results (sample)",
+              "bt_zh": "放榜那週，mentor 會約一次。不是慶祝，是陪你把兩邊的門看清楚。", "bt_en": "The week results come out, your mentor books one more call. Not to celebrate. To look at both doors with you.",
+              "team": "Mentorship", "person": "p-mentor-tw" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "tag_zh": "便宜的那扇門也是門",
+      "tag_en": "The cheap door is a real door",
+      "grade_zh": "高二 · 公立高中",
+      "grade_en": "Junior, public high school",
+      "start_zh": "台北的公立高中。知道有這條路，但家裡付得起台灣的學費，付不起國外四年。他以為這扇門是給有錢人的。",
+      "start_en": "A public high school in Taipei. He knows the road exists, but his family can pay for Taiwan, not four years abroad. He assumes the door is for rich families.",
+      "gate_zh": "美國社區大學，再轉學",
+      "gate_en": "US community college, then transfer",
+      "outcome_zh": "沒有人跟我說過，便宜的那扇門也是真的門。",
+      "outcome_en": "Nobody told me the cheap door was a real door.",
+      "letter_zh": "一年後的我：如果你在社區大學，不要跟任何人道歉。你算過了，那是你算出來的路。",
+      "letter_en": "To me a year from now: if you are at a community college, apologise to nobody. You did the maths. That road is yours.",
+      "letter_meta_zh": "探索營 · 給一年後的自己（範例）",
+      "letter_meta_en": "Bootcamp letter to future self (sample)",
+      "scenes": [
+        {
+          "id": "hall", "kind": "choice",
+          "title_zh": "出發大廳", "title_en": "Departure hall",
+          "situation_zh": "高二。大廳裡只有一個登機門亮著：學測。你知道還有別的門，但門口寫著一個你付不起的數字。",
+          "situation_en": "Junior year. Only one gate in the hall is lit: the entrance exam. You know there are other gates, but each has a number on it you cannot pay.",
+          "choices": [
+            { "label_zh": "不看了，太貴", "label_en": "Too expensive, move on",
+              "quote_zh": "我算過一次，四年要一千萬。算完就關掉了。", "quote_en": "I did the maths once, four years was ten million. I closed the tab.",
+              "quote_meta_zh": "真實學員 · 高二（範例）", "quote_meta_en": "Student, junior year (sample)",
+              "bt_zh": "這時候 BT 還沒出現。這就是 BT 要解決的那一刻。", "bt_en": "BT is not here yet. This is the exact moment BT exists for.",
+              "team": "", "person": "" },
+            { "label_zh": "記下那個數字", "label_en": "Write the number down",
+              "quote_zh": "我把學費抄在筆記本最後一頁。沒有打算做什麼，只是不想忘記。", "quote_en": "I wrote the tuition on the last page of my notebook. No plan. I just did not want to forget it.",
+              "quote_meta_zh": "真實學員 · 高二（範例）", "quote_meta_en": "Student, junior year (sample)",
+              "bt_zh": "這時候 BT 還沒出現。這就是 BT 要解決的那一刻。", "bt_en": "BT is not here yet. This is the exact moment BT exists for.",
+              "team": "", "person": "" }
+          ]
+        },
+        {
+          "id": "hear", "kind": "choice",
+          "title_zh": "第一次聽到", "title_en": "First hearing",
+          "situation_zh": "IG 上滑到一場免費的線上說明會：公立高中生怎麼申請國外。你有一個小時的空檔。",
+          "situation_en": "You scroll past a free online session on Instagram: how public high school students apply abroad. You have one free hour.",
+          "choices": [
+            { "label_zh": "點進去", "label_en": "Join it",
+              "quote_zh": "講者說她家也付不起。我第一次聽到有人講錢。", "quote_en": "The speaker said her family could not afford it either. It was the first time I heard anyone talk about money.",
+              "quote_meta_zh": "真實學員 · 2024 線上說明會（範例）", "quote_meta_en": "Student, 2024 online session (sample)",
+              "bt_zh": "Marketing team 把每一場免費活動放上 IG。你看到的那一則就是他們排的。", "bt_en": "The Marketing team posts every free event on Instagram. That post was theirs.",
+              "team": "Marketing", "person": "p-speaker" },
+            { "label_zh": "存起來，之後再看", "label_en": "Save it for later",
+              "quote_zh": "我存了兩個月才看。看完的那天就報名探索營了。", "quote_en": "I saved it for two months before watching. The day I watched, I signed up for the bootcamp.",
+              "quote_meta_zh": "真實學員 · 2024 線上說明會（範例）", "quote_meta_en": "Student, 2024 online session (sample)",
+              "bt_zh": "Marketing team 把每一場說明會的錄影留在 IG 上，什麼時候看都還在。", "bt_en": "The Marketing team keeps every session's recording on Instagram, so it is there whenever you are ready.",
+              "team": "Marketing", "person": "p-speaker" }
+          ]
+        },
+        {
+          "id": "camp", "kind": "wall",
+          "title_zh": "探索營", "title_en": "Bootcamp",
+          "situation_zh": "暑假的探索營。有一堂課叫「錢從哪裡來」。下課前每個人寫一張便利貼。",
+          "situation_en": "Summer bootcamp. One class is called \"where the money comes from\". Before it ends, everyone writes a sticky note.",
+          "choices": [
+            { "label_zh": "寫你害怕的", "label_en": "Write what you are afraid of",
+              "quote_zh": "我寫的是：怕我爸知道我在算這個。", "quote_en": "I wrote: afraid my dad finds out I am doing this maths.",
+              "quote_meta_zh": "探索營便利貼 · 2025 夏（範例）", "quote_meta_en": "Bootcamp sticky note, summer 2025 (sample)",
+              "bt_zh": "Curriculum team 那一堂課講三條路：獎學金、社區大學轉學、台灣讀完再出去。沒有一條叫「有錢人的路」。", "bt_en": "The Curriculum team's money class covers three roads: scholarships, community college transfer, and finishing in Taiwan first. None of them is \"the rich road\".",
+              "team": "Curriculum", "person": "p-curriculum" },
+            { "label_zh": "寫你想要的", "label_en": "Write what you want",
+              "quote_zh": "我寫的是：一條我付得起的路。", "quote_en": "I wrote: a road I can afford.",
+              "quote_meta_zh": "探索營便利貼 · 2025 夏（範例）", "quote_meta_en": "Bootcamp sticky note, summer 2025 (sample)",
+              "bt_zh": "Curriculum team 那一堂課講三條路：獎學金、社區大學轉學、台灣讀完再出去。沒有一條叫「有錢人的路」。", "bt_en": "The Curriculum team's money class covers three roads: scholarships, community college transfer, and finishing in Taiwan first. None of them is \"the rich road\".",
+              "team": "Curriculum", "person": "p-curriculum" }
+          ]
+        },
+        {
+          "id": "mentor", "kind": "map",
+          "title_zh": "找一位 mentor", "title_en": "Find a mentor",
+          "situation_zh": "配對表上可以勾你想要的 mentor 背景。地圖上亮著的是現在有空的人。",
+          "situation_en": "The pairing form lets you tick what kind of mentor you want. The lights on the map are the people who have time.",
+          "choices": [
+            { "label_zh": "從社區大學轉學的學長", "label_en": "Someone who transferred from a community college",
+              "quote_zh": "他說他第一年住在親戚家打工。我問他後悔嗎，他說只後悔沒早一點知道。", "quote_en": "He said he lived with relatives and worked his first year. I asked if he regretted it. He said he only regretted not knowing sooner.",
+              "quote_meta_zh": "真實學員 · 2025 配對（範例）", "quote_meta_en": "Student, 2025 pairing (sample)",
+              "bt_zh": "Mentorship team 照你勾的背景配。要找走過便宜那條路的人，就配走過的人。", "bt_en": "The Mentorship team matches on what you tick. Ask for someone who took the cheap road and you get someone who did.",
+              "team": "Mentorship", "person": "p-mentor-cc" },
+            { "label_zh": "拿到獎學金的學姐", "label_en": "Someone on a scholarship",
+              "quote_zh": "她說獎學金不是運氣，是三十份申請裡的一份。我開始列清單。", "quote_en": "She said the scholarship was not luck, it was one of thirty applications. I started a list.",
+              "quote_meta_zh": "真實學員 · 2025 配對（範例）", "quote_meta_en": "Student, 2025 pairing (sample)",
+              "bt_zh": "Mentorship team 照你勾的背景配。", "bt_en": "The Mentorship team matches on what you tick.",
+              "team": "Mentorship", "person": "p-mentor-schol" }
+          ]
+        },
+        {
+          "id": "list", "kind": "choice",
+          "title_zh": "選校", "title_en": "The list",
+          "situation_zh": "Mentor 幫你列了一張表：左邊是四年制大學加獎學金，右邊是社區大學兩年再轉。兩邊的總金額差三倍。",
+          "situation_en": "Your mentor draws a table: four-year universities with aid on the left, two years at a community college then transfer on the right. The totals differ by three times.",
+          "choices": [
+            { "label_zh": "申請四年制，賭獎學金", "label_en": "Apply four-year, bet on aid",
+              "quote_zh": "我兩邊都送了。四年制的獎學金沒拿到，社區大學變成我真的走的路。", "quote_en": "I applied to both. The four-year aid did not come through. The community college became the road I actually walked.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Mentor 不替你選，但會要你兩邊都算到最後一塊錢。", "bt_en": "Your mentor does not choose for you, but makes you work both sides down to the last dollar.",
+              "team": "Mentorship", "person": "p-mentor-cc" },
+            { "label_zh": "直接走社區大學", "label_en": "Go straight to community college",
+              "quote_zh": "決定那天我鬆了一口氣。原來選一條付得起的路，不是放棄。", "quote_en": "The day I decided, I felt relief. Choosing a road I could afford was not giving up.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Mentor 不替你選，但會要你兩邊都算到最後一塊錢。", "bt_en": "Your mentor does not choose for you, but makes you work both sides down to the last dollar.",
+              "team": "Mentorship", "person": "p-mentor-cc" }
+          ]
+        },
+        {
+          "id": "family", "kind": "choice",
+          "title_zh": "跟家裡講", "title_en": "Telling the family",
+          "situation_zh": "你要跟爸爸講「社區大學」這四個字。他沒聽過。",
+          "situation_en": "You have to say the words \"community college\" to your father. He has never heard them.",
+          "choices": [
+            { "label_zh": "拿那張表給他看", "label_en": "Show him the table",
+              "quote_zh": "他看了五分鐘，問了一句：轉得過去嗎？我說學長轉過去了。", "quote_en": "He looked at it for five minutes and asked one thing: can you really transfer? I said my mentor did.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "探索營的家長場有一位走過這條路的學長的爸爸來講。", "bt_en": "At the bootcamp parents' session, the father of an alumnus who took this road speaks.",
+              "team": "Curriculum", "person": "p-parent" },
+            { "label_zh": "先講「出國」，細節之後", "label_en": "Say \"abroad\" first, details later",
+              "quote_zh": "我先講出國，他以為要一千萬，臉都白了。後來看到表才鬆下來。", "quote_en": "I said abroad first. He thought ten million and went pale. He only relaxed when he saw the table.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "探索營的家長場有一位走過這條路的學長的爸爸來講。", "bt_en": "At the bootcamp parents' session, the father of an alumnus who took this road speaks.",
+              "team": "Curriculum", "person": "p-parent" }
+          ]
+        },
+        {
+          "id": "essay", "kind": "choice",
+          "title_zh": "寫完，送出", "title_en": "Write it, submit it",
+          "situation_zh": "社區大學的申請很短，但有一欄「為什麼是我們」。你有兩個版本。",
+          "situation_en": "The community college application is short, but has one field: \"why us\". You have two drafts.",
+          "choices": [
+            { "label_zh": "寫便宜", "label_en": "Write about the cost",
+              "quote_zh": "我老實寫我付得起。mentor 說：對，然後再加一句你要拿它做什麼。", "quote_en": "I wrote honestly that I could afford it. My mentor said: yes, now add one line on what you will do with it.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Internship team 的學長姐在送出前一週看最後一版。", "bt_en": "Alumni from the Internship team read the final draft the week before the deadline.",
+              "team": "Internship", "person": "p-intern" },
+            { "label_zh": "寫轉學計畫", "label_en": "Write about the transfer plan",
+              "quote_zh": "我寫了兩年後要轉去哪裡。寫完才發現，我已經有計畫了。", "quote_en": "I wrote where I would transfer in two years. Only after writing it did I realise I had a plan.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Internship team 的學長姐在送出前一週看最後一版。", "bt_en": "Alumni from the Internship team read the final draft the week before the deadline.",
+              "team": "Internship", "person": "p-intern" }
+          ]
+        },
+        {
+          "id": "result", "kind": "letter",
+          "title_zh": "放榜", "title_en": "Results",
+          "situation_zh": "社區大學的錄取信來了，附一張學費單。數字跟你筆記本最後一頁差不多。",
+          "situation_en": "The community college acceptance arrives with a tuition bill. The number is about what you wrote on the last page of your notebook.",
+          "choices": [
+            { "label_zh": "拿給爸爸看", "label_en": "Show your father",
+              "quote_zh": "他看了數字，說：這個可以。那是他第一次說可以。", "quote_en": "He looked at the number and said: this one works. It was the first time he said yes.",
+              "quote_meta_zh": "真實學員 · 2025 放榜（範例）", "quote_meta_en": "Student, 2025 results (sample)",
+              "bt_zh": "放榜那週，mentor 會約一次，把兩年後轉學的時程排出來。", "bt_en": "The week results come out, your mentor books one more call and maps out the transfer two years ahead.",
+              "team": "Mentorship", "person": "p-mentor-cc" },
+            { "label_zh": "先傳給 mentor", "label_en": "Send it to your mentor first",
+              "quote_zh": "他回我一句：歡迎。然後傳了他當年的學費單給我，數字一樣。", "quote_en": "He replied with one word: welcome. Then sent me his own tuition bill from back then. Same number.",
+              "quote_meta_zh": "真實學員 · 2025 放榜（範例）", "quote_meta_en": "Student, 2025 results (sample)",
+              "bt_zh": "放榜那週，mentor 會約一次，把兩年後轉學的時程排出來。", "bt_en": "The week results come out, your mentor books one more call and maps out the transfer two years ahead.",
+              "team": "Mentorship", "person": "p-mentor-cc" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c",
+      "tag_zh": "我以為要花錢",
+      "tag_en": "I thought it cost money",
+      "grade_zh": "高三 · 公立高中",
+      "grade_en": "Senior, public high school",
+      "start_zh": "家裡收入不高。她從來沒想過申請，因為「那要花錢」。一個朋友硬拉她去探索營。",
+      "start_en": "Family income is low. She never considered applying because \"it costs money\". A friend drags her to a bootcamp.",
+      "gate_zh": "美國大學，全額補助",
+      "gate_en": "A US college, with need-based aid",
+      "outcome_zh": "我差一點沒申請，因為我以為要花錢。",
+      "outcome_en": "I almost did not apply, because I thought it cost money.",
+      "letter_zh": "一年後的我：不管結果怎樣，至少你送出去了。以前的你連想都不敢想。",
+      "letter_en": "To me a year from now: whatever happened, at least you submitted. The old you did not dare to even think about it.",
+      "letter_meta_zh": "探索營 · 給一年後的自己（範例）",
+      "letter_meta_en": "Bootcamp letter to future self (sample)",
+      "scenes": [
+        {
+          "id": "hall", "kind": "choice",
+          "title_zh": "出發大廳", "title_en": "Departure hall",
+          "situation_zh": "高三。大廳裡只有一個登機門亮著：學測。你連其他門在哪都沒找過，因為你知道你付不起。",
+          "situation_en": "Senior year. Only one gate in the hall is lit: the entrance exam. You never looked for the other gates, because you know you cannot pay.",
+          "choices": [
+            { "label_zh": "往學測走", "label_en": "Walk to the exam gate",
+              "quote_zh": "出國這兩個字在我家是別人家的事。", "quote_en": "In my house, \"abroad\" was something that happened to other families.",
+              "quote_meta_zh": "真實學員 · 高三（範例）", "quote_meta_en": "Student, senior year (sample)",
+              "bt_zh": "這時候 BT 還沒出現。這就是 BT 要解決的那一刻。", "bt_en": "BT is not here yet. This is the exact moment BT exists for.",
+              "team": "", "person": "" },
+            { "label_zh": "多看一眼", "label_en": "Take one more look",
+              "quote_zh": "我多看了一眼，然後罵自己浪費時間。", "quote_en": "I took one more look, then told myself off for wasting time.",
+              "quote_meta_zh": "真實學員 · 高三（範例）", "quote_meta_en": "Student, senior year (sample)",
+              "bt_zh": "這時候 BT 還沒出現。這就是 BT 要解決的那一刻。", "bt_en": "BT is not here yet. This is the exact moment BT exists for.",
+              "team": "", "person": "" }
+          ]
+        },
+        {
+          "id": "hear", "kind": "choice",
+          "title_zh": "第一次聽到", "title_en": "First hearing",
+          "situation_zh": "朋友報了探索營，說是免費的，拉你一起。你那個週末本來要打工。",
+          "situation_en": "A friend signed up for the bootcamp, says it is free, and drags you along. You were supposed to work that weekend.",
+          "choices": [
+            { "label_zh": "請假去", "label_en": "Take the weekend off",
+              "quote_zh": "我請了兩天假。第一堂課講者就說：我家也沒錢，我是全額補助進去的。", "quote_en": "I took two days off. In the first class the speaker said: my family had no money either, I went on full aid.",
+              "quote_meta_zh": "真實學員 · 2025 探索營（範例）", "quote_meta_en": "Student, 2025 bootcamp (sample)",
+              "bt_zh": "探索營對學員是 0 元。Sponsorship team 讓它維持 0 元。", "bt_en": "The bootcamp costs students nothing. The Sponsorship team keeps it that way.",
+              "team": "Sponsorship", "person": "p-sponsorship" },
+            { "label_zh": "只去第一天", "label_en": "Go for day one only",
+              "quote_zh": "我只去了第一天，然後打電話跟店長說第二天也要請假。", "quote_en": "I went for day one, then called my manager to ask for day two off as well.",
+              "quote_meta_zh": "真實學員 · 2025 探索營（範例）", "quote_meta_en": "Student, 2025 bootcamp (sample)",
+              "bt_zh": "探索營對學員是 0 元。Sponsorship team 讓它維持 0 元。", "bt_en": "The bootcamp costs students nothing. The Sponsorship team keeps it that way.",
+              "team": "Sponsorship", "person": "p-sponsorship" }
+          ]
+        },
+        {
+          "id": "camp", "kind": "wall",
+          "title_zh": "探索營", "title_en": "Bootcamp",
+          "situation_zh": "第二天下午講獎學金與補助。黑板上寫著幾間學校「看家庭收入給補助，不看國籍」。下課前每個人寫一張便利貼。",
+          "situation_en": "Day two afternoon is about aid. On the board: a few schools that give aid by family income, regardless of passport. Before class ends, everyone writes a sticky note.",
+          "choices": [
+            { "label_zh": "寫你害怕的", "label_en": "Write what you are afraid of",
+              "quote_zh": "我寫的是：怕申請了，被人說我在作夢。", "quote_en": "I wrote: afraid that if I apply, people will say I am dreaming.",
+              "quote_meta_zh": "探索營便利貼 · 2025 夏（範例）", "quote_meta_en": "Bootcamp sticky note, summer 2025 (sample)",
+              "bt_zh": "Curriculum team 那一堂課，是全場唯一一堂每個人都抄筆記的課。", "bt_en": "The Curriculum team's aid class is the one class where everyone takes notes.",
+              "team": "Curriculum", "person": "p-curriculum" },
+            { "label_zh": "寫你想要的", "label_en": "Write what you want",
+              "quote_zh": "我寫的是：試一次。就一次。", "quote_en": "I wrote: try once. Just once.",
+              "quote_meta_zh": "探索營便利貼 · 2025 夏（範例）", "quote_meta_en": "Bootcamp sticky note, summer 2025 (sample)",
+              "bt_zh": "Curriculum team 那一堂課，是全場唯一一堂每個人都抄筆記的課。", "bt_en": "The Curriculum team's aid class is the one class where everyone takes notes.",
+              "team": "Curriculum", "person": "p-curriculum" }
+          ]
+        },
+        {
+          "id": "mentor", "kind": "map",
+          "title_zh": "找一位 mentor", "title_en": "Find a mentor",
+          "situation_zh": "配對表上有一格「希望 mentor 懂的事」。你寫了「補助」。地圖上亮起來的是懂的人。",
+          "situation_en": "The pairing form has a field: \"what I hope my mentor understands\". You write \"aid\". The lights on the map are the people who do.",
+          "choices": [
+            { "label_zh": "拿到全額補助的學姐", "label_en": "Someone on full aid",
+              "quote_zh": "她第一次視訊就把她當年的補助申請表打開給我看，一格一格講。", "quote_en": "On our first call she opened her own aid application from back then and walked me through it field by field.",
+              "quote_meta_zh": "真實學員 · 2025 配對（範例）", "quote_meta_en": "Student, 2025 pairing (sample)",
+              "bt_zh": "Mentorship team 配對時看你寫的那一格。寫補助，就配懂補助的人。", "bt_en": "The Mentorship team reads that field when pairing. Write aid, get someone who knows aid.",
+              "team": "Mentorship", "person": "p-mentor-schol" },
+            { "label_zh": "在台灣念書、申請過的學長", "label_en": "Someone in Taiwan who applied before",
+              "quote_zh": "他沒拿到補助，留在台灣。他說：至少你申請了會知道答案，不申請永遠不知道。", "quote_en": "He did not get aid and stayed in Taiwan. He said: at least if you apply you will know. If you do not, you never will.",
+              "quote_meta_zh": "真實學員 · 2025 配對（範例）", "quote_meta_en": "Student, 2025 pairing (sample)",
+              "bt_zh": "Mentorship team 配對時看你寫的那一格。", "bt_en": "The Mentorship team reads that field when pairing.",
+              "team": "Mentorship", "person": "p-mentor-tw" }
+          ]
+        },
+        {
+          "id": "list", "kind": "choice",
+          "title_zh": "選校", "title_en": "The list",
+          "situation_zh": "會給國際學生全額補助的學校很少，而且很難進。Mentor 說：名單要短，但不能只有這些。",
+          "situation_en": "Very few schools give full aid to international students, and they are hard to get into. Your mentor says: keep the list short, but not only those.",
+          "choices": [
+            { "label_zh": "只申請有全額補助的", "label_en": "Only the full-aid schools",
+              "quote_zh": "我只送了四所。mentor 沒反對，但要我把台灣的學測也考好。", "quote_en": "I applied to four. My mentor did not object, but made me take the Taiwan exam seriously too.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Mentor 不會跟你說「一定上」。會跟你說「兩邊都準備」。", "bt_en": "Your mentor never says \"you will get in\". They say \"prepare both sides\".",
+              "team": "Mentorship", "person": "p-mentor-schol" },
+            { "label_zh": "加兩所部分補助的", "label_en": "Add two partial-aid schools",
+              "quote_zh": "部分補助那兩所，我算了還是付不起。但 mentor 說送了才知道他們給多少。", "quote_en": "The two partial-aid schools were still too expensive on paper. But my mentor said you only find out how much they give by applying.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Mentor 不會跟你說「一定上」。會跟你說「兩邊都準備」。", "bt_en": "Your mentor never says \"you will get in\". They say \"prepare both sides\".",
+              "team": "Mentorship", "person": "p-mentor-schol" }
+          ]
+        },
+        {
+          "id": "family", "kind": "choice",
+          "title_zh": "跟家裡講", "title_en": "Telling the family",
+          "situation_zh": "補助申請要填家裡的收入。你一定要跟媽媽講。",
+          "situation_en": "The aid application needs your family's income. You have to tell your mother.",
+          "choices": [
+            { "label_zh": "直接講", "label_en": "Just say it",
+              "quote_zh": "我媽說：我們家的收入填上去，人家會給錢？我說會。她不信，但還是把薪資單拿給我。", "quote_en": "My mother said: we put our income in and they give money? I said yes. She did not believe me, but handed me her pay slip.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "探索營的家長場特別講補助，因為最不相信的通常是家長。", "bt_en": "The bootcamp's parents' session covers aid on purpose, because the parents are usually the ones who do not believe it.",
+              "team": "Curriculum", "person": "p-parent" },
+            { "label_zh": "請 mentor 幫你講", "label_en": "Ask your mentor to explain",
+              "quote_zh": "mentor 跟我媽視訊了二十分鐘。掛掉之後我媽說：那個女生也是這樣進去的喔？", "quote_en": "My mentor spoke to my mother on video for twenty minutes. Afterwards my mother said: so that girl got in this way too?",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "Mentor 願意的話，可以跟家長講一次。這不在規定裡，但常常發生。", "bt_en": "If a mentor is willing, they will talk to the parents once. Not a rule, but it happens often.",
+              "team": "Mentorship", "person": "p-mentor-schol" }
+          ]
+        },
+        {
+          "id": "essay", "kind": "choice",
+          "title_zh": "寫完，送出", "title_en": "Write it, submit it",
+          "situation_zh": "Essay 題目是「你克服過什麼」。你不想寫家裡沒錢。",
+          "situation_en": "The essay prompt is \"something you overcame\". You do not want to write about money.",
+          "choices": [
+            { "label_zh": "寫打工", "label_en": "Write about the part-time job",
+              "quote_zh": "我寫早餐店。寫到一半發現，我其實是在寫為什麼我值得這個補助。", "quote_en": "I wrote about the breakfast shop. Halfway through I realised I was writing why I deserved the aid.",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "送出前一週 Curriculum 開 essay 工作坊，學長姐一對一看最後一版。", "bt_en": "The week before the deadline Curriculum runs an essay workshop. Alumni read the final draft one on one.",
+              "team": "Curriculum", "person": "p-intern" },
+            { "label_zh": "寫別的", "label_en": "Write about something else",
+              "quote_zh": "我寫社團。學姐看完說很好，然後問：早餐店那件事為什麼沒寫？", "quote_en": "I wrote about a club. The alumna said it was good, then asked: why is the breakfast shop not in here?",
+              "quote_meta_zh": "真實學員 · 2024（範例）", "quote_meta_en": "Student, 2024 (sample)",
+              "bt_zh": "送出前一週 Curriculum 開 essay 工作坊，學長姐一對一看最後一版。", "bt_en": "The week before the deadline Curriculum runs an essay workshop. Alumni read the final draft one on one.",
+              "team": "Curriculum", "person": "p-intern" }
+          ]
+        },
+        {
+          "id": "result", "kind": "letter",
+          "title_zh": "放榜", "title_en": "Results",
+          "situation_zh": "三月底。信箱裡有一封信，標題有「financial aid」。",
+          "situation_en": "End of March. There is an email in the inbox with \"financial aid\" in the subject line.",
+          "choices": [
+            { "label_zh": "自己先開", "label_en": "Open it alone",
+              "quote_zh": "我在教室後面開的。數字是全額。我沒哭，我去找我媽。", "quote_en": "I opened it at the back of the classroom. It was full aid. I did not cry. I went to find my mother.",
+              "quote_meta_zh": "真實學員 · 2025 放榜（範例）", "quote_meta_en": "Student, 2025 results (sample)",
+              "bt_zh": "放榜那週，mentor 會約一次。拿到補助的人，接下來要辦的事還有一整頁。", "bt_en": "The week results come out, your mentor books one more call. For someone on aid, the to-do list that follows is a full page.",
+              "team": "Mentorship", "person": "p-mentor-schol" },
+            { "label_zh": "跟媽媽一起開", "label_en": "Open it with your mother",
+              "quote_zh": "我媽看不懂英文，我念給她聽。念到數字那一行，她問我：是他們付？", "quote_en": "My mother cannot read English, so I read it to her. At the line with the number she asked: they pay?",
+              "quote_meta_zh": "真實學員 · 2025 放榜（範例）", "quote_meta_en": "Student, 2025 results (sample)",
+              "bt_zh": "放榜那週，mentor 會約一次。拿到補助的人，接下來要辦的事還有一整頁。", "bt_en": "The week results come out, your mentor books one more call. For someone on aid, the to-do list that follows is a full page.",
+              "team": "Mentorship", "person": "p-mentor-schol" }
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": [
+    { "id": "n1", "text_zh": "原來公立的也可以", "text_en": "So public school kids can too", "session_zh": "2025 冬", "session_en": "Winter 2025" },
+    { "id": "n2", "text_zh": "Common App 是什麼", "text_en": "What is the Common App", "session_zh": "2025 冬", "session_en": "Winter 2025" },
+    { "id": "n3", "text_zh": "想念心理", "text_en": "Want to study psychology", "session_zh": "2025 夏", "session_en": "Summer 2025" },
+    { "id": "n4", "text_zh": "回來跟學弟妹講", "text_en": "Come back and tell the juniors", "session_zh": "2025 夏", "session_en": "Summer 2025" },
+    { "id": "n5", "text_zh": "獎學金怎麼找？", "text_en": "How do I find scholarships?", "session_zh": "2024 夏", "session_en": "Summer 2024" },
+    { "id": "n6", "text_zh": "怕爸媽不懂", "text_en": "Afraid my parents will not understand", "session_zh": "2024 夏", "session_en": "Summer 2024" },
+    { "id": "n7", "text_zh": "不是只有我", "text_en": "It is not just me", "session_zh": "2025 冬", "session_en": "Winter 2025" },
+    { "id": "n8", "text_zh": "先寫一篇再說", "text_en": "Write one essay first", "session_zh": "2024 冬", "session_en": "Winter 2024" },
+    { "id": "n9", "text_zh": "我也想當 mentor", "text_en": "I want to be a mentor too", "session_zh": "2025 夏", "session_en": "Summer 2025" },
+    { "id": "n10", "text_zh": "學測也要顧", "text_en": "Still have to do the exam", "session_zh": "2025 冬", "session_en": "Winter 2025" },
+    { "id": "n11", "text_zh": "（範例便利貼）", "text_en": "(sample note)", "session_zh": "範例", "session_en": "Sample" },
+    { "id": "n12", "text_zh": "原來有人可以問", "text_en": "So there is someone to ask", "session_zh": "2024 冬", "session_en": "Winter 2024" }
+  ]
+}

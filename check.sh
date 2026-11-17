@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team events join impact partner apply feedback resources admin settings alumni history privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+FILES="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -339,13 +339,15 @@ while IFS= read -r d; do
   n_path=$((n_path+1))
   grep -qF "$d" index.html          || missing_path="${missing_path} 首頁第${n_path}條"
   grep -qF "$d" alumni/index.html   || missing_path="${missing_path} alumni第${n_path}條"
+  # 2026-11-16：/stories/ 的島在 stories/src/island.js（ES module，不是 index.html），同一份座標。
+  grep -qF "$d" stories/src/island.js || missing_path="${missing_path} stories第${n_path}條"
 done < scripts/taiwan/coastline.txt
 if [ "$n_path" != "8" ]; then
   bad "coastline.txt 的路徑不是 8 條（本島 1 + 離島 7），現在是 ${n_path} 條 —— 腳本改過就要回來改這個數字"
 elif [ -n "$missing_path" ]; then
   bad "島的座標跟 scripts/taiwan/coastline.txt 對不上：${missing_path}（不要手改座標，改腳本重跑）"
 else
-  ok "首頁與 alumni 的島都跟 coastline.txt 完全一致（本島 1 條 + 離島 7 條）"
+  ok "首頁、alumni 與 stories 的島都跟 coastline.txt 完全一致（本島 1 條 + 離島 7 條）"
 fi
 
 # ════════ /alumni/ 航線圖（官網改版批 3，2026-09-07；先讀資料庫，2026-09-11）════════
@@ -1536,6 +1538,12 @@ leakOut=$(node -e '
                  "這一頁要開 JavaScript 才看得到路。"],
       mustHide: ["左上一個回首頁的 logo 就夠。"]
     },
+    // /stories/ 嘖嘖的互動頁（2026-11-16）。本文是 JavaScript 畫的，靜態 HTML 裡只有標題、贊助那顆、noscript 那一句。
+    "stories/index.html": {
+      mustShow: ["跳到主要內容 / Skip to content", "走一遍這一年", "Walk a student", "贊助這個計畫",
+                 "這一頁要開 JavaScript 才走得了。"],
+      mustHide: ["左上一個回首頁的 logo 就夠。"]
+    },
     "privacy/index.html": {
       mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],
       mustHide: ["因為手機上會有人真的從頭讀到尾"]
@@ -1598,7 +1606,7 @@ leakOut=$(node -e '
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html about/index.html programs/index.html team/index.html events/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html history/index.html privacy/index.html reset/index.html 2>&1)
+' index.html about/index.html programs/index.html team/index.html events/index.html join/index.html impact/index.html partner/index.html apply/index.html resources/index.html alumni/index.html history/index.html stories/index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -1634,7 +1642,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team events join impact partner apply feedback resources admin settings alumni history privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+placeholder_scope="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
@@ -1779,6 +1787,105 @@ if [ $? -eq 0 ]; then
 else
   bad "/history/ 的 Three 載入方式不對："
   printf '%s\n' "$hiThree"
+fi
+
+
+# ════════ /stories/ 嘖嘖的互動頁（2026-11-16）════════
+#
+# 跟 /history/ 同一套三條：GSAP 帶 SRI、gsap 只准在殼的 motion() 裡、Three 只從 cdnjs 載且只有機場版那一支 import 它。
+# 這一頁只載 gsap 核心（沒有捲動釘住，不用 ScrollTrigger），所以是一支不是兩支。
+st_bad=""
+grep -qF "integrity=\"${GSAP_CORE}\"" stories/index.html || st_bad="${st_bad} gsap.min.js"
+st_tag=$(grep -c '^<script src="https://cdnjs.cloudflare.com' stories/index.html)
+st_pre=$(grep -A2 'rel="preload" as="script"' stories/index.html | grep -cF "integrity=\"${GSAP_CORE}\"")
+st_order=$(grep -n '<script type="module" src="./src/engine.js">\|<script src="https://cdnjs.cloudflare.com' stories/index.html | head -1 | grep -c 'engine.js')
+st_defer=$(grep -c '^<script src="https://cdnjs.cloudflare.com[^>]* defer' stories/index.html)
+if [ -n "$st_bad" ]; then
+  bad "stories/index.html 的 cdnjs script 少了正確的 integrity：${st_bad}"
+elif [ "$st_tag" != "1" ] || [ "$st_pre" != "1" ]; then
+  bad "stories/index.html 的 cdnjs script 不是一支、或 preload 的 integrity 跟 script 對不上（標籤 ${st_tag} 支、preload ${st_pre}）"
+elif [ "$st_order" != "1" ] || [ "$st_defer" != "1" ]; then
+  bad "stories/index.html 的 engine.js 要排在 GSAP 前面，而且 GSAP 要 defer（順序 ${st_order}、defer ${st_defer}）"
+else
+  ok "stories/index.html 的 GSAP 有正確的 integrity，preload 也對得上，engine.js 排在前面且 GSAP 有 defer"
+fi
+
+# gsap 只准出現在 shell-lamp.js 與 shell-flight.js 各自的 motion() 裡；engine.js 只有在沒開減少動態效果、gsap 真的載到時才去載殼。
+stMotion=$(node -e '
+  const fs = require("fs");
+  const strip = c => c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const bad = [];
+  for (const f of ["stories/src/shell-lamp.js", "stories/src/shell-flight.js"]) {
+    const code = strip(fs.readFileSync(f, "utf8"));
+    const head = code.indexOf("function motion(");
+    let from = -1, to = -1;
+    if (head < 0) { bad.push(f + " 找不到 function motion("); continue; }
+    let i = code.indexOf(") {", head) + 2, depth = 0; from = i;
+    for (; i < code.length; i++) { if (code[i] === "{") depth++; else if (code[i] === "}") { depth--; if (depth === 0) { to = i; break; } } }
+    if (to < 0) { bad.push(f + " motion() 的大括號沒有收尾"); continue; }
+    for (const m of code.matchAll(/\bgsap\b/g)) {
+      // 外面只准有「window.gsap 在不在」那一個判斷，不准有 gsap. 的呼叫。
+      const call = /^gsap\./.test(code.slice(m.index, m.index + 5));
+      if (call && !(m.index > from && m.index < to)) bad.push(f + " 在 motion() 外面呼叫了 gsap（第 " + code.slice(0, m.index).split("\n").length + " 行）");
+    }
+  }
+  for (const f of fs.readdirSync("stories/src")) {
+    if (f === "shell-lamp.js" || f === "shell-flight.js") continue;
+    const c = strip(fs.readFileSync("stories/src/" + f, "utf8"));
+    if (/\bgsap\./.test(c)) bad.push("stories/src/" + f + " 用到了 gsap（只准殼的 motion()）");
+  }
+  const eng = fs.readFileSync("stories/src/engine.js", "utf8");
+  if (!eng.includes("matchMedia(\"(prefers-reduced-motion: reduce)\")")) bad.push("engine.js 找不到 prefers-reduced-motion 的判斷");
+  if (!/if \(reduce \|\| motionOff\) return null;/.test(eng)) bad.push("engine.js 的 loadShell 少了「減少動態效果或 ?motion=off 就不載殼」那一行");
+  if (!/import\(file\)/.test(eng)) bad.push("engine.js 要動態 import 殼（殼或 Three 載不到才接得住）");
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "/stories/ 的動畫全部關在兩個殼的 motion() 裡，reduce 或 gsap 沒載到就不載殼"
+else
+  bad "/stories/ 有動畫跑到 motion() 外面："
+  printf '%s\n' "$stMotion"
+fi
+
+# /stories/ 的 Three：importmap 跟 /history/ 同一個網址同一個雜湊、只有 shell-flight.js import three、沒有模型或圖檔、JS 不含 Three 小於 250 KB。
+stThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
+  const fs = require("fs");
+  const bad = [];
+  const html = fs.readFileSync("stories/index.html", "utf8");
+  const maps = [...html.matchAll(/<script type="importmap">([\s\S]*?)<\/script>/g)];
+  if (maps.length !== 1) bad.push("stories/index.html 要有一個（而且只有一個）importmap，現在 " + maps.length + " 個");
+  else {
+    let map; try { map = JSON.parse(maps[0][1]); } catch (e) { bad.push("importmap 不是合法的 JSON：" + e.message); }
+    if (map) {
+      if (map.imports.three !== process.env.THREE_URL) bad.push("importmap 的 three 不是 " + process.env.THREE_URL);
+      for (const u of Object.values(map.imports || {})) if (!/^https:\/\/cdnjs\.cloudflare\.com\//.test(u)) bad.push("importmap 裡有不是 cdnjs 的網址：" + u);
+      if (!map.integrity || map.integrity[map.imports.three] !== process.env.THREE_SRI) bad.push("importmap 的 integrity 少了、或跟 check.sh 的 THREE_SRI 不一樣");
+    }
+    const firstModule = html.search(/<script type="module"/), mapAt = html.indexOf("<script type=\"importmap\">");
+    if (firstModule >= 0 && mapAt > firstModule) bad.push("importmap 要排在第一個 module script 前面");
+  }
+  for (const f of fs.readdirSync("stories/src")) {
+    const c = fs.readFileSync("stories/src/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const uses = /from\s+["\x27]three["\x27]/.test(c) || /import\(\s*["\x27]three["\x27]/.test(c);
+    if (uses && f !== "shell-flight.js") bad.push("stories/src/" + f + " import 了 three（只准 shell-flight.js）");
+    if (!uses && f === "shell-flight.js") bad.push("shell-flight.js 沒有從 importmap 的 three 載");
+  }
+  const bin = fs.readdirSync("stories", { recursive: true }).filter(f => /\.(glb|gltf|obj|fbx|bin|ktx2|hdr)$/i.test(String(f)));
+  if (bin.length) bad.push("stories/ 裡放了模型檔（全部要用程式幾何）：" + bin.join("、"));
+  const js = fs.readdirSync("stories/src").reduce((n, f) => n + fs.statSync("stories/src/" + f).size, 0);
+  if (js > 250 * 1024) bad.push("stories/src 的 JS 加起來 " + Math.round(js / 1024) + " KB，超過 250 KB（不含 Three）");
+  // plane.js 與 person.js 是從 history/src/ 抄來的：兩邊要一模一樣（只准第一行的檔頭不同），不然改了一邊另一邊不知道。
+  for (const f of ["plane.js", "person.js"]) {
+    const a = fs.readFileSync("history/src/" + f, "utf8").split("\n").slice(1).join("\n"), b = fs.readFileSync("stories/src/" + f, "utf8").split("\n").slice(1).join("\n");
+    if (a !== b) bad.push("stories/src/" + f + " 跟 history/src/" + f + " 不一樣了（除了第一行）。改一邊就要改另一邊");
+  }
+  if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "/stories/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 shell-flight.js import 它、沒有模型檔、plane.js 與 person.js 跟 /history/ 一致"
+else
+  bad "/stories/ 的 Three 載入方式不對："
+  printf '%s\n' "$stThree"
 fi
 
 # 對外頁面不可以漏掉任何一份清單

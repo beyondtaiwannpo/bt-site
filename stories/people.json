@@ -1,0 +1,120 @@
+{
+  "_readme": [
+    "這一份是 /stories/ 的人：每一關選完之後「出現在你旁邊」的那個人，也是地圖上的光點。**現在全部是範例**，demo 是 true。",
+    "換成真人：一個人一個物件。照片與真名要本人同意；未成年不放名字、不放臉。",
+    "",
+    "欄位：",
+    "  code          劇本裡 person 欄填的代號。英文小寫加減號，不可重複。",
+    "  role          cadre（幹部）、alumni（校友）、parent（家長）、student（學員）。畫面上的標籤與光點顏色照這個。",
+    "  name_zh/en    顯示的稱呼。可以是「講者 J」這種代號。未成年一律用代號。",
+    "  county        他從台灣哪個縣市出發，只能填這 16 個：台北 新竹 台中 彰化 嘉義 台南 高雄 屏東 花蓮 宜蘭 台東 桃園 苗栗 雲林 南投 基隆。島上的光點靠它算。",
+    "  country_zh/en 現在在哪一國。在台灣就填 台灣 / Taiwan。",
+    "  city          現在在哪個城市（英文）。",
+    "  line_zh/en    他自己的一句話。用手寫體排。",
+    "  story_zh/en   兩三句介紹。",
+    "  photo         照片路徑，例如 ./photos/xxx.webp。**留空就顯示代號的首字**。沒有本人同意不要放。",
+    "  consent_date  本人同意公開的日期（YYYY-MM-DD）。**沒有這一欄的人不會出現在畫面上**，劇本指到他也一樣。"
+  ],
+  "demo": true,
+  "people": [
+    {
+      "code": "p-speaker", "role": "alumni",
+      "name_zh": "講者 J（範例）", "name_en": "Speaker J (sample)",
+      "county": "台中", "country_zh": "英國", "country_en": "UK", "city": "London",
+      "line_zh": "我高中在台中，現在在這裡念書。那時候也沒有人跟我說。",
+      "line_en": "I went to high school in Taichung. Nobody told me either.",
+      "story_zh": "BT 校友，回公立高中演講過三次。（範例人物）",
+      "story_en": "BT alumna, has spoken at public high schools three times. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-curriculum", "role": "cadre",
+      "name_zh": "Curriculum 幹部 A（範例）", "name_en": "Curriculum team, A (sample)",
+      "county": "台北", "country_zh": "台灣", "country_en": "Taiwan", "city": "Taipei",
+      "line_zh": "每一場探索營的第一堂課都是我排的。",
+      "line_en": "I schedule the first class of every bootcamp.",
+      "story_zh": "Curriculum team 幹部，在台灣念大學。（範例人物）",
+      "story_en": "Curriculum team cadre, at university in Taiwan. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-mentor-us", "role": "cadre",
+      "name_zh": "Mentor M（範例）", "name_en": "Mentor M (sample)",
+      "county": "新竹", "country_zh": "美國", "country_en": "USA", "city": "Madison",
+      "line_zh": "我只比你早走兩步。",
+      "line_en": "I am only two steps ahead of you.",
+      "story_zh": "Mentorship team 幹部，在美國念大二。（範例人物）",
+      "story_en": "Mentorship team cadre, sophomore in the US. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-mentor-tw", "role": "alumni",
+      "name_zh": "Mentor T（範例）", "name_en": "Mentor T (sample)",
+      "county": "台南", "country_zh": "台灣", "country_en": "Taiwan", "city": "Taipei",
+      "line_zh": "我申請過，最後留在台灣。那是我自己選的。",
+      "line_en": "I applied, then stayed in Taiwan. That was my choice.",
+      "story_zh": "BT 校友，在台灣念大一，當 mentor 第一年。（範例人物）",
+      "story_en": "BT alumnus, freshman in Taiwan, first year as a mentor. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-mentor-cc", "role": "alumni",
+      "name_zh": "Mentor C（範例）", "name_en": "Mentor C (sample)",
+      "county": "桃園", "country_zh": "美國", "country_en": "USA", "city": "San Diego",
+      "line_zh": "社區大學兩年，轉學一年。我只後悔沒早一點知道。",
+      "line_en": "Two years at a community college, one year since transferring. I only regret not knowing sooner.",
+      "story_zh": "BT 校友，從社區大學轉進四年制大學。（範例人物）",
+      "story_en": "BT alumnus, transferred from a community college to a four-year university. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-mentor-schol", "role": "alumni",
+      "name_zh": "Mentor S（範例）", "name_en": "Mentor S (sample)",
+      "county": "高雄", "country_zh": "美國", "country_en": "USA", "city": "Boston",
+      "line_zh": "獎學金不是運氣，是三十份申請裡的一份。",
+      "line_en": "A scholarship is not luck. It is one application out of thirty.",
+      "story_zh": "BT 校友，全額補助。（範例人物）",
+      "story_en": "BT alumna, on full need-based aid. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-parent", "role": "parent",
+      "name_zh": "一位校友的爸爸（範例）", "name_en": "An alumnus's father (sample)",
+      "county": "台北", "country_zh": "台灣", "country_en": "Taiwan", "city": "Taipei",
+      "line_zh": "我當年也以為要一千萬。",
+      "line_en": "I also thought it would cost ten million.",
+      "story_zh": "校友的家長，探索營家長場的講者。（範例人物）",
+      "story_en": "Parent of an alumnus, speaks at the bootcamp parents' session. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-intern", "role": "cadre",
+      "name_zh": "Internship 幹部 K（範例）", "name_en": "Internship team, K (sample)",
+      "county": "花蓮", "country_zh": "日本", "country_en": "Japan", "city": "Tokyo",
+      "line_zh": "我看過兩百篇 essay。最好的那幾篇都很小。",
+      "line_en": "I have read two hundred essays. The best ones were all about small things.",
+      "story_zh": "Internship team 幹部，在日本念書。（範例人物）",
+      "story_en": "Internship team cadre, studying in Japan. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-sponsorship", "role": "cadre",
+      "name_zh": "Sponsorship 幹部 E（範例）", "name_en": "Sponsorship team, E (sample)",
+      "county": "台北", "country_zh": "加拿大", "country_en": "Canada", "city": "Vancouver",
+      "line_zh": "0 元不是沒有成本，是有人去找了錢。",
+      "line_en": "Free does not mean no cost. It means someone went and found the money.",
+      "story_zh": "Sponsorship team 幹部，在加拿大念書。（範例人物）",
+      "story_en": "Sponsorship team cadre, studying in Canada. (sample)",
+      "photo": "", "consent_date": "2026-11-16"
+    },
+    {
+      "code": "p-no-consent", "role": "cadre",
+      "name_zh": "還沒同意的人（範例）", "name_en": "Not yet consented (sample)",
+      "county": "台北", "country_zh": "台灣", "country_en": "Taiwan", "city": "Taipei",
+      "line_zh": "這一筆沒有 consent_date，畫面上不會出現。",
+      "line_en": "This entry has no consent date and never renders.",
+      "story_zh": "示範用。", "story_en": "Demonstration only.",
+      "photo": ""
+    }
+  ]
+}
