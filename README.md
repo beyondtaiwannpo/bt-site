@@ -4695,7 +4695,8 @@ Paul：「right now every island is the same… make it a little bit different�
 - **島上多了二十一個只有角色沒有名字的人**（探索營學員、來講座的講者、配對中的學員、海外的 mentor、高中實習生、校園大使、合作高中的老師、來談合作的夥伴、贊助企業的代表、來拍影片的校友，`sample: true`），Paul 要島上看起來有人在做事。他們不是名單上的人，是這一屆真的會在島上出現的那種人；要拿掉就從 `teams.json` 刪。
 - **每座島自己的那一套擺設**（`teams.json` 的 `scenery`，`scene.js` 的 `decorate()` 照那個字畫，scene.js 裡沒有任何 team 的名字）：聚會所是圓的，中間一塊遊樂場（溜滑梯、鞦韆、翹翹板、沙坑、長凳）；Internship 是方的，一棟兩層的學校（新的 `kind: school`）加操場跑道與籃球架；Curriculum 最大，露天教室（黑板加三排長凳）；Mentorship 圓的，兩兩對坐的長凳、燈、四個花圃；Sponsorship 一個鋪面廣場、噴水池、合作夥伴看板；Marketing 攝影棚加貼文牆（`kind: studio`：三塊海報板、腳架相機、環形燈）、四面旗、一個大「讚」；Community Relations 一座涼亭舞台（`kind: stage`）、一排燈籠、佈告欄、郵筒。樹的數量也不一樣。
 - **機場四架飛機**：一架在跑道上來回滑行（`motion()` 裡動，螺旋槳會轉，到底停一下再轉頭）、兩架停機坪、一座機棚、一台行李車。
-- **Marketing 的 Instagram**：點那一棟「Instagram @beyondtaiwan」，卡上列最近的貼文（有縮圖），按了到 Instagram；島上那三塊海報板貼的是最上面三則有圖的貼文（真的圖，Paul 2026-11-17 說「Yes, add images」）。清單在 `island/posts.json`，Marketing 自己貼連結、一句話說明與圖（檔頭有怎麼縮圖的指令）。**不是自動抓**：抓 Instagram 要 API token 與 instagram.com 的程式，這個 repo 只從 cdnjs 載東西。現在放的九則是 2026-11-17 從 @beyondtaiwan 抓的：六則海報圖卡有圖（都是圖卡，沒有人臉），三則影片只有連結。
+- **貼文掛在每一樣在做的事底下**（同日第四次，Paul：「press and then it shows up in the middle first, press again it goes to Instagram」「if bootcamp for curriculum, can there be a post to represent that」）：`island/posts.json` 每一則有 `program`（teams.json 裡在做的事的 id），點那一棟，卡上列它的貼文；現在海外大學資料庫掛著東京、新加坡、韓國三則，講座掛著 Overseas Unpacked 講者招募，其餘在 Marketing 的 Instagram。**按一則先在畫面中間放大**（圖、一句話、日期），按圖或「到 Instagram 看這一則」才連出去；× 或 Esc 或按旁邊關掉。
+- **Marketing 的 Instagram**：點那一棟「Instagram @beyondtaiwan」，卡上列最近的貼文（有縮圖）；島上那三塊海報板貼的是最上面三則有圖的貼文（真的圖，Paul 2026-11-17 說「Yes, add images」）。清單在 `island/posts.json`，Marketing 自己貼連結、一句話說明與圖（檔頭有怎麼縮圖的指令）。**不是自動抓**：抓 Instagram 要 API token 與 instagram.com 的程式，這個 repo 只從 cdnjs 載東西。現在放的九則是 2026-11-17 從 @beyondtaiwan 抓的：六則海報圖卡有圖（都是圖卡，沒有人臉），三則影片只有連結。
   圖在 `island/posts/`，是這一頁唯一的圖檔：`check.sh` 放行這一個資料夾，但守著最多 12 張、每張 80 KB 以內、每張都要在 posts.json 裡被用到、檔名只能是 Instagram 的代號。**有人的照片要先確認每一位都同意，未成年一律不放臉**，海報與圖卡才直接放。
 - 截圖：`docs/island/2026-11-17-*.jpg`（`packed-*` 是蜂巢版，`dense-*` 是再加密之後，`alive-*` 是人在做事之後）。
 
@@ -4723,7 +4724,7 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 ### 不會寫程式的人怎麼改
 
 - 改一個 team 的說明、加一樣在做的事、改連結：`island/teams.json`，檔頭有每個欄位的說明。畫面會自己長出一棟（`kind` 決定長什麼樣：hall tent booth desk home post pier tower camp airport school studio stage）。
-- 換 Marketing 島上的貼文：`island/posts.json`，一則一筆（連結、一句話中英、日期、post 或 reel、圖），新的放上面；圖縮成 640 px 放進 `island/posts/`（指令在檔頭）。前三則有圖的會貼在島上的板子上。
+- 加一則貼文到某一棟：`island/posts.json`，一則一筆（`program` 是那一棟的 id、連結、一句話中英、日期、post 或 reel、圖），新的放上面；圖縮成 640 px 放進 `island/posts/`（指令在檔頭）。Instagram 那一棟前三則有圖的會貼在島上的板子上。**不會寫程式的人要能貼**，就要做後台那一個分頁（見「還沒做」）。
 - 改一座島的大小：`island/src/layout.js` 的 `SPEC`，一座一行；島跟島的距離是同一個 `SPACING`。
 - 換一座島的地面花紋、那一套擺設、幾棵樹：`teams.json` 那個 team 的 `ground`（grass lawn patch tiles grid paving checker brick）、`scenery`（playground plaza classroom school garden studio square）、`trees`。
 - 加一個人：`people` 加一筆（`code` 不重複、`team`、`role`、要不要具名）。他也參與別座島就加 `also`；校友與學員 `team` 填 `airport`、加 `flow`（走去哪、帶什麼、為什麼）。島上就多一個小人，他自己會走。
@@ -4746,6 +4747,7 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 - 校友與學員換真人（本人同意）。
 - Paul 2026-11-16 說「seven teams」；事實資料庫與團隊頁都是六個 team，這裡照六個做。第七個是哪一個，要他說。
 - ~~校友的故事多一個欄位「在 BT 做過什麼」~~ **2026-11-17 做完**（見上面「跟官網其他頁接起來」）。剩下的是 Paul 把 `2026-12-28-alumni-bt-role.sql` 在正式 Supabase 上跑一次。
+- **貼文從後台貼，不改 JSON**（Paul 2026-11-17：「when we post something onto it, it just goes to here… how am I supposed to edit it?」）：一張 `island_posts` 表（program、連結、一句話中英、日期、圖在 Storage、同意勾選、published）、`/admin/site/` 一個「島上的貼文」分頁（跟歷史之路的照片同一個做法：上傳、勾同意、上架）、一支對外的 `public_island_posts()`；島讀那一支，讀不到就退回 `island/posts.json`。要一支遷移檔在正式 Supabase 上跑，只有 Paul 做得了，所以先問他。
 - 這一頁要不要放進導覽列、放哪裡。現在首頁與團隊頁都還沒連過來。
 - 「把自己放上去」現在只在自己的瀏覽器。要讓大家都看得到（像 HEART 那樣），要存進資料庫，那是另一個決定（要登入、要同意、要有人核可）。
 - 嘖嘖的互動頁 `/stories/` 跟這一頁是兩件事：Paul 2026-11-16 說募資那一頁「we can think of something else」，先留著。
