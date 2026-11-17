@@ -440,6 +440,9 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     const start = L.wanderTarget(isl, blockersOf.get(person.team), rnd); g.position.set(start.x, 0, start.z); g.rotation.y = rnd() * TAU; world.add(g);
     g.traverse(m => { if (m.isMesh) { m.userData.sel = { kind: "person", code: person.code }; pickables.push(m); } });
     const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-person" + (o.me ? " is-me" : ""); pin.dataset.goPerson = person.code; pin.hidden = true; pins.appendChild(pin);
+    // 牌子上有大頭照（團隊頁那一份名單帶來的）就放一顆小的在名字前面；字放在 span 裡，labels() 只換字不碰照片。
+    if (person.avatar) { const im = document.createElement("img"); im.src = person.avatar; im.alt = ""; im.width = 18; im.height = 18; pin.appendChild(im); }
+    pin.appendChild(document.createElement("span"));
     const w = { person, g, pin, isl, home: isl, target: start, wait: rnd() * 4 + 1, me: !!o.me, label: "", trips: 0, path: null, pathI: 0, dest: "", poi: null, partner: null, act: null }; walkers.push(w); shadowsDirty = true; return w;
   }
   for (const p of data.people) addWalker(p);
@@ -524,7 +527,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     labels({ teams, people, me }) {
       for (const o of isleObjs.values()) o.pin.textContent = teams[o.isl.id] || "";
       for (const o of isleObjs.values()) for (const b of o.buildings) b.userData.pin.textContent = (people.programs && people.programs[b.userData.program.id]) || "";
-      for (const w of walkers) w.pin.textContent = w.me ? (me || w.person.code) : (people[w.person.code] || "");
+      for (const w of walkers) { const sp = w.pin.querySelector("span"); (sp || w.pin).textContent = w.me ? (me || w.person.code) : (people[w.person.code] || ""); }
       placePins();
     },
     select(sel) {
@@ -548,7 +551,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       const old = walkers.find(w => w.me); if (old) removeWalker(old);
       if (!info) { if (!motionOn) render(0); return null; }
       const w = addWalker({ code: "me", team: info.team, role: "associate" }, { me: true, shirt: info.shirt, hair: info.hair, skin: 1 });
-      w.pin.textContent = info.label || info.name; if (!motionOn) render(0); return w;
+      w.pin.querySelector("span").textContent = info.label || info.name; if (!motionOn) render(0); return w;
     },
     // 報名開著的活動：那座島上多一塊橘色的「報名中」牌子，按了直接去報名。
     events(list) {
@@ -556,9 +559,9 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       for (const e of list || []) { const o = isleObjs.get(e.team); if (!o || o.evPin) continue; const a = document.createElement("a"); a.className = "pin pin-event"; a.href = e.link; a.textContent = e.title; pins.appendChild(a); o.evPin = a; }
       placePins();
     },
-    // 人換了一批（真的校友從資料庫來）：拿掉 sample 的校友、加新的。
+    // 人換了一批（真的名單或真的校友從資料庫來）：不在新名單上的拿掉（「我」除外）、新的加上去。
     people(list) {
-      for (const w of walkers.slice()) if (w.person.role === "alumni" && !list.some(p => p.code === w.person.code)) removeWalker(w);
+      for (const w of walkers.slice()) if (!w.me && !list.some(p => p.code === w.person.code)) removeWalker(w);
       for (const p of list) if (!walkers.some(w => w.person.code === p.code)) addWalker(p);
       if (!motionOn) render(0);
     },

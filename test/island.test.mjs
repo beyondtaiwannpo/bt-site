@@ -24,9 +24,51 @@ test("資料：八座島照固定順序、每個至少一樣在做的事、人�
   // 校友與學員都有走去的島；也參與別座島的人會走過去
   for (const p of d.teams[7].people) { assert.ok(p.flow && p.goes, p.code); assert.ok(p.sample); }
   assert.ok(D.visitorsOf(d, "curriculum").length >= 2);
-  // 兩位 Co-President 住在自己的 team（Sponsorship）
-  assert.equal(d.people.find(p => p.code === "paul").team, "sponsorship");
-  assert.equal(d.people.find(p => p.code === "alysia").team, "sponsorship");
+  // 2026-11-17 起幹部不在 teams.json 裡（島讀團隊頁那一份名單）：檔裡只剩只放角色的範例
+  for (const p of d.people) assert.ok(p.sample || p.role === "alumni" || p.role === "student", p.code + " 不該在 teams.json 裡，幹部從 public_team() 來");
+  assert.ok(!d.people.some(p => p.named && !["alumni", "student"].includes(p.role)), "teams.json 裡不該有具名的幹部");
+});
+
+test("島上的人就是團隊頁那一份名單：public_team() 一筆職位一列拆成人、team 字樣對到島、職位拆成角色、兼兩個 team 的人會走過去、名字只用英文、帶大頭照；進來之後自己打的幹部讓位；頭銜是「Curriculum Director」這種", () => {
+  const rows = [
+    { id: "11111111-aaaa", name_zh: "王小明", name_en: "Ming Wang", team: "Curriculum Team", avatar: "data:image/jpeg;base64,xx", title_zh: "Director, Curriculum Team", title_en: "Director, Curriculum Team", term: "2026-27" },
+    { id: "11111111-aaaa", name_zh: "王小明", name_en: "Ming Wang", team: "Internship Team", avatar: "data:image/jpeg;base64,xx", title_en: "Adviser, Internship Team", term: "2026-27" },
+    { id: "22222222-bbbb", name_zh: "李", name_en: "", team: "Sponsorship Team", avatar: "", title_en: "Co-President", term: "2026-27" },
+    { id: "22222222-bbbb", name_zh: "李", name_en: "", team: "Sponsorship Team", avatar: "", title_en: "Associate, Sponsorship Team", term: "2026-27" },
+    { id: "33333333-cccc", name_zh: "陳", name_en: "Chen", team: "Community Relations Team", avatar: "javascript:x", title_en: "Senior Adviser", term: "2026-27" },
+    { id: "44444444-dddd", name_zh: "沒有島", name_en: "Nowhere", team: "Finance Team", title_en: "Associate" },
+    { id: "", name_en: "No id", team: "Curriculum Team", title_en: "Associate" },
+  ];
+  const ppl = D.rosterToPeople(rows, d.teams);
+  assert.equal(ppl.length, 3, "對不到島的、沒有 id 的不進來");
+  const ming = ppl.find(p => p.name_en === "Ming Wang");
+  assert.equal(ming.team, "curriculum"); assert.equal(ming.role, "director"); assert.equal(ming.named, true); assert.equal(ming.db, true);
+  assert.equal(ming.name_zh, "Ming Wang", "對外只用英文名");
+  assert.deepEqual(ming.also.map(a => a.team), ["internship"]); assert.equal(ming.goes, "internship");
+  assert.equal(ming.avatar, "data:image/jpeg;base64,xx");
+  const li = ppl.find(p => p.name_en === "李");
+  assert.equal(li.role, "copresident", "Co-President 那一列優先"); assert.equal(li.team, "sponsorship"); assert.equal(li.also.length, 0);
+  const chen = ppl.find(p => p.name_en === "Chen"); assert.equal(chen.avatar, "", "不是 data: 或 https 的頭像不收"); assert.equal(chen.role, "advisor");
+  // 頭銜
+  const cu = d.teams.find(tm => tm.id === "curriculum"), sp = d.teams.find(tm => tm.id === "sponsorship"), cr = d.teams.find(tm => tm.id === "cr");
+  assert.equal(D.titleFor(ming, cu, "en"), "Curriculum Director");
+  assert.equal(D.titleFor(li, sp, "en"), "Co-President");
+  assert.equal(D.titleFor(chen, cr, "en"), "Senior Adviser");
+  assert.equal(D.titleFor({ role: "associate", title_zh: "Associate", title_en: "Associate" }, cu, "zh"), "Curriculum Associate");
+  // 進來之後：sample 的留著，幹部換成真的
+  const d2 = D.normalize(JSON.parse(fs.readFileSync("island/teams.json", "utf8")));
+  const before = d2.people.length;
+  D.mergeRoster(d2, ppl);
+  assert.equal(d2.people.length, before + 3);
+  assert.ok(d2.teams.find(tm => tm.id === "curriculum").people.some(p => p.code === ming.code));
+  assert.ok(d2.people.filter(p => p.sample).length >= 20, "範例的人還在");
+  assert.deepEqual(D.mergeRoster(d2, []), d2, "名單空的就什麼都不動");
+  // 卡：有照片、頭銜短
+  const card = UI.personCardHTML(ming, cu, "en", d2);
+  assert.ok(card.includes('class="card-face"') && card.includes("Curriculum Director") && card.includes("Ming Wang") && card.includes("Also on"));
+  assert.ok(!card.includes("runs this team"));
+  const idx = UI.indexHTML(d2, "en", {});
+  assert.ok(idx.includes('data-team="curriculum"'));
 });
 
 test("資料：未成年只有角色沒有名字；沒有同意（named 不是 true）就不顯示名字；連結只收站內相對路徑與 https", () => {
@@ -124,14 +166,14 @@ test("清單與卡的 HTML：七個 team、做的事可以點、人用角色不�
   assert.ok(idx.includes('class="tree-team on" data-team="mentorship"'));
   const card = UI.teamCardHTML(d.teams[2], "zh", d);
   assert.ok(card.includes("探索營 College Bootcamp"));
-  assert.ok((card.match(/data-go-person="/g) || []).length >= 7);
+  assert.ok((card.match(/data-go-person="/g) || []).length >= 4);
   assert.ok(card.includes("跟誰一起做") && card.includes("常走過來的人"));
   assert.ok(!card.includes("Daphne") && !card.includes("Alice"));
   const en = UI.programCardHTML(d.teams[2].programs[0], d.teams[2], "en");
   assert.ok(en.includes("Twice a year"));
   assert.ok(en.includes('href="../programs/"'));
-  const person = UI.personCardHTML(d.people.find(p => p.code === "ann-chen"), d.teams[1], "en", d);
-  assert.ok(person.includes("Ann Chen") && person.includes("Also on"));
+  const person = UI.personCardHTML(d.people.find(p => p.code === "cu-stu-1"), d.teams[2], "zh", d);
+  assert.ok(person.includes("探索營學員") && person.includes("學員"));
   const al = UI.personCardHTML(d.teams[7].people[0], d.teams[7], "zh", d);
   assert.ok(al.includes("常走去") && al.includes("遮字的範例"));
   const form = UI.meFormHTML(d, "zh", { name: "<b>", team: "cr", shirt: 1, hair: 2 });

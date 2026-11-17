@@ -1,6 +1,6 @@
 // /island/ 畫面的純函式：吃資料與語言，吐 HTML 字串。不碰 DOM。
 import { t } from "./strings.js";
-import { label, connectionsOf, visitorsOf, teamById, eventsOf, postsOf } from "./data.js";
+import { label, connectionsOf, visitorsOf, teamById, eventsOf, postsOf, titleFor } from "./data.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const L = (o, k, lang) => esc(o[k + "_" + lang] || o[k + "_zh"] || "");
@@ -67,10 +67,12 @@ export function personCardHTML(p, tm, lang, d) {
   const also = (p.also || []).map(a => { const o = d ? teamById(d, a.team) : null; return o ? `<li><button type="button" class="lnk" data-go-team="${o.id}"><span class="lnk-team c-${o.colour}">${esc(t("alsoOn", lang))} ${L(o, "name", lang)}</span><span class="lnk-why">${L(a, "why", lang)}</span></button></li>` : ""; }).join("");
   const flow = p.flow && d ? (() => { const o = teamById(d, p.flow.to); return o ? `<li><button type="button" class="lnk" data-go-team="${o.id}"><span class="lnk-team c-${o.colour}">${esc(t("goesTo", lang))} ${L(o, "name", lang)} · ${L(p.flow, "carry", lang)}</span><span class="lnk-why">${L(p.flow, "why", lang)}</span></button></li>` : ""; })() : "";
   const links = also || flow ? `<ul class="links">${also}${flow}</ul>` : "";
-  return `<div class="card-head"><button type="button" class="card-back" data-go-team="${tm.id}">${L(tm, "name", lang)}</button><h2 class="card-h">${esc(label(p, lang))}</h2><p class="card-tag">${esc(t(roleKey(p.role), lang))}</p></div>
+  const face = p.avatar ? `<img class="card-face" src="${esc(p.avatar)}" alt="" width="64" height="64">` : "";
+  const tag = p.named && p.db ? titleFor(p, tm, lang) : (p.role === "alumni" || p.role === "student" || p.role === "intern" ? t(roleKey(p.role), lang) : titleFor(p, tm, lang));
+  return `<div class="card-head card-head-person">${face}<div><button type="button" class="card-back" data-go-team="${tm.id}">${L(tm, "name", lang)}</button><h2 class="card-h">${esc(label(p, lang))}</h2><p class="card-tag">${esc(tag)}</p></div></div>
     ${line}<p class="card-about">${L(tm, "tagline", lang)}</p>${links}
     ${p.where ? `<p class="card-lead">${esc(p.where)}</p>` : ""}
-    <p class="card-note">${esc(p.db ? t("alumniDb", lang) : p.sample ? t("sampleNote", lang) : t("namesNote", lang))}</p>`;
+    <p class="card-note">${esc(p.db && p.role === "alumni" ? t("alumniDb", lang) : p.sample ? t("sampleNote", lang) : t("namesNote", lang))}</p>`;
 }
 // ── 把自己放上去 ──
 export function meFormHTML(d, lang, me) {

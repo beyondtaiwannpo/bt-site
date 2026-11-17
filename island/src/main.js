@@ -134,7 +134,9 @@ async function boot() {
   pushLabels();
   if (start.kind !== "overview") select(start, true);
   // 跟官網其他頁接起來：活動（/events/ 那一份）與真的校友（/alumni/ 那一份）。拿不到就當沒有。
-  const [events, alumni, instagram] = await Promise.all([D.loadEvents(), D.loadAlumni(), D.loadPosts("./", data.teams)]);
+  const [events, alumni, instagram, roster] = await Promise.all([D.loadEvents(), D.loadAlumni(), D.loadPosts("./", data.teams), D.loadRoster(data.teams)]);
+  // 團隊頁那一份名單進來：teams.json 裡自己打的幹部讓位。
+  if (roster.length) { D.mergeRoster(data, roster); if (scene) scene.people(data.people); renderIndex(); renderCard(); pushLabels(); }
   data.instagram = instagram; if (sel && sel.kind === "program") renderCard();
   if (scene) scene.posts(D.postsOf(instagram, "instagram").filter(x => x.image).map(x => "./" + x.image));
   data.events = events;

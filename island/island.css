@@ -21,6 +21,9 @@ html[data-lang="zh"] .en,html[data-lang="en"] .zh{display:none}
 html[data-lang="zh"] .pin-team{font-family:var(--han);font-weight:900;letter-spacing:.04em;font-size:13px}
 .pin-team.on,.pin-prog.on,.pin-person.on{background:var(--bt-orange);border-color:transparent}
 .pin-person{font-size:11.5px;padding:4px 9px;opacity:.95}
+.pin-person img{width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:-5px;margin:-2px 5px -2px -3px}
+.card-head-person{display:flex;gap:12px;align-items:flex-start}
+.card-face{width:64px;height:64px;border-radius:50%;object-fit:cover;flex:none;border:2px solid #fff;box-shadow:0 4px 14px rgba(16,42,134,.16)}
 .pin-person.is-me{background:var(--bt-navy);color:var(--bt-cream);border-color:transparent}
 .pin-person.is-me::after{border-color:transparent}
 .pin:hover{background:var(--bt-orange)}

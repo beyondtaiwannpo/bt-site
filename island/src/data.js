@@ -194,3 +194,43 @@ export async function loadPosts(base, teams) {
   const raw = Array.isArray(db) && db.length ? { handle: file && file.handle, profile: file && file.profile, posts: db } : file;
   return normalizePosts(raw, teams);
 }
+
+// ── 島上的人就是官網團隊頁那一份名單（Paul 2026-11-17：「people on the roster… should be connected to our roster from the organization page」）──
+// /team/ 讀的 public_team() 同一支：本人勾了公開、Co-President 核可、這一屆有職位的幹部，一筆職位一列（兼兩個 team 的人兩列），帶大頭照。
+// 名字照對外頁的規矩只用英文（沒有英文名才退回中文）。職位字樣（"Director, Curriculum Team"）拆成角色；team 字樣對到島（teams.json 的 workspace）。
+const ROLE_OF = t => { const x = String(t || "").toLowerCase(); return /co-president/.test(x) ? "copresident" : /director/.test(x) ? "director" : /advis/.test(x) ? "advisor" : /intern/.test(x) ? "intern" : "associate"; };
+const ROLE_WORD = t => { const m = String(t || "").match(/^\s*([^,·]+?)\s*(?:,|·|$)/); return m ? m[1].trim() : ""; };
+export function rosterToPeople(rows, teams) {
+  const byWs = new Map((teams || []).filter(tm => tm.workspace).map(tm => [tm.workspace.toLowerCase(), tm.id]));
+  const islandOfTeam = t => byWs.get(str(t).toLowerCase()) || "";
+  const people = new Map();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || !str(r.id) || !(str(r.name_en) || str(r.name_zh))) continue;
+    const isl = islandOfTeam(r.team); if (!isl) continue;
+    const title = str(r.title_en) || str(r.title_zh), role = ROLE_OF(title), word = ROLE_WORD(title) || role;
+    const name = str(r.name_en) || str(r.name_zh);
+    let p = people.get(r.id);
+    if (!p) { p = { code: "db-" + str(r.id).slice(0, 8), team: isl, role, named: true, sample: false, db: true, name_zh: name, name_en: name, title_zh: word, title_en: word, line_zh: "", line_en: "", also: [], flow: null, goes: "", avatar: /^(data:image\/|https:\/\/)/.test(str(r.avatar)) ? str(r.avatar) : "", term: str(r.term) }; people.set(r.id, p); }
+    else if (isl !== p.team && !p.also.some(a => a.team === isl)) { p.also.push({ team: isl, role, why_zh: word, why_en: word }); if (!p.goes) p.goes = isl; }
+    // Co-President 的那一列優先當主要角色（他同時可能是某個 team 的 Associate）
+    if (role === "copresident" && p.role !== "copresident") { p.role = "copresident"; p.title_zh = p.title_en = word; }
+  }
+  return [...people.values()];
+}
+// 真的名單進來：teams.json 裡自己打的幹部（不是 sample 的）全部讓位，sample 的學員、校友、來訪的人留著。
+export function mergeRoster(d, people) {
+  if (!people.length) return d;
+  const keep = p => p.sample || p.role === "alumni" || p.role === "student";
+  for (const tm of d.teams) tm.people = tm.people.filter(keep);
+  d.people = d.people.filter(keep);
+  for (const p of people) { const tm = d.teams.find(x => x.id === p.team); if (!tm) continue; d.people.push(p); tm.people.push(p); }
+  return d;
+}
+export const loadRoster = teams => rpc("public_team").then(rows => rosterToPeople(rows, teams)).catch(() => []);
+// 卡上的頭銜：「Curriculum Director」「Co-President」這樣，不解釋（Paul 2026-11-17：「just say director… curriculum associate, curriculum director, co-president」）。
+export function titleFor(p, tm, lang) {
+  const word = p["title_" + lang] || p.title_zh || p.role;
+  if (p.role === "copresident" || /senior/i.test(word) || !tm || tm.id === "commons" || tm.id === "airport") return word;
+  const team = tm.name_en || tm.name_zh;
+  return new RegExp("^" + team.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(word) ? word : `${team} ${word}`;
+}

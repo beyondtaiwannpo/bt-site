@@ -4715,7 +4715,14 @@ Paul 說會卡。本機 Chrome 實測：名牌關著 60 fps，**名牌全開掉�
 修法：牌子加 `will-change: transform` 與 `contain: layout paint`，位置沒變超過半個像素就不碰它；人不投影（陰影貼圖是靜的，走動的人用腳下那一圈）；橋的欄杆柱子與所有島的樹改 InstancedMesh（少了約 400 個 draw call）；像素密度上限 1.5；鏡頭追得快一點。
 修完名牌全開也是 60 fps。真的手機還是沒量過；掉到 30 以下先把 `scene.js` 的陰影貼圖從 2048 降到 1024。
 
-### 名字：這一頁還沒公開，先用自己的名單
+### 島上的人就是團隊頁那一份名單（2026-11-17 第六次）
+
+Paul：「why is Jeremy up there?… people on the roster… should be connected to our roster from the organization page」。改成島讀 `/team/` 同一支 `public_team()`：**本人在 `/settings/` 勾了公開、傳了大頭照，Co-President 在後台團隊頁核可，這一屆有職位的幹部**。一筆職位一列，兼兩個 team 的人住主要那座、會走去另一座。名字照對外頁的規矩只用英文；team 字樣對到島靠 `teams.json` 每個 team 的 `workspace`。
+`teams.json` 的 `people` **不再放幹部**，只剩只放角色的範例（學員、校友、來訪的人）。要誰上島、改誰的頭銜或照片：**設定頁與後台團隊頁，跟 `/team/` 同一個地方**，島跟著變。
+卡上的頭銜是「Curriculum Director」「Co-President」這種（Paul：「just say director」），有大頭照就放在名字旁邊；牌子上也有一顆小的。
+名單讀不到或空的（例如正式庫還沒核可任何人）：島上只剩範例的人。
+
+### 名字：以前這一頁還沒公開時用自己打的名單（2026-11-16，已被上面取代）
 
 Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的名單把人放上去。所以 `island/teams.json` 的 `people` 現在是這一屆真的人：
 兩位 Co-President 住在 Sponsorship，六個 team 各一位 Director、一到兩位 Advisor、一到四位 Associate，身兼兩個 team 的人住在主要那座、`also` 寫另一座（Ann Chen 與 Evelyn Kuei 住 Sponsorship 也是 Curriculum 的 Advisor；Ann Lin 住 Curriculum 也是 Internship 的 Advisor；Emily 住 Sponsorship 也是 Mentorship 的 Advisor）。
@@ -4730,7 +4737,8 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 - 加一則貼文到某一棟：到後台 `/admin/site/#island` 貼（自己 team 的島，team 是「改」以上就行）。`island/posts.json` 是資料庫空著時的退路，一般不用再改它。Instagram 那一棟前三則有圖的會貼在島上的板子上。
 - 改一座島的大小：`island/src/layout.js` 的 `SPEC`，一座一行；島跟島的距離是同一個 `SPACING`。
 - 換一座島的地面花紋、那一套擺設、幾棵樹：`teams.json` 那個 team 的 `ground`（grass lawn patch tiles grid paving checker brick）、`scenery`（playground plaza classroom school garden studio square）、`trees`。
-- 加一個人：`people` 加一筆（`code` 不重複、`team`、`role`、要不要具名）。他也參與別座島就加 `also`；校友與學員 `team` 填 `airport`、加 `flow`（走去哪、帶什麼、為什麼）。島上就多一個小人，他自己會走。
+- 讓一位幹部出現在島上：不改檔。他到 `/settings/` 勾「公開」、傳大頭照，Co-President 到後台團隊頁核可，跟團隊頁同一條路。頭銜照後台的職位。
+- 加一個只放角色的範例人（學員、來訪的人）：`people` 加一筆（`code` 不重複、`team`、`role`、`sample: true`、不具名）。校友與學員 `team` 填 `airport`、加 `flow`（走去哪、帶什麼、為什麼）。
 - 加一條協作線：`connections` 加一筆（`a`、`b`、為什麼）。
 - 介面上的字：`island/src/strings.js`。
 - 不用動任何 `.js` 的場景程式。
