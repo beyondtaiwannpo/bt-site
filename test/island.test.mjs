@@ -77,6 +77,15 @@ test("位置：八座島不重疊、大小距離形狀各不一樣、橋有長�
   const fit = L.cameraOverview(false).fit;
   assert.ok(Math.max(...isl.map(i => Math.abs(i.x) + i.r)) <= fit[0] + 2 && Math.max(...isl.map(i => Math.abs(i.z) + i.r)) <= fit[1] + 2, "島跑出全景");
   for (const id of Object.keys(L.SPEC)) assert.ok(L.islandOf(id), id);
+  // 走路繞開東西（Paul 2026-11-17：「people are walking inside the building」）：路上每一段都不穿過任何一個圓；目標在圓裡的那一個不算
+  const bl = [{ x: 5, z: 0, r: 3 }, { x: 12, z: 1, r: 1.2 }];
+  const dp = L.detour({ x: 0, z: 0 }, { x: 16, z: 0 }, bl);
+  assert.deepEqual(dp[dp.length - 1], { x: 16, z: 0 });
+  let prev = { x: 0, z: 0 };
+  for (const q of dp) { for (const b of bl) { for (let k = 0; k <= 20; k++) { const x = prev.x + (q.x - prev.x) * k / 20, z = prev.z + (q.z - prev.z) * k / 20; assert.ok(Math.hypot(x - b.x, z - b.z) >= b.r - 0.01, "穿過了 " + JSON.stringify(b)); } } prev = q; }
+  assert.deepEqual(L.detour({ x: 0, z: 0 }, { x: 16, z: 0 }, []), [{ x: 16, z: 0 }]);
+  let seed2 = 7; const rnd2 = () => (seed2 = (seed2 * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 30; i++) { const w = L.wanderTarget(cu, [{ x: cu.x, z: cu.z, r: 4 }], rnd2); assert.ok(Math.hypot(w.x - cu.x, w.z - cu.z) >= 4.6 || (w.x === cu.x && w.z === cu.z + 2)); }
 });
 
 test("Marketing 的貼文牆：只收 instagram.com 的 https 連結、最多 12 則、卡上列出來；instagram.json 本身合法而且不放未成年的名字", () => {

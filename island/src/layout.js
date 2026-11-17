@@ -64,14 +64,30 @@ export function programSpots(island, n) {
   return out;
 }
 // 人在島上走：隨機一個目標點，在島上、不在建築的 2.2 公尺內、不在邊緣 1.5 公尺內。
+// blockers 是世界座標的圓 { x, z, r }（房子、桌椅、樹）。目標點不可以落在任何一個圓裡。
 export function wanderTarget(island, blockers, rnd) {
   for (let i = 0; i < 40; i++) {
     const a = rnd() * TAU, d = Math.sqrt(rnd()) * (island.r - 2.0);
     const x = island.x + Math.cos(a) * d, z = island.z + Math.sin(a) * d;
-    if ((blockers || []).some(b => Math.hypot(x - b.x, z - b.z) < 2.3)) continue;
+    if ((blockers || []).some(b => Math.hypot(x - b.x, z - b.z) < (b.r || 1.2) + 0.6)) continue;
     return { x, z };
   }
   return { x: island.x, z: island.z + 2 };
+}
+// 從 a 走到 b 不穿過任何一個圓（Paul 2026-11-17：「people are walking inside the building」）。
+// 回要經過的點（不含 a，含 b）。做法：這一段線碰到哪個圓，就在最靠近圓心的那一點往外推一個點，兩段再各自檢查一次，最多拆六層。
+export function detour(a, b, blockers, depth) {
+  const dep = depth == null ? 6 : depth; const list = blockers || [];
+  const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz); if (len < 0.01 || dep <= 0) return [b];
+  let hit = null, hitT = 0, hitD = Infinity;
+  for (const c of list) { const R = (c.r || 1.2) + 0.5; const tt = Math.max(0, Math.min(1, ((c.x - a.x) * dx + (c.z - a.z) * dz) / (len * len))); const px = a.x + dx * tt, pz = a.z + dz * tt; const dd = Math.hypot(px - c.x, pz - c.z);
+    if (dd < R && tt > 0.02 && tt < 0.98 && tt < hitT + 1e9 && (!hit || tt < hitT)) { hit = c; hitT = tt; hitD = dd; } }
+  if (!hit) return [b];
+  const R = (hit.r || 1.2) + 0.7; const px = a.x + dx * hitT, pz = a.z + dz * hitT;
+  let nx = px - hit.x, nz = pz - hit.z; const nd = Math.hypot(nx, nz); if (nd < 0.05) { nx = -dz / len; nz = dx / len; } else { nx /= nd; nz /= nd; }
+  const via = { x: hit.x + nx * R, z: hit.z + nz * R };
+  // 兩段再各自檢查一次（同一個圓也要再看：往外推的點在圓外，但到它的那一段可能還切到圓的邊）。
+  return detour(a, via, list, dep - 1).concat(detour(via, b, list, dep - 1));
 }
 // 鏡頭：全景、看一座島、鳥瞰。回 { pos, target }。
 // fit：[橫的半徑, 直的半徑]，scene.js 照畫面的長寬把距離算出來；pos 只給方向。
