@@ -1815,7 +1815,7 @@ stMotion=$(node -e '
   const fs = require("fs");
   const strip = c => c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   const bad = [];
-  for (const f of ["stories/src/shell-lamp.js", "stories/src/shell-flight.js"]) {
+  for (const f of ["stories/src/shell-lamp.js", "stories/src/shell-island.js"]) {
     const code = strip(fs.readFileSync(f, "utf8"));
     const head = code.indexOf("function motion(");
     let from = -1, to = -1;
@@ -1830,7 +1830,7 @@ stMotion=$(node -e '
     }
   }
   for (const f of fs.readdirSync("stories/src")) {
-    if (f === "shell-lamp.js" || f === "shell-flight.js") continue;
+    if (f === "shell-lamp.js" || f === "shell-island.js") continue;
     const c = strip(fs.readFileSync("stories/src/" + f, "utf8"));
     if (/\bgsap\./.test(c)) bad.push("stories/src/" + f + " 用到了 gsap（只准殼的 motion()）");
   }
@@ -1847,7 +1847,7 @@ else
   printf '%s\n' "$stMotion"
 fi
 
-# /stories/ 的 Three：importmap 跟 /history/ 同一個網址同一個雜湊、只有 shell-flight.js import three、沒有模型或圖檔、JS 不含 Three 小於 250 KB。
+# /stories/ 的 Three：importmap 跟 /history/ 同一個網址同一個雜湊、只有 shell-island.js import three、沒有模型或圖檔、JS 不含 Three 小於 250 KB。
 stThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
   const fs = require("fs");
   const bad = [];
@@ -1867,22 +1867,17 @@ stThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
   for (const f of fs.readdirSync("stories/src")) {
     const c = fs.readFileSync("stories/src/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     const uses = /from\s+["\x27]three["\x27]/.test(c) || /import\(\s*["\x27]three["\x27]/.test(c);
-    if (uses && f !== "shell-flight.js") bad.push("stories/src/" + f + " import 了 three（只准 shell-flight.js）");
-    if (!uses && f === "shell-flight.js") bad.push("shell-flight.js 沒有從 importmap 的 three 載");
+    if (uses && f !== "shell-island.js") bad.push("stories/src/" + f + " import 了 three（只准 shell-island.js）");
+    if (!uses && f === "shell-island.js") bad.push("shell-island.js 沒有從 importmap 的 three 載");
   }
   const bin = fs.readdirSync("stories", { recursive: true }).filter(f => /\.(glb|gltf|obj|fbx|bin|ktx2|hdr)$/i.test(String(f)));
   if (bin.length) bad.push("stories/ 裡放了模型檔（全部要用程式幾何）：" + bin.join("、"));
   const js = fs.readdirSync("stories/src").reduce((n, f) => n + fs.statSync("stories/src/" + f).size, 0);
   if (js > 250 * 1024) bad.push("stories/src 的 JS 加起來 " + Math.round(js / 1024) + " KB，超過 250 KB（不含 Three）");
-  // plane.js 與 person.js 是從 history/src/ 抄來的：兩邊要一模一樣（只准第一行的檔頭不同），不然改了一邊另一邊不知道。
-  for (const f of ["plane.js", "person.js"]) {
-    const a = fs.readFileSync("history/src/" + f, "utf8").split("\n").slice(1).join("\n"), b = fs.readFileSync("stories/src/" + f, "utf8").split("\n").slice(1).join("\n");
-    if (a !== b) bad.push("stories/src/" + f + " 跟 history/src/" + f + " 不一樣了（除了第一行）。改一邊就要改另一邊");
-  }
   if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
 ' 2>&1)
 if [ $? -eq 0 ]; then
-  ok "/stories/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 shell-flight.js import 它、沒有模型檔、plane.js 與 person.js 跟 /history/ 一致"
+  ok "/stories/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 shell-island.js import 它、沒有模型檔、JS 不含 Three 小於 250 KB"
 else
   bad "/stories/ 的 Three 載入方式不對："
   printf '%s\n' "$stThree"

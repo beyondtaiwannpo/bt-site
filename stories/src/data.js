@@ -81,10 +81,10 @@ export const hashFor = id => (PERSONA_IDS.includes(id) ? "#" + id : "");
 
 // 網址的 ?from=zeczec：從嘖嘖來的人只有兩條路（繼續看、回去贊助），結尾不給「看看 BT 還做了什麼」那顆。
 export const fromZeczec = search => new URLSearchParams(search || "").get("from") === "zeczec";
-// 哪一個殼：?shell=flight 或 lamp。Paul 比較過之後留一個，到時候這裡改預設值就好。
+// 哪一個殼：island（3D 的島，預設）或 lamp（2D 的島點燈，也是 3D 開不起來時的退路）。
 export function shellFromSearch(search, fallback) {
   const v = new URLSearchParams(search || "").get("shell");
-  return v === "flight" || v === "lamp" ? v : (fallback || "lamp");
+  return v === "island" || v === "lamp" ? v : (fallback || "island");
 }
 // 走到哪：第 i 關（0 起算）選了之後的進度，結尾是 1。
 export const progressOf = (i, chosen, total) => total ? Math.min(1, (i + (chosen ? 1 : 0.5)) / total) : 0;

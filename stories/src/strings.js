@@ -9,6 +9,7 @@ export const STR = {
   pickTitle:    { zh: "挑一個學生", en: "Pick a student" },
   pickLead:     { zh: "三個學生，三種起點。每一個選擇都是真實學員那一年真的面對過的。沒有對錯，兩條路都走得下去。", en: "Three students, three starting points. Every choice is one a real student faced that year. No right answers. Both roads go on." },
   pickGo:       { zh: "走他的這一年", en: "Walk their year" },
+  pickHint:     { zh: "三個人站在島上的沙灘。點一個，或按下面的名字。", en: "Three of them are standing on the beach. Tap one, or pick a name below." },
   sceneOf:      { zh: "第 {n} 關，共 {total} 關", en: "Scene {n} of {total}" },
   next:         { zh: "下一關", en: "Next" },
   toEnd:        { zh: "看結尾", en: "See the ending" },
@@ -33,7 +34,7 @@ export const STR = {
   loadFail:     { zh: "劇本載不進來。重新整理一次，還是不行就晚一點再來。", en: "The script could not load. Refresh once, or come back later." },
   noscript:     { zh: "這一頁要開 JavaScript 才走得了。", en: "This page needs JavaScript to walk the year." },
   progress:     { zh: "進度", en: "Progress" },
-  shellFlight:  { zh: "機場版", en: "Flight" },
+  shellIsland:  { zh: "島版", en: "Island" },
   shellLamp:    { zh: "點燈版", en: "Lamp" },
   motionOff:    { zh: "這一版沒有動畫，內容一樣。", en: "This version has no animation. Same content." },
 };

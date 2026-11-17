@@ -13,7 +13,7 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const motionOff = new URLSearchParams(location.search).get("motion") === "off";
 const phone = matchMedia("(pointer: coarse)").matches && Math.min(innerWidth, innerHeight) < 760;
 const fromZeczec = D.fromZeczec(location.search);
-const shellName = D.shellFromSearch(location.search, "lamp");
+const shellName = D.shellFromSearch(location.search, "island");
 
 let lang = doc.getAttribute("data-lang") || "zh";
 let script = null, people = null;
@@ -29,7 +29,7 @@ function setLang(l) {
   $("lang").textContent = t("lang", l); $("lang").setAttribute("aria-label", t("langLabel", l));
   $("back-top").textContent = t("back", l);
   const home = $("home"); if (home) home.href = "../?lang=" + l;
-  if (shell) shell.setLang(l);
+  if (shell) { shell.setLang(l); if (view === "pick" && shell.candidates && script) shell.candidates(script.personas); }
   render();
 }
 
@@ -79,7 +79,7 @@ function again() {
   persona = null; sceneI = 0; picks = []; view = "pick";
   history.replaceState(null, "", location.pathname + location.search);
   render(); scrollTop();
-  if (shell) shell.reset();
+  if (shell) { shell.reset(); if (shell.candidates) shell.candidates(script.personas); }
 }
 function scrollTop() { const m = $("story"); const y = m.getBoundingClientRect().top + scrollY - 70; scrollTo({ top: Math.max(0, Math.min(y, scrollY)), behavior: "auto" }); }
 
@@ -114,12 +114,16 @@ async function loadShell() {
   if (reduce || motionOff) return null;
   await gsapReady();
   if (!window.gsap) return null;
-  const file = shellName === "flight" ? "./shell-flight.js" : "./shell-lamp.js";
-  const mod = await Promise.race([import(file).catch(e => { console.warn("殼載不進來，畫面照走：", e); return null; }), new Promise(res => setTimeout(() => res(null), 10000))]);
-  if (!mod) return null;
   const { palette, fonts } = paletteFromCSS();
-  try { return await mod.create({ stage: $("stage"), palette, fonts, phone, lang, people }); }
-  catch (e) { console.warn("殼開不起來，畫面照走：", e); return null; }
+  // 先試島版（3D）；Three 載不到、沒有 WebGL、開不起來，就退到點燈版（2D）。?shell=lamp 直接點燈版。
+  const order = shellName === "lamp" ? ["./shell-lamp.js"] : ["./shell-island.js", "./shell-lamp.js"];
+  for (const file of order) {
+    const mod = await Promise.race([import(file).catch(e => { console.warn("殼載不進來：", file, e); return null; }), new Promise(res => setTimeout(() => res(null), 10000))]);
+    if (!mod) continue;
+    try { return await mod.create({ stage: $("stage"), palette, fonts, phone, lang, people, onPick: id => pick(id) }); }
+    catch (e) { console.warn("殼開不起來：", file, e); }
+  }
+  return null;
 }
 
 // ── 開頁 ──
@@ -137,6 +141,7 @@ async function boot() {
   shell = await loadShell();
   if (shell) {
     shell.setLang(lang);
+    if (shell.candidates) shell.candidates(script.personas);
     if (persona) { shell.start(persona, lang); shell.scene(sceneI, persona.scenes[sceneI]); persona.scenes.forEach((s, i) => { if (picks[i] != null) shell.light(s.choices[picks[i]].person, i, picks[i]); }); }
   } else {
     doc.classList.add("still"); stillStage();

@@ -4644,12 +4644,13 @@ Paul 2026-10-13 定的：募資的互動內容放官網自己一頁，主線是 
   每一關一個情境、兩個選擇，沒有對錯，兩條都走到下一關。選完出現三樣：一句真實學員的話（手寫體）、這一關 BT 做了什麼（哪個 team）、這時候在你旁邊的人。
 - 結尾一屏：他最後走的門、他自己的一句話、「你剛走完的這一年，對學員是 0 元」、這一年在你旁邊的人、一顆橘色的「贊助這個計畫」連嘖嘖。
   底下「換一個學生再走一次」。**從嘖嘖來的人（網址帶 `?from=zeczec`）只有這兩條路**；別的人多一顆「看看 Beyond Taiwan 還做了什麼」回首頁。
-- 上面那一塊是「舞台」，有兩個殼，Paul 要在手機上比過再留一個：
-  - **點燈版** `?shell=lamp`（現在的預設）：首頁那座島一開始是暗的，每一關選完一個人亮起來。在台灣的人亮在島上他出發的縣市，
-    在海外的人亮在島外，一條航線從他的縣市飛過去（`/alumni/` 的語言）。走完一年島全亮，環繞島的那條線（logo 上的箭頭）畫出來。
-  - **機場版** `?shell=flight`：`/history/` 那座 3D 機場的登機門大廳（Three.js，全部程式幾何）。你扮演的學生背著橘色背包站在走道上，玻璃牆上八個門 A1 到 A8 一關一個，
-    一開始只有 A1「學測」亮著。每一關他走到下一個門前，門亮起來（牌子寫這一關的名字），選完一個人從旁邊走過來站在他旁邊，之後**一群人一起走到下一個門**。
-    走完一年一架 BT 的飛機（橘尾翼、台灣）從停機坪滑進來停在門外，鏡頭拉高。
+- 上面那一塊是「舞台」。**島版**（預設，3D）：一座圓圓的小島在青色的海上，環島一條路，那一年的八關是路上八個小地方（學校、禮堂、營隊帳篷、電話亭、書桌、家、郵筒、碼頭），
+  第一屏三個大頭的學生站在碼頭旁的沙灘上，點一個（或點他頭上的牌子）就開始。每一關學生沿路走到那個地方，鏡頭滑過去，那個地方的窗戶亮起來、頭上掛一塊牌子寫這一關的名字；
+  選完一個人從路的另一頭走過來站在他旁邊，下一關整群人一起走。走完一年一架小飛機降在碼頭外的海上，鏡頭拉遠看整座島，每一關都亮著。
+  **這一版是 2026-11-16 第二版**：第一版是 `/history/` 那座機場的登機門大廳，Paul 看了說「icky、不順」，給了 HEART 政策島（puma.taipei/heart-island，截圖 `docs/stories/reference-heart-island.jpg`）當參考。
+  那個站是純 ES module 加 Three.js、全部程式幾何、沒有模型檔，跟這個 repo 同一種做法；照它的配方重做：窄鏡頭（fov 32）從高處斜看、ACES 調色、圓角盒子組一切、MeshStandard 材質、
+  一盞暖太陽加天光加淡霧、大頭 chibi 小人、鏡頭每一幀用阻尼追目標（連按也不會跳）。
+  **點燈版** `?shell=lamp`（2D，也是 3D 開不起來時自動退到的那一版）：首頁那座島一開始是暗的，每一關選完一個人亮起來，在海外的人一條航線從他的縣市飛過去，走完一年環繞島的那條線畫出來。
 - 中文優先，右上「EN」切英文，語言跟著網址 `?lang=` 走。網址 `#a` `#b` `#c` 直接進某一個學生；進度不存在網址裡，重整就重走。
 - 底下一條細的進度條（在底部不在頂端：研究說頂端那條會讓人走掉），右邊寫「第 3 關，共 8 關」。
 - 開了系統的「減少動態效果」、網址加 `?motion=off`、GSAP 或殼從 cdnjs 載不到：舞台是一張靜的島，內容一字不少。
@@ -4675,16 +4676,16 @@ Mentorship 從真實學員抓三個案例、Curriculum 從故事與信裡挑每�
 ### 程式在哪、怎麼守
 
 - `stories/index.html` 外殼、`stories/stories.css` 版面、`stories/src/strings.js` 中英字典、`src/data.js` 讀兩份 JSON 與網址、`src/ui.js` 畫面的純函式、
-  `src/layout.js` 兩個殼的數字（純數學：誰亮在哪、門在哪、人站哪、鏡頭在哪）、`src/island.js` 島的座標（跟首頁同一份，`check.sh` 比對）、
-  `src/shell-lamp.js` 點燈版、`src/shell-flight.js` 機場版、`src/plane.js` 與 `src/person.js` **從 `history/src/` 原樣抄來**（一個頁面不准 import 另一個頁面資料夾，`check.sh` 守兩邊一致）、`src/engine.js` 接起來。
+  `src/layout.js` 兩個殼的數字（純數學：點燈版誰亮在哪、島版八個地方在路上哪裡、三個學生站哪）、`src/island.js` 島的座標（跟首頁同一份，`check.sh` 比對）、
+  `src/shell-lamp.js` 點燈版、`src/shell-island.js` 島版（Three，全部程式幾何；圓角盒子是自己用 ExtrudeGeometry 做的，cdnjs 沒有 three 的 addon）、`src/engine.js` 接起來（先試島版，開不起來退點燈版）。
 - 只讀 `shared/brand.css`，不掛 `nav.js`，`shared/` 一個檔都沒加。顏色只用 `var(--bt-*)` 與品牌色的 rgba，3D 的顏色從 CSS 變數讀七色混出來，沒有色碼。
 - GSAP（只有核心一支）與 Three 只從 cdnjs 載、帶 integrity；gsap 只准出現在兩個殼的 `motion()` 裡；減少動態效果或 `?motion=off` 根本不載殼。
-- 守門：`./check.sh` 多三條（GSAP 的 SRI、motion()、Three 與抄來的兩支一致）；`node check-motion.mjs`、`node scripts/check-mobile.mjs`、`node --test test/*.test.mjs`（`test/stories.test.mjs` 十四條）都綠（2026-11-16，測試 930 條）。
+- 守門：`./check.sh` 多三條（GSAP 的 SRI、motion()、Three 只從 cdnjs 載且只有 shell-island.js import）；`node check-motion.mjs`、`node scripts/check-mobile.mjs`、`node --test test/*.test.mjs`（`test/stories.test.mjs` 十四條）都綠（2026-11-16，測試 930 條）。
 - 新頁面照例補進每一份清單：`check.sh` 的 FILES、佔位文案範圍、中文字體白名單、外洩註解的錨點、島的比對；`scripts/check-icons.mjs`、`check-motion.mjs`、`scripts/check-mobile.mjs`。
 
 ### 還沒做、要 Paul 決定的
 
-- **留哪一個殼。** 手機上兩個都走一次再選。機場版的 Three 約 170 KB（壓縮後），真的手機上還沒量過幀率。
+- **島版在真的手機上沒量過幀率**（Three 約 170 KB 壓縮後，本機 Chrome 順）。拿一支中階 Android 開一次，掉到 30 以下就把 `shell-island.js` 的陰影貼圖從 1024 降到 512。
 - 三個真實案例與每一關的引言：Mentorship（Evelyn Chiang）與 Curriculum（Ann Lin），計畫上寫 12/06。便利貼照片與信：Curriculum，12/13。幹部照片十組：Sponsorship，12/06。
 - 嘖嘖的兩個網址（搶先看、專案頁）。
 - 「結尾的回首頁那顆只給不是從嘖嘖來的人」這一條改了 10-13 的決定，已經記進 `~/Anson/decisions/log.md`。

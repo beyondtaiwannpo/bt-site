@@ -13,20 +13,18 @@ export function avatarHTML(p, lang) {
 
 // ── 第一屏：三張學生卡 ──
 export function pickerHTML(script, lang) {
-  const cards = script.personas.map(p => `
+  const rows = script.personas.map(p => `
     <li class="pick" data-persona="${p.id}">
       <button type="button" class="pick-btn" data-pick="${p.id}">
         <span class="pick-id">${p.id.toUpperCase()}</span>
-        <span class="pick-tag">${L(p, "tag", lang)}</span>
-        <span class="pick-grade">${L(p, "grade", lang)}</span>
-        <span class="pick-start">${L(p, "start", lang)}</span>
-        <span class="pick-go">${esc(t("pickGo", lang))}</span>
+        <span class="pick-text"><span class="pick-tag">${L(p, "tag", lang)}</span><span class="pick-grade">${L(p, "grade", lang)}</span></span>
       </button>
     </li>`).join("");
   return `<section class="picker" aria-labelledby="pick-h">
     <h2 id="pick-h" class="pick-h">${esc(t("pickTitle", lang))}</h2>
     <p class="pick-lead">${esc(t("pickLead", lang))}</p>
-    <ul class="picks">${cards}</ul>
+    <p class="pick-hint">${esc(t("pickHint", lang))}</p>
+    <ul class="picks">${rows}</ul>
     ${script.demo ? `<p class="demo-badge">${esc(t("demoBadge", lang))}</p>` : ""}
   </section>`;
 }

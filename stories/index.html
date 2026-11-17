@@ -15,7 +15,8 @@
      第一屏三張學生卡。選一個就開始：每一關一個情境、兩個選擇，沒有對錯；選完出現一句真實學員的話、這一關 BT 做了什麼、
      這時候在你旁邊的人。探索營那一關是便利貼牆，找 mentor 那一關是地圖，放榜之後翻開一封給一年後自己的信。
      結尾一屏：這一年對學員是 0 元，一顆按鈕回嘖嘖。從嘖嘖來的人（?from=zeczec）只有這條路；別的人多一顆回首頁。
-     上面那一塊是「舞台」，有兩個殼可以比：?shell=lamp 是首頁那座島一盞一盞亮起來；?shell=flight 是 /history/ 那座 3D 機場的登機門。
+     上面那一塊是「舞台」：預設是島版（3D 的小島，那一年是環島路上八個小地方，三個學生站在沙灘上等你點），
+     ?shell=lamp 是點燈版（首頁那座島一盞一盞亮起來，也是 3D 開不起來時的退路）。
      開了減少動態效果、?motion=off、殼載不到：舞台是一張靜的島，內容一字不少。
 
      ── 資料 ──
@@ -24,7 +25,7 @@
 
      ── 檔案 ──
      stories.css 版面、src/strings.js 中英字典、src/data.js 讀資料與網址、src/ui.js 畫面的純函式、src/layout.js 兩個殼的數字（純數學）、
-     src/island.js 島的座標（跟首頁同一份）、src/shell-lamp.js 點燈版、src/shell-flight.js 機場版（Three）、src/plane.js 與 src/person.js 從 /history/ 抄來、
+     src/island.js 島的座標（跟首頁同一份）、src/shell-lamp.js 點燈版、src/shell-island.js 島版（Three，全部程式幾何）、
      src/engine.js 接起來。只讀 shared/brand.css。GSAP 與 Three 只從 cdnjs 載、帶 integrity。
 
      ── 不掛 nav.js ──
@@ -37,7 +38,7 @@
 <meta property="og:url" content="https://beyondtaiwannpo.com/stories/">
 <meta name="theme-color" content="#EDE5D8">
 
-<!-- Three.js 只從 cdnjs 載，只有 ?shell=flight 會用到（shell-flight.js 動態 import，載不到就走靜的島）。
+<!-- Three.js 只從 cdnjs 載，島版用（shell-island.js 動態 import，載不到就退到點燈版或靜的島）。
      integrity 是 cdnjs 公布的 sha512，跟 /history/ 同一個版本同一個雜湊；升級要同時改這裡、history/index.html、check.sh 的 THREE_SRI。
      importmap 一定要排在任何 module script 前面。 -->
 <script type="importmap">

@@ -1,3 +1,4 @@
+const TAU_ = Math.PI * 2;
 // /stories/ 兩個殼共用的數字：純數學，沒有 DOM、沒有 Three、沒有 gsap。測試直接算。
 // 點燈版：一個人要亮在哪（島上照縣市，海外照國家分散在島外）。
 // 機場版：八個登機門在玻璃牆上哪裡、走過來的人站哪裡、每一關鏡頭在哪。
@@ -45,27 +46,11 @@ export const cityOf = county => CITIES[county] || CITIES["台北"];
 // 把島的座標換成 viewBox 座標（航線的起點要用）。
 export const toView = (x, y) => ({ x: ISLE.tx + x * ISLE.s, y: ISLE.ty + y * ISLE.s });
 
-// ── 機場版 ──
-// 單位公尺，y 朝上。大廳沿 x 軸躺著，玻璃牆在 z = 0，停機坪在 z > 0。旅客站在走道上（z 約 -11）面對玻璃牆。
-export const HALL = { x0: -6, x1: 96, z0: -30, z1: 0, h: 11 };
-// 八個登機門沿玻璃牆每 9 公尺一個，每一關一個：第 i 關旅客走到第 i 個門前面，那個門亮起來。第一個門（學測）在最左。門號 A1 到 A8（跟 /history/ 一樣）。
-export function gates(n) {
-  const out = [], step = 9, x0 = 10;
-  for (let i = 0; i < n; i++) out.push({ i, x: x0 + step * i, z: HALL.z1, label: "A" + (i + 1) });
-  return out;
-}
-// 第 i 關旅客站哪：那個門前面偏左一點。
-export function travellerFor(i, n) { const g = gates(n)[Math.min(i, n - 1)]; return { x: g.x - 1.2, z: -11 }; }
-// 走過來的人站在旅客旁邊：左右交錯、越來越外面，像一群人慢慢圍過來。base 是旅客現在的位置。
-export function standSpot(k, base) {
-  const b = base || { x: 0, z: -11 }, side = k % 2 ? 1 : -1, ring = Math.floor(k / 2);
-  return { x: b.x + side * (1.6 + ring * 1.3), z: b.z - 0.6 - ring * 0.9 + (k % 4 >= 2 ? 0.5 : 0) };
-}
-// 每一關鏡頭在哪：在旅客後方偏右、人眼略高，看著那一關的門；最後一關拉高拉遠看得到停機坪上的飛機。
-export function cameraFor(i, n) {
-  const g = gates(n)[Math.min(i, n - 1)];
-  if (i >= n - 1) return { x: g.x + 2, y: 7.5, z: -27, lookX: g.x + 4, lookY: 2.5, lookZ: 40 };
-  return { x: g.x + 3.2, y: 2.7, z: -22, lookX: g.x - 0.5, lookY: 2.2, lookZ: HALL.z1 };
-}
-// 飛機停的位置（最後一關從右邊滑進來停在最後那個門外）。
-export const PLANE_STAND = { x: gates(8)[7].x + 8, z: 44, fromX: 300 };
+// ── 島版（3D，2026-11-16 第二版）──
+// 單位公尺，y 朝上。一座半徑 ISLAND_R 的圓島，環島一條半徑 ROAD_R 的路。八關是路上八個小地方，照角度排一圈，從碼頭旁邊開始逆時針走。
+export const ISLAND_R = 24, ROAD_R = 16.5;
+export const PIER_ANGLE = Math.PI * 0.5;   // 碼頭在島的「南邊」（+z），第一屏鏡頭從這一側看過去
+const KINDS = ["school", "hall", "camp", "phone", "desk", "home", "post", "pier"];
+export const STATIONS = KINDS.map((kind, i) => { const angle = PIER_ANGLE + 0.35 + i * (TAU_ / 8) * 0.92; return { i, kind, angle, x: Math.cos(angle) * (ROAD_R + 3.2), z: Math.sin(angle) * (ROAD_R + 3.2) }; });
+// 三個學生在沙灘上站的位置（碼頭旁邊），face 是面向鏡頭的角度。
+export const CANDIDATE_SPOTS = [-4.6, 0, 4.6].map((dx, i) => ({ x: dx + Math.cos(PIER_ANGLE) * (ISLAND_R - 3.4), z: Math.sin(PIER_ANGLE) * (ISLAND_R - 3.4) + (i === 1 ? 1.4 : -0.6), face: Math.PI * 0.5 + (i - 1) * 0.2 }));

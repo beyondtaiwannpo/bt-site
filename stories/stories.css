@@ -51,22 +51,20 @@ html[data-lang="zh"] .back-btn{font-family:var(--han);font-weight:900;letter-spa
 .progress-label{position:absolute;right:var(--gut);bottom:10px;font:700 11px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7)}
 html[data-lang="zh"] .progress-label{font-family:var(--body);font-weight:600;letter-spacing:.06em;text-transform:none}
 
-/* ── 第一屏：三張學生卡 ── */
+/* ── 第一屏：三個學生在島上，底下三個名字當備用（鍵盤、讀螢幕、3D 開不起來） ── */
 .pick-h{margin:6px 0 6px;font:700 clamp(30px,5vw,44px)/1.05 var(--display);letter-spacing:.01em}
 html[data-lang="zh"] .pick-h{font-family:var(--han);font-weight:900;letter-spacing:.02em;font-size:clamp(26px,4.6vw,38px)}
-.pick-lead{margin:0 0 18px;max-width:52ch;color:rgba(16,42,134,.82)}
-.picks{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-.pick-btn{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"id tag" "id grade" "id start" "id go";column-gap:14px;row-gap:2px;width:100%;text-align:left;
-  padding:16px 16px 14px;border:1px solid rgba(16,42,134,.18);border-radius:var(--r);background:rgba(255,255,255,.45);color:var(--ink);cursor:pointer;font:inherit;
+.pick-lead{margin:0 0 10px;max-width:52ch;color:rgba(16,42,134,.82)}
+.pick-hint{margin:0 0 14px;font-size:13.5px;color:rgba(16,42,134,.7)}
+.picks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pick-btn{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:10px 14px;border:1px solid rgba(16,42,134,.18);border-radius:999px;background:rgba(255,255,255,.45);color:var(--ink);cursor:pointer;font:inherit;
   transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
-.pick-btn:hover{background:rgba(255,255,255,.75);border-color:var(--bt-navy)}
-.pick-id{grid-area:id;font:700 34px/1 var(--display);color:var(--bt-orange);align-self:start;padding-top:2px}
-.pick-tag{grid-area:tag;font:700 20px/1.2 var(--display);letter-spacing:.01em}
-html[data-lang="zh"] .pick-tag{font-family:var(--han);font-weight:900;font-size:18px}
-.pick-grade{grid-area:grade;font-size:13px;color:rgba(16,42,134,.75)}
-.pick-start{grid-area:start;margin-top:6px;font-size:14.5px;line-height:1.55}
-.pick-go{grid-area:go;margin-top:10px;font:700 13px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--bt-navy)}
-html[data-lang="zh"] .pick-go{font-family:var(--body);font-weight:600;letter-spacing:.04em;text-transform:none}
+.pick-btn:hover{background:rgba(255,255,255,.8);border-color:var(--bt-navy)}
+.pick-id{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--bt-orange);color:var(--bt-navy);font:700 17px/1 var(--display)}
+.pick-text{display:flex;flex-direction:column;min-width:0}
+.pick-tag{font:700 17px/1.2 var(--display)}
+html[data-lang="zh"] .pick-tag{font-family:var(--han);font-weight:900;font-size:16px}
+.pick-grade{font-size:12.5px;color:rgba(16,42,134,.7)}
 .demo-badge{margin:16px 0 0;padding:8px 12px;border-left:3px solid var(--bt-orange);font-size:13px;color:rgba(16,42,134,.8)}
 
 /* ── 一關 ── */
@@ -174,6 +172,7 @@ html[data-lang="en"] .lamp .cap{font-family:var(--display);font-size:16px;letter
 button{cursor:pointer}
 button[disabled]{cursor:default}
 button:not([disabled]):active{transform:scale(.97)}
+.pin-pick:active{transform:translate(-50%,-100%) scale(.97)}
 .note-btn:not([disabled]):active{transform:rotate(var(--rot,0deg)) scale(.95)}
 .back-btn:active{transform:scale(.97)}
 
@@ -183,5 +182,14 @@ button:not([disabled]):active{transform:scale(.97)}
   .note.big .note-btn{transform:rotate(0) scale(1.9)}
 }
 
-/* ── 機場版的畫布 ── */
+/* ── 島版（3D）的畫布與貼在上面的牌子 ── */
 .scene3d{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+.pins{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.pin{position:absolute;left:0;top:0;pointer-events:auto;white-space:nowrap;max-width:min(260px,70vw);overflow:hidden;text-overflow:ellipsis;
+  padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--bt-navy);border:1px solid rgba(16,42,134,.14);
+  box-shadow:0 6px 18px rgba(16,42,134,.14);font:600 13px/1.2 var(--body);transition:opacity var(--dur-2) var(--ease),background var(--dur-2) var(--ease)}
+html[data-lang="zh"] .pin{font-size:13px}
+.pin::after{content:"";position:absolute;left:50%;bottom:-5px;width:9px;height:9px;transform:translateX(-50%) rotate(45deg);background:inherit;border-right:1px solid rgba(16,42,134,.14);border-bottom:1px solid rgba(16,42,134,.14)}
+.pin-station.now{background:var(--bt-orange);border-color:transparent;font-weight:700}
+.pin-pick{cursor:pointer;font-weight:700;border:0}
+.pin-pick.hover,.pin-pick:hover{background:var(--bt-orange)}

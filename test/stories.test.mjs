@@ -54,9 +54,9 @@ test("網址：#a #b #c 是哪個學生，別的 hash 不算；?from=zeczec 與 
   assert.equal(D.hashFor("z"), "");
   assert.equal(D.fromZeczec("?from=zeczec&lang=zh"), true);
   assert.equal(D.fromZeczec("?lang=zh"), false);
-  assert.equal(D.shellFromSearch("?shell=flight"), "flight");
-  assert.equal(D.shellFromSearch("?shell=nope"), "lamp");
-  assert.equal(D.shellFromSearch("", "flight"), "flight");
+  assert.equal(D.shellFromSearch("?shell=lamp"), "lamp");
+  assert.equal(D.shellFromSearch("?shell=nope"), "island");
+  assert.equal(D.shellFromSearch("", "lamp"), "lamp");
 });
 
 test("進度：第 i 關選前一半、選後整格；結尾 1", () => {
@@ -154,17 +154,12 @@ test("點燈版的位置：島上的人在縣市座標，海外的人照國家�
   const q = L.lampSpot({ county: "台北", country_en: "Mars" }, 0); assert.ok(q.abroad && isFinite(q.x));
 });
 
-test("機場版的位置：八個登機門沿玻璃牆等距，旅客一關走到一個門前，走過來的人站在旅客旁邊不重疊", () => {
-  const g = L.gates(8);
-  assert.equal(g.length, 8);
-  for (let i = 1; i < g.length; i++) assert.ok(g[i].x - g[i - 1].x > 6);
-  assert.ok(g[7].x < L.HALL.x1 - 4);
-  assert.equal(L.travellerFor(3, 8).x, g[3].x - 1.2);
-  const base = L.travellerFor(2, 8), a = L.standSpot(0, base), b = L.standSpot(1, base), c = L.standSpot(5, base);
-  assert.ok(Math.hypot(a.x - b.x, a.z - b.z) > 1);
-  assert.ok(Math.hypot(a.x - c.x, a.z - c.z) > 1);
-  assert.ok(Math.abs(a.x - base.x) > 1);
-  // 鏡頭：每一關跟著門往右走；最後一關拉高、看向停機坪
-  assert.ok(L.cameraFor(0, 8).x < L.cameraFor(6, 8).x);
-  assert.ok(L.cameraFor(7, 8).y > L.cameraFor(6, 8).y && L.cameraFor(7, 8).lookZ > 0);
+test("島版的位置：八個地方沿環島的路排一圈、不重疊、都在島上；三個學生站在碼頭旁的沙灘上", () => {
+  assert.equal(L.STATIONS.length, 8);
+  assert.deepEqual(L.STATIONS.map(s => s.kind), ["school", "hall", "camp", "phone", "desk", "home", "post", "pier"]);
+  for (const s of L.STATIONS) assert.ok(Math.hypot(s.x, s.z) < L.ISLAND_R - 1.5 && Math.hypot(s.x, s.z) > L.ROAD_R);
+  for (let i = 1; i < 8; i++) assert.ok(Math.hypot(L.STATIONS[i].x - L.STATIONS[i - 1].x, L.STATIONS[i].z - L.STATIONS[i - 1].z) > 8);
+  assert.equal(L.CANDIDATE_SPOTS.length, 3);
+  for (const c of L.CANDIDATE_SPOTS) assert.ok(Math.hypot(c.x, c.z) < L.ISLAND_R && Math.hypot(c.x, c.z) > L.ROAD_R);
+  assert.ok(Math.abs(L.CANDIDATE_SPOTS[0].x - L.CANDIDATE_SPOTS[2].x) > 4);
 });
