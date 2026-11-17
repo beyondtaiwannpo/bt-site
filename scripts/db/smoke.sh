@@ -3756,6 +3756,39 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 psc2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-27-project-scope.sql 2>&1 || true)
 if echo "${psc2}" | grep -q "OVERALL.*PASS" && ! echo "${psc2}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
+echo "── 校友的故事多一格「在 BT 做過什麼」（2026-12-28-alumni-bt-role.sql）──"
+# 這時候：PAUL Co-President、MEMBER 校友，MEMBER 的故事那一列早就在（上面 10-26 那段插的）。先把它放回「已核可」當起點。
+psql -d "${DB}" -X -A -t -q -c "update public.alumni_stories set public_story=true, story_approved=true, approved_at=now(), county='台北' where id='${MEMBER}';" 2>&1 | grep -i "error" || true
+abr=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-28-alumni-bt-role.sql 2>&1 || true)
+if echo "${abr}" | grep -q "OVERALL.*PASS" && ! echo "${abr}" | grep -q "|FAIL"; then echo "  ok   做過什麼那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 做過什麼那支驗收表："; echo "${abr}" | head -12; fail=$((fail+1)); fi
+abr2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-28-alumni-bt-role.sql 2>&1 || true)
+if echo "${abr2}" | grep -q "OVERALL.*PASS"; then echo "  ok   做過什麼那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 做過什麼那支重跑：${abr2}" | head -5; fail=$((fail+1)); fi
+chk "（前提）MEMBER 的故事已核可" "true|true" "select public_story::text||'|'||story_approved::text from public.alumni_stories where id='${MEMBER}'"
+chkrole authenticated "${MEMBER}" "★ 本人自己填得了做過什麼與哪個 team" "ok" "update public.alumni_stories set bt_role='speaker', bt_team='Curriculum Team' where id='${MEMBER}' returning 'ok'"
+chk "★ 改了做過什麼就下架（story_approved 掉回 false）" "speaker|CurriculumTeam|false" "select bt_role||'|'||bt_team||'|'||story_approved::text from public.alumni_stories where id='${MEMBER}'"
+chkrole anon "" "下架之後對外頁上沒有他" "0" "select count(*) from public.public_alumni() where bt_role='speaker'"
+chkas "${PAUL}" "後台核可清單看得到他說自己做過什麼" "speaker|CurriculumTeam" "select bt_role||'|'||bt_team from public.stories_for_review() where id='${MEMBER}'"
+chkas "${PAUL}" "Co-President 重新核可" "true" "select public.set_story_approved('${MEMBER}', true)::text"
+chkrole anon "" "★ 對外頁多回兩欄：講者、Curriculum Team（/island/ 靠這兩欄讓他走去那座島）" "speaker|CurriculumTeam" "select bt_role||'|'||bt_team from public.public_alumni() where bt_role='speaker'"
+chkrole authenticated "${MEMBER}" "改城市不下架（照舊）" "ok" "update public.alumni_stories set city='Madison' where id='${MEMBER}' returning 'ok'"
+chk "還在公開頁上" "true" "select story_approved::text from public.alumni_stories where id='${MEMBER}'"
+got=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MEMBER}',false);" -c "set role authenticated; update public.alumni_stories set bt_role='president' where id='${MEMBER}';" 2>&1 || true)
+if echo "${got}" | grep -qi "check constraint"; then echo "  ok   ★ 做過什麼只收那六種（亂填被 check 擋）"; pass=$((pass+1)); else echo "  FAIL 亂填的 bt_role 沒被擋：${got}"; fail=$((fail+1)); fi
+got=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MEMBER}',false);" -c "set role authenticated; update public.alumni_stories set bt_team='Exec Team' where id='${MEMBER}';" 2>&1 || true)
+if echo "${got}" | grep -qi "check constraint"; then echo "  ok   ★ team 只收那六個（亂填被 check 擋）"; pass=$((pass+1)); else echo "  FAIL 亂填的 bt_team 沒被擋：${got}"; fail=$((fail+1)); fi
+got=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${MEMBER}',false);" -c "set role authenticated; update public.alumni_stories set story_approved=true where id='${MEMBER}';" 2>&1 || true)
+if echo "${got}" | grep -qi "permission denied"; then echo "  ok   ★ 破壞測試：本人照舊改不了 story_approved（兩把鑰匙還是兩把）"; pass=$((pass+1)); else echo "  FAIL 本人改得了 story_approved：${got}"; fail=$((fail+1)); fi
+chkrole authenticated "${MEMBER}" "本人把 team 清空也可以（前端會照做過什麼給預設）" "ok" "update public.alumni_stories set bt_team=null where id='${MEMBER}' returning 'ok'"
+chkas "${PAUL}" "（還原）重新核可" "true" "select public.set_story_approved('${MEMBER}', true)::text"
+# 破壞測試：少發了那兩欄的權限，驗收表要變紅
+BROKEN=$(mktemp)
+sed "/^grant update (bt_role, bt_team) on public.alumni_stories to authenticated;$/d" supabase/migrations/2026-12-28-alumni-bt-role.sql > "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -c "revoke update (bt_role, bt_team) on public.alumni_stories from authenticated;" >/dev/null 2>&1 || true
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：少發 update 的欄位權限，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 少發權限驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+abr3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-28-alumni-bt-role.sql 2>&1 || true)
+if echo "${abr3}" | grep -q "OVERALL.*PASS" && ! echo "${abr3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

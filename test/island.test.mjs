@@ -116,6 +116,19 @@ test("跟官網接起來：活動照 team 字樣對到島、報名開著才給 /
   assert.equal(al.length, 2);
   assert.equal(al[0].team, "airport"); assert.equal(al[0].goes, "curriculum"); assert.equal(al[0].flow.carry_zh, "Director"); assert.equal(al[0].named, true); assert.equal(al[0].where, "Madison, USA");
   assert.equal(al[1].goes, "commons");
+  // 「在 BT 做過什麼」（2026-12-28-alumni-bt-role.sql）：填了 team 照 team，沒填 team 照角色給預設，角色也沒填才看職位字樣
+  assert.equal(D.alumniTeamFor({ bt_role: "speaker" }), "curriculum");
+  assert.equal(D.alumniTeamFor({ bt_role: "mentor" }), "mentorship");
+  assert.equal(D.alumniTeamFor({ bt_role: "intern" }), "internship");
+  assert.equal(D.alumniTeamFor({ bt_role: "ambassador" }), "cr");
+  assert.equal(D.alumniTeamFor({ bt_role: "student" }), "mentorship");
+  assert.equal(D.alumniTeamFor({ bt_role: "speaker", bt_team: "Marketing Team" }), "marketing");
+  assert.equal(D.alumniTeamFor({ bt_role: "cadre", title: "Director, Internship Team · 2024-25" }), "internship");
+  assert.equal(D.alumniTeamFor({ bt_role: "cadre" }), "commons");
+  assert.equal(D.alumniTeamFor({ bt_role: "nonsense", title: "" }), "commons");
+  const sp = D.alumniToPeople([{ id: "x3", name: "講者", bt_role: "speaker", bt_team: "Community Relations Team", quote: "q" }])[0];
+  assert.equal(sp.goes, "cr"); assert.equal(sp.flow.carry_zh, "講者"); assert.equal(sp.flow.carry_en, "Speaker");
+  assert.ok(sp.flow.why_zh.includes("講者") && sp.flow.why_zh.includes("Community Relations Team"));
   const d2 = D.normalize(JSON.parse(fs.readFileSync("island/teams.json", "utf8")));
   D.mergeAlumni(d2, al);
   const airport = d2.teams.find(tm => tm.id === "airport");

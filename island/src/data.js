@@ -107,18 +107,41 @@ export function normalizeEvents(rows) {
 export const eventsOf = (events, teamId) => (events || []).filter(e => e.team === teamId);
 
 // 校友：/alumni/ 讀的 public_alumni() 同一份（校友自己填、自己勾同意、Co-President 核可才會在裡面）。
-// title 是他最後一屆在 BT 的職位（例如 "Director, Curriculum Team · 2025-26"），用它決定他走去哪座島、帶著什麼。
-// 沒有 title 的走去聚會所。這些人住在機場。真的校友進來之後，teams.json 裡 sample 的那幾筆就不顯示。
+// 他走去哪座島、帶著什麼，照他自己在設定頁填的「在 BT 做過什麼」（bt_role 六選一、bt_team 可空；
+// supabase/migrations/2026-12-28-alumni-bt-role.sql）：
+//   1. 填了 team 就去那座島；
+//   2. 沒填 team 的講者去 Curriculum、mentor 去 Mentorship、實習生去 Internship、校園大使去 Community Relations、
+//      學員去 Mentorship（他的 mentor 在那裡），幹部照最後一屆的職位字樣（title）；
+//   3. 什麼都認不出來的走去聚會所。
+// 這些人住在機場。真的校友進來之後，teams.json 裡 sample 的那幾筆就不顯示。
+export const BT_ROLES = {
+  cadre:      { zh: "幹部",    en: "Organiser", to: "" },
+  speaker:    { zh: "講者",    en: "Speaker",   to: "curriculum" },
+  mentor:     { zh: "Mentor",  en: "Mentor",    to: "mentorship" },
+  intern:     { zh: "實習生",  en: "Intern",    to: "internship" },
+  ambassador: { zh: "校園大使", en: "Ambassador", to: "cr" },
+  student:    { zh: "學員",    en: "Student",   to: "mentorship" },
+};
+export function alumniTeamFor(r) {
+  if (str(r.bt_team)) return teamIdFor(r.bt_team);
+  const br = BT_ROLES[str(r.bt_role)];
+  if (br && br.to) return br.to;
+  return str(r.title) ? teamIdFor(r.title) : "commons";
+}
 export function alumniToPeople(rows) {
   const out = [];
   for (const r of Array.isArray(rows) ? rows : []) {
     if (!r || !str(r.name)) continue;
-    const title = str(r.title), team = title ? teamIdFor(title) : "commons";
-    const role = (title.match(/^(Co-President|Director|Advisor|Associate|Speaker|Mentor|Intern|Ambassador)/i) || [, ""])[1];
+    const title = str(r.title), team = alumniTeamFor(r), br = BT_ROLES[str(r.bt_role)];
+    const fromTitle = (title.match(/^(Co-President|Director|Advisor|Associate|Speaker|Mentor|Intern|Ambassador)/i) || [, ""])[1];
+    const carry_zh = br ? br.zh : (fromTitle || "回來"), carry_en = br ? br.en : (fromTitle || "Back");
+    const did_zh = br ? `在 BT 是${br.zh}${str(r.bt_team) ? `（${r.bt_team}）` : ""}。` : "", did_en = br ? `Was a BT ${br.en.toLowerCase()}${str(r.bt_team) ? ` (${r.bt_team})` : ""}.` : "";
     out.push({ code: "db-" + str(r.id || r.name), team: "airport", role: "alumni", named: true, sample: false, db: true,
       title_zh: "校友", title_en: "Alumni", name_zh: str(r.name), name_en: str(r.name),
       line_zh: str(r.quote), line_en: str(r.quote_en) || str(r.quote), also: [],
-      flow: { to: team, carry_zh: role || "回來", carry_en: role || "Back", why_zh: title ? `最後一屆在 BT 是 ${title}。` : "回來看看。", why_en: title ? `Last BT role: ${title}.` : "Back for a visit." },
+      flow: { to: team, carry_zh, carry_en,
+        why_zh: [did_zh, title ? `最後一屆在 BT 是 ${title}。` : ""].filter(Boolean).join("") || "回來看看。",
+        why_en: [did_en, title ? `Last BT role: ${title}.` : ""].filter(Boolean).join(" ") || "Back for a visit." },
       goes: team, where: [str(r.city), str(r.country_en) || str(r.country)].filter(Boolean).join(", ") });
   }
   return out;

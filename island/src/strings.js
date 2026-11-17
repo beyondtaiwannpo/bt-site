@@ -26,7 +26,7 @@ export const STR = {
   evClosed:    { zh: "報名已截止", en: "Sign-up closed" },
   evInfo:      { zh: "看活動", en: "See the event" },
   evNote:      { zh: "活動跟官網的活動頁是同一份：後台上架一場，這裡就出現。", en: "Events are the same list as the Events page: publish one in the admin area and it appears here." },
-  alumniDb:    { zh: "校友自己在設定頁填的故事，核可之後就站在機場、走去他以前的 team。", en: "Alumni write their story in settings; once approved they stand at the airport and walk to their old team." },
+  alumniDb:    { zh: "校友自己在設定頁填的故事與「在 BT 做過什麼」，核可之後就站在機場、走去他以前的 team。", en: "Alumni write their story and what they did in BT in settings; once approved they stand at the airport and walk to their old team." },
   sampleNote:  { zh: "校友與學員這幾位是遮字的範例，換真人要本人同意。", en: "These alumni and students are masked samples; real people go in with their consent." },
   namesNote:   { zh: "名單來自內部的團隊表，這一頁還沒公開。公開前每一位都要再確認一次。未成年只放角色。", en: "Names come from the internal roster; this page is not public yet. Everyone is re-confirmed before it goes public. Minors are shown by role only." },
   me:          { zh: "把自己放上去", en: "Put yourself here" },

@@ -93,6 +93,7 @@ export const COUNTIES = ["台北", "桃園", "新竹", "苗栗", "台中", "彰�
 
 // 必填的六格加一句話。**英文是選填的** —— /alumni/ 沒有英文就顯示中文那一份。
 const STORY_NEED = [
+  ["bt_role", "story.btRole"],
   ["school", "story.school"], ["county", "story.county"], ["city", "story.city"],
   ["country", "story.country"], ["place", "story.place"], ["quote", "story.quote"], ["note", "story.note"],
 ];
@@ -305,6 +306,10 @@ export function pubNote(me) {
 //
 // 欄位順序**照 /alumni/ 卡片上的順序**：名字、從哪裡、到哪裡、那一句話、介紹。
 // 填的時候就看得出成品長什麼樣，不用另外做預覽。
+// 「在 BT 做過什麼」（2026-11-16，BT 島）：六選一，跟資料庫的 check constraint 一模一樣
+// （supabase/migrations/2026-12-28-alumni-bt-role.sql）。/island/ 用它讓校友走去他以前的那座島。
+export const BT_ROLES = ["cadre", "speaker", "mentor", "intern", "ambassador", "student"];
+
 export function storyHTML(me, story) {
   const s = story || {};
   const v = k => esc(s[k] || "");
@@ -315,6 +320,17 @@ export function storyHTML(me, story) {
       placeholder="${esc(me.name_zh || me.name_en || "")}">
       </label>
     <p class="sec-note">${T("st.nameNote")}</p>
+    <div class="two">
+      <label><i>${T("st.btRole")}</i><select id="sbtrole" name="bt_role">
+        <option value="">${T("s.pick")}</option>
+        ${BT_ROLES.map(r => `<option value="${r}"${s.bt_role === r ? " selected" : ""}>${T("st.btRole." + r)}</option>`).join("")}
+      </select></label>
+      <label><i>${T("st.btTeam")}</i><select id="sbtteam" name="bt_team">
+        <option value="">${T("st.btTeamAny")}</option>
+        ${TEAMS.map(tm => `<option${s.bt_team === tm ? " selected" : ""}>${esc(tm)}</option>`).join("")}
+      </select></label>
+    </div>
+    <p class="sec-note">${T("st.btNote")}</p>
     <div class="two">
       <label><i>${T("st.school")}</i><input id="sschool" name="school" list="schools" value="${v("school")}"
         autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"

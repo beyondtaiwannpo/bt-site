@@ -1170,7 +1170,7 @@ fi
 #
 # story_approved / approved_at 不在清單裡：那是 Co-President 的鑰匙，
 # 本人改得動的話兩把鑰匙就變成一把。updated_at 不在清單裡：由資料庫的 trigger 蓋。
-STORY_WRITABLE="city country country_en county display_name id note note_en place public_story quote quote_en school school_en"
+STORY_WRITABLE="bt_role bt_team city country country_en county display_name id note note_en place public_story quote quote_en school school_en"
 
 listbad=0
 for c in $STORY_WRITABLE; do

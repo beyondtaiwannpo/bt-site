@@ -616,7 +616,9 @@ export function alumniStoriesHTML(rows, msg, busy) {
             <div class="fhead"><b>${esc(r.name)}</b>
               ${r.story_approved ? `<span class="tag open">${T("team.onPage")}</span>`
                                  : `<span class="tag">${T("stories.waiting")}</span>`}
-              ${r.county ? "" : `<span class="tag">${T("stories.noCounty")}</span>`}</div>
+              ${r.county ? "" : `<span class="tag">${T("stories.noCounty")}</span>`}
+              ${r.bt_role ? `<span class="tag">${T("stories.role." + r.bt_role)}${r.bt_team ? "・" + esc(r.bt_team) : ""}</span>`
+                          : `<span class="tag">${T("stories.noRole")}</span>`}</div>
             <div class="fmeta">${esc([r.school, r.county].filter(Boolean).join("・"))}
               → ${esc([r.country, r.city, r.place].filter(Boolean).join("・"))}</div>
             <p class="fquote">${esc(r.quote || "")}</p>

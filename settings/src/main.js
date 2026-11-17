@@ -130,7 +130,7 @@ async function boot() {
     //（RLS 會擋掉，回來是空的）。換到的是幹部與校友每次都少一趟往返。
     const storyQ = supabase.from("alumni_stories")
       .select("display_name, school, county, city, country, place, quote, note, " +
-              "school_en, country_en, quote_en, note_en, public_story, story_approved, updated_at")
+              "school_en, country_en, quote_en, note_en, bt_role, bt_team, public_story, story_approved, updated_at")
       .eq("id", S.user.id).maybeSingle();
     // ⚠⚠ 故事這一份要先把例外收成 { data, error }，**不能讓它 reject**。
     // 下面那句 warn 的意思是「讀不到故事不擋整頁，姓名與大頭照照樣要改得動」，
@@ -518,6 +518,8 @@ async function onAutosave(act, box) {
       country_en: val("scountryen") || null,
       quote_en: val("squoteen") || null,
       note_en: val("snoteen") || null,
+      bt_role: (document.getElementById("sbtrole") || {}).value || null,
+      bt_team: (document.getElementById("sbtteam") || {}).value || null,
       public_story: !!(document.getElementById("spub") || {}).checked,
     };
     // 勾了同意才要求填齊。還沒勾的人是在慢慢填，不要擋他存檔。
@@ -548,6 +550,7 @@ async function onAutosave(act, box) {
             quote: fields.quote, note: fields.note,
             school_en: fields.school_en, country_en: fields.country_en,
             quote_en: fields.quote_en, note_en: fields.note_en,
+            bt_role: fields.bt_role, bt_team: fields.bt_team,
             public_story: fields.public_story,
           }).eq("id", S.user.id)
         : await supabase.from("alumni_stories").insert({
@@ -557,6 +560,7 @@ async function onAutosave(act, box) {
             quote: fields.quote, note: fields.note,
             school_en: fields.school_en, country_en: fields.country_en,
             quote_en: fields.quote_en, note_en: fields.note_en,
+            bt_role: fields.bt_role, bt_team: fields.bt_team,
             public_story: fields.public_story,
           });
       if (e3) throw e3;

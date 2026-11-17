@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { COUNTIES, storyMissing, storyStatus, storyHTML, settingsHTML,
+import { COUNTIES, BT_ROLES, storyMissing, storyStatus, storyHTML, settingsHTML,
          saveFailMessage , setLang as settingsLang } from "../settings/src/ui.js";
 // 登入後的頁面 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 settingsLang("zh");
@@ -14,6 +14,7 @@ import { says } from "../admin/site/src/data.js";
 const FULL = {
   display_name: "張 O 睿", school: "高雄中學", county: "高雄", city: "Vancouver",
   country: "加拿大", place: "UBC", quote: "現在換我回去講。", note: "第一次接觸 BT 是在高雄的一場講座。",
+  bt_role: "speaker", bt_team: "Curriculum Team",
   public_story: false, story_approved: false,
 };
 
@@ -27,6 +28,9 @@ test("★ 縣市清單跟 scripts/taiwan/cities.json 完全一致", () => {
 test("必填缺了會被指出來，而且講的是人看得懂的名字", () => {
   assert.deepEqual(storyMissing(FULL), []);
   assert.deepEqual(storyMissing({ ...FULL, county: "" }), ["縣市"]);
+  // 「在 BT 做過什麼」要公開就一定要填（島上靠它走路）；team 可以不填
+  assert.deepEqual(storyMissing({ ...FULL, bt_role: "" }), ["在 BT 做過什麼"]);
+  assert.deepEqual(storyMissing({ ...FULL, bt_team: "" }), []);
   assert.deepEqual(storyMissing({ ...FULL, quote: "", city: "" }), ["現在的城市", "一句話"]);
 });
 
@@ -49,6 +53,12 @@ test("畫得出每一格，而且值會填回去", () => {
   assert.match(h, /現在換我回去講/);
   // 16 個縣市都要在選單裡
   for (const c of COUNTIES) assert.match(h, new RegExp(">" + c + "<"));
+  // 「在 BT 做過什麼」六選一，跟資料庫的 check 同一組；填過的值要選回去；team 六個都在
+  for (const r of BT_ROLES) assert.match(h, new RegExp('value="' + r + '"'));
+  assert.deepEqual(BT_ROLES, ["cadre", "speaker", "mentor", "intern", "ambassador", "student"]);
+  assert.match(h, /value="speaker" selected/);
+  assert.match(h, /<option selected>Curriculum Team</);
+  assert.match(h, /BT 島/);
 });
 
 // 名字沒填就用 profiles 的中文姓名，不要逼他再打一次。
@@ -73,7 +83,7 @@ test("★ 幹部與校友都看得到", () => {
 // 同意的時候要看得到自己正在公開什麼，逐項列出來，不是一句「公開個人資料」。
 test("★ 同意那一句逐項列出會公開的東西", () => {
   const h = storyHTML({ role: "alumni", name_zh: "張小睿" }, FULL);
-  for (const w of ["名字", "大頭照", "高中", "城市", "一句話", "介紹"]) assert.match(h, new RegExp(w));
+  for (const w of ["名字", "大頭照", "在 BT 做過什麼", "高中", "城市", "一句話", "介紹"]) assert.match(h, new RegExp(w));
 });
 
 // 離島現在不在島的資料裡。選不到就要說為什麼，不然那個人會以為是壞掉。

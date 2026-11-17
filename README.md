@@ -3897,6 +3897,14 @@ Co-President 核可過。**做完程式不等於頁面上有真人**：這張表
 `story_approved` 不是本人改得動的欄位，前端沒有那條路，只能走資料庫的
 `set_story_approved()`，而那支函式只有 Co-President 叫得動。
 
+### 「在 BT 做過什麼」（2026-11-17，給 BT 島用）
+
+故事表單多了兩格：`bt_role`（幹部、講者、mentor、實習生、校園大使、學員，六選一，要公開就一定要填）與 `bt_team`（六個 team 之一，可以空）。
+`/island/` 用這兩格決定核可的校友從機場走去哪座島（規則在 `island/src/data.js` 的 `alumniTeamFor()`）。
+這兩格跟那一句話一樣是用 BT 的名義公開的宣稱，所以**改了就自動下架**、回到後台的核可清單；後台每一位多一個標籤寫他說自己做過什麼，核可前要確認是真的（那一頁的提醒多了第四條）。
+`public_alumni()` 與 `stories_for_review()` 各多回這兩欄；`/alumni/` 照欄位名讀，多兩欄不會壞，也還沒把它印出來（卡上已經有最後一屆的職位）。
+遷移檔 `supabase/migrations/2026-12-28-alumni-bt-role.sql`，`scripts/db/smoke.sh` 最後一段驗它；`check.sh` 的 `STORY_WRITABLE` 清單多了這兩欄。
+
 ### 上線前還欠一件事：隱私政策（排在「開始邀請真的校友」之前）
 
 `privacy/index.html` 要加一段，講清楚校友頁上到底公開了什麼。這件事**排在
@@ -4664,7 +4672,13 @@ Paul：「I posted an event on our website from curriculum team, is that going t
 - **校友**：這一頁讀的是 `/alumni/` 同一支 `public_alumni()`：校友自己在設定頁填故事、自己勾同意、Co-President 核可之後，他就站在機場，
   照他最後一屆的職位（`title`，例如「Director, Curriculum Team · 2025-26」）走去那座島，牌子上寫著職位，卡上有他的一句話與現在在哪。
   **真的校友一進來，機場上十位遮字的範例校友就不顯示**（兩位範例學員留著，他們不是從校友名單來的）。
-  現在正式庫裡還沒有核可的校友，所以畫面上是範例。Paul 要的「講者走去 Curriculum、mentor 走去 Mentorship」現在靠 `title` 猜；要準，校友的故事表單要多一個欄位「在 BT 做過什麼」（講者／mentor／實習生／幹部哪個 team），那是一支遷移檔加設定頁與後台各一格，見「還沒做」。
+  **他走去哪座島照他自己填的「在 BT 做過什麼」**（2026-11-17 第三輪，Paul：「if they were speaker, they are connected to the curriculum team」）：
+  設定頁「我的故事」多了兩格，`bt_role` 六選一（幹部、講者、mentor、實習生、校園大使、學員）加 `bt_team`（六個 team 之一，可以不填）。
+  規則在 `island/src/data.js` 的 `alumniTeamFor()`：填了 team 就去那座；沒填 team 的講者去 Curriculum、mentor 去 Mentorship、實習生去 Internship、校園大使去 Community Relations、學員去 Mentorship；幹部照最後一屆的職位字樣；什麼都認不出來的去聚會所。
+  牌子上寫的是那個角色（講者、Mentor），卡上寫「在 BT 是講者（Curriculum Team）」加最後一屆的職位。
+  遷移檔是 `supabase/migrations/2026-12-28-alumni-bt-role.sql`（兩欄、本人的欄位權限、改了就下架、`public_alumni()` 與 `stories_for_review()` 各多回兩欄），在本機 Postgres 上跑過（`scripts/db/smoke.sh`），**正式 Supabase 還沒跑**。
+  要公開故事一定要填「在 BT 做過什麼」（跟縣市一樣是必填），team 可以空。後台核可那頁每一位多一個標籤寫他說自己做過什麼，核可前要確認那是真的。
+  現在正式庫裡還沒有核可的校友，所以畫面上是範例。
 - 兩份都是「拿不到就當沒有」：Supabase 連不上，島照樣畫。
 
 ### 順不順（2026-11-16 第二輪）
@@ -4704,7 +4718,7 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 - push 之前逐一確認願意具名的人。
 - 校友與學員換真人（本人同意）。
 - Paul 2026-11-16 說「seven teams」；事實資料庫與團隊頁都是六個 team，這裡照六個做。第七個是哪一個，要他說。
-- 校友的故事多一個欄位「在 BT 做過什麼」（講者、mentor、實習生、哪個 team 的幹部）：一支遷移檔（`alumni_stories` 加一欄）、設定頁多一格、後台核可那頁看得到、`public_alumni()` 多回一欄。有了它，島上的校友就不用靠職位字樣猜。
+- ~~校友的故事多一個欄位「在 BT 做過什麼」~~ **2026-11-17 做完**（見上面「跟官網其他頁接起來」）。剩下的是 Paul 把 `2026-12-28-alumni-bt-role.sql` 在正式 Supabase 上跑一次。
 - 這一頁要不要放進導覽列、放哪裡。現在首頁與團隊頁都還沒連過來。
 - 「把自己放上去」現在只在自己的瀏覽器。要讓大家都看得到（像 HEART 那樣），要存進資料庫，那是另一個決定（要登入、要同意、要有人核可）。
 - 嘖嘖的互動頁 `/stories/` 跟這一頁是兩件事：Paul 2026-11-16 說募資那一頁「we can think of something else」，先留著。
