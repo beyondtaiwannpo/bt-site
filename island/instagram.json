@@ -1,26 +1,83 @@
 {
   "_readme": [
-    "這一份是 /island/ Marketing 那座島上的「貼文牆」：點 Instagram 那一棟，卡上列出這幾則貼文，按了到 Instagram 看。",
-    "Paul 2026-11-17：「for marketing team… get a few posts from our Instagram and put it up there」。",
-    "為什麼不是自動抓：抓 Instagram 要 API 的 token、而且要從 instagram.com 載程式，這個 repo 不從 cdnjs 以外的地方載東西。所以是 Marketing 自己把連結貼進來，一則一筆，新的放最上面，留五到八則就好。",
-    "欄位：url（只收 https://www.instagram.com/ 開頭）、caption_zh/caption_en（一句話，自己寫，不用抄整段）、date（YYYY-MM-DD）、kind（post 或 reel）。",
-    "⚠ 說明裡不放未成年的名字（CLAUDE.md 的紅線）。貼文本身是 Instagram 上公開的，這裡只放連結，不存圖。",
-    "島上那三塊海報板的顏色是照 kind 與順序畫的，不是真的圖。"
+    "這一份是 /island/ Marketing 那座島上的「貼文牆」：島上三塊海報板貼的是最上面三則有圖的貼文；點 Instagram 那一棟，卡上列出全部，按了到 Instagram 看。",
+    "Paul 2026-11-17：「for marketing team… get a few posts from our Instagram and put it up there」，再說「Yes, add images」。",
+    "為什麼不是自動抓：抓 Instagram 要 API 的 token、而且要從 instagram.com 載程式，這個 repo 不從 cdnjs 以外的地方載東西。所以是 Marketing 自己把連結與圖貼進來，一則一筆，新的放最上面，留五到八則就好。",
+    "欄位：url（只收 https://www.instagram.com/ 開頭）、caption_zh/caption_en（一句話，自己寫，不用抄整段）、date（YYYY-MM-DD）、kind（post 或 reel）、image（可空；posts/代號.jpg，圖放在 island/posts/，640 px 寬、80 KB 以內：sips -Z 640 -s format jpeg -s formatOptions 70 原圖 --out island/posts/代號.jpg）。",
+    "⚠ 圖只放海報、圖卡這類沒有人臉的；有人的照片要先確認每一位都同意，未成年一律不放臉也不放名字（CLAUDE.md 的紅線）。沒有 image 的那一則，板子上畫的是顏色不是圖。",
+    "check.sh 守著：island/posts/ 最多 12 張、每張 80 KB 以內、每張都要在這一份裡被用到。"
   ],
   "handle": "beyondtaiwan",
   "profile": "https://www.instagram.com/beyondtaiwan/",
   "posts": [
-    { "url": "https://www.instagram.com/beyondtaiwan/reel/DfYuFyXuikI/", "kind": "reel", "date": "2026-11-05",
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/p/Df1S1BtG_a8/",
+      "kind": "post",
+      "date": "2026-11-16",
+      "image": "posts/Df1S1BtG_a8.jpg",
+      "caption_zh": "留學生必經的 9 個階段，你解鎖到第幾個了？",
+      "caption_en": "The nine stages every international student goes through. Which one are you on?"
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/p/DfrEFQEFgyp/",
+      "kind": "post",
+      "date": "2026-11-12",
+      "image": "posts/DfrEFQEFgyp.jpg",
+      "caption_zh": "大學介紹系列：東京大學。基本資訊、熱門學科、入學管道與申請時間一次看。",
+      "caption_en": "College intro series: the University of Tokyo. Basics, popular majors, admission routes and dates in one post."
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/p/DfjQgrzFhRq/",
+      "kind": "post",
+      "date": "2026-11-09",
+      "image": "posts/DfjQgrzFhRq.jpg",
+      "caption_zh": "申請新加坡大學要知道的大小事，先收藏起來。",
+      "caption_en": "Everything to know before applying to universities in Singapore. Save it for later."
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/reel/DfYuFyXuikI/",
+      "kind": "reel",
+      "date": "2026-11-05",
       "caption_zh": "BT Vlog 第三集：跟著 Internship 的 Associate 看 Utah 一所高中的一天。",
-      "caption_en": "BT Vlog, episode 3: a day at a high school in Utah with one of our Internship associates." },
-    { "url": "https://www.instagram.com/beyondtaiwan/reel/De0htb1uvyg/", "kind": "reel", "date": "2026-10-28",
+      "caption_en": "BT Vlog, episode 3: a day at a high school in Utah with one of our Internship associates."
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/p/DfOcqipjqju/",
+      "kind": "post",
+      "date": "2026-11-01",
+      "image": "posts/DfOcqipjqju.jpg",
+      "caption_zh": "想申請韓國大學？春季與秋季入學的時程、文件、面試，每個階段該注意什麼。",
+      "caption_en": "Applying to universities in Korea? Spring and fall intake timelines, documents and interviews, stage by stage."
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/reel/De0htb1uvyg/",
+      "kind": "reel",
+      "date": "2026-10-28",
       "caption_zh": "如果可以重來一次申請大學，你會改變什麼？幾位在海外念書的學長姐回頭給高中的自己的建議。",
-      "caption_en": "If you could apply to college again, what would you change? Alumni studying abroad look back and advise their high-school selves." },
-    { "url": "https://www.instagram.com/beyondtaiwan/reel/Des_DS1uKTI/", "kind": "reel", "date": "2026-10-24",
+      "caption_en": "If you could apply to college again, what would you change? Alumni studying abroad look back and advise their high-school selves."
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/reel/Des_DS1uKTI/",
+      "kind": "reel",
+      "date": "2026-10-24",
       "caption_zh": "BT Vlog 第二集：跟著 Co-President Alysia 看 UW-Madison 的一天。",
-      "caption_en": "BT Vlog, episode 2: a day at UW-Madison with Co-President Alysia." },
-    { "url": "https://www.instagram.com/beyondtaiwan/p/Df1S1BtG_a8/", "kind": "post", "date": "2026-11-16",
-      "caption_zh": "最新的一則貼文。",
-      "caption_en": "The latest post." }
+      "caption_en": "BT Vlog, episode 2: a day at UW-Madison with Co-President Alysia."
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/p/DemhR1MmwT8/",
+      "kind": "post",
+      "date": "2026-10-17",
+      "image": "posts/DemhR1MmwT8.jpg",
+      "caption_zh": "Overseas Unpacked 講者招募：2027 年 1 月 3 日在台北的一日活動，找在海外念過書、願意回來分享的你。",
+      "caption_en": "Speakers wanted for Overseas Unpacked, a one-day event in Taipei on 3 January 2027, for anyone who studied abroad and wants to share."
+    },
+    {
+      "url": "https://www.instagram.com/beyondtaiwan/p/DdNoIbjjtkQ/",
+      "kind": "post",
+      "date": "2026-09-12",
+      "image": "posts/DdNoIbjjtkQ.jpg",
+      "caption_zh": "Beyond Taiwan 是什麼？一個幫台灣公立高中生申請海外大學的非營利組織。",
+      "caption_en": "What is Beyond Taiwan? A nonprofit that helps students at Taiwan's public high schools apply to universities abroad."
+    }
   ]
 }

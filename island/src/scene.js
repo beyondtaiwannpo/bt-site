@@ -85,6 +85,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   const islands = L.islands(); const isleObjs = new Map(); const blockersOf = new Map(); const treePlaces = [];
   const pickables = [];   // 射線打得到的東西：{ obj, sel }
   const planes = [];      // 機場的飛機；有 userData.taxi 的那一架在 motion() 裡滑行
+  const boards = [];      // Marketing 貼文牆上的三片板子；posts() 把真的圖貼上去
   for (const isl of islands) {
     const tm = data.teams.find(x => x.id === isl.id); if (!tm) continue;
     const g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); world.add(g);
@@ -112,7 +113,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     flag.userData.flag = true;
     // 做的事：一樣一棟。
     const spots = L.programSpots({ id: isl.id, x: 0, z: 0, r: isl.r, angle: isl.angle }, tm.programs.length); const blockers = [{ x: fx, z: fz }];
-    tm.programs.forEach((p, k) => { const sp = spots[k]; const b = building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = sp.face; g.add(b); blockers.push({ x: sp.x, z: sp.z });
+    tm.programs.forEach((p, k) => { const sp = spots[k]; const b = building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = p.kind === "studio" ? 0.15 : sp.face; g.add(b);   // 貼文牆要面向鏡頭（+z），不是面向島心 blockers.push({ x: sp.x, z: sp.z });
       b.traverse(o => { if (o.isMesh) { o.userData.sel = { kind: "program", team: tm.id, program: p.id }; pickables.push(o); } });
       const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-prog"; pin.dataset.goProgram = p.id; pin.dataset.team = tm.id; pin.hidden = true; pins.appendChild(pin);
       b.userData.pin = pin; b.userData.program = p; });
@@ -202,6 +203,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       [[M.orange, M.teal], [M.teal, M.yellow], [M.navy, M.orange]].forEach(([a, b2], i) => {
         const x = (i - 1) * 1.65; const board = new THREE.Mesh(rbox(1.4, 1.6, 0.08, 0.04), M.white); board.position.set(x, 1.45, 0.2); g.add(board);
         const pic = new THREE.Mesh(rbox(1.2, 1.0, 0.04, 0.03), a); pic.position.set(x, 1.65, 0.26); g.add(pic);
+        // 真的圖貼在板子前面那一片（posts() 來了才換；沒有圖就留顏色）。
+        const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.0), new THREE.MeshBasicMaterial({ color: P.white })); photo.position.set(x, 1.65, 0.29); photo.visible = false; g.add(photo); boards.push(photo);
         const bar = new THREE.Mesh(rbox(0.9, 0.12, 0.04, 0.02), b2); bar.position.set(x - 0.1, 0.95, 0.26); g.add(bar);
         const heart = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), M.orange); heart.position.set(x + 0.45, 0.95, 0.27); g.add(heart);
       });
@@ -458,6 +461,16 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       for (const w of walkers.slice()) if (w.person.role === "alumni" && !list.some(p => p.code === w.person.code)) removeWalker(w);
       for (const p of list) if (!walkers.some(w => w.person.code === p.code)) addWalker(p);
       if (!motionOn) render(0);
+    },
+    // Marketing 的貼文牆：最上面三張有圖的貼文貼到板子上（島上的圖只有這裡，check.sh 守 island/posts/）。
+    // 圖是 1:1 或 4:5，板子是 6:5：置中裁切。載不到就留顏色。
+    posts(urls) {
+      const loader = new THREE.TextureLoader();
+      (urls || []).slice(0, boards.length).forEach((u, i) => loader.load(u, tex => {
+        tex.colorSpace = THREE.SRGBColorSpace; const img = tex.image, ar = img && img.width ? img.width / img.height : 1, want = 1.2;
+        if (ar < want) { tex.repeat.set(1, ar / want); tex.offset.set(0, (1 - ar / want) / 2); } else { tex.repeat.set(want / ar, 1); tex.offset.set((1 - want / ar) / 2, 0); }
+        boards[i].material.map = tex; boards[i].material.needsUpdate = true; boards[i].visible = true; if (!motionOn) render(0);
+      }, undefined, () => {}));
     },
     render: () => render(0),
     motion() { motionOn = true; return motion({ cam, placeCam, render, walkers, clouds, planes, pose, blockersOf, rnd }); },

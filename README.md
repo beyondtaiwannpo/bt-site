@@ -4687,7 +4687,8 @@ Paul：「right now every island is the same… make it a little bit different�
 - **大小、距離、形狀都不一樣**：`island/src/layout.js` 的 `SPEC` 一座一行（半徑、離中心多遠、角度微調、形狀 hex／round／rect）。改那一行就好，scene.js 照著畫，測試守「不重疊」「橋 4 到 20 公尺」「進得了全景」。橋從島的邊緣開始，所以距離近橋就短：最短 5.6 公尺（Sponsorship 到 Curriculum），最長 17（機場到 CR）。
 - **每座島自己的東西**（`scene.js` 的 `decorate()`，一座一段）：聚會所是圓的，中間一塊遊樂場（溜滑梯、鞦韆、翹翹板、沙坑、長凳）；Internship 是方的，一棟兩層的學校（新的 `kind: school`）加操場跑道與籃球架；Curriculum 最大，露天教室（黑板加三排長凳）；Mentorship 圓的，兩兩對坐的長凳、燈、四個花圃；Sponsorship 一個鋪面廣場、噴水池、合作夥伴看板；Marketing 攝影棚加貼文牆（`kind: studio`：三塊海報板、腳架相機、環形燈）、四面旗、一個大「讚」；Community Relations 一座涼亭舞台（`kind: stage`）、一排燈籠、佈告欄、郵筒。樹的數量也不一樣。
 - **機場四架飛機**：一架在跑道上來回滑行（`motion()` 裡動，螺旋槳會轉，到底停一下再轉頭）、兩架停機坪、一座機棚、一台行李車。
-- **Marketing 的 Instagram**：點那一棟「Instagram @beyondtaiwan」，卡上列最近的貼文，按了到 Instagram。清單在 `island/instagram.json`，Marketing 自己貼連結與一句話說明（檔頭有說明）。**不是自動抓**：抓 Instagram 要 API token 與 instagram.com 的程式，這個 repo 只從 cdnjs 載東西。現在放的四則是 2026-11-17 從 @beyondtaiwan 抓的連結（只有連結與自己寫的一句話，沒有圖，未成年不具名）。
+- **Marketing 的 Instagram**：點那一棟「Instagram @beyondtaiwan」，卡上列最近的貼文（有縮圖），按了到 Instagram；島上那三塊海報板貼的是最上面三則有圖的貼文（真的圖，Paul 2026-11-17 說「Yes, add images」）。清單在 `island/instagram.json`，Marketing 自己貼連結、一句話說明與圖（檔頭有怎麼縮圖的指令）。**不是自動抓**：抓 Instagram 要 API token 與 instagram.com 的程式，這個 repo 只從 cdnjs 載東西。現在放的九則是 2026-11-17 從 @beyondtaiwan 抓的：六則海報圖卡有圖（都是圖卡，沒有人臉），三則影片只有連結。
+  圖在 `island/posts/`，是這一頁唯一的圖檔：`check.sh` 放行這一個資料夾，但守著最多 12 張、每張 80 KB 以內、每張都要在 instagram.json 裡被用到、檔名只能是 Instagram 的代號。**有人的照片要先確認每一位都同意，未成年一律不放臉**，海報與圖卡才直接放。
 - 截圖：`docs/island/2026-11-17-*.jpg`。
 
 **黃色那些線**（Paul 問的）：是協作線，`teams.json` 的 `connections` 一條一筆，加上人走去別座島的路。工具列「協作線」開著才全部亮；選了一座島只亮它的。
@@ -4714,7 +4715,7 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 ### 不會寫程式的人怎麼改
 
 - 改一個 team 的說明、加一樣在做的事、改連結：`island/teams.json`，檔頭有每個欄位的說明。畫面會自己長出一棟（`kind` 決定長什麼樣：hall tent booth desk home post pier tower camp airport school studio stage）。
-- 換 Marketing 島上的貼文：`island/instagram.json`，一則一筆（連結、一句話中英、日期、post 或 reel），新的放上面。
+- 換 Marketing 島上的貼文：`island/instagram.json`，一則一筆（連結、一句話中英、日期、post 或 reel、圖），新的放上面；圖縮成 640 px 放進 `island/posts/`（指令在檔頭）。前三則有圖的會貼在島上的板子上。
 - 搬一座島、改大小或形狀：`island/src/layout.js` 的 `SPEC`，一座一行。
 - 加一個人：`people` 加一筆（`code` 不重複、`team`、`role`、要不要具名）。他也參與別座島就加 `also`；校友與學員 `team` 填 `airport`、加 `flow`（走去哪、帶什麼、為什麼）。島上就多一個小人，他自己會走。
 - 加一條協作線：`connections` 加一筆（`a`、`b`、為什麼）。

@@ -175,6 +175,7 @@ export function normalizePosts(raw) {
   return { handle: str(raw && raw.handle).replace(/^@/, ""), profile: /^https:\/\/www\.instagram\.com\//.test(str(raw && raw.profile)) ? str(raw.profile) : "",
     posts: posts.filter(x => x && /^https:\/\/www\.instagram\.com\/[A-Za-z0-9_./-]+$/.test(str(x.url))).map(x => ({
       url: str(x.url), kind: x.kind === "reel" ? "reel" : "post", date: str(x.date).slice(0, 10),
+      image: /^posts\/[A-Za-z0-9_-]+\.jpg$/.test(str(x.image)) ? str(x.image) : "",   // 只收 island/posts/ 裡的檔名
       caption_zh: str(x.caption_zh) || str(x.caption_en), caption_en: str(x.caption_en) || str(x.caption_zh) })).slice(0, 12) };
 }
 export const loadPosts = base => fetch((base || "./") + "instagram.json").then(r => r.json()).then(normalizePosts).catch(() => normalizePosts(null));

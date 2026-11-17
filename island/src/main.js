@@ -130,6 +130,7 @@ async function boot() {
   // 跟官網其他頁接起來：活動（/events/ 那一份）與真的校友（/alumni/ 那一份）。拿不到就當沒有。
   const [events, alumni, instagram] = await Promise.all([D.loadEvents(), D.loadAlumni(), D.loadPosts("./")]);
   data.instagram = instagram; if (sel && sel.kind === "program") renderCard();
+  if (scene) scene.posts(instagram.posts.filter(x => x.image).map(x => "./" + x.image));
   data.events = events;
   if (alumni.length) { D.mergeAlumni(data, alumni); if (scene) scene.people(data.people); }
   if (scene) scene.events(events.filter(e => e.state === "open").map(e => ({ team: e.team, title: e["title_" + lang] || e.title_zh, link: e.link })));
