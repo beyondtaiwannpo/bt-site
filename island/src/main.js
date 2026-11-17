@@ -59,7 +59,7 @@ function close() { select(null); }
 // 貼文放大看：按一則先在中間放大，按圖或那顆按鈕才到 Instagram；× 或 Esc 或按旁邊關掉。
 function openPost(id) { const x = data && data.instagram ? data.instagram.posts.find(p => p.id === id) : null; if (!x) return; $("lb-box").innerHTML = UI.postBigHTML(x, lang); $("lb").hidden = false; $("lb-box").querySelector(".lb-go").focus(); }
 function closePost() { $("lb").hidden = true; }
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("lb").hidden) closePost(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("lb").hidden) { closePost(); e.stopImmediatePropagation(); } });   // 關了放大看就停在這，不順手把卡也關掉
 document.addEventListener("click", e => {
   const post = e.target.closest("[data-post]"); if (post) { openPost(Number(post.dataset.post)); return; }
   if (e.target.closest("[data-lb-close]") || (e.target.id === "lb")) { closePost(); return; }
