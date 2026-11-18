@@ -10,7 +10,7 @@ export function buildSea(THREE, E, c) {
   const mesh = (geo, m, x, y, z, shadow) => { const o = new THREE.Mesh(geo, m); o.position.set(x || 0, y || 0, z || 0); o.castShadow = shadow !== false; o.receiveShadow = true; return o; };
   const std = (color, extra) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...(extra || {}) });
   const mix = (a, b, t) => a.clone().lerp(b, t);
-  const stats = { beaches: [], waves: 0, buoys: 0, sailboats: 0, dolphins: 0, seaplane: false }; E.seaStats = stats; const objs = { sail: [], dolphins: [], plane: null }; E.seaObjs = objs;   // 除錯：console 裡看帆船、海豚、水上飛機現在在哪
+  const stats = { beaches: [], beachAngles: {}, waves: 0, buoys: 0, sailboats: 0, dolphins: 0, seaplane: false }; E.seaStats = stats; const objs = { sail: [], dolphins: [], plane: null }; E.seaObjs = objs;   // 除錯：console 裡看帆船、海豚、水上飛機現在在哪；beachAngles 是每個沙灘灣朝哪個方向（water.js 的淺水區要靠著沙灘放）
   // 六邊形的島：某個方向上島緣離島心多遠（角是平頂六邊形，頂點在 30 度、90 度……）。圓的島就是 r。
   const edgeR = (isl, th) => { if (isl.shape !== "hex") return isl.r; let ph = (th - Math.PI / 6) % (Math.PI / 3); if (ph < 0) ph += Math.PI / 3; return isl.r * Math.cos(Math.PI / 6) / Math.cos(ph - Math.PI / 6); };
   const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -23,7 +23,7 @@ export function buildSea(THREE, E, c) {
     const avoid = (bridgeAngles.get(id) || []).slice(); for (const pl of lifePlaces.get(id) || []) if (pl.kind === "dock") avoid.push(pl.a);
     let best = null, bestD = -1; for (let k = 0; k < 36; k++) { const a = k / 36 * TAU; const d = Math.min(...avoid.map(b => angDiff(a, b)), 9); if (d > bestD) { bestD = d; best = a; } }
     if (best == null || bestD < 0.8) continue;
-    const g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); world.add(g); stats.beaches.push(id);
+    const g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); world.add(g); stats.beaches.push(id); stats.beachAngles[id] = best;
     const halfW = 0.42, nA = 14, nR = 12, off0 = -3.8, off1 = 2.8;
     const yOf = off => { if (off <= -0.6) return 0.03; if (off <= 1.8) { const u = (off + 0.6) / 2.4; const s = u * u * (3 - 2 * u); return 0.03 - 0.53 * s; } return -0.5 - (off - 1.8) * 0.03; };
     const pos = [], idx = [];
@@ -116,7 +116,11 @@ export function buildSea(THREE, E, c) {
     const prop = pl.getObjectByName("prop"); if (prop) prop.userData.dynamic = true;
     E.mergeChildren(inner);
     const R = 64, H = 19, cx = 4, cz = -2; let a = 1.0;
-    ticks.push((dt, t) => { a += dt * 0.14; g.position.set(cx + Math.cos(a) * R, H + Math.sin(t * 0.4) * 0.6, cz + Math.sin(a) * R); g.rotation.y = -a - Math.PI / 2; inner.rotation.x = 0.24 + Math.sin(t * 0.6) * 0.04; if (prop) prop.rotation.x += dt * 22; });
+    // 2026-11-18 第三批：每繞一圈在西南那一段空水域（角度 3.3 到 4.15，離棕櫚小島與野鼠飛車都 6 公尺以上）降到水面滑一段再拉起來，浮筒半泡在水裡，water.js 在後面畫尾浪。
+    const smooth = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+    const dip = am => am < 3.3 || am > 4.15 ? 0 : am < 3.55 ? smooth((am - 3.3) / 0.25) : am < 3.9 ? 1 : 1 - smooth((am - 3.9) / 0.25);
+    ticks.push((dt, t) => { a += dt * 0.14; const am = a % TAU, w = dip(am), w2 = dip((am + 0.04) % TAU); const y = H + Math.sin(t * 0.4) * 0.6 * (1 - w) - (H - 0.35) * w;
+      g.position.set(cx + Math.cos(a) * R, y, cz + Math.sin(a) * R); g.rotation.y = -a - Math.PI / 2; inner.rotation.x = (0.24 + Math.sin(t * 0.6) * 0.04) * (1 - w); inner.rotation.z = (w2 - w) * 9; if (prop) prop.rotation.x += dt * 22; });
   }
   return { tick: (dt, t) => { for (const f of ticks) f(dt, t); } };
 }

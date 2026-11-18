@@ -69,7 +69,7 @@ export function wanderTarget(island, blockers, rnd) {
   for (let i = 0; i < 40; i++) {
     // 機場是長方形的平台（跑道在後半），人只在前面那一條（z 3 到 8.5）走；島是圓的範圍。
     let x, z;
-    if (island.sea) { x = island.x + (rnd() - 0.5) * 22; z = island.z + 3 + rnd() * 5.5; }
+    if (island.sea) { x = island.x + (rnd() - 0.5) * 22; z = island.z + 4.4 + rnd() * 4.1; }   // 2026-11-18 第三批：z 2.4 到 4.2 那一條是行李拖車的車道（sights.js），人從 4.4 起走
     else { const a = rnd() * TAU, d = Math.sqrt(rnd()) * (island.r - 2.0); x = island.x + Math.cos(a) * d; z = island.z + Math.sin(a) * d; }
     if ((blockers || []).some(b => Math.hypot(x - b.x, z - b.z) < (b.r || 1.2) + 0.6)) continue;
     return { x, z };
@@ -142,6 +142,12 @@ export const SAIL_LOOPS = [
 ];
 // 海豚那一對跳出水面的地方（Sponsorship 南邊、渡輪航線北邊的空水域）。
 export const DOLPHINS = { x: 13, z: 42 };
+// 鯨魚（2026-11-18 第三批，water.js 畫）：北邊遠處的空水域，每 36 秒浮上來一次；每次換一個方向、往前游一點，活動範圍是這一點外 6 公尺以內（測試守離每座島與小島 2 公尺以上）。
+export const WHALE = { x: -6, z: -56, period: 36 };
+// 滑翔翼（sights.js 畫）：繞著雲霄飛車小島上空慢慢轉，半徑 10、高 16。
+export const GLIDER = { x: -52, z: 26, r: 10, h: 16 };
+// 行李拖車的車道（sights.js 畫，機場平台的本地座標）：跑道與人走的那一條之間，東往 z 2.7、西往 z 3.9，東邊到 x 7（再過去是觀景塔）。
+export const CART_LOOP = { x0: -11, x1: 7, z0: 2.7, z1: 3.9 };
 // 橋的樣式（0 木板、1 石拱、2 紅漆拱、3 繩索、4 滑水道）。
 // Paul 2026-11-18：「the water slide should be only at the commons」：滑水道只在聚會所那六條輻條上（三條滑水道三條別的輪流），外圍的環與機場的橋不用。
 export function bridgeStyle(br, i) { if (br.a === "commons" || br.b === "commons") return i % 2 === 0 ? 4 : [0, 1, 2][Math.floor(i / 2) % 3]; return [0, 1, 2, 3][i % 4]; }

@@ -63,7 +63,7 @@ export function buildTown(THREE, E, c) {
     const rectSpot = (hw, hd, dmin, tries, soft) => { for (let i = 0; i < (tries || 320); i++) { const a = rr() * TAU, d = isl.r * (rr() * 0.72); const cx = Math.cos(a) * d, cz = Math.sin(a) * d, ry = rr() * TAU; if (rectFree(cx, cz, ry, hw, hd, dmin, soft)) { if (soft) fell(cx, cz, ry, hw, hd); return { x: cx, z: cz, ry }; } } return null; };
     // 在某棟房子旁邊找位置：離房子的圓 rMin 到 rMax 公尺。
     const near = (b, dmin, rMin, rMax, tries) => { const R = kindR[b.kind] || 3; for (let i = 0; i < (tries || 140); i++) { const a = rr() * TAU, d = R + rMin + rr() * (rMax - rMin); const x = b.x + Math.cos(a) * d, z = b.z + Math.sin(a) * d; if (free(x, z, dmin)) return { x, z, a }; } return null; };
-    bySpot.set(isl.id, { g, rr, blockers, pois, spot, put, free, rectSpot, rectFree, inside, isSoft, isl, places, builds, near, strip: null });
+    bySpot.set(isl.id, { g, rr, blockers, pois, spot, put, free, rectSpot, rectFree, fell, inside, isSoft, isl, places, builds, near, strip: null });   // fell 也露出來：第三批（water.js 的瀑布山丘、sights.js 的機車排與溫泉）要在指定的位置清掉樹與桌椅
 
   }
 

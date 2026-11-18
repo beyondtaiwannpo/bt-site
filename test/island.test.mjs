@@ -139,6 +139,18 @@ test("海上的第二批（2026-11-18）：四艘帆船的橢圓、海豚的位�
   L.SAIL_LOOPS.forEach((o, k) => { for (let i = 0; i < 72; i++) { const th = i / 72 * L.TAU; farEnough(o.cx + Math.cos(th) * o.rx, o.cz + Math.sin(th) * o.rz, "帆船 " + k); } });
   for (let i = 0; i < 12; i++) { const a = i / 12 * L.TAU; farEnough(L.DOLPHINS.x + Math.cos(a) * 5.5, L.DOLPHINS.z + Math.sin(a) * 5.5, "海豚"); }
 });
+test("第三批（2026-11-18）：鯨魚的活動範圍離每座島與小島 2 公尺以上而且在全景裡；滑翔翼繞的是雲霄飛車小島；行李拖車的車道在跑道與人走的那一條之間、不碰觀景塔", () => {
+  const isl = L.islands().map(i => ({ id: i.id, x: i.x, z: i.z, r: i.sea ? 13 : i.r })).concat(L.ISLETS.map(i => ({ id: i.id, x: i.x, z: i.z, r: i.r })));
+  for (let i = 0; i < 12; i++) { const a = i / 12 * L.TAU; const x = L.WHALE.x + Math.cos(a) * 7, z = L.WHALE.z + Math.sin(a) * 7; for (const o of isl) assert.ok(Math.hypot(x - o.x, z - o.z) >= o.r + 2, "鯨魚離 " + o.id + " 太近"); }
+  assert.ok(L.WHALE.period >= 30 && L.WHALE.period <= 40, "鯨魚每 30 到 40 秒浮一次");
+  const fit = L.cameraOverview(false).fit; assert.ok(Math.abs(L.WHALE.x) <= fit[0] && Math.abs(L.WHALE.z) <= fit[1] + 10, "鯨魚跑出全景");
+  const co = L.ISLETS.find(i => i.kind === "coaster"); assert.equal(L.GLIDER.x, co.x); assert.equal(L.GLIDER.z, co.z); assert.ok(L.GLIDER.h >= 12 && L.GLIDER.r >= co.r, "滑翔翼要在雲霄飛車上空繞");
+  const air = L.islandOf("airport"); const C = L.CART_LOOP;
+  assert.ok(C.z0 > 2.0 && C.z1 < 4.4, "車道要在跑道（z 2.0 以內）與人走的那一條（z 4.4 起）之間");
+  assert.ok(C.x0 >= -air.r * 1.3 + 1 && C.x1 <= 9.0, "車道兩頭要在平台上、東邊留給觀景塔");
+  let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 40; i++) { const w = L.wanderTarget(air, [], rnd); assert.ok(w.z - air.z >= 4.4 - 0.01, "人不走到車道上"); }
+});
 test("貼文：掛在哪一樣在做的事底下、只收 instagram.com 的 https 連結、最多 12 則、卡上是按鈕先放大再到 Instagram；posts.json 本身合法而且不放未成年的名字", () => {
   const raw = JSON.parse(fs.readFileSync("island/posts.json", "utf8"));
   const ig = D.normalizePosts(raw, d.teams);

@@ -13,6 +13,8 @@ import { buildRides } from "./rides.js";
 import { buildLife } from "./life.js";
 import { buildTown } from "./town.js";
 import { buildSea } from "./sea.js";
+import { buildWater } from "./water.js";
+import { buildSights } from "./sights.js";
 
 export const webglOK = T.webglOK;
 
@@ -82,9 +84,14 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   const life = buildLife(THREE, E, { islands: islands.map(i => ({ ...i, colour: (data.teams.find(x => x.id === i.id) || {}).colour })), blockersOf, poisOf, buildingsOf, bridgeAngles, airport: islands.find(i => i.sea) });
   // 第二批細節（2026-11-18 Paul：「More detail first」）：town.js 管陸上的（路、球場、菜園、市集、舞台、噴水池、燈串、更多在做事的人、機場的加油車與登機梯），
   // sea.js 管海上的（沙灘灣、浪圈、浮標、帆船、海豚、水上飛機）。town 要在 life 之後（鋪路要知道小店在哪，E.lifePlaces）、sea 在最後（沙灘要避開碼頭）。
-  const town = buildTown(THREE, E, { islands, blockersOf, poisOf, buildingsOf, kindR: T.KIND_R, lifePlaces: E.lifePlaces, bridgeAngles, airport: islands.find(i => i.sea), groupOf: new Map([...isleObjs.values()].map(o => [o.isl.id, o.g])) });
+  const groupOf = new Map([...isleObjs.values()].map(o => [o.isl.id, o.g]));
+  const town = buildTown(THREE, E, { islands, blockersOf, poisOf, buildingsOf, kindR: T.KIND_R, lifePlaces: E.lifePlaces, bridgeAngles, airport: islands.find(i => i.sea), groupOf });
   const sea = buildSea(THREE, E, { islands, blockersOf, bridgeAngles, lifePlaces: E.lifePlaces, islets: L.ISLETS, sailLoops: L.SAIL_LOOPS, dolphins: L.DOLPHINS });
-  const extraTick = (dt, t) => { rides.tick(dt, t); life.tick(dt, t); town.tick(dt, t); sea.tick(dt, t); };
+  // 第三批（2026-11-18 Paul 第三次「More detail first」：要好看、要活）：water.js 管水（漣漪、尾浪、淺水、鯨魚、瀑布），sights.js 管看得到的地標與味道
+  // （觀景塔、風車、溫泉、兩種新的樹、機車、燈籠、夜市招牌、高一層的雲、滑翔翼、機場的信標與行李拖車）。兩支都要在 sea 之後（要知道沙灘、帆船、渡輪在哪）、flushInstances 之前（換掉三分之一的樹、清掉山丘那一塊的樹）。
+  const water = buildWater(THREE, E, { islands, blockersOf, groupOf, whale: L.WHALE, bridgeAngles, lifePlaces: E.lifePlaces });
+  const sights = buildSights(THREE, E, { islands, blockersOf, poisOf, lifePlaces: E.lifePlaces, airport: islands.find(i => i.sea), glider: L.GLIDER, cartLoop: L.CART_LOOP, gondola: L.GONDOLA });
+  const extraTick = (dt, t) => { rides.tick(dt, t); life.tick(dt, t); town.tick(dt, t); sea.tick(dt, t); water.tick(dt, t); sights.tick(dt, t); };
   E.flushInstances();
 
   // ═══ 人：每個人住在自己的島上 ═══
@@ -150,7 +157,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     posts(urls) { E.paintBoards(urls); },
     render: () => E.render(0),
     // 除錯用（?debug=1）：場景物件與材質也露出來，console 裡好查。
-    _scene: E.scene, _M: M, _cam: E.cam, _E: E, _extraTick: extraTick,   // _extraTick：除錯時可以手動推進 rides／life／town／sea 的動畫（畫面沒在跑 rAF 的時候）
+    _scene: E.scene, _M: M, _cam: E.cam, _E: E, _extraTick: extraTick,   // _extraTick：除錯時可以手動推進 rides／life／town／sea／water／sights 的動畫（畫面沒在跑 rAF 的時候）
     // 除錯用（?debug=1）：每個人現在在做什麼。
     debug: () => E.debugWalkers(),
     // 每一幀的迴圈（引擎的）。導航交給 layout.js：哪座島、怎麼繞、橋怎麼走。
