@@ -33,7 +33,7 @@ html[data-lang="zh"] .title h1{font-family:var(--han);font-weight:900;letter-spa
 .scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
 /* 3D 的顏色不在 CSS：main.js 開頁把 --bt-* 七色讀出來丟給 scene.js。 */
 /* 整個世界（場景與卡）靠近一站時一起稍微放大；原點放在畫面中偏下，也就是路上那一站附近。 */
-.world{position:absolute;inset:0;transform-origin:62% 64%;will-change:transform}
+.world{position:absolute;inset:0}
 /* 左上淡淡的大年份：參考站的節奏。不是給人讀的（aria-hidden），年份帶與卡才是。 */
 .ghost{position:absolute;left:var(--gut);top:72px;font-family:var(--display);font-weight:700;font-size:clamp(120px,22vw,300px);line-height:1;letter-spacing:-.02em;color:var(--bt-navy);opacity:.09;pointer-events:none;user-select:none;transition:opacity var(--dur-3) var(--ease)}
 /* 室內那兩段（航廈與空橋）大年份淡一半（main.js 掛 inside）。 */
@@ -42,10 +42,10 @@ html.inside .ghost{opacity:.045}
 .top,.strip{transition:opacity var(--dur-2) var(--ease)}
 html.rushing .top,html.rushing .strip{opacity:.45}
 
-/* 卡站在小場景上方。--x --y 是這一幀 3D 錨點投到螢幕的像素（--s 固定 1，留著是批 3 的介面）。卡本身不隨遠近縮放（字要讀得到），只有靠近才浮出來。 */
-.cards{position:absolute;inset:0;pointer-events:none;--s:1}
-.card{position:absolute;pointer-events:auto;
-  left:calc(var(--x) * var(--s) * 1px);top:calc(var(--y) * var(--s) * 1px);
+/* 卡站在小場景上方。位置是 main.js 每一幀寫的 translate（CSS 的 translate 屬性，跟 transform 分開：transform 留給浮出來那一下的過渡，2026-11-17 順不順批 3）。
+   卡本身不隨遠近縮放（字要讀得到），只有靠近才浮出來。 */
+.cards{position:absolute;inset:0;pointer-events:none}
+.card{position:absolute;pointer-events:auto;left:0;top:0;will-change:translate;
   transform:translate(-50%,-100%) translateY(14px);opacity:0;visibility:hidden;
   display:flex;align-items:center;gap:12px;min-height:60px;width:max-content;max-width:min(340px,82vw);
   padding:10px 16px 10px 12px;border:1px solid rgba(16,42,134,.16);border-radius:14px;
@@ -105,7 +105,7 @@ html[data-lang="zh"] .end-line{font-family:var(--han);font-weight:900;letter-spa
 .strip-stops::-webkit-scrollbar{display:none}
 .strip-stops::before{content:"";position:absolute;left:0;right:0;top:5px;height:1px;background:rgba(16,42,134,.14)}
 .strip-dot{position:absolute;top:0;left:0;width:11px;height:11px;border-radius:50%;background:var(--bt-orange);border:2px solid var(--bt-cream);box-shadow:0 0 0 1px rgba(16,42,134,.25);
-  transform:translate(-50%,0);transition:left var(--dur-1) linear;pointer-events:none;z-index:1}
+  transform:translate(-50%,0);will-change:translate;pointer-events:none;z-index:1}   /* 位置是 main.js 寫的 translate，沒有 transition（順不順批 3：之前 left 加 transition，每一幀都是一次 layout shift）*/
 .strip-stop{flex:0 0 auto;min-height:44px;min-width:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;
   padding:6px 12px 4px;border:0;border-radius:8px 8px 0 0;background:none;color:var(--ink);cursor:pointer;text-align:left;scroll-snap-align:center;
   border-bottom:2px solid transparent;transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
@@ -174,7 +174,7 @@ html[data-lang="zh"] .panel-title{font-family:var(--han);font-weight:900;letter-
 .timeline::before{content:"";position:absolute;left:calc(var(--gut) + 15px);top:0;bottom:0;width:2px;background:rgba(16,42,134,.22)}
 .tl-item{position:relative;padding:0 0 18px 48px}
 .tl-item::before{content:"";position:absolute;left:9px;top:22px;width:14px;height:14px;border-radius:50%;background:var(--bt-orange);box-shadow:0 0 0 4px var(--paper)}
-.timeline .card{position:static;opacity:1;visibility:visible;transform:none;width:100%;max-width:none;transition:box-shadow var(--dur-2) var(--ease)}
+.timeline .card{position:static;opacity:1;visibility:visible;transform:none;translate:none;width:100%;max-width:none;transition:box-shadow var(--dur-2) var(--ease)}
 .timeline .card::after{display:none}
 
 /* ── 手機 ── */
@@ -215,5 +215,4 @@ button:not([disabled]):active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
   .card{transform:translate(-50%,-100%)}
-  .world{will-change:auto}
 }

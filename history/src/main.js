@@ -20,6 +20,7 @@ let api = null;                 // motion() 回的把手；直立時間軸時是
 let gl = null;                  // createScene() 回的場景；直立時間軸時是 null
 let cardsEl = null, cardEls = [], stripCentres = [], endEl = null, stageEl = null, worldEl = null;
 let openedFrom = null, savedY = 0, playing = false, raf = 0, clock = 0;
+let insideNow = null;
 let aim = -1;   // 鍵盤連按時的目標站：鏡頭還在滑的時候 current 還沒變，連按三下要跳三站不是一站
 
 // ── 語言 ──
@@ -41,26 +42,30 @@ function renderCards() {
   if (!cardsEl) return;
   cardsEl.innerHTML = stops.map((s, i) => UI.cardHTML(s, i, lang)).join("");
   cardEls = [...cardsEl.querySelectorAll(".card")];
-  placeCards();
+  measureCards(); placeCards();
 }
 // 卡貼在 3D 錨點投到螢幕的那一點上方（像素）。卡不隨遠近縮放（字要讀得到），鏡頭快到了才浮出來。
+// 卡貼在 3D 錨點投到螢幕的那一點上方。位置用 CSS 的 translate（不是 left/top，也不是 transform：transform 留給浮出來那一下的過渡），
+// 每一幀只寫不讀：卡的寬度在 renderCards() 與 resize 時量一次記在 _w，畫面寬度記在 measured（順不順批 3：之前每一幀每張卡都讀 offsetWidth，寫了再讀就得重新排版，layout shift 0.69）。
 function placeCards() {
   if (!gl || !stageEl) return;
-  const W = stageEl.clientWidth || innerWidth;
+  const W = measured[0] || innerWidth;
   cardEls.forEach((c, i) => {
     const s = w.stops[i]; if (!s) return;
     const p = gl.project(s.anchor);
     // 現在這一站，加上下一站在快到之前那一小段，卡才浮出來。
     const d = (eased - s.p) * Math.max(1, w.n - 1);
     const near = p.visible && d > -0.42 && d < 0.6;
-    c.classList.toggle("near", near);
+    if (c._near !== near) { c._near = near; c.classList.toggle("near", near); }
     if (!p.visible) return;
     // 卡不准被畫面左右切掉（手機上那一站可能靠邊）：夾在邊界內，尾巴可以歪一點沒關係。
-    const half = (c.offsetWidth || 280) / 2 + 10;
-    const x = Math.min(W - half, Math.max(half, p.x));
-    c.style.setProperty("--x", x.toFixed(1)); c.style.setProperty("--y", Math.max(90, p.y - 8).toFixed(1));
+    const half = (c._w || 280) / 2 + 10;
+    const x = Math.round(Math.min(W - half, Math.max(half, p.x)) * 2) / 2, y = Math.round(Math.max(90, p.y - 8) * 2) / 2;
+    if (c._x === x && c._y === y) return;
+    c._x = x; c._y = y; c.style.translate = `${x}px ${y}px`;
   });
 }
+function measureCards() { for (const c of cardEls) c._w = c.offsetWidth || 280; }
 function renderStrip() {
   $("strip").innerHTML = UI.stripHTML(stops, current, lang);
   measureStrip(); placeDot();
@@ -80,7 +85,7 @@ function placeDot() {
   const dot = $("strip").querySelector(".strip-dot"); if (!dot || stripCentres.length < 1) return;
   const q = progress * (stripCentres.length - 1), i = Math.min(stripCentres.length - 2, Math.max(0, Math.floor(q))), f = q - i;
   const x = stripCentres.length > 1 ? stripCentres[i] + (stripCentres[i + 1] - stripCentres[i]) * f : stripCentres[0];
-  dot.style.left = x.toFixed(1) + "px";
+  const xr = Math.round(x * 2) / 2; if (dot._x === xr) return; dot._x = xr; dot.style.translate = xr + "px 0";
 }
 // 左上淡淡的大年份，跟著現在那一站。
 function paintGhost() { const g = $("ghost"); if (g && current >= 0) g.textContent = UI.ghostHTML(stops[current].year); }
@@ -113,18 +118,16 @@ function rush(p) {
 let measured = [0, 0];   // 上次量到的 stage 尺寸；每次推進度先比一下，變了就重量
 function onProgress(p) {
   progress = p;
-  if (stageEl && (stageEl.clientWidth !== measured[0] || stageEl.clientHeight !== measured[1])) size();
   if (!gl) return;
   eased = A.eased(w, p);
   // 這裡不畫：onTick 每一幀畫一次就夠（之前捲動時這裡也畫一次，一幀畫兩次，2026-11-17 批 1 量到）。只有沒有 ticker 的時候（瞬間跳站）才補畫。
   if (!tickerOn) { gl.render(eased, clock); placeCards(); }
   if (endEl) endEl.classList.toggle("show", w.n > 0 && p > 1 - 0.5 / Math.max(1, w.n - 1) && (A.planePoseAt(eased).lift || 0) > 0.6);
-  // 靠近一站整個世界（場景與卡）一起稍微放大。
-  const zoom = 1 + 0.04 * A.closeness(w, p);
-  if (worldEl) worldEl.style.transform = `scale(${zoom.toFixed(3)})`;
+  // 靠近一站稍微放大：放在鏡頭的 zoom（順不順批 3：之前每一幀 scale 整個 .world，含那張幾百萬像素的畫布）。
+  gl.setZoom(1 + 0.04 * A.closeness(w, p));
   placeDot(); rush(p);
-  // 室內那兩段（航廈與空橋）左上的大年份淡一半，不然壓在 3D 的室內上很突兀。
-  doc.classList.toggle("inside", eased < A.PHASES.apron[0]);
+  // 室內那兩段（航廈與空橋）左上的大年份淡一半，不然壓在 3D 的室內上很突兀。class 沒變就不碰。
+  const inside = eased < A.PHASES.apron[0]; if (inside !== insideNow) { insideNow = inside; doc.classList.toggle("inside", inside); }
   const n = A.nearest(w, p); if (n >= 0) setCurrent(n);
   if (p > 0.01) $("hint").classList.add("gone");
 }
@@ -228,7 +231,7 @@ $("play").addEventListener("click", () => playing ? stopPlay() : startPlay());
 addEventListener("hashchange", () => { const i = D.indexFromHash(location.hash, stops); if (i >= 0 && i !== current) goTo(i); });
 // 視窗變了就重量。用 ResizeObserver 不用 resize 事件：嵌在別的視窗裡（預覽面板、iframe）時 resize 不一定會來，而 stage 的大小變了是真的。
 let roTimer = 0;
-const onResize = () => { clearTimeout(roTimer); roTimer = setTimeout(() => { size(); measureStrip(); placeDot(); if (api) api.refresh(); onProgress(progress); }, 80); };
+const onResize = () => { clearTimeout(roTimer); roTimer = setTimeout(() => { size(); measureCards(); measureStrip(); placeDot(); if (api) api.refresh(); onProgress(progress); }, 80); };
 addEventListener("resize", onResize);
 if ("ResizeObserver" in window) new ResizeObserver(onResize).observe(document.documentElement);
 

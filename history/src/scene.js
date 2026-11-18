@@ -451,12 +451,15 @@ export function createScene({ canvas, palette, phone, fonts }) {
     renderer.shadowMap.needsUpdate = true;
   }
   function resize(w, h) { W = w; Hh = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  // 靠近一站稍微放大（順不順批 3：之前是 CSS scale 整個 .world）。zoom 變了超過千分之一才重算投影矩陣。
+  let zoomNow = 1;
+  function setZoom(z) { if (Math.abs(z - zoomNow) < 0.001) return; zoomNow = z; camera.zoom = z; camera.updateProjectionMatrix(); }
   const tmpV = new THREE.Vector3(), lookV = new THREE.Vector3();
   function render(e, t) {
     // 鏡頭
     const c = A.cameraAt(e, phone);
     camera.position.set(c.pos[0], c.pos[1], c.pos[2]); lookV.set(c.look[0], c.look[1], c.look[2]); camera.lookAt(lookV);
-    if (c.fov !== lastFov) { lastFov = c.fov; camera.fov = c.fov; camera.updateProjectionMatrix(); }
+    if (c.fov !== lastFov) { lastFov = c.fov; camera.fov = c.fov; camera.zoom = zoomNow; camera.updateProjectionMatrix(); }
     // 飛機
     const qp = A.planePoseAt(e);
     plane.position.set(qp.x, qp.y + A.PLANE_REST_Y, qp.z); plane.rotation.set(-qp.pitch, qp.yaw, 0);
@@ -502,7 +505,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // createScene 蓋完叫一次，setStops 放完小場景再叫一次。
   function pruneCasters() { world.traverse(m => { if (!m.isMesh || !m.castShadow || m.isInstancedMesh) return; const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const r = g.boundingSphere ? g.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) : 1; if (r < 0.6) m.castShadow = false; }); renderer.shadowMap.needsUpdate = true; }
   pruneCasters();
-  return { setStops, setBoard, prepareBoard, setGate, resize, render, project, dispose, renderer, scene, camera, stopMarkers: () => stopMarkers };
+  return { setStops, setBoard, prepareBoard, setGate, setZoom, resize, render, project, dispose, renderer, scene, camera, stopMarkers: () => stopMarkers };
 }
 const idleFigs = [];
 

@@ -4685,6 +4685,15 @@ Paul：「optimize everything the road… make it more smooth and what's not wor
 - 量（本機 Chrome，整趟捲完兩趟）：60 fps、最糟的一幀 29 到 31 ms、超過 33 ms 的幀 0、Long Animation Frame 0（批 1 後是最糟 48 到 60 ms、兩三幀超過 33）。測試 942、check.sh、check-motion、check-mobile 全過。
 - 下一批（批 3）：卡與年份帶的點改用 transform，不再每一幀讀 `offsetWidth`、不用 `left`，layout shift 從 0.69 降到接近 0。
 
+## 歷史之路（2026-11-17，順不順批 3：卡與年份帶不再擠版面）
+
+Chrome 的效能紀錄說整趟捲完 layout shift 0.69（0.25 以上就算差）：年份帶的點用 `left` 加 transition 在動，每一幀都是一次 layout shift；卡用 `left/top` 定位，而且每一幀每張卡都讀 `offsetWidth`（寫了再讀，瀏覽器就得當場重新排版）；整個 `.world` 每一幀 `scale()`（含那張幾百萬像素的畫布）。三件都改（`history/src/main.js`、`scene.js`、`history.css`）：
+- **卡與點的位置用 CSS 的 `translate` 屬性**（跟 `transform` 分開，`transform` 留給卡浮出來那一下的過渡），`left/top` 固定 0。每一幀只寫不讀：卡的寬度在畫卡與 resize 時量一次記在 `_w`，畫面的寬高記在 `measured`，位置沒變超過半個像素就不碰，class 沒變就不切。
+- **靠近一站的放大改成鏡頭的 `zoom`**（`setZoom`，變了超過千分之一才重算投影矩陣），不再 scale DOM。
+- `onProgress` 不再每一幀讀 `stageEl.clientWidth`（resize 用 ResizeObserver 與 resize 事件就夠）。
+- 量（本機 Chrome，整趟捲完）：layout shift 0.69 → **0**，60 fps，最糟一幀 35 ms。測試 942、check.sh、check-motion、check-mobile 全過。
+- 剩批 4（鏡頭與畫面那幾件：空橋那段的鏡頭、旅客擋住走道、飛機的影子、大年份、滾輪太快），要 Paul 挑。
+
 ## BT 島 `/island/`（2026-11-16）
 
 Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項，島跟島、人跟人相連，還可以把自己放進去）之後定的：
