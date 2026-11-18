@@ -103,6 +103,19 @@ function tileTexture(p) {
   ctx.fillStyle = p.cream; ctx.fillRect(0, 0, 128, 128);
   ctx.strokeStyle = p.grey; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.strokeRect(1, 1, 126, 126);
   ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.moveTo(64, 0); ctx.lineTo(64, 128); ctx.moveTo(0, 64); ctx.lineTo(128, 64); ctx.stroke();
+  // 磨石子（2026-11-18 第三批）：撒一些灰與沙色的小點，地板才不是一片平的奶油色。
+  let a = 7; const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
+  for (let i = 0; i < 260; i++) { ctx.fillStyle = i % 3 ? p.grey : p.sand; ctx.globalAlpha = 0.12 + rnd() * 0.16; const r = 0.6 + rnd() * 1.6; ctx.beginPath(); ctx.arc(rnd() * 128, rnd() * 128, r, 0, Math.PI * 2); ctx.fill(); }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
+  return tex;
+}
+// 表面的貼圖（2026-11-18 第三批）：底色加斑點（草地的深淺、停機坪的污漬），可選每 spacing 像素一條格線（水泥板的縫、牆板的接縫）。重複貼。
+function surfaceTexture(base, spots, n, lines, seed) {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const ctx = c.getContext("2d"); ctx.fillStyle = base; ctx.fillRect(0, 0, 256, 256);
+  let a = seed || 3; const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
+  for (let i = 0; i < n; i++) { ctx.fillStyle = spots[i % spots.length]; ctx.globalAlpha = 0.025 + rnd() * 0.06; const r = 3 + rnd() * 11; ctx.beginPath(); ctx.arc(rnd() * 256, rnd() * 256, r, 0, Math.PI * 2); ctx.fill(); }
+  if (lines) { ctx.globalAlpha = 0.22; ctx.strokeStyle = spots[0]; ctx.lineWidth = 2; for (let k = 0; k < 256; k += lines.x || 256) { ctx.beginPath(); ctx.moveTo(k + 1, 0); ctx.lineTo(k + 1, 256); ctx.stroke(); } for (let k = 0; k < 256; k += lines.y || 256) { ctx.beginPath(); ctx.moveTo(0, k + 1); ctx.lineTo(256, k + 1); ctx.stroke(); } }
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
   return tex;
 }
@@ -164,8 +177,12 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const T = A.TERMINAL;
 
   // ═══ 地 ═══
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000), mats.grass); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; world.add(ground);
-  const apron = new THREE.Mesh(new THREE.PlaneGeometry(340, 220), mats.apron); apron.rotation.x = -Math.PI / 2; apron.position.set(90, 0, 110); apron.receiveShadow = true; world.add(apron);
+  // 地面與停機坪（2026-11-18 第三批）：草地有深淺的斑塊、停機坪有水泥板的縫與污漬，從高處看才不是兩片平的顏色。
+  const grassTex = surfaceTexture(palette.sand, [palette.teal, palette.navy, palette.cream], 140, null, 5); grassTex.repeat.set(14000 / 48, 14000 / 48);
+  const apronTex = surfaceTexture(palette.cream, [palette.grey, palette.navy], 50, { x: 128, y: 128 }, 9); apronTex.repeat.set(340 / 12, 220 / 12);
+  mats.ground = lam(P.grass.clone().lerp(P.sand, 0.15), { map: grassTex }); mats.apronTex = lam(P.apron.clone().lerp(P.grey, 0.1), { map: apronTex });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000), mats.ground); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; world.add(ground);
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(340, 220), mats.apronTex); apron.rotation.x = -Math.PI / 2; apron.position.set(90, 0, 110); apron.receiveShadow = true; world.add(apron);
   // 滑行道：沿樣條鋪一條 18 公尺寬的帶子，中線一條黃線，兩邊每 12 公尺一顆邊燈。
   const tw = A.taxiway();
   world.add(ribbon(tw.points, 9, 0.02, mats.taxi), ribbon(tw.points, 0.3, 0.05, mats.yellowLight));
@@ -211,8 +228,10 @@ export function createScene({ canvas, palette, phone, fonts }) {
     { const sky = new THREE.Mesh(new THREE.PlaneGeometry(tw_, 6), mats.glass); sky.rotation.x = Math.PI / 2; sky.position.set(tx, T.h - 0.95, -20); term.add(sky); const bars = []; for (let x = T.x0 + 3; x < T.x1; x += 6) bars.push([x, T.h - 0.95, -20]); term.add(instanced(new THREE.BoxGeometry(0.2, 0.2, 6), mats.frame, bars, false), box(tw_, 0.2, 0.2, mats.frame, tx, T.h - 0.95, -23, false), box(tw_, 0.2, 0.2, mats.frame, tx, T.h - 0.95, -17, false)); }
   }
   const roof = box(tw_ + 3, 0.8, td + 3, mats.roof, tx, T.h, tz, false); roof.receiveShadow = false; term.add(roof);
-  const sideM = lam(P.wall, { side: THREE.DoubleSide });
-  for (const [w, h, d, x, y, z] of [[tw_, T.h, 0.6, tx, T.h / 2, T.z0], [0.6, T.h, td, T.x0, T.h / 2, tz], [0.6, T.h, td, T.x1, T.h / 2, tz]]) { const m = box(w, h, d, sideM, x, y, z, false); term.add(m); }
+  // 牆（2026-11-18 第三批）：牆板每 3 公尺一道縫、每 4 公尺一道橫縫，長牆與短牆各一個材質（box 的 UV 是 0 到 1，重複數要照牆的長度算）。
+  const wallTexOf = (len, h) => { const t = surfaceTexture(palette.cream, [palette.grey, palette.sand], 30, { x: 256, y: 256 }, 13); t.repeat.set(len / 3, h / 4); return lam(P.wall, { side: THREE.DoubleSide, map: t }); };
+  const sideM = wallTexOf(tw_, T.h), endM = wallTexOf(td, T.h);
+  for (const [w, h, d, x, y, z, m_] of [[tw_, T.h, 0.6, tx, T.h / 2, T.z0, sideM], [0.6, T.h, td, T.x0, T.h / 2, tz, endM], [0.6, T.h, td, T.x1, T.h / 2, tz, endM]]) { const m = box(w, h, d, m_, x, y, z, false); term.add(m); }
   // 陸側牆上一條深藍的帶子、幾扇門、幾面橘色的指標
   term.add(box(tw_, 1.0, 0.2, mats.navy, tx, T.h - 1.6, T.z0 + 0.4, false));
   term.add(instanced(new THREE.BoxGeometry(3, 3.2, 0.3), mats.frame, [[10, 1.6, T.z0 + 0.4], [60, 1.6, T.z0 + 0.4], [95, 1.6, T.z0 + 0.4]], false));

@@ -203,5 +203,26 @@ export function buildGrounds(THREE, c) {
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(1, 1, 1), V = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     movers.push({ fn: t => { for (let i = 0; i < N; i++) { const lane = i < 6; const sp = lane ? 9 + (i % 3) * 1.5 : 10 + (i % 2) * 2; const span = lane ? 230 : 230; const u = ((t * sp + i * 37) % span); const x = lane ? -50 + u : 180 - u, z = lane ? -48.3 + (i % 2) * 1.8 : -108 - (i % 2) * 2.2; Q.setFromAxisAngle(up, lane ? Math.PI / 2 : -Math.PI / 2); V.set(x, 0.6, z); M.compose(V, Q, S); bodies.setMatrixAt(i, M); V.set(x + (lane ? 0.2 : -0.2), 1.5, z); M.compose(V, Q, S); tops.setMatrixAt(i, M); } bodies.instanceMatrix.needsUpdate = true; tops.instanceMatrix.needsUpdate = true; } });
   }
+  // ═══ 第三批（2026-11-18）：航廈的屋頂（從停機坪與空中看最大的一片）與跑道的胎痕 ═══
+  // 屋頂：女兒牆、走道上方那條天窗的玻璃脊（跟裡面的天窗同一條 z -20）、十四台空調主機加管線、四十片太陽能板、兩支天線、逃生梯的出口小屋、幾個通風口。
+  {
+    const tx = (T.x0 + T.x1) / 2, tz = (T.z0 + T.z1) / 2, tw0 = T.x1 - T.x0, td = T.z1 - T.z0, y = T.h + 0.4;
+    world.add(box(tw0 + 3, 0.9, 0.5, mats.wallShade, tx, y + 0.45, T.z0 - 1.5, false), box(tw0 + 3, 0.9, 0.5, mats.wallShade, tx, y + 0.45, T.z1 + 1.5, false), box(0.5, 0.9, td + 3, mats.wallShade, T.x0 - 1.5, y + 0.45, tz, false), box(0.5, 0.9, td + 3, mats.wallShade, T.x1 + 1.5, y + 0.45, tz, false));
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(tw0 - 4, 1.6, 7), mats.glass); ridge.position.set(tx, y + 0.8, -20); world.add(ridge);
+    const ribs = []; for (let x = T.x0 + 3; x < T.x1; x += 6) ribs.push([x, y + 0.8, -20]); world.add(instanced(new THREE.BoxGeometry(0.25, 1.7, 7.2), mats.frame, ribs, false), box(tw0 - 4, 0.25, 0.25, mats.frame, tx, y + 1.65, -20, false));
+    const ac = [], fans = []; for (let i = 0; i < 14; i++) { const x = T.x0 + 8 + i * 8.4, z = i % 2 ? -33 : -7; ac.push([x, y + 1.0, z]); fans.push([x - 0.9, y + 2.05, z], [x + 0.9, y + 2.05, z]); }
+    world.add(instanced(new THREE.BoxGeometry(3.6, 2.0, 2.4), mats.grey, ac), instanced(new THREE.CylinderGeometry(0.7, 0.7, 0.12, 12), mats.dark, fans, false));
+    world.add(box(tw0 - 20, 0.6, 0.6, mats.cream, tx, y + 0.3, -30, false), box(tw0 - 20, 0.6, 0.6, mats.cream, tx, y + 0.3, -10, false));
+    const pv = []; for (let i = 0; i < 20; i++) for (const z of [-27, -13]) pv.push([T.x0 + 12 + i * 5.2, y + 0.5, z]);
+    const pvGeo = new THREE.BoxGeometry(4.6, 0.12, 2.6); pvGeo.rotateX(-0.35); world.add(instanced(pvGeo, lam(P.navy.clone().lerp(P.teal, 0.3), { emissive: P.teal, emissiveIntensity: 0.15 }), pv, false));
+    world.add(cyl(0.08, 0.1, 9, mats.grey, T.x0 + 4, y + 4.5, -36, 6), cyl(0.08, 0.1, 7, mats.grey, T.x1 - 4, y + 3.5, -4, 6), box(1.2, 0.08, 0.08, mats.grey, T.x0 + 4, y + 8.5, -36, false), box(3, 2.6, 3, mats.wall, T.x0 + 10, y + 1.3, -4), box(3, 2.6, 3, mats.wall, T.x1 - 10, y + 1.3, -36));
+    const vents = []; for (let i = 0; i < 10; i++) vents.push([T.x0 + 14 + i * 14, y + 0.5, -21 + (i % 2 ? 5.5 : -5.5)]); world.add(instanced(new THREE.CylinderGeometry(0.5, 0.6, 1.0, 8), mats.wallShade, vents, false));
+  }
+  // 跑道的胎痕：兩端觸地帶各二十幾條深色的刷痕（真的跑道落地那一段都是黑的）。
+  {
+    const marks = []; let a = 17; const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
+    for (let i = 0; i < 26; i++) { const dz = (rnd() - 0.5) * 16, len = 20 + rnd() * 40; marks.push([R.x1 - 120 - rnd() * 90, 0.04, R.z + dz, 0, 1 + rnd()], [R.x0 + 120 + rnd() * 90, 0.04, R.z + dz, 0, 1 + rnd()]); void len; }
+    world.add(instanced(new THREE.BoxGeometry(30, 0.02, 0.9), lam(P.asphalt.clone().lerp(P.navy, 0.35).multiplyScalar(0.8), { transparent: true, opacity: 0.55 }), marks, false));
+  }
   return { tick: t => { for (const m of movers) m.fn(t); } };
 }
