@@ -210,7 +210,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // ═══ 一塊陸地：身體（崖）、頂面（地面花紋）、沙灘那一圈、浪花、淺水。shape 是 hex、round 或 rect；prism(r, h) 給那個形狀的幾何。回頂面那一片（頁面給它 userData.sel 就點得到）。═══
   function landmass(g, { shape, r, prism, top: topM }) {
     const body = new THREE.Mesh(prism(r, 2.6), M.cliff); body.position.y = -2.6; body.receiveShadow = true; g.add(body);
-    const top = new THREE.Mesh(prism(r - 0.1, 0.3), topM || M.grass); top.position.y = -0.3; top.receiveShadow = true; g.add(top);
+    const top = new THREE.Mesh(prism(r - 0.1, 0.3), topM || M.grass); top.position.y = -1.0;   // 2026-11-18：圓角柱體的頂在本地 +1.0（斜角 0.5 加厚 0.3 再抬 0.5），放 -1.0 頂面才在 0。之前放 -0.3，地面在 0.7，長凳與花與路都埋在地裡 top.receiveShadow = true; g.add(top);
     // 沙灘那一圈與淺水：六邊形的島跟著六邊形，圓的跟著圓，方的用淺水就好（操場邊沒有沙灘）。
     const segs = shape === "hex" ? 6 : 40, rot = shape === "hex" ? Math.PI / 6 : 0;
     if (shape !== "rect") { const rim = new THREE.Mesh(new THREE.RingGeometry(r - 1.2, r + 0.1, segs, 1, rot), M.beach); rim.rotation.x = -Math.PI / 2; rim.position.y = 0.02; g.add(rim); }
@@ -495,7 +495,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   function islet(it) {
     const g = new THREE.Group(); g.position.set(it.x, 0, it.z); world.add(g);
     const r = it.r;
-    if (it.kind !== "rock") { const body = new THREE.Mesh(roundPrism(r, 2.2), M.cliff); body.position.y = -2.2; g.add(body); const top = new THREE.Mesh(roundPrism(r - 0.1, 0.3), it.kind === "picnic" ? groundMat("lawn") : M.grass); top.position.y = -0.3; top.receiveShadow = true; g.add(top);
+    if (it.kind !== "rock") { const body = new THREE.Mesh(roundPrism(r, 2.2), M.cliff); body.position.y = -2.2; g.add(body); const top = new THREE.Mesh(roundPrism(r - 0.1, 0.3), it.kind === "picnic" ? groundMat("lawn") : M.grass); top.position.y = -1.0; top.receiveShadow = true; g.add(top);
       const foam = new THREE.Mesh(new THREE.RingGeometry(r + 0.4, r + 1.0, 36), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.4, depthWrite: false })); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.55; g.add(foam); }
     if (it.kind === "coaster") {
       // 雲霄飛車：一條閉合的軌道（CatmullRom 過幾個高高低低的點）、柱子撐著、一列小車沿軌道跑。

@@ -4738,6 +4738,35 @@ the water slide should be only at the commons… make it like somebody is living
 - 真的手機上沒量過（draw call 壓到 674，但三角形 1.3M 大半是人與迴圈飛車的管子）。
 - 纜車在 Curriculum 的塔放在島的北緣（本地 0, 9），有時候會跟 furnish 隨機放的桌椅擠在一起；要挪改 `layout.js` 的 `GONDOLA.pts[4]`。
 
+## BT 島（2026-11-18 第二批：路、球場、海邊、市集）
+
+Paul 看完第一批按了「More detail first」，要島看起來有人住、很熱鬧、很好看。這一批分兩支新檔：`island/src/town.js`（約 45 KB）管陸上的，`island/src/sea.js`（約 17 KB）管海上的，跟 life.js 一樣不碰 three、不碰 toy.js，THREE 跟引擎從 scene.js 傳進去（順序 rides → life → town → sea，鋪路要先知道小店在哪，沙灘要避開碼頭），每一樣放上去的東西都記進 blockers 讓人繞開，會動的標 dynamic、在自己的 tick() 裡動。
+
+### 改了什麼
+
+- **陸上**：每座島房子到島心的步道、小店接到最近路口的小路、最大那棟前面的小廣場加燈與花台、沿路的燈；房子旁邊的樹籬、白柵欄、成排的花、菜園（有稻草人）、溫室、工具間。
+  Marketing 一座網球場（兩個人在打、球會飛）加泳池（四面池緣、梯子、兩個人泡在水裡、躺椅與陽傘）加噴水池（14 顆水珠），Community Relations 一座籃球半場（有人在投籃、球會彈），Curriculum 第二座小遊樂場（翹翹板會蹺、沙坑有小孩、搖搖馬），Sponsorship 有營火圈（火會閃、有煙）、小舞台與看表演的人；
+  市集攤五攤（條紋雨棚加貨加老闆）、燈串五串、野餐桌兩張上面有人在吃、長凳上成對坐的八對、三個人站著聊的五組、餐車前排隊的、Mentorship 有人遛狗（狗會跟著跑）、Curriculum 有人沿著島緣慢跑；機場多了加油車（軟管、地勤）與登機梯前排隊的旅客。
+  球場那種大東西放不下的時候會砍掉擋到的樹、矮樹、引擎撒的桌椅、life.js 的小店或餐車（人會還回 pool），順序是大東西先放、路與菜園後放；聚會所放不下的（泳池、噴水池、舞台）落到別座島。
+- **海上**：Sponsorship、Mentorship、Community Relations 各一個沙灘灣（自己算的網格，沙從島上斜到水裡；陽傘、浴巾、躺椅、沙堡、曬太陽的人、兩層葉子的棕櫚樹）、每座島外圍兩圈一明一暗的浪、15 個會晃的浮標（一個 InstancedMesh）、四艘彩色帆的帆船各繞一片空水域（會傾會晃）、一對每七秒跳出水面的海豚、一架繞整個島群飛的水上飛機（螺旋槳會轉）。
+  帆船的橢圓與海豚的位置在 `layout.js` 的 `SAIL_LOOPS` 與 `DOLPHINS`，`test/island.test.mjs` 多一條守它們離每座島、小島、機場平台、渡輪航線都 2 公尺以上。
+- **引擎修了一個地面的 bug**（`shared/toy.js` 的 `landmass()` 與 `islet()`）：有圓角的柱體（ExtrudeGeometry 的 bevel 0.5）頂面在本地 +1.0，引擎把頂面那一片放在 -0.3，地面其實在 0.7 公尺高，長凳、花、腳踏車、路、小店門口全部埋在地裡只露出頭。Paul 說「到處都空空的」有一半是這個。改成 -1.0，頂面剛好在 0。`rides.js` 自己畫的小島底座同樣改 -1.0。
+- `life.js` 多記 `E.lifePlaces`（每座島小店、餐車、公車亭、碼頭的位置），town.js 鋪路與排隊要用。
+- **效能**（本機 Chrome）：767 個 draw call（第一批 674）、2.53M 個三角形、59.9 fps、240 幀裡超過 33 ms 的 1 幀。
+- 除錯（`?debug=1`）：`__island._E.townStats`（每樣放了幾個、放到哪座島）、`seaStats`、`lifePlaces`，`__island._extraTick(dt, t)` 可以手動推進動畫。
+- 截圖：`docs/island/2026-11-18b-{overview,marketing-tennis-pool,commons-market,cr-beach}.jpg`。測試 943、`check.sh` 全過。
+
+### 怎麼驗證
+
+1. 開 `/island/`，全景就看得到帆船在繞、海豚跳、水上飛機繞圈、島外圍的浪。
+2. 點 Marketing：網球場有人在打球、泳池有人、噴水池在噴。點 Sponsorship：營火、市集攤、舞台。點 Community Relations：籃球場與沙灘。
+3. console 打 `__island._E.renderer.info.render.calls`（或看 `?debug=1` 的 `__island`），在 800 以內。
+
+### 還沒做
+
+- 真的手機沒量過。
+- 島太滿了：沿路的長凳只放成一張，之後要再加東西得先決定砍什麼。
+
 ## 歷史之路（2026-11-18：機場裡外照真的機場做）
 
 Paul 2026-11-18 凌晨（要去睡了，交代做完）：「everything, including what I said, the detail first… make like the shop, detail, layout, decoration… as detailed as possible… feels like an airport as much as it can… by the time I wake up, I want to see an airport with plenty of details in and out of the terminal」。

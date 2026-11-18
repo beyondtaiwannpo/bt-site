@@ -12,7 +12,7 @@ export function buildRides(THREE, E, c) {
   // 一座小島的底（跟 toy.js 的 islet 一樣：崖、頂面、一圈浪花）。
   function base(x, z, r, top) {
     const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g);
-    g.add(mesh(E.roundPrism(r, 2.2), M.cliff, 0, -2.2, 0, false), mesh(E.roundPrism(r - 0.1, 0.3), top || M.grass, 0, -0.3, 0, false));
+    g.add(mesh(E.roundPrism(r, 2.2), M.cliff, 0, -2.2, 0, false), mesh(E.roundPrism(r - 0.1, 0.3), top || M.grass, 0, -1.0, 0, false));   // 頂面那一片放 -1.0 頂面才在 0（圓角柱體的頂在本地 +1.0，見 scene.js landmass 那一段）
     const foam = new THREE.Mesh(new THREE.RingGeometry(r + 0.4, r + 1.0, 36), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.4, depthWrite: false })); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.55; g.add(foam);
     return g;
   }

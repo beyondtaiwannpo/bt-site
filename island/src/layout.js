@@ -131,6 +131,17 @@ export const ENGINE_ISLETS = ["coaster", "lighthouse", "picnic", "palm", "rock"]
 export const GONDOLA = { pts: [[53, 6.5], [31, -1], [8, -3], [-9, 10], [-22.5, 22], [-30, 26]], h: 11, stilts: [5], speed: 1.5, cabins: 12 };
 // 渡輪：在島群南邊的水道來回，兩頭各一座浮動碼頭。
 export const FERRY = { a: [-45, 50], b: [40, 50] };
+// 帆船（2026-11-18 第二批，sea.js 畫）：四艘各自在一片空水域繞橢圓。cx cz 是橢圓中心、rx rz 是兩個半徑、u0 是起點。
+// 四片水域：北邊（燈塔與迴圈飛車之間）、西南（雲霄飛車與渡輪航線之間）、東邊（Community Relations 與遊樂小島之間）、西邊（Internship 與棕櫚小島之間）。
+// 橢圓上每一點離每座島、每座小島、渡輪航線都要有 2 公尺以上（test/island.test.mjs 守）。
+export const SAIL_LOOPS = [
+  { cx: 15, cz: -50, rx: 18, rz: 5, u0: 0.1, speed: 1.4 },
+  { cx: -28, cz: 40, rx: 12, rz: 5, u0: 0.6, speed: 1.2 },
+  { cx: 42, cz: 24, rx: 7, rz: 5, u0: 0.3, speed: 1.0 },
+  { cx: -46, cz: 2, rx: 6, rz: 9, u0: 0.8, speed: 1.1 },
+];
+// 海豚那一對跳出水面的地方（Sponsorship 南邊、渡輪航線北邊的空水域）。
+export const DOLPHINS = { x: 13, z: 42 };
 // 橋的樣式（0 木板、1 石拱、2 紅漆拱、3 繩索、4 滑水道）。
 // Paul 2026-11-18：「the water slide should be only at the commons」：滑水道只在聚會所那六條輻條上（三條滑水道三條別的輪流），外圍的環與機場的橋不用。
 export function bridgeStyle(br, i) { if (br.a === "commons" || br.b === "commons") return i % 2 === 0 ? 4 : [0, 1, 2][Math.floor(i / 2) % 3]; return [0, 1, 2, 3][i % 4]; }

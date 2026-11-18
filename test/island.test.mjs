@@ -132,6 +132,13 @@ test("位置：八座島不重疊、大小距離形狀各不一樣、橋有長�
   for (let i = 0; i < 30; i++) { const w = L.wanderTarget(cu, [{ x: cu.x, z: cu.z, r: 4 }], rnd2); assert.ok(Math.hypot(w.x - cu.x, w.z - cu.z) >= 4.6 || (w.x === cu.x && w.z === cu.z + 2)); }
 });
 
+test("海上的第二批（2026-11-18）：四艘帆船的橢圓、海豚的位置，離每座島、每座小島、機場平台、渡輪航線都 2 公尺以上", () => {
+  const isl = L.islands().map(i => ({ id: i.id, x: i.x, z: i.z, r: i.sea ? 13 : i.r })).concat(L.ISLETS.map(i => ({ id: i.id, x: i.x, z: i.z, r: i.r })));
+  const farEnough = (x, z, what) => { for (const o of isl) assert.ok(Math.hypot(x - o.x, z - o.z) >= o.r + 2, what + " 離 " + o.id + " 太近"); assert.ok(Math.abs(z - L.FERRY.a[1]) >= 2.5 || x < Math.min(L.FERRY.a[0], L.FERRY.b[0]) - 4 || x > Math.max(L.FERRY.a[0], L.FERRY.b[0]) + 4, what + " 撞到渡輪航線"); };
+  assert.equal(L.SAIL_LOOPS.length, 4);
+  L.SAIL_LOOPS.forEach((o, k) => { for (let i = 0; i < 72; i++) { const th = i / 72 * L.TAU; farEnough(o.cx + Math.cos(th) * o.rx, o.cz + Math.sin(th) * o.rz, "帆船 " + k); } });
+  for (let i = 0; i < 12; i++) { const a = i / 12 * L.TAU; farEnough(L.DOLPHINS.x + Math.cos(a) * 5.5, L.DOLPHINS.z + Math.sin(a) * 5.5, "海豚"); }
+});
 test("貼文：掛在哪一樣在做的事底下、只收 instagram.com 的 https 連結、最多 12 則、卡上是按鈕先放大再到 Instagram；posts.json 本身合法而且不放未成年的名字", () => {
   const raw = JSON.parse(fs.readFileSync("island/posts.json", "utf8"));
   const ig = D.normalizePosts(raw, d.teams);

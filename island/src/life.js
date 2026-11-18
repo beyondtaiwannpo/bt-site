@@ -12,17 +12,19 @@ export function buildLife(THREE, E, c) {
   const mulberry = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
   const flowers = [], rocks = [], tufts = [], bikeWheels = [], bikeFrames = [];
   const stats = { shops: 0, carts: 0, stops: 0, bikes: 0, lines: 0, docks: 0, roofs: 0, smoke: 0 }; E.lifeStats = stats;   // 除錯：console 裡 __island._E.lifeStats 看每一樣放了幾個
+  const lifePlaces = new Map(); E.lifePlaces = lifePlaces;   // 每座島的小店、餐車、公車亭、碼頭落在哪（town.js 鋪路、排隊、挑沙灘的方向要看），記的是島的本地座標
   const flowerCol = [P.orange, P.yellow, P.white, P.teal, P.cream];
 
   for (const isl of islands) {
     if (isl.sea) continue;
     const rr = mulberry(isl.x * 31 + isl.z * 17 + 99);
     const blockers = blockersOf.get(isl.id) || [], pois = poisOf.get(isl.id) || [];
+    const places = []; lifePlaces.set(isl.id, places);
     const g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); world.add(g);
     // 矮樹、燈那些小東西（r 0.8 以下）不算：島上被它們佔掉的縫太多，什麼都放不下（2026-11-18 第一版每座島一間店都沒放成）。
     const free = (x, z, dmin) => Math.hypot(x, z) < isl.r - 1.8 && !blockers.some(b => (b.r || 1.2) >= 0.8 && Math.hypot(isl.x + x - b.x, isl.z + z - b.z) < (b.r || 1.2) + dmin);
     const spot = (dmin, rMin, rMax, tries) => { for (let i = 0; i < (tries || 160); i++) { const a = rr() * TAU, d = isl.r * ((rMin == null ? 0.2 : rMin) + rr() * ((rMax == null ? 0.8 : rMax) - (rMin == null ? 0.2 : rMin))); const x = Math.cos(a) * d, z = Math.sin(a) * d; if (free(x, z, dmin)) return { x, z, a }; } return null; };
-    const put = (obj, pos, ry, r) => { obj.position.set(pos.x, 0, pos.z); if (ry != null) obj.rotation.y = ry; g.add(obj); blockers.push({ x: isl.x + pos.x, z: isl.z + pos.z, r: r || 1.2 }); obj.traverse(m => { if (m.isMesh) m.castShadow = true; }); return obj; };
+    const put = (obj, pos, ry, r) => { obj.position.set(pos.x, 0, pos.z); if (ry != null) obj.rotation.y = ry; g.add(obj); blockers.push({ x: isl.x + pos.x, z: isl.z + pos.z, r: r || 1.2 }); places.push({ kind: "item", x: pos.x, z: pos.z, r: r || 1.2, g: obj }); obj.traverse(m => { if (m.isMesh) m.castShadow = true; }); return obj; };   // places 記 g：town.js 的球場放不下可以把它拿掉
     const stand = (pos, a, dist) => pois.push({ kind: "stand", face: a + Math.PI, x: pos.x + Math.sin(a) * dist, z: pos.z + Math.cos(a) * dist });
     const person = (parent, x, z, ry, o) => { const pp = makePerson({ scale: 1.1, ...(o || {}) }); pp.position.set(x, 0, z); pp.rotation.y = ry; parent.add(pp); return pp; };
     // 兩間小店：房子、斜的雨棚（team 的顏色與另一色輪流）、掛在牆上的招牌、門口的 A 字立牌、兩個窗台花箱、一張小桌兩張凳。店門口是人會站的點。
@@ -37,7 +39,7 @@ export function buildLife(THREE, E, c) {
       s.add(mesh(rbox(0.9, 0.2, 0.3, 0.04), M.wood, 0.6, 0.85, 1.25, false), mesh(new THREE.SphereGeometry(0.11, 6, 5), M.orange, 0.4, 1.0, 1.25, false), mesh(new THREE.SphereGeometry(0.11, 6, 5), M.yellow, 0.75, 1.0, 1.25, false));
       s.add(mesh(rbox(0.1, 0.1, 0.9, 0.02), M.dark, 1.45, 2.1, 0.9, false), mesh(rbox(0.06, 0.6, 0.8, 0.03), k ? M.yellow : M.navy, 1.5, 1.65, 1.2, false));
       const ab = new THREE.Group(); ab.position.set(-1.0, 0, 2.0); s.add(ab); for (const sgn of [-1, 1]) { const bd = mesh(rbox(0.5, 0.7, 0.04, 0.02), M.cream, 0, 0.35, sgn * 0.12, false); bd.rotation.x = sgn * 0.3; ab.add(bd); }
-      put(s, sp, face, 1.9); stand(sp, face, 2.4);
+      put(s, sp, face, 1.9); stand(sp, face, 2.4); places.push({ kind: "shop", x: sp.x, z: sp.z, face, r: 1.9, g: s });
       person(s, 1.6, 2.6, Math.PI, { shirt: k ? 2 : 4, bag: true });
     }
     // 餐車：車身、兩個輪子、雨棚、鍋子、一個老闆站在後面、兩個客人在前面。
@@ -45,7 +47,7 @@ export function buildLife(THREE, E, c) {
       f.add(mesh(rbox(1.8, 1.0, 1.0, 0.1), M.white, 0, 0.75, 0), mesh(rbox(1.9, 0.08, 1.1, 0.03), M.wood, 0, 1.28, 0, false), mesh(rbox(2.2, 0.1, 1.6, 0.03), M.orange, 0, 2.3, 0.2, false), mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6), M.dark, -0.95, 1.8, 0.7, false), mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6), M.dark, 0.95, 1.8, 0.7, false));
       for (const x of [-0.6, 0.6]) f.add(mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 10), M.dark, x, 0.28, 0, false).rotateX(Math.PI / 2));
       f.add(mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.2, 10), M.dark, -0.4, 1.4, 0, false), mesh(rbox(0.5, 0.3, 0.3, 0.05), M.teal, 0.45, 1.45, 0, false));
-      put(f, sp, face, 1.6); stand(sp, face, 1.6); stand({ x: sp.x + Math.cos(face) * 0.8, z: sp.z - Math.sin(face) * 0.8 }, face, 1.6);
+      put(f, sp, face, 1.6); places.push({ kind: "cart", x: sp.x, z: sp.z, face, r: 1.6, g: f }); stand(sp, face, 1.6); stand({ x: sp.x + Math.cos(face) * 0.8, z: sp.z - Math.sin(face) * 0.8 }, face, 1.6);
       person(f, 0, -0.9, 0, { shirt: 3, hat: true }); person(f, -0.5, 1.4, Math.PI, { shirt: 1 }); } }
     // 公車亭：兩支柱、玻璃背板、雨棚、長凳、站牌（team 的顏色）。
     { const sp = spot(1.3, 0.5, 0.82); if (sp) { stats.stops++; const b = new THREE.Group(); const face = -sp.a + Math.PI / 2 + Math.PI;
@@ -53,7 +55,7 @@ export function buildLife(THREE, E, c) {
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.8), M.shallow); glass.position.set(0, 1.3, -0.6); b.add(glass);
       const bench = E.bench(); bench.position.set(0, 0, -0.1); b.add(bench);
       b.add(mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.6, 6), M.dark, 1.9, 1.3, 0.6, false), mesh(rbox(0.5, 0.5, 0.06, 0.1), M.team[isl.colour] || M.orange, 1.9, 2.5, 0.6, false));
-      put(b, sp, face, 1.7); pois.push({ kind: "bench", face, x: sp.x + Math.sin(face) * 0.3, z: sp.z + Math.cos(face) * 0.3 });
+      put(b, sp, face, 1.7); places.push({ kind: "stop", x: sp.x, z: sp.z, face, r: 1.7, g: b }); pois.push({ kind: "bench", face, x: sp.x + Math.sin(face) * 0.3, z: sp.z + Math.cos(face) * 0.3 });
       person(b, -0.9, 0.9, Math.PI, { shirt: 5, pack: true }); } }
     // 腳踏車架：三台車（輪子與車架一次畫完）、郵筒、消防栓、一個垃圾桶組。
     { const sp = spot(0.8); if (sp) { stats.bikes++; const ry = rr() * TAU; for (let k = 0; k < 3; k++) { const dx = (k - 1) * 0.7; const x = isl.x + sp.x + Math.cos(ry) * dx, z = isl.z + sp.z - Math.sin(ry) * dx; bikeWheels.push([x + Math.sin(ry) * 0.45, 0.3, z + Math.cos(ry) * 0.45, ry], [x - Math.sin(ry) * 0.45, 0.3, z - Math.cos(ry) * 0.45, ry]); bikeFrames.push([x, 0.45, z, ry]); } blockers.push({ x: isl.x + sp.x, z: isl.z + sp.z, r: 1.3 }); } }
@@ -69,7 +71,7 @@ export function buildLife(THREE, E, c) {
       put(l, sp, ry, 1.5); ticks.push((dt, t) => { cloth.rotation.x = Math.sin(t * 1.9 + sp.x) * 0.25; }); } }
     // 碼頭：從島緣伸出去（挑一個沒有橋的方向）、四支柱、兩艘停著的小船、一個釣魚的人（魚竿、線、浮標會晃）、一盞燈。
     { const ends = (c.bridgeAngles.get(isl.id) || []); let a = null; for (let i = 0; i < 24 && a == null; i++) { const cand = rr() * TAU; if (!ends.some(e => Math.abs(Math.atan2(Math.sin(cand - e), Math.cos(cand - e))) < 0.55)) a = cand; }
-      if (a != null) { stats.docks++; const d = new THREE.Group(); d.position.set(Math.cos(a) * (isl.r - 0.6), 0, Math.sin(a) * (isl.r - 0.6)); d.rotation.y = -a; g.add(d);
+      if (a != null) { stats.docks++; places.push({ kind: "dock", a }); const d = new THREE.Group(); d.position.set(Math.cos(a) * (isl.r - 0.6), 0, Math.sin(a) * (isl.r - 0.6)); d.rotation.y = -a; g.add(d);
         d.add(mesh(rbox(4.6, 0.22, 1.6, 0.05), M.wood, 2.1, 0.08, 0, false)); for (const [ox, oz] of [[0.8, -0.6], [3.9, -0.6], [0.8, 0.6], [3.9, 0.6]]) d.add(mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.5, 6), M.dark, ox, -0.6, oz, false));
         for (const [sx, sz, m, m2] of [[2.4, 1.8, M.white, M.orange], [3.6, -1.9, M.teal, M.navy]]) { const bt = new THREE.Group(); bt.position.set(sx, -0.4, sz); bt.rotation.y = 0.3; d.add(bt); bt.add(mesh(rbox(2.0, 0.45, 0.9, 0.16), m, 0, 0.1, 0), mesh(rbox(0.7, 0.4, 0.6, 0.08), m2, -0.2, 0.5, 0, false)); }
         const l = E.lamp(); l.position.set(0.6, 0, 0.55); d.add(l);
