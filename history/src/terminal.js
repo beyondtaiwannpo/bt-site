@@ -166,10 +166,11 @@ export function buildTerminal(THREE, c) {
     const q = [[x + 2.4, -5.8], [x + 1.2, -5.8], [x - 0.2, -5.8]]; q.forEach(([qx, qz], i) => person(qx, qz, -Math.PI / 2, { shirt: pick(x + i), backpack: i % 2 === 0 }));
   }
   // 我們那一門（登機門櫃台在 airport.js 的 GATE_DESK）：排隊的四個人、拉帶欄、掃描閘。
-  { const [gx, gz] = A.GATE_DESK; stanchions([[gx + 4, gz - 3.4], [gx - 2, gz - 3.4], [gx - 2, gz - 2.0]], mats.navy); for (let i = 0; i < 4; i++) person(gx + 2.8 - i * 1.2, gz + 2.6, -Math.PI / 2, { shirt: pick(90 + i), bag: i % 2 === 1 }); term.add(instanced(new THREE.BoxGeometry(0.3, 1.0, 0.8), mats.grey, [[gx + 2.4, 0.5, gz - 0.2], [gx + 3.4, 0.5, gz - 0.2]], false)); }
+  // 2026-11-18：隊伍、拉帶欄、掃描閘全部搬到櫃台東側（鏡頭從西南斜著走到門，之前會穿過拉帶與排隊的人）。
+  { const [gx, gz] = A.GATE_DESK; stanchions([[gx + 2.5, gz - 3.6], [gx + 8.5, gz - 3.6], [gx + 8.5, gz - 2.2]], mats.navy); for (let i = 0; i < 4; i++) person(gx + 3.2 + i * 1.2, gz - 2.9, Math.PI / 2, { shirt: pick(90 + i), bag: i % 2 === 1 }); term.add(instanced(new THREE.BoxGeometry(0.3, 1.0, 0.8), mats.grey, [[gx + 4.4, 0.5, gz - 0.2], [gx + 5.4, 0.5, gz - 0.2]], false)); }
   // 座位：登機門前兩排（面向窗），候機區再補一段（x 14 到 50 與 104 到 122）。既有 60 到 100 的四排留著。
   seatRow(16, -7, 7, 0, [[0, 1], [5.5, 2], [10, 3], [16, 4], [25, 5], [31, 6]]); seatRow(16, -11, 7, Math.PI, [[2, 7], [11.5, 8], [21, 9], [27, 10]]);
-  seatRow(104, -7, 4, 0, [[1, 11], [6.5, 12], [15, 13]]); seatRow(104, -11, 4, Math.PI, [[3, 14], [12, 15]]);
+  seatRow(116, -7, 2, 0, [[1, 11], [6.5, 12]]); seatRow(116, -11, 2, Math.PI, [[3, 14]]);   // 2026-11-18：原本從 104 起四組，鏡頭往登機門的斜線（100,-20 → 106,-14 → 112,-5）會穿過座位，改從 116 起兩組
   seatRow(16, -29, 5, Math.PI, [[0.5, 16], [10, 17], [20, 18]]);
   term.add(instanced(new THREE.BoxGeometry(5.2, 0.12, 0.9), mats.grey, seatLists.benchA), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.teal, seatLists.seatT), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.orange, seatLists.seatO), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.navy, seatLists.seatN));
   term.add(instanced(new THREE.BoxGeometry(0.3, 1.2, 0.3), mats.navy, seatLists.charge, false), instanced(new THREE.BoxGeometry(0.32, 0.06, 0.32), mats.yellowLight, seatLists.chargeLight, false));
@@ -182,7 +183,7 @@ export function buildTerminal(THREE, c) {
     term.add(instanced(new THREE.CylinderGeometry(0.08, 0.1, 2.0, 6), mats.grey, poles, false), instanced(new THREE.BoxGeometry(1.2, 0.9, 0.12), mats.dark, scr, false), instanced(new THREE.BoxGeometry(1.1, 0.75, 0.14), mats.light, scr, false));
     term.add(instanced(new THREE.BoxGeometry(0.5, 0.9, 0.5), mats.teal, binsA, false), instanced(new THREE.BoxGeometry(0.5, 0.9, 0.5), mats.orange, binsB, false), instanced(new THREE.BoxGeometry(0.5, 0.9, 0.5), mats.navy, binsC, false)); }
   // 兒童遊戲區（x 104 到 110，靠玻璃）：橘色軟墊、小滑梯、三塊積木、兩個小孩。
-  { const x = 107, z = -4.5; term.add(box(6, 0.12, 4, mats.orange, x, 0.06, z, false), box(1.2, 1.0, 1.2, mats.teal, x - 1.8, 0.5, z - 0.8), instanced(new THREE.BoxGeometry(0.5, 0.5, 0.5), mats.navy, [[x + 1.2, 0.25, z + 1.0], [x + 1.8, 0.25, z + 1.0], [x + 1.5, 0.75, z + 1.0]], false));
+  { const x = 120, z = -3.6;   // 2026-11-18：原本在 107，鏡頭往門的斜線會穿過遊戲區 term.add(box(6, 0.12, 4, mats.orange, x, 0.06, z, false), box(1.2, 1.0, 1.2, mats.teal, x - 1.8, 0.5, z - 0.8), instanced(new THREE.BoxGeometry(0.5, 0.5, 0.5), mats.navy, [[x + 1.2, 0.25, z + 1.0], [x + 1.8, 0.25, z + 1.0], [x + 1.5, 0.75, z + 1.0]], false));
     const sl = box(0.9, 0.08, 2.2, mats.cream, x - 0.4, 0.55, z + 0.5, false); sl.rotation.x = 0.45; term.add(sl);
     for (const [kx, kz, ry] of [[x + 0.6, z - 1.0, 0.8], [x - 2.2, z + 1.3, -2.2]]) { const f = person(kx, kz, ry, { shirt: pick(kx), backpack: true }); f.scale.setScalar(0.68); }
     sign("KIDS", "兒童遊戲區", 2.4, 0.6, palette.orange, palette.navy, x, 2.2, z - 2.0, Math.PI); term.add(cyl(0.04, 0.04, 1.9, mats.grey, x, 0.95, z - 2.1, 5)); }

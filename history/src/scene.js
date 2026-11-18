@@ -323,7 +323,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     term.add(box(1.0, 1.9, 0.6, mats.teal, 53.2, 0.95, -39.2, false), box(0.6, 0.5, 0.05, mats.light, 53.2, 1.4, -38.88, false));
     const carts = []; for (let i = 0; i < 6; i++) carts.push([116 + i * 0.5, 0.5, -29]);
     term.add(instanced(new THREE.BoxGeometry(0.7, 0.9, 1.0), mats.grey, carts, false), instanced(new THREE.BoxGeometry(0.7, 0.05, 0.6), mats.navy, carts.map(([x, , z]) => [x, 0.3, z]), false));
-    const bins = []; for (let x = 5; x < T.x1; x += 15) bins.push([x + 0.9, 0.45, -30.8], [x - 0.9, 0.45, -9.2]);
+    const bins = []; for (let x = 5; x < T.x1; x += 15) { bins.push([x + 0.9, 0.45, -30.8]); if (x < 100) bins.push([x - 0.9, 0.45, -9.2]); }   // 2026-11-18：x 110 那一個（109.1,-9.2）正好在鏡頭往登機門的斜線上，拿掉
     term.add(instanced(new THREE.CylinderGeometry(0.3, 0.28, 0.9, 8), mats.frame, bins, false));
     const screens = []; for (let x = 20; x < T.x1; x += 30) screens.push([x, 3.2, -29.3], [x, 3.2, -10.7]);
     term.add(instanced(new THREE.BoxGeometry(1.4, 0.8, 0.08), mats.dark, screens, false), instanced(new THREE.BoxGeometry(1.2, 0.6, 0.02), mats.light, screens.map(([x, y, z]) => [x, y, z + (z > -20 ? 0.05 : -0.05)]), false));
@@ -354,9 +354,11 @@ export function createScene({ canvas, palette, phone, fonts }) {
     gA.add(box(B.half * 2, 0.16, L, wallM, 0, -0.08, 0), box(1.0, 0.02, L, mats.navy, 0, 0.01, 0, false));   // 地板加一條深藍的地帶
     gA.add(new THREE.Mesh(new THREE.BoxGeometry(B.half * 2, 0.12, L), lam(P.ceiling)).translateY(B.h));   // 頂
     gA.add(box(0.15, B.h, L, wallM, -B.half, B.h / 2, 0, false));                            // 靠 -x 那一面實牆
-    gA.add(box(0.15, 1.0, L, wallM, B.half, 0.5, 0, false), box(0.15, 0.4, L, wallM, B.half, B.h - 0.2, 0, false));   // 靠機身那一面：下半牆、上面一條，中間是窗
-    gA.add(new THREE.Mesh(new THREE.PlaneGeometry(L, B.h - 1.4), mats.glass).rotateY(-Math.PI / 2).translateZ(-B.half).translateY(1.0 + (B.h - 1.4) / 2));
-    gA.add(instanced(new THREE.BoxGeometry(0.1, B.h - 1.4, 0.1), mats.frame, Array.from({ length: Math.floor(L / 3) }, (_, i) => [B.half, 1.0 + (B.h - 1.4) / 2, -L / 2 + 1.5 + i * 3]), false));
+    // 靠機身那一面：下半牆、上面一條，中間是窗。這一面在 B 段接上來的那 3.2 公尺不封（2026-11-18：之前封到底，鏡頭轉進 B 段時穿牆）。
+    const Lo = L - 4.8;
+    gA.add(box(0.15, 1.0, Lo, wallM, B.half, 0.5, -2.4, false), box(0.15, 0.4, Lo, wallM, B.half, B.h - 0.2, -2.4, false));
+    gA.add(new THREE.Mesh(new THREE.PlaneGeometry(Lo, B.h - 1.4), mats.glass).rotateY(-Math.PI / 2).translateZ(-B.half).translateY(1.0 + (B.h - 1.4) / 2).translateX(-2.4));
+    gA.add(instanced(new THREE.BoxGeometry(0.1, B.h - 1.4, 0.1), mats.frame, Array.from({ length: Math.floor(Lo / 3) }, (_, i) => [B.half, 1.0 + (B.h - 1.4) / 2, -L / 2 + 1.5 + i * 3]), false));
     gA.add(instanced(new THREE.BoxGeometry(2.2, 0.08, 0.9), mats.light, Array.from({ length: Math.floor(L / 3) }, (_, i) => [0, B.h - 0.1, -L / 2 + 1.5 + i * 3]), false));
     gA.add(box(0.25, 0.08, L, mats.orange, -inner, 1.0, 0, false));                          // 扶手
     // B 段：平的，沿 +x 到機身；-z 那一面是窗（看得到機頭）、頂是玻璃。
@@ -372,7 +374,8 @@ export function createScene({ canvas, palette, phone, fonts }) {
     const bs = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.7), lam(P.navy)); bs.userData.dynamic = true; bs.position.set(lenB / 2 - 1.6, B.h - 0.5, 0); bs.rotation.y = -Math.PI / 2; gB.add(bs); bridgeSign = bs;
     gB.add(box(lenB, 0.08, 0.25, mats.orange, 0, 1.0, inner, false));
     // 門口的圓亭、B 段底下的兩支腳
-    term.add(cyl(2.4, 2.4, 3.6, mats.wallShade, B.x, 1.8, T.z1 + 1.2, 12));
+    // 門口的圓亭（2026-11-18 Paul「walking through walls」：之前是實心的圓柱正好壓在鏡頭走的線上）：改成只有頂蓋加四根柱子，人從中間走過去。
+    term.add(cyl(2.6, 2.6, 0.4, mats.wallShade, B.x, 3.5, T.z1 + 1.2, 12), instanced(new THREE.CylinderGeometry(0.1, 0.1, 3.3, 6), mats.frame, [45, 135, 225, 315].map(a => [B.x + Math.cos(a * DEG) * 2.3, 1.65, T.z1 + 1.2 + Math.sin(a * DEG) * 2.3]), false));
     term.add(cyl(0.3, 0.3, y1, mats.frame, B.x - 1.2, y1 / 2, B.zEnd + B.half + 0.6, 6), cyl(0.3, 0.3, y1, mats.frame, xB1 - 1.5, y1 / 2, B.zEnd + B.half + 0.6, 6));
     // 空橋裡面（2026-11-18 第四批）：之前是四面光牆。A 段實牆每 1.5 公尺一道板縫、兩邊地上深色的踢腳、三張海報；B 段盡頭是機艙門：門框、往牆邊推開的門板、
     // 門裡一張畫了座位與窗的「機艙」（貼在機身皮外 0.15 公尺，鏡頭在門外看得到，不用在機身上挖洞）、一位站在門口迎接的機組員、門上一塊「WELCOME ABOARD 歡迎登機」。
@@ -386,7 +389,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
       const door = box(0.06, 1.9, 1.1, lam(P.cream.clone().lerp(P.grey, 0.15)), 0, 0, 0, false); door.position.set(dx - 0.55, 1.05, 0.95); door.rotation.y = -0.9; gB.add(door);
       const cabinTex = textTexture(512, 768, palette.navy, [], [{ x: 40, y: 120, w: 90, h: 70, color: palette.teal }, { x: 40, y: 220, w: 90, h: 70, color: palette.teal }, { x: 40, y: 320, w: 90, h: 70, color: palette.teal }, { x: 160, y: 120, w: 90, h: 70, color: palette.teal }, { x: 160, y: 220, w: 90, h: 70, color: palette.teal }, { x: 160, y: 320, w: 90, h: 70, color: palette.teal }, { x: 330, y: 100, w: 120, h: 90, color: palette.cream }, { x: 330, y: 260, w: 120, h: 90, color: palette.cream }, { x: 0, y: 420, w: 512, h: 30, color: palette.grey }, { x: 0, y: 0, w: 512, h: 60, color: palette.grey }]);
       const cabin = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.9), lam(P.white, { map: cabinTex })); cabin.position.set(dx - 0.15, 1.05, 0); cabin.rotation.y = -Math.PI / 2; cabin.castShadow = false; gB.add(cabin);
-      const crew = figure(mats, { shirt: P.navy, staff: true }); crew.position.set(dx - 1.3, 0, 0.95); crew.rotation.y = -Math.PI / 2 - 0.6; crew.userData.baseY = 0; gB.add(crew); idleFigs.push(crew);
+      const crew = figure(mats, { shirt: P.navy, staff: true }); crew.position.set(dx - 1.1, 0, 1.22); crew.rotation.y = -Math.PI / 2 - 0.6; crew.userData.baseY = 0; gB.add(crew); idleFigs.push(crew);
       const wb = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.5), lam(P.white, { map: textTexture(1024, 256, palette.orange, [{ text: "WELCOME ABOARD", x: 36, y: 90, font: `700 100px ${fonts.display}`, color: palette.navy }, { text: "歡迎登機", x: 36, y: 195, font: `900 70px ${fonts.han || fonts.display}`, color: palette.navy }]) })); wb.position.set(dx - 3.6, 2.05, B.half - 0.1); wb.rotation.y = Math.PI;   // 貼在 +z 那面實牆上，不跟盡頭的登機門牌疊在一起 wb.castShadow = false; gB.add(wb);
       gB.add(instanced(new THREE.BoxGeometry(0.06, B.h - 0.3, 0.08), lam(P.cream.clone().lerp(P.grey, 0.35)), Array.from({ length: Math.floor(lenB / 1.5) }, (_, i) => [-lenB / 2 + 0.75 + i * 1.5, B.h / 2, B.half - 0.12]), false));
     }
@@ -518,21 +521,11 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const ctx = { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, world, pick, truck, buildAirliner, setGear, shadowOn, tw };
   const extras = [buildTerminal(THREE, ctx), buildGrounds(THREE, ctx), buildDecor(THREE, ctx), buildTraffic(THREE, ctx)];
 
-  // ═══ 空服員（2026-11-18 第五批，Paul：「BT is like a flight attendant that will be there no matter what」）：一位橘衣戴帽的人，站在現在這一站旁邊，面向鏡頭、手在比。
-  // 航廈與空橋那幾站看得到；停機坪與空中的站藏起來（錨點在飛機上）。哪一站由 main.js 叫 setAttendant(i)。 ═══
-  const attendant = figure(mats, { shirt: P.orange, staff: true }); attendant.userData.talking = true; attendant.visible = false; term.add(attendant); idleFigs.push(attendant);
-  let attendantAt = -1;
-  function setAttendant(i) { attendantAt = i; placeAttendant(); }
-  function placeAttendant() {
-    const s = curW && curW.stops[attendantAt]; if (!s || (s.phase !== "terminal" && s.phase !== "bridge")) { attendant.visible = false; return; }
-    attendant.visible = true; attendant.position.set(s.anchor[0] + 1.6, s.anchor[1], s.anchor[2] + (s.anchor[2] < A.CORRIDOR_Z ? 1.4 : -1.4));
-  }
   // ═══ 站：小場景與錨點記號 ═══
   const stopsGroup = new THREE.Group(); stopsGroup.userData.dynamic = true; world.add(stopsGroup);
   let stopMarkers = [];
-  let curW = null;
   function setStops(w, motifs) {
-    curW = w; stopsGroup.clear(); stopMarkers = []; placeAttendant();
+    stopsGroup.clear(); stopMarkers = [];
     w.stops.forEach((s, i) => {
       const g = new THREE.Group(); g.position.set(s.anchor[0], s.anchor[1], s.anchor[2]); g.rotation.y = s.yaw || 0;
       const scale = s.phase === "terminal" ? 1 : 2.2;   // 停機坪離鏡頭遠，小場景放大才看得到
@@ -648,8 +641,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     for (const cl of clouds) cl.position.x += cl.userData.v * 0.016;
     fuel[0].position.x = 150 + Math.sin(t * 0.12) * 40; fuel[0].rotation.y = Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2;
     { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(100 + Math.cos(ang) * 26, 0, 110 + Math.sin(ang) * 26); tug.rotation.y = -ang; }
-    for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u; const dir = (u < span) === (w.x1 > w.x0) ? 1 : -1; f.position.set(Math.min(w.x0, w.x1) + d, f.userData.baseY || 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, !w.stand); }   /* stand：站在電動步道上，帶子在走人不走 */
-    if (attendant.visible) attendant.rotation.y = Math.atan2(camera.position.x - attendant.position.x, camera.position.z - attendant.position.z);
+    for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u, sgn = w.x1 >= w.x0 ? 1 : -1; const dir = (u < span ? 1 : -1) * sgn; f.position.set(w.x0 + sgn * d, f.userData.baseY || 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, !w.stand); }   /* 2026-11-18 Paul「people still walking backward」：之前從 min(x0,x1) 起算、臉卻照 x1>x0 算，x0 > x1 的人一半時間臉朝後。現在從 x0 出發往 x1，臉跟著走的方向 */   /* stand：站在電動步道上，帶子在走人不走 */
     for (const f of idleFigs) walkCycle(f, t, false); lap("idle");
     for (const x of extras) if (x.tick) x.tick(t, e); lap("extras");
     if (people) people.sync(); lap("sync");   // 人的零件世界矩陣抄進 InstancedMesh（2026-11-17 批 1b）
@@ -700,7 +692,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     }
     renderer.shadowMap.needsUpdate = true;
   }
-  return { setStops, setAttendant, setBoard, prepareBoard, setGate, setZoom, setScrub, resize, render, project, dispose, renderer, scene, camera, prof, stopMarkers: () => stopMarkers };
+  return { setStops, setBoard, prepareBoard, setGate, setZoom, setScrub, resize, render, project, dispose, renderer, scene, camera, prof, stopMarkers: () => stopMarkers };
 }
 const idleFigs = [];
 

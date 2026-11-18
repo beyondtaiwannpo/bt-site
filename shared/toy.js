@@ -91,7 +91,7 @@ export function peopleKit({ P, rnd, parent, capacity }) {
   // 現在每一種零件一個 InstancedMesh（腿、手、身體、頭、頭髮、眼睛、背包、行李、帽子、腳下那一圈），不管幾個人都是 12 個 draw call。
   // 每個人還是一個 Group，零件是空的 Object3D（名字照舊：legL legR armL armR head），pose() 照舊轉它們；每一幀 sync() 把零件的世界矩陣抄進 instance。
   // 顏色用 instanceColor（材質底色白，乘上每個人自己的膚色、髮色、衣服色）。
-  const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07).clone(), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), shadow: new THREE.CircleGeometry(0.38, 16) };
+  const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07).clone(), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.LatheGeometry([[0, 0.34], [0.22, 0.32], [0.36, 0.2], [0.4, 0.04], [0.5, 0.02], [0.5, -0.02], [0.4, -0.02], [0, -0.02]].map(([r, y]) => new THREE.Vector2(r, y)), 14), shadow: new THREE.CircleGeometry(0.38, 16) };
   PG.shadow.rotateX(-Math.PI / 2);
   // 第四批的道具（Paul 2026-11-18：人要有變化）：陽傘（傘面加傘柄，舉在右手上方）、抱著的箱子、推的嬰兒車、輪椅。每一樣一個 InstancedMesh，不管幾個人都是一個 draw call。
   // 幾個幾何黏成一個（joinGeo），輪子另外一個（顏色不一樣）。嬰兒車在人前面 0.75；輪椅的座位在髖的高度（0.3）下面，人照坐姿擺（腿往前伸）就是坐在裡面。
@@ -115,7 +115,7 @@ export function peopleKit({ P, rnd, parent, capacity }) {
     head: { geo: PG.head, mat: std({ roughness: 0.7 }), pos: [0, 1.2, 0] },
     cap: { geo: PG.cap, mat: std({ roughness: 0.9 }), pos: [0, 1.23, 0], rot: [-0.25, 0, 0] },
     eyeL: { geo: PG.eye, mat: std({ roughness: 0.4 }), pos: [-0.13, 1.2, 0.33] }, eyeR: { geo: PG.eye, mat: null, pos: [0.13, 1.2, 0.33] },
-    pack: { geo: PG.pack, mat: std(), pos: [0, 0.7, -0.3] }, bag: { geo: PG.bag, mat: null, pos: [0.42, 0.21, 0] }, hat: { geo: PG.hat, mat: null, pos: [0, 1.5, 0] },
+    pack: { geo: PG.pack, mat: std(), pos: [0, 0.7, -0.3] }, bag: { geo: PG.bag, mat: null, pos: [0.42, 0.21, 0] }, hat: { geo: PG.hat, mat: null, pos: [0, 1.42, 0] },
     shadow: { geo: PG.shadow, mat: new THREE.MeshBasicMaterial({ color: white, transparent: true, opacity: 0.12, depthWrite: false }), pos: [0, 0.02, 0] },
     // 道具（opt 是 makePerson 的選項名，沒給就不畫）
     brolly: { geo: PG.brolly, mat: null, pos: [0.33, 1.82, 0.05], opt: "brolly" }, stick: { geo: PG.stick, mat: null, pos: [0.33, 1.5, 0.05], opt: "brolly" },

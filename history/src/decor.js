@@ -134,9 +134,18 @@ export function buildDecor(THREE, c) {
   }
 
   // ═══ 7. 人：推推車的旅客兩位（推車是人的孩子物件，跟著走）、坐輪椅的加推的人、三個人站著聊天兩組、巡邏的兩位 ═══
-  { const trolley = f => { const g = new THREE.Group(); g.userData.dynamic = true; g.add(box(0.6, 0.8, 0.9, mats.grey, 0, 0.5, 0.75, false), box(0.5, 0.35, 0.7, mats.navy, 0, 0.32, 0.75, false), box(0.45, 0.3, 0.6, mats.orange, 0, 0.64, 0.75, false)); f.add(g); };
+  // 行李推車（2026-11-18 Paul「why is there a box in front of this person」：之前是一個灰盒子）：底盤、四根細柱、上層的籃框、推把、四個輪子、一個橫放的橘色行李箱。
+  { const trolley = f => { const g = new THREE.Group(); g.userData.dynamic = true;
+      g.add(box(0.62, 0.04, 0.95, mats.grey, 0, 0.18, 0.8, false), box(0.62, 0.04, 0.5, mats.grey, 0, 0.72, 0.62, false), box(0.62, 0.04, 0.04, mats.grey, 0, 1.0, 0.36, false));
+      g.add(instanced(smallBox(0.03, 0.9, 0.03), mats.grey, [[-0.29, 0.6, 0.38], [0.29, 0.6, 0.38], [-0.29, 0.45, 1.24], [0.29, 0.45, 1.24]], false), instanced(smallBox(0.03, 0.03, 0.9), mats.grey, [[-0.29, 0.95, 0.8], [0.29, 0.95, 0.8]], false));
+      const wg = new THREE.CylinderGeometry(0.07, 0.07, 0.04, 8); wg.rotateZ(Math.PI / 2);
+      g.add(instanced(wg, mats.dark, [[-0.3, 0.07, 0.42], [0.3, 0.07, 0.42], [-0.3, 0.07, 1.2], [0.3, 0.07, 1.2]], false));
+      g.add(box(0.5, 0.26, 0.7, mats.orange, 0, 0.35, 0.8, false), box(0.52, 0.03, 0.1, mats.navy, 0, 0.49, 0.8, false)); f.add(g); f.userData.stroller = true; };
     for (const [x0, x1, z, sp, k] of [[-36, 20, -24.6, 0.85, 22], [40, 118, -15.4, 0.8, 23]]) { const f = figure(mats, { shirt: pick(k), bag: true }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; trolley(f); term.add(f); walkers.push(f); }
-    { const f = figure(mats, { shirt: P.navy, staff: true }); f.userData.baseY = 0; f.userData.w = { x0: 100, x1: 0, z: -14.0, sp: 0.75 }; const g = new THREE.Group(); g.userData.dynamic = true; g.add(box(0.6, 0.5, 0.6, mats.navy, 0, 0.55, 0.9, false), box(0.6, 0.6, 0.1, mats.navy, 0, 1.0, 0.6, false)); for (const s of [-1, 1]) { const w = cyl(0.32, 0.32, 0.06, mats.dark, s * 0.36, 0.32, 0.8, 10); w.rotation.z = Math.PI / 2; g.add(w); } const r = figure(mats, { shirt: pick(24), seated: true }); r.position.set(0, 0.3, 0.9); r.userData.baseY = 0.3; g.add(r); idleFigs.push(r); f.add(g); term.add(f); walkers.push(f); }
+    { const f = figure(mats, { shirt: P.navy, staff: true }); f.userData.baseY = 0; f.userData.w = { x0: 100, x1: 0, z: -14.0, sp: 0.75 }; // 輪椅（2026-11-18 Paul「wheelchair people backward」）：大輪在後面（推的人那一側）、小輪在前面、椅背在後、腳踏板在前，坐的人臉朝前，推的人兩手往前推。
+      const g = new THREE.Group(); g.userData.dynamic = true; g.add(box(0.56, 0.08, 0.5, mats.navy, 0, 0.5, 0.85, false), box(0.56, 0.55, 0.08, mats.navy, 0, 0.82, 0.58, false), box(0.5, 0.05, 0.14, mats.grey, 0, 0.12, 1.22, false), instanced(smallBox(0.04, 0.04, 0.5), mats.grey, [[-0.3, 0.72, 0.85], [0.3, 0.72, 0.85]], false));
+      for (const s of [-1, 1]) { const w = cyl(0.3, 0.3, 0.05, mats.dark, s * 0.34, 0.3, 0.62, 12); w.rotation.z = Math.PI / 2; g.add(w); const c = cyl(0.08, 0.08, 0.04, mats.dark, s * 0.24, 0.08, 1.18, 8); c.rotation.z = Math.PI / 2; g.add(c); }
+      const r = figure(mats, { shirt: pick(24), seated: true }); r.position.set(0, 0.28, 0.85); r.userData.baseY = 0.28; g.add(r); idleFigs.push(r); f.add(g); f.userData.stroller = true; term.add(f); walkers.push(f); }
     for (const [cx, cz, k] of [[26, -16, 25], [85, -24, 28]]) for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.3; person(cx + Math.cos(a) * 0.75, cz + Math.sin(a) * 0.75, Math.atan2(-Math.cos(a), -Math.sin(a)), { shirt: pick(k + i), backpack: i === 1 }); }
     for (const [x0, x1, z, sp] of [[-30, 118, -25.2, 0.7], [-30, 118, -26.0, 0.7]]) { const f = figure(mats, { shirt: P.navy, staff: true }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
   }

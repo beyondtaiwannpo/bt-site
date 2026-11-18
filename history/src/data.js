@@ -71,25 +71,3 @@ export function pickLang(search, stored, navLang) {
   if (stored === "zh" || stored === "en") return stored;
   return /^zh/i.test(navLang || "") ? "zh" : "en";
 }
-
-// 每一站的「選擇」（2026-11-18 第五批，Paul 2026-11-17：每一站不是一張卡讓人點，是一個情境兩三個選擇，BT 像空服員從頭到尾都在，沒有對錯）。
-// 字全部在 history/choices.json（空服員的三句、每一站的情境與選擇、後台新加的站用的 fallback），這裡只負責拿與挑。拿不到就回 null，頁面照舊沒有選擇。
-export async function fetchChoices(url, timeoutMs) {
-  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), timeoutMs || 6000);
-  try { const r = await fetch(url || "./choices.json", { signal: ctl.signal }); if (!r.ok) return null; const j = await r.json(); return j && j.stops ? j : null; }
-  catch (e) { return null; } finally { clearTimeout(tm); }
-}
-// 這一站的情境與選擇：代號對不到就用 fallback；兩邊都沒有就 null。只回有兩個以上選擇的。
-export function choiceFor(ch, slug) {
-  if (!ch) return null;
-  const c = (ch.stops && ch.stops[String(slug || "")]) || ch.fallback || null;
-  return c && Array.isArray(c.choices) && c.choices.length >= 2 ? c : null;
-}
-// 空服員的一句（intro、outro、neutral）或某一站某一個選擇的回話：照語言挑，沒有那個語言就退回另一個。
-const say = (o, key, lang) => o ? (lang === "zh" ? (o[key + "_zh"] || o[key + "_en"] || "") : (o[key + "_en"] || o[key + "_zh"] || "")) : "";
-export const attendantLine = (ch, key, lang) => say(ch && ch.attendant, key, lang);
-export const choiceText = (c, key, lang) => say(c, key, lang);
-export function replyFor(ch, slug, k, lang) {
-  const c = choiceFor(ch, slug); const pick = c && c.choices[k];
-  return pick ? choiceText(pick, "reply", lang) : attendantLine(ch, "neutral", lang);
-}

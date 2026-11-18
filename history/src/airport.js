@@ -171,7 +171,7 @@ export function planePoseAt(e) {
 
 // ── 旅客與鏡頭 ──
 // 空橋那一段的路：走道盡頭 → 轉向門 → 門 → 空橋裡 → 機艙門。走的人與鏡頭都沿這一條。
-const BOARD_PATH = [[WALK.x1, CORRIDOR_Z], [106, -14], [GATE_DOOR[0] - 1, -5], [GATE_DOOR[0], 1], [GATE_DOOR[0], 12], [GATE_DOOR[0], 26], [GATE_DOOR[0], PLANE_DOOR[1] - 1.6], [GATE_DOOR[0] + 1.6, PLANE_DOOR[1]], [PLANE_DOOR[0], PLANE_DOOR[1]]];
+const BOARD_PATH = [[WALK.x1, CORRIDOR_Z], [106, -14], [GATE_DOOR[0] - 1, -5], [GATE_DOOR[0], 1], [GATE_DOOR[0], 12], [GATE_DOOR[0], 26], [GATE_DOOR[0], PLANE_DOOR[1] - 0.6], [GATE_DOOR[0] + 1.6, PLANE_DOOR[1]], [PLANE_DOOR[0], PLANE_DOOR[1]]];
 let _board = null;
 const boardPath = () => _board || (_board = makeCurve(BOARD_PATH, 600));
 const WALK_END = 0.335;      // 鏡頭走到空橋盡頭（機艙門前 4 公尺）的進度
@@ -253,7 +253,7 @@ export function world(n) {
     const p = n > 1 ? i / (n - 1) : 0;
     if (p < PHASES.apron[0]) {
       if (p < PHASES.bridge[0]) stops.push({ p, phase: "terminal", anchor: [cameraAt(p).pos[0] + 9, 0, TERMINAL.z0 + 11], yaw: 0 });
-      else stops.push({ p, phase: "terminal", anchor: [GATE_DESK[0] - 2 - 3.2 * atGate++, 0, GATE_DESK[1] - 4], yaw: 0, gate: true });
+      else stops.push({ p, phase: "terminal", anchor: [GATE_DESK[0] + 5 + 3.2 * atGate++, 0, GATE_DESK[1] - 7], yaw: 0, gate: true });   // 2026-11-18：登機門那幾站的小場景改到櫃台東側偏後（之前在 104,-16，鏡頭往門的斜線正好穿過它的牌子）
     } else {
       const q = planePoseAt(p);
       if (p < PHASES.takeoff[0]) stops.push({ p, phase: "apron", anchor: [q.x + side[0] * 20, 0, q.z + side[1] * 20], yaw: q.yaw });
