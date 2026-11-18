@@ -4668,6 +4668,15 @@ Paul：「optimize everything the road… make it more smooth and what's not wor
 解法是把人改成 InstancedMesh（每一種零件一個，三十個人的腿一次畫），一幀少四百個 draw call；動的人每一幀改 instance 的矩陣就好。這會動到 `shared/toy.js` 的 `peopleKit`（島也用），算順不順的下一批。
 換站那幾下卡（看板重畫貼圖、年份帶整段重建）是批 2，卡與年份帶的點用 transform 是批 3，鏡頭與畫面那幾件是批 4（等 Paul 挑）。測試 942、check.sh、check-motion、check-mobile 全過。
 
+## 歷史之路與 BT 島（2026-11-17，順不順批 1b：人改成 InstancedMesh）
+
+批 1 量出來航廈一幀 525 個 draw call 裡約 470 個是人（一個大頭 chibi 十二三個 mesh）。改法在 `shared/toy.js` 的 `peopleKit`，兩頁一起受惠：
+- **每一種零件一個 InstancedMesh**（腿、手、身體、頭、頭髮、眼睛、背包、行李、帽子、腳下那一圈，共 13 個 pool，容量 256 人），不管幾個人都是十幾個 draw call。顏色用 instanceColor（材質底色白，乘上每個人自己的膚色、髮色、衣服色）。
+- **每個人還是一個 Group**，零件是空的 Object3D（名字照舊：legL、legR、armL、armR、head），`pose()` 照舊轉它們；每一幀畫之前 `people.sync()` 把零件的世界矩陣抄進 instance（島在引擎的 `render()`、機場在 `scene.js` 的 `render()`）。人拿掉就 `people.free(g)`，slot 還回去。
+- **點人**：射線打到 pool，`instanceId` 對回那個人（`people.ownerOf`），引擎的 `hit()` 認得。島上實測五個人四個點得中（一個被前面的房子擋住）。
+- 量（本機 Chrome）：機場航廈一幀 525 → 247 個 draw call、mesh 871 → 414；島 1637 → 1208 個 mesh。兩頁都 60 fps、0 個人卡住。
+- 測試 942、check.sh、check-motion、check-mobile 全過。
+
 ## BT 島 `/island/`（2026-11-16）
 
 Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項，島跟島、人跟人相連，還可以把自己放進去）之後定的：

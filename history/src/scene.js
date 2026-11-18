@@ -108,12 +108,11 @@ function tileTexture(p) {
 let people = null, figN = 0;
 function figure(mats, opts) {
   const o = opts || {}, P = mats.P;
-  if (!people) people = peopleFromPalette(mats.palette, 5);
+  if (!people) people = peopleFromPalette(mats.palette, 5, mats.world);
   const shirtIdx = c => { const list = [P.orange, P.teal, P.yellow, P.navy, P.cream, P.sand]; let best = 4, bd = Infinity; list.forEach((x, i) => { const d = c ? Math.hypot(x.r - c.r, x.g - c.g, x.b - c.b) : Infinity; if (d < bd) { bd = d; best = i; } }); return best; };
   const k = o.phase != null ? Math.floor(o.phase * 97) : figN++;
   const g = people.makePerson({ shirt: o.shirt ? shirtIdx(o.shirt) : k % 6, hair: (k * 7) % 3, skin: k % 3, pants: (k * 5) % 3, pack: !!o.backpack, bag: !!o.bag, hat: !!(o.vest || o.staff), scale: 1.0 });
   g.name = "figure"; g.userData.baseY = 0; if (o.seated) g.userData.sitting = true;
-  g.traverse(m => { if (m.isMesh) m.castShadow = false; });   // 人不投影：腳下自帶一圈（跟島一樣），少幾十個影子的 draw call
   return g;
 }
 function walkCycle(fig, t, walking) { fig.userData.moving = !!walking && !fig.userData.sitting; people.pose(fig, t); }
@@ -157,7 +156,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   let shadowSpan = 0;
   const setShadowSpan = s => { if (s === shadowSpan) return; shadowSpan = s; const c = sun.shadow.camera; c.left = -s; c.right = s; c.top = s; c.bottom = -s; c.updateProjectionMatrix(); };
 
-  const world = new THREE.Group(); scene.add(world);
+  const world = new THREE.Group(); scene.add(world); mats.world = world;   // 人的 InstancedMesh 掛在這裡（figure() 第一次叫的時候建）
   const T = A.TERMINAL;
 
   // ═══ 地 ═══
@@ -471,6 +470,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(100 + Math.cos(ang) * 26, 0, 110 + Math.sin(ang) * 26); tug.rotation.y = -ang; }
     for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u; const dir = (u < span) === (w.x1 > w.x0) ? 1 : -1; f.position.set(Math.min(w.x0, w.x1) + d, 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, true); }
     for (const f of idleFigs) walkCycle(f, t, false);
+    if (people) people.sync();   // 人的零件世界矩陣抄進 InstancedMesh（2026-11-17 批 1b）
     renderer.render(scene, camera);
   }
   // 世界的一點投到螢幕（像素）。回 { x, y, visible, depth }。

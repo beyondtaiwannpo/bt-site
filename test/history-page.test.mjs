@@ -197,7 +197,11 @@ test("人（2026-11-17）：機場裡的人是 BT 島那一批大頭 chibi，從
   assert.match(toy, /export function peopleKit\(/); assert.match(toy, /export function peopleFromPalette\(/);
   // 同一批人：島的引擎也用 peopleKit，沒有第二份 makePerson
   assert.equal((toy.match(/function makePerson\(/g) || []).length, 1);
-  assert.match(toy, /const \{ makePerson, pose \} = peopleKit\(\{ P, M, rnd \}\);/);
+  assert.match(toy, /const people = peopleKit\(\{ P, rnd, parent: world \}\);/);
+  // 人是 InstancedMesh（2026-11-17 批 1b）：零件一種一個 pool，不管幾個人都是十幾個 draw call；兩頁每一幀都要 sync()
+  assert.match(toy, /new THREE\.InstancedMesh\(PARTS\[name\]\.geo/);
+  assert.match(toy, /people\.sync\(\);/, "島的 render() 要 sync");
+  assert.match(scene, /people\.sync\(\);/, "機場的 render() 要 sync");
 });
 
 test("滑行道（批 5）：路點至少三個真的轉彎，樣條連續、等弧長取樣、頭尾落在路點上；從登機門推出到跑道頭", () => {

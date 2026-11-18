@@ -64,29 +64,69 @@ export const BRIDGE_STYLES = 5;
 // 吃 { P（colours() 的結果）, M（至少 skin hair shirt pants eye orange navy 這幾個材質）, rnd }，回 { makePerson, pose }。
 // makePerson(o)：skin hair shirt pants 是色票的序號，pack 背包、bag 行李、hat 帽子、scale 大小（預設 1.25）。回一個 Group，零件有名字（legL legR armL armR head）。
 // pose(g, t)：照 g.userData 擺姿勢：sitting 坐、moving 走（腿手擺、身體上下）、talking 手在比、都不是就站著微微晃。y 用 userData.baseY 當底。
-export function peopleKit({ P, M, rnd }) {
+export function peopleKit({ P, rnd, parent, capacity }) {
+  // 2026-11-17 順不順批 1b：人改成 InstancedMesh。之前一個人十二三個 mesh，航廈裡三十幾個人就是四百多個 draw call（一幀 525 個裡約 470 個是人）。
+  // 現在每一種零件一個 InstancedMesh（腿、手、身體、頭、頭髮、眼睛、背包、行李、帽子、腳下那一圈），不管幾個人都是 12 個 draw call。
+  // 每個人還是一個 Group，零件是空的 Object3D（名字照舊：legL legR armL armR head），pose() 照舊轉它們；每一幀 sync() 把零件的世界矩陣抄進 instance。
+  // 顏色用 instanceColor（材質底色白，乘上每個人自己的膚色、髮色、衣服色）。
   const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), shadow: new THREE.CircleGeometry(0.38, 16) };
   PG.shadow.rotateX(-Math.PI / 2);
-  const shadowMat = new THREE.MeshBasicMaterial({ color: P.navy, transparent: true, opacity: 0.12, depthWrite: false });
+  const CAP = capacity || 256;
+  const white = new THREE.Color(1, 1, 1);
+  const std = extra => new THREE.MeshStandardMaterial({ color: white, roughness: 0.82, metalness: 0, ...(extra || {}) });
+  // 零件表：名字、幾何、材質、本地位置與旋轉。一個人的零件就是這張表的一份（pack、bag、hat 看選項）。
+  const PARTS = {
+    legL: { geo: PG.leg, mat: std(), pos: [-0.13, 0.15, 0] }, legR: { geo: PG.leg, mat: null, pos: [0.13, 0.15, 0] },
+    body: { geo: PG.body, mat: std(), pos: [0, 0.62, 0] },
+    armL: { geo: PG.arm, mat: null, pos: [-0.33, 0.68, 0] }, armR: { geo: PG.arm, mat: null, pos: [0.33, 0.68, 0] },
+    head: { geo: PG.head, mat: std({ roughness: 0.7 }), pos: [0, 1.2, 0] },
+    cap: { geo: PG.cap, mat: std({ roughness: 0.9 }), pos: [0, 1.23, 0], rot: [-0.25, 0, 0] },
+    eyeL: { geo: PG.eye, mat: std({ roughness: 0.4 }), pos: [-0.13, 1.2, 0.33] }, eyeR: { geo: PG.eye, mat: null, pos: [0.13, 1.2, 0.33] },
+    pack: { geo: PG.pack, mat: std(), pos: [0, 0.7, -0.3] }, bag: { geo: PG.bag, mat: null, pos: [0.42, 0.21, 0] }, hat: { geo: PG.hat, mat: null, pos: [0, 1.5, 0] },
+    shadow: { geo: PG.shadow, mat: new THREE.MeshBasicMaterial({ color: white, transparent: true, opacity: 0.12, depthWrite: false }), pos: [0, 0.02, 0] },
+  };
+  PARTS.legR.mat = PARTS.legL.mat; PARTS.armL.mat = PARTS.body.mat; PARTS.armR.mat = PARTS.body.mat; PARTS.eyeR.mat = PARTS.eyeL.mat; PARTS.bag.mat = PARTS.pack.mat; PARTS.hat.mat = PARTS.pack.mat;
+  const NONE = new THREE.Matrix4().makeScale(0, 0, 0);
+  const pools = {}; const owners = {};   // owners[name][slot] = 那個人的 Group
+  for (const name in PARTS) {
+    const im = new THREE.InstancedMesh(PARTS[name].geo, PARTS[name].mat, CAP); im.name = "people-" + name; im.frustumCulled = false; im.castShadow = false; im.receiveShadow = false;
+    for (let i = 0; i < CAP; i++) { im.setMatrixAt(i, NONE); im.setColorAt(i, white); }
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.count = 0; im.userData.peoplePool = name; pools[name] = im; owners[name] = [];
+    if (parent) parent.add(im);
+  }
+  const free = []; let next = 0;   // 一個人一個 slot（所有零件用同一個號碼）
+  const colourOf = (o, g) => ({ legL: o.pantsC, legR: o.pantsC, body: o.shirtC, armL: o.shirtC, armR: o.shirtC, head: o.skinC, cap: o.hairC, eyeL: P.dark, eyeR: P.dark, pack: P.orange, bag: P.navy, hat: P.navy, shadow: P.navy })[g];
   function makePerson(o) {
     o = o || {}; const g = new THREE.Group();
-    const skin = M.skin[(o.skin || 0) % 3], hair = M.hair[(o.hair || 0) % 3], shirt = M.shirt[(o.shirt || 0) % 6], pants = M.pants[(o.pants || 0) % 3];
-    const legL = new THREE.Mesh(PG.leg, pants), legR = new THREE.Mesh(PG.leg, pants); legL.position.set(-0.13, 0.15, 0); legR.position.set(0.13, 0.15, 0); legL.name = "legL"; legR.name = "legR"; g.add(legL, legR);
-    const body = new THREE.Mesh(PG.body, shirt); body.position.y = 0.62; g.add(body);
-    const armL = new THREE.Mesh(PG.arm, shirt), armR = new THREE.Mesh(PG.arm, shirt); armL.position.set(-0.33, 0.68, 0); armR.position.set(0.33, 0.68, 0); armL.name = "armL"; armR.name = "armR"; g.add(armL, armR);
-    const head = new THREE.Mesh(PG.head, skin); head.position.y = 1.2; head.name = "head"; g.add(head);
-    const cap = new THREE.Mesh(PG.cap, hair); cap.position.y = 1.23; cap.rotation.x = -0.25; g.add(cap);
-    for (const sx of [-1, 1]) { const e = new THREE.Mesh(PG.eye, M.eye); e.position.set(sx * 0.13, 1.2, 0.33); g.add(e); }
-    if (o.pack) { const pk = new THREE.Mesh(PG.pack, M.orange); pk.position.set(0, 0.7, -0.3); g.add(pk); }
-    if (o.bag) { const bg = new THREE.Mesh(PG.bag, M.navy); bg.position.set(0.42, 0.21, 0); g.add(bg); }
-    if (o.hat) { const h = new THREE.Mesh(PG.hat, M.navy); h.position.y = 1.5; g.add(h); }
-    const sh = new THREE.Mesh(PG.shadow, shadowMat); sh.position.y = 0.02; g.add(sh);
+    const col = { skinC: P.skin[(o.skin || 0) % 3], hairC: P.hair[(o.hair || 0) % 3], shirtC: P.shirt[(o.shirt || 0) % 6], pantsC: P.pants[(o.pants || 0) % 3] };
+    const parts = {}; const slot = free.length ? free.pop() : (next < CAP ? next++ : -1);
+    if (slot < 0) console.warn("peopleKit：人超過 " + CAP + " 個，這一個畫不出來");
+    for (const name in PARTS) {
+      if ((name === "pack" && !o.pack) || (name === "bag" && !o.bag) || (name === "hat" && !o.hat)) continue;
+      const d = PARTS[name]; const node = new THREE.Object3D(); node.name = name; node.position.set(...d.pos); if (d.rot) node.rotation.set(...d.rot); g.add(node); parts[name] = node;
+      if (slot >= 0) { pools[name].setColorAt(slot, colourOf(col, name)); pools[name].instanceColor.needsUpdate = true; owners[name][slot] = g; pools[name].count = Math.max(pools[name].count, slot + 1); }
+    }
     g.scale.setScalar(o.scale != null ? o.scale : 1.25);   // 島上放大一點（Paul 2026-11-17「push further」：HEART 的人跟島的比例比較大）；機場那一頁 1.0
-    g.userData = { phase: rnd() * 6, moving: false, baseY: 0 };   // 人不投影：陰影貼圖是靜的，走動的人用腳下那一圈就好
+    g.userData = { phase: rnd() * 6, moving: false, baseY: 0, parts, slot };
     return g;
   }
+  // 人拿掉：slot 還回去，所有零件縮成 0。
+  function freePerson(g) {
+    const slot = g.userData.slot; if (slot == null || slot < 0) return;
+    for (const name in PARTS) { if (owners[name][slot] === g) { owners[name][slot] = null; pools[name].setMatrixAt(slot, NONE); pools[name].instanceMatrix.needsUpdate = true; } }
+    g.userData.slot = -1; free.push(slot);
+  }
+  // 每一幀（畫之前）：每個人每個零件的世界矩陣抄進 instance。人不在畫面上（visible false）就縮成 0。
+  function sync() {
+    for (const name in PARTS) { const im = pools[name], own = owners[name]; let any = false;
+      for (let i = 0; i < im.count; i++) { const g = own[i]; if (!g) continue; const node = g.userData.parts[name]; if (!node) continue;
+        if (!g.visible) im.setMatrixAt(i, NONE); else { g.updateMatrixWorld(); im.setMatrixAt(i, node.matrixWorld); } any = true; }
+      if (any) im.instanceMatrix.needsUpdate = true; }
+  }
+  // 射線打到一個 pool：instanceId 對回那個人的 Group。
+  const ownerOf = (im, instanceId) => (owners[im.userData.peoplePool] || [])[instanceId] || null;
   function pose(g, t) {
-    const u = g.userData, legL = g.getObjectByName("legL"), legR = g.getObjectByName("legR"), armL = g.getObjectByName("armL"), armR = g.getObjectByName("armR"), head = g.getObjectByName("head");
+    const u = g.userData, { legL, legR, armL, armR, head } = u.parts;
     if (u.sitting) { legL.rotation.x = -1.4; legR.rotation.x = -1.4; armL.rotation.x = -0.6; armR.rotation.x = -0.6; }   // 坐著：腿伸前面，手放腿上（高度由 motion() 決定）
     else if (u.moving) { const s = Math.sin(t * 9 + u.phase); legL.rotation.x = s * 0.6; legR.rotation.x = -s * 0.6; armL.rotation.x = -s * 0.5; armR.rotation.x = s * 0.5; g.position.y = u.baseY + Math.abs(Math.cos(t * 9 + u.phase)) * 0.05; }
     else if (u.talking) { legL.rotation.x = 0; legR.rotation.x = 0; const s = Math.sin(t * 3.1 + u.phase); armL.rotation.x = -0.4 + s * 0.25; armR.rotation.x = -0.3 - s * 0.2; g.position.y = u.baseY; }   // 聊天：手在比
@@ -94,13 +134,11 @@ export function peopleKit({ P, M, rnd }) {
     head.rotation.y = u.talking ? Math.sin(t * 2.2 + u.phase) * 0.08 : Math.sin(t * 0.7 + u.phase) * 0.12;
     head.rotation.x = u.talking ? Math.sin(t * 4 + u.phase) * 0.06 : 0;
   }
-  return { makePerson, pose };
+  return { makePerson, pose, sync, free: freePerson, ownerOf, pools: Object.values(pools) };
 }
-// 只要人不要整個引擎（/history/ 的機場自己有場景）：從七色直接做材質。
-export function peopleFromPalette(palette, seed) {
-  const P = colours(palette); const std = (color, extra) => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...(extra || {}) });
-  const M = { skin: P.skin.map(c => std(c, { roughness: 0.7 })), hair: P.hair.map(c => std(c, { roughness: 0.9 })), shirt: P.shirt.map(c => std(c)), pants: P.pants.map(c => std(c)), eye: std(P.dark, { roughness: 0.4 }), orange: std(P.orange), navy: std(P.navy) };
-  return peopleKit({ P, M, rnd: mulberry(seed == null ? 5 : seed) });
+// 只要人不要整個引擎（/history/ 的機場自己有場景）：從七色直接做。parent 是 pool 要掛在哪個 Group 底下。
+export function peopleFromPalette(palette, seed, parent) {
+  return peopleKit({ P: colours(palette), rnd: mulberry(seed == null ? 5 : seed), parent });
 }
 
 // ═══ 引擎：畫布、材質、燈、海、所有的建造函式、人、鏡頭、牌子。頁面拿回來的 E 上面全部都有。═══
@@ -525,7 +563,8 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   }
 
   // ═══ 人：大頭 chibi（peopleKit，/history/ 的機場也用同一批人）═══
-  const { makePerson, pose } = peopleKit({ P, M, rnd });
+  const people = peopleKit({ P, rnd, parent: world }); const { makePerson, pose } = people;
+  for (const pm of people.pools) pickables.push(pm);   // 點人：射線打到 pool，instanceId 對回那個人
   // 一個會走的人。person 是 { code, team, role, avatar? }；o 是 { isl（住哪座島，{ id, x, z, r }）, start（起點 { x, z }）, skin, hair, shirt, me }。
   // 牌子是一顆 button（class pin pin-person），大頭照一顆小的在名字前面，字放 span 裡。回 walker 那包（motion() 用的狀態都在上面）。
   const walkers = [];
@@ -534,13 +573,13 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     const g = makePerson({ skin: o.skin != null ? o.skin : walkers.length % 3, hair: o.hair != null ? o.hair : (walkers.length * 7) % 3, shirt: o.shirt != null ? o.shirt : (walkers.length * 5) % 6, pants: walkers.length % 3,
       hat: person.role === "copresident", pack: person.role === "director" || person.role === "student", bag: person.role === "advisor" });
     const start = o.start || { x: isl.x, z: isl.z + 2 }; g.position.set(start.x, 0, start.z); g.rotation.y = rnd() * TAU; world.add(g);
-    g.traverse(m => { if (m.isMesh) { m.userData.sel = { kind: "person", code: person.code }; pickables.push(m); } });
+    g.userData.sel = { kind: "person", code: person.code };
     const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-person" + (o.me ? " is-me" : ""); pin.dataset.goPerson = person.code; pin.hidden = true; pins.appendChild(pin);
     if (person.avatar) { const im = document.createElement("img"); im.src = person.avatar; im.alt = ""; im.width = 18; im.height = 18; pin.appendChild(im); }
     pin.appendChild(document.createElement("span"));
     const w = { person, g, pin, isl, home: isl, target: start, wait: rnd() * 4 + 1, me: !!o.me, label: "", trips: 0, path: null, pathI: 0, dest: "", poi: null, partner: null, act: null }; walkers.push(w); shadowsDirty = true; return w;
   }
-  function removeWalker(w) { world.remove(w.g); w.pin.remove(); const i = walkers.indexOf(w); if (i >= 0) walkers.splice(i, 1); for (let k = pickables.length - 1; k >= 0; k--) if (pickables[k].userData.sel && pickables[k].userData.sel.code === w.person.code) pickables.splice(k, 1); shadowsDirty = true; }
+  function removeWalker(w) { world.remove(w.g); people.free(w.g); w.pin.remove(); const i = walkers.indexOf(w); if (i >= 0) walkers.splice(i, 1); shadowsDirty = true; }
 
   // ═══ 鏡頭：拖曳轉、滾輪縮，每一幀阻尼追目標 ═══
   const cam = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), goalPos: new THREE.Vector3(), goalTgt: new THREE.Vector3() };
@@ -584,7 +623,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
 
   // ═══ 射線、懸停、牌子 ═══
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-  function hit(e) { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); const hs = ray.intersectObjects(pickables, false); return hs.length ? { sel: hs[0].object.userData.sel } : null; }
+  function hit(e) { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); const hs = ray.intersectObjects(pickables, false); if (!hs.length) return null; const h = hs[0]; if (h.object.userData.peoplePool) { const g = people.ownerOf(h.object, h.instanceId); return g && g.userData.sel ? { sel: g.userData.sel } : null; } return { sel: h.object.userData.sel }; }
   let hoverSel = null;
   function setHover(sel) { const key = sel ? JSON.stringify(sel) : ""; if (key === (hoverSel ? JSON.stringify(hoverSel) : "")) return; hoverSel = sel; canvas.style.cursor = sel ? "pointer" : ""; if (onHover) onHover(sel); }
   const v3 = new THREE.Vector3();
@@ -605,7 +644,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // 一顆牌子（DOM）。cls 是 class（pin 之外的），data 是 dataset。
   function pin(cls, data, hidden) { const el = document.createElement("button"); el.type = "button"; el.className = "pin " + cls; for (const k in (data || {})) el.dataset[k] = data[k]; if (hidden) el.hidden = true; pins.appendChild(el); return el; }
   function resize() { const w = stage.clientWidth || 300, h = stage.clientHeight || 200; SW = w; SH = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); for (const p of pins.children) p._v = -1; }
-  function render(t) { if (shadowsDirty) { renderer.shadowMap.needsUpdate = true; shadowsDirty = false; } renderer.render(scene, camera); E.placePins(); void t; }
+  function render(t) { people.sync(); if (shadowsDirty) { renderer.shadowMap.needsUpdate = true; shadowsDirty = false; } renderer.render(scene, camera); E.placePins(); void t; }
   function snapCam() { cam.pos.copy(cam.goalPos); cam.tgt.copy(cam.goalTgt); placeCam(); render(0); }
   if ("ResizeObserver" in window) new ResizeObserver(() => { resize(); render(0); }).observe(stage);
 
@@ -637,7 +676,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, slides, walkers,
     rbox, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane,
     furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances,
-    makePerson, pose, addWalker, removeWalker,
+    makePerson, pose, addWalker, removeWalker, people,
     cam, setGoal, placeCam, orbitBy, snapCam, project, putPin, setHidden, pin, resize, render, hit, paintBoards, debugWalkers,
     get motionOn() { return motionOn; },
     dirty() { shadowsDirty = true; },
