@@ -212,7 +212,8 @@ export function buildSights(THREE, E, c) {
       ticks.push(dt => { for (const v of vehicles) { v.u = (v.u + dt * 1.25 / L + 1) % 1; const p = loop.getPointAt(v.u); loop.getTangentAt(v.u, tan); const ry = Math.atan2(-tan.z, tan.x);   // 車頭朝 +x，所以朝向是 atan2(-tz, tx)
           e.set(0, ry, 0); q.setFromEuler(e); vm.compose(p, q, s3.set(1, 1, 1));
           v.parts.forEach(([x, y, z, w, h, d, col], i) => { pm.compose(p3.set(x, y, z), q.identity(), s3.set(w, h, d)); pm.premultiply(vm); vb.setM(v.ib[i], pm, col); });
-          v.wheels.forEach(([x, z], i) => { pm.compose(p3.set(x, 0.18, z), q.identity(), s3.set(0.36, 0.36, 0.12)); pm.premultiply(vm); vw.setM(v.iw[i], pm); }); }
+          e.set(0, 0, -(v.u * L) / 0.18); q.setFromEuler(e);   // 輪子照走過的距離轉（半徑 0.18；批 B）
+          v.wheels.forEach(([x, z], i) => { pm.compose(p3.set(x, 0.18, z), q, s3.set(0.36, 0.36, 0.12)); pm.premultiply(vm); vw.setM(v.iw[i], pm); }); }
         vb.flush(); vw.flush(); });
     }
   }

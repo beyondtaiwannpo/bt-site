@@ -111,12 +111,14 @@ export function makeCurve(pts, samples) {
   for (let k = 0; k <= N; k++) P.push(curvePoint(pts, k / N));
   for (let k = 1; k <= N; k++) cum.push(cum[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]));
   const length = cum[N];
+  // yawU：不折回 -π 到 π 的航向（每一段跟前一段的差累加），鏡頭跟著機頭轉才不會在航向跨過 0 或 π 的那一幀跳一下（批 B）。
+  const Y = [0]; for (let k = 1; k < N; k++) { const h = Math.atan2(P[k + 1][0] - P[k][0], P[k + 1][1] - P[k][1]); Y.push(Y[k - 1] + wrapAngle(h - Math.atan2(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]))); } Y[0] = Math.atan2(P[1][0] - P[0][0], P[1][1] - P[0][1]); for (let k = 1; k < N; k++) Y[k] += Y[0]; Y.push(Y[N - 1]);
   const at = s => {
     s = Math.min(length, Math.max(0, s));
     let lo = 0, hi = N; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= s) lo = mid; else hi = mid; }
     const seg = cum[hi] - cum[lo] || 1e-9, t = (s - cum[lo]) / seg;
     const a = P[lo], b = P[hi];
-    return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), yaw: Math.atan2(b[0] - a[0], b[1] - a[1]) };
+    return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), yaw: Math.atan2(b[0] - a[0], b[1] - a[1]), yawU: lerp(Y[lo], Y[hi], t) };
   };
   return { at, length, points: P };
 }
@@ -157,7 +159,7 @@ export function planePoseAt(e) {
     const yaw = pushback ? Math.PI : wrapAngle(here.yaw + wrapAngle(Math.PI - here.yaw) * (1 - k));
     const ahead = tw.at(Math.min(tw.length, s + 8));
     const steer = pushback ? 0 : Math.max(-0.6, Math.min(0.6, wrapAngle(ahead.yaw - here.yaw)));
-    return { ...base, x: here.x, z: here.z, yaw, steer, s, pushback, speed: 1 };
+    return { ...base, x: here.x, z: here.z, yaw, yawU: here.yawU - tw.at(0).yawU, steer, s, pushback, speed: 1 };
   }
   // 起飛：對正跑道（往 -x），加速、抬頭、離地、收輪、爬升。
   // 2026-11-18 批 A：速度從滑行的速度接上去（之前 t² 從零起步，跑道頭先煞停）；先抬頭 7° 再離地，抬頭時繞主輪轉所以機身中心墊高一點；
@@ -170,7 +172,7 @@ export function planePoseAt(e) {
   const y = 420 * lift + Math.sin(pitch) * 1.0;
   const gear = 1 - smooth(clamp01((t - 0.49) / 0.2));
   const roll = 0.05 * Math.sin(Math.PI * clamp01((t - 0.6) / 0.4));
-  return { ...base, x, y, z: RUNWAY.z, yaw: -Math.PI / 2, pitch, roll, gear, s: tw.length + run, speed: 2 + 6 * t, lift };
+  return { ...base, x, y, z: RUNWAY.z, yaw: -Math.PI / 2, yawU: tw.at(tw.length).yawU - tw.at(0).yawU, pitch, roll, gear, s: tw.length + run, speed: 2 + 6 * t, lift };
 }
 
 // ── 旅客與鏡頭 ──
@@ -264,9 +266,11 @@ export function cameraAt(e, tall) {
     return { pos, look, fov: lerp(inside, CAM_FOV.outside, u) };
   }
   const q = planePoseAt(e);
-  if (e < PHASES.takeoff[0]) return { pos: [q.x + CAM_OFF[0], q.y + CAM_OFF[1], q.z + CAM_OFF[2]], look: [q.x, q.y + 2, q.z], fov: CAM_FOV.outside };
-  const k = smooth(clamp01((e - PHASES.takeoff[0]) / 0.12));
-  const off = CAM_OFF.map((v, i) => lerp(v, CHASE_OFF[i], k));
+  // 停機坪的鏡頭偏移跟著滑行道的航向（yawU，不折回）轉兩成多（批 B：之前是世界座標的常數，飛機釘在畫面同一點、轉彎鏡頭不繞）；起飛追在後面的那一個隨爬升拉遠四成。
+  const a = 0.22 * (q.yawU || 0), ca = Math.cos(a), sa = Math.sin(a), so = [CAM_OFF[0] * ca + CAM_OFF[2] * sa, CAM_OFF[1], -CAM_OFF[0] * sa + CAM_OFF[2] * ca];
+  if (e < PHASES.takeoff[0]) return { pos: [q.x + so[0], q.y + so[1], q.z + so[2]], look: [q.x, q.y + 2, q.z], fov: CAM_FOV.outside };
+  const k = smooth(clamp01((e - PHASES.takeoff[0]) / 0.12)), pull = 1 + 0.4 * (q.lift || 0);
+  const off = so.map((v, i) => lerp(v, CHASE_OFF[i] * pull, k));
   return { pos: [q.x + off[0], q.y + off[1], q.z + off[2]], look: [q.x - 20 * k, q.y + 2 - 14 * k, q.z], fov: CAM_FOV.outside };
 }
 

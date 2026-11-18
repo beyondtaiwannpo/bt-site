@@ -150,9 +150,11 @@ export function buildRides(THREE, E, c) {
     [[2.0, 0.6, 1], [2.6, -0.5, 3], [1.4, -0.7, 5]].forEach(([px, pz, sh]) => { const pp = makePerson({ shirt: sh, scale: 1.0 }); pp.position.set(px, 0.55, pz); pp.rotation.y = -Math.PI / 2; g.add(pp); });
     for (const [x, z] of [f.a, f.b]) { const d = new THREE.Group(); d.position.set(x, 0, z); world.add(d); d.add(mesh(rbox(5, 0.25, 2.2, 0.06), M.wood, 0, 0.1, -2.4, false)); for (const [ox, oz] of [[-2, -1.5], [2, -1.5], [-2, -3.3], [2, -3.3]]) d.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, 1.6, 6), M.dark, ox, -0.5, oz, false)); const l = E.lamp(); l.position.set(2, 0.2, -3.2); d.add(l); }
     E.mergeChildren(g); E.ferryObj = g;   // water.js 畫渡輪的尾浪要知道它在哪
-    const span = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]), ux = (f.b[0] - f.a[0]) / span, uz = (f.b[1] - f.a[1]) / span; let s = 0, dir = 1, hold = 0;
-    ticks.push((dt, t) => { if (hold > 0) hold -= dt; else { s += dt * 1.6 * dir; if (s >= span) { s = span; dir = -1; hold = 6; } else if (s <= 0) { s = 0; dir = 1; hold = 6; } }
-      g.position.set(f.a[0] + ux * s, -0.3 + Math.sin(t * 1.1) * 0.06, f.a[1] + uz * s); g.rotation.set(0, Math.atan2(ux * dir, uz * dir) + Math.PI / 2, Math.sin(t * 0.8) * 0.02); });
+    const span = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]), ux = (f.b[0] - f.a[0]) / span, uz = (f.b[1] - f.a[1]) / span; let s = 0, dir = 1, hold = 0, yaw = Math.atan2(ux, uz) + Math.PI / 2;
+    // 到頭停 6 秒，停的時候慢慢把船頭轉過去（批 B，之前同一幀翻 180 度）；開的時候先慢後快再慢。
+    ticks.push((dt, t) => { if (hold > 0) hold -= dt; else { const ease = 0.35 + 0.65 * Math.sin(Math.PI * s / span); s += dt * 2.0 * dir * Math.max(0.15, ease); if (s >= span) { s = span; dir = -1; hold = 6; } else if (s <= 0) { s = 0; dir = 1; hold = 6; } }
+      const want = Math.atan2(ux * dir, uz * dir) + Math.PI / 2, d = ((want - yaw + Math.PI) % TAU + TAU) % TAU - Math.PI; yaw += d * (1 - Math.exp(-dt * 1.1));
+      g.position.set(f.a[0] + ux * s, -0.3 + Math.sin(t * 1.1) * 0.06, f.a[1] + uz * s); g.rotation.set(0, yaw, Math.sin(t * 0.8) * 0.02); });
   }
   void blockersOf;
   return { tick: (dt, t) => { for (const f of ticks) f(dt, t); } };

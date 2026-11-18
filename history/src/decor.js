@@ -1,5 +1,4 @@
-// /history/ 航廈裡的第二批細節（2026-11-18 Paul「More detail first」）：三間店做成走得進去的店面、免稅店與美食區補滿、柱子與牆上的裝飾、
-// 世界時鐘、布幔、大廳的小亭子、走道兩側的小島、更多在做事的人。清單在 README「歷史之路（2026-11-18 第二批）」。跟 terminal.js 同一招：不 import three、沒有站名、沒有色碼。
+// /history/ 航廈裡的第二批細節，清單在 README「歷史之路（2026-11-18 第二批）」。跟 terminal.js 同一招：不 import three、沒有站名、沒有色碼。
 import { makeSign } from "./signs.js";
 export function buildDecor(THREE, c) {
   const { mats, P, palette, fonts, T, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, pick } = c;

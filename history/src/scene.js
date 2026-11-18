@@ -132,6 +132,7 @@ function figure(mats, opts) {
   g.name = "figure"; g.userData.baseY = 0; if (o.seated) g.userData.sitting = true;
   return g;
 }
+const wr = a => Math.atan2(Math.sin(a), Math.cos(a));   // 角度差折到 -π 到 π
 function walkCycle(fig, t, walking) { fig.userData.moving = !!walking && !fig.userData.sitting; people.pose(fig, t); }
 
 // 一棵低多邊形的樹：圓錐加圓柱，InstancedMesh 用。
@@ -546,7 +547,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // 出發看板：版面照 airport.js 的 boardLayout（寬 2048、列高至少 48 像素），現在這一站那一列整列橘底深藍字；站多到放不下就只畫現在這一站附近的幾列。
   // 換站的時候整塊翻一下（render() 看 boardFlip：先壓扁、換貼圖、再彈回來），翻牌看板的感覺。
   let boardFlip = null, boardCurrent = -1;
-  // 看板的貼圖一站一張、做過就留著（2026-11-17 順不順批 2：之前每換一站就重畫一張 2048 寬的 canvas 再上傳 GPU，一幀卡 50 到 80 ms）。
+  // 看板的貼圖一站一張、做過就留著（每換一站重畫 2048 寬的 canvas 會卡 50 到 80 ms）。
   // 站少（8 站以內）開頁後趁閒的時候先把每一站那張都做好、先上傳（renderer.initTexture），換站只是換 map；站多就用到才做、最多留 8 張。
   const boardCache = new Map(); const BOARD_KEEP = 8;
   function buildBoardTex(rows) {
@@ -601,7 +602,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     renderer.shadowMap.needsUpdate = true;
   }
   function resize(w, h) { W = w; Hh = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
-  // 靠近一站稍微放大（順不順批 3：之前是 CSS scale 整個 .world）。zoom 變了超過千分之一才重算投影矩陣。
+  // 靠近一站稍微放大。zoom 變了超過千分之一才重算投影矩陣。
   let zoomNow = 1, walkT = 0, walkOn = false, trLast = [0, 0, 0], lastT = 0;
   function setZoom(z) { if (Math.abs(z - zoomNow) < 0.001) return; zoomNow = z; camera.zoom = z; camera.updateProjectionMatrix(); }
   const tmpV = new THREE.Vector3(), lookV = new THREE.Vector3();
@@ -648,9 +649,12 @@ export function createScene({ canvas, palette, phone, fonts }) {
       if (u >= 1) boardFlip = null;
     }
     for (const cl of clouds) { cl.position.x += cl.userData.v * dt; if (cl.position.x > cl.userData.x0 + 300) cl.position.x -= 600; }   /* 用 dt、飄出 300 公尺就繞回來（之前每幀固定加、永遠不回來）*/
-    fuel[0].position.x = 150 + Math.sin(t * 0.12) * 40; fuel[0].rotation.y = Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2;
+    fuel[0].position.x = 150 + Math.sin(t * 0.12) * 40; fuel[0].rotation.y += wr((Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2) - fuel[0].rotation.y) * Math.min(1, dt * 4);
     { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(100 + Math.cos(ang) * 26, 0, 110 + Math.sin(ang) * 26); tug.rotation.y = -ang; }
-    for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u, sgn = w.x1 >= w.x0 ? 1 : -1; const dir = (u < span ? 1 : -1) * sgn; f.position.set(w.x0 + sgn * d, f.userData.baseY || 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, !w.stand); }   /* 從 x0 走到 x1，臉跟著方向；stand：站在電動步道上 */
+    // 走道上來回的人：到頭站 1.2 秒、轉身用追的（批 B，之前瞬間翻面）。從 x0 走到 x1，臉跟著方向；stand：站在電動步道上。
+    for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), T = span / w.sp, H = 1.2, u = t % (2 * (T + H)), sgn = w.x1 >= w.x0 ? 1 : -1;
+      const d = u < T ? u * w.sp : u < T + H ? span : u < 2 * T + H ? span - (u - T - H) * w.sp : 0, mv = u < T || (u >= T + H && u < 2 * T + H), dir = (u < T || u >= 2 * T + H ? 1 : -1) * sgn;
+      f.position.set(w.x0 + sgn * d, f.userData.baseY || 0, w.z); f.rotation.y += wr((dir > 0 ? Math.PI / 2 : -Math.PI / 2) - f.rotation.y) * Math.min(1, dt * 7); walkCycle(f, t, mv && !w.stand); }
     for (const f of idleFigs) walkCycle(f, t, false);
     for (const x of extras) if (x.tick) x.tick(t, e);
     if (people) people.sync();   // 人的零件世界矩陣抄進 InstancedMesh（2026-11-17 批 1b）

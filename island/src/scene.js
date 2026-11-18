@@ -126,7 +126,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     },
     select(sel) {
       show.selectedTeam = sel && sel.team ? sel.team : (sel && sel.kind === "person" ? (walkers.find(w => w.person.code === sel.code) || {}).person?.team || "" : "");
-      for (const o of isleObjs.values()) { const on = o.isl.id === show.selectedTeam; o.pin.classList.toggle("on", on); o.flag.material = on ? M.light : M.team[o.tm.colour]; }
+      for (const o of isleObjs.values()) { const on = o.isl.id === show.selectedTeam; o.pin.classList.toggle("on", on); o.flag.material = on ? M.light : M.team[o.tm.colour]; if (on && sel && sel.kind !== "person") E.bounce(o.g); }   // 點到的島彈一下（批 B）
       for (const w of walkers) w.pin.classList.toggle("on", !!(sel && sel.kind === "person" && sel.code === w.person.code));
       paintLines();
       for (const o of isleObjs.values()) for (const b of o.buildings) b.userData.pin.classList.toggle("on", !!(sel && sel.kind === "program" && sel.program === b.userData.program.id));
@@ -137,6 +137,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       if (!E.motionOn) E.snapCam(); else E.placePins();
     },
     flows(on) { show.flows = !!on; paintLines(); if (!E.motionOn) E.render(0); },
+    // 滑鼠移到哪座島的東西上，那座島的牌子亮起來（批 B）。
+    hover(sel) { const team = sel && sel.team ? sel.team : ""; for (const o of isleObjs.values()) o.pin.classList.toggle("hover", o.isl.id === team); },
     overview() { show.selectedTeam = ""; paintLines(); for (const o of isleObjs.values()) { o.pin.classList.remove("on"); o.flag.material = M.team[o.tm.colour]; } E.setGoal(L.cameraOverview(phone), true); if (!E.motionOn) E.snapCam(); },
     bird(on) { E.setGoal(on ? L.cameraBird(phone) : L.cameraOverview(phone), true); if (!E.motionOn) E.snapCam(); },
     names(on) { show.names = !!on; E.placePins(); },

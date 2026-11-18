@@ -46,7 +46,7 @@ function renderCards() {
 }
 // 卡貼在 3D 錨點投到螢幕的那一點上方（像素）。卡不隨遠近縮放（字要讀得到），鏡頭快到了才浮出來。
 // 卡貼在 3D 錨點投到螢幕的那一點上方。位置用 CSS 的 translate（不是 left/top，也不是 transform：transform 留給浮出來那一下的過渡），
-// 每一幀只寫不讀：卡的寬度在 renderCards() 與 resize 時量一次記在 _w，畫面寬度記在 measured（順不順批 3：之前每一幀每張卡都讀 offsetWidth，寫了再讀就得重新排版，layout shift 0.69）。
+// 每一幀只寫不讀：卡的寬度在 renderCards() 與 resize 時量一次記在 _w，畫面寬度記在 measured（每幀讀 offsetWidth 會逼瀏覽器重新排版）。
 function placeCards() {
   if (!gl || !stageEl) return;
   const W = measured[0] || innerWidth;
@@ -196,7 +196,7 @@ function startPlay() {
   let last = 0;
   const step = ts => {
     if (!playing) return;
-    if (last) scrollTo(0, Math.min(end, scrollY + speed * Math.min(2, (ts - last) / 16.7)));
+    if (last) scrollTo(0, Math.min(end, scrollY + speed * (0.22 + 0.78 * (1 - A.closeness(w, progress))) * Math.min(2, (ts - last) / 16.7)));   // 靠近一站慢到兩成，像停一下（批 B）
     last = ts;
     if (scrollY >= end - 1) { stopPlay(); return; }
     raf = requestAnimationFrame(step);

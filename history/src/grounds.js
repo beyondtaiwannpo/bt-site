@@ -1,11 +1,5 @@
-// /history/ 航廈外面的東西（2026-11-18 Paul：「make it like an actual airport… plenty of details in and out of the terminal」）。
-// 照真的機場分空側與陸側（研究在 docs/history/2026-11-18-真機場研究.md）：
-// 空側：每一個停機位的地面線（黃色引導線、停止線、橘色設備限制線、白色地勤車停放框、位號）、每一位的地勤車（輸送帶車、地面電源、行李籠、錐桶、輪擋、地勤）、
-//       五根高桿照明、停機坪的伸縮縫與服務道、滑行道的指示牌與等待線的牌、跑道兩端的號碼與瞄準點與觸地帶的白塊、PAPI、進場燈、ILS 天線陣、下滑台、擋焰牆、
-//       周界圍籬、消防站第二台車與瞭望塔、直升機停機坪、小飛機機坪與小機棚、水塔、變電所、維修場。
-// 陸側：航廈前整條雨棚與人行道與斑馬線與導盲磚、門架牌、計程車排班、接駁巴士、立體停車場、公車總站、加油站、圓環與機場入口招牌、捷運站出口、
-//       機場公司辦公大樓、空廚、員工停車場、花台與圓樹、廣告看板、路上會跑的車。
-// 不 import three：THREE 跟小工具從 scene.js 傳進來（跟 plane.js、terminal.js 同一招）。沒有任何一站的文字、沒有色碼。
+// /history/ 航廈外面的東西，分空側（停機位、地勤車、跑道設施、周邊）與陸側（雨棚、車道、停車場、圓環、城市）。清單與研究見 README「歷史之路（2026-11-18）」。
+// 不 import three：THREE 跟小工具從 scene.js 傳進來。沒有任何一站的文字、沒有色碼。
 import { makeSign } from "./signs.js";
 export function buildGrounds(THREE, c) {
   const { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, textTexture, lam, world, truck, buildAirliner, shadowOn, tw, pick } = c;
@@ -98,7 +92,7 @@ export function buildGrounds(THREE, c) {
     h.add(box(4.4, 1.7, 1.9, mats.teal, 0, 1.6, 0), box(2.0, 1.0, 1.6, mats.glass, 1.2, 2.2, 0, false), box(5, 0.5, 0.5, mats.teal, -4.2, 1.9, 0, false), box(0.3, 1.4, 0.2, mats.orange, -6.5, 2.4, 0, false), instanced(new THREE.BoxGeometry(5, 0.1, 0.12), mats.dark, [[0, 0.3, -0.9], [0, 0.3, 0.9]], false), instanced(new THREE.BoxGeometry(0.1, 0.5, 0.1), mats.dark, [[-1.2, 0.55, -0.9], [1.2, 0.55, -0.9], [-1.2, 0.55, 0.9], [1.2, 0.55, 0.9]], false), cyl(0.12, 0.12, 0.6, mats.dark, 0, 2.75, 0, 6));
     const rotor = new THREE.Group(); rotor.position.y = 3.05; rotor.add(box(11, 0.08, 0.3, mats.dark, 0, 0, 0, false), box(0.3, 0.08, 11, mats.dark, 0, 0, 0, false)); h.add(rotor);
     const tail = new THREE.Group(); tail.position.set(-6.5, 2.4, 0.15); tail.add(box(1.6, 0.06, 0.15, mats.dark, 0, 0, 0, false), box(0.15, 0.06, 1.6, mats.dark, 0, 0, 0, false)); tail.rotation.x = Math.PI / 2; h.add(tail);
-    movers.push({ fn: t => { rotor.rotation.y = t * 1.2; tail.rotation.z = t * 4; } }); crew(x + 6, z + 5, -0.6); }
+    movers.push({ fn: t => { rotor.rotation.y = t * 24; tail.rotation.z = t * 60; } }); crew(x + 6, z + 5, -0.6); }   // 旋翼每秒四轉（之前 0.19 轉，像壞了）
   // 小飛機機坪（跑道這一側）：兩架小螺旋槳機、一座小機棚；水塔；變電所；維修場（貨櫃、三台車）。
   {
     const wheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.2, 8); wheelGeo.rotateZ(Math.PI / 2);
@@ -111,8 +105,10 @@ export function buildGrounds(THREE, c) {
   // 會動的：跟隨車（黃色，頂燈）在服務道來回；接駁巴士在停機坪遠端來回；行李拖車（第二組）沿航廈前跑。
   {
     const fm = new THREE.Group(); fm.userData.dynamic = true; fm.add(box(4.2, 1.1, 1.9, mats.yellowLight, 0, 0.6, 0), box(2.0, 0.7, 1.7, mats.glass, -0.2, 1.5, 0, false), box(1.2, 0.3, 0.3, mats.orangeLight, 0, 2.0, 0, false), box(0.9, 0.3, 1.9, mats.dark, 1.7, 1.05, 0, false)); world.add(fm);
-    movers.push({ fn: t => { const u = (t * 0.02) % 2, d = u < 1 ? u : 2 - u; fm.position.set(-30 + d * 160, 0, 85); fm.rotation.y = u < 1 ? Math.PI / 2 : -Math.PI / 2; } });
-    const ab = bus(0, 0, 0, mats.cream); ab.userData.dynamic = true; movers.push({ fn: t => { const u = (t * 0.012) % 2, d = u < 1 ? u : 2 - u; ab.position.set(20 + d * 180, 0, 100); ab.rotation.y = u < 1 ? Math.PI / 2 : -Math.PI / 2; } });
+    // 來回的車：兩頭用餘弦慢下來再掉頭，車頭用追的（批 B，之前到頭瞬間翻面）。
+    const wr = a => Math.atan2(Math.sin(a), Math.cos(a)), shuttle = (o, f, x0, len, z) => { let ry = Math.PI / 2; movers.push({ fn: t => { const u = (t * f) % 2, d = 0.5 - 0.5 * Math.cos(Math.PI * u); o.position.set(x0 + d * len, 0, z); ry += wr((u < 1 ? Math.PI / 2 : -Math.PI / 2) - ry) * 0.06; o.rotation.y = ry; } }); };
+    shuttle(fm, 0.02, -30, 160, 85);
+    const ab = bus(0, 0, 0, mats.cream); ab.userData.dynamic = true; shuttle(ab, 0.012, 20, 180, 100);
   }
 
   // ═══ 陸側 ═══

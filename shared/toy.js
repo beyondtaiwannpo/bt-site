@@ -174,10 +174,10 @@ export function peopleKit({ P, rnd, parent, capacity }) {
   function pose(g, t) {
     const u = g.userData, { legL, legR, armL, armR, head } = u.parts;
     if (u.sitting || u.chair) { legL.rotation.x = -1.4; legR.rotation.x = -1.4; armL.rotation.x = -0.6; armR.rotation.x = -0.6; if (u.chair) g.position.y = u.baseY; }   // 坐著：腿伸前面，手放腿上（高度由 motion() 決定）；坐輪椅的一直是這個姿勢
-    else if (u.moving) { const s = Math.sin(t * 9 + u.phase); legL.rotation.x = s * 0.6; legR.rotation.x = -s * 0.6; armL.rotation.x = -s * 0.5; armR.rotation.x = s * 0.5; g.position.y = u.baseY + Math.abs(Math.cos(t * 9 + u.phase)) * 0.05; }
+    else if (u.moving) { const tt = u.wt != null ? u.wt : t, s = Math.sin(tt * 9 + u.phase); legL.rotation.x = s * 0.6; legR.rotation.x = -s * 0.6; armL.rotation.x = -s * 0.5; armR.rotation.x = s * 0.5; g.position.y = u.baseY + Math.abs(Math.cos(tt * 9 + u.phase)) * 0.05; }
     else if (u.talking) { legL.rotation.x = 0; legR.rotation.x = 0; const s = Math.sin(t * 3.1 + u.phase); armL.rotation.x = -0.4 + s * 0.25; armR.rotation.x = -0.3 - s * 0.2; g.position.y = u.baseY; }   // 聊天：手在比
-    else { legL.rotation.x = 0; legR.rotation.x = 0; armL.rotation.x = 0.05; armR.rotation.x = -0.05; g.position.y = u.baseY + Math.sin(t * 1.6 + u.phase) * 0.012; }
-    head.rotation.y = u.talking ? Math.sin(t * 2.2 + u.phase) * 0.08 : Math.sin(t * 0.7 + u.phase) * 0.12;
+    else { legL.rotation.x = 0; legR.rotation.x = 0; const b = Math.sin(t * 1.6 + u.phase); armL.rotation.x = 0.05 + b * 0.04; armR.rotation.x = -0.05 - b * 0.04; g.position.y = u.baseY + b * 0.02; g.rotation.z = Math.sin(t * 0.9 + u.phase) * 0.012; }   // 站著：呼吸、手微擺、重心微移（批 B，之前近看像雕像）
+    head.rotation.y = u.talking ? Math.sin(t * 2.2 + u.phase) * 0.08 : Math.sin(t * 0.7 + u.phase) * 0.12 + Math.sin(t * 0.23 + u.phase * 2) * 0.14;
     head.rotation.x = u.talking ? Math.sin(t * 4 + u.phase) * 0.06 : 0;
     // 道具的手：舉傘的右手舉著、抱箱子的兩手往前抱、推車的兩手往前推（蓋掉上面擺的）。
     if (u.brolly) armR.rotation.x = -2.7; if (u.box) { armL.rotation.x = -1.3; armR.rotation.x = -1.3; } if (u.stroller) { armL.rotation.x = -0.9; armR.rotation.x = -0.9; }
@@ -217,14 +217,17 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   let shadowsDirty = true;
 
   // 海（一片，900 公尺）
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), M.water); sea.rotation.x = -Math.PI / 2; sea.position.y = -0.6; sea.receiveShadow = true; world.add(sea);
+  // 海面有一點起伏（2026-11-18 批 B）：180×180 格，頂點著色器加兩道正弦的湧浪（5 公分，波長 12 到 15 公尺），uT 每幀餵時間。之前只有貼圖在滑。
+  const waveU = { value: 0 };
+  M.water.onBeforeCompile = sh => { sh.uniforms.uT = waveU; sh.vertexShader = "uniform float uT;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.z += sin(position.x * 0.5 + uT) * 0.03 + sin(position.y * 0.42 - uT * 1.3 + 1.7) * 0.02;"); };
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 900, 180, 180), M.water); sea.rotation.x = -Math.PI / 2; sea.position.y = -0.63; sea.receiveShadow = true; world.add(sea);
 
   // 頁面往這些清單 push，最後 flushInstances() 一次畫完（InstancedMesh）。
   const pickables = [];   // 射線打得到的東西：mesh 的 userData.sel 是點到時回給頁面的那包
   const planes = [];      // 機場的飛機；有 userData.flight 的那一架在 motion() 裡飛
   const boards = [];      // 貼文牆上的板子；paintBoards() 把真的圖貼上去
   const treePlaces = [], bushPlaces = [], stoolPlaces = [], postPlaces = [];
-  const coasters = [], beacons = [], boats = [], balloons = [], clouds = [], flags = [];
+  const coasters = [], beacons = [], boats = [], balloons = [], clouds = [], flags = [], foams = [], bounces = [];
   const slides = new Map();   // "a>b" → { curve, dir, splash }：人過這條不是走的，是坐著溜
   const splashes = [];        // 滑水道底的水花（第四批）：{ ring, mat, drops, x, z, t0 }，人溜到最低點 motion() 把 t0 設成現在，接下來 1.3 秒水圈放大、水珠往上噴
   const groundCache = new Map();
@@ -258,7 +261,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     const segs = shape === "hex" ? 6 : 40, rot = shape === "hex" ? Math.PI / 6 : 0;
     if (shape !== "rect") { const rim = new THREE.Mesh(new THREE.RingGeometry(r - 1.2, r + 0.1, segs, 1, rot), M.beach); rim.rotation.x = -Math.PI / 2; rim.position.y = 0.02; g.add(rim); }
     // 島邊一圈白色的浪花（HEART 的島邊都有）
-    { const foam = new THREE.Mesh(new THREE.RingGeometry(r + 0.5, r + 1.2, segs, 1, rot), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.45, depthWrite: false })); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.55; g.add(foam); }
+    { const foam = new THREE.Mesh(new THREE.RingGeometry(r + 0.5, r + 1.2, segs, 1, rot), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.45, depthWrite: false })); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.55; foam.userData.dynamic = true; foam.userData.ph = rnd() * TAU; g.add(foam); foams.push(foam); }   // 浪圈在 motion() 裡一推一推地放大縮小（批 B）
     const shallow = new THREE.Mesh(shape === "rect" ? rectPrism(r + 2.0, 0.01) : new THREE.CircleGeometry(r + 2.2, segs, rot), M.shallow); if (shape !== "rect") shallow.rotation.x = -Math.PI / 2; shallow.position.y = shape === "rect" ? -1.0 : -0.5; g.add(shallow);
     return top;
   }
@@ -570,10 +573,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
         tw.add(new THREE.Mesh(rbox(1.8, 0.16, 1.8, 0.05), M.wood).translateY(top), new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.9, 4), M.orange).translateY(top + 0.6).rotateY(Math.PI / 4));
         for (let k = 0; k < 6; k++) tw.add(new THREE.Mesh(rbox(0.9, 0.05, 0.08, 0.02), M.dark).translateY(0.5 + k * 0.55).translateZ(-0.9));
         tw.traverse(m => { if (m.isMesh) m.castShadow = true; }); }
-      const splashM = new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.45, depthWrite: false });
-      const splash = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.9, 20), splashM); splash.rotation.x = -Math.PI / 2; splash.position.set(br.x0 + dx * 0.5, -0.5, br.z0 + dz * 0.5); splash.userData.dynamic = true; world.add(splash);
-      const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 6, 5), M.white, 10); drops.userData.dynamic = true; drops.frustumCulled = false; drops.castShadow = false; const none = new THREE.Matrix4().makeScale(0, 0, 0); for (let k = 0; k < 10; k++) drops.setMatrixAt(k, none); drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage); world.add(drops);
-      const sp = { ring: splash, mat: splashM, drops, x: splash.position.x, z: splash.position.z, t0: -9, on: false }; splashes.push(sp);
+      const sp = addSplash(br.x0 + dx * 0.5, br.z0 + dz * 0.5);
       slides.set(br.a + ">" + br.b, { curve, dir: 1, splash: sp }); slides.set(br.b + ">" + br.a, { curve, dir: -1, splash: sp });
       for (const [x, z] of [[br.x0, br.z0], [br.x1, br.z1]]) { const l = lamp(); l.position.set(x + 1.3, 0, z + 1.3); world.add(l); }
     }
@@ -605,7 +605,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     const g = new THREE.Group(); g.position.set(it.x, 0, it.z); world.add(g);
     const r = it.r;
     if (it.kind !== "rock") { const body = new THREE.Mesh(roundPrism(r, 2.2), M.cliff); body.position.y = -2.2; g.add(body); const top = new THREE.Mesh(roundPrism(r - 0.1, 0.3), it.kind === "picnic" ? groundMat("lawn") : M.grass); top.position.y = -1.0; top.receiveShadow = true; g.add(top);
-      const foam = new THREE.Mesh(new THREE.RingGeometry(r + 0.4, r + 1.0, 36), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.4, depthWrite: false })); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.55; g.add(foam); }
+      const foam = new THREE.Mesh(new THREE.RingGeometry(r + 0.4, r + 1.0, 36), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.4, depthWrite: false })); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.55; foam.userData.dynamic = true; foam.userData.ph = rnd() * TAU; g.add(foam); foams.push(foam); }
     if (it.kind === "coaster") {
       // 雲霄飛車：一條閉合的軌道（CatmullRom 過幾個高高低低的點）、柱子撐著、一列小車沿軌道跑。
       const pts = [[-5, 1.2, 0], [-3.5, 4.5, -3.5], [0, 6.5, -2], [3.5, 2.0, -4], [5.5, 4.0, 0], [3.5, 1.5, 3.5], [0, 5.0, 3.0], [-3.5, 2.2, 3.5], [-5.5, 1.5, 1.5]].map(a => new THREE.Vector3(...a));
@@ -638,13 +638,20 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     }
     return g;
   }
+  // 一組水花（水圈加十顆水珠）放在 (x, z) 的水面上；把 sp.t0 設成現在的時間它就噴一次。滑水道底與海豚入水都用這個。
+  function addSplash(x, z) {
+    const splashM = new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.45, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.9, 20), splashM); ring.rotation.x = -Math.PI / 2; ring.position.set(x, -0.5, z); ring.userData.dynamic = true; world.add(ring);
+    const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 6, 5), M.white, 10); drops.userData.dynamic = true; drops.frustumCulled = false; drops.castShadow = false; const none = new THREE.Matrix4().makeScale(0, 0, 0); for (let k = 0; k < 10; k++) drops.setMatrixAt(k, none); drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage); world.add(drops);
+    const sp = { ring, mat: splashM, drops, x, z, t0: -9, on: false }; splashes.push(sp); return sp;
+  }
   // 小船：水道裡幾艘，慢慢搖（motion() 裡動）。位置隨機（半徑 14 到 54），離 avoid 裡每一個圓（{ x, z, r, pad }）的邊 pad 公尺以上。
   function addBoats(n, avoid) {
     for (let i = 0; i < n; i++) {
       let x = 0, z = 0, ok = false;
       for (let t = 0; t < 60 && !ok; t++) { const a = rnd() * TAU, d = 14 + rnd() * 40; x = Math.cos(a) * d; z = Math.sin(a) * d; ok = (avoid || []).every(il => Math.hypot(x - il.x, z - il.z) > il.r + (il.pad == null ? 3 : il.pad)); }
       if (!ok) continue;
-      const b = new THREE.Group(); b.position.set(x, -0.35, z); b.rotation.y = rnd() * TAU;
+      const b = new THREE.Group(); b.position.set(x, -0.35, z); b.rotation.y = rnd() * TAU; b.userData.ry = b.rotation.y;
       b.add(new THREE.Mesh(rbox(2.4, 0.5, 1.0, 0.18), [M.white, M.cream, M.teal][i % 3]).translateY(0.1), new THREE.Mesh(rbox(0.9, 0.5, 0.7, 0.08), [M.orange, M.navy, M.yellow][i % 3]).translateY(0.55).translateX(-0.2), new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 5), M.dark).translateY(1.2).translateX(0.5));
       b.traverse(m => { if (m.isMesh) m.castShadow = true; }); b.userData.phase = rnd() * 6; b.userData.dynamic = true; world.add(b); boats.push(b); mergeChildren(b);
     }
@@ -785,6 +792,9 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // 卡在左、清單在右：要看的東西要落在中間空出來的那一塊，不是視窗正中央。freeCentre() 回空出來那一塊的中心佔視窗寬的比例（0.5 就是正中央）。
   // c 是 { pos: [x,y,z], target: [x,y,z], fit?: [橫的半徑, 直的半徑] }；有 fit 就照畫面空出來那一塊的長寬把距離算出來，pos 只給方向。
   const setGoal = (c, centre) => {
+    const far = cam.goalPos.distanceTo(new THREE.Vector3(...c.pos));
+    if (far > 25) { cam.lift = Math.min(14, far * 0.12); cam.liftT = 0; }   // 飛得遠就先抬高再落下（批 B：之前是直線滑過去）
+    idle.at = performance.now();
     cam.goalPos.set(...c.pos); cam.goalTgt.set(...c.target);
     if (c.fit) {
       const frac = typeof freeWidth === "function" ? freeWidth() : 1, tanH = Math.tan(camera.fov * Math.PI / 360), aspectFree = camera.aspect * frac;
@@ -798,22 +808,34 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const shift = right.multiplyScalar(-f * 2 * halfW); cam.goalPos.add(shift); cam.goalTgt.add(shift);
     }
   };
-  function placeCam() { camera.position.copy(cam.pos); camera.lookAt(cam.tgt); }
+  function placeCam() { camera.position.copy(cam.pos); if (cam.lift) camera.position.y += cam.lift * Math.sin(Math.min(1, cam.liftT / 1.2) * Math.PI); camera.lookAt(cam.tgt); }
   // 拖曳：繞著目標點轉（改 goalPos 的方位角與仰角），滾輪：改距離。
   let drag = null, dragged = false, motionOn = false;
   function orbitBy(dyaw, dpitch, dzoom) {
     const off = cam.goalPos.clone().sub(cam.goalTgt); const r = off.length(); let yaw = Math.atan2(off.x, off.z), pitch = Math.asin(off.y / r);
-    yaw += dyaw; pitch = Math.min(1.45, Math.max(0.35, pitch + dpitch)); const nr = Math.min(130, Math.max(14, r * (dzoom || 1)));
+    const nr = Math.min(130, Math.max(14, r * (dzoom || 1)));
+    // 靠得越近仰角的下限越高（14 公尺時 0.6、54 公尺起 0.35），鏡頭才不會鑽進帳篷與屋頂裡（批 B）。
+    const pmin = 0.35 + 0.25 * (1 - Math.min(1, Math.max(0, (nr - 14) / 40)));
+    yaw += dyaw; pitch = Math.min(1.45, Math.max(pmin, pitch + dpitch));
     cam.goalPos.set(cam.goalTgt.x + Math.sin(yaw) * Math.cos(pitch) * nr, cam.goalTgt.y + Math.sin(pitch) * nr, cam.goalTgt.z + Math.cos(yaw) * Math.cos(pitch) * nr);
   }
-  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; dragged = false; canvas.setPointerCapture(e.pointerId); });
+  // 手感（2026-11-18 批 B）：放手帶一點慣性（fling，每秒衰減到 2%）；8 秒沒碰就慢慢自轉（一碰就停）。
+  const fling = { yaw: 0, pitch: 0 }, idle = { at: performance.now() }; let lastMove = 0;
+  const touched = () => { idle.at = performance.now(); fling.yaw = fling.pitch = 0; };
+  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; dragged = false; canvas.setPointerCapture(e.pointerId); touched(); });
   canvas.addEventListener("pointermove", e => {
-    if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true; if (dragged) { if (E.onDrag) E.onDrag(dx, dy); else orbitBy(-dx * 0.005, dy * 0.004); drag.x = e.clientX; drag.y = e.clientY; if (!motionOn) snapCam(); } return; }
+    if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true; if (dragged) { const now = performance.now(), dtm = Math.max(8, now - lastMove) / 1000; lastMove = now; if (E.onDrag) E.onDrag(dx, dy); else { orbitBy(-dx * 0.005, dy * 0.004); fling.yaw = -dx * 0.005 / dtm; fling.pitch = dy * 0.004 / dtm; } drag.x = e.clientX; drag.y = e.clientY; if (!motionOn) snapCam(); } return; }
     const h = hit(e); setHover(h ? h.sel : null);
   });
-  canvas.addEventListener("pointerup", e => { if (!drag) return; canvas.releasePointerCapture(e.pointerId); const was = dragged; drag = null; if (was) return; const h = hit(e); if (h && onSelect) onSelect(h.sel); else if (!h && onSelect) onSelect(null); });
+  canvas.addEventListener("pointerup", e => { if (!drag) return; canvas.releasePointerCapture(e.pointerId); const was = dragged; drag = null; if (performance.now() - lastMove > 80) fling.yaw = fling.pitch = 0; if (was) return; const h = hit(e); if (h && onSelect) onSelect(h.sel); else if (!h && onSelect) onSelect(null); });
   canvas.addEventListener("pointercancel", () => { drag = null; });
-  canvas.addEventListener("wheel", e => { e.preventDefault(); if (E.onWheel) E.onWheel(e.deltaY); else orbitBy(0, 0, Math.exp(e.deltaY * 0.0012)); if (!motionOn) snapCam(); }, { passive: false });
+  canvas.addEventListener("wheel", e => { e.preventDefault(); touched(); if (E.onWheel) E.onWheel(e.deltaY); else orbitBy(0, 0, Math.exp(e.deltaY * 0.0012)); if (!motionOn) snapCam(); }, { passive: false });
+  // 每一幀：慣性與閒置自轉（motion() 的 tick 叫）。
+  function camIdle(dt, paused) {
+    if (drag) return;
+    if (Math.abs(fling.yaw) + Math.abs(fling.pitch) > 1e-3) { orbitBy(fling.yaw * dt, fling.pitch * dt); const k = Math.exp(-dt * 4); fling.yaw *= k; fling.pitch *= k; }
+    else if (!paused && performance.now() - idle.at > 8000) orbitBy(0.03 * dt, 0);
+  }
   // 兩指縮放（手機）
   let pinch = null;
   canvas.addEventListener("touchstart", e => { if (e.touches.length === 2) { drag = null; pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); } }, { passive: true });
@@ -874,13 +896,14 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const debugWalkers = () => walkers.map(w => ({ code: w.person.code, isl: w.isl && w.isl.id, home: w.home && w.home.id, trips: w.trips, stuck: +(w.stuck || 0).toFixed(1), goes: w.person.goes || "", x: +w.g.position.x.toFixed(1), z: +w.g.position.z.toFixed(1), moving: !!w.g.userData.moving, sitting: !!w.g.userData.sitting, talking: !!w.g.userData.talking, path: w.path ? w.path.length - w.pathI : 0, dest: w.dest || "", poi: w.poi ? w.poi.kind : "", partner: w.partner ? w.partner.person.code : "", act: w.act ? w.act.kind + ":" + (w.act.stage || "") : "", wait: +w.wait.toFixed(1), target: w.target ? [+w.target.x.toFixed(1), +w.target.z.toFixed(1)] : null }));
 
   const E = {
-    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, flags, slides, splashes, walkers,
+    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, flags, foams, bounces, waveU, addSplash, slides, splashes, walkers,
     rbox, box, flagGeo, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane, bunting, pennant, bike, rail,
     furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances, mergeStatic, mergeChildren, mergeDynamic, setMerge, mergeOpts,
     makePerson, pose, addWalker, removeWalker, people,
-    cam, setGoal, placeCam, orbitBy, snapCam, project, putPin, setHidden, pin, resize, render, hit, paintBoards, debugWalkers,
+    cam, setGoal, placeCam, orbitBy, snapCam, camIdle, project, putPin, setHidden, pin, resize, render, hit, paintBoards, debugWalkers,
     get motionOn() { return motionOn; },
     dirty() { shadowsDirty = true; },
+    bounce(o) { if (!bounces.some(b => b.o === o)) bounces.push({ o, t0: E.now || 0 }); },
     placePins() {},            // 頁面蓋掉：每一幀把牌子放到該放的地方（用 project / putPin / setHidden）
     onDrag: null, onWheel: null,   // 頁面蓋掉就換掉預設的「拖曳繞轉、滾輪縮放」（路要沿路走）
     // 每一幀的迴圈。nav 是頁面的導航：{ islandOf(id), wanderTarget(isl, blockers, rnd), detour(a, b, blockers), route(from, to), routePoints(ids), blockersOf: Map, poisOf: Map, commons?: id }。
@@ -893,7 +916,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
 /* ── 這裡面才有動畫。外面不准有每一幀的迴圈。 ──
    鏡頭用阻尼追目標（1 - e^(-dt·k)）；人在島上做事、偶爾過橋；雲慢慢飄；雲霄飛車、燈塔、熱氣球、小船、飛機各自動。暫停就是不呼叫 tick。 */
 function motion(E, nav, tickExtra) {
-  const { cam, placeCam, render, walkers, clouds, flags, planes, boats, coasters, beacons, balloons, slides, splashes, pose, rnd } = E;
+  const { cam, placeCam, render, walkers, clouds, flags, foams, bounces, planes, boats, coasters, beacons, balloons, slides, splashes, pose, rnd } = E;
   const SM = new THREE.Matrix4(), NONE4 = new THREE.Matrix4().makeScale(0, 0, 0);
   const { blockersOf, poisOf } = nav;
   // ── 人在島上做的事（Paul 2026-11-17：「make people doing what they do make sense… they are there for meaning」）──
@@ -929,17 +952,19 @@ function motion(E, nav, tickExtra) {
     if (!path.length) return false;
     w.path = path; w.pathI = 0; w.target = path[0]; w.dest = to; return true;
   }
+  // 轉身用追的（每秒追 8 成），不瞬轉（批 B）。
+  const turnTo = (g, yaw, dt) => { const d = ((yaw - g.rotation.y + Math.PI) % TAU + TAU) % TAU - Math.PI; g.rotation.y += d * (1 - Math.exp(-dt * 8)); };
   function arrived(w) {
     const u = w.g.userData; u.moving = false;
     if (w.poi) {
       const poi = w.poi;
-      if (poi.kind === "seat" || poi.kind === "bench") { u.sitting = true; w.g.position.y = 0.22; w.g.rotation.y = poi.face; w.wait = 8 + rnd() * 10; }
-      else if (poi.kind === "stand") { w.g.rotation.y = poi.face; u.talking = true; w.wait = 5 + rnd() * 6; }
+      if (poi.kind === "seat" || poi.kind === "bench") { u.sitting = true; w.g.position.y = 0.22; w.faceTo = poi.face; w.wait = 8 + rnd() * 10; }
+      else if (poi.kind === "stand") { w.faceTo = poi.face; u.talking = true; w.wait = 5 + rnd() * 6; }
       else if (poi.kind === "swing") { w.act = { kind: "swing", t0: t, dur: 9 + rnd() * 7 }; w.g.rotation.y = poi.face; u.sitting = true; }
       else if (poi.kind === "slide") { w.act = { kind: "slide", stage: "climb", t0: t }; w.g.rotation.y = poi.face; }
       return;
     }
-    if (w.partner) { const p = w.partner; const ddx = p.g.position.x - w.g.position.x, ddz = p.g.position.z - w.g.position.z; w.g.rotation.y = Math.atan2(ddx, ddz); p.g.rotation.y = Math.atan2(-ddx, -ddz); u.talking = true; p.g.userData.talking = true; w.wait = 6 + rnd() * 8; p.wait = w.wait; return; }
+    if (w.partner) { const p = w.partner; const ddx = p.g.position.x - w.g.position.x, ddz = p.g.position.z - w.g.position.z; w.faceTo = Math.atan2(ddx, ddz); p.faceTo = Math.atan2(-ddx, -ddz); u.talking = true; p.g.userData.talking = true; w.wait = 6 + rnd() * 8; p.wait = w.wait; return; }
     if (w.wait <= 0) w.wait = 3 + rnd() * 6;
   }
   function doAct(w) {
@@ -962,7 +987,8 @@ function motion(E, nav, tickExtra) {
   function tick() {
     raf = requestAnimationFrame(tick);
     const now = performance.now() / 1000, dt = Math.min(0.2, now - last); last = now; if (document.hidden) return;
-    const k = 1 - Math.exp(-dt * 3.4); cam.pos.lerp(cam.goalPos, k); cam.tgt.lerp(cam.goalTgt, k); placeCam();
+    if (E.camIdle) E.camIdle(dt, paused);
+    const k = 1 - Math.exp(-dt * 3.4); cam.pos.lerp(cam.goalPos, k); cam.tgt.lerp(cam.goalTgt, k); if (cam.lift) { cam.liftT += dt; if (cam.liftT > 1.2) cam.lift = 0; } placeCam();
     if (!paused) {
       t += dt;
       for (const w of walkers) {
@@ -990,16 +1016,16 @@ function motion(E, nav, tickExtra) {
             const sp = Math.min(d, (w.dest ? 1.5 : 1.0) * dt); let nx = w.g.position.x + dx / d * sp, nz = w.g.position.z + dz / d * sp;
             // 每一幀再往外推一次：快碰到東西就沿著它的邊走（detour 算的是大方向，這裡擋細節）。
             if (w.target.isl) for (const b of blockersFor(w.target.isl, w.target)) { const bx = nx - b.x, bz = nz - b.z, bd = Math.hypot(bx, bz); if (bd < b.r + 0.35 && bd > 0.01) { nx = b.x + bx / bd * (b.r + 0.35); nz = b.z + bz / bd * (b.r + 0.35); } }
-            w.g.position.x = nx; w.g.position.z = nz; w.g.rotation.y = Math.atan2(dx, dz); w.g.userData.moving = true;
+            w.g.position.x = nx; w.g.position.z = nz; turnTo(w.g, Math.atan2(dx, dz), dt); w.g.userData.moving = true; w.g.userData.wt = (w.g.userData.wt || 0) + sp / 1.2;   // 步頻照走的距離（1.2 公尺一步），過橋走快的人腳才不會滑
           } else {
             w.pathI++;
             if (w.pathI < w.path.length) { w.target = w.path[w.pathI]; if (w.target.isl) w.isl = islOf(w.target.isl) || w.isl; }
             else { w.path = null; if (w.dest) { w.isl = islOf(w.dest) || w.home; w.dest = ""; w.g.userData.moving = false; pickHere(w); if (!w.path) arrived(w); } else arrived(w); }
           }
         } else {
-          w.wait -= dt;
+          w.wait -= dt; if (w.faceTo != null) turnTo(w.g, w.faceTo, dt);
           if (w.wait <= 0) {
-            w.trips++; stopDoing(w);
+            w.trips++; stopDoing(w); w.faceTo = null;
             let to = "";
             // 走動少一點、做事多一點（Paul 2026-11-17：「they are just walking relentlessly」）：每做三四件事才過一次橋。
             // 用機率不用「第幾次」：之前 trips % 7 === 3 讓四十個人同一刻一起出發（2026-11-17 第九次）。
@@ -1013,6 +1039,9 @@ function motion(E, nav, tickExtra) {
       }
       for (const c of clouds) { c.position.x += c.userData.drift * dt; if (c.position.x > c.userData.cx + 130) c.position.x = c.userData.cx - 130; }   // 飄出 130 公尺就從另一邊回來（之前飄進霧裡就沒了）
       for (const f of flags) { f.rotation.y = Math.sin(t * 2.3 + f.userData.ph) * 0.22; f.scale.x = 0.92 + Math.sin(t * 3.7 + f.userData.ph) * 0.08; }
+      for (const f of foams) { const k = 0.5 + 0.5 * Math.sin(t * 1.1 + f.userData.ph); f.scale.setScalar(1 + 0.035 * k); f.material.opacity = 0.2 + 0.3 * (1 - k); }   // 浪往外推：放大的同時變淡
+      E.waveU.value = t;
+      for (let i = bounces.length - 1; i >= 0; i--) { const b = bounces[i], k = (t - b.t0) / 0.45; if (k >= 1) { b.o.scale.setScalar(1); bounces.splice(i, 1); } else b.o.scale.setScalar(1 + 0.035 * Math.sin(k * Math.PI)); }
       E.now = t;   // 除錯用：現在的時間（秒），console 裡可以把水花的 t0 設成它來看噴水
       // 滑水道底的水花：水圈放大變淡、十顆水珠往外往上噴再落回水裡，1.3 秒收掉。
       for (const sp of splashes) { const age = t - sp.t0; if (age > 1.3) { if (sp.on) { sp.on = false; sp.ring.scale.setScalar(1); sp.mat.opacity = 0.45; for (let k = 0; k < 10; k++) sp.drops.setMatrixAt(k, NONE4); sp.drops.instanceMatrix.needsUpdate = true; } continue; }
@@ -1027,7 +1056,7 @@ function motion(E, nav, tickExtra) {
         c.train.position.copy(p1); c.train.position.y += 0.3; c.train.lookAt(p2.x, p2.y + 0.3, p2.z); c.train.rotateY(-Math.PI / 2); }
       for (const b of beacons) b.rotation.y += dt * 0.9;
       for (const b of balloons) { const u = b.userData; u.a += dt * u.sp; b.position.set(u.cx + Math.cos(u.a) * u.r, u.h + Math.sin(t * 0.5 + u.a) * 0.6, u.cz + Math.sin(u.a) * u.r * 0.8); b.rotation.y += dt * 0.1; }
-      for (const b of boats) { b.position.y = -0.35 + Math.sin(t * 1.3 + b.userData.phase) * 0.08; b.rotation.z = Math.sin(t * 0.9 + b.userData.phase) * 0.04; b.rotation.y += dt * 0.02; }
+      for (const b of boats) { b.position.y = -0.35 + Math.sin(t * 1.3 + b.userData.phase) * 0.08; b.rotation.z = Math.sin(t * 0.9 + b.userData.phase) * 0.04; b.rotation.y = b.userData.ry + Math.sin(t * 0.3 + b.userData.phase) * 0.06; }   // 停著的船繞錨繩微微擺，不再原地自轉（批 B）
       // 機場那架會動的飛機：機坪滑到滑行道、上跑道、加速起飛、繞一圈（高度 14）、降落、滑回機坪，一輪 72 秒。螺旋槳一直轉。
       // 位置是 u（秒）的分段函式；朝向用 lookAt 看下一個點，所以轉彎、爬升、下降都自然；繞圈時側傾。
       // 繞的那一段（32 到 58 秒）頁面可以換：userData.flight.tour(k, v) 給 0..1 的 k 填 v（機場的本地座標）；沒給就繞一個半徑 30 的圈。

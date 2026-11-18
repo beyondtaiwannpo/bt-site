@@ -137,7 +137,7 @@ async function boot() {
   // 3D：動態 import（Three 從 cdnjs 來）。載不到或沒有 WebGL：留清單與卡，上面印一句。
   const mod = await Promise.race([import("./scene.js").catch(e => { console.warn("3D 載不進來：", e); return null; }), new Promise(r => setTimeout(() => r(null), 10000))]);
   if (mod) {
-    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: () => {}, freeCentre, freeWidth }); }
+    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: s => { if (scene) scene.hover(s); }, freeCentre, freeWidth }); }
     catch (e) { console.warn("3D 開不起來：", e); scene = null; }
   }
   if (!scene) { doc.classList.add("no3d"); $("no3d").hidden = false; }

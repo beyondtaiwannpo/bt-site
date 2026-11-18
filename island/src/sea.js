@@ -61,10 +61,9 @@ export function buildSea(THREE, E, c) {
   for (const isl of islands) {
     if (isl.sea || isl.shape === "rect") continue; stats.waves++;
     for (const [r0, r1, m, y] of [[isl.r + 1.5, isl.r + 2.0, waveM, -0.53], [isl.r + 2.5, isl.r + 2.8, waveM2, -0.54]]) {
-      const geo = isl.shape === "hex" ? hexShape(r0, r1) : new THREE.RingGeometry(r0, r1, 48); const ring = new THREE.Mesh(geo, m); ring.rotation.x = -Math.PI / 2; ring.position.set(isl.x, y, isl.z); ring.castShadow = false; ring.receiveShadow = false; world.add(ring);
+      const geo = isl.shape === "hex" ? hexShape(r0, r1) : new THREE.RingGeometry(r0, r1, 48); const ring = new THREE.Mesh(geo, m.clone()); ring.rotation.x = -Math.PI / 2; ring.position.set(isl.x, y, isl.z); ring.castShadow = false; ring.receiveShadow = false; ring.userData.dynamic = true; ring.userData.ph = (m === waveM ? 0 : 2.2) + isl.x * 0.05; world.add(ring); E.foams.push(ring);   // 批 B：交給引擎的 foams 一推一推（放大同時變淡），每圈自己的材質
     }
   }
-  ticks.push((dt, t) => { waveM.opacity = 0.14 + 0.2 * (0.5 + 0.5 * Math.sin(t * 1.1)); waveM2.opacity = 0.08 + 0.18 * (0.5 + 0.5 * Math.sin(t * 1.1 + 2.2)); });
 
   // ═══ 3. 浮標：橘色、一支小桿頂一盞燈，一次畫完（InstancedMesh），每一幀上下晃、微微歪。放在每座外圍島朝外的兩側，離每座島與小島都 2 公尺以上。═══
   {
@@ -98,13 +97,17 @@ export function buildSea(THREE, E, c) {
     for (let k = 0; k < 2; k++) {
       const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const body = new THREE.Group(); body.userData.dynamic = true; g.add(body); stats.dolphins++;
       body.add(mesh(new THREE.CapsuleGeometry(0.2, 0.9, 4, 8), dM, 0, 0, 0, false).rotateZ(Math.PI / 2), mesh(new THREE.ConeGeometry(0.1, 0.35, 6), dM, 0.75, -0.02, 0, false).rotateZ(-Math.PI / 2), mesh(rbox(0.25, 0.3, 0.05, 0.02), dM, -0.05, 0.3, 0, false).rotateZ(0.5), mesh(rbox(0.12, 0.05, 0.6, 0.02), dM, -0.75, 0, 0, false), mesh(rbox(0.3, 0.05, 0.12, 0.02), dM, 0.1, -0.15, 0.22, false), mesh(rbox(0.3, 0.05, 0.12, 0.02), dM, 0.1, -0.15, -0.22, false));
-      E.mergeChildren(body); pair.push({ g, body, k }); objs.dolphins.push(g);
+      E.mergeChildren(body); pair.push({ g, body, k, sp: [E.addSplash(0, 0), E.addSplash(0, 0)] }); objs.dolphins.push(g);   // 批 B：出水與入水各一組水花
     }
     let ang = 0, t0 = -10;
     ticks.push((dt, t) => { if (t - t0 > 7) { t0 = t; ang += 0.7; }
-      for (const d of pair) { const s = (t - t0 - d.k * 0.3) / 1.7; const cx = D.x + Math.cos(ang) * 3, cz = D.z + Math.sin(ang) * 3, ux = -Math.sin(ang), uz = Math.cos(ang), px = -uz, pz = ux;
-        if (s < 0 || s > 1) { d.g.position.set(cx, -2.5, cz); continue; }
-        d.g.position.set(cx + ux * (s * 5 - 2.5) + px * (d.k ? 1.1 : -1.1), -1.2 + Math.sin(s * Math.PI) * 2.6, cz + uz * (s * 5 - 2.5) + pz * (d.k ? 1.1 : -1.1)); d.g.rotation.y = Math.atan2(-uz, ux); d.body.rotation.z = (0.5 - s) * 1.7; } });
+      // 兩隻不同的弧：第二隻晚 0.6 秒、跳矮一點、弧短一點（批 B，之前同一條弧只差 0.3 秒，看三次就機械）。出水、入水各噴一次水花。
+      for (const d of pair) { const dur = d.k ? 1.5 : 1.7, len = d.k ? 4.2 : 5, hi = d.k ? 2.0 : 2.6, s = (t - t0 - d.k * 0.6) / dur; const cx = D.x + Math.cos(ang) * 3, cz = D.z + Math.sin(ang) * 3, ux = -Math.sin(ang), uz = Math.cos(ang), px = -uz, pz = ux, side = d.k ? 1.1 : -1.1;
+        if (s < 0 || s > 1) { d.g.position.set(cx, -2.5, cz); d.was = s; continue; }
+        if (d.was != null && d.was < 0) { const sp = d.sp[0]; sp.x = sp.ring.position.x = cx - ux * len / 2 + px * side; sp.z = sp.ring.position.z = cz - uz * len / 2 + pz * side; sp.t0 = t; }
+        if (s > 0.9 && d.was <= 0.9) { const sp = d.sp[1]; sp.x = sp.ring.position.x = cx + ux * len / 2 + px * side; sp.z = sp.ring.position.z = cz + uz * len / 2 + pz * side; sp.t0 = t; }
+        d.was = s;
+        d.g.position.set(cx + ux * (s * len - len / 2) + px * side, -1.2 + Math.sin(s * Math.PI) * hi, cz + uz * (s * len - len / 2) + pz * side); d.g.rotation.y = Math.atan2(-uz, ux); d.body.rotation.z = (0.5 - s) * 1.7; } });
   }
 
   // ═══ 6. 水上飛機：引擎的小飛機加兩支浮筒，在 19 公尺高繞著整個島群飛，機身往圈內傾、螺旋槳會轉。═══

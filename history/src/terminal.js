@@ -1,10 +1,5 @@
-// /history/ 航廈裡面的東西（2026-11-18 Paul：「detail the airport and the terminal inside and outside… as detailed as possible… feels like an airport」）。
-// 照真的機場分區、照走的順序：陸側大廳（入口、航班螢幕、十二個報到櫃台、自助報到機、行李託運、服務台、兌換所）→ 安檢（排隊的 Z 字欄、托盤台、
-// 人體掃描門）→ 空側（免稅店、美食區、洗手間、藥局與服飾與禮品、貴賓室）→ 登機門（每一門一個櫃台、掃描閘、牌子、八十個座位、充電柱）→ 窗邊吧檯、兒童區、電動步道。
-// 研究的結論（docs/history/2026-11-18-真機場研究.md）：「空」多半不是道具少，是分區沒有邊界、同一種東西沒有成排重複、地上沒有線。這一支先做這三件。
-//
-// 不 import three：THREE 跟小工具（box、cyl、instanced、figure…）從 scene.js 傳進來（跟 plane.js 同一招），check.sh 才守得住「只有 scene.js 與 plane.js import three」。
-// 這裡沒有任何一站的文字；牌子上的字只有機場通用的詞（中英）。顏色全部從 mats 來，沒有色碼。
+// /history/ 航廈裡面的東西，照真的機場分區、照走的順序：陸側大廳 → 安檢 → 空側 → 登機門 → 窗邊。清單與研究見 README「歷史之路（2026-11-18）」。
+// 不 import three：THREE 跟小工具從 scene.js 傳進來（check.sh 守「只有 scene.js 與 plane.js import three」）。沒有任何一站的文字、沒有色碼。
 import { makeSign } from "./signs.js";
 export function buildTerminal(THREE, c) {
   const { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, pick } = c;

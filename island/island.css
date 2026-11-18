@@ -26,7 +26,7 @@ html[data-lang="zh"] .pin-team{font-family:var(--han);font-weight:900;letter-spa
 .card-face{width:64px;height:64px;border-radius:50%;object-fit:cover;flex:none;border:2px solid #fff;box-shadow:0 4px 14px rgba(16,42,134,.16)}
 .pin-person.is-me{background:var(--bt-navy);color:var(--bt-cream);border-color:transparent}
 .pin-person.is-me::after{border-color:transparent}
-.pin:hover{background:var(--bt-orange)}
+.pin:hover,.pin.hover{background:var(--bt-orange)}
 .pin-person.is-me:hover{background:var(--bt-navy)}
 
 /* ── 左上品牌 ── */
@@ -94,7 +94,8 @@ html[data-lang="zh"] .tree-name{font-family:var(--han);font-weight:900;font-size
 .tree-kid.on::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--bt-orange);margin-right:8px;vertical-align:middle}
 
 /* ── 左邊的卡 ── */
-.card{position:fixed;left:var(--gut);top:calc(var(--gut) + 104px);bottom:var(--gut);width:min(400px,calc(100vw - var(--side-w) - 3*var(--gut)));z-index:19;overflow:auto;
+@keyframes card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card{animation:card-in 180ms var(--ease) both;position:fixed;left:var(--gut);top:calc(var(--gut) + 104px);bottom:var(--gut);width:min(400px,calc(100vw - var(--side-w) - 3*var(--gut)));z-index:19;overflow:auto;
   padding:18px 20px 22px;border-radius:18px;background:rgba(255,255,255,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(16,42,134,.1);box-shadow:0 18px 50px rgba(16,42,134,.16)}
 .card-close{position:absolute;right:12px;top:12px;width:34px;height:34px;border:0;border-radius:50%;background:rgba(16,42,134,.08);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
 .card-head{padding-right:36px}

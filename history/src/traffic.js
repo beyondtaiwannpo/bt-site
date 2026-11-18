@@ -8,13 +8,14 @@ export function buildTraffic(THREE, c) {
   // ═══ 進場、落地、滾行的那一架（循環 110 秒：從東邊 1100 公尺外、60 公尺高下來，x 200 觸地，滾到 x -560，滑出去就先消失，等下一輪）═══
   {
     const pl = buildAirliner(THREE, { body: P.cream, tail: P.teal, mark: P.navy, dark: P.dark }); shadowOn(pl); dyn(pl); world.add(pl); setGear(pl, 1);
-    pl.rotation.y = -Math.PI / 2;   // 機頭朝 -x（跟我們起飛同一個方向）
+    pl.rotation.y = -Math.PI / 2; pl.rotation.order = "YXZ";   // 機頭朝 -x（跟我們起飛同一個方向）；先航向再俯仰
     const T = 110, ease = u => u * u * (3 - 2 * u);
+    // 批 B：觸地前 15% 拉平（flare）、觸地之後從進場的速度減到滑行速度、一路滾到 x -615 才消失（之前觸地反而加速 1.9 倍、跑到一半消失）。
     movers.push({ fn: (t, e) => {
       if (e >= A.PHASES.takeoff[0]) { pl.visible = false; return; }
       const u = (t % T) / T;
-      if (u < 0.32) { const k = u / 0.32; pl.visible = true; pl.position.set(1100 - 900 * k, A.PLANE_REST_Y + 56 * (1 - ease(k)), R.z); pl.rotation.z = 0; pl.rotation.x = -0.05 * (1 - k); }
-      else if (u < 0.6) { const k = (u - 0.32) / 0.28; pl.visible = true; pl.position.set(200 - 760 * (1 - (1 - k) * (1 - k)), A.PLANE_REST_Y, R.z); pl.rotation.x = 0; }
+      if (u < 0.32) { const k = u / 0.32; pl.visible = true; pl.position.set(1100 - 900 * k, A.PLANE_REST_Y + 56 * (1 - ease(k)), R.z); pl.rotation.z = 0; pl.rotation.x = 0.02 - 0.08 * ease(Math.max(0, (k - 0.85) / 0.15)); }
+      else if (u < 0.82) { const s = u - 0.32, d = s < 0.1 ? 2812 * s - 6560 * s * s : 215.6 + 1500 * (s - 0.1); pl.visible = true; pl.position.set(200 - d, A.PLANE_REST_Y, R.z); pl.rotation.x = -0.06 * Math.max(0, 1 - s / 0.03); }
       else pl.visible = false;
     } });
   }
@@ -31,7 +32,7 @@ export function buildTraffic(THREE, c) {
   {
     const g = new THREE.Group(); dyn(g); world.add(g); const tug = truck(mats, false); tug.scale.setScalar(0.7); g.add(tug);
     for (let i = 1; i <= 3; i++) { g.add(box(1.6, 1.4, 2.6, mats.grey, 0, 1.0, -3.2 * i - 1.0), box(1.4, 1.0, 2.2, [mats.navy, mats.teal, mats.orange][i - 1], 0, 1.2, -3.2 * i - 1.0, false)); for (const s of [-1, 1]) { const w = cyl(0.3, 0.3, 0.2, mats.dark, s * 0.8, 0.3, -3.2 * i - 1.0, 8); w.rotation.z = Math.PI / 2; g.add(w); } }
-    movers.push({ fn: t => { const u = (t * 5) % 220, d = u < 110 ? u : 220 - u; g.position.set(12 + d, 0, 87.5); g.rotation.y = u < 110 ? Math.PI / 2 : -Math.PI / 2; } });
+    let ry = Math.PI / 2; movers.push({ fn: t => { const u = (t * 5 / 220) % 2, d = 55 - 55 * Math.cos(Math.PI * u); g.position.set(12 + d, 0, 87.5); ry += Math.atan2(Math.sin((u < 1 ? Math.PI / 2 : -Math.PI / 2) - ry), Math.cos((u < 1 ? Math.PI / 2 : -Math.PI / 2) - ry)) * 0.05; g.rotation.y = ry; } });   // 兩頭慢下來、整組繞著車頭掉頭（批 B）
   }
   // ═══ 餐勤車在 B2（x 47）升降台升上去又下來；B4（x 82）的推機車頂在機鼻前 ═══
   {
