@@ -251,7 +251,7 @@ function sceneReady() {
 // 七色從 shared/brand.css 的 CSS 變數讀，字體家族也是。場景程式裡因此沒有任何色碼。
 function paletteFromCSS() {
   const cs = getComputedStyle(doc), v = k => cs.getPropertyValue(k).trim();
-  return { palette: { navy: v("--bt-navy"), teal: v("--bt-teal"), orange: v("--bt-orange"), sand: v("--bt-sand"), cream: v("--bt-cream"), yellow: v("--bt-yellow"), grey: v("--bt-grey") }, fonts: { display: v("--display"), body: v("--body") } };
+  return { palette: { navy: v("--bt-navy"), teal: v("--bt-teal"), orange: v("--bt-orange"), sand: v("--bt-sand"), cream: v("--bt-cream"), yellow: v("--bt-yellow"), grey: v("--bt-grey") }, fonts: { display: v("--display"), body: v("--body"), han: v("--han") } };
 }
 
 // 讓瀏覽器先畫一幀再繼續。分頁在背景時 requestAnimationFrame 不會來，所以最多等 150ms 就往下走，不會卡住。

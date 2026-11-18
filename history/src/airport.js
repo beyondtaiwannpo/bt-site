@@ -28,9 +28,9 @@ export function phaseFor(e) {
 export const MOTIFS = ["seven", "seats", "board", "sign", "boarding", "tail", "crew", "signpost"];
 
 // ── 場地 ──
-export const TERMINAL = { x0: -10, x1: 125, z0: -40, z1: 0, h: 12 };   // 航廈的體積；玻璃牆在 z1
+export const TERMINAL = { x0: -40, x1: 125, z0: -40, z1: 0, h: 12 };   // 航廈的體積；玻璃牆在 z1（2026-11-18 往西加長 30 公尺：安檢之前先有一段報到大廳）
 export const CORRIDOR_Z = -20;                                        // 旅客與鏡頭走的那一條走道
-export const WALK = { x0: -8, x1: 100 };                              // 航廈那一段鏡頭從哪走到哪（2026-11-17 起點往後退 8 公尺：一進來先看到安檢門，再走過去）
+export const WALK = { x0: -38, x1: 100 };                             // 航廈那一段鏡頭從哪走到哪（2026-11-18 從入口旁出發：先走過報到大廳，x 2.5 過安檢，再往登機門）
 export const GATE_DESK = [106, -12];                                  // 登機門櫃台
 export const GATE_DOOR = [113, 0];                                    // 玻璃牆上通往空橋的門
 export const GATE_STAND = [120, 48];                                  // 我們那一架停的位置（機身中心）

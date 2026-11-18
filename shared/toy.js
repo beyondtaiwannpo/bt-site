@@ -120,10 +120,13 @@ export function peopleKit({ P, rnd, parent, capacity }) {
     g.userData.slot = -1; free.push(slot);
   }
   // 每一幀（畫之前）：每個人每個零件的世界矩陣抄進 instance。人不在畫面上（visible false）就縮成 0。
+  // 2026-11-18：每個人的世界矩陣一幀只算一次（之前每一種零件都叫一次 updateMatrixWorld，一個人算十三次，機場兩百多人一幀 10 ms 都在算矩陣）。
   function sync() {
+    const own0 = owners.legL;
+    for (let i = 0; i < pools.legL.count; i++) { const g = own0[i]; if (g && g.visible) g.updateMatrixWorld(); }
     for (const name in PARTS) { const im = pools[name], own = owners[name]; let any = false;
       for (let i = 0; i < im.count; i++) { const g = own[i]; if (!g) continue; const node = g.userData.parts[name]; if (!node) continue;
-        if (!g.visible) im.setMatrixAt(i, NONE); else { g.updateMatrixWorld(); im.setMatrixAt(i, node.matrixWorld); } any = true; }
+        if (!g.visible) im.setMatrixAt(i, NONE); else im.setMatrixAt(i, node.matrixWorld); any = true; }
       if (any) im.instanceMatrix.needsUpdate = true; }
   }
   // 射線打到一個 pool：instanceId 對回那個人的 Group。
@@ -140,8 +143,8 @@ export function peopleKit({ P, rnd, parent, capacity }) {
   return { makePerson, pose, sync, free: freePerson, ownerOf, pools: Object.values(pools) };
 }
 // 只要人不要整個引擎（/history/ 的機場自己有場景）：從七色直接做。parent 是 pool 要掛在哪個 Group 底下。
-export function peopleFromPalette(palette, seed, parent) {
-  return peopleKit({ P: colours(palette), rnd: mulberry(seed == null ? 5 : seed), parent });
+export function peopleFromPalette(palette, seed, parent, capacity) {
+  return peopleKit({ P: colours(palette), rnd: mulberry(seed == null ? 5 : seed), parent, capacity });
 }
 
 // ═══ 引擎：畫布、材質、燈、海、所有的建造函式、人、鏡頭、牌子。頁面拿回來的 E 上面全部都有。═══

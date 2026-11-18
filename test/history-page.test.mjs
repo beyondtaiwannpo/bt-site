@@ -384,12 +384,12 @@ test("退路（批 5）：減少動態、?motion=off、沒有 WebGL、Three 或 
 });
 
 test("資料與場景分開（批 5）：scene.js、airport.js、plane.js、index.html、shared/toy.js 裡沒有任何一站的文字；Three 只在 scene.js、plane.js 與 toy.js 出現；程式碼裡沒有寫死色碼", () => {
-  const files = ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/index.html", "history/src/main.js", "shared/toy.js"];
+  const files = ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/src/terminal.js", "history/src/grounds.js", "history/index.html", "history/src/main.js", "shared/toy.js"];
   const src = Object.fromEntries(files.map(f => [f, fs.readFileSync(new URL("../" + f, import.meta.url), "utf8")]));
   for (const f of files) for (const s of STOPS) { assert.ok(!src[f].includes(s.title_zh), f + " 有站的中文標題"); assert.ok(!src[f].includes(s.title_en), f + " 有站的英文標題"); }
   for (const f of ["history/src/airport.js", "history/src/main.js", "history/src/ui.js", "history/src/data.js"]) assert.ok(!/from\s+["']three["']/.test(src[f] || fs.readFileSync(new URL("../" + f, import.meta.url), "utf8")), f + " 不准 import three");
   assert.ok(/from\s+["']three["']/.test(src["history/src/scene.js"]), "scene.js 用 importmap 的 three");
-  for (const f of ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "shared/toy.js"]) assert.ok(!/#[0-9a-fA-F]{6}\b/.test(src[f].replace(/\/\/.*$/gm, "")), f + " 裡不准寫死色碼（顏色從 CSS 變數讀）");
+  for (const f of ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/src/terminal.js", "history/src/grounds.js", "shared/toy.js"]) assert.ok(!/#[0-9a-fA-F]{6}\b/.test(src[f].replace(/\/\/.*$/gm, "")), f + " 裡不准寫死色碼（顏色從 CSS 變數讀）");
   // importmap：three 只從 cdnjs 來，帶 integrity
   const im = /<script type="importmap">([\s\S]*?)<\/script>/.exec(src["history/index.html"]);
   assert.ok(im, "index.html 要有 importmap");
