@@ -110,8 +110,8 @@ function onProgress(p) {
   if (stageEl && (stageEl.clientWidth !== measured[0] || stageEl.clientHeight !== measured[1])) size();
   if (!gl) return;
   eased = A.eased(w, p);
-  gl.render(eased, clock);
-  placeCards();
+  // 這裡不畫：onTick 每一幀畫一次就夠（之前捲動時這裡也畫一次，一幀畫兩次，2026-11-17 批 1 量到）。只有沒有 ticker 的時候（瞬間跳站）才補畫。
+  if (!tickerOn) { gl.render(eased, clock); placeCards(); }
   if (endEl) endEl.classList.toggle("show", w.n > 0 && p > 1 - 0.5 / Math.max(1, w.n - 1) && (A.planePoseAt(eased).lift || 0) > 0.6);
   // 靠近一站整個世界（場景與卡）一起稍微放大。
   const zoom = 1 + 0.04 * A.closeness(w, p);
@@ -123,7 +123,8 @@ function onProgress(p) {
   if (p > 0.01) $("hint").classList.add("gone");
 }
 // 閒置的時鐘：信標、雲、車、人。進度沒變的時候也要重畫（它們在動）。分頁在背景就不畫。
-function onTick(tsec) { clock = tsec; if (gl && !document.hidden) { gl.render(eased, clock); placeCards(); } }
+let tickerOn = false;
+function onTick(tsec) { clock = tsec; tickerOn = true; if (gl && !document.hidden) { gl.render(eased, clock); placeCards(); } }
 function size() {
   if (!stageEl) return;
   const h = stageEl.clientHeight || innerHeight, ww = stageEl.clientWidth || innerWidth;
@@ -289,6 +290,7 @@ async function boot() {
     $("road-wrap").style.height = `${Math.max(stops.length + 1, 9) * 100}vh`;
     size(); renderCards();
     api = S.motion({ wrap: $("road-wrap"), stage: $("stage"), onProgress, onTick });
+    if (new URLSearchParams(location.search).get("debug") === "1") window.__road = gl;   // 除錯：console 裡看 __road.scene、__road.renderer.info
     api.refresh();
     // 帶 #代號 進來就直接站到那一站（瞬間，不滑），沒有就第一站。年份帶與網址由 onProgress 順手寫。
     api.jump(A.progressFor(w, start), true);

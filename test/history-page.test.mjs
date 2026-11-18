@@ -374,8 +374,8 @@ test("退路（批 5）：減少動態、?motion=off、沒有 WebGL、Three 或 
   assert.equal(A.pickMode({ ...ok, three: false }), "timeline");
   assert.equal(A.pickMode({}), "timeline");
   // 像素密度與陰影貼圖：手機降一級
-  assert.deepEqual(A.quality({ phone: false, dpr: 3 }), { dpr: 2, shadow: 1024 });
-  assert.deepEqual(A.quality({ phone: true, dpr: 3 }), { dpr: 1.5, shadow: 512 });
+  assert.deepEqual(A.quality({ phone: false, dpr: 3 }), { dpr: 1.5, shadow: 1024 });
+  assert.deepEqual(A.quality({ phone: true, dpr: 3 }), { dpr: 1.25, shadow: 512 });
   assert.deepEqual(A.quality({ phone: false, dpr: 1 }), { dpr: 1, shadow: 1024 });
 });
 

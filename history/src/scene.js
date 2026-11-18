@@ -113,6 +113,7 @@ function figure(mats, opts) {
   const k = o.phase != null ? Math.floor(o.phase * 97) : figN++;
   const g = people.makePerson({ shirt: o.shirt ? shirtIdx(o.shirt) : k % 6, hair: (k * 7) % 3, skin: k % 3, pants: (k * 5) % 3, pack: !!o.backpack, bag: !!o.bag, hat: !!(o.vest || o.staff), scale: 1.0 });
   g.name = "figure"; g.userData.baseY = 0; if (o.seated) g.userData.sitting = true;
+  g.traverse(m => { if (m.isMesh) m.castShadow = false; });   // 人不投影：腳下自帶一圈（跟島一樣），少幾十個影子的 draw call
   return g;
 }
 function walkCycle(fig, t, walking) { fig.userData.moving = !!walking && !fig.userData.sitting; people.pose(fig, t); }
@@ -137,6 +138,9 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(q.dpr);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // 陰影貼圖不是每一幀重畫（2026-11-17 批 1 順不順：之前太陽每一幀跟著鏡頭走、陰影每一幀重畫，航廈裡一幀 712 個 draw call 有一半是在畫影子）。
+  // 改成「鏡頭看的點走了 3 公尺、飛機動了 2 公尺、或半秒沒畫過」才重畫一次（render() 裡的 shadowTick）。
+  renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   const scene = new THREE.Scene();
   scene.background = P.sky.clone();
   scene.fog = new THREE.FogExp2(P.sky.clone(), 0.0022);
@@ -386,6 +390,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
       if (s.air) for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.IcosahedronGeometry(3.2 + k, 0), mats.cloud); c.position.set((k - 1) * 4.5, -2.6 - (k % 2), (k % 2) * 2); c.scale.y = 0.5; g.add(c); }
       stopsGroup.add(g); stopMarkers.push(g);
     });
+    pruneCasters();
   }
 
   // ═══ 看板與登機門牌 ═══
@@ -417,6 +422,16 @@ export function createScene({ canvas, palette, phone, fonts }) {
 
   // ═══ 每一幀 ═══
   let W = 1, Hh = 1, lastFov = -1;
+  const shadowAt = new THREE.Vector3(1e9, 0, 0), planeAt = new THREE.Vector3(1e9, 0, 0); let shadowT = -1;
+  function shadowTick(e, t) {
+    const span = e < A.PHASES.apron[0] ? 70 : e < A.PHASES.takeoff[0] ? 220 : 400; const spanChanged = span !== shadowSpan;
+    const moved = lookV.distanceTo(shadowAt) > (span < 100 ? 3 : 8), planeMoved = plane.position.distanceTo(planeAt) > 2, stale = t - shadowT > 0.5;
+    if (!spanChanged && !moved && !planeMoved && !stale) return;
+    setShadowSpan(span);
+    sun.target.position.copy(lookV); sun.position.copy(lookV).add(SUN_OFF);
+    shadowAt.copy(lookV); planeAt.copy(plane.position); shadowT = t;
+    renderer.shadowMap.needsUpdate = true;
+  }
   function resize(w, h) { W = w; Hh = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   const tmpV = new THREE.Vector3(), lookV = new THREE.Vector3();
   function render(e, t) {
@@ -440,9 +455,8 @@ export function createScene({ canvas, palette, phone, fonts }) {
     const inside = 1 - smooth(clamp01((e - 0.335) / 0.065));
     scene.fog.density = lerp(lerp(0.0022, 0.0009, lift), 0.0005, inside);
     hemi.groundColor.copy(P.grass).lerp(P.sand, inside * 0.7); hemi.intensity = lerp(lerp(0.95, 0.7, lift), 1.1, inside);
-    // 太陽跟著鏡頭看的點；室內陰影的範圍小、室外大。
-    sun.target.position.copy(lookV); sun.position.copy(lookV).add(SUN_OFF);
-    setShadowSpan(e < A.PHASES.apron[0] ? 70 : e < A.PHASES.takeoff[0] ? 220 : 400);
+    // 太陽跟著鏡頭看的點；室內陰影的範圍小、室外大。影子只在該重畫的時候重畫（上面 autoUpdate 那段）。
+    shadowTick(e, t);
     // 閒置：信標、雲、加油車、行李車、走道上的人、原地的人。
     beacon.rotation.y = t * 2.4;
     if (boardFlip) {
@@ -465,6 +479,10 @@ export function createScene({ canvas, palette, phone, fonts }) {
     return { x: (tmpV.x + 1) / 2 * W, y: (1 - tmpV.y) / 2 * Hh, visible: tmpV.z < 1 && tmpV.x > -1.3 && tmpV.x < 1.3 && tmpV.y > -1.3 && tmpV.y < 1.3, depth: tmpV.z };
   }
   function dispose() { renderer.dispose(); }
+  // 小東西不投影（2026-11-17 批 1）：半徑 0.6 公尺以下的零件（燈、牌、盆栽、小道具）影子看不出來，但每一個都是陰影貼圖裡的一個 draw call。飛機、建築、樹照投。
+  // createScene 蓋完叫一次，setStops 放完小場景再叫一次。
+  function pruneCasters() { world.traverse(m => { if (!m.isMesh || !m.castShadow || m.isInstancedMesh) return; const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const r = g.boundingSphere ? g.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) : 1; if (r < 0.6) m.castShadow = false; }); renderer.shadowMap.needsUpdate = true; }
+  pruneCasters();
   return { setStops, setBoard, setGate, resize, render, project, dispose, renderer, scene, camera, stopMarkers: () => stopMarkers };
 }
 const idleFigs = [];

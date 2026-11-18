@@ -280,4 +280,5 @@ export function pickMode(o) {
   o = o || {};
   return !o.reduce && !o.motionOff && o.webgl && o.gsap && o.three ? "3d" : "timeline";
 }
-export const quality = o => ({ dpr: Math.min(o.phone ? 1.5 : 2, o.dpr || 1), shadow: o.phone ? 512 : 1024 });
+// 像素密度上限 1.5（手機 1.25），跟 BT 島一樣：2026-11-17 批 1 量到桌機 2 倍時一幀 4.7 百萬像素、每一幀 20 毫秒，沒有餘裕。
+export const quality = o => ({ dpr: Math.min(o.phone ? 1.25 : 1.5, o.dpr || 1), shadow: o.phone ? 512 : 1024 });
