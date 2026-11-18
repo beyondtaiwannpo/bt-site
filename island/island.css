@@ -53,6 +53,18 @@ html[data-lang="zh"] .brand h1{font-family:var(--han);font-weight:900;letter-spa
 .toolbar .me-btn.on{background:var(--bt-navy);color:var(--bt-cream)}
 .toolbar .lang{font:700 12px/1 var(--display);letter-spacing:.1em;border:1px solid rgba(16,42,134,.3)}
 .mob-only{display:none}
+/* 收起來（桌機）：品牌框只剩 logo，清單整個收走、右邊留一個直的小標籤。不做動畫，收就是收。 */
+.fold{flex:0 0 auto;width:26px;height:26px;border:0;border-radius:50%;background:rgba(16,42,134,.08);color:var(--bt-navy);font-size:16px;line-height:1;cursor:pointer}
+.fold:hover{background:var(--bt-orange)}
+.brand .fold{order:3;margin-left:2px}
+html.brand-folded .brand-text{display:none}
+html.brand-folded .brand{padding:8px 10px 8px 10px;gap:8px}
+.side-head .fold{position:absolute;left:-13px;top:50%;margin-top:-13px;background:var(--paper);border:1px solid rgba(16,42,134,.14);box-shadow:0 4px 12px rgba(16,42,134,.12)}
+html.side-folded .sidebar{display:none}
+.side-tab{position:fixed;right:0;top:50%;z-index:18;transform:translateY(-50%);padding:14px 10px;border:1px solid rgba(16,42,134,.14);border-right:0;border-radius:12px 0 0 12px;background:rgba(237,229,216,.94);color:var(--bt-navy);cursor:pointer;font:700 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;writing-mode:vertical-rl;box-shadow:0 10px 30px rgba(16,42,134,.1)}
+.side-tab[hidden]{display:none}
+.side-tab:hover{background:var(--bt-orange)}
+html.side-folded .card{width:min(400px,calc(100vw - 2*var(--gut)))}
 
 .no3d,.loading{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:15;margin:0;padding:12px 18px;border-radius:12px;background:rgba(237,229,216,.92);color:var(--ink);font-size:14px;box-shadow:0 10px 30px rgba(16,42,134,.1)}
 .loading{font-family:var(--display);font-weight:700;letter-spacing:.06em}
@@ -177,6 +189,7 @@ html[data-lang="zh"] .me-h{font-family:var(--han);font-weight:900;font-size:22px
 @media (max-width:900px){
   :root{--side-w:100vw}
   .mob-only{display:inline-block}
+  .desk-only{display:none !important}
   .brand{max-width:calc(100vw - 2*var(--gut));padding:10px 12px}
   .brand .sub{display:none}
   .brand h1{font-size:20px}

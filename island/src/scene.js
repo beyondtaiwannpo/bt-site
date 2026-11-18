@@ -150,10 +150,27 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     const stool = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.2, 0.42, 10), M.wood, Math.max(1, stoolPlaces.length)); stoolPlaces.forEach(([x, z], i) => { m.makeTranslation(x, 0.21, z); stool.setMatrixAt(i, m); }); stool.count = stoolPlaces.length; stool.instanceMatrix.needsUpdate = true; stool.castShadow = true; world.add(stool); }
   // 橋：中間到每一座。欄杆的柱子（加島上圍欄的柱子）一次畫完（InstancedMesh）。
   // 四種橋輪流（Paul 2026-11-17：「make the bridges different material」）：木板橋、石橋（拱起來、石欄）、紅漆橋（拱、紅欄杆）、繩索橋（垂下去、麻繩）。
-  L.bridges().forEach((br, bi) => { const dx = br.x1 - br.x0, dz = br.z1 - br.z0, len = Math.hypot(dx, dz), style = bi % 4; const ry = -Math.atan2(dz, dx);
+  // 五種：木板橋、石拱橋、紅漆拱橋、繩索橋，加三條**滑水道**（Paul 2026-11-17：「island and island can connect through water slide」）：
+  // 兩頭各一座小塔，透明水藍的管子從塔頂下來、在水道中間沉到水面、再升到另一頭。人過這三條不是走的，是坐著溜過去的（motion() 裡）。
+  const BRIDGE_STYLE = [0, 1, 2, 3, 4, 1, 0, 4, 2, 3, 0, 1, 4, 2];
+  const slides = new Map();
+  L.bridges().forEach((br, bi) => { const dx = br.x1 - br.x0, dz = br.z1 - br.z0, len = Math.hypot(dx, dz), style = BRIDGE_STYLE[bi % BRIDGE_STYLE.length]; const ry = -Math.atan2(dz, dx);
     const grp = new THREE.Group(); grp.position.set((br.x0 + br.x1) / 2, 0, (br.z0 + br.z1) / 2); grp.rotation.y = ry; world.add(grp);
     const add = m => { m.castShadow = true; m.receiveShadow = true; grp.add(m); return m; };
-    if (style === 0) { add(new THREE.Mesh(rbox(len, 0.28, 2.2, 0.08), M.wood)).position.y = 0.1; for (let s = 2; s < len - 1; s += 3) for (const side of [-1, 1]) { const tt = s / len; postPlaces.push([br.x0 + dx * tt + (-dz / len) * side * 1.0, 0.5, br.z0 + dz * tt + (dx / len) * side * 1.0]); } }
+    if (style === 4) {
+      const top = 3.6;
+      const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(br.x0, top, br.z0), new THREE.Vector3(br.x0 + dx * 0.25, 1.6, br.z0 + dz * 0.25), new THREE.Vector3(br.x0 + dx * 0.5, 0.2, br.z0 + dz * 0.5), new THREE.Vector3(br.x1 - dx * 0.25, 1.6, br.z1 - dz * 0.25), new THREE.Vector3(br.x1, top, br.z1)], false, "catmullrom", 0.5);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.75, 10, false), new THREE.MeshStandardMaterial({ color: P.shallow, roughness: 0.3, transparent: true, opacity: 0.55, side: THREE.DoubleSide })); world.add(tube);
+      const water = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.5, 8, false), M.shallow); world.add(water);
+      for (const [x, z] of [[br.x0, br.z0], [br.x1, br.z1]]) { const tw = new THREE.Group(); tw.position.set(x, 0, z); world.add(tw);
+        for (const [ox, oz] of [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]]) tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, top, 6), M.teal).translateY(top / 2).translateX(ox).translateZ(oz));
+        tw.add(new THREE.Mesh(rbox(1.8, 0.16, 1.8, 0.05), M.wood).translateY(top), new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.9, 4), M.orange).translateY(top + 0.6).rotateY(Math.PI / 4));
+        for (let k = 0; k < 6; k++) tw.add(new THREE.Mesh(rbox(0.9, 0.05, 0.08, 0.02), M.dark).translateY(0.5 + k * 0.55).translateZ(-0.9));
+        tw.traverse(m => { if (m.isMesh) m.castShadow = true; }); }
+      const splash = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.9, 20), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.5, depthWrite: false })); splash.rotation.x = -Math.PI / 2; splash.position.set(br.x0 + dx * 0.5, -0.5, br.z0 + dz * 0.5); world.add(splash);
+      slides.set(br.a + ">" + br.b, { curve, dir: 1 }); slides.set(br.b + ">" + br.a, { curve, dir: -1 });
+    }
+    else if (style === 0) { add(new THREE.Mesh(rbox(len, 0.28, 2.2, 0.08), M.wood)).position.y = 0.1; for (let s = 2; s < len - 1; s += 3) for (const side of [-1, 1]) { const tt = s / len; postPlaces.push([br.x0 + dx * tt + (-dz / len) * side * 1.0, 0.5, br.z0 + dz * tt + (dx / len) * side * 1.0]); } }
     else if (style === 1) { const n = 7; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n - 0.5; const seg = add(new THREE.Mesh(rbox(len / n + 0.05, 0.34, 2.4, 0.06), M.cliff)); seg.position.set(u * len, 0.1 + Math.cos(u * Math.PI) * 0.45, 0); }
       for (const side of [-1, 1]) for (let i = 0; i <= 6; i++) { const u = i / 6 - 0.5; const bal = add(new THREE.Mesh(rbox(0.22, 0.7, 0.22, 0.05), M.wall)); bal.position.set(u * len, 0.6 + Math.cos(u * Math.PI) * 0.45, side * 1.1); } }
     else if (style === 2) { const n = 7; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n - 0.5; const seg = add(new THREE.Mesh(rbox(len / n + 0.05, 0.22, 2.0, 0.05), M.orange)); seg.position.set(u * len, 0.1 + Math.cos(u * Math.PI) * 0.6, 0); }
@@ -218,6 +235,16 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     const b = new THREE.Group(); b.position.set(x, -0.35, z); b.rotation.y = rnd() * TAU;
     b.add(new THREE.Mesh(rbox(2.4, 0.5, 1.0, 0.18), [M.white, M.cream, M.teal][i % 3]).translateY(0.1), new THREE.Mesh(rbox(0.9, 0.5, 0.7, 0.08), [M.orange, M.navy, M.yellow][i % 3]).translateY(0.55).translateX(-0.2), new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 5), M.dark).translateY(1.2).translateX(0.5));
     b.traverse(m => { if (m.isMesh) m.castShadow = true; }); b.userData.phase = rnd() * 6; world.add(b); boats.push(b);
+  }
+  // 熱氣球（Paul 2026-11-17：「make it more cute」）：三顆在島群上空慢慢繞，motion() 裡動。
+  const balloons = [];
+  for (let i = 0; i < 3; i++) {
+    const g = new THREE.Group(); const env = new THREE.Mesh(new THREE.SphereGeometry(2.0, 16, 12), [M.orange, M.teal, M.yellow][i]); env.scale.y = 1.15; env.position.y = 3.2; env.castShadow = true; g.add(env);
+    for (let k = 0; k < 4; k++) { const stripe = new THREE.Mesh(new THREE.SphereGeometry(2.02, 16, 12, k * Math.PI / 2, 0.35), M.white); stripe.scale.y = 1.15; stripe.position.y = 3.2; g.add(stripe); }
+    const basket = new THREE.Mesh(rbox(1.0, 0.7, 1.0, 0.12), M.wood); basket.position.y = 0.35; g.add(basket);
+    for (const [ox, oz] of [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]]) { const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 4), M.dark); rope.position.set(ox, 1.3, oz); g.add(rope); }
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), M.skin[i]); head.position.y = 0.95; g.add(head);
+    g.userData = { a: i * TAU / 3, r: 30 + i * 9, h: 20 + i * 3, sp: 0.045 - i * 0.008 }; world.add(g); balloons.push(g);
   }
   // 雲
   const clouds = [];
@@ -626,15 +653,15 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     },
     render: () => render(0),
     // 除錯用（?debug=1）：每個人現在在做什麼。
-    debug: () => walkers.map(w => ({ code: w.person.code, isl: w.isl && w.isl.id, x: +w.g.position.x.toFixed(1), z: +w.g.position.z.toFixed(1), moving: !!w.g.userData.moving, sitting: !!w.g.userData.sitting, talking: !!w.g.userData.talking, path: w.path ? w.path.length - w.pathI : 0, dest: w.dest || "", poi: w.poi ? w.poi.kind : "", partner: w.partner ? w.partner.person.code : "", act: w.act ? w.act.kind + ":" + (w.act.stage || "") : "", wait: +w.wait.toFixed(1), target: w.target ? [+w.target.x.toFixed(1), +w.target.z.toFixed(1)] : null })),
-    motion() { motionOn = true; return motion({ cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, pose, blockersOf, poisOf, rnd }); },
+    debug: () => walkers.map(w => ({ code: w.person.code, isl: w.isl && w.isl.id, home: w.home && w.home.id, trips: w.trips, stuck: +(w.stuck || 0).toFixed(1), goes: w.person.goes || "", x: +w.g.position.x.toFixed(1), z: +w.g.position.z.toFixed(1), moving: !!w.g.userData.moving, sitting: !!w.g.userData.sitting, talking: !!w.g.userData.talking, path: w.path ? w.path.length - w.pathI : 0, dest: w.dest || "", poi: w.poi ? w.poi.kind : "", partner: w.partner ? w.partner.person.code : "", act: w.act ? w.act.kind + ":" + (w.act.stage || "") : "", wait: +w.wait.toFixed(1), target: w.target ? [+w.target.x.toFixed(1), +w.target.z.toFixed(1)] : null })),
+    motion() { motionOn = true; return motion({ cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, balloons, slides, pose, blockersOf, poisOf, rnd }); },
   };
   return api;
 }
 
 /* ── 這裡面才有動畫。外面不准有每一幀的迴圈。 ──
    鏡頭用阻尼追目標（1 - e^(-dt·k)）；人偶爾走到島上另一個點；雲慢慢飄。暫停就是不呼叫 tick。 */
-function motion({ cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, pose, blockersOf, poisOf, rnd }) {
+function motion({ cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, balloons, slides, pose, blockersOf, poisOf, rnd }) {
   // ── 人在島上做的事（Paul 2026-11-17：「make people doing what they do make sense… they are there for meaning」）──
   // 每個人輪流做這幾件：走去坐（桌子、長凳、野餐桌）、站在攤子或佈告欄前面、找一個也閒著的人聊天（面對面、手會比）、
   // 聚會所的鞦韆盪一盪、溜滑梯爬上去滑下來；偶爾過橋去別座島或聚會所。走路會繞開房子與桌椅（layout.js 的 detour 加每一幀往外推）。
@@ -661,7 +688,7 @@ function motion({ cam, placeCam, render, walkers, clouds, planes, boats, coaster
     const ids = L.route(w.isl.id, to); if (ids.length < 2) return false;
     const raw = L.routePoints(ids).slice(1); const path = []; let from = { x: w.g.position.x, z: w.g.position.z };
     raw.forEach(([x, z], j) => { const k = Math.floor(j / 3), what = j % 3; const pt = { x, z };
-      if (what === 1) { path.push({ x, z, isl: ids[k + 1] }); from = pt; return; }   // 橋的另一頭：橋上走直線
+      if (what === 1) { const sl = slides.get(ids[k] + ">" + ids[k + 1]); path.push({ x, z, isl: ids[k + 1], slide: sl || null }); from = pt; return; }   // 橋的另一頭：橋上走直線；滑水道就溜過去
       if (what === 2 && j === raw.length - 1) return;                                  // 最後那座島的島心不用走到
       const onIsl = what === 0 ? ids[k] : ids[k + 1];
       for (const q of L.detour(from, pt, blockersFor(onIsl, pt))) path.push({ x: q.x, z: q.z, isl: onIsl }); from = pt; });
@@ -709,9 +736,20 @@ function motion({ cam, placeCam, render, walkers, clouds, planes, boats, coaster
           const dx = w.target.x - w.g.position.x, dz = w.target.z - w.g.position.z, d = Math.hypot(dx, dz);
           // 卡住的保險：一秒半都沒前進（被東西推回來）就當作到了這一點，走下一點；是最後一點就當作到了。
           const px0 = w.g.position.x, pz0 = w.g.position.z;
-          if (d > 0.1 && w.lastX != null && Math.hypot(px0 - w.lastX, pz0 - w.lastZ) < 0.02) { w.stuck = (w.stuck || 0) + dt; } else w.stuck = 0;
+          // ⚠ 門檻要跟 dt 走：60 fps 時一幀只走 0.017 公尺，寫死 0.02 會把正常走路當成卡住（2026-11-17 第九次就是這樣，大家一直被跳點）。
+          if (d > 0.1 && w.lastX != null && Math.hypot(px0 - w.lastX, pz0 - w.lastZ) < 0.25 * dt) { w.stuck = (w.stuck || 0) + dt; } else w.stuck = 0;
           w.lastX = px0; w.lastZ = pz0;
-          if (d > 0.1 && w.stuck > 1.5) { w.stuck = 0; w.pathI++; if (w.pathI < w.path.length) { w.target = w.path[w.pathI]; if (w.target.isl) w.isl = L.islandOf(w.target.isl) || w.isl; } else { w.path = null; if (w.dest) { w.isl = L.islandOf(w.dest) || w.home; w.dest = ""; } w.g.userData.moving = false; stopDoing(w); w.wait = 1 + rnd() * 2; } }
+          if (w.target.slide) {
+            // 坐著溜：沿管子走，y 跟著管子；到另一頭站起來。
+            const sl = w.target.slide; if (w.slideT == null) { w.slideT = 0; w.g.userData.sitting = true; }
+            w.slideT = Math.min(1, w.slideT + dt * 0.45); const k = sl.dir > 0 ? w.slideT : 1 - w.slideT; const q = sl.curve.getPointAt(k), q2 = sl.curve.getPointAt(Math.min(1, Math.max(0, k + sl.dir * 0.02)));
+            w.g.position.set(q.x, q.y - 0.3, q.z); w.g.rotation.y = Math.atan2(q2.x - q.x, q2.z - q.z); w.g.userData.moving = false;
+            if (w.slideT >= 1) { w.slideT = null; w.g.userData.sitting = false; w.g.position.y = 0; w.pathI++; if (w.pathI < w.path.length) { w.target = w.path[w.pathI]; if (w.target.isl) w.isl = L.islandOf(w.target.isl) || w.isl; } else { w.path = null; if (w.dest) { w.isl = L.islandOf(w.dest) || w.home; w.dest = ""; pickHere(w); if (!w.path) arrived(w); } else arrived(w); } }
+            pose(w.g, t); continue;
+          }
+          // 快到了（1.5 公尺內）就直接到，不要在最後那一小段跟東西推來推去；真的卡住兩秒半才跳下一點。
+          if (d > 0.1 && w.stuck > 2.5 && d < 1.5) { w.stuck = 0; w.g.position.x = w.target.x; w.g.position.z = w.target.z; }
+          if (d > 0.1 && w.stuck > 2.5) { w.stuck = 0; w.pathI++; if (w.pathI < w.path.length) { w.target = w.path[w.pathI]; if (w.target.isl) w.isl = L.islandOf(w.target.isl) || w.isl; } else { w.path = null; if (w.dest) { w.isl = L.islandOf(w.dest) || w.home; w.dest = ""; } w.g.userData.moving = false; stopDoing(w); w.wait = 1 + rnd() * 2; } }
           else if (d > 0.1) {
             const sp = Math.min(d, (w.dest ? 1.5 : 1.0) * dt); let nx = w.g.position.x + dx / d * sp, nz = w.g.position.z + dz / d * sp;
             // 每一幀再往外推一次：快碰到東西就沿著它的邊走（detour 算的是大方向，這裡擋細節）。
@@ -728,9 +766,10 @@ function motion({ cam, placeCam, render, walkers, clouds, planes, boats, coaster
             w.trips++; stopDoing(w);
             let to = "";
             // 走動少一點、做事多一點（Paul 2026-11-17：「they are just walking relentlessly」）：每做三四件事才過一次橋。
+            // 用機率不用「第幾次」：之前 trips % 7 === 3 讓四十個人同一刻一起出發（2026-11-17 第九次）。
             if (w.isl.id !== w.home.id && rnd() < 0.35) to = w.home.id;
-            else if (w.person.goes && w.trips % 5 === 0) to = w.person.goes;
-            else if (w.home.id !== "commons" && (w.trips % 7 === 3 || rnd() < 0.08)) to = "commons";   // 聚會所沒有人住，要常常有人走過來才像聚會所
+            else if (w.person.goes && rnd() < 0.18) to = w.person.goes;
+            else if (w.home.id !== "commons" && rnd() < 0.1) to = "commons";   // 聚會所沒有人住，要常常有人走過來才像聚會所
             if (!(to && travel(w, to))) pickHere(w);
           }
         }
@@ -740,6 +779,7 @@ function motion({ cam, placeCam, render, walkers, clouds, planes, boats, coaster
       // 雲霄飛車：小車沿軌道跑，爬坡慢、下坡快；燈塔的光轉。
       for (const c of coasters) { const q0 = c.curve.getPointAt(c.t), q1 = c.curve.getPointAt((c.t + 0.01) % 1); const slope = q1.y - q0.y; c.t = (c.t + dt * (0.028 - slope * 0.12)) % 1; if (c.t < 0) c.t += 1; const p0 = c.curve.getPointAt(c.t), p1 = c.curve.getPointAt((c.t + 0.012) % 1); c.train.position.copy(p0).add(new THREE.Vector3(0, 0.3, 0)); c.train.lookAt(p1.x, p1.y + 0.3, p1.z); c.train.rotateY(-Math.PI / 2); }
       for (const b of beacons) b.rotation.y += dt * 0.9;
+      for (const b of balloons) { const u = b.userData; u.a += dt * u.sp; b.position.set(Math.cos(u.a) * u.r, u.h + Math.sin(t * 0.5 + u.a) * 0.6, Math.sin(u.a) * u.r * 0.8); b.rotation.y += dt * 0.1; }
       for (const b of boats) { b.position.y = -0.35 + Math.sin(t * 1.3 + b.userData.phase) * 0.08; b.rotation.z = Math.sin(t * 0.9 + b.userData.phase) * 0.04; b.rotation.y += dt * 0.02; }
       // 機場那架會動的飛機：機坪滑到滑行道、上跑道、加速起飛、繞島群一圈（高度 14，從島群上空飛過）、降落、滑回機坪，一輪 72 秒。螺旋槳一直轉。
       // 位置是 u（秒）的分段函式；朝向用 lookAt 看下一個點，所以轉彎、爬升、下降都自然；繞圈時側傾。

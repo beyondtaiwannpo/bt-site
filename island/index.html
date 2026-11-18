@@ -80,8 +80,9 @@
 <div class="stage" id="stage" aria-hidden="true"></div>
 <div class="pins" id="pins" aria-hidden="true"></div>
 
-<header class="brand">
+<header class="brand" id="brand">
   <a class="home" id="home" href="../" aria-label="Beyond Taiwan 首頁 / home"><img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
+  <button type="button" class="fold desk-only" id="brand-fold" aria-expanded="true" aria-label="收起 / Fold">−</button>
   <div class="brand-text">
     <p class="eyebrow" data-t="eyebrow">這一屆的 Beyond Taiwan</p>
     <h1><span class="zh">BT 島</span><span class="en">BT Island</span></h1>
@@ -109,11 +110,15 @@
     <h2 data-t="indexTitle">每一座島在做的事。</h2>
     <p class="side-lead" data-t="indexLead">六個 team、聚會所、機場。點一個看它在做什麼、有誰、跟誰連。</p>
     <button type="button" class="side-close mob-only" id="sidebar-close" aria-label="關閉清單 / Close">×</button>
+    <button type="button" class="fold desk-only" id="side-fold" aria-expanded="true" aria-label="收起清單 / Fold index">›</button>
   </div>
   <main id="tree" class="tree-wrap">
     <noscript><p class="state"><span class="zh">這一頁要開 JavaScript 才看得到島。團隊與做的事在首頁與團隊頁也有。</span><span class="en">This page needs JavaScript to draw the island. The teams and programmes are also on the home and team pages.</span></p></noscript>
   </main>
 </aside>
+
+<!-- 清單收起來之後右邊留一個小標籤，按了再打開（Paul 2026-11-17：「make it foldable… immersive」）。 -->
+<button type="button" class="side-tab desk-only" id="side-tab" hidden aria-label="打開清單 / Open index"><span data-t="indexHead">THE TEAM INDEX</span></button>
 
 <article class="card" id="card" hidden aria-label="選取的島、做的事或人 / Selected item">
   <button type="button" class="card-close" data-close aria-label="關閉 / Close">×</button>

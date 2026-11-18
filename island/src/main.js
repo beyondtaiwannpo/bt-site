@@ -105,12 +105,26 @@ $("me").addEventListener("click", e => { if (e.target === $("me")) closeMe(); })
 function freeCentre() {
   const W = innerWidth; if (W < 900) return 0.5;
   const card = $("card"), side = $("sidebar");
-  const left = card.hidden ? 0 : card.getBoundingClientRect().right, right = side.getBoundingClientRect().left;
+  const left = card.hidden ? 0 : card.getBoundingClientRect().right, right = doc.classList.contains("side-folded") ? W : side.getBoundingClientRect().left;
   return ((left + right) / 2) / W;
 }
 
 // 空出來那一塊佔視窗寬的比例（卡與清單之外）。手機上是 1。
-function freeWidth() { const W = innerWidth; if (W < 900) return 1; const card = $("card"), side = $("sidebar"); const left = card.hidden ? 0 : card.getBoundingClientRect().right; return Math.max(0.3, (side.getBoundingClientRect().left - left) / W); }
+function freeWidth() { const W = innerWidth; if (W < 900) return 1; const card = $("card"), side = $("sidebar"); const left = card.hidden ? 0 : card.getBoundingClientRect().right, right = doc.classList.contains("side-folded") ? W : side.getBoundingClientRect().left; return Math.max(0.3, (right - left) / W); }
+// 收起、打開（Paul 2026-11-17：清單與品牌框要收得起來，讓人看島）。記在這台裝置的瀏覽器裡。
+const UI_KEY = "bt-island-ui";
+function readUi() { try { return JSON.parse(localStorage.getItem(UI_KEY) || "{}") || {}; } catch (e) { return {}; } }
+function writeUi(patch) { try { localStorage.setItem(UI_KEY, JSON.stringify({ ...readUi(), ...patch })); } catch (e) { /* 存不了就算了 */ } }
+function applyFolds(ui) {
+  doc.classList.toggle("side-folded", !!ui.sideFolded); doc.classList.toggle("brand-folded", !!ui.brandFolded);
+  $("side-tab").hidden = !ui.sideFolded; $("side-fold").setAttribute("aria-expanded", String(!ui.sideFolded));
+  $("brand-fold").setAttribute("aria-expanded", String(!ui.brandFolded)); $("brand-fold").textContent = ui.brandFolded ? "+" : "−";
+  // 空出來那一塊變了，鏡頭要重新對：有選的對那座島，沒有就全景。
+  if (scene) { if (sel) scene.select(sel); else scene.overview(); }
+}
+$("side-fold").addEventListener("click", () => { writeUi({ sideFolded: true }); applyFolds(readUi()); });
+$("side-tab").addEventListener("click", () => { writeUi({ sideFolded: false }); applyFolds(readUi()); });
+$("brand-fold").addEventListener("click", () => { writeUi({ brandFolded: !readUi().brandFolded }); applyFolds(readUi()); });
 
 // ── 開頁 ──
 function paletteFromCSS() { const cs = getComputedStyle(doc), v = k => cs.getPropertyValue(k).trim(); return { navy: v("--bt-navy"), teal: v("--bt-teal"), orange: v("--bt-orange"), sand: v("--bt-sand"), cream: v("--bt-cream"), yellow: v("--bt-yellow"), grey: v("--bt-grey") }; }
@@ -131,6 +145,7 @@ async function boot() {
   if (new URLSearchParams(location.search).get("debug") === "1") window.__island = scene;   // 除錯：console 打 __island.debug()
   else doc.classList.add("still");
   $("loading").hidden = true;
+  applyFolds(readUi());
   me = loadMe(); if (me && scene) { scene.me({ ...me, label: me.name + " " + t("meYou", lang) }); $("tb-me").classList.add("on"); }
   pushLabels();
   if (start.kind !== "overview") select(start, true);

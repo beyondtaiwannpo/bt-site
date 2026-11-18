@@ -78,8 +78,19 @@ export function wanderTarget(island, blockers, rnd) {
 }
 // 從 a 走到 b 不穿過任何一個圓（Paul 2026-11-17：「people are walking inside the building」）。
 // 回要經過的點（不含 a，含 b）。做法：這一段線碰到哪個圓，就在最靠近圓心的那一點往外推一個點，兩段再各自檢查一次，最多拆六層。
+// 2026-11-17 第九次：之前一條路會拆成三四十個點（每繞一個矮樹就再拆），人就一直在走。現在只繞大東西（半徑 0.9 以上；矮樹、燈每一幀往外推就夠）、
+// 最多拆四層，拆完再拉直：中間的點能直走就拿掉。
 export function detour(a, b, blockers, depth) {
-  const dep = depth == null ? 6 : depth; const list = blockers || [];
+  const big = (blockers || []).filter(c => (c.r || 1.2) >= 0.6);   // 燈（0.4）不算，矮樹以上都繞
+  const pts = detourRaw(a, b, big, depth == null ? 4 : depth);
+  // 拉直
+  const crosses = (p, q) => big.some(c => { const dx = q.x - p.x, dz = q.z - p.z, len2 = dx * dx + dz * dz; if (len2 < 1e-6) return false; const tt = Math.max(0, Math.min(1, ((c.x - p.x) * dx + (c.z - p.z) * dz) / len2)); return Math.hypot(p.x + dx * tt - c.x, p.z + dz * tt - c.z) < (c.r || 1.2) + 0.3; });
+  const out = []; let from = a;
+  for (let i = 0; i < pts.length; i++) { const isLast = i === pts.length - 1; if (!isLast && !crosses(from, pts[i + 1])) continue; out.push(pts[i]); from = pts[i]; }
+  return out.length ? out : [b];
+}
+function detourRaw(a, b, blockers, depth) {
+  const dep = depth; const list = blockers || [];
   const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz); if (len < 0.01 || dep <= 0) return [b];
   let hit = null, hitT = 0, hitD = Infinity;
   for (const c of list) { const R = (c.r || 1.2) + 0.5; const tt = Math.max(0, Math.min(1, ((c.x - a.x) * dx + (c.z - a.z) * dz) / (len * len))); const px = a.x + dx * tt, pz = a.z + dz * tt; const dd = Math.hypot(px - c.x, pz - c.z);
@@ -94,7 +105,7 @@ export function detour(a, b, blockers, depth) {
   for (let k = 1; k <= 4 && inside(via); k++) via = { x: hit.x + nx * (R + k * 1.2), z: hit.z + nz * (R + k * 1.2) };
   if (inside(via)) { via = { x: hit.x - nx * R, z: hit.z - nz * R }; for (let k = 1; k <= 4 && inside(via); k++) via = { x: hit.x - nx * (R + k * 1.2), z: hit.z - nz * (R + k * 1.2) }; }
   // 兩段再各自檢查一次（同一個圓也要再看：往外推的點在圓外，但到它的那一段可能還切到圓的邊）。
-  return detour(a, via, list, dep - 1).concat(detour(via, b, list, dep - 1));
+  return detourRaw(a, via, list, dep - 1).concat(detourRaw(via, b, list, dep - 1));
 }
 // 鏡頭：全景、看一座島、鳥瞰。回 { pos, target }。
 // fit：[橫的半徑, 直的半徑]，scene.js 照畫面的長寬把距離算出來；pos 只給方向。
