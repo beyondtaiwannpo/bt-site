@@ -11,7 +11,7 @@ export function buildDecor(THREE, c) {
   const smallBox = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 
   // ═══ 1. 三間店（x 58 藥局、72 服飾、90 禮品）：走得進去的店面 ═══
-  // 殼：背牆、兩面側牆、天花板加兩條燈、地板、玻璃門面（中間留 2.4 公尺的門）。招牌與雨棚是既有的（scene.js 的雨棚、terminal.js 的字）。
+  // 殼：背牆、側牆、天花板加燈、地板、玻璃門面（中間留 2.4 公尺的門）。
   function shell(cx, wallM, floorM) {
     term.add(box(9, 4.6, 0.3, wallM, cx, 2.3, -39.4, false), box(0.3, 4.6, 5, wallM, cx - 4.5, 2.3, -37, false), box(0.3, 4.6, 5, wallM, cx + 4.5, 2.3, -37, false));
     term.add(box(9, 0.25, 5, lam(P.ceiling), cx, 4.5, -37, false), instanced(smallBox(3.6, 0.1, 0.4), mats.light, [[cx - 2, 4.33, -36], [cx + 2, 4.33, -36], [cx - 2, 4.33, -38.2], [cx + 2, 4.33, -38.2]], false));
@@ -41,7 +41,7 @@ export function buildDecor(THREE, c) {
     term.add(box(1.4, 2.4, 0.08, mats.orange, cx + 3.7, 1.25, -38.3, false), box(1.6, 0.06, 0.06, mats.grey, cx + 3.7, 2.5, -38.3, false));
     person(cx - 0.4, -37.2, Math.PI, { shirt: pick(13), bag: true }); person(cx + 1.6, -35.6, 0.5, { shirt: pick(14) }); person(cx + 2.2, -38.9, 0, { shirt: P.navy, staff: true });
   }
-  // 禮品（x 90）：背牆「TAIWAN 台灣」、茶葉罐牆（三層三色）、中央的鳳梨酥與禮盒展示桌、絨毛玩偶架、明信片旋轉架、天花板吊的燈籠。
+  // 禮品（x 90）：背牆、茶葉罐牆、展示桌、玩偶架、明信片架、燈籠。
   { const cx = 90; shell(cx, mats.navy, woodM);
     sign("TAIWAN", "台灣", 5, 1.1, palette.navy, palette.yellow, cx, 3.7, -39.2, 0, { align: "center" });
     const tins = [[], [], []]; let n = 0;
@@ -59,7 +59,7 @@ export function buildDecor(THREE, c) {
     person(cx - 2.2, -36.0, 0.6, { shirt: pick(15), bag: true }); person(cx + 1.2, -37.4, Math.PI, { shirt: pick(16) }); person(cx + 2.8, -38.6, 0, { shirt: P.navy, staff: true });
   }
 
-  // ═══ 2. 免稅店（x 8 到 26）補：兩面側牆、背牆的酒牆（三層、三色瓶子、每層一條燈）、兩座香水玻璃櫃、購物籃、吊著的「TAX FREE」牌、天花板燈條 ═══
+  // ═══ 2. 免稅店（x 8 到 26）補：側牆、酒牆、香水櫃、購物籃、吊牌、燈條 ═══
   { term.add(box(0.3, 5, 8.6, mats.navy, 8, 2.5, -35.0, false), box(0.3, 5, 8.6, mats.navy, 26, 2.5, -35.0, false));
     const bottles = [[], [], []]; let n = 0;
     for (const y of [1.3, 2.1, 2.9]) { term.add(box(15.6, 0.06, 0.45, mats.cream, 17, y, -38.9, false), box(15.4, 0.04, 0.08, mats.light, 17, y - 0.06, -38.7, false)); for (let i = 0; i < 34; i++) bottles[n++ % 3].push([9.6 + i * 0.44, y + 0.24, -38.9]); }
@@ -71,7 +71,7 @@ export function buildDecor(THREE, c) {
     person(14.5, -30.4, 0, { shirt: pick(17), bag: true }); person(19.8, -30.6, 0.3, { shirt: pick(18) });
   }
 
-  // ═══ 3. 美食區（x 30 到 44）補：每一攤一台飲料冰箱（玻璃門、三色罐子）、櫃台上的玻璃展示櫃（麵包）、桌子上方的吊燈、珍珠奶茶攤、回收餐盤台、調味料台、麵攤的蒸氣 ═══
+  // ═══ 3. 美食區（x 30 到 44）補：冰箱、展示櫃、吊燈、珍珠奶茶攤、回收餐盤台、調味料台、蒸氣 ═══
   { for (const x of [32.5, 37, 41.5]) {
       term.add(box(0.9, 2.0, 0.7, mats.grey, x + 1.9, 1.0, -38.7)); glassPane(0.8, 1.7, x + 1.9, 1.05, -38.34); const cans = [[], [], []]; let n = 0; for (const y of [0.45, 0.95, 1.45]) for (let i = 0; i < 4; i++) cans[n++ % 3].push([x + 1.6 + i * 0.2, y, -38.6]);
       term.add(...cans.map((g, i) => instanced(new THREE.CylinderGeometry(0.06, 0.06, 0.16, 6), [mats.teal, mats.orange, mats.navy][i], g, false)));
@@ -93,7 +93,7 @@ export function buildDecor(THREE, c) {
     ticks.push(t => puffs.forEach((m, i) => { const u = (t * 0.35 + i * 0.2) % 1; m.position.set(Math.sin(t + i) * 0.15 + (i - 2) * 0.12, u * 1.1, Math.cos(t * 0.7 + i) * 0.1); m.scale.setScalar(0.4 + u * 1.1); }));
   }
 
-  // ═══ 4. 柱子：指標帶（深藍的環）、每兩根一塊登機門的指標、陸側那排的滅火器、空側那排的監視器、每根一個喇叭 ═══
+  // ═══ 4. 柱子：指標帶、登機門指標、滅火器、監視器、喇叭 ═══
   { const cols = []; for (let x = T.x0 + 5; x < T.x1; x += 15) cols.push([x, -30], [x, -10]);
     term.add(instanced(smallBox(1.4, 0.7, 1.4), mats.navy, cols.map(([x, z]) => [x, 2.75, z]), false));
     term.add(instanced(smallBox(0.22, 0.4, 0.22), mats.dark, cols.map(([x, z]) => [x + 0.5, 6.0, z + 0.5]), false));
@@ -121,7 +121,7 @@ export function buildDecor(THREE, c) {
     for (const x of [50, 95, -39.2]) { const w = x < -30; sign("EXIT", "出口", 1.0, 0.4, palette.teal, palette.cream, x, 3.5, w ? -6 : -39.5, w ? Math.PI / 2 : 0, { size: 150, align: "center" }); }
   }
 
-  // ═══ 6. 天花板垂下的布幔（五條，橘青藍輪流，「WELCOME 歡迎」）；大廳的 SIM 卡亭、旅遊資訊架、會面點、地上的圓徽；西牆的置物櫃 ═══
+  // ═══ 6. 布幔、SIM 卡亭、旅遊資訊架、會面點、圓徽、置物櫃 ═══
   { [[20, palette.orange], [44, palette.teal], [64, palette.navy], [86, palette.orange], [110, palette.teal]].forEach(([x, bg]) => { sign("WELCOME", "歡迎", 1.2, 4.0, bg, palette.cream, x, 8.6, -4.6, Math.PI / 2, { align: "center", size: 170, both: true }); term.add(box(0.06, 0.06, 1.3, mats.grey, x, 10.65, -4.6, false)); });
     term.add(box(2.4, 2.4, 1.6, mats.teal, -28, 1.2, -4.2), box(2.6, 0.3, 1.8, mats.navy, -28, 2.55, -4.2, false)); sign("SIM CARD", "電信", 2.2, 0.7, palette.navy, palette.cream, -28, 2.55, -5.11, Math.PI, { size: 130 }); glassPane(2.0, 0.9, -28, 1.6, -5.02); person(-28, -3.6, Math.PI, { shirt: P.navy, staff: true }); person(-27.6, -6.4, 0, { shirt: pick(21), backpack: true });
     term.add(box(1.0, 1.5, 0.4, mats.grey, -34, 0.75, -6)); const bro = [[], [], [], []]; let n = 0; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) bro[n++ % 4].push([-34.36 + i * 0.24, 0.45 + j * 0.3, -5.78]);
@@ -132,8 +132,8 @@ export function buildDecor(THREE, c) {
     term.add(instanced(smallBox(0.44, 0.46, 0.04), mats.navy, d2[0], false), instanced(smallBox(0.44, 0.46, 0.04), mats.teal, d2[1], false));
   }
 
-  // ═══ 7. 人：推推車的旅客兩位（推車是人的孩子物件，跟著走）、坐輪椅的加推的人、三個人站著聊天兩組、巡邏的兩位 ═══
-  // 行李推車（2026-11-18 Paul「why is there a box in front of this person」：之前是一個灰盒子）：底盤、四根細柱、上層的籃框、推把、四個輪子、一個橫放的橘色行李箱。
+  // ═══ 7. 人：推推車的旅客（推車是人的孩子物件）、坐輪椅的加推的人、聊天的、巡邏的 ═══
+  // 行李推車：底盤、四根細柱、籃框、推把、四個輪子、一個橘色行李箱。
   { const trolley = f => { const g = new THREE.Group(); g.userData.dynamic = true;
       g.add(box(0.62, 0.04, 0.95, mats.grey, 0, 0.18, 0.8, false), box(0.62, 0.04, 0.5, mats.grey, 0, 0.72, 0.62, false), box(0.62, 0.04, 0.04, mats.grey, 0, 1.0, 0.36, false));
       g.add(instanced(smallBox(0.03, 0.9, 0.03), mats.grey, [[-0.29, 0.6, 0.38], [0.29, 0.6, 0.38], [-0.29, 0.45, 1.24], [0.29, 0.45, 1.24]], false), instanced(smallBox(0.03, 0.03, 0.9), mats.grey, [[-0.29, 0.95, 0.8], [0.29, 0.95, 0.8]], false));
@@ -148,7 +148,7 @@ export function buildDecor(THREE, c) {
     for (const [cx, cz, k] of [[26, -16, 25], [85, -24, 28]]) for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.3; person(cx + Math.cos(a) * 0.75, cz + Math.sin(a) * 0.75, Math.atan2(-Math.cos(a), -Math.sin(a)), { shirt: pick(k + i), backpack: i === 1 }); }
     for (const [x0, x1, z, sp] of [[8, 118, -27.9, 0.7], [9.3, 119.3, -27.9, 0.7]]) { const f = figure(mats, { shirt: P.navy, staff: true }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
   }
-  // ═══ 8. 走道兩側的小島（鏡頭走 z -20，這些放在 z -25.5 與 -14.5）：書報攤、花店推車、充電桌、拍貼機、按摩椅；天花板一串紙飛機慢慢轉 ═══
+  // ═══ 8. 走道兩側的小島（z -25.5 與 -14.5）：書報攤、花店推車、充電桌、拍貼機、按摩椅；紙飛機 ═══
   { // 書報攤（x 48，z -31.8，2026-11-18 自查從 15,-25.5 搬過來：之前在三條走的線上）：圓的攤、雜誌架三面、老闆。
     term.add(cyl(1.3, 1.3, 1.0, mats.navy, 48, 0.5, -31.8, 12), cyl(1.4, 1.4, 0.08, mats.cream, 48, 1.04, -31.8, 12), cyl(1.6, 1.6, 0.12, mats.orange, 48, 3.0, -31.8, 12), cyl(0.05, 0.05, 2.0, mats.grey, 48, 2.0, -31.8, 5));
     const mags = [[], [], []]; let n = 0; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; mags[n++ % 3].push([48 + Math.cos(a) * 1.32, 1.3 + (i % 2) * 0.35, -31.8 + Math.sin(a) * 1.32, -a]); }

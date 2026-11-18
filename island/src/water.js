@@ -91,10 +91,12 @@ export function buildWater(THREE, E, c) {
     tail.add(mesh(rbox(1.4, 0.45, 0.38, 0.12), wM, -0.6, 0, 0, false), mesh(rbox(1.4, 0.1, 1.4, 0.05), wM, -1.6, 0, 0.8, false).rotateY(0.5), mesh(rbox(1.4, 0.1, 1.4, 0.05), wM, -1.6, 0, -0.8, false).rotateY(-0.5));
     E.mergeChildren(body); E.mergeChildren(tail);
     const spray = instancer(new THREE.SphereGeometry(1, 6, 5), new THREE.MeshStandardMaterial({ color: P.white, roughness: 1 }), 12, true); const drops = []; for (let k = 0; k < 12; k++) { drops.push([Math.cos(k * 2.4) * 0.5, Math.sin(k * 2.4) * 0.5, 2.6 + (k % 4) * 0.4]); spray.add(0, -50, 0, 0, 0, 0, 0); }
-    const per = W.period || 36; let heading = 0.6, cx = W.x, cz = W.z, lastP = -1; stats.whale = { x: cx, z: cz, up: false };
+    const per = W.period || 36; let heading = 0.6, cx = W.x, cz = W.z, lastP = -1; stats.whale = { x: cx, z: cz, up: false, upAt: 6 };
+    E.events.push({ id: "whale", dur: 11, when: t => { const a = stats.whale.upAt; return a > t ? a : a + per * Math.ceil((t - a) / per); }, pos: () => [stats.whale.x, 0, stats.whale.z] });
     ticks.push((dt, t) => {
       const p = (t + per - 6) % per;   // 開場六秒後第一次浮上來
       if (p < lastP) { heading += 0.9; const d = Math.hypot(cx - W.x, cz - W.z); if (d > 5) heading = Math.atan2(W.z - cz, W.x - cx) + 0.4; }
+      if (p < lastP || lastP < 0) stats.whale.upAt = t - p;   // 這一輪浮上來的時刻（鏡頭導覽用）
       lastP = p; stats.whale.up = p < 10;
       if (p >= 10) { g.position.set(cx, -9, cz); drops.forEach((d, k) => spray.hide(k)); spray.flush(); return; }
       const u = p; const fwd = Math.min(u, 7) * 0.55; const x = cx + Math.cos(heading) * fwd, z = cz + Math.sin(heading) * fwd; if (u >= 9.9) { cx = x; cz = z; stats.whale.x = cx; stats.whale.z = cz; }

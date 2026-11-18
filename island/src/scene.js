@@ -21,7 +21,7 @@ export const webglOK = T.webglOK;
 // 每座島照 layout.js 的 shape 選一種：六邊形、圓、方（學校的操場）。
 const prismFor = shape => shape === "round" ? T.roundPrism : shape === "rect" ? T.rectPrism : T.hexPrism;
 
-export function create({ stage, pins, palette, phone, data, onSelect, onHover, freeCentre, freeWidth }) {
+export function create({ stage, pins, palette, phone, data, onSelect, onHover, onEvent, freeCentre, freeWidth }) {
   const E = T.createEngine({ stage, pins, palette, phone, onSelect, onHover, freeCentre, freeWidth, seed: 11 });
   const { M, rnd, pickables } = E;
   // 合併的時候合色（2026-11-18 第四批：831 個 draw call 要先降下來才放得下門面的細節）：只差底色的材質合成同一個 Mesh，顏色寫在點上。
@@ -103,9 +103,9 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   for (const p of data.people) addWalker(p);
   // 靜態的東西合併（2026-11-18：加了這麼多道具之後一幀 1171 個 draw call；同材質同一格的合成一個，會動的與點得到的不碰）。
   const noMerge = new URLSearchParams(location.search).get("merge") === "0";   // ?merge=0：不合併，給除錯用的射線檢查（2026-11-18 自查）
-  if (!noMerge) E.mergeStatic();
   // 會動的 group 也再合一次（第四批）：纜車廂、摩天輪、船、晾衣繩那些底下的零件，照「只差底色就合」再合成一兩個。會動的零件各支模組自己標了 dynamic。
-  if (!noMerge) E.mergeDynamic();
+  // 批 C：合併烤的是世界座標，所以開場島浮起來那 1.6 秒之內不能合；motion() 開場演完才合（merged = true）。沒有 motion（減少動態）就馬上合。
+  let merged = false; const mergeAll = () => { if (merged) return; merged = true; if (!noMerge) { E.mergeStatic(); E.mergeDynamic(); } };
 
   // ═══ 鏡頭與牌子 ═══
   const show = { names: false, selectedTeam: "", flows: false };
@@ -115,6 +115,30 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     for (const w of walkers) { const on = show.names || w.me || show.selectedTeam === w.person.team; E.setHidden(w.pin, !on); if (on) E.putPin(w.pin, E.project(w.g.position.x, 2.4, w.g.position.z)); }
   };
   E.setGoal(L.cameraOverview(phone), true); E.resize(); E.snapCam();
+  // ═══ 開場（批 C）：鏡頭從雲上俯衝下來、整個世界從水裡浮上來，八座島一座接一座再冒一下。演完才合併。═══
+  const isleList = [...isleObjs.values()]; let openT = -1;
+  function startOpening() {
+    const o = L.cameraOverview(phone); E.cam.pos.set(o.pos[0] * 0.3, o.pos[1] * 2.1, o.pos[2] * 2.3); E.cam.tgt.set(0, 0, 0); E.cam.lift = 0; E.placeCam();
+    E.world.position.y = -11; openT = 0;
+  }
+  const openTick = dt => {
+    if (openT < 0) return; openT += dt; const ease = k => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
+    E.world.position.y = -11 * (1 - ease(openT / 1.4));
+    isleList.forEach((o, i) => { o.g.position.y = -4 * (1 - ease((openT - 0.5 - i * 0.09) / 0.8)); });
+    if (openT > 1.9) { openT = -1; E.world.position.y = 0; for (const o of isleList) o.g.position.y = 0; mergeAll(); E.dirty(); }
+  };
+  // ═══ 事件導覽（批 C）：鯨魚每 36 秒浮上來、飛機每 72 秒起飛。發生前 2 秒角落出一句（main.js 畫）；十秒沒人碰、也沒有點開哪座島，鏡頭就自己飛過去看。═══
+  const guided = new Map(); let guideBack = -1, lineOn = "";
+  const camFor = ev => { const p = ev.pos(); return { pos: [p[0] + 16, 15, p[2] + 24], target: [p[0], 0.5, p[2]] }; };
+  const guideTick = (dt, t) => {
+    for (const ev of E.events) {
+      const at = ev.when(t), left = at - t, key = ev.id + ":" + Math.round(at);
+      if (left <= 2 && left > -ev.dur) { if (lineOn !== key) { lineOn = key; if (onEvent) onEvent(ev.id, true); } if (left <= 2 && !guided.has(key) && !show.selectedTeam && E.idleFor() > 10000 && openT < 0) { guided.set(key, 1); E.setGoal(camFor(ev)); guideBack = t + ev.dur + 1; } }
+      else if (lineOn === key) { lineOn = ""; if (onEvent) onEvent(ev.id, false); }
+    }
+    if (guideBack > 0 && t > guideBack) { guideBack = -1; if (!show.selectedTeam && E.idleFor() > 10000) E.setGoal(L.cameraOverview(phone), true); }
+    if (guided.size > 8) guided.delete(guided.keys().next().value);
+  };
 
   const api = {
     // 牌子上的字（語言換了 main.js 會再叫一次）。
@@ -169,7 +193,11 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     // 除錯用（?debug=1）：每個人現在在做什麼。
     debug: () => E.debugWalkers(),
     // 每一幀的迴圈（引擎的）。導航交給 layout.js：哪座島、怎麼繞、橋怎麼走。
-    motion() { return E.motion({ islandOf: L.islandOf, wanderTarget: L.wanderTarget, detour: L.detour, route: L.route, routePoints: L.routePoints, blockersOf, poisOf, commons: "commons" }, extraTick); },
+    motion() { startOpening(); return E.motion({ islandOf: L.islandOf, wanderTarget: L.wanderTarget, detour: L.detour, route: L.route, routePoints: L.routePoints, blockersOf, poisOf, commons: "commons" }, (dt, t) => { extraTick(dt, t); openTick(dt); guideTick(dt, t); }); },
+    // 角落那一句被點了：鏡頭飛去看那件事。
+    goEvent(id) { const ev = E.events.find(x => x.id === id); if (ev) { E.setGoal(camFor(ev)); if (!E.motionOn) E.snapCam(); } },
+    // 沒有 motion（減少動態效果）：main.js 叫這個，直接合併。
+    still() { mergeAll(); E.render(0); },
   };
   return api;
 }

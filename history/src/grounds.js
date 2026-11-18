@@ -13,7 +13,7 @@ export function buildGrounds(THREE, c) {
   const bus = (x, z, ry, m) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; g.add(box(11, 3, 2.5, m, 0, 1.6, 0), box(10.6, 1.2, 2.55, mats.glass, 0, 2.1, 0, false), box(11, 0.5, 2.5, mats.navy, 0, 0.5, 0, false)); world.add(g); return g; };
 
   // ═══ 空側 ═══
-  // 停機位：六個（五個 B 門加我們的 A 門），每一位：黃色引導線從服務道到停止點、停止線、橘色設備限制線框、白色地勤車停放框、位號寫在地上。
+  // 停機位六個：引導線、停止線、設備限制線框、地勤車停放框、位號。
   const STANDS = [[25, "B1", true], [40, "B2", true], [58, "B3", false], [75, "B4", true], [92, "B5", true], [113, "", true]];
   {
     const lead = [], stop = [], eraX = [], eraZ = [], gse = [];
@@ -31,7 +31,7 @@ export function buildGrounds(THREE, c) {
     world.add(g, cyl(0.3, 0.3, 2.6, mats.frame, x - 1.2, 1.3, 32, 6), cyl(0.3, 0.3, 2.6, mats.frame, x + 1.2, 1.3, 32, 6));
     const pl = buildAirliner(THREE, { body: P.cream, tail: P[tail], mark: P.navy, dark: P.dark }); pl.position.set(x + 7, A.PLANE_REST_Y, A.GATE_STAND[1]); pl.rotation.y = Math.PI; shadowOn(pl); world.add(pl);
   }
-  // 每一個有飛機的停機位：輸送帶車、地面電源車、四個行李籠、錐桶、輪擋、兩個地勤。空著的 B3：拖車、兩節行李車、指揮的人（兩支橘棒）。
+  // 有飛機的停機位：輸送帶車、電源車、行李籠、錐桶、輪擋、地勤。空著的 B3：拖車、行李車、指揮的人。
   {
     const ulds = [], cones = [], chocks = [], gpus = [], gpuWheels = [];
     for (const [x, , busy] of STANDS) {
@@ -61,7 +61,7 @@ export function buildGrounds(THREE, c) {
   // 滑行道的指示牌（三個彎各一塊黃底黑字）、等待線旁的紅底白字牌。
   for (const u of [0.22, 0.5, 0.78]) { const p = tw.at(tw.length * u), nx = Math.cos(p.yaw), nz = -Math.sin(p.yaw); const x = p.x + nx * 13, z = p.z + nz * 13; world.add(box(2.4, 0.9, 0.2, mats.yellowLight, x, 1.1, z, false), box(0.9, 0.5, 0.22, mats.dark, x - 0.6, 1.1, z, false), instanced(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 5), mats.grey, [[x - 0.9, 0.35, z], [x + 0.9, 0.35, z]], false)); }
   { const h = tw.at(tw.length - 36), nx = Math.cos(h.yaw), nz = -Math.sin(h.yaw); world.add(box(2.4, 0.9, 0.2, redM, h.x + nx * 13, 1.1, h.z + nz * 13, false), box(1.4, 0.3, 0.22, mats.cream, h.x + nx * 13, 1.1, h.z + nz * 13, false)); }
-  // 跑道：另一端的號碼、瞄準點兩大塊、觸地帶白塊（3、2、1 對）、PAPI 四盞、進場燈（跑道頭前方每 30 公尺一排）、ILS 天線陣、下滑台、擋焰牆、距離標牌。
+  // 跑道：另一端的號碼、瞄準點、觸地帶、PAPI、進場燈、ILS、下滑台、擋焰牆、距離標牌。
   {
     const num = new THREE.Mesh(new THREE.PlaneGeometry(14, 22), lam(P.white, { map: textTexture(256, 400, palette.cream, [{ text: "09", font: `700 300px ${fonts.display}`, color: palette.navy, x: 128, y: 200, align: "center" }]) }));
     num.rotation.x = -Math.PI / 2; num.rotation.z = -Math.PI / 2; num.position.set(R.x0 + 60, 0.07, R.z); num.receiveShadow = false; world.add(num);
@@ -112,7 +112,7 @@ export function buildGrounds(THREE, c) {
   }
 
   // ═══ 陸側 ═══
-  // 航廈前：整條雨棚（柱子每 12 公尺一根、底下有燈）、人行道與路緣、導盲磚、斑馬線、護柱、門架牌（出境、計程車、公車）。
+  // 航廈前：雨棚、人行道、導盲磚、斑馬線、護柱、門架牌。
   {
     const x0 = T.x0 - 2, x1 = T.x1 + 2, cx = (x0 + x1) / 2, L = x1 - x0;
     world.add(box(L, 0.5, 8, mats.roof, cx, 5.8, -45.5, false), box(L, 0.6, 0.3, mats.navy, cx, 5.3, -49.4, false));
@@ -144,7 +144,7 @@ export function buildGrounds(THREE, c) {
     world.add(box(6, 6, 0.6, mats.navy, gx + 20.3, 13.8, gz - 12, false)); sign("PARKING", "停車場", 5, 5, palette.navy, palette.yellow, gx + 20.65, 13.8, gz - 12, Math.PI / 2, { align: "center", size: 150 });
     world.add(box(0.3, 1.0, 0.3, mats.navy, gx + 24, 0.5, gz + 12, false), box(4, 0.12, 0.12, mats.orange, gx + 24, 1.0, gz + 14, false));   // 入口柵欄
   }
-  // 公車總站（x 128 到 164，z -62 到 -50）：雨棚、四台公車停在月台、等車的人、牌子。加油站（x -62，z -135）：雨棚、四支油槍、小店、一台車。
+  // 公車總站（x 128 到 164）：雨棚、公車、等車的人。加油站（x -62，z -135）：雨棚、油槍、小店。
   {
     world.add(box(38, 0.3, 11, mats.roof, 137, 4.6, -57, false), instanced(new THREE.CylinderGeometry(0.25, 0.3, 4.6, 8), mats.column, [[121, 2.3, -53], [137, 2.3, -53], [153, 2.3, -53], [121, 2.3, -61], [137, 2.3, -61], [153, 2.3, -61]], false), box(38, 0.25, 3, paveM, 137, 0.12, -52.5, false));
     [mats.teal, mats.orange, mats.navy, mats.cream].forEach((m, i) => bus(123 + i * 9, -59.5, Math.PI / 2, m));

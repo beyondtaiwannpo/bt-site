@@ -41,6 +41,8 @@ export const STR = {
   meRemove:    { zh: "把我拿掉", en: "Remove me" },
   meCancel:    { zh: "取消", en: "Cancel" },
   meYou:       { zh: "（你）", en: "(you)" },
+  evWhale:     { zh: "鯨魚要浮上來了，點這裡去看", en: "The whale is surfacing. Tap to watch" },
+  evPlane:     { zh: "有飛機要起飛了，點這裡去看", en: "A plane is taking off. Tap to watch" },
   indexHead:   { zh: "THE TEAM INDEX", en: "THE TEAM INDEX" },
   indexTitle:  { zh: "每一座島在做的事。", en: "What each island does." },
   indexLead:   { zh: "六個 team、聚會所、機場。點一個看它在做什麼、有誰、跟誰連。", en: "Six teams, the commons, the airport. Tap one to see what it does, who is on it, and who it links to." },

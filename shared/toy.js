@@ -227,7 +227,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const planes = [];      // 機場的飛機；有 userData.flight 的那一架在 motion() 裡飛
   const boards = [];      // 貼文牆上的板子；paintBoards() 把真的圖貼上去
   const treePlaces = [], bushPlaces = [], stoolPlaces = [], postPlaces = [];
-  const coasters = [], beacons = [], boats = [], balloons = [], clouds = [], flags = [], foams = [], bounces = [];
+  const coasters = [], beacons = [], boats = [], balloons = [], clouds = [], flags = [], foams = [], bounces = [], events = [];   // events：會發生的事（鯨魚、飛機），{ id, when(t), dur, pos() }，頁面拿去帶鏡頭
   const slides = new Map();   // "a>b" → { curve, dir, splash }：人過這條不是走的，是坐著溜
   const splashes = [];        // 滑水道底的水花（第四批）：{ ring, mat, drops, x, z, t0 }，人溜到最低點 motion() 把 t0 設成現在，接下來 1.3 秒水圈放大、水珠往上噴
   const groundCache = new Map();
@@ -358,7 +358,10 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const tw = new THREE.Group(); tw.position.set(-6.6, 0, -6.2); g.add(tw);
       tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 3.6, 10), M.wall).translateY(1.8), new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.8, 0.9, 10), roofM).translateY(4.0), new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 10), M.dark).translateY(4.6));
       // 會動的那一架包在一個 group 裡，機身轉成機鼻朝 +z，motion() 用 lookAt 讓它朝著下一個點（轉彎、爬升、下降都對）。
-      const fly = new THREE.Group(); const body = makePlane(M.cream, M.teal); body.rotation.y = -Math.PI / 2; fly.add(body); body.getObjectByName("prop").userData.dynamic = true;   // 螺旋槳在 motion() 裡轉，標 dynamic 才不會被 mergeDynamic() 烤進機身 fly.position.set(-3.0, 0.75, -4.6); fly.userData.flight = { t: 0 }; fly.userData.dynamic = true; g.add(fly); planes.push(fly);
+      const fly = new THREE.Group(); const body = makePlane(M.cream, M.teal); body.rotation.y = -Math.PI / 2; fly.add(body); body.getObjectByName("prop").userData.dynamic = true;   // 螺旋槳在 motion() 裡轉，標 dynamic 才不會被 mergeDynamic() 烤進機身
+      // 2026-11-18 批 C：上面那句註解之前把下面這一行吞掉了（寫在同一行），飛機從第四批起就沒飛過。
+      fly.position.set(-3.0, 0.75, -4.6); fly.userData.flight = { t: 0 }; fly.userData.dynamic = true; g.add(fly); planes.push(fly);
+      const fv = new THREE.Vector3(); events.push({ id: "plane", dur: 14, when: t => t + ((22 - fly.userData.flight.t) % 72 + 72) % 72, pos: () => { fly.getWorldPosition(fv); return [fv.x, fv.y, fv.z]; } });   // 22 秒起飛滾行、26 到 32 爬升
       const p2 = makePlane(M.white, M.orange); p2.position.set(1.0, 0.75, -4.6); p2.rotation.y = 0.15; g.add(p2);
       const p3 = makePlane(M.cream, M.navy); p3.position.set(4.6, 0.75, -4.6); p3.rotation.y = -0.1; g.add(p3);
       const hg = new THREE.Group(); hg.position.set(6.4, 0, -7.0); g.add(hg);
@@ -900,7 +903,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     rbox, box, flagGeo, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane, bunting, pennant, bike, rail,
     furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances, mergeStatic, mergeChildren, mergeDynamic, setMerge, mergeOpts,
     makePerson, pose, addWalker, removeWalker, people,
-    cam, setGoal, placeCam, orbitBy, snapCam, camIdle, project, putPin, setHidden, pin, resize, render, hit, paintBoards, debugWalkers,
+    cam, setGoal, placeCam, orbitBy, snapCam, camIdle, idleFor: () => performance.now() - idle.at, events, project, putPin, setHidden, pin, resize, render, hit, paintBoards, debugWalkers,
     get motionOn() { return motionOn; },
     dirty() { shadowsDirty = true; },
     bounce(o) { if (!bounces.some(b => b.o === o)) bounces.push({ o, t0: E.now || 0 }); },

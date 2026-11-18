@@ -126,6 +126,10 @@ $("side-fold").addEventListener("click", () => { writeUi({ sideFolded: true }); 
 $("side-tab").addEventListener("click", () => { writeUi({ sideFolded: false }); applyFolds(readUi()); });
 $("brand-fold").addEventListener("click", () => { writeUi({ brandFolded: !readUi().brandFolded }); applyFolds(readUi()); });
 
+// ── 角落那一句（批 C）：鯨魚要浮上來、飛機要起飛，發生前兩秒出現，點了鏡頭飛過去。──
+let eventId = "";
+function showEvent(id, on) { const el = $("event-line"); if (!on) { if (eventId === id) { eventId = ""; el.hidden = true; } return; } eventId = id; el.textContent = t(id === "whale" ? "evWhale" : "evPlane", lang); el.hidden = false; }
+$("event-line").addEventListener("click", () => { if (scene && eventId) scene.goEvent(eventId); });
 // ── 開頁 ──
 function paletteFromCSS() { const cs = getComputedStyle(doc), v = k => cs.getPropertyValue(k).trim(); return { navy: v("--bt-navy"), teal: v("--bt-teal"), orange: v("--bt-orange"), sand: v("--bt-sand"), cream: v("--bt-cream"), yellow: v("--bt-yellow"), grey: v("--bt-grey") }; }
 async function boot() {
@@ -137,12 +141,12 @@ async function boot() {
   // 3D：動態 import（Three 從 cdnjs 來）。載不到或沒有 WebGL：留清單與卡，上面印一句。
   const mod = await Promise.race([import("./scene.js").catch(e => { console.warn("3D 載不進來：", e); return null; }), new Promise(r => setTimeout(() => r(null), 10000))]);
   if (mod) {
-    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: s => { if (scene) scene.hover(s); }, freeCentre, freeWidth }); }
+    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: s => { if (scene) scene.hover(s); }, onEvent: (id, on) => showEvent(id, on), freeCentre, freeWidth }); }
     catch (e) { console.warn("3D 開不起來：", e); scene = null; }
   }
   if (!scene) { doc.classList.add("no3d"); $("no3d").hidden = false; }
   else if (!reduce && !motionOff) loop = scene.motion();
-  else doc.classList.add("still");
+  else { doc.classList.add("still"); scene.still(); }
   if (new URLSearchParams(location.search).get("debug") === "1") window.__island = scene;   // 除錯：console 打 __island.debug()
   $("loading").hidden = true;
   applyFolds(readUi());

@@ -41,7 +41,7 @@ export function buildTerminal(THREE, c) {
     term.add(box(3.4, 2.8, 2.0, mats.frame, -6, 1.4, -38.5, false)); { const g = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.2), mats.glass); g.position.set(-6, 1.5, -37.49); term.add(g); } sign("EXCHANGE", "外幣兌換", 3.2, 0.8, palette.orange, palette.navy, -6, 3.2, -37.48, 0);
     person(-6.2, -36.2, Math.PI, { shirt: pick(3), bag: true }); person(-13.5, -37.2, Math.PI, { shirt: pick(1) });
   }
-  // 報到櫃台十二個（x -37 到 -15，每 2 公尺一個，靠陸側牆）：櫃台、檯面、螢幕、磅秤、後面的輸送帶；背後一面深藍的航空公司牆，上方 A 到 F 六個島標。
+  // 報到櫃台十二個（x -37 到 -15，每 2 公尺一個）：櫃台、螢幕、磅秤、輸送帶；背後航空公司牆，上方 A 到 F 島標。
   {
     const desks = [], tops = [], screens = [], scales = [], belts = [], poles = [];
     for (let i = 0; i < 12; i++) { const x = -37 + i * 2; desks.push([x, 0.55, -34.5]); tops.push([x, 1.14, -34.5]); screens.push([x + 0.5, 1.7, -33.9]); scales.push([x - 0.5, 0.1, -33.2]); belts.push([x, 0.5, -36.6]); poles.push([x + 0.5, 1.4, -33.9]); }
@@ -61,7 +61,7 @@ export function buildTerminal(THREE, c) {
     term.add(instanced(new THREE.BoxGeometry(0.6, 1.5, 0.5), mats.navy, kiosks, false), instanced(new THREE.BoxGeometry(0.5, 0.4, 0.04), mats.light, kiosks.map(([x, , z]) => [x, 1.2, z + (z > -26 ? 0.27 : -0.27)]), false));
     for (const [x, z, ry] of [[-12, -23.6, Math.PI], [-8.8, -23.6, Math.PI], [-10.4, -28.4, 0]]) person(x, z, ry, { shirt: pick(k++), backpack: true });
   }
-  // 大廳中央：服務台（圓的深藍櫃台、i 的牌子、一個職員一個問路的）、看板底下三張長凳與幾個抬頭看的人、會面點的柱子。
+  // 大廳中央：服務台、看板底下的長凳與抬頭看的人、會面點的柱子。
   {
     term.add(cyl(1.6, 1.6, 1.1, mats.navy, -30, 0.55, -12, 16), cyl(1.75, 1.75, 0.08, mats.cream, -30, 1.14, -12, 16), cyl(0.05, 0.05, 2.4, mats.grey, -30, 2.3, -12, 5), box(0.9, 0.9, 0.08, mats.orange, -30, 3.7, -12, false), box(0.14, 0.5, 0.1, mats.navy, -30, 3.62, -12, false), cyl(0.07, 0.07, 0.08, mats.navy, -30, 4.0, -12, 6));
     sign("INFORMATION", "服務台", 3.4, 0.7, palette.navy, palette.cream, -30, 2.6, -12.06, Math.PI);
@@ -84,7 +84,7 @@ export function buildTerminal(THREE, c) {
     for (const [x, z] of [[-37, -27], [-14, -31], [-2, -12]]) term.add(cyl(1.2, 1.3, 0.6, mats.pot, x, 0.3, z, 12), cyl(0.12, 0.14, 2.2, mats.trunk, x, 1.6, z, 6), new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 0), mats.plant).translateX(x).translateY(3.2).translateZ(z));
   }
 
-  // ═══ B. 安檢前（x -8 到 -1）：排隊的 Z 字欄（兩邊各一組，中間那條是鏡頭走的快速通道）、托盤台、牌子、人體掃描門 ═══
+  // ═══ B. 安檢前（x -8 到 -1）：Z 字欄（中間是鏡頭走的快速通道）、托盤台、牌子、掃描門 ═══
   {
     stanchions([[-8, -30.5], [-1.5, -30.5], [-1.5, -28.9], [-8, -28.9], [-8, -27.3], [-1.5, -27.3], [-1.5, -25.7], [-8, -25.7]]);
     stanchions([[-8, -9.5], [-1.5, -9.5], [-1.5, -11.1], [-8, -11.1], [-8, -12.7], [-1.5, -12.7], [-1.5, -14.3], [-8, -14.3]]);
@@ -102,7 +102,7 @@ export function buildTerminal(THREE, c) {
   }
 
   // ═══ C. 空側（x 6 到 125）═══
-  // 免稅店（x 8 到 26，靠陸側）：開放的門面、深藍的背牆、六排貨架加三色商品、兩個結帳台、門口兩面香水燈箱、「DUTY FREE 免稅店」大招牌、十個逛的人。
+  // 免稅店（x 8 到 26）：門面、背牆、六排貨架、結帳台、香水燈箱、大招牌、逛的人。
   {
     term.add(box(18, 5, 0.3, mats.navy, 17, 2.5, -39.3, false), box(18.4, 0.3, 9, mats.orange, 17, 5.1, -34.5, false));
     sign("DUTY FREE", "免稅店", 8, 1.6, palette.cream, palette.navy, 17, 6.1, -30.2, 0);

@@ -509,11 +509,15 @@ export function createScene({ canvas, palette, phone, fonts }) {
     g.position.set(-120 - t * 1500, 90 + t * 300 - 70 + (i % 3) * 30, A.RUNWAY.z + side * (80 + (i % 4) * 60));
     g.userData.v = 0.5 + (i % 3) * 0.3; g.userData.x0 = g.position.x; g.userData.dynamic = true; world.add(g); clouds.push(g);
   }
+  { const cf = A.cameraAt(0.93).pos, g = clouds[13]; g.position.set(cf[0], cf[1], cf[2]); g.userData.x0 = cf[0]; g.userData.v = 0; }   // 批 C：這一團放在追鏡的路上，鏡頭穿過去畫面白一下
 
   // ═══ 我們那一架 ═══
   const plane = buildAirliner(THREE, { body: P.cream, tail: P.orange, mark: P.cream, dark: P.dark }); shadowOn(plane); plane.userData.dynamic = true; world.add(plane);
   // 2026-11-18 批 A：先航向、再俯仰、再側傾。之前是預設的 XYZ，對正 -x 之後 rotation.x 轉的是機身軸，起飛「抬頭」其實是在滾。
   plane.rotation.order = "YXZ";
+  // 批 C：翼尖的兩條白氣（離地之後淡入）。
+  const trailM = lam(P.cloud, { transparent: true, opacity: 0, emissive: P.cloud, emissiveIntensity: 0.6, depthWrite: false });
+  for (const sx of [-1, 1]) { const tr = box(0.22, 0.22, 70, trailM, sx * 17.2, 0.9, -40, false); tr.castShadow = false; plane.add(tr); }
   const wheels = []; plane.traverse(m => { if (m.name === "wheel") wheels.push(m); }); let wheelSpin = 0, lastS = 0;
   // 旅客
   const traveller = figure(mats, { shirt: P.teal, backpack: true, phase: 0 }); traveller.userData.baseY = 0; world.add(traveller);
@@ -632,10 +636,17 @@ export function createScene({ canvas, palette, phone, fonts }) {
     }
     // 天空與霧：離地之後慢慢變成高空的藍、霧變薄（機場在底下的霧裡縮小）。
     const lift = qp.lift || 0;
-    scene.background.copy(P.sky).lerp(P.skyHigh, lift * 0.85); scene.fog.color.copy(P.sky).lerp(P.skyHigh, lift * 0.5);
+    // 批 C：時間在走。停機坪那段從正午走到黃昏，起飛是 golden hour：太陽往西沉（飛機往 -x 飛，正對落日）、光變暖、天空帶橘；離地之後再混成高空的藍。
+    const tod = smooth(clamp01((e - 0.45) / 0.55));
+    sun.color.copy(P.cream).lerp(P.orange, tod * 0.55); sun.intensity = lerp(1.7, 1.5, tod); hemi.color.copy(P.sky).lerp(P.orange, tod * 0.22);
+    SUN_OFF.set(lerp(-110, -230, tod), lerp(170, 55, tod), lerp(-70, -30, tod)); sun.position.copy(lookV).add(SUN_OFF);
+    // 鏡頭穿雲：離哪一團雲 26 公尺內霧變濃變白（整個畫面白一下）。
+    let fl = 0; for (const cl of clouds) { const d = camera.position.distanceTo(cl.position); if (d < 26) fl = Math.max(fl, 1 - d / 26); }
+    trailM.opacity = 0.5 * smooth(clamp01((lift - 0.04) / 0.3));
+    scene.background.copy(P.sky).lerp(P.orange, tod * 0.3 * (1 - lift)).lerp(P.skyHigh, lift * 0.85).lerp(P.cloud, fl); scene.fog.color.copy(scene.background).lerp(P.sky, 0.3 * (1 - fl));
     // 室內（航廈與空橋）霧幾乎關掉、半球光的地面色換成沙色，裡面才不會灰綠；升出空橋的那一段慢慢換回室外的。
     const inside = 1 - smooth(clamp01((e - 0.335) / 0.065));
-    scene.fog.density = lerp(lerp(0.0013, 0.0006, lift), 0.0005, inside);   // 2026-11-18 第四批：外面的霧變淡（0.0022 → 0.0013，起飛 0.0009 → 0.0006），遠處的山、海、城市才看得到
+    scene.fog.density = lerp(lerp(0.0013, 0.0006, lift), 0.0005, inside) + fl * 0.05;   // 2026-11-18 第四批：外面的霧變淡（0.0022 → 0.0013，起飛 0.0009 → 0.0006），遠處的山、海、城市才看得到
     hemi.groundColor.copy(P.grass).lerp(P.sand, inside * 0.7); hemi.intensity = lerp(lerp(0.95, 0.7, lift), 1.1, inside);
     // 太陽跟著鏡頭看的點；室內陰影的範圍小、室外大。影子只在該重畫的時候重畫（上面 autoUpdate 那段）。
     shadowTick(e, t);
