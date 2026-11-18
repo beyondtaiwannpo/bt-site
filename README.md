@@ -4637,6 +4637,22 @@ Paul 看完批 4 第三輪在線上的樣子，否決了 2.5D 的畫法：「飛
 - 頁名、副標、結尾句跟批 4 一樣沒改。
 
 
+## 歷史之路（2026-11-17，批 6：換骨成 BT 島那一套）
+
+Paul 2026-11-17：「renovating the road to style exactly like the island so it feels part of it」。計畫在 `docs/2026-11-17-歷史之路改成島的做法計畫.md`，引擎抽出來那一批記在下面 BT 島「島的引擎抽到 `shared/toy.js`」。
+批 4、批 5 那趟機場（航廈、空橋、推出去起飛）整個拿掉，上面那幾節留著當歷史；`history/src/airport.js`、`plane.js`、`person.js` 刪了，GSAP 與 ScrollTrigger 也不載了。
+
+**現在長什麼樣**：海上一條彎彎的路。起點是機場（跟島那一頁同一座：平台、跑道、滑行道、機坪、塔台、機棚，一架飛機沿整條路飛到「今天」再飛回來），
+一站一座圓的小島，最後一座是「今天」（一支旗、一塊牌子寫「路還在走。下一站，等你一起。」、一顆「回 BT 島」的牌子連回 `/island/`）。
+- **站幾個就幾座**：`history/src/road.js` 的 `world(n)` 照站數把島排在一條 sin 彎的路上（等弧長），相鄰 21 公尺、水道 4 到 8 公尺；後台加一站、拿掉一站，路自己重排，程式一行不改。1、3、7、25 站都測過不重疊。
+- **每一站畫什麼**：代號的關鍵字（`data.js` 的 `motifFor`，跟之前同一組）對到 `road.js` 的 `MOTIF_SCENE`：成立是一棟家加花園、導生是聚會所加花園（兩兩對坐的長凳）、博覽會是攤位加廣場、大使是講台加小鎮廣場、探索營是帳篷加露天教室、校友是碼頭加小鎮廣場、幹部是塔樓加攝影棚、認不出來是路標加廣場；地面花紋也跟著換。再加每座島都有的桌椅、燈、花箱、圍欄、矮樹、樹（島小，放不下的自己跳過）。
+- **年份路標**：每站一塊畫了年份的板子立在路邊（canvas 畫的字，不是圖檔）；**照片牆**：有同意的照片才有（最多兩塊），圖從 Storage 貼上去，載不到留白板。
+- **人**：每站兩三個、機場三個、今天一個，全部是角色沒有名字（牌子永遠藏著）。跟島上一樣坐、聊、站在照片牆前、沿路走去隔壁站、坐滑水道。
+- **怎麼走**：滾輪、拖曳、方向鍵、Page Up/Down、Home/End、底下的年份帶、「自動走」（每站約四秒），全部只改一個進度（0 機場、1 今天），每一幀用阻尼追；鏡頭跟著路、到一站就靠近一點。點島、點路標、點卡都打開那一站的覆蓋層（覆蓋層、燈箱、年份帶、大年份都是原來的）。網址 `#代號` 照舊。
+- **退路照舊**：減少動態效果、`?motion=off`、沒有 WebGL、Three 載不到，同樣的站排成直立時間軸，一站都不少（`road.js` 的 `pickMode`，少了 GSAP 那一個條件）。
+- **守門**：`check.sh` 的 /history/ 那兩段改成「沒有 GSAP、每一幀的迴圈只在 shared/toy.js 的 motion()、Three 只有 scene.js 與 toy.js import、main.js 動態 import scene.js」；`test/history-page.test.mjs` 機場那幾條換成路的（站不重疊、橋 3 到 12 公尺、nearest／progressFor 對得上、小島離島夠遠、人沒有名字、代號都有場景、退路四種）。測試 933（拿掉機場那 9 條、加路的 3 條）、check.sh、check-motion、check-mobile 全過。
+- **實測**：Chrome 60 fps，21 個人，0 個卡住。截圖 `docs/history/2026-11-17-road-airport.jpg`（起點）、`2026-11-17-road-stations.jpg`（兩站與卡）、`2026-11-17-road-end.jpg`（今天那座）。**真的手機還沒量過**，Lighthouse 也還沒重跑。
+
 ## BT 島 `/island/`（2026-11-16）
 
 Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項，島跟島、人跟人相連，還可以把自己放進去）之後定的：
@@ -4724,6 +4740,7 @@ Paul 對「`shared/` 多一支檔」說「Yes, shared file」。`/history/` 要�
 - **`shared/toy.js`（約 790 行）**：圓角盒子 `rbox`、島的身體三種形狀、七色混色、材質表、canvas 地面八種花紋、建築十三種（含機場：跑道、滑行道、機坪、塔台、機棚、三架飛機）、小飛機、桌椅燈花箱攤子、`furnish`（每座島都有的那一套）與 `decorate`（七種 scenery）、橋四種加滑水道、協作線、裝飾小島五種、小船、熱氣球、雲、樹與矮樹與柱子一次畫完、大頭小人 `makePerson` 與 `pose`、`addWalker`、鏡頭（阻尼、拖曳、滾輪、兩指、對中間空出來那一塊）、射線、牌子（`project` / `putPin`，只改 transform）、貼文牆貼圖 `paintBoards`、畫字的板子 `textPlane`、`debugWalkers`，與**整個 `motion()`**（人的狀態機：繞路、坐、聊、盪鞦韆、溜滑梯、過橋、坐滑水道；雲、雲霄飛車、燈塔、熱氣球、小船、飛機）。
 - **`island/src/scene.js` 從 814 行剩 144 行**：只剩「哪座島在哪、島上放什麼、牌子怎麼排、點了怎麼辦」。導航（`islandOf`、`wanderTarget`、`detour`、`route`、`routePoints`）還在 `layout.js`，用參數交給引擎的 `motion(nav)`；引擎自己不知道有幾座島、哪一座叫什麼。
 - **引擎裡沒有任何一頁的字**：沒有 team 的字、沒有站的字、沒有色碼。頁面自己的東西（機場在哪、聚會所叫什麼）全部是參數。
+- **純數學那一半在 `shared/toy-nav.js`**（批 2 時補的）：人怎麼繞開東西（`detour`）、隨機目標點（`wanderTarget`）、橋的兩端（`edge`）、最少幾座橋（`route`）、一條路線的點（`routePoints`）。沒有 Three，測試直接 import；`island/src/layout.js` 只轉出去。toy.js 不 import 它，頁面用參數交給 `motion(nav)`。
 - **守門跟著改**（`check.sh`）：Three 只准 `shared/toy.js` 與各頁的 `scene.js` import；`shared/` 裡只有 toy.js 准 import three，而且 toy.js 只准 import three（依賴方向只往下）；每一幀的迴圈（requestAnimationFrame）只准在 toy.js 的 `function motion(` 裡，`island/src/` 整個資料夾一個都不准有；`island/src/` 只有 scene.js 准 import toy.js。
 - **畫面一模一樣**：Chrome 實測 60 fps、43 個人、1637 個 mesh、0 個卡住；截圖 `docs/island/island-12-shared-engine-chrome.jpg`。測試 942、check.sh、check-motion、check-mobile 全過。
 - 下一批：`/history/` 用這支引擎重做（計畫在 `docs/2026-11-17-歷史之路改成島的做法計畫.md`）。

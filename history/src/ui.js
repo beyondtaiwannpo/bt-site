@@ -88,7 +88,7 @@ export function overlayHTML(stop, lang) {
     `<h3 class="panel-photos-h">${esc(t("photos", lang))}</h3>${photosHTML(stop, lang)}</article></div>`;
 }
 
-// 減少動態效果、或 GSAP 載不到：同樣的站排成直立時間軸，卡一樣，點了一樣打開覆蓋層。
+// 減少動態效果、或 Three 載不到：同樣的站排成直立時間軸，卡一樣，點了一樣打開覆蓋層。
 export function timelineHTML(stops, lang) {
   return `<ol class="timeline" aria-label="${esc(t("timelineTitle", lang))}">` +
     (stops || []).map((s, i) => `<li class="tl-item">${cardHTML(s, i, lang)}</li>`).join("") + `</ol>`;

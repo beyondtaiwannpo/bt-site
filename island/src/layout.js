@@ -63,50 +63,8 @@ export function programSpots(island, n) {
   for (let k = 0; k < n; k++) { const a = base + Math.PI + (k - (n - 1) / 2) * (TAU / 7); const rr = island.r * 0.5; out.push({ x: island.x + Math.cos(a) * rr, z: island.z + Math.sin(a) * rr, face: Math.atan2(island.x - (island.x + Math.cos(a) * rr), island.z - (island.z + Math.sin(a) * rr)) }); }
   return out;
 }
-// 人在島上走：隨機一個目標點，在島上、不在建築的 2.2 公尺內、不在邊緣 1.5 公尺內。
-// blockers 是世界座標的圓 { x, z, r }（房子、桌椅、樹）。目標點不可以落在任何一個圓裡。
-export function wanderTarget(island, blockers, rnd) {
-  for (let i = 0; i < 40; i++) {
-    // 機場是長方形的平台（跑道在後半），人只在前面那一條（z 3 到 8.5）走；島是圓的範圍。
-    let x, z;
-    if (island.sea) { x = island.x + (rnd() - 0.5) * 22; z = island.z + 3 + rnd() * 5.5; }
-    else { const a = rnd() * TAU, d = Math.sqrt(rnd()) * (island.r - 2.0); x = island.x + Math.cos(a) * d; z = island.z + Math.sin(a) * d; }
-    if ((blockers || []).some(b => Math.hypot(x - b.x, z - b.z) < (b.r || 1.2) + 0.6)) continue;
-    return { x, z };
-  }
-  return { x: island.x, z: island.z + 2 };
-}
-// 從 a 走到 b 不穿過任何一個圓（Paul 2026-11-17：「people are walking inside the building」）。
-// 回要經過的點（不含 a，含 b）。做法：這一段線碰到哪個圓，就在最靠近圓心的那一點往外推一個點，兩段再各自檢查一次，最多拆六層。
-// 2026-11-17 第九次：之前一條路會拆成三四十個點（每繞一個矮樹就再拆），人就一直在走。現在只繞大東西（半徑 0.9 以上；矮樹、燈每一幀往外推就夠）、
-// 最多拆四層，拆完再拉直：中間的點能直走就拿掉。
-export function detour(a, b, blockers, depth) {
-  const big = (blockers || []).filter(c => (c.r || 1.2) >= 0.6);   // 燈（0.4）不算，矮樹以上都繞
-  const pts = detourRaw(a, b, big, depth == null ? 4 : depth);
-  // 拉直
-  const crosses = (p, q) => big.some(c => { const dx = q.x - p.x, dz = q.z - p.z, len2 = dx * dx + dz * dz; if (len2 < 1e-6) return false; const tt = Math.max(0, Math.min(1, ((c.x - p.x) * dx + (c.z - p.z) * dz) / len2)); return Math.hypot(p.x + dx * tt - c.x, p.z + dz * tt - c.z) < (c.r || 1.2) + 0.3; });
-  const out = []; let from = a;
-  for (let i = 0; i < pts.length; i++) { const isLast = i === pts.length - 1; if (!isLast && !crosses(from, pts[i + 1])) continue; out.push(pts[i]); from = pts[i]; }
-  return out.length ? out : [b];
-}
-function detourRaw(a, b, blockers, depth) {
-  const dep = depth; const list = blockers || [];
-  const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz); if (len < 0.01 || dep <= 0) return [b];
-  let hit = null, hitT = 0, hitD = Infinity;
-  for (const c of list) { const R = (c.r || 1.2) + 0.5; const tt = Math.max(0, Math.min(1, ((c.x - a.x) * dx + (c.z - a.z) * dz) / (len * len))); const px = a.x + dx * tt, pz = a.z + dz * tt; const dd = Math.hypot(px - c.x, pz - c.z);
-    if (dd < R && tt > 0.02 && tt < 0.98 && tt < hitT + 1e9 && (!hit || tt < hitT)) { hit = c; hitT = tt; hitD = dd; } }
-  if (!hit) return [b];
-  const R = (hit.r || 1.2) + 0.7; const px = a.x + dx * hitT, pz = a.z + dz * hitT;
-  let nx = px - hit.x, nz = pz - hit.z; const nd = Math.hypot(nx, nz); if (nd < 0.05) { nx = -dz / len; nz = dx / len; } else { nx /= nd; nz /= nd; }
-  // 往外推的那一點不可以落在別的圓裡（2026-11-17 大家卡在同一點就是這個：目標在圓裡，每一幀被推出來，永遠到不了）。
-  // 落在圓裡就再往外推，推不出來就換另一邊。
-  const inside = q => list.some(c => c !== hit && Math.hypot(q.x - c.x, q.z - c.z) < (c.r || 1.2) + 0.4);
-  let via = { x: hit.x + nx * R, z: hit.z + nz * R };
-  for (let k = 1; k <= 4 && inside(via); k++) via = { x: hit.x + nx * (R + k * 1.2), z: hit.z + nz * (R + k * 1.2) };
-  if (inside(via)) { via = { x: hit.x - nx * R, z: hit.z - nz * R }; for (let k = 1; k <= 4 && inside(via); k++) via = { x: hit.x - nx * (R + k * 1.2), z: hit.z - nz * (R + k * 1.2) }; }
-  // 兩段再各自檢查一次（同一個圓也要再看：往外推的點在圓外，但到它的那一段可能還切到圓的邊）。
-  return detourRaw(a, via, list, dep - 1).concat(detourRaw(via, b, list, dep - 1));
-}
+// 人怎麼走（隨機目標點、繞開東西）：2026-11-17 搬到 shared/toy-nav.js，/history/ 的路也用同一份。這裡只轉出去，test/island.test.mjs 照舊從這裡 import。
+export { wanderTarget, detour } from "../../shared/toy-nav.js";
 // 鏡頭：全景、看一座島、鳥瞰。回 { pos, target }。
 // fit：[橫的半徑, 直的半徑]，scene.js 照畫面的長寬把距離算出來；pos 只給方向。
 export function cameraOverview(phone) { const d = phone ? 125 : 96; return { pos: [0, d * 1.0, d * 0.72], target: [0, 0, 0], fit: [68, 48] }; }

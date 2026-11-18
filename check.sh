@@ -1692,68 +1692,31 @@ else
   printf '%s\n' "$alReduce"
 fi
 
-# /history/ 的 GSAP：兩支都要有正確的 SRI，而且 gsap 只准出現在 scene.js 的 motion() 裡
-#
-# 跟首頁同一條規則，差別是程式在 ES module（history/src/scene.js）不是內嵌 script。
-# motion() 不會被呼叫的條件在 main.js：開了減少動態效果、或 window.gsap 沒載到，兩種都退回直立時間軸。
-hi_bad=""
-grep -qF "integrity=\"${GSAP_CORE}\"" history/index.html || hi_bad="${hi_bad} gsap.min.js"
-grep -qF "integrity=\"${GSAP_ST}\"" history/index.html   || hi_bad="${hi_bad} ScrollTrigger.min.js"
-hi_tag=$(grep -c '^<script src="https://cdnjs.cloudflare.com' history/index.html)
-hi_pre=$(grep -A2 'rel="preload" as="script"' history/index.html | grep -cF "integrity=\"${GSAP_CORE}\"")
-hi_pre2=$(grep -A2 'rel="preload" as="script"' history/index.html | grep -cF "integrity=\"${GSAP_ST}\"")
-# 2026-11-06 批 3：主程式要排在 GSAP 前面（先跑、先拿資料），GSAP 兩支加 defer。順序錯了主程式會等 GSAP 下載完才開始。
-hi_order=$(grep -n '<script type="module" src="./src/main.js">\|<script src="https://cdnjs.cloudflare.com' history/index.html | head -1 | grep -c 'main.js')
-hi_defer=$(grep -c '^<script src="https://cdnjs.cloudflare.com[^>]* defer' history/index.html)
-if [ -n "$hi_bad" ]; then
-  bad "history/index.html 的 cdnjs script 少了正確的 integrity：${hi_bad}"
-elif [ "$hi_tag" != "2" ] || [ "$hi_pre" != "1" ] || [ "$hi_pre2" != "1" ]; then
-  bad "history/index.html 的 cdnjs script 不是兩支、或 preload 的 integrity 跟 script 對不上（標籤 ${hi_tag} 支、preload ${hi_pre} 與 ${hi_pre2}）"
-elif [ "$hi_order" != "1" ] || [ "$hi_defer" != "2" ]; then
-  bad "history/index.html 的 main.js 要排在 GSAP 兩支前面，而且 GSAP 兩支都要 defer（順序 ${hi_order}、defer ${hi_defer}）"
-else
-  ok "history/index.html 的 GSAP 兩支都有正確的 integrity，preload 也對得上，main.js 排在前面且 GSAP 有 defer"
-fi
+# /history/ 沒有 GSAP（2026-11-17 換骨成 BT 島那一套之後）：history/ 裡不准出現 gsap 或 ScrollTrigger，每一幀的迴圈只在 shared/toy.js 的 motion() 裡。
+# 走 3D 的條件集中在 road.js 的 pickMode（reduce、?motion=off、WebGL、Three 四樣都要有），main.js 只准問它；scene.js 要動態 import。
 hiMotion=$(node -e '
   const fs = require("fs");
-  const code = fs.readFileSync("history/src/scene.js", "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const strip = c => c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   const bad = [];
-  const head = code.indexOf("export function motion(");
-  let from = -1, to = -1;
-  if (head < 0) bad.push("找不到 export function motion(");
-  else {
-    // 參數是解構的 { wrap, stage, onProgress }，第一個大括號不是函式本體，要找簽名收尾的 ") {"
-    let i = code.indexOf(") {", head) + 2, depth = 0; from = i;
-    for (; i < code.length; i++) {
-      if (code[i] === "{") depth++;
-      else if (code[i] === "}") { depth--; if (depth === 0) { to = i; break; } }
-    }
-    if (to < 0) bad.push("motion() 的大括號沒有收尾");
-  }
-  for (const m of code.matchAll(/\b(gsap|ScrollTrigger)\b/g))
-    if (!(from >= 0 && to > from && m.index > from && m.index < to))
-      bad.push("motion() 外面用到了 " + m[1] + "（scene.js 第 " + code.slice(0, m.index).split("\n").length + " 行）");
-  for (const f of ["history/src/main.js", "history/src/ui.js", "history/src/data.js", "history/src/strings.js", "history/src/airport.js", "history/src/plane.js"]) {
-    const c = fs.readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    for (const m of c.matchAll(/\bgsap\.|\bScrollTrigger\./g)) bad.push(f + " 用到了 gsap（只准 scene.js 的 motion()）");
-  }
+  const html = strip(fs.readFileSync("history/index.html", "utf8").replace(/<!--[\s\S]*?-->/g, ""));
+  if (/gsap|ScrollTrigger/i.test(html)) bad.push("history/index.html 還載著 GSAP（這一頁 2026-11-17 起沒有 GSAP）");
+  for (const f of fs.readdirSync("history/src")) { const c = strip(fs.readFileSync("history/src/" + f, "utf8")); if (/requestAnimationFrame\(|\bgsap\.|\bScrollTrigger\b/.test(c) && !(f === "main.js" && !/\bgsap\.|\bScrollTrigger\b/.test(c) && (c.match(/requestAnimationFrame\(/g) || []).length <= 2)) bad.push("history/src/" + f + " 有每一幀的迴圈或 gsap（只准 shared/toy.js 的 motion()；main.js 只准用 requestAnimationFrame 等下一幀畫覆蓋層與骨架）"); }
   const main = fs.readFileSync("history/src/main.js", "utf8");
   if (!main.includes("matchMedia(\"(prefers-reduced-motion: reduce)\")")) bad.push("main.js 找不到 prefers-reduced-motion 的判斷");
-  // 批 5：走 3D 的條件集中在 airport.js 的 pickMode（reduce、?motion=off、WebGL、gsap、Three 五樣都要有），main.js 只准問它。
-  if (!/A\.pickMode\(\{ reduce, motionOff, webgl, gsap: /.test(main)) bad.push("main.js 找不到 A.pickMode({ reduce, motionOff, webgl, gsap, three }) 那一行判斷");
+  if (!/R\.pickMode\(\{ reduce, motionOff, webgl, three: /.test(main)) bad.push("main.js 找不到 R.pickMode({ reduce, motionOff, webgl, three }) 那一行判斷");
   if (!/import\("\.\/scene\.js"\)/.test(main)) bad.push("main.js 要動態 import scene.js（Three 載不到才接得住，頁面才不會白掉）");
+  if (!/loop = sc\.motion\(frame\)/.test(main) || !/if \(!reduce && !motionOff\) loop = sc\.motion\(frame\);/.test(main)) bad.push("main.js 少了「沒開減少動態效果才呼叫 sc.motion()」那一行");
   if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
 ' 2>&1)
 if [ $? -eq 0 ]; then
-  ok "/history/ 的動畫全部關在 scene.js 的 motion() 裡，reduce 或 gsap 沒載到就不呼叫"
+  ok "/history/ 沒有 GSAP，每一幀的迴圈全部關在 shared/toy.js 的 motion() 裡，reduce 就不呼叫"
 else
   bad "/history/ 有動畫跑到 motion() 外面："
   printf '%s\n' "$hiMotion"
 fi
 
-# /history/ 的 Three.js（批 5，2026-11-06）：只從 cdnjs 載、importmap 帶 cdnjs 公布的 sha512、
-# 只有 scene.js 與 plane.js 准 import three、沒有模型檔或圖檔。
+# /history/ 的 Three.js（批 5，2026-11-06；2026-11-17 起引擎在 shared/toy.js）：只從 cdnjs 載、importmap 帶 cdnjs 公布的 sha512、
+# 只有 scene.js 准 import three 與 shared/toy.js、沒有模型檔或圖檔。
 # 升級 Three 就要同時換 history/index.html 的網址與雜湊、換這一行。雜湊的來源：
 #   curl -s https://api.cdnjs.com/libraries/three.js/<版本>?fields=sri
 THREE_SRI="sha512-zTnt1Hf43YVf2to5DC6GE6cPRSC/xgPJDf3PLQussTsaDak1uHdbnWtIYnOQiL40AIa2OZfFkayQXVdzL1/DqA=="
@@ -1778,8 +1741,9 @@ hiThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
   for (const f of fs.readdirSync("history/src")) {
     const c = fs.readFileSync("history/src/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     const uses = /from\s+["\x27]three["\x27]/.test(c) || /import\(\s*["\x27]three["\x27]/.test(c);
-    if (uses && !["scene.js", "plane.js"].includes(f)) bad.push("history/src/" + f + " import 了 three（只准 scene.js 與 plane.js）");
+    if (uses && f !== "scene.js") bad.push("history/src/" + f + " import 了 three（只准 scene.js 與 shared/toy.js）");
     if (!uses && f === "scene.js") bad.push("scene.js 沒有從 importmap 的 three 載（應該 import * as THREE from \"three\"）");
+    if (/toy\.js/.test(c) && f !== "scene.js") bad.push("history/src/" + f + " import 了 shared/toy.js（引擎只准 scene.js 用）");
   }
   const bin = fs.readdirSync("history", { recursive: true }).filter(f => /\.(glb|gltf|obj|fbx|png|jpg|jpeg|webp|bin|ktx2|hdr)$/i.test(String(f)));
   if (bin.length) bad.push("history/ 裡放了模型或圖檔（全部要用程式幾何）：" + bin.join("、"));
@@ -1788,7 +1752,7 @@ hiThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
   if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
 ' 2>&1)
 if [ $? -eq 0 ]; then
-  ok "/history/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 scene.js 與 plane.js import 它、沒有模型檔、JS 不含 Three 小於 250 KB"
+  ok "/history/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 scene.js 與 shared/toy.js import 它、沒有模型檔、JS 不含 Three 小於 250 KB"
 else
   bad "/history/ 的 Three 載入方式不對："
   printf '%s\n' "$hiThree"
