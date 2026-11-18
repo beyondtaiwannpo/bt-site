@@ -374,6 +374,22 @@ export function createScene({ canvas, palette, phone, fonts }) {
     // 門口的圓亭、B 段底下的兩支腳
     term.add(cyl(2.4, 2.4, 3.6, mats.wallShade, B.x, 1.8, T.z1 + 1.2, 12));
     term.add(cyl(0.3, 0.3, y1, mats.frame, B.x - 1.2, y1 / 2, B.zEnd + B.half + 0.6, 6), cyl(0.3, 0.3, y1, mats.frame, xB1 - 1.5, y1 / 2, B.zEnd + B.half + 0.6, 6));
+    // 空橋裡面（2026-11-18 第四批）：之前是四面光牆。A 段實牆每 1.5 公尺一道板縫、兩邊地上深色的踢腳、三張海報；B 段盡頭是機艙門：門框、往牆邊推開的門板、
+    // 門裡一張畫了座位與窗的「機艙」（貼在機身皮外 0.15 公尺，鏡頭在門外看得到，不用在機身上挖洞）、一位站在門口迎接的機組員、門上一塊「WELCOME ABOARD 歡迎登機」。
+    {
+      const ribs = Array.from({ length: Math.floor(L / 1.5) }, (_, i) => [-B.half + 0.12, B.h / 2, -L / 2 + 0.75 + i * 1.5]);
+      gA.add(instanced(new THREE.BoxGeometry(0.06, B.h - 0.3, 0.08), lam(P.cream.clone().lerp(P.grey, 0.35)), ribs, false), box(0.3, 0.03, L, mats.dark, -inner + 0.15, 0.02, 0, false), box(0.3, 0.03, L, mats.dark, inner - 0.15, 0.02, 0, false));
+      const posterTex = (en, zh, bg, fg) => textTexture(512, 768, bg, [{ text: en, x: 256, y: 330, font: `700 64px ${fonts.display}`, color: fg, align: "center" }, { text: zh, x: 256, y: 430, font: `900 56px ${fonts.han || fonts.display}`, color: fg, align: "center" }], [{ x: 0, y: 0, w: 512, h: 120, color: fg }, { x: 0, y: 648, w: 512, h: 120, color: fg }]);
+      [["WELCOME ABOARD", "歡迎登機", palette.navy, palette.cream], ["SEVEN COUNTRIES", "七個國家", palette.orange, palette.navy], ["SEE YOU THERE", "那裡見", palette.teal, palette.cream]].forEach(([en, zh, bg, fg], i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.5), lam(P.white, { map: posterTex(en, zh, bg, fg) })); m.position.set(-B.half + 0.2, 1.7, -L / 2 + 5 + i * 9); m.rotation.y = Math.PI / 2; m.castShadow = false; gA.add(m); });
+      const dx = lenB / 2;   // B 段的盡頭（機身皮）
+      gB.add(box(0.2, 2.2, 0.18, mats.navy, dx - 0.1, 1.1, -0.65, false), box(0.2, 2.2, 0.18, mats.navy, dx - 0.1, 1.1, 0.65, false), box(0.2, 0.18, 1.5, mats.navy, dx - 0.1, 2.2, 0, false));
+      const door = box(0.06, 1.9, 1.1, lam(P.cream.clone().lerp(P.grey, 0.15)), 0, 0, 0, false); door.position.set(dx - 0.55, 1.05, 0.95); door.rotation.y = -0.9; gB.add(door);
+      const cabinTex = textTexture(512, 768, palette.navy, [], [{ x: 40, y: 120, w: 90, h: 70, color: palette.teal }, { x: 40, y: 220, w: 90, h: 70, color: palette.teal }, { x: 40, y: 320, w: 90, h: 70, color: palette.teal }, { x: 160, y: 120, w: 90, h: 70, color: palette.teal }, { x: 160, y: 220, w: 90, h: 70, color: palette.teal }, { x: 160, y: 320, w: 90, h: 70, color: palette.teal }, { x: 330, y: 100, w: 120, h: 90, color: palette.cream }, { x: 330, y: 260, w: 120, h: 90, color: palette.cream }, { x: 0, y: 420, w: 512, h: 30, color: palette.grey }, { x: 0, y: 0, w: 512, h: 60, color: palette.grey }]);
+      const cabin = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.9), lam(P.white, { map: cabinTex })); cabin.position.set(dx - 0.15, 1.05, 0); cabin.rotation.y = -Math.PI / 2; cabin.castShadow = false; gB.add(cabin);
+      const crew = figure(mats, { shirt: P.navy, staff: true }); crew.position.set(dx - 1.3, 0, 0.95); crew.rotation.y = -Math.PI / 2 - 0.6; crew.userData.baseY = 0; gB.add(crew); idleFigs.push(crew);
+      const wb = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.5), lam(P.white, { map: textTexture(1024, 256, palette.orange, [{ text: "WELCOME ABOARD", x: 36, y: 90, font: `700 100px ${fonts.display}`, color: palette.navy }, { text: "歡迎登機", x: 36, y: 195, font: `900 70px ${fonts.han || fonts.display}`, color: palette.navy }]) })); wb.position.set(dx - 3.6, 2.05, B.half - 0.1); wb.rotation.y = Math.PI;   // 貼在 +z 那面實牆上，不跟盡頭的登機門牌疊在一起 wb.castShadow = false; gB.add(wb);
+      gB.add(instanced(new THREE.BoxGeometry(0.06, B.h - 0.3, 0.08), lam(P.cream.clone().lerp(P.grey, 0.35)), Array.from({ length: Math.floor(lenB / 1.5) }, (_, i) => [-lenB / 2 + 0.75 + i * 1.5, B.h / 2, B.half - 0.12]), false));
+    }
   }
   // 其他登機門的空橋與停著的飛機：兩座，直直伸出去。
   for (const [x, tail] of [[40, "teal"], [75, "navy"]]) {
@@ -606,7 +622,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     scene.background.copy(P.sky).lerp(P.skyHigh, lift * 0.85); scene.fog.color.copy(P.sky).lerp(P.skyHigh, lift * 0.5);
     // 室內（航廈與空橋）霧幾乎關掉、半球光的地面色換成沙色，裡面才不會灰綠；升出空橋的那一段慢慢換回室外的。
     const inside = 1 - smooth(clamp01((e - 0.335) / 0.065));
-    scene.fog.density = lerp(lerp(0.0022, 0.0009, lift), 0.0005, inside);
+    scene.fog.density = lerp(lerp(0.0013, 0.0006, lift), 0.0005, inside);   // 2026-11-18 第四批：外面的霧變淡（0.0022 → 0.0013，起飛 0.0009 → 0.0006），遠處的山、海、城市才看得到
     hemi.groundColor.copy(P.grass).lerp(P.sand, inside * 0.7); hemi.intensity = lerp(lerp(0.95, 0.7, lift), 1.1, inside);
     // 太陽跟著鏡頭看的點；室內陰影的範圍小、室外大。影子只在該重畫的時候重畫（上面 autoUpdate 那段）。
     lap("pose"); shadowTick(e, t); lap("shadowTick");

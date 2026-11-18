@@ -224,5 +224,20 @@ export function buildGrounds(THREE, c) {
     for (let i = 0; i < 26; i++) { const dz = (rnd() - 0.5) * 16, len = 20 + rnd() * 40; marks.push([R.x1 - 120 - rnd() * 90, 0.04, R.z + dz, 0, 1 + rnd()], [R.x0 + 120 + rnd() * 90, 0.04, R.z + dz, 0, 1 + rnd()]); void len; }
     world.add(instanced(new THREE.BoxGeometry(30, 0.02, 0.9), lam(P.asphalt.clone().lerp(P.navy, 0.35).multiplyScalar(0.8), { transparent: true, opacity: 0.55 }), marks, false));
   }
+  // ═══ 第四批（2026-11-18）：地平線。台灣的機場旁邊就是海與山：西邊一片海（跑道盡頭再過去）加一條沙灘，北邊與南邊兩排山（後排更高更藍），
+  // 陸側遠處一座城市（四十幾棟高矮不一的樓、幾棟深藍的高塔）、幾條樹帶。全部在 1 到 2 公里外，霧讓它們只剩輪廓，那正是遠山該有的樣子。 ═══
+  {
+    const seaM = lam(P.teal.clone().lerp(P.navy, 0.35), { emissive: P.teal, emissiveIntensity: 0.12, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });   // 要比草地藍得多，不然隔著霧分不出來；polygonOffset 加抬高 1 公尺，遠處才不會跟草地的面打架（z-fighting 的階梯紋）
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(7000, 9000), seaM); sea.rotation.x = -Math.PI / 2; sea.position.set(-1250 - 3500, 1.0, R.z); sea.receiveShadow = false; world.add(sea);
+    world.add(box(80, 2.2, 9000, mats.cream, -1250 + 40, 0.0, R.z, false), box(12, 0.14, 9000, lam(P.cream.clone().lerp(P.white, 0.6)), -1250 - 6, 1.02, R.z, false));   // 沙灘與一條白浪
+    const front = [], back = []; let a = 23; const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
+    for (let i = 0; i < 16; i++) { const x = -1500 + i * 210 + rnd() * 80; front.push([x, 0, 1450 + rnd() * 120, rnd() * 3, 0.7 + rnd() * 0.6], [x + 90, 0, -1350 - rnd() * 120, rnd() * 3, 0.6 + rnd() * 0.6]); back.push([x + 60, 0, 1900 + rnd() * 150, rnd() * 3, 1.1 + rnd() * 0.8], [x - 40, 0, -1800 - rnd() * 150, rnd() * 3, 1.0 + rnd() * 0.8]); }
+    const mtn = new THREE.ConeGeometry(260, 320, 6); mtn.translate(0, 160, 0);
+    world.add(instanced(mtn, lam(P.grassDark.clone().lerp(P.sky, 0.25)), front, false), instanced(mtn, lam(P.navy.clone().lerp(P.sky, 0.55)), back, false));
+    const bld = [], tall = []; for (let i = 0; i < 48; i++) { const x = -420 + rnd() * 840, z = -650 - rnd() * 320, h = 18 + rnd() * 50; (i % 9 ? bld : tall).push([x, (i % 9 ? h : h + 50) / 2, z, 0, 1]); }
+    world.add(instanced(new THREE.BoxGeometry(22, 60, 22), mats.wallShade, bld.map(([x, y, z]) => [x, y, z]), false), instanced(new THREE.BoxGeometry(18, 130, 18), lam(P.navy.clone().lerp(P.grey, 0.35)), tall.map(([x, y, z]) => [x, y + 10, z]), false));
+    const belt = []; for (let i = 0; i < 70; i++) belt.push([-900 + i * 26 + rnd() * 10, 0, -400 - rnd() * 30, 0, 1.6 + rnd()]);
+    const tree = new THREE.ConeGeometry(2.6, 6, 6); tree.translate(0, 3, 0); world.add(instanced(tree, mats.leaf, belt, false));
+  }
   return { tick: t => { for (const m of movers) m.fn(t); } };
 }
