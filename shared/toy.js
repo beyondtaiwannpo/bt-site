@@ -69,16 +69,19 @@ export function peopleKit({ P, rnd, parent, capacity }) {
   // 現在每一種零件一個 InstancedMesh（腿、手、身體、頭、頭髮、眼睛、背包、行李、帽子、腳下那一圈），不管幾個人都是 12 個 draw call。
   // 每個人還是一個 Group，零件是空的 Object3D（名字照舊：legL legR armL armR head），pose() 照舊轉它們；每一幀 sync() 把零件的世界矩陣抄進 instance。
   // 顏色用 instanceColor（材質底色白，乘上每個人自己的膚色、髮色、衣服色）。
-  const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), shadow: new THREE.CircleGeometry(0.38, 16) };
+  const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07).clone(), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), shadow: new THREE.CircleGeometry(0.38, 16) };
   PG.shadow.rotateX(-Math.PI / 2);
+  // 腿從髖關節轉、手從肩膀轉（Paul 2026-11-17：「the leg, they look weird」「people walking backward」）：之前零件的原點在正中間，一轉就是整條腿繞著膝蓋轉，看起來像倒著走。
+  // 幾何往下移半截，原點就在最上面；零件的位置改成髖（0.3）與肩（0.85）。
+  PG.leg.translate(0, -0.15, 0); PG.arm.translate(0, -0.17, 0);
   const CAP = capacity || 256;
   const white = new THREE.Color(1, 1, 1);
   const std = extra => new THREE.MeshStandardMaterial({ color: white, roughness: 0.82, metalness: 0, ...(extra || {}) });
   // 零件表：名字、幾何、材質、本地位置與旋轉。一個人的零件就是這張表的一份（pack、bag、hat 看選項）。
   const PARTS = {
-    legL: { geo: PG.leg, mat: std(), pos: [-0.13, 0.15, 0] }, legR: { geo: PG.leg, mat: null, pos: [0.13, 0.15, 0] },
+    legL: { geo: PG.leg, mat: std(), pos: [-0.13, 0.3, 0] }, legR: { geo: PG.leg, mat: null, pos: [0.13, 0.3, 0] },
     body: { geo: PG.body, mat: std(), pos: [0, 0.62, 0] },
-    armL: { geo: PG.arm, mat: null, pos: [-0.33, 0.68, 0] }, armR: { geo: PG.arm, mat: null, pos: [0.33, 0.68, 0] },
+    armL: { geo: PG.arm, mat: null, pos: [-0.33, 0.85, 0] }, armR: { geo: PG.arm, mat: null, pos: [0.33, 0.85, 0] },
     head: { geo: PG.head, mat: std({ roughness: 0.7 }), pos: [0, 1.2, 0] },
     cap: { geo: PG.cap, mat: std({ roughness: 0.9 }), pos: [0, 1.23, 0], rot: [-0.25, 0, 0] },
     eyeL: { geo: PG.eye, mat: std({ roughness: 0.4 }), pos: [-0.13, 1.2, 0.33] }, eyeR: { geo: PG.eye, mat: null, pos: [0.13, 1.2, 0.33] },
