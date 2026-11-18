@@ -40,7 +40,7 @@ function colours(p) {
   return {
     navy, teal, orange, sand, cream, yellow, grey, white, sky: mix(cream, white, 0.35),
     water: mix(teal, cream, 0.22).offsetHSL(0, 0.08, 0), shallow: mix(teal, cream, 0.5), grass, beach: mix(sand, cream, 0.5), cliff: mix(mix(sand, grey, 0.35), teal, 0.25),
-    road: mix(cream, grey, 0.35), asphalt: mix(grey, navy, 0.45), wall: mix(cream, white, 0.5), wall2: mix(sand, white, 0.3), wood: mix(mix(sand, navy, 0.35), orange, 0.2), dark: mix(navy, grey, 0.15),
+    road: mix(cream, grey, 0.35), asphalt: mix(grey, navy, 0.5).multiplyScalar(0.55), /* 真的柏油色：灰藍再壓暗，不然跟平台一樣淡（Paul 2026-11-17「where's the runway?」）*/ wall: mix(cream, white, 0.5), wall2: mix(sand, white, 0.3), wood: mix(mix(sand, navy, 0.35), orange, 0.2), dark: mix(navy, grey, 0.15),
     tree: [mix(mix(teal, yellow, 0.5), navy, 0.1).offsetHSL(0, 0.2, -0.04), mix(mix(teal, yellow, 0.62), sand, 0.08).offsetHSL(0, 0.18, 0), mix(mix(teal, yellow, 0.45), navy, 0.24).offsetHSL(0, 0.2, -0.06)],
     trunk: mix(mix(sand, navy, 0.5), grey, 0.2), cloud: mix(cream, white, 0.7), light: mix(yellow, orange, 0.35),
     skin: [mix(mix(sand, orange, 0.15), white, 0.25), mix(mix(sand, orange, 0.35), white, 0.1), mix(mix(sand, orange, 0.5), navy, 0.08)],
@@ -95,9 +95,10 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     if (isl.sea) {
       // 海上的機場：一塊水泥平台架在柱子上，沒有草、沒有樹、沒有旗，只有一支風向袋。
       // 平台 24.7 × 19 公尺：後半是跑道、滑行道、機坪（building 的 airport 那一段），前面一條（z 3 到 8.5）是人走的地方與回來的碼頭。
-      const deck = new THREE.Mesh(rbox(isl.r * 2.6, 1.2, isl.r * 2.0, 0.3), M.road); deck.position.y = -0.6; deck.receiveShadow = true; deck.castShadow = true; deck.userData.sel = { kind: "team", team: isl.id }; g.add(deck); pickables.push(deck);
+      // ⚠ rbox 的圓角是往外長的（bevelSize），所以 h 1.2、r 0.3 的盒子其實高 1.8：要讓頂面在 0，中心就要放 -0.9（之前放 -0.6，跑道被埋在平台裡，Paul 2026-11-17「where's the runway?」）。
+      const deck = new THREE.Mesh(rbox(isl.r * 2.6, 1.2, isl.r * 2.0, 0.3), M.road); deck.position.y = -0.9; deck.receiveShadow = true; deck.castShadow = true; deck.userData.sel = { kind: "team", team: isl.id }; g.add(deck); pickables.push(deck);
       for (const x of [-10, 0, 10]) for (const z of [-7, 7]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 3, 8), M.dark); post.position.set(x, -2.4, z); g.add(post); }
-      const edge_ = new THREE.Mesh(rbox(isl.r * 2.6 + 0.4, 0.2, isl.r * 2.0 + 0.4, 0.1), M.cream); edge_.position.y = -0.05; g.add(edge_);
+      const edge_ = new THREE.Mesh(rbox(isl.r * 2.6 + 0.4, 0.2, isl.r * 2.0 + 0.4, 0.1), M.cream); edge_.position.y = -0.2; g.add(edge_);
       const sock = new THREE.Group(); sock.position.set(isl.r * 1.2, 0, isl.r * 0.85); g.add(sock);
       sock.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 3, 6), M.dark).translateY(1.5), new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.4, 8), M.orange).translateY(3.1).rotateZ(-Math.PI / 2).translateY(0.3));
       flag = sock.children[1];
@@ -273,11 +274,12 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       // 機場（Paul 2026-11-17 第二次：飛機不要穿過機場，要有滑行道）：跑道在前（local z = +2.6）、滑行道在後（z = -1.4）、
       // 機坪在最後面（z = -4.6），停兩架，塔台在左後角，機棚在右後角。一架會動的飛機：機坪滑出、上跑道、起飛、繞島一圈、降落、滑回機坪（motion() 裡）。
       // 人走路會繞開跑道與滑行道（userData.blockers，島的迴圈會轉成島的座標）。
-      const strip = (len, w, z, m) => { const r = new THREE.Mesh(rbox(len, 0.12, w, 0.05), m); r.position.set(0, 0.06, z); r.receiveShadow = true; g.add(r); return r; };
+      const strip = (len, w, z, m) => { const r = new THREE.Mesh(rbox(len, 0.16, w, 0.05), m); r.position.set(0, 0.08, z); r.receiveShadow = true; g.add(r); return r; };
       strip(16, 2.8, 2.6, M.asphalt); strip(16, 1.6, -1.4, M.asphalt); strip(15, 2.6, -4.6, M.asphalt);
-      for (const z of [0.6, -3.0]) { const link = new THREE.Mesh(rbox(1.6, 0.12, 2.4, 0.05), M.asphalt); link.position.set(-6.0, 0.06, z); g.add(link); const link2 = new THREE.Mesh(rbox(1.6, 0.12, 2.4, 0.05), M.asphalt); link2.position.set(6.0, 0.06, z); g.add(link2); }
-      for (let x = -6.5; x <= 6.5; x += 1.3) { const dash = new THREE.Mesh(rbox(0.7, 0.03, 0.16, 0.01), M.cream); dash.position.set(x, 0.13, 2.6); g.add(dash); }
-      for (let x = -6.5; x <= 6.5; x += 1.3) { const dash = new THREE.Mesh(rbox(0.5, 0.03, 0.1, 0.01), M.yellow); dash.position.set(x, 0.13, -1.4); g.add(dash); }
+      for (const z of [0.6, -3.0]) { const link = new THREE.Mesh(rbox(1.6, 0.16, 2.4, 0.05), M.asphalt); link.position.set(-6.0, 0.08, z); g.add(link); const link2 = new THREE.Mesh(rbox(1.6, 0.16, 2.4, 0.05), M.asphalt); link2.position.set(6.0, 0.08, z); g.add(link2); }
+      for (let x = -6.5; x <= 6.5; x += 1.3) { const dash = new THREE.Mesh(rbox(0.7, 0.03, 0.16, 0.01), M.white); dash.position.set(x, 0.17, 2.6); g.add(dash); }
+      for (const x of [-7.3, 7.3]) for (let k = -3; k <= 3; k++) { if (k === 0) continue; const th = new THREE.Mesh(rbox(1.2, 0.03, 0.18, 0.01), M.white); th.position.set(x, 0.17, 2.6 + k * 0.32); g.add(th); }   // 跑道頭的白線
+      for (let x = -6.5; x <= 6.5; x += 1.3) { const dash = new THREE.Mesh(rbox(0.5, 0.03, 0.1, 0.01), M.yellow); dash.position.set(x, 0.17, -1.4); g.add(dash); }
       for (const x of [-7.3, 7.3]) for (const dz of [-1.2, 1.2]) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M.light); l.position.set(x, 0.2, 2.6 + dz); g.add(l); }
       const tw = new THREE.Group(); tw.position.set(-6.6, 0, -6.2); g.add(tw);
       tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 3.6, 10), M.wall).translateY(1.8), new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.8, 0.9, 10), roofM).translateY(4.0), new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 10), M.dark).translateY(4.6));
@@ -652,6 +654,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
       }, undefined, () => {}));
     },
     render: () => render(0),
+    // 除錯用（?debug=1）：場景物件與材質也露出來，console 裡好查。
+    _scene: scene, _M: M, _cam: cam,
     // 除錯用（?debug=1）：每個人現在在做什麼。
     debug: () => walkers.map(w => ({ code: w.person.code, isl: w.isl && w.isl.id, home: w.home && w.home.id, trips: w.trips, stuck: +(w.stuck || 0).toFixed(1), goes: w.person.goes || "", x: +w.g.position.x.toFixed(1), z: +w.g.position.z.toFixed(1), moving: !!w.g.userData.moving, sitting: !!w.g.userData.sitting, talking: !!w.g.userData.talking, path: w.path ? w.path.length - w.pathI : 0, dest: w.dest || "", poi: w.poi ? w.poi.kind : "", partner: w.partner ? w.partner.person.code : "", act: w.act ? w.act.kind + ":" + (w.act.stage || "") : "", wait: +w.wait.toFixed(1), target: w.target ? [+w.target.x.toFixed(1), +w.target.z.toFixed(1)] : null })),
     motion() { motionOn = true; return motion({ cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, balloons, slides, pose, blockersOf, poisOf, rnd }); },

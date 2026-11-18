@@ -119,5 +119,10 @@ export const ISLETS = [
   { id: "palm", kind: "palm", x: -57, z: -17, r: 4 },
   { id: "rock", kind: "rock", x: 63, z: -31, r: 3.5 },
 ];
-export function cameraIsland(island, phone) { const d = phone ? 38 : 32; const ux = island.x || 0, uz = island.z || 1; const n = Math.hypot(ux, uz) || 1; return { pos: [island.x + (ux / n) * d * 0.25, d * 0.78, island.z + d * 0.62 + (uz / n) * d * 0.1], target: [island.x, 0.8, island.z - 1] }; }
+export function cameraIsland(island, phone) {
+  const d = phone ? 38 : 32; const ux = island.x || 0, uz = island.z || 1; const n = Math.hypot(ux, uz) || 1;
+  // 機場的平台是 24.7 × 19，鏡頭要退遠、再俯一點，跑道（在後半）才進得來。
+  if (island.sea) { const D = d * 1.6; return { pos: [island.x + (ux / n) * D * 0.1, D * 1.0, island.z + D * 0.5], target: [island.x, 0.5, island.z - 2] }; }
+  return { pos: [island.x + (ux / n) * d * 0.25, d * 0.78, island.z + d * 0.62 + (uz / n) * d * 0.1], target: [island.x, 0.8, island.z - 1] };
+}
 export function cameraBird(phone) { const d = phone ? 135 : 118; return { pos: [0, d, 0.01], target: [0, 0, 0], fit: [70, 70] }; }

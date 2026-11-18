@@ -142,8 +142,8 @@ async function boot() {
   }
   if (!scene) { doc.classList.add("no3d"); $("no3d").hidden = false; }
   else if (!reduce && !motionOff) loop = scene.motion();
-  if (new URLSearchParams(location.search).get("debug") === "1") window.__island = scene;   // 除錯：console 打 __island.debug()
   else doc.classList.add("still");
+  if (new URLSearchParams(location.search).get("debug") === "1") window.__island = scene;   // 除錯：console 打 __island.debug()
   $("loading").hidden = true;
   applyFolds(readUi());
   me = loadMe(); if (me && scene) { scene.me({ ...me, label: me.name + " " + t("meYou", lang) }); $("tb-me").classList.add("on"); }
