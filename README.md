@@ -5086,6 +5086,21 @@ Paul：「Yes, batch C」。批 A 修錯的、批 B 修手感，這一批是兩�
 
 測試 944、`check.sh` 全過；歷史之路 61 fps、島 453 draw call。手機真機還是沒量。
 
+## 歷史之路與 BT 島（2026-11-18 批 E：批 D 的剩餘項目，加一條新守門）
+
+Paul：「do the next loop, fix the leftovers」。
+
+- **滑水道單向**（`shared/toy.js` 的 bridge style 4）：一條水道兩管並排（各偏 1 公尺），每管一頭是 3.6 公尺的塔、另一頭落在水面的小池子；a→b 溜 A 管、b→a 溜 B 管，水花各一組。之前一管兩頭都是塔，人往上溜。
+- **路上不長樹**：路（furnish 的橋頭到島心那條）與步道（town.js 的 strip）登記進 `E.noPlant`，`flushInstances()` 畫樹與矮樹之前把樹幹落在路面上的挑掉（`onPath(x, z, 0.35)`）。花沒管（太小）。
+- **公車亭站在路邊**（life.js）：第一條路（橋頭到島心）旁 1.9 公尺、面向路；之前隨機落點，沒有路。
+- **落地那架走脫離道**（traffic.js）：滾到 x -495 減到滑行速度，轉 30 度離開跑道，沿一條 122 公尺的脫離道水泥（有黃中線）到頭才消失；之前滾到跑道中間憑空不見。
+- 市集攤位的朝向查過，本來就朝島心。
+- **一條新守門 `test/modules-parse.test.mjs`**：把 history/src、island/src、stories/src、shared 底下每一支 .js 真的 import 一次，只抓 SyntaxError（import three 失敗是正常的）。
+  原因：批 D 的 rides.js 有一句行尾註解把同一行後面的程式吞掉（`// …） s.set(1, h, 1); …`），944 條測試與 check.sh 都沒抓到，瀏覽器又拿著快取的舊檔，整頁開不起來還推上了 main（b2184ae）。這一批修掉，之後這種錯在 commit 前就會被擋。
+  **寫行尾註解的規矩**：一行裡後面還有程式的，用 `/* */` 不用 `//`。
+
+測試 945、`check.sh` 全過；`history/src` 255,992 bytes（剩 8 bytes，下一個加東西的人一定要先搬一段註解到 README）。
+
 ## 歷史之路與 BT 島（2026-11-18 批 D：合不合理）
 
 Paul：「audit everything on both the island and the road. I want it to make sense. For example the gondola doesn't have a station… the taxiway doesn't have yellow dots on it… examine how an airport is supposed to look and how an island is supposed to look… fix everything you can find」。

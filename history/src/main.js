@@ -1,6 +1,6 @@
 // /history/ 的主程式：拿資料、開 3D 場景、接捲動、年份帶、鍵盤、覆蓋層、網址 hash、中英、自動走。
 // 這一支碰 DOM，純函式都在 data.js、ui.js、airport.js。gsap 不在這裡（只在 scene.js 的 motion()）；Three 也不在這裡（只在 scene.js 與 plane.js）。
-// scene.js 是**動態 import** 的：它一載就會去 cdnjs 拿 Three，拿不到（離線、雜湊對不上、被擋）整支載不進來，這裡接住然後走直立時間軸，頁面不會白掉。
+// scene.js 是**動態 import** 的：Three 拿不到（離線、雜湊對不上、被擋）就走直立時間軸，頁面不會白掉。
 import * as D from "./data.js";
 import * as UI from "./ui.js";
 import * as A from "./airport.js";

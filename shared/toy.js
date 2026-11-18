@@ -229,6 +229,8 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const treePlaces = [], bushPlaces = [], stoolPlaces = [], postPlaces = [];
   const coasters = [], beacons = [], boats = [], balloons = [], clouds = [], flags = [], foams = [], bounces = [], events = [];   // events：會發生的事（鯨魚、飛機），{ id, when(t), dur, pos() }，頁面拿去帶鏡頭
   const slides = new Map();   // "a>b" → { curve, dir, splash }：人過這條不是走的，是坐著溜
+  const noPlant = [];   // 路與步道（世界座標的線段 { x0, z0, x1, z1, w }），flushInstances() 畫樹與矮樹之前把長在上面的挑掉（批 E）
+  const onPath = (x, z, pad) => noPlant.some(s => { const dx = s.x1 - s.x0, dz = s.z1 - s.z0, l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - s.x0) * dx + (z - s.z0) * dz) / l2)); return Math.hypot(x - (s.x0 + dx * t), z - (s.z0 + dz * t)) < s.w / 2 + pad; });
   const bridgeYs = new Map(), BRIDGE_Y = { 1: t => 0.5 * Math.sin(Math.PI * t), 2: t => 0.62 * Math.sin(Math.PI * t), 3: t => -0.28 * Math.sin(Math.PI * t) };   // 橋面高度（0 到 1 沿橋）：石拱、紅拱升，吊橋垂（批 D：之前人在拱橋裡沉、在吊橋上浮）
   const splashes = [];        // 滑水道底的水花（第四批）：{ ring, mat, drops, x, z, t0 }，人溜到最低點 motion() 把 t0 設成現在，接下來 1.3 秒水圈放大、水珠往上噴
   const groundCache = new Map();
@@ -459,7 +461,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     const spot = (dmin, tries) => { for (let i = 0; i < (tries || 40); i++) { const a = rr() * TAU, d = isl.r * (0.25 + rr() * 0.55); const x = Math.cos(a) * d, z = Math.sin(a) * d; if (free(x, z, dmin)) return { x, z, a }; } return null; };
     const put = (obj, pos, ry, r) => { obj.position.set(pos.x, 0, pos.z); if (ry != null) obj.rotation.y = ry; g.add(obj); blockers.push({ x: pos.x, z: pos.z, r: r || 1.2 }); obj.traverse(m => { if (m.isMesh) m.castShadow = true; }); return obj; };
     // 路：橋頭到島心
-    for (const end of roadEnds || []) { const len = Math.hypot(end[0], end[1]) - 1.5; if (len <= 0) continue; const road = new THREE.Mesh(rbox(len, 0.06, 1.5, 0.02), M.road); road.position.set(end[0] / 2, 0.03, end[1] / 2); road.rotation.y = -Math.atan2(end[1], end[0]); road.receiveShadow = true; g.add(road); }
+    for (const end of roadEnds || []) { const len = Math.hypot(end[0], end[1]) - 1.5; if (len <= 0) continue; const road = new THREE.Mesh(rbox(len, 0.06, 1.5, 0.02), M.road); road.position.set(end[0] / 2, 0.03, end[1] / 2); road.rotation.y = -Math.atan2(end[1], end[0]); road.receiveShadow = true; g.add(road); noPlant.push({ x0: isl.x, z0: isl.z, x1: isl.x + end[0], z1: isl.z + end[1], w: 1.5 }); }
     // 三張圓桌、各四張凳子，一張有陽傘
     for (let k = 0; k < 3; k++) { const sp = spot(2.6); if (!sp) break; put(table(k ? M.wall : M.wall2), sp, null, 1.0); if (k === 0) { const u = parasol([M.orange, M.teal, M.yellow][Math.floor(rr() * 3)]); u.position.set(sp.x, 0, sp.z); g.add(u); }
       for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + sp.a; const x = sp.x + Math.cos(a) * 1.35, z = sp.z + Math.sin(a) * 1.35; stoolPlaces.push([isl.x + x, isl.z + z]); pois.push({ x, z, face: Math.atan2(sp.x - x, sp.z - z), kind: "seat" }); } }
@@ -569,17 +571,20 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     if (style !== 4) for (const sg of [-1, 1]) { const l = lamp(); l.position.set(sg * (len / 2 + 0.3), 0, sg * 1.3); grp.add(l); }   // 燈立在兩頭的岸上（批 D：之前在橋面外懸空）
     bridgeYs.set(br.a + ">" + br.b, BRIDGE_Y[style] || null); bridgeYs.set(br.b + ">" + br.a, BRIDGE_Y[style] || null);
     if (style === 4) {
-      const top = 3.6;
-      const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(br.x0, top, br.z0), new THREE.Vector3(br.x0 + dx * 0.25, 1.6, br.z0 + dz * 0.25), new THREE.Vector3(br.x0 + dx * 0.5, 0.2, br.z0 + dz * 0.5), new THREE.Vector3(br.x1 - dx * 0.25, 1.6, br.z1 - dz * 0.25), new THREE.Vector3(br.x1, top, br.z1)], false, "catmullrom", 0.5);
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.75, 10, false), new THREE.MeshStandardMaterial({ color: P.shallow, roughness: 0.3, transparent: true, opacity: 0.55, side: THREE.DoubleSide })); world.add(tube);
-      const water = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.5, 8, false), M.shallow); world.add(water);
-      for (const [x, z] of [[br.x0, br.z0], [br.x1, br.z1]]) { const tw = new THREE.Group(); tw.position.set(x, 0, z); world.add(tw);
-        for (const [ox, oz] of [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]]) tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, top, 6), M.teal).translateY(top / 2).translateX(ox).translateZ(oz));
+      // 批 E：滑水道是單向的，所以一條水道兩管並排（各偏 1 公尺）：每管一頭是 3.6 公尺的塔、另一頭落在水面的小池子，a→b 溜 A 管、b→a 溜 B 管（之前一管兩頭都是塔，人往上溜）。
+      const top = 3.6, nx = -dz / len, nz = dx / len, slM = new THREE.MeshStandardMaterial({ color: P.shallow, roughness: 0.3, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+      const lane = (sx, sz, ex, ez, ox, oz) => {
+        const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(sx + ox, top, sz + oz), new THREE.Vector3(sx + (ex - sx) * 0.3 + ox, 1.5, sz + (ez - sz) * 0.3 + oz), new THREE.Vector3(sx + (ex - sx) * 0.62 + ox, 0.3, sz + (ez - sz) * 0.62 + oz), new THREE.Vector3(ex + ox, 0.3, ez + oz)], false, "catmullrom", 0.5);
+        world.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.75, 10, false), slM), new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.5, 8, false), M.shallow));
+        const tw = new THREE.Group(); tw.position.set(sx + ox, 0, sz + oz); world.add(tw);
+        for (const [cx, cz] of [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]]) tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, top, 6), M.teal).translateY(top / 2).translateX(cx).translateZ(cz));
         tw.add(new THREE.Mesh(rbox(1.8, 0.16, 1.8, 0.05), M.wood).translateY(top), new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.9, 4), M.orange).translateY(top + 0.6).rotateY(Math.PI / 4));
         for (let k = 0; k < 6; k++) tw.add(new THREE.Mesh(rbox(0.9, 0.05, 0.08, 0.02), M.dark).translateY(0.5 + k * 0.55).translateZ(-0.9));
-        tw.traverse(m => { if (m.isMesh) m.castShadow = true; }); }
-      const sp = addSplash(br.x0 + dx * 0.5, br.z0 + dz * 0.5);
-      slides.set(br.a + ">" + br.b, { curve, dir: 1, splash: sp }); slides.set(br.b + ">" + br.a, { curve, dir: -1, splash: sp });
+        tw.traverse(m => { if (m.isMesh) m.castShadow = true; });
+        const pool = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.3, 14), M.shallow); pool.position.set(ex + ox, 0.15, ez + oz); world.add(pool);
+        return { curve, dir: 1, splash: addSplash(sx + (ex - sx) * 0.62 + ox, sz + (ez - sz) * 0.62 + oz) };
+      };
+      slides.set(br.a + ">" + br.b, lane(br.x0, br.z0, br.x1, br.z1, nx, nz)); slides.set(br.b + ">" + br.a, lane(br.x1, br.z1, br.x0, br.z0, -nx, -nz));
       for (const [x, z] of [[br.x0, br.z0], [br.x1, br.z1]]) { const l = lamp(); l.position.set(x + 1.3, 0, z + 1.3); world.add(l); }
     }
     else if (style === 0) { add(new THREE.Mesh(rbox(len, 0.28, 2.2, 0.08), M.wood)).position.y = 0.1;
@@ -681,6 +686,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   }
   // 樹、矮樹、小凳子、欄杆柱子：全部一次畫完（InstancedMesh）。頁面蓋完所有東西再叫一次。
   function flushInstances() {
+    for (const list of [treePlaces, bushPlaces]) { const keep = list.filter(p => !onPath(p[0], p[1], 0.35)); list.length = 0; list.push(...keep); }   // 路上不長樹（批 E）
     { const m = new THREE.Matrix4(), s3 = new THREE.Vector3(), q = new THREE.Quaternion();
       const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.16, 0.8, 6), M.trunk, Math.max(1, treePlaces.length));
       const crowns = [0, 1, 2].map(k => new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 12, 9), M.tree[k], Math.max(1, treePlaces.length)));
@@ -904,7 +910,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const debugWalkers = () => walkers.map(w => ({ code: w.person.code, isl: w.isl && w.isl.id, home: w.home && w.home.id, trips: w.trips, stuck: +(w.stuck || 0).toFixed(1), goes: w.person.goes || "", x: +w.g.position.x.toFixed(1), z: +w.g.position.z.toFixed(1), moving: !!w.g.userData.moving, sitting: !!w.g.userData.sitting, talking: !!w.g.userData.talking, path: w.path ? w.path.length - w.pathI : 0, dest: w.dest || "", poi: w.poi ? w.poi.kind : "", partner: w.partner ? w.partner.person.code : "", act: w.act ? w.act.kind + ":" + (w.act.stage || "") : "", wait: +w.wait.toFixed(1), target: w.target ? [+w.target.x.toFixed(1), +w.target.z.toFixed(1)] : null }));
 
   const E = {
-    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, flags, foams, bounces, waveU, addSplash, slides, bridgeYs, splashes, walkers,
+    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, flags, foams, bounces, waveU, addSplash, slides, bridgeYs, noPlant, onPath, splashes, walkers,
     rbox, box, flagGeo, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane, bunting, pennant, bike, rail,
     furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances, mergeStatic, mergeChildren, mergeDynamic, setMerge, mergeOpts,
     makePerson, pose, addWalker, removeWalker, people,
@@ -1011,7 +1017,7 @@ function motion(E, nav, tickExtra) {
           if (w.target.slide) {
             // 坐著溜：沿管子走，y 跟著管子；到另一頭站起來。
             const sl = w.target.slide; if (w.slideT == null) { w.slideT = 0; w.g.userData.sitting = true; }
-            const was = w.slideT; w.slideT = Math.min(1, w.slideT + dt * 0.45); if (was < 0.5 && w.slideT >= 0.5 && sl.splash) sl.splash.t0 = t;   // 溜到最低點：水花噴起來
+            const was = w.slideT; w.slideT = Math.min(1, w.slideT + dt * 0.45); if (was < 0.6 && w.slideT >= 0.6 && sl.splash) sl.splash.t0 = t;   // 溜到最低點：水花噴起來
             const k = sl.dir > 0 ? w.slideT : 1 - w.slideT; const q = sl.curve.getPointAt(k), q2 = sl.curve.getPointAt(Math.min(1, Math.max(0, k + sl.dir * 0.02)));
             w.g.position.set(q.x, q.y - 0.3, q.z); w.g.rotation.y = Math.atan2(q2.x - q.x, q2.z - q.z); w.g.userData.moving = false;
             if (w.slideT >= 1) { w.slideT = null; w.g.userData.sitting = false; w.g.position.y = 0; w.pathI++; if (w.pathI < w.path.length) { w.target = w.path[w.pathI]; if (w.target.isl) w.isl = islOf(w.target.isl) || w.isl; } else { w.path = null; if (w.dest) { w.isl = islOf(w.dest) || w.home; w.dest = ""; pickHere(w); if (!w.path) arrived(w); } else arrived(w); } }

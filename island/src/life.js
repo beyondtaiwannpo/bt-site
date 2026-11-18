@@ -50,7 +50,10 @@ export function buildLife(THREE, E, c) {
       put(f, sp, face, 1.6); places.push({ kind: "cart", x: sp.x, z: sp.z, face, r: 1.6, g: f }); stand(sp, face, 1.6); stand({ x: sp.x + Math.cos(face) * 0.8, z: sp.z - Math.sin(face) * 0.8 }, face, 1.6);
       person(f, 0, -0.9, 0, { shirt: 3, hat: true }); person(f, -0.5, 1.4, Math.PI, { shirt: 1 }); } }
     // 公車亭：兩支柱、玻璃背板、雨棚、長凳、站牌（team 的顏色）。
-    { const sp = spot(1.3, 0.5, 0.82); if (sp) { stats.stops++; const b = new THREE.Group(); const face = Math.atan2(-sp.x, -sp.z);
+    { // 公車亭站在第一條路（橋頭到島心那條）旁邊 1.7 公尺、面向路（批 E：之前隨機落點，沒有路）。
+      const ra = (c.bridgeAngles.get(isl.id) || [])[0]; let sp = null;
+      if (ra != null) { const d = isl.r * 0.55, px = Math.cos(ra) * d, pz = Math.sin(ra) * d, sx = -Math.sin(ra), sz = Math.cos(ra); for (const sg of [1, -1]) { const cx = px + sx * sg * 1.9, cz = pz + sz * sg * 1.9; if (free(cx, cz, 1.3)) { sp = { x: cx, z: cz, a: Math.atan2(cz, cx), face: Math.atan2(-sg * sx, -sg * sz) }; break; } } }
+      if (sp) { stats.stops++; const b = new THREE.Group(); const face = sp.face;
       b.add(mesh(rbox(3.0, 0.15, 1.4, 0.04), M.navy, 0, 2.4, 0, false), mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.4, 6), M.dark, -1.3, 1.2, -0.5, false), mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.4, 6), M.dark, 1.3, 1.2, -0.5, false));
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.8), M.shallow); glass.position.set(0, 1.3, -0.6); b.add(glass);
       const bench = E.bench(); bench.position.set(0, 0, -0.1); b.add(bench);

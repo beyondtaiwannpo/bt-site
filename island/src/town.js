@@ -213,7 +213,7 @@ export function buildTown(THREE, E, c) {
     // 房子的正面：building 的 rotation.y 是 ry，正面在本地 +z，所以正面那一點是 (sin ry, cos ry) 方向。
     const nodes = [{ x: 0, z: 0 }];
     for (const a of bridgeAngles.get(isl.id) || []) nodes.push({ x: Math.cos(a) * (isl.r - 0.6), z: Math.sin(a) * (isl.r - 0.6) });
-    const strip = (ax, az, bx, bz, w) => { const len = Math.hypot(bx - ax, bz - az); if (len < 0.8) return null; const s = mesh(rbox(len, 0.05, w || 1.1, 0.02), MM.path, (ax + bx) / 2, 0.05, (az + bz) / 2, false); s.rotation.y = -Math.atan2(bz - az, bx - ax); g.add(s); stats.paths++; return { ax, az, bx, bz, len }; };
+    const strip = (ax, az, bx, bz, w) => { const len = Math.hypot(bx - ax, bz - az); if (len < 0.8) return null; const s = mesh(rbox(len, 0.05, w || 1.1, 0.02), MM.path, (ax + bx) / 2, 0.05, (az + bz) / 2, false); s.rotation.y = -Math.atan2(bz - az, bx - ax); g.add(s); stats.paths++; E.noPlant.push({ x0: isl.x + ax, z0: isl.z + az, x1: isl.x + bx, z1: isl.z + bz, w: w || 1.1 }); return { ax, az, bx, bz, len }; };
     const paths = [];
     let biggest = null;
     for (const b of builds) {

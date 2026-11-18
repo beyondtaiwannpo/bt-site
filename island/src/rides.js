@@ -87,7 +87,7 @@ export function buildRides(THREE, E, c) {
     for (let k = 0; k < ties; k++) { const p = curve.getPointAt(k / ties); curve.getTangentAt(k / ties, fwd); m3.lookAt(fwd, new THREE.Vector3(0, 0, 0), up); q.setFromRotationMatrix(m3); mx.compose(new THREE.Vector3(p.x, p.y - 0.15, p.z), q, s); tie.setMatrixAt(k, mx); }
     tie.castShadow = false; g.add(tie);
     const post = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.1, 1, 6), M.wall, posts); q.identity();
-    for (let k = 0; k < posts; k++) { const p = curve.getPointAt(k / posts); if (p.y > 6.5) continue; const h = Math.max(0.3, p.y - 0.35);   // 迴圈頂上不立柱（會打穿迴圈底，批 D） s.set(1, h, 1); mx.compose(new THREE.Vector3(p.x, h / 2, p.z), q, s); post.setMatrixAt(k, mx); }
+    for (let k = 0; k < posts; k++) { const p = curve.getPointAt(k / posts); if (p.y > 6.5) continue; /* 迴圈頂上不立柱（會打穿迴圈底，批 D）*/ const h = Math.max(0.3, p.y - 0.35); s.set(1, h, 1); mx.compose(new THREE.Vector3(p.x, h / 2, p.z), q, s); post.setMatrixAt(k, mx); }
     g.add(post); s.set(1, 1, 1);
     const train = new THREE.Group(); train.userData.dynamic = true;
     for (let ci = 0; ci < cars; ci++) { const car = mesh(rbox(1.0, 0.5, 0.7, 0.12), [M.yellow, M.teal, M.orange, M.navy][ci % 4], -ci * 1.1, 0, 0); train.add(car); train.add(head(-ci * 1.1 + 0.1, 0.42, -0.17, ci), head(-ci * 1.1 + 0.1, 0.42, 0.17, ci + 1)); if (o.armsUp) for (const dz of [-0.17, 0.17]) train.add(mesh(rbox(0.08, 0.4, 0.08, 0.02), M.skin[ci % 3], -ci * 1.1 + 0.1, 0.72, dz * 1.6, false)); }

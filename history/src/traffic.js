@@ -1,21 +1,22 @@
-// /history/ 機場外面會動的東西（2026-11-18 第二批）：進場落地的飛機、等起飛的飛機、行李拖車、餐勤車、鳥、旗；不動的燈與井蓋與貨運坪。
-// 不 import three。tick(t, e) 多收捲動的進度 e：起飛那一段跑道要留給我們自己那一架，進場的那一架先躲開。
+// /history/ 機場外面會動的東西：進場的飛機、等起飛的飛機、行李拖車、餐勤車、鳥、旗；燈與井蓋與貨運坪。不 import three。tick(t, e) 收進度 e，起飛時進場那架躲開。
 export function buildTraffic(THREE, c) {
   const { mats, P, A, box, cyl, instanced, figure, idleFigs, lam, world, truck, buildAirliner, setGear, shadowOn, tw } = c;
   const movers = [], R = A.RUNWAY;
   const dyn = g => { g.userData.dynamic = true; return g; };
 
-  // ═══ 進場、落地、滾行的那一架（循環 110 秒：從東邊 1100 公尺外、60 公尺高下來，x 200 觸地，滾到 x -560，滑出去就先消失，等下一輪）═══
+  // ═══ 進場、落地、滾行、脫離的那一架（循環 110 秒）═══
   {
     const pl = buildAirliner(THREE, { body: P.cream, tail: P.teal, mark: P.navy, dark: P.dark }); shadowOn(pl); dyn(pl); world.add(pl); setGear(pl, 1);
     pl.rotation.y = -Math.PI / 2; pl.rotation.order = "YXZ";   // 機頭朝 -x（跟我們起飛同一個方向）；先航向再俯仰
-    const T = 110, ease = u => u * u * (3 - 2 * u);
+    const T = 110, ease = u => u * u * (3 - 2 * u), EX = [-495, R.z, -555, R.z - 100], EXY = Math.atan2(EX[2] - EX[0], EX[3] - EX[1]);
+    { const ex = box(16, 0.04, 122, mats.taxi, (EX[0] + EX[2]) / 2, 0.012, (EX[1] + EX[3]) / 2, false); ex.rotation.y = EXY; world.add(ex); const cl = box(0.3, 0.04, 110, mats.yellowLight, (EX[0] + EX[2]) / 2, 0.05, (EX[1] + EX[3]) / 2, false); cl.rotation.y = EXY; world.add(cl); }
     // 批 B：觸地前 15% 拉平（flare）、觸地之後從進場的速度減到滑行速度、一路滾到 x -615 才消失（之前觸地反而加速 1.9 倍、跑到一半消失）。
     movers.push({ fn: (t, e) => {
       if (e >= 0.74) { pl.visible = false; return; }   // 我們 0.75 起就在跑道頭，它先躲開
       const u = (t % T) / T;
       if (u < 0.32) { const k = u / 0.32; pl.visible = true; pl.position.set(1100 - 1080 * k, A.PLANE_REST_Y + 79 * (1 - ease(k)), R.z); pl.rotation.z = 0; pl.rotation.x = 0.02 - 0.08 * ease(Math.max(0, (k - 0.85) / 0.15)); }
-      else if (u < 0.82) { const s = u - 0.32, d = s < 0.1 ? 2812 * s - 6560 * s * s : 215.6 + 1500 * (s - 0.1); pl.visible = true; pl.position.set(20 - d, A.PLANE_REST_Y, R.z); pl.rotation.x = -0.06 * Math.max(0, 1 - s / 0.03); }
+      else if (u < 0.62) { const s = u - 0.32, d = s < 0.1 ? 2812 * s - 6560 * s * s : 215.6 + 1500 * (s - 0.1); pl.visible = true; pl.position.set(20 - d, A.PLANE_REST_Y, R.z); pl.rotation.x = -0.06 * Math.max(0, 1 - s / 0.03); pl.rotation.y = -Math.PI / 2; }
+      else if (u < 0.74) { const k = (u - 0.62) / 0.12; pl.visible = true; pl.position.set(EX[0] + (EX[2] - EX[0]) * k, A.PLANE_REST_Y, EX[1] + (EX[3] - EX[1]) * k); pl.rotation.y = -Math.PI / 2 + (EXY + Math.PI / 2) * Math.min(1, k * 3); }   // 脫離道（批 E）：滾完轉 30 度離開跑道，到頭才消失（之前滾到跑道中間憑空不見）
       else pl.visible = false;
     } });
   }
@@ -59,7 +60,7 @@ export function buildTraffic(THREE, c) {
     [[-37, mats.orange], [-31, mats.teal], [-25, mats.navy]].forEach(([x, mt], i) => { world.add(cyl(0.08, 0.1, 10, mats.grey, x, 5, -44.5, 6)); const f = box(2.4, 1.4, 0.05, mt, 0, 0, 0, false); dyn(f); f.position.set(x + 1.2, 9.2, -44.5); world.add(f); flags.push([f, i]); });
     movers.push({ fn: t => { for (const [f, i] of flags) { f.rotation.y = Math.sin(t * 2.2 + i) * 0.35; f.scale.x = 0.85 + Math.sin(t * 4 + i) * 0.15; } } });
   }
-  // ═══ 不動的：滑行道邊每 10 公尺一對藍燈（路面外 0.8 公尺）、中線每 7.5 公尺一顆綠燈、跑道頭前的等待線（兩實兩虛的黃線）、跑道兩側白燈、門檻燈、加油井蓋、貨運坪 ═══
+  // ═══ 不動的：滑行道藍邊燈、綠中線燈、等待線、跑道白燈、門檻燈、加油井蓋、貨運坪 ═══
   {
     const blue = [], white = [], thr = [], green = [];
     for (let s = 20; s < tw.length - 70; s += 10) { const a = tw.at(s), nx = Math.cos(a.yaw), nz = -Math.sin(a.yaw); blue.push([a.x + nx * 9.8, 0.3, a.z + nz * 9.8], [a.x - nx * 9.8, 0.3, a.z - nz * 9.8]); }

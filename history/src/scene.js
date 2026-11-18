@@ -1,4 +1,4 @@
-// /history/ 的場景（批 5，2026-11-06 換成真的 3D）：一座 Three.js 的機場。航廈裡面走到登機門、空橋、上飛機、推出去滑行、起飛。
+// /history/ 的場景：一座 Three.js 的機場。航廈走到登機門、空橋、上飛機、推出去滑行、起飛。
 //
 // ── 讀這一支之前先知道五件事 ──
 // 1. **資料與場景分開。** 這裡沒有任何一站的文字，只拿「有幾站」與「每站畫哪一種小場景」。看板的字只從 ui.js 的 boardRows 來。
@@ -10,7 +10,7 @@
 //    main.js 都不會走到這裡（airport.js 的 pickMode），畫的是直立時間軸。
 // 5. **數字都在 airport.js**（純函式，測試直接算）。這一支只把 Three 的物件擺到那些數字上。
 //
-// 單位公尺，y 朝上。航廈沿 x 軸（-10 到 125），玻璃牆在 z=0，停機坪 z>0，跑道在 z=400 沿 x 軸，飛機往 -x 起飛。
+// 單位公尺，y 朝上。航廈沿 x 軸，玻璃牆在 z=0，停機坪 z>0，跑道在 z=400，飛機往 -x 起飛。
 
 import * as THREE from "three";
 import * as A from "./airport.js";
@@ -26,7 +26,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = t => t * t * (3 - 2 * t);
 const DEG = Math.PI / 180;
 
-// WebGL 能不能用：開不出 context 就走直立時間軸（舊機器、省電模式、被企業政策關掉都會這樣）。
+// WebGL 開不出 context 就走直立時間軸。
 export function webglOK() {
   try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch (e) { return false; }
 }
