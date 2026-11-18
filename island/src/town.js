@@ -315,19 +315,19 @@ export function buildTown(THREE, E, c) {
   // ═══ 7. 機場：加油車（車頭、油罐、軟管）、登機梯加排隊的旅客與地勤。塔台與風向袋引擎已經有了。═══
   if (airport) {
     const g = new THREE.Group(); g.position.set(airport.x, 0, airport.z); world.add(g);
-    const truck = new THREE.Group(); truck.position.set(8.8, 0, -5.2); truck.rotation.y = 0.3; g.add(truck);
+    const truck = new THREE.Group(); truck.position.set(10.2, 0, -4.6); truck.rotation.y = 0.3; g.add(truck);
     truck.add(mesh(rbox(0.9, 0.9, 1.0, 0.1), M.yellow, 0.9, 0.75, 0), mesh(rbox(0.5, 0.4, 0.9, 0.05), M.light, 1.15, 1.0, 0, false), mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.9, 12), M.white, -0.5, 0.9, 0, false).rotateZ(Math.PI / 2), mesh(rbox(2.6, 0.2, 1.0, 0.04), M.dark, 0, 0.35, 0, false), mesh(rbox(0.4, 0.3, 0.3, 0.05), M.orange, -0.5, 1.55, 0, false));
     for (const x of [-0.8, 0.8]) for (const z of [-0.55, 0.55]) truck.add(mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.16, 10), M.dark, x, 0.24, z, false).rotateX(Math.PI / 2));
     const hose = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-1.4, 0.9, 0.3), new THREE.Vector3(-2.4, 0.3, 0.9), new THREE.Vector3(-3.4, 0.6, 0.9)); truck.add(mesh(new THREE.TubeGeometry(hose, 12, 0.04, 5, false), M.dark, 0, 0, 0, false));
     person(truck, -1.2, 1.0, 2.6, { shirt: 2, hat: true, scale: 1.0 });
     // 登機梯靠在停著那架（本地 (1.0, -6.6)）的左側；三個旅客排隊、一個地勤在梯子前面。
-    const st = new THREE.Group(); st.position.set(1.0, 0, -5.4); g.add(st);
+    const st = new THREE.Group(); st.position.set(1.0, 0, -2.9); g.add(st);   // 梯子靠機身這一側的門（批 D：之前前兩階在機身裡、排隊的人頭穿機翼）
     for (let k = 0; k < 4; k++) st.add(mesh(rbox(0.9, 0.12, 0.3, 0.02), M.dark, 0, 0.15 + k * 0.17, 0.5 - k * 0.3, false));
     for (const x of [-0.45, 0.45]) { const rail = mesh(rbox(0.04, 0.04, 1.3, 0.01), M.dark, x, 0.9, -0.1, false); rail.rotation.x = -0.45; st.add(rail); st.add(mesh(rbox(0.04, 0.6, 0.04, 0.01), M.dark, x, 0.5, 0.5, false)); }
     st.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.12, 8), M.dark, -0.4, 0.06, 0.7, false).rotateX(Math.PI / 2), mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.12, 8), M.dark, 0.4, 0.06, 0.7, false).rotateX(Math.PI / 2));
     [[0.3, 1.2, 1], [-0.3, 1.9, 3], [0.2, 2.6, 5]].forEach(([x, z, sh], k) => person(st, x, z, Math.PI, { shirt: sh, bag: k !== 1, pack: k === 1, scale: 1.0 }));
     const agent = person(st, 0.9, 0.9, -Math.PI / 2, { shirt: 3, hat: true, scale: 1.0 }); agent.userData.parts.armR.rotation.x = -1.2;
-    for (const [x, z] of [[1.3, -4.2], [0.7, -3.5], [1.2, -2.8], [9.0, -5.2]]) (blockersOf.get("airport") || []).push({ x: airport.x + x, z: airport.z + z, r: 0.5 });
+    for (const [x, z] of [[1.3, -1.7], [0.7, -1.0], [1.2, -0.3], [10.4, -4.6]]) (blockersOf.get("airport") || []).push({ x: airport.x + x, z: airport.z + z, r: 0.5 });
   }
 
   // ═══ 一次畫完的小東西 ═══

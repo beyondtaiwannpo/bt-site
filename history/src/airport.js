@@ -55,8 +55,8 @@ export const VOLUMES = (() => {
 export const insideBox = (p, B) => p[0] > B[0] && p[0] < B[1] && p[1] > B[2] && p[1] < B[3] && p[2] > B[4] && p[2] < B[5];
 // 一點到方框的距離（在裡面是 0）。
 export function boxDistance(p, B) { const dx = Math.max(B[0] - p[0], 0, p[0] - B[1]), dy = Math.max(B[2] - p[1], 0, p[1] - B[3]), dz = Math.max(B[4] - p[2], 0, p[2] - B[5]); return Math.hypot(dx, dy, dz); }
-export const RUNWAY = { z: 400, x0: -900, x1: 320, half: 22 };        // 跑道沿 x 軸，飛機往 -x 起飛
-export const TOWER = [40, 80];
+export const RUNWAY = { z: 400, x0: -1600, x1: 320, half: 22 };       // 跑道沿 x 軸，飛機往 -x 起飛；1,920 公尺（批 D：之前 1,220，A320 起飛距離不夠、追鏡一眼就看到盡頭）
+export const TOWER = [140, -22];   // 塔台在航廈東側的陸側（批 D：之前在停機坪正中間的車道上）
 export const CAM_OFF = [80, 95, 115];                                 // 停機坪的鏡頭相對飛機的位置（高角度四分之三）
 export const CHASE_OFF = [175, 62, 55];                               // 起飛追在後面、高一點的位置（飛機往 -x 飛，所以在 +x），底下的機場還看得到
 export const CAM_FOV = { inside: 62, outside: 38, insideTall: 74 };   // 直式的手機室內視角開大一點，走道旁的小場景才進得了畫面

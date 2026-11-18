@@ -48,7 +48,7 @@ export function buildSights(THREE, E, c) {
     const T = spots && spots.get("commons");
     if (T) { const cab = (x, z) => { const [ax, az, bx, bz] = [8, -3, -9, 10]; const dx = bx - ax, dz = bz - az; const tt = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - (ax + dx * tt), z - (az + dz * tt)); };
       for (let i = 0; i < 400 && !site; i++) { const a = T.rr() * TAU, d = T.isl.r * T.rr() * 0.7; const x = Math.cos(a) * d, z = Math.sin(a) * d; if (cab(x, z) >= 4.5 && T.rectFree(x, z, 0, 1.6, 1.6, 0.3, true)) { T.fell(x, z, 0, 1.6, 1.6); site = { parent: T.g, x, z, id: "commons", bl: T.blockers, wx: T.isl.x + x, wz: T.isl.z + z }; } } }
-    if (!site && airport) { const g = new THREE.Group(); g.position.set(airport.x, 0, airport.z); world.add(g); site = { parent: g, x: 10.5, z: 2.4, id: "airport", bl: blockersOf.get("airport") || blockersOf.set("airport", []).get("airport"), wx: airport.x + 10.5, wz: airport.z + 2.4 }; }
+    if (!site && c.fair) { const f = c.fair; site = { parent: world, x: f.x - 6, z: f.z - 4, id: "fair", bl: [], wx: f.x - 6, wz: f.z - 4 }; }   // 批 D：聚會所放不下就去遊樂小島（之前落在機場跑道的延長線上）
     if (site) {
       stats.tower = site.id; const tw = new THREE.Group(); tw.position.set(site.x, 0, site.z); site.parent.add(tw); site.bl.push({ x: site.wx, z: site.wz, r: 1.9 });
       tw.add(mesh(new THREE.CylinderGeometry(2.0, 2.1, 0.16, 20), std(mix(P.cream, P.grey, 0.25)), 0, 0.08, 0, false), mesh(new THREE.CylinderGeometry(0.3, 0.36, H, 10), M.wall, 0, H / 2, 0));

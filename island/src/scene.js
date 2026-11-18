@@ -47,7 +47,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, o
     flag.userData.flag = true;
     // 做的事：一樣一棟。機場那座：機場在中間偏後，別的（碼頭）在前面左邊。
     const spots = L.programSpots({ id: isl.id, x: 0, z: 0, r: isl.r, angle: isl.angle }, tm.programs.length); const blockers = [{ x: fx, z: fz, r: 0.6 }];
-    tm.programs.forEach((p, k) => { const sp = isl.sea ? (p.kind === "airport" ? { x: 0, z: -2.0, face: 0 } : { x: -8.5, z: 6.2, face: Math.PI }) : spots[k]; const b = E.building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = p.kind === "studio" ? 0.15 : sp.face; if (p.kind !== "airport") b.scale.setScalar(1.2); g.add(b);   // 貼文牆要面向鏡頭（+z），不是面向島心
+    tm.programs.forEach((p, k) => { let sp = isl.sea ? (p.kind === "airport" ? { x: 0, z: -2.0, face: 0 } : { x: -4, z: 9.0, face: 0 }) : spots[k];
+      if (p.kind === "pier" && !isl.sea) { const a = fa + 0.6, d = isl.r - 1.3; sp = { x: Math.cos(a) * d, z: Math.sin(a) * d, face: Math.atan2(Math.cos(a), Math.sin(a)) }; } /* 碼頭在島緣、甲板伸進水裡（批 D：之前照 programSpots 放在草地中間）*/ const b = E.building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = p.kind === "studio" ? 0.15 : sp.face; if (p.kind !== "airport") b.scale.setScalar(1.2); g.add(b);   // 貼文牆要面向鏡頭（+z），不是面向島心
       for (const eb of (b.userData.blockers || [])) { const c = Math.cos(sp.face), sn = Math.sin(sp.face); blockers.push({ x: sp.x + eb.x * c + eb.z * sn, z: sp.z - eb.x * sn + eb.z * c, r: eb.r }); }
       blockers.push({ x: sp.x, z: sp.z, r: T.KIND_R[p.kind] || 3.2 });
       for (const o of E.mergeChildren(b, { kind: "program", team: tm.id, program: p.id })) pickables.push(o);   // 一棟房子的零件合成幾個，點得到的就是合成的那幾個（2026-11-18）
@@ -76,7 +77,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, o
   for (const c of data.connections || []) { const A = L.islandOf(c.a), B = L.islandOf(c.b); if (!A || !B) continue; lines.push({ a: c.a, b: c.b, mesh: E.arc(A, B) }); }
   // 海上的裝飾小島（layout.js 的 ISLETS）、小船、熱氣球、雲。
   for (const it of L.ISLETS) if (L.ENGINE_ISLETS.includes(it.kind)) E.islet(it);
-  E.addBoats(6, islands.map(il => ({ x: il.x, z: il.z, r: il.r, pad: il.sea ? 6 : 3 })).concat(L.ISLETS.map(il => ({ x: il.x, z: il.z, r: il.r, pad: 3 }))));
+  E.addBoats(6, islands.map(il => ({ x: il.x, z: il.z, r: il.r, pad: il.sea ? 6 : 3 })).concat(L.ISLETS.map(il => ({ x: il.x, z: il.z, r: il.r, pad: 3 })), L.GONDOLA.pts.map(p => ({ x: p[0], z: p[1], r: 2.5, pad: 1 })), [{ x: (L.FERRY.a[0] + L.FERRY.b[0]) / 2, z: (L.FERRY.a[1] + L.FERRY.b[1]) / 2, r: Math.hypot(L.FERRY.b[0] - L.FERRY.a[0], L.FERRY.b[1] - L.FERRY.a[1]) / 2, pad: 2 }]));   // 錨泊的小船也避開纜車塔與渡輪航線（批 D）
   E.addBalloons(3); E.addClouds(8);
   // 遊樂設施（rides.js：纜車、兩座新的雲霄飛車、遊樂小島、渡輪）與生活感（life.js：小店、餐車、公車亭、碼頭、晾衣繩、煙、花、石頭、鳥）。
   // 兩支都不碰 three，THREE 跟引擎傳進去；它們每一幀要動的東西從 motion() 的 tickExtra 叫。位置記進 blockersOf（人會繞開）、站的點記進 poisOf。
@@ -93,7 +94,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, o
   // 第三批（2026-11-18 Paul 第三次「More detail first」：要好看、要活）：water.js 管水（漣漪、尾浪、淺水、鯨魚、瀑布），sights.js 管看得到的地標與味道
   // （觀景塔、風車、溫泉、兩種新的樹、機車、燈籠、夜市招牌、高一層的雲、滑翔翼、機場的信標與行李拖車）。兩支都要在 sea 之後（要知道沙灘、帆船、渡輪在哪）、flushInstances 之前（換掉三分之一的樹、清掉山丘那一塊的樹）。
   const water = buildWater(THREE, E, { islands, blockersOf, groupOf, whale: L.WHALE, bridgeAngles, lifePlaces: E.lifePlaces });
-  const sights = buildSights(THREE, E, { islands, blockersOf, poisOf, lifePlaces: E.lifePlaces, airport: islands.find(i => i.sea), glider: L.GLIDER, cartLoop: L.CART_LOOP, gondola: L.GONDOLA });
+  const sights = buildSights(THREE, E, { islands, blockersOf, poisOf, lifePlaces: E.lifePlaces, airport: islands.find(i => i.sea), glider: L.GLIDER, cartLoop: L.CART_LOOP, gondola: L.GONDOLA, fair: L.ISLETS.find(i => i.kind === "fair") });
   const extraTick = (dt, t) => { rides.tick(dt, t); life.tick(dt, t); town.tick(dt, t); sea.tick(dt, t); water.tick(dt, t); sights.tick(dt, t); };
   E.flushInstances();
 

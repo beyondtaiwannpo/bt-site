@@ -99,6 +99,11 @@ export function buildTerminal(THREE, c) {
     // 托盤台（安檢後）與托盤：x 6.5，兩邊各一台；人體掃描門在 z -23 那條。
     for (const z of [-26.2, -14.4]) { term.add(box(4.0, 0.9, 1.0, mats.grey, 7.5, 0.45, z), instanced(new THREE.BoxGeometry(0.5, 0.08, 0.4), mats.grey, Array.from({ length: 6 }, (_, i) => [6 + (i % 3) * 0.6, 0.96 + Math.floor(i / 3) * 0.1, z + 0.2]), false)); }
     term.add(cyl(1.1, 1.1, 2.4, mats.cream, 2.5, 1.2, -23, 12, true), box(1.4, 0.5, 2.0, mats.navy, 2.5, 2.6, -23, false));
+    // 批 D：安檢區兩側的玻璃隔牆（之前 z -40 到 -27 與 -13 到 0 整個開著，安檢等於沒圍）；安檢之後是證照查驗（國際機場少不了），三座櫃台在 x 14，鏡頭從中間 z -20 過。
+    for (const [z0, z1] of [[-40, -31.8], [-8.2, 0]]) term.add(box(0.12, 3.0, z1 - z0, mats.glass, 1.0, 1.5, (z0 + z1) / 2, false), box(0.12, 0.2, z1 - z0, mats.frame, 1.0, 3.05, (z0 + z1) / 2, false));
+    for (const z of [-27.5, -24.5, -15.5, -12.5]) { term.add(box(2.2, 1.1, 1.4, mats.navy, 14, 0.55, z), box(2.4, 0.08, 1.6, mats.cream, 14, 1.12, z, false), box(0.5, 0.4, 0.06, mats.dark, 14.6, 1.4, z, false)); person(14, z - 0.9, 0, { shirt: pick(k++), staff: true }); }
+    sign("IMMIGRATION", "證照查驗", 4.4, 1.0, palette.navy, palette.cream, 14, 5.4, -20.5, -Math.PI / 2);
+    term.add(instanced(new THREE.CylinderGeometry(0.03, 0.03, T.h - 7.4, 5), mats.grey, [[14, 5.9 + (T.h - 7.4) / 2, -22.1], [14, 5.9 + (T.h - 7.4) / 2, -18.9]], false));
   }
 
   // ═══ C. 空側（x 6 到 125）═══
@@ -191,7 +196,7 @@ export function buildTerminal(THREE, c) {
   { const panels = [[8, -30], [38, -10], [68, -30], [98, -10], [-22, -30], [-7, -10]];
     const tex = textTexture(512, 768, palette.cream, [{ text: "BEYOND", x: 256, y: 300, font: `700 110px ${fonts.display}`, color: palette.navy, align: "center" }, { text: "TAIWAN", x: 256, y: 420, font: `700 110px ${fonts.display}`, color: palette.navy, align: "center" }], [{ x: 0, y: 0, w: 512, h: 180, color: palette.orange }, { x: 0, y: 588, w: 512, h: 180, color: palette.teal }]);
     for (const [x, z] of panels) { term.add(box(1.5, 2.3, 0.14, mats.frame, x + 0.65, 2.2, z, false)); const m = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 2.0), lam(P.white, { map: tex })); m.position.set(x + 0.65, 2.2, z + (z > -20 ? -0.08 : 0.08)); m.rotation.y = z > -20 ? Math.PI : 0; term.add(m); } }
-  hanging(-34, -20, "CHECK-IN  ·  SECURITY", "報到  ·  安檢", "→"); hanging(-12, -20, "SECURITY", "安檢", "→"); hanging(8, -20, "GATES A · B", "登機門", "→"); hanging(30, -20, "FOOD · TOILETS", "美食區 · 洗手間", "↑"); hanging(70, -20, "GATES B3 – B5", "登機門", "→"); hanging(90, -20, "GATE A · LOUNGE", "登機門 · 貴賓室", "→");
+  hanging(-34, -20, "CHECK-IN  ·  SECURITY", "報到  ·  安檢", "→"); hanging(-12, -20, "SECURITY", "安檢", "→"); hanging(8, -20, "GATES A · B", "登機門", "→"); hanging(30, -20, "FOOD · TOILETS", "美食區 · 洗手間", "↑"); hanging(70, -20, "GATES B4 · B5 · A", "登機門", "→"); hanging(90, -20, "GATE A · LOUNGE", "登機門 · 貴賓室", "→");
   // 清潔人員兩位（推車）、機組員三位（制服、帽、行李箱）走去登機門、拍照的、牽小孩的。
   { for (const [x, z, ry] of [[44, -31.8, 0.4], [86, -11.4, 2.6]]) { person(x, z, ry, { shirt: P.teal, staff: true }); term.add(box(0.8, 0.9, 0.6, mats.grey, x + 0.8, 0.5, z, false), box(0.1, 1.1, 0.1, mats.grey, x + 0.8, 1.3, z - 0.2, false), cyl(0.18, 0.15, 0.4, mats.orange, x + 0.8, 1.15, z, 8)); }
     for (const [off, k] of [[0, 0], [1.3, 1], [2.6, 2]]) { const f = figure(mats, { shirt: P.navy, staff: true, bag: true }); f.userData.baseY = 0; f.userData.w = { x0: 6 + off, x1: 104 + off, z: -22.6 + (k % 2) * 0.9, sp: 1.25 }; term.add(f); walkers.push(f); }

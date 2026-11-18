@@ -35,7 +35,9 @@ export const islandOf = id => islands().find(i => i.id === id) || null;
 export function hexPoints(cx, cz, r) { const pts = []; for (let k = 0; k < 6; k++) { const a = k * TAU / 6 + Math.PI / 6; pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return pts; }
 // 橋：中間那座到外圍每一座（輻條）、外圍相鄰的兩座之間（環）、機場接右邊兩座。
 // 每一條從兩邊的邊緣開始。a、b 是兩端的 team id，人沿橋走的時候用。
-function edge(a, b) { const A = islandOf(a), B = islandOf(b); const dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz), ux = dx / d, uz = dz / d; return { a, b, x0: A.x + ux * (A.r - 0.6), z0: A.z + uz * (A.r - 0.6), x1: B.x - ux * (B.r - 0.6), z1: B.z - uz * (B.r - 0.6) }; }
+// 機場那座的橋頭不照半徑算，固定落在平台西緣的人行帶裡（批 D：之前落在機坪西端，到站的人要繞跑道頭才走得到人行帶）。
+const SEA_END = { marketing: [-12.0, 4.4], cr: [-12.0, 7.8] };
+function edge(a, b) { const A = islandOf(a), B = islandOf(b); const dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz), ux = dx / d, uz = dz / d; const sa = A.sea && SEA_END[b]; return { a, b, x0: sa ? A.x + sa[0] : A.x + ux * (A.r - 0.6), z0: sa ? A.z + sa[1] : A.z + uz * (A.r - 0.6), x1: B.x - ux * (B.r - 0.6), z1: B.z - uz * (B.r - 0.6) }; }
 export function bridges() {
   const out = RING.map(id => edge("commons", id));
   RING.forEach((id, i) => out.push(edge(id, RING[(i + 1) % RING.length])));
@@ -128,9 +130,10 @@ export const ENGINE_ISLETS = ["coaster", "lighthouse", "picnic", "palm", "rock"]
 // 纜車（Paul 2026-11-18：「a gondola over the whole island from airport all the way to curriculum」）：
 // 機場平台上的站 → 水上的塔（機場與 Marketing／Community Relations 之間）→ 聚會所東邊的塔 → 聚會所與 Curriculum 之間水上的塔 → Curriculum 北緣的塔 → Curriculum 旁水上架高的站。
 // 站與塔都在 11 公尺高，廂吊在纜繩下 2.6 公尺，比島上任何一棟房子都高。stilts 是哪幾站架在水上的柱子上。
-export const GONDOLA = { pts: [[53, 6.5], [31, -1], [8, -3], [-9, 10], [-22.5, 22], [-30, 26]], h: 11, stilts: [5], speed: 1.5, cabins: 12 };
+export const GONDOLA = { pts: [[53, 13], [31, -6], [8, -3], [-9, 10], [-22.5, 22], [-30, 26]], h: 11, stilts: [0, 5], speed: 1.5, cabins: 12 };
 // 渡輪：在島群南邊的水道來回，兩頭各一座浮動碼頭。
-export const FERRY = { a: [-45, 50], b: [40, 50] };
+// 渡輪（批 D）：之前兩座碼頭都在空海上，離陸地 10 公尺以上，看起來是「一艘船在空海來回」。現在從野餐小島東岸到遊樂小島西岸，la、lb 是各自靠的那座島的中心（碼頭朝它）。
+export const FERRY = { a: [35.5, 45], b: [48.5, 41], la: [29, 41], lb: [60, 36] };
 // 帆船（2026-11-18 第二批，sea.js 畫）：四艘各自在一片空水域繞橢圓。cx cz 是橢圓中心、rx rz 是兩個半徑、u0 是起點。
 // 四片水域：北邊（燈塔與迴圈飛車之間）、西南（雲霄飛車與渡輪航線之間）、東邊（Community Relations 與遊樂小島之間）、西邊（Internship 與棕櫚小島之間）。
 // 橢圓上每一點離每座島、每座小島、渡輪航線都要有 2 公尺以上（test/island.test.mjs 守）。
@@ -143,7 +146,7 @@ export const SAIL_LOOPS = [
 // 海豚那一對跳出水面的地方（Sponsorship 南邊、渡輪航線北邊的空水域）。
 export const DOLPHINS = { x: 13, z: 42 };
 // 鯨魚（2026-11-18 第三批，water.js 畫）：北邊遠處的空水域，每 36 秒浮上來一次；每次換一個方向、往前游一點，活動範圍是這一點外 6 公尺以內（測試守離每座島與小島 2 公尺以上）。
-export const WHALE = { x: -6, z: -56, period: 36 };
+export const WHALE = { x: -12, z: -58, period: 36 };   // 批 D：離帆船第一條橢圓遠一點（之前在 (-3,-50) 重疊）
 // 滑翔翼（sights.js 畫）：繞著雲霄飛車小島上空慢慢轉，半徑 10、高 16。
 export const GLIDER = { x: -52, z: 26, r: 10, h: 16 };
 // 行李拖車的車道（sights.js 畫，機場平台的本地座標）：跑道與人走的那一條之間，東往 z 2.7、西往 z 3.9，東邊到 x 7（再過去是觀景塔）。

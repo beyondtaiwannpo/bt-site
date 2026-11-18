@@ -30,7 +30,7 @@ export function buildLife(THREE, E, c) {
     // 兩間小店：房子、斜的雨棚（team 的顏色與另一色輪流）、掛在牆上的招牌、門口的 A 字立牌、兩個窗台花箱、一張小桌兩張凳。店門口是人會站的點。
     for (let k = 0; k < 2; k++) {
       const sp = spot(1.3); if (!sp) break; stats.shops++;
-      const s = new THREE.Group(); const face = -sp.a + Math.PI / 2;   // 門朝島心
+      const s = new THREE.Group(); const face = Math.atan2(-sp.x, -sp.z);   // 門朝島心（批 D：之前的式子朝海，客人站到海上）
       const wallM = k ? M.wall2 : M.wall, awnM = k ? M.orange : M.teal;
       s.add(mesh(rbox(2.8, 2.3, 2.2, 0.12), wallM, 0, 1.15, 0), mesh(new THREE.ConeGeometry(2.0, 1.2, 4), k ? M.navy : M.orange, 0, 2.9, 0).rotateY(Math.PI / 4));
       const awn = mesh(rbox(3.0, 0.08, 1.2, 0.03), awnM, 0, 1.9, 1.55, false); awn.rotation.x = 0.35; s.add(awn);
@@ -43,14 +43,14 @@ export function buildLife(THREE, E, c) {
       person(s, 1.6, 2.6, Math.PI, { shirt: k ? 2 : 4, bag: true });
     }
     // 餐車：車身、兩個輪子、雨棚、鍋子、一個老闆站在後面、兩個客人在前面。
-    { const sp = spot(1.2); if (sp) { stats.carts++; const f = new THREE.Group(); const face = -sp.a + Math.PI / 2;
+    { const sp = spot(1.2); if (sp) { stats.carts++; const f = new THREE.Group(); const face = Math.atan2(-sp.x, -sp.z);
       f.add(mesh(rbox(1.8, 1.0, 1.0, 0.1), M.white, 0, 0.75, 0), mesh(rbox(1.9, 0.08, 1.1, 0.03), M.wood, 0, 1.28, 0, false), mesh(rbox(2.2, 0.1, 1.6, 0.03), M.orange, 0, 2.3, 0.2, false), mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6), M.dark, -0.95, 1.8, 0.7, false), mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6), M.dark, 0.95, 1.8, 0.7, false));
       for (const x of [-0.6, 0.6]) f.add(mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 10), M.dark, x, 0.28, 0, false).rotateX(Math.PI / 2));
       f.add(mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.2, 10), M.dark, -0.4, 1.4, 0, false), mesh(rbox(0.5, 0.3, 0.3, 0.05), M.teal, 0.45, 1.45, 0, false));
       put(f, sp, face, 1.6); places.push({ kind: "cart", x: sp.x, z: sp.z, face, r: 1.6, g: f }); stand(sp, face, 1.6); stand({ x: sp.x + Math.cos(face) * 0.8, z: sp.z - Math.sin(face) * 0.8 }, face, 1.6);
       person(f, 0, -0.9, 0, { shirt: 3, hat: true }); person(f, -0.5, 1.4, Math.PI, { shirt: 1 }); } }
     // 公車亭：兩支柱、玻璃背板、雨棚、長凳、站牌（team 的顏色）。
-    { const sp = spot(1.3, 0.5, 0.82); if (sp) { stats.stops++; const b = new THREE.Group(); const face = -sp.a + Math.PI / 2 + Math.PI;
+    { const sp = spot(1.3, 0.5, 0.82); if (sp) { stats.stops++; const b = new THREE.Group(); const face = Math.atan2(-sp.x, -sp.z);
       b.add(mesh(rbox(3.0, 0.15, 1.4, 0.04), M.navy, 0, 2.4, 0, false), mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.4, 6), M.dark, -1.3, 1.2, -0.5, false), mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.4, 6), M.dark, 1.3, 1.2, -0.5, false));
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.8), M.shallow); glass.position.set(0, 1.3, -0.6); b.add(glass);
       const bench = E.bench(); bench.position.set(0, 0, -0.1); b.add(bench);
@@ -119,7 +119,7 @@ export function buildLife(THREE, E, c) {
   // ═══ 機場：兩台行李車、一座油槽、會轉的雷達、走道上三盞燈。═══
   if (airport) {
     const g = new THREE.Group(); g.position.set(airport.x, 0, airport.z); world.add(g);
-    for (const [x, z] of [[4.5, 7.6], [6.2, 7.6]]) g.add(mesh(rbox(1.2, 0.6, 0.7, 0.06), M.grey || M.dark, x, 0.45, z), mesh(rbox(0.5, 0.4, 0.5, 0.05), M.navy, x - 0.2, 0.95, z, false), mesh(rbox(0.5, 0.35, 0.5, 0.05), M.orange, x + 0.3, 0.92, z, false));
+    for (const [x, z] of [[-3, 7.6], [-1.3, 7.6]]) g.add(mesh(rbox(1.2, 0.6, 0.7, 0.06), M.grey || M.dark, x, 0.45, z), mesh(rbox(0.5, 0.4, 0.5, 0.05), M.navy, x - 0.2, 0.95, z, false), mesh(rbox(0.5, 0.35, 0.5, 0.05), M.orange, x + 0.3, 0.92, z, false));
     g.add(mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.6, 12), M.cream, -10.5, 0.8, -7.5), mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.1, 12), M.dark, -10.5, 1.65, -7.5, false));
     const radar = new THREE.Group(); radar.userData.dynamic = true; radar.position.set(10.5, 0, -8.5); g.add(radar);
     radar.add(mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 6), M.dark, 0, 1.1, 0, false)); const dish = mesh(rbox(1.6, 0.4, 0.08, 0.04), M.cream, 0, 2.4, 0, false); radar.add(dish);

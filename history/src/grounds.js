@@ -17,16 +17,16 @@ export function buildGrounds(THREE, c) {
   const STANDS = [[25, "B1", true], [40, "B2", true], [58, "B3", false], [75, "B4", true], [92, "B5", true], [113, "", true]];
   {
     const lead = [], stop = [], eraX = [], eraZ = [], gse = [];
-    for (const [x] of STANDS) { const px = x + 7; lead.push([px, 0.05, 60]); stop.push([px, 0.05, 40]); eraX.push([px, 0.04, 22], [px, 0.04, 76]); eraZ.push([px - 20, 0.04, 49], [px + 20, 0.04, 49]); gse.push([px - 15, 0.04, 31], [px - 15, 0.04, 37], [px - 20, 0.04, 34, Math.PI / 2], [px - 10, 0.04, 34, Math.PI / 2]); }
-    world.add(instanced(new THREE.BoxGeometry(0.3, 0.02, 36), mats.yellowLight, lead, false), instanced(new THREE.BoxGeometry(6, 0.02, 0.4), mats.yellowLight, stop, false));
+    for (const [x] of STANDS) { const px = x + 7; lead.push([px, 0.05, 57]); stop.push([px, 0.05, 35.5]); eraX.push([px, 0.04, 22], [px, 0.04, 76]); eraZ.push([px - 20, 0.04, 49], [px + 20, 0.04, 49]); gse.push([px - 15, 0.04, 31], [px - 15, 0.04, 37], [px - 20, 0.04, 34, Math.PI / 2], [px - 10, 0.04, 34, Math.PI / 2]); }
+    world.add(instanced(new THREE.BoxGeometry(0.3, 0.02, 42), mats.yellowLight, lead, false), instanced(new THREE.BoxGeometry(6, 0.02, 0.4), mats.yellowLight, stop, false));
     world.add(instanced(new THREE.BoxGeometry(40, 0.02, 0.25), redM, eraX, false), instanced(new THREE.BoxGeometry(0.25, 0.02, 54), redM, eraZ, false), instanced(new THREE.BoxGeometry(10, 0.02, 0.2), mats.cream, gse.map(p => p.length > 3 ? [p[0], p[1], p[2], p[3], 0.6] : p), false));
     for (const [x, label] of STANDS) if (label) sign(label, "", 4, 4, palette.apron || palette.grey, palette.yellow, x + 7, 0.06, 70, Math.PI, { flat: true, align: "center", size: 560 });
     // 停機位的看板（一根柱子、A320 / B737 的字）
-    for (const [x, label] of STANDS) { world.add(cyl(0.08, 0.1, 3.2, mats.grey, x + 7, 1.6, 78, 6)); sign((label || "A") + "  ·  A320 / B737", "", 3.0, 0.8, palette.navy, palette.cream, x + 7, 3.4, 78, Math.PI, { align: "center", size: 180 }); }
+    for (const [x, label] of STANDS) { world.add(cyl(0.08, 0.1, 3.2, mats.grey, x + 7, 1.6, 19, 6)); sign((label || "A") + "  ·  A320 / B737", "", 3.0, 0.8, palette.navy, palette.cream, x + 7, 3.4, 19, 0, { align: "center", size: 180 }); }   // 位號在航廈那一面，機師進位時對著看（批 D：之前立在推出去的路上）
   }
   // 另外兩座空橋與停著的飛機（B1、B5）：跟 scene.js 的 B2、B4 一樣直直伸出去。B3 空著，只留一台拖車與地勤。
   for (const [x, tail] of [[25, "orange"], [92, "yellow"]]) {
-    const g = new THREE.Group(); g.position.set(x, 2.6, 19);
+    const g = new THREE.Group(); g.position.set(x + 3.4, 2.6, 19);
     g.add(box(3.2, 2.9, 38, lam(P.wall), 0, 0, 0)); g.add(box(3.4, 0.5, 38, mats.teal, 0, 0.2, 0, false));
     world.add(g, cyl(0.3, 0.3, 2.6, mats.frame, x - 1.2, 1.3, 32, 6), cyl(0.3, 0.3, 2.6, mats.frame, x + 1.2, 1.3, 32, 6));
     const pl = buildAirliner(THREE, { body: P.cream, tail: P[tail], mark: P.navy, dark: P.dark }); pl.position.set(x + 7, A.PLANE_REST_Y, A.GATE_STAND[1]); pl.rotation.y = Math.PI; shadowOn(pl); world.add(pl);
@@ -41,7 +41,7 @@ export function buildGrounds(THREE, c) {
       const bl = truck(mats, false); bl.position.set(px - 6, 0, 42); bl.rotation.y = -0.6; const belt = box(0.9, 0.2, 6, mats.grey, 0, 1.6, -3.2, false); belt.rotation.x = 0.35; bl.add(belt); world.add(bl);
       gpus.push([px - 12, 0.8, 30]); gpuWheels.push([px - 12.9, 0.35, 30, 0, 1], [px - 11.1, 0.35, 30, 0, 1]);
       for (let i = 0; i < 4; i++) ulds.push([px - 18 + (i % 2) * 2.6, 0.75, 32 + Math.floor(i / 2) * 2.0]);
-      cones.push([px - 4, 0.4, 36], [px + 4, 0.4, 36], [px - 9, 0.4, 56], [px + 9, 0.4, 56]); chocks.push([px - 2.2, 0.2, 40.2], [px + 2.2, 0.2, 40.2]);
+      cones.push([px - 4, 0.4, 36], [px + 4, 0.4, 36], [px - 9, 0.4, 56], [px + 9, 0.4, 56]); chocks.push([px - 2.6, 0.2, 49.6], [px + 2.6, 0.2, 49.6]);
       crew(px - 10, 39.5, 0.4); crew(px + 3, 56, 2.5);
     }
     world.add(instanced(new THREE.BoxGeometry(2.2, 1.5, 1.6), mats.grey, ulds), instanced(new THREE.ConeGeometry(0.35, 0.8, 6), mats.orange, cones, false), instanced(new THREE.BoxGeometry(0.6, 0.3, 0.3), mats.orange, chocks, false));
@@ -56,11 +56,11 @@ export function buildGrounds(THREE, c) {
     const dashes = []; for (let x = -48; x <= 138; x += 6) dashes.push([x, 0.05, 12]); world.add(instanced(new THREE.BoxGeometry(2.4, 0.01, 0.2), mats.cream, dashes, false));
   }
   // 高桿照明五根（25 公尺，頂上一排燈）。
-  { const masts = [], heads = [], lights = []; for (const x of [-25, 15, 50, 85, 120]) { masts.push([x, 13, 8]); heads.push([x, 26.4, 8]); for (let i = 0; i < 4; i++) lights.push([x - 1.5 + i, 26.1, 8.7]); }
+  { const masts = [], heads = [], lights = []; for (const x of [-25, 15, 50, 85, 120]) { masts.push([x, 13, 18.5]); heads.push([x, 26.4, 18.5]); for (let i = 0; i < 4; i++) lights.push([x - 1.5 + i, 26.1, 19.2]); }
     world.add(instanced(new THREE.CylinderGeometry(0.3, 0.5, 26, 8), mats.grey, masts), instanced(new THREE.BoxGeometry(3.6, 0.8, 1.2), mats.dark, heads, false), instanced(new THREE.BoxGeometry(0.7, 0.3, 0.2), mats.yellowLight, lights, false)); }
   // 滑行道的指示牌（三個彎各一塊黃底黑字）、等待線旁的紅底白字牌。
   for (const u of [0.22, 0.5, 0.78]) { const p = tw.at(tw.length * u), nx = Math.cos(p.yaw), nz = -Math.sin(p.yaw); const x = p.x + nx * 13, z = p.z + nz * 13; world.add(box(2.4, 0.9, 0.2, mats.yellowLight, x, 1.1, z, false), box(0.9, 0.5, 0.22, mats.dark, x - 0.6, 1.1, z, false), instanced(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 5), mats.grey, [[x - 0.9, 0.35, z], [x + 0.9, 0.35, z]], false)); }
-  { const h = tw.at(tw.length - 36), nx = Math.cos(h.yaw), nz = -Math.sin(h.yaw); world.add(box(2.4, 0.9, 0.2, redM, h.x + nx * 13, 1.1, h.z + nz * 13, false), box(1.4, 0.3, 0.22, mats.cream, h.x + nx * 13, 1.1, h.z + nz * 13, false)); }
+  { const h = tw.at(tw.length - 130), nx = Math.cos(h.yaw), nz = -Math.sin(h.yaw); world.add(box(2.4, 0.9, 0.2, redM, h.x + nx * 13, 1.1, h.z + nz * 13, false), box(1.4, 0.3, 0.22, mats.cream, h.x + nx * 13, 1.1, h.z + nz * 13, false)); }
   // 跑道：另一端的號碼、瞄準點、觸地帶、PAPI、進場燈、ILS、下滑台、擋焰牆、距離標牌。
   {
     const num = new THREE.Mesh(new THREE.PlaneGeometry(14, 22), lam(P.white, { map: textTexture(256, 400, palette.cream, [{ text: "09", font: `700 300px ${fonts.display}`, color: palette.navy, x: 128, y: 200, align: "center" }]) }));
@@ -70,20 +70,20 @@ export function buildGrounds(THREE, c) {
     world.add(instanced(new THREE.BoxGeometry(22, 0.04, 1.8), mats.cream, tdz, false));
     world.add(instanced(new THREE.BoxGeometry(1.0, 0.6, 0.6), mats.cream, [[R.x1 - 300, 0.4, R.z - R.half - 15], [R.x1 - 300, 0.4, R.z - R.half - 19]], false), instanced(new THREE.BoxGeometry(1.0, 0.6, 0.6), mats.orangeLight, [[R.x1 - 300, 0.4, R.z - R.half - 23], [R.x1 - 300, 0.4, R.z - R.half - 27]], false));
     const posts = [], bars = [], lights = []; for (let x = R.x1 + 30; x <= R.x1 + 330; x += 30) { posts.push([x, 1.2, R.z]); bars.push([x, 2.4, R.z]); for (let i = -2; i <= 2; i++) lights.push([x, 2.5, R.z + i * 1.5]); }
-    world.add(instanced(new THREE.CylinderGeometry(0.1, 0.12, 2.4, 6), mats.grey, posts, false), instanced(new THREE.BoxGeometry(0.2, 0.2, 7), mats.grey, bars, false), instanced(new THREE.SphereGeometry(0.28, 6, 4), mats.yellowLight, lights, false));
+    world.add(instanced(new THREE.CylinderGeometry(0.1, 0.12, 2.4, 6), mats.grey, posts, false), instanced(new THREE.BoxGeometry(0.2, 0.2, 7), mats.grey, bars, false), instanced(new THREE.SphereGeometry(0.28, 6, 4), lam(P.cream, { emissive: P.cream, emissiveIntensity: 1.2 }), lights, false));
     const loc = []; for (let i = 0; i < 12; i++) loc.push([R.x0 - 150, 1.2, R.z - 16.5 + i * 3]);
     world.add(instanced(new THREE.BoxGeometry(0.3, 2.4, 0.3), mats.orange, loc.filter((_, i) => i % 2 === 0), false), instanced(new THREE.BoxGeometry(0.3, 2.4, 0.3), mats.cream, loc.filter((_, i) => i % 2 === 1), false), box(36, 0.3, 0.3, mats.grey, R.x0 - 150, 0.15, R.z, false));
     { const x = R.x1 - 300, z = R.z + R.half + 120; world.add(cyl(0.3, 0.4, 12, mats.grey, x, 6, z, 6), box(4.4, 0.3, 0.3, mats.cream, x, 11.5, z, false), box(4.4, 0.3, 0.3, mats.cream, x, 8.0, z, false), box(3, 2, 2.4, mats.wallShade, x + 4, 1, z, false)); }
-    { const f = box(60, 3.2, 0.4, mats.navy, R.x0 - 50, 1.6, R.z, false); f.rotation.x = -0.35; f.rotation.y = Math.PI / 2; world.add(f); }
+    { const f = box(60, 3.2, 0.4, mats.navy, R.x0 - 260, 1.6, R.z, false); f.rotation.x = -0.35; f.rotation.y = Math.PI / 2; world.add(f); }
     const ds = []; for (let x = R.x1 - 300; x > R.x0 + 200; x -= 300) ds.push([x, 0.8, R.z - R.half - 12]); world.add(instanced(new THREE.BoxGeometry(0.4, 1.4, 1.6), mats.navy, ds, false), instanced(new THREE.BoxGeometry(0.42, 0.5, 1.2), mats.cream, ds.map(([x, y, z]) => [x, y + 0.2, z]), false));
   }
   // 周界圍籬：繞整個空側一圈（航廈那一段不圍），每 6 公尺一根柱、上面一條橫桿。
   {
     const posts = [], rails = [];
     const seg = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.floor(L / 6); for (let i = 0; i <= n; i++) posts.push([x0 + (x1 - x0) * i / n, 1.2, z0 + (z1 - z0) * i / n]); const r = box(L, 0.08, 0.08, mats.grey, (x0 + x1) / 2, 2.3, (z0 + z1) / 2, false); r.rotation.y = -Math.atan2(z1 - z0, x1 - x0); rails.push(r); };
-    seg(-1100, 2, -48, 2); seg(140, 2, 420, 2); seg(420, 2, 420, 560); seg(420, 560, -1100, 560); seg(-1100, 560, -1100, 2);
+    seg(-1800, 2, -48, 2); seg(140, 2, 430, 2); seg(430, 2, 430, 560); seg(430, 560, -1800, 560); seg(-1800, 560, -1800, 2);
     world.add(instanced(new THREE.CylinderGeometry(0.06, 0.08, 2.4, 5), mats.grey, posts, false), ...rails);
-    for (const [x, z] of [[-140, 2], [260, 2], [420, 270], [60, 560], [-1100, 270]]) sign("RESTRICTED AREA", "管制區", 2.2, 0.8, palette.yellow, palette.navy, x, 1.5, z + 0.3, 0);
+    for (const [x, z] of [[-140, 2], [260, 2], [430, 270], [60, 560], [-1800, 270]]) sign("RESTRICTED AREA", "管制區", 2.2, 0.8, palette.yellow, palette.navy, x, 1.5, z + 0.3, 0);
   }
   // 消防站：第二台消防車、一座瞭望塔。直升機停機坪（圓、H、一架直升機，旋翼會轉）。
   { const g = new THREE.Group(); g.position.set(210, 0, 70); world.add(g); g.add(box(7, 2.6, 3, mats.orange, 9, 1.4, -13), box(2.6, 1.6, 2.8, mats.frame, 5.8, 3.2, -13), box(0.3, 0.3, 6, mats.grey, 9.5, 2.95, -13, false), cyl(0.5, 0.6, 14, mats.wall, -17, 7, 6, 8), box(3.6, 2.4, 3.6, mats.wallShade, -17, 15.2, 6), box(4, 0.3, 4, mats.roof, -17, 16.5, 6, false)); }
@@ -107,8 +107,8 @@ export function buildGrounds(THREE, c) {
     const fm = new THREE.Group(); fm.userData.dynamic = true; fm.add(box(4.2, 1.1, 1.9, mats.yellowLight, 0, 0.6, 0), box(2.0, 0.7, 1.7, mats.glass, -0.2, 1.5, 0, false), box(1.2, 0.3, 0.3, mats.orangeLight, 0, 2.0, 0, false), box(0.9, 0.3, 1.9, mats.dark, 1.7, 1.05, 0, false)); world.add(fm);
     // 來回的車：兩頭用餘弦慢下來再掉頭，車頭用追的（批 B，之前到頭瞬間翻面）。
     const wr = a => Math.atan2(Math.sin(a), Math.cos(a)), shuttle = (o, f, x0, len, z) => { let ry = Math.PI / 2; movers.push({ fn: t => { const u = (t * f) % 2, d = 0.5 - 0.5 * Math.cos(Math.PI * u); o.position.set(x0 + d * len, 0, z); ry += wr((u < 1 ? Math.PI / 2 : -Math.PI / 2) - ry) * 0.06; o.rotation.y = ry; } }); };
-    shuttle(fm, 0.02, -30, 160, 85);
-    const ab = bus(0, 0, 0, mats.cream); ab.userData.dynamic = true; shuttle(ab, 0.012, 20, 180, 100);
+    shuttle(fm, 0.02, -30, 130, 85);
+    const ab = bus(0, 0, 0, mats.cream); ab.userData.dynamic = true; shuttle(ab, 0.012, 20, 80, 100);
   }
 
   // ═══ 陸側 ═══
@@ -207,15 +207,15 @@ export function buildGrounds(THREE, c) {
   // 跑道的胎痕：兩端觸地帶各二十幾條深色的刷痕（真的跑道落地那一段都是黑的）。
   {
     const marks = []; let a = 17; const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
-    for (let i = 0; i < 26; i++) { const dz = (rnd() - 0.5) * 16, len = 20 + rnd() * 40; marks.push([R.x1 - 120 - rnd() * 90, 0.04, R.z + dz, 0, 1 + rnd()], [R.x0 + 120 + rnd() * 90, 0.04, R.z + dz, 0, 1 + rnd()]); void len; }
+    for (let i = 0; i < 26; i++) { const dz = (rnd() - 0.5) * 16, len = 20 + rnd() * 40; marks.push([R.x1 - 250 - rnd() * 120, 0.04, R.z + dz, 0, 1 + rnd()], [R.x0 + 250 + rnd() * 120, 0.04, R.z + dz, 0, 1 + rnd()]); void len; }
     world.add(instanced(new THREE.BoxGeometry(30, 0.02, 0.9), lam(P.asphalt.clone().lerp(P.navy, 0.35).multiplyScalar(0.8), { transparent: true, opacity: 0.55 }), marks, false));
   }
   // ═══ 第四批（2026-11-18）：地平線。台灣的機場旁邊就是海與山：西邊一片海（跑道盡頭再過去）加一條沙灘，北邊與南邊兩排山（後排更高更藍），
   // 陸側遠處一座城市（四十幾棟高矮不一的樓、幾棟深藍的高塔）、幾條樹帶。全部在 1 到 2 公里外，霧讓它們只剩輪廓，那正是遠山該有的樣子。 ═══
   {
     const seaM = lam(P.teal.clone().lerp(P.navy, 0.35), { emissive: P.teal, emissiveIntensity: 0.12, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });   // 要比草地藍得多，不然隔著霧分不出來；polygonOffset 加抬高 1 公尺，遠處才不會跟草地的面打架（z-fighting 的階梯紋）
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(7000, 9000), seaM); sea.rotation.x = -Math.PI / 2; sea.position.set(-1250 - 3500, 1.0, R.z); sea.receiveShadow = false; world.add(sea);
-    world.add(box(80, 2.2, 9000, mats.cream, -1250 + 40, 0.0, R.z, false), box(12, 0.14, 9000, lam(P.cream.clone().lerp(P.white, 0.6)), -1250 - 6, 1.02, R.z, false));   // 沙灘與一條白浪
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(7000, 9000), seaM); sea.rotation.x = -Math.PI / 2; sea.position.set(-1950 - 3500, 1.0, R.z); sea.receiveShadow = false; world.add(sea);
+    world.add(box(80, 2.2, 9000, mats.cream, -1950 + 40, 0.0, R.z, false), box(12, 0.14, 9000, lam(P.cream.clone().lerp(P.white, 0.6)), -1950 - 6, 1.02, R.z, false));   // 沙灘與一條白浪
     const front = [], back = []; let a = 23; const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
     for (let i = 0; i < 16; i++) { const x = -1500 + i * 210 + rnd() * 80; front.push([x, 0, 1450 + rnd() * 120, rnd() * 3, 0.7 + rnd() * 0.6], [x + 90, 0, -1350 - rnd() * 120, rnd() * 3, 0.6 + rnd() * 0.6]); back.push([x + 60, 0, 1900 + rnd() * 150, rnd() * 3, 1.1 + rnd() * 0.8], [x - 40, 0, -1800 - rnd() * 150, rnd() * 3, 1.0 + rnd() * 0.8]); }
     const mtn = new THREE.ConeGeometry(260, 320, 6); mtn.translate(0, 160, 0);

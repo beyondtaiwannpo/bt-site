@@ -30,19 +30,29 @@ export function buildRides(THREE, E, c) {
       const g = new THREE.Group(); g.position.set(p.x, 0, p.z); g.rotation.y = Math.atan2(side.x, side.z); world.add(g);
       if (station) {
         // 水上的站架在柱子上（Curriculum 那一頭）；機場那一頭直接站在平台上。
-        if (gondola.stilts && gondola.stilts.includes(i)) { g.add(mesh(rbox(7, 0.5, 6, 0.1), M.road, 0, -0.25, 0)); for (const [ox, oz] of [[-2.8, -2.3], [2.8, -2.3], [-2.8, 2.3], [2.8, 2.3]]) g.add(mesh(new THREE.CylinderGeometry(0.3, 0.35, 2.6, 8), M.dark, ox, -1.6, oz, false)); }
-        g.add(mesh(rbox(5.2, 3.0, 4.2, 0.12), M.wall, 0, 1.5, 0), mesh(rbox(5.8, 0.3, 4.8, 0.06), M.orange, 0, 3.15, 0), mesh(rbox(2.2, 0.2, 5.2, 0.05), M.wood, 0, 0.1, 0, false));
+        if (gondola.stilts && gondola.stilts.includes(i)) { g.add(mesh(rbox(9, 0.5, 9, 0.1), M.road, 0, -0.25, 0)); for (const [ox, oz] of [[-3.8, -3.8], [3.8, -3.8], [-3.8, 3.8], [3.8, 3.8]]) g.add(mesh(new THREE.CylinderGeometry(0.3, 0.35, 2.6, 8), M.dark, ox, -1.6, oz, false)); }
+        // 批 D：兩站都架在水上的柱子上（機場那站原本擠在跑道與平台邊之間 4 公尺的人行帶裡，樓梯落在跑道上）。Curriculum 那站加一段棧橋到島上。
+        if (i === last) { const il = { x: -22.5, z: 13 }; const bx = il.x - p.x, bz = il.z - p.z, bl = Math.hypot(bx, bz); const bw = mesh(rbox(bl * 0.55, 0.2, 1.6, 0.04), M.wood, 0, 0, 0, false); bw.position.set(p.x + bx * 0.3, -0.1, p.z + bz * 0.3); bw.rotation.y = -Math.atan2(bz, bx); world.add(bw); }
+        // 2026-11-18 Paul「the gondola doesn't have a station」：之前的站是地上一棟 3 公尺的小房子，廂在 7.6 公尺高飛過去，等於沒有站。
+        // 現在站是真的站：售票的小房子在地上，上面一層月台剛好在廂的地板高度（dy），四根柱子撐著、頂上一片屋頂罩著大輪，一道斜坡樓梯上去，排隊的人跟操作員都在月台上。
+        const dy = gondola.h - 3.45;
+        g.add(mesh(rbox(5.2, 3.0, 4.2, 0.12), M.wall, 0, 1.5, 0), mesh(rbox(2.2, 0.2, 5.2, 0.05), M.wood, 0, 0.1, 0, false));
         for (let k = 0; k < 3; k++) g.add(mesh(rbox(0.5, 0.5, 0.08, 0.06), M.light, -1.4 + k * 1.4, 1.6, 2.12, false));
-        const wheel = mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.25, 20), M.dark, 0, gondola.h, 0, false); g.add(wheel);
-        g.add(mesh(new THREE.CylinderGeometry(0.12, 0.14, gondola.h - 3.2, 8), M.dark, -1.6, 3.2 + (gondola.h - 3.2) / 2, 0, false), mesh(new THREE.CylinderGeometry(0.12, 0.14, gondola.h - 3.2, 8), M.dark, 1.6, 3.2 + (gondola.h - 3.2) / 2, 0, false), mesh(rbox(3.6, 0.3, 0.3, 0.05), M.dark, 0, gondola.h - 0.2, 0, false));
-        for (let k = 0; k < 4; k++) g.add(mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.0, 6), M.dark, -2.4 + (k % 2) * 4.8, 0.5, 2.6 + Math.floor(k / 2) * 1.2, false));
-        for (const z of [2.6, 3.8]) g.add(mesh(rbox(4.8, 0.04, 0.04, 0.01), M.orange, 0, 0.95, z, false));
-        const q = [makePerson({ shirt: 1, pack: true }), makePerson({ shirt: 3, bag: true }), makePerson({ shirt: 5 })]; q.forEach((pp, k) => { pp.position.set(-1.8 + k * 1.2, 0, 3.2); pp.rotation.y = Math.PI; g.add(pp); });
-        const op = makePerson({ shirt: 3, hat: true }); op.position.set(2.0, 0, -1.2); op.rotation.y = Math.PI / 2; g.add(op);
+        g.add(mesh(rbox(7.2, 0.3, 6.2, 0.06), M.wood, 0, dy, 0), mesh(rbox(8.0, 0.3, 7.0, 0.06), M.orange, 0, gondola.h + 1.9, 0));
+        for (const [ox, oz] of [[-3.4, -2.9], [3.4, -2.9], [-3.4, 2.9], [3.4, 2.9]]) g.add(mesh(new THREE.CylinderGeometry(0.2, 0.24, gondola.h + 1.9, 8), M.dark, ox, (gondola.h + 1.9) / 2, oz, false));
+        for (const z of [-2.95, 2.95]) g.add(mesh(rbox(7.2, 0.05, 0.05, 0.01), M.dark, 0, dy + 1.05, z, false), mesh(rbox(7.2, 0.05, 0.05, 0.01), M.dark, 0, dy + 0.6, z, false));
+        for (const x of [-3.55, 3.55]) for (const z of [-2.45, 2.45]) g.add(mesh(rbox(0.05, 1.1, 1.0, 0.01), M.dark, x, dy + 0.6, z, false));
+        const wheel = mesh(new THREE.TorusGeometry(1.25, 0.12, 8, 28), M.dark, 0, gondola.h, 0, false); wheel.rotation.x = Math.PI / 2; g.add(wheel);   // 大輪是一個環，纜繩繞在輪緣（批 D）
+        g.add(mesh(new THREE.CylinderGeometry(0.12, 0.14, gondola.h - dy, 8), M.dark, -1.6, dy + (gondola.h - dy) / 2, 0, false), mesh(new THREE.CylinderGeometry(0.12, 0.14, gondola.h - dy, 8), M.dark, 1.6, dy + (gondola.h - dy) / 2, 0, false), mesh(rbox(3.6, 0.3, 0.3, 0.05), M.dark, 0, gondola.h - 0.2, 0, false));
+        // 上月台走電梯（批 D）：一座 1.8 公尺見方的電梯塔在月台角落，地面與月台各一道門；之前的斜坡樓梯不是落在跑道上就是落在海裡。
+        g.add(mesh(rbox(1.8, gondola.h + 1.9, 1.8, 0.06), M.wall, -3.0, (gondola.h + 1.9) / 2, 3.1), mesh(rbox(0.9, 2.0, 0.06, 0.02), M.dark, -3.0, 1.0, 2.2, false), mesh(rbox(0.9, 2.0, 0.06, 0.02), M.dark, -2.1, dy + 1.0, 3.1, false).rotateY(Math.PI / 2), mesh(rbox(0.3, 0.3, 0.06, 0.02), M.light, -3.0, 2.3, 2.2, false));
+        for (let k = 0; k < 4; k++) g.add(mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.0, 6), M.dark, -2.4 + (k % 2) * 4.8, dy + 0.65, -2.4 + Math.floor(k / 2) * 0.8, false));
+        const q = [makePerson({ shirt: 1, pack: true }), makePerson({ shirt: 3, bag: true }), makePerson({ shirt: 5 })]; q.forEach((pp, k) => { pp.position.set(-1.8 + k * 1.2, dy + 0.15, -2.4); pp.rotation.y = 0; g.add(pp); });
+        const op = makePerson({ shirt: 3, hat: true }); op.position.set(2.6, dy + 0.15, 2.2); op.rotation.y = -Math.PI / 2; g.add(op);
       } else {
         for (const [ox, oz] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) { const leg = mesh(new THREE.CylinderGeometry(0.1, 0.16, gondola.h + 0.4, 6), M.wall, ox * 0.5, gondola.h / 2, oz * 0.5, false); leg.rotation.z = -ox * 0.07; leg.rotation.x = oz * 0.07; g.add(leg); }
         for (let y = 2.5; y < gondola.h - 1; y += 3) { g.add(mesh(rbox(1.3, 0.08, 0.08, 0.02), M.wall, 0, y, 0.55, false), mesh(rbox(1.3, 0.08, 0.08, 0.02), M.wall, 0, y, -0.55, false), mesh(rbox(0.08, 0.08, 1.3, 0.02), M.wall, 0.55, y, 0, false), mesh(rbox(0.08, 0.08, 1.3, 0.02), M.wall, -0.55, y, 0, false)); }
-        g.add(mesh(rbox(3.2, 0.25, 0.3, 0.05), M.dark, 0, gondola.h + 0.2, 0, false), mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 12), M.dark, -1.2, gondola.h, 0, false), mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 12), M.dark, 1.2, gondola.h, 0, false), mesh(new THREE.SphereGeometry(0.16, 8, 6), M.amber, 0, gondola.h + 0.5, 0, false));
+        g.add(mesh(rbox(3.2, 0.25, 0.3, 0.05), M.dark, 0, gondola.h + 0.2, 0, false), mesh(new THREE.SphereGeometry(0.16, 8, 6), M.amber, 0, gondola.h + 0.5, 0, false)); for (const sz of [-1.2, 1.2]) { const sh = mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 12), M.dark, 0, gondola.h - 0.3, sz, false); sh.rotation.x = Math.PI / 2; g.add(sh); }   // 滑輪立著、在纜繩底下（批 D：之前躺平、纜繩從輪心穿過）
       }
     }
     // 兩條纜繩：去程在 side 的 +1.2、回程在 -1.2，兩塔之間垂一點。
@@ -59,7 +69,10 @@ export function buildRides(THREE, E, c) {
       E.mergeChildren(g); cabins.push(g);
     }
     const L = loop.getLength(); let u0 = 0; const tangent = new THREE.Vector3();
-    ticks.push((dt, t) => { u0 = (u0 + dt * (gondola.speed || 1.5) / L) % 1; for (let i = 0; i < N; i++) { const u = (u0 + i / N) % 1; const p = loop.getPointAt(u); loop.getTangentAt(u, tangent); const g = cabins[i]; g.position.copy(p); g.rotation.set(Math.sin(t * 1.7 + i) * 0.025, Math.atan2(tangent.x, tangent.z), Math.sin(t * 1.3 + i * 2) * 0.03); } });
+    // 進站慢下來（批 D）：兩個站附近 8 公尺內速度降到兩成。用一張表把「均勻的時間參數」對到「閉環上的位置」，廂在站裡擠在一起、在線上拉開，像真的脫掛式纜車。
+    const NW = 512, warp = [0]; { const ends = [pts[first], pts[last]]; let acc = 0; for (let k = 0; k < NW; k++) { const p = loop.getPointAt((k + 0.5) / NW); const d = Math.min(...ends.map(e => Math.hypot(p.x - e.x, p.z - e.z))); acc += 1 / (0.2 + 0.8 * Math.min(1, Math.max(0, (d - 3) / 8))); warp.push(acc); } for (let k = 0; k <= NW; k++) warp[k] /= acc; }
+    const warpAt = u => { const q = u * NW, k = Math.min(NW - 1, Math.floor(q)), f = q - k; return warp[k] + (warp[k + 1] - warp[k]) * f; };
+    ticks.push((dt, t) => { u0 = (u0 + dt * (gondola.speed || 1.5) * 0.7 / L) % 1; for (let i = 0; i < N; i++) { const u = warpAt((u0 + i / N) % 1); const p = loop.getPointAt(u); loop.getTangentAt(u, tangent); const g = cabins[i]; g.position.copy(p); g.rotation.set(Math.sin(t * 1.7 + i) * 0.025, Math.atan2(tangent.x, tangent.z), Math.sin(t * 1.3 + i * 2) * 0.03); } });
   }
 
   // ═══ 雲霄飛車（共用的軌道工廠）═══
@@ -74,7 +87,7 @@ export function buildRides(THREE, E, c) {
     for (let k = 0; k < ties; k++) { const p = curve.getPointAt(k / ties); curve.getTangentAt(k / ties, fwd); m3.lookAt(fwd, new THREE.Vector3(0, 0, 0), up); q.setFromRotationMatrix(m3); mx.compose(new THREE.Vector3(p.x, p.y - 0.15, p.z), q, s); tie.setMatrixAt(k, mx); }
     tie.castShadow = false; g.add(tie);
     const post = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.1, 1, 6), M.wall, posts); q.identity();
-    for (let k = 0; k < posts; k++) { const p = curve.getPointAt(k / posts); const h = Math.max(0.3, p.y - 0.35); s.set(1, h, 1); mx.compose(new THREE.Vector3(p.x, h / 2, p.z), q, s); post.setMatrixAt(k, mx); }
+    for (let k = 0; k < posts; k++) { const p = curve.getPointAt(k / posts); if (p.y > 6.5) continue; const h = Math.max(0.3, p.y - 0.35);   // 迴圈頂上不立柱（會打穿迴圈底，批 D） s.set(1, h, 1); mx.compose(new THREE.Vector3(p.x, h / 2, p.z), q, s); post.setMatrixAt(k, mx); }
     g.add(post); s.set(1, 1, 1);
     const train = new THREE.Group(); train.userData.dynamic = true;
     for (let ci = 0; ci < cars; ci++) { const car = mesh(rbox(1.0, 0.5, 0.7, 0.12), [M.yellow, M.teal, M.orange, M.navy][ci % 4], -ci * 1.1, 0, 0); train.add(car); train.add(head(-ci * 1.1 + 0.1, 0.42, -0.17, ci), head(-ci * 1.1 + 0.1, 0.42, 0.17, ci + 1)); if (o.armsUp) for (const dz of [-0.17, 0.17]) train.add(mesh(rbox(0.08, 0.4, 0.08, 0.02), M.skin[ci % 3], -ci * 1.1 + 0.1, 0.72, dz * 1.6, false)); }
@@ -96,7 +109,7 @@ export function buildRides(THREE, E, c) {
     const g = base(it.x, it.z, it.r);
     const r = it.r;
     track(g, [[-6, 1.0, 2.0], [-3, 1.0, 2.0], [0, 6.5, 2.0], [3, 7.5, 2.0], [5.5, 2.0, 1.6], [7.0, 3.6, 0.6], [6.4, 7.0, -0.4], [4.2, 8.2, -1.0], [2.0, 7.0, -1.4], [1.4, 3.6, -1.0], [2.6, 1.4, -0.2], [5.5, 1.2, -3.0], [3.0, 4.2, -5.5], [-1.0, 1.2, -5.5], [-4.5, 3.8, -4.5], [-6.5, 1.4, -1.5]], M.teal, 4, { tension: 0.4, armsUp: true });
-    station(g, -6, 2.0, Math.PI / 2, M.teal);
+    station(g, -6, 5.2, Math.PI, M.teal, true); g.add(mesh(rbox(4.0, 0.12, 0.9, 0.03), M.wood, -5.5, 0.72, 3.0, false), mesh(rbox(4.0, 0.04, 0.04, 0.01), M.dark, -5.5, 1.5, 3.4, false));   // 批 D：站搬到軌道旁（之前房子罩在軌道上、排隊的人站在軌道裡），月台在 z 3
     for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; g.add(mesh(rbox(0.3, 0.5, 0.03, 0.02), [M.orange, M.teal, M.yellow][k % 3], Math.cos(a) * (r - 1.0), 2.4, Math.sin(a) * (r - 1.0), false), mesh(new THREE.CylinderGeometry(0.03, 0.04, 2.6, 5), M.dark, Math.cos(a) * (r - 1.0) - 0.15, 1.3, Math.sin(a) * (r - 1.0), false)); }
     const kiosk = E.kiosk(M.orange); kiosk.position.set(-2, 0, -2.5); kiosk.rotation.y = 0.4; g.add(kiosk);
     const b = E.bench(M.teal); b.position.set(2, 0, 5); b.rotation.y = Math.PI; g.add(b);
@@ -108,7 +121,7 @@ export function buildRides(THREE, E, c) {
     const pts = [[-4.5, 3.2, -5], [4.5, 3.2, -5], [4.5, 3.2, -3], [-4.5, 3.0, -3], [-4.5, 2.8, -1], [4.5, 2.6, -1], [4.5, 2.4, 1], [-4.5, 2.0, 1], [-4.5, 1.4, 3], [4.0, 1.0, 3.2], [5.5, 1.0, 0], [5.5, 3.2, -6.5], [-4.5, 3.4, -6.5]];
     const curve = track(g, pts, M.yellow, 1, { tension: 0.15 });
     for (let k = 1; k < 3; k++) { const train = new THREE.Group(); train.userData.dynamic = true; train.add(mesh(rbox(1.0, 0.5, 0.7, 0.12), [M.orange, M.navy][k - 1], 0, 0, 0), head(0.1, 0.42, -0.17, k), head(0.1, 0.42, 0.17, k + 1)); g.add(train); coasters.push({ curve, train, t: k / 3 }); E.mergeChildren(train); }
-    station(g, 0, 5.0, 0, M.yellow, true);
+    station(g, 0, 5.0, 0, M.yellow, true); g.add(mesh(rbox(4.0, 0.12, 0.8, 0.03), M.wood, 0, 0.9, 4.3, false));   // 月台在 z 3 那段軌道旁（批 D）
     E.treePlaces.push([it.x - 6.8, it.z + 2.5, 0.9, 1], [it.x + 7, it.z + 3, 1.0, 0]);
   }
   // 遊樂小島：摩天輪（最高的東西）、旋轉木馬、票亭、一排燈、長凳、幾個人。
@@ -122,6 +135,9 @@ export function buildRides(THREE, E, c) {
     for (const dz of [-0.6, 0.6]) { const ring = mesh(new THREE.TorusGeometry(R, 0.1, 6, 36), M.orange, 0, 0, dz, false); wheel.add(ring); for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; const sp = mesh(rbox(R, 0.08, 0.08, 0.02), M.orange, Math.cos(a) * R / 2, Math.sin(a) * R / 2, dz, false); sp.rotation.z = a; wheel.add(sp); } }
     for (let k = 0; k < 24; k++) { const a = k / 24 * TAU; wheel.add(mesh(new THREE.SphereGeometry(0.1, 6, 5), k % 2 ? M.light : M.amber, Math.cos(a) * R, Math.sin(a) * R, 0, false)); }
     wheel.add(mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.4, 12), M.navy, 0, 0, 0, false).rotateX(Math.PI / 2));
+    // 上車的月台（批 D）：最低那個廂旁邊兩階小台、一條欄、兩個等的人。
+    g.add(mesh(rbox(2.6, 0.3, 1.6, 0.04), M.wood, wx, 0.15, wz + 2.4, false), mesh(rbox(2.6, 0.3, 0.8, 0.04), M.wood, wx, 0.45, wz + 2.0, false), mesh(rbox(2.6, 0.04, 0.04, 0.01), M.dark, wx, 1.25, wz + 3.2, false));
+    for (const [px, sh] of [[wx - 0.7, 2], [wx + 0.6, 5]]) { const pp = makePerson({ shirt: sh, scale: 1.1 }); pp.position.set(px, 0.3, wz + 2.6); pp.rotation.y = Math.PI; g.add(pp); }
     const pods = [];
     for (let k = 0; k < 12; k++) { const pod = new THREE.Group(); pod.userData.dynamic = true; g.add(pod); pod.add(mesh(rbox(1.0, 0.9, 1.0, 0.25), [M.teal, M.yellow, M.navy, M.cream][k % 4], 0, -0.9, 0), mesh(rbox(1.1, 0.2, 1.1, 0.05), M.orange, 0, -0.35, 0, false), mesh(rbox(0.06, 0.5, 0.06, 0.01), M.dark, 0, -0.15, 0, false)); if (k % 3 !== 2) pod.add(head(-0.2, -0.75, 0.1, k), head(0.2, -0.75, -0.1, k + 2)); E.mergeChildren(pod); pods.push(pod); }
     E.mergeChildren(wheel);
@@ -135,7 +151,7 @@ export function buildRides(THREE, E, c) {
     for (const h of horses) E.mergeChildren(h);
     ticks.push((dt, t) => { car.rotation.y += dt * 0.35; horses.forEach((h, k) => { h.position.y = 0.2 + Math.sin(t * 2.2 + k) * 0.18; }); });
     // 票亭、燈、長凳、幾個人在逛。
-    const kiosk = E.kiosk(M.teal); kiosk.position.set(0.5, 0, -6.2); kiosk.rotation.y = Math.PI; g.add(kiosk);
+    const kiosk = E.kiosk(M.teal); kiosk.position.set(0.5, 0, -6.2); kiosk.rotation.y = 0; g.add(kiosk);   // 面向島內（批 D：之前朝海）
     for (let k = 0; k < 4; k++) { const l = E.lamp(); const a = k / 4 * TAU + 0.4; l.position.set(Math.cos(a) * (it.r - 1.8), 0, Math.sin(a) * (it.r - 1.8)); g.add(l); }
     const b = E.bench(M.orange); b.position.set(-1, 0, 6.5); b.rotation.y = Math.PI; g.add(b);
     [[-5.5, 4, 0.5, 2], [1.5, -3, -0.4, 5], [6.5, -1, 1.6, 1], [-6, -3, 2.4, 4]].forEach(([px, pz, ry, sh], k) => { const pp = makePerson({ shirt: sh, pack: k % 2 === 1, scale: 1.1 }); pp.position.set(px, 0, pz); pp.rotation.y = ry; g.add(pp); });
@@ -148,7 +164,7 @@ export function buildRides(THREE, E, c) {
     g.add(mesh(rbox(6.4, 0.9, 2.4, 0.3), M.cream, 0, 0.1, 0), mesh(rbox(3.4, 1.1, 1.9, 0.12), M.teal, -0.4, 1.1, 0), mesh(rbox(3.5, 0.3, 2.0, 0.05), M.white, -0.4, 1.8, 0, false), mesh(new THREE.CylinderGeometry(0.22, 0.26, 1.0, 8), M.orange, -1.4, 2.4, 0, false), mesh(rbox(0.08, 1.4, 0.08, 0.02), M.dark, 2.4, 1.3, 0, false), mesh(rbox(0.6, 0.4, 0.04, 0.02), M.orange, 2.4, 1.9, 0.3, false));
     for (let k = 0; k < 3; k++) g.add(mesh(rbox(0.6, 0.6, 0.06, 0.06), M.light, -1.2 + k * 0.9, 1.15, 0.97, false), mesh(rbox(0.6, 0.6, 0.06, 0.06), M.light, -1.2 + k * 0.9, 1.15, -0.97, false));
     [[2.0, 0.6, 1], [2.6, -0.5, 3], [1.4, -0.7, 5]].forEach(([px, pz, sh]) => { const pp = makePerson({ shirt: sh, scale: 1.0 }); pp.position.set(px, 0.55, pz); pp.rotation.y = -Math.PI / 2; g.add(pp); });
-    for (const [x, z] of [f.a, f.b]) { const d = new THREE.Group(); d.position.set(x, 0, z); world.add(d); d.add(mesh(rbox(5, 0.25, 2.2, 0.06), M.wood, 0, 0.1, -2.4, false)); for (const [ox, oz] of [[-2, -1.5], [2, -1.5], [-2, -3.3], [2, -3.3]]) d.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, 1.6, 6), M.dark, ox, -0.5, oz, false)); const l = E.lamp(); l.position.set(2, 0.2, -3.2); d.add(l); }
+    for (const [[x, z], land] of [[f.a, f.la], [f.b, f.lb]]) { const d = new THREE.Group(); d.position.set(x, 0, z); if (land) d.rotation.y = Math.atan2(-(land[0] - x), -(land[1] - z)); world.add(d); d.add(mesh(rbox(5, 0.25, 2.2, 0.06), M.wood, 0, 0.1, -2.4, false)); for (const [ox, oz] of [[-2, -1.5], [2, -1.5], [-2, -3.3], [2, -3.3]]) d.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, 1.6, 6), M.dark, ox, -0.5, oz, false)); const l = E.lamp(); l.position.set(2, 0.2, -3.2); d.add(l); }
     E.mergeChildren(g); E.ferryObj = g;   // water.js 畫渡輪的尾浪要知道它在哪
     const span = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]), ux = (f.b[0] - f.a[0]) / span, uz = (f.b[1] - f.a[1]) / span; let s = 0, dir = 1, hold = 0, yaw = Math.atan2(ux, uz) + Math.PI / 2;
     // 到頭停 6 秒，停的時候慢慢把船頭轉過去（批 B，之前同一幀翻 180 度）；開的時候先慢後快再慢。
