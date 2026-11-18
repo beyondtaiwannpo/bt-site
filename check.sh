@@ -1891,22 +1891,26 @@ fi
 
 # ════════ /island/ BT 島（2026-11-16）════════
 #
-# 這一頁沒有 GSAP（每一幀的迴圈是 requestAnimationFrame，關在 scene.js 的 motion() 裡，main.js 只在沒開減少動態效果時呼叫）。
-# Three 跟 /history/ /stories/ 同一條：只從 cdnjs 載、importmap 帶正確的雜湊、只有 scene.js import、沒有模型檔、JS 小於 250 KB。
+# 這一頁沒有 GSAP（每一幀的迴圈是 requestAnimationFrame，關在 shared/toy.js 的 motion() 裡，main.js 只在沒開減少動態效果時呼叫）。
+# Three 跟 /history/ /stories/ 同一條：只從 cdnjs 載、importmap 帶正確的雜湊、只有 scene.js 與 shared/toy.js import、沒有模型檔、JS 小於 250 KB。
+# 2026-11-17 引擎（圓角盒子、人、橋、鏡頭、motion()）抽到 shared/toy.js 給 /island/ 與 /history/ 共用；island/src/scene.js 只剩版面與牌子。
 isMotion=$(node -e '
   const fs = require("fs");
   const strip = c => c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   const bad = [];
-  const code = strip(fs.readFileSync("island/src/scene.js", "utf8"));
+  // 2026-11-17 引擎抽到 shared/toy.js：每一幀的迴圈只在 toy.js 的 function motion( 裡；island/src 整個資料夾一個 requestAnimationFrame 都不准有。
+  const code = strip(fs.readFileSync("shared/toy.js", "utf8"));
   const head = code.indexOf("function motion(");
-  if (head < 0) bad.push("scene.js 找不到 function motion(");
+  if (head < 0) bad.push("shared/toy.js 找不到 function motion(");
   else {
     let i = code.indexOf(") {", head) + 2, depth = 0; const from = i; let to = -1;
     for (; i < code.length; i++) { if (code[i] === "{") depth++; else if (code[i] === "}") { depth--; if (depth === 0) { to = i; break; } } }
     if (to < 0) bad.push("motion() 的大括號沒有收尾");
-    for (const m of code.matchAll(/requestAnimationFrame\(/g)) if (!(m.index > from && m.index < to)) bad.push("scene.js 在 motion() 外面用了 requestAnimationFrame（第 " + code.slice(0, m.index).split("\n").length + " 行）");
+    for (const m of code.matchAll(/requestAnimationFrame\(/g)) if (!(m.index > from && m.index < to)) bad.push("shared/toy.js 在 motion() 外面用了 requestAnimationFrame（第 " + code.slice(0, m.index).split("\n").length + " 行）");
+    if (/\bgsap\./.test(code)) bad.push("shared/toy.js 用到了 gsap（引擎只用 requestAnimationFrame）");
   }
-  for (const f of fs.readdirSync("island/src")) { if (f === "scene.js") continue; const c = strip(fs.readFileSync("island/src/" + f, "utf8")); if (/requestAnimationFrame\(|\bgsap\./.test(c)) bad.push("island/src/" + f + " 有每一幀的迴圈或 gsap（只准 scene.js 的 motion()）"); }
+  for (const f of fs.readdirSync("shared").filter(f => f.endsWith(".js") && f !== "toy.js")) { const c = strip(fs.readFileSync("shared/" + f, "utf8")); if (/requestAnimationFrame\(/.test(c)) bad.push("shared/" + f + " 有每一幀的迴圈（只准 toy.js 的 motion()）"); }
+  for (const f of fs.readdirSync("island/src")) { const c = strip(fs.readFileSync("island/src/" + f, "utf8")); if (/requestAnimationFrame\(|\bgsap\./.test(c)) bad.push("island/src/" + f + " 有每一幀的迴圈或 gsap（只准 shared/toy.js 的 motion()）"); }
   const main = fs.readFileSync("island/src/main.js", "utf8");
   if (!main.includes("matchMedia(\"(prefers-reduced-motion: reduce)\")")) bad.push("main.js 找不到 prefers-reduced-motion 的判斷");
   if (!/else if \(!reduce && !motionOff\) loop = scene\.motion\(\);/.test(main)) bad.push("main.js 少了「沒開減少動態效果才呼叫 scene.motion()」那一行");
@@ -1914,7 +1918,7 @@ isMotion=$(node -e '
   if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
 ' 2>&1)
 if [ $? -eq 0 ]; then
-  ok "/island/ 的每一幀迴圈全部關在 scene.js 的 motion() 裡，reduce 就不呼叫"
+  ok "/island/ 的每一幀迴圈全部關在 shared/toy.js 的 motion() 裡，reduce 就不呼叫"
 else
   bad "/island/ 有動畫跑到 motion() 外面："
   printf '%s\n' "$isMotion"
@@ -1938,8 +1942,16 @@ isThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
   for (const f of fs.readdirSync("island/src")) {
     const c = fs.readFileSync("island/src/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     const uses = /from\s+["\x27]three["\x27]/.test(c) || /import\(\s*["\x27]three["\x27]/.test(c);
-    if (uses && f !== "scene.js") bad.push("island/src/" + f + " import 了 three（只准 scene.js）");
+    if (uses && f !== "scene.js") bad.push("island/src/" + f + " import 了 three（只准 scene.js 與 shared/toy.js）");
     if (!uses && f === "scene.js") bad.push("scene.js 沒有從 importmap 的 three 載");
+    if (/toy\.js/.test(c) && f !== "scene.js") bad.push("island/src/" + f + " import 了 shared/toy.js（引擎只准 scene.js 用）");
+  }
+  // shared/ 裡只有 toy.js 准 import three（2026-11-17 引擎抽出來），而且 toy.js 只准 import three（依賴方向只往下，SHARED_UP 那條另外守）。
+  for (const f of fs.readdirSync("shared").filter(f => f.endsWith(".js"))) {
+    const c = fs.readFileSync("shared/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const uses = /from\s+["\x27]three["\x27]/.test(c);
+    if (uses && f !== "toy.js") bad.push("shared/" + f + " import 了 three（只准 toy.js）");
+    if (f === "toy.js") { if (!uses) bad.push("shared/toy.js 沒有 import three"); for (const m of c.matchAll(/^\s*import\s[^;]*from\s+["\x27]([^"\x27]+)["\x27]/gm)) if (m[1] !== "three") bad.push("shared/toy.js import 了 " + m[1] + "（引擎只准 import three）"); }
   }
   // 模型與貼圖一律程式幾何；唯一的例外是 island/posts/：Marketing 貼文牆的縮圖（2026-11-17 Paul 要真的圖），
   // 檔名只能是 Instagram 的代號、每張不超過 80 KB、最多 12 張，而且每一張都要在 posts.json 裡被用到。
@@ -1963,7 +1975,7 @@ isThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
   if (bad.length) { console.log("  " + bad.join("\n  ")); process.exit(1); }
 ' 2>&1)
 if [ $? -eq 0 ]; then
-  ok "/island/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 scene.js import 它、沒有模型檔、人沒有未經同意的名字"
+  ok "/island/ 的 Three 只從 cdnjs 載、importmap 帶正確的 integrity、只有 scene.js 與 shared/toy.js import 它、沒有模型檔、人沒有未經同意的名字"
 else
   bad "/island/ 的 Three 或資料不對："
   printf '%s\n' "$isThree"

@@ -4718,6 +4718,16 @@ Paul 看了正式站：人還是穿過房子、一堆人擠在同一點不動、
 - **五座裝飾小島**（`layout.js` 的 `ISLETS`，不能點、人不會去）：雲霄飛車（閉合軌道、柱子、三節小車上坡慢下坡快、售票亭、彩旗）、燈塔（光會轉、小屋）、野餐（桌傘樹）、棕櫚（三棵、毛巾）、礁石（海鷗）。全景的 fit 放大到 68 × 48。
 - 截圖：`docs/island/2026-11-17-islets-*.jpg`。
 
+### 島的引擎抽到 `shared/toy.js`（2026-11-17 第十一次，批 1）
+
+Paul 對「`shared/` 多一支檔」說「Yes, shared file」。`/history/` 要改成跟島同一套做法，兩個資料夾又不准互相 import，所以把島的引擎抽出來共用，兩頁都 import 它：
+- **`shared/toy.js`（約 790 行）**：圓角盒子 `rbox`、島的身體三種形狀、七色混色、材質表、canvas 地面八種花紋、建築十三種（含機場：跑道、滑行道、機坪、塔台、機棚、三架飛機）、小飛機、桌椅燈花箱攤子、`furnish`（每座島都有的那一套）與 `decorate`（七種 scenery）、橋四種加滑水道、協作線、裝飾小島五種、小船、熱氣球、雲、樹與矮樹與柱子一次畫完、大頭小人 `makePerson` 與 `pose`、`addWalker`、鏡頭（阻尼、拖曳、滾輪、兩指、對中間空出來那一塊）、射線、牌子（`project` / `putPin`，只改 transform）、貼文牆貼圖 `paintBoards`、畫字的板子 `textPlane`、`debugWalkers`，與**整個 `motion()`**（人的狀態機：繞路、坐、聊、盪鞦韆、溜滑梯、過橋、坐滑水道；雲、雲霄飛車、燈塔、熱氣球、小船、飛機）。
+- **`island/src/scene.js` 從 814 行剩 144 行**：只剩「哪座島在哪、島上放什麼、牌子怎麼排、點了怎麼辦」。導航（`islandOf`、`wanderTarget`、`detour`、`route`、`routePoints`）還在 `layout.js`，用參數交給引擎的 `motion(nav)`；引擎自己不知道有幾座島、哪一座叫什麼。
+- **引擎裡沒有任何一頁的字**：沒有 team 的字、沒有站的字、沒有色碼。頁面自己的東西（機場在哪、聚會所叫什麼）全部是參數。
+- **守門跟著改**（`check.sh`）：Three 只准 `shared/toy.js` 與各頁的 `scene.js` import；`shared/` 裡只有 toy.js 准 import three，而且 toy.js 只准 import three（依賴方向只往下）；每一幀的迴圈（requestAnimationFrame）只准在 toy.js 的 `function motion(` 裡，`island/src/` 整個資料夾一個都不准有；`island/src/` 只有 scene.js 准 import toy.js。
+- **畫面一模一樣**：Chrome 實測 60 fps、43 個人、1637 個 mesh、0 個卡住；截圖 `docs/island/island-12-shared-engine-chrome.jpg`。測試 942、check.sh、check-motion、check-mobile 全過。
+- 下一批：`/history/` 用這支引擎重做（計畫在 `docs/2026-11-17-歷史之路改成島的做法計畫.md`）。
+
 ### 島在前面，路在島裡（2026-11-17 第十次）
 
 Paul：「swapping link and the road live inside the island. So I am not putting the road at the front anymore.」
