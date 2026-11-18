@@ -4647,6 +4647,27 @@ Paul 看完批 4 第三輪在線上的樣子，否決了 2.5D 的畫法：「飛
 - 順手：島上機場的滑行道邊加三顆黃燈（Paul：「three yellow dots on the taxiway」），截圖 `docs/island/2026-11-17-taxiway-lights.png`。
 - 那條海上的路的做法留在 git（da87edc）與 `docs/2026-11-17-歷史之路改成島的做法計畫.md`，以後要回頭看得到。
 
+## 歷史之路（2026-11-17，順不順批 1：影子、一幀畫一次、像素密度）
+
+Paul：「optimize everything the road… make it more smooth and what's not working so well」。先量再改（本機 Chrome，`http://localhost:8765/history/`，滾輪掛鉤數每一幀的 draw call）：
+
+| | 改前 | 改後 |
+|---|---|---|
+| 站著不動（航廈）| 60 fps，一幀 20 ms（沒有餘裕）、712 個 draw call | 60 fps，19 ms、639 個 draw call（renderer.info 單幀 525）|
+| 整趟捲完 | 56 fps，最糟的一幀 227 ms，換站時三次 50 到 80 ms 的卡 | 59.9 fps，最糟 48 ms |
+| 畫布 | 2940 × 1602（像素密度 2）| 2205 × 1201（1.5，跟島一樣）|
+
+改了四件（`history/src/scene.js`、`main.js`、`airport.js`）：
+- **陰影貼圖不再每一幀重畫**：`shadowMap.autoUpdate = false`，鏡頭看的點走了 3 公尺（室外 8）、飛機動了 2 公尺、或半秒沒畫過才重畫一次（`shadowTick`）。太陽也只在那時候搬。
+- **一幀只畫一次**：之前捲動時 `onProgress` 畫一次、ticker 又畫一次。現在只有 ticker 畫，`onProgress` 只改進度（沒有 ticker 的瞬間跳站才補畫）。
+- **像素密度上限 1.5、手機 1.25**（`airport.js` 的 `quality`），跟島一樣。
+- **小東西不投影**：人（腳下自帶一圈，跟島一樣）與半徑 0.6 公尺以下的零件（燈、牌、盆栽）不進陰影貼圖，`pruneCasters()` 蓋完與放完小場景各跑一次。投影的 mesh 剩 165。
+- `?debug=1` 會把場景掛在 `window.__road`（`__road.scene`、`__road.renderer.info`）。
+
+**量出來還沒解的**：航廈那一幀 525 個 draw call 裡約 470 個是人。大頭 chibi 一個人十二三個 mesh，航廈裡三十幾個人就是四百多個 draw call，這是現在一幀 19 ms 的主因，影子只是一小半。
+解法是把人改成 InstancedMesh（每一種零件一個，三十個人的腿一次畫），一幀少四百個 draw call；動的人每一幀改 instance 的矩陣就好。這會動到 `shared/toy.js` 的 `peopleKit`（島也用），算順不順的下一批。
+換站那幾下卡（看板重畫貼圖、年份帶整段重建）是批 2，卡與年份帶的點用 transform 是批 3，鏡頭與畫面那幾件是批 4（等 Paul 挑）。測試 942、check.sh、check-motion、check-mobile 全過。
+
 ## BT 島 `/island/`（2026-11-16）
 
 Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項，島跟島、人跟人相連，還可以把自己放進去）之後定的：
