@@ -65,6 +65,12 @@ function renderStrip() {
   $("strip").innerHTML = UI.stripHTML(stops, current, lang);
   measureStrip(); placeDot();
 }
+// 換站只改 class 與那兩個數字，不重建整條年份帶（順不順批 2：之前每換一站 innerHTML 重來、再量一次每一顆的位置）。
+function updateStrip() {
+  const strip = $("strip"); if (!strip.querySelector(".strip-stop")) { renderStrip(); return; }
+  strip.querySelectorAll(".strip-stop").forEach((b, i) => { const on = i === current; b.classList.toggle("on", on); if (on) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current"); });
+  const pr = strip.querySelector(".strip-progress"); if (pr) { const sr = pr.querySelector(".sr"); pr.textContent = ""; if (sr) pr.appendChild(sr); pr.appendChild(document.createTextNode(UI.progressText(current, stops.length))); }
+}
 function measureStrip() {
   const box = $("strip").querySelector(".strip-stops");
   stripCentres = box ? [...box.querySelectorAll(".strip-stop")].map(b => b.offsetLeft + b.offsetWidth / 2) : [];
@@ -82,7 +88,7 @@ function setCurrent(i) {
   if (i === aim) aim = -1;
   if (i === current) return;
   current = i;
-  renderStrip(); revealCurrent(); paintGhost();
+  updateStrip(); revealCurrent(); paintGhost();
   if (gl) gl.setBoard(UI.boardRows(stops, current));
   // 網址寫上這一站。replaceState 不會讓瀏覽器自己跳。
   history.replaceState(null, "", location.pathname + location.search + D.hashFor(stops[i]));
@@ -286,6 +292,7 @@ async function boot() {
     const { palette, fonts } = paletteFromCSS();
     gl = S.createScene({ canvas: $("scene"), palette, phone, fonts });
     gl.setStops(w, motifs); gl.setBoard(UI.boardRows(stops, 0)); gl.setGate(A.boardingGate(stops.length));
+    gl.prepareBoard(stops.map((_, i) => UI.boardRows(stops, i)));   // 每一站那張看板趁閒的時候先做好（順不順批 2）
     // 捲動的長度：每站一屏，最少九屏（四段要有地方走；站少的時候不能三下就起飛）。
     $("road-wrap").style.height = `${Math.max(stops.length + 1, 9) * 100}vh`;
     size(); renderCards();

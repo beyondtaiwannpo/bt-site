@@ -396,7 +396,10 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // 出發看板：版面照 airport.js 的 boardLayout（寬 2048、列高至少 48 像素），現在這一站那一列整列橘底深藍字；站多到放不下就只畫現在這一站附近的幾列。
   // 換站的時候整塊翻一下（render() 看 boardFlip：先壓扁、換貼圖、再彈回來），翻牌看板的感覺。
   let boardFlip = null, boardCurrent = -1;
-  function setBoard(rows) {
+  // 看板的貼圖一站一張、做過就留著（2026-11-17 順不順批 2：之前每換一站就重畫一張 2048 寬的 canvas 再上傳 GPU，一幀卡 50 到 80 ms）。
+  // 站少（8 站以內）開頁後趁閒的時候先把每一站那張都做好、先上傳（renderer.initTexture），換站只是換 map；站多就用到才做、最多留 8 張。
+  const boardCache = new Map(); const BOARD_KEEP = 8;
+  function buildBoardTex(rows) {
     const lines = A.boardLines(rows), n = lines.length, L = A.boardLayout(n), current = Math.max(0, lines.findIndex(l => l.now));
     const from = A.boardWindow(n, current, L.visible);
     const cols = [60, 340, 1240, 1500, 1720];
@@ -408,10 +411,26 @@ export function createScene({ canvas, palette, phone, fonts }) {
       const col = l.now ? palette.navy : palette.cream;
       cols.forEach((x, k) => tl.push({ text: String(l.cells[k]).slice(0, k === 1 ? 34 : 12), x, y, font: `700 ${Math.round(L.rowH * 0.6)}px ${fonts.display}`, color: k === 4 && !l.now ? palette.sand : col }));
     });
-    const tex = textTexture(L.width, L.height, palette.navy, tl, rects);
+    return { tex: textTexture(L.width, L.height, palette.navy, tl, rects), current };
+  }
+  function boardTexFor(rows) {
+    const lines = A.boardLines(rows), current = Math.max(0, lines.findIndex(l => l.now));
+    let tex = boardCache.get(current);
+    if (!tex) { tex = buildBoardTex(rows).tex; boardCache.set(current, tex); renderer.initTexture(tex);
+      if (boardCache.size > BOARD_KEEP) for (const k of boardCache.keys()) { if (k !== current && k !== boardCurrent) { boardCache.get(k).dispose(); boardCache.delete(k); break; } } }
+    return { tex, current };
+  }
+  function setBoard(rows) {
+    const { tex, current } = boardTexFor(rows);
     if (boardCurrent >= 0 && boardCurrent !== current && boards[0].material.map) boardFlip = { tex, t0: null };
-    else boards.forEach(b => { if (b.material.map) b.material.map.dispose(); b.material.map = tex; b.material.needsUpdate = true; });
+    else boards.forEach(b => { b.material.map = tex; b.material.needsUpdate = true; });
     boardCurrent = current;
+  }
+  function prepareBoard(rowsByIndex) {
+    if (!rowsByIndex || rowsByIndex.length > BOARD_KEEP) return;
+    const idle = window.requestIdleCallback ? (f => window.requestIdleCallback(f, { timeout: 2000 })) : (f => setTimeout(f, 60));
+    let i = 0; const step = () => { while (i < rowsByIndex.length && boardCache.has(i)) i++; if (i >= rowsByIndex.length) return; boardTexFor(rowsByIndex[i]); i++; idle(step); };
+    idle(step);
   }
   function setGate(label) {
     const tex = textTexture(512, 136, palette.navy, [{ text: "GATE", x: 40, y: 68, font: `700 48px ${fonts.display}`, color: palette.sand }, { text: label, x: 472, y: 68, font: `700 92px ${fonts.display}`, color: palette.cream, align: "right" }]);
@@ -461,7 +480,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     if (boardFlip) {
       if (boardFlip.t0 == null) boardFlip.t0 = t;
       const u = (t - boardFlip.t0) / 0.5, sy = u < 0.5 ? 1 - u * 2 : Math.min(1, (u - 0.5) * 2);
-      if (u >= 0.5 && boardFlip.tex) { boards.forEach(b => { if (b.material.map) b.material.map.dispose(); b.material.map = boardFlip.tex; b.material.needsUpdate = true; }); boardFlip.tex = null; }
+      if (u >= 0.5 && boardFlip.tex) { boards.forEach(b => { b.material.map = boardFlip.tex; b.material.needsUpdate = true; }); boardFlip.tex = null; }   /* 舊的 map 不 dispose：在快取裡，下次換回來直接用 */
       boards.forEach(b => { b.scale.y = Math.max(0.02, sy); });
       if (u >= 1) boardFlip = null;
     }
@@ -483,7 +502,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // createScene 蓋完叫一次，setStops 放完小場景再叫一次。
   function pruneCasters() { world.traverse(m => { if (!m.isMesh || !m.castShadow || m.isInstancedMesh) return; const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const r = g.boundingSphere ? g.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) : 1; if (r < 0.6) m.castShadow = false; }); renderer.shadowMap.needsUpdate = true; }
   pruneCasters();
-  return { setStops, setBoard, setGate, resize, render, project, dispose, renderer, scene, camera, stopMarkers: () => stopMarkers };
+  return { setStops, setBoard, prepareBoard, setGate, resize, render, project, dispose, renderer, scene, camera, stopMarkers: () => stopMarkers };
 }
 const idleFigs = [];
 

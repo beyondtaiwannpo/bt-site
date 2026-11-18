@@ -4677,6 +4677,14 @@ Paul：「optimize everything the road… make it more smooth and what's not wor
 - 量（本機 Chrome）：機場航廈一幀 525 → 247 個 draw call、mesh 871 → 414；島 1637 → 1208 個 mesh。兩頁都 60 fps、0 個人卡住。
 - 測試 942、check.sh、check-motion、check-mobile 全過。
 
+## 歷史之路（2026-11-17，順不順批 2：換站不卡）
+
+批 1 之後整趟捲完還有兩三幀 50 到 60 ms，全部在換站那一下。兩個原因、兩個改法（`history/src/scene.js`、`main.js`）：
+- **出發看板的貼圖一站一張、做過就留著**。之前每換一站重畫一張 2048 寬的 canvas、再上傳 GPU、翻牌動畫換上去，一幀就卡住。現在 `boardTexFor()` 用「現在第幾站」當鍵快取，8 站以內開頁後趁閒的時候（`requestIdleCallback`）先把每一站那張都做好、先用 `renderer.initTexture` 上傳（`prepareBoard`）；換站只是換 `map`，翻牌動畫照舊。站多就用到才做、最多留 8 張（一張約 6 MB）。
+- **年份帶換站只改 class**。之前 `setCurrent` 每次把整條年份帶的 HTML 重建、再量一次每一顆的位置；現在 `updateStrip()` 只切 `.on` 與 `aria-current`、換那兩個數字，整條只在開頁與換語言時建一次。
+- 量（本機 Chrome，整趟捲完兩趟）：60 fps、最糟的一幀 29 到 31 ms、超過 33 ms 的幀 0、Long Animation Frame 0（批 1 後是最糟 48 到 60 ms、兩三幀超過 33）。測試 942、check.sh、check-motion、check-mobile 全過。
+- 下一批（批 3）：卡與年份帶的點改用 transform，不再每一幀讀 `offsetWidth`、不用 `left`，layout shift 從 0.69 降到接近 0。
+
 ## BT 島 `/island/`（2026-11-16）
 
 Paul 2026-11-16 看了 HEART 政策島（puma.taipei/heart-island，沈伯洋的政見網站：一格政見一座島，點進去看細項，島跟島、人跟人相連，還可以把自己放進去）之後定的：
