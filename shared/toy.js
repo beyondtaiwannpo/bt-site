@@ -60,6 +60,49 @@ export const KIND_R = { airport: 1.5, post: 1.4, tent: 2.6, camp: 3.2, hall: 3.2
 // 四種橋加滑水道，頁面照這個表輪流。
 export const BRIDGE_STYLES = 5;
 
+// ═══ 人：大頭 chibi。一個工廠，/island/ 與 /history/ 的機場都用它（Paul 2026-11-17：「I want the people to be like the BT Island people」）。═══
+// 吃 { P（colours() 的結果）, M（至少 skin hair shirt pants eye orange navy 這幾個材質）, rnd }，回 { makePerson, pose }。
+// makePerson(o)：skin hair shirt pants 是色票的序號，pack 背包、bag 行李、hat 帽子、scale 大小（預設 1.25）。回一個 Group，零件有名字（legL legR armL armR head）。
+// pose(g, t)：照 g.userData 擺姿勢：sitting 坐、moving 走（腿手擺、身體上下）、talking 手在比、都不是就站著微微晃。y 用 userData.baseY 當底。
+export function peopleKit({ P, M, rnd }) {
+  const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), shadow: new THREE.CircleGeometry(0.38, 16) };
+  PG.shadow.rotateX(-Math.PI / 2);
+  const shadowMat = new THREE.MeshBasicMaterial({ color: P.navy, transparent: true, opacity: 0.12, depthWrite: false });
+  function makePerson(o) {
+    o = o || {}; const g = new THREE.Group();
+    const skin = M.skin[(o.skin || 0) % 3], hair = M.hair[(o.hair || 0) % 3], shirt = M.shirt[(o.shirt || 0) % 6], pants = M.pants[(o.pants || 0) % 3];
+    const legL = new THREE.Mesh(PG.leg, pants), legR = new THREE.Mesh(PG.leg, pants); legL.position.set(-0.13, 0.15, 0); legR.position.set(0.13, 0.15, 0); legL.name = "legL"; legR.name = "legR"; g.add(legL, legR);
+    const body = new THREE.Mesh(PG.body, shirt); body.position.y = 0.62; g.add(body);
+    const armL = new THREE.Mesh(PG.arm, shirt), armR = new THREE.Mesh(PG.arm, shirt); armL.position.set(-0.33, 0.68, 0); armR.position.set(0.33, 0.68, 0); armL.name = "armL"; armR.name = "armR"; g.add(armL, armR);
+    const head = new THREE.Mesh(PG.head, skin); head.position.y = 1.2; head.name = "head"; g.add(head);
+    const cap = new THREE.Mesh(PG.cap, hair); cap.position.y = 1.23; cap.rotation.x = -0.25; g.add(cap);
+    for (const sx of [-1, 1]) { const e = new THREE.Mesh(PG.eye, M.eye); e.position.set(sx * 0.13, 1.2, 0.33); g.add(e); }
+    if (o.pack) { const pk = new THREE.Mesh(PG.pack, M.orange); pk.position.set(0, 0.7, -0.3); g.add(pk); }
+    if (o.bag) { const bg = new THREE.Mesh(PG.bag, M.navy); bg.position.set(0.42, 0.21, 0); g.add(bg); }
+    if (o.hat) { const h = new THREE.Mesh(PG.hat, M.navy); h.position.y = 1.5; g.add(h); }
+    const sh = new THREE.Mesh(PG.shadow, shadowMat); sh.position.y = 0.02; g.add(sh);
+    g.scale.setScalar(o.scale != null ? o.scale : 1.25);   // 島上放大一點（Paul 2026-11-17「push further」：HEART 的人跟島的比例比較大）；機場那一頁 1.0
+    g.userData = { phase: rnd() * 6, moving: false, baseY: 0 };   // 人不投影：陰影貼圖是靜的，走動的人用腳下那一圈就好
+    return g;
+  }
+  function pose(g, t) {
+    const u = g.userData, legL = g.getObjectByName("legL"), legR = g.getObjectByName("legR"), armL = g.getObjectByName("armL"), armR = g.getObjectByName("armR"), head = g.getObjectByName("head");
+    if (u.sitting) { legL.rotation.x = -1.4; legR.rotation.x = -1.4; armL.rotation.x = -0.6; armR.rotation.x = -0.6; }   // 坐著：腿伸前面，手放腿上（高度由 motion() 決定）
+    else if (u.moving) { const s = Math.sin(t * 9 + u.phase); legL.rotation.x = s * 0.6; legR.rotation.x = -s * 0.6; armL.rotation.x = -s * 0.5; armR.rotation.x = s * 0.5; g.position.y = u.baseY + Math.abs(Math.cos(t * 9 + u.phase)) * 0.05; }
+    else if (u.talking) { legL.rotation.x = 0; legR.rotation.x = 0; const s = Math.sin(t * 3.1 + u.phase); armL.rotation.x = -0.4 + s * 0.25; armR.rotation.x = -0.3 - s * 0.2; g.position.y = u.baseY; }   // 聊天：手在比
+    else { legL.rotation.x = 0; legR.rotation.x = 0; armL.rotation.x = 0.05; armR.rotation.x = -0.05; g.position.y = u.baseY + Math.sin(t * 1.6 + u.phase) * 0.012; }
+    head.rotation.y = u.talking ? Math.sin(t * 2.2 + u.phase) * 0.08 : Math.sin(t * 0.7 + u.phase) * 0.12;
+    head.rotation.x = u.talking ? Math.sin(t * 4 + u.phase) * 0.06 : 0;
+  }
+  return { makePerson, pose };
+}
+// 只要人不要整個引擎（/history/ 的機場自己有場景）：從七色直接做材質。
+export function peopleFromPalette(palette, seed) {
+  const P = colours(palette); const std = (color, extra) => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...(extra || {}) });
+  const M = { skin: P.skin.map(c => std(c, { roughness: 0.7 })), hair: P.hair.map(c => std(c, { roughness: 0.9 })), shirt: P.shirt.map(c => std(c)), pants: P.pants.map(c => std(c)), eye: std(P.dark, { roughness: 0.4 }), orange: std(P.orange), navy: std(P.navy) };
+  return peopleKit({ P, M, rnd: mulberry(seed == null ? 5 : seed) });
+}
+
 // ═══ 引擎：畫布、材質、燈、海、所有的建造函式、人、鏡頭、牌子。頁面拿回來的 E 上面全部都有。═══
 export function createEngine({ stage, pins, palette, phone, onSelect, onHover, freeCentre, freeWidth, seed }) {
   if (!webglOK()) throw new Error("no webgl");
@@ -67,7 +110,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const P = colours(palette);
   const std = (color, extra) => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...(extra || {}) });
   const M = { grass: std(P.grass), beach: std(P.beach), cliff: std(P.cliff), road: std(P.road, { roughness: 0.95 }), asphalt: std(P.asphalt, { roughness: 0.95 }), wall: std(P.wall), wall2: std(P.wall2), wood: std(P.wood), dark: std(P.dark),
-    trunk: std(P.trunk), cloud: std(P.cloud, { emissive: P.cloud, emissiveIntensity: 0.25 }), light: std(P.light, { emissive: P.light, emissiveIntensity: 0.9 }), cream: std(P.cream), white: std(P.white), orange: std(P.orange), teal: std(P.teal), navy: std(P.navy), yellow: std(P.yellow),
+    trunk: std(P.trunk), cloud: std(P.cloud, { emissive: P.cloud, emissiveIntensity: 0.25 }), light: std(P.light, { emissive: P.light, emissiveIntensity: 0.9 }), amber: std(P.yellow, { emissive: P.yellow, emissiveIntensity: 0.8 }), cream: std(P.cream), white: std(P.white), orange: std(P.orange), teal: std(P.teal), navy: std(P.navy), yellow: std(P.yellow),
     shallow: new THREE.MeshStandardMaterial({ color: P.shallow, roughness: 0.6, transparent: true, opacity: 0.85 }), water: new THREE.MeshStandardMaterial({ color: P.water, roughness: 0.35 }),
     tree: P.tree.map(c => std(c)), skin: P.skin.map(c => std(c, { roughness: 0.7 })), hair: P.hair.map(c => std(c, { roughness: 0.9 })), shirt: P.shirt.map(c => std(c)), pants: P.pants.map(c => std(c)), eye: std(P.dark, { roughness: 0.4 }),
     team: Object.fromEntries(Object.entries(P.team).map(([k, c]) => [k, std(c)])) };
@@ -178,6 +221,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       for (const x of [-7.3, 7.3]) for (let k = -3; k <= 3; k++) { if (k === 0) continue; const th = new THREE.Mesh(rbox(1.2, 0.03, 0.18, 0.01), M.white); th.position.set(x, 0.17, 2.6 + k * 0.32); g.add(th); }   /* 跑道頭的白線 */
       for (let x = -6.5; x <= 6.5; x += 1.3) { const dash = new THREE.Mesh(rbox(0.5, 0.03, 0.1, 0.01), M.yellow); dash.position.set(x, 0.17, -1.4); g.add(dash); }
       for (const x of [-7.3, 7.3]) for (const dz of [-1.2, 1.2]) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M.light); l.position.set(x, 0.2, 2.6 + dz); g.add(l); }
+      for (const x of [-4.5, 0, 4.5]) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M.amber); l.position.set(x, 0.2, -0.45); g.add(l); }   /* 滑行道邊三顆黃燈（Paul 2026-11-17：「three yellow dots on the taxiway」）*/
       const tw = new THREE.Group(); tw.position.set(-6.6, 0, -6.2); g.add(tw);
       tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 3.6, 10), M.wall).translateY(1.8), new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.8, 0.9, 10), roofM).translateY(4.0), new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 10), M.dark).translateY(4.6));
       // 會動的那一架包在一個 group 裡，機身轉成機鼻朝 +z，motion() 用 lookAt 讓它朝著下一個點（轉彎、爬升、下降都對）。
@@ -480,36 +524,8 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     { const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), M.dark, Math.max(1, postPlaces.length)); const m = new THREE.Matrix4(); postPlaces.forEach((pp, i) => { m.makeTranslation(pp[0], pp[1], pp[2]); im.setMatrixAt(i, m); }); im.count = postPlaces.length; im.instanceMatrix.needsUpdate = true; world.add(im); }
   }
 
-  // ═══ 人：大頭 chibi ═══
-  const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), shadow: new THREE.CircleGeometry(0.38, 16) };
-  PG.shadow.rotateX(-Math.PI / 2);
-  const shadowMat = new THREE.MeshBasicMaterial({ color: P.navy, transparent: true, opacity: 0.12, depthWrite: false });
-  function makePerson(o) {
-    o = o || {}; const g = new THREE.Group();
-    const skin = M.skin[(o.skin || 0) % 3], hair = M.hair[(o.hair || 0) % 3], shirt = M.shirt[(o.shirt || 0) % 6], pants = M.pants[(o.pants || 0) % 3];
-    const legL = new THREE.Mesh(PG.leg, pants), legR = new THREE.Mesh(PG.leg, pants); legL.position.set(-0.13, 0.15, 0); legR.position.set(0.13, 0.15, 0); legL.name = "legL"; legR.name = "legR"; g.add(legL, legR);
-    const body = new THREE.Mesh(PG.body, shirt); body.position.y = 0.62; g.add(body);
-    const armL = new THREE.Mesh(PG.arm, shirt), armR = new THREE.Mesh(PG.arm, shirt); armL.position.set(-0.33, 0.68, 0); armR.position.set(0.33, 0.68, 0); armL.name = "armL"; armR.name = "armR"; g.add(armL, armR);
-    const head = new THREE.Mesh(PG.head, skin); head.position.y = 1.2; head.name = "head"; g.add(head);
-    const cap = new THREE.Mesh(PG.cap, hair); cap.position.y = 1.23; cap.rotation.x = -0.25; g.add(cap);
-    for (const sx of [-1, 1]) { const e = new THREE.Mesh(PG.eye, M.eye); e.position.set(sx * 0.13, 1.2, 0.33); g.add(e); }
-    if (o.pack) { const pk = new THREE.Mesh(PG.pack, M.orange); pk.position.set(0, 0.7, -0.3); g.add(pk); }
-    if (o.bag) { const bg = new THREE.Mesh(PG.bag, M.navy); bg.position.set(0.42, 0.21, 0); g.add(bg); }
-    if (o.hat) { const h = new THREE.Mesh(PG.hat, M.navy); h.position.y = 1.5; g.add(h); }
-    const sh = new THREE.Mesh(PG.shadow, shadowMat); sh.position.y = 0.02; g.add(sh);
-    g.scale.setScalar(1.25);   // 人放大一點（Paul 2026-11-17「push further」：HEART 的人跟島的比例比較大）
-    g.userData = { phase: rnd() * 6, moving: false, baseY: 0 };   // 人不投影：陰影貼圖是靜的，走動的人用腳下那一圈就好
-    return g;
-  }
-  function pose(g, t) {
-    const u = g.userData, legL = g.getObjectByName("legL"), legR = g.getObjectByName("legR"), armL = g.getObjectByName("armL"), armR = g.getObjectByName("armR"), head = g.getObjectByName("head");
-    if (u.sitting) { legL.rotation.x = -1.4; legR.rotation.x = -1.4; armL.rotation.x = -0.6; armR.rotation.x = -0.6; }   // 坐著：腿伸前面，手放腿上（高度由 motion() 決定）
-    else if (u.moving) { const s = Math.sin(t * 9 + u.phase); legL.rotation.x = s * 0.6; legR.rotation.x = -s * 0.6; armL.rotation.x = -s * 0.5; armR.rotation.x = s * 0.5; g.position.y = u.baseY + Math.abs(Math.cos(t * 9 + u.phase)) * 0.05; }
-    else if (u.talking) { legL.rotation.x = 0; legR.rotation.x = 0; const s = Math.sin(t * 3.1 + u.phase); armL.rotation.x = -0.4 + s * 0.25; armR.rotation.x = -0.3 - s * 0.2; g.position.y = u.baseY; }   // 聊天：手在比
-    else { legL.rotation.x = 0; legR.rotation.x = 0; armL.rotation.x = 0.05; armR.rotation.x = -0.05; g.position.y = u.baseY + Math.sin(t * 1.6 + u.phase) * 0.012; }
-    head.rotation.y = u.talking ? Math.sin(t * 2.2 + u.phase) * 0.08 : Math.sin(t * 0.7 + u.phase) * 0.12;
-    head.rotation.x = u.talking ? Math.sin(t * 4 + u.phase) * 0.06 : 0;
-  }
+  // ═══ 人：大頭 chibi（peopleKit，/history/ 的機場也用同一批人）═══
+  const { makePerson, pose } = peopleKit({ P, M, rnd });
   // 一個會走的人。person 是 { code, team, role, avatar? }；o 是 { isl（住哪座島，{ id, x, z, r }）, start（起點 { x, z }）, skin, hair, shirt, me }。
   // 牌子是一顆 button（class pin pin-person），大頭照一顆小的在名字前面，字放 span 裡。回 walker 那包（motion() 用的狀態都在上面）。
   const walkers = [];

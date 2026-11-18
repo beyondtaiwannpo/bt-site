@@ -3,7 +3,7 @@
 export const STR = {
   zh: {
     title: "歷史之路",
-    subtitle: "BT 怎麼走過來。滾一滾，沿著路走。",
+    subtitle: "BT 怎麼走過來。往下捲，沿著路走。",
     play: "自動走",
     pause: "停一下",
     lang: "EN",
@@ -28,7 +28,6 @@ export const STR = {
     board: "Departures",
     endLine: "路還在走。",
     endSub: "下一站，等你一起。",
-    backToIsland: "回 BT 島",
   },
   en: {
     title: "Our Road",
@@ -57,7 +56,6 @@ export const STR = {
     board: "Departures",
     endLine: "The journey continues.",
     endSub: "Next stop, with you.",
-    backToIsland: "Back to BT Island",
   },
 };
 export const t = (key, lang) => {
