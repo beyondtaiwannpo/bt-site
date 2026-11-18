@@ -133,8 +133,7 @@ function onProgress(p) {
 }
 // 閒置的時鐘：信標、雲、車、人。進度沒變的時候也要重畫（它們在動）。分頁在背景就不畫。
 let tickerOn = false;
-let lastMoveAt = 0, lastEased = -1;
-function onTick(tsec) { clock = tsec; tickerOn = true; if (gl && !document.hidden) { if (Math.abs(eased - lastEased) > 1e-5) { lastMoveAt = performance.now(); lastEased = eased; } gl.setScrub(performance.now() - lastMoveAt < 180); gl.render(eased, clock); placeCards(); } }
+function onTick(tsec) { clock = tsec; tickerOn = true; if (gl && !document.hidden) { gl.render(eased, clock); placeCards(); } }
 function size() {
   if (!stageEl) return;
   const h = stageEl.clientHeight || innerHeight, ww = stageEl.clientWidth || innerWidth;

@@ -224,7 +224,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const planes = [];      // 機場的飛機；有 userData.flight 的那一架在 motion() 裡飛
   const boards = [];      // 貼文牆上的板子；paintBoards() 把真的圖貼上去
   const treePlaces = [], bushPlaces = [], stoolPlaces = [], postPlaces = [];
-  const coasters = [], beacons = [], boats = [], balloons = [], clouds = [];
+  const coasters = [], beacons = [], boats = [], balloons = [], clouds = [], flags = [];
   const slides = new Map();   // "a>b" → { curve, dir, splash }：人過這條不是走的，是坐著溜
   const splashes = [];        // 滑水道底的水花（第四批）：{ ring, mat, drops, x, z, t0 }，人溜到最低點 motion() 把 t0 設成現在，接下來 1.3 秒水圈放大、水珠往上噴
   const groundCache = new Map();
@@ -276,7 +276,8 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // 旗桿加旗子（放在 x, z）。回旗子那一片（選中時頁面換它的材質）。
   function flagpole(g, x, z, flagM) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 8), M.dark); pole.position.set(x, 2.5, z); pole.castShadow = true; g.add(pole);
-    const flag = new THREE.Mesh(rbox(1.8, 1.0, 0.06, 0.03), flagM); flag.userData.dynamic = true; flag.position.set(x + 0.95, 4.4, z); flag.castShadow = true; g.add(flag); return flag;
+    // 旗子的原點在旗桿那一邊，motion() 裡繞旗桿擺、沿風向縮放才像在飄（2026-11-18 批 A：之前標了 dynamic 但沒有人動它）。
+    const flag = new THREE.Mesh(rbox(1.8, 1.0, 0.06, 0.03).clone().translate(0.9, 0, 0), flagM); flag.userData.dynamic = true; flag.userData.ph = rnd() * TAU; flag.position.set(x + 0.05, 4.4, z); flag.castShadow = true; g.add(flag); flags.push(flag); return flag;
   }
 
   // ═══ 建築 ═══
@@ -661,7 +662,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   }
   // 雲：n 團，圓心外 70 到 110 公尺、高 26 到 34，慢慢往 +x 飄。
   function addClouds(n, cx, cz) {
-    for (let i = 0; i < n; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 70 + rnd() * 40; g.position.set((cx || 0) + Math.cos(a) * d, 26 + rnd() * 8, (cz || 0) + Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; g.userData.dynamic = true; world.add(g); clouds.push(g); mergeChildren(g); }
+    for (let i = 0; i < n; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 70 + rnd() * 40; g.position.set((cx || 0) + Math.cos(a) * d, 26 + rnd() * 8, (cz || 0) + Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; g.userData.cx = cx || 0; g.userData.dynamic = true; world.add(g); clouds.push(g); mergeChildren(g); }
   }
   // 樹、矮樹、小凳子、欄杆柱子：全部一次畫完（InstancedMesh）。頁面蓋完所有東西再叫一次。
   function flushInstances() {
@@ -842,7 +843,9 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // 一顆牌子（DOM）。cls 是 class（pin 之外的），data 是 dataset。
   function pin(cls, data, hidden) { const el = document.createElement("button"); el.type = "button"; el.className = "pin " + cls; for (const k in (data || {})) el.dataset[k] = data[k]; if (hidden) el.hidden = true; pins.appendChild(el); return el; }
   function resize() { const w = stage.clientWidth || 300, h = stage.clientHeight || 200; SW = w; SH = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); for (const p of pins.children) p._v = -1; }
-  function render(t) { people.sync(); if (shadowsDirty) { renderer.shadowMap.needsUpdate = true; shadowsDirty = false; } renderer.render(scene, camera); E.placePins(); void t; }
+  // 影子平常不每幀算（陰影貼圖 2048 的 PCFSoft 一次不便宜），但會動的東西（纜車、渡輪、熱氣球、飛車）每三分之一秒要跟上，不然影子釘在原地（2026-11-18 批 A）。
+  let lastShadow = -1;
+  function render(t) { people.sync(); if (shadowsDirty || t - lastShadow > 0.33) { renderer.shadowMap.needsUpdate = true; shadowsDirty = false; lastShadow = t; } renderer.render(scene, camera); E.placePins(); }
   function snapCam() { cam.pos.copy(cam.goalPos); cam.tgt.copy(cam.goalTgt); placeCam(); render(0); }
   if ("ResizeObserver" in window) new ResizeObserver(() => { resize(); render(0); }).observe(stage);
 
@@ -871,7 +874,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const debugWalkers = () => walkers.map(w => ({ code: w.person.code, isl: w.isl && w.isl.id, home: w.home && w.home.id, trips: w.trips, stuck: +(w.stuck || 0).toFixed(1), goes: w.person.goes || "", x: +w.g.position.x.toFixed(1), z: +w.g.position.z.toFixed(1), moving: !!w.g.userData.moving, sitting: !!w.g.userData.sitting, talking: !!w.g.userData.talking, path: w.path ? w.path.length - w.pathI : 0, dest: w.dest || "", poi: w.poi ? w.poi.kind : "", partner: w.partner ? w.partner.person.code : "", act: w.act ? w.act.kind + ":" + (w.act.stage || "") : "", wait: +w.wait.toFixed(1), target: w.target ? [+w.target.x.toFixed(1), +w.target.z.toFixed(1)] : null }));
 
   const E = {
-    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, slides, splashes, walkers,
+    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, flags, slides, splashes, walkers,
     rbox, box, flagGeo, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane, bunting, pennant, bike, rail,
     furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances, mergeStatic, mergeChildren, mergeDynamic, setMerge, mergeOpts,
     makePerson, pose, addWalker, removeWalker, people,
@@ -890,7 +893,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
 /* ── 這裡面才有動畫。外面不准有每一幀的迴圈。 ──
    鏡頭用阻尼追目標（1 - e^(-dt·k)）；人在島上做事、偶爾過橋；雲慢慢飄；雲霄飛車、燈塔、熱氣球、小船、飛機各自動。暫停就是不呼叫 tick。 */
 function motion(E, nav, tickExtra) {
-  const { cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, balloons, slides, splashes, pose, rnd } = E;
+  const { cam, placeCam, render, walkers, clouds, flags, planes, boats, coasters, beacons, balloons, slides, splashes, pose, rnd } = E;
   const SM = new THREE.Matrix4(), NONE4 = new THREE.Matrix4().makeScale(0, 0, 0);
   const { blockersOf, poisOf } = nav;
   // ── 人在島上做的事（Paul 2026-11-17：「make people doing what they do make sense… they are there for meaning」）──
@@ -1008,14 +1011,20 @@ function motion(E, nav, tickExtra) {
         }
         pose(w.g, t);
       }
-      for (const c of clouds) c.position.x += c.userData.drift * dt;
+      for (const c of clouds) { c.position.x += c.userData.drift * dt; if (c.position.x > c.userData.cx + 130) c.position.x = c.userData.cx - 130; }   // 飄出 130 公尺就從另一邊回來（之前飄進霧裡就沒了）
+      for (const f of flags) { f.rotation.y = Math.sin(t * 2.3 + f.userData.ph) * 0.22; f.scale.x = 0.92 + Math.sin(t * 3.7 + f.userData.ph) * 0.08; }
       E.now = t;   // 除錯用：現在的時間（秒），console 裡可以把水花的 t0 設成它來看噴水
       // 滑水道底的水花：水圈放大變淡、十顆水珠往外往上噴再落回水裡，1.3 秒收掉。
       for (const sp of splashes) { const age = t - sp.t0; if (age > 1.3) { if (sp.on) { sp.on = false; sp.ring.scale.setScalar(1); sp.mat.opacity = 0.45; for (let k = 0; k < 10; k++) sp.drops.setMatrixAt(k, NONE4); sp.drops.instanceMatrix.needsUpdate = true; } continue; }
         sp.on = true; sp.ring.scale.setScalar(1 + age * 1.4); sp.mat.opacity = 0.8 * (1 - age / 1.3);
         for (let k = 0; k < 10; k++) { const a = k / 10 * TAU + 0.3; const r = 0.4 + age * 2.4, y = -0.45 + 3.6 * age - 7.5 * age * age; if (y < -0.5) sp.drops.setMatrixAt(k, NONE4); else sp.drops.setMatrixAt(k, SM.makeTranslation(sp.x + Math.cos(a) * r, y, sp.z + Math.sin(a) * r)); } sp.drops.instanceMatrix.needsUpdate = true; }
-      // 雲霄飛車：小車沿軌道跑，爬坡慢、下坡快；燈塔的光轉。
-      for (const c of coasters) { const q0 = c.curve.getPointAt(c.t), q1 = c.curve.getPointAt((c.t + 0.01) % 1); const slope = q1.y - q0.y; c.t = (c.t + dt * (0.028 - slope * 0.12)) % 1; if (c.t < 0) c.t += 1; const p0 = c.curve.getPointAt(c.t), p1 = c.curve.getPointAt((c.t + 0.012) % 1); c.train.position.copy(p0).add(new THREE.Vector3(0, 0.3, 0)); c.train.lookAt(p1.x, p1.y + 0.3, p1.z); c.train.rotateY(-Math.PI / 2); }
+      // 雲霄飛車：小車沿軌道跑，速度照能量守恆（離最高點越低越快，sqrt(2g·落差) 乘 0.6），最慢 1.6 m/s 當拉升鏈。
+      // 2026-11-18 批 A：之前用「前方 1% 軌道的高度差」算速度，陡坡算出負的，車退到坡度剛好那一點就停，五列有三列是停著的。
+      for (const c of coasters) {
+        if (!c.L) { c.L = c.curve.getLength(); c.top = -1e9; for (let k = 0; k < 64; k++) c.top = Math.max(c.top, c.curve.getPointAt(k / 64).y); }
+        const p0 = c.curve.getPointAt(c.t), v = Math.max(1.6, Math.sqrt(2 * 9.8 * Math.max(0, c.top + 0.3 - p0.y)) * 0.6);
+        c.t = (c.t + dt * v / c.L) % 1; const p1 = c.curve.getPointAt(c.t), p2 = c.curve.getPointAt((c.t + 0.012) % 1);
+        c.train.position.copy(p1); c.train.position.y += 0.3; c.train.lookAt(p2.x, p2.y + 0.3, p2.z); c.train.rotateY(-Math.PI / 2); }
       for (const b of beacons) b.rotation.y += dt * 0.9;
       for (const b of balloons) { const u = b.userData; u.a += dt * u.sp; b.position.set(u.cx + Math.cos(u.a) * u.r, u.h + Math.sin(t * 0.5 + u.a) * 0.6, u.cz + Math.sin(u.a) * u.r * 0.8); b.rotation.y += dt * 0.1; }
       for (const b of boats) { b.position.y = -0.35 + Math.sin(t * 1.3 + b.userData.phase) * 0.08; b.rotation.z = Math.sin(t * 0.9 + b.userData.phase) * 0.04; b.rotation.y += dt * 0.02; }

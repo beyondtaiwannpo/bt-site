@@ -72,7 +72,8 @@ export const TAXI_WAYPOINTS = [
   [300, 230],
   [300, 320],
   [285, 375],   // 第三個彎：轉向 -x，對正跑道
-  [250, 400],   // 跑道頭（在跑道中線上）
+  [250, 400],   // 上跑道中線
+  [215, 400],   // 跑道頭：最後一段正對 -x，滑行末端的航向就是起飛的航向（2026-11-18 批 A：之前到 250,400 時切線還斜 35°，起飛那一幀原地轉頭）
 ];
 export const PUSHBACK_LEN = 55;   // 推出去那一段的弧長（到第二個路點）
 
@@ -159,14 +160,17 @@ export function planePoseAt(e) {
     return { ...base, x: here.x, z: here.z, yaw, steer, s, pushback, speed: 1 };
   }
   // 起飛：對正跑道（往 -x），加速、抬頭、離地、收輪、爬升。
+  // 2026-11-18 批 A：速度從滑行的速度接上去（之前 t² 從零起步，跑道頭先煞停）；先抬頭 7° 再離地，抬頭時繞主輪轉所以機身中心墊高一點；
+  // 離地之後才收輪；爬升時輕輕側傾一下。
   const t = (e - PHASES.takeoff[0]) / (1 - PHASES.takeoff[0]);
-  const x = TAXI_WAYPOINTS[TAXI_WAYPOINTS.length - 1][0] - TAKEOFF_ROLL * t * t;
-  const lift = smooth(clamp01((t - 0.4) / 0.6));
-  const rotate = smooth(clamp01((t - 0.35) / 0.25));
-  const y = 420 * lift;
-  const pitch = 0.2 * rotate + 0.08 * lift;
-  const gear = 1 - smooth(clamp01((t - 0.45) / 0.25));
-  return { ...base, x, y, z: RUNWAY.z, yaw: -Math.PI / 2, pitch, gear, s: tw.length + TAKEOFF_ROLL * t * t, speed: 2 + 6 * t, lift };
+  const v0 = tw.length / (PHASES.apron[1] - PHASES.apron[0]) * (1 - PHASES.takeoff[0]), run = v0 * t + (TAKEOFF_ROLL - v0) * t * t;
+  const x = TAXI_WAYPOINTS[TAXI_WAYPOINTS.length - 1][0] - run;
+  const rotate = smooth(clamp01((t - 0.36) / 0.14)), lift = smooth(clamp01((t - 0.47) / 0.53));
+  const pitch = 0.12 * rotate + 0.1 * lift;
+  const y = 420 * lift + Math.sin(pitch) * 1.0;
+  const gear = 1 - smooth(clamp01((t - 0.49) / 0.2));
+  const roll = 0.05 * Math.sin(Math.PI * clamp01((t - 0.6) / 0.4));
+  return { ...base, x, y, z: RUNWAY.z, yaw: -Math.PI / 2, pitch, roll, gear, s: tw.length + run, speed: 2 + 6 * t, lift };
 }
 
 // ── 旅客與鏡頭 ──
@@ -184,13 +188,16 @@ export const bridgeFloorY = (s, z) => { const bp = boardPath(); const q = typeof
 export function travellerAt(e) {
   const camS = walkArc(e), bp = boardPath();
   // 走到機艙門就進去了（看不到）；鏡頭還在後面幾公尺，不會跟他疊在一起。
-  if (e >= BOARD_IN || camS + 6 >= bp.length - 0.6) return { visible: false, walking: false, pos: [PLANE_DOOR[0], 2.4, PLANE_DOOR[1]], yaw: 0 };
+  if (e >= BOARD_IN || camS + 8 >= bp.length - 0.6) return { visible: false, walking: false, pos: [PLANE_DOOR[0], 2.4, PLANE_DOOR[1]], yaw: 0 };
   if (e < PHASES.bridge[0]) {
-    // 旅客走在鏡頭前面偏右（順不順批 4：之前在正中間，把整條走道的盡頭都擋住）。
-    const x = lerp(WALK.x0, WALK.x1, e / PHASES.bridge[0]) + 8;
-    return { visible: true, walking: true, pos: [x, 0, CORRIDOR_Z + 2.4], yaw: Math.PI / 2 };
+    // 旅客走在鏡頭前面 8 公尺偏右（順不順批 4：之前在正中間，把整條走道的盡頭都擋住）。
+    // 2026-11-18 批 A：走道最後 10 公尺慢慢靠回中線、轉向門，過了走道盡頭就沿空橋那條路走（之前 0.3 那一幀往回跳 4 公尺）。
+    const ax = lerp(WALK.x0, WALK.x1, e / PHASES.bridge[0]) + 8;
+    if (ax > WALK.x1) { const q = bp.at(ax - WALK.x1); return { visible: true, walking: true, pos: [q.x, bridgeFloorY(ax - WALK.x1), q.z], yaw: q.yaw }; }
+    const k = smooth(clamp01((ax - (WALK.x1 - 10)) / 10));
+    return { visible: true, walking: true, pos: [ax, 0, CORRIDOR_Z + 2.4 * (1 - k)], yaw: Math.PI / 2 - k * Math.PI / 4 };
   }
-  const s = Math.min(bp.length - 0.2, camS + 6), q = bp.at(s);
+  const s = Math.min(bp.length - 0.2, camS + 8), q = bp.at(s);
   return { visible: true, walking: true, pos: [q.x, bridgeFloorY(s), q.z], yaw: q.yaw };
 }
 // 空橋那一段鏡頭走到哪（弧長）：0.30 在走道盡頭，WALK_END 在機艙門。
@@ -213,12 +220,30 @@ function rise3(u) {
   const RP = risePath(), xz = curvePoint(RP.map(p => [p[0], p[2]]), u), y = curvePoint(RP.map((p, i) => [i, p[1]]), u)[1];
   return [xz[0], y, xz[1]];
 }
+// 升起那條曲線照弧長取（f 是 0 到 1 的弧長比例）。2026-11-18 批 A：之前用樣條的 u 加 smooth()，鏡頭在空橋盡頭停死、中間衝到走路的四倍、到停機坪又停死。
+let _riseTab = null;
+function riseTab() {
+  if (_riseTab) return _riseTab;
+  const N = 160, P = [], cum = [0];
+  for (let k = 0; k <= N; k++) { P.push(rise3(k / N)); if (k) cum.push(cum[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1], P[k][2] - P[k - 1][2])); }
+  return (_riseTab = { P, cum, N, L: cum[N] });
+}
+function riseAt(f) {
+  const T = riseTab(), s = clamp01(f) * T.L; let lo = 0, hi = T.N;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T.cum[m] <= s) lo = m; else hi = m; }
+  const t = (s - T.cum[lo]) / ((T.cum[hi] - T.cum[lo]) || 1e-9);
+  return T.P[lo].map((v, i) => lerp(v, T.P[hi][i], t));
+}
+// 頭尾斜率指定的三次曲線（0 到 1）：進入的速度接走路、離開的速度接停機坪，中間自然快一點。
+const hermite = (u, m0, m1) => (u * u * u - 2 * u * u + u) * m0 + (3 * u * u - 2 * u * u * u) + (u * u * u - u * u) * m1;
 export function cameraAt(e, tall) {
   e = clamp01(e);
   const EYE = 1.7, inside = tall ? CAM_FOV.insideTall : CAM_FOV.inside;
   if (e < PHASES.bridge[0]) {
     const x = lerp(WALK.x0, WALK.x1, e / PHASES.bridge[0]);
-    return { pos: [x, EYE, CORRIDOR_Z], look: [x + 14, 1.4, CORRIDOR_Z - (tall ? 1.5 : 0.5)], fov: inside };
+    // 最後 12 公尺把視線慢慢轉向空橋那條路的方向（2026-11-18 批 A：之前 0.3 那一幀視線硬切 45°）。
+    const k = smooth(clamp01((x - (WALK.x1 - 12)) / 12)), a5 = boardPath().at(5);
+    return { pos: [x, EYE, CORRIDOR_Z], look: [x + lerp(14, a5.x - WALK.x1, k), 1.4, CORRIDOR_Z + lerp(-(tall ? 1.5 : 0.5), a5.z - CORRIDOR_Z, k)], fov: inside };
   }
   if (e < WALK_END) {
     const bp = boardPath(), s = walkArc(e), q = bp.at(s), ahead = bp.at(Math.min(bp.length, s + 5));
@@ -230,8 +255,10 @@ export function cameraAt(e, tall) {
     return { pos: [q.x, y, q.z], look, fov: inside };
   }
   if (e < PHASES.apron[0]) {
-    const u = smooth((e - WALK_END) / (PHASES.apron[0] - WALK_END));
-    const pos = rise3(u), g = GATE_STAND;
+    const span = PHASES.apron[0] - WALK_END, L = riseTab().L;
+    const vWalk = (boardPath().length - STOP_SHORT) / (WALK_END - PHASES.bridge[0]), vApron = taxiway().length / (PHASES.apron[1] - PHASES.apron[0]);
+    const u = hermite(clamp01((e - WALK_END) / span), vWalk * span / L, vApron * span / L);
+    const pos = riseAt(u), g = GATE_STAND;
     // 一開始看著機艙門前方，慢慢轉成看飛機中心
     const look = [lerp(PLANE_DOOR[0], g[0], u), lerp(PLANE_REST_Y, 2, u), lerp(PLANE_DOOR[1], g[1], u)];   // 先看著機艙門，升起來之後慢慢轉成看飛機中心
     return { pos, look, fov: lerp(inside, CAM_FOV.outside, u) };

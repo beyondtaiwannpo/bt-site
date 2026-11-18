@@ -10,7 +10,7 @@
 // 4. **會動的只有 motion()。** gsap 與 ScrollTrigger 只准出現在 motion() 裡（check.sh 守著）。render() 每一幀照進度擺東西，那是算數學不是動畫；
 //    誰呼叫它（捲動的追趕、閒置的時鐘）才在 motion() 裡。prefers-reduced-motion、?motion=off、沒有 WebGL、Three 或 GSAP 載不到，
 //    main.js 都不會走到這裡（airport.js 的 pickMode），畫的是直立時間軸。
-// 5. **數字都在 airport.js。** 飛機在哪、鏡頭在哪、旅客在哪、每一站的錨點在哪，全部是那一支的純函式（測試直接算）。這一支只負責把 Three 的物件擺到那些數字上。
+// 5. **數字都在 airport.js**（純函式，測試直接算）。這一支只把 Three 的物件擺到那些數字上。
 //
 // 單位公尺，y 朝上。航廈沿 x 軸（-10 到 125），玻璃牆在 z=0，停機坪 z>0，跑道在 z=400 沿 x 軸，飛機往 -x 起飛。
 
@@ -121,7 +121,7 @@ function surfaceTexture(base, spots, n, lines, seed) {
 }
 
 // 一個人：BT 島那一批大頭 chibi（shared/toy.js 的 peopleKit；Paul 2026-11-17：「I want the people to be like the BT Island people」）。
-// 這裡只是把場景慣用的參數換成工廠的參數。opts：shirt（上衣的顏色，對到最接近的那一號）、seated、backpack、bag、vest（地勤，戴帽）、staff（戴帽）、skirt（沒差別）、phase。
+// opts：shirt、seated、backpack、bag、vest（地勤，戴帽）、staff（戴帽）、skirt、phase。
 let people = null, figN = 0;
 function figure(mats, opts) {
   const o = opts || {}, P = mats.P;
@@ -154,7 +154,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(q.dpr);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  // 陰影貼圖不是每一幀重畫（2026-11-17 批 1 順不順：之前太陽每一幀跟著鏡頭走、陰影每一幀重畫，航廈裡一幀 712 個 draw call 有一半是在畫影子）。
+  // 陰影貼圖不是每一幀重畫（之前每一幀重畫，一幀一半的 draw call 在畫影子）。
   // 改成「鏡頭看的點走了 3 公尺、飛機動了 2 公尺、或半秒沒畫過」才重畫一次（render() 裡的 shadowTick）。
   renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   const scene = new THREE.Scene();
@@ -273,7 +273,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     face.userData.dynamic = true; term.add(g); boards.push(face);
   }
   // 安檢（2026-11-17 Paul：「there should be no security in the terminal… the security should be right off the thing」）：
-  // 不在大廳中間，在一進來的地方（x 0.5 到 5，鏡頭從 x -8 出發、十公尺外先看到安檢門，再走過去；旅客從 x 0 出發、一開始就走進門框）。三條通道：鏡頭走 z -20、旅客走 z -17.5，各自一個門框；兩邊是 X 光機與輸送帶，前面一排欄柱。
+  // 一進來的地方（x 0.5 到 5）。三條通道：鏡頭走 z -20、旅客走 z -17.5，各自一個門框；兩邊 X 光機與輸送帶，前面一排欄柱。
   {
     const x = 2.5, lanes = [-23, -20, -17.5];
     for (const z of lanes) term.add(box(0.3, 2.3, 0.3, mats.navy, x, 1.15, z - 0.75, false), box(0.3, 2.3, 0.3, mats.navy, x, 1.15, z + 0.75, false), box(0.3, 0.25, 1.8, mats.navy, x, 2.4, z, false), box(0.3, 0.06, 1.5, mats.orangeLight, x, 2.22, z, false));
@@ -506,11 +506,14 @@ export function createScene({ canvas, palette, phone, fonts }) {
     for (let k = 0; k < n; k++) { const s = new THREE.Mesh(cloudGeo[(i + k) % 3], mats.cloud); s.position.set((k - n / 2) * 13 + ((k * 7) % 5), (k % 2) * 4 - ((k * 3) % 4), ((k * 11) % 10) - 5); s.scale.set(1.15, 0.5 + (k % 2) * 0.1, 1); s.castShadow = false; s.receiveShadow = false; g.add(s); }
     const t = i / 13, side = i % 2 ? 1 : -1;
     g.position.set(-120 - t * 1500, 90 + t * 300 - 70 + (i % 3) * 30, A.RUNWAY.z + side * (80 + (i % 4) * 60));
-    g.userData.v = 0.5 + (i % 3) * 0.3; g.userData.dynamic = true; world.add(g); clouds.push(g);
+    g.userData.v = 0.5 + (i % 3) * 0.3; g.userData.x0 = g.position.x; g.userData.dynamic = true; world.add(g); clouds.push(g);
   }
 
   // ═══ 我們那一架 ═══
   const plane = buildAirliner(THREE, { body: P.cream, tail: P.orange, mark: P.cream, dark: P.dark }); shadowOn(plane); plane.userData.dynamic = true; world.add(plane);
+  // 2026-11-18 批 A：先航向、再俯仰、再側傾。之前是預設的 XYZ，對正 -x 之後 rotation.x 轉的是機身軸，起飛「抬頭」其實是在滾。
+  plane.rotation.order = "YXZ";
+  const wheels = []; plane.traverse(m => { if (m.name === "wheel") wheels.push(m); }); let wheelSpin = 0, lastS = 0;
   // 旅客
   const traveller = figure(mats, { shirt: P.teal, backpack: true, phase: 0 }); traveller.userData.baseY = 0; world.add(traveller);
   // 走道上來回走的兩個人
@@ -599,27 +602,33 @@ export function createScene({ canvas, palette, phone, fonts }) {
   }
   function resize(w, h) { W = w; Hh = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   // 靠近一站稍微放大（順不順批 3：之前是 CSS scale 整個 .world）。zoom 變了超過千分之一才重算投影矩陣。
-  let zoomNow = 1, scrubbing = false;
-  function setScrub(v) { scrubbing = !!v; }
+  let zoomNow = 1, walkT = 0, walkOn = false, trLast = [0, 0, 0], lastT = 0;
   function setZoom(z) { if (Math.abs(z - zoomNow) < 0.001) return; zoomNow = z; camera.zoom = z; camera.updateProjectionMatrix(); }
   const tmpV = new THREE.Vector3(), lookV = new THREE.Vector3();
-  // 除錯用的碼表（?debug=1 之後 console 裡 __road.prof.on = true，再讀 __road.prof.t：每一段累計的毫秒）。平常 on 是 false，一幀只多一個 if。
-  const prof = { on: false, t: {} }; let pT = 0; const lap = k => { if (!prof.on) return; const n = performance.now(); prof.t[k] = (prof.t[k] || 0) + n - pT; pT = n; };
   function render(e, t) {
-    if (prof.on) pT = performance.now();
+    const dt = Math.min(0.1, Math.max(0, t - lastT)); lastT = t;
     // 鏡頭
     const c = A.cameraAt(e, phone);
     camera.position.set(c.pos[0], c.pos[1], c.pos[2]); lookV.set(c.look[0], c.look[1], c.look[2]); camera.lookAt(lookV);
     if (c.fov !== lastFov) { lastFov = c.fov; camera.fov = c.fov; camera.zoom = zoomNow; camera.updateProjectionMatrix(); }
     // 飛機
     const qp = A.planePoseAt(e);
-    plane.position.set(qp.x, qp.y + A.PLANE_REST_Y, qp.z); plane.rotation.set(-qp.pitch, qp.yaw, 0);
+    plane.position.set(qp.x, qp.y + A.PLANE_REST_Y, qp.z); plane.rotation.set(-qp.pitch, qp.yaw, qp.roll || 0);
     if (plane.userData.gear !== qp.gear) setGear(plane, qp.gear);
     steerNose(plane, qp.steer);
-    // 旅客
+    // 輪子照走過的距離轉（半徑 0.5）；推出去的時候倒轉；離地就不轉。
+    if (qp.y < 0.5) { wheelSpin += (qp.s - lastS) / 0.5 * (qp.pushback ? -1 : 1); for (const w of wheels) w.rotation.x = wheelSpin; } lastS = qp.s;
+    // 旅客：腳照他真的走了多遠擺（1.2 公尺一步的節奏），不是照時間。停下來先把腿收齊再站好，不會立正。
+    // （2026-11-18 批 A；之前腿擺固定 9 rad/s 跟捲動快慢無關，而且捲動一停 180 毫秒就立正。）
     const tr = A.travellerAt(e);
     traveller.visible = tr.visible;
-    if (tr.visible) { traveller.position.set(tr.pos[0], tr.pos[1], tr.pos[2]); traveller.userData.baseY = tr.pos[1]; traveller.rotation.y = tr.yaw; walkCycle(traveller, t, tr.walking && scrubbing); }   /* 沒在捲就站著（Paul 2026-11-17：「when I'm not scrolling they're moving as well」）*/
+    if (tr.visible) {
+      traveller.position.set(tr.pos[0], tr.pos[1], tr.pos[2]); traveller.userData.baseY = tr.pos[1]; traveller.rotation.y = tr.yaw;
+      const d = Math.min(0.35, Math.hypot(tr.pos[0] - trLast[0], tr.pos[2] - trLast[2])); trLast = tr.pos;
+      if (d > 0.002) { walkT += d / 1.2; walkOn = true; }
+      else if (walkOn) { const rem = (Math.PI - (walkT * 9 + traveller.userData.phase) % Math.PI) / 9; if (rem < 0.06) { walkT += rem; walkOn = false; } else walkT += 0.05; }
+      walkCycle(traveller, walkT, walkOn);
+    }
     // 天空與霧：離地之後慢慢變成高空的藍、霧變薄（機場在底下的霧裡縮小）。
     const lift = qp.lift || 0;
     scene.background.copy(P.sky).lerp(P.skyHigh, lift * 0.85); scene.fog.color.copy(P.sky).lerp(P.skyHigh, lift * 0.5);
@@ -628,7 +637,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     scene.fog.density = lerp(lerp(0.0013, 0.0006, lift), 0.0005, inside);   // 2026-11-18 第四批：外面的霧變淡（0.0022 → 0.0013，起飛 0.0009 → 0.0006），遠處的山、海、城市才看得到
     hemi.groundColor.copy(P.grass).lerp(P.sand, inside * 0.7); hemi.intensity = lerp(lerp(0.95, 0.7, lift), 1.1, inside);
     // 太陽跟著鏡頭看的點；室內陰影的範圍小、室外大。影子只在該重畫的時候重畫（上面 autoUpdate 那段）。
-    lap("pose"); shadowTick(e, t); lap("shadowTick");
+    shadowTick(e, t);
     // 閒置：信標、雲、加油車、行李車、走道上的人、原地的人。
     beacon.rotation.y = t * 2.4;
     if (boardFlip) {
@@ -638,14 +647,14 @@ export function createScene({ canvas, palette, phone, fonts }) {
       boards.forEach(b => { b.scale.y = Math.max(0.02, sy); });
       if (u >= 1) boardFlip = null;
     }
-    for (const cl of clouds) cl.position.x += cl.userData.v * 0.016;
+    for (const cl of clouds) { cl.position.x += cl.userData.v * dt; if (cl.position.x > cl.userData.x0 + 300) cl.position.x -= 600; }   /* 用 dt、飄出 300 公尺就繞回來（之前每幀固定加、永遠不回來）*/
     fuel[0].position.x = 150 + Math.sin(t * 0.12) * 40; fuel[0].rotation.y = Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2;
     { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(100 + Math.cos(ang) * 26, 0, 110 + Math.sin(ang) * 26); tug.rotation.y = -ang; }
-    for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u, sgn = w.x1 >= w.x0 ? 1 : -1; const dir = (u < span ? 1 : -1) * sgn; f.position.set(w.x0 + sgn * d, f.userData.baseY || 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, !w.stand); }   /* 2026-11-18 Paul「people still walking backward」：之前從 min(x0,x1) 起算、臉卻照 x1>x0 算，x0 > x1 的人一半時間臉朝後。現在從 x0 出發往 x1，臉跟著走的方向 */   /* stand：站在電動步道上，帶子在走人不走 */
-    for (const f of idleFigs) walkCycle(f, t, false); lap("idle");
-    for (const x of extras) if (x.tick) x.tick(t, e); lap("extras");
-    if (people) people.sync(); lap("sync");   // 人的零件世界矩陣抄進 InstancedMesh（2026-11-17 批 1b）
-    renderer.render(scene, camera); lap("draw");
+    for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u, sgn = w.x1 >= w.x0 ? 1 : -1; const dir = (u < span ? 1 : -1) * sgn; f.position.set(w.x0 + sgn * d, f.userData.baseY || 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, !w.stand); }   /* 從 x0 走到 x1，臉跟著方向；stand：站在電動步道上 */
+    for (const f of idleFigs) walkCycle(f, t, false);
+    for (const x of extras) if (x.tick) x.tick(t, e);
+    if (people) people.sync();   // 人的零件世界矩陣抄進 InstancedMesh（2026-11-17 批 1b）
+    renderer.render(scene, camera);
   }
   // 世界的一點投到螢幕（像素）。回 { x, y, visible, depth }。
   function project(anchor) {
@@ -653,12 +662,11 @@ export function createScene({ canvas, palette, phone, fonts }) {
     return { x: (tmpV.x + 1) / 2 * W, y: (1 - tmpV.y) / 2 * Hh, visible: tmpV.z < 1 && tmpV.x > -1.3 && tmpV.x < 1.3 && tmpV.y > -1.3 && tmpV.y < 1.3, depth: tmpV.z };
   }
   function dispose() { renderer.dispose(); }
-  // 小東西不投影（2026-11-17 批 1）：半徑 0.6 公尺以下的零件（燈、牌、盆栽、小道具）影子看不出來，但每一個都是陰影貼圖裡的一個 draw call。飛機、建築、樹照投。
+  // 半徑 0.6 公尺以下的小東西不投影（影子看不出來，但各是陰影貼圖裡的一個 draw call）。
   // createScene 蓋完叫一次，setStops 放完小場景再叫一次。
   function pruneCasters() { world.traverse(m => { if (!m.isMesh || !m.castShadow || m.isInstancedMesh) return; const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const r = g.boundingSphere ? g.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) : 1; if (r < 0.6) m.castShadow = false; }); renderer.shadowMap.needsUpdate = true; }
   pruneCasters();
-  // 靜態的東西合併（2026-11-18）：航廈裡外加了幾百樣道具之後一幀 1045 個 draw call、41 fps。同一種材質、同一個 80 公尺的格子裡的靜態 Mesh 合成一個，
-  // 格子留著是為了視錐剔除還有用（整個機場合成一個的話每一幀都要畫全部）。會動的、會換貼圖的（userData.dynamic）、有貼圖的、InstancedMesh、人，都不碰。
+  // 靜態的東西合併：同材質、同一個 80 公尺格子裡的靜態 Mesh 合成一個（格子留著視錐剔除才有用）。會動的（userData.dynamic）、有貼圖的、InstancedMesh、人，都不碰。
   if (new URLSearchParams(location.search).get("merge") !== "0") mergeStatic();   // ?merge=0：不合併，給除錯用的射線檢查（合併後一個 mesh 幾萬個三角形，射線慢到當掉）
   function mergeStatic() {
     const groups = new Map(); const dyn = new Set();
@@ -692,7 +700,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     }
     renderer.shadowMap.needsUpdate = true;
   }
-  return { setStops, setBoard, prepareBoard, setGate, setZoom, setScrub, resize, render, project, dispose, renderer, scene, camera, prof, stopMarkers: () => stopMarkers };
+  return { setStops, setBoard, prepareBoard, setGate, setZoom, resize, render, project, dispose, renderer, scene, camera, stopMarkers: () => stopMarkers };
 }
 const idleFigs = [];
 
