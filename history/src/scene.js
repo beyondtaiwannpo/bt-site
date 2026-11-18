@@ -20,6 +20,8 @@ import { buildAirliner, setGear, steerNose, TAIWAN } from "./plane.js";
 import { peopleFromPalette } from "../../shared/toy.js";
 import { buildTerminal } from "./terminal.js";
 import { buildGrounds } from "./grounds.js";
+import { buildDecor } from "./decor.js";
+import { buildTraffic } from "./traffic.js";
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -270,10 +272,8 @@ export function createScene({ canvas, palette, phone, fonts }) {
     for (const [x, z, i] of [[62, -7, 0], [71, -11, 1], [90, -29, 2], [96, -33, 3], [83, -7, 4], [67, -29, 1]]) { const f = figure(mats, { shirt: pick(i), seated: true, skirt: i % 3 === 1 }); f.position.set(x, 0.3, z + (z > -20 ? -0.15 : 0.15)); f.userData.baseY = 0.3; f.rotation.y = z > -20 ? Math.PI : 0; term.add(f); idleFigs.push(f); }
   }
   // 商店：陸側三間，各自一種顏色的門面與雨棚、一塊招牌、架上幾樣東西。
-  for (const [x, front, awn] of [[58, mats.teal, mats.orange], [72, mats.orange, mats.navy], [90, mats.navy, mats.teal]]) {
-    term.add(box(9, 4, 5, front, x, 2, -37), box(9.6, 0.3, 2.2, awn, x, 3.4, -33.6, false), box(6, 1, 0.2, mats.cream, x, 4.6, -34.4, false));
-    term.add(instanced(new THREE.BoxGeometry(0.9, 0.9, 0.5), mats.sand, [[x - 2.6, 0.45, -34.9], [x - 1.4, 0.45, -34.9], [x + 1.4, 0.45, -34.9], [x + 2.6, 0.45, -34.9]], false));
-  }
+  // 2026-11-18 第二批：店本身（殼、貨架、人台、商品）搬到 decor.js 做成走得進去的店面，這裡只剩雨棚與招牌的板子。
+  for (const [x, , awn] of [[58, mats.teal, mats.orange], [72, mats.orange, mats.navy], [90, mats.navy, mats.teal]]) term.add(box(9.6, 0.3, 2.2, awn, x, 3.4, -33.6, false), box(6, 1, 0.2, mats.cream, x, 4.6, -34.4, false));
   // 盆栽：柱子旁與候機區幾盆。
   {
     const pots = [], leaves = [];
@@ -480,8 +480,8 @@ export function createScene({ canvas, palette, phone, fonts }) {
   for (const [x0, x1, z, sp, k] of [[10, 95, -15.5, 1.2, 0], [90, 20, -23.4, 1.0, 2], [30, 100, -13, 0.9, 3], [105, 5, -24.2, 1.1, 4], [-36, 110, -14.2, 1.05, 1], [112, -30, -16.6, 0.85, 5], [-20, 60, -27.6, 0.95, 2], [118, 62, -16.2, 1.15, 3]]) { const f = figure(mats, { shirt: figMats[k % figMats.length], bag: figMats[(k + 2) % figMats.length] }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
 
   // ═══ 航廈裡面與外面的細節（2026-11-18）：terminal.js 與 grounds.js，THREE 跟小工具傳進去 ═══
-  const ctx = { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, world, pick, truck, buildAirliner, shadowOn, tw };
-  const extras = [buildTerminal(THREE, ctx), buildGrounds(THREE, ctx)];
+  const ctx = { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, world, pick, truck, buildAirliner, setGear, shadowOn, tw };
+  const extras = [buildTerminal(THREE, ctx), buildGrounds(THREE, ctx), buildDecor(THREE, ctx), buildTraffic(THREE, ctx)];
 
   // ═══ 站：小場景與錨點記號 ═══
   const stopsGroup = new THREE.Group(); stopsGroup.userData.dynamic = true; world.add(stopsGroup);
@@ -605,7 +605,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(100 + Math.cos(ang) * 26, 0, 110 + Math.sin(ang) * 26); tug.rotation.y = -ang; }
     for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u; const dir = (u < span) === (w.x1 > w.x0) ? 1 : -1; f.position.set(Math.min(w.x0, w.x1) + d, f.userData.baseY || 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, !w.stand); }   /* stand：站在電動步道上，帶子在走人不走 */
     for (const f of idleFigs) walkCycle(f, t, false); lap("idle");
-    for (const x of extras) if (x.tick) x.tick(t); lap("extras");
+    for (const x of extras) if (x.tick) x.tick(t, e); lap("extras");
     if (people) people.sync(); lap("sync");   // 人的零件世界矩陣抄進 InstancedMesh（2026-11-17 批 1b）
     renderer.render(scene, camera); lap("draw");
   }
