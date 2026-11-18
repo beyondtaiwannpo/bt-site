@@ -12,8 +12,10 @@ export function makeSign(THREE, { textTexture, lam, P, fonts, parent }) {
       if (o.arrow) lines.push({ text: o.arrow, x: W - 36, y: H / 2, font: `700 ${Math.round(H * 0.6)}px ${fonts.display}`, color: fg, align: "right" });
       tex = textTexture(W, H, bg, lines); cache.set(key, tex);
     }
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), lam(P.white, { map: tex, side: o.both ? THREE.DoubleSide : THREE.FrontSide })); m.position.set(x, y, z);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), lam(P.white, { map: tex })); m.position.set(x, y, z);
     if (o.flat) { m.rotation.x = -Math.PI / 2; m.rotation.z = face || 0; } else m.rotation.y = face || 0;
-    m.castShadow = false; m.receiveShadow = false; (o.parent || parent).add(m); return m;
+    m.castShadow = false; m.receiveShadow = false; (o.parent || parent).add(m);
+    if (o.both && !o.flat) { const b = m.clone(); b.rotation.y = (face || 0) + Math.PI; b.position.x -= Math.sin(face || 0) * 0.01; b.position.z -= Math.cos(face || 0) * 0.01; (o.parent || parent).add(b); }   // 雙面：背面另一張，字才不會是鏡像（2026-11-18 自查：DoubleSide 從背面看是反的）
+    return m;
   };
 }

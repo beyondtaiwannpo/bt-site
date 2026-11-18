@@ -312,10 +312,10 @@ export function createScene({ canvas, palette, phone, fonts }) {
   }
   // 書報攤（走道旁 x 28）：一個小亭子、雨棚、兩面雜誌架。（服務台搬到大廳，terminal.js）
   {
-    term.add(box(4, 2.6, 3, mats.sand, 28, 1.3, -13.5), box(4.6, 0.25, 3.8, mats.orange, 28, 2.75, -13.5, false), box(2.6, 0.7, 0.1, mats.cream, 28, 3.3, -11.6, false));
-    term.add(instanced(new THREE.BoxGeometry(0.34, 0.5, 0.04), [mats.teal, mats.navy, mats.orange, mats.cream][0], Array.from({ length: 8 }, (_, i) => [26.4 + (i % 4) * 1.05, 1.0 + Math.floor(i / 4) * 0.7, -11.9]), false));
-    term.add(instanced(new THREE.BoxGeometry(0.34, 0.5, 0.04), mats.navy, Array.from({ length: 8 }, (_, i) => [26.9 + (i % 4) * 1.05, 1.35 + Math.floor(i / 4) * 0.7, -11.9]), false));
-    { const f = figure(mats, { shirt: pick(4) }); f.position.set(27.2, 0, -10.6); f.userData.baseY = 0; f.rotation.y = Math.PI; term.add(f); idleFigs.push(f); }
+    term.add(box(4, 2.6, 3, mats.sand, 28, 1.3, -10.5), box(4.6, 0.25, 3.8, mats.orange, 28, 2.75, -10.5, false), box(2.6, 0.7, 0.1, mats.cream, 28, 3.3, -8.6, false));   // 2026-11-18 自查：往玻璃牆挪 3 公尺，走道上走的人才不會穿過它
+    term.add(instanced(new THREE.BoxGeometry(0.34, 0.5, 0.04), [mats.teal, mats.navy, mats.orange, mats.cream][0], Array.from({ length: 8 }, (_, i) => [26.4 + (i % 4) * 1.05, 1.0 + Math.floor(i / 4) * 0.7, -8.9]), false));
+    term.add(instanced(new THREE.BoxGeometry(0.34, 0.5, 0.04), mats.navy, Array.from({ length: 8 }, (_, i) => [26.9 + (i % 4) * 1.05, 1.35 + Math.floor(i / 4) * 0.7, -8.9]), false));
+    { const f = figure(mats, { shirt: pick(4) }); f.position.set(27.2, 0, -7.6); f.userData.baseY = 0; f.rotation.y = Math.PI; term.add(f); idleFigs.push(f); }
   }
   // 販賣機三台、ATM、行李推車兩堆、垃圾桶、柱子上的螢幕、掛在走道上方的旗子。
   {
@@ -389,7 +389,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
       const door = box(0.06, 1.9, 1.1, lam(P.cream.clone().lerp(P.grey, 0.15)), 0, 0, 0, false); door.position.set(dx - 0.55, 1.05, 0.95); door.rotation.y = -0.9; gB.add(door);
       const cabinTex = textTexture(512, 768, palette.navy, [], [{ x: 40, y: 120, w: 90, h: 70, color: palette.teal }, { x: 40, y: 220, w: 90, h: 70, color: palette.teal }, { x: 40, y: 320, w: 90, h: 70, color: palette.teal }, { x: 160, y: 120, w: 90, h: 70, color: palette.teal }, { x: 160, y: 220, w: 90, h: 70, color: palette.teal }, { x: 160, y: 320, w: 90, h: 70, color: palette.teal }, { x: 330, y: 100, w: 120, h: 90, color: palette.cream }, { x: 330, y: 260, w: 120, h: 90, color: palette.cream }, { x: 0, y: 420, w: 512, h: 30, color: palette.grey }, { x: 0, y: 0, w: 512, h: 60, color: palette.grey }]);
       const cabin = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.9), lam(P.white, { map: cabinTex })); cabin.position.set(dx - 0.15, 1.05, 0); cabin.rotation.y = -Math.PI / 2; cabin.castShadow = false; gB.add(cabin);
-      const crew = figure(mats, { shirt: P.navy, staff: true }); crew.position.set(dx - 1.1, 0, 1.22); crew.rotation.y = -Math.PI / 2 - 0.6; crew.userData.baseY = 0; gB.add(crew); idleFigs.push(crew);
+      const crew = figure(mats, { shirt: P.navy, staff: true }); crew.position.set(dx - 1.5, 0, 1.05); crew.rotation.y = -Math.PI / 2 - 0.6; crew.userData.baseY = 0; gB.add(crew); idleFigs.push(crew);
       const wb = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.5), lam(P.white, { map: textTexture(1024, 256, palette.orange, [{ text: "WELCOME ABOARD", x: 36, y: 90, font: `700 100px ${fonts.display}`, color: palette.navy }, { text: "歡迎登機", x: 36, y: 195, font: `900 70px ${fonts.han || fonts.display}`, color: palette.navy }]) })); wb.position.set(dx - 3.6, 2.05, B.half - 0.1); wb.rotation.y = Math.PI;   // 貼在 +z 那面實牆上，不跟盡頭的登機門牌疊在一起 wb.castShadow = false; gB.add(wb);
       gB.add(instanced(new THREE.BoxGeometry(0.06, B.h - 0.3, 0.08), lam(P.cream.clone().lerp(P.grey, 0.35)), Array.from({ length: Math.floor(lenB / 1.5) }, (_, i) => [-lenB / 2 + 0.75 + i * 1.5, B.h / 2, B.half - 0.12]), false));
     }
@@ -422,7 +422,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // 停著的第三架：遠處機坪，黃尾翼。
   { const pl = buildAirliner(THREE, { body: P.cream, tail: P.yellow, mark: P.navy, dark: P.dark }); pl.position.set(190, A.PLANE_REST_Y, 150); pl.rotation.y = -2.2; shadowOn(pl); world.add(pl); }
   // 加油車兩台（一台會走）、行李拖車一組（會繞）、幾個地勤。
-  const fuel = []; for (const [x, z] of [[150, 30], [60, 70]]) { const g = truck(mats, true); g.userData.dynamic = true; g.position.set(x, 0, z); world.add(g); fuel.push(g); }
+  const fuel = []; for (const [x, z] of [[150, 90], [60, 70]]) { const g = truck(mats, true); g.userData.dynamic = true; g.position.set(x, 0, z); world.add(g); fuel.push(g); }
   const tug = new THREE.Group(); tug.userData.dynamic = true; { const t = truck(mats, false); tug.add(t); for (let k = 1; k <= 3; k++) { const c = box(2.2, 1.4, 2.4, mats.grey, 0, 0.9, -3.2 * k); c.add(box(2.2, 0.6, 2.2, mats.navy, 0, 0.9, 0)); tug.add(c); } world.add(tug); }
   for (const [x, z, ry] of [[112, 48, 0.4], [126, 30, -1.2], [88, 52, 2.2]]) { const f = figure(mats, { shirt: P.navy, vest: true }); f.position.set(x, 0, z); f.rotation.y = ry; f.userData.baseY = 0; world.add(f); idleFigs.push(f); }
   world.add(instanced(new THREE.ConeGeometry(0.35, 0.8, 6), mats.orange, [[108, 0.4, 44], [110, 0.4, 56], [132, 0.4, 44], [130, 0.4, 58]], false));
@@ -488,12 +488,12 @@ export function createScene({ canvas, palette, phone, fonts }) {
     { const g = new THREE.Group(); g.position.set(250, 0, 378); world.add(g); g.add(cyl(0.08, 0.1, 7, mats.grey, 0, 3.5, 0, 6)); const sock = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3.2, 8), mats.orange); sock.rotation.z = -Math.PI / 2; sock.position.set(1.6, 6.8, 0); g.add(sock); }
     // 停機坪上再多一點：兩架停著的飛機、兩台巴士、登機梯車、餐勤車、行李拖車兩組、更多錐桶與地勤。
     for (const [x, z, ry, tail] of [[-5, 150, 0.7, P.teal], [250, 125, -1.9, P.navy]]) { const pl = buildAirliner(THREE, { body: P.cream, tail, mark: P.navy, dark: P.dark }); pl.position.set(x, A.PLANE_REST_Y, z); pl.rotation.y = ry; shadowOn(pl); world.add(pl); }
-    for (const [x, z, ry] of [[70, 110, 0.3], [160, 60, -1.2]]) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; world.add(g); g.add(box(11, 3, 2.5, mats.cream, 0, 1.6, 0), box(10.6, 1.2, 2.55, mats.glass, 0, 2.1, 0, false), box(11, 0.5, 2.5, mats.navy, 0, 0.5, 0, false)); }
+    for (const [x, z, ry] of [[70, 128, 0.3], [160, 60, -1.2]]) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; world.add(g); g.add(box(11, 3, 2.5, mats.cream, 0, 1.6, 0), box(10.6, 1.2, 2.55, mats.glass, 0, 2.1, 0, false), box(11, 0.5, 2.5, mats.navy, 0, 0.5, 0, false)); }
     { const g = new THREE.Group(); g.position.set(142, 0, 112); g.rotation.y = 0.5; world.add(g); g.add(box(2.2, 1.4, 2.4, mats.orange, 0, 1.0, 2.6), box(2.4, 0.5, 6, mats.grey, 0, 0.5, -0.8)); const st = box(1.6, 0.3, 5, mats.grey, 0, 3.0, -1.5); st.rotation.x = 0.45; g.add(st); g.add(instanced(new THREE.BoxGeometry(0.08, 1.0, 5), mats.grey, [[-0.8, 3.6, -1.5, 0], [0.8, 3.6, -1.5, 0]].map(([x, y, z]) => [x, y, z]), false)); }
     { const g = new THREE.Group(); g.position.set(95, 0, 20); g.rotation.y = -0.3; world.add(g); g.add(box(2.2, 1.6, 2.2, mats.cream, 0, 1.2, 2.0), box(2.4, 2.6, 5, mats.cream, 0, 3.2, -1.2), box(2.4, 0.5, 6.4, mats.grey, 0, 0.5, -0.6), instanced(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 6), mats.dark, [[-0.9, 1.9, -1.2, 0], [0.9, 1.9, -1.2, 0]], false)); }
     for (const [x, z, ry] of [[75, 36, 0.2], [150, 95, 1.3]]) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; world.add(g); const t = truck(mats, false); g.add(t); for (let k = 1; k <= 3; k++) { const c = box(2.2, 1.4, 2.4, mats.grey, 0, 0.9, -3.2 * k); c.add(box(2.2, 0.6, 2.2, [mats.navy, mats.orange, mats.teal][k % 3], 0, 0.9, 0)); g.add(c); } }
     world.add(instanced(new THREE.ConeGeometry(0.35, 0.8, 6), mats.orange, [[60, 0.4, 100], [64, 0.4, 118], [155, 0.4, 70], [162, 0.4, 56], [-10, 0.4, 140], [2, 0.4, 162], [240, 0.4, 112], [258, 0.4, 134]], false));
-    for (const [x, z, ry] of [[66, 104, 0.9], [158, 66, -0.5], [0, 146, 1.6], [246, 118, 2.4]]) { const f = figure(mats, { shirt: P.navy, vest: true }); f.position.set(x, 0, z); f.rotation.y = ry; f.userData.baseY = 0; world.add(f); idleFigs.push(f); }
+    for (const [x, z, ry] of [[66, 104, 0.9], [158, 66, -0.5], [8, 146, 1.6], [246, 118, 2.4]]) { const f = figure(mats, { shirt: P.navy, vest: true }); f.position.set(x, 0, z); f.rotation.y = ry; f.userData.baseY = 0; world.add(f); idleFigs.push(f); }
     // 航廈屋頂的空調箱與天線。
     world.add(instanced(new THREE.BoxGeometry(3, 1.6, 2.2), mats.wallShade, [[20, T.h + 1.6, -30], [50, T.h + 1.6, -12], [80, T.h + 1.6, -30], [110, T.h + 1.6, -12]], false), cyl(0.1, 0.1, 6, mats.grey, 100, T.h + 3.8, -34, 5));
   }
@@ -515,7 +515,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const traveller = figure(mats, { shirt: P.teal, backpack: true, phase: 0 }); traveller.userData.baseY = 0; world.add(traveller);
   // 走道上來回走的兩個人
   const walkers = [];
-  for (const [x0, x1, z, sp, k] of [[10, 95, -15.5, 1.2, 0], [90, 20, -23.4, 1.0, 2], [30, 100, -13, 0.9, 3], [105, 5, -24.2, 1.1, 4], [-36, 110, -14.2, 1.05, 1], [112, -30, -16.6, 0.85, 5], [-20, 60, -27.6, 0.95, 2], [118, 62, -16.2, 1.15, 3]]) { const f = figure(mats, { shirt: figMats[k % figMats.length], bag: figMats[(k + 2) % figMats.length] }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
+  for (const [x0, x1, z, sp, k] of [[10, 95, -15.5, 1.2, 0], [90, 20, -23.4, 1.0, 2], [30, 100, -13, 0.9, 3], [105, 5, -24.2, 1.1, 4], [8, 104, -14.2, 1.05, 1], [104, 8, -16.6, 0.85, 5], [-36, -14, -23.0, 0.95, 2], [104, 62, -16.2, 1.15, 3]]) { const f = figure(mats, { shirt: figMats[k % figMats.length], bag: figMats[(k + 2) % figMats.length] }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
 
   // ═══ 航廈裡面與外面的細節（2026-11-18）：terminal.js 與 grounds.js，THREE 跟小工具傳進去 ═══
   const ctx = { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, world, pick, truck, buildAirliner, setGear, shadowOn, tw };
@@ -659,7 +659,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   pruneCasters();
   // 靜態的東西合併（2026-11-18）：航廈裡外加了幾百樣道具之後一幀 1045 個 draw call、41 fps。同一種材質、同一個 80 公尺的格子裡的靜態 Mesh 合成一個，
   // 格子留著是為了視錐剔除還有用（整個機場合成一個的話每一幀都要畫全部）。會動的、會換貼圖的（userData.dynamic）、有貼圖的、InstancedMesh、人，都不碰。
-  mergeStatic();
+  if (new URLSearchParams(location.search).get("merge") !== "0") mergeStatic();   // ?merge=0：不合併，給除錯用的射線檢查（合併後一個 mesh 幾萬個三角形，射線慢到當掉）
   function mergeStatic() {
     const groups = new Map(); const dyn = new Set();
     world.updateMatrixWorld(true);

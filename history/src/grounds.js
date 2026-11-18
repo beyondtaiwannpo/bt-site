@@ -48,7 +48,7 @@ export function buildGrounds(THREE, c) {
       gpus.push([px - 12, 0.8, 30]); gpuWheels.push([px - 12.9, 0.35, 30, 0, 1], [px - 11.1, 0.35, 30, 0, 1]);
       for (let i = 0; i < 4; i++) ulds.push([px - 18 + (i % 2) * 2.6, 0.75, 32 + Math.floor(i / 2) * 2.0]);
       cones.push([px - 4, 0.4, 36], [px + 4, 0.4, 36], [px - 9, 0.4, 56], [px + 9, 0.4, 56]); chocks.push([px - 2.2, 0.2, 40.2], [px + 2.2, 0.2, 40.2]);
-      crew(px - 8, 38, 0.4); crew(px + 3, 56, 2.5);
+      crew(px - 10, 39.5, 0.4); crew(px + 3, 56, 2.5);
     }
     world.add(instanced(new THREE.BoxGeometry(2.2, 1.5, 1.6), mats.grey, ulds), instanced(new THREE.ConeGeometry(0.35, 0.8, 6), mats.orange, cones, false), instanced(new THREE.BoxGeometry(0.6, 0.3, 0.3), mats.orange, chocks, false));
     world.add(instanced(new THREE.BoxGeometry(1.8, 1.4, 1.2), mats.navy, gpus), instanced(new THREE.CylinderGeometry(0.35, 0.35, 0.3, 8), mats.dark, gpuWheels.map(([x, y, z]) => [x, y, z]), false));
@@ -111,7 +111,7 @@ export function buildGrounds(THREE, c) {
   // 會動的：跟隨車（黃色，頂燈）在服務道來回；接駁巴士在停機坪遠端來回；行李拖車（第二組）沿航廈前跑。
   {
     const fm = new THREE.Group(); fm.userData.dynamic = true; fm.add(box(4.2, 1.1, 1.9, mats.yellowLight, 0, 0.6, 0), box(2.0, 0.7, 1.7, mats.glass, -0.2, 1.5, 0, false), box(1.2, 0.3, 0.3, mats.orangeLight, 0, 2.0, 0, false), box(0.9, 0.3, 1.9, mats.dark, 1.7, 1.05, 0, false)); world.add(fm);
-    movers.push({ fn: t => { const u = (t * 0.02) % 2, d = u < 1 ? u : 2 - u; fm.position.set(-30 + d * 160, 0, 12); fm.rotation.y = u < 1 ? Math.PI / 2 : -Math.PI / 2; } });
+    movers.push({ fn: t => { const u = (t * 0.02) % 2, d = u < 1 ? u : 2 - u; fm.position.set(-30 + d * 160, 0, 85); fm.rotation.y = u < 1 ? Math.PI / 2 : -Math.PI / 2; } });
     const ab = bus(0, 0, 0, mats.cream); ab.userData.dynamic = true; movers.push({ fn: t => { const u = (t * 0.012) % 2, d = u < 1 ? u : 2 - u; ab.position.set(20 + d * 180, 0, 100); ab.rotation.y = u < 1 ? Math.PI / 2 : -Math.PI / 2; } });
   }
 
@@ -174,7 +174,7 @@ export function buildGrounds(THREE, c) {
   {
     world.add(box(8, 4, 6, mats.frame, -25, 2, -62), box(7.4, 3.2, 5.4, mats.glass, -25, 2, -62, false), box(8.6, 0.4, 6.6, mats.navy, -25, 4.2, -62, false), instanced(new THREE.BoxGeometry(6, 0.3, 1), mats.wallShade, [[-25, 0.15, -57.5], [-25, 0.45, -56.5], [-25, 0.75, -55.5]], false));
     sign("METRO", "捷運", 4, 1.0, palette.navy, palette.yellow, -25, 4.9, -58.6, 0);
-    let k = 9; for (const [x, z] of [[-27, -55], [-23.5, -54.6], [-25, -53.2]]) person(x, z, 0, { shirt: pick(k++), bag: true });
+    let k = 9; for (const [x, z] of [[-31.5, -56], [-30.2, -55.4], [-31, -54.2]]) person(x, z, 0, { shirt: pick(k++), bag: true });
     { const g = new THREE.Group(); g.position.set(0, 0, -140); world.add(g); g.add(box(30, 17, 16, mats.wallShade, 0, 8.5, 0), box(31, 0.6, 17, mats.roof, 0, 17.3, 0, false)); const win = []; for (let f = 0; f < 5; f++) for (let i = 0; i < 8; i++) win.push([-12.25 + i * 3.5, 2.4 + f * 3.1, 8.05]); g.add(instanced(new THREE.BoxGeometry(2.2, 1.6, 0.1), mats.glass, win, false)); g.add(box(8, 3.2, 0.4, mats.navy, 0, 1.6, 8.2, false)); }
     { const g = new THREE.Group(); g.position.set(-110, 0, -25); world.add(g); g.add(box(30, 8, 20, mats.wallShade, 0, 4, 0), box(31, 0.6, 21, mats.roof, 0, 8.3, 0, false), instanced(new THREE.BoxGeometry(4, 3.5, 0.4), mats.dark, [[-8, 1.75, 10.2], [8, 1.75, 10.2]], false)); for (const x of [-8, 8]) { const t = new THREE.Group(); t.position.set(x, 0, 15); t.rotation.y = Math.PI; t.add(box(2.2, 1.6, 2.2, mats.cream, 0, 1.2, 2.0), box(2.4, 2.6, 5, mats.cream, 0, 2.2, -1.2), box(2.4, 0.5, 6.4, mats.grey, 0, 0.5, -0.6)); g.add(t); } }
     sign("CATERING", "空廚", 6, 1.2, palette.navy, palette.cream, -110, 9.2, -14.6, 0);

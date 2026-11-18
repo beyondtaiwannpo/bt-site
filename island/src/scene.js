@@ -102,9 +102,10 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   function addWalker(person, opts) { const isl = L.islandOf(person.team); return E.addWalker(person, { ...(opts || {}), isl, start: L.wanderTarget(isl, blockersOf.get(person.team), rnd) }); }
   for (const p of data.people) addWalker(p);
   // 靜態的東西合併（2026-11-18：加了這麼多道具之後一幀 1171 個 draw call；同材質同一格的合成一個，會動的與點得到的不碰）。
-  E.mergeStatic();
+  const noMerge = new URLSearchParams(location.search).get("merge") === "0";   // ?merge=0：不合併，給除錯用的射線檢查（2026-11-18 自查）
+  if (!noMerge) E.mergeStatic();
   // 會動的 group 也再合一次（第四批）：纜車廂、摩天輪、船、晾衣繩那些底下的零件，照「只差底色就合」再合成一兩個。會動的零件各支模組自己標了 dynamic。
-  E.mergeDynamic();
+  if (!noMerge) E.mergeDynamic();
 
   // ═══ 鏡頭與牌子 ═══
   const show = { names: false, selectedTeam: "", flows: false };

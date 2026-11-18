@@ -31,7 +31,7 @@ export function buildTraffic(THREE, c) {
   {
     const g = new THREE.Group(); dyn(g); world.add(g); const tug = truck(mats, false); tug.scale.setScalar(0.7); g.add(tug);
     for (let i = 1; i <= 3; i++) { g.add(box(1.6, 1.4, 2.6, mats.grey, 0, 1.0, -3.2 * i - 1.0), box(1.4, 1.0, 2.2, [mats.navy, mats.teal, mats.orange][i - 1], 0, 1.2, -3.2 * i - 1.0, false)); for (const s of [-1, 1]) { const w = cyl(0.3, 0.3, 0.2, mats.dark, s * 0.8, 0.3, -3.2 * i - 1.0, 8); w.rotation.z = Math.PI / 2; g.add(w); } }
-    movers.push({ fn: t => { const u = (t * 5) % 220, d = u < 110 ? u : 220 - u; g.position.set(12 + d, 0, 34); g.rotation.y = u < 110 ? Math.PI / 2 : -Math.PI / 2; } });
+    movers.push({ fn: t => { const u = (t * 5) % 220, d = u < 110 ? u : 220 - u; g.position.set(12 + d, 0, 87.5); g.rotation.y = u < 110 ? Math.PI / 2 : -Math.PI / 2; } });
   }
   // ═══ 餐勤車在 B2（x 47）升降台升上去又下來；B4（x 82）的推機車頂在機鼻前 ═══
   {
