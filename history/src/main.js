@@ -296,8 +296,9 @@ async function boot() {
     gl = S.createScene({ canvas: $("scene"), palette, phone, fonts });
     gl.setStops(w, motifs); gl.setBoard(UI.boardRows(stops, 0)); gl.setGate(A.boardingGate(stops.length));
     gl.prepareBoard(stops.map((_, i) => UI.boardRows(stops, i)));   // 每一站那張看板趁閒的時候先做好（順不順批 2）
-    // 捲動的長度：每站一屏，最少九屏（四段要有地方走；站少的時候不能三下就起飛）。
-    $("road-wrap").style.height = `${Math.max(stops.length + 1, 9) * 100}vh`;
+    // 捲動的長度（下面那一行有新的說明）。
+    // 每站一屏半（順不順批 4，Paul：滾輪太快、一撥就跳過一站；之前一屏）。最少九屏，站少的時候不能三下就起飛。自動走的速度照站數算，不受影響。
+    $("road-wrap").style.height = `${Math.max(stops.length + 1, 9) * 150}vh`;
     size(); renderCards();
     api = S.motion({ wrap: $("road-wrap"), stage: $("stage"), onProgress, onTick });
     if (new URLSearchParams(location.search).get("debug") === "1") window.__road = gl;   // 除錯：console 裡看 __road.scene、__road.renderer.info

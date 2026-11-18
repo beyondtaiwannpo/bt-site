@@ -186,8 +186,9 @@ export function travellerAt(e) {
   // 走到機艙門就進去了（看不到）；鏡頭還在後面幾公尺，不會跟他疊在一起。
   if (e >= BOARD_IN || camS + 6 >= bp.length - 0.6) return { visible: false, walking: false, pos: [PLANE_DOOR[0], 2.4, PLANE_DOOR[1]], yaw: 0 };
   if (e < PHASES.bridge[0]) {
-    const x = lerp(WALK.x0, WALK.x1, e / PHASES.bridge[0]) + 7;
-    return { visible: true, walking: true, pos: [x, 0, CORRIDOR_Z + 0.4], yaw: Math.PI / 2 };
+    // 旅客走在鏡頭前面偏右（順不順批 4：之前在正中間，把整條走道的盡頭都擋住）。
+    const x = lerp(WALK.x0, WALK.x1, e / PHASES.bridge[0]) + 8;
+    return { visible: true, walking: true, pos: [x, 0, CORRIDOR_Z + 2.4], yaw: Math.PI / 2 };
   }
   const s = Math.min(bp.length - 0.2, camS + 6), q = bp.at(s);
   return { visible: true, walking: true, pos: [q.x, bridgeFloorY(s), q.z], yaw: q.yaw };
@@ -203,8 +204,9 @@ function risePath() {
   if (_rise) return _rise;
   const g = GATE_STAND, o = CAM_OFF, end = [g[0] + o[0], o[1], g[1] + o[2]];
   const bp = boardPath(), q = bp.at(bp.length - STOP_SHORT), y0 = 1.7 + bridgeFloorY(bp.length - STOP_SHORT);
-  // 先直直往上穿過空橋 B 段的玻璃頂，再斜著退到停機坪的視角；不從機身上面貼著飛過去（那幾幀只看得到一片奶油色）。
-  return (_rise = [[q.x, y0, q.z], [q.x, 30, q.z - 3], [lerp(q.x, end[0], 0.5), lerp(30, end[1], 0.6), lerp(q.z, end[2], 0.45)], end]);
+  // 2026-11-17 順不順批 4（Paul：空橋那段鏡頭「stuck on top of the plane」）：不再直直往上 30 公尺（那幾幀是從機身正上方往下看空橋的頂），
+  // 改成往後退（朝航廈、-z）同時慢慢升到 12 公尺，飛機整個在前面，再斜著退到停機坪的視角。
+  return (_rise = [[q.x, y0, q.z], [q.x - 4, 12, q.z - 18], [lerp(q.x, end[0], 0.42), lerp(12, end[1], 0.5), lerp(q.z - 18, end[2], 0.3)], end]);
 }
 function rise3(u) {
   // 三維的 Catmull-Rom（用兩個二維的：xz 與 y 各算一次，同一個 u）

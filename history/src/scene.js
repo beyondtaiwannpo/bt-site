@@ -150,7 +150,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const hemi = new THREE.HemisphereLight(P.sky, P.grass, 0.95); scene.add(hemi);
   const sun = new THREE.DirectionalLight(P.cream, 1.7);
   sun.castShadow = true; sun.shadow.mapSize.set(q.shadow, q.shadow);
-  sun.shadow.camera.near = 10; sun.shadow.camera.far = 900; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.6; sun.shadow.radius = 4;
+  sun.shadow.camera.near = 10; sun.shadow.camera.far = 900; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.6; sun.shadow.radius = 2;   /* 順不順批 4：影子收緊（之前 4，飛機的影子糊成一團）*/
   scene.add(sun, sun.target);
   const SUN_OFF = new THREE.Vector3(-110, 170, -70);
   let shadowSpan = 0;
@@ -442,7 +442,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   let W = 1, Hh = 1, lastFov = -1;
   const shadowAt = new THREE.Vector3(1e9, 0, 0), planeAt = new THREE.Vector3(1e9, 0, 0); let shadowT = -1;
   function shadowTick(e, t) {
-    const span = e < A.PHASES.apron[0] ? 70 : e < A.PHASES.takeoff[0] ? 220 : 400; const spanChanged = span !== shadowSpan;
+    const span = e < A.PHASES.apron[0] ? 70 : e < A.PHASES.takeoff[0] ? 150 : 170; const spanChanged = span !== shadowSpan;   /* 室外的範圍收小（之前 220／400）：1024 的貼圖罩 300 公尺一格就是 0.3 公尺，飛機的影子才有邊 */
     const moved = lookV.distanceTo(shadowAt) > (span < 100 ? 3 : 8), planeMoved = plane.position.distanceTo(planeAt) > 2, stale = t - shadowT > 0.5;
     if (!spanChanged && !moved && !planeMoved && !stale) return;
     setShadowSpan(span);
