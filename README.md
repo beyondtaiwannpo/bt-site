@@ -4944,6 +4944,38 @@ Paul 第三次按「More detail first」。這一批挑兩個之前完全空的�
 2. 鏡頭升起來看整架飛機那一刻，背景是兩排山。
 3. 起飛之後往前看是海，往下看是海岸線與沙灘。
 
+## 歷史之路（2026-11-18 第五批：每一站的選擇，BT 是空服員）
+
+Paul 2026-11-17 定的、2026-11-18 按了「Do the choices」才做：「for every point, we want them to click into it and then see our history… BT is like a flight attendant that will be there no matter what… each choice is going to be a choice, and there's no consequences or right or wrong」。
+每一站不再只是一張卡讓人點，是一個情境加兩三個選擇；BT 像一位空服員，一進機場打招呼、每一站回你一句、起飛之後說再見。你選哪一條都打開同一站的歷史，差別只在空服員回你的那一句。
+
+### 改了什麼
+
+- **字全部在 `history/choices.json`**，程式一行都不用動就能換：`attendant` 三句（intro 一進來、outro 起飛之後、neutral 不是從選擇進來時說的）、`stops.<代號>` 每一站的情境 `ask` 與 `choices[]`（每個有 `label` 按鈕上的字與 `reply` 回話，中英各一份）、`fallback` 給後台新加的站（代號對不到就用它，所以加站永遠不會壞）。
+  **現在全部是範例**（`demo` 是 true）：Mentorship 與 Curriculum 照真的故事把字換掉，再把 demo 改成 false。紅線寫在檔案裡的 `_readme`：不放任何人的名字，數字只用事實資料庫裡有的，對外字串改之前過 TW。
+- `data.js`：`fetchChoices()`（同網域拿 JSON，拿不到回 null，頁面照舊沒有選擇）、`choiceFor()`（代號對得到用那一站、對不到用 fallback、少於兩個選擇不算）、`replyFor()`（選了第幾個就回那一句，沒選就 neutral）、`attendantLine()`。
+- `ui.js`：卡從一顆 button 變成一個 div（`.card`）：上面是原本那一顆（`.card-open`，點標題打開），下面一段情境加兩三顆選擇（`.card-ask`、`.choice`，帶 `data-i` 與 `data-k`）。按鈕不能包按鈕，這是改成 div 的原因。
+  覆蓋層最上面多一句空服員的話（`.panel-att`），結尾多一句 outro（`.end-att`），開場多一個浮在「往下捲」上方的泡泡（`#intro`，捲了就跟提示一起消失）。直立時間軸（減少動態效果或 `?motion=off`）的卡一樣有選擇。
+- `main.js`：choices.json 跟站的資料一起拿；點 `.choice` 用那個選擇打開，點標題或年份帶用 neutral；換語言覆蓋層裡那一句跟著換；卡變高了，貼卡的位置改成「底不能高過卡自己的高度加頂欄」（之前有選擇的卡被推出畫面上方）。
+- `scene.js`：一位橘衣戴帽的空服員站在現在這一站旁邊，面向鏡頭、手在比（`setAttendant(i)`，main.js 換站時叫）。航廈與空橋那幾站看得到，停機坪與空中的站藏起來（錨點在飛機上）。
+- `strings.js` 多兩個鍵（`attendant`、`choose`）。CSS 在 `history.css` 最後一段，選擇按鈕的底色是品牌橘的 22%（check.sh §11-14 只准七色加白）。
+- **為了塞進 250 KB**：三支模組各自一份的 `sign()` 抽成 `history/src/signs.js`（`makeSign(THREE, { textTexture, lam, P, fonts, parent })`），幾個模組的開頭註解縮短。`history/src` 現在 255.5 KB，離上限剩不到 1 KB。**之後任何要加進 history/src 的東西都要先減。**
+- 效能沒變：58.7 fps、590 個 draw call（多一個人）。
+- 測試 947（多三條：choices.json 的形狀、choiceFor 與 replyFor、卡與覆蓋層與開場結尾的 HTML）、`check.sh` 全過、check-mandarin 過。
+
+### 怎麼驗證
+
+1. 開 `/history/`：一進來畫面下方有 BT 的問候；捲到任何一站，卡底下有一句情境與兩三顆按鈕。
+2. 點任何一顆：覆蓋層打開，最上面是 BT 回你的那一句，底下是那一站的歷史。點標題或年份帶進來，那一句是 neutral。
+3. 切中文，字全部換；起飛之後最後一句在「路還在走」底下。
+4. `?motion=off` 的直立時間軸也有按鈕。
+5. 改 `history/choices.json` 任何一句，重新整理就換，不用動程式。
+
+### 還沒做
+
+- 字是範例。真的劇本等 Mentorship 與 Curriculum 給（跟 `/stories/` 的劇本同一批人）。
+- 手機上有選擇的卡高了三倍，實機沒看過。
+
 ## 歷史之路（2026-11-17 晚上：機場要像真的機場）
 
 Paul：人倒著走、腿怪、旅客沒好好走過安檢、大廳不該有安檢、航廈太空、整座機場太空（「go research an actual airport… a lot of details」）。改了這幾件：

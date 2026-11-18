@@ -1,6 +1,6 @@
 // /history/ 的畫面：純函式，吃整理好的站，吐 HTML。沒有 document。
 import { STR, t } from "./strings.js";
-import { shortTitle } from "./data.js";
+import { shortTitle, choiceText } from "./data.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pick = (stop, field, lang) => lang === "zh" ? (stop[field + "_zh"] || stop[field + "_en"] || "") : (stop[field + "_en"] || stop[field + "_zh"] || "");
@@ -19,16 +19,20 @@ export const progressText = (i, n) => String(n ? i + 1 : 0).padStart(2, "0") + "
 
 // 路邊那張卡。是 button：點或 Enter 都打開覆蓋層。data-i 是站的序號，main.js 用它找站。
 // 有勾了同意的照片就把第一張當小縮圖（參考站的卡也是這樣）；沒有就沒有 <img>，不會有破圖。
-export function cardHTML(stop, i, lang) {
+export function cardHTML(stop, i, lang, choice) {
   const title = pick(stop, "title", lang), summary = pick(stop, "summary", lang);
   const thumb = stop.photos && stop.photos[0] ? `<img class="card-thumb" src="${esc(stop.photos[0].url)}" alt="" loading="lazy" decoding="async" width="72" height="72">` : "";
   // 不用 aria-label：讀螢幕的名字要以看得見的字開頭（WCAG 2.5.3），所以年份與標題照印，「打開這一站」用看不見的 span 接在後面。
-  return `<button type="button" class="card${thumb ? " has-thumb" : ""}" data-i="${i}">` + thumb +
+  const open = `<button type="button" class="card-open" data-i="${i}">` + thumb +
     `<span class="card-plus" aria-hidden="true">+</span>` +
     `<span class="card-text"><span class="card-year">${esc(stop.year)}</span>` +
     `<span class="card-title">${esc(title)}</span>` +
     (summary ? `<span class="card-sub">${esc(summary)}</span>` : "") +
     `<span class="sr">（${esc(t("open", lang))}）</span></span></button>`;
+  // 選擇（2026-11-18 第五批）：卡底下一段情境加兩三顆按鈕，每一顆都打開這一站，差別只在空服員回你的那一句。沒有 choices 的站就只有上面那一顆。
+  const ask = choice ? `<div class="card-ask"><p class="ask-line"><span class="att-badge" aria-hidden="true">BT</span>${esc(choiceText(choice, "ask", lang))}</p>` +
+    `<div class="card-choices">${choice.choices.map((c, k) => `<button type="button" class="choice" data-i="${i}" data-k="${k}">${esc(choiceText(c, "label", lang))}</button>`).join("")}</div></div>` : "";
+  return `<div class="card${thumb ? " has-thumb" : ""}${choice ? " has-ask" : ""}" data-i="${i}">${open}${ask}</div>`;
 }
 
 // 一進來先畫的骨架：一張卡的形狀加「路在鋪」那一句，資料到了就換成真的卡。沒有任何一站的文字。
@@ -59,7 +63,9 @@ export function boardRows(stops, current) {
   }));
 }
 // 最後一站之後那一句安靜的結尾。
-export const endHTML = lang => `<p class="end-line">${esc(t("endLine", lang))}</p><p class="end-sub">${esc(t("endSub", lang))}</p>`;
+export const endHTML = (lang, outro) => `<p class="end-line">${esc(t("endLine", lang))}</p><p class="end-sub">${esc(t("endSub", lang))}</p>` + (outro ? `<p class="end-att"><span class="att-badge" aria-hidden="true">BT</span>${esc(outro)}</p>` : "");
+// 一進機場空服員那一句（intro）：捲動之前浮在畫面下方，跟「往下捲」一起消失。沒有字就空的。
+export const introHTML = (lang, intro) => intro ? `<p class="intro-line"><span class="att-badge" aria-hidden="true">BT</span><span class="sr">${esc(t("attendant", lang))}：</span>${esc(intro)}</p>` : "";
 
 const paras = text => String(text || "").split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
 
@@ -75,13 +81,15 @@ export function photosHTML(stop, lang) {
 }
 
 // 覆蓋層：日期、標題、一句話、說明、照片、回到路上。
-export function overlayHTML(stop, lang) {
+export function overlayHTML(stop, lang, reply) {
   const title = pick(stop, "title", lang), summary = pick(stop, "summary", lang), body = pick(stop, "body", lang);
+  // 空服員回你的那一句（從選擇進來是那個選擇的 reply，不是就 neutral），在日期上面。
+  const att = reply ? `<p class="panel-att"><span class="att-badge" aria-hidden="true">BT</span><span class="sr">${esc(t("attendant", lang))}：</span>${esc(reply)}</p>` : "";
   // 2026-11-07 Paul：不要貼在右邊，要像參考站那樣在正中間、大一點、後面的場景還看得到一點。
   // .panel 本身是整個螢幕的底（模糊加一點深藍），卡在中間，點卡外面也關。
   return `<div class="panel-card"><div class="panel-head"><button type="button" class="back" data-close aria-label="${esc(t("back", lang))}">` +
     `<span aria-hidden="true">×</span></button></div>` +
-    `<article class="panel-body"><p class="panel-date">${dateText(stop.happened_on, lang)}</p>` +
+    `<article class="panel-body">${att}<p class="panel-date">${dateText(stop.happened_on, lang)}</p>` +
     `<h2 class="panel-title" id="panel-title">${esc(title)}</h2>` +
     (summary ? `<p class="panel-summary">${esc(summary)}</p>` : "") +
     (body ? `<div class="panel-text">${paras(body)}</div>` : "") +
@@ -89,9 +97,9 @@ export function overlayHTML(stop, lang) {
 }
 
 // 減少動態效果、或 GSAP 載不到：同樣的站排成直立時間軸，卡一樣，點了一樣打開覆蓋層。
-export function timelineHTML(stops, lang) {
+export function timelineHTML(stops, lang, choiceOf) {
   return `<ol class="timeline" aria-label="${esc(t("timelineTitle", lang))}">` +
-    (stops || []).map((s, i) => `<li class="tl-item">${cardHTML(s, i, lang)}</li>`).join("") + `</ol>`;
+    (stops || []).map((s, i) => `<li class="tl-item">${cardHTML(s, i, lang, choiceOf ? choiceOf(s) : null)}</li>`).join("") + `</ol>`;
 }
 
 // 左上淡淡的大年份：顯示字型（Barlow Condensed）的真文字，只留數字。

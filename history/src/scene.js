@@ -518,11 +518,21 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const ctx = { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, world, pick, truck, buildAirliner, setGear, shadowOn, tw };
   const extras = [buildTerminal(THREE, ctx), buildGrounds(THREE, ctx), buildDecor(THREE, ctx), buildTraffic(THREE, ctx)];
 
+  // ═══ 空服員（2026-11-18 第五批，Paul：「BT is like a flight attendant that will be there no matter what」）：一位橘衣戴帽的人，站在現在這一站旁邊，面向鏡頭、手在比。
+  // 航廈與空橋那幾站看得到；停機坪與空中的站藏起來（錨點在飛機上）。哪一站由 main.js 叫 setAttendant(i)。 ═══
+  const attendant = figure(mats, { shirt: P.orange, staff: true }); attendant.userData.talking = true; attendant.visible = false; term.add(attendant); idleFigs.push(attendant);
+  let attendantAt = -1;
+  function setAttendant(i) { attendantAt = i; placeAttendant(); }
+  function placeAttendant() {
+    const s = curW && curW.stops[attendantAt]; if (!s || (s.phase !== "terminal" && s.phase !== "bridge")) { attendant.visible = false; return; }
+    attendant.visible = true; attendant.position.set(s.anchor[0] + 1.6, s.anchor[1], s.anchor[2] + (s.anchor[2] < A.CORRIDOR_Z ? 1.4 : -1.4));
+  }
   // ═══ 站：小場景與錨點記號 ═══
   const stopsGroup = new THREE.Group(); stopsGroup.userData.dynamic = true; world.add(stopsGroup);
   let stopMarkers = [];
+  let curW = null;
   function setStops(w, motifs) {
-    stopsGroup.clear(); stopMarkers = [];
+    curW = w; stopsGroup.clear(); stopMarkers = []; placeAttendant();
     w.stops.forEach((s, i) => {
       const g = new THREE.Group(); g.position.set(s.anchor[0], s.anchor[1], s.anchor[2]); g.rotation.y = s.yaw || 0;
       const scale = s.phase === "terminal" ? 1 : 2.2;   // 停機坪離鏡頭遠，小場景放大才看得到
@@ -639,6 +649,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     fuel[0].position.x = 150 + Math.sin(t * 0.12) * 40; fuel[0].rotation.y = Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2;
     { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(100 + Math.cos(ang) * 26, 0, 110 + Math.sin(ang) * 26); tug.rotation.y = -ang; }
     for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), u = (t * w.sp) % (span * 2), d = u < span ? u : span * 2 - u; const dir = (u < span) === (w.x1 > w.x0) ? 1 : -1; f.position.set(Math.min(w.x0, w.x1) + d, f.userData.baseY || 0, w.z); f.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; walkCycle(f, t, !w.stand); }   /* stand：站在電動步道上，帶子在走人不走 */
+    if (attendant.visible) attendant.rotation.y = Math.atan2(camera.position.x - attendant.position.x, camera.position.z - attendant.position.z);
     for (const f of idleFigs) walkCycle(f, t, false); lap("idle");
     for (const x of extras) if (x.tick) x.tick(t, e); lap("extras");
     if (people) people.sync(); lap("sync");   // 人的零件世界矩陣抄進 InstancedMesh（2026-11-17 批 1b）
@@ -689,7 +700,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     }
     renderer.shadowMap.needsUpdate = true;
   }
-  return { setStops, setBoard, prepareBoard, setGate, setZoom, setScrub, resize, render, project, dispose, renderer, scene, camera, prof, stopMarkers: () => stopMarkers };
+  return { setStops, setAttendant, setBoard, prepareBoard, setGate, setZoom, setScrub, resize, render, project, dispose, renderer, scene, camera, prof, stopMarkers: () => stopMarkers };
 }
 const idleFigs = [];
 

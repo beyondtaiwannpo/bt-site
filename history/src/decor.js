@@ -1,27 +1,12 @@
-// /history/ 航廈裡的第二批細節（2026-11-18 Paul 看過第一批之後：「More detail first」）。
-// 第一批把分區與成排的東西放好了，這一批做「店裡面」與「裝飾」：三間店（藥局、服飾、禮品）從實心的盒子改成走得進去的店面（玻璃門面、燈、貨架、人台、商品），
-// 免稅店補酒牆與香水櫃與購物籃，美食區補冰箱與展示櫃與吊燈與珍珠奶茶攤與回收餐盤台與麵攤的蒸氣，柱子上加指標帶、滅火器、監視器、喇叭，
-// 牆上加世界時鐘（真的照現在的時間算）、壁畫、置物櫃、育嬰室、出口燈，天花板垂下歡迎的布幔，大廳補 SIM 卡亭、旅遊資訊架、會面點、地上的圓徽，
-// 人再多一些（推推車的、坐輪椅的、三個人站著聊天的、巡邏的）。
-// 跟 terminal.js 同一招：不 import three，THREE 跟小工具從 scene.js 傳進來；沒有任何一站的字；顏色全部從 mats 來。
+// /history/ 航廈裡的第二批細節（2026-11-18 Paul「More detail first」）：三間店做成走得進去的店面、免稅店與美食區補滿、柱子與牆上的裝飾、
+// 世界時鐘、布幔、大廳的小亭子、走道兩側的小島、更多在做事的人。清單在 README「歷史之路（2026-11-18 第二批）」。跟 terminal.js 同一招：不 import three、沒有站名、沒有色碼。
+import { makeSign } from "./signs.js";
 export function buildDecor(THREE, c) {
   const { mats, P, palette, fonts, T, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, pick } = c;
-  const han = fonts.han || fonts.display, ticks = [];
+  const ticks = [];
   const person = (x, z, ry, o) => { const f = figure(mats, o || {}); f.position.set(x, 0, z); f.rotation.y = ry; f.userData.baseY = 0; term.add(f); idleFigs.push(f); return f; };
   const seated = (x, z, ry, o) => { const f = figure(mats, { ...(o || {}), seated: true }); f.position.set(x, 0.3, z); f.rotation.y = ry; f.userData.baseY = 0.3; term.add(f); idleFigs.push(f); return f; };
-  const texCache = new Map();
-  function sign(en, zh, w, h, bg, fg, x, y, z, face, opt) {
-    const o = opt || {}; const key = [en, zh, bg, fg, o.size || 0, o.align || "", o.arrow || ""].join("|");
-    let tex = texCache.get(key);
-    if (!tex) {
-      const W = 1024, H = Math.max(64, Math.round(1024 * h / w)), size = o.size || Math.round(H * 0.42), cx = o.align === "center" ? W / 2 : 36;
-      const lines = zh ? [{ text: en, x: cx, y: H * 0.36, font: `700 ${size}px ${fonts.display}`, color: fg, align: o.align || "left" }, { text: zh, x: cx, y: H * 0.76, font: `900 ${Math.round(size * 0.55)}px ${han}`, color: fg, align: o.align || "left" }]
-        : [{ text: en, x: cx, y: H / 2, font: `700 ${size}px ${fonts.display}`, color: fg, align: o.align || "left" }];
-      if (o.arrow) lines.push({ text: o.arrow, x: W - 36, y: H / 2, font: `700 ${Math.round(H * 0.6)}px ${fonts.display}`, color: fg, align: "right" });
-      tex = textTexture(W, H, bg, lines); texCache.set(key, tex);
-    }
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), lam(P.white, { map: tex, side: o.both ? THREE.DoubleSide : THREE.FrontSide })); m.position.set(x, y, z); if (o.flat) { m.rotation.x = -Math.PI / 2; m.rotation.z = face || 0; } else m.rotation.y = face || 0; m.castShadow = false; m.receiveShadow = false; term.add(m); return m;
-  }
+  const sign = makeSign(THREE, { textTexture, lam, P, fonts, parent: term });
   const whiteM = lam(P.cream.clone().lerp(P.white, 0.6)), woodM = lam(P.sand.clone().lerp(P.orange, 0.25).lerp(P.navy, 0.15)), redM = lam(P.orange.clone().lerp(P.navy, 0.25)), darkFloor = lam(P.navy.clone().lerp(P.grey, 0.55)), tealLight = lam(P.teal, { emissive: P.teal, emissiveIntensity: 0.8 });
   const glassPane = (w, h, x, y, z, ry) => { const g = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mats.glass); g.position.set(x, y, z); g.rotation.y = ry || 0; term.add(g); return g; };
   const smallBox = (w, h, d) => new THREE.BoxGeometry(w, h, d);

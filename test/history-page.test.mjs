@@ -384,12 +384,12 @@ test("退路（批 5）：減少動態、?motion=off、沒有 WebGL、Three 或 
 });
 
 test("資料與場景分開（批 5）：scene.js、airport.js、plane.js、index.html、shared/toy.js 裡沒有任何一站的文字；Three 只在 scene.js、plane.js 與 toy.js 出現；程式碼裡沒有寫死色碼", () => {
-  const files = ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/src/terminal.js", "history/src/grounds.js", "history/src/decor.js", "history/src/traffic.js", "history/index.html", "history/src/main.js", "shared/toy.js"];
+  const files = ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/src/terminal.js", "history/src/grounds.js", "history/src/decor.js", "history/src/traffic.js", "history/src/signs.js", "history/index.html", "history/src/main.js", "shared/toy.js"];
   const src = Object.fromEntries(files.map(f => [f, fs.readFileSync(new URL("../" + f, import.meta.url), "utf8")]));
   for (const f of files) for (const s of STOPS) { assert.ok(!src[f].includes(s.title_zh), f + " 有站的中文標題"); assert.ok(!src[f].includes(s.title_en), f + " 有站的英文標題"); }
   for (const f of ["history/src/airport.js", "history/src/main.js", "history/src/ui.js", "history/src/data.js"]) assert.ok(!/from\s+["']three["']/.test(src[f] || fs.readFileSync(new URL("../" + f, import.meta.url), "utf8")), f + " 不准 import three");
   assert.ok(/from\s+["']three["']/.test(src["history/src/scene.js"]), "scene.js 用 importmap 的 three");
-  for (const f of ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/src/terminal.js", "history/src/grounds.js", "history/src/decor.js", "history/src/traffic.js", "shared/toy.js"]) assert.ok(!/#[0-9a-fA-F]{6}\b/.test(src[f].replace(/\/\/.*$/gm, "")), f + " 裡不准寫死色碼（顏色從 CSS 變數讀）");
+  for (const f of ["history/src/scene.js", "history/src/airport.js", "history/src/plane.js", "history/src/terminal.js", "history/src/grounds.js", "history/src/decor.js", "history/src/traffic.js", "history/src/signs.js", "shared/toy.js"]) assert.ok(!/#[0-9a-fA-F]{6}\b/.test(src[f].replace(/\/\/.*$/gm, "")), f + " 裡不准寫死色碼（顏色從 CSS 變數讀）");
   // importmap：three 只從 cdnjs 來，帶 integrity
   const im = /<script type="importmap">([\s\S]*?)<\/script>/.exec(src["history/index.html"]);
   assert.ok(im, "index.html 要有 importmap");
@@ -435,4 +435,42 @@ test("年份帶（批 3）：有一顆隨捲動滑的點，大年份小標籤", 
 test("esc：五個該逃的字都逃掉", () => {
   assert.equal(UI.esc(`<a href="x">&'`), "&lt;a href=&quot;x&quot;&gt;&amp;&#39;");
   assert.equal(UI.esc(null), "");
+});
+
+// ── 每一站的選擇（2026-11-18 第五批）──
+import fs2 from "node:fs";
+const CHOICES = JSON.parse(fs2.readFileSync(new URL("../history/choices.json", import.meta.url), "utf8"));
+test("choices.json：空服員三句中英都有、每一站兩到三個選擇、每個選擇四個欄位都有字、有 fallback、demo 是布林", () => {
+  for (const k of ["intro", "outro", "neutral"]) { assert.ok(CHOICES.attendant[k + "_zh"], k + "_zh"); assert.ok(CHOICES.attendant[k + "_en"], k + "_en"); }
+  assert.equal(typeof CHOICES.demo, "boolean");
+  const all = Object.entries(CHOICES.stops).concat([["fallback", CHOICES.fallback]]);
+  for (const [slug, c] of all) {
+    assert.ok(c.ask_zh && c.ask_en, slug + " 的情境要中英都有");
+    assert.ok(c.choices.length >= 2 && c.choices.length <= 3, slug + " 要兩到三個選擇");
+    for (const o of c.choices) for (const f of ["label_zh", "label_en", "reply_zh", "reply_en"]) assert.ok(o[f], slug + " 的選擇少了 " + f);
+  }
+});
+test("choiceFor：代號對得到用那一站、對不到用 fallback、沒有資料回 null；replyFor 照選擇回話，沒選就 neutral", () => {
+  assert.equal(D.choiceFor(CHOICES, "2020-founded"), CHOICES.stops["2020-founded"]);
+  assert.equal(D.choiceFor(CHOICES, "2099-new-stop"), CHOICES.fallback);
+  assert.equal(D.choiceFor(null, "2020-founded"), null);
+  assert.equal(D.choiceFor({ stops: {}, fallback: { choices: [{}] } }, "x"), null);   // 只有一個選擇不算
+  assert.equal(D.replyFor(CHOICES, "2020-founded", 1, "zh"), CHOICES.stops["2020-founded"].choices[1].reply_zh);
+  assert.equal(D.replyFor(CHOICES, "2020-founded", 1, "en"), CHOICES.stops["2020-founded"].choices[1].reply_en);
+  assert.equal(D.replyFor(CHOICES, "2020-founded", undefined, "zh"), CHOICES.attendant.neutral_zh);
+  assert.equal(D.replyFor(null, "2020-founded", 0, "zh"), "");
+  assert.equal(D.attendantLine(CHOICES, "intro", "en"), CHOICES.attendant.intro_en);
+  assert.equal(D.attendantLine(null, "intro", "en"), "");
+});
+test("卡有選擇就多一段情境與按鈕（每顆帶 data-i 與 data-k），沒有就只有打開那一顆；覆蓋層最上面是空服員那一句；結尾與開場各一句", () => {
+  const c = CHOICES.stops["2020-founded"];
+  const withAsk = UI.cardHTML(STOPS[0], 0, "zh", c), plain = UI.cardHTML(STOPS[0], 0, "zh");
+  assert.ok(withAsk.includes("card-open") && withAsk.includes(c.ask_zh) && withAsk.includes('class="choice" data-i="0" data-k="1"') && withAsk.includes(c.choices[1].label_zh));
+  assert.ok(!plain.includes("card-ask") && plain.includes("card-open"));
+  assert.ok(!withAsk.includes("<button") || !/<button[^>]*>[^<]*<button/.test(withAsk), "按鈕不能包按鈕");
+  const ov = UI.overlayHTML(STOPS[1], "en", "a reply"); assert.ok(ov.indexOf("panel-att") < ov.indexOf("panel-date") && ov.includes("a reply"));
+  assert.ok(!UI.overlayHTML(STOPS[1], "en", "").includes("panel-att"));
+  assert.ok(UI.endHTML("zh", "最後一句").includes("最後一句") && !UI.endHTML("zh").includes("end-att"));
+  assert.ok(UI.introHTML("en", "hello").includes("hello") && UI.introHTML("en", "") === "");
+  assert.ok(UI.timelineHTML(STOPS, "en", s => D.choiceFor(CHOICES, s.slug)).includes("card-choices"));
 });

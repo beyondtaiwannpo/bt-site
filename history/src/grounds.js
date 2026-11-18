@@ -6,24 +6,14 @@
 // 陸側：航廈前整條雨棚與人行道與斑馬線與導盲磚、門架牌、計程車排班、接駁巴士、立體停車場、公車總站、加油站、圓環與機場入口招牌、捷運站出口、
 //       機場公司辦公大樓、空廚、員工停車場、花台與圓樹、廣告看板、路上會跑的車。
 // 不 import three：THREE 跟小工具從 scene.js 傳進來（跟 plane.js、terminal.js 同一招）。沒有任何一站的文字、沒有色碼。
+import { makeSign } from "./signs.js";
 export function buildGrounds(THREE, c) {
   const { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, textTexture, lam, world, truck, buildAirliner, shadowOn, tw, pick } = c;
-  const han = fonts.han || fonts.display, R = A.RUNWAY;
+  const R = A.RUNWAY;
   const movers = [];   // 每一幀要動的東西：{ g, fn(t) }
   const person = (x, z, ry, o) => { const f = figure(mats, o || {}); f.position.set(x, 0, z); f.rotation.y = ry; f.userData.baseY = 0; world.add(f); idleFigs.push(f); return f; };
   const crew = (x, z, ry) => person(x, z, ry, { shirt: P.navy, vest: true });
-  const texCache = new Map();
-  function sign(en, zh, w, h, bg, fg, x, y, z, face, opt) {
-    const o = opt || {}; const key = [en, zh, bg, fg, o.size || 0, o.align || ""].join("|");
-    let tex = texCache.get(key);
-    if (!tex) {
-      const W = 1024, H = Math.max(64, Math.round(1024 * h / w)), size = o.size || Math.round(H * 0.42), cx = o.align === "center" ? W / 2 : 36;
-      const lines = zh ? [{ text: en, x: cx, y: H * 0.36, font: `700 ${size}px ${fonts.display}`, color: fg, align: o.align || "left" }, { text: zh, x: cx, y: H * 0.76, font: `900 ${Math.round(size * 0.55)}px ${han}`, color: fg, align: o.align || "left" }]
-        : [{ text: en, x: cx, y: H / 2, font: `700 ${size}px ${fonts.display}`, color: fg, align: o.align || "left" }];
-      tex = textTexture(W, H, bg, lines); texCache.set(key, tex);
-    }
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), lam(P.white, { map: tex })); m.position.set(x, y, z); if (o.flat) { m.rotation.x = -Math.PI / 2; m.rotation.z = face || 0; } else m.rotation.y = face || 0; m.castShadow = false; m.receiveShadow = false; world.add(m); return m;
-  }
+  const sign = makeSign(THREE, { textTexture, lam, P, fonts, parent: world });
   const roadM = lam(P.asphalt.clone().lerp(P.grey, 0.3)), paveM = lam(P.cream.clone().lerp(P.grey, 0.25)), redM = lam(P.orange.clone().lerp(P.navy, 0.25));
   const carBody = new THREE.BoxGeometry(4.2, 1.1, 1.9), carTop = new THREE.BoxGeometry(2.2, 0.8, 1.7);
   const bus = (x, z, ry, m) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; g.add(box(11, 3, 2.5, m, 0, 1.6, 0), box(10.6, 1.2, 2.55, mats.glass, 0, 2.1, 0, false), box(11, 0.5, 2.5, mats.navy, 0, 0.5, 0, false)); world.add(g); return g; };

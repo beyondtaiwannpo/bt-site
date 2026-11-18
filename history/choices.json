@@ -1,0 +1,96 @@
+{
+  "_readme": [
+    "這一份是 /history/ 每一站的「選擇」：Paul 2026-11-17 定的，每一站不是一張卡讓人點，是一個情境、兩三個選擇，",
+    "BT 像一位空服員，這一趟從頭到尾都在，你選哪一條都沒有對錯，選了就打開那一站的歷史。",
+    "**現在全部是範例**（demo 是 true）。Mentorship 與 Curriculum 照真的故事把每一站的字換掉，再把 demo 改成 false。程式一行都不用動。",
+    "",
+    "欄位：",
+    "  attendant.intro_zh/en   一進機場那一句問候（BT 自我介紹、這一趟的規則：每一站你選，沒有錯的門）。",
+    "  attendant.outro_zh/en   起飛之後最後那一句。",
+    "  attendant.neutral_zh/en 不是從選擇進來（點年份帶、直接帶網址）時空服員說的那一句。",
+    "  stops.<代號>            代號就是後台那一站的代號（網址 #後面那一段）。",
+    "    ask_zh/en             那一站的情境，一兩句，用「你」。",
+    "    choices[]             兩個或三個。label 是按鈕上的字，reply 是你選了之後 BT 回你的一句。沒有對錯，每一句都要讓人覺得選了也好。",
+    "  fallback                後台新加的站如果這裡沒有，就用這一組，所以後台加站永遠不會壞。",
+    "",
+    "紅線：不放任何人的名字；數字只用 ~/Anson/wiki/entities/beyond-taiwan.md 事實資料庫裡有的。對外字串改之前過 TW。"
+  ],
+  "demo": true,
+  "attendant": {
+    "intro_zh": "你好，我是 BT。這一趟我從頭到尾都在。每一站你來選，哪一條都走得通，沒有錯的門。",
+    "intro_en": "Hi, I'm BT, your attendant for this trip. I'm with you the whole way. At every stop you choose. Every door leads on, none of them is wrong.",
+    "outro_zh": "不管你接下來飛去哪，我們都在。",
+    "outro_en": "Wherever you fly next, we're there.",
+    "neutral_zh": "不管你是怎麼走到這一站的，都好。這一站發生了這些事。",
+    "neutral_en": "However you got to this stop, it's fine. Here's what happened here."
+  },
+  "stops": {
+    "2020-founded": {
+      "ask_zh": "2020 年。七個在不同時區的學生開了一通視訊，問你：要不要一起？",
+      "ask_en": "2020. Seven students in seven time zones are on a call. They ask: want to join?",
+      "choices": [
+        { "label_zh": "好，我要做什麼？", "label_en": "Yes. What do I do?", "reply_zh": "一開始誰都不知道要做什麼，先來就對了。看看那七個人做了什麼。", "reply_en": "Nobody knew what to do at the start either. Showing up was the whole job. See what those seven did." },
+        { "label_zh": "我先看看。", "label_en": "I'll watch first.", "reply_zh": "很多人都是先看。看著看著就在裡面了。看看你在看的時候發生了什麼。", "reply_en": "Most of us watched first. Watching is how you end up inside. See what happened while you watched." }
+      ]
+    },
+    "2020-mentorship-begins": {
+      "ask_zh": "有人問你：要不要配一位在國外念書的學長姐，每個月聊一次？",
+      "ask_en": "Someone asks: want a mentor who studies abroad, one call a month?",
+      "choices": [
+        { "label_zh": "要，我有很多問題。", "label_en": "Yes, I have questions.", "reply_zh": "問題多是好事，這就是這件事開始的原因。看看第一批 36 個人怎麼開始的。", "reply_en": "Questions are the point. That's why this started. See how the first 36 began." },
+        { "label_zh": "我不知道要問什麼。", "label_en": "I don't know what to ask.", "reply_zh": "沒關係，第一通電話多半是對方在問你。看看第一批 36 個人怎麼開始的。", "reply_en": "That's fine. On the first call, the mentor usually does the asking. See how the first 36 began." },
+        { "label_zh": "我自己查就好。", "label_en": "I'll figure it out myself.", "reply_zh": "可以，資料我們也會一直放著。想聊的時候，人還在。看看這件事是怎麼開始的。", "reply_en": "You can. The resources stay up either way. When you want to talk, someone's here. See how this started." }
+      ]
+    },
+    "2021-online-fair": {
+      "ask_zh": "2021 年的一個晚上，一場線上博覽會，一百多個分組房間。你會？",
+      "ask_en": "One night in 2021, an online fair, dozens of breakout rooms. You would?",
+      "choices": [
+        { "label_zh": "每一間都進去看。", "label_en": "Drop into every room.", "reply_zh": "那天晚上很多人就是這樣，從一間逛到下一間。看看那場有多少人來。", "reply_en": "That's how most people spent that night, one room to the next. See how many came." },
+        { "label_zh": "只進一間，把問題問完。", "label_en": "Pick one room, ask everything.", "reply_zh": "一間問到底也很好，那些回答後來變成了資料庫。看看那場有多少人來。", "reply_en": "One room, all the way down, works too. Those answers became the database. See how many came." }
+      ]
+    },
+    "2021-campus-ambassadors": {
+      "ask_zh": "你的高中沒有人聽過 BT。要不要當第一個把它帶進學校的人？",
+      "ask_en": "Nobody at your high school has heard of BT. Be the first to bring it in?",
+      "choices": [
+        { "label_zh": "好，我去跟老師講。", "label_en": "Yes, I'll talk to a teacher.", "reply_zh": "第一句最難講，講了就有了。看看那一年的 18 位大使做了什麼。", "reply_en": "The first sentence is the hardest. After that it exists. See what the 18 ambassadors did that year." },
+        { "label_zh": "我先拉一個朋友。", "label_en": "I'll bring a friend first.", "reply_zh": "兩個人就是一個開始。看看那一年的 18 位大使做了什麼。", "reply_en": "Two people is a start. See what the 18 ambassadors did that year." }
+      ]
+    },
+    "2023-first-bootcamp": {
+      "ask_zh": "暑假有一個四天的探索營，不用錢。你？",
+      "ask_en": "There's a four day bootcamp this summer. It's free. You?",
+      "choices": [
+        { "label_zh": "報名，四天都到。", "label_en": "Sign up, all four days.", "reply_zh": "好。第一屆就是這樣來了八十幾個人。看看那四天。", "reply_en": "Good. That's how more than 80 people showed up to the first one. See those four days." },
+        { "label_zh": "我家裡不一定讓我去。", "label_en": "My family might not let me.", "reply_zh": "很多人也是先過這一關。我們幫你跟家裡講。看看那四天發生了什麼。", "reply_en": "A lot of people had that conversation first. We help you have it. See what happened over those four days." },
+        { "label_zh": "我覺得我程度不夠。", "label_en": "I don't think I'm good enough.", "reply_zh": "探索營沒有門檻，就是為了這句話開的。看看那四天發生了什麼。", "reply_en": "There's no bar to clear. The bootcamp exists because of that sentence. See what happened over those four days." }
+      ]
+    },
+    "2025-alumni-accounts": {
+      "ask_zh": "你申請完了，結果也出來了。接下來？",
+      "ask_en": "You're done applying. The results are in. Now what?",
+      "choices": [
+        { "label_zh": "回來幫下一個人。", "label_en": "Come back and help the next one.", "reply_zh": "校友帳號就是為了這個開的。看看有多少人回來了。", "reply_en": "That's what the alumni accounts are for. See how many came back." },
+        { "label_zh": "先專心過自己的生活。", "label_en": "Live my own life for a while.", "reply_zh": "當然。門一直開著，什麼時候回來都算回來。看看有多少人回來了。", "reply_en": "Of course. The door stays open. Whenever you come back counts. See how many have." }
+      ]
+    },
+    "today": {
+      "ask_zh": "現在。接近三十個幹部，分在七個國家，全部是學生。你會站在哪一邊？",
+      "ask_en": "Now. Close to thirty organisers in seven countries, all students. Where do you stand?",
+      "choices": [
+        { "label_zh": "我想加入。", "label_en": "I want in.", "reply_zh": "好，等你。看看現在是誰在做這件事。", "reply_en": "Good, we'll be here. See who's doing this now." },
+        { "label_zh": "我想支持。", "label_en": "I want to support this.", "reply_zh": "謝謝。看看你支持的是誰。", "reply_en": "Thank you. See who you'd be supporting." },
+        { "label_zh": "我只是路過。", "label_en": "Just passing through.", "reply_zh": "路過也歡迎。看看這一站。", "reply_en": "Passing through is welcome too. Have a look around this stop." }
+      ]
+    }
+  },
+  "fallback": {
+    "ask_zh": "這一站，你會？",
+    "ask_en": "At this stop, you would?",
+    "choices": [
+      { "label_zh": "走進去看看。", "label_en": "Walk in and look.", "reply_zh": "好。看看這一站發生了什麼。", "reply_en": "Good. See what happened here." },
+      { "label_zh": "在外面看一下就好。", "label_en": "Just look from outside.", "reply_zh": "也可以。看看這一站發生了什麼。", "reply_en": "That works too. See what happened here." }
+    ]
+  }
+}

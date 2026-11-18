@@ -28,6 +28,8 @@ export const STR = {
     board: "Departures",
     endLine: "路還在走。",
     endSub: "下一站，等你一起。",
+    attendant: "BT 空服員",
+    choose: "你會？",
   },
   en: {
     title: "Our Road",
@@ -56,6 +58,8 @@ export const STR = {
     board: "Departures",
     endLine: "The journey continues.",
     endSub: "Next stop, with you.",
+    attendant: "BT, your attendant",
+    choose: "You would?",
   },
 };
 export const t = (key, lang) => {

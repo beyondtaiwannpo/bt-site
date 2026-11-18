@@ -5,26 +5,14 @@
 //
 // 不 import three：THREE 跟小工具（box、cyl、instanced、figure…）從 scene.js 傳進來（跟 plane.js 同一招），check.sh 才守得住「只有 scene.js 與 plane.js import three」。
 // 這裡沒有任何一站的文字；牌子上的字只有機場通用的詞（中英）。顏色全部從 mats 來，沒有色碼。
+import { makeSign } from "./signs.js";
 export function buildTerminal(THREE, c) {
   const { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, pick } = c;
-  const han = fonts.han || fonts.display;
   const made = [];   // 回給 scene.js 的「每一幀」要做的事（這一支沒有，留著跟 grounds.js 一致）
   const person = (x, z, ry, o) => { const f = figure(mats, o || {}); f.position.set(x, 0, z); f.rotation.y = ry; f.userData.baseY = 0; term.add(f); idleFigs.push(f); return f; };
   const seated = (x, z, ry, o) => { const f = figure(mats, { ...(o || {}), seated: true }); f.position.set(x, 0.3, z); f.rotation.y = ry; f.userData.baseY = 0.3; term.add(f); idleFigs.push(f); return f; };
   // 牌子：一塊平面貼 canvas 的字（英文大字、中文小字），bg/fg 是色票的字串。face：面向 +z（0）或 -z（π）或 -x（-π/2）。
-  const texCache = new Map();
-  function sign(en, zh, w, h, bg, fg, x, y, z, face, opt) {
-    const o = opt || {}; const key = [en, zh, bg, fg, o.size || 0].join("|");
-    let tex = texCache.get(key);
-    if (!tex) {
-      const W = 1024, H = Math.round(1024 * h / w), size = o.size || Math.round(H * 0.42);
-      const lines = zh ? [{ text: en, x: 36, y: H * 0.36, font: `700 ${size}px ${fonts.display}`, color: fg }, { text: zh, x: 36, y: H * 0.76, font: `900 ${Math.round(size * 0.55)}px ${han}`, color: fg }]
-        : [{ text: en, x: o.align === "center" ? W / 2 : 36, y: H / 2, font: `700 ${size}px ${fonts.display}`, color: fg, align: o.align || "left" }];
-      if (o.arrow) lines.push({ text: o.arrow, x: W - 36, y: H / 2, font: `700 ${Math.round(H * 0.6)}px ${fonts.display}`, color: fg, align: "right" });
-      tex = textTexture(W, H, bg, lines); texCache.set(key, tex);
-    }
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), lam(P.white, { map: tex })); m.position.set(x, y, z); m.rotation.y = face || 0; m.castShadow = false; m.receiveShadow = false; term.add(m); return m;
-  }
+  const sign = makeSign(THREE, { textTexture, lam, P, fonts, parent: term });
   // 吊牌：深藍的板子加兩條吊桿，正面朝 -x（迎著走過來的人）。
   function hanging(x, z, en, zh, arrow) {
     term.add(box(4.4, 1.1, 0.14, mats.navy, x, 4.7, z, false), instanced(new THREE.CylinderGeometry(0.03, 0.03, T.h - 6.3, 5), mats.grey, [[x, 4.7 + 0.55 + (T.h - 6.3) / 2, z - 1.6], [x, 4.7 + 0.55 + (T.h - 6.3) / 2, z + 1.6]], false));

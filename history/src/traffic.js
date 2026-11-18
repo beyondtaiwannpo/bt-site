@@ -1,8 +1,5 @@
-// /history/ 機場外面會動的東西與第二批細節（2026-11-18 Paul 看過第一批之後：「More detail first」）。
-// 從高處看機場，「活著」的感覺多半來自會動的東西：一架飛機照著循環進場、落地、滾行、滑出跑道；一架在跑道頭等著起飛（信標燈在閃）；
-// 行李拖車在服務道上來回；餐勤車的升降台在升降；兩群鳥繞著停機坪飛；航廈門口三面旗子在飄。
-// 不動的：滑行道兩側的藍燈與跑道兩側的白燈（真的機場晚上就是這兩種燈）、每一位的加油井蓋、貨運坪的貨櫃堆與堆高機。
-// 不 import three：THREE 跟小工具從 scene.js 傳進來（跟 grounds.js 同一招）。tick(t, e) 多收捲動的進度 e：起飛那一段跑道要留給我們自己那一架，進場的那一架先躲開。
+// /history/ 機場外面會動的東西（2026-11-18 第二批）：進場落地的飛機、等起飛的飛機、行李拖車、餐勤車、鳥、旗；不動的燈與井蓋與貨運坪。
+// 不 import three。tick(t, e) 多收捲動的進度 e：起飛那一段跑道要留給我們自己那一架，進場的那一架先躲開。
 export function buildTraffic(THREE, c) {
   const { mats, P, A, box, cyl, instanced, figure, idleFigs, lam, world, truck, buildAirliner, setGear, shadowOn, tw } = c;
   const movers = [], R = A.RUNWAY;

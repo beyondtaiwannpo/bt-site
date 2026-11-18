@@ -21,6 +21,7 @@ let gl = null;                  // createScene() 回的場景；直立時間軸�
 let cardsEl = null, cardEls = [], stripCentres = [], endEl = null, stageEl = null, worldEl = null;
 let openedFrom = null, savedY = 0, playing = false, raf = 0, clock = 0;
 let insideNow = null;
+let choices = null, introEl = null;   // 每一站的選擇（history/choices.json）；拿不到就 null，卡上沒有按鈕，覆蓋層沒有空服員那一句
 let aim = -1;   // 鍵盤連按時的目標站：鏡頭還在滑的時候 current 還沒變，連按三下要跳三站不是一站
 
 // ── 語言 ──
@@ -32,15 +33,16 @@ function setLang(l) {
   const home = $("home"); if (home) home.href = "../?lang=" + l;
   $("lang").textContent = t("lang", l); $("lang").setAttribute("aria-label", t("langLabel", l));
   paintPlay();
-  if (endEl) endEl.innerHTML = UI.endHTML(l);
-  if (stops.length) { renderCards(); renderStrip(); paintGhost(); if (!$("panel").hidden) $("panel").innerHTML = UI.overlayHTML(stops[current], lang); }
+  if (endEl) endEl.innerHTML = UI.endHTML(l, D.attendantLine(choices, "outro", l));
+  if (introEl) introEl.innerHTML = UI.introHTML(l, D.attendantLine(choices, "intro", l));
+  if (stops.length) { renderCards(); renderStrip(); paintGhost(); if (!$("panel").hidden) $("panel").innerHTML = UI.overlayHTML(stops[current], lang, lastReply); }
 }
 function paintPlay() { const b = $("play"); b.textContent = playing ? t("pause", lang) : t("play", lang); b.setAttribute("aria-pressed", playing ? "true" : "false"); }
 
 // ── 畫 ──
 function renderCards() {
   if (!cardsEl) return;
-  cardsEl.innerHTML = stops.map((s, i) => UI.cardHTML(s, i, lang)).join("");
+  cardsEl.innerHTML = stops.map((s, i) => UI.cardHTML(s, i, lang, D.choiceFor(choices, s.slug))).join("");
   cardEls = [...cardsEl.querySelectorAll(".card")];
   measureCards(); placeCards();
 }
@@ -60,12 +62,12 @@ function placeCards() {
     if (!p.visible) return;
     // 卡不准被畫面左右切掉（手機上那一站可能靠邊）：夾在邊界內，尾巴可以歪一點沒關係。
     const half = (c._w || 280) / 2 + 10;
-    const x = Math.round(Math.min(W - half, Math.max(half, p.x)) * 2) / 2, y = Math.round(Math.max(90, p.y - 8) * 2) / 2;
+    const x = Math.round(Math.min(W - half, Math.max(half, p.x)) * 2) / 2, y = Math.round(Math.max((c._h || 60) + 76, p.y - 8) * 2) / 2;   // 卡的底不能高過卡自己的高度加頂欄（有選擇的卡高了三倍，2026-11-18）
     if (c._x === x && c._y === y) return;
     c._x = x; c._y = y; c.style.translate = `${x}px ${y}px`;
   });
 }
-function measureCards() { for (const c of cardEls) c._w = c.offsetWidth || 280; }
+function measureCards() { for (const c of cardEls) { c._w = c.offsetWidth || 280; c._h = c.offsetHeight || 60; } }
 function renderStrip() {
   $("strip").innerHTML = UI.stripHTML(stops, current, lang);
   measureStrip(); placeDot();
@@ -94,7 +96,7 @@ function setCurrent(i) {
   if (i === current) return;
   current = i;
   updateStrip(); revealCurrent(); paintGhost();
-  if (gl) gl.setBoard(UI.boardRows(stops, current));
+  if (gl) { gl.setBoard(UI.boardRows(stops, current)); gl.setAttendant(i); }
   // 網址寫上這一站。replaceState 不會讓瀏覽器自己跳。
   history.replaceState(null, "", location.pathname + location.search + D.hashFor(stops[i]));
 }
@@ -129,7 +131,7 @@ function onProgress(p) {
   // 室內那兩段（航廈與空橋）左上的大年份淡一半，不然壓在 3D 的室內上很突兀。class 沒變就不碰。
   const inside = eased < A.PHASES.apron[0]; if (inside !== insideNow) { insideNow = inside; doc.classList.toggle("inside", inside); }
   const n = A.nearest(w, p); if (n >= 0) setCurrent(n);
-  if (p > 0.01) $("hint").classList.add("gone");
+  if (p > 0.01) { $("hint").classList.add("gone"); if (introEl) introEl.classList.add("gone"); }
 }
 // 閒置的時鐘：信標、雲、車、人。進度沒變的時候也要重畫（它們在動）。分頁在背景就不畫。
 let tickerOn = false;
@@ -155,12 +157,15 @@ function goTo(i, instant) {
 }
 
 // ── 覆蓋層 ──
-function openStop(i, from) {
+let lastReply = "";
+// k 是選了第幾個選擇（沒有就是從標題或年份帶進來，空服員說 neutral 那一句）。
+function openStop(i, from, k) {
   if (i < 0 || i >= stops.length) return;
   stopPlay();
   openedFrom = from || null; savedY = scrollY;
   const panel = $("panel");
-  panel.innerHTML = UI.overlayHTML(stops[i], lang);
+  lastReply = D.replyFor(choices, stops[i].slug, k, lang);
+  panel.innerHTML = UI.overlayHTML(stops[i], lang, lastReply);
   panel.hidden = false; doc.classList.add("panel-open");
   requestAnimationFrame(() => { panel.classList.add("in"); const b = panel.querySelector("[data-close]"); if (b) b.focus(); });
   history.replaceState(null, "", location.pathname + location.search + D.hashFor(stops[i]));
@@ -221,7 +226,8 @@ addEventListener("keydown", e => {
 
 // ── 點 ──
 document.addEventListener("click", e => {
-  const card = e.target.closest(".card"); if (card) { openStop(+card.dataset.i, card); return; }
+  const ch = e.target.closest(".choice"); if (ch) { openStop(+ch.dataset.i, ch, +ch.dataset.k); return; }
+  const card = e.target.closest(".card-open"); if (card) { openStop(+card.dataset.i, card); return; }
   const strip = e.target.closest(".strip-stop"); if (strip) { stopPlay(); goTo(+strip.dataset.i); return; }
   if (e.target.closest("[data-close]") || e.target === $("panel")) { closePanel(); return; }
   const shot = e.target.closest(".shot-btn"); if (shot) { if (matchMedia("(min-width: 760px)").matches) openLightbox(shot); return; }
@@ -265,11 +271,11 @@ async function boot() {
   const state = $("state");
   const wantMove = !reduce && !motionOff;
   stageEl = wantMove ? $("stage") : null; worldEl = wantMove ? $("world") : null;
-  endEl = wantMove ? $("end") : null; if (endEl) endEl.innerHTML = UI.endHTML(lang);
+  endEl = wantMove ? $("end") : null; introEl = wantMove ? $("intro") : null;
   (wantMove ? $("road-wrap") : $("static")).hidden = false;
   // 先放一張骨架卡，不等資料也不等 Three（手機上 public_milestones() 要幾百毫秒、Three 要幾百 KB，空白看起來像壞了）。
   $("skeleton").innerHTML = UI.skeletonHTML(lang);
-  const fetching = D.fetchStops();
+  const fetching = D.fetchStops(), fetchingChoices = D.fetchChoices("./choices.json");
   await paintFirst();
   // 三樣東西一起等：GSAP、場景（Three，幾百 KB）、資料。減少動態或 ?motion=off 就不去載場景。
   // **資料先到就先畫年份帶與大年份**，不等 Three：大年份是 Lighthouse 量 LCP 的那個元素，批 5 第一次量讓它等 Three 下載完，慢了快一秒。
@@ -277,7 +283,9 @@ async function boot() {
   let rows;
   try { rows = await fetching; }
   catch (e) { console.error("public_milestones() 拿不到：", e); $("skeleton").innerHTML = ""; state.innerHTML = UI.errorHTML(lang); return; }
-  stops = rows;
+  stops = rows; choices = await fetchingChoices;
+  if (endEl) endEl.innerHTML = UI.endHTML(lang, D.attendantLine(choices, "outro", lang));
+  if (introEl) introEl.innerHTML = UI.introHTML(lang, D.attendantLine(choices, "intro", lang));
   $("skeleton").innerHTML = "";
   if (!stops.length) { state.innerHTML = UI.emptyHTML(lang); return; }
   state.innerHTML = "";
@@ -308,7 +316,7 @@ async function boot() {
     api.jump(A.progressFor(w, start), true);
   } else {
     // 直立時間軸：每一站一張卡。
-    $("timeline").innerHTML = UI.timelineHTML(stops, lang);
+    $("timeline").innerHTML = UI.timelineHTML(stops, lang, s => D.choiceFor(choices, s.slug));
     cardEls = [...$("timeline").querySelectorAll(".card")];
     if (start > 0) goTo(start, true);
     // 捲到哪一張卡，年份帶就亮哪一站。

@@ -216,3 +216,38 @@ button:not([disabled]):active{transform:scale(.97)}
   *{animation:none!important;transition:none!important}
   .card{transform:translate(-50%,-100%)}
 }
+
+/* ── 每一站的選擇（2026-11-18 第五批）──
+   卡變成一個 div：上面是原本那一顆（.card-open，點標題打開），下面一段情境加兩三顆選擇（.card-ask）。每一顆都打開這一站，差別只在空服員回你的那一句。
+   空服員的字前面一顆小小的「BT」徽章（.att-badge）：一進來那一句（.intro）、覆蓋層最上面那一句（.panel-att）、最後那一句（.end-att）都用它。 */
+.card{flex-direction:column;align-items:stretch;gap:0;padding:0;cursor:default}
+.card-open{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 16px 10px 12px;border:0;border-radius:14px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+.card-open:hover{background:rgba(16,42,134,.05)}
+.card-ask{border-top:1px solid rgba(16,42,134,.12);padding:9px 12px 11px;display:flex;flex-direction:column;gap:8px}
+.ask-line{margin:0;font-size:13.5px;line-height:1.4;color:var(--ink);display:flex;gap:8px;align-items:flex-start}
+.att-badge{flex:0 0 auto;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--bt-navy);color:var(--bt-cream);font:700 10px/1 var(--display);letter-spacing:.06em;margin-top:-1px}
+.card-choices{display:flex;flex-wrap:wrap;gap:6px}
+.choice{appearance:none;border:1.5px solid var(--bt-orange);border-radius:999px;background:rgba(255,196,108,.22);color:var(--ink);font:500 13px/1.2 var(--body);padding:7px 12px;cursor:pointer;text-align:left;
+  transition:background var(--dur-2) var(--ease),transform var(--dur-2) var(--ease)}
+.choice:hover{background:var(--bt-orange)}
+.choice:active{transform:scale(.97)}
+.choice:focus-visible,.card-open:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+html[data-lang="zh"] .ask-line,html[data-lang="zh"] .choice{font-size:14px}
+.panel-att{margin:0 0 18px;padding:12px 14px;border-radius:12px;background:rgba(16,42,134,.06);display:flex;gap:10px;align-items:flex-start;font-size:16px;line-height:1.5;font-weight:500}
+.panel-att .att-badge{width:28px;height:28px;font-size:11px}
+.end-att{margin:22px auto 0;max-width:420px;display:flex;gap:10px;align-items:center;justify-content:center;font-size:16px;color:var(--ink)}
+.intro{position:absolute;left:50%;bottom:calc(var(--strip-h) + 72px);transform:translateX(-50%);width:max-content;max-width:min(460px,86vw);pointer-events:none;
+  opacity:1;transition:opacity var(--dur-3) var(--ease),visibility 0s linear 0s}
+.intro:empty{display:none}
+.intro-line{margin:0;padding:12px 16px;border-radius:14px;background:rgba(237,229,216,.97);border:1px solid rgba(16,42,134,.16);box-shadow:0 14px 36px rgba(16,42,134,.16);
+  display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.45;color:var(--ink)}
+.intro.gone{opacity:0;visibility:hidden;transition:opacity var(--dur-3) var(--ease),visibility 0s linear var(--dur-3)}
+.timeline .card{flex-direction:column}
+@media (max-width:760px){
+  .card-open{padding:9px 12px 9px 10px;gap:10px}
+  .card-ask{padding:8px 10px 10px}
+  .ask-line{font-size:13px}
+  .choice{font-size:12.5px;padding:6px 10px}
+  .intro{bottom:calc(var(--strip-h) + 64px)}
+  .intro-line{font-size:14px;padding:10px 12px}
+}
