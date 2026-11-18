@@ -132,7 +132,7 @@ export function buildSights(THREE, E, c) {
     const edgeR = (isl, th) => { if (isl.shape !== "hex") return isl.r; let ph = (th - Math.PI / 6) % (Math.PI / 3); if (ph < 0) ph += Math.PI / 3; return isl.r * Math.cos(Math.PI / 6) / Math.cos(ph - Math.PI / 6); };
     for (const id of ["marketing", "internship", "cr", "sponsorship"]) {
       const T = spots && spots.get(id); if (!T || T.isl.shape === "rect") continue; stats.rider = id;
-      const grp = new THREE.Group(); grp.userData.dynamic = true; T.g.add(grp); const bike = new THREE.Group(); bike.scale.setScalar(S); grp.add(bike);
+      const grp = new THREE.Group(); grp.userData.dynamic = true; T.g.add(grp); const bike = new THREE.Group(); bike.userData.dynamic = true; bike.scale.setScalar(S); grp.add(bike);
       bike.add(mesh(rbox(1.1, 0.26, 0.3, 0.06), M.teal, 0, 0.5, 0), mesh(rbox(0.36, 0.3, 0.4, 0.05), M.teal, -0.42, 0.66, 0, false), mesh(rbox(0.5, 0.1, 0.34, 0.03), M.dark, -0.3, 0.84, 0, false), mesh(rbox(0.1, 0.55, 0.42, 0.03), M.teal, 0.45, 0.72, 0, false), mesh(rbox(0.06, 0.12, 0.18, 0.02), M.light, 0.51, 0.82, 0, false), mesh(rbox(0.08, 0.06, 0.62, 0.02), M.dark, 0.4, 1.0, 0, false), mesh(rbox(0.08, 0.36, 0.08, 0.02), M.dark, 0.42, 0.86, 0, false), mesh(rbox(0.5, 0.06, 0.5, 0.02), M.dark, -0.05, 0.36, 0, false));
       for (const lx of [0.47, -0.45]) bike.add(mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 10), M.dark, lx, 0.22, 0, false).rotateX(Math.PI / 2));
       E.mergeChildren(bike);
@@ -176,7 +176,7 @@ export function buildSights(THREE, E, c) {
     for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + 0.5, d = 45 + (k % 3) * 35; cl.push({ x: Math.cos(a) * d, z: Math.sin(a) * d * 0.8, y: 40 + (k % 4) * 2.5, s: 0.55 + (k % 3) * 0.15, ry: k * 0.9, v: 0.1 + (k % 3) * 0.05 }); hi.add(0, 0, 0, 1); stats.clouds++; }
     ticks.push(dt => { cl.forEach((c, k) => { c.x += c.v * dt; if (c.x > 175) c.x = -175; hi.set(k, c.x, c.y, c.z, c.s, c.s * 0.7, c.s, c.ry); }); hi.flush(); });
     if (GL) {
-      const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const inner = new THREE.Group(); g.add(inner); stats.glider = true;
+      const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const inner = new THREE.Group(); inner.userData.dynamic = true; g.add(inner); stats.glider = true;
       const tri = (pts, m, y) => { const sh = new THREE.Shape(); pts.forEach(([x, z], i) => i ? sh.lineTo(x, -z) : sh.moveTo(x, -z)); sh.closePath(); const o = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshStandardMaterial({ color: m, emissive: m, emissiveIntensity: 0.3, roughness: 0.9, side: THREE.DoubleSide })); o.rotation.x = -Math.PI / 2; o.position.y = y; o.castShadow = true; return o; };
       inner.add(tri([[2.4, 0], [-1.4, 2.8], [-1.0, 0], [-1.4, -2.8]], P.orange, 0), tri([[1.8, 0], [-1.1, 1.5], [-0.9, 0], [-1.1, -1.5]], P.white, 0.02), mesh(rbox(3.8, 0.06, 0.06, 0.01), M.dark, 0.4, -0.04, 0, false));
       for (const s of [-1, 1]) { const bar = mesh(rbox(0.05, 1.5, 0.05, 0.01), M.dark, 0.5, -0.75, s * 0.35, false); bar.rotation.x = s * 0.45; inner.add(bar); } inner.add(mesh(rbox(0.05, 0.05, 1.3, 0.01), M.dark, 0.5, -1.45, 0, false));

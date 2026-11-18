@@ -24,6 +24,9 @@ const prismFor = shape => shape === "round" ? T.roundPrism : shape === "rect" ? 
 export function create({ stage, pins, palette, phone, data, onSelect, onHover, freeCentre, freeWidth }) {
   const E = T.createEngine({ stage, pins, palette, phone, onSelect, onHover, freeCentre, freeWidth, seed: 11 });
   const { M, rnd, pickables } = E;
+  // 合併的時候合色（2026-11-18 第四批：831 個 draw call 要先降下來才放得下門面的細節）：只差底色的材質合成同一個 Mesh，顏色寫在點上。
+  // cell 設到 400 公尺是整個世界合成一格：全景本來就全部都在畫面裡，切格子只是多幾十個 draw call。
+  E.setMerge({ colours: true, cell: 400 });
 
   // ═══ 八座島（七座加機場）═══
   const islands = L.islands(); const isleObjs = new Map(); const blockersOf = new Map(); const poisOf = new Map();
@@ -100,6 +103,8 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
   for (const p of data.people) addWalker(p);
   // 靜態的東西合併（2026-11-18：加了這麼多道具之後一幀 1171 個 draw call；同材質同一格的合成一個，會動的與點得到的不碰）。
   E.mergeStatic();
+  // 會動的 group 也再合一次（第四批）：纜車廂、摩天輪、船、晾衣繩那些底下的零件，照「只差底色就合」再合成一兩個。會動的零件各支模組自己標了 dynamic。
+  E.mergeDynamic();
 
   // ═══ 鏡頭與牌子 ═══
   const show = { names: false, selectedTeam: "", flows: false };
@@ -138,7 +143,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     me(info) {
       const old = walkers.find(w => w.me); if (old) E.removeWalker(old);
       if (!info) { if (!E.motionOn) E.render(0); return null; }
-      const w = addWalker({ code: "me", team: info.team, role: "associate" }, { me: true, shirt: info.shirt, hair: info.hair, skin: 1 });
+      const w = addWalker({ code: "me", team: info.team, role: "associate" }, { me: true, shirt: info.shirt, hair: info.hair, skin: 1, brolly: 0, box: false });   // 「我」不拿道具，名牌才看得清楚
       w.pin.querySelector("span").textContent = info.label || info.name; if (!E.motionOn) E.render(0); return w;
     },
     // 報名開著的活動：那座島上多一塊橘色的「報名中」牌子，按了直接去報名。

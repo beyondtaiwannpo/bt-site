@@ -294,6 +294,24 @@ export function buildTown(THREE, E, c) {
     }
   }
 
+  // ═══ 6b. 聚會所的門面（2026-11-18 第四批）：聚會所已經放不下東西，就把有的打扮起來。島心那塊圓形鋪面外面三圈深淺交錯的磚（平的，一次畫完，不壓到房子）、
+  // 外圍一圈彩旗（八支桿子之間掛，哪一支放不下就跳過那一段）、幾盞燈、三群人：牽手的一對、推嬰兒車的加一個朋友、坐輪椅的加一個朋友。═══
+  const tiles = [];
+  { const T = bySpot.get("commons");
+    if (T) { stats.commonsRing = { tiles: 0, poles: 0, lamps: 0, groups: 0 };
+      const onBig = (x, z) => T.blockers.some(b => (b.r || 1.2) >= 1.0 && Math.hypot(T.isl.x + x - b.x, T.isl.z + z - b.z) < b.r - 0.2);
+      for (const [ring, rad] of [[0, 3.95], [1, 5.1], [2, 6.25]]) { const n = Math.round(TAU * rad / 1.12); for (let i = 0; i < n; i++) { const a = i / n * TAU; const x = Math.cos(a) * rad, z = Math.sin(a) * rad; if (!T.inside(x, z, 1.4) || onBig(x, z)) continue; tiles.push([T.isl.x + x, 0.035, T.isl.z + z, -a, 1, (ring + i) % 2]); stats.commonsRing.tiles++; } }
+      const poles = []; for (let k = 0; k < 8; k++) { const a = k / 8 * TAU + 0.2; let got = null; for (const rad of [7.3, 6.7, 7.9]) { const x = Math.cos(a) * rad, z = Math.sin(a) * rad; if (T.inside(x, z, 1.5) && T.free(x, z, 0.15)) { got = { x, y: 3.3, z }; break; } }
+        if (got) { const pole = new THREE.Group(); pole.add(mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.4, 6), M.dark, 0, 1.7, 0, false), mesh(new THREE.SphereGeometry(0.09, 6, 5), M.orange, 0, 3.4, 0, false)); T.put(pole, got, null, 0.3); stats.commonsRing.poles++; } poles.push(got); }
+      for (let k = 0; k < 8; k++) { const A = poles[k], B = poles[(k + 1) % 8]; if (A && B) E.bunting(T.g, A, B, [M.orange, M.teal, M.yellow, M.white], 0.7); }
+      for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + 0.6; for (const rad of [6.3, 5.6, 7.0]) { const x = Math.cos(a) * rad, z = Math.sin(a) * rad; if (T.inside(x, z, 1.5) && T.free(x, z, 0.2)) { T.put(E.lamp(), { x, z }, null, 0.4); stats.commonsRing.lamps++; break; } } }
+      // 三群人：在磚的那幾圈上找離大東西 0.35 公尺的空位。
+      const groupAt = fn => { for (let i = 0; i < 200; i++) { const a = T.rr() * TAU, rad = 4.0 + T.rr() * 2.6; const x = Math.cos(a) * rad, z = Math.sin(a) * rad; if (!T.inside(x, z, 1.6) || !T.free(x, z, 0.35)) continue; const grp = new THREE.Group(); T.put(grp, { x, z }, Math.atan2(-x, -z), 0.8); fn(grp); stats.commonsRing.groups++; return; } };
+      groupAt(grp => { const a = person(grp, -0.32, 0, 0, { shirt: 1, skin: 0 }), b = person(grp, 0.32, 0, 0, { shirt: 4, skin: 2, hat: true }); a.userData.parts.armR.rotation.z = -0.5; b.userData.parts.armL.rotation.z = 0.5; a.userData.parts.armR.rotation.x = -0.15; b.userData.parts.armL.rotation.x = -0.15; });   // 牽手：內側的手往對方伸
+      groupAt(grp => { person(grp, -0.4, 0, 0.3, { shirt: 2, skin: 1, stroller: true }); chat(person(grp, 0.6, 0.3, -0.9, { shirt: 5, bag: true }), 1); });
+      groupAt(grp => { person(grp, -0.3, 0.2, 0.4, { shirt: 0, skin: 2, chair: true }); chat(person(grp, 0.55, -0.2, -0.7, { shirt: 3, pack: true }), 0); });
+    } }
+
   // ═══ 7. 機場：加油車（車頭、油罐、軟管）、登機梯加排隊的旅客與地勤。塔台與風向袋引擎已經有了。═══
   if (airport) {
     const g = new THREE.Group(); g.position.set(airport.x, 0, airport.z); world.add(g);
@@ -320,5 +338,6 @@ export function buildTown(THREE, E, c) {
   putAll(rbox(0.1, 0.72, 0.04, 0.015), M.white, pickets);
   putAll(new THREE.SphereGeometry(0.07, 6, 5), M.amber, bulbs);
   putAll(new THREE.DodecahedronGeometry(0.2, 0), M.cliff, stones);
+  { const a = mix(P.cream, P.sand, 0.55), b = mix(P.orange, P.white, 0.6); putAll(new THREE.BoxGeometry(0.95, 0.03, 0.95), new THREE.MeshStandardMaterial({ color: P.white, roughness: 0.9 }), tiles, p => p[5] ? a : b); }   // 聚會所的鋪面磚（兩色交錯）
   return { tick: (dt, t) => { for (const f of ticks) f(dt, t); } };
 }

@@ -28,6 +28,28 @@ export function rbox(w, h, d, r) {
   const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.01, d - rr * 2), bevelEnabled: true, bevelThickness: rr, bevelSize: rr, bevelSegments: 3, curveSegments: 6 });
   g.translate(0, 0, -(d - rr * 2) / 2); g.computeVertexNormals(); rboxCache.set(key, g); return g;
 }
+// 直角盒子（2026-11-18 第四批）：門面的小零件（窗框、窗台、排水管、欄杆）用它，12 個三角形；rbox 一個兩千多個點，幾百個窗框會把三角形數撐大三成。
+const boxCache = new Map();
+export function box(w, h, d) { const key = [w, h, d].join(","); if (boxCache.has(key)) return boxCache.get(key); const g = new THREE.BoxGeometry(w, h, d); boxCache.set(key, g); return g; }
+// 幾個有 index 的幾何黏成一個（嬰兒車、輪椅這種一個 InstancedMesh 畫完的道具）：parts 是 [幾何, x, y, z, sx, sy, sz, rx, ry, rz]。
+export function joinGeo(parts) {
+  const pos = [], nor = [], idx = []; let off = 0; const m = new THREE.Matrix4(), nm = new THREE.Matrix3(), v = new THREE.Vector3(), e = new THREE.Euler(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  for (const [g, x, y, z, sx, sy, sz, rx, ry, rz] of parts) {
+    e.set(rx || 0, ry || 0, rz || 0); q.setFromEuler(e); sc.set(sx == null ? 1 : sx, sy == null ? (sx == null ? 1 : sx) : sy, sz == null ? (sx == null ? 1 : sx) : sz); m.compose(v.set(x || 0, y || 0, z || 0), q, sc); nm.getNormalMatrix(m);
+    const p = g.attributes.position, n = g.attributes.normal;
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m); pos.push(v.x, v.y, v.z); v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize(); nor.push(v.x, v.y, v.z); }
+    for (let i = 0; i < g.index.count; i++) idx.push(g.index.getX(i) + off); off += p.count;
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); geo.setIndex(idx); return geo;
+}
+// 一面兩層的三角旗（正面朝 +z、背面朝 -z 各一片，所以不用雙面材質，合色的時候才合得進去）。apex 是尖端在哪：right 尖端朝右（旗桿上的），down 尖端朝下（彩旗串上的）。
+const flagCache = new Map();
+export function flagGeo(w, h, apex) {
+  const key = w + "," + h + "," + apex; if (flagCache.has(key)) return flagCache.get(key);
+  const tri = apex === "down" ? [-w / 2, 0, 0, w / 2, 0, 0, 0, -h, 0] : apex === "up" ? [-w / 2, 0, 0, w / 2, 0, 0, 0, h, 0] : [0, 0, 0, w, h / 2, 0, 0, h, 0];
+  const pos = tri.concat([tri[0], tri[1], tri[2], tri[6], tri[7], tri[8], tri[3], tri[4], tri[5]]); const nor = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, -1, 0, 0, -1];
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); g.setIndex([0, 1, 2, 3, 4, 5]); flagCache.set(key, g); return g;
+}
 // 島的身體：圓柱、圓角長方、任意多邊形（六邊形）。擠出 h、轉平、再抬 0.5（斜角那一截），用法照 landmass()：放 -h 時頂面落在 0。
 export function roundPrism(r, h) { const sh = new THREE.Shape(); sh.absarc(0, 0, r, 0, TAU, false); const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: true, bevelThickness: 0.5, bevelSize: 0.5, bevelSegments: 2, curveSegments: 40 }); g.rotateX(Math.PI / 2); g.translate(0, 0.5, 0); return g; }
 export function rectPrism(r, h) { const w = r * 2.0, d = r * 1.75; const sh = new THREE.Shape(); const rr = 1.6; sh.moveTo(-w / 2 + rr, -d / 2); sh.lineTo(w / 2 - rr, -d / 2); sh.absarc(w / 2 - rr, -d / 2 + rr, rr, -Math.PI / 2, 0, false); sh.lineTo(w / 2, d / 2 - rr); sh.absarc(w / 2 - rr, d / 2 - rr, rr, 0, Math.PI / 2, false); sh.lineTo(-w / 2 + rr, d / 2); sh.absarc(-w / 2 + rr, d / 2 - rr, rr, Math.PI / 2, Math.PI, false); sh.lineTo(-w / 2, -d / 2 + rr); sh.absarc(-w / 2 + rr, -d / 2 + rr, rr, Math.PI, Math.PI * 1.5, false); const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: true, bevelThickness: 0.5, bevelSize: 0.5, bevelSegments: 2, curveSegments: 8 }); g.rotateX(Math.PI / 2); g.translate(0, 0.5, 0); return g; }
@@ -71,6 +93,14 @@ export function peopleKit({ P, rnd, parent, capacity }) {
   // 顏色用 instanceColor（材質底色白，乘上每個人自己的膚色、髮色、衣服色）。
   const PG = { head: new THREE.SphereGeometry(0.36, 16, 12), cap: new THREE.SphereGeometry(0.38, 16, 8, 0, TAU, 0, Math.PI * 0.52), eye: new THREE.SphereGeometry(0.045, 8, 6), body: new THREE.CapsuleGeometry(0.24, 0.3, 4, 10), arm: new THREE.CapsuleGeometry(0.075, 0.26, 3, 8), leg: rbox(0.2, 0.3, 0.22, 0.07).clone(), pack: rbox(0.34, 0.4, 0.18, 0.06), bag: rbox(0.5, 0.42, 0.26, 0.06), hat: new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), shadow: new THREE.CircleGeometry(0.38, 16) };
   PG.shadow.rotateX(-Math.PI / 2);
+  // 第四批的道具（Paul 2026-11-18：人要有變化）：陽傘（傘面加傘柄，舉在右手上方）、抱著的箱子、推的嬰兒車、輪椅。每一樣一個 InstancedMesh，不管幾個人都是一個 draw call。
+  // 幾個幾何黏成一個（joinGeo），輪子另外一個（顏色不一樣）。嬰兒車在人前面 0.75；輪椅的座位在髖的高度（0.3）下面，人照坐姿擺（腿往前伸）就是坐在裡面。
+  const cyl = (r, h, n) => new THREE.CylinderGeometry(r, r, h, n || 8);
+  PG.brolly = new THREE.ConeGeometry(0.58, 0.2, 10); PG.stick = cyl(0.015, 0.62, 5); PG.box = new THREE.BoxGeometry(0.46, 0.36, 0.36);
+  PG.stroller = joinGeo([[new THREE.BoxGeometry(0.5, 0.26, 0.56), 0, 0.46, 0.08], [new THREE.BoxGeometry(0.52, 0.3, 0.3), 0, 0.72, 0.26], [new THREE.BoxGeometry(0.5, 0.04, 0.04), 0, 0.96, -0.36], [new THREE.BoxGeometry(0.04, 0.52, 0.04), -0.23, 0.72, -0.3, 1, 1, 1, 0.25], [new THREE.BoxGeometry(0.04, 0.52, 0.04), 0.23, 0.72, -0.3, 1, 1, 1, 0.25]]);
+  PG.strollerWheels = joinGeo([[-0.28, 0.12, 0.26], [0.28, 0.12, 0.26], [-0.28, 0.12, -0.22], [0.28, 0.12, -0.22]].map(([x, y, z]) => [cyl(0.12, 0.06, 10), x, y, z, 1, 1, 1, 0, 0, Math.PI / 2]));
+  PG.chair = joinGeo([[new THREE.BoxGeometry(0.56, 0.06, 0.5), 0, 0.26, 0.05], [new THREE.BoxGeometry(0.56, 0.5, 0.06), 0, 0.52, -0.2], [new THREE.BoxGeometry(0.4, 0.04, 0.2), 0, 0.08, 0.5], [new THREE.BoxGeometry(0.04, 0.04, 0.6), -0.3, 0.1, 0.2], [new THREE.BoxGeometry(0.04, 0.04, 0.6), 0.3, 0.1, 0.2], [new THREE.BoxGeometry(0.04, 0.4, 0.04), -0.3, 0.9, -0.22], [new THREE.BoxGeometry(0.04, 0.4, 0.04), 0.3, 0.9, -0.22], [new THREE.BoxGeometry(0.66, 0.04, 0.04), 0, 1.1, -0.22]]);
+  PG.chairWheels = joinGeo([[new THREE.TorusGeometry(0.3, 0.045, 6, 16), -0.34, 0.3, -0.05, 1, 1, 1, 0, Math.PI / 2], [new THREE.TorusGeometry(0.3, 0.045, 6, 16), 0.34, 0.3, -0.05, 1, 1, 1, 0, Math.PI / 2], [cyl(0.07, 0.05, 8), -0.22, 0.07, 0.42, 1, 1, 1, 0, 0, Math.PI / 2], [cyl(0.07, 0.05, 8), 0.22, 0.07, 0.42, 1, 1, 1, 0, 0, Math.PI / 2]]);
   // 腿從髖關節轉、手從肩膀轉（Paul 2026-11-17：「the leg, they look weird」「people walking backward」）：之前零件的原點在正中間，一轉就是整條腿繞著膝蓋轉，看起來像倒著走。
   // 幾何往下移半截，原點就在最上面；零件的位置改成髖（0.3）與肩（0.85）。
   PG.leg.translate(0, -0.15, 0); PG.arm.translate(0, -0.17, 0);
@@ -87,8 +117,14 @@ export function peopleKit({ P, rnd, parent, capacity }) {
     eyeL: { geo: PG.eye, mat: std({ roughness: 0.4 }), pos: [-0.13, 1.2, 0.33] }, eyeR: { geo: PG.eye, mat: null, pos: [0.13, 1.2, 0.33] },
     pack: { geo: PG.pack, mat: std(), pos: [0, 0.7, -0.3] }, bag: { geo: PG.bag, mat: null, pos: [0.42, 0.21, 0] }, hat: { geo: PG.hat, mat: null, pos: [0, 1.5, 0] },
     shadow: { geo: PG.shadow, mat: new THREE.MeshBasicMaterial({ color: white, transparent: true, opacity: 0.12, depthWrite: false }), pos: [0, 0.02, 0] },
+    // 道具（opt 是 makePerson 的選項名，沒給就不畫）
+    brolly: { geo: PG.brolly, mat: null, pos: [0.33, 1.82, 0.05], opt: "brolly" }, stick: { geo: PG.stick, mat: null, pos: [0.33, 1.5, 0.05], opt: "brolly" },
+    box: { geo: PG.box, mat: null, pos: [0, 0.72, 0.42], opt: "box" },
+    stroller: { geo: PG.stroller, mat: null, pos: [0, 0, 0.78], opt: "stroller" }, strollerWheels: { geo: PG.strollerWheels, mat: null, pos: [0, 0, 0.78], opt: "stroller" },
+    chair: { geo: PG.chair, mat: null, pos: [0, 0, 0], opt: "chair" }, chairWheels: { geo: PG.chairWheels, mat: null, pos: [0, 0, 0], opt: "chair" },
   };
   PARTS.legR.mat = PARTS.legL.mat; PARTS.armL.mat = PARTS.body.mat; PARTS.armR.mat = PARTS.body.mat; PARTS.eyeR.mat = PARTS.eyeL.mat; PARTS.bag.mat = PARTS.pack.mat; PARTS.hat.mat = PARTS.pack.mat;
+  for (const k of ["brolly", "stick", "box", "stroller", "strollerWheels", "chair", "chairWheels"]) PARTS[k].mat = PARTS.pack.mat;
   const NONE = new THREE.Matrix4().makeScale(0, 0, 0);
   const pools = {}; const owners = {};   // owners[name][slot] = 那個人的 Group
   for (const name in PARTS) {
@@ -98,19 +134,23 @@ export function peopleKit({ P, rnd, parent, capacity }) {
     if (parent) parent.add(im);
   }
   const free = []; let next = 0;   // 一個人一個 slot（所有零件用同一個號碼）
-  const colourOf = (o, g) => ({ legL: o.pantsC, legR: o.pantsC, body: o.shirtC, armL: o.shirtC, armR: o.shirtC, head: o.skinC, cap: o.hairC, eyeL: P.dark, eyeR: P.dark, pack: P.orange, bag: P.navy, hat: P.navy, shadow: P.navy })[g];
+  const brollyC = [P.orange, P.teal, P.yellow], boxC = P.cream.clone().lerp(P.sand, 0.5), strollerC = P.navy.clone().lerp(P.white, 0.25);
+  const colourOf = (o, g) => ({ legL: o.pantsC, legR: o.pantsC, body: o.shirtC, armL: o.shirtC, armR: o.shirtC, head: o.skinC, cap: o.hairC, eyeL: P.dark, eyeR: P.dark, pack: P.orange, bag: P.navy, hat: P.navy, shadow: P.navy,
+    brolly: brollyC[o.brolly % 3], stick: P.dark, box: boxC, stroller: strollerC, strollerWheels: P.dark, chair: strollerC, chairWheels: P.dark })[g];
+  // o 的選項：skin hair shirt pants 色票序號；pack 背包、bag 行李、hat 帽子；brolly 陽傘（1 到 3 是顏色）、box 抱箱子、stroller 推嬰兒車、chair 坐輪椅；scale 大小。
   function makePerson(o) {
     o = o || {}; const g = new THREE.Group();
-    const col = { skinC: P.skin[(o.skin || 0) % 3], hairC: P.hair[(o.hair || 0) % 3], shirtC: P.shirt[(o.shirt || 0) % 6], pantsC: P.pants[(o.pants || 0) % 3] };
+    const col = { skinC: P.skin[(o.skin || 0) % 3], hairC: P.hair[(o.hair || 0) % 3], shirtC: P.shirt[(o.shirt || 0) % 6], pantsC: P.pants[(o.pants || 0) % 3], brolly: (o.brolly | 0) + 2 };
     const parts = {}; const slot = free.length ? free.pop() : (next < CAP ? next++ : -1);
     if (slot < 0) console.warn("peopleKit：人超過 " + CAP + " 個，這一個畫不出來");
     for (const name in PARTS) {
       if ((name === "pack" && !o.pack) || (name === "bag" && !o.bag) || (name === "hat" && !o.hat)) continue;
-      const d = PARTS[name]; const node = new THREE.Object3D(); node.name = name; node.position.set(...d.pos); if (d.rot) node.rotation.set(...d.rot); g.add(node); parts[name] = node;
+      const d = PARTS[name]; if (d.opt && !o[d.opt]) continue;
+      const node = new THREE.Object3D(); node.name = name; node.position.set(...d.pos); if (d.rot) node.rotation.set(...d.rot); g.add(node); parts[name] = node;
       if (slot >= 0) { pools[name].setColorAt(slot, colourOf(col, name)); pools[name].instanceColor.needsUpdate = true; owners[name][slot] = g; pools[name].count = Math.max(pools[name].count, slot + 1); }
     }
     g.scale.setScalar(o.scale != null ? o.scale : 1.25);   // 島上放大一點（Paul 2026-11-17「push further」：HEART 的人跟島的比例比較大）；機場那一頁 1.0
-    g.userData = { phase: rnd() * 6, moving: false, baseY: 0, parts, slot };
+    g.userData = { phase: rnd() * 6, moving: false, baseY: 0, parts, slot, brolly: !!o.brolly, box: !!o.box, stroller: !!o.stroller, chair: !!o.chair };
     return g;
   }
   // 人拿掉：slot 還回去，所有零件縮成 0。
@@ -133,12 +173,14 @@ export function peopleKit({ P, rnd, parent, capacity }) {
   const ownerOf = (im, instanceId) => (owners[im.userData.peoplePool] || [])[instanceId] || null;
   function pose(g, t) {
     const u = g.userData, { legL, legR, armL, armR, head } = u.parts;
-    if (u.sitting) { legL.rotation.x = -1.4; legR.rotation.x = -1.4; armL.rotation.x = -0.6; armR.rotation.x = -0.6; }   // 坐著：腿伸前面，手放腿上（高度由 motion() 決定）
+    if (u.sitting || u.chair) { legL.rotation.x = -1.4; legR.rotation.x = -1.4; armL.rotation.x = -0.6; armR.rotation.x = -0.6; if (u.chair) g.position.y = u.baseY; }   // 坐著：腿伸前面，手放腿上（高度由 motion() 決定）；坐輪椅的一直是這個姿勢
     else if (u.moving) { const s = Math.sin(t * 9 + u.phase); legL.rotation.x = s * 0.6; legR.rotation.x = -s * 0.6; armL.rotation.x = -s * 0.5; armR.rotation.x = s * 0.5; g.position.y = u.baseY + Math.abs(Math.cos(t * 9 + u.phase)) * 0.05; }
     else if (u.talking) { legL.rotation.x = 0; legR.rotation.x = 0; const s = Math.sin(t * 3.1 + u.phase); armL.rotation.x = -0.4 + s * 0.25; armR.rotation.x = -0.3 - s * 0.2; g.position.y = u.baseY; }   // 聊天：手在比
     else { legL.rotation.x = 0; legR.rotation.x = 0; armL.rotation.x = 0.05; armR.rotation.x = -0.05; g.position.y = u.baseY + Math.sin(t * 1.6 + u.phase) * 0.012; }
     head.rotation.y = u.talking ? Math.sin(t * 2.2 + u.phase) * 0.08 : Math.sin(t * 0.7 + u.phase) * 0.12;
     head.rotation.x = u.talking ? Math.sin(t * 4 + u.phase) * 0.06 : 0;
+    // 道具的手：舉傘的右手舉著、抱箱子的兩手往前抱、推車的兩手往前推（蓋掉上面擺的）。
+    if (u.brolly) armR.rotation.x = -2.7; if (u.box) { armL.rotation.x = -1.3; armR.rotation.x = -1.3; } if (u.stroller) { armL.rotation.x = -0.9; armR.rotation.x = -0.9; }
   }
   return { makePerson, pose, sync, free: freePerson, ownerOf, pools: Object.values(pools) };
 }
@@ -183,7 +225,8 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const boards = [];      // 貼文牆上的板子；paintBoards() 把真的圖貼上去
   const treePlaces = [], bushPlaces = [], stoolPlaces = [], postPlaces = [];
   const coasters = [], beacons = [], boats = [], balloons = [], clouds = [];
-  const slides = new Map();   // "a>b" → { curve, dir }：人過這條不是走的，是坐著溜
+  const slides = new Map();   // "a>b" → { curve, dir, splash }：人過這條不是走的，是坐著溜
+  const splashes = [];        // 滑水道底的水花（第四批）：{ ring, mat, drops, x, z, t0 }，人溜到最低點 motion() 把 t0 設成現在，接下來 1.3 秒水圈放大、水珠往上噴
   const groundCache = new Map();
 
   // ═══ 地面：一種花紋畫在 canvas 上當貼圖，沒有圖檔 ═══
@@ -238,22 +281,63 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
 
   // ═══ 建築 ═══
   function house(w, h, d, wallM, roofM) { const g = new THREE.Group(); const b = new THREE.Mesh(rbox(w, h, d, 0.12), wallM); b.position.y = h / 2; b.castShadow = true; b.receiveShadow = true; g.add(b); const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.78, h * 0.6, 4), roofM); roof.position.y = h + h * 0.3; roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof); return g; }
-  function win(g, n, y, z, spread) { for (let i = 0; i < n; i++) { const wm = new THREE.Mesh(rbox(0.5, 0.5, 0.08, 0.06), M.light); wm.position.set((i - (n - 1) / 2) * spread, y, z); g.add(wm); } }
+  // ═══ 門面的零件（2026-11-18 第四批，Paul 第四次「More detail first」：之前的房子都是一個盒子加一個屋頂）═══
+  // 全部都是小零件，加在房子的 group 裡，scene.js 的 mergeChildren 照樣把整棟合成一兩個 Mesh。座標照房子本地：正面朝 +z，地面 y 0。
+  const mk = (geo, m, x, y, z, cast) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = cast !== false; return o; };
+  // 窗：白框（比牆面凸一點）、發光的窗、窗台、中間一條直的窗櫺。
+  function win(g, n, y, z, spread) { for (let i = 0; i < n; i++) { const x = (i - (n - 1) / 2) * spread; g.add(mk(box(0.66, 0.66, 0.06), M.white, x, y, z - 0.03, false), mk(rbox(0.5, 0.5, 0.08, 0.06), M.light, x, y, z, false), mk(box(0.78, 0.07, 0.18), M.white, x, y - 0.35, z + 0.05), mk(box(0.035, 0.52, 0.02), M.dark, x, y, z + 0.05, false)); } }
+  // 門：白框、深色的門、黃色的門把、門口一塊台階；awning 給材質就有一片斜的雨棚加兩支撐桿；light 給 true 門邊一盞燈。
+  function door(g, x, z, o) { o = o || {}; g.add(mk(box(0.86, 1.34, 0.05), M.white, x, 0.66, z - 0.02, false), mk(rbox(0.7, 1.2, 0.08, 0.04), M.dark, x, 0.6, z + 0.02), mk(new THREE.SphereGeometry(0.04, 6, 5), M.yellow, x + 0.25, 0.6, z + 0.08, false), mk(box(1.1, 0.12, 0.6), M.road, x, 0.06, z + 0.3, false));
+    if (o.awning) { const a = mk(box(1.3, 0.05, 0.75), o.awning, x, 1.46, z + 0.32); a.rotation.x = 0.28; g.add(a); for (const sg of [-1, 1]) rod(g, [x + sg * 0.55, 1.1, z], [x + sg * 0.55, 1.36, z + 0.62], 0.02); }
+    if (o.light) g.add(mk(box(0.08, 0.08, 0.22), M.dark, x + 0.62, 1.36, z + 0.1, false), mk(new THREE.SphereGeometry(0.09, 7, 6), M.light, x + 0.62, 1.28, z + 0.22, false)); }
+  // 招牌：奶油色的板、一條顏色的字帶、一條深色的小字。
+  function sign(g, x, y, z, w, stripeM) { g.add(mk(box(w, 0.4, 0.08), M.white, x, y, z + 0.04), mk(box(w + 0.06, 0.05, 0.1), M.dark, x, y + 0.2, z + 0.04, false), mk(box(w - 0.3, 0.14, 0.02), stripeM, x, y + 0.05, z + 0.09, false), mk(box(w - 0.5, 0.05, 0.02), M.dark, x, y - 0.11, z + 0.09, false)); }   // 白板加深色的上緣，不然跟牆同色看不到
+  // 屋簷排水：前後各一條水槽（e 是屋簷離中心多遠）、一支落水管從屋簷接到牆角再下到地。
+  function gutter(g, e, h, w, d) { for (const sg of [1, -1]) g.add(mk(box(e * 2 + 0.1, 0.07, 0.08), M.dark, 0, h + 0.02, sg * e, false)); const cx = w / 2 + 0.08, cz = d / 2 + 0.08; if (e - cz > 0.05) g.add(mk(box(0.06, 0.06, e - cz + 0.1), M.dark, cx, h + 0.02, (e + cz) / 2, false)); g.add(mk(new THREE.CylinderGeometry(0.03, 0.03, h, 5), M.dark, cx, h / 2, cz, false)); }
+  function chimney(g, x, y, z) { g.add(mk(rbox(0.45, 0.9, 0.45, 0.05), M.wall, x, y, z), mk(box(0.6, 0.08, 0.6), M.dark, x, y + 0.52, z, false)); }
+  // 欄杆：從 (x0, z0) 到 (x1, z1) 一排細柱加一條橫桿（屋頂、陽台、碼頭都用）。
+  function rail(g, x0, z0, x1, z1, y, m) { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(L / 0.45)); for (let i = 0; i <= n; i++) g.add(mk(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 5), m || M.dark, x0 + (x1 - x0) * i / n, y + 0.35, z0 + (z1 - z0) * i / n, false)); const r = mk(box(L + 0.05, 0.05, 0.05), m || M.dark, (x0 + x1) / 2, y + 0.7, (z0 + z1) / 2, false); r.rotation.y = -Math.atan2(z1 - z0, x1 - x0); g.add(r); }
+  // 旗桿加一面三角旗（旗子朝 +x 飄）。
+  function pennant(g, x, y, z, m, len) { const L = len || 1.2; g.add(mk(new THREE.CylinderGeometry(0.025, 0.03, L, 5), M.dark, x, y + L / 2, z, false), mk(flagGeo(0.6, 0.3, "right"), m, x + 0.03, y + L - 0.34, z, false)); }
+  // 彩旗串：A 到 B 一條垂下來的線，線上一面一面倒三角的小旗，顏色輪流。
+  function bunting(g, A, B, mats, sag) { const cv = new THREE.QuadraticBezierCurve3(new THREE.Vector3(A.x, A.y, A.z), new THREE.Vector3((A.x + B.x) / 2, (A.y + B.y) / 2 - (sag == null ? 0.5 : sag), (A.z + B.z) / 2), new THREE.Vector3(B.x, B.y, B.z));
+    g.add(mk(new THREE.TubeGeometry(cv, 8, 0.015, 4, false), M.dark, 0, 0, 0, false)); const n = Math.max(3, Math.round(cv.getLength() / 0.42)), ry = Math.atan2(-(B.z - A.z), B.x - A.x);
+    for (let i = 1; i < n; i++) { const p = cv.getPoint(i / n); const f = mk(flagGeo(0.26, 0.24, "down"), mats[i % mats.length], p.x, p.y, p.z, false); f.rotation.y = ry; g.add(f); } }
+  // 一台停著的腳踏車（車頭朝本地 +x）。
+  function bike(g, x, z, ry, m) { const b = new THREE.Group(); b.position.set(x, 0, z); b.rotation.y = ry; g.add(b); for (const dx of [-0.42, 0.42]) b.add(mk(new THREE.TorusGeometry(0.27, 0.035, 5, 12), M.dark, dx, 0.27, 0, false)); b.add(mk(box(0.84, 0.06, 0.05), m || M.orange, 0, 0.42, 0, false), mk(box(0.05, 0.4, 0.05), m || M.orange, 0.12, 0.6, 0, false), mk(box(0.04, 0.04, 0.36), M.dark, 0.14, 0.82, 0, false), mk(box(0.22, 0.05, 0.12), M.dark, -0.16, 0.76, 0, false)); return b; }
+  // 兩點之間一根細桿（營繩、支撐桿）。
+  const rodUp = new THREE.Vector3(0, 1, 0), rodV = new THREE.Vector3();
+  function rod(g, a, b, r, m) { rodV.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = rodV.length(); const o = mk(new THREE.CylinderGeometry(r, r, L, 4), m || M.dark, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, false); o.quaternion.setFromUnitVectors(rodUp, rodV.normalize()); g.add(o); return o; }
+  const pot = (g, x, z, m, ry) => { const pl = planter(m); pl.scale.setScalar(0.6); pl.position.set(x, 0, z); if (ry) pl.rotation.y = ry; g.add(pl); };
   function building(kind, roofM) {
     const g = new THREE.Group();
-    if (kind === "hall") { const h = house(4, 2.2, 2.8, M.wall2, roofM); win(h, 3, 1.3, 1.44, 1.0); g.add(h); }
-    else if (kind === "tent") { for (const [x, m] of [[-1.3, roofM], [1.3, M.yellow]]) { const t = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.9, 4), m); t.position.set(x, 0.95, 0); t.rotation.y = Math.PI / 4; t.castShadow = true; g.add(t); } }
-    else if (kind === "booth") { const b = new THREE.Mesh(rbox(2.2, 2.0, 1.6, 0.14), M.wall); b.position.y = 1.0; b.castShadow = true; g.add(b); const roof = new THREE.Mesh(rbox(2.8, 0.2, 2.2, 0.06), roofM); roof.position.y = 2.1; roof.castShadow = true; g.add(roof); win(b, 2, 0.1, 0.84, 0.9); }
-    else if (kind === "desk") { const h = house(3.2, 2.0, 2.6, M.wall, roofM); win(h, 2, 1.2, 1.34, 1.2); g.add(h); for (let i = 0; i < 3; i++) { const bk = new THREE.Mesh(rbox(0.5, 0.8 - i * 0.1, 0.3, 0.04), [M.navy, M.teal, M.orange][i]); bk.position.set(-2.2 + i * 0.55, 0.4, 0.8); bk.castShadow = true; g.add(bk); } }
-    else if (kind === "home") { const h = house(3.4, 2.4, 3, M.wall2, roofM); win(h, 2, 1.4, 1.54, 1.4); g.add(h); const chim = new THREE.Mesh(rbox(0.5, 1.0, 0.5, 0.06), M.wall); chim.position.set(1.1, 3.1, -0.6); h.add(chim); }
-    else if (kind === "post") { const bx = new THREE.Mesh(rbox(0.9, 1.5, 0.9, 0.2), roofM); bx.position.y = 1.05; bx.castShadow = true; g.add(bx); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8), M.dark); leg.position.y = 0.2; g.add(leg); const sign = new THREE.Mesh(rbox(1.6, 0.9, 0.1, 0.06), M.cream); sign.position.set(1.6, 1.4, 0); sign.castShadow = true; g.add(sign); const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.0, 6), M.dark); sp.position.set(1.6, 0.5, 0); g.add(sp); }
-    else if (kind === "pier") { const deck = new THREE.Mesh(rbox(3.6, 0.3, 1.8, 0.08), M.wood); deck.position.y = 0.2; deck.castShadow = true; g.add(deck); const booth = new THREE.Mesh(rbox(1.4, 1.6, 1.2, 0.12), M.wall); booth.position.set(-0.9, 1.1, 0); booth.castShadow = true; g.add(booth); const roof = new THREE.Mesh(rbox(1.8, 0.18, 1.6, 0.05), roofM); roof.position.set(-0.9, 2.0, 0); g.add(roof); const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), M.light); lamp.position.set(1.3, 2.0, -0.5); g.add(lamp); const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.7, 6), M.dark); lp.position.set(1.3, 1.15, -0.5); g.add(lp); }
+    if (kind === "hall") { const h = house(4, 2.2, 2.8, M.wall2, roofM); g.add(h); win(h, 2, 1.38, 1.44, 1.9); door(h, 0, 1.4, { awning: roofM, light: true }); sign(h, 0, 1.92, 1.4, 1.5, roofM); gutter(h, 2.2, 2.2, 4, 2.8); chimney(h, 1.3, 2.65, -0.8); pennant(h, 0, 3.5, 0, roofM, 1.3); pot(h, 1.75, 1.95, M.wall); bike(h, -2.45, 0.9, 0.35, M.teal); }
+    else if (kind === "tent") {
+      for (const [x, m] of [[-1.3, roofM], [1.3, M.yellow]]) { const t = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.9, 4), m); t.position.set(x, 0.95, 0); t.rotation.y = Math.PI / 4; t.castShadow = true; g.add(t); pennant(g, x, 1.85, 0, m === roofM ? M.yellow : roofM, 0.6);
+        const flap = mk(flagGeo(0.7, 1.0, "up"), M.dark, x, 0.02, 1.06, false); flap.rotation.x = -0.52; flap.rotation.y = 0; g.add(flap);   // 門簾：一片深色的三角貼在面向前面那一面上
+        for (const [dx, dz] of [[-1.3, 0.9], [1.3, 0.9], [0, -1.6]]) { rod(g, [x, 1.85, 0], [x + dx * 1.2, 0.06, dz * 1.2], 0.012, M.sand); g.add(mk(box(0.08, 0.14, 0.08), M.dark, x + dx * 1.2, 0.05, dz * 1.2, false)); } }   // 三條營繩加地釘
+      g.add(mk(new THREE.CylinderGeometry(0.03, 0.04, 1.2, 5), M.dark, 0, 0.6, 1.5, false), mk(box(0.9, 0.4, 0.05), M.cream, 0, 1.3, 1.5), mk(box(0.6, 0.1, 0.02), roofM, 0, 1.34, 1.54, false));   // 入口的牌子
+      g.add(mk(new THREE.CylinderGeometry(0.03, 0.04, 1.6, 5), M.dark, 0, 0.8, -0.6, false), mk(box(0.22, 0.26, 0.22), M.light, 0, 1.72, -0.6, false));   // 燈籠桿
+    }
+    else if (kind === "booth") { const b = new THREE.Mesh(rbox(2.2, 2.0, 1.6, 0.14), M.wall); b.position.y = 1.0; b.castShadow = true; g.add(b); const roof = new THREE.Mesh(rbox(2.8, 0.2, 2.2, 0.06), roofM); roof.position.y = 2.1; roof.castShadow = true; g.add(roof); win(b, 2, 0.1, 0.84, 0.9);
+      g.add(mk(box(2.0, 0.08, 0.42), M.wood, 0, 0.72, 0.98), mk(box(1.5, 0.4, 0.08), M.cream, 0, 2.5, 0.7), mk(box(1.1, 0.12, 0.02), roofM, 0, 2.54, 0.75, false), mk(box(0.9, 0.05, 0.02), M.dark, 0, 2.4, 0.75, false));   // 櫃台、屋頂上的招牌
+      const awn = mk(box(2.4, 0.05, 0.7), roofM === M.yellow ? M.orange : M.yellow, 0, 1.72, 1.15); awn.rotation.x = 0.3; g.add(awn); rail(g, -1.3, 1.0, 1.3, 1.0, 2.24); pennant(g, 1.2, 2.24, -0.8, roofM, 0.9); pot(g, -1.5, 0.9, M.cream); }
+    else if (kind === "desk") { const h = house(3.2, 2.0, 2.6, M.wall, roofM); g.add(h); win(h, 2, 1.22, 1.34, 1.5); door(h, 0, 1.3, { light: true }); sign(h, 0, 1.78, 1.3, 1.5, roofM); gutter(h, 1.76, 2.0, 3.2, 2.6); chimney(h, 1.0, 2.4, -0.6); for (let i = 0; i < 3; i++) { const bk = new THREE.Mesh(rbox(0.5, 0.8 - i * 0.1, 0.3, 0.04), [M.navy, M.teal, M.orange][i]); bk.position.set(-2.2 + i * 0.55, 0.4, 0.8); bk.castShadow = true; g.add(bk); } pot(g, 1.9, 1.5, M.wall2); }
+    else if (kind === "home") { const h = house(3.4, 2.4, 3, M.wall2, roofM); g.add(h); win(h, 2, 1.42, 1.54, 1.5); door(h, 0, 1.5, { awning: roofM, light: true }); gutter(h, 1.87, 2.4, 3.4, 3); chimney(h, 1.1, 2.95, -0.6); pot(h, 1.5, 1.85, M.wall); pot(h, -1.5, 1.85, M.cream); bike(h, -2.25, 0.6, 0.2, M.orange); }
+    else if (kind === "post") { const bx = new THREE.Mesh(rbox(0.9, 1.5, 0.9, 0.2), roofM); bx.position.y = 1.05; bx.castShadow = true; g.add(bx); const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8), M.dark); leg.position.y = 0.2; g.add(leg); const sign_ = new THREE.Mesh(rbox(1.6, 0.9, 0.1, 0.06), M.cream); sign_.position.set(1.6, 1.4, 0); sign_.castShadow = true; g.add(sign_); const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.0, 6), M.dark); sp.position.set(1.6, 0.5, 0); g.add(sp);
+      g.add(mk(box(0.5, 0.06, 0.06), M.dark, 0, 1.3, 0.58, false), mk(box(1.1, 0.08, 1.1), M.dark, 0, 2.0, 0, false), mk(box(1.1, 0.14, 0.02), M.orange, 1.6, 1.58, 0.08, false), mk(box(0.9, 0.07, 0.02), M.dark, 1.6, 1.3, 0.08, false), mk(rbox(0.5, 0.35, 0.4, 0.04), M.cream, -0.9, 0.2, 0.4), mk(rbox(0.36, 0.3, 0.3, 0.03), M.sand, -0.85, 0.52, 0.42));   // 投信口、小屋頂、招牌的字、門口兩個包裹
+      const l = lamp(); l.position.set(-1.2, 0, -0.6); g.add(l); }
+    else if (kind === "pier") { const deck = new THREE.Mesh(rbox(3.6, 0.3, 1.8, 0.08), M.wood); deck.position.y = 0.2; deck.castShadow = true; g.add(deck); const booth = new THREE.Mesh(rbox(1.4, 1.6, 1.2, 0.12), M.wall); booth.position.set(-0.9, 1.1, 0); booth.castShadow = true; g.add(booth); const roof = new THREE.Mesh(rbox(1.8, 0.18, 1.6, 0.05), roofM); roof.position.set(-0.9, 2.0, 0); g.add(roof); const lamp_ = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), M.light); lamp_.position.set(1.3, 2.0, -0.5); g.add(lamp_); const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.7, 6), M.dark); lp.position.set(1.3, 1.15, -0.5); g.add(lp);
+      for (const sg of [-1, 1]) rail(g, -0.1, sg * 0.86, 1.75, sg * 0.86, 0.35, M.white); for (const sg of [-1, 1]) g.add(mk(new THREE.CylinderGeometry(0.08, 0.1, 0.4, 7), M.dark, 1.7, 0.5, sg * 0.6, false));   // 欄杆、兩支繫船柱
+      g.add(mk(new THREE.TorusGeometry(0.2, 0.05, 6, 14), M.orange, -0.9, 1.25, 0.66, false), mk(box(1.2, 0.3, 0.06), M.cream, -0.9, 2.3, 0.5), mk(box(0.8, 0.1, 0.02), roofM, -0.9, 2.33, 0.54, false), mk(new THREE.TorusGeometry(0.16, 0.05, 5, 10), M.sand, 0.6, 0.4, -0.5, false).rotateX(Math.PI / 2), mk(box(0.6, 0.5, 0.05), M.dark, -0.9, 0.6, 0.63, false)); }   // 救生圈、招牌、一捲繩子、門
     else if (kind === "camp") {
       // 一圈石頭圍著營火，四張長凳，一頂帳篷。
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.18, 6, 12), M.dark); ring.rotation.x = Math.PI / 2; ring.position.y = 0.15; g.add(ring);
       const fire = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.0, 7), M.light); fire.position.y = 0.6; g.add(fire);
       for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; const b = new THREE.Mesh(rbox(2.0, 0.3, 0.5, 0.08), M.wood); b.position.set(Math.cos(a) * 2.3, 0.45, Math.sin(a) * 2.3); b.rotation.y = -a + Math.PI / 2; b.castShadow = true; g.add(b); for (const dx of [-0.7, 0.7]) { const leg = new THREE.Mesh(rbox(0.2, 0.3, 0.4, 0.04), M.dark); leg.position.set(Math.cos(a) * 2.3 + Math.cos(a + Math.PI / 2) * dx, 0.15, Math.sin(a) * 2.3 + Math.sin(a + Math.PI / 2) * dx); g.add(leg); } }
-      const tent = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.8, 4), M.teal); tent.position.set(-3.2, 0.9, -1.5); tent.rotation.y = Math.PI / 4; tent.castShadow = true; g.add(tent);
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.8, 4), M.teal); tent.position.set(-3.2, 0.9, -1.5); tent.rotation.y = Math.PI / 4; tent.castShadow = true; g.add(tent); pennant(g, -3.2, 1.75, -1.5, M.orange, 0.5);
+      g.add(mk(new THREE.CylinderGeometry(0.03, 0.04, 1.7, 5), M.dark, 2.7, 0.85, 1.3, false), mk(box(0.22, 0.26, 0.22), M.light, 2.7, 1.8, 1.3, false));   // 燈籠桿
+      for (const [x, y, z] of [[-2.5, 0.12, 1.7], [-2.5, 0.12, 1.95], [-2.5, 0.33, 1.82]]) g.add(mk(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 6), M.trunk, x, y, z, false).rotateZ(Math.PI / 2));   // 一堆柴
     }
     else if (kind === "airport") {
       // 機場（Paul 2026-11-17 第二次：飛機不要穿過機場，要有滑行道）：跑道在前（local z = +2.6）、滑行道在後（z = -1.4）、
@@ -270,7 +354,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const tw = new THREE.Group(); tw.position.set(-6.6, 0, -6.2); g.add(tw);
       tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 3.6, 10), M.wall).translateY(1.8), new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.8, 0.9, 10), roofM).translateY(4.0), new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 10), M.dark).translateY(4.6));
       // 會動的那一架包在一個 group 裡，機身轉成機鼻朝 +z，motion() 用 lookAt 讓它朝著下一個點（轉彎、爬升、下降都對）。
-      const fly = new THREE.Group(); const body = makePlane(M.cream, M.teal); body.rotation.y = -Math.PI / 2; fly.add(body); fly.position.set(-3.0, 0.75, -4.6); fly.userData.flight = { t: 0 }; fly.userData.dynamic = true; g.add(fly); planes.push(fly);
+      const fly = new THREE.Group(); const body = makePlane(M.cream, M.teal); body.rotation.y = -Math.PI / 2; fly.add(body); body.getObjectByName("prop").userData.dynamic = true;   // 螺旋槳在 motion() 裡轉，標 dynamic 才不會被 mergeDynamic() 烤進機身 fly.position.set(-3.0, 0.75, -4.6); fly.userData.flight = { t: 0 }; fly.userData.dynamic = true; g.add(fly); planes.push(fly);
       const p2 = makePlane(M.white, M.orange); p2.position.set(1.0, 0.75, -4.6); p2.rotation.y = 0.15; g.add(p2);
       const p3 = makePlane(M.cream, M.navy); p3.position.set(4.6, 0.75, -4.6); p3.rotation.y = -0.1; g.add(p3);
       const hg = new THREE.Group(); hg.position.set(6.4, 0, -7.0); g.add(hg);
@@ -283,13 +367,15 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       g.traverse(m => { if (m.isMesh) m.castShadow = true; });
     }
     else if (kind === "school") {
-      // 學校：一棟兩層的長樓、兩排窗、門口一面鐘、一支旗。操場在 decorate() 裡。
+      // 學校：一棟兩層的長樓、兩排窗、門口一面鐘、一支旗。操場在 decorate() 裡。第四批：窗框、門的雨棚、招牌、屋簷排水、屋頂欄杆、屋頂的旗、門口的腳踏車架與花箱。
       const b = new THREE.Mesh(rbox(6.4, 3.2, 2.6, 0.14), M.wall); b.position.y = 1.6; b.castShadow = true; b.receiveShadow = true; g.add(b);
       const roof = new THREE.Mesh(rbox(6.9, 0.25, 3.1, 0.06), roofM); roof.position.y = 3.3; roof.castShadow = true; g.add(roof);
-      win(g, 5, 2.4, 1.34, 1.15); win(g, 5, 1.0, 1.34, 1.15);
-      const door = new THREE.Mesh(rbox(0.8, 1.3, 0.1, 0.05), M.dark); door.position.set(0, 0.65, 1.33); g.add(door);
-      const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16), M.cream); clock.rotation.x = Math.PI / 2; clock.position.set(0, 3.0, 1.36); g.add(clock);
-      const steps = new THREE.Mesh(rbox(1.6, 0.25, 0.8, 0.05), M.road); steps.position.set(0, 0.12, 1.7); g.add(steps);
+      win(g, 5, 2.4, 1.34, 1.15); win(g, 4, 1.0, 1.34, 1.5);   // 樓下四扇（之前五扇，正中間那一扇被門擋住）
+      door(g, 0, 1.3, { awning: roofM, light: true }); sign(g, 0, 1.82, 1.34, 1.8, roofM);
+      const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16), M.cream); clock.rotation.x = Math.PI / 2; clock.position.set(0, 3.0, 1.36); g.add(clock); g.add(mk(box(0.04, 0.28, 0.02), M.dark, 0, 3.08, 1.42, false), mk(box(0.2, 0.04, 0.02), M.dark, 0.08, 3.0, 1.42, false));
+      for (const sg of [1, -1]) g.add(mk(box(7.0, 0.07, 0.08), M.dark, 0, 3.2, sg * 1.58, false)); for (const x of [-3.3, 3.3]) g.add(mk(new THREE.CylinderGeometry(0.03, 0.03, 3.2, 5), M.dark, x, 1.6, 1.4, false));
+      rail(g, -3.3, 1.45, 3.3, 1.45, 3.45); pennant(g, -3.0, 3.45, -1.1, roofM, 2.0);
+      for (let k = 0; k < 3; k++) bike(g, 3.6, 0.7 + k * 0.55, Math.PI / 2, [M.orange, M.teal, M.navy][k]); pot(g, -1.4, 1.85, M.cream); pot(g, 1.4, 1.85, M.cream);
     }
     else if (kind === "studio") {
       // 攝影棚加貼文牆：三塊海報板（Instagram 的貼文，點了看清單）、一支腳架相機、一圈環形燈。板子前面那一片記進 boards，paintBoards() 貼真的圖。
@@ -307,6 +393,9 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       tri.add(new THREE.Mesh(rbox(0.6, 0.4, 0.4, 0.08), M.dark).translateY(1.65), new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.3, 10), M.navy).translateY(1.65).translateZ(-0.33).rotateX(Math.PI / 2));
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.07, 8, 24), M.light); ring.position.set(2.3, 1.7, 1.6); g.add(ring);
       const rp = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.7, 6), M.dark); rp.position.set(2.3, 0.85, 1.6); g.add(rp);
+      // 第四批：牆頂的招牌、「錄影中」的燈、牆前一塊鋪面、兩端的旗桿、兩個花箱。
+      sign(g, 0, 3.05, 0.12, 2.2, M.orange); g.add(mk(box(0.3, 0.2, 0.1), M.dark, 2.2, 2.95, 0.28, false), mk(new THREE.SphereGeometry(0.08, 7, 6), M.amber, 2.2, 2.95, 0.36, false));
+      g.add(mk(box(5.6, 0.08, 1.4), M.road, 0, 0.04, 0.85, false)); pennant(g, -2.9, 0, -0.1, M.teal, 3.2); pennant(g, 2.9, 0, -0.1, M.orange, 3.2); pot(g, -2.5, 1.2, M.cream); pot(g, 2.5, 1.2, M.wall);
     }
     else if (kind === "stage") {
       // 校園講座：一座涼亭式的小舞台，六根柱子、一個圓錐屋頂、台前三排小椅子。
@@ -315,8 +404,15 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const roof = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.3, 6), roofM); roof.position.y = 3.2; roof.castShadow = true; g.add(roof);
       const mic = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1, 6), M.dark); mic.position.set(0, 0.95, 1.2); g.add(mic); const mh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), M.navy); mh.position.set(0, 1.5, 1.2); g.add(mh);
       for (let r = 0; r < 3; r++) for (let c = -1; c <= 1; c++) { const ch = new THREE.Mesh(rbox(0.5, 0.35, 0.5, 0.06), [M.teal, M.yellow, M.orange][(r + c + 3) % 3]); ch.position.set(c * 0.8, 0.18, 3.0 + r * 0.85); g.add(ch); }
+      // 第四批：六根柱子之間一圈彩旗、屋頂尖一面旗、台前一級台階、兩邊各一個喇叭。
+      for (let k = 0; k < 6; k++) { const a0 = k * TAU / 6, a1 = (k + 1) * TAU / 6; bunting(g, { x: Math.cos(a0) * 1.7, y: 2.45, z: Math.sin(a0) * 1.7 }, { x: Math.cos(a1) * 1.7, y: 2.45, z: Math.sin(a1) * 1.7 }, [M.orange, M.teal, M.yellow, M.white], 0.25); }
+      pennant(g, 0, 3.8, 0, roofM, 0.9); g.add(mk(box(1.4, 0.2, 0.5), M.wood, 0, 0.1, 2.35, false)); for (const sg of [-1, 1]) g.add(mk(box(0.4, 0.6, 0.35), M.dark, sg * 2.0, 0.3, 1.3), mk(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 10), M.navy, sg * 2.0, 0.35, 1.49, false).rotateX(Math.PI / 2));
     }
-    else { /* tower */ const base = new THREE.Mesh(rbox(2.6, 3.4, 2.6, 0.2), M.wall); base.position.y = 1.7; base.castShadow = true; g.add(base); const cap = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.4, 4), roofM); cap.position.y = 4.1; cap.rotation.y = Math.PI / 4; cap.castShadow = true; g.add(cap); win(base, 2, 2.4, 1.34, 1.0); win(base, 2, 1.2, 1.34, 1.0); const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 16), M.cream); clock.rotation.x = Math.PI / 2; clock.position.set(0, 2.9, 1.36); g.add(clock); }
+    else { /* tower */ const base = new THREE.Mesh(rbox(2.6, 3.4, 2.6, 0.2), M.wall); base.position.y = 1.7; base.castShadow = true; g.add(base); const cap = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.4, 4), roofM); cap.position.y = 4.1; cap.rotation.y = Math.PI / 4; cap.castShadow = true; g.add(cap);
+      // 第四批：窗改到牆上（之前上面兩扇的高度在屋頂裡）、門加台階、二樓一個陽台加欄杆、屋簷排水、塔尖一面旗。
+      win(g, 2, 2.65, 1.34, 1.3); win(g, 2, 1.25, 1.34, 1.5); door(g, 0, 1.3, { light: true }); const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16), M.cream); clock.rotation.x = Math.PI / 2; clock.position.set(0, 3.3, 1.36); g.add(clock); g.add(mk(box(0.04, 0.3, 0.02), M.dark, 0, 3.38, 1.42, false), mk(box(0.22, 0.04, 0.02), M.dark, 0.09, 3.3, 1.42, false));
+      g.add(mk(box(1.9, 0.1, 0.7), M.wood, 0, 2.2, 1.6)); rail(g, -0.95, 1.92, 0.95, 1.92, 2.25); rail(g, -0.95, 1.3, -0.95, 1.92, 2.25); rail(g, 0.95, 1.3, 0.95, 1.92, 2.25); for (const sg of [-1, 1]) g.add(mk(box(0.06, 0.06, 0.5), M.dark, sg * 0.8, 1.95, 1.55, false).rotateX(-0.6));
+      gutter(g, 1.42, 3.4, 2.6, 2.6); pennant(g, 0, 4.78, 0, roofM, 1.2); pot(g, -1.0, 1.75, M.wall2); }
     return g;
   }
 
@@ -457,10 +553,12 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // ═══ 橋：五種輪流（Paul 2026-11-17：「make the bridges different material」「island and island can connect through water slide」）═══
   // 0 木板橋、1 石拱橋、2 紅漆拱橋、3 繩索橋、4 滑水道（兩頭各一座小塔，透明水藍的管子從塔頂下來、在水道中間沉到水面、再升到另一頭；人坐著溜過去）。
   // br 是 { a, b, x0, z0, x1, z1 }（兩端的 id 與世界座標）。滑水道記進 slides（"a>b" 與 "b>a"）。
+  // 第四批：每座橋兩頭各一盞燈；木板橋一片一片深淺交錯的板子加兩邊的欄杆；石拱橋欄杆的橫桿跟著拱；紅拱橋欄杆上掛彩旗；滑水道底下會噴的水花。
   function bridge(br, style) {
     const dx = br.x1 - br.x0, dz = br.z1 - br.z0, len = Math.hypot(dx, dz); const ry = -Math.atan2(dz, dx);
     const grp = new THREE.Group(); grp.position.set((br.x0 + br.x1) / 2, 0, (br.z0 + br.z1) / 2); grp.rotation.y = ry; world.add(grp);
     const add = m => { m.castShadow = true; m.receiveShadow = true; grp.add(m); return m; };
+    if (style !== 4) for (const sg of [-1, 1]) { const l = lamp(); l.position.set(sg * (len / 2 - 0.7), 0.3, sg * 1.35); grp.add(l); }
     if (style === 4) {
       const top = 3.6;
       const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(br.x0, top, br.z0), new THREE.Vector3(br.x0 + dx * 0.25, 1.6, br.z0 + dz * 0.25), new THREE.Vector3(br.x0 + dx * 0.5, 0.2, br.z0 + dz * 0.5), new THREE.Vector3(br.x1 - dx * 0.25, 1.6, br.z1 - dz * 0.25), new THREE.Vector3(br.x1, top, br.z1)], false, "catmullrom", 0.5);
@@ -471,14 +569,24 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
         tw.add(new THREE.Mesh(rbox(1.8, 0.16, 1.8, 0.05), M.wood).translateY(top), new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.9, 4), M.orange).translateY(top + 0.6).rotateY(Math.PI / 4));
         for (let k = 0; k < 6; k++) tw.add(new THREE.Mesh(rbox(0.9, 0.05, 0.08, 0.02), M.dark).translateY(0.5 + k * 0.55).translateZ(-0.9));
         tw.traverse(m => { if (m.isMesh) m.castShadow = true; }); }
-      const splash = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.9, 20), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.5, depthWrite: false })); splash.rotation.x = -Math.PI / 2; splash.position.set(br.x0 + dx * 0.5, -0.5, br.z0 + dz * 0.5); world.add(splash);
-      slides.set(br.a + ">" + br.b, { curve, dir: 1 }); slides.set(br.b + ">" + br.a, { curve, dir: -1 });
+      const splashM = new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: 0.45, depthWrite: false });
+      const splash = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.9, 20), splashM); splash.rotation.x = -Math.PI / 2; splash.position.set(br.x0 + dx * 0.5, -0.5, br.z0 + dz * 0.5); splash.userData.dynamic = true; world.add(splash);
+      const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 6, 5), M.white, 10); drops.userData.dynamic = true; drops.frustumCulled = false; drops.castShadow = false; const none = new THREE.Matrix4().makeScale(0, 0, 0); for (let k = 0; k < 10; k++) drops.setMatrixAt(k, none); drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage); world.add(drops);
+      const sp = { ring: splash, mat: splashM, drops, x: splash.position.x, z: splash.position.z, t0: -9, on: false }; splashes.push(sp);
+      slides.set(br.a + ">" + br.b, { curve, dir: 1, splash: sp }); slides.set(br.b + ">" + br.a, { curve, dir: -1, splash: sp });
+      for (const [x, z] of [[br.x0, br.z0], [br.x1, br.z1]]) { const l = lamp(); l.position.set(x + 1.3, 0, z + 1.3); world.add(l); }
     }
-    else if (style === 0) { add(new THREE.Mesh(rbox(len, 0.28, 2.2, 0.08), M.wood)).position.y = 0.1; for (let s = 2; s < len - 1; s += 3) for (const side of [-1, 1]) { const tt = s / len; postPlaces.push([br.x0 + dx * tt + (-dz / len) * side * 1.0, 0.5, br.z0 + dz * tt + (dx / len) * side * 1.0]); } }
+    else if (style === 0) { add(new THREE.Mesh(rbox(len, 0.28, 2.2, 0.08), M.wood)).position.y = 0.1;
+      // 欄杆的柱子：兩頭各一支、中間每 1.5 公尺一支（短的橋之前只有一對柱子、沒有橫桿）；橫桿從頭到尾。
+      const x0 = -len / 2 + 0.8, x1 = len / 2 - 0.8, np = Math.max(1, Math.round((x1 - x0) / 1.5)); for (let i = 0; i <= np; i++) { const tt = (x0 + (x1 - x0) * i / np + len / 2) / len; for (const side of [-1, 1]) postPlaces.push([br.x0 + dx * tt + (-dz / len) * side * 1.0, 0.5, br.z0 + dz * tt + (dx / len) * side * 1.0]); }
+      let k = 0; for (let x = -len / 2 + 0.9; x < len / 2 - 0.6; x += 0.6, k++) add(new THREE.Mesh(box(0.5, 0.04, 2.1), k % 2 ? M.trunk : M.wood)).position.set(x, 0.33, 0);   // 一片一片的板子，深淺交錯
+      for (const side of [-1, 1]) { const r = add(new THREE.Mesh(box(x1 - x0 + 0.1, 0.05, 0.07), M.dark)); r.position.set(0, 0.93, side * 1.0); } }
     else if (style === 1) { const n = 7; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n - 0.5; const seg = add(new THREE.Mesh(rbox(len / n + 0.05, 0.34, 2.4, 0.06), M.cliff)); seg.position.set(u * len, 0.1 + Math.cos(u * Math.PI) * 0.45, 0); }
-      for (const side of [-1, 1]) for (let i = 0; i <= 6; i++) { const u = i / 6 - 0.5; const bal = add(new THREE.Mesh(rbox(0.22, 0.7, 0.22, 0.05), M.wall)); bal.position.set(u * len, 0.6 + Math.cos(u * Math.PI) * 0.45, side * 1.1); } }
+      for (const side of [-1, 1]) { for (let i = 0; i <= 6; i++) { const u = i / 6 - 0.5; const bal = add(new THREE.Mesh(rbox(0.22, 0.7, 0.22, 0.05), M.wall)); bal.position.set(u * len, 0.6 + Math.cos(u * Math.PI) * 0.45, side * 1.1); }
+        for (let i = 0; i < 6; i++) { const u0 = i / 6 - 0.5, u1 = (i + 1) / 6 - 0.5; const y0 = 1.0 + Math.cos(u0 * Math.PI) * 0.45, y1 = 1.0 + Math.cos(u1 * Math.PI) * 0.45; const L = Math.hypot((u1 - u0) * len, y1 - y0); const r = add(new THREE.Mesh(box(L + 0.05, 0.08, 0.26), M.wall)); r.position.set((u0 + u1) / 2 * len, (y0 + y1) / 2, side * 1.1); r.rotation.z = Math.atan2(y1 - y0, (u1 - u0) * len); } } }   // 欄杆的橫桿一段一段跟著拱
     else if (style === 2) { const n = 7; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n - 0.5; const seg = add(new THREE.Mesh(rbox(len / n + 0.05, 0.22, 2.0, 0.05), M.orange)); seg.position.set(u * len, 0.1 + Math.cos(u * Math.PI) * 0.6, 0); }
-      for (const side of [-1, 1]) { for (let i = 0; i <= 4; i++) { const u = i / 4 - 0.5; const pst = add(new THREE.Mesh(rbox(0.12, 1.0, 0.12, 0.03), M.orange)); pst.position.set(u * len, 0.7 + Math.cos(u * Math.PI) * 0.6, side * 0.95); } const rail = add(new THREE.Mesh(rbox(len, 0.08, 0.1, 0.03), M.orange)); rail.position.set(0, 1.25, side * 0.95); } }
+      for (const side of [-1, 1]) { for (let i = 0; i <= 4; i++) { const u = i / 4 - 0.5; const pst = add(new THREE.Mesh(rbox(0.12, 1.0, 0.12, 0.03), M.orange)); pst.position.set(u * len, 0.7 + Math.cos(u * Math.PI) * 0.6, side * 0.95); } const rail = add(new THREE.Mesh(rbox(len, 0.08, 0.1, 0.03), M.orange)); rail.position.set(0, 1.25, side * 0.95);
+        for (let i = 0; i < 4; i++) { const u0 = i / 4 - 0.5, u1 = (i + 1) / 4 - 0.5; bunting(grp, { x: u0 * len, y: 1.22, z: side * 0.95 }, { x: u1 * len, y: 1.22, z: side * 0.95 }, [M.teal, M.yellow, M.white, M.navy], 0.22); } } }   // 欄杆之間掛彩旗
     else { const n = 9; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n - 0.5; const plank = add(new THREE.Mesh(rbox(len / n - 0.08, 0.1, 1.6, 0.03), M.trunk)); plank.position.set(u * len, 0.05 - Math.cos(u * Math.PI) * 0.35, 0); plank.rotation.z = Math.sin(u * Math.PI) * 0.12; }
       for (const side of [-1, 1]) { const rope = add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(new THREE.Vector3(-len / 2, 1.0, side * 0.8), new THREE.Vector3(0, 0.45, side * 0.8), new THREE.Vector3(len / 2, 1.0, side * 0.8)), 10, 0.04, 5, false), M.sand)); rope.castShadow = false; for (const e of [-1, 1]) { const pst = add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.2, 6), M.trunk)); pst.position.set(e * len / 2, 0.5, side * 0.8); } } }
     return grp;
@@ -575,11 +683,14 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // 把一串 Mesh（含 InstancedMesh 的每一個 instance）烤成一個幾何：pre 是最後再乘上去的矩陣（合到世界用單位矩陣、合到某個 group 的本地用它的反矩陣）。
   // rbox 是 ExtrudeGeometry，沒有 index，這裡自己補（2026-11-18 第一版漏了這個，六百多個圓角盒子全部沒合到）。
   const bakeM = { nm: new THREE.Matrix3(), mw: new THREE.Matrix4(), im: new THREE.Matrix4(), v: new THREE.Vector3() };
-  function bake(list, pre) {
-    const { nm, mw, im, v } = bakeM; const pos = [], nor = [], idx = []; let off = 0;
+  // colours 給 true：每個點多記一個顏色（那個 Mesh 的材質底色，已經合過色的就抄它自己的顏色），合出來的那一個用白底加 vertexColors 的材質，不同顏色的零件就能合成同一個。
+  function bake(list, pre, colours) {
+    const { nm, mw, im, v } = bakeM; const pos = [], nor = [], col = [], idx = []; let off = 0;
     for (const m of list) {
       const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, reps = m.isInstancedMesh ? m.count : 1;
+      const ca = g.attributes.color, mc = m.material.color;
       for (let k = 0; k < reps; k++) {
+        if (colours) { for (let i = 0; i < p.count; i++) { if (ca) col.push(ca.getX(i) * mc.r, ca.getY(i) * mc.g, ca.getZ(i) * mc.b); else col.push(mc.r, mc.g, mc.b); } }
         if (m.isInstancedMesh) { m.getMatrixAt(k, im); mw.multiplyMatrices(m.matrixWorld, im); } else mw.copy(m.matrixWorld);
         if (pre) mw.premultiply(pre);
         nm.getNormalMatrix(mw);
@@ -588,24 +699,38 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
         off += p.count;
       }
     }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); geo.setIndex(idx);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); if (colours) geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(idx);
     return geo;
   }
   const mergeable = m => m.isMesh && !m.userData.peoplePool && !(m.isInstancedMesh && (m.count > 24 || m.instanceColor)) && !Array.isArray(m.material) && !m.material.map && m.geometry.attributes.position && m.geometry.attributes.normal;
   const dynSet = root => { const dyn = new Set(); root.traverse(o => { if (o !== root && (o.userData.dynamic || (o.parent && dyn.has(o.parent)))) dyn.add(o); }); return dyn; };
+  // ═══ 合色（2026-11-18 第四批）：只差底色的材質合成同一個 Mesh ═══
+  // 島上大部分的材質都是 std() 出來的：只有顏色不一樣，粗糙度、金屬度都一樣。這種「平的」材質合併的時候不照材質分，照「粗糙度加金屬度」分，
+  // 顏色寫在每個點上（vertexColors），合出來的那一個用白底的共用材質。畫面一模一樣（底色乘上點的顏色就是原來的顏色），draw call 少一大半。
+  // 不算平的（各自照材質分，跟以前一樣）：會發光的、透明的、雙面的、有貼圖的、本來就有 vertexColors 的。頁面叫 E.setMerge({ colours: true }) 才開；/history/ 沒開，行為照舊。
+  const mergeOpts = { colours: false, cell: 60 };
+  const plainMats = new Map();
+  const isPlain = mt => mt.isMeshStandardMaterial && !mt.map && !mt.normalMap && !mt.emissiveMap && !mt.transparent && mt.opacity === 1 && mt.side === THREE.FrontSide && !mt.flatShading && !mt.wireframe && mt.depthWrite && mt.depthTest && !mt.alphaTest && (mt.emissive.r + mt.emissive.g + mt.emissive.b === 0 || mt.emissiveIntensity === 0);
+  const plainKey = mt => "plain|" + mt.roughness + "|" + mt.metalness;
+  const plainMat = (key, mt) => plainMats.get(key) || plainMats.set(key, new THREE.MeshStandardMaterial({ color: P.white, vertexColors: true, roughness: mt.roughness, metalness: mt.metalness })).get(key);
+  // 一個 Mesh 合併的時候照什麼分組：開了合色而且材質是平的就照粗糙度分，不然照材質。回 { key, mat, colours }。
+  const mergeKeyOf = m => (mergeOpts.colours && isPlain(m.material)) ? { key: plainKey(m.material), colours: true } : { key: m.material.uuid, colours: false };
+  const mergedMat = (list, colours) => colours ? plainMat(plainKey(list[0].material), list[0].material) : list[0].material;
   // 同一種材質、同一個 60 公尺格子裡的靜態 Mesh 合成一個；24 個以下的小 InstancedMesh 也攤開合進去。
   // 不碰：會動的（userData.dynamic，含它底下的）、點得到的（userData.sel）、有貼圖的、人。頁面蓋完所有東西、加完人之後叫一次。
+  // 格子的大小是 mergeOpts.cell（預設 60 公尺；島那一頁開合色之後設大一點，整片合成一個也沒關係，全景本來就全部都在畫面裡）。
   function mergeStatic() {
-    const groups = new Map(); world.updateMatrixWorld(true); const dyn = dynSet(world);
+    const groups = new Map(); world.updateMatrixWorld(true); const dyn = dynSet(world); const cell = mergeOpts.cell || 60;
     world.traverse(m => {
       if (!mergeable(m) || dyn.has(m) || m.userData.sel) return;
-      const key = m.material.uuid + "|" + (m.castShadow ? 1 : 0) + (m.receiveShadow ? 1 : 0) + "|" + Math.floor(m.matrixWorld.elements[12] / 60) + "," + Math.floor(m.matrixWorld.elements[14] / 60);
-      (groups.get(key) || groups.set(key, []).get(key)).push(m);
+      const mk = mergeKeyOf(m);
+      const key = mk.key + "|" + (m.castShadow ? 1 : 0) + (m.receiveShadow ? 1 : 0) + "|" + Math.floor(m.matrixWorld.elements[12] / cell) + "," + Math.floor(m.matrixWorld.elements[14] / cell);
+      (groups.get(key) || groups.set(key, { colours: mk.colours, list: [] }).get(key)).list.push(m);
     });
     let merged = 0;
-    for (const list of groups.values()) {
+    for (const { colours, list } of groups.values()) {
       if (list.length < 2 && !list[0].isInstancedMesh) continue;
-      const mesh = new THREE.Mesh(bake(list, null), list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; world.add(mesh);
+      const mesh = new THREE.Mesh(bake(list, null, colours), mergedMat(list, colours)); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = true; world.add(mesh);
       for (const m of list) { m.parent.remove(m); merged++; }
     }
     shadowsDirty = true; return merged;
@@ -614,15 +739,24 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // sel 給了就把它寫到合成的那幾個上（房子要點得到）。底下再有 dynamic 的子樹不碰。回合成的那幾個 Mesh。
   function mergeChildren(root, sel) {
     root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(); const dyn = dynSet(root); const groups = new Map();
-    root.traverse(m => { if (m === root || !mergeable(m) || dyn.has(m)) return; const key = m.material.uuid + "|" + (m.castShadow ? 1 : 0); (groups.get(key) || groups.set(key, []).get(key)).push(m); });
+    root.traverse(m => { if (m === root || !mergeable(m) || dyn.has(m)) return; const mk = mergeKeyOf(m); const key = mk.key + "|" + (m.castShadow ? 1 : 0); (groups.get(key) || groups.set(key, { colours: mk.colours, list: [] }).get(key)).list.push(m); });
     const out = [];
-    for (const list of groups.values()) {
+    for (const { colours, list } of groups.values()) {
       if (list.length < 2 && !list[0].isInstancedMesh) { if (sel) list[0].userData.sel = sel; out.push(list[0]); continue; }
-      const mesh = new THREE.Mesh(bake(list, inv), list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = true; if (sel) mesh.userData.sel = sel; root.add(mesh); out.push(mesh);
+      const mesh = new THREE.Mesh(bake(list, inv, colours), mergedMat(list, colours)); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = true; mesh.userData.merged = true; if (sel) mesh.userData.sel = sel; root.add(mesh); out.push(mesh);
       for (const m of list) m.parent.remove(m);
     }
     return out;
   }
+  // 會動的 group 全部再合一次（2026-11-18 第四批）：世界裡每一個標了 dynamic 的東西，底下的零件照 mergeChildren 合（底下再有 dynamic 的不碰、點得到的不碰）。
+  // 頁面各支模組自己叫過 mergeChildren 的也會再合一次：開了合色之後，之前照材質分成四五個的會合成一兩個。
+  // ⚠ 會動的零件一定要自己標 dynamic（翅膀、螺旋槳、旋轉木馬的馬），不然會被烤進它的 group 裡不動了。回合了幾個 group。
+  function mergeDynamic() {
+    const roots = []; world.traverse(o => { if (o !== world && o.userData.dynamic && !o.userData.sel) roots.push(o); });
+    let n = 0; for (const r of roots) { let any = false; const dyn = dynSet(r); r.traverse(m => { if (m !== r && mergeable(m) && !dyn.has(m) && !m.userData.sel) any = true; }); if (!any) continue; mergeChildren(r); n++; }
+    shadowsDirty = true; return n;
+  }
+  function setMerge(o) { Object.assign(mergeOpts, o || {}); return mergeOpts; }
 
   // ═══ 人：大頭 chibi（peopleKit，/history/ 的機場也用同一批人）═══
   const people = peopleKit({ P, rnd, parent: world }); const { makePerson, pose } = people;
@@ -632,8 +766,10 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const walkers = [];
   function addWalker(person, o) {
     o = o || {}; const isl = o.isl;
-    const g = makePerson({ skin: o.skin != null ? o.skin : walkers.length % 3, hair: o.hair != null ? o.hair : (walkers.length * 7) % 3, shirt: o.shirt != null ? o.shirt : (walkers.length * 5) % 6, pants: walkers.length % 3,
-      hat: person.role === "copresident", pack: person.role === "director" || person.role === "student", bag: person.role === "advisor" });
+    const n = walkers.length;
+    const g = makePerson({ skin: o.skin != null ? o.skin : n % 3, hair: o.hair != null ? o.hair : (n * 7) % 3, shirt: o.shirt != null ? o.shirt : (n * 5) % 6, pants: n % 3,
+      hat: person.role === "copresident", pack: person.role === "director" || person.role === "student", bag: person.role === "advisor",
+      brolly: o.brolly != null ? o.brolly : (n % 7 === 3 ? 1 + n % 3 : 0), box: o.box != null ? o.box : n % 11 === 6 });   // 第四批：每七個人一個撐陽傘、每十一個人一個抱箱子（「我」不給）
     const start = o.start || { x: isl.x, z: isl.z + 2 }; g.position.set(start.x, 0, start.z); g.rotation.y = rnd() * TAU; world.add(g);
     g.userData.sel = { kind: "person", code: person.code };
     const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin pin-person" + (o.me ? " is-me" : ""); pin.dataset.goPerson = person.code; pin.hidden = true; pins.appendChild(pin);
@@ -735,9 +871,9 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const debugWalkers = () => walkers.map(w => ({ code: w.person.code, isl: w.isl && w.isl.id, home: w.home && w.home.id, trips: w.trips, stuck: +(w.stuck || 0).toFixed(1), goes: w.person.goes || "", x: +w.g.position.x.toFixed(1), z: +w.g.position.z.toFixed(1), moving: !!w.g.userData.moving, sitting: !!w.g.userData.sitting, talking: !!w.g.userData.talking, path: w.path ? w.path.length - w.pathI : 0, dest: w.dest || "", poi: w.poi ? w.poi.kind : "", partner: w.partner ? w.partner.person.code : "", act: w.act ? w.act.kind + ":" + (w.act.stage || "") : "", wait: +w.wait.toFixed(1), target: w.target ? [+w.target.x.toFixed(1), +w.target.z.toFixed(1)] : null }));
 
   const E = {
-    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, slides, walkers,
-    rbox, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane,
-    furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances, mergeStatic, mergeChildren,
+    THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, slides, splashes, walkers,
+    rbox, box, flagGeo, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane, bunting, pennant, bike, rail,
+    furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances, mergeStatic, mergeChildren, mergeDynamic, setMerge, mergeOpts,
     makePerson, pose, addWalker, removeWalker, people,
     cam, setGoal, placeCam, orbitBy, snapCam, project, putPin, setHidden, pin, resize, render, hit, paintBoards, debugWalkers,
     get motionOn() { return motionOn; },
@@ -754,7 +890,8 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
 /* ── 這裡面才有動畫。外面不准有每一幀的迴圈。 ──
    鏡頭用阻尼追目標（1 - e^(-dt·k)）；人在島上做事、偶爾過橋；雲慢慢飄；雲霄飛車、燈塔、熱氣球、小船、飛機各自動。暫停就是不呼叫 tick。 */
 function motion(E, nav, tickExtra) {
-  const { cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, balloons, slides, pose, rnd } = E;
+  const { cam, placeCam, render, walkers, clouds, planes, boats, coasters, beacons, balloons, slides, splashes, pose, rnd } = E;
+  const SM = new THREE.Matrix4(), NONE4 = new THREE.Matrix4().makeScale(0, 0, 0);
   const { blockersOf, poisOf } = nav;
   // ── 人在島上做的事（Paul 2026-11-17：「make people doing what they do make sense… they are there for meaning」）──
   // 每個人輪流做這幾件：走去坐（桌子、長凳、野餐桌）、站在攤子或佈告欄前面、找一個也閒著的人聊天（面對面、手會比）、
@@ -837,7 +974,8 @@ function motion(E, nav, tickExtra) {
           if (w.target.slide) {
             // 坐著溜：沿管子走，y 跟著管子；到另一頭站起來。
             const sl = w.target.slide; if (w.slideT == null) { w.slideT = 0; w.g.userData.sitting = true; }
-            w.slideT = Math.min(1, w.slideT + dt * 0.45); const k = sl.dir > 0 ? w.slideT : 1 - w.slideT; const q = sl.curve.getPointAt(k), q2 = sl.curve.getPointAt(Math.min(1, Math.max(0, k + sl.dir * 0.02)));
+            const was = w.slideT; w.slideT = Math.min(1, w.slideT + dt * 0.45); if (was < 0.5 && w.slideT >= 0.5 && sl.splash) sl.splash.t0 = t;   // 溜到最低點：水花噴起來
+            const k = sl.dir > 0 ? w.slideT : 1 - w.slideT; const q = sl.curve.getPointAt(k), q2 = sl.curve.getPointAt(Math.min(1, Math.max(0, k + sl.dir * 0.02)));
             w.g.position.set(q.x, q.y - 0.3, q.z); w.g.rotation.y = Math.atan2(q2.x - q.x, q2.z - q.z); w.g.userData.moving = false;
             if (w.slideT >= 1) { w.slideT = null; w.g.userData.sitting = false; w.g.position.y = 0; w.pathI++; if (w.pathI < w.path.length) { w.target = w.path[w.pathI]; if (w.target.isl) w.isl = islOf(w.target.isl) || w.isl; } else { w.path = null; if (w.dest) { w.isl = islOf(w.dest) || w.home; w.dest = ""; pickHere(w); if (!w.path) arrived(w); } else arrived(w); } }
             pose(w.g, t); continue;
@@ -871,6 +1009,11 @@ function motion(E, nav, tickExtra) {
         pose(w.g, t);
       }
       for (const c of clouds) c.position.x += c.userData.drift * dt;
+      E.now = t;   // 除錯用：現在的時間（秒），console 裡可以把水花的 t0 設成它來看噴水
+      // 滑水道底的水花：水圈放大變淡、十顆水珠往外往上噴再落回水裡，1.3 秒收掉。
+      for (const sp of splashes) { const age = t - sp.t0; if (age > 1.3) { if (sp.on) { sp.on = false; sp.ring.scale.setScalar(1); sp.mat.opacity = 0.45; for (let k = 0; k < 10; k++) sp.drops.setMatrixAt(k, NONE4); sp.drops.instanceMatrix.needsUpdate = true; } continue; }
+        sp.on = true; sp.ring.scale.setScalar(1 + age * 1.4); sp.mat.opacity = 0.8 * (1 - age / 1.3);
+        for (let k = 0; k < 10; k++) { const a = k / 10 * TAU + 0.3; const r = 0.4 + age * 2.4, y = -0.45 + 3.6 * age - 7.5 * age * age; if (y < -0.5) sp.drops.setMatrixAt(k, NONE4); else sp.drops.setMatrixAt(k, SM.makeTranslation(sp.x + Math.cos(a) * r, y, sp.z + Math.sin(a) * r)); } sp.drops.instanceMatrix.needsUpdate = true; }
       // 雲霄飛車：小車沿軌道跑，爬坡慢、下坡快；燈塔的光轉。
       for (const c of coasters) { const q0 = c.curve.getPointAt(c.t), q1 = c.curve.getPointAt((c.t + 0.01) % 1); const slope = q1.y - q0.y; c.t = (c.t + dt * (0.028 - slope * 0.12)) % 1; if (c.t < 0) c.t += 1; const p0 = c.curve.getPointAt(c.t), p1 = c.curve.getPointAt((c.t + 0.012) % 1); c.train.position.copy(p0).add(new THREE.Vector3(0, 0.3, 0)); c.train.lookAt(p1.x, p1.y + 0.3, p1.z); c.train.rotateY(-Math.PI / 2); }
       for (const b of beacons) b.rotation.y += dt * 0.9;

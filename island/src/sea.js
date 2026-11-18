@@ -80,7 +80,7 @@ export function buildSea(THREE, E, c) {
 
   // ═══ 4. 帆船：四艘，各自在一片空水域繞橢圓（橢圓的位置挑過，離每座島與小島都遠；test/island.test.mjs 守）。主帆一色、前帆白色、船尾一個掌舵的人；船會傾、會上下晃。═══
   for (const [k, L] of (c.sailLoops || []).entries()) {
-    const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const inner = new THREE.Group(); g.add(inner); stats.sailboats++; objs.sail.push(g);
+    const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const inner = new THREE.Group(); inner.userData.dynamic = true; g.add(inner); stats.sailboats++; objs.sail.push(g);
     const sailM = [M.orange, M.teal, M.yellow, M.navy][k % 4], hullM = k % 2 ? M.cream : M.white;
     inner.add(mesh(rbox(2.8, 0.5, 1.1, 0.18), hullM, 0, 0.1, 0, false), mesh(rbox(2.6, 0.08, 0.9, 0.03), M.wood, 0, 0.4, 0, false), mesh(rbox(0.9, 0.35, 0.7, 0.08), sailM, 0.9, 0.55, 0, false), mesh(new THREE.CylinderGeometry(0.04, 0.05, 3.4, 6), M.dark, 0.3, 2.1, 0, false), mesh(rbox(1.7, 0.05, 0.05, 0.01), M.dark, -0.55, 0.75, 0, false));
     const tri = (pts, m) => { const sh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x, y) : sh.moveTo(x, y)); sh.closePath(); const o = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshStandardMaterial({ color: m.color, emissive: m.color, emissiveIntensity: 0.35, roughness: 0.9, side: THREE.DoubleSide })); o.castShadow = false; return o; };   // 帆是一片薄的，背光那一面會整片黑，加一點自發光
@@ -96,7 +96,7 @@ export function buildSea(THREE, E, c) {
   if (c.dolphins) {
     const D = c.dolphins; const dM = std(mix(mix(P.navy, P.grey, 0.4), P.white, 0.25), { roughness: 0.5 }); const pair = [];
     for (let k = 0; k < 2; k++) {
-      const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const body = new THREE.Group(); g.add(body); stats.dolphins++;
+      const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const body = new THREE.Group(); body.userData.dynamic = true; g.add(body); stats.dolphins++;
       body.add(mesh(new THREE.CapsuleGeometry(0.2, 0.9, 4, 8), dM, 0, 0, 0, false).rotateZ(Math.PI / 2), mesh(new THREE.ConeGeometry(0.1, 0.35, 6), dM, 0.75, -0.02, 0, false).rotateZ(-Math.PI / 2), mesh(rbox(0.25, 0.3, 0.05, 0.02), dM, -0.05, 0.3, 0, false).rotateZ(0.5), mesh(rbox(0.12, 0.05, 0.6, 0.02), dM, -0.75, 0, 0, false), mesh(rbox(0.3, 0.05, 0.12, 0.02), dM, 0.1, -0.15, 0.22, false), mesh(rbox(0.3, 0.05, 0.12, 0.02), dM, 0.1, -0.15, -0.22, false));
       E.mergeChildren(body); pair.push({ g, body, k }); objs.dolphins.push(g);
     }
@@ -109,7 +109,7 @@ export function buildSea(THREE, E, c) {
 
   // ═══ 6. 水上飛機：引擎的小飛機加兩支浮筒，在 19 公尺高繞著整個島群飛，機身往圈內傾、螺旋槳會轉。═══
   {
-    const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const inner = new THREE.Group(); g.add(inner); stats.seaplane = true; objs.plane = g;
+    const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const inner = new THREE.Group(); inner.userData.dynamic = true; g.add(inner); stats.seaplane = true; objs.plane = g;
     const pl = E.makePlane(M.white, M.orange); inner.add(pl); pl.traverse(m => { if (m.isMesh) m.castShadow = false; });
     for (const z of [-0.55, 0.55]) { inner.add(mesh(rbox(2.4, 0.22, 0.32, 0.08), M.cream, 0.2, -0.95, z, false)); for (const x of [-0.5, 0.9]) inner.add(mesh(rbox(0.06, 0.6, 0.06, 0.01), M.dark, x, -0.6, z, false)); }
     inner.add(mesh(rbox(0.1, 0.1, 1.2, 0.02), M.dark, 0.2, -0.95, 0, false));

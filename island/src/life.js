@@ -105,12 +105,16 @@ export function buildLife(THREE, E, c) {
   { const wheel = new THREE.TorusGeometry(0.3, 0.04, 6, 14); put(wheel, M.dark, bikeWheels); const frame = rbox(0.9, 0.08, 0.06, 0.02); put(frame, M.orange, bikeFrames); put(rbox(0.06, 0.5, 0.06, 0.01), M.orange, bikeFrames.map(([x, y, z, ry]) => [x + Math.sin(ry) * 0.1, y + 0.2, z + Math.cos(ry) * 0.1, ry])); }
 
   // ═══ 鳥：兩群各七隻（V 字），繞著島群飛，翅膀會拍。═══
+  // 第四批：一群七隻的身體合成一個 Mesh（引擎的 mergeDynamic），十四片翅膀是一個 InstancedMesh，每一幀把每片的矩陣寫進去；之前一群 21 個 draw call，現在 2 個。
+  const wingGeo = rbox(0.5, 0.03, 0.12, 0.01);
   for (let f = 0; f < 2; f++) {
     const flock = new THREE.Group(); flock.userData.dynamic = true; world.add(flock); const wings = [];
-    for (let k = 0; k < 7; k++) { const b = new THREE.Group(); const row = Math.ceil(k / 2), side = k % 2 ? 1 : -1; b.position.set(-row * 1.4, -row * 0.15, side * row * 1.1); flock.add(b);
-      b.add(mesh(new THREE.ConeGeometry(0.12, 0.6, 5), M.white, 0, 0, 0, false).rotateX(Math.PI / 2).rotateZ(Math.PI)); for (const s of [-1, 1]) { const w = mesh(rbox(0.5, 0.03, 0.12, 0.01), M.white, s * 0.28, 0, 0, false); b.add(w); wings.push([w, s]); } }
-    const R = 44 + f * 16, H = 16 + f * 5, sp = 0.055 - f * 0.012; let a = f * 2.2;   // 翅膀要各自拍，不合併
-    ticks.push((dt, t) => { a += dt * sp; flock.position.set(Math.cos(a) * R, H + Math.sin(t * 0.6 + f) * 0.8, Math.sin(a) * R * 0.75); flock.rotation.y = -a + Math.PI; for (const [w, s] of wings) w.rotation.x = s * Math.sin(t * 7 + w.position.x) * 0.6; });
+    const wim = new THREE.InstancedMesh(wingGeo, M.white, 14); wim.userData.dynamic = true; wim.castShadow = false; wim.frustumCulled = false; wim.instanceMatrix.setUsage(THREE.DynamicDrawUsage); flock.add(wim);
+    for (let k = 0; k < 7; k++) { const b = new THREE.Group(); const row = Math.ceil(k / 2), side = k % 2 ? 1 : -1; b.position.set(-row * 1.4, -row * 0.15, side * row * 1.1); flock.add(b); b.updateMatrix();
+      b.add(mesh(new THREE.ConeGeometry(0.12, 0.6, 5), M.white, 0, 0, 0, false).rotateX(Math.PI / 2).rotateZ(Math.PI)); for (const s of [-1, 1]) { const w = new THREE.Object3D(); w.position.set(s * 0.28, 0, 0); b.add(w); wings.push([w, s, b]); } }
+    const R = 44 + f * 16, H = 16 + f * 5, sp = 0.055 - f * 0.012; let a = f * 2.2; const wm = new THREE.Matrix4();   // 翅膀要各自拍
+    ticks.push((dt, t) => { a += dt * sp; flock.position.set(Math.cos(a) * R, H + Math.sin(t * 0.6 + f) * 0.8, Math.sin(a) * R * 0.75); flock.rotation.y = -a + Math.PI;
+      wings.forEach(([w, s, b], i) => { w.rotation.x = s * Math.sin(t * 7 + w.position.x) * 0.6; w.updateMatrix(); wm.multiplyMatrices(b.matrix, w.matrix); wim.setMatrixAt(i, wm); }); wim.instanceMatrix.needsUpdate = true; });
   }
   // ═══ 機場：兩台行李車、一座油槽、會轉的雷達、走道上三盞燈。═══
   if (airport) {

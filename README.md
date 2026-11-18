@@ -4800,6 +4800,35 @@ Paul 看完第二批又說「More detail first」。島上已經放滿（第二�
 - 瀑布的山丘側面是單色綠，可以換成有花紋的 groundMat。
 - draw call 剩 19 個的餘裕，再加東西要先合併或拿掉。
 
+## BT 島（2026-11-18 第四批：先合併再做門面）
+
+Paul 第三次按「More detail first」。島已經放滿、draw call 也到了 831，所以這一批先把 draw call 降下來，再把空出來的額度拿去做「特寫時眼睛會落在的地方」：房子的門面、橋、聚會所、人。
+
+### 改了什麼
+
+- **合色合併**（`shared/toy.js`，頁面要 `E.setMerge({ colours: true, cell })` 才開，`/history/` 沒開所以行為照舊）：只差底色的材質合成同一個 Mesh，顏色寫在每個點上乘白底，畫面一模一樣但一幀只畫 397 次（之前 831）。發光的、透明的、有貼圖的照舊各自一個。
+  全景的格子放大到 400 公尺（全景本來就全部都在畫面裡）。新的 `mergeDynamic()` 把每一個標 dynamic 的 group 再合一次，所以**會動的零件一定要自己標 dynamic**，這一批把旋轉木馬的馬、鳥的翅膀、帆船、海豚、鯨魚身體、水上飛機、滑翔翼、繞圈的機車、機場那架飛機的螺旋槳都補標了（沒標會被烤進去不動）。
+  量測：831 個 call 裡 403 個是會動的 group 底下的零件、301 個是靜態合併後還剩的、88 個是點得到的房子零件。
+- **建築門面**（`toy.js` 的 `building()`，十二種房子都有）：窗框加窗台加窗櫺、門加台階加門把、雨棚、門燈、招牌（白板加深色上緣）、排水槽與落水管、煙囪、屋頂欄杆或陽台、三角旗、花箱、門口的腳踏車；
+  學校樓下改四扇窗（之前正中間那扇被門擋住）、塔的窗改到牆上（之前落在屋頂裡）、塔頂加時鐘指針、郵局有投信口與包裹、碼頭有繫船柱與救生圈、帳篷有門簾與營繩與地釘、舞台的柱子之間一圈彩旗加兩個喇叭、攝影棚有「錄影中」的燈。輪廓都沒變，`scene.js` 的 `mergeChildren(b, sel)` 照舊把整棟合成一兩個可點的 Mesh。
+- **橋與滑水道**：每座橋兩頭各一盞燈；木板橋改成一片一片深淺交錯的板子加兩邊柱子與橫桿；石拱橋的橫桿一段一段跟著拱；紅拱橋欄杆上掛彩旗；滑水道兩頭各一盞燈，人溜到最低點水圈放大變淡、十顆水珠噴出來再落回去。
+- **聚會所**（`town.js`）：島心鋪面外三圈兩色交錯的磚、桿子之間的彩旗圈、牽手的一對、推嬰兒車的加朋友、坐輪椅的加朋友。燈一盞都放不下，略過。
+- **人的變化**（`peopleKit` 多四個選項 `brolly`、`box`、`stroller`、`chair`，各自一個 InstancedMesh pool，不管幾個人都只多 7 個 draw call）：走路的人每七個一個撐陽傘、每十一個一個抱箱子，「我」不拿道具；pose() 會把舉傘的右手舉著、抱箱子與推車的兩手往前、坐輪椅的一直是坐姿。
+- `life.js` 鳥的翅膀改成一群一個 InstancedMesh（一群 21 個 draw call 變 2 個）。
+- **效能**（本機 Chrome，全景）：draw call 831 → 第一半 397 → 第二半 **445**；三角形 2.70M；59.9 fps、300 幀裡超過 33 ms 的 0 幀。`/history/` 跟著 toy.js 一起驗過：588 個 draw call、59.3 fps、295 個人照常。island/src 加總 242 KB（上限 250）。
+- 截圖：`docs/island/2026-11-18d-{overview,facade-hall,facade-school,commons,bridge,slide-splash}.jpg`。測試 944、`check.sh` 全過。
+
+### 怎麼驗證
+
+1. 開 `/island/?debug=1`，console 打 `__island._E.renderer.info.render.calls`，全景在 450 左右（之前 831）。
+2. 點任何一座島：房子有窗框、門、台階、招牌、排水管、旗子；橋兩頭有燈，木板橋一片一片；等人溜滑水道，底下會噴水花。
+3. 開 `/history/` 確認人照常出現（toy.js 兩頁共用）。
+
+### 之後要注意
+
+- **新加會動的東西一定要標 `userData.dynamic = true`**，不然 `mergeDynamic()` 會把它烤進不動的那一份。
+- 三角形 2.7M 幾乎都是 rbox（一個圓角盒子兩千多個點）；手機要再快就是把小零件的 rbox 換成 `box()`，不是 draw call 的事了。
+
 ## 歷史之路（2026-11-18：機場裡外照真的機場做）
 
 Paul 2026-11-18 凌晨（要去睡了，交代做完）：「everything, including what I said, the detail first… make like the shop, detail, layout, decoration… as detailed as possible… feels like an airport as much as it can… by the time I wake up, I want to see an airport with plenty of details in and out of the terminal」。

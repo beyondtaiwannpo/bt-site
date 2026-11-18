@@ -80,7 +80,7 @@ export function buildWater(THREE, E, c) {
 
   // ═══ 4. 鯨魚：遠處北邊的空水域。每 36 秒浮上來一次：背先出水、往前游、噴水（一小把白球往上拋再落下）、再頭往下潛、尾巴翹起來甩一下。海面是不透明的，水下的部分自然看不到。═══
   if (W) {
-    const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const body = new THREE.Group(); g.add(body); const tail = new THREE.Group(); tail.userData.dynamic = true; tail.position.set(-3.4, 0, 0); body.add(tail);
+    const g = new THREE.Group(); g.userData.dynamic = true; world.add(g); const body = new THREE.Group(); body.userData.dynamic = true; g.add(body); const tail = new THREE.Group(); tail.userData.dynamic = true; tail.position.set(-3.4, 0, 0); body.add(tail);
     const wM = std(mix(mix(P.navy, P.grey, 0.45), P.teal, 0.12), { roughness: 0.5 }), wM2 = std(mix(mix(P.navy, P.grey, 0.45), P.white, 0.35), { roughness: 0.6 });
     // 身體：前面一顆壓扁的大球當頭、後面一段往尾巴收細的圓錐，背上一片小背鰭、兩側一對胸鰭、一條白色的嘴線、兩顆眼睛；尾巴（會甩）在 tail 這個 group。
     const head = mesh(new THREE.SphereGeometry(1.0, 14, 10), wM, 1.3, 0, 0); head.scale.set(2.1, 1.3, 1.45); body.add(head);
