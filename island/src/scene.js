@@ -9,13 +9,13 @@
 import * as THREE from "three";
 import * as T from "../../shared/toy.js";
 import * as L from "./layout.js";
+import { buildRides } from "./rides.js";
+import { buildLife } from "./life.js";
 
 export const webglOK = T.webglOK;
 
 // 每座島照 layout.js 的 shape 選一種：六邊形、圓、方（學校的操場）。
 const prismFor = shape => shape === "round" ? T.roundPrism : shape === "rect" ? T.rectPrism : T.hexPrism;
-// 五種橋輪流（木板、石拱、紅漆拱、繩索、滑水道）。
-const BRIDGE_STYLE = [0, 1, 2, 3, 4, 1, 0, 4, 2, 3, 0, 1, 4, 2];
 
 export function create({ stage, pins, palette, phone, data, onSelect, onHover, freeCentre, freeWidth }) {
   const E = T.createEngine({ stage, pins, palette, phone, onSelect, onHover, freeCentre, freeWidth, seed: 11 });
@@ -43,7 +43,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     tm.programs.forEach((p, k) => { const sp = isl.sea ? (p.kind === "airport" ? { x: 0, z: -2.0, face: 0 } : { x: -8.5, z: 6.2, face: Math.PI }) : spots[k]; const b = E.building(p.kind, M.team[tm.colour]); b.position.set(sp.x, 0, sp.z); b.rotation.y = p.kind === "studio" ? 0.15 : sp.face; if (p.kind !== "airport") b.scale.setScalar(1.2); g.add(b);   // 貼文牆要面向鏡頭（+z），不是面向島心
       for (const eb of (b.userData.blockers || [])) { const c = Math.cos(sp.face), sn = Math.sin(sp.face); blockers.push({ x: sp.x + eb.x * c + eb.z * sn, z: sp.z - eb.x * sn + eb.z * c, r: eb.r }); }
       blockers.push({ x: sp.x, z: sp.z, r: T.KIND_R[p.kind] || 3.2 });
-      b.traverse(o => { if (o.isMesh) { o.userData.sel = { kind: "program", team: tm.id, program: p.id }; pickables.push(o); } });
+      for (const o of E.mergeChildren(b, { kind: "program", team: tm.id, program: p.id })) pickables.push(o);   // 一棟房子的零件合成幾個，點得到的就是合成的那幾個（2026-11-18）
       b.userData.pin = E.pin("pin-prog", { goProgram: p.id, team: tm.id }, true); b.userData.program = p; });
     // 每座島自己的那一套擺設（teams.json 的 scenery）＋每座島都有的桌椅、路、矮樹、燈、圍欄（furnish）。
     // Paul 2026-11-17 第二次：「everything on it has different stuff on it and it's actually working… right now our island looks empty」。
@@ -63,20 +63,30 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     blockersOf.set(isl.id, blockers.map(b => ({ x: isl.x + b.x, z: isl.z + b.z, r: b.r || 1.2 })));
   }
   // 橋：五種輪流（Paul 2026-11-17：「make the bridges different material」「island and island can connect through water slide」）。
-  L.bridges().forEach((br, bi) => E.bridge(br, BRIDGE_STYLE[bi % BRIDGE_STYLE.length]));
+  L.bridges().forEach((br, bi) => E.bridge(br, L.bridgeStyle(br, bi)));   // 滑水道只在聚會所那六條（layout.js 的 bridgeStyle）
   // 協作線：島跟島之間一條拱起來的細管（橘色），全景時收起，開了「協作線」或選了那座島才亮。
   const lines = [];
   for (const c of data.connections || []) { const A = L.islandOf(c.a), B = L.islandOf(c.b); if (!A || !B) continue; lines.push({ a: c.a, b: c.b, mesh: E.arc(A, B) }); }
   // 海上的裝飾小島（layout.js 的 ISLETS）、小船、熱氣球、雲。
-  for (const it of L.ISLETS) E.islet(it);
+  for (const it of L.ISLETS) if (L.ENGINE_ISLETS.includes(it.kind)) E.islet(it);
   E.addBoats(6, islands.map(il => ({ x: il.x, z: il.z, r: il.r, pad: il.sea ? 6 : 3 })).concat(L.ISLETS.map(il => ({ x: il.x, z: il.z, r: il.r, pad: 3 }))));
   E.addBalloons(3); E.addClouds(8);
+  // 遊樂設施（rides.js：纜車、兩座新的雲霄飛車、遊樂小島、渡輪）與生活感（life.js：小店、餐車、公車亭、碼頭、晾衣繩、煙、花、石頭、鳥）。
+  // 兩支都不碰 three，THREE 跟引擎傳進去；它們每一幀要動的東西從 motion() 的 tickExtra 叫。位置記進 blockersOf（人會繞開）、站的點記進 poisOf。
+  const buildingsOf = new Map(); for (const o of isleObjs.values()) buildingsOf.set(o.isl.id, o.buildings.map(b => ({ x: b.position.x, z: b.position.z, ry: b.rotation.y, kind: b.userData.program.kind })));
+  const bridgeAngles = new Map(); for (const br of L.bridges()) { const A = L.islandOf(br.a), B = L.islandOf(br.b); (bridgeAngles.get(br.a) || bridgeAngles.set(br.a, []).get(br.a)).push(Math.atan2(br.z0 - A.z, br.x0 - A.x)); (bridgeAngles.get(br.b) || bridgeAngles.set(br.b, []).get(br.b)).push(Math.atan2(br.z1 - B.z, br.x1 - B.x)); }
+  for (const [id, x, z, r] of [["commons", 8, -3, 1.3], ["curriculum", -22.5, 22, 1.3], ["airport", 53, 6.5, 3.2]]) (blockersOf.get(id) || blockersOf.set(id, []).get(id)).push({ x, z, r });   // 纜車的塔與站
+  const rides = buildRides(THREE, E, { gondola: L.GONDOLA, islets: L.ISLETS, blockersOf, ferry: L.FERRY });
+  const life = buildLife(THREE, E, { islands: islands.map(i => ({ ...i, colour: (data.teams.find(x => x.id === i.id) || {}).colour })), blockersOf, poisOf, buildingsOf, bridgeAngles, airport: islands.find(i => i.sea) });
+  const extraTick = (dt, t) => { rides.tick(dt, t); life.tick(dt, t); };
   E.flushInstances();
 
   // ═══ 人：每個人住在自己的島上 ═══
   const walkers = E.walkers;
   function addWalker(person, opts) { const isl = L.islandOf(person.team); return E.addWalker(person, { ...(opts || {}), isl, start: L.wanderTarget(isl, blockersOf.get(person.team), rnd) }); }
   for (const p of data.people) addWalker(p);
+  // 靜態的東西合併（2026-11-18：加了這麼多道具之後一幀 1171 個 draw call；同材質同一格的合成一個，會動的與點得到的不碰）。
+  E.mergeStatic();
 
   // ═══ 鏡頭與牌子 ═══
   const show = { names: false, selectedTeam: "", flows: false };
@@ -138,7 +148,7 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, f
     // 除錯用（?debug=1）：每個人現在在做什麼。
     debug: () => E.debugWalkers(),
     // 每一幀的迴圈（引擎的）。導航交給 layout.js：哪座島、怎麼繞、橋怎麼走。
-    motion() { return E.motion({ islandOf: L.islandOf, wanderTarget: L.wanderTarget, detour: L.detour, route: L.route, routePoints: L.routePoints, blockersOf, poisOf, commons: "commons" }); },
+    motion() { return E.motion({ islandOf: L.islandOf, wanderTarget: L.wanderTarget, detour: L.detour, route: L.route, routePoints: L.routePoints, blockersOf, poisOf, commons: "commons" }, extraTick); },
   };
   return api;
 }

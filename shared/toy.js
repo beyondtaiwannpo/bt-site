@@ -227,12 +227,13 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     const edge_ = new THREE.Mesh(rbox(r * 2.6 + 0.4, 0.2, r * 2.0 + 0.4, 0.1), M.cream); edge_.position.y = -0.2; g.add(edge_);
     const sock = new THREE.Group(); sock.position.set(r * 1.2, 0, r * 0.85); g.add(sock);
     sock.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 3, 6), M.dark).translateY(1.5), new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.4, 8), M.orange).translateY(3.1).rotateZ(-Math.PI / 2).translateY(0.3));
+    sock.children[1].userData.dynamic = true;
     return { deck, flag: sock.children[1] };
   }
   // 旗桿加旗子（放在 x, z）。回旗子那一片（選中時頁面換它的材質）。
   function flagpole(g, x, z, flagM) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 8), M.dark); pole.position.set(x, 2.5, z); pole.castShadow = true; g.add(pole);
-    const flag = new THREE.Mesh(rbox(1.8, 1.0, 0.06, 0.03), flagM); flag.position.set(x + 0.95, 4.4, z); flag.castShadow = true; g.add(flag); return flag;
+    const flag = new THREE.Mesh(rbox(1.8, 1.0, 0.06, 0.03), flagM); flag.userData.dynamic = true; flag.position.set(x + 0.95, 4.4, z); flag.castShadow = true; g.add(flag); return flag;
   }
 
   // ═══ 建築 ═══
@@ -269,7 +270,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const tw = new THREE.Group(); tw.position.set(-6.6, 0, -6.2); g.add(tw);
       tw.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 3.6, 10), M.wall).translateY(1.8), new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.8, 0.9, 10), roofM).translateY(4.0), new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 10), M.dark).translateY(4.6));
       // 會動的那一架包在一個 group 裡，機身轉成機鼻朝 +z，motion() 用 lookAt 讓它朝著下一個點（轉彎、爬升、下降都對）。
-      const fly = new THREE.Group(); const body = makePlane(M.cream, M.teal); body.rotation.y = -Math.PI / 2; fly.add(body); fly.position.set(-3.0, 0.75, -4.6); fly.userData.flight = { t: 0 }; g.add(fly); planes.push(fly);
+      const fly = new THREE.Group(); const body = makePlane(M.cream, M.teal); body.rotation.y = -Math.PI / 2; fly.add(body); fly.position.set(-3.0, 0.75, -4.6); fly.userData.flight = { t: 0 }; fly.userData.dynamic = true; g.add(fly); planes.push(fly);
       const p2 = makePlane(M.white, M.orange); p2.position.set(1.0, 0.75, -4.6); p2.rotation.y = 0.15; g.add(p2);
       const p3 = makePlane(M.cream, M.navy); p3.position.set(4.6, 0.75, -4.6); p3.rotation.y = -0.1; g.add(p3);
       const hg = new THREE.Group(); hg.position.set(6.4, 0, -7.0); g.add(hg);
@@ -297,7 +298,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       [[M.orange, M.teal], [M.teal, M.yellow], [M.navy, M.orange]].forEach(([a, b2], i) => {
         const x = (i - 1) * 1.65; const board = new THREE.Mesh(rbox(1.4, 1.6, 0.08, 0.04), M.white); board.position.set(x, 1.45, 0.2); g.add(board);
         const pic = new THREE.Mesh(rbox(1.2, 1.0, 0.04, 0.03), a); pic.position.set(x, 1.65, 0.26); g.add(pic);
-        const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.0), new THREE.MeshBasicMaterial({ color: P.white })); photo.position.set(x, 1.65, 0.29); photo.visible = false; g.add(photo); boards.push(photo);
+        const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.0), new THREE.MeshBasicMaterial({ color: P.white })); photo.position.set(x, 1.65, 0.29); photo.visible = false; photo.userData.dynamic = true; g.add(photo); boards.push(photo);
         const bar = new THREE.Mesh(rbox(0.9, 0.12, 0.04, 0.02), b2); bar.position.set(x - 0.1, 0.95, 0.26); g.add(bar);
         const heart = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), M.orange); heart.position.set(x + 0.45, 0.95, 0.27); g.add(heart);
       });
@@ -400,7 +401,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       for (const sx of [-1.5, 1.5]) for (const sz of [-0.5, 0.5]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.5, 6), M.teal); leg.position.set(sx, 1.15, sz); leg.rotation.x = sz > 0 ? -0.2 : 0.2; swing.add(leg); }
       // 鞦韆的座位掛在一個 pivot 上，pivot 繞橫桿轉就是在盪（motion() 裡轉）。坐上去的人跟著 pivot 走。
       const swingRy = -(fa - 0.5); const pivots = [];
-      for (const sx of [-0.7, 0.7]) { const pv = new THREE.Group(); pv.position.set(sx, 2.3, 0); swing.add(pv); pivots.push(pv);
+      for (const sx of [-0.7, 0.7]) { const pv = new THREE.Group(); pv.userData.dynamic = true; pv.position.set(sx, 2.3, 0); swing.add(pv); pivots.push(pv);
         for (const rz of [-0.25, 0.25]) { const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.6, 4), M.dark); rope.position.set(rz, -0.8, 0); pv.add(rope); }
         pv.add(new THREE.Mesh(rbox(0.6, 0.08, 0.3, 0.02), M.orange).translateY(-1.6)); }
       put(swing, at(-0.5, 5.4), swingRy, 1.9);
@@ -504,7 +505,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const rail2 = new THREE.Mesh(new THREE.TubeGeometry(curve, 120, 0.06, 5, true), M.dark); rail2.position.y = -0.28; g.add(rail2);
       for (let k = 0; k < 18; k++) { const q = curve.getPointAt(k / 18); const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, Math.max(0.3, q.y - 0.1), 6), M.wall); post.position.set(q.x, (q.y - 0.1) / 2, q.z); g.add(post); }
       const train = new THREE.Group(); for (let c = 0; c < 3; c++) { const car = new THREE.Mesh(rbox(0.9, 0.5, 0.6, 0.12), [M.yellow, M.teal, M.orange][c]); car.position.x = -c * 1.0; car.castShadow = true; train.add(car); for (const dz of [-0.15, 0.15]) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 5), M.skin[c % 3]); h.position.set(-c * 1.0 + 0.1, 0.42, dz); train.add(h); } }
-      g.add(train); coasters.push({ curve, train, t: rnd() });
+      train.userData.dynamic = true; g.add(train); coasters.push({ curve, train, t: rnd() }); mergeChildren(train);
       const booth = new THREE.Mesh(rbox(1.6, 1.3, 1.2, 0.1), M.wall); booth.position.set(0, 0.65, 6.0); g.add(booth); const br = new THREE.Mesh(rbox(2.0, 0.15, 1.6, 0.05), M.orange); br.position.set(0, 1.4, 6.0); g.add(br);
       for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; const f = new THREE.Mesh(rbox(0.3, 0.5, 0.03, 0.02), [M.orange, M.teal, M.yellow][k % 3]); f.position.set(Math.cos(a) * (r - 1.0), 2.4, Math.sin(a) * (r - 1.0)); g.add(f); const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 2.6, 5), M.dark); fp.position.set(Math.cos(a) * (r - 1.0) - 0.15, 1.3, Math.sin(a) * (r - 1.0)); g.add(fp); }
     } else if (it.kind === "lighthouse") {
@@ -512,7 +513,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       for (const y of [1.2, 3.0]) { const band = new THREE.Mesh(new THREE.CylinderGeometry(1.14, 1.2, 0.5, 12), M.orange); band.position.y = y; g.add(band); }
       const lamp_ = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.9, 12), M.light); lamp_.position.y = 5.95; g.add(lamp_);
       const cap = new THREE.Mesh(new THREE.ConeGeometry(1.0, 0.8, 12), M.navy); cap.position.y = 6.8; g.add(cap);
-      const beam = new THREE.Mesh(new THREE.ConeGeometry(0.5, 6, 10, 1, true), new THREE.MeshBasicMaterial({ color: P.light, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide })); beam.rotation.z = Math.PI / 2; beam.position.set(3, 5.95, 0); const pivot = new THREE.Group(); pivot.position.y = 0; pivot.add(beam); g.add(pivot); beacons.push(pivot);
+      const beam = new THREE.Mesh(new THREE.ConeGeometry(0.5, 6, 10, 1, true), new THREE.MeshBasicMaterial({ color: P.light, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide })); beam.rotation.z = Math.PI / 2; beam.position.set(3, 5.95, 0); const pivot = new THREE.Group(); pivot.userData.dynamic = true; pivot.position.y = 0; pivot.add(beam); g.add(pivot); beacons.push(pivot);
       const hut = new THREE.Mesh(rbox(1.8, 1.2, 1.4, 0.1), M.wall2); hut.position.set(2.2, 0.6, 1.2); hut.castShadow = true; g.add(hut); const hr = new THREE.Mesh(new THREE.ConeGeometry(1.4, 0.8, 4), M.orange); hr.rotation.y = Math.PI / 4; hr.position.set(2.2, 1.6, 1.2); g.add(hr);
     } else if (it.kind === "picnic") {
       const t2 = table(M.wall2); t2.position.set(0.5, 0, 0.5); g.add(t2); const u = parasol(M.teal); u.position.set(0.5, 0, 0.5); g.add(u);
@@ -536,7 +537,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       if (!ok) continue;
       const b = new THREE.Group(); b.position.set(x, -0.35, z); b.rotation.y = rnd() * TAU;
       b.add(new THREE.Mesh(rbox(2.4, 0.5, 1.0, 0.18), [M.white, M.cream, M.teal][i % 3]).translateY(0.1), new THREE.Mesh(rbox(0.9, 0.5, 0.7, 0.08), [M.orange, M.navy, M.yellow][i % 3]).translateY(0.55).translateX(-0.2), new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 5), M.dark).translateY(1.2).translateX(0.5));
-      b.traverse(m => { if (m.isMesh) m.castShadow = true; }); b.userData.phase = rnd() * 6; world.add(b); boats.push(b);
+      b.traverse(m => { if (m.isMesh) m.castShadow = true; }); b.userData.phase = rnd() * 6; b.userData.dynamic = true; world.add(b); boats.push(b); mergeChildren(b);
     }
   }
   // 熱氣球（Paul 2026-11-17：「make it more cute」）：n 顆在上空慢慢繞（圓心 cx, cz），motion() 裡動。
@@ -547,12 +548,12 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const basket = new THREE.Mesh(rbox(1.0, 0.7, 1.0, 0.12), M.wood); basket.position.y = 0.35; g.add(basket);
       for (const [ox, oz] of [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]]) { const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 4), M.dark); rope.position.set(ox, 1.3, oz); g.add(rope); }
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), M.skin[i % 3]); head.position.y = 0.95; g.add(head);
-      g.userData = { a: i * TAU / 3, r: 30 + i * 9, h: 20 + i * 3, sp: 0.045 - i * 0.008, cx: cx || 0, cz: cz || 0 }; world.add(g); balloons.push(g);
+      g.userData = { a: i * TAU / 3, r: 30 + i * 9, h: 20 + i * 3, sp: 0.045 - i * 0.008, cx: cx || 0, cz: cz || 0, dynamic: true }; world.add(g); balloons.push(g); mergeChildren(g);
     }
   }
   // 雲：n 團，圓心外 70 到 110 公尺、高 26 到 34，慢慢往 +x 飄。
   function addClouds(n, cx, cz) {
-    for (let i = 0; i < n; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 70 + rnd() * 40; g.position.set((cx || 0) + Math.cos(a) * d, 26 + rnd() * 8, (cz || 0) + Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; world.add(g); clouds.push(g); }
+    for (let i = 0; i < n; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 70 + rnd() * 40; g.position.set((cx || 0) + Math.cos(a) * d, 26 + rnd() * 8, (cz || 0) + Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; g.userData.dynamic = true; world.add(g); clouds.push(g); mergeChildren(g); }
   }
   // 樹、矮樹、小凳子、欄杆柱子：全部一次畫完（InstancedMesh）。頁面蓋完所有東西再叫一次。
   function flushInstances() {
@@ -566,6 +567,61 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const bush = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 10, 8), M.tree[1], Math.max(1, bushPlaces.length)); bushPlaces.forEach(([x, z, sc_], i) => { s3.set(sc_ * 1.1, sc_ * 0.8, sc_ * 1.1); m.compose(new THREE.Vector3(x, 0.3 * sc_, z), q, s3); bush.setMatrixAt(i, m); }); bush.count = bushPlaces.length; bush.instanceMatrix.needsUpdate = true; bush.castShadow = true; world.add(bush);
       const stool = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.2, 0.42, 10), M.wood, Math.max(1, stoolPlaces.length)); stoolPlaces.forEach(([x, z], i) => { m.makeTranslation(x, 0.21, z); stool.setMatrixAt(i, m); }); stool.count = stoolPlaces.length; stool.instanceMatrix.needsUpdate = true; stool.castShadow = true; world.add(stool); }
     { const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), M.dark, Math.max(1, postPlaces.length)); const m = new THREE.Matrix4(); postPlaces.forEach((pp, i) => { m.makeTranslation(pp[0], pp[1], pp[2]); im.setMatrixAt(i, m); }); im.count = postPlaces.length; im.instanceMatrix.needsUpdate = true; world.add(im); }
+  }
+
+  // ═══ 靜態的東西合併（2026-11-18）═══
+  // 同一種材質、同一個 60 公尺格子裡的靜態 Mesh 合成一個；24 個以下的小 InstancedMesh 也攤開合進去。
+  // 不碰：會動的（userData.dynamic，含它底下的）、點得到的（userData.sel）、有貼圖的、人（peoplePool）。頁面蓋完所有東西、加完人之後叫一次。
+  // 把一串 Mesh（含 InstancedMesh 的每一個 instance）烤成一個幾何：pre 是最後再乘上去的矩陣（合到世界用單位矩陣、合到某個 group 的本地用它的反矩陣）。
+  // rbox 是 ExtrudeGeometry，沒有 index，這裡自己補（2026-11-18 第一版漏了這個，六百多個圓角盒子全部沒合到）。
+  const bakeM = { nm: new THREE.Matrix3(), mw: new THREE.Matrix4(), im: new THREE.Matrix4(), v: new THREE.Vector3() };
+  function bake(list, pre) {
+    const { nm, mw, im, v } = bakeM; const pos = [], nor = [], idx = []; let off = 0;
+    for (const m of list) {
+      const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, reps = m.isInstancedMesh ? m.count : 1;
+      for (let k = 0; k < reps; k++) {
+        if (m.isInstancedMesh) { m.getMatrixAt(k, im); mw.multiplyMatrices(m.matrixWorld, im); } else mw.copy(m.matrixWorld);
+        if (pre) mw.premultiply(pre);
+        nm.getNormalMatrix(mw);
+        for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(mw); pos.push(v.x, v.y, v.z); v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize(); nor.push(v.x, v.y, v.z); }
+        if (g.index) { const ix = g.index.array; for (let i = 0; i < ix.length; i++) idx.push(ix[i] + off); } else for (let i = 0; i < p.count; i++) idx.push(i + off);
+        off += p.count;
+      }
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); geo.setIndex(idx);
+    return geo;
+  }
+  const mergeable = m => m.isMesh && !m.userData.peoplePool && !(m.isInstancedMesh && (m.count > 24 || m.instanceColor)) && !Array.isArray(m.material) && !m.material.map && m.geometry.attributes.position && m.geometry.attributes.normal;
+  const dynSet = root => { const dyn = new Set(); root.traverse(o => { if (o !== root && (o.userData.dynamic || (o.parent && dyn.has(o.parent)))) dyn.add(o); }); return dyn; };
+  // 同一種材質、同一個 60 公尺格子裡的靜態 Mesh 合成一個；24 個以下的小 InstancedMesh 也攤開合進去。
+  // 不碰：會動的（userData.dynamic，含它底下的）、點得到的（userData.sel）、有貼圖的、人。頁面蓋完所有東西、加完人之後叫一次。
+  function mergeStatic() {
+    const groups = new Map(); world.updateMatrixWorld(true); const dyn = dynSet(world);
+    world.traverse(m => {
+      if (!mergeable(m) || dyn.has(m) || m.userData.sel) return;
+      const key = m.material.uuid + "|" + (m.castShadow ? 1 : 0) + (m.receiveShadow ? 1 : 0) + "|" + Math.floor(m.matrixWorld.elements[12] / 60) + "," + Math.floor(m.matrixWorld.elements[14] / 60);
+      (groups.get(key) || groups.set(key, []).get(key)).push(m);
+    });
+    let merged = 0;
+    for (const list of groups.values()) {
+      if (list.length < 2 && !list[0].isInstancedMesh) continue;
+      const mesh = new THREE.Mesh(bake(list, null), list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; world.add(mesh);
+      for (const m of list) { m.parent.remove(m); merged++; }
+    }
+    shadowsDirty = true; return merged;
+  }
+  // 一個 group 底下的零件合成幾個（同材質一個），留在它的本地座標：會動的 group（摩天輪、纜車廂、旋轉木馬、船）整個一起動，底下的零件不用一個一個畫。
+  // sel 給了就把它寫到合成的那幾個上（房子要點得到）。底下再有 dynamic 的子樹不碰。回合成的那幾個 Mesh。
+  function mergeChildren(root, sel) {
+    root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(); const dyn = dynSet(root); const groups = new Map();
+    root.traverse(m => { if (m === root || !mergeable(m) || dyn.has(m)) return; const key = m.material.uuid + "|" + (m.castShadow ? 1 : 0); (groups.get(key) || groups.set(key, []).get(key)).push(m); });
+    const out = [];
+    for (const list of groups.values()) {
+      if (list.length < 2 && !list[0].isInstancedMesh) { if (sel) list[0].userData.sel = sel; out.push(list[0]); continue; }
+      const mesh = new THREE.Mesh(bake(list, inv), list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = true; if (sel) mesh.userData.sel = sel; root.add(mesh); out.push(mesh);
+      for (const m of list) m.parent.remove(m);
+    }
+    return out;
   }
 
   // ═══ 人：大頭 chibi（peopleKit，/history/ 的機場也用同一批人）═══
@@ -681,7 +737,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   const E = {
     THREE, canvas, renderer, scene, camera, world, sun, P, M, std, rnd, pickables, planes, boards, treePlaces, bushPlaces, stoolPlaces, postPlaces, coasters, beacons, boats, balloons, clouds, slides, walkers,
     rbox, roundPrism, rectPrism, polyPrism, hexPrism, groundMat, landmass, platform, flagpole, building, makePlane, bench, lamp, flowerbed, table, parasol, picnic, kiosk, planter, signboard, textPlane,
-    furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances,
+    furnish, plantTrees, decorate, bridge, arc, islet, addBoats, addBalloons, addClouds, flushInstances, mergeStatic, mergeChildren,
     makePerson, pose, addWalker, removeWalker, people,
     cam, setGoal, placeCam, orbitBy, snapCam, project, putPin, setHidden, pin, resize, render, hit, paintBoards, debugWalkers,
     get motionOn() { return motionOn; },

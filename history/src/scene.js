@@ -630,7 +630,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     world.traverse(m => {
       if (!m.isMesh || dyn.has(m) || m.userData.peoplePool) return;
       if (m.isInstancedMesh && m.count > 24) return;
-      const g = m.geometry, mt = m.material; if (!g.index || !g.attributes.position || !g.attributes.normal || Array.isArray(mt) || mt.map) return;
+      const g = m.geometry, mt = m.material; if (!g.attributes.position || !g.attributes.normal || Array.isArray(mt) || mt.map) return;
       const key = mt.uuid + "|" + (m.castShadow ? 1 : 0) + (m.receiveShadow ? 1 : 0) + "|" + Math.floor(m.matrixWorld.elements[12] / 80) + "," + Math.floor(m.matrixWorld.elements[14] / 80);
       (groups.get(key) || groups.set(key, []).get(key)).push(m);
     });
@@ -639,12 +639,13 @@ export function createScene({ canvas, palette, phone, fonts }) {
       if (list.length < 2 && !list[0].isInstancedMesh) continue;
       const pos = [], nor = [], idx = []; let off = 0;
       for (const m of list) {
-        const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, ix = g.index.array, reps = m.isInstancedMesh ? m.count : 1;
+        const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, ix = g.index ? g.index.array : null, reps = m.isInstancedMesh ? m.count : 1;
         for (let k = 0; k < reps; k++) {
           if (m.isInstancedMesh) { m.getMatrixAt(k, im); mw.multiplyMatrices(m.matrixWorld, im); } else mw.copy(m.matrixWorld);
           nm.getNormalMatrix(mw);
           for (let i = 0; i < p.count; i++) { tmpV.fromBufferAttribute(p, i).applyMatrix4(mw); pos.push(tmpV.x, tmpV.y, tmpV.z); tmpV.fromBufferAttribute(n, i).applyMatrix3(nm).normalize(); nor.push(tmpV.x, tmpV.y, tmpV.z); }
-          for (let i = 0; i < ix.length; i++) idx.push(ix[i] + off); off += p.count;
+          if (ix) for (let i = 0; i < ix.length; i++) idx.push(ix[i] + off); else for (let i = 0; i < p.count; i++) idx.push(i + off);   /* ExtrudeGeometry 沒有 index */
+          off += p.count;
         }
         m.parent.remove(m);
       }

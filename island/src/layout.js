@@ -112,13 +112,28 @@ function detourRaw(a, b, blockers, depth) {
 export function cameraOverview(phone) { const d = phone ? 125 : 96; return { pos: [0, d * 1.0, d * 0.72], target: [0, 0, 0], fit: [68, 48] }; }
 // 海上的裝飾小島（Paul 2026-11-17：「a couple of decorative islands on the side… a few roller coaster around」）：沒有功能、不能點、人不會去。
 // kind 決定畫什麼：coaster 雲霄飛車、lighthouse 燈塔、picnic 幾棵樹一張桌、palm 棕櫚、rock 礁石。位置跟每座島都隔得開（測試守）。
+// 2026-11-18 Paul：「add more coaster, add more stuff」：多了迴圈雲霄飛車（loop）、野鼠式小飛車（mouse）、摩天輪加旋轉木馬的遊樂小島（fair），
+// 這三種在 island/src/rides.js 畫（引擎的 islet() 只認前五種，scene.js 用 ENGINE_ISLETS 分）。礁石往東挪一點讓位給迴圈飛車。
 export const ISLETS = [
   { id: "coaster", kind: "coaster", x: -52, z: 26, r: 7.5 },
   { id: "lighthouse", kind: "lighthouse", x: -27, z: -45, r: 4 },
   { id: "picnic", kind: "picnic", x: 29, z: 41, r: 5 },
   { id: "palm", kind: "palm", x: -57, z: -17, r: 4 },
-  { id: "rock", kind: "rock", x: 63, z: -31, r: 3.5 },
+  { id: "rock", kind: "rock", x: 70, z: -20, r: 3.5 },
+  { id: "loop", kind: "loop", x: 62, z: -46, r: 9 },
+  { id: "mouse", kind: "mouse", x: -64, z: -44, r: 8.5 },
+  { id: "fair", kind: "fair", x: 60, z: 36, r: 10 },
 ];
+export const ENGINE_ISLETS = ["coaster", "lighthouse", "picnic", "palm", "rock"];
+// 纜車（Paul 2026-11-18：「a gondola over the whole island from airport all the way to curriculum」）：
+// 機場平台上的站 → 水上的塔（機場與 Marketing／Community Relations 之間）→ 聚會所東邊的塔 → 聚會所與 Curriculum 之間水上的塔 → Curriculum 北緣的塔 → Curriculum 旁水上架高的站。
+// 站與塔都在 11 公尺高，廂吊在纜繩下 2.6 公尺，比島上任何一棟房子都高。stilts 是哪幾站架在水上的柱子上。
+export const GONDOLA = { pts: [[53, 6.5], [31, -1], [8, -3], [-9, 10], [-22.5, 22], [-30, 26]], h: 11, stilts: [5], speed: 1.5, cabins: 12 };
+// 渡輪：在島群南邊的水道來回，兩頭各一座浮動碼頭。
+export const FERRY = { a: [-45, 50], b: [40, 50] };
+// 橋的樣式（0 木板、1 石拱、2 紅漆拱、3 繩索、4 滑水道）。
+// Paul 2026-11-18：「the water slide should be only at the commons」：滑水道只在聚會所那六條輻條上（三條滑水道三條別的輪流），外圍的環與機場的橋不用。
+export function bridgeStyle(br, i) { if (br.a === "commons" || br.b === "commons") return i % 2 === 0 ? 4 : [0, 1, 2][Math.floor(i / 2) % 3]; return [0, 1, 2, 3][i % 4]; }
 export function cameraIsland(island, phone) {
   const d = phone ? 38 : 32; const ux = island.x || 0, uz = island.z || 1; const n = Math.hypot(ux, uz) || 1;
   // 機場的平台是 24.7 × 19，鏡頭要退遠、再俯一點，跑道（在後半）才進得來。

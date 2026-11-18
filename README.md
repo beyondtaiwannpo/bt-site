@@ -4702,6 +4702,42 @@ Chrome 的效能紀錄說整趟捲完 layout shift 0.69（0.25 以上就算差�
 - **滾輪慢一點**：每站一屏半（之前一屏），7 站從 7209 px 變 10813 px；自動走的速度照站數算，不受影響。
 - 測試 942（鏡頭不穿牆那條照過：升起來那段從 0.34 起本來就在准許穿過空橋玻璃頂的範圍）、check.sh、check-motion、check-mobile 全過。
 
+## BT 島（2026-11-18：纜車、更多飛車、有人住的樣子）
+
+Paul 2026-11-18 凌晨跟機場那一批一起交代的：「add more details… add more coaster, add more stuff… maybe a gondola over the whole island from airport all the way to curriculum…
+the water slide should be only at the commons… make it like somebody is living in there… make it beautiful」。研究與對照表在 `docs/island/2026-11-18-島的生活感研究.md`。
+
+### 改了什麼
+
+- **纜車**（新檔 `island/src/rides.js`）：從機場平台上的站出發，過水上的塔、聚會所東邊的塔、聚會所與 Curriculum 之間水上的塔、Curriculum 北緣的塔，到 Curriculum 旁架在水上的站。
+  塔 11 公尺比島上任何一棟房子高，兩條纜繩去回接成閉環，十二個廂（青橘輪流、一半裡面有人）每秒 1.5 公尺輕輕晃著走，站有大輪、月台、排隊的人與一個操作員。路線的數字在 `layout.js` 的 `GONDOLA`。
+- **更多飛車**：原本那一座之外多了**迴圈雲霄飛車**（爬坡、俯衝、直立迴圈、兩個駝峰、傾斜彎，四節車、舉手的人，有車站與排隊）與**野鼠式小飛車**（平的急轉彎、三台單節車）；
+  再加一座**遊樂小島**：摩天輪（十二個廂一直是正的、一圈燈）、旋轉木馬（八匹馬上下）、票亭、燈、長凳。三座新小島在 `layout.js` 的 `ISLETS`（kind 是 loop、mouse、fair），引擎的 `islet()` 只認原本五種，新的由 rides.js 畫。
+  軌道的車交給引擎原本的 `E.coasters`（爬坡慢、下坡快），所以程式只負責畫軌道。
+- **渡輪**：在島群南邊的水道來回（`layout.js` 的 `FERRY`），兩頭各一座浮動碼頭，船上三個人，到頭停六秒再掉頭。
+- **滑水道只在聚會所**（`layout.js` 的 `bridgeStyle`）：聚會所那六條輻條三條滑水道三條別的輪流；外圍的環與機場的橋是木板、石拱、紅漆拱、繩索。
+- **有人住的樣子**（新檔 `island/src/life.js`）：每座 team 的島上兩間小店（雨棚、招牌、A 字立牌、窗台花、門口站著的人）、一台餐車（老闆加客人）、一座公車亭（站牌是 team 的顏色）、腳踏車架三台、郵筒、消防栓、分類桶、
+  晾衣繩（衣服會飄）、一座伸到海上的碼頭（兩艘停著的船、一個釣魚的人、浮標會晃）、平頂的房子加空調水塔天線、家的煙囪冒煙、花、岸邊的石頭、草叢；整片海兩群鳥繞著飛、翅膀會拍；機場多了行李車、油槽、會轉的雷達、走道的燈。
+  每一樣東西的位置記進 `blockersOf`（人走路會繞開），店門口、餐車前、公車亭的長凳記進 `poisOf`（人會走過去站著或坐著）。放的時候矮樹與燈那些小東西不算擋路，不然島上什麼都放不下（第一版一間店都沒放成）。
+  `?debug=1` 之後 console 裡 `__island._E.lifeStats` 看每一樣放了幾個（2026-11-18：店 14、餐車 7、公車亭 7、腳踏車架 7、晾衣繩 6、碼頭 6）。
+- 兩支新檔都**不 import three、不 import toy.js**：THREE 跟引擎 E 從 `scene.js` 傳進去（跟 /history/ 的 plane.js 同一招），check.sh 那兩條守門沒改。會動的東西每一幀從引擎 `motion()` 的 `tickExtra` 叫。
+- **效能**（`shared/toy.js`）：加完一幀 1217 個 draw call。引擎多了 `mergeStatic()`（同材質同 60 公尺格子的靜態 Mesh 合一、小的 InstancedMesh 攤開合進去；會動的、點得到的、有貼圖的、人不碰）
+  與 `mergeChildren(group, sel)`（一個會動的 group 底下的零件合成幾個、留在本地座標；給 sel 就還點得到，房子用這個）。圓角盒子 `rbox` 是 ExtrudeGeometry 沒有 index，烤的時候自己補（第一版漏了，六百多個沒合到）。
+  結果 **674 個 draw call、60 fps**（本機 Chrome 全景五秒，最糟一幀 34 ms）。/history/ 的 `mergeStatic` 也補了同一個 index 的修正。
+- 截圖：`docs/island/2026-11-18-overview.jpg`（全景）、`2026-11-18-mentorship-life.jpg`（一座島上的店與餐車）、`2026-11-18-commons-gondola.jpg`（聚會所與纜車）、`2026-11-18-fair-ferris.jpg`（遊樂小島）、`2026-11-18-loop-coaster.jpg`（迴圈飛車）。
+
+### 怎麼驗證
+
+1. `/island/`：全景看得到一條纜車線從機場跨過聚會所到 Curriculum 旁邊，廂在動；左下橘色飛車、右上青色迴圈飛車、左上角黃色小飛車、右下摩天輪都在轉。
+2. 點任何一座 team 的島：看得到兩間有雨棚的小店、一台餐車、一座公車亭、一座碼頭（有人釣魚）、晾衣繩在飄；人會走到店門口站著。
+3. 聚會所的六條橋有三條是滑水道，外圍的橋沒有滑水道。
+4. `node --test test/*.test.mjs`（942）、`./check.sh`、`node check-motion.mjs`、`node scripts/check-mobile.mjs` 都過（2026-11-18）。
+
+### 還沒做
+
+- 真的手機上沒量過（draw call 壓到 674，但三角形 1.3M 大半是人與迴圈飛車的管子）。
+- 纜車在 Curriculum 的塔放在島的北緣（本地 0, 9），有時候會跟 furnish 隨機放的桌椅擠在一起；要挪改 `layout.js` 的 `GONDOLA.pts[4]`。
+
 ## 歷史之路（2026-11-18：機場裡外照真的機場做）
 
 Paul 2026-11-18 凌晨（要去睡了，交代做完）：「everything, including what I said, the detail first… make like the shop, detail, layout, decoration… as detailed as possible… feels like an airport as much as it can… by the time I wake up, I want to see an airport with plenty of details in and out of the terminal」。
