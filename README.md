@@ -5082,6 +5082,8 @@ Paul：「Yes, batch C」。批 A 修錯的、批 B 修手感，這一批是兩�
 - **順便抓到一個舊 bug**：toy.js 第四批加的一句註解跟 `fly.position.set(...)`、`fly.userData.flight = { t: 0 }`、`planes.push(fly)` 寫在同一行，後面全被註解吞掉，
   機場那架飛機從第四批起就沒飛過（`E.planes` 是空的）。拆成兩行就好了。
 
+- 收尾（Paul「fix the end card overlapping the header」）：追鏡拉遠之後最後一站的卡浮到頂欄上。`main.js` 的 `placeCards` 現在把卡的底夾在「卡高加 86」以下（`measureCards` 多量 `_h`），整張卡在頂欄底下。
+
 測試 944、`check.sh` 全過；歷史之路 61 fps、島 453 draw call。手機真機還是沒量。
 
 ## 歷史之路（2026-11-17 晚上：機場要像真的機場）

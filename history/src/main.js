@@ -60,12 +60,12 @@ function placeCards() {
     if (!p.visible) return;
     // 卡不准被畫面左右切掉（手機上那一站可能靠邊）：夾在邊界內，尾巴可以歪一點沒關係。
     const half = (c._w || 280) / 2 + 10;
-    const x = Math.round(Math.min(W - half, Math.max(half, p.x)) * 2) / 2, y = Math.round(Math.max(90, p.y - 8) * 2) / 2;
+    const x = Math.round(Math.min(W - half, Math.max(half, p.x)) * 2) / 2, y = Math.round(Math.max((c._h || 60) + 86, p.y - 8) * 2) / 2;   // 整張卡要在頂欄底下
     if (c._x === x && c._y === y) return;
     c._x = x; c._y = y; c.style.translate = `${x}px ${y}px`;
   });
 }
-function measureCards() { for (const c of cardEls) c._w = c.offsetWidth || 280; }
+function measureCards() { for (const c of cardEls) { c._w = c.offsetWidth || 280; c._h = c.offsetHeight || 60; } }
 function renderStrip() {
   $("strip").innerHTML = UI.stripHTML(stops, current, lang);
   measureStrip(); placeDot();

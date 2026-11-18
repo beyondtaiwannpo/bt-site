@@ -640,7 +640,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     const tod = smooth(clamp01((e - 0.45) / 0.55));
     sun.color.copy(P.cream).lerp(P.orange, tod * 0.55); sun.intensity = lerp(1.7, 1.5, tod); hemi.color.copy(P.sky).lerp(P.orange, tod * 0.22);
     SUN_OFF.set(lerp(-110, -230, tod), lerp(170, 55, tod), lerp(-70, -30, tod)); sun.position.copy(lookV).add(SUN_OFF);
-    // 鏡頭穿雲：離哪一團雲 26 公尺內霧變濃變白（整個畫面白一下）。
+    // 鏡頭穿雲：離雲 26 公尺內霧變濃變白。
     let fl = 0; for (const cl of clouds) { const d = camera.position.distanceTo(cl.position); if (d < 26) fl = Math.max(fl, 1 - d / 26); }
     trailM.opacity = 0.5 * smooth(clamp01((lift - 0.04) / 0.3));
     scene.background.copy(P.sky).lerp(P.orange, tod * 0.3 * (1 - lift)).lerp(P.skyHigh, lift * 0.85).lerp(P.cloud, fl); scene.fog.color.copy(scene.background).lerp(P.sky, 0.3 * (1 - fl));
