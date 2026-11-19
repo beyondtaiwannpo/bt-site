@@ -130,10 +130,10 @@ export const ENGINE_ISLETS = ["coaster", "lighthouse", "picnic", "palm", "rock"]
 // 纜車（Paul 2026-11-18：「a gondola over the whole island from airport all the way to curriculum」）：
 // 機場平台上的站 → 水上的塔（機場與 Marketing／Community Relations 之間）→ 聚會所東邊的塔 → 聚會所與 Curriculum 之間水上的塔 → Curriculum 北緣的塔 → Curriculum 旁水上架高的站。
 // 站與塔都在 11 公尺高，廂吊在纜繩下 2.6 公尺，比島上任何一棟房子都高。stilts 是哪幾站架在水上的柱子上。
-export const GONDOLA = { pts: [[53, 13], [31, -6], [8, -3], [-9, 10], [-22.5, 22], [-30, 26]], h: 11, stilts: [0, 5], speed: 1.5, cabins: 12 };
+export const GONDOLA = { pts: [[53, 15.2], [34, 11], [8, -3], [-9, 10], [-22.5, 22], [-31.5, 28.5]], h: 11, stilts: [0, 5], speed: 1.5, cabins: 12 };   // 批 F：第一跨留在機場平台北邊（之前斜切跑道），兩站都離岸一點、各自一段棧橋
 // 渡輪：在島群南邊的水道來回，兩頭各一座浮動碼頭。
 // 渡輪（批 D）：之前兩座碼頭都在空海上，離陸地 10 公尺以上，看起來是「一艘船在空海來回」。現在從野餐小島東岸到遊樂小島西岸，la、lb 是各自靠的那座島的中心（碼頭朝它）。
-export const FERRY = { a: [35.5, 45], b: [48.5, 41], la: [29, 41], lb: [60, 36] };
+export const FERRY = { a: [35.5, 45], b: [46.5, 41.6], la: [29, 41], lb: [60, 36] };   // b 退 2 公尺，船頭不再陷進遊樂小島的崖
 // 帆船（2026-11-18 第二批，sea.js 畫）：四艘各自在一片空水域繞橢圓。cx cz 是橢圓中心、rx rz 是兩個半徑、u0 是起點。
 // 四片水域：北邊（燈塔與迴圈飛車之間）、西南（雲霄飛車與渡輪航線之間）、東邊（Community Relations 與遊樂小島之間）、西邊（Internship 與棕櫚小島之間）。
 // 橢圓上每一點離每座島、每座小島、渡輪航線都要有 2 公尺以上（test/island.test.mjs 守）。

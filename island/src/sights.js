@@ -137,7 +137,7 @@ export function buildSights(THREE, E, c) {
       for (const lx of [0.47, -0.45]) bike.add(mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 10), M.dark, lx, 0.22, 0, false).rotateX(Math.PI / 2));
       E.mergeChildren(bike);
       const rider = sit(person(bike, -0.2, 0, Math.PI / 2, { shirt: 0, scale: 1.0 / S, hat: true }), 0.6); rider.userData.parts.armL.rotation.x = -1.3; rider.userData.parts.armR.rotation.x = -1.3;
-      let th = 1.0; const inset = 1.35;
+      let th = 1.0; const inset = 2.6;
       ticks.push((dt, t) => { const R = edgeR(T.isl, th) - inset; th -= dt * 2.3 / R; const p = { x: Math.cos(th) * R, z: Math.sin(th) * R }; const R2 = edgeR(T.isl, th - 0.03) - inset; const q = { x: Math.cos(th - 0.03) * R2, z: Math.sin(th - 0.03) * R2 };
         grp.position.set(p.x, 0, p.z); grp.rotation.y = -Math.atan2(q.z - p.z, q.x - p.x); bike.rotation.x = 0.12 + Math.sin(t * 9) * 0.01; });
       break;

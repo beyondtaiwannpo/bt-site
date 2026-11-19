@@ -8,7 +8,7 @@ export function buildTraffic(THREE, c) {
   {
     const pl = buildAirliner(THREE, { body: P.cream, tail: P.teal, mark: P.navy, dark: P.dark }); shadowOn(pl); dyn(pl); world.add(pl); setGear(pl, 1);
     pl.rotation.y = -Math.PI / 2; pl.rotation.order = "YXZ";   // 機頭朝 -x（跟我們起飛同一個方向）；先航向再俯仰
-    const T = 110, ease = u => u * u * (3 - 2 * u), EX = [-495, R.z, -555, R.z - 100], EXY = Math.atan2(EX[2] - EX[0], EX[3] - EX[1]);
+    const T = 110, ease = u => u * u * (3 - 2 * u), EX = [-495, R.z, -582, R.z - 50], EXY = Math.atan2(EX[2] - EX[0], EX[3] - EX[1]);
     { const ex = box(16, 0.04, 122, mats.taxi, (EX[0] + EX[2]) / 2, 0.012, (EX[1] + EX[3]) / 2, false); ex.rotation.y = EXY; world.add(ex); const cl = box(0.3, 0.04, 110, mats.yellowLight, (EX[0] + EX[2]) / 2, 0.05, (EX[1] + EX[3]) / 2, false); cl.rotation.y = EXY; world.add(cl); }
     // 批 B：觸地前 15% 拉平（flare）、觸地之後從進場的速度減到滑行速度、一路滾到 x -615 才消失（之前觸地反而加速 1.9 倍、跑到一半消失）。
     movers.push({ fn: (t, e) => {
@@ -20,11 +20,11 @@ export function buildTraffic(THREE, c) {
       else pl.visible = false;
     } });
   }
-  // ═══ 在跑道頭等起飛的那一架（x 345、z 330，機頭朝跑道）：防撞信標紅燈一秒閃一次 ═══
+  // ═══ 在跑道頭等起飛的那一架（x 190、z 330）：防撞信標紅燈一秒閃一次 ═══
   {
     const pad = new THREE.Mesh(new THREE.PlaneGeometry(70, 90), mats.taxi); pad.rotation.x = -Math.PI / 2; pad.position.set(190, 0.02, 329); pad.receiveShadow = true; world.add(pad);   // 等待區的水泥（不然飛機停在草地上）
     const stub = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), mats.taxi); stub.rotation.x = -Math.PI / 2; stub.position.set(160, 0.02, 300); world.add(stub);
-    world.add(box(0.3, 0.02, 80, mats.yellowLight, 190, 0.05, 334, false), box(26, 0.02, 0.5, mats.yellowLight, 190, 0.05, 362, false));   // 中線與等待線
+    world.add(box(0.3, 0.02, 80, mats.yellowLight, 190, 0.05, 334, false), box(26, 0.02, 0.5, mats.yellowLight, 190, 0.05, 326, false));   // 中線與等待線（離跑道中線 74 公尺，跟滑行道那條一樣）
     const pl = buildAirliner(THREE, { body: P.cream, tail: P.orange, mark: P.navy, dark: P.dark }); shadowOn(pl); pl.position.set(190, A.PLANE_REST_Y, 330); pl.rotation.y = 0; world.add(pl);
     const bk = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), lam(P.orange.clone().lerp(P.navy, 0.2), { emissive: P.orange, emissiveIntensity: 2 })); dyn(bk); bk.position.set(190, A.PLANE_REST_Y + 4.6, 330); world.add(bk);
     movers.push({ fn: t => { bk.visible = (t % 1.2) < 0.25; } });
@@ -37,10 +37,10 @@ export function buildTraffic(THREE, c) {
   }
   // ═══ 餐勤車在 B2（x 47）升降台升上去又下來；B4（x 82）的推機車頂在機鼻前 ═══
   {
-    const ct = truck(mats, false); ct.position.set(47 - 6, 0, 42); ct.rotation.y = Math.PI / 2; world.add(ct);
+    const ct = truck(mats, false); ct.position.set(32 - 6, 0, 42); ct.rotation.y = Math.PI / 2; world.add(ct);
     const lift = box(2.2, 2.4, 3.6, mats.cream, 0, 2.4, -1.0); dyn(lift); ct.add(lift); const legs = instanced(new THREE.BoxGeometry(0.15, 2.4, 0.15), mats.grey, [[-0.9, 1.2, 0.6], [0.9, 1.2, 0.6], [-0.9, 1.2, -2.6], [0.9, 1.2, -2.6]], false); dyn(legs); ct.add(legs);
     movers.push({ fn: t => { const u = (t * 0.08) % 2, h = (u < 1 ? u : 2 - u) * 2.6; lift.position.y = 2.4 + h; legs.scale.y = 1 + h / 2.4; legs.position.y = h / 2; } });
-    const pb = truck(mats, false); pb.scale.setScalar(0.8); pb.position.set(82 + 7, 0, 29); pb.rotation.y = Math.PI; world.add(pb);
+    const pb = truck(mats, false); pb.scale.setScalar(0.8); pb.position.set(99 + 7, 0, 29); pb.rotation.y = Math.PI; world.add(pb);
   }
   // ═══ 兩群鳥（每群七隻，翅膀是兩片小板子，拍動；整群繞著停機坪上空轉）═══
   {
@@ -57,14 +57,14 @@ export function buildTraffic(THREE, c) {
   // ═══ 航廈門口三面旗（橘、青、深藍）在飄 ═══
   {
     const flags = [];
-    [[-37, mats.orange], [-31, mats.teal], [-25, mats.navy]].forEach(([x, mt], i) => { world.add(cyl(0.08, 0.1, 10, mats.grey, x, 5, -44.5, 6)); const f = box(2.4, 1.4, 0.05, mt, 0, 0, 0, false); dyn(f); f.position.set(x + 1.2, 9.2, -44.5); world.add(f); flags.push([f, i]); });
+    [[-37, mats.orange], [-31, mats.teal], [-25, mats.navy]].forEach(([x, mt], i) => { world.add(cyl(0.08, 0.1, 10, mats.grey, x, 5, -56, 6)); const f = box(2.4, 1.4, 0.05, mt, 0, 0, 0, false); dyn(f); f.position.set(x + 1.2, 9.2, -56); world.add(f); flags.push([f, i]); });
     movers.push({ fn: t => { for (const [f, i] of flags) { f.rotation.y = Math.sin(t * 2.2 + i) * 0.35; f.scale.x = 0.85 + Math.sin(t * 4 + i) * 0.15; } } });
   }
   // ═══ 不動的：滑行道藍邊燈、綠中線燈、等待線、跑道白燈、門檻燈、加油井蓋、貨運坪 ═══
   {
     const blue = [], white = [], thr = [], green = [];
-    for (let s = 20; s < tw.length - 70; s += 10) { const a = tw.at(s), nx = Math.cos(a.yaw), nz = -Math.sin(a.yaw); blue.push([a.x + nx * 9.8, 0.3, a.z + nz * 9.8], [a.x - nx * 9.8, 0.3, a.z - nz * 9.8]); }
-    for (let s = 20; s < tw.length - 60; s += 7.5) { const a = tw.at(s); green.push([a.x, 0.12, a.z]); }
+    for (let s = 20; s < tw.length - 120; s += 10) { const a = tw.at(s), nx = Math.cos(a.yaw), nz = -Math.sin(a.yaw); blue.push([a.x + nx * 9.8, 0.3, a.z + nz * 9.8], [a.x - nx * 9.8, 0.3, a.z - nz * 9.8]); }
+    for (let s = 20; s < tw.length - 120; s += 7.5) { const a = tw.at(s); green.push([a.x, 0.12, a.z]); }
     world.add(instanced(new THREE.SphereGeometry(0.26, 6, 5), lam(P.teal, { emissive: P.teal, emissiveIntensity: 1.8 }), green, false));
     { const hs = tw.length - 130, h = tw.at(hs); const bar = (ds, w, dash) => { const q = tw.at(hs + ds); for (let k = 0; k < (dash ? 6 : 1); k++) { const b = box(dash ? 1.8 : 18, 0.04, w, mats.yellowLight, 0, 0.06, 0, false); b.rotation.y = q.yaw + Math.PI / 2; const nx = Math.cos(q.yaw), nz = -Math.sin(q.yaw), o = dash ? -7.5 + k * 3 : 0; b.position.set(q.x + nx * o, 0.06, q.z + nz * o); world.add(b); } }; bar(-1.2, 0.3); bar(-0.5, 0.3); bar(0.5, 0.3, true); bar(1.2, 0.3, true); void h; }
     for (let x = R.x0; x <= R.x1; x += 60) white.push([x, 0.3, R.z - R.half - 1.5], [x, 0.3, R.z + R.half + 1.5]);

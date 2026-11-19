@@ -10,7 +10,7 @@ export function buildTerminal(THREE, c) {
   const sign = makeSign(THREE, { textTexture, lam, P, fonts, parent: term });
   // 吊牌：深藍的板子加兩條吊桿，正面朝 -x（迎著走過來的人）。
   function hanging(x, z, en, zh, arrow) {
-    term.add(box(4.4, 1.1, 0.14, mats.navy, x, 4.7, z, false), instanced(new THREE.CylinderGeometry(0.03, 0.03, T.h - 6.3, 5), mats.grey, [[x, 4.7 + 0.55 + (T.h - 6.3) / 2, z - 1.6], [x, 4.7 + 0.55 + (T.h - 6.3) / 2, z + 1.6]], false));
+    term.add(box(4.4, 1.1, 0.14, mats.navy, x, 4.7, z, false), instanced(new THREE.CylinderGeometry(0.03, 0.03, T.h - 5.9, 5), mats.grey, [[x, 4.7 + 0.55 + (T.h - 5.9) / 2, z - 1.6], [x, 4.7 + 0.55 + (T.h - 5.9) / 2, z + 1.6]], false));
     sign(en, zh, 4.2, 1.0, palette.navy, palette.cream, x - 0.08, 4.7, z, -Math.PI / 2, { arrow });
   }
   // 拉帶欄柱：一串點，柱子加帶子。
@@ -28,11 +28,11 @@ export function buildTerminal(THREE, c) {
   // ═══ A. 陸側大廳（x -40 到 -1）═══
   // 入口：陸側牆上三道玻璃門（深藍框、淡青玻璃，貼在牆內側）、上方「DEPARTURES 出境」大字、兩側各一面航班資訊大螢幕。
   {
-    const z = T.z0 + 0.5, x0 = -31;
+    const z = T.z0 + 0.5, x0 = -4;   /* 入口在航空公司牆（x -38 到 -14）東邊，之前三道門畫在那面牆的體積裡 */
     for (const dx of [-3.2, 0, 3.2]) { term.add(box(3.0, 3.4, 0.2, mats.navy, x0 + dx, 1.7, z, false)); const g = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.9), mats.glass); g.position.set(x0 + dx, 1.6, z + 0.12); term.add(g); }
     term.add(box(10.4, 0.5, 0.3, mats.navy, x0, 3.65, z, false));
     sign("DEPARTURES", "出境大廳", 9.6, 1.6, palette.navy, palette.cream, x0, 5.1, z + 0.2, 0);
-    for (const x of [-38.2, -22.2]) { term.add(box(4.2, 2.3, 0.3, mats.frame, x, 3.0, z, false)); sign("FLIGHT INFORMATION", "航班資訊", 3.8, 1.9, palette.navy, palette.yellow, x, 3.0, z + 0.2, 0, { size: 150 }); }
+    for (const x of [-11.8]) { term.add(box(4.2, 2.3, 0.3, mats.frame, x, 3.0, z, false)); sign("FLIGHT INFORMATION", "航班資訊", 3.8, 1.9, palette.navy, palette.yellow, x, 3.0, z + 0.2, 0, { size: 150 }); }
     // 入口旁：推車停放處（兩排二十台）、行李打包機、兩台 ATM、外幣兌換小亭。
     const carts = []; for (let i = 0; i < 10; i++) carts.push([-38.6 + i * 0.5, 0.5, -31.5], [-38.6 + i * 0.5, 0.5, -29.9]);
     term.add(instanced(new THREE.BoxGeometry(0.7, 0.9, 1.0), mats.grey, carts, false), instanced(new THREE.BoxGeometry(0.7, 0.05, 0.6), mats.navy, carts.map(([x, , z]) => [x, 0.3, z]), false));
@@ -52,8 +52,8 @@ export function buildTerminal(THREE, c) {
     for (let i = 0; i < 12; i += 2) person(-37 + i * 2, -35.6, 0, { shirt: P.navy, staff: true });
     // 前四個櫃台前面 Z 字形排隊（三折），有九個人在排；後面幾個櫃台是空的，才像真的。
     stanchions([[-38.2, -32.6], [-30.8, -32.6], [-30.8, -31.2], [-38.2, -31.2], [-38.2, -29.8], [-30.8, -29.8]]);
-    let k = 7; for (const [x, z] of [[-36.5, -33.3], [-35.3, -33.3], [-32.8, -33.3], [-31.6, -31.9], [-33.6, -31.9], [-36, -31.9], [-37.4, -30.5], [-34.5, -30.5], [-31.8, -30.5]]) person(x, z, z < -32 ? 0 : Math.PI / 2, { shirt: pick(k), bag: k % 2 === 0, backpack: k % 3 === 0 }), k++;
-    for (const [x, z] of [[-26, -33.4], [-20, -33.4], [-19, -32.2]]) person(x, z, 0, { shirt: pick(k++), bag: true });
+    let k = 7; for (const [x, z] of [[-36.5, -33.3], [-35.3, -33.3], [-32.8, -33.3], [-31.6, -31.9], [-33.6, -31.9], [-36, -31.9], [-37.4, -30.5], [-34.5, -30.5], [-31.8, -30.5]]) person(x, z, z < -32 ? Math.PI : Math.PI / 2, { shirt: pick(k), bag: k % 2 === 0, backpack: k % 3 === 0 }), k++;
+    for (const [x, z] of [[-26, -33.4], [-20, -33.4], [-19, -32.2]]) person(x, z, Math.PI, { shirt: pick(k++), bag: true });
     // 行李託運兩台（x -11、-9）、自助報到機八台（背靠背四組，x -12 到 -6、z -27 與 -25）。
     term.add(instanced(new THREE.BoxGeometry(1.8, 1.1, 1.2), mats.teal, [[-11, 0.55, -34.5], [-9, 0.55, -34.5]]), instanced(new THREE.BoxGeometry(1.9, 0.08, 1.4), mats.cream, [[-11, 1.14, -34.5], [-9, 1.14, -34.5]], false));
     sign("BAG DROP", "行李託運", 3.6, 0.9, palette.teal, palette.cream, -10, 3.0, T.z0 + 0.32, 0);
@@ -99,11 +99,11 @@ export function buildTerminal(THREE, c) {
     // 托盤台（安檢後）與托盤：x 6.5，兩邊各一台；人體掃描門在 z -23 那條。
     for (const z of [-26.2, -14.4]) { term.add(box(4.0, 0.9, 1.0, mats.grey, 7.5, 0.45, z), instanced(new THREE.BoxGeometry(0.5, 0.08, 0.4), mats.grey, Array.from({ length: 6 }, (_, i) => [6 + (i % 3) * 0.6, 0.96 + Math.floor(i / 3) * 0.1, z + 0.2]), false)); }
     term.add(cyl(1.1, 1.1, 2.4, mats.cream, 2.5, 1.2, -23, 12, true), box(1.4, 0.5, 2.0, mats.navy, 2.5, 2.6, -23, false));
-    // 批 D：安檢區兩側的玻璃隔牆（之前 z -40 到 -27 與 -13 到 0 整個開著，安檢等於沒圍）；安檢之後是證照查驗（國際機場少不了），三座櫃台在 x 14，鏡頭從中間 z -20 過。
+    // 安檢區兩側的玻璃隔牆；安檢之後是證照查驗。
     for (const [z0, z1] of [[-40, -31.8], [-8.2, 0]]) term.add(box(0.12, 3.0, z1 - z0, mats.glass, 1.0, 1.5, (z0 + z1) / 2, false), box(0.12, 0.2, z1 - z0, mats.frame, 1.0, 3.05, (z0 + z1) / 2, false));
-    for (const z of [-27.5, -24.5, -15.5, -12.5]) { term.add(box(2.2, 1.1, 1.4, mats.navy, 14, 0.55, z), box(2.4, 0.08, 1.6, mats.cream, 14, 1.12, z, false), box(0.5, 0.4, 0.06, mats.dark, 14.6, 1.4, z, false)); person(14, z - 0.9, 0, { shirt: pick(k++), staff: true }); }
-    sign("IMMIGRATION", "證照查驗", 4.4, 1.0, palette.navy, palette.cream, 14, 5.4, -20.5, -Math.PI / 2);
-    term.add(instanced(new THREE.CylinderGeometry(0.03, 0.03, T.h - 7.4, 5), mats.grey, [[14, 5.9 + (T.h - 7.4) / 2, -22.1], [14, 5.9 + (T.h - 7.4) / 2, -18.9]], false));
+    for (const [z, oz] of [[-22.8, -0.9], [-17.2, 0.9]]) { term.add(box(2.2, 1.1, 1.4, mats.navy, 11, 0.55, z), box(2.4, 0.08, 1.6, mats.cream, 11, 1.12, z, false), box(0.5, 0.4, 0.06, mats.dark, 11.6, 1.4, z, false)); person(11, z + oz, oz < 0 ? 0 : Math.PI, { shirt: pick(k++), staff: true }); }   /* 在 x 11：托盤台（到 9.5）之後、走道上來回的人的車道（8 與 10 起）之前；官員面向鏡頭那條 */
+    sign("IMMIGRATION", "證照查驗", 4.4, 1.0, palette.navy, palette.cream, 11, 5.4, -20.5, -Math.PI / 2);
+    term.add(instanced(new THREE.CylinderGeometry(0.03, 0.03, T.h - 7.4, 5), mats.grey, [[11, 5.9 + (T.h - 7.4) / 2, -22.1], [11, 5.9 + (T.h - 7.4) / 2, -18.9]], false));
   }
 
   // ═══ C. 空側（x 6 到 125）═══
@@ -183,7 +183,7 @@ export function buildTerminal(THREE, c) {
     term.add(instanced(new THREE.CylinderGeometry(0.08, 0.1, 2.0, 6), mats.grey, poles, false), instanced(new THREE.BoxGeometry(1.2, 0.9, 0.12), mats.dark, scr, false), instanced(new THREE.BoxGeometry(1.1, 0.75, 0.14), mats.light, scr, false));
     term.add(instanced(new THREE.BoxGeometry(0.5, 0.9, 0.5), mats.teal, binsA, false), instanced(new THREE.BoxGeometry(0.5, 0.9, 0.5), mats.orange, binsB, false), instanced(new THREE.BoxGeometry(0.5, 0.9, 0.5), mats.navy, binsC, false)); }
   // 兒童遊戲區（x 104 到 110，靠玻璃）：橘色軟墊、小滑梯、三塊積木、兩個小孩。
-  { const x = 120, z = -3.6;   // 2026-11-18：原本在 107，鏡頭往門的斜線會穿過遊戲區 term.add(box(6, 0.12, 4, mats.orange, x, 0.06, z, false), box(1.2, 1.0, 1.2, mats.teal, x - 1.8, 0.5, z - 0.8), instanced(new THREE.BoxGeometry(0.5, 0.5, 0.5), mats.navy, [[x + 1.2, 0.25, z + 1.0], [x + 1.8, 0.25, z + 1.0], [x + 1.5, 0.75, z + 1.0]], false));
+  { const x = 120, z = -3.6; /* 原本在 107，鏡頭往門的斜線會穿過遊戲區 */ term.add(box(6, 0.12, 4, mats.orange, x, 0.06, z, false), box(1.2, 1.0, 1.2, mats.teal, x - 1.8, 0.5, z - 0.8), instanced(new THREE.BoxGeometry(0.5, 0.5, 0.5), mats.navy, [[x + 1.2, 0.25, z + 1.0], [x + 1.8, 0.25, z + 1.0], [x + 1.5, 0.75, z + 1.0]], false));
     const sl = box(0.9, 0.08, 2.2, mats.cream, x - 0.4, 0.55, z + 0.5, false); sl.rotation.x = 0.45; term.add(sl);
     for (const [kx, kz, ry] of [[x + 0.6, z - 1.0, 0.8], [x - 2.2, z + 1.3, -2.2]]) { const f = person(kx, kz, ry, { shirt: pick(kx), backpack: true }); f.scale.setScalar(0.68); }
     sign("KIDS", "兒童遊戲區", 2.4, 0.6, palette.orange, palette.navy, x, 2.2, z - 2.0, Math.PI); term.add(cyl(0.04, 0.04, 1.9, mats.grey, x, 0.95, z - 2.1, 5)); }
@@ -201,6 +201,6 @@ export function buildTerminal(THREE, c) {
   { for (const [x, z, ry] of [[44, -31.8, 0.4], [86, -11.4, 2.6]]) { person(x, z, ry, { shirt: P.teal, staff: true }); term.add(box(0.8, 0.9, 0.6, mats.grey, x + 0.8, 0.5, z, false), box(0.1, 1.1, 0.1, mats.grey, x + 0.8, 1.3, z - 0.2, false), cyl(0.18, 0.15, 0.4, mats.orange, x + 0.8, 1.15, z, 8)); }
     for (const [off, k] of [[0, 0], [1.3, 1], [2.6, 2]]) { const f = figure(mats, { shirt: P.navy, staff: true, bag: true }); f.userData.baseY = 0; f.userData.w = { x0: 6 + off, x1: 104 + off, z: -22.6 + (k % 2) * 0.9, sp: 1.25 }; term.add(f); walkers.push(f); }
     person(50, -2.6, 0.2, { shirt: pick(7), backpack: true }); term.add(box(0.2, 0.14, 0.3, mats.dark, 50.1, 1.35, -2.3, false));
-    const kid = person(31, -16, Math.PI / 2, { shirt: pick(8) }); kid.scale.setScalar(0.68); person(30.2, -16.6, Math.PI / 2, { shirt: pick(9), bag: true }); }
+    const kid = person(31, -18.4, Math.PI / 2, { shirt: pick(8) }); kid.scale.setScalar(0.68); person(30.2, -19.0, Math.PI / 2, { shirt: pick(9), bag: true }); }
   return { tick: null, made };
 }

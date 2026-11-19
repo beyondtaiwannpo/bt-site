@@ -35,7 +35,7 @@ export function buildLife(THREE, E, c) {
       s.add(mesh(rbox(2.8, 2.3, 2.2, 0.12), wallM, 0, 1.15, 0), mesh(new THREE.ConeGeometry(2.0, 1.2, 4), k ? M.navy : M.orange, 0, 2.9, 0).rotateY(Math.PI / 4));
       const awn = mesh(rbox(3.0, 0.08, 1.2, 0.03), awnM, 0, 1.9, 1.55, false); awn.rotation.x = 0.35; s.add(awn);
       for (let i = 0; i < 4; i++) s.add(mesh(rbox(0.7, 0.3, 0.05, 0.02), i % 2 ? M.white : awnM, -1.05 + i * 0.7, 1.55, 2.1, false));
-      s.add(mesh(rbox(0.7, 1.3, 0.08, 0.05), M.dark, -0.7, 0.65, 1.14, false), mesh(rbox(0.9, 0.7, 0.08, 0.06), M.light, 0.6, 1.2, 1.14, false));
+      s.add(mesh(rbox(0.7, 1.66, 0.08, 0.05), M.dark, -0.7, 0.83, 1.14, false), mesh(rbox(0.9, 0.7, 0.08, 0.06), M.light, 0.6, 1.2, 1.14, false));   /* 門 1.76 高，人 1.8 才進得去 */
       s.add(mesh(rbox(0.9, 0.2, 0.3, 0.04), M.wood, 0.6, 0.85, 1.25, false), mesh(new THREE.SphereGeometry(0.11, 6, 5), M.orange, 0.4, 1.0, 1.25, false), mesh(new THREE.SphereGeometry(0.11, 6, 5), M.yellow, 0.75, 1.0, 1.25, false));
       s.add(mesh(rbox(0.1, 0.1, 0.9, 0.02), M.dark, 1.45, 2.1, 0.9, false), mesh(rbox(0.06, 0.6, 0.8, 0.03), k ? M.yellow : M.navy, 1.5, 1.65, 1.2, false));
       const ab = new THREE.Group(); ab.position.set(-1.0, 0, 2.0); s.add(ab); for (const sgn of [-1, 1]) { const bd = mesh(rbox(0.5, 0.7, 0.04, 0.02), M.cream, 0, 0.35, sgn * 0.12, false); bd.rotation.x = sgn * 0.3; ab.add(bd); }
@@ -127,7 +127,7 @@ export function buildLife(THREE, E, c) {
     const radar = new THREE.Group(); radar.userData.dynamic = true; radar.position.set(10.5, 0, -8.5); g.add(radar);
     radar.add(mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 6), M.dark, 0, 1.1, 0, false)); const dish = mesh(rbox(1.6, 0.4, 0.08, 0.04), M.cream, 0, 2.4, 0, false); radar.add(dish);
     ticks.push((dt) => { radar.rotation.y += dt * 1.4; });
-    for (const x of [-7, 0, 7]) { const l = E.lamp(); l.position.set(x, 0, 8.6); g.add(l); }
+    for (const x of [-8, -2, 4]) { const l = E.lamp(); l.position.set(x, 0, 8.6); g.add(l); }
   }
   return { tick: (dt, t) => { for (const f of ticks) f(dt, t); } };
 }

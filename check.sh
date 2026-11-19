@@ -2189,5 +2189,14 @@ else
   bad "時區地名別名兩份不一樣：availability/src/tz-alias.js 與 settings/src/tz-alias.js 要一起改"
 fi
 
+# 行尾的 // 註解把同一行後面的程式吞掉（2026-11-18 批 D 的 rides.js、批 F 抓到的 terminal.js 與 scene.js 都是這樣，語法合法所以 parse test 抓不到）。
+# 規矩：一行裡後面還有程式的用 /* */。這裡抓「// 之後同一行還出現 .add( 或 .push( 或 world.add」。
+if grep -nE '//[^/]*[^:]\b(term|world|g|gA|gB|grp|s|f|h|wheel|inner|train)\.(add|push)\(' history/src/*.js island/src/*.js shared/toy.js | grep -vE '/\*|https?:' | grep -qE '//.*\.(add|push)\('; then
+  bad "行尾 // 註解之後同一行還有 .add( 或 .push(（程式被註解吞掉）：" ; grep -nE '//[^/]*\b(term|world|g|gA|gB|grp|s|f|h|wheel|inner|train)\.(add|push)\(' history/src/*.js island/src/*.js shared/toy.js | grep -vE '/\*|https?:' | cut -c1-140
+else
+  ok "沒有行尾 // 註解吞掉同一行程式的（.add( / .push( 不在 // 之後）"
+fi
+
+
 [ $fail -eq 0 ] && say "" && say "全部通過。" || { say ""; say "有項目未通過。"; }
 exit $fail

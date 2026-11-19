@@ -162,7 +162,7 @@ export function buildTown(THREE, E, c) {
   const rimAt = (isl, th, inset) => { const R = edgeR(isl, th) - inset; return { x: Math.cos(th) * R, z: Math.sin(th) * R }; };
   const walkerLoop = (id, speed, inset, phase0, build) => { const T = bySpot.get(id); if (!T || T.isl.shape === "rect") return ""; const grp = new THREE.Group(); grp.userData.dynamic = true; T.g.add(grp); const out = build(grp); let th = phase0;
     ticks.push((dt, t) => { const R = edgeR(T.isl, th) - inset; th += dt * speed / R; const p = rimAt(T.isl, th, inset), q = rimAt(T.isl, th + 0.03, inset); grp.position.set(p.x, 0, p.z); grp.rotation.y = Math.atan2(q.x - p.x, q.z - p.z); out(dt, t); }); return id; };
-  stats.dog = walkerLoop("mentorship", 0.9, 1.0, 0.4, grp => {
+  stats.dog = walkerLoop("mentorship", 0.9, 2.4, 0.4, grp => {
     const pp = person(grp, 0, 0, 0, { shirt: 3, scale: 1.1 }); pp.userData.moving = true; pp.userData.parts.armR.rotation.x = -0.5;
     const dog = new THREE.Group(); dog.userData.dynamic = true; dog.position.set(0.7, 0, 0.9); grp.add(dog);
     dog.add(mesh(rbox(0.55, 0.26, 0.24, 0.08), MM.dog, 0, 0.38, 0, false), mesh(rbox(0.26, 0.24, 0.22, 0.07), MM.dog, 0.05, 0.56, 0.3, false), mesh(rbox(0.1, 0.12, 0.05, 0.02), M.dark, -0.08, 0.68, 0.3, false), mesh(rbox(0.1, 0.12, 0.05, 0.02), M.dark, 0.18, 0.68, 0.3, false), mesh(new THREE.SphereGeometry(0.04, 5, 4), M.dark, 0.05, 0.55, 0.43, false), mesh(rbox(0.06, 0.06, 0.3, 0.02), MM.dog, 0, 0.5, -0.25, false).rotateX(-0.6));
@@ -171,7 +171,7 @@ export function buildTown(THREE, E, c) {
     const leash = mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.1, 4), M.dark, 0.5, 0.65, 0.55, false); leash.rotation.x = 0.9; leash.rotation.z = -0.4; grp.add(leash);
     return (dt, t) => { pose(pp, t); dog.position.y = Math.abs(Math.sin(t * 7)) * 0.05; dog.rotation.z = Math.sin(t * 7) * 0.05; };
   });
-  stats.jogger = walkerLoop("curriculum", 2.4, 1.0, 2.0, grp => { const pp = person(grp, 0, 0, 0, { shirt: 2, scale: 1.1, hat: true }); pp.userData.moving = true; pp.userData.phase = 0; return (dt, t) => { pose(pp, t * 1.4); pp.userData.parts.armL.rotation.x -= 0.8; pp.userData.parts.armR.rotation.x -= 0.8; }; });
+  stats.jogger = walkerLoop("curriculum", 2.4, 2.4, 2.0, grp => { const pp = person(grp, 0, 0, 0, { shirt: 2, scale: 1.1, hat: true }); pp.userData.moving = true; pp.userData.phase = 0; return (dt, t) => { pose(pp, t * 1.4); pp.userData.parts.armL.rotation.x -= 0.8; pp.userData.parts.armR.rotation.x -= 0.8; }; });
 
   // ═══ 6. 聚會所：市集攤位（五攤，有條紋雨棚與貨）、小舞台（三個人在演、四個人在看）、會噴水的噴水池。放不下的落到別座島。═══
   const stall = (k) => { const s = new THREE.Group(); const awnM = [M.orange, M.teal, M.yellow, M.navy, M.orange][k % 5];

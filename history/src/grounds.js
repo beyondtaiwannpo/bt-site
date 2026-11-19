@@ -14,7 +14,7 @@ export function buildGrounds(THREE, c) {
 
   // ═══ 空側 ═══
   // 停機位六個：引導線、停止線、設備限制線框、地勤車停放框、位號。
-  const STANDS = [[25, "B1", true], [40, "B2", true], [58, "B3", false], [75, "B4", true], [92, "B5", true], [113, "", true]];
+  const STANDS = [[25, "B1", true], [40, "B2", false], [58, "B3", false], [75, "B4", false], [92, "B5", true], [113, "", true]];
   {
     const lead = [], stop = [], eraX = [], eraZ = [], gse = [];
     for (const [x] of STANDS) { const px = x + 7; lead.push([px, 0.05, 57]); stop.push([px, 0.05, 35.5]); eraX.push([px, 0.04, 22], [px, 0.04, 76]); eraZ.push([px - 20, 0.04, 49], [px + 20, 0.04, 49]); gse.push([px - 15, 0.04, 31], [px - 15, 0.04, 37], [px - 20, 0.04, 34, Math.PI / 2], [px - 10, 0.04, 34, Math.PI / 2]); }
@@ -22,7 +22,7 @@ export function buildGrounds(THREE, c) {
     world.add(instanced(new THREE.BoxGeometry(40, 0.02, 0.25), redM, eraX, false), instanced(new THREE.BoxGeometry(0.25, 0.02, 54), redM, eraZ, false), instanced(new THREE.BoxGeometry(10, 0.02, 0.2), mats.cream, gse.map(p => p.length > 3 ? [p[0], p[1], p[2], p[3], 0.6] : p), false));
     for (const [x, label] of STANDS) if (label) sign(label, "", 4, 4, palette.apron || palette.grey, palette.yellow, x + 7, 0.06, 70, Math.PI, { flat: true, align: "center", size: 560 });
     // 停機位的看板（一根柱子、A320 / B737 的字）
-    for (const [x, label] of STANDS) { world.add(cyl(0.08, 0.1, 3.2, mats.grey, x + 7, 1.6, 19, 6)); sign((label || "A") + "  ·  A320 / B737", "", 3.0, 0.8, palette.navy, palette.cream, x + 7, 3.4, 19, 0, { align: "center", size: 180 }); }   // 位號在航廈那一面，機師進位時對著看（批 D：之前立在推出去的路上）
+    for (const [x, label] of STANDS) { world.add(cyl(0.08, 0.1, 3.2, mats.grey, x + 2, 1.6, 21, 6)); sign((label || "A") + "  ·  A320 / B737", "", 3.0, 0.8, palette.navy, palette.cream, x + 2, 3.4, 21, 0, { align: "center", size: 180 }); }   // 位號在航廈那一面，機師進位時對著看（批 D：之前立在推出去的路上）
   }
   // 另外兩座空橋與停著的飛機（B1、B5）：跟 scene.js 的 B2、B4 一樣直直伸出去。B3 空著，只留一台拖車與地勤。
   for (const [x, tail] of [[25, "orange"], [92, "yellow"]]) {
@@ -38,7 +38,7 @@ export function buildGrounds(THREE, c) {
       const px = x + 7;
       if (!busy) { const t = truck(mats, false); t.position.set(px - 14, 0, 34); t.rotation.y = 0.3; world.add(t); for (let k = 1; k <= 2; k++) { const cb = box(2.2, 1.4, 2.4, mats.grey, px - 14 - Math.sin(0.3) * 3.2 * k, 0.9, 34 - Math.cos(0.3) * 3.2 * k); cb.add(box(2.2, 0.6, 2.2, mats.navy, 0, 0.9, 0)); world.add(cb); } const m = crew(px, 41.5, Math.PI); world.add(box(0.08, 0.6, 0.08, mats.orangeLight, px - 0.5, 1.4, 41.2, false), box(0.08, 0.6, 0.08, mats.orangeLight, px + 0.5, 1.4, 41.2, false)); void m; continue; }
       // 輸送帶車：貼在機身前門旁（機身在 z 48，門在 x+5 那一側）
-      const bl = truck(mats, false); bl.position.set(px - 6, 0, 42); bl.rotation.y = -0.6; const belt = box(0.9, 0.2, 6, mats.grey, 0, 1.6, -3.2, false); belt.rotation.x = 0.35; bl.add(belt); world.add(bl);
+      const bl = truck(mats, false); bl.position.set(px + 6, 0, 41); bl.rotation.y = 0.6;   /* 在前貨艙那一側，之前的帶子戳進空橋 B 段地板 */ const belt = box(0.9, 0.2, 6, mats.grey, 0, 1.6, -3.2, false); belt.rotation.x = 0.35; bl.add(belt); world.add(bl);
       gpus.push([px - 12, 0.8, 30]); gpuWheels.push([px - 12.9, 0.35, 30, 0, 1], [px - 11.1, 0.35, 30, 0, 1]);
       for (let i = 0; i < 4; i++) ulds.push([px - 18 + (i % 2) * 2.6, 0.75, 32 + Math.floor(i / 2) * 2.0]);
       cones.push([px - 4, 0.4, 36], [px + 4, 0.4, 36], [px - 9, 0.4, 56], [px + 9, 0.4, 56]); chocks.push([px - 2.6, 0.2, 49.6], [px + 2.6, 0.2, 49.6]);
@@ -74,7 +74,7 @@ export function buildGrounds(THREE, c) {
     const loc = []; for (let i = 0; i < 12; i++) loc.push([R.x0 - 150, 1.2, R.z - 16.5 + i * 3]);
     world.add(instanced(new THREE.BoxGeometry(0.3, 2.4, 0.3), mats.orange, loc.filter((_, i) => i % 2 === 0), false), instanced(new THREE.BoxGeometry(0.3, 2.4, 0.3), mats.cream, loc.filter((_, i) => i % 2 === 1), false), box(36, 0.3, 0.3, mats.grey, R.x0 - 150, 0.15, R.z, false));
     { const x = R.x1 - 300, z = R.z + R.half + 120; world.add(cyl(0.3, 0.4, 12, mats.grey, x, 6, z, 6), box(4.4, 0.3, 0.3, mats.cream, x, 11.5, z, false), box(4.4, 0.3, 0.3, mats.cream, x, 8.0, z, false), box(3, 2, 2.4, mats.wallShade, x + 4, 1, z, false)); }
-    { const f = box(60, 3.2, 0.4, mats.navy, R.x0 - 260, 1.6, R.z, false); f.rotation.x = -0.35; f.rotation.y = Math.PI / 2; world.add(f); }
+    { const f = box(60, 3.2, 0.4, mats.navy, R.x0 - 150, 1.6, R.z, false); f.rotation.x = -0.35; f.rotation.y = Math.PI / 2; world.add(f); }
     const ds = []; for (let x = R.x1 - 300; x > R.x0 + 200; x -= 300) ds.push([x, 0.8, R.z - R.half - 12]); world.add(instanced(new THREE.BoxGeometry(0.4, 1.4, 1.6), mats.navy, ds, false), instanced(new THREE.BoxGeometry(0.42, 0.5, 1.2), mats.cream, ds.map(([x, y, z]) => [x, y + 0.2, z]), false));
   }
   // 周界圍籬：繞整個空側一圈（航廈那一段不圍），每 6 公尺一根柱、上面一條橫桿。
@@ -166,7 +166,7 @@ export function buildGrounds(THREE, c) {
     world.add(box(18, 3.6, 0.8, mats.navy, rx + 16, 1.8, rz - 150, false)); sign("INTERNATIONAL AIRPORT", "國際機場", 16, 2.6, palette.navy, palette.cream, rx + 16, 2.0, rz - 149.55, 0);
     for (const [x, z, en, zh] of [[rx + 8, rz - 40, "DEPARTURES  ·  PARKING", "出境  ·  停車場"], [rx - 8, rz + 18, "CARGO  ·  RENTAL CARS", "貨運  ·  租車"]]) { world.add(cyl(0.08, 0.1, 4, mats.grey, x, 2, z, 6)); sign(en, zh, 4.4, 1.0, palette.teal, palette.cream, x, 4.3, z, 0); }
   }
-  // 捷運站出口（x -25，z -62）：玻璃亭、樓梯、牌子、幾個人。機場公司辦公大樓（x 0，z -140）：五層、一排排窗。空廚（x -110，z -25）：倉庫加兩台餐勤車。員工停車場（x -120，z -75）。
+  // 捷運站出口、機場公司辦公大樓、空廚、員工停車場。
   {
     world.add(box(8, 4, 6, mats.frame, -25, 2, -62), box(7.4, 3.2, 5.4, mats.glass, -25, 2, -62, false), box(8.6, 0.4, 6.6, mats.navy, -25, 4.2, -62, false), instanced(new THREE.BoxGeometry(6, 0.3, 1), mats.wallShade, [[-25, 0.15, -57.5], [-25, 0.45, -56.5], [-25, 0.75, -55.5]], false));
     sign("METRO", "捷運", 4, 1.0, palette.navy, palette.yellow, -25, 4.9, -58.6, 0);
@@ -190,7 +190,7 @@ export function buildGrounds(THREE, c) {
     movers.push({ fn: t => { for (let i = 0; i < N; i++) { const lane = i < 6; const sp = lane ? 9 + (i % 3) * 1.5 : 10 + (i % 2) * 2; const span = lane ? 230 : 230; const u = ((t * sp + i * 37) % span); const x = lane ? -50 + u : 180 - u, z = lane ? -48.3 + (i % 2) * 1.8 : -108 - (i % 2) * 2.2; Q.setFromAxisAngle(up, lane ? Math.PI / 2 : -Math.PI / 2); V.set(x, 0.6, z); M.compose(V, Q, S); bodies.setMatrixAt(i, M); V.set(x + (lane ? 0.2 : -0.2), 1.5, z); M.compose(V, Q, S); tops.setMatrixAt(i, M); } bodies.instanceMatrix.needsUpdate = true; tops.instanceMatrix.needsUpdate = true; } });
   }
   // ═══ 第三批（2026-11-18）：航廈的屋頂（從停機坪與空中看最大的一片）與跑道的胎痕 ═══
-  // 屋頂：女兒牆、走道上方那條天窗的玻璃脊（跟裡面的天窗同一條 z -20）、十四台空調主機加管線、四十片太陽能板、兩支天線、逃生梯的出口小屋、幾個通風口。
+  // 屋頂：女兒牆、天窗的玻璃脊、空調主機、太陽能板、天線、逃生梯小屋、通風口。
   {
     const tx = (T.x0 + T.x1) / 2, tz = (T.z0 + T.z1) / 2, tw0 = T.x1 - T.x0, td = T.z1 - T.z0, y = T.h + 0.4;
     world.add(box(tw0 + 3, 0.9, 0.5, mats.wallShade, tx, y + 0.45, T.z0 - 1.5, false), box(tw0 + 3, 0.9, 0.5, mats.wallShade, tx, y + 0.45, T.z1 + 1.5, false), box(0.5, 0.9, td + 3, mats.wallShade, T.x0 - 1.5, y + 0.45, tz, false), box(0.5, 0.9, td + 3, mats.wallShade, T.x1 + 1.5, y + 0.45, tz, false));

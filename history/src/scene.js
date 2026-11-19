@@ -184,7 +184,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const apron = new THREE.Mesh(new THREE.PlaneGeometry(340, 220), mats.apronTex); apron.rotation.x = -Math.PI / 2; apron.position.set(90, 0, 110); apron.receiveShadow = true; world.add(apron);
   // 滑行道：沿樣條鋪一條 18 公尺寬的帶子，中線一條黃線，兩邊每 12 公尺一顆邊燈。
   const tw = A.taxiway();
-  const twp = tw.points.slice(165, -190);   // 停機位那 18 公尺不鋪、進跑道那 60 公尺不鋪（跑道本身是柏油）
+  const twp = tw.points.slice(165, -341);   // 停機位那 18 公尺不鋪、進跑道那 60 公尺不鋪（跑道本身是柏油）
   world.add(ribbon(twp, 9, 0.02, mats.taxi), ribbon(tw.points, 0.3, 0.05, mats.yellowLight));
   for (const o of [-8.6, -8.2, 8.2, 8.6]) world.add(ribbon(twp, 0.1, 0.05, mats.yellowLight, o));   // 滑行道兩邊各兩條黃邊線（批 D，Paul：滑行道上什麼都沒有）；燈在 traffic.js
   // 跑道：長條、跑道頭的條紋、號碼、中線虛線、邊燈、等待線。
@@ -277,7 +277,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     let k = 0;
     for (let x = 60; x <= 100; x += 7) for (const z of [-7, -11, -29, -33]) { benches.push([x, 0.28, z]); for (let i = 0; i < 5; i++) (k++ % 2 ? seatsT : seatsO).push([x - 2 + i, 0.62, z]); }
     term.add(instanced(new THREE.BoxGeometry(5.2, 0.12, 0.9), mats.grey, benches), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.teal, seatsT), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.orange, seatsO));
-    for (const [x, z, i] of [[62, -7, 0], [71, -11, 1], [90, -29, 2], [96, -33, 3], [83, -7, 4], [67, -29, 1]]) { const f = figure(mats, { shirt: pick(i), seated: true, skirt: i % 3 === 1 }); f.position.set(x, 0.3, z + (z > -20 ? -0.15 : 0.15)); f.userData.baseY = 0.3; f.rotation.y = z > -20 ? Math.PI : 0; term.add(f); idleFigs.push(f); }
+    for (const [x, z, i] of [[62, -7, 0], [71, -11, 1], [90, -29, 2], [96, -33, 3], [83, -7, 4], [67, -29, 1]]) { const f = figure(mats, { shirt: pick(i), seated: true, skirt: i % 3 === 1 }); f.position.set(x, 0.57, z + (z > -20 ? -0.15 : 0.15)); f.userData.baseY = 0.57; f.rotation.y = z > -20 ? Math.PI : 0; term.add(f); idleFigs.push(f); }
   }
   // 商店：陸側三間，各自一種顏色的門面與雨棚、一塊招牌、架上幾樣東西。
   // 店本身在 decor.js，這裡只剩雨棚與招牌的板子。
@@ -378,16 +378,16 @@ export function createScene({ canvas, palette, phone, fonts }) {
       const cabinTex = textTexture(512, 768, palette.navy, [], [{ x: 40, y: 120, w: 90, h: 70, color: palette.teal }, { x: 40, y: 220, w: 90, h: 70, color: palette.teal }, { x: 40, y: 320, w: 90, h: 70, color: palette.teal }, { x: 160, y: 120, w: 90, h: 70, color: palette.teal }, { x: 160, y: 220, w: 90, h: 70, color: palette.teal }, { x: 160, y: 320, w: 90, h: 70, color: palette.teal }, { x: 330, y: 100, w: 120, h: 90, color: palette.cream }, { x: 330, y: 260, w: 120, h: 90, color: palette.cream }, { x: 0, y: 420, w: 512, h: 30, color: palette.grey }, { x: 0, y: 0, w: 512, h: 60, color: palette.grey }]);
       const cabin = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.9), lam(P.white, { map: cabinTex })); cabin.position.set(dx - 0.15, 1.05, 0); cabin.rotation.y = -Math.PI / 2; cabin.castShadow = false; gB.add(cabin);
       const crew = figure(mats, { shirt: P.navy, staff: true }); crew.position.set(dx - 1.5, 0, 1.05); crew.rotation.y = -Math.PI / 2 - 0.6; crew.userData.baseY = 0; gB.add(crew); idleFigs.push(crew);
-      const wb = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.5), lam(P.white, { map: textTexture(1024, 256, palette.orange, [{ text: "WELCOME ABOARD", x: 36, y: 90, font: `700 100px ${fonts.display}`, color: palette.navy }, { text: "歡迎登機", x: 36, y: 195, font: `900 70px ${fonts.han || fonts.display}`, color: palette.navy }]) })); wb.position.set(dx - 3.6, 2.05, B.half - 0.1); wb.rotation.y = Math.PI;   // 貼在 +z 那面實牆上，不跟盡頭的登機門牌疊在一起 wb.castShadow = false; gB.add(wb);
+      const wb = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.5), lam(P.white, { map: textTexture(1024, 256, palette.orange, [{ text: "WELCOME ABOARD", x: 36, y: 90, font: `700 100px ${fonts.display}`, color: palette.navy }, { text: "歡迎登機", x: 36, y: 195, font: `900 70px ${fonts.han || fonts.display}`, color: palette.navy }]) })); wb.position.set(dx - 3.6, 2.05, B.half - 0.1); wb.rotation.y = Math.PI; /* 貼在 +z 那面實牆上 */ wb.castShadow = false; gB.add(wb);
       gB.add(instanced(new THREE.BoxGeometry(0.06, B.h - 0.3, 0.08), lam(P.cream.clone().lerp(P.grey, 0.35)), Array.from({ length: Math.floor(lenB / 1.5) }, (_, i) => [-lenB / 2 + 0.75 + i * 1.5, B.h / 2, B.half - 0.12]), false));
     }
   }
   // 其他登機門的空橋與停著的飛機：兩座，直直伸出去。
   // 批 D：B2 與 B4 的飛機拿掉（翼展 34 公尺、停機位只隔 15 到 21 公尺，鄰機翼尖互穿），空橋留著當空的登機門；橋對著機艙門（x + 3.4）。
-  for (const x of [40, 75]) {
-    const g = new THREE.Group(); g.position.set(x + 3.4, 2.6, 19);
-    g.add(box(3.2, 2.9, 38, lam(P.wall), 0, 0, 0)); g.add(box(3.4, 0.5, 38, mats.teal, 0, 0.2, 0, false));
-    term.add(g, cyl(0.3, 0.3, 2.6, mats.frame, x + 2.2, 1.3, 32, 6), cyl(0.3, 0.3, 2.6, mats.frame, x + 4.6, 1.3, 32, 6));
+  for (const x of [40, 75]) {   /* 沒飛機的門空橋縮回（24 公尺） */
+    const g = new THREE.Group(); g.position.set(x + 3.4, 2.6, 12);
+    g.add(box(3.2, 2.9, 24, lam(P.wall), 0, 0, 0)); g.add(box(3.4, 0.5, 24, mats.teal, 0, 0.2, 0, false));
+    term.add(g, cyl(0.3, 0.3, 2.6, mats.frame, x + 2.2, 1.3, 20, 6), cyl(0.3, 0.3, 2.6, mats.frame, x + 4.6, 1.3, 20, 6));
   }
 
   // ═══ 停機坪上的東西 ═══
@@ -403,7 +403,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     g.add(box(0.4, 13, 34, mats.dark, 22.1, 6.5, 0, false));
   }
   // 消防站：橘牆、三扇門、一台消防車探頭。
-  { const g = new THREE.Group(); g.position.set(210, 0, 70); g.rotation.y = Math.PI; world.add(g); world.add(box(7, 0.04, 290, mats.asphalt, 210, 0.015, 225, false));   // 門朝跑道那一側，一條直通跑道的消防道（批 D）
+  { const g = new THREE.Group(); g.position.set(210, 0, 70); g.rotation.y = Math.PI; world.add(g); world.add(box(7, 0.04, 38, mats.asphalt, 210, 0.012, 99, false));   // 門朝跑道那一側，一條直通跑道的消防道（批 D）
     g.add(box(26, 7, 16, lam(P.sand.clone().lerp(P.orange, 0.35)), 0, 3.5, 0), box(27, 0.6, 17, mats.roof, 0, 7.2, 0, false));
     g.add(instanced(new THREE.BoxGeometry(5.5, 5, 0.4), mats.dark, [[-8, 2.5, -8.1], [0, 2.5, -8.1], [8, 2.5, -8.1]], false));
     g.add(box(7, 2.6, 3, mats.orange, 0, 1.4, -13), box(2.6, 1.6, 2.8, mats.frame, -3.2, 3.2, -13)); }
@@ -430,7 +430,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     for (const [x, z] of [[140, -95], [146, -100], [185, -95], [190, -62], [142, -62], [-40, -80], [-44, -90], [-18, -58], [-10, -58]]) places.push([x, 0, z, x + z, 1.1]);
     for (let x = -110; x <= -40; x += 9) places.push([x, 0, 62 + (x % 3) * 2, x, 1.0]);
     for (let z = 220; z <= 285; z += 11) places.push([-138, 0, z, z, 1.0]);
-    for (let x = 280; x <= 330; x += 12) places.push([x, 0, 205 + (x % 2) * 4, x, 0.9]);
+    for (let x = 350; x <= 400; x += 12) places.push([x, 0, 205 + (x % 2) * 4, x, 0.9]);
     world.add(instanced(treeGeo(), mats.leaf, places), instanced(trunkGeo(), mats.trunk, places));
   }
   // ═══ 機場的周邊 ═══
@@ -479,7 +479,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     { const g = new THREE.Group(); g.position.set(250, 0, 300); world.add(g); g.add(cyl(0.08, 0.1, 7, mats.grey, 0, 3.5, 0, 6)); const sock = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3.2, 8), mats.orange); sock.rotation.z = -Math.PI / 2; sock.position.set(1.6, 6.8, 0); g.add(sock); }
     // 停機坪上再多一點：遠端停機位的飛機、巴士、登機梯車、餐勤車、行李拖車、錐桶與地勤。
     for (const [x, z, ry] of [[70, 128, 0.3], [160, 60, -1.2]]) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; world.add(g); g.add(box(11, 3, 2.5, mats.cream, 0, 1.6, 0), box(10.6, 1.2, 2.55, mats.glass, 0, 2.1, 0, false), box(11, 0.5, 2.5, mats.navy, 0, 0.5, 0, false)); }
-    { const g = new THREE.Group(); g.position.set(142, 0, 112); g.rotation.y = 0.5; world.add(g); g.add(box(2.2, 1.4, 2.4, mats.orange, 0, 1.0, 2.6), box(2.4, 0.5, 6, mats.grey, 0, 0.5, -0.8)); const st = box(1.6, 0.3, 5, mats.grey, 0, 3.0, -1.5); st.rotation.x = 0.45; g.add(st); g.add(instanced(new THREE.BoxGeometry(0.08, 1.0, 5), mats.grey, [[-0.8, 3.6, -1.5, 0], [0.8, 3.6, -1.5, 0]].map(([x, y, z]) => [x, y, z]), false)); }
+    { const g = new THREE.Group(); g.position.set(70, 0, 150); g.rotation.y = 0.5; world.add(g); g.add(box(2.2, 1.4, 2.4, mats.orange, 0, 1.0, 2.6), box(2.4, 0.5, 6, mats.grey, 0, 0.5, -0.8)); const st = box(1.6, 0.3, 5, mats.grey, 0, 3.0, -1.5); st.rotation.x = 0.45; g.add(st); g.add(instanced(new THREE.BoxGeometry(0.08, 1.0, 5), mats.grey, [[-0.8, 3.6, -1.5, 0], [0.8, 3.6, -1.5, 0]].map(([x, y, z]) => [x, y, z]), false)); }
     { const g = new THREE.Group(); g.position.set(95, 0, 20); g.rotation.y = -0.3; world.add(g); g.add(box(2.2, 1.6, 2.2, mats.cream, 0, 1.2, 2.0), box(2.4, 2.6, 5, mats.cream, 0, 3.2, -1.2), box(2.4, 0.5, 6.4, mats.grey, 0, 0.5, -0.6), instanced(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 6), mats.dark, [[-0.9, 1.9, -1.2, 0], [0.9, 1.9, -1.2, 0]], false)); }
     for (const [x, z, ry] of [[75, 36, 0.2], [150, 95, 1.3]]) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; world.add(g); const t = truck(mats, false); g.add(t); for (let k = 1; k <= 3; k++) { const c = box(2.2, 1.4, 2.4, mats.grey, 0, 0.9, -3.2 * k); c.add(box(2.2, 0.6, 2.2, [mats.navy, mats.orange, mats.teal][k % 3], 0, 0.9, 0)); g.add(c); } }
     world.add(instanced(new THREE.ConeGeometry(0.35, 0.8, 6), mats.orange, [[60, 0.4, 100], [64, 0.4, 118], [155, 0.4, 70], [162, 0.4, 56], [-10, 0.4, 140], [2, 0.4, 162], [240, 0.4, 112], [258, 0.4, 134]], false));
@@ -507,11 +507,12 @@ export function createScene({ canvas, palette, phone, fonts }) {
   const trailM = lam(P.cloud, { transparent: true, opacity: 0, emissive: P.cloud, emissiveIntensity: 0.6, depthWrite: false });
   for (const sx of [-1, 1]) { const tr = box(0.22, 0.22, 70, trailM, sx * 17.2, 0.9, -40, false); tr.castShadow = false; plane.add(tr); }
   const wheels = []; plane.traverse(m => { if (m.name === "wheel") wheels.push(m); }); let wheelSpin = 0, lastS = 0;
+  const pbt = truck(mats, false); pbt.scale.setScalar(0.8); pbt.userData.dynamic = true; pbt.visible = false; world.add(pbt);   /* 推機車：推出去的時候頂在機鼻前 */
   // 旅客
   const traveller = figure(mats, { shirt: P.teal, backpack: true, phase: 0 }); traveller.userData.baseY = 0; world.add(traveller);
   // 走道上來回走的兩個人
   const walkers = [];
-  for (const [x0, x1, z, sp, k] of [[10, 95, -15.5, 1.2, 0], [90, 20, -23.4, 1.0, 2], [30, 100, -13, 0.9, 3], [105, 5, -24.2, 1.1, 4], [8, 104, -14.2, 1.05, 1], [104, 8, -16.6, 0.85, 5], [-36, -14, -23.0, 0.95, 2], [104, 62, -16.2, 1.15, 3]]) { const f = figure(mats, { shirt: figMats[k % figMats.length], bag: figMats[(k + 2) % figMats.length] }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
+  for (const [x0, x1, z, sp, k] of [[10, 95, -15.5, 1.2, 0], [90, 20, -23.4, 1.0, 2], [30, 100, -13, 0.9, 3], [105, 9, -24.2, 1.1, 4], [8, 104, -14.2, 1.05, 1], [104, 8, -16.6, 0.85, 5], [-36, -14, -23.0, 0.95, 2], [104, 62, -16.2, 1.15, 3]]) { const f = figure(mats, { shirt: figMats[k % figMats.length], bag: figMats[(k + 2) % figMats.length] }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
 
   // ═══ 航廈裡面與外面的細節（2026-11-18）：terminal.js 與 grounds.js，THREE 跟小工具傳進去 ═══
   const ctx = { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, world, pick, truck, buildAirliner, setGear, shadowOn, tw };
@@ -611,6 +612,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     steerNose(plane, qp.steer);
     // 輪子照走過的距離轉（半徑 0.5）；推出去的時候倒轉；離地就不轉。
     if (qp.y < 0.5) { wheelSpin += (qp.s - lastS) / 0.5 * (qp.pushback ? -1 : 1); for (const w of wheels) w.rotation.x = wheelSpin; } lastS = qp.s;
+    if (qp.pushback) { pbt.visible = true; pbt.position.set(qp.x, 0, qp.z - 22.5); pbt.rotation.y = Math.PI; } else if (e < A.PHASES.apron[0]) pbt.visible = false;
     // 旅客：腳照他真的走了多遠擺（1.2 公尺一步的節奏），不是照時間。停下來先把腿收齊再站好，不會立正。
     // （2026-11-18 批 A；之前腿擺固定 9 rad/s 跟捲動快慢無關，而且捲動一停 180 毫秒就立正。）
     const tr = A.travellerAt(e);
@@ -649,7 +651,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     }
     for (const cl of clouds) { cl.position.x += cl.userData.v * dt; if (cl.position.x > cl.userData.x0 + 300) cl.position.x -= 600; }   /* 用 dt、飄出 300 公尺就繞回來（之前每幀固定加、永遠不回來）*/
     fuel[0].position.x = 60 + Math.sin(t * 0.12) * 30; fuel[0].rotation.y += wr((Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2) - fuel[0].rotation.y) * Math.min(1, dt * 4);
-    { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(40 + Math.cos(ang) * 18, 0, 170 + Math.sin(ang) * 18); tug.rotation.y = -ang; }
+    { const u = (t * 0.03) % 1, ang = u * Math.PI * 2; tug.position.set(40 + Math.cos(ang) * 14, 0, 148 + Math.sin(ang) * 14); tug.rotation.y = -ang; }
     // 走道上來回的人：到頭站 1.2 秒、轉身用追的（批 B，之前瞬間翻面）。從 x0 走到 x1，臉跟著方向；stand：站在電動步道上。
     for (const f of walkers) { const w = f.userData.w, span = Math.abs(w.x1 - w.x0), T = span / w.sp, H = 1.2, u = t % (2 * (T + H)), sgn = w.x1 >= w.x0 ? 1 : -1;
       const d = u < T ? u * w.sp : u < T + H ? span : u < 2 * T + H ? span - (u - T - H) * w.sp : 0, mv = u < T || (u >= T + H && u < 2 * T + H), dir = (u < T || u >= 2 * T + H ? 1 : -1) * sgn;
@@ -669,7 +671,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // createScene 蓋完叫一次，setStops 放完小場景再叫一次。
   function pruneCasters() { world.traverse(m => { if (!m.isMesh || !m.castShadow || m.isInstancedMesh) return; const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const r = g.boundingSphere ? g.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) : 1; if (r < 0.6) m.castShadow = false; }); renderer.shadowMap.needsUpdate = true; }
   pruneCasters();
-  // 靜態的東西合併：同材質、同一個 80 公尺格子裡的靜態 Mesh 合成一個（格子留著視錐剔除才有用）。會動的（userData.dynamic）、有貼圖的、InstancedMesh、人，都不碰。
+  // 靜態的東西合併：同材質、同一格的靜態 Mesh 合成一個。會動的、有貼圖的、InstancedMesh、人，都不碰。
   if (new URLSearchParams(location.search).get("merge") !== "0") mergeStatic();   // ?merge=0：不合併，給除錯用的射線檢查（合併後一個 mesh 幾萬個三角形，射線慢到當掉）
   function mergeStatic() {
     const groups = new Map(); const dyn = new Set();

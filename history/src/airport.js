@@ -1,14 +1,11 @@
 // /history/ 的機場（批 5，2026-11-06 換成真的 3D）：純數學，沒有 DOM、沒有 Three。
-// 這一支回答「進度 e 的時候，飛機在哪、鏡頭在哪、旅客在哪、每一站的錨點在哪」。scene.js 拿這些數字去擺 Three 的物件，
-// main.js 拿鏡頭把站的錨點投影到螢幕上貼卡。測試（test/history-page.test.mjs）直接 import 這一支，不用開瀏覽器。
+// 回答「進度 e 的時候，飛機、鏡頭、旅客、每一站的錨點在哪」。scene.js 拿去擺物件，main.js 拿去貼卡，測試直接 import。
 //
 // ── 讀這一支之前先知道四件事 ──
 // 1. **資料與場景分開。** 這裡沒有任何一站的文字，只拿「有幾站」。加一站永遠不碰這支。
-// 2. **單位是公尺，y 朝上。** 航廈沿 x 軸躺著（x 從 -10 到 125），玻璃牆在 z=0，停機坪在 z>0，跑道在 z=400 沿 x 軸。
-//    航向 yaw 的定義跟 Three 一樣：rotation.y = yaw 會把模型的 +z 轉到 (sin yaw, 0, cos yaw)，所以模型的機頭要朝 +z。
-// 3. **四段照捲動的比例切（PHASES）**，站不管幾個都平均分在 0 到 1 上（第 i 站在 i/(n-1)），每一站照自己落在哪一段決定錨點在哪。
-// 4. **滑行道是一條 centripetal Catmull-Rom 樣條**（跟 Three 的 CatmullRomCurve3 同一個算法，這裡自己寫一份，
-//    因為飛機的位置、卡的錨點、滑行道的路面都要同一條線，而卡的投影在測試裡要算得出來）。等弧長取樣，所以飛機的速度是均勻的。
+// 2. **單位公尺，y 朝上。** 航廈沿 x 軸，玻璃牆 z=0，跑道 z=400。yaw 跟 Three 一樣：rotation.y 把模型的 +z 轉到 (sin yaw, 0, cos yaw)，機頭朝 +z。
+// 3. **四段照捲動的比例切（PHASES）**，站平均分在 0 到 1 上，每一站照落在哪一段決定錨點。
+// 4. **滑行道是一條 centripetal Catmull-Rom 樣條**（自己寫一份，測試裡才算得出來）。等弧長取樣，飛機的速度均勻。
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
 const smooth = t => t * t * (3 - 2 * t);
@@ -35,9 +32,9 @@ export const GATE_DESK = [106, -12];                                  // 登機�
 export const GATE_DOOR = [113, 0];                                    // 玻璃牆上通往空橋的門
 export const GATE_STAND = [120, 48];                                  // 我們那一架停的位置（機身中心）
 export const PLANE_DOOR = [118, 37];                                  // 機艙門（面向航廈停，左前門，在機身皮上 x=118）
-// 空橋是兩段直的（第二輪改的）：A 段從玻璃牆的門沿 +z 走到機艙門的 z，B 段轉 90 度沿 +x 接到機身。直的才有辦法用方框檢查鏡頭有沒有穿牆。
+// 空橋兩段直的：A 段從門沿 +z 到機艙門的 z，B 段轉 90 度沿 +x 接機身。直的才能用方框檢查穿牆。
 export const BRIDGE = { x: GATE_DOOR[0], zEnd: PLANE_DOOR[1], half: 1.6, h: 2.8, floorEnd: 2.4 };
-// 牆的方框 [x0, x1, y0, y1, z0, z1]：航廈的三面實牆、玻璃牆（門口留 4 公尺的洞）、空橋兩段的牆。測試拿這些檢查鏡頭每一幀都不在牆裡、而且離牆有 0.3 公尺。
+// 牆的方框 [x0, x1, y0, y1, z0, z1]：三面實牆、玻璃牆（門口留洞）、空橋的牆。測試拿來檢查鏡頭不穿牆、離牆 0.3 公尺。
 export const WALLS = (() => {
   const T = TERMINAL, b = BRIDGE, g = GATE_DOOR[0], w = 0.3, H = 12;
   return [
@@ -168,7 +165,8 @@ export function planePoseAt(e) {
   const v0 = tw.length / (PHASES.apron[1] - PHASES.apron[0]) * (1 - PHASES.takeoff[0]), run = v0 * t + (TAKEOFF_ROLL - v0) * t * t;
   const x = TAXI_WAYPOINTS[TAXI_WAYPOINTS.length - 1][0] - run;
   const rotate = smooth(clamp01((t - 0.36) / 0.14)), lift = smooth(clamp01((t - 0.47) / 0.53));
-  const pitch = 0.12 * rotate + 0.1 * lift;
+  const dT = 0.004, l2 = smooth(clamp01((t + dT - 0.47) / 0.53)), r2 = v0 * (t + dT) + (TAKEOFF_ROLL - v0) * (t + dT) * (t + dT), path = Math.atan2(420 * (l2 - lift), Math.max(1e-6, r2 - run));
+  const pitch = 0.12 * rotate * (1 - lift) + lift * (path + 0.06);   /* 離地後俯仰跟著航跡角走（之前爬到頂平飛還抬頭 12 度） */
   const y = 420 * lift + Math.sin(pitch) * 1.0;
   const gear = 1 - smooth(clamp01((t - 0.49) / 0.2));
   const roll = 0.05 * Math.sin(Math.PI * clamp01((t - 0.6) / 0.4));
@@ -266,7 +264,7 @@ export function cameraAt(e, tall) {
     return { pos, look, fov: lerp(inside, CAM_FOV.outside, u) };
   }
   const q = planePoseAt(e);
-  // 停機坪的鏡頭偏移跟著滑行道的航向（yawU，不折回）轉兩成多（批 B：之前是世界座標的常數，飛機釘在畫面同一點、轉彎鏡頭不繞）；起飛追在後面的那一個隨爬升拉遠四成。
+  // 停機坪的鏡頭偏移跟著滑行道的航向（yawU）轉兩成多；起飛追鏡隨爬升拉遠四成。
   const a = 0.22 * (q.yawU || 0), ca = Math.cos(a), sa = Math.sin(a), so = [CAM_OFF[0] * ca + CAM_OFF[2] * sa, CAM_OFF[1], -CAM_OFF[0] * sa + CAM_OFF[2] * ca];
   if (e < PHASES.takeoff[0]) return { pos: [q.x + so[0], q.y + so[1], q.z + so[2]], look: [q.x, q.y + 2, q.z], fov: CAM_FOV.outside };
   const k = smooth(clamp01((e - PHASES.takeoff[0]) / 0.12)), pull = 1 + 0.4 * (q.lift || 0);
@@ -287,8 +285,8 @@ export function world(n) {
       else stops.push({ p, phase: "terminal", anchor: [GATE_DESK[0] + 5 + 3.2 * atGate++, 0, GATE_DESK[1] - 7], yaw: 0, gate: true });   // 2026-11-18：登機門那幾站的小場景改到櫃台東側偏後（之前在 104,-16，鏡頭往門的斜線正好穿過它的牌子）
     } else {
       const q = planePoseAt(p);
-      if (p < PHASES.takeoff[0]) stops.push({ p, phase: "apron", anchor: [q.x + side[0] * 20, 0, q.z + side[1] * 20], yaw: q.yaw });
-      else stops.push({ p, phase: "takeoff", anchor: [q.x + 18, q.y + (q.y > 0 ? 10 : 2), q.z + 24], yaw: q.yaw, air: q.y > 0 });
+      if (p < PHASES.takeoff[0]) stops.push({ p, phase: "apron", anchor: [q.x + side[0] * 20, 0, Math.min(q.z + side[1] * 20, RUNWAY.z - 60)], yaw: q.yaw });   /* 錨點不落在跑道上 */
+      else stops.push({ p, phase: "takeoff", anchor: [q.x + 18, q.y + (q.y > 0 ? 10 : 2), q.z + 32], yaw: q.yaw, air: q.y > 0 });
     }
   }
   return { n, stops };
