@@ -59,7 +59,7 @@ export function buildDecor(THREE, c) {
     person(cx - 2.2, -36.0, 0.6, { shirt: pick(15), bag: true }); person(cx + 1.2, -37.4, Math.PI, { shirt: pick(16) }); person(cx + 2.8, -38.6, 0, { shirt: P.navy, staff: true });
   }
 
-  // ═══ 2. 免稅店（x 8 到 26）補：側牆、酒牆、香水櫃、購物籃、吊牌、燈條 ═══
+  // ═══ 2. 免稅店（x 8 到 26）補 ═══
   { term.add(box(0.3, 5, 8.6, mats.navy, 8, 2.5, -35.0, false), box(0.3, 5, 8.6, mats.navy, 26, 2.5, -35.0, false));
     const bottles = [[], [], []]; let n = 0;
     for (const y of [1.3, 2.1, 2.9]) { term.add(box(15.6, 0.06, 0.45, mats.cream, 17, y, -38.9, false), box(15.4, 0.04, 0.08, mats.light, 17, y - 0.06, -38.7, false)); for (let i = 0; i < 34; i++) bottles[n++ % 3].push([9.6 + i * 0.44, y + 0.24, -38.9]); }
@@ -68,10 +68,10 @@ export function buildDecor(THREE, c) {
     term.add(instanced(smallBox(0.5, 0.3, 0.4), mats.orange, [[9.0, 0.15, -30.5], [9.0, 0.45, -30.5], [9.0, 0.75, -30.5], [9.0, 1.05, -30.5]], false));
     for (const x of [12, 17.5, 23]) { sign("TAX FREE", "免稅", 1.4, 0.5, palette.yellow, palette.navy, x, 3.9, -35.9, 0, { both: true }); term.add(cyl(0.01, 0.01, 0.9, mats.grey, x, 4.6, -35.9, 4)); }
     term.add(instanced(smallBox(5, 0.1, 0.5), mats.light, [[11.5, 4.9, -37.6], [17, 4.9, -37.6], [22.5, 4.9, -37.6], [11.5, 4.9, -33.4], [17, 4.9, -33.4], [22.5, 4.9, -33.4]], false));
-    person(14.5, -30.4, 0, { shirt: pick(17), bag: true }); person(19.8, -30.6, 0.3, { shirt: pick(18) });
+    person(14.6, -33.1, Math.PI, { shirt: pick(17), bag: true }); person(19.8, -30.6, 0.3, { shirt: pick(18) });
   }
 
-  // ═══ 3. 美食區（x 30 到 44）補：冰箱、展示櫃、吊燈、珍珠奶茶攤、回收餐盤台、調味料台、蒸氣 ═══
+  // ═══ 3. 美食區（x 30 到 44）補 ═══
   { for (const x of [32.5, 37, 41.5]) {
       term.add(box(0.9, 2.0, 0.7, mats.grey, x + 1.9, 1.0, -38.7)); glassPane(0.8, 1.7, x + 1.9, 1.05, -38.34); const cans = [[], [], []]; let n = 0; for (const y of [0.45, 0.95, 1.45]) for (let i = 0; i < 4; i++) cans[n++ % 3].push([x + 1.6 + i * 0.2, y, -38.6]);
       term.add(...cans.map((g, i) => instanced(new THREE.CylinderGeometry(0.06, 0.06, 0.16, 6), [mats.teal, mats.orange, mats.navy][i], g, false)));
@@ -79,7 +79,7 @@ export function buildDecor(THREE, c) {
     }
     const lamps = []; for (const x of [31.5, 35, 38.5, 42]) for (const z of [-33.5, -29.5]) lamps.push([x, 2.7, z]);
     term.add(instanced(new THREE.ConeGeometry(0.32, 0.3, 10, 1, true), mats.orange, lamps, false), instanced(new THREE.SphereGeometry(0.07, 6, 5), mats.yellowLight, lamps.map(([x, y, z]) => [x, y - 0.1, z]), false), instanced(new THREE.CylinderGeometry(0.01, 0.01, T.h - 3.6, 4), mats.grey, lamps.map(([x, , z]) => [x, 2.85 + (T.h - 3.6) / 2, z]), false));
-    // 珍珠奶茶攤（x 28.3，免稅店與麵攤之間）：橘色的攤、杯子、招牌、一個老闆、一個客人。
+    // 珍珠奶茶攤（x 28.3，免稅店與麵攤之間）。
     term.add(box(2.4, 1.1, 1.2, mats.orange, 28.3, 0.55, -37.2), box(2.6, 0.08, 1.4, mats.cream, 28.3, 1.14, -37.2, false), box(2.6, 1.2, 0.1, mats.frame, 28.3, 3.2, -39.2, false));
     sign("BUBBLE TEA", "珍珠奶茶", 2.4, 1.0, palette.orange, palette.navy, 28.3, 3.2, -39.12, 0, { size: 150 });
     term.add(instanced(new THREE.CylinderGeometry(0.07, 0.06, 0.2, 7), mats.teal, Array.from({ length: 6 }, (_, i) => [27.5 + i * 0.3, 1.28, -36.8]), false));
@@ -87,7 +87,7 @@ export function buildDecor(THREE, c) {
     // 回收餐盤台（x 44.6）與調味料台（x 29.8）。
     term.add(box(1.2, 1.0, 0.6, mats.grey, 44.6, 0.5, -30.0), box(1.2, 0.06, 0.6, mats.navy, 44.6, 1.03, -30.0, false)); sign("TRAY RETURN", "回收餐盤", 1.2, 0.5, palette.navy, palette.cream, 44.6, 1.3, -30.3, Math.PI, { size: 120 });
     term.add(box(0.8, 1.0, 0.5, mats.cream, 29.8, 0.5, -30.0), instanced(new THREE.CylinderGeometry(0.04, 0.04, 0.16, 6), mats.orange, [[29.6, 1.08, -30.1], [29.8, 1.08, -30.1], [30.0, 1.08, -30.1], [29.7, 1.08, -29.9], [29.9, 1.08, -29.9]], false));
-    // 麵攤的蒸氣：五顆半透明的小球往上飄、越高越小（會動，所以整組標 dynamic，mergeStatic 不會把它們合掉）。
+    // 麵攤的蒸氣。
     const steam = new THREE.Group(); steam.userData.dynamic = true; steam.position.set(32.5, 1.4, -37.6); term.add(steam); const steamM = lam(P.cloud, { transparent: true, opacity: 0.45, depthWrite: false });
     const puffs = Array.from({ length: 5 }, (_, i) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), steamM); m.castShadow = false; steam.add(m); return m; });
     ticks.push(t => puffs.forEach((m, i) => { const u = (t * 0.35 + i * 0.2) % 1; m.position.set(Math.sin(t + i) * 0.15 + (i - 2) * 0.12, u * 1.1, Math.cos(t * 0.7 + i) * 0.1); m.scale.setScalar(0.4 + u * 1.1); }));
@@ -102,14 +102,14 @@ export function buildDecor(THREE, c) {
     term.add(instanced(smallBox(0.32, 0.14, 0.14), mats.dark, cols.filter(([, z]) => z > -20).map(([x, z]) => [x - 0.6, 5.2, z - 0.1, 0.6]), false), instanced(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 6), mats.grey, cols.filter(([, z]) => z > -20).map(([x, z]) => [x - 0.5, 5.4, z]), false));
   }
 
-  // ═══ 5. 牆上：世界時鐘（照現在的時間算五個城市）、壁畫、置物櫃、育嬰室、出口燈 ═══
+  // ═══ 5. 牆上 ═══
   { const fmt = tz => { try { return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz }).format(new Date()); } catch (e) { return "--:--"; } };
     const cities = [["TAIPEI", "Asia/Taipei"], ["TOKYO", "Asia/Tokyo"], ["LONDON", "Europe/London"], ["NEW YORK", "America/New_York"], ["LOS ANGELES", "America/Los_Angeles"]];
     const W = 1024, H = 160, lines = [], rects = [];
     cities.forEach(([name, tz], i) => { const x = 20 + i * 200; rects.push({ x: x - 8, y: 20, w: 184, h: 120, color: palette.navy }); lines.push({ text: name, x: x + 84, y: 52, font: `700 26px ${fonts.display}`, color: palette.yellow, align: "center" }, { text: fmt(tz), x: x + 84, y: 104, font: `700 58px ${fonts.display}`, color: palette.cream, align: "center" }); });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(9, 9 * H / W), lam(P.white, { map: textTexture(W, H, palette.grey, lines, rects) })); m.position.set(49, 7.3, -39.6); m.castShadow = false; term.add(m);
     sign("WORLD CLOCK", "世界時間", 3, 0.6, palette.navy, palette.cream, 49, 8.5, -39.6, 0, { align: "center" });
-    // 壁畫（x 81，服飾與禮品之間）：幾塊深藍的樓、一個橘色的太陽、青色的海，加「WELCOME 歡迎」。
+    // 壁畫（x 81，服飾與禮品之間）。
     const art = [{ x: 0, y: 360, w: 1024, h: 100, color: palette.teal }, { x: 60, y: 200, w: 70, h: 160, color: palette.navy }, { x: 150, y: 120, w: 60, h: 240, color: palette.navy }, { x: 230, y: 240, w: 90, h: 120, color: palette.navy }, { x: 340, y: 60, w: 50, h: 300, color: palette.navy }, { x: 420, y: 180, w: 80, h: 180, color: palette.navy }, { x: 760, y: 60, w: 120, h: 120, color: palette.orange }, { x: 560, y: 220, w: 100, h: 140, color: palette.navy }, { x: 700, y: 260, w: 140, h: 100, color: palette.navy }, { x: 880, y: 160, w: 60, h: 200, color: palette.navy }];
     const mural = new THREE.Mesh(new THREE.PlaneGeometry(8, 3.6), lam(P.white, { map: textTexture(1024, 460, palette.cream, [{ text: "WELCOME", x: 512, y: 410, font: `700 60px ${fonts.display}`, color: palette.navy, align: "center" }], art) })); mural.position.set(81, 3.0, -39.6); mural.castShadow = false; term.add(mural);
     term.add(box(8.3, 3.9, 0.08, mats.navy, 81, 3.0, -39.66, false));
@@ -132,7 +132,7 @@ export function buildDecor(THREE, c) {
     term.add(instanced(smallBox(0.44, 0.46, 0.04), mats.navy, d2[0], false), instanced(smallBox(0.44, 0.46, 0.04), mats.teal, d2[1], false));
   }
 
-  // ═══ 7. 人：推推車的旅客（推車是人的孩子物件）、坐輪椅的加推的人、聊天的、巡邏的 ═══
+  // ═══ 7. 人 ═══
   // 行李推車：底盤、四根細柱、籃框、推把、四個輪子、一個橘色行李箱。
   { const trolley = f => { const g = new THREE.Group(); g.userData.dynamic = true;
       g.add(box(0.62, 0.04, 0.95, mats.grey, 0, 0.18, 0.8, false), box(0.62, 0.04, 0.5, mats.grey, 0, 0.72, 0.62, false), box(0.62, 0.04, 0.04, mats.grey, 0, 1.0, 0.36, false));
@@ -148,7 +148,7 @@ export function buildDecor(THREE, c) {
     for (const [cx, cz, k] of [[18, -26.2, 25], [101.6, -27.8, 28]]) for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.3; person(cx + Math.cos(a) * 0.75, cz + Math.sin(a) * 0.75, Math.atan2(-Math.cos(a), -Math.sin(a)), { shirt: pick(k + i), backpack: i === 1 }); }
     for (const [x0, x1, z, sp] of [[8, 118, -27.9, 0.7], [9.3, 119.3, -27.9, 0.7]]) { const f = figure(mats, { shirt: P.navy, staff: true }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
   }
-  // ═══ 8. 走道兩側的小島（z -25.5 與 -14.5）：書報攤、花店推車、充電桌、拍貼機、按摩椅；紙飛機 ═══
+  // ═══ 8. 走道兩側的小島（z -25.5 與 -14.5） ═══
   { // 書報攤（x 48，z -31.8，2026-11-18 自查從 15,-25.5 搬過來：之前在三條走的線上）：圓的攤、雜誌架三面、老闆。
     term.add(cyl(1.3, 1.3, 1.0, mats.navy, 48, 0.5, -31.8, 12), cyl(1.4, 1.4, 0.08, mats.cream, 48, 1.04, -31.8, 12), cyl(1.6, 1.6, 0.12, mats.orange, 48, 3.0, -31.8, 12), cyl(0.05, 0.05, 2.0, mats.grey, 48, 2.0, -31.8, 5));
     const mags = [[], [], []]; let n = 0; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; mags[n++ % 3].push([48 + Math.cos(a) * 1.32, 1.3 + (i % 2) * 0.35, -31.8 + Math.sin(a) * 1.32, -a]); }
@@ -158,7 +158,7 @@ export function buildDecor(THREE, c) {
     const fl = [[], [], []]; n = 0; for (let i = 0; i < 12; i++) fl[n++ % 3].push([49.2 + (i % 6) * 0.32, 1.25 + Math.floor(i / 6) * 0.15, -11.5 + Math.floor(i / 6) * 0.5]);
     term.add(...fl.map((g, i) => instanced(new THREE.SphereGeometry(0.13, 6, 5), [mats.orangeLight, mats.yellowLight, mats.cream][i], g, false)), instanced(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 4), mats.plant, fl.flat().map(([x, y, z]) => [x, y - 0.2, z]), false));
     sign("FLOWERS", "花店", 1.6, 0.5, palette.teal, palette.cream, 50, 2.0, -11.96, Math.PI, { align: "center", size: 150 }); person(51.6, -10.1, -Math.PI / 2, { shirt: pick(31), bag: true });
-    // 充電桌（x 65，z -30.6）：高桌、四張高腳凳、桌上的充電孔與三支手機、兩個人坐著滑。
+    // 充電桌（x 65，z -30.6）。
     term.add(box(2.6, 0.08, 0.9, whiteM, 65, 1.1, -30.6, false), instanced(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 6), mats.dark, [[64, 0.55, -30.6], [66, 0.55, -30.6]], false), instanced(new THREE.CylinderGeometry(0.2, 0.18, 0.7, 8), mats.teal, [[64.2, 0.35, -31.5], [65.8, 0.35, -31.5], [64.2, 0.35, -29.7], [65.8, 0.35, -29.7]], false));
     term.add(instanced(smallBox(0.1, 0.02, 0.18), mats.dark, [[64.3, 1.15, -30.8], [65.1, 1.15, -30.4], [65.9, 1.15, -30.7]], false), box(0.5, 0.12, 0.2, mats.navy, 65, 1.2, -30.6, false), instanced(new THREE.SphereGeometry(0.04, 5, 4), mats.yellowLight, [[64.85, 1.28, -30.6], [65.15, 1.28, -30.6]], false));
     { const a = seated(64.2, -31.7, 0, { shirt: pick(32) }); a.position.y = 0.65; a.userData.baseY = 0.65; const b = seated(65.8, -29.5, Math.PI, { shirt: pick(33), backpack: true }); b.position.y = 0.65; b.userData.baseY = 0.65; }
@@ -166,7 +166,7 @@ export function buildDecor(THREE, c) {
     term.add(box(1.8, 2.3, 1.6, mats.orange, 80, 1.15, -11.0), box(0.8, 1.8, 0.05, mats.navy, 80, 1.0, -11.83, false), box(1.6, 0.4, 0.1, mats.light, 80, 2.0, -11.86, false)); sign("PHOTO", "拍貼", 1.5, 0.4, palette.navy, palette.cream, 80, 2.48, -11.83, Math.PI, { align: "center", size: 150 }); person(79.2, -12.0, 0.3, { shirt: pick(34) });
     for (const x of [94, 96]) { term.add(box(0.9, 0.5, 1.4, mats.navy, x, 0.4, -30.6), box(0.9, 1.0, 0.3, mats.navy, x, 1.1, -31.3, false), instanced(smallBox(0.22, 0.5, 0.9), mats.teal, [[x - 0.4, 0.75, -30.5], [x + 0.4, 0.75, -30.5]], false)); }
     { const m = seated(94, -30.5, 0, { shirt: pick(35) }); m.position.y = 0.6; m.userData.baseY = 0.6; } sign("MASSAGE", "按摩椅", 1.2, 0.4, palette.teal, palette.cream, 95, 1.9, -31.4, 0, { align: "center", size: 150 }); term.add(cyl(0.03, 0.03, 1.8, mats.grey, 95, 0.9, -31.5, 4));
-    // 天花板的紙飛機（x 30 到 60，z -27 與 -13）：十二架奶油色的紙飛機吊著，各自慢慢轉。
+    // 天花板的紙飛機（x 30 到 60，z -27 與 -13）。
     const planes = new THREE.Group(); planes.userData.dynamic = true; term.add(planes); const pg = new THREE.ConeGeometry(0.25, 1.2, 3); pg.rotateX(Math.PI / 2);
     const arr = []; for (let i = 0; i < 12; i++) { const m = new THREE.Mesh(pg, mats.cream); m.castShadow = false; m.position.set(30 + (i % 6) * 6, 7.5 + (i % 3) * 0.8, i < 6 ? -27 : -13); planes.add(m); arr.push(m); const w = cyl(0.01, 0.01, T.h - 1 - m.position.y, mats.grey, m.position.x, (T.h - 1 + m.position.y) / 2, m.position.z, 3); w.castShadow = false; term.add(w); }
     ticks.push(t => arr.forEach((m, i) => { m.rotation.y = t * 0.4 + i; m.rotation.z = Math.sin(t * 0.8 + i) * 0.15; }));

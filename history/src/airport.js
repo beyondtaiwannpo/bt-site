@@ -186,9 +186,9 @@ const BOARD_IN = 0.345;      // 旅客走進機艙、看不到的進度
 export const bridgeFloorY = (s, z) => { const bp = boardPath(); const q = typeof z === "number" ? z : bp.at(s).z; return q <= 0 ? 0 : BRIDGE.floorEnd * clamp01(q / (BRIDGE.zEnd - BRIDGE.half)); };
 
 // 旅客在航廈裡走的路（2026-11-19 Paul：「he shouldn't be crossing boxes or passing through people… turn left, buy coffee, talk to people」）：
-// 每一格 [進度 e, x, z, 面向, 站著]，兩格同一點就是停下來做事（排隊報到、證照查驗、窗邊咖啡店買咖啡、搭電動步道、跟三個人聊天）。點都挑在走道上來回的人的車道之間、傢俱之外（自查時用射線掃過）。
-// 最後一格就是空橋那條路 8 公尺處，跟空橋段接得上。鏡頭還是走 z -20 那條直線。
-const WALK_PTS = [[0, -30, -17.6], [0.012, -16, -21.5], [0.02, -14.5, -28.5], [0.024, -16.5, -31.0, Math.PI], [0.036, -16.5, -31.0, Math.PI], [0.042, -14.5, -24], [0.05, -8, -17.5], [0.058, 6, -17.5], [0.063, 11, -19.4, 0], [0.071, 11, -19.4, 0], [0.078, 14, -18.4], [0.13, 44, -18.4], [0.142, 46, -9.5], [0.148, 46, -7.3], [0.156, 52, -7.3, Math.PI], [0.168, 52, -7.3, Math.PI], [0.176, 46, -7.3], [0.19, 46.5, -18.4], [0.2, 48, -26.2], [0.215, 60, -26.2, 0, 1], [0.26, 96, -26.2, 0, 1], [0.266, 99.5, -26.2, 2.22], [0.278, 99.5, -26.2, 2.22], [0.3, 105.7, -14.4]];
+// 每一格 [進度 e, x, z, 面向, 站著]，兩格同一點就是停下來做事。面向 0 看 +z、π 看 -z。順序：大廳 → 報到 → 右轉到便利商店買水 → 安檢 → 證照查驗 → 免稅店門口 → 美食區 → 咖啡店買咖啡 → 窗邊看飛機 → 電動步道 → 登機門前跟人聊天等叫號 → 櫃台查登機證 → 空橋。
+// 點都挑在走的人的車道之外、傢俱之外，而且不走回頭路（追鏡在身後 4 公尺，走回頭路就會撞進鏡頭）。自查用射線掃過，見 README「批 H」。咖啡店那一停（0.162 到 0.172）壓在第二站（七站時 p 1/6）上，卡滑到正中間的時候他正好站著買咖啡。
+const WALK_PTS = [[0, -31, -20], [0.004, -28, -25.6], [0.009, -28, -32.4], [0.017, -16.5, -32.4, Math.PI], [0.029, -16.5, -32.4, Math.PI], [0.032, -15.95, -28.3], [0.035, -15.95, -24], [0.041, -15, -16], [0.047, -18, -8, 0], [0.059, -18, -8, 0], [0.063, -13, -11], [0.068, -10, -17], [0.073, -3, -20], [0.076, 0.5, -20, Math.PI / 2], [0.082, 0.5, -20, Math.PI / 2], [0.085, 6, -20], [0.089, 11, -18.8, 0], [0.097, 11, -18.8, 0], [0.099, 13.2, -20.5], [0.102, 13.2, -25], [0.106, 12.4, -30.2], [0.109, 17, -31, Math.PI], [0.117, 17, -31, Math.PI], [0.121, 20, -27], [0.124, 24, -25], [0.131, 34, -25], [0.133, 37, -26.5, Math.PI], [0.141, 37, -26.5, Math.PI], [0.144, 41, -25.2], [0.15, 46, -18.4], [0.156, 46, -9.5], [0.158, 46, -7.3], [0.162, 52, -7.3, Math.PI], [0.172, 52, -7.3, Math.PI], [0.176, 55.9, -7.6], [0.178, 56.4, -9.9], [0.181, 56.4, -13], [0.187, 63, -13], [0.195, 63, -4.5], [0.198, 66, -4.5], [0.2, 67, -2.75, 0], [0.21, 67, -2.75, 0], [0.213, 70.3, -5], [0.217, 70.6, -8.6], [0.223, 77.5, -9], [0.227, 77.5, -13], [0.24, 66, -21], [0.248, 58, -23.6], [0.25, 57, -25.75], [0.252, 61, -25.75, 0, 1], [0.272, 95, -25.75, 0, 1], [0.275, 97.5, -25.75], [0.278, 101.5, -26, 3.08], [0.286, 101.5, -26, 3.08], [0.298, 105.7, -14.4, 0], [0.3, 105.7, -14.4, 0]];
 export function travellerAt(e) {
   const camS = walkArc(e), bp = boardPath();
   // 走到機艙門就進去了（看不到）；鏡頭還在後面幾公尺，不會跟他疊在一起。
@@ -238,15 +238,32 @@ function riseAt(f) {
 }
 // 頭尾斜率指定的三次曲線（0 到 1）：進入的速度接走路、離開的速度接停機坪，中間自然快一點。
 const hermite = (u, m0, m1) => (u * u * u - 2 * u * u + u) * m0 + (3 * u * u - 2 * u * u * u) + (u * u * u - u * u) * m1;
+// 旅客走過的路照弧長記一張表（去掉停著的格），鏡頭沿同一條路跟在他後面 4 公尺。
+let _trail = null;
+function trail() {
+  if (_trail) return _trail;
+  const P = WALK_PTS.map(k => [k[1], k[2]]), cum = [0];
+  for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+  const at = s => { s = Math.max(0, Math.min(cum[cum.length - 1], s)); let i = 0; while (i < cum.length - 2 && s > cum[i + 1]) i++; const t = (s - cum[i]) / ((cum[i + 1] - cum[i]) || 1e-9); return [lerp(P[i][0], P[i + 1][0], t), lerp(P[i][1], P[i + 1][1], t)]; };
+  // 進度 e 走到弧長幾公尺（照格算，同一點走兩次也不會認錯）
+  const sOf = e => { let i = 0; while (i < WALK_PTS.length - 2 && e >= WALK_PTS[i + 1][0]) i++; const t = clamp01((e - WALK_PTS[i][0]) / (WALK_PTS[i + 1][0] - WALK_PTS[i][0] || 1e-9)); return lerp(cum[i], cum[i + 1], t); };
+  return (_trail = { P, cum, at, sOf });
+}
+const CHASE = 4, CHASE_Y = 1.9;   // 跟在後面 4 公尺、1.9 公尺高：比安檢門框的橫桿（2.19）低，從門框底下過
+function chaseAt(e) {
+  const T = trail(), tr = travellerAt(e), s = T.sOf(e);
+  let pos;
+  if (s >= CHASE) pos = T.at(s - CHASE);
+  else { const d = [T.P[1][0] - T.P[0][0], T.P[1][1] - T.P[0][1]], L = Math.hypot(d[0], d[1]) || 1; pos = [T.P[0][0] - d[0] / L * (CHASE - s), T.P[0][1] - d[1] / L * (CHASE - s)]; }
+  return { pos: [pos[0], CHASE_Y, pos[1]], look: [tr.pos[0], 1.3, tr.pos[2]] };
+}
 export function cameraAt(e, tall) {
   e = clamp01(e);
   const EYE = 1.7, inside = tall ? CAM_FOV.insideTall : CAM_FOV.inside;
-  if (e < PHASES.bridge[0]) {
-    const x = lerp(WALK.x0, WALK.x1, e / PHASES.bridge[0]);
-    // 最後 12 公尺把視線慢慢轉向空橋那條路的方向（2026-11-18 批 A：之前 0.3 那一幀視線硬切 45°）。
-    const k = smooth(clamp01((x - (WALK.x1 - 12)) / 12)), a5 = boardPath().at(5);
-    return { pos: [x, EYE, CORRIDOR_Z], look: [x + lerp(14, a5.x - WALK.x1, k), 1.4, CORRIDOR_Z + lerp(-(tall ? 1.5 : 0.5), a5.z - CORRIDOR_Z, k)], fov: inside };
-  }
+  // 航廈：第三人稱跟拍（2026-11-19 Paul：「our perspective should be with the protagonist… if the kid goes to the shop on the left, our view should also shift left」）。
+  if (e < PHASES.bridge[0]) { const c = chaseAt(e); return { pos: c.pos, look: c.look, fov: inside }; }
+  // 空橋前 0.012 從跟拍的位置混到空橋那條路的起點，不跳。
+  if (e < PHASES.bridge[0] + 0.012) { const c = chaseAt(PHASES.bridge[0] - 1e-6), b = cameraAt(PHASES.bridge[0] + 0.012, tall), k = smooth((e - PHASES.bridge[0]) / 0.012); return { pos: c.pos.map((v, i) => lerp(v, b.pos[i], k)), look: c.look.map((v, i) => lerp(v, b.look[i], k)), fov: inside }; }
   if (e < WALK_END) {
     const bp = boardPath(), s = walkArc(e), q = bp.at(s), ahead = bp.at(Math.min(bp.length, s + 5));
     const y = EYE + bridgeFloorY(s);

@@ -1,6 +1,6 @@
-// /history/ 的主程式：拿資料、開 3D 場景、接捲動、年份帶、鍵盤、覆蓋層、網址 hash、中英、自動走。
+// /history/ 的主程式。
 // 這一支碰 DOM，純函式都在 data.js、ui.js、airport.js。gsap 不在這裡（只在 scene.js 的 motion()）；Three 也不在這裡（只在 scene.js 與 plane.js）。
-// scene.js 是**動態 import** 的：Three 拿不到（離線、雜湊對不上、被擋）就走直立時間軸，頁面不會白掉。
+// scene.js 是**動態 import** 的。
 import * as D from "./data.js";
 import * as UI from "./ui.js";
 import * as A from "./airport.js";
@@ -45,8 +45,8 @@ function renderCards() {
   measureCards(); placeCards();
 }
 // 卡貼在 3D 錨點投到螢幕的那一點上方（像素）。卡不隨遠近縮放（字要讀得到），鏡頭快到了才浮出來。
-// 卡貼在 3D 錨點投到螢幕的那一點上方。位置用 CSS 的 translate（不是 left/top，也不是 transform：transform 留給浮出來那一下的過渡），
-// 每一幀只寫不讀：卡的寬度在 renderCards() 與 resize 時量一次記在 _w，畫面寬度記在 measured（每幀讀 offsetWidth 會逼瀏覽器重新排版）。
+// 卡貼在 3D 錨點投到螢幕的那一點上方。位置用 CSS 的 translate（不是 left/top，也不是 transform。
+// 每一幀只寫不讀。
 function placeCards() {
   if (!gl || !stageEl) return;
   const W = measured[0] || innerWidth;
@@ -55,12 +55,17 @@ function placeCards() {
     const p = gl.project(s.anchor);
     // 現在這一站，加上下一站在快到之前那一小段，卡才浮出來。
     const d = (eased - s.p) * Math.max(1, w.n - 1);
-    const near = p.visible && d > -0.42 && d < 0.6;
+    // 2026-11-19 Paul：走到一站卡自己滑到正中間（不用點），走過去就滑回錨點。closeness 0.45 以上算「到了」。
+    // 到了就一定顯示，不管錨點在不在畫面裡（追鏡跟著旅客轉，錨點常常在鏡頭背後）。
+    const focus = i === A.nearest(w, progress) && A.closeness(w, progress) > 0.45;
+    const near = focus || (p.visible && d > -0.42 && d < 0.6);
     if (c._near !== near) { c._near = near; c.classList.toggle("near", near); }
-    if (!p.visible) return;
-    // 卡不准被畫面左右切掉（手機上那一站可能靠邊）：夾在邊界內，尾巴可以歪一點沒關係。
+    if (c._focus !== focus) { c._focus = focus; c.classList.toggle("focus", focus); }
+    if (!near) return;
+    // 卡不准被畫面左右切掉（手機上那一站可能靠邊）。
     const half = (c._w || 280) / 2 + 10;
-    const x = Math.round(Math.min(W - half, Math.max(half, p.x)) * 2) / 2, y = Math.round(Math.max((c._h || 60) + 86, p.y - 8) * 2) / 2;   // 整張卡要在頂欄底下
+    const H = measured[1] || innerHeight;
+    const x = focus ? Math.round(W / 2) : Math.round(Math.min(W - half, Math.max(half, p.x)) * 2) / 2, y = focus ? Math.round(Math.max((c._h || 60) + 86, H * 0.38)) : Math.round(Math.max((c._h || 60) + 86, p.y - 8) * 2) / 2;   // 整張卡要在頂欄底下；到站的卡尖端在 38% 高，壓在旅客頭上方而不是蓋住他（追鏡把他放在正中間）
     if (c._x === x && c._y === y) return;
     c._x = x; c._y = y; c.style.translate = `${x}px ${y}px`;
   });
@@ -70,7 +75,7 @@ function renderStrip() {
   $("strip").innerHTML = UI.stripHTML(stops, current, lang);
   measureStrip(); placeDot();
 }
-// 換站只改 class 與那兩個數字，不重建整條年份帶（順不順批 2：之前每換一站 innerHTML 重來、再量一次每一顆的位置）。
+// 換站只改 class 與那兩個數字，不重建整條年份帶（順不順批 2。
 function updateStrip() {
   const strip = $("strip"); if (!strip.querySelector(".strip-stop")) { renderStrip(); return; }
   strip.querySelectorAll(".strip-stop").forEach((b, i) => { const on = i === current; b.classList.toggle("on", on); if (on) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current"); });
@@ -120,10 +125,10 @@ function onProgress(p) {
   progress = p;
   if (!gl) return;
   eased = A.eased(w, p);
-  // 這裡不畫：onTick 每一幀畫一次就夠（之前捲動時這裡也畫一次，一幀畫兩次，2026-11-17 批 1 量到）。只有沒有 ticker 的時候（瞬間跳站）才補畫。
+  // 這裡不畫。
   if (!tickerOn) { gl.render(eased, clock); placeCards(); }
   if (endEl) endEl.classList.toggle("show", w.n > 0 && p > 1 - 0.5 / Math.max(1, w.n - 1) && (A.planePoseAt(eased).lift || 0) > 0.6);
-  // 靠近一站稍微放大：放在鏡頭的 zoom（順不順批 3：之前每一幀 scale 整個 .world，含那張幾百萬像素的畫布）。
+  // 靠近一站稍微放大。
   gl.setZoom(1 + 0.04 * A.closeness(w, p));
   placeDot(); rush(p);
   // 室內那兩段（航廈與空橋）左上的大年份淡一半，不然壓在 3D 的室內上很突兀。class 沒變就不碰。
@@ -131,7 +136,7 @@ function onProgress(p) {
   const n = A.nearest(w, p); if (n >= 0) setCurrent(n);
   if (p > 0.01) $("hint").classList.add("gone");
 }
-// 閒置的時鐘：信標、雲、車、人。進度沒變的時候也要重畫（它們在動）。分頁在背景就不畫。
+// 閒置的時鐘。
 let tickerOn = false;
 function onTick(tsec) { clock = tsec; tickerOn = true; if (gl && !document.hidden) { gl.render(eased, clock); placeCards(); } }
 function size() {
@@ -229,7 +234,7 @@ document.addEventListener("click", e => {
 $("lang").addEventListener("click", () => setLang(lang === "zh" ? "en" : "zh"));
 $("play").addEventListener("click", () => playing ? stopPlay() : startPlay());
 addEventListener("hashchange", () => { const i = D.indexFromHash(location.hash, stops); if (i >= 0 && i !== current) goTo(i); });
-// 視窗變了就重量。用 ResizeObserver 不用 resize 事件：嵌在別的視窗裡（預覽面板、iframe）時 resize 不一定會來，而 stage 的大小變了是真的。
+// 視窗變了就重量。用 ResizeObserver 不用 resize 事件。
 let roTimer = 0;
 const onResize = () => { clearTimeout(roTimer); roTimer = setTimeout(() => { size(); measureCards(); measureStrip(); placeDot(); if (api) api.refresh(); onProgress(progress); }, 80); };
 addEventListener("resize", onResize);
@@ -270,8 +275,8 @@ async function boot() {
   $("skeleton").innerHTML = UI.skeletonHTML(lang);
   const fetching = D.fetchStops();
   await paintFirst();
-  // 三樣東西一起等：GSAP、場景（Three，幾百 KB）、資料。減少動態或 ?motion=off 就不去載場景。
-  // **資料先到就先畫年份帶與大年份**，不等 Three：大年份是 Lighthouse 量 LCP 的那個元素，批 5 第一次量讓它等 Three 下載完，慢了快一秒。
+  // 三樣東西一起等。
+  // **資料先到就先畫年份帶與大年份**，不等 Three。
   const sceneP = wantMove ? Promise.all([gsapReady(), sceneReady()]).then(r => r[1]) : gsapReady().then(() => null);
   let rows;
   try { rows = await fetching; }
@@ -284,7 +289,7 @@ async function boot() {
   const start = Math.max(0, D.indexFromHash(location.hash, stops));
   $("strip").hidden = false; setCurrent(start); revealCurrent(true);
   const S = await sceneP, webgl = !!(S && S.webglOK());
-  // 走哪一條：沒開減少動態效果、沒有 ?motion=off、WebGL 開得出來、gsap 與 Three 都載到了，才走 3D（airport.js 的 pickMode）。
+  // 走哪一條。
   const mode = A.pickMode({ reduce, motionOff, webgl, gsap: !!(window.gsap && window.ScrollTrigger), three: !!S });
   if (mode !== "3d" && wantMove) {
     // 本來準備走 3D 的，少了一樣：換到直立時間軸。
@@ -297,7 +302,7 @@ async function boot() {
     gl.setStops(w, motifs); gl.setBoard(UI.boardRows(stops, 0)); gl.setGate(A.boardingGate(stops.length));
     gl.prepareBoard(stops.map((_, i) => UI.boardRows(stops, i)));   // 每一站那張看板趁閒的時候先做好（順不順批 2）
     // 捲動的長度（下面那一行有新的說明）。
-    // 每站一屏半（順不順批 4，Paul：滾輪太快、一撥就跳過一站；之前一屏）。最少九屏，站少的時候不能三下就起飛。自動走的速度照站數算，不受影響。
+    // 每站一屏半（順不順批 4，Paul。
     $("road-wrap").style.height = `${Math.max(stops.length + 1, 9) * 150}vh`;
     size(); renderCards();
     api = S.motion({ wrap: $("road-wrap"), stage: $("stage"), onProgress, onTick });

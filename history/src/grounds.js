@@ -24,14 +24,14 @@ export function buildGrounds(THREE, c) {
     // 停機位的看板（一根柱子、A320 / B737 的字）
     for (const [x, label] of STANDS) { world.add(cyl(0.08, 0.1, 3.2, mats.grey, x + 2, 1.6, 21, 6)); sign((label || "A") + "  ·  A320 / B737", "", 3.0, 0.8, palette.navy, palette.cream, x + 2, 3.4, 21, 0, { align: "center", size: 180 }); }   // 位號在航廈那一面，機師進位時對著看（批 D：之前立在推出去的路上）
   }
-  // 另外兩座空橋與停著的飛機（B1、B5）：跟 scene.js 的 B2、B4 一樣直直伸出去。B3 空著，只留一台拖車與地勤。
+  // 另外兩座空橋與停著的飛機（B1、B5）。
   for (const [x, tail] of [[25, "orange"], [92, "yellow"]]) {
     const g = new THREE.Group(); g.position.set(x + 3.4, 2.6, 19);
     g.add(box(3.2, 2.9, 38, lam(P.wall), 0, 0, 0)); g.add(box(3.4, 0.5, 38, mats.teal, 0, 0.2, 0, false));
     world.add(g, cyl(0.3, 0.3, 2.6, mats.frame, x - 1.2, 1.3, 32, 6), cyl(0.3, 0.3, 2.6, mats.frame, x + 1.2, 1.3, 32, 6));
     const pl = buildAirliner(THREE, { body: P.cream, tail: P[tail], mark: P.navy, dark: P.dark }); pl.position.set(x + 7, A.PLANE_REST_Y, A.GATE_STAND[1]); pl.rotation.y = Math.PI; shadowOn(pl); world.add(pl);
   }
-  // 有飛機的停機位：輸送帶車、電源車、行李籠、錐桶、輪擋、地勤。空著的 B3：拖車、行李車、指揮的人。
+  // 有飛機的停機位。
   {
     const ulds = [], cones = [], chocks = [], gpus = [], gpuWheels = [];
     for (const [x, , busy] of STANDS) {
@@ -47,7 +47,7 @@ export function buildGrounds(THREE, c) {
     world.add(instanced(new THREE.BoxGeometry(2.2, 1.5, 1.6), mats.grey, ulds), instanced(new THREE.ConeGeometry(0.35, 0.8, 6), mats.orange, cones, false), instanced(new THREE.BoxGeometry(0.6, 0.3, 0.3), mats.orange, chocks, false));
     world.add(instanced(new THREE.BoxGeometry(1.8, 1.4, 1.2), mats.navy, gpus), instanced(new THREE.CylinderGeometry(0.35, 0.35, 0.3, 8), mats.dark, gpuWheels.map(([x, y, z]) => [x, y, z]), false));
   }
-  // 停機坪：伸縮縫（每 7.5 公尺一條深灰線，兩個方向）、沿航廈的服務道（白邊線、虛線）。
+  // 停機坪。
   {
     const jx = [], jz = []; for (let z = 7.5; z < 220; z += 7.5) jx.push([90, 0.025, z]); for (let x = -72.5; x < 260; x += 7.5) jz.push([x, 0.025, 110]);
     const jointM = lam(P.apron.clone().lerp(P.navy, 0.18));
@@ -61,7 +61,7 @@ export function buildGrounds(THREE, c) {
   // 滑行道的指示牌（三個彎各一塊黃底黑字）、等待線旁的紅底白字牌。
   for (const u of [0.22, 0.5, 0.78]) { const p = tw.at(tw.length * u), nx = Math.cos(p.yaw), nz = -Math.sin(p.yaw); const x = p.x + nx * 13, z = p.z + nz * 13; world.add(box(2.4, 0.9, 0.2, mats.yellowLight, x, 1.1, z, false), box(0.9, 0.5, 0.22, mats.dark, x - 0.6, 1.1, z, false), instanced(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 5), mats.grey, [[x - 0.9, 0.35, z], [x + 0.9, 0.35, z]], false)); }
   { const h = tw.at(tw.length - 130), nx = Math.cos(h.yaw), nz = -Math.sin(h.yaw); world.add(box(2.4, 0.9, 0.2, redM, h.x + nx * 13, 1.1, h.z + nz * 13, false), box(1.4, 0.3, 0.22, mats.cream, h.x + nx * 13, 1.1, h.z + nz * 13, false)); }
-  // 跑道：另一端的號碼、瞄準點、觸地帶、PAPI、進場燈、ILS、下滑台、擋焰牆、距離標牌。
+  // 跑道。
   {
     const num = new THREE.Mesh(new THREE.PlaneGeometry(14, 22), lam(P.white, { map: textTexture(256, 400, palette.cream, [{ text: "09", font: `700 300px ${fonts.display}`, color: palette.navy, x: 128, y: 200, align: "center" }]) }));
     num.rotation.x = -Math.PI / 2; num.rotation.z = -Math.PI / 2; num.position.set(R.x0 + 60, 0.07, R.z); num.receiveShadow = false; world.add(num);
@@ -77,7 +77,7 @@ export function buildGrounds(THREE, c) {
     { const f = box(60, 3.2, 0.4, mats.navy, R.x0 - 150, 1.6, R.z, false); f.rotation.x = -0.35; f.rotation.y = Math.PI / 2; world.add(f); }
     const ds = []; for (let x = R.x1 - 300; x > R.x0 + 200; x -= 300) ds.push([x, 0.8, R.z - R.half - 12]); world.add(instanced(new THREE.BoxGeometry(0.4, 1.4, 1.6), mats.navy, ds, false), instanced(new THREE.BoxGeometry(0.42, 0.5, 1.2), mats.cream, ds.map(([x, y, z]) => [x, y + 0.2, z]), false));
   }
-  // 周界圍籬：繞整個空側一圈（航廈那一段不圍），每 6 公尺一根柱、上面一條橫桿。
+  // 周界圍籬。
   {
     const posts = [], rails = [];
     const seg = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.floor(L / 6); for (let i = 0; i <= n; i++) posts.push([x0 + (x1 - x0) * i / n, 1.2, z0 + (z1 - z0) * i / n]); const r = box(L, 0.08, 0.08, mats.grey, (x0 + x1) / 2, 2.3, (z0 + z1) / 2, false); r.rotation.y = -Math.atan2(z1 - z0, x1 - x0); rails.push(r); };
@@ -85,7 +85,7 @@ export function buildGrounds(THREE, c) {
     world.add(instanced(new THREE.CylinderGeometry(0.06, 0.08, 2.4, 5), mats.grey, posts, false), ...rails);
     for (const [x, z] of [[-140, 2], [260, 2], [430, 270], [60, 560], [-1800, 270]]) sign("RESTRICTED AREA", "管制區", 2.2, 0.8, palette.yellow, palette.navy, x, 1.5, z + 0.3, 0);
   }
-  // 消防站：第二台消防車、一座瞭望塔。直升機停機坪（圓、H、一架直升機，旋翼會轉）。
+  // 消防站。
   { const g = new THREE.Group(); g.position.set(210, 0, 70); world.add(g); g.add(box(7, 2.6, 3, mats.orange, 9, 1.4, -13), box(2.6, 1.6, 2.8, mats.frame, 5.8, 3.2, -13), box(0.3, 0.3, 6, mats.grey, 9.5, 2.95, -13, false), cyl(0.5, 0.6, 14, mats.wall, -17, 7, 6, 8), box(3.6, 2.4, 3.6, mats.wallShade, -17, 15.2, 6), box(4, 0.3, 4, mats.roof, -17, 16.5, 6, false)); }
   { const x = 262, z = 28; world.add(cyl(9, 9, 0.06, mats.cream, x, 0.03, z, 24), cyl(8.3, 8.3, 0.08, mats.apron, x, 0.04, z, 24), instanced(new THREE.BoxGeometry(0.8, 0.02, 5), mats.cream, [[x - 1.8, 0.09, z], [x + 1.8, 0.09, z], [x, 0.09, z, Math.PI / 2, 0.75]], false));
     const h = new THREE.Group(); h.userData.dynamic = true; h.position.set(x, 0, z); h.rotation.y = 0.6; world.add(h);
@@ -93,7 +93,7 @@ export function buildGrounds(THREE, c) {
     const rotor = new THREE.Group(); rotor.position.y = 3.05; rotor.add(box(11, 0.08, 0.3, mats.dark, 0, 0, 0, false), box(0.3, 0.08, 11, mats.dark, 0, 0, 0, false)); h.add(rotor);
     const tail = new THREE.Group(); tail.position.set(-6.5, 2.4, 0.15); tail.add(box(1.6, 0.06, 0.15, mats.dark, 0, 0, 0, false), box(0.15, 0.06, 1.6, mats.dark, 0, 0, 0, false)); tail.rotation.x = Math.PI / 2; h.add(tail);
     movers.push({ fn: t => { rotor.rotation.y = t * 24; tail.rotation.z = t * 60; } }); crew(x + 6, z + 5, -0.6); }   // 旋翼每秒四轉（之前 0.19 轉，像壞了）
-  // 小飛機機坪（跑道這一側）：兩架小螺旋槳機、一座小機棚；水塔；變電所；維修場（貨櫃、三台車）。
+  // 小飛機機坪（跑道這一側）。
   {
     const wheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.2, 8); wheelGeo.rotateZ(Math.PI / 2);
     for (const [x, z, ry, m] of [[-20, 250, 0.4, mats.cream], [-5, 262, -0.3, mats.orange]]) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; world.add(g); const body = cyl(0.6, 0.75, 7, m, 0, 1.3, 0, 10); body.rotation.x = Math.PI / 2; g.add(body); g.add(box(9, 0.14, 1.4, m, 0, 1.2, 0.4), box(2.8, 0.14, 0.9, m, 0, 1.4, -3.3, false), box(0.12, 1.4, 1.0, m, 0, 2.0, -3.3, false), box(0.12, 1.4, 0.3, mats.dark, 0, 1.3, 3.6, false), cyl(0.14, 0.14, 0.5, mats.dark, 0, 1.3, 3.55, 6), instanced(wheelGeo, mats.dark, [[-1, 0.3, 1.2], [1, 0.3, 1.2], [0, 0.3, -2.4]], false)); }
@@ -105,7 +105,7 @@ export function buildGrounds(THREE, c) {
   // 會動的。
   {
     const fm = new THREE.Group(); fm.userData.dynamic = true; fm.add(box(4.2, 1.1, 1.9, mats.yellowLight, 0, 0.6, 0), box(2.0, 0.7, 1.7, mats.glass, -0.2, 1.5, 0, false), box(1.2, 0.3, 0.3, mats.orangeLight, 0, 2.0, 0, false), box(0.9, 0.3, 1.9, mats.dark, 1.7, 1.05, 0, false)); world.add(fm);
-    // 來回的車：兩頭用餘弦慢下來再掉頭，車頭用追的（批 B，之前到頭瞬間翻面）。
+    // 來回的車。
     const wr = a => Math.atan2(Math.sin(a), Math.cos(a)), shuttle = (o, f, x0, len, z) => { let ry = Math.PI / 2; movers.push({ fn: t => { const u = (t * f) % 2, d = 0.5 - 0.5 * Math.cos(Math.PI * u); o.position.set(x0 + d * len, 0, z); ry += wr((u < 1 ? Math.PI / 2 : -Math.PI / 2) - ry) * 0.06; o.rotation.y = ry; } }); };
     shuttle(fm, 0.02, -30, 130, 85);
     const ab = bus(0, 0, 0, mats.cream); ab.userData.dynamic = true; shuttle(ab, 0.012, 20, 80, 100);
@@ -144,7 +144,7 @@ export function buildGrounds(THREE, c) {
     world.add(box(6, 6, 0.6, mats.navy, gx + 20.3, 13.8, gz - 12, false)); sign("PARKING", "停車場", 5, 5, palette.navy, palette.yellow, gx + 20.65, 13.8, gz - 12, Math.PI / 2, { align: "center", size: 150 });
     world.add(box(0.3, 1.0, 0.3, mats.navy, gx + 24, 0.5, gz + 12, false), box(4, 0.12, 0.12, mats.orange, gx + 24, 1.0, gz + 14, false));   // 入口柵欄
   }
-  // 公車總站（x 128 到 164）：雨棚、公車、等車的人。加油站（x -62，z -135）：雨棚、油槍、小店。
+  // 公車總站（x 128 到 164）。
   {
     world.add(box(38, 0.3, 11, mats.roof, 137, 4.6, -57, false), instanced(new THREE.CylinderGeometry(0.25, 0.3, 4.6, 8), mats.column, [[121, 2.3, -53], [137, 2.3, -53], [153, 2.3, -53], [121, 2.3, -61], [137, 2.3, -61], [153, 2.3, -61]], false), box(38, 0.25, 3, paveM, 137, 0.12, -52.5, false));
     [mats.teal, mats.orange, mats.navy, mats.cream].forEach((m, i) => bus(123 + i * 9, -59.5, Math.PI / 2, m));
@@ -189,8 +189,8 @@ export function buildGrounds(THREE, c) {
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(1, 1, 1), V = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     movers.push({ fn: t => { for (let i = 0; i < N; i++) { const lane = i < 6; const sp = lane ? 9 + (i % 3) * 1.5 : 10 + (i % 2) * 2; const span = lane ? 230 : 230; const u = ((t * sp + i * 37) % span); const x = lane ? -50 + u : 180 - u, z = lane ? -48.3 + (i % 2) * 1.8 : -108 - (i % 2) * 2.2; Q.setFromAxisAngle(up, lane ? Math.PI / 2 : -Math.PI / 2); V.set(x, 0.6, z); M.compose(V, Q, S); bodies.setMatrixAt(i, M); V.set(x + (lane ? 0.2 : -0.2), 1.5, z); M.compose(V, Q, S); tops.setMatrixAt(i, M); } bodies.instanceMatrix.needsUpdate = true; tops.instanceMatrix.needsUpdate = true; } });
   }
-  // ═══ 第三批（2026-11-18）：航廈的屋頂（從停機坪與空中看最大的一片）與跑道的胎痕 ═══
-  // 屋頂：女兒牆、天窗的玻璃脊、空調主機、太陽能板、天線、逃生梯小屋、通風口。
+  // ═══ 第三批（2026-11-18） ═══
+  // 屋頂。
   {
     const tx = (T.x0 + T.x1) / 2, tz = (T.z0 + T.z1) / 2, tw0 = T.x1 - T.x0, td = T.z1 - T.z0, y = T.h + 0.4;
     world.add(box(tw0 + 3, 0.9, 0.5, mats.wallShade, tx, y + 0.45, T.z0 - 1.5, false), box(tw0 + 3, 0.9, 0.5, mats.wallShade, tx, y + 0.45, T.z1 + 1.5, false), box(0.5, 0.9, td + 3, mats.wallShade, T.x0 - 1.5, y + 0.45, tz, false), box(0.5, 0.9, td + 3, mats.wallShade, T.x1 + 1.5, y + 0.45, tz, false));
@@ -204,7 +204,7 @@ export function buildGrounds(THREE, c) {
     world.add(cyl(0.08, 0.1, 9, mats.grey, T.x0 + 4, y + 4.5, -36, 6), cyl(0.08, 0.1, 7, mats.grey, T.x1 - 4, y + 3.5, -4, 6), box(1.2, 0.08, 0.08, mats.grey, T.x0 + 4, y + 8.5, -36, false), box(3, 2.6, 3, mats.wall, T.x0 + 10, y + 1.3, -4), box(3, 2.6, 3, mats.wall, T.x1 - 10, y + 1.3, -36));
     const vents = []; for (let i = 0; i < 10; i++) vents.push([T.x0 + 14 + i * 14, y + 0.5, -21 + (i % 2 ? 5.5 : -5.5)]); world.add(instanced(new THREE.CylinderGeometry(0.5, 0.6, 1.0, 8), mats.wallShade, vents, false));
   }
-  // 跑道的胎痕：兩端觸地帶各二十幾條深色的刷痕（真的跑道落地那一段都是黑的）。
+  // 跑道的胎痕。
   {
     const marks = []; let a = 17; const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
     for (let i = 0; i < 26; i++) { const dz = (rnd() - 0.5) * 16, len = 20 + rnd() * 40; marks.push([R.x1 - 250 - rnd() * 120, 0.04, R.z + dz, 0, 1 + rnd()], [R.x0 + 250 + rnd() * 120, 0.04, R.z + dz, 0, 1 + rnd()]); void len; }

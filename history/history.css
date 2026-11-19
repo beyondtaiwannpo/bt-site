@@ -54,6 +54,8 @@ html.rushing .top,html.rushing .strip{opacity:.45}
   font:400 15px/1.3 var(--body);
   transition:opacity var(--dur-3) var(--ease),transform var(--dur-3) var(--ease),visibility 0s linear var(--dur-3),box-shadow var(--dur-2) var(--ease)}
 .card.near{opacity:1;visibility:visible;transform:translate(-50%,-100%) translateY(0);transition-delay:0s}
+.card.near{transition:translate var(--dur-3) var(--ease),scale var(--dur-3) var(--ease),box-shadow var(--dur-3) var(--ease),opacity var(--dur-2) var(--ease),visibility 0s}
+.card.focus{scale:1.14;box-shadow:0 22px 60px rgba(16,42,134,.28);z-index:3}
 .card:hover{box-shadow:0 20px 48px rgba(16,42,134,.24),0 2px 6px rgba(16,42,134,.1)}
 .card-thumb{flex:0 0 auto;width:56px;height:56px;border-radius:10px;object-fit:cover;background:rgba(16,42,134,.08)}
 .card-plus{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:var(--bt-orange);color:var(--bt-navy);

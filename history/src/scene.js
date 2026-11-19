@@ -263,7 +263,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     const hang = instanced(new THREE.CylinderGeometry(0.06, 0.06, T.h - 8, 5), mats.grey, [[-3.8, (T.h - 8) / 2 + 1.7, 0], [3.8, (T.h - 8) / 2 + 1.7, 0]], false); g.add(hang);
     face.userData.dynamic = true; term.add(g); boards.push(face);
   }
-  // 安檢在 x 0.5 到 5：鏡頭走 z -20、旅客走 z -17.5。
+  // 安檢在 x 0.5 到 5：旅客跟追鏡都走 z -20，穿過中間那道門。
   {
     const x = 2.5, lanes = [-23, -20, -17.5];
     for (const z of lanes) term.add(box(0.3, 2.3, 0.3, mats.navy, x, 1.15, z - 0.75, false), box(0.3, 2.3, 0.3, mats.navy, x, 1.15, z + 0.75, false), box(0.3, 0.25, 1.8, mats.navy, x, 2.4, z, false), box(0.3, 0.06, 1.5, mats.orangeLight, x, 2.22, z, false));
@@ -278,7 +278,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     let k = 0;
     for (let x = 60; x <= 100; x += 7) for (const z of [-7, -11, -29, -33]) { benches.push([x, 0.28, z]); for (let i = 0; i < 5; i++) (k++ % 2 ? seatsT : seatsO).push([x - 2 + i, 0.62, z]); }
     term.add(instanced(new THREE.BoxGeometry(5.2, 0.12, 0.9), mats.grey, benches), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.teal, seatsT), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.orange, seatsO));
-    for (const [x, z, i] of [[62, -7, 0], [71, -11, 1], [90, -29, 2], [96, -33, 3], [83, -7, 4], [67, -29, 1]]) { const f = figure(mats, { shirt: pick(i), seated: true, skirt: i % 3 === 1 }); f.position.set(x, 0.57, z + (z > -20 ? -0.15 : 0.15)); f.userData.baseY = 0.57; f.rotation.y = z > -20 ? Math.PI : 0; term.add(f); idleFigs.push(f); }
+    for (const [x, z, i] of [[62, -7, 0], [72, -11, 1], [90, -29, 2], [96, -33, 3], [83, -7, 4], [67, -29, 1]]) { const f = figure(mats, { shirt: pick(i), seated: true, skirt: i % 3 === 1 }); f.position.set(x, 0.57, z + (z > -20 ? -0.15 : 0.15)); f.userData.baseY = 0.57; f.rotation.y = z > -20 ? Math.PI : 0; term.add(f); idleFigs.push(f); }
   }
   // 商店：陸側三間，各自一種顏色的門面與雨棚、一塊招牌、架上幾樣東西。
   // 店本身在 decor.js，這裡只剩雨棚與招牌的板子。
@@ -286,7 +286,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
   // 盆栽：柱子旁與候機區幾盆。
   {
     const pots = [], leaves = [];
-    for (const [x, z] of [[5, -27], [20, -13], [35, -27], [50, -13], [65, -27.5], [80, -12.5], [101, -30.2], [110, -27], [57, -8], [99, -8]]) { pots.push([x, 0.4, z]); leaves.push([x, 1.4, z, 0, 1]); }
+    for (const [x, z] of [[5, -27], [20, -13], [33, -28.8], [50, -13], [65, -27.5], [80, -12.5], [101, -30.2], [110, -27], [57.5, -9.6], [99, -8]]) { pots.push([x, 0.4, z]); leaves.push([x, 1.4, z, 0, 1]); }
     term.add(instanced(new THREE.CylinderGeometry(0.55, 0.45, 0.8, 8), mats.pot, pots), instanced(new THREE.IcosahedronGeometry(0.75, 0), mats.plant, leaves));
   }
   // ═══ 航廈裡再多一點東西 ═══
@@ -328,7 +328,7 @@ export function createScene({ canvas, palette, phone, fonts }) {
     for (const [x, z, ry] of [[41, -26.2, 0.6], [42.3, -25.8, Math.PI + 0.6], [70, -22.2, -0.4], [71.2, -21.8, Math.PI - 0.4], [100, -15.5, 2.0], [101.4, -15.8, 2.0 + Math.PI], [86, -17, 1.1], [86.9, -18.2, 1.1 + Math.PI]]) { const f = figure(mats, { shirt: pick(k), backpack: k % 2 === 0 }); f.position.set(x, 0, z); f.userData.baseY = 0; f.rotation.y = ry; term.add(f); idleFigs.push(f); k++; }
     for (const [x, z] of [[58.6, -33.5], [73.5, -33.6], [89, -33.4], [91.8, -33.7]]) { const f = figure(mats, { shirt: pick(k), bag: pick(k + 2) }); f.position.set(x, 0, z); f.userData.baseY = 0; f.rotation.y = Math.PI; term.add(f); idleFigs.push(f); k++; }
     for (const [x, z] of [[31.5, -26.2], [34.6, -21.6], [81.6, -19]]) { const f = figure(mats, { shirt: pick(k) }); f.position.set(x, 0, z); f.userData.baseY = 0; f.rotation.y = Math.PI / 2; term.add(f); idleFigs.push(f); k++; }
-    for (const [x, z, ry] of [[63, -9.2, 0.3], [97.5, -31.4, -2.4]]) { const f = figure(mats, { shirt: pick(k), backpack: true }); f.scale.setScalar(0.68); f.position.set(x, 0, z); f.userData.baseY = 0; f.rotation.y = ry; term.add(f); idleFigs.push(f); k++; }
+    for (const [x, z, ry] of [[61.6, -9.3, 0.3], [97.5, -31.4, -2.4]]) { const f = figure(mats, { shirt: pick(k), backpack: true }); f.scale.setScalar(0.68); f.position.set(x, 0, z); f.userData.baseY = 0; f.rotation.y = ry; term.add(f); idleFigs.push(f); k++; }
   }
   // 登機門櫃台：深藍的櫃台、奶油色檯面、一個站著的地勤、一支小牌。
   term.add(box(3.4, 1.1, 1.1, mats.navy, A.GATE_DESK[0], 0.55, A.GATE_DESK[1]), box(3.6, 0.1, 1.3, mats.cream, A.GATE_DESK[0], 1.12, A.GATE_DESK[1], false));

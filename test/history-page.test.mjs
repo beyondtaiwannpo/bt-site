@@ -263,9 +263,9 @@ test("鏡頭樣條（批 5）：航廈往前走在人的高度、空橋那一段
   }
   // 航廈：在人的眼睛高度、沿走道往 +X 走、看向前方
   const a = A.cameraAt(0.05), b = A.cameraAt(0.25);
-  assert.ok(a.pos[1] > 1.3 && a.pos[1] < 2.2 && b.pos[1] > 1.3 && b.pos[1] < 2.2, "航廈的鏡頭在人的高度");
+  assert.ok(a.pos[1] > 1.3 && a.pos[1] < 2.6 && b.pos[1] > 1.3 && b.pos[1] < 2.6, "航廈的鏡頭在人的高度（跟拍在 2.05）");
   assert.ok(b.pos[0] > a.pos[0] + 20, "航廈的鏡頭往前走");
-  assert.ok(a.look[0] > a.pos[0], "看向前方");
+  for (const e of [0.05, 0.12, 0.2, 0.29]) { const c = A.cameraAt(e), t = A.travellerAt(e); const d = Math.hypot(c.look[0] - t.pos[0], c.look[2] - t.pos[2]); assert.ok(d < 1.5, "鏡頭看著旅客 " + e); }   // 2026-11-19：第三人稱跟拍
   const T = A.TERMINAL;
   assert.ok(a.pos[2] > T.z0 && a.pos[2] < T.z1 && a.pos[0] > T.x0 && a.pos[0] < T.x1, "鏡頭在航廈體積裡面");
   // 空橋：0.30 還在室內低處、0.40 已經在室外高處；中間單調升高
@@ -317,9 +317,10 @@ test("看板的版面（批 5 第二輪）：貼圖至少 1024 寬、列高至�
 });
 
 test("旅客（批 5）：航廈裡走在鏡頭前面、進空橋、上飛機就看不到了；走路的循環只在他在走的時候", () => {
-  const a = A.travellerAt(0.05), c = A.cameraAt(0.05);
+  const a = A.travellerAt(0.04);   /* 0.04 在報到與便利商店之間，他在走；0.05 他站在店門口買水 */
   assert.ok(a.visible && a.walking);
-  assert.ok(a.pos[0] > c.pos[0] + 2 && a.pos[0] < c.pos[0] + 12, "在鏡頭前面幾公尺");
+  assert.ok(!A.travellerAt(0.05).walking && !A.travellerAt(0.166).walking, "0.05 在便利商店、0.166 在咖啡店，都站著");
+  for (const e of [0.05, 0.1, 0.2, 0.28]) { const t = A.travellerAt(e), c = A.cameraAt(e); const d = Math.hypot(t.pos[0] - c.pos[0], t.pos[2] - c.pos[2]); assert.ok(d > 3 && d < 6, "鏡頭跟在旅客後面 3 到 6 公尺 " + e + "：" + d.toFixed(1)); }
   const d = A.travellerAt(0.33);
   assert.ok(d.visible && d.pos[2] > A.TERMINAL.z1 - 1, "0.33 已經走進空橋（過了玻璃牆）");
   assert.ok(!A.travellerAt(0.42).visible, "上了飛機就看不到");
