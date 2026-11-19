@@ -220,3 +220,6 @@ button:not([disabled]):active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+/* 星球頁的漫畫風（planet.html?look=comic，planet.js 在 <html> 加 .comic）：名牌像漫畫對白框，粗深藍框加實心錯位陰影。島那一頁不會有這個 class。 */
+.comic .pin{border:2px solid var(--bt-navy);box-shadow:3px 3px 0 var(--bt-navy);background:#fff}
+.comic .pin::after{border-right:2px solid var(--bt-navy);border-bottom:2px solid var(--bt-navy);bottom:-6px}

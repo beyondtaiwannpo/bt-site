@@ -5385,6 +5385,23 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 - 截圖：`docs/prototypes/2026-11-19-planet/`（桌機全景、點 Mentorship、跟著一位校友、手機全景、手機點 Curriculum）。
 - `?debug=1` 會掛一個 `window.__planet`，可以在畫面被藏起來時手動推幾幀（`__planet.frame()`）、選地方、選人。
 
+### 島風格的星球頁 `/island/planet.html`（2026-11-19）
+
+Paul 看完上面那個原型：「build it as another page, don't take away the island, build it with all the info and method on island… I want the island style」。
+所以多做一頁，跟島並排，島本身沒有拿掉。
+
+- 打開：`/island/planet.html`（本機 `http://localhost:8765/island/planet.html`）。島那一頁沒有連過來，要直接打網址；星球頁右上有「回到島」。頁面掛 `noindex`，搜尋引擎不收。
+- 跟島共用的部分：同一支 `island/src/main.js`（清單、卡、網址 `#team`、`#team/做的事`、`#p/代號`、名牌、協作線、暫停、把自己放上去全部一樣）、同一份 `teams.json`、同一個引擎 `shared/toy.js`（人、房子、桌椅、樹、地面花紋、雲、飛機都是島上那一套）。
+  `planet.html` 的 `<body data-scene="planet">` 讓 main.js 改叫 `scene.js` 的 `createPlanet()`，其他都不變。
+- 星球自己的部分只有兩支：`island/src/planet.js`（球、廣場、路、把島的擺設搬到球面上、人沿路走、鏡頭）與 `island/src/planet-strings.js`（星球頁的標題、提示，跟講到「島」的那幾句換成「地方」「星球」）。
+  `planet.js` 不自己 import three 與引擎，由 `scene.js` 傳進去，所以 check.sh 那條「只有 scene.js 碰引擎」照舊成立。
+- 擺設怎麼來的：每個廣場先叫引擎的 `decorate()` 與 `furnish()` 在一塊平的地上蓋好（跟島一模一樣），再一件一件搬到球面上。島改了擺設，星球跟著變。
+- 檔案大小：check.sh 把 `planet*.js` 從島的 250 KB 裡拿出來，另外算 60 KB 上限。**島那一頁的 250 KB 只剩約 50 bytes**，下一個要加東西到 `island/src` 的人會先撞到這條，到時候要嘛砍東西，要嘛問 Paul 要不要放寬。
+- 漫畫風：網址加 `?look=comic`（例如 `/island/planet.html?look=comic`）。光照只留三階（像賽璐璐上色）、每個東西外圍一圈深藍描邊、名牌變成粗框加實心陰影的對白框。
+  Paul 2026-11-19 說喜歡第一版原型的「漫畫感」才加的，兩種看法並排給幹部比。描邊會讓畫的東西變兩倍，所以預設關著，選定之後再決定要不要變成預設。
+  程式在 `planet.js` 的「漫畫風」那一段，名牌的樣式在 `island/island.css` 最後三行（只對 `.comic` 生效，島那一頁不受影響）。
+- 還沒做：沒接選單、沒有正式頁的效能實測、手機上沒在真機上試過。機場那張卡的文字還是島的說法（「海上的機場」「走橋上島」），那是 `teams.json` 兩頁共用的資料，要改得兩頁一起想。
+
 ## 嘖嘖的互動頁 `/stories/`（2026-11-16，demo）
 
 Paul 2026-10-13 定的：募資的互動內容放官網自己一頁，主線是 three personas：陌生人挑一個公立高中生、走一遍他申請的那一年，最後落到「贊助這個計畫」。
