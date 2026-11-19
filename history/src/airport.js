@@ -185,17 +185,19 @@ const BOARD_IN = 0.345;      // 旅客走進機艙、看不到的進度
 // A 段從門口的 0 升到轉角的 2.4（空橋本來就是斜的），B 段平的。用 z 算，不用弧長。
 export const bridgeFloorY = (s, z) => { const bp = boardPath(); const q = typeof z === "number" ? z : bp.at(s).z; return q <= 0 ? 0 : BRIDGE.floorEnd * clamp01(q / (BRIDGE.zEnd - BRIDGE.half)); };
 
+// 旅客在航廈裡走的路（2026-11-19 Paul：「he shouldn't be crossing boxes or passing through people… turn left, buy coffee, talk to people」）：
+// 每一格 [進度 e, x, z, 面向, 站著]，兩格同一點就是停下來做事（排隊報到、證照查驗、窗邊咖啡店買咖啡、搭電動步道、跟三個人聊天）。點都挑在走道上來回的人的車道之間、傢俱之外（自查時用射線掃過）。
+// 最後一格就是空橋那條路 8 公尺處，跟空橋段接得上。鏡頭還是走 z -20 那條直線。
+const WALK_PTS = [[0, -30, -17.6], [0.012, -16, -21.5], [0.02, -14.5, -28.5], [0.024, -16.5, -31.0, Math.PI], [0.036, -16.5, -31.0, Math.PI], [0.042, -14.5, -24], [0.05, -8, -17.5], [0.058, 6, -17.5], [0.063, 11, -19.4, 0], [0.071, 11, -19.4, 0], [0.078, 14, -18.4], [0.13, 44, -18.4], [0.142, 46, -9.5], [0.148, 46, -7.3], [0.156, 52, -7.3, Math.PI], [0.168, 52, -7.3, Math.PI], [0.176, 46, -7.3], [0.19, 46.5, -18.4], [0.2, 48, -26.2], [0.215, 60, -26.2, 0, 1], [0.26, 96, -26.2, 0, 1], [0.266, 99.5, -26.2, 2.22], [0.278, 99.5, -26.2, 2.22], [0.3, 105.7, -14.4]];
 export function travellerAt(e) {
   const camS = walkArc(e), bp = boardPath();
   // 走到機艙門就進去了（看不到）；鏡頭還在後面幾公尺，不會跟他疊在一起。
   if (e >= BOARD_IN || camS + 8 >= bp.length - 0.6) return { visible: false, walking: false, pos: [PLANE_DOOR[0], 2.4, PLANE_DOOR[1]], yaw: 0 };
   if (e < PHASES.bridge[0]) {
-    // 旅客走在鏡頭前面 8 公尺偏右（順不順批 4：之前在正中間，把整條走道的盡頭都擋住）。
-    // 2026-11-18 批 A：走道最後 10 公尺慢慢靠回中線、轉向門，過了走道盡頭就沿空橋那條路走（之前 0.3 那一幀往回跳 4 公尺）。
-    const ax = lerp(WALK.x0, WALK.x1, e / PHASES.bridge[0]) + 8;
-    if (ax > WALK.x1) { const q = bp.at(ax - WALK.x1); return { visible: true, walking: true, pos: [q.x, bridgeFloorY(ax - WALK.x1), q.z], yaw: q.yaw }; }
-    const k = smooth(clamp01((ax - (WALK.x1 - 10)) / 10));
-    return { visible: true, walking: true, pos: [ax, 0, CORRIDOR_Z + 2.4 * (1 - k)], yaw: Math.PI / 2 - k * Math.PI / 4 };
+    let i = 0; while (i < WALK_PTS.length - 2 && e >= WALK_PTS[i + 1][0]) i++;
+    const a = WALK_PTS[i], b = WALK_PTS[i + 1], t = clamp01((e - a[0]) / (b[0] - a[0] || 1e-9));
+    const dx = b[1] - a[1], dz = b[2] - a[2], still = Math.hypot(dx, dz) < 0.01;   // 第五格 1 是站在電動步道上讓帶子載（不擺腿）
+    return { visible: true, walking: !still && !a[4], pos: [lerp(a[1], b[1], t), 0, lerp(a[2], b[2], t)], yaw: still ? (a[3] || 0) : Math.atan2(dx, dz) };
   }
   const s = Math.min(bp.length - 0.2, camS + 8), q = bp.at(s);
   return { visible: true, walking: true, pos: [q.x, bridgeFloorY(s), q.z], yaw: q.yaw };

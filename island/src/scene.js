@@ -114,7 +114,9 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, o
   E.placePins = () => {
     for (const o of isleObjs.values()) { E.putPin(o.pin, E.project(o.isl.x, 7.2, o.isl.z)); if (o.evPin) E.putPin(o.evPin, E.project(o.isl.x, 7.2, o.isl.z), 34); for (const b of o.buildings) { E.setHidden(b.userData.pin, show.selectedTeam !== o.isl.id); if (!b.userData.pin.hidden) E.putPin(b.userData.pin, E.project(o.isl.x + b.position.x, 5.0, o.isl.z + b.position.z)); } }
     for (const w of walkers) { const on = show.names || w.me || show.selectedTeam === w.person.team; E.setHidden(w.pin, !on); if (on) E.putPin(w.pin, E.project(w.g.position.x, 2.4, w.g.position.z)); }
+    E.putPin(cablePin, E.project(L.GONDOLA.pts[0][0], L.GONDOLA.h + 3.2, L.GONDOLA.pts[0][1]));
   };
+  const cablePin = E.pin("pin-team pin-cable", {}, false);   /* 纜車站上一塊牌子（2026-11-19 Paul：「there's still this line connecting each island, I don't know what that's for」） */
   E.setGoal(L.cameraOverview(phone), true); E.resize(); E.snapCam();
   // ═══ 開場（批 C）：鏡頭從雲上俯衝下來、整個世界從水裡浮上來，八座島一座接一座再冒一下。演完才合併。═══
   const isleList = [...isleObjs.values()]; let openT = -1;
@@ -134,16 +136,16 @@ export function create({ stage, pins, palette, phone, data, onSelect, onHover, o
   const guideTick = (dt, t) => {
     for (const ev of E.events) {
       const at = ev.when(t), left = at - t, key = ev.id + ":" + Math.round(at);
-      if (left <= 2 && left > -ev.dur) { if (lineOn !== key) { lineOn = key; if (onEvent) onEvent(ev.id, true); } if (left <= 2 && !guided.has(key) && !show.selectedTeam && E.idleFor() > 10000 && openT < 0) { guided.set(key, 1); E.setGoal(camFor(ev)); guideBack = t + ev.dur + 1; } }
+      if (left <= 2 && left > -ev.dur) { if (lineOn !== key) { lineOn = key; if (onEvent) onEvent(ev.id, true); } }
       else if (lineOn === key) { lineOn = ""; if (onEvent) onEvent(ev.id, false); }
     }
-    if (guideBack > 0 && t > guideBack) { guideBack = -1; if (!show.selectedTeam && E.idleFor() > 10000) E.setGoal(L.cameraOverview(phone), true); }
-    if (guided.size > 8) guided.delete(guided.keys().next().value);
+    void guideBack; void guided;
   };
 
   const api = {
     // 牌子上的字（語言換了 main.js 會再叫一次）。
-    labels({ teams, people, me }) {
+    labels({ teams, people, me, cable }) {
+      cablePin.textContent = cable || "";
       for (const o of isleObjs.values()) o.pin.textContent = teams[o.isl.id] || "";
       for (const o of isleObjs.values()) for (const b of o.buildings) b.userData.pin.textContent = (people.programs && people.programs[b.userData.program.id]) || "";
       for (const w of walkers) { const sp = w.pin.querySelector("span"); (sp || w.pin).textContent = w.me ? (me || w.person.code) : (people[w.person.code] || ""); }

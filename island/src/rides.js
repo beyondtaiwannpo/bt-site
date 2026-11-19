@@ -90,9 +90,9 @@ export function buildRides(THREE, E, c) {
     const post = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.1, 1, 6), M.wall, posts); q.identity();
     for (let k = 0; k < posts; k++) { const p = curve.getPointAt(k / posts); if (p.y > 6.5) continue; /* 迴圈頂上不立柱（會打穿迴圈底，批 D）*/ const h = Math.max(0.3, p.y - 0.35); s.set(1, h, 1); mx.compose(new THREE.Vector3(p.x, h / 2, p.z), q, s); post.setMatrixAt(k, mx); }
     g.add(post); s.set(1, 1, 1);
-    const train = new THREE.Group(); train.userData.dynamic = true;
-    for (let ci = 0; ci < cars; ci++) { const car = mesh(rbox(1.0, 0.5, 0.7, 0.12), [M.yellow, M.teal, M.orange, M.navy][ci % 4], -ci * 1.1, 0, 0); train.add(car); train.add(head(-ci * 1.1 + 0.1, 0.42, -0.17, ci), head(-ci * 1.1 + 0.1, 0.42, 0.17, ci + 1)); if (o.armsUp) for (const dz of [-0.17, 0.17]) train.add(mesh(rbox(0.08, 0.4, 0.08, 0.02), M.skin[ci % 3], -ci * 1.1 + 0.1, 0.72, dz * 1.6, false)); }
-    g.add(train); coasters.push({ curve, train, t: rnd() }); E.mergeChildren(train);
+    // 每一節車廂各自一個 group，引擎各自放在軌道上（2026-11-19：之前整列是一塊硬的，彎道與迴圈上浮在軌道外）。
+    const carList = []; for (let ci = 0; ci < cars; ci++) { const car = new THREE.Group(); car.userData.dynamic = true; car.add(mesh(rbox(1.0, 0.5, 0.7, 0.12), [M.yellow, M.teal, M.orange, M.navy][ci % 4], 0, 0, 0), head(0.1, 0.42, -0.17, ci), head(0.1, 0.42, 0.17, ci + 1)); if (o.armsUp) for (const dz of [-0.17, 0.17]) car.add(mesh(rbox(0.08, 0.4, 0.08, 0.02), M.skin[ci % 3], 0.1, 0.72, dz * 1.6, false)); g.add(car); E.mergeChildren(car); carList.push(car); }
+    coasters.push({ curve, cars: carList, t: rnd() });
     return curve;
   }
   // 車站：一棟有雨棚的小房子、入口的拱門、排隊的欄與人、身高牌。
@@ -122,7 +122,7 @@ export function buildRides(THREE, E, c) {
     const g = base(it.x, it.z, it.r, E.groundMat("paving"));
     const pts = [[-4.5, 3.2, -5], [4.5, 3.2, -5], [4.5, 3.2, -3], [-4.5, 3.0, -3], [-4.5, 2.8, -1], [4.5, 2.6, -1], [4.5, 2.4, 1], [-4.5, 2.0, 1], [-4.5, 1.4, 3], [4.0, 1.0, 3.2], [5.5, 1.0, 0], [5.5, 3.2, -6.5], [-4.5, 3.4, -6.5]];
     const curve = track(g, pts, M.yellow, 1, { tension: 0.15 });
-    for (let k = 1; k < 3; k++) { const train = new THREE.Group(); train.userData.dynamic = true; train.add(mesh(rbox(1.0, 0.5, 0.7, 0.12), [M.orange, M.navy][k - 1], 0, 0, 0), head(0.1, 0.42, -0.17, k), head(0.1, 0.42, 0.17, k + 1)); g.add(train); coasters.push({ curve, train, t: k / 3 }); E.mergeChildren(train); }
+    for (let k = 1; k < 3; k++) { const train = new THREE.Group(); train.userData.dynamic = true; train.add(mesh(rbox(1.0, 0.5, 0.7, 0.12), [M.orange, M.navy][k - 1], 0, 0, 0), head(0.1, 0.42, -0.17, k), head(0.1, 0.42, 0.17, k + 1)); g.add(train); coasters.push({ curve, cars: [train], t: k / 3 }); E.mergeChildren(train); }
     station(g, 0, 5.0, 0, M.yellow, true); g.add(mesh(rbox(4.0, 0.12, 0.8, 0.03), M.wood, 0, 0.9, 4.3, false));   // 月台在 z 3 那段軌道旁（批 D）
     E.treePlaces.push([it.x - 6.8, it.z + 2.5, 0.9, 1], [it.x + 7, it.z + 3, 1.0, 0]);
   }

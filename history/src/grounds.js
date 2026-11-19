@@ -102,7 +102,7 @@ export function buildGrounds(THREE, c) {
     { const g = new THREE.Group(); g.position.set(-160, 0, 300); world.add(g); g.add(box(20, 1.6, 0.2, mats.grey, 0, 0.8, -10, false), box(20, 1.6, 0.2, mats.grey, 0, 0.8, 10, false), box(0.2, 1.6, 20, mats.grey, -10, 0.8, 0, false), box(0.2, 1.6, 20, mats.grey, 10, 0.8, 0, false)); g.add(instanced(new THREE.BoxGeometry(3, 3, 2.4), mats.wallShade, [[-5, 1.5, -3], [0, 1.5, -3], [5, 1.5, -3]]), instanced(new THREE.CylinderGeometry(0.15, 0.15, 1.6, 6), mats.cream, [[-5, 3.8, -3], [0, 3.8, -3], [5, 3.8, -3], [-5, 3.8, 3], [0, 3.8, 3], [5, 3.8, 3]], false), instanced(new THREE.BoxGeometry(0.1, 0.1, 16), mats.grey, [[-5, 4.4, 0], [0, 4.4, 0], [5, 4.4, 0]], false)); }
     { const boxes = []; for (let i = 0; i < 8; i++) boxes.push([-125 + (i % 4) * 4.4, 1.3 + Math.floor(i / 4) * 2.6, 160]); world.add(instanced(new THREE.BoxGeometry(4, 2.5, 2.4), mats.navy, boxes.filter((_, i) => i % 2 === 0)), instanced(new THREE.BoxGeometry(4, 2.5, 2.4), mats.orange, boxes.filter((_, i) => i % 2 === 1))); for (const [x, z, ry] of [[-130, 172, 0.2], [-120, 174, -0.1], [-110, 170, 0.4]]) { const t = truck(mats, false); t.position.set(x, 0, z); t.rotation.y = ry; world.add(t); } }
   }
-  // 會動的：跟隨車（黃色，頂燈）在服務道來回；接駁巴士在停機坪遠端來回；行李拖車（第二組）沿航廈前跑。
+  // 會動的。
   {
     const fm = new THREE.Group(); fm.userData.dynamic = true; fm.add(box(4.2, 1.1, 1.9, mats.yellowLight, 0, 0.6, 0), box(2.0, 0.7, 1.7, mats.glass, -0.2, 1.5, 0, false), box(1.2, 0.3, 0.3, mats.orangeLight, 0, 2.0, 0, false), box(0.9, 0.3, 1.9, mats.dark, 1.7, 1.05, 0, false)); world.add(fm);
     // 來回的車：兩頭用餘弦慢下來再掉頭，車頭用追的（批 B，之前到頭瞬間翻面）。
@@ -133,7 +133,7 @@ export function buildGrounds(THREE, c) {
     const win = []; for (let x = T.x0 + 4; x < T.x1 - 2; x += 4) win.push([x, 9.2, T.z0 - 0.4]); world.add(instanced(new THREE.BoxGeometry(3, 2.0, 0.2), mats.glass, win, false));
     sign("BEYOND TAIWAN AIRPORT", "國際機場", 22, 2.4, palette.navy, palette.cream, 42, 7.4, T.z0 - 0.5, Math.PI);
   }
-  // 立體停車場（x -85 到 -45，z -100 到 -60）：四層樓板、柱子、每層的矮牆、坡道、頂樓與一樓停的車、P 的牌子。
+  // 立體停車場（x -85 到 -45，z -100 到 -60）。
   {
     const gx = -72, gz = -80; const slabs = [], cols = [], paras = [];
     for (let f = 0; f < 4; f++) { const y = 0.3 + f * 3.4; slabs.push([gx, y, gz]); for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (f < 3) cols.push([gx - 16 + i * 8, y + 1.9, gz - 16 + j * 8]); paras.push([gx, y + 0.8, gz - 19.85], [gx, y + 0.8, gz + 19.85], [gx - 19.85, y + 0.8, gz, Math.PI / 2], [gx + 19.85, y + 0.8, gz, Math.PI / 2]); }
@@ -154,7 +154,7 @@ export function buildGrounds(THREE, c) {
     world.add(instanced(new THREE.BoxGeometry(0.8, 1.6, 0.5), mats.teal, [[px - 4.5, 0.8, pz], [px - 1.5, 0.8, pz], [px + 1.5, 0.8, pz], [px + 4.5, 0.8, pz]], false), box(10, 3.5, 6, mats.wall, px, 1.75, pz + 10), box(10.5, 0.4, 6.5, mats.roof, px, 3.7, pz + 10, false));
     sign("FUEL", "加油站", 4, 1.0, palette.orange, palette.navy, px, 5.6, pz - 5.1, Math.PI); world.add(box(4.2, 1.1, 1.9, mats.cream, px - 3, 0.6, pz - 2.4), box(2.0, 0.7, 1.7, mats.glass, px - 3.2, 1.5, pz - 2.4, false));
   }
-  // 圓環（x -45，z -110 的路口）：環狀路、中間的草地與三支旗桿與一片橘色尾翼雕塑、歡迎字牆；往外的進場道路、路燈、機場入口招牌牆。
+  // 圓環（x -45，z -110 的路口）。
   {
     const rx = -45, rz = -110; world.add(cyl(23, 23, 0.1, roadM, rx, 0.03, rz, 32), cyl(13, 13, 0.5, mats.grass, rx, 0.25, rz, 32), cyl(12, 12, 0.6, lam(P.grass.clone().lerp(P.teal, 0.2)), rx, 0.3, rz, 32));
     world.add(instanced(new THREE.CylinderGeometry(0.06, 0.08, 9, 6), mats.grey, [[rx - 3, 4.5, rz - 2], [rx, 4.5, rz - 3.5], [rx + 3, 4.5, rz - 2]], false), instanced(new THREE.BoxGeometry(1.8, 1.1, 0.06), mats.orange, [[rx - 2.1, 8.4, rz - 2], [rx + 0.9, 8.4, rz - 3.5], [rx + 3.9, 8.4, rz - 2]], false));
@@ -177,7 +177,7 @@ export function buildGrounds(THREE, c) {
     { const px = -120, pz = -75; world.add(box(40, 0.06, 26, mats.taxi, px, 0.01, pz, false)); const lines = [], cars = [[], [], []]; let n = 0; for (const zr of [pz - 7, pz + 7]) for (let x = px - 18; x <= px + 18; x += 4) { lines.push([x - 2, 0.05, zr]); n++; if (n % 5 !== 0) cars[n % 3].push([x, 0.6, zr, Math.PI / 2]); } world.add(instanced(new THREE.BoxGeometry(0.15, 0.02, 5.2), mats.cream, lines, false)); [mats.navy, mats.cream, mats.teal].forEach((m, i) => world.add(instanced(carBody, m, cars[i]), instanced(carTop, mats.glass, cars[i].map(([x, y, z, ry]) => [x, y + 0.9, z + 0.2, ry]), false)));
       const posts = []; for (let x = px - 20; x <= px + 20; x += 5) posts.push([x, 0.9, pz - 13], [x, 0.9, pz + 13]); world.add(instanced(new THREE.CylinderGeometry(0.05, 0.06, 1.8, 5), mats.grey, posts, false)); }
   }
-  // 圓樹（跟針葉的那一批不一樣的形狀）：陸側的路邊、停車場、圓環、旅館四周；廣告看板四面；路上會跑的車。
+  // 圓樹（跟針葉的那一批不一樣的形狀）。
   {
     const crown = new THREE.IcosahedronGeometry(2.4, 1); crown.translate(0, 5.2, 0); const trunk = new THREE.CylinderGeometry(0.3, 0.4, 3.4, 6); trunk.translate(0, 1.7, 0);
     const places = []; for (let x = -40; x <= 130; x += 11) places.push([x + (x % 3), 0, -52 - (x % 2) * 1.5, x, 0.9 + (x % 4) / 10]);
@@ -210,7 +210,7 @@ export function buildGrounds(THREE, c) {
     for (let i = 0; i < 26; i++) { const dz = (rnd() - 0.5) * 16, len = 20 + rnd() * 40; marks.push([R.x1 - 250 - rnd() * 120, 0.04, R.z + dz, 0, 1 + rnd()], [R.x0 + 250 + rnd() * 120, 0.04, R.z + dz, 0, 1 + rnd()]); void len; }
     world.add(instanced(new THREE.BoxGeometry(30, 0.02, 0.9), lam(P.asphalt.clone().lerp(P.navy, 0.35).multiplyScalar(0.8), { transparent: true, opacity: 0.55 }), marks, false));
   }
-  // ═══ 第四批（2026-11-18）：地平線。台灣的機場旁邊就是海與山：西邊一片海（跑道盡頭再過去）加一條沙灘，北邊與南邊兩排山（後排更高更藍），
+  // ═══ 第四批（2026-11-18）。
   // 陸側遠處一座城市（四十幾棟高矮不一的樓、幾棟深藍的高塔）、幾條樹帶。全部在 1 到 2 公里外，霧讓它們只剩輪廓，那正是遠山該有的樣子。 ═══
   {
     const seaM = lam(P.teal.clone().lerp(P.navy, 0.35), { emissive: P.teal, emissiveIntensity: 0.12, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });   // 要比草地藍得多，不然隔著霧分不出來；polygonOffset 加抬高 1 公尺，遠處才不會跟草地的面打架（z-fighting 的階梯紋）

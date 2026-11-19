@@ -624,8 +624,8 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       const rail = new THREE.Mesh(new THREE.TubeGeometry(curve, 120, 0.12, 6, true), M.orange); rail.castShadow = true; g.add(rail);
       const rail2 = new THREE.Mesh(new THREE.TubeGeometry(curve, 120, 0.06, 5, true), M.dark); rail2.position.y = -0.28; g.add(rail2);
       for (let k = 0; k < 18; k++) { const q = curve.getPointAt(k / 18); const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, Math.max(0.3, q.y - 0.1), 6), M.wall); post.position.set(q.x, (q.y - 0.1) / 2, q.z); g.add(post); }
-      const train = new THREE.Group(); for (let c = 0; c < 3; c++) { const car = new THREE.Mesh(rbox(0.9, 0.5, 0.6, 0.12), [M.yellow, M.teal, M.orange][c]); car.position.x = -c * 1.0; car.castShadow = true; train.add(car); for (const dz of [-0.15, 0.15]) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), M.skin[c % 3]); h.position.set(-c * 1.0 + 0.1, 0.42, dz); train.add(h); } }
-      train.userData.dynamic = true; g.add(train); coasters.push({ curve, train, t: rnd() }); mergeChildren(train);
+      const cars = []; for (let c = 0; c < 3; c++) { const car = new THREE.Group(); car.userData.dynamic = true; const body = new THREE.Mesh(rbox(0.9, 0.5, 0.6, 0.12), [M.yellow, M.teal, M.orange][c]); body.castShadow = true; car.add(body); for (const dz of [-0.15, 0.15]) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), M.skin[c % 3]); h.position.set(0.1, 0.42, dz); car.add(h); } g.add(car); mergeChildren(car); cars.push(car); }
+      coasters.push({ curve, cars, t: rnd() });
       const booth = new THREE.Mesh(rbox(1.6, 1.3, 1.2, 0.1), M.wall); booth.position.set(0, 0.65, 6.0); g.add(booth); const br = new THREE.Mesh(rbox(2.0, 0.15, 1.6, 0.05), M.orange); br.position.set(0, 1.4, 6.0); g.add(br);
       // 月台（批 D）：軌道起點 (-5,1.2,0) 旁一塊板子、一條欄、兩個排隊的人；之前只有一個售票亭。
       const plat = new THREE.Mesh(rbox(3.2, 0.12, 1.0, 0.03), M.wood); plat.position.set(-4.6, 0.95, 1.1); g.add(plat); const prail = new THREE.Mesh(rbox(3.2, 0.04, 0.04, 0.01), M.dark); prail.position.set(-4.6, 1.75, 1.55); g.add(prail);
@@ -679,11 +679,12 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
       for (const [ox, oz] of [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]]) { const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 4), M.dark); rope.position.set(ox, 1.3, oz); g.add(rope); }
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), M.skin[i % 3]); head.position.y = 0.95; g.add(head);
       g.userData = { a: i * TAU / 3, r: 30 + i * 9, h: 20 + i * 3, sp: 0.045 - i * 0.008, cx: cx || 0, cz: cz || 0, dynamic: true }; world.add(g); balloons.push(g); mergeChildren(g);
+      g.traverse(m => { if (m.isMesh) m.castShadow = false; }); const bs = new THREE.Mesh(new THREE.CircleGeometry(2.4, 18), new THREE.MeshBasicMaterial({ color: P.navy, transparent: true, opacity: 0.1, depthWrite: false })); bs.rotation.x = -Math.PI / 2; bs.position.y = -0.58; bs.userData.dynamic = true; world.add(bs); g.userData.shadow = bs;   /* 影子用一片淡圓（2026-11-19 Paul「the shadow for balloon looks bad」：陰影貼圖每 1/3 秒才重算，影子一跳一跳） */
     }
   }
   // 雲：n 團，圓心外 70 到 110 公尺、高 26 到 34，慢慢往 +x 飄。
   function addClouds(n, cx, cz) {
-    for (let i = 0; i < n; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 70 + rnd() * 40; g.position.set((cx || 0) + Math.cos(a) * d, 36 + rnd() * 8, (cz || 0) + Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.castShadow = true; b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; g.userData.cx = cx || 0; g.userData.dynamic = true; world.add(g); clouds.push(g); mergeChildren(g); }
+    for (let i = 0; i < n; i++) { const g = new THREE.Group(); const a = rnd() * TAU, d = 70 + rnd() * 40; g.position.set((cx || 0) + Math.cos(a) * d, 36 + rnd() * 8, (cz || 0) + Math.sin(a) * d); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1.4 + rnd() * 1.4, 10, 8), M.cloud); b.position.set(k * 1.8 - 2.7, rnd() * 0.5, rnd() * 0.8); g.add(b); } g.userData.drift = 0.25 + rnd() * 0.3; g.userData.cx = cx || 0; g.userData.dynamic = true; world.add(g); clouds.push(g); mergeChildren(g); }
   }
   // 樹、矮樹、小凳子、欄杆柱子：全部一次畫完（InstancedMesh）。頁面蓋完所有東西再叫一次。
   function flushInstances() {
@@ -837,9 +838,13 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // 手感（2026-11-18 批 B）：放手帶一點慣性（fling，每秒衰減到 2%）；8 秒沒碰就慢慢自轉（一碰就停）。
   const fling = { yaw: 0, pitch: 0 }, idle = { at: performance.now() }; let lastMove = 0;
   const touched = () => { idle.at = performance.now(); fling.yaw = fling.pitch = 0; };
-  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; dragged = false; canvas.setPointerCapture(e.pointerId); touched(); });
+  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId, pan: e.button === 2 || e.shiftKey }; dragged = false; canvas.setPointerCapture(e.pointerId); touched(); if (E.onInput) E.onInput(); });
+  canvas.addEventListener("contextmenu", e => e.preventDefault());
+  // 平移（2026-11-19 Paul「I can't move my mouse freely… how do I move from here to here」）：右鍵拖、Shift 拖、兩指拖、方向鍵。目標點夾在 120 公尺內。
+  function panBy(dx, dy) { const off = cam.goalTgt.clone().sub(cam.goalPos); off.y = 0; const d = Math.max(14, cam.goalPos.distanceTo(cam.goalTgt)); off.normalize(); const right = new THREE.Vector3(-off.z, 0, off.x); const mv = right.multiplyScalar(-dx * d * 0.0011).addScaledVector(off, dy * d * 0.0011); const nt = cam.goalTgt.clone().add(mv); if (nt.length() > 120) return; cam.goalTgt.copy(nt); cam.goalPos.add(mv); }
+  addEventListener("keydown", e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] }[e.key]; if (!k) return; e.preventDefault(); touched(); panBy(k[0], k[1]); if (!motionOn) snapCam(); });
   canvas.addEventListener("pointermove", e => {
-    if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true; if (dragged) { const now = performance.now(), dtm = Math.max(8, now - lastMove) / 1000; lastMove = now; if (E.onDrag) E.onDrag(dx, dy); else { orbitBy(-dx * 0.005, dy * 0.004); fling.yaw = -dx * 0.005 / dtm; fling.pitch = dy * 0.004 / dtm; } drag.x = e.clientX; drag.y = e.clientY; if (!motionOn) snapCam(); } return; }
+    if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true; if (dragged) { const now = performance.now(), dtm = Math.max(8, now - lastMove) / 1000; lastMove = now; if (E.onDrag) E.onDrag(dx, dy); else if (drag.pan) panBy(dx, dy); else { orbitBy(-dx * 0.005, dy * 0.004); fling.yaw = -dx * 0.005 / dtm; fling.pitch = dy * 0.004 / dtm; } drag.x = e.clientX; drag.y = e.clientY; if (!motionOn) snapCam(); } return; }
     const h = hit(e); setHover(h ? h.sel : null);
   });
   canvas.addEventListener("pointerup", e => { if (!drag) return; canvas.releasePointerCapture(e.pointerId); const was = dragged; drag = null; if (performance.now() - lastMove > 80) fling.yaw = fling.pitch = 0; if (was) return; const h = hit(e); if (h && onSelect) onSelect(h.sel); else if (!h && onSelect) onSelect(null); });
@@ -849,13 +854,14 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   function camIdle(dt, paused) {
     if (drag) return;
     if (Math.abs(fling.yaw) + Math.abs(fling.pitch) > 1e-3) { orbitBy(fling.yaw * dt, fling.pitch * dt); const k = Math.exp(-dt * 4); fling.yaw *= k; fling.pitch *= k; }
-    else if (!paused && performance.now() - idle.at > 8000) orbitBy(0.03 * dt, 0);
+
   }
   // 兩指縮放（手機）
   let pinch = null;
   canvas.addEventListener("touchstart", e => { if (e.touches.length === 2) { drag = null; pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); } }, { passive: true });
-  canvas.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); orbitBy(0, 0, pinch / d); pinch = d; if (!motionOn) snapCam(); } }, { passive: true });
-  canvas.addEventListener("touchend", () => { pinch = null; }, { passive: true });
+  let pinchC = null;
+  canvas.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY), cx = (e.touches[0].clientX + e.touches[1].clientX) / 2, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2; orbitBy(0, 0, pinch / d); if (pinchC) panBy(cx - pinchC[0], cy - pinchC[1]); pinchC = [cx, cy]; pinch = d; if (!motionOn) snapCam(); } }, { passive: true });
+  canvas.addEventListener("touchend", () => { pinch = null; pinchC = null; }, { passive: true });
 
   // ═══ 射線、懸停、牌子 ═══
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -932,7 +938,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
    鏡頭用阻尼追目標（1 - e^(-dt·k)）；人在島上做事、偶爾過橋；雲慢慢飄；雲霄飛車、燈塔、熱氣球、小船、飛機各自動。暫停就是不呼叫 tick。 */
 function motion(E, nav, tickExtra) {
   const { cam, placeCam, render, walkers, clouds, flags, foams, bounces, planes, boats, coasters, beacons, balloons, slides, bridgeYs, splashes, pose, rnd } = E;
-  const SM = new THREE.Matrix4(), NONE4 = new THREE.Matrix4().makeScale(0, 0, 0);
+  const SM = new THREE.Matrix4(), NONE4 = new THREE.Matrix4().makeScale(0, 0, 0), CT = new THREE.Vector3(), CS = new THREE.Vector3(), CN = new THREE.Vector3(), CB = new THREE.Vector3(), CL = new THREE.Vector3(), CM = new THREE.Matrix4(), UPV = new THREE.Vector3(0, 1, 0);
   const { blockersOf, poisOf } = nav;
   // ── 人在島上做的事（Paul 2026-11-17：「make people doing what they do make sense… they are there for meaning」）──
   // 每個人輪流做這幾件：走去坐（桌子、長凳、野餐桌）、站在攤子或佈告欄前面、找一個也閒著的人聊天（面對面、手會比）、
@@ -1064,13 +1070,18 @@ function motion(E, nav, tickExtra) {
         for (let k = 0; k < 10; k++) { const a = k / 10 * TAU + 0.3; const r = 0.4 + age * 2.4, y = -0.45 + 3.6 * age - 7.5 * age * age; if (y < -0.5) sp.drops.setMatrixAt(k, NONE4); else sp.drops.setMatrixAt(k, SM.makeTranslation(sp.x + Math.cos(a) * r, y, sp.z + Math.sin(a) * r)); } sp.drops.instanceMatrix.needsUpdate = true; }
       // 雲霄飛車：小車沿軌道跑，速度照能量守恆（離最高點越低越快，sqrt(2g·落差) 乘 0.6），最慢 1.6 m/s 當拉升鏈。
       // 2026-11-18 批 A：之前用「前方 1% 軌道的高度差」算速度，陡坡算出負的，車退到坡度剛好那一點就停，五列有三列是停著的。
+      // 2026-11-19 Paul「they're floating on the coaster」：每一節車廂各自放在軌道上，車身的「上」沿著軌道傳遞（平行移動的框架），過迴圈時倒過來貼著軌道，不再用世界的上。
       for (const c of coasters) {
-        if (!c.L) { c.L = c.curve.getLength(); c.top = -1e9; for (let k = 0; k < 64; k++) c.top = Math.max(c.top, c.curve.getPointAt(k / 64).y); }
+        if (!c.L) { c.L = c.curve.getLength(); c.top = -1e9; for (let k = 0; k < 64; k++) c.top = Math.max(c.top, c.curve.getPointAt(k / 64).y); c.cars = c.cars || [c.train]; }
         const p0 = c.curve.getPointAt(c.t), v = Math.max(1.6, Math.sqrt(2 * 9.8 * Math.max(0, c.top + 0.3 - p0.y)) * 0.6);
-        c.t = (c.t + dt * v / c.L) % 1; const p1 = c.curve.getPointAt(c.t), p2 = c.curve.getPointAt((c.t + 0.012) % 1);
-        c.train.position.copy(p1); c.train.position.y += 0.3; c.train.lookAt(p2.x, p2.y + 0.3, p2.z); c.train.rotateY(-Math.PI / 2); }
+        c.t = (c.t + dt * v / c.L) % 1;
+        c.cars.forEach((car, k) => { const u = ((c.t - k * 1.1 / c.L) % 1 + 1) % 1; const p1 = c.curve.getPointAt(u), p2 = c.curve.getPointAt((u + 0.006) % 1);
+          CT.subVectors(p2, p1).normalize(); const ud = car.userData; if (!ud.side) ud.side = new THREE.Vector3().crossVectors(UPV, CT).normalize();
+          CS.copy(ud.side).addScaledVector(CT, -ud.side.dot(CT)); if (CS.lengthSq() < 0.01) CS.crossVectors(UPV, CT); CS.normalize();
+          if (Math.abs(CT.y) < 0.7) { CL.crossVectors(UPV, CT).normalize(); CS.lerp(CL, 0.12).normalize(); }   // 平的路段慢慢回到水平，不然繞幾圈會歪掉
+          ud.side.copy(CS); CN.crossVectors(CT, CS).normalize(); CB.copy(CS).negate(); CM.makeBasis(CT, CN, CB); car.quaternion.setFromRotationMatrix(CM); car.position.copy(p1).addScaledVector(CN, 0.3); }); }
       for (const b of beacons) b.rotation.y += dt * 0.9;
-      for (const b of balloons) { const u = b.userData; u.a += dt * u.sp; b.position.set(u.cx + Math.cos(u.a) * u.r, u.h + Math.sin(t * 0.5 + u.a) * 0.6, u.cz + Math.sin(u.a) * u.r * 0.8); b.rotation.y += dt * 0.1; }
+      for (const b of balloons) { const u = b.userData; u.a += dt * u.sp; b.position.set(u.cx + Math.cos(u.a) * u.r, u.h + Math.sin(t * 0.5 + u.a) * 0.6, u.cz + Math.sin(u.a) * u.r * 0.8); b.rotation.y += dt * 0.1; if (u.shadow) u.shadow.position.set(b.position.x + 2.5, -0.58, b.position.z - 1.5); }
       for (const b of boats) { b.position.y = -0.35 + Math.sin(t * 1.3 + b.userData.phase) * 0.08; b.rotation.z = Math.sin(t * 0.9 + b.userData.phase) * 0.04; b.rotation.y = b.userData.ry + Math.sin(t * 0.3 + b.userData.phase) * 0.06; }   // 停著的船繞錨繩微微擺，不再原地自轉（批 B）
       // 機場那架會動的飛機：機坪滑到滑行道、上跑道、加速起飛、繞一圈（高度 14）、降落、滑回機坪，一輪 72 秒。螺旋槳一直轉。
       // 位置是 u（秒）的分段函式；朝向用 lookAt 看下一個點，所以轉彎、爬升、下降都自然；繞圈時側傾。

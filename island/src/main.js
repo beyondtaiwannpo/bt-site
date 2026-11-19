@@ -32,7 +32,7 @@ function pushLabels() {
   for (const tm of data.teams) { teams[tm.id] = tm["name_" + lang] || tm.name_zh; for (const p of tm.programs) people.programs[p.id] = p["name_" + lang] || p.name_zh; }
   for (const p of data.people) people[p.code] = D.label(p, lang) + (p.flow ? " · " + (p.flow["carry_" + lang] || p.flow.carry_zh) : "");
   const evs = (data.events || []).filter(e => e.state === "open"); if (scene) scene.events(evs.map(e => ({ team: e.team, title: e["title_" + lang] || e.title_zh, link: e.link })));
-  scene.labels({ teams, people, me: me ? me.name + " " + t("meYou", lang) : "" });
+  scene.labels({ teams, people, me: me ? me.name + " " + t("meYou", lang) : "", cable: t("cable", lang) });
 }
 
 // ── 畫 ──
@@ -130,6 +130,9 @@ $("brand-fold").addEventListener("click", () => { writeUi({ brandFolded: !readUi
 let eventId = "";
 function showEvent(id, on) { const el = $("event-line"); if (!on) { if (eventId === id) { eventId = ""; el.hidden = true; } return; } eventId = id; el.textContent = t(id === "whale" ? "evWhale" : "evPlane", lang); el.hidden = false; }
 $("event-line").addEventListener("click", () => { if (scene && eventId) scene.goEvent(eventId); });
+// ── 操作提示（2026-11-19）：開頁先教怎麼動，第一次拖、滾、點就收起來。──
+function hideHint() { const h = $("hint"); if (h && !h.hidden) h.hidden = true; }
+for (const ev of ["pointerdown", "wheel", "keydown", "touchstart"]) addEventListener(ev, hideHint, { passive: true, once: false });
 // ── 開頁 ──
 function paletteFromCSS() { const cs = getComputedStyle(doc), v = k => cs.getPropertyValue(k).trim(); return { navy: v("--bt-navy"), teal: v("--bt-teal"), orange: v("--bt-orange"), sand: v("--bt-sand"), cream: v("--bt-cream"), yellow: v("--bt-yellow"), grey: v("--bt-grey") }; }
 async function boot() {

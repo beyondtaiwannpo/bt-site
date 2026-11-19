@@ -1,4 +1,4 @@
-// /history/ 航廈裡的第二批細節，清單在 README「歷史之路（2026-11-18 第二批）」。跟 terminal.js 同一招：不 import three、沒有站名、沒有色碼。
+// /history/ 航廈裡的第二批細節，清單在 README「歷史之路（2026-11-18 第二批）」。跟 terminal.js 同一招。
 import { makeSign } from "./signs.js";
 export function buildDecor(THREE, c) {
   const { mats, P, palette, fonts, T, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, pick } = c;
@@ -19,7 +19,7 @@ export function buildDecor(THREE, c) {
     for (const s of [-1, 1]) { glassPane(3.3, 4.2, cx + s * 2.85, 2.1, -34.5); term.add(box(0.12, 4.3, 0.12, mats.frame, cx + s * 1.2, 2.15, -34.5, false), box(0.12, 4.3, 0.12, mats.frame, cx + s * 4.42, 2.15, -34.5, false)); }
     term.add(box(9, 0.12, 0.12, mats.frame, cx, 4.3, -34.5, false));
   }
-  // 藥局（x 58）：白色的中島貨架兩座（三色小盒子）、背牆三層架、青色的櫃台加藥師、玻璃上青色的十字、購物籃。
+  // 藥局（x 58）。
   { const cx = 58; shell(cx, whiteM, whiteM);
     const goods = [[], [], []]; let n = 0;
     for (const gx of [cx - 2, cx + 2]) { term.add(box(2.6, 1.5, 0.8, whiteM, gx, 0.75, -36.3)); for (let i = 0; i < 8; i++) for (const dz of [-0.28, 0.28]) goods[n++ % 3].push([gx - 1.1 + i * 0.32, 1.62, -36.3 + dz]); }
@@ -30,7 +30,7 @@ export function buildDecor(THREE, c) {
     term.add(instanced(smallBox(0.5, 0.3, 0.4), mats.teal, [[cx - 3.8, 0.15, -35.0], [cx - 3.8, 0.45, -35.0], [cx - 3.8, 0.75, -35.0]], false));
     person(cx + 2.6, -38.9, 0, { shirt: P.cream, staff: true }); person(cx + 2.2, -37.3, Math.PI, { shirt: pick(11), bag: true }); person(cx - 2.4, -35.3, 0, { shirt: pick(12) });
   }
-  // 服飾（x 72）：兩座衣架（橫桿加六件掛著的衣服）、摺衣桌、兩個人台（白衣、圓底座）、鏡子、橘色的試衣間布簾。
+  // 服飾（x 72）。
   { const cx = 72; shell(cx, lam(P.wall), darkFloor);
     const shirts = [[], [], [], []]; let n = 0;
     for (const gx of [cx - 2.2, cx + 2.2]) { term.add(instanced(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 5), mats.grey, [[gx - 1.1, 0.75, -36.3], [gx + 1.1, 0.75, -36.3]], false)); const rail = cyl(0.025, 0.025, 2.4, mats.grey, gx, 1.5, -36.3, 5); rail.rotation.z = Math.PI / 2; term.add(rail); for (let i = 0; i < 6; i++) shirts[n++ % 4].push([gx - 1.0 + i * 0.4, 1.12, -36.3]); }
@@ -145,7 +145,7 @@ export function buildDecor(THREE, c) {
       const g = new THREE.Group(); g.userData.dynamic = true; g.add(box(0.56, 0.08, 0.5, mats.navy, 0, 0.5, 0.85, false), box(0.56, 0.55, 0.08, mats.navy, 0, 0.82, 0.58, false), box(0.5, 0.05, 0.14, mats.grey, 0, 0.12, 1.22, false), instanced(smallBox(0.04, 0.04, 0.5), mats.grey, [[-0.3, 0.72, 0.85], [0.3, 0.72, 0.85]], false));
       for (const s of [-1, 1]) { const w = cyl(0.3, 0.3, 0.05, mats.dark, s * 0.34, 0.3, 0.62, 12); w.rotation.z = Math.PI / 2; g.add(w); const c = cyl(0.08, 0.08, 0.04, mats.dark, s * 0.24, 0.08, 1.18, 8); c.rotation.z = Math.PI / 2; g.add(c); }
       const r = figure(mats, { shirt: pick(24), seated: true }); r.position.set(0, 0.28, 0.85); r.userData.baseY = 0.28; g.add(r); idleFigs.push(r); f.add(g); f.userData.stroller = true; term.add(f); walkers.push(f); }
-    for (const [cx, cz, k] of [[26, -18.2, 25], [85, -30.5, 28]]) for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.3; person(cx + Math.cos(a) * 0.75, cz + Math.sin(a) * 0.75, Math.atan2(-Math.cos(a), -Math.sin(a)), { shirt: pick(k + i), backpack: i === 1 }); }
+    for (const [cx, cz, k] of [[18, -26.2, 25], [101.6, -27.8, 28]]) for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.3; person(cx + Math.cos(a) * 0.75, cz + Math.sin(a) * 0.75, Math.atan2(-Math.cos(a), -Math.sin(a)), { shirt: pick(k + i), backpack: i === 1 }); }
     for (const [x0, x1, z, sp] of [[8, 118, -27.9, 0.7], [9.3, 119.3, -27.9, 0.7]]) { const f = figure(mats, { shirt: P.navy, staff: true }); f.userData.baseY = 0; f.userData.w = { x0, x1, z, sp }; term.add(f); walkers.push(f); }
   }
   // ═══ 8. 走道兩側的小島（z -25.5 與 -14.5）：書報攤、花店推車、充電桌、拍貼機、按摩椅；紙飛機 ═══

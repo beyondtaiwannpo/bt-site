@@ -1,12 +1,12 @@
-// /history/ 航廈裡面的東西，照真的機場分區、照走的順序：陸側大廳 → 安檢 → 空側 → 登機門 → 窗邊。清單與研究見 README「歷史之路（2026-11-18）」。
-// 不 import three：THREE 跟小工具從 scene.js 傳進來（check.sh 守「只有 scene.js 與 plane.js import three」）。沒有任何一站的文字、沒有色碼。
+// /history/ 航廈裡面的東西，照真的機場分區、照走的順序。
+// 不 import three。
 import { makeSign } from "./signs.js";
 export function buildTerminal(THREE, c) {
   const { mats, P, palette, fonts, T, A, box, cyl, instanced, figure, idleFigs, walkers, textTexture, lam, term, pick } = c;
   const made = [];   // 回給 scene.js 的「每一幀」要做的事（這一支沒有，留著跟 grounds.js 一致）
   const person = (x, z, ry, o) => { const f = figure(mats, o || {}); f.position.set(x, 0, z); f.rotation.y = ry; f.userData.baseY = 0; term.add(f); idleFigs.push(f); return f; };
   const seated = (x, z, ry, o) => { const f = figure(mats, { ...(o || {}), seated: true }); f.position.set(x, 0.3, z); f.rotation.y = ry; f.userData.baseY = 0.3; term.add(f); idleFigs.push(f); return f; };
-  // 牌子：一塊平面貼 canvas 的字（英文大字、中文小字），bg/fg 是色票的字串。face：面向 +z（0）或 -z（π）或 -x（-π/2）。
+  // 牌子。
   const sign = makeSign(THREE, { textTexture, lam, P, fonts, parent: term });
   // 吊牌：深藍的板子加兩條吊桿，正面朝 -x（迎著走過來的人）。
   function hanging(x, z, en, zh, arrow) {
@@ -26,7 +26,7 @@ export function buildTerminal(THREE, c) {
   }
 
   // ═══ A. 陸側大廳（x -40 到 -1）═══
-  // 入口：陸側牆上三道玻璃門（深藍框、淡青玻璃，貼在牆內側）、上方「DEPARTURES 出境」大字、兩側各一面航班資訊大螢幕。
+  // 入口。
   {
     const z = T.z0 + 0.5, x0 = -4;   /* 入口在航空公司牆（x -38 到 -14）東邊，之前三道門畫在那面牆的體積裡 */
     for (const dx of [-3.2, 0, 3.2]) { term.add(box(3.0, 3.4, 0.2, mats.navy, x0 + dx, 1.7, z, false)); const g = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.9), mats.glass); g.position.set(x0 + dx, 1.6, z + 0.12); term.add(g); }
@@ -41,7 +41,7 @@ export function buildTerminal(THREE, c) {
     term.add(box(3.4, 2.8, 2.0, mats.frame, -6, 1.4, -38.5, false)); { const g = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.2), mats.glass); g.position.set(-6, 1.5, -37.49); term.add(g); } sign("EXCHANGE", "外幣兌換", 3.2, 0.8, palette.orange, palette.navy, -6, 3.2, -37.48, 0);
     person(-6.2, -36.2, Math.PI, { shirt: pick(3), bag: true }); person(-13.5, -37.2, Math.PI, { shirt: pick(1) });
   }
-  // 報到櫃台十二個（x -37 到 -15，每 2 公尺一個）：櫃台、螢幕、磅秤、輸送帶；背後航空公司牆，上方 A 到 F 島標。
+  // 報到櫃台十二個（x -37 到 -15，每 2 公尺一個）。
   {
     const desks = [], tops = [], screens = [], scales = [], belts = [], poles = [];
     for (let i = 0; i < 12; i++) { const x = -37 + i * 2; desks.push([x, 0.55, -34.5]); tops.push([x, 1.14, -34.5]); screens.push([x + 0.5, 1.7, -33.9]); scales.push([x - 0.5, 0.1, -33.2]); belts.push([x, 0.5, -36.6]); poles.push([x + 0.5, 1.4, -33.9]); }
@@ -135,7 +135,7 @@ export function buildTerminal(THREE, c) {
     sign("FOOD COURT", "美食區", 5, 1.0, palette.orange, palette.navy, 37, 5.6, -33.2, 0);
     term.add(instanced(new THREE.CylinderGeometry(0.03, 0.03, T.h - 7.4, 5), mats.grey, [[35, 6.1 + (T.h - 7.4) / 2, -33.2], [39, 6.1 + (T.h - 7.4) / 2, -33.2]], false));
   }
-  // 洗手間兩處（x 46 與 100，靠陸側）：凹進去的深色門洞、男女與無障礙的圖示、牌子。貴賓室（x 104 到 122）：深色玻璃門面、接待台、牌子。
+  // 洗手間兩處（x 46 與 100，靠陸側）。
   for (const x of [46, 100]) {
     term.add(box(3.2, 3.0, 0.6, mats.dark, x, 1.5, -39.2, false), box(4.0, 0.3, 1.2, mats.navy, x, 3.1, -38.9, false));
     term.add(instanced(new THREE.BoxGeometry(0.22, 0.5, 0.05), mats.cream, [[x - 0.8, 2.3, -38.85], [x + 0.8, 2.3, -38.85]], false), instanced(new THREE.SphereGeometry(0.11, 6, 5), mats.cream, [[x - 0.8, 2.72, -38.85], [x + 0.8, 2.72, -38.85]], false), box(0.5, 0.18, 0.05, mats.cream, x + 0.8, 2.2, -38.84, false));
@@ -154,7 +154,7 @@ export function buildTerminal(THREE, c) {
   [[58, "PHARMACY", "藥局"], [72, "FASHION", "服飾"], [90, "GIFTS", "禮品"]].forEach(([x, en, zh]) => sign(en, zh, 5.6, 0.9, palette.cream, palette.navy, x, 4.6, -34.27, 0));
 
   // ═══ D. 登機門（沿玻璃牆）═══
-  // 我們那一門是 A（號碼由 setGate 填），其他五門是 B1 到 B5：每一門一個雙位櫃台、牌柱、航班螢幕、兩道登機證掃描閘、拉帶欄、後面一排排座位、充電柱。
+  // 我們那一門是 A（號碼由 setGate 填），其他五門是 B1 到 B5。
   const GATES = [[25, "B1"], [40, "B2"], [58, "B3"], [75, "B4"], [92, "B5"]];
   for (const [x, label] of GATES) {
     term.add(box(3.2, 1.1, 0.8, mats.navy, x, 0.55, -3.0), box(3.4, 0.08, 1.0, mats.cream, x, 1.14, -3.0, false), cyl(0.06, 0.06, 2.6, mats.grey, x + 1.3, 2.3, -3.0, 5), box(1.0, 0.6, 0.06, mats.dark, x - 0.6, 1.44, -2.6, false));
@@ -169,7 +169,7 @@ export function buildTerminal(THREE, c) {
   // 2026-11-18：隊伍、拉帶欄、掃描閘全部搬到櫃台東側（鏡頭從西南斜著走到門，之前會穿過拉帶與排隊的人）。
   { const [gx, gz] = A.GATE_DESK; stanchions([[gx + 2.5, gz - 3.6], [gx + 8.5, gz - 3.6], [gx + 8.5, gz - 2.2]], mats.navy); for (let i = 0; i < 4; i++) person(gx + 3.2 + i * 1.2, gz - 2.9, Math.PI / 2, { shirt: pick(90 + i), bag: i % 2 === 1 }); term.add(instanced(new THREE.BoxGeometry(0.3, 1.0, 0.8), mats.grey, [[gx + 4.4, 0.5, gz - 0.2], [gx + 5.4, 0.5, gz - 0.2]], false)); }
   // 座位：登機門前兩排（面向窗），候機區再補一段（x 14 到 50 與 104 到 122）。既有 60 到 100 的四排留著。
-  seatRow(16, -7, 7, 0, [[0, 1], [5.5, 2], [10, 3], [16, 4], [25, 5], [31, 6]]); seatRow(16, -11, 7, Math.PI, [[2, 7], [11.5, 8], [21, 9], [27, 10]]);
+  seatRow(16, -7, 6, 0, [[0, 1], [5.5, 2], [10, 3], [16, 4], [25, 5]]); seatRow(16, -11, 6, Math.PI, [[2, 7], [11.5, 8], [21, 9], [27, 10]]);   /* 六組不是七組：第七組（x 46）把咖啡店的走道封死 */
   seatRow(116, -7, 2, 0, [[1, 11], [6.5, 12]]); seatRow(116, -11, 2, Math.PI, [[3, 14]]);   // 2026-11-18：原本從 104 起四組，鏡頭往登機門的斜線（100,-20 → 106,-14 → 112,-5）會穿過座位，改從 116 起兩組
   seatRow(16, -29, 5, Math.PI, [[0.5, 16], [10, 17], [20, 18]]);
   term.add(instanced(new THREE.BoxGeometry(5.2, 0.12, 0.9), mats.grey, seatLists.benchA), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.teal, seatLists.seatT), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.orange, seatLists.seatO), instanced(new THREE.BoxGeometry(0.8, 0.5, 0.8), mats.navy, seatLists.seatN));
@@ -191,7 +191,7 @@ export function buildTerminal(THREE, c) {
   { term.add(box(36, 0.12, 1.6, mats.dark, 78, 0.06, -26, false), box(36, 0.02, 1.4, lam(P.dark.clone().lerp(P.grey, 0.3)), 78, 0.13, -26, false));
     for (const dz of [-1.0, 1.0]) { const g = new THREE.Mesh(new THREE.PlaneGeometry(36, 0.9), mats.glass); g.position.set(78, 0.6, -26 + dz); term.add(g); term.add(box(36, 0.06, 0.06, mats.navy, 78, 1.08, -26 + dz, false)); }
     term.add(instanced(new THREE.BoxGeometry(1.8, 0.4, 0.2), mats.navy, [[59.2, 0.3, -27.1], [59.2, 0.3, -24.9], [96.8, 0.3, -27.1], [96.8, 0.3, -24.9]], false));
-    for (const [x0, x1, sp, k] of [[61, 95, 0.55, 1], [95, 61, 0.5, 4], [61, 95, 0.6, 2]]) { const f = figure(mats, { shirt: pick(k), bag: k % 2 === 0 }); f.userData.baseY = 0.13; f.userData.w = { x0, x1, z: -26, sp, stand: true }; term.add(f); walkers.push(f); } }
+    for (const [x0, x1, sp, k] of [[61, 95, 0.55, 1]]) { const f = figure(mats, { shirt: pick(k), bag: k % 2 === 0 }); f.userData.baseY = 0.13; f.userData.w = { x0, x1, z: -26, sp, stand: true }; term.add(f); walkers.push(f); } }   /* 步道上只留一個人（旅客也搭這條，三個人會跟他疊） */
   // 柱子上的廣告燈箱（幾塊有顏色方塊的板子）、吊牌（走道上方，每二十幾公尺一組）。
   { const panels = [[8, -30], [38, -10], [68, -30], [98, -10], [-22, -30], [-7, -10]];
     const tex = textTexture(512, 768, palette.cream, [{ text: "BEYOND", x: 256, y: 300, font: `700 110px ${fonts.display}`, color: palette.navy, align: "center" }, { text: "TAIWAN", x: 256, y: 420, font: `700 110px ${fonts.display}`, color: palette.navy, align: "center" }], [{ x: 0, y: 0, w: 512, h: 180, color: palette.orange }, { x: 0, y: 588, w: 512, h: 180, color: palette.teal }]);
@@ -201,6 +201,6 @@ export function buildTerminal(THREE, c) {
   { for (const [x, z, ry] of [[44, -31.8, 0.4], [86, -11.4, 2.6]]) { person(x, z, ry, { shirt: P.teal, staff: true }); term.add(box(0.8, 0.9, 0.6, mats.grey, x + 0.8, 0.5, z, false), box(0.1, 1.1, 0.1, mats.grey, x + 0.8, 1.3, z - 0.2, false), cyl(0.18, 0.15, 0.4, mats.orange, x + 0.8, 1.15, z, 8)); }
     for (const [off, k] of [[0, 0], [1.3, 1], [2.6, 2]]) { const f = figure(mats, { shirt: P.navy, staff: true, bag: true }); f.userData.baseY = 0; f.userData.w = { x0: 6 + off, x1: 104 + off, z: -22.6 + (k % 2) * 0.9, sp: 1.25 }; term.add(f); walkers.push(f); }
     person(50, -2.6, 0.2, { shirt: pick(7), backpack: true }); term.add(box(0.2, 0.14, 0.3, mats.dark, 50.1, 1.35, -2.3, false));
-    const kid = person(31, -18.4, Math.PI / 2, { shirt: pick(8) }); kid.scale.setScalar(0.68); person(30.2, -19.0, Math.PI / 2, { shirt: pick(9), bag: true }); }
+    const kid = person(38, -26.3, Math.PI / 2, { shirt: pick(8) }); kid.scale.setScalar(0.68); person(37.2, -26.9, Math.PI / 2, { shirt: pick(9), bag: true }); }
   return { tick: null, made };
 }
