@@ -423,7 +423,7 @@ export function createPlanet(THREE, T, { stage, pins, palette, phone, data, onSe
       h.userData.ink = true; h.castShadow = h.receiveShadow = false; h.raycast = () => {}; o.add(h);
     }
   }
-  ink(E.scene); if (COMIC) document.documentElement.classList.add("comic");
+  ink(E.scene);
 
   // 不做引擎的整體合併（mergeStatic）：它照世界座標烤，星球會一直轉，烤進去就錯位。每一棟房子已經各自合成幾個（mergeChildren）。
 
