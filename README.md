@@ -5398,6 +5398,7 @@ Paul 看完上面那個原型：「build it as another page, don't take away the
 - 擺設怎麼來的：每個廣場先叫引擎的 `decorate()` 與 `furnish()` 在一塊平的地上蓋好（跟島一模一樣），再一件一件搬到球面上。島改了擺設，星球跟著變。
 - 檔案大小：check.sh 把 `planet*.js` 從島的 250 KB 裡拿出來，另外算 60 KB 上限。**島那一頁的 250 KB 只剩約 50 bytes**，下一個要加東西到 `island/src` 的人會先撞到這條，到時候要嘛砍東西，要嘛問 Paul 要不要放寬。
 - 名牌：星球頁的名牌一律是漫畫對白框（粗深藍框加實心錯位陰影），島那一頁不變。Paul 2026-11-19 選的：「Keep the toy look but I want the font to be like the demo you show me comic look font」，也就是 3D 維持島的玩具風，只有名牌換成漫畫風。樣式在 `island/island.css` 最後三行（`[data-scene=planet] .pin`）。
+- 框與按鈕：同一天 Paul 說「do the buttons and card too」，所以左上的品牌框、工具列、提示、卡、清單的邊、「把自己放上去」的視窗，連同裡面的小框與按鈕，都換成同一套粗深藍框加實心陰影。全部寫在 `island/island.css` 最後一段，選擇器都以 `[data-scene=planet]` 開頭，島那一頁一行都不受影響。
 - 漫畫風的 3D：網址加 `?look=comic`（例如 `/island/planet.html?look=comic`）。光照只留三階（像賽璐璐上色）、每個東西外圍一圈深藍描邊。
   描邊會讓畫的東西變兩倍，Paul 選了玩具風，所以這個只留著當選項，預設關著。程式在 `planet.js` 的「漫畫風」那一段。
 - 還沒做：沒接選單、沒有正式頁的效能實測、手機上沒在真機上試過。機場那張卡的文字還是島的說法（「海上的機場」「走橋上島」），那是 `teams.json` 兩頁共用的資料，要改得兩頁一起想。
