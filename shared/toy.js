@@ -829,39 +829,54 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   let drag = null, dragged = false, motionOn = false;
   function orbitBy(dyaw, dpitch, dzoom) {
     const off = cam.goalPos.clone().sub(cam.goalTgt); const r = off.length(); let yaw = Math.atan2(off.x, off.z), pitch = Math.asin(off.y / r);
-    const nr = Math.min(130, Math.max(14, r * (dzoom || 1)));
+    const nr = Math.min(Math.max(130, r), Math.max(14, r * (dzoom || 1)));   // 全景比 130 遠時，往內滾不會先跳一下
     // 靠得越近仰角的下限越高（14 公尺時 0.6、54 公尺起 0.35），鏡頭才不會鑽進帳篷與屋頂裡（批 B）。
     const pmin = 0.35 + 0.25 * (1 - Math.min(1, Math.max(0, (nr - 14) / 40)));
     yaw += dyaw; pitch = Math.min(1.45, Math.max(pmin, pitch + dpitch));
     cam.goalPos.set(cam.goalTgt.x + Math.sin(yaw) * Math.cos(pitch) * nr, cam.goalTgt.y + Math.sin(pitch) * nr, cam.goalTgt.z + Math.cos(yaw) * Math.cos(pitch) * nr);
   }
   // 手感（2026-11-18 批 B）：放手帶一點慣性（fling，每秒衰減到 2%）；8 秒沒碰就慢慢自轉（一碰就停）。
-  const fling = { yaw: 0, pitch: 0 }, idle = { at: performance.now() }; let lastMove = 0;
-  const touched = () => { idle.at = performance.now(); fling.yaw = fling.pitch = 0; };
-  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId, pan: e.button === 2 || e.shiftKey }; dragged = false; canvas.setPointerCapture(e.pointerId); touched(); if (E.onInput) E.onInput(); });
+  const fling = { yaw: 0, pitch: 0, x: 0, z: 0 }, idle = { at: performance.now() }; let lastMove = 0;
+  const touched = () => { idle.at = performance.now(); fling.yaw = fling.pitch = fling.x = fling.z = 0; };
+  // 2026-11-20 Paul「when I zoom in … it only goes to the commons and it's hard to shift around」：
+  // 拖曳改成抓著地圖移動（像地圖 app），右鍵拖或 Shift 拖才是轉視角；滾輪與兩指往游標（手指中間）那一點縮放，不再只往正中間。
+  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId, pan: !(e.button === 2 || e.shiftKey) }; dragged = false; canvas.setPointerCapture(e.pointerId); touched(); if (E.onInput) E.onInput(); });
   canvas.addEventListener("contextmenu", e => e.preventDefault());
-  // 平移（2026-11-19 Paul「I can't move my mouse freely… how do I move from here to here」）：右鍵拖、Shift 拖、兩指拖、方向鍵。目標點夾在 120 公尺內。
-  function panBy(dx, dy) { const off = cam.goalTgt.clone().sub(cam.goalPos); off.y = 0; const d = Math.max(14, cam.goalPos.distanceTo(cam.goalTgt)); off.normalize(); const right = new THREE.Vector3(-off.z, 0, off.x); const mv = right.multiplyScalar(-dx * d * 0.0011).addScaledVector(off, dy * d * 0.0011); const nt = cam.goalTgt.clone().add(mv); if (nt.length() > 120) return; cam.goalTgt.copy(nt); cam.goalPos.add(mv); }
+  // 平移（2026-11-19 起）：一指或左鍵拖、兩指拖、方向鍵。目標點夾在 85 公尺內（島上最遠的東西約 75 公尺，再遠只看得到海；超出就停在邊上）。
+  // 一個像素在地上是幾公尺：看目標點那個深度的視窗高度；往前後拖再除以仰角的 sin，手指下面那塊地跟著手走。
+  function moveTgt(mv) { const nt = cam.goalTgt.clone().add(mv); nt.y = cam.goalTgt.y; const L = Math.hypot(nt.x, nt.z); if (L > 85) { nt.x *= 85 / L; nt.z *= 85 / L; } mv.subVectors(nt, cam.goalTgt); cam.goalTgt.add(mv); cam.goalPos.add(mv); return mv; }
+  function panBy(dx, dy) { const off = cam.goalTgt.clone().sub(cam.goalPos); const d = off.length(); const sp = Math.max(0.35, -off.y / d); off.y = 0; off.normalize(); const right = new THREE.Vector3(-off.z, 0, off.x); const px = 2 * Math.tan(camera.fov * Math.PI / 360) * d / Math.max(1, canvas.clientHeight); return moveTgt(right.multiplyScalar(-dx * px).addScaledVector(off, dy * px / sp)); }
+  const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), gp = new THREE.Vector3();
+  function zoomAt(x, y, k) {
+    const r = cam.goalPos.distanceTo(cam.goalTgt), f = Math.min(Math.max(130, r), Math.max(14, r * k)) / r;
+    const rc = canvas.getBoundingClientRect(); ndc.set(((x - rc.left) / rc.width) * 2 - 1, -((y - rc.top) / rc.height) * 2 + 1); ray.setFromCamera(ndc, camera); ground.constant = -cam.goalTgt.y;
+    if (f !== 1 && ray.ray.intersectPlane(ground, gp)) moveTgt(gp.sub(cam.goalTgt).multiplyScalar(1 - f));
+    orbitBy(0, 0, k);
+  }
   addEventListener("keydown", e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] }[e.key]; if (!k) return; e.preventDefault(); touched(); panBy(k[0], k[1]); if (!motionOn) snapCam(); });
   canvas.addEventListener("pointermove", e => {
-    if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true; if (dragged) { const now = performance.now(), dtm = Math.max(8, now - lastMove) / 1000; lastMove = now; if (E.onDrag) E.onDrag(dx, dy); else if (drag.pan) panBy(dx, dy); else { orbitBy(-dx * 0.005, dy * 0.004); fling.yaw = -dx * 0.005 / dtm; fling.pitch = dy * 0.004 / dtm; } drag.x = e.clientX; drag.y = e.clientY; if (!motionOn) snapCam(); } return; }
+    if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true; if (dragged) { const now = performance.now(), dtm = Math.max(8, now - lastMove) / 1000; lastMove = now; if (E.onDrag) E.onDrag(dx, dy); else if (drag.pan) { const mv = panBy(dx, dy), cap = cam.goalPos.distanceTo(cam.goalTgt) * 0.8, v = Math.hypot(mv.x, mv.z) / dtm, k = v > cap ? cap / v : 1; fling.x = mv.x / dtm * k; fling.z = mv.z / dtm * k; } else { orbitBy(-dx * 0.005, dy * 0.004); fling.yaw = -dx * 0.005 / dtm; fling.pitch = dy * 0.004 / dtm; } drag.x = e.clientX; drag.y = e.clientY; if (!motionOn) snapCam(); } return; }
     const h = hit(e); setHover(h ? h.sel : null);
   });
-  canvas.addEventListener("pointerup", e => { if (!drag) return; canvas.releasePointerCapture(e.pointerId); const was = dragged; drag = null; if (performance.now() - lastMove > 80) fling.yaw = fling.pitch = 0; if (was) return; const h = hit(e); if (h && onSelect) onSelect(h.sel); else if (!h && onSelect) onSelect(null); });
+  canvas.addEventListener("pointerup", e => { if (!drag) return; canvas.releasePointerCapture(e.pointerId); const was = dragged; drag = null; if (performance.now() - lastMove > 80) fling.yaw = fling.pitch = fling.x = fling.z = 0; if (was) return; const h = hit(e); if (h && onSelect) onSelect(h.sel); else if (!h && onSelect) onSelect(null); });
   canvas.addEventListener("pointercancel", () => { drag = null; });
-  canvas.addEventListener("wheel", e => { e.preventDefault(); touched(); if (E.onWheel) E.onWheel(e.deltaY); else orbitBy(0, 0, Math.exp(e.deltaY * 0.0012)); if (!motionOn) snapCam(); }, { passive: false });
+  // 名牌蓋在畫布上面，滾輪停在名牌上也要縮放（不然島中間名牌一多就滾不動）。
+  const onWheel = e => { e.preventDefault(); touched(); if (E.onWheel) E.onWheel(e.deltaY); else zoomAt(e.clientX, e.clientY, Math.exp(e.deltaY * 0.0012)); if (!motionOn) snapCam(); };
+  canvas.addEventListener("wheel", onWheel, { passive: false }); if (pins) pins.addEventListener("wheel", onWheel, { passive: false });
   // 每一幀：慣性與閒置自轉（motion() 的 tick 叫）。
   function camIdle(dt, paused) {
     if (drag) return;
     if (Math.abs(fling.yaw) + Math.abs(fling.pitch) > 1e-3) { orbitBy(fling.yaw * dt, fling.pitch * dt); const k = Math.exp(-dt * 4); fling.yaw *= k; fling.pitch *= k; }
+    if (Math.abs(fling.x) + Math.abs(fling.z) > 0.05) { moveTgt(new THREE.Vector3(fling.x * dt, 0, fling.z * dt)); const k = Math.exp(-dt * 5); fling.x *= k; fling.z *= k; }
 
   }
   // 兩指縮放（手機）
   let pinch = null;
-  canvas.addEventListener("touchstart", e => { if (e.touches.length === 2) { drag = null; pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); } }, { passive: true });
-  let pinchC = null;
-  canvas.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY), cx = (e.touches[0].clientX + e.touches[1].clientX) / 2, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2; orbitBy(0, 0, pinch / d); if (pinchC) panBy(cx - pinchC[0], cy - pinchC[1]); pinchC = [cx, cy]; pinch = d; if (!motionOn) snapCam(); } }, { passive: true });
-  canvas.addEventListener("touchend", () => { pinch = null; pinchC = null; }, { passive: true });
+  // 兩指：捏合往兩指中間縮放、一起滑是移動、轉動是轉視角。一指拖就是抓著地圖移動（上面的 pointer 事件）。
+  const twoF = e => { const a = e.touches[0], b = e.touches[1]; return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2, ang: Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) }; };
+  canvas.addEventListener("touchstart", e => { if (e.touches.length === 2) { drag = null; pinch = twoF(e); } }, { passive: true });
+  canvas.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2) { const n = twoF(e); let da = n.ang - pinch.ang; if (da > Math.PI) da -= TAU; else if (da < -Math.PI) da += TAU; zoomAt(n.cx, n.cy, pinch.d / n.d); panBy(n.cx - pinch.cx, n.cy - pinch.cy); orbitBy(-da, 0); pinch = n; if (!motionOn) snapCam(); } }, { passive: true });
+  canvas.addEventListener("touchend", () => { pinch = null; }, { passive: true });
 
   // ═══ 射線、懸停、牌子 ═══
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
