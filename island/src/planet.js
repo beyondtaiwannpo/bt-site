@@ -10,16 +10,7 @@
 // 3. 沒有色碼：顏色全部是引擎從七色混出來的材質（M、P）。
 // 4. 資料與場景分開：哪些 team、做什麼、誰，全部從 data 來，這裡沒有任何一個 team 的字。
 
-export function createPlanet(THREE, T, { stage, pins, palette, phone, data, onSelect, onHover }) {
-  // 卡在星球頁是正中間的彈出視窗（Paul 2026-11-19，照 /history/ 那一個），不佔左邊，所以鏡頭只扣掉右邊的清單。
-  // 卡打開時 <html> 加 pop-on，CSS 才把 #pop 變成模糊的底；這支沒載到時卡照島的樣子貼在左邊，不會整個看不到。
-  const doc = document.documentElement, $ = id => document.getElementById(id), card = $("card"), pop = $("pop");
-  const free = () => { const W = innerWidth; return W < 900 || doc.classList.contains("side-folded") ? W : $("sidebar").getBoundingClientRect().left; };
-  const freeCentre = () => free() / 2 / innerWidth, freeWidth = () => Math.max(0.3, free() / innerWidth);
-  if (card && pop) {
-    new MutationObserver(() => doc.classList.toggle("pop-on", !card.hidden)).observe(card, { attributes: true, attributeFilter: ["hidden"] });
-    pop.addEventListener("click", e => { if (e.target === pop) card.querySelector("[data-close]").click(); });
-  }
+export function createPlanet(THREE, T, { stage, pins, palette, phone, data, onSelect, onHover, freeCentre, freeWidth }) {
   const E = T.createEngine({ stage, pins, palette, phone, onSelect, onHover, freeCentre, freeWidth, seed: 11 });
   const { M, P, rnd, pickables } = E;
   const TAU = Math.PI * 2, D2R = Math.PI / 180, YV = new THREE.Vector3(0, 1, 0);
