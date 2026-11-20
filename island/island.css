@@ -226,12 +226,28 @@ button:not([disabled]):active{transform:scale(.97)}
 /* 星球頁的框與按鈕也跟名牌同一套（Paul 2026-11-19「do the buttons and card too」）：粗深藍框加實心錯位陰影。 */
 [data-scene=planet]{--ln:2px solid var(--bt-navy);--pop:4px 4px 0 var(--bt-navy)}
 [data-scene=planet] :is(.brand,.toolbar,.hint,.side-tab,.no3d,.loading,.me-box,.lb-box){border:var(--ln);box-shadow:var(--pop)}
-[data-scene=planet] .card{border:var(--ln);box-shadow:6px 6px 0 var(--bt-navy);background:rgba(255,255,255,.96)}
 [data-scene=planet] .sidebar{border-left:var(--ln)}
-[data-scene=planet] :is(.card-close,.side-close,.lb-close,.fold,.toolbar .me-btn,.toolbar .lang){border:var(--ln);background:#fff}
+[data-scene=planet] :is(.side-close,.lb-close,.fold,.toolbar .me-btn,.toolbar .lang){border:var(--ln);background:#fff}
 [data-scene=planet] .toolbar .me-btn{background:var(--bt-orange)}
 [data-scene=planet] .toolbar .me-btn.on{background:var(--bt-navy)}
 [data-scene=planet] :is(.prog,.lnk,.ev,.ig,.pp,.me-field input[type="text"],.me-field select){border:var(--ln)}
 [data-scene=planet] :is(.prog,.lnk,.ev,.ig,.pp):hover{box-shadow:3px 3px 0 var(--bt-navy)}
 [data-scene=planet] :is(.card-link,.btn-primary){border:var(--ln);box-shadow:3px 3px 0 var(--bt-orange)}
 @media (max-width:900px){[data-scene=planet] .sidebar{border-left:0;border-top:var(--ln)}}
+/* 星球頁的卡：正中間的彈出視窗，跟 /history/ 的同一個樣子（Paul 2026-11-19 給的截圖）。planet.js 在卡打開時給 <html> 加 pop-on。 */
+.pop{display:contents}
+@keyframes pop-in{from{opacity:0}}
+html.pop-on .pop{position:fixed;inset:0;z-index:35;display:grid;place-items:center;padding:24px;background:rgba(16,42,134,.34);backdrop-filter:blur(10px) saturate(90%);-webkit-backdrop-filter:blur(10px) saturate(90%);animation:pop-in var(--dur-3) var(--ease) both}
+html.pop-on .pop .card{position:relative;inset:auto;width:min(860px,100%);max-height:calc(100vh - 48px);padding:0 clamp(24px,6vw,64px) 48px;border:0;border-radius:22px;background:rgba(237,229,216,.92);box-shadow:0 30px 80px rgba(16,42,134,.35),0 0 0 1px rgba(255,255,255,.5) inset}
+html.pop-on .card-close{position:sticky;top:16px;float:right;margin:16px calc(16px - clamp(24px,6vw,64px)) 0 0;width:44px;height:44px;border:1px solid rgba(16,42,134,.24);background:var(--bt-cream);font:400 26px/1 var(--display);z-index:2}
+html.pop-on .card-close:hover{background:var(--bt-navy);color:var(--bt-cream)}
+html.pop-on .card-head{padding:56px 0 0}
+html.pop-on .card-kicker{font-size:15px;letter-spacing:.14em;color:rgba(16,42,134,.8)}
+html.pop-on .card-h{font-size:clamp(28px,4.4vw,40px);margin-bottom:14px}
+html.pop-on[data-lang="zh"] .card-h{font-size:clamp(26px,4vw,34px)}
+html.pop-on .card-tag{font-size:18px;line-height:1.6;font-weight:500}
+html.pop-on .card-about{font-size:16px}
+html.pop-on .card-sub{margin-top:28px;font-size:13px}
+html.pop-on :is(.progs,.links){display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+html.pop-on .progs li{margin:0}
+@media (max-width:600px){html.pop-on .pop{padding:16px}html.pop-on .pop .card{border-radius:18px;max-height:calc(100vh - 32px)}}

@@ -5399,6 +5399,8 @@ Paul 看完上面那個原型：「build it as another page, don't take away the
 - 檔案大小：check.sh 把 `planet*.js` 從島的 250 KB 裡拿出來，另外算 60 KB 上限。**島那一頁的 250 KB 只剩約 50 bytes**，下一個要加東西到 `island/src` 的人會先撞到這條，到時候要嘛砍東西，要嘛問 Paul 要不要放寬。
 - 名牌：星球頁的名牌一律是漫畫對白框（粗深藍框加實心錯位陰影），島那一頁不變。Paul 2026-11-19 選的：「Keep the toy look but I want the font to be like the demo you show me comic look font」，也就是 3D 維持島的玩具風，只有名牌換成漫畫風。樣式在 `island/island.css` 最後三行（`[data-scene=planet] .pin`）。
 - 框與按鈕：同一天 Paul 說「do the buttons and card too」，所以左上的品牌框、工具列、提示、卡、清單的邊、「把自己放上去」的視窗，連同裡面的小框與按鈕，都換成同一套粗深藍框加實心陰影。全部寫在 `island/island.css` 最後一段，選擇器都以 `[data-scene=planet]` 開頭，島那一頁一行都不受影響。
+- 卡是正中間的彈出視窗：同一天 Paul 給了 `/history/` 那個彈出視窗的截圖說「I mean pop up I mean like this」。點一個地方或一個人，整個螢幕蓋一層模糊的深藍，卡在正中間（最寬 860px），標題放大，右上一顆圓的關閉鈕，點卡外面或按 Esc 也會關。鏡頭不再扣掉左邊的卡，只扣右邊的清單。
+  怎麼做的：`planet.html` 用 `<div class="pop" id="pop">` 包住卡；`planet.js` 開頭看卡有沒有 `hidden`，打開時給 `<html>` 加 `pop-on`，CSS（`island/island.css` 最後一段）才把 `#pop` 變成模糊的底。`planet.js` 沒載到的時候（例如這台裝置畫不出 3D）`#pop` 什麼都不做，卡照島的樣子貼在左邊，不會整個消失。
 - 漫畫風的 3D：網址加 `?look=comic`（例如 `/island/planet.html?look=comic`）。光照只留三階（像賽璐璐上色）、每個東西外圍一圈深藍描邊。
   描邊會讓畫的東西變兩倍，Paul 選了玩具風，所以這個只留著當選項，預設關著。程式在 `planet.js` 的「漫畫風」那一段。
 - 還沒做：沒接選單、沒有正式頁的效能實測、手機上沒在真機上試過。機場那張卡的文字還是島的說法（「海上的機場」「走橋上島」），那是 `teams.json` 兩頁共用的資料，要改得兩頁一起想。
