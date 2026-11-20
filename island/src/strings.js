@@ -71,11 +71,8 @@ export const STR = {
   igNote:      { zh: "按一則先放大看，再按一次到 Instagram。清單在 island/posts.json。", en: "Tap one to see it large, tap again to open it on Instagram. The list lives in island/posts.json." },
   igOpen:      { zh: "到 Instagram 看這一則", en: "Open this on Instagram" },
 };
-// 星球頁把 planet-strings.js 疊上來。
-let OVER = {};
-export function useStrings(o) { OVER = o; }
 export function t(key, lang, vars) {
-  const e = OVER[key] || STR[key]; if (!e) return key;
+  const e = STR[key]; if (!e) return key;
   let s = e[lang] || e.zh;
   if (vars) for (const k of Object.keys(vars)) s = s.split("{" + k + "}").join(String(vars[k]));
   return s;

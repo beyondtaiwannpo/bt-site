@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html island/planet.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1926,10 +1926,9 @@ fi
 isThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
   const fs = require("fs");
   const bad = [];
-  for (const page of ["island/index.html", "island/planet.html"]) {   // 2026-11-19 星球頁跟島頁同一套 importmap
-  const html = fs.readFileSync(page, "utf8");
+  const html = fs.readFileSync("island/index.html", "utf8");
   const maps = [...html.matchAll(/<script type="importmap">([\s\S]*?)<\/script>/g)];
-  if (maps.length !== 1) bad.push(page + " 要有一個（而且只有一個）importmap，現在 " + maps.length + " 個");
+  if (maps.length !== 1) bad.push("island/index.html 要有一個（而且只有一個）importmap，現在 " + maps.length + " 個");
   else {
     let map; try { map = JSON.parse(maps[0][1]); } catch (e) { bad.push("importmap 不是合法的 JSON：" + e.message); }
     if (map) {
@@ -1939,7 +1938,6 @@ isThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
     }
     const firstModule = html.search(/<script type="module"/), mapAt = html.indexOf("<script type=\"importmap\">");
     if (firstModule >= 0 && mapAt > firstModule) bad.push("importmap 要排在第一個 module script 前面");
-  }
   }
   for (const f of fs.readdirSync("island/src")) {
     const c = fs.readFileSync("island/src/" + f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -1969,11 +1967,8 @@ isThree=$(THREE_SRI="$THREE_SRI" THREE_URL="$THREE_URL" node -e '
     if (!used.has("posts/" + f)) bad.push("island/posts/" + f + " 沒有被 posts.json 用到（刪掉或補一筆）");
   }
   for (const u of used) if (!posts.includes(u.replace(/^posts\//, ""))) bad.push("posts.json 指到不存在的圖：" + u);
-  // 2026-11-19 星球頁（planet.html）：planet*.js 只有星球頁載，各自算。島那一頁載的是其他全部，維持 250 KB；星球頁 = 那些加 planet*.js，planet*.js 自己不超過 60 KB。
-  const sz = f => fs.statSync("island/src/" + f).size, srcs = fs.readdirSync("island/src");
-  const js = srcs.filter(f => !/^planet/.test(f)).reduce((n, f) => n + sz(f), 0), pj = srcs.filter(f => /^planet/.test(f)).reduce((n, f) => n + sz(f), 0);
-  if (js > 250 * 1024) bad.push("island/src 的 JS（不含 planet*.js）加起來 " + Math.round(js / 1024) + " KB，超過 250 KB（不含 Three）");
-  if (pj > 60 * 1024) bad.push("island/src/planet*.js 加起來 " + Math.round(pj / 1024) + " KB，超過 60 KB");
+  const js = fs.readdirSync("island/src").reduce((n, f) => n + fs.statSync("island/src/" + f).size, 0);
+  if (js > 250 * 1024) bad.push("island/src 的 JS 加起來 " + Math.round(js / 1024) + " KB，超過 250 KB（不含 Three）");
   // 人全部是角色代號：named 是 true 的那一筆才可以有名字。公開 repo 上不該有未經同意的名字。
   const data = JSON.parse(fs.readFileSync("island/teams.json", "utf8"));
   for (const p of data.people || []) if (p.named !== true && (p.name_zh || p.name_en)) bad.push("teams.json 的 " + p.code + " 有名字但 named 不是 true（本人同意之後才把 named 改成 true）");

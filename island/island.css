@@ -220,18 +220,3 @@ button:not([disabled]):active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
-/* 星球頁的名牌：漫畫對白框（粗深藍框、實心陰影）。只對 planet.html 生效，島不受影響。 */
-[data-scene=planet] .pin{border:2px solid var(--bt-navy);box-shadow:3px 3px 0 var(--bt-navy)}
-[data-scene=planet] .pin::after{border-right:2px solid var(--bt-navy);border-bottom:2px solid var(--bt-navy);bottom:-6px}
-/* 星球頁的框與按鈕也跟名牌同一套（Paul 2026-11-19「do the buttons and card too」）：粗深藍框加實心錯位陰影。 */
-[data-scene=planet]{--ln:2px solid var(--bt-navy);--pop:4px 4px 0 var(--bt-navy)}
-[data-scene=planet] :is(.brand,.toolbar,.hint,.side-tab,.no3d,.loading,.me-box,.lb-box){border:var(--ln);box-shadow:var(--pop)}
-[data-scene=planet] .card{border:var(--ln);box-shadow:6px 6px 0 var(--bt-navy);background:rgba(255,255,255,.96)}
-[data-scene=planet] .sidebar{border-left:var(--ln)}
-[data-scene=planet] :is(.card-close,.side-close,.lb-close,.fold,.toolbar .me-btn,.toolbar .lang){border:var(--ln);background:#fff}
-[data-scene=planet] .toolbar .me-btn{background:var(--bt-orange)}
-[data-scene=planet] .toolbar .me-btn.on{background:var(--bt-navy)}
-[data-scene=planet] :is(.prog,.lnk,.ev,.ig,.pp,.me-field input[type="text"],.me-field select){border:var(--ln)}
-[data-scene=planet] :is(.prog,.lnk,.ev,.ig,.pp):hover{box-shadow:3px 3px 0 var(--bt-navy)}
-[data-scene=planet] :is(.card-link,.btn-primary){border:var(--ln);box-shadow:3px 3px 0 var(--bt-orange)}
-@media (max-width:900px){[data-scene=planet] .sidebar{border-left:0;border-top:var(--ln)}}

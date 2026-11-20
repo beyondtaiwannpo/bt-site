@@ -5106,7 +5106,7 @@ Paul（2026-11-19，透過主 session 轉來）：鏡頭要第三人稱跟在主
   - 一進來就站在第一站，所以要等人先動過（滾輪、摸螢幕、按鍵、點）才開始，不然一打開頁面就被蓋住。
   - 按「Play journey」自動走的時候，走到站的正中間就開，播放先停；關掉之後接著走。
   - 程式在 `history/src/main.js` 的 `autoPop()`，從 `onProgress()` 呼叫。點卡照舊也會開。
-- **漫畫對白框。** 同一天先做在 `/island/planet.html` 的名牌上，Paul 要路也一樣：右上兩顆按鈕、路上的卡、底部年份帶的上緣、覆蓋層的大卡、關閉鈕、照片，都換成粗深藍框加實心錯位陰影。只改框與影子，位置與動畫沒動。寫在 `history/history.css` 最後一段。
+- **漫畫對白框。** 同一天先做在星球頁的名牌上（星球後來拿掉了），Paul 要路也一樣：右上兩顆按鈕、路上的卡、底部年份帶的上緣、覆蓋層的大卡、關閉鈕、照片，都換成粗深藍框加實心錯位陰影。只改框與影子，位置與動畫沒動。寫在 `history/history.css` 最後一段。
 - **檔案大小：** `history/src` 的 JS 250 KB 上限只剩約 270 bytes，下一個要加程式的人會先撞到這條。
 
 ## 歷史之路與 BT 島（2026-11-19 批 G：Paul 睡前那一串）
@@ -5381,38 +5381,11 @@ Paul 2026-11-16 說這一頁還沒 push、還不公開，先用我們自己的�
 - 「把自己放上去」現在只在自己的瀏覽器。要讓大家都看得到（像 HEART 那樣），要存進資料庫，那是另一個決定（要登入、要同意、要有人核可）。
 - 嘖嘖的互動頁 `/stories/` 跟這一頁是兩件事：Paul 2026-11-16 說募資那一頁「we can think of something else」，先留著。
 
-## BT 星球原型（2026-11-19，給幹部比較用，還不是正式頁）
+## BT 星球（2026-11-19 做了又拿掉）
 
-幹部覺得 `/island/` 跟 HEART 政策島太像。Paul 要幾個別的呈現方式，五個裡面（小星球、剖開的校舍、捷運圖、機場航廈、星空）先做小星球。
-這一頁只是拿來比、拿來投票，沒有接到選單，`/island/` 一行都沒動。
-
-- 打開：`docs/prototypes/2026-11-19-planet.html`（本機 `http://localhost:8765/docs/prototypes/2026-11-19-planet.html`，加 `?lang=en` 看英文）。
-- 資料直接讀 `island/teams.json`：team、在做的事、協作線、校友範例都跟島同一份，換呈現方式不用重填資料。
-- 長相：聚會所在北極，六個 team 繞一圈，機場在南半球。聚會所到每個 team 一條路，六個 team 之間一圈環狀路，機場接最近的兩個 team，人沿著路走去別的 team，走到另一面就看不到了。
-- 畫風刻意跟 HEART 拉開：米白紙的背景、深藍描邊、兩三階的平塗陰影，人是細長的剪影，不是大頭小人。
-- 點一個 team：星球轉過來、拉近，旁邊開一張卡（在做的事、一起做事的 team、現在在這裡的人數），協作線用橘色的弧畫在天上。點一個人：鏡頭站到他身後上方跟著走，卡上寫他是誰、正要去哪。
-- 人都是示意：每個 team 四位「幹部（示意）」，加上 teams.json 本來就有的校友與學員範例，不顯示名字。
-- 沒做的：把自己放上去、正式頁的效能與無障礙守門、真的幹部名單（正式版要跟島一樣讀 `public_team()`）。
-- 截圖：`docs/prototypes/2026-11-19-planet/`（桌機全景、點 Mentorship、跟著一位校友、手機全景、手機點 Curriculum）。
-- `?debug=1` 會掛一個 `window.__planet`，可以在畫面被藏起來時手動推幾幀（`__planet.frame()`）、選地方、選人。
-
-### 島風格的星球頁 `/island/planet.html`（2026-11-19）
-
-Paul 看完上面那個原型：「build it as another page, don't take away the island, build it with all the info and method on island… I want the island style」。
-所以多做一頁，跟島並排，島本身沒有拿掉。
-
-- 打開：`/island/planet.html`（本機 `http://localhost:8765/island/planet.html`）。島那一頁沒有連過來，要直接打網址；星球頁右上有「回到島」。頁面掛 `noindex`，搜尋引擎不收。
-- 跟島共用的部分：同一支 `island/src/main.js`（清單、卡、網址 `#team`、`#team/做的事`、`#p/代號`、名牌、協作線、暫停、把自己放上去全部一樣）、同一份 `teams.json`、同一個引擎 `shared/toy.js`（人、房子、桌椅、樹、地面花紋、雲、飛機都是島上那一套）。
-  `planet.html` 的 `<body data-scene="planet">` 讓 main.js 改叫 `scene.js` 的 `createPlanet()`，其他都不變。
-- 星球自己的部分只有兩支：`island/src/planet.js`（球、廣場、路、把島的擺設搬到球面上、人沿路走、鏡頭）與 `island/src/planet-strings.js`（星球頁的標題、提示，跟講到「島」的那幾句換成「地方」「星球」）。
-  `planet.js` 不自己 import three 與引擎，由 `scene.js` 傳進去，所以 check.sh 那條「只有 scene.js 碰引擎」照舊成立。
-- 擺設怎麼來的：每個廣場先叫引擎的 `decorate()` 與 `furnish()` 在一塊平的地上蓋好（跟島一模一樣），再一件一件搬到球面上。島改了擺設，星球跟著變。
-- 檔案大小：check.sh 把 `planet*.js` 從島的 250 KB 裡拿出來，另外算 60 KB 上限。**島那一頁的 250 KB 只剩約 50 bytes**，下一個要加東西到 `island/src` 的人會先撞到這條，到時候要嘛砍東西，要嘛問 Paul 要不要放寬。
-- 名牌：星球頁的名牌一律是漫畫對白框（粗深藍框加實心錯位陰影），島那一頁不變。Paul 2026-11-19 選的：「Keep the toy look but I want the font to be like the demo you show me comic look font」，也就是 3D 維持島的玩具風，只有名牌換成漫畫風。樣式在 `island/island.css` 最後三行（`[data-scene=planet] .pin`）。
-- 框與按鈕：同一天 Paul 說「do the buttons and card too」，所以左上的品牌框、工具列、提示、卡、清單的邊、「把自己放上去」的視窗，連同裡面的小框與按鈕，都換成同一套粗深藍框加實心陰影。全部寫在 `island/island.css` 最後一段，選擇器都以 `[data-scene=planet]` 開頭，島那一頁一行都不受影響。
-- 漫畫風的 3D：網址加 `?look=comic`（例如 `/island/planet.html?look=comic`）。光照只留三階（像賽璐璐上色）、每個東西外圍一圈深藍描邊。
-  描邊會讓畫的東西變兩倍，Paul 選了玩具風，所以這個只留著當選項，預設關著。程式在 `planet.js` 的「漫畫風」那一段。
-- 還沒做：沒接選單、沒有正式頁的效能實測、手機上沒在真機上試過。機場那張卡的文字還是島的說法（「海上的機場」「走橋上島」），那是 `teams.json` 兩頁共用的資料，要改得兩頁一起想。
+幹部覺得 `/island/` 跟 HEART 政策島太像，Paul 要幾個別的呈現方式，2026-11-19 先做了小星球：一個海報風的原型（`docs/prototypes/2026-11-19-planet.html`），再做成島風格的正式頁 `/island/planet.html`（跟島共用 `main.js`、`teams.json`、`shared/toy.js`，自己只有 `planet.js` 與 `planet-strings.js`），名牌、按鈕與框換成漫畫對白框。
+同一天推上線之後 Paul 說「Take the planet out」，整個拿掉：上面那些檔案刪掉，`main.js`、`scene.js`、`strings.js`、`island.css`、`check.sh` 回到做星球之前的樣子。`/island/` 本身從頭到尾沒動。
+要找回來：程式都在 git 歷史裡，最後一版是 commit `277b154`（`git show 277b154:island/src/planet.js`）。漫畫對白框留在 `/history/`（見上面批 I）。
 
 ## 嘖嘖的互動頁 `/stories/`（2026-11-16，demo）
 

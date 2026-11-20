@@ -2,7 +2,7 @@
 // Three 只在 scene.js（動態 import，載不到就只剩清單與卡，內容一樣）。
 import * as D from "./data.js";
 import * as UI from "./ui.js";
-import { t, useStrings } from "./strings.js";
+import { t } from "./strings.js";
 
 const $ = id => document.getElementById(id);
 const doc = document.documentElement;
@@ -10,8 +10,6 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const motionOff = new URLSearchParams(location.search).get("motion") === "off";
 const phone = matchMedia("(pointer: coarse)").matches && Math.min(innerWidth, innerHeight) < 760;
 const ME_KEY = "bt-island-me";
-// planet.html 也用這一支，只換 3D 的世界。
-const PLANET = document.body.dataset.scene === "planet"; if (PLANET) useStrings((await import("./planet-strings.js")).PLANET_STR);
 
 let lang = doc.getAttribute("data-lang") || "zh";
 let data = null, scene = null, loop = null, sel = null, me = null;
@@ -81,7 +79,6 @@ $("tb-bird").addEventListener("click", () => { ui.bird = !ui.bird; $("tb-bird").
 $("tb-index").addEventListener("click", () => $("sidebar").classList.toggle("open"));
 $("sidebar-close").addEventListener("click", () => $("sidebar").classList.remove("open"));
 $("tb-me").addEventListener("click", openMe);
-if ($("tb-island")) $("tb-island").addEventListener("click", () => { location.href = "./" + location.search; });
 addEventListener("hashchange", () => { const s = D.parseHash(location.hash); select(s.kind === "overview" ? null : s, true); });
 addEventListener("keydown", e => { if (e.key === "Escape" && $("lb").hidden) { if (!$("me").hidden) closeMe(); else if (sel) close(); } });
 
@@ -147,7 +144,7 @@ async function boot() {
   // 3D：動態 import（Three 從 cdnjs 來）。載不到或沒有 WebGL：留清單與卡，上面印一句。
   const mod = await Promise.race([import("./scene.js").catch(e => { console.warn("3D 載不進來：", e); return null; }), new Promise(r => setTimeout(() => r(null), 10000))]);
   if (mod) {
-    try { const opts = { stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: s => { if (scene) scene.hover(s); }, onEvent: (id, on) => showEvent(id, on), freeCentre, freeWidth }; scene = PLANET ? await mod.createPlanet(opts) : mod.create(opts); }
+    try { scene = mod.create({ stage: $("stage"), pins: $("pins"), palette: paletteFromCSS(), phone, data, onSelect: s => select(s), onHover: s => { if (scene) scene.hover(s); }, onEvent: (id, on) => showEvent(id, on), freeCentre, freeWidth }); }
     catch (e) { console.warn("3D 開不起來：", e); scene = null; }
   }
   if (!scene) { doc.classList.add("no3d"); $("no3d").hidden = false; }

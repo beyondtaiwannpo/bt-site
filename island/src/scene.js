@@ -18,9 +18,6 @@ import { buildSights } from "./sights.js";
 
 export const webglOK = T.webglOK;
 
-// 星球頁（planet.html）：planet.js 不准自己 import three 與引擎，從這裡傳過去。島這一頁不會載到它。
-export function createPlanet(opts) { return import("./planet.js").then(m => m.createPlanet(THREE, T, opts)); }
-
 // 每座島照 layout.js 的 shape 選一種：六邊形、圓、方（學校的操場）。
 const prismFor = shape => shape === "round" ? T.roundPrism : shape === "rect" ? T.rectPrism : T.hexPrism;
 

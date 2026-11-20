@@ -220,7 +220,7 @@ button:not([disabled]):active{transform:scale(.97)}
 }
 
 /* ═════════ 漫畫對白框（Paul 2026-11-19「No I mean the road not the planet」）═════════ */
-/* 跟 /island/planet.html 的名牌同一套：粗深藍框加實心錯位陰影。只改框與影子，位置、動畫、顏色都不動。 */
+/* 粗深藍框加實心錯位陰影。只改框與影子，位置、動畫、顏色都不動。 */
 :root{--ln:2px solid var(--bt-navy);--pop:4px 4px 0 var(--bt-navy)}
 .play,.lang,.back{border:var(--ln);box-shadow:3px 3px 0 var(--bt-navy)}
 .play[aria-pressed="true"]{border-color:var(--bt-navy)}
