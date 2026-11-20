@@ -135,6 +135,18 @@ function onProgress(p) {
   const inside = eased < A.PHASES.apron[0]; if (inside !== insideNow) { insideNow = inside; doc.classList.toggle("inside", inside); }
   const n = A.nearest(w, p); if (n >= 0) setCurrent(n);
   if (p > 0.01) $("hint").classList.add("gone");
+  const c = A.closeness(w, p); autoPop(n >= 0 && c > 0.3 ? n : -1, c);
+}
+// 走到一站，人停 0.5 秒，覆蓋層自己開（Paul 2026-11-19）。播放時走到站中間就開，關了接著走。
+// 同一站開過不再開。要等人先動過才開始，不然第一站一進來就被蓋住。
+let popTimer = 0, popDone = -1, popResume = false, popArmed = false;
+for (const ev of ["wheel", "touchmove", "keydown", "pointerdown"]) addEventListener(ev, () => { popArmed = true; }, { passive: true });
+function autoPop(i, c) {
+  clearTimeout(popTimer);
+  if (!popArmed || i < 0 || i === popDone || !$("panel").hidden) return;
+  const go = () => { if (!$("panel").hidden || !$("lightbox").hidden) return; popDone = i; popResume = playing; openStop(i, cardEls[i]); };
+  if (playing) { if (c > 0.9) go(); return; }
+  popTimer = setTimeout(go, 500);
 }
 // 閒置的時鐘。
 let tickerOn = false;
@@ -180,6 +192,7 @@ function closePanel() {
   closeLightbox();
   if (openedFrom && openedFrom.isConnected) openedFrom.focus(); else { const c = cardEls[current]; if (c) c.focus(); }
   openedFrom = null;
+  if (popResume) { popResume = false; startPlay(); }
 }
 // 燈箱直接拿覆蓋層裡那張圖的網址與說明，不回頭查資料（覆蓋層畫的是什麼就放大什麼）。
 function openLightbox(btn) {

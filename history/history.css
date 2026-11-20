@@ -218,3 +218,17 @@ button:not([disabled]):active{transform:scale(.97)}
   *{animation:none!important;transition:none!important}
   .card{transform:translate(-50%,-100%)}
 }
+
+/* ═════════ 漫畫對白框（Paul 2026-11-19「No I mean the road not the planet」）═════════ */
+/* 跟 /island/planet.html 的名牌同一套：粗深藍框加實心錯位陰影。只改框與影子，位置、動畫、顏色都不動。 */
+:root{--ln:2px solid var(--bt-navy);--pop:4px 4px 0 var(--bt-navy)}
+.play,.lang,.back{border:var(--ln);box-shadow:3px 3px 0 var(--bt-navy)}
+.play[aria-pressed="true"]{border-color:var(--bt-navy)}
+.card,.card-skeleton{border:var(--ln);box-shadow:var(--pop)}
+.card:hover{box-shadow:6px 6px 0 var(--bt-navy)}
+.card.focus{box-shadow:6px 6px 0 var(--bt-navy)}
+.card-plus{border:var(--ln)}
+.strip{border-top:var(--ln)}
+.strip-progress{box-shadow:3px 3px 0 var(--bt-orange)}
+.panel-card{border:var(--ln);box-shadow:8px 8px 0 var(--bt-navy),0 30px 80px rgba(16,42,134,.3)}
+.shot-btn{border:var(--ln)}
