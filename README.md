@@ -5098,6 +5098,20 @@ Paul（2026-11-19，透過主 session 轉來）：鏡頭要第三人稱跟在主
 
 **驗證**：`node --test test/*.test.mjs` 945 全過、`check.sh` 全過、`history/src` 254,823 bytes。桌機 Chrome 捲動中 55 到 58 fps（除錯模式）。手機只在內建瀏覽器 375 寬模擬看過版面（卡在旅客頭上方、不超出邊），**真機沒量**。**沒 push**，等 Paul 說。
 
+## BT 島（2026-11-20 第二批：轉方向的按鈕、觸控板）
+
+Paul 試完上一批：「it's still kind of hard to move around and now I can't turn things around like I am stuck with sponsorship in front of me the whole time」。
+上一批把一般拖曳改成移動，轉視角只剩右鍵拖或 Shift 拖；在觸控板上右鍵拖幾乎按不出來，所以看起來就是轉不動，永遠 Sponsorship 在前面。觸控板的兩指滑動也被當成滾輪，一滑就放大縮小。
+
+- **轉方向與縮放的按鈕**：地圖右下角一排直的四顆，↺ ↻（一次轉 45 度）、− +。側欄收起來就貼著右邊；手機在工具列上面。按鈕寫在 `island/index.html`（`data-cam="ccw|cw|in|out"`），`shared/toy.js` 的引擎看到有這個屬性的按鈕就接起來，`island/src` 不用多寫程式。樣式在 `island/island.css` 的 `.cam-pad`。
+- **鍵盤**：Q、E 轉，+、- 縮放，方向鍵照舊移動。
+- **觸控板**：兩指滑動是移動、捏合是縮放（跟地圖 app 一樣）。分辨方法寫在 `toy.js` 的 `onWheel` 上面：捏合在 Chrome 是帶 ctrlKey 的滾輪、數字有小數；兩指滑動幾乎都帶一點左右的量。看過一次就記住是觸控板。滑鼠滾輪照舊是往滑鼠的地方縮放。
+- **Mac 的 Safari**：觸控板兩指轉動就是轉方向（Safari 的 gesture 事件；Chrome 沒有這個事件，所以 Chrome 上靠按鈕或 Q、E）。
+- **手機兩指轉動的方向修正**：上一批轉反了，現在手指順時針轉，島也順時針轉，跟 ↻ 同一個方向。
+- 開頁的提示改成「拖曳或兩指滑動移動 · 滾輪或捏合縮放 · 按 ↺ ↻ 轉方向 · 點一座島」。
+
+在 Chrome 實測：按鈕轉向（↻ 兩下是 90 度，機場從右邊轉到下面）、滑鼠滾輪縮放、模擬的觸控板滑動與捏合、模擬的兩指轉動，沒有錯誤。**真的觸控板、真的手機、Safari 的轉動都還沒試過。** 手機上開頁那一行提示會蓋到工具列，是之前就有的，第一次碰畫面就收起來。測試 945、`check.sh` 全過。
+
 ## BT 島（2026-11-20：放大往滑鼠的地方、拖曳就是移動）
 
 Paul 的原話：「when I zoom in and try to look closer it only goes to the commons and its like hard to shift around」。

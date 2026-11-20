@@ -61,7 +61,7 @@ export const STR = {
   loadFail:    { zh: "島載不進來。重新整理一次，還是不行就晚一點再來。", en: "The island could not load. Refresh once, or come back later." },
   noscript:    { zh: "這一頁要開 JavaScript 才看得到島。", en: "This page needs JavaScript to draw the island." },
   no3d:        { zh: "這台裝置畫不出 3D。下面的清單是同一份內容。", en: "This device cannot draw the 3D view. The index below has the same content." },
-  hint:        { zh: "拖曳移動 · 滾輪往滑鼠的地方放大 · 右鍵拖或 Shift 拖轉視角 · 點一座島", en: "Drag to move · Scroll to zoom where you point · Right-drag or Shift-drag to turn · Click an island" },
+  hint:        { zh: "拖曳或兩指滑動移動 · 滾輪或捏合縮放 · 按 ↺ ↻ 轉方向 · 點一座島", en: "Drag or two-finger swipe to move · Scroll or pinch to zoom · ↺ ↻ to turn · Click an island" },
   cable:       { zh: "纜車", en: "Cable car" },
   teamPage:    { zh: "團隊頁", en: "Team page" },
   posts:       { zh: "最近的貼文", en: "Recent posts" },

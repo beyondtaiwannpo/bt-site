@@ -853,7 +853,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
     if (f !== 1 && ray.ray.intersectPlane(ground, gp)) moveTgt(gp.sub(cam.goalTgt).multiplyScalar(1 - f));
     orbitBy(0, 0, k);
   }
-  addEventListener("keydown", e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] }[e.key]; if (!k) return; e.preventDefault(); touched(); panBy(k[0], k[1]); if (!motionOn) snapCam(); });
+  addEventListener("keydown", e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; const c = { q: "ccw", Q: "ccw", e: "cw", E: "cw", "+": "in", "=": "in", "-": "out" }[e.key]; if (c && !e.metaKey && !e.ctrlKey) { e.preventDefault(); camStep(c); return; } const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] }[e.key]; if (!k) return; e.preventDefault(); touched(); panBy(k[0], k[1]); if (!motionOn) snapCam(); });
   canvas.addEventListener("pointermove", e => {
     if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true; if (dragged) { const now = performance.now(), dtm = Math.max(8, now - lastMove) / 1000; lastMove = now; if (E.onDrag) E.onDrag(dx, dy); else if (drag.pan) { const mv = panBy(dx, dy), cap = cam.goalPos.distanceTo(cam.goalTgt) * 0.8, v = Math.hypot(mv.x, mv.z) / dtm, k = v > cap ? cap / v : 1; fling.x = mv.x / dtm * k; fling.z = mv.z / dtm * k; } else { orbitBy(-dx * 0.005, dy * 0.004); fling.yaw = -dx * 0.005 / dtm; fling.pitch = dy * 0.004 / dtm; } drag.x = e.clientX; drag.y = e.clientY; if (!motionOn) snapCam(); } return; }
     const h = hit(e); setHover(h ? h.sel : null);
@@ -861,8 +861,20 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   canvas.addEventListener("pointerup", e => { if (!drag) return; canvas.releasePointerCapture(e.pointerId); const was = dragged; drag = null; if (performance.now() - lastMove > 80) fling.yaw = fling.pitch = fling.x = fling.z = 0; if (was) return; const h = hit(e); if (h && onSelect) onSelect(h.sel); else if (!h && onSelect) onSelect(null); });
   canvas.addEventListener("pointercancel", () => { drag = null; });
   // 名牌蓋在畫布上面，滾輪停在名牌上也要縮放（不然島中間名牌一多就滾不動）。
-  const onWheel = e => { e.preventDefault(); touched(); if (E.onWheel) E.onWheel(e.deltaY); else zoomAt(e.clientX, e.clientY, Math.exp(e.deltaY * 0.0012)); if (!motionOn) snapCam(); };
+  // 觸控板（2026-11-20 Paul「still hard to move around … I can't turn things around」）：兩指滑動是移動、捏合是縮放，跟地圖 app 一樣。
+  // 分辨方法：捏合在 Chrome 是帶 ctrlKey 的滾輪、數字有小數；兩指滑動幾乎都帶一點左右的 deltaX。看過一次就記住是觸控板。滑鼠滾輪照舊是縮放。
+  let pad = false;
+  const onWheel = e => { e.preventDefault(); touched(); if ((e.deltaX && !e.shiftKey) || (e.ctrlKey && e.deltaY % 1)) pad = true;
+    if (E.onWheel) E.onWheel(e.deltaY); else if (pad && !e.ctrlKey) panBy(-e.deltaX, -e.deltaY); else zoomAt(e.clientX, e.clientY, Math.exp(Math.max(-0.3, Math.min(0.3, e.deltaY * (e.ctrlKey ? 0.01 : 0.0012))))); if (!motionOn) snapCam(); };
   canvas.addEventListener("wheel", onWheel, { passive: false }); if (pins) pins.addEventListener("wheel", onWheel, { passive: false });
+  // Mac 的 Safari：觸控板兩指轉動與捏合走 gesture 事件。iPhone、iPad 也會發，但那邊下面的兩指觸控已經處理，跳過免得轉兩次。
+  if (!navigator.maxTouchPoints) { let gs = null; const gOpt = { passive: false };
+    canvas.addEventListener("gesturestart", e => { e.preventDefault(); gs = { s: 1, r: 0 }; }, gOpt);
+    canvas.addEventListener("gesturechange", e => { e.preventDefault(); if (!gs) return; touched(); zoomAt(e.clientX, e.clientY, gs.s / e.scale); orbitBy((e.rotation - gs.r) * Math.PI / 180, 0); gs = { s: e.scale, r: e.rotation }; if (!motionOn) snapCam(); }, gOpt);
+    canvas.addEventListener("gestureend", e => { e.preventDefault(); gs = null; }, gOpt); }
+  // 轉向與縮放按鈕：頁面上有 data-cam="ccw|cw|in|out" 的按鈕就接起來（右鍵拖在觸控板上很難按，轉方向一定要有按鈕）。鍵盤 Q、E 轉，+、- 縮放。
+  function camStep(k) { touched(); if (k === "in" || k === "out") orbitBy(0, 0, k === "in" ? 0.7 : 1 / 0.7); else orbitBy(k === "ccw" ? -Math.PI / 4 : Math.PI / 4, 0); if (!motionOn) snapCam(); }
+  for (const b of document.querySelectorAll("[data-cam]")) b.addEventListener("click", () => camStep(b.dataset.cam));
   // 每一幀：慣性與閒置自轉（motion() 的 tick 叫）。
   function camIdle(dt, paused) {
     if (drag) return;
@@ -875,7 +887,7 @@ export function createEngine({ stage, pins, palette, phone, onSelect, onHover, f
   // 兩指：捏合往兩指中間縮放、一起滑是移動、轉動是轉視角。一指拖就是抓著地圖移動（上面的 pointer 事件）。
   const twoF = e => { const a = e.touches[0], b = e.touches[1]; return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2, ang: Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) }; };
   canvas.addEventListener("touchstart", e => { if (e.touches.length === 2) { drag = null; pinch = twoF(e); } }, { passive: true });
-  canvas.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2) { const n = twoF(e); let da = n.ang - pinch.ang; if (da > Math.PI) da -= TAU; else if (da < -Math.PI) da += TAU; zoomAt(n.cx, n.cy, pinch.d / n.d); panBy(n.cx - pinch.cx, n.cy - pinch.cy); orbitBy(-da, 0); pinch = n; if (!motionOn) snapCam(); } }, { passive: true });
+  canvas.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2) { const n = twoF(e); let da = n.ang - pinch.ang; if (da > Math.PI) da -= TAU; else if (da < -Math.PI) da += TAU; zoomAt(n.cx, n.cy, pinch.d / n.d); panBy(n.cx - pinch.cx, n.cy - pinch.cy); orbitBy(da, 0); pinch = n; if (!motionOn) snapCam(); } }, { passive: true });
   canvas.addEventListener("touchend", () => { pinch = null; }, { passive: true });
 
   // ═══ 射線、懸停、牌子 ═══

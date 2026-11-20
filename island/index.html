@@ -103,7 +103,13 @@
 
 <p class="no3d" id="no3d" hidden><span class="zh">這台裝置畫不出 3D。下面的清單是同一份內容。</span><span class="en">This device cannot draw the 3D view. The index below has the same content.</span></p>
 <button type="button" class="event-line" id="event-line" hidden></button>
-<p class="hint" id="hint" data-t="hint">拖曳移動 · 滾輪往滑鼠的地方放大 · 右鍵拖或 Shift 拖轉視角 · 點一座島</p>
+<div class="cam-pad" role="group" aria-label="轉方向與縮放 / Turn and zoom">
+  <button type="button" data-cam="ccw" aria-label="往左轉 / Turn left" title="Q">↺</button>
+  <button type="button" data-cam="cw" aria-label="往右轉 / Turn right" title="E">↻</button>
+  <button type="button" data-cam="out" aria-label="縮小 / Zoom out" title="-">−</button>
+  <button type="button" data-cam="in" aria-label="放大 / Zoom in" title="+">+</button>
+</div>
+<p class="hint" id="hint" data-t="hint">拖曳或兩指滑動移動 · 滾輪或捏合縮放 · 按 ↺ ↻ 轉方向 · 點一座島</p>
 <p class="loading" id="loading"><span class="zh">正在把島組起來⋯</span><span class="en">Putting the islands together…</span></p>
 
 <aside class="sidebar" id="sidebar" aria-label="清單 / Index">
