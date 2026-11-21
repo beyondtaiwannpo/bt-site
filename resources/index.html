@@ -295,9 +295,10 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
 
-/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
-/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
-   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+/* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
+/* 頂欄只留四項，最想讓人做的那件事是一顆橘色的按鈕「活動與計畫」，不是第五個連結。
+   2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
+   每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它排在選單第一個、撐滿一整列。 */
 .navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
   padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
@@ -317,12 +318,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="../resources/" aria-current="page"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
-    <a class="nav-cta" href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a>
+    <a class="nav-cta" href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
@@ -352,7 +352,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </main>
 
 <footer>
-  <p class="foot-links"><a href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a><a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
+  <p class="foot-links"><a href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>
@@ -433,5 +433,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </script>
 
 <script type="module" src="./src/main.js"></script>
+<!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
+<script src="../shared/public.js" defer></script>
 </body>
 </html>

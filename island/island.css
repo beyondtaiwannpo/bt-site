@@ -32,9 +32,6 @@ html[data-lang="zh"] .pin-team{font-family:var(--han);font-weight:900;letter-spa
 /* ── 左上品牌 ── */
 .brand{position:fixed;left:var(--gut);top:var(--gut);z-index:20;display:flex;align-items:flex-start;gap:12px;max-width:min(420px,calc(100vw - 2*var(--gut)));
   padding:12px 16px 12px 12px;background:rgba(237,229,216,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(16,42,134,.1);border-radius:16px;box-shadow:0 10px 30px rgba(16,42,134,.1)}
-.home{display:flex;flex:0 0 auto;position:relative;margin-top:2px}
-.home img{height:30px;width:auto;display:block}
-.home::after{content:"";position:absolute;inset:-8px -6px}
 .brand-text{min-width:0}
 .eyebrow{margin:0 0 2px;font:700 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:rgba(16,42,134,.7)}
 html[data-lang="zh"] .eyebrow{font-family:var(--body);font-weight:600;letter-spacing:.06em;text-transform:none}
@@ -51,7 +48,6 @@ html[data-lang="zh"] .brand h1{font-family:var(--han);font-weight:900;letter-spa
 .toolbar button[aria-pressed="true"]{background:var(--bt-navy);color:var(--bt-cream)}
 .toolbar .me-btn{background:var(--bt-orange);color:var(--bt-navy);font-weight:700}
 .toolbar .me-btn.on{background:var(--bt-navy);color:var(--bt-cream)}
-.toolbar .lang{font:700 12px/1 var(--display);letter-spacing:.1em;border:1px solid rgba(16,42,134,.3)}
 .mob-only{display:none}
 /* 收起來（桌機）：品牌框只剩 logo，清單整個收走、右邊留一個直的小標籤。不做動畫，收就是收。 */
 .fold{flex:0 0 auto;width:26px;height:26px;border:0;border-radius:50%;background:rgba(16,42,134,.08);color:var(--bt-navy);font-size:16px;line-height:1;cursor:pointer}
@@ -219,6 +215,69 @@ html[data-lang="zh"] .me-h{font-family:var(--han);font-weight:900;font-size:22px
   .card{left:var(--gut);right:var(--gut);top:auto;bottom:calc(var(--gut) + 56px + env(safe-area-inset-bottom,0px));max-height:52vh;width:auto;z-index:25}
   .me-box{padding:18px 16px 14px}
 }
+
+/* ═════════ 頂欄：跟全站同一條 liquid glass（2026-11-21）═════════ */
+/* 樣式跟每一個對外頁那一份同一組數字（玻璃的四層見 README「頂欄的 liquid glass」）。差別只有兩個：
+   這一頁整個視窗是 3D，所以頂欄是 fixed 不是 sticky；右邊讓出清單的寬度，清單收起來就伸到底。
+   --bar 是頂欄佔掉的高度，下面的牌子、工具列、卡片都往下讓這麼多。 */
+:root{--bar:64px}
+.topbar{position:fixed;top:12px;left:var(--gut);right:calc(var(--side-w) + var(--gut));z-index:30;
+  display:flex;align-items:center;gap:clamp(10px,1.8vw,26px);padding:9px 10px 9px 16px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(237,229,216,.6));
+  backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(16,42,134,.05),0 10px 30px rgba(16,42,134,.10),0 2px 6px rgba(16,42,134,.06)}
+html.side-folded .topbar{right:var(--gut)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .topbar,.brand,.toolbar{background:var(--bt-cream);border-color:rgba(16,42,134,.14)}
+}
+.topbar .home{display:flex;align-items:center;margin:0 auto 0 0;flex:0 0 auto;position:relative}
+.topbar .home img{height:30px;width:auto;display:block}
+.navlinks{display:flex;align-items:center;gap:clamp(10px,1.5vw,24px)}
+.navlinks a{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;opacity:.74;padding:7px 1px;
+  border-bottom:2px solid transparent;white-space:nowrap;transition:opacity var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
+.navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+.navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
+.navlinks .nav-cta:hover,.navlinks .nav-cta:focus-visible{background:var(--bt-navy);color:var(--bt-cream)}
+.topbar .lang{min-width:44px;font:700 13px/1 var(--display);letter-spacing:.12em;border:1px solid rgba(16,42,134,.32);border-radius:999px;
+  padding:6px 13px;background:none;color:var(--ink);cursor:pointer;position:relative;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease)}
+.topbar .lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.login{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;font-weight:600;font-size:14.5px;padding:9px 18px;
+  border-radius:999px;white-space:nowrap;line-height:1;position:relative;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease)}
+.login:hover{background:var(--bt-orange);color:var(--bt-navy)}
+.burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;position:relative;padding:6px 8px;font:700 14px/1 var(--display);letter-spacing:.1em}
+.topbar .home::after,.topbar .lang::after,.login::after,.burger::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+/* 這一頁的頂欄比別頁窄（右邊讓給清單），所以選單早一點收成一顆按鈕。 */
+@media (max-width:1320px){
+  .navlinks{display:none;position:absolute;left:0;right:0;top:calc(100% + 8px);flex-direction:column;align-items:flex-start;gap:0;padding:6px 18px 10px;border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(237,229,216,.92));backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 14px 34px rgba(16,42,134,.14)}
+  .navlinks.open{display:flex}
+  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
+  .navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}
+  .burger{display:block}
+}
+@media (max-width:900px){.topbar{right:var(--gut)}}
+@media (max-width:560px){
+  .lg-sep{display:none}
+  html[data-lang="en"] .lg-a{display:none}
+  html[data-lang="zh"] .lg-b{display:none}
+  .topbar{gap:10px}
+  .topbar .home img{height:26px}
+  .login{padding:9px 13px;font-size:14px}
+}
+/* 牌子、工具列、卡片：往下讓出頂欄，換成同一種玻璃。 */
+.brand,.toolbar{background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(237,229,216,.6));backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid rgba(255,255,255,.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(16,42,134,.05),0 10px 30px rgba(16,42,134,.10),0 2px 6px rgba(16,42,134,.06)}
+.brand{top:calc(12px + var(--bar));padding:12px 14px 12px 18px;border-radius:20px;max-width:min(360px,calc(100vw - 2*var(--gut)))}
+.card{top:calc(var(--gut) + 104px + var(--bar))}
+/* 收起來：只留「BT 島」那兩個字與那顆按鈕。 */
+html.brand-folded .brand-text{display:block}
+html.brand-folded .brand-text .eyebrow,html.brand-folded .brand-text .sub{display:none}
+html.brand-folded .brand{padding:8px 10px 8px 16px;align-items:center}
+html.brand-folded .brand h1{font-size:19px}
+@media (min-width:901px){.toolbar{top:calc(12px + var(--bar))}}
+@media (max-width:900px){.brand{top:calc(12px + var(--bar));padding:9px 14px;border-radius:999px}.card{top:auto}}
 
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 跟每一頁同一段：按下去立刻縮，不加 transition。 */

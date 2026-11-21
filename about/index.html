@@ -6,7 +6,7 @@
 <title>關於我們 / Beyond Taiwan</title>
 
 <!-- 對外的內容頁（2026-09-07 新增）。
-     這一頁講 BT 的使命、數字與時間軸。數字來自 BT 的既有紀錄。
+     這一頁只講「為什麼」：信念、使命、願景、價值（Paul 2026-11-21 給的定稿，一字不改）、數字與時間軸。「誰在做」在 /team/。數字來自 BT 的既有紀錄。
      2026-11-20 起 /impact/（做過什麼）併進這一頁：數字、時間軸、數字怎麼來的三段原樣搬過來，/impact/ 只剩轉址。
      ── 這一頁不碰 auth ──
      不載入 supabase、不判斷登入狀態。右上角那顆按鈕只是一個連結。
@@ -24,9 +24,9 @@
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
      ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
 
-<meta name="description" content="Beyond Taiwan 從 2020 年開始，處理的是海外升學的資訊落差。我們的使命、五年的數字與時間軸。">
+<meta name="description" content="我們相信，人人都有選擇自己教育的權利。Beyond Taiwan 的信念、使命、願景、價值，五年的數字與時間軸。">
 <meta property="og:title" content="關於我們 / Beyond Taiwan">
-<meta property="og:description" content="Beyond Taiwan 從 2020 年開始，處理的是海外升學的資訊落差。我們的使命、五年的數字與時間軸。">
+<meta property="og:description" content="我們相信，人人都有選擇自己教育的權利。Beyond Taiwan 的信念、使命、願景、價值，五年的數字與時間軸。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/about/">
 <meta name="theme-color" content="#EDE5D8">
@@ -309,9 +309,10 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
 
-/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
-/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
-   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+/* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
+/* 頂欄只留四項，最想讓人做的那件事是一顆橘色的按鈕「活動與計畫」，不是第五個連結。
+   2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
+   每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它排在選單第一個、撐滿一整列。 */
 .navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
   padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
@@ -320,6 +321,10 @@ summary{cursor:pointer}
 a.nav-cta:active{transform:scale(.97)}
 @media (max-width:900px){.navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
+
+/* 照片（2026-11-21 從首頁搬過來的那一張）。樣式跟首頁同一段。 */
+.photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
+.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;background:rgba(16,42,134,.06)}
 </style>
 </head>
 <body>
@@ -331,12 +336,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
     <a href="../about/" aria-current="page"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
-    <a class="nav-cta" href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a>
+    <a class="nav-cta" href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
@@ -347,18 +351,55 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
 <div class="zh" lang="zh-Hant">
 <header class="hero">
-  <h1>我們在處理的是資訊落差。</h1>
+  <h1>我們相信，人人都有選擇自己教育的權利。</h1>
   <p class="lead">Beyond Taiwan 從 2020 年五月開始，七個人。到現在五年，接近三十位幹部，全部是學生，分布在七個國家。</p>
 </header>
 
-<section class="sec">
+<section class="sec" id="mission">
   <div class="sec-in">
-    <h2>我們相信什麼</h2>
+    <h2>使命</h2>
     <div class="body">
-      <p>在台灣，「出國念書」常被當成一件家裡有錢才能想的事。真正的門檻不只是錢，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
-      <p>所以很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
-      <p>我們沒辦法幫任何人做決定。我們能做的，是讓他在做決定之前，先知道自己有哪些選擇。</p>
+      <p>因此，我們為台灣公立學校的學生打開被忽略的可能，讓他們看見「唯一一條路」之外的選項。那可能是走向世界去留學，也可能是留在台灣，用更開闊的方式學習與生活。</p>
+      <p>我們同時維繫一個由「選擇了自己道路的人」所組成的社群，讓走過的人成為後來者的引路人，也讓這個網絡長久地延續下去。</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="vision">
+  <div class="sec-in">
+    <h2>願景</h2>
+    <div class="body">
+      <p class="pull">一個台灣，升學不再只有一條路。每個學生，無論來自哪裡，都能看見自己的選項，並擁有選擇的權利與勇氣。</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="values">
+  <div class="sec-in">
+    <h2>價值</h2>
+    <div class="body">
+      <ul class="rows">
+        <li><b>看見</b><span>你無法選擇你從未看見的東西。</span></li>
+        <li><b>平等</b><span>選擇的權利，不該取決於出身或家庭的資源。</span></li>
+        <li><b>陪伴</b><span>沒有人該獨自摸索。走過的人，拉下一個人一把。</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="gap">
+  <div class="sec-in">
+    <h2>我們在處理的是資訊落差。</h2>
+    <div class="body">
+      <p>在台灣，「出國念書」常被當成一件家裡有錢才能想的事。</p>
+      <p>這不完全是錯覺。留學代辦的費用不低，公立學校能給的海外升學資源，通常也比不上私立或國際學校。真正的問題不是錢而已，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
+      <p>於是很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
+      <p>Beyond Taiwan 處理的就是這一段落差。我們幾乎所有活動都免費，導生配對計畫、探索營、講座，都不收費。我們沒辦法幫你做決定，但可以讓你在做決定之前，先知道自己有哪些選擇。</p>
       <p class="pull">「我們不是老師，也不是顧問。多數人只比你早走一兩步。」</p>
+      <picture class="photo">
+        <source srcset="../photos/talking-laptop.webp" type="image/webp">
+        <img src="../photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy">
+      </picture>
     </div>
   </div>
 </section>
@@ -417,33 +458,59 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     </div>
   </div>
 </section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>誰在做這件事</h2>
-    <div class="body">
-      <p>兩位 Co-President，六個 team，幹部每年換一批。</p>
-      <p><a href="../team/">看團隊怎麼運作</a></p>
-      <p>想用逛的：<a href="../island/">BT 島</a>上一座島是一個 team，點一座島就看得到那一群人在做什麼。</p>
-    </div>
-  </div>
-</section>
 </div>
 
 <div class="en" lang="en">
 <header class="hero">
-  <h1>The gap we work on is information.</h1>
+  <h1>We believe that everyone has the right to choose their own education.</h1>
   <p class="lead">Beyond Taiwan started in May 2020 with seven people. Five years on, we are close to thirty organisers, all of us students, spread across seven countries.</p>
 </header>
 
-<section class="sec">
+<section class="sec" id="mission-en">
   <div class="sec-in">
-    <h2>What we believe</h2>
+    <h2>Mission</h2>
     <div class="body">
-      <p>In Taiwan, studying abroad is still widely treated as something only well-off families get to consider. The harder barrier is not money alone. It is information: if no one around you has done it, you do not even know what to ask.</p>
+      <p>Therefore, we help students in Taiwan's public schools discover the possibilities they were never shown: the options beyond the single path they'd been told to follow. That might mean studying abroad, or staying in Taiwan and learning to live in a more open way.</p>
+      <p>And we're building a lasting community of people who chose their own path, where those who went before can guide the ones coming after.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="vision-en">
+  <div class="sec-in">
+    <h2>Vision</h2>
+    <div class="body">
+      <p class="pull">A Taiwan where success is no longer defined by a single path, where every student, wherever they come from, can see their options and has the right, and the courage, to choose.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="values-en">
+  <div class="sec-in">
+    <h2>Values</h2>
+    <div class="body">
+      <ul class="rows">
+        <li><b>Seeing</b><span>You can't choose what you've never seen.</span></li>
+        <li><b>Equality</b><span>The right to choose shouldn't depend on where you come from or what your family has.</span></li>
+        <li><b>Company</b><span>No one should have to figure it out alone. Those who've walked the road pull the next person up.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="gap-en">
+  <div class="sec-in">
+    <h2>The gap we work on is information.</h2>
+    <div class="body">
+      <p>In Taiwan, studying abroad is still widely treated as something only well-off families get to consider.</p>
+      <p>That impression is not baseless. Agency fees are high, and public schools rarely have the staff or resources to guide a student through an overseas application. But the harder barrier is information. If no one around you has done it, you do not even know what to ask.</p>
       <p>So students rule the option out before they ever look into it. Not because it does not suit them, but because no one has shown them what it actually involves.</p>
-      <p>We cannot make anyone's decision. What we can do is make sure they know what they are choosing between.</p>
+      <p>That gap is the reason Beyond Taiwan exists. Almost everything we run is free: mentorship, bootcamps, talks. We cannot make anyone's decision. We can make sure they know what they are choosing between.</p>
       <p class="pull">"We are not teachers and we are not consultants. Most of us are only a step or two ahead of you."</p>
+      <picture class="photo">
+        <source srcset="../photos/talking-laptop.webp" type="image/webp">
+        <img src="../photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy">
+      </picture>
     </div>
   </div>
 </section>
@@ -502,23 +569,12 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     </div>
   </div>
 </section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Who runs this</h2>
-    <div class="body">
-      <p>Two Co-Presidents, six teams, and a new group of organisers every year.</p>
-      <p><a href="../team/">See how the team works</a></p>
-      <p>Or explore it: on <a href="../island/">BT Island</a> every island is one team. Click one to see what those people do.</p>
-    </div>
-  </div>
-</section>
 </div>
 
 </main>
 
 <footer>
-  <p class="foot-links"><a href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a><a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
+  <p class="foot-links"><a href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>
@@ -598,5 +654,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 })();
 </script>
 
+<!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
+<script src="../shared/public.js" defer></script>
 </body>
 </html>

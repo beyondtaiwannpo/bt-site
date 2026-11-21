@@ -367,9 +367,10 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
 
-/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
-/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
-   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+/* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
+/* 頂欄只留四項，最想讓人做的那件事是一顆橘色的按鈕「活動與計畫」，不是第五個連結。
+   2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
+   每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它排在選單第一個、撐滿一整列。 */
 .navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
   padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
@@ -378,6 +379,39 @@ summary{cursor:pointer}
 a.nav-cta:active{transform:scale(.97)}
 @media (max-width:900px){.navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
+
+/* BT 島的大區塊。島本身是 /island/ 的 3D，這裡只畫一張安靜的小地圖當門牌：
+   七座島（中間聚會所、外圍六個 team）加海上的機場，跟 island/teams.json 的配置同一個意思，但不讀它，
+   改了島不用回來改這裡。整塊是一個連結，點哪裡都進 /island/。 */
+.isle-block{margin:clamp(28px,5vh,64px) var(--gut) 0;border-radius:28px;background:var(--bt-navy);color:var(--bt-cream);
+  display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(18px,3vw,48px);align-items:center;
+  padding:clamp(28px,4.5vw,64px);overflow:hidden;position:relative}
+.isle-block small{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--bt-orange)}
+.isle-block h2{color:var(--bt-cream);margin:8px 0 14px;font-size:clamp(30px,4.4vw,64px)}
+.isle-block p{color:rgba(237,229,216,.86);max-width:30em;margin:0 0 20px}
+.isle-block .row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.isle-block .cta{margin-top:0}
+.isle-block .more{color:var(--bt-cream);font-weight:600;text-underline-offset:3px}
+.isle-block .more:hover{text-decoration-color:var(--bt-orange)}
+.isle-map{display:block;width:100%;height:auto}
+.isle-map .ring{fill:none;stroke:rgba(237,229,216,.32);stroke-width:2;stroke-dasharray:3 7}
+.isle-map .cliff{fill:var(--bt-navy);filter:brightness(.45)}
+.isle-map .i-cream{fill:var(--bt-cream)} .isle-map .i-orange{fill:var(--bt-orange)}
+.isle-map .i-teal{fill:var(--bt-teal)} .isle-map .i-sand{fill:var(--bt-sand)}
+.isle-map text{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.04em;fill:var(--bt-navy);text-anchor:middle}
+.isle-map .air{fill:var(--bt-grey)} .isle-map .runway{stroke:var(--bt-navy);stroke-width:2;stroke-dasharray:6 5}
+.isle-map .air-t{fill:var(--bt-cream);font-size:13px}
+.isle-map g.isl{transition:transform var(--dur-2) var(--ease);transform-box:fill-box;transform-origin:center}
+.isle-link:hover .isle-map g.isl,.isle-link:focus-visible .isle-map g.isl{transform:translateY(-4px)}
+.isle-link{display:block;border-radius:20px}
+@media (max-width:820px){.isle-block{grid-template-columns:1fr}}
+.cta.warm{background:var(--bt-orange);color:var(--bt-navy)}
+.cta.warm:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.isle-block .cta.warm:hover{background:var(--bt-cream);color:var(--bt-navy)}
+
+/* 照片（2026-11-21 從首頁搬過來的那一張）。樣式跟首頁同一段。 */
+.photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
+.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;background:rgba(16,42,134,.06)}
 </style>
 </head>
 <body>
@@ -389,12 +423,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../team/" aria-current="page"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
-    <a class="nav-cta" href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a>
+    <a class="nav-cta" href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
@@ -409,6 +442,16 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   <p class="lead">兩位 Co-President，六個 team。幹部分布在台灣、美國、加拿大、歐洲、澳洲、日本與韓國。</p>
 </header>
 
+<section class="isle-block" aria-labelledby="isle-h">
+  <div>
+    <small>BT Island</small>
+    <h2 id="isle-h">走進 BT 島。</h2>
+    <p>七座島，外圍六座一座一個 team，中間是大家都會去的聚會所。點一座島，看那一群人在做什麼；從機場往外走，是 BT 五年走過來的路。</p>
+    <div class="row"><a class="cta warm" href="../island/">進 BT 島</a><a class="more" href="../history/">走歷史之路</a></div>
+  </div>
+  <a class="isle-link" href="../island/" tabindex="-1" aria-hidden="true"><svg class="isle-map" viewBox="0 0 600 350" aria-hidden="true" focusable="false"><ellipse class="ring" cx="300" cy="172" rx="178" ry="110"/><g class="isl"><ellipse class="cliff" cx="300" cy="181" rx="76" ry="38"/><ellipse class="i-cream" cx="300" cy="172" rx="76" ry="38"/><text x="300" y="177">Commons</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="73" rx="64" ry="30"/><ellipse class="i-orange" cx="300" cy="64" rx="64" ry="30"/><text x="300" y="69">Sponsorship</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="127" rx="64" ry="30"/><ellipse class="i-teal" cx="478" cy="118" rx="64" ry="30"/><text x="478" y="123">Curriculum</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="237" rx="64" ry="30"/><ellipse class="i-sand" cx="478" cy="228" rx="64" ry="30"/><text x="478" y="233">Internship</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="291" rx="64" ry="30"/><ellipse class="i-teal" cx="300" cy="282" rx="64" ry="30"/><text x="300" y="287">Mentorship</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="237" rx="64" ry="30"/><ellipse class="i-orange" cx="122" cy="228" rx="64" ry="30"/><text x="122" y="233">Marketing</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="127" rx="64" ry="30"/><ellipse class="i-sand" cx="122" cy="118" rx="64" ry="30"/><text x="122" y="123">CR</text></g><g class="isl"><rect class="air" x="498" y="296" width="92" height="30" rx="8"/><line class="runway" x1="508" y1="311" x2="580" y2="311"/><text class="air-t" x="544" y="345">Airport</text></g></svg></a>
+</section>
+
 <section class="sec">
   <div class="sec-in">
     <h2>怎麼運作</h2>
@@ -416,6 +459,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
       <p>兩位 Co-President 各帶三個 team。</p>
       <p>每個 team 有一位 Director 與一到兩位 Advisor，他們是對外與跨組的對接窗口。</p>
       <p>所有人都是學生，多數是大學生，也有還在念高中的。</p>
+      <p>我們不是老師，也不是顧問。多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。</p>
+      <picture class="photo">
+        <source srcset="../photos/sharing-mic.webp" type="image/webp">
+        <img src="../photos/sharing-mic.jpg" alt="一位拿麥克風的講者站著分享，坐在地上的聽眾在笑" width="1200" height="800" loading="lazy">
+      </picture>
     </div>
   </div>
 </section>
@@ -458,9 +506,8 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
 <section class="sec">
   <div class="sec-in">
-    <h2>用逛的認識我們</h2>
+    <h2>校友去了哪</h2>
     <div class="body">
-      <p><a href="../island/">BT 島</a>上一座島就是一個 team，島上是那一群人與他們在做的事。點一座島就看得到。</p>
       <p>從 BT 出發的校友後來去了哪，畫在<a href="../alumni/">校友航線圖</a>上。</p>
     </div>
   </div>
@@ -472,7 +519,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <div class="body">
       <p>我們持續在找願意一起做的人與單位。</p>
       <p><a class="cta" href="../partner/">一起做這件事</a></p>
-      <p>想當幹部：招募開放的時候，會出現在<a href="../apply/">報名頁</a>。</p>
+      <p>想當幹部：招募開放的時候，申請表會放在<a href="../apply/">這一頁</a>。</p>
     </div>
   </div>
 </section>
@@ -484,6 +531,16 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   <p class="lead">Two Co-Presidents and six teams. Our organisers are in Taiwan, the United States, Canada, Europe, Australia, Japan and Korea.</p>
 </header>
 
+<section class="isle-block" aria-labelledby="isle-h-en">
+  <div>
+    <small>BT Island</small>
+    <h2 id="isle-h-en">Step onto BT Island.</h2>
+    <p>Seven islands: one for each of our six teams, and the Commons in the middle where everyone meets. Click an island to see what those people do. Walk out past the airport and you are on the road Beyond Taiwan took to get here.</p>
+    <div class="row"><a class="cta warm" href="../island/">Explore BT Island</a><a class="more" href="../history/">Walk Our Road</a></div>
+  </div>
+  <a class="isle-link" href="../island/" tabindex="-1" aria-hidden="true"><svg class="isle-map" viewBox="0 0 600 350" aria-hidden="true" focusable="false"><ellipse class="ring" cx="300" cy="172" rx="178" ry="110"/><g class="isl"><ellipse class="cliff" cx="300" cy="181" rx="76" ry="38"/><ellipse class="i-cream" cx="300" cy="172" rx="76" ry="38"/><text x="300" y="177">Commons</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="73" rx="64" ry="30"/><ellipse class="i-orange" cx="300" cy="64" rx="64" ry="30"/><text x="300" y="69">Sponsorship</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="127" rx="64" ry="30"/><ellipse class="i-teal" cx="478" cy="118" rx="64" ry="30"/><text x="478" y="123">Curriculum</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="237" rx="64" ry="30"/><ellipse class="i-sand" cx="478" cy="228" rx="64" ry="30"/><text x="478" y="233">Internship</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="291" rx="64" ry="30"/><ellipse class="i-teal" cx="300" cy="282" rx="64" ry="30"/><text x="300" y="287">Mentorship</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="237" rx="64" ry="30"/><ellipse class="i-orange" cx="122" cy="228" rx="64" ry="30"/><text x="122" y="233">Marketing</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="127" rx="64" ry="30"/><ellipse class="i-sand" cx="122" cy="118" rx="64" ry="30"/><text x="122" y="123">CR</text></g><g class="isl"><rect class="air" x="498" y="296" width="92" height="30" rx="8"/><line class="runway" x1="508" y1="311" x2="580" y2="311"/><text class="air-t" x="544" y="345">Airport</text></g></svg></a>
+</section>
+
 <section class="sec">
   <div class="sec-in">
     <h2>How it works</h2>
@@ -491,6 +548,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
       <p>The two Co-Presidents lead three teams each.</p>
       <p>Every team has a Director and one or two Advisors, who are the point of contact for anything crossing teams or going outside the organisation.</p>
       <p>Everyone here is a student. Most are at university; some are still in high school.</p>
+      <p>We are not teachers and we are not consultants. Most of us are only a step or two ahead of you. Some finished their own applications recently enough to still remember not knowing where to start.</p>
+      <picture class="photo">
+        <source srcset="../photos/sharing-mic.webp" type="image/webp">
+        <img src="../photos/sharing-mic.jpg" alt="A speaker with a microphone; the audience seated on the floor, laughing" width="1200" height="800" loading="lazy">
+      </picture>
     </div>
   </div>
 </section>
@@ -533,10 +595,9 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
 <section class="sec">
   <div class="sec-in">
-    <h2>Explore instead</h2>
+    <h2>Where they went</h2>
     <div class="body">
-      <p>On <a href="../island/">BT Island</a> every island is one team, with its people and what they are working on. Click an island to see.</p>
-      <p>Where our alumni went after Beyond Taiwan is drawn on the <a href="../alumni/">alumni map</a>.</p>
+      <p>Where Beyond Taiwan alumni went next is drawn on the <a href="../alumni/">alumni map</a>.</p>
     </div>
   </div>
 </section>
@@ -547,7 +608,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <div class="body">
       <p>We are always looking for people and organisations willing to build this with us.</p>
       <p><a class="cta" href="../partner/">Build this with us</a></p>
-      <p>Want to join as an organiser? When recruitment opens, it appears on the <a href="../apply/">Sign up page</a>.</p>
+      <p>Want to join as an organiser? When recruitment opens, the form is posted <a href="../apply/">on this page</a>.</p>
     </div>
   </div>
 </section>
@@ -556,7 +617,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </main>
 
 <footer>
-  <p class="foot-links"><a href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a><a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
+  <p class="foot-links"><a href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>
@@ -637,5 +698,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </script>
 
 <script type="module" src="./src/main.js"></script>
+<!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
+<script src="../shared/public.js" defer></script>
 </body>
 </html>

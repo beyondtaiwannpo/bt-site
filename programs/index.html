@@ -3,12 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>我們做什麼 / Beyond Taiwan</title>
+<title>活動與計畫 / Beyond Taiwan</title>
 
-<!-- 對外的內容頁（2026-09-07 新增）。
-     這一頁講兩個主要活動。細節與首頁那一段一致，這裡展開講。
+<!-- 活動與計畫（2026-09-07 新增時叫「我們做什麼」，2026-11-21 改成現在這樣）。
+     頂欄那顆橘色按鈕到的就是這一頁：學生能參加的東西全部在這裡，現在開放的排最上面，挑了才開帳號。
+     四個計畫的說明寫死在這個檔裡；「現在開放」那一段與每個計畫開不開放，是 src/main.js 問資料庫之後畫的
+     （後台「網站上的活動」發布的活動，加狀態是開放的報名表）。問不到的時候這一頁照樣讀得完。
      ── 這一頁不碰 auth ──
-     不載入 supabase、不判斷登入狀態。右上角那顆按鈕只是一個連結。
+     不載入 supabase-js、不判斷登入狀態。右上角那顆按鈕只是一個連結。
 
      ── 文案的來源 ──
      這一頁的每一個事實都來自 BT 的既有紀錄，沒有推估。
@@ -23,9 +25,9 @@
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
      ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
 
-<meta name="description" content="探索營 College Bootcamp 與導生配對計畫 Mentorship Program，都免費。">
-<meta property="og:title" content="我們做什麼 / Beyond Taiwan">
-<meta property="og:description" content="探索營 College Bootcamp 與導生配對計畫 Mentorship Program，都免費。">
+<meta name="description" content="探索營、導生配對、講座、高中生實習。現在開放報名的排在最上面。">
+<meta property="og:title" content="活動與計畫 / Beyond Taiwan">
+<meta property="og:description" content="探索營、導生配對、講座、高中生實習。現在開放報名的排在最上面。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/programs/">
 <meta name="theme-color" content="#EDE5D8">
@@ -280,9 +282,10 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
 
-/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
-/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
-   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+/* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
+/* 頂欄只留四項，最想讓人做的那件事是一顆橘色的按鈕「活動與計畫」，不是第五個連結。
+   2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
+   每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它排在選單第一個、撐滿一整列。 */
 .navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
   padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
@@ -291,6 +294,54 @@ summary{cursor:pointer}
 a.nav-cta:active{transform:scale(.97)}
 @media (max-width:900px){.navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
+
+/* ═════════ 活動與計畫（2026-11-21）═════════ */
+/* 四個計畫刻意不是四張一樣圓角一樣陰影的卡片（視覺方向「要避開的套路」），是兩欄，每一個靠上面那條橘線分開，跟首頁「數字」同一套語言。
+   每一個上面有一行狀態（.prog-st）：HTML 裡寫的是一年到頭都對的那一句，src/main.js 問到資料之後換成「開放報名中」或「下一輪大約幾月」。 */
+.progs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(28px,4vw,56px) clamp(24px,3.4vw,52px)}
+.prog{border-top:2px solid var(--bt-orange);padding-top:16px;display:flex;flex-direction:column;align-items:flex-start}
+.prog h3{margin:0 0 8px;font-size:clamp(22px,2.2vw,30px)}
+.prog p{font-size:16px;line-height:1.65;margin:0 0 12px}
+.prog-st{display:inline-block;font-size:13.5px!important;font-weight:600;line-height:1.2!important;padding:6px 12px;border-radius:999px;
+  border:1px solid rgba(16,42,134,.28);color:rgba(16,42,134,.82);margin:0 0 14px!important}
+.prog-st.on{background:var(--bt-orange);border-color:transparent;color:var(--bt-navy)}
+.prog-st a{color:inherit;text-decoration:none}
+.prog-act{margin-top:auto!important;padding-top:8px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.prog-note{font-size:14px;color:rgba(16,42,134,.82)}
+.cta.sm{font-size:14.5px;padding:10px 18px;margin-top:0}
+.cta.warm{background:var(--bt-orange);color:var(--bt-navy)}
+.cta.warm:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.body a.cta.warm{color:var(--bt-navy)}
+.body a.cta.warm:hover{color:var(--bt-cream)}
+.more{font-weight:600;font-size:14.5px}
+.open-forms span{display:block}
+.open-act{display:flex!important;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:10px}
+#open-zh h3,#open-en h3{margin:30px 0 12px}
+#open-zh h3:first-child,#open-en h3:first-child{margin-top:0}
+.sec[id]{scroll-margin-top:84px}
+@media (max-width:820px){.progs{grid-template-columns:1fr}}
+/* ───────── 活動卡（2026-11-01）：三欄到手機一欄，封面 3:2，狀態標籤只用品牌色。 ───────── */
+.ev-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:8px}
+@media (max-width:900px){.ev-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.ev-cards{grid-template-columns:1fr}}
+.ev-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1px solid rgba(16,42,134,.16);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.45);transition:border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
+.ev-card:hover{border-color:var(--bt-navy);box-shadow:0 10px 26px rgba(16,42,134,.1)}
+.ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:rgba(255,196,108,.35)}
+/* 沒有封面的活動卡（2026-11-09）：不要一塊空的米色，矮一點、淡淡的斜紋加品牌橘的邊，看得出是刻意留白。 */
+.ev-noimg{aspect-ratio:3/1;background:repeating-linear-gradient(135deg,rgba(255,196,108,.22) 0 6px,rgba(255,232,197,.35) 6px 14px);border-bottom:3px solid var(--bt-orange)}
+.ev-body{display:flex;flex-direction:column;gap:5px;padding:14px 16px 16px}
+.ev-body b{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:.01em}
+.ev-when{font-size:13px;color:rgba(16,42,134,.78)}
+.ev-sum{font-size:14px;line-height:1.5}
+.ev-tag{align-self:flex-start;margin-top:4px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid rgba(16,42,134,.3)}
+.ev-tag.on{background:var(--bt-orange);border-color:var(--bt-orange)}
+.ev-cover{display:block;width:100%;max-width:820px;aspect-ratio:3/2;object-fit:cover;border-radius:16px}
+.ev-by{font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 6px}
+.ev-text{line-height:1.75}
+.ev-note{font-size:14px;color:rgba(16,42,134,.82)}
+
+/* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
+/* 頂欄只留四項，最想讓人做的那件事是一顆橘色的按鈕「活動與計畫」，不是第五個連結。
 </style>
 </head>
 <body>
@@ -302,12 +353,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../programs/" aria-current="page"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
-    <a class="nav-cta" href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a>
+    <a class="nav-cta" href="../programs/" aria-current="page"><span class="zh">活動與計畫</span><span class="en">What's on</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
@@ -318,53 +368,66 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
 <div class="zh" lang="zh-Hant">
 <header class="hero">
-  <h1>兩件事，都免費。</h1>
-  <p class="lead">探索營與導生配對計畫，加上不定期的講座。下一場什麼時候，會先在 Instagram 公布。</p>
+  <h1>還有別條路，只是沒有人跟你說過。</h1>
+  <p class="lead">探索營、導生配對、講座都免費，還有高中生實習。現在開放報名的排在最上面，挑好了再開帳號。</p>
 </header>
 
-<section class="sec">
+<section class="sec" id="open">
   <div class="sec-in">
-    <h2>探索營 College Bootcamp</h2>
-    <div class="body">
+    <h2>現在開放</h2>
+    <div class="body" id="open-zh">
+      <p>下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="all">
+  <div class="sec-in">
+    <h2>四個計畫</h2>
+    <div class="body progs">
+    <article class="prog" data-prog="bootcamp">
+      <h3>探索營 College Bootcamp</h3>
+      <p class="prog-st">每學期開始時開放</p>
       <p>每年寒暑假各一場，兩天，免費。</p>
       <p>兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。</p>
       <p>我們會事先問你想讀什麼，再去找對應背景的人回來。所以每一屆的講者名單都不一樣。</p>
       <p>第一屆在 2023 年六月，超過 80 位高中生參加。</p>
-      <p><a class="cta" href="../apply/">報名探索營</a></p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>導生配對計畫 Mentorship Program</h2>
-    <div class="body">
+      <p class="prog-act"><a class="cta sm" href="../app/">開放時通知我</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">追蹤 Instagram</a></p>
+    </article>
+    <article class="prog" data-prog="mentorship">
+      <h3>導生配對計畫 Mentorship Program</h3>
+      <p class="prog-st">每學期開始時開放</p>
       <p>一學期配對一次，免費。</p>
       <p>你會有一位走過同一條路的學長姐。他不會幫你寫 essay，但會陪你把卡住的地方講清楚。</p>
       <p>有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
       <p>導生制度從 2020 年九月開始，第一批 36 人。</p>
-      <p><a class="cta" href="../apply/">申請導生配對</a></p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>講座</h2>
-    <div class="body">
+      <p class="prog-act"><a class="cta sm" href="../app/">開放時通知我</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">追蹤 Instagram</a></p>
+    </article>
+    <article class="prog" data-prog="talks">
+      <h3>講座</h3>
+      <p class="prog-st">場次先在 Instagram 公布</p>
       <p>不定期舉辦，也不收費。場次同樣會在 Instagram 公布。</p>
-      <p><a href="../apply/#upcoming">看近期的講座與活動</a></p>
+      <p class="prog-act"><a class="cta sm" href="../app/">開放時通知我</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">追蹤 Instagram</a></p>
+    </article>
+    <article class="prog" data-prog="internship">
+      <h3>高中生實習計劃</h3>
+      <p class="prog-st">每學期開始時開放</p>
+      <p>每學期收一批，從官網報名。</p>
+      <p>讓公立高中生在申請之前就有一段真的做過的事。實習生進 BT 的各個 team 做真的事，有自己的實習護照記錄做過什麼。</p>
+      <p class="prog-act"><a class="cta sm" href="../app/">開放時通知我</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">追蹤 Instagram</a></p>
+    </article>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>怎麼參加</h2>
+    <h2>還沒開放的時候</h2>
     <div class="body">
-      <p>下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</p>
-      <p><a class="cta" href="../apply/">去報名頁</a></p>
-      <p>還沒準備好報名，可以先看<a href="../resources/">免費資源</a>：學長姐整理的申請資料，登入就拿得到。</p>
+      <p>每個 team 都在學期開始的時候開新的一輪，大約是八月和二月。</p>
+      <p>「開放時通知我」會帶你開一個免費的 BT 帳號。註冊的時候勾「我願意收 BT 的活動通知與資源更新」，下一輪開放我們會寄信給你。不勾也可以，帳號照樣能用。</p>
+      <p>等的時候可以先看<a href="../resources/">免費資源</a>：學長姐整理的申請資料，登入就拿得到。</p>
+      <p><a href="../events/">看過去辦過的活動</a></p>
     </div>
   </div>
 </section>
@@ -372,53 +435,66 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
 <div class="en" lang="en">
 <header class="hero">
-  <h1>Two programmes. Both free.</h1>
-  <p class="lead">College Bootcamp and the Mentorship Program, plus talks through the year. Dates are announced on Instagram first.</p>
+  <h1>There are other paths. No one told you about them.</h1>
+  <p class="lead">College Bootcamp, the Mentorship Program and talks are free, and there is a high school internship. Whatever is open right now is at the top. Pick one first, the account comes after.</p>
 </header>
 
-<section class="sec">
+<section class="sec" id="open-en-sec">
   <div class="sec-in">
-    <h2>College Bootcamp</h2>
-    <div class="body">
+    <h2>Open now</h2>
+    <div class="body" id="open-en">
+      <p>The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="all-en">
+  <div class="sec-in">
+    <h2>Four programmes</h2>
+    <div class="body progs">
+    <article class="prog" data-prog="bootcamp">
+      <h3>College Bootcamp</h3>
+      <p class="prog-st">Opens at the start of each term</p>
       <p>Twice a year, winter and summer. Two days. Free.</p>
       <p>Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like.</p>
       <p>We ask what you want to study before the camp, then bring back people with that background. No two years have the same line-up.</p>
       <p>The first bootcamp ran in June 2023 with more than 80 high school students.</p>
-      <p><a class="cta" href="../apply/">Sign up for Bootcamp</a></p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Mentorship Program</h2>
-    <div class="body">
+      <p class="prog-act"><a class="cta sm" href="../app/?lang=en">Tell me when it opens</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">Follow on Instagram</a></p>
+    </article>
+    <article class="prog" data-prog="mentorship">
+      <h3>Mentorship Program</h3>
+      <p class="prog-st">Opens at the start of each term</p>
       <p>One matching round per semester. Free.</p>
       <p>You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on.</p>
       <p>Some pairs that started in an application season are still in touch more than two years later.</p>
       <p>Mentorship began in September 2020 with 36 students.</p>
-      <p><a class="cta" href="../apply/">Apply for Mentorship</a></p>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Talks</h2>
-    <div class="body">
+      <p class="prog-act"><a class="cta sm" href="../app/?lang=en">Tell me when it opens</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">Follow on Instagram</a></p>
+    </article>
+    <article class="prog" data-prog="talks">
+      <h3>Talks</h3>
+      <p class="prog-st">Dates go on Instagram first</p>
       <p>Held through the year, also free. Dates are announced on Instagram.</p>
-      <p><a href="../apply/#upcoming">See upcoming talks and events</a></p>
+      <p class="prog-act"><a class="cta sm" href="../app/?lang=en">Tell me when it opens</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">Follow on Instagram</a></p>
+    </article>
+    <article class="prog" data-prog="internship">
+      <h3>High school internship</h3>
+      <p class="prog-st">Opens at the start of each term</p>
+      <p>One intake a semester, apply on the site.</p>
+      <p>The high school internship programme gives public school students real work experience before they apply. Interns join BT's teams and do real work, tracked in their own intern passport.</p>
+      <p class="prog-act"><a class="cta sm" href="../app/?lang=en">Tell me when it opens</a> <a class="more" href="https://www.instagram.com/beyondtaiwan/">Follow on Instagram</a></p>
+    </article>
     </div>
   </div>
 </section>
 
 <section class="sec">
   <div class="sec-in">
-    <h2>How to join</h2>
+    <h2>When nothing is open</h2>
     <div class="body">
-      <p>The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</p>
-      <p><a class="cta" href="../apply/">Go to Sign up</a></p>
-      <p>Not ready to apply yet? Start with the <a href="../resources/">free resources</a>: application guides written by alumni, free with an account.</p>
+      <p>Every team opens a new round at the start of term, around August and around February.</p>
+      <p>"Tell me when it opens" takes you to a free Beyond Taiwan account. Tick "I would like BT's event notices and resource updates" when you sign up and we will email you when the next round opens. You can leave it unticked and the account still works.</p>
+      <p>While you wait, start with the <a href="../resources/">free resources</a>: application guides written by alumni, free with an account.</p>
+      <p><a href="../events/">See past events</a></p>
     </div>
   </div>
 </section>
@@ -427,7 +503,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </main>
 
 <footer>
-  <p class="foot-links"><a href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a><a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
+  <p class="foot-links"><a href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>
@@ -460,7 +536,9 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     for (var i = 0; i < as.length; i++) {
       var h = as[i].getAttribute("href");
       if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
-      as[i].setAttribute("href", h.split("?")[0] + "?lang=" + l);
+      /* 這一頁的連結有的帶自己的參數（報名是 ../apply/?f=…），所以只改 lang 這一個，不把 ? 後面整段換掉。 */
+      var u = new URL(h, location.href); u.searchParams.set("lang", l);
+      as[i].setAttribute("href", u.pathname + u.search + u.hash);
     }
   }
 
@@ -507,5 +585,8 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 })();
 </script>
 
+<script type="module" src="./src/main.js"></script>
+<!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
+<script src="../shared/public.js" defer></script>
 </body>
 </html>

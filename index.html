@@ -120,7 +120,9 @@
    用 clip 不用 hidden：hidden 會讓 <html> 變成一個捲動容器，
    頂欄的 position:sticky 就會失效（而且是安靜地失效，只有在手機上捲才看得出來）。
    clip 只切不捲，sticky 不受影響。 */
-html{scroll-behavior:smooth;overflow-x:clip}
+/* 2026-11-21：首頁不開 scroll-behavior:smooth。「三個價值」那一段會停住，量位置的時候程式要瞬間捲到頂再捲回來；
+   開著 smooth 那兩下會變成慢慢捲，位置就量錯，重新整理之後那一段會蓋在別段上面（實測過）。這一頁也沒有站內錨點要捲。 */
+html{overflow-x:clip}
 body{
   margin:0;background:var(--paper);color:var(--ink);
   font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;
@@ -300,16 +302,17 @@ h1 .ln{display:block}
    排成幾行都不會壞 —— 開場的拆行是量實際渲染結果的，不是寫死三行。 */
 h1{
   font-family:var(--han);font-weight:900;
-  font-size:clamp(38px,7.4vw,116px);line-height:.98;letter-spacing:-.02em;
-  margin:0;max-width:13ch;text-wrap:balance;
+  font-size:clamp(36px,6.4vw,100px);line-height:1.02;letter-spacing:-.02em;
+  margin:0;max-width:15ch;text-wrap:balance;
 }
 /* 英文標題長很多，同樣的字級會擠成一團，所以收一點字級。
    11ch 是量出來的：斷成
    There are / other paths. / No one / told you / about them.
    （Paul 2026-09-07 指定的斷法。12ch 以上會變成四行、9ch 以下變六行。）
    跟中文那個 13ch 一樣，這個數字不能照字數推算，改了要實際看一次。 */
-.en h1{font-family:var(--display);font-size:clamp(40px,7.8vw,120px);line-height:.94;
-  letter-spacing:-.01em;max-width:11ch}
+/* 2026-11-21 標題換成信念那一句（十二個字），字級收到 6vw、行寬放到 15ch，排成四到五行。 */
+.en h1{font-family:var(--display);font-size:clamp(38px,6vw,96px);line-height:.96;
+  letter-spacing:-.01em;max-width:15ch}
 .lead{
   font-size:clamp(16px,1.35vw,20px);line-height:1.62;
   max-width:34ch;margin:clamp(20px,3.2vh,34px) 0 0;
@@ -540,9 +543,10 @@ summary{cursor:pointer}
 .ev-tag{align-self:flex-start;margin-top:4px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid rgba(16,42,134,.3)}
 .ev-tag.on{background:var(--bt-orange);border-color:var(--bt-orange)}
 
-/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
-/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
-   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+/* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
+/* 頂欄只留四項，最想讓人做的那件事是一顆橘色的按鈕「活動與計畫」，不是第五個連結。
+   2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
+   每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它排在選單第一個、撐滿一整列。 */
 .navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
   padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
@@ -552,24 +556,69 @@ a.nav-cta:active{transform:scale(.97)}
 @media (max-width:900px){.navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
-/* ═════════ 三扇門與 BT 島（2026-11-20 對外頁重整）═════════ */
-/* Paul 2026-11-20：「if I want people to go to this, they can go to this」。
-   第一屏底下先問「你是誰」，三種人各一扇門，每扇門一顆按鈕直接到那一頁。
-   刻意不是三張一樣圓角一樣陰影的卡片（視覺方向「要避開的套路」），是三欄，靠上面那條橘線分開，
-   跟「數字」那一段同一套語言。 */
-.doors{padding:clamp(40px,7vh,96px) var(--gut) 0}
-.doors-in{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(20px,3.6vw,56px)}
-.door{border-top:2px solid var(--bt-orange);padding-top:16px;display:flex;flex-direction:column;align-items:flex-start}
-.door small{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7)}
-.door h2{font-size:clamp(22px,2.4vw,34px);margin:6px 0 10px}
-.door p{font-size:15.5px;line-height:1.6;color:rgba(16,42,134,.82);margin:0 0 16px}
-.door .row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:auto}
-.door .cta{margin-top:0}
-.door .more{font-weight:600;color:var(--ink);text-underline-offset:3px}
-.door .more:hover{text-decoration-color:var(--bt-orange)}
+/* ═════════ 首頁第一屏以下（2026-11-21 第二次重整）═════════ */
+/* 一個畫面一件事。四段都靠左、不對稱，跟第一屏同一套；沒有一段是「三張一樣的卡片」。 */
+.hero-act{margin:clamp(18px,3vh,30px) 0 0}
 .cta.warm{background:var(--bt-orange);color:var(--bt-navy)}
 .cta.warm:hover{background:var(--bt-navy);color:var(--bt-cream)}
-@media (max-width:820px){.doors-in{grid-template-columns:1fr}}
+.isle-block .cta.warm:hover{background:var(--bt-cream);color:var(--bt-navy)}
+.row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.row .cta{margin-top:0}
+.more{font-weight:600;color:var(--ink);text-underline-offset:3px}
+.more:hover{text-decoration-color:var(--bt-orange)}
+small{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7)}
+
+/* 現在開放 */
+.now{padding:clamp(34px,6vh,84px) var(--gut) 0;display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);gap:clamp(18px,4.5vw,74px);align-items:start}
+.now-head{border-top:2px solid var(--bt-orange);padding-top:14px}
+.now-head h2{margin-top:6px}
+.now-body{border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(16px,2.6vh,28px)}
+.now-body .ev-cards{margin:0 0 22px}
+.now-forms{list-style:none;margin:0 0 22px;padding:0}
+.now-forms li{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+.now-forms li:first-child{border-top:0;padding-top:0}
+.now-forms b{font-family:var(--display);font-size:clamp(19px,1.8vw,24px);letter-spacing:.01em}
+html[data-lang="zh"] .now-forms b{font-family:var(--body);font-weight:600;font-size:18px}
+.cta.sm{font-size:14.5px;padding:10px 18px}
+.now-note{color:rgba(16,42,134,.82)}
+.now-none{font-family:var(--display);font-weight:700;font-size:clamp(22px,2.4vw,32px);line-height:1.2;margin:0 0 10px}
+html[data-lang="zh"] .now-none{font-family:var(--han);font-weight:900}
+.ev-note{font-size:14px;color:rgba(16,42,134,.82);margin-left:10px}
+@media (max-width:820px){.now{grid-template-columns:1fr;gap:14px}}
+
+/* 三個價值加願景。這裡寫的是「不動」的樣子：四欄裡的三欄加底下一句。
+   會動的版本是 .vals-on（頁尾 motion() 加上去的 class）：整段停住，四句疊在同一個位置一句一句換。 */
+.vals{padding:clamp(52px,8.5vh,124px) var(--gut) 0}
+.vals-k{display:block;border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(20px,3.4vh,40px)}
+.vals-stage{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(20px,3.6vw,56px);margin-top:18px}
+.val h2{font-size:clamp(38px,5vw,76px)}
+.val p{font-size:clamp(17px,1.5vw,21px);line-height:1.55;margin:14px 0 0;max-width:22em}
+.val-vision{grid-column:1 / -1;border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(18px,3vh,34px);margin-top:clamp(8px,2vh,22px)}
+.val-vision h2{font-family:var(--display);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);line-height:1.2}
+html[data-lang="zh"] .val-vision h2{font-family:var(--body);font-weight:600;letter-spacing:.06em}
+.val-vision p{font-family:var(--hand);font-size:clamp(22px,2.9vw,40px);line-height:1.5;max-width:26em;margin:8px 0 16px}
+.vals-on{padding-top:0;min-height:100svh;display:flex;align-items:center}
+.vals-on .vals-in{width:100%}
+.vals-on .vals-k{border-top:0}
+.vals-on .vals-stage{display:block;position:relative;height:min(64svh,620px);margin-top:0}
+.vals-on .val{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;border-top:0;padding-top:0;margin-top:0}
+.vals-on .val:not(.val-vision) h2{font-size:clamp(84px,19vw,300px);line-height:.9}
+/* 英文有往下掉的筆畫（q、y、g），行高太緊會壓到下面那一句。 */
+html[data-lang="en"] .vals-on .val:not(.val-vision) h2{line-height:1.12}
+.vals-on .val:not(.val-vision) p{font-size:clamp(20px,2.6vw,38px);line-height:1.4;max-width:20em;margin-top:clamp(14px,3vh,34px)}
+.vals-on .val-vision p{font-size:clamp(26px,4vw,58px);line-height:1.38;max-width:19em}
+@media (max-width:820px){.vals-stage{grid-template-columns:1fr}}
+
+.nums-src{margin-top:clamp(18px,3vh,30px)}
+
+/* 合作：左邊字、右邊那張大合照。合作過的單位用字寫，不放 logo（沒有每一家的授權，字比一排大小不一的 logo 乾淨）。 */
+.pstrip{padding:clamp(52px,8.5vh,124px) var(--gut) 0;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(20px,4.5vw,74px);align-items:center}
+.pstrip h2{margin:8px 0 14px}
+.pstrip .photo{margin:0}
+.partners{list-style:none;margin:6px 0 24px;padding:0;max-width:34em}
+.partners li{padding:11px 0;border-top:1px solid rgba(16,42,134,.14);font-family:var(--display);font-weight:700;font-size:clamp(18px,1.7vw,24px);letter-spacing:.01em}
+html[data-lang="zh"] .partners li{font-family:var(--body);font-weight:600;font-size:17px}
+@media (max-width:820px){.pstrip{grid-template-columns:1fr}}
 
 /* BT 島的大區塊。島本身是 /island/ 的 3D，這裡只畫一張安靜的小地圖當門牌：
    七座島（中間聚會所、外圍六個 team）加海上的機場，跟 island/teams.json 的配置同一個意思，但不讀它，
@@ -610,12 +659,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
        錨點的問題是：路人以為點進去會看到一整頁，結果只是捲到同一頁的一段。
        標籤自己也有中英兩份，跟著 data-lang 一起切。 -->
   <div class="navlinks" id="navlinks">
-    <a href="./programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
     <a href="./resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
     <a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="./team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="./partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
-    <a class="nav-cta" href="./apply/"><span class="zh">報名</span><span class="en">Sign up</span></a>
+    <a class="nav-cta" href="./programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="./app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
@@ -641,12 +689,14 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 <header class="hero" id="top">
   <div class="hero-copy">
     <div class="zh" lang="zh-Hant">
-      <h1>還有別條路，只是沒有人跟你說過。</h1>
+      <h1>我們相信，人人都有選擇自己教育的權利。</h1>
       <p class="lead">Beyond Taiwan 是一群從台灣公立高中走出去的大學生。我們回來，把自己走過的路講給你聽。</p>
+      <p class="hero-act"><a class="cta warm" href="./programs/">看現在開放什麼</a></p>
     </div>
     <div class="en" lang="en">
-      <h1>There are other paths. No one told you about them.</h1>
+      <h1>We believe that everyone has the right to choose their own education.</h1>
       <p class="lead">Beyond Taiwan is a group of students who came out of Taiwan's public high schools. We went looking, and we came back to tell you what we found.</p>
+      <p class="hero-act"><a class="cta warm" href="./programs/">See what's open</a></p>
     </div>
   </div>
 
@@ -674,106 +724,60 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   </div>
 </header>
 
-<!-- 三扇門（2026-11-20，Paul 要「想讓人去哪，他就去得到哪」）。
-     三種人各一扇：高中生到報名與計畫、要資源的到免費資源、想合作的到合作。
-     底下那塊深藍是 BT 島的門口：島不在頂欄，在這裡放大，頁尾也連得到。
-     這兩段是改版新加的文案，下面的六段定稿文案一字未動。 -->
-<section class="doors" aria-label="你想做什麼 / What brings you here">
-  <div class="doors-in">
-    <div class="door">
-      <small><span class="zh">高中生</span><span class="en">Students</span></small>
-      <h2><span class="zh">我想報名</span><span class="en">I want to sign up</span></h2>
-      <p><span class="zh">探索營、導生配對、講座，全部免費。現在開放報名的，都在報名頁。</span><span class="en">College Bootcamp, the Mentorship Program and talks are all free. Whatever is open right now is on the Sign up page.</span></p>
-      <div class="row"><a class="cta warm" href="./apply/"><span class="zh">去報名</span><span class="en">Sign up</span></a><a class="more" href="./programs/"><span class="zh">先看有哪些計畫</span><span class="en">See the programmes</span></a></div>
-    </div>
-    <div class="door">
-      <small><span class="zh">免費資源</span><span class="en">Free resources</span></small>
-      <h2><span class="zh">我想先自己看</span><span class="en">I want to read up first</span></h2>
-      <p><span class="zh">申請文書怎麼寫、選校怎麼看、時程怎麼排。學長姐整理好的資料，開一個免費帳號就拿得到。</span><span class="en">How to write your essays, read a school list and plan the timeline. Guides written by alumni, free with an account.</span></p>
-      <div class="row"><a class="cta" href="./resources/"><span class="zh">看免費資源</span><span class="en">Get the resources</span></a></div>
-    </div>
-    <div class="door">
-      <small><span class="zh">學校、企業、個人</span><span class="en">Schools, companies, people</span></small>
-      <h2><span class="zh">我想一起做</span><span class="en">I want to work with you</span></h2>
-      <p><span class="zh">場地、講者、把我們帶進學校，或是贊助。合作不一定是錢。</span><span class="en">A venue, a speaker, a way into a school, or funding. Partnership does not have to mean money.</span></p>
-      <div class="row"><a class="cta" href="./partner/"><span class="zh">看怎麼合作</span><span class="en">Ways to partner</span></a></div>
-    </div>
+<!-- 第一屏以下（2026-11-21 第二次重整，Paul：「students signing up the fastest they can, and they are attracted to it」）。
+     首頁只剩六個短的畫面，一個畫面一件事：第一屏、現在開放、三個價值、數字、BT 島、合作。
+     原本在這裡的六段長文搬到內頁，一句都沒有丟：為什麼在 → /about/、做什麼 → /programs/、誰在做 → /team/、加入與聯絡 → /programs/ 與 /partner/。
+     信念、價值、願景是 Paul 2026-11-21 給的定稿，要改先問 Co-President。 -->
+
+<!-- 現在開放。HTML 裡寫的是「現在沒有開放」時也對的那幾句；最下面那段 type="module" 的程式問到資料之後，
+     把近期活動與開放中的報名表畫在 #now-zh 與 #now-en 裡。問不到就維持原樣。 -->
+<section class="now" id="now" aria-labelledby="now-h">
+  <div class="now-head">
+    <small><span class="zh">現在</span><span class="en">Now</span></small>
+    <h2 id="now-h"><span class="zh">現在開放</span><span class="en">Open now</span></h2>
+  </div>
+  <div class="now-body">
+    <div class="zh" id="now-zh"></div>
+    <div class="en" id="now-en"></div>
+    <p class="now-note"><span class="zh">探索營、導生配對、講座、高中生實習，每學期開始的時候開新的一輪，大約是八月和二月。</span><span class="en">College Bootcamp, the Mentorship Program, talks and the high school internship each open a new round at the start of term, around August and around February.</span></p>
+    <div class="row"><a class="cta" href="./programs/"><span class="zh">看全部的活動與計畫</span><span class="en">See everything we run</span></a><a class="more" href="./resources/"><span class="zh">還沒開放？先看免費資源</span><span class="en">Nothing open yet? Start with the free resources</span></a></div>
   </div>
 </section>
 
-<section class="isle-block" aria-labelledby="isle-h">
-  <div>
-    <small>BT Island</small>
-    <h2 id="isle-h"><span class="zh">走進 BT 島。</span><span class="en">Step onto BT Island.</span></h2>
-    <p><span class="zh">七座島，外圍六座一座一個 team，中間是大家都會去的聚會所。點一座島，看那一群人在做什麼；從機場往外走，是 BT 五年走過來的路。</span><span class="en">Seven islands: one for each of our six teams, and the Commons in the middle where everyone meets. Click an island to see what those people do. Walk out past the airport and you are on the road Beyond Taiwan took to get here.</span></p>
-    <div class="row"><a class="cta warm" href="./island/"><span class="zh">進 BT 島</span><span class="en">Explore BT Island</span></a><a class="more" href="./history/"><span class="zh">走歷史之路</span><span class="en">Walk Our Road</span></a></div>
-  </div>
-  <a class="isle-link" href="./island/" tabindex="-1" aria-hidden="true"><svg class="isle-map" viewBox="0 0 600 350" aria-hidden="true" focusable="false"><ellipse class="ring" cx="300" cy="172" rx="178" ry="110"/><g class="isl"><ellipse class="cliff" cx="300" cy="181" rx="76" ry="38"/><ellipse class="i-cream" cx="300" cy="172" rx="76" ry="38"/><text x="300" y="177">Commons</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="73" rx="64" ry="30"/><ellipse class="i-orange" cx="300" cy="64" rx="64" ry="30"/><text x="300" y="69">Sponsorship</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="127" rx="64" ry="30"/><ellipse class="i-teal" cx="478" cy="118" rx="64" ry="30"/><text x="478" y="123">Curriculum</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="237" rx="64" ry="30"/><ellipse class="i-sand" cx="478" cy="228" rx="64" ry="30"/><text x="478" y="233">Internship</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="291" rx="64" ry="30"/><ellipse class="i-teal" cx="300" cy="282" rx="64" ry="30"/><text x="300" y="287">Mentorship</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="237" rx="64" ry="30"/><ellipse class="i-orange" cx="122" cy="228" rx="64" ry="30"/><text x="122" y="233">Marketing</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="127" rx="64" ry="30"/><ellipse class="i-sand" cx="122" cy="118" rx="64" ry="30"/><text x="122" y="123">CR</text></g><g class="isl"><rect class="air" x="498" y="296" width="92" height="30" rx="8"/><line class="runway" x1="508" y1="311" x2="580" y2="311"/><text class="air-t" x="544" y="345">Airport</text></g></svg></a>
-</section>
-
-<!-- ═══════════ 中文 ═══════════ -->
-<div class="zh" lang="zh-Hant">
-
-<!-- 這張照片本來是第一屏的主視覺。島接手之後它往下移，不刪 ——
-     真實現場感是 BT 照片美學的重點，島是輪廓，照片才是人。 -->
 <div class="wrap"><picture class="photo photo-lead">
   <source srcset="./photos/hero-listening.webp" type="image/webp">
   <img src="./photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800" loading="lazy">
 </picture></div>
 
-<section class="sec" id="about">
-  <div class="sec-in">
-    <h2>我們為什麼在</h2>
-    <div class="body">
-      <p>在台灣，「出國念書」常被當成一件家裡有錢才能想的事。</p>
-      <p>這不完全是錯覺。留學代辦的費用不低，公立學校能給的海外升學資源，通常也比不上私立或國際學校。真正的問題不是錢而已，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
-      <p>於是很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
-      <p>Beyond Taiwan 處理的就是這一段落差。我們幾乎所有活動都免費，導生配對計畫、探索營、講座，都不收費。我們沒辦法幫你做決定，但可以讓你在做決定之前，先知道自己有哪些選擇。</p>
-      <picture class="photo">
-        <source srcset="./photos/talking-laptop.webp" type="image/webp">
-        <img src="./photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy">
-      </picture>
+<!-- 三個價值，加願景。沒有動畫的時候是三欄加底下一句；有動畫的時候（頁尾 motion() 裡）這一段會停住，四句一句一句換。 -->
+<section class="vals" id="values" aria-label="我們的價值與願景 / Our values and vision">
+  <div class="vals-in">
+    <small class="vals-k"><span class="zh">我們的價值</span><span class="en">What we value</span></small>
+    <div class="vals-stage">
+      <article class="val">
+        <h2><span class="zh">看見</span><span class="en">Seeing</span></h2>
+        <p><span class="zh">你無法選擇你從未看見的東西。</span><span class="en">You can't choose what you've never seen.</span></p>
+      </article>
+      <article class="val">
+        <h2><span class="zh">平等</span><span class="en">Equality</span></h2>
+        <p><span class="zh">選擇的權利，不該取決於出身或家庭的資源。</span><span class="en">The right to choose shouldn't depend on where you come from or what your family has.</span></p>
+      </article>
+      <article class="val">
+        <h2><span class="zh">陪伴</span><span class="en">Company</span></h2>
+        <p><span class="zh">沒有人該獨自摸索。走過的人，拉下一個人一把。</span><span class="en">No one should have to figure it out alone. Those who've walked the road pull the next person up.</span></p>
+      </article>
+      <article class="val val-vision">
+        <h2><span class="zh">願景</span><span class="en">Vision</span></h2>
+        <p><span class="zh">一個台灣，升學不再只有一條路。每個學生，無論來自哪裡，都能看見自己的選項，並擁有選擇的權利與勇氣。</span><span class="en">A Taiwan where success is no longer defined by a single path, where every student, wherever they come from, can see their options and has the right, and the courage, to choose.</span></p>
+        <a class="more" href="./about/"><span class="zh">看我們的使命</span><span class="en">Read our mission</span></a>
+      </article>
     </div>
   </div>
 </section>
 
-<section class="sec" id="what">
-  <div class="sec-in">
-    <h2>我們做什麼</h2>
-    <div class="body">
-      <h3>探索營 College Bootcamp</h3>
-      <p>每年寒暑假各一場，免費。兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。我們會事先問你想讀什麼，再去找對應背景的人回來。</p>
-      <h3>導生配對計畫 Mentorship Program</h3>
-      <p>一學期配對一次。你會有一位走過同一條路的學長姐，他不會幫你寫 essay，但會陪你把卡住的地方講清楚。有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
-      <picture class="photo">
-        <source srcset="./photos/three-at-laptop.webp" type="image/webp">
-        <img src="./photos/three-at-laptop.jpg" alt="三個人擠在一台筆電前，中間那位笑著" width="1200" height="800" loading="lazy">
-      </picture>
-    </div>
-  </div>
-</section>
-
-<!-- 近期活動（2026-11-01，Paul 2026-10-24 同意這一句新標題；首頁其他文案不動）。
-     這一段沒有寫死任何活動：開頁用 fetch 打 public_events()，最多三張卡；
-     讀不到、或沒有公開中的活動，整段維持 hidden，首頁跟以前一模一樣（跟團隊頁「一個人都還沒公開就整段不出現」同一個做法）。
-     程式在這一頁最底下那段 type="module" 的 script。 -->
-<section class="sec sec-events" id="events" hidden>
-  <div class="sec-in">
-    <h2>近期活動</h2>
-    <div class="body"><div class="ev-cards" id="ev-cards-zh"></div></div>
-  </div>
-</section>
-
-<!-- 宣傳影片。**要放影片只要做一件事**：把 YouTube 的影片編號填進這一頁最下面
-     那段程式裡的 VIDEO_ID（網址 youtube.com/watch?v=XXXXXXXXXXX 裡 v= 後面那一串）。
-     填了中英兩段就會自己出現，沒填就整段不存在 —— 不用改 hidden，也不用改程式。
-     中英各一段但編號只填一次，是刻意的：填兩次就一定有一天只改到一邊。
-
-     ⚠ 這裡不要寫出開頭是小於號的 script 標籤，連在註解裡也不行。
-     check.sh 用正規表示式找內嵌的程式區塊，註解裡的那個標籤會被它當成真的，
-     於是往下一路吃到下一個結束標籤，把 GSAP 那兩行也吞進去，
-     然後回報「首頁有動畫跑到 motion() 外面」——訊息跟真正的原因完全對不上。
-     2026-09-08 踩過一次。 -->
+<!-- 宣傳影片：填了 VIDEO_ID 才會出現，說明在頁尾那段程式。
+     ⚠ 這裡不要寫出開頭是小於號的 script 標籤，連在註解裡也不行（check.sh 會把它當成真的，2026-09-08 踩過一次）。 -->
+<div class="zh" lang="zh-Hant">
 <section class="sec vid" id="video" hidden>
   <div class="sec-in">
     <h2>一分鐘看 BT</h2>
@@ -788,105 +792,8 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     </div>
   </div>
 </section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>誰在做這件事</h2>
-    <div class="body">
-      <p>Beyond Taiwan 現在有接近三十個人，全部是學生，分散在台灣、美國、加拿大、歐洲、澳洲、日本、韓國。</p>
-      <p>我們不是老師，也不是顧問。多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。</p>
-      <p>從 2020 年五月開始，七個人，到現在五年。</p>
-      <picture class="photo">
-        <source srcset="./photos/sharing-mic.webp" type="image/webp">
-        <img src="./photos/sharing-mic.jpg" alt="一位拿麥克風的講者站著分享，坐在地上的聽眾在笑" width="1200" height="800" loading="lazy">
-      </picture>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>數字</h2>
-    <div class="body">
-      <div class="nums">
-        <div><b><span class="fig">250+</span> 位學員</b><p>從 2020 年到現在，超過 250 位高中生在申請路上有人可以問。</p></div>
-        <div><b>每年 <span class="fig">50</span> 對配對</b><p>一學期一次，配到就是一整個申請季有人陪。</p></div>
-        <div><b><span class="fig">100+</span> 位高中生</b><p>探索營舉辦兩年，收到超過 150 份申請，協助超過 100 位國內高中生。</p></div>
-        <div><b><span class="fig">20+</span> 位學長姐回來</b><p>超過 20 位 BT 校友回來當講者。他們當年也是被這樣帶過來的。</p></div>
-        <div><b><span class="fig">5</span> 年，近 30 人</b><p>成立五年，幹部全部是學生，分布七個國家。</p></div>
-        <div><b><span class="fig">0</span> 元</b><p>幾乎所有活動都免費。</p></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="join">
-  <div class="sec-in">
-    <h2>加入我們 / 聯絡</h2>
-    <div class="body">
-      <h3>如果你是高中生</h3>
-      <p>下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</p>
-      <p><a class="cta" href="./apply/">看現在開放什麼</a></p>
-      <h3>如果你想贊助或合作</h3>
-      <p>我們持續在找願意一起做這件事的個人、企業與學校。過去合作過的單位包括美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
-      <p>來信：<a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
-      <picture class="photo">
-        <source srcset="./photos/group-photo.webp" type="image/webp">
-        <img src="./photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" loading="lazy">
-      </picture>
-    </div>
-  </div>
-</section>
-
 </div>
-
-<!-- ═══════════ English ═══════════ -->
 <div class="en" lang="en">
-
-<div class="wrap"><picture class="photo photo-lead">
-  <source srcset="./photos/hero-listening.webp" type="image/webp">
-  <img src="./photos/hero-listening.jpg" alt="A row of high-school students listening to a speaker; two blurred heads in the foreground" width="1200" height="800" loading="lazy">
-</picture></div>
-
-<section class="sec" id="about-en">
-  <div class="sec-in">
-    <h2>Why we exist</h2>
-    <div class="body">
-      <p>In Taiwan, studying abroad is still widely treated as something only well-off families get to consider.</p>
-      <p>That impression is not baseless. Agency fees are high, and public schools rarely have the staff or resources to guide a student through an overseas application. But the harder barrier is information. If no one around you has done it, you do not even know what to ask.</p>
-      <p>So students rule the option out before they ever look into it. Not because it does not suit them, but because no one has shown them what it actually involves.</p>
-      <p>That gap is the reason Beyond Taiwan exists. Almost everything we run is free: mentorship, bootcamps, talks. We cannot make anyone's decision. We can make sure they know what they are choosing between.</p>
-      <picture class="photo">
-        <source srcset="./photos/talking-laptop.webp" type="image/webp">
-        <img src="./photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy">
-      </picture>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="what-en">
-  <div class="sec-in">
-    <h2>What we do</h2>
-    <div class="body">
-      <h3>College Bootcamp</h3>
-      <p>Twice a year, winter and summer, free. Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like. We ask what you want to study before the camp, then bring back people with that background.</p>
-      <h3>Mentorship Program</h3>
-      <p>One matching round per semester. You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on. Some pairs that started in an application season are still in touch more than two years later.</p>
-      <picture class="photo">
-        <source srcset="./photos/three-at-laptop.webp" type="image/webp">
-        <img src="./photos/three-at-laptop.jpg" alt="Three students crowded around one laptop, the one in the middle smiling" width="1200" height="800" loading="lazy">
-      </picture>
-    </div>
-  </div>
-</section>
-
-<section class="sec sec-events" id="events-en" hidden>
-  <div class="sec-in">
-    <h2>Upcoming</h2>
-    <div class="body"><div class="ev-cards" id="ev-cards-en"></div></div>
-  </div>
-</section>
-
 <section class="sec vid" id="video-en" hidden>
   <div class="sec-in">
     <h2>One minute</h2>
@@ -901,26 +808,23 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     </div>
   </div>
 </section>
+</div>
 
-<section class="sec">
+<section class="sec" id="numbers">
   <div class="sec-in">
-    <h2>Who runs this</h2>
+    <h2><span class="zh">數字</span><span class="en">Numbers</span></h2>
     <div class="body">
-      <p>Beyond Taiwan is close to thirty people, all of us students, spread across Taiwan, the United States, Canada, Europe, Australia, Japan and Korea.</p>
-      <p>We are not teachers and we are not consultants. Most of us are only a step or two ahead of you. Some finished their own applications recently enough to still remember not knowing where to start.</p>
-      <p>We began in May 2020 with seven people. Five years later, we are still here.</p>
-      <picture class="photo">
-        <source srcset="./photos/sharing-mic.webp" type="image/webp">
-        <img src="./photos/sharing-mic.jpg" alt="A speaker with a microphone; the audience seated on the floor, laughing" width="1200" height="800" loading="lazy">
-      </picture>
-    </div>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Numbers</h2>
-    <div class="body">
+      <div class="zh" lang="zh-Hant">
+      <div class="nums">
+        <div><b><span class="fig">250+</span> 位學員</b><p>從 2020 年到現在，超過 250 位高中生在申請路上有人可以問。</p></div>
+        <div><b>每年 <span class="fig">50</span> 對配對</b><p>一學期一次，配到就是一整個申請季有人陪。</p></div>
+        <div><b><span class="fig">100+</span> 位高中生</b><p>探索營舉辦兩年，收到超過 150 份申請，協助超過 100 位國內高中生。</p></div>
+        <div><b><span class="fig">20+</span> 位學長姐回來</b><p>超過 20 位 BT 校友回來當講者。他們當年也是被這樣帶過來的。</p></div>
+        <div><b><span class="fig">5</span> 年，近 30 人</b><p>成立五年，幹部全部是學生，分布七個國家。</p></div>
+        <div><b><span class="fig">0</span> 元</b><p>幾乎所有活動都免費。</p></div>
+      </div>
+      </div>
+      <div class="en" lang="en">
       <div class="nums">
         <div><b><span class="fig">250+</span> mentees</b><p>Since 2020, more than 250 high school students have had someone to ask.</p></div>
         <div><b><span class="fig">50</span> pairs a year</b><p>One matching round each semester. A match means company for a whole application season.</p></div>
@@ -929,33 +833,45 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
         <div><b><span class="fig">5</span> years, close to 30 people</b><p>Five years old. Every organizer is a student. Seven countries.</p></div>
         <div><b><span class="fig">Free</span></b><p>Almost everything we run costs nothing.</p></div>
       </div>
+      </div>
+      <p class="nums-src"><a href="./about/#numbers"><span class="zh">這些數字怎麼來的</span><span class="en">Where these numbers come from</span></a></p>
     </div>
   </div>
 </section>
 
-<section class="sec" id="join-en">
-  <div class="sec-in">
-    <h2>Get involved / Contact</h2>
-    <div class="body">
-      <h3>If you are a high school student</h3>
-      <p>The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</p>
-      <p><a class="cta" href="./apply/">See what is open now</a></p>
-      <h3>If you want to support or partner with us</h3>
-      <p>We are always looking for individuals, companies and schools willing to build this with us. Past partners include the American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
-      <p>Write to us: <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
-      <picture class="photo">
-        <source srcset="./photos/group-photo.webp" type="image/webp">
-        <img src="./photos/group-photo.jpg" alt="About thirty Beyond Taiwan cadres on a stage, all making the same hand sign" width="1200" height="800" loading="lazy">
-      </picture>
-    </div>
+<section class="isle-block" aria-labelledby="isle-h">
+  <div>
+    <small>BT Island</small>
+    <h2 id="isle-h"><span class="zh">走進 BT 島。</span><span class="en">Step onto BT Island.</span></h2>
+    <p><span class="zh">七座島，外圍六座一座一個 team，中間是大家都會去的聚會所。點一座島，看那一群人在做什麼；從機場往外走，是 BT 五年走過來的路。</span><span class="en">Seven islands: one for each of our six teams, and the Commons in the middle where everyone meets. Click an island to see what those people do. Walk out past the airport and you are on the road Beyond Taiwan took to get here.</span></p>
+    <div class="row"><a class="cta warm" href="./island/"><span class="zh">進 BT 島</span><span class="en">Explore BT Island</span></a><a class="more" href="./team/"><span class="zh">認識團隊</span><span class="en">Meet the team</span></a></div>
   </div>
+  <a class="isle-link" href="./island/" tabindex="-1" aria-hidden="true"><svg class="isle-map" viewBox="0 0 600 350" aria-hidden="true" focusable="false"><ellipse class="ring" cx="300" cy="172" rx="178" ry="110"/><g class="isl"><ellipse class="cliff" cx="300" cy="181" rx="76" ry="38"/><ellipse class="i-cream" cx="300" cy="172" rx="76" ry="38"/><text x="300" y="177">Commons</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="73" rx="64" ry="30"/><ellipse class="i-orange" cx="300" cy="64" rx="64" ry="30"/><text x="300" y="69">Sponsorship</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="127" rx="64" ry="30"/><ellipse class="i-teal" cx="478" cy="118" rx="64" ry="30"/><text x="478" y="123">Curriculum</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="237" rx="64" ry="30"/><ellipse class="i-sand" cx="478" cy="228" rx="64" ry="30"/><text x="478" y="233">Internship</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="291" rx="64" ry="30"/><ellipse class="i-teal" cx="300" cy="282" rx="64" ry="30"/><text x="300" y="287">Mentorship</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="237" rx="64" ry="30"/><ellipse class="i-orange" cx="122" cy="228" rx="64" ry="30"/><text x="122" y="233">Marketing</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="127" rx="64" ry="30"/><ellipse class="i-sand" cx="122" cy="118" rx="64" ry="30"/><text x="122" y="123">CR</text></g><g class="isl"><rect class="air" x="498" y="296" width="92" height="30" rx="8"/><line class="runway" x1="508" y1="311" x2="580" y2="311"/><text class="air-t" x="544" y="345">Airport</text></g></svg></a>
 </section>
 
-</div>
+<section class="pstrip" aria-labelledby="pstrip-h">
+  <div class="pstrip-copy">
+    <small><span class="zh">合作</span><span class="en">Partner</span></small>
+    <h2 id="pstrip-h"><span class="zh">一起做這件事。</span><span class="en">Build this with us.</span></h2>
+    <p><span class="zh">我們持續在找願意一起做這件事的個人、企業與學校。過去合作過的單位包括美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</span><span class="en">We are always looking for individuals, companies and schools willing to build this with us. Past partners include the American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</span></p>
+    <ul class="partners">
+      <li><span class="zh">美國在臺協會 AIT</span><span class="en">American Institute in Taiwan</span></li>
+      <li>EducationUSA</li>
+      <li><span class="zh">TRÈS BON 好伴 café</span><span class="en">TRÈS BON café</span></li>
+      <li><span class="zh">臺北市立第一女子高級中學</span><span class="en">Taipei First Girls' High School</span></li>
+    </ul>
+    <div class="row"><a class="cta" href="./partner/"><span class="zh">看怎麼合作</span><span class="en">Ways to partner</span></a><a class="more" href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></div>
+  </div>
+  <picture class="photo">
+  <source srcset="./photos/group-photo.webp" type="image/webp">
+  <img src="./photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" loading="lazy">
+</picture>
+</section>
+
 </main>
 
 <footer>
-  <p class="foot-links"><a href="./apply/"><span class="zh">報名</span><span class="en">Sign up</span></a><a href="./programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a><a href="./resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="./team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="./partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="./island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="./alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="./history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="./events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
+  <p class="foot-links"><a href="./programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a><a href="./resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="./team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="./partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="./island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="./alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="./history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="./events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
   <p><a href="./privacy/">隱私政策 / Privacy Policy</a></p>
   <!-- 這兩句放在 footer 是使用者 2026-09-03 的決定：家長、學校、Google 審查三種人
        都用得到，而隱私政策裡有完整版，但沒有人會為了確認這件事去點進去。 -->
@@ -1013,7 +929,9 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     for (var i = 0; i < as.length; i++) {
       var h = as[i].getAttribute("href");
       if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
-      as[i].setAttribute("href", h.split("?")[0] + "?lang=" + l);
+      /* 只改 lang 這一個參數，不把 ? 後面整段換掉：「現在開放」那一段的報名連結帶著自己的 ?f=。 */
+      var u = new URL(h, location.href); u.searchParams.set("lang", l);
+      as[i].setAttribute("href", u.pathname + u.search + u.hash);
     }
   }
 
@@ -1166,7 +1084,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
        另一份是 display:none，量不到行也不需要動。 */
     var lang = document.documentElement.getAttribute("data-lang") || "zh";
     var copy = document.querySelector(".hero-copy ." + lang) || document.querySelector(".hero-copy .zh");
-    var h1 = copy.querySelector("h1"), lead = copy.querySelector(".lead");
+    var h1 = copy.querySelector("h1"), lead = copy.querySelectorAll(".lead, .hero-act");
     var lines = null;
     try { lines = splitLines(h1); } catch (e) { lines = null; }
 
@@ -1176,7 +1094,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
     tl.from(".hero-isle svg", { opacity: 0, scale: 1.12, duration: 1.5 }, 0)
       .from(lines || h1, { opacity: 0, yPercent: 55, duration: 1, stagger: lines ? 0.09 : 0 }, 0.35)
-      .from(lead, { opacity: 0, y: 18, duration: 0.8 }, 0.9);
+      .from(lead, { opacity: 0, y: 18, duration: 0.8, stagger: 0.12 }, 0.9);
 
     /* 環繞的軌跡用 stroke-dasharray 自己畫。
        GSAP 的 DrawSVGPlugin 是付費外掛，免費的 CDN 版沒有，這幾行就是它做的事。 */
@@ -1207,27 +1125,53 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
       scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 1.2 }
     });
 
-    /* 數字遞增。只有這一段有，因為那些數字是 community 規模的直接證據，
-       值得一個動畫；其他四段安靜就好。
-       HTML 裡寫的就是最終值，這裡先歸零再跑回去，跑完把原字串原樣寫回去 ——
-       所以就算動畫中途壞掉，畫面上也不會留下一個算到一半的數字。 */
-    document.querySelectorAll(".nums .fig").forEach(function (el) {
-      var finalText = el.textContent;
-      var m = finalText.match(/^(\d[\d,]*)(.*)$/);
-      if (!m) return;               /* 例如英文那一格的 Free，沒有數字就不動 */
-      var target = parseInt(m[1].replace(/,/g, ""), 10), suffix = m[2], box = { v: 0 };
-      el.textContent = "0" + suffix;
-      ScrollTrigger.create({
-        trigger: el, start: "top 88%", once: true,
-        onEnter: function () {
-          gsap.to(box, {
-            v: target, duration: 1.5, ease: "power2.out",
-            onUpdate: function () { el.textContent = Math.round(box.v).toLocaleString("en-US") + suffix; },
-            onComplete: function () { el.textContent = finalText; }
-          });
-        }
+    /* 數字從 0 數到定位那件事搬到 shared/public.js 了（每一個對外頁同一支），這裡不再做。 */
+
+    /* ── 三個價值加願景：整段停住，四句疊在同一個位置，捲一段換一句 ──
+       .vals-on 這個 class 是這裡加的，所以只有「真的會動」的時候版面才會變成疊在一起；
+       開了減少動態效果、或 GSAP 沒載到，它就是 CSS 裡那個三欄加一句的樣子，四句都看得到。
+       pin 的長度是「每一句一個螢幕高的 85%」。scrub 0.5 是讓它跟著手指走，但收尾軟一點。 */
+    var vals = document.querySelector(".vals");
+    var items = vals ? gsap.utils.toArray(".vals .val") : [];
+    if (vals && items.length > 1) {
+      vals.classList.add("vals-on");
+      gsap.set(items.slice(1), { autoAlpha: 0, yPercent: 16 });
+      var vt = gsap.timeline({
+        defaults: { ease: "power2.inOut", duration: 1 },
+        scrollTrigger: { trigger: vals, start: "top top", end: "+=" + (items.length - 1) * 85 + "%", pin: true, scrub: 0.5, anticipatePin: 1 }
       });
-    });
+      items.forEach(function (it, i) {
+        if (!i) return;
+        /* 上一句先走完，下一句才進來：兩句同時半透明疊在一起的話，中間那一下誰都讀不到。 */
+        vt.to(items[i - 1], { autoAlpha: 0, yPercent: -16, duration: 0.45 }, i - 1 + 0.2)
+          .to(it, { autoAlpha: 1, yPercent: 0, duration: 0.5 }, i - 1 + 0.65);
+      });
+      vt.to({}, { duration: 0.35 });   /* 最後一句停一下再放手 */
+    }
+
+    /* ── BT 島那一塊：小地圖從躺平立起來，七座島一座一座亮 ──
+       只動外面那個連結與每一座島的透明度；島自己的 transform 留給 hover（CSS 裡有過渡，兩邊搶會抖）。 */
+    if (document.querySelector(".isle-block")) {
+      gsap.from(".isle-link", {
+        rotationX: 34, yPercent: 14, autoAlpha: 0.25, transformPerspective: 900, transformOrigin: "50% 100%", ease: "none",
+        scrollTrigger: { trigger: ".isle-block", start: "top 88%", end: "top 30%", scrub: 0.6 }
+      });
+      gsap.from(".isle-map g.isl", {
+        opacity: 0, duration: 0.5, stagger: 0.07, ease: "power2.out",
+        scrollTrigger: { trigger: ".isle-block", start: "top 62%", once: true }
+      });
+    }
+
+    /* 「現在開放」那一段畫完會長高（頁尾那段 module 發 bt:layout），停住的那一段要重新量位置。 */
+    document.addEventListener("bt:layout", function () { ScrollTrigger.refresh(); });
+
+    /* ── 合作那張大合照：進場時從放大一點收回來 ── */
+    if (document.querySelector(".pstrip .photo img")) {
+      gsap.from(".pstrip .photo img", {
+        scale: 1.12, ease: "none",
+        scrollTrigger: { trigger: ".pstrip", start: "top 90%", end: "top 25%", scrub: 0.6 }
+      });
+    }
   }
 })();
 </script>
@@ -1274,23 +1218,35 @@ var VIDEO_ID = "";
 </script>
 
 <script type="module">
-/* 近期活動（2026-11-01）。不載 supabase-js：只拿 shared/supabase-config.js 的網址與公開金鑰，fetch 打 public_events()。
-   三秒內拿不到、或沒有公開中的活動，兩段維持 hidden。畫卡片的函式跟 /events/ 共用（events/src/ui.js）。 */
+/* 現在開放（2026-11-21，原本是 2026-11-01 的「近期活動」）。不載 supabase-js：只拿 shared/supabase-config.js 的網址與公開金鑰，
+   用 fetch 問兩件事：公開的活動（public_events()）與狀態是開放的報名表。三秒內問不到，那一段就維持 HTML 裡原本的幾句話。
+   活動卡跟 /events/ 共用同一支畫法（events/src/ui.js），哪些表單算「現在開放」跟 /programs/ 共用同一支判斷（programs/src/logic.js）。 */
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./shared/supabase-config.js";
-import { homeCardsHTML } from "./events/src/ui.js";
+import { homeCardsHTML, esc } from "./events/src/ui.js";
+import { looseForms, fmtDay } from "./programs/src/logic.js";
 (async () => {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 3000);
+  const H = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: "Bearer " + SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" };
+  const ask = async (path, init) => { const r = await fetch(SUPABASE_URL + path, { ...init, headers: H, signal: ctl.signal }); if (!r.ok) throw new Error(path); return r.json(); };
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/public_events", { method: "POST", signal: ctl.signal,
-      headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: "Bearer " + SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" }, body: "{}" });
-    if (!r.ok) return;
-    const events = await r.json();
-    const zh = homeCardsHTML(events, "zh"), en = homeCardsHTML(events, "en");
-    if (!zh) return;
-    document.getElementById("ev-cards-zh").innerHTML = zh; document.getElementById("ev-cards-en").innerHTML = en;
-    document.getElementById("events").hidden = false; document.getElementById("events-en").hidden = false;
-  } catch (e) { /* 整段維持 hidden */ } finally { clearTimeout(t); }
+    const [events, forms] = await Promise.all([
+      ask("/rest/v1/rpc/public_events", { method: "POST", body: "{}" }),
+      ask("/rest/v1/forms?select=id,kind,title,intro,closes_at,opens_at,status&status=eq.open", { method: "GET" }),
+    ]);
+    const loose = looseForms(forms, events, new Date()).slice(0, 4);
+    for (const l of ["zh", "en"]) {
+      const en = l === "en", cards = homeCardsHTML(events, l);
+      const rows = loose.map(f => `<li><b>${esc(f.title)}</b><span><a class="cta warm sm" href="./apply/?f=${encodeURIComponent(f.id)}&lang=${l}">${en ? "Sign up" : "報名"}</a>${f.closes_at ? ` <span class="ev-note">${en ? "closes " + fmtDay(f.closes_at, true) : fmtDay(f.closes_at, false) + " 截止"}</span>` : ""}</span></li>`).join("");
+      document.getElementById("now-" + l).innerHTML = (rows ? `<ul class="now-forms">${rows}</ul>` : "") + (cards ? `<div class="ev-cards">${cards}</div>` : "")
+        || `<p class="now-none">${en ? "Nothing is open right now." : "現在還沒有開放報名的活動。"}</p>`;
+    }
+    if (window.btRise) window.btRise(document);
+    /* 這一段長高了，下面停住的那一段要重新量位置。這裡只發一個訊號，量位置是頁面中間 motion() 那一段自己聽了之後做的（這一段不碰動畫）。 */
+    document.dispatchEvent(new Event("bt:layout"));
+  } catch (e) { /* 維持 HTML 裡原本的幾句話 */ } finally { clearTimeout(t); }
 })();
 </script>
+<!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
+<script src="./shared/public.js" defer></script>
 </body>
 </html>

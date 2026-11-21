@@ -1462,22 +1462,23 @@ leakOut=$(node -e '
   const ANCHORS = {
     "index.html": {
       // 2026-09-02 換成定稿文案。這幾句是那一頁存在的理由，少一句就是文案被吃掉了。
-      mustShow: ["登入 / Sign in", "還有別條路，只是沒有人跟你說過。",
-                 "There are other paths. No one told you about them.",
+      // 2026-11-21：大標題換成信念那一句（Paul 給的定稿），原本那一句搬到 /programs/ 當標題。
+      mustShow: ["登入 / Sign in", "我們相信，人人都有選擇自己教育的權利。",
+                 "We believe that everyone has the right to choose their own education.",
                  "收到超過 150 份申請，協助超過 100 位國內高中生",
                  "隱私政策 / Privacy Policy",
                  "本網站不使用任何追蹤或廣告工具。", "This site uses no tracking or advertising tools."],
-      mustHide: ["之後要改文案", "scripts/check-photos.mjs", "三種人"]
+      mustHide: ["之後要改文案", "scripts/check-photos.mjs", "要改先問 Co-President"]
     },
     // 2026-09-07 新增的四個對外內容頁。四頁共用同一個外殼，
     // 所以 mustHide 取的是同一句（那段檔頭註解的最後一句）。
     "about/index.html": {
-      mustShow: ["跳到主要內容", "我們在處理的是資訊落差。", "這些數字怎麼來的", "回 Beyond Taiwan 首頁",
+      mustShow: ["跳到主要內容", "我們相信，人人都有選擇自己教育的權利。", "我們在處理的是資訊落差。", "這些數字怎麼來的", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
     "programs/index.html": {
-      mustShow: ["跳到主要內容", "兩件事，都免費。", "回 Beyond Taiwan 首頁",
+      mustShow: ["跳到主要內容", "還有別條路，只是沒有人跟你說過。", "四個計畫", "還沒開放的時候", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
@@ -1909,7 +1910,9 @@ isMotion=$(node -e '
     for (const m of code.matchAll(/requestAnimationFrame\(/g)) if (!(m.index > from && m.index < to)) bad.push("shared/toy.js 在 motion() 外面用了 requestAnimationFrame（第 " + code.slice(0, m.index).split("\n").length + " 行）");
     if (/\bgsap\./.test(code)) bad.push("shared/toy.js 用到了 gsap（引擎只用 requestAnimationFrame）");
   }
-  for (const f of fs.readdirSync("shared").filter(f => f.endsWith(".js") && f !== "toy.js")) { const c = strip(fs.readFileSync("shared/" + f, "utf8")); if (/requestAnimationFrame\(/.test(c)) bad.push("shared/" + f + " 有每一幀的迴圈（只准 toy.js 的 motion()）"); }
+  // 2026-11-21：shared/public.js（對外頁的捲動效果）數數字那一段也用 requestAnimationFrame。它不是 toy.js 那種每一幀的迴圈，數完就停；
+  // 准它的條件是「reduce 就整段不做」那一行排在第一個 requestAnimationFrame 前面，下面「對外頁共用的那一支」那一條另外守著。
+  for (const f of fs.readdirSync("shared").filter(f => f.endsWith(".js") && f !== "toy.js" && f !== "public.js")) { const c = strip(fs.readFileSync("shared/" + f, "utf8")); if (/requestAnimationFrame\(/.test(c)) bad.push("shared/" + f + " 有每一幀的迴圈（只准 toy.js 的 motion()）"); }
   for (const f of fs.readdirSync("island/src")) { const c = strip(fs.readFileSync("island/src/" + f, "utf8")); if (/requestAnimationFrame\(|\bgsap\./.test(c)) bad.push("island/src/" + f + " 有每一幀的迴圈或 gsap（只准 shared/toy.js 的 motion()）"); }
   const main = fs.readFileSync("island/src/main.js", "utf8");
   if (!main.includes("matchMedia(\"(prefers-reduced-motion: reduce)\")")) bad.push("main.js 找不到 prefers-reduced-motion 的判斷");
@@ -2006,29 +2009,58 @@ else
   ok "每一個 index.html 都在 FILES、佔位文案範圍與 check-icons 的清單裡（共 $(printf '%s\n' $pages | wc -l | tr -d ' ') 頁）"
 fi
 
-# ── 對外頁的頂欄十頁一模一樣（2026-11-20 對外頁重整）─────────────────────
-# Paul 2026-11-20：「too many, and they serve almost the same thing」。頂欄收成五項加一顆「報名」。
+# ── 對外頁的頂欄每一頁一模一樣（2026-11-20 對外頁重整，2026-11-21 第二次）─────────────────────
+# Paul 2026-11-20：「too many, and they serve almost the same thing」。2026-11-21 再收一次：
+# 四項（免費資源、關於我們、團隊、合作）加一顆橘色的「活動與計畫」。原本那顆寫「報名」，看起來像要註冊帳號，學生不會點。
 # 頂欄是每頁各一份（外殼各自一份的代價），所以最容易壞的方式是「改了九頁漏一頁」：
 # 那一頁不會壞，只會跟別頁不一樣，而沒有人會一頁一頁點過去比對。
-# 這一條把每一頁的 navlinks 拿掉 aria-current 與 ./ ../ 的差別之後比對，要全部一樣；
-# 也擋著不准有人把 BT 島或做過什麼加回頂欄（BT 島在首頁的大區塊與頁尾，見 README「對外頁重整」）。
+# 這一條把每一頁的 navlinks 拿掉 aria-current 與 ./ ../ 的差別之後比對，要全部一樣（BT 島那一頁也掛同一條，一起比）；
+# 也擋著不准有人把 BT 島、校友或活動加回頂欄（BT 島在團隊頁最上面、首頁的大區塊與頁尾，見 README「對外頁重整」）。
 navOut=$(node -e '
   const fs = require("fs");
-  const pages = ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","programs/index.html","partner/index.html","resources/index.html","team/index.html"];
+  const pages = ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","programs/index.html","partner/index.html","resources/index.html","team/index.html","island/index.html"];
   const norm = f => { const m = fs.readFileSync(f, "utf8").match(/<div class="navlinks" id="navlinks">([\s\S]*?)<\/div>/);
     return m ? m[1].replace(/ aria-current="page"/g, "").replace(/href="\.\.?\//g, "href=\"/").replace(/\s+/g, " ").trim() : null; };
   const base = norm("index.html"), bad = [];
   for (const f of pages) { const n = norm(f); if (n === null) bad.push(f + " 找不到頂欄"); else if (n !== base) bad.push(f + " 的頂欄跟首頁不一樣"); }
   const items = (base.match(/<a /g) || []).length;
-  if (items !== 6) bad.push("頂欄要是五項加一顆報名（共 6 個連結），現在 " + items + " 個");
-  if (/island\/|impact\/|alumni\/|events\//.test(base)) bad.push("頂欄裡出現了 BT 島、做過什麼、校友或活動（它們在首頁與頁尾，不在頂欄）");
-  if (!/class="nav-cta" href="\/apply\/"/.test(base)) bad.push("頂欄少了那顆「報名」按鈕");
+  if (items !== 5) bad.push("頂欄要是四項加一顆「活動與計畫」（共 5 個連結），現在 " + items + " 個");
+  if (/island\/|impact\/|alumni\/|events\/|apply\//.test(base)) bad.push("頂欄裡出現了 BT 島、做過什麼、校友、活動或報名頁（它們在別的地方，不在頂欄）");
+  if (!/class="nav-cta" href="\/programs\/"/.test(base)) bad.push("頂欄少了那顆橘色的「活動與計畫」按鈕（要連到 /programs/）");
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
 ' 2>&1)
 if [ $? -ne 0 ]; then
   bad "對外頁的頂欄不一致："; printf '%s\n' "$navOut"
 else
-  ok "九頁對外頁的頂欄一模一樣：五項加一顆報名，BT 島不在頂欄"
+  ok "十頁對外頁（含 BT 島）的頂欄一模一樣：四項加一顆「活動與計畫」"
+fi
+
+# ── 對外頁共用的那一支 shared/public.js 不准長大（2026-11-21）────────────────
+# Paul 2026-11-21 同意在 shared/ 加這一個檔，條件是它很小、只做捲動效果（加募資期間那條橫條）。
+# shared/ 要保持極小是北極星的一部分，所以這裡把「很小」寫成數字：160 行以內；
+# 而且它不連資料庫、不存也不讀使用者裝置上的東西、不載別的檔案。九個對外頁都要載它，少一頁那一頁就沒有效果也沒有橫條。
+pubOut=$(node -e '
+  const fs = require("fs"), bad = [];
+  const src = fs.readFileSync("shared/public.js", "utf8");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const lines = src.split("\n").length;
+  if (lines > 160) bad.push("shared/public.js 有 " + lines + " 行，超過 160 行（它只准做捲動效果與募資橫條）");
+  for (const [re, why] of [[/\bfetch\(|XMLHttpRequest|\bimport\b|supabase/i, "連資料庫或載別的檔案"], [/localStorage|sessionStorage|document\.cookie|indexedDB/, "存或讀使用者裝置上的東西"], [/\bgsap\b|ScrollTrigger/, "用到 GSAP"]])
+    if (re.test(code)) bad.push("shared/public.js 不准" + why);
+  const stop = code.indexOf("if (reduce ||"), raf = code.indexOf("requestAnimationFrame("), io = code.indexOf("new IntersectionObserver(");
+  if (stop < 0) bad.push("shared/public.js 找不到「開了減少動態效果就整段不做」那一行");
+  else if ((raf >= 0 && raf < stop) || (io >= 0 && io < stop)) bad.push("shared/public.js 有會動的東西排在「減少動態效果就不做」那一行前面");
+  if (!/url: ""/.test(code) && !/url: "https:\/\/(www\.)?zeczec\.com\//.test(code)) bad.push("shared/public.js 募資橫條的 url 只准是空的或嘖嘖（zeczec.com）的網址");
+  for (const f of ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","programs/index.html","partner/index.html","resources/index.html","team/index.html"]) {
+    const h = fs.readFileSync(f, "utf8"), p = f === "index.html" ? "./" : "../";
+    if (!h.includes("<script src=\"" + p + "shared/public.js\" defer></script>")) bad.push(f + " 沒有載 shared/public.js");
+  }
+  if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
+' 2>&1)
+if [ $? -ne 0 ]; then
+  bad "對外頁共用的那一支有問題："; printf '%s\n' "$pubOut"
+else
+  ok "shared/public.js 在 160 行以內、不連資料庫、不存東西、reduce 就不動，九個對外頁都有載"
 fi
 
 # CNAME 不可掉，而且內容要對

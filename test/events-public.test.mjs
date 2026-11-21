@@ -54,12 +54,13 @@ test("一場活動：主辦、時間、地點、說明保留換行、報名按�
   assert.equal(U.esc("<b>"), "&lt;b&gt;");
 });
 
-test("★ 首頁：兩段 hidden、標題只有「近期活動」「Upcoming」、程式 import 設定檔不抄金鑰、三秒逾時；/events/ 同樣；check.sh 守著", () => {
+test("★ 首頁「現在開放」：第一屏下面第一段、問不到也有字、程式 import 設定檔不抄金鑰、三秒逾時；/events/ 同樣；check.sh 守著", () => {
   const idx = readFileSync("index.html", "utf8"), ev = readFileSync("events/index.html", "utf8"), main = readFileSync("events/src/main.js", "utf8"), chk = readFileSync("check.sh", "utf8");
-  assert.match(idx, /<section class="sec sec-events" id="events" hidden>\s*<div class="sec-in">\s*<h2>近期活動<\/h2>/);
-  assert.match(idx, /<section class="sec sec-events" id="events-en" hidden>\s*<div class="sec-in">\s*<h2>Upcoming<\/h2>/);
-  assert.ok(idx.indexOf('id="what"') < idx.indexOf('id="events"') && idx.indexOf('id="events"') < idx.indexOf('id="join"'), "在「我們做什麼」之後、「加入我們」之前");
-  assert.ok(idx.indexOf('id="what-en"') < idx.indexOf('id="events-en"') && idx.indexOf('id="events-en"') < idx.indexOf('id="join-en"'));
+  // 2026-11-21：原本是「近期活動」（沒有活動就整段 hidden），現在是「現在開放」，一直都在：有東西畫卡片與報名表，沒有就是 HTML 裡那幾句。
+  assert.match(idx, /<section class="now" id="now" aria-labelledby="now-h">[\s\S]*?<h2 id="now-h"><span class="zh">現在開放<\/span><span class="en">Open now<\/span><\/h2>/);
+  assert.match(idx, /<div class="zh" id="now-zh"><\/div>\s*<div class="en" id="now-en"><\/div>\s*<p class="now-note">/, "兩個空的容器後面接著問不到時也對的那一句");
+  assert.ok(idx.indexOf("</header>") < idx.indexOf('id="now"') && idx.indexOf('id="now"') < idx.indexOf('id="values"') && idx.indexOf('id="values"') < idx.indexOf('id="numbers"'), "第一屏、現在開放、價值、數字");
+  assert.match(idx, /import \{ looseForms, fmtDay \} from "\.\/programs\/src\/logic\.js"/, "哪些表單算開放跟 /programs/ 同一支判斷");
   for (const f of [idx, ev, main]) assert.doesNotMatch(f, /sb_publishable_|supabase\.co/, "不抄金鑰");
   assert.match(idx, /import \{ SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY \} from "\.\/shared\/supabase-config\.js"/);
   assert.match(main, /from "\.\.\/\.\.\/shared\/supabase-config\.js"/);

@@ -27,7 +27,7 @@
      src/scene.js Three 的場景與唯一會動的 motion()、src/main.js 接起來。只讀 shared/brand.css。Three 只從 cdnjs 載、帶 integrity。
 
      ── 不掛 nav.js ──
-     這一頁是一張地圖不是功能清單。左上一個回首頁的 logo 就夠。 -->
+     nav.js 是登入後的功能清單。這一頁掛的是對外頁那條玻璃頂欄（2026-11-21），讓人從島上去得了別頁。 -->
 
 <meta name="description" content="Beyond Taiwan 這一屆的組織：六座島是六個 team，中間是聚會所，海上有機場。點一座島看他們在做什麼、跟誰連。">
 <meta property="og:title" content="BT 島 / Beyond Taiwan">
@@ -80,8 +80,26 @@
 <div class="stage" id="stage" aria-hidden="true"></div>
 <div class="pins" id="pins" aria-hidden="true"></div>
 
+<!-- 頂欄（2026-11-21）：跟每一個對外頁同一條玻璃、同一份選單。Paul：左上那塊牌子的大小跟外面的頂欄對不起來、也不是同一種玻璃。
+     選單那五個連結每一頁各一份，check.sh 守著每一頁一模一樣；要改選單見 README「對外頁重整」。
+     語言鈕就是原本工具列上那一顆（id 沒變，src/main.js 照舊管它），只是搬到這裡。 -->
+<nav class="topbar" aria-label="網站導覽">
+  <a class="home" id="home" href="../" aria-label="Beyond Taiwan 首頁">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <div class="navlinks" id="navlinks">
+    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
+    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
+    <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
+    <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
+    <a class="nav-cta" href="../programs/"><span class="zh">活動與計畫</span><span class="en">What's on</span></a>
+  </div>
+  <button class="lang" id="lang" type="button" aria-label="Switch language">EN</button>
+  <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
+  <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
+</nav>
+
 <header class="brand" id="brand">
-  <a class="home" id="home" href="../" aria-label="Beyond Taiwan 首頁 / home"><img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
   <button type="button" class="fold desk-only" id="brand-fold" aria-expanded="true" aria-label="收起 / Fold">−</button>
   <div class="brand-text">
     <p class="eyebrow" data-t="eyebrow">這一屆的 Beyond Taiwan</p>
@@ -98,7 +116,6 @@
   <button type="button" id="tb-bird" class="tg" aria-pressed="false" data-t="bird">鳥瞰</button>
   <button type="button" id="tb-me" class="me-btn" data-t="me">把自己放上去</button>
   <button type="button" id="tb-index" class="mob-only" data-t="index">清單</button>
-  <button type="button" class="lang" id="lang" aria-label="Switch language">EN</button>
 </nav>
 
 <p class="no3d" id="no3d" hidden><span class="zh">這台裝置畫不出 3D。下面的清單是同一份內容。</span><span class="en">This device cannot draw the 3D view. The index below has the same content.</span></p>
@@ -140,6 +157,33 @@
   <form class="me-box" id="me-form"></form>
 </div>
 
+<!-- 頂欄的手機選單，與「語言換了之後選單的連結跟著換」。語言本身是 src/main.js 在管，這裡只看它改了沒。
+     跟其他對外頁一樣：已經登入的話右上那顆寫「我的 BT 帳號」，只看瀏覽器裡有沒有那把鑰匙，不載 supabase。 -->
+<script>
+(function () {
+  var html = document.documentElement, links = document.getElementById("navlinks"), burger = document.getElementById("burger");
+  function keepLang() {
+    var l = html.getAttribute("data-lang") === "en" ? "en" : "zh", as = links.querySelectorAll("a[href]");
+    for (var i = 0; i < as.length; i++) as[i].setAttribute("href", as[i].getAttribute("href").split("?")[0] + "?lang=" + l);
+  }
+  keepLang();
+  if (window.MutationObserver) new MutationObserver(keepLang).observe(html, { attributes: true, attributeFilter: ["data-lang"] });
+  burger.addEventListener("click", function () {
+    var open = links.classList.toggle("open");
+    burger.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  try {
+    var loginBtn = document.querySelector(".login");
+    for (var i = 0; loginBtn && i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (/^sb-.+-auth-token$/.test(k) && localStorage.getItem(k)) {
+        loginBtn.innerHTML = '<span class="lg-a">我的 BT 帳號</span><span class="lg-sep"> / </span><span class="lg-b">Account</span>';
+        break;
+      }
+    }
+  } catch (e) { /* 讀不到就維持「登入」 */ }
+})();
+</script>
 <!-- 主程式：ES module。Three 由 scene.js 透過 importmap 載。這一頁沒有 GSAP（每一幀的迴圈用 requestAnimationFrame，關在 scene.js 的 motion() 裡）。 -->
 <script type="module" src="./src/main.js"></script>
 </body>
