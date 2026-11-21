@@ -182,6 +182,9 @@ p{margin:0 0 17px;max-width:34em}
 .cta{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
   font-weight:600;font-size:16px;padding:14px 26px;border-radius:999px;margin-top:6px;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
 .cta:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
+/* 段落裡的按鈕（2026-11-20 修）：.body a 的深藍字比 .cta 的米白字更具體，會贏，按鈕就變成一顆看不到字的深藍藥丸。 */
+.body a.cta{color:var(--bt-cream);text-decoration:none}
+.body a.cta:hover{color:var(--bt-navy)}
 
 .en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);
   padding-top:clamp(16px,3vh,36px)}
@@ -368,6 +371,18 @@ summary{cursor:pointer}
 .ev-by{font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 6px}
 .ev-text{line-height:1.75}
 .ev-note{font-size:14px;color:rgba(16,42,134,.82)}
+
+/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
+/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
+   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+   手機上它排在選單第一個、撐滿一整列。 */
+.navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
+  padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
+.navlinks .nav-cta:hover,.navlinks .nav-cta:focus-visible{background:var(--bt-navy);color:var(--bt-cream)}
+.navlinks .nav-cta[aria-current]{box-shadow:inset 0 0 0 2px var(--bt-navy)}
+a.nav-cta:active{transform:scale(.97)}
+@media (max-width:900px){.navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}}
+footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </style>
 </head>
 <body>
@@ -379,15 +394,12 @@ summary{cursor:pointer}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="../resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
-    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
-    <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
-    <a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a>
-    <a href="../alumni/">Alumni</a>
+    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
+    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
+    <a class="nav-cta" href="../apply/" aria-current="page"><span class="zh">報名</span><span class="en">Sign up</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
@@ -415,6 +427,7 @@ summary{cursor:pointer}
 </main>
 
 <footer>
+  <p class="foot-links"><a href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a><a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>

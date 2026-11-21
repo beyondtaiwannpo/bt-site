@@ -438,7 +438,7 @@ export const MINE = {
   "hi.readonly":      { zh: "你看得到清單，改不動。加站與傳照片要是 Marketing 的 Director 或 Co-President。", en: "You can see the list but not change it. Adding stops and photos needs Marketing's Director or a Co-President." },
   "hi.new":           { zh: "加一站", en: "Add a stop" },
   "hi.none":          { zh: "還沒有任何一站", en: "No stops yet" },
-  "hi.noneHint":      { zh: "遷移檔跑過會先有 /impact/ 那七點。按「加一站」加新的。", en: "After the migration runs, the seven points from /impact/ are here. Use \"Add a stop\" for new ones." },
+  "hi.noneHint":      { zh: "遷移檔跑過會先有「五年走過來」那七點（在 /about/）。按「加一站」加新的。", en: "After the migration runs, the seven points from Five years (on /about/) are here. Use \"Add a stop\" for new ones." },
   "hi.st.draft":      { zh: "草稿", en: "Draft" },
   "hi.st.ready":      { zh: "準備好了", en: "Ready" },
   "hi.st.published":  { zh: "在路上", en: "On the road" },

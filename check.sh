@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html impact/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html"
+FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1472,7 +1472,7 @@ leakOut=$(node -e '
     // 2026-09-07 新增的四個對外內容頁。四頁共用同一個外殼，
     // 所以 mustHide 取的是同一句（那段檔頭註解的最後一句）。
     "about/index.html": {
-      mustShow: ["跳到主要內容", "我們在處理的是資訊落差。", "回 Beyond Taiwan 首頁",
+      mustShow: ["跳到主要內容", "我們在處理的是資訊落差。", "這些數字怎麼來的", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
@@ -1505,10 +1505,10 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
+    // impact/ 2026-11-20 併進 /about/，只剩轉址（跟 join/ 同一個做法）。
     "impact/index.html": {
-      mustShow: ["跳到主要內容", "五年，這些是真的發生過的事。", "回 Beyond Taiwan 首頁",
-                 "本網站不使用任何追蹤或廣告工具。"],
-      mustHide: ["維護者要講的話寫在 README"]
+      mustShow: ["這一頁搬家了。", "This page has moved."],
+      mustHide: ["漏一個的表現是「有時候會跳到另一頁」"]
     },
     "partner/index.html": {
       mustShow: ["跳到主要內容", "一起做這件事。", "回 Beyond Taiwan 首頁",
@@ -2004,6 +2004,31 @@ if [ -n "$listbad" ]; then
   bad "有對外頁面漏掉某一份清單（加了頁面就要一份一份補）：${listbad}"
 else
   ok "每一個 index.html 都在 FILES、佔位文案範圍與 check-icons 的清單裡（共 $(printf '%s\n' $pages | wc -l | tr -d ' ') 頁）"
+fi
+
+# ── 對外頁的頂欄十頁一模一樣（2026-11-20 對外頁重整）─────────────────────
+# Paul 2026-11-20：「too many, and they serve almost the same thing」。頂欄收成五項加一顆「報名」。
+# 頂欄是每頁各一份（外殼各自一份的代價），所以最容易壞的方式是「改了九頁漏一頁」：
+# 那一頁不會壞，只會跟別頁不一樣，而沒有人會一頁一頁點過去比對。
+# 這一條把每一頁的 navlinks 拿掉 aria-current 與 ./ ../ 的差別之後比對，要全部一樣；
+# 也擋著不准有人把 BT 島或做過什麼加回頂欄（BT 島在首頁的大區塊與頁尾，見 README「對外頁重整」）。
+navOut=$(node -e '
+  const fs = require("fs");
+  const pages = ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","programs/index.html","partner/index.html","resources/index.html","team/index.html"];
+  const norm = f => { const m = fs.readFileSync(f, "utf8").match(/<div class="navlinks" id="navlinks">([\s\S]*?)<\/div>/);
+    return m ? m[1].replace(/ aria-current="page"/g, "").replace(/href="\.\.?\//g, "href=\"/").replace(/\s+/g, " ").trim() : null; };
+  const base = norm("index.html"), bad = [];
+  for (const f of pages) { const n = norm(f); if (n === null) bad.push(f + " 找不到頂欄"); else if (n !== base) bad.push(f + " 的頂欄跟首頁不一樣"); }
+  const items = (base.match(/<a /g) || []).length;
+  if (items !== 6) bad.push("頂欄要是五項加一顆報名（共 6 個連結），現在 " + items + " 個");
+  if (/island\/|impact\/|alumni\/|events\//.test(base)) bad.push("頂欄裡出現了 BT 島、做過什麼、校友或活動（它們在首頁與頁尾，不在頂欄）");
+  if (!/class="nav-cta" href="\/apply\/"/.test(base)) bad.push("頂欄少了那顆「報名」按鈕");
+  if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
+' 2>&1)
+if [ $? -ne 0 ]; then
+  bad "對外頁的頂欄不一致："; printf '%s\n' "$navOut"
+else
+  ok "九頁對外頁的頂欄一模一樣：五項加一顆報名，BT 島不在頂欄"
 fi
 
 # CNAME 不可掉，而且內容要對

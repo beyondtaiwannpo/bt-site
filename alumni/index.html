@@ -455,6 +455,18 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 /* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
+
+/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
+/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
+   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+   手機上它排在選單第一個、撐滿一整列。 */
+.navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
+  padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
+.navlinks .nav-cta:hover,.navlinks .nav-cta:focus-visible{background:var(--bt-navy);color:var(--bt-cream)}
+.navlinks .nav-cta[aria-current]{box-shadow:inset 0 0 0 2px var(--bt-navy)}
+a.nav-cta:active{transform:scale(.97)}
+@media (max-width:900px){.navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}}
+footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </style>
 </head>
 <body>
@@ -466,15 +478,12 @@ summary{cursor:pointer}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="../resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
-    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
-    <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
-    <a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a>
-    <a href="../alumni/" aria-current="page">Alumni</a>
+    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
+    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
+    <a class="nav-cta" href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>

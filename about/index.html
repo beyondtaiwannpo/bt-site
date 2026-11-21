@@ -6,7 +6,8 @@
 <title>關於我們 / Beyond Taiwan</title>
 
 <!-- 對外的內容頁（2026-09-07 新增）。
-     這一頁講 BT 的使命與時間軸。數字來自 BT 的既有紀錄。
+     這一頁講 BT 的使命、數字與時間軸。數字來自 BT 的既有紀錄。
+     2026-11-20 起 /impact/（做過什麼）併進這一頁：數字、時間軸、數字怎麼來的三段原樣搬過來，/impact/ 只剩轉址。
      ── 這一頁不碰 auth ──
      不載入 supabase、不判斷登入狀態。右上角那顆按鈕只是一個連結。
 
@@ -23,9 +24,9 @@
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
      ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
 
-<meta name="description" content="Beyond Taiwan 從 2020 年開始，處理的是海外升學的資訊落差。我們的使命、五年走過來的時間軸。">
+<meta name="description" content="Beyond Taiwan 從 2020 年開始，處理的是海外升學的資訊落差。我們的使命、五年的數字與時間軸。">
 <meta property="og:title" content="關於我們 / Beyond Taiwan">
-<meta property="og:description" content="Beyond Taiwan 從 2020 年開始，處理的是海外升學的資訊落差。我們的使命、五年走過來的時間軸。">
+<meta property="og:description" content="Beyond Taiwan 從 2020 年開始，處理的是海外升學的資訊落差。我們的使命、五年的數字與時間軸。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/about/">
 <meta name="theme-color" content="#EDE5D8">
@@ -176,6 +177,34 @@ p{margin:0 0 17px;max-width:34em}
   color:rgba(16,42,134,.7);white-space:nowrap}
 .tl span{font-size:16px;line-height:1.6}
 
+/* 數字。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
+   是兩欄的列，靠上面那條細線分隔，跟時間軸與六個 team 同一套語言。
+   數字本身用 Barlow Condensed 放到很大，那是這一頁唯一需要大聲的東西。 */
+.nums{margin:0;padding:0;list-style:none;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  column-gap:clamp(20px,4vw,56px)}
+.nums li{padding:20px 0;border-top:1px solid rgba(16,42,134,.14)}
+.nums li:nth-child(-n+2){border-top:0;padding-top:0}
+.nums b{display:block;font-family:var(--display);font-weight:700;
+  font-size:clamp(40px,4.8vw,68px);line-height:.95;letter-spacing:-.01em}
+.nums i{display:block;font-style:normal;font-family:var(--display);font-weight:600;
+  font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(16,42,134,.7);margin:7px 0 9px}
+.nums span{display:block;font-size:15.5px;line-height:1.6;
+  color:rgba(16,42,134,.82);max-width:24em}
+@media (max-width:700px){
+  /* 一欄的時候「前兩個不畫上線」就不對了，只有第一個不畫。
+     ⚠ 這裡一定要重寫 :nth-child(-n+2) 那一條，不能只寫 .nums li ——
+     媒體查詢不會提高特異性，:nth-child 那一條本來就比較高，會贏。
+     2026-09-08 就是這樣漏掉的：手機上第二格沒有上線，看起來像跟第一格黏在一起。 */
+  .nums{grid-template-columns:1fr}
+  .nums li:nth-child(-n+2){border-top:1px solid rgba(16,42,134,.14);padding-top:20px}
+  .nums li:first-child{border-top:0;padding-top:0}
+}
+
+/* 從 /impact/ 轉過來會跳到 #numbers，標題不要躲在黏住的頂欄底下。 */
+.sec[id]{scroll-margin-top:84px}
+
 /* 團隊的六個 team。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
    是六列，靠上面那條線分隔。 */
 .rows{margin:0;padding:0;list-style:none;max-width:34em}
@@ -188,6 +217,9 @@ p{margin:0 0 17px;max-width:34em}
 .cta{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
   font-weight:600;font-size:16px;padding:14px 26px;border-radius:999px;margin-top:6px;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
 .cta:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
+/* 段落裡的按鈕（2026-11-20 修）：.body a 的深藍字比 .cta 的米白字更具體，會贏，按鈕就變成一顆看不到字的深藍藥丸。 */
+.body a.cta{color:var(--bt-cream);text-decoration:none}
+.body a.cta:hover{color:var(--bt-navy)}
 
 .en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);
   padding-top:clamp(16px,3vh,36px)}
@@ -276,6 +308,18 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 /* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
 .body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
 summary{cursor:pointer}
+
+/* ═════════ 頂欄的「報名」與頁尾的全站連結（2026-11-20 對外頁重整）═════════ */
+/* 頂欄只留五項，最想讓人做的那件事（報名）是一顆橘色的按鈕，不是第六個連結。
+   十頁各一份（外殼各自一份的代價），改一頁就要改十頁，check.sh 守著十頁的頂欄一模一樣。
+   手機上它排在選單第一個、撐滿一整列。 */
+.navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;
+  padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
+.navlinks .nav-cta:hover,.navlinks .nav-cta:focus-visible{background:var(--bt-navy);color:var(--bt-cream)}
+.navlinks .nav-cta[aria-current]{box-shadow:inset 0 0 0 2px var(--bt-navy)}
+a.nav-cta:active{transform:scale(.97)}
+@media (max-width:900px){.navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}}
+footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </style>
 </head>
 <body>
@@ -287,15 +331,12 @@ summary{cursor:pointer}
     <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
   </a>
   <div class="navlinks" id="navlinks">
-    <a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="../resources/"><span class="zh">資源</span><span class="en">Resources</span></a>
-    <a href="../about/" aria-current="page"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a>
-    <a href="../impact/"><span class="zh">做過什麼</span><span class="en">What we've done</span></a>
-    <a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a>
-    <a href="../alumni/">Alumni</a>
+    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
+    <a href="../about/" aria-current="page"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
+    <a class="nav-cta" href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
@@ -332,13 +373,47 @@ summary{cursor:pointer}
   </div>
 </section>
 
+<section class="sec" id="numbers">
+  <div class="sec-in">
+    <h2>數字</h2>
+    <div class="body">
+      <ul class="nums">
+        <li><b>250+</b><i>位學員</i><span>2020 年到現在，超過 250 位高中生在申請的路上有人可以問。</span></li>
+        <li><b>50</b><i>對配對／年</i><span>導生配對計畫一學期配對一次。</span></li>
+        <li><b>100+</b><i>位高中生</i><span>探索營辦了兩年，收到超過 150 份申請，協助超過 100 位高中生。</span></li>
+        <li><b>20+</b><i>位校友回來</i><span>超過 20 位 BT 校友回來當講者。</span></li>
+        <li><b>30</b><i>位幹部</i><span>接近三十位，全部是學生，分布在七個國家。</span></li>
+        <li><b>0</b><i>元</i><span>幾乎所有活動都免費。</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 <section class="sec">
   <div class="sec-in">
     <h2>五年走過來</h2>
     <div class="body">
-      <p>2020 年五月，七個人。到現在接近三十位幹部，全部是學生，分布七個國家。</p>
-      <p>中間發生過什麼、幫過多少人，都在另一頁。</p>
-      <p><a href="../impact/">看五年做過什麼</a></p>
+      <ul class="tl">
+        <li><b>2020.05</b><span>成立，七個人。</span></li>
+        <li><b>2020.09</b><span>導生制度開始，第一批 36 人。</span></li>
+        <li><b>2021.06</b><span>線上博覽會，超過 400 人參加。</span></li>
+        <li><b>2021.10</b><span>校園大使 18 位。</span></li>
+        <li><b>2023.06</b><span>第一屆探索營，超過 80 人。</span></li>
+        <li><b>2025.05</b><span>校友帳號超過 85 個。</span></li>
+        <li><b>現在</b><span>接近三十位幹部，全部是學生，分布七個國家。</span></li>
+      </ul>
+      <p><a href="../history/">走一遍歷史之路</a>：同一段五年，在 BT 島上用走的看。</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-in">
+    <h2>這些數字怎麼來的</h2>
+    <div class="body">
+      <p>全部來自 BT 自己的活動紀錄。每一場營隊、每一輪配對、每一位回來的校友，當時都有人記下來。</p>
+      <p>我們手上還有一些數字，但把握不夠，所以這一頁沒有寫。寧可少一句話，也不要寫一個之後要撤回的數字。</p>
+      <p>如果你要引用這一頁的任何數字，寫信來問一聲，我們會告訴你它是怎麼算的。</p>
     </div>
   </div>
 </section>
@@ -349,6 +424,7 @@ summary{cursor:pointer}
     <div class="body">
       <p>兩位 Co-President，六個 team，幹部每年換一批。</p>
       <p><a href="../team/">看團隊怎麼運作</a></p>
+      <p>想用逛的：<a href="../island/">BT 島</a>上一座島是一個 team，點一座島就看得到那一群人在做什麼。</p>
     </div>
   </div>
 </section>
@@ -382,13 +458,47 @@ summary{cursor:pointer}
   </div>
 </section>
 
+<section class="sec" id="numbers-en">
+  <div class="sec-in">
+    <h2>Numbers</h2>
+    <div class="body">
+      <ul class="nums">
+        <li><b>250+</b><i>students</i><span>Since 2020, more than 250 high school students have had someone to ask.</span></li>
+        <li><b>50</b><i>pairs a year</i><span>The mentorship programme pairs once a semester.</span></li>
+        <li><b>100+</b><i>students at bootcamp</i><span>Two years of College Bootcamp: over 150 applications, over 100 students.</span></li>
+        <li><b>20+</b><i>alumni came back</i><span>More than 20 Beyond Taiwan alumni have come back as speakers.</span></li>
+        <li><b>30</b><i>organisers</i><span>Close to thirty, all students, spread across seven countries.</span></li>
+        <li><b>0</b><i>NT dollars</i><span>Almost everything we run is free.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 <section class="sec">
   <div class="sec-in">
     <h2>Five years</h2>
     <div class="body">
-      <p>Seven people in May 2020. Close to thirty organisers today, all students, across seven countries.</p>
-      <p>What happened in between, and how many people it reached, is on another page.</p>
-      <p><a href="../impact/">See what five years added up to</a></p>
+      <ul class="tl">
+        <li><b>2020.05</b><span>Founded, seven people.</span></li>
+        <li><b>2020.09</b><span>Mentorship began, 36 students in the first round.</span></li>
+        <li><b>2021.06</b><span>Online fair, more than 400 attendees.</span></li>
+        <li><b>2021.10</b><span>18 campus ambassadors.</span></li>
+        <li><b>2023.06</b><span>First College Bootcamp, more than 80 students.</span></li>
+        <li><b>2025.05</b><span>More than 85 alumni accounts.</span></li>
+        <li><b>Today</b><span>Close to thirty organisers, all students, across seven countries.</span></li>
+      </ul>
+      <p><a href="../history/">Walk Our Road</a>: the same five years, on BT Island, on foot.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-in">
+    <h2>Where these numbers come from</h2>
+    <div class="body">
+      <p>All of them come from our own records. Every camp, every round of pairing, every alumnus who came back was written down at the time.</p>
+      <p>We hold a few more numbers that we are not confident enough about, so they are not on this page. Better one sentence short than one number we have to take back.</p>
+      <p>If you want to cite anything here, write to us and we will tell you how it was counted.</p>
     </div>
   </div>
 </section>
@@ -399,6 +509,7 @@ summary{cursor:pointer}
     <div class="body">
       <p>Two Co-Presidents, six teams, and a new group of organisers every year.</p>
       <p><a href="../team/">See how the team works</a></p>
+      <p>Or explore it: on <a href="../island/">BT Island</a> every island is one team. Click one to see what those people do.</p>
     </div>
   </div>
 </section>
@@ -407,6 +518,7 @@ summary{cursor:pointer}
 </main>
 
 <footer>
+  <p class="foot-links"><a href="../apply/"><span class="zh">報名</span><span class="en">Sign up</span></a><a href="../programs/"><span class="zh">計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../events/"><span class="zh">過去的活動</span><span class="en">Past events</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>
