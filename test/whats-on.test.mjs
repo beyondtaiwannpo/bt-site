@@ -110,7 +110,8 @@ test("★ BT 島掛的是全站那一條頂欄；語言鈕還是同一顆", () =
   const h = readFileSync("island/index.html", "utf8"), css = readFileSync("island/island.css", "utf8");
   assert.match(h, /<nav class="topbar" aria-label="網站導覽">\s*<a class="home" id="home" href="\.\.\/"/);
   assert.equal((h.match(/id="lang"/g) || []).length, 1); assert.equal((h.match(/id="home"/g) || []).length, 1);
-  assert.match(h, /<a class="nav-cta" href="\.\.\/programs\/">/);
+  assert.match(h, /<div class="navlinks" id="navlinks">\s*<a class="nav-cta" href="\.\.\/programs\/"><svg class="flame"/, "活動與計畫排第一個，前面是畫出來的火");
+  assert.doesNotMatch(css, /\.navlinks \.nav-cta\{[^}]*background:var\(--bt-orange\)/, "不是橘色藥丸");
   assert.match(css, /\.topbar\{position:fixed;top:12px;left:var\(--gut\);right:calc\(var\(--side-w\) \+ var\(--gut\)\)/);
   assert.match(css, /\.brand,\.toolbar\{background:linear-gradient\(180deg,rgba\(255,255,255,\.78\),rgba\(237,229,216,\.6\)\);backdrop-filter:blur\(20px\) saturate\(180%\)/, "牌子與工具列跟頂欄同一種玻璃");
 });

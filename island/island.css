@@ -237,8 +237,10 @@ html.side-folded .topbar{right:var(--gut)}
 .navlinks a{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;opacity:.74;padding:7px 1px;
   border-bottom:2px solid transparent;white-space:nowrap;transition:opacity var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
 .navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
-.navlinks .nav-cta{opacity:1;background:var(--bt-orange);color:var(--bt-navy);font-weight:600;padding:9px 16px;border-radius:999px;border-bottom:0;margin-left:clamp(2px,.6vw,8px)}
-.navlinks .nav-cta:hover,.navlinks .nav-cta:focus-visible{background:var(--bt-navy);color:var(--bt-cream)}
+.navlinks .nav-cta{opacity:1;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+.navlinks .nav-cta .flame{width:15px;height:15px;flex:0 0 auto;fill:var(--bt-orange);stroke:var(--bt-navy);stroke-width:1.6;stroke-linejoin:round;
+  transform-origin:50% 100%;animation:bt-flame 1.7s ease-in-out infinite}
+@keyframes bt-flame{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.07,1.16) rotate(3deg)}}
 .topbar .lang{min-width:44px;font:700 13px/1 var(--display);letter-spacing:.12em;border:1px solid rgba(16,42,134,.32);border-radius:999px;
   padding:6px 13px;background:none;color:var(--ink);cursor:pointer;position:relative;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease)}
 .topbar .lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
@@ -254,7 +256,7 @@ html.side-folded .topbar{right:var(--gut)}
     border:1px solid rgba(255,255,255,.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 14px 34px rgba(16,42,134,.14)}
   .navlinks.open{display:flex}
   .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
-  .navlinks .nav-cta{order:-1;align-self:stretch;text-align:center;margin:10px 0 6px;padding:14px 18px}
+  .navlinks .nav-cta{order:-1}
   .burger{display:block}
 }
 @media (max-width:900px){.topbar{right:var(--gut)}}
@@ -277,6 +279,20 @@ html.brand-folded .brand-text .eyebrow,html.brand-folded .brand-text .sub{displa
 html.brand-folded .brand{padding:8px 10px 8px 16px;align-items:center}
 html.brand-folded .brand h1{font-size:19px}
 @media (min-width:901px){.toolbar{top:calc(12px + var(--bar))}}
+/* 筆電寬度（901 到 1320px）：牌子與工具列排同一列、工具列又置中的話會撞在一起（2026-11-21 實測）。
+   所以牌子只留「BT 島」兩個字，工具列靠地圖那一塊的右邊；再窄（1100px 以下）連這樣都放不下，工具列就掉到第二列。 */
+@media (min-width:901px) and (max-width:1320px){
+  .brand .eyebrow,.brand .sub,.brand .fold{display:none}
+  .brand{align-items:center;padding:9px 16px}
+  .brand h1{font-size:19px}
+  .toolbar{left:auto;right:calc(var(--side-w) + var(--gut));transform:none}
+  html.side-folded .toolbar{right:var(--gut)}
+}
+@media (min-width:901px) and (max-width:1100px){
+  .toolbar{top:calc(12px + var(--bar) + 50px);left:var(--gut);right:auto}
+  html.side-folded .toolbar{right:auto}
+  .card{top:calc(var(--gut) + 154px + var(--bar))}
+}
 @media (max-width:900px){.brand{top:calc(12px + var(--bar));padding:9px 14px;border-radius:999px}.card{top:auto}}
 
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
