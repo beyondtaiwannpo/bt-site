@@ -5109,7 +5109,7 @@ Paul（2026-11-19，透過主 session 轉來）：鏡頭要第三人稱跟在主
 
 | 頂欄 | 網址 | 這一頁只做一件事 |
 |---|---|---|
-| **計畫 Programmes**（排第一個，前面一顆小火） | `/programs/` | 讓學生報到名。現在開放的排最上面，下面四個計畫 |
+| **活動與計畫 Programmes**（排第一個，前面一顆小火） | `/programs/` | 讓學生報到名。現在開放的排最上面，下面四個計畫 |
 | 免費資源 Free resources | `/resources/` | 今天就拿得到的東西。沒有動 |
 | 關於我們 About | `/about/` | **為什麼**：信念、使命、願景、價值、免費是刻意的、數字、五年 |
 | 團隊 Team | `/team/` | **誰**：BT 島在最上面，六個 team、這一屆的人、校友去了哪、想一起做 |
@@ -5162,7 +5162,7 @@ Paul（2026-11-19，透過主 session 轉來）：鏡頭要第三人稱跟在主
 **要改頂欄**：頂欄在十個檔各有一份（首頁、about、alumni、apply、events、programs、partner、resources、team、island），
 一次要改十份。`check.sh` 會比對十份是不是一模一樣、是不是五個連結、「活動與計畫」是不是排第一個連到 `/programs/`。改之前先問 Paul。
 
-**頂欄上的字是「計畫 Programmes」**：上線時寫「活動與計畫 What's on」，Paul 當天說不喜歡 What's on，選了 Programmes，中文跟著改回「計畫」。
+**頂欄上的字是中文「活動與計畫」、英文「Programmes」**：上線時英文寫 What's on，Paul 當天說不喜歡，選了 Programmes；中文他要留長的那一個（「keep the longer Chinese one」），所以兩邊不是逐字對應，這是刻意的。
 這一節其他地方寫的「活動與計畫」指的就是這一個連結與 `/programs/` 那一頁（頁面的標題沒有改）。
 
 **它為什麼不是橘色按鈕**：第一版是一顆橘色藥丸，上線之後 Paul 說「I don't like it to be orange-y… looks really out of place」，
