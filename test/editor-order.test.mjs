@@ -45,7 +45,8 @@ test("★ BT 島的一則貼文：這一則 → 圖 → 放上島；狀態寫在
 
 test("★ Records 的一場活動：「種類與屆別」排在最後；「加一場舊活動」的表單在頁首正下面", () => {
   const ui = read("admin/records/src/ui.js");
-  assert.match(ui, /\+ reviewHTML \+ sessHTML \+ partHTML \+ formsHTML \+ scalesHTML \+ commentsHTML \+ pairsHTML \+ settings;/, "分類用的那一段不再擋在檢討與出席前面");
+  // 2026-11-23 第二輪：檢討搬到留言後面（先看大家說了什麼再寫要改什麼），配對跟出席排在一起。
+  assert.match(ui, /\+ sessHTML \+ partHTML \+ pairsHTML \+ formsHTML \+ scalesHTML \+ commentsHTML \+ reviewHTML \+ settings;/, "誰來了 → 他們說了什麼 → 檢討 → 分類");
   const form = RC.pastEventFormHTML([], { kind: "bootcamp" }, false);
   const ov = RC.overviewHTML({ can_view: true, can_manage: true, counts: { people: 3 }, events: [{ id: "e1", title_zh: "營隊", numbers: {}, term_id: "2026-27", starts_at: "2026-07-01T00:00:00Z" }] }, "", form);
   assert.ok(at(ov, "</header>") < at(ov, "data-past") && at(ov, "data-past") < at(ov, '<table class="table rc-table"'), "表單在頁首與清單中間，不是在整頁最下面");
@@ -118,4 +119,81 @@ test("★ 資源的編輯頁：名字 → 介紹 → 連結，種類、順序、
     assert.ok(at(h, 'id="rurl"') < at(h, 'id="rkind"') && at(h, 'id="rkind"') < at(h, 'class="form-foot"'), "連結在種類前面");
     assert.equal(h.split('id="rurl"').length - 1, 1);
   }
+});
+
+// ── 2026-11-23 第三輪：剩下的六件，Paul 說「do all of them」 ──
+import * as TF from "../admin/team-forms/src/ui.js";
+import * as MK from "../admin/marketing/src/ui.js";
+TF.setLang("zh"); MK.setLang("zh");
+const n = (h, s) => h.split(s).length - 1;
+// 假的畫面：兩個存檔的框，各有自己的格子。allValues 要兩個一起讀。
+const fakeBox = (act, fields, doc) => ({ dataset: { autosave: act }, ownerDocument: doc, querySelectorAll: () => fields });
+const fakeDoc = boxes => { const d = { querySelectorAll: sel => boxes.filter(b => sel === `[data-autosave="${b.dataset.autosave}"]`) }; for (const b of boxes) b.ownerDocument = d; return d; };
+
+test("★ Records 的回饋表編輯頁：名稱與說明 → 題目 → 截止時間；兩個框一起讀，動哪一個都存整份", () => {
+  const r = { form: { id: "f1", title: "回饋", intro: "", kind: "post-event", status: "draft", lang: "zh", anonymous: false, closes_at: null, responses: 0 }, can_edit: true, questions: [] };
+  const h = RC.formEditHTML(r, { boot: { events: [], terms: [], can_manage: true }, questions: [], fx: {}, msg: "" });
+  const q = at(h, "<h2>題目");
+  assert.ok(at(h, 'name="title"') < q && at(h, 'name="lang"') < q && at(h, 'name="anonymous"') < q, "名稱、語言、匿名在題目前面（語言與匿名決定加得了哪些題型）");
+  assert.ok(q < at(h, 'name="closes_at"') && at(h, 'name="closes_at"') < at(h, 'data-act="form-delete"'), "截止時間在題目後面，刪除在最底");
+  assert.equal(n(h, 'data-autosave="rc-save"'), 2); assert.equal(n(h, 'class="autosave" data-for="rc-save"'), 2);
+  assert.match(h, /data-autosave="rc-save" data-part="top"/); assert.match(h, /data-autosave="rc-save" data-part="bottom"/);
+  assert.match(read("admin/records/src/main.js"), /liveBox\(`\[data-autosave="rc-save"\]\[data-part="\$\{box\.dataset\.part \|\| "top"\}"\]`, box\)/, "存完把「存好了」印回動的那一個框");
+  const top = fakeBox("rc-save", [{ name: "title", value: " 回饋 ", type: "text" }, { name: "anonymous", type: "checkbox", checked: true }]);
+  const bottom = fakeBox("rc-save", [{ name: "closes_at", value: "2027-01-10T18:00", type: "datetime-local" }]);
+  const canvas = fakeBox("q-save", [{ name: "title", value: "不該被讀到", type: "text" }]);
+  fakeDoc([top, bottom, canvas]);
+  const fromBottom = RC.readFormEditor(bottom).data, fromTop = RC.readFormEditor(top).data;
+  assert.equal(fromBottom.title, "回饋", "從下面那個框存，名稱沒有被存成空的"); assert.equal(fromBottom.anonymous, true);
+  assert.ok(fromTop.closes_at, "從上面那個框存，截止時間也在");
+  assert.deepEqual(fromTop, fromBottom);
+});
+
+test("★ 內部表單的編輯頁：名稱與說明 → 題目 → 截止時間與規則；兩個框一起讀", () => {
+  const a = { form: { id: "f1", title: "x", status: "draft", anonymous: false, allow_edit: true }, can_edit: true, can_edit_editors: true, engine: true, responses: 0, recipients: 0, questions: [] };
+  const h = TF.questionsEditHTML(a, "", false, { mode: "edit", logicOpen: new Set() });
+  const q = at(h, "<h2>題目");
+  assert.ok(at(h, 'name="title"') < q && at(h, 'name="anonymous"') < q, "名稱與匿名在題目前面");
+  assert.ok(q < at(h, 'name="closes_at"') && at(h, 'name="closes_at"') < at(h, 'name="allow_edit"') && at(h, 'name="allow_edit"') < at(h, 'data-act="tf-delete"'), "截止時間與「可以改答案」在題目後面");
+  assert.equal(n(h, 'data-autosave="tf-save"'), 2); assert.equal(n(h, 'class="autosave" data-for="tf-save"'), 2);
+  const top = fakeBox("tf-save", [{ name: "title", value: "x", type: "text" }, { name: "anonymous", type: "checkbox", checked: false }]);
+  const bottom = fakeBox("tf-save", [{ name: "closes_at", value: "", type: "datetime-local" }, { name: "allow_edit", type: "checkbox", checked: true }]);
+  fakeDoc([top, bottom]);
+  assert.deepEqual(TF.readSettings(bottom), TF.readSettings(top));
+  assert.equal(TF.readSettings(bottom).title, "x"); assert.equal(TF.readSettings(top).allow_edit, true);
+});
+
+test("★ 大學介紹貼文：最上面只有狀態那一行，送審、核可、下載在內容與預覽下面", () => {
+  const p = { id: "p1", school: "Vanderbilt University", status: "in_review", data: {}, sources: {}, checks: {}, caption: "", created_by: "someone", review_note: "" };
+  const boot = { can_edit: true, can_approve: true, me: "me", problems: { p1: [] }, hashes: {}, names: {} };
+  const h = MK.postEditorHTML(p, boot, "", false, {}, {});
+  assert.ok(at(h, 'id="cp-status"') < at(h, 'data-autosave="cp-save"'), "狀態在最上面");
+  assert.ok(at(h, 'data-autosave="cp-save"') < at(h, 'class="cp-prev"') && at(h, 'class="cp-prev"') < at(h, 'id="cp-actions"'), "按鈕那一塊在內容與預覽下面");
+  for (const act of ["cp-approve", "cp-return-open", "cp-dl-png", "cp-dl-pptx"]) assert.ok(at(h, 'id="cp-actions"') < at(h, `data-act="${act}"`), `${act} 在下面那一塊`);
+  const top = h.slice(at(h, 'id="cp-status"'), at(h, 'data-autosave="cp-save"'));
+  assert.doesNotMatch(top, /data-act="cp-(approve|submit|return-open|dl-png)"/, "最上面那一行沒有按鈕");
+  assert.match(top, /data-act="cp-to-actions"/, "最上面有一顆直接捲到送審與下載的");
+  assert.match(read("admin/marketing/src/main.js"), /act === "cp-to-actions"\) \{ const el = document\.getElementById\("cp-actions"\); if \(el\) el\.scrollIntoView/);
+  const back = MK.postEditorHTML({ ...p, status: "draft", review_note: "SAT 要再查" }, boot, "", false, {}, {});
+  assert.ok(at(back, "SAT 要再查") < at(back, 'data-autosave="cp-save"'), "被退回的原因留在最上面");
+  const m = read("admin/marketing/src/main.js");
+  assert.match(m, /st\.outerHTML = UI\.statusLineHTML\(np, S\.mkt\)/); assert.match(m, /ac\.outerHTML = UI\.statusPanel\(np, S\.mkt, S\.ui, S\.busy\)/, "存完兩塊都換");
+});
+
+test("★ 實習生的遊戲板：選格數 → 排棋盤 → 打開；開著的時候最上面有一行狀態", () => {
+  const term = { id: "2026-27", title_zh: "這一屆" };
+  const off = PA.boardAdminHTML(term, [], { term: "2026-27", size: 30, active: false }, null, null, "", false);
+  assert.ok(at(off, 'id="bd-size"') < at(off, 'class="bgrid"') && at(off, 'class="bgrid"') < at(off, 'data-act="board-toggle" data-on="1"'), "打開的按鈕在棋盤後面");
+  assert.doesNotMatch(off, /class="tag open"/);
+  const on = PA.boardAdminHTML(term, [], { term: "2026-27", size: 30, active: true }, null, null, "", false);
+  assert.ok(at(on, 'class="tag open"') < at(on, 'id="bd-size"') && at(on, 'class="bgrid"') < at(on, 'data-act="board-toggle" data-on="0"'), "開著：上面一行狀態，關掉的按鈕在最下面");
+  const fresh = PA.boardAdminHTML(term, [], null, null, null, "", false);
+  assert.doesNotMatch(fresh, /board-toggle/); assert.match(fresh, /存好之後這裡才有打開的按鈕/, "還沒存過的棋盤說清楚為什麼沒有按鈕");
+});
+
+test("★ 收支新增一筆：嘖嘖那一句自己一行，在按鈕上面", () => {
+  const ui = read("admin/finance/src/ui.js");
+  assert.match(ui, /<div class="mini fin-tip">\$\{esc\(T\("tx\.zeczec"\)\)\}<\/div>\s*<div class="form-foot"><button class="btn" data-act="tx-add"/);
+  assert.doesNotMatch(ui, /<span class="sp"><\/span><span class="mini">\$\{esc\(T\("tx\.zeczec"\)\)\}/);
+  assert.match(read("admin/admin.css"), /\.fin-tip\{/);
 });

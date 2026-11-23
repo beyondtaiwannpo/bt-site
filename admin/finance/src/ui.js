@@ -861,7 +861,8 @@ export function txPageHTML(rows, ctx, f, me, msg, busy, draft, up) {
   const u = up || {};
   const head = pageHead(T("tx.title"), T("tx.lede"), edit && !draft ? [{ act: "tx-new", label: T("tx.new"), primary: true }] : []);
   const newForm = edit && draft ? `<div class="card inline-form fin-new"><h2>${esc(T("tx.newTitle"))}</h2><div class="fin-grid" data-txform="new">${txFields(draft, ctx)}</div>
-      <div class="form-foot"><button class="btn" data-act="tx-add"${dis}>${busy ? T("common.saving") : T("tx.add")}</button><button class="btn ghost" data-act="tx-cancel"${dis}>${T("tx.cancel")}</button><span class="sp"></span><span class="mini">${esc(T("tx.zeczec"))}</span></div></div>` : "";
+      <div class="mini fin-tip">${esc(T("tx.zeczec"))}</div>
+      <div class="form-foot"><button class="btn" data-act="tx-add"${dis}>${busy ? T("common.saving") : T("tx.add")}</button><button class="btn ghost" data-act="tx-cancel"${dis}>${T("tx.cancel")}</button></div></div>` : "";
   const row = t => {
     const voided = !!t.voided_at;
     const sign = t.kind === "income" ? "+" : t.kind === "expense" ? "−" : "";

@@ -226,6 +226,8 @@ export const MINE = {
   "ed.deleteAsk":     { zh: "整份連所有答案一起刪掉，救不回來。確定？", en: "This deletes the form and every answer. It can't be undone. Sure?" },
   "ed.readonly":      { zh: "你是這一份的讀者，看得到設定與答案，改不動。", en: "You are a reader on this form: you can see the settings and answers but can't change them." },
   "ed.settings":      { zh: "設定", en: "Settings" },
+  "ed.basics":        { zh: "名稱與說明", en: "Name and description" },
+  "ed.window":        { zh: "截止時間與規則", en: "Closing time and rules" },
   "ed.name":          { zh: "表單名稱", en: "Title" },
   "ed.intro":         { zh: "開頭的說明", en: "Intro" },
   "ed.introPh":       { zh: "這份是做什麼的、大概要花幾分鐘、答案會拿去做什麼", en: "What this is for, how long it takes, what the answers are used for" },

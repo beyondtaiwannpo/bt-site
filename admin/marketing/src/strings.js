@@ -256,6 +256,8 @@ export const MINE = {
   "cp.s.photos":      { zh: "照片", en: "Photos" },
   "cp.s.photosHint":  { zh: "只用 Wikimedia Commons、學校自己的媒體庫或 BT 自己拍的照片，作者與授權一定要填（核可前會檢查）。不放學生與未成年人的照片。", en: "Use only Wikimedia Commons, the school's own media library or BT's own photos. Author and license are required (checked before approval). No photos of students or minors." },
   "cp.s.caption":     { zh: "Caption（中英）", en: "Caption (English and Chinese)" },
+  "cp.s.review":      { zh: "送審與下載", en: "Review and download" },
+  "cp.toActions":     { zh: "送審與下載 ↓", en: "Review and download ↓" },
   "cp.f.school":      { zh: "學校英文全名", en: "School's full English name" },
   "cp.f.zh":          { zh: "中文校名", en: "Chinese name" },
   "cp.f.line1":       { zh: "封面第一行與顏色", en: "Cover line 1 and colour" },

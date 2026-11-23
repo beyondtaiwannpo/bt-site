@@ -197,6 +197,13 @@ export function dirtyTracker() {
     forget: key => { last.delete(key); },
   };
 }
+// 設定拆成上下兩個存檔的框（2026-11-23）之後，讀的時候同一種框一起讀，動哪一個都存整份。
+// 只讀存檔的框，不讀整頁：畫布上的題目也有 name，混進來會把設定蓋掉。
+export function allValues(box, act) {
+  const doc = box && box.ownerDocument;
+  const boxes = doc && doc.querySelectorAll ? [...doc.querySelectorAll(`[data-autosave="${act}"]`)] : [];
+  return Object.assign({}, ...(boxes.length ? boxes : [box]).map(formValues));
+}
 // 容器裡每一格讀成 { name: value }：文字去頭尾空白、checkbox 是布林、radio 取選到的、沒有 name 的不讀。
 export function formValues(box) {
   const out = {};
@@ -874,9 +881,10 @@ export function eventHTML(d, S) {
       // 2026-11-10：網站上開的活動，連回那場活動的頁面（報名表、審核、簽到、場地都在那裡）。
       e.slug && e.source !== "import" ? [{ href: "/admin/#events/" + e.slug, label: T("ev.openSite") }] : [], { act: "back-overview", label: T("ev.back") })
     + msgHTML(S.msg) + numbersHTML(e.numbers, d.previous) + (edit ? "" : `<div class="note">${esc(T("ev.readonly"))}</div>`)
-    // 2026-11-23：「種類與屆別」搬到最下面（跟活動編輯頁同一次重排，那邊也搬到「其他設定」）。它是分類用的、很少改，
-    // 以前排在第二段，擋在檢討與出席名單的前面。其他段的順序沒動。
-    + reviewHTML + sessHTML + partHTML + formsHTML + scalesHTML + commentsHTML + pairsHTML + settings;
+    // 2026-11-23：「種類與屆別」搬到最下面（跟活動編輯頁同一次重排，那邊也搬到「其他設定」）。它是分類用的、很少改。
+    // 同一天第二輪（Paul：「do all of them」）：「檢討」從最上面搬到留言後面。那一段自己的說明寫的是先看完再填一句，
+    // 所以順序是：誰來了（場次、出席、配對）→ 他們說了什麼（回饋表、分數、留言）→ 檢討 → 分類。
+    + sessHTML + partHTML + pairsHTML + formsHTML + scalesHTML + commentsHTML + reviewHTML + settings;
 }
 // 從畫面讀：場次、出席狀態、檢討、活動設定。
 export function readSessions(box) {
@@ -926,20 +934,28 @@ export function formHeadHTML(r, sub) {
 export function formEditHTML(r, S) {
   const f = r.form || {}, edit = !!r.can_edit, dis = edit ? "" : " disabled", events = (S.boot && S.boot.events) || [], terms = (S.boot && S.boot.terms) || [];
   const anonLocked = f.anonymous && (f.responses || 0) > 0;
-  return msgHTML(S.msg) + `<div data-autosave="rc-save" data-id="${esc(f.id)}">`
-    + sectionHTML(T("ed.settings"), `<div class="tf-settings">
+  // 2026-11-23 照做事的順序拆成三段（跟 /admin/ 的申請表編輯頁同一套）：名稱與說明 → 題目 → 截止時間。
+  // 語言與匿名留在上面那一段：兩個都會改畫布上加得了哪些題型，要在出題之前定。開放與關閉是頁首那顆鈕。
+  // 存檔的框變成上下兩個，都是 rc-save；readFormEditor 兩個框一起讀，動哪一個都存整份。data-part 是存完要把「存好了」印回哪一個框。
+  return msgHTML(S.msg) + `<div data-autosave="rc-save" data-part="top" data-id="${esc(f.id)}">`
+    + sectionHTML(T("ed.basics"), `<div class="tf-settings">
       <label><i>${esc(T("ed.name"))}</i><input name="title" value="${esc(f.title)}" maxlength="200"${dis}></label>
       <label><i>${esc(T("ed.intro"))}</i><textarea name="intro" rows="3" placeholder="${esc(T("form.introPh"))}"${dis}>${esc(f.intro || "")}</textarea></label>
       <div class="two"><label><i>${esc(T("form.event"))}</i>${sel("event_id", eventOpts(events), f.event_id || "", !edit, T("form.noEvent"))}</label>
       <label><i>${esc(T("ev.term"))}</i>${sel("term_id", termOpts(terms), f.term_id || "", !edit, T("ev.noTerm"))}</label></div>
-      <div class="two"><label><i>${esc(T("form.lang"))}</i>${sel("lang", [["zh", "中文"], ["en", "English"]], f.lang, !edit)}</label>
-      <label><i>${esc(T("ed.closes"))}</i><input type="datetime-local" name="closes_at" value="${esc(dtLocal(f.closes_at))}"${dis}></label></div>
+      <label><i>${esc(T("form.lang"))}</i>${sel("lang", [["zh", "中文"], ["en", "English"]], f.lang, !edit)}</label>
       <label class="check"><input type="checkbox" name="anonymous"${f.anonymous ? " checked" : ""}${dis || (anonLocked ? " disabled" : "")}><span>${esc(T("form.anon"))}</span></label>
       ${anonLocked ? `<div class="mini">${esc(T("ed.anonLocked"))}</div>` : ""}
       <div class="mini">${esc(T("form.consentNote"))}</div>
       ${edit ? `<div class="form-foot">${autosaveHint("rc-save")}</div>` : ""}</div>`)
     + `</div>`
     + sectionHTML(T("ed.questions"), questionsHTML(r, S))
+    + `<div data-autosave="rc-save" data-part="bottom" data-id="${esc(f.id)}">`
+    + sectionHTML(T("ed.window"), `<div class="tf-settings">
+      <label><i>${esc(T("ed.closes"))}</i><input type="datetime-local" name="closes_at" value="${esc(dtLocal(f.closes_at))}"${dis}></label>
+      <div class="mini">${esc(T("ed.windowNote"))}</div>
+      ${edit ? `<div class="form-foot">${autosaveHint("rc-save")}</div>` : ""}</div>`)
+    + `</div>`
     + (S.boot && S.boot.can_manage ? sectionHTML("", `<div class="row"><span class="sp"></span><button class="btn quiet sm" data-act="form-delete" data-id="${esc(f.id)}">${esc(T("ed.delete"))}</button></div>`) : "");
 }
 // 題目那一區：編輯／預覽切換加畫布。預覽是一個空的框，main.js 在上面 mount 引擎（跟 /feedback/ 同一支，條件邏輯照樣會動）。
@@ -962,7 +978,7 @@ export function questionsHTML(r, S) {
 }
 // 設定那一塊讀回來（題目各自存，不在這裡）。
 export function readFormEditor(box) {
-  const v = formValues(box);
+  const v = allValues(box, "rc-save");
   const data = { title: v.title || "", intro: v.intro || "", event_id: v.event_id || "", term_id: v.term_id || "", lang: v.lang || "zh", closes_at: fromLocal(v.closes_at || ""), anonymous: !!v.anonymous };
   return { data };
 }

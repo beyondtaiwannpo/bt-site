@@ -1097,17 +1097,17 @@ export function boardAdminHTML(term, tasks, board, draft, sel, msg, busy) {
        { act: "ipreview", label: T("bd.preview") }])
     + msgHTML(msg)
     + `<div class="note">${esc(T("bd.rules"))}</div>`
-    + sectionHTML(T("bd.setup"), `<div class="two">
-        <label><i>${esc(T("bd.size"))}</i><select id="bd-size"${dis || (active ? " disabled" : "")}>
+    // 2026-11-23 照做事的順序：選幾格 → 排棋盤 → 打開。開關以前跟格數擠在第一段，可是那一句說明自己寫的是「排好再開」，
+    // 而且一打開格數與蛇梯就鎖住。開著的時候上面多一行狀態，不用捲到最底才知道為什麼格數改不了。
+    + (active ? `<div class="row" style="margin-bottom:12px"><span class="tag open">${esc(T("bd.onTag"))}</span></div>` : "")
+    + sectionHTML(T("bd.setup"), `<label><i>${esc(T("bd.size"))}</i><select id="bd-size"${dis || (active ? " disabled" : "")}>
           ${BOARD_SIZES.map(n => `<option value="${n}"${size === n ? " selected" : ""}>${n}</option>`).join("")}
-        </select></label>
-        <div>
-          <div class="mini" style="margin-bottom:8px">${esc(active ? T("bd.on") : T("bd.off"))}${d.dirty ? ` <span class="tag warn">${esc(T("bd.unsaved"))}</span>` : ""}</div>
-          ${board ? `<button class="btn ghost sm" data-act="board-toggle" data-on="${active ? "0" : "1"}"${dis}>${esc(active ? T("bd.turnOff") : T("bd.turnOn"))}</button>` : ""}
-        </div>
-      </div>`, { id: "board-setup" })
+        </select></label>`, { id: "board-setup" })
     + sectionHTML(T("bd.layout"), `<div class="bgrid" style="grid-template-columns:repeat(${BOARD_PER_ROW},1fr)">${grid}</div>${editor}`,
-        { id: "board-layout", hint: T("bd.layoutHint", { l: counts.ladder, s: counts.snake, k: counts.task }) });
+        { id: "board-layout", hint: T("bd.layoutHint", { l: counts.ladder, s: counts.snake, k: counts.task }) })
+    + sectionHTML(T("bd.live"), `<div class="mini" style="margin-bottom:8px">${esc(active ? T("bd.on") : T("bd.off"))}${d.dirty ? ` <span class="tag warn">${esc(T("bd.unsaved"))}</span>` : ""}</div>
+        ${board ? `<div class="row"><button class="btn ghost sm" data-act="board-toggle" data-on="${active ? "0" : "1"}"${dis}>${esc(active ? T("bd.turnOff") : T("bd.turnOn"))}</button></div>`
+                : `<div class="mini">${esc(T("bd.saveFirst"))}</div>`}`, { id: "board-live" });
 }
 
 export function notCadreHTML() {

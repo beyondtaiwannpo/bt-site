@@ -161,7 +161,9 @@ async function onAutosave(act, box) {
   try {
     await savePost();
     const np = curPost(), el = root();
-    const st = el.querySelector("#cp-status"); if (st) st.outerHTML = UI.statusPanel(np, S.mkt, S.ui, S.busy);
+    // 狀態那一行在最上面、送審與下載那一塊在最下面（2026-11-23 拆開），兩塊都換。
+    const st = el.querySelector("#cp-status"); if (st) st.outerHTML = UI.statusLineHTML(np, S.mkt);
+    const ac = el.querySelector("#cp-actions"); if (ac) ac.outerHTML = UI.statusPanel(np, S.mkt, S.ui, S.busy);
     for (const [k] of SL.FACTS) {
       const b = el.querySelector("#fx-" + k); if (b) b.innerHTML = UI.factBadge(np, S.mkt, k);
       const cb = el.querySelector(`[data-act="cp-check"][data-key="${k}"]`); if (cb) cb.checked = UI.factState(np, S.mkt, k) === "ok";
@@ -273,6 +275,7 @@ document.addEventListener("click", async e => {
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") { e.preventDefault(); S.msg = ""; history.pushState(null, "", "#" + b.dataset.t); openTab(b.dataset.t); return; }
+  if (act === "cp-to-actions") { const el = document.getElementById("cp-actions"); if (el) el.scrollIntoView({ block: "start" }); return; }
   if (act === "cp-back") { history.pushState(null, "", "#posts"); openTab("posts"); return; }
   if (act === "cp-archived") { S.showArchived = !S.showArchived; render(); return; }
   if (act === "cp-zoom") { b.classList.toggle("big"); return; }

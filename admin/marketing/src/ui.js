@@ -770,12 +770,20 @@ function actionsHTML(p, boot, ui, busy) {
   const ret = ui.returning ? `<div class="cp-inline"><textarea id="cp-return-note" rows="2" placeholder="${esc(T("cp.returnPh"))}" data-noauto="1"></textarea>${b("cp-return", T("cp.act.returnGo"), "danger sm")}${b("cp-inline-cancel", T("common.cancel"), "ghost sm")}</div>` : "";
   const post = ui.posting ? `<div class="cp-inline"><input id="cp-posted-url" placeholder="https://www.instagram.com/p/…" data-noauto="1">${b("cp-posted", T("cp.act.postedGo"), "sm")}${b("cp-inline-cancel", T("common.cancel"), "ghost sm")}</div>` : "";
   const dl = `<div class="row">${b("cp-dl-png", T("cp.dl.png"), "ghost sm")}${b("cp-dl-pptx", T("cp.dl.pptx"), "ghost sm")}</div><p class="mini">${esc(T("cp.dl.hint"))}</p>`;
+  // 2026-11-23 照做事的順序拆成兩塊（Paul：「do all of them」）：最上面只剩一行「現在是什麼狀態」（statusLineHTML），
+  // 送審、核可、退回、標成已發、下載這些按鈕搬到內容與預覽的下面，因為要先寫完、看完才按。
+  // 被退回的原因留在最上面那一行底下：那是打開這一頁第一件要知道的事。
+  // 內容那一段有七張圖那麼長，所以最上面那一行右邊有一顆「送審與下載 ↓」直接捲下去（審稿的人看過了不用再捲一次）。
+  return `<div class="card cp-status cp-actions" id="cp-actions"><h2>${esc(T("cp.s.review"))}</h2>
+    ${main ? `<div class="row">${main}</div>` : ""}${note ? `<p class="mini">${esc(note)}</p>` : ""}${ret}${post}${dl}</div>`;
+}
+export function statusLineHTML(p, boot) {
   const who = [p.created_by && T("cp.by", { who: nameOf(boot, p.created_by), date: fmtDay(p.created_at) }),
                p.approved_by && T("cp.approvedBy", { who: nameOf(boot, p.approved_by), date: fmtDay(p.approved_at) }),
                p.posted_url && T("cp.postedAt", { date: fmtDay(p.posted_at) })].filter(Boolean).map(esc).join("　");
-  return `<div class="card cp-status" id="cp-status"><div class="row">${statusTag(p.status)}<span class="mini">${who}</span>${p.posted_url ? `<a class="mini" href="${v(p.posted_url)}" target="_blank" rel="noopener">${esc(T("cp.openIg"))}</a>` : ""}</div>
-    ${p.review_note ? `<div class="msg err">${esc(T("cp.returned"))}${esc(p.review_note)}</div>` : ""}
-    ${main ? `<div class="row">${main}</div>` : ""}${note ? `<p class="mini">${esc(note)}</p>` : ""}${ret}${post}${dl}</div>`;
+  return `<div class="card cp-status" id="cp-status"><div class="row">${statusTag(p.status)}<span class="mini">${who}</span>${p.posted_url ? `<a class="mini" href="${v(p.posted_url)}" target="_blank" rel="noopener">${esc(T("cp.openIg"))}</a>` : ""}
+    <span class="sp"></span><button type="button" class="lnk" data-act="cp-to-actions">${esc(T("cp.toActions"))}</button></div>
+    ${p.review_note ? `<div class="msg err">${esc(T("cp.returned"))}${esc(p.review_note)}</div>` : ""}</div>`;
 }
 export function statusPanel(p, boot, ui, busy) { return actionsHTML(p, boot, ui || {}, busy); }
 
@@ -852,7 +860,8 @@ export function postEditorHTML(p, boot, msg, busy, ui, urls, rs) {
   </div>`;
   const prev = `<div class="cp-prev">${[0, 1, 2, 3, 4, 5, 6].map(i => `<canvas width="1080" height="1350" data-slide="${i}" data-act="cp-zoom" title="${esc(T("cp.zoom"))}"></canvas>`).join("")}</div>`;
   return pageHead(esc(p.school), T("cp.editLede"), [], { act: "cp-back", label: T("cp.back") }) + msgHTML(msg)
-    + statusPanel(p, boot, ui, busy) + researchHTML(p, boot, rs, busy) + `<div class="cp-wrap"><div>${form}</div><aside>${prev}</aside></div>`;
+    + statusLineHTML(p, boot) + researchHTML(p, boot, rs, busy) + `<div class="cp-wrap"><div>${form}</div><aside>${prev}</aside></div>`
+    + statusPanel(p, boot, ui, busy);
 }
 // caption 的字數與 hashtag 數（IG 上限 2,200 字、30 個 hashtag）。
 export function captionCount(text) {

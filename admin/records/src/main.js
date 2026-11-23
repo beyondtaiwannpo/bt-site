@@ -177,7 +177,7 @@ async function onAutosave(act, box, field) {
         const after = S.results.form || {};
         // 匿名與語言改了，畫布上能加的題型與新題的預設字跟著換；兩個都是勾的、選的，重畫不會吃掉打到一半的字。
         if (before.anonymous !== after.anonymous || before.lang !== after.lang) render();
-        UI.autosaveState(liveBox('[data-autosave="rc-save"]', box), "saved"); UI.toast(T("msg.saved"));
+        UI.autosaveState(liveBox(`[data-autosave="rc-save"][data-part="${box.dataset.part || "top"}"]`, box), "saved"); UI.toast(T("msg.saved"));
       } catch (e) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + D.says(e)); }
     });
   }

@@ -197,6 +197,13 @@ export function dirtyTracker() {
     forget: key => { last.delete(key); },
   };
 }
+// 設定拆成上下兩個存檔的框（2026-11-23）之後，讀的時候同一種框一起讀，動哪一個都存整份。
+// 只讀存檔的框，不讀整頁：畫布上的題目也有 name，混進來會把設定蓋掉。
+export function allValues(box, act) {
+  const doc = box && box.ownerDocument;
+  const boxes = doc && doc.querySelectorAll ? [...doc.querySelectorAll(`[data-autosave="${act}"]`)] : [];
+  return Object.assign({}, ...(boxes.length ? boxes : [box]).map(formValues));
+}
 // 容器裡每一格讀成 { name: value }：文字去頭尾空白、checkbox 是布林、radio 取選到的、沒有 name 的不讀。
 export function formValues(box) {
   const out = {};
@@ -814,12 +821,13 @@ export function questionsEditHTML(a, msg, busy, fx) {
       : (qs.length ? "" : `<p class="mini">${esc(T("ed.noQHint"))}</p>`)
         + F.canvasHTML(qs, { en: isEn(), canEdit: edit, menuAt: e.menuAt, filter: e.filter, logicOpen: e.logicOpen, lockedIds: locked,
             types: a.engine === false ? OLD_TYPES : TYPES, prefill: false, act: "tf-q", hint: () => edit ? autosaveHint("tf-q") : "" }));
+  // 2026-11-23 照做事的順序拆成三段（跟 /admin/ 的申請表編輯頁同一套）：名稱與說明 → 題目 → 截止時間與規則。
+  // 匿名留在上面：有人答過就鎖住，要在發出去之前定。開放與關閉是頁首那顆鈕。
+  // 存檔的框變成上下兩個，都是 tf-save；readSettings 兩個框一起讀，動哪一個都存整份。
   return msgHTML(msg) + `<div data-autosave="tf-save" data-id="${esc(f.id)}">`
-    + sectionHTML(T("ed.settings"), `<div class="tf-settings">
+    + sectionHTML(T("ed.basics"), `<div class="tf-settings">
       <label><i>${esc(T("ed.name"))}</i><input name="title" value="${esc(f.title)}" maxlength="200"${dis}></label>
       <label><i>${esc(T("ed.intro"))}</i><textarea name="intro" rows="3" placeholder="${esc(T("ed.introPh"))}"${dis}>${esc(f.intro || "")}</textarea></label>
-      <label><i>${esc(T("ed.closes"))}</i><input type="datetime-local" name="closes_at" value="${esc(dtLocal(f.closes_at))}"${dis}></label>
-      <label class="check"><input type="checkbox" name="allow_edit"${f.allow_edit ? " checked" : ""}${dis}><span>${esc(T("ed.allowEdit"))}</span></label>
       <label class="check"><input type="checkbox" name="anonymous"${f.anonymous ? " checked" : ""}${dis || (anonLocked ? " disabled" : "")}><span>${esc(T("ed.anon"))}</span></label>
       ${anonLocked ? `<div class="mini">${esc(T("ed.anonLocked"))}</div>` : ""}
       ${edit ? `<div class="form-foot">${autosaveHint("tf-save")}</div>` : ""}</div>`)
@@ -827,11 +835,17 @@ export function questionsEditHTML(a, msg, busy, fx) {
     + sectionHTML(T("ed.questions"), `<div class="mini" style="margin-bottom:10px">${esc(T("ed.qNote"))}</div>
       ${a.engine === false ? `<div class="note">${esc(T("ed.oldDb"))}</div>` : ""}
       ${canvas}`)
+    + `<div data-autosave="tf-save" data-id="${esc(f.id)}">`
+    + sectionHTML(T("ed.window"), `<div class="tf-settings">
+      <label><i>${esc(T("ed.closes"))}</i><input type="datetime-local" name="closes_at" value="${esc(dtLocal(f.closes_at))}"${dis}></label>
+      <label class="check"><input type="checkbox" name="allow_edit"${f.allow_edit ? " checked" : ""}${dis}><span>${esc(T("ed.allowEdit"))}</span></label>
+      ${edit ? `<div class="form-foot">${autosaveHint("tf-save")}</div>` : ""}</div>`)
+    + `</div>`
     + (a.can_edit_editors ? sectionHTML("", `<div class="row"><span class="sp"></span><button class="btn quiet sm" data-act="tf-delete" data-id="${esc(f.id)}">${esc(T("ed.delete"))}</button></div>`) : "");
 }
 // 設定那一塊讀成 tf_save_form 的 p_data。
 export function readSettings(box) {
-  const v = formValues(box);
+  const v = allValues(box, "tf-save");
   return { title: v.title || "", intro: v.intro || "", closes_at: fromLocal(v.closes_at || ""), allow_edit: !!v.allow_edit, anonymous: !!v.anonymous };
 }
 
