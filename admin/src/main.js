@@ -292,7 +292,8 @@ async function reloadEvents(slug) {
 function readEvent() {
   const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
   const chk = id => { const el = document.getElementById(id); return !!(el && el.checked); };
-  const iso = v => v ? new Date(v).toISOString() : "";
+  // 開始與結束填的是台灣時間，不是這台電腦的時間（見 ui.js 的 evFromTaipei）。
+  const iso = v => UI.evFromTaipei(v);
   const patch = { title_zh: val("ev-tzh"), title_en: val("ev-ten"), summary_zh: val("ev-szh"), summary_en: val("ev-sen"), body_zh: val("ev-bzh"), body_en: val("ev-ben"),
     starts_at: iso(val("ev-starts")), ends_at: iso(val("ev-ends")), place: val("ev-place"), capacity: Number(val("ev-cap") || 0), cover_url: val("ev-cover"), cover_consent: chk("ev-consent") };
   // 計畫的四格（2026-12-31-programmes.sql）。那一塊有畫出來才帶（遷移檔還沒跑的時候沒有畫，帶了資料庫也不認得）。
@@ -1076,6 +1077,15 @@ document.addEventListener("click", async e => {
     } catch (err) { S.msg = T("err.evPhSave") + D.says(err); }
     S.busy = false; render(); return;
   }
+  // 說明上面那一排排版的按鈕（2026-11-23）：把選到的字包起來或在行首加記號（UI.evFmtApply 算），選取範圍留著，
+  // 再丟一個 input 事件：自動儲存那條路與下面的預覽都是聽 input 的，所以按按鈕跟自己打字是同一條路，不用另外存。
+  if (act === "ev-fmt") {
+    const ta = document.getElementById(b.dataset.for); if (!ta || ta.readOnly || ta.disabled) return;
+    const r = UI.evFmtApply(ta.value, ta.selectionStart, ta.selectionEnd, b.dataset.k);
+    ta.value = r.text; ta.focus(); ta.setSelectionRange(r.start, r.end);
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
   // ── 講者（2026-11-23，2027-01-02-event-speakers-tickets.sql）──
   // 從紀錄裡找人：叫 Records 原本那一支（讀不到名錄的人拿到的是空的）。挑了只是把名字與學校帶進「加一位」那一格，還沒有存。
   if (act === "ev-sp-find") {
@@ -1758,6 +1768,10 @@ document.addEventListener("change", async e => {
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("input", e => {
+  // 活動頁的說明（2026-11-23）：邊打邊更新下面的預覽。只換預覽那一格裡面，不重畫整頁，游標不會跳。
+  if (S.view === "event" && e.target && (e.target.id === "ev-bzh" || e.target.id === "ev-ben")) {
+    const prev = document.getElementById(e.target.id + "-prev"); if (prev) prev.innerHTML = UI.evPreviewHTML(e.target.value);
+  }
   // 活動清單的搜尋（2026-11-11）：分段的數字要跟著變，所以重畫，再把游標放回去。
   if (S.view === "events" && e.target && e.target.id === "ev-q") {
     keepEvDraft(); S.evF = Object.assign({}, S.evF, { q: e.target.value }); render();

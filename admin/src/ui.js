@@ -1372,7 +1372,17 @@ export function evCoverOk(url) {
 }
 export function evSlug(s) { return String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40); }
 const evDate = d => d ? String(d).slice(0, 16).replace("T", " ") : "";
-// datetime-local 要的格式（本機時間）。
+// 活動的開始與結束一律是「台灣時間」（2026-11-23）。活動在台灣辦，但填的人可能在美國：
+// 以前這兩格照填的人電腦的時區算，在芝加哥填早上九點，存進去是台灣晚上十一點，對外頁就寫錯時間。
+// evTaipei 把資料庫的時間換成 datetime-local 要的字（台灣時間），evFromTaipei 反過來。台灣沒有日光節約，固定是 UTC+8。
+export const evTaipei = d => {
+  if (!d) return ""; const x = new Date(d); if (isNaN(x)) return "";
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(x);
+  const g = t => p.find(q => q.type === t).value;
+  return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
+};
+export const evFromTaipei = v => { if (!v) return ""; const x = new Date(String(v).slice(0, 16) + ":00+08:00"); return isNaN(x) ? "" : x.toISOString(); };
+// datetime-local 要的格式（本機時間）。報名表的開放與截止那幾個地方還在用。
 const evLocal = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; };
 export const evPast = e => !!(e && (e.ends_at || e.starts_at) && new Date(e.ends_at || e.starts_at) < new Date());
 export const evTitle = e => (lang() === "zh" ? (e.title_zh || e.title_en) : (e.title_en || e.title_zh)) || e.slug;
@@ -1544,6 +1554,89 @@ export function evFeedbackQuestions(l) {
 }
 // 新回饋表的名字：「活動名稱 · 活動後回饋」，跟 Records 那邊開出來的一樣。
 export const evFeedbackTitle = e => `${evTitle(e)} · ${T("ev.fb.kind")}`;
+
+// ── 說明的排版、工具列、預覽（2026-11-23，Paul：「I need the text to be bold, highlight, or in different colors」）──
+// 對外那一頁怎麼排說明，寫在 events/src/ui.js 的 richInline 與 richText。後台的預覽要畫得一模一樣，
+// 但後台不 import 別的資料夾（對外頁壞掉不該讓後台打不開），所以這裡抄一份。
+// **那邊改了這裡要跟著改**：test/event-page.test.mjs 拿同一批字餵兩份，輸出要一字不差，不一樣就紅。
+// 記號：整行的「## 」大標題、「### 」小標題、「- 」清單、「> 」引言；一行裡面的 **粗體**、==橘色螢光==、{{綠色螢光}}、[[藍底橘字]]。
+// 每一段字都先 esc() 再加標籤，說明裡打的 HTML 只會是字。
+export function evRichInline(s) {
+  return esc(s)
+    .replace(/==(.+?)==/g, "<mark>$1</mark>")
+    .replace(/\{\{(.+?)\}\}/g, '<mark class="hl2">$1</mark>')
+    .replace(/\[\[(.+?)\]\]/g, '<span class="rt-c">$1</span>')
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+}
+export function evRichText(text) {
+  const out = []; let para = [], list = [], quote = [];
+  const endP = () => { if (para.length) { out.push(`<p>${para.join("<br>")}</p>`); para = []; } };
+  const endL = () => { if (list.length) { out.push(`<ul>${list.map(x => `<li>${x}</li>`).join("")}</ul>`); list = []; } };
+  const endQ = () => { if (quote.length) { out.push(`<blockquote>${quote.join("<br>")}</blockquote>`); quote = []; } };
+  for (const raw of String(text == null ? "" : text).replace(/\r\n?/g, "\n").split("\n")) {
+    const line = raw.trim();
+    if (!line) { endP(); endL(); endQ(); continue; }
+    const h = /^(#{2,3})\s+(.+)$/.exec(line), li = /^-\s+(.+)$/.exec(line), q = /^>\s+(.+)$/.exec(line);
+    if (h) { endP(); endL(); endQ(); out.push(h[1].length === 2 ? `<h3>${evRichInline(h[2])}</h3>` : `<h4>${evRichInline(h[2])}</h4>`); }
+    else if (li) { endP(); endQ(); list.push(evRichInline(li[1])); }
+    else if (q) { endP(); endL(); quote.push(evRichInline(q[1])); }
+    else { endL(); endQ(); para.push(evRichInline(line)); }
+  }
+  endP(); endL(); endQ();
+  return out.join("");
+}
+// 工具列的八顆按鈕。mark 是整行的記號（加在行首）；open、close 是一行裡面的記號（包住選到的字）。
+export const EV_FMT = [
+  { k: "h2", mark: "## " }, { k: "h3", mark: "### " }, { k: "b", open: "**", close: "**" }, { k: "hl", open: "==", close: "==" },
+  { k: "hl2", open: "{{", close: "}}" }, { k: "c", open: "[[", close: "]]" }, { k: "ul", mark: "- " }, { k: "q", mark: "> " },
+];
+const EV_LINE_MARK = /^(#{2,3}\s+|-\s+|>\s+)/;
+// 按了一顆按鈕之後，那一格的字與選取範圍要變成什麼。純函式：吃整段字、選取的頭尾、哪一顆，回 { text, start, end }。
+// 一行裡面的（粗體、兩種螢光、藍底橘字）：
+//   有選字就把選到的字包起來，包完選取範圍是連記號一起，所以再按一次同一顆就是拿掉；選到的字外面剛好已經包著同一組，也是拿掉。
+//   選了好幾行就一行一行包（記號不能跨行，跨了對外頁不認）。沒選字就放一組空的記號，游標停在中間。
+// 整行的（大標題、小標題、清單、引言）：
+//   選到的每一行（沒選就是游標在的那一行）行首加上記號；那幾行本來是別種整行記號就換掉；全部都已經是這一種，就拿掉。空白行不動。
+export function evFmtApply(text, start, end, k) {
+  const t = String(text == null ? "" : text), f = EV_FMT.find(x => x.k === k);
+  const a = Math.max(0, Math.min(Number(start) || 0, t.length)), b = Math.max(a, Math.min(Number(end) || 0, t.length));
+  if (!f) return { text: t, start: a, end: b };
+  if (f.mark) {
+    const ls = t.lastIndexOf("\n", a - 1) + 1;
+    let le = t.indexOf("\n", b > a && t[b - 1] === "\n" ? b - 1 : b); if (le < 0) le = t.length;
+    const lines = t.slice(ls, le).split("\n"), live = lines.filter(x => x.trim());
+    if (!live.length) return { text: t.slice(0, ls) + f.mark + t.slice(ls), start: ls + f.mark.length, end: ls + f.mark.length };
+    const has = live.every(x => x.replace(/^\s+/, "").startsWith(f.mark));
+    const block = lines.map(x => { if (!x.trim()) return x; const bare = x.replace(/^\s+/, "").replace(EV_LINE_MARK, ""); return has ? bare : f.mark + bare; }).join("\n");
+    return { text: t.slice(0, ls) + block + t.slice(le), start: ls, end: ls + block.length };
+  }
+  const o = f.open, c = f.close, sel = t.slice(a, b);
+  if (!sel) return { text: t.slice(0, a) + o + c + t.slice(a), start: a + o.length, end: a + o.length };
+  if (sel.length > o.length + c.length && sel.startsWith(o) && sel.endsWith(c) && !sel.includes("\n")) {
+    const inner = sel.slice(o.length, sel.length - c.length);
+    return { text: t.slice(0, a) + inner + t.slice(b), start: a, end: a + inner.length };
+  }
+  if (a >= o.length && t.slice(a - o.length, a) === o && t.slice(b, b + c.length) === c) {
+    return { text: t.slice(0, a - o.length) + sel + t.slice(b + c.length), start: a - o.length, end: b - o.length };
+  }
+  const wrapped = sel.split("\n").map(x => { const m = /^(\s*)(.*?)(\s*)$/.exec(x); return m[2] ? m[1] + o + m[2] + c + m[3] : x; }).join("\n");
+  return { text: t.slice(0, a) + wrapped + t.slice(b), start: a, end: a + wrapped.length };
+}
+// 預覽那一格裡面的 HTML：有字就是對外頁會畫的樣子，沒有字是一句話。main.js 在打字的時候叫同一支更新。
+export const evPreviewHTML = text => evRichText(text) || `<p class="mini">${T("ev.prevEmpty")}</p>`;
+// 說明那一格（中文一格、英文一格）：上面一排工具列，中間打字，下面一行怎麼打的提示（按鈕不能用的時候的退路），最下面是預覽。
+// 打字那一格還是原本的 id 與 name（ev-bzh／body_zh、ev-ben／body_en），所以自動儲存與 readEvent() 都不用改。
+// 唯讀的人只有那一格字（按不了、也不用看預覽）。
+export function eventDescHTML(e, lg, canEdit, busy) {
+  const id = lg === "zh" ? "ev-bzh" : "ev-ben", name = "body_" + lg, val = e[name] || "";
+  const dis = busy ? " disabled" : "", ro = canEdit ? "" : " readonly";
+  const bar = !canEdit ? "" : `<div class="ev-tb" role="toolbar" aria-label="${esc(T("ev.fmt.bar"))}">${EV_FMT.map(f =>
+    `<button type="button" class="ev-tb-b" data-act="ev-fmt" data-k="${f.k}" data-for="${id}" title="${esc(T("ev.fmt.tip." + f.k))}"${dis}>${esc(T("ev.fmt." + f.k))}</button>`).join("")}</div>`;
+  return `<div class="ev-desc"><label for="${id}"><i>${T(lg === "zh" ? "ev.bodyZh" : "ev.bodyEn")}</i></label>${bar}
+        <textarea id="${id}" name="${name}" style="min-height:170px"${ro}${dis}>${esc(val)}</textarea>${!canEdit ? "" : `
+        <span class="mini">${esc(T("ev.bodyHelp"))}</span>
+        <div class="ev-prev"><i>${T("ev.prev")}</i><div class="ev-rt" id="${id}-prev">${evPreviewHTML(val)}</div></div>`}</div>`;
+}
 
 // 封面那一塊（在「內容」的自動儲存框裡：連結那一格與同意勾選都是改了就存）。
 // 主要是選檔案（main.js 聽 #ev-cover-file 的 change：縮圖、傳到 Storage 的 events bucket、把網址存進 cover_url）；貼連結收在一格裡當備用。
@@ -1776,10 +1869,10 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
         <label><i>${T("ev.titleEn")}</i><input id="ev-ten" name="title_en" value="${esc(e.title_en || "")}"${ro}${dis}></label>
         <label><i>${T("ev.sumZh")}</i><input id="ev-szh" name="summary_zh" value="${esc(e.summary_zh || "")}" placeholder="${esc(T("ev.sumPh"))}"${ro}${dis}></label>
         <label><i>${T("ev.sumEn")}</i><input id="ev-sen" name="summary_en" value="${esc(e.summary_en || "")}"${ro}${dis}></label>
-        <label class="wide"><i>${T("ev.bodyZh")}</i><textarea id="ev-bzh" name="body_zh" style="min-height:120px"${ro}${dis}>${esc(e.body_zh || "")}</textarea>${canEdit ? `<span class="mini">${esc(T("ev.bodyHelp"))}</span>` : ""}</label>
-        <label class="wide"><i>${T("ev.bodyEn")}</i><textarea id="ev-ben" name="body_en" style="min-height:120px"${ro}${dis}>${esc(e.body_en || "")}</textarea>${canEdit ? `<span class="mini">${esc(T("ev.bodyHelp"))}</span>` : ""}</label>
-        <label><i>${T("ev.starts")}</i><input id="ev-starts" name="starts_at" type="datetime-local" value="${esc(evLocal(e.starts_at))}"${ro}${dis}></label>
-        <label><i>${T("ev.ends")}</i><input id="ev-ends" name="ends_at" type="datetime-local" value="${esc(evLocal(e.ends_at))}"${ro}${dis}></label>
+        ${eventDescHTML(e, "zh", canEdit, busy)}
+        ${eventDescHTML(e, "en", canEdit, busy)}
+        <label><i>${T("ev.starts")}</i><input id="ev-starts" name="starts_at" type="datetime-local" value="${esc(evTaipei(e.starts_at))}"${ro}${dis}></label>
+        <label><i>${T("ev.ends")}</i><input id="ev-ends" name="ends_at" type="datetime-local" value="${esc(evTaipei(e.ends_at))}"${ro}${dis}></label>
         <label><i>${T("ev.place")}</i><input id="ev-place" name="place" value="${esc(e.place || "")}"${ro}${dis}></label>
         <label><i>${T("ev.capacity")}</i><input id="ev-cap" name="capacity" type="number" min="0" value="${esc(String(e.capacity || 0))}"${ro}${dis}></label>
       </div>

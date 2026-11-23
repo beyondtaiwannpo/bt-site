@@ -269,37 +269,34 @@ test("★ 這一批新的字中英都有，而且程式裡用到的鍵字典裡�
 });
 
 // ── 3. 對外的活動頁 ────────────────────────────────────────────────────
+// 2026-11-23 同一天後面那一頁整個重排（兩欄、右邊的卡、照片變成橫的一排、等資料回來才畫），細節搬到 test/event-page.test.mjs。
+// 這裡留三件當初定的事：只畫 https 的照片而且只用網址、沒有照片就什麼都不多、問不到不印錯誤。
 test("★ 對外：galleryHTML 只畫 https 的照片、alt 是空的、捲到才載；沒有、載不到、形狀不對都回空字串", () => {
-  const h = PUB.galleryHTML({ photos: [{ url: "https://x/a.jpg" }, { url: "https://x/b.jpg" }] });
+  const h = PUB.galleryHTML({ photos: [{ url: "https://x/a.jpg" }, { url: "https://x/b.jpg" }] }, "zh");
   assert.equal(count(h, /<img /g), 2);
-  assert.match(h, /^<img src="https:\/\/x\/a\.jpg" alt="" loading="lazy" decoding="async" onerror="this\.remove\(\)"><img src="https:\/\/x\/b\.jpg"/, "照資料庫給的順序");
-  for (const bad of [null, undefined, {}, { photos: [] }, { photos: null }, { photos: "x" }, [], "nope", { message: "Could not find the function" }]) assert.equal(PUB.galleryHTML(bad), "", JSON.stringify(bad));
-  assert.equal(PUB.galleryHTML({ photos: [{ url: "javascript:alert(1)" }, { url: "http://x/a.jpg" }, {}, null, { url: "" }] }), "", "不是 https 的不畫");
-  assert.match(PUB.galleryHTML({ photos: [{ url: 'https://x/a.jpg"><script>' }] }), /src="https:\/\/x\/a\.jpg&quot;&gt;&lt;script&gt;"/, "網址有引號也逃得掉");
-  assert.equal(count(PUB.galleryHTML({ photos: [{ url: "https://x/a.jpg", consent: false, id: "p1", caption: "小明" }] }), /小明|p1|consent/g), 0, "只用網址，別的欄位不會被印出來");
+  assert.match(h, /<li><img src="https:\/\/x\/a\.jpg" alt="" loading="lazy" decoding="async" onerror="this\.closest\('li'\)\.remove\(\)"><\/li><li><img src="https:\/\/x\/b\.jpg"/, "照資料庫給的順序");
+  for (const bad of [null, undefined, {}, { photos: [] }, { photos: null }, { photos: "x" }, [], "nope", { message: "Could not find the function" }]) assert.equal(PUB.galleryHTML(bad, "zh"), "", JSON.stringify(bad));
+  assert.equal(PUB.galleryHTML({ photos: [{ url: "javascript:alert(1)" }, { url: "http://x/a.jpg" }, {}, null, { url: "" }] }, "zh"), "", "不是 https 的不畫");
+  assert.match(PUB.galleryHTML({ photos: [{ url: 'https://x/a.jpg"><script>' }] }, "zh"), /src="https:\/\/x\/a\.jpg&quot;&gt;&lt;script&gt;"/, "網址有引號也逃得掉");
+  assert.equal(count(PUB.galleryHTML({ photos: [{ url: "https://x/a.jpg", consent: false, id: "p1", caption: "小明" }] }, "zh"), /小明|p1|consent/g), 0, "只用網址，別的欄位不會被印出來");
 });
 
-test("★ 對外：一場活動那一頁多一個空的、藏著的框，沒有照片的時候跟原本一模一樣；清單與卡片沒動", () => {
+test("★ 對外：沒有照片的時候那一頁沒有照片那一塊；清單與卡片沒動", () => {
   const e = { slug: "info", team: "Curriculum Team", title_zh: "說明會", title_en: "Info session", summary_zh: "", summary_en: "", body_zh: "內容", body_en: "Body", cover_url: null,
     starts_at: "2027-01-20T02:00:00Z", ends_at: null, place: "台北", capacity: 0, form_id: null, signup_open: false, signed_up: 0, is_full: false, is_past: false };
-  const h = PUB.detailHTML(e, "zh");
-  assert.equal(count(h, /<div class="ev-photos" data-ev-gallery hidden><\/div>/g), 1);
-  assert.ok(h.indexOf('class="ev-text"') < h.indexOf("data-ev-gallery") && h.indexOf("data-ev-gallery") < h.indexOf("所有活動"), "在說明底下、回清單的連結上面");
-  assert.doesNotMatch(h.replace('<div class="ev-photos" data-ev-gallery hidden></div>', ""), /ev-photos|gallery|<img/, "多的就只有那一個框，裡面是空的");
+  for (const x of [undefined, null, { photos: [] }]) assert.doesNotMatch(PUB.detailHTML(e, "zh", x), /ev-photos|ev-strip|<img/, "沒有照片：一張圖、一個空的框都沒有");
+  const h = PUB.detailHTML(e, "zh", { photos: [{ url: "https://x/a.jpg" }] });
+  assert.equal(count(h, /<div class="ev-photos">/g), 1);
+  assert.ok(h.indexOf('class="ev-text"') < h.indexOf('class="ev-photos"') && h.indexOf('class="ev-photos"') < h.lastIndexOf("所有活動"), "在說明底下、最下面回清單的連結上面");
   assert.doesNotMatch(PUB.cardHTML(e, "zh", "./"), /ev-photos/); assert.doesNotMatch(PUB.listHTML([e], "zh"), /ev-photos/);
-  const page = read("events/index.html");
-  assert.match(page, /\.ev-photos\[hidden\]\{display:none\}/, "寫了 display:grid 就要自己把 hidden 接回來，不然空的框會佔一塊");
-  assert.match(page, /\.ev-photos img\{display:block;width:100%;min-width:0;/, "照片不會比格子寬");
-  assert.match(page, /@media \(max-width:600px\)\{\.ev-photos\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/, "手機兩欄，不會往旁邊捲");
 });
 
-test("★ 對外：照片另外問 public_event_extras；問不到、函式不在、逾時都不動頁面；沒有動 public_events 那一條", () => {
+test("★ 對外：照片、講者、報名類型另外問 public_event_extras；問不到、函式不在、逾時都回 null，不印錯誤；沒有動 public_events 那一條", () => {
   const m = read("events/src/main.js");
-  assert.match(m, /rest\/v1\/rpc\/public_event_extras/); assert.match(m, /body: JSON\.stringify\(\{ p_slug: slug \}\)/);
-  assert.match(m, /return r\.ok \? await r\.json\(\) : null;\s*\} catch \(e\) \{ return null; \}/, "失敗一律回 null，不丟錯");
-  assert.match(m, /rest\/v1\/rpc\/public_events`/, "原本那一支照舊");
-  assert.match(m, /if \(slugOf\(\) === slug\) fillExtras\(slug\)/, "照片回來的時候人已經換到別場，就不要填進去");
-  assert.match(m, /el\.hidden = !html/, "沒有照片那個框就一直藏著");
+  assert.match(m, /x = await rpc\("public_event_extras", \{ p_slug: slug \}, 2500\); \} catch \(e\) \{ x = null; \}/, "失敗一律是 null，不丟錯");
+  assert.match(m, /const load = \(\) => rpc\("public_events", \{\}, 4000\);/, "原本那一支照舊");
+  assert.match(m, /`\$\{SUPABASE_URL\}\/rest\/v1\/rpc\/\$\{name\}`/);
+  assert.match(m, /if \(slugOf\(\) !== slug\) return;\s*paint\(cache, slug, x\);/, "資料回來的時候人已經換到別場，就不要畫");
   assert.doesNotMatch(m, /sb_publishable_|supabase\.co/, "不抄金鑰");
 });
 
@@ -375,4 +372,16 @@ test("★ smoke.sh 有跑這一支，而且有四條反向的斷言；後台的�
   assert.match(block, /\.ev-panel\{/); assert.match(block, /\.ev-acts\{display:flex/);
   for (const c of block.match(/rgba\([^)]*\)/g) || []) assert.match(c, /^rgba\((16,42,134|255,255,255),/, `${c} 不是品牌色`);
   assert.doesNotMatch(block, /#[0-9a-fA-F]{3,8}\b/, "不寫死色碼");
+});
+
+test("★ 活動的開始與結束是台灣時間，不看填的人電腦在哪個時區", () => {
+  // 台灣 2027-01-03 09:00 = UTC 01:00
+  assert.equal(F.evFromTaipei("2027-01-03T09:00"), "2027-01-03T01:00:00.000Z");
+  assert.equal(F.evTaipei("2027-01-03T01:00:00Z"), "2027-01-03T09:00");
+  assert.equal(F.evTaipei(F.evFromTaipei("2027-01-03T17:00")), "2027-01-03T17:00", "來回一趟不變");
+  // 在芝加哥填的舊資料（當地 09:00 = 台灣 23:00）會照實顯示成台灣晚上十一點，填的人看得出來要改
+  assert.equal(F.evTaipei("2027-01-03T15:00:00Z"), "2027-01-03T23:00");
+  assert.equal(F.evFromTaipei(""), ""); assert.equal(F.evTaipei(null), ""); assert.equal(F.evFromTaipei("亂打"), "");
+  const main = readFileSync("admin/src/main.js", "utf8");
+  assert.match(main, /const iso = v => UI\.evFromTaipei\(v\);\s*const patch = \{ title_zh/, "存的時候走台灣時間");
 });

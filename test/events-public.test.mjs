@@ -45,7 +45,8 @@ test("一場活動：主辦、時間、地點、說明保留換行、報名按�
   const h = U.detailHTML(EVS[0], "zh");
   assert.match(h, /<p class="ev-by">Marketing 主辦<\/p>/); assert.match(h, /<h1>2027 冬令營<\/h1>/);
   assert.match(h, /<img class="ev-cover" src="https:\/\/x\/y.jpg"/); assert.match(h, /<li><b>地點<\/b><span>台北<\/span><\/li>/);
-  assert.match(h, /說明<br>第二行/); assert.match(h, /<a class="cta" href="..\/apply\/\?f=f1">報名<\/a>/); assert.match(h, /12 \/ 40 人。報名要先登入/);
+  // 2026-11-23 重排：報名那一顆叫「立即報名」，在右邊那張卡裡；下面一行寫還有幾個名額，再一行「報名要先登入」（細節在 test/event-page.test.mjs）。
+  assert.match(h, /說明<br>第二行/); assert.match(h, /<a class="cta ev-go" href="..\/apply\/\?f=f1">立即報名<\/a>/); assert.match(h, /<p class="ev-note">還有 28 個名額<\/p><p class="ev-note">報名要先登入，一分鐘。<\/p>/);
   assert.match(U.detailHTML(EVS[1], "zh"), /<b>額滿<\/b>・12 \/ 40 人/);
   assert.match(U.detailHTML(EVS[2], "en"), /Sign-up opens \d{4}-\d{2}-\d{2}/);
   assert.match(U.detailHTML(EVS[3], "en"), /<b>Ended<\/b>/);
@@ -75,7 +76,8 @@ test("封面連結壞掉：卡片的 img 帶 onerror 換成色塊、沒有封面
   assert.match(card, /<img src="https:\/\/x\/y.jpg" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;ev-noimg&quot;><\/span>'">/);
   assert.match(U.cardHTML({ ...EVS[0], cover_url: null }, "zh", "./"), /<span class="ev-noimg"><\/span>/);
   const one = U.detailHTML(EVS[0], "zh");
-  assert.match(one, /<section class="sec ev-cover-sec">[\s\S]*onerror="this\.closest\('section'\)\.remove\(\)"/);
+  // 2026-11-23 重排：封面在左邊那一欄的最上面，壞掉就只拿掉那一張圖（它自己就是一塊，不用連外面一起拿）。
+  assert.match(one, /<header class="ev-head">\s*<img class="ev-cover" src="https:\/\/x\/y\.jpg" alt="" onerror="this\.remove\(\)">/);
   assert.doesNotMatch(U.detailHTML({ ...EVS[0], cover_url: null }, "zh"), /ev-cover/);
   for (const f of ["index.html", "events/index.html"]) {
     const css = readFileSync(f, "utf8");

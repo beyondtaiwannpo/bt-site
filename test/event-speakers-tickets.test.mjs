@@ -18,6 +18,7 @@ import * as A from "../apply/src/ui.js";
 F.setLang("zh");
 const read = p => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 const count = (h, re) => (h.match(re) || []).length;
+const U_DETAIL_NO_SPEAKERS = PUB.detailHTML({ slug: "x", team: "Curriculum Team", title_zh: "說明會", starts_at: "2027-01-20T02:00:00Z" }, "zh", { speakers: [] });
 const WS = "custom:event-winter-camp-2027";
 const ASSOC = { id: "u2", role: "cadre", board: "member", team: "Curriculum Team", name: "小安", senior: false, pres: false, ws: {} };
 const VIEWER = { ...ASSOC, id: "u7", ws: { [WS]: "view" } };
@@ -175,10 +176,11 @@ test("★ 整頁：講者在內容與活動照片中間；報名類型在報名�
 test("★ 說明底下有一行怎麼打的提示（中英兩格各一行），唯讀的人沒有；報名名單上有類型的標籤", () => {
   const rc = { event: { numbers: {} }, review: null, forms: [] };
   const h = F.eventEditHTML(EV, FORM, 3, EDITOR, "", false, [], [], null, rc, null, {});
-  assert.equal(count(h, /<\/textarea><span class="mini">一行開頭打「## 」會變成標題，前後各兩個星號 \*\*這樣\*\* 會變粗體，一行開頭打「- 」會變成清單，空一行是新的一段。<\/span><\/label>/g), 2);
-  assert.doesNotMatch(F.eventEditHTML(EV, FORM, 3, VIEWER, "", false, [], [], null, rc, null, {}), /會變成標題/);
-  assert.match(FS.STRINGS["ev.bodyHelp"].en, /Start a line with "## " for a heading, wrap words in two asterisks \*\*like this\*\* for bold, start a line with "- " for a list/);
-  assert.doesNotMatch(read("admin/src/ui.js") + read("admin/src/main.js"), /from "\.\.\/\.\.\/events\//, "後台只要那一行提示，不 import 對外頁的排版函式");
+  // 2026-11-23 同一天後面加了工具列與預覽，那一行提示留著當退路、內容換成新的記號（工具列的測試在 test/event-page.test.mjs）。
+  assert.equal(count(h, /<span class="mini">選一段字再按上面的按鈕就好。自己打也可以：一行開頭打「## 」是大標題、「### 」是小標題、「- 」是清單、「&gt; 」是引言；\*\*粗體\*\*、==橘色螢光==、\{\{綠色螢光\}\}、\[\[藍底橘字\]\]；空一行是新的一段。<\/span>/g), 2);
+  assert.doesNotMatch(F.eventEditHTML(EV, FORM, 3, VIEWER, "", false, [], [], null, rc, null, {}), /是大標題|ev-tb|ev-prev/);
+  assert.match(FS.STRINGS["ev.bodyHelp"].en, /start a line with "## " for a heading, "### " for a small heading, "- " for a list, "> " for a quote; \*\*bold\*\*, ==orange highlight==, \{\{green highlight\}\}, \[\[orange on navy\]\]/);
+  assert.doesNotMatch(read("admin/src/ui.js") + read("admin/src/main.js"), /from "\.\.\/\.\.\/events\//, "後台不 import 對外頁的排版函式，自己有一份（兩份要一樣，test/event-page.test.mjs 守著）");
   const app = { id: "a1", applicant_name: "小明", applicant_school: "建中", applicant_grade: "高二", applicant_email: "a@b.co", status: "received", submitted_at: "2026-11-01T00:00:00Z", answers: new Map() };
   const withT = F.appsHTML(FORM, [{ ...app, ticket_id: TICKETS[0].id, ticket: TICKETS[0] }, { ...app, id: "a2", ticket: null }], [], true, new Set(), "all", [], "", false);
   assert.equal(count(withT, /<span class="tag" data-ticket>報名類型：學生<\/span>/g), 1, "有類型的那一筆有標籤，分類型之前報的沒有");
@@ -231,26 +233,7 @@ test("★ richText：說明裡打的 HTML 一律只是字（先逃脫再加標�
   assert.equal(PUB.richText("**a < b** & \"c\""), "<p><b>a &lt; b</b> &amp; &quot;c&quot;</p>");
 });
 
-test("★ 對外：一場活動那一頁是一欄；說明走 richText；多三個框（講者、報名、照片），沒有資料的時候跟原本一樣只有說明與報名按鈕", () => {
-  const e = { slug: "info", team: "Curriculum Team", title_zh: "說明會", title_en: "Info session", summary_zh: "", summary_en: "", body_zh: "## 關於說明會\n內容 **重點**", body_en: "Body", cover_url: "https://x/c.jpg",
-    starts_at: "2027-01-20T02:00:00Z", ends_at: null, place: "台北", capacity: 40, form_id: "f1", signup_open: true, signed_up: 12, is_full: false, is_past: false };
-  const h = PUB.detailHTML(e, "zh");
-  assert.match(h, /<section class="sec ev-one"><div class="sec-in"><div class="body">/, "那一段有 ev-one，CSS 把它排成一欄");
-  assert.match(h, /<section class="sec ev-cover-sec">/);
-  assert.match(h, /<div class="ev-text"><h3>關於說明會<\/h3><p>內容 <b>重點<\/b><\/p><\/div>/);
-  assert.equal(count(h, /<div class="ev-speakers" data-ev-speakers hidden><\/div>/g), 1); assert.equal(count(h, /<div class="ev-photos" data-ev-gallery hidden><\/div>/g), 1);
-  assert.match(h, /<div class="ev-signup" data-ev-signup><p><a class="cta" href="\.\.\/apply\/\?f=f1">報名<\/a> <span class="ev-note">12 \/ 40 人。報名要先登入，一分鐘。<\/span><\/p><\/div>/, "原本那一顆報名按鈕原樣包在框裡");
-  const at = s => h.indexOf(s);
-  assert.ok(at('class="ev-text"') < at("data-ev-speakers") && at("data-ev-speakers") < at("data-ev-signup") && at("data-ev-signup") < at("data-ev-gallery") && at("data-ev-gallery") < at("所有活動"), "說明、講者、報名、照片、回清單");
-  assert.doesNotMatch(PUB.listHTML([e], "zh"), /ev-one|ev-speakers|ev-signup/, "清單那一頁沒動（它有 h2，照舊兩欄）");
-  assert.match(PUB.detailHTML({ ...e, form_id: null }, "zh"), /<div class="ev-signup" data-ev-signup><\/div>/, "沒有報名表：那個框是空的");
-  const page = read("events/index.html");
-  assert.match(page, /\.ev-one \.sec-in,\.ev-cover-sec \.sec-in\{grid-template-columns:minmax\(0,1fr\)\}/, "一欄");
-  assert.match(page, /\.ev-one \.rows,\.ev-one \.ev-text\{max-width:40em\}/, "字的那幾塊最寬 40em");
-  assert.match(page, /\.sec-in\{display:grid;grid-template-columns:minmax\(0,\.62fr\) minmax\(0,1\.38fr\);/, "清單用的兩欄那一條沒有動");
-  assert.match(page, /\.ev-text h3\{/); assert.match(page, /\.ev-text ul\{/); assert.match(page, /\.ev-text b\{font-weight:700\}/);
-});
-
+// 一場活動那一頁的版面 2026-11-23 同一天後面重排過（兩欄、右邊的卡、沒有空的框），那一條搬到 test/event-page.test.mjs。
 test("★ 對外：講者只印名字、主題、學校、照片四樣；沒有照片是一個圓加第一個字；沒有、載不到、形狀不對都回空字串", () => {
   const x = { speakers: [
     { name: "Annie", subject: "Computer Science", school: "UCLA", photo_url: "https://x/a.jpg", person_id: "p-secret", id: "s-secret", email: "annie@example.com", consent: true },
@@ -271,40 +254,31 @@ test("★ 對外：講者只印名字、主題、學校、照片四樣；沒有�
   assert.match(page, /\.ev-sp-grid\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/, "桌機一排四位");
   assert.match(page, /@media \(max-width:600px\)\{\.ev-sp-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/, "手機一排兩位");
   assert.match(page, /\.ev-sp-grid li > \*\{max-width:100%;overflow-wrap:anywhere\}/, "字太長就換行，不會往旁邊捲");
-  assert.match(page, /\.ev-speakers\[hidden\]\{display:none\}/);
   assert.match(page, /\.ev-sp-face\{[^}]*border-radius:50%/, "照片是圓的");
+  assert.doesNotMatch(U_DETAIL_NO_SPEAKERS, /ev-speakers|ev-sp-grid/, "沒有講者就沒有那一塊（不留空的框）");
 });
 
 test("★ 對外：報名類型一種一顆報名按鈕（帶 f 與 ticket）、有名額寫還有幾個、滿了寫額滿沒有按鈕；沒有類型或現在報不了就不畫", () => {
   const e = { slug: "camp", form_id: "f1", signup_open: true, is_full: false, is_past: false, signed_up: 4, capacity: 40 };
   const x = { tickets: TICKETS };
   const zh = PUB.ticketsHTML(e, x, "zh"), en = PUB.ticketsHTML(e, x, "en");
-  assert.match(zh, /^<h3>報名類型<\/h3><ul class="ev-types">/); assert.match(en, /^<h3>Sign-up types<\/h3>/);
+  assert.match(zh, /^<b class="ev-card-h">報名類型<\/b><ul class="ev-types">/); assert.match(en, /^<b class="ev-card-h">Sign-up types<\/b>/);
   assert.match(zh, /<b>學生<\/b><span>高中生本人<\/span><span class="ev-note">還有 17 個名額<\/span><\/span><a class="cta" href="\.\.\/apply\/\?f=f1&amp;ticket=11111111-1111-4111-8111-111111111111">報名<\/a>/);
   assert.match(en, /<b>Student<\/b><span>For high school students<\/span><span class="ev-note">17 places left<\/span>/);
   assert.match(zh, /<b>家長<\/b><\/span><a class="cta" href="\.\.\/apply\/\?f=f1&amp;ticket=22222222-2222-4222-8222-222222222222">報名<\/a>/, "不限名額的不寫還有幾個");
-  assert.match(zh, /<b>老師<\/b><\/span><span class="ev-tag">額滿<\/span><\/li>/, "滿了的那一種沒有按鈕");
+  assert.match(zh, /<b>老師<\/b><\/span><span class="ev-tag">額滿<\/span><\/li><\/ul>$/, "滿了的那一種沒有按鈕");
   assert.equal(count(zh, /class="cta"/g), 2);
-  assert.match(zh, /<p class="ev-note">4 \/ 40 人。報名要先登入，一分鐘。<\/p>$/);
   assert.match(PUB.ticketsHTML(e, { tickets: [{ ...TICKETS[0], capacity: 4, taken: 3 }] }, "en"), /1 place left/);
   assert.match(PUB.ticketsHTML(e, { tickets: [{ ...TICKETS[0], capacity: 3, taken: 3, full: false }] }, "zh"), /<span class="ev-tag">額滿<\/span>/, "數字到了就算滿，不只看 full");
-  // 不畫的時候回空字串，main.js 就不動原本那一顆報名按鈕
+  // 不畫的時候回空字串，卡片上就是一顆「立即報名」或一句現況
   for (const bad of [null, {}, { tickets: [] }, { tickets: null }, { photos: [] }]) assert.equal(PUB.ticketsHTML(e, bad, "zh"), "", JSON.stringify(bad));
   assert.equal(PUB.ticketsHTML({ ...e, signup_open: false }, x, "zh"), "", "還沒開放或關了：照原本那一行");
   assert.equal(PUB.ticketsHTML({ ...e, is_full: true }, x, "zh"), "", "活動整場額滿：照原本那一行");
   assert.equal(PUB.ticketsHTML({ ...e, is_past: true }, x, "zh"), ""); assert.equal(PUB.ticketsHTML({ ...e, form_id: null }, x, "zh"), "");
   assert.equal(PUB.ticketsHTML(e, { tickets: [{ id: 'x"><script>', name_zh: "壞" }] }, "zh"), "", "id 不是 uuid 的樣子就不畫");
   assert.match(PUB.ticketsHTML(e, { tickets: [{ ...TICKETS[1], name_zh: "<i>", note_zh: "<b>" }] }, "zh"), /<b>&lt;i&gt;<\/b><span>&lt;b&gt;<\/span>/);
-  const m = read("events/src/main.js");
-  assert.match(m, /put\(root\.querySelector\("\[data-ev-speakers\]"\), UI\.speakersHTML\(x, l\)\);/);
-  assert.match(m, /const types = e \? UI\.ticketsHTML\(e, x, l\) : "", box = root\.querySelector\("\[data-ev-signup\]"\);\s*if \(types && box\) box\.innerHTML = types;/, "有類型才換掉，沒有就不動");
-  assert.match(m, /if \(typeof window\.btKeepLang === "function"\) window\.btKeepLang\(\);\s*\}\s*function render/, "新畫的報名按鈕也補上語言");
   const page = read("events/index.html");
   assert.match(page, /u\.searchParams\.set\("lang", l\);/, "語言只改 lang 這一個參數，f 與 ticket 留著");
-  const block = page.slice(page.indexOf("/* 一場活動那一頁是一欄"), page.indexOf("/* 活動照片（2026-11-23）"));
-  assert.ok(block.length > 2000, "抓得到這一批的樣式");
-  for (const c of block.match(/rgba\([^)]*\)/g) || []) assert.match(c, /^rgba\((16,42,134|255,196,108),/, `${c} 不是品牌色`);
-  assert.doesNotMatch(block, /#[0-9a-fA-F]{3,8}\b/, "不寫死色碼");
 });
 
 // ── 4. /apply/ ────────────────────────────────────────────────────────

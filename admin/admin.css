@@ -355,6 +355,32 @@ main > .fold{margin-bottom:24px}
 .ev-gap{margin:0 0 14px}
 .ev-ph-state{margin:0 0 8px}
 .hi-photo-f .ev-acts{margin:0 0 8px}
+/* 說明那一格（2026-11-23）：上面一排排版的按鈕、中間打字、下面是預覽。
+   .ev-rt 是預覽，樣子照對外頁的 .ev-text（events/index.html）：大標題左邊一道橘色、小標題底下一道綠色、
+   螢光是橘底或綠底配深藍字、「藍底橘字」是深藍底配橘字、引言左邊一道綠色。顏色都是品牌色的變數。 */
+.two .ev-desc{grid-column:1/-1;margin:0 0 16px;min-width:0}
+.ev-desc > label{margin:0}
+.ev-tb{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.ev-tb-b{font-family:var(--body);font-size:13px;font-weight:600;line-height:1;color:var(--ink);background:rgba(255,255,255,.7);
+  border:1px solid rgba(16,42,134,.28);border-radius:999px;padding:7px 12px;cursor:pointer}
+.ev-tb-b:hover{border-color:var(--bt-navy);background:rgba(255,255,255,.95)}
+.ev-tb-b[disabled]{opacity:.5;cursor:default}
+.ev-desc > .mini{display:block;margin:5px 0 0}
+.ev-prev{margin:10px 0 0;border:1px dashed rgba(16,42,134,.28);border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.35)}
+.ev-prev > i{display:block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 8px}
+.ev-rt{font-size:15px;line-height:1.75;overflow-wrap:anywhere}
+.ev-rt p{margin:0 0 12px}
+.ev-rt h3{font-family:var(--display);font-size:21px;font-weight:700;line-height:1.25;margin:22px 0 10px;padding:1px 0 1px 12px;border-left:6px solid var(--bt-orange)}
+.ev-rt h4{font-family:var(--body);font-size:16px;font-weight:700;line-height:1.4;margin:18px 0 8px;padding:0 0 3px;width:fit-content;max-width:100%;border-bottom:3px solid var(--bt-teal)}
+.ev-rt > :first-child{margin-top:0}
+.ev-rt > :last-child{margin-bottom:0}
+.ev-rt b{font-weight:700}
+.ev-rt mark{background:var(--bt-orange);color:var(--ink);padding:.05em .3em;border-radius:5px}
+.ev-rt mark.hl2{background:var(--bt-teal)}
+.ev-rt .rt-c{background:var(--bt-navy);color:var(--bt-orange);font-weight:600;padding:.05em .4em;border-radius:5px}
+.ev-rt ul{margin:0 0 12px;padding:0 0 0 1.25em}
+.ev-rt li{margin:0 0 4px}
+.ev-rt blockquote{margin:0 0 12px;padding:10px 14px;border-left:5px solid var(--bt-teal);border-radius:0 12px 12px 0;background:rgba(255,255,255,.55)}
 /* 講者與報名類型（2027-01-02）。一位講者一列：左邊圓的照片（沒有照片是一個色塊加名字的第一個字），右邊是那幾格與按鈕。
    報名類型一種一列，放在 .ev-panel 裡，列跟列之間一條線。手機上照片搬到那幾格的上面。 */
 .ev-sp-list,.ev-tk-list{list-style:none;margin:0 0 14px;padding:0}
