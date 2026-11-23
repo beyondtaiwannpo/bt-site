@@ -2011,8 +2011,9 @@ fi
 
 # ── 對外頁的頂欄每一頁一模一樣（2026-11-20 對外頁重整，2026-11-21 第二次）─────────────────────
 # Paul 2026-11-20：「too many, and they serve almost the same thing」。2026-11-21 再收一次：
-# 五個連結：「活動與計畫」排第一個（前面一顆小火），再來免費資源、關於我們、團隊、合作。原本那顆橘色藥丸寫「報名」，看起來像要註冊帳號，學生不會點；
-# 改成「活動與計畫」之後 Paul 看了還是覺得橘色藥丸「looks really out of place」，所以同一天改成跟別的連結同一種字。
+# 六個連結：現在開放（到 /apply/，現在報得了名的都在那裡）、活動與計畫（到 /programs/，四個計畫加辦過的活動）、免費資源、關於我們、團隊、合作。
+# 「現在開放」怎麼標出來試過三次：橘色藥丸寫「報名」（像要註冊帳號）、橘色藥丸寫「活動與計畫」（Paul：out of place）、
+# 一顆小火（Paul：ugly）。2026-11-22 定案：不標，直接多一個連結叫「現在開放」，字粗一點而已。
 # 頂欄是每頁各一份（外殼各自一份的代價），所以最容易壞的方式是「改了九頁漏一頁」：
 # 那一頁不會壞，只會跟別頁不一樣，而沒有人會一頁一頁點過去比對。
 # 這一條把每一頁的 navlinks 拿掉 aria-current 與 ./ ../ 的差別之後比對，要全部一樣（BT 島那一頁也掛同一條，一起比）；
@@ -2025,17 +2026,17 @@ navOut=$(node -e '
   const base = norm("index.html"), bad = [];
   for (const f of pages) { const n = norm(f); if (n === null) bad.push(f + " 找不到頂欄"); else if (n !== base) bad.push(f + " 的頂欄跟首頁不一樣"); }
   const items = (base.match(/<a /g) || []).length;
-  if (items !== 5) bad.push("頂欄要是五個連結（活動與計畫排第一個），現在 " + items + " 個");
-  if (/island\/|impact\/|alumni\/|events\/|apply\//.test(base)) bad.push("頂欄裡出現了 BT 島、做過什麼、校友、活動或報名頁（它們在別的地方，不在頂欄）");
-  if (!/class="nav-cta" href="\/programs\/"/.test(base)) bad.push("頂欄少了「活動與計畫」那一個（class 是 nav-cta，要連到 /programs/）");
-  if (!/^<a class="nav-cta" href="\/programs\/"><svg class="flame"/.test(base)) bad.push("「活動與計畫」要排在頂欄第一個，前面是那顆畫出來的小火（不是 emoji）");
-  if (/background:var\(--bt-orange\)[^}]*\}/.test((fs.readFileSync("index.html", "utf8").match(/\.navlinks \.nav-cta\{[^}]*\}/) || [""])[0])) bad.push("頂欄的「活動與計畫」又變回橘色藥丸了（Paul 2026-11-21 說不要）");
+  if (items !== 6) bad.push("頂欄要是六個連結（現在開放、活動與計畫、免費資源、關於我們、團隊、合作），現在 " + items + " 個");
+  if (/island\/|impact\/|alumni\/|events\//.test(base)) bad.push("頂欄裡出現了 BT 島、做過什麼、校友或活動頁（它們在別的地方，不在頂欄）");
+  if (!/^<a class="nav-cta" href="\/apply\/"><span class="zh">現在開放<\/span><span class="en">Open now<\/span><\/a> <a href="\/programs\/"><span class="zh">活動與計畫<\/span><span class="en">Programmes<\/span><\/a>/.test(base)) bad.push("頂欄前兩個要是「現在開放 Open now」（到 /apply/）與「活動與計畫 Programmes」（到 /programs/）");
+  if (/<svg|flame/.test(base)) bad.push("頂欄裡又出現圖示了（小火 Paul 2026-11-22 說醜，拿掉了）");
+  if (/background:var\(--bt-orange\)/.test((fs.readFileSync("index.html", "utf8").match(/\.navlinks \.nav-cta\{[^}]*\}/) || [""])[0])) bad.push("頂欄的第一個連結又變回橘色藥丸了（Paul 2026-11-21 說不要）");
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
 ' 2>&1)
 if [ $? -ne 0 ]; then
   bad "對外頁的頂欄不一致："; printf '%s\n' "$navOut"
 else
-  ok "十頁對外頁（含 BT 島）的頂欄一模一樣：五個連結，「活動與計畫」排第一個加一顆小火"
+  ok "十頁對外頁（含 BT 島）的頂欄一模一樣：六個連結，「現在開放」排第一個"
 fi
 
 # ── 對外頁共用的那一支 shared/public.js 不准長大（2026-11-21）────────────────

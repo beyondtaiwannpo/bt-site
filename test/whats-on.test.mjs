@@ -54,7 +54,9 @@ test("★ /programs/：四張卡都在、每張有狀態與通知按鈕、沒有
   for (const k of L.PROGS) assert.equal((h.match(new RegExp(`<article class="prog" data-prog="${k}">`, "g")) || []).length, 2, k + " 中英各一張");
   assert.equal((h.match(/<p class="prog-st">/g) || []).length, 8);
   assert.equal((h.match(/<p class="prog-act"><a class="cta sm" href="\.\.\/app\/(\?lang=en)?">/g) || []).length, 8, "沒開的時候每張卡都有「開放時通知我」");
-  assert.match(h, /<div class="body" id="open-zh">\s*<p>/, "問不到資料的時候「現在開放」那一段有字");
+  assert.doesNotMatch(h, /id="open-zh"|id="open-en"/, "現在開放的東西不在這一頁，在 /apply/（Paul 2026-11-22）");
+  assert.match(h, /<section class="sec" id="past" hidden>[\s\S]*?<div id="past-zh"><\/div>/, "辦過的活動：沒有資料就整段不出現");
+  assert.match(h, /<p class="hero-act"><a class="cta" href="\.\.\/apply\/">看現在開放報名的<\/a><\/p>/);
   assert.match(h, /u\.searchParams\.set\("lang", l\)/, "只改 lang，不把 ? 後面整段換掉");
   assert.match(h, /<script type="module" src="\.\/src\/main\.js"><\/script>/);
   const main = readFileSync("programs/src/main.js", "utf8");
@@ -110,8 +112,18 @@ test("★ BT 島掛的是全站那一條頂欄；語言鈕還是同一顆", () =
   const h = readFileSync("island/index.html", "utf8"), css = readFileSync("island/island.css", "utf8");
   assert.match(h, /<nav class="topbar" aria-label="網站導覽">\s*<a class="home" id="home" href="\.\.\/"/);
   assert.equal((h.match(/id="lang"/g) || []).length, 1); assert.equal((h.match(/id="home"/g) || []).length, 1);
-  assert.match(h, /<div class="navlinks" id="navlinks">\s*<a class="nav-cta" href="\.\.\/programs\/"><svg class="flame"/, "活動與計畫排第一個，前面是畫出來的火");
+  assert.match(h, /<div class="navlinks" id="navlinks">\s*<a class="nav-cta" href="\.\.\/apply\/"><span class="zh">現在開放<\/span><span class="en">Open now<\/span><\/a>\s*<a href="\.\.\/programs\/"><span class="zh">活動與計畫<\/span><span class="en">Programmes<\/span><\/a>/, "現在開放排第一個，活動與計畫第二個，沒有圖示");
   assert.doesNotMatch(css, /\.navlinks \.nav-cta\{[^}]*background:var\(--bt-orange\)/, "不是橘色藥丸");
   assert.match(css, /\.topbar\{position:fixed;top:12px;left:var\(--gut\);right:calc\(var\(--side-w\) \+ var\(--gut\)\)/);
   assert.match(css, /\.brand,\.toolbar\{background:linear-gradient\(180deg,rgba\(255,255,255,\.78\),rgba\(237,229,216,\.6\)\);backdrop-filter:blur\(20px\) saturate\(180%\)/, "牌子與工具列跟頂欄同一種玻璃");
+});
+
+test("★ 現在開放（/apply/）與活動與計畫（/programs/）各管一件事（Paul 2026-11-22）", () => {
+  const ap = readFileSync("apply/index.html", "utf8"), main = readFileSync("programs/src/main.js", "utf8"), home = readFileSync("index.html", "utf8");
+  assert.match(ap, /<title>現在開放 \/ Beyond Taiwan<\/title>/);
+  assert.match(ap, /<a class="nav-cta" href="\.\.\/apply\/" aria-current="page">/);
+  assert.match(ap, /<h2><span class="zh">想參加的還沒開放<\/span>/, "什麼都沒開的時候這一頁還是有下一步");
+  assert.match(main, /split\(events\)/); assert.match(main, /getElementById\("past-" \+ l\)/, "/programs/ 畫的是辦過的活動");
+  assert.doesNotMatch(main, /openHTML|looseForms/, "/programs/ 不再畫現在開放的清單");
+  assert.equal((home.match(/<p class="hero-act"><a class="cta warm" href="\.\/apply\/">/g) || []).length, 2, "首頁第一屏的按鈕到現在開放");
 });

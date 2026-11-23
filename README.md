@@ -5098,7 +5098,35 @@ Paul（2026-11-19，透過主 session 轉來）：鏡頭要第三人稱跟在主
 
 **驗證**：`node --test test/*.test.mjs` 945 全過、`check.sh` 全過、`history/src` 254,823 bytes。桌機 Chrome 捲動中 55 到 58 fps（除錯模式）。手機只在內建瀏覽器 375 寬模擬看過版面（卡在旅客頭上方、不超出邊），**真機沒量**。**沒 push**，等 Paul 說。
 
-## 對外頁第二次重整：頂欄五個連結，「活動與計畫」排第一個（2026-11-21）
+## 頂欄現在長這樣：六個連結，「現在開放」排第一個（2026-11-22）
+
+**這一節是現況，底下 2026-11-21 與 2026-11-20 兩節是怎麼走到這裡的；講法不一樣的地方以這一節為準。**
+
+| 頂欄 | 網址 | 這一頁只做一件事 |
+|---|---|---|
+| **現在開放 Open now** | `/apply/` | 現在報得了名的全部在這裡：近期活動、開放中的計畫申請、幹部招募。挑了才開帳號 |
+| 活動與計畫 Programmes | `/programs/` | 四個計畫在做什麼，加辦過的活動 |
+| 免費資源 Free resources | `/resources/` | 今天就拿得到的東西 |
+| 關於我們 About | `/about/` | 為什麼：信念、使命、願景、價值、數字、五年 |
+| 團隊 Team | `/team/` | 誰：BT 島在最上面，六個 team、這一屆的人 |
+| 合作 Partner | `/partner/` | 贊助與學校 |
+
+Paul 2026-11-22 的原話：「keep programmes but add open now which is all the program events that are open for registration. Programmes are past events and programmes」。
+
+**「現在開放」怎麼標出來，試過三次都不要**：橘色藥丸寫「報名」（看起來像要註冊帳號）、橘色藥丸寫「活動與計畫」（Paul：「out of place」）、
+連結前面一顆小火（Paul：「looks ugly」）。定案是不標：直接多一個連結叫「現在開放」，字比別的粗一點而已。`check.sh` 擋著藥丸與圖示不准回來。
+英文一開始寫 What's on，Paul 不喜歡，改成 Programmes；中文他要留「活動與計畫」，所以中英不是逐字對應，這是刻意的。
+
+**兩頁怎麼分工**：
+- `/apply/`（現在開放）：最上面近期活動（後台「網站上的活動」發布的），再來開放中的申請（後台開的表單），最下面一段「想參加的還沒開放」
+  （學期開始才開新的一輪、開帳號勾通知、看四個計畫），所以什麼都沒開的時候這一頁還是有下一步。首頁第一屏那顆按鈕也是到這裡。
+- `/programs/`（活動與計畫）：四張計畫卡照舊（後台的表單標題有關鍵字，那張卡會亮出「開放報名中」與報名按鈕，見下一節），
+  下面多一段「辦過的活動」：後台發布過、已經結束、一年內的活動，一張都沒有就整段不出現。現在開放的清單不畫在這一頁了。
+- `/events/` 還是一場活動的細節頁，不在頂欄，辦過的活動卡點了到那裡。
+
+**要改頂欄**：十個檔各一份（首頁、about、alumni、apply、events、programs、partner、resources、team、island），一次改十份，`check.sh` 會比對。改之前先問 Paul。
+
+## 對外頁第二次重整（2026-11-21，頂欄那一部分隔天被上面那一節改掉了）
 
 前一天那一版上線之後，Paul 看了說三件事不對：
 「programs and team, they feel like the same thing, and about is also about our teams」；
