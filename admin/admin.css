@@ -336,6 +336,50 @@ main > .fold{margin-bottom:24px}
 .plain{list-style:none;margin:0;padding:0;font-size:14px;line-height:1.6}
 .plain li{padding:6px 0;border-bottom:1px dotted rgba(16,42,134,.16)}
 .ev-cover{display:block;max-width:360px;width:100%;border-radius:12px;margin:4px 0 10px;border:1px solid rgba(16,42,134,.14)}
+/* 活動編輯頁的下半（2026-11-23，Paul：報名、回饋、記分卡不要只是一排連結）。
+   .ev-panel 是一塊一件事：小標題、一行現況、一排按鈕。封面、報名表、行前與當天、回饋表、記分卡、種類與屆別、場地都用它。
+   .ev-acts 是那一排按鈕：這一頁的動作都是真的按鈕（框線），會丟東西的才用底線字。 */
+.ev-panel{background:rgba(255,255,255,.5);border:1px solid rgba(16,42,134,.16);border-radius:16px;padding:16px 18px;margin:0 0 14px}
+.ev-panel > h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:var(--display);font-size:18px;font-weight:700;
+  letter-spacing:.03em;line-height:1.2;margin:0 0 8px}
+.ev-panel > :last-child{margin-bottom:0}
+.ev-panel .two label{margin-bottom:10px}
+.ev-panel .plain{margin-bottom:10px}
+.ev-panel .fold{margin:10px 0 14px}
+.ev-line{font-size:14.5px;line-height:1.6;margin:0 0 6px}
+.ev-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 0}
+.ev-acts .sp{flex:1}
+.section > .ev-acts{margin:0 0 4px}
+.ev-coverbox{margin-top:6px}
+.ev-coverbox .hi-upload{margin:0 0 12px}
+.ev-gap{margin:0 0 14px}
+.ev-ph-state{margin:0 0 8px}
+.hi-photo-f .ev-acts{margin:0 0 8px}
+/* 講者與報名類型（2027-01-02）。一位講者一列：左邊圓的照片（沒有照片是一個色塊加名字的第一個字），右邊是那幾格與按鈕。
+   報名類型一種一列，放在 .ev-panel 裡，列跟列之間一條線。手機上照片搬到那幾格的上面。 */
+.ev-sp-list,.ev-tk-list{list-style:none;margin:0 0 14px;padding:0}
+.ev-sp{display:flex;gap:16px;align-items:flex-start;border:1px solid rgba(16,42,134,.16);border-radius:14px;background:rgba(255,255,255,.5);padding:14px 16px;margin:0 0 12px}
+.ev-sp-pic{flex:none;width:72px;height:72px;border-radius:50%;object-fit:cover;background:rgba(16,42,134,.1);display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-size:28px;font-weight:700;line-height:1;color:rgba(16,42,134,.72)}
+.ev-sp-f{flex:1;min-width:0}
+.ev-sp-f .two label{margin-bottom:10px}
+.ev-sp-f .hi-upload{margin:0 0 10px}
+.ev-sp-f .check{margin-bottom:4px}
+.ev-sp-find{margin:0 0 12px;padding:0 0 12px;border-bottom:1px dotted rgba(16,42,134,.16)}
+.ev-sp-findrow{display:flex;gap:8px;align-items:center}
+.ev-sp-findrow input{flex:1;min-width:0}
+.ev-sp-found{margin:8px 0 0}
+.ev-sp-found li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ev-sp-found li .btn{margin-left:auto}
+.ev-tk{padding:12px 0;border-top:1px dotted rgba(16,42,134,.16)}
+.ev-tk:first-child{border-top:0;padding-top:4px}
+.ev-tk .two label{margin-bottom:10px}
+.ev-tk-list + .mini{margin:0 0 10px}
+@media (max-width:640px){
+  .ev-panel{padding:14px 14px}
+  .ev-acts .btn{flex:1 1 auto}
+  .ev-sp{flex-direction:column;gap:10px;padding:14px}
+}
 /* 行銷需求單（2026-10-31）：一張單的欄位表、說明保留換行、收回的那一列淡掉。 */
 .rq-dl{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 14px;margin:0;font-size:14px}
 .rq-dl dt{font-family:var(--display);font-size:12.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,42,134,.7);padding-top:2px}

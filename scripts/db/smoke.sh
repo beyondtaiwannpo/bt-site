@@ -3974,6 +3974,367 @@ if echo "${pgm3}" | grep -q "OVERALL.*PASS" && ! echo "${pgm3}" | grep -q "|FAIL
 chk "★ 重跑之後後台改過的字沒被 seed 蓋掉，五筆也沒變成十筆" "改過的名字|5|5" \
   "select (select edition_zh from public.events where slug='winter-bootcamp')||'|'||(select count(*) from public.events where slug in (${PGSEED}))||'|'||(select count(*) from public.workspaces where id in (select 'custom:event-' || s from unnest(array[${PGSEED}]) s))"
 chkrole anon "" "重跑之後沒登入的人還是叫得到對外兩支" "5|1" "select (select count(*) from public.public_events() where slug in (${PGSEED}))||'|'||(select count(*) from public.public_event('coffee-chat'))"
+echo "── 活動的照片（2027-01-01-event-photos.sql）──"
+# 這時候：PAUL Co-President、AMT 是 AMTEAM 的「改」、AMV 是 AMTEAM 的「看」、AMX 是不在任何 team 的幹部、STU 是學員。
+# PGEV 是上一段那一筆 pg-no-date：AMTEAM 的活動、已經在對外頁上。
+EPURL="https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/events/${PGEV}"
+epg=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2027-01-01-event-photos.sql 2>&1 || true)
+if echo "${epg}" | grep -q "OVERALL.*PASS" && ! echo "${epg}" | grep -q "|FAIL"; then echo "  ok   活動照片那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 活動照片那支驗收表："; echo "${epg}" | head -14; fail=$((fail+1)); fi
+epg2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2027-01-01-event-photos.sql 2>&1 || true)
+if echo "${epg2}" | grep -q "OVERALL.*PASS" && ! echo "${epg2}" | grep -q "|FAIL"; then echo "  ok   活動照片那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${epg2}" | head -5; fail=$((fail+1)); fi
+chkrole anon "" "還沒有照片的時候，對外那一支回一個空的 photos" "0" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos')"
+EP1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.add_event_photo('${PGEV}','${EPURL}/a.jpg')" 2>&1 | tail -1 | tr -d ' \n')
+case "${EP1}" in ????????-*) echo "  ok   team 是「改」的人加了一張照片（${EP1}）"; pass=$((pass+1));; *) echo "  FAIL 加照片失敗：${EP1}"; fail=$((fail+1));; esac
+chk "★ 新加的照片同意是沒勾，排在 10" "false|10" "select consent::text||'|'||sort from public.event_photos where id='${EP1}'"
+chkraise "★ 不在這個 team 的幹部加不了照片（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.add_event_photo('${PGEV}','${EPURL}/x.jpg');"
+chkraise "★ team 是「看」的人加不了照片（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMV}',true); perform public.add_event_photo('${PGEV}','${EPURL}/x.jpg');"
+chkraise "★ 學員加不了照片（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${STU}',true); perform public.add_event_photo('${PGEV}','${EPURL}/x.jpg');"
+chkraise "網址不是 https 擋（photo_not_https）" "photo_not_https" \
+  "perform set_config('test.uid','${AMT}',true); perform public.add_event_photo('${PGEV}','http://x/a.jpg');"
+chkraise "活動不存在擋（no_such_event）" "no_such_event" \
+  "perform set_config('test.uid','${AMT}',true); perform public.add_event_photo('00000000-0000-0000-0000-000000000000','${EPURL}/x.jpg');"
+chkrole anon "" "★ 沒勾同意的照片對外看不到（photos 還是空的）" "0" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos')"
+chkraise "★ 不在這個 team 的幹部勾不了同意（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.set_event_photo_consent('${EP1}', true);"
+chkas "${AMT}" "team 是「改」的人勾同意" "true" "select public.set_event_photo_consent('${EP1}', true)::text"
+chkrole anon "" "★ 勾了同意，沒登入的人拿得到那一張，而且只有網址（沒有 id、誰傳的、同意）" "1|${EPURL}/a.jpg|url" \
+  "select jsonb_array_length(j->'photos')||'|'||(j->'photos'->0->>'url')||'|'||(select string_agg(k, ',') from jsonb_object_keys(j->'photos'->0) k) from public.public_event_extras('pg-no-date') j"
+chkrole anon "" "對外那一支現在只有 photos 一個鍵（之後講者、票種加在旁邊）" "photos" "select string_agg(k, ',') from jsonb_object_keys(public.public_event_extras('pg-no-date')) k"
+chkrole authenticated "${STU}" "登入的學員也叫得到對外那一支" "1" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos')"
+EP2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.add_event_photo('${PGEV}','${EPURL}/b.jpg')" 2>&1 | tail -1 | tr -d ' \n')
+case "${EP2}" in ????????-*) echo "  ok   Co-President 再加一張（沒勾同意）"; pass=$((pass+1));; *) echo "  FAIL Co-President 加照片失敗：${EP2}"; fail=$((fail+1));; esac
+chkrole anon "" "★ 第二張沒勾同意，對外還是只有一張" "1" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos')"
+chkas "${AMT}" "後台讀得到兩張（含沒勾同意的），照順序" "2|true|false" \
+  "select jsonb_array_length(j)||'|'||(j->0->>'consent')||'|'||(j->1->>'consent') from public.event_photos_list('${PGEV}') j"
+chkraise "★ 不在這個 team 的幹部讀不到這一場的照片清單（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.event_photos_list('${PGEV}');"
+chkas "${PAUL}" "第二張也勾同意" "true" "select public.set_event_photo_consent('${EP2}', true)::text"
+chkraise "★ 不在這個 team 的幹部排不了順序（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.reorder_event_photos('${PGEV}', array['${EP2}','${EP1}']::uuid[]);"
+chkas "${AMT}" "排順序：第二張搬到前面" "2" "select public.reorder_event_photos('${PGEV}', array['${EP2}','${EP1}']::uuid[])"
+chkrole anon "" "★ 對外照新的順序" "${EPURL}/b.jpg,${EPURL}/a.jpg" \
+  "select string_agg(p->>'url', ',' order by n) from jsonb_array_elements(public.public_event_extras('pg-no-date')->'photos') with ordinality x(p, n)"
+# 直接讀表：沒登入的人、登入的幹部、Co-President 都讀不到（沒有政策也沒發權限），只能走函式。
+epan=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.event_photos;" 2>&1 || true)
+if echo "${epan}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 event_photos 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到 event_photos 表：${epan}"; fail=$((fail+1)); fi
+epau=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; select count(*) from public.event_photos;" 2>&1 || true)
+if echo "${epau}" | grep -qi "permission denied"; then echo "  ok   ★ 登入的人（就算是 Co-President）也讀不到表本身，只能走函式"; pass=$((pass+1)); else echo "  FAIL 登入的人直接讀得到 event_photos 表：${epau}"; fail=$((fail+1)); fi
+epaw=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "set role authenticated; insert into public.event_photos (event_id, url, consent) values ('${PGEV}','${EPURL}/z.jpg', true);" 2>&1 || true)
+if echo "${epaw}" | grep -qi "permission denied"; then echo "  ok   ★ 登入的人直接寫不進表（繞不過函式自己把同意寫成勾了）"; pass=$((pass+1)); else echo "  FAIL 登入的人直接寫得進 event_photos 表：${epaw}"; fail=$((fail+1)); fi
+epaf=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.add_event_photo('${PGEV}','${EPURL}/x.jpg');" 2>&1 || true)
+if echo "${epaf}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到 add_event_photo()"; pass=$((pass+1)); else echo "  FAIL 沒登入的人叫得到 add_event_photo()：${epaf}"; fail=$((fail+1)); fi
+epad=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.delete_event_photo('${EP1}');" 2>&1 || true)
+if echo "${epad}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到 delete_event_photo()"; pass=$((pass+1)); else echo "  FAIL 沒登入的人叫得到 delete_event_photo()：${epad}"; fail=$((fail+1)); fi
+# 破壞測試：有人直接把同意改掉，對外那一張就不見（門在函式裡，不在畫面上）。
+psql -d "${DB}" -X -A -t -q -c "update public.event_photos set consent=false where id='${EP2}';" >/dev/null
+chkrole anon "" "★ 破壞測試：直接把同意改掉，對外就少那一張" "1|${EPURL}/a.jpg" "select jsonb_array_length(j->'photos')||'|'||(j->'photos'->0->>'url') from public.public_event_extras('pg-no-date') j"
+psql -d "${DB}" -X -A -t -q -c "update public.event_photos set consent=true where id='${EP2}';" >/dev/null
+# 沒上架的活動：草稿、撤下來的、代號不存在的，一律回空值，就算照片的同意都勾了。
+EPD=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('${AMTEAM}','ep-draft','照片測試','Photo test',false)" 2>&1 | tail -1 | tr -d ' \n')
+case "${EPD}" in ????????-*) echo "  ok   （準備）開一場草稿活動（${EPD}）"; pass=$((pass+1));; *) echo "  FAIL 開草稿活動失敗：${EPD}"; fail=$((fail+1));; esac
+chkas "${AMT}" "草稿活動也可以先放照片、先勾同意" "true" \
+  "select public.set_event_photo_consent(public.add_event_photo('${EPD}','https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/events/${EPD}/d.jpg'), true)::text"
+chkrole anon "" "★ 草稿活動對外什麼都不回（空值），照片勾了同意也一樣" "true" "select (public.public_event_extras('ep-draft') is null)::text"
+chkrole anon "" "代號不存在也是空值" "true" "select (public.public_event_extras('no-such-event') is null)::text"
+psql -d "${DB}" -X -A -t -q -c "update public.events set status='archived' where id='${PGEV}';" >/dev/null
+chkrole anon "" "★ 活動撤下來之後，對外那一支也回空值" "true" "select (public.public_event_extras('pg-no-date') is null)::text"
+psql -d "${DB}" -X -A -t -q -c "update public.events set status='published' where id='${PGEV}';" >/dev/null
+chkrole anon "" "（還原）放回對外頁，兩張都回來了" "2" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos')"
+# 一場最多 30 張。
+psql -d "${DB}" -X -A -t -q -c "insert into public.event_photos (event_id, url) select '${EPD}', 'https://x/' || g || '.jpg' from generate_series(1, 29) g;" >/dev/null
+chkraise "一場最多 30 張，第 31 張擋（too_many_photos）" "too_many_photos" \
+  "perform set_config('test.uid','${AMT}',true); perform public.add_event_photo('${EPD}','https://x/31.jpg');"
+# 拿掉一張
+chkraise "★ 不在這個 team 的幹部拿不掉照片（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.delete_event_photo('${EP1}');"
+chkraise "★ team 是「看」的人拿不掉照片（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMV}',true); perform public.delete_event_photo('${EP1}');"
+chkraise "照片不存在擋（no_such_photo）" "no_such_photo" \
+  "perform set_config('test.uid','${AMT}',true); perform public.delete_event_photo('00000000-0000-0000-0000-000000000000');"
+chkas "${AMT}" "team 是「改」的人拿掉一張，拿回它的網址（後台拿去刪 Storage 的檔）" "${EPURL}/a.jpg" "select public.delete_event_photo('${EP1}')"
+chkrole anon "" "對外剩一張" "1|${EPURL}/b.jpg" "select jsonb_array_length(j->'photos')||'|'||(j->'photos'->0->>'url') from public.public_event_extras('pg-no-date') j"
+# 活動刪掉，照片那幾列跟著走（on delete cascade）。
+psql -d "${DB}" -X -A -t -q -c "delete from public.events where id='${EPD}';" >/dev/null 2>&1 || true
+chk "活動刪掉，它的照片也跟著刪掉" "0|0" "select (select count(*) from public.events where id='${EPD}')||'|'||(select count(*) from public.event_photos where event_id='${EPD}')"
+# Storage 政策（替身表）：幹部傳得上 events bucket，學員不行；沒登入的人讀得到（對外頁要用 <img>）。
+chk "Storage：events bucket 是公開的，四條政策都在" "true|4" \
+  "select (select public::text from storage.buckets where id='events')||'|'||(select count(*) from pg_policies where schemaname='storage' and tablename='objects' and policyname in ('events_read','events_insert','events_update','events_delete'))"
+chkrole authenticated "${AMT}" "★ Storage：幹部傳得上 events bucket" "1" \
+  "insert into storage.objects (bucket_id, name, owner) values ('events','${PGEV}/a.jpg','${AMT}'); select count(*) from storage.objects where bucket_id='events'"
+epst=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${STU}',false);" -c "set role authenticated; insert into storage.objects (bucket_id, name, owner) values ('events','${PGEV}/x.jpg','${STU}');" 2>&1 || true)
+if echo "${epst}" | grep -qi "row-level security"; then echo "  ok   ★ 破壞測試：學員傳不上 events bucket（RLS）"; pass=$((pass+1)); else echo "  FAIL 學員傳得上 events bucket：${epst}"; fail=$((fail+1)); fi
+chkrole anon "" "Storage：沒登入的人讀得到 events bucket 的檔" "1" "select count(*) from storage.objects where bucket_id='events'"
+psql -d "${DB}" -q -c "delete from storage.objects where bucket_id='events';" >/dev/null
+# 沒動到的：對外原本那兩支的欄位、save_event() 的門。
+chk "★ public_events() 還是 24 欄（這一支沒有動它）" "24" "select array_length(proargnames,1) from pg_proc where proname='public_events' and pronamespace='public'::regnamespace"
+# 破壞測試
+BROKEN=$(mktemp)
+sed "s/from event_photos p where p.event_id = e.id and p.consent), '\[\]'::jsonb))/from event_photos p where p.event_id = e.id), '[]'::jsonb))/" supabase/migrations/2027-01-01-event-photos.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：對外那一支拿掉「只回同意勾了的」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉同意的門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/   where e.slug = p_slug and e.status = 'published';/   where e.slug = p_slug;/" supabase/migrations/2027-01-01-event-photos.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：對外那一支拿掉「只回 published」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 published 的門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/^revoke all on public.event_photos from public, anon, authenticated;$/grant select on public.event_photos to authenticated;/" supabase/migrations/2027-01-01-event-photos.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：把表的讀取權限發給登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 發了表的權限驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+epg3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2027-01-01-event-photos.sql 2>&1 || true)
+if echo "${epg3}" | grep -q "OVERALL.*PASS" && ! echo "${epg3}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過："; echo "${epg3}" | head -14; fail=$((fail+1)); fi
+chkrole anon "" "重跑之後照片還在，沒登入的人照樣拿得到" "1" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos')"
+echo "── 講者、報名類型、封面沒勾同意不對外（2027-01-02-event-speakers-tickets.sql）──"
+# 這時候：PAUL Co-President、AMT 是 AMTEAM 的「改」（讀不到名錄）、AMV 是 AMTEAM 的「看」而且紀錄是「看」（讀得到名錄）、AMX 不在任何 team、STU 學員。
+# PGEV 是 pg-no-date：AMTEAM 的活動、在對外頁上、沒有報名表、上一段留了一張勾了同意的照片（b.jpg）。
+# 先記下這一支跑之前的樣子：封面沒勾同意的照樣對外（這就是要補的洞）。
+psql -d "${DB}" -X -A -t -q -c "update public.events set cover_url='https://x/cover-1.jpg', cover_consent=false where id='${PGEV}';" >/dev/null
+chkrole anon "" "（跑這一支之前）封面沒勾同意也對外，洞是真的" "https://x/cover-1.jpg" "select cover_url from public.public_event('pg-no-date')"
+stk=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2027-01-02-event-speakers-tickets.sql 2>&1 || true)
+if echo "${stk}" | grep -q "OVERALL.*PASS" && ! echo "${stk}" | grep -q "|FAIL"; then echo "  ok   講者與報名類型那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 講者與報名類型那支驗收表："; echo "${stk}" | head -18; fail=$((fail+1)); fi
+stk2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2027-01-02-event-speakers-tickets.sql 2>&1 || true)
+if echo "${stk2}" | grep -q "OVERALL.*PASS" && ! echo "${stk2}" | grep -q "|FAIL"; then echo "  ok   講者與報名類型那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${stk2}" | head -5; fail=$((fail+1)); fi
+# ── C. 封面的同意，兩個方向 ──
+chkrole anon "" "★ 封面沒勾同意：對外兩支都不回封面（空值），那一場還在" "1|true|true" \
+  "select count(*)||'|'||bool_and(cover_url is null)||'|'||(select cover_url is null from public.public_events() where slug='pg-no-date') from public.public_event('pg-no-date')"
+psql -d "${DB}" -X -A -t -q -c "update public.events set cover_consent=true where id='${PGEV}';" >/dev/null
+chkrole anon "" "★ 封面勾了同意：對外兩支都回那張封面" "https://x/cover-1.jpg|https://x/cover-1.jpg" \
+  "select (select cover_url from public.public_event('pg-no-date'))||'|'||(select cover_url from public.public_events() where slug='pg-no-date')"
+chkas "${AMT}" "★ 已經上架的活動換封面：同意退回沒勾，對外馬上不回封面（新的那張要重新勾才出得去）" "false|true" \
+  "select public.save_event('${PGEV}', '{\"cover_url\":\"https://x/cover-2.jpg\"}'::jsonb); select (select cover_consent::text from public.events where id='${PGEV}')||'|'||(select (cover_url is null)::text from public.public_event('pg-no-date'))"
+chkas "${AMT}" "重新勾同意，新封面才對外" "https://x/cover-2.jpg" \
+  "select public.save_event('${PGEV}', '{\"cover_consent\":true}'::jsonb); select cover_url from public.public_event('pg-no-date')"
+chk "★ public_events() 還是 24 欄，順序沒動（create or replace 蓋過去的，沒有 drop）" "24|slug|cover_url|is_past|edition_en" \
+  "select array_length(proargnames,1)||'|'||proargnames[1]||'|'||proargnames[9]||'|'||proargnames[20]||'|'||proargnames[24] from pg_proc where proname='public_events' and pronamespace='public'::regnamespace"
+psql -d "${DB}" -X -A -t -q -c "update public.events set cover_url=null, cover_consent=false where id='${PGEV}';" >/dev/null
+# ── A. 講者 ──
+chkrole anon "" "對外那一支現在有三個鍵，照片那一張還在" "photos,speakers,tickets|1|0|0" \
+  "select (select string_agg(k, ',' order by k) from jsonb_object_keys(j) k)||'|'||jsonb_array_length(j->'photos')||'|'||jsonb_array_length(j->'speakers')||'|'||jsonb_array_length(j->'tickets') from public.public_event_extras('pg-no-date') j"
+SPK1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"Annie\",\"subject\":\"Computer Science\",\"school\":\"UCLA\",\"photo_url\":\"${EPURL}/s1.jpg\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${SPK1}" in ????????-*) echo "  ok   team 是「改」的人打字加了一位講者（${SPK1}）"; pass=$((pass+1));; *) echo "  FAIL 加講者失敗：${SPK1}"; fail=$((fail+1));; esac
+chk "★ 新加的講者同意是沒勾，排在 10，沒有連到紀錄裡的人" "false|10|true" "select consent::text||'|'||sort||'|'||(person_id is null)::text from public.event_speakers where id='${SPK1}'"
+chkrole anon "" "★ 沒勾同意的講者對外看不到（speakers 是空的）" "0" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'speakers')"
+chkraise "★ 不在這個 team 的幹部加不了講者（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"X\"}'::jsonb);"
+chkraise "★ team 是「看」的人加不了講者（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMV}',true); perform public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"X\"}'::jsonb);"
+chkraise "★ 學員加不了講者（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${STU}',true); perform public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"X\"}'::jsonb);"
+chkraise "★ 不在這個 team 的幹部讀不到講者清單（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.event_speakers_list('${PGEV}');"
+chkraise "★ 不在這個 team 的幹部勾不了講者的同意（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.set_event_speaker_consent('${SPK1}', true);"
+chkraise "★ 不在這個 team 的幹部拿不掉講者（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.delete_event_speaker('${SPK1}');"
+chkraise "★ 不在這個 team 的幹部排不了講者的順序（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.reorder_event_speakers('${PGEV}', array['${SPK1}']::uuid[]);"
+chkraise "名字空的擋（speaker_no_name）" "speaker_no_name" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"  \"}'::jsonb);"
+chkraise "照片網址不是 https 擋（photo_not_https）" "photo_not_https" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"X\",\"photo_url\":\"http://x/a.jpg\"}'::jsonb);"
+chkraise "講者不存在擋（no_such_speaker）" "no_such_speaker" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event_speaker('${PGEV}', '00000000-0000-0000-0000-000000000000', '{\"display_name\":\"X\"}'::jsonb);"
+chkas "${AMT}" "team 是「改」的人勾講者的同意" "true" "select public.set_event_speaker_consent('${SPK1}', true)::text"
+chkrole anon "" "★ 勾了同意，沒登入的人拿得到那一位，而且只有四個鍵（沒有 id、person_id、同意、誰加的）" "1|Annie|ComputerScience|UCLA|${EPURL}/s1.jpg|name,photo_url,school,subject" \
+  "select jsonb_array_length(j->'speakers')||'|'||(j->'speakers'->0->>'name')||'|'||(j->'speakers'->0->>'subject')||'|'||(j->'speakers'->0->>'school')||'|'||(j->'speakers'->0->>'photo_url')||'|'||(select string_agg(k, ',' order by k) from jsonb_object_keys(j->'speakers'->0) k) from public.public_event_extras('pg-no-date') j"
+chkrole authenticated "${STU}" "登入的學員也叫得到對外那一支，看到的一樣" "1" "select jsonb_array_length(public.public_event_extras('pg-no-date')->'speakers')"
+# 從紀錄挑人：AMT 讀不到名錄，帶了 person_id 也當沒帶；AMV 讀得到名錄但這場只有「看」；Co-President 兩樣都有。
+SPKP=$(psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_zh, name_en, kind, email, school) values ('講者甲', 'Speaker Person', 'member', 'speaker-secret@example.com', 'NTU') returning id" | head -1 | tr -d ' \n')
+chkas "${AMT}" "★ 讀不到名錄的人（rc_can_view 是 false）帶了 person_id：講者加得成，但沒有連到那個人" "false|true" \
+  "select public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"Ben\",\"person_id\":\"${SPKP}\"}'::jsonb); select public.rc_can_view()::text||'|'||(select (person_id is null)::text from public.event_speakers where event_id='${PGEV}' and display_name='Ben')"
+chkas "${AMT}" "★ 這一支沒有多開讀名錄的路：這場「改」的人照樣讀不到名錄" "0|0" "select jsonb_array_length(public.rc_directory())||'|'||jsonb_array_length(public.rc_find_people(''))"
+SPK2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"Speaker\",\"subject\":\"Economics\",\"school\":\"NTU\",\"person_id\":\"${SPKP}\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${SPK2}" in ????????-*) echo "  ok   Co-President 從紀錄挑一個人當講者（${SPK2}）"; pass=$((pass+1));; *) echo "  FAIL 從紀錄挑人失敗：${SPK2}"; fail=$((fail+1));; esac
+chk "讀得到名錄的人挑的，連到紀錄裡那個人；同意還是沒勾" "true|false" "select (person_id='${SPKP}')::text||'|'||consent::text from public.event_speakers where id='${SPK2}'"
+chkraise "紀錄裡沒有這個人擋（no_such_person）" "no_such_person" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"X\",\"person_id\":\"00000000-0000-0000-0000-000000000000\"}'::jsonb);"
+chkas "${PAUL}" "第二位也勾同意" "true" "select public.set_event_speaker_consent('${SPK2}', true)::text"
+chkrole anon "" "★ 對外的講者整段沒有紀錄裡的 email、沒有 person_id、沒有任何 id" "0" \
+  "select count(*) from public.public_event_extras('pg-no-date') j where j::text like '%speaker-secret%' or j::text like '%${SPKP}%' or j::text like '%${SPK1}%' or j::text like '%${SPK2}%' or j::text like '%person_id%'"
+chkas "${AMT}" "後台讀得到三位（含沒勾同意的 Ben），照順序" "3|Annie,Ben,Speaker|true,false,true" \
+  "select jsonb_array_length(j)||'|'||(select string_agg(x->>'display_name', ',' order by n) from jsonb_array_elements(j) with ordinality y(x, n))||'|'||(select string_agg(x->>'consent', ',' order by n) from jsonb_array_elements(j) with ordinality y(x, n)) from public.event_speakers_list('${PGEV}') j"
+chkrole anon "" "★ 對外只有勾了同意的兩位，Ben 不在" "Annie,Speaker" \
+  "select string_agg(x->>'name', ',' order by n) from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') with ordinality y(x, n)"
+chkas "${AMT}" "排順序：第二位搬到最前面" "2" "select public.reorder_event_speakers('${PGEV}', array['${SPK2}','${SPK1}']::uuid[])"
+chkrole anon "" "★ 對外照新的順序" "Speaker,Annie" \
+  "select string_agg(x->>'name', ',' order by n) from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') with ordinality y(x, n)"
+chkas "${AMT}" "★ 改了名字，同意退回沒勾，對外就少那一位" "false|Speaker" \
+  "select public.save_event_speaker('${PGEV}', '${SPK1}', '{\"display_name\":\"Annie Chen\"}'::jsonb); select (select consent::text from public.event_speakers where id='${SPK1}')||'|'||(select string_agg(x->>'name', ',') from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') x)"
+chkas "${AMT}" "只改主題與學校，同意不動" "true|Econ|台大" \
+  "select public.save_event_speaker('${PGEV}', '${SPK2}', '{\"subject\":\"Econ\",\"school\":\"台大\"}'::jsonb); select consent::text||'|'||subject||'|'||school from public.event_speakers where id='${SPK2}'"
+chkas "${AMT}" "★ 換了照片，同意也退回沒勾" "false" \
+  "select public.save_event_speaker('${PGEV}', '${SPK2}', '{\"photo_url\":\"${EPURL}/s2.jpg\"}'::jsonb); select consent::text from public.event_speakers where id='${SPK2}'"
+chkas "${PAUL}" "（還原）兩位都重新勾同意" "true|true" "select public.set_event_speaker_consent('${SPK1}', true)::text||'|'||public.set_event_speaker_consent('${SPK2}', true)::text"
+# 破壞測試：有人直接把同意改掉，對外那一位就不見（門在函式裡，不在畫面上）。
+psql -d "${DB}" -X -A -t -q -c "update public.event_speakers set consent=false where id='${SPK2}';" >/dev/null
+chkrole anon "" "★ 破壞測試：直接把講者的同意改掉，對外就少那一位" "1|AnnieChen" "select jsonb_array_length(j->'speakers')||'|'||(j->'speakers'->0->>'name') from public.public_event_extras('pg-no-date') j"
+psql -d "${DB}" -X -A -t -q -c "update public.event_speakers set consent=true where id='${SPK2}';" >/dev/null
+# 直接讀寫表：沒登入的人、登入的人都不行，只能走函式。
+span=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.event_speakers;" 2>&1 || true)
+if echo "${span}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 event_speakers 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到 event_speakers 表：${span}"; fail=$((fail+1)); fi
+spau=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; select count(*) from public.event_speakers;" 2>&1 || true)
+if echo "${spau}" | grep -qi "permission denied"; then echo "  ok   ★ 登入的人（就算是 Co-President）也讀不到 event_speakers 表本身"; pass=$((pass+1)); else echo "  FAIL 登入的人直接讀得到 event_speakers 表：${spau}"; fail=$((fail+1)); fi
+spaw=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "set role authenticated; insert into public.event_speakers (event_id, display_name, consent) values ('${PGEV}','直接寫', true);" 2>&1 || true)
+if echo "${spaw}" | grep -qi "permission denied"; then echo "  ok   ★ 登入的人直接寫不進 event_speakers（繞不過函式自己把同意寫成勾了）"; pass=$((pass+1)); else echo "  FAIL 登入的人直接寫得進 event_speakers：${spaw}"; fail=$((fail+1)); fi
+spaf=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"X\"}'::jsonb);" 2>&1 || true)
+if echo "${spaf}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到 save_event_speaker()"; pass=$((pass+1)); else echo "  FAIL 沒登入的人叫得到 save_event_speaker()：${spaf}"; fail=$((fail+1)); fi
+# 紀錄那邊忘記這個人：他當講者的那一列跟著刪，對外馬上不見。
+chkas "${PAUL}" "★ 紀錄那邊忘記這個人（forget_person）：他當講者的那一列跟著刪掉，對外只剩另一位" "0|AnnieChen" \
+  "select public.forget_person('${SPKP}'); select (select count(*) from public.event_speakers where id='${SPK2}')||'|'||(select string_agg(x->>'name', ',') from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') x)"
+chkraise "忘記之後不能再把他連成講者（no_such_person）" "no_such_person" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"X\",\"person_id\":\"${SPKP}\"}'::jsonb);"
+chkraise "★ team 是「看」的人拿不掉講者（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMV}',true); perform public.delete_event_speaker('${SPK1}');"
+chkas "${AMT}" "team 是「改」的人拿掉一位，拿回照片網址（後台拿去刪 Storage 的檔）" "${EPURL}/s1.jpg" "select public.delete_event_speaker('${SPK1}')"
+psql -d "${DB}" -X -A -t -q -c "update public.events set status='archived' where id='${PGEV}';" >/dev/null
+chkrole anon "" "★ 活動撤下來，對外那一支回空值（講者、類型都不回）" "true" "select (public.public_event_extras('pg-no-date') is null)::text"
+psql -d "${DB}" -X -A -t -q -c "update public.events set status='published' where id='${PGEV}';" >/dev/null
+# ── B. 報名類型 ──
+# 開一場有報名表的活動（AMTEAM），表單開著、活動在對外頁上、活動本身名額 3。四個學員帳號。
+TKU1=88880000-0000-0000-0000-0000000000f1; TKU2=88880000-0000-0000-0000-0000000000f2; TKU3=88880000-0000-0000-0000-0000000000f3; TKU4=88880000-0000-0000-0000-0000000000f4; TKU5=88880000-0000-0000-0000-0000000000f5
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${TKU1}','tk1@example.com'), ('${TKU2}','tk2@example.com'), ('${TKU3}','tk3@example.com'), ('${TKU4}','tk4@example.com'), ('${TKU5}','tk5@example.com');
+insert into public.profiles (id,name_zh,role) values ('${TKU1}','類型一號','student'), ('${TKU2}','類型二號','student'), ('${TKU3}','類型三號','student'), ('${TKU4}','類型四號','student'), ('${TKU5}','類型五號','student');
+SQL
+TKEV=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('${AMTEAM}','tk-smoke','類型測試','Ticket smoke',true)" 2>&1 | tail -1 | tr -d ' \n')
+TKF=$(psql -d "${DB}" -X -A -t -q -c "select form_id from public.events where id='${TKEV}'" | tr -d ' \n')
+TKEV2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('${AMTEAM}','tk-other','另一場','Other event',true)" 2>&1 | tail -1 | tr -d ' \n')
+TKF2=$(psql -d "${DB}" -X -A -t -q -c "select form_id from public.events where id='${TKEV2}'" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "update public.forms set status='open' where id in ('${TKF}','${TKF2}');" -c "update public.events set status='published', capacity=3 where id='${TKEV}';" -c "update public.events set status='published' where id='${TKEV2}';" >/dev/null
+case "${TKF}" in ????????-*) echo "  ok   （準備）兩場有報名表的活動都在對外頁上"; pass=$((pass+1));; *) echo "  FAIL 開活動失敗：${TKEV} ${TKF}"; fail=$((fail+1));; esac
+# 還沒有類型：舊的叫法（三個、四個參數）照樣送得出去。
+chkas "${TKU1}" "★ 活動沒有分類型，舊的叫法（不帶 p_ticket）照樣送得出去，ticket_id 是空的" "true" \
+  "select public.submit_application('${TKF}', '[]'::jsonb, null); select (ticket_id is null)::text from public.applications where form_id='${TKF}' and user_id='${TKU1}'"
+chkrole authenticated "${TKU1}" "★ 登入的學員用 authenticated 的身分叫得到新的那一支（四個具名參數，沒有兩支對不上）" "true" \
+  "select (public.submit_application(p_form_id => '${TKF}', p_answers => '[]'::jsonb, p_guardian_email => null, p_meta => null) is not null)::text"
+chk "★ submit_application 只有一支（舊的四個參數那一支拿掉了）" "1|p_form_iduuid,p_answersjsonb,p_guardian_emailtext,p_metajsonb,p_ticketuuid" \
+  "select count(*)||'|'||max(pg_get_function_identity_arguments(oid)) from pg_proc where proname='submit_application' and pronamespace='public'::regnamespace"
+chkraise "★ 活動沒有分類型卻帶了一個亂寫的類型（bad_ticket）" "bad_ticket" \
+  "perform set_config('test.uid','${TKU2}',true); perform public.submit_application('${TKF}', '[]'::jsonb, null, null, '00000000-0000-0000-0000-000000000000');"
+chkrole anon "" "還沒有類型：對外兩支都回空陣列" "0|0" "select jsonb_array_length(public.public_event_extras('tk-smoke')->'tickets')||'|'||jsonb_array_length(public.public_form_tickets('${TKF}'))"
+# 加類型
+TK1=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\"學生\",\"name_en\":\"Student\",\"note_zh\":\"高中生\",\"capacity\":\"1\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${TK1}" in ????????-*) echo "  ok   team 是「改」的人加了一種報名類型（${TK1}）"; pass=$((pass+1));; *) echo "  FAIL 加類型失敗：${TK1}"; fail=$((fail+1));; esac
+TK2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\"家長\",\"name_en\":\"Parent\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+TKO=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event_ticket('${TKEV2}', null, '{\"name_zh\":\"別場的\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chk "第二種沒填名額就是 0（不限），排在第一種後面" "0|20|1" "select capacity||'|'||sort||'|'||(select capacity from public.event_tickets where id='${TK1}') from public.event_tickets where id='${TK2}'"
+chkraise "★ 不在這個 team 的幹部加不了類型（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\"X\"}'::jsonb);"
+chkraise "★ team 是「看」的人加不了類型（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMV}',true); perform public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\"X\"}'::jsonb);"
+chkraise "★ 學員加不了類型（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${STU}',true); perform public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\"X\"}'::jsonb);"
+chkraise "★ 不在這個 team 的幹部讀不到類型清單（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.event_tickets_list('${TKEV}');"
+chkraise "★ 不在這個 team 的幹部改不了名額（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.save_event_ticket('${TKEV}', '${TK1}', '{\"capacity\":99}'::jsonb);"
+chkraise "★ 不在這個 team 的幹部刪不了類型（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.delete_event_ticket('${TK2}');"
+chkraise "★ 不在這個 team 的幹部排不了類型的順序（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMX}',true); perform public.reorder_event_tickets('${TKEV}', array['${TK2}','${TK1}']::uuid[]);"
+chkraise "中英名稱都空的擋（ticket_no_name）" "ticket_no_name" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\" \",\"name_en\":\"\"}'::jsonb);"
+chkraise "名額不是 0 以上的整數擋（bad_capacity）" "bad_capacity" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event_ticket('${TKEV}', '${TK1}', '{\"capacity\":\"-1\"}'::jsonb);"
+chkraise "別場活動的類型用這一場的 id 改不到（no_such_ticket）" "no_such_ticket" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event_ticket('${TKEV}', '${TKO}', '{\"name_zh\":\"偷改\"}'::jsonb);"
+chkrole anon "" "★ 沒登入的人拿得到兩種類型：鍵只有八個，照順序，還沒人報" "2|學生,家長|capacity,full,id,name_en,name_zh,note_en,note_zh,taken|1:0:false,0:0:false" \
+  "select jsonb_array_length(j)||'|'||(select string_agg(x->>'name_zh', ',' order by n) from jsonb_array_elements(j) with ordinality y(x, n))||'|'||(select string_agg(k, ',' order by k) from jsonb_object_keys(j->0) k)||'|'||(select string_agg((x->>'capacity')||':'||(x->>'taken')||':'||(x->>'full'), ',' order by n) from jsonb_array_elements(j) with ordinality y(x, n)) from (select public.public_event_extras('tk-smoke')->'tickets' j) q"
+chkrole anon "" "★ /apply/ 用表單 id 問，拿到同一份" "true" "select (public.public_form_tickets('${TKF}') = public.public_event_extras('tk-smoke')->'tickets')::text"
+# 送出：有類型之後
+chkraise "★ 活動有分類型，沒帶類型送不出去（ticket_required）" "ticket_required" \
+  "perform set_config('test.uid','${TKU2}',true); perform public.submit_application('${TKF}', '[]'::jsonb, null, null);"
+chkraise "★ 帶別場活動的類型送不出去（bad_ticket）" "bad_ticket" \
+  "perform set_config('test.uid','${TKU2}',true); perform public.submit_application('${TKF}', '[]'::jsonb, null, null, '${TKO}');"
+chkraise "帶一個不存在的類型也送不出去（bad_ticket）" "bad_ticket" \
+  "perform set_config('test.uid','${TKU2}',true); perform public.submit_application('${TKF}', '[]'::jsonb, null, null, '00000000-0000-0000-0000-000000000000');"
+chkrole authenticated "${TKU2}" "★ 帶對的類型送得出去，報名記著是哪一種" "true" \
+  "select public.submit_application(p_form_id => '${TKF}', p_answers => '[]'::jsonb, p_ticket => '${TK1}'); select (ticket_id = '${TK1}')::text from public.applications where form_id='${TKF}' and user_id='${TKU2}'"
+chkrole anon "" "★ 那一種名額 1、報了 1：對外說滿了；另一種沒滿" "1:1:true,0:0:false" \
+  "select string_agg((x->>'capacity')||':'||(x->>'taken')||':'||(x->>'full'), ',' order by n) from jsonb_array_elements(public.public_form_tickets('${TKF}')) with ordinality y(x, n)"
+chkraise "★ 那一種滿了，下一個人送不進來（ticket_full）" "ticket_full" \
+  "perform set_config('test.uid','${TKU3}',true); perform public.submit_application('${TKF}', '[]'::jsonb, null, null, '${TK1}');"
+TKA2=$(psql -d "${DB}" -X -A -t -q -c "select id from public.applications where form_id='${TKF}' and user_id='${TKU2}'" | tr -d ' \n')
+chkas "${TKU2}" "★ 已經報過的人再按一次（那一種已經滿了）拿回原本那一筆，不會被擋" "${TKA2}" "select public.submit_application('${TKF}', '[]'::jsonb, null, null, '${TK1}')"
+chkas "${TKU1}" "★ 分類型之前就報了的人再按一次（沒帶類型）也拿回原本那一筆，不會被 ticket_required 擋" "true" \
+  "select (public.submit_application('${TKF}', '[]'::jsonb, null) = (select id from public.applications where form_id='${TKF}' and user_id='${TKU1}'))::text"
+chkas "${TKU3}" "另一種不限名額，送得進去" "true" \
+  "select public.submit_application('${TKF}', '[]'::jsonb, null, null, '${TK2}'); select (ticket_id = '${TK2}')::text from public.applications where form_id='${TKF}' and user_id='${TKU3}'"
+# 活動本身的名額那道門還在：活動名額 3、已經 3 個人，不限的那一種也送不進來，而且訊息正好是 full（不是 ticket_full）。
+tkfull=$(psql -d "${DB}" -X -A -t -q -c "do \$\$ begin perform set_config('test.uid','${TKU4}',true); perform public.submit_application('${TKF}', '[]'::jsonb, null, null, '${TK2}'); raise notice 'NOT_BLOCKED'; exception when others then raise notice 'GOT[%]', SQLERRM; end \$\$;" 2>&1 || true)
+if echo "${tkfull}" | grep -q "GOT\[full\]"; then echo "  ok   ★ 活動本身的名額那道門還在：活動滿了，不限名額的那一種也送不進來，訊息正好是 full"; pass=$((pass+1)); else echo "  FAIL 活動名額的門訊息不對：${tkfull}"; fail=$((fail+1)); fi
+# 婉拒的不算名額：把滿的那一種唯一一筆婉拒，位子就空出來；活動名額也空出一個。
+psql -d "${DB}" -X -A -t -q -c "update public.applications set status='rejected' where id='${TKA2}';" >/dev/null
+chkrole anon "" "被婉拒的不算：那一種又有位子了" "1:0:false" "select (x->>'capacity')||':'||(x->>'taken')||':'||(x->>'full') from jsonb_array_elements(public.public_form_tickets('${TKF}')) x where x->>'id'='${TK1}'"
+chkas "${TKU4}" "位子空出來，下一個人送得進那一種" "true" \
+  "select public.submit_application('${TKF}', '[]'::jsonb, null, null, '${TK1}'); select (ticket_id = '${TK1}')::text from public.applications where form_id='${TKF}' and user_id='${TKU4}'"
+# 後台看每一種報了幾個
+chkas "${AMT}" "★ 後台看得到每一種報了幾個（taken 不算婉拒的，used 全算）" "學生:1:2,家長:1:1" \
+  "select string_agg((x->>'name_zh')||':'||(x->>'taken')||':'||(x->>'used'), ',' order by n) from jsonb_array_elements(public.event_tickets_list('${TKEV}')) with ordinality y(x, n)"
+chkraise "★ 已經有人報的類型刪不掉（ticket_in_use）" "ticket_in_use" \
+  "perform set_config('test.uid','${AMT}',true); perform public.delete_event_ticket('${TK1}');"
+chkas "${AMT}" "改名字、改名額：其他欄位不動" "Students|5|高中生" \
+  "select public.save_event_ticket('${TKEV}', '${TK1}', '{\"name_en\":\"Students\",\"capacity\":5}'::jsonb); select name_en||'|'||capacity||'|'||note_zh from public.event_tickets where id='${TK1}'"
+chkas "${AMT}" "排順序：家長搬到前面，對外跟著換" "2|家長,學生" \
+  "select public.reorder_event_tickets('${TKEV}', array['${TK2}','${TK1}']::uuid[]); select '2|'||string_agg(x->>'name_zh', ',' order by n) from jsonb_array_elements(public.public_form_tickets('${TKF}')) with ordinality y(x, n)"
+TK3=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\"沒人報的\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+chkas "${AMT}" "沒人報的類型刪得掉" "2" "select public.delete_event_ticket('${TK3}'); select count(*) from public.event_tickets where event_id='${TKEV}'"
+# 看報名名單的人把 ticket_id 對回名字
+chkas "${AMV}" "★ team 是「看」、沒被加進這一場的人看不到這場的報名，類型的名字也拿到空的" "0" "select jsonb_array_length(public.form_ticket_names('${TKF}'))"
+psql -d "${DB}" -X -A -t -q -c "insert into public.assignments (user_id, workspace_id, level) values ('${AMV}','custom:event-tk-smoke','view') on conflict (user_id,workspace_id) do update set level='view';" >/dev/null
+chkas "${AMV}" "★ 被加進這一場（「看」）的人拿得到類型的名字，用來對報名名單；只有 id 與中英名稱" "2|id,name_en,name_zh" \
+  "select jsonb_array_length(j)||'|'||(select string_agg(k, ',' order by k) from jsonb_object_keys(j->0) k) from public.form_ticket_names('${TKF}') j"
+chkas "${AMX}" "★ 看不到這場報名的幹部拿到空的" "0" "select jsonb_array_length(public.form_ticket_names('${TKF}'))"
+chkraise "★ 這一場只有「看」的人還是改不了類型（not_event_editor）" "not_event_editor" \
+  "perform set_config('test.uid','${AMV}',true); perform public.save_event_ticket('${TKEV}', '${TK1}', '{\"capacity\":50}'::jsonb);"
+psql -d "${DB}" -X -A -t -q -c "delete from public.assignments where user_id='${AMV}' and workspace_id='custom:event-tk-smoke';" >/dev/null
+chkas "${TKU3}" "學員也拿到空的（對外要的走 public_form_tickets）" "0" "select jsonb_array_length(public.form_ticket_names('${TKF}'))"
+chkrole authenticated "${TKU3}" "學員讀得到自己那一筆報名的 ticket_id（RLS 照舊只有自己的）" "1|true" "select count(*)||'|'||bool_and(ticket_id = '${TK2}') from public.applications where form_id='${TKF}'"
+# 直接讀寫表
+tkan=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select count(*) from public.event_tickets;" 2>&1 || true)
+if echo "${tkan}" | grep -qi "permission denied"; then echo "  ok   ★ anon 讀不到 event_tickets 表本身"; pass=$((pass+1)); else echo "  FAIL anon 讀得到 event_tickets 表：${tkan}"; fail=$((fail+1)); fi
+tkau=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "set role authenticated; update public.event_tickets set capacity=999 where id='${TK1}';" 2>&1 || true)
+if echo "${tkau}" | grep -qi "permission denied"; then echo "  ok   ★ 登入的人直接改不了 event_tickets（只能走函式）"; pass=$((pass+1)); else echo "  FAIL 登入的人直接改得了 event_tickets：${tkau}"; fail=$((fail+1)); fi
+tkaf=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.save_event_ticket('${TKEV}', null, '{\"name_zh\":\"X\"}'::jsonb);" 2>&1 || true)
+if echo "${tkaf}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到 save_event_ticket()"; pass=$((pass+1)); else echo "  FAIL 沒登入的人叫得到 save_event_ticket()：${tkaf}"; fail=$((fail+1)); fi
+tkas=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.submit_application('${TKF}','[]'::jsonb, null, null, '${TK2}');" 2>&1 || true)
+if echo "${tkas}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到新的 submit_application()"; pass=$((pass+1)); else echo "  FAIL 沒登入的人叫得到 submit_application()：${tkas}"; fail=$((fail+1)); fi
+tkai=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "set role authenticated; select public.event_tickets_public('${TKEV}');" 2>&1 || true)
+if echo "${tkai}" | grep -qi "permission denied"; then echo "  ok   裡面用的 event_tickets_public() 登入的人直接叫不到"; pass=$((pass+1)); else echo "  FAIL event_tickets_public() 直接叫得到：${tkai}"; fail=$((fail+1)); fi
+# 活動還沒上架：/apply/ 那一支回空的；撤下來的活動表單還收件，所以類型還回。
+psql -d "${DB}" -X -A -t -q -c "update public.events set status='draft' where id='${TKEV}';" >/dev/null
+chkrole anon "" "★ 活動退回草稿：兩支對外的都不回類型" "true|0" "select (public.public_event_extras('tk-smoke') is null)::text||'|'||jsonb_array_length(public.public_form_tickets('${TKF}'))"
+psql -d "${DB}" -X -A -t -q -c "update public.events set status='published' where id='${TKEV}';" >/dev/null
+# 類型整個刪掉（活動刪掉連帶刪）：報名還在，ticket_id 變空的。
+psql -d "${DB}" -X -A -t -q -c "delete from public.events where id='${TKEV2}';" >/dev/null 2>&1 || true
+chk "活動刪掉，它的類型跟著刪" "0" "select count(*) from public.event_tickets where id='${TKO}'"
+psql -d "${DB}" -X -A -t -q -c "delete from public.event_tickets where id='${TK2}';" >/dev/null
+chk "★ 類型被刪掉（繞過函式直接刪），報名還在，ticket_id 變空的" "1|true" "select count(*)||'|'||bool_and(ticket_id is null) from public.applications where form_id='${TKF}' and user_id='${TKU3}'"
+# 破壞測試
+BROKEN=$(mktemp)
+sed "s/from event_speakers s where s.event_id = e.id and s.consent), '\[\]'::jsonb),/from event_speakers s where s.event_id = e.id), '[]'::jsonb),/" supabase/migrations/2027-01-02-event-speakers-tickets.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：對外拿掉「講者只回同意勾了的」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉講者同意的門驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/         case when e.cover_consent then e.cover_url end, e.starts_at,/         e.cover_url, e.starts_at,/" supabase/migrations/2027-01-02-event-speakers-tickets.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：封面改回不看同意，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 封面改回不看同意驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/        raise exception 'ticket_full' using errcode = 'P0001';/        null;/" supabase/migrations/2027-01-02-event-speakers-tickets.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「那一種滿了就擋」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 ticket_full 驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/^revoke all on public.event_speakers from public, anon, authenticated;$/grant select on public.event_speakers to authenticated;/" supabase/migrations/2027-01-02-event-speakers-tickets.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：把講者表的讀取權限發給登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 發了講者表的權限驗收表沒變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "revoke all on public.event_speakers from public, anon, authenticated;" >/dev/null
+# 有人重跑了舊的表單引擎那一支：會多一支四個參數的 submit_application，這一支的驗收表要紅；再跑一次這一支就回來。
+psql -d "${DB}" -X -A -t -q -f supabase/migrations/2026-12-20-form-engine.sql >/dev/null 2>&1 || true
+chk "（破壞）重跑舊的表單引擎那一支之後，submit_application 變成兩支" "2" "select count(*) from pg_proc where proname='submit_application' and pronamespace='public'::regnamespace"
+rm -f "${BROKEN}"
+stk3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2027-01-02-event-speakers-tickets.sql 2>&1 || true)
+if echo "${stk3}" | grep -q "OVERALL.*PASS" && ! echo "${stk3}" | grep -q "|FAIL"; then echo "  ok   ★ 再跑一次這一支：四個參數那一支又拿掉了，驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過："; echo "${stk3}" | head -18; fail=$((fail+1)); fi
+chk "裝回之後 submit_application 又只有一支" "1" "select count(*) from pg_proc where proname='submit_application' and pronamespace='public'::regnamespace"
+chkrole anon "" "重跑之後講者、類型、照片都還在，沒登入的人照樣拿得到" "1|0|1" \
+  "select (select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos'))||'|'||(select jsonb_array_length(public.public_event_extras('pg-no-date')->'speakers'))||'|'||(select jsonb_array_length(public.public_event_extras('tk-smoke')->'tickets'))"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

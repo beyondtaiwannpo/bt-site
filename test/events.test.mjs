@@ -49,7 +49,7 @@ test("一場活動：草稿時「管」有準備好了、ready 時 senior 有放
   assert.match(draft, /data-act="ev-ready" data-id="e1"/); assert.doesNotMatch(draft, /ev-publish/);
   assert.match(draft, /<input id="ev-cover" name="cover_url" value="https:\/\/drive.google.com\/cover.jpg"/); assert.match(draft, /id="ev-consent" name="cover_consent" checked/);
   assert.match(draft, /<img class="ev-cover" src="https:\/\/drive.google.com\/cover.jpg"/);
-  assert.match(draft, /data-act="open-form" data-id="f1"/); assert.match(draft, /data-act="open-apps" data-id="f1">報名的人：3<\/a> \/ 40/);
+  assert.match(draft, /data-act="open-form" data-id="f1"/); assert.match(draft, /data-act="open-apps" data-id="f1">看報名的人<\/button>/); assert.match(draft, /已報名 3 \/ 40 人/, "2026-11-23 起報名那一塊是按鈕，人數寫在上面那一行");
   assert.match(draft, /data-act="open-checkin" data-id="f1"/); assert.match(draft, /data-act="open-notice" data-id="f1"/);
   assert.match(draft, /data-act="members-open" data-ws="custom:event-winter-camp-2027"/);
   assert.match(draft, /data-autosave="ev-save" data-id="e1"/); assert.match(draft, /class="autosave" data-for="ev-save"/, "2026-11-06 起內容改了就存，沒有存起來那顆鈕"); assert.doesNotMatch(draft, /data-act="ev-save"/);

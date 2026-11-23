@@ -33,6 +33,12 @@ let S = {
   requests: null, rqDraft: null, rqF: { status: "open", mine: "", q: "" }, rqSel: null, rqAssignees: [], cadres: [],
   // 活動上架（2026-11-01）：events 是 loadEvents() 回的；evSel 打開的那一場（slug）；evDraft 開活動那張表單填到一半的值；evSigned 那一場的報名數。
   events: null, evSel: null, evDraft: null, evSigned: null, evRc: undefined,
+  // 活動的照片（2026-11-23）：evPhotos 是打開的那一場的照片（undefined 還在載、null 是遷移檔還沒跑、陣列是照片）；
+  // evUp 是封面的上傳進度、evPhUp 是活動照片的上傳進度（null 是沒有在傳）。
+  evPhotos: undefined, evUp: null, evPhUp: null,
+  // 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）：evSpeakers、evTickets 是打開的那一場的（undefined 還在載、null 是遷移檔還沒跑、陣列）；
+  // evSpUp 講者照片的上傳進度 { id, pct, name }；evSpDraft、evTkDraft 是「加一位」「加一種」填到一半的；evSpFound 從紀錄找到的人（undefined 是還沒找過）；evSpQ 找的字。
+  evSpeakers: undefined, evTickets: undefined, evSpUp: null, evSpDraft: null, evTkDraft: null, evSpFound: undefined, evSpQ: "",
   // 專案（2026-12-26）：projects 是 projects_list() 回的（undefined 還沒載，null 是遷移檔還沒跑）；pjSel 打開的那一個（id）；pjDraft 開專案填到一半；pjEvDraft 在專案裡開活動填到一半。
   projects: undefined, pjSel: null, pjDraft: null, pjEvDraft: null,
   // 場地（2026-11-10）：venues 是 venues_list() 回的 { can_edit, venues }；venue 是打開的那一個（venue_get）；vnQ 清單的搜尋字；vnOpen 哪個收起來的表單開著。
@@ -117,7 +123,10 @@ function render() {
     body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"], S.projects);
   } else if (S.view === "event" && S.evSel) {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
-    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects)
+    body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects,
+                { photos: S.evPhotos, coverUp: S.evUp, photoUp: S.evPhUp, coverLinkOpen: !!S.vnOpen["ev-cover-link"],
+                  speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ,
+                  tickets: S.evTickets, tkDraft: S.evTkDraft, tkOpen: !!S.vnOpen["ev-tk-new"] })
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
   } else if (S.view === "venues") {
     body = UI.venuesListHTML(S.venues, S.vnQ, S.msg, S.busy, !!S.vnOpen["vn-add"]);
@@ -290,6 +299,145 @@ function readEvent() {
   if (document.getElementById("ev-month")) Object.assign(patch, UI.evProgrammePatch({ usual_month: val("ev-month"), recurring: chk("ev-recurring"), edition_zh: val("ev-edzh"), edition_en: val("ev-eden") }));
   return patch;
 }
+// ── 活動的照片與下半那幾顆按鈕（2026-11-23）──────────────────────────────
+// 重畫之前，把「內容」那幾格現在打的字收進 S.events 那一列（只改記憶體；存檔是自動儲存那條路在做，離開那一格就送了）。
+// 不這樣的話，按了照片或報名的按鈕，畫面照 S.events 重畫，剛打、還沒存完的字就不見了（2026-11-07 歷史之路踩過同一個坑）。
+// 封面的連結與同意不收：那兩格換了資料庫會把同意改回沒勾，交給自動儲存那條路一起處理，這裡先收會讓畫面上的勾跟資料庫對不上。
+function keepEventTyped() {
+  keepPanelsTyped();
+  const ev = (S.events || []).find(x => x.slug === S.evSel);
+  if (!ev || !UI.canEditWs(S.me, ev.workspace_id) || !document.getElementById("ev-tzh")) return;
+  const p = readEvent(); delete p.cover_url; delete p.cover_consent;
+  Object.assign(ev, p);
+}
+// 講者與報名類型那幾列打到一半、還沒按「存這一位」「存這一種」的字：重畫前收進那一列的 typed，畫面照它印（UI.evRowVals）。
+// 「加一位」「加一種」那兩格收進 evSpDraft、evTkDraft。只收畫面上是這一場的（data-ev），換到別場的時候不會把上一場的字帶過去。
+const rowTyped = box => { const o = {}; for (const el of box.querySelectorAll("[data-f]")) o[el.dataset.f] = el.value; return o; };
+function keepPanelsTyped() {
+  if (S.view !== "event") return;
+  const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev) return;
+  for (const li of document.querySelectorAll("[data-sp-row]")) { const r = (Array.isArray(S.evSpeakers) ? S.evSpeakers : []).find(x => x.id === li.dataset.id); if (r) r.typed = rowTyped(li); }
+  for (const li of document.querySelectorAll("[data-tk-row]")) { const r = (Array.isArray(S.evTickets) ? S.evTickets : []).find(x => x.id === li.dataset.id); if (r) r.typed = rowTyped(li); }
+  const sn = document.getElementById("ev-sp-new-box"); if (sn && sn.dataset.ev === ev.id) S.evSpDraft = Object.assign({}, S.evSpDraft, rowTyped(sn));
+  const tn = document.getElementById("ev-tk-new-box"); if (tn && tn.dataset.ev === ev.id) S.evTkDraft = Object.assign({}, S.evTkDraft, rowTyped(tn));
+  const q = document.getElementById("ev-sp-q"); if (q) S.evSpQ = q.value;
+}
+// 重讀講者或報名類型。別列打到一半的字帶過去；剛存的那一列（fresh）照資料庫的印。
+async function reloadEventSpeakers(eventId, fresh) {
+  const old = Array.isArray(S.evSpeakers) ? S.evSpeakers : [];
+  try {
+    S.evSpeakers = await D.loadEventSpeakers(eventId);
+    for (const r of S.evSpeakers || []) { const o = old.find(x => x.id === r.id); if (o && o.typed && r.id !== fresh) r.typed = o.typed; }
+  } catch (e) { S.evSpeakers = old; S.msg = T("err.evSpLoad") + D.says(e); }
+}
+async function reloadEventTickets(eventId, fresh) {
+  const old = Array.isArray(S.evTickets) ? S.evTickets : [];
+  try {
+    S.evTickets = await D.loadEventTickets(eventId);
+    for (const r of S.evTickets || []) { const o = old.find(x => x.id === r.id); if (o && o.typed && r.id !== fresh) r.typed = o.typed; }
+  } catch (e) { S.evTickets = old; S.msg = T("err.evTkLoad") + D.says(e); }
+}
+// 講者的照片：縮圖 → 傳到 Storage 的 events bucket → 把網址存進那一位（資料庫會把同意改回沒勾）→ 舊的那個檔刪掉。跟封面同一條路。
+async function uploadSpeakerPhoto(speakerId, file) {
+  const ev = (S.events || []).find(x => x.slug === S.evSel), sp = (S.evSpeakers || []).find(x => x.id === speakerId); if (!ev || !sp) return;
+  keepEventTyped();
+  if (!UI.evFileOk(file)) { S.msg = T("err.evFile"); render(); return; }
+  S.busy = true; S.msg = ""; S.evSpUp = { id: speakerId, pct: 10, name: file.name }; render();
+  let url = "";
+  try {
+    const blob = await shrinkImage(file); S.evSpUp = { id: speakerId, pct: 45, name: file.name }; render();
+    url = await D.uploadEventImage(ev.id, blob); S.evSpUp = { id: speakerId, pct: 85, name: file.name }; render();
+    const old = sp.photo_url;
+    await D.saveEventSpeaker(ev.id, speakerId, { photo_url: url });
+    if (old && old !== url) await D.removeEventFile(UI.evStoragePath(old));
+    await reloadEventSpeakers(ev.id);
+    if (!S.msg) S.msg = T("msg.evSpPhoto");
+  } catch (e) {
+    // 檔傳上去了、網址卻沒存成：把剛傳的那個檔刪掉，不留一個沒人用的檔。
+    if (url) await D.removeEventFile(UI.evStoragePath(url));
+    S.msg = T("err.evSpSave") + D.says(e);
+  }
+  S.evSpUp = null; S.busy = false; render();
+}
+// 封面換了（上傳、拿掉、換連結）之後，自動儲存記的「上次存的值」要忘掉那兩格。
+// 不忘的話：勾過同意 → 換封面（資料庫把同意改回沒勾）→ 再勾一次，會被當成「跟上次一樣」而沒送出去，畫面有勾、資料庫沒有。
+function forgetCover(id) { dirty.forget("ev-save|" + id + "|cover_consent"); dirty.forget("ev-save|" + id + "|cover_url"); }
+// 瀏覽器端先縮圖再傳（最長邊 1600）。回一個 JPEG Blob；讀不出來就丟 err.evResize。
+// 用 canvas 不用任何函式庫；EXIF 方向交給瀏覽器（createImageBitmap 的 imageOrientation）。跟 admin/site/src/main.js 的同一個做法。
+async function shrinkImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch (e) { throw new Error(T("err.evResize")); }
+  const { w, h } = UI.evFit(bmp.width, bmp.height);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+  bmp.close && bmp.close();
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
+  if (!blob) throw new Error(T("err.evResize"));
+  return blob;
+}
+async function reloadEventPhotos(eventId) {
+  try { S.evPhotos = await D.loadEventPhotos(eventId); }
+  catch (e) { S.evPhotos = S.evPhotos || []; S.msg = T("err.evPhLoad") + D.says(e); }
+}
+// 封面：縮圖 → 傳到 Storage → 把網址存進 cover_url（走原本的 save_event，資料庫會把同意改回沒勾）→ 舊的那個檔刪掉。
+async function uploadEventCover(eventId, file) {
+  const ev = (S.events || []).find(x => x.id === eventId); if (!ev) return;
+  keepEventTyped();
+  if (!UI.evFileOk(file)) { S.msg = T("err.evFile"); render(); return; }
+  S.busy = true; S.msg = ""; S.evUp = { pct: 10, name: file.name }; render();
+  let url = "";
+  try {
+    const blob = await shrinkImage(file); S.evUp = { pct: 45, name: file.name }; render();
+    url = await D.uploadEventImage(eventId, blob); S.evUp = { pct: 85, name: file.name }; render();
+    const old = ev.cover_url;
+    await D.saveEvent(eventId, { cover_url: url });
+    ev.cover_url = url; ev.cover_consent = false; forgetCover(eventId);
+    if (old !== url) await D.removeEventFile(UI.evStoragePath(old));
+    S.vnOpen["ev-cover-link"] = false; S.msg = T("msg.evCover");
+  } catch (e) {
+    // 檔傳上去了、網址卻沒存成：把剛傳的那個檔刪掉，不留一個沒人用的檔。
+    if (url) await D.removeEventFile(UI.evStoragePath(url));
+    S.msg = T("err.evCoverUp") + D.says(e);
+  }
+  S.evUp = null; S.busy = false; render();
+}
+// 活動照片：一次可以選好幾張，一張一張傳。壞掉的那幾張記下來，其他照傳；傳完重讀一次。新照片的同意一律是沒勾。
+async function uploadEventPhotos(eventId, files) {
+  keepEventTyped();
+  const bad = files.filter(f => !UI.evFileOk(f)).map(f => f.name);
+  const ok = files.filter(f => UI.evFileOk(f));
+  if (!ok.length) { S.msg = T("err.evFile"); render(); return; }
+  S.busy = true; S.msg = ""; S.evPhUp = { pct: 0, name: ok[0].name, i: 1, n: ok.length }; render();
+  const failed = [];
+  for (let i = 0; i < ok.length; i++) {
+    const file = ok[i];
+    const base = Math.round(i / ok.length * 100), span = 100 / ok.length;
+    const step = pct => { S.evPhUp = { pct: Math.round(base + span * pct / 100), name: file.name, i: i + 1, n: ok.length }; render(); };
+    let url = "";
+    try {
+      step(10);
+      const blob = await shrinkImage(file);
+      step(45);
+      url = await D.uploadEventImage(eventId, blob);
+      step(85);
+      await D.addEventPhoto(eventId, url);
+    } catch (e) {
+      if (url) await D.removeEventFile(UI.evStoragePath(url));
+      failed.push(file.name + "（" + D.says(e) + "）");
+    }
+  }
+  S.evPhUp = null;
+  const n = ok.length - failed.length;
+  const parts = [];
+  if (n) parts.push(T(n === 1 ? "msg.evPhotoAdded" : "msg.evPhotosAdded", { n }));
+  if (failed.length) parts.push(T("err.evUploadSome") + failed.join("、"));
+  if (bad.length) parts.push(T("err.evFileSome") + bad.join("、"));
+  await reloadEventPhotos(eventId);
+  // reloadEventPhotos 讀不到的時候自己會寫一句錯誤，那一句留著，接在後面。
+  S.msg = parts.concat(S.msg ? [S.msg] : []).join(" ");
+  S.busy = false; render();
+}
 async function reloadVenues(id) {
   try {
     if (id) S.venue = await D.loadVenue(id); else S.venues = await D.loadVenues();
@@ -366,13 +514,21 @@ async function openTab(t) {
     S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = "";
     await Promise.all([reloadEvents(ev[1]), reloadProjects(), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null,
       ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
-    S.evLinks = null; S.evRc = undefined;
+    S.evLinks = null; S.evRc = undefined; S.evPhotos = undefined; S.evUp = null; S.evPhUp = null; S.vnOpen["ev-cover-link"] = false;
+    S.evSpeakers = undefined; S.evTickets = undefined; S.evSpUp = null; S.evSpDraft = null; S.evTkDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; S.vnOpen["ev-tk-new"] = false;
     const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]);
     // 2026-11-13：只在紀錄裡的舊活動沒有對外頁、報名、簽到，這裡是空的；直接去它在 Records 的記分卡。
     if (one && one.source === "import") { location.replace("/admin/records/#overview/" + encodeURIComponent(one.id)); return; }
     if (one) S.evLinks = await D.loadEventLinks(one.id).catch(() => null);
     render();
     if (!one) return;
+    // 活動照片（2026-11-23）：讀的門是這場活動「改」以上，改不動的人那一塊本來就不畫，不用問資料庫。
+    // 講者與報名類型（2027-01-02）同一道門，一起讀。
+    if (UI.canEditWs(S.me, one.workspace_id)) {
+      await Promise.all([reloadEventPhotos(one.id), reloadEventSpeakers(one.id), reloadEventTickets(one.id)]);
+      if (S.view === "event" && S.evSel === one.slug) render();
+    }
+    else { S.evPhotos = []; S.evSpeakers = []; S.evTickets = []; }
     // 活動結束之後打開，先把報名的人抄進 Records 一次（錄取的人結束後算到了），再讀 Records 的數字。失敗不吵。
     if (one.form_id && new Date(one.ends_at || one.starts_at || 0) < new Date()) await D.syncEvent(one.id).catch(() => {});
     S.evRc = await D.loadRecordsCard(one.id);
@@ -538,9 +694,12 @@ async function onAutosave(act, box, field) {
       if (!UI.evCoverOk(patch.cover_url)) return fail(T("err.evCover"));
       await D.saveEvent(id, patch);
       // 換了封面，資料庫會把同意改回沒勾（同意是對那一張照片的）。畫面跟著改，不然勾勾還在、資料庫卻是沒同意。
-      if ((patch.cover_url || "") !== (ev.cover_url || "")) { patch.cover_consent = false; const c = document.getElementById("ev-consent"); if (c) c.checked = false; }
+      // 2026-11-23：同時把自動儲存記的「同意上次存的值」忘掉，不然再勾一次會被當成沒變而沒送出去（forgetCover 的註解）。
+      const coverChanged = (patch.cover_url || "") !== (ev.cover_url || "");
+      if (coverChanged) { patch.cover_consent = false; const c = document.getElementById("ev-consent"); if (c) c.checked = false; }
       Object.assign(ev, patch);
       dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.evSaved"));
+      if (coverChanged) dirty.forget("ev-save|" + id + "|cover_consent");
       return;
     }
     if (act === "mt-min") {
@@ -861,6 +1020,145 @@ document.addEventListener("click", async e => {
     catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); }
     render(); return;
   }
+  // ── 活動編輯頁下半的按鈕（2026-11-23）──
+  // 開放或關閉報名：跟表單編輯頁改狀態同一條路（D.saveForm，門是資料庫的 form_can_edit），這裡只是多一顆按鈕。
+  if (act === "ev-form-status") {
+    const to = b.dataset.v === "open" ? "open" : "closed";
+    const f = (S.forms || []).find(x => x.id === id); if (!f) return;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      // 開放之前先擋一次：沒有題目的表單開出去，報名的人看到的是空的（表單編輯頁同一條規則）。
+      if (to === "open" && (await D.countQuestions(id)) === 0) throw new Error(T("err.noQuestions"));
+      await D.saveForm(id, { status: to });
+      f.status = to; if (S.form && S.form.id === id) S.form.status = to;
+      S.msg = T(to === "open" ? "msg.evFormOpened" : "msg.evFormClosed");
+    } catch (err) { S.msg = T("err.evFormStatus") + D.says(err); }
+    S.busy = false; render(); return;
+  }
+  // 建立回饋表：建一張掛在這場活動上的活動後回饋（Records 那邊同一支 rc_save_form），建好直接進那張表的編輯頁。
+  if (act === "ev-fb-create") {
+    const ev = (S.events || []).find(x => x.id === id); if (!ev) return;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      const fid = await D.createFeedbackForm(id, UI.evFeedbackTitle(ev), lang(), UI.evFeedbackQuestions(lang()));
+      location.href = "/admin/records/#forms/" + encodeURIComponent(fid);
+    } catch (err) { S.busy = false; S.msg = T("err.evFbCreate") + D.says(err); render(); }
+    return;
+  }
+  if (act === "ev-cover-clear") {
+    const ev = (S.events || []).find(x => x.id === id); if (!ev) return;
+    if (UI.needAsk(S, b, T("confirm.evCoverClear"))) return;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      const old = ev.cover_url;
+      await D.saveEvent(id, { cover_url: "" });
+      ev.cover_url = null; ev.cover_consent = false; forgetCover(id);
+      await D.removeEventFile(UI.evStoragePath(old));
+      S.msg = T("msg.evCoverCleared");
+    } catch (err) { S.msg = T("err.evSave") + D.says(err); }
+    S.busy = false; render(); return;
+  }
+  if (act === "ev-ph-move" || act === "ev-ph-del") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evPhotos)) return;
+    const ids = act === "ev-ph-move" ? UI.evPhotoMove(S.evPhotos, id, b.dataset.dir) : null;
+    if (act === "ev-ph-move" && !ids) return;
+    if (act === "ev-ph-del" && UI.needAsk(S, b, T("confirm.evPhDel"))) return;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (ids) await D.reorderEventPhotos(ev.id, ids);
+      else await D.removeEventFile(UI.evStoragePath(await D.deleteEventPhoto(id)));
+      await reloadEventPhotos(ev.id);
+      if (!S.msg) S.msg = T(ids ? "msg.evPhMoved" : "msg.evPhDeleted");
+    } catch (err) { S.msg = T("err.evPhSave") + D.says(err); }
+    S.busy = false; render(); return;
+  }
+  // ── 講者（2026-11-23，2027-01-02-event-speakers-tickets.sql）──
+  // 從紀錄裡找人：叫 Records 原本那一支（讀不到名錄的人拿到的是空的）。挑了只是把名字與學校帶進「加一位」那一格，還沒有存。
+  if (act === "ev-sp-find") {
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    S.evSpFound = await D.findPeople(S.evSpQ);
+    S.vnOpen["ev-sp-new"] = true; S.busy = false; render(); return;
+  }
+  if (act === "ev-sp-pick" || act === "ev-sp-unpick") {
+    keepEventTyped();
+    const p = act === "ev-sp-pick" ? (S.evSpFound || []).find(x => x.id === id) : null;
+    S.evSpDraft = p ? Object.assign({}, S.evSpDraft, { display_name: UI.evFirstName(p.name), school: p.school || "", person_id: p.id, from: p.name || "" })
+                    : Object.assign({}, S.evSpDraft, { person_id: null, from: "" });
+    S.vnOpen["ev-sp-new"] = true; S.msg = ""; render();
+    const n = document.getElementById("ev-sp-new-name"); if (n && p) n.focus();
+    return;
+  }
+  if (act === "ev-sp-add" || act === "ev-sp-save") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evSpeakers)) return;
+    keepEventTyped();
+    const adding = act === "ev-sp-add";
+    const row = adding ? null : S.evSpeakers.find(x => x.id === id); if (!adding && !row) return;
+    const patch = UI.evSpeakerPatch(adding ? S.evSpDraft : row.typed);
+    if (!patch) { S.msg = T("err.evSpName"); if (adding) S.vnOpen["ev-sp-new"] = true; render(); return; }
+    if (adding && S.evSpDraft && S.evSpDraft.person_id) patch.person_id = S.evSpDraft.person_id;
+    const reset = !adding && row.consent && patch.display_name !== row.display_name;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const sid = await D.saveEventSpeaker(ev.id, adding ? null : id, patch);
+      if (adding) { S.evSpDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; }
+      await reloadEventSpeakers(ev.id, sid);
+      if (!S.msg) S.msg = T(adding ? "msg.evSpAdded" : reset ? "msg.evSpSavedReset" : "msg.evSpSaved");
+    } catch (err) { S.msg = T("err.evSpSave") + D.says(err); if (adding) S.vnOpen["ev-sp-new"] = true; }
+    S.busy = false; render(); return;
+  }
+  if (act === "ev-sp-move" || act === "ev-sp-del" || act === "ev-sp-photo-clear") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evSpeakers)) return;
+    const ids = act === "ev-sp-move" ? UI.evPhotoMove(S.evSpeakers, id, b.dataset.dir) : null;
+    if (act === "ev-sp-move" && !ids) return;
+    if (act === "ev-sp-del" && UI.needAsk(S, b, T("confirm.evSpDel"))) return;
+    keepEventTyped();
+    const sp = S.evSpeakers.find(x => x.id === id);
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (ids) await D.reorderEventSpeakers(ev.id, ids);
+      else if (act === "ev-sp-del") await D.removeEventFile(UI.evStoragePath(await D.deleteEventSpeaker(id)));
+      else { await D.saveEventSpeaker(ev.id, id, { photo_url: "" }); await D.removeEventFile(UI.evStoragePath(sp && sp.photo_url)); }
+      await reloadEventSpeakers(ev.id);
+      if (!S.msg) S.msg = T(ids ? "msg.evSpMoved" : act === "ev-sp-del" ? "msg.evSpDeleted" : "msg.evSpPhotoCleared");
+    } catch (err) { S.msg = T("err.evSpSave") + D.says(err); }
+    S.busy = false; render(); return;
+  }
+  // ── 報名類型（免費的，沒有價錢）──
+  if (act === "ev-tk-add" || act === "ev-tk-save") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evTickets)) return;
+    keepEventTyped();
+    const adding = act === "ev-tk-add";
+    const row = adding ? null : S.evTickets.find(x => x.id === id); if (!adding && !row) return;
+    const r = UI.evTicketPatch(adding ? S.evTkDraft : row.typed);
+    if (r.err) { S.msg = T(r.err); if (adding) S.vnOpen["ev-tk-new"] = true; render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const tid = await D.saveEventTicket(ev.id, adding ? null : id, r.patch);
+      if (adding) { S.evTkDraft = null; S.vnOpen["ev-tk-new"] = false; }
+      await reloadEventTickets(ev.id, tid);
+      if (!S.msg) S.msg = T(adding ? "msg.evTkAdded" : "msg.evTkSaved");
+    } catch (err) { S.msg = T("err.evTkSave") + D.says(err); if (adding) S.vnOpen["ev-tk-new"] = true; }
+    S.busy = false; render(); return;
+  }
+  if (act === "ev-tk-move" || act === "ev-tk-del") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evTickets)) return;
+    const ids = act === "ev-tk-move" ? UI.evPhotoMove(S.evTickets, id, b.dataset.dir) : null;
+    if (act === "ev-tk-move" && !ids) return;
+    if (act === "ev-tk-del" && UI.needAsk(S, b, T("confirm.evTkDel"))) return;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (ids) await D.reorderEventTickets(ev.id, ids); else await D.deleteEventTicket(id);
+      await reloadEventTickets(ev.id);
+      if (!S.msg) S.msg = T(ids ? "msg.evTkMoved" : "msg.evTkDeleted");
+    } catch (err) { S.msg = T("err.evTkSave") + D.says(err); await reloadEventTickets(ev.id); }
+    S.busy = false; render(); return;
+  }
   // 活動清單的篩選（2026-11-11）。重畫前先把「開一場活動」填到一半的字收進草稿，不然一按篩選就不見了。
   if (act === "ev-fst" || act === "ev-fclear") {
     keepEvDraft();
@@ -895,6 +1193,7 @@ document.addEventListener("click", async e => {
     // ⚠ 要在 render() 之前讀：render() 會照 S.events 重畫表單，重畫完再讀到的是舊值
     // （2026-11-07 歷史之路的照片說明就是這樣存成舊的，Paul 回報「存不起來」）。
     const pending = act === "ev-ready" && UI.canEditWs(S.me, ev.workspace_id) && document.getElementById("ev-tzh") ? readEvent() : null;
+    keepPanelsTyped();
     S.busy = true; S.msg = ""; render();
     try {
       if (pending) {
@@ -1357,22 +1656,51 @@ function switchLang(l) {
   try { localStorage.setItem(STORE_KEY, lang()); } catch (e) { /* 無痕視窗存不了，這一頁照樣切 */ }
   const u = new URL(location.href); u.searchParams.set("lang", lang());
   history.replaceState(null, "", u.pathname + u.search + u.hash);
+  keepPanelsTyped();
   render();
 }
 applyLang(pickLang(location.search, readStored()));
 boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
 // 場地頁兩個收起來的表單開著沒（重畫之後照舊）。
-document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new", "pj-new", "pj-ev-new", "pj-ev-add"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
+document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new", "pj-new", "pj-ev-new", "pj-ev-add", "ev-cover-link", "ev-sp-new", "ev-tk-new"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 活動頁的照片（2026-11-23）：選了檔案就傳；每一張照片的同意勾了就送。
+  if (S.view === "event" && e.target && e.target.id === "ev-cover-file") { const f = (e.target.files || [])[0]; if (f) await uploadEventCover(e.target.dataset.id, f); return; }
+  if (S.view === "event" && e.target && e.target.id === "ev-photo-files") { const fs = Array.from(e.target.files || []); if (fs.length) await uploadEventPhotos(e.target.dataset.id, fs); return; }
+  if (S.view === "event" && e.target && e.target.dataset && e.target.dataset.act === "ev-ph-consent") {
+    const pid = e.target.dataset.id, on = !!e.target.checked;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      const saved = await D.setEventPhotoConsent(pid, on);
+      const ph = (S.evPhotos || []).find(x => x.id === pid); if (ph) ph.consent = !!saved;
+      S.msg = T(saved ? "msg.evPhConsentOn" : "msg.evPhConsentOff");
+    } catch (err) { S.msg = T("err.evPhSave") + D.says(err); }
+    S.busy = false; render(); return;
+  }
+  // 講者（2027-01-02）：選了照片就傳；同意勾了就送。
+  if (S.view === "event" && e.target && e.target.dataset && e.target.dataset.act === "ev-sp-photo") { const f = (e.target.files || [])[0]; if (f) await uploadSpeakerPhoto(e.target.dataset.id, f); return; }
+  if (S.view === "event" && e.target && e.target.dataset && e.target.dataset.act === "ev-sp-consent") {
+    const sid = e.target.dataset.id, on = !!e.target.checked;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      const saved = await D.setEventSpeakerConsent(sid, on);
+      const sp = (S.evSpeakers || []).find(x => x.id === sid); if (sp) sp.consent = !!saved;
+      S.msg = T(saved ? "msg.evSpConsentOn" : "msg.evSpConsentOff");
+    } catch (err) { S.msg = T("err.evSpSave") + D.says(err); }
+    S.busy = false; render(); return;
+  }
   // 活動頁的「放進哪個專案」（2026-12-26）：選了就存。
   if (S.view === "event" && e.target && e.target.id === "ev-project") {
     const evId = e.target.dataset.id, pid = e.target.value || null;
     const one = (S.events || []).find(x => x.id === evId); if (!one) return;
     const to = pid ? (S.projects || []).find(p => p.id === pid) : null;
+    keepPanelsTyped();
     S.busy = true; S.msg = ""; render();
     try {
       await D.setEventProject(evId, pid);
@@ -1395,6 +1723,7 @@ document.addEventListener("change", async e => {
   // 活動頁的「場地」（2026-11-10）：選了就存，地點那一格空的話資料庫順手填場地名字，所以重讀活動。
   if (S.view === "event" && e.target && (e.target.id === "ev-kind" || e.target.id === "ev-term")) {
     const evId = e.target.dataset.id, p = e.target.id === "ev-kind" ? { kind: e.target.value } : { term_id: e.target.value };
+    keepPanelsTyped();
     S.busy = true; S.msg = ""; render();
     try { await D.saveEventMeta(evId, p); S.busy = false; await reloadEvents(S.evSel); S.msg = T("ev.metaSaved"); render(); }
     catch (x) { S.busy = false; S.msg = T("err.save") + D.says(x); render(); }
@@ -1402,6 +1731,7 @@ document.addEventListener("change", async e => {
   }
   if (S.view === "event" && e.target && e.target.id === "ev-venue") {
     const evId = e.target.dataset.id, vid = e.target.value || null;
+    keepPanelsTyped();
     S.busy = true; S.msg = ""; render();
     try { await D.setEventVenue(evId, vid); S.busy = false; await reloadEvents(S.evSel); S.msg = T("vn.saved"); render(); }
     catch (x) { S.busy = false; S.msg = T("err.vnSave") + D.says(x); render(); }
@@ -1471,6 +1801,8 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
+  // 活動頁「從紀錄裡找人」那一格：按 Enter 就是按「找」。
+  if (e.target && e.target.id === "ev-sp-q") { e.preventDefault(); const find = document.querySelector('[data-act="ev-sp-find"]'); if (find && !find.disabled) find.click(); return; }
   const box = e.target.closest(".picker"); if (!box) return;
   const go = box.querySelector('[data-act="members-assign"],[data-act="ws-assign"]'); if (!go || go.disabled) return;
   e.preventDefault(); go.click();

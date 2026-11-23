@@ -15,6 +15,8 @@ let S = {
   view: "list", msg: "", busy: false, ready: false,
   // 填到哪：answers 是 { 題目 id: 答案 }，page 是第幾頁；guard 家長 email；meta 隱藏欄位的值；reason 關著的原因。
   answers: {}, page: 0, guard: "", meta: {}, reason: "", runner: null,
+  // 報名類型（2027-01-02）：tickets 是這份表單的活動分的類型（沒有分就是空陣列）；ticket 是選好的那一種的 id（網址上的 ticket，或在這一頁按的）。
+  tickets: [], ticket: null,
 };
 
 const root = () => document.getElementById("ap-root");
@@ -30,7 +32,12 @@ function state() {
   return "signedIn";
 }
 
+// 畫完之後把語言補進新畫出來的連結（index.html 的 keepLang：只改 lang，f 與 ticket 都留著）。
 function render() {
+  paint();
+  if (typeof window.btKeepLang === "function") window.btKeepLang();
+}
+function paint() {
   const el = root();
   if (!el) return;
   if (!S.ready) return;
@@ -38,7 +45,8 @@ function render() {
   if (S.view === "error") { el.innerHTML = UI.errorHTML(S.msg); return; }
   if (S.view === "form" && S.form) {
     const st = state();
-    el.innerHTML = UI.formHTML(S.form, S.questions, st, S.msg, S.busy, isEn(), "", S.reason);
+    el.innerHTML = UI.formHTML(S.form, S.questions, st, S.msg, S.busy, isEn(), "", S.reason, { tickets: S.tickets, picked: S.ticket });
+    // 活動有分報名類型、還沒選的時候沒有 #fx-run，mountRun 自己會跳過。
     if (st === "signedIn") mountRun();
     return;
   }
@@ -46,6 +54,22 @@ function render() {
 }
 
 const formId = () => new URLSearchParams(location.search).get("f");
+// 報名類型（2027-01-02）：網址上的 ticket 是在活動頁按哪一種的報名按鈕帶過來的。
+const ticketId = () => new URLSearchParams(location.search).get("ticket");
+// 這份表單的活動有哪些報名類型。沒有分類型、問不到、函式還不在（遷移檔還沒跑）都是空陣列，那就跟原本一樣直接填表。
+async function loadTickets(id) {
+  try {
+    const { data, error } = await supabase.rpc("public_form_tickets", { p_form: id });
+    return !error && Array.isArray(data) ? data : [];
+  } catch (e) { return []; }
+}
+// 把選的類型寫進網址（或拿掉），f 與 lang 都留著。這樣重新整理、把連結傳給別人，選的那一種還在。
+function ticketToUrl(id) {
+  const u = new URL(location.href);
+  if (id) u.searchParams.set("ticket", id); else u.searchParams.delete("ticket");
+  u.searchParams.set("lang", isEn() ? "en" : "zh");
+  history.pushState({}, "", u.pathname + u.search);
+}
 
 async function boot() {
   try {
@@ -117,6 +141,9 @@ async function openForm(id) {
   if (error) throw error;
   S.form = f; S.questions = (qs || []).map(F.normalize); S.view = "form"; S.msg = "";
   S.reason = F.closedReason(f, Date.now());
+  // 活動有分報名類型：網址上帶的那一種對得上、還沒滿就用它；沒帶或對不上，畫面先請他選一種。
+  S.tickets = await loadTickets(id);
+  S.ticket = UI.ticketFromUrl(S.tickets, ticketId());
 
   // 已經送過了嗎。RLS 讓他只讀得到自己那一筆，所以這一句對別人是空的。
   S.applied = false;
@@ -172,6 +199,8 @@ async function submit(payload) {
   S.busy = true; S.msg = ""; if (S.runner) S.runner.setBusy(true);
   try {
     const args = { p_form_id: S.form.id, p_answers: payload, p_guardian_email: S.guard || null, p_meta: S.meta };
+    // 有選報名類型才帶 p_ticket：活動沒有分類型的時候不帶，還沒跑 2027-01-02 那一支的資料庫也照樣收得到。
+    if (S.ticket) args.p_ticket = S.ticket;
     let { error } = await supabase.rpc("submit_application", args);
     // 還沒跑 2026-12-20-form-engine.sql 的資料庫沒有 p_meta 這個參數（PostgREST 說找不到函式），拿掉再送一次。
     if (error && (String(error.code) === "PGRST202" || /p_meta/.test(error.message || ""))) {
@@ -186,6 +215,11 @@ async function submit(payload) {
     S.busy = false;
     S.msg = UI.says(err, isEn());
     if (/form_closed|\bfull\b/.test(String(err && err.message))) S.reason = /full/.test(String(err.message)) ? "full" : "closed";
+    // 報名類型出了問題（那一種剛滿、類型對不上、後台剛加了類型）：重讀一次類型，回到「先選一種」。填的答案留在 S.answers 與草稿裡，選好還在。
+    if (/ticket_full|bad_ticket|ticket_required/.test(String(err && err.message))) {
+      if (S.runner && typeof S.runner.answers === "function") { try { S.answers = S.runner.answers(); } catch (e) { /* 草稿裡還有一份 */ } }
+      S.tickets = await loadTickets(S.form.id); S.ticket = null; ticketToUrl(null);
+    }
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -201,6 +235,13 @@ document.addEventListener("click", async e => {
     // 而清單已經在手上了。
     history.pushState({}, "", location.pathname + (isEn() ? "?lang=en" : "?lang=zh"));
     S.view = "list"; S.form = null; S.msg = ""; render();
+    return;
+  }
+
+  // 報名類型：選一種、換一種。不重新載入，只改網址（f 與 lang 留著）再重畫。
+  if (act === "ticket-pick" || act === "ticket-clear") {
+    S.ticket = act === "ticket-pick" ? UI.ticketFromUrl(S.tickets, b.dataset.id) : null;
+    S.msg = ""; ticketToUrl(S.ticket); render();
     return;
   }
 
@@ -221,12 +262,18 @@ document.addEventListener("input", e => { if (e.target && e.target.id === "guard
 
 // 語言按鈕會改 data-lang，但這一區的字是 JavaScript 畫的，不會自己跟著換。
 // 監看那個屬性，改了就重畫。
-new MutationObserver(() => render())
-  .observe(document.documentElement, { attributes: true, attributeFilter: ["data-lang"] });
+// 換了語言，網址上的 lang 也跟著換（只改這一個參數，f 與 ticket 都留著），這樣重新整理不會跳回原本的語言。
+new MutationObserver(() => {
+  const u = new URL(location.href), l = isEn() ? "en" : "zh";
+  if (u.searchParams.get("lang") !== l) { u.searchParams.set("lang", l); history.replaceState(history.state, "", u.pathname + u.search + u.hash); }
+  render();
+}).observe(document.documentElement, { attributes: true, attributeFilter: ["data-lang"] });
 
 window.addEventListener("popstate", () => {
   const id = formId();
   if (!id) { S.view = "list"; S.form = null; render(); }
+  // 在同一份表單裡按上一頁（選了類型又退回去）：照網址上的 ticket 重畫。
+  else if (S.form && S.form.id === id) { S.ticket = UI.ticketFromUrl(S.tickets, ticketId()); render(); }
 });
 
 boot();

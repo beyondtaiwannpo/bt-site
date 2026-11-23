@@ -370,7 +370,56 @@ summary{cursor:pointer}
 .ev-cover{display:block;width:100%;max-width:820px;aspect-ratio:3/2;object-fit:cover;border-radius:16px}
 .ev-by{font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 6px}
 .ev-text{line-height:1.75}
+/* 一場活動那一頁是一欄（2026-11-23 Paul：字都擠在最左邊）。.sec-in 平常是兩欄（左邊 h2、右邊內容），這一頁沒有左邊的標題，
+   照兩欄排內容會掉進左邊那一欄窄的。改成一欄；字的那幾塊最寬 40em 好讀，講者、報名類型、照片可以用整個寬度。清單那一頁有 h2，沒有動。 */
+.ev-one .sec-in,.ev-cover-sec .sec-in{grid-template-columns:minmax(0,1fr)}
+.ev-one .body{min-width:0}
+.ev-one .rows,.ev-one .ev-text{max-width:40em}
+.ev-cover-sec{padding-top:clamp(18px,3vh,36px)}
+.ev-cover-sec .sec-in{border-top:0;padding-top:0}
+/* 說明的排版（events/src/ui.js 的 richText）：小標題、粗體、清單、分段。只有這幾種，顏色都是品牌色。 */
+.ev-text{margin:26px 0 22px}
+.ev-text p{max-width:none;margin:0 0 15px}
+.ev-text h3{margin:30px 0 8px}
+.ev-text > :first-child{margin-top:0}
+.ev-text > :last-child{margin-bottom:0}
+.ev-text b{font-weight:700}
+.ev-text ul{margin:0 0 15px;padding:0 0 0 1.25em}
+.ev-text li{margin:0 0 5px}
+.ev-text li::marker{color:rgba(16,42,134,.55)}
+.ev-speakers h3,.ev-signup h3{margin:34px 0 14px}
+/* 講者（2027-01-02）：桌機一排四位、平板三位、手機兩位。照片是圓的；沒有照片是一個橘色的圓加名字的第一個字（照片疊在字上面）。
+   字太長就換行（overflow-wrap），不會把格子撐開、不會往旁邊捲。沒有講者的時候那個框帶著 hidden。 */
+.ev-speakers[hidden]{display:none}
+.ev-speakers{margin:0 0 30px}
+.ev-sp-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 18px;max-width:100%}
+.ev-sp-grid li{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;gap:3px}
+.ev-sp-grid li > *{max-width:100%;overflow-wrap:anywhere}
+.ev-sp-face{position:relative;display:flex;align-items:center;justify-content:center;width:min(100%,132px);aspect-ratio:1/1;border-radius:50%;overflow:hidden;
+  margin:0 0 9px;background:rgba(255,196,108,.5);font-family:var(--display);font-weight:700;font-size:clamp(30px,4vw,46px);line-height:1;color:var(--ink)}
+.ev-sp-face img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ev-sp-grid b{font-family:var(--display);font-weight:700;font-size:21px;line-height:1.15;letter-spacing:.01em}
+.ev-sp-grid li > span{font-size:14.5px;line-height:1.4}
+.ev-sp-grid li > .ev-sp-face{font-size:clamp(30px,4vw,46px);line-height:1}
+.ev-sp-grid li > .ev-sp-school{font-size:13.5px;color:rgba(16,42,134,.74)}
+@media (max-width:900px){.ev-sp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:600px){.ev-sp-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 12px}}
+/* 報名類型（2027-01-02）：一種一列，左邊名字、說明、還有幾個名額，右邊一顆報名按鈕（滿了是「額滿」兩個字）。手機上按鈕掉到下一行。 */
+.ev-types{list-style:none;margin:0 0 14px;padding:0;max-width:40em}
+.ev-types li{display:flex;gap:10px 18px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+.ev-types li:first-child{border-top:0;padding-top:0}
+.ev-type-t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 220px;overflow-wrap:anywhere}
+.ev-type-t b{font-family:var(--display);font-weight:700;font-size:21px;line-height:1.2;letter-spacing:.01em}
+.ev-type-t span{font-size:14.5px;line-height:1.5}
+.ev-types .ev-tag{margin:0;align-self:center}
+.ev-types .cta{margin-top:0;flex:none}
 .ev-note{font-size:14px;color:rgba(16,42,134,.82)}
+/* 活動照片（2026-11-23）：一格一格排，每張 4:3 裁切。桌機一格至少 220px 寬（不會比容器寬），手機固定兩欄，不會往旁邊捲。
+   沒有照片的時候那個框帶著 hidden；這裡寫了 display:grid，所以要自己把 hidden 接回來。 */
+.ev-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:12px;margin:26px 0 22px;max-width:100%}
+.ev-photos[hidden]{display:none}
+.ev-photos img{display:block;width:100%;min-width:0;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:rgba(255,196,108,.22)}
+@media (max-width:600px){.ev-photos{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
 
 /* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
 /* 頂欄六個連結。第一個是「現在開放」（到 /apply/，現在報得了名的活動與計畫都在那裡），字比別的粗一點，就這樣：橘色藥丸與小火 Paul 都看過、都不要。

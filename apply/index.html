@@ -279,6 +279,17 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
     letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:999px;
     background:rgba(107,198,187,.42);color:rgba(16,42,134,.92);margin-bottom:8px}
   .loading{padding:40px 0;color:rgba(16,42,134,.75)}
+  /* 報名類型（2027-01-02）：活動有分幾種報名的時候，表單前面先選一種。一種一列，左邊名字、說明、還有幾個名額，右邊一顆按鈕；
+     手機上按鈕掉到下一行。選好之後只剩一行「你報名的是」。 */
+  .tklist{margin:0 0 22px;padding:0;list-style:none;max-width:38em}
+  .tklist li{display:flex;gap:10px 18px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 0;border-top:1px solid rgba(16,42,134,.15)}
+  .tklist li:first-child{border-top:0;padding-top:4px}
+  .tk-t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 220px;overflow-wrap:anywhere}
+  .tk-t b{font-family:var(--display);font-size:clamp(19px,2vw,24px);line-height:1.2}
+  .tk-t span{font-size:15px;line-height:1.5}
+  .tk-t .when{margin:0}
+  .tklist .tagline{margin:0}
+  .tk-yours{font-size:15.5px;margin:0 0 18px;max-width:38em}
 
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
@@ -430,13 +441,17 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   /* 把目前的語言寫進站內每一個連結，這樣點過去之後語言不會跳回瀏覽器預設。
      跳過外部連結、mailto、純錨點，以及 app/ ——
      那是登入的系統，它自己在讀網址上的 next 參數，不要去動它。 */
+  /* 這一頁的連結有的帶自己的參數（一份申請是 ?f=…，報名類型再多一個 ticket=…），所以不能把 ? 後面整段換掉，
+     只改 lang 這一個（2026-11-23，跟 /events/ 同一個做法）。main.js 每次畫完會再叫一次 window.btKeepLang()。 */
   function keepLang(l) {
     var as = document.querySelectorAll("a[href]");
     for (var i = 0; i < as.length; i++) {
       var h = as[i].getAttribute("href");
       if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
-      as[i].setAttribute("href", h.split("?")[0] + "?lang=" + l);
+      var u = new URL(h, location.href); u.searchParams.set("lang", l);
+      as[i].setAttribute("href", u.pathname + u.search + u.hash);
     }
+    window.btKeepLang = function () { keepLang(html.getAttribute("data-lang") === "en" ? "en" : "zh"); };
   }
 
   /* 已經登入的話，右上角那顆改成「我的帳號」。

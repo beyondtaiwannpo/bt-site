@@ -186,7 +186,9 @@ const APP_COLS = "id, user_id, applicant_name, applicant_school, applicant_grade
                  "applicant_email, guardian_email, status, submitted_at, decided_at, checked_in_at";
 async function appRows(formId) {
   const q = cols => supabase.from("applications").select(cols).eq("form_id", formId).order("submitted_at", { ascending: true });
-  const r = await q(APP_COLS + ", meta");
+  // ticket_id（報名的是哪一種類型）是 2027-01-02-event-speakers-tickets.sql 加的，meta 是 2026-12-20 加的；哪一支還沒跑就少讀那一欄。
+  let r = await q(APP_COLS + ", meta, ticket_id");
+  if (r.error && r.error.code === "42703") r = await q(APP_COLS + ", meta");
   return r.error && r.error.code === "42703" ? q(APP_COLS) : r;
 }
 // 上傳的檔案：60 秒的簽名網址。Storage 的政策只讓改得動那份表單的人拿得到（2026-12-22-form-uploads.sql）。
@@ -209,8 +211,12 @@ export async function loadApplications(formId) {
     if (!byApp.has(a.application_id)) byApp.set(a.application_id, new Map());
     byApp.get(a.application_id).set(a.question_id, a.value);
   }
-  return (ap.data || []).map(a => ({ ...a, answers: byApp.get(a.id) || new Map() }));
+  // 報名類型的名字（2027-01-02）：有人帶著 ticket_id 才問。看得到這份報名的人才拿得到（form_ticket_names 的門是 form_can_view）；問不到就不印那個標籤。
+  const names = new Map();
+  if ((ap.data || []).some(a => a.ticket_id)) for (const t of await loadTicketNames(formId)) names.set(t.id, t);
+  return (ap.data || []).map(a => ({ ...a, answers: byApp.get(a.id) || new Map(), ticket: (a.ticket_id && names.get(a.ticket_id)) || null }));
 }
+export const loadTicketNames = formId => supabase.rpc("form_ticket_names", { p_form: formId }).then(r => (r.error || !Array.isArray(r.data) ? [] : r.data), () => []);
 
 // 一次改很多筆。**回傳真的改了幾筆** —— 狀態本來就一樣的不算，
 // 那正是「按兩次錄取不會寄兩封信」的地方。
@@ -392,6 +398,31 @@ const SAYS = [
   ["not_ready", "要先按「準備好了」。", "Mark it ready first."],
   ["not_published", "這場活動不在對外頁上。", "This event is not published."],
   ["not_event_editor", "你對這場活動只有「看」，改不動。", "You can only view this event, so you can't change it."],
+  // 活動的照片與回饋表（2026-11-23）
+  ["photo_not_https", "照片網址要 https 開頭。", "The photo URL must start with https."],
+  ["too_many_photos", "一場活動最多放 30 張照片，先拿掉幾張再加。", "An event holds up to 30 photos. Remove some before adding more."],
+  ["no_such_photo", "找不到這張照片，重新整理再試一次。", "Photo not found. Refresh and try again."],
+  ["Bucket not found", "Storage 的 events bucket 還不在，要先跑 2027-01-01-event-photos.sql。還沒跑之前，封面可以先用貼連結的。", "The events storage bucket does not exist yet. Run 2027-01-01-event-photos.sql first. Until then, paste a link for the cover."],
+  ["event_photos_list", "活動照片的函式還不在資料庫裡，要先跑 2027-01-01-event-photos.sql。", "The event photo functions are not in the database yet. Run 2027-01-01-event-photos.sql first."],
+  ["add_event_photo", "活動照片的函式還不在資料庫裡，要先跑 2027-01-01-event-photos.sql。", "The event photo functions are not in the database yet. Run 2027-01-01-event-photos.sql first."],
+  // 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）。ticket_full 要排在下面那句 full 前面（誰先被 includes 命中誰贏）。
+  ["speaker_no_name", "講者要有名字。", "A speaker needs a name."],
+  ["speaker_name_long", "名字太長了，最多 60 個字。對外只放名字，不放姓。", "That name is too long (60 characters at most). Only the first name goes public."],
+  ["too_many_speakers", "一場活動最多放 40 位講者，先拿掉幾位再加。", "An event holds up to 40 speakers. Remove some before adding more."],
+  ["no_such_speaker", "找不到這位講者，重新整理再試一次。", "Speaker not found. Refresh and try again."],
+  ["no_such_person", "紀錄裡找不到這個人，可能已經被移除了。直接打名字也可以。", "That person is not in Records any more. You can type the name instead."],
+  ["ticket_no_name", "報名類型要有名字，中文或英文至少填一個。", "A sign-up type needs a name in Chinese or English."],
+  ["bad_capacity", "名額要填 0 以上的整數，0 是不限。", "The limit must be a whole number, 0 or more. 0 means no limit."],
+  ["too_many_tickets", "一場活動最多分 12 種報名類型。", "An event can have up to 12 sign-up types."],
+  ["no_such_ticket", "找不到這個報名類型，重新整理再試一次。", "Sign-up type not found. Refresh and try again."],
+  ["ticket_in_use", "已經有人報這一種了，刪不掉。不想再收的話，把名額改成現在的人數。", "People have already signed up for this type, so it cannot be removed. To stop taking more, set the limit to the current number."],
+  ["ticket_full", "這一種額滿了。", "This type is full."],
+  ["event_speakers_list", "講者的函式還不在資料庫裡，要先跑 2027-01-02-event-speakers-tickets.sql。", "The speaker functions are not in the database yet. Run 2027-01-02-event-speakers-tickets.sql first."],
+  ["save_event_speaker", "講者的函式還不在資料庫裡，要先跑 2027-01-02-event-speakers-tickets.sql。", "The speaker functions are not in the database yet. Run 2027-01-02-event-speakers-tickets.sql first."],
+  ["event_tickets_list", "報名類型的函式還不在資料庫裡，要先跑 2027-01-02-event-speakers-tickets.sql。", "The sign-up type functions are not in the database yet. Run 2027-01-02-event-speakers-tickets.sql first."],
+  ["save_event_ticket", "報名類型的函式還不在資料庫裡，要先跑 2027-01-02-event-speakers-tickets.sql。", "The sign-up type functions are not in the database yet. Run 2027-01-02-event-speakers-tickets.sql first."],
+  ["not_form_creator", "建回饋表要是這場活動「改」以上的人，或紀錄工作區的人。", "Creating a feedback form needs Edit on this event, or membership of the Records workspace."],
+  ["rc_save_form", "回饋表的函式還不在資料庫裡，要先跑 Records 那一批遷移檔（2026-12-01-records.sql 到 2026-12-24-feedback-engine.sql）。", "The feedback form functions are not in the database yet. Run the Records migrations first (2026-12-01-records.sql through 2026-12-24-feedback-engine.sql)."],
   ["no_such_event", "找不到這場活動，重新整理再試一次。", "Event not found. Refresh and try again."],
   ["full", "額滿了。", "Full."],
   // 行銷需求單（2026-10-31）
@@ -604,6 +635,64 @@ export async function publishEvent(id, on) {
   const { data, error } = await supabase.rpc(on ? "publish_event" : "unpublish_event", { p_id: id });
   if (error) throw error;
   return data;
+}
+// ── 活動的照片（2026-11-23，2027-01-01-event-photos.sql）──────────────────
+// 封面與活動照片都傳到 Storage 的 events bucket（公開讀；上傳與刪除給幹部），做法跟歷史之路、BT 島同一套（admin/site/src/data.js）。
+// 檔案傳得上去不代表掛得上去：封面的網址走 save_event()，活動照片走 add_event_photo()，門都是這場活動「改」以上。
+// 路徑 <活動 id>/<時間>-<亂數>.jpg，不用原檔名（原檔名可能有人名）。傳進來的 blob 是 main.js 已經縮好的 JPEG。
+export async function uploadEventImage(eventId, blob) {
+  need();
+  const name = `${eventId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage.from("events").upload(name, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+  if (error) throw error;
+  return supabase.storage.from("events").getPublicUrl(name).data.publicUrl;
+}
+// 把 bucket 裡的一個檔刪掉。path 是 UI.evStoragePath(網址) 算的；空的（貼的連結，不是我們的檔）就不做事。
+// 刪不掉只是多佔一點空間，不擋。
+export async function removeEventFile(path) {
+  if (!path || !supabase) return;
+  try { await supabase.storage.from("events").remove([path]); } catch (e) { /* 檔留著，不擋 */ }
+}
+// 這一場的照片（含還沒勾同意的）。遷移檔還沒跑（函式不存在）回 null，畫面說要先跑哪一支。
+export const loadEventPhotos = id => rpcV("event_photos_list", { p_event: id })
+  .catch(e => { if (/event_photos_list|Could not find|does not exist/.test(String(e && e.message))) return null; throw e; });
+export const addEventPhoto = (eventId, url) => rpcV("add_event_photo", { p_event: eventId, p_url: url });
+export const setEventPhotoConsent = (id, on) => rpcV("set_event_photo_consent", { p_id: id, p_consent: !!on });
+export const reorderEventPhotos = (eventId, ids) => rpcV("reorder_event_photos", { p_event: eventId, p_ids: ids });
+// 拿掉一張，回它的網址（main.js 拿去把 Storage 的檔也刪掉）。
+export const deleteEventPhoto = id => rpcV("delete_event_photo", { p_id: id });
+// ── 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）────
+// 兩張表都不開給前端，讀寫一律走函式，門是這場活動「改」以上（跟活動照片同一條）。遷移檔還沒跑（函式不存在）回 null，畫面說要先跑哪一支。
+// 講者的照片傳到同一個 events bucket（上面的 uploadEventImage），網址存在 event_speakers.photo_url。
+const notYet = name => e => { if (new RegExp(name + "|Could not find|does not exist").test(String(e && e.message))) return null; throw e; };
+export const loadEventSpeakers = id => rpcV("event_speakers_list", { p_event: id }).catch(notYet("event_speakers_list"));
+// 加一位（id 給 null）或改一位。p 的鍵：display_name、subject、school、photo_url、person_id，沒帶的不動。回那一位的 id。
+export const saveEventSpeaker = (eventId, id, p) => rpcV("save_event_speaker", { p_event: eventId, p_id: id || null, p });
+export const setEventSpeakerConsent = (id, on) => rpcV("set_event_speaker_consent", { p_id: id, p_consent: !!on });
+export const reorderEventSpeakers = (eventId, ids) => rpcV("reorder_event_speakers", { p_event: eventId, p_ids: ids });
+// 拿掉一位，回他的照片網址（main.js 拿去把 Storage 的檔也刪掉；沒有照片是 null）。
+export const deleteEventSpeaker = id => rpcV("delete_event_speaker", { p_id: id });
+// 從紀錄（Records）找人：叫的是 Records 原本那一支 rc_find_people()，沒有新的讀取權限。
+// 讀不到名錄的人（不是 Co-President、Senior Adviser，也不在紀錄工作區）資料庫回空陣列；叫不到也當成空的。
+export const findPeople = q => rpcV("rc_find_people", { p_q: q || "" }).then(r => (Array.isArray(r) ? r : []), () => []);
+export const loadEventTickets = id => rpcV("event_tickets_list", { p_event: id }).catch(notYet("event_tickets_list"));
+// 加一種（id 給 null）或改一種。p 的鍵：name_zh、name_en、note_zh、note_en、capacity，沒帶的不動。
+export const saveEventTicket = (eventId, id, p) => rpcV("save_event_ticket", { p_event: eventId, p_id: id || null, p });
+export const reorderEventTickets = (eventId, ids) => rpcV("reorder_event_tickets", { p_event: eventId, p_ids: ids });
+// 已經有人報的那一種刪不掉（ticket_in_use）。
+export const deleteEventTicket = id => rpcV("delete_event_ticket", { p_id: id });
+// ── 活動頁上的「建立回饋表」（2026-11-23）────────────────────────────────
+// 叫的是 Records 那邊開回饋表同一支 rc_save_form()（admin/records/src/data.js 的 saveForm），沒有新的資料庫函式：
+// p_form 給 null 是新建，event_id 帶著就掛在這場活動上。誰建得了由那一支決定（這場活動「改」以上，或紀錄工作區的人）。回新表的 id。
+// 後台的資料夾之間不互相 import，所以這一句抄一份。
+export const createFeedbackForm = (eventId, title, l, questions) =>
+  rpcV("rc_save_form", { p_form: null, p_data: { title, kind: "post-event", event_id: eventId, lang: l }, p_questions: questions || [] });
+// 一份報名表有幾題。開放報名之前先看一次：沒有題目的表單開出去，報名的人看到的是空的。
+export async function countQuestions(formId) {
+  need();
+  const { count, error } = await supabase.from("form_questions").select("id", { count: "exact", head: true }).eq("form_id", formId);
+  if (error) throw error;
+  return count || 0;
 }
 
 // ── 會議紀錄（2026-11-02）──────────────────────────────────────────────

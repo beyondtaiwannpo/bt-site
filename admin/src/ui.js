@@ -268,6 +268,7 @@ export function appsHTML(form, apps, questions, canDecide, sel, filter, pending,
           <div class="fhead">
             <b>${esc(a.applicant_name)}</b>
             <span class="tag ${st.tag}">${esc(T(st.label))}</span>
+            ${a.ticket ? `<span class="tag" data-ticket>${T("apps.ticket", { name: esc(evTicketName(a.ticket)) })}</span>` : ""}
           </div>
           <div class="fmeta">${[esc(a.applicant_school || T("apps.noSchool")), esc(a.applicant_grade || ""),
             esc(a.applicant_email), T("apps.submitted", { when: fmtWhen(a.submitted_at) })].filter(Boolean).join("・")}
@@ -1476,11 +1477,276 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
         : emptyHTML(T("ev.none"), (canCreateTeams || []).length ? T("ev.noneHint") : T("ev.noneHintNo")))
     + recLine;
 }
+// ── 活動編輯頁的照片與下半（2026-11-23，Paul：封面要選檔案上傳、要能放好幾張、報名與回饋不要只是一排連結）──
+// 下面這幾支都是純函式，test/event-editor.test.mjs 有測。
+// 縮圖：最長邊縮到 1600，小的不放大，邊長最少 1。跟歷史之路同一個算法（admin/site/src/ui.js 的 hiFit）；
+// 後台的資料夾之間不互相 import，所以這裡有自己的一份。
+export const EV_IMG_MAX = 1600;
+export function evFit(w, h, max) {
+  const m = max || EV_IMG_MAX, big = Math.max(w, h);
+  if (big <= m) return { w, h };
+  const r = m / big;
+  return { w: Math.max(1, Math.round(w * r)), h: Math.max(1, Math.round(h * r)) };
+}
+// 選檔先擋一次：只收圖、原檔 25 MB 以內（更大的手機瀏覽器解碼會卡死）。縮完一定在 5 MB 以內（bucket 的上限）。
+export const evFileOk = f => !!f && /^image\//.test(String(f.type || "")) && Number(f.size || 0) <= 25 * 1024 * 1024;
+// 公開網址 → events bucket 裡的路徑（…/object/public/events/<活動 id>/<檔名> → <活動 id>/<檔名>）。
+// 不是這個 bucket 的網址（貼的 Drive 連結）回空字串：那種沒有檔可以刪。
+export function evStoragePath(url) {
+  const m = /\/object\/public\/events\/([^?#]+)/.exec(String(url || ""));
+  if (!m) return "";
+  try { return decodeURIComponent(m[1]); } catch (x) { return ""; }
+}
+// 照片往前或往後一格：回一整串新順序的 id（交給 reorder_event_photos）；已經在頭或尾、找不到那一張，回 null。
+export function evPhotoMove(photos, id, dir) {
+  const ids = (photos || []).map(p => p.id), i = ids.indexOf(id), j = i + (Number(dir) < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= ids.length) return null;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  return ids;
+}
+// 報名表現在收不收得到。沒有表是 none；draft 還在寫、closed 關了；狀態是開放中的再分：時間還沒到 soon、過了截止 over、名額滿了 full、其他 open。
+export function evFormState(form, signed, capacity, now) {
+  if (!form) return "none";
+  if (form.status !== "open") return form.status === "closed" ? "closed" : "draft";
+  const t = now || new Date(), cap = Number(capacity) || 0;
+  if (form.opens_at && new Date(form.opens_at) > t) return "soon";
+  if (form.closes_at && new Date(form.closes_at) < t) return "over";
+  if (cap > 0 && Number(signed) >= cap) return "full";
+  return "open";
+}
+// 報名表那一行的事實：什麼時候開放、什麼時候截止、幾個人報了（有名額就寫幾分之幾）。回一串字，畫面用「・」接起來。
+// 時間印瀏覽器的時區。報名數載不到（null）印問號，不印 0。
+export function evFormFacts(form, signed, capacity) {
+  if (!form) return [];
+  const out = [], cap = Number(capacity) || 0, n = signed == null ? "?" : signed;
+  if (form.opens_at) out.push(T("ev.opens", { d: evLocal(form.opens_at).replace("T", " ") }));
+  if (form.closes_at) out.push(T("ev.fm.closes", { d: evLocal(form.closes_at).replace("T", " ") }));
+  out.push(cap ? T("ev.fm.countCap", { n, c: cap }) : T("ev.fm.count", { n }));
+  return out;
+}
+// 活動後回饋的固定題目（六題）。**跟 admin/records/src/ui.js 的 TEMPLATES["post-event"] 一字不差**（test/event-editor.test.mjs 逐題比對）：
+// 同一個 key 每一年都一樣，記分卡的「會推薦」「覺得有用」就是靠 recommend、useful 這兩個 key 算的。
+// 後台的資料夾之間不互相 import，所以抄一份；Records 那邊改了題目，測試會紅，這裡要跟著改。
+const FBQ = (key, type, zh, en, extra) => Object.assign({ key, type, label: { zh, en }, required: false, options: [], scale_min: 1, scale_max: 5, min_label: "", max_label: "" }, extra || {});
+const FB_POST_EVENT = [
+  FBQ("recommend", "scale", "你會不會推薦這場活動給跟你情況一樣的朋友？", "How likely are you to recommend this event to a friend in your situation?", { required: true, min_label: { zh: "不會", en: "Would not" }, max_label: { zh: "一定會", en: "Definitely" } }),
+  FBQ("useful", "scale", "今天對你自己的下一步有多有用？", "How useful was today for your own next step?"),
+  FBQ("clarity", "scale", "活動結束後，你清不清楚接下來要做什麼？", "Was it clear what to do next after this event?"),
+  FBQ("best", "short", "最有用的部分是什麼？", "What was the most useful part?"),
+  FBQ("change", "long", "下一次我們該改什麼？", "What should we change next time?"),
+  FBQ("first_time", "single", "這是你第一次參加 BT 的活動嗎？", "Is this your first BT event?", { options: { zh: ["是", "不是"], en: ["Yes", "No"] } }),
+];
+// 照表單的語言變成 rc_save_form 要的題目清單。
+export function evFeedbackQuestions(l) {
+  const pick = v => (v && typeof v === "object" && !Array.isArray(v)) ? (v[l] != null ? v[l] : v.en) : v;
+  return FB_POST_EVENT.map(q => ({ key: q.key, type: q.type, label: pick(q.label), help: "", required: !!q.required,
+    options: (pick(q.options) || []), scale_min: q.scale_min, scale_max: q.scale_max, min_label: pick(q.min_label) || "", max_label: pick(q.max_label) || "" }));
+}
+// 新回饋表的名字：「活動名稱 · 活動後回饋」，跟 Records 那邊開出來的一樣。
+export const evFeedbackTitle = e => `${evTitle(e)} · ${T("ev.fb.kind")}`;
+
+// 封面那一塊（在「內容」的自動儲存框裡：連結那一格與同意勾選都是改了就存）。
+// 主要是選檔案（main.js 聽 #ev-cover-file 的 change：縮圖、傳到 Storage 的 events bucket、把網址存進 cover_url）；貼連結收在一格裡當備用。
+// 連結那一格一直在畫面上，readEvent() 才讀得到；封面本來就是貼的連結，那一格先打開。x.coverUp 是上傳進度 { pct, name }。
+export function eventCoverHTML(e, canEdit, busy, x) {
+  const o = x || {}, dis = busy ? " disabled" : "", ro = canEdit ? "" : " readonly", up = o.coverUp;
+  const uploaded = !!evStoragePath(e.cover_url);
+  const pick = !canEdit ? "" : up
+    ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(T("ev.uploading", { name: up.name || "" }))}</span></div>`
+    : `<label class="hi-upload"><i>${T(e.cover_url ? "ev.coverChange" : "ev.coverPick")}</i><input type="file" id="ev-cover-file" accept="image/*" data-noauto="1" data-id="${esc(e.id)}"${dis}></label>`;
+  const link = `<label><i>${T("ev.cover")}</i><input id="ev-cover" name="cover_url" value="${esc(e.cover_url || "")}" placeholder="https://…"${ro}${dis}></label>`;
+  const linkBox = canEdit ? foldHTML("ev-cover-link", T("ev.coverLink"), link, !!o.coverLinkOpen || (!!e.cover_url && !uploaded)) : (e.cover_url ? link : "");
+  return `<div class="ev-panel ev-coverbox">
+      <h3>${T("ev.coverSec")}</h3>
+      ${e.cover_url ? `<img class="ev-cover" src="${esc(e.cover_url)}" alt="">` : `<p class="ev-line">${T("ev.coverNone")}</p>`}
+      ${canEdit && e.status === "published" ? `<div class="note">${T("ev.coverLive")}</div>` : ""}
+      ${pick}
+      ${linkBox}
+      <label class="check"><input type="checkbox" id="ev-consent" name="cover_consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label>
+      <div class="mini">${T("ev.coverNote")}</div>
+      ${canEdit && e.cover_url ? `<div class="ev-acts"><button class="btn quiet danger sm" data-act="ev-cover-clear" data-id="${esc(e.id)}"${dis}>${T("ev.coverClear")}</button></div>` : ""}
+    </div>`;
+}
+// 活動照片（好幾張）。photos 是 event_photos_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是照片。
+// 讀與寫的門都是「這場活動改得動」（資料庫的 can_edit），所以只有「看」的人整塊不畫。x.photoUp 是上傳進度 { pct, name, i, n }。
+// 每一張自己勾同意（勾了就送，main.js 聽 change）；沒勾的不會出現在對外頁，那道門在資料庫的 public_event_extras()。
+export function eventPhotosHTML(e, photos, canEdit, busy, x) {
+  if (!canEdit) return "";
+  const o = x || {}, up = o.photoUp, dis = busy ? " disabled" : "";
+  const head = `${T("ev.photos")}${Array.isArray(photos) ? `<span class="hint">${photos.length}</span>` : ""}`;
+  if (photos === undefined) return sectionHTML(head, `<div class="mini">${T("loading")}</div>`, { id: "ev-photos" });
+  if (!Array.isArray(photos)) return sectionHTML(head, `<div class="note">${T("ev.photosNeedsSql")}</div>`, { id: "ev-photos" });
+  const live = e.status === "published";
+  const card = (p, i) => `<li class="hi-photo">
+      <img src="${esc(p.url)}" alt="" loading="lazy">
+      <div class="hi-photo-f">
+        <div class="ev-ph-state"><span class="tag${p.consent && live ? " open" : p.consent ? " ok" : " draft"}">${T(p.consent ? (live ? "ev.phPublic" : "ev.phReady") : "ev.phHidden")}</span></div>
+        <label class="check"><input type="checkbox" data-act="ev-ph-consent" data-noauto="1" data-id="${esc(p.id)}"${p.consent ? " checked" : ""}${dis}><span>${T("ev.consent")}</span></label>
+        <div class="ev-acts"><button class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>${T("ev.phUp")}</button><button class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="1"${i === photos.length - 1 || busy ? " disabled" : ""}>${T("ev.phDown")}</button><span class="sp"></span><button class="btn quiet danger sm" data-act="ev-ph-del" data-id="${esc(p.id)}"${dis}>${T("ev.phDel")}</button></div>
+      </div></li>`;
+  const pick = up
+    ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(up.n > 1 ? T("ev.uploadingN", { name: up.name || "", i: up.i || 1, n: up.n }) : T("ev.uploading", { name: up.name || "" }))}</span></div>`
+    : `<label class="hi-upload"><i>${T("ev.photosPick")}</i><input type="file" id="ev-photo-files" accept="image/*" multiple data-id="${esc(e.id)}"${dis}></label>`;
+  return sectionHTML(head, `<div class="note">${T("ev.photosNote")}</div>
+      ${photos.length ? `<ul class="hi-photos">${photos.map(card).join("")}</ul>` : `<p class="ev-line">${T("ev.photosNone")}</p>`}
+      ${pick}`, { hint: T("ev.photosHint"), id: "ev-photos" });
+}
+// ── 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）──
+// 下面這幾支純函式 test/event-speakers-tickets.test.mjs 有測。
+// 對外只放名字不放姓。從紀錄挑人的時候先幫忙猜一個：英文名字（有空白、都是拉丁字母）取第一段，其他的原樣帶入，讓編輯的人自己改短。
+export function evFirstName(name) {
+  const n = String(name || "").trim().replace(/\s+/g, " ");
+  return /^[A-Za-z][A-Za-z.'-]*( [A-Za-z][A-Za-z.'-]*)+$/.test(n) ? n.split(" ")[0] : n;
+}
+// 沒有照片的時候圓圈裡印的那一個字：名字的第一個字（英文轉大寫）。沒有名字回空字串。
+export function evInitial(name) { const c = Array.from(String(name || "").trim())[0] || ""; return c.toUpperCase(); }
+// 一列（講者或報名類型）現在要印的值：畫面上打到一半的（typed，重畫前 main.js 收進來的）蓋過資料庫的。
+export function evRowVals(row, keys) {
+  const t = (row && row.typed) || {}, out = {};
+  for (const k of keys) out[k] = t[k] != null ? String(t[k]) : (row && row[k] != null ? String(row[k]) : "");
+  return out;
+}
+// 講者那一列打的字 → save_event_speaker() 的 patch。名字空的回 null（畫面先擋一次）。
+export function evSpeakerPatch(raw) {
+  const r = raw || {}, name = String(r.display_name || "").trim();
+  if (!name) return null;
+  return { display_name: name, subject: String(r.subject || "").trim(), school: String(r.school || "").trim() };
+}
+// 報名類型那一列打的字 → save_event_ticket() 的 patch。回 { patch } 或 { err: "err.evTkName" | "err.evTkCap" }。
+// 名額：空的當 0（不限）；要是 0 以上的整數，最多六位數（跟資料庫同一條）。
+export function evTicketPatch(raw) {
+  const r = raw || {}, zh = String(r.name_zh || "").trim(), en = String(r.name_en || "").trim(), cap = String(r.capacity == null ? "" : r.capacity).trim() || "0";
+  if (!zh && !en) return { err: "err.evTkName" };
+  if (!/^[0-9]{1,6}$/.test(cap)) return { err: "err.evTkCap" };
+  return { patch: { name_zh: zh, name_en: en, note_zh: String(r.note_zh || "").trim(), note_en: String(r.note_en || "").trim(), capacity: Number(cap) } };
+}
+// 報名類型的名字：照畫面的語言，沒有就用另一種。
+export const evTicketName = t => (t ? (lang() === "zh" ? (t.name_zh || t.name_en) : (t.name_en || t.name_zh)) || "" : "");
+// 一種類型報了幾個：有名額寫幾分之幾，不限就只寫人數。
+export const evTicketFacts = t => { const c = Number(t && t.capacity) || 0, n = Number(t && t.taken) || 0; return c ? T("ev.tkCountCap", { n, c }) : T("ev.tkCount", { n }); };
+export const evTicketFull = t => { const c = Number(t && t.capacity) || 0; return c > 0 && (Number(t && t.taken) || 0) >= c; };
+// 誰看得到「從紀錄裡找人」：Co-President、Senior Adviser、紀錄工作區裡的人（跟資料庫的 rc_can_view 同一條）。
+// 這只決定畫不畫那一格；讀不到名錄的人就算自己去叫，資料庫回的也是空的。
+export const evCanPickPeople = me => !!me && (senior(me) || !!wsLevel(me, "custom:records"));
+
+// 講者（一場可以好幾位）。speakers 是 event_speakers_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是講者。
+// 讀與寫的門都是「這場活動改得動」，所以只有「看」的人整塊不畫。
+// x.spUp 是照片的上傳進度 { id, pct, name }；x.spDraft 是「加一位」填到一半的 { display_name, subject, school, person_id, from }；
+// x.spOpen 那一格開著沒；x.canPick 看不看得到「從紀錄裡找人」；x.spFound 找到的人（undefined 是還沒找過）；x.spQ 找的字。
+// 名字、主題、學校改完要按「存這一位」；同意是勾了就送（main.js 聽 change）。沒勾的不會出現在對外頁，那道門在資料庫的 public_event_extras()。
+const SP_KEYS = ["display_name", "subject", "school"];
+export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
+  if (!canEdit) return "";
+  const o = x || {}, up = o.spUp, dis = busy ? " disabled" : "";
+  const head = `${T("ev.sp")}${Array.isArray(speakers) ? `<span class="hint">${speakers.length}</span>` : ""}`;
+  if (speakers === undefined) return sectionHTML(head, `<div class="mini">${T("loading")}</div>`, { id: "ev-speakers" });
+  if (!Array.isArray(speakers)) return sectionHTML(head, `<div class="note">${T("ev.spNeedsSql")}</div>`, { id: "ev-speakers" });
+  const live = e.status === "published";
+  const face = (name, url) => url ? `<img class="ev-sp-pic" src="${esc(url)}" alt="">` : `<span class="ev-sp-pic" aria-hidden="true">${esc(evInitial(name))}</span>`;
+  const fields = (v, idp) => `<div class="two">
+          <label><i>${T("ev.spName")}</i><input data-f="display_name"${idp ? ` id="${idp}-name"` : ""} value="${esc(v.display_name)}" maxlength="60" autocomplete="off"${dis}></label>
+          <label><i>${T("ev.spSubject")}</i><input data-f="subject" value="${esc(v.subject)}" maxlength="120" autocomplete="off"${dis}></label>
+          <label><i>${T("ev.spSchool")}</i><input data-f="school" value="${esc(v.school)}" maxlength="120" autocomplete="off"${dis}></label>
+        </div>`;
+  const card = (sp, i) => {
+    const v = evRowVals(sp, SP_KEYS), mine = up && up.id === sp.id;
+    const pick = mine
+      ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(T("ev.uploading", { name: up.name || "" }))}</span></div>`
+      : `<label class="hi-upload"><i>${T(sp.photo_url ? "ev.spPhotoChange" : "ev.spPhotoPick")}</i><input type="file" accept="image/*" data-act="ev-sp-photo" data-id="${esc(sp.id)}"${dis}></label>`;
+    return `<li class="ev-sp" data-sp-row data-id="${esc(sp.id)}">
+      ${face(sp.display_name, sp.photo_url)}
+      <div class="ev-sp-f">
+        <div class="ev-ph-state"><span class="tag${sp.consent && live ? " open" : sp.consent ? " ok" : " draft"}">${T(sp.consent ? (live ? "ev.spPublic" : "ev.spReady") : "ev.spHidden")}</span>${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}</div>
+        ${fields(v)}
+        ${pick}
+        <label class="check"><input type="checkbox" data-act="ev-sp-consent" data-id="${esc(sp.id)}"${sp.consent ? " checked" : ""}${dis}><span>${T("ev.spConsent")}</span></label>
+        <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button><button class="btn ghost sm" data-act="ev-sp-move" data-id="${esc(sp.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>${T("ev.phUp")}</button><button class="btn ghost sm" data-act="ev-sp-move" data-id="${esc(sp.id)}" data-dir="1"${i === speakers.length - 1 || busy ? " disabled" : ""}>${T("ev.phDown")}</button>${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
+      </div></li>`;
+  };
+  const d = o.spDraft || {};
+  const found = o.spFound;
+  const finder = !o.canPick ? "" : `<div class="ev-sp-find">
+        <label><i>${T("ev.spFind")}</i><span class="ev-sp-findrow"><input id="ev-sp-q" type="search" value="${esc(o.spQ || "")}" placeholder="${esc(T("ev.spFindPh"))}" autocomplete="off"${dis}><button class="btn ghost sm" data-act="ev-sp-find" data-id="${esc(e.id)}"${dis}>${T("ev.spFindGo")}</button></span><span class="mini">${T("ev.spFindHint")}</span></label>
+        ${Array.isArray(found) ? (found.length
+          ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""} <span class="tag${p.kind === "student" ? " warn" : ""}">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
+          : `<p class="ev-line">${T("ev.spFindNone")}</p>`) : ""}
+      </div>`;
+  const picked = d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "";
+  const add = foldHTML("ev-sp-new", T("ev.spNew"), `<div id="ev-sp-new-box" data-ev="${esc(e.id)}">${finder}${picked}${fields(evRowVals({ typed: d }, SP_KEYS), "ev-sp-new")}
+      <div class="mini">${T("ev.spAddHint")}</div>
+      <div class="ev-acts"><button class="btn sm" data-act="ev-sp-add" data-id="${esc(e.id)}"${dis}>${T("ev.spAdd")}</button></div></div>`, !!o.spOpen);
+  return sectionHTML(head, `<div class="note">${T("ev.spNote")}</div>
+      ${speakers.length ? `<ul class="ev-sp-list">${speakers.map(card).join("")}</ul>` : `<p class="ev-line">${T("ev.spNone")}</p>`}
+      ${add}`, { hint: T("ev.spHint"), id: "ev-speakers" });
+}
+// 報名類型（免費的，沒有價錢）。放在「報名與現場」裡、報名表那一塊的下面。tickets 是 event_tickets_list() 回的（undefined、null、陣列，同上）。
+// 這場活動「改」以上才畫（讀的門也是那一條）；沒有報名表的活動不畫（沒有表就沒有人報得了名）。
+// x.tkDraft 是「加一種」填到一半的；x.tkOpen 那一格開著沒。已經有人報的那一種沒有「拿掉」的按鈕，改成一句話（資料庫也擋，ticket_in_use）。
+const TK_KEYS = ["name_zh", "name_en", "capacity", "note_zh", "note_en"];
+export function eventTicketsHTML(e, tickets, canEdit, busy, x) {
+  if (!canEdit || tickets === undefined) return "";
+  const o = x || {}, dis = busy ? " disabled" : "";
+  if (!Array.isArray(tickets)) return `<div class="ev-panel" id="ev-tickets"><h3>${T("ev.tk")}</h3><div class="note">${T("ev.spNeedsSql")}</div></div>`;
+  const fields = (v, idp) => `<div class="two">
+          <label><i>${T("ev.tkNameZh")}</i><input data-f="name_zh"${idp ? ` id="${idp}-zh"` : ""} value="${esc(v.name_zh)}" maxlength="60" autocomplete="off"${dis}></label>
+          <label><i>${T("ev.tkNameEn")}</i><input data-f="name_en" value="${esc(v.name_en)}" maxlength="60" autocomplete="off"${dis}></label>
+          <label><i>${T("ev.tkNoteZh")}</i><input data-f="note_zh" value="${esc(v.note_zh)}" maxlength="200" autocomplete="off"${dis}></label>
+          <label><i>${T("ev.tkNoteEn")}</i><input data-f="note_en" value="${esc(v.note_en)}" maxlength="200" autocomplete="off"${dis}></label>
+          <label><i>${T("ev.tkCap")}</i><input data-f="capacity" type="number" min="0" step="1" inputmode="numeric" value="${esc(v.capacity || "0")}"${dis}></label>
+        </div>`;
+  const row = (t, i) => `<li class="ev-tk" data-tk-row data-id="${esc(t.id)}">
+        <p class="ev-line"><b>${esc(evTicketName(t))}</b>・${esc(evTicketFacts(t))}${evTicketFull(t) ? ` <span class="tag warn">${T("ev.tkFull")}</span>` : ""}</p>
+        ${fields(evRowVals(t, TK_KEYS))}
+        ${Number(t.used) > 0 ? `<div class="mini">${T("ev.tkInUse", { n: Number(t.used) })}</div>` : ""}
+        <div class="ev-acts"><button class="btn sm" data-act="ev-tk-save" data-id="${esc(t.id)}"${dis}>${T("ev.tkSave")}</button><button class="btn ghost sm" data-act="ev-tk-move" data-id="${esc(t.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>${T("ev.phUp")}</button><button class="btn ghost sm" data-act="ev-tk-move" data-id="${esc(t.id)}" data-dir="1"${i === tickets.length - 1 || busy ? " disabled" : ""}>${T("ev.phDown")}</button>${Number(t.used) > 0 ? "" : `<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-tk-del" data-id="${esc(t.id)}"${dis}>${T("ev.tkDel")}</button>`}</div>
+      </li>`;
+  const add = foldHTML("ev-tk-new", T("ev.tkNew"), `<div id="ev-tk-new-box" data-ev="${esc(e.id)}">${fields(evRowVals({ typed: o.tkDraft || {} }, TK_KEYS), "ev-tk-new")}
+      <div class="ev-acts"><button class="btn sm" data-act="ev-tk-add" data-id="${esc(e.id)}"${dis}>${T("ev.tkAdd")}</button></div></div>`, !!o.tkOpen);
+  return `<div class="ev-panel" id="ev-tickets"><h3>${T("ev.tk")}${tickets.length ? ` <span class="hint">${tickets.length}</span>` : ""}</h3>
+      <div class="mini">${T("ev.tkNote")}</div>
+      ${tickets.length ? `<ul class="ev-tk-list">${tickets.map(row).join("")}</ul><div class="mini">${T("ev.tkOld")}</div>` : `<p class="ev-line">${T("ev.tkNone")}</p>`}
+      ${add}</div>`;
+}
+// 報名與現場（2026-11-23 改成一塊一塊的，原本是一排連結）。
+// 2026-11-13 起每一位幹部都看得到每一場活動（2026-12-19-access-fixes.sql），但報名名單、表單、簽到只給被加進這一場的人。
+// 沒被加進來的不畫那幾顆按鈕（點進去會是空的），改一句話告訴他找誰。
+// 開放與關閉報名用的是表單編輯頁同一條路（改 forms.status，門是資料庫的 form_can_edit），這裡只是多一顆按鈕，沒有新的權限。
+// more：接在報名表那一塊下面的東西（報名類型，eventTicketsHTML 畫的）。沒有報名表的時候不放。
+export function eventSignupHTML(e, form, signed, me, busy, more) {
+  const dis = busy ? " disabled" : "";
+  const canView = !!wsLevel(me, e.workspace_id), canEdit = canEditWs(me, e.workspace_id), canManage = wsLevel(me, e.workspace_id) === "manage";
+  if (!canView) return sectionHTML(T("ev.signup"), `<div class="note">${T("ev.notOnEvent")}</div>`);
+  const members = canManage ? `<div class="ev-acts"><button class="btn ghost sm" data-act="members-open" data-ws="${esc(e.workspace_id)}" data-name="${esc(evTitle(e))}"${dis}>${T("ev.members")}</button><span class="mini">${T("ev.membersHint")}</span></div>` : "";
+  if (!form) {
+    const add = canEdit && !e.form_id;
+    return sectionHTML(T("ev.signup"), `<div class="ev-panel"><h3>${T("ev.fm.title")}</h3>
+      <p class="ev-line">${T("ev.noFormLine")}</p>
+      ${add ? `<div class="mini">${T("ev.addFormHint")}</div><div class="ev-acts"><button class="btn sm" data-act="ev-attach-form" data-id="${esc(e.id)}"${dis}>${T("ev.addForm")}</button></div>` : ""}</div>${members}`);
+  }
+  const st = evFormState(form, signed, e.capacity);
+  const tagCls = form.status === "open" ? " open" : form.status === "closed" ? " closed" : " draft";
+  const warn = st === "soon" ? T("ev.fm.notYet") : st === "over" ? T("ev.fm.over") : st === "full" ? T("ev.fm.full") : "";
+  const hint = st === "draft" ? T("ev.fm.draftHint") : st === "closed" ? T("ev.fm.closedHint") : e.status !== "published" ? T("ev.formLive") : st === "open" ? T("ev.fm.openHint") : "";
+  const toggle = !canEdit ? "" : form.status === "open"
+    ? `<button class="btn ghost sm" data-act="ev-form-status" data-id="${esc(form.id)}" data-v="closed"${dis}>${T("ev.fm.close")}</button>`
+    : `<button class="btn sm" data-act="ev-form-status" data-id="${esc(form.id)}" data-v="open"${dis}>${T("ev.fm.open")}</button>`;
+  return sectionHTML(T("ev.signup"), `<div class="ev-panel"><h3>${T("ev.fm.title")} <span class="tag${tagCls}">${esc(T("status." + form.status))}</span>${warn ? ` <span class="tag warn">${esc(warn)}</span>` : ""}</h3>
+      <p class="ev-line">${evFormFacts(form, signed, e.capacity).map(esc).join("・")}</p>
+      ${hint ? `<div class="mini">${hint}</div>` : ""}
+      <div class="ev-acts"><button class="btn ghost sm" data-act="open-form" data-id="${esc(form.id)}">${T("ev.formEdit")}</button>${toggle}<button class="btn ghost sm" data-act="open-apps" data-id="${esc(form.id)}">${T("ev.attendees")}</button></div></div>${more || ""}
+    <div class="ev-panel"><h3>${T("ev.day")}</h3>
+      <div class="mini">${T("ev.dayHint")}</div>
+      <div class="ev-acts"><button class="btn ghost sm" data-act="open-notice" data-id="${esc(form.id)}">${T("ev.notice")}</button><button class="btn ghost sm" data-act="open-checkin" data-id="${esc(form.id)}">${T("ev.checkin")}</button></div></div>${members}`);
+}
 // 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
 // canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
 // rc：Records 那邊這一場的資料（rc_event 回的；undefined 是還在載，null 是看不到或還沒有）。
-export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evLinks, rc, projects) {
-  const dis = busy ? " disabled" : "";
+// x：這一頁後來加的東西都收在這一個物件裡，不再往後面排參數：
+//    { photos（活動照片，見 eventPhotosHTML）, coverUp、photoUp（上傳進度）, coverLinkOpen（貼連結那一格開著沒）}。
+//    2027-01-02 多了講者與報名類型：speakers、tickets（各自 undefined 還在載、null 遷移檔還沒跑、陣列），
+//    spUp、spDraft、spOpen、canPick、spFound、spQ（見 eventSpeakersHTML），tkDraft、tkOpen（見 eventTicketsHTML）。
+export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evLinks, rc, projects, x) {
+  const dis = busy ? " disabled" : "", o = x || {};
   const canEdit = canEditWs(me, e.workspace_id), canManage = wsLevel(me, e.workspace_id) === "manage", sen = senior(me);
   const ro = canEdit ? "" : " readonly";
   const st = e.status;
@@ -1495,16 +1761,6 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
       ${st === "published" && sen ? `<button class="btn ghost" data-act="ev-unpublish" data-id="${esc(e.id)}"${dis}>${T("ev.unpublish")}</button>` : ""}
       ${st === "published" ? `<a class="btn ghost sm" href="${esc(publicLink)}" target="_blank" rel="noopener">${T("ev.seePublic")}</a>` : ""}
     </div>`;
-  // 2026-11-13 起每一位幹部都看得到每一場活動（2026-12-19-access-fixes.sql），但報名名單、表單、簽到只給被加進這一場的人。
-  // 沒被加進來的不畫那幾個連結（點進去會是空的），改一句話告訴他找誰。
-  const canView = !!wsLevel(me, e.workspace_id);
-  const links = !canView ? `<div class="note">${T("ev.notOnEvent")}</div>` : `<ul class="plain">
-      <li>${form ? `<a href="#" data-act="open-form" data-id="${esc(form.id)}">${T("ev.formEdit")}</a>${T("punct.colon")}${esc(T("status." + form.status))}${form.opens_at ? `・${esc(T("ev.opens", { d: evDate(form.opens_at) }))}` : ""}`
-        : `${T("ev.noFormLine")}${canEdit && !e.form_id ? ` <button class="btn ghost sm" data-act="ev-attach-form" data-id="${esc(e.id)}"${dis}>${T("ev.addForm")}</button>` : ""}`}</li>
-      ${form ? `<li><a href="#" data-act="open-apps" data-id="${esc(form.id)}">${T("ev.attendees", { n: signed == null ? "?" : signed })}</a>${e.capacity ? ` / ${esc(String(e.capacity))}` : ""}</li>
-      <li><a href="#" data-act="open-checkin" data-id="${esc(form.id)}">${T("ev.checkin")}</a>・<a href="#" data-act="open-notice" data-id="${esc(form.id)}">${T("ev.notice")}</a></li>` : ""}
-      ${canManage ? `<li><button class="lnk" data-act="members-open" data-ws="${esc(e.workspace_id)}" data-name="${esc(evTitle(e))}">${T("ev.members")}</button></li>` : ""}
-    </ul>`;
   // 2026-11-13 Paul：「活動結束了點進來什麼都沒有」。結束了，Records 的數字（出席、回饋）搬到最上面；還沒辦，放在報名底下。
   const after = eventAfterHTML(e, terms, canEdit, busy, rc);
   const ended = evPast(e);
@@ -1514,27 +1770,26 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
     + sectionHTML(T("ev.status"), `<div class="note">${statusLine}</div>${keys}`)
     + eventProjectHTML(e, projects, me, busy)
     // 2026-11-06 自動儲存：內容那一區包在 data-autosave="ev-save" 裡（只有「改」以上的人有；唯讀的沒有容器也沒有事件）。
-    // 準備好了、退回、放上、撤下都會改狀態與畫面結構，留按鈕。
+    // 準備好了、退回、放上、撤下都會改狀態與畫面結構，留按鈕。封面那一塊也在這個框裡（連結與同意是改了就存，選檔案是另一條路）。
     + sectionHTML(T("ev.content"), `${canEdit ? `<div data-autosave="ev-save" data-id="${esc(e.id)}">` : "<div>"}<div class="two">
         <label><i>${T("ev.titleZh")}</i><input id="ev-tzh" name="title_zh" value="${esc(e.title_zh || "")}"${ro}${dis}></label>
         <label><i>${T("ev.titleEn")}</i><input id="ev-ten" name="title_en" value="${esc(e.title_en || "")}"${ro}${dis}></label>
         <label><i>${T("ev.sumZh")}</i><input id="ev-szh" name="summary_zh" value="${esc(e.summary_zh || "")}" placeholder="${esc(T("ev.sumPh"))}"${ro}${dis}></label>
         <label><i>${T("ev.sumEn")}</i><input id="ev-sen" name="summary_en" value="${esc(e.summary_en || "")}"${ro}${dis}></label>
-        <label class="wide"><i>${T("ev.bodyZh")}</i><textarea id="ev-bzh" name="body_zh" style="min-height:120px"${ro}${dis}>${esc(e.body_zh || "")}</textarea></label>
-        <label class="wide"><i>${T("ev.bodyEn")}</i><textarea id="ev-ben" name="body_en" style="min-height:120px"${ro}${dis}>${esc(e.body_en || "")}</textarea></label>
+        <label class="wide"><i>${T("ev.bodyZh")}</i><textarea id="ev-bzh" name="body_zh" style="min-height:120px"${ro}${dis}>${esc(e.body_zh || "")}</textarea>${canEdit ? `<span class="mini">${esc(T("ev.bodyHelp"))}</span>` : ""}</label>
+        <label class="wide"><i>${T("ev.bodyEn")}</i><textarea id="ev-ben" name="body_en" style="min-height:120px"${ro}${dis}>${esc(e.body_en || "")}</textarea>${canEdit ? `<span class="mini">${esc(T("ev.bodyHelp"))}</span>` : ""}</label>
         <label><i>${T("ev.starts")}</i><input id="ev-starts" name="starts_at" type="datetime-local" value="${esc(evLocal(e.starts_at))}"${ro}${dis}></label>
         <label><i>${T("ev.ends")}</i><input id="ev-ends" name="ends_at" type="datetime-local" value="${esc(evLocal(e.ends_at))}"${ro}${dis}></label>
         <label><i>${T("ev.place")}</i><input id="ev-place" name="place" value="${esc(e.place || "")}"${ro}${dis}></label>
         <label><i>${T("ev.capacity")}</i><input id="ev-cap" name="capacity" type="number" min="0" value="${esc(String(e.capacity || 0))}"${ro}${dis}></label>
-        <label class="wide"><i>${T("ev.cover")}</i><input id="ev-cover" name="cover_url" value="${esc(e.cover_url || "")}" placeholder="https://…"${ro}${dis}></label>
       </div>
-      ${e.cover_url ? `<img class="ev-cover" src="${esc(e.cover_url)}" alt="">` : ""}
-      <label class="check"><input type="checkbox" id="ev-consent" name="cover_consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label>
-      <div class="mini" style="margin-bottom:18px">${T("ev.coverNote")}</div>
+      ${eventCoverHTML(e, canEdit, busy, o)}
       ${eventProgrammeHTML(e, canEdit, busy)}
       ${canEdit ? `<div class="form-foot">${autosaveHint("ev-save", `data-id="${esc(e.id)}"`)}</div>` : `<div class="mini">${T("ev.readOnly")}</div>`}</div>`)
+    + eventSpeakersHTML(e, o.speakers, canEdit, busy, o)
+    + eventPhotosHTML(e, o.photos, canEdit, busy, o)
     + eventVenueHTML(e, venues, canEdit, busy)
-    + sectionHTML(T("ev.signup"), links)
+    + eventSignupHTML(e, form, signed, me, busy, eventTicketsHTML(e, o.tickets, canEdit, busy, o))
     + (ended ? "" : after)
     + eventLinksHTML(e, evLinks, busy);
 }
@@ -1547,7 +1802,8 @@ export function eventLinksHTML(e, links, busy) {
   const money = m ? `<div class="note">${m.n ? esc(T("ev.money", { in: "NT$" + Number(m.income || 0).toLocaleString("en-US"), out: "NT$" + Number(m.expense || 0).toLocaleString("en-US"), n: m.n })) : esc(T("ev.moneyNone"))} <a href="/admin/finance/#tx">${T("ev.moneyGo")}</a></div>` : "";
   return sectionHTML(T("ev.links"), rq + `<div class="form-foot"><button class="btn ghost sm" data-act="ev-ask-mkt" data-id="${esc(e.id)}"${busy ? " disabled" : ""}>${T("ev.askMkt")}</button></div>` + money);
 }
-// Records 的數字（2026-11-13）：rc 是 rc_event() 回的。報名幾人、到了幾人、回饋幾份、推薦與有用的平均、檢討了沒、回饋表。
+// Records 的數字（2026-11-13）：rc 是 rc_event() 回的。報名幾人、到了幾人、回饋幾份、推薦與有用的平均、檢討了沒。
+// 回饋表的清單 2026-11-23 搬到 eventFeedbackHTML（跟「建立回饋表」那顆按鈕放在同一塊）。
 export function eventRecordsHTML(e, rc) {
   if (rc === undefined) return `<div class="mini">${T("loading")}</div>`;
   if (!rc || !rc.event) return "";
@@ -1562,26 +1818,42 @@ export function eventRecordsHTML(e, rc) {
     kpi(esc(fmt(num(n.useful_avg))), T("ev.rc.useful"), "", num(n.useful_avg) == null),
   ].join("");
   const rv = rc.review;
-  const review = rv && rv.we_change ? `<div class="note">${T("ev.rc.reviewed")} ${esc(rv.we_change)}</div>` : `<div class="mini">${T("ev.rc.notReviewed")}</div>`;
-  const forms = rc.forms || [];
-  const fl = forms.length ? `<ul class="plain">${forms.map(f => `<li><a href="/admin/records/#forms/${esc(f.id)}">${esc(f.title || "")}</a>${f.status ? ` <span class="tag${f.status === "open" ? " open" : f.status === "draft" ? " draft" : ""}">${esc(T("status." + f.status))}</span>` : ""}${f.responses != null ? ` <span class="mini">${esc(T("ev.rc.nResp", { n: f.responses }))}</span>` : ""}</li>`).join("")}</ul>`
-    : `<div class="mini">${T("ev.rc.noForms")}</div>`;
-  return `<div class="todo ev-kpis">${cards}</div>${review}<h3 class="sec-h">${T("ev.fbForms")}</h3>${fl}`;
+  const review = rv && rv.we_change ? `<div class="note">${T("ev.rc.reviewed")} ${esc(rv.we_change)}</div>` : `<div class="mini ev-gap">${T("ev.rc.notReviewed")}</div>`;
+  return `<div class="todo ev-kpis">${cards}</div>${review}`;
 }
-// 紀錄與活動之後（2026-11-10，11-13 加 Records 的數字）：種類與屆別（年度比較靠這兩個），這一場的出席與回饋，連到 Records 的記分卡。
+// 回饋表那一塊（2026-11-23 Paul：「Can you just press create here, and once we press that, we can jump into that」）。
+// 已經有的列出來（點了去 Records 那一張）；「建立回饋表」直接建一張掛在這場活動上的活動後回饋，建好就進那張表的編輯頁（main.js 的 ev-fb-create）。
+// 叫的是 Records 那邊同一支 rc_save_form()，誰建得了由它決定（這場活動「改」以上，或紀錄工作區的人）；這裡只在「改」以上才畫按鈕。
+// 導生學期的回饋表是另外兩種（mentee、mentor），只有紀錄工作區的人開得了，留在記分卡那邊開。
+export function eventFeedbackHTML(e, rc, canEdit, busy) {
+  // 還在載的時候整塊不畫：這時候還不知道這場有沒有回饋表，先畫出「建立回饋表」會讓人多建一張。
+  if (rc === undefined) return "";
+  const forms = (rc && rc.forms) || [];
+  const list = !rc ? "" : forms.length
+    ? `<ul class="plain">${forms.map(f => `<li><a href="/admin/records/#forms/${esc(f.id)}">${esc(f.title || "")}</a>${f.status ? ` <span class="tag${f.status === "open" ? " open" : f.status === "draft" ? " draft" : ""}">${esc(T("status." + f.status))}</span>` : ""}${f.responses != null ? ` <span class="mini">${esc(T("ev.rc.nResp", { n: f.responses }))}</span>` : ""}</li>`).join("")}</ul>`
+    : `<p class="ev-line">${T("ev.rc.noForms")}</p>`;
+  const make = e.kind === "mentorship-term" ? `<div class="mini">${T("ev.fb.termNote")}</div>`
+    : canEdit ? `<div class="mini">${T("ev.fb.createHint")}</div><div class="ev-acts"><button class="btn${forms.length ? " ghost" : ""} sm" data-act="ev-fb-create" data-id="${esc(e.id)}"${busy ? " disabled" : ""}>${T("ev.fb.create")}</button></div>` : "";
+  if (!list && !make) return "";
+  return `<div class="ev-panel"><h3>${T("ev.fbForms")}</h3>${list}${make}</div>`;
+}
+// 紀錄與活動之後（2026-11-10，11-13 加 Records 的數字，11-23 分成一塊一塊）：這一場的出席與回饋、回饋表、連到 Records 的記分卡、種類與屆別（年度比較靠這兩個）。
 export const EV_KINDS = ["bootcamp", "workshop", "roundtable", "meetup", "clinic", "info-session", "mentorship-term", "fair", "other"];
 export function eventAfterHTML(e, terms, canEdit, busy, rc) {
   const dis = (canEdit && !busy) ? "" : " disabled";
   const opt = (v, label, on) => `<option value="${esc(v)}"${on ? " selected" : ""}>${esc(label)}</option>`;
   const kinds = EV_KINDS.map(k => opt(k, T("evk." + k), (e.kind || "other") === k)).join("");
   const ts = opt("", T("ev.noTerm"), !e.term_id) + (terms || []).map(t => opt(t.id, t.id, e.term_id === t.id)).join("");
-  return sectionHTML(T("ev.after"), eventRecordsHTML(e, rc) + `
-    <div class="form-foot"><a class="btn ghost sm" href="/admin/records/#overview/${esc(e.id)}">${T("ev.scorecard")}</a></div>
-    <div class="two">
-      <label><i>${T("ev.kind")}</i><select id="ev-kind" data-id="${esc(e.id)}"${dis}>${kinds}</select></label>
-      <label><i>${T("ev.term")}</i><select id="ev-term" data-id="${esc(e.id)}"${dis}>${ts}</select></label></div>
-    <div class="mini">${T("ev.kindHint")}</div>
-    ${e.form_id ? `<div class="mini">${T("ev.syncNote")}</div>` : ""}`, { hint: T("ev.afterHint"), id: "ev-after" });
+  return sectionHTML(T("ev.after"), eventRecordsHTML(e, rc) + eventFeedbackHTML(e, rc, canEdit, busy) + `
+    <div class="ev-panel"><h3>${T("ev.scorecardSec")}</h3>
+      <p class="ev-line">${T("ev.scorecardWhat")}</p>
+      <div class="ev-acts"><a class="btn ghost sm" href="/admin/records/#overview/${esc(e.id)}">${T("ev.scorecard")}</a></div></div>
+    <div class="ev-panel"><h3>${T("ev.meta")}</h3>
+      <div class="two">
+        <label><i>${T("ev.kind")}</i><select id="ev-kind" data-id="${esc(e.id)}"${dis}>${kinds}</select></label>
+        <label><i>${T("ev.term")}</i><select id="ev-term" data-id="${esc(e.id)}"${dis}>${ts}</select></label></div>
+      <div class="mini">${T("ev.kindHint")}</div>
+      ${e.form_id ? `<div class="mini">${T("ev.syncNote")}</div>` : ""}</div>`, { hint: T("ev.afterHint"), id: "ev-after" });
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1978,5 +2250,5 @@ export function eventVenueHTML(e, venues, canEdit, busy) {
   const pick = canEdit && venues.length ? `<label><i>${T("vn.pick")}</i><select id="ev-venue" data-id="${esc(e.id)}"${busy ? " disabled" : ""}><option value="">${T("vn.pickNone")}</option>${
       venues.map(v => `<option value="${esc(v.id)}"${v.id === e.venue_id ? " selected" : ""}>${esc(v.name)}${v.city ? `・${esc(v.city)}` : ""}</option>`).join("")}</select></label>` : "";
   const now = cur ? `<div class="row"><span>${esc(cur.name)}${cur.city ? `・${esc(cur.city)}` : ""}</span><a class="btn ghost sm" href="#venues/${esc(cur.id)}" data-act="vn-open" data-id="${esc(cur.id)}">${T("vn.openVenue")}</a></div>` : `<div class="mini">${T("vn.eventNone")}</div>`;
-  return sectionHTML(esc(T("vn.eventVenue")), now + pick + `<div class="mini">${T("vn.eventNote")}</div>`);
+  return sectionHTML(esc(T("vn.eventVenue")), `<div class="ev-panel">${now}${pick}<div class="mini">${T("vn.eventNote")}</div></div>`);
 }

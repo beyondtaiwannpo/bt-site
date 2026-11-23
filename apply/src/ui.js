@@ -43,6 +43,16 @@ const DICT = {
   badAnswer:["這一題的答案格式不對：", "This answer does not look right: "],
   sendFail: ["送不出去：", "Could not send: "],
   fullTag:  ["已收滿", "Full"],
+  // 報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）。都是免費的，沒有價錢。
+  ticketPick:   ["這場活動分成幾種報名，先選一種。", "This event has more than one way to sign up. Pick one first."],
+  ticketChoose: ["選這一種", "Choose this"],
+  ticketYours:  ["你報名的是：", "You are signing up as: "],
+  ticketChange: ["換一種", "Change"],
+  ticketFullTag:["額滿", "Full"],
+  ticketAllFull:["每一種都額滿了，謝謝你想參加。下一場會先公布在 Instagram。", "Every type is full. Thank you for wanting to join. The next one will be on Instagram first."],
+  ticketRequired:["這場活動要先選一種報名類型，選好再送出。", "Pick a sign-up type for this event, then submit again."],
+  badTicket:    ["這個報名類型不是這場活動的，重新選一次。", "That sign-up type does not belong to this event. Please pick again."],
+  ticketFull:   ["你選的那一種剛剛額滿了，換一種試試看。你填的答案還在。", "The type you picked has just filled up. Try another one. Your answers are still here."],
 };
 const T = (k, en) => DICT[k][en ? 1 : 0];
 
@@ -83,6 +93,38 @@ export function listHTML(forms, en) {
   return block("program", group("program")) + block("board", group("board"));
 }
 
+// ── 報名類型 ──────────────────────────────────────────────────────────
+// 活動有分報名類型（後台設的，免費的）才會用到。tickets 是 public_form_tickets() 回的
+// [{ id, name_zh, name_en, note_zh, note_en, capacity, taken, full }]，picked 是選好的那一種的 id（網址上的 ticket，或在這一頁按的）。
+// 還有幾個名額：有名額才寫。
+export const ticketLeft = (t, en) => {
+  const cap = Number(t && t.capacity) || 0; if (!cap) return "";
+  const n = Math.max(0, cap - (Number(t.taken) || 0));
+  return en ? `${n} ${n === 1 ? "place" : "places"} left` : `還有 ${n} 個名額`;
+};
+export const ticketIsFull = t => !!t && (t.full === true || ((Number(t.capacity) || 0) > 0 && (Number(t.taken) || 0) >= Number(t.capacity)));
+const tkName = (t, en) => (en ? (t.name_en || t.name_zh) : (t.name_zh || t.name_en)) || "";
+const tkNote = (t, en) => (en ? (t.note_en || t.note_zh) : (t.note_zh || t.note_en)) || "";
+// 網址上的 ticket 對不對得上：要是這份表單的類型、而且還沒滿。對不上回 null（那就先選一種）。
+export function ticketFromUrl(tickets, id) {
+  const t = (tickets || []).find(x => x && x.id === id);
+  return t && !ticketIsFull(t) ? t.id : null;
+}
+// 選好了：一行「你報名的是哪一種」，有兩種以上才有「換一種」。還沒選：一種一列，一顆「選這一種」，滿了的寫「額滿」沒有按鈕。
+export function ticketsHTML(tickets, picked, en) {
+  const ts = tickets || [];
+  if (!ts.length) return "";
+  const mine = ts.find(t => t.id === picked);
+  if (mine) return `<p class="tk-yours">${esc(T("ticketYours", en))}<b>${esc(tkName(mine, en))}</b>${
+    ts.length > 1 ? ` <button class="quiet" data-act="ticket-clear">${esc(T("ticketChange", en))}</button>` : ""}</p>`;
+  const allFull = ts.every(ticketIsFull);
+  return `<div class="warn">${esc(T(allFull ? "ticketAllFull" : "ticketPick", en))}</div>
+    <ul class="tklist">${ts.map(t => `<li>
+      <span class="tk-t"><b>${esc(tkName(t, en))}</b>${tkNote(t, en) ? `<span>${esc(tkNote(t, en))}</span>` : ""}${!ticketIsFull(t) && ticketLeft(t, en) ? `<span class="when">${esc(ticketLeft(t, en))}</span>` : ""}</span>
+      ${ticketIsFull(t) ? `<span class="tagline">${esc(T("ticketFullTag", en))}</span>` : `<button class="btn sm" data-act="ticket-pick" data-id="${esc(t.id)}">${esc(T("ticketChoose", en))}</button>`}
+    </li>`).join("")}</ul>`;
+}
+
 // ── 一份表單 ──────────────────────────────────────────────────────────
 // 2026-11-13 起題目由 shared/forms.js 畫（三套表單共用的引擎）：十五種題型、條件邏輯、分頁與進度條。
 // state：
@@ -92,7 +134,9 @@ export function listHTML(forms, en) {
 //   already     已經送出過
 //   closed      收滿了、還沒開放、或剛剛關了（reason 說是哪一種）
 // run：signedIn 時引擎第一次畫的那一頁（F.pageHTML 的結果），沒給就留一個空的 #fx-run。
-export function formHTML(form, questions, state, msg, busy, en, run, reason) {
+// tk：{ tickets, picked }，活動有分報名類型才有東西。還沒選的時候只畫「先選一種」，選好才畫表單（或登入的按鈕）；
+//     已經送過、已經關了的不畫。沒給 tk（活動沒有分類型）這一頁跟原本一模一樣。
+export function formHTML(form, questions, state, msg, busy, en, run, reason, tk) {
   const editable = state === "signedIn";
   const head = `<p><button class="quiet" data-act="back">${esc(T("back", en))}</button></p>
     <h3 style="font-family:var(--display);font-size:clamp(24px,2.8vw,34px);margin:14px 0 8px">${esc(form.title)}</h3>
@@ -100,8 +144,10 @@ export function formHTML(form, questions, state, msg, busy, en, run, reason) {
     ${form.notify_by ? `<p class="when">${esc(T("notify", en))}${fmtDate(form.notify_by, en)}${esc(T("notify2", en))}</p>` : ""}
     ${form.closes_at && state !== "closed" ? `<p class="when">${esc(T("closesAt", en))}${fmtDate(form.closes_at, en)}</p>` : ""}
     ${msg ? `<div class="warn" role="alert">${esc(msg)}</div>` : ""}`;
-  if (editable) return head + `<div id="fx-run">${run || ""}</div>`;
-  return head
+  const types = tk && state !== "already" && state !== "closed" ? ticketsHTML(tk.tickets, tk.picked, en) : "";
+  if (types && !(tk.tickets || []).some(t => t.id === tk.picked)) return head + types;
+  if (editable) return head + types + `<div id="fx-run">${run || ""}</div>`;
+  return head + types
     + (state === "already" ? `<div class="warn">${esc(T("already", en))}</div>` : "")
     + (state === "closed" ? `<div class="warn">${esc(T(reason === "full" ? "full" : reason === "not_yet" ? "notYet" : "closed", en))}</div>` : "")
     + (state === "needIn" ? `<div class="warn">${esc(T("needIn", en))}<br>${esc(T("preview", en))}</div>
@@ -127,6 +173,10 @@ export function says(err, en) {
   if (m.startsWith("bad_answer:")) return T("badAnswer", en) + m.slice(11);
   if (m.includes("form_closed")) return T("justClosed", en);
   if (m.includes("email_used")) return T("emailUsed", en);
+  // 報名類型的三種。ticket_full 要排在下面那句 full 前面（那一句是整場活動額滿）。
+  if (m.includes("ticket_required")) return T("ticketRequired", en);
+  if (m.includes("bad_ticket")) return T("badTicket", en);
+  if (m.includes("ticket_full")) return T("ticketFull", en);
   if (/\bfull\b/.test(m)) return T("full", en);
   if (m.includes("profile_incomplete")) return T("profile", en);
   return T("sendFail", en) + m;
