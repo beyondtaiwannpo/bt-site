@@ -89,7 +89,7 @@ test("活動卡：只知道日期的不印 00:00；沒有日期的計畫不排�
 });
 
 test("★ 頂欄：十一個檔同一份，現在開放、這一年、團隊、免費資源、關於我們、合作；沒有藥丸也沒有圖示", () => {
-  const want = ["apply|現在開放|Open now", "year|這一年|This year", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
+  const want = ["apply|現在開放|Open now", "year|活動與計畫|Programmes", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
   for (const p of ["index.html", "about/index.html", "alumni/index.html", "apply/index.html", "events/index.html", "impact/index.html", "year/index.html", "partner/index.html", "resources/index.html", "team/index.html", "island/index.html"]) {
     const h = readFileSync(p, "utf8"), nav = h.match(/<div class="navlinks" id="navlinks">([\s\S]*?)<\/div>/)[1];
     const got = [...nav.matchAll(/href="\.\.?\/([a-z]+)\/"[^>]*><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span>/g)].map(m => m[1] + "|" + m[2] + "|" + m[3]);

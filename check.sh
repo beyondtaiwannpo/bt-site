@@ -1484,7 +1484,7 @@ leakOut=$(node -e '
     },
     // /year/ 這一年（2026-11-22）。時間軸是 JavaScript 畫的，錨點取靜態的那幾句。
     "year/index.html": {
-      mustShow: ["跳到主要內容", "這一年。", "這一屆的行程還在排。", "回 Beyond Taiwan 首頁",
+      mustShow: ["跳到主要內容", "活動與計畫。", "這一屆的行程還在排。", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
@@ -2036,9 +2036,9 @@ navOut=$(node -e '
   const items = (base.match(/<a /g) || []).length;
   if (items !== 6) bad.push("頂欄要是六個連結（現在開放、這一年、團隊、免費資源、關於我們、合作），現在 " + items + " 個");
   if (/island\/|impact\/|alumni\/|events\/|programs\//.test(base)) bad.push("頂欄裡出現了 BT 島、數字、校友、活動頁或已經拆掉的 /programs/（它們不在頂欄）");
-  const want = ["apply|現在開放|Open now", "year|這一年|This year", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
+  const want = ["apply|現在開放|Open now", "year|活動與計畫|Programmes", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
   const got = [...base.matchAll(/href="\/([a-z]+)\/"><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span>/g)].map(m => m[1] + "|" + m[2] + "|" + m[3]);
-  if (got.join(" ") !== want.join(" ")) bad.push("頂欄要照這個順序：現在開放、這一年、團隊、免費資源（英文 Resources）、關於我們、合作。現在是：" + got.join("、"));
+  if (got.join(" ") !== want.join(" ")) bad.push("頂欄要照這個順序：現在開放、活動與計畫（英文 Programmes，到 /year/）、團隊、免費資源（英文 Resources）、關於我們、合作。現在是：" + got.join("、"));
   if (/<svg|flame/.test(base)) bad.push("頂欄裡又出現圖示了（小火 Paul 2026-11-22 說醜，拿掉了）");
   if (/background:var\(--bt-orange\)/.test((fs.readFileSync("index.html", "utf8").match(/\.navlinks \.nav-cta\{[^}]*\}/) || [""])[0])) bad.push("頂欄的第一個連結又變回橘色藥丸了（Paul 2026-11-21 說不要）");
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
