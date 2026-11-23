@@ -106,7 +106,7 @@ test("有換頁的表單：第一頁只畫第一頁的題，按鈕是下一頁�
 
 test("英文版走英文字串", () => {
   const h = A.formHTML(form, qs, "needIn", "", false, true);
-  assert.match(h, /You need a Beyond Taiwan account/);
+  assert.match(h, /Sign in or create a free Beyond Taiwan account to sign up/);
   assert.doesNotMatch(h, /送出申請/);
 });
 

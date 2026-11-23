@@ -772,7 +772,9 @@ export function numbersHTML(n, prev) {
 }
 
 // 總覽：數量、每一屆的活動與四個數字。
-export function overviewHTML(boot, msg) {
+// top：要放在頁首正下面的東西（「加一場舊活動」的表單）。2026-11-23 以前那張表單接在整頁最下面，
+// 可是打開它的按鈕在頁首，活動一多，按了看起來像沒反應（表單在好幾屏以下）。
+export function overviewHTML(boot, msg, top) {
   const b = boot || {}, c = b.counts || {}, events = b.events || [];
   // 2026-11-13 Paul：「這些數字放最前面有什麼用？可以收起來嗎」。是整個 Records 的總數，不用處理什麼，收成一行；要看再打開。
   const kpis = b.can_view ? `${foldStart("ov-totals", "data-totals", T("ov.totals", { n: c.people == null ? "–" : c.people }), null)}<div class="todo">${[["ov.people", c.people], ["ov.students", c.students], ["ov.participation", c.participation], ["ov.responses", c.responses], ["ov.pairs", c.pairs], ["ov.outcomes", c.outcomes]]
@@ -785,7 +787,7 @@ export function overviewHTML(boot, msg) {
   const tables = terms.map(t => sectionHTML(t || T("ov.noTerm"), `<div class="tf-scroll"><table class="table rc-table"><thead><tr><th>${esc(T("ov.event"))}</th><th>${esc(T("num.attendance"))}</th><th>${esc(T("num.recommend"))}</th><th>${esc(T("num.useful"))}</th><th>${esc(T("num.responses"))}</th><th>${esc(T("ov.review"))}</th></tr></thead>
     <tbody>${events.filter(e => (e.term_id || "") === t).map(row).join("")}</tbody></table></div>`)).join("");
   const acts = b.can_manage ? [{ act: "ev-new", label: T("ov.addPast") }] : [];
-  return pageHead(T("ov.title"), T("ov.lede"), acts) + msgHTML(msg) + kpis
+  return pageHead(T("ov.title"), T("ov.lede"), acts) + msgHTML(msg) + (top || "") + kpis
     + (events.length ? tables : emptyHTML(T("ov.none"), esc(T("ov.noneHint"))))
     + `<div class="note">${esc(T("ov.ritual"))}</div>`;
 }
@@ -872,7 +874,9 @@ export function eventHTML(d, S) {
       // 2026-11-10：網站上開的活動，連回那場活動的頁面（報名表、審核、簽到、場地都在那裡）。
       e.slug && e.source !== "import" ? [{ href: "/admin/#events/" + e.slug, label: T("ev.openSite") }] : [], { act: "back-overview", label: T("ev.back") })
     + msgHTML(S.msg) + numbersHTML(e.numbers, d.previous) + (edit ? "" : `<div class="note">${esc(T("ev.readonly"))}</div>`)
-    + reviewHTML + settings + sessHTML + partHTML + formsHTML + scalesHTML + commentsHTML + pairsHTML;
+    // 2026-11-23：「種類與屆別」搬到最下面（跟活動編輯頁同一次重排，那邊也搬到「其他設定」）。它是分類用的、很少改，
+    // 以前排在第二段，擋在檢討與出席名單的前面。其他段的順序沒動。
+    + reviewHTML + sessHTML + partHTML + formsHTML + scalesHTML + commentsHTML + pairsHTML + settings;
 }
 // 從畫面讀：場次、出席狀態、檢討、活動設定。
 export function readSessions(box) {

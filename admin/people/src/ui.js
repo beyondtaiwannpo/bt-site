@@ -1090,7 +1090,9 @@ export function personNewHTML(terms, msg, busy, draft) {
   const termId = d.term || ((terms || []).find(t => t.status !== "current") || (terms || [])[0] || {}).id || "";
   return pageHead(T("pn.title"), T("pn.lede"), [], { act: "roster-back", label: T("pe.back") })
     + msgHTML(msg)
-    + sectionHTML("", `<div class="two">
+    // 「要補一整屆的話，貼一整屆比較快」那一句放在最上面（2026-11-23）：以前在所有格子的底下，填完一個人才看到還有更快的路。
+    + sectionHTML("", `<div class="note">${T("pn.order")}</div>
+    <div class="two">
       <label><i>${T("pe.nameZh")}</i><input id="pn-zh" value="${esc(d.name_zh || "")}"${dis}></label>
       <label><i>${T("pe.nameEn")}</i><input id="pn-en" value="${esc(d.name_en || "")}"${dis}></label>
     </div>
@@ -1104,7 +1106,6 @@ export function personNewHTML(terms, msg, busy, draft) {
       <label><i>${T("pe.titleZh")}</i><input id="pn-tzh" value="${esc(d.title_zh || "")}"${dis}></label>
     </div>
     <label><i>${T("pn.note")}</i><input id="pn-note" value="${esc(d.note || "")}" placeholder="${esc(T("pn.notePh"))}"${dis}></label>
-    <div class="note">${T("pn.order")}</div>
     <div class="form-foot">
       <button class="btn" data-act="person-create"${dis}>${busy ? T("common.saving") : T("pn.create")}</button>
       <button class="btn ghost" data-act="roster-back"${dis}>${T("common.cancel")}</button>

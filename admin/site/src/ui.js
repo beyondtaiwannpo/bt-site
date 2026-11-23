@@ -815,9 +815,10 @@ export function mailEditHTML(kind, t, msg, busy, prev) {
     // 2026-11-06 自動儲存：六格都在 data-autosave="mail-save" 的容器裡（data-k 是哪一封），停下來就存，沒有「存起來」鈕了。
     + `<div class="cols">` + sectionHTML("", `<div data-autosave="mail-save" data-k="${esc(kind)}"><label><i>${T("mail.subjectLabel")}</i><input id="msub" name="subject" value="${esc(subject)}"></label>
     <label><i>${T("mail.body")}</i><textarea id="mbody" name="body" style="min-height:230px">${esc(body)}</textarea></label>
-    <label><i>${T("mail.button")}</i><input id="mbtn" name="button_label" value="${esc(btnZh)}" placeholder="${esc(mailButtonLabel(kind, "zh"))}"></label>
+    <!-- 代換符號的說明放在內文底下（2026-11-23）：以前在「按鈕上的字」那一格底下，可是它講的是主旨與內文。 -->
     <div class="mini" style="margin:-6px 0 14px">
       ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : kind === "meeting_summary" ? T("mail.varsSummary") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
+    <label><i>${T("mail.button")}</i><input id="mbtn" name="button_label" value="${esc(btnZh)}" placeholder="${esc(mailButtonLabel(kind, "zh"))}"></label>
     <details class="fold" data-fold="mail-en"${pv.enOpen ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("mail.enTitle")}</b><span class="mini">${T("mail.enHint")}</span></summary><div class="fold-body">
     <label><i>${T("mail.subjectEn")}</i><input id="msub-en" name="subject_en" value="${esc(subjectEn)}"></label>
     <label><i>${T("mail.bodyEn")}</i><textarea id="mbody-en" name="body_en" style="min-height:180px">${esc(bodyEn)}</textarea></label>
@@ -949,6 +950,9 @@ export function historyListHTML(rows, me, msg, busy) {
     + sectionHTML("", list.length ? `<ol class="flist hi-list">${list.map(row).join("")}</ol>` : emptyHTML(T("hi.none"), T("hi.noneHint"), can ? { act: "hi-new", label: T("hi.new") } : null));
 }
 // 一站：m 是那一列（null 是新的一站）；up 是上傳中的 { pct, name }。
+// 順序（2026-11-23，跟活動編輯頁同一次重排；Paul：「It doesn't make sense to have going live... in that order」）：
+// 這一站的內容 → 照片 → 上線。以前「上線」在最上面，可是「準備好了」要每一張照片都勾了同意才按得下去，而照片在最下面。
+// 現在是先填、再放照片勾同意、最後才是上線那幾顆。現在是什麼狀態寫在標題旁邊的標籤，不用捲到最下面才知道。
 export function historyEditHTML(m, me, msg, busy, up) {
   const can = hiCanEdit(me), sen = senior(me), dis = busy ? " disabled" : "", ro = can ? "" : " readonly";
   const v = Object.assign({ id: "", slug: "", happened_on: "", title_zh: "", title_en: "", summary_zh: "", summary_en: "", body_zh: "", body_en: "", status: "draft", photos: [] }, m || {});
@@ -992,8 +996,8 @@ export function historyEditHTML(m, me, msg, busy, up) {
       ${(v.photos || []).length ? `<ul class="hi-photos">${v.photos.map(photoCard).join("")}</ul>` : ""}
       ${can ? (up ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(up.n > 1 ? T("hi.uploadingN", { name: up.name || "", i: up.i || 1, n: up.n }) : T("hi.uploading", { name: up.name || "" }))}</span></div>`
         : `<label class="hi-upload"><i>${T("hi.upload")}</i><input type="file" id="hi-file" accept="image/*" multiple data-id="${esc(v.id)}"${dis}></label>`) : ""}`);
-  return pageHead(isNew ? T("hi.newTitle") : esc(hiTitle(v)), isNew ? "" : `${esc(v.happened_on || "")}・${esc(v.slug)}`, [], { act: "hi-back", label: T("hi.back") })
-    + msgHTML(msg) + keys + content + photos;
+  return pageHead(isNew ? T("hi.newTitle") : `${esc(hiTitle(v))} ${hiTag(st)}`, isNew ? "" : `${esc(v.happened_on || "")}・${esc(v.slug)}`, [], { act: "hi-back", label: T("hi.back") })
+    + msgHTML(msg) + content + photos + keys;
 }
 
 // ── BT 島上的貼文（2026-11-17）──────────────────────────────────────
@@ -1017,6 +1021,8 @@ export function islandListHTML(rows, me, msg, busy, programs) {
                    : sectionHTML("", emptyHTML(T("ip.none"), T("ip.noneHint"), can ? { act: "ip-new", label: T("ip.new") } : null)));
 }
 // 一則：r 是那一列（null 是新的）；programs 是可以掛的那幾棟；up 是上傳中的 { pct, name }。
+// 順序（2026-11-23，跟活動編輯頁同一次重排）：這一則的內容 → 圖 → 放上島。以前「放上島」在最上面，
+// 可是有圖的話要先勾同意才按得下去，而圖在最下面。狀態寫在標題旁邊的標籤。
 export function islandEditHTML(r, me, msg, busy, programs, up) {
   const v = Object.assign({ id: "", program: "", team: "", url: "", kind: "post", caption_zh: "", caption_en: "", posted_on: "", image_url: "", consent: false, status: "draft" }, r || {});
   const isNew = !v.id, st = v.status;
@@ -1051,8 +1057,8 @@ export function islandEditHTML(r, me, msg, busy, programs, up) {
         ${can ? `<div class="row"><button class="btn quiet danger sm" data-act="ip-img-del" data-id="${esc(v.id)}"${dis}>${T("ip.delImage")}</button></div>` : ""}</div></li></ul>` : ""}
       ${can ? (up ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(T("ip.uploading", { name: up.name || "" }))}</span></div>`
         : `<label class="hi-upload"><i>${T("ip.upload")}</i><input type="file" id="ip-file" accept="image/*" data-id="${esc(v.id)}"${dis}></label>`) : ""}`);
-  return pageHead(isNew ? T("ip.newTitle") : esc(ipTitle(v)), isNew ? "" : esc(ipProgramLabel(ipProgram(programs, v.program)) || v.program), [], { act: "ip-back", label: T("ip.back") })
-    + msgHTML(msg) + keys + content + image;
+  return pageHead(isNew ? T("ip.newTitle") : `${esc(ipTitle(v))} ${ipTag(st)}`, isNew ? "" : esc(ipProgramLabel(ipProgram(programs, v.program)) || v.program), [], { act: "ip-back", label: T("ip.back") })
+    + msgHTML(msg) + content + image + keys;
 }
 
 // ── BT 島：島、在做的事、協作線（2026-11-17）──────────────────────────

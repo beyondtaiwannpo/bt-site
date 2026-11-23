@@ -229,7 +229,7 @@ export const MINE = {
   "ed.name":          { zh: "表單名稱", en: "Title" },
   "ed.intro":         { zh: "開頭的說明", en: "Intro" },
   "ed.introPh":       { zh: "這份是做什麼的、大概要花幾分鐘、答案會拿去做什麼", en: "What this is for, how long it takes, what the answers are used for" },
-  "ed.closes":        { zh: "截止時間（可以不填）", en: "Closes at (optional)" },
+  "ed.closes":        { zh: "截止時間（台灣時間，可以不填）", en: "Closes at (Taiwan time, optional)" },
   "ed.allowEdit":     { zh: "收答案期間，填過的人可以回來改自己的答案", en: "While open, people can come back and change their answers" },
   "ed.anon":          { zh: "匿名：讀答案的人看不到是誰寫的", en: "Anonymous: readers can't see who wrote what" },
   "ed.anonLocked":    { zh: "已經有人填了，不能改回具名（填的人是看到「匿名」才寫的）。", en: "People have already answered, so this can't go back to named (they answered because it said anonymous)." },

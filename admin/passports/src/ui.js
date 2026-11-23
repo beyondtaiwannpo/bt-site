@@ -684,7 +684,8 @@ export function internGroupEditHTML(g, msg, busy) {
     : `<input id="${id}" value="${esc(v || "")}" placeholder="${esc(ph || "")}"${dis}>`}</label>`;
   return pageHead(cur.key ? T("ig.editTitle") : T("ig.newTitle"), T("ig.lede"), [], { act: "intern-back", label: T("it.back") })
     + msgHTML(msg)
-    + `<div class="form"><div class="two">
+    // 2026-11-23：外殼跟其他編輯頁一樣（一個 section，按鈕在底部那一排）。以前是一個沒有樣式的 <div class="form">。
+    + sectionHTML("", `<div class="two">
       ${f("ig-name-zh", T("ig.nameZh"), cur.name_zh, "入門")}
       ${f("ig-name-en", T("ig.nameEn"), cur.name_en, "Onboard")}
       ${f("ig-tag-zh", T("ig.tagZh"), cur.tagline_zh, "第一個月做的事")}
@@ -692,7 +693,7 @@ export function internGroupEditHTML(g, msg, busy) {
       ${f("ig-body-zh", T("ig.bodyZh"), cur.body_zh, "", true)}
       ${f("ig-body-en", T("ig.bodyEn"), cur.body_en, "", true)}
     </div>
-    <div class="row"><button class="btn" data-act="ig-save" data-key="${esc(cur.key || "")}"${dis}>${busy ? T("common.saving") : T("ig.save")}</button></div></div>`;
+    <div class="form-foot"><button class="btn" data-act="ig-save" data-key="${esc(cur.key || "")}"${dis}>${busy ? T("common.saving") : T("ig.save")}</button></div>`);
 }
 
 // 改或開一屆。id 建了就不能改（格子與護照靠它對應），所以改的時候那一格鎖住。
@@ -945,9 +946,9 @@ export function activityEditHTML(a, month, months, msg, busy, draft) {
     </div>
     <label><i>${T("ik.desc")}</i>
       <textarea id="ak-desc" name="description" placeholder="${esc(T("ak.descPh"))}" maxlength="200"${dis}>${esc(cur.description || "")}</textarea></label>
-    ${a ? sessEditHTML(cur, dis) : ""}
+    ${a ? sessEditHTML(cur, dis) : `<div class="note">${T("ak.extrasLater")}</div>`}
+    <!-- 2026-11-23：「時間與範例照片存好之後再加」那一句自己一行、放在說明底下。以前塞在下面兩欄的左邊，看起來像是在講右邊那一格。 -->
     <div class="two">
-      ${a ? "" : `<div class="fmeta">${T("ak.extrasLater")}</div>`}
       <label><i>${T("ak.cb")}</i>
         <input id="ak-cb" name="callback_to" value="${esc(cur.callback_to || "")}" placeholder="09B" maxlength="4"${dis}></label>
     </div>

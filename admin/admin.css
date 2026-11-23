@@ -342,7 +342,11 @@ main > .fold{margin-bottom:24px}
 .ev-panel{background:rgba(255,255,255,.5);border:1px solid rgba(16,42,134,.16);border-radius:16px;padding:16px 18px;margin:0 0 14px}
 .ev-panel > h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:var(--display);font-size:18px;font-weight:700;
   letter-spacing:.03em;line-height:1.2;margin:0 0 8px}
+.ev-panel > h3 .hint{font-family:var(--body);font-size:13px;font-weight:400;letter-spacing:0;color:rgba(16,42,134,.78)}
 .ev-panel > :last-child{margin-bottom:0}
+.ev-panel > .two:last-child > label:last-child{margin-bottom:0}
+.ev-panel .note{margin-bottom:12px}
+.ev-panel .form-foot{margin-top:2px;padding-top:10px}
 .ev-panel .two label{margin-bottom:10px}
 .ev-panel .plain{margin-bottom:10px}
 .ev-panel .fold{margin:10px 0 14px}
@@ -350,8 +354,25 @@ main > .fold{margin-bottom:24px}
 .ev-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 0}
 .ev-acts .sp{flex:1}
 .section > .ev-acts{margin:0 0 4px}
-.ev-coverbox{margin-top:6px}
-.ev-coverbox .hi-upload{margin:0 0 12px}
+#ev-coverbox .hi-upload{margin:0 0 12px}
+/* 活動編輯頁重排（2026-11-23，Paul：每一段要長一樣、說明要在那一格底下、最上面要一直看得到狀態）。
+   .ev-help 是一格底下的說明：自己一行、小字。不管前面是下拉、勾選還是打字的格子，都排在底下，不會接在旁邊。
+   .ev-chk 是「一個勾選加它的說明」。.ev-state 是頁面最上面那一行狀態（不是一段，沒有會改狀態的按鈕）。 */
+.ev-help{display:block;font-size:12.5px;line-height:1.55;color:rgba(16,42,134,.8);margin:5px 0 0}
+.ev-help:empty{display:none}
+.ev-help .autosave{margin-left:6px}
+div.ev-help,p.ev-help{margin:0 0 10px}
+.two > .ev-help{grid-column:1/-1;margin:-2px 0 12px}
+.ev-chk{margin:0 0 14px}
+.ev-chk .check{margin:0}
+.two > .ev-chk{align-self:center}
+.ev-fwin{margin-top:10px}
+.ev-money{margin:12px 0 0;padding-top:10px;border-top:1px dotted rgba(16,42,134,.16)}
+.ev-state{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-6px 0 22px;padding:10px 14px;border-radius:14px;
+  background:rgba(255,255,255,.5);border:1px solid rgba(16,42,134,.16);font-size:14px;line-height:1.5}
+.ev-state .sp{flex:1}
+.ev-state-t{min-width:0}
+@media (max-width:640px){ .ev-state .sp{display:none} .ev-state-t{flex:1 1 100%;order:3} }
 .ev-gap{margin:0 0 14px}
 .ev-ph-state{margin:0 0 8px}
 .hi-photo-f .ev-acts{margin:0 0 8px}
@@ -366,8 +387,15 @@ main > .fold{margin-bottom:24px}
 .ev-tb-b:hover{border-color:var(--bt-navy);background:rgba(255,255,255,.95)}
 .ev-tb-b[disabled]{opacity:.5;cursor:default}
 .ev-desc > .mini{display:block;margin:5px 0 0}
-.ev-prev{margin:10px 0 0;border:1px dashed rgba(16,42,134,.28);border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.35)}
-.ev-prev > i{display:block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 8px}
+/* 預覽收成一行（2026-11-23）：真的 <details>，預設收著；那一行就是「對外頁上會長這樣」，點了才打開。 */
+.ev-prev{margin:10px 0 0;border:1px dashed rgba(16,42,134,.28);border-radius:12px;background:rgba(255,255,255,.35)}
+.ev-prev > summary{list-style:none;display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;
+  font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7)}
+.ev-prev > summary::-webkit-details-marker{display:none}
+.ev-prev > summary:hover{color:var(--ink)}
+.ev-prev .chev{flex:none;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform var(--dur-2) var(--ease);margin:0 2px 0 2px}
+.ev-prev[open] .chev{transform:rotate(45deg)}
+.ev-prev > .ev-rt{padding:4px 14px 12px}
 .ev-rt{font-size:15px;line-height:1.75;overflow-wrap:anywhere}
 .ev-rt p{margin:0 0 12px}
 .ev-rt h3{font-family:var(--display);font-size:21px;font-weight:700;line-height:1.25;margin:22px 0 10px;padding:1px 0 1px 12px;border-left:6px solid var(--bt-orange)}
@@ -384,7 +412,8 @@ main > .fold{margin-bottom:24px}
 /* 講者與報名類型（2027-01-02）。一位講者一列：左邊圓的照片（沒有照片是一個色塊加名字的第一個字），右邊是那幾格與按鈕。
    報名類型一種一列，放在 .ev-panel 裡，列跟列之間一條線。手機上照片搬到那幾格的上面。 */
 .ev-sp-list,.ev-tk-list{list-style:none;margin:0 0 14px;padding:0}
-.ev-sp{display:flex;gap:16px;align-items:flex-start;border:1px solid rgba(16,42,134,.16);border-radius:14px;background:rgba(255,255,255,.5);padding:14px 16px;margin:0 0 12px}
+.ev-sp{display:flex;gap:16px;align-items:flex-start;padding:14px 0;border-top:1px dotted rgba(16,42,134,.16)}
+.ev-sp:first-child{border-top:0;padding-top:4px}
 .ev-sp-pic{flex:none;width:72px;height:72px;border-radius:50%;object-fit:cover;background:rgba(16,42,134,.1);display:flex;align-items:center;justify-content:center;
   font-family:var(--display);font-size:28px;font-weight:700;line-height:1;color:rgba(16,42,134,.72)}
 .ev-sp-f{flex:1;min-width:0}
@@ -404,7 +433,7 @@ main > .fold{margin-bottom:24px}
 @media (max-width:640px){
   .ev-panel{padding:14px 14px}
   .ev-acts .btn{flex:1 1 auto}
-  .ev-sp{flex-direction:column;gap:10px;padding:14px}
+  .ev-sp{flex-direction:column;gap:10px}
 }
 /* 行銷需求單（2026-10-31）：一張單的欄位表、說明保留換行、收回的那一列淡掉。 */
 .rq-dl{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 14px;margin:0;font-size:14px}

@@ -63,6 +63,9 @@
     var q = new URLSearchParams(location.search).get("lang");
     document.documentElement.setAttribute("data-lang",
       q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+    /* 網址帶 ?f=<表單> 的時候，這一頁只有那一張表（2026-11-23，樣式見下面 html.ap-one 那一段）。
+       在這裡就加 class，是為了大標題與近期活動不要先閃出來再消失。 */
+    if (new URLSearchParams(location.search).get("f")) document.documentElement.classList.add("ap-one");
   })();
 </script>
 
@@ -356,6 +359,20 @@ summary{cursor:pointer}
    手機上它本來就排第一個。 */
 .navlinks .nav-cta{opacity:1;font-weight:600}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
+
+/* ═════════ 只填一張表的時候（2026-11-23）═════════ */
+/* Paul：在活動頁按「立即報名」，學生要看到的是那一場的報名表，不是整頁「現在開放什麼」。
+   以前這一頁不管怎麼進來都是同一個樣子：大標題、近期活動、申請（表單擠在右邊那一欄）、想參加的還沒開放。
+   現在網址帶 ?f= 就只留那一張表，放在畫面中間的一張卡裡；按「回到這場活動」或「看全部開放中的」才回去。
+   html.ap-one 這個 class 是 <head> 那段程式與 src/main.js 加的。 */
+html.ap-one main > .hero, html.ap-one #upcoming, html.ap-one .ap-more, html.ap-one #ap-sec .sec-in > h2{display:none}
+html.ap-one #ap-sec{padding-top:clamp(20px,4vh,48px)}
+html.ap-one #ap-sec .sec-in{display:block;border-top:0;padding-top:0;max-width:46rem;margin:0 auto}
+html.ap-one #ap-root{background:rgba(255,255,255,.72);border:1px solid rgba(16,42,134,.14);border-radius:22px;
+  padding:clamp(20px,3.4vw,40px);box-shadow:0 18px 44px rgba(16,42,134,.1)}
+.ap-ev{font-size:15px;color:rgba(16,42,134,.82);margin:0 0 14px}
+.ap-pre{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:26px 0 8px}
+html[data-lang="zh"] .ap-pre{font-family:var(--body);font-weight:600;letter-spacing:.04em}
 </style>
 </head>
 <body>
@@ -393,13 +410,13 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     </div>
   </div>
 </section>
-<section class="sec">
+<section class="sec" id="ap-sec">
   <div class="sec-in">
     <h2><span class="zh">申請</span><span class="en">Apply</span></h2>
     <div class="body"><div id="ap-root"><div class="loading"><span class="zh">載入中…</span><span class="en">Loading…</span></div></div></div>
   </div>
 </section>
-<section class="sec">
+<section class="sec ap-more">
   <div class="sec-in">
     <h2><span class="zh">想參加的還沒開放</span><span class="en">Not open yet</span></h2>
     <div class="body">

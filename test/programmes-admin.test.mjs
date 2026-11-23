@@ -56,7 +56,8 @@ test("★ evProgrammePatch：表單上的值變成 save_event() 的四個鍵，�
 });
 
 test("evWhenLabel：有日期印日期，沒有就印通常幾月，再沒有才印多數年份都會辦", () => {
-  assert.equal(F.evWhenLabel({ ...EV, starts_at: "2027-01-02T16:00:00+00:00" }), "2027-01-02 16:00", "有日期就不印月份");
+  // 2026-11-23：清單上印的是台灣時間（UTC 1 月 2 日 16:00 是台灣 1 月 3 日 00:00），跟編輯頁那一格同一個時間。以前印的是 UTC。
+  assert.equal(F.evWhenLabel({ ...EV, starts_at: "2027-01-02T16:00:00+00:00" }), "2027-01-03 00:00", "有日期就不印月份");
   assert.equal(F.evWhenLabel({ ...EV, usual_month: 8 }), "通常 8 月");
   assert.equal(F.evWhenLabel({ ...EV, usual_month: null }), "多數年份都會辦");
   assert.equal(F.evWhenLabel({ ...EV, usual_month: null, recurring: false }), "");
@@ -79,9 +80,10 @@ test("★ 編輯頁那一塊：下拉是不填加 12 個月、選到的那個月
   assert.match(h, /id="ev-edzh" name="edition_zh" value="Overseas Unpacked"/);
   assert.match(h, /id="ev-eden" name="edition_en" value="Overseas Unpacked"/);
   for (const s of ["通常在幾月", "多數年份都會辦", "這一屆叫什麼（中）", "這一屆叫什麼（英）",
-    "沒有確定日期的時候填這一格，對外的「這一年」會把它排在那個月。",
-    "勾了它會出現在「團隊」頁那個 team 的固定計畫裡。",
-    "例如寒假探索營這一屆叫 Overseas Unpacked。可以不填。"]) assert.ok(h.includes(s), s);
+    "只有沒填開始時間的時候才用得到：對外的「活動與計畫」頁會把它排在這個月，活動頁上寫大約幾月。填了開始時間就照日期排，這一格不用管。",
+    "勾了，它會列在對外「團隊」頁那個 team 底下，當成每年固定會辦的計畫。",
+    "填了，對外頁會用這個名字當大標題，原本的名稱放在旁邊。例如寒假探索營這一屆叫 Overseas Unpacked。可以不填。"]) assert.ok(h.includes(s), s);
+  assert.doesNotMatch(h, /這一年/, "對外那一頁 2026-11-22 改名叫「活動與計畫」了");
   const none = F.eventProgrammeHTML({ ...EV, usual_month: null, recurring: false, edition_zh: "", edition_en: "" }, true, false);
   assert.match(none, /<option value="" selected>不填<\/option>/);
   assert.doesNotMatch(none, /id="ev-recurring" name="recurring" checked/);
@@ -110,8 +112,11 @@ test("★ 遷移檔還沒跑：那幾格不畫，改一句話說要先跑哪一�
 
 test("★ 整頁：那一塊在「改了就存」的容器裡面（存檔提示之前），沒有日期的計畫整頁畫得出來", () => {
   const h = F.eventEditHTML(EV, null, null, EDITOR, "", false);
-  const box = h.indexOf('data-autosave="ev-save"'), month = h.indexOf('id="ev-month"'), foot = h.indexOf('class="form-foot"', box);
-  assert.ok(box > 0 && month > box && foot > month, "容器 → 那一塊 → 存檔提示");
+  // 2026-11-23 重排：那一塊自己一段、自己一個「改了就存」的框（這一頁有四個，存的是同一條路）。
+  const sec = h.indexOf('<section class="section" id="ev-listing">'), box = h.indexOf('data-autosave="ev-save"', sec), month = h.indexOf('id="ev-month"'), foot = h.indexOf('class="form-foot"', box);
+  assert.ok(sec > 0 && box > sec && month > box && foot > month, "那一段 → 容器 → 四格 → 存檔提示");
+  assert.ok(h.slice(box, month).indexOf('data-autosave') === 0 && !h.slice(box + 20, month).includes('data-autosave'), "四格跟容器之間沒有別的框");
+  assert.match(h, /<section class="section" id="ev-listing"><h2>對外的「活動與計畫」頁和「團隊」頁上怎麼列<span class="hint">都可以不填<\/span><\/h2>/);
   assert.match(h, /id="ev-starts" name="starts_at" type="datetime-local" value=""/, "開始時間是空的也畫得出來");
   const view = F.eventEditHTML(EV, null, null, ASSOC, "", false);
   assert.doesNotMatch(view, /data-autosave="ev-save"/, "只有「看」的人沒有自動儲存的容器");
@@ -122,7 +127,7 @@ test("★ 整頁：那一塊在「改了就存」的容器裡面（存檔提示�
 test("清單：沒有日期的計畫印「通常 1 月」，有日期的照舊印日期", () => {
   const h = F.eventsListHTML([EV, { ...EV, id: "e2", slug: "dated", title_zh: "有日期的", starts_at: "2027-01-20T01:00:00Z", usual_month: 1 }], PRES, [], null, "", false, []);
   assert.match(h, /Curriculum・通常 1 月/);
-  assert.match(h, /Curriculum・2027-01-20 01:00/);
+  assert.match(h, /Curriculum・2027-01-20 09:00/, "台灣時間（UTC 01:00 是台灣 09:00）");
 });
 
 test("★ main.js 的接線：那一塊有畫才帶四個鍵；data.js 讀得到四欄、欄位不在就退回、有 bad_month 那一句", () => {

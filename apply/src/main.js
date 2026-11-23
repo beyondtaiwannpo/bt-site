@@ -45,7 +45,7 @@ function paint() {
   if (S.view === "error") { el.innerHTML = UI.errorHTML(S.msg); return; }
   if (S.view === "form" && S.form) {
     const st = state();
-    el.innerHTML = UI.formHTML(S.form, S.questions, st, S.msg, S.busy, isEn(), "", S.reason, { tickets: S.tickets, picked: S.ticket });
+    el.innerHTML = UI.formHTML(S.form, S.questions, st, S.msg, S.busy, isEn(), "", S.reason, { tickets: S.tickets, picked: S.ticket }, S.event);
     // 活動有分報名類型、還沒選的時候沒有 #fx-run，mountRun 自己會跳過。
     if (st === "signedIn") mountRun();
     return;
@@ -92,11 +92,13 @@ async function boot() {
       try { const { data: full } = await supabase.rpc("form_is_full", { p_form: f.id }); f.is_full = !!full; } catch (e) { /* 照舊 */ }
     }));
     // 英文畫面：表單只有一個 title（多半是中文），改用那場活動的 title_en 與 summary_en（public_events() 誰都叫得到）。沒對到就照舊。
-    if (isEn()) {
+    // 只填一張表的時候（網址帶 ?f=）也要知道它是哪一場活動的：表單上面印那一場的名字與時間，「回去」那顆按鈕回那一場。
+    if (isEn() || formId()) {
       try {
         const { data: evs } = await supabase.rpc("public_events");
         const byForm = {}; for (const e of evs || []) if (e.form_id) byForm[e.form_id] = e;
-        S.forms = S.forms.map(f => byForm[f.id] ? { ...f, title: byForm[f.id].title_en || f.title, intro: byForm[f.id].summary_en || f.intro } : f);
+        S.byForm = byForm;
+        if (isEn()) S.forms = S.forms.map(f => byForm[f.id] ? { ...f, title: byForm[f.id].title_en || f.title, intro: byForm[f.id].summary_en || f.intro } : f);
       } catch (e) { /* 對不到就用表單自己的標題 */ }
     }
 
@@ -140,6 +142,7 @@ async function openForm(id) {
   if (error && String(error.code) === "42703") ({ data: qs, error } = await load(QC));
   if (error) throw error;
   S.form = f; S.questions = (qs || []).map(F.normalize); S.view = "form"; S.msg = "";
+  S.event = (S.byForm && S.byForm[id]) || null;
   S.reason = F.closedReason(f, Date.now());
   // 活動有分報名類型：網址上帶的那一種對得上、還沒滿就用它；沒帶或對不上，畫面先請他選一種。
   S.tickets = await loadTickets(id);
@@ -231,10 +234,13 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act;
 
   if (act === "back") {
-    // 回清單。**用 pushState 不用 location** —— 整頁重載會再打一次資料庫，
-    // 而清單已經在手上了。
+    // 這張表是某一場活動的報名表：回那一場的頁（學生是從那裡按「立即報名」進來的）。
+    if (S.event && S.event.slug) { location.href = "../events/?lang=" + (isEn() ? "en" : "zh") + "#" + encodeURIComponent(S.event.slug); return; }
+    // 其他的回清單。**用 pushState 不用 location** —— 整頁重載會再打一次資料庫，
+    // 而清單已經在手上了。清單要看得到大標題與近期活動，所以把「只填一張表」的樣子拿掉。
     history.pushState({}, "", location.pathname + (isEn() ? "?lang=en" : "?lang=zh"));
-    S.view = "list"; S.form = null; S.msg = ""; render();
+    document.documentElement.classList.remove("ap-one");
+    S.view = "list"; S.form = null; S.event = null; S.msg = ""; render();
     return;
   }
 

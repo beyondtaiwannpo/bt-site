@@ -126,7 +126,8 @@ function render() {
     body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects,
                 { photos: S.evPhotos, coverUp: S.evUp, photoUp: S.evPhUp, coverLinkOpen: !!S.vnOpen["ev-cover-link"],
                   speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ,
-                  tickets: S.evTickets, tkDraft: S.evTkDraft, tkOpen: !!S.vnOpen["ev-tk-new"] })
+                  tickets: S.evTickets, tkDraft: S.evTkDraft, tkOpen: !!S.vnOpen["ev-tk-new"],
+                  prevZh: !!S.vnOpen["ev-bzh-fold"], prevEn: !!S.vnOpen["ev-ben-fold"] })
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
   } else if (S.view === "venues") {
     body = UI.venuesListHTML(S.venues, S.vnQ, S.msg, S.busy, !!S.vnOpen["vn-add"]);
@@ -516,6 +517,7 @@ async function openTab(t) {
     await Promise.all([reloadEvents(ev[1]), reloadProjects(), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null,
       ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
     S.evLinks = null; S.evRc = undefined; S.evPhotos = undefined; S.evUp = null; S.evPhUp = null; S.vnOpen["ev-cover-link"] = false;
+    S.vnOpen["ev-bzh-fold"] = false; S.vnOpen["ev-ben-fold"] = false;   // 說明底下的預覽：每次打開一場活動都是收著的
     S.evSpeakers = undefined; S.evTickets = undefined; S.evSpUp = null; S.evSpDraft = null; S.evTkDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; S.vnOpen["ev-tk-new"] = false;
     const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]);
     // 2026-11-13：只在紀錄裡的舊活動沒有對外頁、報名、簽到，這裡是空的；直接去它在 Records 的記分卡。
@@ -612,11 +614,11 @@ function readForm() {
     kind: val("fkind"),
     lang: val("flang"),
     status: val("fstatus"),
-    // datetime-local 給的是「本機時間、沒有時區」。直接送進 timestamptz
-    // 會被當成 UTC，台灣的使用者填 09:00 會變成下午五點才開放。
-    // 轉成 ISO 讓瀏覽器把時區補上去。
-    opens_at: val("fopen") ? new Date(val("fopen")).toISOString() : "",
-    closes_at: val("fclose") ? new Date(val("fclose")).toISOString() : "",
+    // datetime-local 給的是一串沒有時區的字。直接送進 timestamptz 會被當成 UTC，填 09:00 會變成下午五點才開放。
+    // 2026-11-23 起這兩格一律是台灣時間（UI.evFromTaipei 補上 +08:00），跟活動編輯頁「報名」那一段的兩格同一套，
+    // 人在哪一個時區填，存進去的都是同一個時間。以前是照這台電腦的時區算，而且畫面印的是 UTC，每存一次就差一次時區。
+    opens_at: UI.evFromTaipei(val("fopen")),
+    closes_at: UI.evFromTaipei(val("fclose")),
     notify_by: val("fnotify"),
     interview_url: val("fcal"),
     ...(document.getElementById("fteam") ? { team: val("fteam") } : {}),
@@ -701,6 +703,24 @@ async function onAutosave(act, box, field) {
       Object.assign(ev, patch);
       dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.evSaved"));
       if (coverChanged) dirty.forget("ev-save|" + id + "|cover_consent");
+      return;
+    }
+    // 活動編輯頁「報名」那一段的開放與截止時間（2026-11-23，Paul：「where can I set registration open windows?」）。
+    // 存的是報名表那兩欄，走的是表單編輯頁同一支 D.saveForm（門是資料庫的 form_can_edit），沒有新的資料庫函式。填的是台灣時間。
+    // 存完不重畫（重畫會把正在打的那一格的游標弄掉），只換「報名表」旁邊的標籤與底下那一句（還沒到開放時間、過了截止時間）。
+    if (act === "ev-fwin") {
+      const f = (S.forms || []).find(x => x.id === id); if (!f) return;
+      const read = n => { const el = box.querySelector(`[name="${n}"]`); return el ? UI.evFromTaipei(el.value) : ""; };
+      const patch = { opens_at: read("opens_at"), closes_at: read("closes_at") };
+      await D.saveForm(id, patch);
+      const saved = { opens_at: patch.opens_at || null, closes_at: patch.closes_at || null };
+      Object.assign(f, saved); if (S.form && S.form.id === id) Object.assign(S.form, saved);
+      dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.saved"));
+      const ev = (S.events || []).find(x => x.form_id === id);
+      if (ev) {
+        const bits = UI.evFormBits(ev, f, S.evSigned), tags = document.getElementById("ev-fm-tags"), hint = document.getElementById("ev-fm-hint");
+        if (tags) tags.innerHTML = bits.tags; if (hint) hint.innerHTML = bits.hint;
+      }
       return;
     }
     if (act === "mt-min") {
@@ -1177,6 +1197,12 @@ document.addEventListener("click", async e => {
   }
   if (act === "ev-open") { e.preventDefault(); history.pushState(null, "", "#events/" + b.dataset.slug); await openTab("events/" + b.dataset.slug); return; }
   if (act === "ev-back") { history.pushState(null, "", "#events"); await openTab("events"); return; }
+  // 活動編輯頁最上面那一行的「到『上線』那一段」（2026-11-23）：只捲過去，網址不變（網址的 # 後面是分頁名，不能拿來當錨點）。
+  if (act === "ev-jump") {
+    const to = document.getElementById(b.dataset.to);
+    if (to) to.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    return;
+  }
   if (act === "ev-create") {
     const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
     const d = { team: val("ev-team"), slug: val("ev-slug") || UI.evSlug(val("ev-ten")), title_zh: val("ev-tzh"), title_en: val("ev-ten"), with_form: !!(document.getElementById("ev-withform") || {}).checked };
@@ -1672,8 +1698,9 @@ function switchLang(l) {
 applyLang(pickLang(location.search, readStored()));
 boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
-// 場地頁兩個收起來的表單開著沒（重畫之後照舊）。
-document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new", "pj-new", "pj-ev-new", "pj-ev-add", "ev-cover-link", "ev-sp-new", "ev-tk-new"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
+// 場地頁兩個收起來的表單開著沒（重畫之後照舊）。活動編輯頁說明底下那兩格預覽（ev-bzh-fold、ev-ben-fold）也記在這裡：
+// 只記在記憶體裡，同一頁重畫之後還開著，重新整理就回到收著。
+document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new", "pj-new", "pj-ev-new", "pj-ev-add", "ev-cover-link", "ev-sp-new", "ev-tk-new", "ev-bzh-fold", "ev-ben-fold"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。

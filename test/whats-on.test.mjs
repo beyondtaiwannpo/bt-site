@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 import * as L from "../year/src/logic.js";
 import { rowHTML } from "../team/src/programmes.js";
 import { split, fmtWhen, names, whenText, cardHTML, detailHTML } from "../events/src/ui.js";
+import * as AP from "../apply/src/ui.js";
 
 const NOW = new Date("2026-11-22T04:00:00Z");
 const f = (id, title, extra) => Object.assign({ id, kind: "program", status: "open", title, opens_at: null, closes_at: null }, extra);
@@ -173,4 +174,21 @@ test("★ 活動卡與活動頁：這一屆有自己的名字就用它，計畫�
   assert.equal(whenText({ usual_month: 8 }, "zh"), "大約 8 月"); assert.equal(whenText({ usual_month: 8 }, "en"), "Around August");
   assert.equal(whenText({}, "zh"), "日期還沒定"); assert.equal(whenText(ou, "zh"), "2027-01-03");
   assert.match(detailHTML({ slug: "coffee-chat", team: "Mentorship Team", title_zh: "Coffee chat", title_en: "Coffee chat" }, "en"), /<li><b>When<\/b><span>Date to be confirmed<\/span><\/li>/);
+});
+
+test("★ 從活動頁按立即報名：/apply/?f= 只有那一張表，回去那顆回那一場活動（Paul 2026-11-23）", () => {
+  const html = readFileSync("apply/index.html", "utf8"), main = readFileSync("apply/src/main.js", "utf8");
+  assert.match(html, /if \(new URLSearchParams\(location\.search\)\.get\("f"\)\) document\.documentElement\.classList\.add\("ap-one"\);/, "在 head 就加 class，大標題不會先閃出來");
+  assert.match(html, /html\.ap-one main > \.hero, html\.ap-one #upcoming, html\.ap-one \.ap-more, html\.ap-one #ap-sec \.sec-in > h2\{display:none\}/);
+  assert.match(html, /<section class="sec" id="ap-sec">/); assert.match(html, /<section class="sec ap-more">/);
+  assert.match(main, /if \(S\.event && S\.event\.slug\) \{ location\.href = "\.\.\/events\/\?lang="/, "活動的報名表按回去，回那一場");
+  assert.match(main, /document\.documentElement\.classList\.remove\("ap-one"\);/, "回清單的時候把只填一張表的樣子拿掉");
+  const form = { id: "f1", title: "報名表", intro: "", notify_by: null, closes_at: null }, ev = { slug: "overseas-unpacked", starts_at: "2027-01-03T01:00:00Z", place: "Taipei" };
+  const withEv = AP.formHTML(form, [], "needIn", "", false, false, "", "", null, ev), plain = AP.formHTML(form, [], "needIn", "", false, false, "", "", null, null);
+  assert.match(withEv, /data-act="back">← 回到這場活動<\/button>/); assert.match(withEv, /<p class="ap-ev">[^<]*Taipei<\/p>/);
+  assert.match(plain, /data-act="back">← 看全部開放中的<\/button>/); assert.doesNotMatch(plain, /class="ap-ev"/);
+  assert.match(withEv, /報名要先登入，或開一個免費的 BT 帳號，一分鐘。登入之後會回到這張表。/);
+  assert.match(withEv, /<p class="ap-pre">這張表會問的問題（現在還不能填）<\/p>/, "還不能填的時候講清楚底下只是先給他看");
+  assert.match(AP.formHTML(form, [], "needProfile", "", false, false, "", "", null, ev), /填我的資料，填完會回到這張表/);
+  assert.doesNotMatch(AP.formHTML(form, [], "signedIn", "", false, false, "", "", null, ev), /class="ap-pre"/, "可以填的時候沒有那一行");
 });

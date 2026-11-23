@@ -321,18 +321,19 @@ test("★ 後台說明那一格：上面八顆真的按鈕、下面一行提示�
   for (const [k, label] of [["h2", "大標題"], ["h3", "小標題"], ["b", "粗體"], ["hl", "橘色螢光"], ["hl2", "綠色螢光"], ["c", "藍底橘字"], ["ul", "清單"], ["q", "引言"]])
     assert.match(zh, new RegExp(`data-k="${k}" data-for="ev-bzh" title="[^"]+">${label}</button>`), `少了 ${label}`);
   assert.match(zh, /<textarea id="ev-bzh" name="body_zh" style="min-height:170px">## 活動資訊\n==免費==<\/textarea>/, "打字那一格的 id 與 name 沒變（自動儲存與 readEvent 照舊）");
-  assert.match(zh, /<div class="ev-prev"><i>對外頁上會長這樣<\/i><div class="ev-rt" id="ev-bzh-prev"><h3>活動資訊<\/h3><p><mark>免費<\/mark><\/p><\/div><\/div><\/div>$/);
+  // 2026-11-23：預覽收成一行（真的 <details>，預設收著），裡面還是同一格 #ev-bzh-prev。
+  assert.match(zh, /<details class="ev-prev" id="ev-bzh-fold"><summary><span class="chev" aria-hidden="true"><\/span>對外頁上會長這樣<\/summary><div class="ev-rt" id="ev-bzh-prev"><h3>活動資訊<\/h3><p><mark>免費<\/mark><\/p><\/div><\/details><\/div>$/);
   assert.match(en, /<label for="ev-ben"><i>說明（英）<\/i><\/label>/); assert.equal(count(en, /data-for="ev-ben"/g), 8);
   assert.match(en, /<textarea id="ev-ben" name="body_en"/); assert.match(en, /id="ev-ben-prev"><p class="mini">還沒有字。<\/p><\/div>/, "沒有字的時候預覽是一句話");
   assert.equal(F.evPreviewHTML("**粗**"), "<p><b>粗</b></p>"); assert.equal(F.evPreviewHTML(""), '<p class="mini">還沒有字。</p>');
   assert.match(F.eventDescHTML({ id: "e1", body_zh: "<script>x</script>" }, "zh", true, false), /<textarea[^>]*>&lt;script&gt;x&lt;\/script&gt;<\/textarea>[\s\S]*id="ev-bzh-prev"><p>&lt;script&gt;x&lt;\/script&gt;<\/p>/, "預覽裡打的 HTML 也只是字");
   const ro = F.eventDescHTML(ev, "zh", false, false);
-  assert.doesNotMatch(ro, /ev-tb|ev-prev|ev-fmt|class="mini"/); assert.match(ro, /<textarea id="ev-bzh" name="body_zh" style="min-height:170px" readonly>/);
+  assert.doesNotMatch(ro, /ev-tb|ev-prev|ev-fmt|class="mini"|class="ev-help"/); assert.match(ro, /<textarea id="ev-bzh" name="body_zh" style="min-height:170px" readonly>/);
   assert.equal(count(F.eventDescHTML(ev, "zh", true, true), /data-for="ev-bzh" title="[^"]+" disabled>/g), 8, "忙的時候按鈕按不了");
   // 字典：八顆的名字與說明中英都有，沒有破折號與 emoji
   const keys = ["ev.fmt.bar", "ev.prev", "ev.prevEmpty", "ev.bodyHelp", ...F.EV_FMT.flatMap(f => ["ev.fmt." + f.k, "ev.fmt.tip." + f.k])];
   for (const k of keys) { assert.ok(FS.STRINGS[k] && FS.STRINGS[k].zh && FS.STRINGS[k].en, `字典裡沒有 ${k}`); for (const l of ["zh", "en"]) { assert.doesNotMatch(FS.STRINGS[k][l], /[—–]/, `${k} 有破折號`); assert.doesNotMatch(FS.STRINGS[k][l], /\p{Extended_Pictographic}/u, `${k} 有 emoji`); } }
-  F.setLang("en"); assert.match(F.eventDescHTML(ev, "en", true, false), />Heading<\/button>[\s\S]*>Orange on navy<\/button>[\s\S]*<i>How it will look on the public page<\/i>/); F.setLang("zh");
+  F.setLang("en"); assert.match(F.eventDescHTML(ev, "en", true, false), />Heading<\/button>[\s\S]*>Orange on navy<\/button>[\s\S]*<summary><span class="chev" aria-hidden="true"><\/span>How it will look on the public page<\/summary>/); F.setLang("zh");
 });
 
 test("★ 後台 main.js：按工具列的按鈕改字、留住選取、丟一個 input（自動儲存與預覽都聽它）；打字的時候只換預覽那一格", () => {

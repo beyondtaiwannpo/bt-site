@@ -114,7 +114,7 @@ test("★ 講者：每一位自己勾同意（沒勾的對外看不到）、可�
   const up = F.eventSpeakersHTML(EV, SPEAKERS, true, true, { spUp: { id: "s2", pct: 45, name: "a.jpg" } });
   assert.match(up, /<progress value="45" max="100">/); assert.equal(count(up, /data-act="ev-sp-photo"/g), 1);
   // 還在載、遷移檔還沒跑、改不動
-  assert.match(F.eventSpeakersHTML(EV, undefined, true, false, {}), /id="ev-speakers"><h2>講者<\/h2><div class="mini">載入中/);
+  assert.match(F.eventSpeakersHTML(EV, undefined, true, false, {}), /id="ev-speakers"><h2>講者<\/h2><div class="ev-panel"><div class="mini">載入中/);
   const noSql = F.eventSpeakersHTML(EV, null, true, false, {});
   assert.match(noSql, /2027-01-02-event-speakers-tickets\.sql/); assert.doesNotMatch(noSql, /ev-sp-add/);
   assert.equal(F.eventSpeakersHTML(EV, SPEAKERS, false, false, {}), "", "只有「看」的人整塊不畫（讀的門也是「改」）");
@@ -159,25 +159,26 @@ test("★ 報名類型：一種一列、報了幾個、滿了有標；已經有�
   assert.equal(F.eventTicketsHTML(EV, TICKETS, false, false, {}), ""); assert.equal(F.eventTicketsHTML(EV, undefined, true, false, {}), "", "還在載不畫");
 });
 
-test("★ 整頁：講者在內容與活動照片中間；報名類型在報名表那一塊下面、行前與當天上面；沒有報名表的活動沒有報名類型", () => {
+test("★ 整頁：講者在照片後面、報名前面（2026-11-23 重排）；報名類型在報名表那一塊下面、行前與當天上面；沒有報名表的活動沒有報名類型", () => {
   const rc = { event: { numbers: {} }, review: null, forms: [] };
   const h = F.eventEditHTML(EV, FORM, 3, EDITOR, "", false, [], [], null, rc, null, { photos: [], speakers: SPEAKERS, tickets: TICKETS });
   const at = s => { const i = h.indexOf(s); assert.ok(i >= 0, `找不到 ${s}`); return i; };
-  assert.ok(at('data-autosave="ev-save"') < at('id="ev-speakers"') && at('id="ev-speakers"') < at('id="ev-photos"'), "講者在內容後面、照片前面");
+  assert.ok(at('id="ev-photos"') < at('id="ev-speakers"') && at('id="ev-speakers"') < at('id="ev-signup"'), "內容、時間、照片都弄好了才輪到講者，接著是報名");
   assert.ok(at('data-act="ev-form-status"') < at('id="ev-tickets"') && at('id="ev-tickets"') < at("行前與當天"), "報名類型接在報名表那一塊下面");
-  assert.ok(at('id="ev-speakers"') > at('class="autosave" data-for="ev-save"'), "講者不在自動儲存的框裡（那幾格要按「存這一位」）");
+  const sp = h.slice(at('id="ev-speakers"'), at('id="ev-signup"'));
+  assert.doesNotMatch(sp, /data-autosave=|class="autosave"/, "講者不在自動儲存的框裡（那幾格要按「存這一位」）");
   assert.doesNotMatch(F.eventEditHTML({ ...EV, form_id: null }, null, null, EDITOR, "", false, [], [], null, rc, null, { photos: [], speakers: [], tickets: TICKETS }), /id="ev-tickets"/, "沒有報名表就沒有報名類型");
   const viewer = F.eventEditHTML(EV, FORM, 3, VIEWER, "", false, [], [], null, rc, null, { photos: [], speakers: SPEAKERS, tickets: TICKETS });
   assert.doesNotMatch(viewer, /id="ev-speakers"|id="ev-tickets"|ev-sp-|ev-tk-/, "只有「看」的人兩塊都沒有");
   assert.doesNotMatch(F.eventEditHTML(EV, FORM, 3, EDITOR, "", false), /id="ev-tickets"/, "x 沒給也畫得出來（還在載，報名類型先不畫）");
-  assert.match(F.eventEditHTML(EV, FORM, 3, EDITOR, "", false), /id="ev-speakers"><h2>講者<\/h2><div class="mini">載入中/);
+  assert.match(F.eventEditHTML(EV, FORM, 3, EDITOR, "", false), /id="ev-speakers"><h2>講者<\/h2><div class="ev-panel"><div class="mini">載入中/);
 });
 
 test("★ 說明底下有一行怎麼打的提示（中英兩格各一行），唯讀的人沒有；報名名單上有類型的標籤", () => {
   const rc = { event: { numbers: {} }, review: null, forms: [] };
   const h = F.eventEditHTML(EV, FORM, 3, EDITOR, "", false, [], [], null, rc, null, {});
   // 2026-11-23 同一天後面加了工具列與預覽，那一行提示留著當退路、內容換成新的記號（工具列的測試在 test/event-page.test.mjs）。
-  assert.equal(count(h, /<span class="mini">選一段字再按上面的按鈕就好。自己打也可以：一行開頭打「## 」是大標題、「### 」是小標題、「- 」是清單、「&gt; 」是引言；\*\*粗體\*\*、==橘色螢光==、\{\{綠色螢光\}\}、\[\[藍底橘字\]\]；空一行是新的一段。<\/span>/g), 2);
+  assert.equal(count(h, /<span class="ev-help">選一段字再按上面的按鈕就好。自己打也可以：一行開頭打「## 」是大標題、「### 」是小標題、「- 」是清單、「&gt; 」是引言；\*\*粗體\*\*、==橘色螢光==、\{\{綠色螢光\}\}、\[\[藍底橘字\]\]；空一行是新的一段。<\/span>/g), 2);
   assert.doesNotMatch(F.eventEditHTML(EV, FORM, 3, VIEWER, "", false, [], [], null, rc, null, {}), /是大標題|ev-tb|ev-prev/);
   assert.match(FS.STRINGS["ev.bodyHelp"].en, /start a line with "## " for a heading, "### " for a small heading, "- " for a list, "> " for a quote; \*\*bold\*\*, ==orange highlight==, \{\{green highlight\}\}, \[\[orange on navy\]\]/);
   assert.doesNotMatch(read("admin/src/ui.js") + read("admin/src/main.js"), /from "\.\.\/\.\.\/events\//, "後台不 import 對外頁的排版函式，自己有一份（兩份要一樣，test/event-page.test.mjs 守著）");
@@ -349,7 +350,7 @@ test("★ /apply/ 的 main.js：有選才帶 p_ticket；選了寫進網址；換
   assert.match(m, /if \(u\.searchParams\.get\("lang"\) !== l\) \{ u\.searchParams\.set\("lang", l\); history\.replaceState\(history\.state, "", u\.pathname \+ u\.search \+ u\.hash\); \}/, "換語言：網址只改 lang");
   assert.match(m, /if \(\/ticket_full\|bad_ticket\|ticket_required\/\.test\(String\(err && err\.message\)\)\) \{/);
   assert.match(m, /S\.tickets = await loadTickets\(S\.form\.id\); S\.ticket = null; ticketToUrl\(null\);/);
-  assert.match(m, /UI\.formHTML\(S\.form, S\.questions, st, S\.msg, S\.busy, isEn\(\), "", S\.reason, \{ tickets: S\.tickets, picked: S\.ticket \}\)/);
+  assert.match(m, /UI\.formHTML\(S\.form, S\.questions, st, S\.msg, S\.busy, isEn\(\), "", S\.reason, \{ tickets: S\.tickets, picked: S\.ticket \}, S\.event\)/);
   for (const act of ["ticket-pick", "ticket-clear"]) assert.match(m, new RegExp(`act === "${act}"`));
   assert.match(m, /function render\(\) \{\s*paint\(\);\s*if \(typeof window\.btKeepLang === "function"\) window\.btKeepLang\(\);\s*\}/, "每次畫完把語言補進新的連結");
   // 這一頁的 keepLang 原本會把 ? 後面整段換掉（f 就不見了），改成只動 lang

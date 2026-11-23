@@ -90,7 +90,9 @@ test("evFormFacts：開放與截止時間有填才寫；有名額寫幾分之幾
   assert.deepEqual(F.evFormFacts(FORM, 0, 40), ["已報名 0 / 40 人"], "0 個人是 0，不是問號");
   const both = F.evFormFacts({ ...FORM, opens_at: "2026-12-01T01:00:00Z", closes_at: "2026-12-20T15:59:00Z" }, 3, 40);
   assert.equal(both.length, 3);
-  assert.match(both[0], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} 開放$/); assert.match(both[1], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} 截止$/);
+  // 2026-11-23：時間一律印台灣時間、字裡寫明（UTC 01:00 是台灣 09:00；15:59 是 23:59），不看跑測試的機器在哪個時區。
+  assert.equal(both[0], "2026-12-01 09:00 開放（台灣時間）"); assert.equal(both[1], "2026-12-20 23:59 截止（台灣時間）");
+  assert.deepEqual(F.evFormFacts({ ...FORM, opens_at: "2026-12-01T01:00:00Z", closes_at: "2026-12-20T15:59:00Z" }, 3, 40, true), ["已報名 3 / 40 人"], "改得動的人看到的是底下那兩格，這一行不重複印時間");
   F.setLang("en");
   assert.deepEqual(F.evFormFacts(FORM, 3, 40), ["3 of 40 signed up"]); assert.deepEqual(F.evFormFacts(FORM, 3, 0), ["3 signed up"]);
   F.setLang("zh");
@@ -112,12 +114,15 @@ test("★ 回饋表的固定題目跟 Records 那一份一字不差（同一個 
 // ── 2. 畫面 ────────────────────────────────────────────────────────────
 test("★ 報名與現場：一塊一塊的，動作都是按鈕不是連結；狀態、人數、開放與關閉", () => {
   const h = F.eventSignupHTML(EV, FORM, 3, DIR, false);
-  assert.match(h, /<div class="ev-panel"><h3>報名表 <span class="tag draft">還在寫<\/span><\/h3>/);
+  assert.match(h, /<div class="ev-panel" id="ev-form"><h3>報名表 <span id="ev-fm-tags"><span class="tag draft">還在寫<\/span><\/span><\/h3>/);
   assert.match(h, /<p class="ev-line">已報名 3 \/ 40 人<\/p>/);
   assert.match(h, /報名表還在寫，外面的人看不到/);
   for (const act of ["open-form", "open-apps", "open-notice", "open-checkin"]) assert.match(h, new RegExp(`<button class="btn ghost sm" data-act="${act}" data-id="f1"`), `${act} 要是按鈕`);
   assert.match(h, /<button class="btn sm" data-act="ev-form-status" data-id="f1" data-v="open">開放報名<\/button>/);
-  assert.match(h, /<button class="btn ghost sm" data-act="members-open" data-ws="custom:event-winter-camp-2027" data-name="2027 冬令營">誰能改這場活動<\/button>/);
+  // 2026-11-23：「誰能改這場活動」搬到最下面的「其他設定」（跟報名沒有關係），按鈕本身一個字都沒改。
+  assert.doesNotMatch(h, /members-open/, "報名這一段不再有成員那顆");
+  assert.match(F.eventMembersHTML(EV, DIR, false), /<div class="ev-panel" id="ev-members"><h3>這場活動的成員<\/h3>[\s\S]*<button class="btn ghost sm" data-act="members-open" data-ws="custom:event-winter-camp-2027" data-name="2027 冬令營">誰能改這場活動<\/button>/);
+  assert.equal(F.eventMembersHTML(EV, EDITOR, false), "", "成員要「管」"); assert.equal(F.eventMembersHTML(EV, VIEWER, false), "");
   assert.doesNotMatch(h, /<a /, "這一塊沒有連結了"); assert.doesNotMatch(h, /class="plain"/);
   // 開放中、活動還沒上架：提醒一句；按鈕變成關閉
   const open = F.eventSignupHTML(EV, { ...FORM, status: "open" }, 3, DIR, false);
@@ -139,7 +144,7 @@ test("★ 報名與現場：誰看得到哪一顆（「看」沒有開關、「�
   assert.match(view, /data-act="open-apps"/); assert.match(view, /data-act="open-form"/);
   assert.doesNotMatch(view, /ev-form-status|members-open|ev-attach-form/);
   const edit = F.eventSignupHTML(EV, FORM, 3, EDITOR, false);
-  assert.match(edit, /data-act="ev-form-status"/); assert.doesNotMatch(edit, /members-open/, "成員要「管」");
+  assert.match(edit, /data-act="ev-form-status"/);
   const out = F.eventSignupHTML(EV, FORM, 3, ASSOC, false);
   assert.match(out, /找這個 team 的 Director/); assert.doesNotMatch(out, /data-act=/);
 });
@@ -152,7 +157,7 @@ test("★ 沒有報名表：一句話加一顆「加一張報名表」（用原�
   assert.match(h, /不收報名的活動可以不加/);
   assert.doesNotMatch(h, /open-apps|open-checkin|ev-form-status/);
   assert.doesNotMatch(F.eventSignupHTML(noForm, null, null, VIEWER, false), /ev-attach-form/);
-  assert.match(F.eventSignupHTML(noForm, null, null, DIR, false), /data-act="members-open"/, "沒有報名表也改得了成員");
+  assert.match(F.eventEditHTML(noForm, null, null, DIR, "", false), /data-act="members-open"/, "沒有報名表也改得了成員（那顆在「其他設定」）");
 });
 
 test("★ 封面：主要是選檔案，貼連結收在一格裡；同意與「換了要重勾」都還在；已經在對外頁上的多一句提醒", () => {
@@ -185,7 +190,7 @@ test("★ 封面：主要是選檔案，貼連結收在一格裡；同意與「�
 
 test("★ 活動照片：每一張自己勾同意（預設沒勾）、可以往前往後、可以拿掉；一次可以選好幾張；改不動的人整塊不畫", () => {
   const h = F.eventPhotosHTML(EV, PHOTOS, true, false, {});
-  assert.match(h, /<section class="section" id="ev-photos"><h2>活動照片<span class="hint">3<\/span>/);
+  assert.match(h, /^<div class="ev-panel" id="ev-photos"><h3>活動照片 <span class="hint">3<\/span>/, "2026-11-23 起是「照片」那一段裡的一塊，不是自己一整段");
   assert.equal(count(h, /<li class="hi-photo">/g), 3);
   assert.equal(count(h, /<img src="[^"]+" alt="" loading="lazy">/g), 3);
   assert.equal(count(h, /data-act="ev-ph-consent" data-noauto="1"/g), 3);
@@ -232,25 +237,197 @@ test("★ 回饋表：沒有的時候是一顆「建立回饋表」，不再叫�
   assert.match(F.eventFeedbackHTML(EV, rc0, true, true), /data-act="ev-fb-create" data-id="e1" disabled>/);
 });
 
-test("★ 記分卡是一顆次要的按鈕，上面一句話講它是什麼；種類與屆別自己一塊", () => {
-  const h = F.eventAfterHTML(EV, [{ id: "2026-27" }], true, false, null);
-  assert.match(h, /<div class="ev-panel"><h3>完整記分卡<\/h3>\s*<p class="ev-line">記分卡是這場活動在 Records 的那一頁[^<]*<\/p>\s*<div class="ev-acts"><a class="btn ghost sm" href="\/admin\/records\/#overview\/e1">打開完整記分卡<\/a>/);
-  assert.match(h, /<div class="ev-panel"><h3>種類與屆別<\/h3>[\s\S]*<select id="ev-kind" data-id="e1">[\s\S]*<select id="ev-term" data-id="e1">/);
+test("★ 記分卡是一顆次要的按鈕，上面一句話講它是什麼；種類與屆別自己一塊（2026-11-23 起在「其他設定」）", () => {
+  const h = F.eventAfterHTML(EV, true, false, null) + F.eventMetaHTML(EV, [{ id: "2026-27" }], true, false);
+  assert.doesNotMatch(F.eventAfterHTML(EV, true, false, null), /ev-kind|ev-term/, "活動之後那一段不再有種類與屆別");
+  assert.match(h, /<div class="ev-panel"><h3>完整記分卡<\/h3>\s*<p class="ev-line">記分卡是這場活動在 Records 的那一頁[^<]*<\/p>\s*<div class="ev-help">錄取與簽到的人[^<]*<\/div>\s*<div class="ev-acts"><a class="btn ghost sm" href="\/admin\/records\/#overview\/e1">打開完整記分卡<\/a>/);
+  assert.match(h, /<div class="ev-panel" id="ev-meta"><h3>種類與屆別<\/h3>[\s\S]*<select id="ev-kind" data-id="e1">[\s\S]*<select id="ev-term" data-id="e1">/);
   assert.doesNotMatch(h, /class="form-foot"><a class="btn ghost sm" href="\/admin\/records/, "不再是掛在一條線底下的一顆");
 });
 
-test("★ 整頁：內容、活動照片、場地、報名、紀錄照這個順序；x 沒給也畫得出來", () => {
-  const rc = { event: { numbers: {} }, review: null, forms: [] };
-  const h = F.eventEditHTML(EV, FORM, 3, DIR, "", false, [{ id: "v1", name: "台大", city: "台北" }], [], null, rc, null, { photos: PHOTOS });
+// ── 2026-11-23 重排：順序、每一段同一個樣子、狀態那一行、預覽收起來、報名的開放與截止時間 ──
+// Paul：「It doesn't make sense to have going live, project in that order. If I wanted to make an event, it should be in a certain order
+//        that makes it efficient and it makes sense.」
+const SECTIONS = ["ev-content", "ev-when", "ev-listing", "ev-pics", "ev-speakers", "ev-signup", "ev-live", "ev-links", "ev-after", "ev-house"];
+const secOf = (h, id) => { const a = h.indexOf(`<section class="section" id="${id}">`); assert.ok(a >= 0, `找不到 ${id} 那一段`); const b = h.indexOf('<section class="section"', a + 10); return h.slice(a, b < 0 ? h.length : b); };
+// 這一支的 EV 沒有計畫那四欄（那是遷移檔還沒跑的樣子），整頁的測試補上，四格才畫得出來。
+const PG = { usual_month: null, recurring: false, edition_zh: "", edition_en: "" };
+const fullPage = (ev, me, x) => F.eventEditHTML({ ...PG, ...(ev || EV) }, FORM, 3, me || DIR, "", false, [{ id: "v1", name: "台大", city: "台北" }], [{ id: "2026-27" }], { money: null, requests: [] },
+  { event: { numbers: {} }, review: null, forms: [] }, [], Object.assign({ photos: PHOTOS, speakers: [], tickets: [] }, x || {}));
+
+test("★ 整頁的順序：狀態那一行 → 內容 → 時間與地點 → 對外怎麼列 → 照片 → 講者 → 報名 → 上線 → 行銷與錢 → 活動之後 → 其他設定", () => {
+  const h = fullPage();
   const at = s => { const i = h.indexOf(s); assert.ok(i >= 0, `找不到 ${s}`); return i; };
-  assert.ok(at('data-autosave="ev-save"') < at('id="ev-cover-file"') && at('id="ev-cover-file"') < at('id="ev-photos"'), "封面在內容裡，照片在內容後面");
-  assert.ok(at('id="ev-photos"') < at('id="ev-venue"') && at('id="ev-venue"') < at('data-act="ev-form-status"') && at('data-act="ev-form-status"') < at('id="ev-after"'));
-  assert.ok(at('id="ev-cover-file"') < at('class="autosave" data-for="ev-save"'), "封面那一塊在自動儲存的框裡（連結與同意改了就存）");
+  const order = ['id="ev-state"', ...SECTIONS.map(id => `<section class="section" id="${id}">`)].map(at);
+  assert.deepEqual(order, order.slice().sort((a, b) => a - b), "十段照「辦一場活動會先做什麼」排");
+  assert.equal(count(h, /<section class="section"/g), SECTIONS.length, "沒有多出來或漏掉的一段");
+  // 每一段的標題
+  for (const [id, title] of [["ev-content", "內容"], ["ev-when", "時間與地點"], ["ev-listing", "對外的「活動與計畫」頁和「團隊」頁上怎麼列"], ["ev-pics", "照片"], ["ev-speakers", "講者"],
+    ["ev-signup", "報名與現場"], ["ev-live", "上線"], ["ev-links", "行銷與錢"], ["ev-after", "活動之後"], ["ev-house", "其他設定"]])
+    assert.ok(secOf(h, id).startsWith(`<section class="section" id="${id}"><h2>${title}`), `${id} 的標題不是「${title}」`);
+  // 每一格在它該在的那一段裡
+  const has = (id, ...needles) => { const s = secOf(h, id); for (const n of needles) assert.ok(s.includes(n), `${id} 那一段裡沒有 ${n}`); };
+  has("ev-content", 'id="ev-tzh"', 'id="ev-ten"', 'id="ev-szh"', 'id="ev-sen"', 'id="ev-bzh"', 'id="ev-ben"');
+  has("ev-when", 'id="ev-starts"', 'id="ev-ends"', 'id="ev-place"', 'id="ev-cap"', 'id="ev-venue"');
+  has("ev-listing", 'id="ev-month"', 'id="ev-recurring"', 'id="ev-edzh"', 'id="ev-eden"');
+  has("ev-pics", 'id="ev-cover-file"', 'id="ev-cover"', 'id="ev-consent"', 'id="ev-photos"');
+  has("ev-signup", 'data-act="open-form"', 'data-act="ev-form-status"', 'id="ev-fopen"', 'id="ev-fclose"', 'id="ev-tickets"', 'data-act="open-apps"', 'data-act="open-notice"', 'data-act="open-checkin"');
+  has("ev-live", 'data-act="ev-ready"', "草稿。填好內容");
+  has("ev-links", 'data-act="ev-ask-mkt"');
+  has("ev-after", 'data-act="ev-fb-create"', 'href="/admin/records/#overview/e1"');
+  has("ev-house", 'id="ev-pj-box"', 'id="ev-kind"', 'id="ev-term"', 'data-act="members-open"');
+  // 段裡面的順序
+  const pics = secOf(h, "ev-pics"); assert.ok(pics.indexOf('id="ev-coverbox"') < pics.indexOf('id="ev-photos"'), "封面在活動照片上面");
+  const su = secOf(h, "ev-signup"); assert.ok(su.indexOf('id="ev-form"') < su.indexOf('id="ev-tickets"') && su.indexOf('id="ev-tickets"') < su.indexOf("行前與當天"), "報名表 → 報名類型 → 行前與當天");
+  const ho = secOf(h, "ev-house"); assert.ok(ho.indexOf('id="ev-pj-box"') < ho.indexOf('id="ev-meta"') && ho.indexOf('id="ev-meta"') < ho.indexOf('id="ev-members"'), "專案 → 種類與屆別 → 成員");
+  const wh = secOf(h, "ev-when"); assert.ok(wh.indexOf('id="ev-place"') < wh.indexOf('id="ev-venue"'), "場地在地點那一格下面");
+  // 會改狀態的按鈕只在「上線」那一段；專案不再是第二段
+  assert.equal(count(h, /data-act="ev-(ready|unready|publish|unpublish)"/g), 1);
+  assert.ok(at('id="ev-pj-box"') > at('<section class="section" id="ev-after">'), "專案在最後面的其他設定裡");
   assert.equal(count(h, /id="ev-cover"/g), 1, "連結那一格只有一個"); assert.equal(count(h, /id="ev-consent"/g), 1);
-  assert.match(h, /<div class="ev-panel"><div class="mini">還沒選場地/, "場地也包成一塊");
+  // x 沒給也畫得出來
   const bare = F.eventEditHTML(EV, FORM, 3, DIR, "", false);
-  assert.match(bare, /id="ev-photos"><h2>活動照片<\/h2><div class="mini">載入中/);
-  assert.doesNotMatch(F.eventEditHTML(EV, FORM, 3, VIEWER, "", false, [], [], null, rc, null, { photos: PHOTOS }), /id="ev-photos"|ev-cover-file|ev-fb-create|ev-form-status/, "只有「看」的人：沒有照片那一塊、沒有任何會改東西的按鈕");
+  assert.match(bare, /<div class="ev-panel" id="ev-photos"><h3>活動照片<\/h3><div class="mini">載入中/);
+  assert.doesNotMatch(fullPage(EV, VIEWER), /id="ev-photos"|ev-cover-file|ev-fb-create|ev-form-status|ev-fopen|data-autosave=/, "只有「看」的人：沒有照片那一塊、沒有任何會改東西的按鈕與格子");
+});
+
+test("★ 結束了的活動：「活動之後」搬到狀態那一行的正下面（2026-11-13 Paul 定的），其他照舊", () => {
+  const past = fullPage({ ...EV, status: "published", starts_at: "2025-07-01T00:00:00Z" });
+  const at = s => { const i = past.indexOf(s); assert.ok(i >= 0, `找不到 ${s}`); return i; };
+  assert.ok(at('id="ev-state"') < at('id="ev-after"') && at('id="ev-after"') < at('id="ev-content"'), "狀態 → 活動之後 → 內容");
+  assert.ok(at('id="ev-live"') < at('id="ev-links"') && at('id="ev-links"') < at('id="ev-house"'));
+  assert.equal(count(past, /id="ev-after"/g), 1, "只畫一次");
+});
+
+test("★ 每一段長一樣：一個 h2，底下是一塊一塊的 .ev-panel；沒有光禿禿的小標題、沒有往上拉的負邊界", () => {
+  for (const me of [DIR, EDITOR, VIEWER, ASSOC]) {
+    const h = fullPage(EV, me);
+    for (const id of SECTIONS) {
+      if (id === "ev-speakers" && (me === VIEWER || me === ASSOC)) continue;   // 改不動的人沒有講者那一段
+      const s = secOf(h, id), body = s.slice(s.indexOf("</h2>") + 5);
+      assert.ok(body.startsWith('<div class="ev-panel"') || (id === "ev-after" && /^<div class="(todo ev-kpis|mini ev-gap)"/.test(body)), `${id} 的 h2 底下不是一塊 .ev-panel：${body.slice(0, 60)}`);
+    }
+    assert.doesNotMatch(h, /class="sec-h"/, "不再有自己一個樣子的小標題");
+    assert.doesNotMatch(h, /style="margin:-/, "說明不靠負邊界硬拉上去");
+    assert.doesNotMatch(h, /<section class="section"[^>]*><h2>[^<]*<\/h2><div class="note">/, "段的最上面不是一條提醒");
+  }
+  // 「通常在幾月」的說明在下拉的底下（自己一行），不是接在右邊
+  const pg = F.eventProgrammeHTML({ ...EV, usual_month: 1, recurring: true, edition_zh: "", edition_en: "" }, true, false);
+  assert.match(pg, /<\/select><span class="ev-help">只有沒填開始時間的時候才用得到/);
+  assert.doesNotMatch(pg, /<h3|class="mini"/);
+  const css = read("admin/admin.css");
+  assert.match(css, /\.ev-help\{display:block;/, "說明自己一行");
+  assert.match(css, /\.two > \.ev-help\{grid-column:1\/-1/, "兩欄裡的說明橫跨兩欄");
+});
+
+test("★ 最上面那一行狀態：四種狀態各一句、對外中有「看對外的那一頁」、一顆帶你到「上線」；不是一段，也沒有會改狀態的按鈕", () => {
+  const draft = F.eventStateHTML(EV);
+  assert.match(draft, /^<div class="ev-state" id="ev-state"><span class="tag draft">草稿<\/span><span class="ev-state-t">還沒上線，外面的人看不到。<\/span>/);
+  assert.match(draft, /<button type="button" class="btn quiet sm" data-act="ev-jump" data-to="ev-live">到「上線」那一段<\/button><\/div>$/);
+  assert.doesNotMatch(draft, /<a |<section|<h2/);
+  assert.match(F.eventStateHTML({ ...EV, status: "ready" }), /<span class="tag warn">準備好了<\/span><span class="ev-state-t">等 Co-President 或 Senior Adviser 放上對外頁/);
+  const live = F.eventStateHTML({ ...EV, status: "published" });
+  assert.match(live, /<span class="tag open">對外中<\/span>/); assert.match(live, /<a class="btn ghost sm" href="\/events\/\?e=winter-camp-2027" target="_blank" rel="noopener">看對外的那一頁<\/a>/);
+  assert.match(F.eventStateHTML({ ...EV, status: "archived" }), /<span class="tag">撤下了<\/span><span class="ev-state-t">撤下來了，外面的人看不到。/);
+  for (const st of ["draft", "ready", "published", "archived"]) assert.doesNotMatch(F.eventStateHTML({ ...EV, status: st }), /ev-ready|ev-unready|ev-publish|ev-unpublish/);
+  const m = read("admin/src/main.js");
+  assert.match(m, /if \(act === "ev-jump"\) \{\s*const to = document\.getElementById\(b\.dataset\.to\);\s*if \(to\) to\.scrollIntoView\(/, "只捲過去，不改網址");
+  // 整頁上那一行在標題的正下面；唯讀的人接著一句「改不動」
+  const view = fullPage(EV, VIEWER);
+  assert.match(view, /<\/header><div class="ev-state" id="ev-state">[\s\S]*?<\/div><div class="note">你對這場活動是「看」，改不動。<\/div><section class="section" id="ev-content">/);
+});
+
+test("★ 說明底下的預覽收成一行：真的 <details>，中英兩格都是，預設收著；開著沒只記在記憶體，換一場活動就收回去", () => {
+  const ev = { id: "e1", body_zh: "## 活動資訊", body_en: "Hello" };
+  for (const [lg, id] of [["zh", "ev-bzh"], ["en", "ev-ben"]]) {
+    const h = F.eventDescHTML(ev, lg, true, false);
+    assert.match(h, new RegExp(`<details class="ev-prev" id="${id}-fold"><summary><span class="chev" aria-hidden="true"></span>對外頁上會長這樣</summary><div class="ev-rt" id="${id}-prev">`), `${lg} 那一格預設收著`);
+    assert.match(F.eventDescHTML(ev, lg, true, false, true), new RegExp(`<details class="ev-prev" id="${id}-fold" open>`), "開過的重畫後還開著");
+  }
+  assert.match(F.eventDescHTML(ev, "zh", true, false), /id="ev-bzh-prev"><h3>活動資訊<\/h3><\/div><\/details>/, "收著的時候裡面一樣是最新的");
+  const h = fullPage(); assert.equal(count(h, /<details class="ev-prev"/g), 2); assert.doesNotMatch(h, /<details class="ev-prev"[^>]* open/);
+  assert.equal(count(fullPage(EV, DIR, { prevZh: true }), /<details class="ev-prev"[^>]* open>/g), 1);
+  const m = read("admin/src/main.js");
+  assert.match(m, /"ev-bzh-fold", "ev-ben-fold"\]\.includes\(t\.id\)\) S\.vnOpen\[t\.id\] = t\.open;/, "開關記在 S.vnOpen（記憶體）");
+  assert.match(m, /prevZh: !!S\.vnOpen\["ev-bzh-fold"\], prevEn: !!S\.vnOpen\["ev-ben-fold"\]/);
+  assert.match(m, /S\.vnOpen\["ev-bzh-fold"\] = false; S\.vnOpen\["ev-ben-fold"\] = false;/, "打開一場活動的時候都是收著的");
+  assert.doesNotMatch(m, /localStorage[^\n]*ev-b(zh|en)-fold|ev-b(zh|en)-fold[^\n]*localStorage/, "不存進 localStorage：重新整理就回到收著");
+  const css = read("admin/admin.css");
+  assert.match(css, /\.ev-prev > summary\{[^}]*cursor:pointer/); assert.match(css, /\.ev-prev\[open\] \.chev\{transform:rotate\(45deg\)\}/);
+});
+
+test("★ 報名的開放與截止時間：活動編輯頁上改得到，兩格是台灣時間；「看」的人看到的是一行字；表單編輯頁那兩格同一套", () => {
+  const form = { ...FORM, status: "open", opens_at: "2026-12-01T01:00:00Z", closes_at: "2026-12-20T15:59:00Z" };
+  const h = F.eventSignupHTML(EV, form, 3, EDITOR, false);
+  assert.match(h, /<div class="two ev-fwin" data-autosave="ev-fwin" data-id="f1">/, "自己一個「改了就存」的框，data-id 是報名表的 id");
+  assert.match(h, /<label><i>開放報名的時間（台灣時間）<\/i><input id="ev-fopen" name="opens_at" type="datetime-local" value="2026-12-01T09:00"><\/label>/, "UTC 01:00 印成台灣 09:00");
+  assert.match(h, /<label><i>截止報名的時間（台灣時間）<\/i><input id="ev-fclose" name="closes_at" type="datetime-local" value="2026-12-20T23:59"><\/label>/);
+  assert.match(h, /要先按「開放報名」，這兩個時間才有用/); assert.match(h, /<span class="autosave" data-for="ev-fwin" data-id="f1">改了就存<\/span>/);
+  assert.match(h, /<p class="ev-line">已報名 3 \/ 40 人<\/p>/, "有那兩格的人，上面那一行不重複印時間");
+  assert.match(F.eventSignupHTML(EV, FORM, 3, EDITOR, false), /id="ev-fopen" name="opens_at" type="datetime-local" value="">/, "沒設過是空的");
+  assert.match(F.eventSignupHTML(EV, form, 3, EDITOR, true), /id="ev-fopen"[^>]* disabled>/, "忙的時候按不了");
+  const view = F.eventSignupHTML(EV, form, 3, VIEWER, false);
+  assert.doesNotMatch(view, /ev-fopen|ev-fclose|ev-fwin/, "只有「看」的人沒有那兩格");
+  assert.match(view, /<p class="ev-line">2026-12-01 09:00 開放（台灣時間）・2026-12-20 23:59 截止（台灣時間）・已報名 3 \/ 40 人<\/p>/);
+  assert.doesNotMatch(F.eventSignupHTML({ ...EV, form_id: null }, null, null, EDITOR, false), /ev-fopen/, "沒有報名表就沒有那兩格");
+  // 狀態旁邊的標籤與底下那一句：時間一改就要跟著換（main.js 存完只換這兩小塊，不重畫）
+  const pub = { ...EV, status: "published" };
+  assert.deepEqual(F.evFormBits(pub, { ...FORM, status: "open", opens_at: "2099-01-01T00:00:00Z" }, 0), { tags: '<span class="tag open">開放中</span> <span class="tag warn">還沒到開放時間</span>', hint: "" });
+  assert.deepEqual(F.evFormBits(pub, { ...FORM, status: "open", closes_at: "2020-01-01T00:00:00Z" }, 0), { tags: '<span class="tag open">開放中</span> <span class="tag warn">過了截止時間</span>', hint: "" });
+  assert.deepEqual(F.evFormBits(pub, { ...FORM, status: "open" }, 0), { tags: '<span class="tag open">開放中</span>', hint: "現在收得到報名。" });
+  assert.match(h, /<span id="ev-fm-tags">/); assert.match(h, /<div class="ev-help" id="ev-fm-hint">/);
+  // 台灣時間的兩支：不管在哪個時區跑都一樣；空的回空的
+  assert.equal(F.evTaipei("2026-12-01T01:00:00Z"), "2026-12-01T09:00"); assert.equal(F.evTaipei("2026-12-31T16:30:00+00:00"), "2027-01-01T00:30", "跨日也對");
+  assert.equal(F.evFromTaipei("2026-12-01T09:00"), "2026-12-01T01:00:00.000Z"); assert.equal(F.evFromTaipei(""), ""); assert.equal(F.evTaipei(null), "");
+  assert.equal(F.evTaipei(F.evFromTaipei("2027-03-23T00:00")), "2027-03-23T00:00", "存進去再讀出來是同一個時間（不會每存一次差一次時區）");
+  // 表單編輯頁：同一套、有寫台灣時間
+  const fe = F.formHTML({ ...form, title: "報名", intro: "", kind: "program", lang: "zh", notify_by: null, interview_url: "" }, [], true, [], "", false);
+  assert.match(fe, /<label><i>開放時間（台灣時間，不填就是立刻）<\/i>\s*<input id="fopen" name="opens_at" type="datetime-local" value="2026-12-01T09:00"><\/label>/);
+  assert.match(fe, /<label><i>截止時間（台灣時間，不填就是不自動關）<\/i>\s*<input id="fclose" name="closes_at" type="datetime-local" value="2026-12-20T23:59"><\/label>/);
+  // main.js：兩邊存的時候都用 evFromTaipei；活動頁那兩格走的是表單編輯頁同一支 saveForm，沒有新的資料庫函式
+  const m = read("admin/src/main.js"), d = read("admin/src/data.js");
+  assert.match(m, /opens_at: UI\.evFromTaipei\(val\("fopen"\)\),\s*closes_at: UI\.evFromTaipei\(val\("fclose"\)\),/);
+  assert.doesNotMatch(m, /new Date\(val\("f(open|close)"\)\)/, "不再照這台電腦的時區算");
+  const win = m.slice(m.indexOf('if (act === "ev-fwin") {'), m.indexOf('if (act === "mt-min") {'));
+  assert.ok(win.length > 200, "onAutosave 有接 ev-fwin");
+  assert.match(win, /UI\.evFromTaipei\(el\.value\)/); assert.match(win, /await D\.saveForm\(id, patch\);/);
+  assert.doesNotMatch(win, /render\(\)/, "存完不重畫（正在打的那一格游標不會跳）"); assert.match(win, /UI\.evFormBits\(ev, f, S\.evSigned\)/);
+  assert.doesNotMatch(win, /\.rpc\(|supabase/);
+  assert.match(d, /const FORM_FIELDS = \[[^\]]*"opens_at", "closes_at"/, "saveForm 本來就收這兩欄");
+  // 會議的開始與結束不動：幹部在好幾個國家，會議照各自電腦的時間
+  const ui = read("admin/src/ui.js");
+  assert.match(ui, /<input id="mt-starts" name="starts_at" type="datetime-local" value="\$\{esc\(mtLocal\(v\.starts_at\)\)\}"/);
+  assert.match(ui, /<input id="mt-ends" name="ends_at" type="datetime-local" value="\$\{esc\(mtLocal\(v\.ends_at\)\)\}"/);
+});
+
+test("★ 這一頁有四塊「改了就存」（內容、時間與地點、對外怎麼列、封面），存的都是同一條路；場地、種類、專案不在框裡", () => {
+  const h = fullPage();
+  assert.equal(count(h, /data-autosave="ev-save" data-id="e1"/g), 4);
+  assert.equal(count(h, /class="autosave" data-for="ev-save" data-id="e1"/g), 4, "每一塊各自一行「改了就存」");
+  for (const id of ["ev-content", "ev-when", "ev-listing"]) assert.match(secOf(h, id), /^<section class="section" id="[a-z-]+"><h2>[^<]*(<span class="hint">[^<]*<\/span>)?<\/h2><div class="ev-panel" data-autosave="ev-save" data-id="e1">/, `${id} 的第一塊就是那個框`);
+  assert.match(h, /<div class="ev-panel" id="ev-coverbox" data-autosave="ev-save" data-id="e1">/);
+  // 每一格都只落在一個框裡，名字沒變（readEvent 照 id 讀整頁）
+  const boxes = h.split('data-autosave="ev-save"').slice(1).map(b => b.slice(0, b.indexOf('class="autosave" data-for="ev-save"')));
+  const names = boxes.map(b => [...b.matchAll(/ name="([a-z_]+)"/g)].map(m => m[1]));
+  assert.deepEqual(names, [["title_zh", "title_en", "summary_zh", "summary_en", "body_zh", "body_en"], ["starts_at", "ends_at", "place", "capacity"],
+    ["usual_month", "recurring", "edition_zh", "edition_en"], ["cover_url", "cover_consent"]]);
+  for (const b of boxes) assert.doesNotMatch(b, /id="ev-venue"|id="ev-kind"|id="ev-term"|id="ev-project"|data-act="ev-ph-consent"/, "選了就存的那幾格不在「改了就存」的框裡（各有各的路）");
+  assert.match(read("admin/src/main.js"), /const patch = \{ title_zh: val\("ev-tzh"\)[^\n]*\n\s*starts_at: iso\(val\("ev-starts"\)\)[^\n]*cover_url: val\("ev-cover"\), cover_consent: chk\("ev-consent"\) \};/, "readEvent 還是照 id 把整頁讀一遍");
+  assert.doesNotMatch(fullPage(EV, VIEWER), /data-autosave=|class="autosave"/, "唯讀的人沒有框也沒有那行小字");
+});
+
+test("★ 重排用到的字中英都有，沒有破折號與 emoji；「通常在幾月」的說明不再寫已經改名的「這一年」", () => {
+  const keys = ["ev.top.draft", "ev.top.ready", "ev.top.published", "ev.top.archived", "ev.jumpLive", "ev.when", "ev.picsSec", "ev.house", "ev.houseHint", "ev.membersSec",
+    "ev.pg", "ev.pgHint", "ev.monthHelp", "ev.recurringHelp", "ev.editionHelp", "ev.formEdit", "ev.after", "ev.opens", "ev.fm.closes", "ev.fm.opensAt", "ev.fm.closesAt", "ev.fm.windowHelp", "form.opens", "form.closes"];
+  for (const k of keys) { assert.ok(FS.STRINGS[k] && FS.STRINGS[k].zh && FS.STRINGS[k].en, `字典裡沒有 ${k}`); for (const l of ["zh", "en"]) { assert.doesNotMatch(FS.STRINGS[k][l], /[—–]/, `${k} 有破折號`); assert.doesNotMatch(FS.STRINGS[k][l], /\p{Extended_Pictographic}/u, `${k} 有 emoji`); } }
+  for (const k of ["ev.monthHelp", "ev.recurringHelp", "ev.editionHelp", "ev.pg"]) { assert.doesNotMatch(FS.STRINGS[k].zh, /這一年/, k); assert.doesNotMatch(FS.STRINGS[k].en, /This year page/, k); }
+  assert.match(FS.STRINGS["ev.monthHelp"].zh, /沒填開始時間的時候才用得到[\s\S]*「活動與計畫」頁/); assert.match(FS.STRINGS["ev.monthHelp"].en, /Programmes page/);
+  assert.match(FS.STRINGS["ev.recurringHelp"].zh, /「團隊」頁那個 team 底下/); assert.match(FS.STRINGS["ev.editionHelp"].zh, /當大標題，原本的名稱放在旁邊/);
+  for (const k of ["ev.fm.opensAt", "ev.fm.closesAt", "form.opens", "form.closes", "ev.opens", "ev.fm.closes"]) { assert.match(FS.STRINGS[k].zh, /台灣時間/, k); assert.match(FS.STRINGS[k].en, /Taiwan time/, k); }
+  F.setLang("en");
+  const en = fullPage().replace(/<[^>]+>/g, " ").replace(/2027 冬令營|台北|台大/g, "");
+  assert.doesNotMatch(en, /[一-鿿]/, "英文模式不該剩中文：" + (en.match(/[^\s]*[一-鿿]+[^\s]*/) || [""])[0]);
+  F.setLang("zh");
 });
 
 test("★ 這一批新的字中英都有，而且程式裡用到的鍵字典裡都有", () => {

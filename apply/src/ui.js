@@ -15,8 +15,10 @@ const DICT = {
   closesAt: ["收件到 ", "Closes "],
   notify:   ["預計 ", "Decisions by "],
   notify2:  [" 前通知", ""],
-  back:     ["← 回清單", "← Back"],
-  needIn:   ["送出申請需要一個 BT 帳號。", "You need a Beyond Taiwan account to submit."],
+  back:     ["← 看全部開放中的", "← Everything that is open"],
+  backEvent:["← 回到這場活動", "← Back to the event"],
+  preHead:  ["這張表會問的問題（現在還不能填）", "What this form asks (you cannot fill it in yet)"],
+  needIn:   ["報名要先登入，或開一個免費的 BT 帳號，一分鐘。登入之後會回到這張表。", "Sign in or create a free Beyond Taiwan account to sign up. It takes a minute, and you come straight back to this form."],
   signin:   ["登入或註冊", "Sign in or sign up"],
   preview:  ["下面是這份申請會問的問題，可以先看過再決定。",
              "These are the questions. Have a look before you decide."],
@@ -33,7 +35,7 @@ const DICT = {
   required: ["必填", "required"],
   profile:  ["先把你的姓名、學校、年級填一下，送出申請要用。",
              "Please fill in your name, school and year first."],
-  toProfile:["去填", "Fill it in"],
+  toProfile:["填我的資料，填完會回到這張表", "Fill in my details, then come back here"],
   full:     ["這一份已經收滿了，謝謝你的興趣。下一場會先公布在 Instagram。", "This one is full. Thank you for your interest. The next one will be on Instagram first."],
   notYet:   ["這一份還沒開始收件。", "This one is not open yet."],
   closed:   ["這一份已經不收了。", "This one is closed."],
@@ -136,10 +138,17 @@ export function ticketsHTML(tickets, picked, en) {
 // run：signedIn 時引擎第一次畫的那一頁（F.pageHTML 的結果），沒給就留一個空的 #fx-run。
 // tk：{ tickets, picked }，活動有分報名類型才有東西。還沒選的時候只畫「先選一種」，選好才畫表單（或登入的按鈕）；
 //     已經送過、已經關了的不畫。沒給 tk（活動沒有分類型）這一頁跟原本一模一樣。
-export function formHTML(form, questions, state, msg, busy, en, run, reason, tk) {
+// ev：這張表是哪一場活動的報名表（public_events() 的那一列），沒有就是一般的申請。有的話上面印那一場的時間與地點，「回去」那顆寫回這場活動。
+export function eventLine(ev, en) {
+  if (!ev) return "";
+  const when = ev.starts_at ? fmtDate(ev.starts_at, en) : "";
+  return [when, ev.place].filter(Boolean).join(en ? " · " : "・");
+}
+export function formHTML(form, questions, state, msg, busy, en, run, reason, tk, ev) {
   const editable = state === "signedIn";
-  const head = `<p><button class="quiet" data-act="back">${esc(T("back", en))}</button></p>
+  const head = `<p><button class="quiet" data-act="back">${esc(T(ev ? "backEvent" : "back", en))}</button></p>
     <h3 style="font-family:var(--display);font-size:clamp(24px,2.8vw,34px);margin:14px 0 8px">${esc(form.title)}</h3>
+    ${eventLine(ev, en) ? `<p class="ap-ev">${esc(eventLine(ev, en))}</p>` : ""}
     ${form.intro ? `<p class="note" style="margin-bottom:16px">${esc(form.intro).replace(/\n/g, "<br>")}</p>` : ""}
     ${form.notify_by ? `<p class="when">${esc(T("notify", en))}${fmtDate(form.notify_by, en)}${esc(T("notify2", en))}</p>` : ""}
     ${form.closes_at && state !== "closed" ? `<p class="when">${esc(T("closesAt", en))}${fmtDate(form.closes_at, en)}</p>` : ""}
@@ -154,7 +163,8 @@ export function formHTML(form, questions, state, msg, busy, en, run, reason, tk)
       <p><button class="btn" data-act="signin">${esc(T("signin", en))}</button></p>` : "")
     + (state === "needProfile" ? `<div class="warn">${esc(T("profile", en))}</div>
       <p><button class="btn" data-act="signin">${esc(T("toProfile", en))}</button></p>` : "")
-    + (state === "already" || state === "closed" ? "" : F.flatHTML(questions, en));
+    // 還不能填的時候，底下的題目只是給他先看過（每一格都鎖著）。上面加一行字講清楚，不然看起來像一張壞掉的表。
+    + (state === "already" || state === "closed" ? "" : `<p class="ap-pre">${esc(T("preHead", en))}</p>` + F.flatHTML(questions, en));
 }
 
 // 最後一頁送出鈕上面那一格：家長或監護人的 email（2026-09-07 拍板，未滿 18 歲請填）。

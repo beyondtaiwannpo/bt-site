@@ -34,7 +34,7 @@ function body() {
   if (!S.loaded) return UI.skeletonHTML();
   if (!canEnter()) return UI.noAccessHTML(S.me);
   if (S.view === "overview" && S.id) return S.event ? UI.eventHTML(S.event, S) : UI.msgHTML(S.msg) + UI.skeletonHTML();
-  if (S.view === "overview") return UI.overviewHTML(S.boot, S.msg) + (S.pastDraft ? UI.pastEventFormHTML(S.boot.terms, S.pastDraft, S.busy) : "");
+  if (S.view === "overview") return UI.overviewHTML(S.boot, S.msg, S.pastDraft ? UI.pastEventFormHTML(S.boot.terms, S.pastDraft, S.busy) : "");
   if (S.view === "forms" && S.id) {
     if (!S.results) return UI.msgHTML(S.msg) + UI.skeletonHTML();
     const head = UI.formHeadHTML(S.results, S.sub);
