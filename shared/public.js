@@ -51,7 +51,7 @@
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduce || !("IntersectionObserver" in window)) return;
 
-  var RISE = "[data-rise], .rows li, .tl li, .nums > div, .nums > li, .prog, .partners li, .body > .photo, .ev-card";
+  var RISE = "[data-rise], .rows li, .tl li, .nums > div, .nums > li, .tm, .partners li, .body > .photo, .ev-card";
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
       if (!e.isIntersecting) return;

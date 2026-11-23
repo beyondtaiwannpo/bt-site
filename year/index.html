@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>這一年 / Beyond Taiwan</title>
+
+<!-- 這一年（2026-11-22 新增，Paul：學生在沒有東西開放的時候，也看得到這一年會發生什麼）。
+     一整屆的時間軸：橫的是八月到隔年七月，一個 team 一列。不是日曆，多數東西只知道「大概十月」。
+     資料只有一份：後台「網站上的活動」發布的那幾筆。Director 在後台改一筆，這一頁、「現在開放」、「團隊」一起變。
+     畫的程式在 src/main.js，判斷在 src/logic.js。問不到資料或這一屆還沒有東西的時候，這一頁是下面那幾句話，不會是一張空表。
+     ── 這一頁不碰 auth ──
+     不載入 supabase-js、不判斷登入狀態。右上角那顆按鈕只是一個連結。
+     ── 中英兩版 ──
+     兩版都在 HTML 裡，沒有 JavaScript 時兩版都讀得到。
+     ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
+     ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
+
+<meta name="description" content="Beyond Taiwan 這一屆從八月到隔年七月，六個 team 排好要做的事。有確定日期的寫日期，還沒定的寫大概幾月。">
+<meta property="og:title" content="這一年 / Beyond Taiwan">
+<meta property="og:description" content="Beyond Taiwan 這一屆從八月到隔年七月，六個 team 排好要做的事。有確定日期的寫日期，還沒定的寫大概幾月。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://beyondtaiwannpo.com/year/">
+<meta name="theme-color" content="#EDE5D8">
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 不擋渲染的載法（media="print" 加 onload 切回 all）。
+     那份 CSS 有三萬多位元組，擋著載會讓文字晚一秒多才出現。
+     沒有 JavaScript 的瀏覽器走 noscript 那一行。 -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
+<link rel="stylesheet" href="../shared/brand.css">
+
+<!-- 語言的判斷要在這裡，不能等到頁尾。中英兩版都在 HTML 裡，
+     在瀏覽器套上 data-lang 之前畫面上是兩版接在一起；
+     判斷寫在頁尾的話畫面已經畫完才藏掉一版，下面所有東西會跳一次。 -->
+<script>
+  /* 語言是這樣決定的，順序不能反：
+       1. 網址上的 ?lang= —— 使用者在上一頁選過，那個選擇要跟著他走。
+       2. 沒有的話才看瀏覽器的語言設定。
+     為什麼用網址不用 localStorage：**這個站不在任何人的裝置上存東西。**
+     讀者包含未成年人，「什麼都沒存」是一個值得保住的性質，
+     而且這樣隱私政策一個字都不用改。代價是網址上會多一段 ?lang=，
+     好處是把連結傳給別人時語言也跟著過去。
+     連結上的參數是頁尾那段 keepLang() 補的。 */
+  (function () {
+    var q = new URLSearchParams(location.search).get("lang");
+    document.documentElement.setAttribute("data-lang",
+      q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+  })();
+</script>
+
+<style>
+*{box-sizing:border-box}
+:root{--gut:clamp(20px,5vw,88px)}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+main,footer,.topbar{position:relative;z-index:1}
+.skip{position:absolute;left:-9999px;top:0;z-index:80;
+  background:var(--bt-navy);color:var(--bt-cream);padding:12px 18px;text-decoration:none}
+.skip:focus{left:0}
+:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+
+/* ═════════ 頂欄：liquid glass ═════════ */
+/* 跟首頁同一塊玻璃，樣式刻意各自寫一份 —— 搬進 shared/ 的話 shared/ 就開始長版面，
+   而規格說它要保持極小。玻璃的四層與兩個實測後調過的值見 README「頂欄的 liquid glass」。
+   這條頂欄跟 shared/nav.js 是兩回事：那是登入後的功能清單，只有幹部看得到。 */
+.topbar{
+  position:sticky;top:12px;z-index:50;
+  display:flex;align-items:center;gap:clamp(10px,1.8vw,26px);
+  margin:12px var(--gut) 0;padding:9px 10px 9px 16px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(237,229,216,.6));
+  backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(16,42,134,.05),
+             0 10px 30px rgba(16,42,134,.10),0 2px 6px rgba(16,42,134,.06);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .topbar{background:var(--bt-cream);border-color:rgba(16,42,134,.14)}
+}
+.topbar .home{display:flex;align-items:center;margin-right:auto;flex:0 0 auto;position:relative}
+.topbar .home img{height:30px;width:auto;display:block}
+.navlinks{display:flex;align-items:center;gap:clamp(10px,1.5vw,24px)}
+.navlinks a{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;
+  opacity:.74;padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;transition:opacity var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
+.navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+.navlinks a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
+.lang{min-width:44px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.12em;
+  border:1px solid rgba(16,42,134,.32);border-radius:999px;padding:6px 13px;background:none;
+  color:var(--ink);cursor:pointer;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease);line-height:1;position:relative}
+.lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.login{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+  font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px;white-space:nowrap;
+  line-height:1;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease);position:relative}
+.login:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
+/* 頂欄那顆按鈕在窄螢幕上只講一種語言（2026-09-08）。
+   Paul 回報「選單跑掉了」：登入之後那顆按鈕的字從「登入 / Sign in」變成
+   「我的 BT 帳號 / Account」，加上 logo、語言鈕、選單鈕，在 390px 的手機上
+   總寬就超過頂欄。這幾個都是 white-space:nowrap，縮不下去，
+   於是排在最後的「選單」被擠到玻璃外面去（而且沒有任何東西會報錯）。
+
+   **修法不是把選單藏起來**，是讓那顆按鈕在窄螢幕上只顯示一半：
+   現在看的是中文就只留中文那半，英文就只留英文那半。
+   兩種讀者都還看得懂，寬螢幕上兩半照舊都在。
+   斜線那一格要一起藏 —— 不藏的話會變成「登入 /」。 */
+@media (max-width:560px){
+  .lg-sep{display:none}
+  html[data-lang="en"] .lg-a{display:none}
+  html[data-lang="zh"] .lg-b{display:none}
+  /* 只藏一半還不夠寬裕：實測 390px 的手機上，中文那半「我的 BT 帳號」
+     排完只剩 1px 餘裕，任何一個字級或間距改動都會再擠出去一次。
+     這三行把餘裕拉到十幾 px。logo 是等比例縮小（height 改、width:auto），
+     沒有改色、拉伸、旋轉或透明度，Brand Book 的硬規則沒有被碰到。 */
+  .topbar{gap:10px}
+  .topbar .home img{height:26px}
+  .login{padding:9px 13px;font-size:14px}
+}
+.burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;position:relative;
+  padding:6px 8px;font-family:var(--display);font-size:14px;font-weight:700;letter-spacing:.1em}
+/* 可點區域 44x44，視覺大小不變。 */
+.topbar .home::after,.lang::after,.login::after,.burger::after{
+  content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
+
+/* ═════════ 版面 ═════════ */
+.hero{padding:clamp(40px,8vh,110px) var(--gut) clamp(20px,3vh,40px)}
+h1{font-family:var(--han);font-weight:900;font-size:clamp(36px,6.4vw,96px);
+  line-height:1;letter-spacing:-.02em;margin:0;max-width:9em}
+.en h1{font-family:var(--display);font-weight:700;font-size:clamp(38px,6.8vw,100px);
+  line-height:.96;letter-spacing:-.01em;max-width:15ch}
+.lead{font-size:clamp(16px,1.35vw,20px);line-height:1.62;max-width:34em;
+  margin:clamp(20px,3.2vh,34px) 0 0;color:rgba(16,42,134,.82)}
+
+.sec{padding:clamp(46px,7.5vh,110px) var(--gut) 0}
+.sec-in{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);
+  gap:clamp(18px,4.5vw,74px);align-items:start;
+  border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(20px,3.4vh,40px)}
+h2{font-family:var(--han);font-weight:900;font-size:clamp(24px,3.4vw,50px);
+  line-height:1.06;letter-spacing:-.015em;margin:0;text-wrap:balance}
+.en h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.8vw,54px);
+  line-height:1;letter-spacing:0}
+h3{font-family:var(--display);font-weight:700;font-size:clamp(19px,1.7vw,25px);
+  letter-spacing:.005em;line-height:1.2;margin:36px 0 10px}
+h3:first-child{margin-top:0}
+p{margin:0 0 17px;max-width:34em}
+.body a{color:var(--ink);font-weight:600;text-decoration-thickness:1px;text-underline-offset:3px;transition:text-decoration-color var(--dur-2) var(--ease),text-underline-offset var(--dur-2) var(--ease)}
+.body a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
+.pull{font-family:var(--hand);font-size:clamp(21px,2.6vw,34px);line-height:1.55;
+  margin:clamp(22px,3.4vh,38px) 0;max-width:22em;color:var(--ink)}
+
+/* 時間軸。只有這一段是真的時間順序，所以只有這裡用得起年份當標記
+   —— 其他地方不准用 01/02/03 那種編號（見視覺方向「要避開的套路」）。 */
+.tl{margin:0;padding:0;list-style:none;max-width:34em}
+.tl li{display:grid;grid-template-columns:5.5em 1fr;gap:clamp(12px,2vw,26px);
+  padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+.tl li:first-child{border-top:0;padding-top:0}
+.tl b{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.03em;
+  color:rgba(16,42,134,.7);white-space:nowrap}
+.tl span{font-size:16px;line-height:1.6}
+
+/* 數字。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
+   是兩欄的列，靠上面那條細線分隔，跟時間軸與六個 team 同一套語言。
+   數字本身用 Barlow Condensed 放到很大，那是這一頁唯一需要大聲的東西。 */
+.nums{margin:0;padding:0;list-style:none;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  column-gap:clamp(20px,4vw,56px)}
+.nums li{padding:20px 0;border-top:1px solid rgba(16,42,134,.14)}
+.nums li:nth-child(-n+2){border-top:0;padding-top:0}
+.nums b{display:block;font-family:var(--display);font-weight:700;
+  font-size:clamp(40px,4.8vw,68px);line-height:.95;letter-spacing:-.01em}
+.nums i{display:block;font-style:normal;font-family:var(--display);font-weight:600;
+  font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(16,42,134,.7);margin:7px 0 9px}
+.nums span{display:block;font-size:15.5px;line-height:1.6;
+  color:rgba(16,42,134,.82);max-width:24em}
+@media (max-width:700px){
+  /* 一欄的時候「前兩個不畫上線」就不對了，只有第一個不畫。
+     ⚠ 這裡一定要重寫 :nth-child(-n+2) 那一條，不能只寫 .nums li ——
+     媒體查詢不會提高特異性，:nth-child 那一條本來就比較高，會贏。
+     2026-09-08 就是這樣漏掉的：手機上第二格沒有上線，看起來像跟第一格黏在一起。 */
+  .nums{grid-template-columns:1fr}
+  .nums li:nth-child(-n+2){border-top:1px solid rgba(16,42,134,.14);padding-top:20px}
+  .nums li:first-child{border-top:0;padding-top:0}
+}
+
+/* 從 /impact/ 轉過來會跳到 #numbers，標題不要躲在黏住的頂欄底下。 */
+.sec[id]{scroll-margin-top:84px}
+
+/* 團隊的六個 team。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
+   是六列，靠上面那條線分隔。 */
+.rows{margin:0;padding:0;list-style:none;max-width:34em}
+.rows li{padding:16px 0;border-top:1px solid rgba(16,42,134,.14)}
+.rows li:first-child{border-top:0;padding-top:0}
+.rows b{display:block;font-family:var(--display);font-weight:700;font-size:19px;
+  letter-spacing:.02em;margin-bottom:4px}
+.rows span{font-size:15.5px;line-height:1.6;color:rgba(16,42,134,.78)}
+
+.cta{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
+  font-weight:600;font-size:16px;padding:14px 26px;border-radius:999px;margin-top:6px;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
+.cta:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
+/* 段落裡的按鈕（2026-11-20 修）：.body a 的深藍字比 .cta 的米白字更具體，會贏，按鈕就變成一顆看不到字的深藍藥丸。 */
+.body a.cta{color:var(--bt-cream);text-decoration:none}
+.body a.cta:hover{color:var(--bt-navy)}
+
+.en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);
+  padding-top:clamp(16px,3vh,36px)}
+html[data-lang] .en{border-top:0;margin-top:0;padding-top:0}
+html[data-lang="zh"] .en,html[data-lang="en"] .zh{display:none}
+
+footer{margin-top:clamp(56px,9vh,120px);
+  padding:clamp(28px,4vh,44px) var(--gut) clamp(44px,7vh,84px);
+  border-top:1px solid rgba(16,42,134,.15);font-size:14.5px;color:rgba(16,42,134,.78)}
+footer p{margin:0 0 8px;max-width:none}
+footer a{color:var(--ink);font-weight:600;text-underline-offset:3px;transition:text-decoration-color var(--dur-2) var(--ease),text-underline-offset var(--dur-2) var(--ease)}
+footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
+
+@media (max-width:820px){.sec-in{grid-template-columns:1fr;gap:14px}}
+/* 導覽有八項之後，中等寬度會擠。**先縮字級與間距，再換漢堡** ——
+   1100px 上直接換成漢堡，對一台筆電來說太早了。
+   量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
+@media (max-width:1180px){
+  .navlinks{gap:clamp(7px,1.05vw,14px)}
+  .navlinks a{font-size:13.5px}
+  .login{padding:9px 14px;font-size:13.5px}
+}
+@media (max-width:900px){
+  .navlinks{display:none;position:absolute;left:0;right:0;top:calc(100% + 8px);
+    flex-direction:column;align-items:flex-start;gap:0;padding:6px 18px 10px;border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.93),rgba(237,229,216,.88));
+    backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 14px 34px rgba(16,42,134,.14)}
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .navlinks{background:var(--bt-cream)}
+  }
+  .navlinks.open{display:flex}
+  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
+  .burger{display:block}
+  .tl li{grid-template-columns:1fr;gap:2px}
+}
+@media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
+/* 捲到才出現（2026-11-05 視覺收尾）。純 CSS 的 scroll-driven animation，不用 JS 也不用 GSAP：
+   每一段進到畫面下緣之後的 220px 內，從透明往上 22px 浮到定位。
+   不支援 animation-timeline 的瀏覽器（Firefox 舊版）會把它當成一個 0 秒的動畫，立刻停在最後一格，
+   也就是直接看到內容，所以不用包 @supports（而且 check-motion.mjs 看不懂巢狀區塊）。
+   reduce 時下面那條 *{animation:none} 會把它關掉。首頁不加，首頁的段落是 GSAP 在管。 */
+.sec-in{animation:bt-reveal linear both;animation-timeline:view();animation-range:entry 0% entry 220px}
+@keyframes bt-reveal{from{opacity:0;translate:0 22px}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+/* ═════════ 點下去要有回饋（2026-09-08）═════════ */
+/* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
+   Paul 的要求：「點擊會有回饋」。
+
+   ⚠ **五個登入後的頁面設了 -webkit-tap-highlight-color:transparent**，
+   那一行會把手機上唯一的預設回饋關掉。關掉就一定要自己補一個 ——
+   在那之前，那五頁在手機上按下去畫面完全不動，
+   而**畫面不動的時候使用者會再按一次**（這個 repo 一路上最常見的失敗形狀）。
+
+   ⚠ **不要給它 transition。** 按下去的回饋要立刻發生；
+   加了過渡就變成「按了之後才慢慢縮」，那比沒有回饋更像卡住。
+   沒有 transition 也表示它不是「會動位置的過渡」，
+   對 prefers-reduced-motion 沒有意義 —— 按鍵回饋不是前庭刺激來源。 */
+button{cursor:pointer}
+button[disabled]{cursor:default}
+button:not([disabled]):active,
+a.btn:active, a.cta:active, a.login:active, a.photo:active, a.avbtn:active,
+summary:active{
+  transform:scale(.97);
+}
+/* 實心的主要按鈕：壓下去再暗一階，光靠縮小在小按鈕上看不太出來。 */
+.btn:not([disabled]):not(.ghost):not(.quiet):active,
+a.btn:not(.ghost):active, a.cta:active, a.login:active{
+  background:var(--bt-navy);color:var(--bt-cream);filter:brightness(.88);
+}
+/* 框線鈕：壓下去底色再深一點。
+   ⚠ **.chip.on 要排除。** 選起來的 chip 底色是深藍，
+   蓋一層淺色上去會讓它在按著的時候閃白一下，看起來像取消選取。 */
+/* 用橘色不用深藍調淡：深藍 12% 在米白上讀起來是**冷灰**，
+   而整站是暖的 —— 那一下按壓會看起來像變髒，不像有回應。
+   橘色本來就是這個品牌「正在動的東西」的顏色，而正在被按的就是那個東西。 */
+.btn.ghost:not([disabled]):active, .chip:not(.on):active,
+.lang:active, .btnav-out:active{
+  background:rgba(255,196,108,.38);
+}
+.chip.on:active{filter:brightness(1.15)}
+/* 整行可以點的東西（單選、多選、勾選框）：按著的時候整行變色。
+   這些是 <label> 不是 <button>，上面那條抓不到，而它們是**手機上最常按的東西**。 */
+.opt:active, .check:active{background:rgba(255,196,108,.26);border-radius:10px}
+/* 內文裡的連結不縮放（那會讓一段字在按的時候跳動），改成底線變橘色。 */
+.body a:active, .note a:active, footer a:active{text-decoration-color:var(--bt-orange)}
+summary{cursor:pointer}
+
+/* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
+/* 頂欄六個連結。第一個是「現在開放」（到 /apply/，現在報得了名的活動與計畫都在那裡），字比別的粗一點，就這樣：橘色藥丸與小火 Paul 都看過、都不要。
+   2026-11-22 稍晚 Paul 再定一次：現在開放、這一年（/year/，一整屆的時間軸）、團隊、免費資源、關於我們、合作。/programs/ 拆掉了，只剩轉址。
+   2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
+   每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
+   手機上它本來就排第一個。 */
+.navlinks .nav-cta{opacity:1;font-weight:600}
+footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
+
+/* 照片（2026-11-21 從首頁搬過來的那一張）。樣式跟首頁同一段。 */
+.photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
+.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;background:rgba(16,42,134,.06)}
+
+/* ═════════ 這一年的時間軸（2026-11-22）═════════ */
+/* 寬螢幕：左邊一欄 team 的名字，右邊十二格（八月到七月）。每一列自己是一個十二欄的格子，
+   每一顆從它那個月的格線開始往右佔三格，同一列裡不撞的會自己排在同一行，撞的往下排。
+   「現在」是一條淡橘色的直欄，位置由 --now 決定（八月是 0）。顏色只用品牌色。
+   手機（820px 以下）：格子收起來，改成照月份排的清單。兩份都是 src/main.js 畫的。 */
+/* --months 是一屆的月數。寫成變數不直接寫數字，是因為 check.sh 有一條護照的舊守門：整個 repo 不准出現「十二欄的 repeat」（護照的進度牆是十一欄）。 */
+.yr-sec{--months:12;padding:clamp(20px,4vh,48px) var(--gut) 0}
+.yr-term{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:rgba(16,42,134,.7);margin:0 0 14px;max-width:none}
+html[data-lang="zh"] .yr-term{font-family:var(--body);font-weight:600;letter-spacing:.04em}
+.yr{border-top:1px solid rgba(16,42,134,.15)}
+.yr-row{display:grid;grid-template-columns:minmax(0,9.5em) minmax(0,1fr);gap:0 clamp(10px,1.6vw,24px);border-bottom:1px solid rgba(16,42,134,.15);align-items:start}
+.yr-row h3{margin:0;padding:16px 0;font-size:clamp(16px,1.35vw,20px)}
+.yr-head h3{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.6);padding:10px 0}
+.yr-lane{position:relative;padding:12px 0;min-height:56px;
+  background-image:linear-gradient(to right,rgba(16,42,134,.09) 1px,rgba(16,42,134,0) 1px);background-size:calc(100% / 12) 100%}
+.yr-lane::before{content:"";position:absolute;top:0;bottom:0;left:calc(var(--now) * 100% / 12);width:calc(100% / 12);background:rgba(255,196,108,.26);pointer-events:none}
+.yr-head .yr-lane{padding:0;min-height:0}
+.yr-months{display:grid;grid-template-columns:repeat(var(--months),minmax(0,1fr));position:relative}
+.yr-months span{padding:10px 0 10px 6px;font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.06em;color:rgba(16,42,134,.7);white-space:nowrap}
+html[data-lang="zh"] .yr-months span{font-family:var(--body);font-weight:600;letter-spacing:0}
+.yr-months .is-now{color:var(--bt-navy)}
+.yr-track{display:grid;grid-template-columns:repeat(var(--months),minmax(0,1fr));grid-auto-flow:row dense;gap:6px 0;position:relative}
+.yr-cell{min-width:0;padding:0 6px 0 4px}
+.yr-chip{display:block;text-decoration:none;color:var(--ink);background:rgba(255,255,255,.72);border:1px solid rgba(16,42,134,.16);border-left:3px solid var(--bt-navy);
+  border-radius:10px;padding:8px 10px;font-size:13.5px;line-height:1.3;transition:border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
+.yr-chip:hover,.yr-chip:focus-visible{border-color:var(--bt-navy);box-shadow:0 8px 20px rgba(16,42,134,.1)}
+.yr-chip b{display:block;font-weight:600;font-size:14.5px}
+.yr-sub,.yr-when,.yr-team{display:block;color:rgba(16,42,134,.78)}
+.yr-team{font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:2px}
+.yr-tag{display:inline-block;margin-top:5px;font-size:12px;font-weight:600;line-height:1;padding:4px 8px;border-radius:999px;border:1px solid rgba(16,42,134,.28)}
+.yr-tag.on{background:var(--bt-orange);border-color:transparent;color:var(--bt-navy)}
+.yr-chip.is-open{border-left-color:var(--bt-orange);background:rgba(255,232,197,.9)}
+.yr-chip.is-past{border-left-color:rgba(16,42,134,.3);background:rgba(255,255,255,.4)}
+.yr-chip.is-past b{font-weight:500}
+.yr-loose{position:relative;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:10px;padding-left:4px}
+.yr-loose>span{font-size:12.5px;font-weight:600;color:rgba(16,42,134,.7);margin-right:2px}
+.yr-loose .yr-chip{border-left-style:dashed}
+.yr-list{display:none}
+.yr-m{border-top:1px solid rgba(16,42,134,.15);padding:16px 0}
+.yr-m h3{margin:0 0 10px;display:flex;align-items:baseline;gap:10px}
+.yr-m h3 span{font-family:var(--body);font-size:12.5px;font-weight:600;letter-spacing:0;background:var(--bt-orange);color:var(--bt-navy);padding:3px 9px;border-radius:999px}
+.yr-m .yr-chip{margin:0 0 8px;max-width:34em}
+.yr-none{font-size:14.5px;color:rgba(16,42,134,.7);margin:0}
+.yr-foot{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;margin:clamp(24px,4vh,44px) 0 0;max-width:none}
+.yr-foot .cta{margin-top:0}
+.yr-foot a:not(.cta){color:var(--ink);font-weight:600;text-underline-offset:3px}
+.more{font-weight:600}
+@media (max-width:820px){.yr{display:none}.yr-list{display:block}}
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main"><span class="zh">跳到主要內容</span><span class="en">Skip to content</span></a>
+
+<nav class="topbar" aria-label="網站導覽">
+  <a class="home" href="../" aria-label="Beyond Taiwan 首頁">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <div class="navlinks" id="navlinks">
+    <a class="nav-cta" href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
+    <a href="../year/" aria-current="page"><span class="zh">這一年</span><span class="en">This year</span></a>
+    <a href="../team/"><span class="zh">團隊</span><span class="en">Teams</span></a>
+    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a>
+    <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
+    <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
+  </div>
+  <button class="lang" id="lang" type="button">EN</button>
+  <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
+  <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
+</nav>
+
+<main id="main">
+
+<div class="zh" lang="zh-Hant">
+<header class="hero">
+  <h1>這一年。</h1>
+  <p class="lead">BT 一屆從八月到隔年七月。這一頁是這一屆六個 team 排好要做的事：有確定日期的寫日期，還沒定的寫大概幾月。</p>
+</header>
+<section class="yr-sec">
+  <div id="yr-zh">
+    <p>這一屆的行程還在排。確定的會先放上來，新的場次也會在 Instagram <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a> 公布。</p>
+  </div>
+  <p class="yr-foot"><a class="cta" href="../apply/">看現在開放報名的</a> <a class="more" href="../team/">每個 team 固定在做的事</a> <a class="more" href="../events/">更早辦過的活動</a></p>
+</section>
+</div>
+
+<div class="en" lang="en">
+<header class="hero">
+  <h1>This year.</h1>
+  <p class="lead">A Beyond Taiwan term runs from August to July. This page shows what our six teams have planned for this term. Fixed dates are shown as dates, and the rest say roughly which month.</p>
+</header>
+<section class="yr-sec">
+  <div id="yr-en">
+    <p>This term's schedule is still being planned. Confirmed items go up here first, and new dates are also announced on Instagram <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>.</p>
+  </div>
+  <p class="yr-foot"><a class="cta" href="../apply/">See what's open now</a> <a class="more" href="../team/">What each team runs every year</a> <a class="more" href="../events/">Earlier events</a></p>
+</section>
+</div>
+
+</main>
+
+<footer>
+  <p class="foot-links"><a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a><a href="../year/"><span class="zh">這一年</span><span class="en">This year</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Teams</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../impact/"><span class="zh">數字</span><span class="en">Numbers</span></a></p>
+  <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
+  <p>本網站不使用任何追蹤或廣告工具。</p>
+  <p lang="en">This site uses no tracking or advertising tools.</p>
+  <p>beyondtaiwan2020@gmail.com</p>
+  <p>Beyond Taiwan</p>
+</footer>
+
+<script>
+(function () {
+  var html = document.documentElement;
+  var btn = document.getElementById("lang");
+  var links = document.getElementById("navlinks");
+  var burger = document.getElementById("burger");
+  /* 語言在 <head> 就決定好了（那裡有寫為什麼：晚一步決定畫面會跳）。
+     這裡只補按鈕文字，不要再判斷一次 —— 判斷兩次就會有一個地方沒改到。 */
+  setLang(html.getAttribute("data-lang") === "en" ? "en" : "zh");
+  function setLang(l) {
+    html.setAttribute("data-lang", l);
+    html.setAttribute("lang", l === "zh" ? "zh-Hant" : "en");
+    btn.textContent = l === "zh" ? "EN" : "\u4e2d";
+    btn.setAttribute("aria-label", l === "zh" ? "Switch to English" : "\u5207\u63db\u70ba\u4e2d\u6587");
+    keepLang(l);
+  }
+
+  /* 把目前的語言寫進站內每一個連結，這樣點過去之後語言不會跳回瀏覽器預設。
+     跳過外部連結、mailto、純錨點，以及 app/ ——
+     那是登入的系統，它自己在讀網址上的 next 參數，不要去動它。 */
+  function keepLang(l) {
+    var as = document.querySelectorAll("a[href]");
+    for (var i = 0; i < as.length; i++) {
+      var h = as[i].getAttribute("href");
+      if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
+      /* 這一頁的連結有的帶 #代號（活動頁的那一場），所以只改 lang 這一個，不把後面整段換掉。src/main.js 畫完會再叫一次 btKeepLang()。 */
+      var u = new URL(h, location.href); u.searchParams.set("lang", l);
+      as[i].setAttribute("href", u.pathname + u.search + u.hash);
+    }
+    window.btKeepLang = function () { keepLang(html.getAttribute("data-lang") === "en" ? "en" : "zh"); };
+  }
+
+  /* 已經登入的話，右上角那顆改成「我的帳號」。
+     2026-09-08：Paul 回報「登入之後回首頁還是寫登入」。那顆按鈕的**行為**一直是對的
+     （不管登入沒登入，點下去都到 /app/，而 /app/ 自己會判斷要顯示什麼），
+     錯的只有那幾個字。
+
+     ⚠ **這裡不載入 supabase。** 對外頁面刻意不碰 auth（見這一頁檔頭），
+     為了一顆按鈕的字去載整包 supabase-js，會讓每一個路人都多下載一份他用不到的東西。
+     所以只看瀏覽器裡有沒有那把鑰匙：supabase-js 把 session 存在
+     localStorage 的 `sb-<專案>-auth-token`。
+
+     **不解析內容、不驗證過期。** 驗過期要整包 supabase-js，而這顆按鈕不值得。
+     票過期的話按下去會看到登入頁，那正是他該看到的東西。
+
+     try/catch 是必要的：無痕視窗與擋第三方資料的瀏覽器會在讀 localStorage 時丟例外。
+     沒改到就是維持「登入」，那是安全的預設。 */
+  try {
+    var loginBtn = document.querySelector(".login");
+    for (var i = 0; loginBtn && i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (/^sb-.+-auth-token$/.test(k) && localStorage.getItem(k)) {
+        loginBtn.innerHTML = '<span class="lg-a">我的 BT 帳號</span>' +
+          '<span class="lg-sep"> / </span><span class="lg-b">Account</span>';
+        break;
+      }
+    }
+  } catch (e) { /* 讀不到就算了，維持「登入」。 */ }
+
+  btn.addEventListener("click", function () {
+    setLang(html.getAttribute("data-lang") === "zh" ? "en" : "zh");
+  });
+  burger.addEventListener("click", function () {
+    var open = links.classList.toggle("open");
+    burger.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  links.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") {
+      links.classList.remove("open");
+      burger.setAttribute("aria-expanded", "false");
+    }
+  });
+})();
+</script>
+
+<script type="module" src="./src/main.js"></script>
+<!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
+<script src="../shared/public.js" defer></script>
+</body>
+</html>

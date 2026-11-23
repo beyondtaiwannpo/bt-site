@@ -161,6 +161,8 @@ export const MINE = {
   "se.view":      { zh: "看對外那一頁", en: "View on the site" },
   "se.edit":      { zh: "到活動頁", en: "Open the event" },
   "se.noDate":    { zh: "還沒定日期", en: "No date yet" },
+  "se.usualIn":   { zh: "通常 {m} 月", en: "Usually {name}" },
+  "se.recurring": { zh: "多數年份都會辦，沒有固定日期", en: "Runs most years, no fixed date" },
   "err.seLoad":   { zh: "活動載不到：", en: "Could not load events: " },
   // 資源的類型
   "res.pdf":          { zh: "PDF", en: "PDF" },

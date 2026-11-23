@@ -1142,18 +1142,26 @@ export function siteEventGroups(rows, now) {
   g.past.reverse();
   return g;
 }
+// 一筆活動「什麼時候」那一句（純函式，test/programmes-admin.test.mjs）：有日期印日期；沒有日期但填了通常在幾月印「通常 8 月」；
+// 只勾了多數年份都會辦印那幾個字；三樣都沒有才是「還沒定日期」。2026-12-31-programmes.sql 之後計畫可以沒有日期。
+const SE_MONTH_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export function siteEventWhen(e) {
+  if (e && e.starts_at) {
+    try { return new Date(e.starts_at).toLocaleDateString(lang() === "zh" ? "zh-TW" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); }
+    catch (x) { return String(e.starts_at).slice(0, 10); }
+  }
+  const m = e ? Number(e.usual_month) : NaN;
+  if (e && e.usual_month != null && e.usual_month !== "" && Number.isInteger(m) && m >= 1 && m <= 12) return T("se.usualIn", { m, name: SE_MONTH_EN[m - 1] });
+  return e && e.recurring === true ? T("se.recurring") : T("se.noDate");
+}
 export function siteEventsHTML(rows, msg) {
   const g = siteEventGroups(rows);
   const name = e => (lang() === "zh" ? (e.title_zh || e.title_en) : (e.title_en || e.title_zh)) || e.slug;
-  const when = e => {
-    if (!e.starts_at) return T("se.noDate");
-    try { return new Date(e.starts_at).toLocaleDateString(lang() === "zh" ? "zh-TW" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); }
-    catch (x) { return String(e.starts_at).slice(0, 10); }
-  };
+  const when = siteEventWhen;
   const row = e => `<li><div class="fhead"><b>${esc(name(e))}</b>${e.team ? `<span class="tag">${esc(String(e.team).replace(/\s*Team$/i, ""))}</span>` : ""}</div>
     <div class="fmeta">${esc(when(e))}${e.place ? "・" + esc(e.place) : ""}</div>
     <div class="row">${e.status === "published" ? `<a class="btn quiet sm" href="${esc(withLang("/events/#" + e.slug))}" target="_blank" rel="noopener">${esc(T("se.view"))}</a>` : ""}
-      <a class="btn quiet sm" href="${esc(withLang("/admin/#events/" + encodeURIComponent(e.id)))}">${esc(T("se.edit"))}</a></div></li>`;
+      <a class="btn quiet sm" href="${esc(withLang("/admin/#events/" + encodeURIComponent(e.slug)))}">${esc(T("se.edit"))}</a></div></li>`;
   const block = (k, list) => sectionHTML(T("se." + k) + ` <span class="mini">${list.length}</span>`,
     list.length ? `<ul class="flist">${list.map(row).join("")}</ul>` : `<div class="mini">${esc(T("se." + k + "None"))}</div>`);
   return pageHead(T("se.title"), T("se.lede"), [{ href: withLang("/events/"), label: T("se.open") }])

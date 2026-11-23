@@ -190,7 +190,7 @@ test("清單與卡的 HTML：七個 team、做的事可以點、人用角色不�
   assert.ok(!card.includes("Daphne") && !card.includes("Alice"));
   const en = UI.programCardHTML(d.teams[2].programs[0], d.teams[2], "en");
   assert.ok(en.includes("Twice a year"));
-  assert.ok(en.includes('href="../programs/"'));
+  assert.ok(en.includes('href="../year/"'));
   const person = UI.personCardHTML(d.people.find(p => p.code === "cu-stu-1"), d.teams[2], "zh", d);
   assert.ok(person.includes("探索營學員") && person.includes("學員"));
   const al = UI.personCardHTML(d.teams[7].people[0], d.teams[7], "zh", d);

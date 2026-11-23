@@ -1,67 +1,122 @@
-// 活動與計畫（/programs/）、對外頁共用的 shared/public.js、2026-11-21 那次重整的幾條不能壞的事。跑法：node --test test/*.test.mjs
+// 對外頁的結構（2026-11-21 兩次重整、2026-11-22 拆掉 /programs/ 加上 /year/）幾條不能壞的事。跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import * as L from "../programs/src/logic.js";
+import { readFileSync, existsSync } from "node:fs";
+import * as L from "../year/src/logic.js";
+import { rowHTML } from "../team/src/programmes.js";
+import { split, fmtWhen } from "../events/src/ui.js";
 
-const NOW = new Date("2026-11-21T04:00:00Z");
+const NOW = new Date("2026-11-22T04:00:00Z");
 const f = (id, title, extra) => Object.assign({ id, kind: "program", status: "open", title, opens_at: null, closes_at: null }, extra);
+const ev = (slug, team, extra) => Object.assign({ slug, team, title_zh: slug, title_en: slug, starts_at: null, ends_at: null, is_past: false, signup_open: false, is_full: false, form_id: null }, extra);
 
-test("認計畫：看標題裡的關鍵字，中英都認，認不出來回空字串", () => {
-  assert.equal(L.progOf("2027 寒假探索營報名"), "bootcamp");
-  assert.equal(L.progOf("College Bootcamp Winter 2027"), "bootcamp");
-  assert.equal(L.progOf("導生配對計畫 2027 春"), "mentorship");
-  assert.equal(L.progOf("Mentorship Program application"), "mentorship");
-  assert.equal(L.progOf("高中生實習計劃 第三期"), "internship");
-  assert.equal(L.progOf("留學說明會"), "talks");
-  assert.equal(L.progOf("校友之夜"), "");
-  assert.equal(L.progOf(null), "");
-});
-
-test("開放中的表單：只算給高中生的、過了開放時間、還沒截止；幹部招募不算", () => {
+test("開放中的表單：只算給高中生的、過了開放時間、還沒截止；掛在活動上的由活動卡帶", () => {
   const forms = [f("a", "探索營"), f("b", "幹部招募", { kind: "board" }), f("c", "導生", { opens_at: "2026-12-01T00:00:00Z" }),
     f("d", "實習", { closes_at: "2026-11-20T00:00:00Z" }), f("e", "講座", { status: "closed" }), f("g", "導生", { closes_at: "2026-12-05T15:59:00Z" })];
   assert.deepEqual(L.openForms(forms, NOW).map(x => x.id), ["a", "g"]);
+  assert.deepEqual(L.looseForms(forms, [{ form_id: "a" }], NOW).map(x => x.id), ["g"]);
   assert.deepEqual(L.openForms(null, NOW), []);
 });
 
-test("下一輪：三月到八月說八月，九月到二月說二月（每個 team 學期開始開一輪）", () => {
-  const m = d => L.nextTerm(new Date(d));
-  assert.equal(m("2026-11-21T00:00:00"), 2); assert.equal(m("2027-01-15T00:00:00"), 2); assert.equal(m("2027-02-10T00:00:00"), 2);
-  assert.equal(m("2027-03-01T00:00:00"), 8); assert.equal(m("2027-08-20T00:00:00"), 8); assert.equal(m("2027-09-01T00:00:00"), 2);
-  assert.equal(L.termLabel(2, false), "下一輪大約二月開放"); assert.equal(L.termLabel(8, true), "Next round opens around August");
-});
-
-test("★ 每張卡的狀態：對到的亮、掛在活動上的表單不算計畫的、同一個計畫兩份取先截止的", () => {
-  const forms = [f("late", "探索營 夏", { closes_at: "2027-01-10T00:00:00Z" }), f("soon", "探索營 冬", { closes_at: "2026-12-01T00:00:00Z" }),
-    f("ev", "導生說明會報名"), f("x", "校友之夜")];
-  const events = [{ form_id: "ev" }];
-  const st = L.statusByProg(forms, events, NOW);
-  assert.equal(st.bootcamp.form.id, "soon");
-  assert.equal(st.mentorship, null, "那份表單是某一場活動的報名表，跟著活動卡走");
-  assert.equal(st.internship, null); assert.equal(st.talks, null);
-  assert.deepEqual(L.looseForms(forms, events, NOW).map(x => x.id).sort(), ["late", "soon", "x"], "認不出來的表單照樣排在最上面，不會不見");
-});
-
-test("截止日期一律用台灣的日期", () => {
+test("日期一律用台灣的日期", () => {
   assert.equal(L.fmtDay("2026-12-05T15:59:00Z", false), "12 月 5 日");
   assert.equal(L.fmtDay("2026-12-05T16:01:00Z", true), "6 Dec");
   assert.equal(L.fmtDay("not a date", true), "");
 });
 
-test("★ /programs/：四張卡都在、每張有狀態與通知按鈕、沒有資料庫也讀得完、語言切換不吃掉 ?f=", () => {
-  const h = readFileSync("programs/index.html", "utf8");
-  for (const k of L.PROGS) assert.equal((h.match(new RegExp(`<article class="prog" data-prog="${k}">`, "g")) || []).length, 2, k + " 中英各一張");
-  assert.equal((h.match(/<p class="prog-st">/g) || []).length, 8);
-  assert.equal((h.match(/<p class="prog-act"><a class="cta sm" href="\.\.\/app\/(\?lang=en)?">/g) || []).length, 8, "沒開的時候每張卡都有「開放時通知我」");
-  assert.doesNotMatch(h, /id="open-zh"|id="open-en"/, "現在開放的東西不在這一頁，在 /apply/（Paul 2026-11-22）");
-  assert.match(h, /<section class="sec" id="past" hidden>[\s\S]*?<div id="past-zh"><\/div>/, "辦過的活動：沒有資料就整段不出現");
-  assert.match(h, /<p class="hero-act"><a class="cta" href="\.\.\/apply\/">看現在開放報名的<\/a><\/p>/);
-  assert.match(h, /u\.searchParams\.set\("lang", l\)/, "只改 lang，不把 ? 後面整段換掉");
-  assert.match(h, /<script type="module" src="\.\/src\/main\.js"><\/script>/);
-  const main = readFileSync("programs/src/main.js", "utf8");
-  assert.doesNotMatch(main, /sb_publishable_|supabase\.co|shared\/supabase\.js/, "不抄金鑰、不載 supabase-js");
-  assert.match(main, /status=eq\.open/);
+test("一屆是八月到隔年七月；這一筆算不算這一屆", () => {
+  assert.deepEqual(L.TERM, [8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(L.termIndex(8), 0); assert.equal(L.termIndex(7), 11); assert.equal(L.termIndex(0), -1);
+  assert.equal(L.termStart(NOW), 2026); assert.equal(L.termStart(new Date("2027-03-01T00:00:00Z")), 2026); assert.equal(L.termStart(new Date("2027-08-02T00:00:00Z")), 2027);
+  assert.equal(L.inTerm(ev("a", "Curriculum", { starts_at: "2027-01-02T16:00:00Z" }), NOW), true);
+  assert.equal(L.inTerm(ev("b", "Curriculum", { starts_at: "2026-06-10T02:00:00Z" }), NOW), false, "上一屆六月的不算");
+  assert.equal(L.inTerm(ev("c", "Curriculum", { starts_at: "2027-08-05T02:00:00Z" }), NOW), false, "下一屆八月的不算");
+  assert.equal(L.inTerm(ev("d", "Curriculum", { usual_month: 10 }), NOW), true, "沒有日期的計畫每一屆都算");
+});
+
+test("★ 排在哪個月、什麼狀態、怎麼寫時間", () => {
+  const dated = ev("ou", "Curriculum Team", { starts_at: "2027-01-02T16:00:00Z", usual_month: 1, edition_zh: "Overseas Unpacked", edition_en: "Overseas Unpacked", title_zh: "寒假探索營", title_en: "Winter College Bootcamp" });
+  assert.equal(L.monthOf(dated), 1, "有日期看日期（台灣 1 月 3 日）");
+  assert.equal(L.whenLabel(dated, false), "1 月 3 日"); assert.equal(L.whenLabel(dated, true), "3 Jan");
+  assert.deepEqual(L.nameOf(dated, "zh"), { main: "Overseas Unpacked", sub: "寒假探索營" }, "這一屆有自己的名字就用它，計畫的名字放後面");
+  const month = ev("intake", "Internship", { usual_month: 8 });
+  assert.equal(L.monthOf(month), 8); assert.equal(L.whenLabel(month, false), "大約 8 月"); assert.equal(L.whenLabel(month, true), "Around August");
+  assert.equal(L.stateOf(month, NOW), "past", "十一月看八月的，已經過了");
+  assert.equal(L.stateOf(ev("x", "CR", { usual_month: 3 }), NOW), "upcoming");
+  const none = ev("coffee", "Mentorship");
+  assert.equal(L.monthOf(none), 0); assert.equal(L.whenLabel(none, false), ""); assert.equal(L.stateOf(none, NOW), "upcoming");
+  assert.deepEqual(L.nameOf(none, "en"), { main: "coffee", sub: "" });
+  assert.equal(L.stateOf(ev("o", "CR", { signup_open: true }), NOW), "open");
+  assert.equal(L.stateOf(ev("full", "CR", { signup_open: true, is_full: true, starts_at: "2027-02-01T00:00:00Z" }), NOW), "upcoming", "滿了不算報得了名");
+  assert.equal(L.stateOf(ev("p", "CR", { starts_at: "2026-09-01T00:00:00Z", is_past: true }), NOW), "past");
+  // 那四格是新的：資料庫還沒跑那支遷移檔的時候不會有，不能壞
+  assert.equal(L.monthOf({ slug: "old", team: "Curriculum" }), 0); assert.deepEqual(L.nameOf({ title_zh: "舊", title_en: "Old" }, "zh"), { main: "舊", sub: "" });
+});
+
+test("六個 team：後台那一格是字，認成六個代號；認不出來不排進去", () => {
+  for (const [t, k] of [["Curriculum Team", "curriculum"], ["curriculum", "curriculum"], ["Sponsorship", "sponsorship"], ["Internship Team", "internship"],
+    ["Mentorship", "mentorship"], ["Marketing Team", "marketing"], ["CR", "cr"], ["CR Team", "cr"], ["Community Relations", "cr"], ["Board", ""], ["", ""], [null, ""]]) assert.equal(L.teamKey(t), k, String(t));
+  assert.deepEqual(L.TEAMS, ["sponsorship", "curriculum", "internship", "mentorship", "marketing", "cr"]);
+});
+
+test("★ 這一年的版面：照 team 分列、照月份排、沒有月份的另外放、別屆的不算", () => {
+  const evs = [ev("ou", "Curriculum", { starts_at: "2027-01-02T16:00:00Z" }), ev("intake", "Internship", { usual_month: 8 }), ev("match", "Mentorship"),
+    ev("talk", "Curriculum", { usual_month: 10 }), ev("old", "Curriculum", { starts_at: "2026-03-01T00:00:00Z", is_past: true }), ev("who", "Board", { usual_month: 9 })];
+  const p = L.yearPlan(evs, NOW);
+  assert.equal(p.count, 4, "上一屆的與認不出 team 的不算");
+  assert.deepEqual(p.teams.curriculum.placed.map(x => x.slug), ["talk", "ou"], "十月排在一月前面（一屆從八月開始）");
+  assert.deepEqual(p.teams.mentorship.loose.map(x => x.slug), ["match"]); assert.deepEqual(p.loose.map(x => x.slug), ["match"]);
+  assert.deepEqual(p.months[8].map(x => x.slug), ["intake"]); assert.equal(p.teams.internship.placed[0].state, "past");
+  assert.equal(L.yearPlan([], NOW).count, 0); assert.equal(L.yearPlan(null, NOW).count, 0);
+});
+
+test("★ 團隊頁的固定計畫：只拿勾了「多數年份都會辦」的，這一屆的版本一行", () => {
+  const evs = [ev("ou", "Curriculum", { recurring: true, starts_at: "2027-01-02T16:00:00Z", title_zh: "寒假探索營", edition_zh: "Overseas Unpacked" }),
+    ev("once", "Curriculum", { usual_month: 10 }), ev("match", "Mentorship", { recurring: true, title_zh: "Mentor 配對" }), ev("intake", "Internship", { recurring: true, usual_month: 8, title_zh: "高中生實習招募" })];
+  const by = L.teamProgrammes(evs, NOW);
+  assert.deepEqual(by.curriculum.map(x => x.slug), ["ou"]); assert.deepEqual(by.sponsorship, [], "後台還沒有資料的 team 是空的，頁面那一格不出現");
+  assert.match(rowHTML(by.curriculum[0], "zh"), /<b>寒假探索營<\/b><span>這一屆：Overseas Unpacked，1 月 3 日<\/span>/);
+  assert.match(rowHTML(by.mentorship[0], "zh"), /<b>Mentor 配對<\/b><span>這一屆的時間還沒定<\/span>/);
+  assert.match(rowHTML(by.internship[0], "zh"), /這一屆：大約 8 月<em>已結束<\/em>/);
+  assert.match(rowHTML(by.curriculum[0], "en"), /href="\.\.\/events\/\?lang=en#ou"/);
+});
+
+test("活動卡：只知道日期的不印 00:00；沒有日期的計畫不排進近期活動", () => {
+  assert.equal(fmtWhen("2027-01-02T16:00:00Z", null, "zh"), "2027-01-03");
+  assert.match(fmtWhen("2027-01-03T06:30:00Z", null, "zh"), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  const s = split([{ slug: "a", is_past: false, starts_at: null }, { slug: "b", is_past: false, starts_at: "2099-01-01T00:00:00Z" }]);
+  assert.deepEqual(s.upcoming.map(e => e.slug), ["b"]);
+});
+
+test("★ 頂欄：十一個檔同一份，現在開放、這一年、團隊、免費資源、關於我們、合作；沒有藥丸也沒有圖示", () => {
+  const want = ["apply|現在開放|Open now", "year|這一年|This year", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
+  for (const p of ["index.html", "about/index.html", "alumni/index.html", "apply/index.html", "events/index.html", "impact/index.html", "year/index.html", "partner/index.html", "resources/index.html", "team/index.html", "island/index.html"]) {
+    const h = readFileSync(p, "utf8"), nav = h.match(/<div class="navlinks" id="navlinks">([\s\S]*?)<\/div>/)[1];
+    const got = [...nav.matchAll(/href="\.\.?\/([a-z]+)\/"[^>]*><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span>/g)].map(m => m[1] + "|" + m[2] + "|" + m[3]);
+    assert.deepEqual(got, want, p); assert.doesNotMatch(nav, /<svg|flame/, p);
+  }
+  const css = readFileSync("island/island.css", "utf8"), isl = readFileSync("island/index.html", "utf8");
+  assert.doesNotMatch(css, /\.navlinks \.nav-cta\{[^}]*background:var\(--bt-orange\)/, "不是橘色藥丸");
+  assert.match(css, /\.topbar\{position:fixed;top:12px;left:var\(--gut\);right:calc\(var\(--side-w\) \+ var\(--gut\)\)/);
+  assert.match(css, /\.brand,\.toolbar\{background:linear-gradient\(180deg,rgba\(255,255,255,\.78\),rgba\(237,229,216,\.6\)\);backdrop-filter:blur\(20px\) saturate\(180%\)/, "牌子與工具列跟頂欄同一種玻璃");
+  assert.equal((isl.match(/id="lang"/g) || []).length, 1); assert.equal((isl.match(/id="home"/g) || []).length, 1);
+});
+
+test("★ 每一頁只做一件事：現在開放、這一年、團隊、關於我們、數字；/programs/ 只剩轉址", () => {
+  const ap = readFileSync("apply/index.html", "utf8"), yr = readFileSync("year/index.html", "utf8"), tm = readFileSync("team/index.html", "utf8");
+  const ab = readFileSync("about/index.html", "utf8"), im = readFileSync("impact/index.html", "utf8"), pr = readFileSync("programs/index.html", "utf8"), home = readFileSync("index.html", "utf8");
+  assert.match(ap, /<title>現在開放 \/ Beyond Taiwan<\/title>/); assert.match(ap, /<h2><span class="zh">想參加的還沒開放<\/span>/, "什麼都沒開的時候還是有下一步");
+  assert.match(yr, /<div id="yr-zh">\s*<p>這一屆的行程還在排。/, "沒有資料的時候是幾句話，不是一張空表"); assert.match(yr, /<script type="module" src="\.\/src\/main\.js"><\/script>/);
+  for (const k of L.TEAMS) assert.equal((tm.match(new RegExp(`<article class="tm" data-team="${k}">`, "g")) || []).length, 2, k + " 中英各一塊");
+  assert.equal((tm.match(/<div class="tm-live" hidden><\/div>/g) || []).length, 12, "後台畫的那一格預設不出現");
+  assert.match(tm, /<script type="module" src="\.\/src\/programmes\.js"><\/script>/);
+  assert.deepEqual([...ab.slice(ab.indexOf('<div class="zh"'), ab.indexOf('<div class="en"')).matchAll(/<h2>([^<]*)<\/h2>/g)].map(m => m[1]), ["我們在處理的是資訊落差。", "使命", "願景", "價值", "免費是刻意的", "五年下來"], "/about/ 瘦身之後的順序");
+  assert.doesNotMatch(ab, /class="nums"|class="tl"/, "數字與時間軸不在 /about/ 了");
+  for (const s of ["五年，這些是真的發生過的事。", "這些數字怎麼來的", "收到超過 150 份申請"]) assert.ok(im.includes(s), "/impact/ 少了：" + s);
+  assert.match(pr, /<meta http-equiv="refresh" content="0; url=\.\.\/year\/">/); assert.match(pr, /location\.replace\("\.\.\/year\/" \+ location\.search\)/); assert.match(pr, /<a href="\.\.\/year\/">/);
+  assert.ok(!existsSync("programs/src"), "/programs/ 底下沒有程式了，判斷搬到 year/src/logic.js");
+  assert.equal((home.match(/<p class="hero-act"><a class="cta warm" href="\.\/apply\/">/g) || []).length, 2, "首頁第一屏的按鈕到現在開放");
+  assert.doesNotMatch(home + ap + tm + ab + yr, /href="\.\.?\/programs\//, "沒有連結還指到拆掉的那一頁");
 });
 
 test("★ 信念、使命、願景、價值：Paul 2026-11-21 的定稿，首頁與 /about/ 一字不差", () => {
@@ -81,12 +136,13 @@ test("★ 信念、使命、願景、價值：Paul 2026-11-21 的定稿，首頁
   for (const s of ["never shown —", "single path —"]) assert.ok(!about.includes(s) && !home.includes(s), "英文的使命與願景不用破折號（Paul 同意換成冒號與逗號）");
 });
 
-test("★ 首頁搬走的六段長文，每一句都還在某一個內頁上", () => {
-  const pages = ["about", "programs", "team", "partner"].map(d => readFileSync(d + "/index.html", "utf8")).join("\n") + readFileSync("index.html", "utf8");
+test("★ 首頁搬走的六段長文與原本 /programs/ 的字，每一句都還在某一頁上", () => {
+  const pages = ["about", "team", "partner", "apply", "impact"].map(d => readFileSync(d + "/index.html", "utf8")).join("\n") + readFileSync("index.html", "utf8");
   for (const s of ["這不完全是錯覺。留學代辦的費用不低", "於是很多人在還沒認真了解之前，就先把這個選項刪掉了。", "Beyond Taiwan 處理的就是這一段落差。",
-    "我們會事先問你想讀什麼，再去找對應背景的人回來。", "有些配對從申請季開始，到現在超過兩年還在聯絡。",
+    "我們會事先問你想讀什麼，再去找對應背景的人回來。", "有些配對從申請季開始，到現在超過兩年還在聯絡。", "第一屆在 2023 年六月，超過 80 位高中生參加。", "導生制度從 2020 年九月開始，第一批 36 人。",
+    "不定期舉辦，也不收費。場次同樣會在 Instagram 公布。", "實習生進 BT 的各個 team 做真的事，有自己的實習護照記錄做過什麼。",
     "多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。", "追蹤 <a href=\"https://www.instagram.com/beyondtaiwan/\">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。",
-    "我們持續在找願意一起做這件事的個人、企業與學校。", "That impression is not baseless.", "That gap is the reason Beyond Taiwan exists.",
+    "我們持續在找願意一起做這件事的個人、企業與學校。", "That impression is not baseless.", "That gap is the reason Beyond Taiwan exists.", "No two years have the same line-up.",
     "Some finished their own applications recently enough to still remember not knowing where to start.", "We read everything.",
     "收到超過 150 份申請，協助超過 100 位國內高中生"]) assert.ok(pages.includes(s), "找不到：" + s);
 });
@@ -106,24 +162,4 @@ test("★ shared/public.js：募資橫條預設關著、日期含頭含尾、開
   assert.match(src, /from: "2027-01-26", to: "2027-04-21"/);
   assert.ok(src.indexOf("if (reduce ||") < src.indexOf("new IntersectionObserver("), "先看 reduce 再做任何會動的事");
   assert.match(src, /if \(el\.getBoundingClientRect\(\)\.top < vh \* 0\.92\) continue;/, "一開頁就看得到的東西不藏");
-});
-
-test("★ BT 島掛的是全站那一條頂欄；語言鈕還是同一顆", () => {
-  const h = readFileSync("island/index.html", "utf8"), css = readFileSync("island/island.css", "utf8");
-  assert.match(h, /<nav class="topbar" aria-label="網站導覽">\s*<a class="home" id="home" href="\.\.\/"/);
-  assert.equal((h.match(/id="lang"/g) || []).length, 1); assert.equal((h.match(/id="home"/g) || []).length, 1);
-  assert.match(h, /<div class="navlinks" id="navlinks">\s*<a class="nav-cta" href="\.\.\/apply\/"><span class="zh">現在開放<\/span><span class="en">Open now<\/span><\/a>\s*<a href="\.\.\/programs\/"><span class="zh">活動與計畫<\/span><span class="en">Programmes<\/span><\/a>/, "現在開放排第一個，活動與計畫第二個，沒有圖示");
-  assert.doesNotMatch(css, /\.navlinks \.nav-cta\{[^}]*background:var\(--bt-orange\)/, "不是橘色藥丸");
-  assert.match(css, /\.topbar\{position:fixed;top:12px;left:var\(--gut\);right:calc\(var\(--side-w\) \+ var\(--gut\)\)/);
-  assert.match(css, /\.brand,\.toolbar\{background:linear-gradient\(180deg,rgba\(255,255,255,\.78\),rgba\(237,229,216,\.6\)\);backdrop-filter:blur\(20px\) saturate\(180%\)/, "牌子與工具列跟頂欄同一種玻璃");
-});
-
-test("★ 現在開放（/apply/）與活動與計畫（/programs/）各管一件事（Paul 2026-11-22）", () => {
-  const ap = readFileSync("apply/index.html", "utf8"), main = readFileSync("programs/src/main.js", "utf8"), home = readFileSync("index.html", "utf8");
-  assert.match(ap, /<title>現在開放 \/ Beyond Taiwan<\/title>/);
-  assert.match(ap, /<a class="nav-cta" href="\.\.\/apply\/" aria-current="page">/);
-  assert.match(ap, /<h2><span class="zh">想參加的還沒開放<\/span>/, "什麼都沒開的時候這一頁還是有下一步");
-  assert.match(main, /split\(events\)/); assert.match(main, /getElementById\("past-" \+ l\)/, "/programs/ 畫的是辦過的活動");
-  assert.doesNotMatch(main, /openHTML|looseForms/, "/programs/ 不再畫現在開放的清單");
-  assert.equal((home.match(/<p class="hero-act"><a class="cta warm" href="\.\/apply\/">/g) || []).length, 2, "首頁第一屏的按鈕到現在開放");
 });

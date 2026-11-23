@@ -16,6 +16,9 @@ export function fmtWhen(starts, ends, l) {
   const a = new Date(starts), b = ends ? new Date(ends) : null;
   const d = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
   const t = x => `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`;
+  // 只知道哪一天、還不知道幾點的，後台存的是台灣的半夜十二點（例如 2027-01-03 00:00）。那種只印日期，印「00:00」會讓人以為半夜開始。
+  if (!b && new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(a) === "00:00")
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(a);
   if (!b) return `${d(a)} ${t(a)}`;
   return d(a) === d(b) ? `${d(a)} ${t(a)}–${t(b)}` : `${d(a)} – ${d(b)}`;
 }
@@ -32,7 +35,8 @@ export function split(events) {
   const now = new Date(), yearAgo = new Date(now.getTime() - 365 * 86400000);
   const list = events || [];
   return {
-    upcoming: list.filter(e => !e.is_past).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at)),
+    // 沒有日期的是「計畫」（只知道大概幾月，見 year/src/logic.js），它們排在「這一年」與「團隊」，不排進有日期的近期活動。
+    upcoming: list.filter(e => !e.is_past && e.starts_at).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at)),
     past: list.filter(e => e.is_past && new Date(e.ends_at || e.starts_at) >= yearAgo).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at)),
   };
 }

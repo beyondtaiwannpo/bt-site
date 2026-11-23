@@ -369,7 +369,7 @@ summary{cursor:pointer}
 
 /* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
 /* 頂欄六個連結。第一個是「現在開放」（到 /apply/，現在報得了名的活動與計畫都在那裡），字比別的粗一點，就這樣：橘色藥丸與小火 Paul 都看過、都不要。
-   第二個「活動與計畫」到 /programs/，是四個計畫在做什麼，加辦過的活動（Paul 2026-11-22）。
+   2026-11-22 稍晚 Paul 再定一次：現在開放、這一年（/year/，一整屆的時間軸）、團隊、免費資源、關於我們、合作。/programs/ 拆掉了，只剩轉址。
    2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
    每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它本來就排第一個。 */
@@ -408,6 +408,29 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 /* 照片（2026-11-21 從首頁搬過來的那一張）。樣式跟首頁同一段。 */
 .photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
 .photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;background:rgba(16,42,134,.06)}
+
+/* ═════════ 六個 team 各一塊（2026-11-22）═════════ */
+/* 每一塊：名字、兩行介紹、這個 team 的計畫在做什麼，最下面 .tm-live 是後台資料畫的（src/programmes.js）：
+   勾了「多數年份都會辦」的計畫，這一屆的版本佔一行。後台還沒有那個 team 的資料，那一格就不出現，不留空位也不編內容。
+   刻意不是六張一樣圓角一樣陰影的卡片，是兩欄，靠上面那條橘線分開。 */
+.tms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(30px,4.4vw,60px) clamp(24px,3.4vw,52px)}
+.tm{border-top:2px solid var(--bt-orange);padding-top:16px;min-width:0}
+.tm h3{margin:0 0 6px;font-size:clamp(22px,2.2vw,30px)}
+.tm p{font-size:16px;line-height:1.65;margin:0 0 10px}
+.tm .tm-tag{font-weight:600;margin-bottom:12px}
+.tm h4{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:.01em;margin:20px 0 6px}
+html[data-lang="zh"] .tm h4{font-family:var(--body);font-weight:600;font-size:17px}
+.tm-live{margin-top:18px}
+.tm-live small{display:block;font-family:var(--display);font-weight:700;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin-bottom:4px}
+html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;letter-spacing:.04em}
+.tm-live ul{list-style:none;margin:0;padding:0}
+.tm-live li{border-top:1px solid rgba(16,42,134,.14)}
+.tm-live a{display:block;padding:11px 0;text-decoration:none;color:var(--ink)}
+.tm-live a:hover b{text-decoration:underline;text-decoration-color:var(--bt-orange);text-underline-offset:4px}
+.tm-live b{display:block;font-weight:600;font-size:16px}
+.tm-live span{display:block;font-size:14.5px;color:rgba(16,42,134,.8)}
+.tm-live em{font-style:normal;font-size:12px;font-weight:600;background:var(--bt-orange);color:var(--bt-navy);padding:2px 8px;border-radius:999px;margin-left:6px}
+@media (max-width:820px){.tms{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -420,10 +443,10 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   </a>
   <div class="navlinks" id="navlinks">
     <a class="nav-cta" href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="../programs/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a>
-    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
+    <a href="../year/"><span class="zh">這一年</span><span class="en">This year</span></a>
+    <a href="../team/" aria-current="page"><span class="zh">團隊</span><span class="en">Teams</span></a>
+    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
-    <a href="../team/" aria-current="page"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
@@ -469,14 +492,56 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   <div class="sec-in">
     <h2>六個 team</h2>
     <div class="body">
-      <ul class="rows">
-        <li><b>Sponsorship</b><span>贊助與合作。</span></li>
-        <li><b>Curriculum</b><span>活動內容。</span></li>
-        <li><b>Internship</b><span>實習。</span></li>
-        <li><b>Mentorship</b><span>導生配對。</span></li>
-        <li><b>Marketing</b><span>對外的內容與視覺。</span></li>
-        <li><b>CR</b><span>校園關係。</span></li>
-      </ul>
+      <div class="tms">
+      <article class="tm" data-team="curriculum">
+        <h3>Curriculum</h3>
+        <p class="tm-tag">活動內容。探索營的每一堂課都是這裡排的。</p>
+        <h4>探索營 College Bootcamp</h4>
+        <p>每年寒暑假各一場，兩天，免費。</p>
+        <p>兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。</p>
+        <p>我們會事先問你想讀什麼，再去找對應背景的人回來。所以每一屆的講者名單都不一樣。</p>
+        <p>第一屆在 2023 年六月，超過 80 位高中生參加。</p>
+        <h4>講座</h4>
+        <p>不定期舉辦，也不收費。場次同樣會在 Instagram 公布。</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="mentorship">
+        <h3>Mentorship</h3>
+        <p class="tm-tag">導生配對。配一位走過同一條路的學長姐。</p>
+        <h4>導生配對計畫 Mentorship Program</h4>
+        <p>一學期配對一次，免費。</p>
+        <p>你會有一位走過同一條路的學長姐。他不會幫你寫 essay，但會陪你把卡住的地方講清楚。</p>
+        <p>有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
+        <p>導生制度從 2020 年九月開始，第一批 36 人。</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="internship">
+        <h3>Internship</h3>
+        <p class="tm-tag">實習。履歷上有真的做過的事。</p>
+        <h4>高中生實習計劃</h4>
+        <p>每學期收一批，從官網報名。</p>
+        <p>讓公立高中生在申請之前就有一段真的做過的事。實習生進 BT 的各個 team 做真的事，有自己的實習護照記錄做過什麼。</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="cr">
+        <h3>Community Relations</h3>
+        <p class="tm-tag">社群關係。走進公立高中，也顧著學校與社群的關係。</p>
+        <p>安排學長姐回公立高中演講，讓資訊到達本來到不了的地方；校園大使把消息帶進自己的學校。2021 年十月第一批校園大使 18 位。</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="sponsorship">
+        <h3>Sponsorship</h3>
+        <p class="tm-tag">贊助與合作。讓這一切對學員維持 0 元。</p>
+        <p>找願意一起做這件事的個人、企業與學校。嘖嘖募資也在這裡：2027 年 3 月 23 日上線，4 月 21 日結束。</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="marketing">
+        <h3>Marketing</h3>
+        <p class="tm-tag">對外的內容與視覺。</p>
+        <p>Instagram、大學介紹系列、官網的照片與影片。活動公告以 Instagram 為第一管道。</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      </div>
     </div>
   </div>
 </section>
@@ -558,14 +623,56 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   <div class="sec-in">
     <h2>Six teams</h2>
     <div class="body">
-      <ul class="rows">
-        <li><b>Sponsorship</b><span>Partnerships and funding.</span></li>
-        <li><b>Curriculum</b><span>Programme content.</span></li>
-        <li><b>Internship</b><span>Internships.</span></li>
-        <li><b>Mentorship</b><span>Matching and mentoring.</span></li>
-        <li><b>Marketing</b><span>Everything we say and show publicly.</span></li>
-        <li><b>CR</b><span>Campus relations.</span></li>
-      </ul>
+      <div class="tms">
+      <article class="tm" data-team="curriculum">
+        <h3>Curriculum</h3>
+        <p class="tm-tag">Programme content. Every bootcamp class is scheduled here.</p>
+        <h4>College Bootcamp</h4>
+        <p>Twice a year, winter and summer. Two days. Free.</p>
+        <p>Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like.</p>
+        <p>We ask what you want to study before the camp, then bring back people with that background. No two years have the same line-up.</p>
+        <p>The first bootcamp ran in June 2023 with more than 80 high school students.</p>
+        <h4>Talks</h4>
+        <p>Held through the year, also free. Dates are announced on Instagram.</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="mentorship">
+        <h3>Mentorship</h3>
+        <p class="tm-tag">Matching and mentoring. One alumnus who has walked the same road.</p>
+        <h4>Mentorship Program</h4>
+        <p>One matching round per semester. Free.</p>
+        <p>You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on.</p>
+        <p>Some pairs that started in an application season are still in touch more than two years later.</p>
+        <p>Mentorship began in September 2020 with 36 students.</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="internship">
+        <h3>Internship</h3>
+        <p class="tm-tag">Internships. Real work on a real CV.</p>
+        <h4>High school internship</h4>
+        <p>One intake a semester, apply on the site.</p>
+        <p>The high school internship programme gives public school students real work experience before they apply. Interns join BT's teams and do real work, tracked in their own intern passport.</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="cr">
+        <h3>Community Relations</h3>
+        <p class="tm-tag">Community relations. Into public high schools, and the ties with schools and the wider community.</p>
+        <p>Arranges alumni talks at public high schools so the information reaches places it never did; campus ambassadors carry the news into their own schools. The first 18 ambassadors started in October 2021.</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="sponsorship">
+        <h3>Sponsorship</h3>
+        <p class="tm-tag">Partnerships and funding. Keeps everything free for students.</p>
+        <p>Finds the people, companies and schools willing to build this with us. The Zeczec crowdfunding campaign lives here too: live 23 March 2027, closes 21 April 2027.</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      <article class="tm" data-team="marketing">
+        <h3>Marketing</h3>
+        <p class="tm-tag">Everything we say and show publicly.</p>
+        <p>Instagram, the college introduction series, the photos and video on this site. Instagram is the first channel for every announcement.</p>
+        <div class="tm-live" hidden></div>
+      </article>
+      </div>
     </div>
   </div>
 </section>
@@ -614,7 +721,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </main>
 
 <footer>
-  <p class="foot-links"><a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a><a href="../programs/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a></p>
+  <p class="foot-links"><a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a><a href="../year/"><span class="zh">這一年</span><span class="en">This year</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Teams</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../impact/"><span class="zh">數字</span><span class="en">Numbers</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>
@@ -647,8 +754,11 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     for (var i = 0; i < as.length; i++) {
       var h = as[i].getAttribute("href");
       if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
-      as[i].setAttribute("href", h.split("?")[0] + "?lang=" + l);
+      /* 這一頁的連結有的帶 #代號（活動頁的那一場），所以只改 lang 這一個，不把後面整段換掉。src/programmes.js 畫完會再叫一次 btKeepLang()。 */
+      var u = new URL(h, location.href); u.searchParams.set("lang", l);
+      as[i].setAttribute("href", u.pathname + u.search + u.hash);
     }
+    window.btKeepLang = function () { keepLang(html.getAttribute("data-lang") === "en" ? "en" : "zh"); };
   }
 
   /* 已經登入的話，右上角那顆改成「我的帳號」。
@@ -695,6 +805,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 </script>
 
 <script type="module" src="./src/main.js"></script>
+<script type="module" src="./src/programmes.js"></script>
 <!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
 <script src="../shared/public.js" defer></script>
 </body>

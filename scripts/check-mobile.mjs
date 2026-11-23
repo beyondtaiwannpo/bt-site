@@ -25,7 +25,7 @@ const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 // 登入後的四頁沒有登入就是一個轉址，量不到內容。
 // 那四頁由 scripts/mobile-fixtures.mjs 產生一份帶假資料的 _audit.html。
 const PAGES = [
-  "index.html", "about/index.html", "programs/index.html", "team/index.html",
+  "index.html", "about/index.html", "programs/index.html", "year/index.html", "team/index.html",
   "join/index.html", "impact/index.html", "partner/index.html", "apply/index.html", "feedback/index.html",
   "resources/index.html", "alumni/index.html", "history/index.html", "stories/index.html", "island/index.html", "privacy/index.html",
   "app/index.html", "reset/index.html",

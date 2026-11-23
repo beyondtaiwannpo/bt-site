@@ -60,7 +60,7 @@ test("★ 首頁「現在開放」：第一屏下面第一段、問不到也有�
   assert.match(idx, /<section class="now" id="now" aria-labelledby="now-h">[\s\S]*?<h2 id="now-h"><span class="zh">現在開放<\/span><span class="en">Open now<\/span><\/h2>/);
   assert.match(idx, /<div class="zh" id="now-zh"><\/div>\s*<div class="en" id="now-en"><\/div>\s*<p class="now-note">/, "兩個空的容器後面接著問不到時也對的那一句");
   assert.ok(idx.indexOf("</header>") < idx.indexOf('id="now"') && idx.indexOf('id="now"') < idx.indexOf('id="values"') && idx.indexOf('id="values"') < idx.indexOf('id="numbers"'), "第一屏、現在開放、價值、數字");
-  assert.match(idx, /import \{ looseForms, fmtDay \} from "\.\/programs\/src\/logic\.js"/, "哪些表單算開放跟 /programs/ 同一支判斷");
+  assert.match(idx, /import \{ looseForms, fmtDay \} from "\.\/year\/src\/logic\.js"/, "哪些表單算開放的判斷在 year/src/logic.js");
   for (const f of [idx, ev, main]) assert.doesNotMatch(f, /sb_publishable_|supabase\.co/, "不抄金鑰");
   assert.match(idx, /import \{ SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY \} from "\.\/shared\/supabase-config\.js"/);
   assert.match(main, /from "\.\.\/\.\.\/shared\/supabase-config\.js"/);

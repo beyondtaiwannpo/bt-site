@@ -339,7 +339,7 @@ summary{cursor:pointer}
 .ev-tag.on{background:var(--bt-orange);border-color:var(--bt-orange)}
 /* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
 /* 頂欄六個連結。第一個是「現在開放」（到 /apply/，現在報得了名的活動與計畫都在那裡），字比別的粗一點，就這樣：橘色藥丸與小火 Paul 都看過、都不要。
-   第二個「活動與計畫」到 /programs/，是四個計畫在做什麼，加辦過的活動（Paul 2026-11-22）。
+   2026-11-22 稍晚 Paul 再定一次：現在開放、這一年（/year/，一整屆的時間軸）、團隊、免費資源、關於我們、合作。/programs/ 拆掉了，只剩轉址。
    2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
    每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它本來就排第一個。 */
@@ -357,10 +357,10 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   </a>
   <div class="navlinks" id="navlinks">
     <a class="nav-cta" href="../apply/" aria-current="page"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="../programs/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a>
-    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
+    <a href="../year/"><span class="zh">這一年</span><span class="en">This year</span></a>
+    <a href="../team/"><span class="zh">團隊</span><span class="en">Teams</span></a>
+    <a href="../resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
-    <a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
@@ -378,7 +378,7 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <h2><span class="zh">近期活動</span><span class="en">Upcoming events</span></h2>
     <div class="body">
       <div class="zh" id="up-zh"></div><div class="en" id="up-en"></div>
-      <p><a href="../programs/"><span class="zh">看辦過的活動與四個計畫</span><span class="en">See past events and the four programmes</span></a></p>
+      <p><a href="../year/"><span class="zh">看這一年的行程</span><span class="en">See this year's schedule</span></a></p>
     </div>
   </div>
 </section>
@@ -394,14 +394,15 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     <div class="body">
       <p><span class="zh">每個 team 都在學期開始的時候開新的一輪，大約是八月和二月。</span><span class="en">Every team opens a new round at the start of term, around August and around February.</span></p>
       <p><span class="zh"><a href="../app/">開一個免費的 BT 帳號</a>，註冊的時候勾「我願意收 BT 的活動通知與資源更新」，下一輪開放我們會寄信給你。</span><span class="en"><a href="../app/?lang=en">Create a free Beyond Taiwan account</a> and tick "I would like BT's event notices and resource updates". We will email you when the next round opens.</span></p>
-      <p><a href="../programs/"><span class="zh">看四個計畫在做什麼</span><span class="en">See what the four programmes are</span></a></p>
+      <p><span class="zh">下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</span><span class="en">The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</span></p>
+      <p><a href="../year/"><span class="zh">看這一年排了什麼</span><span class="en">See what is planned this year</span></a>　<a href="../team/"><span class="zh">看每個 team 在做什麼</span><span class="en">See what each team runs</span></a></p>
     </div>
   </div>
 </section>
 </main>
 
 <footer>
-  <p class="foot-links"><a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a><a href="../programs/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a></p>
+  <p class="foot-links"><a href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a><a href="../year/"><span class="zh">這一年</span><span class="en">This year</span></a><a href="../team/"><span class="zh">團隊</span><span class="en">Teams</span></a><a href="../resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a><a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="../island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="../alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="../history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="../impact/"><span class="zh">數字</span><span class="en">Numbers</span></a></p>
   <p><a href="../"><span class="zh">回 Beyond Taiwan 首頁</span><span class="en">Back to Beyond Taiwan</span></a>　<a href="../privacy/">隱私政策 / Privacy Policy</a></p>
   <p>本網站不使用任何追蹤或廣告工具。</p>
   <p lang="en">This site uses no tracking or advertising tools.</p>

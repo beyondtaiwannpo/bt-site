@@ -408,12 +408,15 @@ export function says(err) {
 
 // 網站上的活動（2026-11-13）：對外 /events/ 上現在有什麼、等上架的、草稿。只讀；上架與下架在那場活動的頁面（senior）。
 // 從紀錄匯入的舊活動（source = import）不在網站上，不列。
+// 2026-12-31：多讀 usual_month 與 recurring（2026-12-31-programmes.sql），沒有日期的計畫才印得出「通常 8 月」。
+// 那一支還沒跑的時候這兩欄不存在（42703），退回只讀原本那幾欄，這一頁照樣打得開。
 export async function loadSiteEvents() {
   need();
-  const { data, error } = await supabase.from("events")
-    .select("id, slug, team, title_zh, title_en, starts_at, ends_at, place, status, published_at, source")
-    .neq("source", "import").neq("status", "archived")
+  const COLS = "id, slug, team, title_zh, title_en, starts_at, ends_at, place, status, published_at, source";
+  const q = cols => supabase.from("events").select(cols).neq("source", "import").neq("status", "archived")
     .order("starts_at", { ascending: true, nullsFirst: false });
+  let { data, error } = await q(COLS + ", usual_month, recurring");
+  if (error && String(error.code) === "42703") ({ data, error } = await q(COLS));
   if (error) throw error;
   return data || [];
 }

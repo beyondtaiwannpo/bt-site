@@ -1375,6 +1375,49 @@ const evDate = d => d ? String(d).slice(0, 16).replace("T", " ") : "";
 const evLocal = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; };
 export const evPast = e => !!(e && (e.ends_at || e.starts_at) && new Date(e.ends_at || e.starts_at) < new Date());
 export const evTitle = e => (lang() === "zh" ? (e.title_zh || e.title_en) : (e.title_en || e.title_zh)) || e.slug;
+// ── 計畫的四格（2026-12-31-programmes.sql）──
+// 一筆活動可以沒有日期：只要填了「通常在幾月」或勾了「多數年份都會辦」。對外的「現在開放」「這一年」「團隊」三頁讀的是同一筆。
+// 下面這幾支都是純函式，test/programmes-admin.test.mjs 有測。
+// evMonth：下拉或資料庫來的值收成 1 到 12 的整數，其他（空的、0、13、8.5、亂打的字）都當沒填，回 null。
+export function evMonth(v) {
+  if (v === null || v === undefined || v === "" || typeof v === "boolean") return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= 12 ? n : null;
+}
+const EV_MONTH_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+// 月份的名字：中文「8 月」，英文 August。不是 1 到 12 回空字串。
+export function evMonthName(v) { const m = evMonth(v); return m ? T("ev.monthN", { m, name: EV_MONTH_EN[m - 1] }) : ""; }
+// 資料庫有沒有那四欄（遷移檔跑過沒）。沒跑過的時候 loadEvents() 回來的列沒有 recurring 這個鍵。
+export const evHasProgramme = e => !!e && typeof e.recurring === "boolean";
+// 表單上那四格讀出來的值 → save_event() 的 patch。月份沒選是 null（清掉）；名字頭尾的空白拿掉。
+export function evProgrammePatch(raw) {
+  const r = raw || {};
+  return { usual_month: evMonth(r.usual_month), recurring: r.recurring === true, edition_zh: String(r.edition_zh || "").trim(), edition_en: String(r.edition_en || "").trim() };
+}
+// 清單上「什麼時候」那一小段：有日期印日期；沒有日期印「通常 8 月」；兩樣都沒有但勾了多數年份都會辦，印那五個字；都沒有回空字串。
+export function evWhenLabel(e) {
+  if (!e) return "";
+  if (e.starts_at) return evDate(e.starts_at);
+  const m = evMonth(e.usual_month);
+  if (m) return T("ev.usualIn", { m, name: EV_MONTH_EN[m - 1] });
+  return e.recurring === true ? T("ev.recurringTag") : "";
+}
+// 編輯頁那一塊。ro／dis 跟上面內容那幾格同一套（唯讀的人看得到值、改不了）。遷移檔還沒跑就只印一句要先跑哪一支。
+export function eventProgrammeHTML(e, canEdit, busy) {
+  if (!evHasProgramme(e)) return `<h3 class="sec-h">${T("ev.pg")}</h3><div class="note">${T("ev.pgNeedsSql")}</div>`;
+  const dis = busy ? " disabled" : "", ro = canEdit ? "" : " readonly", off = canEdit ? "" : " disabled";
+  const m = evMonth(e.usual_month);
+  const opts = `<option value=""${m ? "" : " selected"}>${esc(T("ev.monthNone"))}</option>`
+    + EV_MONTH_EN.map((_, i) => `<option value="${i + 1}"${m === i + 1 ? " selected" : ""}>${esc(evMonthName(i + 1))}</option>`).join("");
+  return `<h3 class="sec-h">${T("ev.pg")}</h3>
+      <div class="two">
+        <label><i>${T("ev.month")}</i><select id="ev-month" name="usual_month"${off}${dis}>${opts}</select><span class="mini">${T("ev.monthHelp")}</span></label>
+        <div><label class="check"><input type="checkbox" id="ev-recurring" name="recurring"${e.recurring ? " checked" : ""}${off}${dis}><span>${T("ev.recurring")}</span></label><div class="mini">${T("ev.recurringHelp")}</div></div>
+        <label><i>${T("ev.editionZh")}</i><input id="ev-edzh" name="edition_zh" value="${esc(e.edition_zh || "")}"${ro}${dis}></label>
+        <label><i>${T("ev.editionEn")}</i><input id="ev-eden" name="edition_en" value="${esc(e.edition_en || "")}"${ro}${dis}></label>
+      </div>
+      <div class="mini" style="margin:-6px 0 14px">${T("ev.editionHelp")}</div>`;
+}
 // 一場活動在清單上屬於哪一段。紀錄那邊倒進來的舊活動（source import）另成一組，它們從來沒上過網站。
 export function evGroup(e) {
   if (e.source === "import") return "records";
@@ -1407,7 +1450,7 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
   const shown = ev.filter(e => eventMatches(e, fx));
   const groups = ["ready", "draft", "published", "past"].map(k => [k, shown.filter(e => evGroup(e) === k)]).filter(g => g[1].length);
   const row = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(e.source === "import" ? T("ev.st.records") : T("ev.st." + e.status))}</span></div>
-      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${pjOf(projects, e.id) ? `・${esc(T("pj.inProject", { p: pjTitle(pjOf(projects, e.id)) }))}` : ""}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
+      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${pjOf(projects, e.id) ? `・${esc(T("pj.inProject", { p: pjTitle(pjOf(projects, e.id)) }))}` : ""}${evWhenLabel(e) ? `・${esc(evWhenLabel(e))}` : ""}${e.place ? `・${esc(e.place)}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}</div></li>`;
   // 開一場活動：收成一行放在最上面（2026-11-11 Paul：以前一直開著放在最底下，清單長了根本看不到）。填到一半或剛打開過，重畫後還開著。
   const create = (canCreateTeams || []).length ? foldHTML("ev-new", T("ev.new"), `<div class="note">${T("ev.newWhat")}</div><div class="two">
       <label><i>${T("ev.team")}</i><select id="ev-team"${dis}>${canCreateTeams.map(t => `<option value="${esc(t)}"${d.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label>
@@ -1487,7 +1530,8 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
       </div>
       ${e.cover_url ? `<img class="ev-cover" src="${esc(e.cover_url)}" alt="">` : ""}
       <label class="check"><input type="checkbox" id="ev-consent" name="cover_consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label>
-      <div class="mini">${T("ev.coverNote")}</div>
+      <div class="mini" style="margin-bottom:18px">${T("ev.coverNote")}</div>
+      ${eventProgrammeHTML(e, canEdit, busy)}
       ${canEdit ? `<div class="form-foot">${autosaveHint("ev-save", `data-id="${esc(e.id)}"`)}</div>` : `<div class="mini">${T("ev.readOnly")}</div>`}</div>`)
     + eventVenueHTML(e, venues, canEdit, busy)
     + sectionHTML(T("ev.signup"), links)
@@ -1598,7 +1642,7 @@ export function projectHTML(p, projects, events, me, msg, busy, o) {
   const byId = new Map((events || []).map(e => [e.id, e]));
   const evs = (p.events || []).map(id => byId.get(id)).filter(Boolean);
   const evRow = e => `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag${e.status === "published" ? " open" : e.status === "ready" ? " warn" : e.status === "archived" ? "" : " draft"}">${esc(T("ev.st." + e.status))}</span></div>
-      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${e.starts_at ? `・${esc(evDate(e.starts_at))}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}・<a href="/admin/records/#overview/${esc(e.id)}">${T("pj.scorecard")}</a>${edit && canEditWs(me, e.workspace_id) ? `・<button class="lnk" data-act="pj-ev-out" data-id="${esc(e.id)}"${dis}>${T("pj.evOut")}</button>` : ""}</div></li>`;
+      <div class="fmeta">${esc(String(e.team || "").replace(/\s*Team$/i, ""))}${evWhenLabel(e) ? `・${esc(evWhenLabel(e))}` : ""}${e.form_id ? "" : `・${T("ev.noForm")}`}・<a href="/admin/records/#overview/${esc(e.id)}">${T("pj.scorecard")}</a>${edit && canEditWs(me, e.workspace_id) ? `・<button class="lnk" data-act="pj-ev-out" data-id="${esc(e.id)}"${dis}>${T("pj.evOut")}</button>` : ""}</div></li>`;
   const addable = edit ? pjAddable(events, projects, p, me) : [];
   const addOld = addable.length ? foldHTML("pj-ev-add", T("pj.evAdd"), `<div class="row"><select id="pj-ev-pick" aria-label="${esc(T("pj.evAdd"))}"${dis}>${addable.map(e => `<option value="${esc(e.id)}">${esc(evTitle(e))}${e.starts_at ? pjParen(esc(evDate(e.starts_at).slice(0, 10))) : ""}</option>`).join("")}</select>
       <button class="btn" data-act="pj-ev-add" data-id="${esc(p.id)}"${dis}>${T("pj.evAddGo")}</button></div>`, !!x.addOpen) : "";

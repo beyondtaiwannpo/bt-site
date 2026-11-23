@@ -545,7 +545,7 @@ summary{cursor:pointer}
 
 /* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
 /* 頂欄六個連結。第一個是「現在開放」（到 /apply/，現在報得了名的活動與計畫都在那裡），字比別的粗一點，就這樣：橘色藥丸與小火 Paul 都看過、都不要。
-   第二個「活動與計畫」到 /programs/，是四個計畫在做什麼，加辦過的活動（Paul 2026-11-22）。
+   2026-11-22 稍晚 Paul 再定一次：現在開放、這一年（/year/，一整屆的時間軸）、團隊、免費資源、關於我們、合作。/programs/ 拆掉了，只剩轉址。
    2026-11-21 Paul：原本那顆寫「報名」，看起來像要註冊帳號，學生不會點；改成先看有什麼可以參加，挑了才開帳號。
    每一頁各一份（外殼各自一份的代價），改一頁就要每一頁都改，check.sh 守著每一頁的頂欄一模一樣。
    手機上它本來就排第一個。 */
@@ -656,10 +656,10 @@ html[data-lang="zh"] .partners li{font-family:var(--body);font-weight:600;font-s
        標籤自己也有中英兩份，跟著 data-lang 一起切。 -->
   <div class="navlinks" id="navlinks">
     <a class="nav-cta" href="./apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="./programs/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a>
-    <a href="./resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a>
+    <a href="./year/"><span class="zh">這一年</span><span class="en">This year</span></a>
+    <a href="./team/"><span class="zh">團隊</span><span class="en">Teams</span></a>
+    <a href="./resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a>
     <a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a>
-    <a href="./team/"><span class="zh">團隊</span><span class="en">Team</span></a>
     <a href="./partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
   </div>
   <button class="lang" id="lang" type="button">EN</button>
@@ -723,7 +723,7 @@ html[data-lang="zh"] .partners li{font-family:var(--body);font-weight:600;font-s
 
 <!-- 第一屏以下（2026-11-21 第二次重整，Paul：「students signing up the fastest they can, and they are attracted to it」）。
      首頁只剩六個短的畫面，一個畫面一件事：第一屏、現在開放、三個價值、數字、BT 島、合作。
-     原本在這裡的六段長文搬到內頁，一句都沒有丟：為什麼在 → /about/、做什麼 → /programs/、誰在做 → /team/、加入與聯絡 → /programs/ 與 /partner/。
+     原本在這裡的六段長文搬到內頁，一句都沒有丟：為什麼在 → /about/、做什麼 → /team/（每個計畫在它那個 team 底下）、誰在做 → /team/、加入與聯絡 → /apply/ 與 /partner/。
      信念、價值、願景是 Paul 2026-11-21 給的定稿，要改先問 Co-President。 -->
 
 <!-- 現在開放。HTML 裡寫的是「現在沒有開放」時也對的那幾句；最下面那段 type="module" 的程式問到資料之後，
@@ -737,7 +737,7 @@ html[data-lang="zh"] .partners li{font-family:var(--body);font-weight:600;font-s
     <div class="zh" id="now-zh"></div>
     <div class="en" id="now-en"></div>
     <p class="now-note"><span class="zh">探索營、導生配對、講座、高中生實習，每學期開始的時候開新的一輪，大約是八月和二月。</span><span class="en">College Bootcamp, the Mentorship Program, talks and the high school internship each open a new round at the start of term, around August and around February.</span></p>
-    <div class="row"><a class="cta" href="./programs/"><span class="zh">看全部的活動與計畫</span><span class="en">See everything we run</span></a><a class="more" href="./resources/"><span class="zh">還沒開放？先看免費資源</span><span class="en">Nothing open yet? Start with the free resources</span></a></div>
+    <div class="row"><a class="cta" href="./year/"><span class="zh">看這一年的行程</span><span class="en">See this year's schedule</span></a><a class="more" href="./resources/"><span class="zh">還沒開放？先看免費資源</span><span class="en">Nothing open yet? Start with the free resources</span></a></div>
   </div>
 </section>
 
@@ -831,7 +831,7 @@ html[data-lang="zh"] .partners li{font-family:var(--body);font-weight:600;font-s
         <div><b><span class="fig">Free</span></b><p>Almost everything we run costs nothing.</p></div>
       </div>
       </div>
-      <p class="nums-src"><a href="./about/#numbers"><span class="zh">這些數字怎麼來的</span><span class="en">Where these numbers come from</span></a></p>
+      <p class="nums-src"><a href="./impact/"><span class="zh">這些數字怎麼來的</span><span class="en">Where these numbers come from</span></a></p>
     </div>
   </div>
 </section>
@@ -868,7 +868,7 @@ html[data-lang="zh"] .partners li{font-family:var(--body);font-weight:600;font-s
 </main>
 
 <footer>
-  <p class="foot-links"><a href="./apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a><a href="./programs/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a><a href="./resources/"><span class="zh">免費資源</span><span class="en">Free resources</span></a><a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="./team/"><span class="zh">團隊</span><span class="en">Team</span></a><a href="./partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="./island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="./alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="./history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a></p>
+  <p class="foot-links"><a href="./apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a><a href="./year/"><span class="zh">這一年</span><span class="en">This year</span></a><a href="./team/"><span class="zh">團隊</span><span class="en">Teams</span></a><a href="./resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a><a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a><a href="./partner/"><span class="zh">合作</span><span class="en">Partner</span></a><a href="./island/"><span class="zh">BT 島</span><span class="en">BT Island</span></a><a href="./alumni/"><span class="zh">校友航線圖</span><span class="en">Alumni map</span></a><a href="./history/"><span class="zh">歷史之路</span><span class="en">Our road</span></a><a href="./impact/"><span class="zh">數字</span><span class="en">Numbers</span></a></p>
   <p><a href="./privacy/">隱私政策 / Privacy Policy</a></p>
   <!-- 這兩句放在 footer 是使用者 2026-09-03 的決定：家長、學校、Google 審查三種人
        都用得到，而隱私政策裡有完整版，但沒有人會為了確認這件事去點進去。 -->
@@ -1217,10 +1217,10 @@ var VIDEO_ID = "";
 <script type="module">
 /* 現在開放（2026-11-21，原本是 2026-11-01 的「近期活動」）。不載 supabase-js：只拿 shared/supabase-config.js 的網址與公開金鑰，
    用 fetch 問兩件事：公開的活動（public_events()）與狀態是開放的報名表。三秒內問不到，那一段就維持 HTML 裡原本的幾句話。
-   活動卡跟 /events/ 共用同一支畫法（events/src/ui.js），哪些表單算「現在開放」跟 /programs/ 共用同一支判斷（programs/src/logic.js）。 */
+   活動卡跟 /events/ 共用同一支畫法（events/src/ui.js），哪些表單算「現在開放」的判斷在 year/src/logic.js。 */
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./shared/supabase-config.js";
 import { homeCardsHTML, esc } from "./events/src/ui.js";
-import { looseForms, fmtDay } from "./programs/src/logic.js";
+import { looseForms, fmtDay } from "./year/src/logic.js";
 (async () => {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 3000);
   const H = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: "Bearer " + SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" };

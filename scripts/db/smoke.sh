@@ -3882,6 +3882,98 @@ imp2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/202
 if echo "${imp2}" | grep -q "OVERALL.*PASS"; then echo "  ok   島那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${imp2}" | head -5; fail=$((fail+1)); fi
 chk "★ 重跑之後後台改過的字沒被 seed 蓋掉" "新的一句話" "select tagline_zh from public.island_teams where id='curriculum'"
 psql -d "${DB}" -X -A -t -q -c "delete from public.assignments where user_id='${ISTAFF}' and workspace_id='res:Curriculum Team';" >/dev/null
+echo "── 計畫：一筆資料餵三頁（2026-12-31-programmes.sql）──"
+# 這時候：PAUL Co-President、AMT 是 AMTEAM 的「改」、AMX 是不在任何 team 的幹部、ISTAFF 只在 Internship、STU 是學員。
+PGSEED="'winter-bootcamp','intern-intake','mentor-matching','coffee-chat','essay-ecosystem'"
+PGOLD=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.events" | tr -d ' \n')
+pgm=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-31-programmes.sql 2>&1 || true)
+if echo "${pgm}" | grep -q "OVERALL.*PASS" && ! echo "${pgm}" | grep -q "|FAIL"; then echo "  ok   計畫那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 計畫那支驗收表："; echo "${pgm}" | head -14; fail=$((fail+1)); fi
+chk "★ 原本的活動一筆沒少，四個新欄位都是預設值（沒月份、不是固定計畫、沒有另外取名）" "${PGOLD}" \
+  "select count(*) from public.events where slug not in (${PGSEED}) and usual_month is null and not recurring and edition_zh='' and edition_en=''"
+chk "★ public_events() 回 24 欄，原本 20 欄的順序沒動，最後四欄是新的" "24|slug|is_past|usual_month,recurring,edition_zh,edition_en" \
+  "select array_length(proargnames,1)||'|'||proargnames[1]||'|'||proargnames[20]||'|'||array_to_string(proargnames[21:24], ',') from pg_proc where proname='public_events' and pronamespace='public'::regnamespace"
+chkrole anon "" "★ 沒登入的人看得到 seed 的五筆計畫" "5" "select count(*) from public.public_events() where slug in (${PGSEED})"
+chkrole anon "" "寒假探索營：team、中英名稱、這一屆叫什麼、固定計畫、1 月、2027-01-03 台北時間半夜" "CurriculumTeam|寒假探索營|WinterCollegeBootcamp|OverseasUnpacked|OverseasUnpacked|true|1|2027-01-0300:00|false" \
+  "select team||'|'||title_zh||'|'||title_en||'|'||edition_zh||'|'||edition_en||'|'||recurring||'|'||usual_month||'|'||to_char(starts_at at time zone 'Asia/Taipei','YYYY-MM-DD HH24:MI')||'|'||is_past from public.public_event('winter-bootcamp')"
+chkrole anon "" "★ 沒有日期的四筆：is_past 是 false 不是空的，實習招募是 8 月，其他三筆沒月份" "coffee-chat:-:false,essay-ecosystem:-:false,intern-intake:8:false,mentor-matching:-:false" \
+  "select string_agg(slug||':'||coalesce(usual_month::text,'-')||':'||is_past, ',' order by slug) from public.public_events() where starts_at is null and slug in (${PGSEED})"
+chkrole anon "" "★ 有日期的排前面，沒有日期的排最後" "true" \
+  "select (coalesce(max(n) filter (where starts_at is not null), 0) < min(n) filter (where starts_at is null))::text from (select starts_at, row_number() over () n from public.public_events()) x"
+chkrole anon "" "沒有日期的那幾筆彼此照月份再照代號" "intern-intake,coffee-chat,essay-ecosystem,mentor-matching" \
+  "select string_agg(slug, ',') from (select slug from public.public_events() where starts_at is null and slug in (${PGSEED})) x"
+chk "seed 的工作區照 create_event() 的樣子：custom:event-<代號>、team 填對、沒有擁有人、沒有報名表" "custom|MentorshipTeam|none|none" \
+  "select w.kind||'|'||w.team||'|'||coalesce(w.owner::text,'none')||'|'||coalesce(e.form_id::text,'none') from public.events e join public.workspaces w on w.id=e.workspace_id where e.slug='mentor-matching' and w.id='custom:event-mentor-matching'"
+psql -d "${DB}" -X -A -t -q -c "insert into public.assignments (user_id,workspace_id,level) values ('${ISTAFF}','res:Curriculum Team','edit') on conflict (user_id,workspace_id) do update set level='edit';" >/dev/null
+chkas "${ISTAFF}" "★ Curriculum「改」的人改得動 seed 的寒假探索營，改不動 Mentorship 的" "true|false" "select public.can_edit('custom:event-winter-bootcamp')::text||'|'||public.can_edit('custom:event-coffee-chat')::text"
+psql -d "${DB}" -X -A -t -q -c "delete from public.assignments where user_id='${ISTAFF}' and workspace_id='res:Curriculum Team';" >/dev/null
+# 一筆沒有日期的計畫從草稿走到對外
+PGEV=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('${AMTEAM}','pg-no-date','沒日期的計畫','Programme without a date',false)" 2>&1 | tail -1 | tr -d ' \n')
+case "${PGEV}" in ????????-*) echo "  ok   Co-President 開了一筆沒有日期的計畫（${PGEV}）"; pass=$((pass+1));; *) echo "  FAIL 開計畫失敗：${PGEV}"; fail=$((fail+1));; esac
+chkraise "★ 沒日期、沒月份、不是固定計畫：按不了準備好了（need_start，跟以前一樣）" "need_start" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_event_ready('${PGEV}', true);"
+chkraise "月份填 13 擋（bad_month）" "bad_month" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event('${PGEV}', '{\"usual_month\":13}'::jsonb);"
+chkraise "月份填不是數字的擋（bad_month）" "bad_month" \
+  "perform set_config('test.uid','${AMT}',true); perform public.save_event('${PGEV}', '{\"usual_month\":\"八月\"}'::jsonb);"
+chkraise "★ 不在這個 team 的幹部存不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${AMX}',true); perform public.save_event('${PGEV}', '{\"usual_month\":8,\"recurring\":true}'::jsonb);"
+chkas "${AMT}" "team 是「改」的人存通常在幾月與這一屆叫什麼" "8|false|第三屆|Thirdedition" \
+  "select public.save_event('${PGEV}', '{\"usual_month\":8,\"edition_zh\":\"第三屆\",\"edition_en\":\"Third edition\"}'::jsonb); select coalesce(usual_month::text,'-')||'|'||recurring||'|'||edition_zh||'|'||edition_en from public.events where id='${PGEV}'"
+chkas "${AMT}" "★ 沒帶新鍵的舊呼叫不會動那四欄" "8|false|第三屆|Thirdedition|一句話" \
+  "select public.save_event('${PGEV}', '{\"summary_zh\":\"一句話\",\"place\":\"\",\"capacity\":0}'::jsonb); select coalesce(usual_month::text,'-')||'|'||recurring||'|'||edition_zh||'|'||edition_en||'|'||summary_zh from public.events where id='${PGEV}'"
+chkas "${PAUL}" "★ 有填通常在幾月，沒有日期也按得了準備好了" "ready" "select public.set_event_ready('${PGEV}', true)"
+chkas "${PAUL}" "退回草稿" "draft" "select public.set_event_ready('${PGEV}', false)"
+chkas "${AMT}" "月份清掉（空字串）、改勾多數年份都會辦" "-|true" \
+  "select public.save_event('${PGEV}', '{\"usual_month\":\"\",\"recurring\":true}'::jsonb); select coalesce(usual_month::text,'-')||'|'||recurring from public.events where id='${PGEV}'"
+chkas "${PAUL}" "★ 只勾多數年份都會辦，沒有日期也按得了準備好了" "ready" "select public.set_event_ready('${PGEV}', true)"
+chkas "${PAUL}" "再退回草稿" "draft" "select public.set_event_ready('${PGEV}', false)"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event('${PGEV}', '{\"recurring\":false}'::jsonb)" >/dev/null 2>&1
+chkraise "★ 兩樣都拿掉又擋回來（need_start）" "need_start" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.set_event_ready('${PGEV}', true);"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event('${PGEV}', '{\"recurring\":true,\"usual_month\":null}'::jsonb)" >/dev/null 2>&1
+chkrole anon "" "還是草稿，沒登入的人看不到" "0" "select count(*) from public.public_event('pg-no-date')"
+chkas "${PAUL}" "準備好了" "ready" "select public.set_event_ready('${PGEV}', true)"
+chkas "${PAUL}" "★ Co-President 放上對外頁（沒有日期）" "published" "select public.publish_event('${PGEV}')"
+chkrole anon "" "★ 沒登入的人看得到那一筆：沒日期、沒月份、固定計畫、還沒過去、這一屆叫什麼帶出來了" "true|-|true|false|第三屆|Thirdedition" \
+  "select (starts_at is null)::text||'|'||coalesce(usual_month::text,'-')||'|'||recurring||'|'||is_past||'|'||edition_zh||'|'||edition_en from public.public_event('pg-no-date')"
+chkrole anon "" "★ 整份對外清單沒有一筆 is_past 是空的" "0" "select count(*) from public.public_events() where is_past is null"
+# 只知道哪一天、還不知道幾點的（台灣今天半夜十二點、沒有結束時間）：整個今天都還不算過去。昨天半夜十二點的就算過去了。
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event('${PGEV}', jsonb_build_object('starts_at', date_trunc('day', now() at time zone 'Asia/Taipei') at time zone 'Asia/Taipei'))" >/dev/null 2>&1
+chkrole anon "" "★ 只填日期（台灣今天半夜十二點）的活動，當天還不算過去" "false" "select is_past::text from public.public_event('pg-no-date')"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event('${PGEV}', jsonb_build_object('starts_at', (date_trunc('day', now() at time zone 'Asia/Taipei') - interval '1 day') at time zone 'Asia/Taipei'))" >/dev/null 2>&1
+chkrole anon "" "只填日期、日期是昨天的，算過去了" "true" "select is_past::text from public.public_event('pg-no-date')"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${AMT}',false);" -c "select public.save_event('${PGEV}', '{\"starts_at\":\"2020-01-01T00:00:00Z\"}'::jsonb)" >/dev/null 2>&1
+chkrole anon "" "填了過去的日期，is_past 照舊是 true" "true" "select is_past::text from public.public_event('pg-no-date')"
+chkrole authenticated "${STU}" "登入的學員也叫得到對外那一支" "true" "select (count(*) > 0)::text from public.public_events()"
+chkraise "★ 學員存不了（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${STU}',true); perform public.save_event('${PGEV}', '{\"recurring\":false}'::jsonb);"
+pgan=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.save_event('${PGEV}', '{\"recurring\":false}'::jsonb);" 2>&1 || true)
+if echo "${pgan}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到 save_event()"; pass=$((pass+1)); else echo "  FAIL 沒登入的人叫得到 save_event()：${pgan}"; fail=$((fail+1)); fi
+# 破壞測試
+BROKEN=$(mktemp)
+# 2026-11-22：is_past 那一行多了「只知道日期的整天都不算過去」，破壞的方法改成把最後那個 false 換成空值（沒有日期的那幾筆就會回空的）。
+sed "s/< now(), false) as is_past/< now(), null::boolean) as is_past/" supabase/migrations/2026-12-31-programmes.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：is_past 改回會是空的那一版，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL is_past 改回舊版驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/if e.starts_at is null and e.usual_month is null and not e.recurring then raise exception 'need_start' using errcode = 'P0001'; end if;//" supabase/migrations/2026-12-31-programmes.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「要有日期、月份或固定計畫」那道門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 need_start 那道門驗收表沒變紅"; fail=$((fail+1)); fi
+# seed 整段刪掉也要跑得過：先把 seed 的五筆清掉，跑沒有 seed 的版本，再跑完整的把它們放回來。
+psql -d "${DB}" -X -A -t -q -c "delete from public.events where slug in (${PGSEED}); delete from public.workspaces where id in (select 'custom:event-' || s from unnest(array[${PGSEED}]) s);" >/dev/null
+sed '/▼▼▼ seed 從這裡開始/,/▲▲▲ seed 到這裡結束/d' supabase/migrations/2026-12-31-programmes.sql > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*PASS" && ! echo "${bk}" | grep -q "|FAIL" && echo "${bk}" | grep -q "沒有 seed"; then echo "  ok   ★ seed 整段刪掉再跑：驗收表照樣全 PASS，一筆都沒灌"; pass=$((pass+1)); else echo "  FAIL seed 刪掉之後："; echo "${bk}" | head -14; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+chk "（確認）沒有 seed 的版本真的一筆都沒灌" "0" "select count(*) from public.events where slug in (${PGSEED})"
+pgm2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-31-programmes.sql 2>&1 || true)
+if echo "${pgm2}" | grep -q "OVERALL.*PASS" && ! echo "${pgm2}" | grep -q "|FAIL"; then echo "  ok   裝回正確版，驗收表又全 PASS，五筆回來了"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過："; echo "${pgm2}" | head -14; fail=$((fail+1)); fi
+chkas "${PAUL}" "後台把寒假探索營這一屆的名字改掉" "改過的名字" \
+  "select public.save_event((select id from public.events where slug='winter-bootcamp'), '{\"edition_zh\":\"改過的名字\"}'::jsonb); select edition_zh from public.events where slug='winter-bootcamp'"
+pgm3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f supabase/migrations/2026-12-31-programmes.sql 2>&1 || true)
+if echo "${pgm3}" | grep -q "OVERALL.*PASS" && ! echo "${pgm3}" | grep -q "|FAIL"; then echo "  ok   計畫那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${pgm3}" | head -5; fail=$((fail+1)); fi
+chk "★ 重跑之後後台改過的字沒被 seed 蓋掉，五筆也沒變成十筆" "改過的名字|5|5" \
+  "select (select edition_zh from public.events where slug='winter-bootcamp')||'|'||(select count(*) from public.events where slug in (${PGSEED}))||'|'||(select count(*) from public.workspaces where id in (select 'custom:event-' || s from unnest(array[${PGSEED}]) s))"
+chkrole anon "" "重跑之後沒登入的人還是叫得到對外兩支" "5|1" "select (select count(*) from public.public_events() where slug in (${PGSEED}))||'|'||(select count(*) from public.public_event('coffee-chat'))"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

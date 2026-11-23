@@ -284,8 +284,11 @@ function readEvent() {
   const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
   const chk = id => { const el = document.getElementById(id); return !!(el && el.checked); };
   const iso = v => v ? new Date(v).toISOString() : "";
-  return { title_zh: val("ev-tzh"), title_en: val("ev-ten"), summary_zh: val("ev-szh"), summary_en: val("ev-sen"), body_zh: val("ev-bzh"), body_en: val("ev-ben"),
+  const patch = { title_zh: val("ev-tzh"), title_en: val("ev-ten"), summary_zh: val("ev-szh"), summary_en: val("ev-sen"), body_zh: val("ev-bzh"), body_en: val("ev-ben"),
     starts_at: iso(val("ev-starts")), ends_at: iso(val("ev-ends")), place: val("ev-place"), capacity: Number(val("ev-cap") || 0), cover_url: val("ev-cover"), cover_consent: chk("ev-consent") };
+  // 計畫的四格（2026-12-31-programmes.sql）。那一塊有畫出來才帶（遷移檔還沒跑的時候沒有畫，帶了資料庫也不認得）。
+  if (document.getElementById("ev-month")) Object.assign(patch, UI.evProgrammePatch({ usual_month: val("ev-month"), recurring: chk("ev-recurring"), edition_zh: val("ev-edzh"), edition_en: val("ev-eden") }));
+  return patch;
 }
 async function reloadVenues(id) {
   try {

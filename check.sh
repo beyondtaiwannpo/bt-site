@@ -28,7 +28,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
 # 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
 # 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
-FILES="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories island privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+FILES="index.html about programs year team events join impact partner apply feedback resources admin settings alumni history stories island privacy reset shared app/index.html app/src availability/index.html availability/src passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -235,7 +235,7 @@ fi
 # 跟 ESTAMP_PALETTE 同一個做法。
 FONT_ALLOWED="Barlow+Condensed Inter Noto+Sans+TC Iansui"
 FONT_CJK="Noto+Sans+TC Iansui"
-FONT_CJK_PAGES="index.html about/index.html programs/index.html team/index.html events/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html"
+FONT_CJK_PAGES="index.html about/index.html year/index.html impact/index.html team/index.html events/index.html partner/index.html apply/index.html feedback/index.html resources/index.html alumni/index.html history/index.html stories/index.html island/index.html"
 # brand.css 裡准出現的家族名（含後備字體）。集合相等，多一個少一個都 FAIL。
 FONT_IN_BRAND="Barlow Condensed|Inter|Noto Sans TC|Iansui|PingFang TC|Klee One"
 FONT_TOKENS="--display --body --han --hand"
@@ -1473,12 +1473,18 @@ leakOut=$(node -e '
     // 2026-09-07 新增的四個對外內容頁。四頁共用同一個外殼，
     // 所以 mustHide 取的是同一句（那段檔頭註解的最後一句）。
     "about/index.html": {
-      mustShow: ["跳到主要內容", "我們相信，人人都有選擇自己教育的權利。", "我們在處理的是資訊落差。", "這些數字怎麼來的", "回 Beyond Taiwan 首頁",
+      mustShow: ["跳到主要內容", "我們相信，人人都有選擇自己教育的權利。", "我們在處理的是資訊落差。", "免費是刻意的", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
+// programs/ 2026-11-22 拆掉了，只剩轉址到 /year/（跟 join/ 同一個做法）。四個計畫的字在 /team/，辦過的活動在 /year/。
     "programs/index.html": {
-      mustShow: ["跳到主要內容", "還有別條路，只是沒有人跟你說過。", "四個計畫", "還沒開放的時候", "回 Beyond Taiwan 首頁",
+      mustShow: ["這一頁搬家了。", "This page has moved."],
+      mustHide: ["漏一個的表現是「有時候會跳到別頁」"]
+    },
+    // /year/ 這一年（2026-11-22）。時間軸是 JavaScript 畫的，錨點取靜態的那幾句。
+    "year/index.html": {
+      mustShow: ["跳到主要內容", "這一年。", "這一屆的行程還在排。", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
@@ -1506,10 +1512,11 @@ leakOut=$(node -e '
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
-    // impact/ 2026-11-20 併進 /about/，只剩轉址（跟 join/ 同一個做法）。
+    // impact/ 2026-11-20 併進過 /about/，2026-11-22 Paul 要 /about/ 瘦身，數字與五年搬回這一頁（當時那一版原樣還原）。
     "impact/index.html": {
-      mustShow: ["這一頁搬家了。", "This page has moved."],
-      mustHide: ["漏一個的表現是「有時候會跳到另一頁」"]
+      mustShow: ["跳到主要內容", "五年，這些是真的發生過的事。", "這些數字怎麼來的", "回 Beyond Taiwan 首頁",
+                 "本網站不使用任何追蹤或廣告工具。"],
+      mustHide: ["維護者要講的話寫在 README"]
     },
     "partner/index.html": {
       mustShow: ["跳到主要內容", "一起做這件事。", "回 Beyond Taiwan 首頁",
@@ -1648,7 +1655,7 @@ fi
 # 「對外頁面不可以漏掉任何一份清單」那條後設守門抓出來的。
 # app/ 特別重要 —— 它是**全站唯一一個沒登入的人也看得到的動態頁面**，
 # 也是 Google OAuth 同意畫面指過去的地方，跟當初把 index.html 加進來是同一個理由。
-placeholder_scope="index.html about programs team events join impact partner apply feedback resources admin settings alumni history stories island privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
+placeholder_scope="index.html about programs year team events join impact partner apply feedback resources admin settings alumni history stories island privacy reset app availability passport/index.html passport/src passport/activities.json intern-passport/index.html intern-passport/src home/index.html home/src"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
@@ -2011,7 +2018,8 @@ fi
 
 # ── 對外頁的頂欄每一頁一模一樣（2026-11-20 對外頁重整，2026-11-21 第二次）─────────────────────
 # Paul 2026-11-20：「too many, and they serve almost the same thing」。2026-11-21 再收一次：
-# 六個連結：現在開放（到 /apply/，現在報得了名的都在那裡）、活動與計畫（到 /programs/，四個計畫加辦過的活動）、免費資源、關於我們、團隊、合作。
+# 六個連結：現在開放（/apply/，現在報得了名的）、這一年（/year/，一整屆的時間軸）、團隊（/team/，六個 team 與它們固定在做的事）、免費資源、關於我們、合作。
+# （2026-11-22 上午是「現在開放、活動與計畫…」，同一天稍晚 Paul 改成現在這樣，/programs/ 拆掉只剩轉址。）
 # 「現在開放」怎麼標出來試過三次：橘色藥丸寫「報名」（像要註冊帳號）、橘色藥丸寫「活動與計畫」（Paul：out of place）、
 # 一顆小火（Paul：ugly）。2026-11-22 定案：不標，直接多一個連結叫「現在開放」，字粗一點而已。
 # 頂欄是每頁各一份（外殼各自一份的代價），所以最容易壞的方式是「改了九頁漏一頁」：
@@ -2020,15 +2028,17 @@ fi
 # 也擋著不准有人把 BT 島、校友或活動加回頂欄（BT 島在團隊頁最上面、首頁的大區塊與頁尾，見 README「對外頁重整」）。
 navOut=$(node -e '
   const fs = require("fs");
-  const pages = ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","programs/index.html","partner/index.html","resources/index.html","team/index.html","island/index.html"];
+  const pages = ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","impact/index.html","year/index.html","partner/index.html","resources/index.html","team/index.html","island/index.html"];
   const norm = f => { const m = fs.readFileSync(f, "utf8").match(/<div class="navlinks" id="navlinks">([\s\S]*?)<\/div>/);
     return m ? m[1].replace(/ aria-current="page"/g, "").replace(/href="\.\.?\//g, "href=\"/").replace(/\s+/g, " ").trim() : null; };
   const base = norm("index.html"), bad = [];
   for (const f of pages) { const n = norm(f); if (n === null) bad.push(f + " 找不到頂欄"); else if (n !== base) bad.push(f + " 的頂欄跟首頁不一樣"); }
   const items = (base.match(/<a /g) || []).length;
-  if (items !== 6) bad.push("頂欄要是六個連結（現在開放、活動與計畫、免費資源、關於我們、團隊、合作），現在 " + items + " 個");
-  if (/island\/|impact\/|alumni\/|events\//.test(base)) bad.push("頂欄裡出現了 BT 島、做過什麼、校友或活動頁（它們在別的地方，不在頂欄）");
-  if (!/^<a class="nav-cta" href="\/apply\/"><span class="zh">現在開放<\/span><span class="en">Open now<\/span><\/a> <a href="\/programs\/"><span class="zh">活動與計畫<\/span><span class="en">Programmes<\/span><\/a>/.test(base)) bad.push("頂欄前兩個要是「現在開放 Open now」（到 /apply/）與「活動與計畫 Programmes」（到 /programs/）");
+  if (items !== 6) bad.push("頂欄要是六個連結（現在開放、這一年、團隊、免費資源、關於我們、合作），現在 " + items + " 個");
+  if (/island\/|impact\/|alumni\/|events\/|programs\//.test(base)) bad.push("頂欄裡出現了 BT 島、數字、校友、活動頁或已經拆掉的 /programs/（它們不在頂欄）");
+  const want = ["apply|現在開放|Open now", "year|這一年|This year", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
+  const got = [...base.matchAll(/href="\/([a-z]+)\/"><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span>/g)].map(m => m[1] + "|" + m[2] + "|" + m[3]);
+  if (got.join(" ") !== want.join(" ")) bad.push("頂欄要照這個順序：現在開放、這一年、團隊、免費資源（英文 Resources）、關於我們、合作。現在是：" + got.join("、"));
   if (/<svg|flame/.test(base)) bad.push("頂欄裡又出現圖示了（小火 Paul 2026-11-22 說醜，拿掉了）");
   if (/background:var\(--bt-orange\)/.test((fs.readFileSync("index.html", "utf8").match(/\.navlinks \.nav-cta\{[^}]*\}/) || [""])[0])) bad.push("頂欄的第一個連結又變回橘色藥丸了（Paul 2026-11-21 說不要）");
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
@@ -2036,7 +2046,7 @@ navOut=$(node -e '
 if [ $? -ne 0 ]; then
   bad "對外頁的頂欄不一致："; printf '%s\n' "$navOut"
 else
-  ok "十頁對外頁（含 BT 島）的頂欄一模一樣：六個連結，「現在開放」排第一個"
+  ok "十一頁對外頁（含 BT 島）的頂欄一模一樣：現在開放、這一年、團隊、免費資源、關於我們、合作"
 fi
 
 # ── 對外頁共用的那一支 shared/public.js 不准長大（2026-11-21）────────────────
@@ -2055,7 +2065,7 @@ pubOut=$(node -e '
   if (stop < 0) bad.push("shared/public.js 找不到「開了減少動態效果就整段不做」那一行");
   else if ((raf >= 0 && raf < stop) || (io >= 0 && io < stop)) bad.push("shared/public.js 有會動的東西排在「減少動態效果就不做」那一行前面");
   if (!/url: ""/.test(code) && !/url: "https:\/\/(www\.)?zeczec\.com\//.test(code)) bad.push("shared/public.js 募資橫條的 url 只准是空的或嘖嘖（zeczec.com）的網址");
-  for (const f of ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","programs/index.html","partner/index.html","resources/index.html","team/index.html"]) {
+  for (const f of ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","impact/index.html","year/index.html","partner/index.html","resources/index.html","team/index.html"]) {
     const h = fs.readFileSync(f, "utf8"), p = f === "index.html" ? "./" : "../";
     if (!h.includes("<script src=\"" + p + "shared/public.js\" defer></script>")) bad.push(f + " 沒有載 shared/public.js");
   }
@@ -2064,7 +2074,7 @@ pubOut=$(node -e '
 if [ $? -ne 0 ]; then
   bad "對外頁共用的那一支有問題："; printf '%s\n' "$pubOut"
 else
-  ok "shared/public.js 在 160 行以內、不連資料庫、不存東西、reduce 就不動，九個對外頁都有載"
+  ok "shared/public.js 在 160 行以內、不連資料庫、不存東西、reduce 就不動，十個對外頁都有載"
 fi
 
 # CNAME 不可掉，而且內容要對

@@ -384,7 +384,8 @@ const SAYS = [
   ["cover_not_https", "封面網址要是 https:// 開頭。", "The cover URL must start with https://."],
   ["consent_required", "封面有填就要勾「照片裡的人與那場活動都在拍攝同意範圍內」。", "With a cover image you must tick the photo-consent box."],
   ["need_both_titles", "中英標題都要填才能準備好。", "Both titles are needed before it can be marked ready."],
-  ["need_start", "要填開始時間才能準備好。", "A start time is needed before it can be marked ready."],
+  ["need_start", "要有開始時間才能準備好。沒有確定日期的話，填「通常在幾月」或勾「多數年份都會辦」也可以。", "A start time is needed before it can be marked ready. With no fixed date, set a usual month or tick Runs most years instead."],
+  ["bad_month", "「通常在幾月」只能選 1 到 12 月，或不填。", "Usual month must be January to December, or left unset."],
   ["already_published", "已經在對外頁上了，要改先請 Co-President 撤下來。", "Already published; ask a Co-President to unpublish first."],
   ["not_ready", "要先按「準備好了」。", "Mark it ready first."],
   ["not_published", "這場活動不在對外頁上。", "This event is not published."],
@@ -527,11 +528,16 @@ export async function withdrawRequest(id) {
 
 // ── 活動上架（2026-11-01）──────────────────────────────────────────────
 // 讀 events（RLS：工作區「看」以上自己那場，senior 全部）；寫一律走函式。報名數從 applications 算（RLS 決定看不看得到）。
+// 2026-12-31：多讀計畫的四欄（usual_month、recurring、edition_zh、edition_en，2026-12-31-programmes.sql）。
+// 那一支還沒跑的時候這四欄不存在，整句會被拒（42703）；退回只讀原本那幾欄，活動清單照樣打得開，
+// 回來的列沒有 recurring 這個鍵，畫面看到就不畫那幾格，改說要先跑哪一支（UI.evHasProgramme）。
+const EV_COLS = "id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind, venue_id, term_id";
+export const EV_PROGRAMME_COLS = "usual_month, recurring, edition_zh, edition_en";
 export async function loadEvents() {
   need();
-  const { data, error } = await supabase.from("events")
-    .select("id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind, venue_id, term_id")
-    .order("starts_at", { ascending: true, nullsFirst: false });
+  const q = cols => supabase.from("events").select(cols).order("starts_at", { ascending: true, nullsFirst: false });
+  let { data, error } = await q(EV_COLS + ", " + EV_PROGRAMME_COLS);
+  if (error && String(error.code) === "42703") ({ data, error } = await q(EV_COLS));
   if (error) throw error;
   return data || [];
 }
