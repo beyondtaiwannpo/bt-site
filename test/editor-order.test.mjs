@@ -79,3 +79,43 @@ test("★ 本來就是台灣時間的那幾格，標題寫出來（Records 的�
   // 那幾格填的與印的本來就是固定 +08:00（這次沒有動），所以標題寫台灣時間是對的
   for (const p of ["admin/records/src/ui.js", "admin/team-forms/src/ui.js"]) assert.match(read(p), /export const fromLocal = s => s \? `\$\{s\}:00\+08:00` : "";/, p);
 });
+
+// ── 2026-11-23 第二輪：Paul 看過九件裡的三件建議，說「Yes, do those three」 ──
+import * as ADM from "../admin/src/ui.js";
+ADM.setLang("zh");
+
+test("★ 申請表與報名表的編輯頁：名稱與說明 → 題目 → 開放時間與狀態；兩個存檔的框都是 save-form", () => {
+  const form = { id: "f1", title: "報名", intro: "", kind: "program", lang: "zh", status: "open", team: "Curriculum Team",
+    opens_at: null, closes_at: null, notify_by: null, interview_url: "", max_responses: null, hidden_fields: [], confirm_mail: true };
+  const h = ADM.formHTML(form, [], true, ["Curriculum Team"], "", false);
+  assert.ok(at(h, 'id="ftitle"') < at(h, 'id="fintro"') && at(h, 'id="fintro"') < at(h, 'id="flang"'), "名稱、說明、語言在最上面那一段");
+  const q = at(h, "<h2>題目");
+  assert.ok(at(h, 'id="flang"') < q && at(h, 'id="fteam"') < q, "種類、語言、team 在題目前面（語言決定題目用哪一種寫）");
+  for (const id of ["fopen", "fclose", "fnotify", "fcal", "fmax", "fhidden", "fconfirm", "fstatus"]) assert.ok(q < at(h, `id="${id}"`), `${id} 在題目後面`);
+  assert.ok(at(h, 'id="fopen"') < at(h, 'id="fstatus"'), "先填時間，最後才選狀態");
+  assert.ok(at(h, 'id="fstatus"') < at(h, "/apply/?f=f1") && at(h, "/apply/?f=f1") < at(h, 'data-act="del-form"'), "對外連結在狀態底下，刪除在最底");
+  assert.equal(h.split('<div data-autosave="save-form" data-id="f1">').length - 1, 2, "上下兩段各一個存檔的框");
+  assert.equal(h.split('class="autosave" data-for="save-form"').length - 1, 2, "兩個框各有一行「改了就存」，存了才看得到回饋");
+  const ro = ADM.formHTML(form, [], false, [], "", false);
+  assert.doesNotMatch(ro, /class="autosave"|del-form/, "唯讀的沒有那行小字也沒有刪除");
+  // main.js 照 id 讀整頁，所以哪一個框動了都存整份；這一句不成立的話，動上面那一段會把下面那一段存成空的。
+  assert.match(read("admin/src/main.js"), /function readForm\(\) \{\s*const val = id => \{ const el = document\.getElementById\(id\)/);
+});
+
+test("★ 一個人的編輯頁：姓名在職級前面；頁面中間沒有第二顆「回名單」", () => {
+  const terms = [{ id: "2026-27", status: "current" }];
+  const p = { person_id: "p1", profile_id: "u2", role: "cadre", board_role: "member", name_zh: "王小明", name_en: "Ming", team: "Marketing Team", positions: [], workspaces: [] };
+  const h = PE.personEditHTML(p, terms, "u1", true, "", false, null, [p], null, "a@example.com", []);
+  assert.ok(at(h, 'id="pk-zh"') < at(h, 'id="pk-role"') && at(h, 'id="pk-role"') < at(h, 'id="pk-term"'), "姓名 → 職級 → 這一屆的職位");
+  assert.equal(h.split('data-act="roster-back"').length - 1, 1, "只剩頁首那一顆");
+  assert.match(h, /class="autosave" data-for="person-save"/);
+});
+
+test("★ 資源的編輯頁：名字 → 介紹 → 連結，種類、順序、team 在後面", () => {
+  for (const r of [null, { id: "r1", title: "SAT 指南", blurb: "一句話", kind: "pdf", url: "https://drive.google.com/x", team: "", status: "draft", ord: 100 }]) {
+    const h = SITE.resEditHTML(r, "", false);
+    assert.ok(at(h, 'id="rtitle"') < at(h, 'id="rblurb"') && at(h, 'id="rblurb"') < at(h, 'id="rurl"'), "名字、介紹、連結");
+    assert.ok(at(h, 'id="rurl"') < at(h, 'id="rkind"') && at(h, 'id="rkind"') < at(h, 'class="form-foot"'), "連結在種類前面");
+    assert.equal(h.split('id="rurl"').length - 1, 1);
+  }
+});

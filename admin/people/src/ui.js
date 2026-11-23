@@ -1073,12 +1073,12 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
   // 2026-11-06 自動儲存：職級、名字、這一屆的職位、team 標籤四塊在同一個 data-autosave="person-save" 容器裡，
   // 改了就存（main.js 的 onAutosave 走跟原本那顆鈕一樣的幾步：職級、名字、職位、標籤，照樣記進變動紀錄）。
   // 存取格（wsSec）本來就是一格一格改了就送（grid-level），不放進容器。「存起來」鈕拿掉了，換成那個小字。
+  // 2026-11-23：姓名排在職級前面（先知道這是誰，再看他是什麼）；頁面中間那顆「回名單」拿掉，頁首已經有一顆。
   return pageHead(`${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}`, lede, [], { act: "roster-back", label: T("pe.back") })
     + msgHTML(msg)
-    + `<div data-autosave="person-save" data-id="${esc(p.person_id)}">` + rankSec + nameSec + posSec + teamSec + `</div>` + wsSec
+    + `<div data-autosave="person-save" data-id="${esc(p.person_id)}">` + nameSec + rankSec + posSec + teamSec + `</div>` + wsSec
     + `<div class="form-foot" style="margin-bottom:28px">
       ${autosaveHint("person-save")}
-      <button class="btn ghost" data-act="roster-back"${dis}>${T("pe.back")}</button>
     </div>`
     + dupSec + danger;
 }

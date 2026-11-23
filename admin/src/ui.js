@@ -149,9 +149,12 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
 
   return formHeadHTML(form, "form")
     + msgHTML(msg)
-    // 2026-11-06 自動儲存：整區包在 data-autosave="save-form" 裡，每一格有 name，改了就存（main.js 的 onAutosave）。
+    // 2026-11-06 自動儲存：兩個框都是 data-autosave="save-form"，每一格有 name，改了就存（main.js 的 onAutosave）。
     // 「刪掉這份表單」還是按鈕，會丟東西的不自動。
-    + sectionHTML(T("form.settings"), `<div data-autosave="save-form" data-id="${esc(form.id)}">
+    // 2026-11-23 照做事的順序拆成三段（Paul：「the sequence… doesn't really make any sense」，他看過建議說做）：
+    // 先取名字、寫說明，再出題目，最後才決定什麼時候開、開不開。以前「狀態」在題目上面，而沒有題目的表單開不了。
+    // 存檔的框變成兩個（上面那段與下面那段），readForm() 是照 id 讀整頁的，哪一個框動了都存整份。
+    + sectionHTML(T("form.basics"), `<div data-autosave="save-form" data-id="${esc(form.id)}">
     <label><i>${T("form.name")}</i><input id="ftitle" name="title" value="${esc(form.title)}"${canEdit ? "" : " disabled"}></label>
     <label><i>${T("form.intro")}</i>
       <textarea id="fintro" name="intro"${canEdit ? "" : " disabled"}>${esc(form.intro || "")}</textarea></label>
@@ -166,6 +169,14 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
         <option value="zh"${form.lang === "zh" ? " selected" : ""}>${T("lang.zh")}</option>
         <option value="en"${form.lang === "en" ? " selected" : ""}>${T("lang.en")}</option>
       </select></label>
+      ${teamPick}
+    </div>
+    ${canEdit ? `<div class="form-foot">${autosaveHint("save-form")}</div>` : ""}</div>`)
+    + sectionHTML(T("form.questions"), `<div class="mini" style="margin-bottom:10px">
+      ${T("form.qNote")}</div>
+    ${questionsHTML(questions, canEdit, ed, form.lang === "en")}`)
+    + sectionHTML(T("form.window"), `<div data-autosave="save-form" data-id="${esc(form.id)}">
+    <div class="two">
       <!-- 開放與截止一律是台灣時間（2026-11-23）：活動編輯頁「報名」那一段有同樣的兩格，兩邊印的要是同一個時間。 -->
       <label><i>${T("form.opens")}</i>
         <input id="fopen" name="opens_at" type="datetime-local" value="${esc(evTaipei(form.opens_at))}"${canEdit ? "" : " disabled"}></label>
@@ -176,7 +187,6 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
            不要編一個日期出來。 -->
       <label><i>${T("form.notify")}</i>
         <input id="fnotify" name="notify_by" type="date" value="${esc(dateVal(form.notify_by))}"${canEdit ? "" : " disabled"}></label>
-      ${teamPick}
     </div>
     <label><i>${T("form.cal")}</i>
       <input id="fcal" name="interview_url" value="${esc(form.interview_url || "")}" placeholder="https://cal.com/..."${canEdit ? "" : " disabled"}></label>
@@ -192,15 +202,12 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
       ${STATUSES.map(s => `<option value="${s.v}"${form.status === s.v ? " selected" : ""}>${esc(T(s.label))}</option>`).join("")}
     </select></label>
     <div class="mini" style="margin:-6px 0 16px">${esc(T(st.hint))}</div>
+    ${form.status === "open" ? `<div class="mini" style="margin-bottom:16px">${esc(T("form.link"))}：<code>beyondtaiwannpo.com/apply/?f=${esc(form.id)}</code></div>` : ""}
     ${canEdit ? `<div class="form-foot">
       ${autosaveHint("save-form")}
       <span class="sp"></span>
       <button class="btn quiet" data-act="del-form">${T("form.deleteForm")}</button>
-    </div>` : ""}</div>`)
-    + sectionHTML(T("form.questions"), `<div class="mini" style="margin-bottom:10px">
-      ${T("form.qNote")}</div>
-    ${form.status === "open" ? `<div class="mini" style="margin-bottom:10px">${esc(T("form.link"))}：<code>beyondtaiwannpo.com/apply/?f=${esc(form.id)}</code></div>` : ""}
-    ${questionsHTML(questions, canEdit, ed, form.lang === "en")}`);
+    </div>` : ""}</div>`);
 }
 
 // 題目那一區：編輯／預覽切換，加上畫布（shared/forms.js 的 canvasHTML）。預覽是一個空的框，main.js 在上面 mount 引擎。

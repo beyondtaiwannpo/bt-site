@@ -674,6 +674,12 @@ export function resEditHTML(r, msg, busy) {
          所以這一格要寫得像一句對高中生講的話，不是一行檔名。 -->
     <label><i>${T("res.blurb")}</i>
       <textarea id="rblurb" name="blurb" placeholder="${esc(T("res.blurbPh"))}">${esc(cur.blurb || "")}</textarea></label>
+    <!-- 2026-11-23：連結排在介紹底下。一筆資源就是名字、一句介紹、一條連結，種類、順序、team 是後面才分的。 -->
+    <label><i>${T("res.url")}</i>
+      <input id="rurl" name="url" value="${esc(cur.url)}" placeholder="https://..."></label>
+    <!-- 這一句是人的流程，不是程式。Drive 的分享權限設錯，網站看不出來，
+         而使用者看到的是一頁「你需要存取權」。 -->
+    <div class="note">${T("res.urlNote")}</div>
     <div class="two">
       <label><i>${T("res.kind")}</i><select id="rkind" name="kind">
         ${RES_KINDS.map(k => `<option value="${k.v}"${cur.kind === k.v ? " selected" : ""}>${esc(T(k.label))}</option>`).join("")}
@@ -682,11 +688,6 @@ export function resEditHTML(r, msg, busy) {
       <label><i>${T("res.team")}</i><input id="rteam" name="team" value="${esc(cur.team || "")}"></label>
       ${statusCtl}
     </div>
-    <label><i>${T("res.url")}</i>
-      <input id="rurl" name="url" value="${esc(cur.url)}" placeholder="https://..."></label>
-    <!-- 這一句是人的流程，不是程式。Drive 的分享權限設錯，網站看不出來，
-         而使用者看到的是一頁「你需要存取權」。 -->
-    <div class="note">${T("res.urlNote")}</div>
     <div class="form-foot">
       ${isNew ? `<button class="btn" data-act="res-save" ${busy ? "disabled" : ""}>${busy ? T("common.saving") : T("res.create")}</button>` : autosaveHint("res-save")}
       ${statusBtn}

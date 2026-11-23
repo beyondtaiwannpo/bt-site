@@ -204,6 +204,8 @@ export const MINE = {
   "form.ofEvent":     { zh: "「{t}」的報名表", en: "Sign-up form for \"{t}\"" },
   // 表單設定
   "form.settings":    { zh: "設定", en: "Settings" },
+  "form.basics":      { zh: "名稱與說明", en: "Name and description" },
+  "form.window":      { zh: "開放時間與狀態", en: "Opening and status" },
   "form.name":        { zh: "表單名稱", en: "Form name" },
   "form.intro":       { zh: "說明（申請人會看到，寫在題目上面）", en: "Description (applicants see it above the questions)" },
   "form.lang":        { zh: "語言", en: "Language" },
