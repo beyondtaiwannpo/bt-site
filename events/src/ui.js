@@ -5,9 +5,9 @@ export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "
 
 const T = {
   zh: { past: "過去的活動", upcoming: "近期活動", none: "現在沒有公開的活動。", signup: "報名", full: "額滿", closed: "報名已截止", ended: "已結束",
-        opens: d => `${d} 開放報名`, cap: (n, c) => c ? `${n} / ${c} 人` : `${n} 人報名`, login: "報名要先登入，一分鐘。", back: "所有活動", notFound: "找不到這場活動。", place: "地點", when: "時間", by: t => `${t.replace(/\s*Team$/i, "")} 主辦` },
+        opens: d => `${d} 開放報名`, cap: (n, c) => c ? `${n} / ${c} 人` : `${n} 人報名`, login: "報名要先登入，一分鐘。", back: "所有活動", notFound: "找不到這場活動。", place: "地點", when: "時間", around: m => `大約 ${m} 月`, tbc: "日期還沒定", by: t => `${t.replace(/\s*Team$/i, "")} 主辦` },
   en: { past: "Past events", upcoming: "Upcoming", none: "No public events right now.", signup: "Sign up", full: "Full", closed: "Sign-up closed", ended: "Ended",
-        opens: d => `Sign-up opens ${d}`, cap: (n, c) => c ? `${n} / ${c} signed up` : `${n} signed up`, login: "Signing up takes a one-minute login.", back: "All events", notFound: "Event not found.", place: "Place", when: "When", by: t => `Hosted by ${t.replace(/\s*Team$/i, "")}` },
+        opens: d => `Sign-up opens ${d}`, cap: (n, c) => c ? `${n} / ${c} signed up` : `${n} signed up`, login: "Signing up takes a one-minute login.", back: "All events", notFound: "Event not found.", place: "Place", when: "When", around: m => `Around ${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]}`, tbc: "Date to be confirmed", by: t => `Hosted by ${t.replace(/\s*Team$/i, "")}` },
 };
 export const pick = (e, k, l) => (l === "zh" ? (e[k + "_zh"] || e[k + "_en"]) : (e[k + "_en"] || e[k + "_zh"])) || "";
 // 日期印成「2027-01-20（三）10:00」這種，兩個語言一樣（數字最不會翻錯）。
@@ -31,6 +31,18 @@ export function signupState(e) {
   if (e.signup_opens_at && new Date(e.signup_opens_at) > new Date()) return "soon";
   return "closed";
 }
+// 名字：這一屆有自己的名字（後台「這一屆叫什麼」，例如寒假探索營這一屆叫 Overseas Unpacked）就用它當大字，計畫本來的名字放在旁邊當說明。
+// 跟「這一年」那一頁同一個規則（year/src/logic.js 的 nameOf）。那一格是 2026-12-31-programmes.sql 加的，沒有就照舊只有標題。
+export function names(e, l) {
+  const edition = pick(e, "edition", l), title = pick(e, "title", l);
+  return edition && edition !== title ? { main: edition, sub: title } : { main: title, sub: "" };
+}
+// 什麼時候：有日期照舊；沒有日期的計畫寫「大約幾月」，連月份都沒有就說還沒定，不留一格空的。
+export function whenText(e, l) {
+  const w = fmtWhen(e.starts_at, e.ends_at, l); if (w) return w;
+  const m = Number(e.usual_month);
+  return m >= 1 && m <= 12 ? T[l].around(m) : T[l].tbc;
+}
 export function split(events) {
   const now = new Date(), yearAgo = new Date(now.getTime() - 365 * 86400000);
   const list = events || [];
@@ -47,7 +59,7 @@ export function cardHTML(e, l, base) {
   const tag = st === "open" ? `<span class="ev-tag on">${s.signup}</span>` : st === "full" ? `<span class="ev-tag">${s.full}</span>` : st === "ended" ? `<span class="ev-tag">${s.ended}</span>` : "";
   return `<a class="ev-card" href="${esc(base || "")}#${esc(e.slug)}">
     ${e.cover_url ? `<img src="${esc(e.cover_url)}" alt="" loading="lazy" onerror="${NOIMG}">` : `<span class="ev-noimg"></span>`}
-    <span class="ev-body"><b>${esc(pick(e, "title", l))}</b><span class="ev-when">${esc(fmtWhen(e.starts_at, e.ends_at, l))}${e.place ? `・${esc(e.place)}` : ""}</span>${pick(e, "summary", l) ? `<span class="ev-sum">${esc(pick(e, "summary", l))}</span>` : ""}${tag}</span>
+    <span class="ev-body"><b>${esc(names(e, l).main)}</b>${names(e, l).sub ? `<span class="ev-when">${esc(names(e, l).sub)}</span>` : ""}<span class="ev-when">${esc(fmtWhen(e.starts_at, e.ends_at, l))}${e.place ? `・${esc(e.place)}` : ""}</span>${pick(e, "summary", l) ? `<span class="ev-sum">${esc(pick(e, "summary", l))}</span>` : ""}${tag}</span>
   </a>`;
 }
 export function listHTML(events, l) {
@@ -60,10 +72,10 @@ export function detailHTML(e, l) {
   const signup = st === "none" ? "" : st === "open"
     ? `<p><a class="cta" href="../apply/?f=${esc(e.form_id)}">${s.signup}</a> <span class="ev-note">${s.cap(e.signed_up, e.capacity)}${l === "zh" ? "。" : ". "}${s.login}</span></p>`
     : `<p class="ev-note"><b>${st === "full" ? s.full : st === "ended" ? s.ended : st === "soon" ? s.opens(fmtWhen(e.signup_opens_at, null, l)) : s.closed}</b>${e.capacity ? `・${s.cap(e.signed_up, e.capacity)}` : ""}</p>`;
-  return `<header class="hero ev-hero"><p class="ev-by">${esc(s.by(e.team))}</p><h1>${esc(pick(e, "title", l))}</h1>${pick(e, "summary", l) ? `<p class="lead">${esc(pick(e, "summary", l))}</p>` : ""}</header>
+  return `<header class="hero ev-hero"><p class="ev-by">${esc(s.by(e.team))}${names(e, l).sub ? "・" + esc(names(e, l).sub) : ""}</p><h1>${esc(names(e, l).main)}</h1>${pick(e, "summary", l) ? `<p class="lead">${esc(pick(e, "summary", l))}</p>` : ""}</header>
     ${e.cover_url ? `<section class="sec ev-cover-sec"><div class="sec-in"><img class="ev-cover" src="${esc(e.cover_url)}" alt="" onerror="this.closest('section').remove()"></div></section>` : ""}
     <section class="sec"><div class="sec-in"><div class="body">
-      <ul class="rows"><li><b>${s.when}</b><span>${esc(fmtWhen(e.starts_at, e.ends_at, l))}</span></li>${e.place ? `<li><b>${s.place}</b><span>${esc(e.place)}</span></li>` : ""}</ul>
+      <ul class="rows"><li><b>${s.when}</b><span>${esc(whenText(e, l))}</span></li>${e.place ? `<li><b>${s.place}</b><span>${esc(e.place)}</span></li>` : ""}</ul>
       ${pick(e, "body", l) ? `<div class="ev-text">${esc(pick(e, "body", l)).replace(/\n/g, "<br>")}</div>` : ""}
       ${signup}
       <p><a href="./">← ${s.back}</a></p>

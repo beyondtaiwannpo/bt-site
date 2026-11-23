@@ -26,7 +26,7 @@ function render(events) {
     else el.innerHTML = UI.listHTML(events, l);
   }
   const e = slug && (events || []).find(x => x.slug === slug);
-  if (e) document.title = `${e.title_zh || e.title_en} / Beyond Taiwan`;
+  if (e) document.title = `${e.edition_zh || e.edition_en || e.title_zh || e.title_en} / Beyond Taiwan`;
   // 語言切換那支把連結上的 ? 換掉，這裡重跑一次讓新畫出來的連結也帶語言。
   if (typeof window.btKeepLang === "function") window.btKeepLang();
 }

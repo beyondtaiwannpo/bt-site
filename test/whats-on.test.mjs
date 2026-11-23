@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import * as L from "../year/src/logic.js";
 import { rowHTML } from "../team/src/programmes.js";
-import { split, fmtWhen } from "../events/src/ui.js";
+import { split, fmtWhen, names, whenText, cardHTML, detailHTML } from "../events/src/ui.js";
 
 const NOW = new Date("2026-11-22T04:00:00Z");
 const f = (id, title, extra) => Object.assign({ id, kind: "program", status: "open", title, opens_at: null, closes_at: null }, extra);
@@ -162,4 +162,15 @@ test("★ shared/public.js：募資橫條預設關著、日期含頭含尾、開
   assert.match(src, /from: "2027-01-26", to: "2027-04-21"/);
   assert.ok(src.indexOf("if (reduce ||") < src.indexOf("new IntersectionObserver("), "先看 reduce 再做任何會動的事");
   assert.match(src, /if \(el\.getBoundingClientRect\(\)\.top < vh \* 0\.92\) continue;/, "一開頁就看得到的東西不藏");
+});
+
+test("★ 活動卡與活動頁：這一屆有自己的名字就用它，計畫的名字放旁邊；沒有日期的寫大約幾月", () => {
+  const ou = { slug: "winter-bootcamp", team: "Curriculum Team", title_zh: "寒假探索營", title_en: "Winter College Bootcamp", edition_zh: "Overseas Unpacked", edition_en: "Overseas Unpacked", starts_at: "2027-01-02T16:00:00Z", is_past: false };
+  assert.deepEqual(names(ou, "zh"), { main: "Overseas Unpacked", sub: "寒假探索營" });
+  assert.deepEqual(names({ title_zh: "講座", title_en: "Talk" }, "en"), { main: "Talk", sub: "" }, "沒有那一格就照舊");
+  assert.match(cardHTML(ou, "en", "./"), /<b>Overseas Unpacked<\/b><span class="ev-when">Winter College Bootcamp<\/span><span class="ev-when">2027-01-03<\/span>/);
+  assert.match(detailHTML(ou, "zh"), /<p class="ev-by">Curriculum 主辦・寒假探索營<\/p><h1>Overseas Unpacked<\/h1>/);
+  assert.equal(whenText({ usual_month: 8 }, "zh"), "大約 8 月"); assert.equal(whenText({ usual_month: 8 }, "en"), "Around August");
+  assert.equal(whenText({}, "zh"), "日期還沒定"); assert.equal(whenText(ou, "zh"), "2027-01-03");
+  assert.match(detailHTML({ slug: "coffee-chat", team: "Mentorship Team", title_zh: "Coffee chat", title_en: "Coffee chat" }, "en"), /<li><b>When<\/b><span>Date to be confirmed<\/span><\/li>/);
 });

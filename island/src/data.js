@@ -114,7 +114,8 @@ export function eventState(e) {
 }
 export function normalizeEvents(rows) {
   return (Array.isArray(rows) ? rows : []).filter(e => e && str(e.slug)).map(e => ({
-    slug: str(e.slug), team: teamIdFor(e.team), title_zh: str(e.title_zh) || str(e.title_en), title_en: str(e.title_en) || str(e.title_zh),
+    // 這一屆有自己的名字（後台「這一屆叫什麼」）就用它，跟活動卡與「這一年」同一個規則。
+    slug: str(e.slug), team: teamIdFor(e.team), title_zh: str(e.edition_zh) || str(e.edition_en) || str(e.title_zh) || str(e.title_en), title_en: str(e.edition_en) || str(e.edition_zh) || str(e.title_en) || str(e.title_zh),
     starts_at: str(e.starts_at), ends_at: str(e.ends_at), form_id: str(e.form_id), state: eventState(e),
     link: e.form_id && eventState(e) === "open" ? "../apply/?f=" + encodeURIComponent(str(e.form_id)) : "../events/#" + encodeURIComponent(str(e.slug)),
   })).filter(e => e.state !== "ended").sort((a, b) => (a.starts_at || "").localeCompare(b.starts_at || ""));
