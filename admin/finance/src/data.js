@@ -17,7 +17,7 @@ async function rpc(fn, args) {
 // 我是誰。ws 裡 finance 那一格是 my_access() 算的（view / edit），側欄與這一頁的門都看它；真正的門在資料庫。
 export async function loadMe(userId) {
   need();
-  const { row: data, ws } = await whoAmI(userId);
+  const { row: data, ws, info } = await whoAmI(userId);
   if (!data) return null;
   return {
     role: data.role,
@@ -27,6 +27,8 @@ export async function loadMe(userId) {
     senior: data.board_role === "president" || data.board_role === "senior_adviser",
     pres: data.board_role === "president",
     ws,
+    // 每個工作區是哪個 team 的、叫什麼（2026-11-23）：側欄的「我的工作區」用。
+    wsInfo: info || {},
   };
 }
 

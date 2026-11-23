@@ -106,7 +106,9 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     assert.match(ph, /area-tab" href="#events" data-act="tab" data-t="events">網站上的活動/, label);
     // Co-President：十個東西都在。
     const pr = M.railHTML("forms", "teams", pres);
-    assert.equal((pr.match(/class="rail-item rail-area/g) || []).length, M.AREAS.length, `${label}：Co-President 每一行都在`);
+    // 2026-11-23：「我的工作區」那一段的 team 行（rail-team）另外算，Co-President 是六個 team 各一行（test/home-team.test.mjs）。
+    assert.equal((pr.match(/class="rail-item rail-area(?! rail-team)/g) || []).length, M.AREAS.length, `${label}：Co-President 每一行都在`);
+    assert.equal((pr.match(/class="rail-item rail-area rail-team/g) || []).length, 6, `${label}：Co-President 六個 team 各一行`);
     assert.match(pr, /Co-President・全部 team/, label);
     assert.match(M.railHTML("forms", "teams", { ...ME.senior, name: "顧", team: "Marketing Team" }), /Senior Adviser・全部 team/, `${label}：Senior Adviser 就算勾了標籤也印全部 team`);
     // 2026-12-25 起 Senior Adviser 讀得到校友故事與變動紀錄（資料庫也開了），兩頁都畫。Associate 照舊沒有。

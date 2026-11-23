@@ -7,7 +7,7 @@
 // 時間一律照「看的人自己的時區」（profiles.tz，沒填就台北）。資料庫存的是絕對時間（timestamptz），
 // 換成哪一天幾點是在這裡用 Intl 算，不自己加減時差（夏令時間會算錯）。
 import { T, lang, setLang } from "./strings.js";
-import { canEditWs, withLang } from "../../shared/rail.js";
+import { canEditWs, withLang, senior, myTeams, canManageWs, peopleHref, boardName, teamShort } from "../../shared/rail.js";
 export { T, lang, setLang };
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -394,6 +394,76 @@ export function feedbackHTML(list) {
   const L = Array.isArray(list) ? list : [];
   if (!L.length) return "";
   return `<section class="block pairs feedback"><h2>${T("home.feedback")}${L.length > 1 ? ` <span class="count">${L.length}</span>` : ""}</h2><ul class="pairlist">${L.map(f => `<li class="pair"><b>${esc(lang() === "zh" ? (f.event_zh || f.event) : f.event)}</b>${f.done ? `<span class="mini ok">✓ ${esc(T("home.filled", { title: f.title }))}</span>` : `<a class="lnk" href="../feedback/?t=${encodeURIComponent(f.token)}&lang=${lang()}">${esc(T("home.fill", { title: f.title }))}</a>`}</li>`).join("")}</ul><p class="mini">${T("home.fbHint")}</p></section>`;
+}
+
+// ── team 的頁（2026-11-23，/home/#team=<team>）──────────────────────────
+// Paul：「I don't want my members to be confused if they're in two workspaces」。側欄「我的工作區」點一個 team 進來，
+// 這一頁把那個 team 的專案、活動、申請表、資源收在一起，每一樣都連回後台原本那一頁。這裡只看、不改。
+// 為什麼這樣做、另外兩個沒選的做法：docs/2026-11-23-工作區怎麼分.md。
+//
+// teamView() 是純函式（test/home-team.test.mjs 直接測）：d 是 data.js loadTeam() 回的，me 是側欄那個「我是誰」。
+// 回 { mine, projects, loose, old, forms, resources, directors }；哪一塊讀不到就是 null。
+//   mine：我在這個 team 的那一列（shared/rail.js myTeams() 的同一份），沒有就是 null。
+//   每一個專案、每一場活動都帶 level（"manage" / "edit" / "view" / ""）。空字串就是沒開給我，畫面標「只能看」。
+export function teamView(team, d, me) {
+  const data = d || {}, ws = (me && me.ws) || {}, top = senior(me);
+  const lvOf = id => top ? "manage" : String(ws[id] || "");
+  const evs = data.events ? data.events.filter(e => e.source !== "import") : null;
+  const evRow = e => ({ id: e.id, slug: e.slug, title_zh: e.title_zh, title_en: e.title_en, status: e.status, starts_at: e.starts_at, hasForm: !!e.form_id, level: lvOf(e.workspace_id) });
+  const projects = data.projects ? data.projects.filter(p => (p.team || "") === team)
+    .sort((a, b) => (a.active === false) - (b.active === false))
+    .map(p => ({ id: p.id, title_zh: p.title_zh, title_en: p.title_en, active: p.active !== false, level: top ? "manage" : String(p.level || ""),
+      forms: (p.forms || []).length, events: (evs || []).filter(e => e.project_id === p.id).map(evRow) })) : null;
+  // 活動的報名表掛在那一場活動上、專案的報名表掛在專案上，這裡只留兩邊都不是的（計畫與招募）。
+  const taken = new Set([...(data.events || []).map(e => e.form_id), ...(data.projects || []).flatMap(p => (p.forms || []).map(f => f.id))].filter(Boolean));
+  return {
+    mine: myTeams(me).find(t => t.team === team) || null,
+    projects,
+    loose: evs ? evs.filter(e => !e.project_id).map(evRow) : null,
+    old: data.events ? data.events.filter(e => e.source === "import").length : 0,
+    forms: data.forms ? data.forms.filter(f => !taken.has(f.id) && f.kind !== "post-event") : null,
+    resources: data.resources || null,
+    directors: (data.people || []).filter(p => p.team === team && /director/i.test(String(p.title_en || p.title_zh || "")))
+      .map(p => String((lang() === "zh" ? (p.name_zh || p.name_en) : (p.name_en || p.name_zh)) || "").trim()).filter(Boolean),
+  };
+}
+const tName = o => (lang() === "zh" ? (o.title_zh || o.title_en) : (o.title_en || o.title_zh)) || "";
+const lvTag = lv => lv ? `<span class="tag lv" title="${esc(T("team.yours"))}">${esc(T("team.lv." + lv))}</span>` : `<span class="tag lv dim">${esc(T("team.viewOnly"))}</span>`;
+const stTag = st => `<span class="tag st ${esc(st)}">${esc(T("team.st." + st))}</span>`;
+function teamEventRow(e, tz) {
+  const when = e.starts_at ? dateLabel(dayKey(new Date(e.starts_at), tz || "Asia/Taipei")) : T("team.noDate");
+  return `<li class="trow"><a class="lnk" href="${esc(A("/admin/#events/" + encodeURIComponent(e.slug)))}">${esc(tName(e) || e.slug)}</a>${stTag(e.status)}${lvTag(e.level)}<span class="mini">${esc(when)}</span></li>`;
+}
+export function teamHTML(team, d, me, tz) {
+  const short = esc(teamShort(team));
+  if (!d) return `<div class="home team"><header class="hello"><div class="hello-t"><p class="kicker">${T("team.kicker")}</p><h1>${short}</h1></div></header><div class="empty loading">${T("team.loading")}</div></div>`;
+  const v = teamView(team, d, me), m = v.mine;
+  const lede = senior(me) ? T("team.ledeRank", { rank: esc(boardName(me.board, lang())) })
+    : m && m.level ? T("team.ledeLevel", { lv: T("team.lv." + m.level), what: T("team.what" + m.level[0].toUpperCase() + m.level.slice(1)) })
+    : m && m.some ? T("team.ledeSome") : T("team.ledeView");
+  const canEdit = senior(me) || (m && ["edit", "manage"].includes(m.level));
+  const gone = `<p class="mini">${T("team.gone")}</p>`;
+  const people = canManageWs(me, "res:" + team) ? `<a class="btn ghost sm" href="${esc(peopleHref("res:" + team, lang()))}">${T("team.people")}</a>` : "";
+  const pj = v.projects === null ? gone : v.projects.length ? `<div class="tcards">${v.projects.map(p => `<article class="tcard${p.active ? "" : " off"}">
+      <h3><a class="lnk" href="${esc(A("/admin/#projects/" + encodeURIComponent(p.id)))}">${esc(tName(p) || p.id)}</a>${lvTag(p.level)}${p.active ? "" : `<span class="tag st archived">${T("team.pjArchived")}</span>`}</h3>
+      ${p.events.length ? `<ul class="tlist">${p.events.map(e => teamEventRow(e, tz)).join("")}</ul>` : `<p class="mini">${T("team.pjNoEvents")}</p>`}
+      ${p.forms ? `<p class="mini">${esc(T("team.pjForms", { n: p.forms }))}</p>` : ""}
+    </article>`).join("")}</div>` : `<p class="mini">${T("team.pjNone")}</p>`;
+  const ev = v.loose === null ? gone : (v.loose.length ? `<ul class="tlist">${v.loose.map(e => teamEventRow(e, tz)).join("")}</ul>` : `<p class="mini">${T("team.evNone")}</p>`)
+    + (v.old ? `<p class="mini">${esc(T("team.evOld", { n: v.old }))}</p>` : "");
+  const fm = v.forms === null ? gone : v.forms.length ? `<ul class="tlist">${v.forms.map(f => `<li class="trow"><span>${esc(f.title || "")}</span>${stTag(["open", "closed"].includes(f.status) ? f.status : "draft")}</li>`).join("")}</ul>` : `<p class="mini">${T("team.fmNone")}</p>`;
+  const rs = v.resources === null ? gone : v.resources.length ? `<ul class="tlist">${v.resources.map(r => `<li class="trow"><span>${esc(r.title || "")}</span>${stTag(r.status === "published" ? "published" : "draft")}</li>`).join("")}</ul>` : `<p class="mini">${T("team.rsNone")}</p>`;
+  const n = list => list && list.length ? ` <span class="count">${list.length}</span>` : "";
+  const go = (href, key) => `<a class="btn ghost sm" href="${esc(A(href))}">${T(key)}</a>`;
+  return `<div class="home team">
+    <header class="hello"><div class="hello-t"><p class="kicker">${T("team.kicker")}</p><h1>${short}</h1>
+      <p class="mini">${lede}</p>
+      <p class="mini">${v.directors.length ? esc(T("team.director", { names: v.directors.join(T("punct.list")) })) : T("team.noDirector")}</p></div>${people}</header>
+    <section class="block"><h2>${T("team.pj")}${n(v.projects)}${canEdit ? go("/admin/#projects", "team.pjNew") : ""}</h2>${pj}</section>
+    <section class="block"><h2>${T("team.ev")}${n(v.loose)}${canEdit ? go("/admin/#events", "team.evNew") : ""}</h2>${ev}</section>
+    <section class="block"><h2>${T("team.fm")}${n(v.forms)}${go("/admin/#forms", "team.fmGo")}</h2>${fm}</section>
+    <section class="block"><h2>${T("team.rs")}${n(v.resources)}${go("/admin/site/#res", "team.rsGo")}</h2>${rs}</section>
+  </div>`;
 }
 
 // ── 行事曆 ──────────────────────────────────────────────────────────

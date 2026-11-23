@@ -105,7 +105,8 @@ test("首頁的樣子：跟 Marketing 提需求是一顆按鈕、等你處理、
 });
 
 test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段；行事曆底下是行事曆、會議、時間看板、會議範本", () => {
-  assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "work", "org"]);
+  // 2026-11-23：「我的」底下多一段「我的工作區」（ws），一個 team 一行，照人畫，不在 AREAS 裡（test/home-team.test.mjs）。
+  assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws", "work", "org"]);
   assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "mypassport", "events", "forms", "marketing", "website", "passports", "people", "records", "money", "venues"]);
   // 2026-12-26：專案那一行底下是專案、活動、計畫與招募、各 team；場地是整個 BT 的，自己一行。
   assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events", "forms", "teams"]);

@@ -112,7 +112,7 @@ function render() {
   if (bare) { el.innerHTML = body; return; }
   const name = S.profile && (S.profile.name_zh || S.profile.name_en);
   const w = S.who || {}, row = w.row || {};
-  const me = { id: S.user.id, role: S.role, board: row.board_role || "member", team: row.team || "", name, ws: w.ws || {},
+  const me = { id: S.user.id, role: S.role, board: row.board_role || "member", team: row.team || "", name, ws: w.ws || {}, wsInfo: w.info || {},
     senior: ["president", "senior_adviser"].includes(row.board_role) };
   RAIL.railBefore(el);
   el.innerHTML = RAIL.shellHTML(navHTML({ current: "passport", role: S.role, lang: lang(), name }),

@@ -339,29 +339,34 @@ export function forgetMe() { const st = meStore(); if (st) try { st.removeItem(M
 export function meCacheValid(item, userId, now) {
   return !!item && item.id === userId && typeof item.at === "number" && (now - item.at) >= 0 && (now - item.at) < ME_TTL && !!item.row;
 }
-export function rememberMe(userId, row, ws) {
+export function rememberMe(userId, row, ws, info) {
   const st = meStore(); if (!st) return;
-  try { st.setItem(ME_KEY, JSON.stringify({ id: userId, at: Date.now(), row, ws: ws || {} })); } catch (e) { /* 存不進去就每次問 */ }
+  try { st.setItem(ME_KEY, JSON.stringify({ id: userId, at: Date.now(), row, ws: ws || {}, info: info || {} })); } catch (e) { /* 存不進去就每次問 */ }
 }
 export function recallMe(userId) {
   const st = meStore(); if (!st) return null;
   try { const item = JSON.parse(st.getItem(ME_KEY) || "null"); return meCacheValid(item, userId, Date.now()) ? item : null; } catch (e) { return null; }
 }
-// 回 { row, ws }：row 是 profiles 自己那一列（沒有就是 null），ws 是 { "apps:Curriculum Team": "manage", … }。
+// 回 { row, ws, info }：row 是 profiles 自己那一列（沒有就是 null），ws 是 { "apps:Curriculum Team": "manage", … }。
+// info（2026-11-23）是同一批工作區的 { 種類、哪個 team、中英文名字 }，側欄的「我的工作區」要靠它知道一個專案是哪個 team 的
+//（專案的代號是 project:winter-2027，看不出 team）。my_access() 本來就回這幾欄，這裡只是不丟掉。
 // fresh = true 跳過快取（/settings/ 這種要改自己資料的頁面用）。查完一定寫回快取。
 export async function whoAmI(userId, fresh) {
   if (!supabase) throw new Error(MSG.offline);
-  if (!fresh) { const c = recallMe(userId); if (c) return { row: c.row, ws: c.ws || {}, cached: true }; }
+  if (!fresh) { const c = recallMe(userId); if (c) return { row: c.row, ws: c.ws || {}, info: c.info || {}, cached: true }; }
   const [pr, ac] = await Promise.all([
     supabase.from("profiles").select(ME_COLS).eq("id", userId).maybeSingle(),
     // my_access() 叫不到（遷移檔還沒跑）就當成沒有指派，不擋整頁。
     Promise.resolve(supabase.rpc("my_access")).catch(() => ({ data: null })),
   ]);
   if (pr.error) throw pr.error;
-  const ws = {};
-  if (ac && ac.data && Array.isArray(ac.data.workspaces)) for (const w of ac.data.workspaces) ws[w.id] = w.level;
-  if (pr.data) rememberMe(userId, pr.data, ws);
-  return { row: pr.data || null, ws, cached: false };
+  const ws = {}, info = {};
+  if (ac && ac.data && Array.isArray(ac.data.workspaces)) for (const w of ac.data.workspaces) {
+    ws[w.id] = w.level;
+    info[w.id] = { kind: w.kind || "", team: w.team || "", title_zh: w.title_zh || "", title_en: w.title_en || "" };
+  }
+  if (pr.data) rememberMe(userId, pr.data, ws, info);
+  return { row: pr.data || null, ws, info, cached: false };
 }
 
 // Google 登入（規格 §3-4）。Supabase 內建的供應商，前端只有這一顆按鈕。

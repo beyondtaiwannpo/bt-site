@@ -48,6 +48,26 @@ export async function loadHome() {
 
 // 回覆。必到的會不能到要帶理由（資料庫也擋：need_reason）。
 // 還沒跑 11-17 的資料庫沒有 p_note 那一個參數，沒有理由的話退回兩個參數的叫法。
+// ── team 的頁（2026-11-23，/home/#team=<team>）──────────────────────────
+// 一個 team 的專案、活動、申請表、資源、Director。**全部是幹部本來就讀得到的東西**：
+// 這一頁沒有新的資料庫函式、沒有動 RLS，只是把散在後台四頁的清單照 team 收在一起。
+// 五個查詢同時發、各自接住：哪一個讀不到，那一塊就是 null（畫面寫「載不到」），其他照畫。
+export async function loadTeam(team) {
+  need();
+  const EV = "id, slug, team, workspace_id, form_id, title_zh, title_en, status, starts_at";
+  const evq = cols => supabase.from("events").select(cols).eq("team", team).order("starts_at", { ascending: true, nullsFirst: false });
+  const [pj, ev, fm, rs, pt] = await Promise.allSettled([
+    supabase.rpc("projects_list"),
+    // project_id（2026-12-26-projects.sql）與 source（2026-12-01-records.sql）還不在的資料庫，退回不帶這兩欄的查法。
+    evq(EV + ", project_id, source").then(r => (r.error && String(r.error.code) === "42703") ? evq(EV) : r),
+    supabase.from("forms").select("id, team, kind, title, status").eq("team", team).order("updated_at", { ascending: false }),
+    supabase.from("resources").select("id, title, team, status, ord").eq("team", team).order("ord"),
+    supabase.rpc("public_team"),
+  ]);
+  const rows = r => (r.status === "fulfilled" && r.value && !r.value.error && Array.isArray(r.value.data)) ? r.value.data : null;
+  return { projects: rows(pj), events: rows(ev), forms: rows(fm), resources: rows(rs), people: rows(pt) };
+}
+
 export async function setRsvp(id, status, note) {
   need();
   const args = { p_meeting: id, p_status: status };

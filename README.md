@@ -828,6 +828,48 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 
 **同一天順手改的**：人與權限 → 幹部名單，同一屆兼好幾個職位的人，職位照職級排（Co-President、Senior Adviser、Director、Adviser、Associate）。以前照輸入的順序，兩位 Co-President 一位的「Co-President」在第一行、另一位在第二行。`admin/people/src/ui.js` 的 `positionsFor()`；改一個人那一頁的職位列也是這個順序。
 
+## 側欄的「我的工作區」與 team 的頁（2026-11-23）
+
+Paul 2026-11-23：「I don't want my members to be confused if they're in two workspaces」。盤點發現一般幹部的側欄照功能分（專案、表單、行銷…），沒有任何一行寫著自己的 team；在一個 team 跟在兩個 team 的人，側欄幾乎一樣。盤點、三個方案、為什麼選這一個：`docs/2026-11-23-工作區怎麼分.md`。Paul 選方案乙，加一句「for people who have multiple access, maybe we can fold them」。
+
+**側欄多一段「我的工作區」**，在「我的」與「BT」中間，一個 team 一行：
+
+- 照**指派**畫，不是寫死的清單。被派進 `res:<team>`、那個 team 的專案或活動、實習護照（算 Internship）、Marketing 的需求單（算 Marketing），那個 team 就有一行。
+- 每一行右邊一顆小標籤是他在那個 team 的等級：看、改、管。只開了一個專案、沒被派進 team 自己的工作區的人，標「部分」。
+- 只在「設定」勾了 team、沒被派進去的人，那個 team 也有一行，標「看」（淡框）。他點得進去，裡面的東西全部只能看。
+- **只在一個 team 的人**，那一行一直開著，底下是「總覽」與他進得去的專案。
+- **好幾個 team 的人**，每一行都收著，點哪一個才展開哪一個，另一個自動收起來。
+- **Co-President 與 Senior Adviser** 是六個 team 各一行、都是「管」，上面一句「你是 Co-President，每個 team 都進得去」。他們是依職級全部都有，不看指派，所以以前自己的畫面看不出哪個 team 有什麼。
+- 什麼 team 都沒有的幹部看到一句「你還沒被派進任何 team。找你的 Director 或 Co-President。」學員、實習生、校友沒有側欄，照舊。
+- 原本「BT」底下那一行「專案」沒有動，說明改成「每個 team 的專案、活動、計畫與招募」。要看別的 team 的東西走那裡。
+
+**team 的頁**（`/home/#team=Curriculum%20Team`），從側欄點 team 進來：
+
+- 最上面一句話講他在這個 team 是哪一級、那一級做得了什麼，下面一行是 Director。
+- 四塊：專案（一個專案一張卡，卡裡列它的活動）、不在專案裡的活動、計畫與招募的申請表、資源。每一樣都連回後台原本那一頁，這一頁只看不改。
+- 每一個專案、每一場活動旁邊標等級；沒開給他的標「只能看」。
+- 改得動的人多「開一個專案」「開一場活動」兩顆鈕（連到後台那兩頁）；「管」的人多一顆「誰在這個 team」。
+- 紀錄倒進來的舊活動不列，只寫「另外有 N 場舊活動只在紀錄裡」。
+
+**這一批只動版面，權限一條都沒變**：沒有新的遷移檔、沒有新的資料庫函式、沒有動 RLS。team 的頁讀的都是幹部本來就讀得到的東西（`projects_list()`、`public_team()`、`events`、`forms`、`resources`），只是把散在後台四頁的清單照 team 收在一起。
+
+**程式在哪**：
+
+- `shared/rail.js`：`TEAMS`（六個 team 的固定順序）、`teamOfWs()`（一個工作區是哪個 team 的）、`myTeams()`（這個人在哪幾個 team）、`teamRowsHTML()`（那一段怎麼畫）。樣式在 `shared/rail.css` 最下面。
+- `shared/auth.js` 的 `whoAmI()` 多回一份 `info`：每個工作區的種類、team、中英文名字。`my_access()` 本來就回這幾欄，以前丟掉了。專案的代號（`project:winter-2027`）看不出是哪個 team 的，要靠它。
+- 十一個畫側欄的地方把它傳成 `me.wsInfo`：八個後台資料夾的 `data.js`（`loadMe`），加 `home`、`passport`、`availability` 的 `main.js`。
+- team 的頁在 `home/src/`：`data.js` 的 `loadTeam()`、`ui.js` 的 `teamView()`（純函式）與 `teamHTML()`、`main.js` 的 `teamOf()` 與 `openTeam()`，字在 `strings.js` 的 `team.` 開頭那一段，樣式在 `home/index.html`。
+- 測試：`test/home-team.test.mjs` 11 條。
+
+**要多一個 team**：`shared/rail.js` 的 `TEAMS` 加一行，`admin/src/ui.js` 與 `admin/people/src/ui.js` 的 `PK_TEAMS` 也要加（`test/home-team.test.mjs` 會比對側欄這一份跟人與權限那一份）。
+
+**還沒做的**：
+
+- 後台「專案 → 各 team」那一頁（你的存取、你的 team）還在，內容跟 team 的頁有一部分重複。之後可以把「你的 team」那一塊拿掉，或改成連到 team 的頁。
+- 在專案頁或活動頁的時候，側欄亮的是「BT → 專案」，不是那個 team 的那一行。
+- 「設定裡勾的 team」跟「被派進的工作區」不一樣的人，側欄會看到淡框的「看」。上線前最好先列一張兩邊不一樣的人的名單（要看正式站的資料）。
+- 沒被開進去的專案，名字與活動內容每一位幹部都看得到（唯讀）。這是原本就這樣，要不要連名字都藏起來是另一件事，會動到可見範圍，要 Paul 明說才做。
+
 ## 工作區、專案、活動：三層（`supabase/migrations/2026-12-26-projects.sql`，2026-11-14）
 
 Paul 2026-11-14：「curriculum, sponsorship, mentorship, and all that is going to be workspace. And in one workspace, there can be multiple projects. And in one project, there can be multiple forms, registration, records」。另外「venue, records, money… should be on a separate workspace, because they're like whole BT」。他接著回答三題：一個專案底下可以有好幾場活動、好幾份報名表；場地照舊誰都能改。

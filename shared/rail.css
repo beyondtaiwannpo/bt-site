@@ -65,6 +65,13 @@
 .rail-subs{display:flex;flex-direction:column;gap:1px;margin:2px 0 8px 21px;padding-left:9px;border-left:2px solid rgba(16,42,134,.16)}
 .rail-sub{padding:6px 10px;font-size:14px;line-height:1.3}
 .rail-sub.rail-people{font-size:13px;color:rgba(16,42,134,.75)}
+/* 我的工作區（2026-11-23，shared/rail.js teamRowsHTML）：一個 team 一行，比上下那幾行矮（只有名字，沒有第二行說明），
+   右邊一顆小標籤是這個人在那個 team 的等級。淡框的那一種（.dim）是「只能看」或「只開了幾樣」。 */
+.rail-team{padding:7px 10px}
+.rail-lv{margin-left:auto;flex:none;font-size:11.5px;font-weight:600;line-height:1;padding:4px 8px;border-radius:999px;
+  background:rgba(255,196,108,.45);color:var(--ink);white-space:nowrap}
+.rail-lv.dim{background:none;box-shadow:inset 0 0 0 1px rgba(16,42,134,.28);color:rgba(16,42,134,.72);font-weight:500}
+.rail-foot.rail-none{padding:0 12px 4px;margin:0 0 4px}
 /* 寬螢幕上側欄已經列出這一區的每一頁，上方那一排分頁不再畫一次；手機上側欄收起來，那一排照舊。 */
 @media (min-width:721px){ .shell .area-tabs{display:none} }
 /* 這一區的分頁：一排圓角膠囊，現在這一頁是深藍。窄螢幕自己換行，不橫向捲。 */

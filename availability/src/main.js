@@ -86,7 +86,7 @@ function render() {
   // 未升級的人也有頂欄：對他來說功能項是空的，但 logo、名字、登出都在。
   if (S.role !== "cadre") { el.innerHTML = navHTML({ current: null, role: S.role, name: S.myName, lang: lang() }) + UI.notCadreHTML(); return; }
   // 側欄要的「我是誰」跟後台同一個形狀。S.team 在這一頁是看板的 team 篩選，所以自己的 team 放 S.myTeam。
-  const me = { id: S.user.id, role: S.role, board: S.board, team: S.myTeam, name: S.myName, ws: S.ws, senior: S.senior };
+  const me = { id: S.user.id, role: S.role, board: S.board, team: S.myTeam, name: S.myName, ws: S.ws, wsInfo: S.wsInfo || {}, senior: S.senior };
   const shell = body => {
     RAIL.railBefore(el);
     el.innerHTML = RAIL.shellHTML(navHTML({ current: "availability", role: S.role, name: S.myName, lang: lang() }),
@@ -203,7 +203,7 @@ async function boot() {
 
     S.members = all.members; S.slots = all.slots;
     // 排會與回覆（2026-11-02）：我能排哪些範圍；信裡的連結 ?meeting=<id> 進來就先把那一場撈出來。
-    S.ws = whoRes.ws || {};
+    S.ws = whoRes.ws || {}; S.wsInfo = whoRes.info || {};
     S.senior = !!data && ["president", "senior_adviser"].includes(data.board_role);
     S.board = (data && data.board_role) || "member"; S.myTeam = (data && data.team) || "";
     // 2026-10-28：回覆搬到幹部首頁。舊信裡的 /availability/?meeting=<id> 直接轉過去，那邊回覆、看誰會到。

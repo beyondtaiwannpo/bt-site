@@ -13,7 +13,7 @@ export async function loadMe(userId) {
   need();
   // 2026-11-06 起從 shared/auth.js 的 whoAmI() 拿：profiles 與 my_access() 同時查、同一個分頁十分鐘內不重問
   //（理由與清除時機寫在那裡）。這裡只負責把那一列整理成這一組要的形狀。
-  const { row: data, ws } = await whoAmI(userId);
+  const { row: data, ws, info } = await whoAmI(userId);
   if (!data) return null;
   return {
     role: data.role,
@@ -23,6 +23,8 @@ export async function loadMe(userId) {
     senior: data.board_role === "president" || data.board_role === "senior_adviser",
     pres: data.board_role === "president",
     ws,
+    // 每個工作區是哪個 team 的、叫什麼（2026-11-23）：側欄的「我的工作區」用。
+    wsInfo: info || {},
   };
 }
 

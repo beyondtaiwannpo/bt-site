@@ -3,6 +3,7 @@
 // 一個資料夾兩個畫面：
 //   /home/            首頁：一張「等你處理」的清單（照日期排，2026-11-14 跟後台的「待辦」合併）、接下來的會、我的護照。
 //   /home/#calendar   行事曆：月與週，像 Google 日曆。點一場打開，回覆、看議程與會議紀錄。
+//   /home/#team=<team> 一個 team 的頁（2026-11-23）：側欄「我的工作區」點進來，那個 team 的專案、活動、申請表、資源。只看不改。
 // 信裡的連結是 /home/?meeting=<id>：那一場放在首頁最上面。
 //
 // 回覆只改自己那一列（set_rsvp）。必到的會按「不能到」要寫一句理由，理由只有本人與排會的人看得到（RLS）。
@@ -17,13 +18,26 @@ import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 const root = () => document.getElementById("bt-root");
 const S = {
   ready: false, down: false, role: null, me: null, name: "", tz: "Asia/Taipei", senior: false, ws: {}, board: "member", team: "", w: null,
-  data: null, items: [], busy: false, reasonFor: null, changing: null, open: null,
+  data: null, items: [], busy: false, reasonFor: null, changing: null, open: null, teams: {}, wsInfo: {},
   linked: null, linkedMsg: "",
   cal: { view: "month", at: null, mode: "mine" },
 };
 const LINK_KEY = "bt-home-meeting";
 const store = () => { try { return window.localStorage; } catch (e) { return null; } };
-const view = () => (location.hash.replace(/\?.*$/, "") === "#calendar" ? "calendar" : "home");
+const view = () => (location.hash.replace(/\?.*$/, "") === "#calendar" ? "calendar" : teamOf() ? "team" : "home");
+// #team=Curriculum%20Team → "Curriculum Team"。不是這個形狀就回空字串。
+function teamOf() {
+  const m = location.hash.match(/^#team=([^?&]+)/);
+  if (!m) return "";
+  try { return decodeURIComponent(m[1]).trim(); } catch (e) { return ""; }
+}
+// team 的頁要的資料：第一次進那個 team 才讀，讀過的留著（S.teams），換回來不用再等。
+async function openTeam() {
+  const team = teamOf();
+  if (!team || S.role !== "cadre" || S.teams[team]) return;
+  try { S.teams[team] = await D.loadTeam(team); } catch (e) { S.teams[team] = { projects: null, events: null, forms: null, resources: null, people: null }; }
+  if (teamOf() === team) render();
+}
 
 function ctx() {
   return { me: S.me, tz: S.tz, now: new Date(), name: S.name, senior: S.senior, ws: S.ws, board: S.board, w: S.w, people: S.data ? S.data.people : [], forms: S.data ? S.data.forms : [], pairs: S.pairs || [], feedback: S.feedback || [],
@@ -40,10 +54,11 @@ function render() {
   const nav = navHTML({ current: v === "calendar" ? "calendar" : "home", role: S.role, name: S.name, lang: lang() });
   if (S.role !== "cadre") { el.innerHTML = nav + UI.notCadreHTML(); return; }
   const c = ctx();
-  const body = v === "calendar" ? UI.calendarHTML(S.items, c, S.cal) : UI.homeHTML(S.items, c);
+  const rme = railMe(), team = teamOf();
+  const body = v === "calendar" ? UI.calendarHTML(S.items, c, S.cal) : v === "team" ? UI.teamHTML(team, S.teams[team], rme, S.tz) : UI.homeHTML(S.items, c);
   const open = S.open ? S.items.find(i => i.id === S.open) : null;
-  const rme = railMe();
-  const tab = v === "calendar" ? "calendar" : "home";
+  // 側欄：team 的頁不是 ITEMS 裡的一頁，用 "team:<team>" 告訴側欄現在在哪個 team（shared/rail.js teamRowsHTML）。
+  const tab = v === "calendar" ? "calendar" : v === "team" ? "team:" + team : "home";
   RAIL.railBefore(el);
   el.innerHTML = RAIL.shellHTML(nav, RAIL.railHTML("home", tab, rme, {}, lang()), body, RAIL.areaTabsHTML("home", tab, rme, lang())) + (open ? UI.detailHTML(open, c) : "");
   RAIL.railAfter(el);
@@ -56,7 +71,7 @@ function render() {
 }
 
 // 側欄要的「我是誰」：跟後台 admin/src/data.js 的 loadMe() 同一個形狀。
-function railMe() { return { id: S.me, role: S.role, board: S.board, team: S.team, name: S.name, ws: S.ws, senior: S.senior }; }
+function railMe() { return { id: S.me, role: S.role, board: S.board, team: S.team, name: S.name, ws: S.ws, wsInfo: S.wsInfo || {}, senior: S.senior }; }
 // Marketing 貼文核可的人：senior 或 Marketing 是「管」（跟資料庫的 mkt_can_approve() 同一條，2026-12-25）。
 const approver = () => RAIL.canManageWs(railMe(), "res:Marketing Team");
 async function loadWaiting() {
@@ -164,7 +179,7 @@ async function boot() {
     S.me = who.user.id;
     const [w] = await Promise.all([AUTH.whoAmI(S.me)]);
     const row = w.row || {};
-    S.role = row.role || null; S.tz = row.tz || "Asia/Taipei"; S.ws = w.ws || {};
+    S.role = row.role || null; S.tz = row.tz || "Asia/Taipei"; S.ws = w.ws || {}; S.wsInfo = w.info || {};
     S.name = (lang() === "zh" ? (row.name_zh || row.name_en) : (row.name_en || row.name_zh)) || "";
     S.senior = ["president", "senior_adviser"].includes(row.board_role);
     S.board = row.board_role || "member"; S.team = row.team || ""; S.row = row;
@@ -178,6 +193,7 @@ async function boot() {
     }
     S.cal.at = UI.dayKey(new Date(), S.tz);
     S.ready = true; render();
+    openTeam();
     if (S.linked) { const n = document.getElementById("m-" + S.linked); if (n) n.scrollIntoView({ block: "start" }); }
     // Google 日曆（2026-11-23）：畫好之後在背景拉一次大家在 Google 的回覆，有人改了就重畫。
     if (S.role === "cadre") D.gcalRefresh().then(async n => { if (n > 0) { await reload(); render(); } }).catch(() => {});
@@ -190,5 +206,5 @@ async function boot() {
 
 document.addEventListener("click", onClick);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && S.open) { S.open = null; S.reasonFor = null; render(); } });
-window.addEventListener("hashchange", () => { S.open = null; render(); });
+window.addEventListener("hashchange", () => { S.open = null; render(); openTeam(); });
 boot();

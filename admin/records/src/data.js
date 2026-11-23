@@ -16,13 +16,13 @@ async function rpc(fn, args) {
 // 我是誰。ws 裡 records 那一格是 my_access() 算的（edit 管得了、view 看得到）。
 export async function loadMe(userId) {
   need();
-  const { row: data, ws } = await whoAmI(userId);
+  const { row: data, ws, info } = await whoAmI(userId);
   if (!data) return null;
   return {
     id: userId, role: data.role, board: data.board_role || "member", team: data.team || "",
     name: data.name_zh || data.name_en || "",
     senior: data.board_role === "president" || data.board_role === "senior_adviser",
-    pres: data.board_role === "president", ws,
+    pres: data.board_role === "president", ws, wsInfo: info || {},
   };
 }
 
