@@ -197,11 +197,12 @@ main,footer,.topbar{position:relative;z-index:1}
   .slide[data-team="mentorship"] img{object-position:62% 32%}
   .slide[data-team="cr"] img{object-position:58% 32%}
 }
-/* 控制列：六格（哪一格亮就是哪一個 team，點了就過去）加上一個、下一個。沒有 JavaScript 的時候不出現。 */
-.ctl{position:absolute;z-index:3;left:var(--gut);right:var(--gut);bottom:clamp(14px,3vh,30px);
-  display:flex;align-items:center;gap:clamp(10px,1.4vw,20px)}
+/* 控制：下面六格（哪一格亮就是哪一個 team，點了就過去），上一個、下一個兩顆箭頭在照片的左右兩邊（Paul 2026-11-24）。
+   .ctl 自己不佔位置（display:contents），所以六格與箭頭都是對著 .stage 定位。沒有 JavaScript 的時候不出現。 */
+.ctl{display:contents}
 html:not([data-tm]) .ctl{display:none}
-.rail{flex:1;min-width:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.rail{position:absolute;z-index:3;left:var(--gut);right:var(--gut);bottom:clamp(14px,3vh,30px);
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
 .rail button{background:none;border:0;padding:14px 0 6px;min-height:44px;text-align:left;color:rgba(237,229,216,.74);
   font-family:var(--display);font-weight:700;font-size:13px;line-height:1.2;letter-spacing:.1em;text-transform:uppercase}
 .rail i{display:block;height:3px;border-radius:2px;background:rgba(237,229,216,.38);margin-bottom:9px;transition:background var(--dur-2) var(--ease)}
@@ -211,12 +212,14 @@ html:not([data-tm]) .ctl{display:none}
 .rail button[aria-current]{color:var(--bt-cream)}
 .rail button[aria-current] i{background:var(--bt-orange)}
 .rail button:focus-visible,.arw:focus-visible{outline-color:var(--bt-orange)}
-.arw{flex:0 0 auto;width:48px;height:48px;border-radius:50%;border:1px solid rgba(237,229,216,.6);padding:0;
+.arw{position:absolute;z-index:3;top:50%;transform:translateY(-50%);width:clamp(44px,3.6vw,56px);height:clamp(44px,3.6vw,56px);border-radius:50%;border:1px solid rgba(237,229,216,.6);padding:0;
   background:rgba(16,42,134,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--bt-cream);
-  display:grid;place-items:center;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
+  display:grid;place-items:center;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),opacity var(--dur-2) var(--ease)}
 .arw svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .arw:hover:not([disabled]){background:var(--bt-orange);color:var(--bt-navy);border-color:var(--bt-orange)}
-.arw[disabled]{opacity:.35}
+.arw.prev{left:clamp(8px,1.6vw,28px)}
+.arw.next{right:clamp(8px,1.6vw,28px)}
+.arw[disabled]{opacity:0;pointer-events:none}
 @media (max-width:1100px){.rail span{display:none}.rail button{padding:20px 0}.rail i{margin:0}}
 
 .sec{padding:clamp(46px,7.5vh,110px) var(--gut) 0}
