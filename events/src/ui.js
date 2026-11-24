@@ -8,12 +8,14 @@ const T = {
         opens: d => `${d} 開放報名`, cap: (n, c) => c ? `${n} / ${c} 人` : `${n} 人報名`, login: "報名要先登入，一分鐘。", back: "所有活動", notFound: "找不到這場活動。", place: "地點", when: "時間", around: m => `大約 ${m} 月`, tbc: "日期還沒定", by: t => `${t.replace(/\s*Team$/i, "")} 主辦`,
         speakers: "講者", types: "報名類型", left: n => `還有 ${n} 個名額`,
         register: "立即報名", deadline: d => `報名到 ${d} 截止`, cal: "加入行事曆", gcal: "Google 日曆", ics: "下載行事曆檔（Apple、Outlook）",
-        photos: "活動照片", prev: "看前面的照片", next: "看後面的照片" },
+        photos: "活動照片", prev: "看前面的照片", next: "看後面的照片",
+        starts: "開始", noTime: "時間還沒定", tw: "台灣時間", view: "看這場活動", opensShort: d => `${d} 開放報名` },
   en: { past: "Past events", upcoming: "Upcoming", none: "No public events right now.", signup: "Sign up", full: "Full", closed: "Sign-up closed", ended: "Ended",
         opens: d => `Sign-up opens ${d}`, cap: (n, c) => c ? `${n} / ${c} signed up` : `${n} signed up`, login: "Signing up takes a one-minute login.", back: "All events", notFound: "Event not found.", place: "Place", when: "When", around: m => `Around ${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]}`, tbc: "Date to be confirmed", by: t => `Hosted by ${t.replace(/\s*Team$/i, "")}`,
         speakers: "Speakers", types: "Sign-up types", left: n => `${n} ${n === 1 ? "place" : "places"} left`,
         register: "Register now", deadline: d => `Sign-up closes ${d}`, cal: "Add to calendar", gcal: "Google Calendar", ics: "Download calendar file (Apple, Outlook)",
-        photos: "Photos", prev: "Previous photos", next: "Next photos" },
+        photos: "Photos", prev: "Previous photos", next: "Next photos",
+        starts: "Starts", noTime: "Time to be confirmed", tw: "Taiwan time", view: "View event", opensShort: d => `Opens ${d}` },
 };
 export const pick = (e, k, l) => (l === "zh" ? (e[k + "_zh"] || e[k + "_en"]) : (e[k + "_en"] || e[k + "_zh"])) || "";
 // 日期印成「2027-01-20（三）10:00」這種，兩個語言一樣（數字最不會翻錯）。
@@ -58,19 +60,61 @@ export function split(events) {
     past: list.filter(e => e.is_past && new Date(e.ends_at || e.starts_at) >= yearAgo).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at)),
   };
 }
+// ── 活動的卡片是一張機票（2026-11-24）─────────────────────────────────
+// Paul 拿一張演唱會售票頁的截圖當參考：「I like the style, especially the airplane air ticket thing… I want each event boxes looking like this…
+// obviously our colour」。一張卡由上到下四塊：海報（封面，沒有封面就用日期當海報）、日期與名字、撕線下面的票根（幾點開始加一架紙飛機）、
+// 最下面一條條碼加一句話（現在報得了名是橘色的「立即報名」）。整張卡是一條連結，點哪裡都到那一場活動的頁，報名的按鈕在那一頁。
+// 首頁、/events/ 的清單、/apply/ 的近期活動三個地方共用這一支；樣式三頁各一份（.ev-card 那一段），要改三份一起改，test/events-public.test.mjs 守著三份一樣。
+// 時間一律是台灣時間（跟一場活動那一頁同一個規則）。純函式。
+const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const valid = v => !!v && !isNaN(new Date(v));
+// 票上的日期。中文「2027.01.03（日）」，英文「SUN JAN 3 · 2027」；跨天的印頭尾兩天；沒有日期照 whenText（大約幾月、日期還沒定）。
+export function ticketDate(e, l) {
+  if (!e || !valid(e.starts_at)) return whenText({ ...(e || {}), starts_at: null }, l);
+  const a = tpe(new Date(e.starts_at)), b = valid(e.ends_at) ? tpe(new Date(e.ends_at)) : null;
+  const multi = b && !(a.y === b.y && a.m === b.m && a.d === b.d);
+  if (l === "zh") return multi ? `${a.y}.${a.m}.${a.d} – ${a.y === b.y ? "" : b.y + "."}${b.m}.${b.d}` : `${a.y}.${a.m}.${a.d}（${WD_ZH[a.wd]}）`;
+  const md = p => `${MON[+p.m - 1]} ${+p.d}`;
+  if (!multi) return `${a.wd.toUpperCase()} ${md(a)} · ${a.y}`;
+  return `${md(a)} – ${a.m === b.m && a.y === b.y ? +b.d : md(b)} · ${b.y}`;
+}
+// 票根上的幾點開始（台灣時間）。只知道哪一天、還不知道幾點的回空字串。
+export function ticketTime(e) {
+  if (!e || !valid(e.starts_at) || dateOnly(e.starts_at, e.ends_at)) return "";
+  const a = tpe(new Date(e.starts_at)); return `${a.hh}:${a.mm}`;
+}
+// 最下面那一條寫什麼、什麼顏色。on：橘色（現在報得了名）；off：淡的（額滿、截止、結束）；其他是深藍。
+export function ticketAction(e, l) {
+  const s = T[l], st = signupState(e);
+  if (st === "open") return { cls: "on", text: s.register };
+  if (st === "full") return { cls: "off", text: s.full };
+  if (st === "closed") return { cls: "off", text: s.closed };
+  if (st === "ended") return { cls: "off", text: s.ended };
+  if (st === "soon") { const o = tpe(new Date(e.signup_opens_at)); return { cls: "", text: s.opensShort(`${o.m}.${o.d}`) }; }
+  return { cls: e.is_past ? "off" : "", text: s.view };
+}
+// 沒有封面的時候，海報那一塊是日期：小字是星期與年，大字是月與日。沒有日期就只有深藍的一塊。
+function posterHTML(e, l) {
+  if (!valid(e.starts_at)) return `<span class="ev-noimg"></span>`;
+  const a = tpe(new Date(e.starts_at));
+  const small = l === "zh" ? `${a.y}（${WD_ZH[a.wd]}）` : `${a.wd} · ${a.y}`, big = l === "zh" ? `${a.m}.${a.d}` : `${MON[+a.m - 1]} ${a.d}`;
+  return `<span class="ev-noimg"><span class="tk-big"><small>${esc(small)}</small>${esc(big)}</span></span>`;
+}
+const PLANE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 2.5 2.9 9.6l6.5 2.9 2.9 6.5z"/><path d="M21.5 2.5 9.4 12.5"/></svg>`;
 // 封面連結壞掉（team 貼錯、Drive 權限沒開）：卡片換成跟「沒有封面」一樣的色塊，不留破圖的圖示；一場活動的頁把那一塊整個拿掉，不留空位。
 const NOIMG = "this.outerHTML='<span class=&quot;ev-noimg&quot;></span>'";
 export function cardHTML(e, l, base) {
-  const s = T[l], st = signupState(e);
-  const tag = st === "open" ? `<span class="ev-tag on">${s.signup}</span>` : st === "full" ? `<span class="ev-tag">${s.full}</span>` : st === "ended" ? `<span class="ev-tag">${s.ended}</span>` : "";
-  return `<a class="ev-card" href="${esc(base || "")}#${esc(e.slug)}">
-    ${e.cover_url ? `<img src="${esc(e.cover_url)}" alt="" loading="lazy" onerror="${NOIMG}">` : `<span class="ev-noimg"></span>`}
-    <span class="ev-body"><b>${esc(names(e, l).main)}</b>${names(e, l).sub ? `<span class="ev-when">${esc(names(e, l).sub)}</span>` : ""}<span class="ev-when">${esc(fmtWhen(e.starts_at, e.ends_at, l))}${e.place ? `・${esc(e.place)}` : ""}</span>${pick(e, "summary", l) ? `<span class="ev-sum">${esc(pick(e, "summary", l))}</span>` : ""}${tag}</span>
+  const s = T[l], n = names(e, l), time = ticketTime(e), act = ticketAction(e, l), sum = pick(e, "summary", l);
+  return `<a class="ev-card" href="${esc(base || "")}#${esc(e.slug)}" data-l="${l === "zh" ? "zh" : "en"}">
+    ${e.cover_url ? `<img src="${esc(e.cover_url)}" alt="" loading="lazy" onerror="${NOIMG}">` : posterHTML(e, l)}
+    <span class="ev-body"><span class="tk-date">${esc(ticketDate(e, l))}</span><b>${esc(n.main)}</b>${n.sub ? `<span class="ev-when">${esc(n.sub)}</span>` : ""}${e.place ? `<span class="tk-place">${esc(e.place)}</span>` : ""}${sum ? `<span class="ev-sum">${esc(sum)}</span>` : ""}</span>
+    <span class="tk-stub"><span class="tk-time">${time ? `<i>${s.starts}</i><span class="tk-arrow" aria-hidden="true">→</span><b>${time}</b><small>${s.tw}</small>` : `<i>${s.noTime}</i>`}</span><span class="tk-ico">${PLANE}</span></span>
+    <span class="tk-go${act.cls ? " " + act.cls : ""}"><span class="tk-bars" aria-hidden="true"></span><span class="tk-go-t">${esc(act.text)}</span></span>
   </a>`;
 }
 export function listHTML(events, l) {
   const s = T[l], { upcoming, past } = split(events);
-  const sec = (title, es) => `<section class="sec"><div class="sec-in"><h2>${title}</h2><div class="body">${es.length ? `<div class="ev-cards">${es.map(e => cardHTML(e, l, "./")).join("")}</div>` : `<p>${s.none}</p>`}</div></div></section>`;
+  const sec = (title, es) => `<section class="sec sec-cards"><div class="sec-in"><h2>${title}</h2><div class="body">${es.length ? `<div class="ev-cards">${es.map(e => cardHTML(e, l, "./")).join("")}</div>` : `<p>${s.none}</p>`}</div></div></section>`;
   return sec(s.upcoming, upcoming) + (past.length ? sec(s.past, past) : "");
 }
 // ── 說明的排版 ─────────────────────────────────────────────────────────

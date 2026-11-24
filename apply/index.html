@@ -338,17 +338,43 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 summary{cursor:pointer}
 
 /* 近期活動的卡片（2026-11-20 從 /events/ 搬一份過來，外殼各自一份的代價）。 */
-.ev-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:8px}
-@media (max-width:900px){.ev-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:600px){.ev-cards{grid-template-columns:1fr}}
-.ev-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1px solid rgba(16,42,134,.16);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.45);transition:border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
-.ev-card:hover{border-color:var(--bt-navy);box-shadow:0 10px 26px rgba(16,42,134,.1)}
-.ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:rgba(255,196,108,.35)}
-.ev-noimg{aspect-ratio:3/1;background:repeating-linear-gradient(135deg,rgba(255,196,108,.22) 0 6px,rgba(255,232,197,.35) 6px 14px);border-bottom:3px solid var(--bt-orange)}
-.ev-body{display:flex;flex-direction:column;gap:5px;padding:14px 16px 16px}
-.ev-body b{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:.01em}
-.ev-when{font-size:13px;color:rgba(16,42,134,.78)}
-.ev-sum{font-size:14px;line-height:1.5}
+.ev-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:26px;margin-top:8px}
+/* 活動的卡片是一張機票（2026-11-24，Paul 拿售票頁的截圖當參考：「the airplane air ticket thing… obviously our colour」）。
+   由上到下：海報（封面；沒有封面用日期當海報）、日期與名字、撕線、票根（幾點開始加紙飛機）、條碼那一條（橘色是現在報得了名）。
+   撕線兩頭的缺口是 mask 挖的，看得到後面的頁面；--tk-cut 是缺口離卡片底部多高，等於票根加條碼那一條的高度，兩個高度改了它要跟著改。
+   首頁、/events/、/apply/ 各一份，一個字都要一樣（test/events-public.test.mjs 守著）。卡片的字在 events/src/ui.js 的 cardHTML。 */
+.ev-card{--tk-cut:109px;display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1.5px solid var(--bt-navy);border-radius:var(--r);overflow:hidden;width:100%;max-width:400px;background:rgba(255,255,255,.45);transition:transform var(--dur-2) var(--ease);
+  -webkit-mask:radial-gradient(circle 10px at 0 calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) right/51% 100% no-repeat;
+  mask:radial-gradient(circle 10px at 0 calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) right/51% 100% no-repeat}
+.ev-card:hover{transform:translateY(-4px)}
+.ev-card:hover .tk-ico{background:var(--bt-orange)}
+.ev-card:focus-visible{outline:var(--ring);outline-offset:-6px}
+.ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--bt-navy);border-bottom:1.5px solid var(--bt-navy)}
+.ev-noimg{display:flex;align-items:flex-end;padding:16px 18px;color:var(--bt-cream);background:radial-gradient(circle at 84% 22%,var(--bt-orange) 0 4px,transparent 5px),radial-gradient(circle at 72% 40%,var(--bt-teal) 0 3px,transparent 4px),var(--bt-navy)}
+.tk-big{font-family:var(--display);font-weight:700;font-size:clamp(60px,7.4vw,88px);line-height:.86;letter-spacing:.01em}
+.tk-big small{display:block;font-size:.26em;font-weight:600;letter-spacing:.16em;line-height:1.2;color:var(--bt-orange);margin-bottom:8px;text-transform:uppercase}
+.ev-body{display:flex;flex-direction:column;gap:6px;flex:1;padding:16px 18px 22px}
+.tk-date{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.16em}
+.ev-body b{font-family:var(--han);font-size:23px;font-weight:900;line-height:1.25}
+.ev-card[data-l="en"] .ev-body b{font-family:var(--display);font-size:30px;font-weight:700;line-height:1.04;letter-spacing:.01em;text-transform:uppercase}
+.ev-when{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(16,42,134,.78)}
+.tk-place{font-size:13.5px;letter-spacing:.04em;margin-top:2px}
+.ev-sum{font-size:14px;line-height:1.5;margin-top:2px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.tk-stub{display:flex;align-items:stretch;height:54px;border-top:1.5px dashed rgba(16,42,134,.55)}
+.tk-time{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 18px;font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.tk-time i{font-style:normal}
+.tk-time b{font-size:21px;font-weight:700;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.tk-time small{font-size:11.5px;letter-spacing:.1em;color:rgba(16,42,134,.78)}
+.tk-ico{flex:none;width:54px;display:grid;place-items:center;border-left:1.5px solid var(--bt-navy);transition:background var(--dur-2) var(--ease)}
+.tk-ico svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.tk-go{display:flex;align-items:center;gap:12px;height:54px;padding:0 18px;border-top:1.5px solid var(--bt-navy);background:var(--bt-navy);color:var(--bt-cream);font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.tk-go.on{background:var(--bt-orange);color:var(--bt-navy)}
+.tk-go.off{background:transparent;color:rgba(16,42,134,.78)}
+.tk-bars{flex:none;width:76px;height:24px;background:linear-gradient(90deg,currentColor 0 2px,transparent 2px 4px,currentColor 4px 5px,transparent 5px 8px,currentColor 8px 11px,transparent 11px 12px,currentColor 12px 13px,transparent 13px 16px,currentColor 16px 18px,transparent 18px 19px) 0 0/19px 100%}
+.tk-go-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 放票卡的那一段用整個寬度：標題在上面、卡片在下面一排。票卡要有寬度才像一張票，擠在右邊那一欄只放得下一張。 */
+.sec-cards .sec-in{grid-template-columns:1fr;gap:clamp(14px,2vw,24px)}
+.sec-cards .body{max-width:none}
 .ev-tag{align-self:flex-start;margin-top:4px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid rgba(16,42,134,.3)}
 .ev-tag.on{background:var(--bt-orange);border-color:var(--bt-orange)}
 /* ═════════ 頂欄那顆橘色按鈕與頁尾的全站連結（2026-11-20 對外頁重整，2026-11-21 改成「活動與計畫」）═════════ */
@@ -401,7 +427,7 @@ html[data-lang="zh"] .ap-pre{font-family:var(--body);font-weight:600;letter-spac
   <h1><span class="zh">現在開放什麼</span><span class="en">Open right now</span></h1>
   <p class="lead"><span class="zh">活動報名、計畫申請、加入團隊，現在開放的都在這一頁。送出之前需要一個 BT 帳號，開帳號是免費的，兩分鐘。</span><span class="en">Event sign-ups, programme applications and joining the team: everything open right now is on this page. You need a Beyond Taiwan account to submit; it is free and takes two minutes.</span></p>
 </header>
-<section class="sec" id="upcoming" hidden>
+<section class="sec sec-cards" id="upcoming" hidden>
   <div class="sec-in">
     <h2><span class="zh">近期活動</span><span class="en">Upcoming events</span></h2>
     <div class="body">
