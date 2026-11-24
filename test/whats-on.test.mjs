@@ -130,7 +130,8 @@ test("★ 信念、使命、願景、價值：Paul 2026-11-21 的定稿，首頁
     "No one should have to figure it out alone. Those who've walked the road pull the next person up."];
   const VISION = ["一個台灣，升學不再只有一條路。每個學生，無論來自哪裡，都能看見自己的選項，並擁有選擇的權利與勇氣。",
     "A Taiwan where success is no longer defined by a single path, where every student, wherever they come from, can see their options and has the right, and the courage, to choose."];
-  for (const s of [...VALUES, ...VISION]) { assert.ok(home.includes(s), "首頁少了：" + s); assert.ok(about.includes(s), "/about/ 少了：" + s); }
+  // 2026-11-24 首頁第三次重整：三個價值與願景不再放首頁（那一段會把捲動停住三個螢幕），只在 /about/。首頁留信念那一句大標題。
+  for (const s of [...VALUES, ...VISION]) assert.ok(about.includes(s), "/about/ 少了：" + s);
   for (const s of ["因此，我們為台灣公立學校的學生打開被忽略的可能，讓他們看見「唯一一條路」之外的選項。那可能是走向世界去留學，也可能是留在台灣，用更開闊的方式學習與生活。",
     "我們同時維繫一個由「選擇了自己道路的人」所組成的社群，讓走過的人成為後來者的引路人，也讓這個網絡長久地延續下去。",
     "Therefore, we help students in Taiwan's public schools discover the possibilities they were never shown: the options beyond the single path they'd been told to follow.",
@@ -149,13 +150,40 @@ test("★ 首頁搬走的六段長文與原本 /programs/ 的字，每一句都�
     "收到超過 150 份申請，協助超過 100 位國內高中生"]) assert.ok(pages.includes(s), "找不到：" + s);
 });
 
-test("★ 首頁的動畫：三個價值那一段不動的時候四句都看得到；module 只發訊號不碰動畫", () => {
+test("★ 首頁的動畫：沒有任何一段會把捲動停住；module 只發訊號不碰動畫", () => {
   const h = readFileSync("index.html", "utf8");
-  assert.equal((h.match(/<article class="val( val-vision)?">/g) || []).length, 4);
-  assert.match(h, /vals\.classList\.add\("vals-on"\)/, "疊在一起的版面是 motion() 加的 class，不是預設");
-  assert.doesNotMatch(h.slice(0, h.indexOf("</style>")).replace(/\.vals-on[^{]*\{[^}]*\}/g, ""), /\.val\{[^}]*position:absolute/, "預設的 .val 不是疊在一起的");
+  // 2026-11-24：三個價值那一段（停住三個螢幕、一句一句換）拿掉了。首頁剩下的動畫只有第一屏那座島。
+  assert.doesNotMatch(h, /pin:\s*true/, "首頁不再有停住的段落");
+  assert.doesNotMatch(h, /vals-on|class="val\b/);
   assert.match(h, /document\.dispatchEvent\(new Event\("bt:layout"\)\)/);
   assert.doesNotMatch(h, /<script type="module">[\s\S]*ScrollTrigger/, "首頁的 module 不碰動畫");
+});
+
+test("★ 首頁只留五個畫面（2026-11-24）：信念、我們做什麼、現在開放、數字、從哪裡開始；拿掉的都還在自己的那一頁", () => {
+  const h = readFileSync("index.html", "utf8"), body = h.slice(h.indexOf("<main"), h.indexOf("</main>"));
+  const at = k => { const i = body.indexOf(k); assert.ok(i >= 0, "找不到 " + k); return i; };
+  assert.ok(at("</header>") < at('id="what"') && at('id="what"') < at('id="now"') && at('id="now"') < at('id="numbers"') && at('id="numbers"') < at('id="start"'), "五段的順序");
+  // 沒有藏起來的段落只有這五個（宣傳影片那兩段沒填影片編號的時候是 hidden）
+  const shown = [...body.matchAll(/<(?:header|section)\b[^>]*>/g)].map(m => m[0]).filter(t => !/\bhidden\b/.test(t));
+  assert.equal(shown.length, 5, "首頁多了一段？加之前先看 README「首頁只留五個畫面」：" + shown.join(" "));
+  // 我們做什麼：三行，各連到自己的那一頁
+  assert.deepEqual([...body.matchAll(/<a class="wrow" href="([^"]+)">/g)].map(m => m[1]), ["./year/", "./year/", "./resources/"]);
+  // 數字：三個，中英各一份
+  assert.equal((body.match(/<span class="fig">/g) || []).length, 6);
+  for (const s of ["250+", "100+"]) assert.equal(body.split(`<span class="fig">${s}</span>`).length - 1, 2, s + " 中英各一次");
+  assert.match(body, /<p class="nums-src"><a href="\.\/impact\/">/, "完整的數字與來源在 /impact/");
+  // 從哪裡開始：三條路，第一條是高中生
+  assert.deepEqual([...body.matchAll(/<a class="pcard(?: main)?" href="([^"]+)">/g)].map(m => m[1]), ["./apply/", "./team/", "./partner/"]);
+  assert.match(body, /<a class="pcard main" href="\.\/apply\/">/, "最重的那一顆是給高中生的");
+  // 拿掉的東西不在首頁，但都還在自己的那一頁
+  for (const gone of ["isle-block", "pstrip", "photo-lead", "vals-stage", "走進 BT 島", "Step onto BT Island"]) assert.ok(!h.includes(gone), "首頁不該再有 " + gone);
+  assert.match(h, /<a href="\.\/island\/">/, "BT 島在頁尾還有連結");
+  assert.ok(readFileSync("about/index.html", "utf8").includes("你無法選擇你從未看見的東西。"), "三個價值在 /about/");
+  // 介紹的句子是從內頁搬來的，那一頁改了這裡要跟著看
+  const res = readFileSync("resources/index.html", "utf8");
+  for (const s of ["申請文書怎麼寫、選校怎麼看、時程怎麼排。這些是 BT 五年下來一次一次講給學生聽的東西，寫下來讓更多人拿得到。", "How to write your essays, how to read a school list, how to plan the timeline."]) { assert.ok(body.includes(s)); assert.ok(res.includes(s), "/resources/ 的那一句改了，首頁要跟著看"); }
+  // 首頁的照片只剩一張
+  assert.equal((body.match(/<picture/g) || []).length, 1);
 });
 
 test("★ shared/public.js：募資橫條預設關著、日期含頭含尾、開了減少動態效果就不動", () => {

@@ -5986,6 +5986,51 @@ Paul 2026-11-24 看了編輯頁之後說的，原話：
 **驗收**：`test/event-editor.test.mjs`（小圖、放大的那一格、`evLbStep`）與 `test/event-speakers-tickets.test.mjs`（收成一行、箭頭）。
 另外用真的 Chrome 在本機走過一遍：三十張照片的小圖、放大、左右鍵、連按往後一格再重新整理確認順序有存到、同意的勾、拿掉的確認與取消、講者收合，還有手機寬度。
 
+## 首頁只留五個畫面（2026-11-24 第三次重整）
+
+Paul：「right now home is just a combination of every pages we have… I want it to be more clean… do a research on what should be put out there」。
+
+改之前首頁在筆電上要捲九個螢幕：信念與島、現在開放、一張滿版照片、三個價值與願景（那一段會把捲動停住三個螢幕）、六個數字、BT 島、合作。現在是四個半螢幕，五個畫面，一個畫面一件事：
+
+| 畫面 | 放什麼 | 連到哪 |
+|---|---|---|
+| 1 信念 | 那一句信念、一句我們是誰、一顆橘色按鈕、那座島（沒動） | `/apply/` |
+| 2 我們做什麼 | 三行：探索營、導生配對計畫、免費資源 | `/year/`、`/year/`、`/resources/` |
+| 3 現在開放 | 開放中的報名表與近期活動的票卡（沒動） | `/apply/`、`/events/` |
+| 4 數字 | 一張照片加三個數字：250+ 位學員、探索營 100+ 位高中生、0 元 | `/impact/` |
+| 5 從哪裡開始 | 一塊深藍，三條路：我是高中生、我想加入團隊、我想合作或贊助；底下一行合作過的單位 | `/apply/`、`/team/`、`/partner/` |
+
+**拿掉的四樣都還在自己的那一頁，一句都沒有丟**：三個價值與願景在 `/about/`（定稿一字沒動）；BT 島在 `/island/`，頁尾有連結；合作那一大塊與大合照在 `/partner/`；六個數字完整的在 `/impact/`。
+
+**這一頁新寫的字只有小標與按鈕**（我們做什麼、全部免費、從哪裡開始、下一步、我是高中生、我想加入團隊、我想合作或贊助）。每一句介紹都是從定稿或內頁原句搬來的，`/resources/` 那一句測試會對。信念那一句是 Paul 2026-11-21 的定稿。
+
+### 為什麼是這五個（查到的東西）
+
+看了十個同類組織的首頁（QuestBridge、Matriculate、College Track、Thrive Scholars、Teach For Taiwan、均一、charity: water、Schoolhouse.world、Girls Who Code、Code.org），加上 Nielsen Norman Group、Wired Impact、Candid 的幾份研究。
+
+- 十個裡十個第一屏是一句話；九個有成效數字；八個有三到五張「我們做什麼」的卡片連到內頁；七個最後有一塊收尾的行動呼籲；六個把不同的人分開指路。
+- **沒有一個**在首頁放團隊名單。計畫的細節、歷史、行事曆、常見問題也幾乎都留在內頁。
+- 首頁要回答三件事：這跟我有關嗎、你們做什麼、我下一步去哪（Wired Impact）。
+- 讀的人大約四分之三的注意力在前兩個螢幕，很少人捲過第三個（NN/g 2018，桌機眼動研究，數字不是手機的）。
+- 青少年在資訊密的頁面上表現最差，要短、字不能小、按的地方要大（NN/g 2019）。
+- NN/g 建議避開跟著捲動才出現的字與視差。這是拿掉「三個價值」那一段的理由之一。
+
+研究裡有但這一版**沒有做**的：學員的故事或一句話（七個有）。BT 現在沒有一則拿到同意、可以放在首頁的學員故事。之後有了，放在「數字」那一段裡最順。
+
+來源：
+- https://www.nngroup.com/articles/homepage-design-principles/
+- https://www.nngroup.com/articles/scrolling-and-attention/
+- https://www.nngroup.com/articles/usability-of-websites-for-teenagers/
+- https://wiredimpact.com/blog/how-to-nail-your-nonprofit-website-homepage/
+- https://candid.org/blogs/3-strategies-to-create-an-effective-nonprofit-homepage/
+
+### 之後要改
+
+- 想在首頁加一段之前，先問這一段是不是別的頁已經有了。`test/whats-on.test.mjs` 有一條守著「沒有藏起來的段落只有五個」，加第六段測試會紅，那是提醒，不是不准。
+- 「我們做什麼」三行的順序與連結在 `index.html` 的 `<section class="what">`，一行一個 `<a class="wrow">`。
+- 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
+- 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
+
 ## 活動的卡片是一張機票（2026-11-24）
 
 Paul 拿一張演唱會售票頁的截圖當參考：「I like the style, especially the airplane air ticket thing… I want each event boxes looking like this… obviously our colour」。
@@ -6270,6 +6315,8 @@ Paul 2026-11-22 的原話：「keep programmes but add open now which is all the
 原本那一句搬去當 `/programs/` 的大標題（它是對學生講的）。四段全文在 `/about/` 最上面。
 價值的英文與英文版拿掉破折號（換成冒號與逗號），Paul 都同意過。要改這些字先問 Co-President。
 `test/whats-on.test.mjs` 有一條逐句比對，少一個字會紅。
+
+⚠ **2026-11-24 更新：首頁再改過一次，現在是五個畫面，見上面「首頁只留五個畫面」。下面這一段是 2026-11-22 當時的樣子，留著當紀錄。**
 
 **首頁只剩六個短的畫面**，一個畫面一件事：
 1. 一整個螢幕的台灣，標題是信念，一顆按鈕「看現在開放什麼」。
