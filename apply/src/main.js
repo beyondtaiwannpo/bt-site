@@ -6,6 +6,7 @@
 import { supabase } from "../../shared/supabase.js";
 import * as AUTH from "../../shared/auth.js";
 import * as UI from "./ui.js";
+import { split } from "../../events/src/ui.js";
 // 表單引擎（2026-11-13）：題型、條件邏輯、分頁、驗證、草稿都在那一支，這一頁只管讀寫資料與外殼。
 import * as F from "../../shared/forms.js";
 
@@ -41,6 +42,9 @@ function paint() {
   const el = root();
   if (!el) return;
   if (!S.ready) return;
+  // 「申請」那一段（#ap-sec）：填一張表、送出之後、出錯的時候一定要在；只有清單是空的時候才整段收起來（見下面）。
+  const sec = document.getElementById("ap-sec");
+  if (sec) sec.hidden = false;
   if (S.view === "done") { el.innerHTML = UI.doneHTML(isEn()); return; }
   if (S.view === "error") { el.innerHTML = UI.errorHTML(S.msg); return; }
   if (S.view === "form" && S.form) {
@@ -50,7 +54,11 @@ function paint() {
     if (st === "signedIn") mountRun();
     return;
   }
-  el.innerHTML = UI.listHTML(S.forms, isEn());
+  // 清單（網址沒有 ?f=）：上面「近期活動」已經有卡片的表單不再列一次。剩下的一張都沒有就整段不出現，
+  // 「想參加的還沒開放」那一段接著講下一步（Paul 2026-11-24）。活動那一支載不到的時候 S.upcoming 是空的，表單全部照列。
+  const list = UI.notOnEventCards(S.forms, S.upcoming);
+  if (sec) sec.hidden = !list.length;
+  el.innerHTML = UI.listHTML(list, isEn());
 }
 
 const formId = () => new URLSearchParams(location.search).get("f");
@@ -93,11 +101,13 @@ async function boot() {
     }));
     // 英文畫面：表單只有一個 title（多半是中文），改用那場活動的 title_en 與 summary_en（public_events() 誰都叫得到）。沒對到就照舊。
     // 只填一張表的時候（網址帶 ?f=）也要知道它是哪一場活動的：表單上面印那一場的名字與時間，「回去」那顆按鈕回那一場。
-    if (isEn() || formId()) {
+    // 2026-11-24 起中文的清單也要問：要知道哪幾張表單已經掛在上面「近期活動」的卡片上（S.upcoming），那幾張不再列一次。
+    {
       try {
         const { data: evs } = await supabase.rpc("public_events");
         const byForm = {}; for (const e of evs || []) if (e.form_id) byForm[e.form_id] = e;
         S.byForm = byForm;
+        S.upcoming = split(evs || []).upcoming;
         if (isEn()) S.forms = S.forms.map(f => byForm[f.id] ? { ...f, title: byForm[f.id].title_en || f.title, intro: byForm[f.id].summary_en || f.intro } : f);
       } catch (e) { /* 對不到就用表單自己的標題 */ }
     }

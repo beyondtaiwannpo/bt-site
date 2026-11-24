@@ -403,3 +403,21 @@ test("審核那一頁：排版區塊不列、檔案題只有改得動的人有�
   assert.doesNotMatch(ro, /file-open/);
   assert.match(ro, /只有改得動這份表單的人打得開/);
 });
+
+// 2026-11-24（Paul：「we can delete apply」）：已經掛在上面「近期活動」卡片上的表單，下面「申請」不再列一次。
+test("★ /apply/：活動卡片上已經有的表單不再列一次；沒掛在活動上的照舊列；清單空了整段收起來", async () => {
+  const { readFileSync } = await import("node:fs");
+  const board = { ...form, id: "f2", kind: "board", title: "2027 幹部招募" };
+  const up = [{ slug: "camp", form_id: "f1", starts_at: "2027-01-03T01:00:00Z" }, { slug: "talk", form_id: null }];
+  assert.deepEqual(A.notOnEventCards([form, board], up).map(f => f.id), ["f2"], "幹部招募沒有活動卡，這裡是它唯一會被看到的地方");
+  assert.deepEqual(A.notOnEventCards([form], up), []);
+  assert.deepEqual(A.notOnEventCards([form, board], []).map(f => f.id), ["f1", "f2"], "活動那一支載不到：表單全部照列，不能讓人沒地方報名");
+  assert.deepEqual(A.notOnEventCards([form], null).map(f => f.id), ["f1"]); assert.deepEqual(A.notOnEventCards(null, up), []);
+  const main = readFileSync("apply/src/main.js", "utf8"), page = readFileSync("apply/index.html", "utf8");
+  assert.match(main, /const list = UI\.notOnEventCards\(S\.forms, S\.upcoming\);\s+if \(sec\) sec\.hidden = !list\.length;/);
+  assert.match(main, /if \(sec\) sec\.hidden = false;\s+if \(S\.view === "done"\)/, "填表、送出、出錯的時候那一段一定要在");
+  assert.match(main, /S\.upcoming = split\(evs \|\| \[\]\)\.upcoming;/, "跟上面那一段用同一條規則挑近期活動");
+  assert.match(page, /<section class="sec" id="ap-sec">/);
+  assert.match(page, /<a href="\.\.\/year\/"><span class="zh">看我們有哪些活動與計畫<\/span><span class="en">See our programmes<\/span><\/a>/);
+  assert.match(page, /<h2><span class="zh">想參加的還沒開放<\/span><span class="en">Not open yet<\/span><\/h2>/);
+});

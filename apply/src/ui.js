@@ -75,6 +75,14 @@ export const fmtDate = (v, en) => {
   return `${day} ${MON[m - 1]} ${y}`;
 };
 
+// 已經掛在上面「近期活動」某一張卡上的表單，下面「申請」那一段不再列一次（Paul 2026-11-24：同一場活動出現兩次，
+// 「we can delete apply」）。upcoming 是 events/src/ui.js 的 split().upcoming，就是上面那一段畫出來的那幾場。
+// 沒有掛在任何活動上的表單（幹部招募、沒有對應活動的計畫申請）照舊留在清單裡：那是它唯一會被看到的地方。
+export function notOnEventCards(forms, upcoming) {
+  const on = new Set((upcoming || []).map(e => e && e.form_id).filter(Boolean));
+  return (forms || []).filter(f => !on.has(f.id));
+}
+
 // ── 清單 ──────────────────────────────────────────────────────────────
 // 分兩區：給高中生的計畫、幹部招募。**那兩區的讀者不是同一群人**，
 // 混在一起的話高中生會看到一份他不該申請的東西。
