@@ -97,6 +97,15 @@ th,td{text-align:left;padding:11px 14px;border-bottom:1px solid rgba(16,42,134,.
 th{font-weight:600;white-space:nowrap;color:rgba(16,42,134,.82);
   font-size:13px;letter-spacing:.04em;border-bottom-color:rgba(16,42,134,.28)}
 
+/* 最近的更新（2026-11-24）：政策改了什麼，列在最上面，點下去跳到那一節。純 HTML，沒有 JavaScript。 */
+.changes{margin:clamp(22px,3.6vh,36px) 0 0;padding:16px 0 2px;border-top:1px solid rgba(16,42,134,.16);font-size:15.5px}
+.changes h2{font-size:17px;margin:0 0 10px}
+.changes ul{list-style:none;padding:0;margin:0}
+.changes li{margin:0 0 12px}
+.changes a{color:var(--ink);font-weight:600;text-underline-offset:3px}
+.changes a:hover{text-decoration-color:var(--bt-orange)}
+h3[id]{scroll-margin-top:18px}
+
 footer{margin-top:clamp(56px,9vh,100px);padding-top:22px;
   border-top:1px solid rgba(16,42,134,.16);font-size:14.5px;color:rgba(16,42,134,.78)}
 footer a{color:var(--ink);font-weight:600;text-underline-offset:3px;transition:text-decoration-color var(--dur-2) var(--ease),text-underline-offset var(--dur-2) var(--ease)}
@@ -164,6 +173,17 @@ summary{cursor:pointer}
   </nav>
 </header>
 
+<!-- 最近的更新。**每次改政策就在最上面加一條**（日期、改了什麼、連到那一節），最舊的留著不刪。
+     政策自己寫了「將更新本頁日期並於網站公告」，這一塊就是那個公告。
+     登入頁與學員頁上那一行提醒在 app/src/ui.js 的 POLICY_NOTICE，兩邊的日期要一樣。 -->
+<div class="changes" id="changes">
+<h2>最近的更新 / Recent changes</h2>
+<ul>
+<li><strong>2026-11-24</strong><br>多了一節「<a href="#zh-contacts">講者、教授與其他聯絡人</a>」，可見範圍表多了四列。<br><span lang="en">New section "<a href="#en-contacts">Speakers, professors and other contacts</a>", and four more rows in the visibility table.</span></li>
+<li><strong>2026-11-08</strong><br>多了一節「<a href="#zh-records">回饋與紀錄</a>」，可見範圍表多了三列。<br><span lang="en">New section "<a href="#en-records">Feedback and records</a>", and three more rows in the visibility table.</span></li>
+</ul>
+</div>
+
 <section id="zh" lang="zh-Hant">
 <h2>關於這份政策</h2>
 <p>當你在 <code>beyondtaiwannpo.com</code> 使用我們的服務時，我們會儲存部分與你有關的資料。這份政策說明我們收集什麼、誰能存取、以及你可以如何管理這些資料。</p>
@@ -180,13 +200,13 @@ summary{cursor:pointer}
 <p>若你以學員身分使用這個網站（申請活動、取得資源），我們會另外儲存下列資料。<strong>你不需要是 BT 幹部也可以有帳號。</strong></p>
 <div class="tw"><table><thead><tr><th>資料</th><th>用途</th></tr></thead><tbody><tr><td>姓名</td><td>申請與聯絡</td></tr><tr><td>就讀學校、年級</td><td>決定活動要辦在哪裡、辦給誰</td></tr><tr><td>申請內容</td><td>你在申請表上填寫的答案</td></tr><tr><td>家長或監護人 email</td><td>若你未滿 18 歲且填寫了，我們會寄一封告知信給對方</td></tr><tr><td>活動通知的訂閱狀態</td><td>你有沒有同意收 BT 的活動通知與資源更新，以及同意的時間</td></tr><tr><td>簽到紀錄</td><td>你有沒有到場</td></tr></tbody></table></div>
 <p>訂閱是選填的，預設不勾。不訂閱不影響你使用帳號、申請活動或取得資源。每一封通知信都有取消訂閱的方式。</p>
-<h3>回饋與紀錄</h3>
+<h3 id="zh-records">回饋與紀錄</h3>
 <p>辦完活動我們會請你填一份回饋表，不用登入就能填。我們會保存你的答案，但只有在你自己選擇留下 email 的時候才會保存 email，而且只有留了 email 這份答案才會對到你本人，沒留就是匿名的。表上會問你是不是 18 歲以下，我們只保存「是、不是、不想說」其中一個答案，不保存生日。答案只有負責那場活動的幹部與 Co-President 看得到，<strong>不會公開、不會用在募資頁上，也不會原文轉給答案裡提到的人</strong>。具名的答案保存三屆（大約三年），之後只留下匿名的部分。</p>
 <p>如果你參加 mentorship，我們會記下你跟誰配對、在哪一個學期，而期中與期末 check-in 的答案只有負責 mentorship 的幹部與 Co-President 看得到，<strong>你的 mentor 或 mentee 看不到你寫了什麼</strong>。如果有事情需要轉達，負責的幹部會用自己的話講，不會把你寫的原文交出去。</p>
 <p>幹部與校友可以在設定裡自己填寫去向，也就是離開 BT 之後念哪一間學校、在哪個國家、現在做什麼；你告訴過 BT 的去向，負責 mentorship 的幹部也可能替你記下來。去向預設只有 BT 內部負責管理紀錄的人看得到，對外的年度報告、募資頁與贊助提案<strong>只會用五個人以上的總數，不會出現名字</strong>，除非你自己在設定裡勾選「可以連名字公開」。未滿 18 歲的人的去向在任何情況下都不會連名字公開。</p>
 <p>2026 年 11 月，我們把 2020 年到 2026 年之間的報名表、出席名單、配對名單與回饋表從 Google Drive 整理進同一個資料庫，搬過去的只有姓名、email、學校、年級、出席與配對這幾項，電話、生日、緊急聯絡人、飲食需求、面試紀錄與申請時寫的 essay 都沒有搬。至於 2025 年以前、當時表單上沒有告知的回饋，答案一律沒有對到任何人，只能看整體的彙總。</p>
 <p>想知道我們記了你哪些資料，或是要更正、要刪除，寫信到 beyondtaiwan2020@gmail.com 就可以。刪除的時候，你的名字、email、出席、配對與去向都會清掉，答案會留著但不再對到你，人數統計裡則留一個沒有名字的位子。請注意，學員自己在帳號頁刪除帳號時，刪掉的是帳號、申請與申請裡的答案，<strong>不會一併清掉這一節講的紀錄</strong>，要一起清掉的話請另外來信。</p>
-<h3>講者、教授與其他聯絡人</h3>
+<h3 id="zh-contacts">講者、教授與其他聯絡人</h3>
 <p>BT 會邀請講者、教授、招生官與校友來跟學生分享。為了記得跟誰合作過、之後怎麼找到你，我們會替你留一份個人檔案。</p>
 <p>我們先放進去的，只有你公開過或自己告訴過我們的資料：姓名、聯絡方式、學校與工作，還有你參與過的 BT 活動。接著我們會給你一條只屬於你的連結，不用註冊也不用密碼，打開就看得到我們記了什麼。你可以改、可以補，也可以什麼都不填。連結九十天後失效，之後要再改，寫信給我們就會重開一條。</p>
 <p>連結上有六題，問的是你這一路怎麼走過來的。每一題都可以不答。</p>
@@ -260,13 +280,13 @@ summary{cursor:pointer}
 <p>If you use this site as a student (applying to a programme, taking a resource), we also store the following. <strong>You do not need to be a Beyond Taiwan organiser to have an account.</strong></p>
 <div class="tw"><table><thead><tr><th>Data</th><th>Purpose</th></tr></thead><tbody><tr><td>Name</td><td>Applications and correspondence</td></tr><tr><td>School and year</td><td>Deciding where to run programmes and for whom</td></tr><tr><td>Application content</td><td>The answers you write on an application form</td></tr><tr><td>Parent or guardian email</td><td>If you are under 18 and provide one, we send them a single notice</td></tr><tr><td>Newsletter consent</td><td>Whether you agreed to receive our announcements, and when you agreed</td></tr><tr><td>Attendance</td><td>Whether you came to an event</td></tr></tbody></table></div>
 <p>Consent is optional and unchecked by default. Not subscribing does not affect your account, your applications, or your access to resources. Every announcement includes a way to unsubscribe.</p>
-<h3>Feedback and records</h3>
+<h3 id="en-records">Feedback and records</h3>
 <p>After an event we will ask you to fill in a feedback form, which you can do without signing in. We keep your answers, but we keep your email only if you choose to leave it, and only a form with an email on it is linked to you; without one it is anonymous. The form asks whether you are under 18, and we store only one of three answers (yes, no, or prefer not to say), never a birth date. Your answers are read only by the cadres responsible for that event and the Co-Presidents, and they are <strong>never published, never used on fundraising pages, and never forwarded word for word to anyone named in them</strong>. Named answers are kept for three terms, which is about three years, and after that only the anonymous part remains.</p>
 <p>If you take part in mentorship, we record who you were paired with and in which term, and the answers you give in the mid-term and end-of-term check-ins are read only by the cadres responsible for mentorship and the Co-Presidents, <strong>so your mentor or mentee cannot see what you wrote</strong>. If something needs to be passed on, the responsible cadre will say it in their own words rather than hand over your text.</p>
 <p>Cadres and alumni can record their own outcomes under Settings, meaning where they studied after BT, in which country, and what they do now, and an outcome you have told BT about may also be recorded for you by the cadres responsible for mentorship. By default an outcome is visible only to the people who keep BT's records, and our public annual reports, fundraising pages and sponsorship proposals <strong>use only totals of five people or more, never names</strong>, unless you yourself tick "may be public with my name" under Settings. The outcomes of people under 18 are never published with a name under any circumstances.</p>
 <p>In November 2026 we moved the sign-up sheets, attendance lists, pairing lists and feedback forms from 2020 to 2026 out of Google Drive and into one database, taking only names, email addresses, schools, years, attendance and pairings; phone numbers, birth dates, emergency contacts, dietary needs, interview notes and application essays were left behind. Feedback from before 2025 whose form carried no notice at the time is not linked to anyone and can only be seen in aggregate.</p>
 <p>To find out what we hold about you, or to correct or delete it, write to beyondtaiwan2020@gmail.com. When we delete, your name, email, attendance, pairings and outcomes are cleared, your answers stay but are no longer linked to you, and the headcount keeps one unnamed place. Please note that deleting your own account on the account page removes the account, your applications and the answers in them, <strong>but not the records described in this section</strong>, so if you want those cleared as well, write to us separately.</p>
-<h3>Speakers, professors and other contacts</h3>
+<h3 id="en-contacts">Speakers, professors and other contacts</h3>
 <p>BT invites speakers, professors, admission officers and alumni to share with students. To remember who we have worked with and how to reach you again, we keep a profile for you.</p>
 <p>We start it only with information you have made public or told us yourself: your name, contact details, schools and work, and the BT events you took part in. We then give you a link that is yours alone. There is no account and no password. Opening it shows you what we hold, and you can correct it, add to it, or leave it empty. The link stops working after ninety days. If you want to change something later, write to us and we will make a new one.</p>
 <p>The link asks six questions about how you got to where you are. Every one of them is optional.</p>

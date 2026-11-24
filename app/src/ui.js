@@ -21,6 +21,18 @@ import { T, lang, setLang } from "./strings.js";
 export { T, lang, setLang };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// 隱私政策更新的提醒（2026-11-24）。政策寫了改動會「於網站公告」，這一行就是公告在登入頁與學員頁上的那一半
+// （另一半是 privacy/index.html 最上面的「最近的更新」）。
+// **過了 until 那一天它自己消失**，不用有人記得回來刪：一條掛了一年的「最近更新」比沒有更糟。
+// 下次改政策要做三件事：改 date 與 until（大約兩個月後）、改 strings.js 的 policy.notice、
+// 在 privacy/index.html 的「最近的更新」最上面加一條。日期是 YYYY-MM-DD，照字串比大小。
+export const POLICY_NOTICE = { date: "2026-11-24", until: "2027-01-31" };
+export function policyNoticeHTML(today) {
+  const d = today || new Date().toISOString().slice(0, 10);
+  if (d > POLICY_NOTICE.until) return "";
+  return `<div class="note policy-note">${T("policy.notice")}</div>`;
+}
+
 // ⚠ 這裡原本有一段註解寫著「不做自助重設、不做重設畫面、不呼叫
 // resetPasswordForEmail（spec §6.3）」。**那段話 2026-09-01 起是錯的** ——
 // 自助重設做了，重設畫面在 /reset/，resetPasswordForEmail 在 shared/auth.js。
@@ -149,6 +161,7 @@ export function authHTML(mode, msg, email, busy, invite, student) {
          而連 email 都想不起來的人（換過信箱、當初用學校信箱註冊）沒有別的出口。
          一條自助路徑蓋不住所有情況，留著人工那條的成本只是一行字。 -->
     ${up ? "" : `<div class="note">${T("auth.forgot")}<button class="link" data-act="switch-auth" data-m="forgot">${T("auth.sendReset")}</button><br>${T("auth.noEmail")}</div>`}
+    ${policyNoticeHTML()}
   </div>`;
 }
 
@@ -431,6 +444,7 @@ export function studentHTML(p, msg, apps, opens, pairs, feedback) {
     <div class="note" style="margin-top:26px;border-top:1px solid rgba(16,42,134,.13);padding-top:16px">
       ${T("sd.toSettings")}
     </div>
+    ${policyNoticeHTML()}
   </div>`;
 }
 
