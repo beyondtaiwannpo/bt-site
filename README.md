@@ -1550,7 +1550,7 @@ Paul：「give them a link, they go in and then that's their profile」。不用
 
 ### 2027-01-03 那一場怎麼用（給 Paul 與 Director）
 
-1. Paul 在正式 Supabase 跑 `supabase/migrations/2027-01-03-people-network.sql`，驗收表要全 PASS。
+1. ~~Paul 在正式 Supabase 跑 `supabase/migrations/2027-01-03-people-network.sql`~~ **2026-11-24 Paul 跑完，驗收表全 PASS。** 同一天從外面用沒登入的身分問過正式資料庫三件事：假的連結讀出來是空的（`/profile/` 會顯示「連結不對」）、開連結那一支沒登入叫不動、`rc_profiles` 這張表沒登入讀不到。
 2. ~~隱私政策多一節~~ **2026-11-24 Paul 過稿，已貼進 `privacy/index.html`**：「回饋與紀錄」後面多一節「講者、教授與其他聯絡人」，中英各一節，可見範圍表各多四列，頁首日期改成 2026-11-24。原稿留在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-23-privacy-contacts-paragraph/draft.md`。之後 `/profile/` 那一頁的行為有變（例如開放本人上傳照片、連結期限改了），這一節要跟著改。
 3. 後台「紀錄 → 人 → 加一個人」把九位講者加進去，各自的頁面填我們已經知道的（單位、領域、聯絡方式、誰認識他）。這是公開的 repo，名單不能寫進程式，只能從後台加。
 4. 活動編輯頁「講者」從紀錄挑這九位。
@@ -1559,7 +1559,7 @@ Paul：「give them a link, they go in and then that's their profile」。不用
 
 ### 資料庫（`supabase/migrations/2027-01-03-people-network.sql`）
 
-- 接在 `2027-01-02-event-speakers-tickets.sql` 後面跑。可以重跑，不動既有資料。驗收表 18 項加 OVERALL。**還沒在正式資料庫跑。**
+- 接在 `2027-01-02-event-speakers-tickets.sql` 後面跑。可以重跑，不動既有資料。驗收表 18 項加 OVERALL。**2026-11-24 Paul 在正式資料庫跑完，全 PASS。** 之後如果重跑 `2026-12-10`、`2026-12-11` 或 `2026-12-12` 那三支，這一支要跟著再跑一次（它重新定義了那三支裡的幾個函式）。
 - 三張新表：`rc_profiles`（個人檔案、故事、舉手、同意、關係紀錄）、`rc_labels`（BT 給的標籤）、`rc_profile_links`（個人連結）。跟其他 `rc_` 表一樣沒有政策、不發權限，讀寫全走函式。
   **新欄位不放進 `people` 表**：那張表開了 select 政策（本人與 senior 讀得到整列），放那裡等於多開一條路。
 - `rc_outcomes` 多一欄 `title`（學位或職稱）。連結上填的學歷與經歷存成去向，來源 self、內部可見。BT 記的錄取紀錄與只有本人看得到的那幾筆，連結動不到。
