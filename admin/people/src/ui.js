@@ -1084,11 +1084,19 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
   // 2026-11-23：姓名排在職級前面（先知道這是誰，再看他是什麼）；頁面中間那顆「回名單」拿掉，頁首已經有一顆。
   return pageHead(`${esc(name)}${alt ? `<span class="alt">${esc(alt)}</span>` : ""}`, lede, [], { act: "roster-back", label: T("pe.back") })
     + msgHTML(msg)
-    + `<div data-autosave="person-save" data-id="${esc(p.person_id)}">` + nameSec + rankSec + posSec + teamSec + `</div>` + wsSec
-    + `<div class="form-foot" style="margin-bottom:28px">
+    // 2026-11-24：一長條收成三個分頁（Paul：「do the same thing… for the whole BT」）。
+    //   profile 基本資料  姓名、職級、這一屆的職位、team 標籤（同一個 person-save 的框，整個框在同一個分頁裡，不能拆開）
+    //   ws      工作區    進得去哪些工作區（幹部才有）
+    //   account 帳號      創辦人、可能重複、邀請回來、刪除紀錄、從平台移除
+    // 沒選到的只是藏起來：main.js 的 readPersonForm() 是照 id 讀的。
+    + RAIL.pageTabsHTML("pe-person", [
+        { key: "profile", label: T("petab.profile"), body: `<div data-autosave="person-save" data-id="${esc(p.person_id)}">` + nameSec + rankSec + posSec + teamSec + `</div>`
+          + `<div class="form-foot" style="margin-bottom:28px">
       ${autosaveHint("person-save")}
-    </div>`
-    + fdrSec + dupSec + danger;
+    </div>` },
+        { key: "ws", label: T("petab.ws"), body: wsSec },
+        { key: "account", label: T("petab.account"), body: fdrSec + dupSec + danger, n: dups.length },
+      ], { aria: T("petab.aria") });
 }
 
 // 加一筆過去的紀錄（沒有帳號的人）：名字加一筆職位。

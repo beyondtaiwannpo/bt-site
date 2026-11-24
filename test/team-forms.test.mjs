@@ -160,7 +160,8 @@ test("畫面：題目是引擎的畫布，一塊一塊各自存；有人答過�
     questions: [{ id: "q1", type: "short", label: "Name", answered: true, logic: [] }, { id: "q2", type: "long", label: "More", answered: false, logic: [] }] };
   const fx = { mode: "edit", menuAt: 2, filter: "", logicOpen: new Set() };
   const ed = UI.questionsEditHTML(a, "", false, fx);
-  assert.match(ed, /data-autosave="tf-save"/, "設定那一塊還在");
+  assert.doesNotMatch(ed, /data-autosave="tf-save"/, "設定那一塊搬到「設定」分頁了（2026-11-24）");
+  assert.match(UI.questionsEditHTML(a, "", false, fx, "settings"), /data-autosave="tf-save"/);
   assert.equal((ed.match(/data-autosave="tf-q"/g) || []).length, 2);
   assert.match(ed, /data-fx-slash/);
   assert.doesNotMatch(ed, /data-type="file"/, "沒有上傳檔案");

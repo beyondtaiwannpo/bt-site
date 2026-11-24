@@ -349,6 +349,66 @@ export function areaTabsHTML(group, tab, me, L) {
   }).join("")}${people}</nav>`;
 }
 
+// ── 一頁裡面的分頁（2026-11-24）──
+// Paul 看過活動編輯頁的分頁之後：「I want you to do the same thing, but like for the whole BT… make it more efficient and easier for us to add」。
+// 一頁疊了四塊以上、要一直往下捲的，就把同一類的收成一個分頁，最上面一排按鈕。後台每一個資料夾都用這一支，樣式在 admin/admin.css（.subtabs、.tabp）。
+//
+// **怎麼用（要加一排分頁，或是在現有的那一排加一個，就是改這一個陣列）：**
+//   RAIL.pageTabsHTML("rc-event", [
+//     { key: "attendance", label: T("rtab.attendance"), body: sessions + participation },
+//     { key: "feedback",   label: T("rtab.feedback"),   body: forms + scales, n: 3 },   // n 是標籤旁邊的小數字，0 或沒給就不畫
+//   ])
+//   - id 是這一排分頁的名字（一種頁面一個）。開著哪一個照 id 記在 sessionStorage，重畫、重新整理、換一筆資料都留在同一個分頁。
+//   - body 是空字串的那一個不畫（這個人看不到的那一塊，分頁也不該出現）。只剩一個的時候不畫那一排，內容照樣出來。
+//   - label 是已經可以直接放進 HTML 的字（字典裡的字）。使用者填的字要自己先 esc()。
+//   - 各頁的 main.js **什麼都不用接**：按鈕由這一支自己聽（第一次畫的時候掛一個 click 在 document 上），只換哪一塊看得到，不重畫，打到一半的字留著。
+//   - 要自己接（活動編輯頁要把分頁寫進網址）就給 opts.act，按鈕會帶 data-act，這一支就不管那一排；開著哪一個由 opts.on 決定。
+//   - opts.start 是第一次進來開哪一個（沒給就是第一個）；opts.keepEmpty 是 body 空的也照畫（內容還在載的那種）。
+//
+// ⚠ **沒選到的分頁只是藏起來（hidden），不能改成「不畫」。** 後台好幾頁是照 id 把整頁的格子讀一遍一起存的，
+//   哪一格不在畫面裡，讀到的就是空的，存下去會把那一欄清掉。test/page-tabs.test.mjs 守著這一條。
+const ptMem = {};
+let ptBound = false;
+function ptGet(id) {
+  if (id in ptMem) return ptMem[id];
+  try { return (typeof sessionStorage !== "undefined" && sessionStorage.getItem("bt.ptab." + id)) || ""; } catch (_) { return ""; }
+}
+export function setPageTab(id, key) {
+  ptMem[id] = key;
+  try { if (typeof sessionStorage !== "undefined") sessionStorage.setItem("bt.ptab." + id, key); } catch (_) { /* 私密視窗存不了，這一次開著的還是記得 */ }
+}
+// 現在開著哪一個：記著的那一個還在清單裡就用它，不然用 fallback，再不然第一個。
+export function pageTabOf(id, keys, fallback) {
+  const w = ptGet(id);
+  return keys.includes(w) ? w : keys.includes(fallback) ? fallback : (keys[0] || "");
+}
+function ptClick(ev) {
+  const b = ev.target && ev.target.closest && ev.target.closest("button[data-ptab]");
+  if (!b || b.dataset.act) return;
+  const id = b.dataset.ptab, key = b.dataset.tab, nav = b.closest("nav");
+  setPageTab(id, key);
+  if (nav) nav.querySelectorAll("button[data-ptab]").forEach(x => {
+    const on = x === b; x.classList.toggle("on", on);
+    if (on) x.setAttribute("aria-current", "page"); else x.removeAttribute("aria-current");
+  });
+  document.querySelectorAll(".tabp").forEach(p => { if (p.dataset.ptabs === id) p.hidden = p.dataset.tabp !== key; });
+  if (nav && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: "start" });
+  b.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+export function pageTabsHTML(id, tabs, opts) {
+  const o = opts || {};
+  const list = (tabs || []).filter(t => t && (t.body || o.keepEmpty));
+  if (!list.length) return "";
+  if (list.length === 1) return list[0].body;
+  if (!o.act && !ptBound && typeof document !== "undefined") { ptBound = true; document.addEventListener("click", ptClick); }
+  const keys = list.map(t => t.key);
+  const on = keys.includes(o.on) ? o.on : pageTabOf(id, keys, o.start);
+  const nav = `<nav class="subtabs ptabs" id="${esc(id)}-tabs"${o.aria ? ` aria-label="${esc(o.aria)}"` : ""}>${list.map(t =>
+    `<button type="button" data-ptab="${esc(id)}" class="subtab${t.key === on ? " on" : ""}"${o.act ? ` data-act="${esc(o.act)}"` : ""} data-tab="${esc(t.key)}"${t.key === on ? ' aria-current="page"' : ""}>${t.label}${
+      t.n ? `<span class="subtab-n">${esc(String(t.n))}</span>` : ""}</button>`).join("")}</nav>`;
+  return nav + list.map(t => `<div class="tabp" data-ptabs="${esc(id)}" data-tabp="${esc(t.key)}"${t.key === on ? "" : " hidden"}>${t.body}</div>`).join("");
+}
+
 // 中英切換：兩顆小按鈕，現在的那一顆亮著。字面「中文」「English」刻意不翻。各頁 main.js 接 data-act="lang"。
 export function langSwitchHTML(L) {
   const b = l => `<button class="lang${L === l ? " on" : ""}" data-act="lang" data-lang="${l}" aria-pressed="${L === l}">${l === "zh" ? "中文" : "English"}</button>`;

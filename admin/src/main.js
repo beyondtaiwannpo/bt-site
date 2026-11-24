@@ -1337,6 +1337,7 @@ document.addEventListener("click", async e => {
   // 所以按上一頁是回活動清單，不是一個分頁一個分頁退）。分頁那一排已經捲出畫面的話（從狀態那一行按「到上線那個分頁」不會，但以後可能有別的入口）捲回來。
   if (act === "ev-tab") {
     const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !UI.EV_TABS.includes(b.dataset.tab)) return;
+    const go = b.dataset.go || "";
     keepEventTyped();
     S.evTab = b.dataset.tab; S.msg = "";
     history.replaceState(null, "", "#events/" + ev.slug + "/" + S.evTab);
@@ -1344,6 +1345,9 @@ document.addEventListener("click", async e => {
     const nav = document.getElementById("ev-tabs"), on = nav && nav.querySelector(".subtab.on");
     if (nav && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: "start" });
     if (on) { on.focus({ preventScroll: true }); on.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+    // 狀態那一行的「到上線那一段」帶 data-go：換到「設定」之後，那一段不在畫面裡才捲過去（它在最上面，通常不用捲）。
+    const sec = go && document.getElementById(go);
+    if (sec) { const r = sec.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.6) sec.scrollIntoView({ block: "start" }); }
     return;
   }
   // 「用場地的連結」：把這場活動掛的那個場地的 Google 地圖連結抄到活動那一格（按了才抄，場地的資料本來只有幹部看得到）。
@@ -1657,7 +1661,19 @@ document.addEventListener("click", async e => {
   if (act === "back-list") {
     S.view = "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render(); return;
   }
-  if (act === "open-form") { await openForm(id); return; }
+  // 「題目」與「設定」是同一個畫面的兩個分頁（2026-11-24）：按鈕帶 data-sub。已經在這份表單的編輯畫面上就只換哪一塊看得到
+  // （不重讀、不重畫，打到一半的字留著）；從別的畫面過來（申請、活動）才真的打開。
+  if (act === "open-form") {
+    const sub = b.dataset.sub || "";
+    if (sub) UI.setFormSub(sub);
+    if (sub && (S.view === "form" || S.view === "question") && S.form && S.form.id === id) {
+      document.querySelectorAll('.tabp[data-ptabs="form"]').forEach(p => { p.hidden = p.dataset.tabp !== sub; });
+      const nav = b.closest("nav");
+      if (nav) nav.querySelectorAll("button.subtab").forEach(x => { const on = x === b; x.classList.toggle("on", on); if (on) x.setAttribute("aria-current", "page"); else x.removeAttribute("aria-current"); });
+      return;
+    }
+    await openForm(id); return;
+  }
   if (act === "open-apps") { await openApps(id); return; }
 
   // ── 批 4：審核 ────────────────────────────────────────────────────

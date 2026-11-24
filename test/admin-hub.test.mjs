@@ -323,17 +323,28 @@ test("Co-President 的申請表清單照 team 分段，Director 的不分", () =
   assert.doesNotMatch(FORMS.listHTML([AF], true, "", false, null, [], "", false), /<h2>Curriculum/, "只有一個 team 就不分段");
 });
 
-test("一份表單裡的三個分頁：申請、設定、活動，當前的有標記，四個畫面都有同一條", () => {
+test("一份表單裡的四個分頁：申請、題目、設定、活動，當前的有標記，四個畫面都有同一條", () => {
   assert.match(FORMS.formTabsHTML(AF, "apps"), /class="subtab on" data-act="open-apps" data-id="f1" aria-current="page">申請/);
-  assert.match(FORMS.formTabsHTML(AF, "question"), /class="subtab on" data-act="open-form"[^>]*>設定/);
+  assert.deepEqual([...FORMS.formTabsHTML(AF, "apps").matchAll(/>([^<]+)<\/button>/g)].map(m => m[1]), ["申請", "題目", "設定", "活動"]);
+  assert.equal((FORMS.formTabsHTML(AF, "apps").match(/class="subtab on"/g) || []).length, 1, "在「申請」的時候題目與設定都不亮");
+  // 「題目」與「設定」是同一個畫面的兩個分頁（2026-11-24），開著哪一個是記著的；第一次是「題目」
+  assert.match(FORMS.formTabsHTML(AF, "question"), /class="subtab on" data-act="open-form" data-id="f1" data-sub="questions" aria-current="page">題目/);
+  FORMS.setFormSub("settings");
+  assert.match(FORMS.formTabsHTML(AF, "form"), /class="subtab on" data-act="open-form" data-id="f1" data-sub="settings" aria-current="page">設定/);
+  assert.match(FORMS.formHTML(AF, [], true, [], "", false), /<div class="tabp" data-ptabs="form" data-tabp="questions" hidden>[\s\S]*<div class="tabp" data-ptabs="form" data-tabp="settings">/, "兩塊都在畫面裡，沒選到的藏著");
+  FORMS.setFormSub("nope"); assert.equal(FORMS.formSub(), "settings", "認不得的名字不收");
+  FORMS.setFormSub("questions");
+  assert.match(FORMS.formHTML(AF, [], true, [], "", false), /<div class="tabp" data-ptabs="form" data-tabp="questions">[\s\S]*<div class="tabp" data-ptabs="form" data-tabp="settings" hidden>/);
   assert.match(FORMS.formTabsHTML(AF, "notice"), /class="subtab on" data-act="open-checkin"[^>]*>活動/);
+  // main.js：已經在這份表單的編輯畫面上，按「題目」「設定」只換哪一塊看得到，不重讀
+  assert.match(readFileSync("admin/src/main.js", "utf8"), /if \(sub && \(S\.view === "form" \|\| S\.view === "question"\) && S\.form && S\.form\.id === id\) \{\s*document\.querySelectorAll\('\.tabp\[data-ptabs="form"\]'\)/);
   for (const h of [
     FORMS.formHTML(AF, [], true, [], "", false),
     FORMS.appsHTML(AF, [], [], true, new Set(), "all", [], "", false),
     FORMS.checkinHTML(AF, [], true, "", false),
     FORMS.noticeHTML(AF, [], new Set(), "", false),
   ]) {
-    assert.match(h, /class="subtabs"/);
+    assert.match(h, /class="subtabs ptabs"/);
     assert.match(h, /data-act="back-list"/);
   }
 });

@@ -290,32 +290,35 @@ test("★ 記分卡是一顆次要的按鈕，上面一句話講它是什麼；�
 // Paul：「It doesn't make sense to have going live, project in that order. If I wanted to make an event, it should be in a certain order
 //        that makes it efficient and it makes sense.」
 // 2026-11-24 起這幾段分在七個分頁裡（見下面 TAB_OF）；這一串是它們在畫面原始碼裡的順序。回饋表從「活動之後」搬出來自己一段（ev-feedback，在「表單」分頁）。
-const SECTIONS = ["ev-content", "ev-when", "ev-pics", "ev-speakers", "ev-signup", "ev-feedback", "ev-live", "ev-links", "ev-after", "ev-listing", "ev-house"];
+const SECTIONS = ["ev-content", "ev-when", "ev-pics", "ev-speakers", "ev-signup", "ev-feedback", "ev-after", "ev-live", "ev-links", "ev-listing", "ev-house"];
 const secOf = (h, id) => { const a = h.indexOf(`<section class="section" id="${id}">`); assert.ok(a >= 0, `找不到 ${id} 那一段`); const b = h.indexOf('<section class="section"', a + 10); return h.slice(a, b < 0 ? h.length : b); };
 // 這一支的 EV 沒有計畫那四欄（那是遷移檔還沒跑的樣子），整頁的測試補上，四格才畫得出來。
 const PG = { usual_month: null, recurring: false, edition_zh: "", edition_en: "" };
 const fullPage = (ev, me, x) => F.eventEditHTML({ ...PG, ...(ev || EV) }, FORM, 3, me || DIR, "", false, [{ id: "v1", name: "台大", city: "台北" }], [{ id: "2026-27" }], { money: null, requests: [] },
   { event: { numbers: {} }, review: null, forms: [] }, [], Object.assign({ photos: PHOTOS, speakers: [], tickets: [] }, x || {}));
 
-// ── 分頁（2026-11-24）── Paul：「put everything that has the same categories on the top so I can just click them」。七個，他看過名單說「Yes, go ahead」。
-const TABS = ["details", "photos", "speakers", "forms", "live", "results", "settings"];
+// ── 分頁（2026-11-24）── Paul：「put everything that has the same categories on the top so I can just click them」。一開始七個，他看過名單說「Yes, go ahead」。
+// 同一天用過之後：「go live, that whole category can just be in settings… that's not a separate category」，「上線」收進「設定」最上面，剩六個。
+const TABS = ["details", "photos", "speakers", "forms", "results", "settings"];
 const TAB_OF = { "ev-content": "details", "ev-when": "details", "ev-pics": "photos", "ev-speakers": "speakers", "ev-signup": "forms", "ev-feedback": "forms",
-  "ev-live": "live", "ev-links": "live", "ev-after": "results", "ev-listing": "settings", "ev-house": "settings" };
-const tabOf = (h, k) => { const a = h.indexOf(`<div class="ev-tabp" data-tabp="${k}"`); assert.ok(a >= 0, `找不到 ${k} 那個分頁`); const b = h.indexOf('<div class="ev-tabp"', a + 10); return h.slice(a, b < 0 ? h.length : b); };
+  "ev-live": "settings", "ev-links": "settings", "ev-after": "results", "ev-listing": "settings", "ev-house": "settings" };
+const tabOf = (h, k) => { const a = h.indexOf(`<div class="tabp" data-ptabs="ev" data-tabp="${k}"`); assert.ok(a >= 0, `找不到 ${k} 那個分頁`); const b = h.indexOf('<div class="tabp"', a + 10); return h.slice(a, b < 0 ? h.length : b); };
 
-test("★ 七個分頁：內容、照片、講者、表單、上線、成果、設定；每一段在它該在的分頁裡；預設開「內容」", () => {
+test("★ 六個分頁：內容、照片、講者、表單、成果、設定（上線在設定的最上面）；每一段在它該在的分頁裡；預設開「內容」", () => {
   const h = fullPage();
   const at = s => { const i = h.indexOf(s); assert.ok(i >= 0, `找不到 ${s}`); return i; };
   // 那一排分頁在狀態那一行的下面、內容的上面
-  assert.ok(at('id="ev-state"') < at('<nav class="subtabs ev-tabs" id="ev-tabs"') && at('id="ev-tabs"') < at('<div class="ev-tabp"'));
+  assert.ok(at('id="ev-state"') < at('<nav class="subtabs ptabs" id="ev-tabs"') && at('id="ev-tabs"') < at('<div class="tabp"'));
   assert.deepEqual([...h.matchAll(/class="subtab(?: on)?" data-act="ev-tab" data-tab="([a-z]+)"/g)].map(m => m[1]), TABS);
-  assert.deepEqual([...h.matchAll(/class="subtab(?: on)?" data-act="ev-tab" data-tab="[a-z]+"(?: aria-current="page")?>([^<]+)</g)].map(m => m[1]), ["內容", "照片", "講者", "表單", "上線", "成果", "設定"]);
-  assert.match(h, /<button type="button" class="subtab on" data-act="ev-tab" data-tab="details" aria-current="page">內容<\/button>/, "還沒結束的活動預設開「內容」");
+  assert.deepEqual([...h.matchAll(/class="subtab(?: on)?" data-act="ev-tab" data-tab="[a-z]+"(?: aria-current="page")?>([^<]+)</g)].map(m => m[1]), ["內容", "照片", "講者", "表單", "成果", "設定"]);
+  const set = tabOf(h, "settings"); assert.ok(set.indexOf('id="ev-live"') < set.indexOf('id="ev-links"') && set.indexOf('id="ev-links"') < set.indexOf('id="ev-listing"') && set.indexOf('id="ev-listing"') < set.indexOf('id="ev-house"'), "「設定」裡：上線 → 行銷與錢 → 對外怎麼列 → 其他設定");
+  assert.doesNotMatch(h, /data-tab="live"|data-tabp="live"/, "沒有「上線」那個分頁了");
+  assert.match(h, /<button type="button" data-ptab="ev" class="subtab on" data-act="ev-tab" data-tab="details" aria-current="page">內容<\/button>/, "還沒結束的活動預設開「內容」");
   assert.equal(count(h, /class="subtab on"/g), 1);
   // 分頁的順序、哪一段在哪一個分頁、段的順序
-  assert.deepEqual([...h.matchAll(/<div class="ev-tabp" data-tabp="([a-z]+)"/g)].map(m => m[1]), TABS);
+  assert.deepEqual([...h.matchAll(/<div class="tabp" data-ptabs="ev" data-tabp="([a-z]+)"/g)].map(m => m[1]), TABS);
   const order = SECTIONS.map(id => `<section class="section" id="${id}">`).map(at);
-  assert.deepEqual(order, order.slice().sort((a, b) => a - b), "段的順序：內容、時間與地點、照片、講者、報名、回饋、上線、行銷與錢、成果、對外怎麼列、其他設定");
+  assert.deepEqual(order, order.slice().sort((a, b) => a - b), "段的順序：內容、時間與地點、照片、講者、報名、回饋、成果、上線、行銷與錢、對外怎麼列、其他設定");
   assert.equal(count(h, /<section class="section"/g), SECTIONS.length, "沒有多出來或漏掉的一段");
   for (const id of SECTIONS) assert.ok(tabOf(h, TAB_OF[id]).includes(`<section class="section" id="${id}">`), `${id} 不在「${TAB_OF[id]}」那個分頁裡`);
   // 每一段的標題
@@ -353,38 +356,39 @@ test("★ 七個分頁：內容、照片、講者、表單、上線、成果、�
 test("★ 結束了的活動：預設開「成果」那個分頁（2026-11-13 Paul：「活動結束了點進來什麼都沒有」），分頁與段的順序照舊", () => {
   const past = fullPage({ ...EV, status: "published", starts_at: "2025-07-01T00:00:00Z" });
   assert.match(past, /class="subtab on" data-act="ev-tab" data-tab="results" aria-current="page">成果</);
-  assert.match(past, /<div class="ev-tabp" data-tabp="results"><section class="section" id="ev-after">/, "「成果」開著");
-  assert.match(past, /<div class="ev-tabp" data-tabp="details" hidden>/, "「內容」藏著");
-  assert.deepEqual([...past.matchAll(/<div class="ev-tabp" data-tabp="([a-z]+)"/g)].map(m => m[1]), TABS, "分頁的順序不會因為結束了就換");
+  assert.match(past, /<div class="tabp" data-ptabs="ev" data-tabp="results"><section class="section" id="ev-after">/, "「成果」開著");
+  assert.match(past, /<div class="tabp" data-ptabs="ev" data-tabp="details" hidden>/, "「內容」藏著");
+  assert.deepEqual([...past.matchAll(/<div class="tabp" data-ptabs="ev" data-tabp="([a-z]+)"/g)].map(m => m[1]), TABS, "分頁的順序不會因為結束了就換");
   assert.equal(count(past, /id="ev-after"/g), 1, "只畫一次");
   // 自己點過別的分頁就照他點的
-  assert.match(fullPage({ ...EV, status: "published", starts_at: "2025-07-01T00:00:00Z" }, DIR, { tab: "photos" }), /<div class="ev-tabp" data-tabp="photos"><section/);
+  assert.match(fullPage({ ...EV, status: "published", starts_at: "2025-07-01T00:00:00Z" }, DIR, { tab: "photos" }), /<div class="tabp" data-ptabs="ev" data-tabp="photos"><section/);
 });
 
-test("★ 七個分頁都在畫面裡，沒選到的只是藏起來：readEvent() 照 id 讀整頁，哪一格不在就會被存成空的", () => {
+test("★ 六個分頁都在畫面裡，沒選到的只是藏起來：readEvent() 照 id 讀整頁，哪一格不在就會被存成空的", () => {
   const ids = ["ev-tzh", "ev-ten", "ev-szh", "ev-sen", "ev-bzh", "ev-ben", "ev-starts", "ev-ends", "ev-place", "ev-cap", "ev-cover", "ev-month", "ev-recurring", "ev-edzh", "ev-eden"];
   for (const tab of TABS) {
     const h = fullPage(EV, DIR, { tab });
     for (const id of ids) assert.equal(count(h, new RegExp(`id="${id}"`, "g")), 1, `開著「${tab}」的時候 #${id} 不在畫面裡（或有兩個）`);
-    assert.equal(count(h, /<div class="ev-tabp" data-tabp="[a-z]+" hidden>/g), 6, "六個藏著");
-    assert.match(h, new RegExp(`<div class="ev-tabp" data-tabp="${tab}">`), "一個開著");
+    assert.equal(count(h, /<div class="tabp" data-ptabs="ev" data-tabp="[a-z]+" hidden>/g), 5, "五個藏著");
+    assert.match(h, new RegExp(`<div class="tabp" data-ptabs="ev" data-tabp="${tab}">`), "一個開著");
     assert.match(h, new RegExp(`class="subtab on" data-act="ev-tab" data-tab="${tab}" aria-current="page"`));
   }
   // readEvent 讀的每一格都在上面那一串裡（它多讀一格，這裡就要多守一格）
   const m = read("admin/src/main.js"), fn = m.slice(m.indexOf("function readEvent() {"), m.indexOf("// ", m.indexOf("return patch;", m.indexOf("function readEvent() {"))));
   for (const id of [...fn.matchAll(/(?:val|chk)\("(ev-[a-z]+)"\)/g)].map(x => x[1])) assert.ok(ids.includes(id), `readEvent 讀 #${id}，上面那一串沒有守到它`);
   // 樣式沒有把 hidden 蓋掉
-  assert.doesNotMatch(read("admin/admin.css"), /\.ev-tabp\{[^}]*display:/, ".ev-tabp 不能自己設 display，不然 hidden 藏不住");
+  assert.doesNotMatch(read("admin/admin.css"), /\.tabp\{[^}]*display:/, ".tabp 不能自己設 display，不然 hidden 藏不住");
 });
 
 test("★ 分頁的小東西：evTabOf 認不得的名字回預設；改不動的人沒有「講者」；名字後面的小數字；網址與 main.js 的接法", () => {
   assert.equal(F.evTabOf(EV, "forms", true), "forms"); assert.equal(F.evTabOf(EV, "nope", true), "details"); assert.equal(F.evTabOf(EV, null, true), "details");
   assert.equal(F.evTabOf({ ...EV, starts_at: "2025-07-01T00:00:00Z" }, null, true), "results");
   assert.equal(F.evTabOf(EV, "speakers", false), "details", "改不動的人沒有「講者」，網址寫了也回預設");
+  assert.equal(F.evTabOf(EV, "live", true), "settings", "舊網址 #events/<代號>/live 帶到「設定」"); assert.equal(F.evTabOf({ ...EV, starts_at: "2025-07-01T00:00:00Z" }, "live", false), "settings");
   assert.deepEqual(F.evTabs(true), TABS); assert.deepEqual(F.evTabs(false), TABS.filter(k => k !== "speakers"));
   const view = fullPage(EV, VIEWER);
   assert.doesNotMatch(view, /data-tab="speakers"|data-tabp="speakers"/, "只有「看」的人：沒有「講者」那個分頁");
-  assert.equal(count(view, /<div class="ev-tabp"/g), 6);
+  assert.equal(count(view, /<div class="tabp"/g), 5);
   // 小數字：幾張照片、幾位講者、幾張表單（報名表一張加回饋表幾張）。零不印，還在載不印。
   const h = F.eventEditHTML({ ...PG, ...EV }, FORM, 3, DIR, "", false, [], [], { money: null, requests: [] }, { event: { numbers: {} }, review: null, forms: [{ id: "f9", title: "回饋", status: "open", responses: 2 }] }, [],
     { photos: PHOTOS, speakers: [{ id: "s1", display_name: "A", subject: "", school: "", photo_url: null, consent: true }], tickets: [] });
@@ -402,7 +406,8 @@ test("★ 分頁的小東西：evTabOf 認不得的名字回預設；改不動�
   assert.match(m, /if \(act === "ev-tab"\) \{[\s\S]{0,200}keepEventTyped\(\);\s*S\.evTab = b\.dataset\.tab; S\.msg = "";\s*history\.replaceState\(null, "", "#events\/" \+ ev\.slug \+ "\/" \+ S\.evTab\);\s*render\(\);/);
   assert.match(m, /tab: S\.evTab, speakers: S\.evSpeakers/);
   const css = read("admin/admin.css");
-  assert.match(css, /\.ev-tabs\{overflow-x:auto;/, "手機上放不下就左右捲");
+  assert.match(css, /\.ptabs\{overflow-x:auto;/, "手機上放不下就左右捲");
+  assert.match(m, /const go = b\.dataset\.go \|\| "";/, "狀態那一行的按鈕帶 data-go，換到「設定」之後捲到上線那一段");
 });
 
 test("★ 每一段長一樣：一個 h2，底下是一塊一塊的 .ev-panel；沒有光禿禿的小標題、沒有往上拉的負邊界", () => {
@@ -427,10 +432,10 @@ test("★ 每一段長一樣：一個 h2，底下是一塊一塊的 .ev-panel；
   assert.match(css, /\.two > \.ev-help\{grid-column:1\/-1/, "兩欄裡的說明橫跨兩欄");
 });
 
-test("★ 最上面那一行狀態：四種狀態各一句、對外中有「看對外的那一頁」、一顆帶你到「上線」那個分頁；不是一段，也沒有會改狀態的按鈕", () => {
+test("★ 最上面那一行狀態：四種狀態各一句、對外中有「看對外的那一頁」、一顆帶你到「設定」裡的上線；不是一段，也沒有會改狀態的按鈕", () => {
   const draft = F.eventStateHTML(EV);
   assert.match(draft, /^<div class="ev-state" id="ev-state"><span class="tag draft">草稿<\/span><span class="ev-state-t">還沒上線，外面的人看不到。<\/span>/);
-  assert.match(draft, /<button type="button" class="btn quiet sm" data-act="ev-tab" data-tab="live">到「上線」那個分頁<\/button><\/div>$/);
+  assert.match(draft, /<button type="button" class="btn quiet sm" data-act="ev-tab" data-tab="settings" data-go="ev-live">到「設定」裡的上線<\/button><\/div>$/);
   assert.doesNotMatch(draft, /<a |<section|<h2/);
   assert.match(F.eventStateHTML({ ...EV, status: "ready" }), /<span class="tag warn">準備好了<\/span><span class="ev-state-t">等 Co-President 或 Senior Adviser 放上對外頁/);
   const live = F.eventStateHTML({ ...EV, status: "published" });
@@ -440,7 +445,7 @@ test("★ 最上面那一行狀態：四種狀態各一句、對外中有「看�
   assert.doesNotMatch(read("admin/src/main.js") + read("admin/src/ui.js"), /"ev-jump"/, "以前那顆是捲到那一段；現在是換分頁，舊的那一條拿掉了");
   // 整頁上那一行在標題的正下面；唯讀的人接著一句「改不動」
   const view = fullPage(EV, VIEWER);
-  assert.match(view, /<\/header><div class="ev-state" id="ev-state">[\s\S]*?<\/div><div class="note">你對這場活動是「看」，改不動。<\/div><nav class="subtabs ev-tabs" id="ev-tabs"[^>]*>[\s\S]*?<\/nav><div class="ev-tabp" data-tabp="details"><section class="section" id="ev-content">/);
+  assert.match(view, /<\/header><div class="ev-state" id="ev-state">[\s\S]*?<\/div><div class="note">你對這場活動是「看」，改不動。<\/div><nav class="subtabs ptabs" id="ev-tabs"[^>]*>[\s\S]*?<\/nav><div class="tabp" data-ptabs="ev" data-tabp="details"><section class="section" id="ev-content">/);
 });
 
 test("★ 說明底下的預覽收成一行：真的 <details>，中英兩格都是，預設收著；開著沒只記在記憶體，換一場活動就收回去", () => {

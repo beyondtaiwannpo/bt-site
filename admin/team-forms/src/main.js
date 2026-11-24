@@ -41,7 +41,7 @@ function body() {
   if (S.sub === "people") return head + UI.audienceHTML(S.admin, people(), S.aud, S.audSaved, S.find, S.msg, S.busy);
   if (S.sub === "results") return head + (S.results ? UI.resultsHTML(S.results, S.msg, S.more) : UI.msgHTML(S.msg) + UI.skeletonHTML());
   if (S.sub === "log") return head + UI.msgHTML(S.msg) + UI.logHTML(S.admin);
-  return head + UI.questionsEditHTML(S.admin, S.msg, S.busy, S.fx);
+  return head + UI.questionsEditHTML(S.admin, S.msg, S.busy, S.fx, S.sub);
 }
 function render() {
   const el = root();

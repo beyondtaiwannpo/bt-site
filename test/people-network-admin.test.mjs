@@ -143,9 +143,16 @@ test("★ 畫面不再印「種類」：一個人的頁面與名錄的列都只�
   assert.equal(UI.dirLabel({ id: "x", name: "No Labels", kind: "guest", labels: [] }), "No Labels");
 });
 
-test("★ 一個人的頁面：新的幾塊照順序排在最上面，原本的時間軸在後面", () => {
+test("★ 一個人的頁面：四個分頁（基本資料、參與紀錄、故事與同意、設定），每一塊在它該在的分頁裡", () => {
   const h = UI.personHTML(PERSON, MGR);
-  const order = ['id="rc-labels"', "data-pedit", 'id="rc-profile"', 'id="rc-rel"', 'id="rc-story"', 'id="rc-consent"', 'id="rc-speaking"', 'id="rc-link-sec"', "data-cadd", "data-sadd", "data-paddev", "data-oadd"];
+  // 2026-11-24：十幾塊收成四個分頁。順序：他是誰 → BT 跟他的關係與時間軸 → 他自己寫的與同意的。
+  const order = ['id="rc-labels"', "data-pedit", 'id="rc-profile"', "data-cadd", "data-sadd", 'id="rc-rel"', "data-paddev", 'id="rc-speaking"', "data-oadd", 'id="rc-story"', 'id="rc-consent"', 'id="rc-link-sec"'];
+  const tabp = k => at(h, `<div class="tabp" data-ptabs="rc-person" data-tabp="${k}"`);
+  assert.ok(tabp("details") < at(h, 'id="rc-labels"') && at(h, "data-sadd") < tabp("bt") && tabp("bt") < at(h, 'id="rc-rel"') && at(h, "data-oadd") < tabp("voice") && tabp("voice") < at(h, 'id="rc-story"'));
+  assert.deepEqual([...h.matchAll(/data-ptab="rc-person" class="subtab(?: on)?" data-tab="([a-z]+)"/g)].map(m => m[1]), ["details", "bt", "voice", "settings"], "Co-President 四個都有");
+  assert.ok(tabp("settings") < at(h, 'data-act="forget"') || /<div class="tabp" data-ptabs="rc-person" data-tabp="settings"[^>]*><section/.test(h), "移除的要求在「設定」分頁");
+  const notPres = UI.personHTML(PERSON, { ...MGR, me: { pres: false } });
+  assert.deepEqual([...notPres.matchAll(/data-ptab="rc-person" class="subtab(?: on)?" data-tab="([a-z]+)"/g)].map(m => m[1]), ["details", "bt", "voice"], "不是 Co-President 沒有「設定」分頁：裡面只有移除的要求，空的分頁不畫");
   for (let i = 1; i < order.length; i++) assert.ok(at(h, order[i - 1]) < at(h, order[i]), `${order[i - 1]} 要在 ${order[i]} 前面`);
   for (const id of ["rc-labels", "rc-profile", "rc-rel", "rc-story", "rc-consent", "rc-speaking", "rc-link-sec"]) assert.equal(count(h, new RegExp(`id="${id}"`, "g")), 1, `${id} 只有一塊`);
   // 去向多印學位或職稱

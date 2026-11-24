@@ -186,13 +186,13 @@ test("活動頁：結束了預設開「成果」那個分頁（Records 的數字
     review: null, forms: [{ id: "f9", title: "營隊回饋", status: "closed", responses: 20 }] };
   const past = eventEditHTML(Object.assign({}, base, { starts_at: "2025-07-01T00:00:00Z" }), null, 0, me, "", false, null, [], null, rc);
   // 2026-11-24 起是分頁：結束了預設開「成果」（以前是把那一段搬到最上面）
-  assert.match(past, /class="subtab on" data-act="ev-tab" data-tab="results" aria-current="page">/); assert.match(past, /<div class="ev-tabp" data-tabp="results"><section class="section" id="ev-after">/);
-  assert.match(past, /<div class="ev-tabp" data-tabp="details" hidden>/);
+  assert.match(past, /class="subtab on" data-act="ev-tab" data-tab="results" aria-current="page">/); assert.match(past, /<div class="tabp" data-ptabs="ev" data-tabp="results"><section class="section" id="ev-after">/);
+  assert.match(past, /<div class="tabp" data-ptabs="ev" data-tabp="details" hidden>/);
   assert.match(past, /32<span class="kpi-u">\/ 40<\/span>/); assert.match(past, /80%/); assert.match(past, /8\.6/);
   assert.match(past, /href="\/admin\/records\/#forms\/f9">營隊回饋</);
   assert.match(past, /還沒檢討/);
   const soon = eventEditHTML(Object.assign({}, base, { starts_at: new Date(Date.now() + 864e5 * 20).toISOString() }), null, 0, me, "", false, null, [], null, null);
-  assert.match(soon, /class="subtab on" data-act="ev-tab" data-tab="details" aria-current="page">/, "還沒辦開的是「內容」"); assert.match(soon, /<div class="ev-tabp" data-tabp="results" hidden>/);
+  assert.match(soon, /class="subtab on" data-act="ev-tab" data-tab="details" aria-current="page">/, "還沒辦開的是「內容」"); assert.match(soon, /<div class="tabp" data-ptabs="ev" data-tabp="results" hidden>/);
   assert.doesNotMatch(soon, /class="todo ev-kpis"/, "看不到 Records 就只有連結");
   assert.match(eventEditHTML(base, null, 0, me, "", false, null, [], null, undefined), /載入中/);
 });

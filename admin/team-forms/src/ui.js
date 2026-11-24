@@ -794,7 +794,10 @@ export function buildListHTML(boot, msg, busy, newDraft) {
 }
 
 // 編輯畫面的頁首與分頁。
-export const SUBS = ["questions", "people", "results", "log"];
+// 2026-11-24：「題目與設定」拆成「題目」與「設定」兩個分頁（Paul 看過活動編輯頁的分頁之後：「do the same thing… for the whole BT… sign up form should be like that, feedback form should be like that」）。
+// 設定那兩個框只在「設定」分頁裡畫，題目的畫布只在「題目」分頁裡畫：存設定的時候是把同名的框一起讀（allValues），兩個框都在同一個分頁，所以不會少讀。
+// 那一排分頁跟活動編輯頁同一個樣子（.subtabs），不再是藥丸。
+export const SUBS = ["questions", "settings", "people", "results", "log"];
 export function editorHeadHTML(a, sub) {
   const f = a.form || {}, edit = !!a.can_edit;
   const acts = [];
@@ -803,7 +806,7 @@ export function editorHeadHTML(a, sub) {
     if (f.status === "open") acts.push({ act: "tf-status", id: "closed", label: T("ed.close") });
     if (f.status === "closed") acts.push({ act: "tf-status", id: "open", label: T("ed.reopen") });
   }
-  const tabs = `<div class="chips tf-tabs" role="tablist">${SUBS.map(s => `<a class="chip${s === sub ? " on" : ""}" role="tab" aria-selected="${s === sub}" href="#build/${esc(f.id)}/${s}" data-act="sub" data-t="${s}">${esc(T("ed.tab." + s))}</a>`).join("")}</div>`;
+  const tabs = `<nav class="subtabs ptabs" aria-label="${esc(T("ed.tabs"))}">${SUBS.map(s => `<a class="subtab${s === sub ? " on" : ""}"${s === sub ? ' aria-current="page"' : ""} href="#build/${esc(f.id)}/${s}" data-act="sub" data-t="${s}">${esc(T("ed.tab." + s))}</a>`).join("")}</nav>`;
   return pageHead(`${esc(f.title || "")} ${statusTag(f.status)}`, esc(T("st." + f.status + "Hint")) + `<br><span class="mini">${esc(T("build.count", { n: a.responses || 0, of: a.recipients || 0 }))}</span>`, acts, { act: "back-build", label: T("ed.back") })
     + (edit ? "" : `<div class="note">${esc(T("ed.readonly"))}</div>`) + tabs;
 }
@@ -811,7 +814,7 @@ export function editorHeadHTML(a, sub) {
 // 題目與設定。設定那一塊改了就存（main.js 的 onAutosave tf-save）；題目是引擎的畫布（shared/forms.js 的 canvasHTML），
 // 每一塊各自是 data-autosave="tf-q"，打完就存；加、刪、移、複製、拖曳、條件邏輯的按鈕改的是整份清單，存完重畫。
 // fx：{ mode: "edit"|"preview", menuAt（哪一條「＋」開著）, filter（/ 後面打的字）, logicOpen: Set }。沒給就是編輯、選單收著。
-export function questionsEditHTML(a, msg, busy, fx) {
+export function questionsEditHTML(a, msg, busy, fx, sub) {
   const f = a.form || {}, qs = a.questions || [], edit = !!a.can_edit, dis = edit ? "" : " disabled";
   const e = fx || {};
   const anonLocked = f.anonymous && (a.responses || 0) > 0;
@@ -821,9 +824,12 @@ export function questionsEditHTML(a, msg, busy, fx) {
       : (qs.length ? "" : `<p class="mini">${esc(T("ed.noQHint"))}</p>`)
         + F.canvasHTML(qs, { en: isEn(), canEdit: edit, menuAt: e.menuAt, filter: e.filter, logicOpen: e.logicOpen, lockedIds: locked,
             types: a.engine === false ? OLD_TYPES : TYPES, prefill: false, act: "tf-q", hint: () => edit ? autosaveHint("tf-q") : "" }));
-  // 2026-11-23 照做事的順序拆成三段（跟 /admin/ 的申請表編輯頁同一套）：名稱與說明 → 題目 → 截止時間與規則。
+  // 2026-11-23 照做事的順序拆成三段：名稱與說明 → 題目 → 截止時間與規則。2026-11-24 題目自己一個分頁，另外兩段在「設定」分頁（sub）。
   // 匿名留在上面：有人答過就鎖住，要在發出去之前定。開放與關閉是頁首那顆鈕。
   // 存檔的框變成上下兩個，都是 tf-save；readSettings 兩個框一起讀，動哪一個都存整份。
+  if (sub !== "settings") return msgHTML(msg) + sectionHTML(T("ed.questions"), `<div class="mini" style="margin-bottom:10px">${esc(T("ed.qNote"))}</div>
+      ${a.engine === false ? `<div class="note">${esc(T("ed.oldDb"))}</div>` : ""}
+      ${canvas}`);
   return msgHTML(msg) + `<div data-autosave="tf-save" data-id="${esc(f.id)}">`
     + sectionHTML(T("ed.basics"), `<div class="tf-settings">
       <label><i>${esc(T("ed.name"))}</i><input name="title" value="${esc(f.title)}" maxlength="200"${dis}></label>
@@ -832,9 +838,6 @@ export function questionsEditHTML(a, msg, busy, fx) {
       ${anonLocked ? `<div class="mini">${esc(T("ed.anonLocked"))}</div>` : ""}
       ${edit ? `<div class="form-foot">${autosaveHint("tf-save")}</div>` : ""}</div>`)
     + `</div>`
-    + sectionHTML(T("ed.questions"), `<div class="mini" style="margin-bottom:10px">${esc(T("ed.qNote"))}</div>
-      ${a.engine === false ? `<div class="note">${esc(T("ed.oldDb"))}</div>` : ""}
-      ${canvas}`)
     + `<div data-autosave="tf-save" data-id="${esc(f.id)}">`
     + sectionHTML(T("ed.window"), `<div class="tf-settings">
       <label><i>${esc(T("ed.closes"))}</i><input type="datetime-local" name="closes_at" value="${esc(dtLocal(f.closes_at))}"${dis}></label>

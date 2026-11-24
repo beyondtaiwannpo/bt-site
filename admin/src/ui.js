@@ -121,11 +121,18 @@ export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, my
 
 // 一份表單裡的三個分頁（2026-10-19，批 3）：申請（審核）、設定（欄位與題目）、活動（簽到與寄信）。
 // 位置固定在頁首底下，簽到跟行前信不再藏在底線字後面。view 是 main.js 的 S.view。
+// 2026-11-24：「設定」拆成「題目」與「設定」兩個分頁（Paul 看過活動編輯頁的分頁之後：「do the same thing… sign up form should be like that」）。
+// 兩個都是同一個畫面（view "form"），兩塊都在畫面裡、沒選到的藏起來（readForm() 照 id 讀整頁，見 formHTML）。
+// 開著哪一個用 shared/rail.js 那一份記（id 是 "form"）；已經在這個畫面上就只換哪一塊看得到，不重讀也不重畫（main.js 的 open-form）。
+export const FORM_SUBS = ["questions", "settings"];
+export const formSub = () => RAIL.pageTabOf("form", FORM_SUBS, "questions");
+export const setFormSub = k => { if (FORM_SUBS.includes(k)) RAIL.setPageTab("form", k); };
 export function formTabsHTML(form, view) {
-  const on = k => (k === "apps" && view === "apps") || (k === "form" && (view === "form" || view === "question")) ||
-                  (k === "event" && (view === "checkin" || view === "notice"));
-  const tab = (k, act, label) => `<button class="subtab${on(k) ? " on" : ""}" data-act="${act}" data-id="${esc(form.id)}"${on(k) ? ' aria-current="page"' : ""}>${label}</button>`;
-  return `<nav class="subtabs" aria-label="${esc(T("tabs.aria"))}">${tab("apps", "open-apps", T("tabs.apps"))}${tab("form", "open-form", T("tabs.form"))}${tab("event", "open-checkin", T("tabs.event"))}</nav>`;
+  const inForm = view === "form" || view === "question", sub = formSub();
+  const on = k => (k === "apps" && view === "apps") || (inForm && k === sub) || (k === "event" && (view === "checkin" || view === "notice"));
+  const tab = (k, act, label, extra) => `<button class="subtab${on(k) ? " on" : ""}" data-act="${act}" data-id="${esc(form.id)}"${extra || ""}${on(k) ? ' aria-current="page"' : ""}>${label}</button>`;
+  return `<nav class="subtabs ptabs" aria-label="${esc(T("tabs.aria"))}">${tab("apps", "open-apps", T("tabs.apps"))}${tab("questions", "open-form", T("tabs.questions"), ' data-sub="questions"')}${
+    tab("settings", "open-form", T("tabs.form"), ' data-sub="settings"')}${tab("event", "open-checkin", T("tabs.event"))}</nav>`;
 }
 // 一份表單共用的頁首：名字、狀態、team，返回清單。
 export function formHeadHTML(form, view, count) {
@@ -147,13 +154,20 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
       </select></label>`
     : "";
 
+  const sub = formSub();
+  const panel = (k, body) => `<div class="tabp" data-ptabs="form" data-tabp="${k}"${k === sub ? "" : " hidden"}>${body}</div>`;
   return formHeadHTML(form, "form")
     + msgHTML(msg)
+    + panel("questions", sectionHTML(T("form.questions"), `<div class="mini" style="margin-bottom:10px">
+      ${T("form.qNote")}</div>
+    ${questionsHTML(questions, canEdit, ed, form.lang === "en")}`))
+    + panel("settings", ""
     // 2026-11-06 自動儲存：兩個框都是 data-autosave="save-form"，每一格有 name，改了就存（main.js 的 onAutosave）。
     // 「刪掉這份表單」還是按鈕，會丟東西的不自動。
     // 2026-11-23 照做事的順序拆成三段（Paul：「the sequence… doesn't really make any sense」，他看過建議說做）：
     // 先取名字、寫說明，再出題目，最後才決定什麼時候開、開不開。以前「狀態」在題目上面，而沒有題目的表單開不了。
     // 存檔的框變成兩個（上面那段與下面那段），readForm() 是照 id 讀整頁的，哪一個框動了都存整份。
+    // 2026-11-24：題目自己一個分頁（上面那個 panel），名字與開關這兩段在「設定」分頁。兩個分頁都在畫面裡，所以 readForm() 照樣讀得到每一格。
     + sectionHTML(T("form.basics"), `<div data-autosave="save-form" data-id="${esc(form.id)}">
     <label><i>${T("form.name")}</i><input id="ftitle" name="title" value="${esc(form.title)}"${canEdit ? "" : " disabled"}></label>
     <label><i>${T("form.intro")}</i>
@@ -172,9 +186,6 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
       ${teamPick}
     </div>
     ${canEdit ? `<div class="form-foot">${autosaveHint("save-form")}</div>` : ""}</div>`)
-    + sectionHTML(T("form.questions"), `<div class="mini" style="margin-bottom:10px">
-      ${T("form.qNote")}</div>
-    ${questionsHTML(questions, canEdit, ed, form.lang === "en")}`)
     + sectionHTML(T("form.window"), `<div data-autosave="save-form" data-id="${esc(form.id)}">
     <div class="two">
       <!-- 開放與截止一律是台灣時間（2026-11-23）：活動編輯頁「報名」那一段有同樣的兩格，兩邊印的要是同一個時間。 -->
@@ -207,7 +218,7 @@ export function formHTML(form, questions, canEdit, teams, msg, busy, ed) {
       ${autosaveHint("save-form")}
       <span class="sp"></span>
       <button class="btn quiet" data-act="del-form">${T("form.deleteForm")}</button>
-    </div>` : ""}</div>`);
+    </div>` : ""}</div>`));
 }
 
 // 題目那一區：編輯／預覽切換，加上畫布（shared/forms.js 的 canvasHTML）。預覽是一個空的框，main.js 在上面 mount 引擎。
@@ -1995,12 +2006,12 @@ export function eventMembersHTML(e, me, busy) {
       <div class="ev-acts"><button class="btn ghost sm" data-act="members-open" data-ws="${esc(e.workspace_id)}" data-name="${esc(evTitle(e))}"${busy ? " disabled" : ""}>${T("ev.members")}</button></div>`, 'id="ev-members"');
 }
 // 最上面那一行：這場活動現在是什麼狀態（草稿、準備好了、對外中、撤下了），一句話，對外中的話有一顆「看對外的那一頁」。
-// 不是一整段，也沒有會改狀態的按鈕：那些按鈕在下面的「上線」那一段（內容、時間、報名都弄好了才輪到它），這裡有一顆帶你捲過去。
+// 不是一整段，也沒有會改狀態的按鈕：那些按鈕在「設定」分頁最上面的「上線」那一段（內容、時間、報名都弄好了才輪到它），這裡有一顆帶你過去。
 export function eventStateHTML(e) {
   const st = EV_STATUS.includes(e.status) ? e.status : "draft";
   const cls = st === "published" ? " open" : st === "ready" ? " warn" : st === "archived" ? "" : " draft";
   return `<div class="ev-state" id="ev-state"><span class="tag${cls}">${esc(T("ev.st." + st))}</span><span class="ev-state-t">${T("ev.top." + st)}</span><span class="sp"></span>${
-    st === "published" ? `<a class="btn ghost sm" href="/events/?e=${esc(encodeURIComponent(e.slug))}" target="_blank" rel="noopener">${T("ev.seePublic")}</a>` : ""}<button type="button" class="btn quiet sm" data-act="ev-tab" data-tab="live">${T("ev.jumpLive")}</button></div>`;
+    st === "published" ? `<a class="btn ghost sm" href="/events/?e=${esc(encodeURIComponent(e.slug))}" target="_blank" rel="noopener">${T("ev.seePublic")}</a>` : ""}<button type="button" class="btn quiet sm" data-act="ev-tab" data-tab="settings" data-go="ev-live">${T("ev.jumpLive")}</button></div>`;
 }
 // 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
 // canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
@@ -2014,7 +2025,7 @@ export function eventStateHTML(e) {
 //    2026-11-24 多了 tab（開著哪一個分頁）、spOpenIds（哪幾位講者那一行開著）。
 //
 // ── 這一頁怎麼排（2026-11-24 改成分頁；2026-11-23 那一版是一整頁十段照順序往下排）──
-// 最上面：頁首、訊息、一行狀態（eventStateHTML）、唯讀的提醒。再來是一排分頁（eventTabsHTML），底下是七個分頁的內容，一次只看得到一個。
+// 最上面：頁首、訊息、一行狀態（eventStateHTML）、唯讀的提醒。再來是一排分頁（RAIL.pageTabsHTML），底下是六個分頁的內容，一次只看得到一個。
 // 哪一段在哪一個分頁、預設開哪一個、為什麼沒選到的只能藏不能不畫，都寫在這支函式下面 EV_TABS 那一段。
 // 每一段還是一個 h2 加底下一塊或幾塊 .ev-panel，每一格的 id、name、data-act 都沒改，所以 main.js 讀字與存檔的路照舊。
 // 分頁裡的順序有測試守著（test/event-editor.test.mjs）。
@@ -2065,16 +2076,15 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
   // 回饋表（2026-11-24 從「活動之後」搬到「表單」分頁）。還在載或什麼都沒有的時候那一塊不畫，整段就不畫。
   const fb = eventFeedbackHTML(e, rc, canEdit, busy);
   const feedback = fb ? sectionHTML(T("ev.fbSec"), fb, { id: "ev-feedback" }) : "";
-  // ── 分頁（2026-11-24）── 每一個分頁是一個 <div class="ev-tabp">，沒選到的加 hidden。**七個都在畫面裡**，理由在 evTabs 上面那段註解。
+  // ── 分頁（2026-11-24）── 每一個分頁是一個 <div class="tabp">（shared/rail.js 的 pageTabsHTML 畫的），沒選到的加 hidden。**六個都在畫面裡**，理由在 evTabs 上面那段註解。
   const tab = evTabOf(e, o.tab, canEdit);
   const groups = {
     details: content + when,
     photos: pics,
     speakers: eventSpeakersHTML(e, o.speakers, canEdit, busy, o),
     forms: eventSignupHTML(e, form, signed, me, busy, eventTicketsHTML(e, o.tickets, canEdit, busy, o)) + feedback,
-    live: live + eventLinksHTML(e, evLinks, busy),
     results: after,
-    settings: listing + house,
+    settings: live + eventLinksHTML(e, evLinks, busy) + listing + house,
   };
   const counts = { photos: Array.isArray(o.photos) && canEdit ? o.photos.length : null, speakers: Array.isArray(o.speakers) ? o.speakers.length : null,
                    forms: rc === undefined ? null : (form ? 1 : 0) + ((rc && rc.forms) || []).length };
@@ -2083,36 +2093,33 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
     + msgHTML(msg)
     + eventStateHTML(e)
     + (canEdit ? "" : `<div class="note">${T("ev.readOnly")}</div>`)
-    + eventTabsHTML(list, tab, counts)
-    + list.map(k => `<div class="ev-tabp" data-tabp="${k}"${k === tab ? "" : " hidden"}>${groups[k]}</div>`).join("");
+    + RAIL.pageTabsHTML("ev", list.map(k => ({ key: k, label: T("evtab." + k), body: groups[k], n: counts[k] })),
+        { on: tab, act: "ev-tab", aria: T("evtab.aria"), keepEmpty: true });
 }
 // ── 活動編輯頁最上面那一排分頁（2026-11-24）──
 // Paul：「right now it's one page and it has like all the information that I need to fill in. Whereas when we open up the sign up pages, which is great…
 //        I can see the applicant settings and then jump into event… put everything that has the same categories on the top so I can just click them.
 //        For example… form… there's going to be a sign-up form, there's going to be a feedback form… and other settings at the bottom, there should be a category for that as well.」
-// 七個（他 2026-11-24 看過名單說「Yes, go ahead」）：
+// 一開始是七個（他 2026-11-24 看過名單說「Yes, go ahead」）。同一天他用過之後：「go live, that whole category can just be in settings… that's not a separate category」，
+// 所以「上線」那一個收進「設定」的最上面，剩六個：
 //   details  內容     名稱、一句話、說明；開始、結束、地點、名額、場地
 //   photos   照片     封面、活動照片
 //   speakers 講者     只有這場活動「改」以上的人有（讀的門也是「改」，其他人那一段本來就是空的）
 //   forms    表單     報名表（開關、開放與截止時間、題目、名單）、報名類型、行前信與簽到、回饋表
-//   live     上線     準備好了、放上對外頁、撤下來；行銷需求單與收支
 //   results  成果     出席與回饋的數字、記分卡
-//   settings 設定     對外的兩頁上怎麼列、屬於哪個專案、種類與屆別、誰能改這場活動
+//   settings 設定     上線（準備好了、放上對外頁、撤下來）、行銷需求單與收支、對外的兩頁上怎麼列、屬於哪個專案、種類與屆別、誰能改這場活動
 // 預設開哪一個：活動已經結束開「成果」（2026-11-13 Paul：「活動結束了點進來什麼都沒有」，以前是把那一段搬到最上面），其他開「內容」。
 // 開著哪一個記在網址（#events/<代號>/<分頁>，main.js 的 ev-tab），重新整理還在同一個分頁。
 //
 // ⚠ **沒選到的分頁只是藏起來（hidden），不能改成「不畫」。** main.js 的 readEvent() 是照 id 把整頁那幾格讀一遍一起存的（名稱、時間、地點、名額、封面連結…），
-//   哪一格不在畫面裡，讀到的就是空的，存下去會把那一欄清掉。test/event-editor.test.mjs 的「七個分頁都在畫面裡」守著這一條。
-export const EV_TABS = ["details", "photos", "speakers", "forms", "live", "results", "settings"];
+//   哪一格不在畫面裡，讀到的就是空的，存下去會把那一欄清掉。test/event-editor.test.mjs 的「六個分頁都在畫面裡」守著這一條。
+// 那一排按鈕與每一塊的外框是 shared/rail.js 的 pageTabsHTML 畫的（後台每一頁共用），這裡只決定有哪幾個、開哪一個。
+export const EV_TABS = ["details", "photos", "speakers", "forms", "results", "settings"];
 export const evTabs = canEdit => EV_TABS.filter(k => k !== "speakers" || canEdit);
+// 舊網址 #events/<代號>/live（「上線」還是一個分頁的時候存的書籤）帶到「設定」。
 export function evTabOf(e, want, canEdit) {
-  const list = evTabs(canEdit);
-  return list.includes(want) ? want : (evPast(e) ? "results" : "details");
-}
-export function eventTabsHTML(list, tab, counts) {
-  const c = counts || {};
-  return `<nav class="subtabs ev-tabs" id="ev-tabs" aria-label="${esc(T("evtab.aria"))}">${list.map(k =>
-    `<button type="button" class="subtab${k === tab ? " on" : ""}" data-act="ev-tab" data-tab="${k}"${k === tab ? ' aria-current="page"' : ""}>${T("evtab." + k)}${c[k] ? `<span class="subtab-n">${esc(String(c[k]))}</span>` : ""}</button>`).join("")}</nav>`;
+  const list = evTabs(canEdit), w = want === "live" ? "settings" : want;
+  return list.includes(w) ? w : (evPast(e) ? "results" : "details");
 }
 // 行銷與錢（2026-11-10）：掛在這場的需求單、這場的收支加總（links.money 是 null 就是這個人看不到財務，那一行不畫）。
 export function eventLinksHTML(e, links, busy) {

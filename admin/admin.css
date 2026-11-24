@@ -300,13 +300,18 @@ main > .fold{margin-bottom:24px}
   color:rgba(16,42,134,.72);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--dur-2) var(--ease)}
 .subtab:hover{color:var(--ink)}
 .subtab.on{color:var(--ink);border-bottom-color:var(--bt-orange)}
-/* 活動編輯頁那一排分頁（2026-11-24，七個）：跟表單頁的三個是同一種，多兩件事：分頁名字後面可以有一個小數字（幾張照片、幾位講者、幾張表單）；
-   手機上放不下就左右捲，不折成兩行。scroll-margin 是讓「捲回分頁那一排」的時候不會被上面浮著的頂欄蓋住。 */
-.ev-tabs{overflow-x:auto;scrollbar-width:none;scroll-margin-top:96px}
-.ev-tabs::-webkit-scrollbar{display:none}
-.ev-tabs .subtab{flex:none;white-space:nowrap}
+/* 一頁裡面的那一排分頁（2026-11-24；先是活動編輯頁，同一天搬成後台每一頁共用，shared/rail.js 的 pageTabsHTML 畫的）：
+   跟表單頁的那一排是同一種，多兩件事：分頁名字後面可以有一個小數字（幾張照片、幾位講者、幾張表單）；
+   手機上放不下就左右捲，不折成兩行。scroll-margin 是讓「捲回分頁那一排」的時候不會被上面浮著的頂欄蓋住。
+   .tabp 是一個分頁的那一塊，沒選到的帶 hidden：這裡不能給它 display，不然藏不住。 */
+.ptabs{overflow-x:auto;scrollbar-width:none;scroll-margin-top:96px}
+.ptabs::-webkit-scrollbar{display:none}
+.ptabs .subtab{flex:none;white-space:nowrap}
+a.subtab{text-decoration:none}
+/* 那一排前面不是頁首而是一排數字卡（Records 的一場活動）的時候，.subtabs 預設往上拉的 8px 會讓它貼到卡片，推回來。 */
+.rc-nums + .ptabs{margin-top:20px}
 .subtab-n{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;background:rgba(16,42,134,.1);font-family:var(--body);font-size:11.5px;font-weight:600;letter-spacing:0;line-height:18px;vertical-align:2px}
-.ev-tabp > .section:first-child{margin-top:0}
+.tabp > .section:first-child{margin-top:0}
 /* 內嵌表單：展開在清單上面的一張卡。 */
 .inline-form{border-color:rgba(255,196,108,.9);background:rgba(255,232,197,.35)}
 /* 批次列：選了人之後黏在底部，捲到名單最下面也按得到。 */

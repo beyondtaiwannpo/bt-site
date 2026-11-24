@@ -579,7 +579,10 @@ export const PROLES = ["student", "mentee", "mentor", "speaker", "organizer", "v
 export const PSTATUS = ["registered", "attended", "no-show", "cancelled"];
 export const OKINDS = ["applied", "admitted", "enrolled", "transferred", "graduated", "working", "gap", "other"];
 export const VIS = ["private", "internal", "aggregate", "public"];
-export const SUBS = ["questions", "people", "results", "log"];
+// 2026-11-24：「題目與設定」拆成「題目」與「設定」兩個分頁（Paul 看過活動編輯頁的分頁之後：「do the same thing… for the whole BT… sign up form should be like that, feedback form should be like that」）。
+// 設定那兩個框只在「設定」分頁裡畫，題目的畫布只在「題目」分頁裡畫：存設定的時候是把同名的框一起讀（allValues），兩個框都在同一個分頁，所以不會少讀。
+// 那一排分頁跟活動編輯頁同一個樣子（.subtabs），不再是藥丸。
+export const SUBS = ["questions", "settings", "people", "results", "log"];
 
 // 我在側欄上的等級：my_access() 的 records 那一格（edit 管得了、view 看得到）。
 export const rcLevel = me => String(((me && me.ws) || {})["records"] || "");
@@ -884,7 +887,14 @@ export function eventHTML(d, S) {
     // 2026-11-23：「種類與屆別」搬到最下面（跟活動編輯頁同一次重排，那邊也搬到「其他設定」）。它是分類用的、很少改。
     // 同一天第二輪（Paul：「do all of them」）：「檢討」從最上面搬到留言後面。那一段自己的說明寫的是先看完再填一句，
     // 所以順序是：誰來了（場次、出席、配對）→ 他們說了什麼（回饋表、分數、留言）→ 檢討 → 分類。
-    + sessHTML + partHTML + pairsHTML + formsHTML + scalesHTML + commentsHTML + reviewHTML + settings;
+    // 2026-11-24：八塊疊成一長條，收成四個分頁（Paul：「do the same thing… for the whole BT」）。上面那一排數字留在分頁外面，換哪一個分頁都看得到。
+    // 每一塊照樣都在畫面裡，沒選到的只是藏起來：main.js 存場次、出席、檢討、種類的時候是照 data-sessions、data-parts、data-review、data-evmeta 去找那一塊的。
+    + RAIL.pageTabsHTML("rc-event", [
+        { key: "attendance", label: T("rtab.attendance"), body: sessHTML + partHTML + pairsHTML, n: parts.length },
+        { key: "feedback", label: T("rtab.feedback"), body: formsHTML + scalesHTML + commentsHTML, n: forms.length },
+        { key: "review", label: T("rtab.review"), body: reviewHTML },
+        { key: "settings", label: T("rtab.settings"), body: settings },
+      ], { aria: T("rtab.evAria") });
 }
 // 從畫面讀：場次、出席狀態、檢討、活動設定。
 export function readSessions(box) {
@@ -922,7 +932,7 @@ export function formHeadHTML(r, sub) {
     if (f.status === "open") acts.push({ act: "form-status", id: "closed", label: T("ed.close") });
     if (f.status === "closed") acts.push({ act: "form-status", id: "open", label: T("ed.reopen") });
   }
-  const tabs = `<div class="chips tf-tabs" role="tablist">${SUBS.map(s => `<a class="chip${s === sub ? " on" : ""}" role="tab" aria-selected="${s === sub}" href="#forms/${esc(f.id)}/${s}" data-act="sub" data-t="${s}">${esc(T("ed.tab." + s))}</a>`).join("")}</div>`;
+  const tabs = `<nav class="subtabs ptabs" aria-label="${esc(T("ed.tabs"))}">${SUBS.map(s => `<a class="subtab${s === sub ? " on" : ""}"${s === sub ? ' aria-current="page"' : ""} href="#forms/${esc(f.id)}/${s}" data-act="sub" data-t="${s}">${esc(T("ed.tab." + s))}</a>`).join("")}</nav>`;
   const link = f.status === "open" ? `<div class="note rc-link"><b>${esc(T("form.linkLabel"))}</b> <input readonly value="${esc(feedbackURL(f.token))}" id="rc-link" data-noauto="1"> <button class="btn ghost sm" data-act="copy-link">${esc(T("form.copy"))}</button><div class="mini">${esc(T("form.linkHint"))}</div></div>` : "";
   return pageHead(`${esc(f.title || "")} ${statusTag(f.status)} <span class="tag">${esc(T("fkind." + f.kind))}</span>`, `${f.event_title ? esc(f.event_title) + "・" : ""}${esc(T("form.count", { n: f.responses || 0 }))}`, acts, { act: "back-forms", label: T("ed.back") })
     + (edit ? "" : `<div class="note">${esc(T("ed.readonly"))}</div>`) + link + tabs;
@@ -934,9 +944,10 @@ export function formHeadHTML(r, sub) {
 export function formEditHTML(r, S) {
   const f = r.form || {}, edit = !!r.can_edit, dis = edit ? "" : " disabled", events = (S.boot && S.boot.events) || [], terms = (S.boot && S.boot.terms) || [];
   const anonLocked = f.anonymous && (f.responses || 0) > 0;
-  // 2026-11-23 照做事的順序拆成三段（跟 /admin/ 的申請表編輯頁同一套）：名稱與說明 → 題目 → 截止時間。
-  // 語言與匿名留在上面那一段：兩個都會改畫布上加得了哪些題型，要在出題之前定。開放與關閉是頁首那顆鈕。
+  // 2026-11-23 照做事的順序拆成三段：名稱與說明 → 題目 → 截止時間。2026-11-24 題目自己一個分頁，另外兩段在「設定」分頁（S.sub）。
+  // 語言與匿名會改畫布上加得了哪些題型，要在出題之前定；開一張新的表單的時候這兩個已經選過了。開放與關閉是頁首那顆鈕。
   // 存檔的框變成上下兩個，都是 rc-save；readFormEditor 兩個框一起讀，動哪一個都存整份。data-part 是存完要把「存好了」印回哪一個框。
+  if (S.sub !== "settings") return msgHTML(S.msg) + sectionHTML(T("ed.questions"), questionsHTML(r, S));
   return msgHTML(S.msg) + `<div data-autosave="rc-save" data-part="top" data-id="${esc(f.id)}">`
     + sectionHTML(T("ed.basics"), `<div class="tf-settings">
       <label><i>${esc(T("ed.name"))}</i><input name="title" value="${esc(f.title)}" maxlength="200"${dis}></label>
@@ -949,7 +960,6 @@ export function formEditHTML(r, S) {
       <div class="mini">${esc(T("form.consentNote"))}</div>
       ${edit ? `<div class="form-foot">${autosaveHint("rc-save")}</div>` : ""}</div>`)
     + `</div>`
-    + sectionHTML(T("ed.questions"), questionsHTML(r, S))
     + `<div data-autosave="rc-save" data-part="bottom" data-id="${esc(f.id)}">`
     + sectionHTML(T("ed.window"), `<div class="tf-settings">
       <label><i>${esc(T("ed.closes"))}</i><input type="datetime-local" name="closes_at" value="${esc(dtLocal(f.closes_at))}"${dis}></label>
@@ -1288,7 +1298,7 @@ export function peopleHTML(boot, S) {
   const tab = S.ptab === "dups" || S.ptab === "add" ? S.ptab : "dir";
   const n = Array.isArray(S.dir) ? S.dir.length : ((b.counts || {}).people || 0);
   const tabs = [["dir", T("dir.tab", { n })], ["dups", T("dir.dupTab", { n: dups.filter(d => (Array.isArray(d.members) ? d.members.length >= 2 : !!d.a)).length })]].concat(b.can_manage ? [["add", T("dir.addTab")]] : []);
-  const tabHTML = `<div class="chips tf-tabs" role="tablist">${tabs.map(([k, l]) => `<button class="chip${k === tab ? " on" : ""}" role="tab" aria-selected="${k === tab}" data-act="ptab" data-t="${k}">${esc(l)}</button>`).join("")}</div>`;
+  const tabHTML = `<nav class="subtabs ptabs" aria-label="${esc(T("pp.title"))}">${tabs.map(([k, l]) => `<button type="button" class="subtab${k === tab ? " on" : ""}"${k === tab ? ' aria-current="page"' : ""} data-act="ptab" data-t="${k}">${esc(l)}</button>`).join("")}</nav>`;
   const cards = dups.filter(d => (Array.isArray(d.members) ? d.members.length >= 2 : !!d.a));   // 只剩 set_aside 的群不算一張卡
   const dupHTML = sectionHTML(T("pp.dups", { n: cards.length }), cards.length ? `<div class="mini">${esc(T("pp.dupsHint"))} ${esc(T("dup.groupHint"))}</div>${cards.map(d => dupGroupHTML(d, S.busy, !!(S.me && S.me.pres))).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`) + dupAsideHTML(dups, S.busy);
   const add = b.can_manage ? sectionHTML(T("pp.add"), `<div data-padd><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" maxlength="60"></label></div>
@@ -1602,9 +1612,19 @@ export function personHTML(d, S) {
   // 順序：他是誰（標籤、基本資料、個人檔案）→ BT 跟他的關係 → 他自己寫的與同意的 → 當講者的活動 → 個人連結與聯絡方式（傳連結要用）→ 原本的時間軸。
   // 已經移除的人那幾塊不畫：個人檔案、標籤、連結在移除時一起清掉了。
   const network = !net ? `<div class="note">${esc(T("net.noSql"))}</div>` : p.forgotten_at ? "" : null;
-  const top = network != null ? network + edit
-    : personLabelsHTML(d, S, canEdit) + edit + personProfileHTML(d, S, canEdit) + personRelHTML(d, S, canEdit) + personStoryHTML(d) + personConsentHTML(d, S, canEdit) + personSpeakingHTML(d) + personLinkHTML(d, S, canEdit);
-  return head + aliasHTML + msgHTML(S.msg) + top + ctHTML + schHTML + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
+  // 2026-11-24：這一頁疊到十幾塊，收成四個分頁（Paul：「do the same thing… for the whole BT」）。照上面那個順序分：
+  //   details  基本資料    他是誰：標籤、基本資料、個人檔案、聯絡方式、學校
+  //   bt       參與紀錄    BT 跟他的關係、幹部職位、參加過的活動、當講者的活動、配對、去向
+  //   voice    故事與同意  他自己寫的故事、他同意了什麼、個人連結、他填過的回饋
+  //   settings 設定        移除的要求（只有 Co-President 有，其他人沒有這個分頁）
+  // 遷移檔還沒跑的那一句提醒（network）留在分頁外面。看不到的那一塊是空字串，整個分頁都空的就不畫那個分頁。
+  const on = network == null;
+  return head + aliasHTML + msgHTML(S.msg) + (network || "") + RAIL.pageTabsHTML("rc-person", [
+    { key: "details", label: T("ptab.details"), body: (on ? personLabelsHTML(d, S, canEdit) : "") + edit + (on ? personProfileHTML(d, S, canEdit) : "") + ctHTML + schHTML },
+    { key: "bt", label: T("ptab.bt"), body: (on ? personRelHTML(d, S, canEdit) : "") + posHTML + partHTML + (on ? personSpeakingHTML(d) : "") + pairHTML + outHTML, n: parts.length },
+    { key: "voice", label: T("ptab.voice"), body: (on ? personStoryHTML(d) + personConsentHTML(d, S, canEdit) + personLinkHTML(d, S, canEdit) : "") + respHTML },
+    { key: "settings", label: T("ptab.settings"), body: forget },
+  ], { aria: T("ptab.aria") });
 }
 // 年度比較。
 // ── 年度比較（2026-12-04 改版，Paul：「it looks really messy and pointless, make filters」）──

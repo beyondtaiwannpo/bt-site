@@ -214,7 +214,9 @@ export const MINE = {
 
   // 編輯畫面
   "ed.back":          { zh: "回表單清單", en: "Back to forms" },
-  "ed.tab.questions": { zh: "題目與設定", en: "Questions & settings" },
+  "ed.tabs":          { zh: "這張表單的分頁", en: "Sections of this form" },
+  "ed.tab.questions": { zh: "題目", en: "Questions" },
+  "ed.tab.settings":  { zh: "設定", en: "Settings" },
   "ed.tab.people":    { zh: "發給誰、誰看得到", en: "Who gets it, who reads it" },
   "ed.tab.results":   { zh: "結果", en: "Results" },
   "ed.tab.log":       { zh: "改過什麼", en: "History" },
