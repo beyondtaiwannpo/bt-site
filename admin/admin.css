@@ -412,8 +412,64 @@ div.ev-help,p.ev-help{margin:0 0 10px}
 /* 講者與報名類型（2027-01-02）。一位講者一列：左邊圓的照片（沒有照片是一個色塊加名字的第一個字），右邊是那幾格與按鈕。
    報名類型一種一列，放在 .ev-panel 裡，列跟列之間一條線。手機上照片搬到那幾格的上面。 */
 .ev-sp-list,.ev-tk-list{list-style:none;margin:0 0 14px;padding:0}
-.ev-sp{display:flex;gap:16px;align-items:flex-start;padding:14px 0;border-top:1px dotted rgba(16,42,134,.16)}
-.ev-sp:first-child{border-top:0;padding-top:4px}
+/* 2026-11-24：一位講者收成一行（真的 <details>）。收著：箭頭、小的圓照片、名字、學校與主題，右邊兩顆排順序的箭頭。打開才是那幾格。 */
+.ev-sp{border-top:1px dotted rgba(16,42,134,.16)}
+.ev-sp:first-child{border-top:0}
+.ev-sp-fold > summary{list-style:none;display:flex;align-items:center;gap:12px;padding:8px 6px;cursor:pointer;border-radius:12px}
+.ev-sp-fold > summary::-webkit-details-marker{display:none}
+.ev-sp-fold > summary:hover{background:rgba(16,42,134,.04)}
+.ev-sp-fold > summary .sp{flex:1}
+.ev-sp-fold .chev{flex:none;width:8px;height:8px;border-right:2px solid var(--bt-navy);border-bottom:2px solid var(--bt-navy);transform:rotate(-45deg);transition:transform var(--dur-2) var(--ease);margin:0 2px 0 4px}
+.ev-sp-fold[open] > summary .chev{transform:rotate(45deg)}
+.ev-sp-who{display:flex;flex-direction:column;min-width:0;line-height:1.35}
+.ev-sp-who b{font-size:15.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-sp-who .mini{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-sp-fold > .ev-sp-f{padding:4px 6px 16px 34px}
+/* 排順序的箭頭（照片底下的左右、講者與報名類型的上下）。一顆一個方的小按鈕，手指按得到。 */
+.ev-mv{display:inline-flex;gap:4px;flex:none}
+.ev-arrow{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:32px;padding:0 8px;border-radius:9px;
+  border:1px solid rgba(16,42,134,.3);background:rgba(255,255,255,.55);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1;cursor:pointer}
+.ev-arrow:hover{background:var(--bt-orange);border-color:var(--bt-orange)}
+.ev-arrow[disabled]{opacity:.3;cursor:default;background:none}
+/* 活動照片的小圖（2026-11-24）：一格一格的方形小圖，三十張在桌機上大約四排。對外看不到的那幾張變淡、左上角一個標籤。 */
+.ev-thumbs{list-style:none;margin:0 0 6px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px 10px}
+.ev-thumb{position:relative;min-width:0}
+.ev-thumb-b{display:block;width:100%;padding:0;border:1px solid rgba(16,42,134,.18);border-radius:10px;overflow:hidden;background:rgba(16,42,134,.08);cursor:zoom-in}
+.ev-thumb-b img{display:block;width:100%;aspect-ratio:1;object-fit:cover}
+.ev-thumb-b:hover{border-color:var(--ink)}
+.ev-thumb.off .ev-thumb-b img{opacity:.45}
+.ev-thumb-tag{position:absolute;top:6px;left:6px;pointer-events:none;background:var(--bt-cream)}
+.ev-thumb-mv{display:flex;gap:4px;margin-top:5px}
+.ev-thumb-mv .ev-arrow{flex:1;min-width:0;height:30px}
+.ev-thumbs-tip{margin:0 0 12px}
+/* 放大的那一格：畫面中間一張卡，後面整頁變暗。它掛在 <body> 底下（不在 #bt-root 裡），所以字體與按鈕的底要自己寫一次。 */
+.ev-lb{border:0;padding:0;margin:auto;width:min(1080px,calc(100vw - 24px));max-width:none;max-height:calc(100dvh - 24px);border-radius:18px;
+  background:var(--paper);color:var(--ink);font-family:var(--body);line-height:1.55;box-shadow:0 24px 80px rgba(16,42,134,.35);overflow:hidden}
+.ev-lb::backdrop{background:rgba(16,42,134,.72)}
+.ev-lb:focus{outline:none}
+.ev-lb button{font-family:var(--body);cursor:pointer}
+.ev-lb :focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+.ev-lb-in{display:flex;flex-direction:column;max-height:calc(100dvh - 24px)}
+.ev-lb-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(16,42,134,.14)}
+.ev-lb-bar .sp{flex:1}
+.ev-lb-n{font-family:var(--display);font-size:18px;letter-spacing:.04em}
+.ev-lb-stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;background:rgba(16,42,134,.06)}
+.ev-lb-img{flex:0 1 auto;min-width:0;max-width:100%;max-height:calc(100dvh - 250px);object-fit:contain;border-radius:10px}
+.ev-lb-nav{flex:none;width:52px;height:76px;border-radius:14px;border:1px solid rgba(16,42,134,.3);background:rgba(255,255,255,.75);color:var(--ink);font-size:26px;line-height:1}
+.ev-lb-nav:hover{background:var(--bt-orange);border-color:var(--bt-orange)}
+.ev-lb-foot{padding:12px 16px 14px;border-top:1px solid rgba(16,42,134,.14)}
+.ev-lb-foot .check{margin:0 0 4px}
+.ev-lb-foot .ev-acts{margin:8px 0 0}
+.ev-lb-msg{margin:0 16px 14px}
+@media (max-width:640px){
+  .ev-lb{width:calc(100vw - 12px);max-height:calc(100dvh - 12px);border-radius:14px}
+  .ev-lb-in{max-height:calc(100dvh - 12px)}
+  .ev-lb-stage{padding:8px 6px;gap:6px}
+  .ev-lb-nav{width:40px;height:64px;font-size:22px}
+  .ev-lb-img{max-height:calc(100dvh - 300px)}
+  .ev-thumbs{grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px 8px}
+  .ev-sp-fold > .ev-sp-f{padding-left:6px}
+}
 .ev-sp-pic{flex:none;width:72px;height:72px;border-radius:50%;object-fit:cover;background:rgba(16,42,134,.1);display:flex;align-items:center;justify-content:center;
   font-family:var(--display);font-size:28px;font-weight:700;line-height:1;color:rgba(16,42,134,.72)}
 .ev-sp-f{flex:1;min-width:0}
@@ -433,7 +489,6 @@ div.ev-help,p.ev-help{margin:0 0 10px}
 @media (max-width:640px){
   .ev-panel{padding:14px 14px}
   .ev-acts .btn{flex:1 1 auto}
-  .ev-sp{flex-direction:column;gap:10px}
 }
 /* 行銷需求單（2026-10-31）：一張單的欄位表、說明保留換行、收回的那一列淡掉。 */
 .rq-dl{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 14px;margin:0;font-size:14px}

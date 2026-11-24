@@ -1686,7 +1686,13 @@ export function eventCoverHTML(e, canEdit, busy, x) {
 }
 // 活動照片（好幾張）。photos 是 event_photos_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是照片。
 // 讀與寫的門都是「這場活動改得動」（資料庫的 can_edit），所以只有「看」的人整塊不畫。x.photoUp 是上傳進度 { pct, name, i, n }。
-// 每一張自己勾同意（勾了就送，main.js 聽 change）；沒勾的不會出現在對外頁，那道門在資料庫的 public_event_extras()。
+// 2026-11-24 改成一格一格的小圖（Paul：「the photo is way too big. If I have like 30 photos on them, there'll be no place to fit…
+//   whenever I press them it's gonna pop up in the middle, and then I can tap right or left, and then change early and later to the arrow sign」）：
+//   每一格只有照片與底下兩顆箭頭（往前一格、往後一格）；點照片在畫面中間放大（evLightboxHTML，main.js 管那個 <dialog>），
+//   同意、拿掉這張都在放大的那一格裡。對外看不到的那幾張，小圖上有一個標籤、照片變淡。
+// 沒勾同意的不會出現在對外頁，那道門在資料庫的 public_event_extras()，這裡只是換了畫法。
+export const evArrow = (act, id, dir, label, off, glyph) =>
+  `<button type="button" class="ev-arrow" data-act="${act}" data-id="${esc(id)}" data-dir="${dir}" aria-label="${esc(label)}" title="${esc(label)}"${off ? " disabled" : ""}>${glyph}</button>`;
 export function eventPhotosHTML(e, photos, canEdit, busy, x) {
   if (!canEdit) return "";
   const o = x || {}, up = o.photoUp, dis = busy ? " disabled" : "";
@@ -1694,20 +1700,39 @@ export function eventPhotosHTML(e, photos, canEdit, busy, x) {
   const head = `${T("ev.photos")}${Array.isArray(photos) ? ` <span class="hint">${photos.length}</span>` : ""}`;
   if (photos === undefined) return evPanel(head, `<div class="mini">${T("loading")}</div>`, 'id="ev-photos"');
   if (!Array.isArray(photos)) return evPanel(head, `<div class="note">${T("ev.photosNeedsSql")}</div>`, 'id="ev-photos"');
-  const live = e.status === "published";
-  const card = (p, i) => `<li class="hi-photo">
-      <img src="${esc(p.url)}" alt="" loading="lazy">
-      <div class="hi-photo-f">
-        <div class="ev-ph-state"><span class="tag${p.consent && live ? " open" : p.consent ? " ok" : " draft"}">${T(p.consent ? (live ? "ev.phPublic" : "ev.phReady") : "ev.phHidden")}</span></div>
-        <label class="check"><input type="checkbox" data-act="ev-ph-consent" data-noauto="1" data-id="${esc(p.id)}"${p.consent ? " checked" : ""}${dis}><span>${T("ev.consent")}</span></label>
-        <div class="ev-acts"><button class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>${T("ev.phUp")}</button><button class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="1"${i === photos.length - 1 || busy ? " disabled" : ""}>${T("ev.phDown")}</button><span class="sp"></span><button class="btn quiet danger sm" data-act="ev-ph-del" data-id="${esc(p.id)}"${dis}>${T("ev.phDel")}</button></div>
-      </div></li>`;
+  const n = photos.length;
+  const card = (p, i) => `<li class="ev-thumb${p.consent ? "" : " off"}">
+      <button type="button" class="ev-thumb-b" data-act="ev-ph-open" data-id="${esc(p.id)}" aria-label="${esc(T("ev.phOpen", { i: i + 1, n }))}"><img src="${esc(p.url)}" alt="" loading="lazy"></button>
+      ${p.consent ? "" : `<span class="tag draft ev-thumb-tag">${T("ev.phHidden")}</span>`}
+      <div class="ev-thumb-mv">${evArrow("ev-ph-move", p.id, -1, T("ev.phEarlier"), i === 0 || busy, "←")}${evArrow("ev-ph-move", p.id, 1, T("ev.phLater"), i === n - 1 || busy, "→")}</div></li>`;
   const pick = up
     ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(up.n > 1 ? T("ev.uploadingN", { name: up.name || "", i: up.i || 1, n: up.n }) : T("ev.uploading", { name: up.name || "" }))}</span></div>`
     : `<label class="hi-upload"><i>${T("ev.photosPick")}</i><input type="file" id="ev-photo-files" accept="image/*" multiple data-id="${esc(e.id)}"${dis}></label>`;
   return evPanel(`${head} <span class="hint">${T("ev.photosHint")}</span>`, `<div class="note">${T("ev.photosNote")}</div>
-      ${photos.length ? `<ul class="hi-photos">${photos.map(card).join("")}</ul>` : `<p class="ev-line">${T("ev.photosNone")}</p>`}
+      ${n ? `<ul class="ev-thumbs">${photos.map(card).join("")}</ul><div class="ev-help ev-thumbs-tip">${T("ev.photosTip")}</div>` : `<p class="ev-line">${T("ev.photosNone")}</p>`}
       ${pick}`, 'id="ev-photos"');
+}
+// 放大的那一格要看哪一張：往左往右一張，到頭就繞回另一頭。找不到現在那一張（剛被拿掉）回 null。純函式，test/event-editor.test.mjs 有測。
+export function evLbStep(photos, id, dir) {
+  const list = Array.isArray(photos) ? photos : [], i = list.findIndex(p => p.id === id);
+  if (i < 0 || !list.length) return null;
+  return list[(i + (Number(dir) < 0 ? -1 : 1) + list.length) % list.length].id;
+}
+// 放大的那一格裡面的 HTML（main.js 把它放進 <dialog id="ev-lb">）。找不到那一張回空字串，main.js 就把那一格關掉。
+// 上面一行：第幾張、對外看不看得到、關掉。中間：左右兩顆大的箭頭換照片（只有一張就不畫）。
+// 下面：同意那個勾（跟以前每一張底下的是同一個 data-act，勾了就送）、往前一格與往後一格、拿掉這張。
+// 往前往後按了之後這一格跟著同一張照片走，所以可以連按，一路把一張照片排到想要的位置。
+export function evLightboxHTML(e, photos, id, busy) {
+  const list = Array.isArray(photos) ? photos : [], i = list.findIndex(p => p.id === id);
+  if (i < 0) return "";
+  const p = list[i], n = list.length, dis = busy ? " disabled" : "", live = e && e.status === "published";
+  const nav = (dir, label, glyph) => n < 2 ? "" : `<button type="button" class="ev-lb-nav" data-act="ev-lb-go" data-dir="${dir}" aria-label="${esc(label)}" title="${esc(label)}">${glyph}</button>`;
+  return `<div class="ev-lb-bar"><b class="ev-lb-n">${esc(T("ev.lbCount", { i: i + 1, n }))}</b><span class="tag${p.consent && live ? " open" : p.consent ? " ok" : " draft"}">${T(p.consent ? (live ? "ev.phPublic" : "ev.phReady") : "ev.phHidden")}</span><span class="sp"></span><button type="button" class="btn ghost sm" data-act="ev-lb-close">${T("ev.lbClose")}</button></div>
+    <div class="ev-lb-stage">${nav(-1, T("ev.lbPrev"), "←")}<img class="ev-lb-img" src="${esc(p.url)}" alt="">${nav(1, T("ev.lbNext"), "→")}</div>
+    <div class="ev-lb-foot">
+      <label class="check"><input type="checkbox" data-act="ev-ph-consent" data-noauto="1" data-id="${esc(p.id)}"${p.consent ? " checked" : ""}${dis}><span>${T("ev.consent")}</span></label>
+      <div class="ev-acts"><button type="button" class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>← ${T("ev.phEarlier")}</button><button type="button" class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="1"${i === n - 1 || busy ? " disabled" : ""}>${T("ev.phLater")} →</button><span class="sp"></span><button type="button" class="btn quiet danger sm" data-act="ev-ph-del" data-id="${esc(p.id)}"${dis}>${T("ev.phDel")}</button></div>
+    </div>`;
 }
 // ── 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）──
 // 下面這幾支純函式 test/event-speakers-tickets.test.mjs 有測。
@@ -1801,26 +1826,32 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
   if (speakers === undefined) return sectionHTML(head, evPanel("", `<div class="mini">${T("loading")}</div>`), { id: "ev-speakers" });
   if (!Array.isArray(speakers)) return sectionHTML(head, evPanel("", `<div class="note">${T("ev.spNeedsSql")}</div>`), { id: "ev-speakers" });
   const live = e.status === "published";
-  const face = (name, url) => url ? `<img class="ev-sp-pic" src="${esc(url)}" alt="">` : `<span class="ev-sp-pic" aria-hidden="true">${esc(evInitial(name))}</span>`;
+  const face = (name, url, sz) => url ? `<img class="ev-sp-pic${sz || ""}" src="${esc(url)}" alt="">` : `<span class="ev-sp-pic${sz || ""}" aria-hidden="true">${esc(evInitial(name))}</span>`;
   const fields = (v, idp) => `<div class="two">
           <label><i>${T("ev.spName")}</i><input data-f="display_name"${idp ? ` id="${idp}-name"` : ""} value="${esc(v.display_name)}" maxlength="60" autocomplete="off"${dis}></label>
           <label><i>${T("ev.spSubject")}</i><input data-f="subject" value="${esc(v.subject)}" maxlength="120" autocomplete="off"${dis}></label>
           <label><i>${T("ev.spSchool")}</i><input data-f="school" value="${esc(v.school)}" maxlength="120" autocomplete="off"${dis}></label>
         </div>`;
+  // 2026-11-24 每一位收成一行（Paul：「it's like a whole chunk of information I need to fill out, and that's not necessary to see」）：
+  // 收著的時候只有照片、名字、學校與主題，右邊兩顆箭頭排順序；點那一行打開才是那幾格、換照片、同意、存、拿掉。
+  // 是真的 <details>，哪幾位開著 main.js 記在 x.spOpenIds（重畫後還開著）；照片正在傳的那一位一定開著。
+  // 收著的那幾格還在畫面裡（只是看不到），所以打到一半的字不會因為收起來就不見（keepPanelsTyped 照樣收得到）。
   const card = (sp, i) => {
     const v = evRowVals(sp, SP_KEYS), mine = up && up.id === sp.id;
     const pick = mine
       ? `<div class="hi-up"><progress value="${esc(String(up.pct || 0))}" max="100"></progress> <span class="mini">${esc(T("ev.uploading", { name: up.name || "" }))}</span></div>`
       : `<label class="hi-upload"><i>${T(sp.photo_url ? "ev.spPhotoChange" : "ev.spPhotoPick")}</i><input type="file" accept="image/*" data-act="ev-sp-photo" data-id="${esc(sp.id)}"${dis}></label>`;
-    return `<li class="ev-sp" data-sp-row data-id="${esc(sp.id)}">
-      ${face(sp.display_name, sp.photo_url)}
+    const open = mine || !!(o.spOpenIds && o.spOpenIds[sp.id]);
+    const sub = [sp.school, sp.subject].map(t => String(t || "").trim()).filter(Boolean).join("・");
+    return `<li class="ev-sp" data-sp-row data-id="${esc(sp.id)}"><details class="ev-sp-fold" data-sp-fold="${esc(sp.id)}"${open ? " open" : ""}>
+      <summary><span class="chev" aria-hidden="true"></span>${face(sp.display_name, sp.photo_url, " sm")}<span class="ev-sp-who"><b>${esc(sp.display_name || "")}</b>${sub ? `<span class="mini">${esc(sub)}</span>` : ""}</span>${sp.consent ? "" : `<span class="tag draft">${T("ev.spHidden")}</span>`}<span class="sp"></span><span class="ev-mv">${evArrow("ev-sp-move", sp.id, -1, T("ev.mvUp"), i === 0 || busy, "↑")}${evArrow("ev-sp-move", sp.id, 1, T("ev.mvDown"), i === speakers.length - 1 || busy, "↓")}</span></summary>
       <div class="ev-sp-f">
         <div class="ev-ph-state"><span class="tag${sp.consent && live ? " open" : sp.consent ? " ok" : " draft"}">${T(sp.consent ? (live ? "ev.spPublic" : "ev.spReady") : "ev.spHidden")}</span>${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}</div>
         ${fields(v)}
         ${pick}
         <label class="check"><input type="checkbox" data-act="ev-sp-consent" data-id="${esc(sp.id)}"${sp.consent ? " checked" : ""}${dis}><span>${T("ev.spConsent")}</span></label>
-        <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button><button class="btn ghost sm" data-act="ev-sp-move" data-id="${esc(sp.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>${T("ev.phUp")}</button><button class="btn ghost sm" data-act="ev-sp-move" data-id="${esc(sp.id)}" data-dir="1"${i === speakers.length - 1 || busy ? " disabled" : ""}>${T("ev.phDown")}</button>${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
-      </div></li>`;
+        <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button>${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
+      </div></details></li>`;
   };
   const d = o.spDraft || {};
   const found = o.spFound;
@@ -1860,7 +1891,7 @@ export function eventTicketsHTML(e, tickets, canEdit, busy, x) {
         <p class="ev-line"><b>${esc(evTicketName(t))}</b>・${esc(evTicketFacts(t))}${evTicketFull(t) ? ` <span class="tag warn">${T("ev.tkFull")}</span>` : ""}</p>
         ${fields(evRowVals(t, TK_KEYS))}
         ${Number(t.used) > 0 ? `<div class="mini">${T("ev.tkInUse", { n: Number(t.used) })}</div>` : ""}
-        <div class="ev-acts"><button class="btn sm" data-act="ev-tk-save" data-id="${esc(t.id)}"${dis}>${T("ev.tkSave")}</button><button class="btn ghost sm" data-act="ev-tk-move" data-id="${esc(t.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>${T("ev.phUp")}</button><button class="btn ghost sm" data-act="ev-tk-move" data-id="${esc(t.id)}" data-dir="1"${i === tickets.length - 1 || busy ? " disabled" : ""}>${T("ev.phDown")}</button>${Number(t.used) > 0 ? "" : `<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-tk-del" data-id="${esc(t.id)}"${dis}>${T("ev.tkDel")}</button>`}</div>
+        <div class="ev-acts"><button class="btn sm" data-act="ev-tk-save" data-id="${esc(t.id)}"${dis}>${T("ev.tkSave")}</button><span class="ev-mv">${evArrow("ev-tk-move", t.id, -1, T("ev.mvUp"), i === 0 || busy, "↑")}${evArrow("ev-tk-move", t.id, 1, T("ev.mvDown"), i === tickets.length - 1 || busy, "↓")}</span>${Number(t.used) > 0 ? "" : `<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-tk-del" data-id="${esc(t.id)}"${dis}>${T("ev.tkDel")}</button>`}</div>
       </li>`;
   const add = foldHTML("ev-tk-new", T("ev.tkNew"), `<div id="ev-tk-new-box" data-ev="${esc(e.id)}">${fields(evRowVals({ typed: o.tkDraft || {} }, TK_KEYS), "ev-tk-new")}
       <div class="ev-acts"><button class="btn sm" data-act="ev-tk-add" data-id="${esc(e.id)}"${dis}>${T("ev.tkAdd")}</button></div></div>`, !!o.tkOpen);

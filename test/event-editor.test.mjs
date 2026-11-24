@@ -188,24 +188,27 @@ test("★ 封面：主要是選檔案，貼連結收在一格裡；同意與「�
   assert.match(ro, /<input id="ev-cover" name="cover_url" value="[^"]+" placeholder="https:\/\/…" readonly>/);
 });
 
-test("★ 活動照片：每一張自己勾同意（預設沒勾）、可以往前往後、可以拿掉；一次可以選好幾張；改不動的人整塊不畫", () => {
+// 2026-11-24 改成一格一格的小圖（Paul：「the photo is way too big. If I have like 30 photos on them, there'll be no place to fit」）。
+// 小圖上只有照片與兩顆箭頭；同意、拿掉這張搬到放大的那一格（下一條測試）。
+test("★ 活動照片：一格一格的小圖，點了放大；底下兩顆箭頭排順序；對外看不到的有標籤；一次可以選好幾張；改不動的人整塊不畫", () => {
   const h = F.eventPhotosHTML(EV, PHOTOS, true, false, {});
   assert.match(h, /^<div class="ev-panel" id="ev-photos"><h3>活動照片 <span class="hint">3<\/span>/, "2026-11-23 起是「照片」那一段裡的一塊，不是自己一整段");
-  assert.equal(count(h, /<li class="hi-photo">/g), 3);
+  assert.match(h, /<ul class="ev-thumbs">/); assert.doesNotMatch(h, /hi-photo/, "不再用歷史頁那種一張一大格的版面");
+  assert.equal(count(h, /<li class="ev-thumb(?: off)?">/g), 3); assert.equal(count(h, /<li class="ev-thumb off">/g), 2, "沒勾同意的那兩張變淡");
   assert.equal(count(h, /<img src="[^"]+" alt="" loading="lazy">/g), 3);
-  assert.equal(count(h, /data-act="ev-ph-consent" data-noauto="1"/g), 3);
-  assert.match(h, /data-act="ev-ph-consent" data-noauto="1" data-id="p1" checked>/); assert.match(h, /data-act="ev-ph-consent" data-noauto="1" data-id="p2">/);
-  assert.equal(count(h, /這張照片裡的人與那場活動都在拍攝同意範圍內/g), 3, "同意那句話跟封面的一字不差");
-  assert.match(h, /data-act="ev-ph-move" data-id="p1" data-dir="-1" disabled>往前/, "第一張不能再往前");
-  assert.match(h, /data-act="ev-ph-move" data-id="p1" data-dir="1">往後/);
-  assert.match(h, /data-act="ev-ph-move" data-id="p3" data-dir="1" disabled>往後/, "最後一張不能再往後");
-  assert.equal(count(h, /data-act="ev-ph-del"/g), 3);
+  assert.match(h, /<button type="button" class="ev-thumb-b" data-act="ev-ph-open" data-id="p1" aria-label="放大看第 1 張，共 3 張">/, "照片本身是一顆按鈕，點了放大");
+  assert.match(h, /data-act="ev-ph-move" data-id="p1" data-dir="-1" aria-label="往前一格" title="往前一格" disabled>←</, "第一張不能再往前");
+  assert.match(h, /data-act="ev-ph-move" data-id="p1" data-dir="1" aria-label="往後一格" title="往後一格">→</);
+  assert.match(h, /data-act="ev-ph-move" data-id="p3" data-dir="1" aria-label="往後一格" title="往後一格" disabled>→</, "最後一張不能再往後");
+  assert.doesNotMatch(h, />往前<|>往後<|Earlier|Later/, "「往前」「往後」那兩個字換成箭頭了");
+  assert.doesNotMatch(h, /ev-ph-del|ev-ph-consent/, "拿掉與同意不在小圖上，在放大的那一格裡（整頁才不會有兩顆一樣的按鈕）");
   assert.match(h, /<input type="file" id="ev-photo-files" accept="image\/\*" multiple data-id="e1">/);
-  assert.match(h, /沒勾的不會出現在對外頁/);
-  // 標籤：活動還沒上架，勾了同意的寫「上架後看得到」；上架了寫「對外看得到」；沒勾的一律「對外看不到」
-  assert.equal(count(h, /對外看不到/g), 2); assert.match(h, /活動上架後對外看得到/); assert.doesNotMatch(h, />對外看得到</);
-  const live = F.eventPhotosHTML({ ...EV, status: "published" }, PHOTOS, true, false, {});
-  assert.equal(count(live, />對外看得到</g), 1); assert.equal(count(live, />對外看不到</g), 2);
+  assert.match(h, /沒勾的不會出現在對外頁/); assert.match(h, /點照片可以放大看/);
+  assert.equal(count(h, /<span class="tag draft ev-thumb-tag">對外看不到<\/span>/g), 2, "對外看不到的那兩張，小圖上有標籤");
+  // 三十張也只是三十格小圖
+  const many = Array.from({ length: 30 }, (_, i) => ({ id: "m" + i, url: UP.replace("ab12cd", "m" + i), consent: true, sort: i * 10 }));
+  const big = F.eventPhotosHTML(EV, many, true, false, {});
+  assert.equal(count(big, /<li class="ev-thumb">/g), 30); assert.match(big, /aria-label="放大看第 30 張，共 30 張"/);
   // 空的、還在載、遷移檔還沒跑
   assert.match(F.eventPhotosHTML(EV, [], true, false, {}), /還沒有照片。[\s\S]*ev-photo-files/);
   assert.match(F.eventPhotosHTML(EV, undefined, true, false, {}), /載入中/);
@@ -214,9 +217,41 @@ test("★ 活動照片：每一張自己勾同意（預設沒勾）、可以往�
   // 上傳中
   const going = F.eventPhotosHTML(EV, PHOTOS, true, true, { photoUp: { pct: 30, name: "b.jpg", i: 2, n: 5 } });
   assert.match(going, /第 2 張，共 5 張：傳 b\.jpg 中/); assert.doesNotMatch(going, /ev-photo-files/);
-  assert.match(going, /data-act="ev-ph-del" data-id="p1" disabled>/);
+  assert.match(going, /data-act="ev-ph-move" data-id="p2" data-dir="-1"[^>]* disabled>/, "忙的時候箭頭按不動");
   // 改不動的人
   assert.equal(F.eventPhotosHTML(EV, PHOTOS, false, false, {}), "");
+});
+
+test("★ 放大的那一格：第幾張、左右換照片、同意、往前往後一格、拿掉這張；只有一張沒有左右；找不到那一張回空字串", () => {
+  const h = F.evLightboxHTML(EV, PHOTOS, "p2", false);
+  assert.match(h, /<b class="ev-lb-n">第 2 張，共 3 張<\/b><span class="tag draft">對外看不到<\/span>/);
+  assert.match(h, /data-act="ev-lb-close">關掉</);
+  assert.match(h, /data-act="ev-lb-go" data-dir="-1" aria-label="上一張" title="上一張">←</); assert.match(h, /data-act="ev-lb-go" data-dir="1" aria-label="下一張" title="下一張">→</);
+  assert.match(h, new RegExp(`<img class="ev-lb-img" src="${PHOTOS[1].url.replace(/[.?/]/g, "\\$&")}" alt="">`));
+  assert.match(h, /data-act="ev-ph-consent" data-noauto="1" data-id="p2"><span>這張照片裡的人與那場活動都在拍攝同意範圍內<\/span>/, "同意那句話跟封面的一字不差，沒勾的就是沒勾");
+  assert.match(F.evLightboxHTML(EV, PHOTOS, "p1", false), /data-act="ev-ph-consent" data-noauto="1" data-id="p1" checked>/);
+  assert.match(h, /data-act="ev-ph-move" data-id="p2" data-dir="-1">← 往前一格</); assert.match(h, /data-act="ev-ph-move" data-id="p2" data-dir="1">往後一格 →</);
+  assert.match(F.evLightboxHTML(EV, PHOTOS, "p1", false), /data-act="ev-ph-move" data-id="p1" data-dir="-1" disabled>/, "第一張不能再往前");
+  assert.match(F.evLightboxHTML(EV, PHOTOS, "p3", false), /data-act="ev-ph-move" data-id="p3" data-dir="1" disabled>/, "最後一張不能再往後");
+  assert.equal(count(h, /data-act="ev-ph-del" data-id="p2">拿掉這張</g), 1);
+  // 標籤：活動還沒上架，勾了同意的寫「上架後看得到」；上架了寫「對外看得到」
+  assert.match(F.evLightboxHTML(EV, PHOTOS, "p1", false), /<span class="tag ok">活動上架後對外看得到<\/span>/);
+  assert.match(F.evLightboxHTML({ ...EV, status: "published" }, PHOTOS, "p1", false), /<span class="tag open">對外看得到<\/span>/);
+  // 忙的時候：同意、排順序、拿掉都按不動，左右換照片照樣可以
+  const busy = F.evLightboxHTML(EV, PHOTOS, "p2", true);
+  assert.match(busy, /data-act="ev-ph-consent" data-noauto="1" data-id="p2" disabled>/); assert.match(busy, /data-act="ev-ph-del" data-id="p2" disabled>/);
+  assert.match(busy, /data-act="ev-lb-go" data-dir="1" aria-label="下一張" title="下一張">/);
+  // 只有一張：沒有左右；找不到：空字串（main.js 會把那一格關掉）
+  assert.doesNotMatch(F.evLightboxHTML(EV, PHOTOS.slice(0, 1), "p1", false), /ev-lb-go/);
+  assert.equal(F.evLightboxHTML(EV, PHOTOS, "nope", false), ""); assert.equal(F.evLightboxHTML(EV, undefined, "p1", false), "");
+  // 網址裡的怪字不會變成 HTML
+  assert.doesNotMatch(F.evLightboxHTML(EV, [{ id: "x", url: 'https://a/"><script>', consent: true }], "x", false), /<script>/);
+});
+
+test("evLbStep：往左往右一張，到頭繞回另一頭；找不到現在那一張回 null", () => {
+  assert.equal(F.evLbStep(PHOTOS, "p1", 1), "p2"); assert.equal(F.evLbStep(PHOTOS, "p2", -1), "p1");
+  assert.equal(F.evLbStep(PHOTOS, "p3", 1), "p1", "最後一張再往右是第一張"); assert.equal(F.evLbStep(PHOTOS, "p1", -1), "p3", "第一張再往左是最後一張");
+  assert.equal(F.evLbStep(PHOTOS.slice(0, 1), "p1", 1), "p1"); assert.equal(F.evLbStep(PHOTOS, "nope", 1), null); assert.equal(F.evLbStep(null, "p1", 1), null);
 });
 
 test("★ 回饋表：沒有的時候是一顆「建立回饋表」，不再叫人去 Records 開；有的列出來；還在載不畫按鈕；導生學期留在記分卡開", () => {

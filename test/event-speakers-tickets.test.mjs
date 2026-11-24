@@ -92,8 +92,14 @@ test("★ 講者：每一位自己勾同意（沒勾的對外看不到）、可�
   assert.match(h, /id="ev-speakers"><h2>講者<span class="hint">2<\/span>/);
   assert.match(h, /對外頁只放名字，不放姓，未成年的人不要放。每一位都要本人同意，勾了才會出現在對外頁。/, "那一行提醒");
   assert.equal(count(h, /<li class="ev-sp" data-sp-row data-id="s[12]">/g), 2);
-  assert.match(h, new RegExp(`<img class="ev-sp-pic" src="${PIC.replace(/[.?/]/g, "\\$&")}" alt="">`), "有照片的印照片");
-  assert.match(h, /<span class="ev-sp-pic" aria-hidden="true">小<\/span>/, "沒有照片的是一個圓加名字的第一個字");
+  assert.match(h, new RegExp(`<img class="ev-sp-pic sm" src="${PIC.replace(/[.?/]/g, "\\$&")}" alt="">`), "有照片的印照片");
+  assert.match(h, /<span class="ev-sp-pic sm" aria-hidden="true">小<\/span>/, "沒有照片的是一個圓加名字的第一個字");
+  // 2026-11-24 每一位收成一行（Paul：「it's like a whole chunk of information I need to fill out, and that's not necessary to see」）
+  assert.equal(count(h, /<details class="ev-sp-fold" data-sp-fold="s[12]">/g), 2, "預設都收著");
+  assert.match(h, /<summary><span class="chev" aria-hidden="true"><\/span><img class="ev-sp-pic sm"[^>]*><span class="ev-sp-who"><b>Annie<\/b><span class="mini">UCLA・Computer Science<\/span><\/span><span class="sp">/, "收著的那一行：照片、名字、學校與主題");
+  assert.match(h, /<b>小安<\/b>(?:<span class="mini">[^<]*<\/span>)?<\/span><span class="tag draft">對外看不到<\/span><span class="sp">/, "對外看不到的那一位，收著也看得出來");
+  assert.match(F.eventSpeakersHTML(EV, SPEAKERS, true, false, { spOpenIds: { s2: true } }), /<details class="ev-sp-fold" data-sp-fold="s2" open>/, "開過的重畫後還開著");
+  assert.match(F.eventSpeakersHTML(EV, SPEAKERS, true, true, { spUp: { id: "s1", pct: 10, name: "a.jpg" } }), /<details class="ev-sp-fold" data-sp-fold="s1" open>/, "照片正在傳的那一位一定開著");
   assert.match(h, /<input data-f="display_name" value="Annie" maxlength="60"/); assert.match(h, /<input data-f="subject" value="Computer Science"/); assert.match(h, /<input data-f="school" value="UCLA"/);
   assert.match(h, /data-act="ev-sp-consent" data-id="s1" checked><span>這個人同意把名字與照片放在對外頁<\/span>/);
   assert.match(h, /data-act="ev-sp-consent" data-id="s2"><span>/, "沒勾的就是沒勾");
@@ -102,8 +108,9 @@ test("★ 講者：每一位自己勾同意（沒勾的對外看不到）、可�
   assert.match(F.eventSpeakersHTML({ ...EV, status: "published" }, SPEAKERS, true, false, {}), /<span class="tag open">對外看得到<\/span>/);
   assert.match(h, /data-act="ev-sp-photo" data-id="s1">/); assert.match(h, /換一張照片/); assert.match(h, /加照片/);
   assert.equal(count(h, /data-act="ev-sp-photo-clear"/g), 1, "有照片的那一位才有「拿掉照片」");
-  assert.match(h, /data-act="ev-sp-move" data-id="s1" data-dir="-1" disabled>往前/, "第一位不能再往前");
-  assert.match(h, /data-act="ev-sp-move" data-id="s2" data-dir="1" disabled>往後/, "最後一位不能再往後");
+  assert.match(h, /data-act="ev-sp-move" data-id="s1" data-dir="-1" aria-label="往上移一位" title="往上移一位" disabled>↑</, "第一位不能再往上");
+  assert.match(h, /data-act="ev-sp-move" data-id="s2" data-dir="1" aria-label="往下移一位" title="往下移一位" disabled>↓</, "最後一位不能再往下");
+  assert.doesNotMatch(h, />往前<|>往後</, "「往前」「往後」換成箭頭了");
   assert.equal(count(h, /data-act="ev-sp-save"/g), 2); assert.equal(count(h, /data-act="ev-sp-del"/g), 2);
   // 加一位：收著的一格，名字、主題、學校三格加一顆按鈕
   assert.match(h, /<details class="fold rc-fold" id="ev-sp-new"><summary>[\s\S]*加一位講者/);

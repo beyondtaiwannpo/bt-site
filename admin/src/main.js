@@ -36,6 +36,8 @@ let S = {
   // 活動的照片（2026-11-23）：evPhotos 是打開的那一場的照片（undefined 還在載、null 是遷移檔還沒跑、陣列是照片）；
   // evUp 是封面的上傳進度、evPhUp 是活動照片的上傳進度（null 是沒有在傳）。
   evPhotos: undefined, evUp: null, evPhUp: null,
+  // 2026-11-24：evLb 是放大看的那一張照片的 id（null 是沒有放大）；evSpOpenIds 是哪幾位講者那一行開著（{ id: true }）。兩樣都只在記憶體裡。
+  evLb: null, evSpOpenIds: {},
   // 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）：evSpeakers、evTickets 是打開的那一場的（undefined 還在載、null 是遷移檔還沒跑、陣列）；
   // evSpUp 講者照片的上傳進度 { id, pct, name }；evSpDraft、evTkDraft 是「加一位」「加一種」填到一半的；evSpFound 從紀錄找到的人（undefined 是還沒找過）；evSpQ 找的字。
   evSpeakers: undefined, evTickets: undefined, evSpUp: null, evSpDraft: null, evTkDraft: null, evSpFound: undefined, evSpQ: "",
@@ -125,7 +127,7 @@ function render() {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
     body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects,
                 { photos: S.evPhotos, coverUp: S.evUp, photoUp: S.evPhUp, coverLinkOpen: !!S.vnOpen["ev-cover-link"],
-                  speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ,
+                  speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], spOpenIds: S.evSpOpenIds, canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ,
                   tickets: S.evTickets, tkDraft: S.evTkDraft, tkOpen: !!S.vnOpen["ev-tk-new"],
                   prevZh: !!S.vnOpen["ev-bzh-fold"], prevEn: !!S.vnOpen["ev-ben-fold"] })
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
@@ -166,8 +168,58 @@ function render() {
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
+  paintLightbox();
   if ((S.view === "form" || S.view === "question") && S.fx.mode === "preview") mountPreview();
 }
+
+// ── 活動照片放大的那一格（2026-11-24，Paul：「whenever I press them it's gonna pop up in the middle, and then I can tap right or left」）──
+// 一個 <dialog id="ev-lb">，掛在 <body> 底下、不在 render() 會整個換掉的那一塊裡，所以整頁重畫的時候它不會閃一下。
+// 裡面的 HTML 是 UI.evLightboxHTML 畫的；S.evLb 是現在看的那一張的 id。render() 每次畫完都叫 paintLightbox()：
+// 那一張還在就照新的資料重畫，不在了（被拿掉、換到別頁）就關掉。Esc 與點旁邊暗的地方是瀏覽器的 <dialog> 自己會關，關了把 S.evLb 清掉。
+// 左右鍵與手指左右滑換照片（下面那兩個 listener）。
+function lightboxEl() {
+  let d = document.getElementById("ev-lb");
+  if (d) return d;
+  d = document.createElement("dialog"); d.id = "ev-lb"; d.className = "ev-lb"; d.setAttribute("aria-label", T("ev.lbAria"));
+  d.addEventListener("close", () => { S.evLb = null; S.ask = null; });
+  d.addEventListener("click", e => { if (e.target === d) d.close(); });
+  let x0 = null;
+  d.addEventListener("touchstart", e => { x0 = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  d.addEventListener("touchend", e => {
+    if (x0 == null || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 60) lightboxGo(dx > 0 ? -1 : 1);
+  }, { passive: true });
+  document.body.appendChild(d);
+  return d;
+}
+function lightboxGo(dir) {
+  const to = UI.evLbStep(S.evPhotos, S.evLb, dir);
+  if (to && to !== S.evLb) { S.evLb = to; S.ask = null; paintLightbox(); }
+}
+function paintLightbox() {
+  const old = document.getElementById("ev-lb");
+  const ev = S.view === "event" ? (S.events || []).find(x => x.slug === S.evSel) : null;
+  const html = ev && S.evLb ? UI.evLightboxHTML(ev, S.evPhotos, S.evLb, S.busy) : "";
+  if (!html) { S.evLb = null; if (old && old.open) old.close(); return; }
+  const d = old || lightboxEl();
+  // 重畫前記住游標停在哪一顆（往前一格、下一張…），畫完放回去，連按鍵盤才不會掉。
+  const at = document.activeElement, was = at && d.contains(at) && at.dataset ? { act: at.dataset.act, dir: at.dataset.dir } : null;
+  d.innerHTML = `<div class="ev-lb-in">${html}</div>`;
+  // 這一格開著的時候底下的 toast 被蓋住，沒做成的那一句（例如順序沒存成）要在這一格裡也講一次。
+  if (S.msg && UI.msgKind(S.msg) !== "ok") { const m = document.createElement("div"); m.className = "note ev-lb-msg"; m.textContent = S.msg; d.firstChild.appendChild(m); }
+  if (!d.open) d.showModal();
+  if (S.ask) UI.mountAsk(d, S.ask);
+  const again = was && was.act ? d.querySelector(`[data-act="${was.act}"]${was.dir ? `[data-dir="${was.dir}"]` : ""}:not([disabled]):not([hidden])`) : null;
+  (again || d).focus({ preventScroll: true });
+}
+document.addEventListener("keydown", e => {
+  if (!S.evLb || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+  e.preventDefault(); lightboxGo(e.key === "ArrowLeft" ? -1 : 1);
+});
+// 照片排順序是「先動畫面、再送資料庫」：一張一張送會讓連按的時候每按一下都要等。送的那幾次排成一條隊（evPhQ），後按的不會比先按的早到；
+// 哪一次沒送成，講一聲、把資料庫現在的順序讀回來。要重讀照片的地方（傳完、拿掉之後）都先等這條隊走完。
+let evPhQ = Promise.resolve();
 
 // 側欄與頂欄先畫（2026-11-06）：知道我是誰就先把外殼畫出來，內容那一格放骨架，資料回來 render() 整個換掉。
 // 不等資料的理由：外殼只要 S.me，而 S.me 從分頁快取拿幾乎不用等。這一頁的「慢」實測全部在資料那一半。
@@ -385,6 +437,7 @@ async function shrinkImage(file) {
   return blob;
 }
 async function reloadEventPhotos(eventId) {
+  await evPhQ;
   try { S.evPhotos = await D.loadEventPhotos(eventId); }
   catch (e) { S.evPhotos = S.evPhotos || []; S.msg = T("err.evPhLoad") + D.says(e); }
 }
@@ -524,7 +577,7 @@ async function openTab(t) {
       ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
     S.evLinks = null; S.evRc = undefined; S.evPhotos = undefined; S.evUp = null; S.evPhUp = null; S.vnOpen["ev-cover-link"] = false;
     S.vnOpen["ev-bzh-fold"] = false; S.vnOpen["ev-ben-fold"] = false;   // 說明底下的預覽：每次打開一場活動都是收著的
-    S.evSpeakers = undefined; S.evTickets = undefined; S.evSpUp = null; S.evSpDraft = null; S.evTkDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; S.vnOpen["ev-tk-new"] = false;
+    S.evLb = null; S.evSpOpenIds = {}; S.evSpeakers = undefined; S.evTickets = undefined; S.evSpUp = null; S.evSpDraft = null; S.evTkDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; S.vnOpen["ev-tk-new"] = false;
     const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]);
     // 2026-11-13：只在紀錄裡的舊活動沒有對外頁、報名、簽到，這裡是空的；直接去它在 Records 的記分卡。
     if (one && one.source === "import") { location.replace("/admin/records/#overview/" + encodeURIComponent(one.id)); return; }
@@ -819,7 +872,7 @@ document.addEventListener("click", async e => {
   const id = b.dataset.id;
 
   if (act === "retry") { location.reload(); return; }
-  if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
+  if (act === "ask-cancel") { UI.cancelAsk(S, root()); const lb = document.getElementById("ev-lb"); if (lb) UI.cancelAsk(S, lb); return; }
   // ── 會議（2026-11-02）──
   if (act === "mt-open") { e.preventDefault(); history.pushState(null, "", "#meetings/" + id); await openTab("meetings/" + id); return; }
   if (act === "mt-back") { history.pushState(null, "", "#meetings"); await openTab("meetings"); return; }
@@ -1088,18 +1141,41 @@ document.addEventListener("click", async e => {
     } catch (err) { S.msg = T("err.evSave") + D.says(err); }
     S.busy = false; render(); return;
   }
-  if (act === "ev-ph-move" || act === "ev-ph-del") {
-    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evPhotos)) return;
-    const ids = act === "ev-ph-move" ? UI.evPhotoMove(S.evPhotos, id, b.dataset.dir) : null;
-    if (act === "ev-ph-move" && !ids) return;
-    if (act === "ev-ph-del" && UI.needAsk(S, b, T("confirm.evPhDel"))) return;
+  // 活動照片（2026-11-24 改成小圖加放大）：點小圖放大、放大的那一格裡換上一張下一張、關掉。
+  if (act === "ev-ph-open") { if (Array.isArray(S.evPhotos)) { S.evLb = id; S.ask = null; paintLightbox(); } return; }
+  if (act === "ev-lb-go") { lightboxGo(b.dataset.dir); return; }
+  if (act === "ev-lb-close") { const d = document.getElementById("ev-lb"); if (d && d.open) d.close(); return; }
+  // 往前一格、往後一格：畫面馬上換，資料庫在後面排隊送（見 evPhQ）。放大的那一格跟著同一張走，所以可以連按。
+  if (act === "ev-ph-move") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evPhotos) || S.busy) return;
+    const dir = b.dataset.dir, ids = UI.evPhotoMove(S.evPhotos, id, dir); if (!ids) return;
     keepEventTyped();
+    const by = new Map(S.evPhotos.map(p => [p.id, p]));
+    S.evPhotos = ids.map(i => by.get(i)); S.msg = ""; render();
+    if (!S.evLb) {
+      const again = document.querySelector(`#ev-photos [data-act="ev-ph-move"][data-id="${id}"][data-dir="${dir}"]:not([disabled])`) || document.querySelector(`#ev-photos [data-act="ev-ph-open"][data-id="${id}"]`);
+      if (again) again.focus({ preventScroll: true });
+    }
+    evPhQ = evPhQ.then(() => D.reorderEventPhotos(ev.id, ids)).catch(async err => {
+      S.msg = T("err.evPhSave") + D.says(err);
+      try { S.evPhotos = await D.loadEventPhotos(ev.id); } catch (_) { /* 讀不回來就留著畫面上的 */ }
+      if (S.view === "event" && S.evSel === ev.slug) render();
+    });
+    return;
+  }
+  if (act === "ev-ph-del") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evPhotos)) return;
+    if (UI.needAsk(S, b, T("confirm.evPhDel"))) return;
+    keepEventTyped();
+    // 拿掉的是正在放大看的那一張：拿掉之後換看下一張（沒有下一張就上一張，都沒有就關掉）。
+    const at = S.evPhotos.findIndex(p => p.id === id), next = S.evLb === id ? ((S.evPhotos[at + 1] || S.evPhotos[at - 1] || {}).id || null) : S.evLb;
     S.busy = true; S.msg = ""; render();
     try {
-      if (ids) await D.reorderEventPhotos(ev.id, ids);
-      else await D.removeEventFile(UI.evStoragePath(await D.deleteEventPhoto(id)));
+      await evPhQ;
+      await D.removeEventFile(UI.evStoragePath(await D.deleteEventPhoto(id)));
+      S.evLb = next;
       await reloadEventPhotos(ev.id);
-      if (!S.msg) S.msg = T(ids ? "msg.evPhMoved" : "msg.evPhDeleted");
+      if (!S.msg) S.msg = T("msg.evPhDeleted");
     } catch (err) { S.msg = T("err.evPhSave") + D.says(err); }
     S.busy = false; render(); return;
   }
@@ -1149,7 +1225,7 @@ document.addEventListener("click", async e => {
     if (from) { try { copied = await copyRecordsPhoto(ev.id, from); patch.photo_url = copied; } catch (x) { copied = ""; } }
     try {
       const sid = await D.saveEventSpeaker(ev.id, adding ? null : id, patch);
-      if (adding) { S.evSpDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; }
+      if (adding) { S.evSpDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; if (sid) S.evSpOpenIds[sid] = true; }   // 剛加的那一位先開著：接下來要放照片
       await reloadEventSpeakers(ev.id, sid);
       if (!S.msg) S.msg = T(adding ? (from ? (copied ? "msg.evSpAddedPhoto" : "msg.evSpAddedNoPhoto") : "msg.evSpAdded") : reset ? "msg.evSpSavedReset" : "msg.evSpSaved");
     } catch (err) {
@@ -1717,7 +1793,7 @@ boot();
 // 瀏覽器上一頁、或自己在網址列改 #分頁：跟著換分頁（2026-10-23 盤點 F3）。側欄點分頁是 pushState，所以上一頁回得去。
 // 場地頁兩個收起來的表單開著沒（重畫之後照舊）。活動編輯頁說明底下那兩格預覽（ev-bzh-fold、ev-ben-fold）也記在這裡：
 // 只記在記憶體裡，同一頁重畫之後還開著，重新整理就回到收著。
-document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new", "pj-new", "pj-ev-new", "pj-ev-add", "ev-cover-link", "ev-sp-new", "ev-tk-new", "ev-bzh-fold", "ev-ben-fold"].includes(t.id)) S.vnOpen[t.id] = t.open; }, true);
+document.addEventListener("toggle", e => { const t = e.target; if (t && ["vn-add", "vnc-add", "ev-new", "mt-new", "pj-new", "pj-ev-new", "pj-ev-add", "ev-cover-link", "ev-sp-new", "ev-tk-new", "ev-bzh-fold", "ev-ben-fold"].includes(t.id)) S.vnOpen[t.id] = t.open; if (t && t.dataset && t.dataset.spFold) S.evSpOpenIds[t.dataset.spFold] = t.open; }, true);
 window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(location.hash.slice(1)); } });
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
