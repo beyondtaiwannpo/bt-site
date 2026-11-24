@@ -1551,7 +1551,7 @@ Paul：「give them a link, they go in and then that's their profile」。不用
 ### 2027-01-03 那一場怎麼用（給 Paul 與 Director）
 
 1. Paul 在正式 Supabase 跑 `supabase/migrations/2027-01-03-people-network.sql`，驗收表要全 PASS。
-2. 隱私政策多一節（草稿在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-23-privacy-contacts-paragraph/draft.md`），Paul 過稿之後貼上線。**第一條連結發出去之前要先上線。**
+2. ~~隱私政策多一節~~ **2026-11-24 Paul 過稿，已貼進 `privacy/index.html`**：「回饋與紀錄」後面多一節「講者、教授與其他聯絡人」，中英各一節，可見範圍表各多四列，頁首日期改成 2026-11-24。原稿留在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-23-privacy-contacts-paragraph/draft.md`。之後 `/profile/` 那一頁的行為有變（例如開放本人上傳照片、連結期限改了），這一節要跟著改。
 3. 後台「紀錄 → 人 → 加一個人」把九位講者加進去，各自的頁面填我們已經知道的（單位、領域、聯絡方式、誰認識他）。這是公開的 repo，名單不能寫進程式，只能從後台加。
 4. 活動編輯頁「講者」從紀錄挑這九位。
 5. 每一位的頁面按「開一條連結」，事前傳給他；當天沒填的，開他的頁面按「顯示 QR code」給他掃。
