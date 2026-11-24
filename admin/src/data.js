@@ -390,7 +390,7 @@ const SAYS = [
   ["not_ws_edit", "這裡你只看得到、改不了。請這裡的 Director 把你改成「改」。", "You can view this but not edit it. Ask the Director to give you Edit."],
   ["bad_slug", "代號只能用小寫英文、數字和連字號，2 到 40 個字。", "The slug can only use lowercase letters, digits and hyphens, 2 to 40 characters."],
   ["cover_not_https", "封面網址要是 https:// 開頭。", "The cover URL must start with https://."],
-  ["consent_required", "封面有填就要勾「照片裡的人與那場活動都在拍攝同意範圍內」。", "With a cover image you must tick the photo-consent box."],
+  ["consent_required", "封面現在是「對外看不到」。到「照片」那個分頁，在封面那一塊按「放上對外頁」，或是把封面拿掉。", "The cover is marked Hidden. Open the Photos tab and press Show publicly on the cover, or remove the cover."],
   ["need_both_titles", "中英標題都要填才能準備好。", "Both titles are needed before it can be marked ready."],
   ["need_start", "要有開始時間才能準備好。沒有確定日期的話，填「通常在幾月」或勾「多數年份都會辦」也可以。", "A start time is needed before it can be marked ready. With no fixed date, set a usual month or tick Runs most years instead."],
   ["bad_month", "「通常在幾月」只能選 1 到 12 月，或不填。", "Usual month must be January to December, or left unset."],

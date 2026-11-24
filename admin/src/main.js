@@ -38,6 +38,8 @@ let S = {
   evPhotos: undefined, evUp: null, evPhUp: null,
   // 2026-11-24：evLb 是放大看的那一張照片的 id（null 是沒有放大）；evSpOpenIds 是哪幾位講者那一行開著（{ id: true }）。兩樣都只在記憶體裡。
   evLb: null, evSpOpenIds: {},
+  // evTab 是活動編輯頁開著哪一個分頁（null 是照預設：結束了的活動開「成果」，其他開「內容」）。記在網址 #events/<代號>/<分頁>。
+  evTab: null,
   // 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）：evSpeakers、evTickets 是打開的那一場的（undefined 還在載、null 是遷移檔還沒跑、陣列）；
   // evSpUp 講者照片的上傳進度 { id, pct, name }；evSpDraft、evTkDraft 是「加一位」「加一種」填到一半的；evSpFound 從紀錄找到的人（undefined 是還沒找過）；evSpQ 找的字。
   evSpeakers: undefined, evTickets: undefined, evSpUp: null, evSpDraft: null, evTkDraft: null, evSpFound: undefined, evSpQ: "",
@@ -127,7 +129,7 @@ function render() {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
     body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects,
                 { photos: S.evPhotos, coverUp: S.evUp, photoUp: S.evPhUp, coverLinkOpen: !!S.vnOpen["ev-cover-link"],
-                  speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], spOpenIds: S.evSpOpenIds, canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ,
+                  tab: S.evTab, speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], spOpenIds: S.evSpOpenIds, canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ,
                   tickets: S.evTickets, tkDraft: S.evTkDraft, tkOpen: !!S.vnOpen["ev-tk-new"],
                   prevZh: !!S.vnOpen["ev-bzh-fold"], prevEn: !!S.vnOpen["ev-ben-fold"] })
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
@@ -348,10 +350,23 @@ function readEvent() {
   // 開始與結束填的是台灣時間，不是這台電腦的時間（見 ui.js 的 evFromTaipei）。
   const iso = v => UI.evFromTaipei(v);
   const patch = { title_zh: val("ev-tzh"), title_en: val("ev-ten"), summary_zh: val("ev-szh"), summary_en: val("ev-sen"), body_zh: val("ev-bzh"), body_en: val("ev-ben"),
-    starts_at: iso(val("ev-starts")), ends_at: iso(val("ev-ends")), place: val("ev-place"), capacity: Number(val("ev-cap") || 0), cover_url: val("ev-cover"), cover_consent: chk("ev-consent") };
+    starts_at: iso(val("ev-starts")), ends_at: iso(val("ev-ends")), place: val("ev-place"), capacity: Number(val("ev-cap") || 0), cover_url: val("ev-cover") };
   // 計畫的四格（2026-12-31-programmes.sql）。那一塊有畫出來才帶（遷移檔還沒跑的時候沒有畫，帶了資料庫也不認得）。
   if (document.getElementById("ev-month")) Object.assign(patch, UI.evProgrammePatch({ usual_month: val("ev-month"), recurring: chk("ev-recurring"), edition_zh: val("ev-edzh"), edition_en: val("ev-eden") }));
   return patch;
+}
+// 存活動那幾格（save_event）。封面換了，資料庫會把 cover_consent 退回 false（同意是對那一張照片的）。
+// 2026-11-24 起畫面上沒有同意的勾（Paul：「If I upload a photo, I have consent. So just take that away」）：放上封面就算確認過同意，
+// 所以封面換成另一張（不是拿掉）的時候，這裡接著再存一次 cover_consent: true。資料庫那道門沒動，只是由這裡替按的人補那一下。
+// 封面沒換就不碰 cover_consent：改版之前放的、當時沒勾的封面不會因為改了別的欄位就變公開，要按「放上對外頁」（ev-cover-show）。
+// patch 裡不帶 cover_consent（readEvent 不讀它）。回封面有沒有換。
+async function saveEventFields(ev, patch) {
+  const changed = "cover_url" in patch && (patch.cover_url || "") !== (ev.cover_url || "");
+  await D.saveEvent(ev.id, patch);
+  if (!changed) return false;
+  ev.cover_url = patch.cover_url || null; ev.cover_consent = false;
+  if (patch.cover_url) { await D.saveEvent(ev.id, { cover_consent: true }); ev.cover_consent = true; }
+  return true;
 }
 // ── 活動的照片與下半那幾顆按鈕（2026-11-23）──────────────────────────────
 // 重畫之前，把「內容」那幾格現在打的字收進 S.events 那一列（只改記憶體；存檔是自動儲存那條路在做，離開那一格就送了）。
@@ -361,7 +376,7 @@ function keepEventTyped() {
   keepPanelsTyped();
   const ev = (S.events || []).find(x => x.slug === S.evSel);
   if (!ev || !UI.canEditWs(S.me, ev.workspace_id) || !document.getElementById("ev-tzh")) return;
-  const p = readEvent(); delete p.cover_url; delete p.cover_consent;
+  const p = readEvent(); delete p.cover_url;
   Object.assign(ev, p);
 }
 // 講者與報名類型那幾列打到一半、還沒按「存這一位」「存這一種」的字：重畫前收進那一列的 typed，畫面照它印（UI.evRowVals）。
@@ -397,7 +412,12 @@ async function copyRecordsPhoto(eventId, url) {
   if (!res.ok) throw new Error("photo " + res.status);
   return D.uploadEventImage(eventId, await shrinkImage(await res.blob()));
 }
-// 講者的照片：縮圖 → 傳到 Storage 的 events bucket → 把網址存進那一位（資料庫會把同意改回沒勾）→ 舊的那個檔刪掉。跟封面同一條路。
+// 改了講者的名字或照片，資料庫會把 consent 退回 false。本來對外看得到的那一位，這裡替他補回去（2026-11-24 起畫面上沒有同意的勾）；
+// 本來看不到的不補，所以改版之前沒勾的、紀錄裡是學員的那幾位，不會因為改了字就變公開。補不成不算整件事失敗，講一聲就好。
+async function keepSpeakerShown(speakerId) {
+  try { await D.setEventSpeakerConsent(speakerId, true); } catch (e) { S.msg = T("msg.evShowFailed"); }
+}
+// 講者的照片：縮圖 → 傳到 Storage 的 events bucket → 把網址存進那一位 → 本來對外看得到的補回去 → 舊的那個檔刪掉。跟封面同一條路。
 async function uploadSpeakerPhoto(speakerId, file) {
   const ev = (S.events || []).find(x => x.slug === S.evSel), sp = (S.evSpeakers || []).find(x => x.id === speakerId); if (!ev || !sp) return;
   keepEventTyped();
@@ -407,8 +427,9 @@ async function uploadSpeakerPhoto(speakerId, file) {
   try {
     const blob = await shrinkImage(file); S.evSpUp = { id: speakerId, pct: 45, name: file.name }; render();
     url = await D.uploadEventImage(ev.id, blob); S.evSpUp = { id: speakerId, pct: 85, name: file.name }; render();
-    const old = sp.photo_url;
+    const old = sp.photo_url, shown = !!sp.consent;
     await D.saveEventSpeaker(ev.id, speakerId, { photo_url: url });
+    if (shown) await keepSpeakerShown(speakerId);
     if (old && old !== url) await D.removeEventFile(UI.evStoragePath(old));
     await reloadEventSpeakers(ev.id);
     if (!S.msg) S.msg = T("msg.evSpPhoto");
@@ -421,7 +442,7 @@ async function uploadSpeakerPhoto(speakerId, file) {
 }
 // 封面換了（上傳、拿掉、換連結）之後，自動儲存記的「上次存的值」要忘掉那兩格。
 // 不忘的話：勾過同意 → 換封面（資料庫把同意改回沒勾）→ 再勾一次，會被當成「跟上次一樣」而沒送出去，畫面有勾、資料庫沒有。
-function forgetCover(id) { dirty.forget("ev-save|" + id + "|cover_consent"); dirty.forget("ev-save|" + id + "|cover_url"); }
+function forgetCover(id) { dirty.forget("ev-save|" + id + "|cover_url"); }
 // 瀏覽器端先縮圖再傳（最長邊 1600）。回一個 JPEG Blob；讀不出來就丟 err.evResize。
 // 用 canvas 不用任何函式庫；EXIF 方向交給瀏覽器（createImageBitmap 的 imageOrientation）。跟 admin/site/src/main.js 的同一個做法。
 async function shrinkImage(file) {
@@ -441,7 +462,7 @@ async function reloadEventPhotos(eventId) {
   try { S.evPhotos = await D.loadEventPhotos(eventId); }
   catch (e) { S.evPhotos = S.evPhotos || []; S.msg = T("err.evPhLoad") + D.says(e); }
 }
-// 封面：縮圖 → 傳到 Storage → 把網址存進 cover_url（走原本的 save_event，資料庫會把同意改回沒勾）→ 舊的那個檔刪掉。
+// 封面：縮圖 → 傳到 Storage → 把網址存進 cover_url 並且補上同意（saveEventFields）→ 舊的那個檔刪掉。
 async function uploadEventCover(eventId, file) {
   const ev = (S.events || []).find(x => x.id === eventId); if (!ev) return;
   keepEventTyped();
@@ -452,8 +473,7 @@ async function uploadEventCover(eventId, file) {
     const blob = await shrinkImage(file); S.evUp = { pct: 45, name: file.name }; render();
     url = await D.uploadEventImage(eventId, blob); S.evUp = { pct: 85, name: file.name }; render();
     const old = ev.cover_url;
-    await D.saveEvent(eventId, { cover_url: url });
-    ev.cover_url = url; ev.cover_consent = false; forgetCover(eventId);
+    await saveEventFields(ev, { cover_url: url }); forgetCover(eventId);
     if (old !== url) await D.removeEventFile(UI.evStoragePath(old));
     S.vnOpen["ev-cover-link"] = false; S.msg = T("msg.evCover");
   } catch (e) {
@@ -463,14 +483,14 @@ async function uploadEventCover(eventId, file) {
   }
   S.evUp = null; S.busy = false; render();
 }
-// 活動照片：一次可以選好幾張，一張一張傳。壞掉的那幾張記下來，其他照傳；傳完重讀一次。新照片的同意一律是沒勾。
+// 活動照片：一次可以選好幾張，一張一張傳。壞掉的那幾張記下來，其他照傳；傳完重讀一次。傳上去的每一張接著補上同意（2026-11-24：傳照片就算確認過同意）。
 async function uploadEventPhotos(eventId, files) {
   keepEventTyped();
   const bad = files.filter(f => !UI.evFileOk(f)).map(f => f.name);
   const ok = files.filter(f => UI.evFileOk(f));
   if (!ok.length) { S.msg = T("err.evFile"); render(); return; }
   S.busy = true; S.msg = ""; S.evPhUp = { pct: 0, name: ok[0].name, i: 1, n: ok.length }; render();
-  const failed = [];
+  const failed = []; let hidden = 0;
   for (let i = 0; i < ok.length; i++) {
     const file = ok[i];
     const base = Math.round(i / ok.length * 100), span = 100 / ok.length;
@@ -482,7 +502,9 @@ async function uploadEventPhotos(eventId, files) {
       step(45);
       url = await D.uploadEventImage(eventId, blob);
       step(85);
-      await D.addEventPhoto(eventId, url);
+      const pid = await D.addEventPhoto(eventId, url);
+      // 傳照片就算確認過同意（2026-11-24）。這一下沒成，照片還在、只是對外看不到，最後講一聲。
+      try { await D.setEventPhotoConsent(pid, true); } catch (x) { hidden++; }
     } catch (e) {
       if (url) await D.removeEventFile(UI.evStoragePath(url));
       failed.push(file.name + "（" + D.says(e) + "）");
@@ -492,6 +514,7 @@ async function uploadEventPhotos(eventId, files) {
   const n = ok.length - failed.length;
   const parts = [];
   if (n) parts.push(T(n === 1 ? "msg.evPhotoAdded" : "msg.evPhotosAdded", { n }));
+  if (hidden) parts.push(T("msg.evShowFailed"));
   if (failed.length) parts.push(T("err.evUploadSome") + failed.join("、"));
   if (bad.length) parts.push(T("err.evFileSome") + bad.join("、"));
   await reloadEventPhotos(eventId);
@@ -570,9 +593,10 @@ async function openTab(t) {
     render(); return;
   }
   // 活動上架（2026-11-01）：#events 清單，#events/<代號> 一場。打開一場時順便載場地清單（「場地」那一格要用；資料表還沒建就不畫）。
-  const ev = /^events(?:\/([a-z0-9-]+))?$/.exec(t || "");
+  // 2026-11-24：一場活動有分頁，#events/<代號>/<分頁>。沒寫分頁就照預設（UI.evTabOf）。
+  const ev = /^events(?:\/([a-z0-9-]+)(?:\/([a-z]+))?)?$/.exec(t || "");
   if (ev) {
-    S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = "";
+    S.view = ev[1] ? "event" : "events"; S.evSel = ev[1] || null; S.msg = ""; S.evTab = (ev[1] && ev[2]) || null;
     await Promise.all([reloadEvents(ev[1]), reloadProjects(), ev[1] ? D.loadVenues().then(r => { S.venues = r; }).catch(() => {}) : null,
       ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
     S.evLinks = null; S.evRc = undefined; S.evPhotos = undefined; S.evUp = null; S.evPhUp = null; S.vnOpen["ev-cover-link"] = false;
@@ -754,14 +778,11 @@ async function onAutosave(act, box, field) {
       const ev = (S.events || []).find(x => x.id === id); if (!ev) return;
       const patch = readEvent();
       if (!UI.evCoverOk(patch.cover_url)) return fail(T("err.evCover"));
-      await D.saveEvent(id, patch);
-      // 換了封面，資料庫會把同意改回沒勾（同意是對那一張照片的）。畫面跟著改，不然勾勾還在、資料庫卻是沒同意。
-      // 2026-11-23：同時把自動儲存記的「同意上次存的值」忘掉，不然再勾一次會被當成沒變而沒送出去（forgetCover 的註解）。
-      const coverChanged = (patch.cover_url || "") !== (ev.cover_url || "");
-      if (coverChanged) { patch.cover_consent = false; const c = document.getElementById("ev-consent"); if (c) c.checked = false; }
+      // 封面的連結換了：saveEventFields 會接著補上同意（放上封面就算確認過同意）。這一條路存完不重畫，所以封面那一行「對外看得到沒」自己換。
+      const coverChanged = await saveEventFields(ev, patch);
       Object.assign(ev, patch);
       dirty.mark(key, val); UI.autosaveState(box, "saved"); UI.toast(T("msg.evSaved"));
-      if (coverChanged) dirty.forget("ev-save|" + id + "|cover_consent");
+      if (coverChanged) { const st = document.getElementById("ev-cover-state"); if (st) st.innerHTML = UI.evCoverStateHTML(ev, true, false); }
       return;
     }
     // 活動編輯頁「報名」那一段的開放與截止時間（2026-11-23，Paul：「where can I set registration open windows?」）。
@@ -1216,7 +1237,10 @@ document.addEventListener("click", async e => {
     const patch = UI.evSpeakerPatch(adding ? S.evSpDraft : row.typed);
     if (!patch) { S.msg = T("err.evSpName"); if (adding) S.vnOpen["ev-sp-new"] = true; render(); return; }
     if (adding && S.evSpDraft && S.evSpDraft.person_id) patch.person_id = S.evSpDraft.person_id;
-    const reset = !adding && row.consent && patch.display_name !== row.display_name;
+    // 2026-11-24 起沒有同意的勾：加一位就算確認過本人同意，加完接著補上（紀錄裡是學員、可能未成年的那一種除外，先不對外）。
+    // 改既有的那一位：本來對外看得到的，存完補回去（改名字資料庫會退回 false）；本來看不到的不動。
+    const minor = adding && !!(S.evSpDraft && S.evSpDraft.person_id && S.evSpDraft.minor);
+    const shown = adding ? !minor : !!row.consent;
     S.busy = true; S.msg = ""; render();
     // 從紀錄帶來的照片（2027-01-03）：抄一份到 events bucket 再掛上去，跟自己選檔上傳同一條路。
     // 不直接用紀錄那邊的網址：那邊換照片或拿掉照片會把檔刪掉，這一位在對外頁的照片就跟著壞了。抄不過來就不帶照片，照樣加，講一聲。
@@ -1225,9 +1249,10 @@ document.addEventListener("click", async e => {
     if (from) { try { copied = await copyRecordsPhoto(ev.id, from); patch.photo_url = copied; } catch (x) { copied = ""; } }
     try {
       const sid = await D.saveEventSpeaker(ev.id, adding ? null : id, patch);
+      if (shown && sid) await keepSpeakerShown(sid);
       if (adding) { S.evSpDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; if (sid) S.evSpOpenIds[sid] = true; }   // 剛加的那一位先開著：接下來要放照片
       await reloadEventSpeakers(ev.id, sid);
-      if (!S.msg) S.msg = T(adding ? (from ? (copied ? "msg.evSpAddedPhoto" : "msg.evSpAddedNoPhoto") : "msg.evSpAdded") : reset ? "msg.evSpSavedReset" : "msg.evSpSaved");
+      if (!S.msg) S.msg = T(adding ? (minor ? "msg.evSpAddedMinor" : from ? (copied ? "msg.evSpAddedPhoto" : "msg.evSpAddedNoPhoto") : "msg.evSpAdded") : "msg.evSpSaved");
     } catch (err) {
       if (copied) await D.removeEventFile(UI.evStoragePath(copied));   // 檔抄過來了、講者卻沒加成：不留一個沒人用的檔
       S.msg = T("err.evSpSave") + D.says(err); if (adding) S.vnOpen["ev-sp-new"] = true;
@@ -1245,7 +1270,7 @@ document.addEventListener("click", async e => {
     try {
       if (ids) await D.reorderEventSpeakers(ev.id, ids);
       else if (act === "ev-sp-del") await D.removeEventFile(UI.evStoragePath(await D.deleteEventSpeaker(id)));
-      else { await D.saveEventSpeaker(ev.id, id, { photo_url: "" }); await D.removeEventFile(UI.evStoragePath(sp && sp.photo_url)); }
+      else { await D.saveEventSpeaker(ev.id, id, { photo_url: "" }); if (sp && sp.consent) await keepSpeakerShown(id); await D.removeEventFile(UI.evStoragePath(sp && sp.photo_url)); }
       await reloadEventSpeakers(ev.id);
       if (!S.msg) S.msg = T(ids ? "msg.evSpMoved" : act === "ev-sp-del" ? "msg.evSpDeleted" : "msg.evSpPhotoCleared");
     } catch (err) { S.msg = T("err.evSpSave") + D.says(err); }
@@ -1291,10 +1316,41 @@ document.addEventListener("click", async e => {
   if (act === "ev-open") { e.preventDefault(); history.pushState(null, "", "#events/" + b.dataset.slug); await openTab("events/" + b.dataset.slug); return; }
   if (act === "ev-back") { history.pushState(null, "", "#events"); await openTab("events"); return; }
   // 活動編輯頁最上面那一行的「到『上線』那一段」（2026-11-23）：只捲過去，網址不變（網址的 # 後面是分頁名，不能拿來當錨點）。
-  if (act === "ev-jump") {
-    const to = document.getElementById(b.dataset.to);
-    if (to) to.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  // 活動編輯頁換分頁（2026-11-24）：只是換哪一塊看得到，資料不重讀、打到一半的字留著。開著哪一個寫進網址（replaceState，
+  // 所以按上一頁是回活動清單，不是一個分頁一個分頁退）。分頁那一排已經捲出畫面的話（從狀態那一行按「到上線那個分頁」不會，但以後可能有別的入口）捲回來。
+  if (act === "ev-tab") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !UI.EV_TABS.includes(b.dataset.tab)) return;
+    keepEventTyped();
+    S.evTab = b.dataset.tab; S.msg = "";
+    history.replaceState(null, "", "#events/" + ev.slug + "/" + S.evTab);
+    render();
+    const nav = document.getElementById("ev-tabs"), on = nav && nav.querySelector(".subtab.on");
+    if (nav && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: "start" });
+    if (on) { on.focus({ preventScroll: true }); on.scrollIntoView({ block: "nearest", inline: "nearest" }); }
     return;
+  }
+  // 封面、活動照片、講者的「放上對外頁」與「從對外頁收起來」（2026-11-24，取代以前那三個同意的勾）。
+  // 叫的是原本那幾支（save_event 的 cover_consent、set_event_photo_consent、set_event_speaker_consent），門沒有變。
+  // 講者要放上去之前多問一次（要滿 18 歲、本人同意）：會走到這裡的只有改版之前沒勾的，還有紀錄裡是學員的。
+  if (act === "ev-cover-show" || act === "ev-ph-show" || act === "ev-sp-show") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev) return;
+    const on = act === "ev-cover-show" ? true : b.dataset.v === "1";
+    if (act === "ev-sp-show" && on && UI.needAsk(S, b, T("confirm.evSpShow", { name: b.dataset.name || "" }))) return;
+    keepEventTyped();
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (act === "ev-cover-show") { await D.saveEvent(ev.id, { cover_consent: true }); ev.cover_consent = true; S.msg = T("msg.evCoverShown"); }
+      else if (act === "ev-ph-show") {
+        const saved = await D.setEventPhotoConsent(id, on);
+        const ph = (S.evPhotos || []).find(x => x.id === id); if (ph) ph.consent = !!saved;
+        S.msg = T(saved ? "msg.evPhConsentOn" : "msg.evPhConsentOff");
+      } else {
+        const saved = await D.setEventSpeakerConsent(id, on);
+        const sp = (S.evSpeakers || []).find(x => x.id === id); if (sp) sp.consent = !!saved;
+        S.msg = T(saved ? "msg.evSpConsentOn" : "msg.evSpConsentOff");
+      }
+    } catch (err) { S.msg = T(act === "ev-sp-show" ? "err.evSpSave" : act === "ev-ph-show" ? "err.evPhSave" : "err.evSave") + D.says(err); }
+    S.busy = false; render(); return;
   }
   if (act === "ev-create") {
     const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
@@ -1327,7 +1383,7 @@ document.addEventListener("click", async e => {
     try {
       if (pending) {
         if (!UI.evCoverOk(pending.cover_url)) throw new Error(T("err.evCoverRaw"));
-        await D.saveEvent(id, pending);
+        await saveEventFields(ev, pending);
       }
       if (act === "ev-ready") await D.setEventReady(id, true);
       else if (act === "ev-unready") await D.setEventReady(id, false);
@@ -1798,33 +1854,11 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
-  // 活動頁的照片（2026-11-23）：選了檔案就傳；每一張照片的同意勾了就送。
+  // 活動頁的照片（2026-11-23）：選了檔案就傳。
   if (S.view === "event" && e.target && e.target.id === "ev-cover-file") { const f = (e.target.files || [])[0]; if (f) await uploadEventCover(e.target.dataset.id, f); return; }
   if (S.view === "event" && e.target && e.target.id === "ev-photo-files") { const fs = Array.from(e.target.files || []); if (fs.length) await uploadEventPhotos(e.target.dataset.id, fs); return; }
-  if (S.view === "event" && e.target && e.target.dataset && e.target.dataset.act === "ev-ph-consent") {
-    const pid = e.target.dataset.id, on = !!e.target.checked;
-    keepEventTyped();
-    S.busy = true; S.msg = ""; render();
-    try {
-      const saved = await D.setEventPhotoConsent(pid, on);
-      const ph = (S.evPhotos || []).find(x => x.id === pid); if (ph) ph.consent = !!saved;
-      S.msg = T(saved ? "msg.evPhConsentOn" : "msg.evPhConsentOff");
-    } catch (err) { S.msg = T("err.evPhSave") + D.says(err); }
-    S.busy = false; render(); return;
-  }
-  // 講者（2027-01-02）：選了照片就傳；同意勾了就送。
+  // 講者（2027-01-02）：選了照片就傳。
   if (S.view === "event" && e.target && e.target.dataset && e.target.dataset.act === "ev-sp-photo") { const f = (e.target.files || [])[0]; if (f) await uploadSpeakerPhoto(e.target.dataset.id, f); return; }
-  if (S.view === "event" && e.target && e.target.dataset && e.target.dataset.act === "ev-sp-consent") {
-    const sid = e.target.dataset.id, on = !!e.target.checked;
-    keepEventTyped();
-    S.busy = true; S.msg = ""; render();
-    try {
-      const saved = await D.setEventSpeakerConsent(sid, on);
-      const sp = (S.evSpeakers || []).find(x => x.id === sid); if (sp) sp.consent = !!saved;
-      S.msg = T(saved ? "msg.evSpConsentOn" : "msg.evSpConsentOff");
-    } catch (err) { S.msg = T("err.evSpSave") + D.says(err); }
-    S.busy = false; render(); return;
-  }
   // 活動頁的「放進哪個專案」（2026-12-26）：選了就存。
   if (S.view === "event" && e.target && e.target.id === "ev-project") {
     const evId = e.target.dataset.id, pid = e.target.value || null;

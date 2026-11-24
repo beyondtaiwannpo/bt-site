@@ -160,18 +160,26 @@ test("★ 沒有報名表：一句話加一顆「加一張報名表」（用原�
   assert.match(F.eventEditHTML(noForm, null, null, DIR, "", false), /data-act="members-open"/, "沒有報名表也改得了成員（那顆在「其他設定」）");
 });
 
-test("★ 封面：主要是選檔案，貼連結收在一格裡；同意與「換了要重勾」都還在；已經在對外頁上的多一句提醒", () => {
+// 2026-11-24 起沒有同意的勾（Paul：「If I upload a photo, I have consent. So just take that away」）：放上封面就算確認過同意，那一句寫在選檔那一格的下面。
+test("★ 封面：主要是選檔案，貼連結收在一格裡；沒有同意的勾，放上去就算確認過；改版之前沒勾的那一張有「放上對外頁」", () => {
   const none = F.eventCoverHTML(EV, true, false, {});
   assert.match(none, /<h3>封面照片<\/h3>/); assert.match(none, /還沒有封面。/);
   assert.match(none, /<input type="file" id="ev-cover-file" accept="image\/\*" data-noauto="1" data-id="e1">/, "data-noauto：自動儲存不碰這一格");
   assert.match(none, /<details class="fold rc-fold" id="ev-cover-link"><summary>[\s\S]*改用貼連結[\s\S]*<input id="ev-cover" name="cover_url" value="" placeholder="https:\/\/…">/, "連結那一格還在畫面上（收著），readEvent() 讀得到");
-  assert.match(none, /id="ev-consent" name="cover_consent">/); assert.match(none, /換了封面要重新勾同意/);
-  assert.doesNotMatch(none, /ev-cover-clear/, "沒有封面就沒有「拿掉封面」"); assert.doesNotMatch(none, /已經在對外頁上/);
+  assert.doesNotMatch(none, /ev-consent|cover_consent|type="checkbox"/, "沒有同意的勾了");
+  assert.match(none, /在這裡放封面，就是你確認過照片裡的人與那場活動都在拍攝同意範圍內。/, "那一句講清楚放上去代表什麼");
+  assert.match(none, /<div class="ev-ph-state" id="ev-cover-state"><\/div>/, "沒有封面就沒有「對外看得到沒」那一行");
+  assert.doesNotMatch(none, /ev-cover-clear/, "沒有封面就沒有「拿掉封面」"); assert.doesNotMatch(none, /ev-cover-show/);
   // 傳上去的封面：連結那一格收著；有「拿掉封面」
   const up = F.eventCoverHTML({ ...EV, cover_url: UP, cover_consent: true }, true, false, {});
   assert.match(up, new RegExp(`<img class="ev-cover" src="${UP.replace(/[.?/]/g, "\\$&")}" alt="">`));
   assert.match(up, /<details class="fold rc-fold" id="ev-cover-link"><summary>/); assert.match(up, /換一張封面/);
-  assert.match(up, /id="ev-consent" name="cover_consent" checked>/);
+  assert.match(up, /id="ev-cover-state"><span class="tag ok">活動上架後對外看得到<\/span><\/div>/); assert.doesNotMatch(up, /ev-cover-show/, "同意過的封面沒有那顆按鈕");
+  assert.match(F.eventCoverHTML({ ...EV, cover_url: UP, cover_consent: true, status: "published" }, true, false, {}), /id="ev-cover-state"><span class="tag open">對外看得到<\/span><\/div>/);
+  // 改版之前放的、當時沒勾的封面：不會自己變公開，寫「對外看不到」加一顆「放上對外頁」
+  const old = F.eventCoverHTML({ ...EV, cover_url: UP, cover_consent: false }, true, false, {});
+  assert.match(old, /id="ev-cover-state"><span class="tag draft">對外看不到<\/span> <button type="button" class="btn sm" data-act="ev-cover-show" data-id="e1">放上對外頁<\/button><span class="ev-help">這張封面是改版之前放的/);
+  assert.match(F.eventCoverHTML({ ...EV, cover_url: UP, cover_consent: false }, true, true, {}), /data-act="ev-cover-show" data-id="e1" disabled>/);
   assert.match(up, /<button class="btn quiet danger sm" data-act="ev-cover-clear" data-id="e1">拿掉封面<\/button>/);
   // 貼的連結：那一格先打開，才看得到貼的是什麼
   assert.match(F.eventCoverHTML({ ...EV, cover_url: "https://drive.google.com/cover.jpg" }, true, false, {}), /id="ev-cover-link" open>/);
@@ -179,12 +187,9 @@ test("★ 封面：主要是選檔案，貼連結收在一格裡；同意與「�
   // 上傳中：進度條，沒有選檔那一格
   const going = F.eventCoverHTML(EV, true, true, { coverUp: { pct: 45, name: "a.jpg" } });
   assert.match(going, /<progress value="45" max="100">/); assert.match(going, /傳 a\.jpg 中/); assert.doesNotMatch(going, /ev-cover-file/);
-  // 已經在對外頁上
-  // 2027-01-02 起 public_events() 的封面同意勾了才回，所以這一句從「新的那一張會馬上出現」改成「勾之前對外頁不會放封面」。
-  assert.match(F.eventCoverHTML({ ...EV, status: "published" }, true, false, {}), /這場活動已經在對外頁上。換了封面要重新勾同意，勾之前對外頁不會放封面。/);
-  // 唯讀：沒有選檔、沒有拿掉；同意那一格按不了
+  // 唯讀：沒有選檔、沒有拿掉、沒有「放上對外頁」；看得到那個標籤
   const ro = F.eventCoverHTML({ ...EV, cover_url: UP, status: "published" }, false, false, {});
-  assert.doesNotMatch(ro, /ev-cover-file|ev-cover-clear|ev-cover-link|已經在對外頁上/); assert.match(ro, /id="ev-consent" name="cover_consent" disabled>/);
+  assert.doesNotMatch(ro, /ev-cover-file|ev-cover-clear|ev-cover-link|ev-cover-show|在這裡放封面/); assert.match(ro, /id="ev-cover-state"><span class="tag draft">對外看不到<\/span><\/div>/);
   assert.match(ro, /<input id="ev-cover" name="cover_url" value="[^"]+" placeholder="https:\/\/…" readonly>/);
 });
 
@@ -194,7 +199,7 @@ test("★ 活動照片：一格一格的小圖，點了放大；底下兩顆箭�
   const h = F.eventPhotosHTML(EV, PHOTOS, true, false, {});
   assert.match(h, /^<div class="ev-panel" id="ev-photos"><h3>活動照片 <span class="hint">3<\/span>/, "2026-11-23 起是「照片」那一段裡的一塊，不是自己一整段");
   assert.match(h, /<ul class="ev-thumbs">/); assert.doesNotMatch(h, /hi-photo/, "不再用歷史頁那種一張一大格的版面");
-  assert.equal(count(h, /<li class="ev-thumb(?: off)?">/g), 3); assert.equal(count(h, /<li class="ev-thumb off">/g), 2, "沒勾同意的那兩張變淡");
+  assert.equal(count(h, /<li class="ev-thumb(?: off)?">/g), 3); assert.equal(count(h, /<li class="ev-thumb off">/g), 2, "對外看不到的那兩張變淡");
   assert.equal(count(h, /<img src="[^"]+" alt="" loading="lazy">/g), 3);
   assert.match(h, /<button type="button" class="ev-thumb-b" data-act="ev-ph-open" data-id="p1" aria-label="放大看第 1 張，共 3 張">/, "照片本身是一顆按鈕，點了放大");
   assert.match(h, /data-act="ev-ph-move" data-id="p1" data-dir="-1" aria-label="往前一格" title="往前一格" disabled>←</, "第一張不能再往前");
@@ -203,7 +208,7 @@ test("★ 活動照片：一格一格的小圖，點了放大；底下兩顆箭�
   assert.doesNotMatch(h, />往前<|>往後<|Earlier|Later/, "「往前」「往後」那兩個字換成箭頭了");
   assert.doesNotMatch(h, /ev-ph-del|ev-ph-consent/, "拿掉與同意不在小圖上，在放大的那一格裡（整頁才不會有兩顆一樣的按鈕）");
   assert.match(h, /<input type="file" id="ev-photo-files" accept="image\/\*" multiple data-id="e1">/);
-  assert.match(h, /沒勾的不會出現在對外頁/); assert.match(h, /點照片可以放大看/);
+  assert.match(h, /在這裡傳照片，就是你確認過照片裡的人與那場活動都在拍攝同意範圍內。/, "沒有勾了，那一句講清楚傳上去代表什麼"); assert.match(h, /點照片可以放大看/);
   assert.equal(count(h, /<span class="tag draft ev-thumb-tag">對外看不到<\/span>/g), 2, "對外看不到的那兩張，小圖上有標籤");
   // 三十張也只是三十格小圖
   const many = Array.from({ length: 30 }, (_, i) => ({ id: "m" + i, url: UP.replace("ab12cd", "m" + i), consent: true, sort: i * 10 }));
@@ -222,14 +227,15 @@ test("★ 活動照片：一格一格的小圖，點了放大；底下兩顆箭�
   assert.equal(F.eventPhotosHTML(EV, PHOTOS, false, false, {}), "");
 });
 
-test("★ 放大的那一格：第幾張、左右換照片、同意、往前往後一格、拿掉這張；只有一張沒有左右；找不到那一張回空字串", () => {
+test("★ 放大的那一格：第幾張、左右換照片、往前往後一格、放上對外頁或收起來、拿掉這張；沒有同意的勾；只有一張沒有左右；找不到那一張回空字串", () => {
   const h = F.evLightboxHTML(EV, PHOTOS, "p2", false);
   assert.match(h, /<b class="ev-lb-n">第 2 張，共 3 張<\/b><span class="tag draft">對外看不到<\/span>/);
   assert.match(h, /data-act="ev-lb-close">關掉</);
   assert.match(h, /data-act="ev-lb-go" data-dir="-1" aria-label="上一張" title="上一張">←</); assert.match(h, /data-act="ev-lb-go" data-dir="1" aria-label="下一張" title="下一張">→</);
   assert.match(h, new RegExp(`<img class="ev-lb-img" src="${PHOTOS[1].url.replace(/[.?/]/g, "\\$&")}" alt="">`));
-  assert.match(h, /data-act="ev-ph-consent" data-noauto="1" data-id="p2"><span>這張照片裡的人與那場活動都在拍攝同意範圍內<\/span>/, "同意那句話跟封面的一字不差，沒勾的就是沒勾");
-  assert.match(F.evLightboxHTML(EV, PHOTOS, "p1", false), /data-act="ev-ph-consent" data-noauto="1" data-id="p1" checked>/);
+  assert.doesNotMatch(h, /ev-ph-consent|type="checkbox"|拍攝同意/, "沒有同意的勾了");
+  assert.match(h, /<button type="button" class="btn sm" data-act="ev-ph-show" data-id="p2" data-v="1">放上對外頁<\/button>/, "對外看不到的那一張（改版之前沒勾的）：一顆「放上對外頁」，按了才會公開");
+  assert.match(F.evLightboxHTML(EV, PHOTOS, "p1", false), /<button type="button" class="btn quiet sm" data-act="ev-ph-show" data-id="p1" data-v="0">從對外頁收起來<\/button>/, "看得到的那一張可以收起來");
   assert.match(h, /data-act="ev-ph-move" data-id="p2" data-dir="-1">← 往前一格</); assert.match(h, /data-act="ev-ph-move" data-id="p2" data-dir="1">往後一格 →</);
   assert.match(F.evLightboxHTML(EV, PHOTOS, "p1", false), /data-act="ev-ph-move" data-id="p1" data-dir="-1" disabled>/, "第一張不能再往前");
   assert.match(F.evLightboxHTML(EV, PHOTOS, "p3", false), /data-act="ev-ph-move" data-id="p3" data-dir="1" disabled>/, "最後一張不能再往後");
@@ -237,9 +243,9 @@ test("★ 放大的那一格：第幾張、左右換照片、同意、往前往�
   // 標籤：活動還沒上架，勾了同意的寫「上架後看得到」；上架了寫「對外看得到」
   assert.match(F.evLightboxHTML(EV, PHOTOS, "p1", false), /<span class="tag ok">活動上架後對外看得到<\/span>/);
   assert.match(F.evLightboxHTML({ ...EV, status: "published" }, PHOTOS, "p1", false), /<span class="tag open">對外看得到<\/span>/);
-  // 忙的時候：同意、排順序、拿掉都按不動，左右換照片照樣可以
+  // 忙的時候：放上對外頁、排順序、拿掉都按不動，左右換照片照樣可以
   const busy = F.evLightboxHTML(EV, PHOTOS, "p2", true);
-  assert.match(busy, /data-act="ev-ph-consent" data-noauto="1" data-id="p2" disabled>/); assert.match(busy, /data-act="ev-ph-del" data-id="p2" disabled>/);
+  assert.match(busy, /data-act="ev-ph-show" data-id="p2" data-v="1" disabled>/); assert.match(busy, /data-act="ev-ph-del" data-id="p2" disabled>/);
   assert.match(busy, /data-act="ev-lb-go" data-dir="1" aria-label="下一張" title="下一張">/);
   // 只有一張：沒有左右；找不到：空字串（main.js 會把那一格關掉）
   assert.doesNotMatch(F.evLightboxHTML(EV, PHOTOS.slice(0, 1), "p1", false), /ev-lb-go/);
@@ -283,33 +289,51 @@ test("★ 記分卡是一顆次要的按鈕，上面一句話講它是什麼；�
 // ── 2026-11-23 重排：順序、每一段同一個樣子、狀態那一行、預覽收起來、報名的開放與截止時間 ──
 // Paul：「It doesn't make sense to have going live, project in that order. If I wanted to make an event, it should be in a certain order
 //        that makes it efficient and it makes sense.」
-const SECTIONS = ["ev-content", "ev-when", "ev-listing", "ev-pics", "ev-speakers", "ev-signup", "ev-live", "ev-links", "ev-after", "ev-house"];
+// 2026-11-24 起這幾段分在七個分頁裡（見下面 TAB_OF）；這一串是它們在畫面原始碼裡的順序。回饋表從「活動之後」搬出來自己一段（ev-feedback，在「表單」分頁）。
+const SECTIONS = ["ev-content", "ev-when", "ev-pics", "ev-speakers", "ev-signup", "ev-feedback", "ev-live", "ev-links", "ev-after", "ev-listing", "ev-house"];
 const secOf = (h, id) => { const a = h.indexOf(`<section class="section" id="${id}">`); assert.ok(a >= 0, `找不到 ${id} 那一段`); const b = h.indexOf('<section class="section"', a + 10); return h.slice(a, b < 0 ? h.length : b); };
 // 這一支的 EV 沒有計畫那四欄（那是遷移檔還沒跑的樣子），整頁的測試補上，四格才畫得出來。
 const PG = { usual_month: null, recurring: false, edition_zh: "", edition_en: "" };
 const fullPage = (ev, me, x) => F.eventEditHTML({ ...PG, ...(ev || EV) }, FORM, 3, me || DIR, "", false, [{ id: "v1", name: "台大", city: "台北" }], [{ id: "2026-27" }], { money: null, requests: [] },
   { event: { numbers: {} }, review: null, forms: [] }, [], Object.assign({ photos: PHOTOS, speakers: [], tickets: [] }, x || {}));
 
-test("★ 整頁的順序：狀態那一行 → 內容 → 時間與地點 → 對外怎麼列 → 照片 → 講者 → 報名 → 上線 → 行銷與錢 → 活動之後 → 其他設定", () => {
+// ── 分頁（2026-11-24）── Paul：「put everything that has the same categories on the top so I can just click them」。七個，他看過名單說「Yes, go ahead」。
+const TABS = ["details", "photos", "speakers", "forms", "live", "results", "settings"];
+const TAB_OF = { "ev-content": "details", "ev-when": "details", "ev-pics": "photos", "ev-speakers": "speakers", "ev-signup": "forms", "ev-feedback": "forms",
+  "ev-live": "live", "ev-links": "live", "ev-after": "results", "ev-listing": "settings", "ev-house": "settings" };
+const tabOf = (h, k) => { const a = h.indexOf(`<div class="ev-tabp" data-tabp="${k}"`); assert.ok(a >= 0, `找不到 ${k} 那個分頁`); const b = h.indexOf('<div class="ev-tabp"', a + 10); return h.slice(a, b < 0 ? h.length : b); };
+
+test("★ 七個分頁：內容、照片、講者、表單、上線、成果、設定；每一段在它該在的分頁裡；預設開「內容」", () => {
   const h = fullPage();
   const at = s => { const i = h.indexOf(s); assert.ok(i >= 0, `找不到 ${s}`); return i; };
-  const order = ['id="ev-state"', ...SECTIONS.map(id => `<section class="section" id="${id}">`)].map(at);
-  assert.deepEqual(order, order.slice().sort((a, b) => a - b), "十段照「辦一場活動會先做什麼」排");
+  // 那一排分頁在狀態那一行的下面、內容的上面
+  assert.ok(at('id="ev-state"') < at('<nav class="subtabs ev-tabs" id="ev-tabs"') && at('id="ev-tabs"') < at('<div class="ev-tabp"'));
+  assert.deepEqual([...h.matchAll(/class="subtab(?: on)?" data-act="ev-tab" data-tab="([a-z]+)"/g)].map(m => m[1]), TABS);
+  assert.deepEqual([...h.matchAll(/class="subtab(?: on)?" data-act="ev-tab" data-tab="[a-z]+"(?: aria-current="page")?>([^<]+)</g)].map(m => m[1]), ["內容", "照片", "講者", "表單", "上線", "成果", "設定"]);
+  assert.match(h, /<button type="button" class="subtab on" data-act="ev-tab" data-tab="details" aria-current="page">內容<\/button>/, "還沒結束的活動預設開「內容」");
+  assert.equal(count(h, /class="subtab on"/g), 1);
+  // 分頁的順序、哪一段在哪一個分頁、段的順序
+  assert.deepEqual([...h.matchAll(/<div class="ev-tabp" data-tabp="([a-z]+)"/g)].map(m => m[1]), TABS);
+  const order = SECTIONS.map(id => `<section class="section" id="${id}">`).map(at);
+  assert.deepEqual(order, order.slice().sort((a, b) => a - b), "段的順序：內容、時間與地點、照片、講者、報名、回饋、上線、行銷與錢、成果、對外怎麼列、其他設定");
   assert.equal(count(h, /<section class="section"/g), SECTIONS.length, "沒有多出來或漏掉的一段");
+  for (const id of SECTIONS) assert.ok(tabOf(h, TAB_OF[id]).includes(`<section class="section" id="${id}">`), `${id} 不在「${TAB_OF[id]}」那個分頁裡`);
   // 每一段的標題
   for (const [id, title] of [["ev-content", "內容"], ["ev-when", "時間與地點"], ["ev-listing", "對外的「活動與計畫」頁和「團隊」頁上怎麼列"], ["ev-pics", "照片"], ["ev-speakers", "講者"],
-    ["ev-signup", "報名與現場"], ["ev-live", "上線"], ["ev-links", "行銷與錢"], ["ev-after", "活動之後"], ["ev-house", "其他設定"]])
+    ["ev-signup", "報名與現場"], ["ev-feedback", "活動後的回饋"], ["ev-live", "上線"], ["ev-links", "行銷與錢"], ["ev-after", "活動之後"], ["ev-house", "其他設定"]])
     assert.ok(secOf(h, id).startsWith(`<section class="section" id="${id}"><h2>${title}`), `${id} 的標題不是「${title}」`);
   // 每一格在它該在的那一段裡
   const has = (id, ...needles) => { const s = secOf(h, id); for (const n of needles) assert.ok(s.includes(n), `${id} 那一段裡沒有 ${n}`); };
   has("ev-content", 'id="ev-tzh"', 'id="ev-ten"', 'id="ev-szh"', 'id="ev-sen"', 'id="ev-bzh"', 'id="ev-ben"');
   has("ev-when", 'id="ev-starts"', 'id="ev-ends"', 'id="ev-place"', 'id="ev-cap"', 'id="ev-venue"');
   has("ev-listing", 'id="ev-month"', 'id="ev-recurring"', 'id="ev-edzh"', 'id="ev-eden"');
-  has("ev-pics", 'id="ev-cover-file"', 'id="ev-cover"', 'id="ev-consent"', 'id="ev-photos"');
+  has("ev-pics", 'id="ev-cover-file"', 'id="ev-cover"', 'id="ev-cover-state"', 'id="ev-photos"');
   has("ev-signup", 'data-act="open-form"', 'data-act="ev-form-status"', 'id="ev-fopen"', 'id="ev-fclose"', 'id="ev-tickets"', 'data-act="open-apps"', 'data-act="open-notice"', 'data-act="open-checkin"');
-  has("ev-live", 'data-act="ev-ready"', "草稿。填好內容");
+  has("ev-live", 'data-act="ev-ready"', "草稿。內容填好之後");
   has("ev-links", 'data-act="ev-ask-mkt"');
-  has("ev-after", 'data-act="ev-fb-create"', 'href="/admin/records/#overview/e1"');
+  has("ev-feedback", 'data-act="ev-fb-create"');
+  has("ev-after", 'href="/admin/records/#overview/e1"');
+  assert.ok(!secOf(h, "ev-after").includes("ev-fb-create"), "回饋表不在「成果」裡了，在「表單」");
   has("ev-house", 'id="ev-pj-box"', 'id="ev-kind"', 'id="ev-term"', 'data-act="members-open"');
   // 段裡面的順序
   const pics = secOf(h, "ev-pics"); assert.ok(pics.indexOf('id="ev-coverbox"') < pics.indexOf('id="ev-photos"'), "封面在活動照片上面");
@@ -319,19 +343,66 @@ test("★ 整頁的順序：狀態那一行 → 內容 → 時間與地點 → �
   // 會改狀態的按鈕只在「上線」那一段；專案不再是第二段
   assert.equal(count(h, /data-act="ev-(ready|unready|publish|unpublish)"/g), 1);
   assert.ok(at('id="ev-pj-box"') > at('<section class="section" id="ev-after">'), "專案在最後面的其他設定裡");
-  assert.equal(count(h, /id="ev-cover"/g), 1, "連結那一格只有一個"); assert.equal(count(h, /id="ev-consent"/g), 1);
+  assert.equal(count(h, /id="ev-cover"/g), 1, "連結那一格只有一個"); assert.doesNotMatch(h, /id="ev-consent"|ev-ph-consent|ev-sp-consent/, "整頁沒有任何一個同意的勾");
   // x 沒給也畫得出來
   const bare = F.eventEditHTML(EV, FORM, 3, DIR, "", false);
   assert.match(bare, /<div class="ev-panel" id="ev-photos"><h3>活動照片<\/h3><div class="mini">載入中/);
   assert.doesNotMatch(fullPage(EV, VIEWER), /id="ev-photos"|ev-cover-file|ev-fb-create|ev-form-status|ev-fopen|data-autosave=/, "只有「看」的人：沒有照片那一塊、沒有任何會改東西的按鈕與格子");
 });
 
-test("★ 結束了的活動：「活動之後」搬到狀態那一行的正下面（2026-11-13 Paul 定的），其他照舊", () => {
+test("★ 結束了的活動：預設開「成果」那個分頁（2026-11-13 Paul：「活動結束了點進來什麼都沒有」），分頁與段的順序照舊", () => {
   const past = fullPage({ ...EV, status: "published", starts_at: "2025-07-01T00:00:00Z" });
-  const at = s => { const i = past.indexOf(s); assert.ok(i >= 0, `找不到 ${s}`); return i; };
-  assert.ok(at('id="ev-state"') < at('id="ev-after"') && at('id="ev-after"') < at('id="ev-content"'), "狀態 → 活動之後 → 內容");
-  assert.ok(at('id="ev-live"') < at('id="ev-links"') && at('id="ev-links"') < at('id="ev-house"'));
+  assert.match(past, /class="subtab on" data-act="ev-tab" data-tab="results" aria-current="page">成果</);
+  assert.match(past, /<div class="ev-tabp" data-tabp="results"><section class="section" id="ev-after">/, "「成果」開著");
+  assert.match(past, /<div class="ev-tabp" data-tabp="details" hidden>/, "「內容」藏著");
+  assert.deepEqual([...past.matchAll(/<div class="ev-tabp" data-tabp="([a-z]+)"/g)].map(m => m[1]), TABS, "分頁的順序不會因為結束了就換");
   assert.equal(count(past, /id="ev-after"/g), 1, "只畫一次");
+  // 自己點過別的分頁就照他點的
+  assert.match(fullPage({ ...EV, status: "published", starts_at: "2025-07-01T00:00:00Z" }, DIR, { tab: "photos" }), /<div class="ev-tabp" data-tabp="photos"><section/);
+});
+
+test("★ 七個分頁都在畫面裡，沒選到的只是藏起來：readEvent() 照 id 讀整頁，哪一格不在就會被存成空的", () => {
+  const ids = ["ev-tzh", "ev-ten", "ev-szh", "ev-sen", "ev-bzh", "ev-ben", "ev-starts", "ev-ends", "ev-place", "ev-cap", "ev-cover", "ev-month", "ev-recurring", "ev-edzh", "ev-eden"];
+  for (const tab of TABS) {
+    const h = fullPage(EV, DIR, { tab });
+    for (const id of ids) assert.equal(count(h, new RegExp(`id="${id}"`, "g")), 1, `開著「${tab}」的時候 #${id} 不在畫面裡（或有兩個）`);
+    assert.equal(count(h, /<div class="ev-tabp" data-tabp="[a-z]+" hidden>/g), 6, "六個藏著");
+    assert.match(h, new RegExp(`<div class="ev-tabp" data-tabp="${tab}">`), "一個開著");
+    assert.match(h, new RegExp(`class="subtab on" data-act="ev-tab" data-tab="${tab}" aria-current="page"`));
+  }
+  // readEvent 讀的每一格都在上面那一串裡（它多讀一格，這裡就要多守一格）
+  const m = read("admin/src/main.js"), fn = m.slice(m.indexOf("function readEvent() {"), m.indexOf("// ", m.indexOf("return patch;", m.indexOf("function readEvent() {"))));
+  for (const id of [...fn.matchAll(/(?:val|chk)\("(ev-[a-z]+)"\)/g)].map(x => x[1])) assert.ok(ids.includes(id), `readEvent 讀 #${id}，上面那一串沒有守到它`);
+  // 樣式沒有把 hidden 蓋掉
+  assert.doesNotMatch(read("admin/admin.css"), /\.ev-tabp\{[^}]*display:/, ".ev-tabp 不能自己設 display，不然 hidden 藏不住");
+});
+
+test("★ 分頁的小東西：evTabOf 認不得的名字回預設；改不動的人沒有「講者」；名字後面的小數字；網址與 main.js 的接法", () => {
+  assert.equal(F.evTabOf(EV, "forms", true), "forms"); assert.equal(F.evTabOf(EV, "nope", true), "details"); assert.equal(F.evTabOf(EV, null, true), "details");
+  assert.equal(F.evTabOf({ ...EV, starts_at: "2025-07-01T00:00:00Z" }, null, true), "results");
+  assert.equal(F.evTabOf(EV, "speakers", false), "details", "改不動的人沒有「講者」，網址寫了也回預設");
+  assert.deepEqual(F.evTabs(true), TABS); assert.deepEqual(F.evTabs(false), TABS.filter(k => k !== "speakers"));
+  const view = fullPage(EV, VIEWER);
+  assert.doesNotMatch(view, /data-tab="speakers"|data-tabp="speakers"/, "只有「看」的人：沒有「講者」那個分頁");
+  assert.equal(count(view, /<div class="ev-tabp"/g), 6);
+  // 小數字：幾張照片、幾位講者、幾張表單（報名表一張加回饋表幾張）。零不印，還在載不印。
+  const h = F.eventEditHTML({ ...PG, ...EV }, FORM, 3, DIR, "", false, [], [], { money: null, requests: [] }, { event: { numbers: {} }, review: null, forms: [{ id: "f9", title: "回饋", status: "open", responses: 2 }] }, [],
+    { photos: PHOTOS, speakers: [{ id: "s1", display_name: "A", subject: "", school: "", photo_url: null, consent: true }], tickets: [] });
+  assert.match(h, /data-tab="photos">照片<span class="subtab-n">3<\/span>/); assert.match(h, /data-tab="speakers">講者<span class="subtab-n">1<\/span>/); assert.match(h, /data-tab="forms">表單<span class="subtab-n">2<\/span>/);
+  assert.doesNotMatch(fullPage(), /data-tab="speakers">講者<span/, "零位講者不印數字");
+  assert.doesNotMatch(F.eventEditHTML(EV, FORM, 3, DIR, "", false), /subtab-n/, "都還在載的時候不印數字");
+  // 「表單」分頁：報名表、報名類型、行前與當天、回饋表，每一張都是一顆按鈕或一條連結
+  const forms = tabOf(h, "forms");
+  for (const n of ['data-act="open-form" data-id="f1"', 'data-act="open-apps" data-id="f1"', 'data-act="open-checkin" data-id="f1"', 'href="/admin/records/#forms/f9"', 'data-act="ev-fb-create"'])
+    assert.ok(forms.includes(n), `「表單」分頁裡沒有 ${n}`);
+  // main.js：網址 #events/<代號>/<分頁>；換分頁不重讀資料，先把打到一半的字收起來，網址用 replaceState
+  const m = read("admin/src/main.js");
+  assert.match(m, /const ev = \/\^events\(\?:\\\/\(\[a-z0-9-\]\+\)\(\?:\\\/\(\[a-z\]\+\)\)\?\)\?\$\/\.exec\(t \|\| ""\);/);
+  assert.match(m, /S\.evTab = \(ev\[1\] && ev\[2\]\) \|\| null;/);
+  assert.match(m, /if \(act === "ev-tab"\) \{[\s\S]{0,200}keepEventTyped\(\);\s*S\.evTab = b\.dataset\.tab; S\.msg = "";\s*history\.replaceState\(null, "", "#events\/" \+ ev\.slug \+ "\/" \+ S\.evTab\);\s*render\(\);/);
+  assert.match(m, /tab: S\.evTab, speakers: S\.evSpeakers/);
+  const css = read("admin/admin.css");
+  assert.match(css, /\.ev-tabs\{overflow-x:auto;/, "手機上放不下就左右捲");
 });
 
 test("★ 每一段長一樣：一個 h2，底下是一塊一塊的 .ev-panel；沒有光禿禿的小標題、沒有往上拉的負邊界", () => {
@@ -339,6 +410,7 @@ test("★ 每一段長一樣：一個 h2，底下是一塊一塊的 .ev-panel；
     const h = fullPage(EV, me);
     for (const id of SECTIONS) {
       if (id === "ev-speakers" && (me === VIEWER || me === ASSOC)) continue;   // 改不動的人沒有講者那一段
+      if (id === "ev-feedback" && !h.includes('id="ev-feedback"')) continue;   // 沒有回饋表、也建不了的人沒有那一段
       const s = secOf(h, id), body = s.slice(s.indexOf("</h2>") + 5);
       assert.ok(body.startsWith('<div class="ev-panel"') || (id === "ev-after" && /^<div class="(todo ev-kpis|mini ev-gap)"/.test(body)), `${id} 的 h2 底下不是一塊 .ev-panel：${body.slice(0, 60)}`);
     }
@@ -355,21 +427,20 @@ test("★ 每一段長一樣：一個 h2，底下是一塊一塊的 .ev-panel；
   assert.match(css, /\.two > \.ev-help\{grid-column:1\/-1/, "兩欄裡的說明橫跨兩欄");
 });
 
-test("★ 最上面那一行狀態：四種狀態各一句、對外中有「看對外的那一頁」、一顆帶你到「上線」；不是一段，也沒有會改狀態的按鈕", () => {
+test("★ 最上面那一行狀態：四種狀態各一句、對外中有「看對外的那一頁」、一顆帶你到「上線」那個分頁；不是一段，也沒有會改狀態的按鈕", () => {
   const draft = F.eventStateHTML(EV);
   assert.match(draft, /^<div class="ev-state" id="ev-state"><span class="tag draft">草稿<\/span><span class="ev-state-t">還沒上線，外面的人看不到。<\/span>/);
-  assert.match(draft, /<button type="button" class="btn quiet sm" data-act="ev-jump" data-to="ev-live">到「上線」那一段<\/button><\/div>$/);
+  assert.match(draft, /<button type="button" class="btn quiet sm" data-act="ev-tab" data-tab="live">到「上線」那個分頁<\/button><\/div>$/);
   assert.doesNotMatch(draft, /<a |<section|<h2/);
   assert.match(F.eventStateHTML({ ...EV, status: "ready" }), /<span class="tag warn">準備好了<\/span><span class="ev-state-t">等 Co-President 或 Senior Adviser 放上對外頁/);
   const live = F.eventStateHTML({ ...EV, status: "published" });
   assert.match(live, /<span class="tag open">對外中<\/span>/); assert.match(live, /<a class="btn ghost sm" href="\/events\/\?e=winter-camp-2027" target="_blank" rel="noopener">看對外的那一頁<\/a>/);
   assert.match(F.eventStateHTML({ ...EV, status: "archived" }), /<span class="tag">撤下了<\/span><span class="ev-state-t">撤下來了，外面的人看不到。/);
   for (const st of ["draft", "ready", "published", "archived"]) assert.doesNotMatch(F.eventStateHTML({ ...EV, status: st }), /ev-ready|ev-unready|ev-publish|ev-unpublish/);
-  const m = read("admin/src/main.js");
-  assert.match(m, /if \(act === "ev-jump"\) \{\s*const to = document\.getElementById\(b\.dataset\.to\);\s*if \(to\) to\.scrollIntoView\(/, "只捲過去，不改網址");
+  assert.doesNotMatch(read("admin/src/main.js") + read("admin/src/ui.js"), /"ev-jump"/, "以前那顆是捲到那一段；現在是換分頁，舊的那一條拿掉了");
   // 整頁上那一行在標題的正下面；唯讀的人接著一句「改不動」
   const view = fullPage(EV, VIEWER);
-  assert.match(view, /<\/header><div class="ev-state" id="ev-state">[\s\S]*?<\/div><div class="note">你對這場活動是「看」，改不動。<\/div><section class="section" id="ev-content">/);
+  assert.match(view, /<\/header><div class="ev-state" id="ev-state">[\s\S]*?<\/div><div class="note">你對這場活動是「看」，改不動。<\/div><nav class="subtabs ev-tabs" id="ev-tabs"[^>]*>[\s\S]*?<\/nav><div class="ev-tabp" data-tabp="details"><section class="section" id="ev-content">/);
 });
 
 test("★ 說明底下的預覽收成一行：真的 <details>，中英兩格都是，預設收著；開著沒只記在記憶體，換一場活動就收回去", () => {
@@ -445,9 +516,9 @@ test("★ 這一頁有四塊「改了就存」（內容、時間與地點、對�
   const boxes = h.split('data-autosave="ev-save"').slice(1).map(b => b.slice(0, b.indexOf('class="autosave" data-for="ev-save"')));
   const names = boxes.map(b => [...b.matchAll(/ name="([a-z_]+)"/g)].map(m => m[1]));
   assert.deepEqual(names, [["title_zh", "title_en", "summary_zh", "summary_en", "body_zh", "body_en"], ["starts_at", "ends_at", "place", "capacity"],
-    ["usual_month", "recurring", "edition_zh", "edition_en"], ["cover_url", "cover_consent"]]);
+    ["cover_url"], ["usual_month", "recurring", "edition_zh", "edition_en"]]);
   for (const b of boxes) assert.doesNotMatch(b, /id="ev-venue"|id="ev-kind"|id="ev-term"|id="ev-project"|data-act="ev-ph-consent"/, "選了就存的那幾格不在「改了就存」的框裡（各有各的路）");
-  assert.match(read("admin/src/main.js"), /const patch = \{ title_zh: val\("ev-tzh"\)[^\n]*\n\s*starts_at: iso\(val\("ev-starts"\)\)[^\n]*cover_url: val\("ev-cover"\), cover_consent: chk\("ev-consent"\) \};/, "readEvent 還是照 id 把整頁讀一遍");
+  assert.match(read("admin/src/main.js"), /const patch = \{ title_zh: val\("ev-tzh"\)[^\n]*\n\s*starts_at: iso\(val\("ev-starts"\)\)[^\n]*cover_url: val\("ev-cover"\) \};/, "readEvent 還是照 id 把整頁讀一遍；2026-11-24 起不讀同意（沒有那個勾了，讀了會每存一次就把同意存成 false）");
   assert.doesNotMatch(fullPage(EV, VIEWER), /data-autosave=|class="autosave"/, "唯讀的人沒有框也沒有那行小字");
 });
 
@@ -551,10 +622,20 @@ test("★ 資料層與 main.js：叫的函式名字跟遷移檔一樣；封面�
   assert.match(d, /rpcV\("rc_save_form", \{ p_form: null, p_data: \{ title, kind: "post-event", event_id: eventId, lang: l \}, p_questions: questions \|\| \[\] \}\)/);
   assert.match(rcd, /rpc\("rc_save_form", \{ p_form: id \|\| null, p_data: data \|\| \{\}, p_questions:/, "Records 那邊叫的是同一支、同樣的參數名字");
   assert.doesNotMatch(d + m + read("admin/src/ui.js"), /from "\.\.\/(records|site|people|passports|finance|marketing)\//, "不 import 別的後台資料夾");
-  // 封面：存的是 cover_url 一個鍵，走原本的 saveEvent；存完畫面上的同意改回沒勾
-  assert.match(m, /await D\.saveEvent\(eventId, \{ cover_url: url \}\);\s*ev\.cover_url = url; ev\.cover_consent = false; forgetCover\(eventId\);/);
+  // 封面：存的是 cover_url 一個鍵，走原本的 save_event；2026-11-24 起封面換成另一張就接著補上同意（saveEventFields），拿掉封面不補
+  assert.match(m, /await saveEventFields\(ev, \{ cover_url: url \}\); forgetCover\(eventId\);/);
+  const sef = m.slice(m.indexOf("async function saveEventFields(ev, patch) {"), m.indexOf("// ── 活動的照片與下半那幾顆按鈕"));
+  assert.match(sef, /const changed = "cover_url" in patch && \(patch\.cover_url \|\| ""\) !== \(ev\.cover_url \|\| ""\);\s*await D\.saveEvent\(ev\.id, patch\);\s*if \(!changed\) return false;/, "封面沒換就不碰同意：改版之前沒勾的封面不會因為改了別的欄位就變公開");
+  assert.match(sef, /if \(patch\.cover_url\) \{ await D\.saveEvent\(ev\.id, \{ cover_consent: true \}\); ev\.cover_consent = true; \}/);
+  assert.equal(count(m, /D\.saveEvent\(ev\.id, \{ cover_consent: true \}\)/g), 2, "補同意只有兩個地方：換封面的時候，還有按「放上對外頁」的時候");
+  assert.match(m, /if \(act === "ev-cover-show"\) \{ await D\.saveEvent\(ev\.id, \{ cover_consent: true \}\);/);
+  // 活動照片：傳上去的每一張接著補上同意；補不成照片還在，只是對外看不到
+  assert.match(m, /const pid = await D\.addEventPhoto\(eventId, url\);[\s\S]{0,120}try \{ await D\.setEventPhotoConsent\(pid, true\); \} catch \(x\) \{ hidden\+\+; \}/);
+  assert.equal(count(m, /D\.setEventPhotoConsent\(/g), 2, "照片的同意只有兩個地方會動：剛傳上去的那一張，還有按「放上對外頁／收起來」");
+  assert.doesNotMatch(m, /"ev-ph-consent"|"ev-sp-consent"|getElementById\("ev-consent"\)/, "那三個勾的 listener 都拿掉了");
   assert.match(m, /await D\.saveEvent\(id, \{ cover_url: "" \}\);\s*ev\.cover_url = null; ev\.cover_consent = false; forgetCover\(id\);/);
-  assert.match(m, /if \(coverChanged\) dirty\.forget\("ev-save\|" \+ id \+ "\|cover_consent"\);/, "換了連結也要忘掉上次存的同意，不然再勾一次送不出去");
+  assert.match(m, /const coverChanged = await saveEventFields\(ev, patch\);/, "貼連結那條路（改了就存）也走同一支");
+  assert.match(m, /if \(coverChanged\) \{ const st = document\.getElementById\("ev-cover-state"\); if \(st\) st\.innerHTML = UI\.evCoverStateHTML\(ev, true, false\); \}/, "那條路存完不重畫，「對外看得到沒」那一行自己換");
   // 傳上去卻沒掛成的檔要刪掉
   // 三條上傳的路各一句：封面、活動照片、講者的照片（2027-01-02）。
   assert.equal((m.match(/if \(url\) await D\.removeEventFile\(UI\.evStoragePath\(url\)\);/g) || []).length, 3);
@@ -566,7 +647,7 @@ test("★ 資料層與 main.js：叫的函式名字跟遷移檔一樣；封面�
   assert.match(m, /if \(to === "open" && \(await D\.countQuestions\(id\)\) === 0\) throw new Error\(T\("err\.noQuestions"\)\);\s*await D\.saveForm\(id, \{ status: to \}\);/);
   for (const act of ["ev-form-status", "ev-fb-create", "ev-cover-clear", "ev-ph-move", "ev-ph-del"]) assert.match(m, new RegExp(`act === "${act}"`), `main.js 沒接 ${act}`);
   for (const id of ["ev-cover-file", "ev-photo-files"]) assert.match(m, new RegExp(`e\\.target\\.id === "${id}"`), `main.js 沒聽 ${id}`);
-  assert.match(m, /e\.target\.dataset\.act === "ev-ph-consent"/);
+  for (const act of ["ev-ph-open", "ev-lb-go", "ev-lb-close", "ev-tab"]) assert.match(m, new RegExp(`act === "${act}"`), `main.js 沒接 ${act}`);
   // 會重畫的每一條路，重畫前都先把打到一半的字收起來
   assert.ok((m.match(/keepEventTyped\(\);/g) || []).length >= 7, "七個會重畫的動作都先收字");
   // 錯誤講人話

@@ -1664,7 +1664,17 @@ export const evPanel = (title, body, attrs) => `<div class="ev-panel"${attrs ? `
 const evSaveAttr = (e, canEdit) => canEdit ? `data-autosave="ev-save" data-id="${esc(e.id)}"` : "";
 const evSaveFoot = (e, canEdit) => canEdit ? `<div class="form-foot">${autosaveHint("ev-save", `data-id="${esc(e.id)}"`)}</div>` : "";
 
-// 封面那一塊（自己是一個「改了就存」的框：連結那一格與同意勾選都是改了就存）。
+// 對外看得到沒的那個標籤（封面、活動照片、講者共用）：沒同意的是「對外看不到」；同意了的，活動上架了是「對外看得到」，還沒上架是「上架後看得到」。
+export const evShownTag = (on, live, k) => `<span class="tag${on && live ? " open" : on ? " ok" : " draft"}">${T(on ? (live ? k + "Public" : k + "Ready") : k + "Hidden")}</span>`;
+// 封面那一塊裡「對外看得到沒」的那一行。2026-11-24 起沒有同意的勾了（Paul：「If I upload a photo, I have consent. So just take that away」）：
+// 放上封面（選檔或貼連結）就算確認過同意，main.js 的 saveEventFields 接著把 cover_consent 存成 true。
+// 改版之前放的、當時沒勾的封面不會自己變公開：這裡寫「對外看不到」加一顆「放上對外頁」，按了才會（main.js 的 ev-cover-show）。
+// main.js 貼連結存完不重畫整頁，只換這一行（id="ev-cover-state"）。
+export function evCoverStateHTML(e, canEdit, busy) {
+  if (!e.cover_url) return "";
+  return `${evShownTag(!!e.cover_consent, e.status === "published", "ev.ph")}${!e.cover_consent && canEdit ? ` <button type="button" class="btn sm" data-act="ev-cover-show" data-id="${esc(e.id)}"${busy ? " disabled" : ""}>${T("ev.showPublic")}</button><span class="ev-help">${T("ev.coverHiddenHelp")}</span>` : ""}`;
+}
+// 封面那一塊（自己是一個「改了就存」的框：連結那一格改了就存）。
 // 主要是選檔案（main.js 聽 #ev-cover-file 的 change：縮圖、傳到 Storage 的 events bucket、把網址存進 cover_url）；貼連結收在一格裡當備用。
 // 連結那一格一直在畫面上，readEvent() 才讀得到；封面本來就是貼的連結，那一格先打開。x.coverUp 是上傳進度 { pct, name }。
 export function eventCoverHTML(e, canEdit, busy, x) {
@@ -1677,10 +1687,10 @@ export function eventCoverHTML(e, canEdit, busy, x) {
   const linkBox = canEdit ? foldHTML("ev-cover-link", T("ev.coverLink"), link, !!o.coverLinkOpen || (!!e.cover_url && !uploaded)) : (e.cover_url ? link : "");
   return evPanel(T("ev.coverSec"), `
       ${e.cover_url ? `<img class="ev-cover" src="${esc(e.cover_url)}" alt="">` : `<p class="ev-line">${T("ev.coverNone")}</p>`}
-      ${canEdit && e.status === "published" ? `<div class="note">${T("ev.coverLive")}</div>` : ""}
+      <div class="ev-ph-state" id="ev-cover-state">${evCoverStateHTML(e, canEdit, busy)}</div>
       ${pick}
       ${linkBox}
-      <div class="ev-chk"><label class="check"><input type="checkbox" id="ev-consent" name="cover_consent"${e.cover_consent ? " checked" : ""}${canEdit ? "" : " disabled"}${dis}><span>${T("ev.consent")}</span></label><span class="ev-help">${T("ev.coverNote")}</span></div>
+      ${canEdit ? `<span class="ev-help">${T("ev.coverNote")}</span>` : ""}
       ${canEdit && e.cover_url ? `<div class="ev-acts"><button class="btn quiet danger sm" data-act="ev-cover-clear" data-id="${esc(e.id)}"${dis}>${T("ev.coverClear")}</button></div>` : ""}
       ${evSaveFoot(e, canEdit)}`, `id="ev-coverbox"${canEdit ? " " + evSaveAttr(e, canEdit) : ""}`);
 }
@@ -1690,7 +1700,9 @@ export function eventCoverHTML(e, canEdit, busy, x) {
 //   whenever I press them it's gonna pop up in the middle, and then I can tap right or left, and then change early and later to the arrow sign」）：
 //   每一格只有照片與底下兩顆箭頭（往前一格、往後一格）；點照片在畫面中間放大（evLightboxHTML，main.js 管那個 <dialog>），
 //   同意、拿掉這張都在放大的那一格裡。對外看不到的那幾張，小圖上有一個標籤、照片變淡。
-// 沒勾同意的不會出現在對外頁，那道門在資料庫的 public_event_extras()，這裡只是換了畫法。
+// 同意：2026-11-24 起沒有勾了。傳照片就算確認過同意（main.js 傳完接著叫 set_event_photo_consent），那一句寫在上面的提醒裡。
+// 資料庫那道門沒動：consent 是 false 的照樣不會出現在對外頁（public_event_extras()）。改版之前傳的、當時沒勾的那幾張還是 false，
+// 小圖上有「對外看不到」的標籤，放大之後有一顆「放上對外頁」，按了才會公開。
 export const evArrow = (act, id, dir, label, off, glyph) =>
   `<button type="button" class="ev-arrow" data-act="${act}" data-id="${esc(id)}" data-dir="${dir}" aria-label="${esc(label)}" title="${esc(label)}"${off ? " disabled" : ""}>${glyph}</button>`;
 export function eventPhotosHTML(e, photos, canEdit, busy, x) {
@@ -1720,18 +1732,20 @@ export function evLbStep(photos, id, dir) {
 }
 // 放大的那一格裡面的 HTML（main.js 把它放進 <dialog id="ev-lb">）。找不到那一張回空字串，main.js 就把那一格關掉。
 // 上面一行：第幾張、對外看不看得到、關掉。中間：左右兩顆大的箭頭換照片（只有一張就不畫）。
-// 下面：同意那個勾（跟以前每一張底下的是同一個 data-act，勾了就送）、往前一格與往後一格、拿掉這張。
+// 下面：往前一格與往後一格、對外看不到的有「放上對外頁」（看得到的是「從對外頁收起來」）、拿掉這張。
 // 往前往後按了之後這一格跟著同一張照片走，所以可以連按，一路把一張照片排到想要的位置。
 export function evLightboxHTML(e, photos, id, busy) {
   const list = Array.isArray(photos) ? photos : [], i = list.findIndex(p => p.id === id);
   if (i < 0) return "";
   const p = list[i], n = list.length, dis = busy ? " disabled" : "", live = e && e.status === "published";
   const nav = (dir, label, glyph) => n < 2 ? "" : `<button type="button" class="ev-lb-nav" data-act="ev-lb-go" data-dir="${dir}" aria-label="${esc(label)}" title="${esc(label)}">${glyph}</button>`;
-  return `<div class="ev-lb-bar"><b class="ev-lb-n">${esc(T("ev.lbCount", { i: i + 1, n }))}</b><span class="tag${p.consent && live ? " open" : p.consent ? " ok" : " draft"}">${T(p.consent ? (live ? "ev.phPublic" : "ev.phReady") : "ev.phHidden")}</span><span class="sp"></span><button type="button" class="btn ghost sm" data-act="ev-lb-close">${T("ev.lbClose")}</button></div>
+  const show = p.consent
+    ? `<button type="button" class="btn quiet sm" data-act="ev-ph-show" data-id="${esc(p.id)}" data-v="0"${dis}>${T("ev.hidePublic")}</button>`
+    : `<button type="button" class="btn sm" data-act="ev-ph-show" data-id="${esc(p.id)}" data-v="1"${dis}>${T("ev.showPublic")}</button>`;
+  return `<div class="ev-lb-bar"><b class="ev-lb-n">${esc(T("ev.lbCount", { i: i + 1, n }))}</b>${evShownTag(!!p.consent, live, "ev.ph")}<span class="sp"></span><button type="button" class="btn ghost sm" data-act="ev-lb-close">${T("ev.lbClose")}</button></div>
     <div class="ev-lb-stage">${nav(-1, T("ev.lbPrev"), "←")}<img class="ev-lb-img" src="${esc(p.url)}" alt="">${nav(1, T("ev.lbNext"), "→")}</div>
     <div class="ev-lb-foot">
-      <label class="check"><input type="checkbox" data-act="ev-ph-consent" data-noauto="1" data-id="${esc(p.id)}"${p.consent ? " checked" : ""}${dis}><span>${T("ev.consent")}</span></label>
-      <div class="ev-acts"><button type="button" class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>← ${T("ev.phEarlier")}</button><button type="button" class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="1"${i === n - 1 || busy ? " disabled" : ""}>${T("ev.phLater")} →</button><span class="sp"></span><button type="button" class="btn quiet danger sm" data-act="ev-ph-del" data-id="${esc(p.id)}"${dis}>${T("ev.phDel")}</button></div>
+      <div class="ev-acts"><button type="button" class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="-1"${i === 0 || busy ? " disabled" : ""}>← ${T("ev.phEarlier")}</button><button type="button" class="btn ghost sm" data-act="ev-ph-move" data-id="${esc(p.id)}" data-dir="1"${i === n - 1 || busy ? " disabled" : ""}>${T("ev.phLater")} →</button>${show}<span class="sp"></span><button type="button" class="btn quiet danger sm" data-act="ev-ph-del" data-id="${esc(p.id)}"${dis}>${T("ev.phDel")}</button></div>
     </div>`;
 }
 // ── 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）──
@@ -1793,7 +1807,9 @@ export function evLabelChips(p) {
 // 挑了一個人之後，「加一位」那幾格要變成什麼。純函式，main.js 的 ev-sp-pick 只叫它。
 // 帶什麼：名字（英文名取第一段）、主題（個人檔案的專長領域）、學校（個人檔案的公司或單位，沒有就最近一筆去向，再沒有才是名單上的學校）、照片。
 // **只填空的格子**：人已經打了字的那一格不蓋。上一次帶入、人沒改過的那個字算空的（draft.auto 記著），所以挑錯人再挑一次會換成對的那個人的。
-// 同意不在這裡：講者的同意照舊要自己勾，挑人不會勾它。
+// minor：紀錄裡這個人現在是學員（可能未成年）。2026-11-24 起加講者就算確認過同意、直接對外，**只有這一種不會**：
+// 加進來先是「對外看不到」，要有人按「放上對外頁」並且確認才會公開（main.js 的 ev-sp-add 看這個旗子）。
+export const evMaybeMinor = p => !!p && (Array.isArray(p.labels) ? p.labels.includes("student") : p.kind === "student");
 export const EV_SP_FILL = ["display_name", "subject", "school", "photo_url"];
 export function evSpeakerPrefill(draft, p) {
   const d = Object.assign({}, draft), auto = Object.assign({}, d.auto), who = p || {}, card = who.card || {};
@@ -1803,13 +1819,13 @@ export function evSpeakerPrefill(draft, p) {
     if (cur !== "" && !(auto[k] != null && cur === String(auto[k]).trim())) continue;
     d[k] = want[k]; auto[k] = want[k];
   }
-  return Object.assign(d, { person_id: who.id || null, from: who.name || "", auto });
+  return Object.assign(d, { person_id: who.id || null, from: who.name || "", auto, minor: evMaybeMinor(who) });
 }
 // 不連到這個人了：名字、主題、學校留著（照舊，人可能只是不想連），紀錄裡帶來的那張照片拿掉（那是他個人檔案的照片）。
 export function evSpeakerUnpick(draft) {
   const d = Object.assign({}, draft), auto = Object.assign({}, d.auto);
   if (d.photo_url && auto.photo_url === d.photo_url) { d.photo_url = ""; delete auto.photo_url; }
-  return Object.assign(d, { person_id: null, from: "", auto });
+  return Object.assign(d, { person_id: null, from: "", auto, minor: false });
 }
 
 // 講者（一場可以好幾位）。speakers 是 event_speakers_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是講者。
@@ -1817,7 +1833,9 @@ export function evSpeakerUnpick(draft) {
 // x.spUp 是照片的上傳進度 { id, pct, name }；x.spDraft 是「加一位」填到一半的 { display_name, subject, school, person_id, from, photo_url, auto }
 //（photo_url 是從紀錄帶來的照片，auto 記哪幾格是帶入的，見上面的 evSpeakerPrefill）；
 // x.spOpen 那一格開著沒；x.canPick 看不看得到「從紀錄裡找人」；x.spFound 找到的人（undefined 是還沒找過）；x.spQ 找的字。
-// 名字、主題、學校改完要按「存這一位」；同意是勾了就送（main.js 聽 change）。沒勾的不會出現在對外頁，那道門在資料庫的 public_event_extras()。
+// 名字、主題、學校改完要按「存這一位」。同意 2026-11-24 起沒有勾了（Paul：「take that away as well」）：加一位講者就算確認過本人同意，
+// main.js 加完接著叫 set_event_speaker_consent；改名字、換照片資料庫會把 consent 退回 false，main.js 照改之前的樣子補回去（本來看得到的還是看得到，本來看不到的還是看不到）。
+// 看不到的那一位（改版之前沒勾的、紀錄裡是學員的）打開之後有一顆「放上對外頁」，按了要再確認一次。資料庫那道門（public_event_extras()）沒動。
 const SP_KEYS = ["display_name", "subject", "school"];
 export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
   if (!canEdit) return "";
@@ -1846,11 +1864,10 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
     return `<li class="ev-sp" data-sp-row data-id="${esc(sp.id)}"><details class="ev-sp-fold" data-sp-fold="${esc(sp.id)}"${open ? " open" : ""}>
       <summary><span class="chev" aria-hidden="true"></span>${face(sp.display_name, sp.photo_url, " sm")}<span class="ev-sp-who"><b>${esc(sp.display_name || "")}</b>${sub ? `<span class="mini">${esc(sub)}</span>` : ""}</span>${sp.consent ? "" : `<span class="tag draft">${T("ev.spHidden")}</span>`}<span class="sp"></span><span class="ev-mv">${evArrow("ev-sp-move", sp.id, -1, T("ev.mvUp"), i === 0 || busy, "↑")}${evArrow("ev-sp-move", sp.id, 1, T("ev.mvDown"), i === speakers.length - 1 || busy, "↓")}</span></summary>
       <div class="ev-sp-f">
-        <div class="ev-ph-state"><span class="tag${sp.consent && live ? " open" : sp.consent ? " ok" : " draft"}">${T(sp.consent ? (live ? "ev.spPublic" : "ev.spReady") : "ev.spHidden")}</span>${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}</div>
+        <div class="ev-ph-state">${evShownTag(!!sp.consent, live, "ev.sp")}${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}${sp.consent ? "" : ` <button type="button" class="btn sm" data-act="ev-sp-show" data-id="${esc(sp.id)}" data-v="1" data-name="${esc(sp.display_name || "")}"${dis}>${T("ev.showPublic")}</button><span class="ev-help">${T("ev.spHiddenHelp")}</span>`}</div>
         ${fields(v)}
         ${pick}
-        <label class="check"><input type="checkbox" data-act="ev-sp-consent" data-id="${esc(sp.id)}"${sp.consent ? " checked" : ""}${dis}><span>${T("ev.spConsent")}</span></label>
-        <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button>${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
+        <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button>${sp.consent ? `<button type="button" class="btn quiet sm" data-act="ev-sp-show" data-id="${esc(sp.id)}" data-v="0"${dis}>${T("ev.hidePublic")}</button>` : ""}${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
       </div></details></li>`;
   };
   const d = o.spDraft || {};
@@ -1864,6 +1881,7 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
           : `<p class="ev-line">${T("ev.spFindNone")}</p>`) : ""}
       </div>`;
   const picked = (d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "")
+    + (d.person_id && d.minor ? `<div class="note">${T("ev.spMinorNote")}</div>` : "")
     + (d.photo_url ? `<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="${esc(d.photo_url)}" alt=""> <span>${T("ev.spPhotoFrom")}</span> <button class="btn quiet sm" data-act="ev-sp-nophoto"${dis}>${T("ev.spPhotoDrop")}</button></p>` : "");
   const add = foldHTML("ev-sp-new", T("ev.spNew"), `<div id="ev-sp-new-box" data-ev="${esc(e.id)}">${finder}${picked}${fields(evRowVals({ typed: d }, SP_KEYS), "ev-sp-new")}
       <div class="mini">${T("ev.spAddHint")}</div>
@@ -1961,7 +1979,7 @@ export function eventStateHTML(e) {
   const st = EV_STATUS.includes(e.status) ? e.status : "draft";
   const cls = st === "published" ? " open" : st === "ready" ? " warn" : st === "archived" ? "" : " draft";
   return `<div class="ev-state" id="ev-state"><span class="tag${cls}">${esc(T("ev.st." + st))}</span><span class="ev-state-t">${T("ev.top." + st)}</span><span class="sp"></span>${
-    st === "published" ? `<a class="btn ghost sm" href="/events/?e=${esc(encodeURIComponent(e.slug))}" target="_blank" rel="noopener">${T("ev.seePublic")}</a>` : ""}<button type="button" class="btn quiet sm" data-act="ev-jump" data-to="ev-live">${T("ev.jumpLive")}</button></div>`;
+    st === "published" ? `<a class="btn ghost sm" href="/events/?e=${esc(encodeURIComponent(e.slug))}" target="_blank" rel="noopener">${T("ev.seePublic")}</a>` : ""}<button type="button" class="btn quiet sm" data-act="ev-tab" data-tab="live">${T("ev.jumpLive")}</button></div>`;
 }
 // 一場活動。e 是 events 那一列加 form（報名表那一列，可能 null）與 signed（報名數）。
 // canEdit：工作區「改」以上；canManage：「管」以上；senior：Co-President 或 Senior Adviser。
@@ -1972,24 +1990,13 @@ export function eventStateHTML(e) {
 //    spUp、spDraft、spOpen、canPick、spFound、spQ（見 eventSpeakersHTML），tkDraft、tkOpen（見 eventTicketsHTML）。
 //    2026-11-23 多了 prevZh、prevEn：中文、英文說明底下那一格預覽開著沒。
 //
-// ── 這一頁的順序（2026-11-23 重排）──
-// Paul：「It doesn't make sense to have going live, project in that order. If I wanted to make an event, it should be in a certain order
-//        that makes it efficient and it makes sense.」以前是 上線 → 專案 → 內容 →（封面、計畫的資料）→ 講者 → 照片 → 場地 → 報名 → 紀錄 → 行銷與錢。
-// 現在照「辦一場活動會先做什麼」排，每一段都是一個 h2 加底下一塊或幾塊 .ev-panel：
-//   0. 最上面一行狀態（eventStateHTML，不是一段）
-//   1. 內容：名稱、一句話、說明
-//   2. 時間與地點：開始、結束、地點、名額，還有場地
-//   3. 對外的「活動與計畫」頁和「團隊」頁上怎麼列：通常在幾月、多數年份都會辦、這一屆叫什麼
-//   4. 照片：封面，再來是活動照片
-//   5. 講者
-//   6. 報名與現場：報名表（狀態、開放與截止時間、題目、名單）、報名類型、行前信與簽到
-//   7. 上線：準備好了、放上對外頁、撤下來（規則與那幾句話都沒動，只是搬到東西都填好之後）
-//   8. 行銷與錢：上線之後才會去跟 Marketing 要宣傳
-//   9. 活動之後：出席與回饋的數字、回饋表、記分卡
-//  10. 其他設定：屬於哪個專案、種類與屆別、誰能改這場活動（不常改的放最後）
-// 例外只有一個，是 2026-11-13 Paul 定的（「活動結束了點進來什麼都沒有」）：活動已經結束，「活動之後」搬到狀態那一行的正下面，
-// 因為這時候進來的人是要看來了幾個人、回饋怎樣，不是要填內容。
-// 每一格的 id、name、data-act 都沒改，所以 main.js 讀字與存檔的路照舊；順序有測試守著（test/event-editor.test.mjs）。
+//    2026-11-24 多了 tab（開著哪一個分頁）、spOpenIds（哪幾位講者那一行開著）。
+//
+// ── 這一頁怎麼排（2026-11-24 改成分頁；2026-11-23 那一版是一整頁十段照順序往下排）──
+// 最上面：頁首、訊息、一行狀態（eventStateHTML）、唯讀的提醒。再來是一排分頁（eventTabsHTML），底下是七個分頁的內容，一次只看得到一個。
+// 哪一段在哪一個分頁、預設開哪一個、為什麼沒選到的只能藏不能不畫，都寫在這支函式下面 EV_TABS 那一段。
+// 每一段還是一個 h2 加底下一塊或幾塊 .ev-panel，每一格的 id、name、data-act 都沒改，所以 main.js 讀字與存檔的路照舊。
+// 分頁裡的順序有測試守著（test/event-editor.test.mjs）。
 export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evLinks, rc, projects, x) {
   const dis = busy ? " disabled" : "", o = x || {};
   const canEdit = canEditWs(me, e.workspace_id), canManage = wsLevel(me, e.workspace_id) === "manage", sen = senior(me);
@@ -2031,24 +2038,59 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
   const live = sectionHTML(T("ev.status"), evPanel("", `<p class="ev-line">${statusLine}</p>${keyList.length ? `<div class="ev-acts">${keyList.join("")}</div>` : ""}`), { id: "ev-live" });
   // 9. 活動之後。2026-11-13 Paul：「活動結束了點進來什麼都沒有」，所以結束了的活動這一段搬到最上面。
   const after = eventAfterHTML(e, canEdit, busy, rc);
-  const ended = evPast(e);
-  // 10. 其他設定。三塊都可能不畫（專案的遷移檔還沒跑、不是「管」），那一段照樣在，因為種類與屆別一定有。
+  // 其他設定。三塊都可能不畫（專案的遷移檔還沒跑、不是「管」），那一段照樣在，因為種類與屆別一定有。
   const house = sectionHTML(T("ev.house"), eventProjectHTML(e, projects, me, busy) + eventMetaHTML(e, terms, canEdit, busy) + eventMembersHTML(e, me, busy), { id: "ev-house", hint: T("ev.houseHint") });
+  // 回饋表（2026-11-24 從「活動之後」搬到「表單」分頁）。還在載或什麼都沒有的時候那一塊不畫，整段就不畫。
+  const fb = eventFeedbackHTML(e, rc, canEdit, busy);
+  const feedback = fb ? sectionHTML(T("ev.fbSec"), fb, { id: "ev-feedback" }) : "";
+  // ── 分頁（2026-11-24）── 每一個分頁是一個 <div class="ev-tabp">，沒選到的加 hidden。**七個都在畫面裡**，理由在 evTabs 上面那段註解。
+  const tab = evTabOf(e, o.tab, canEdit);
+  const groups = {
+    details: content + when,
+    photos: pics,
+    speakers: eventSpeakersHTML(e, o.speakers, canEdit, busy, o),
+    forms: eventSignupHTML(e, form, signed, me, busy, eventTicketsHTML(e, o.tickets, canEdit, busy, o)) + feedback,
+    live: live + eventLinksHTML(e, evLinks, busy),
+    results: after,
+    settings: listing + house,
+  };
+  const counts = { photos: Array.isArray(o.photos) && canEdit ? o.photos.length : null, speakers: Array.isArray(o.speakers) ? o.speakers.length : null,
+                   forms: rc === undefined ? null : (form ? 1 : 0) + ((rc && rc.forms) || []).length };
+  const list = evTabs(canEdit);
   return pageHead(esc(evTitle(e)), `${esc(e.team.replace(/\s*Team$/i, ""))}・${esc(e.slug)}`, [], { act: "ev-back", label: T("ev.back") })
     + msgHTML(msg)
     + eventStateHTML(e)
     + (canEdit ? "" : `<div class="note">${T("ev.readOnly")}</div>`)
-    + (ended ? after : "")
-    + content
-    + when
-    + listing
-    + pics
-    + eventSpeakersHTML(e, o.speakers, canEdit, busy, o)
-    + eventSignupHTML(e, form, signed, me, busy, eventTicketsHTML(e, o.tickets, canEdit, busy, o))
-    + live
-    + eventLinksHTML(e, evLinks, busy)
-    + (ended ? "" : after)
-    + house;
+    + eventTabsHTML(list, tab, counts)
+    + list.map(k => `<div class="ev-tabp" data-tabp="${k}"${k === tab ? "" : " hidden"}>${groups[k]}</div>`).join("");
+}
+// ── 活動編輯頁最上面那一排分頁（2026-11-24）──
+// Paul：「right now it's one page and it has like all the information that I need to fill in. Whereas when we open up the sign up pages, which is great…
+//        I can see the applicant settings and then jump into event… put everything that has the same categories on the top so I can just click them.
+//        For example… form… there's going to be a sign-up form, there's going to be a feedback form… and other settings at the bottom, there should be a category for that as well.」
+// 七個（他 2026-11-24 看過名單說「Yes, go ahead」）：
+//   details  內容     名稱、一句話、說明；開始、結束、地點、名額、場地
+//   photos   照片     封面、活動照片
+//   speakers 講者     只有這場活動「改」以上的人有（讀的門也是「改」，其他人那一段本來就是空的）
+//   forms    表單     報名表（開關、開放與截止時間、題目、名單）、報名類型、行前信與簽到、回饋表
+//   live     上線     準備好了、放上對外頁、撤下來；行銷需求單與收支
+//   results  成果     出席與回饋的數字、記分卡
+//   settings 設定     對外的兩頁上怎麼列、屬於哪個專案、種類與屆別、誰能改這場活動
+// 預設開哪一個：活動已經結束開「成果」（2026-11-13 Paul：「活動結束了點進來什麼都沒有」，以前是把那一段搬到最上面），其他開「內容」。
+// 開著哪一個記在網址（#events/<代號>/<分頁>，main.js 的 ev-tab），重新整理還在同一個分頁。
+//
+// ⚠ **沒選到的分頁只是藏起來（hidden），不能改成「不畫」。** main.js 的 readEvent() 是照 id 把整頁那幾格讀一遍一起存的（名稱、時間、地點、名額、封面連結…），
+//   哪一格不在畫面裡，讀到的就是空的，存下去會把那一欄清掉。test/event-editor.test.mjs 的「七個分頁都在畫面裡」守著這一條。
+export const EV_TABS = ["details", "photos", "speakers", "forms", "live", "results", "settings"];
+export const evTabs = canEdit => EV_TABS.filter(k => k !== "speakers" || canEdit);
+export function evTabOf(e, want, canEdit) {
+  const list = evTabs(canEdit);
+  return list.includes(want) ? want : (evPast(e) ? "results" : "details");
+}
+export function eventTabsHTML(list, tab, counts) {
+  const c = counts || {};
+  return `<nav class="subtabs ev-tabs" id="ev-tabs" aria-label="${esc(T("evtab.aria"))}">${list.map(k =>
+    `<button type="button" class="subtab${k === tab ? " on" : ""}" data-act="ev-tab" data-tab="${k}"${k === tab ? ' aria-current="page"' : ""}>${T("evtab." + k)}${c[k] ? `<span class="subtab-n">${esc(String(c[k]))}</span>` : ""}</button>`).join("")}</nav>`;
 }
 // 行銷與錢（2026-11-10）：掛在這場的需求單、這場的收支加總（links.money 是 null 就是這個人看不到財務，那一行不畫）。
 export function eventLinksHTML(e, links, busy) {
@@ -2096,8 +2138,10 @@ export function eventFeedbackHTML(e, rc, canEdit, busy) {
 }
 // 活動之後（2026-11-10，11-13 加 Records 的數字，11-23 分成一塊一塊）：這一場的出席與回饋、回饋表、連到 Records 的記分卡。
 // 種類與屆別 2026-11-23 搬到最下面的「其他設定」（eventMetaHTML）：那是分類用的，不是活動辦完才做的事。
+// 2026-11-24：回饋表那一塊搬到「表單」那個分頁（跟報名表放一起，Paul：「I can just click form, and then there's going to be a sign-up form,
+// there's going to be a feedback form」），這一段只剩數字與記分卡，是「成果」那個分頁。
 export function eventAfterHTML(e, canEdit, busy, rc) {
-  return sectionHTML(T("ev.after"), eventRecordsHTML(e, rc) + eventFeedbackHTML(e, rc, canEdit, busy)
+  return sectionHTML(T("ev.after"), eventRecordsHTML(e, rc)
     + evPanel(T("ev.scorecardSec"), `
       <p class="ev-line">${T("ev.scorecardWhat")}</p>
       ${e.form_id ? `<div class="ev-help">${T("ev.syncNote")}</div>` : ""}

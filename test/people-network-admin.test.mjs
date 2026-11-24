@@ -435,13 +435,20 @@ test("★ 挑講者：從紀錄帶入名字、主題、學校、照片，只填�
   const un = F.evSpeakerUnpick(first);
   assert.deepEqual({ display_name: un.display_name, school: un.school, photo_url: un.photo_url, person_id: un.person_id, from: un.from }, { display_name: "Nina", school: "Acme Labs", photo_url: "", person_id: null, from: "" });
   assert.deepEqual(F.EV_SP_FILL, ["display_name", "subject", "school", "photo_url"]);
-  // main.js：挑人只叫這一支；同意照舊只有勾那一格的那條路
+  // main.js：挑人只叫這一支
   const m = read("admin/src/main.js");
   assert.match(m, /S\.evSpDraft = p \? UI\.evSpeakerPrefill\(S\.evSpDraft, p\)/);
   assert.match(m, /: UI\.evSpeakerUnpick\(S\.evSpDraft\);/);
-  assert.equal(count(m, /D\.setEventSpeakerConsent\(/g), 1, "勾同意只有原本那一個地方");
+  // 2026-11-24 起沒有同意的勾：加一位就算確認過本人同意，加完接著補上。**紀錄裡現在是學員（可能未成年）的那一種不補**，先不對外。
+  assert.equal(count(m, /D\.setEventSpeakerConsent\(/g), 2, "講者的同意只有兩個地方會動：keepSpeakerShown（加完或改完補回去），還有按「放上對外頁／收起來」");
   const add = m.slice(at(m, 'if (act === "ev-sp-add" || act === "ev-sp-save") {'), at(m, 'if (act === "ev-sp-move"'));
-  assert.doesNotMatch(add, /consent\s*:|setEventSpeakerConsent/, "加一位的時候不送同意");
+  assert.match(add, /const minor = adding && !!\(S\.evSpDraft && S\.evSpDraft\.person_id && S\.evSpDraft\.minor\);\s*const shown = adding \? !minor : !!row\.consent;/, "學員不補；改既有的那一位照他本來看不看得到");
+  assert.match(add, /if \(shown && sid\) await keepSpeakerShown\(sid\);/);
+  assert.match(add, /T\(adding \? \(minor \? "msg\.evSpAddedMinor" :/, "學員加進來的那一句講清楚為什麼沒對外");
+  assert.equal(F.evMaybeMinor({ labels: ["student"] }), true); assert.equal(F.evMaybeMinor({ labels: ["student:past", "mentor"] }), false, "畢業了的學員不算");
+  assert.equal(F.evMaybeMinor({ kind: "student" }), true, "遷移檔還沒跑（沒有 labels）看種類"); assert.equal(F.evMaybeMinor({ kind: "member" }), false); assert.equal(F.evMaybeMinor(null), false);
+  assert.equal(F.evSpeakerPrefill(null, { id: "s1", name: "Sam Student", labels: ["student"] }).minor, true); assert.equal(F.evSpeakerPrefill(null, NINA).minor, false);
+  assert.equal(F.evSpeakerUnpick(F.evSpeakerPrefill(null, { id: "s1", name: "Sam Student", labels: ["student"] })).minor, false, "不連到這個人了就不算");
   assert.match(add, /copied = await copyRecordsPhoto\(ev\.id, from\); patch\.photo_url = copied;/, "照片抄一份到 events bucket，不直接用紀錄那邊的網址");
   assert.match(add, /if \(copied\) await D\.removeEventFile\(UI\.evStoragePath\(copied\)\);/, "講者沒加成就把抄過來的檔刪掉");
   assert.match(read("supabase/migrations/2027-01-02-event-speakers-tickets.sql"), /insert into event_speakers \(event_id, person_id, display_name, subject, school, photo_url, consent, sort, created_by\)/);
@@ -457,8 +464,10 @@ test("★ 挑講者的清單：每一個人後面印標籤與現在做什麼；�
   assert.doesNotMatch(h, />來賓<|>成員</, "有標籤的時候不印種類");
   // 帶入之後那幾格與那張照片
   assert.match(h, /id="ev-sp-new-name" value="Nina"/); assert.match(h, /<input data-f="subject" value="Machine learning"/); assert.match(h, /<input data-f="school" value="Acme Labs"/);
-  assert.match(h, /<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="https:\/\/x\.supabase\.co\/storage\/v1\/object\/public\/people\/p1\/1-abc\.jpg" alt=""> <span>加進來的時候會抄一份紀錄裡的這張照片。同意還是要自己勾。<\/span> <button class="btn quiet sm" data-act="ev-sp-nophoto">不用這張照片<\/button><\/p>/);
-  assert.doesNotMatch(h, /data-act="ev-sp-consent"[^>]*checked/, "沒有任何一個同意是勾著的");
+  assert.match(h, /<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="https:\/\/x\.supabase\.co\/storage\/v1\/object\/public\/people\/p1\/1-abc\.jpg" alt=""> <span>加進來的時候會抄一份紀錄裡的這張照片。<\/span> <button class="btn quiet sm" data-act="ev-sp-nophoto">不用這張照片<\/button><\/p>/);
+  assert.doesNotMatch(h, /紀錄裡這個人是學員/, "帶入的不是學員就沒有那一句");
+  const stu = F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spOpen: true, spDraft: F.evSpeakerPrefill(null, found[1]) });
+  assert.match(stu, /<div class="note">紀錄裡這個人是學員，可能未成年。加進來之後先不會出現在對外頁，要有人另外按「放上對外頁」才會。<\/div>/, "帶入的是學員：先講清楚加進來不會對外");
   assert.doesNotMatch(F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spOpen: true, spDraft: { display_name: "X" } }), /ev-sp-from|ev-sp-nophoto/, "沒有帶照片就沒有那一行");
   // 遷移檔還沒跑：rc_find_people 回的列沒有 labels，照舊
   const old = F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spFound: [{ id: "p8", name: "Sam Student", school: "Test High", kind: "student" }, { id: "p9", name: "Gina Guest", school: "", kind: "guest" }] });

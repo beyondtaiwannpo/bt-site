@@ -47,7 +47,7 @@ test("清單：照狀態分段（準備好了、草稿、在對外頁上、過�
 test("一場活動：草稿時「管」有準備好了、ready 時 senior 有放上對外頁而「管」只看到等一句、published 有撤下與看對外頁；「看」的人唯讀；報名入口三個", () => {
   const draft = F.eventEditHTML(EV, FORM, 3, DIR, "", false);
   assert.match(draft, /data-act="ev-ready" data-id="e1"/); assert.doesNotMatch(draft, /ev-publish/);
-  assert.match(draft, /<input id="ev-cover" name="cover_url" value="https:\/\/drive.google.com\/cover.jpg"/); assert.match(draft, /id="ev-consent" name="cover_consent" checked/);
+  assert.match(draft, /<input id="ev-cover" name="cover_url" value="https:\/\/drive.google.com\/cover.jpg"/); assert.doesNotMatch(draft, /id="ev-consent"/, "2026-11-24 起沒有同意的勾"); assert.match(draft, /id="ev-cover-state"><span class="tag ok">活動上架後對外看得到<\/span>/);
   assert.match(draft, /<img class="ev-cover" src="https:\/\/drive.google.com\/cover.jpg"/);
   assert.match(draft, /data-act="open-form" data-id="f1"/); assert.match(draft, /data-act="open-apps" data-id="f1">看報名的人<\/button>/); assert.match(draft, /已報名 3 \/ 40 人/, "2026-11-23 起報名那一塊是按鈕，人數寫在上面那一行");
   assert.match(draft, /data-act="open-checkin" data-id="f1"/); assert.match(draft, /data-act="open-notice" data-id="f1"/);
@@ -178,20 +178,21 @@ test("會議清單：記一場會議收在最上面，搜尋只藏列", async ()
   assert.doesNotMatch(h, /<h2>記一場會議/, "收起來那一格裡不再有第二個標題");
 });
 
-test("活動頁：結束了 Records 的數字在最上面，還沒辦放在報名底下", async () => {
+test("活動頁：結束了預設開「成果」那個分頁（Records 的數字），還沒辦開「內容」", async () => {
   const { eventEditHTML } = await import("../admin/src/ui.js");
   const me = { ws: { "custom:event-x": "edit" }, board: "member" };
   const base = { id: "e1", slug: "x", team: "Curriculum Team", workspace_id: "custom:event-x", status: "published", kind: "bootcamp" };
   const rc = { event: { numbers: { registered: 40, attended: 32, attendance_rate: 80, responses: 20, response_rate: 62.5, recommend_avg: 8.6, recommend_n: 19, useful_avg: 4.2 } },
     review: null, forms: [{ id: "f9", title: "營隊回饋", status: "closed", responses: 20 }] };
   const past = eventEditHTML(Object.assign({}, base, { starts_at: "2025-07-01T00:00:00Z" }), null, 0, me, "", false, null, [], null, rc);
-  assert.ok(past.indexOf('id="ev-after"') < past.indexOf("<h2>上線"), "結束了在最上面，比「上線」還前面");
-  assert.ok(past.indexOf('id="ev-after"') < past.indexOf('data-autosave="ev-save"'), "在內容前面");
+  // 2026-11-24 起是分頁：結束了預設開「成果」（以前是把那一段搬到最上面）
+  assert.match(past, /class="subtab on" data-act="ev-tab" data-tab="results" aria-current="page">/); assert.match(past, /<div class="ev-tabp" data-tabp="results"><section class="section" id="ev-after">/);
+  assert.match(past, /<div class="ev-tabp" data-tabp="details" hidden>/);
   assert.match(past, /32<span class="kpi-u">\/ 40<\/span>/); assert.match(past, /80%/); assert.match(past, /8\.6/);
   assert.match(past, /href="\/admin\/records\/#forms\/f9">營隊回饋</);
   assert.match(past, /還沒檢討/);
   const soon = eventEditHTML(Object.assign({}, base, { starts_at: new Date(Date.now() + 864e5 * 20).toISOString() }), null, 0, me, "", false, null, [], null, null);
-  assert.ok(soon.indexOf('id="ev-after"') > soon.indexOf('data-autosave="ev-save"'), "還沒辦在後面");
+  assert.match(soon, /class="subtab on" data-act="ev-tab" data-tab="details" aria-current="page">/, "還沒辦開的是「內容」"); assert.match(soon, /<div class="ev-tabp" data-tabp="results" hidden>/);
   assert.doesNotMatch(soon, /class="todo ev-kpis"/, "看不到 Records 就只有連結");
   assert.match(eventEditHTML(base, null, 0, me, "", false, null, [], null, undefined), /載入中/);
 });
