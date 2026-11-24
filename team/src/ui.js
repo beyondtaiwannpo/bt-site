@@ -68,9 +68,26 @@ export function rankWeight(title) {
 }
 // 整個組織的職位（Paul 2026-10-24）：職位本身就是「Co-President」或「Senior Adviser」（沒有逗號接 team）。
 // public_team() 對沒有 team 的職位會退回那個人標籤上的 team，所以這裡不看 row.team，看職位開頭那個字。
+// 2026-11-24：Founder 也算（Paul：Leadership 那一張要有 founders）。資料庫現在沒有 Founder 這個職位，
+// 哪天加了、那個人也同意公開，他就會自己出現在那一張，不用改這裡。
 export function isLeadership(title_en) {
-  const t = String(title_en || "").trim().toLowerCase().replace(/\s*·.*$/, "");
-  return t === "co-president" || t === "senior adviser" || t === "president";
+  return leadRank(title_en) < 9;
+}
+// Leadership 那一張裡誰排前面：Founder、Co-President、Senior Adviser。不是這三種回 9。
+export function leadRank(title) {
+  const t = String(title || "").trim().toLowerCase().replace(/\s*·.*$/, "");
+  if (t === "founder" || t === "co-founder") return 0;
+  if (t === "co-president" || t === "president") return 1;
+  if (t === "senior adviser") return 2;
+  return 9;
+}
+// Leadership 那一塊的標題：只寫名單上真的有的那幾種，不寫沒有人的職位。
+const LEAD_WORD = [["創辦人", "Founders"], ["Co-President", "Co-Presidents"], ["Senior Adviser", "Senior Advisers"]];
+export function leadHeading(people, lang) {
+  const en = lang === "en", has = [0, 1, 2].filter(r => (people || []).some(p => leadRank(p.title) === r)).map(r => LEAD_WORD[r][en ? 1 : 0]);
+  if (!has.length) return "";
+  if (has.length === 1) return has[0];
+  return en ? has.slice(0, -1).join(", ") + " and " + has[has.length - 1] : has.slice(0, -1).join("、") + " 與 " + has[has.length - 1];
 }
 export const LEAD_KEY = "__lead";
 export function toPerson(row) {
@@ -134,7 +151,7 @@ export function peopleHTML(people, lang) {
 }
 
 // 2026-11-24：六個 team 的人改放在那個 team 自己那一塊底下（照片下面那一段），
-// 不屬於六個 team 的組（Co-President 與 Senior Adviser、填了別的 team、沒填 team）留在頁面下面那一段。
+// 不屬於六個 team 的組（Founder、Co-President 與 Senior Adviser、填了別的 team、沒填 team）放在第七張 Leadership 那一塊。
 // 分法只有這一份：byTeam() 分完組，key 在 TEAM_ORDER 裡的進 teams，其他進 rest。
 export function splitGroups(people) {
   const groups = byTeam(people || []);

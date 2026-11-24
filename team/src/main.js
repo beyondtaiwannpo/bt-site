@@ -5,18 +5,18 @@
 // 而六個 team 的照片與介紹本來就自成一頁。
 // 這一段是加分，不是骨幹。
 //
-// 2026-11-24 起人分兩個地方放（Paul：「under each team there's going to be their members」）：
+// 2026-11-24 起人分兩個地方放（Paul：「under each team there's going to be their members」，
+// 同一天又說 Co-President 與 Senior Adviser「I dont need them to show up every page」，另外給一張）：
 //   六個 team 的人   → 那個 team 自己那一塊底下的 .tm-people（中英各一格）
-//   其他（Co-President 與 Senior Adviser、填了別的 team、沒填 team）→ 頁面下面那一段 #faces-zh / #faces-en
+//   其他（Founder、Co-President 與 Senior Adviser、填了別的 team、沒填 team）→ 第七張 Leadership 那一塊的 .tm-people
 // 怎麼分只有一份，在 ui.js 的 splitGroups()。
 import { supabase } from "../../shared/supabase.js";
-import { splitGroups, crewHTML, groupsHTML, teamSlug, toPerson, rankWeight, LEAD_KEY } from "./ui.js";
+import { splitGroups, crewHTML, groupsHTML, teamSlug, toPerson, rankWeight, leadRank, leadHeading, LEAD_KEY } from "./ui.js";
 
-// 中英兩版各一個掛載點。**兩邊畫同一批人**，只有標題與那一句說明不一樣。
-const MOUNTS = [["faces-zh", "zh"], ["faces-en", "en"]];
+// 中英兩版**畫同一批人**，只有標題與那一句說明不一樣。
 const T = {
-  zh: { people: "這一屆的人", note: "這裡列的是這一屆願意具名的幹部。沒有出現的人一樣在做事，只是選擇不公開。", lead: "Co-President 與 Senior Adviser", other: "還有這些人" },
-  en: { people: "This year's team", note: "These are the organisers who chose to be named. The others do the same work; they simply chose not to be public.", lead: "Co-Presidents and Senior Advisers", other: "Also on the board" },
+  zh: { people: "這一屆的人", note: "這裡列的是這一屆願意具名的幹部。沒有出現的人一樣在做事，只是選擇不公開。" },
+  en: { people: "This year's team", note: "These are the organisers who chose to be named. The others do the same work; they simply chose not to be public." },
 };
 
 (async () => {
@@ -36,21 +36,16 @@ const T = {
       .sort((a, b) => rankWeight(a.title) - rankWeight(b.title) || (a.en || a.zh).localeCompare(b.en || b.zh, "en"));
     if (!people.length) return;
     const { teams, rest } = splitGroups(people);
-    for (const [id, lang] of MOUNTS) {
-      for (const g of teams) {
-        const box = document.querySelector(`.${lang} .tm[data-team="${teamSlug(g.key)}"] .tm-people`);
-        if (!box) continue;
-        box.innerHTML = `<h4>${T[lang].people}</h4>${crewHTML(g.people)}<p class="tm-note">${T[lang].note}</p>`;
-        box.hidden = false;
-      }
-      const el = document.getElementById(id);
-      if (!el || !rest.length) continue;
-      const sec = el.closest("section"), hasLead = rest[0].key === LEAD_KEY;
-      sec.querySelector("h2").textContent = hasLead ? T[lang].lead : T[lang].other;
-      // 第一組的標題就是這一段的 h2，不再印一次：lead 那一組 groupsHTML 自己省掉，「還有這些人」那一組在這裡拿掉。
-      const out = groupsHTML(rest, lang, true);
-      el.innerHTML = !hasLead && rest[0].key === "" ? out.replace(/^<section class="teamsec"><h3>[^<]*<\/h3><p class="sub"><\/p>/, '<section class="teamsec">') : out;
-      sec.hidden = false;
+    // Leadership 那一組裡：Founder 在前、Co-President 其次、Senior Adviser 最後，同一種照英文名（上面已經排過）。
+    const lead = rest.filter(g => g.key === LEAD_KEY).flatMap(g => g.people).sort((a, b) => leadRank(a.title) - leadRank(b.title));
+    const others = rest.filter(g => g.key !== LEAD_KEY);
+    for (const lang of ["zh", "en"]) {
+      const fill = (slug, html) => {
+        const box = document.querySelector(`.${lang} .tm[data-team="${slug}"] .tm-people`);
+        if (box && html) { box.innerHTML = html + `<p class="tm-note">${T[lang].note}</p>`; box.hidden = false; }
+      };
+      for (const g of teams) fill(teamSlug(g.key), `<h4>${T[lang].people}</h4>${crewHTML(g.people)}`);
+      fill("leadership", (lead.length ? `<h4>${leadHeading(lead, lang)}</h4>${crewHTML(lead)}` : "") + groupsHTML(others, lang));
     }
   } catch (e) {
     // 安靜地不出現。**不要對讀者說任何話** —— 對他來說本來就沒有壞掉。

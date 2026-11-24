@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="bt-version" content="2026-11-24-1110">
+<!-- 版本號與 importmap（2026-11-24）：這一段由 scripts/bump-version.sh 整段改寫，不要手改。
+     這一頁的 HTML 跟 team/src/ 的程式是成對的。GitHub Pages 把每個檔案快取 10 分鐘，
+     沒有版本號的話，剛改版的那十分鐘有人會拿到新的 HTML 配舊的程式，每個 team 的人就全部疊在一起。
+     所以這一頁載的每一個自己的檔案、與這張 importmap，都帶同一個版本號，版本一換整組一起換。見 README「後台速度」。 -->
+<!-- bt-importmap -->
+<script type="importmap">{ "imports": { "/team/src/main.js": "/team/src/main.js?v=2026-11-24-1110", "/team/src/programmes.js": "/team/src/programmes.js?v=2026-11-24-1110", "/team/src/reel.js": "/team/src/reel.js?v=2026-11-24-1110", "/team/src/ui.js": "/team/src/ui.js?v=2026-11-24-1110", "/events/src/ui.js": "/events/src/ui.js?v=2026-11-24-1110", "/year/src/logic.js": "/year/src/logic.js?v=2026-11-24-1110", "/shared/auth.js": "/shared/auth.js?v=2026-11-24-1110", "/shared/supabase.js": "/shared/supabase.js?v=2026-11-24-1110", "/shared/supabase-config.js": "/shared/supabase-config.js?v=2026-11-24-1110", "/shared/nav.js": "/shared/nav.js?v=2026-11-24-1110", "/shared/rail.js": "/shared/rail.js?v=2026-11-24-1110", "/vendor/supabase-js.js": "/vendor/supabase-js.js?v=2026-11-24-1110" } }</script>
+<!-- /bt-importmap -->
 <title>團隊 / Beyond Taiwan</title>
 
 <!-- 對外的內容頁（2026-09-07 新增）。
@@ -47,7 +55,7 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap">
 <noscript><link rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
-<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="../shared/brand.css?v=2026-11-24-1110">
 
 <!-- 語言的判斷要在這裡，不能等到頁尾。中英兩版都在 HTML 裡，
      在瀏覽器套上 data-lang 之前畫面上是兩版接在一起；
@@ -71,7 +79,7 @@
        沒有 JavaScript 的話這個屬性不存在，六塊全部排在下面。 */
     var h = location.hash.slice(1);
     document.documentElement.setAttribute("data-tm",
-      /^(curriculum|mentorship|internship|cr|sponsorship|marketing)$/.test(h) ? h : "curriculum");
+      /^(curriculum|mentorship|internship|cr|sponsorship|marketing|leadership)$/.test(h) ? h : "curriculum");
   })();
 </script>
 
@@ -202,7 +210,7 @@ main,footer,.topbar{position:relative;z-index:1}
 .ctl{display:contents}
 html:not([data-tm]) .ctl{display:none}
 .rail{position:absolute;z-index:3;left:var(--gut);right:var(--gut);bottom:clamp(14px,3vh,30px);
-  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .rail button{background:none;border:0;padding:14px 0 6px;min-height:44px;text-align:left;color:rgba(237,229,216,.74);
   font-family:var(--display);font-weight:700;font-size:13px;line-height:1.2;letter-spacing:.1em;text-transform:uppercase}
 .rail i{display:block;height:3px;border-radius:2px;background:rgba(237,229,216,.38);margin-bottom:9px;transition:background var(--dur-2) var(--ease)}
@@ -329,8 +337,6 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
 
    ⚠ **每個人的姿勢單獨看也要成立。** 手機上一排一個，
    那時候看不到任何連動，只看得到那一個人。 */
-.sec-people .sec-in{grid-template-columns:1fr;gap:clamp(14px,2vw,24px)}
-.sec-people .body{max-width:none}
 
 .teamsec{margin:clamp(40px,5.5vw,64px) 0 0}
 .teamsec:first-child{margin-top:clamp(20px,2.6vw,32px)}
@@ -396,9 +402,6 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
 @media (max-width:430px){
   .crew{grid-template-columns:1fr;gap:clamp(86px,22vw,110px) 0}
 }
-/* 這一段的第一組緊接在 h2 下面，不用再空一大段（卡片上面那一截是留給頭超出來的）。 */
-.sec-people .teamsec:first-child{margin-top:0}
-.sec-people .teamsec:first-child .crew{padding-top:clamp(70px,7vw,96px)}
 
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
@@ -484,7 +487,8 @@ html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;lett
 html[data-tm] .tm{display:none;border-top:0;padding-top:0;margin-top:0}
 html[data-tm="curriculum"] .tm[data-team="curriculum"],html[data-tm="mentorship"] .tm[data-team="mentorship"],
 html[data-tm="internship"] .tm[data-team="internship"],html[data-tm="cr"] .tm[data-team="cr"],
-html[data-tm="sponsorship"] .tm[data-team="sponsorship"],html[data-tm="marketing"] .tm[data-team="marketing"]{
+html[data-tm="sponsorship"] .tm[data-team="sponsorship"],html[data-tm="marketing"] .tm[data-team="marketing"],
+html[data-tm="leadership"] .tm[data-team="leadership"]{
   display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);column-gap:clamp(24px,4.5vw,76px);align-items:start;
   animation:tm-in var(--dur-3) var(--ease) both}
 @keyframes tm-in{from{opacity:0;translate:0 14px}}
@@ -493,6 +497,10 @@ html[data-tm] .tm>h3{position:absolute;width:1px;height:1px;margin:-1px;overflow
 html[data-tm] .tm-about{grid-column:1}
 html[data-tm] .tm-live{grid-column:2;margin-top:0}
 html[data-tm] .tm-people{grid-column:1/-1}
+/* 第七張 Leadership（Paul 2026-11-24：Co-President 與 Senior Adviser 不要每個 team 底下都出現，另外給一張）。
+   它那一塊只有人，上面沒有介紹，所以不用那條分隔線。沒有 JavaScript 的時候名單載不到，那一塊整個不畫。 */
+.tm[data-team="leadership"] .tm-people{margin-top:0;border-top:0;padding-top:0}
+html:not([data-tm]) .tm[data-team="leadership"]{display:none}
 @media (max-width:820px){
   html[data-tm] .tm[data-team]{grid-template-columns:minmax(0,1fr)}
   html[data-tm] .tm-live{grid-column:1;margin-top:18px}
@@ -553,6 +561,10 @@ html[data-tm] .tm-people{grid-column:1/-1}
       <picture><source srcset="../photos/group-photo.webp" type="image/webp"><img src="../photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" loading="lazy"></picture>
       <figcaption><h2>Marketing</h2><span>對外的內容與視覺。</span></figcaption>
     </figure>
+    <figure class="slide plain" data-team="leadership">
+      <svg class="orbit" viewBox="0 0 800 500" aria-hidden="true" focusable="false"><ellipse class="o1" cx="400" cy="250" rx="380" ry="200"/><ellipse class="o2" cx="400" cy="250" rx="260" ry="118"/><circle cx="651" cy="219" r="7"/></svg>
+      <figcaption><h2>Leadership</h2><span>創辦人、Co-President 與 Senior Adviser。</span></figcaption>
+    </figure>
   </div>
   <div class="ctl">
     <div class="rail" role="group" aria-label="選一個 team">
@@ -562,6 +574,7 @@ html[data-tm] .tm-people{grid-column:1/-1}
       <button type="button" aria-label="Community Relations"><i></i><span>Community Relations</span></button>
       <button type="button" aria-label="Sponsorship"><i></i><span>Sponsorship</span></button>
       <button type="button" aria-label="Marketing"><i></i><span>Marketing</span></button>
+      <button type="button" aria-label="Leadership"><i></i><span>Leadership</span></button>
     </div>
     <button type="button" class="arw prev" aria-label="上一個 team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button type="button" class="arw next" aria-label="下一個 team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg></button>
@@ -629,15 +642,10 @@ html[data-tm] .tm-people{grid-column:1/-1}
     <div class="tm-live" hidden></div>
     <div class="tm-people" hidden></div>
   </article>
-</section>
-
-<section class="sec sec-people" hidden>
-  <div class="sec-in">
-    <h2></h2>
-    <div class="body">
-      <div id="faces-zh"></div>
-    </div>
-  </div>
+  <article class="tm" data-team="leadership">
+    <h3>Leadership</h3>
+    <div class="tm-people" hidden></div>
+  </article>
 </section>
 
 <section class="sec">
@@ -706,6 +714,10 @@ html[data-tm] .tm-people{grid-column:1/-1}
       <picture><source srcset="../photos/group-photo.webp" type="image/webp"><img src="../photos/group-photo.jpg" alt="Close to thirty Beyond Taiwan organisers on a stage, everyone making the same hand sign" width="1200" height="800" loading="lazy"></picture>
       <figcaption><h2>Marketing</h2><span>Everything we say and show publicly.</span></figcaption>
     </figure>
+    <figure class="slide plain" data-team="leadership">
+      <svg class="orbit" viewBox="0 0 800 500" aria-hidden="true" focusable="false"><ellipse class="o1" cx="400" cy="250" rx="380" ry="200"/><ellipse class="o2" cx="400" cy="250" rx="260" ry="118"/><circle cx="651" cy="219" r="7"/></svg>
+      <figcaption><h2>Leadership</h2><span>Founders, Co-Presidents and Senior Advisers.</span></figcaption>
+    </figure>
   </div>
   <div class="ctl">
     <div class="rail" role="group" aria-label="Choose a team">
@@ -715,6 +727,7 @@ html[data-tm] .tm-people{grid-column:1/-1}
       <button type="button" aria-label="Community Relations"><i></i><span>Community Relations</span></button>
       <button type="button" aria-label="Sponsorship"><i></i><span>Sponsorship</span></button>
       <button type="button" aria-label="Marketing"><i></i><span>Marketing</span></button>
+      <button type="button" aria-label="Leadership"><i></i><span>Leadership</span></button>
     </div>
     <button type="button" class="arw prev" aria-label="Previous team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button type="button" class="arw next" aria-label="Next team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg></button>
@@ -782,15 +795,10 @@ html[data-tm] .tm-people{grid-column:1/-1}
     <div class="tm-live" hidden></div>
     <div class="tm-people" hidden></div>
   </article>
-</section>
-
-<section class="sec sec-people" hidden>
-  <div class="sec-in">
-    <h2></h2>
-    <div class="body">
-      <div id="faces-en"></div>
-    </div>
-  </div>
+  <article class="tm" data-team="leadership">
+    <h3>Leadership</h3>
+    <div class="tm-people" hidden></div>
+  </article>
 </section>
 
 <section class="sec">
@@ -916,10 +924,10 @@ html[data-tm] .tm-people{grid-column:1/-1}
 })();
 </script>
 
-<script type="module" src="./src/reel.js"></script>
-<script type="module" src="./src/main.js"></script>
-<script type="module" src="./src/programmes.js"></script>
+<script type="module" src="./src/reel.js?v=2026-11-24-1110"></script>
+<script type="module" src="./src/main.js?v=2026-11-24-1110"></script>
+<script type="module" src="./src/programmes.js?v=2026-11-24-1110"></script>
 <!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->
-<script src="../shared/public.js" defer></script>
+<script src="../shared/public.js?v=2026-11-24-1110" defer></script>
 </body>
 </html>

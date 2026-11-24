@@ -110,7 +110,8 @@ test("★ 每一頁只做一件事：現在開放、這一年、團隊、關於�
   assert.match(yr, /<div id="yr-zh">\s*<p>這一屆的行程還在排。/, "沒有資料的時候是幾句話，不是一張空表"); assert.match(yr, /<script type="module" src="\.\/src\/main\.js"><\/script>/);
   for (const k of L.TEAMS) assert.equal((tm.match(new RegExp(`<article class="tm" data-team="${k}">`, "g")) || []).length, 2, k + " 中英各一塊");
   assert.equal((tm.match(/<div class="tm-live" hidden><\/div>/g) || []).length, 12, "後台畫的那一格預設不出現");
-  assert.match(tm, /<script type="module" src="\.\/src\/programmes\.js"><\/script>/);
+  // 2026-11-24：/team/ 的檔案帶版本號了（?v=…），這裡認得帶與不帶兩種。
+  assert.match(tm, /<script type="module" src="\.\/src\/programmes\.js(\?v=[\w-]+)?"><\/script>/);
   assert.deepEqual([...ab.slice(ab.indexOf('<div class="zh"'), ab.indexOf('<div class="en"')).matchAll(/<h2>([^<]*)<\/h2>/g)].map(m => m[1]), ["我們在處理的是資訊落差。", "使命", "願景", "價值", "免費是刻意的", "五年下來"], "/about/ 瘦身之後的順序");
   assert.doesNotMatch(ab, /class="nums"|class="tl"/, "數字與時間軸不在 /about/ 了");
   for (const s of ["五年，這些是真的發生過的事。", "這些數字怎麼來的", "收到超過 150 份申請"]) assert.ok(im.includes(s), "/impact/ 少了：" + s);

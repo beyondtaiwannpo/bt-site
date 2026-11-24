@@ -2067,7 +2067,8 @@ pubOut=$(node -e '
   if (!/url: ""/.test(code) && !/url: "https:\/\/(www\.)?zeczec\.com\//.test(code)) bad.push("shared/public.js 募資橫條的 url 只准是空的或嘖嘖（zeczec.com）的網址");
   for (const f of ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","impact/index.html","year/index.html","partner/index.html","resources/index.html","team/index.html"]) {
     const h = fs.readFileSync(f, "utf8"), p = f === "index.html" ? "./" : "../";
-    if (!h.includes("<script src=\"" + p + "shared/public.js\" defer></script>")) bad.push(f + " 沒有載 shared/public.js");
+    // 2026-11-24：/team/ 的檔案帶版本號（?v=…，見 scripts/bump-version.sh），比對之前先剝掉。
+    if (!h.replace(/(shared\/public\.js)\?v=[\w-]+/, "$1").includes("<script src=\"" + p + "shared/public.js\" defer></script>")) bad.push(f + " 沒有載 shared/public.js");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
 ' 2>&1)

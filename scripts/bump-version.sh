@@ -8,7 +8,8 @@
 #
 # 它改哪些檔：
 #   version.json                 線上現在是哪一版（頁面開著會用 cache: no-store 讀它，不一樣就提醒重整）
-#   九個登入後頁面的 index.html   <meta name="bt-version">、<script type="importmap">（模組名稱對到帶版本的網址）、
+#   FOLDERS 裡每一頁的 index.html（登入後的頁面，2026-11-24 起加上對外的 /team/）
+#                                <meta name="bt-version">、<script type="importmap">（模組名稱對到帶版本的網址）、
 #                                modulepreload 與 <script src> 的 ?v=
 # 它**不改任何 .js**：模組之間的 import 還是乾淨的 "./ui.js"，是 index.html 裡那張 importmap 把它對到 "./ui.js?v=…"。
 # 所以 node 的測試照樣直接 import 原始檔，不用知道版本這件事。
@@ -21,10 +22,15 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-FOLDERS="admin admin/site admin/people admin/passports admin/finance admin/marketing admin/team-forms admin/records settings passport intern-passport availability app home"
+FOLDERS="admin admin/site admin/people admin/passports admin/finance admin/marketing admin/team-forms admin/records settings passport intern-passport availability app home team"
 # 每一頁都會 import 的共用模組。它們也走 importmap，這樣 shared/auth.js 裡的 "./supabase.js" 跟
 # data.js 裡的 "../../shared/supabase.js" 會對到**同一個**網址，瀏覽器只建一份 client（shared/supabase.js 檔頭的要求）。
 SHARED="/shared/auth.js /shared/supabase.js /shared/supabase-config.js /shared/nav.js /shared/rail.js /vendor/supabase-js.js"
+
+# 2026-11-24：對外的 /team/ 也進來了。它那一頁的 HTML 跟 team/src/ 的程式是成對的（HTML 留位置、程式把人填進去），
+# 新 HTML 配到快取裡的舊程式，畫面就是「每個 team 的人全部疊在一起」（Paul 2026-11-24 遇到的）。
+# 它另外會 import 兩支別的資料夾的模組，那兩支也要帶版本號，寫在這裡。之後哪一頁要 import 別的資料夾的模組，加一行。
+extra() { case "$1" in team) echo "/events/src/ui.js /year/src/logic.js";; esac; }
 
 current() { sed -n 's/.*"v": *"\([^"]*\)".*/\1/p' version.json; }
 
@@ -44,6 +50,12 @@ if [ "${1:-}" = "--check" ]; then
     for m in "$d"/src/*.js; do
       grep -q "\"/$m\": \"/$m?v=$v\"" "$f" || { echo "FAIL  ${f} 的 importmap 少了 /${m}"; bad=1; }
     done
+    for m in $(extra "$d"); do
+      grep -q "\"$m\": \"$m?v=$v\"" "$f" || { echo "FAIL  ${f} 的 importmap 少了 ${m}"; bad=1; }
+    done
+    # 頁面自己的 <script src> 也要帶版本號：importmap 只管 import，不管 <script src>。
+    nos=$(grep -o '<script[^>]* src="\.[^"]*\.js"' "$f" || true)
+    if [ -n "$nos" ]; then echo "FAIL  ${f} 的 <script src> 沒帶 ?v=：${nos}"; bad=1; fi
   done
   [ $bad = 0 ] && echo "ok    九個登入後頁面的版本號都是 ${v}，importmap 都齊"
   exit $bad
@@ -58,6 +70,7 @@ for d in $FOLDERS; do
   map='<script type="importmap">{ "imports": {'
   sep=""
   for m in "$d"/src/*.js; do map="$map$sep \"/$m\": \"/$m?v=$V\""; sep=","; done
+  for m in $(extra "$d"); do map="$map$sep \"$m\": \"$m?v=$V\""; sep=","; done
   for m in $SHARED; do map="$map$sep \"$m\": \"$m?v=$V\""; sep=","; done
   map="$map } }</script>"
   perl -0pi -e 's{<!-- bt-importmap -->.*?<!-- /bt-importmap -->}{<!-- bt-importmap -->\n'"$map"'\n<!-- /bt-importmap -->}s' "$f"

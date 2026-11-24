@@ -7,11 +7,12 @@
 # 有改到一半的就印出來叫你自己加。
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
-WATCH='^(admin|settings|passport|intern-passport|availability|app|shared|vendor)/'
+# 2026-11-24：/team/ 也帶版本號了，連同它 import 的那兩支別的資料夾的模組（見 bump-version.sh 的 extra）。
+WATCH='^(admin|settings|passport|intern-passport|availability|app|shared|vendor|team)/|^events/src/ui\.js$|^year/src/logic\.js$'
 if ! git diff --cached --name-only | grep -Eq "$WATCH"; then exit 0; fi
 # 這次已經換過版本號（version.json 在暫存區）就不再換，不然每次 commit --amend 都會再跳一號。
 if git diff --cached --name-only | grep -q '^version.json$'; then exit 0; fi
-TARGETS="version.json admin/index.html admin/site/index.html admin/people/index.html admin/passports/index.html admin/finance/index.html admin/marketing/index.html admin/team-forms/index.html admin/records/index.html settings/index.html passport/index.html intern-passport/index.html availability/index.html app/index.html home/index.html"
+TARGETS="version.json admin/index.html admin/site/index.html admin/people/index.html admin/passports/index.html admin/finance/index.html admin/marketing/index.html admin/team-forms/index.html admin/records/index.html settings/index.html passport/index.html intern-passport/index.html availability/index.html app/index.html home/index.html team/index.html"
 clean=""; dirty=""
 for f in $TARGETS; do
   if git diff --quiet -- "$f"; then clean="$clean $f"; else dirty="$dirty $f"; fi

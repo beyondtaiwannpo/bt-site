@@ -2369,8 +2369,8 @@ Paul 2026-11-24 要的：`/team/` 拿掉「三十個人，全部是學生。」�
 
 ### `/team/`
 
-- 最上面是一排大照片，一張一個 team（`.stage` 裡的 `.reel`，用 CSS 的 scroll-snap，就是瀏覽器自己會停在整張的那種捲動）。
-  手機用手指滑，電腦按兩邊的箭頭、下面六格或鍵盤左右鍵。
+- 最上面是一排大照片，一張一個 team，第七張是 Leadership（`.stage` 裡的 `.reel`，用 CSS 的 scroll-snap，就是瀏覽器自己會停在整張的那種捲動）。
+  手機用手指滑，電腦按照片左右兩邊的箭頭、下面七格或鍵盤左右鍵。
 - 照片下面那一塊是現在這個 team 的介紹、固定在做的活動、這一屆的人。
   現在是哪一個 team 記在 `<html data-tm="…">`，`<head>` 裡那一小段先定（所以不會閃），`team/src/reel.js` 接手。
   網址後面可以帶 `#mentorship` 這種代號直接開在那一個 team。沒有 JavaScript 的時候六個 team 全部攤開。
@@ -2378,12 +2378,20 @@ Paul 2026-11-24 要的：`/team/` 拿掉「三十個人，全部是學生。」�
   沒有照片就在 class 加 `plain`，會是一張深藍底、橘色字的畫面。
   現在 Sponsorship 與 Internship 是 `plain`，其他四張是站上本來就有的照片暫代，**不一定真的是那個 team**，等 Paul 給真的照片。
   新照片放上來之前要先確認那場活動與照片裡的人都在拍攝同意範圍內（GOALS.md「明確不做」那一條）。
-- 人怎麼分到各個 team：`team/src/ui.js` 的 `splitGroups()`。屬於六個 team 的放在那個 team 底下，
-  其餘（Co-President、Senior Adviser 等）放在六個 team 後面那一段。名單照舊來自 `public_team()`，只有本人同意且 Co-President 核可的人。
+- 人怎麼分到各個 team：`team/src/ui.js` 的 `splitGroups()`。屬於六個 team 的放在那個 team 底下，而且**只有那個 team 的人**。
+  Co-President 與 Senior Adviser 不在每個 team 底下出現，只在第七張 Leadership（Paul 2026-11-24：「I dont need them to show up every page」）。
+  填了別的 team 或沒填 team 的人也放在 Leadership 那一塊。名單照舊來自 `public_team()`，只有本人同意且 Co-President 核可的人。
+- Leadership 那一塊的標題只寫名單上真的有的職位（`leadHeading()`）。Founder 也認得、會排最前面，
+  **但資料庫現在沒有 Founder 這個職位**，所以創辦人還不會出現。要讓他們出現得先在職位裡加 Founder、本人勾同意、Co-President 核可，
+  不要把名字直接寫進 HTML（這是 public repo，人名的規則見 CLAUDE.md）。
 - 「我們不是老師，也不是顧問…」那一句從「怎麼運作」留下來當一句引言，因為測試規定首頁搬走的長文每一句都要還在某一頁上。
 - 隔兩張以上（按下面六格）是直接切過去加淡入，不是滑過去：`scroll-snap-stop:always` 在 Chrome 會擋掉程式一次滑兩張。
   照片停在哪一張，下面就是哪一個 team，以照片的位置為準（`reel.js` 的 `sync()`）。
-- 守門：`test/team-reel.test.mjs`（六張照片、六格、六塊內容中英順序一致，拿掉的東西不會回來）。
+- **這一頁的檔案都帶版本號**（`?v=…` 與一張 importmap，跟登入後的頁面同一套，見「後台速度」的「版本號」）。
+  起因是 Paul 2026-11-24 改版當天看到每個 team 的人全部疊在一起：瀏覽器拿到新的 HTML，卻還在用十分鐘快取裡的舊程式。
+  `scripts/bump-version.sh` 的清單加了 `team`；它 import 的另外兩支（`events/src/ui.js`、`year/src/logic.js`）寫在那支腳本的 `extra()`。
+  之後 `team/src/` 多 import 一支別的資料夾的檔，要加進 `extra()`，測試會擋。
+- 守門：`test/team-reel.test.mjs`（七張、七格、七塊內容中英順序一致，拿掉的東西不會回來，Leadership 不回到每個 team 底下，檔案都帶版本號）。
   `check.sh` 檢查這一頁還在的那個字串從舊大標改成「校友去了哪」。
 
 ### `/partner/`
@@ -6960,6 +6968,7 @@ GitHub Pages 把每個檔案快取 10 分鐘。改了程式推上去的十分鐘
 - 四個後台 `main.js`：`paintShell()`、`boot()` 的並行；四個後台 `ui.js`：`bindPrefetch()`、`prefetchTargets()`、`checkVersion()`、`loadedVersion()`、`versionDiffers()`（四份一模一樣，test/admin-hub.test.mjs 逐字比對）。
 - settings、passport、intern-passport、availability 的 `main.js` 各有一份 `checkVersion()`（它們沒有後台那套 toast，用 `.verbar` 那一條）。
 - `scripts/bump-version.sh`、`scripts/pre-commit-bump.sh`、`version.json`。
+- 2026-11-24 起對外的 `/team/` 也在清單裡（它是對外頁裡唯一一頁 HTML 與程式成對的），見「團隊、合作、關於我們三頁改版」。
 - `check.sh`：modulepreload 的檔案存在檢查會先剝掉 `?v=`；多守「九個 index.html 的版本號都跟 version.json 一樣、importmap 把 src/ 每一支都對到」與「八個登入後 main.js 都有 checkVersion」。
 
 ## 自動儲存（2026-11-06）
