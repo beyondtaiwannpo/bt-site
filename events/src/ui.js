@@ -5,13 +5,13 @@ export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "
 
 const T = {
   zh: { past: "過去的活動", upcoming: "近期活動", none: "現在沒有公開的活動。", signup: "報名", full: "額滿", closed: "報名已截止", ended: "已結束",
-        opens: d => `${d} 開放報名`, cap: (n, c) => c ? `${n} / ${c} 人` : `${n} 人報名`, login: "報名要先登入，一分鐘。", back: "所有活動", notFound: "找不到這場活動。", place: "地點", when: "時間", around: m => `大約 ${m} 月`, tbc: "日期還沒定", by: t => `${t.replace(/\s*Team$/i, "")} 主辦`,
+        opens: d => `${d} 開放報名`, cap: (n, c) => c ? `${n} / ${c} 人` : `${n} 人報名`, login: "報名要先登入，一分鐘。", back: "所有活動", notFound: "找不到這場活動。", place: "地點", map: "在 Google 地圖上看", when: "時間", around: m => `大約 ${m} 月`, tbc: "日期還沒定", by: t => `${t.replace(/\s*Team$/i, "")} 主辦`,
         speakers: "講者", types: "報名類型", left: n => `還有 ${n} 個名額`,
         register: "立即報名", deadline: d => `報名到 ${d} 截止`, cal: "加入行事曆", gcal: "Google 日曆", ics: "下載行事曆檔（Apple、Outlook）",
         photos: "活動照片", prev: "看前面的照片", next: "看後面的照片",
         starts: "開始", noTime: "時間還沒定", tw: "台灣時間", view: "看這場活動", opensShort: d => `${d} 開放報名` },
   en: { past: "Past events", upcoming: "Upcoming", none: "No public events right now.", signup: "Sign up", full: "Full", closed: "Sign-up closed", ended: "Ended",
-        opens: d => `Sign-up opens ${d}`, cap: (n, c) => c ? `${n} / ${c} signed up` : `${n} signed up`, login: "Signing up takes a one-minute login.", back: "All events", notFound: "Event not found.", place: "Place", when: "When", around: m => `Around ${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]}`, tbc: "Date to be confirmed", by: t => `Hosted by ${t.replace(/\s*Team$/i, "")}`,
+        opens: d => `Sign-up opens ${d}`, cap: (n, c) => c ? `${n} / ${c} signed up` : `${n} signed up`, login: "Signing up takes a one-minute login.", back: "All events", notFound: "Event not found.", place: "Place", map: "Open in Google Maps", when: "When", around: m => `Around ${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]}`, tbc: "Date to be confirmed", by: t => `Hosted by ${t.replace(/\s*Team$/i, "")}`,
         speakers: "Speakers", types: "Sign-up types", left: n => `${n} ${n === 1 ? "place" : "places"} left`,
         register: "Register now", deadline: d => `Sign-up closes ${d}`, cal: "Add to calendar", gcal: "Google Calendar", ics: "Download calendar file (Apple, Outlook)",
         photos: "Photos", prev: "Previous photos", next: "Next photos",
@@ -295,6 +295,16 @@ export function galleryHTML(extras, l) {
 //   - 手機一欄：那張卡接在活動名稱下面；現在報得了名的話，螢幕最下面多一條細細的、固定的「立即報名」。
 // x 是 public_event_extras() 回的（講者、報名類型、照片），沒有（null、還沒跑遷移檔）就是沒有那幾塊，其他照畫。
 // main.js 會等 x 回來才畫這一頁，所以畫出來之後版面不會再跳。o.url 是這一頁的網址（行事曆的說明裡用）。
+// 地點那一行（2026-11-24，2027-01-05-map-links.sql）：地點的字，後面一條「在 Google 地圖上看」（後台有貼連結才有）。
+// 連結從 public_event_extras() 來（x.map_url）。資料庫只收 Google 地圖的連結，這裡印之前再對一次同一條規則：
+// 不是 https、不是 Google 地圖的網域、帶空白或引號的，一律當作沒有。沒有地點的字但有連結，那一行照樣印（只有連結）。
+export const MAP_RE = /^https:\/\/(maps\.app\.goo\.gl\/|goo\.gl\/maps\/|(www\.)?google\.com(\.tw)?\/maps[/?]|maps\.google\.com(\.tw)?\/)[^\s<>"'`\\]*$/;
+export const mapUrl = x => { const u = x && typeof x.map_url === "string" ? x.map_url.trim() : ""; return u && u.length <= 600 && MAP_RE.test(u) ? u : ""; };
+export function placeHTML(e, x, l) {
+  const u = mapUrl(x), place = String(e.place || "").trim();
+  if (!place && !u) return "";
+  return `<li><b>${T[l].place}</b><span>${esc(place)}${u ? `${place ? " " : ""}<a class="ev-map" href="${esc(u)}" target="_blank" rel="noopener">${T[l].map}</a>` : ""}</span></li>`;
+}
 export function detailHTML(e, l, x, o) {
   const s = T[l], n = names(e, l), st = signupState(e), opt = o || {};
   const speakers = speakersHTML(x, l), photos = galleryHTML(x, l), types = st === "open" && !!ticketsHTML(e, x, l);
@@ -310,7 +320,7 @@ export function detailHTML(e, l, x, o) {
       </header>
       <aside class="ev-side"><div class="ev-card2" data-ev-card>
         <p class="ev-card-by">${esc(s.by(e.team))}</p><p class="ev-card-t">${esc(n.main)}</p>
-        <ul class="rows"><li><b>${s.when}</b><span>${esc(whenLong(e, l))}</span></li>${e.place ? `<li><b>${s.place}</b><span>${esc(e.place)}</span></li>` : ""}</ul>
+        <ul class="rows"><li><b>${s.when}</b><span>${esc(whenLong(e, l))}</span></li>${placeHTML(e, x, l)}</ul>
         <div class="ev-signup" data-ev-signup>${signupHTML(e, x, l)}</div>
         ${calendarHTML(e, l, opt.url)}
       </div></aside>

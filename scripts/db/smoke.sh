@@ -4037,7 +4037,7 @@ EPD=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',fal
 case "${EPD}" in ????????-*) echo "  ok   （準備）開一場草稿活動（${EPD}）"; pass=$((pass+1));; *) echo "  FAIL 開草稿活動失敗：${EPD}"; fail=$((fail+1));; esac
 chkas "${AMT}" "草稿活動也可以先放照片、先勾同意" "true" \
   "select public.set_event_photo_consent(public.add_event_photo('${EPD}','https://norjaglyaotzewxavmhv.supabase.co/storage/v1/object/public/events/${EPD}/d.jpg'), true)::text"
-chkrole anon "" "★ 草稿活動對外什麼都不回（空值），照片勾了同意也一樣" "true" "select (public.public_event_extras('ep-draft') is null)::text"
+chkrole anon "" "★ 草稿活動對外什麼都不回（空值），照片勾了同意也一樣" "true" "select (public.public_event_extras('ml-draft') is null)::text"
 chkrole anon "" "代號不存在也是空值" "true" "select (public.public_event_extras('no-such-event') is null)::text"
 psql -d "${DB}" -X -A -t -q -c "update public.events set status='archived' where id='${PGEV}';" >/dev/null
 chkrole anon "" "★ 活動撤下來之後，對外那一支也回空值" "true" "select (public.public_event_extras('pg-no-date') is null)::text"
@@ -4524,6 +4524,56 @@ psql -d "${DB}" -X -A -t -q -c "revoke all on function public.set_founder_consen
 rm -f "${BROKEN}"
 fd3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FDM}" 2>&1 || true)
 if echo "${fd3}" | grep -q "OVERALL.*PASS" && ! echo "${fd3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
+echo "── 地點與場地的 Google 地圖連結（2027-01-05-map-links.sql）──"
+# Paul 2026-11-24：「for when and where, for where I need to be able to post Google Map link. Same for the venue.」
+# 這時候：PAUL 是 Co-President；AMT 是 PGEV 那個 team「改」的人，AMX 不在那個 team；PGEV（pg-no-date）上架了。
+# 草稿的活動與場地這一段自己開（前面幾段開的那幾個，到這裡有的已經被刪掉了）：MLD（ml-draft）是草稿，MLV 是 Map Hall。
+MLM=supabase/migrations/2027-01-05-map-links.sql
+GM=https://maps.app.goo.gl/AbCdEf123
+MLD=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('${AMTEAM}','ml-draft','地圖測試','Map test',false)" 2>&1 | tail -1 | tr -d ' \n')
+MLV=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.venue_save(null, '{\"name\":\"Map Hall\",\"city\":\"Taipei\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+case "${MLD}${MLV}" in ????????-*) echo "  ok   （準備）開了一場草稿活動與一個場地"; pass=$((pass+1));; *) echo "  FAIL 開不了測試用的活動或場地：${MLD} ${MLV}"; fail=$((fail+1));; esac
+ml=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MLM}" 2>&1 || true)
+if echo "${ml}" | grep -q "OVERALL.*PASS" && ! echo "${ml}" | grep -q "|FAIL"; then echo "  ok   地圖連結那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 地圖連結那支驗收表："; echo "${ml}" | head -14; fail=$((fail+1)); fi
+ml2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MLM}" 2>&1 || true)
+if echo "${ml2}" | grep -q "OVERALL.*PASS" && ! echo "${ml2}" | grep -q "|FAIL"; then echo "  ok   地圖連結那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${ml2}" | head -5; fail=$((fail+1)); fi
+chkrole anon "" "★ 沒登入的人叫不動存連結的那一支" "ERROR:permissiondeniedforfunctionset_event_map_url" "select public.set_event_map_url('${PGEV}', '${GM}')"
+chkraise "★ 不在這個 team 的幹部存不了（not_event_editor）" "not_event_editor" "perform set_config('test.uid','${AMX}',true); perform public.set_event_map_url('${PGEV}', '${GM}');"
+chkraise "學員存不了（not_event_editor）" "not_event_editor" "perform set_config('test.uid','${STU}',true); perform public.set_event_map_url('${PGEV}', '${GM}');"
+chkraise "★ 別的網站的連結存不了（bad_map_url）" "bad_map_url" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_map_url('${PGEV}', 'https://example.com/maps/x');"
+chkraise "★ 假的 google 網域存不了（bad_map_url）" "bad_map_url" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_map_url('${PGEV}', 'https://www.google.com.evil.example/maps/x');"
+chkraise "http 的存不了（bad_map_url）" "bad_map_url" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_map_url('${PGEV}', 'http://maps.app.goo.gl/abc');"
+chkraise "沒有這場活動（no_such_event）" "no_such_event" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_map_url('00000000-0000-0000-0000-000000000000', '${GM}');"
+chkrole anon "" "還沒存之前：對外那一格是空的" "true" "select ((public.public_event_extras('pg-no-date')->>'map_url') is null)::text"
+chkas "${AMT}" "team 是「改」的人存得了，回存進去的值" "${GM}" "select public.set_event_map_url('${PGEV}', '  ${GM}  ')"
+chkrole anon "" "★ 上架的活動：沒登入的人拿得到那一條連結" "${GM}" "select public.public_event_extras('pg-no-date')->>'map_url'"
+chkrole anon "" "照片、講者、報名類型那三個鍵都還在" "map_url,photos,speakers,tickets" "select string_agg(k, ',' order by k) from jsonb_object_keys(public.public_event_extras('pg-no-date')) k"
+chkas "${PAUL}" "（準備）草稿那一場也存一條" "${GM}" "select public.set_event_map_url('${MLD}', '${GM}')"
+chkrole anon "" "★ 沒上架的活動：對外什麼都不回，連結也沒有" "0" "select count(*) from (select public.public_event_extras('ml-draft') x) t where x is not null"
+chk "★ 直接改表也塞不進別的網站的連結（檢查掛在欄位上）" "NOTICE:blocked" "do \$\$ begin update public.events set map_url = 'https://example.com/x' where id = '${PGEV}'; raise notice 'NOT_BLOCKED'; exception when check_violation then raise notice 'blocked'; end \$\$;"
+chkas "${AMT}" "空字串就是拿掉" "true" "select (public.set_event_map_url('${PGEV}', '') is null)::text"
+chkrole anon "" "拿掉之後對外也沒有了" "true" "select ((public.public_event_extras('pg-no-date')->>'map_url') is null)::text"
+chk "存與拿掉都留了紀錄" "true" "select (count(*) >= 3)::text from public.rc_log where what = 'event_map_url'"
+# 場地
+chkraise "★ 沒指派的幹部存不了場地的連結（not_venue_editor）" "not_venue_editor" "perform set_config('test.uid','${OUTC}',true); perform public.venue_save('${MLV}', '{\"map_url\":\"${GM}\"}'::jsonb);"
+chkraise "★ 場地：別的網站的連結存不了（bad_map_url）" "bad_map_url" "perform set_config('test.uid','${PAUL}',true); perform public.venue_save('${MLV}', '{\"map_url\":\"https://example.com/maps\"}'::jsonb);"
+chkas "${PAUL}" "場地：Google 地圖的連結存得了" "${GM}" "select public.venue_save('${MLV}', '{\"map_url\":\"${GM}\"}'::jsonb); select map_url from public.venues where id = '${MLV}'"
+chkas "${PAUL}" "場地：只改別的欄位，連結留著" "${GM}" "select public.venue_save('${MLV}', '{\"cost\":\"free\"}'::jsonb); select map_url from public.venues where id = '${MLV}'"
+chkas "${PAUL}" "場地清單多回 map_url 與 has_map" "true|${GM}" "select (public.venues_list()->>'has_map')||'|'||(select v->>'map_url' from jsonb_array_elements(public.venues_list()->'venues') v where v->>'id' = '${MLV}')"
+chkas "${PAUL}" "一個場地那一頁也讀得到" "${GM}" "select public.venue_get('${MLV}')->'venue'->>'map_url'"
+chkraise "★ 學員讀不到場地（連結也讀不到）" "not_cadre" "perform set_config('test.uid','${STU}',true); perform public.venue_get('${MLV}');"
+chkrole anon "" "★ 場地的連結不會自己跑到對外頁：活動那一格是空的就是空的" "true" "select ((public.public_event_extras('pg-no-date')->>'map_url') is null)::text"
+BROKEN=$(mktemp)
+sed "s/^   where e\.slug = p_slug and e\.status = 'published';$/   where e.slug = p_slug;/" "${MLM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「上架了才回」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉上架那一條驗收表沒有變紅"; fail=$((fail+1)); fi
+sed "s/^revoke all on function public.set_event_map_url(uuid, text) from public, anon;$/grant execute on function public.set_event_map_url(uuid, text) to anon;/" "${MLM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：把存連結那一支開給沒登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 存連結那一支開給 anon 驗收表沒有變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "revoke all on function public.set_event_map_url(uuid, text) from anon;" >/dev/null
+rm -f "${BROKEN}"
+ml3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MLM}" 2>&1 || true)
+if echo "${ml3}" | grep -q "OVERALL.*PASS" && ! echo "${ml3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -529,7 +529,22 @@ async function reloadVenues(id) {
 }
 function readVenue(idp) {
   const val = k => { const el = document.getElementById(idp + "-" + k); return el ? el.value.trim() : ""; };
-  return { name: val("name"), kind: val("kind") || "other", city: val("city"), address: val("address"), capacity: val("capacity"), cost: val("cost"), url: val("url"), notes: val("notes") };
+  const p = { name: val("name"), kind: val("kind") || "other", city: val("city"), address: val("address"), capacity: val("capacity"), cost: val("cost"), url: val("url"), notes: val("notes") };
+  // Google 地圖連結（2027-01-05-map-links.sql）：那一格有畫出來才帶（遷移檔還沒跑的時候沒有畫）。
+  if (document.getElementById(idp + "-map")) p.map_url = val("map");
+  return p;
+}
+// 活動地點的 Google 地圖連結：先在這裡擋一次不是 Google 地圖的（資料庫會再擋一次），存好把那一列的值換掉再重畫。空的就是拿掉。
+async function saveEventMap(eventId, url) {
+  const ev = (S.events || []).find(x => x.id === eventId); if (!ev) return;
+  const v = String(url || "").trim();
+  keepEventTyped();
+  if (!UI.evMapOk(v)) { ev.map_url = v; S.msg = T("err.evMap") + D.says("bad_map_url"); render(); return; }
+  if (v === String(ev.map_url || "")) return;
+  S.busy = true; S.msg = ""; render();
+  try { const saved = await D.setEventMapUrl(eventId, v); ev.map_url = saved || null; S.msg = T(saved ? "msg.evMapSaved" : "msg.evMapCleared"); }
+  catch (e) { ev.map_url = v; S.msg = T("err.evMap") + D.says(e); }
+  S.busy = false; render();
 }
 async function reloadMeetings() {
   try {
@@ -989,6 +1004,7 @@ document.addEventListener("click", async e => {
   if (act === "vn-create") {
     const p = readVenue("vn-new");
     if (!p.name) { S.msg = T("err.vnSave") + D.says("need_venue_name"); render(); return; }
+    if (!UI.evMapOk(p.map_url)) { S.msg = T("err.vnSave") + D.says("bad_map_url"); render(); return; }
     S.busy = true; S.msg = ""; render();
     try { const nid = await D.saveVenue(null, p); S.busy = false; S.vnOpen["vn-add"] = false; const m = T("vn.created", { name: p.name }); history.pushState(null, "", "#venues/" + nid); await openTab("venues/" + nid); S.msg = m; render(); }
     catch (e) { S.busy = false; S.msg = T("err.vnSave") + D.says(e); render(); }
@@ -996,6 +1012,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "vn-save") {
     const p = readVenue("vn-ed");
+    if (!UI.evMapOk(p.map_url)) { S.msg = T("err.vnSave") + D.says("bad_map_url"); UI.toast(S.msg); return; }
     S.busy = true; S.msg = ""; render();
     try { await D.saveVenue(id, p); S.busy = false; await reloadVenues(id); S.venues = null; S.msg = T("vn.saved"); render(); }
     catch (e) { S.busy = false; S.msg = T("err.vnSave") + D.says(e); render(); }
@@ -1327,6 +1344,12 @@ document.addEventListener("click", async e => {
     const nav = document.getElementById("ev-tabs"), on = nav && nav.querySelector(".subtab.on");
     if (nav && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: "start" });
     if (on) { on.focus({ preventScroll: true }); on.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+    return;
+  }
+  // 「用場地的連結」：把這場活動掛的那個場地的 Google 地圖連結抄到活動那一格（按了才抄，場地的資料本來只有幹部看得到）。
+  if (act === "ev-map-venue") {
+    const ev = (S.events || []).find(x => x.id === id), vn = ev && ((S.venues && S.venues.venues) || []).find(v => v.id === ev.venue_id);
+    if (ev && vn && vn.map_url) await saveEventMap(ev.id, vn.map_url);
     return;
   }
   // 封面、活動照片、講者的「放上對外頁」與「從對外頁收起來」（2026-11-24，取代以前那三個同意的勾）。
@@ -1893,6 +1916,8 @@ document.addEventListener("change", async e => {
     catch (x) { S.busy = false; S.msg = T("err.save") + D.says(x); render(); }
     return;
   }
+  // 活動地點的 Google 地圖連結（2027-01-05-map-links.sql）：改完離開那一格就存。
+  if (S.view === "event" && e.target && e.target.id === "ev-map") { await saveEventMap(e.target.dataset.id, e.target.value); return; }
   if (S.view === "event" && e.target && e.target.id === "ev-venue") {
     const evId = e.target.dataset.id, vid = e.target.value || null;
     keepPanelsTyped();

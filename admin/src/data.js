@@ -417,6 +417,8 @@ const SAYS = [
   ["no_such_ticket", "找不到這個報名類型，重新整理再試一次。", "Sign-up type not found. Refresh and try again."],
   ["ticket_in_use", "已經有人報這一種了，刪不掉。不想再收的話，把名額改成現在的人數。", "People have already signed up for this type, so it cannot be removed. To stop taking more, set the limit to the current number."],
   ["ticket_full", "這一種額滿了。", "This type is full."],
+  ["bad_map_url", "這不是 Google 地圖的連結。到 Google 地圖按「分享」，把那一條連結貼進來。", "That is not a Google Maps link. In Google Maps press Share and paste that link here."],
+  ["set_event_map_url", "地圖連結的函式還不在資料庫裡，要先跑 2027-01-05-map-links.sql。", "The map link function is not in the database yet. Run 2027-01-05-map-links.sql first."],
   ["event_speakers_list", "講者的函式還不在資料庫裡，要先跑 2027-01-02-event-speakers-tickets.sql。", "The speaker functions are not in the database yet. Run 2027-01-02-event-speakers-tickets.sql first."],
   ["save_event_speaker", "講者的函式還不在資料庫裡，要先跑 2027-01-02-event-speakers-tickets.sql。", "The speaker functions are not in the database yet. Run 2027-01-02-event-speakers-tickets.sql first."],
   ["event_tickets_list", "報名類型的函式還不在資料庫裡，要先跑 2027-01-02-event-speakers-tickets.sql。", "The sign-up type functions are not in the database yet. Run 2027-01-02-event-speakers-tickets.sql first."],
@@ -566,10 +568,14 @@ export async function withdrawRequest(id) {
 // 回來的列沒有 recurring 這個鍵，畫面看到就不畫那幾格，改說要先跑哪一支（UI.evHasProgramme）。
 const EV_COLS = "id, slug, team, workspace_id, form_id, title_zh, title_en, summary_zh, summary_en, body_zh, body_en, cover_url, cover_consent, starts_at, ends_at, place, capacity, status, published_by, published_at, created_by, created_at, source, kind, venue_id, term_id";
 export const EV_PROGRAMME_COLS = "usual_month, recurring, edition_zh, edition_en";
+// 地點的 Google 地圖連結（2027-01-05-map-links.sql）。那一支還沒跑就沒有這一欄，一樣退一步不帶它讀；
+// 回來的列沒有 map_url 這個鍵，畫面看到就不畫那一格（UI.evHasMap）。
+export const EV_MAP_COLS = "map_url";
 export async function loadEvents() {
   need();
   const q = cols => supabase.from("events").select(cols).order("starts_at", { ascending: true, nullsFirst: false });
-  let { data, error } = await q(EV_COLS + ", " + EV_PROGRAMME_COLS);
+  let { data, error } = await q(EV_COLS + ", " + EV_PROGRAMME_COLS + ", " + EV_MAP_COLS);
+  if (error && String(error.code) === "42703") ({ data, error } = await q(EV_COLS + ", " + EV_PROGRAMME_COLS));
   if (error && String(error.code) === "42703") ({ data, error } = await q(EV_COLS));
   if (error) throw error;
   return data || [];
@@ -598,6 +604,8 @@ export const deleteVenue       = id => rpcV("venue_delete", { p_id: id });
 export const saveVenueContact  = (id, p) => rpcV("venue_contact_save", { p_id: id || null, p });
 export const deleteVenueContact = id => rpcV("venue_contact_delete", { p_id: id });
 export const setEventVenue     = (eventId, venueId) => rpcV("set_event_venue", { p_event: eventId, p_venue: venueId || null });
+// 活動地點的 Google 地圖連結（2027-01-05-map-links.sql）。空的就是拿掉。門是這場活動「改」以上；只收 Google 地圖的連結（資料庫再擋一次）。回存進去的值。
+export const setEventMapUrl    = (eventId, url) => rpcV("set_event_map_url", { p_event: eventId, p_url: url || null });
 // ── 專案（2026-12-26）──────────────────────────────────────────────────
 // 工作區（team 或整個 BT）→ 專案 → 活動與報名表。專案是 workspaces 的一列（kind = project），所以成員與三級權限跟別的地方一樣。
 // 清單一律走 projects_list()：每一位幹部看得到有哪些專案，表單只回看得到的。遷移檔還沒跑的時候回 null（畫面說要先跑）。

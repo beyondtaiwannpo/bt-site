@@ -1396,6 +1396,27 @@ export const evFromTaipei = v => { if (!v) return ""; const x = new Date(String(
 const evDate = d => evTaipei(d).replace("T", " ");
 export const evPast = e => !!(e && (e.ends_at || e.starts_at) && new Date(e.ends_at || e.starts_at) < new Date());
 export const evTitle = e => (lang() === "zh" ? (e.title_zh || e.title_en) : (e.title_en || e.title_zh)) || e.slug;
+// ── Google 地圖的連結（2026-11-24，2027-01-05-map-links.sql）──
+// Paul：「for when and where, for where I need to be able to post Google Map link. Same for the venue.」
+// 只收 Google 地圖的連結（分享出來的短網址，或 google.com/maps 開頭的），一定要 https。這一條跟資料庫的 map_url_ok() 是同一條，
+// events/src/ui.js 印對外頁之前也再對一次（同一條 regex 抄了一份，那邊不 import 後台的檔）。空的算可以（就是沒有連結）。
+export const EV_MAP_RE = /^https:\/\/(maps\.app\.goo\.gl\/|goo\.gl\/maps\/|(www\.)?google\.com(\.tw)?\/maps[/?]|maps\.google\.com(\.tw)?\/)[^\s<>"'`\\]*$/;
+export const evMapOk = u => { const v = String(u == null ? "" : u).trim(); return !v || (v.length <= 600 && EV_MAP_RE.test(v)); };
+// 這一列有沒有 map_url 這個鍵：沒有就是遷移檔還沒跑（data.js 讀的時候退了一步），那一格不畫。
+export const evHasMap = e => !!e && Object.prototype.hasOwnProperty.call(e, "map_url");
+// 「時間與地點」那一塊裡，地點底下的那一格。自己存（main.js 聽 #ev-map 的 change，叫 set_event_map_url），不走整頁那條「改了就存」，
+// 所以標了 data-noauto，readEvent() 也不讀它。有連結的時候旁邊一條「在 Google 地圖上打開」讓填的人自己點點看對不對。
+// venue：這場活動掛的場地（有的話）。場地有連結、活動這一格還是空的，多一顆「用場地的連結」（按了才抄過來：場地的資料只有幹部看得到，要不要放上對外頁是填的人決定）。
+export function eventMapHTML(e, venue, canEdit, busy) {
+  if (!evHasMap(e)) return "";
+  const url = String(e.map_url || ""), dis = busy ? " disabled" : "";
+  const open = url && evMapOk(url) ? `<a class="btn ghost sm" href="${esc(url)}" target="_blank" rel="noopener">${T("ev.mapOpen")}</a>` : "";
+  if (!canEdit) return url ? `<p class="ev-line ev-map-ro">${T("ev.map")}：${open}</p>` : "";
+  const fromVenue = !url && venue && venue.map_url && evMapOk(venue.map_url)
+    ? `<button type="button" class="btn ghost sm" data-act="ev-map-venue" data-id="${esc(e.id)}"${dis}>${T("ev.mapFromVenue", { name: esc(venue.name || "") })}</button>` : "";
+  return `<label class="wide"><i>${T("ev.map")}</i><input id="ev-map" type="url" inputmode="url" data-noauto="1" data-id="${esc(e.id)}" value="${esc(url)}" maxlength="600" placeholder="https://maps.app.goo.gl/…" autocomplete="off"${dis}></label>
+        <span class="ev-help">${T("ev.mapHelp")}</span>${open || fromVenue ? `<div class="ev-acts ev-map-acts">${open}${fromVenue}</div>` : ""}`;
+}
 // ── 計畫的四格（2026-12-31-programmes.sql）──
 // 一筆活動可以沒有日期：只要填了「通常在幾月」或勾了「多數年份都會辦」。對外的「現在開放」「這一年」「團隊」三頁讀的是同一筆。
 // 下面這幾支都是純函式，test/programmes-admin.test.mjs 有測。
@@ -2028,6 +2049,7 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
         <label><i>${T("ev.ends")}</i><input id="ev-ends" name="ends_at" type="datetime-local" value="${esc(evTaipei(e.ends_at))}"${ro}${dis}></label>
         <label><i>${T("ev.place")}</i><input id="ev-place" name="place" value="${esc(e.place || "")}"${ro}${dis}></label>
         <label><i>${T("ev.capacity")}</i><input id="ev-cap" name="capacity" type="number" min="0" value="${esc(String(e.capacity || 0))}"${ro}${dis}></label>
+        ${eventMapHTML(e, (venues || []).find(v => v.id === e.venue_id), canEdit, busy)}
       </div>${evSaveFoot(e, canEdit)}`, evSaveAttr(e, canEdit)) + eventVenueHTML(e, venues, canEdit, busy), { id: "ev-when" });
   // 3. 對外的兩頁上怎麼列。遷移檔還沒跑的時候裡面只有一句話，不用框。
   const listing = sectionHTML(T("ev.pg"), evPanel("", eventProgrammeHTML(e, canEdit, busy) + (evHasProgramme(e) ? evSaveFoot(e, canEdit) : ""),
@@ -2487,7 +2509,8 @@ export function venueMatches(v, q) {
   const qq = n(q); if (!qq) return true;
   return [v.name, v.city, v.address, T("vn.k." + v.kind)].some(x => n(x).includes(qq));
 }
-function venueFields(v, dis, idp) {
+// hasMap：2027-01-05-map-links.sql 跑過了沒（沒跑就不畫 Google 地圖那一格，填了也存不進去）。
+function venueFields(v, dis, idp, hasMap) {
   const x = v || {};
   return `<div class="two">
       <label><i>${T("vn.name")}</i><input id="${idp}-name" value="${esc(x.name || "")}" maxlength="120"${dis}></label>
@@ -2496,6 +2519,7 @@ function venueFields(v, dis, idp) {
       <label><i>${T("vn.address")}</i><input id="${idp}-address" value="${esc(x.address || "")}" maxlength="200"${dis}></label>
       <label><i>${T("vn.capacity")}</i><input id="${idp}-capacity" type="number" min="0" value="${esc(x.capacity == null ? "" : String(x.capacity))}"${dis}></label>
       <label><i>${T("vn.cost")}</i><input id="${idp}-cost" value="${esc(x.cost || "")}" maxlength="120" placeholder="${esc(T("vn.costPh"))}"${dis}></label>
+      ${hasMap ? `<label class="wide"><i>${T("vn.map")}</i><input id="${idp}-map" type="url" inputmode="url" value="${esc(x.map_url || "")}" maxlength="600" placeholder="https://maps.app.goo.gl/…" autocomplete="off"${dis}><span class="ev-help">${T("vn.mapHelp")}</span></label>` : ""}
       <label class="wide"><i>${T("vn.url")}</i><input id="${idp}-url" value="${esc(x.url || "")}" maxlength="300" placeholder="https://…"${dis}></label>
       <label class="wide"><i>${T("vn.notes")}</i><textarea id="${idp}-notes" style="min-height:90px" placeholder="${esc(T("vn.notesPh"))}"${dis}>${esc(x.notes || "")}</textarea></label>
     </div>`;
@@ -2506,7 +2530,7 @@ export function venuesListHTML(r, q, msg, busy, addOpen) {
   const list = (r && r.venues) || [], canEdit = !!(r && r.can_edit);
   const row = v => `<li data-vn-row data-q="${esc([v.name, v.city, T("vn.k." + v.kind)].join(" "))}"${venueMatches(v, q) ? "" : " hidden"}><div class="fhead"><b><a href="#venues/${esc(v.id)}" data-act="vn-open" data-id="${esc(v.id)}">${esc(v.name)}</a></b> <span class="tag">${esc(T("vn.k." + v.kind))}</span></div>
       <div class="fmeta">${[v.city, v.capacity != null ? T("vn.fits", { n: v.capacity }) : "", v.cost, T("vn.nEvents", { n: v.n_events || 0 }), v.last_used ? T("vn.lastUsed", { d: vnDate(v.last_used) }) : "", T("vn.nContacts", { n: v.n_contacts || 0 })].filter(Boolean).map(esc).join("・")}</div></li>`;
-  const add = canEdit ? vnFold("vn-add", T("vn.add"), `${venueFields(null, dis, "vn-new")}<div class="row"><button class="btn" data-act="vn-create"${dis}>${busy ? T("common.saving") : T("vn.addGo")}</button><span class="mini">${T("vn.addNote")}</span></div>`, addOpen) : "";
+  const add = canEdit ? vnFold("vn-add", T("vn.add"), `${venueFields(null, dis, "vn-new", !!(r && r.has_map))}<div class="row"><button class="btn" data-act="vn-create"${dis}>${busy ? T("common.saving") : T("vn.addGo")}</button><span class="mini">${T("vn.addNote")}</span></div>`, addOpen) : "";
   return pageHead(T("vn.title"), T("vn.lede"))
     + msgHTML(msg)
     + add
@@ -2522,8 +2546,8 @@ export function venueHTML(r, msg, busy, contactOpen) {
   const v = r.venue || {}, canEdit = !!r.can_edit, cs = r.contacts || [], evs = r.events || [];
   const lede = [T("vn.k." + v.kind), v.city].filter(Boolean).map(esc).join("・");
   const details = canEdit
-    ? `<div data-vn-form>${venueFields(v, dis, "vn-ed")}<div class="row"><button class="btn" data-act="vn-save" data-id="${esc(v.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button></div></div>`
-    : `<dl class="vn-dl">${[["vn.address", esc(v.address)], ["vn.capacity", v.capacity == null ? "" : esc(String(v.capacity))], ["vn.cost", esc(v.cost)],
+    ? `<div data-vn-form>${venueFields(v, dis, "vn-ed", evHasMap(v))}<div class="row"><button class="btn" data-act="vn-save" data-id="${esc(v.id)}"${dis}>${busy ? T("common.saving") : T("common.save")}</button></div></div>`
+    : `<dl class="vn-dl">${[["vn.address", esc(v.address)], ["vn.map", v.map_url && evMapOk(v.map_url) ? vnLink(v.map_url, T("ev.mapOpen")) : ""], ["vn.capacity", v.capacity == null ? "" : esc(String(v.capacity))], ["vn.cost", esc(v.cost)],
         ["vn.url", /^https?:\/\//i.test(v.url || "") ? vnLink(v.url, v.url) : esc(v.url)], ["vn.notes", esc(v.notes).replace(/\n/g, "<br>")]]
         .filter(([, x]) => x).map(([k, x]) => `<dt>${T(k)}</dt><dd>${x}</dd>`).join("")}</dl>`;
   const crow = c => {
@@ -2556,6 +2580,6 @@ export function eventVenueHTML(e, venues, canEdit, busy) {
   const cur = venues.find(v => v.id === e.venue_id);
   const pick = canEdit && venues.length ? `<label><i>${T("vn.pick")}</i><select id="ev-venue" data-id="${esc(e.id)}"${busy ? " disabled" : ""}><option value="">${T("vn.pickNone")}</option>${
       venues.map(v => `<option value="${esc(v.id)}"${v.id === e.venue_id ? " selected" : ""}>${esc(v.name)}${v.city ? `・${esc(v.city)}` : ""}</option>`).join("")}</select></label>` : "";
-  const now = cur ? `<p class="ev-line">${esc(cur.name)}${cur.city ? `・${esc(cur.city)}` : ""} <a class="btn ghost sm" href="#venues/${esc(cur.id)}" data-act="vn-open" data-id="${esc(cur.id)}">${T("vn.openVenue")}</a></p>` : `<p class="ev-line">${T("vn.eventNone")}</p>`;
+  const now = cur ? `<p class="ev-line">${esc(cur.name)}${cur.city ? `・${esc(cur.city)}` : ""} <a class="btn ghost sm" href="#venues/${esc(cur.id)}" data-act="vn-open" data-id="${esc(cur.id)}">${T("vn.openVenue")}</a>${cur.map_url && evMapOk(cur.map_url) ? ` <a class="btn ghost sm" href="${esc(cur.map_url)}" target="_blank" rel="noopener">${T("ev.mapOpen")}</a>` : ""}</p>` : `<p class="ev-line">${T("vn.eventNone")}</p>`;
   return evPanel(esc(T("vn.eventVenue")), `${now}${pick}<div class="ev-help">${T("vn.eventNote")}</div>`, 'id="ev-place-box"');
 }
