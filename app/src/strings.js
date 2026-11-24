@@ -182,8 +182,8 @@ export const MINE = {
   "m.deleted":        { zh: "帳號已經刪掉了。謝謝你來過。", en: "Your account has been deleted. Thank you for being here." },
   "m.delFail":        { zh: "刪不掉：", en: "Could not delete: " },
   // 隱私政策更新的提醒（2026-11-24）。下次改政策：改這一句，再改 ui.js 的 POLICY_NOTICE 兩個日期。
-  "policy.notice":    { zh: "隱私政策在 2026-11-24 更新了，多了一節「講者、教授與其他聯絡人」。<a href=\"../privacy/#changes\">看改了什麼</a>",
-                        en: "Our privacy policy was updated on 24 November 2026, with a new section on speakers, professors and other contacts. <a href=\"../privacy/#changes\">See what changed</a>" },
+  "policy.notice":    { zh: "隱私政策在 2026-11-24 更新了，多了一節「講者、教授與其他聯絡人」，「公開的團隊頁」也多了創辦人那一段。<a href=\"../privacy/#changes\">看改了什麼</a>",
+                        en: "Our privacy policy was updated on 24 November 2026, with a new section on speakers, professors and other contacts, and a new paragraph on founders under the public team page. <a href=\"../privacy/#changes\">See what changed</a>" },
 };
 
 export const STRINGS = { ...COMMON, ...MINE };
