@@ -349,7 +349,11 @@ summary{cursor:pointer}
 .ev-card:hover{transform:translateY(-4px)}
 .ev-card:hover .tk-ico{background:var(--bt-orange)}
 .ev-card:focus-visible{outline:var(--ring);outline-offset:-6px}
-.ev-card img,.ev-noimg{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--bt-navy);border-bottom:1.5px solid var(--bt-navy)}
+/* 封面不裁：照它本來的比例整張放（2026-11-24 上線後看到正式站的封面是 2:1 的橫幅、字貼到兩邊，裁成 4:3 會把字切掉）。
+   直的海報太長才會裁，最高 460px。沒有封面的那一塊（日期當海報）維持 4:3。 */
+.ev-card img,.ev-noimg{display:block;width:100%;background:var(--bt-navy);border-bottom:1.5px solid var(--bt-navy)}
+.ev-card img{height:auto;max-height:460px;object-fit:cover}
+.ev-noimg{aspect-ratio:4/3}
 .ev-noimg{display:flex;align-items:flex-end;padding:16px 18px;color:var(--bt-cream);background:radial-gradient(circle at 84% 22%,var(--bt-orange) 0 4px,transparent 5px),radial-gradient(circle at 72% 40%,var(--bt-teal) 0 3px,transparent 4px),var(--bt-navy)}
 .tk-big{font-family:var(--display);font-weight:700;font-size:clamp(60px,7.4vw,88px);line-height:.86;letter-spacing:.01em}
 .tk-big small{display:block;font-size:.26em;font-weight:600;letter-spacing:.16em;line-height:1.2;color:var(--bt-orange);margin-bottom:8px;text-transform:uppercase}
