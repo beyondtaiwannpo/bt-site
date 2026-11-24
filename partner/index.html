@@ -288,6 +288,87 @@ summary{cursor:pointer}
    手機上它本來就排第一個。 */
 .navlinks .nav-cta{opacity:1;font-weight:600}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
+
+/* ═════════ 合作頁（2026-11-24 改版）═════════ */
+/* Paul：「more attractive to our sponsors」。字沒有換，換的是順序與份量：
+   一張大照片加一顆寫信的按鈕 → 四個數字 → 合作過誰 → 可以怎麼合作 → 錢用在哪 → 怎麼開始。
+   ⚠ 這一頁的數字只准用 /impact/ 上已經有的那幾個，字也要一樣（test/public-pages-2026-11-24.test.mjs 守著）。
+   ⚠ 用語的紅線照舊：只有「贊助」「支持」。 */
+.p-hero{position:relative;margin-top:-66px;min-height:clamp(520px,84svh,880px);display:flex;align-items:flex-end;
+  background:var(--bt-navy);color:var(--bt-cream);overflow:hidden}
+.p-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 40%}
+.p-hero::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,rgba(16,42,134,.95) 0%,rgba(16,42,134,.86) 38%,rgba(16,42,134,.42) 100%)}
+.p-hero-in{position:relative;z-index:2;padding:clamp(120px,18vh,200px) var(--gut) clamp(40px,7vh,84px);max-width:min(100%,1100px)}
+.p-hero h1{color:var(--bt-cream);font-size:clamp(46px,9.4vw,150px);max-width:none}
+.en .p-hero h1{font-size:clamp(56px,11.5vw,180px);line-height:.88;text-transform:uppercase;max-width:none}
+.p-hero .lead{color:rgba(237,229,216,.92);font-size:clamp(17px,1.5vw,22px);max-width:32em}
+.p-acts{display:flex;flex-wrap:wrap;align-items:center;gap:14px 26px;margin:clamp(22px,3.4vh,36px) 0 0;max-width:none}
+.p-acts .cta{margin-top:0;font-size:17px;padding:16px 30px}
+.cta.warm{background:var(--bt-orange);color:var(--bt-navy)}
+.cta.warm:hover{background:var(--bt-cream);color:var(--bt-navy)}
+.p-more{color:var(--bt-cream);font-weight:600;text-underline-offset:4px;text-decoration-thickness:1px}
+.p-more:hover{text-decoration-color:var(--bt-orange)}
+@media (max-width:700px){
+  .p-hero::after{background:linear-gradient(180deg,rgba(16,42,134,.5) 0%,rgba(16,42,134,.8) 40%,rgba(16,42,134,.96) 100%)}
+}
+
+/* 四個數字。跟 /impact/ 同一份字，這裡只挑贊助的人最先想知道的四個。 */
+.p-nums{padding:clamp(34px,6vh,76px) var(--gut) 0}
+.p-nums ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(18px,2.6vw,44px)}
+.p-nums li{border-top:2px solid var(--bt-orange);padding-top:14px;min-width:0}
+.p-nums b{display:block;font-family:var(--display);font-weight:700;font-size:clamp(60px,8.4vw,136px);line-height:.9;letter-spacing:-.01em}
+.p-nums i{display:block;font-style:normal;font-weight:600;font-size:clamp(15px,1.3vw,19px);margin:8px 0 6px}
+.p-nums span{display:block;font-size:14.5px;line-height:1.55;color:rgba(16,42,134,.8)}
+.p-nums p{margin:clamp(18px,2.6vh,28px) 0 0;font-size:15px;max-width:none}
+.p-nums a{color:var(--ink);font-weight:600;text-underline-offset:3px;text-decoration-thickness:1px}
+.p-nums a:hover{text-decoration-color:var(--bt-orange)}
+@media (max-width:820px){.p-nums ul{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:28px}}
+
+/* 只有一欄的一段（標題在上、內容整個寬度）。 */
+.sec-in.one{grid-template-columns:1fr;gap:clamp(18px,3vh,34px)}
+
+/* 合作過誰：四個名字用大字排，不放 logo（logo 要對方同意）。 */
+.p-names{list-style:none;margin:0 0 clamp(18px,3vh,30px);padding:0}
+.p-names li{font-family:var(--han);font-weight:900;font-size:clamp(24px,3.5vw,52px);line-height:1.16;letter-spacing:-.01em;
+  padding:clamp(12px,1.6vw,20px) 0;border-top:1px solid rgba(16,42,134,.15)}
+.p-names li:first-child{border-top:0;padding-top:0}
+.en .p-names li{font-family:var(--display);font-weight:700;letter-spacing:0;font-size:clamp(28px,4vw,60px);line-height:1.04}
+
+/* 可以怎麼合作：四格。最後一格（贊助）是深藍底，是這一頁要人看到的那一格。 */
+.p-ways{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(12px,1.6vw,22px)}
+.p-ways li{border-radius:22px;padding:clamp(22px,3vw,44px);min-width:0;background:rgba(255,232,197,.7);
+  display:flex;flex-direction:column;justify-content:space-between;min-height:clamp(190px,21vw,300px)}
+.p-ways b{display:block;font-family:var(--han);font-weight:900;font-size:clamp(34px,5.2vw,84px);line-height:1;letter-spacing:-.02em}
+.en .p-ways b{font-family:var(--display);font-weight:700;letter-spacing:0;text-transform:uppercase;font-size:clamp(38px,5.8vw,92px);line-height:.9}
+.p-ways span{display:block;margin-top:clamp(18px,2.6vw,34px);font-size:clamp(15.5px,1.2vw,18px);line-height:1.6;max-width:30em;color:rgba(16,42,134,.86)}
+.p-ways li:nth-child(2){background:rgba(255,196,108,.62)}
+.p-ways li:nth-child(3){background:rgba(107,198,187,.34)}
+.p-ways li:last-child{background:var(--bt-navy);color:var(--bt-cream)}
+.p-ways li:last-child b{color:var(--bt-orange)}
+.p-ways li:last-child span{color:rgba(237,229,216,.92)}
+@media (max-width:700px){.p-ways{grid-template-columns:1fr}.p-ways li{min-height:0}}
+
+/* 錢用在哪：一整條深藍，三件事用大字。 */
+.p-band{margin-top:clamp(46px,7.5vh,110px);padding:clamp(44px,8vh,110px) var(--gut);background:var(--bt-navy);color:var(--bt-cream)}
+.p-band h2{color:var(--bt-cream);font-size:clamp(30px,4.6vw,68px)}
+.en .p-band h2{font-size:clamp(34px,5.2vw,76px)}
+.p-band .p-count{margin:clamp(18px,3vh,30px) 0 0;color:rgba(237,229,216,.8);font-weight:600}
+.p-three{list-style:none;margin:8px 0 clamp(24px,4vh,44px);padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(14px,2.4vw,40px)}
+.p-three li{border-top:2px solid var(--bt-orange);padding-top:14px;font-family:var(--han);font-weight:900;
+  font-size:clamp(24px,3.3vw,50px);line-height:1.12;letter-spacing:-.01em;color:var(--bt-orange)}
+.en .p-three li{font-family:var(--display);font-weight:700;letter-spacing:0;font-size:clamp(26px,3.6vw,54px);line-height:1}
+.p-band p{color:rgba(237,229,216,.92);font-size:clamp(16.5px,1.3vw,19px);max-width:38em}
+@media (max-width:700px){.p-three{grid-template-columns:1fr;gap:16px}}
+
+/* 怎麼開始：信箱用大字，整個是一個寫信的連結。 */
+.p-start{margin:clamp(46px,7.5vh,110px) var(--gut) 0;padding:clamp(28px,5vw,72px);border-radius:28px;
+  background:linear-gradient(180deg,rgba(255,196,108,.78),rgba(255,232,197,.9))}
+.p-mail{display:block;margin:clamp(14px,2.4vh,26px) 0 clamp(18px,3vh,30px);color:var(--ink);font-family:var(--display);font-weight:700;
+  font-size:clamp(23px,5vw,76px);line-height:1.05;overflow-wrap:anywhere;text-decoration-thickness:2px;text-underline-offset:.12em;
+  text-decoration-color:rgba(16,42,134,.3);transition:text-decoration-color var(--dur-2) var(--ease)}
+.p-mail:hover{text-decoration-color:var(--bt-navy)}
+.p-start p a{color:var(--ink);font-weight:600;text-underline-offset:3px}
 </style>
 </head>
 <body>
@@ -314,104 +395,134 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 <main id="main">
 
 <div class="zh" lang="zh-Hant">
-<header class="hero">
-  <h1>一起做這件事。</h1>
-  <p class="lead">我們持續在找願意一起做這件事的個人、企業與學校。合作不一定是錢，很多時候是一個場地、一個下午、或是一句「來我們學校講」。</p>
+<header class="p-hero">
+  <picture><source srcset="../photos/group-photo.webp" type="image/webp"><img src="../photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" fetchpriority="high"></picture>
+  <div class="p-hero-in">
+    <h1>一起做這件事。</h1>
+    <p class="lead">我們持續在找願意一起做這件事的個人、企業與學校。合作不一定是錢，很多時候是一個場地、一個下午、或是一句「來我們學校講」。</p>
+    <p class="p-acts"><a class="cta warm" href="mailto:beyondtaiwan2020@gmail.com">寫信給我們</a><a class="p-more" href="#ways">看可以怎麼合作</a></p>
+  </div>
 </header>
+
+<section class="p-nums">
+  <ul>
+    <li><b>250+</b><i>位學員</i><span>2020 年到現在，超過 250 位高中生在申請的路上有人可以問。</span></li>
+    <li><b>100+</b><i>位高中生</i><span>探索營辦了兩年，收到超過 150 份申請，協助超過 100 位高中生。</span></li>
+    <li><b>20+</b><i>位校友回來</i><span>超過 20 位 BT 校友回來當講者。</span></li>
+    <li><b>0</b><i>元</i><span>幾乎所有活動都免費。</span></li>
+  </ul>
+  <p><a href="../impact/">這些數字怎麼來的</a></p>
+</section>
 
 <section class="sec">
   <div class="sec-in">
     <h2>合作過誰</h2>
     <div class="body">
-      <p>美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
+      <ul class="p-names">
+        <li>美國在臺協會 AIT</li>
+        <li>EducationUSA</li>
+        <li>TRÈS BON 好伴 café</li>
+        <li>臺北市立第一女子高級中學</li>
+      </ul>
       <p>這幾個單位幫過的事都不一樣：有的提供場地，有的把我們介紹給對的人，有的直接讓我們進校園。<a href="../impact/">五年下來累積了什麼</a>寫在另一頁。</p>
     </div>
   </div>
 </section>
 
-<section class="sec">
-  <div class="sec-in">
+<section class="sec" id="ways">
+  <div class="sec-in one">
     <h2>可以怎麼合作</h2>
-    <div class="body">
-      <ul class="rows">
-        <li><b>場地</b><span>一場探索營是兩天，需要一個能坐下幾十個高中生的空間。</span></li>
-        <li><b>講者</b><span>你如果走過海外升學這條路，回來講一個下午。對現場的高中生來說，那是一個真的存在的樣本，比任何簡報都有用。</span></li>
-        <li><b>學校</b><span>把 BT 帶進你的學校，讓學生在校內就問得到。</span></li>
-        <li><b>贊助</b><span>直接支持我們把活動辦下去。</span></li>
-      </ul>
-    </div>
+    <ul class="p-ways">
+      <li><b>場地</b><span>一場探索營是兩天，需要一個能坐下幾十個高中生的空間。</span></li>
+      <li><b>講者</b><span>你如果走過海外升學這條路，回來講一個下午。對現場的高中生來說，那是一個真的存在的樣本，比任何簡報都有用。</span></li>
+      <li><b>學校</b><span>把 BT 帶進你的學校，讓學生在校內就問得到。</span></li>
+      <li><b>贊助</b><span>直接支持我們把活動辦下去。</span></li>
+    </ul>
   </div>
 </section>
 
-<section class="sec">
-  <div class="sec-in">
-    <h2>贊助的錢用在哪</h2>
-    <div class="body">
-      <p>三件事：日常營運、暑期探索營、導生配對計畫。</p>
-      <p>學員不收費是刻意的設計，不是還沒開始收。我們處理的是資訊落差，把資訊放在付費牆後面就變成我們原本要解決的那個問題。所以這些活動能不能辦下去，靠的是願意支持的人。</p>
-    </div>
-  </div>
+<section class="p-band">
+  <h2>贊助的錢用在哪</h2>
+  <p class="p-count">三件事：</p>
+  <ul class="p-three">
+    <li>日常營運</li>
+    <li>暑期探索營</li>
+    <li>導生配對計畫</li>
+  </ul>
+  <p>學員不收費是刻意的設計，不是還沒開始收。我們處理的是資訊落差，把資訊放在付費牆後面就變成我們原本要解決的那個問題。所以這些活動能不能辦下去，靠的是願意支持的人。</p>
 </section>
 
-<section class="sec">
-  <div class="sec-in">
-    <h2>怎麼開始</h2>
-    <div class="body">
-      <p>寫一封信到 <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a>，講一下你是誰、想怎麼參與。不用寫得很正式。</p>
-      <p>我們是學生組織，幹部都在上學，回信可能不會太快，但每一封都會看。</p>
-    </div>
-  </div>
+<section class="p-start">
+  <h2>怎麼開始</h2>
+  <a class="p-mail" href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a>
+  <p>寫一封信到 <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a>，講一下你是誰、想怎麼參與。不用寫得很正式。</p>
+  <p>我們是學生組織，幹部都在上學，回信可能不會太快，但每一封都會看。</p>
 </section>
 </div>
 
 <div class="en" lang="en">
-<header class="hero">
-  <h1>Build this with us.</h1>
-  <p class="lead">We are always looking for individuals, companies and schools willing to build this with us. It does not have to be money. Often it is a room, an afternoon, or an invitation to come and speak.</p>
+<header class="p-hero">
+  <picture><source srcset="../photos/group-photo.webp" type="image/webp"><img src="../photos/group-photo.jpg" alt="Close to thirty Beyond Taiwan organisers on a stage, everyone making the same hand sign" width="1200" height="800" loading="lazy"></picture>
+  <div class="p-hero-in">
+    <h1>Build this with us.</h1>
+    <p class="lead">We are always looking for individuals, companies and schools willing to build this with us. It does not have to be money. Often it is a room, an afternoon, or an invitation to come and speak.</p>
+    <p class="p-acts"><a class="cta warm" href="mailto:beyondtaiwan2020@gmail.com">Write to us</a><a class="p-more" href="#ways-en">Ways to work with us</a></p>
+  </div>
 </header>
+
+<section class="p-nums">
+  <ul>
+    <li><b>250+</b><i>students</i><span>Since 2020, more than 250 high school students have had someone to ask.</span></li>
+    <li><b>100+</b><i>students at bootcamp</i><span>Two years of College Bootcamp: over 150 applications, over 100 students.</span></li>
+    <li><b>20+</b><i>alumni came back</i><span>More than 20 Beyond Taiwan alumni have come back as speakers.</span></li>
+    <li><b>0</b><i>NT dollars</i><span>Almost everything we run is free.</span></li>
+  </ul>
+  <p><a href="../impact/">Where these numbers come from</a></p>
+</section>
 
 <section class="sec">
   <div class="sec-in">
     <h2>Who we have worked with</h2>
     <div class="body">
-      <p>The American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
+      <ul class="p-names">
+        <li>The American Institute in Taiwan</li>
+        <li>EducationUSA</li>
+        <li>TRÈS BON café</li>
+        <li>Taipei First Girls' High School</li>
+      </ul>
       <p>Each of them helped in a different way: a venue, an introduction to the right people, a door into a school. <a href="../impact/">What five years added up to</a> is on another page.</p>
     </div>
   </div>
 </section>
 
-<section class="sec">
-  <div class="sec-in">
+<section class="sec" id="ways-en">
+  <div class="sec-in one">
     <h2>Ways to work with us</h2>
-    <div class="body">
-      <ul class="rows">
-        <li><b>A venue</b><span>College Bootcamp runs for two days and needs a room that seats a few dozen teenagers.</span></li>
-        <li><b>Speaking</b><span>If you have walked this path, come and spend an afternoon. To the students in the room you are a real example, which beats any slide deck.</span></li>
-        <li><b>Your school</b><span>Bring Beyond Taiwan into your school so students can ask their questions on campus. School talks are alumni going back to their own high schools to explain how they applied. For many students that talk is the first time they hear the road exists.</span></li>
-        <li><b>Sponsorship</b><span>Support us so the programmes keep running.</span></li>
-      </ul>
-    </div>
+    <ul class="p-ways">
+      <li><b>A venue</b><span>College Bootcamp runs for two days and needs a room that seats a few dozen teenagers.</span></li>
+      <li><b>Speaking</b><span>If you have walked this path, come and spend an afternoon. To the students in the room you are a real example, which beats any slide deck.</span></li>
+      <li><b>Your school</b><span>Bring Beyond Taiwan into your school so students can ask their questions on campus. School talks are alumni going back to their own high schools to explain how they applied. For many students that talk is the first time they hear the road exists.</span></li>
+      <li><b>Sponsorship</b><span>Support us so the programmes keep running.</span></li>
+    </ul>
   </div>
 </section>
 
-<section class="sec">
-  <div class="sec-in">
-    <h2>Where sponsorship goes</h2>
-    <div class="body">
-      <p>Three things: day to day operations, the summer College Bootcamp, and the mentorship programme.</p>
-      <p>Students pay nothing, and that is deliberate. We work on an information gap, and putting information behind a paywall would recreate the very problem we set out to solve. So whether these programmes keep running depends on people willing to support them.</p>
-    </div>
-  </div>
+<section class="p-band">
+  <h2>Where sponsorship goes</h2>
+  <p class="p-count">Three things:</p>
+  <ul class="p-three">
+    <li>Day to day operations</li>
+    <li>The summer College Bootcamp</li>
+    <li>The mentorship programme</li>
+  </ul>
+  <p>Students pay nothing, and that is deliberate. We work on an information gap, and putting information behind a paywall would recreate the very problem we set out to solve. So whether these programmes keep running depends on people willing to support them.</p>
 </section>
 
-<section class="sec">
-  <div class="sec-in">
-    <h2>How to start</h2>
-    <div class="body">
-      <p>Write to <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a> and tell us who you are and how you would like to be involved. It does not need to be formal.</p>
-      <p>We are a student organisation and everyone is in school, so a reply may take a while, but we read all of them.</p>
-    </div>
-  </div>
+<section class="p-start">
+  <h2>How to start</h2>
+  <a class="p-mail" href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a>
+  <p>Write to <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a> and tell us who you are and how you would like to be involved. It does not need to be formal.</p>
+  <p>We are a student organisation and everyone is in school, so a reply may take a while, but we read all of them.</p>
 </section>
 </div>
 

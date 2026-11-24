@@ -130,10 +130,28 @@ export function initial(name) {
 // lang："zh" 或 "en"，只影響 team 底下那行小標。人名兩邊都出現。
 export function peopleHTML(people, lang) {
   if (!people || !people.length) return "";
-  return byTeam(people).map(g => {
+  return groupsHTML(byTeam(people), lang);
+}
+
+// 2026-11-24：六個 team 的人改放在那個 team 自己那一塊底下（照片下面那一段），
+// 不屬於六個 team 的組（Co-President 與 Senior Adviser、填了別的 team、沒填 team）留在頁面下面那一段。
+// 分法只有這一份：byTeam() 分完組，key 在 TEAM_ORDER 裡的進 teams，其他進 rest。
+export function splitGroups(people) {
+  const groups = byTeam(people || []);
+  return { teams: groups.filter(g => TEAM_ORDER.includes(g.key)), rest: groups.filter(g => !TEAM_ORDER.includes(g.key)) };
+}
+// TEAM_ORDER 的名字對到 index.html 上 data-team 的代號（"Curriculum" → "curriculum"、"CR" → "cr"）。
+export const teamSlug = key => String(key || "").toLowerCase();
+// 一個 team 的那一排卡片，不帶標題（標題是那個 team 的照片）。
+export function crewHTML(people) {
+  return people && people.length ? `<ul class="crew">${people.map(cardHTML).join("")}</ul>` : "";
+}
+// 帶標題的幾組。lead 那一組的標題可以省掉（noLeadHead）：頁面下面那一段的 h2 已經寫了「Co-President 與 Senior Adviser」。
+export function groupsHTML(groups, lang, noLeadHead) {
+  return (groups || []).map(g => {
     const sub = TEAM_SUB[g.key] ? TEAM_SUB[g.key][lang === "en" ? 1 : 0] : "";
     const head = g.key === LEAD_KEY
-      ? `<h3>${lang === "en" ? "Leadership" : "領導"}</h3><p class="sub">${lang === "en" ? "Co-Presidents and Senior Advisers" : "Co-President 與 Senior Adviser"}</p>`
+      ? (noLeadHead ? "" : `<h3>${lang === "en" ? "Leadership" : "領導"}</h3><p class="sub">${lang === "en" ? "Co-Presidents and Senior Advisers" : "Co-President 與 Senior Adviser"}</p>`)
       : g.key
       ? `<h3>${esc(g.key)}</h3>${sub ? `<p class="sub">${esc(sub)}</p>` : `<p class="sub"></p>`}`
       : `<h3>${lang === "en" ? "Also on the board" : "還有這些人"}</h3><p class="sub"></p>`;

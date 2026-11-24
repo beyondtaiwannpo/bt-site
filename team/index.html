@@ -8,7 +8,7 @@
 <!-- 對外的內容頁（2026-09-07 新增）。
      ⚠ 這一頁刻意**不放個別幹部的姓名**。團隊裡有未成年人，
      公開姓名跟公開 alumni 姓名是同一件事：要本人同意。
-     這裡只講結構。要放名單的話先取得每一位的同意。
+     這一頁上有名字的人，都是本人勾了同意、Co-President 也核可過的（見 src/main.js）。
      ── 這一頁不碰 auth ──
      不載入 supabase、不判斷登入狀態。右上角那顆按鈕只是一個連結。
 
@@ -25,9 +25,9 @@
      ⚠ 這一頁不准出現佔位文案，check.sh 有守門。
      ⚠ 對外檔案不放內部筆記，維護者要講的話寫在 README。 -->
 
-<meta name="description" content="Beyond Taiwan 接近三十位幹部，全部是學生，兩位 Co-President、六個 team。">
+<meta name="description" content="Beyond Taiwan 的六個 team，各自在做什麼、裡面有誰。">
 <meta property="og:title" content="團隊 / Beyond Taiwan">
-<meta property="og:description" content="Beyond Taiwan 接近三十位幹部，全部是學生，兩位 Co-President、六個 team。">
+<meta property="og:description" content="Beyond Taiwan 的六個 team，各自在做什麼、裡面有誰。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/team/">
 <meta name="theme-color" content="#EDE5D8">
@@ -65,6 +65,13 @@
     var q = new URLSearchParams(location.search).get("lang");
     document.documentElement.setAttribute("data-lang",
       q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+    /* 現在看的是哪一個 team。下面六塊介紹裡只出現這一塊（CSS 照 data-tm 決定），
+       所以也要在畫面畫出來之前定好，不然會先看到六塊再收成一塊。
+       網址帶 #代號（例如 /team/#mentorship）就開那一個，沒有就是第一個。之後由 src/reel.js 接手。
+       沒有 JavaScript 的話這個屬性不存在，六塊全部排在下面。 */
+    var h = location.hash.slice(1);
+    document.documentElement.setAttribute("data-tm",
+      /^(curriculum|mentorship|internship|cr|sponsorship|marketing)$/.test(h) ? h : "curriculum");
   })();
 </script>
 
@@ -143,13 +150,74 @@ main,footer,.topbar{position:relative;z-index:1}
   content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
 
 /* ═════════ 版面 ═════════ */
-.hero{padding:clamp(40px,8vh,110px) var(--gut) clamp(20px,3vh,40px)}
-h1{font-family:var(--han);font-weight:900;font-size:clamp(36px,6.4vw,96px);
-  line-height:1;letter-spacing:-.02em;margin:0;max-width:9em}
-.en h1{font-family:var(--display);font-weight:700;font-size:clamp(38px,6.8vw,100px);
-  line-height:.96;letter-spacing:-.01em;max-width:15ch}
-.lead{font-size:clamp(16px,1.35vw,20px);line-height:1.62;max-width:34em;
-  margin:clamp(20px,3.2vh,34px) 0 0;color:rgba(16,42,134,.82)}
+/* 這一頁的大標題就是照片上那個 team 的名字，所以 h1「團隊」只留給讀螢幕的軟體與搜尋引擎。 */
+.stage-h{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* ═════════ 六個 team：一張大照片一個 team（2026-11-24）═════════ */
+/* Paul：「a giant picture at the back, and these pictures have the teams on them, and then you can scroll
+   to your left, change a picture, change a team」。
+   .stage 是整塊，.reel 是橫著捲的那一排（CSS scroll-snap，手機用手指滑），一張 .slide 佔滿整個寬度。
+   橫著捲的只有 .reel 自己，整頁不會左右捲。
+   照片塞到頂欄底下（margin-top 是負的），頂欄那塊玻璃浮在照片上。
+   沒有照片的 team（.plain）是一整面深藍加橘色的字，不是空白：等照片的時候這一頁也成立。
+   箭頭、下面那六格、鍵盤左右鍵在 src/reel.js。 */
+.stage{position:relative;margin-top:-66px;background:var(--bt-navy)}
+.reel{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none}
+.reel::-webkit-scrollbar{display:none}
+.reel:focus-visible{outline-offset:-4px}
+/* 一次換兩個 team 以上是直接切過去的（src/reel.js），照片淡入一下，不然像壞掉。 */
+.reel.cut{animation:reel-cut .34s var(--ease)}
+@keyframes reel-cut{from{opacity:.2}}
+.slide{position:relative;flex:0 0 100%;margin:0;overflow:hidden;scroll-snap-align:start;scroll-snap-stop:always;
+  height:clamp(520px,86svh,940px);background:var(--bt-navy)}
+.slide img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 32%;
+  transform:scale(1.07);transition:transform 1.4s var(--ease)}
+.slide.on img{transform:none}
+/* 照片上那一層深藍：上面一點點（頂欄壓在上面），下面很深（字要讀得到）。 */
+.slide::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(16,42,134,.3) 0%,rgba(16,42,134,0) 24%,rgba(16,42,134,.16) 46%,rgba(16,42,134,.93) 100%)}
+.slide figcaption{position:absolute;z-index:2;left:var(--gut);right:var(--gut);bottom:clamp(88px,12.5vh,124px);color:var(--bt-cream)}
+.slide h2,.en .slide h2{font-family:var(--display);font-weight:700;font-size:clamp(52px,14.2vw,220px);line-height:.84;
+  letter-spacing:-.01em;text-transform:uppercase;margin:0;color:var(--bt-cream);text-wrap:balance}
+.slide figcaption span{display:block;margin-top:clamp(12px,1.6vw,22px);max-width:30em;
+  font-size:clamp(16px,1.5vw,22px);font-weight:500;line-height:1.5}
+.slide.plain::after{display:none}
+.slide.plain h2{color:var(--bt-orange)}
+.orbit{position:absolute;right:-12%;top:4%;width:min(96%,1100px);height:auto;transform:rotate(-12deg)}
+.orbit ellipse{fill:none;stroke-width:2}
+.orbit .o1{stroke:var(--bt-teal);stroke-dasharray:4 12;opacity:.7}
+.orbit .o2{stroke:var(--bt-orange);opacity:.55}
+.orbit circle{fill:var(--bt-yellow)}
+/* 每張照片要留住的地方不一樣。手機是直的，只看得到橫照片中間三分之一，所以要另外指定看哪裡。 */
+.slide[data-team="curriculum"] img{object-position:center 6%}
+.slide[data-team="marketing"] img{object-position:center 46%}
+@media (max-width:700px){
+  .slide h2,.en .slide h2{font-size:clamp(54px,16.5vw,120px)}
+  .slide[data-team="curriculum"] img{object-position:82% 6%}
+  .slide[data-team="mentorship"] img{object-position:62% 32%}
+  .slide[data-team="cr"] img{object-position:58% 32%}
+}
+/* 控制列：六格（哪一格亮就是哪一個 team，點了就過去）加上一個、下一個。沒有 JavaScript 的時候不出現。 */
+.ctl{position:absolute;z-index:3;left:var(--gut);right:var(--gut);bottom:clamp(14px,3vh,30px);
+  display:flex;align-items:center;gap:clamp(10px,1.4vw,20px)}
+html:not([data-tm]) .ctl{display:none}
+.rail{flex:1;min-width:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.rail button{background:none;border:0;padding:14px 0 6px;min-height:44px;text-align:left;color:rgba(237,229,216,.74);
+  font-family:var(--display);font-weight:700;font-size:13px;line-height:1.2;letter-spacing:.1em;text-transform:uppercase}
+.rail i{display:block;height:3px;border-radius:2px;background:rgba(237,229,216,.38);margin-bottom:9px;transition:background var(--dur-2) var(--ease)}
+.rail span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rail button:hover{color:var(--bt-cream)}
+.rail button:hover i{background:rgba(237,229,216,.8)}
+.rail button[aria-current]{color:var(--bt-cream)}
+.rail button[aria-current] i{background:var(--bt-orange)}
+.rail button:focus-visible,.arw:focus-visible{outline-color:var(--bt-orange)}
+.arw{flex:0 0 auto;width:48px;height:48px;border-radius:50%;border:1px solid rgba(237,229,216,.6);padding:0;
+  background:rgba(16,42,134,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--bt-cream);
+  display:grid;place-items:center;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
+.arw svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.arw:hover:not([disabled]){background:var(--bt-orange);color:var(--bt-navy);border-color:var(--bt-orange)}
+.arw[disabled]{opacity:.35}
+@media (max-width:1100px){.rail span{display:none}.rail button{padding:20px 0}.rail i{margin:0}}
 
 .sec{padding:clamp(46px,7.5vh,110px) var(--gut) 0}
 .sec-in{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);
@@ -165,6 +233,8 @@ h3:first-child{margin-top:0}
 p{margin:0 0 17px;max-width:34em}
 .body a{color:var(--ink);font-weight:600;text-decoration-thickness:1px;text-underline-offset:3px;transition:text-decoration-color var(--dur-2) var(--ease),text-underline-offset var(--dur-2) var(--ease)}
 .body a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
+/* 只有一句話的一段（沒有左邊的標題）。 */
+.sec-in.one{grid-template-columns:1fr}
 .pull{font-family:var(--hand);font-size:clamp(21px,2.6vw,34px);line-height:1.55;
   margin:clamp(22px,3.4vh,38px) 0;max-width:22em;color:var(--ink)}
 
@@ -323,6 +393,9 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
 @media (max-width:430px){
   .crew{grid-template-columns:1fr;gap:clamp(86px,22vw,110px) 0}
 }
+/* 這一段的第一組緊接在 h2 下面，不用再空一大段（卡片上面那一截是留給頭超出來的）。 */
+.sec-people .teamsec:first-child{margin-top:0}
+.sec-people .teamsec:first-child .crew{padding-top:clamp(70px,7vw,96px)}
 
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
@@ -376,50 +449,20 @@ summary{cursor:pointer}
 .navlinks .nav-cta{opacity:1;font-weight:600}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
-/* BT 島的大區塊。島本身是 /island/ 的 3D，這裡只畫一張安靜的小地圖當門牌：
-   七座島（中間聚會所、外圍六個 team）加海上的機場，跟 island/teams.json 的配置同一個意思，但不讀它，
-   改了島不用回來改這裡。整塊是一個連結，點哪裡都進 /island/。 */
-.isle-block{margin:clamp(28px,5vh,64px) var(--gut) 0;border-radius:28px;background:var(--bt-navy);color:var(--bt-cream);
-  display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(18px,3vw,48px);align-items:center;
-  padding:clamp(28px,4.5vw,64px);overflow:hidden;position:relative}
-.isle-block small{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--bt-orange)}
-.isle-block h2{color:var(--bt-cream);margin:8px 0 14px;font-size:clamp(30px,4.4vw,64px)}
-.isle-block p{color:rgba(237,229,216,.86);max-width:30em;margin:0 0 20px}
-.isle-block .row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
-.isle-block .cta{margin-top:0}
-.isle-block .more{color:var(--bt-cream);font-weight:600;text-underline-offset:3px}
-.isle-block .more:hover{text-decoration-color:var(--bt-orange)}
-.isle-map{display:block;width:100%;height:auto}
-.isle-map .ring{fill:none;stroke:rgba(237,229,216,.32);stroke-width:2;stroke-dasharray:3 7}
-.isle-map .cliff{fill:var(--bt-navy);filter:brightness(.45)}
-.isle-map .i-cream{fill:var(--bt-cream)} .isle-map .i-orange{fill:var(--bt-orange)}
-.isle-map .i-teal{fill:var(--bt-teal)} .isle-map .i-sand{fill:var(--bt-sand)}
-.isle-map text{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.04em;fill:var(--bt-navy);text-anchor:middle}
-.isle-map .air{fill:var(--bt-grey)} .isle-map .runway{stroke:var(--bt-navy);stroke-width:2;stroke-dasharray:6 5}
-.isle-map .air-t{fill:var(--bt-cream);font-size:13px}
-.isle-map g.isl{transition:transform var(--dur-2) var(--ease);transform-box:fill-box;transform-origin:center}
-.isle-link:hover .isle-map g.isl,.isle-link:focus-visible .isle-map g.isl{transform:translateY(-4px)}
-.isle-link{display:block;border-radius:20px}
-@media (max-width:820px){.isle-block{grid-template-columns:1fr}}
-.cta.warm{background:var(--bt-orange);color:var(--bt-navy)}
-.cta.warm:hover{background:var(--bt-navy);color:var(--bt-cream)}
-.isle-block .cta.warm:hover{background:var(--bt-cream);color:var(--bt-navy)}
-
-/* 照片（2026-11-21 從首頁搬過來的那一張）。樣式跟首頁同一段。 */
-.photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
-.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;background:rgba(16,42,134,.06)}
-
-/* ═════════ 六個 team 各一塊（2026-11-22）═════════ */
-/* 每一塊：名字、兩行介紹、這個 team 的計畫在做什麼，最下面 .tm-live 是後台資料畫的（src/programmes.js）：
-   勾了「多數年份都會辦」的計畫，這一屆的版本佔一行。後台還沒有那個 team 的資料，那一格就不出現，不留空位也不編內容。
-   刻意不是六張一樣圓角一樣陰影的卡片，是兩欄，靠上面那條橘線分開。 */
-.tms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(30px,4.4vw,60px) clamp(24px,3.4vw,52px)}
-.tm{border-top:2px solid var(--bt-orange);padding-top:16px;min-width:0}
-.tm h3{margin:0 0 6px;font-size:clamp(22px,2.2vw,30px)}
-.tm p{font-size:16px;line-height:1.65;margin:0 0 10px}
-.tm .tm-tag{font-weight:600;margin-bottom:12px}
-.tm h4{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:.01em;margin:20px 0 6px}
-html[data-lang="zh"] .tm h4{font-family:var(--body);font-weight:600;font-size:17px}
+/* ═════════ 照片下面那一塊：現在這個 team 的介紹、固定在做的、這一屆的人（2026-11-22，2026-11-24 改）═════════ */
+/* 六塊都在 HTML 裡。<html data-tm="代號"> 是哪一個，就只出現那一塊（下面那一長串選擇器）；
+   沒有 JavaScript 的時候 data-tm 不存在，六塊一塊接一塊排下去，靠上面那條橘線分開。
+   .tm-live 是後台資料畫的（src/programmes.js）：勾了「多數年份都會辦」的計畫，這一屆的版本佔一行。
+   .tm-people 是那個 team 願意具名的人（src/main.js）。兩格沒有資料就不出現，不留空位也不編內容。 */
+.tm-wrap{padding:clamp(30px,5.5vh,72px) var(--gut) 0}
+.tm{min-width:0;border-top:2px solid var(--bt-orange);padding-top:16px;margin-top:clamp(30px,4.4vw,60px)}
+.tm:first-child{margin-top:0}
+.tm h3{margin:0 0 10px;font-size:clamp(22px,2.2vw,30px)}
+.tm-about{font-size:clamp(16.5px,1.25vw,19px);line-height:1.7}
+.tm-about p{margin:0 0 12px}
+.tm-about h4{font-family:var(--display);font-weight:700;font-size:clamp(20px,1.9vw,27px);letter-spacing:.01em;line-height:1.2;margin:26px 0 8px}
+html[data-lang="zh"] .tm-about h4{font-family:var(--han);font-weight:900;font-size:clamp(19px,1.7vw,24px)}
+.tm-about h4:first-child{margin-top:0}
 .tm-live{margin-top:18px}
 .tm-live small{display:block;font-family:var(--display);font-weight:700;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7);margin-bottom:4px}
 html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;letter-spacing:.04em}
@@ -430,7 +473,29 @@ html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;lett
 .tm-live b{display:block;font-weight:600;font-size:16px}
 .tm-live span{display:block;font-size:14.5px;color:rgba(16,42,134,.8)}
 .tm-live em{font-style:normal;font-size:12px;font-weight:600;background:var(--bt-orange);color:var(--bt-navy);padding:2px 8px;border-radius:999px;margin-left:6px}
-@media (max-width:820px){.tms{grid-template-columns:1fr}}
+.tm-people{margin-top:clamp(28px,4.5vh,54px);border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(18px,3vh,30px)}
+.tm-people h4{font-family:var(--han);font-weight:900;font-size:clamp(22px,2.8vw,40px);line-height:1.1;letter-spacing:-.01em;margin:0}
+.en .tm-people h4{font-family:var(--display);font-weight:700;letter-spacing:0}
+.tm-note{font-size:14px;line-height:1.6;color:rgba(16,42,134,.74);margin:clamp(22px,3.4vh,36px) 0 0;max-width:40em}
+
+html[data-tm] .tm{display:none;border-top:0;padding-top:0;margin-top:0}
+html[data-tm="curriculum"] .tm[data-team="curriculum"],html[data-tm="mentorship"] .tm[data-team="mentorship"],
+html[data-tm="internship"] .tm[data-team="internship"],html[data-tm="cr"] .tm[data-team="cr"],
+html[data-tm="sponsorship"] .tm[data-team="sponsorship"],html[data-tm="marketing"] .tm[data-team="marketing"]{
+  display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);column-gap:clamp(24px,4.5vw,76px);align-items:start;
+  animation:tm-in var(--dur-3) var(--ease) both}
+@keyframes tm-in{from{opacity:0;translate:0 14px}}
+/* 名字已經在照片上了，這裡的 h3 只留給讀螢幕的軟體。 */
+html[data-tm] .tm>h3{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+html[data-tm] .tm-about{grid-column:1}
+html[data-tm] .tm-live{grid-column:2;margin-top:0}
+html[data-tm] .tm-people{grid-column:1/-1}
+@media (max-width:820px){
+  html[data-tm] .tm[data-team]{grid-template-columns:minmax(0,1fr)}
+  html[data-tm] .tm-live{grid-column:1;margin-top:18px}
+}
+/* 減少動態效果：照片不慢慢縮回來（上面那條 reduce 已經把 transition 關了，這裡把起點也拿掉，不然換張的時候會跳一下）。 */
+@media (prefers-reduced-motion:reduce){.slide img{transform:none}.reel{scroll-behavior:auto}}
 </style>
 </head>
 <body>
@@ -457,92 +522,124 @@ html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;lett
 <main id="main">
 
 <div class="zh" lang="zh-Hant">
-<header class="hero">
-  <h1>三十個人，全部是學生。</h1>
-  <p class="lead">兩位 Co-President，六個 team。幹部分布在台灣、美國、加拿大、歐洲、澳洲、日本與韓國。</p>
-</header>
 
-<section class="isle-block" aria-labelledby="isle-h">
-  <div>
-    <small>BT Island</small>
-    <h2 id="isle-h">走進 BT 島。</h2>
-    <p>七座島，外圍六座一座一個 team，中間是大家都會去的聚會所。點一座島，看那一群人在做什麼；從機場往外走，是 BT 五年走過來的路。</p>
-    <div class="row"><a class="cta warm" href="../island/">進 BT 島</a><a class="more" href="../history/">走歷史之路</a></div>
+<section class="stage" aria-roledescription="carousel" aria-label="六個 team">
+  <h1 class="stage-h">團隊</h1>
+  <div class="reel" tabindex="0">
+    <figure class="slide" data-team="curriculum">
+      <picture><source srcset="../photos/sharing-mic.webp" type="image/webp"><img src="../photos/sharing-mic.jpg" alt="一位拿麥克風的講者站著分享，坐在地上的聽眾在笑" width="1200" height="800" fetchpriority="high"></picture>
+      <figcaption><h2>Curriculum</h2><span>活動內容。探索營的每一堂課都是這裡排的。</span></figcaption>
+    </figure>
+    <figure class="slide" data-team="mentorship">
+      <picture><source srcset="../photos/talking-laptop.webp" type="image/webp"><img src="../photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy"></picture>
+      <figcaption><h2>Mentorship</h2><span>導生配對。配一位走過同一條路的學長姐。</span></figcaption>
+    </figure>
+    <figure class="slide plain" data-team="internship">
+      <svg class="orbit" viewBox="0 0 800 500" aria-hidden="true" focusable="false"><ellipse class="o1" cx="400" cy="250" rx="380" ry="200"/><ellipse class="o2" cx="400" cy="250" rx="260" ry="118"/><circle cx="651" cy="219" r="7"/></svg>
+      <figcaption><h2>Internship</h2><span>實習。履歷上有真的做過的事。</span></figcaption>
+    </figure>
+    <figure class="slide" data-team="cr">
+      <picture><source srcset="../photos/hero-listening.webp" type="image/webp"><img src="../photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800" loading="lazy"></picture>
+      <figcaption><h2>Community Relations</h2><span>社群關係。走進公立高中，也顧著學校與社群的關係。</span></figcaption>
+    </figure>
+    <figure class="slide plain" data-team="sponsorship">
+      <svg class="orbit" viewBox="0 0 800 500" aria-hidden="true" focusable="false"><ellipse class="o1" cx="400" cy="250" rx="380" ry="200"/><ellipse class="o2" cx="400" cy="250" rx="260" ry="118"/><circle cx="651" cy="219" r="7"/></svg>
+      <figcaption><h2>Sponsorship</h2><span>贊助與合作。讓這一切對學員維持 0 元。</span></figcaption>
+    </figure>
+    <figure class="slide" data-team="marketing">
+      <picture><source srcset="../photos/group-photo.webp" type="image/webp"><img src="../photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" loading="lazy"></picture>
+      <figcaption><h2>Marketing</h2><span>對外的內容與視覺。</span></figcaption>
+    </figure>
   </div>
-  <a class="isle-link" href="../island/" tabindex="-1" aria-hidden="true"><svg class="isle-map" viewBox="0 0 600 350" aria-hidden="true" focusable="false"><ellipse class="ring" cx="300" cy="172" rx="178" ry="110"/><g class="isl"><ellipse class="cliff" cx="300" cy="181" rx="76" ry="38"/><ellipse class="i-cream" cx="300" cy="172" rx="76" ry="38"/><text x="300" y="177">Commons</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="73" rx="64" ry="30"/><ellipse class="i-orange" cx="300" cy="64" rx="64" ry="30"/><text x="300" y="69">Sponsorship</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="127" rx="64" ry="30"/><ellipse class="i-teal" cx="478" cy="118" rx="64" ry="30"/><text x="478" y="123">Curriculum</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="237" rx="64" ry="30"/><ellipse class="i-sand" cx="478" cy="228" rx="64" ry="30"/><text x="478" y="233">Internship</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="291" rx="64" ry="30"/><ellipse class="i-teal" cx="300" cy="282" rx="64" ry="30"/><text x="300" y="287">Mentorship</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="237" rx="64" ry="30"/><ellipse class="i-orange" cx="122" cy="228" rx="64" ry="30"/><text x="122" y="233">Marketing</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="127" rx="64" ry="30"/><ellipse class="i-sand" cx="122" cy="118" rx="64" ry="30"/><text x="122" y="123">CR</text></g><g class="isl"><rect class="air" x="498" y="296" width="92" height="30" rx="8"/><line class="runway" x1="508" y1="311" x2="580" y2="311"/><text class="air-t" x="544" y="345">Airport</text></g></svg></a>
+  <div class="ctl">
+    <div class="rail" role="group" aria-label="選一個 team">
+      <button type="button" aria-label="Curriculum"><i></i><span>Curriculum</span></button>
+      <button type="button" aria-label="Mentorship"><i></i><span>Mentorship</span></button>
+      <button type="button" aria-label="Internship"><i></i><span>Internship</span></button>
+      <button type="button" aria-label="Community Relations"><i></i><span>Community Relations</span></button>
+      <button type="button" aria-label="Sponsorship"><i></i><span>Sponsorship</span></button>
+      <button type="button" aria-label="Marketing"><i></i><span>Marketing</span></button>
+    </div>
+    <button type="button" class="arw prev" aria-label="上一個 team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button type="button" class="arw next" aria-label="下一個 team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
 </section>
 
-<section class="sec">
+<section class="tm-wrap">
+  <article class="tm" data-team="curriculum">
+    <h3>Curriculum</h3>
+    <div class="tm-about">
+      <h4>探索營 College Bootcamp</h4>
+      <p>每年寒暑假各一場，兩天，免費。</p>
+      <p>兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。</p>
+      <p>我們會事先問你想讀什麼，再去找對應背景的人回來。所以每一屆的講者名單都不一樣。</p>
+      <p>第一屆在 2023 年六月，超過 80 位高中生參加。</p>
+      <h4>講座</h4>
+      <p>不定期舉辦，也不收費。場次同樣會在 Instagram 公布。</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="mentorship">
+    <h3>Mentorship</h3>
+    <div class="tm-about">
+      <h4>導生配對計畫 Mentorship Program</h4>
+      <p>一學期配對一次，免費。</p>
+      <p>你會有一位走過同一條路的學長姐。他不會幫你寫 essay，但會陪你把卡住的地方講清楚。</p>
+      <p>有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
+      <p>導生制度從 2020 年九月開始，第一批 36 人。</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="internship">
+    <h3>Internship</h3>
+    <div class="tm-about">
+      <h4>高中生實習計劃</h4>
+      <p>每學期收一批，從官網報名。</p>
+      <p>讓公立高中生在申請之前就有一段真的做過的事。實習生進 BT 的各個 team 做真的事，有自己的實習護照記錄做過什麼。</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="cr">
+    <h3>Community Relations</h3>
+    <div class="tm-about">
+      <p>安排學長姐回公立高中演講，讓資訊到達本來到不了的地方；校園大使把消息帶進自己的學校。2021 年十月第一批校園大使 18 位。</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="sponsorship">
+    <h3>Sponsorship</h3>
+    <div class="tm-about">
+      <p>找願意一起做這件事的個人、企業與學校。嘖嘖募資也在這裡：2027 年 3 月 23 日上線，4 月 21 日結束。</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="marketing">
+    <h3>Marketing</h3>
+    <div class="tm-about">
+      <p>Instagram、大學介紹系列、官網的照片與影片。活動公告以 Instagram 為第一管道。</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+</section>
+
+<section class="sec sec-people" hidden>
   <div class="sec-in">
-    <h2>怎麼運作</h2>
+    <h2></h2>
     <div class="body">
-      <p>兩位 Co-President 各帶三個 team。</p>
-      <p>每個 team 有一位 Director 與一到兩位 Advisor，他們是對外與跨組的對接窗口。</p>
-      <p>所有人都是學生，多數是大學生，也有還在念高中的。</p>
-      <p>我們不是老師，也不是顧問。多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。</p>
-      <picture class="photo">
-        <source srcset="../photos/sharing-mic.webp" type="image/webp">
-        <img src="../photos/sharing-mic.jpg" alt="一位拿麥克風的講者站著分享，坐在地上的聽眾在笑" width="1200" height="800" loading="lazy">
-      </picture>
+      <div id="faces-zh"></div>
     </div>
   </div>
 </section>
 
 <section class="sec">
-  <div class="sec-in">
-    <h2>六個 team</h2>
-    <div class="body">
-      <div class="tms">
-      <article class="tm" data-team="curriculum">
-        <h3>Curriculum</h3>
-        <p class="tm-tag">活動內容。探索營的每一堂課都是這裡排的。</p>
-        <h4>探索營 College Bootcamp</h4>
-        <p>每年寒暑假各一場，兩天，免費。</p>
-        <p>兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。</p>
-        <p>我們會事先問你想讀什麼，再去找對應背景的人回來。所以每一屆的講者名單都不一樣。</p>
-        <p>第一屆在 2023 年六月，超過 80 位高中生參加。</p>
-        <h4>講座</h4>
-        <p>不定期舉辦，也不收費。場次同樣會在 Instagram 公布。</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="mentorship">
-        <h3>Mentorship</h3>
-        <p class="tm-tag">導生配對。配一位走過同一條路的學長姐。</p>
-        <h4>導生配對計畫 Mentorship Program</h4>
-        <p>一學期配對一次，免費。</p>
-        <p>你會有一位走過同一條路的學長姐。他不會幫你寫 essay，但會陪你把卡住的地方講清楚。</p>
-        <p>有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
-        <p>導生制度從 2020 年九月開始，第一批 36 人。</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="internship">
-        <h3>Internship</h3>
-        <p class="tm-tag">實習。履歷上有真的做過的事。</p>
-        <h4>高中生實習計劃</h4>
-        <p>每學期收一批，從官網報名。</p>
-        <p>讓公立高中生在申請之前就有一段真的做過的事。實習生進 BT 的各個 team 做真的事，有自己的實習護照記錄做過什麼。</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="cr">
-        <h3>Community Relations</h3>
-        <p class="tm-tag">社群關係。走進公立高中，也顧著學校與社群的關係。</p>
-        <p>安排學長姐回公立高中演講，讓資訊到達本來到不了的地方；校園大使把消息帶進自己的學校。2021 年十月第一批校園大使 18 位。</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="sponsorship">
-        <h3>Sponsorship</h3>
-        <p class="tm-tag">贊助與合作。讓這一切對學員維持 0 元。</p>
-        <p>找願意一起做這件事的個人、企業與學校。嘖嘖募資也在這裡：2027 年 3 月 23 日上線，4 月 21 日結束。</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="marketing">
-        <h3>Marketing</h3>
-        <p class="tm-tag">對外的內容與視覺。</p>
-        <p>Instagram、大學介紹系列、官網的照片與影片。活動公告以 Instagram 為第一管道。</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      </div>
-    </div>
+  <div class="sec-in one">
+    <p class="pull">我們不是老師，也不是顧問。多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。</p>
   </div>
 </section>
 
@@ -552,16 +649,6 @@ html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;lett
     <div class="body">
       <p>BT 的幹部每年換屆。這件事決定了我們怎麼做每一個工具：能簡單就簡單，讓下一個接手的人看得懂、改得動。</p>
       <p>這個網站本身就是照這個原則做的。</p>
-    </div>
-  </div>
-</section>
-
-<section class="sec sec-people" hidden>
-  <div class="sec-in">
-    <h2>這一屆的人</h2>
-    <div class="body">
-      <p>下面是這一屆願意具名的幹部。沒有出現在這裡的人一樣在做事，只是選擇不公開，那完全沒有問題。</p>
-      <div id="faces-zh"></div>
     </div>
   </div>
 </section>
@@ -588,92 +675,124 @@ html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;lett
 </div>
 
 <div class="en" lang="en">
-<header class="hero">
-  <h1>Thirty people. All students.</h1>
-  <p class="lead">Two Co-Presidents and six teams. Our organisers are in Taiwan, the United States, Canada, Europe, Australia, Japan and Korea.</p>
-</header>
 
-<section class="isle-block" aria-labelledby="isle-h-en">
-  <div>
-    <small>BT Island</small>
-    <h2 id="isle-h-en">Step onto BT Island.</h2>
-    <p>Seven islands: one for each of our six teams, and the Commons in the middle where everyone meets. Click an island to see what those people do. Walk out past the airport and you are on the road Beyond Taiwan took to get here.</p>
-    <div class="row"><a class="cta warm" href="../island/">Explore BT Island</a><a class="more" href="../history/">Walk Our Road</a></div>
+<section class="stage" aria-roledescription="carousel" aria-label="Six teams">
+  <h1 class="stage-h">Teams</h1>
+  <div class="reel" tabindex="0">
+    <figure class="slide" data-team="curriculum">
+      <picture><source srcset="../photos/sharing-mic.webp" type="image/webp"><img src="../photos/sharing-mic.jpg" alt="A speaker with a microphone; the audience seated on the floor, laughing" width="1200" height="800" fetchpriority="high"></picture>
+      <figcaption><h2>Curriculum</h2><span>Programme content. Every bootcamp class is scheduled here.</span></figcaption>
+    </figure>
+    <figure class="slide" data-team="mentorship">
+      <picture><source srcset="../photos/talking-laptop.webp" type="image/webp"><img src="../photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy"></picture>
+      <figcaption><h2>Mentorship</h2><span>Matching and mentoring. One alumnus who has walked the same road.</span></figcaption>
+    </figure>
+    <figure class="slide plain" data-team="internship">
+      <svg class="orbit" viewBox="0 0 800 500" aria-hidden="true" focusable="false"><ellipse class="o1" cx="400" cy="250" rx="380" ry="200"/><ellipse class="o2" cx="400" cy="250" rx="260" ry="118"/><circle cx="651" cy="219" r="7"/></svg>
+      <figcaption><h2>Internship</h2><span>Internships. Real work on a real CV.</span></figcaption>
+    </figure>
+    <figure class="slide" data-team="cr">
+      <picture><source srcset="../photos/hero-listening.webp" type="image/webp"><img src="../photos/hero-listening.jpg" alt="A row of high school students listening to a speaker, two heads out of focus in the foreground" width="1200" height="800" loading="lazy"></picture>
+      <figcaption><h2>Community Relations</h2><span>Community relations. Into public high schools, and the ties with schools and the wider community.</span></figcaption>
+    </figure>
+    <figure class="slide plain" data-team="sponsorship">
+      <svg class="orbit" viewBox="0 0 800 500" aria-hidden="true" focusable="false"><ellipse class="o1" cx="400" cy="250" rx="380" ry="200"/><ellipse class="o2" cx="400" cy="250" rx="260" ry="118"/><circle cx="651" cy="219" r="7"/></svg>
+      <figcaption><h2>Sponsorship</h2><span>Partnerships and funding. Keeps everything free for students.</span></figcaption>
+    </figure>
+    <figure class="slide" data-team="marketing">
+      <picture><source srcset="../photos/group-photo.webp" type="image/webp"><img src="../photos/group-photo.jpg" alt="Close to thirty Beyond Taiwan organisers on a stage, everyone making the same hand sign" width="1200" height="800" loading="lazy"></picture>
+      <figcaption><h2>Marketing</h2><span>Everything we say and show publicly.</span></figcaption>
+    </figure>
   </div>
-  <a class="isle-link" href="../island/" tabindex="-1" aria-hidden="true"><svg class="isle-map" viewBox="0 0 600 350" aria-hidden="true" focusable="false"><ellipse class="ring" cx="300" cy="172" rx="178" ry="110"/><g class="isl"><ellipse class="cliff" cx="300" cy="181" rx="76" ry="38"/><ellipse class="i-cream" cx="300" cy="172" rx="76" ry="38"/><text x="300" y="177">Commons</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="73" rx="64" ry="30"/><ellipse class="i-orange" cx="300" cy="64" rx="64" ry="30"/><text x="300" y="69">Sponsorship</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="127" rx="64" ry="30"/><ellipse class="i-teal" cx="478" cy="118" rx="64" ry="30"/><text x="478" y="123">Curriculum</text></g><g class="isl"><ellipse class="cliff" cx="478" cy="237" rx="64" ry="30"/><ellipse class="i-sand" cx="478" cy="228" rx="64" ry="30"/><text x="478" y="233">Internship</text></g><g class="isl"><ellipse class="cliff" cx="300" cy="291" rx="64" ry="30"/><ellipse class="i-teal" cx="300" cy="282" rx="64" ry="30"/><text x="300" y="287">Mentorship</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="237" rx="64" ry="30"/><ellipse class="i-orange" cx="122" cy="228" rx="64" ry="30"/><text x="122" y="233">Marketing</text></g><g class="isl"><ellipse class="cliff" cx="122" cy="127" rx="64" ry="30"/><ellipse class="i-sand" cx="122" cy="118" rx="64" ry="30"/><text x="122" y="123">CR</text></g><g class="isl"><rect class="air" x="498" y="296" width="92" height="30" rx="8"/><line class="runway" x1="508" y1="311" x2="580" y2="311"/><text class="air-t" x="544" y="345">Airport</text></g></svg></a>
+  <div class="ctl">
+    <div class="rail" role="group" aria-label="Choose a team">
+      <button type="button" aria-label="Curriculum"><i></i><span>Curriculum</span></button>
+      <button type="button" aria-label="Mentorship"><i></i><span>Mentorship</span></button>
+      <button type="button" aria-label="Internship"><i></i><span>Internship</span></button>
+      <button type="button" aria-label="Community Relations"><i></i><span>Community Relations</span></button>
+      <button type="button" aria-label="Sponsorship"><i></i><span>Sponsorship</span></button>
+      <button type="button" aria-label="Marketing"><i></i><span>Marketing</span></button>
+    </div>
+    <button type="button" class="arw prev" aria-label="Previous team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button type="button" class="arw next" aria-label="Next team"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
 </section>
 
-<section class="sec">
+<section class="tm-wrap">
+  <article class="tm" data-team="curriculum">
+    <h3>Curriculum</h3>
+    <div class="tm-about">
+      <h4>College Bootcamp</h4>
+      <p>Twice a year, winter and summer. Two days. Free.</p>
+      <p>Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like.</p>
+      <p>We ask what you want to study before the camp, then bring back people with that background. No two years have the same line-up.</p>
+      <p>The first bootcamp ran in June 2023 with more than 80 high school students.</p>
+      <h4>Talks</h4>
+      <p>Held through the year, also free. Dates are announced on Instagram.</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="mentorship">
+    <h3>Mentorship</h3>
+    <div class="tm-about">
+      <h4>Mentorship Program</h4>
+      <p>One matching round per semester. Free.</p>
+      <p>You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on.</p>
+      <p>Some pairs that started in an application season are still in touch more than two years later.</p>
+      <p>Mentorship began in September 2020 with 36 students.</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="internship">
+    <h3>Internship</h3>
+    <div class="tm-about">
+      <h4>High school internship</h4>
+      <p>One intake a semester, apply on the site.</p>
+      <p>The high school internship programme gives public school students real work experience before they apply. Interns join BT's teams and do real work, tracked in their own intern passport.</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="cr">
+    <h3>Community Relations</h3>
+    <div class="tm-about">
+      <p>Arranges alumni talks at public high schools so the information reaches places it never did; campus ambassadors carry the news into their own schools. The first 18 ambassadors started in October 2021.</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="sponsorship">
+    <h3>Sponsorship</h3>
+    <div class="tm-about">
+      <p>Finds the people, companies and schools willing to build this with us. The Zeczec crowdfunding campaign lives here too: live 23 March 2027, closes 21 April 2027.</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+  <article class="tm" data-team="marketing">
+    <h3>Marketing</h3>
+    <div class="tm-about">
+      <p>Instagram, the college introduction series, the photos and video on this site. Instagram is the first channel for every announcement.</p>
+    </div>
+    <div class="tm-live" hidden></div>
+    <div class="tm-people" hidden></div>
+  </article>
+</section>
+
+<section class="sec sec-people" hidden>
   <div class="sec-in">
-    <h2>How it works</h2>
+    <h2></h2>
     <div class="body">
-      <p>The two Co-Presidents lead three teams each.</p>
-      <p>Every team has a Director and one or two Advisors, who are the point of contact for anything crossing teams or going outside the organisation.</p>
-      <p>Everyone here is a student. Most are at university; some are still in high school.</p>
-      <p>We are not teachers and we are not consultants. Most of us are only a step or two ahead of you. Some finished their own applications recently enough to still remember not knowing where to start.</p>
-      <picture class="photo">
-        <source srcset="../photos/sharing-mic.webp" type="image/webp">
-        <img src="../photos/sharing-mic.jpg" alt="A speaker with a microphone; the audience seated on the floor, laughing" width="1200" height="800" loading="lazy">
-      </picture>
+      <div id="faces-en"></div>
     </div>
   </div>
 </section>
 
 <section class="sec">
-  <div class="sec-in">
-    <h2>Six teams</h2>
-    <div class="body">
-      <div class="tms">
-      <article class="tm" data-team="curriculum">
-        <h3>Curriculum</h3>
-        <p class="tm-tag">Programme content. Every bootcamp class is scheduled here.</p>
-        <h4>College Bootcamp</h4>
-        <p>Twice a year, winter and summer. Two days. Free.</p>
-        <p>Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like.</p>
-        <p>We ask what you want to study before the camp, then bring back people with that background. No two years have the same line-up.</p>
-        <p>The first bootcamp ran in June 2023 with more than 80 high school students.</p>
-        <h4>Talks</h4>
-        <p>Held through the year, also free. Dates are announced on Instagram.</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="mentorship">
-        <h3>Mentorship</h3>
-        <p class="tm-tag">Matching and mentoring. One alumnus who has walked the same road.</p>
-        <h4>Mentorship Program</h4>
-        <p>One matching round per semester. Free.</p>
-        <p>You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on.</p>
-        <p>Some pairs that started in an application season are still in touch more than two years later.</p>
-        <p>Mentorship began in September 2020 with 36 students.</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="internship">
-        <h3>Internship</h3>
-        <p class="tm-tag">Internships. Real work on a real CV.</p>
-        <h4>High school internship</h4>
-        <p>One intake a semester, apply on the site.</p>
-        <p>The high school internship programme gives public school students real work experience before they apply. Interns join BT's teams and do real work, tracked in their own intern passport.</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="cr">
-        <h3>Community Relations</h3>
-        <p class="tm-tag">Community relations. Into public high schools, and the ties with schools and the wider community.</p>
-        <p>Arranges alumni talks at public high schools so the information reaches places it never did; campus ambassadors carry the news into their own schools. The first 18 ambassadors started in October 2021.</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="sponsorship">
-        <h3>Sponsorship</h3>
-        <p class="tm-tag">Partnerships and funding. Keeps everything free for students.</p>
-        <p>Finds the people, companies and schools willing to build this with us. The Zeczec crowdfunding campaign lives here too: live 23 March 2027, closes 21 April 2027.</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      <article class="tm" data-team="marketing">
-        <h3>Marketing</h3>
-        <p class="tm-tag">Everything we say and show publicly.</p>
-        <p>Instagram, the college introduction series, the photos and video on this site. Instagram is the first channel for every announcement.</p>
-        <div class="tm-live" hidden></div>
-      </article>
-      </div>
-    </div>
+  <div class="sec-in one">
+    <p class="pull">We are not teachers and we are not consultants. Most of us are only a step or two ahead of you. Some finished their own applications recently enough to still remember not knowing where to start.</p>
   </div>
 </section>
 
@@ -683,16 +802,6 @@ html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;lett
     <div class="body">
       <p>Beyond Taiwan hands over to a new group of organisers each year. That single fact shapes how we build every tool: keep it simple enough that the next person can read it and change it.</p>
       <p>This website is built on that principle.</p>
-    </div>
-  </div>
-</section>
-
-<section class="sec sec-people" hidden>
-  <div class="sec-in">
-    <h2>This year</h2>
-    <div class="body">
-      <p>These are the organisers who chose to be named. The people not listed here do the same work; they simply chose not to be public, which is entirely fine.</p>
-      <div id="faces-en"></div>
     </div>
   </div>
 </section>
@@ -804,6 +913,7 @@ html[data-lang="zh"] .tm-live small{font-family:var(--body);font-weight:600;lett
 })();
 </script>
 
+<script type="module" src="./src/reel.js"></script>
 <script type="module" src="./src/main.js"></script>
 <script type="module" src="./src/programmes.js"></script>
 <!-- 捲動效果與募資橫條：每一個對外頁都載同一支，說明在那個檔的檔頭。沒載到也不影響這一頁的任何內容。 -->

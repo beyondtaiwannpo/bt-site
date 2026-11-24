@@ -1489,7 +1489,7 @@ leakOut=$(node -e '
       mustHide: ["維護者要講的話寫在 README"]
     },
     "team/index.html": {
-      mustShow: ["跳到主要內容", "三十個人，全部是學生。", "回 Beyond Taiwan 首頁",
+      mustShow: ["跳到主要內容", "校友去了哪", "回 Beyond Taiwan 首頁",
                  "本網站不使用任何追蹤或廣告工具。"],
       mustHide: ["維護者要講的話寫在 README"]
     },
