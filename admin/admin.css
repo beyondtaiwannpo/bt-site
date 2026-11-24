@@ -1015,6 +1015,40 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .rc-alias{margin:-6px 0 12px}
 .rc-contacts .ckind{display:inline-block;min-width:88px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
 .rc-contacts a{word-break:break-all}
+/* 關係網（2027-01-03）：標籤、名錄的快速篩選、個人檔案、他的故事、同意、個人連結。現在不是了的標籤變淡，徽章裡的字照樣在。 */
+.tag.past{opacity:.55}
+.rc-labels{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:8px}
+.rc-labhelp{margin:0 0 4px;line-height:1.6}
+.rc-glabel{padding:12px 0 2px;border-top:1px dotted rgba(16,42,134,.16);margin-top:12px}
+.rc-glabel .two label{margin-bottom:10px}
+.rc-quick{margin:0 0 14px}
+.rc-now{color:rgba(16,42,134,.92)}
+.rc-pf{display:flex;gap:20px;align-items:flex-start}
+.rc-pf-photo{flex:none;width:180px}
+.rc-pf-photo .hi-upload{margin:0 0 8px}
+.rc-pf-photo .mini{margin:0 0 8px;line-height:1.5}
+.rc-pf-f{flex:1;min-width:0}
+.rc-photo{display:flex;align-items:center;justify-content:center;width:112px;height:112px;border-radius:50%;object-fit:cover;background:rgba(16,42,134,.1);
+  font-family:var(--display);font-size:40px;font-weight:700;line-height:1;color:rgba(16,42,134,.72);margin:0 0 10px}
+.rc-story{margin:0 0 14px}
+.rc-q{font-weight:600;font-size:14px;line-height:1.5;margin:0 0 4px}
+.rc-a{margin:0;font-size:14.5px;line-height:1.7;overflow-wrap:anywhere}
+.rc-rel > li,.rc-ticks > li{padding:8px 0}
+.rc-ticks + .mini,.rc-ticks + .mini + .mini{margin-top:8px;line-height:1.6}
+.rc-linkstate{margin:8px 0 12px;font-size:14px;line-height:1.7}
+.rc-linkstate .mini{display:block}
+#rc-plink{font-size:13px}
+#rc-qr{margin-top:12px}
+#rc-qr:empty{display:none}
+.rc-qrbox{display:inline-block;padding:10px;background:#fff;border-radius:10px;line-height:0}
+.rc-qrbox svg{width:220px;height:220px;display:block}
+@media (max-width:640px){
+  .rc-pf{flex-direction:column;gap:10px}
+  .rc-pf-photo{width:auto}
+}
+/* 活動編輯頁挑講者：會帶過去的那張紀錄照片，小一號 */
+.ev-sp-from{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ev-sp-pic.sm{width:44px;height:44px;font-size:18px}
 .rc-verdict{margin:0 0 12px;padding:10px 14px;border-left:3px solid var(--bt-orange);background:rgba(255,196,108,.14);border-radius:0 10px 10px 0;font-size:14.5px;line-height:1.55}
 .rc-dup thead th .mini{font-weight:400;letter-spacing:0;text-transform:none;margin-top:3px;max-width:220px;line-height:1.35}
 .rc-aside{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center;padding:10px 0;border-top:1px solid rgba(16,42,134,.1)}

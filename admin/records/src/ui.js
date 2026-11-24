@@ -1043,7 +1043,9 @@ export function logHTML(r) {
 // 人：找、重複、加。
 // ── 名錄（2026-12-03）：rc_directory() 整份拿回來，搜尋與篩選都在瀏覽器裡做（一千多個人的 JSON 幾百 KB，一次拿比每打一個字問一次快）。 ──
 // 篩選的鍵跟 rc_directory 回的欄位一一對應。純函式，test/records.test.mjs 用假資料測。
-export const DIR_FILTERS = ["kind", "who", "role", "team", "school", "grad", "term", "event", "country"];
+// 2027-01-03（關係網）：多 label（標籤）與兩個快速篩選 speak、mentor（他自己舉手說願意演講、願意當 mentor）。
+// kind 留在函式裡（遷移檔還沒跑的資料庫還在用那個下拉），跑過之後畫面上換成標籤那一格。
+export const DIR_FILTERS = ["kind", "label", "who", "role", "team", "school", "grad", "term", "event", "country", "speak", "mentor"];
 // 這個人在 BT 當過什麼（2026-11-10 Paul：名錄上用標籤，mentor 標 Mentor、mentee 標 Mentee、實習生標 Intern、其他參加活動的標 Student）。
 // roles 是 rc_participation 的角色，account 是登入帳號的身分（intern 就是實習生）。講者、工作人員、志工、校友來賓照自己的名字標，
 // 那些多半是幹部或外面的人，標成學員會錯。
@@ -1061,6 +1063,9 @@ export function filterDirectory(list, q, f) {
     if (qq && !(norm(p.name).includes(qq) || norm(p.name_zh).includes(qq) || norm(p.name_en).includes(qq) || norm(p.school).includes(qq)
       || (p.aliases || []).some(a => norm(a).includes(qq)) || (p.schools || []).some(a => norm(a).includes(qq)))) return false;
     if (x.kind && p.kind !== x.kind) return false;
+    if (x.label && !(p.labels || []).some(c => labelFilterKey(c) === x.label)) return false;
+    if (x.speak && !p.offer_speak) return false;
+    if (x.mentor && !p.offer_mentor) return false;
     if (x.who && !whoTags(p.roles, p.role).includes(x.who)) return false;
     if (x.role === "none" ? p.has_account : (x.role && p.role !== x.role)) return false;
     if (x.team && !parseTeamsLoose(p.team).includes(x.team)) return false;
@@ -1081,6 +1086,7 @@ export function dirOptions(list, events) {
   const evTitle = id => { const e = (events || []).find(e => e.id === id); return e ? ((lang() === "zh" ? e.title_zh : e.title_en) || e.title_en || e.title_zh || e.slug) : null; };
   return {
     kind: count(p => [p.kind]),
+    label: count(p => [...new Set((p.labels || []).map(labelFilterKey))]).filter(x => LABEL_FILTERS.includes(x[0])).sort((a, b) => LABEL_FILTERS.indexOf(a[0]) - LABEL_FILTERS.indexOf(b[0])),
     who: count(p => whoTags(p.roles, p.role)).sort((a, b) => WHO_ORDER.indexOf(a[0]) - WHO_ORDER.indexOf(b[0])),
     role: count(p => [p.has_account ? p.role : "none"]),
     team: count(p => parseTeamsLoose(p.team)),
@@ -1110,15 +1116,22 @@ export function directoryHTML(S) {
   const opts = dirOptions(dir, events);
   const hits = filterDirectory(dir, S.pq, f);
   const shown = hits.slice(0, S.dirN || DIR_PAGE);
-  const optLabel = (key, v) => key === "kind" ? T("pkind." + v) : key === "who" ? T(v === "intern" ? "who.intern" : "prole." + v) : key === "role" ? (v === "none" ? T("dir.noAccount") : T("acct." + v)) : v;
+  // 遷移檔跑過沒：名錄的每一列都帶 labels（陣列）。空的名錄當成跑過，不為了零個人印一句「要先跑遷移檔」。
+  const net = !dir.length || dir.some(hasNetwork);
+  const optLabel = (key, v) => key === "kind" ? T("pkind." + v) : key === "label" ? labelName(parseLabel(v).label, parseLabel(v).current) : key === "who" ? T(v === "intern" ? "who.intern" : "prole." + v) : key === "role" ? (v === "none" ? T("dir.noAccount") : T("acct." + v)) : v;
   const box = (key, labelKey, anyKey) => `<label><i>${esc(T(labelKey))}</i><select name="${key}" class="rc-dfilter" data-noauto="1">${pickOpt("", T(anyKey), f[key] || "")}${(opts[key] || []).map(([v, n, title]) => pickOpt(v, `${title || optLabel(key, v)} (${n})`, f[key] || "")).join("")}</select></label>`;
   const active = DIR_FILTERS.filter(k => f[k]).length + (S.pq ? 1 : 0);
   const dbHits = S.pq && S.pq.includes("@") && boot.can_manage ? (S.people || []) : null;
-  const row = p => `<li><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> ${rowTags(p)}${p.has_account ? ` <span class="tag open">${esc(acctTag(p))}</span>` : ""}</div>
-      <div class="fmeta">${[p.school, p.grad_year, p.team, (p.terms || []).slice().sort().reverse().join(" "), p.n ? T("dir.events", { n: p.n }) : "", p.latest, (p.countries || []).join(" ")].filter(Boolean).map(v => esc(String(v))).join("・")}</div></li>`;
+  // 一列：名字、標籤（沒跑遷移檔的退回舊的那排）、有沒有帳號；他自己舉的手；現在做什麼（領域、職稱、單位、城市，有填才印）；再來是原本那一行。
+  const now = p => [p.field, p.job_title, p.job_org, [p.city, p.country_now].filter(Boolean).join(", ")].filter(Boolean);
+  const offers = p => `${p.offer_speak ? ` <span class="tag ok">${esc(T("dir.offerSpeak"))}</span>` : ""}${p.offer_mentor ? ` <span class="tag ok">${esc(T("dir.offerMentor"))}</span>` : ""}`;
+  const row = p => `<li><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> ${hasNetwork(p) ? labelChipsHTML(p.labels) : rowTags(p)}${p.has_account ? ` <span class="tag open">${esc(acctTag(p))}</span>` : ""}${offers(p)}</div>
+      ${now(p).length ? `<div class="fmeta rc-now">${now(p).map(v => esc(String(v))).join("・")}</div>` : ""}<div class="fmeta">${[p.school, p.grad_year, p.team, (p.terms || []).slice().sort().reverse().join(" "), p.n ? T("dir.events", { n: p.n }) : "", p.latest, (p.countries || []).join(" ")].filter(Boolean).map(v => esc(String(v))).join("・")}</div></li>`;
   return `<div class="card">
     <label><i>${esc(T("dir.search"))}</i><input type="search" id="rc-pfind" class="rc-pfind" value="${esc(S.pq || "")}" placeholder="${esc(T("dir.searchPh"))}" autocomplete="off" data-noauto="1"></label>
-    <div class="two">${box("kind", "dir.kind", "dir.anyKind")}${box("who", "dir.who", "dir.anyWho")}</div>
+    ${net ? "" : `<div class="note">${esc(T("net.noSql"))}</div>`}
+    <div class="two">${net ? box("label", "dir.label", "dir.anyLabel") : box("kind", "dir.kind", "dir.anyKind")}${net ? "" : box("who", "dir.who", "dir.anyWho")}</div>
+    ${net ? `<div class="chips rc-quick" role="group" aria-label="${esc(T("dir.quick"))}">${[["speak", "dir.offerSpeak"], ["mentor", "dir.offerMentor"]].map(([k, l]) => `<button type="button" class="chip sm${f[k] ? " on" : ""}" aria-pressed="${f[k] ? "true" : "false"}" data-act="dir-quick" data-k="${k}">${esc(T(l))}</button>`).join("")}</div>` : ""}
     <div class="two">${box("role", "dir.role", "dir.anyRole")}${box("team", "dir.team", "dir.anyTeam")}</div>
     <div class="two">${box("school", "dir.school", "dir.anySchool")}${box("grad", "dir.grad", "dir.anyGrad")}</div>
     <div class="two">${box("term", "dir.term", "dir.anyTerm")}${box("event", "dir.event", "dir.anyEvent")}</div>
@@ -1130,7 +1143,8 @@ export function directoryHTML(S) {
   </div>`;
 }
 // 名錄裡一個人在下拉清單上的那一行：名字 · 學校或身分 · 畢業年。選到之後用這一行反查 id（dirMatch）。
-export const dirLabel = x => [x.name || T("common.noName"), x.school || T("pkind." + (x.kind || "student")), x.grad_year || ""].filter(Boolean).join(" · ");
+// 沒有學校的人第二段印他的第一個標籤（幹部、講者…）；遷移檔還沒跑、沒有標籤的資料庫才退回舊的身分。
+export const dirLabel = x => [x.name || T("common.noName"), x.school || (hasNetwork(x) ? (x.labels.length ? labelName(parseLabel(x.labels[0]).label, parseLabel(x.labels[0]).current) : "") : T("pkind." + (x.kind || "student"))), x.grad_year || ""].filter(Boolean).join(" · ");
 export function dirMatch(list, label) { const l = String(label || "").trim(); if (!l) return null; return (list || []).find(x => dirLabel(x) === l) || null; }
 // 一組同名的人，一張卡 N 欄（2026-12-06；12-05 那版是兩兩一組，三個同名會變三張卡，Paul 問「第一張的左邊要跟第二張的右邊合怎麼辦」）。
 // 每一欄：radio「留這一欄」（預設建議的那欄）、checkbox「併進留的那一欄」（預設勾，除了留的那欄、跟說過「不是同一個人」的）。
@@ -1278,8 +1292,9 @@ export function peopleHTML(boot, S) {
   const cards = dups.filter(d => (Array.isArray(d.members) ? d.members.length >= 2 : !!d.a));   // 只剩 set_aside 的群不算一張卡
   const dupHTML = sectionHTML(T("pp.dups", { n: cards.length }), cards.length ? `<div class="mini">${esc(T("pp.dupsHint"))} ${esc(T("dup.groupHint"))}</div>${cards.map(d => dupGroupHTML(d, S.busy, !!(S.me && S.me.pres))).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`) + dupAsideHTML(dups, S.busy);
   const add = b.can_manage ? sectionHTML(T("pp.add"), `<div data-padd><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" maxlength="60"></label></div>
-      <div class="two"><label><i>${esc(T("person.email"))}</i><input name="email" type="email" maxlength="120"></label><label><i>${esc(T("person.kind"))}</i>${sel("kind", ["student", "guest", "member"].map(k => [k, T("pkind." + k)]), "student")}</label></div>
-      <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100"></label></div>
+      <div class="two"><label><i>${esc(T("person.email"))}</i><input name="email" type="email" maxlength="120"></label><label><i>${esc(T("person.school"))}</i><input name="school" maxlength="80"></label></div>
+      <div class="two"><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100"></label><span></span></div>
+      ${hsCheckHTML(false, false)}
       <div class="form-foot"><button class="btn sm" data-act="person-add"${S.busy ? " disabled" : ""}>${esc(T("pp.addBtn"))}</button><span class="mini">${esc(T("pp.addHint"))}</span></div></div>`) : "";
   return pageHead(T("pp.title"), T("pp.lede"), []) + msgHTML(S.msg) + tabHTML + (tab === "dups" ? dupHTML : tab === "add" ? add : directoryHTML(S));
 }
@@ -1321,14 +1336,229 @@ export function contactHref(kind, value) {
     default:         return "";
   }
 }
+// ═══════════════════════════════════════════════════════════════════════
+// 關係網（2027-01-03，Paul 2026-11-23：「turn BT's people database… into a relationship network」）。
+// 資料庫那一半在 supabase/migrations/2027-01-03-people-network.sql，門在那裡每一支函式的第一句。
+// 這一半：標籤怎麼叫、怎麼排，加上一個人的頁面上那幾塊（個人檔案、跟 BT 的關係、他的故事、同意、當講者的活動、個人連結）。
+// 遷移檔還沒跑的資料庫回的東西沒有 labels、profile、link：每一支都把「沒有」當成「還沒有這個功能」，畫面照舊，只多一句說要跑哪一支。
+// ═══════════════════════════════════════════════════════════════════════
+// 標籤的順序跟資料庫的 rc_labels_of() 一樣：前八種從紀錄算（賺來的），後三種是 BT 給的。
+export const LABELS = ["member", "intern", "student", "mentee", "mentor", "speaker", "volunteer", "organizer", "professor", "admission_officer", "connection"];
+export const GIVEN_LABELS = ["professor", "admission_officer", "connection"];
+// 「以前是」有自己名字的只有兩種：幹部 → 校友（前幹部）、學員 → 以前的學員。其他幾種現在與以前同一個名字，畫面上只是變淡。
+const PAST_NAMED = ["member", "student"];
+// 名錄與搜尋回的短版："speaker"、"student:past"（:past 是現在不是了）。
+export function parseLabel(code) { const [label, tail] = String(code || "").split(":"); return { label, current: tail !== "past" }; }
+export function labelName(label, current) {
+  const k = "lab." + label + (current === false && PAST_NAMED.includes(label) ? ".past" : "");
+  return STRINGS[k] ? T(k) : String(label || "");
+}
+// 名錄篩選用的鍵：名字不一樣的才分開（幹部與校友、學員與以前的學員），其他不分現在與以前。
+export const LABEL_FILTERS = ["member", "member:past", "intern", "student", "student:past", "mentee", "mentor", "speaker", "volunteer", "organizer", "professor", "admission_officer", "connection"];
+export function labelFilterKey(code) { const { label, current } = parseLabel(code); return !current && PAST_NAMED.includes(label) ? label + ":past" : label; }
+// 這一列（名錄的、搜尋的、rc_person 回的）有沒有標籤那一格。沒有就是遷移檔還沒跑。
+export const hasNetwork = x => !!x && Array.isArray(x.labels);
+// 一個標籤。顏色沿用名錄原本那四種（who-mentor、who-mentee、who-intern、who-student），其他是一般的徽章；現在不是了的變淡。
+export function labelTag(label, current) { return `<span class="tag who-${esc(label)}${current === false ? " past" : ""}">${esc(labelName(label, current))}</span>`; }
+// 名錄一列上的那排標籤。認不得的代碼不印（資料庫比這一頁新的時候）。
+export function labelChipsHTML(codes) {
+  return (codes || []).map(parseLabel).filter(l => LABELS.includes(l.label)).map(l => labelTag(l.label, l.current)).join(" ");
+}
+// 一個標籤後面那行小字：哪一年起（BT 給的可以有到哪一年）、幾次（超過一次才寫）、補充說明。
+export function labelFacts(l) {
+  const out = [];
+  if (l.since && l.until) out.push(T("lab.range", { from: l.since, to: l.until }));
+  else if (l.since) out.push(T("lab.since", { y: l.since }));
+  else if (l.until) out.push(T("lab.until", { y: l.until }));
+  const n = Number(l.n) || 0;
+  if (n > 1) out.push(T(l.label === "member" ? "lab.nTerms" : l.label === "mentor" || l.label === "mentee" ? "lab.nPairs" : "lab.nEvents", { n }));
+  if (l.detail) out.push(String(l.detail));
+  return out;
+}
+// 個人連結的網址（不用登入的那一頁）。
+export const profileURL = token => `${typeof location === "undefined" ? "https://beyondtaiwannpo.com" : location.origin}/profile/?t=${encodeURIComponent(token || "")}`;
+// 還在念高中的學員開不了個人連結（跟資料庫的 minor_no_link 同一條：kind 是 student，而且畢業年是空的或還沒到）。
+// 這裡先擋是為了不讓人按了才知道；真正的門在資料庫。
+export function linkBlocked(p, year) {
+  const y = year || new Date().getFullYear();
+  return !!p && p.kind === "student" && (!p.grad_year || Number(p.grad_year) >= y);
+}
+// 個人連結現在是哪一種：none（沒有）、expired（過期了）、live（還有效）。
+export function linkState(link) { return !link ? "none" : link.expired ? "expired" : "live"; }
+// 照片：Storage 網址 → bucket 裡的路徑（刪檔用）。不是 people bucket 的網址回空字串。
+export function personStoragePath(url) {
+  const m = /\/object\/public\/people\/([^?#]+)/.exec(String(url || ""));
+  if (!m) return "";
+  try { return decodeURIComponent(m[1]); } catch (x) { return ""; }
+}
+// 選檔先擋一次：bucket 只收這三種。
+export const photoFileOk = f => !!f && /^image\/(jpeg|png|webp)$/.test(String(f.type || ""));
+// 傳上去之前縮到最長邊 800（大頭照用不到更大）。
+export const PHOTO_MAX = 800;
+export function photoFit(w, h, max) {
+  const m = max || PHOTO_MAX, big = Math.max(w, h);
+  if (big <= m) return { w, h };
+  const r = m / big;
+  return { w: Math.max(1, Math.round(w * r)), h: Math.max(1, Math.round(h * r)) };
+}
+// 自動儲存收的鍵（rc_save_profile 的 p）。**兩個同意不在裡面**：同意只有本人給得了，這一頁只能取消（data.js 的 withdrawConsent 寫死送 false）。
+// 他自己舉的手（願意演講、願意當 mentor、可以聯絡）也不在：那是他在個人連結上說的，這一頁只讀。
+export const PF_KEYS = ["city", "country", "job_title", "job_org", "field", "bio", "rel_owner", "rel_last_contact", "rel_open", "rel_note"];
+export const REL_OPEN = ["unknown", "open", "maybe", "closed"];
+export const STORY_KEYS = ["highschool", "turning", "hardest", "decision", "wish17", "first_step"];
+// 「團隊裡誰認識他」那一格的清單：名錄裡的幹部、校友、實習生（標籤 member 或 intern，現在或以前都算）。一個都沒有就給整份名錄。
+export function teamOf(dir) {
+  const list = Array.isArray(dir) ? dir : [];
+  const team = list.filter(x => hasNetwork(x) ? x.labels.some(c => ["member", "intern"].includes(parseLabel(c).label)) : x.kind === "member");
+  return team.length ? team : list;
+}
+// 自動儲存的一格 → rc_save_profile 的 { 鍵: 值 }。回 { patch } 或 { err: "err.relOwner" } 或 null（這一格不歸這裡存）。
+// 「誰認識他」那一格打的是名錄上的那一行字，要對回那個人的 id；清空就是拿掉。
+export function profileFieldPatch(name, value, dir) {
+  const v = typeof value === "string" ? value.trim() : value;
+  if (name === "rel_owner_who") {
+    if (!v) return { patch: { rel_owner: "" }, owner: null };
+    const m = dirMatch(teamOf(dir), v) || dirMatch(dir, v);
+    return m ? { patch: { rel_owner: m.id }, owner: m } : { err: "err.relOwner" };
+  }
+  if (!PF_KEYS.includes(name) || name === "rel_owner") return null;
+  if (name === "rel_open" && !REL_OPEN.includes(v)) return null;
+  return { patch: { [name]: v == null ? "" : v } };
+}
+// 「現在還在念高中」那一格：取代以前的三選一（成員、學員、來賓）。勾了送 kind student，沒勾送 guest；成員不在這裡加。
+function hsCheckHTML(on, locked) {
+  return `<label class="check"><input type="checkbox" name="hs" data-noauto="1"${on ? " checked" : ""}${locked ? " disabled" : ""}><span>${esc(T("pp.hs"))}<br><span class="mini">${esc(T("pp.hsHint"))}</span></span></label>`;
+}
+// 基本資料存的時候 kind 要送什麼：成員照舊是成員（這一頁不改），其他人看那一格勾了沒。
+export function kindFromForm(oldKind, hs) { return oldKind === "member" ? "member" : hs ? "student" : "guest"; }
+const brText = v => esc(String(v || "")).replace(/\r?\n/g, "<br>");
+const photoHTML = (url, name) => url ? `<img class="rc-photo" src="${esc(url)}" alt="">` : `<span class="rc-photo" aria-hidden="true">${esc((Array.from(String(name || "").trim())[0] || "").toUpperCase())}</span>`;
+
+// 標籤那一塊：每一個標籤一行（哪一年起、幾次、補充），一句說明，管的人底下有「BT 給的標籤」可以加、改、拿掉。
+export function personLabelsHTML(d, S, canEdit) {
+  const labs = (d.labels || []).filter(l => LABELS.includes(l.label));
+  const list = labs.length ? `<ul class="rc-labels">${labs.map(l => { const facts = labelFacts(l);
+      return `<li${l.current ? "" : ` title="${esc(T("lab.notNow"))}"`}>${labelTag(l.label, !!l.current)}${facts.length ? ` <span class="mini">${facts.map(esc).join("・")}</span>` : ""}</li>`; }).join("")}</ul>`
+    : `<div class="mini">${esc(T("lab.none"))}</div>`;
+  const given = Object.fromEntries((d.given || []).map(g => [g.label, g]));
+  const one = k => { const g = given[k];
+    return `<div class="rc-glabel" data-glabel="${k}"><div class="fhead"><b>${esc(T("lab." + k))}</b>${g ? ` <span class="tag ok">${esc(T("lab.has"))}</span>` : ""}</div>
+        <div class="two"><label class="wide"><i>${esc(T("lab.detail"))}</i><input name="detail" value="${esc(g ? g.detail || "" : "")}" maxlength="160" autocomplete="off"></label>
+          <label><i>${esc(T("lab.sinceYear"))}</i><input name="since" type="number" min="1950" max="2100" value="${esc(g && g.since ? g.since : "")}"></label><label><i>${esc(T("lab.untilYear"))}</i><input name="until" type="number" min="1950" max="2100" value="${esc(g && g.until ? g.until : "")}"></label></div>
+        <div class="form-foot"><button class="btn sm" data-act="label-save" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T(g ? "lab.save" : "lab.add"))}</button>${g ? `<button class="btn quiet sm" data-act="label-del" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T("lab.remove"))}</button>` : ""}</div></div>`; };
+  const editor = canEdit ? `${foldStart("glabels", "data-glabels", T("lab.given"), S)}<div class="mini">${esc(T("lab.givenHint"))}</div>${GIVEN_LABELS.map(one).join("")}</div></details>` : "";
+  return sectionHTML(T("lab.title"), `${list}<div class="mini rc-labhelp">${esc(T("lab.help"))}</div>${editor}`, { id: "rc-labels" });
+}
+// 個人檔案：照片、現在在哪、現在的工作、專長領域、一段介紹。管的人改了就存（一格一格送，rc_save_profile 只改有給的鍵）；看的人只讀。
+export function personProfileHTML(d, S, canEdit) {
+  const p = d.person || {}, pf = d.profile || {};
+  const done = pf.done_at ? `<span class="mini">${esc(T("pf.selfDone", { day: fmtDay(pf.done_at) }))}</span>` : "";
+  if (!canEdit) {
+    const lines = [[pf.job_title, pf.job_org].filter(Boolean).join("・"), pf.field, [pf.city, pf.country].filter(Boolean).join(", ")].filter(Boolean);
+    const any = pf.photo_url || lines.length || pf.bio;
+    return sectionHTML(T("pf.title"), any ? `<div class="rc-pf">${photoHTML(pf.photo_url, p.name)}<div class="rc-pf-f">${lines.map(l => `<div>${esc(l)}</div>`).join("")}${pf.bio ? `<p class="rc-a">${brText(pf.bio)}</p>` : ""}${done}</div></div>` : `<div class="mini">${esc(T("pf.empty"))}</div>`, { id: "rc-profile" });
+  }
+  const inp = (name, key, max) => `<label><i>${esc(T(key))}</i><input name="${name}" value="${esc(pf[name] || "")}" maxlength="${max}" autocomplete="off"></label>`;
+  return sectionHTML(T("pf.title"), `<div class="rc-pf">
+      <div class="rc-pf-photo">${photoHTML(pf.photo_url, p.name)}
+        <label class="hi-upload"><i>${esc(T(pf.photo_url ? "pf.photoChange" : "pf.photoPick"))}</i><input type="file" accept="image/jpeg,image/png,image/webp" data-act="pf-photo" data-noauto="1"${S.busy ? " disabled" : ""}></label>
+        <div class="mini" data-pf-up>${esc(T("pf.photoHint"))}</div>
+        ${pf.photo_url ? `<button class="btn quiet sm" data-act="pf-photo-clear"${S.busy ? " disabled" : ""}>${esc(T("pf.photoClear"))}</button>` : ""}
+      </div>
+      <div class="rc-pf-f" data-autosave="pf-save" data-part="profile">
+        <div class="two">${inp("job_title", "pf.jobTitle", 120)}${inp("job_org", "pf.jobOrg", 120)}</div>
+        <div class="two">${inp("city", "pf.city", 80)}${inp("country", "pf.country", 80)}</div>
+        ${inp("field", "pf.field", 120)}
+        <label><i>${esc(T("pf.bio"))}</i><textarea name="bio" rows="4" maxlength="600">${esc(pf.bio || "")}</textarea></label>
+        <div class="form-foot">${autosaveHint("pf-save")}${done}</div>
+      </div></div>`, { id: "rc-profile" });
+}
+// 跟 BT 的關係：團隊裡誰認識他、上次聯絡、多願意幫忙、備註。只有 BT 內部看得到（個人連結那一支函式讀不到這幾格）。
+export function personRelHTML(d, S, canEdit) {
+  const pf = d.profile || {}, open = REL_OPEN.includes(pf.rel_open) ? pf.rel_open : "unknown";
+  const priv = `<div class="mini">${esc(T("rel.private"))}</div>`;
+  if (!canEdit) {
+    const any = pf.rel_owner || pf.rel_last_contact || open !== "unknown" || pf.rel_note;
+    const owner = pf.rel_owner ? `<a href="#people/${esc(pf.rel_owner)}" data-act="open-person" data-id="${esc(pf.rel_owner)}">${esc(pf.rel_owner_name || T("common.noName"))}</a>` : "";
+    return sectionHTML(T("rel.title"), priv + (any ? `<ul class="flist rc-rel">
+        ${owner ? `<li><span class="mini">${esc(T("rel.owner"))}</span> ${owner}</li>` : ""}
+        ${pf.rel_last_contact ? `<li><span class="mini">${esc(T("rel.last"))}</span> ${esc(String(pf.rel_last_contact))}</li>` : ""}
+        <li><span class="mini">${esc(T("rel.open"))}</span> ${esc(T("rel.open." + open))}</li>
+        ${pf.rel_note ? `<li><span class="mini">${esc(T("rel.note"))}</span><p class="rc-a">${brText(pf.rel_note)}</p></li>` : ""}</ul>` : `<div class="mini">${esc(T("rel.none"))}</div>`), { id: "rc-rel" });
+  }
+  // 清單用名錄上的那一行字（dirLabel），選到再對回 id。現在那個人不在清單上（名錄還沒載到）就先印他的名字。
+  const team = teamOf(S.dir), cur = pf.rel_owner ? (team.find(x => x.id === pf.rel_owner) || (Array.isArray(S.dir) ? S.dir : []).find(x => x.id === pf.rel_owner)) : null;
+  return sectionHTML(T("rel.title"), `${priv}<div data-autosave="pf-save" data-part="rel">
+      <div class="two"><label><i>${esc(T("rel.owner"))}</i><input name="rel_owner_who" class="rc-who" list="rc-team-list" autocomplete="off" placeholder="${esc(T("rel.ownerPh"))}" value="${esc(cur ? dirLabel(cur) : pf.rel_owner_name || "")}"></label>
+        <label><i>${esc(T("rel.last"))}</i><input name="rel_last_contact" type="date" value="${esc(pf.rel_last_contact || "")}"></label></div>
+      <datalist id="rc-team-list">${team.map(x => `<option value="${esc(dirLabel(x))}"></option>`).join("")}</datalist>
+      <label><i>${esc(T("rel.open"))}</i>${sel("rel_open", REL_OPEN.map(k => [k, T("rel.open." + k)]), open)}</label>
+      <label><i>${esc(T("rel.note"))}</i><textarea name="rel_note" rows="3" maxlength="2000">${esc(pf.rel_note || "")}</textarea></label>
+      <div class="form-foot">${autosaveHint("pf-save")}</div></div>`, { id: "rc-rel" });
+}
+// 他的故事：六題，題目在上、他寫的在下。只讀：那是他自己的話，資料庫也沒有給管的人改的路。
+export function personStoryHTML(d) {
+  const pf = d.profile || {}, st = pf.story || {};
+  const any = STORY_KEYS.some(k => String(st[k] || "").trim());
+  const body = !any ? `<div class="mini">${esc(T("story.empty"))}</div>`
+    : `<div class="note">${esc(T(pf.share_story ? "story.shareYes" : "story.shareNo"))}</div>
+      ${STORY_KEYS.map(k => `<div class="rc-story"><div class="rc-q">${esc(T("story.q." + k))}</div>${String(st[k] || "").trim() ? `<p class="rc-a">${brText(st[k])}</p>` : `<p class="rc-a mini">${esc(T("story.blank"))}</p>`}</div>`).join("")}
+      <div class="mini">${esc(T("story.own"))}</div>`;
+  return sectionHTML(T("story.title"), body, { id: "rc-story" });
+}
+// 他願意做的事與同意：五格都只讀（他自己在個人連結上勾的）。兩個同意勾著的時候，管的人各有一顆「替他取消」；沒有任何一格能在這裡勾起來。
+export function personConsentHTML(d, S, canEdit) {
+  const pf = d.profile || {};
+  const tick = on => `<span class="tag ${on ? "ok" : "draft"}">${esc(T(on ? "cons.yes" : "cons.no"))}</span>`;
+  const row = (key, label, withdraw) => `<li>${tick(!!pf[key])} ${esc(T(label))}${withdraw && canEdit && pf[key] ? ` <button class="btn quiet sm" data-act="pf-withdraw" data-k="${key}"${S.busy ? " disabled" : ""}>${esc(T("cons.withdraw"))}</button>` : ""}</li>`;
+  return sectionHTML(T("cons.title"), `<ul class="flist rc-ticks">${row("offer_speak", "cons.speak")}${row("offer_mentor", "cons.mentor")}${row("contact_ok", "cons.contact")}${row("share_profile", "cons.profile", true)}${row("share_story", "cons.story", true)}</ul>
+      ${pf.consent_at ? `<div class="mini">${esc(T("cons.at", { day: fmtDay(pf.consent_at) }))}</div>` : ""}<div class="mini">${esc(T("cons.selfOnly"))}</div>`, { id: "rc-consent" });
+}
+// 當講者的活動：活動頁的講者連到他的那幾場，點過去是那一場的編輯頁（/admin/#events/<代號>）。沒有就整塊不畫。
+export function personSpeakingHTML(d) {
+  const sp = d.speaking || [];
+  if (!sp.length) return "";
+  return sectionHTML(T("spk.title", { n: sp.length }), `<ul class="flist">${sp.map(x => `<li><div class="fhead">${x.slug ? `<a href="${esc(withLang("/admin/#events/" + encodeURIComponent(x.slug)))}"><b>${esc(x.event || x.slug)}</b></a>` : `<b>${esc(x.event || "")}</b>`} <span class="tag ${x.consent ? "ok" : "draft"}">${esc(T(x.consent ? "spk.consentYes" : "spk.consentNo"))}</span></div>
+      <div class="fmeta">${[fmtDay(x.starts_at), x.subject].filter(Boolean).map(esc).join("・")}</div></li>`).join("")}</ul>`, { id: "rc-speaking" });
+}
+// 個人連結：一行狀態（沒有、哪天開的哪天過期、打開過沒、送出過沒、過期了），管的人有開、複製、QR、開新的、撤銷。
+// QR code 那一格：svg 是 qr.js 的 qrSVG() 給的（空字串是連結太長畫不成）。白底留著，深色背景上才掃得到。
+export function qrBoxHTML(svg) {
+  return svg ? `<div class="rc-qrbox">${svg}</div><div class="mini">${esc(T("link.qrHint"))}</div>` : `<div class="mini">${esc(T("link.qrTooLong"))}</div>`;
+}
+// token 只有管的人拿得到（rc_person 只給他們）；看的人只看得到狀態。#rc-qr 是 QR code 的框（main.js 的 link-qr 按了才畫）。
+export function personLinkHTML(d, S, canEdit) {
+  const p = d.person || {}, link = d.link || null, state = linkState(link);
+  const status = state === "none" ? `<div class="mini">${esc(T("link.none"))}</div>`
+    : `<div class="rc-linkstate"><span class="tag ${state === "live" ? "open" : "closed"}">${esc(T(state === "live" ? "link.live" : "link.dead"))}</span> ${esc(T(state === "live" ? "link.made" : "link.expired", { day: fmtDay(link.created_at), exp: fmtDay(link.expires_at) }))}
+        <span class="mini">${esc(T(link.opened_at ? "link.opened" : "link.notOpened", { day: fmtDay(link.opened_at) }))} ${esc(T(link.submitted_at ? "link.submitted" : "link.notSubmitted", { day: fmtDay(link.submitted_at) }))}</span></div>`;
+  let tools = "";
+  if (canEdit) {
+    const dis = S.busy ? " disabled" : "";
+    if (state !== "live" && linkBlocked(p)) tools = `<div class="note">${esc(T("link.minor"))}</div>`;
+    else if (state !== "live") tools = `<div class="form-foot"><button class="btn sm" data-act="link-create"${dis}>${esc(T(state === "none" ? "link.create" : "link.renew"))}</button></div>`;
+    else {
+      const url = link.token ? profileURL(link.token) : "";
+      tools = `${url ? `<label><i>${esc(T("link.url"))}</i><input id="rc-plink" readonly value="${esc(url)}" data-noauto="1"></label>` : ""}
+        <div class="form-foot">${url ? `<button class="btn sm" data-act="link-copy">${esc(T("link.copy"))}</button><button class="btn ghost sm" data-act="link-qr">${esc(T("link.qr"))}</button>` : ""}<button class="btn ghost sm" data-act="link-create"${dis}>${esc(T("link.renew"))}</button><button class="btn quiet sm" data-act="link-revoke"${dis}>${esc(T("link.revoke"))}</button></div>
+        ${url ? `<div id="rc-qr" data-link="${esc(url)}"></div>` : ""}`;
+    }
+  } else if (state === "live") tools = `<div class="mini">${esc(T("link.managerOnly"))}</div>`;
+  return sectionHTML(T("link.title"), `<div class="mini">${esc(T("link.hint"))}</div>${status}${tools}`, { id: "rc-link-sec" });
+}
 // 一個人的時間軸。
 export function personHTML(d, S) {
   const p = d.person || {}, manage = !!(S.boot && S.boot.can_manage), pres = !!(S.me && S.me.pres);
-  const head = pageHead(`${esc(p.name || T("common.noName"))} ${rowTags({ kind: p.kind, role: p.role, roles: [...new Set((d.participation || []).map(x => x.role).concat((d.pairs || []).map(x => x.as)))] })}${p.forgotten_at ? ` <span class="tag closed">${esc(T("person.forgotten"))}</span>` : ""}`,
-    `${p.name_zh && p.name_en ? esc(p.name_zh) + "・" : ""}${esc(p.school || "")}${p.grad_year ? "・" + esc(String(p.grad_year)) : ""}${p.has_account ? "・" + esc(T("pp.hasAccount")) + (p.role ? ` (${esc(p.role)})` : "") : ""}`, [], { act: "back-people", label: T("person.back") });
+  // 關係網（2027-01-03）：rc_person 回了 labels 與 profile 才畫標籤與那幾塊；沒有（遷移檔還沒跑）就照舊，多一句說要跑哪一支。
+  const net = hasNetwork(d) && !!d.profile, canEdit = manage && !p.forgotten_at;
+  const head = pageHead(`${esc(p.name || T("common.noName"))} ${net ? labelChipsHTML(d.labels.map(l => l.label + (l.current ? "" : ":past"))) : rowTags({ kind: p.kind, role: p.role, roles: [...new Set((d.participation || []).map(x => x.role).concat((d.pairs || []).map(x => x.as)))] })}${p.forgotten_at ? ` <span class="tag closed">${esc(T("person.forgotten"))}</span>` : ""}`,
+    // 有的才印、用「・」接起來（以前學校是空的時候中文名後面會掛一個落單的「・」）。
+    [p.name_zh && p.name_en ? esc(p.name_zh) : "", esc(p.school || ""), p.grad_year ? esc(String(p.grad_year)) : "",
+     p.has_account ? esc(T("pp.hasAccount")) + (p.role ? ` (${esc(p.role)})` : "") : ""].filter(Boolean).join("・"), [], { act: "back-people", label: T("person.back") });
   const edit = manage && !p.forgotten_at ? sectionHTML(T("person.edit"), `<div data-pedit><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" value="${esc(p.name_zh || "")}" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" value="${esc(p.name_en || "")}" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" value="${esc(p.school || "")}" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100" value="${esc(p.grad_year || "")}"></label></div>
-      <div class="two"><label><i>${esc(T("person.kind"))}</i>${sel("kind", ["student", "guest", "member"].map(k => [k, T("pkind." + k)]), p.kind, !!p.has_account)}</label><label><i>${esc(T("person.note"))}</i><input name="note" value="${esc(p.note || "")}" maxlength="500"></label></div>
+      <label><i>${esc(T("person.note"))}</i><input name="note" value="${esc(p.note || "")}" maxlength="500"></label>
+      ${p.kind === "member" ? "" : hsCheckHTML(p.kind === "student", !!p.has_account)}
       <div class="form-foot"><button class="btn sm" data-act="person-save"${S.busy ? " disabled" : ""}>${esc(T("common.save"))}</button></div></div>`) : "";
   // 聯絡方式（2026-12-12）：email、LINE、LinkedIn 這些一種一列，原本塞在備註裡。只有管紀錄的人看得到（rc_person 只給他們 identities）。
   const cts = contactsOf(d.identities, p.login_email);
@@ -1361,7 +1591,7 @@ export function personHTML(d, S) {
   const pairs = d.pairs || [];
   const pairHTML = pairs.length ? sectionHTML(T("person.pairs"), `<ul class="flist">${pairs.map(x => `<li><div class="fhead"><b>${esc(x.event || "")}</b>・${esc(x.as === "mentor" ? "Mentor" : "Mentee")}</div><div class="fmeta">${esc(T("person.pairWith"))} ${x.with_id ? `<a href="#people/${esc(x.with_id)}" data-act="open-person" data-id="${esc(x.with_id)}">${esc(x.with || "")}</a>` : esc(T("pair.forgotten"))}${x.matched_on ? "・" + esc(x.matched_on) : ""}${x.ended_on ? "・" + esc(x.ended_on) + " " + esc(T("pend." + (x.end_reason || "other"))) : ""}</div></li>`).join("")}</ul>`) : "";
   const outs = d.outcomes || [];
-  const outHTML = sectionHTML(T("person.outcomes", { n: outs.length }), `${outs.length ? `<ul class="flist">${outs.map(o => `<li><div class="fhead"><b>${esc(T("okind." + o.kind))}</b> ${o.institution ? esc(o.institution) : ""}${o.year ? ` <span class="mini">${esc(String(o.year))}</span>` : ""}</div><div class="fmeta">${[o.country, o.major, o.note].filter(Boolean).map(esc).join("・")}・<span class="mini">${esc(T("vis." + o.visibility))}・${esc(T("osrc." + o.source))}</span>${manage ? ` <button class="btn quiet sm" data-act="out-del" data-id="${esc(o.id)}">${esc(T("common.delete"))}</button>` : ""}</div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("person.noOutcomes"))}</div>`}
+  const outHTML = sectionHTML(T("person.outcomes", { n: outs.length }), `${outs.length ? `<ul class="flist">${outs.map(o => `<li><div class="fhead"><b>${esc(T("okind." + o.kind))}</b> ${o.institution ? esc(o.institution) : ""}${o.year ? ` <span class="mini">${esc(String(o.year))}</span>` : ""}</div><div class="fmeta">${[o.title, o.country, o.major, o.note].filter(Boolean).map(esc).join("・")}・<span class="mini">${esc(T("vis." + o.visibility))}・${esc(T("osrc." + o.source))}</span>${manage ? ` <button class="btn quiet sm" data-act="out-del" data-id="${esc(o.id)}">${esc(T("common.delete"))}</button>` : ""}</div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("person.noOutcomes"))}</div>`}
     ${manage && !p.forgotten_at ? `${foldStart("oadd", "data-oadd", T("out.add"), S)}<div class="two"><label><i>${esc(T("out.kind"))}</i>${sel("kind", OKINDS.map(k => [k, T("okind." + k)]), "admitted")}</label><label><i>${esc(T("out.year"))}</i><input name="year" type="number" min="2000" max="2100"></label></div>
       <div class="two"><label><i>${esc(T("out.institution"))}</i><input name="institution" maxlength="120"></label><label><i>${esc(T("out.country"))}</i><input name="country" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("out.major"))}</i><input name="major" maxlength="80"></label><label><i>${esc(T("out.visibility"))}</i>${sel("visibility", VIS.map(v => [v, T("vis." + v)]), "internal")}</label></div>
@@ -1369,7 +1599,12 @@ export function personHTML(d, S) {
   const resp = d.responses || [];
   const respHTML = resp.length ? sectionHTML(T("person.responses", { n: resp.length }), `<ul class="flist">${resp.map(r => `<li><div class="fhead"><a href="#forms/${esc(r.form_id)}/results" data-act="open-form" data-id="${esc(r.form_id)}"><b>${esc(r.title)}</b></a> <span class="mini">${esc(fmtWhen(r.submitted_at))}</span></div><div class="fmeta">${(r.answers || []).map(a => `${esc(a.key || a.label)}: ${esc(a.value)}`).join("・")}</div></li>`).join("")}</ul>`) : "";
   const forget = pres && !p.forgotten_at ? sectionHTML(T("person.remove"), `<div class="mini">${esc(T(p.has_account ? "person.removeAccount" : "person.removeHint"))}</div>${p.has_account ? "" : `<div class="form-foot"><button class="btn quiet sm" data-act="forget" data-id="${esc(p.id)}">${esc(T("person.forget"))}</button></div>`}`) : "";
-  return head + aliasHTML + msgHTML(S.msg) + edit + ctHTML + schHTML + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
+  // 順序：他是誰（標籤、基本資料、個人檔案）→ BT 跟他的關係 → 他自己寫的與同意的 → 當講者的活動 → 個人連結與聯絡方式（傳連結要用）→ 原本的時間軸。
+  // 已經移除的人那幾塊不畫：個人檔案、標籤、連結在移除時一起清掉了。
+  const network = !net ? `<div class="note">${esc(T("net.noSql"))}</div>` : p.forgotten_at ? "" : null;
+  const top = network != null ? network + edit
+    : personLabelsHTML(d, S, canEdit) + edit + personProfileHTML(d, S, canEdit) + personRelHTML(d, S, canEdit) + personStoryHTML(d) + personConsentHTML(d, S, canEdit) + personSpeakingHTML(d) + personLinkHTML(d, S, canEdit);
+  return head + aliasHTML + msgHTML(S.msg) + top + ctHTML + schHTML + posHTML + partHTML + pairHTML + outHTML + respHTML + forget;
 }
 // 年度比較。
 // ── 年度比較（2026-12-04 改版，Paul：「it looks really messy and pointless, make filters」）──

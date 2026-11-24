@@ -17,6 +17,7 @@ let S = {
   boot: null, event: null, results: null, person: null, yearly: null,
   people: [], pq: "", pastDraft: null, newDraft: null,
   dir: null, dirErr: "", df: {}, dirN: 0, ptab: "dir",
+  dirStale: false,                                          // 個人檔案或標籤改過了，名錄手上那一份舊了：回名錄的時候重拿（先不丟，一個人的頁面還要用它當清單）
   yf: {},                                                   // 年度比較的篩選與「比什麼」   // 名錄（2026-12-03）：整份、載入失敗的訊息、篩選、目前印到第幾個、哪個分頁
   aud: null, audSaved: null, find: {}, more: {},
   // 題目畫布（2026-11-13，shared/forms.js）：questions 是引擎形狀的題目（從 results.questions 轉），
@@ -112,6 +113,11 @@ async function loadDir() {
   try { S.dir = await D.loadDirectory(); }
   catch (e) { S.dir = null; S.dirErr = /rc_directory/.test(String(e && e.message || e)) ? T("dir.noFn") : T("err.load") + D.says(e); }
 }
+// 一個人的頁面。管的人連名錄一起要：「團隊裡誰認識他」那一格要從名單挑人（已經在手上就不重拿）。
+async function loadPerson() {
+  S.person = await D.loadPerson(S.id);
+  if (S.boot && S.boot.can_manage && !Array.isArray(S.dir)) await loadDir();
+}
 async function loadBoot() {
   try { S.boot = await D.loadBootstrap(); }
   catch (e) { S.boot = { events: [], forms: [], terms: [], people: [], duplicates: [], counts: {}, can_manage: false, can_view: false }; S.msg = T("err.load") + D.says(e); }
@@ -126,8 +132,8 @@ async function openRoute(keepMsg) {
   try {
     if (S.view === "overview" && S.id) { S.event = await D.loadEvent(S.id); if (S.event && S.event.can_edit && !Array.isArray(S.dir)) { await loadDir(); } }
     else if (S.view === "forms" && S.id) { const other = !S.aud || S.aud._id !== S.id; setResults(await D.loadResults(S.id)); if (other) { resetAud(); S.fx = newFx(); } }
-    else if (S.view === "people" && S.id) S.person = await D.loadPerson(S.id);
-    else if (S.view === "people" && !Array.isArray(S.dir)) await loadDir();
+    else if (S.view === "people" && S.id) await loadPerson();
+    else if (S.view === "people" && (!Array.isArray(S.dir) || S.dirStale)) { await loadDir(); S.dirStale = false; }
   } catch (e) { S.msg = T("err.load") + D.says(e); }
   S.busy = false;
   render();
@@ -160,6 +166,7 @@ const canEditQs = () => S.view === "forms" && S.id && S.sub === "questions" && !
 const byIds = (qs, ids) => ids.map(id => qs.find(q => q.id === id)).filter(Boolean);
 const liveBox = (sel, box) => root().querySelector(sel) || box;
 async function onAutosave(act, box, field) {
+  if (act === "pf-save") return saveProfileField(box, field);
   if (!S.results) return;
   if (act === "rc-save") {
     // 表單設定：p_questions 送 null，題目不動。
@@ -202,6 +209,65 @@ async function onAutosave(act, box, field) {
       } catch (e) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + D.says(e)); }
     });
   }
+}
+// 個人檔案與關係紀錄（2027-01-03）：改了哪一格就只送那一格（rc_save_profile 只改有給的鍵），存完不重畫，剛打的字留著。
+// 送得出去的鍵只有 UI.PF_KEYS 那幾個（UI.profileFieldPatch 擋），兩個同意不在裡面：這條路送不出 share_profile、share_story。
+async function saveProfileField(box, field) {
+  if (!S.person || !field) return;
+  const id = S.id, r = UI.profileFieldPatch(field.name, field.value, S.dir);
+  if (!r) return;
+  if (r.err) { UI.autosaveState(box, "failed"); UI.toast(T(r.err)); return; }
+  const k = Object.keys(r.patch)[0], v = r.patch[k], key = `pf:${id}:${k}`;
+  if (!dirty.changed(key, v)) return;
+  UI.autosaveState(box, "saving");
+  try {
+    await D.saveProfile(id, r.patch);
+    dirty.mark(key, v);
+    // 手上那一份跟著改，之後這一頁因為別的事重畫（傳照片、開連結）才不會印回舊的字。
+    if (S.person && S.id === id) S.person.profile = Object.assign({}, S.person.profile, r.patch, k === "rel_owner" ? { rel_owner: v || null, rel_owner_name: r.owner ? r.owner.name : null } : {});
+    S.dirStale = true;
+    UI.autosaveState(liveBox(`[data-autosave="pf-save"][data-part="${box.dataset.part || "profile"}"]`, box), "saved"); UI.toast(T("msg.saved"));
+  } catch (e) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + D.says(e)); }
+}
+// 照片（2027-01-03）：瀏覽器端先縮到最長邊 800 的 JPEG（canvas，不用函式庫；透明的地方補白）→ 傳到 Storage 的 people bucket
+// → 網址存進個人檔案 → 舊的那個檔刪掉。跟活動講者的照片同一條路（admin/src/main.js 的 uploadSpeakerPhoto），這裡自己一份。
+async function shrinkPhoto(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch (e) { throw new Error(T("says.photoRead")); }
+  const { w, h } = UI.photoFit(bmp.width, bmp.height);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(bmp, 0, 0, w, h);
+  bmp.close && bmp.close();
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
+  if (!blob) throw new Error(T("says.photoRead"));
+  return blob;
+}
+async function uploadPhoto(input) {
+  const file = (input.files || [])[0];
+  if (!file || !S.person || S.view !== "people" || !S.id) return;
+  if (!UI.photoFileOk(file)) { S.msg = T("err.photo") + T("says.photoType"); render(); return; }
+  const id = S.id, old = (S.person.profile || {}).photo_url || "";
+  // 傳的時候不重畫（別的格子打到一半的字還在）：只把選檔那一格關起來，底下那行小字換成「上傳中」。
+  input.disabled = true;
+  const hint = root().querySelector("[data-pf-up]"); if (hint) hint.textContent = T("pf.uploading");
+  let url = "", msg = "";
+  try {
+    const blob = await shrinkPhoto(file);
+    url = await D.uploadPersonPhoto(id, blob);
+    await D.saveProfile(id, { photo_url: url });
+    if (old && old !== url) await D.removePersonFile(UI.personStoragePath(old));
+    msg = T("msg.photoSaved");
+  } catch (e) {
+    // 檔傳上去了、網址卻沒存成：把剛傳的那個檔刪掉，不留一個沒人用的檔。
+    if (url) await D.removePersonFile(UI.personStoragePath(url));
+    msg = T("err.photo") + D.saysUpload(e);
+  }
+  S.dirStale = true;
+  // 傳的途中人已經去別頁了：不重畫別人的頁面，只在左下角說一聲。
+  if (S.view !== "people" || S.id !== id) { UI.toast(msg); return; }
+  try { await loadPerson(); } catch (e) { /* 重讀失敗就照手上的畫 */ }
+  S.msg = msg; render();
 }
 // 加題、複製、刪、重排、套範本：整份送一次、重讀（ord 與「有人答過」以資料庫為準）、重畫。
 // focusAt：存完要把游標放在第幾題的題目那一格（新加的那一題）。
@@ -461,12 +527,14 @@ document.addEventListener("click", async e => {
   if (act === "ptab") { S.ptab = b.dataset.t; S.msg = ""; render(); return; }
   if (act === "dir-clear") { S.df = {}; S.pq = ""; S.people = []; S.dirN = 0; render(); return; }
   if (act === "dir-more") { S.dirN = (S.dirN || UI.DIR_PAGE) + UI.DIR_PAGE; render(); return; }
+  // 快速篩選（2027-01-03）：願意演講、願意當 mentor，按一下開、再按一下關。
+  if (act === "dir-quick") { const k = b.dataset.k === "mentor" ? "mentor" : "speak"; S.df = { ...(S.df || {}), [k]: (S.df || {})[k] ? "" : "1" }; S.dirN = 0; render(); return; }
   if (act === "person-add-event") {
     const v = vals("[data-paddev]");
     if (!v.event_id) { S.msg = T("err.save") + T("err.needEvent"); render(); return; }
     const ok = await run("err.save", () => D.setParticipation(v.event_id, { person_id: S.id, role: v.role, status: v.status }));
     if (ok === undefined) return;
-    S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.saved"); render(); return;
+    S.dir = null; await loadPerson(); await loadBoot(); S.msg = T("msg.saved"); render(); return;
   }
   // 同名一群一張卡（2026-12-06）：radio 留哪欄、checkbox 勾哪幾欄，一顆鈕併，一顆鈕記「不是同一個人」。
   if (act === "dup-merge" || act === "dup-not-same") {
@@ -508,18 +576,19 @@ document.addEventListener("click", async e => {
     if (ok === undefined) return;
     await loadBoot(); S.msg = T("msg.notSame"); render(); return;
   }
+  // 2027-01-03：不再問「是誰」。預設是來賓（kind guest），勾了「現在還在念高中」才是學員；成員不在這裡加（登入就有）。畫面上的標籤是從紀錄算的。
   if (act === "person-add") {
     const v = vals("[data-padd]");
     if (!String(v.name_zh || v.name_en || v.email || "").trim()) { S.msg = T("err.save") + T("err.needName"); render(); return; }
-    const id = await run("err.save", () => D.savePerson(null, { name_zh: v.name_zh, name_en: v.name_en, email: v.email, kind: v.kind, school: v.school, grad_year: v.grad_year || "" }));
+    const id = await run("err.save", () => D.savePerson(null, { name_zh: v.name_zh, name_en: v.name_en, email: v.email, kind: UI.kindFromForm("", v.hs), school: v.school, grad_year: v.grad_year || "" }));
     if (id === undefined) return;
     S.dir = null; await loadBoot(); go("people/" + id); return;
   }
   if (act === "person-save") {
     const v = vals("[data-pedit]");
-    const ok = await run("err.save", () => D.savePerson(S.id, { name_zh: v.name_zh, name_en: v.name_en, school: v.school, grad_year: v.grad_year || "", kind: v.kind, note: v.note }));
+    const ok = await run("err.save", () => D.savePerson(S.id, { name_zh: v.name_zh, name_en: v.name_en, school: v.school, grad_year: v.grad_year || "", kind: UI.kindFromForm(((S.person || {}).person || {}).kind, v.hs), note: v.note }));
     if (ok === undefined) return;
-    S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.saved"); render(); return;
+    S.dir = null; await loadPerson(); await loadBoot(); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "merge") {
     if (UI.needAsk(S, b, T("merge.ask"))) return;
@@ -531,13 +600,13 @@ document.addEventListener("click", async e => {
     if (UI.needAsk(S, b, T("person.forgetAsk"))) return;
     const ok = await run("err.forget", () => D.forgetPerson(b.dataset.id));
     if (ok === undefined) return;
-    S.dir = null; S.person = await D.loadPerson(S.id); await loadBoot(); S.msg = T("msg.forgot"); render(); return;
+    S.dir = null; await loadPerson(); await loadBoot(); S.msg = T("msg.forgot"); render(); return;
   }
   if (act === "out-add") {
     const v = vals("[data-oadd]");
     const ok = await run("err.save", () => D.saveOutcome(null, { person_id: S.id, kind: v.kind, year: v.year || "", institution: v.institution, country: v.country, major: v.major, visibility: v.visibility }));
     if (ok === undefined) return;
-    S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+    await loadPerson(); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "school-add") {
     const v = vals("[data-sadd]");
@@ -545,34 +614,92 @@ document.addEventListener("click", async e => {
     const mc = document.querySelector('[data-sadd] input[name="make_current"]');
     const ok = await run("err.save", () => D.saveSchool(null, { person_id: S.id, school: v.school, year_from: v.year_from || "", year_to: v.year_to || "", note: v.note || "", make_current: !!(mc && mc.checked) }));
     if (ok === undefined) return;
-    S.dir = null; S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+    S.dir = null; await loadPerson(); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "contact-add") {
     const v = vals("[data-cadd]");
     if (!String(v.value || "").trim()) { S.msg = T("err.save") + T("says.needValue"); render(); return; }
     const ok = await run("err.save", () => D.addContact(S.id, v.kind, v.value));
     if (ok === undefined) return;
-    S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+    await loadPerson(); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "contact-del") {
     const ok = await run("err.delete", () => D.deleteContact(b.dataset.id));
     if (ok === undefined) return;
-    S.person = await D.loadPerson(S.id); render(); return;
+    await loadPerson(); render(); return;
   }
   if (act === "school-del") {
     const ok = await run("err.delete", () => D.deleteSchool(b.dataset.id));
     if (ok === undefined) return;
-    S.dir = null; S.person = await D.loadPerson(S.id); render(); return;
+    S.dir = null; await loadPerson(); render(); return;
   }
   if (act === "school-current") {
     const ok = await run("err.save", () => D.setCurrentSchool(b.dataset.id));
     if (ok === undefined) return;
-    S.dir = null; S.person = await D.loadPerson(S.id); S.msg = T("msg.saved"); render(); return;
+    S.dir = null; await loadPerson(); S.msg = T("msg.saved"); render(); return;
+  }
+  // ── 關係網（2027-01-03，2027-01-03-people-network.sql）：BT 給的標籤、照片、同意、個人連結 ──
+  if (act === "label-save" || act === "label-del") {
+    const label = b.dataset.label, box = b.closest("[data-glabel]"); if (!box || !UI.GIVEN_LABELS.includes(label)) return;
+    const del = act === "label-del";
+    if (del && UI.needAsk(S, b, T("lab.delAsk"))) return;
+    const v = UI.formValues(box), yr = x => (String(x || "").trim() ? Number(x) : null);
+    const since = yr(v.since), until = yr(v.until);
+    const badYear = y => y != null && !(Number.isInteger(y) && y >= 1950 && y <= 2100);
+    if (!del && (badYear(since) || badYear(until) || (since != null && until != null && until < since))) { S.msg = T("err.save") + T("says.badYears"); render(); return; }
+    const ok = await run(del ? "err.delete" : "err.save", () => D.setLabel(S.id, label, !del, v.detail || "", since, until));
+    if (ok === undefined) return;
+    await loadPerson(); S.dirStale = true; S.msg = T(del ? "msg.labelRemoved" : "msg.labelSaved"); render(); return;
+  }
+  if (act === "pf-photo-clear") {
+    if (UI.needAsk(S, b, T("pf.photoClearAsk"))) return;
+    const old = ((S.person || {}).profile || {}).photo_url || "";
+    const ok = await run("err.save", () => D.saveProfile(S.id, { photo_url: "" }));
+    if (ok === undefined) return;
+    await D.removePersonFile(UI.personStoragePath(old));
+    await loadPerson(); S.dirStale = true; S.msg = T("msg.photoCleared"); render(); return;
+  }
+  // 替他取消一個同意。只有取消這一條路：D.withdrawConsent 寫死送 false，這一頁沒有任何按鈕或格子能把同意勾起來。
+  if (act === "pf-withdraw") {
+    if (UI.needAsk(S, b, T("cons.withdrawAsk"))) return;
+    const ok = await run("err.save", () => D.withdrawConsent(S.id, b.dataset.k));
+    if (ok === undefined) return;
+    await loadPerson(); S.msg = T("msg.withdrawn"); render(); return;
+  }
+  // 個人連結：開（已經有一條的時候先問，舊的會馬上失效）、撤銷、複製、QR code。
+  if (act === "link-create") {
+    if (S.person && S.person.link && UI.needAsk(S, b, T("link.renewAsk"))) return;
+    const r = await run("err.link", () => D.profileLink(S.id, "create"));
+    if (r === undefined) return;
+    await loadPerson(); S.msg = T("msg.linkMade"); render(); return;
+  }
+  if (act === "link-revoke") {
+    if (UI.needAsk(S, b, T("link.revokeAsk"))) return;
+    const r = await run("err.revoke", () => D.profileLink(S.id, "revoke"));
+    if (r === undefined) return;
+    await loadPerson(); S.msg = T("msg.linkRevoked"); render(); return;
+  }
+  if (act === "link-copy") {
+    const el = document.getElementById("rc-plink"); if (!el) return;
+    try { await navigator.clipboard.writeText(el.value); UI.toast(T("msg.copied")); } catch (x) { el.select(); }
+    return;
+  }
+  // QR code：自己畫（admin/records/src/qr.js，不載外面的程式）。按的時候才去載那一支，平常開這一頁不用多抓一個檔。
+  // 再按一次收起來。頁面一重畫容器就是空的，所以不用記狀態。
+  if (act === "link-qr") {
+    const box = document.getElementById("rc-qr");
+    if (!box || !box.dataset.link) return;
+    if (box.innerHTML) { box.innerHTML = ""; return; }
+    try {
+      const { qrSVG } = await import("./qr.js");
+      box.innerHTML = UI.qrBoxHTML(qrSVG(box.dataset.link, { px: 260 }));
+    } catch (x) { UI.toast(T("link.qrFail")); }
+    return;
   }
   if (act === "out-del") {
     const ok = await run("err.delete", () => D.deleteOutcome(b.dataset.id));
     if (ok === undefined) return;
-    S.person = await D.loadPerson(S.id); render(); return;
+    await loadPerson(); render(); return;
   }
 });
 
@@ -582,6 +709,7 @@ let findTimer = null;
 document.addEventListener("change", e => {
   const el = e.target;
   if (!el || !el.classList) return;
+  if (el.dataset && el.dataset.act === "pf-photo") { uploadPhoto(el); return; }   // 個人檔案的照片：選了檔就傳
   // 可能重複那張卡：改了留哪欄或勾了誰，合併鈕的字跟著變（「把勾起來的 2 欄併進第 3 欄」）；留的那欄自己的勾選框關掉。
   const dupBox = el.closest && el.closest("[data-dup]");
   if (dupBox) {

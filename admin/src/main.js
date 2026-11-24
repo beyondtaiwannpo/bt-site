@@ -339,6 +339,12 @@ async function reloadEventTickets(eventId, fresh) {
     for (const r of S.evTickets || []) { const o = old.find(x => x.id === r.id); if (o && o.typed && r.id !== fresh) r.typed = o.typed; }
   } catch (e) { S.evTickets = old; S.msg = T("err.evTkLoad") + D.says(e); }
 }
+// 紀錄（Records）裡的照片抄一份到 events bucket：抓下來、照一般照片縮一次、傳上去，回新的網址。抓不到或讀不出來就丟錯，叫的人自己決定怎麼辦。
+async function copyRecordsPhoto(eventId, url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("photo " + res.status);
+  return D.uploadEventImage(eventId, await shrinkImage(await res.blob()));
+}
 // 講者的照片：縮圖 → 傳到 Storage 的 events bucket → 把網址存進那一位（資料庫會把同意改回沒勾）→ 舊的那個檔刪掉。跟封面同一條路。
 async function uploadSpeakerPhoto(speakerId, file) {
   const ev = (S.events || []).find(x => x.slug === S.evSel), sp = (S.evSpeakers || []).find(x => x.id === speakerId); if (!ev || !sp) return;
@@ -1114,11 +1120,14 @@ document.addEventListener("click", async e => {
     S.evSpFound = await D.findPeople(S.evSpQ);
     S.vnOpen["ev-sp-new"] = true; S.busy = false; render(); return;
   }
-  if (act === "ev-sp-pick" || act === "ev-sp-unpick") {
+  // 2027-01-03：挑了多帶主題、學校（個人檔案的單位）與照片，只填空的格子（UI.evSpeakerPrefill）。同意照舊不會自己勾。
+  if (act === "ev-sp-pick" || act === "ev-sp-unpick" || act === "ev-sp-nophoto") {
     keepEventTyped();
     const p = act === "ev-sp-pick" ? (S.evSpFound || []).find(x => x.id === id) : null;
-    S.evSpDraft = p ? Object.assign({}, S.evSpDraft, { display_name: UI.evFirstName(p.name), school: p.school || "", person_id: p.id, from: p.name || "" })
-                    : Object.assign({}, S.evSpDraft, { person_id: null, from: "" });
+    if (act === "ev-sp-pick" && !p) return;
+    S.evSpDraft = p ? UI.evSpeakerPrefill(S.evSpDraft, p)
+                    : act === "ev-sp-nophoto" ? Object.assign({}, S.evSpDraft, { photo_url: "" })
+                    : UI.evSpeakerUnpick(S.evSpDraft);
     S.vnOpen["ev-sp-new"] = true; S.msg = ""; render();
     const n = document.getElementById("ev-sp-new-name"); if (n && p) n.focus();
     return;
@@ -1133,12 +1142,20 @@ document.addEventListener("click", async e => {
     if (adding && S.evSpDraft && S.evSpDraft.person_id) patch.person_id = S.evSpDraft.person_id;
     const reset = !adding && row.consent && patch.display_name !== row.display_name;
     S.busy = true; S.msg = ""; render();
+    // 從紀錄帶來的照片（2027-01-03）：抄一份到 events bucket 再掛上去，跟自己選檔上傳同一條路。
+    // 不直接用紀錄那邊的網址：那邊換照片或拿掉照片會把檔刪掉，這一位在對外頁的照片就跟著壞了。抄不過來就不帶照片，照樣加，講一聲。
+    const from = adding && S.evSpDraft ? String(S.evSpDraft.photo_url || "") : "";
+    let copied = "";
+    if (from) { try { copied = await copyRecordsPhoto(ev.id, from); patch.photo_url = copied; } catch (x) { copied = ""; } }
     try {
       const sid = await D.saveEventSpeaker(ev.id, adding ? null : id, patch);
       if (adding) { S.evSpDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; }
       await reloadEventSpeakers(ev.id, sid);
-      if (!S.msg) S.msg = T(adding ? "msg.evSpAdded" : reset ? "msg.evSpSavedReset" : "msg.evSpSaved");
-    } catch (err) { S.msg = T("err.evSpSave") + D.says(err); if (adding) S.vnOpen["ev-sp-new"] = true; }
+      if (!S.msg) S.msg = T(adding ? (from ? (copied ? "msg.evSpAddedPhoto" : "msg.evSpAddedNoPhoto") : "msg.evSpAdded") : reset ? "msg.evSpSavedReset" : "msg.evSpSaved");
+    } catch (err) {
+      if (copied) await D.removeEventFile(UI.evStoragePath(copied));   // 檔抄過來了、講者卻沒加成：不留一個沒人用的檔
+      S.msg = T("err.evSpSave") + D.says(err); if (adding) S.vnOpen["ev-sp-new"] = true;
+    }
     S.busy = false; render(); return;
   }
   if (act === "ev-sp-move" || act === "ev-sp-del" || act === "ev-sp-photo-clear") {

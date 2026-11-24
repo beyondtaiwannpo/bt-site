@@ -1747,9 +1747,50 @@ export const evTicketFull = t => { const c = Number(t && t.capacity) || 0; retur
 // 這只決定畫不畫那一格；讀不到名錄的人就算自己去叫，資料庫回的也是空的。
 export const evCanPickPeople = me => !!me && (senior(me) || !!wsLevel(me, "custom:records"));
 
+// ── 從紀錄挑講者（2027-01-03，2027-01-03-people-network.sql）──
+// rc_find_people() 多回三樣：labels（["speaker", "student:past"…]，:past 是現在不是了）、card（個人檔案裡的領域、職稱、單位、照片，沒有檔案是 null）、
+// latest（最近一筆去向的學校或公司）。遷移檔還沒跑的資料庫沒有這三樣，下面每一支都當成「沒有」，畫面照舊印身分（成員、學員、來賓）。
+// 標籤的名字在 strings.js 的 lab.*，跟 admin/records 那一份一樣（資料夾之間不互相 import）。
+const EV_LABELS = ["member", "intern", "student", "mentee", "mentor", "speaker", "volunteer", "organizer", "professor", "admission_officer", "connection"];
+export function evLabelName(code) {
+  const [label, tail] = String(code || "").split(":"), past = tail === "past";
+  if (!EV_LABELS.includes(label)) return "";
+  return T("lab." + label + (past && (label === "member" || label === "student") ? ".past" : ""));
+}
+// 找到的那個人後面那排標籤。現在還是學員的那一個照舊是警告色加「可能未成年」（對外頁不放未成年的人）；現在不是了的變淡。
+export function evLabelChips(p) {
+  return ((p && p.labels) || []).map(code => {
+    const name = evLabelName(code); if (!name) return "";
+    if (code === "student") return `<span class="tag warn">${esc(T("ev.spKind.student"))}</span>`;
+    return `<span class="tag${String(code).endsWith(":past") ? " past" : ""}">${esc(name)}</span>`;
+  }).filter(Boolean).join(" ");
+}
+// 挑了一個人之後，「加一位」那幾格要變成什麼。純函式，main.js 的 ev-sp-pick 只叫它。
+// 帶什麼：名字（英文名取第一段）、主題（個人檔案的專長領域）、學校（個人檔案的公司或單位，沒有就最近一筆去向，再沒有才是名單上的學校）、照片。
+// **只填空的格子**：人已經打了字的那一格不蓋。上一次帶入、人沒改過的那個字算空的（draft.auto 記著），所以挑錯人再挑一次會換成對的那個人的。
+// 同意不在這裡：講者的同意照舊要自己勾，挑人不會勾它。
+export const EV_SP_FILL = ["display_name", "subject", "school", "photo_url"];
+export function evSpeakerPrefill(draft, p) {
+  const d = Object.assign({}, draft), auto = Object.assign({}, d.auto), who = p || {}, card = who.card || {};
+  const want = { display_name: evFirstName(who.name), subject: card.field || "", school: card.job_org || who.latest || who.school || "", photo_url: card.photo_url || "" };
+  for (const k of EV_SP_FILL) {
+    const cur = String(d[k] == null ? "" : d[k]).trim();
+    if (cur !== "" && !(auto[k] != null && cur === String(auto[k]).trim())) continue;
+    d[k] = want[k]; auto[k] = want[k];
+  }
+  return Object.assign(d, { person_id: who.id || null, from: who.name || "", auto });
+}
+// 不連到這個人了：名字、主題、學校留著（照舊，人可能只是不想連），紀錄裡帶來的那張照片拿掉（那是他個人檔案的照片）。
+export function evSpeakerUnpick(draft) {
+  const d = Object.assign({}, draft), auto = Object.assign({}, d.auto);
+  if (d.photo_url && auto.photo_url === d.photo_url) { d.photo_url = ""; delete auto.photo_url; }
+  return Object.assign(d, { person_id: null, from: "", auto });
+}
+
 // 講者（一場可以好幾位）。speakers 是 event_speakers_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是講者。
 // 讀與寫的門都是「這場活動改得動」，所以只有「看」的人整塊不畫。
-// x.spUp 是照片的上傳進度 { id, pct, name }；x.spDraft 是「加一位」填到一半的 { display_name, subject, school, person_id, from }；
+// x.spUp 是照片的上傳進度 { id, pct, name }；x.spDraft 是「加一位」填到一半的 { display_name, subject, school, person_id, from, photo_url, auto }
+//（photo_url 是從紀錄帶來的照片，auto 記哪幾格是帶入的，見上面的 evSpeakerPrefill）；
 // x.spOpen 那一格開著沒；x.canPick 看不看得到「從紀錄裡找人」；x.spFound 找到的人（undefined 是還沒找過）；x.spQ 找的字。
 // 名字、主題、學校改完要按「存這一位」；同意是勾了就送（main.js 聽 change）。沒勾的不會出現在對外頁，那道門在資料庫的 public_event_extras()。
 const SP_KEYS = ["display_name", "subject", "school"];
@@ -1783,13 +1824,16 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
   };
   const d = o.spDraft || {};
   const found = o.spFound;
+  // 找到的人後面：個人檔案裡的領域與單位（有才印），再來是標籤。遷移檔還沒跑（沒有 labels）就照舊印身分。
+  const nowOf = p => [(p.card || {}).field, (p.card || {}).job_org].filter(Boolean).join("・");
   const finder = !o.canPick ? "" : `<div class="ev-sp-find">
         <label><i>${T("ev.spFind")}</i><span class="ev-sp-findrow"><input id="ev-sp-q" type="search" value="${esc(o.spQ || "")}" placeholder="${esc(T("ev.spFindPh"))}" autocomplete="off"${dis}><button class="btn ghost sm" data-act="ev-sp-find" data-id="${esc(e.id)}"${dis}>${T("ev.spFindGo")}</button></span><span class="mini">${T("ev.spFindHint")}</span></label>
         ${Array.isArray(found) ? (found.length
-          ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""} <span class="tag${p.kind === "student" ? " warn" : ""}">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
+          ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""}${nowOf(p) ? ` <span class="mini">${esc(nowOf(p))}</span>` : ""} ${Array.isArray(p.labels) ? evLabelChips(p) : `<span class="tag${p.kind === "student" ? " warn" : ""}">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span>`} <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
           : `<p class="ev-line">${T("ev.spFindNone")}</p>`) : ""}
       </div>`;
-  const picked = d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "";
+  const picked = (d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "")
+    + (d.photo_url ? `<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="${esc(d.photo_url)}" alt=""> <span>${T("ev.spPhotoFrom")}</span> <button class="btn quiet sm" data-act="ev-sp-nophoto"${dis}>${T("ev.spPhotoDrop")}</button></p>` : "");
   const add = foldHTML("ev-sp-new", T("ev.spNew"), `<div id="ev-sp-new-box" data-ev="${esc(e.id)}">${finder}${picked}${fields(evRowVals({ typed: d }, SP_KEYS), "ev-sp-new")}
       <div class="mini">${T("ev.spAddHint")}</div>
       <div class="ev-acts"><button class="btn sm" data-act="ev-sp-add" data-id="${esc(e.id)}"${dis}>${T("ev.spAdd")}</button></div></div>`, !!o.spOpen);

@@ -60,6 +60,37 @@ export const mergeAccounts = (keep, drop) => rpc("rc_merge_accounts", { p_keep: 
 export const forgetPerson  = id => rpc("forget_person", { p_person: id });
 export const anonymiseOld  = doIt => rpc("rc_anonymise_old", { p_do: !!doIt });
 
+// ── 關係網（2027-01-03，supabase/migrations/2027-01-03-people-network.sql）──
+// 三支都是管紀錄的人才叫得動（門在函式第一句）。rc_person、rc_directory、rc_find_people 多回的東西不用另外叫。
+// 給或拿掉「BT 給的標籤」（教授、招生官、聯絡人）。賺來的標籤沒有寫的函式：那些是從紀錄算的。
+export const setLabel = (person, label, on, detail, since, until) => rpc("rc_label_set", { p_person: person, p_label: label, p_on: !!on, p_detail: detail || "", p_since: since == null ? null : since, p_until: until == null ? null : until });
+// 改個人檔案與關係紀錄。p 只帶要改的鍵；故事不在這裡（那是他自己的話）。
+// **兩個同意不走這一支**：share_profile、share_story 混在 p 裡會被拿掉，要取消走下面的 withdrawConsent()。
+export function saveProfile(person, p) {
+  const patch = Object.assign({}, p || {});
+  delete patch.share_profile; delete patch.share_story;
+  return rpc("rc_save_profile", { p_person: person, p: patch });
+}
+// 替他取消一個同意。寫死送 false：同意只有本人在個人連結上給得了（資料庫的 consent_needs_self 也擋 true），這一頁沒有任何一條路送得出 true。
+export const withdrawConsent = (person, which) => rpc("rc_save_profile", { p_person: person, p: { [which === "share_story" ? "share_story" : "share_profile"]: false } });
+// 個人連結：action 是 create（舊的撤掉、開一條新的，回 { token, expires_at }）或 revoke。
+export const profileLink = (person, action) => rpc("rc_profile_link", { p_person: person, p_action: action === "revoke" ? "revoke" : "create" });
+// 照片傳到 Storage 的 people bucket（公開讀；上傳與刪除只給管紀錄的人；5 MB；只收圖）。做法跟活動照片同一套（admin/src/data.js 的 uploadEventImage），
+// 這裡自己一份（後台資料夾之間不互相 import）。路徑 <人的 id>/<時間>-<亂數>.jpg，不用原檔名（原檔名可能有人名）。
+// 傳進來的 blob 是 main.js 已經縮好的 JPEG。傳得上去不代表掛得上去：網址要再走 saveProfile({ photo_url })。
+export async function uploadPersonPhoto(personId, blob) {
+  need();
+  const name = `${personId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage.from("people").upload(name, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+  if (error) throw error;
+  return supabase.storage.from("people").getPublicUrl(name).data.publicUrl;
+}
+// 把 bucket 裡的一個檔刪掉。path 是 UI.personStoragePath(網址) 算的；空的（不是我們的檔）就不做事。刪不掉只是多佔一點空間，不擋。
+export async function removePersonFile(path) {
+  if (!path || !supabase) return;
+  try { await supabase.storage.from("people").remove([path]); } catch (e) { /* 檔留著，不擋 */ }
+}
+
 // 資料庫回的代碼翻成人話。先命中先贏。
 const SAYS = [
   ["not_records_manager", "says.notManager"], ["not_records_viewer", "says.notViewer"],
@@ -73,8 +104,13 @@ const SAYS = [
   ["mentor_cannot_read", "says.mentorRead"], ["pair_readers_by_person", "says.pairByPerson"],
   ["same_person", "says.samePerson"], ["both_have_accounts", "says.bothAccounts"], ["has_account", "says.hasAccount"], ["email_taken", "says.emailTaken"],
   ["slug_taken", "says.slugTaken"], ["bad_slug", "says.badSlug"], ["not_president", "says.notPresident"], ["both_have_accounts", "says.bothAccounts"], ["not_both_accounts", "says.notBothAccounts"], ["has_unused_invite", "says.unusedInvite"], ["cannot_remove_self", "says.cannotSelf"], ["cannot_retire_president", "says.cannotPresident"], ["need_name_or_email", "err.needName"],
+  // 關係網（2027-01-03）。too_long:bio 這幾條要排在下面那句 too_long 前面（誰先被 includes 命中誰贏）。
+  ["consent_needs_self", "says.consentSelf"], ["minor_no_link", "link.minor"], ["bad_label", "says.badLabel"], ["bad_years", "says.badYears"], ["bad_rel_open", "says.badRelOpen"],
+  ["photo_not_https", "says.photoNotHttps"], ["too_long:bio", "says.longBio"], ["too_long:rel_note", "says.longNote"], ["too_long:", "says.longField"],
   ["contact_taken", "says.contactTaken"], ["need_value", "says.needValue"], ["bad_email", "says.badEmail"], ["login_email", "says.loginEmail"], ["bad_contact_kind", "says.badContactKind"], ["too_long", "says.tooLong"],
   ["rc_bootstrap", "says.noTables"], ["rc_event", "says.noTables"],
+  // 函式還不在（2027-01-03-people-network.sql 沒跑）：PostgREST 回的句子裡有函式的名字。
+  ["rc_label_set", "says.noNetwork"], ["rc_save_profile", "says.noNetwork"], ["rc_profile_link", "says.noNetwork"],
 ];
 export function says(err) {
   const m = String((err && err.message) || err || "");
@@ -83,4 +119,13 @@ export function says(err) {
   // 資料庫的原文（duplicate key、violates…）不給人看：翻成一句人話（2026-12-11，Paul 看到 rc_identities_one 那串）
   if (/duplicate key|violates|constraint|syntax error|null value in column/i.test(m)) return T("says.dbClash");
   return m;
+}
+// 照片傳不上去的原因。Storage 回的句子跟資料庫函式的不一樣（沒有我們的代碼），先認這幾種，認不得的再交給 says()。
+export function saysUpload(err) {
+  const m = String((err && err.message) || err || "");
+  if (/bucket not found/i.test(m)) return T("says.noBucket");
+  if (/row-level security|unauthorized|not authorized/i.test(m)) return T("says.notManager");
+  if (/exceeded the maximum|too large/i.test(m)) return T("says.photoBig");
+  if (/mime type/i.test(m)) return T("says.photoType");
+  return says(err);
 }

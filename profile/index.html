@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>你的資料 Your details / Beyond Taiwan</title>
+
+<!-- 個人資料的填寫頁（2027-01-03，人的名錄變成關係網）。
+     BT 管紀錄的人在後台替一位**成年的**聯絡人（講者、教授、招生官、校友）開一條個人連結（?t=token），
+     他用那條連結進來，**不用登入**：看 BT 手上關於他的資料、改對、補上學歷與工作、回答六題故事、選 BT 可以拿去做什麼。
+     這一頁沒有 nav、沒有連到站內別頁（只有 logo 回首頁與隱私政策），就是五步的一張表。
+     ── 這一頁不碰 auth ──
+     不判斷登入狀態。讀用 rc_public_profile(token)，存用 rc_public_profile_save(token, p)，兩支是開給 anon 的。
+     資料庫那一半在 supabase/migrations/2027-01-03-people-network.sql；畫面與每一句字在 src/ui.js，載入與存檔在 src/main.js。
+     ── 網址上的 token 是鑰匙 ──
+     所以這一頁有 referrer 的 no-referrer（點出去的連結、載字體，都不會把這條網址帶給別人）與 noindex。
+     token 只出現在叫資料庫的那兩句與右上角換語言的網址；草稿的鑰匙是它的雜湊。改這一頁的時候不要把它接到別的地方。
+     ── 中英兩版 ──
+     預設中文，右上角那顆換英文；網址上有 ?lang= 就照網址。換語言之後網址會跟著換，token 留著。
+     ── 沒有上傳照片 ──
+     不登入的頁面不收檔案（跟回饋表同一條線）。照片由 BT 在後台放，這一頁只顯示。
+     ⚠ 這一頁不准出現佔位文案，check.sh 有守門。 -->
+
+<meta name="description" content="Beyond Taiwan 的個人資料頁。用你收到的個人連結打開，確認 BT 手上關於你的資料。">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta property="og:title" content="你的資料 / Beyond Taiwan">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#EDE5D8">
+
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&display=swap"></noscript>
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="modulepreload" href="../shared/supabase.js">
+<link rel="modulepreload" href="../vendor/supabase-js.js">
+<link rel="modulepreload" href="../shared/supabase-config.js">
+<link rel="modulepreload" href="./src/ui.js">
+
+<script>
+  /* 語言：預設中文，網址上有 ?lang=en 才是英文（這一頁的讀者多半是台灣人，在國外的也是）。
+     語言不記在瀏覽器裡。填到一半的內容放 sessionStorage，只活在這個分頁裡，存成功就清掉（src/ui.js 的 draftSave）。 */
+  (function () {
+    var q = new URLSearchParams(location.search).get("lang");
+    document.documentElement.setAttribute("data-lang", q === "en" ? "en" : "zh");
+  })();
+</script>
+
+<style>
+*{box-sizing:border-box}
+:root{--gut:clamp(20px,5vw,88px)}
+/* 靜態的那幾句（跳到主要內容、載入中、noscript）兩種語言都寫在 HTML 裡，照 <html data-lang> 藏另一版。
+   表單本身由 src/ui.js 畫，一次只畫一種語言。 */
+html[data-lang="en"] .zh,html[data-lang="zh"] .en{display:none}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(118% 88% at 80% 4%, var(--bt-sand) 0%, rgba(255,232,197,0) 60%)}
+main,footer,.topbar{position:relative;z-index:1}
+.skip{position:absolute;left:-9999px;top:0;z-index:80;background:var(--bt-navy);color:var(--bt-cream);padding:12px 18px;text-decoration:none}
+.skip:focus{left:0}
+:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
+.topbar{display:flex;align-items:center;gap:16px;margin:12px var(--gut) 0;padding:9px 0}
+.topbar .home{display:flex;align-items:center;margin-right:auto}
+.topbar .home img{height:30px;width:auto;display:block}
+.lang{display:inline-block;min-width:44px;text-align:center;font:600 14px/1 var(--body);border:1px solid rgba(16,42,134,.32);border-radius:999px;padding:10px 16px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.lang:hover{background:var(--bt-navy);color:var(--bt-cream)}
+main{max-width:760px;margin:0 auto;padding:clamp(16px,3vh,32px) var(--gut) 0}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,4.6vw,40px);line-height:1.12;margin:0 0 18px;color:var(--bt-navy);text-wrap:balance}
+html[data-lang="zh"] h1{font-family:var(--han);font-weight:900;font-size:clamp(25px,4vw,34px);line-height:1.3}
+a{color:var(--ink)}
+.mini{font-size:13.5px;line-height:1.65;color:rgba(16,42,134,.8)}
+.warn{background:rgba(255,196,108,.28);border-radius:12px;padding:12px 16px;margin:0 0 18px;font-size:15.5px;line-height:1.65;overflow-wrap:anywhere}
+.btn{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);border:1px solid var(--bt-navy);border-radius:999px;padding:14px 28px;font:600 16px/1 var(--body);cursor:pointer;text-decoration:none;text-align:center}
+.btn[disabled]{opacity:.6;cursor:default}
+.btn:hover{background:var(--bt-orange);color:var(--bt-navy);border-color:var(--bt-orange)}
+.btn.ghost{background:none;color:var(--ink);border-color:rgba(16,42,134,.3)}
+.btn.ghost:hover{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+
+/* ── 上面那一排步驟 ── 手機上只有五個數字，寬一點才有字；現在是第幾步另外寫一行。 */
+.pf-steps ol{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0}
+.pf-steps button{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px 6px 6px;border:1px solid rgba(16,42,134,.2);border-radius:999px;background:rgba(255,255,255,.5);color:var(--ink);font:500 14px/1.2 var(--body);transition:border-color var(--dur-2) var(--ease),background var(--dur-2) var(--ease)}
+.pf-steps button b{display:flex;align-items:center;justify-content:center;width:30px;height:30px;flex:none;border-radius:999px;background:rgba(16,42,134,.1);font-weight:600}
+.pf-steps button:hover{border-color:var(--bt-navy)}
+.pf-steps button.pf-past b{background:rgba(107,198,187,.5)}
+.pf-steps button[aria-current]{border-color:var(--bt-navy);background:rgba(255,255,255,.92);font-weight:600}
+.pf-steps button[aria-current] b{background:var(--bt-navy);color:var(--bt-cream)}
+@media (max-width:759px){
+  .pf-steps button{padding:6px}
+  .pf-steps button span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+}
+.pf-count{margin:10px 0 16px;font-size:13.5px;color:rgba(16,42,134,.8)}
+
+/* ── 那一張卡 ── 跟 /apply/?f= 那一張同一個樣子。 */
+.pf-card{display:block;background:rgba(255,255,255,.72);border:1px solid rgba(16,42,134,.14);border-radius:22px;padding:clamp(18px,3.4vw,40px);box-shadow:0 18px 44px rgba(16,42,134,.1)}
+.pf-card h2{font-family:var(--display);font-weight:700;font-size:clamp(24px,3vw,30px);line-height:1.2;margin:0 0 12px;color:var(--bt-navy)}
+html[data-lang="zh"] .pf-card h2{font-family:var(--han);font-weight:900;font-size:clamp(21px,2.6vw,26px)}
+.pf-card h2:focus{outline:none}
+.pf-sub{font:600 17px/1.4 var(--body);margin:28px 0 6px;padding-top:20px;border-top:1px solid rgba(16,42,134,.14);color:var(--bt-navy)}
+.pf-lead{margin:0 0 18px;font-size:16px;line-height:1.7}
+.pf-hello p{margin:0 0 10px;font-size:16px;line-height:1.7}
+.pf-hello .pf-hi{font-weight:600;font-size:18px}
+.pf-hello .pf-ev,.pf-hello .pf-again{background:rgba(255,232,197,.7);border-left:3px solid var(--bt-orange);border-radius:0 10px 10px 0;padding:10px 14px}
+.pf-h{font-size:14px;line-height:1.6;color:rgba(16,42,134,.82);margin:0 0 8px;overflow-wrap:anywhere}
+.pf-n{white-space:nowrap;font-variant-numeric:tabular-nums}
+.pf-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 18px}
+@media (min-width:620px){
+  .pf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pf-grid .pf-wide{grid-column:1 / -1}
+}
+.pf-f{margin:0 0 18px;min-width:0}
+.pf-l{display:block;font-weight:600;font-size:16px;line-height:1.5;margin:0 0 5px;color:var(--ink)}
+.pf-f input[type=text],.pf-f input[type=email],.pf-f input[type=tel],.pf-f textarea{
+  display:block;width:100%;font-family:var(--body);font-size:16px;color:var(--ink);padding:12px 14px;
+  border:1px solid rgba(16,42,134,.28);border-radius:12px;background:rgba(255,255,255,.8);
+  transition:border-color var(--dur-2) var(--ease),background var(--dur-2) var(--ease)}
+.pf-f textarea{min-height:120px;line-height:1.65;resize:vertical}
+.pf-f input:hover,.pf-f textarea:hover{border-color:rgba(16,42,134,.5)}
+.pf-f input:focus-visible,.pf-f textarea:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap);background:rgba(255,255,255,.96)}
+.pf-bad input[type=text],.pf-bad input[type=email],.pf-bad input[type=tel],.pf-bad textarea{border-color:var(--bt-navy);border-width:2px}
+.pf-err{font-size:14.5px;font-weight:600;color:var(--ink);margin:8px 0 0;padding:7px 11px;border-left:3px solid var(--bt-orange);background:rgba(255,196,108,.24);border-radius:0 8px 8px 0;overflow-wrap:anywhere}
+.pf-err[hidden]{display:none}
+.pf-opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;cursor:pointer;font-size:16px;line-height:1.5;
+  border:1px solid rgba(16,42,134,.18);border-radius:12px;background:rgba(255,255,255,.55);transition:border-color var(--dur-2) var(--ease),background var(--dur-2) var(--ease)}
+.pf-opt:hover{border-color:rgba(16,42,134,.45)}
+.pf-opt:has(input:checked){border-color:var(--bt-navy);background:rgba(255,255,255,.94)}
+.pf-opt input{width:22px;height:22px;flex:none;margin:1px 0 0;accent-color:var(--bt-navy);cursor:pointer}
+.pf-opt b{display:block;font-weight:600}
+.pf-opt .pf-oh{display:block;font-size:14px;line-height:1.55;color:rgba(16,42,134,.82);margin-top:3px}
+.pf-bad .pf-opt{border-color:var(--bt-navy);border-width:2px}
+.pf-rows{margin:0 0 14px}
+.pf-row{margin:0 0 14px;padding:14px 16px 16px;border:1px solid rgba(16,42,134,.18);border-radius:16px;background:rgba(237,229,216,.35);min-width:0}
+.pf-row legend{font:600 14px/1.3 var(--body);padding:0 8px;color:rgba(16,42,134,.85)}
+.pf-del{min-height:44px;padding:8px 16px;border:1px solid rgba(16,42,134,.3);border-radius:999px;background:none;color:var(--ink);font:500 14.5px/1 var(--body)}
+.pf-del:hover{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.pf-empty{margin:0 0 12px}
+.pf-photo{display:flex;gap:14px;align-items:center;margin:4px 0 6px}
+.pf-photo img{width:72px;height:72px;flex:none;border-radius:999px;object-fit:cover;background:rgba(255,196,108,.35)}
+.pf-photo .pf-h{margin:0;min-width:0}
+.pf-adult{margin-top:26px;padding-top:22px;border-top:1px solid rgba(16,42,134,.14)}
+.pf-nav{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:26px}
+.pf-keep{margin:16px 2px 0}
+.pf-done h1{margin-bottom:12px}
+.pf-done p{margin:0 0 10px;font-size:16px;line-height:1.7}
+.pf-sum{margin:0 0 14px;padding-left:1.3em;font-size:16px;line-height:1.7}
+footer{margin-top:clamp(56px,9vh,120px);padding:28px var(--gut) 40px;font-size:13.5px;line-height:1.7;opacity:.85}
+footer p{margin:0 0 6px}
+footer a{color:var(--ink);font-weight:600}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
+/* 點下去要有回饋（2026-09-08 全站規矩）。 */
+button{cursor:pointer}
+button[disabled]{cursor:default}
+button:not([disabled]):active{transform:scale(.97)}
+.btn:not([disabled]):active{background:var(--bt-navy);color:var(--bt-cream);filter:brightness(.88)}
+.lang:active,.pf-del:active,.pf-steps button:active,.pf-opt:active{background:rgba(255,196,108,.38)}
+footer a:active{text-decoration-color:var(--bt-orange)}
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main"><span class="zh">跳到主要內容</span><span class="en">Skip to content</span></a>
+
+<nav class="topbar" aria-label="網站導覽">
+  <a class="home" href="../" aria-label="Beyond Taiwan 首頁">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
+  </a>
+  <a class="lang" id="lang" href="?lang=en" lang="en" hreflang="en">English</a>
+</nav>
+
+<main id="main">
+  <div id="pf-root"><p class="mini"><span class="zh">載入中…</span><span class="en">Loading…</span></p></div>
+  <noscript><p class="warn"><span class="zh">這一頁要開 JavaScript 才填得了。</span><span class="en">This page needs JavaScript.</span></p></noscript>
+</main>
+
+<footer>
+  <p><a href="../privacy/">隱私政策 / Privacy Policy</a></p>
+  <p>本網站不使用任何追蹤或廣告工具。</p>
+  <p lang="en">This site uses no tracking or advertising tools.</p>
+  <p>beyondtaiwan2020@gmail.com</p>
+  <p>Beyond Taiwan</p>
+</footer>
+
+<script>
+/* 右上角換語言。這裡只換 <html data-lang> 與那顆按鈕上的字，然後喊一聲 bt-lang；
+   src/main.js 聽到之後把表單照新的語言重畫，並把網址換成帶著 token 與新語言的那一條。 */
+(function () {
+  var html = document.documentElement, a = document.getElementById("lang");
+  function setLang(l) {
+    var other = l === "zh" ? "en" : "zh";
+    html.setAttribute("data-lang", l);
+    html.setAttribute("lang", l === "zh" ? "zh-Hant" : "en");
+    a.textContent = other === "en" ? "English" : "中文";
+    a.setAttribute("lang", other === "en" ? "en" : "zh-Hant");
+    a.setAttribute("hreflang", other === "en" ? "en" : "zh-Hant");
+  }
+  setLang(html.getAttribute("data-lang") === "en" ? "en" : "zh");
+  a.addEventListener("click", function (e) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+    e.preventDefault();
+    setLang(html.getAttribute("data-lang") === "zh" ? "en" : "zh");
+    document.dispatchEvent(new CustomEvent("bt-lang"));
+  });
+})();
+</script>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

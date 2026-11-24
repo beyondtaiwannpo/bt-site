@@ -174,4 +174,30 @@ make("admin", "admin",
   `import * as UI from "./src/ui.js";
    ${RQ_PEOPLE}
    const R = Object.assign({ id:"r1", requester:"u2", status:"in_progress", reply:"", created_at:"2026-11-20T00:00:00Z", assignee:"u5" }, UI.rqPayload(D));`, "_audit-rqq.html");
+// /profile/ 個人連結的填寫頁（2027-01-03）。這一頁不用登入，但沒有 token 打開只有一句「連結打不開」，量不到表單。
+// 所以拿 src/ui.js 直接畫三步：第一步（中文，有活動、有上次存的日期、兩格有錯）、第二步（英文，兩所學校、名字都用最長的）、
+// 第五步（英文，沒勾滿 18 歲的那句錯誤開著）。假資料，不叫資料庫。
+function makeProfile(out, lang, step, errors) {
+  const boot = `
+<script type="module">
+import * as UI from "./src/ui.js";
+document.documentElement.setAttribute("data-lang", ${JSON.stringify(lang)});
+const LONG = "Massachusetts Institute of Technology and Example Graduate School of Engineering Sciences";
+const S = UI.fromServer({
+  person: { name_zh: "測試講者", name_en: "Alexandra Montgomery-Wellington", school: "臺北市立測試高級中學 Example Municipal Senior High School" },
+  profile: { photo_url: null, city: "Massachusetts Cambridge", country: "United States of America", job_title: "Senior Staff Research Scientist", job_org: LONG, field: "Semiconductor process engineering", bio: "A short bio.",
+             story: {}, offer_speak: true, offer_mentor: true, contact_ok: true, share_profile: true, share_story: true, done_at: "2027-01-01T00:00:00Z" },
+  contacts: { email: "alexandra.montgomery-wellington@example-university.example.com", phone: "+1 608 555 0100", linkedin: "https://www.linkedin.com/in/alexandra-montgomery-wellington-0123456789", ig: "alexandra.montgomery", line: "alexandra_m", website: "https://example.com/people/alexandra-montgomery-wellington" },
+  education: [{ id: "11111111-1111-4111-8111-111111111111", kind: "graduated", institution: LONG, major: "Electrical Engineering and Computer Science", title: "Bachelor of Science", year: 2019 },
+              { id: "22222222-2222-4222-8222-222222222222", kind: "enrolled", institution: LONG, major: "Materials Science", title: "PhD", year: 2028 }],
+  career: [], events: [], expires_at: "2027-04-03T00:00:00Z" });
+document.getElementById("pf-root").innerHTML = UI.formHTML(S, { step: ${step}, en: ${lang === "en"}, errors: ${JSON.stringify(errors)}, msg: UI.t("fix", ${lang === "en"}),
+  meta: { events: [{ title_zh: "2027 寒假探索營：海外大學申請分享會（假）", title_en: "Winter Exploration Camp 2027: Applying Abroad (fake)", starts_at: "2027-01-03T01:00:00Z" }], done_at: "2027-01-01T00:00:00Z", expires_at: "2027-04-03T00:00:00Z", now: "2026-12-20T00:00:00Z" } });
+</script>`;
+  const s = readFileSync("profile/index.html", "utf8").replace(/<script type="module" src="[^"]*main\.js"><\/script>/, boot);
+  writeFileSync("profile/" + out, s);
+}
+makeProfile("_audit-1.html", "zh", 1, { name_en: "need_name", "contacts.email": "bad_email" });
+makeProfile("_audit-2.html", "en", 2, { "education.1.year": "bad_year" });
+makeProfile("_audit-5.html", "en", 5, { adult: "adult_only" });
 console.log("ok");

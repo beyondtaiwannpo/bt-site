@@ -4335,6 +4335,150 @@ if echo "${stk3}" | grep -q "OVERALL.*PASS" && ! echo "${stk3}" | grep -q "|FAIL
 chk "裝回之後 submit_application 又只有一支" "1" "select count(*) from pg_proc where proname='submit_application' and pronamespace='public'::regnamespace"
 chkrole anon "" "重跑之後講者、類型、照片都還在，沒登入的人照樣拿得到" "1|0|1" \
   "select (select jsonb_array_length(public.public_event_extras('pg-no-date')->'photos'))||'|'||(select jsonb_array_length(public.public_event_extras('pg-no-date')->'speakers'))||'|'||(select jsonb_array_length(public.public_event_extras('tk-smoke')->'tickets'))"
+echo "── 人的關係網：標籤、profile、個人連結（2027-01-03-people-network.sql）──"
+# 這時候：PAUL Co-President（管紀錄）、AMV 紀錄是「看」（讀得到名錄、改不動）、AMT 讀不到名錄、STU 學員。PGEV 是 pg-no-date（對外、沒日期）。
+NWM=supabase/migrations/2027-01-03-people-network.sql
+nw=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${NWM}" 2>&1 || true)
+if echo "${nw}" | grep -q "OVERALL.*PASS" && ! echo "${nw}" | grep -q "|FAIL"; then echo "  ok   關係網那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 關係網那支驗收表："; echo "${nw}" | head -24; fail=$((fail+1)); fi
+nw2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${NWM}" 2>&1 || true)
+if echo "${nw2}" | grep -q "OVERALL.*PASS" && ! echo "${nw2}" | grep -q "|FAIL"; then echo "  ok   關係網那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${nw2}" | head -5; fail=$((fail+1)); fi
+# 前面有幾支重跑過的遷移檔會把紀錄的「看」升成「改」，這裡先撥回「看」，後面才測得到「看得到但改不動」那一層。
+psql -d "${DB}" -X -A -t -q -c "update public.assignments set level='view' where user_id='${AMV}' and workspace_id='custom:records';" >/dev/null
+chkas "${AMV}" "（準備）AMV 在紀錄是「看」：讀得到、改不動" "true|false" "select public.rc_can_view()::text||'|'||public.rc_can_manage()::text"
+nwq() { psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "$1" 2>&1 | tail -1 | tr -d ' \n'; }
+NWP=$(nwq "select public.rc_save_person(null, '{\"name_en\":\"Nina Speaker\",\"email\":\"nina-nw@example.com\",\"kind\":\"guest\"}'::jsonb)")
+NWS=$(nwq "select public.rc_save_person(null, '{\"name_zh\":\"小高\",\"name_en\":\"Hs Kid\",\"kind\":\"student\"}'::jsonb)")
+NWO=$(nwq "select public.rc_save_person(null, '{\"name_en\":\"Other Contact\",\"email\":\"taken-nw@example.com\",\"kind\":\"guest\"}'::jsonb)")
+case "${NWP}${NWS}${NWO}" in ????????-*) echo "  ok   建了三個人（講者、高中生、另一位聯絡人）"; pass=$((pass+1));; *) echo "  FAIL 建人失敗：${NWP} ${NWS} ${NWO}"; fail=$((fail+1));; esac
+# ── 標籤 ──
+chk "剛加的人沒有任何標籤（guest 不是標籤）" "[]" "select public.rc_labels_of('${NWP}')::text"
+chk "★ 算標籤那一支前端叫不到（anon 與登入的人）" "false|false" "select has_function_privilege('anon','public.rc_labels_of(uuid)','execute')::text||'|'||has_function_privilege('authenticated','public.rc_labels_of(uuid)','execute')::text"
+chkraise "★ 紀錄只是「看」的人給不了標籤（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${AMV}',true); perform public.rc_label_set('${NWP}','professor',true,'',null,null);"
+chkraise "★ 學員給不了標籤（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${STU}',true); perform public.rc_label_set('${NWP}','professor',true,'',null,null);"
+chkraise "★ 沒有人能手動給「賺來的」標籤：speaker 不是給得了的（bad_label）" "bad_label" "perform set_config('test.uid','${PAUL}',true); perform public.rc_label_set('${NWP}','speaker',true,'',null,null);"
+chkraise "member 也給不了（bad_label）：標籤不是權限" "bad_label" "perform set_config('test.uid','${PAUL}',true); perform public.rc_label_set('${NWP}','member',true,'',null,null);"
+chkas "${PAUL}" "管紀錄的人給「教授」，帶一句說明與年份" "professor|given|true|NTUEconomics|2019" \
+  "select public.rc_label_set('${NWP}','professor',true,'NTU Economics',2019,null); select (l->>'label')||'|'||(l->>'source')||'|'||(l->>'current')||'|'||(l->>'detail')||'|'||(l->>'since') from jsonb_array_elements(public.rc_labels_of('${NWP}')) l"
+chkas "${PAUL}" "結束年份過了的，標成不是現在" "false" \
+  "select public.rc_label_set('${NWP}','professor',true,'NTU Economics',2019,2020); select l->>'current' from jsonb_array_elements(public.rc_labels_of('${NWP}')) l"
+chkraise "結束年份比開始早擋（bad_years）" "bad_years" "perform set_config('test.uid','${PAUL}',true); perform public.rc_label_set('${NWP}','professor',true,'',2020,2019);"
+NWSPK=$(nwq "select public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"Nina\",\"subject\":\"Economics\",\"person_id\":\"${NWP}\"}'::jsonb)")
+chk "★ 活動頁的講者連到他，speaker 標籤自己出現（沒有人手動加）" "professor:past,speaker:past" "select string_agg(c, ',' order by c) from jsonb_array_elements_text(public.rc_label_codes('${NWP}')) c"
+chk "高中生：student、是現在的" "student|true" "select (l->>'label')||'|'||(l->>'current') from jsonb_array_elements(public.rc_labels_of('${NWS}')) l"
+psql -d "${DB}" -X -A -t -q -c "update public.people set grad_year = 2020 where id='${NWS}';" >/dev/null
+chk "畢業年過了：同一個標籤變成以前的（畫面叫以前的學員）" "student:past" "select string_agg(c, ',') from jsonb_array_elements_text(public.rc_label_codes('${NWS}')) c"
+psql -d "${DB}" -X -A -t -q -c "update public.people set grad_year = null where id='${NWS}';" >/dev/null
+chkas "${PAUL}" "一個人可以同時有好幾個：Co-President 自己是 member" "true" "select exists (select 1 from jsonb_array_elements(public.rc_labels_of(public.rc_me_person())) l where l->>'label' = 'member')::text"
+chk "★ people.kind 沒被動到（幹部名單靠它）" "guest|student" "select (select kind from public.people where id='${NWP}')||'|'||(select kind from public.people where id='${NWS}')"
+# ── profile ──
+chkraise "★ 紀錄只是「看」的人改不了 profile（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${AMV}',true); perform public.rc_save_profile('${NWP}', '{\"city\":\"Taipei\"}'::jsonb);"
+chkraise "★ 管的人不能替別人勾「可以對外」（consent_needs_self）" "consent_needs_self" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_profile('${NWP}', '{\"share_profile\":true}'::jsonb);"
+chkraise "★ 故事可以引用也一樣（consent_needs_self）" "consent_needs_self" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_profile('${NWP}', '{\"share_story\":true}'::jsonb);"
+chkraise "「多願意幫忙」只收四種（bad_rel_open）" "bad_rel_open" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_profile('${NWP}', '{\"rel_open\":\"very\"}'::jsonb);"
+chkraise "照片網址不是 https 擋（photo_not_https）" "photo_not_https" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_profile('${NWP}', '{\"photo_url\":\"http://x/a.jpg\"}'::jsonb);"
+chkas "${PAUL}" "管的人先幫他填：工作、領域、關係紀錄" "Professor|NTU|Economics|open|metatforum|true" \
+  "select public.rc_save_profile('${NWP}', '{\"job_title\":\"Professor\",\"job_org\":\"NTU\",\"field\":\"Economics\",\"rel_open\":\"open\",\"rel_note\":\"met at forum\",\"rel_last_contact\":\"2026-11-01\",\"rel_owner\":\"${NWO}\",\"photo_url\":\"https://x/nina.jpg\"}'::jsonb); select job_title||'|'||job_org||'|'||field||'|'||rel_open||'|'||rel_note||'|'||(rel_owner='${NWO}')::text from public.rc_profiles where person_id='${NWP}'"
+chkas "${PAUL}" "只改有給的鍵：改城市不會洗掉工作" "Taipei|Professor" "select public.rc_save_profile('${NWP}', '{\"city\":\"Taipei\"}'::jsonb); select city||'|'||job_title from public.rc_profiles where person_id='${NWP}'"
+chk "紀錄只記改了哪幾格，不記關係備註的內容" "0" "select count(*) from public.rc_log where what='profile_edit' and after::text like '%met at forum%'"
+chkrole authenticated "${PAUL}" "★ 就算是 Co-President 也不能直接讀 rc_profiles 這張表（只走函式）" "ERROR:permissiondeniedfortablerc_profiles" "select count(*) from public.rc_profiles"
+chkrole anon "" "★ 沒登入的人讀不到 rc_profile_links" "ERROR:permissiondeniedfortablerc_profile_links" "select count(*) from public.rc_profile_links"
+# ── 個人連結 ──
+chkraise "★ 紀錄只是「看」的人開不了連結（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${AMV}',true); perform public.rc_profile_link('${NWP}','create');"
+chkraise "★ 還在念高中的學員開不了連結（minor_no_link）" "minor_no_link" "perform set_config('test.uid','${PAUL}',true); perform public.rc_profile_link('${NWS}','create');"
+chkrole anon "" "★ 沒登入的人叫不到開連結那一支" "ERROR:permissiondeniedforfunctionrc_profile_link" "select public.rc_profile_link('${NWP}','create')"
+NWT0=$(nwq "select public.rc_profile_link('${NWP}','create')->>'token'")
+NWT=$(nwq "select public.rc_profile_link('${NWP}','create')->>'token'")
+chk "連結是 64 個字的亂碼；再開一次，舊的那條就撤掉，同時只有一條有效" "64|true|1|2" "select length('${NWT}')||'|'||('${NWT}' <> '${NWT0}')::text||'|'||(select count(*) from public.rc_profile_links where person_id='${NWP}' and revoked_at is null)||'|'||(select count(*) from public.rc_profile_links where person_id='${NWP}')"
+chkrole anon "" "★ 舊的那條連結打不開了（空值）" "true" "select (public.rc_public_profile('${NWT0}') is null)::text"
+chkrole anon "" "★ 亂猜的連結、太短的連結：空值" "true|true" "select (public.rc_public_profile(repeat('a',64)) is null)::text||'|'||(public.rc_public_profile('abc') is null)::text"
+chkrole anon "" "★ 沒登入、拿對的連結：讀得到自己的那一份，七個鍵" "career,contacts,education,events,expires_at,person,profile" "select string_agg(k, ',' order by k) from jsonb_object_keys(public.rc_public_profile('${NWT}')) k"
+chkrole anon "" "★ 連結讀到的東西裡沒有關係紀錄、沒有內部備註、沒有 id" "0|name_en,name_zh,school" \
+  "select (select count(*) from jsonb_object_keys(public.rc_public_profile('${NWT}')->'profile') k where k like 'rel%')||'|'||(select string_agg(k, ',' order by k) from jsonb_object_keys(public.rc_public_profile('${NWT}')->'person') k)"
+chkrole anon "" "BT 先填的東西他打開就看得到：工作、email、要講的那一場" "Professor|nina-nw@example.com|1" \
+  "select (j->'profile'->>'job_title')||'|'||(j->'contacts'->>'email')||'|'||jsonb_array_length(j->'events') from public.rc_public_profile('${NWT}') j"
+chk "打開過就記一筆時間" "true" "select (opened_at is not null)::text from public.rc_profile_links where token='${NWT}'"
+chkraise "★ 沒勾「我已滿 18 歲」存不進去（adult_only）" "adult_only" "set local role anon; perform public.rc_public_profile_save('${NWT}', '{\"name_en\":\"Nina\"}'::jsonb);"
+chkraise "名字兩個都空的擋（need_name）" "need_name" "set local role anon; perform public.rc_public_profile_save('${NWT}', '{\"adult\":true}'::jsonb);"
+chkraise "email 不像樣擋（bad_email）" "bad_email" "set local role anon; perform public.rc_public_profile_save('${NWT}', '{\"adult\":true,\"name_en\":\"Nina\",\"contacts\":{\"email\":\"not-an-email\"}}'::jsonb);"
+chkraise "故事一題超過三千字擋（too_long）" "too_long:turning" "set local role anon; perform public.rc_public_profile_save('${NWT}', jsonb_build_object('adult', true, 'name_en', 'Nina', 'story', jsonb_build_object('turning', repeat('x', 3001))));"
+chkraise "★ 連結不對存不進去（bad_link）" "bad_link" "set local role anon; perform public.rc_public_profile_save(repeat('b',64), '{\"adult\":true,\"name_en\":\"X\"}'::jsonb);"
+# BT 先記的兩筆去向：一筆錄取（不在表單上）、一筆只有本人看得到的。這兩筆不能被他的表單洗掉。
+psql -d "${DB}" -X -A -t -q -c "insert into public.rc_outcomes (person_id, kind, institution, source, visibility) values ('${NWP}', 'admitted', 'Somewhere U', 'mentorship', 'internal'), ('${NWP}', 'working', 'Secret Co', 'self', 'private');" >/dev/null
+NWSAVE='{"adult":true,"name_en":"Nina Chen","name_zh":"陳妮娜","school":"Taipei First Girls","profile":{"city":"Boston","country":"USA","job_title":"Assistant Professor","job_org":"MIT","field":"Economics","bio":"Hello"},"story":{"highschool":"quiet","turning":"a class","hardest":"visa","decision":"going abroad","wish17":"ask more","first_step":"read","hack":"x"},"contacts":{"email":"taken-nw@example.com","phone":"+1 617 000 0000","linkedin":"https://linkedin.com/in/nina/"},"education":[{"kind":"graduated","institution":"NTU","major":"Economics","title":"BA","year":"2012"},{"kind":"graduated","institution":"MIT","major":"Economics","title":"PhD","year":"2018"}],"career":[{"institution":"MIT","title":"Assistant Professor","year":"2019"}],"offer_speak":true,"contact_ok":true,"share_profile":true,"share_story":false}'
+chkrole anon "" "★ 沒登入、拿對的連結、勾了滿 18：存得進去" "true" "select (public.rc_public_profile_save('${NWT}', '${NWSAVE}'::jsonb)->>'ok')"
+chk "名字、高中、所在地、工作都是他填的" "NinaChen|陳妮娜|TaipeiFirstGirls|Boston|AssistantProfessor|MIT" "select pe.name_en||'|'||pe.name_zh||'|'||pe.school||'|'||pf.city||'|'||pf.job_title||'|'||pf.job_org from public.people pe join public.rc_profiles pf on pf.person_id = pe.id where pe.id='${NWP}'"
+chk "★ 故事只收那六題，別的鍵丟掉" "6|false" "select (select count(*) from jsonb_object_keys(story))||'|'||(story ? 'hack')::text from public.rc_profiles where person_id='${NWP}'"
+chk "★ 他自己勾的同意存進去了，而且記了時間；舉的手也是" "true|false|true|true|true|true" "select share_profile::text||'|'||share_story::text||'|'||(consent_at is not null)::text||'|'||offer_speak::text||'|'||contact_ok::text||'|'||(done_at is not null)::text from public.rc_profiles where person_id='${NWP}'"
+chk "★ 關係紀錄沒有被他的表單動到" "open|metatforum" "select rel_open||'|'||rel_note from public.rc_profiles where person_id='${NWP}'"
+chk "電話與 LinkedIn 進了聯絡方式，來源是本人" "self|self" "select string_agg(source, '|' order by kind) from public.rc_identities where person_id='${NWP}' and kind in ('phone','linkedin')"
+chk "★ 他填了別人的 email：不寫到他身上、那個 email 還是原主的、記一筆給管的人" "0|1|1" \
+  "select (select count(*) from public.rc_identities where person_id='${NWP}' and lower(value)='taken-nw@example.com')||'|'||(select count(*) from public.rc_identities where person_id='${NWO}' and lower(value)='taken-nw@example.com')||'|'||(select count(*) from public.rc_log where what='profile_contact_conflict' and ref='${NWP}')"
+chk "學歷兩筆、經歷一筆，來源本人、內部可見、帶學位與職稱" "3|self|internal|BA,PhD,AssistantProfessor" "select count(*)||'|'||min(source)||'|'||min(visibility)||'|'||string_agg(title, ',' order by year) from public.rc_outcomes where person_id='${NWP}' and source='self' and visibility='internal'"
+chk "★ BT 記的錄取那一筆、只有本人看得到的那一筆都還在" "1|1" "select (select count(*) from public.rc_outcomes where person_id='${NWP}' and kind='admitted')||'|'||(select count(*) from public.rc_outcomes where person_id='${NWP}' and visibility='private')"
+chk "送出過就記一筆時間" "true" "select (submitted_at is not null)::text from public.rc_profile_links where token='${NWT}'"
+NWEDU=$(psql -d "${DB}" -X -A -t -q -c "select id from public.rc_outcomes where person_id='${NWP}' and institution='MIT' and kind='graduated'" | tr -d ' \n')
+chkrole anon "" "再存一次：帶 id 的改那一列，沒送回來的那一列是他拿掉的；電話留空就是拿掉" "true" \
+  "select (public.rc_public_profile_save('${NWT}', '{\"adult\":true,\"name_en\":\"Nina Chen\",\"contacts\":{\"phone\":\"\"},\"education\":[{\"id\":\"${NWEDU}\",\"kind\":\"graduated\",\"institution\":\"MIT\",\"major\":\"Econ\",\"title\":\"PhD\",\"year\":\"2018\"}],\"career\":[]}'::jsonb)->>'ok')"
+chk "學歷剩一筆（同一列、改了科系），經歷清空，電話拿掉，email 還在" "1|true|Econ|0|0|1" \
+  "select (select count(*) from public.rc_outcomes where person_id='${NWP}' and kind='graduated')||'|'||(select (id='${NWEDU}')::text from public.rc_outcomes where person_id='${NWP}' and kind='graduated')||'|'||(select major from public.rc_outcomes where id='${NWEDU}')||'|'||(select count(*) from public.rc_outcomes where person_id='${NWP}' and kind='working' and visibility<>'private')||'|'||(select count(*) from public.rc_identities where person_id='${NWP}' and kind='phone')||'|'||(select count(*) from public.rc_identities where person_id='${NWP}' and kind='email')"
+chk "★ 這一次沒勾「可以對外」：同意被他自己收回" "false" "select share_profile::text from public.rc_profiles where person_id='${NWP}'"
+NWOEDU=$(psql -d "${DB}" -X -A -t -q -c "insert into public.rc_outcomes (person_id, kind, institution, source, visibility) values ('${NWO}', 'graduated', 'Other U', 'import', 'internal') returning id" | head -1 | tr -d ' \n')
+chkrole anon "" "帶別人的去向 id 存一次（下一條看有沒有改到別人）" "true" \
+  "select (public.rc_public_profile_save('${NWT}', '{\"adult\":true,\"name_en\":\"Nina Chen\",\"education\":[{\"id\":\"${NWOEDU}\",\"kind\":\"graduated\",\"institution\":\"Hacked\"}]}'::jsonb)->>'ok')"
+chk "★ 帶別人的去向 id 進來：別人那一列一個字都沒變，當成新的一列加在自己身上" "OtherU|${NWO}|1" \
+  "select (select institution from public.rc_outcomes where id='${NWOEDU}')||'|'||(select person_id from public.rc_outcomes where id='${NWOEDU}')||'|'||(select count(*) from public.rc_outcomes where person_id='${NWP}' and institution='Hacked')"
+chk "★ 沒送 profile 與 story 那兩段的存檔，不會把工作與故事洗掉" "AssistantProfessor|MIT|Economics|6" "select job_title||'|'||job_org||'|'||field||'|'||(select count(*) from jsonb_object_keys(story)) from public.rc_profiles where person_id='${NWP}'"
+chkrole anon "" "換一個 email 存一次" "true" "select (public.rc_public_profile_save('${NWT}', '{\"adult\":true,\"name_en\":\"Nina Chen\",\"contacts\":{\"email\":\"nina-new@example.com\"}}'::jsonb)->>'ok')"
+chkrole anon "" "★ 換過 email 之後重開連結，看到的是新的那個（舊的還留在紀錄裡，BT 找得到他）" "nina-new@example.com" "select public.rc_public_profile('${NWT}')->'contacts'->>'email'"
+chk "舊的 email 沒有被刪" "2" "select count(*) from public.rc_identities where person_id='${NWP}' and kind='email'"
+# ── 誰看得到什麼 ──
+chkas "${PAUL}" "★ 管的人在一個人的頁面看得到連結的 token、標籤、profile、他講的場次" "true|true|true|1" \
+  "select (j->'link'->>'token' = '${NWT}')::text||'|'||(jsonb_array_length(j->'labels') >= 2)::text||'|'||(j->'profile'->>'rel_note' = 'met at forum')::text||'|'||jsonb_array_length(j->'speaking') from public.rc_person('${NWP}') j"
+chkas "${AMV}" "★ 只是「看」的人：看得到 profile 與關係紀錄，拿不到 token" "true|true" "select (j->'link'->>'token' is null)::text||'|'||(j->'profile'->>'rel_open' = 'open')::text from public.rc_person('${NWP}') j"
+chkraise "★ 讀不到名錄的幹部打不開一個人的頁面（not_records_viewer）" "not_records_viewer" "perform set_config('test.uid','${AMT}',true); perform public.rc_person('${NWP}');"
+chkas "${AMV}" "名錄每一列帶標籤與講者卡要的幾格" "true|Economics|MIT|true" "select (x ? 'labels')::text||'|'||(x->>'field')||'|'||(x->>'job_org')||'|'||(x->>'profile_done') from jsonb_array_elements(public.rc_directory()) x where x->>'id' = '${NWP}'"
+chkas "${AMT}" "★ 讀不到名錄的幹部：名錄與找人都是空的" "0|0" "select jsonb_array_length(public.rc_directory())||'|'||jsonb_array_length(public.rc_find_people('Nina'))"
+chkas "${AMV}" "找人帶講者卡（挑講者時直接帶進去）" "Economics|MIT|https://x/nina.jpg" "select (x->'card'->>'field')||'|'||(x->'card'->>'job_org')||'|'||(x->'card'->>'photo_url') from jsonb_array_elements(public.rc_find_people('Nina')) x where x->>'id' = '${NWP}'"
+# ── 連結失效的三種情況 ──
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profile_links set saves = 40, saves_from = now() where token='${NWT}';" >/dev/null
+chkraise "★ 一小時存超過 40 次擋（too_many）" "too_many" "set local role anon; perform public.rc_public_profile_save('${NWT}', '{\"adult\":true,\"name_en\":\"Nina Chen\"}'::jsonb);"
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profile_links set saves = 0, expires_at = now() - interval '1 minute' where token='${NWT}';" >/dev/null
+chkrole anon "" "★ 過期的連結打不開" "true" "select (public.rc_public_profile('${NWT}') is null)::text"
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profile_links set expires_at = now() + interval '1 day' where token='${NWT}';" >/dev/null
+chkas "${PAUL}" "撤銷之後打不開、存不進去" "true" "select public.rc_profile_link('${NWP}','revoke'); select (public.rc_public_profile('${NWT}') is null)::text"
+chkraise "★ 撤銷的連結存不進去（bad_link）" "bad_link" "set local role anon; perform public.rc_public_profile_save('${NWT}', '{\"adult\":true,\"name_en\":\"X\"}'::jsonb);"
+# ── 合併、忘記 ──
+NWD=$(nwq "select public.rc_save_person(null, '{\"name_en\":\"Nina C\",\"kind\":\"guest\"}'::jsonb)")
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.rc_save_profile('${NWD}', '{\"country\":\"Japan\",\"city\":\"Tokyo\",\"rel_note\":\"second note\"}'::jsonb)" -c "select public.rc_label_set('${NWD}','connection',true,'via alumni',null,null)" -c "select public.rc_profile_link('${NWD}','create')" >/dev/null 2>&1
+chkas "${PAUL}" "★ 合併兩個人：留的那個人空的才補、標籤搬過來、被併那一列的連結撤掉" "Boston|USA|metatforum/secondnote|connection,professor|0" \
+  "select public.rc_merge_people('${NWP}','${NWD}'); select (select city||'|'||country||'|'||rel_note from public.rc_profiles where person_id='${NWP}')||'|'||(select string_agg(label, ',' order by label) from public.rc_labels where person_id='${NWP}')||'|'||(select count(*) from public.rc_profile_links where person_id='${NWD}' and revoked_at is null)"
+NWT2=$(nwq "select public.rc_profile_link('${NWP}','create')->>'token'")
+chkas "${PAUL}" "★ 忘記一個人：profile、標籤、連結都清掉，那條連結馬上打不開" "0|0|0|true" \
+  "select public.forget_person('${NWP}'); select (select count(*) from public.rc_profiles where person_id='${NWP}')||'|'||(select count(*) from public.rc_labels where person_id='${NWP}')||'|'||(select count(*) from public.rc_profile_links where person_id='${NWP}')||'|'||(public.rc_public_profile('${NWT2}') is null)::text"
+chk "他當講者的那一列也跟著刪了（上一支的 trigger 還在）" "0" "select count(*) from public.event_speakers where id='${NWSPK}'"
+# ── 破壞測試 ──
+BROKEN=$(mktemp)
+sed "s/  if not coalesce((p->>'adult')::boolean, false) then raise exception 'adult_only' using errcode = 'P0001'; end if;//" "${NWM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「要滿 18」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 adult_only 驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/^revoke all on public.rc_profiles from public, anon, authenticated;$/grant select on public.rc_profiles to authenticated;/" "${NWM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：把 profile 表的讀取權限發給登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 發了 rc_profiles 的權限驗收表沒變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "revoke all on public.rc_profiles from public, anon, authenticated;" >/dev/null
+sed "s/'profile', public.rc_profile_json(v_person, false),/'profile', public.rc_profile_json(v_person, true),/" "${NWM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：讓個人連結讀得到關係紀錄，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 連結讀得到關係紀錄驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/    if pe.kind = 'student' and (pe.grad_year is null or pe.grad_year >= extract(year from now())::int) then raise exception 'minor_no_link' using errcode = 'P0001'; end if;//" "${NWM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「高中生開不了連結」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉 minor_no_link 驗收表沒變紅"; fail=$((fail+1)); fi
+sed "s/^grant execute on function public.rc_profile_link(uuid, text) to authenticated;$/grant execute on function public.rc_profile_link(uuid, text) to anon, authenticated;/" "${NWM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：多開一支函式給沒登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 多開給 anon 驗收表沒變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "revoke all on function public.rc_profile_link(uuid, text) from anon;" >/dev/null
+rm -f "${BROKEN}"
+nw3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${NWM}" 2>&1 || true)
+if echo "${nw3}" | grep -q "OVERALL.*PASS" && ! echo "${nw3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過："; echo "${nw3}" | head -24; fail=$((fail+1)); fi
+chkas "${PAUL}" "幹部名單照舊：roster() 沒有把講者與學員帶進來" "0" "select count(*) from jsonb_array_elements(to_jsonb(array(select r from public.roster() r))) x where x->>'person_id' in ('${NWS}','${NWO}')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
