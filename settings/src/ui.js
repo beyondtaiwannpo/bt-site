@@ -172,7 +172,7 @@ export function tzListHTML(results, q) {
 }
 export { searchTz, labelOf };
 
-export function settingsHTML(me, msg, busy, story, outcomes, tz) {
+export function settingsHTML(me, msg, busy, story, outcomes, tz, founder) {
   const cadre = me.role === "cadre";
   const alumni = me.role === "alumni";
   // 2026-10-17：第四種人，實習生。名字兩格、大頭照（進度牆要用）、沒有故事、可以刪帳號。
@@ -219,6 +219,7 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz) {
     <div class="autorow">${autosaveHint("profile")}<span class="savenote">${T("s.autoNote")}</span></div>
     </div>
     ${cadre ? tzHTML(me, tz) : ""}
+    ${teller ? founderHTML(founder) : ""}
     ${teller ? `<div data-autosave="story" data-id="${esc(me.id || "")}">${storyHTML(me, story)}
     <div class="autorow">${autosaveHint("story")}</div>
     </div>` : ""}
@@ -256,6 +257,21 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz) {
 export function internshipStaff(me) {
   return me.role === "cadre" &&
     (me.board_role === "president" || me.board_role === "senior_adviser" || !!((me.ws || {})["intern-passport"]));
+}
+
+// 創辦人（2026-11-24，supabase/migrations/2027-01-04-founders.sql）。f 是 my_founder() 回的 { founder, consent }。
+// **沒被標成創辦人的人完全看不到這一段**（回空字串），遷移檔還沒跑的時候 f 是 null，也一樣不出現。
+// 這個勾刻意放在兩個自動儲存的容器外面：它不是 profiles 的欄位，是另一支函式（set_founder_consent），
+// 而且只有本人叫得動。main.js 聽 #fdr 的 change，存好只換下面那一行字，不重畫整頁。
+export function founderHTML(f) {
+  if (!f || !f.founder) return "";
+  return `<h3 class="sec-h">${T("fd.title")}</h3>
+    <p class="sec-note">${T("fd.note")}</p>
+    <label class="check">
+      <input id="fdr" type="checkbox"${f.consent ? " checked" : ""}>
+      <span>${T("fd.consent")}</span>
+    </label>
+    <p class="sec-note" data-fdr-note>${f.consent ? T("fd.on") : ""}</p>`;
 }
 
 function avatarHTML(me, cadre, intern) {

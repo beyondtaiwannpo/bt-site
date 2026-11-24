@@ -983,7 +983,7 @@ const teamSelect = (id, val, dis, orgWide) => {
 // 這一屆的職位、team 標籤（只是標籤）、他在哪幾個工作區（唯讀，去工作區頁改）、
 // 最底下是危險的事：發校友碼、合併、刪除成員或刪除紀錄。draft 留住存檔被擋時剛填的東西。
 // remove = { typed }：按了「刪除成員」之後第二步的狀態（要把名字打一次）。
-export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people, remove, email, workspaces) {
+export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people, remove, email, workspaces, founder) {
   const cur = currentTerm(terms);
   const d = draft || {};
   const termId = d.term || (cur ? cur.id : ((terms || [])[0] || {}).id || "");
@@ -1052,6 +1052,14 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
   const dupSec = dups.length ? sectionHTML(T("pe.dup"), `<div class="note">${T("pe.dupNote")}</div>${
     dups.map(o => `<div class="row"><b>${esc(personName(o).name)}</b>${hasAccount(o) ? ` <span class="tag">${T("pe.dupHasAccount")}</span>` : ` <span class="tag draft">${T("ro.noAccount")}</span>`}
       ${isPres ? `<button class="btn ghost sm" data-act="person-merge" data-keep="${esc(p.person_id)}" data-drop="${esc(o.person_id)}"${dis}>${T("pe.mergeInto")}</button>` : ""}</div>`).join("")}`) : "";
+  // 創辦人（2026-11-24，supabase/migrations/2027-01-04-founders.sql）。founder 是 founder_status() 回的 { founder, consent }；
+  // 還在載、載不到、或那支遷移檔還沒跑都是空的，這一段就不出現。沒有帳號的人也不出現（同意公開要他自己登入來勾）。
+  // **這裡只有「標」與「取消」兩顆，沒有替他同意的東西**：會不會公開只有本人勾得了，資料庫那一支也沒有替誰勾的參數。
+  const fdrSec = hasAccount(p) && founder ? sectionHTML(T("pe.founder"),
+    `<div class="note">${!founder.founder ? T("pe.fdrOff") : founder.consent ? T("pe.fdrPublic") : T("pe.fdrWaiting")}</div>
+    ${isPres ? `<div class="row"><button class="btn ghost sm" data-act="founder-set" data-id="${esc(p.person_id)}" data-on="${founder.founder ? "0" : "1"}"${dis}>${founder.founder ? T("pe.fdrUnmark") : T("pe.fdrMark")}</button></div>`
+             : `<div class="mini">${T("pe.presOnly")}</div>`}
+    <div class="mini" style="margin-top:8px">${T("pe.fdrNote")}</div>`) : "";
   let danger = "";
   // 沒有帳號的紀錄（2026-11-07）：「邀請回來」取代原本的「校友碼與刪除紀錄」。Co-President 與 Senior Adviser 都寄得了；
   // 發碼那一條收在摺疊裡（沒有 email 的人才用）；刪除紀錄還是只有 Co-President，放最底下。
@@ -1080,7 +1088,7 @@ export function personEditHTML(p, terms, meId, isPres, msg, busy, draft, people,
     + `<div class="form-foot" style="margin-bottom:28px">
       ${autosaveHint("person-save")}
     </div>`
-    + dupSec + danger;
+    + fdrSec + dupSec + danger;
 }
 
 // 加一筆過去的紀錄（沒有帳號的人）：名字加一筆職位。

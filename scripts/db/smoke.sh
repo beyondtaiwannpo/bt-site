@@ -4479,6 +4479,51 @@ rm -f "${BROKEN}"
 nw3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${NWM}" 2>&1 || true)
 if echo "${nw3}" | grep -q "OVERALL.*PASS" && ! echo "${nw3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒過："; echo "${nw3}" | head -24; fail=$((fail+1)); fi
 chkas "${PAUL}" "幹部名單照舊：roster() 沒有把講者與學員帶進來" "0" "select count(*) from jsonb_array_elements(to_jsonb(array(select r from public.roster() r))) x where x->>'person_id' in ('${NWS}','${NWO}')"
+echo "── 創辦人：Co-President 標、本人同意、對外才出現（2027-01-04-founders.sql）──"
+# Paul 2026-11-24：「add a Founder position so founders show up」，已經離開的創辦人也出現，但要本人同意。
+# 這時候：PAUL 是 Co-President。FDU 是隨便一位有帳號、不是 PAUL 的幹部（他的 people 列是 FDP）。
+FDM=supabase/migrations/2027-01-04-founders.sql
+fd=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FDM}" 2>&1 || true)
+if echo "${fd}" | grep -q "OVERALL.*PASS" && ! echo "${fd}" | grep -q "|FAIL"; then echo "  ok   創辦人那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 創辦人那支驗收表："; echo "${fd}" | head -14; fail=$((fail+1)); fi
+fd2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FDM}" 2>&1 || true)
+if echo "${fd2}" | grep -q "OVERALL.*PASS" && ! echo "${fd2}" | grep -q "|FAIL"; then echo "  ok   創辦人那支重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${fd2}" | head -5; fail=$((fail+1)); fi
+FDROW=$(psql -d "${DB}" -X -A -t -q -c "select pe.id||'|'||pe.profile_id from public.people pe join public.profiles p on p.id = pe.profile_id where p.role = 'cadre' and p.id <> '${PAUL}' order by pe.id limit 1" | tr -d ' \n')
+FDP=${FDROW%%|*}; FDU=${FDROW##*|}
+FDNO=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where profile_id is null order by id limit 1" | tr -d ' \n')
+case "${FDP}${FDU}" in ????????-*) echo "  ok   （準備）找到一位有帳號的幹部當創辦人"; pass=$((pass+1));; *) echo "  FAIL 找不到可以拿來測的人：${FDROW}"; fail=$((fail+1));; esac
+chkrole anon "" "★ 沒登入的人讀不到 founders 表" "ERROR:permissiondeniedfortablefounders" "select count(*) from public.founders"
+chkrole authenticated "${PAUL}" "★ 登入的人（連 Co-President）也不能直接讀寫那張表" "ERROR:permissiondeniedfortablefounders" "update public.founders set consent = true"
+chkraise "★ 不是 Co-President 標不了創辦人（not_president）" "not_president" "perform set_config('test.uid','${FDU}',true); perform public.set_founder('${FDP}', true);"
+chkraise "學員標不了（not_president）" "not_president" "perform set_config('test.uid','${STU}',true); perform public.set_founder('${FDP}', true);"
+if [ -n "${FDNO}" ]; then chkraise "沒有帳號的人標不了：沒有人能替他同意（founder_needs_account）" "founder_needs_account" "perform set_config('test.uid','${PAUL}',true); perform public.set_founder('${FDNO}', true);"; fi
+chkraise "沒被標的人勾不了同意（not_a_founder）" "not_a_founder" "perform set_config('test.uid','${FDU}',true); perform public.set_founder_consent(true);"
+chkas "${PAUL}" "Co-President 標一位創辦人" "true" "select public.set_founder('${FDP}', true)::text"
+chkas "${PAUL}" "後台看得到：標了、本人還沒同意" "true|false" "select (public.founder_status('${FDP}')->>'founder')||'|'||(public.founder_status('${FDP}')->>'consent')"
+chkraise "學員讀不到別人的狀態（not_senior）" "not_senior" "perform set_config('test.uid','${STU}',true); perform public.founder_status('${FDP}');"
+chkrole anon "" "★ 標了但本人沒勾：對外一個都沒有" "0" "select count(*) from public.public_founders()"
+chkraise "★ Co-President 替他勾不了：那一支只改自己那一列，而他自己沒被標（not_a_founder）" "not_a_founder" "perform set_config('test.uid','${PAUL}',true); perform public.set_founder_consent(true);"
+chkas "${FDU}" "本人看得到自己被標了" "true|false" "select (public.my_founder()->>'founder')||'|'||(public.my_founder()->>'consent')"
+chkas "${FDU}" "本人勾同意" "true" "select public.set_founder_consent(true)::text"
+chkrole anon "" "★ 兩把鑰匙都轉了：沒登入的人看得到這一位，只有四欄" "1|id,name_zh,name_en,avatar" "select (select count(*) from public.public_founders())||'|'||(select string_agg(key, ',' order by ord) from (select key, ordinality ord from json_object_keys((select row_to_json(f) from public.public_founders() f limit 1)) with ordinality as k(key, ordinality)) x)"
+chkas "${FDU}" "本人把勾拿掉" "false" "select public.set_founder_consent(false)::text"
+chkrole anon "" "★ 本人收回：對外馬上沒有" "0" "select count(*) from public.public_founders()"
+chkas "${FDU}" "（準備）再勾一次" "true" "select public.set_founder_consent(true)::text"
+chkas "${PAUL}" "★ 取消標記再標一次：同意被清掉，要他重新勾" "true|false" "select public.set_founder('${FDP}', false); select public.set_founder('${FDP}', true); select (public.founder_status('${FDP}')->>'founder')||'|'||(public.founder_status('${FDP}')->>'consent')"
+chkrole anon "" "重新標之後、他還沒重新勾：對外沒有" "0" "select count(*) from public.public_founders()"
+psql -d "${DB}" -X -A -t -q -c "update public.founders set consent = true where profile_id = '${FDU}'; update public.profiles set role = 'student' where id = '${FDU}';" >/dev/null 2>&1 || true
+chkrole anon "" "★ 帳號不再是幹部或校友：就算勾過也不對外" "0" "select count(*) from public.public_founders()"
+psql -d "${DB}" -X -A -t -q -c "update public.profiles set role = 'cadre' where id = '${FDU}';" >/dev/null 2>&1 || true
+chkas "${PAUL}" "public_team() 照舊：沒有多出創辦人那一列" "0" "select count(*) from public.public_team() where title_en = 'Founder'"
+sed "s/^   where f\.consent$/   where true/" "${FDM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉「本人同意才對外」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉同意那一行驗收表沒有變紅"; fail=$((fail+1)); fi
+sed "s/^revoke all on function public.set_founder_consent(boolean) from public, anon;$/grant execute on function public.set_founder_consent(boolean) to anon;/" "${FDM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：把同意那一支開給沒登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 同意那一支開給 anon 驗收表沒有變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "revoke all on function public.set_founder_consent(boolean) from anon;" >/dev/null
+rm -f "${BROKEN}"
+fd3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FDM}" 2>&1 || true)
+if echo "${fd3}" | grep -q "OVERALL.*PASS" && ! echo "${fd3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

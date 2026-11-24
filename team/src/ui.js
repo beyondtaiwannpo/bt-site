@@ -81,10 +81,28 @@ export function leadRank(title) {
   if (t === "senior adviser") return 2;
   return 9;
 }
+// 創辦人（2026-11-24，supabase/migrations/2027-01-04-founders.sql）：創辦人不是一屆一屆的職位，是另一張表，
+// public_founders() 只回 Co-President 標了、本人也同意了的人（id、名字、大頭照）。這裡把他們併進名單：
+//   這一屆已經是 Co-President 或 Senior Adviser 的 → 同一張卡，頭銜前面加 Founder（不要同一個人兩張卡）
+//   其他人（已經離開的、或這一屆在某個 team 的）  → Leadership 多一張卡，頭銜就是 Founder
+// 他在某個 team 的那一張卡不動：那一張回答的是「這個 team 有誰」。
+export function withFounders(people, rows) {
+  const out = (people || []).slice(), seen = new Set();
+  for (const r of rows || []) {
+    if (!r || !r.id || seen.has(r.id)) continue;
+    seen.add(r.id);
+    const i = out.findIndex(p => p.id === r.id && p.lead);
+    if (i >= 0) out[i] = { ...out[i], title: out[i].title ? `Founder · ${out[i].title}` : "Founder" };
+    else { const f = toPerson({ ...r, team: "", title_en: "Founder", title_zh: "創辦人", term: "" }); if (f.name) out.push(f); }
+  }
+  return out;
+}
 // Leadership 那一塊的標題：只寫名單上真的有的那幾種，不寫沒有人的職位。
 const LEAD_WORD = [["創辦人", "Founders"], ["Co-President", "Co-Presidents"], ["Senior Adviser", "Senior Advisers"]];
 export function leadHeading(people, lang) {
-  const en = lang === "en", has = [0, 1, 2].filter(r => (people || []).some(p => leadRank(p.title) === r)).map(r => LEAD_WORD[r][en ? 1 : 0]);
+  // 「Founder · Co-President · 2026-27」這種頭銜兩種都算：每一段各看一次。
+  const ranks = new Set((people || []).flatMap(p => String(p.title || "").split("·").map(leadRank)));
+  const en = lang === "en", has = [0, 1, 2].filter(r => ranks.has(r)).map(r => LEAD_WORD[r][en ? 1 : 0]);
   if (!has.length) return "";
   if (has.length === 1) return has[0];
   return en ? has.slice(0, -1).join(", ") + " and " + has[has.length - 1] : has.slice(0, -1).join("、") + " 與 " + has[has.length - 1];
@@ -93,6 +111,8 @@ export const LEAD_KEY = "__lead";
 export function toPerson(row) {
   const avatar = row.avatar || "";
   return {
+    // 帳號的 id。只用來認「這位創辦人是不是也在名單上」（withFounders），不印在畫面上。
+    id: row.id || "",
     lead: isLeadership(row.title_en || row.title_zh || row.public_title),
     zh: row.name_zh || "",
     en: row.name_en || "",

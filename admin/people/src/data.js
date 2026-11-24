@@ -154,6 +154,10 @@ export const setPosition     = (person, term, zh, en, team) => rpc("set_position
 export const deletePosition  = (person, term, team) => rpc("delete_position", { p_person: person, p_term: term, p_team: team || null });
 // 註冊用的 email，只有 Co-President 與 Senior Adviser 拿得到（門在函式裡）；沒有帳號回 null。
 export const personEmail     = person => rpc("person_email", { p_person: person });
+// 創辦人（2026-11-24，supabase/migrations/2027-01-04-founders.sql）。狀態是 { founder, consent }：標了沒、他本人同意公開了沒。
+// 標記只有 Co-President（門在函式裡）；同意只有本人在「設定」勾得了，這裡沒有替他勾的函式。
+export const founderStatus   = person => rpc("founder_status", { p_person: person });
+export const setFounder      = (person, on) => rpc("set_founder", { p_person: person, p_on: !!on });
 export const renamePerson    = (person, zh, en) => rpc("rename_person", { p_person: person, p_name_zh: zh, p_name_en: en });
 export const addPerson       = (zh, en, note) => rpc("add_person", { p_name_zh: zh, p_name_en: en, p_note: note || null });
 export const removeMember    = person => rpc("remove_member", { p_person: person });
@@ -189,6 +193,7 @@ const SAYS = [
    "One of these applications belongs to another team, so nothing was changed."],
   ["rank_needs_president", "Co-President 與 Senior Adviser 的邀請只有 Co-President 發得出去。", "Only a Co-President can invite someone as Co-President or Senior Adviser."],
   ["not_president", "只有當屆 Co-President 可以做這件事。", "Only this term's Co-Presidents can do this."],
+  ["founder_needs_account", "這個人沒有帳號，標不了創辦人。同意公開要他自己登入來勾。", "This person has no account, so they cannot be marked as a founder. They have to sign in and agree themselves."],
   // set_story_approved() 的第二條失敗路徑（那一列不存在也走這裡）。
   // ⚠ 排在 not_a_cadre / not_cadre **前面**：這張表是「誰先被 includes 命中誰贏」，
   // 而這幾個代碼長得很像，哪天有人加一個含有它們的新代碼就會被前面那條吃掉。

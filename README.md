@@ -2381,8 +2381,7 @@ Paul 2026-11-24 要的：`/team/` 拿掉「三十個人，全部是學生。」�
 - 人怎麼分到各個 team：`team/src/ui.js` 的 `splitGroups()`。屬於六個 team 的放在那個 team 底下，而且**只有那個 team 的人**。
   Co-President 與 Senior Adviser 不在每個 team 底下出現，只在第七張 Leadership（Paul 2026-11-24：「I dont need them to show up every page」）。
   填了別的 team 或沒填 team 的人也放在 Leadership 那一塊。名單照舊來自 `public_team()`，只有本人同意且 Co-President 核可的人。
-- Leadership 那一塊的標題只寫名單上真的有的職位（`leadHeading()`）。Founder 也認得、會排最前面，
-  **但資料庫現在沒有 Founder 這個職位**，所以創辦人還不會出現。要讓他們出現得先在職位裡加 Founder、本人勾同意、Co-President 核可，
+- Leadership 那一塊的標題只寫名單上真的有的職位（`leadHeading()`）。創辦人排最前面，怎麼讓一位創辦人出現見下面「創辦人」那一小節。
   不要把名字直接寫進 HTML（這是 public repo，人名的規則見 CLAUDE.md）。
 - 「我們不是老師，也不是顧問…」那一句從「怎麼運作」留下來當一句引言，因為測試規定首頁搬走的長文每一句都要還在某一頁上。
 - 隔兩張以上（按下面六格）是直接切過去加淡入，不是滑過去：`scroll-snap-stop:always` 在 Chrome 會擋掉程式一次滑兩張。
@@ -2393,6 +2392,37 @@ Paul 2026-11-24 要的：`/team/` 拿掉「三十個人，全部是學生。」�
   之後 `team/src/` 多 import 一支別的資料夾的檔，要加進 `extra()`，測試會擋。
 - 守門：`test/team-reel.test.mjs`（七張、七格、七塊內容中英順序一致，拿掉的東西不會回來，Leadership 不回到每個 team 底下，檔案都帶版本號）。
   `check.sh` 檢查這一頁還在的那個字串從舊大標改成「校友去了哪」。
+
+### 創辦人（`supabase/migrations/2027-01-04-founders.sql`，2026-11-24）
+
+Paul：「add a Founder position so founders show up」。同一天問他已經不在這一屆的創辦人要不要出現，他選「要，但要本人同意」。
+
+⚠ **這一支遷移檔（就是改資料庫的腳本）還沒在正式的 Supabase 上跑。** 沒跑之前三個畫面都安靜地不出現，不會壞：
+團隊頁沒有創辦人、設定頁沒有那個勾、後台沒有那一段。跑完驗收表要全 PASS。
+
+**為什麼不是一個「職位」。** 職位是一屆一屆的（人 × 屆 × team），換屆就不見，而 BT 2020 年成立，創辦人多半已經不在這一屆。
+所以創辦人是跟著人的一個記號，放在自己一張表 `founders`，換屆不用重設。`positions` 與 `public_team()` 都沒有動
+（首頁、後台、BT 島都在讀 `public_team()`，改它牽連太大）。
+
+**兩把鑰匙，各自獨立：**
+
+| 誰 | 在哪裡 | 做什麼 |
+|---|---|---|
+| Co-President | 後台 People，點進那個人，往下捲到「創辦人」 | 按「標成創辦人」或「取消創辦人」。只有 Co-President，Senior Adviser 看得到狀態、沒有按鈕 |
+| 本人 | 登入後的「設定」，被標了才會出現「創辦人」那一段 | 自己打勾同意公開，隨時可以拿掉 |
+
+兩把都轉了，他才會出現在 `/team/` 的 Leadership 那一張，頭銜是 Founder，排最前面。本人把勾拿掉就馬上不見。
+
+- **沒有任何人能替他同意。** 資料庫那一支（`set_founder_consent`）沒有「替誰勾」的參數，改的永遠是叫它的那個人自己的那一列；
+  後台也沒有那顆按鈕。Co-President 取消標記會連同意一起清掉，再標一次他要重新勾。
+- 要有帳號才標得了。已經離開的創辦人先照「把老幹部請回來」那一節請他回來註冊（校友帳號就可以），再標。
+- 對外那一支（`public_founders()`）只回 id、中英文名、大頭照，而且那個帳號現在要是幹部或校友。`founders` 表前端完全讀寫不到。
+- 這一屆是 Co-President 或 Senior Adviser 的創辦人不會有兩張卡：同一張，頭銜變成「Founder · Co-President · 2026-27」（`team/src/ui.js` 的 `withFounders()`）。
+- 未滿 18 歲的人不要標。系統沒有生日欄位，擋不住，後台那一段有寫這一句。
+- **還沒做的一件**：隱私政策「誰看得到什麼」那張表寫的是這一屆的幹部。已經離開的創辦人出現在團隊頁是新的一種公開，
+  標第一位已經離開的創辦人之前，政策要補一句，照「隱私政策改了之後，網站上的公告」那四步走。
+- 守門：`test/founders.test.mjs`；`scripts/db/smoke.sh` 最後一段（標、同意、收回、取消、角色變了就不對外，加兩條破壞測試）。
+  本機的 Supabase（不是正式站）上跑過，也在瀏覽器裡用本機的測試帳號整條走過：Co-President 標、校友自己勾、沒登入的人在團隊頁看得到、勾拿掉就不見、取消標記之後設定頁那一段消失。
 
 ### `/partner/`
 

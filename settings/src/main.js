@@ -29,7 +29,7 @@ function render() {
   if (!S.me) { el.innerHTML = UI.downHTML(); return; }
 
   if (S.view === "delete") { el.innerHTML = nav + UI.deleteHTML(S.msg, S.busy); return; }
-  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes, S.tz);
+  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes, S.tz, S.founder);
 
   // 學校清單學員的 #school 跟幹部/校友「我的故事」那格的 #sschool 共用同一份
   // datalist，兩格都要點進去才載（2026-09-11：故事那一格也接上自動完成）。
@@ -84,6 +84,26 @@ document.addEventListener("change", e => {
   // 2026-11-06 自動儲存：程式幫他選的縣市不會自己觸發 change，補發一次，
   // 不然高中存了、縣市要等他再改別格才會跟著存。
   sel.dispatchEvent(new Event("change", { bubbles: true }));
+});
+
+// 創辦人的同意（2026-11-24，2027-01-04-founders.sql）。勾了就存、拿掉也是；只有本人叫得動那一支（它沒有「替誰勾」的參數）。
+// 沒存進去就把勾撥回原樣：畫面上打著勾、資料庫裡沒有，是最糟的一種狀態（他以為同意了，或以為收回了）。
+document.addEventListener("change", async e => {
+  if (!e.target || e.target.id !== "fdr") return;
+  const box = e.target, ok = box.checked;
+  box.disabled = true;
+  try {
+    const { error } = await supabase.rpc("set_founder_consent", { p_ok: ok });
+    if (error) throw error;
+    S.founder = { founder: true, consent: ok };
+    const note = document.querySelector("[data-fdr-note]");
+    if (note) note.innerHTML = ok ? T("fd.on") : "";
+    UI.toast(T("m.saved", { notes: "" }).trim());
+  } catch (err) {
+    box.checked = !ok;
+    console.error("創辦人的同意沒存進去：", err);
+    UI.toast(T("fd.failed"));
+  } finally { box.disabled = false; }
 });
 
 // 版本提示（2026-11-06，後台速度）：開頁問一次線上的 version.json（cache: no-store，繞過 GitHub Pages 的 10 分鐘快取），
@@ -141,7 +161,7 @@ async function boot() {
     //     要看到的是資料庫現在的值；查完它會把新值寫回快取，別的頁面接著用。
     //   - terms 與 positions 不用等 profiles：positions 的 RLS 只給自己那幾列，先全拿回來再挑這一屆的。
     //     學員會多發這兩個查詢（RLS 擋掉，回來是空的），換到的是幹部每次少兩趟往返。
-    const [whoRes, storyRes, termRes, posRes, welRes, outRes] = await Promise.all([
+    const [whoRes, storyRes, termRes, posRes, welRes, outRes, fdrRes] = await Promise.all([
       AUTH.whoAmI(S.user.id, true),
       Promise.resolve(storyQ).catch(err => ({ data: null, error: err })),
       Promise.resolve(supabase.from("terms").select("id").eq("status", "current").maybeSingle()).catch(() => ({ data: null })),
@@ -150,6 +170,8 @@ async function boot() {
       Promise.resolve(supabase.from("profiles").select("alumni_welcome_dismissed_at").eq("id", S.user.id).maybeSingle()).catch(() => ({ data: null })),
       // 2026-11-08 我的去向（rc_my_outcomes()，只回本人那幾筆）。紀錄那支遷移檔還沒跑、或讀不到，就當作空的，不擋整頁。
       Promise.resolve(supabase.rpc("rc_my_outcomes")).catch(() => ({ data: null })),
+      // 2026-11-24 我是不是創辦人、同意公開了沒（my_founder()，只回本人的）。那支遷移檔還沒跑、或讀不到，就當作不是，不擋整頁。
+      Promise.resolve(supabase.rpc("my_founder")).catch(() => ({ data: null })),
     ]);
     S.me = { ...(whoRes.row || {}), email: S.user.email, alumni_welcome_dismissed_at: (welRes && welRes.data && welRes.data.alumni_welcome_dismissed_at) || null };
     // 2026-10-24：幹部多讀兩樣，都是「有就有、沒有也不擋整頁」：
@@ -164,6 +186,7 @@ async function boot() {
     // 「我的故事」是另一張表。學員沒有這一區，所以查回來的東西直接丟掉。
     if (S.me.role === "cadre" || S.me.role === "alumni") {
       S.outcomes = Array.isArray(outRes && outRes.data) ? outRes.data : [];
+      S.founder = (fdrRes && !fdrRes.error && fdrRes.data && fdrRes.data.founder) ? fdrRes.data : null;
       const { data: st, error: e2 } = storyRes;
       // 讀不到故事**不擋整頁**：姓名與大頭照照樣要改得動。
       if (e2) console.warn("故事讀不到，先當作還沒填：", e2);

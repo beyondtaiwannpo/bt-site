@@ -106,6 +106,12 @@ export const MINE = {
   "av.noTitle":       { zh: "這一屆還沒有你的職位，團隊頁上不會出現。請 Co-President 到後台的幹部名單填。", en: "You have no position this term yet, so you will not appear on the team page. Ask a Co-President to set it under Roster in the admin." },
   "av.approved":      { zh: "已經在公開的團隊頁上了。隨時可以把上面那個勾拿掉。", en: "You are on the public team page. You can untick the box above at any time." },
   "av.pending":       { zh: "還要等 Co-President 核可才會真的出現在公開頁面上。", en: "A Co-President has to approve it before it actually appears on the public page." },
+  // 創辦人（2026-11-24，supabase/migrations/2027-01-04-founders.sql）：Co-President 標了的人才看得到這一段。
+  "fd.title":         { zh: "創辦人", en: "Founder" },
+  "fd.note":          { zh: "Co-President 把你標成 BT 的創辦人。要不要出現在公開的頁面上，由你自己決定，沒有人能替你勾。", en: "A Co-President marked you as a BT founder. Whether you appear on the public page is up to you. Nobody can tick this for you." },
+  "fd.consent":       { zh: "我同意把我的名字與大頭照，以創辦人的身分放上\n        <a href=\"../team/#leadership\">公開的團隊頁</a>。那一頁任何人都看得到，也會被搜尋引擎收錄。\n        不打勾完全沒有關係。", en: "I agree to put my name and avatar on the <a href=\"../team/#leadership\">public team page</a> as a Founder. Anyone can see that page and search engines index it. Leaving this unticked is completely fine." },
+  "fd.on":            { zh: "已經在公開的團隊頁上了。隨時可以把上面那個勾拿掉。", en: "You are on the public team page as a Founder. You can untick the box above at any time." },
+  "fd.failed":        { zh: "沒存進去，再試一次。", en: "Not saved. Please try again." },
   // 我的故事
   "st.title":         { zh: "我的故事", en: "My story" },
   "st.lede":          { zh: "填完並且勾同意、Co-President 核可之後，\n      你會出現在<a href=\"../alumni/\">公開的校友頁</a>那張航線圖上：\n      從你的高中飛到你現在的城市。", en: "Once you fill this in, give consent and a Co-President approves it, you appear on the <a href=\"../alumni/\">public alumni page</a> route map: a flight from your high school to the city you are in now." },

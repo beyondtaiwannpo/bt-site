@@ -53,7 +53,7 @@ function render() {
   else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior(), S.grp); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
-  else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces);
+  else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces, S.personFounder);
   else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd, S.bulk);
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body); UI.railAfter(el);
   UI.afterRender(S, el);
@@ -204,9 +204,12 @@ async function reopenPerson(id, msg) {
 // 註冊用的 email（2026-10-26）：另外叫一次 person_email()，回來再重畫那一行。沒有帳號不叫。
 // 載不到不擋整頁，只是那一行停在「載入中」。
 async function loadEmail(p) {
-  S.personEmail = undefined;
+  S.personEmail = undefined; S.personFounder = null;
   if (!p || !p.profile_id) { S.personEmail = null; return; }
+  // 創辦人的狀態（2026-11-24）跟 email 一起問。載不到（那支遷移檔還沒跑）就是 null，那一段不出現，不擋別的。
+  const fq = D.founderStatus(p.person_id).catch(() => null);
   try { S.personEmail = await D.personEmail(p.person_id); } catch (e) { S.personEmail = undefined; }
+  S.personFounder = await fq;
   if (S.person && S.person.person_id === p.person_id) render();
 }
 // 批次面板上填的東西收進 S.bulk（重畫不會掉）：每一列的 email 與語言、全部套用的語言。
@@ -420,6 +423,15 @@ document.addEventListener("click", async e => {
     try { await navigator.clipboard.writeText(b.dataset.email); S.msg = T("msg.copied", { email: b.dataset.email }); }
     catch (e) { S.msg = T("err.copy"); }
     render(); return;
+  }
+  // 創辦人（2026-11-24）：標或取消。只有 Co-President（門在 set_founder() 裡）。標了不等於公開，要他本人在「設定」勾。
+  if (act === "founder-set") {
+    const p = findPerson(b.dataset.id); if (!p) return;
+    const on = b.dataset.on === "1";
+    const done = await run("err.founder", () => D.setFounder(p.person_id, on));
+    // 新標的與重新標的都還沒同意（取消會把同意一起清掉），所以這裡直接知道狀態，不用再問一次。
+    if (done !== undefined) { S.personFounder = { founder: on, consent: false }; await reopenPerson(p.person_id, T(on ? "msg.fdrMarked" : "msg.fdrUnmarked")); }
+    return;
   }
   if (act === "person-code") {
     const p = findPerson(b.dataset.id); if (!p) return;

@@ -11,7 +11,7 @@
 //   其他（Founder、Co-President 與 Senior Adviser、填了別的 team、沒填 team）→ 第七張 Leadership 那一塊的 .tm-people
 // 怎麼分只有一份，在 ui.js 的 splitGroups()。
 import { supabase } from "../../shared/supabase.js";
-import { splitGroups, crewHTML, groupsHTML, teamSlug, toPerson, rankWeight, leadRank, leadHeading, LEAD_KEY } from "./ui.js";
+import { splitGroups, crewHTML, groupsHTML, teamSlug, toPerson, rankWeight, leadRank, leadHeading, withFounders, LEAD_KEY } from "./ui.js";
 
 // 中英兩版**畫同一批人**，只有標題與那一句說明不一樣。
 const T = {
@@ -25,14 +25,19 @@ const T = {
     // 只回「本人同意、Co-President 核可、而且這一屆有職位」的幹部，頭銜從職位算（title_en · term），
     // 分組用職位上的 team（空的退回 profiles.team 第一個）。換屆之後沒留下的人自動消失。
     // 它是 security definer，沒登入也叫得動；不再直接讀 profiles 那幾欄。
-    const { data, error } = await supabase.rpc("public_team");
+    // 創辦人另外一支（public_founders()，2027-01-04-founders.sql）：Co-President 標了、本人也同意了才回。
+    // **那一支載不到不擋名單**：遷移檔還沒跑、或資料庫那一支壞了，就當作沒有創辦人，其他人照畫。
+    const [{ data, error }, founders] = await Promise.all([
+      supabase.rpc("public_team"),
+      Promise.resolve(supabase.rpc("public_founders")).then(r => (r && !r.error && Array.isArray(r.data)) ? r.data : [], () => []),
+    ]);
     if (error) throw error;
     // ⚠ **排序要是固定的，而且要看得懂為什麼。**
     // 拍照那天的姿勢是照這個順序配的（往右看的人，右邊那個比「噠噠」），
     // 所以「誰在誰旁邊」不能每次載入都不一樣。
     // 用英文名的字母序：不用誰去維護一個順序欄位，加一個人也不會把別人的姿勢錯開太多。
     // 2026-10-28 Paul：同一組裡 Director 在前、Adviser 其次、其他（Associate）照英文名。看的是職位開頭那個字。
-    const people = (data || []).map(toPerson).filter(p => p.name)
+    const people = withFounders((data || []).map(toPerson).filter(p => p.name), founders)
       .sort((a, b) => rankWeight(a.title) - rankWeight(b.title) || (a.en || a.zh).localeCompare(b.en || b.zh, "en"));
     if (!people.length) return;
     const { teams, rest } = splitGroups(people);
