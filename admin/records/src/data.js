@@ -50,7 +50,6 @@ export const saveOutcome   = (id, p) => rpc("rc_save_outcome", { p_outcome: id |
 export const deleteOutcome = id => rpc("rc_delete_outcome", { p_outcome: id });
 export const saveSchool    = (id, p) => rpc("rc_save_school", { p_school: id || null, p });
 export const deleteSchool  = id => rpc("rc_delete_school", { p_school: id });
-export const setCurrentSchool = id => rpc("rc_set_current_school", { p_school: id });
 export const addContact    = (person, kind, value) => rpc("rc_contact_add", { p_person: person, p_kind: kind, p_value: value });
 export const deleteContact = id => rpc("rc_contact_del", { p_id: Number(id) });
 export const saveReview    = (id, p) => rpc("rc_save_review", { p_event: id, p });

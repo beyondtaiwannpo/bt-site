@@ -6031,6 +6031,72 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 紀錄裡一個人的那一頁：標籤可以自己加、現在在哪照時間排、「跟 BT 的關係」拿掉（2026-11-25）
+
+Paul 看著紀錄裡一位以前的學員（高中在名單上，後來念了大學）講的：
+
+> why is it not editable from people?… Each people should be able to be given label, and then label can be added and… there's got to be detail…
+> if he was the speaker of our overseas unpack, that label should say it. And we should be able to edit that if we click into individual people.
+>
+> she used to be a student, but now she is in University of Washington… AIA… is her current school, which is not right… always put university or job
+> in a chronologically order. And put the latest as their current status. And obviously, if they're a university student, untick the currently a high school student thing.
+>
+> the relationship part in a people, I think that's kind of useless
+
+⚠ **這一步有遷移檔 `supabase/migrations/2027-01-06-labels-and-schools.sql`，要 Paul 在正式的 Supabase 跑過。** 檔直接交給他了。還沒跑之前：
+畫面照樣打得開，「現在在哪」已經照時間排（那是畫面算的）；教授、招生官、聯絡人以外的標籤加不了，會講要跑哪一支；已經念大學的人「現在還在念高中」那一格還是勾著的。
+
+### 1. 標籤每一種都可以自己加
+
+標籤有兩個來源，畫面上每一行後面寫是哪一個：
+
+| 來源 | 怎麼來的 | 能不能改 |
+|---|---|---|
+| 從紀錄來的 | 出席、職位、配對、當講者，資料庫自己算 | 拿不掉（要拿掉就去改那一筆紀錄），但可以替它寫補充說明與年份 |
+| BT 加的 | 管紀錄的人在這一頁加的 | 可以改、可以拿掉 |
+
+- 以前只有教授、招生官、聯絡人三種可以自己加，其他八種（幹部、實習生、學員、Mentee、Mentor、講者、志工、主辦）只能靠紀錄算。現在**十一種都可以加**。
+- 「加、改標籤」打開：已經加過的每一種一塊（補充說明、哪一年起、到哪一年、存、拿掉），最下面一塊「加一個標籤」先選哪一種。
+- 講者、學員、志工、主辦從紀錄來的時候，補充說明會自己列出是哪幾場活動（最近三場）。BT 寫了補充說明就用 BT 寫的。
+- 同一種標籤兩邊都有，合成一行，寫「從紀錄來的，BT 補了說明」。
+- 現在還是不是：BT 寫了「到哪一年」就照那一年；沒寫就照紀錄；只有 BT 加的、沒寫到哪一年的當成現在還是。
+- **「學員」例外**：要算現在的學員，「現在還在念高中」那一格一定要勾著，光加標籤不算。活動的講者那一塊就是看這個決定「放在對外頁」先不先勾。
+- 標籤只是描述一個人，**不給任何權限**。資料庫裡沒有任何一道門看這張表。加標籤的門沒有變：管得了紀錄的人。
+
+### 2. 現在在哪：學校與去向排成一條
+
+以前「現在的學校」是名單上那一格（多半是高中），大學與工作另外記在「去向」，所以念了大學的人頁首還是高中。
+
+- 「學校與工作，新的在上面」那一塊把兩邊排成一條，**第一列標「現在」**，頁首名字底下印的也是那一列。算法在 `admin/records/src/ui.js` 的 `placesOf`：
+  去向只收「就讀、轉學、畢業、工作」（申請、錄取不算，那還沒去）；去向排在學校前面，有年份的新到舊；只記在學校那邊、年份比每一筆去向都晚的那一所排最前面。
+- 每一所學校旁邊那顆「設成現在的」拿掉了：現在是哪一所照年份排，不用人指定。年份排錯了就去補年份。
+- 名單上那一格學校（`people.school`）沒有動，名錄的篩選照舊用它。
+- **念大學或工作了，「現在還在念高中」那一格自己取消**（要跑遷移檔才有）：去向多了一筆「就讀、轉學、畢業、工作」（年份是空的或不晚於今年），那一格就取消，
+  跟人在畫面上取消一模一樣；同時留一個「學員」標籤，所以看得出是「以前的學員」。遷移檔會把現有的資料照這一條補一次，驗收表第 9 列寫補了幾個人。
+  有自己帳號的學員不動（那一格本來就鎖著）。「錄取」不算：高三錄取了還在念高中。
+- ⚠ 那一格取消之後，這個人就開得了個人連結、去向也可以由他自己勾成連名字公開。那兩道門本身一行沒改，只是他不再被當成高中生。
+
+### 3.「跟 BT 的關係」那一塊拿掉
+
+「參與紀錄」分頁最上面那一塊（團隊裡誰認識他、上次聯絡、他多願意幫忙、備註）不畫了，也不再從這一頁存。資料庫那四欄還在，已經填的沒有刪。
+
+### 還沒做的：備註變成參與紀錄
+
+Paul 同一次也說了，每個人備註裡那種「BT: Event Attendee; since S2021; S21 Event Attendee; status: Student」要拿掉，變成真的參與紀錄。**這一件還沒做**，原因：
+
+- 那些備註是從舊的 BT Alumni Database 匯進來的，只寫「2021 夏天參加過活動」，沒有寫是哪一場。
+- Drive 匯出的清單裡，2021 年只有秋天 EC panel 的簽到表、模擬面試報名、導生與 office hour 的表單，沒有 2021 夏天活動的簽到表，所以多半對不到某一場。
+- Claude 讀不到正式資料庫，不知道備註到底有哪幾種寫法、資料庫裡現在有哪些過去的活動可以掛。
+
+下一步是 Paul 跑一支只讀的查詢（`~/Anson/outputs/beyond-taiwan/website/docs/2026-11-25-notes-to-participation/note-patterns-readonly.sql`，不印名字、不改資料），
+把結果貼回來，再決定對不到場次的那些要掛在哪（例如一個「2021 夏天的活動」），然後才寫轉換的那一支。
+
+### 驗收
+
+`test/people-network-admin.test.mjs` 多三條（標籤編輯區、現在在哪的排序、遷移檔的規則），`test/records.test.mjs` 改了一條。`scripts/db/smoke.sh` 最後多一段 31 項（它的遷移檔清單是寫死的，新增一支要自己加）：
+補資料抓得到人、錄取與還沒到的年份不算、還算高中的人照舊開不了連結、十一種標籤加得了、沒被派進紀錄的人加不了、沒登入的人叫不到、兩個破壞測試。
+本機瀏覽器接本機 Supabase 走過：加一個講者標籤、加一筆就讀的去向，那一格自己取消、頁首變成大學。試完的資料都還原了。正式站上還沒跑、還沒人點過。
+
 ## 講者與紀錄接起來：在活動裡就能加新的人、開他的個人連結（2026-11-25）
 
 Paul 問的：

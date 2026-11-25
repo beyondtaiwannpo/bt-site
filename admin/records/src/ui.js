@@ -1354,7 +1354,8 @@ export function contactHref(kind, value) {
 // ═══════════════════════════════════════════════════════════════════════
 // 標籤的順序跟資料庫的 rc_labels_of() 一樣：前八種從紀錄算（賺來的），後三種是 BT 給的。
 export const LABELS = ["member", "intern", "student", "mentee", "mentor", "speaker", "volunteer", "organizer", "professor", "admission_officer", "connection"];
-export const GIVEN_LABELS = ["professor", "admission_officer", "connection"];
+// BT 自己加得了的標籤。2027-01-06-labels-and-schools.sql 起十一種都可以（原本只有教授、招生官、聯絡人三種）。
+export const GIVEN_LABELS = LABELS.slice();
 // 「以前是」有自己名字的只有兩種：幹部 → 校友（前幹部）、學員 → 以前的學員。其他幾種現在與以前同一個名字，畫面上只是變淡。
 const PAST_NAMED = ["member", "student"];
 // 名錄與搜尋回的短版："speaker"、"student:past"（:past 是現在不是了）。
@@ -1413,26 +1414,14 @@ export function photoFit(w, h, max) {
 }
 // 自動儲存收的鍵（rc_save_profile 的 p）。**兩個同意不在裡面**：同意只有本人給得了，這一頁只能取消（data.js 的 withdrawConsent 寫死送 false）。
 // 他自己舉的手（願意演講、願意當 mentor、可以聯絡）也不在：那是他在個人連結上說的，這一頁只讀。
-export const PF_KEYS = ["city", "country", "job_title", "job_org", "field", "bio", "rel_owner", "rel_last_contact", "rel_open", "rel_note"];
-export const REL_OPEN = ["unknown", "open", "maybe", "closed"];
+// 2026-11-25：「跟 BT 的關係」那一塊拿掉了（Paul：「the relationship part in a people, I think that's kind of useless」），所以 rel_* 那四格不再從這一頁送。
+// 資料庫那四欄還在（rc_profiles.rel_*），已經填的沒有刪，只是這一頁不畫、不存。
+export const PF_KEYS = ["city", "country", "job_title", "job_org", "field", "bio"];
 export const STORY_KEYS = ["highschool", "turning", "hardest", "decision", "wish17", "first_step"];
-// 「團隊裡誰認識他」那一格的清單：名錄裡的幹部、校友、實習生（標籤 member 或 intern，現在或以前都算）。一個都沒有就給整份名錄。
-export function teamOf(dir) {
-  const list = Array.isArray(dir) ? dir : [];
-  const team = list.filter(x => hasNetwork(x) ? x.labels.some(c => ["member", "intern"].includes(parseLabel(c).label)) : x.kind === "member");
-  return team.length ? team : list;
-}
-// 自動儲存的一格 → rc_save_profile 的 { 鍵: 值 }。回 { patch } 或 { err: "err.relOwner" } 或 null（這一格不歸這裡存）。
-// 「誰認識他」那一格打的是名錄上的那一行字，要對回那個人的 id；清空就是拿掉。
-export function profileFieldPatch(name, value, dir) {
+// 自動儲存的一格 → rc_save_profile 的 { 鍵: 值 }。回 { patch } 或 null（這一格不歸這裡存）。
+export function profileFieldPatch(name, value) {
   const v = typeof value === "string" ? value.trim() : value;
-  if (name === "rel_owner_who") {
-    if (!v) return { patch: { rel_owner: "" }, owner: null };
-    const m = dirMatch(teamOf(dir), v) || dirMatch(dir, v);
-    return m ? { patch: { rel_owner: m.id }, owner: m } : { err: "err.relOwner" };
-  }
-  if (!PF_KEYS.includes(name) || name === "rel_owner") return null;
-  if (name === "rel_open" && !REL_OPEN.includes(v)) return null;
+  if (!PF_KEYS.includes(name)) return null;
   return { patch: { [name]: v == null ? "" : v } };
 }
 // 「現在還在念高中」那一格：取代以前的三選一（成員、學員、來賓）。勾了送 kind student，沒勾送 guest；成員不在這裡加。
@@ -1444,20 +1433,58 @@ export function kindFromForm(oldKind, hs) { return oldKind === "member" ? "membe
 const brText = v => esc(String(v || "")).replace(/\r?\n/g, "<br>");
 const photoHTML = (url, name) => url ? `<img class="rc-photo" src="${esc(url)}" alt="">` : `<span class="rc-photo" aria-hidden="true">${esc((Array.from(String(name || "").trim())[0] || "").toUpperCase())}</span>`;
 
-// 標籤那一塊：每一個標籤一行（哪一年起、幾次、補充），一句說明，管的人底下有「BT 給的標籤」可以加、改、拿掉。
+// 標籤那一塊（2026-11-25 重做，Paul：「why is it not editable from people?… Each people should be able to be given label… there's got to be detail…
+// we should be able to edit that if we click into individual people」）。
+// 標籤有兩個來源，資料庫的 rc_labels_of() 已經合成一列（2027-01-06-labels-and-schools.sql）：
+//   earned 從紀錄算出來的（出席、職位、配對、當講者）。拿不掉，要拿掉就去改那一筆紀錄；但可以替它寫補充說明與年份。
+//   given  BT 自己加的。十一種都可以加，寫補充說明、哪一年起、到哪一年，可以改、可以拿掉。
+// 每一行：標籤、那行小字（年份、幾次、補充說明）、來源。管的人底下有一格「加、改標籤」：已經加過的每一種一塊（存、拿掉），最下面一塊是加新的（先選哪一種）。
+// 還沒跑那一支的資料庫，每一列沒有 given／earned 這兩個鍵，就照 source 判斷；加那三種以外的標籤資料庫會回 bad_label，那一句會講要跑哪一支。
+const isGiven = l => (l.given != null ? !!l.given : l.source === "given");
+const isEarned = l => (l.earned != null ? !!l.earned : l.source !== "given");
 export function personLabelsHTML(d, S, canEdit) {
   const labs = (d.labels || []).filter(l => LABELS.includes(l.label));
+  const src = l => T(isEarned(l) ? (isGiven(l) ? "lab.srcBoth" : "lab.srcEarned") : "lab.srcGiven");
   const list = labs.length ? `<ul class="rc-labels">${labs.map(l => { const facts = labelFacts(l);
-      return `<li${l.current ? "" : ` title="${esc(T("lab.notNow"))}"`}>${labelTag(l.label, !!l.current)}${facts.length ? ` <span class="mini">${facts.map(esc).join("・")}</span>` : ""}</li>`; }).join("")}</ul>`
+      return `<li${l.current ? "" : ` title="${esc(T("lab.notNow"))}"`}>${labelTag(l.label, !!l.current)}${facts.length ? ` <span class="mini">${facts.map(esc).join("・")}</span>` : ""} <span class="mini rc-labsrc">${esc(src(l))}</span></li>`; }).join("")}</ul>`
     : `<div class="mini">${esc(T("lab.none"))}</div>`;
   const given = Object.fromEntries((d.given || []).map(g => [g.label, g]));
+  const fields = g => `<div class="two"><label class="wide"><i>${esc(T("lab.detail"))}</i><input name="detail" value="${esc(g ? g.detail || "" : "")}" maxlength="160" autocomplete="off"></label>
+          <label><i>${esc(T("lab.sinceYear"))}</i><input name="since" type="number" min="1950" max="2100" value="${esc(g && g.since ? g.since : "")}"></label><label><i>${esc(T("lab.untilYear"))}</i><input name="until" type="number" min="1950" max="2100" value="${esc(g && g.until ? g.until : "")}"></label></div>`;
   const one = k => { const g = given[k];
-    return `<div class="rc-glabel" data-glabel="${k}"><div class="fhead"><b>${esc(T("lab." + k))}</b>${g ? ` <span class="tag ok">${esc(T("lab.has"))}</span>` : ""}</div>
-        <div class="two"><label class="wide"><i>${esc(T("lab.detail"))}</i><input name="detail" value="${esc(g ? g.detail || "" : "")}" maxlength="160" autocomplete="off"></label>
-          <label><i>${esc(T("lab.sinceYear"))}</i><input name="since" type="number" min="1950" max="2100" value="${esc(g && g.since ? g.since : "")}"></label><label><i>${esc(T("lab.untilYear"))}</i><input name="until" type="number" min="1950" max="2100" value="${esc(g && g.until ? g.until : "")}"></label></div>
-        <div class="form-foot"><button class="btn sm" data-act="label-save" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T(g ? "lab.save" : "lab.add"))}</button>${g ? `<button class="btn quiet sm" data-act="label-del" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T("lab.remove"))}</button>` : ""}</div></div>`; };
-  const editor = canEdit ? `${foldStart("glabels", "data-glabels", T("lab.given"), S)}<div class="mini">${esc(T("lab.givenHint"))}</div>${GIVEN_LABELS.map(one).join("")}</div></details>` : "";
+    return `<div class="rc-glabel" data-glabel="${k}"><div class="fhead"><b>${esc(T("lab." + k))}</b></div>
+        ${fields(g)}
+        <div class="form-foot"><button class="btn sm" data-act="label-save" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T("lab.save"))}</button><button class="btn quiet sm" data-act="label-del" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T("lab.remove"))}</button></div></div>`; };
+  const free = GIVEN_LABELS.filter(k => !given[k]);
+  const add = free.length ? `<div class="rc-glabel" data-glabel="new"><div class="fhead"><b>${esc(T("lab.addNew"))}</b></div>
+        <label><i>${esc(T("lab.which"))}</i>${sel("label", free.map(k => [k, T("lab." + k)]), free[0])}</label>
+        ${fields(null)}
+        <div class="form-foot"><button class="btn sm" data-act="label-save" data-label=""${S.busy ? " disabled" : ""}>${esc(T("lab.add"))}</button><span class="mini">${esc(T("lab.addHint"))}</span></div></div>` : "";
+  const editor = canEdit ? `${foldStart("glabels", "data-glabels", T("lab.given"), S)}<div class="mini">${esc(T("lab.givenHint"))}</div>${GIVEN_LABELS.filter(k => given[k]).map(one).join("")}${add}</div></details>` : "";
   return sectionHTML(T("lab.title"), `${list}<div class="mini rc-labhelp">${esc(T("lab.help"))}</div>${editor}`, { id: "rc-labels" });
+}
+// ── 現在在哪：學校與去向排成一條，最新的在最上面（2026-11-25）──
+// Paul：「she used to be a student, but now she is in University of Washington… AIA… is her current school, which is not right… always put university or job
+// in a chronologically order. And put the latest as their current status」。
+// 以前「現在的學校」是名單上那一格（people.school，多半是高中），去向（就讀哪一所大學、在哪裡工作）另外列，所以念了大學的人「現在」還是高中。
+// 現在把兩邊排成一條，第一列就是「現在」。純函式，不動資料：
+//   去向只收「就讀、轉學、畢業、工作」而且有寫學校或公司的（申請、錄取不算，那還沒去）。同一個名字學校那邊也有一列的，只留去向那一列。
+//   順序：去向在前（有年份的新到舊，沒年份的接在後面），學校在後（有年份的新到舊，名單上那一所排前面，沒年份的最後）。
+//   例外：去向每一筆都有年份，而某一所學校的年份比它們都晚，那一所排最前面（例如工作之後又回去念書，只記在學校那一邊）。
+export const PLACE_OKINDS = ["enrolled", "transferred", "graduated", "working"];
+export function placesOf(d) {
+  const key = v => String(v || "").trim().toLowerCase();
+  const outs = ((d && d.outcomes) || []).filter(o => PLACE_OKINDS.includes(o.kind) && key(o.institution))
+    .map(o => ({ from: "outcome", id: o.id, name: String(o.institution).trim(), year: Number(o.year) || null, kind: o.kind, extra: [o.title, o.major].filter(Boolean).join("・") }));
+  const seen = new Set(outs.map(o => key(o.name)));
+  const schs = ((d && d.schools) || []).filter(x => key(x.school) && !seen.has(key(x.school)))
+    .map(x => ({ from: "school", id: x.id, name: String(x.school).trim(), year: Number(x.year_to) || Number(x.year_from) || null, year_from: x.year_from || null, year_to: x.year_to || null, note: x.note || "", source: x.source || "admin", listed: !!x.current }));
+  const byYear = (a, b) => (b.year || 0) - (a.year || 0) || (a.year ? 0 : (b.listed ? 1 : 0) - (a.listed ? 1 : 0));
+  outs.sort((a, b) => (a.year ? 0 : 1) - (b.year ? 0 : 1) || (b.year || 0) - (a.year || 0));
+  schs.sort((a, b) => (a.year ? 0 : 1) - (b.year ? 0 : 1) || byYear(a, b) || (b.listed ? 1 : 0) - (a.listed ? 1 : 0));
+  const top = outs.length && outs.every(o => o.year) ? Math.max(...outs.map(o => o.year)) : null;
+  const later = top == null ? [] : schs.filter(x => x.year && x.year > top);
+  return [...later, ...outs, ...schs.filter(x => !later.includes(x))];
 }
 // 個人檔案：照片、現在在哪、現在的工作、專長領域、一段介紹。管的人改了就存（一格一格送，rc_save_profile 只改有給的鍵）；看的人只讀。
 export function personProfileHTML(d, S, canEdit) {
@@ -1482,29 +1509,6 @@ export function personProfileHTML(d, S, canEdit) {
         <label><i>${esc(T("pf.bio"))}</i><textarea name="bio" rows="4" maxlength="600">${esc(pf.bio || "")}</textarea></label>
         <div class="form-foot">${autosaveHint("pf-save")}${done}</div>
       </div></div>`, { id: "rc-profile" });
-}
-// 跟 BT 的關係：團隊裡誰認識他、上次聯絡、多願意幫忙、備註。只有 BT 內部看得到（個人連結那一支函式讀不到這幾格）。
-export function personRelHTML(d, S, canEdit) {
-  const pf = d.profile || {}, open = REL_OPEN.includes(pf.rel_open) ? pf.rel_open : "unknown";
-  const priv = `<div class="mini">${esc(T("rel.private"))}</div>`;
-  if (!canEdit) {
-    const any = pf.rel_owner || pf.rel_last_contact || open !== "unknown" || pf.rel_note;
-    const owner = pf.rel_owner ? `<a href="#people/${esc(pf.rel_owner)}" data-act="open-person" data-id="${esc(pf.rel_owner)}">${esc(pf.rel_owner_name || T("common.noName"))}</a>` : "";
-    return sectionHTML(T("rel.title"), priv + (any ? `<ul class="flist rc-rel">
-        ${owner ? `<li><span class="mini">${esc(T("rel.owner"))}</span> ${owner}</li>` : ""}
-        ${pf.rel_last_contact ? `<li><span class="mini">${esc(T("rel.last"))}</span> ${esc(String(pf.rel_last_contact))}</li>` : ""}
-        <li><span class="mini">${esc(T("rel.open"))}</span> ${esc(T("rel.open." + open))}</li>
-        ${pf.rel_note ? `<li><span class="mini">${esc(T("rel.note"))}</span><p class="rc-a">${brText(pf.rel_note)}</p></li>` : ""}</ul>` : `<div class="mini">${esc(T("rel.none"))}</div>`), { id: "rc-rel" });
-  }
-  // 清單用名錄上的那一行字（dirLabel），選到再對回 id。現在那個人不在清單上（名錄還沒載到）就先印他的名字。
-  const team = teamOf(S.dir), cur = pf.rel_owner ? (team.find(x => x.id === pf.rel_owner) || (Array.isArray(S.dir) ? S.dir : []).find(x => x.id === pf.rel_owner)) : null;
-  return sectionHTML(T("rel.title"), `${priv}<div data-autosave="pf-save" data-part="rel">
-      <div class="two"><label><i>${esc(T("rel.owner"))}</i><input name="rel_owner_who" class="rc-who" list="rc-team-list" autocomplete="off" placeholder="${esc(T("rel.ownerPh"))}" value="${esc(cur ? dirLabel(cur) : pf.rel_owner_name || "")}"></label>
-        <label><i>${esc(T("rel.last"))}</i><input name="rel_last_contact" type="date" value="${esc(pf.rel_last_contact || "")}"></label></div>
-      <datalist id="rc-team-list">${team.map(x => `<option value="${esc(dirLabel(x))}"></option>`).join("")}</datalist>
-      <label><i>${esc(T("rel.open"))}</i>${sel("rel_open", REL_OPEN.map(k => [k, T("rel.open." + k)]), open)}</label>
-      <label><i>${esc(T("rel.note"))}</i><textarea name="rel_note" rows="3" maxlength="2000">${esc(pf.rel_note || "")}</textarea></label>
-      <div class="form-foot">${autosaveHint("pf-save")}</div></div>`, { id: "rc-rel" });
 }
 // 他的故事：六題，題目在上、他寫的在下。只讀：那是他自己的話，資料庫也沒有給管的人改的路。
 export function personStoryHTML(d) {
@@ -1561,9 +1565,11 @@ export function personHTML(d, S) {
   const p = d.person || {}, manage = !!(S.boot && S.boot.can_manage), pres = !!(S.me && S.me.pres);
   // 關係網（2027-01-03）：rc_person 回了 labels 與 profile 才畫標籤與那幾塊；沒有（遷移檔還沒跑）就照舊，多一句說要跑哪一支。
   const net = hasNetwork(d) && !!d.profile, canEdit = manage && !p.forgotten_at;
+  const places = placesOf(d), nowAt = places.length ? places[0].name : (p.school || "");
   const head = pageHead(`${esc(p.name || T("common.noName"))} ${net ? labelChipsHTML(d.labels.map(l => l.label + (l.current ? "" : ":past"))) : rowTags({ kind: p.kind, role: p.role, roles: [...new Set((d.participation || []).map(x => x.role).concat((d.pairs || []).map(x => x.as)))] })}${p.forgotten_at ? ` <span class="tag closed">${esc(T("person.forgotten"))}</span>` : ""}`,
     // 有的才印、用「・」接起來（以前學校是空的時候中文名後面會掛一個落單的「・」）。
-    [p.name_zh && p.name_en ? esc(p.name_zh) : "", esc(p.school || ""), p.grad_year ? esc(String(p.grad_year)) : "",
+    // 2026-11-25：名字底下那一行印「現在在哪」（placesOf 的第一列），不是名單上那一格學校；還在那一所學校的才接著印畢業年。
+    [p.name_zh && p.name_en ? esc(p.name_zh) : "", esc(nowAt || ""), p.grad_year && (!places.length || (places[0].from === "school" && places[0].name === (p.school || ""))) ? esc(String(p.grad_year)) : "",
      p.has_account ? esc(T("pp.hasAccount")) + (p.role ? ` (${esc(p.role)})` : "") : ""].filter(Boolean).join("・"), [], { act: "back-people", label: T("person.back") });
   const edit = manage && !p.forgotten_at ? sectionHTML(T("person.edit"), `<div data-pedit><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" value="${esc(p.name_zh || "")}" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" value="${esc(p.name_en || "")}" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" value="${esc(p.school || "")}" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100" value="${esc(p.grad_year || "")}"></label></div>
@@ -1578,16 +1584,20 @@ export function personHTML(d, S) {
       <div class="two"><label><i>${esc(T("contact.kind"))}</i>${sel("kind", CONTACT_KINDS.map(k => [k, T("ckind." + k)]), "line")}</label><label><i>${esc(T("contact.value"))}</i><input name="value" maxlength="200"></label></div>
       <div class="form-foot"><button class="btn sm" data-act="contact-add"${S.busy ? " disabled" : ""}>${esc(T("contact.addBtn"))}</button><span class="mini">${esc(T("contact.addHint"))}</span></div></div></details>` : "";
   const ctHTML = manage ? sectionHTML(T("person.contacts", { n: cts.length }), ctList + ctAdd) : "";
-  // 讀過的學校（2026-12-10）：一所一列，現在那一所有標記；管的人可以加、刪、設成現在的。合併帶進來的也在這裡。
+  // 學校與去向排成一條（2026-11-25，見 placesOf）：最新的在最上面、標「現在」。學校那幾列管的人可以刪；去向那幾列在「參與紀錄」分頁的去向那一塊改。
+  // 以前每一所學校有一顆「設成現在的」，拿掉了：現在是哪一所照年份排，不用人指定。
   const sch = (d.schools || []).slice();
   const yrs = x => x.year_from && x.year_to ? T("school.years", { from: x.year_from, to: x.year_to }) : x.year_from ? T("school.from", { from: x.year_from }) : x.year_to ? T("school.to", { to: x.year_to }) : "";
-  const schList = sch.length ? `<ul class="flist">${sch.map(x => `<li><div class="fhead"><b>${esc(x.school)}</b>${x.current ? ` <span class="tag open">${esc(T("school.current"))}</span>` : ""}${yrs(x) ? ` <span class="mini">${esc(yrs(x))}</span>` : ""}</div><div class="fmeta">${[x.note, T("ssrc." + (x.source || "admin"))].filter(Boolean).map(esc).join("・")}${manage && !p.forgotten_at ? `${x.current ? "" : ` <button class="btn ghost sm" data-act="school-current" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("school.setCurrent"))}</button>`} <button class="btn quiet sm" data-act="school-del" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : ""}</div></li>`).join("")}</ul>` : `<div class="mini">${esc(T("person.noSchools"))}</div>`;
+  const placeRow = (x, i) => `<li><div class="fhead"><b>${esc(x.name)}</b>${i === 0 ? ` <span class="tag open">${esc(T("school.current"))}</span>` : ""}${x.from === "outcome" ? ` <span class="tag">${esc(T("okind." + x.kind))}</span>${x.year ? ` <span class="mini">${esc(String(x.year))}</span>` : ""}` : (yrs(x) ? ` <span class="mini">${esc(yrs(x))}</span>` : "")}</div><div class="fmeta">${x.from === "outcome"
+      ? [x.extra, T("place.fromOutcome")].filter(Boolean).map(esc).join("・")
+      : [x.note, T("ssrc." + x.source)].filter(Boolean).map(esc).join("・") + (manage && !p.forgotten_at ? ` <button class="btn quiet sm" data-act="school-del" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : "")}</div></li>`;
+  const schList = places.length ? `<ul class="flist rc-places">${places.map(placeRow).join("")}</ul>` : `<div class="mini">${esc(T("person.noSchools"))}</div>`;
   const schAdd = manage && !p.forgotten_at ? `${foldStart("sadd", "data-sadd", T("school.add"), S)}
       <div class="two"><label><i>${esc(T("school.name"))}</i><input name="school" maxlength="80"></label><label><i>${esc(T("school.note"))}</i><input name="note" maxlength="200"></label></div>
       <div class="two"><label><i>${esc(T("school.yearFrom"))}</i><input name="year_from" type="number" min="2000" max="2100"></label><label><i>${esc(T("school.yearTo"))}</i><input name="year_to" type="number" min="2000" max="2100"></label></div>
       <label class="check"><input type="checkbox" name="make_current" data-noauto="1"${sch.length ? "" : " checked"}><span>${esc(T("school.makeCurrent"))}</span></label>
       <div class="form-foot"><button class="btn sm" data-act="school-add"${S.busy ? " disabled" : ""}>${esc(T("school.addBtn"))}</button><span class="mini">${esc(T("school.addHint"))}</span></div></div></details>` : "";
-  const schHTML = sectionHTML(T("person.schools", { n: sch.length }), schList + schAdd);
+  const schHTML = sectionHTML(T("person.schools", { n: places.length }), schList + schAdd);
   const aliasHTML = (d.aliases || []).length ? `<div class="mini rc-alias">${esc(T("person.aliases"))}${esc(T("punct.colon"))}${d.aliases.map(esc).join(esc(T("punct.list")))}</div>` : "";
   const pos = (d.positions || []);
   const posHTML = pos.length ? sectionHTML(T("person.positions"), `<ul class="flist">${pos.map(x => `<li><b>${esc(x.term)}</b>・${esc((lang() === "zh" ? x.title_zh : x.title_en) || x.title_en || x.title_zh || "")}${x.team ? "・" + esc(x.team) : ""}</li>`).join("")}</ul>`) : "";
@@ -1609,19 +1619,19 @@ export function personHTML(d, S) {
   const resp = d.responses || [];
   const respHTML = resp.length ? sectionHTML(T("person.responses", { n: resp.length }), `<ul class="flist">${resp.map(r => `<li><div class="fhead"><a href="#forms/${esc(r.form_id)}/results" data-act="open-form" data-id="${esc(r.form_id)}"><b>${esc(r.title)}</b></a> <span class="mini">${esc(fmtWhen(r.submitted_at))}</span></div><div class="fmeta">${(r.answers || []).map(a => `${esc(a.key || a.label)}: ${esc(a.value)}`).join("・")}</div></li>`).join("")}</ul>`) : "";
   const forget = pres && !p.forgotten_at ? sectionHTML(T("person.remove"), `<div class="mini">${esc(T(p.has_account ? "person.removeAccount" : "person.removeHint"))}</div>${p.has_account ? "" : `<div class="form-foot"><button class="btn quiet sm" data-act="forget" data-id="${esc(p.id)}">${esc(T("person.forget"))}</button></div>`}`) : "";
-  // 順序：他是誰（標籤、基本資料、個人檔案）→ BT 跟他的關係 → 他自己寫的與同意的 → 當講者的活動 → 個人連結與聯絡方式（傳連結要用）→ 原本的時間軸。
+  // 順序：他是誰（標籤、基本資料、個人檔案）→ 他在 BT 做過什麼 → 他自己寫的與同意的 → 當講者的活動 → 個人連結與聯絡方式（傳連結要用）→ 原本的時間軸。
   // 已經移除的人那幾塊不畫：個人檔案、標籤、連結在移除時一起清掉了。
   const network = !net ? `<div class="note">${esc(T("net.noSql"))}</div>` : p.forgotten_at ? "" : null;
   // 2026-11-24：這一頁疊到十幾塊，收成四個分頁（Paul：「do the same thing… for the whole BT」）。照上面那個順序分：
   //   details  基本資料    他是誰：標籤、基本資料、個人檔案、聯絡方式、學校
-  //   bt       參與紀錄    BT 跟他的關係、幹部職位、參加過的活動、當講者的活動、配對、去向
+  //   bt       參與紀錄    幹部職位、參加過的活動、當講者的活動、配對、去向（「跟 BT 的關係」那一塊 2026-11-25 拿掉了）
   //   voice    故事與同意  他自己寫的故事、他同意了什麼、個人連結、他填過的回饋
   //   settings 設定        移除的要求（只有 Co-President 有，其他人沒有這個分頁）
   // 遷移檔還沒跑的那一句提醒（network）留在分頁外面。看不到的那一塊是空字串，整個分頁都空的就不畫那個分頁。
   const on = network == null;
   return head + aliasHTML + msgHTML(S.msg) + (network || "") + RAIL.pageTabsHTML("rc-person", [
     { key: "details", label: T("ptab.details"), body: (on ? personLabelsHTML(d, S, canEdit) : "") + edit + (on ? personProfileHTML(d, S, canEdit) : "") + ctHTML + schHTML },
-    { key: "bt", label: T("ptab.bt"), body: (on ? personRelHTML(d, S, canEdit) : "") + posHTML + partHTML + (on ? personSpeakingHTML(d) : "") + pairHTML + outHTML, n: parts.length },
+    { key: "bt", label: T("ptab.bt"), body: posHTML + partHTML + (on ? personSpeakingHTML(d) : "") + pairHTML + outHTML, n: parts.length },
     { key: "voice", label: T("ptab.voice"), body: (on ? personStoryHTML(d) + personConsentHTML(d, S, canEdit) + personLinkHTML(d, S, canEdit) : "") + respHTML },
     { key: "settings", label: T("ptab.settings"), body: forget },
   ], { aria: T("ptab.aria") });

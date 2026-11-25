@@ -214,9 +214,8 @@ async function onAutosave(act, box, field) {
 // 送得出去的鍵只有 UI.PF_KEYS 那幾個（UI.profileFieldPatch 擋），兩個同意不在裡面：這條路送不出 share_profile、share_story。
 async function saveProfileField(box, field) {
   if (!S.person || !field) return;
-  const id = S.id, r = UI.profileFieldPatch(field.name, field.value, S.dir);
+  const id = S.id, r = UI.profileFieldPatch(field.name, field.value);
   if (!r) return;
-  if (r.err) { UI.autosaveState(box, "failed"); UI.toast(T(r.err)); return; }
   const k = Object.keys(r.patch)[0], v = r.patch[k], key = `pf:${id}:${k}`;
   if (!dirty.changed(key, v)) return;
   UI.autosaveState(box, "saving");
@@ -224,7 +223,7 @@ async function saveProfileField(box, field) {
     await D.saveProfile(id, r.patch);
     dirty.mark(key, v);
     // 手上那一份跟著改，之後這一頁因為別的事重畫（傳照片、開連結）才不會印回舊的字。
-    if (S.person && S.id === id) S.person.profile = Object.assign({}, S.person.profile, r.patch, k === "rel_owner" ? { rel_owner: v || null, rel_owner_name: r.owner ? r.owner.name : null } : {});
+    if (S.person && S.id === id) S.person.profile = Object.assign({}, S.person.profile, r.patch);
     S.dirStale = true;
     UI.autosaveState(liveBox(`[data-autosave="pf-save"][data-part="${box.dataset.part || "profile"}"]`, box), "saved"); UI.toast(T("msg.saved"));
   } catch (e) { UI.autosaveState(box, "failed"); UI.toast(T("err.save") + D.says(e)); }
@@ -633,17 +632,14 @@ document.addEventListener("click", async e => {
     if (ok === undefined) return;
     S.dir = null; await loadPerson(); render(); return;
   }
-  if (act === "school-current") {
-    const ok = await run("err.save", () => D.setCurrentSchool(b.dataset.id));
-    if (ok === undefined) return;
-    S.dir = null; await loadPerson(); S.msg = T("msg.saved"); render(); return;
-  }
   // ── 關係網（2027-01-03，2027-01-03-people-network.sql）：BT 給的標籤、照片、同意、個人連結 ──
   if (act === "label-save" || act === "label-del") {
-    const label = b.dataset.label, box = b.closest("[data-glabel]"); if (!box || !UI.GIVEN_LABELS.includes(label)) return;
+    // 2026-11-25：十一種標籤都可以自己加。已經加過的那一塊，按鈕上寫著是哪一種；「加一個標籤」那一塊是空的，看選單選了哪一種。
+    const box = b.closest("[data-glabel]"); if (!box) return;
+    const v = UI.formValues(box), label = b.dataset.label || v.label; if (!UI.GIVEN_LABELS.includes(label)) return;
     const del = act === "label-del";
     if (del && UI.needAsk(S, b, T("lab.delAsk"))) return;
-    const v = UI.formValues(box), yr = x => (String(x || "").trim() ? Number(x) : null);
+    const yr = x => (String(x || "").trim() ? Number(x) : null);
     const since = yr(v.since), until = yr(v.until);
     const badYear = y => y != null && !(Number.isInteger(y) && y >= 1950 && y <= 2100);
     if (!del && (badYear(since) || badYear(until) || (since != null && until != null && until < since))) { S.msg = T("err.save") + T("says.badYears"); render(); return; }

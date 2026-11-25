@@ -73,10 +73,13 @@ test("★ 標籤的名字：Paul 定的十三個；幹部與學員「以前是�
   en();
   try { assert.equal(UI.labelName("member", false), "Alumni (former member)"); assert.equal(UI.labelName("student", false), "Past participant"); assert.equal(UI.labelName("admission_officer", true), "Admission officer"); }
   finally { zh(); }
-  // 標籤的清單跟遷移檔的檢查式對得上：給的三種在資料表的 check 裡，十一種都在 rc_labels_of 裡算
-  const sql = read("supabase/migrations/2027-01-03-people-network.sql");
+  // 標籤的清單跟遷移檔的檢查式對得上。2027-01-06 起十一種都可以自己加（原本只有三種），資料表的 check 與 rc_label_set 都要認得每一種。
+  const sql = read("supabase/migrations/2027-01-03-people-network.sql"), sql6 = read("supabase/migrations/2027-01-06-labels-and-schools.sql");
   assert.match(sql, /label in \('professor', 'admission_officer', 'connection'\)/);
-  assert.deepEqual(UI.GIVEN_LABELS, ["professor", "admission_officer", "connection"]);
+  assert.deepEqual(UI.GIVEN_LABELS, UI.LABELS, "十一種都可以自己加");
+  const all11 = "'member', 'intern', 'student', 'mentee', 'mentor', 'speaker', 'volunteer', 'organizer', 'professor', 'admission_officer', 'connection'";
+  assert.equal(count(sql6, new RegExp(`label in \\(${all11}\\)|p_label not in \\(${all11}\\)`, "g")), 2, "資料表的 check 與 rc_label_set 各認得十一種");
+  assert.deepEqual(all11.replace(/'/g, "").split(", "), UI.LABELS, "順序也跟畫面的一樣");
   for (const l of UI.LABELS) assert.ok(sql.includes(`'${l}'`), `遷移檔裡沒有 ${l}`);
 });
 
@@ -98,9 +101,14 @@ test("★ 一個人的頁面上的標籤：哪一年起、幾次（超過一次�
   try { assert.deepEqual(UI.labelFacts(LABELS[1]), ["since 2025", "3 events"]); assert.deepEqual(UI.labelFacts(LABELS[0]), ["since 2023", "2 terms", "Curriculum Team"]); }
   finally { zh(); }
   const h = UI.personLabelsHTML(PERSON, MGR, true);
-  assert.match(h, /<li title="現在不是了"><span class="tag who-member past">校友（前幹部）<\/span> <span class="mini">2023 年起・2 屆・Curriculum Team<\/span><\/li>/);
-  assert.match(h, /<li><span class="tag who-speaker">講者<\/span> <span class="mini">2025 年起・3 場<\/span><\/li>/);
-  assert.match(h, /從紀錄算出來的，這裡改不了。哪一個不對，就去改那一筆紀錄：出席、職位、配對，或活動頁的講者。標籤只是標示，不會給任何權限。/);
+  assert.match(h, /<li title="現在不是了"><span class="tag who-member past">校友（前幹部）<\/span> <span class="mini">2023 年起・2 屆・Curriculum Team<\/span> <span class="mini rc-labsrc">從紀錄來的<\/span><\/li>/);
+  assert.match(h, /<li><span class="tag who-speaker">講者<\/span> <span class="mini">2025 年起・3 場<\/span> <span class="mini rc-labsrc">從紀錄來的<\/span><\/li>/);
+  assert.match(h, /who-professor[^]*?<span class="mini rc-labsrc">BT 加的<\/span>/, "每一行後面寫來源");
+  // 2027-01-06 那一支跑過之後每一列多 given、earned 兩個鍵：兩邊都有的那一種寫「從紀錄來的，BT 補了說明」
+  assert.match(UI.personLabelsHTML({ ...PERSON, labels: [{ label: "speaker", source: "earned", given: true, earned: true, since: 2027, until: null, current: true, n: 1, detail: "Overseas Unpacked 2027" }] }, MGR, true),
+    /<span class="mini">2027 年起・Overseas Unpacked 2027<\/span> <span class="mini rc-labsrc">從紀錄來的，BT 補了說明<\/span>/);
+  assert.match(h, /標籤有兩個來源。紀錄：出席、職位、配對、當講者會自己帶出標籤，要拿掉就去改那一筆紀錄。BT：下面可以自己加任何一種[^<]*標籤只是描述一個人，不給任何權限。/);
+  assert.doesNotMatch(h, /這裡改不了/, "2026-11-25 Paul：「why is it not editable from people?」");
   assert.match(UI.personLabelsHTML({ ...PERSON, labels: [] }, MGR, true), /還沒有標籤。/);
 });
 
@@ -146,15 +154,16 @@ test("★ 畫面不再印「種類」：一個人的頁面與名錄的列都只�
 test("★ 一個人的頁面：四個分頁（基本資料、參與紀錄、故事與同意、設定），每一塊在它該在的分頁裡", () => {
   const h = UI.personHTML(PERSON, MGR);
   // 2026-11-24：十幾塊收成四個分頁。順序：他是誰 → BT 跟他的關係與時間軸 → 他自己寫的與同意的。
-  const order = ['id="rc-labels"', "data-pedit", 'id="rc-profile"', "data-cadd", "data-sadd", 'id="rc-rel"', "data-paddev", 'id="rc-speaking"', "data-oadd", 'id="rc-story"', 'id="rc-consent"', 'id="rc-link-sec"'];
+  const order = ['id="rc-labels"', "data-pedit", 'id="rc-profile"', "data-cadd", "data-sadd", "data-paddev", 'id="rc-speaking"', "data-oadd", 'id="rc-story"', 'id="rc-consent"', 'id="rc-link-sec"'];
   const tabp = k => at(h, `<div class="tabp" data-ptabs="rc-person" data-tabp="${k}"`);
-  assert.ok(tabp("details") < at(h, 'id="rc-labels"') && at(h, "data-sadd") < tabp("bt") && tabp("bt") < at(h, 'id="rc-rel"') && at(h, "data-oadd") < tabp("voice") && tabp("voice") < at(h, 'id="rc-story"'));
+  assert.ok(tabp("details") < at(h, 'id="rc-labels"') && at(h, "data-sadd") < tabp("bt") && tabp("bt") < at(h, "data-paddev") && at(h, "data-oadd") < tabp("voice") && tabp("voice") < at(h, 'id="rc-story"'));
   assert.deepEqual([...h.matchAll(/data-ptab="rc-person" class="subtab(?: on)?" data-tab="([a-z]+)"/g)].map(m => m[1]), ["details", "bt", "voice", "settings"], "Co-President 四個都有");
   assert.ok(tabp("settings") < at(h, 'data-act="forget"') || /<div class="tabp" data-ptabs="rc-person" data-tabp="settings"[^>]*><section/.test(h), "移除的要求在「設定」分頁");
   const notPres = UI.personHTML(PERSON, { ...MGR, me: { pres: false } });
   assert.deepEqual([...notPres.matchAll(/data-ptab="rc-person" class="subtab(?: on)?" data-tab="([a-z]+)"/g)].map(m => m[1]), ["details", "bt", "voice"], "不是 Co-President 沒有「設定」分頁：裡面只有移除的要求，空的分頁不畫");
   for (let i = 1; i < order.length; i++) assert.ok(at(h, order[i - 1]) < at(h, order[i]), `${order[i - 1]} 要在 ${order[i]} 前面`);
-  for (const id of ["rc-labels", "rc-profile", "rc-rel", "rc-story", "rc-consent", "rc-speaking", "rc-link-sec"]) assert.equal(count(h, new RegExp(`id="${id}"`, "g")), 1, `${id} 只有一塊`);
+  assert.doesNotMatch(h, /id="rc-rel"|rel_owner_who|rel_open|跟 BT 的關係|團隊裡誰認識他/, "2026-11-25「跟 BT 的關係」那一塊拿掉了（Paul：「that's pretty useless to me」）");
+  for (const id of ["rc-labels", "rc-profile", "rc-story", "rc-consent", "rc-speaking", "rc-link-sec"]) assert.equal(count(h, new RegExp(`id="${id}"`, "g")), 1, `${id} 只有一塊`);
   // 去向多印學位或職稱
   assert.match(h, /<b>工作中<\/b> Acme Labs <span class="mini">2026<\/span><\/div><div class="fmeta">Staff Engineer・/);
   // 沒有當過講者就沒有那一塊；已經移除的人那幾塊都不畫
@@ -166,7 +175,7 @@ test("★ 一個人的頁面：四個分頁（基本資料、參與紀錄、故�
 test("★ 個人檔案與關係：管的人每一格改了就存（一格一格送），看的人只讀；故事誰都只讀", () => {
   const m = UI.personHTML(PERSON, MGR), v = UI.personHTML(PERSON, VIEWER);
   const sec = (h, id, next) => h.slice(at(h, `id="${id}"`), at(h, `id="${next}"`));
-  const mp = sec(m, "rc-profile", "rc-rel"), vp = sec(v, "rc-profile", "rc-rel");
+  const mp = sec(m, "rc-profile", "rc-story"), vp = sec(v, "rc-profile", "rc-story");
   assert.match(mp, /<div class="rc-pf-f" data-autosave="pf-save" data-part="profile">/);
   for (const [name, val] of [["job_title", "Engineer"], ["job_org", "Acme Labs"], ["city", "Taipei"], ["country", "Taiwan"], ["field", "Machine learning"]])
     assert.match(mp, new RegExp(`<input name="${name}" value="${val}" maxlength="\\d+" autocomplete="off">`));
@@ -177,23 +186,9 @@ test("★ 個人檔案與關係：管的人每一格改了就存（一格一格�
   assert.match(mp, /他自己在 2026-12-01 填過這一份。/);
   assert.doesNotMatch(vp, /<input|<textarea|<select|data-autosave|data-act=/, "看的人那一塊沒有任何一格、任何一顆鈕");
   assert.match(vp, /<div>Engineer・Acme Labs<\/div><div>Machine learning<\/div><div>Taipei, Taiwan<\/div><p class="rc-a">第一行<br>第二行<\/p>/);
-  assert.match(sec(UI.personHTML({ ...PERSON, profile: { ...PROFILE, photo_url: null } }, MGR), "rc-profile", "rc-rel"), /<span class="rc-photo" aria-hidden="true">N<\/span>[\s\S]*放一張照片/, "沒有照片：圓裡是名字的第一個字，沒有「拿掉照片」");
-  assert.doesNotMatch(sec(UI.personHTML({ ...PERSON, profile: { ...PROFILE, photo_url: null } }, MGR), "rc-profile", "rc-rel"), /pf-photo-clear/);
-  assert.match(sec(UI.personHTML({ ...PERSON, profile: { story: {}, rel_open: "unknown" } }, VIEWER), "rc-profile", "rc-rel"), /還沒有資料。/);
-  // 關係
-  const mr = sec(m, "rc-rel", "rc-story"), vr = sec(v, "rc-rel", "rc-story");
-  assert.match(mr, /這一段只有 BT 內部看得到，他從個人連結看不到。/);
-  assert.match(mr, /<div data-autosave="pf-save" data-part="rel">/);
-  assert.match(mr, /<input name="rel_owner_who" class="rc-who" list="rc-team-list" autocomplete="off" placeholder="[^"]+" value="Mia Member · 幹部">/, "誰認識他：從名單清單選，現在那個人先印好");
-  assert.match(mr, /<datalist id="rc-team-list"><option value="Mia Member · 幹部"><\/option><option value="Nina Speaker · 校友（前幹部）"><\/option><\/datalist>/, "清單只列幹部與校友，不是整份名錄");
-  assert.match(mr, /<input name="rel_last_contact" type="date" value="2026-11-20">/);
-  assert.match(mr, /<select name="rel_open"><option value="unknown">還不知道<\/option><option value="open" selected>很願意<\/option><option value="maybe">可以問問看<\/option><option value="closed">先不要打擾<\/option><\/select>/);
-  assert.match(mr, /<textarea name="rel_note" rows="3" maxlength="2000">在研討會認識的<\/textarea>/);
-  assert.doesNotMatch(vr, /<input|<textarea|<select|data-autosave/);
-  assert.match(vr, /data-act="open-person" data-id="m1">Mia Member<\/a>/); assert.match(vr, /2026-11-20/); assert.match(vr, /很願意/); assert.match(vr, /在研討會認識的/);
-  en();
-  try { assert.match(UI.personRelHTML(PERSON, MGR, true), />Not known yet<\/option><option value="open" selected>Open<\/option><option value="maybe">Maybe<\/option><option value="closed">Do not contact</); }
-  finally { zh(); }
+  assert.match(sec(UI.personHTML({ ...PERSON, profile: { ...PROFILE, photo_url: null } }, MGR), "rc-profile", "rc-story"), /<span class="rc-photo" aria-hidden="true">N<\/span>[\s\S]*放一張照片/, "沒有照片：圓裡是名字的第一個字，沒有「拿掉照片」");
+  assert.doesNotMatch(sec(UI.personHTML({ ...PERSON, profile: { ...PROFILE, photo_url: null } }, MGR), "rc-profile", "rc-story"), /pf-photo-clear/);
+  assert.match(sec(UI.personHTML({ ...PERSON, profile: { story: {}, rel_open: "unknown" } }, VIEWER), "rc-profile", "rc-story"), /還沒有資料。/);
   // 故事：六題照順序，題目在上；沒寫的那幾題標出來；管的人也沒有任何一格
   for (const h of [m, v]) {
     const st = sec(h, "rc-story", "rc-consent");
@@ -218,40 +213,42 @@ test("★ 個人檔案與關係：管的人每一格改了就存（一格一格�
   assert.match(m, /<div class="fmeta">2027-01-03・Machine learning<\/div>/);
 });
 
-test("★ 自動儲存只送得出那十個鍵；「誰認識他」打的字要對回名單上的人", () => {
-  assert.deepEqual(UI.PF_KEYS, ["city", "country", "job_title", "job_org", "field", "bio", "rel_owner", "rel_last_contact", "rel_open", "rel_note"]);
-  assert.deepEqual(UI.profileFieldPatch("city", "  Taipei ", DIR), { patch: { city: "Taipei" } });
-  assert.deepEqual(UI.profileFieldPatch("rel_last_contact", "", DIR), { patch: { rel_last_contact: "" } }, "清空就是拿掉");
-  assert.deepEqual(UI.profileFieldPatch("rel_open", "maybe", DIR), { patch: { rel_open: "maybe" } });
-  assert.equal(UI.profileFieldPatch("rel_open", "whatever", DIR), null);
-  assert.deepEqual(UI.profileFieldPatch("rel_owner_who", "Mia Member · 幹部", DIR), { patch: { rel_owner: "m1" }, owner: DIR[0] });
-  assert.deepEqual(UI.profileFieldPatch("rel_owner_who", "", DIR), { patch: { rel_owner: "" }, owner: null });
-  assert.deepEqual(UI.profileFieldPatch("rel_owner_who", "Nobody Here", DIR), { err: "err.relOwner" }, "名單上沒有的名字不送");
-  for (const k of ["share_profile", "share_story", "offer_speak", "offer_mentor", "contact_ok", "photo_url", "story", "rel_owner", "hs", ""]) assert.equal(UI.profileFieldPatch(k, true, DIR), null, `${k} 不走自動儲存`);
-  assert.deepEqual(UI.teamOf(DIR).map(x => x.id), ["m1", "p1"]); assert.deepEqual(UI.teamOf([DIR[2]]).map(x => x.id), ["s1"], "一個幹部都沒有就給整份");
+test("★ 自動儲存只送得出個人檔案那六個鍵；關係那四格 2026-11-25 起不送了", () => {
+  assert.deepEqual(UI.PF_KEYS, ["city", "country", "job_title", "job_org", "field", "bio"]);
+  assert.deepEqual(UI.profileFieldPatch("city", "  Taipei "), { patch: { city: "Taipei" } });
+  assert.deepEqual(UI.profileFieldPatch("bio", ""), { patch: { bio: "" } }, "清空就是拿掉");
+  for (const k of ["share_profile", "share_story", "offer_speak", "offer_mentor", "contact_ok", "photo_url", "story", "rel_owner", "rel_owner_who", "rel_open", "rel_last_contact", "rel_note", "hs", ""]) assert.equal(UI.profileFieldPatch(k, true), null, `${k} 不走自動儲存`);
+  assert.equal(UI.personRelHTML, undefined); assert.equal(UI.teamOf, undefined);
   const m = read("admin/records/src/main.js");
   assert.match(m, /if \(act === "pf-save"\) return saveProfileField\(box, field\);\n  if \(!S\.results\) return;/, "個人檔案的自動儲存排在「沒有打開表單就不存」那一句前面");
-  assert.match(m, /const id = S\.id, r = UI\.profileFieldPatch\(field\.name, field\.value, S\.dir\);/); assert.match(m, /await D\.saveProfile\(id, r\.patch\);/);
+  assert.match(m, /const id = S\.id, r = UI\.profileFieldPatch\(field\.name, field\.value\);/); assert.match(m, /await D\.saveProfile\(id, r\.patch\);/);
 });
 
-test("★ BT 給的三種標籤：只有管的人有編輯區；有的可以改、可以拿掉，沒有的可以加；賺來的沒有任何一格", () => {
+test("★ 加、改標籤：十一種都可以加；已經加過的每一種一塊（存、拿掉），沒加過的在「加一個標籤」的選單裡；只有管的人有編輯區", () => {
   const h = UI.personLabelsHTML(PERSON, MGR, true);
   assert.match(h, /<details class="fold rc-fold" data-glabels data-fold="people:p1:glabels">/, "收著，打開過的重畫之後還開著");
-  assert.deepEqual([...h.matchAll(/data-glabel="(\w+)"/g)].map(x => x[1]), ["professor", "admission_officer", "connection"]);
-  const prof = h.slice(at(h, 'data-glabel="professor"'), at(h, 'data-glabel="admission_officer"'));
-  assert.match(prof, /<b>教授<\/b> <span class="tag ok">已經有<\/span>/);
-  assert.match(prof, /<input name="detail" value="NTU Economics" maxlength="160" autocomplete="off">/);
-  assert.match(prof, /<input name="since" type="number" min="1950" max="2100" value="2020">/); assert.match(prof, /<input name="until" type="number" min="1950" max="2100" value="2026">/);
-  assert.match(prof, /data-act="label-save" data-label="professor">存這個標籤</); assert.match(prof, /data-act="label-del" data-label="professor">拿掉</);
-  const conn = h.slice(at(h, 'data-glabel="connection"'));
-  assert.match(conn, /data-act="label-save" data-label="connection">加上這個標籤</); assert.doesNotMatch(conn, /label-del|已經有/);
-  assert.equal(count(h, /data-act="label-save"/g), 3);
-  for (const earned of ["member", "intern", "student", "mentee", "mentor", "speaker", "volunteer", "organizer"]) assert.doesNotMatch(h, new RegExp(`data-(glabel|label)="${earned}"`), `${earned} 是算出來的，沒有編輯的地方`);
+  const givenNow = (PERSON.given || []).map(g => g.label);
+  assert.ok(givenNow.length >= 1, "測試資料裡至少有一個 BT 加的標籤");
+  assert.deepEqual([...h.matchAll(/data-glabel="(\w+)"/g)].map(x => x[1]), [...UI.LABELS.filter(k => givenNow.includes(k)), "new"], "已經加過的各一塊，最後一塊是加新的");
+  const prof = h.slice(at(h, 'data-glabel="professor"'), at(h, 'data-glabel="new"'));
+  assert.match(prof, /<b>教授<\/b>/); assert.match(prof, /name="detail" value="[^"]+"/, "補充說明印出來可以改");
+  assert.match(prof, /data-act="label-save" data-label="professor">存這個標籤<\/button><button class="btn quiet sm" data-act="label-del" data-label="professor">拿掉/);
+  const add = h.slice(at(h, 'data-glabel="new"'));
+  assert.match(add, /<b>加一個標籤<\/b>/);
+  const opts = [...add.slice(0, at(add, "</select>")).matchAll(/<option value="(\w+)"/g)].map(x => x[1]);
+  assert.deepEqual(opts, UI.LABELS.filter(k => !givenNow.includes(k)), "選單裡是還沒加過的每一種，幹部、學員、Mentor、講者都在");
+  for (const k of ["member", "student", "mentor", "mentee", "speaker", "volunteer", "organizer"]) assert.ok(opts.includes(k), `選單裡沒有 ${k}`);
+  assert.match(add, /data-act="label-save" data-label="">加上這個標籤<\/button>/, "加新的那顆按鈕不寫死是哪一種，看選單");
+  assert.doesNotMatch(add, /label-del/);
+  assert.match(add, /name="detail" value=""/); assert.match(add, /name="since" type="number" min="1950" max="2100" value=""/); assert.match(add, /name="until"/);
+  assert.match(UI.personLabelsHTML(PERSON, { ...MGR, busy: true }, true), /data-act="label-save" data-label="" disabled>/);
+  // 十一種都加過了就沒有「加一個標籤」那一塊
+  assert.doesNotMatch(UI.personLabelsHTML({ ...PERSON, given: UI.LABELS.map(l => ({ label: l, detail: "", since: null, until: null })) }, MGR, true), /data-glabel="new"/);
   const v = UI.personLabelsHTML(PERSON, VIEWER, false);
   assert.doesNotMatch(v, /data-glabels|data-act=|<input/, "看的人只看得到標籤");
   assert.match(v, /who-professor/);
   const m = read("admin/records/src/main.js"), d = read("admin/records/src/data.js");
-  assert.match(m, /if \(!box \|\| !UI\.GIVEN_LABELS\.includes\(label\)\) return;/);
+  assert.match(m, /const v = UI\.formValues\(box\), label = b\.dataset\.label \|\| v\.label; if \(!UI\.GIVEN_LABELS\.includes\(label\)\) return;/, "加新的那一塊看選單選了哪一種；不是十一種之一的不送");
   assert.match(m, /if \(del && UI\.needAsk\(S, b, T\("lab\.delAsk"\)\)\) return;/, "拿掉之前先問");
   assert.match(d, /rpc\("rc_label_set", \{ p_person: person, p_label: label, p_on: !!on, p_detail: detail \|\| "", p_since: since == null \? null : since, p_until: until == null \? null : until \}\)/);
 });
@@ -378,7 +375,7 @@ test("★ 遷移檔還沒跑：一個人的頁面與名錄都照舊（印原本�
 });
 
 test("資料庫回的代碼都有一句人話；照片的幾個純函式", () => {
-  assert.equal(says(new Error("bad_label")), "這裡只能給教授、招生官、聯絡人這三種標籤。");
+  assert.equal(says(new Error("bad_label")), "這一種標籤資料庫還不收，要先在 Supabase 跑 2027-01-06-labels-and-schools.sql。");
   assert.equal(says(new Error("bad_years")), "結束的年份不能比開始的早，而且要在 1950 到 2100 之間。");
   assert.equal(says(new Error("bad_rel_open")), "「他多願意幫忙」那一格的值不對，重新選一次。");
   assert.equal(says(new Error("photo_not_https")), "照片的網址要是 https 開頭。");
@@ -483,4 +480,69 @@ test("★ 挑講者的清單：每一個人後面印標籤與現在做什麼；�
   assert.match(old, /<b>Sam Student<\/b> <span class="mini">Test High<\/span> <span class="tag">學員<\/span>/); assert.match(old, /<b>Gina Guest<\/b> <span class="tag">來賓<\/span>/);
   assert.equal(F.evLabelName("member:past"), "校友（前幹部）"); assert.equal(F.evLabelName("student:past"), "以前的學員"); assert.equal(F.evLabelName("nope"), "");
   assert.match(read("admin/src/main.js"), /if \(act === "ev-sp-pick" \|\| act === "ev-sp-unpick" \|\| act === "ev-sp-nophoto"\) \{/);
+});
+
+// ── 現在在哪：學校與去向排成一條（2026-11-25）──────────────────────────
+// Paul：「she used to be a student, but now she is in University of Washington… AIA… is her current school, which is not right…
+// always put university or job in a chronologically order. And put the latest as their current status」。
+test("★ 現在在哪：去向（就讀、轉學、畢業、工作）與學校排成一條，最新的在最上面；申請與錄取不算；頁首印的是第一列", () => {
+  const sch = (id, school, yf, yt, current) => ({ id, school, year_from: yf, year_to: yt, source: "import", note: "", current: !!current });
+  const out = (id, kind, institution, year, extra) => ({ id, kind, institution, year, title: "", major: "", country: "", note: "", source: "import", visibility: "internal", ...(extra || {}) });
+  const names = d => UI.placesOf(d).map(x => x.name);
+  assert.deepEqual(UI.PLACE_OKINDS, ["enrolled", "transferred", "graduated", "working"]);
+  // Paul 看到的那一個：高中在學校那邊（沒有年份、名單上那一所），大學在去向那邊（沒有年份）。大學排前面
+  const angel = { schools: [sch("s1", "American International Academy", null, null, true)], outcomes: [out("o1", "enrolled", "University of Washington", null)] };
+  assert.deepEqual(names(angel), ["University of Washington", "American International Academy"]);
+  assert.equal(UI.placesOf(angel)[0].from, "outcome");
+  // 申請、錄取、gap、其他不算：高三錄取了，現在還是高中
+  assert.deepEqual(names({ schools: [sch("s1", "TFG", 2023, null, true)], outcomes: [out("o1", "admitted", "NTU", 2026), out("o2", "applied", "MIT", 2026), out("o3", "gap", "", 2026), out("o4", "other", "X", 2026)] }), ["TFG"]);
+  // 有年份的新到舊；沒年份的去向接在有年份的去向後面，還是在學校前面
+  assert.deepEqual(names({ schools: [sch("s1", "HS A", 2015, 2018), sch("s2", "HS B", 2018, 2021, true)],
+    outcomes: [out("o1", "graduated", "UCLA", 2025), out("o2", "working", "Acme", 2026), out("o3", "enrolled", "Somewhere", null)] }), ["Acme", "UCLA", "Somewhere", "HS B", "HS A"]);
+  // 只記在學校那邊、年份比每一筆去向都晚的那一所排最前面（工作之後又回去念書）
+  assert.deepEqual(names({ schools: [sch("s1", "HS", 2015, 2018), sch("s2", "Stanford GSB", 2027, null)], outcomes: [out("o1", "working", "Acme", 2024)] }), ["Stanford GSB", "Acme", "HS"]);
+  // 去向有一筆沒年份，就不讓學校插到前面（不知道誰比較晚，大學與工作優先）
+  assert.deepEqual(names({ schools: [sch("s1", "HS", 2024, 2026, true)], outcomes: [out("o1", "enrolled", "UW", null)] }), ["UW", "HS"]);
+  // 同一個名字兩邊都有，只留去向那一列（不分大小寫、前後空白）
+  assert.deepEqual(UI.placesOf({ schools: [sch("s1", " university of washington ", 2022, null), sch("s2", "AIA", 2018, 2022)], outcomes: [out("o1", "enrolled", "University of Washington", 2022)] }).map(x => x.from + ":" + x.name), ["outcome:University of Washington", "school:AIA"]);
+  // 只有學校：名單上那一所排前面（都沒年份的時候）
+  assert.deepEqual(names({ schools: [sch("s1", "Old", null, null), sch("s2", "Listed", null, null, true)], outcomes: [] }), ["Listed", "Old"]);
+  assert.deepEqual(UI.placesOf({}), []); assert.deepEqual(UI.placesOf(null), []);
+  // 一個人的頁面：第一列標「現在」，頁首那一行印的是現在在哪，不是名單上那一格學校
+  const d = { ...PERSON, person: { ...PERSON.person, school: "American International Academy", grad_year: 2022 }, schools: angel.schools, outcomes: angel.outcomes };
+  const h = UI.personHTML(d, MGR);
+  assert.match(h, /<li><div class="fhead"><b>University of Washington<\/b> <span class="tag open">現在<\/span> <span class="tag">就讀中<\/span><\/div><div class="fmeta">從去向來的，到「參與紀錄」改<\/div><\/li>/);
+  assert.equal(count(h, /<span class="tag open">現在<\/span>/g), 1);
+  assert.match(h, /<b>American International Academy<\/b><\/div><div class="fmeta">匯入 <button class="btn quiet sm" data-act="school-del" data-id="s1">/, "學校那一列管的人可以刪；去向那一列在去向那一塊改");
+  assert.doesNotMatch(h.slice(at(h, "<ul class=\"flist rc-places\">"), at(h, "data-sadd")), /data-act="out-del"/);
+  const head = h.slice(0, at(h, "rc-labels"));
+  assert.match(head, /University of Washington/); assert.doesNotMatch(head, /American International Academy|2022/, "頁首不再印高中與它的畢業年");
+  // 還在那一所高中的人照舊印學校與畢業年
+  const hs = UI.personHTML({ ...PERSON, person: { ...PERSON.person, kind: "student", school: "TFG", grad_year: 2027 }, schools: [sch("s1", "TFG", 2024, null, true)], outcomes: [] }, MGR);
+  assert.match(hs.slice(0, at(hs, "rc-labels")), /TFG・2027/);
+  assert.match(UI.personHTML({ ...PERSON, schools: [], outcomes: [] }, MGR), /還沒有學校或工作的紀錄。/);
+  const m = read("admin/records/src/main.js"), dd = read("admin/records/src/data.js");
+  assert.doesNotMatch(m + dd, /school-current|setCurrentSchool/, "「設成現在的」那顆按鈕與它叫的函式都拿掉了");
+});
+
+test("★ 2027-01-06 那一支：念大學或工作了就不算還在念高中；只認四種去向、錄取不算；有帳號的學員不動；標籤合成一列", () => {
+  const sql = read("supabase/migrations/2027-01-06-labels-and-schools.sql"), code = sql.replace(/--[^\n]*/g, "");
+  assert.match(code, /create trigger rc_outcomes_left_school after insert or update of kind, year on public\.rc_outcomes\s+for each row execute function public\.rc_left_school_trg\(\);/);
+  const trg = code.slice(code.indexOf("function public.rc_left_school_trg()"), code.indexOf("drop trigger if exists rc_outcomes_left_school"));
+  assert.match(trg, /if new\.kind not in \('enrolled', 'transferred', 'graduated', 'working'\) then return new; end if;/); assert.doesNotMatch(trg, /'admitted'|'applied'/, "錄取、申請不算");
+  assert.deepEqual(trg.match(/not in \(([^)]*)\)/)[1].replace(/'/g, "").split(", "), UI.PLACE_OKINDS, "跟畫面排「現在在哪」用的是同一份清單");
+  assert.match(trg, /if new\.year is not null and new\.year > extract\(year from now\(\)\)::int then return new; end if;/, "還沒到的年份不算");
+  assert.match(trg, /if pe\.id is null or pe\.kind <> 'student' or pe\.profile_id is not null then return new; end if;/, "有自己帳號的學員不動");
+  assert.match(trg, /update public\.people set kind = 'guest' where id = pe\.id;/, "跟在畫面上取消「現在還在念高中」一樣");
+  assert.equal(UI.kindFromForm("student", false), "guest");
+  assert.match(trg, /values \(pe\.id, 'student', '', null, new\.year::smallint, null\) on conflict \(person_id, label\) do nothing;/, "留一個「學員」標籤，他還是看得出以前是學員");
+  assert.match(trg, /rc_log_it\('left_high_school'/);
+  assert.match(code, /when o\.label = 'student' then coalesce\(\(select kind = 'student' and \(grad_year is null or grad_year >= cur\.y\) from pe\), false\)/, "現在還是學員一定要那一格勾著，光給標籤不算");
+  assert.match(code, /if not public\.rc_can_manage\(\) then raise exception 'not_records_manager'/);
+  assert.match(code, /revoke all on function public\.rc_labels_of\(uuid\) from public, anon, authenticated;/); assert.match(code, /revoke all on function public\.rc_left_school_trg\(\) from public, anon, authenticated;/);
+  assert.doesNotMatch(code, /create policy|alter policy|grant select|grant all|to anon/, "沒有動 RLS，沒有開給沒登入的人");
+  assert.doesNotMatch(code, /rc_profile_link|minor_no_link/, "個人連結那道門這一支沒有碰");
+  // 驗收表：每一列都有 PASS／FAIL，第 9 列只是印數字
+  assert.equal(count(sql, /union all select \d+, /g), 10); assert.match(sql, /'OVERALL'/);
+  assert.match(read("scripts/db/smoke.sh"), /LSM=supabase\/migrations\/2027-01-06-labels-and-schools\.sql/, "smoke.sh 有跑這一支（它的清單是寫死的，新增遷移檔要自己加）");
 });

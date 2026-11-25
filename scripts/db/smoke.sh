@@ -4574,6 +4574,64 @@ psql -d "${DB}" -X -A -t -q -c "revoke all on function public.set_event_map_url(
 rm -f "${BROKEN}"
 ml3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MLM}" 2>&1 || true)
 if echo "${ml3}" | grep -q "OVERALL.*PASS" && ! echo "${ml3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
+echo "── 標籤每一種都可以加；念大學了就不算還在念高中（2027-01-06-labels-and-schools.sql）──"
+# Paul 2026-11-25：「Each people should be able to be given label…」「if they're a university student, untick the currently a high school student thing」
+# 這時候：PAUL 是 Co-President；OUTC 是沒被派進紀錄的幹部；STU 是學員。四個沒有帳號的學員這一段自己開：
+#   LSD 在跑那一支之前就有一筆「就讀」的去向（補資料那一步要抓到他）；LSA 跑完才加「就讀」；LSB 只有「錄取」；LSC「就讀」的年份還沒到。
+LSM=supabase/migrations/2027-01-06-labels-and-schools.sql
+lsq() { psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "$1" 2>&1 | tail -1 | tr -d ' \n'; }
+LSD=$(lsq "select public.rc_save_person(null, '{\"name_en\":\"Ls Before\",\"kind\":\"student\",\"school\":\"AIA\"}'::jsonb)")
+LSA=$(lsq "select public.rc_save_person(null, '{\"name_en\":\"Ls Angel\",\"kind\":\"student\",\"school\":\"AIA\"}'::jsonb)")
+LSB=$(lsq "select public.rc_save_person(null, '{\"name_en\":\"Ls Senior\",\"kind\":\"student\",\"school\":\"TFG\"}'::jsonb)")
+LSC=$(lsq "select public.rc_save_person(null, '{\"name_en\":\"Ls Future\",\"kind\":\"student\",\"school\":\"TFG\"}'::jsonb)")
+case "${LSD}${LSA}${LSB}${LSC}" in ????????-*) echo "  ok   （準備）開了四個沒有帳號的學員"; pass=$((pass+1));; *) echo "  FAIL 開不了測試用的學員：${LSD} ${LSA}"; fail=$((fail+1));; esac
+psql -d "${DB}" -X -A -t -q -c "drop trigger if exists rc_outcomes_left_school on public.rc_outcomes;" >/dev/null 2>&1
+lsq "select public.rc_save_outcome(null, '{\"person_id\":\"${LSD}\",\"kind\":\"enrolled\",\"institution\":\"University of Washington\"}'::jsonb)" >/dev/null
+chk "（準備）還沒跑那一支：有就讀的去向，還是算念高中" "student" "select kind from public.people where id = '${LSD}'"
+chkraise "還沒跑那一支：Mentor 這種標籤加不了（bad_label）" "bad_label" "perform set_config('test.uid','${PAUL}',true); perform public.rc_label_set('${LSA}', 'mentor', true, 'x', null, null);"
+ls1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LSM}" 2>&1 || true)
+if echo "${ls1}" | grep -q "OVERALL.*PASS" && ! echo "${ls1}" | grep -q "|FAIL"; then echo "  ok   標籤與學校那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 標籤與學校那一支驗收表：${ls1}" | head -20; fail=$((fail+1)); fi
+if echo "${ls1}" | grep -Eq "^9\|.*\|[1-9][0-9]*\|PASS"; then echo "  ok   ★ 補資料：這一次有取消到人（LSD，加上前面幾段留下來、已經有就讀去向的學員）"; pass=$((pass+1)); else echo "  FAIL 補資料那一列的數字不對：$(echo "${ls1}" | grep '^9|')"; fail=$((fail+1)); fi
+chk "★ 補資料：LSD 不算念高中了（kind 變 guest）" "guest" "select kind from public.people where id = '${LSD}'"
+chkas "${PAUL}" "★ LSD 還看得出以前是學員（標籤是 student:past）" '["student:past"]' "select public.rc_label_codes('${LSD}')::text"
+chkas "${PAUL}" "LSD 的變動紀錄有一筆 left_high_school" "1" "select count(*) from public.rc_log where ref = '${LSD}' and what = 'left_high_school'"
+ls2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LSM}" 2>&1 || true)
+if echo "${ls2}" | grep -q "OVERALL.*PASS" && ! echo "${ls2}" | grep -q "|FAIL" && echo "${ls2}" | grep -q "^9|.*|0|PASS"; then echo "  ok   重跑一次也全 PASS，這一次取消 0 個人"; pass=$((pass+1)); else echo "  FAIL 重跑：${ls2}" | head -20; fail=$((fail+1)); fi
+# 之後加去向：四種算、錄取不算、還沒到的年份不算
+lsq "select public.rc_save_outcome(null, '{\"person_id\":\"${LSB}\",\"kind\":\"admitted\",\"institution\":\"NTU\",\"year\":\"2026\"}'::jsonb)" >/dev/null
+chk "★ 只有錄取：還是算念高中" "student" "select kind from public.people where id = '${LSB}'"
+lsq "select public.rc_save_outcome(null, '{\"person_id\":\"${LSC}\",\"kind\":\"enrolled\",\"institution\":\"MIT\",\"year\":\"2099\"}'::jsonb)" >/dev/null
+chk "★ 就讀的年份還沒到：還是算念高中" "student" "select kind from public.people where id = '${LSC}'"
+chkraise "★ 還算念高中的人照舊開不了個人連結（minor_no_link，這一支沒有動那道門）" "minor_no_link" "perform set_config('test.uid','${PAUL}',true); perform public.rc_profile_link('${LSB}', 'create');"
+lsq "select public.rc_save_outcome(null, '{\"person_id\":\"${LSA}\",\"kind\":\"enrolled\",\"institution\":\"University of Washington\",\"year\":\"2022\"}'::jsonb)" >/dev/null
+chk "★ 加一筆就讀：不算念高中了" "guest" "select kind from public.people where id = '${LSA}'"
+chk "留了一個「學員」標籤，到那一年" "2022" "select until_year from public.rc_labels where person_id = '${LSA}' and label = 'student'"
+chkas "${PAUL}" "★ 念大學的人開得了個人連結了" "64" "select length(public.rc_profile_link('${LSA}', 'create')->>'token')"
+chk "名單上那一格學校沒有被動到" "AIA" "select school from public.people where id = '${LSA}'"
+# 標籤：十一種都加得了，門沒有變
+chkas "${PAUL}" "★ Co-President 加得了 Mentor 這種標籤" "true" "select public.rc_label_set('${LSA}', 'mentor', true, 'Fall 2025', 2025, null)::text"
+chkas "${PAUL}" "加得了講者，補充說明寫哪一場" "true" "select public.rc_label_set('${LSA}', 'speaker', true, 'Overseas Unpacked 2027', 2027, 2027)::text"
+chkas "${PAUL}" "★ 合成一列：BT 加的 Mentor 沒寫到哪一年，算現在還是" 'mentor|true|true|false|Fall2025' "select l->>'label'||'|'||(l->>'current')||'|'||(l->>'given')||'|'||(l->>'earned')||'|'||(l->>'detail') from jsonb_array_elements(public.rc_labels_of('${LSA}')) l where l->>'label' = 'mentor'"
+chkas "${PAUL}" "標籤的短版：以前的學員、Mentor、講者" '["student:past","mentor","speaker"]' "select public.rc_label_codes('${LSA}')::text"
+chkas "${PAUL}" "★ 光給「學員」標籤不會讓人變成現在的學員（那一格沒勾）" "false" "select public.rc_label_set('${LSA}', 'student', true, '', null, null); select l->>'current' from jsonb_array_elements(public.rc_labels_of('${LSA}')) l where l->>'label' = 'student'"
+chkas "${PAUL}" "拿得掉" "false" "select public.rc_label_set('${LSA}', 'speaker', false, '', null, null)::text"
+chkraise "★ 沒被派進紀錄的幹部加不了標籤（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_label_set('${LSA}', 'mentor', true, 'x', null, null);"
+chkraise "學員加不了標籤（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${STU}',true); perform public.rc_label_set('${LSA}', 'mentor', true, 'x', null, null);"
+chkraise "不認得的標籤加不了（bad_label）" "bad_label" "perform set_config('test.uid','${PAUL}',true); perform public.rc_label_set('${LSA}', 'president', true, 'x', null, null);"
+chkrole anon "" "★ 沒登入的人叫不動加標籤的那一支" "ERROR:permissiondeniedforfunctionrc_label_set" "select public.rc_label_set('${LSA}', 'mentor', true, 'x', null, null)"
+chkrole authenticated "${PAUL}" "★ rc_labels_of 前端叫不到（要經過 rc_person 那幾支）" "ERROR:permissiondeniedforfunctionrc_labels_of" "select public.rc_labels_of('${LSA}')"
+BROKEN=$(mktemp)
+sed "s/^  if not public.rc_can_manage() then raise exception 'not_records_manager' using errcode = 'P0001'; end if;$/  -- gate removed/" "${LSM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉加標籤的門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉加標籤的門驗收表沒有變紅"; fail=$((fail+1)); fi
+sed "s/^  if new.kind not in ('enrolled', 'transferred', 'graduated', 'working') then return new; end if;$/  if new.kind not in ('enrolled', 'transferred', 'graduated', 'working', 'admitted') then return new; end if;/" "${LSM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：把「錄取」也算進去，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 把錄取算進去驗收表沒有變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -X -A -t -q -c "update public.people set kind = 'student' where id = '${LSB}';" >/dev/null
+ls3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LSM}" 2>&1 || true)
+if echo "${ls3}" | grep -q "OVERALL.*PASS" && ! echo "${ls3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${ls3}" | head -20; fail=$((fail+1)); fi
+chk "裝回去之後，只有錄取的那一位還是算念高中" "student" "select kind from public.people where id = '${LSB}'"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -268,14 +268,16 @@ test("★ 一個人的頁面：讀過的學校清單與別名", () => {
     schools: [{ id: "s1", school: "Taipei First Girls High School", year_from: 2020, year_to: 2022, source: "merge", note: "", current: false }, { id: "s2", school: "UWC Costa Rica", year_from: 2022, year_to: null, source: "backfill", note: "IB", current: true }],
     aliases: ["Alecia Tsai"] };
   const h = UI.personHTML(d, { boot: { can_manage: true }, me: { pres: true }, msg: "" });
-  assert.match(h, /Schools over time \(2\)|讀過的學校（2）/); assert.match(h, /Taipei First Girls High School/); assert.match(h, /2020 to 2022|2020 到 2022/); assert.match(h, /from 2022|2022 起/);
-  assert.match(h, /data-act="school-current" data-id="s1"/); assert.doesNotMatch(h, /data-act="school-current" data-id="s2"/);
+  assert.match(h, /Schools and work, newest first \(2\)|學校與工作，新的在上面（2）/); assert.match(h, /Taipei First Girls High School/); assert.match(h, /2020 to 2022|2020 到 2022/); assert.match(h, /from 2022|2022 起/);
+  assert.doesNotMatch(h, /school-current/, "2026-11-25「設成現在的」拿掉了：現在是哪一所照年份排");
+  assert.ok(h.indexOf("<b>UWC Costa Rica</b>") < h.indexOf("<b>Taipei First Girls High School</b>"), "新的在上面");
+  assert.match(h, /<b>UWC Costa Rica<\/b> <span class="tag open">(now|現在)<\/span>/); assert.equal((h.match(/<span class="tag open">(now|現在)<\/span>/g) || []).length, 1, "只有第一列是現在");
   assert.match(h, /data-act="school-del" data-id="s2"/); assert.match(h, /data-sadd/); assert.match(h, /data-act="school-add"/);
   assert.match(h, /Also known as|也叫/); assert.match(h, /Alecia Tsai/); assert.match(h, /from a merge|合併帶進來/);
   const v = UI.personHTML(d, { boot: { can_manage: false }, me: {}, msg: "" });
   assert.match(v, /Taipei First Girls High School/); assert.doesNotMatch(v, /data-act="school-/); assert.doesNotMatch(v, /data-sadd/);
   const none = UI.personHTML({ ...d, schools: [], aliases: [] }, { boot: { can_manage: true }, me: {}, msg: "" });
-  assert.match(none, /No schools recorded yet|還沒有學校紀錄/); assert.match(none, /name="make_current" data-noauto="1" checked/); assert.doesNotMatch(none, /Also known as|也叫/);
+  assert.match(none, /No schools or work recorded yet|還沒有學校或工作的紀錄/); assert.match(none, /name="make_current" data-noauto="1" checked/); assert.doesNotMatch(none, /Also known as|也叫/);
 });
 
 // 2026-12-12 聯絡方式
