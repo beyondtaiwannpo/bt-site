@@ -198,7 +198,7 @@ test("★ 活動卡與活動頁：這一屆有自己的名字就用它，計畫�
   const ou = { slug: "winter-bootcamp", team: "Curriculum Team", title_zh: "寒假探索營", title_en: "Winter College Bootcamp", edition_zh: "Overseas Unpacked", edition_en: "Overseas Unpacked", starts_at: "2027-01-02T16:00:00Z", is_past: false };
   assert.deepEqual(names(ou, "zh"), { main: "Overseas Unpacked", sub: "寒假探索營" });
   assert.deepEqual(names({ title_zh: "講座", title_en: "Talk" }, "en"), { main: "Talk", sub: "" }, "沒有那一格就照舊");
-  assert.match(cardHTML(ou, "en", "./"), /<span class="tk-date">SUN JAN 3 · 2027<\/span><b>Overseas Unpacked<\/b><span class="ev-when">Winter College Bootcamp<\/span>/);   // 2026-11-24 票卡：日期在名字上面
+  assert.match(cardHTML(ou, "en", "./"), /<span class="ev-body"><b>Overseas Unpacked<\/b><span class="ev-when">Winter College Bootcamp<\/span><\/span>[^]*<i>Date<\/i><b>SUN JAN 3 · 2027<\/b>/);   // 2026-11-25 票卡：名字在上面那一塊，日期在票根的第一格
   assert.match(detailHTML(ou, "zh"), /<p class="ev-by">Curriculum 主辦・寒假探索營<\/p><h1>Overseas Unpacked<\/h1>/);
   assert.equal(whenText({ usual_month: 8 }, "zh"), "大約 8 月"); assert.equal(whenText({ usual_month: 8 }, "en"), "Around August");
   assert.equal(whenText({}, "zh"), "日期還沒定"); assert.equal(whenText(ou, "zh"), "2027-01-03");

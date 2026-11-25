@@ -6031,7 +6031,41 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 機票重排：只有一種字、每一塊對齊，首頁只放一張大的（2026-11-25）
+
+Paul 把 Marketing Director 的意見轉過來，附了兩張登機證當參考：
+
+> My marketing director think the event box looks kinda off and the font is not correct so change the font to inter or make it look aligned…
+> most of the time there's only one event / program opening, at max three so the home page should only showcase 1 event and make it look super good. and events list can have multiple
+
+改之前的問題有三個：一張卡上有三種字（窄的英文標題字、中文標題字、內文字），字距每一行都不一樣；票根那一行「開始 → 09:00 台灣時間」大小字擠在同一行；右下角那架紙飛機看起來像「傳送」的按鈕。
+
+**現在一張卡是兩塊，中間是撕線：**
+
+| 哪一塊 | 由上到下 |
+|---|---|
+| 上面（`.tk-top`） | 一行抬頭：一架飛機加 Beyond Taiwan，右邊是主辦的 team，底下一條橘線。封面（四邊留白，照原本的比例不裁；沒有封面用日期當海報）。活動名字、計畫的名字、一句介紹 |
+| 票根（`.tk-stub`） | 最多四格：日期、時間（同一天有結束時間就印「09:00 – 17:00」，底下一行「台灣時間」）、地點、名額。小字是欄位名，大字是內容。沒填地點、不限名額的那一格不畫。最下面是條碼加一句話，規則沒變（橘色是現在報得了名） |
+
+- **字**：整張卡只用內文那一套（`--body`，英文數字是 Inter，中文是系統的黑體），中文的名字也是。名字常常是英文（例如 Overseas Unpacked），換成中文標題那一套字，同一張票上的英文就會有兩種長相。首頁、`/events/`、`/apply/` 三頁跟 Google Fonts 多要了 Inter 的 700 與 800 兩個字重。
+- **對齊**：抬頭、封面、名字、欄位、條碼那一條，左右都是 16px，左邊對在同一條線上。測試守著。
+- **缺口**：挖在兩塊相接的那兩個角上，卡片多高都對得上。以前要算缺口離底部多高（`--tk-cut`），那個數字拿掉了。缺口邊上那一圈線是背景畫的。
+- **名額那一格是新的**：印的是後台填的人數上限（`capacity`），這個數字本來就在一場活動的頁上。沒填（不限）就不畫。
+
+**首頁只放一張大的**（`homeCardsHTML`）：
+
+- 挑哪一張：現在報得了名的裡面最近的那一場。都還不能報，就是最近的那一場。
+- 還有別場：票的下面多一行「還有 N 場活動，看全部」，連到 `/events/`。只有一場就沒有那一行。
+- 樣子：字與順序跟小張一模一樣，只多一個 class（`feat`）。「現在開放」右邊那一欄有 620px 以上寬，就變成橫的登機證：票根在右邊、撕線變直的、每一格一行中間隔橘線。窄的時候（手機）跟小張一樣上下兩塊。量的是那一欄的寬度不是螢幕的寬度，用的是 `@container`。這一段樣式只有首頁有。
+- `/events/` 的清單與 `/apply/` 的「近期活動」照舊是小張的，有幾場排幾張。一張至少 320px、最寬 400px。
+
+**要改的時候**：字與順序改 `events/src/ui.js` 的 `cardHTML`；樣式三頁各一份（`.ev-cards` 到 `.tk-go-t` 那一段），一個字都要一樣，`test/events-public.test.mjs` 會擋；大張的樣式在首頁那一段的正下面。卡片裡不要用 `<small>`，首頁有一條全站的 `small` 樣式會把字體換掉。
+
+沒有遷移檔，資料庫沒動。本機接正式資料庫的公開資料看過首頁、`/events/`、`/apply/`，中英兩版、桌機與手機寬度；沒有封面、額滿、還沒開放、跨天、名字很長、地點很長這幾種是塞假資料進畫面看的。還沒在真的手機上看過。
+
 ## 活動的卡片是一張機票（2026-11-24）
+
+（2026-11-25 重排過，現在的樣子看上面那一節。這一節留著當時的樣子與原因。）
 
 Paul 拿一張演唱會售票頁的截圖當參考：「I like the style, especially the airplane air ticket thing… I want each event boxes looking like this… obviously our colour」。
 

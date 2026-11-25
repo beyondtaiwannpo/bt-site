@@ -42,9 +42,9 @@
      那份 CSS 有三萬多位元組，擋著載會讓文字晚一秒多才出現。
      沒有 JavaScript 的瀏覽器走 noscript 那一行。 -->
 <link rel="stylesheet" media="print" onload="this.media='all'"
-      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap">
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap">
 <noscript><link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@900&family=Iansui&display=swap"></noscript>
 <link rel="stylesheet" href="../shared/brand.css">
 
 <!-- 語言的判斷要在這裡，不能等到頁尾。中英兩版都在 HTML 裡，
@@ -338,43 +338,49 @@ a.btn:not(.ghost):active, a.cta:active, a.login:active{
 summary{cursor:pointer}
 
 /* 近期活動的卡片（2026-11-20 從 /events/ 搬一份過來，外殼各自一份的代價）。 */
-.ev-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:26px;margin-top:8px}
-/* 活動的卡片是一張機票（2026-11-24，Paul 拿售票頁的截圖當參考：「the airplane air ticket thing… obviously our colour」）。
-   由上到下：海報（封面；沒有封面用日期當海報）、日期與名字、撕線、票根（幾點開始加紙飛機）、條碼那一條（橘色是現在報得了名）。
-   撕線兩頭的缺口是 mask 挖的，看得到後面的頁面；--tk-cut 是缺口離卡片底部多高，等於票根加條碼那一條的高度，兩個高度改了它要跟著改。
+.ev-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:26px;margin-top:8px}
+/* 活動的卡片是一張機票（2026-11-24 Paul 拿售票頁的截圖當參考；2026-11-25 照 Marketing Director 給的兩張登機證重排：整張只有一種字、左邊對齊同一條線）。
+   兩塊：.tk-top（抬頭、封面、名字）與 .tk-stub（日期、時間、地點、名額最多四格，加最下面條碼那一條；橘色是現在報得了名）。中間的虛線是撕線。
+   撕線兩頭的缺口是 mask 挖的，看得到後面的頁面；缺口挖在兩塊相接的那兩個角上，所以卡片多高都對得上。缺口邊上那一圈線是背景畫的。
    首頁、/events/、/apply/ 各一份，一個字都要一樣（test/events-public.test.mjs 守著）。卡片的字在 events/src/ui.js 的 cardHTML。 */
-.ev-card{--tk-cut:109px;display:flex;flex-direction:column;text-decoration:none;color:var(--ink);border:1.5px solid var(--bt-navy);border-radius:var(--r);overflow:hidden;width:100%;max-width:400px;background:rgba(255,255,255,.45);transition:transform var(--dur-2) var(--ease);
-  -webkit-mask:radial-gradient(circle 10px at 0 calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) right/51% 100% no-repeat;
-  mask:radial-gradient(circle 10px at 0 calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% calc(100% - var(--tk-cut)),transparent 9.5px,black 10px) right/51% 100% no-repeat}
+.ev-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);width:100%;max-width:400px;font-family:var(--body);filter:drop-shadow(0 8px 18px rgba(16,42,134,.1));transition:transform var(--dur-2) var(--ease)}
 .ev-card:hover{transform:translateY(-4px)}
-.ev-card:hover .tk-ico{background:var(--bt-orange)}
-.ev-card:focus-visible{outline:var(--ring);outline-offset:-6px}
-/* 封面不裁：照它本來的比例整張放（2026-11-24 上線後看到正式站的封面是 2:1 的橫幅、字貼到兩邊，裁成 4:3 會把字切掉）。
-   直的海報太長才會裁，最高 460px。沒有封面的那一塊（日期當海報）維持 4:3。 */
-.ev-card img,.ev-noimg{display:block;width:100%;background:var(--bt-navy);border-bottom:1.5px solid var(--bt-navy)}
+.ev-card:hover .tk-arrow{transform:translateX(4px)}
+.ev-card:focus-visible{outline:var(--ring);outline-offset:4px;border-radius:14px}
+.tk-top,.tk-stub{display:flex;flex-direction:column;border:1.5px solid var(--bt-navy);background-color:rgba(255,255,255,.5);background-repeat:no-repeat;background-origin:border-box;background-size:12px 12px}
+.tk-top{flex:1;gap:14px;padding:14px 16px 18px;border-bottom:0;border-radius:14px 14px 0 0;background-image:radial-gradient(circle at 0 100%,transparent 9.5px,var(--bt-navy) 10px 11.5px,transparent 12px),radial-gradient(circle at 100% 100%,transparent 9.5px,var(--bt-navy) 10px 11.5px,transparent 12px);background-position:left bottom,right bottom;
+  -webkit-mask:radial-gradient(circle 10px at 0 100%,transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% 100%,transparent 9.5px,black 10px) right/51% 100% no-repeat;
+  mask:radial-gradient(circle 10px at 0 100%,transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% 100%,transparent 9.5px,black 10px) right/51% 100% no-repeat}
+.tk-stub{border-top:1.5px dashed rgba(16,42,134,.55);border-radius:0 0 14px 14px;overflow:hidden;background-image:radial-gradient(circle at 0 0,transparent 9.5px,var(--bt-navy) 10px 11.5px,transparent 12px),radial-gradient(circle at 100% 0,transparent 9.5px,var(--bt-navy) 10px 11.5px,transparent 12px);background-position:left top,right top;
+  -webkit-mask:radial-gradient(circle 10px at 0 0,transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% 0,transparent 9.5px,black 10px) right/51% 100% no-repeat;
+  mask:radial-gradient(circle 10px at 0 0,transparent 9.5px,black 10px) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% 0,transparent 9.5px,black 10px) right/51% 100% no-repeat}
+.tk-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:10px;border-bottom:2px solid var(--bt-orange);font-size:10px;font-weight:700;line-height:1.3;letter-spacing:.12em;text-transform:uppercase}
+.tk-brand{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.tk-brand svg{flex:none;width:17px;height:17px;fill:currentColor}
+.tk-by{min-width:0;font-weight:600;letter-spacing:.08em;color:rgba(16,42,134,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 封面照它原本的比例整張放，不裁：team 做的封面常常是字排到邊的橫幅，裁了字就不見。太高的直式才裁，最多 460px。
+   沒有封面的那一塊（日期當海報）沒有自己的比例，所以給它一個。 */
+.ev-card img,.ev-noimg{display:block;width:100%;border-radius:6px;background:var(--bt-navy)}
 .ev-card img{height:auto;max-height:460px;object-fit:cover}
-.ev-noimg{aspect-ratio:4/3}
-.ev-noimg{display:flex;align-items:flex-end;padding:16px 18px;color:var(--bt-cream);background:radial-gradient(circle at 84% 22%,var(--bt-orange) 0 4px,transparent 5px),radial-gradient(circle at 72% 40%,var(--bt-teal) 0 3px,transparent 4px),var(--bt-navy)}
-.tk-big{font-family:var(--display);font-weight:700;font-size:clamp(60px,7.4vw,88px);line-height:.86;letter-spacing:.01em}
-.tk-big small{display:block;font-size:.26em;font-weight:600;letter-spacing:.16em;line-height:1.2;color:var(--bt-orange);margin-bottom:8px;text-transform:uppercase}
-.ev-body{display:flex;flex-direction:column;gap:6px;flex:1;padding:16px 18px 22px}
-.tk-date{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.16em}
-.ev-body b{font-family:var(--han);font-size:23px;font-weight:900;line-height:1.25}
-.ev-card[data-l="en"] .ev-body b{font-family:var(--display);font-size:30px;font-weight:700;line-height:1.04;letter-spacing:.01em;text-transform:uppercase}
-.ev-when{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(16,42,134,.78)}
-.tk-place{font-size:13.5px;letter-spacing:.04em;margin-top:2px}
-.ev-sum{font-size:14px;line-height:1.5;margin-top:2px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
-.tk-stub{display:flex;align-items:stretch;height:54px;border-top:1.5px dashed rgba(16,42,134,.55)}
-.tk-time{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 18px;font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
-.tk-time i{font-style:normal}
-.tk-time b{font-size:21px;font-weight:700;letter-spacing:.06em;font-variant-numeric:tabular-nums}
-.tk-time small{font-size:11.5px;letter-spacing:.1em;color:rgba(16,42,134,.78)}
-.tk-ico{flex:none;width:54px;display:grid;place-items:center;border-left:1.5px solid var(--bt-navy);transition:background var(--dur-2) var(--ease)}
-.tk-ico svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
-.tk-go{display:flex;align-items:center;gap:12px;height:54px;padding:0 18px;border-top:1.5px solid var(--bt-navy);background:var(--bt-navy);color:var(--bt-cream);font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.ev-noimg{aspect-ratio:2/1;display:flex;align-items:flex-end;padding:14px 16px;color:var(--bt-cream);background:radial-gradient(circle at 84% 22%,var(--bt-orange) 0 4px,transparent 5px),radial-gradient(circle at 72% 40%,var(--bt-teal) 0 3px,transparent 4px),var(--bt-navy)}
+.tk-big{font-size:clamp(40px,5vw,54px);font-weight:800;line-height:1;letter-spacing:-.02em}
+.tk-big i{display:block;font-style:normal;font-size:12px;font-weight:600;line-height:1.2;letter-spacing:.14em;text-transform:uppercase;color:var(--bt-orange);margin-bottom:8px}
+.ev-body{display:flex;flex-direction:column;gap:6px}
+.ev-body b{font-size:24px;font-weight:800;line-height:1.15;letter-spacing:-.02em}
+.ev-card[data-l="zh"] .ev-body b{font-size:23px;line-height:1.3;letter-spacing:0}
+.ev-when{font-size:14px;font-weight:500;line-height:1.4;color:rgba(16,42,134,.78)}
+.ev-sum{font-size:14px;font-weight:400;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.tk-fields{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px 16px;padding:16px 16px 18px}
+.tk-f{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tk-f:nth-child(3):last-child{grid-column:1/-1}
+.tk-f i{font-style:normal;font-size:10.5px;font-weight:600;line-height:1.3;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.7)}
+.tk-f b{font-size:14.5px;font-weight:700;line-height:1.3;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tk-f em{font-style:normal;font-size:12px;font-weight:400;line-height:1.3;color:rgba(16,42,134,.78)}
+.tk-go{display:flex;align-items:center;gap:12px;min-height:52px;margin-top:auto;padding:0 16px;border-top:1.5px solid var(--bt-navy);background:var(--bt-navy);color:var(--bt-cream);font-size:15px;font-weight:700;letter-spacing:.01em}
 .tk-go.on{background:var(--bt-orange);color:var(--bt-navy)}
 .tk-go.off{background:transparent;color:rgba(16,42,134,.78)}
-.tk-bars{flex:none;width:76px;height:24px;background:linear-gradient(90deg,currentColor 0 2px,transparent 2px 4px,currentColor 4px 5px,transparent 5px 8px,currentColor 8px 11px,transparent 11px 12px,currentColor 12px 13px,transparent 13px 16px,currentColor 16px 18px,transparent 18px 19px) 0 0/19px 100%}
+.tk-bars{flex:none;width:57px;height:22px;background:linear-gradient(90deg,currentColor 0 2px,transparent 2px 4px,currentColor 4px 5px,transparent 5px 8px,currentColor 8px 11px,transparent 11px 12px,currentColor 12px 13px,transparent 13px 16px,currentColor 16px 18px,transparent 18px 19px) 0 0/19px 100%}
+.tk-arrow{flex:none;order:3;margin-left:auto;font-size:18px;line-height:1;transition:transform var(--dur-2) var(--ease)}
 .tk-go-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 放票卡的那一段用整個寬度：標題在上面、卡片在下面一排。票卡要有寬度才像一張票，擠在右邊那一欄只放得下一張。 */
 .sec-cards .sec-in{grid-template-columns:1fr;gap:clamp(14px,2vw,24px)}
