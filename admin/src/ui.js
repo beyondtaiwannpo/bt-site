@@ -1860,6 +1860,60 @@ export function evSpeakerUnpick(draft) {
   return Object.assign(d, { person_id: null, from: "", auto, minor: false });
 }
 
+// ── 講者與紀錄接起來（2026-11-25）──
+// Paul：「what if this speaker is completely new to our organization and I do want to add him or her into our databases? Like where do I do that?…
+// there's no link that we talked about. Even the 2 people that was in our databases… I still wanted to send them a link」。
+// 以前要跑三個地方（紀錄加人、紀錄開連結、回活動挑人）。現在在講者那一塊就做得完，三件事：
+//   1. 找不到人的時候，一顆「把「某某」加進名單」：在紀錄建一個人（種類是來賓），名字帶進「加一位」那幾格。
+//   2. 每一位講者打開有一塊「個人連結」：開連結、複製、看他打開過沒、送出過沒。直接打名字加的那一位先有一顆「加進名單」。
+//   3. 他送出之後，一顆「照他填的更新這一位」：領域、單位、照片帶過來，名字不動。
+// 只有管得了紀錄的人看得到這幾塊（跟資料庫的 rc_can_manage 同一條：Co-President、Senior Adviser，或紀錄工作區「改」以上）。
+// 叫的都是 Records 原本的函式，門沒有變，沒有遷移檔。還在念高中的學員照舊開不了個人連結（資料庫擋，回 minor_no_link）。
+export const evCanManagePeople = me => !!me && (senior(me) || ["edit", "manage"].includes(wsLevel(me, "custom:records")));
+export const evProfileURL = token => `${typeof location === "undefined" ? "https://beyondtaiwannpo.com" : location.origin}/profile/?t=${encodeURIComponent(token || "")}`;
+// 一個新的人要存進紀錄的那幾格。有中文字的名字放 name_zh，其他放 name_en；種類是來賓（講者多半是外面的人，來賓開得了個人連結）。
+export function evPersonDraft(name, school) {
+  const n = String(name || "").trim().replace(/\s+/g, " ").slice(0, 80); if (!n) return null;
+  const o = { kind: "guest" }; o[/[\u3400-\u9fff]/.test(n) ? "name_zh" : "name_en"] = n;
+  const sc = String(school || "").trim(); if (sc) o.school = sc;
+  return o;
+}
+// rc_person() 回的那一包 → 講者卡要更新成什麼。只帶他有填的：領域 → 主題；單位（沒有就最近一筆去向的學校或公司，再沒有才是名單上的學校）→ 學校；照片。
+// 名字不動（對外只放名字，那是加的人決定的）。沒有任何一樣可以帶就回 null。純函式。
+export function evProfileFill(sp, rc) {
+  const r = rc || {}, pf = r.profile || {}, pe = r.person || {}, out = (r.outcomes || [])[0] || {}, cur = sp || {};
+  const subject = String(pf.field || "").trim(), school = String(pf.job_org || out.institution || pe.school || "").trim(), photo = String(pf.photo_url || "").trim();
+  const patch = { display_name: String(cur.display_name || "").trim(), subject: subject || String(cur.subject || ""), school: school || String(cur.school || "") };
+  const changed = patch.subject !== String(cur.subject || "") || patch.school !== String(cur.school || "");
+  if (!changed && !photo) return null;
+  return { patch, photo, changed };
+}
+const evDay = v => (v ? String(v).slice(0, 10) : "");
+// 一位講者打開之後的那一塊「個人連結」。st 是 main.js 記的那一位的狀態：undefined 還沒按、"loading"、{ err }、或 rc_person() 回的那一包。
+export function evSpeakerLinkHTML(sp, st, canLink, busy) {
+  if (!canLink) return "";
+  const dis = busy ? " disabled" : "", id = esc(sp.id);
+  if (!sp.person_id) {
+    const full = sp.typed && sp.typed.full_name != null ? sp.typed.full_name : (sp.display_name || "");
+    return `<div class="ev-sp-ppl"><p class="ev-line">${T("ev.spPplNone")}</p>
+          <label><i>${T("ev.spPplFull")}</i><span class="ev-sp-findrow"><input data-f="full_name" value="${esc(full)}" maxlength="80" autocomplete="off"${dis}><button type="button" class="btn ghost sm" data-act="ev-sp-toperson" data-id="${id}"${dis}>${T("ev.spPplAdd")}</button></span></label>
+          <span class="ev-help">${T("ev.spPplHelp")}</span></div>`;
+  }
+  const head = `<b class="ev-sp-ppl-h">${T("ev.spLink")}</b>`;
+  if (st === undefined) return `<div class="ev-sp-ppl"><button type="button" class="btn ghost sm" data-act="ev-sp-link" data-id="${id}"${dis}>${T("ev.spLink")}</button><span class="ev-help">${T("ev.spLinkHelp")}</span></div>`;
+  if (st === "loading") return `<div class="ev-sp-ppl">${head}<p class="ev-line mini">${T("ev.spLinkLoading")}</p></div>`;
+  if (st && st.err) return `<div class="ev-sp-ppl">${head}<div class="note">${esc(st.err)}</div><button type="button" class="btn ghost sm" data-act="ev-sp-link" data-id="${id}"${dis}>${T("ev.spLink")}</button></div>`;
+  const l = (st && st.link) || null, pf = (st && st.profile) || {};
+  const make = k => `<button type="button" class="btn ${l ? "ghost " : ""}sm" data-act="ev-sp-link-create" data-id="${id}"${dis}>${T(k)}</button>`;
+  let body;
+  if (!l) body = `<p class="ev-line">${T("ev.spLinkNone")}</p><div class="ev-acts">${make("ev.spLinkCreate")}</div>`;
+  else if (l.expired || !l.token) body = `<p class="ev-line">${l.expired ? T("ev.spLinkExpired", { exp: evDay(l.expires_at) }) : T("ev.spLinkExp", { exp: evDay(l.expires_at) })}</p><div class="ev-acts">${make("ev.spLinkNew")}</div>`;
+  else body = `<label><i>${T("ev.spLinkUrl")}</i><span class="ev-sp-findrow"><input id="ev-sp-url-${id}" readonly value="${esc(evProfileURL(l.token))}"><button type="button" class="btn sm" data-act="ev-sp-link-copy" data-id="${id}">${T("ev.spLinkCopy")}</button></span></label>
+          <p class="ev-line mini">${T("ev.spLinkExp", { exp: evDay(l.expires_at) })} ${l.opened_at ? T("ev.spLinkOpened", { day: evDay(l.opened_at) }) : T("ev.spLinkNotOpened")} ${l.submitted_at ? T("ev.spLinkSubmitted", { day: evDay(l.submitted_at) }) : T("ev.spLinkNotSubmitted")}</p>`;
+  const fresh = pf.updated_at || pf.done_at ? `<div class="ev-acts"><button type="button" class="btn ghost sm" data-act="ev-sp-refresh" data-id="${id}"${dis}>${T("ev.spRefresh")}</button><span class="ev-help">${T("ev.spRefreshHelp")}</span></div>` : "";
+  return `<div class="ev-sp-ppl">${head}${body}${fresh}<p class="ev-line mini"><a href="${withLang("/admin/records/#people/" + encodeURIComponent(sp.person_id))}">${T("ev.spLinkRecords")}</a></p></div>`;
+}
+
 // 講者（一場可以好幾位）。speakers 是 event_speakers_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是講者。
 // 讀與寫的門都是「這場活動改得動」，所以只有「看」的人整塊不畫。
 // x.spUp 是照片的上傳進度 { id, pct, name }；x.spDraft 是「加一位」填到一半的 { display_name, subject, school, person_id, from, photo_url, auto }
@@ -1904,6 +1958,7 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
         <div class="ev-ph-state">${showBox(`data-act="ev-sp-show" data-id="${esc(sp.id)}"`, !!sp.consent)}${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}</div>
         ${fields(v)}
         ${pick}
+        ${evSpeakerLinkHTML(sp, (o.spLink || {})[sp.id], !!o.canLink, busy)}
         <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button>${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
       </div></details></li>`;
   };
@@ -1916,6 +1971,7 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
         ${Array.isArray(found) ? (found.length
           ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""}${nowOf(p) ? ` <span class="mini">${esc(nowOf(p))}</span>` : ""} ${Array.isArray(p.labels) ? evLabelChips(p) : `<span class="tag">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span>`} <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
           : `<p class="ev-line">${T("ev.spFindNone")}</p>`) : ""}
+        ${Array.isArray(found) && o.canLink && String(o.spQ || "").trim() && !d.person_id ? `<p class="ev-line ev-sp-newp"><button type="button" class="btn ghost sm" data-act="ev-sp-newperson" data-id="${esc(e.id)}"${dis}>${esc(T("ev.spNewPerson", { name: String(o.spQ).trim() }))}</button> <span class="mini">${T("ev.spNewPersonHelp")}</span></p>` : ""}
       </div>`;
   const picked = (d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "")
     + (d.photo_url ? `<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="${esc(d.photo_url)}" alt=""> <span>${T("ev.spPhotoFrom")}</span> <button class="btn quiet sm" data-act="ev-sp-nophoto"${dis}>${T("ev.spPhotoDrop")}</button></p>` : "");

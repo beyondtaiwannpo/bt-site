@@ -490,6 +490,13 @@ div.ev-help,p.ev-help{margin:0 0 10px}
 .ev-sp-f .check{margin-bottom:4px}
 /* 講者那一格「放在對外頁」（2026-11-25）：跟後面那句小字排在同一行。 */
 .ev-ph-state .ev-sp-show{display:inline-flex;margin:0 10px 0 0;padding:0;vertical-align:middle}
+/* 講者的「個人連結」那一塊（2026-11-25）：一條細線隔開，裡面是連結、複製、他打開過沒。 */
+.ev-sp-ppl{margin:4px 0 12px;padding:12px 0 2px;border-top:1px dotted rgba(16,42,134,.16)}
+.ev-sp-ppl-h{display:block;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.78);margin:0 0 6px}
+.ev-sp-ppl label{display:block;margin:0 0 8px}
+.ev-sp-ppl .ev-acts{margin:0 0 8px}
+.ev-sp-newp{margin-top:8px}
+.ev-sp-ppl a{color:var(--ink);text-underline-offset:3px}
 .ev-sp-find{margin:0 0 12px;padding:0 0 12px;border-bottom:1px dotted rgba(16,42,134,.16)}
 .ev-sp-findrow{display:flex;gap:8px;align-items:center}
 .ev-sp-findrow input{flex:1;min-width:0}

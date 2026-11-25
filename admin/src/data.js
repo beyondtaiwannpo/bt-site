@@ -411,6 +411,8 @@ const SAYS = [
   ["too_many_speakers", "一場活動最多放 40 位講者，先拿掉幾位再加。", "An event holds up to 40 speakers. Remove some before adding more."],
   ["no_such_speaker", "找不到這位講者，重新整理再試一次。", "Speaker not found. Refresh and try again."],
   ["no_such_person", "紀錄裡找不到這個人，可能已經被移除了。直接打名字也可以。", "That person is not in Records any more. You can type the name instead."],
+  ["minor_no_link", "紀錄裡這個人還在念高中，開不了個人連結。他已經畢業的話，到紀錄補上畢業年再開。", "Records lists this person as still in high school, so a personal link cannot be made. If they have graduated, add the graduation year in Records first."],
+  ["not_records_manager", "這一步要管得了紀錄的人才能做（Co-President、Senior Adviser，或被派進紀錄工作區的人）。", "This step needs someone who manages Records (a Co-President, a Senior Adviser, or someone assigned to the Records workspace)."],
   ["ticket_no_name", "報名類型要有名字，中文或英文至少填一個。", "A sign-up type needs a name in Chinese or English."],
   ["bad_capacity", "名額要填 0 以上的整數，0 是不限。", "The limit must be a whole number, 0 or more. 0 means no limit."],
   ["too_many_tickets", "一場活動最多分 12 種報名類型。", "An event can have up to 12 sign-up types."],
@@ -683,6 +685,12 @@ export const deleteEventSpeaker = id => rpcV("delete_event_speaker", { p_id: id 
 // 從紀錄（Records）找人：叫的是 Records 原本那一支 rc_find_people()，沒有新的讀取權限。
 // 讀不到名錄的人（不是 Co-President、Senior Adviser，也不在紀錄工作區）資料庫回空陣列；叫不到也當成空的。
 export const findPeople = q => rpcV("rc_find_people", { p_q: q || "" }).then(r => (Array.isArray(r) ? r : []), () => []);
+// 講者與紀錄接起來（2026-11-25）：在活動的「講者」分頁就把一個新的人加進名單、開他的個人連結、照他填的更新講者卡。
+// 三支都是 Records 原本的函式（rc_save_person、rc_person、rc_profile_link），門沒有變：管得了紀錄的人才叫得動，其他人資料庫會回 not_records_manager。
+// 沒有新的讀取或寫入權限，沒有遷移檔。Records 那一邊自己也有一份（admin/records/src/data.js，資料夾之間不互相 import）。
+export const addRecordsPerson = p => rpcV("rc_save_person", { p_person: null, p });
+export const loadRecordsPerson = id => rpcV("rc_person", { p_person: id });
+export const makeProfileLink = id => rpcV("rc_profile_link", { p_person: id, p_action: "create" });
 export const loadEventTickets = id => rpcV("event_tickets_list", { p_event: id }).catch(notYet("event_tickets_list"));
 // 加一種（id 給 null）或改一種。p 的鍵：name_zh、name_en、note_zh、note_en、capacity，沒帶的不動。
 export const saveEventTicket = (eventId, id, p) => rpcV("save_event_ticket", { p_event: eventId, p_id: id || null, p });

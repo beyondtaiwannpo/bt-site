@@ -43,6 +43,8 @@ let S = {
   // 講者與報名類型（2026-11-23，2027-01-02-event-speakers-tickets.sql）：evSpeakers、evTickets 是打開的那一場的（undefined 還在載、null 是遷移檔還沒跑、陣列）；
   // evSpUp 講者照片的上傳進度 { id, pct, name }；evSpDraft、evTkDraft 是「加一位」「加一種」填到一半的；evSpFound 從紀錄找到的人（undefined 是還沒找過）；evSpQ 找的字。
   evSpeakers: undefined, evTickets: undefined, evSpUp: null, evSpDraft: null, evTkDraft: null, evSpFound: undefined, evSpQ: "",
+  // 2026-11-25：evSpLink 是每一位講者的個人連結那一塊讀到哪了（{ 講者 id: "loading" | { err } | rc_person() 回的那一包 }），只在記憶體裡，換一場活動就清掉。
+  evSpLink: {},
   // 專案（2026-12-26）：projects 是 projects_list() 回的（undefined 還沒載，null 是遷移檔還沒跑）；pjSel 打開的那一個（id）；pjDraft 開專案填到一半；pjEvDraft 在專案裡開活動填到一半。
   projects: undefined, pjSel: null, pjDraft: null, pjEvDraft: null,
   // 場地（2026-11-10）：venues 是 venues_list() 回的 { can_edit, venues }；venue 是打開的那一個（venue_get）；vnQ 清單的搜尋字；vnOpen 哪個收起來的表單開著。
@@ -129,7 +131,7 @@ function render() {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
     body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects,
                 { photos: S.evPhotos, coverUp: S.evUp, photoUp: S.evPhUp, coverLinkOpen: !!S.vnOpen["ev-cover-link"],
-                  tab: S.evTab, speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], spOpenIds: S.evSpOpenIds, canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ,
+                  tab: S.evTab, speakers: S.evSpeakers, spUp: S.evSpUp, spDraft: S.evSpDraft, spOpen: !!S.vnOpen["ev-sp-new"], spOpenIds: S.evSpOpenIds, canPick: UI.evCanPickPeople(S.me), spFound: S.evSpFound, spQ: S.evSpQ, canLink: UI.evCanManagePeople(S.me), spLink: S.evSpLink,
                   tickets: S.evTickets, tkDraft: S.evTkDraft, tkOpen: !!S.vnOpen["ev-tk-new"],
                   prevZh: !!S.vnOpen["ev-bzh-fold"], prevEn: !!S.vnOpen["ev-ben-fold"] })
               : UI.emptyHTML(T("ev.notFound"), T("ev.notFoundHint"), { act: "ev-back", label: T("ev.back") });
@@ -617,7 +619,7 @@ async function openTab(t) {
       ev[1] && !S.terms ? D.loadTerms().then(r => { S.terms = r; }).catch(() => { S.terms = []; }) : null]);
     S.evLinks = null; S.evRc = undefined; S.evPhotos = undefined; S.evUp = null; S.evPhUp = null; S.vnOpen["ev-cover-link"] = false;
     S.vnOpen["ev-bzh-fold"] = false; S.vnOpen["ev-ben-fold"] = false;   // 說明底下的預覽：每次打開一場活動都是收著的
-    S.evLb = null; S.evSpOpenIds = {}; S.evSpeakers = undefined; S.evTickets = undefined; S.evSpUp = null; S.evSpDraft = null; S.evTkDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; S.vnOpen["ev-tk-new"] = false;
+    S.evLb = null; S.evSpOpenIds = {}; S.evSpLink = {}; S.evSpeakers = undefined; S.evTickets = undefined; S.evSpUp = null; S.evSpDraft = null; S.evTkDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; S.vnOpen["ev-tk-new"] = false;
     const one = ev[1] && (S.events || []).find(x => x.slug === ev[1]);
     // 2026-11-13：只在紀錄裡的舊活動沒有對外頁、報名、簽到，這裡是空的；直接去它在 Records 的記分卡。
     if (one && one.source === "import") { location.replace("/admin/records/#overview/" + encodeURIComponent(one.id)); return; }
@@ -1245,6 +1247,70 @@ document.addEventListener("click", async e => {
                     : UI.evSpeakerUnpick(S.evSpDraft);
     S.vnOpen["ev-sp-new"] = true; S.msg = ""; render();
     const n = document.getElementById("ev-sp-new-name"); if (n && p) n.focus();
+    return;
+  }
+  // ── 講者與紀錄接起來（2026-11-25，見 UI.evSpeakerLinkHTML 上面那一段）。門都在資料庫（rc_can_manage），這裡只是叫。──
+  // 把找的那個名字加進紀錄的名單，帶進「加一位」那幾格。
+  if (act === "ev-sp-newperson") {
+    keepEventTyped();
+    const name = String(S.evSpQ || "").trim(), draft = UI.evPersonDraft(name);
+    if (!draft) { S.msg = T("err.evSpName"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      const pid = await D.addRecordsPerson(draft);
+      S.evSpDraft = UI.evSpeakerPrefill(S.evSpDraft, { id: pid, name, labels: [], card: null });
+      S.evSpFound = undefined; S.vnOpen["ev-sp-new"] = true; S.msg = T("msg.evSpPersonNew");
+    } catch (err) { S.msg = T("err.evSpPerson") + D.says(err); }
+    S.busy = false; render(); return;
+  }
+  if (act === "ev-sp-toperson" || act === "ev-sp-link" || act === "ev-sp-link-create" || act === "ev-sp-refresh") {
+    const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev || !Array.isArray(S.evSpeakers)) return;
+    keepEventTyped();
+    let sp = S.evSpeakers.find(x => x.id === id); if (!sp) return;
+    const readLink = async () => { S.evSpLink[id] = await D.loadRecordsPerson(sp.person_id); };
+    S.busy = true; S.msg = ""; if (act === "ev-sp-link") S.evSpLink[id] = "loading"; render();
+    try {
+      if (act === "ev-sp-toperson") {
+        // 直接打名字加的那一位：在紀錄建一個人，再把這張講者卡連過去。連過去不動名字與照片，本來對外看得到的照舊補回去。
+        const draft = UI.evPersonDraft((sp.typed && sp.typed.full_name) || sp.display_name, sp.school);
+        if (!draft) { S.msg = T("err.evSpName"); S.busy = false; render(); return; }
+        const pid = await D.addRecordsPerson(draft), shown = !!sp.consent;
+        await D.saveEventSpeaker(ev.id, id, { person_id: pid });
+        if (shown) await keepSpeakerShown(id);
+        await reloadEventSpeakers(ev.id);
+        sp = S.evSpeakers.find(x => x.id === id) || sp; S.evSpOpenIds[id] = true;
+        if (sp.person_id) await readLink();
+        if (!S.msg) S.msg = T("msg.evSpPersonAdded");
+      } else if (act === "ev-sp-link") {
+        await readLink();
+      } else if (act === "ev-sp-link-create") {
+        await D.makeProfileLink(sp.person_id); await readLink(); S.msg = T("msg.evSpLinkMade");
+      } else {
+        // 照他填的更新：先讀最新的那一包，沒有可以帶的就講一聲。照片抄一份到 events bucket（跟從紀錄帶入同一條路），抄不過來就只更新字。
+        await readLink();
+        const fill = UI.evProfileFill(sp, S.evSpLink[id]);
+        if (!fill) S.msg = T("msg.evSpRefreshNone");
+        else {
+          const patch = Object.assign({}, fill.patch), shown = !!sp.consent, old = sp.photo_url;
+          let copied = "";
+          if (fill.photo) { try { copied = await copyRecordsPhoto(ev.id, fill.photo); patch.photo_url = copied; } catch (x) { copied = ""; } }
+          try { await D.saveEventSpeaker(ev.id, id, patch); }
+          catch (err) { if (copied) await D.removeEventFile(UI.evStoragePath(copied)); throw err; }
+          if (copied && old && old !== copied) await D.removeEventFile(UI.evStoragePath(old));
+          if (shown) await keepSpeakerShown(id);
+          await reloadEventSpeakers(ev.id, id);
+          if (!S.msg) S.msg = T("msg.evSpRefreshed");
+        }
+      }
+    } catch (err) {
+      const why = D.says(err);
+      if (act === "ev-sp-link") S.evSpLink[id] = { err: why }; else S.msg = T(act === "ev-sp-toperson" ? "err.evSpPerson" : act === "ev-sp-refresh" ? "err.evSpSave" : "err.evSpLink") + why;
+    }
+    S.busy = false; render(); return;
+  }
+  if (act === "ev-sp-link-copy") {
+    const el = document.getElementById("ev-sp-url-" + id); if (!el) return;
+    try { await navigator.clipboard.writeText(el.value); UI.toast(T("msg.evSpLinkCopied")); } catch (x) { el.select(); }
     return;
   }
   if (act === "ev-sp-add" || act === "ev-sp-save") {

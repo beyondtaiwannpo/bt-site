@@ -473,3 +473,85 @@ test("★ smoke.sh 有跑這一支，反向的斷言都在", () => {
     "帶別場活動的類型送不出去（bad_ticket）", "舊的叫法（不帶 p_ticket）照樣送得出去", "封面沒勾同意：對外兩支都不回封面", "封面勾了同意：對外兩支都回那張封面",
     "已經有人報的類型刪不掉（ticket_in_use）", "這一支沒有多開讀名錄的路", "紀錄那邊忘記這個人"]) assert.ok(sm.includes(s), `smoke.sh 少了：${s}`);
 });
+
+// ── 講者與紀錄接起來（2026-11-25）──────────────────────────────────────
+// Paul：「what if this speaker is completely new to our organization and I do want to add him or her into our databases?… there's no link that we talked about.
+// Even the 2 people that was in our databases… I still wanted to send them a link」。在講者那一塊就做得完：加進名單、開個人連結、照他填的更新。
+test("★ 講者與紀錄：管得了紀錄的人才看得到；新的人加進名單；個人連結那一塊的每一種樣子；照他填的更新只帶有填的、名字不動", () => {
+  const LINKED = { id: "s1", person_id: "p1", display_name: "Annie", subject: "CS", school: "UCLA", photo_url: null, consent: true };
+  const TYPED = { id: "s2", person_id: null, display_name: "小安", subject: "", school: "台灣大學", photo_url: null, consent: false };
+  // 誰看得到：跟資料庫的 rc_can_manage 同一條
+  assert.equal(F.evCanManagePeople(SENIOR), true); assert.equal(F.evCanManagePeople({ ...ASSOC, ws: { "custom:records": "edit" } }), true); assert.equal(F.evCanManagePeople({ ...ASSOC, ws: { "custom:records": "manage" } }), true);
+  assert.equal(F.evCanManagePeople(RECORDS), false, "紀錄只有「看」的人找得到人，但加不了人、開不了連結"); assert.equal(F.evCanManagePeople(EDITOR), false); assert.equal(F.evCanManagePeople(null), false);
+  assert.match(read("supabase/migrations/2026-12-25-access-model.sql"), /create or replace function public\.rc_can_manage\(\)[\s\S]{0,200}is_senior\(\) or coalesce\(public\.ws_my_level\('custom:records'\) in \('edit', 'manage'\), false\)/);
+  for (const st of [undefined, "loading", { link: null, profile: {} }]) { assert.equal(F.evSpeakerLinkHTML(LINKED, st, false, false), "", "管不了紀錄的人整塊不畫"); assert.equal(F.evSpeakerLinkHTML(TYPED, st, false, false), ""); }
+  const plain = F.eventSpeakersHTML(EV, [LINKED, TYPED], true, false, { canPick: true, spFound: [], spQ: "Zed Nobody" });
+  assert.doesNotMatch(plain, /ev-sp-ppl|ev-sp-newperson|ev-sp-link|ev-sp-toperson/, "沒有 canLink：講者那一塊跟以前一樣");
+  // 新的人加進名單要存的那幾格
+  assert.deepEqual(F.evPersonDraft("  Zed   Nobody "), { kind: "guest", name_en: "Zed Nobody" }); assert.deepEqual(F.evPersonDraft("王小明", "台灣大學"), { kind: "guest", name_zh: "王小明", school: "台灣大學" });
+  assert.equal(F.evPersonDraft("  "), null); assert.equal(F.evPersonDraft(null), null); assert.equal(F.evPersonDraft("x".repeat(200)).name_en.length, 80);
+  // 找不到人：一顆「把某某加進名單」。已經帶入一個人、或沒打字，就沒有
+  const find = F.eventSpeakersHTML(EV, [], true, false, { canPick: true, canLink: true, spOpen: true, spFound: [], spQ: 'Zed "N" <b>' });
+  assert.match(find, /<button type="button" class="btn ghost sm" data-act="ev-sp-newperson" data-id="e1">把「Zed &quot;N&quot; &lt;b&gt;」加進名單<\/button>/, "名字只是字");
+  assert.doesNotMatch(F.eventSpeakersHTML(EV, [], true, false, { canPick: true, canLink: true, spFound: [], spQ: " " }), /ev-sp-newperson/);
+  assert.doesNotMatch(F.eventSpeakersHTML(EV, [], true, false, { canPick: true, canLink: true, spQ: "Zed" }), /ev-sp-newperson/, "還沒找過就沒有");
+  assert.doesNotMatch(F.eventSpeakersHTML(EV, [], true, false, { canPick: true, canLink: true, spFound: [], spQ: "Zed", spDraft: { person_id: "p9", from: "Zed" } }), /ev-sp-newperson/, "已經帶入一個人了");
+  // 直接打名字加的那一位：一格全名加一顆「加進名單」
+  const typed = F.evSpeakerLinkHTML(TYPED, undefined, true, false);
+  assert.match(typed, /這一位還不在紀錄的名單裡。/); assert.match(typed, /<input data-f="full_name" value="小安" maxlength="80" autocomplete="off"><button type="button" class="btn ghost sm" data-act="ev-sp-toperson" data-id="s2">加進名單<\/button>/);
+  assert.match(F.evSpeakerLinkHTML({ ...TYPED, typed: { full_name: "王小安" } }, undefined, true, false), /data-f="full_name" value="王小安"/, "打到一半的全名重畫後還在");
+  assert.doesNotMatch(typed, /ev-sp-link"/);
+  // 連到紀錄的那一位：還沒按、讀取中、讀不到、沒有連結、有連結、過期
+  assert.match(F.evSpeakerLinkHTML(LINKED, undefined, true, false), /^<div class="ev-sp-ppl"><button type="button" class="btn ghost sm" data-act="ev-sp-link" data-id="s1">個人連結<\/button>/);
+  assert.match(F.evSpeakerLinkHTML(LINKED, "loading", true, false), /讀取中/);
+  assert.match(F.evSpeakerLinkHTML(LINKED, { err: "<b>壞</b>" }, true, false), /<div class="note">&lt;b&gt;壞&lt;\/b&gt;<\/div><button[^>]*data-act="ev-sp-link"/);
+  const none = F.evSpeakerLinkHTML(LINKED, { link: null, profile: {} }, true, false);
+  assert.match(none, /還沒有開連結。<\/p><div class="ev-acts"><button type="button" class="btn sm" data-act="ev-sp-link-create" data-id="s1">開一條連結<\/button>/); assert.doesNotMatch(none, /ev-sp-refresh|ev-sp-url/);
+  assert.match(none, /href="\/admin\/records\/\?lang=zh#people\/p1"/, "QR code 與撤銷留在紀錄那一頁，這裡給一條連結過去");
+  const live = F.evSpeakerLinkHTML(LINKED, { link: { token: "a&b", expires_at: "2027-02-23T00:00:00Z", expired: false, opened_at: "2026-11-26T03:00:00Z", submitted_at: null }, profile: { updated_at: null, done_at: null } }, true, false);
+  assert.match(live, /<input id="ev-sp-url-s1" readonly value="https:\/\/beyondtaiwannpo\.com\/profile\/\?t=a%26b"><button type="button" class="btn sm" data-act="ev-sp-link-copy" data-id="s1">複製連結<\/button>/);
+  assert.match(live, /2027-02-23 過期。 他在 2026-11-26 打開過。 還沒送出。/); assert.doesNotMatch(live, /ev-sp-refresh|ev-sp-link-create/, "他還沒填就沒有「照他填的更新」；有效的連結不用再開");
+  const done = F.evSpeakerLinkHTML(LINKED, { link: { token: "t", expires_at: "2027-02-23T00:00:00Z", expired: false, opened_at: "2026-11-26T03:00:00Z", submitted_at: "2026-11-27T03:00:00Z" }, profile: { updated_at: "2026-11-27T03:00:00Z" } }, true, true);
+  assert.match(done, /他在 2026-11-27 送出過。/); assert.match(done, /data-act="ev-sp-refresh" data-id="s1" disabled>照他填的更新這一位/, "忙的時候按不動");
+  const dead = F.evSpeakerLinkHTML(LINKED, { link: { token: "t", expires_at: "2026-10-01T00:00:00Z", expired: true }, profile: {} }, true, false);
+  assert.match(dead, /這條連結在 2026-10-01 過期了，他打不開。/); assert.match(dead, /data-act="ev-sp-link-create" data-id="s1">開一條新的/); assert.doesNotMatch(dead, /ev-sp-url/);
+  assert.match(F.evSpeakerLinkHTML(LINKED, { link: { token: null, expires_at: "2027-02-23T00:00:00Z", expired: false }, profile: {} }, true, false), /data-act="ev-sp-link-create"/, "資料庫沒給連結本身（不該發生，管的人才畫得到這一塊）就當成要重開");
+  assert.equal(F.evProfileURL("x y"), "https://beyondtaiwannpo.com/profile/?t=x%20y");
+  // 一整塊裡：有 canLink 的時候每一位都有那一塊，放在換照片與「存這一位」中間
+  const all = F.eventSpeakersHTML(EV, [LINKED, TYPED], true, false, { canLink: true, spLink: { s1: { link: null, profile: {} } } });
+  assert.equal(count(all, /<div class="ev-sp-ppl">/g), 2); assert.ok(all.indexOf('data-act="ev-sp-photo" data-id="s1"') < all.indexOf('data-act="ev-sp-link-create" data-id="s1"') && all.indexOf('data-act="ev-sp-link-create" data-id="s1"') < all.indexOf('data-act="ev-sp-save" data-id="s1"'));
+  // 照他填的更新：領域 → 主題；單位（沒有就最近一筆去向、再沒有名單上的學校）→ 學校；照片；名字不動；他沒填的那一格留原本的
+  const rc = { profile: { field: "Robotics", job_org: "Waterloo Labs", photo_url: "https://x/p.jpg" }, person: { school: "Old High" }, outcomes: [{ institution: "MIT" }] };
+  assert.deepEqual(F.evProfileFill(LINKED, rc), { patch: { display_name: "Annie", subject: "Robotics", school: "Waterloo Labs" }, photo: "https://x/p.jpg", changed: true });
+  assert.equal(F.evProfileFill(LINKED, { profile: { field: "", job_org: "" }, person: {}, outcomes: [{ institution: "MIT" }] }).patch.school, "MIT");
+  assert.deepEqual(F.evProfileFill(LINKED, { profile: { field: "", job_org: "" }, person: { school: "" }, outcomes: [] }), null, "什麼都沒填就沒有東西可以帶");
+  assert.deepEqual(F.evProfileFill(LINKED, { profile: { field: "CS", job_org: "UCLA" }, person: {}, outcomes: [] }), null, "跟現在一樣也不用存");
+  assert.deepEqual(F.evProfileFill(LINKED, { profile: { field: "", job_org: "", photo_url: "https://x/p.jpg" } }), { patch: { display_name: "Annie", subject: "CS", school: "UCLA" }, photo: "https://x/p.jpg", changed: false }, "只有照片也算");
+  assert.equal(F.evProfileFill(LINKED, null), null);
+});
+
+test("★ 講者與紀錄的資料層與 main.js：叫的是 Records 原本那三支、門沒有變、沒有遷移檔；連過去不動同意；錯誤講人話", () => {
+  const d = read("admin/src/data.js"), m = read("admin/src/main.js");
+  assert.match(d, /export const addRecordsPerson = p => rpcV\("rc_save_person", \{ p_person: null, p \}\);/);
+  assert.match(d, /export const loadRecordsPerson = id => rpcV\("rc_person", \{ p_person: id \}\);/);
+  assert.match(d, /export const makeProfileLink = id => rpcV\("rc_profile_link", \{ p_person: id, p_action: "create" \}\);/);
+  assert.doesNotMatch(d, /p_action: "revoke"/, "撤銷連結留在紀錄那一頁");
+  for (const k of ["minor_no_link", "not_records_manager"]) assert.match(d, new RegExp(`\\["${k}", "`), `says() 沒有 ${k}`);
+  const rcSql = read("supabase/migrations/2026-12-01-records.sql"), pnSql = read("supabase/migrations/2027-01-03-people-network.sql"), spSql = read("supabase/migrations/2027-01-02-event-speakers-tickets.sql");
+  assert.match(rcSql, /create or replace function public\.rc_save_person\(p_person uuid, p jsonb\)[\s\S]{0,260}if not public\.rc_can_manage\(\) then raise exception 'not_records_manager'/);
+  assert.match(pnSql, /create or replace function public\.rc_profile_link\(p_person uuid, p_action text\)[\s\S]{0,260}if not public\.rc_can_manage\(\) then raise exception 'not_records_manager'/);
+  assert.match(pnSql, /if pe\.kind = 'student' and \(pe\.grad_year is null or pe\.grad_year >= extract\(year from now\(\)\)::int\) then raise exception 'minor_no_link'/, "還在念高中的學員照舊開不了，這一批沒有動");
+  assert.match(spSql, /consent = case when v_name is distinct from display_name or v_photo is distinct from photo_url then false else consent end,/, "只連到一個人（名字與照片沒變）不會動同意");
+  for (const act of ["ev-sp-newperson", "ev-sp-toperson", "ev-sp-link", "ev-sp-link-create", "ev-sp-refresh", "ev-sp-link-copy"]) assert.match(m, new RegExp(`act === "${act}"`), `main.js 沒接 ${act}`);
+  assert.match(m, /canLink: UI\.evCanManagePeople\(S\.me\), spLink: S\.evSpLink,/); assert.match(m, /S\.evSpOpenIds = \{\}; S\.evSpLink = \{\};/, "換一場活動就清掉");
+  const blk = m.slice(m.indexOf('if (act === "ev-sp-newperson") {'), m.indexOf('if (act === "ev-sp-link-copy") {'));
+  assert.match(blk, /const pid = await D\.addRecordsPerson\(draft\);\s*S\.evSpDraft = UI\.evSpeakerPrefill\(S\.evSpDraft, \{ id: pid, name, labels: \[\], card: null \}\);/, "新的人帶進「加一位」那幾格，跟從紀錄挑人同一條路");
+  assert.match(blk, /await D\.saveEventSpeaker\(ev\.id, id, \{ person_id: pid \}\);\s*if \(shown\) await keepSpeakerShown\(id\);/);
+  assert.match(blk, /await D\.makeProfileLink\(sp\.person_id\); await readLink\(\);/);
+  assert.match(blk, /copied = await copyRecordsPhoto\(ev\.id, fill\.photo\); patch\.photo_url = copied;/, "照片抄一份到 events bucket，不直接用紀錄那邊的網址");
+  assert.match(blk, /catch \(err\) \{ if \(copied\) await D\.removeEventFile\(UI\.evStoragePath\(copied\)\); throw err; \}/, "沒存成就把抄過來的檔刪掉");
+  assert.match(blk, /if \(copied && old && old !== copied\) await D\.removeEventFile\(UI\.evStoragePath\(old\)\);\s*if \(shown\) await keepSpeakerShown\(id\);/, "舊照片的檔刪掉；本來對外看得到的補回去");
+  assert.doesNotMatch(blk, /setEventSpeakerConsent\(id, true\)|consent: true/, "這幾步不會自己把人放上對外頁");
+  assert.match(m, /await navigator\.clipboard\.writeText\(el\.value\); UI\.toast\(T\("msg\.evSpLinkCopied"\)\);/);
+  const css = read("admin/admin.css"); assert.match(css, /\.ev-sp-ppl\{/);
+});

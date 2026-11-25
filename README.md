@@ -6031,6 +6031,38 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 講者與紀錄接起來：在活動裡就能加新的人、開他的個人連結（2026-11-25）
+
+Paul 問的：
+
+> what if this speaker is completely new to our organization and I do want to add him or her into our databases? Like where do I do that?…
+> adding a speaker, it only asks me for first name, subject or major, and there's no link that we talked about. Even the 2 people that was in our databases,
+> their story or their information isn't complete, so I'm still going to send them a link
+
+以前要跑三個地方：到紀錄加一個人、在紀錄那個人的頁開個人連結、回活動的講者那一塊把他找出來。直接在「加一位講者」打名字的話，只會多一張這一場的講者卡，名單裡沒有這個人，也沒有連結。
+
+現在在活動的「講者」分頁就做得完。**沒有遷移檔**，叫的都是紀錄原本那三支函式（`rc_save_person`、`rc_profile_link`、`rc_person`），門沒有變。
+
+| 要做什麼 | 怎麼做 |
+|---|---|
+| 一個全新的人 | 「加一位講者」打開，在「從紀錄裡找人」打他的全名、按「找」。找不到（或找到的都不是他），下面有一顆「把「某某」加進名單」。按了就在紀錄建一個人（種類是來賓），名字帶進下面那幾格，補上主題與學校再按「加進來」 |
+| 以前直接打名字加的講者 | 打開那一位，有一行「這一位還不在紀錄的名單裡」，旁邊一格全名（預設是卡上的名字，改成全名比較好認）加一顆「加進名單」。全名只放進名單，不會出現在對外頁 |
+| 開個人連結給他 | 打開那一位，按「個人連結」。還沒有連結就按「開一條連結」，然後「複製連結」傳給他。那一行會寫幾號過期、他打開過沒、送出過沒 |
+| 他填完之後 | 同一塊多一顆「照他填的更新這一位」：把他填的領域、單位、照片帶到講者卡上。**名字不會動**（對外只放名字，那是加的人決定的），他沒填的那一格留原本的。對外看不看得到也不會變 |
+
+要知道的幾件事：
+
+- **誰看得到這幾塊**：管得了紀錄的人，也就是 Co-President、Senior Adviser，或被派進紀錄工作區而且是「改」以上的人（跟資料庫的 `rc_can_manage` 同一條）。其他改得動這場活動的人看到的講者那一塊跟以前一樣。要讓每一個辦活動的人都能開連結，得改資料庫的門，那要 Paul 另外說。
+- **個人連結不是帳號。** 它是一條不用登入的連結（`/profile/?t=…`），90 天過期，他在上面填個人檔案、寫故事、勾同意。之後要再請他補資料，就再傳同一條，或開一條新的。
+- **還在念高中的學員開不了個人連結**，資料庫擋的，這一批沒有動。按了會講原因。
+- **加進名單不會查重複。** 沒有 email 可以比對，所以同一個人按兩次會有兩筆。先找再加；真的重複了到紀錄那一頁合併。
+- QR code 與撤銷連結留在紀錄那個人的頁，這一塊最下面有一條連結過去。
+- 照片是抄一份到活動的儲存空間再掛上去（跟從紀錄帶入同一條路），紀錄那邊換照片不會把對外頁的弄壞。
+
+程式在 `admin/src/ui.js` 的 `evSpeakerLinkHTML`、`evPersonDraft`、`evProfileFill`，按鈕接在 `admin/src/main.js`（`ev-sp-newperson`、`ev-sp-toperson`、`ev-sp-link`、`ev-sp-link-create`、`ev-sp-link-copy`、`ev-sp-refresh`）。
+
+本機接本機 Supabase 走過一次：把直接打名字的那一位加進名單、開連結、假裝他填了領域與單位再更新；找不到的名字加進名單再加成講者。試完的資料都刪掉了。個人連結那一頁本身（`/profile/`）這次沒有重測。正式站上還沒有人點過。
+
 ## 後台小整理：講者一格勾選、紀錄的選單改名、「誰在這裡」收起來（2026-11-25）
 
 Paul 看著後台的截圖一次講的四件事。都只動後台的畫面，**沒有遷移檔，資料庫、RLS、誰看得到什麼都沒有變**。
