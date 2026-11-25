@@ -766,8 +766,9 @@ test("★ 總覽「你的存取」：被派的人一行一個工作區加直達�
   const blocks = FORMS.teamBlocksHTML({ ...ME.pres }, [], { resources: [], roster: [], workspaces: WS, directors: DIRS });
   assert.match(blocks, /<h3>Community Relations/);
   assert.match(blocks, /Director：林育安/);
-  assert.match(blocks, /href="\/admin\/\?lang=zh#members=res%3ACurriculum%20Team">這個 team 的人（看／改／管）/, "2026-12-25 起連到 /admin/#members=，Director 自己也進得去");
+  assert.doesNotMatch(blocks, /#members=/, "2026-11-25：Co-President 不畫這一條，他在「人與權限 → 工作區」管");
   const dir = FORMS.teamBlocksHTML({ ...ME.director, team: "", ws: { "res:Marketing Team": "manage" } }, [], { resources: [], roster: [], workspaces: WS, directors: [] });
+  assert.match(dir, /href="\/admin\/\?lang=zh#members=res%3AMarketing%20Team">這個 team 的人（看／改／管）/, "2026-12-25 起連到 /admin/#members=，Director 自己進得去");
   assert.match(dir, /<h3>Marketing/, "被派進去的 team 就算沒勾標籤也有一段");
   assert.match(dir, /#members=res%3AMarketing%20Team">這個 team 的人/, "2026-12-25：team 是「管」的 Director 直接有一條連到自己 team 的成員頁");
   // 只能看的人，卡上寫「去看」不寫「去審」（2026-11-14 起那張卡不畫在這一頁，資料照舊從 todoCards 算）。
@@ -872,9 +873,11 @@ test("★ 側欄：現在這一區展開成它的每一頁，現在這一頁有�
     const pres = { role: "cadre", board: "president", team: "Sponsorship Team", name: "P", ws: {} };
     const rail = M.railHTML("records", "people", pres, {}, "en");
     assert.match(rail, /<a class="rail-item rail-area here" href="#overview"[^>]*>.*?<b>紀錄<\/b>.*?<\/a><div class="rail-subs">/, label);
-    assert.match(rail, /rail-sub" href="#overview" data-act="tab" data-t="overview">活動記分卡</, label);
-    assert.match(rail, /rail-sub on" href="#people" data-act="tab" data-t="people" aria-current="page">所有人</, label);
-    assert.match(rail, /rail-sub rail-people" href="\/admin\/\?lang=zh#members=custom%3Arecords"/, `${label}：誰在這裡也在側欄`);
+    assert.match(rail, /rail-sub" href="#overview" data-act="tab" data-t="overview">活動</, label);
+    assert.match(rail, /rail-sub on" href="#people" data-act="tab" data-t="people" aria-current="page">人</, label);
+    assert.doesNotMatch(rail, /rail-people|#members=/, `${label}：2026-11-25 Co-President 的側欄沒有「誰在這裡」`);
+    assert.match(M.railHTML("records", "people", { role: "cadre", board: "director", team: "", name: "D", ws: { records: "edit", "custom:records": "manage" } }, {}, "en"),
+      /rail-sub rail-people" href="\/admin\/\?lang=zh#members=custom%3Arecords"/, `${label}：只管這一區的人照舊有`);
     assert.equal((rail.match(/rail-subs/g) || []).length, 1, `${label}：只有現在這一區展開`);
     // 一般幹部在對外網站只有資源庫一頁：不展開，那一行自己深藍。
     const one = M.railHTML("site", "res", { role: "cadre", board: "member", team: "Curriculum Team", ws: {} }, {}, "zh");

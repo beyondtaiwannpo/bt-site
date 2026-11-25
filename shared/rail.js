@@ -115,7 +115,7 @@ export const AREAS = [
   { key: "website",   sec: "work", label: { zh: "對外網站", en: "Website" },    hint: { zh: "資源、團隊頁、校友故事、信", en: "Resources, team page, stories, emails" } },
   { key: "passports", sec: "work", label: { zh: "護照",     en: "Passports" },  hint: { zh: "幹部護照、實習護照", en: "Cadre and intern passports" } },
   { key: "people",    sec: "org",  label: { zh: "人與權限", en: "People" },     hint: { zh: "名單、邀請、工作區", en: "Roster, invites, workspaces" } },
-  { key: "records",   sec: "org",  label: { zh: "紀錄",     en: "Records" },    hint: { zh: "記分卡、每個人、年度比較", en: "Scorecards, everyone, year by year" } },
+  { key: "records",   sec: "org",  label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較", en: "Events, people, year by year" } },
   { key: "money",     sec: "org",  label: { zh: "錢",       en: "Money" },      hint: { zh: "收支、預算、匯出", en: "Income, spending, budget" } },
   // 場地是整個 BT 的（2026-12-26 Paul：「venue, records, money … whole BT」）。誰改得動不變：開得了活動的人照舊改得動。
   { key: "venues",    sec: "org",  label: { zh: "場地",     en: "Venues" },     hint: { zh: "場地與聯絡人", en: "Places and contacts" } },
@@ -172,8 +172,8 @@ export const ITEMS = [
   // 變動紀錄：2026-12-25 起 role_changes 的 RLS 也給 Senior Adviser 讀（以前只給 Co-President）。
   { group: "people",    key: "changes",    area: "people",    who: "senior", label: { zh: "誰改了什麼", en: "Change log" } },
   // 紀錄
-  { group: "records",   key: "overview",   area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "活動記分卡", en: "Event scorecards" } },
-  { group: "records",   key: "people",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "所有人", en: "Everyone" } },
+  { group: "records",   key: "overview",   area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "活動", en: "Events" } },
+  { group: "records",   key: "people",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "人", en: "People" } },
   { group: "records",   key: "yearly",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "年度比較", en: "Year by year" } },
   // 場地（2026-12-26 從「專案」底下搬到整個 BT）
   { group: "forms",     key: "venues",     area: "venues",    who: "cadre",  label: { zh: "場地", en: "Venues" } },
@@ -275,7 +275,7 @@ function teamRowsHTML(group, tab, me, L) {
     const tag = t.level ? { txt: lvName(t.level), tip: fill(RT.lvTip, L, { lv: lvName(t.level) }), cls: "" }
       : t.some ? { txt: tx(RT.lvSome, L), tip: tx(RT.lvSomeTip, L), cls: " dim" }
       : { txt: tx(RT.lvView, L), tip: tx(RT.lvViewTip, L), cls: " dim" };
-    const ppl = canManageWs(me, "res:" + t.team)
+    const ppl = showPeopleHere(me, "res:" + t.team)
       ? `<a class="rail-item rail-sub rail-people" href="${esc(peopleHref("res:" + t.team, L))}" title="${esc(tx(RT.peopleT, L))}">${esc(tx(RT.people, L))}</a>` : "";
     const projects = t.projects.map(p => `<a class="rail-item rail-sub" href="${esc(withLang("/admin/#projects/" + encodeURIComponent(p.id), L))}">${esc(tx({ zh: p.title_zh || p.title_en, en: p.title_en || p.title_zh }, L) || p.id)}</a>`).join("");
     const open = cur || (teams.length === 1 && !!(projects || ppl));
@@ -300,7 +300,7 @@ export function railHTML(group, tab, me, counts, L) {
     // 現在這一區在側欄裡展開，底下列出它的每一頁（2026-11-14 Paul：「I still want the left menu click and show all the stuff in that tab like before」）。
     // 展開的時候那一區本身是淺底，深藍的是現在這一頁；寬螢幕上內容區上方那一排分頁就不畫了（rail.css），手機上照舊。
     const it = on ? itemOf(group, tab) : null;
-    const ppl = it && it.ws && canManageWs(me, it.ws)
+    const ppl = it && it.ws && showPeopleHere(me, it.ws)
       ? `<a class="rail-item rail-sub rail-people" href="${esc(peopleHref(it.ws, L))}" title="${esc(tx(RT.peopleT, L))}">${esc(tx(RT.people, L))}</a>` : "";
     const open = on && (items.length > 1 || ppl);
     const subs = open ? `<div class="rail-subs">${items.map(i => {
@@ -334,13 +334,17 @@ export function canManageWs(me, id) {
   if (id === "custom:money") return me.board === "president" || String((me.ws || {})[id] || "") === "manage";
   return senior(me) || String((me.ws || {})[id] || "") === "manage";
 }
+// 「誰在這裡」那一條連結畫不畫（2026-11-25 Paul：「for every workspaces, take out the people here. I can just go to workspaces and manage people there」）。
+// Co-President 與 Senior Adviser 不畫：他們在「人與權限 → 工作區」一頁管得到每一區的人。
+// 那一頁只開給他們兩種人，所以只管自己那一區的 Director 照舊有這一條，不然他就沒有地方加人了。門沒有變，還是 canManageWs。
+export const showPeopleHere = (me, id) => !senior(me) && canManageWs(me, id);
 export function peopleHref(id, L) { return withLang(`/admin/#members=${encodeURIComponent(id)}`, L); }
 // 內容區最上面那一排分頁：現在這一行（area）底下看得到的每一頁。只有一頁、也沒有「誰在這裡」就不畫。
 export function areaTabsHTML(group, tab, me, L) {
   const it = itemOf(group, tab);
   if (!it) return "";
   const items = visibleItems(it.area, me);
-  const people = it.ws && canManageWs(me, it.ws)
+  const people = it.ws && showPeopleHere(me, it.ws)
     ? `<a class="area-tab area-people" href="${esc(peopleHref(it.ws, L))}" title="${esc(tx(RT.peopleT, L))}">${esc(tx(RT.people, L))}</a>` : "";
   if (items.length < 2 && !people) return "";
   return `<nav class="area-tabs" aria-label="${esc(tx(RT.tabs, L))}">${items.map(i => {

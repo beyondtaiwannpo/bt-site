@@ -87,12 +87,13 @@ test("報名類型的名字照語言、報了幾個、滿了沒；誰看得到�
 });
 
 // ── 2. 後台的畫面 ──────────────────────────────────────────────────────
-// 2026-11-24 起沒有同意的勾（Paul：「take this person agreed to their name and photos on public pages, take that away as well」）：
-// 加一位就算確認過本人同意。對外看不到的那一位（改版之前沒勾的、紀錄裡是學員的）有一顆「放上對外頁」。
-test("★ 講者：沒有同意的勾，加進來就算確認過；看不到的那一位有「放上對外頁」；可以改、可以放照片、可以排、可以拿掉；改不動的人整塊不畫", () => {
+// 2026-11-24 同意的勾拿掉（Paul：「take this person agreed to their name and photos on public pages, take that away as well」）。
+// 2026-11-25 換成一格「放在對外頁」（Paul：「Why is showing that if I can choose they're being shown or not? So make a box I can tick」），
+// 那一段「只放名字、未成年不放」的提醒與「可能未成年」的標籤同一天拿掉（「take it out… I don't need that in everywhere possible」）。
+test("★ 講者：每一位有一格「放在對外頁」，勾了才對外；沒有那一段提醒；可以改、可以放照片、可以排、可以拿掉；改不動的人整塊不畫", () => {
   const h = F.eventSpeakersHTML(EV, SPEAKERS, true, false, {});
   assert.match(h, /id="ev-speakers"><h2>講者<span class="hint">2<\/span>/);
-  assert.match(h, /對外頁只放名字，不放姓，未成年的人不要放。在這裡加一位講者，就是你確認過他本人同意把名字與照片放在對外頁。/, "那一行提醒");
+  assert.doesNotMatch(h, /未成年|minor|滿 18 歲|<div class="note">/, "那一行提醒拿掉了，也沒有別的未成年提醒");
   assert.equal(count(h, /<li class="ev-sp" data-sp-row data-id="s[12]">/g), 2);
   assert.match(h, new RegExp(`<img class="ev-sp-pic sm" src="${PIC.replace(/[.?/]/g, "\\$&")}" alt="">`), "有照片的印照片");
   assert.match(h, /<span class="ev-sp-pic sm" aria-hidden="true">小<\/span>/, "沒有照片的是一個圓加名字的第一個字");
@@ -103,12 +104,18 @@ test("★ 講者：沒有同意的勾，加進來就算確認過；看不到的�
   assert.match(F.eventSpeakersHTML(EV, SPEAKERS, true, false, { spOpenIds: { s2: true } }), /<details class="ev-sp-fold" data-sp-fold="s2" open>/, "開過的重畫後還開著");
   assert.match(F.eventSpeakersHTML(EV, SPEAKERS, true, true, { spUp: { id: "s1", pct: 10, name: "a.jpg" } }), /<details class="ev-sp-fold" data-sp-fold="s1" open>/, "照片正在傳的那一位一定開著");
   assert.match(h, /<input data-f="display_name" value="Annie" maxlength="60"/); assert.match(h, /<input data-f="subject" value="Computer Science"/); assert.match(h, /<input data-f="school" value="UCLA"/);
-  assert.doesNotMatch(h, /ev-sp-consent|type="checkbox"|這個人同意把名字與照片放在對外頁/, "沒有同意的勾了");
-  assert.match(h, /<span class="tag ok">活動上架後對外看得到<\/span> <span class="mini">從紀錄挑的<\/span><\/div>/, "活動還沒上架：看得到的寫上架後才看得到；從紀錄挑的有標");
-  assert.match(h, /<span class="tag draft">對外看不到<\/span> <button type="button" class="btn sm" data-act="ev-sp-show" data-id="s2" data-v="1" data-name="小安">放上對外頁<\/button><span class="ev-help">這一位現在不會出現在對外頁。確定他滿 18 歲/, "看不到的那一位：一顆「放上對外頁」加一句話");
-  assert.equal(count(h, /data-act="ev-sp-show"[^>]*data-v="1"/g), 1, "只有看不到的那一位有");
-  assert.match(h, /<button type="button" class="btn quiet sm" data-act="ev-sp-show" data-id="s1" data-v="0">從對外頁收起來<\/button>/, "看得到的那一位可以收起來");
-  assert.match(F.eventSpeakersHTML({ ...EV, status: "published" }, SPEAKERS, true, false, {}), /<span class="tag open">對外看得到<\/span>/);
+  assert.doesNotMatch(h, /ev-sp-consent|這個人同意把名字與照片放在對外頁/, "不是同意的勾，是「放在對外頁」");
+  assert.match(h, /<div class="ev-ph-state"><label class="check ev-sp-show"><input type="checkbox" data-act="ev-sp-show" data-id="s1" checked><span>放在對外頁<\/span><\/label> <span class="mini">活動上架之後才看得到<\/span> <span class="mini">從紀錄挑的<\/span><\/div>/, "看得到的那一位：勾著；活動還沒上架多一句；從紀錄挑的有標");
+  assert.match(h, /<div class="ev-ph-state"><label class="check ev-sp-show"><input type="checkbox" data-act="ev-sp-show" data-id="s2"><span>放在對外頁<\/span><\/label><\/div>/, "看不到的那一位：沒勾，後面沒有別的話");
+  assert.equal(count(h, /data-act="ev-sp-show"/g), 2, "一位一格"); assert.doesNotMatch(h, /<button[^>]*data-act="ev-sp-show"|放上對外頁|從對外頁收起來|對外看得到/, "沒有那兩顆按鈕與狀態標籤了");
+  const liveH = F.eventSpeakersHTML({ ...EV, status: "published" }, SPEAKERS, true, false, {});
+  assert.doesNotMatch(liveH, /活動上架之後才看得到/, "上架了就不用那一句");
+  assert.match(F.eventSpeakersHTML(EV, SPEAKERS, true, true, {}), /data-act="ev-sp-show" data-id="s1" checked disabled>/, "忙的時候按不動");
+  // 「加一位」也有一格：沒動過是勾著的；從紀錄挑了學員的先不勾；自己動過就照自己的
+  assert.match(h, /<label class="check ev-sp-show"><input type="checkbox" id="ev-sp-new-show" checked>/);
+  assert.match(F.eventSpeakersHTML(EV, [], true, false, { spDraft: { person_id: "p8", minor: true } }), /id="ev-sp-new-show"><span>/, "學員：先不勾");
+  assert.match(F.eventSpeakersHTML(EV, [], true, false, { spDraft: { person_id: "p8", minor: true, show: true } }), /id="ev-sp-new-show" checked>/);
+  assert.match(F.eventSpeakersHTML(EV, [], true, false, { spDraft: { show: false } }), /id="ev-sp-new-show"><span>/);
   assert.match(h, /data-act="ev-sp-photo" data-id="s1">/); assert.match(h, /換一張照片/); assert.match(h, /加照片/);
   assert.equal(count(h, /data-act="ev-sp-photo-clear"/g), 1, "有照片的那一位才有「拿掉照片」");
   assert.match(h, /data-act="ev-sp-move" data-id="s1" data-dir="-1" aria-label="往上移一位" title="往上移一位" disabled>↑</, "第一位不能再往上");
@@ -131,7 +138,7 @@ test("★ 講者：沒有同意的勾，加進來就算確認過；看不到的�
   assert.match(F.eventSpeakersHTML(EV, [], true, false, {}), /還沒有講者。/);
 });
 
-test("★ 從紀錄裡找人：讀得到名錄的人才有那一格；挑了只帶名字與學校進「加一位」；學員標「可能未成年」", () => {
+test("★ 從紀錄裡找人：讀得到名錄的人才有那一格；挑了只帶名字與學校進「加一位」；學員就標「學員」", () => {
   assert.doesNotMatch(F.eventSpeakersHTML(EV, SPEAKERS, true, false, { canPick: false }), /ev-sp-find|ev-sp-q|從紀錄裡找人/, "讀不到名錄的人沒有那一格，直接打字");
   const h = F.eventSpeakersHTML(EV, SPEAKERS, true, false, { canPick: true, spOpen: true, spQ: "wang",
     spFound: [{ id: "p9", name: "Paul Wang", school: "NTU", kind: "member" }, { id: "p8", name: "王小明", school: "建中", kind: "student" }],
@@ -139,7 +146,7 @@ test("★ 從紀錄裡找人：讀得到名錄的人才有那一格；挑了只�
   assert.match(h, /id="ev-sp-new" open>/);
   assert.match(h, /<input id="ev-sp-q" type="search" value="wang"/); assert.match(h, /data-act="ev-sp-find" data-id="e1">找/);
   assert.match(h, /<b>Paul Wang<\/b> <span class="mini">NTU<\/span> <span class="tag">成員<\/span> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="p9">帶入/);
-  assert.match(h, /<span class="tag warn">學員，可能未成年<\/span>/, "學員那一列有警告的標籤");
+  assert.match(h, /<b>王小明<\/b> <span class="mini">建中<\/span> <span class="tag">學員<\/span>/, "學員那一列跟別人一樣是一個標籤"); assert.doesNotMatch(h, /tag warn|未成年/);
   assert.match(h, /帶入的是紀錄裡的「Paul Wang」。 <button class="btn quiet sm" data-act="ev-sp-unpick">不連到這個人/);
   assert.match(h, /id="ev-sp-new-name" value="Paul"/); assert.match(h, /<input data-f="school" value="NTU"/);
   assert.doesNotMatch(h, /data-f="person_id"/, "連到誰不是一格可以打的字，放在 main.js 的草稿裡");
@@ -201,8 +208,8 @@ test("★ 說明底下有一行怎麼打的提示（中英兩格各一行），�
 test("★ 這一批新的字中英都有、沒有破折號、沒有 emoji；程式裡用到的鍵字典裡都有", () => {
   const src = read("admin/src/ui.js") + read("admin/src/main.js");
   const keys = new Set([...src.matchAll(/T\("((?:ev\.(?:sp|tk)|msg\.ev(?:Sp|Tk)|err\.ev(?:Sp|Tk)|confirm\.ev(?:Sp|Tk)|apps\.ticket|ev\.bodyHelp)[A-Za-z.]*)"/g)].map(m => m[1]));
-  for (const k of ["ev.spPublic", "ev.spReady", "ev.spHidden", "ev.spPhotoPick", "ev.spPhotoChange", "ev.spKind.member", "ev.spKind.student", "ev.spKind.guest",
-    "msg.evSpAdded", "msg.evSpSaved", "msg.evSpAddedMinor", "msg.evSpConsentOn", "msg.evSpConsentOff", "msg.evSpMoved", "msg.evSpDeleted", "msg.evSpPhotoCleared",
+  for (const k of ["ev.spHidden", "ev.spShow", "ev.spShowLater", "ev.spPhotoPick", "ev.spPhotoChange", "ev.spKind.member", "ev.spKind.student", "ev.spKind.guest",
+    "msg.evSpAdded", "msg.evSpSaved", "msg.evSpAddedHidden", "msg.evSpConsentOn", "msg.evSpConsentOff", "msg.evSpMoved", "msg.evSpDeleted", "msg.evSpPhotoCleared",
     "msg.evTkAdded", "msg.evTkSaved", "msg.evTkMoved", "msg.evTkDeleted", "ev.tkCount", "ev.tkCountCap", "err.evTkName", "err.evTkCap"]) keys.add(k);
   assert.ok(keys.size > 60, `抓得到鍵（這條檢查自己沒壞），抓到 ${keys.size}`);
   for (const k of keys) { if (k.endsWith(".")) continue; assert.ok(FS.STRINGS[k], `字典裡沒有 ${k}`); assert.ok(FS.STRINGS[k].zh && FS.STRINGS[k].en, `${k} 少一種語言`); }
@@ -448,7 +455,9 @@ test("★ 資料層與 main.js：叫的函式名字與參數跟遷移檔一樣�
     assert.match(m, new RegExp(`act === "${act}"`), `main.js 沒接 ${act}`);
   assert.match(m, /e\.target\.dataset\.act === "ev-sp-photo"/); assert.doesNotMatch(m, /"ev-sp-consent"/, "2026-11-24 起沒有同意的勾");
   assert.match(m, /if \(act === "ev-cover-show" \|\| act === "ev-ph-show" \|\| act === "ev-sp-show"\) \{/);
-  assert.match(m, /if \(act === "ev-sp-show" && on && UI\.needAsk\(S, b, T\("confirm\.evSpShow", \{ name: b\.dataset\.name \|\| "" \}\)\)\) return;/, "講者要放上對外頁之前多問一次（滿 18 歲、本人同意）");
+  assert.match(m, /const on = act === "ev-cover-show" \? true : b\.type === "checkbox" \? b\.checked : b\.dataset\.v === "1";/, "講者那一格是勾選：勾了沒看 checked");
+  assert.doesNotMatch(m, /confirm\.evSpShow|evSpAddedMinor/, "2026-11-25 起放上去不再多問一次");
+  assert.match(m, /const ss = document\.getElementById\("ev-sp-new-show"\); if \(ss && sn && sn\.dataset\.ev === ev\.id\) S\.evSpDraft\.show = ss\.checked;/, "「加一位」那一格勾了沒，重畫前收進草稿");
   assert.match(m, /if \(adding && S\.evSpDraft && S\.evSpDraft\.person_id\) patch\.person_id = S\.evSpDraft\.person_id;/, "連到誰只在「加一位」的時候帶");
   assert.match(m, /url = await D\.uploadEventImage\(ev\.id, blob\);[\s\S]{0,200}await D\.saveEventSpeaker\(ev\.id, speakerId, \{ photo_url: url \}\);/, "講者的照片用原本那一支上傳（同一個 bucket）");
   assert.match(m, /else if \(act === "ev-sp-del"\) await D\.removeEventFile\(UI\.evStoragePath\(await D\.deleteEventSpeaker\(id\)\)\);/, "拿掉講者，Storage 的檔也刪");

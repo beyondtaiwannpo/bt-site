@@ -6031,6 +6031,36 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 後台小整理：講者一格勾選、紀錄的選單改名、「誰在這裡」收起來（2026-11-25）
+
+Paul 看著後台的截圖一次講的四件事。都只動後台的畫面，**沒有遷移檔，資料庫、RLS、誰看得到什麼都沒有變**。
+
+**1. 講者那一塊的提醒拿掉**（「take out the public page shows first name only and never a minor… I don't need that in everywhere possible… Take out the maybe a minor thing」）
+
+- 最上面那一段「對外頁只放名字，不放姓，未成年的人不要放…」拿掉了。
+- 從紀錄找人的時候，學員後面的標籤從警告色的「學員，可能未成年」變成跟別人一樣的「學員」。
+- 挑了學員之後那一句「可能未成年，加進來先不會出現在對外頁」拿掉了；把講者放上對外頁之前也不再多問一次「他滿 18 歲了嗎」。
+- **沒有動的**：紀錄那一邊還在念高中的學員開不了個人連結、去向不能連名字公開（資料庫擋的，隱私政策寫的），`/profile/` 那一頁要勾「我已滿 18 歲」，對外網站核可團隊頁與故事之前那幾句提醒。那些是資料庫的門與隱私政策答應的事，不是這一塊的提示字，要動要 Paul 另外說。
+
+**2. 講者對外看不看得到，改成一格勾選**（「Why is showing that if I can choose they're being shown or not? So make a box I can tick」）
+
+- 每一位打開之後第一行是一格「放在對外頁」。勾或取消馬上存，不用再按「存這一位」。活動還沒上架的時候，勾著的後面多一句「活動上架之後才看得到」。
+- 前一天的「對外看得到」標籤、「放上對外頁」「從對外頁收起來」兩顆按鈕拿掉了。收著的那一行，沒勾的那一位照舊有一個「對外看不到」的小標籤，不用一個一個打開看。
+- 「加一位講者」也有一格，一開始是勾著的。**從紀錄挑了現在還是學員的人，那一格一開始不勾**，要放就自己勾。這是唯一留下來的保護，畫面上沒有任何一句話。
+- 叫的還是原本那一支 `set_event_speaker_consent`，門是這場活動「改」以上，沒有變。
+- 封面與活動照片沒有動（那兩樣 Paul 前一天說放上去就算同意）。
+
+**3. 紀錄的選單改名**：「活動記分卡」改成「活動」（Events），「所有人」改成「人」（People），「年度比較」不動。側欄那一行的說明跟著改成「活動、人、年度比較」。頁面裡面講「記分卡」的句子沒有動。
+
+**4. 「誰在這裡」收起來**（「for every workspaces, take out the people here. I can just go to workspaces and manage people there」）
+
+- Co-President 與 Senior Adviser 的側欄、每一區最上面那一排分頁、team 總覽那一段、專案的設定，都不再有「誰在這裡」那一條。他們在「人與權限 → 工作區」一頁管得到每一區、每一個專案的人。
+- **只管自己那一區的人（例如只管自己 team 的 Director）照舊有那一條。**「人與權限」那一頁只開給 Co-President 與 Senior Adviser，把那一條也拿掉的話，Director 就沒有地方加人了。
+- 判斷在 `shared/rail.js` 的 `showPeopleHere`（沒有新增 shared 的檔案）。派人的門 `canManageWs` 沒有變。
+- 活動「設定」裡那一顆「誰能改這場活動」沒有動：單一場活動的人在「工作區」那一頁找不到，拿掉就沒有地方管了。
+
+本機接本機 Supabase 看過：講者那一格勾、取消、加一位沒勾的，資料庫存的都對；Co-President 的側欄沒有「誰在這裡」。試完的資料都還原了。測試 1167、`check.sh` 全過。正式站登入之後還沒有人點過。
+
 ## 機票重排：只有一種字、每一塊對齊，首頁只放一張大的（2026-11-25）
 
 Paul 把 Marketing Director 的意見轉過來，附了兩張登機證當參考：

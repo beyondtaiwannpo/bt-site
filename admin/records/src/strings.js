@@ -251,7 +251,7 @@ export const MINE = {
   "num.responseRate": { zh: "回覆率 {p}", en: "{p} response rate" },
   "num.prev":         { zh: "跟上一場同類（{title}，{when}）比；正數是進步。", en: "Compared with the previous one of this kind ({title}, {when}); plus means better." },
   // 總覽
-  "ov.title":         { zh: "活動記分卡", en: "Event scorecards" },
+  "ov.title":         { zh: "活動", en: "Events" },
   "ov.lede":          { zh: "每一場活動四個數字，加一句「下一次我們改什麼」。點一場看細節。", en: "Four numbers per event, plus one line on what to change next time. Open an event for details." },
   "ov.totals":        { zh: "Records 裡總共有什麼（{n} 個人）", en: "Totals in Records ({n} people)" },
   "ov.people":        { zh: "名單上的人", en: "People" },

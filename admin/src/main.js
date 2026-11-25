@@ -388,6 +388,7 @@ function keepPanelsTyped() {
   for (const li of document.querySelectorAll("[data-sp-row]")) { const r = (Array.isArray(S.evSpeakers) ? S.evSpeakers : []).find(x => x.id === li.dataset.id); if (r) r.typed = rowTyped(li); }
   for (const li of document.querySelectorAll("[data-tk-row]")) { const r = (Array.isArray(S.evTickets) ? S.evTickets : []).find(x => x.id === li.dataset.id); if (r) r.typed = rowTyped(li); }
   const sn = document.getElementById("ev-sp-new-box"); if (sn && sn.dataset.ev === ev.id) S.evSpDraft = Object.assign({}, S.evSpDraft, rowTyped(sn));
+  const ss = document.getElementById("ev-sp-new-show"); if (ss && sn && sn.dataset.ev === ev.id) S.evSpDraft.show = ss.checked;   // 「放在對外頁」那一格勾了沒
   const tn = document.getElementById("ev-tk-new-box"); if (tn && tn.dataset.ev === ev.id) S.evTkDraft = Object.assign({}, S.evTkDraft, rowTyped(tn));
   const q = document.getElementById("ev-sp-q"); if (q) S.evSpQ = q.value;
 }
@@ -1254,10 +1255,10 @@ document.addEventListener("click", async e => {
     const patch = UI.evSpeakerPatch(adding ? S.evSpDraft : row.typed);
     if (!patch) { S.msg = T("err.evSpName"); if (adding) S.vnOpen["ev-sp-new"] = true; render(); return; }
     if (adding && S.evSpDraft && S.evSpDraft.person_id) patch.person_id = S.evSpDraft.person_id;
-    // 2026-11-24 起沒有同意的勾：加一位就算確認過本人同意，加完接著補上（紀錄裡是學員、可能未成年的那一種除外，先不對外）。
+    // 加一位：照「放在對外頁」那一格勾了沒（2026-11-25；沒動過就是勾著的，從紀錄挑了學員的先不勾，見 UI.evSpeakerPrefill）。
     // 改既有的那一位：本來對外看得到的，存完補回去（改名字資料庫會退回 false）；本來看不到的不動。
-    const minor = adding && !!(S.evSpDraft && S.evSpDraft.person_id && S.evSpDraft.minor);
-    const shown = adding ? !minor : !!row.consent;
+    const dr = S.evSpDraft || {};
+    const shown = adding ? (dr.show == null ? !(dr.person_id && dr.minor) : !!dr.show) : !!row.consent;
     S.busy = true; S.msg = ""; render();
     // 從紀錄帶來的照片（2027-01-03）：抄一份到 events bucket 再掛上去，跟自己選檔上傳同一條路。
     // 不直接用紀錄那邊的網址：那邊換照片或拿掉照片會把檔刪掉，這一位在對外頁的照片就跟著壞了。抄不過來就不帶照片，照樣加，講一聲。
@@ -1269,7 +1270,7 @@ document.addEventListener("click", async e => {
       if (shown && sid) await keepSpeakerShown(sid);
       if (adding) { S.evSpDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; if (sid) S.evSpOpenIds[sid] = true; }   // 剛加的那一位先開著：接下來要放照片
       await reloadEventSpeakers(ev.id, sid);
-      if (!S.msg) S.msg = T(adding ? (minor ? "msg.evSpAddedMinor" : from ? (copied ? "msg.evSpAddedPhoto" : "msg.evSpAddedNoPhoto") : "msg.evSpAdded") : "msg.evSpSaved");
+      if (!S.msg) S.msg = T(adding ? (!shown ? "msg.evSpAddedHidden" : from ? (copied ? "msg.evSpAddedPhoto" : "msg.evSpAddedNoPhoto") : "msg.evSpAdded") : "msg.evSpSaved");
     } catch (err) {
       if (copied) await D.removeEventFile(UI.evStoragePath(copied));   // 檔抄過來了、講者卻沒加成：不留一個沒人用的檔
       S.msg = T("err.evSpSave") + D.says(err); if (adding) S.vnOpen["ev-sp-new"] = true;
@@ -1356,13 +1357,11 @@ document.addEventListener("click", async e => {
     if (ev && vn && vn.map_url) await saveEventMap(ev.id, vn.map_url);
     return;
   }
-  // 封面、活動照片、講者的「放上對外頁」與「從對外頁收起來」（2026-11-24，取代以前那三個同意的勾）。
+  // 封面、活動照片的「放上對外頁」與「從對外頁收起來」（2026-11-24，取代以前的同意勾），還有講者那一格「放在對外頁」（2026-11-25 改成一格勾選，勾或取消馬上存）。
   // 叫的是原本那幾支（save_event 的 cover_consent、set_event_photo_consent、set_event_speaker_consent），門沒有變。
-  // 講者要放上去之前多問一次（要滿 18 歲、本人同意）：會走到這裡的只有改版之前沒勾的，還有紀錄裡是學員的。
   if (act === "ev-cover-show" || act === "ev-ph-show" || act === "ev-sp-show") {
     const ev = (S.events || []).find(x => x.slug === S.evSel); if (!ev) return;
-    const on = act === "ev-cover-show" ? true : b.dataset.v === "1";
-    if (act === "ev-sp-show" && on && UI.needAsk(S, b, T("confirm.evSpShow", { name: b.dataset.name || "" }))) return;
+    const on = act === "ev-cover-show" ? true : b.type === "checkbox" ? b.checked : b.dataset.v === "1";
     keepEventTyped();
     S.busy = true; S.msg = ""; render();
     try {

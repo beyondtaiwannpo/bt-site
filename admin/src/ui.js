@@ -1047,7 +1047,7 @@ export function teamBlocksHTML(me, forms, todo) {
         <li><a href="${withLang("/admin/#forms")}">${T("team.forms")}</a>${T("punct.colon")}${fs.length ? `${T("team.formsSum", { n: fs.length, open: open.length })}${rec ? T("team.formsRec", { n: rec }) : ""}` : T("team.noneYet")}</li>
         <li><a href="${withLang("/admin/site/#res")}">${T("team.res")}</a>${T("punct.colon")}${rs.length ? T("team.resSum", { n: rs.length, pub }) : T("team.noneYet")}</li>
         <li>${T("team.director")}${dirs.length ? esc(dirs.join(T("punct.list"))) : T("team.noDirector")}</li>
-        ${RAIL.canManageWs(me, "res:" + team) ? `<li><a href="${withLang("/admin/#members=" + encodeURIComponent("res:" + team))}">${T("team.people")}</a></li>` : ""}
+        ${RAIL.showPeopleHere(me, "res:" + team) ? `<li><a href="${withLang("/admin/#members=" + encodeURIComponent("res:" + team))}">${T("team.people")}</a></li>` : ""}
       </ul>
     </section>`;
   }).join("")}</div>`;
@@ -1828,19 +1828,18 @@ export function evLabelName(code) {
   if (!EV_LABELS.includes(label)) return "";
   return T("lab." + label + (past && (label === "member" || label === "student") ? ".past" : ""));
 }
-// 找到的那個人後面那排標籤。現在還是學員的那一個照舊是警告色加「可能未成年」（對外頁不放未成年的人）；現在不是了的變淡。
+// 找到的那個人後面那排標籤；現在不是了的變淡。學員就寫「學員」，跟別的標籤一樣（2026-11-25 Paul：「Take out the maybe a minor thing」）。
 export function evLabelChips(p) {
   return ((p && p.labels) || []).map(code => {
     const name = evLabelName(code); if (!name) return "";
-    if (code === "student") return `<span class="tag warn">${esc(T("ev.spKind.student"))}</span>`;
     return `<span class="tag${String(code).endsWith(":past") ? " past" : ""}">${esc(name)}</span>`;
   }).filter(Boolean).join(" ");
 }
 // 挑了一個人之後，「加一位」那幾格要變成什麼。純函式，main.js 的 ev-sp-pick 只叫它。
 // 帶什麼：名字（英文名取第一段）、主題（個人檔案的專長領域）、學校（個人檔案的公司或單位，沒有就最近一筆去向，再沒有才是名單上的學校）、照片。
 // **只填空的格子**：人已經打了字的那一格不蓋。上一次帶入、人沒改過的那個字算空的（draft.auto 記著），所以挑錯人再挑一次會換成對的那個人的。
-// minor：紀錄裡這個人現在是學員（可能未成年）。2026-11-24 起加講者就算確認過同意、直接對外，**只有這一種不會**：
-// 加進來先是「對外看不到」，要有人按「放上對外頁」並且確認才會公開（main.js 的 ev-sp-add 看這個旗子）。
+// minor：紀錄裡這個人現在是學員。它只決定「放在對外頁」那一格一開始勾不勾（show）：挑了學員那一格先不勾，其他人先勾，
+// 要不要放是加的人自己勾的。2026-11-25 起畫面上不再寫「可能未成年」、放上去也不再多問一次（Paul：「take it out… I don't need that in everywhere possible」）。
 export const evMaybeMinor = p => !!p && (Array.isArray(p.labels) ? p.labels.includes("student") : p.kind === "student");
 export const EV_SP_FILL = ["display_name", "subject", "school", "photo_url"];
 export function evSpeakerPrefill(draft, p) {
@@ -1851,7 +1850,8 @@ export function evSpeakerPrefill(draft, p) {
     if (cur !== "" && !(auto[k] != null && cur === String(auto[k]).trim())) continue;
     d[k] = want[k]; auto[k] = want[k];
   }
-  return Object.assign(d, { person_id: who.id || null, from: who.name || "", auto, minor: evMaybeMinor(who) });
+  const minor = evMaybeMinor(who);
+  return Object.assign(d, { person_id: who.id || null, from: who.name || "", auto, minor, show: !minor });
 }
 // 不連到這個人了：名字、主題、學校留著（照舊，人可能只是不想連），紀錄裡帶來的那張照片拿掉（那是他個人檔案的照片）。
 export function evSpeakerUnpick(draft) {
@@ -1865,9 +1865,12 @@ export function evSpeakerUnpick(draft) {
 // x.spUp 是照片的上傳進度 { id, pct, name }；x.spDraft 是「加一位」填到一半的 { display_name, subject, school, person_id, from, photo_url, auto }
 //（photo_url 是從紀錄帶來的照片，auto 記哪幾格是帶入的，見上面的 evSpeakerPrefill）；
 // x.spOpen 那一格開著沒；x.canPick 看不看得到「從紀錄裡找人」；x.spFound 找到的人（undefined 是還沒找過）；x.spQ 找的字。
-// 名字、主題、學校改完要按「存這一位」。同意 2026-11-24 起沒有勾了（Paul：「take that away as well」）：加一位講者就算確認過本人同意，
-// main.js 加完接著叫 set_event_speaker_consent；改名字、換照片資料庫會把 consent 退回 false，main.js 照改之前的樣子補回去（本來看得到的還是看得到，本來看不到的還是看不到）。
-// 看不到的那一位（改版之前沒勾的、紀錄裡是學員的）打開之後有一顆「放上對外頁」，按了要再確認一次。資料庫那道門（public_event_extras()）沒動。
+// 名字、主題、學校改完要按「存這一位」。
+// 對外看不看得到是一格勾選「放在對外頁」（2026-11-25 Paul：「Why is showing that if I can choose they're being shown or not? So make a box I can tick」），
+// 取代前一天的狀態標籤加「放上對外頁／從對外頁收起來」兩顆按鈕。每一位打開之後有一格，勾或取消馬上存（main.js 的 ev-sp-show，叫的還是 set_event_speaker_consent）；
+// 「加一位」也有一格（x.spDraft.show，沒動過就是勾著的，從紀錄挑了學員的先不勾），加完照它存。
+// 改名字、換照片資料庫會把 consent 退回 false，main.js 照改之前的樣子補回去。資料庫那道門（public_event_extras()）沒動。
+// 那一段「只放名字、未成年不放」的提醒與「可能未成年」的標籤同一天拿掉（Paul：「take it out」）。
 const SP_KEYS = ["display_name", "subject", "school"];
 export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
   if (!canEdit) return "";
@@ -1877,6 +1880,8 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
   if (!Array.isArray(speakers)) return sectionHTML(head, evPanel("", `<div class="note">${T("ev.spNeedsSql")}</div>`), { id: "ev-speakers" });
   const live = e.status === "published";
   const face = (name, url, sz) => url ? `<img class="ev-sp-pic${sz || ""}" src="${esc(url)}" alt="">` : `<span class="ev-sp-pic${sz || ""}" aria-hidden="true">${esc(evInitial(name))}</span>`;
+  // 「放在對外頁」那一格。勾著、活動還沒上架的時候後面多一句「活動上架之後才看得到」。
+  const showBox = (attrs, on) => `<label class="check ev-sp-show"><input type="checkbox" ${attrs}${on ? " checked" : ""}${dis}><span>${T("ev.spShow")}</span></label>${on && !live ? ` <span class="mini">${T("ev.spShowLater")}</span>` : ""}`;
   const fields = (v, idp) => `<div class="two">
           <label><i>${T("ev.spName")}</i><input data-f="display_name"${idp ? ` id="${idp}-name"` : ""} value="${esc(v.display_name)}" maxlength="60" autocomplete="off"${dis}></label>
           <label><i>${T("ev.spSubject")}</i><input data-f="subject" value="${esc(v.subject)}" maxlength="120" autocomplete="off"${dis}></label>
@@ -1896,10 +1901,10 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
     return `<li class="ev-sp" data-sp-row data-id="${esc(sp.id)}"><details class="ev-sp-fold" data-sp-fold="${esc(sp.id)}"${open ? " open" : ""}>
       <summary><span class="chev" aria-hidden="true"></span>${face(sp.display_name, sp.photo_url, " sm")}<span class="ev-sp-who"><b>${esc(sp.display_name || "")}</b>${sub ? `<span class="mini">${esc(sub)}</span>` : ""}</span>${sp.consent ? "" : `<span class="tag draft">${T("ev.spHidden")}</span>`}<span class="sp"></span><span class="ev-mv">${evArrow("ev-sp-move", sp.id, -1, T("ev.mvUp"), i === 0 || busy, "↑")}${evArrow("ev-sp-move", sp.id, 1, T("ev.mvDown"), i === speakers.length - 1 || busy, "↓")}</span></summary>
       <div class="ev-sp-f">
-        <div class="ev-ph-state">${evShownTag(!!sp.consent, live, "ev.sp")}${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}${sp.consent ? "" : ` <button type="button" class="btn sm" data-act="ev-sp-show" data-id="${esc(sp.id)}" data-v="1" data-name="${esc(sp.display_name || "")}"${dis}>${T("ev.showPublic")}</button><span class="ev-help">${T("ev.spHiddenHelp")}</span>`}</div>
+        <div class="ev-ph-state">${showBox(`data-act="ev-sp-show" data-id="${esc(sp.id)}"`, !!sp.consent)}${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}</div>
         ${fields(v)}
         ${pick}
-        <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button>${sp.consent ? `<button type="button" class="btn quiet sm" data-act="ev-sp-show" data-id="${esc(sp.id)}" data-v="0"${dis}>${T("ev.hidePublic")}</button>` : ""}${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
+        <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button>${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
       </div></details></li>`;
   };
   const d = o.spDraft || {};
@@ -1909,17 +1914,16 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
   const finder = !o.canPick ? "" : `<div class="ev-sp-find">
         <label><i>${T("ev.spFind")}</i><span class="ev-sp-findrow"><input id="ev-sp-q" type="search" value="${esc(o.spQ || "")}" placeholder="${esc(T("ev.spFindPh"))}" autocomplete="off"${dis}><button class="btn ghost sm" data-act="ev-sp-find" data-id="${esc(e.id)}"${dis}>${T("ev.spFindGo")}</button></span><span class="mini">${T("ev.spFindHint")}</span></label>
         ${Array.isArray(found) ? (found.length
-          ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""}${nowOf(p) ? ` <span class="mini">${esc(nowOf(p))}</span>` : ""} ${Array.isArray(p.labels) ? evLabelChips(p) : `<span class="tag${p.kind === "student" ? " warn" : ""}">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span>`} <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
+          ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""}${nowOf(p) ? ` <span class="mini">${esc(nowOf(p))}</span>` : ""} ${Array.isArray(p.labels) ? evLabelChips(p) : `<span class="tag">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span>`} <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
           : `<p class="ev-line">${T("ev.spFindNone")}</p>`) : ""}
       </div>`;
   const picked = (d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "")
-    + (d.person_id && d.minor ? `<div class="note">${T("ev.spMinorNote")}</div>` : "")
     + (d.photo_url ? `<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="${esc(d.photo_url)}" alt=""> <span>${T("ev.spPhotoFrom")}</span> <button class="btn quiet sm" data-act="ev-sp-nophoto"${dis}>${T("ev.spPhotoDrop")}</button></p>` : "");
   const add = foldHTML("ev-sp-new", T("ev.spNew"), `<div id="ev-sp-new-box" data-ev="${esc(e.id)}">${finder}${picked}${fields(evRowVals({ typed: d }, SP_KEYS), "ev-sp-new")}
+      <div class="ev-ph-state">${showBox('id="ev-sp-new-show"', d.show == null ? !d.minor : !!d.show)}</div>
       <div class="mini">${T("ev.spAddHint")}</div>
       <div class="ev-acts"><button class="btn sm" data-act="ev-sp-add" data-id="${esc(e.id)}"${dis}>${T("ev.spAdd")}</button></div></div>`, !!o.spOpen);
-  return sectionHTML(head, evPanel("", `<div class="note">${T("ev.spNote")}</div>
-      ${speakers.length ? `<ul class="ev-sp-list">${speakers.map(card).join("")}</ul>` : `<p class="ev-line">${T("ev.spNone")}</p>`}
+  return sectionHTML(head, evPanel("", `${speakers.length ? `<ul class="ev-sp-list">${speakers.map(card).join("")}</ul>` : `<p class="ev-line">${T("ev.spNone")}</p>`}
       ${add}`), { hint: T("ev.spHint"), id: "ev-speakers" });
 }
 // 報名類型（免費的，沒有價錢）。放在「報名與現場」裡、報名表那一塊的下面。tickets 是 event_tickets_list() 回的（undefined、null、陣列，同上）。
@@ -1930,6 +1934,8 @@ export function eventTicketsHTML(e, tickets, canEdit, busy, x) {
   if (!canEdit || tickets === undefined) return "";
   const o = x || {}, dis = busy ? " disabled" : "";
   if (!Array.isArray(tickets)) return evPanel(T("ev.tk"), `<div class="note">${T("ev.spNeedsSql")}</div>`, 'id="ev-tickets"');
+  // 「放在對外頁」那一格。勾著、活動還沒上架的時候後面多一句「活動上架之後才看得到」。
+  const showBox = (attrs, on) => `<label class="check ev-sp-show"><input type="checkbox" ${attrs}${on ? " checked" : ""}${dis}><span>${T("ev.spShow")}</span></label>${on && !live ? ` <span class="mini">${T("ev.spShowLater")}</span>` : ""}`;
   const fields = (v, idp) => `<div class="two">
           <label><i>${T("ev.tkNameZh")}</i><input data-f="name_zh"${idp ? ` id="${idp}-zh"` : ""} value="${esc(v.name_zh)}" maxlength="60" autocomplete="off"${dis}></label>
           <label><i>${T("ev.tkNameEn")}</i><input data-f="name_en" value="${esc(v.name_en)}" maxlength="60" autocomplete="off"${dis}></label>
@@ -2270,7 +2276,8 @@ export function projectHTML(p, projects, events, me, msg, busy, o) {
       <button class="btn ghost" data-act="pj-form-new" data-id="${esc(p.id)}"${dis}>${T("pj.formNew")}</button></div>` : "";
   const fSec = sectionHTML(`${esc(T("pj.forms"))}<span class="hint">${(p.forms || []).length}</span>`,
     ((p.forms || []).length ? `<ul class="flist">${p.forms.map(fRow).join("")}</ul>` : `<div class="mini">${T("pj.noForms")}</div>`) + newForm, { hint: T("pj.formsHint") });
-  const people = manage ? `<button class="btn ghost sm" data-act="members-open" data-ws="${esc(p.id)}" data-name="${esc(pjTitle(p))}">${T("pj.members")}</button>` : "";
+  // 2026-11-25：Co-President 與 Senior Adviser 不畫這一顆，他們在「人與權限 → 工作區」管得到每一個專案的人（RAIL.showPeopleHere 同一條）。
+  const people = manage && !senior(me) ? `<button class="btn ghost sm" data-act="members-open" data-ws="${esc(p.id)}" data-name="${esc(pjTitle(p))}">${T("pj.members")}</button>` : "";
   const settings = manage ? sectionHTML(T("pj.settings"), `<div class="two">
       <label><i>${T("ev.titleZh")}</i><input id="pj-e-tzh" value="${esc(p.title_zh || "")}"${dis}></label>
       <label><i>${T("ev.titleEn")}</i><input id="pj-e-ten" value="${esc(p.title_en || "")}"${dis}></label></div>

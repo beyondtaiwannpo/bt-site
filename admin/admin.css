@@ -488,6 +488,8 @@ div.ev-help,p.ev-help{margin:0 0 10px}
 .ev-sp-f .two label{margin-bottom:10px}
 .ev-sp-f .hi-upload{margin:0 0 10px}
 .ev-sp-f .check{margin-bottom:4px}
+/* 講者那一格「放在對外頁」（2026-11-25）：跟後面那句小字排在同一行。 */
+.ev-ph-state .ev-sp-show{display:inline-flex;margin:0 10px 0 0;padding:0;vertical-align:middle}
 .ev-sp-find{margin:0 0 12px;padding:0 0 12px;border-bottom:1px dotted rgba(16,42,134,.16)}
 .ev-sp-findrow{display:flex;gap:8px;align-items:center}
 .ev-sp-findrow input{flex:1;min-width:0}

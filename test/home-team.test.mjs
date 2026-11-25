@@ -104,7 +104,9 @@ test("側欄：Co-President 與 Senior Adviser 是六個 team，上面一句說�
   assert.match(RAIL.railHTML("forms", "projects", SA, {}, "zh"), /你是 Senior Adviser，每個 team 都進得去。/);
   // 六個都收著；點了才開，開的那一個有「誰在這裡」。
   assert.equal((p.match(/rail-subs/g) || []).length, 1, "只有專案那一區展開");
-  assert.match(RAIL.railHTML("home", "team:Marketing Team", PRES, {}, "zh"), /href="#team=Marketing%20Team" aria-current="page">總覽<\/a><a class="rail-item rail-sub rail-people" href="\/admin\/\?lang=zh#members=res%3AMarketing%20Team"/);
+  // 2026-11-25：Co-President 開的那一個沒有「誰在這裡」（他在「人與權限 → 工作區」管）；只管這一個 team 的人有，上面 Internship 那一條守著。
+  assert.match(RAIL.railHTML("home", "team:Marketing Team", PRES, {}, "zh"), /href="#team=Marketing%20Team" aria-current="page">總覽<\/a><\/div>/);
+  assert.doesNotMatch(RAIL.railHTML("home", "team:Marketing Team", PRES, {}, "zh"), /rail-people|#members=/);
   const none = RAIL.railHTML("home", "home", cadre({ "custom:records": "view" }), {}, "zh");
   assert.match(none, /我的工作區<\/div><div class="rail-foot rail-none">你還沒被派進任何 team。/);
   assert.doesNotMatch(none, /rail-team/);

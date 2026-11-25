@@ -44,7 +44,15 @@ test("每一區的分頁列：「管」的人多一顆「誰在這裡」連到 /
   assert.match(h, /class="area-tab area-people" href="\/admin\/\?lang=zh#members=custom%3Arecords"/);
   const plain = RAIL.areaTabsHTML("records", "overview", { ...base, ws: { records: "edit", "custom:records": "edit" } }, "zh");
   assert.doesNotMatch(plain, /area-people/);
-  assert.match(RAIL.areaTabsHTML("finance", "overview", PRES, "zh"), /#members=custom%3Amoney/);
+  // 2026-11-25 Paul：「for every workspaces, take out the people here. I can just go to workspaces and manage people there」。
+  // Co-President 與 Senior Adviser 不畫這一顆（他們在「人與權限 → 工作區」管）；只管自己那一區的人照舊有，不然他沒有地方加人。
+  assert.doesNotMatch(RAIL.areaTabsHTML("finance", "overview", PRES, "zh"), /area-people|#members=/);
+  assert.doesNotMatch(RAIL.areaTabsHTML("records", "overview", SA, "zh"), /area-people|#members=/);
+  assert.match(RAIL.areaTabsHTML("finance", "overview", { ...base, ws: { finance: "edit", "custom:money": "manage" } }, "zh"), /#members=custom%3Amoney/);
+  assert.equal(RAIL.showPeopleHere(PRES, "custom:money"), false); assert.equal(RAIL.showPeopleHere(SA, "custom:records"), false);
+  assert.equal(RAIL.showPeopleHere({ ...base, ws: { "custom:money": "manage" } }, "custom:money"), true);
+  assert.equal(RAIL.showPeopleHere({ ...base, ws: { "custom:money": "edit" } }, "custom:money"), false);
+  assert.equal(RAIL.canManageWs(PRES, "custom:money"), true, "門沒有變，只是那一條連結不畫");
   assert.doesNotMatch(RAIL.areaTabsHTML("finance", "overview", SA, "zh"), /area-people/, "Senior Adviser 派不了人進錢");
   // 只有一頁、但有「誰在這裡」的區也要畫出那一排
   const tpl = RAIL.areaTabsHTML("forms", "mtemplates", { ...base, ws: { "custom:meeting-templates": "manage" } }, "zh");
