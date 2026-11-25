@@ -6143,7 +6143,7 @@ Paul 同一天貼著「時間與地點」那一塊的截圖說的：
 
 > Also for when and where, for where I need to be able to post Google Map link. Same for the venue.
 
-⚠ **這一步有遷移檔，要 Paul 在正式的 Supabase 跑過才會出現。** 檔已經直接交給他了。還沒跑之前：後台那兩格不畫，對外頁沒有那條連結，其他照舊，不會壞。
+**這一支 2026-11-25 Paul 在正式的 Supabase 跑過了，驗收表全 PASS。** 跑完從外面（沒登入）看過：`public_event_extras` 多回了 `map_url`，`set_event_map_url` 與 `venues_list` 沒登入叫不到。後台那兩格與對外頁那條連結，登入之後在正式站上還沒有人點過一次。沒跑之前的樣子留著當紀錄：後台那兩格不畫，對外頁沒有那條連結，其他照舊，不會壞。
 本機的 Supabase 跑過，驗收表全 PASS，重跑一次也是。
 
 **畫面上多了什麼**
