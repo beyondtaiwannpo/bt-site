@@ -77,6 +77,8 @@ function download(name, text, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 document.addEventListener("click", ev => {
+  // 點那一格外面的暗色地方也關得掉（點到的是 <dialog> 自己，不是它裡面的東西）。
+  if (ev.target && ev.target.tagName === "DIALOG" && ev.target.classList.contains("ev-sp-dlg")) { ev.target.close(); return; }
   const b = ev.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
   // 照片往前、往後：一次捲差不多一個畫面寬。
@@ -85,6 +87,9 @@ document.addEventListener("click", ev => {
     list.scrollBy({ left: Number(b.dataset.dir) * Math.max(200, list.clientWidth * 0.85), behavior: reduce ? "auto" : "smooth" });
     return;
   }
+  // 講者的「看他的經歷」：開那一位的那一格（<dialog>，Esc 與那顆叉叉都關得掉）。
+  if (act === "sp-open") { const d = document.getElementById(b.dataset.dlg); if (d && d.showModal) d.showModal(); return; }
+  if (act === "sp-close") { const d = b.closest("dialog"); if (d) d.close(); return; }
   // 下載行事曆檔。
   if (act === "ics") {
     const e = (cache || []).find(v => v.slug === b.dataset.slug), l = b.dataset.l === "en" ? "en" : "zh";

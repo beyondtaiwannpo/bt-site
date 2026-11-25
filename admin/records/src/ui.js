@@ -1487,7 +1487,10 @@ export function placesOf(d) {
   return [...later, ...outs, ...schs.filter(x => !later.includes(x))];
 }
 // 個人檔案：照片、現在在哪、現在的工作、專長領域、一段介紹。管的人改了就存（一格一格送，rc_save_profile 只改有給的鍵）；看的人只讀。
-export function personProfileHTML(d, S, canEdit) {
+// 2026-11-25 Paul：「her profile is like at the very last. Can we have her profile on the left and then obviously her detail and then her current job,
+// organization, city, country, and then her short bio」。所以這一塊排在這個分頁的最上面：左邊照片，右邊先是基本資料（名字、學校、畢業年、備註，
+// details 是 personHTML 給的那一段，有自己的「儲存」），接著才是現在的工作、城市、領域、介紹（改了就存）。
+export function personProfileHTML(d, S, canEdit, details) {
   const p = d.person || {}, pf = d.profile || {};
   const done = pf.done_at ? `<span class="mini">${esc(T("pf.selfDone", { day: fmtDay(pf.done_at) }))}</span>` : "";
   if (!canEdit) {
@@ -1502,13 +1505,14 @@ export function personProfileHTML(d, S, canEdit) {
         <div class="mini" data-pf-up>${esc(T("pf.photoHint"))}</div>
         ${pf.photo_url ? `<button class="btn quiet sm" data-act="pf-photo-clear"${S.busy ? " disabled" : ""}>${esc(T("pf.photoClear"))}</button>` : ""}
       </div>
+      <div class="rc-pf-main">${details ? `<h3 class="rc-pf-h">${esc(T("person.edit"))}</h3>${details}<h3 class="rc-pf-h">${esc(T("pf.work"))}</h3>` : ""}
       <div class="rc-pf-f" data-autosave="pf-save" data-part="profile">
         <div class="two">${inp("job_title", "pf.jobTitle", 120)}${inp("job_org", "pf.jobOrg", 120)}</div>
         <div class="two">${inp("city", "pf.city", 80)}${inp("country", "pf.country", 80)}</div>
         ${inp("field", "pf.field", 120)}
         <label><i>${esc(T("pf.bio"))}</i><textarea name="bio" rows="4" maxlength="600">${esc(pf.bio || "")}</textarea></label>
         <div class="form-foot">${autosaveHint("pf-save")}${done}</div>
-      </div></div>`, { id: "rc-profile" });
+      </div></div></div>`, { id: "rc-profile" });
 }
 // 他的故事：六題，題目在上、他寫的在下。只讀：那是他自己的話，資料庫也沒有給管的人改的路。
 export function personStoryHTML(d) {
@@ -1571,11 +1575,14 @@ export function personHTML(d, S) {
     // 2026-11-25：名字底下那一行印「現在在哪」（placesOf 的第一列），不是名單上那一格學校；還在那一所學校的才接著印畢業年。
     [p.name_zh && p.name_en ? esc(p.name_zh) : "", esc(nowAt || ""), p.grad_year && (!places.length || (places[0].from === "school" && places[0].name === (p.school || ""))) ? esc(String(p.grad_year)) : "",
      p.has_account ? esc(T("pp.hasAccount")) + (p.role ? ` (${esc(p.role)})` : "") : ""].filter(Boolean).join("・"), [], { act: "back-people", label: T("person.back") });
-  const edit = manage && !p.forgotten_at ? sectionHTML(T("person.edit"), `<div data-pedit><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" value="${esc(p.name_zh || "")}" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" value="${esc(p.name_en || "")}" maxlength="60"></label></div>
+  const editInner = manage && !p.forgotten_at ? `<div data-pedit><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" value="${esc(p.name_zh || "")}" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" value="${esc(p.name_en || "")}" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.school"))}</i><input name="school" value="${esc(p.school || "")}" maxlength="80"></label><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100" value="${esc(p.grad_year || "")}"></label></div>
       <label><i>${esc(T("person.note"))}</i><input name="note" value="${esc(p.note || "")}" maxlength="500"></label>
       ${p.kind === "member" ? "" : hsCheckHTML(p.kind === "student", !!p.has_account)}
-      <div class="form-foot"><button class="btn sm" data-act="person-save"${S.busy ? " disabled" : ""}>${esc(T("common.save"))}</button></div></div>`) : "";
+      <div class="form-foot"><button class="btn sm" data-act="person-save"${S.busy ? " disabled" : ""}>${esc(T("common.save"))}</button></div></div>` : "";
+  // 個人檔案那一塊畫得出來的時候（有關係網的資料、人還在），基本資料放進它的右邊；畫不出來就照舊自己一塊。
+  const inProfile = hasNetwork(d) && !!d.profile && !p.forgotten_at && canEdit;
+  const edit = editInner && !inProfile ? sectionHTML(T("person.edit"), editInner) : "";
   // 聯絡方式（2026-12-12）：email、LINE、LinkedIn 這些一種一列，原本塞在備註裡。只有管紀錄的人看得到（rc_person 只給他們 identities）。
   const cts = contactsOf(d.identities, p.login_email);
   const ctList = cts.length ? `<ul class="flist rc-contacts">${cts.map(c => { const href = contactHref(c.kind, c.value);
@@ -1623,14 +1630,14 @@ export function personHTML(d, S) {
   // 已經移除的人那幾塊不畫：個人檔案、標籤、連結在移除時一起清掉了。
   const network = !net ? `<div class="note">${esc(T("net.noSql"))}</div>` : p.forgotten_at ? "" : null;
   // 2026-11-24：這一頁疊到十幾塊，收成四個分頁（Paul：「do the same thing… for the whole BT」）。照上面那個順序分：
-  //   details  基本資料    他是誰：標籤、基本資料、個人檔案、聯絡方式、學校
+  //   details  基本資料    他是誰：個人檔案（左邊照片，右邊基本資料與現在的工作，2026-11-25 排到最上面）、標籤、聯絡方式、學校
   //   bt       參與紀錄    幹部職位、參加過的活動、當講者的活動、配對、去向（「跟 BT 的關係」那一塊 2026-11-25 拿掉了）
   //   voice    故事與同意  他自己寫的故事、他同意了什麼、個人連結、他填過的回饋
   //   settings 設定        移除的要求（只有 Co-President 有，其他人沒有這個分頁）
   // 遷移檔還沒跑的那一句提醒（network）留在分頁外面。看不到的那一塊是空字串，整個分頁都空的就不畫那個分頁。
   const on = network == null;
   return head + aliasHTML + msgHTML(S.msg) + (network || "") + RAIL.pageTabsHTML("rc-person", [
-    { key: "details", label: T("ptab.details"), body: (on ? personLabelsHTML(d, S, canEdit) : "") + edit + (on ? personProfileHTML(d, S, canEdit) : "") + ctHTML + schHTML },
+    { key: "details", label: T("ptab.details"), body: (on ? personProfileHTML(d, S, canEdit, inProfile ? editInner : "") : "") + edit + (on ? personLabelsHTML(d, S, canEdit) : "") + ctHTML + schHTML },
     { key: "bt", label: T("ptab.bt"), body: posHTML + partHTML + (on ? personSpeakingHTML(d) : "") + pairHTML + outHTML, n: parts.length },
     { key: "voice", label: T("ptab.voice"), body: (on ? personStoryHTML(d) + personConsentHTML(d, S, canEdit) + personLinkHTML(d, S, canEdit) : "") + respHTML },
     { key: "settings", label: T("ptab.settings"), body: forget },

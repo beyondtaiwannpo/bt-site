@@ -1870,6 +1870,14 @@ export function evSpeakerUnpick(draft) {
 // 只有管得了紀錄的人看得到這幾塊（跟資料庫的 rc_can_manage 同一條：Co-President、Senior Adviser，或紀錄工作區「改」以上）。
 // 叫的都是 Records 原本的函式，門沒有變，沒有遷移檔。還在念高中的學員照舊開不了個人連結（資料庫擋，回 minor_no_link）。
 export const evCanManagePeople = me => !!me && (senior(me) || ["edit", "manage"].includes(wsLevel(me, "custom:records")));
+// 一個人在紀錄裡的那一頁（2026-11-25 Paul：「it doesn't take me directly to the people. Like I still have to go to records and then find people」）。
+// 講者那一行、找到的每一個人、剛帶入的那一句後面都有這一條，一點就到，不用自己去紀錄裡找。
+export const evPersonHref = id => withLang("/admin/records/#people/" + encodeURIComponent(id || ""));
+// 找到的人那一行要印的另一個名字：資料庫回了 name_zh／name_en（2027-01-07-speaker-profiles.sql）就印跟大字不一樣的那一個；沒回就不印。
+export function evOtherName(p) {
+  const main = String((p && p.name) || "").trim(), zh = String((p && p.name_zh) || "").trim(), en = String((p && p.name_en) || "").trim();
+  return [zh, en].filter(n => n && n !== main).join(" ");
+}
 export const evProfileURL = token => `${typeof location === "undefined" ? "https://beyondtaiwannpo.com" : location.origin}/profile/?t=${encodeURIComponent(token || "")}`;
 // 一個新的人要存進紀錄的那幾格。有中文字的名字放 name_zh，其他放 name_en；種類是來賓（講者多半是外面的人，來賓開得了個人連結）。
 export function evPersonDraft(name, school) {
@@ -1911,7 +1919,7 @@ export function evSpeakerLinkHTML(sp, st, canLink, busy) {
   else body = `<label><i>${T("ev.spLinkUrl")}</i><span class="ev-sp-findrow"><input id="ev-sp-url-${id}" readonly value="${esc(evProfileURL(l.token))}"><button type="button" class="btn sm" data-act="ev-sp-link-copy" data-id="${id}">${T("ev.spLinkCopy")}</button></span></label>
           <p class="ev-line mini">${T("ev.spLinkExp", { exp: evDay(l.expires_at) })} ${l.opened_at ? T("ev.spLinkOpened", { day: evDay(l.opened_at) }) : T("ev.spLinkNotOpened")} ${l.submitted_at ? T("ev.spLinkSubmitted", { day: evDay(l.submitted_at) }) : T("ev.spLinkNotSubmitted")}</p>`;
   const fresh = pf.updated_at || pf.done_at ? `<div class="ev-acts"><button type="button" class="btn ghost sm" data-act="ev-sp-refresh" data-id="${id}"${dis}>${T("ev.spRefresh")}</button><span class="ev-help">${T("ev.spRefreshHelp")}</span></div>` : "";
-  return `<div class="ev-sp-ppl">${head}${body}${fresh}<p class="ev-line mini"><a href="${withLang("/admin/records/#people/" + encodeURIComponent(sp.person_id))}">${T("ev.spLinkRecords")}</a></p></div>`;
+  return `<div class="ev-sp-ppl">${head}${body}${fresh}<p class="ev-line mini"><a href="${evPersonHref(sp.person_id)}">${T("ev.spLinkRecords")}</a></p></div>`;
 }
 
 // 講者（一場可以好幾位）。speakers 是 event_speakers_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是講者。
@@ -1955,7 +1963,7 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
     return `<li class="ev-sp" data-sp-row data-id="${esc(sp.id)}"><details class="ev-sp-fold" data-sp-fold="${esc(sp.id)}"${open ? " open" : ""}>
       <summary><span class="chev" aria-hidden="true"></span>${face(sp.display_name, sp.photo_url, " sm")}<span class="ev-sp-who"><b>${esc(sp.display_name || "")}</b>${sub ? `<span class="mini">${esc(sub)}</span>` : ""}</span>${sp.consent ? "" : `<span class="tag draft">${T("ev.spHidden")}</span>`}<span class="sp"></span><span class="ev-mv">${evArrow("ev-sp-move", sp.id, -1, T("ev.mvUp"), i === 0 || busy, "↑")}${evArrow("ev-sp-move", sp.id, 1, T("ev.mvDown"), i === speakers.length - 1 || busy, "↓")}</span></summary>
       <div class="ev-sp-f">
-        <div class="ev-ph-state">${showBox(`data-act="ev-sp-show" data-id="${esc(sp.id)}"`, !!sp.consent)}${sp.person_id ? ` <span class="mini">${T("ev.spFromRecords")}</span>` : ""}</div>
+        <div class="ev-ph-state">${showBox(`data-act="ev-sp-show" data-id="${esc(sp.id)}"`, !!sp.consent)}${sp.person_id ? ` <a class="mini ev-sp-open" href="${evPersonHref(sp.person_id)}">${T("ev.spFromRecords")}</a>` : ""}</div>
         ${fields(v)}
         ${pick}
         ${evSpeakerLinkHTML(sp, (o.spLink || {})[sp.id], !!o.canLink, busy)}
@@ -1969,11 +1977,11 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
   const finder = !o.canPick ? "" : `<div class="ev-sp-find">
         <label><i>${T("ev.spFind")}</i><span class="ev-sp-findrow"><input id="ev-sp-q" type="search" value="${esc(o.spQ || "")}" placeholder="${esc(T("ev.spFindPh"))}" autocomplete="off"${dis}><button class="btn ghost sm" data-act="ev-sp-find" data-id="${esc(e.id)}"${dis}>${T("ev.spFindGo")}</button></span><span class="mini">${T("ev.spFindHint")}</span></label>
         ${Array.isArray(found) ? (found.length
-          ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""}${nowOf(p) ? ` <span class="mini">${esc(nowOf(p))}</span>` : ""} ${Array.isArray(p.labels) ? evLabelChips(p) : `<span class="tag">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span>`} <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
+          ? `<ul class="plain ev-sp-found">${found.map(p => `<li><b>${esc(p.name || T("common.noName"))}</b>${evOtherName(p) ? ` <b class="ev-sp-alt">${esc(evOtherName(p))}</b>` : ""}${p.school ? ` <span class="mini">${esc(p.school)}</span>` : ""}${p.latest && p.latest !== p.school && p.latest !== (p.card || {}).job_org ? ` <span class="mini">${esc(p.latest)}</span>` : ""}${nowOf(p) ? ` <span class="mini">${esc(nowOf(p))}</span>` : ""} ${Array.isArray(p.labels) ? evLabelChips(p) : `<span class="tag">${esc(T("ev.spKind." + (["member", "student", "guest"].includes(p.kind) ? p.kind : "member")))}</span>`} <a class="mini ev-sp-open" href="${evPersonHref(p.id)}">${T("ev.spOpenPerson")}</a> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="${esc(p.id)}"${dis}>${T("ev.spPick")}</button></li>`).join("")}</ul>`
           : `<p class="ev-line">${T("ev.spFindNone")}</p>`) : ""}
         ${Array.isArray(found) && o.canLink && String(o.spQ || "").trim() && !d.person_id ? `<p class="ev-line ev-sp-newp"><button type="button" class="btn ghost sm" data-act="ev-sp-newperson" data-id="${esc(e.id)}"${dis}>${esc(T("ev.spNewPerson", { name: String(o.spQ).trim() }))}</button> <span class="mini">${T("ev.spNewPersonHelp")}</span></p>` : ""}
       </div>`;
-  const picked = (d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "")
+  const picked = (d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <a class="ev-sp-open" href="${evPersonHref(d.person_id)}">${T("ev.spOpenPerson")}</a> <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "")
     + (d.photo_url ? `<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="${esc(d.photo_url)}" alt=""> <span>${T("ev.spPhotoFrom")}</span> <button class="btn quiet sm" data-act="ev-sp-nophoto"${dis}>${T("ev.spPhotoDrop")}</button></p>` : "");
   const add = foldHTML("ev-sp-new", T("ev.spNew"), `<div id="ev-sp-new-box" data-ev="${esc(e.id)}">${finder}${picked}${fields(evRowVals({ typed: d }, SP_KEYS), "ev-sp-new")}
       <div class="ev-ph-state">${showBox('id="ev-sp-new-show"', d.show == null ? !d.minor : !!d.show)}</div>

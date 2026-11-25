@@ -267,7 +267,7 @@ export const MINE = {
   "mail.request_rejected.when": { zh: "Marketing 退件的時候，寄給送單的人，信裡帶退件原因", en: "when Marketing rejects a request; goes to the requester with the reason" },
   "mail.varsRequest":  { zh: "可以用的代換符號：{requester} 送單的人、{title} 標題、{needed_by} 預計發布日、{link} 直達那張單、{reply} 回覆（已發布那封才有）。", en: "Placeholders: {requester}, {title}, {needed_by} (planned publish date), {link} (opens the request), {reply} (Published email only)." },
   "mail.sampleRequest":{ zh: "預覽用的範例：{name} 送的「{title}」。", en: "Preview sample: \"{title}\" sent by {name}." },
-  "mail.invite.when": { zh: "你在「人與權限 → 邀請」寄邀請的時候", en: "when you send an invite under People → Invites" },
+  "mail.invite.when": { zh: "你在「人與權限 → 邀請」寄邀請的時候", en: "when you send an invite under Internal → Invites" },
   "mail.varsInvite":  { zh: "可以用五個代換符號：<b>{name}</b> 名字、<b>{position}</b> 職位、<b>{term}</b> 屆別、<b>{link}</b> 連結、<b>{sender}</b> 邀請的人。\n      打錯或刪掉不會壞掉，那個位置會空著。<b>{link}</b> 一定要在，不然他點不進來。",
                         en: "Five placeholders: <b>{name}</b>, <b>{position}</b>, <b>{term}</b>, <b>{link}</b>, <b>{sender}</b>. A typo leaves the spot blank. Keep <b>{link}</b> in, or they cannot get in." },
   "mail.sampleInvite":{ zh: "用「{name}」與「{position}」當範例。", en: "Using \"{name}\" and \"{position}\" as the example." },

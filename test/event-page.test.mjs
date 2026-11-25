@@ -211,7 +211,7 @@ test("★ 一場活動那一頁：最上面一行回清單、左邊標題與內�
   assert.match(h, /<li><b>時間<\/b><span>2027\.01\.03（日）09:00 - 17:00（台灣時間）<\/span><\/li><li><b>地點<\/b><span>台北市大安區<\/span><\/li>/);
   assert.ok(at("data-ev-card") < at("data-ev-signup") && at("data-ev-signup") < at('class="ev-cal"') && at('class="ev-cal"') < at('<div class="ev-rest">'), "卡裡：時間地點、報名、加入行事曆");
   // 其他
-  assert.ok(at('class="ev-text"') < at('class="ev-speakers"') && at('class="ev-speakers"') < at('class="ev-photos"') && at('class="ev-photos"') < h.lastIndexOf("所有活動"), "說明、講者、照片、回清單");
+  assert.ok(at('class="ev-photos"') < at('class="ev-text"') && at('class="ev-text"') < at('class="ev-speakers"') && at('class="ev-speakers"') < h.lastIndexOf("所有活動"), "照片、說明、講者、回清單（2026-11-25 照片搬到說明上面）");
   assert.match(h, /<div class="ev-text"><h3>活動資訊<\/h3><p>內容<\/p><\/div>/);
   assert.match(PUB.detailHTML(E, "en", X, { url: URL_ }), /<p class="ev-card-t">Overseas Unpacked<\/p>[\s\S]*<li><b>When<\/b><span>2027\.01\.03 \(Sun\) 09:00 - 17:00 \(Taiwan time, GMT\+8\)<\/span><\/li>/);
 });
@@ -401,4 +401,51 @@ test("★ index.html：說明的樣式、照片那一排、減少動態效果；
   for (const c of block.match(/rgba\([^)]*\)/g) || []) assert.match(c, /^rgba\((16,42,134|255,196,108|255,255,255|237,229,216),/, `${c} 不是品牌色`);
   assert.doesNotMatch(block, /#[0-9a-fA-F]{3,8}\b/, "不寫死色碼");
   assert.doesNotMatch(block, /transition:|animation:|@keyframes/, "這一批沒有加任何過渡或動畫");
+});
+
+// ── 講者可以點開看他的經歷（2026-11-25，2027-01-07-speaker-profiles.sql）──────────
+// Paul：「it says speaker Emily, Yale University. It's not attractive at all. I want people to be able to click it and then see their experience. If they have one」。
+test("★ 講者的經歷：他本人同意的才有職稱與故事；有故事的那一位多一顆按鈕與一格；六題只認代號、每一段都逃脫；題目跟個人連結那一頁一樣", async () => {
+  const PF = await import("../profile/src/ui.js");
+  const src = read("profile/src/ui.js");
+  assert.deepEqual(PUB.STORY_KEYS, PF.STORY_KEYS, "六題的代號與順序跟個人連結那一頁一樣");
+  for (const k of PUB.STORY_KEYS) for (const q of PUB.STORY_Q[k]) assert.ok(src.includes(`"${q}"`), `題目「${q}」跟 profile/src/ui.js 的不一樣`);
+  const sp = [
+    { name: "Emily", subject: "Applying from a public high school", school: "Yale University", photo_url: "https://x/e.jpg", job: "Research Assistant, Yale",
+      story: { highschool: "I was shy.\nThen I was not.", turning: "  ", wish17: "<b>Ask</b> for help.", evil: "not a question", first_step: 7 } },
+    { name: "Eric", subject: "", school: "University of Pennsylvania", photo_url: null, job: "Analyst, Acme" },
+    { name: "小安", subject: "心理系", school: "台灣大學", photo_url: null },
+  ];
+  assert.deepEqual(PUB.speakerMore(sp[0]), { job: "Research Assistant, Yale", story: [["highschool", "I was shy.\nThen I was not."], ["wish17", "<b>Ask</b> for help."]] }, "只留有寫的、認得的那幾題，照題目的順序");
+  assert.deepEqual(PUB.speakerMore(sp[2]), { job: "", story: [] }); assert.deepEqual(PUB.speakerMore(null), { job: "", story: [] });
+  assert.deepEqual(PUB.speakerMore({ job: 5, story: ["x"] }), { job: "", story: [] }, "形狀不對的當成沒有");
+  const h = PUB.speakersHTML({ speakers: sp }, "zh");
+  // 卡片：有職稱的印職稱；只有有故事的那一位有按鈕
+  assert.match(h, /<li class="has-more"><span class="ev-sp-face">[^]*?<\/span><span class="ev-sp-t"><b>Emily<\/b><span class="ev-sp-job">Research Assistant, Yale<\/span><span>Applying from a public high school<\/span><span class="ev-sp-school">Yale University<\/span><button type="button" class="ev-sp-more" data-act="sp-open" data-dlg="ev-sp-zh-0">看他的經歷 →<\/button><\/span><\/li>/);
+  assert.match(h, /<li><span class="ev-sp-face"><span aria-hidden="true">E<\/span><\/span><span class="ev-sp-t"><b>Eric<\/b><span class="ev-sp-job">Analyst, Acme<\/span><span class="ev-sp-school">University of Pennsylvania<\/span><\/span><\/li>/, "只有職稱沒有故事：印職稱，沒有按鈕");
+  assert.equal((h.match(/data-act="sp-open"/g) || []).length, 1); assert.equal((h.match(/<dialog /g) || []).length, 1);
+  // 那一格：照片、名字、他寫的那幾題（題目在上），多出來的鍵不印，每一段都逃脫，換行留著
+  const dlg = h.slice(h.indexOf("<dialog"));
+  assert.match(dlg, /^<dialog class="ev-sp-dlg" id="ev-sp-zh-0" aria-label="Emily"><button type="button" class="ev-sp-x" data-act="sp-close" aria-label="關上">×<\/button>/);
+  assert.match(dlg, /<b class="ev-sp-sh">他的故事<\/b><dl class="ev-sp-story"><dt>高中的你是什麼樣子？那時候想成為什麼樣的人？<\/dt><dd>I was shy\.<br>Then I was not\.<\/dd><dt>你希望 17 歲的時候有人告訴你什麼？<\/dt><dd>&lt;b&gt;Ask&lt;\/b&gt; for help\.<\/dd><\/dl><\/dialog>$/);
+  assert.doesNotMatch(dlg, /not a question|evil|轉捩點|第一步/, "沒寫的題目與不認得的鍵都不印");
+  const en = PUB.speakersHTML({ speakers: sp }, "en");
+  assert.match(en, /data-dlg="ev-sp-en-0">Read their story →</); assert.match(en, /<dialog class="ev-sp-dlg" id="ev-sp-en-0"/, "中英兩塊的那一格 id 不一樣，同一頁不會撞");
+  assert.match(en, /<b class="ev-sp-sh">Their story<\/b><dl class="ev-sp-story"><dt>What were you like in high school, and what did you want to become then\?<\/dt>/); assert.match(en, /aria-label="Close"/);
+  // main.js：開、關、點外面關
+  const m = read("events/src/main.js");
+  assert.match(m, /if \(act === "sp-open"\) \{ const d = document\.getElementById\(b\.dataset\.dlg\); if \(d && d\.showModal\) d\.showModal\(\); return; \}/);
+  assert.match(m, /if \(act === "sp-close"\) \{ const d = b\.closest\("dialog"\); if \(d\) d\.close\(\); return; \}/);
+  assert.match(m, /ev\.target\.tagName === "DIALOG" && ev\.target\.classList\.contains\("ev-sp-dlg"\)\) \{ ev\.target\.close\(\); return; \}/);
+  // 遷移檔：職稱看 share_profile、故事看 share_story；介紹、領域、城市不對外
+  const sql = read("supabase/migrations/2027-01-07-speaker-profiles.sql").replace(/--[^\n]*/g, "");
+  assert.match(sql, /'job', case when pf\.share_profile then nullif\(concat_ws\(', ', nullif\(btrim\(pf\.job_title\), ''\), nullif\(btrim\(pf\.job_org\), ''\)\), ''\) end/);
+  assert.match(sql, /'story', case when pf\.share_story then /);
+  assert.deepEqual(sql.match(/k\.key in \(([^)]*)\)/)[1].replace(/'/g, "").split(", "), PUB.STORY_KEYS, "資料庫只放行那六題");
+  assert.match(sql, /where pf\.person_id = s\.person_id and pe\.forgotten_at is null/);
+  assert.match(sql, /from event_speakers s where s\.event_id = e\.id and s\.consent/); assert.match(sql, /where e\.slug = p_slug and e\.status = 'published';/);
+  const ext = sql.slice(sql.indexOf("function public.public_event_extras"), sql.indexOf("function public.rc_find_people"));
+  assert.doesNotMatch(ext, /pf\.bio|pf\.field|pf\.city|pf\.country|rel_|person_id'|email/, "介紹、領域、城市、關係、person_id 不對外");
+  assert.match(sql, /'name_zh', coalesce\(/); assert.match(sql, /'name_en', coalesce\(/); assert.match(sql, /select case when public\.rc_can_view\(\) then/);
+  assert.match(read("scripts/db/smoke.sh"), /SPM=supabase\/migrations\/2027-01-07-speaker-profiles\.sql/, "smoke.sh 有跑這一支（它的清單是寫死的，新增遷移檔要自己加）");
 });

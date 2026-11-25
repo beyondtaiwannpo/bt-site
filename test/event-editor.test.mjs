@@ -575,7 +575,8 @@ test("★ 對外：沒有照片的時候那一頁沒有照片那一塊；清單�
   for (const x of [undefined, null, { photos: [] }]) assert.doesNotMatch(PUB.detailHTML(e, "zh", x), /ev-photos|ev-strip|<img/, "沒有照片：一張圖、一個空的框都沒有");
   const h = PUB.detailHTML(e, "zh", { photos: [{ url: "https://x/a.jpg" }] });
   assert.equal(count(h, /<div class="ev-photos">/g), 1);
-  assert.ok(h.indexOf('class="ev-text"') < h.indexOf('class="ev-photos"') && h.indexOf('class="ev-photos"') < h.lastIndexOf("所有活動"), "在說明底下、最下面回清單的連結上面");
+  // 2026-11-25 Paul：「we need a better places for picture. Like right now, it's sitting at the bottom of the pages」。照片搬到說明上面。
+  assert.ok(h.indexOf('<div class="ev-rest">') < h.indexOf('class="ev-photos"') && h.indexOf('class="ev-photos"') < h.indexOf('class="ev-text"') && h.indexOf('class="ev-text"') < h.lastIndexOf("所有活動"), "照片在說明上面");
   assert.doesNotMatch(PUB.cardHTML(e, "zh", "./"), /ev-photos/); assert.doesNotMatch(PUB.listHTML([e], "zh"), /ev-photos/);
 });
 

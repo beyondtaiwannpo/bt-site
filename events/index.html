@@ -483,18 +483,34 @@ button.cta{border:0;font-family:var(--body);line-height:inherit;cursor:pointer}
 /* 講者（2027-01-02）：桌機一排四位、平板三位、手機兩位。照片是圓的；沒有照片是一個橘色的圓加名字的第一個字（照片疊在字上面）。
    字太長就換行（overflow-wrap），不會把格子撐開、不會往旁邊捲。 */
 .ev-speakers{margin:0 0 30px}
-.ev-sp-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 18px;max-width:100%}
-.ev-sp-grid li{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;gap:3px}
-.ev-sp-grid li > *{max-width:100%;overflow-wrap:anywhere}
-.ev-sp-face{position:relative;display:flex;align-items:center;justify-content:center;width:min(100%,132px);aspect-ratio:1/1;border-radius:50%;overflow:hidden;
-  margin:0 0 9px;background:rgba(255,196,108,.5);font-family:var(--display);font-weight:700;font-size:clamp(30px,4vw,46px);line-height:1;color:var(--ink)}
+/* 講者（2026-11-25 重做）：一位一張卡，左邊圓的照片、右邊名字與幾行字；有故事的那一位多一顆「看他的經歷」，按了開一格。 */
+.ev-sp-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:14px;max-width:100%}
+.ev-sp-grid li{display:flex;align-items:center;gap:16px;min-width:0;padding:16px 18px;background:rgba(255,255,255,.55);border:1px solid rgba(16,42,134,.14);border-radius:18px}
+.ev-sp-grid li.has-more{border-color:rgba(16,42,134,.3)}
+.ev-sp-face{position:relative;flex:none;display:flex;align-items:center;justify-content:center;width:84px;aspect-ratio:1/1;border-radius:50%;overflow:hidden;
+  background:rgba(255,196,108,.5);font-family:var(--display);font-weight:700;font-size:34px;line-height:1;color:var(--ink)}
 .ev-sp-face img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.ev-sp-grid b{font-family:var(--display);font-weight:700;font-size:21px;line-height:1.15;letter-spacing:.01em}
-.ev-sp-grid li > span{font-size:14.5px;line-height:1.4}
-.ev-sp-grid li > .ev-sp-face{font-size:clamp(30px,4vw,46px);line-height:1}
-.ev-sp-grid li > .ev-sp-school{font-size:13.5px;color:rgba(16,42,134,.74)}
-@media (max-width:1100px){.ev-sp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:600px){.ev-sp-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 12px}}
+.ev-sp-t{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.ev-sp-t > *{max-width:100%;overflow-wrap:anywhere}
+.ev-sp-t b{font-family:var(--display);font-weight:700;font-size:23px;line-height:1.15;letter-spacing:.01em}
+.ev-sp-t span{font-size:14.5px;line-height:1.4}
+.ev-sp-t .ev-sp-job{font-weight:600}
+.ev-sp-t .ev-sp-school{font-size:13.5px;color:rgba(16,42,134,.74)}
+.ev-sp-more{margin:8px 0 0;padding:6px 14px;border:1.5px solid var(--bt-navy);border-radius:999px;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.ev-sp-more:hover{background:var(--bt-navy);color:var(--bt-cream)}
+.ev-sp-more:focus-visible{outline:var(--ring);outline-offset:2px}
+.ev-sp-dlg{width:min(92vw,640px);max-height:86vh;padding:26px 26px 22px;border:1.5px solid var(--bt-navy);border-radius:20px;background:var(--bt-cream);color:var(--ink);overflow-y:auto}
+.ev-sp-dlg::backdrop{background:rgba(16,42,134,.45)}
+.ev-sp-x{position:absolute;top:10px;right:12px;width:40px;height:40px;border:0;border-radius:50%;background:transparent;color:var(--ink);font-size:26px;line-height:1;cursor:pointer}
+.ev-sp-x:hover{background:rgba(16,42,134,.1)}
+.ev-sp-dh{display:flex;align-items:center;gap:18px;margin:0 30px 18px 0}
+.ev-sp-dh .ev-sp-face{width:104px;font-size:42px}
+.ev-sp-sh{display:block;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.78);margin:0 0 10px;padding-top:16px;border-top:2px solid var(--bt-orange)}
+.ev-sp-story{margin:0}
+.ev-sp-story dt{font-weight:600;font-size:15px;line-height:1.5;margin:0 0 4px}
+.ev-sp-story dd{margin:0 0 18px;font-size:16px;line-height:1.7}
+.ev-sp-story dd:last-child{margin-bottom:0}
+@media (max-width:600px){.ev-sp-grid li{padding:14px}.ev-sp-face{width:68px;font-size:28px}.ev-sp-dlg{padding:22px 18px 18px}}
 /* 活動照片（2026-11-23）：橫的一排，往左往右滑（scroll-snap，一張一張停）。每一格固定 4:3，照片還沒載到版面也不會跳。
    捲的是那一排自己（overflow-x:auto），整頁不會往旁邊捲。左右兩顆按鈕桌機才出現，手機用手滑。
    開了「減少動態效果」的人按按鈕是直接跳過去（下面 reduce 那一行，加上 main.js 的 scrollBy 也看同一個設定）。 */

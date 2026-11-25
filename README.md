@@ -6031,6 +6031,50 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 講者點得開看經歷、照片搬到上面；後台找人看得到中文名、一點就到那個人的頁（2026-11-25）
+
+Paul 同一天接著講的（都是從「活動的講者」這件事延伸出來的）：
+
+> when I add speaker, type a name… it doesn't take me directly to the people. Like I still have to go to records and then find people and then edit that again.
+> when we're searching for a speaker… if I type Alicia, can you show their Chinese or like their important information as well?
+> can you change the organization name people to, I don't know, internal?
+> her profile is like at the very last. Can we have her profile on the left and then obviously her detail and then her current job, organization, city, country, and then her short bio.
+> on the outfront pages… it says speaker Emily, Yale University. It's not attractive at all. I want people to be able to click it and then see their experience. If they have one…
+> we need a better places for picture. Like right now, it's sitting at the bottom of the pages
+
+⚠ **這一步有遷移檔 `supabase/migrations/2027-01-07-speaker-profiles.sql`，要 Paul 在正式的 Supabase 跑過。** 還沒跑之前：對外頁的講者卡是新的樣子，但沒有人點得開（資料庫還沒回職稱與故事）；
+後台找人只看得到一個名字。其他都不用等它。
+
+### 對外的活動頁（`/events/#代號`）
+
+- **照片搬到說明上面**，接在活動名稱與那一句介紹的下面。以前在整頁最下面。
+- **講者一位一張卡**：左邊圓的照片，右邊名字、職稱、主題、學校。以前是一排置中的圓圈加兩行字。
+- **有故事的那一位多一顆「看他的經歷」**，按了開一格：照片、名字、他寫的那幾題故事（題目在上、他寫的在下）。Esc、右上角的叉叉、點外面都關得掉。
+- **什麼會對外，完全看他本人在個人連結上勾了什麼**（資料庫擋，不是畫面擋）：
+
+| 他勾了 | 對外多了什麼 |
+|---|---|
+| 「BT 可以公開我的名字、照片跟職稱」 | 職稱與單位（例如 Software Engineer, Shopify） |
+| 「BT 可以引用我寫的故事」 | 六題故事裡他有寫的那幾題 |
+| 都沒勾，或這張講者卡沒有連到紀錄裡的人 | 跟以前一樣：名字、主題、學校、照片 |
+
+- **不會對外的**：他寫的「一段介紹」、專長領域、城市、聯絡方式、中文全名。他同意的那一句寫的是「名字、照片跟職稱」，沒有寫介紹，所以介紹不放。要放得先改個人連結上那一句同意的字（還有隱私政策）。
+- 後台把那一位的「放在對外頁」取消，整位都不回，他同意了什麼都一樣。紀錄裡把那個人移除，職稱與故事也跟著不回。
+- 所以現在正式站上還沒有任何一位點得開：要先開個人連結給講者、他填了故事也勾了同意，才會有那顆按鈕。
+
+### 後台
+
+- **側欄英文的「People」（名單、邀請、工作區那一區）改叫「Internal」**，免得跟紀錄裡的「People」搞混。中文還是「人與權限」（本來就跟紀錄的「人」不一樣）。各頁英文說明裡「under People」那幾句跟著改成「under Internal」。
+- **從講者一點就到那個人在紀錄裡的頁**：講者打開之後那一行有「打開他在名單裡的那一頁」；找到的每一個人、剛帶入的那一句後面有「看他的那一頁」。
+- **找人的結果多印幾樣**：另一個名字（中文名或英文名，要跑遷移檔才有）、名單上的學校、最近的去向（跟學校不一樣才印）、領域與單位、標籤。同名的人比較分得出來。
+- **紀錄裡一個人的那一頁，個人檔案排到最上面**：左邊照片，右邊先是基本資料（名字、學校、畢業年、備註、現在還在念高中，有自己的「儲存」），接著是現在的工作、城市、領域、介紹（改了就存）。標籤、聯絡方式、學校與工作排在它下面。
+
+### 驗收
+
+`test/event-page.test.mjs` 多一條（講者的經歷：只認六題、每一段逃脫、題目跟個人連結那一頁一樣、遷移檔的同意那兩道門），其他改了幾條排版的。
+`scripts/db/smoke.sh` 最後多一段：沒同意只有四個鍵、同意職稱才有 job、同意故事才有 story、介紹與中文全名怎樣都不對外、後台取消就整位不回、兩個破壞測試。
+本機瀏覽器接本機 Supabase 看過：對外頁的講者卡與那一格、照片的位置、紀錄那一頁的新排法、側欄的 Internal。試完的資料都還原了。正式站上還沒跑、還沒人點過。
+
 ## 紀錄裡一個人的那一頁：標籤可以自己加、現在在哪照時間排、「跟 BT 的關係」拿掉（2026-11-25）
 
 Paul 看著紀錄裡一位以前的學員（高中在名單上，後來念了大學）講的：

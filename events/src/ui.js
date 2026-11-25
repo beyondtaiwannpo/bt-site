@@ -10,6 +10,7 @@ const T = {
         register: "立即報名", deadline: d => `報名到 ${d} 截止`, cal: "加入行事曆", gcal: "Google 日曆", ics: "下載行事曆檔（Apple、Outlook）",
         photos: "活動照片", prev: "看前面的照片", next: "看後面的照片",
         starts: "開始", noTime: "時間還沒定", tw: "台灣時間", view: "看這場活動", opensShort: d => `${d} 開放報名`,
+        spMore: "看他的經歷", spClose: "關上", spStory: "他的故事",
         tkDate: "日期", tkTime: "時間", seats: "名額", more: n => `還有 ${n} 場活動，看全部` },
   en: { past: "Past events", upcoming: "Upcoming", none: "No public events right now.", signup: "Sign up", full: "Full", closed: "Sign-up closed", ended: "Ended",
         opens: d => `Sign-up opens ${d}`, cap: (n, c) => c ? `${n} / ${c} signed up` : `${n} signed up`, login: "Signing up takes a one-minute login.", back: "All events", notFound: "Event not found.", place: "Place", map: "Open in Google Maps", when: "When", around: m => `Around ${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]}`, tbc: "Date to be confirmed", by: t => `Hosted by ${t.replace(/\s*Team$/i, "")}`,
@@ -17,6 +18,7 @@ const T = {
         register: "Register now", deadline: d => `Sign-up closes ${d}`, cal: "Add to calendar", gcal: "Google Calendar", ics: "Download calendar file (Apple, Outlook)",
         photos: "Photos", prev: "Previous photos", next: "Next photos",
         starts: "Starts", noTime: "Time to be confirmed", tw: "Taiwan time", view: "View event", opensShort: d => `Opens ${d}`,
+        spMore: "Read their story", spClose: "Close", spStory: "Their story",
         tkDate: "Date", tkTime: "Time", seats: "Seats", more: n => `${n} more ${n === 1 ? "event" : "events"} coming up. See all` },
 };
 export const pick = (e, k, l) => (l === "zh" ? (e[k + "_zh"] || e[k + "_en"]) : (e[k + "_en"] || e[k + "_zh"])) || "";
@@ -260,16 +262,46 @@ export function calendarHTML(e, l, url) {
 }
 
 // ── 一場活動那一頁 ─────────────────────────────────────────────────────
-// 講者（2027-01-02-event-speakers-tickets.sql）。extras.speakers 是 [{ name, subject, school, photo_url }]：
-// 資料庫只回本人同意、後台勾了的，照後台排的順序，只有這四個鍵。沒有、載不到、函式還不在，回空字串。
-// 一格一位：圓的照片、名字、主題、學校。沒有照片或照片連結壞掉，是一個品牌色的圓加名字的第一個字（照片疊在那個字上面，載不到就自己拿掉）。
-// 只印這四樣，物件裡就算多了別的鍵也不會被印出來。
+// 講者（2027-01-02-event-speakers-tickets.sql；2026-11-25 重做，2027-01-07-speaker-profiles.sql）。
+// Paul：「it says speaker Emily, Yale University. It's not attractive at all. I want people to be able to click it and then see their experience. If they have one」。
+// extras.speakers 是 [{ name, subject, school, photo_url, job?, story? }]：資料庫只回後台勾了「放在對外頁」的，照後台排的順序。
+//   job   他現在的職稱與單位。只有他本人在個人連結上勾了「BT 可以公開我的名字、照片跟職稱」才有。
+//   story 他寫的那六題故事 { highschool, turning, … }，只有他勾了「BT 可以引用我寫的故事」才有，而且只有他有寫的那幾題。
+// 一位一張卡：左邊圓的照片，右邊名字、職稱、主題、學校。有故事的那一位多一顆「看他的經歷」，按了開一格（<dialog>）：照片、名字、六題裡他寫的那幾題。
+// 沒有照片或照片連結壞掉，是一個品牌色的圓加名字的第一個字（照片疊在那個字上面，載不到就自己拿掉）。
+// 只印這六樣，物件裡就算多了別的鍵也不會被印出來；故事只認那六題的代號，每一段字都先 esc()。沒有講者、載不到、函式還不在，回空字串。
+// 六題的題目跟 profile/src/ui.js 的一樣（資料夾之間不互相 import，各一份；test/event-page.test.mjs 逐題比對）。
+export const STORY_KEYS = ["highschool", "turning", "hardest", "decision", "wish17", "first_step"];
+export const STORY_Q = {
+  highschool: ["高中的你是什麼樣子？那時候想成為什麼樣的人？", "What were you like in high school, and what did you want to become then?"],
+  turning:    ["是哪一個轉捩點，讓你走上現在這條路？", "What was the turning point that set you on your current path?"],
+  hardest:    ["最難的一刻是什麼？你怎麼走過來的？", "What was the hardest moment, and how did you get through it?"],
+  decision:   ["有哪一個決定你會再做一次？哪一個你會改？", "What's one decision you'd make again, and one you'd change?"],
+  wish17:     ["你希望 17 歲的時候有人告訴你什麼？", "What do you wish someone had told you at 17?"],
+  first_step: ["如果一個台灣學生想走你這條路，他第一步該做什麼？", "If a Taiwanese student wanted your path, what should they do first?"],
+};
+// 一位講者除了那四樣還有什麼可以給人看：{ job, story: [[代號, 他寫的字]…] }。
+export function speakerMore(x) {
+  const job = x && typeof x.job === "string" ? x.job.trim() : "";
+  const st = x && x.story && typeof x.story === "object" && !Array.isArray(x.story) ? x.story : {};
+  return { job, story: STORY_KEYS.filter(k => typeof st[k] === "string" && st[k].trim()).map(k => [k, st[k].trim()]) };
+}
 export function speakersHTML(extras, l) {
   const sp = ((extras && Array.isArray(extras.speakers) && extras.speakers) || []).filter(x => x && String(x.name || "").trim());
   if (!sp.length) return "";
+  const s = T[l === "en" ? "en" : "zh"], li = l === "en" ? 1 : 0;
   const ini = n => (Array.from(String(n).trim())[0] || "").toUpperCase();
   const face = x => `<span class="ev-sp-face"><span aria-hidden="true">${esc(ini(x.name))}</span>${/^https:\/\//.test(String(x.photo_url || "")) ? `<img src="${esc(x.photo_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ""}</span>`;
-  return `<h3>${T[l].speakers}</h3><ul class="ev-sp-grid">${sp.map(x => `<li>${face(x)}<b>${esc(String(x.name).trim())}</b>${x.subject ? `<span>${esc(x.subject)}</span>` : ""}${x.school ? `<span class="ev-sp-school">${esc(x.school)}</span>` : ""}</li>`).join("")}</ul>`;
+  const lines = (x, m) => `<b>${esc(String(x.name).trim())}</b>${m.job ? `<span class="ev-sp-job">${esc(m.job)}</span>` : ""}${x.subject ? `<span>${esc(x.subject)}</span>` : ""}${x.school ? `<span class="ev-sp-school">${esc(x.school)}</span>` : ""}`;
+  const dlgs = [];
+  const card = (x, i) => {
+    const m = speakerMore(x), id = `ev-sp-${l === "en" ? "en" : "zh"}-${i}`;
+    if (m.story.length) dlgs.push(`<dialog class="ev-sp-dlg" id="${id}" aria-label="${esc(String(x.name).trim())}"><button type="button" class="ev-sp-x" data-act="sp-close" aria-label="${s.spClose}">×</button>
+        <div class="ev-sp-dh">${face(x)}<span class="ev-sp-t">${lines(x, m)}</span></div>
+        <b class="ev-sp-sh">${s.spStory}</b><dl class="ev-sp-story">${m.story.map(([k, v]) => `<dt>${STORY_Q[k][li]}</dt><dd>${esc(v).replace(/\r?\n/g, "<br>")}</dd>`).join("")}</dl></dialog>`);
+    return `<li${m.story.length ? ` class="has-more"` : ""}>${face(x)}<span class="ev-sp-t">${lines(x, m)}${m.story.length ? `<button type="button" class="ev-sp-more" data-act="sp-open" data-dlg="${id}">${s.spMore} →</button>` : ""}</span></li>`;
+  };
+  return `<h3>${s.speakers}</h3><ul class="ev-sp-grid">${sp.map(card).join("")}</ul>${dlgs.join("")}`;
 }
 // 報名類型（免費的，沒有價錢）。extras.tickets 是 [{ id, name_zh, name_en, note_zh, note_en, capacity, taken, full }]。
 // 活動有分類型、而且現在報得了名（signupState 是 open）才畫：一種一列，有名額的寫還有幾個，一種一顆報名按鈕（連到 ../apply/?f=…&ticket=…）；
@@ -310,7 +342,7 @@ export function galleryHTML(extras, l) {
 }
 // 一場活動那一頁（2026-11-23 重排，Paul 拿 Accupass 的活動頁當樣子）：
 //   - 最上面沒有「活動」那一大塊標題，只有一行「← 所有活動」。
-//   - 桌機兩欄。左邊：封面、主辦、活動名稱、一句話、說明、講者、照片。右邊一張卡，往下捲的時候一直在畫面上：
+//   - 桌機兩欄。左邊：封面、主辦、活動名稱、一句話、照片、說明、講者（2026-11-25 照片從最下面搬到說明上面，Paul：「it's sitting at the bottom of the pages, which is like not doing anything」）。右邊一張卡，往下捲的時候一直在畫面上：
 //     主辦、活動名稱、時間（台灣時間、帶星期）、地點、報名（一顆「立即報名」，或一種一列的報名類型，或一句現況）、加入行事曆。
 //   - 手機一欄：那張卡接在活動名稱下面；現在報得了名的話，螢幕最下面多一條細細的、固定的「立即報名」。
 // x 是 public_event_extras() 回的（講者、報名類型、照片），沒有（null、還沒跑遷移檔）就是沒有那幾塊，其他照畫。
@@ -345,9 +377,9 @@ export function detailHTML(e, l, x, o) {
         ${calendarHTML(e, l, opt.url)}
       </div></aside>
       <div class="ev-rest">
+        ${photos ? `<div class="ev-photos">${photos}</div>` : ""}
         ${body ? `<div class="ev-text">${richText(body)}</div>` : ""}
         ${speakers ? `<div class="ev-speakers">${speakers}</div>` : ""}
-        ${photos ? `<div class="ev-photos">${photos}</div>` : ""}
         ${body || speakers || photos ? `<p class="ev-back"><a href="./">← ${s.back}</a></p>` : ""}
       </div>
     </div>

@@ -150,7 +150,7 @@ export const COMMON = {
 export const MINE = {
   // 進不去
   "noAccess.title":   { zh: "Marketing 這一區只有 Marketing 的人看得到", en: "This area is for the Marketing team" },
-  "noAccess.lede":    { zh: "要被派進 Marketing 的資源工作區或行銷需求單工作區（任何等級），或是 Co-President、Senior Adviser。你是 Marketing 卻進不來，請 Co-President 到「人與權限」把你加進去。", en: "You need to be in the Marketing resources workspace or the Marketing requests workspace (any level), or be a Co-President or Senior Adviser. If you are on Marketing and still cannot get in, ask a Co-President to add you under People." },
+  "noAccess.lede":    { zh: "要被派進 Marketing 的資源工作區或行銷需求單工作區（任何等級），或是 Co-President、Senior Adviser。你是 Marketing 卻進不來，請 Co-President 到「人與權限」把你加進去。", en: "You need to be in the Marketing resources workspace or the Marketing requests workspace (any level), or be a Co-President or Senior Adviser. If you are on Marketing and still cannot get in, ask a Co-President to add you under Internal." },
   "noAccess.back":    { zh: "回後台首頁", en: "Back to admin home" },
   // Instagram 連線（批 1）
   "ig.title":         { zh: "Instagram", en: "Instagram" },
@@ -391,7 +391,7 @@ export const MINE = {
   "err.photoUrl":     { zh: "網址要是 https:// 開頭。", en: "The link must start with https://." },
   "err.download":     { zh: "下載不了：", en: "Could not download: " },
   "says.notEditor":   { zh: "要 Marketing 工作區「改」以上才做得了。", en: "This needs Edit or higher in a Marketing workspace." },
-  "says.notApprover": { zh: "你不是核可的人。誰能核可由 Co-President 在「人與權限 → 工作區」的「Marketing 貼文核可」加人。", en: "You are not an approver. A Co-President adds approvers under People, Workspaces, Marketing post approvals." },
+  "says.notApprover": { zh: "你不是核可的人。誰能核可由 Co-President 在「人與權限 → 工作區」的「Marketing 貼文核可」加人。", en: "You are not an approver. A Co-President adds approvers under Internal, Workspaces, Marketing post approvals." },
   "says.own":         { zh: "這一篇是你開的，不能自己核可，要請另一位核可的人。", en: "You started this post, so you cannot approve it. Ask another approver." },
   "says.changedViewed": { zh: "你打開之後這一篇又被改過了，重新整理看最新的版本再核可。", en: "The post changed after you opened it. Refresh, look at the latest version, then approve." },
   "says.changedApproved": { zh: "核可之後內容又改了，要重新核可。", en: "The content changed after approval, so it needs approving again." },

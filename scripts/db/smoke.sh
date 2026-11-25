@@ -4632,6 +4632,42 @@ psql -d "${DB}" -X -A -t -q -c "update public.people set kind = 'student' where 
 ls3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LSM}" 2>&1 || true)
 if echo "${ls3}" | grep -q "OVERALL.*PASS" && ! echo "${ls3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${ls3}" | head -20; fail=$((fail+1)); fi
 chk "裝回去之後，只有錄取的那一位還是算念高中" "student" "select kind from public.people where id = '${LSB}'"
+echo "── 對外的講者可以點開看經歷；後台找人看得到中英文名（2027-01-07-speaker-profiles.sql）──"
+# Paul 2026-11-25：「I want people to be able to click it and then see their experience. If they have one」「if they have a Chinese name… I should know」
+# 這時候：PGEV（pg-no-date）上架了；LSA 是上一段那位念大學的人（沒有帳號）。這一段替他開一張講者卡、放一份個人檔案（先都沒同意）。
+SPM=supabase/migrations/2027-01-07-speaker-profiles.sql
+SPK=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.save_event_speaker('${PGEV}', null, '{\"display_name\":\"Angel\",\"subject\":\"CS\",\"school\":\"UW\",\"person_id\":\"${LSA}\"}'::jsonb)" 2>&1 | tail -1 | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.set_event_speaker_consent('${SPK}', true)" >/dev/null 2>&1
+psql -d "${DB}" -X -A -t -q -c "update public.people set name_zh = '黃安琪' where id = '${LSA}';" \
+  -c "insert into public.rc_profiles (person_id, job_title, job_org, bio, field, city, story, share_profile, share_story) values ('${LSA}', 'Research Assistant', 'UW', 'SECRETBIO', 'SECRETFIELD', 'SECRETCITY', '{\"highschool\":\"I was shy.\",\"turning\":\" \",\"evil\":\"x\"}'::jsonb, false, false) on conflict (person_id) do update set job_title = excluded.job_title, job_org = excluded.job_org, bio = excluded.bio, field = excluded.field, city = excluded.city, story = excluded.story, share_profile = false, share_story = false;" >/dev/null 2>&1
+case "${SPK}" in ????????-*) echo "  ok   （準備）替 LSA 開了一張講者卡與一份還沒同意的個人檔案"; pass=$((pass+1));; *) echo "  FAIL 開不了測試用的講者卡：${SPK}"; fail=$((fail+1));; esac
+SPSEL="select (select string_agg(k, ',' order by k) from jsonb_object_keys(v) k) from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') v where v->>'name' = 'Angel'"
+sp1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SPM}" 2>&1 || true)
+if echo "${sp1}" | grep -q "OVERALL.*PASS" && ! echo "${sp1}" | grep -q "|FAIL"; then echo "  ok   講者經歷那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 講者經歷那一支驗收表：${sp1}" | head -20; fail=$((fail+1)); fi
+sp2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SPM}" 2>&1 || true)
+if echo "${sp2}" | grep -q "OVERALL.*PASS" && ! echo "${sp2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${sp2}" | head -20; fail=$((fail+1)); fi
+chkrole anon "" "★ 他兩個都沒同意：沒登入的人拿到的還是只有四個鍵" "name,photo_url,school,subject" "${SPSEL}"
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profiles set share_profile = true where person_id = '${LSA}';" >/dev/null
+chkrole anon "" "★ 他同意公開職稱：多一個 job，故事還是沒有" "job,name,photo_url,school,subject|ResearchAssistant,UW" "select (select string_agg(k, ',' order by k) from jsonb_object_keys(v) k)||'|'||(v->>'job') from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') v where v->>'name' = 'Angel'"
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profiles set share_profile = false, share_story = true where person_id = '${LSA}';" >/dev/null
+chkrole anon "" "★ 他只同意引用故事：有 story 沒有 job，而且只有他有寫的、認得的那一題" 'name,photo_url,school,story,subject|{"highschool":"Iwasshy."}' "select (select string_agg(k, ',' order by k) from jsonb_object_keys(v) k)||'|'||(v->'story')::text from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') v where v->>'name' = 'Angel'"
+chkrole anon "" "★ 介紹、領域、城市、中文全名不管同不同意都不對外" "0" "select (public.public_event_extras('pg-no-date')::text ~ 'SECRET|黃安琪|person_id')::int"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.set_event_speaker_consent('${SPK}', false)" >/dev/null 2>&1
+chkrole anon "" "★ 後台取消「放在對外頁」：整位都不回，他同意了也一樣" "0" "select count(*) from jsonb_array_elements(public.public_event_extras('pg-no-date')->'speakers') v where v->>'name' = 'Angel'"
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.set_event_speaker_consent('${SPK}', true)" >/dev/null 2>&1
+chkas "${PAUL}" "後台找人多回中文名與英文名" "黃安琪|LsAngel" "select (v->>'name_zh')||'|'||(v->>'name_en') from jsonb_array_elements(public.rc_find_people('Ls Angel')) v"
+chkas "${OUTC}" "★ 沒被派進紀錄的幹部找人還是空的" "[]" "select public.rc_find_people('Ls Angel')::text"
+chkrole anon "" "★ 沒登入的人叫不動找人的那一支" "ERROR:permissiondeniedforfunctionrc_find_people" "select public.rc_find_people('Ls')"
+BROKEN=$(mktemp)
+sed "s/'job', case when pf.share_profile then /'job', case when true then /" "${SPM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：職稱不看他同不同意，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 職稱不看同意驗收表沒有變紅"; fail=$((fail+1)); fi
+sed "s/from event_speakers s where s.event_id = e.id and s.consent)/from event_speakers s where s.event_id = e.id)/" "${SPM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：拿掉講者「放在對外頁」那道門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉講者那道門驗收表沒有變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+sp3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SPM}" 2>&1 || true)
+if echo "${sp3}" | grep -q "OVERALL.*PASS" && ! echo "${sp3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${sp3}" | head -20; fail=$((fail+1)); fi
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -105,7 +105,7 @@ test("★ 講者：每一位有一格「放在對外頁」，勾了才對外；�
   assert.match(F.eventSpeakersHTML(EV, SPEAKERS, true, true, { spUp: { id: "s1", pct: 10, name: "a.jpg" } }), /<details class="ev-sp-fold" data-sp-fold="s1" open>/, "照片正在傳的那一位一定開著");
   assert.match(h, /<input data-f="display_name" value="Annie" maxlength="60"/); assert.match(h, /<input data-f="subject" value="Computer Science"/); assert.match(h, /<input data-f="school" value="UCLA"/);
   assert.doesNotMatch(h, /ev-sp-consent|這個人同意把名字與照片放在對外頁/, "不是同意的勾，是「放在對外頁」");
-  assert.match(h, /<div class="ev-ph-state"><label class="check ev-sp-show"><input type="checkbox" data-act="ev-sp-show" data-id="s1" checked><span>放在對外頁<\/span><\/label> <span class="mini">活動上架之後才看得到<\/span> <span class="mini">從紀錄挑的<\/span><\/div>/, "看得到的那一位：勾著；活動還沒上架多一句；從紀錄挑的有標");
+  assert.match(h, /<div class="ev-ph-state"><label class="check ev-sp-show"><input type="checkbox" data-act="ev-sp-show" data-id="s1" checked><span>放在對外頁<\/span><\/label> <span class="mini">活動上架之後才看得到<\/span> <a class="mini ev-sp-open" href="\/admin\/records\/\?lang=zh#people\/p1">打開他在名單裡的那一頁<\/a><\/div>/, "看得到的那一位：勾著；活動還沒上架多一句；連到紀錄的有一條連結直接到那個人的頁（2026-11-25 Paul：「it doesn't take me directly to the people」）");
   assert.match(h, /<div class="ev-ph-state"><label class="check ev-sp-show"><input type="checkbox" data-act="ev-sp-show" data-id="s2"><span>放在對外頁<\/span><\/label><\/div>/, "看不到的那一位：沒勾，後面沒有別的話");
   assert.equal(count(h, /data-act="ev-sp-show"/g), 2, "一位一格"); assert.doesNotMatch(h, /<button[^>]*data-act="ev-sp-show"|放上對外頁|從對外頁收起來|對外看得到/, "沒有那兩顆按鈕與狀態標籤了");
   const liveH = F.eventSpeakersHTML({ ...EV, status: "published" }, SPEAKERS, true, false, {});
@@ -145,9 +145,9 @@ test("★ 從紀錄裡找人：讀得到名錄的人才有那一格；挑了只�
     spDraft: { display_name: "Paul", school: "NTU", person_id: "p9", from: "Paul Wang" } });
   assert.match(h, /id="ev-sp-new" open>/);
   assert.match(h, /<input id="ev-sp-q" type="search" value="wang"/); assert.match(h, /data-act="ev-sp-find" data-id="e1">找/);
-  assert.match(h, /<b>Paul Wang<\/b> <span class="mini">NTU<\/span> <span class="tag">成員<\/span> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="p9">帶入/);
+  assert.match(h, /<b>Paul Wang<\/b> <span class="mini">NTU<\/span> <span class="tag">成員<\/span> <a class="mini ev-sp-open" href="\/admin\/records\/\?lang=zh#people\/p9">看他的那一頁<\/a> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="p9">帶入/);
+  assert.match(h, /帶入的是紀錄裡的「Paul Wang」。 <a class="ev-sp-open" href="\/admin\/records\/\?lang=zh#people\/p9">看他的那一頁<\/a> <button class="btn quiet sm" data-act="ev-sp-unpick">/, "帶入之後那一句後面也有");
   assert.match(h, /<b>王小明<\/b> <span class="mini">建中<\/span> <span class="tag">學員<\/span>/, "學員那一列跟別人一樣是一個標籤"); assert.doesNotMatch(h, /tag warn|未成年/);
-  assert.match(h, /帶入的是紀錄裡的「Paul Wang」。 <button class="btn quiet sm" data-act="ev-sp-unpick">不連到這個人/);
   assert.match(h, /id="ev-sp-new-name" value="Paul"/); assert.match(h, /<input data-f="school" value="NTU"/);
   assert.doesNotMatch(h, /data-f="person_id"/, "連到誰不是一格可以打的字，放在 main.js 的草稿裡");
   assert.match(F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spFound: [] }), /紀錄裡沒有找到。直接在下面打名字也可以。/);
@@ -261,17 +261,17 @@ test("★ 對外：講者只印名字、主題、學校、照片四樣；沒有�
   const h = PUB.speakersHTML(x, "zh");
   assert.match(h, /^<h3>講者<\/h3><ul class="ev-sp-grid">/); assert.match(PUB.speakersHTML(x, "en"), /^<h3>Speakers<\/h3>/);
   assert.equal(count(h, /<li>/g), 3, "沒有名字的那一筆與空的那一筆不畫");
-  assert.match(h, /<li><span class="ev-sp-face"><span aria-hidden="true">A<\/span><img src="https:\/\/x\/a\.jpg" alt="" loading="lazy" decoding="async" onerror="this\.remove\(\)"><\/span><b>Annie<\/b><span>Computer Science<\/span><span class="ev-sp-school">UCLA<\/span><\/li>/);
-  assert.match(h, /<li><span class="ev-sp-face"><span aria-hidden="true">小<\/span><\/span><b>小安<\/b><span class="ev-sp-school">台灣大學<\/span><\/li>/, "沒有照片：圓裡是第一個字；沒有主題就不留空行");
-  assert.match(h, /<span aria-hidden="true">B<\/span><\/span><b>Ben<\/b>/, "不是 https 的照片不畫");
+  assert.match(h, /<li><span class="ev-sp-face"><span aria-hidden="true">A<\/span><img src="https:\/\/x\/a\.jpg" alt="" loading="lazy" decoding="async" onerror="this\.remove\(\)"><\/span><span class="ev-sp-t"><b>Annie<\/b><span>Computer Science<\/span><span class="ev-sp-school">UCLA<\/span><\/span><\/li>/);
+  assert.match(h, /<li><span class="ev-sp-face"><span aria-hidden="true">小<\/span><\/span><span class="ev-sp-t"><b>小安<\/b><span class="ev-sp-school">台灣大學<\/span><\/span><\/li>/, "沒有照片：圓裡是第一個字；沒有主題就不留空行");
+  assert.match(h, /<span aria-hidden="true">B<\/span><\/span><span class="ev-sp-t"><b>Ben<\/b>/, "不是 https 的照片不畫");
+  assert.doesNotMatch(h, /<dialog|ev-sp-more|sp-open|has-more/, "沒有故事的講者沒有那顆按鈕、也沒有那一格");
   assert.doesNotMatch(h, /p-secret|s-secret|annie@example\.com|consent|person_id/, "物件裡就算多了別的鍵也不會被印出來");
   for (const bad of [null, undefined, {}, { speakers: [] }, { speakers: null }, { speakers: "x" }, [], { message: "Could not find the function" }, { photos: [{ url: "https://x/a.jpg" }] }]) assert.equal(PUB.speakersHTML(bad, "zh"), "", JSON.stringify(bad));
   assert.match(PUB.speakersHTML({ speakers: [{ name: '<script>x</script>', subject: '"><b>', school: "&", photo_url: 'https://x/a.jpg"><script>' }] }, "zh"),
     /<b>&lt;script&gt;x&lt;\/script&gt;<\/b><span>&quot;&gt;&lt;b&gt;<\/span><span class="ev-sp-school">&amp;<\/span>/, "每一格都逃脫");
   const page = read("events/index.html");
-  assert.match(page, /\.ev-sp-grid\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/, "桌機一排四位");
-  assert.match(page, /@media \(max-width:600px\)\{\.ev-sp-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/, "手機一排兩位");
-  assert.match(page, /\.ev-sp-grid li > \*\{max-width:100%;overflow-wrap:anywhere\}/, "字太長就換行，不會往旁邊捲");
+  assert.match(page, /\.ev-sp-grid\{[^}]*grid-template-columns:repeat\(auto-fill,minmax\(min\(100%,270px\),1fr\)\)/, "一位一張卡，照寬度自己排（2026-11-25）");
+  assert.match(page, /\.ev-sp-t > \*\{max-width:100%;overflow-wrap:anywhere\}/, "字太長就換行，不會往旁邊捲");
   assert.match(page, /\.ev-sp-face\{[^}]*border-radius:50%/, "照片是圓的");
   assert.doesNotMatch(U_DETAIL_NO_SPEAKERS, /ev-speakers|ev-sp-grid/, "沒有講者就沒有那一塊（不留空的框）");
 });

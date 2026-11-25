@@ -154,9 +154,10 @@ test("★ 畫面不再印「種類」：一個人的頁面與名錄的列都只�
 test("★ 一個人的頁面：四個分頁（基本資料、參與紀錄、故事與同意、設定），每一塊在它該在的分頁裡", () => {
   const h = UI.personHTML(PERSON, MGR);
   // 2026-11-24：十幾塊收成四個分頁。順序：他是誰 → BT 跟他的關係與時間軸 → 他自己寫的與同意的。
-  const order = ['id="rc-labels"', "data-pedit", 'id="rc-profile"', "data-cadd", "data-sadd", "data-paddev", 'id="rc-speaking"', "data-oadd", 'id="rc-story"', 'id="rc-consent"', 'id="rc-link-sec"'];
+  // 2026-11-25：個人檔案排到最上面，基本資料在它的右邊（Paul：「her profile is like at the very last」）。
+  const order = ['id="rc-profile"', "data-pedit", 'name="job_title"', 'id="rc-labels"', "data-cadd", "data-sadd", "data-paddev", 'id="rc-speaking"', "data-oadd", 'id="rc-story"', 'id="rc-consent"', 'id="rc-link-sec"'];
   const tabp = k => at(h, `<div class="tabp" data-ptabs="rc-person" data-tabp="${k}"`);
-  assert.ok(tabp("details") < at(h, 'id="rc-labels"') && at(h, "data-sadd") < tabp("bt") && tabp("bt") < at(h, "data-paddev") && at(h, "data-oadd") < tabp("voice") && tabp("voice") < at(h, 'id="rc-story"'));
+  assert.ok(tabp("details") < at(h, 'id="rc-profile"') && at(h, "data-sadd") < tabp("bt") && tabp("bt") < at(h, "data-paddev") && at(h, "data-oadd") < tabp("voice") && tabp("voice") < at(h, 'id="rc-story"'));
   assert.deepEqual([...h.matchAll(/data-ptab="rc-person" class="subtab(?: on)?" data-tab="([a-z]+)"/g)].map(m => m[1]), ["details", "bt", "voice", "settings"], "Co-President 四個都有");
   assert.ok(tabp("settings") < at(h, 'data-act="forget"') || /<div class="tabp" data-ptabs="rc-person" data-tabp="settings"[^>]*><section/.test(h), "移除的要求在「設定」分頁");
   const notPres = UI.personHTML(PERSON, { ...MGR, me: { pres: false } });
@@ -180,7 +181,9 @@ test("★ 個人檔案與關係：管的人每一格改了就存（一格一格�
   for (const [name, val] of [["job_title", "Engineer"], ["job_org", "Acme Labs"], ["city", "Taipei"], ["country", "Taiwan"], ["field", "Machine learning"]])
     assert.match(mp, new RegExp(`<input name="${name}" value="${val}" maxlength="\\d+" autocomplete="off">`));
   assert.match(mp, /<textarea name="bio" rows="4" maxlength="600">第一行\n第二行<\/textarea>/);
-  assert.match(mp, /<span class="autosave" data-for="pf-save">改了就存<\/span>/); assert.doesNotMatch(mp, /data-act="[^"]*save"/, "沒有「存起來」那顆鈕");
+  assert.match(mp, /<span class="autosave" data-for="pf-save">改了就存<\/span>/); assert.doesNotMatch(mp.slice(at(mp, 'class="rc-pf-f"'), at(mp, 'id="rc-labels"')), /data-act="[^"]*save"/, "現在的工作與介紹那幾格沒有「存起來」那顆鈕");
+  assert.match(mp, /<div class="rc-pf-main"><h3 class="rc-pf-h">基本資料<\/h3><div data-pedit>[^]*data-act="person-save"[^]*<h3 class="rc-pf-h">現在的工作與介紹<\/h3>\s*<div class="rc-pf-f" data-autosave="pf-save" data-part="profile">/, "右邊那一欄：先基本資料（有自己的儲存），再現在的工作與介紹");
+  assert.equal(count(m, /data-pedit/g), 1, "基本資料只畫一次，不會上面一份、下面又一份"); assert.doesNotMatch(vp, /data-pedit|rc-pf-main/, "看的人沒有那幾格");
   assert.match(mp, /<img class="rc-photo" src="https:\/\/x\.supabase\.co\/storage\/v1\/object\/public\/people\/p1\/1-abc\.jpg" alt="">/);
   assert.match(mp, /<input type="file" accept="image\/jpeg,image\/png,image\/webp" data-act="pf-photo" data-noauto="1">/); assert.match(mp, /換一張照片/); assert.match(mp, /data-act="pf-photo-clear"/);
   assert.match(mp, /他自己在 2026-12-01 填過這一份。/);
@@ -464,9 +467,16 @@ test("★ 挑講者的清單：每一個人後面印標籤與現在做什麼；�
   const found = [NINA, { id: "s1", name: "Sam Student", school: "Test High", kind: "student", labels: ["student"], card: null, latest: null },
     { id: "s2", name: "Olga Oldstudent", school: "", kind: "student", labels: ["student:past", "mentor:past", "from_the_future"], card: null, latest: null }];
   const h = F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spOpen: true, spQ: "s", spFound: found, spDraft: F.evSpeakerPrefill(null, NINA) });
-  assert.match(h, /<li><b>Nina Speaker<\/b> <span class="mini">Test High<\/span> <span class="mini">Machine learning・Acme Labs<\/span> <span class="tag past">校友（前幹部）<\/span> <span class="tag">講者<\/span> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="p1">帶入<\/button><\/li>/);
-  assert.match(h, /<li><b>Sam Student<\/b> <span class="mini">Test High<\/span> <span class="tag">學員<\/span> <button/); assert.doesNotMatch(h, /tag warn|未成年/);
-  assert.match(h, /<li><b>Olga Oldstudent<\/b> <span class="tag past">以前的學員<\/span> <span class="tag past">Mentor<\/span> <button/, "畢業了的學員是「以前的學員」；認不得的代碼不印");
+  assert.match(h, /<li><b>Nina Speaker<\/b> <span class="mini">Test High<\/span> <span class="mini">Latest University<\/span> <span class="mini">Machine learning・Acme Labs<\/span> <span class="tag past">校友（前幹部）<\/span> <span class="tag">講者<\/span> <a class="mini ev-sp-open" href="\/admin\/records\/\?lang=zh#people\/p1">看他的那一頁<\/a> <button class="btn ghost sm" data-act="ev-sp-pick" data-id="p1">帶入<\/button><\/li>/);
+  assert.match(h, /<li><b>Sam Student<\/b> <span class="mini">Test High<\/span> <span class="tag">學員<\/span> <a class="mini ev-sp-open"/); assert.doesNotMatch(h, /tag warn|未成年/);
+  // 2026-11-25 Paul：「if they have a Chinese name and last name, I should know… where they go to school, which is also very important」。
+  // 資料庫回了 name_zh／name_en（2027-01-07-speaker-profiles.sql）就多印跟大字不一樣的那一個；最近的去向跟名單上的學校不一樣也印。
+  const rich = F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spFound: [{ id: "a1", name: "Alicia Lee", name_zh: "李艾莉", name_en: "Alicia Lee", school: "北一女中", latest: "National Taiwan University", labels: ["student:past"], card: null }] });
+  assert.match(rich, /<li><b>Alicia Lee<\/b> <b class="ev-sp-alt">李艾莉<\/b> <span class="mini">北一女中<\/span> <span class="mini">National Taiwan University<\/span> <span class="tag past">以前的學員<\/span>/);
+  assert.equal(F.evOtherName({ name: "王小明", name_zh: "王小明", name_en: "" }), ""); assert.equal(F.evOtherName({ name: "Alicia Lee" }), "", "資料庫還沒回那兩格就不印");
+  assert.equal(F.evOtherName({ name: "Alicia Lee", name_zh: "李艾莉", name_en: "Alicia Lee" }), "李艾莉"); assert.equal(F.evOtherName(null), "");
+  assert.equal(F.evPersonHref("p 1"), "/admin/records/?lang=zh#people/p%201");
+  assert.match(h, /<li><b>Olga Oldstudent<\/b> <span class="tag past">以前的學員<\/span> <span class="tag past">Mentor<\/span> <a class="mini ev-sp-open"/, "畢業了的學員是「以前的學員」；認不得的代碼不印");
   assert.doesNotMatch(h, />來賓<|>成員</, "有標籤的時候不印種類");
   // 帶入之後那幾格與那張照片
   assert.match(h, /id="ev-sp-new-name" value="Nina"/); assert.match(h, /<input data-f="subject" value="Machine learning"/); assert.match(h, /<input data-f="school" value="Acme Labs"/);
@@ -515,11 +525,11 @@ test("★ 現在在哪：去向（就讀、轉學、畢業、工作）與學校�
   assert.equal(count(h, /<span class="tag open">現在<\/span>/g), 1);
   assert.match(h, /<b>American International Academy<\/b><\/div><div class="fmeta">匯入 <button class="btn quiet sm" data-act="school-del" data-id="s1">/, "學校那一列管的人可以刪；去向那一列在去向那一塊改");
   assert.doesNotMatch(h.slice(at(h, "<ul class=\"flist rc-places\">"), at(h, "data-sadd")), /data-act="out-del"/);
-  const head = h.slice(0, at(h, "rc-labels"));
+  const head = h.slice(0, at(h, "rc-profile"));
   assert.match(head, /University of Washington/); assert.doesNotMatch(head, /American International Academy|2022/, "頁首不再印高中與它的畢業年");
   // 還在那一所高中的人照舊印學校與畢業年
   const hs = UI.personHTML({ ...PERSON, person: { ...PERSON.person, kind: "student", school: "TFG", grad_year: 2027 }, schools: [sch("s1", "TFG", 2024, null, true)], outcomes: [] }, MGR);
-  assert.match(hs.slice(0, at(hs, "rc-labels")), /TFG・2027/);
+  assert.match(hs.slice(0, at(hs, "rc-profile")), /TFG・2027/);
   assert.match(UI.personHTML({ ...PERSON, schools: [], outcomes: [] }, MGR), /還沒有學校或工作的紀錄。/);
   const m = read("admin/records/src/main.js"), dd = read("admin/records/src/data.js");
   assert.doesNotMatch(m + dd, /school-current|setCurrentSchool/, "「設成現在的」那顆按鈕與它叫的函式都拿掉了");

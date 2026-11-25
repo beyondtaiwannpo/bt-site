@@ -150,7 +150,7 @@ export const COMMON = {
 export const MINE = {
   // 進不去
   "noAccess.title":   { zh: "錢只有 Co-President、Senior Adviser、Sponsorship 的 Director 與被派進「錢」的人看得到", en: "Money is for Co-Presidents, Senior Advisers, the Sponsorship Director and people assigned to Money" },
-  "noAccess.lede":    { zh: "要進來請 Co-President 到人與權限，在你的那一張卡上把「錢」設成看或改。你是 Sponsorship 的 Director 卻進不來，請 Co-President 確認這一屆的職位有填「Director, Sponsorship Team」。", en: "To get in, ask a Co-President to set Money to View or Edit on your card under People. If you are the Sponsorship Director and still cannot get in, ask a Co-President to check that this term's position reads \"Director, Sponsorship Team\"." },
+  "noAccess.lede":    { zh: "要進來請 Co-President 到人與權限，在你的那一張卡上把「錢」設成看或改。你是 Sponsorship 的 Director 卻進不來，請 Co-President 確認這一屆的職位有填「Director, Sponsorship Team」。", en: "To get in, ask a Co-President to set Money to View or Edit on your card under Internal. If you are the Sponsorship Director and still cannot get in, ask a Co-President to check that this term's position reads \"Director, Sponsorship Team\"." },
   "noAccess.back":    { zh: "回後台首頁", en: "Back to admin home" },
   "readonly":         { zh: "你只能看，改不動。改得動的是 Co-President、Sponsorship 的 Director 與在「錢」是「改」以上的人。", en: "You can view but not edit. Co-Presidents, the Sponsorship Director and Money Editors can edit." },
   // 種類與帳戶種類

@@ -497,6 +497,11 @@ div.ev-help,p.ev-help{margin:0 0 10px}
 .ev-sp-ppl .ev-acts{margin:0 0 8px}
 .ev-sp-newp{margin-top:8px}
 .ev-sp-ppl a{color:var(--ink);text-underline-offset:3px}
+/* 講者那一塊連到紀錄裡那個人的連結，與找到的人那一行的另一個名字（2026-11-25）。 */
+.ev-sp-open{color:var(--ink);text-underline-offset:3px;white-space:nowrap}
+.ev-sp-alt{font-weight:600;margin-left:2px}
+.ev-sp-found li .ev-sp-open{margin-left:auto}
+.ev-sp-found li .ev-sp-open + .btn{margin-left:0}
 .ev-sp-find{margin:0 0 12px;padding:0 0 12px;border-bottom:1px dotted rgba(16,42,134,.16)}
 .ev-sp-findrow{display:flex;gap:8px;align-items:center}
 .ev-sp-findrow input{flex:1;min-width:0}
@@ -1104,6 +1109,10 @@ input[type=file]:active::file-selector-button{background:rgba(255,196,108,.6)}
 .rc-pf-photo .hi-upload{margin:0 0 8px}
 .rc-pf-photo .mini{margin:0 0 8px;line-height:1.5}
 .rc-pf-f{flex:1;min-width:0}
+/* 個人檔案右邊那一欄（2026-11-25）：先基本資料，再現在的工作與介紹，各一個小標題。 */
+.rc-pf-main{flex:1;min-width:0}
+.rc-pf-h{font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.78);margin:0 0 10px}
+.rc-pf-main [data-pedit]{margin:0 0 22px;padding:0 0 18px;border-bottom:1px dotted rgba(16,42,134,.16)}
 .rc-photo{display:flex;align-items:center;justify-content:center;width:112px;height:112px;border-radius:50%;object-fit:cover;background:rgba(16,42,134,.1);
   font-family:var(--display);font-size:40px;font-weight:700;line-height:1;color:rgba(16,42,134,.72);margin:0 0 10px}
 .rc-story{margin:0 0 14px}

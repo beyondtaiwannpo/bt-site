@@ -440,7 +440,7 @@ const SAYS = [
   ["empty_reply", "退件要先寫原因。", "Write a reason before rejecting."],
   ["not_open", "這張單已經發布、收回或退件了，不能再退。", "This request is already published, withdrawn or rejected."],
   // 第二版（2026-11-09）
-  ["not_in_workspace", "接的人只能選需求工作區裡的人，要先在 People 的 Workspaces 把他加進來。", "The assignee must be in the Marketing requests workspace. Add them under People, Workspaces first."],
+  ["not_in_workspace", "接的人只能選需求工作區裡的人，要先在 People 的 Workspaces 把他加進來。", "The assignee must be in the Marketing requests workspace. Add them under Internal, Workspaces first."],
   ["bad_platform", "平台只能勾表單上那五個。", "Pick platforms from the five on the form."],
   ["bad_owner", "需求負責人要是幹部，重新選一次。", "The request owner must be a cadre. Pick again."],
   ["bad_date", "預計發布日的格式不對。", "The publish date is not a valid date."],
