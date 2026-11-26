@@ -6145,9 +6145,10 @@ Paul：
 - 收件匣：`admin/people/src/ui.js` 的 `feedbackPageHTML`，資料那三支在 `admin/people/src/data.js`。選單那一列在 `shared/rail.js` 的 `ITEMS`。
 - 資料庫：`supabase/migrations/2027-01-10-site-feedback.sql`。
 
-### 資料庫（要 Paul 在正式的 Supabase 跑）
+### 資料庫（Paul 2026-11-26 在正式的 Supabase 跑完，全 PASS）
 
-⚠ **這一步有遷移檔 `supabase/migrations/2027-01-10-site-feedback.sql`。** 檔直接交給他了。它做的事：
+遷移檔是 `supabase/migrations/2027-01-10-site-feedback.sql`。跑完之後從外面確認過：沒登入的人叫不到那幾支函式，也讀不到那張表。
+**還沒驗過的只剩一件：真的信有沒有寄到。**本機寄不出信，要等第一則真的回報送出來才知道。它做的事：
 
 - 一張新的表 `site_feedback`。開了 RLS、沒有任何政策、沒有發任何權限，前端一列都讀不到，全部走函式。
 - 一個私人的 bucket `feedback`（一張 5 MB、只收 JPG、PNG、WebP）。放得進去的是幹部，而且只能放在自己的資料夾、檔名是程式取的那個格式；
@@ -6155,7 +6156,7 @@ Paul：
 - 四支函式：`send_feedback`（幹部送）、`feedback_inbox` 與 `feedback_set`（只有 Co-President 與 Senior Adviser）、`feedback_count`（選單上的數字，別人拿到 0）。
 - 信的種類多一種 `feedback_new`。它是讀現在的清單再加一個，原本的一種都沒少。**寄信那幾支函式一支都沒重寫**，信裡的連結是內文裡的一行字。
 
-還沒跑之前：那一顆看得到，按送出會說「資料庫還沒準備好，要先跑 2027-01-10-site-feedback.sql」；收件匣那一頁也是同一句。
+如果哪一天資料庫重建、這一支還沒跑：那一顆看得到，按送出會說「資料庫還沒準備好，要先跑 2027-01-10-site-feedback.sql」；收件匣那一頁也是同一句。
 之後如果重跑會重建信的種類清單的遷移檔（`2026-12-21-form-received-mail.sql` 與更早那幾支），要再跑一次這一支；沒跑的話回報照樣存得進收件匣，只是信寄不出去。
 
 ### 驗收
@@ -6187,9 +6188,9 @@ Paul 貼了一張後台「上架」那一塊的截圖，上面只有一句「Unp
 **只在紀錄裡的舊活動上不去。** 它們的狀態也是 `archived`，但從來沒上過對外頁（`published_at` 是空的）。畫面不畫那一顆，那一句話改成說它上不去，資料庫也擋（`not_relistable`）。
 2027-01-08 那三場「名稱沒有紀錄」的過去活動就是這一種。分辨的方法只有一個：有沒有上過對外頁。
 
-⚠ **這一步有遷移檔 `supabase/migrations/2027-01-09-relist-events.sql`，要 Paul 在正式的 Supabase 跑過。** 檔直接交給他了。
+**遷移檔 `supabase/migrations/2027-01-09-relist-events.sql`，Paul 2026-11-26 在正式的 Supabase 跑完，全 PASS。**
 它只重寫 `set_event_ready()` 一支，跟 2026-12-31 那一版只差一個判斷（測試逐行比過）。沒有新的表、沒有新的欄位、沒有動 RLS，`publish_event`、`unpublish_event` 一行都沒改。
-還沒跑之前：那一顆看得到，按了會說「資料庫還是舊的，要先跑 2027-01-09-relist-events.sql」，不會講成「已經在對外頁上了」。
+如果 `set_event_ready()` 被換回舊的版本：那一顆看得到，按了會說「資料庫還是舊的，要先跑 2027-01-09-relist-events.sql」，不會講成「已經在對外頁上了」。
 之後如果重跑 `2026-12-31-programmes.sql` 或 `2026-11-01-events.sql`，要再跑一次這一支。
 
 驗收：`test/event-relist.test.mjs` 五條（撤下來的有那一顆、只有「改」的人沒有、舊活動沒有、其他三種狀態的按鈕沒變、遷移檔跟上一版逐行比只差那一個判斷）。
@@ -6823,9 +6824,10 @@ Senior Adviser 看得到那一塊，開關與勾選是灰的。
 - **誰改得了大標**：Co-President、Senior Adviser，或至少在一個 team 的資源工作區是「管」的人。只有「改」權限的人不能加、改、刪大標，但可以把自己那一筆資源放進已經有的大標。最多 40 個，名字最多 60 個字。
 - **連結還是只有登入的人拿得到。** 沒登入的人多讀得到的只有「這一筆在哪個大標」，遷移檔驗收表第 1 列會驗。`resources` 的四條政策沒有動。
 
-### 兩支遷移檔還沒在正式資料庫跑
+### 兩支遷移檔（Paul 2026-11-26 在正式的 Supabase 跑完，全 PASS）
 
-兩支都要 Paul 在正式的 Supabase 跑，檔直接交給他了。互相不相依，先跑哪一支都可以，都可以重跑，最後各印一張 PASS / FAIL 表。
+跑完之後從外面確認過：`public_past_team()` 回空的清單（還沒有任何一屆被打開），`resource_sections` 讀得到、裡面是空的。
+互相不相依，先跑哪一支都可以，都可以重跑，最後各印一張 PASS / FAIL 表。下面那張表留著，資料庫重建的時候用得到。
 
 | 檔 | 還沒跑的時候 | 跑完之後 |
 |---|---|---|
@@ -7949,7 +7951,7 @@ Paul 2026-11-25：「when I am trying to load the directory of people and events
 
 ### 改了什麼
 
-1. **遷移檔 `2027-01-12-fast-directory.sql`**（要在 Supabase 跑過才會變快；沒跑之前名錄照舊能用，只是照舊慢）。
+1. **遷移檔 `2027-01-12-fast-directory.sql`**（Paul 2026-11-26 在正式的 Supabase 跑完，全 PASS；正式站跑完之後的速度還沒有人重新量過。沒跑的資料庫上名錄照舊能用，只是照舊慢）。
    新函式 `rc_label_codes_all()` 一次回每一個人的標籤代號；`rc_directory()` 改成跟它接起來，名字直接算、能不能管整趟只問一次。
    **回的東西一個字都沒變**，門也沒變（`rc_can_view()`，不公開的去向照舊只有管得了紀錄的人看得到）。沒有新的表、沒有動 RLS。
    本機 1250 個人：982 毫秒變 45 毫秒，換之前換之後每一個人那一列逐字比過，對不上的 0 列。
