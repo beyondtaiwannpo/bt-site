@@ -6136,8 +6136,20 @@ Paul 同一次也說了，每個人備註裡那種「BT: Event Attendee; since S
 - Drive 匯出的清單裡，2021 年只有秋天 EC panel 的簽到表、模擬面試報名、導生與 office hour 的表單，沒有 2021 夏天活動的簽到表，所以多半對不到某一場。
 - Claude 讀不到正式資料庫，不知道備註到底有哪幾種寫法、資料庫裡現在有哪些過去的活動可以掛。
 
-下一步是 Paul 跑一支只讀的查詢（`~/Anson/outputs/beyond-taiwan/website/docs/2026-11-25-notes-to-participation/note-patterns-readonly.sql`，不印名字、不改資料），
-把結果貼回來，再決定對不到場次的那些要掛在哪（例如一個「2021 夏天的活動」），然後才寫轉換的那一支。
+Paul 2026-11-25 跑了第一支只讀的查詢（`~/Anson/outputs/beyond-taiwan/website/docs/2026-11-25-notes-to-participation/note-patterns-readonly.sql`，不印名字、不改資料）。知道了這幾件事：
+
+- 934 位有備註，其中 236 位一筆參與紀錄都沒有。
+- 備註裡的 S 是春季（2 月開始的那一期），F 是秋季（9 月開始的那一期），不是夏天。2020 秋到 2026 秋十三期 mentorship 資料庫裡都有，
+  所以「Mentor in F25, S26」「F24 Mentee」「mentor F22」這幾種寫法對得到確定的一場。
+- 「F22 Event Attendee」這種只寫了哪一期，對不到確定的一場：2021 春那一期資料庫裡一場活動都沒有，有的學期有兩場。
+
+**Paul 定的規則（同一天）：已經有的參與紀錄一列都不刪、不改，動手之前先把備註跟參與紀錄對一次。** 原話：
+「whoever has that participation, don't delete their participation, but compare their notes and their participation before you do anything.」
+起因是他看了一位幹部的頁，她的參與紀錄已經是對的，備註講的事那裡都有。
+
+所以現在在第二步：同一個資料夾的 `compare-notes-readonly.sql`（一樣只讀、不印名字），算備註講的每一期有幾位已經記了、少幾位，
+以及備註講某一期參加過活動的人，那個學年每一場各有幾位已經在裡面。Paul 跑完貼回來，才寫真的轉換那一支：只補少的，不動已經有的。
+對不到場次的那些要掛在哪，等看到數字再跟 Paul 定。
 
 ### 驗收
 
