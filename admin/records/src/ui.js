@@ -1352,6 +1352,26 @@ export function foldStart(name, attr, title, S) {
 }
 // 聯絡方式（2026-12-12）。順序就是加的時候下拉選單的順序。
 export const CONTACT_KINDS = ["line", "email", "phone", "ig", "linkedin", "wechat", "whatsapp", "facebook", "website"];
+// 貼進來的字如果一看就是某個網站的連結，就照那個網站歸類，不管選單選的是哪一種（2026-11-26）。
+// Paul 貼著一條掛在 LinkedIn 底下的 facebook.com 連結：「this is obviously facebook then change it to facebook, check all others」。
+// 正式站掛在 LinkedIn 底下的 120 筆裡只有 4 筆是 LinkedIn（舊名單那一欄叫 LinkedIn，大家填的多半是臉書），
+// 資料由 2027-01-18-contact-kinds.sql 搬過一次，這一支是讓之後新加的不會再掛錯。**規則跟那一支遷移檔同一份**（測試逐條對）。
+// 不是連結的字（一個名字、一個帳號）看不出是哪裡的，照選單選的；email 與電話不改。純函式。
+export const CONTACT_SITES = [
+  ["facebook", /\b(facebook\.com|fb\.com|fb\.me)\b/i],
+  ["ig", /\binstagram\.com\b/i],
+  ["linkedin", /\blinkedin\.com\b/i],
+  ["line", /\b(line\.me|lin\.ee)\b/i],
+  ["whatsapp", /\b(wa\.me|whatsapp\.com)\b/i],
+];
+export function contactKindFor(kind, value) {
+  const v = String(value || "").trim();
+  if (!v || kind === "email" || kind === "phone") return kind;
+  const hit = CONTACT_SITES.find(([, re]) => re.test(v));
+  if (hit) return hit[0];
+  // 別的網址：原本選的是某個平台（LinkedIn、Facebook、Instagram…）就改成「網站」；選的本來就是網站或 WeChat 這種沒有網址的照舊。
+  return /^(https?:\/\/|www\.)/i.test(v) && ["linkedin", "facebook", "ig", "line", "whatsapp", "wechat"].includes(kind) ? "website" : kind;
+}
 // login：登入用的 email（rc_person 的 login_email，或 identities 上 verified 的那個），刪不掉，所以沒有刪除鈕。
 export function contactsOf(ids, login) {
   const lg = String(login || "").toLowerCase();

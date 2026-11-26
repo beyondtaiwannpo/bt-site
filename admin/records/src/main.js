@@ -684,9 +684,11 @@ document.addEventListener("click", async e => {
   if (act === "contact-add") {
     const v = vals("[data-cadd]");
     if (!String(v.value || "").trim()) { S.msg = T("err.save") + T("says.needValue"); render(); return; }
-    const ok = await run("err.save", () => D.addContact(S.id, v.kind, v.value));
+    // 貼的是某個網站的連結就照那個網站歸類（選 LinkedIn 貼了 facebook.com 的，存成 Facebook），存完講一聲。
+    const kind = UI.contactKindFor(v.kind, v.value);
+    const ok = await run("err.save", () => D.addContact(S.id, kind, v.value));
     if (ok === undefined) return;
-    await loadPerson(); S.msg = T("msg.saved"); render(); return;
+    await loadPerson(); S.msg = kind === v.kind ? T("msg.saved") : T("msg.contactAs", { kind: T("ckind." + kind) }); render(); return;
   }
   if (act === "contact-del") {
     const ok = await run("err.delete", () => D.deleteContact(b.dataset.id));

@@ -622,6 +622,7 @@ export const MINE = {
   "contact.addHint":  { zh: "同一個 LINE、email、電話只能屬於一個人。系統說別人已經有了，多半是同一個人有兩列，去「可能重複」看。", en: "A LINE ID, email or phone can belong to only one person. If it says someone else has it, that person probably has two rows: check Possible duplicates." },
   "contact.login":    { zh: "登入用", en: "Sign-in" },
   "contact.fromNote": { zh: "從備註搬過來的", en: "Moved from the note" },
+  "msg.contactAs":    { zh: "存好了，照連結歸在「{kind}」。", en: "Saved under {kind}, going by the link." },
   "ckind.email":      { zh: "Email", en: "Email" },
   "ckind.line":       { zh: "LINE", en: "LINE" },
   "ckind.phone":      { zh: "電話", en: "Phone" },

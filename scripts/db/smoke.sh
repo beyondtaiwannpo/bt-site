@@ -5355,6 +5355,31 @@ chkraise "★ 裝回去之後一般幹部還是改不了哪一季" "not_senior" 
 # 收乾淨
 psql -d "${DB}" -q -c "delete from public.rc_log where ref in (select id from public.people where name_en like 'Ts %'); delete from public.people where name_en like 'Ts %';" >/dev/null 2>&1
 chk "（收尾）假的人與他們的職位都拿掉了" "0|0" "select (select count(*) from public.people where name_en like 'Ts %')||'|'||(select count(*) from public.positions po where not exists (select 1 from public.people p where p.id = po.person_id))"
+echo "── 聯絡方式掛錯種類的搬回對的那一種（2027-01-18-contact-kinds.sql）──"
+# Paul 2026-11-26（LinkedIn 那一行是一條 facebook.com 的連結）：「this is obviously facebook then change it to facebook, check all others」
+# 正式站掛在 LinkedIn 底下的 120 筆裡只有 4 筆是 LinkedIn。這一支只改資料（種類），沒有函式。
+CKM=supabase/migrations/2027-01-18-contact-kinds.sql
+CKLOG0=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.rc_log where what = 'contact_kind_fix'" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -c "insert into public.people (name_en, kind) values ('Ck A', 'guest'), ('Ck B', 'guest');" \
+  -c "insert into public.rc_identities (person_id, kind, value, source) select p.id, v.k, v.v, 'note' from (values ('Ck A', 'linkedin', 'https://www.facebook.com/ck.a.0110'), ('Ck A', 'linkedin', 'https://www.linkedin.com/in/ck-a'), ('Ck A', 'linkedin', 'https://instagram.com/ck_a/'), ('Ck A', 'linkedin', 'Ck A Name'), ('Ck A', 'linkedin', 'https://line.me/ti/p/ckabc'), ('Ck A', 'linkedin', 'https://ck-a.example.com/me'), ('Ck A', 'ig', 'ck_plain'), ('Ck A', 'line', '0912345678'), ('Ck A', 'email', 'ck.a@facebook.com'), ('Ck A', 'phone', '+886 900 000 000'), ('Ck A', 'facebook', 'https://www.facebook.com/ck.dup'), ('Ck A', 'linkedin', 'https://www.facebook.com/ck.dup/'), ('Ck B', 'facebook', 'https://www.facebook.com/ck.taken'), ('Ck A', 'linkedin', 'https://www.FACEBOOK.com/ck.taken'), ('Ck A', 'linkedin', 'notfacebook.community/x')) v(n, k, v) join public.people p on p.name_en = v.n;" >/dev/null 2>&1
+chk "（準備）兩個假的人、十五筆聯絡方式" "15" "select count(*) from public.rc_identities i join public.people p on p.id = i.person_id where p.name_en like 'Ck %'"
+ck1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${CKM}" 2>&1 || true)
+if echo "${ck1}" | grep -q "OVERALL.*PASS" && ! echo "${ck1}" | grep -q "|FAIL"; then echo "  ok   聯絡方式那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 聯絡方式那一支驗收表：${ck1}" | head -20; fail=$((fail+1)); fi
+ck2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${CKM}" 2>&1 || true)
+if echo "${ck2}" | grep -q "OVERALL.*PASS" && ! echo "${ck2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${ck2}" | head -20; fail=$((fail+1)); fi
+CKA="from public.rc_identities i join public.people p on p.id = i.person_id where p.name_en = 'Ck A'"
+chk "★ 掛在 LinkedIn 底下的 Facebook 連結變成 Facebook，字沒有動" "facebook" "select i.kind ${CKA} and i.value = 'https://www.facebook.com/ck.a.0110'"
+chk "★ Instagram 的連結變成 Instagram，收成帳號" "ig" "select i.kind ${CKA} and i.value = 'ck_a'"
+chk "LINE 的連結變成 LINE；別的網址變成網站" "line|website" "select (select i.kind ${CKA} and i.value = 'https://line.me/ti/p/ckabc')||'|'||(select i.kind ${CKA} and i.value = 'https://ck-a.example.com/me')"
+chk "★ 真的是 LinkedIn 的、不是連結的名字、字裡面剛好有 facebook 的：都還在 LinkedIn" "3" "select count(*) ${CKA} and i.kind = 'linkedin' and i.value in ('https://www.linkedin.com/in/ck-a', 'Ck A Name', 'notfacebook.community/x')"
+chk "★ email 與電話沒有被動（就算 email 的網域是 facebook.com）" "email|phone" "select (select i.kind ${CKA} and i.value = 'ck.a@facebook.com')||'|'||(select i.kind ${CKA} and i.value = '+886 900 000 000')"
+chk "原本就對的（Instagram 帳號、LINE ID）沒有動" "ig|line" "select (select i.kind ${CKA} and i.value = 'ck_plain')||'|'||(select i.kind ${CKA} and i.value = '0912345678')"
+chk "★ 同一個人已經有對的那一筆：掛錯的那一筆拿掉，不留兩筆" "1" "select count(*) ${CKA} and lower(i.value) like '%facebook.com/ck.dup%'"
+chk "★ 別人已經有同一個連結：不搬，留在原地；別人的那一筆沒有動" "linkedin|facebook" "select (select i.kind ${CKA} and i.value = 'https://www.FACEBOOK.com/ck.taken')||'|'||(select i.kind from public.rc_identities i join public.people p on p.id = i.person_id where p.name_en = 'Ck B')"
+chk "★ 改的與拿掉的每一筆都有紀錄，重跑沒有多寫" "5" "select count(*) - ${CKLOG0} from public.rc_log where what = 'contact_kind_fix'"
+chk "紀錄裡留著改之前的種類" "linkedin" "select distinct before->>'kind' from public.rc_log where what = 'contact_kind_fix' and ref = (select id from public.people where name_en = 'Ck A')"
+psql -d "${DB}" -q -c "delete from public.rc_log where ref in (select id from public.people where name_en like 'Ck %'); delete from public.people where name_en like 'Ck %';" >/dev/null 2>&1
+chk "（收尾）假的人與他們的聯絡方式都拿掉了" "0" "select count(*) from public.rc_identities i where not exists (select 1 from public.people p where p.id = i.person_id) or exists (select 1 from public.people p where p.id = i.person_id and p.name_en like 'Ck %')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

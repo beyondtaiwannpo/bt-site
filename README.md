@@ -8103,6 +8103,18 @@ Paul 2026-11-26 看著名錄問了三件事：沒當過幹部的人為什麼掛�
 - 重跑 `2027-01-06-labels-and-schools.sql` 或 `2027-01-12-fast-directory.sql` 會把其中一支換回舊規則，要再跑一次 `2027-01-16-member-label-rule.sql`。
 - 守門：`test/label-rules.test.mjs`、`scripts/db/smoke.sh` 那一段（八個假的人，含兩個破壞測試）。
 
+## 聯絡方式掛錯種類（2026-11-26）
+
+Paul 貼著一個人的頁面，LinkedIn 那一行是一條 facebook.com 的連結：「this is obviously facebook then change it to facebook, check all others」。
+
+正式站 1250 個人全部看過：**掛在 LinkedIn 底下的 120 筆裡，真的是 LinkedIn 連結的只有 4 筆**。98 筆是 Facebook、5 筆是 Instagram、1 筆是 LINE、1 筆是別的網址、11 筆不是連結。
+都是 2026-12-12 從備註搬出來的：舊名單那一欄叫 LinkedIn，大家填的多半是臉書。其他種類沒有掛錯的。
+
+- 遷移檔 `2027-01-18-contact-kinds.sql`（要在 Supabase 跑過，資料才會改）：照那一筆的字是哪個網站的連結改種類（facebook.com、fb.com、fb.me；instagram.com；linkedin.com；line.me、lin.ee；wa.me、whatsapp.com；其他網址算「網站」）。
+  只改種類，字與是誰的都不動；Instagram 另外把網址收成帳號。同一個人已經有對的那一筆就把掛錯的拿掉；別人已經有同一個的不搬。每改一筆寫一列 `rc_log`（`contact_kind_fix`）。
+  **不是連結的那 11 筆不動**（一個名字或帳號，看不出是哪裡的），要人自己看；email 與電話不碰。沒有新的函式、沒有動任何一道門。
+- 之後新加的：在一個人的頁面加聯絡方式，貼的是某個網站的連結就照那個網站歸類，不管選單選的是哪一種，存完講一聲（`contactKindFor`，`admin/records/src/ui.js`）。規則跟遷移檔同一份，`test/contact-kinds.test.mjs` 逐條對。
+
 ## 一個人在哪幾屆做過事：屆別、哪一季、校友（2026-11-26）
 
 Paul 2026-11-26：「people that is labeled as alumni, we don't get to just choose people and add them into terms. For example, if Andrea works in 2025 6, spring, I should be able to in her page add them into that term, or in terms add people into that… they should appear on that term, and that terms should be connected to the front of the page where in things that says 2025 to 2026 alumni.」
