@@ -120,3 +120,45 @@ a.rail-item.on:active{filter:brightness(1.15)}
   .shell{display:block}
   .main{max-width:none}
 }
+
+/* 右下角那一顆：回報問題、許願功能（2026-11-25，shared/rail.js 的 feedbackHTML）。掛在 body 上，每一頁重畫都不會動到它。
+   左下角是 toast（admin.css），所以放右邊。格子用原生 <dialog>，外面那一圈暗的是 ::backdrop。 */
+.fb-fab{position:fixed;right:20px;bottom:20px;z-index:40;width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;background:var(--bt-navy);color:var(--bt-cream);
+  box-shadow:0 8px 22px rgba(16,42,134,.28)}
+.fb-fab:hover{background:var(--bt-orange);color:var(--bt-navy)}
+.fb-fab:focus-visible{outline:3px solid var(--bt-orange);outline-offset:3px}
+.fb-dlg{width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:22px 22px 18px;border:1px solid rgba(16,42,134,.2);border-radius:18px;
+  background:var(--bt-cream);color:var(--bt-navy);font-family:var(--body);box-shadow:0 24px 60px rgba(16,42,134,.3)}
+.fb-dlg::backdrop{background:rgba(16,42,134,.38)}
+.fb-dlg h2{margin:0 0 4px;font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:.02em;line-height:1.15}
+.fb-lede{margin:0 0 16px;font-size:13.5px;line-height:1.5;color:rgba(16,42,134,.8)}
+.fb-kinds{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.fb-kind{margin:0;cursor:pointer}
+.fb-kind input{position:absolute;opacity:0;width:1px;height:1px}
+.fb-kind span{display:inline-flex;align-items:center;height:34px;padding:0 13px;border:1px solid rgba(16,42,134,.3);border-radius:17px;font-size:13.5px;font-weight:600;background:rgba(255,255,255,.6)}
+.fb-kind input:checked + span{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}
+.fb-kind input:focus-visible + span{outline:2px solid var(--bt-orange);outline-offset:2px}
+.fb-lab{display:block;margin:0 0 5px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.8)}
+.fb-body{display:block;width:100%;min-height:120px;resize:vertical;padding:10px 12px;border:1px solid rgba(16,42,134,.28);border-radius:11px;
+  background:rgba(255,255,255,.8);color:var(--bt-navy);font-family:var(--body);font-size:15px;line-height:1.5}
+.fb-body:focus-visible{outline:2px solid var(--bt-navy);outline-offset:1px}
+.fb-pics{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.fb-pics:empty{display:none}
+.fb-pic{position:relative;width:84px;height:84px;border-radius:10px;overflow:hidden;border:1px solid rgba(16,42,134,.2);background:rgba(255,255,255,.7)}
+.fb-pic img{width:100%;height:100%;object-fit:cover;display:block}
+.fb-pic button{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:0;cursor:pointer;background:var(--bt-navy);color:var(--bt-cream);font-size:16px;line-height:1}
+.fb-addrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px}
+.fb-add{display:inline-flex;align-items:center;height:34px;margin:0;padding:0 13px;border:1px solid rgba(16,42,134,.3);border-radius:17px;cursor:pointer;font-size:13.5px;font-weight:600}
+.fb-add:hover{background:rgba(255,255,255,.9)}
+.fb-add:focus-within{outline:2px solid var(--bt-orange);outline-offset:2px}
+.fb-hint{font-size:12.5px;color:rgba(16,42,134,.75)}
+.fb-msg{min-height:20px;margin:12px 0 0;font-size:13.5px;line-height:1.45}
+.fb-msg.bad{padding:8px 12px;border-radius:10px;background:var(--bt-navy);color:var(--bt-cream);font-weight:600}
+.fb-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.fb-btn{height:40px;padding:0 18px;border-radius:20px;border:1px solid var(--bt-navy);cursor:pointer;background:var(--bt-navy);color:var(--bt-cream);
+  font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.fb-btn.quiet{background:none;color:var(--bt-navy);border-color:rgba(16,42,134,.3)}
+.fb-btn[disabled]{opacity:.55;cursor:default}
+@media (max-width:520px){.fb-fab{right:14px;bottom:14px}.fb-dlg{padding:18px 16px 14px}}
+@media print{.fb-fab{display:none}}

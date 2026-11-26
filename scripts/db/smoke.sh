@@ -4797,5 +4797,74 @@ rm -f "${BROKEN}"
 rl3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RLM}" 2>&1 || true)
 if echo "${rl3}" | grep -q "OVERALL.*PASS" && ! echo "${rl3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有變回綠的"; fail=$((fail+1)); fi
 echo
+echo "── 後台右下角：回報問題、許願功能（2027-01-10-site-feedback.sql）──"
+# Paul 2026-11-25：「team members can submit bug, features they want through text and pictures and it goes to me」
+# 這時候：PAUL 是 Co-President，DIR 是 Director（幹部、不是 senior），STU 是學生。
+FBM=supabase/migrations/2027-01-10-site-feedback.sql
+FBKSQL="select count(*) from regexp_matches((select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.mail_outbox'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%kind%' limit 1), chr(39) || '([a-z_]+)' || chr(39), 'g')"
+FBKN=$(psql -d "${DB}" -X -A -t -q -c "${FBKSQL}" | tr -d ' \n')
+fb1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FBM}" 2>&1 || true)
+if echo "${fb1}" | grep -q "OVERALL.*PASS" && ! echo "${fb1}" | grep -q "|FAIL"; then echo "  ok   回報那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 回報那一支驗收表：${fb1}" | head -20; fail=$((fail+1)); fi
+fb2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FBM}" 2>&1 || true)
+if echo "${fb2}" | grep -q "OVERALL.*PASS" && ! echo "${fb2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${fb2}" | head -20; fail=$((fail+1)); fi
+chk "★ 信的種類剛好多一種，原本的一種都沒少（重跑也不會再多）" "$((FBKN+1))" "${FBKSQL}"
+FBP="${DIR}/1795661014499-ab12cd.jpg"
+fbins() { echo "insert into storage.objects (bucket_id, name, owner) values ('feedback', '${1}', '${2}'); select 'inserted'"; }
+fbdeny() { # fbdeny 名稱 使用者 路徑
+  local got; got=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${2}',false);" -c "set role authenticated; insert into storage.objects (bucket_id, name, owner) values ('feedback', '${3}', '${2}');" 2>&1 || true)
+  if echo "${got}" | grep -qi "row-level security"; then echo "  ok   ${1}"; pass=$((pass+1)); else echo "  FAIL ${1}（沒有被擋：${got}）"; fail=$((fail+1)); fi
+}
+chkrole authenticated "${DIR}" "★ 幹部的圖放得進自己的資料夾" "inserted" "$(fbins "${FBP}" "${DIR}")"
+fbdeny "★ 放不進別人的資料夾" "${DIR}" "${PAUL}/1795661014499-ab12cd.jpg"
+fbdeny "★ 檔名不是程式取的那種，放不進去" "${DIR}" "${DIR}/screenshot.jpg"
+fbdeny "★ 路徑多一層，放不進去" "${DIR}" "${DIR}/x/1795661014499-ab12cd.jpg"
+fbdeny "★ 不是圖的副檔名，放不進去" "${DIR}" "${DIR}/1795661014499-ab12cd.pdf"
+fbdeny "★ 學生放不進去" "${STU}" "${STU}/1795661014499-ab12cd.jpg"
+fban=$(psql -d "${DB}" -X -A -t -q -c "set role anon; insert into storage.objects (bucket_id, name) values ('feedback', '${DIR}/1795661014499-zzzzzz.jpg');" 2>&1 || true)
+if echo "${fban}" | grep -qi "row-level security\|permission denied"; then echo "  ok   ★ 沒登入放不進去"; pass=$((pass+1)); else echo "  FAIL anon 放得進去：${fban}"; fail=$((fail+1)); fi
+chkas "${DIR}" "★ 幹部送得出去（一張圖）" "true" "select (public.send_feedback('{\"kind\":\"bug\",\"body\":\"  SMOKEBUG 存檔沒反應  \",\"page\":\"/admin/#events\",\"photos\":[\"${FBP}\"]}'::jsonb) is not null)::text"
+chk "存成一列：種類、去掉頭尾空白的字、哪一頁、一張圖、新的" "bug|SMOKEBUG存檔沒反應|/admin/#events|1|new" "select kind, body, page, cardinality(photos), status from public.site_feedback where author = '${DIR}'"
+chk "★ 信排給每一位 Co-President 與 Senior Adviser（至少一位），一位一封" "t|t" "select (select count(*) from public.mail_outbox where kind = 'feedback_new') >= 1, (select count(*) from public.mail_outbox where kind = 'feedback_new') = (select count(*) from public.profiles p join auth.users u on u.id = p.id where p.role = 'cadre' and p.board_role in ('president', 'senior_adviser') and p.id <> '${DIR}' and coalesce(u.email, '') <> '')"
+chk "★ 信裡有他寫的字與哪一頁、有收件匣的連結，沒有圖的路徑" "t" "select bool_and(body like '%SMOKEBUG%' and body like '%/admin/#events%' and body like '%/admin/people/#feedback%' and body like '%[[en]]%' and body not like '%1795661014499%') from public.mail_outbox where kind = 'feedback_new'"
+chk "★ 沒有任何一封寄給不是 Co-President 也不是 Senior Adviser 的人" "0" "select count(*) from public.mail_outbox m where m.kind = 'feedback_new' and not exists (select 1 from auth.users u join public.profiles p on p.id = u.id where lower(u.email) = lower(m.to_email) and p.role = 'cadre' and p.board_role in ('president', 'senior_adviser'))"
+chkas "${PAUL}" "信畫得出來（這一種沒有範本也不會壞）" "t" "select (select subject <> '' and html like '%SMOKEBUG%' from public.mail_render((select id from public.mail_outbox where kind = 'feedback_new' limit 1)) limit 1)"
+chkraise "★ 學生送不了" "not_cadre" "perform set_config('test.uid','${STU}',true); perform public.send_feedback('{\"kind\":\"bug\",\"body\":\"x\"}'::jsonb);"
+chkraise "種類亂填會被擋" "bad_kind" "perform set_config('test.uid','${DIR}',true); perform public.send_feedback('{\"kind\":\"spam\",\"body\":\"x\"}'::jsonb);"
+chkraise "沒寫字會被擋" "empty_body" "perform set_config('test.uid','${DIR}',true); perform public.send_feedback('{\"kind\":\"bug\",\"body\":\"   \"}'::jsonb);"
+chkraise "★ 圖指到別人的資料夾會被擋" "bad_photo" "perform set_config('test.uid','${PAUL}',true); perform public.send_feedback('{\"kind\":\"bug\",\"body\":\"x\",\"photos\":[\"${FBP}\"]}'::jsonb);"
+chkraise "★ 圖沒有真的傳上去會被擋" "bad_photo" "perform set_config('test.uid','${DIR}',true); perform public.send_feedback('{\"kind\":\"bug\",\"body\":\"x\",\"photos\":[\"${DIR}/1795661014499-nofile.jpg\"]}'::jsonb);"
+chkraise "超過四張會被擋" "too_many_photos" "perform set_config('test.uid','${DIR}',true); perform public.send_feedback('{\"kind\":\"bug\",\"body\":\"x\",\"photos\":[\"a\",\"b\",\"c\",\"d\",\"e\"]}'::jsonb);"
+chkas "${PAUL}" "Co-President 自己也送得了" "true" "select (public.send_feedback('{\"kind\":\"feature\",\"body\":\"FROMPAUL\"}'::jsonb) is not null)::text"
+chk "★ 他自己送的不寄給他自己" "0" "select count(*) from public.mail_outbox m join auth.users u on lower(u.email) = lower(m.to_email) where u.id = '${PAUL}' and m.kind = 'feedback_new' and m.body like '%FROMPAUL%'"
+chkas "${PAUL}" "★ Co-President 讀得到全部" "2" "select jsonb_array_length(public.feedback_inbox())"
+chkraise "★ 不是 Co-President 也不是 Senior Adviser 的幹部讀不到" "not_senior" "perform set_config('test.uid','${DIR}',true); perform public.feedback_inbox();"
+chkas "${PAUL}" "還沒處理的有兩則" "2" "select public.feedback_count()"
+chkas "${DIR}" "★ 別人問有幾則拿到 0" "0" "select public.feedback_count()"
+chkas "${PAUL}" "★ Co-President 標得了狀態與備註" "done" "select public.feedback_set((select id from public.site_feedback where author = '${DIR}'), 'done', '  修好了  ')"
+chk "狀態、備註、誰標的都記下來" "done|修好了|t|t" "select status, note, handled_by = '${PAUL}', handled_at is not null from public.site_feedback where author = '${DIR}'"
+chkraise "★ 別的幹部標不了" "not_senior" "perform set_config('test.uid','${DIR}',true); perform public.feedback_set((select id from public.site_feedback where author = '${DIR}'), 'new', '');"
+chkraise "狀態亂填會被擋" "bad_status" "perform set_config('test.uid','${PAUL}',true); perform public.feedback_set((select id from public.site_feedback where author = '${DIR}'), 'gone', '');"
+chkrole authenticated "${PAUL}" "★ 圖：Co-President 讀得到" "1" "select count(*) from storage.objects where bucket_id = 'feedback'"
+chkrole authenticated "${DIR}" "★ 圖：放的人自己讀得到" "1" "select count(*) from storage.objects where bucket_id = 'feedback'"
+chkrole authenticated "${ASSOC}" "★ 圖：別的幹部讀不到" "0" "select count(*) from storage.objects where bucket_id = 'feedback'"
+fbt=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; select count(*) from public.site_feedback;" 2>&1 || true)
+if echo "${fbt}" | grep -qi "permission denied"; then echo "  ok   ★ 那張表前端直接讀不到（連 Co-President 也要走函式）"; pass=$((pass+1)); else echo "  FAIL 表直接讀得到：${fbt}"; fail=$((fail+1)); fi
+fba=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.feedback_count();" 2>&1 || true)
+if echo "${fba}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人連問有幾則都不行"; pass=$((pass+1)); else echo "  FAIL anon 叫得到：${fba}"; fail=$((fail+1)); fi
+# 破壞測試一：把「只有 senior 讀得到」那一句拿掉，驗收表要變紅
+BROKEN=$(mktemp)
+sed "s/  perform public.require_senior();//" "${FBM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${FBM}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^4|.*|FAIL"; then echo "  ok   ★ 破壞測試：讀的那道門拿掉，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試一：門拿掉了驗收表還是綠的：${bk}" | head -12; fail=$((fail+1)); fi
+# 破壞測試二：把表的讀取權限發給登入的人，驗收表要變紅
+sed "s/^revoke all on public.site_feedback from public, anon, authenticated;/grant select on public.site_feedback to authenticated;/" "${FBM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${FBM}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^1|.*|FAIL"; then echo "  ok   ★ 破壞測試：表的讀取權限發出去，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試二：權限發出去了驗收表還是綠的：${bk}" | head -12; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+fb3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FBM}" 2>&1 || true)
+if echo "${fb3}" | grep -q "OVERALL.*PASS" && ! echo "${fb3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有變回綠的：${fb3}" | head -12; fail=$((fail+1)); fi
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

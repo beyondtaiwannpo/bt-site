@@ -169,6 +169,8 @@ export const ITEMS = [
   { group: "people",    key: "invites",    area: "people",    who: "senior", label: { zh: "邀請新的人", en: "Invite people" } },
   { group: "people",    key: "workspaces", area: "people",    who: "senior", label: { zh: "工作區", en: "Workspaces" } },
   { group: "people",    key: "terms",      area: "people",    who: "senior", label: { zh: "屆別", en: "Years (terms)" } },
+  // 回報與許願的收件匣（2026-11-25）：幹部從右下角那一顆送的，只有 Co-President 與 Senior Adviser 讀得到（資料庫的門是 require_senior）。
+  { group: "people",    key: "feedback",   area: "people",    who: "senior", label: { zh: "回報與許願", en: "Bugs & requests" } },
   // 變動紀錄：2026-12-25 起 role_changes 的 RLS 也給 Senior Adviser 讀（以前只給 Co-President）。
   { group: "people",    key: "changes",    area: "people",    who: "senior", label: { zh: "誰改了什麼", en: "Change log" } },
   // 紀錄
@@ -288,6 +290,9 @@ function teamRowsHTML(group, tab, me, L) {
 // group 是現在在哪個資料夾，tab 是哪一頁，counts 是 { <item key>: 數字 }（有才顯示，一個東西的數字是它底下幾頁加起來）。
 const svg = d => `<svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 export function railHTML(group, tab, me, counts, L) {
+  // 右下角那一顆「回報問題、許願功能」掛在 body 上，不在這一段 HTML 裡：每一頁重畫的時候會把側欄整個換掉，
+  // 表單要是畫在裡面，打到一半的字與選好的圖會跟著不見。只有幹部有（資料庫也只收幹部，send_feedback）。
+  if (typeof document !== "undefined" && me && me.role === "cadre") mountFeedback(L);
   const c = counts || {};
   const here = areaOf(group, tab);
   const row = a => {
@@ -433,4 +438,142 @@ export function railAfter(root) {
   r.scrollTop = railY;
   const on = r.querySelector(".rail-item.on"), b = r.getBoundingClientRect();
   if (on) { const a = on.getBoundingClientRect(); if (a.top < b.top || a.bottom > b.bottom) r.scrollTop += a.top - b.top - 48; }
+}
+
+// ── 右下角那一顆：回報問題、許願功能（2026-11-25）──────────────────────
+// Paul：「team members can submit bug, features they want through text and pictures and it goes to me like a little folating icon is enough」。
+// 一顆圓的按鈕，按了開一格 <dialog>：選是哪一種、打字、最多四張圖（選檔或直接貼上截圖）。送出走 send_feedback()，
+// 圖先縮到長邊 1600 再傳進私人的 bucket「feedback」（自己的資料夾）。讀的人是 Co-President 與 Senior Adviser，在「回報與許願」那一頁，另外各收一封信。
+// 資料庫那一半在 supabase/migrations/2027-01-10-site-feedback.sql。這一段只在瀏覽器裡跑；supabase 用到的時候才載（跟每一頁用的是同一個 client）。
+const FB = {
+  open:   { zh: "回報問題、許願功能", en: "Report a bug or ask for a feature" },
+  title:  { zh: "回報問題、許願功能", en: "Report a bug or ask for a feature" },
+  lede:   { zh: "送給 Co-President 與 Senior Adviser。只有他們看得到。", en: "This goes to the Co-Presidents and Senior Advisers. Only they can read it." },
+  kind:   { zh: "這是哪一種", en: "What is it" },
+  bug:    { zh: "有東西壞了", en: "Something is broken" },
+  feature:{ zh: "想要一個功能", en: "I want a feature" },
+  other:  { zh: "其他", en: "Something else" },
+  body:   { zh: "發生了什麼事，或你想要什麼", en: "What happened, or what do you want" },
+  bodyPh: { zh: "寫得到的都寫：你按了什麼、看到什麼、原本以為會怎樣。", en: "Say what you pressed, what you saw, and what you expected instead." },
+  add:    { zh: "加圖", en: "Add pictures" },
+  addHint:{ zh: "最多四張。截圖可以直接貼在上面那一格。", en: "Up to four. You can also paste a screenshot into the box above." },
+  remove: { zh: "拿掉這張圖", en: "Remove this picture" },
+  send:   { zh: "送出", en: "Send" },
+  sending:{ zh: "送出中", en: "Sending" },
+  cancel: { zh: "取消", en: "Cancel" },
+  sent:   { zh: "送出去了，謝謝。", en: "Sent. Thank you." },
+  needBody:{ zh: "先寫一句話。", en: "Write a sentence first." },
+  max:    { zh: "最多四張圖。", en: "Four pictures at most." },
+  notImg: { zh: "只收 JPG、PNG、WebP 的圖。", en: "Only JPG, PNG or WebP pictures." },
+  eLimit: { zh: "你今天送很多了，明天再送。", en: "You have sent a lot today. Try again tomorrow." },
+  eCadre: { zh: "只有幹部送得了。", en: "Only cadres can send this." },
+  eSetup: { zh: "資料庫還沒準備好：要先在 Supabase 跑 2027-01-10-site-feedback.sql。", en: "The database is not ready: run 2027-01-10-site-feedback.sql in Supabase first." },
+  ePhoto: { zh: "有一張圖傳不上去。拿掉它再送一次，或換一張小一點的。", en: "One picture would not upload. Remove it and send again, or try a smaller one." },
+  eOther: { zh: "送不出去：", en: "Could not send: " },
+};
+export const FB_MAX = 4;
+const FB_ICON = `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-6l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M12 8v4M12 14.6v.2"/></svg>`;
+// 畫面（純函式，測試看得到）：一顆按鈕加一格 dialog。圖的縮圖是選了檔之後才塞進 .fb-pics 的。
+export function feedbackHTML(L) {
+  const t = k => esc(tx(FB[k], L));
+  const kind = (v, on) => `<label class="fb-kind"><input type="radio" name="fb-kind" value="${v}"${on ? " checked" : ""}><span>${t(v)}</span></label>`;
+  return `<button type="button" class="fb-fab" data-fb="open" aria-haspopup="dialog" aria-label="${t("open")}" title="${t("open")}">${FB_ICON}</button>
+  <dialog class="fb-dlg" aria-labelledby="fb-h">
+    <h2 id="fb-h">${t("title")}</h2>
+    <p class="fb-lede">${t("lede")}</p>
+    <div class="fb-kinds" role="radiogroup" aria-label="${t("kind")}">${kind("bug", true)}${kind("feature")}${kind("other")}</div>
+    <label class="fb-lab" for="fb-body">${t("body")}</label>
+    <textarea id="fb-body" class="fb-body" rows="5" maxlength="4000" placeholder="${t("bodyPh")}"></textarea>
+    <div class="fb-pics" aria-live="polite"></div>
+    <div class="fb-addrow"><label class="fb-add"><input type="file" data-fb="files" accept="image/jpeg,image/png,image/webp" multiple hidden>${t("add")}</label><span class="fb-hint">${t("addHint")}</span></div>
+    <p class="fb-msg" role="status"></p>
+    <div class="fb-foot"><button type="button" class="fb-btn quiet" data-fb="close">${t("cancel")}</button><button type="button" class="fb-btn" data-fb="send">${t("send")}</button></div>
+  </dialog>`;
+}
+// 資料庫回的錯變成一句話。純函式。
+export function feedbackSays(err, L) {
+  const m = String((err && err.message) || err || "");
+  if (/too_many_today/.test(m)) return tx(FB.eLimit, L);
+  if (/not_cadre/.test(m)) return tx(FB.eCadre, L);
+  if (/bad_photo|too_many_photos|row-level security|Bucket not found|mime type|exceeded the maximum/i.test(m)) return /Bucket not found/i.test(m) ? tx(FB.eSetup, L) : tx(FB.ePhoto, L);
+  if (/Could not find the function|send_feedback|schema cache|PGRST202/i.test(m)) return tx(FB.eSetup, L);
+  return tx(FB.eOther, L) + m;
+}
+// 傳之前給圖取的檔名：13 位數的時間加六個字（資料庫只收這個格式，而且第一段要是自己的 id）。
+export const feedbackPath = (uid, type, now, rnd) => `${uid}/${String(now).padStart(13, "0")}-${String(rnd || "").replace(/[^a-z0-9]/g, "").padEnd(6, "0").slice(0, 6)}.${type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg"}`;
+let fbL = "zh", fbFiles = [], fbBusy = false;
+function fbHost() { return document.getElementById("bt-fb"); }
+function fbMsg(text, bad) { const el = fbHost() && fbHost().querySelector(".fb-msg"); if (el) { el.textContent = text || ""; el.classList.toggle("bad", !!bad); } }
+function fbDrawPics() {
+  const box = fbHost() && fbHost().querySelector(".fb-pics"); if (!box) return;
+  box.innerHTML = fbFiles.map((f, i) => `<span class="fb-pic"><img src="${esc(f.url)}" alt=""><button type="button" data-fb="rm" data-i="${i}" aria-label="${esc(tx(FB.remove, fbL))}">×</button></span>`).join("");
+}
+function fbAdd(files) {
+  for (const f of files) {
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { fbMsg(tx(FB.notImg, fbL), true); continue; }
+    if (fbFiles.length >= FB_MAX) { fbMsg(tx(FB.max, fbL), true); break; }
+    fbFiles.push({ file: f, url: URL.createObjectURL(f) });
+  }
+  fbDrawPics();
+}
+function fbReset() { fbFiles.forEach(f => URL.revokeObjectURL(f.url)); fbFiles = []; const h = fbHost(); if (!h) return; h.querySelector(".fb-body").value = ""; fbDrawPics(); fbMsg(""); }
+// 長邊縮到 1600 再存成 JPEG：截圖原檔常常好幾 MB，bucket 一張只收 5 MB。縮不了（瀏覽器畫不出來）就傳原檔。
+async function fbShrink(file) {
+  try {
+    const bmp = await createImageBitmap(file), k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
+    return blob || file;
+  } catch (e) { return file; }
+}
+async function fbSend() {
+  const h = fbHost(); if (!h || fbBusy) return;
+  const body = h.querySelector(".fb-body").value.trim();
+  if (!body) { fbMsg(tx(FB.needBody, fbL), true); h.querySelector(".fb-body").focus(); return; }
+  const kind = (h.querySelector('input[name="fb-kind"]:checked') || {}).value || "other";
+  const btn = h.querySelector('[data-fb="send"]');
+  fbBusy = true; btn.disabled = true; btn.textContent = tx(FB.sending, fbL); fbMsg("");
+  try {
+    const { supabase } = await import("./supabase.js");
+    const uid = (((await supabase.auth.getUser()).data || {}).user || {}).id;
+    if (!uid) throw new Error("not_cadre");
+    const photos = [];
+    for (const f of fbFiles) {
+      const blob = await fbShrink(f.file), path = feedbackPath(uid, blob.type, Date.now(), Math.random().toString(36).slice(2, 8));
+      const up = await supabase.storage.from("feedback").upload(path, blob, { contentType: blob.type, upsert: false });
+      if (up.error) throw up.error;
+      photos.push(path);
+    }
+    const r = await supabase.rpc("send_feedback", { p: { kind, body, page: (location.pathname + location.hash).slice(0, 300), photos } });
+    if (r.error) throw r.error;
+    fbReset(); fbMsg(tx(FB.sent, fbL));
+    setTimeout(() => { const d = fbHost() && fbHost().querySelector("dialog"); if (d && d.open && !fbBusy) { d.close(); fbMsg(""); } }, 1600);
+  } catch (e) { fbMsg(feedbackSays(e, fbL), true); }
+  fbBusy = false; btn.disabled = false; btn.textContent = tx(FB.send, fbL);
+}
+function mountFeedback(L) {
+  let h = fbHost();
+  if (h) {
+    // 換語言：格子關著、沒有打到一半的東西才重畫，不然字會不見。
+    const d = h.querySelector("dialog");
+    if (h.dataset.lang !== L && d && !d.open && !fbFiles.length && !h.querySelector(".fb-body").value) { h.innerHTML = feedbackHTML(L); h.dataset.lang = L; fbL = L; }
+    return;
+  }
+  if (!document.body) return;
+  h = document.createElement("div"); h.id = "bt-fb"; h.dataset.lang = L; fbL = L; h.innerHTML = feedbackHTML(L); document.body.appendChild(h);
+  h.addEventListener("click", e => {
+    const b = e.target.closest("[data-fb]"), d = h.querySelector("dialog");
+    if (!b) { if (e.target === d) d.close(); return; }   // 點到格子外面那一圈暗的：關掉，字留著
+    const a = b.dataset.fb;
+    if (a === "open") { if (!d.open) d.showModal(); h.querySelector(".fb-body").focus(); }
+    else if (a === "close") d.close();
+    else if (a === "rm") { const f = fbFiles.splice(Number(b.dataset.i), 1)[0]; if (f) URL.revokeObjectURL(f.url); fbDrawPics(); fbMsg(""); }
+    else if (a === "send") fbSend();
+  });
+  h.addEventListener("change", e => { if (e.target.dataset && e.target.dataset.fb === "files") { fbAdd([...e.target.files]); e.target.value = ""; } });
+  h.addEventListener("paste", e => {
+    const imgs = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => /^image\//.test(f.type));
+    if (imgs.length) { e.preventDefault(); fbAdd(imgs); }
+  });
 }

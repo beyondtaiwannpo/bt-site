@@ -985,6 +985,40 @@ export function changesHTML(changes, people, msg) {
       : emptyHTML(T("ch.empty"), T("ch.emptyHint")), { id: "changes" });
 }
 
+// 回報與許願的收件匣（2026-11-25）。幹部從後台右下角那一顆送的（shared/rail.js 的 feedbackHTML），只有 Co-President 與 Senior Adviser 讀得到。
+// list 是 feedback_inbox() 回的；urls 是 { 路徑: 一小時有效的連結 }；f 是 { st: 看哪一種狀態 }；drafts 是 { id: 打到一半的備註 }。
+// 時間印看的人那台電腦的時區（這一頁是拿來回「他什麼時候送的」，印 UTC 會差八小時）。
+const fbWhen = v => { const d = new Date(v); return isNaN(d) ? "" : d.toLocaleString(lang() === "zh" ? "zh-TW" : "en-GB", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }); };
+export const FB_STATUS = ["new", "doing", "done", "closed"];
+export const fbCounts = list => Object.fromEntries(FB_STATUS.concat("all").map(k => [k, (list || []).filter(x => k === "all" || x.status === k).length]));
+export function feedbackPageHTML(list, urls, msg, busy, f, drafts) {
+  const all = Array.isArray(list) ? list : [], st = (f && f.st) || "new", n = fbCounts(all), dis = busy ? " disabled" : "", u = urls || {}, dr = drafts || {};
+  const shown = all.filter(x => st === "all" || x.status === st);
+  const chips = `<div class="chips fb-tabs" role="group" aria-label="${esc(T("fb.status"))}">${FB_STATUS.concat("all").map(k =>
+    `<button type="button" class="chip${st === k ? " on" : ""}" data-act="fb-st" data-v="${k}" aria-pressed="${st === k}">${T("fb.st." + k)} ${n[k]}</button>`).join("")}</div>`;
+  // 他當時在哪一頁：只有站內的路徑才給連結（資料庫沒有限制他送什麼字進來，不是斜線開頭的當成純文字）。
+  const pageLink = p => /^\/[^\/]/.test(p || "") ? `<a href="${esc(p)}">${esc(p)}</a>` : esc(p || "");
+  const row = x => {
+    const pics = (x.photos || []).map(p => u[p] ? `<a class="fb-thumb" href="${esc(u[p])}" target="_blank" rel="noopener"><img src="${esc(u[p])}" alt="${esc(T("fb.picAlt"))}" loading="lazy"></a>` : `<span class="fb-thumb none">${T("fb.picGone")}</span>`).join("");
+    const note = x.id in dr ? dr[x.id] : (x.note || "");
+    return `<li class="fb-row" data-fb-id="${esc(x.id)}">
+      <div class="fhead"><span class="tag ${x.kind === "bug" ? "warn" : x.kind === "feature" ? "ok" : ""}">${T("fb.kind." + x.kind)}</span> <b>${esc(x.author_name || T("fb.gone"))}</b>${x.author_team ? ` <span class="mini">${esc(x.author_team)}</span>` : ""}</div>
+      <div class="fmeta">${esc(fbWhen(x.created_at))}${x.page ? `・${T("fb.on")} ${pageLink(x.page)}` : ""}</div>
+      <p class="fb-text">${esc(x.body)}</p>
+      ${pics ? `<div class="fb-thumbs">${pics}</div>` : ""}
+      <div class="fb-act"><label><i>${T("fb.status")}</i><select data-act="fb-set" data-id="${esc(x.id)}" aria-label="${esc(T("fb.status"))}"${dis}>${FB_STATUS.map(k => `<option value="${k}"${x.status === k ? " selected" : ""}>${T("fb.st." + k)}</option>`).join("")}</select></label>
+        <label class="fb-note"><i>${T("fb.note")}</i><input data-fb-note="${esc(x.id)}" value="${esc(note)}" maxlength="2000" placeholder="${esc(T("fb.notePh"))}"${dis}></label>
+        <button type="button" class="btn ghost sm" data-act="fb-note-save" data-id="${esc(x.id)}"${dis}>${T("fb.noteSave")}</button></div>
+      ${x.handled_at ? `<div class="mini">${T("fb.handled", { who: esc(x.handled_by_name || T("fb.gone")), d: esc(fbWhen(x.handled_at)) })}</div>` : ""}
+    </li>`;
+  };
+  return pageHead(T("fb.title"), T("fb.lede"))
+    + msgHTML(msg)
+    + chips
+    + sectionHTML("", shown.length ? `<ul class="flist">${shown.map(row).join("")}</ul>`
+      : all.length ? emptyHTML(T("fb.emptyHere"), T("fb.emptyHereHint")) : emptyHTML(T("fb.empty"), T("fb.emptyHint")), { id: "feedback" });
+}
+
 // orgWide = true：職級是 Co-President 或 Senior Adviser，整格鎖住、只印「全部 team」，存的時候 team 是空的。
 const teamSelect = (id, val, dis, orgWide) => {
   if (orgWide) return `<select id="${id}" disabled data-orgwide="1"><option value="" selected>${T("pe.allTeams")}</option></select>`;

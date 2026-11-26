@@ -130,6 +130,19 @@ const rpc = async (fn, args) => {
   return data;
 };
 export const loadPeople      = () => rpc("roster");
+// 回報與許願的收件匣（2026-11-25，2027-01-10-site-feedback.sql）：讀全部、標狀態、還沒處理的有幾則。門在函式裡（require_senior）。
+// 圖在私人的 bucket，要一張一張換成一小時有效的連結才看得到；換不到（遷移檔還沒跑、圖不見了）那一張就不畫。
+export const loadFeedback    = () => rpc("feedback_inbox");
+export const setFeedback     = (id, status, note) => rpc("feedback_set", { p_id: id, p_status: status, p_note: note || "" });
+export const feedbackCount   = () => rpc("feedback_count");
+export async function feedbackPhotoUrls(paths) {
+  const list = [...new Set((paths || []).filter(Boolean))];
+  if (!list.length) return {};
+  need();
+  const { data, error } = await supabase.storage.from("feedback").createSignedUrls(list, 3600);
+  if (error) return {};
+  return Object.fromEntries((data || []).filter(x => x && x.signedUrl && !x.error).map(x => [x.path, x.signedUrl]));
+}
 export const loadTerms       = async () => {
   need();
   const { data, error } = await supabase.from("terms")

@@ -25,6 +25,8 @@ let S = {
   invites: [], inviteDraft: null,
   // 把老幹部請回來（2026-11-07）：名單上勾起來要一起寄的人與每一列填的 email（bulk），邀請狀態 roster_invites() 合進 people 的 invite 欄。
   bulk: null,
+  // 回報與許願的收件匣（2026-11-25）：全部的、圖的連結、看哪一種狀態、打到一半的備註、還沒處理的有幾則（側欄的數字）
+  feedback: [], fbUrls: {}, fbF: { st: "new" }, fbDrafts: {}, fbNew: 0,
 };
 
 const root = () => document.getElementById("bt-root");
@@ -50,12 +52,13 @@ function render() {
   let body, tab = "roster";
   if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres(), batchOpen(), S.people); tab = "invites"; }
   else if (S.view === "changes") { body = UI.changesHTML(S.changes, S.people, S.msg); tab = "changes"; }
+  else if (S.view === "feedback") { body = UI.feedbackPageHTML(S.feedback, S.fbUrls, S.msg, S.busy, S.fbF, S.fbDrafts); tab = "feedback"; }
   else if (S.view === "workspaces") { body = UI.workspacesHTML(S.workspaces, S.wsSel, S.members, S.people, S.msg, S.busy, S.wsDraft, isSenior(), S.grp); tab = "workspaces"; }
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces, S.personFounder);
   else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd, S.bulk);
-  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me), body); UI.railAfter(el);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me, { feedback: S.fbNew }), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
 
@@ -87,6 +90,7 @@ async function boot(retried) {
     // 自動儲存（2026-11-06）掛在 #bt-root 上一次，之後 render() 只換裡面的 innerHTML，監聽還在。
     UI.bindAutosave(root(), onAutosave);
     await openTab(want);
+    if (isSenior()) loadFeedbackCount();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-people"); return; }
     console.error(HERE + " 載入失敗：", e);
@@ -107,6 +111,7 @@ async function openTab(key, ws) {
   }
   if (key === "invites") return openInvites();
   if (key === "changes") return openRoster(false, "changes");
+  if (key === "feedback") return openFeedback();
   if (key === "workspaces") return openWorkspaces(ws);
   if (key === "terms") return openTerms();
   return openRoster();
@@ -125,6 +130,23 @@ async function loadCore(keepMsg) {
   ]);
   S.people = UI.mergeInvites(people || [], rosterInv); S.terms = terms; S.changes = changes; S.workspaces = workspaces || [];
   if (S.person) S.person = findPerson(S.person.person_id) || null;
+}
+// 回報與許願的收件匣（2026-11-25）。遷移檔還沒跑的時候函式不在，講要跑哪一支，不印資料庫的原話。
+const fbSays = e => /Could not find the function|schema cache|PGRST202/i.test(String((e && e.message) || e)) ? T("err.fbSql") : D.says(e);
+async function loadFeedback() {
+  S.feedback = (await D.loadFeedback()) || [];
+  S.fbNew = S.feedback.filter(x => x.status === "new").length;
+  S.fbUrls = await D.feedbackPhotoUrls(S.feedback.flatMap(x => x.photos || []));
+}
+async function openFeedback(keepMsg) {
+  S.busy = true; if (!keepMsg) S.msg = ""; S.view = "feedback"; render();
+  try { await loadFeedback(); S.busy = false; }
+  catch (e) { S.busy = false; S.feedback = []; S.msg = T("err.fbLoad") + fbSays(e); }
+  render();
+}
+// 側欄那個數字：不在收件匣那一頁的時候也要有，所以進後台這一區就問一次（問不到就當 0，不擋別的頁）。
+async function loadFeedbackCount() {
+  try { const n = Number(await D.feedbackCount()) || 0; if (n !== S.fbNew) { S.fbNew = n; if (S.view !== "feedback") render(); } } catch (e) { /* 遷移檔還沒跑：沒有數字 */ }
 }
 async function openRoster(keepMsg, view) {
   S.busy = true; render();
@@ -364,6 +386,16 @@ document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act;
+  // ── 回報與許願的收件匣（2026-11-25）──
+  if (act === "fb-st") { S.fbF = { st: b.dataset.v || "new" }; S.msg = ""; render(); return; }
+  if (act === "fb-note-save") {
+    const id = b.dataset.id, row = S.feedback.find(x => x.id === id); if (!row) return;
+    const inp = document.querySelector(`[data-fb-note="${id}"]`), note = inp ? inp.value : (row.note || "");
+    S.busy = true; S.msg = ""; render();
+    try { await D.setFeedback(id, row.status, note); delete S.fbDrafts[id]; await loadFeedback(); S.busy = false; S.msg = T("msg.fbSaved"); }
+    catch (err) { S.busy = false; S.msg = T("err.fbSave") + fbSays(err); }
+    render(); return;
+  }
 
   if (act === "retry") { location.reload(); return; }
   if (act === "ask-cancel") {
@@ -808,6 +840,15 @@ document.addEventListener("click", async e => {
 
 // 兩個下拉選單是「選了就動」的：改一個人那一頁換屆別（表單換成那一屆的職位）、工作區裡改等級（直接存）。
 document.addEventListener("change", async e => {
+  // 收件匣：換了「處理到哪」就存（備註那一格打到一半的字一起存，不然一換狀態就不見）。
+  if (e.target && e.target.dataset && e.target.dataset.act === "fb-set") {
+    const id = e.target.dataset.id, row = S.feedback.find(x => x.id === id); if (!row) return;
+    const inp = document.querySelector(`[data-fb-note="${id}"]`), note = inp ? inp.value : (row.note || ""), st = e.target.value;
+    S.busy = true; S.msg = ""; render();
+    try { await D.setFeedback(id, st, note); delete S.fbDrafts[id]; await loadFeedback(); S.busy = false; S.msg = T("msg.fbSaved"); }
+    catch (err) { S.busy = false; S.msg = T("err.fbSave") + fbSays(err); }
+    render(); return;
+  }
   // 2026-11-07：這兩種欄位沒有 data-act，要在下面那一句 closest 之前接。
   //   邀請頁打完名字（離開欄位）：重畫一次，名單上有同名的人就跳出「掛到哪一筆」。
   //   批次面板的語言下拉：收進 S.bulk，重畫不會掉。
@@ -918,6 +959,8 @@ document.addEventListener("change", async e => {
 // 自訂工作區的代號：英文名稱打到哪，代號跟到哪（使用者自己改過代號之後就不跟了）。這一條直接改那一格，不重畫。
 document.addEventListener("input", e => {
   const el = e.target;
+  // 收件匣的備註：打到一半先記著，別的動作重畫的時候才不會不見。
+  if (el && el.dataset && el.dataset.fbNote) { S.fbDrafts[el.dataset.fbNote] = el.value; return; }
   if (!el || !el.id) return;
   if (el.id === "ro-search") {
     S.filter.q = el.value; render();

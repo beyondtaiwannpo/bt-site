@@ -6094,6 +6094,78 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 後台右下角一顆：回報問題、許願功能（2026-11-25）
+
+Paul：
+
+> I need you to build a requesting button on the page, team members can submit bug, features they want through text and pictures and it goes to me like a little folating icon is enough
+
+動手之前問了他三件事，他選的是：送到他手上的方式是**後台一頁收件匣加一封信**；讀得到的是 **Co-President 與 Senior Adviser**；看得到那一顆的是**登入的幹部**。
+
+### 幹部怎麼送
+
+後台每一頁（還有幹部首頁、護照、時間看板，有側欄的那幾頁）右下角有一顆圓的按鈕。按了開一格：
+
+1. 選是哪一種：有東西壞了、想要一個功能、其他。
+2. 寫發生了什麼事，或想要什麼。最多 4000 個字。
+3. 要的話加圖，最多四張。可以選檔，也可以把截圖直接貼在打字那一格。
+4. 按「送出」。
+
+格子上寫著「送給 Co-President 與 Senior Adviser，只有他們看得到」。他當時在哪一頁會一起記下來。圖送出之前會先縮到長邊 1600。
+學生、實習生、校友、對外網站都沒有那一顆。一個人一天最多送 30 則。
+
+### Co-President 與 Senior Adviser 怎麼收
+
+- **一封信**：每一則送出的時候，每一位 Co-President 與 Senior Adviser 各收一封（送的人自己是其中一位的話，不寄給自己）。
+  信裡有誰送的、哪一種、他寫的字、他當時在哪一頁、收件匣的連結。**信裡沒有圖**，圖要登入後台才看得到。
+- **收件匣**：後台 Internal →「回報與許願」（`/admin/people/#feedback`）。選單上有還沒處理的數字。
+  一則一列：誰、哪一種、什麼時候、當時在哪一頁、他寫的字、縮圖（點了看大張）。
+  每一則可以標「新的、處理中、做好了、不做」，可以記一句自己的備註。最上面一排可以只看某一種狀態。
+
+### 誰看得到什麼
+
+| | 幹部 | Co-President、Senior Adviser |
+|---|---|---|
+| 送一則 | 可以 | 可以 |
+| 看別人送的 | 不行 | 可以，全部 |
+| 看自己送過的 | 沒有這一頁 | 在收件匣裡 |
+| 圖 | 只讀得到自己放的 | 全部 |
+| 標狀態、記備註 | 不行 | 可以 |
+
+送的人**不會**收到「做好了」的通知，也沒有一頁看自己送過的。要的話是下一步，要先問 Paul（會多寄信）。
+
+⚠ **截圖裡可能有別人的資料。** 幹部截的是後台的畫面，上面可能有學生的名字或申請內容。
+所以圖放在私人的地方、沒有公開網址，收件匣裡的縮圖是一小時就失效的連結，信裡不放圖。讀得到的本來就是看得到整個後台的那幾位。
+
+### 程式在哪
+
+- 那一顆與格子：`shared/rail.js` 最下面那一段（`feedbackHTML`、`mountFeedback`），樣式在 `shared/rail.css` 的 `.fb-`。
+  它掛在 `<body>` 上，不在側欄的 HTML 裡：每一頁重畫的時候會把側欄整個換掉，格子要是畫在裡面，打到一半的字會跟著不見。
+  `railHTML()` 被叫到、而且看的人是幹部的時候才掛。沒有新增 `shared/` 的檔案。
+- 收件匣：`admin/people/src/ui.js` 的 `feedbackPageHTML`，資料那三支在 `admin/people/src/data.js`。選單那一列在 `shared/rail.js` 的 `ITEMS`。
+- 資料庫：`supabase/migrations/2027-01-10-site-feedback.sql`。
+
+### 資料庫（要 Paul 在正式的 Supabase 跑）
+
+⚠ **這一步有遷移檔 `supabase/migrations/2027-01-10-site-feedback.sql`。** 檔直接交給他了。它做的事：
+
+- 一張新的表 `site_feedback`。開了 RLS、沒有任何政策、沒有發任何權限，前端一列都讀不到，全部走函式。
+- 一個私人的 bucket `feedback`（一張 5 MB、只收 JPG、PNG、WebP）。放得進去的是幹部，而且只能放在自己的資料夾、檔名是程式取的那個格式；
+  讀得到的是 Co-President、Senior Adviser 與放的人自己；沒有人改得了、刪得掉。
+- 四支函式：`send_feedback`（幹部送）、`feedback_inbox` 與 `feedback_set`（只有 Co-President 與 Senior Adviser）、`feedback_count`（選單上的數字，別人拿到 0）。
+- 信的種類多一種 `feedback_new`。它是讀現在的清單再加一個，原本的一種都沒少。**寄信那幾支函式一支都沒重寫**，信裡的連結是內文裡的一行字。
+
+還沒跑之前：那一顆看得到，按送出會說「資料庫還沒準備好，要先跑 2027-01-10-site-feedback.sql」；收件匣那一頁也是同一句。
+之後如果重跑會重建信的種類清單的遷移檔（`2026-12-21-form-received-mail.sql` 與更早那幾支），要再跑一次這一支；沒跑的話回報照樣存得進收件匣，只是信寄不出去。
+
+### 驗收
+
+`test/site-feedback.test.mjs` 七條（格子的每一格、檔名的格式跟資料庫那一條規則一樣、錯誤變成一句話、只給幹部而且掛在 body、收件匣只在 senior 的選單上、收件匣的每一列與跳脫、遷移檔的每一道門）。
+`scripts/db/smoke.sh` 最後多一段 40 項：圖放得進自己的資料夾、放不進別人的、檔名亂取放不進、學生與沒登入放不進；幹部送得出去、學生送不了；
+信只排給 Co-President 與 Senior Adviser、沒有寄給別人、沒有圖的路徑、自己送的不寄給自己、信畫得出來；別的幹部讀不到、標不了；表直接讀不到；兩個破壞測試。
+本機瀏覽器接本機 Supabase 走過：以一般幹部開那一顆、打字、放一張 2400 寬的圖、送出（存成一列、圖縮成 1600、排了四封信）；換成 Co-President 到收件匣看到那一則與縮圖、標成處理中、備註存得起來。
+**本機沒有真的把信寄出去**（本機沒有設寄信），正式站第一則送出之後要看一次信有沒有到。兩張截圖在 `~/Anson/outputs/beyond-taiwan/website/web/2026-11-25-feedback-button/`。
+
 ## 撤下來的活動可以再上去（2026-11-25）
 
 Paul 貼了一張後台「上架」那一塊的截圖，上面只有一句「Unpublished; not visible publicly. Mark ready again to relist it.」，沒有任何按鈕：
