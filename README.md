@@ -6042,8 +6042,11 @@ Paul 同一天接著講的（都是從「活動的講者」這件事延伸出來
 > on the outfront pages… it says speaker Emily, Yale University. It's not attractive at all. I want people to be able to click it and then see their experience. If they have one…
 > we need a better places for picture. Like right now, it's sitting at the bottom of the pages
 
-⚠ **這一步有遷移檔 `supabase/migrations/2027-01-07-speaker-profiles.sql`，要 Paul 在正式的 Supabase 跑過。** 還沒跑之前：對外頁的講者卡是新的樣子，但沒有人點得開（資料庫還沒回職稱與故事）；
-後台找人只看得到一個名字。其他都不用等它。
+**遷移檔 `supabase/migrations/2027-01-07-speaker-profiles.sql`：Paul 2026-11-25 在正式的 Supabase 跑過，驗收表每一列都是 PASS。**
+同一天不登入叫了一次正式站的 `public_event_extras`：五場上架的活動都回 200，Overseas Unpacked 回 5 張照片與 3 位講者，
+三位都只有名字、主題、學校、照片四樣，沒有人有職稱或故事。這是對的，因為還沒有任何一位講者在個人連結上勾同意。
+所以對外頁現在還沒有人點得開，要等講者自己填完、自己勾了才會出現那顆按鈕。
+⚠ 之後如果重跑 `2027-01-05-map-links.sql`、`2027-01-02-event-speakers-tickets.sql` 或 `2027-01-03-people-network.sql`，要再跑一次這一支，不然會被換回舊的版本。
 
 ### 對外的活動頁（`/events/#代號`）
 
@@ -6087,8 +6090,9 @@ Paul 看著紀錄裡一位以前的學員（高中在名單上，後來念了大
 >
 > the relationship part in a people, I think that's kind of useless
 
-⚠ **這一步有遷移檔 `supabase/migrations/2027-01-06-labels-and-schools.sql`，要 Paul 在正式的 Supabase 跑過。** 檔直接交給他了。還沒跑之前：
-畫面照樣打得開，「現在在哪」已經照時間排（那是畫面算的）；教授、招生官、聯絡人以外的標籤加不了，會講要跑哪一支；已經念大學的人「現在還在念高中」那一格還是勾著的。
+**遷移檔 `supabase/migrations/2027-01-06-labels-and-schools.sql`：Paul 2026-11-25 在正式的 Supabase 跑過，驗收表每一列都是 PASS。**
+十一種標籤現在都加得了；已經念大學或在工作、而且沒有自己帳號的學員，「現在還在念高中」那一格已經自己取消（取消了幾位看驗收表第 9 列，這裡沒有記那個數字）。
+⚠ 那一格取消之後，那個人就開得了個人連結。還沒有人登入正式站的後台把加標籤、加去向實際點過一次。
 
 ### 1. 標籤每一種都可以自己加
 
