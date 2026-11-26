@@ -420,30 +420,30 @@ const EV = { id: "e1", slug: "jan-talk", status: "draft" };
 const NINA = { id: "p1", name: "Nina Speaker", kind: "guest", school: "Test High", labels: ["member:past", "speaker"], latest: "Latest University",
   card: { field: "Machine learning", job_title: "Engineer", job_org: "Acme Labs", photo_url: "https://x.supabase.co/storage/v1/object/public/people/p1/1-abc.jpg" } };
 
-test("★ 挑講者：從紀錄帶入名字、主題、學校、照片，只填空的格子；同意不在帶入的東西裡", () => {
+test("★ 挑講者：從紀錄帶入名字、主題、學校，只填空的格子；照片不抄，只記名單裡那一張給人先看；同意不在帶入的東西裡", () => {
   const d = F.evSpeakerPrefill(null, NINA);
-  assert.deepEqual({ display_name: d.display_name, subject: d.subject, school: d.school, photo_url: d.photo_url, person_id: d.person_id, from: d.from },
-    { display_name: "Nina", subject: "Machine learning", school: "Acme Labs", photo_url: NINA.card.photo_url, person_id: "p1", from: "Nina Speaker" });
+  assert.deepEqual({ display_name: d.display_name, subject: d.subject, school: d.school, photo_url: d.photo_url, people_photo: d.people_photo, person_id: d.person_id, from: d.from },
+    { display_name: "Nina", subject: "Machine learning", school: "Acme Labs", photo_url: undefined, people_photo: NINA.card.photo_url, person_id: "p1", from: "Nina Speaker" }, "2026-11-26：照片不抄進講者卡，對外頁用名單裡的");
   assert.ok(!("consent" in d), "同意不是帶入的東西");
   // 已經打了字的格子不蓋
   const typed = F.evSpeakerPrefill({ display_name: "Dr. N", subject: "My own topic", school: "" }, NINA);
-  assert.equal(typed.display_name, "Dr. N"); assert.equal(typed.subject, "My own topic"); assert.equal(typed.school, "Acme Labs"); assert.equal(typed.photo_url, NINA.card.photo_url);
+  assert.equal(typed.display_name, "Dr. N"); assert.equal(typed.subject, "My own topic"); assert.equal(typed.school, "Acme Labs"); assert.equal(typed.photo_url, undefined); assert.equal(typed.people_photo, NINA.card.photo_url);
   assert.equal(F.evSpeakerPrefill({ school: "   " }, NINA).school, "Acme Labs", "只有空白算空的");
   // 學校：個人檔案的單位 → 最近一筆去向 → 名單上的學校
   assert.equal(F.evSpeakerPrefill(null, { ...NINA, card: { ...NINA.card, job_org: "" } }).school, "Latest University");
   assert.equal(F.evSpeakerPrefill(null, { ...NINA, card: null, latest: null }).school, "Test High");
   // 沒有個人檔案（card 是 null）、遷移檔還沒跑（沒有 card、labels、latest）：跟以前一樣只帶名字與學校
   const bare = F.evSpeakerPrefill(null, { id: "p2", name: "王小明", school: "Test High", kind: "student" });
-  assert.deepEqual({ display_name: bare.display_name, subject: bare.subject, school: bare.school, photo_url: bare.photo_url }, { display_name: "王小明", subject: "", school: "Test High", photo_url: "" });
+  assert.deepEqual({ display_name: bare.display_name, subject: bare.subject, school: bare.school, people_photo: bare.people_photo }, { display_name: "王小明", subject: "", school: "Test High", people_photo: "" });
   // 挑錯人再挑一次：上一次帶入、沒改過的格子換成新的那個人的；自己改過的那一格留著
   const first = F.evSpeakerPrefill(null, NINA);
   const second = F.evSpeakerPrefill({ ...first, subject: "I changed this" }, { id: "p3", name: "Omar Other", school: "", labels: ["speaker"], latest: null, card: { field: "Design", job_title: "", job_org: "", photo_url: null } });
-  assert.deepEqual({ display_name: second.display_name, subject: second.subject, school: second.school, photo_url: second.photo_url, person_id: second.person_id, from: second.from },
-    { display_name: "Omar", subject: "I changed this", school: "", photo_url: "", person_id: "p3", from: "Omar Other" }, "上一個人的學校與照片不會留在新的人身上");
-  // 不連到這個人了：字留著，紀錄帶來的照片拿掉；自己另外放的照片網址不動
+  assert.deepEqual({ display_name: second.display_name, subject: second.subject, school: second.school, people_photo: second.people_photo, person_id: second.person_id, from: second.from },
+    { display_name: "Omar", subject: "I changed this", school: "", people_photo: "", person_id: "p3", from: "Omar Other" }, "上一個人的學校與照片不會留在新的人身上");
+  // 不連到這個人了：字留著，名單裡那張照片的預覽拿掉
   const un = F.evSpeakerUnpick(first);
-  assert.deepEqual({ display_name: un.display_name, school: un.school, photo_url: un.photo_url, person_id: un.person_id, from: un.from }, { display_name: "Nina", school: "Acme Labs", photo_url: "", person_id: null, from: "" });
-  assert.deepEqual(F.EV_SP_FILL, ["display_name", "subject", "school", "photo_url"]);
+  assert.deepEqual({ display_name: un.display_name, school: un.school, people_photo: un.people_photo, person_id: un.person_id, from: un.from }, { display_name: "Nina", school: "Acme Labs", people_photo: "", person_id: null, from: "" });
+  assert.deepEqual(F.EV_SP_FILL, ["display_name", "subject", "school"]);
   // main.js：挑人只叫這一支
   const m = read("admin/src/main.js");
   assert.match(m, /S\.evSpDraft = p \? UI\.evSpeakerPrefill\(S\.evSpDraft, p\)/);
@@ -460,8 +460,7 @@ test("★ 挑講者：從紀錄帶入名字、主題、學校、照片，只填�
   assert.equal(F.evMaybeMinor({ kind: "student" }), true, "遷移檔還沒跑（沒有 labels）看種類"); assert.equal(F.evMaybeMinor({ kind: "member" }), false); assert.equal(F.evMaybeMinor(null), false);
   assert.equal(F.evSpeakerPrefill(null, { id: "s1", name: "Sam Student", labels: ["student"] }).minor, true); assert.equal(F.evSpeakerPrefill(null, NINA).minor, false);
   assert.equal(F.evSpeakerUnpick(F.evSpeakerPrefill(null, { id: "s1", name: "Sam Student", labels: ["student"] })).minor, false, "不連到這個人了就不算");
-  assert.match(add, /copied = await copyRecordsPhoto\(ev\.id, from\); patch\.photo_url = copied;/, "照片抄一份到 events bucket，不直接用紀錄那邊的網址");
-  assert.match(add, /if \(copied\) await D\.removeEventFile\(UI\.evStoragePath\(copied\)\);/, "講者沒加成就把抄過來的檔刪掉");
+  assert.doesNotMatch(add, /copyRecordsPhoto/, "2026-11-26：加一位不再抄名單裡的照片，對外頁直接用名單的那一張（2027-01-14-speaker-people-photo.sql）");
   assert.match(read("supabase/migrations/2027-01-02-event-speakers-tickets.sql"), /insert into event_speakers \(event_id, person_id, display_name, subject, school, photo_url, consent, sort, created_by\)/);
 });
 
@@ -482,7 +481,8 @@ test("★ 挑講者的清單：每一個人後面印標籤與現在做什麼；�
   assert.doesNotMatch(h, />來賓<|>成員</, "有標籤的時候不印種類");
   // 帶入之後那幾格與那張照片
   assert.match(h, /id="ev-sp-new-name" value="Nina"/); assert.match(h, /<input data-f="subject" value="Machine learning"/); assert.match(h, /<input data-f="school" value="Acme Labs"/);
-  assert.match(h, /<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="https:\/\/x\.supabase\.co\/storage\/v1\/object\/public\/people\/p1\/1-abc\.jpg" alt=""> <span>加進來的時候會抄一份紀錄裡的這張照片。<\/span> <button class="btn quiet sm" data-act="ev-sp-nophoto">不用這張照片<\/button><\/p>/);
+  assert.match(h, /<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="https:\/\/x\.supabase\.co\/storage\/v1\/object\/public\/people\/p1\/1-abc\.jpg" alt=""> <span>活動頁會用他在名單裡的這張照片。這一場要用別張，加進來之後再從他那一格換。<\/span><\/p>/);
+  assert.doesNotMatch(h, /ev-sp-nophoto/, "2026-11-26：沒有「不用這張照片」了，照片不是抄的");
   assert.doesNotMatch(h, /紀錄裡這個人是學員/, "帶入的不是學員就沒有那一句");
   const stu = F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spOpen: true, spDraft: F.evSpeakerPrefill(null, found[1]) });
   assert.doesNotMatch(stu, /未成年|<div class="note">/, "帶入的是學員：沒有那一句了"); assert.match(stu, /id="ev-sp-new-show"><span>放在對外頁/, "只是那一格先不勾");
@@ -491,7 +491,7 @@ test("★ 挑講者的清單：每一個人後面印標籤與現在做什麼；�
   const old = F.eventSpeakersHTML(EV, [], true, false, { canPick: true, spFound: [{ id: "p8", name: "Sam Student", school: "Test High", kind: "student" }, { id: "p9", name: "Gina Guest", school: "", kind: "guest" }] });
   assert.match(old, /<b>Sam Student<\/b> <span class="mini">Test High<\/span> <span class="tag">學員<\/span>/); assert.match(old, /<b>Gina Guest<\/b> <span class="tag">來賓<\/span>/);
   assert.equal(F.evLabelName("member:past"), "校友（前幹部）"); assert.equal(F.evLabelName("student:past"), "以前的學員"); assert.equal(F.evLabelName("nope"), "");
-  assert.match(read("admin/src/main.js"), /if \(act === "ev-sp-pick" \|\| act === "ev-sp-unpick" \|\| act === "ev-sp-nophoto"\) \{/);
+  assert.match(read("admin/src/main.js"), /if \(act === "ev-sp-pick" \|\| act === "ev-sp-unpick"\) \{/);
 });
 
 // ── 現在在哪：學校與去向排成一條（2026-11-25）──────────────────────────

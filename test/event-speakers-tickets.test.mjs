@@ -522,11 +522,14 @@ test("★ 講者與紀錄：管得了紀錄的人才看得到；新的人加進�
   assert.equal(count(all, /<div class="ev-sp-ppl">/g), 2); assert.ok(all.indexOf('data-act="ev-sp-photo" data-id="s1"') < all.indexOf('data-act="ev-sp-link-create" data-id="s1"') && all.indexOf('data-act="ev-sp-link-create" data-id="s1"') < all.indexOf('data-act="ev-sp-save" data-id="s1"'));
   // 照他填的更新：領域 → 主題；單位（沒有就最近一筆去向、再沒有名單上的學校）→ 學校；照片；名字不動；他沒填的那一格留原本的
   const rc = { profile: { field: "Robotics", job_org: "Waterloo Labs", photo_url: "https://x/p.jpg" }, person: { school: "Old High" }, outcomes: [{ institution: "MIT" }] };
-  assert.deepEqual(F.evProfileFill(LINKED, rc), { patch: { display_name: "Annie", subject: "Robotics", school: "Waterloo Labs" }, photo: "https://x/p.jpg", changed: true });
+  // 2026-11-26：照片只在講者卡已經有自己的一張的時候才帶（換成名單裡現在的）；卡上沒有就不抄，對外頁本來就用名單的那一張
+  assert.deepEqual(F.evProfileFill(LINKED, rc), { patch: { display_name: "Annie", subject: "Robotics", school: "Waterloo Labs" }, photo: "", changed: true });
+  assert.deepEqual(F.evProfileFill({ ...LINKED, photo_url: "https://x/own.jpg" }, rc), { patch: { display_name: "Annie", subject: "Robotics", school: "Waterloo Labs" }, photo: "https://x/p.jpg", changed: true });
   assert.equal(F.evProfileFill(LINKED, { profile: { field: "", job_org: "" }, person: {}, outcomes: [{ institution: "MIT" }] }).patch.school, "MIT");
   assert.deepEqual(F.evProfileFill(LINKED, { profile: { field: "", job_org: "" }, person: { school: "" }, outcomes: [] }), null, "什麼都沒填就沒有東西可以帶");
   assert.deepEqual(F.evProfileFill(LINKED, { profile: { field: "CS", job_org: "UCLA" }, person: {}, outcomes: [] }), null, "跟現在一樣也不用存");
-  assert.deepEqual(F.evProfileFill(LINKED, { profile: { field: "", job_org: "", photo_url: "https://x/p.jpg" } }), { patch: { display_name: "Annie", subject: "CS", school: "UCLA" }, photo: "https://x/p.jpg", changed: false }, "只有照片也算");
+  assert.deepEqual(F.evProfileFill({ ...LINKED, photo_url: "https://x/own.jpg" }, { profile: { field: "", job_org: "", photo_url: "https://x/p.jpg" } }), { patch: { display_name: "Annie", subject: "CS", school: "UCLA" }, photo: "https://x/p.jpg", changed: false }, "卡上有自己的照片：只有照片也算");
+  assert.equal(F.evProfileFill(LINKED, { profile: { field: "", job_org: "", photo_url: "https://x/p.jpg" } }), null, "卡上沒有照片：名單裡有照片不算要更新的東西");
   assert.equal(F.evProfileFill(LINKED, null), null);
 });
 

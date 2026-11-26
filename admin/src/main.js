@@ -1263,14 +1263,13 @@ document.addEventListener("click", async e => {
     S.evSpFound = await D.findPeople(S.evSpQ);
     S.vnOpen["ev-sp-new"] = true; S.busy = false; render(); return;
   }
-  // 2027-01-03：挑了多帶主題、學校（個人檔案的單位）與照片，只填空的格子（UI.evSpeakerPrefill）。同意照舊不會自己勾。
-  if (act === "ev-sp-pick" || act === "ev-sp-unpick" || act === "ev-sp-nophoto") {
+  // 2027-01-03：挑了多帶主題、學校（個人檔案的單位），只填空的格子（UI.evSpeakerPrefill）。同意照舊不會自己勾。
+  // 2026-11-26：照片不再抄。講者卡沒有自己的照片，對外頁用他在名單裡的那一張（2027-01-14-speaker-people-photo.sql）。
+  if (act === "ev-sp-pick" || act === "ev-sp-unpick") {
     keepEventTyped();
     const p = act === "ev-sp-pick" ? (S.evSpFound || []).find(x => x.id === id) : null;
     if (act === "ev-sp-pick" && !p) return;
-    S.evSpDraft = p ? UI.evSpeakerPrefill(S.evSpDraft, p)
-                    : act === "ev-sp-nophoto" ? Object.assign({}, S.evSpDraft, { photo_url: "" })
-                    : UI.evSpeakerUnpick(S.evSpDraft);
+    S.evSpDraft = p ? UI.evSpeakerPrefill(S.evSpDraft, p) : UI.evSpeakerUnpick(S.evSpDraft);
     S.vnOpen["ev-sp-new"] = true; S.msg = ""; render();
     const n = document.getElementById("ev-sp-new-name"); if (n && p) n.focus();
     return;
@@ -1352,19 +1351,13 @@ document.addEventListener("click", async e => {
     const dr = S.evSpDraft || {};
     const shown = adding ? (dr.show == null ? !(dr.person_id && dr.minor) : !!dr.show) : !!row.consent;
     S.busy = true; S.msg = ""; render();
-    // 從紀錄帶來的照片（2027-01-03）：抄一份到 events bucket 再掛上去，跟自己選檔上傳同一條路。
-    // 不直接用紀錄那邊的網址：那邊換照片或拿掉照片會把檔刪掉，這一位在對外頁的照片就跟著壞了。抄不過來就不帶照片，照樣加，講一聲。
-    const from = adding && S.evSpDraft ? String(S.evSpDraft.photo_url || "") : "";
-    let copied = "";
-    if (from) { try { copied = await copyRecordsPhoto(ev.id, from); patch.photo_url = copied; } catch (x) { copied = ""; } }
     try {
       const sid = await D.saveEventSpeaker(ev.id, adding ? null : id, patch);
       if (shown && sid) await keepSpeakerShown(sid);
       if (adding) { S.evSpDraft = null; S.evSpFound = undefined; S.evSpQ = ""; S.vnOpen["ev-sp-new"] = false; if (sid) S.evSpOpenIds[sid] = true; }   // 剛加的那一位先開著：接下來要放照片
       await reloadEventSpeakers(ev.id, sid);
-      if (!S.msg) S.msg = T(adding ? (!shown ? "msg.evSpAddedHidden" : from ? (copied ? "msg.evSpAddedPhoto" : "msg.evSpAddedNoPhoto") : "msg.evSpAdded") : "msg.evSpSaved");
+      if (!S.msg) S.msg = T(adding ? (!shown ? "msg.evSpAddedHidden" : "msg.evSpAdded") : "msg.evSpSaved");
     } catch (err) {
-      if (copied) await D.removeEventFile(UI.evStoragePath(copied));   // 檔抄過來了、講者卻沒加成：不留一個沒人用的檔
       S.msg = T("err.evSpSave") + D.says(err); if (adding) S.vnOpen["ev-sp-new"] = true;
     }
     S.busy = false; render(); return;

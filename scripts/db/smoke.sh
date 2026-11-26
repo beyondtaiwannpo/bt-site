@@ -5065,5 +5065,90 @@ chkrole anon "" "裝回去之後對外還是只有沒被藏的那一位" "PastAl
 psql -d "${DB}" -X -A -t -q -c "delete from public.people where id::text like 'aaaa0111-%'; delete from public.terms where id = '2019-20';" >/dev/null 2>&1 || true
 chk "（收尾）這一段開的人、職位、屆、藏人的列都不在了" "0|0|0|0" "select (select count(*) from public.people where id::text like 'aaaa0111-%')||'|'||(select count(*) from public.positions where term_id = '2019-20')||'|'||(select count(*) from public.terms where id = '2019-20')||'|'||(select count(*) from public.past_team_hidden)"
 echo
+echo "── 講者卡沒有照片就用名單裡的那一張（2027-01-14-speaker-people-photo.sql）──"
+# Paul 2026-11-26：「in their people, they have their profile picture, but when they're added to the events, their picture is not loaded」
+# 這一段自己建一場上架的活動、三個名單裡的人、兩個幹部（PHE 改得了這場活動但讀不到名單，PHN 什麼都沒被派）。
+PHF=supabase/migrations/2027-01-14-speaker-people-photo.sql
+PHE=aaaa0114-0000-0000-0000-000000000001
+PHN=aaaa0114-0000-0000-0000-000000000002
+PHA=aaaa0114-0000-0000-0000-0000000000a1
+PHB=aaaa0114-0000-0000-0000-0000000000a2
+PHURL=https://x.supabase.co/storage/v1/object/public
+PHEV=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.create_event('${AMTEAM}','ph-smoke','照片測試','Photo smoke',false)" 2>&1 | tail -1 | tr -d ' \n')
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+update public.events set status = 'published', published_at = now() where id = '${PHEV}';
+insert into auth.users (id,email) values ('${PHE}','ph-edit@example.com'), ('${PHN}','ph-none@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values
+  ('${PHE}','照片改','Photo Editor','${AMTEAM}','cadre','member'), ('${PHN}','照片無','Photo Nobody','${AMTEAM}','cadre','member');
+insert into public.assignments (user_id, workspace_id, level) select '${PHE}', workspace_id, 'edit' from public.events where id = '${PHEV}'
+  on conflict (user_id, workspace_id) do update set level = excluded.level;
+insert into public.people (id, name_zh, name_en, kind, email, school) values
+  ('${PHA}','照片甲','Photo Alpha','member','ph-alpha-secret@example.com','NTU'),
+  ('${PHB}','照片乙','Photo Beta','member','ph-beta-secret@example.com','NTU');
+-- 忘記一個人的時候 rc_network_forget 會把他的 profile 刪掉，所以正常情形被忘記的人沒有照片可以帶。
+-- 這裡故意在忘記之後再塞一列 profile（當作哪一天有一列漏掉了），才驗得到對外那一支自己的那道門。
+update public.people set forgotten_at = now() where id = '${PHB}';
+insert into public.rc_profiles (person_id, photo_url) values ('${PHA}','${PHURL}/people/a/1.jpg'), ('${PHB}','${PHURL}/people/b/1.jpg');
+insert into public.event_speakers (event_id, person_id, display_name, school, photo_url, consent, sort) values
+  ('${PHEV}','${PHA}','FromPeople','S', null, true, 10),
+  ('${PHEV}','${PHA}','OwnWins','S', '${PHURL}/events/e/own.jpg', true, 20),
+  ('${PHEV}', null,'Typed','S', null, true, 30),
+  ('${PHEV}','${PHB}','Forgotten','S', null, true, 40),
+  ('${PHEV}','${PHA}','Hidden','S', null, false, 50);
+SQL
+PHPUB="select string_agg(coalesce(replace(x->>'photo_url','${PHURL}/',''),'none'), ',' order by n) from jsonb_array_elements(public.public_event_extras('ph-smoke')->'speakers') with ordinality y(x, n)"
+PHLIST="select string_agg((x->>'display_name')||'='||coalesce(replace(x->>'people_photo','${PHURL}/',''),'none'), ',' order by n) from jsonb_array_elements(public.event_speakers_list('${PHEV}')) with ordinality y(x, n)"
+chkrole anon "" "（跑之前）沒有自己照片的講者，對外沒有照片" "none,events/e/own.jpg,none,none" "${PHPUB}"
+ph1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PHF}" 2>&1 || true)
+if echo "${ph1}" | grep -q "OVERALL.*PASS" && ! echo "${ph1}" | grep -q "|FAIL"; then echo "  ok   講者照片那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 講者照片那一支驗收表：${ph1}" | head -20; fail=$((fail+1)); fi
+ph2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PHF}" 2>&1 || true)
+if echo "${ph2}" | grep -q "OVERALL.*PASS" && ! echo "${ph2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${ph2}" | head -20; fail=$((fail+1)); fi
+if echo "${ph1}" | grep -q "^9|.*|[1-9][0-9]*|INFO"; then echo "  ok   驗收表數得到「照片從名單來的」那幾位"; pass=$((pass+1)); else echo "  FAIL 驗收表第 9 列沒有數到"; fail=$((fail+1)); fi
+chkrole anon "" "★ 對外：沒有自己照片的用名單裡的；卡上有的用卡上的；沒連到人的沒有；被忘記的人不帶；沒放上對外頁的那一位不在" "people/a/1.jpg,events/e/own.jpg,none,none" "${PHPUB}"
+chkrole anon "" "★ 對外回的鍵沒有多（沒有 id、person_id、email）" "0|0" \
+  "select (select count(*) from jsonb_array_elements(j->'speakers') x, jsonb_object_keys(x) k where k not in ('name','subject','school','photo_url','job','story'))||'|'||(select count(*) from (select j::text t) q where t like '%secret%' or t like '%${PHA}%') from public.public_event_extras('ph-smoke') j"
+chkrole authenticated "${PHN}" "登入的人叫對外那一支，看到的跟沒登入一樣" "people/a/1.jpg,events/e/own.jpg,none,none" "${PHPUB}"
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profiles set photo_url = '${PHURL}/people/a/2.jpg' where person_id = '${PHA}';" >/dev/null
+chkrole anon "" "★ 在名單換照片，對外頁跟著換；卡上自己的那一張不動" "people/a/2.jpg,events/e/own.jpg,none,none" "${PHPUB}"
+chkas "${PAUL}" "★ 後台：讀得到名單的人每一位連到的都看得到名單的照片（含還沒對外的那一位）；被忘記的、沒連到的沒有" \
+  "FromPeople=people/a/2.jpg,OwnWins=people/a/2.jpg,Typed=none,Forgotten=none,Hidden=people/a/2.jpg" "${PHLIST}"
+chkas "${PHE}" "（前提）PHE 改得了這場活動，但讀不到名單" "true|false" "select public.can_edit((select workspace_id from public.events where id = '${PHEV}'))::text||'|'||public.rc_can_view()::text"
+chkas "${PHE}" "★ 後台：讀不到名單的編輯，只看得到已經對外的那幾位的名單照片；沒對外的那一位是空的" \
+  "FromPeople=people/a/2.jpg,OwnWins=people/a/2.jpg,Typed=none,Forgotten=none,Hidden=none" "${PHLIST}"
+chkas "${PHE}" "後台那一支原本的鍵都還在，多一個 people_photo" "consent,display_name,id,people_photo,person_id,photo_url,school,sort,subject" \
+  "select string_agg(k, ',' order by k) from jsonb_object_keys(public.event_speakers_list('${PHEV}')->0) k"
+chkraise "★ 什麼都沒被派的幹部讀不到講者（not_event_editor）" "not_event_editor" "perform set_config('test.uid','${PHN}',true); perform public.event_speakers_list('${PHEV}');"
+phanon=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.event_speakers_list('${PHEV}');" 2>&1 || true)
+if echo "${phanon}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到後台那一支"; pass=$((pass+1)); else echo "  FAIL ★ 沒登入叫得到後台那一支：${phanon}"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profiles set photo_url = null where person_id = '${PHA}';" >/dev/null
+chkrole anon "" "在名單把照片拿掉，對外那一位就沒有照片" "none,events/e/own.jpg,none,none" "${PHPUB}"
+psql -d "${DB}" -X -A -t -q -c "update public.rc_profiles set photo_url = '${PHURL}/people/a/2.jpg' where person_id = '${PHA}'; update public.events set status = 'archived' where id = '${PHEV}';" >/dev/null
+chkrole anon "" "★ 活動撤下來，對外那一支整個不回（名單的照片也跟著不對外）" "true" "select (public.public_event_extras('ph-smoke') is null)::text"
+psql -d "${DB}" -X -A -t -q -c "update public.events set status = 'published' where id = '${PHEV}';" >/dev/null
+chk "名單裡不是講者的人，照片沒有因為這一支多一條對外的路（對外回的照片都對得回一位對外的講者）" "0" \
+  "select count(*) from public.events e, jsonb_array_elements(coalesce(public.public_event_extras(e.slug)->'speakers','[]'::jsonb)) x where e.status = 'published' and x->>'photo_url' like '%/people/%' and not exists (select 1 from public.event_speakers s join public.rc_profiles pf on pf.person_id = s.person_id where s.event_id = e.id and s.consent and s.photo_url is null and pf.photo_url = x->>'photo_url')"
+# 破壞測試一：後台那一支不看「對外了沒、讀不讀得到名單」，驗收表要變紅，PHE 也真的看得到沒對外那一位的照片
+BROKEN=$(mktemp)
+sed "s/'people_photo', case when s\.consent or v_view then/'people_photo', case when true then/" "${PHF}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${PHF}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^6|.*|FAIL"; then echo "  ok   ★ 破壞測試：名單的照片回給每一個編輯，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試一驗收表沒有變紅"; fail=$((fail+1)); fi
+chkas "${PHE}" "破壞之後，讀不到名單的編輯真的看得到沒對外那一位的照片（所以那一道門是有用的）" "people/a/2.jpg" \
+  "select replace(x->>'people_photo','${PHURL}/','') from jsonb_array_elements(public.event_speakers_list('${PHEV}')) x where x->>'display_name' = 'Hidden'"
+# 破壞測試二：對外那一支不管被忘記的人，驗收表要變紅，對外也真的多一張
+sed "s/where ph\.person_id = s\.person_id and pp\.forgotten_at is null and ph\.photo_url ~ '\^https:\/\/')))/where ph.person_id = s.person_id and ph.photo_url ~ '^https:\/\/')))/" "${PHF}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${PHF}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^2|.*|FAIL"; then echo "  ok   ★ 破壞測試：被忘記的人也帶照片，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試二驗收表沒有變紅"; fail=$((fail+1)); fi
+chkrole anon "" "破壞之後，被忘記的那個人的照片真的跑到對外頁了（所以那一道門是有用的）" "people/a/2.jpg,events/e/own.jpg,none,people/b/1.jpg" "${PHPUB}"
+rm -f "${BROKEN}"
+ph3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PHF}" 2>&1 || true)
+if echo "${ph3}" | grep -q "OVERALL.*PASS" && ! echo "${ph3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS"; echo "${ph3}" | head -8; fail=$((fail+1)); fi
+chkrole anon "" "裝回去之後對外又是對的" "people/a/2.jpg,events/e/own.jpg,none,none" "${PHPUB}"
+chkas "${PHE}" "裝回去之後，沒對外那一位的照片又看不到了" "FromPeople=people/a/2.jpg,OwnWins=people/a/2.jpg,Typed=none,Forgotten=none,Hidden=none" "${PHLIST}"
+# 收乾淨：這一段開的活動、人、帳號拿掉。
+psql -d "${DB}" -X -A -t -q -c "delete from public.events where id = '${PHEV}'; delete from public.people where id::text like 'aaaa0114-%'; delete from public.assignments where user_id::text like 'aaaa0114-%'; delete from public.profiles where id::text like 'aaaa0114-%'; delete from auth.users where id::text like 'aaaa0114-%';" >/dev/null 2>&1 || true
+chk "（收尾）這一段開的活動、講者、人都不在了" "0|0|0" "select (select count(*) from public.events where slug = 'ph-smoke')||'|'||(select count(*) from public.event_speakers where display_name in ('FromPeople','OwnWins','Typed','Forgotten','Hidden'))||'|'||(select count(*) from public.people where id::text like 'aaaa0114-%')"
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

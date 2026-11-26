@@ -1843,28 +1843,29 @@ export function evLabelChips(p) {
   }).filter(Boolean).join(" ");
 }
 // 挑了一個人之後，「加一位」那幾格要變成什麼。純函式，main.js 的 ev-sp-pick 只叫它。
-// 帶什麼：名字（英文名取第一段）、主題（個人檔案的專長領域）、學校（個人檔案的公司或單位，沒有就最近一筆去向，再沒有才是名單上的學校）、照片。
+// 帶什麼：名字（英文名取第一段）、主題（個人檔案的專長領域）、學校（個人檔案的公司或單位，沒有就最近一筆去向，再沒有才是名單上的學校）。
+// **照片不帶、不抄**（2026-11-26，Paul 選的）：講者卡沒有自己的照片，對外頁就用他在名單裡的那一張（資料庫 2027-01-14-speaker-people-photo.sql），
+// 所以之後在名單換照片，活動頁會跟著換。draft.people_photo 只是給加的人先看一眼那一張，不會存進講者卡。
 // **只填空的格子**：人已經打了字的那一格不蓋。上一次帶入、人沒改過的那個字算空的（draft.auto 記著），所以挑錯人再挑一次會換成對的那個人的。
 // minor：紀錄裡這個人現在是學員。它只決定「放在對外頁」那一格一開始勾不勾（show）：挑了學員那一格先不勾，其他人先勾，
 // 要不要放是加的人自己勾的。2026-11-25 起畫面上不再寫「可能未成年」、放上去也不再多問一次（Paul：「take it out… I don't need that in everywhere possible」）。
 export const evMaybeMinor = p => !!p && (Array.isArray(p.labels) ? p.labels.includes("student") : p.kind === "student");
-export const EV_SP_FILL = ["display_name", "subject", "school", "photo_url"];
+export const EV_SP_FILL = ["display_name", "subject", "school"];
 export function evSpeakerPrefill(draft, p) {
   const d = Object.assign({}, draft), auto = Object.assign({}, d.auto), who = p || {}, card = who.card || {};
-  const want = { display_name: evFirstName(who.name), subject: card.field || "", school: card.job_org || who.latest || who.school || "", photo_url: card.photo_url || "" };
+  const want = { display_name: evFirstName(who.name), subject: card.field || "", school: card.job_org || who.latest || who.school || "" };
   for (const k of EV_SP_FILL) {
     const cur = String(d[k] == null ? "" : d[k]).trim();
     if (cur !== "" && !(auto[k] != null && cur === String(auto[k]).trim())) continue;
     d[k] = want[k]; auto[k] = want[k];
   }
   const minor = evMaybeMinor(who);
-  return Object.assign(d, { person_id: who.id || null, from: who.name || "", auto, minor, show: !minor });
+  return Object.assign(d, { person_id: who.id || null, from: who.name || "", auto, minor, show: !minor, people_photo: String(card.photo_url || "") });
 }
-// 不連到這個人了：名字、主題、學校留著（照舊，人可能只是不想連），紀錄裡帶來的那張照片拿掉（那是他個人檔案的照片）。
+// 不連到這個人了：名字、主題、學校留著（照舊，人可能只是不想連），名單裡那張照片的預覽拿掉（不連到他，對外頁就不會用他的照片）。
 export function evSpeakerUnpick(draft) {
   const d = Object.assign({}, draft), auto = Object.assign({}, d.auto);
-  if (d.photo_url && auto.photo_url === d.photo_url) { d.photo_url = ""; delete auto.photo_url; }
-  return Object.assign(d, { person_id: null, from: "", auto, minor: false });
+  return Object.assign(d, { person_id: null, from: "", auto, minor: false, people_photo: "" });
 }
 
 // ── 講者與紀錄接起來（2026-11-25）──
@@ -1894,10 +1895,11 @@ export function evPersonDraft(name, school) {
   return o;
 }
 // rc_person() 回的那一包 → 講者卡要更新成什麼。只帶他有填的：領域 → 主題；單位（沒有就最近一筆去向的學校或公司，再沒有才是名單上的學校）→ 學校；照片。
+// 照片只在講者卡**已經有自己的一張**的時候才帶（把那一張換成名單裡現在的）。卡上沒有照片就不抄：對外頁本來就會用名單裡的那一張（2026-11-26）。
 // 名字不動（對外只放名字，那是加的人決定的）。沒有任何一樣可以帶就回 null。純函式。
 export function evProfileFill(sp, rc) {
   const r = rc || {}, pf = r.profile || {}, pe = r.person || {}, out = (r.outcomes || [])[0] || {}, cur = sp || {};
-  const subject = String(pf.field || "").trim(), school = String(pf.job_org || out.institution || pe.school || "").trim(), photo = String(pf.photo_url || "").trim();
+  const subject = String(pf.field || "").trim(), school = String(pf.job_org || out.institution || pe.school || "").trim(), photo = cur.photo_url ? String(pf.photo_url || "").trim() : "";
   const patch = { display_name: String(cur.display_name || "").trim(), subject: subject || String(cur.subject || ""), school: school || String(cur.school || "") };
   const changed = patch.subject !== String(cur.subject || "") || patch.school !== String(cur.school || "");
   if (!changed && !photo) return null;
@@ -1927,6 +1929,14 @@ export function evSpeakerLinkHTML(sp, st, canLink, busy) {
           <p class="ev-line mini">${T("ev.spLinkExp", { exp: evDay(l.expires_at) })} ${l.opened_at ? T("ev.spLinkOpened", { day: evDay(l.opened_at) }) : T("ev.spLinkNotOpened")} ${l.submitted_at ? T("ev.spLinkSubmitted", { day: evDay(l.submitted_at) }) : T("ev.spLinkNotSubmitted")}</p>`;
   const fresh = pf.updated_at || pf.done_at ? `<div class="ev-acts"><button type="button" class="btn ghost sm" data-act="ev-sp-refresh" data-id="${id}"${dis}>${T("ev.spRefresh")}</button><span class="ev-help">${T("ev.spRefreshHelp")}</span></div>` : "";
   return `<div class="ev-sp-ppl">${head}${body}${fresh}<p class="ev-line mini"><a href="${evPersonHref(sp.person_id)}">${T("ev.spLinkRecords")}</a></p></div>`;
+}
+
+// 一位講者打開之後，照片那一格下面的一句話（2026-11-26）。sp.people_photo 是 event_speakers_list() 回的：他在名單裡的照片，沒有就是 null。
+// 卡上沒有自己的照片、名單裡有：講現在用的是名單那一張。卡上有自己的、名單裡也有：講拿掉這一張就會改用名單的。其他情形不印。
+export function evPeoplePhotoNote(sp) {
+  const s = sp || {};
+  if (!s.person_id || !/^https:\/\//.test(String(s.people_photo || ""))) return "";
+  return `<p class="ev-line mini ev-sp-pnote">${T(s.photo_url ? "ev.spPhotoPeopleAlso" : "ev.spPhotoPeople")}</p>`;
 }
 
 // 講者（一場可以好幾位）。speakers 是 event_speakers_list() 回的：undefined 還在載、null 是遷移檔還沒跑、陣列是講者。
@@ -1968,11 +1978,11 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
     const open = mine || !!(o.spOpenIds && o.spOpenIds[sp.id]);
     const sub = [sp.school, sp.subject].map(t => String(t || "").trim()).filter(Boolean).join("・");
     return `<li class="ev-sp" data-sp-row data-id="${esc(sp.id)}"><details class="ev-sp-fold" data-sp-fold="${esc(sp.id)}"${open ? " open" : ""}>
-      <summary><span class="chev" aria-hidden="true"></span>${face(sp.display_name, sp.photo_url, " sm")}<span class="ev-sp-who"><b>${esc(sp.display_name || "")}</b>${sub ? `<span class="mini">${esc(sub)}</span>` : ""}</span>${sp.consent ? "" : `<span class="tag draft">${T("ev.spHidden")}</span>`}<span class="sp"></span><span class="ev-mv">${evArrow("ev-sp-move", sp.id, -1, T("ev.mvUp"), i === 0 || busy, "↑")}${evArrow("ev-sp-move", sp.id, 1, T("ev.mvDown"), i === speakers.length - 1 || busy, "↓")}</span></summary>
+      <summary><span class="chev" aria-hidden="true"></span>${face(sp.display_name, sp.photo_url || sp.people_photo, " sm")}<span class="ev-sp-who"><b>${esc(sp.display_name || "")}</b>${sub ? `<span class="mini">${esc(sub)}</span>` : ""}</span>${sp.consent ? "" : `<span class="tag draft">${T("ev.spHidden")}</span>`}<span class="sp"></span><span class="ev-mv">${evArrow("ev-sp-move", sp.id, -1, T("ev.mvUp"), i === 0 || busy, "↑")}${evArrow("ev-sp-move", sp.id, 1, T("ev.mvDown"), i === speakers.length - 1 || busy, "↓")}</span></summary>
       <div class="ev-sp-f">
         <div class="ev-ph-state">${showBox(`data-act="ev-sp-show" data-id="${esc(sp.id)}"`, !!sp.consent)}${sp.person_id ? ` <a class="mini ev-sp-open" href="${evPersonHref(sp.person_id)}">${T("ev.spFromRecords")}</a>` : ""}</div>
         ${fields(v)}
-        ${pick}
+        ${pick}${evPeoplePhotoNote(sp)}
         ${evSpeakerLinkHTML(sp, (o.spLink || {})[sp.id], !!o.canLink, busy)}
         <div class="ev-acts"><button class="btn sm" data-act="ev-sp-save" data-id="${esc(sp.id)}"${dis}>${T("ev.spSave")}</button>${sp.photo_url ? `<button class="btn ghost sm" data-act="ev-sp-photo-clear" data-id="${esc(sp.id)}"${dis}>${T("ev.spPhotoClear")}</button>` : ""}<span class="sp"></span><button class="btn quiet danger sm" data-act="ev-sp-del" data-id="${esc(sp.id)}"${dis}>${T("ev.spDel")}</button></div>
       </div></details></li>`;
@@ -1989,7 +1999,7 @@ export function eventSpeakersHTML(e, speakers, canEdit, busy, x) {
         ${Array.isArray(found) && o.canLink && String(o.spQ || "").trim() && !d.person_id ? `<p class="ev-line ev-sp-newp"><button type="button" class="btn ghost sm" data-act="ev-sp-newperson" data-id="${esc(e.id)}"${dis}>${esc(T("ev.spNewPerson", { name: String(o.spQ).trim() }))}</button> <span class="mini">${T("ev.spNewPersonHelp")}</span></p>` : ""}
       </div>`;
   const picked = (d.person_id ? `<p class="ev-line">${T("ev.spPicked", { name: esc(d.from || "") })} <a class="ev-sp-open" href="${evPersonHref(d.person_id)}">${T("ev.spOpenPerson")}</a> <button class="btn quiet sm" data-act="ev-sp-unpick"${dis}>${T("ev.spUnpick")}</button></p>` : "")
-    + (d.photo_url ? `<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="${esc(d.photo_url)}" alt=""> <span>${T("ev.spPhotoFrom")}</span> <button class="btn quiet sm" data-act="ev-sp-nophoto"${dis}>${T("ev.spPhotoDrop")}</button></p>` : "");
+    + (d.person_id && /^https:\/\//.test(String(d.people_photo || "")) ? `<p class="ev-line ev-sp-from"><img class="ev-sp-pic sm" src="${esc(d.people_photo)}" alt=""> <span>${T("ev.spPhotoFrom")}</span></p>` : "");
   const add = foldHTML("ev-sp-new", T("ev.spNew"), `<div id="ev-sp-new-box" data-ev="${esc(e.id)}">${finder}${picked}${fields(evRowVals({ typed: d }, SP_KEYS), "ev-sp-new")}
       <div class="ev-ph-state">${showBox('id="ev-sp-new-show"', d.show == null ? !d.minor : !!d.show)}</div>
       <div class="mini">${T("ev.spAddHint")}</div>
