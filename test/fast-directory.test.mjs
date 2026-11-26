@@ -67,7 +67,7 @@ test("★ 紀錄那一頁：要等的一起等，存一個人的東西不重拿�
   assert.ok(boot.indexOf("parseHash();") < boot.indexOf("D.loadBootstrap()"), "要先知道開的是哪一頁");
   assert.match(boot, /if \(!S\.me \|\| S\.me\.role !== "cadre"\) \{ render\(\); return; \}/, "不是幹部照舊擋在這裡");
   // 一個人的頁面：兩趟一起
-  assert.match(m, /const \[person\] = await Promise\.all\(\[D\.loadPerson\(S\.id\), needDir \? loadDir\(\) : null\]\);/);
+  assert.match(m, /const \[person\] = await Promise\.all\(\[D\.loadPerson\(S\.id\), needDir \? \(dirFlight \|\| loadDir\(\)\) : null\]\);/);
   // 存：不再有「先等這個人、再等 bootstrap」的排隊
   assert.doesNotMatch(m, /await loadPerson\(\); await loadBoot\(\)/, "兩趟要一起等");
   assert.doesNotMatch(m, /await loadBoot\(\); (if \(act === "dup-merge"\) )?await loadDir\(\)/, "兩趟要一起等");
@@ -76,7 +76,11 @@ test("★ 紀錄那一頁：要等的一起等，存一個人的東西不重拿�
   for (const line of nulls)
     assert.match(line, /dup-merge|msg\.merged|msg\.forgot|go\("people\/" \+ id\)|loadBoot\(\)|manual|S\.dirErr/, "只有名單的人數會變的時候才丟掉名錄：" + line.trim().slice(0, 90));
   assert.ok((m.match(/S\.dirStale = true/g) || []).length >= 6, "存一個人的東西只標「舊了」");
-  assert.match(m, /else if \(S\.view === "people" && \(!Array\.isArray\(S\.dir\) \|\| S\.dirStale\)\) \{ await loadDir\(\); S\.dirStale = false; \}/, "回名錄的時候重拿");
+  assert.match(m, /else if \(S\.view === "people" && \(!Array\.isArray\(S\.dir\) \|\| S\.dirStale\)\) \{ await \(!S\.dirStale && dirFlight \? dirFlight : loadDir\(\)\); S\.dirStale = false; \}/, "回名錄的時候重拿；舊了的一定是新問的，不拿背景那一趟");
+  // 第二輪（2026-11-26）：開的不是名錄也先在背景拿回來；存一個人的東西不等 bootstrap
+  assert.match(boot, /await openRoute\(\);[\s\S]*if \(S\.boot && S\.boot\.can_view && !Array\.isArray\(S\.dir\) && !dirFlight\) \{ const f = loadDir\(\)\.finally/, "畫完才在背景拿名錄，讀不到的人不問");
+  assert.equal((m.match(/S\.dirStale = true; await loadPerson\(\); refreshBootQuietly\(\); S\.msg = T\("msg\.saved"\); render\(\); return;/g) || []).length, 2, "存完只等這個人回來，bootstrap 在背景重拿");
+  assert.match(m, /function refreshBootQuietly\(\) \{\s*loadBoot\(\)\.then\(\(\) => \{ const a = document\.activeElement; if \(!S\.busy && !\(a && \/\^\(INPUT\|TEXTAREA\|SELECT\)\$\/\.test\(a\.tagName\)\)\) render\(\); \}\);/, "人正在打字就不重畫");
 });
 
 test("★ 後台活動那一頁：不等待辦那一包，開頁問過的不問第二次", () => {
@@ -84,9 +88,18 @@ test("★ 後台活動那一頁：不等待辦那一包，開頁問過的不問�
   const boot = m.slice(m.indexOf("async function boot("), m.indexOf("// 側欄的兩個分頁"));
   const all = boot.slice(boot.indexOf("await Promise.all(["), boot.indexOf("]);", boot.indexOf("await Promise.all([")));
   assert.doesNotMatch(all, /loadTodo/, "待辦那一包不在大家一起等的那一輪裡（裡面的 public_team 正式站一趟一秒多）");
-  assert.match(boot, /const todoP = D\.loadTodo\(S\.me\)\.catch\(\(\) => \(\{\}\)\);/);
-  assert.match(boot, /if \(\/\^\(teams\|home\)\$\/\.test\(hash0\)\) takeTodo\(await todoP\);/, "只有「各 team」那一頁等它");
-  assert.match(boot, /takeTodo\(\{\}\);\s*todoP\.then\(todo => \{ takeTodo\(todo\);/, "其他頁先畫，回來再補");
+  assert.match(boot, /const todoP = defer \? null : D\.loadTodo\(S\.me\)\.catch\(\(\) => \(\{\}\)\);/);
+  assert.match(boot, /else if \(\/\^\(teams\|home\)\$\/\.test\(hash0\)\) takeTodo\(await todoP\);/, "只有「各 team」那一頁等它");
+  assert.match(boot, /else \{ takeTodo\(\{\}\); todoP\.then\(todo => \{ takeTodo\(todo\); quietRender\(\); \}\); \}/, "其他頁先畫，回來再補");
+  // 第二輪（2026-11-26）：開頁就是活動那一頁，先問它自己要的，畫完才問其他的
+  assert.match(boot, /const defer = !light && \(\(hash0 === "" && new URLSearchParams\(location\.search\)\.get\("tab"\) !== "forms"\) \|\| \/\^events\(\\\/\|\$\)\/\.test\(hash0\)\);/);
+  assert.match(all, /light \|\| defer \? null : D\.loadRequests\(\)/); assert.match(all, /light \|\| defer \? null : D\.loadMeetings\(\)/);
+  assert.match(all, /light \? null : D\.loadEvents\(\)/, "活動自己在第一輪");
+  assert.match(boot, /const pendingP = light \|\| defer \? Promise\.resolve\(\[\]\) : D\.loadPendingAll\(\)/);
+  assert.equal((boot.match(/if \(defer\) secondWave\(\); return; \}/g) || []).length, 2, "兩條開活動的路畫完都跑第二輪");
+  assert.ok(boot.indexOf("await openTab(") < boot.lastIndexOf("if (defer) secondWave();"), "第二輪在畫完之後");
+  assert.match(boot, /if \(S\.requests == null\) S\.requests = rq; if \(S\.meetings == null\) S\.meetings = mt;/, "人已經點進那一頁自己重拿過的不蓋掉");
+  assert.match(boot, /if \(!defer\) sideJobs\(\);/, "提醒信與 Google 日曆：活動那一頁放到第二輪，別的頁照舊");
   assert.match(boot, /INPUT\|TEXTAREA\|SELECT/, "人正在打字就不重畫");
   assert.match(boot, /S\.todo\.requests = S\.requests; S\.todo\.events = S\.events; S\.todo\.meetings = S\.meetings;/, "待辦要的三樣照舊掛上去");
   // 專案清單跟第一輪一起問；三秒內不問第二次

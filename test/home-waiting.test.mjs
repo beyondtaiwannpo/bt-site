@@ -154,7 +154,7 @@ test("★ 時間看板與我的護照也有側欄（2026-11-14 Paul：add the si
 
 test("後台：沒有 # 開活動；#teams 與舊的 #home 開各 team", () => {
   const main = readFileSync("admin/src/main.js", "utf8");
-  assert.match(main, /else if \(!\/\^\(teams\|home\)\$\/\.test\(location\.hash\.slice\(1\)\)\) \{ history\.replaceState\(null, "", location\.pathname \+ location\.search \+ "#events"\); await openTab\("events"\); return; \}/);
+  assert.match(main, /else if \(!\/\^\(teams\|home\)\$\/\.test\(location\.hash\.slice\(1\)\)\) \{ history\.replaceState\(null, "", location\.pathname \+ location\.search \+ "#events"\); await openTab\("events"\); if \(defer\) secondWave\(\); return; \}/);
   assert.match(main, /S\.view = \(t === "teams" \|\| t === "home"\) \? "home" : "list"/);
   const home = readFileSync("home/src/main.js", "utf8");
   assert.match(home, /RAIL\.shellHTML\(nav, RAIL\.railHTML\("home", tab, rme, \{\}, lang\(\)\)/);

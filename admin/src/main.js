@@ -264,35 +264,46 @@ async function boot(retried) {
     // 2026-11-09 效率：沒有任何工作區、也不是 Co-President／Senior Adviser／Director 的幹部，總覽只會印「今天沒有要處理的」加自己的 team，
     // 工作區、需求單、活動、會議、待寄的信對他全是空的（RLS），不用問（實測從 16 次查詢降到 9 次）。有指派或職級的人照舊全抓。
     const light = !S.me.senior && S.me.board === "member" && !Object.keys(S.me.ws || {}).length;
-    const pendingP = light ? Promise.resolve([]) : D.loadPendingAll().catch(() => []);
+    // 2026-11-26 速度第二輪：開頁就是活動那一頁（/admin/ 預設就是）的時候，先問這一頁畫得出來要的那幾樣
+    //（表單、team、工作區、活動、專案），畫完才問其他的（待寄的信、需求單、會議、待辦那一包、提醒信、Google 日曆）。
+    // 正式站量到：十九趟一起發的時候活動那一趟要 1038 毫秒，自己一趟只要 308 毫秒（資料庫一次只接幾趟，其他的在排隊）。
+    // 別的頁（#requests、#meetings、#teams…）照舊全部一起問：它們自己的內容就在那一輪裡。
+    const hash0 = location.hash.slice(1);
+    const defer = !light && ((hash0 === "" && new URLSearchParams(location.search).get("tab") !== "forms") || /^events(\/|$)/.test(hash0));
+    const pendingP = light || defer ? Promise.resolve([]) : D.loadPendingAll().catch(() => []);
     // 2026-11-25 速度：待辦那一包（loadTodo）裡有一趟要一秒多（公開團隊頁的名單連大頭照，正式站 494 KB），
     // 而它只有「各 team」那一頁的內容與側欄右邊的小數字在用。以前每一頁都等它回來才畫，活動那一頁因此每次多等一秒多。
     // 現在只有 #teams／#home 等它；其他頁先畫，它回來了再補側欄的數字（人正在打字就不重畫，下一次畫的時候數字就在了）。
-    const hash0 = location.hash.slice(1);
-    const todoP = D.loadTodo(S.me).catch(() => ({}));
+    const todoP = defer ? null : D.loadTodo(S.me).catch(() => ({}));
     // 開頁就是活動那一頁的話，專案清單也一起問（以前是等上面全部回來才問第二輪）。
     if (hash0 === "" || /^events(\/|$)/.test(hash0)) { const p = D.loadProjects(); p.catch(() => {}); bootProjects = { p, at: Date.now() }; }
     const [forms, pendingAll, teams, workspaces, requests, events, meetings] = await Promise.all([
       formsP, pendingP,
       D.loadTeams().catch(() => []),
       light ? [] : D.loadWorkspaces().catch(() => []),
-      light ? null : D.loadRequests().catch(() => null),
+      light || defer ? null : D.loadRequests().catch(() => null),
       light ? null : D.loadEvents().catch(() => null),
-      light ? null : D.loadMeetings().catch(() => null),
+      light || defer ? null : D.loadMeetings().catch(() => null),
     ]);
     S.forms = forms; S.pendingAll = pendingAll; S.teams = teams; S.workspaces = workspaces;
     S.requests = requests; S.events = events; S.meetings = meetings;
     if (events) bootEventsAt = Date.now();
     const takeTodo = todo => { S.todo = todo || {}; S.todo.requests = S.requests; S.todo.events = S.events; S.todo.meetings = S.meetings; };
-    if (/^(teams|home)$/.test(hash0)) takeTodo(await todoP);
-    else {
-      takeTodo({});
-      todoP.then(todo => { takeTodo(todo); const a = document.activeElement; if (!S.busy && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) render(); });
-    }
+    // 補資料回來之後重畫一次；人正在打字（或正在存）就不畫，下一次畫的時候東西就在了。
+    const quietRender = () => { const a = document.activeElement; if (!S.busy && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) render(); };
     // 提醒信的退路（2026-11-02）：開頁叫一次 tick_mail()，Resend 沒設好也不會讓頁面壞。
-    if (!light) D.tickMail().catch(() => {});
     // 開頁拉一次大家在 Google 日曆上的回覆，有人改了就重讀會議。
-    if (!light) D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {});
+    const sideJobs = () => { if (light) return; D.tickMail().catch(() => {}); D.gcalRefresh().then(n => { if (n > 0) return reloadMeetings().then(() => render()); }).catch(() => {}); };
+    // 活動那一頁畫完才跑的第二輪。需求單與會議只在還沒有的時候才放（人已經點進那一頁的話，那一頁自己重拿過了，比這一份新）。
+    const secondWave = () => {
+      sideJobs();
+      Promise.all([D.loadPendingAll().catch(() => []), D.loadRequests().catch(() => null), D.loadMeetings().catch(() => null), D.loadTodo(S.me).catch(() => ({}))])
+        .then(([pending, rq, mt, todo]) => { S.pendingAll = pending; if (S.requests == null) S.requests = rq; if (S.meetings == null) S.meetings = mt; takeTodo(todo); quietRender(); });
+    };
+    if (defer) takeTodo({});
+    else if (/^(teams|home)$/.test(hash0)) takeTodo(await todoP);
+    else { takeTodo({}); todoP.then(todo => { takeTodo(todo); quietRender(); }); }
+    if (!defer) sideJobs();
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
     // #members=<工作區>（2026-12-25）：每一區的「誰在做」都連到這裡，一頁管所有地方的成員。門在 workspace_members / assign 裡。
     const mh = location.hash.slice(1).match(/^members=(.+)$/);
@@ -303,9 +314,9 @@ async function boot(retried) {
       await openMembers(ws, name, "home"); if (S.mp) { S.mp.fromLink = true; S.mp.canBack = document.referrer.startsWith(location.origin); render(); } return;
     }
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
-    else if (/^(requests?|events|projects|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); return; }
+    else if (/^(requests?|events|projects|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); if (defer) secondWave(); return; }
     // 2026-11-14：/admin/ 沒有 # 的時候開活動（待辦搬到 /home/ 了）。#teams 與舊的 #home 開「各 team」。
-    else if (!/^(teams|home)$/.test(location.hash.slice(1))) { history.replaceState(null, "", location.pathname + location.search + "#events"); await openTab("events"); return; }
+    else if (!/^(teams|home)$/.test(location.hash.slice(1))) { history.replaceState(null, "", location.pathname + location.search + "#events"); await openTab("events"); if (defer) secondWave(); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session

@@ -99,6 +99,9 @@ async function boot(retried) {
     UI.F.bindDrag(root(), (from, to) => { if (canEditQs()) restructure(qs => byIds(qs, UI.F.moveId(qs.map(q => q.id), from, to))); });
     await Promise.all([loadBoot(bootP), dirP ? loadDir(dirP) : null]);
     await openRoute();
+    // 2026-11-26 速度第二輪：開的不是名錄那一頁，畫完之後也先把名錄拿回來放著（正式站一趟一秒多、八百 KB），
+    // 之後點「人」就是馬上有。讀不到名錄的人不問。人在它回來之前就點進名錄的話，openRoute 等的是同一趟，不問第二次。
+    if (S.boot && S.boot.can_view && !Array.isArray(S.dir) && !dirFlight) { const f = loadDir().finally(() => { if (dirFlight === f) dirFlight = null; }); dirFlight = f; }
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-records"); return; }
     console.error(HERE + " 載入失敗：", e);
@@ -114,6 +117,12 @@ function parseHash() {
   S.sub = UI.SUBS.includes(parts[2]) ? parts[2] : "questions";
 }
 // 名錄整份拿回來。函式還不在（遷移檔沒跑）就在那一頁說一句，別的分頁照樣能用。
+// 背景先拿的那一趟（見 boot 最後）。只有它會放在這裡；改了名單（併人、移除、新增）之後的重拿不走這裡，一定是新問的。
+let dirFlight = null;
+// bootstrap（數字、同名的卡）在背景重拿，回來了再畫一次；人正在打字或正在存就不畫，下一次畫的時候就是新的。
+function refreshBootQuietly() {
+  loadBoot().then(() => { const a = document.activeElement; if (!S.busy && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) render(); });
+}
 // p 是已經發出去的那一趟（boot 一開頁就先問了）；沒給就現在問。這一支不會丟錯，所以可以跟別的一起等。
 async function loadDir(p) {
   S.dirErr = "";
@@ -124,7 +133,7 @@ async function loadDir(p) {
 // 兩趟一起問（2026-11-25）：以前是先等這個人回來才去拿名錄，名錄慢的時候每存一次就多等一輪。
 async function loadPerson() {
   const needDir = S.boot && S.boot.can_manage && !Array.isArray(S.dir);
-  const [person] = await Promise.all([D.loadPerson(S.id), needDir ? loadDir() : null]);
+  const [person] = await Promise.all([D.loadPerson(S.id), needDir ? (dirFlight || loadDir()) : null]);
   S.person = person;
 }
 async function loadBoot(p) {
@@ -142,7 +151,7 @@ async function openRoute(keepMsg) {
     if (S.view === "overview" && S.id) { S.event = await D.loadEvent(S.id); if (S.event && S.event.can_edit && !Array.isArray(S.dir)) { await loadDir(); } }
     else if (S.view === "forms" && S.id) { const other = !S.aud || S.aud._id !== S.id; setResults(await D.loadResults(S.id)); if (other) { resetAud(); S.fx = newFx(); } }
     else if (S.view === "people" && S.id) await loadPerson();
-    else if (S.view === "people" && (!Array.isArray(S.dir) || S.dirStale)) { await loadDir(); S.dirStale = false; }
+    else if (S.view === "people" && (!Array.isArray(S.dir) || S.dirStale)) { await (!S.dirStale && dirFlight ? dirFlight : loadDir()); S.dirStale = false; }
   } catch (e) { S.msg = T("err.load") + D.says(e); }
   S.busy = false;
   render();
@@ -557,7 +566,7 @@ document.addEventListener("click", async e => {
     if (!v.event_id) { S.msg = T("err.save") + T("err.needEvent"); render(); return; }
     const ok = await run("err.save", () => D.setParticipation(v.event_id, { person_id: S.id, role: v.role, status: v.status }));
     if (ok === undefined) return;
-    S.dirStale = true; await Promise.all([loadPerson(), loadBoot()]); S.msg = T("msg.saved"); render(); return;
+    S.dirStale = true; await loadPerson(); refreshBootQuietly(); S.msg = T("msg.saved"); render(); return;
   }
   // 同名一群一張卡（2026-12-06）：radio 留哪欄、checkbox 勾哪幾欄，一顆鈕併，一顆鈕記「不是同一個人」。
   if (act === "dup-merge" || act === "dup-not-same") {
@@ -613,7 +622,7 @@ document.addEventListener("click", async e => {
     const v = vals("[data-pedit]");
     const ok = await run("err.save", () => D.savePerson(S.id, { name_zh: v.name_zh, name_en: v.name_en, school: v.school, grad_year: v.grad_year || "", kind: UI.kindFromForm(((S.person || {}).person || {}).kind, v.hs), note: v.note }));
     if (ok === undefined) return;
-    S.dirStale = true; await Promise.all([loadPerson(), loadBoot()]); S.msg = T("msg.saved"); render(); return;
+    S.dirStale = true; await loadPerson(); refreshBootQuietly(); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "merge") {
     if (UI.needAsk(S, b, T("merge.ask"))) return;
