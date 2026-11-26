@@ -146,7 +146,7 @@ async function openRoute(keepMsg) {
   if (!keepMsg) S.msg = "";
   if (S.view !== "overview" || !S.id) S.event = null;
   if (S.view !== "forms" || S.id !== (S.results && S.results.form && S.results.form.id)) S.results = null;
-  if (S.view !== "people" || !S.id) { S.person = null; S.personTerms = null; }
+  if (S.view !== "people" || !S.id) { S.person = null; S.personTerms = null; S.labNew = null; }
   render();
   try {
     if (S.view === "overview" && S.id) { S.event = await D.loadEvent(S.id); if (S.event && S.event.can_edit && !Array.isArray(S.dir)) { await loadDir(); } }
@@ -318,6 +318,14 @@ function download(text, name) {
 
 // 收起來的「加一個…」表單開著沒（ui.js 的 foldStart），重畫之後照舊。
 document.addEventListener("toggle", e => { const k = e.target && e.target.dataset && e.target.dataset.fold; if (k) UI.setFold(k, e.target.open); }, true);
+// 「加一個標籤」那一塊：換了哪一種、或勾了「只記一句」，底下要問的東西跟著換（2026-11-26）。只改 S 再畫，沒有存任何東西。
+document.addEventListener("change", e => {
+  const pick = e.target && e.target.closest && e.target.closest("select[data-labnew]");
+  const tick = e.target && e.target.closest && e.target.closest("input[data-labnote]");
+  if (!pick && !tick) return;
+  S.labNew = pick ? { label: pick.value, noteOnly: false } : Object.assign({}, S.labNew, { label: (S.labNew || {}).label || UI.GIVEN_LABELS[0], noteOnly: tick.checked });
+  render();
+});
 // 一筆職位的「哪一季」：選了就存（2026-11-26）。不重拿整個人，只把手上那一筆改掉再畫。
 document.addEventListener("change", async e => {
   const el = e.target && e.target.closest && e.target.closest("select[data-ptseason]");
@@ -701,6 +709,30 @@ document.addEventListener("click", async e => {
     S.dirStale = true; await loadPerson(); render(); return;
   }
   // ── 關係網（2027-01-03，2027-01-03-people-network.sql）：BT 給的標籤、照片、同意、個人連結 ──
+  // 加一個標籤：選了哪一種就存那一種真正的紀錄（2026-11-26）。幹部是一筆職位、學員／講者／志工／主辦是一筆參與紀錄、mentor／mentee 是一組配對。
+  // 門都在資料庫（職位：Co-President 與 Senior Adviser；參與紀錄與配對：管得了紀錄的人）。標籤自己從紀錄算，不另外寫 rc_labels。
+  if (act === "label-record") {
+    const box = b.closest("[data-glabel]"); if (!box) return;
+    const v = UI.formValues(box), label = v.label, how = UI.labelHow(label);
+    if (how === "note") return;
+    if (how !== "term" && !v.event_id) { S.msg = T("err.save") + T("err.labNeedEvent"); render(); return; }
+    const other = how === "pair" ? UI.dirMatch(S.dir, v.other_who) : null;
+    if (how === "pair" && String(v.other_who || "").trim() && !other) { S.msg = T("err.save") + T("err.labPickList"); render(); return; }
+    const ok = await run("err.save", async () => {
+      if (how === "term") {
+        const t = UI.termTitles(v.title);
+        await D.setPosition(S.id, v.term, t.zh, t.en, v.team);
+        if (v.season) await D.setPositionSeason(S.id, v.term, v.team, v.season);
+      } else if (other) {
+        await D.savePair(null, { event_id: v.event_id, mentor_id: label === "mentor" ? S.id : other.id, mentee_id: label === "mentee" ? S.id : other.id });
+      } else {
+        await D.setParticipation(v.event_id, { person_id: S.id, role: label, status: how === "event" ? (v.status || "attended") : "attended" });
+      }
+      return true;
+    });
+    if (ok === undefined) return;
+    S.labNew = { label }; S.dirStale = true; await loadPerson(); refreshBootQuietly(); S.msg = T("msg.labRecorded"); render(); return;
+  }
   if (act === "label-save" || act === "label-del") {
     // 2026-11-25：十一種標籤都可以自己加。已經加過的那一塊，按鈕上寫著是哪一種；「加一個標籤」那一塊是空的，看選單選了哪一種。
     const box = b.closest("[data-glabel]"); if (!box) return;

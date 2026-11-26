@@ -8103,6 +8103,31 @@ Paul 2026-11-26 看著名錄問了三件事：沒當過幹部的人為什麼掛�
 - 重跑 `2027-01-06-labels-and-schools.sql` 或 `2027-01-12-fast-directory.sql` 會把其中一支換回舊規則，要再跑一次 `2027-01-16-member-label-rule.sql`。
 - 守門：`test/label-rules.test.mjs`、`scripts/db/smoke.sh` 那一段（八個假的人，含兩個破壞測試）。
 
+## 加一個標籤的時候問真正的紀錄（2026-11-26）
+
+Paul：「i add a participation into this person as a speaker but the label doesn't show up like adding a label should interact with our stuff for example if I add a member label it should asked me what terms and what teams, student, what events she attends, mentee what year what pairs」。
+
+兩件事，一件在資料庫、一件在畫面：
+
+1. **有真的紀錄了，就不再印舊資料庫留下來的那一句**（遷移檔 `2027-01-19-labels-prefer-records.sql`，要在 Supabase 跑過才生效；只換兩支函式的算法，資料一列都不改）。
+   2027-01-08 把舊名單的備註搬成標籤的時候，對不到哪一場的留了一個 BT 給的標籤，補充說明是 `Old database: Speaker, Spring 2025 (event not recorded)` 這種，
+   「到哪一年」也寫了那一年。規則原本是「BT 寫了就用 BT 寫的」，所以之後把真的那一場補進去，畫面上還是印舊的那一句，看起來像沒加進去。
+   現在：同一種標籤從紀錄算得出來、而 BT 那一句是 `Old database:` 開頭的，補充說明、哪一年起、現在還是不是都照紀錄，不看「到哪一年」。
+   那一句沒有刪，底下「加、改標籤」那一塊還在，旁邊會講一句可以拿掉。BT 自己寫的補充說明照舊優先。
+2. **「加一個標籤」選了哪一種，就問那一種真正的紀錄**（`admin/records/src/ui.js` 的 `labelHow`、`personLabelsHTML`，`main.js` 的 `label-record`）：
+
+| 選的 | 問什麼 | 存成什麼 |
+|---|---|---|
+| 幹部 | 哪一屆、哪一季、team、職位 | 一筆職位（`set_position`，只有 Co-President 與 Senior Adviser） |
+| 學員、講者、志工、主辦 | 哪一場活動、到了沒 | 一筆參與紀錄（`rc_set_participation`） |
+| Mentor、Mentee | 哪一期 mentorship、配對的對象（名單裡的人，可以空著） | 有對象是一組配對（`rc_save_pair`，兩個人都有紀錄）；沒有就是那一期的參與紀錄 |
+| 教授、招生官、聯絡人、實習生 | 補充說明、哪一年起、到哪一年 | BT 給的標籤（`rc_label_set`，跟以前一樣） |
+
+   存的是紀錄，標籤自己從紀錄算，不另外寫一份。紀錄裡沒有那一場或那一屆的時候勾「只記一句」，退回原本的三格。
+   某一種 BT 已經給過一句了，「加一個標籤」那裡只補紀錄，那一句在上面那一塊改，不會有兩句。
+
+守門：`test/label-add.test.mjs`、`scripts/db/smoke.sh` 那一段（含一個破壞測試）。
+
 ## 聯絡方式掛錯種類（2026-11-26）
 
 Paul 貼著一個人的頁面，LinkedIn 那一行是一條 facebook.com 的連結：「this is obviously facebook then change it to facebook, check all others」。

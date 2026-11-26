@@ -239,14 +239,16 @@ test("★ 加、改標籤：十一種都可以加；已經加過的每一種一�
   const add = h.slice(at(h, 'data-glabel="new"'));
   assert.match(add, /<b>加一個標籤<\/b>/);
   const opts = [...add.slice(0, at(add, "</select>")).matchAll(/<option value="(\w+)"/g)].map(x => x[1]);
-  assert.deepEqual(opts, UI.LABELS.filter(k => !givenNow.includes(k)), "選單裡是還沒加過的每一種，幹部、學員、Mentor、講者都在");
+  // 2026-11-26 起選單裡是全部十一種：選了哪一種就問那一種真正的紀錄（見 test/label-add.test.mjs），已經給過的那一種也可以再補一筆紀錄。
+  assert.deepEqual(opts, UI.LABELS, "選單裡是每一種，幹部、學員、Mentor、講者都在");
   for (const k of ["member", "student", "mentor", "mentee", "speaker", "volunteer", "organizer"]) assert.ok(opts.includes(k), `選單裡沒有 ${k}`);
   assert.match(add, /data-act="label-save" data-label="">加上這個標籤<\/button>/, "加新的那顆按鈕不寫死是哪一種，看選單");
   assert.doesNotMatch(add, /label-del/);
   assert.match(add, /name="detail" value=""/); assert.match(add, /name="since" type="number" min="1950" max="2100" value=""/); assert.match(add, /name="until"/);
   assert.match(UI.personLabelsHTML(PERSON, { ...MGR, busy: true }, true), /data-act="label-save" data-label="" disabled>/);
-  // 十一種都加過了就沒有「加一個標籤」那一塊
-  assert.doesNotMatch(UI.personLabelsHTML({ ...PERSON, given: UI.LABELS.map(l => ({ label: l, detail: "", since: null, until: null })) }, MGR, true), /data-glabel="new"/);
+  // 十一種都給過了：「加一個標籤」那一塊還在（可以再補紀錄），但不會出現第二個「加上這個標籤」，那一句在上面那一塊改
+  const allGiven = UI.personLabelsHTML({ ...PERSON, given: UI.LABELS.map(l => ({ label: l, detail: "", since: null, until: null })) }, MGR, true);
+  assert.doesNotMatch(allGiven.slice(at(allGiven, 'data-glabel="new"')), /data-act="label-save"/);
   const v = UI.personLabelsHTML(PERSON, VIEWER, false);
   assert.doesNotMatch(v, /data-glabels|data-act=|<input/, "看的人只看得到標籤");
   assert.match(v, /who-professor/);

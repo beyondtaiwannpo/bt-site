@@ -1495,6 +1495,11 @@ const photoHTML = (url, name) => url ? `<img class="rc-photo" src="${esc(url)}" 
 // 還沒跑那一支的資料庫，每一列沒有 given／earned 這兩個鍵，就照 source 判斷；加那三種以外的標籤資料庫會回 bad_label，那一句會講要跑哪一支。
 const isGiven = l => (l.given != null ? !!l.given : l.source === "given");
 const isEarned = l => (l.earned != null ? !!l.earned : l.source !== "given");
+// 加一個標籤的時候問什麼（2026-11-26）：term 問哪一屆、哪一季、哪一個 team（存成一筆職位）；event 問哪一場活動（存成一筆參與紀錄）；
+// pair 問哪一期 mentorship 與配對的對象（存成一組配對，沒填對象就存成那一期的參與紀錄）；note 是原本的三格（補充說明、哪一年起、到哪一年）。
+// 教授、招生官、聯絡人、實習生沒有對應的紀錄，只有 note。
+export const LABEL_HOW = { member: "term", student: "event", speaker: "event", volunteer: "event", organizer: "event", mentee: "pair", mentor: "pair" };
+export const labelHow = k => LABEL_HOW[k] || "note";
 export function personLabelsHTML(d, S, canEdit) {
   const labs = (d.labels || []).filter(l => LABELS.includes(l.label));
   const src = l => T(isEarned(l) ? (isGiven(l) ? "lab.srcBoth" : "lab.srcEarned") : "lab.srcGiven");
@@ -1505,14 +1510,45 @@ export function personLabelsHTML(d, S, canEdit) {
   const fields = g => `<div class="two"><label class="wide"><i>${esc(T("lab.detail"))}</i><input name="detail" value="${esc(g ? g.detail || "" : "")}" maxlength="160" autocomplete="off"></label>
           <label><i>${esc(T("lab.sinceYear"))}</i><input name="since" type="number" min="1950" max="2100" value="${esc(g && g.since ? g.since : "")}"></label><label><i>${esc(T("lab.untilYear"))}</i><input name="until" type="number" min="1950" max="2100" value="${esc(g && g.until ? g.until : "")}"></label></div>`;
   const one = k => { const g = given[k];
+    // 舊資料庫留下來的那一句、而同一種現在有真的紀錄了：上面那一行已經照紀錄印，講一聲這一句可以拿掉（2026-11-26）。
+    const stale = /^Old database:/.test(String(g.detail || "")) && labs.some(l => l.label === k && isEarned(l));
     return `<div class="rc-glabel" data-glabel="${k}"><div class="fhead"><b>${esc(T("lab." + k))}</b></div>
-        ${fields(g)}
+        ${stale ? `<div class="mini">${esc(T("lab.staleNote"))}</div>` : ""}${fields(g)}
         <div class="form-foot"><button class="btn sm" data-act="label-save" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T("lab.save"))}</button><button class="btn quiet sm" data-act="label-del" data-label="${k}"${S.busy ? " disabled" : ""}>${esc(T("lab.remove"))}</button></div></div>`; };
-  const free = GIVEN_LABELS.filter(k => !given[k]);
-  const add = free.length ? `<div class="rc-glabel" data-glabel="new"><div class="fhead"><b>${esc(T("lab.addNew"))}</b></div>
-        <label><i>${esc(T("lab.which"))}</i>${sel("label", free.map(k => [k, T("lab." + k)]), free[0])}</label>
-        ${fields(null)}
-        <div class="form-foot"><button class="btn sm" data-act="label-save" data-label=""${S.busy ? " disabled" : ""}>${esc(T("lab.add"))}</button><span class="mini">${esc(T("lab.addHint"))}</span></div></div>` : "";
+  // 加一個標籤（2026-11-26 重做）：選了哪一種，就問那一種真正的紀錄，存進去的是那一筆紀錄，標籤自己從紀錄算出來。
+  // Paul：「adding a label should interact with our stuff for example if I add a member label it should asked me what terms and what teams,
+  // student, what events she attends, mentee what year what pairs」。問什麼看 labelHow()；紀錄裡沒有那一場或那一屆的時候，勾「只記一句」退回原本的三格。
+  const nw = (S && S.labNew) || {}, kind = GIVEN_LABELS.includes(nw.label) ? nw.label : GIVEN_LABELS[0], dis = S.busy ? " disabled" : "";
+  const pt = S && S.personTerms, canTerm = !!(pt && pt.can_edit && (pt.terms || []).length);
+  const evs = ((S.boot && S.boot.events) || []).slice().sort((a, b) => String(b.starts_at || "").localeCompare(String(a.starts_at || "")));
+  const how = labelHow(kind), has = !!given[kind];
+  // 做不到的情況：幹部要 Co-President 或 Senior Adviser 才加得了職位；一場活動都沒有就沒得選。
+  const cant = (how === "term" && !canTerm) || ((how === "event" || how === "pair") && !evs.length);
+  const pairEvs = evs.filter(e => e.kind === "mentorship-term");
+  const noteBody = `${fields(null)}
+        <div class="form-foot"><button class="btn sm" data-act="label-save" data-label=""${dis}>${esc(T("lab.add"))}</button><span class="mini">${esc(T("lab.addHint"))}</span></div>`;
+  const recordBody = how === "term" && canTerm ? `<div class="two"><label><i>${esc(T("pt.term"))}</i>${sel("term", pt.terms.map(t => [t.id, t.id + (t.status === "current" ? T("pt.current") : "")]), (pt.terms.find(t => t.status !== "current") || pt.terms[0]).id)}</label><label><i>${esc(T("pt.season"))}</i>${sel("season", SEASONS.map(x => [x, seasonName(x)]), "")}</label></div>
+        <div class="two"><label><i>${esc(T("pt.team"))}</i><input name="team" list="rc-lab-teams" maxlength="60" autocomplete="off"><datalist id="rc-lab-teams">${(pt.teams || []).map(t => `<option value="${esc(t)}"></option>`).join("")}</datalist></label><label><i>${esc(T("pt.title"))}</i><input name="title" maxlength="60" placeholder="Member" autocomplete="off"></label></div>
+        <div class="form-foot"><button class="btn sm" data-act="label-record"${dis}>${esc(T("lab.addTerm"))}</button><span class="mini">${esc(T("lab.howTerm"))}</span></div>`
+    : how === "event" ? `<div class="two"><label><i>${esc(T("lab.whichEvent"))}</i>${sel("event_id", eventOpts(evs), "", false, T("person.pickEvent"))}</label><label><i>${esc(T("part.status"))}</i>${sel("status", PSTATUS.map(st => [st, T("pstatus." + st)]), "attended")}</label></div>
+        <div class="form-foot"><button class="btn sm" data-act="label-record"${dis}>${esc(T("lab.addEvent", { label: T("lab." + kind) }))}</button><span class="mini">${esc(T("lab.howEvent"))}</span></div>`
+    : how === "pair" ? `<div class="two"><label><i>${esc(T("lab.whichTerm"))}</i>${sel("event_id", eventOpts(pairEvs.length ? pairEvs : evs), "", false, T("person.pickEvent"))}</label><label><i>${esc(T(kind === "mentor" ? "lab.pairMentee" : "lab.pairMentor"))}</i><input name="other_who" class="rc-who" list="rc-lab-dir" autocomplete="off" placeholder="${esc(T("part.whoPh"))}" data-noauto="1"><datalist id="rc-lab-dir">${(Array.isArray(S.dir) ? S.dir : []).filter(x => x.id !== (d.person || {}).id).map(x => `<option value="${esc(dirLabel(x))}"></option>`).join("")}</datalist></label></div>
+        <div class="form-foot"><button class="btn sm" data-act="label-record"${dis}>${esc(T("lab.addPair", { label: T("lab." + kind) }))}</button><span class="mini">${esc(T("lab.howPair"))}</span></div>`
+    : "";
+  // 哪一塊要畫：
+  //   note 那幾種（教授、招生官、聯絡人、實習生）：三格。已經給過的在上面改，這裡講一句。
+  //   做不到（cant）：講為什麼；還沒給過就退回三格。
+  //   這一種 BT 已經給過了：這裡只補紀錄（那一句在上面改，不會有第二個）。
+  //   其他：預設問紀錄，勾了「只記一句」才是三格。
+  const tick = `<label class="check"><input type="checkbox" name="note_only" data-labnote data-noauto="1"${nw.noteOnly ? " checked" : ""}><span>${esc(T("lab.noteOnly"))}</span></label>`;
+  const above = `<div class="mini">${esc(T("lab.editAbove"))}</div>`;
+  const inner = how === "note" ? (has ? above : noteBody)
+    : cant ? `<div class="mini">${esc(T(how === "term" ? "lab.cantTerm" : "lab.cantEvent"))}</div>${has ? above : noteBody}`
+    : has ? recordBody
+    : (nw.noteOnly ? noteBody : recordBody) + tick;
+  const add = `<div class="rc-glabel" data-glabel="new"><div class="fhead"><b>${esc(T("lab.addNew"))}</b></div>
+        <label><i>${esc(T("lab.which"))}</i><select name="label" data-labnew${dis}>${GIVEN_LABELS.map(k => `<option value="${k}"${k === kind ? " selected" : ""}>${esc(T("lab." + k))}</option>`).join("")}</select></label>
+        ${inner}</div>`;
   const editor = canEdit ? `${foldStart("glabels", "data-glabels", T("lab.given"), S)}<div class="mini">${esc(T("lab.givenHint"))}</div>${GIVEN_LABELS.filter(k => given[k]).map(one).join("")}${add}</div></details>` : "";
   return sectionHTML(T("lab.title"), `${list}<div class="mini rc-labhelp">${esc(T("lab.help"))}</div>${editor}`, { id: "rc-labels" });
 }

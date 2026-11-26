@@ -5380,6 +5380,38 @@ chk "★ 改的與拿掉的每一筆都有紀錄，重跑沒有多寫" "5" "sele
 chk "紀錄裡留著改之前的種類" "linkedin" "select distinct before->>'kind' from public.rc_log where what = 'contact_kind_fix' and ref = (select id from public.people where name_en = 'Ck A')"
 psql -d "${DB}" -q -c "delete from public.rc_log where ref in (select id from public.people where name_en like 'Ck %'); delete from public.people where name_en like 'Ck %';" >/dev/null 2>&1
 chk "（收尾）假的人與他們的聯絡方式都拿掉了" "0" "select count(*) from public.rc_identities i where not exists (select 1 from public.people p where p.id = i.person_id) or exists (select 1 from public.people p where p.id = i.person_id and p.name_en like 'Ck %')"
+echo "── 標籤：有真的紀錄了，就不再看舊資料庫留下來的那一句（2027-01-19-labels-prefer-records.sql）──"
+# Paul 2026-11-26：「i add a participation into this person as a speaker but the label doesn't show up」
+# 他剛把人加進一場活動當講者，標籤那一行還是印「Old database: Speaker, Spring 2025 (event not recorded)」與「到 2025」。
+LPM=supabase/migrations/2027-01-19-labels-prefer-records.sql
+psql -d "${DB}" -X -A -t -q -c "insert into public.events (workspace_id, team, slug, title_zh, title_en, status, starts_at) select w.workspace_id, w.team, 'lpm-boot', '夏令營 2025', 'Lpm Bootcamp 2025', 'archived', timestamptz '2025-06-07' from (select workspace_id, team from public.events where team is not null limit 1) w;" \
+  -c "insert into public.people (name_en, kind) values ('Lpm Covered', 'guest'), ('Lpm Bare', 'guest'), ('Lpm Own', 'guest');" \
+  -c "insert into public.rc_labels (person_id, label, detail, since_year, until_year) select id, 'speaker', case when name_en = 'Lpm Own' then 'Keynote, written by BT' else 'Old database: Speaker, Spring 2025 (event not recorded)' end, 2025, 2025 from public.people where name_en like 'Lpm %';" \
+  -c "create table public.lpm_before as select p.id, public.rc_label_codes(p.id) c from public.people p where p.forgotten_at is null;" >/dev/null 2>&1
+lp1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LPM}" 2>&1 || true)
+if echo "${lp1}" | grep -q "OVERALL.*PASS" && ! echo "${lp1}" | grep -q "|FAIL"; then echo "  ok   標籤照紀錄那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 標籤照紀錄那一支驗收表：${lp1}" | head -20; fail=$((fail+1)); fi
+lp2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LPM}" 2>&1 || true)
+if echo "${lp2}" | grep -q "OVERALL.*PASS" && ! echo "${lp2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${lp2}" | head -20; fail=$((fail+1)); fi
+chk "★ 換了規則，沒有任何一個人的標籤代號變了（只有補充說明與年份會變）" "0" "select count(*) from public.lpm_before b where b.c is distinct from public.rc_label_codes(b.id)"
+LPL="select (l->>'since')||'|'||coalesce(l->>'until', 'none')||'|'||(l->>'earned')||'|'||(l->>'detail') from public.people p, jsonb_array_elements(public.rc_labels_of(p.id)) l where l->>'label' = 'speaker' and p.name_en ="
+chk "還沒有紀錄：照舊印舊資料庫的那一句與到哪一年" "2025|2025|false|Olddatabase:Speaker,Spring2025(eventnotrecorded)" "${LPL} 'Lpm Covered'"
+psql -d "${DB}" -X -A -t -q -c "insert into public.rc_participation (person_id, event_id, role, status) select p.id, e.id, 'speaker', 'attended' from public.people p, public.events e where p.name_en in ('Lpm Covered', 'Lpm Own') and e.slug = 'lpm-boot';" >/dev/null 2>&1
+chk "★ 補了那一場之後：補充說明是那一場活動、沒有到哪一年、來源是紀錄" "2025|none|true|夏令營2025" "${LPL} 'Lpm Covered'"
+chk "★ 沒補的那一位：舊的那一句還在" "2025|2025|false|Olddatabase:Speaker,Spring2025(eventnotrecorded)" "${LPL} 'Lpm Bare'"
+chk "★ BT 自己寫的補充說明（不是 Old database 開頭）照舊優先，到哪一年也照舊" "2025|2025|true|Keynote,writtenbyBT" "${LPL} 'Lpm Own'"
+chk "★ 舊的那一句沒有被刪（底下那一塊還拿得掉）" "1" "select count(*) from public.rc_labels g join public.people p on p.id = g.person_id where p.name_en = 'Lpm Covered' and g.detail like 'Old database:%'"
+chk "★ 名錄那一份跟一個人那一頁的每一個人都一樣" "0" "select count(*) from public.people p left join public.rc_label_codes_all() a on a.person_id = p.id where p.forgotten_at is null and coalesce(a.codes, '[]'::jsonb) is distinct from public.rc_label_codes(p.id)"
+# 破壞測試：一個人的那一頁改回「BT 寫了就用 BT 寫的」，驗收表第 3 列要變紅（補了紀錄的那一位又印舊的那一句）
+BROKEN=$(mktemp)
+sed "s/           case when (e.label is not null and coalesce(g.detail like 'Old database:%', false)) then coalesce(e.detail, '') else coalesce(nullif(g.detail, ''), e.detail, '') end as detail/           coalesce(nullif(g.detail, ''), e.detail, '') as detail/" "${LPM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${LPM}"; then echo "  FAIL 破壞測試沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^3|.*|FAIL"; then echo "  ok   ★ 破壞測試：改回印舊的那一句，驗收表第 3 列變紅"; pass=$((pass+1)); else echo "  FAIL 改回舊的驗收表沒有變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+lp3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LPM}" 2>&1 || true)
+if echo "${lp3}" | grep -q "OVERALL.*PASS" && ! echo "${lp3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${lp3}" | head -20; fail=$((fail+1)); fi
+psql -d "${DB}" -q -c "delete from public.people where name_en like 'Lpm %'; delete from public.events where slug = 'lpm-boot'; drop table public.lpm_before;" >/dev/null 2>&1
+chk "（收尾）假的人與假的活動都拿掉了" "0|0" "select (select count(*) from public.people where name_en like 'Lpm %')||'|'||(select count(*) from public.events where slug = 'lpm-boot')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
