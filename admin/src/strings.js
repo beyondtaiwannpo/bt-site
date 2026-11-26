@@ -933,7 +933,7 @@ export const MINE = {
   "lab.member.past":  { zh: "校友（前幹部）", en: "Alumni (former member)" },
   "lab.intern":       { zh: "實習生", en: "Intern" },
   "lab.student":      { zh: "學員", en: "Student" },
-  "lab.student.past": { zh: "以前的學員", en: "Past participant" },
+  "lab.student.past": { zh: "以前的學員", en: "Former student" },
   "lab.mentee":       { zh: "Mentee", en: "Mentee" },
   "lab.mentor":       { zh: "Mentor", en: "Mentor" },
   "lab.speaker":      { zh: "講者", en: "Speaker" },

@@ -5242,6 +5242,56 @@ chkraise "裝回去之後，不是 senior 的人又寄不了" "not_senior" "perf
 # 收乾淨
 psql -d "${DB}" -X -A -t -q -c "delete from public.mail_outbox where to_email like 'rq-%@example.com'; delete from public.invite_uses where user_id::text like 'aaaa0115-%'; delete from public.invite_codes where email like 'rq-%@example.com'; delete from public.applications where form_id in ('${RQFB}','${RQFP}'); delete from public.forms where id in ('${RQFB}','${RQFP}'); delete from public.people where lower(email) like 'rq-%@example.com' or profile_id::text like 'aaaa0115-%'; delete from public.assignments where user_id::text like 'aaaa0115-%'; delete from public.passports where id::text like 'aaaa0115-%'; delete from public.role_changes where target::text like 'aaaa0115-%'; delete from public.profiles where id::text like 'aaaa0115-%'; delete from auth.users where id::text like 'aaaa0115-%';" >/dev/null 2>&1 || true
 chk "（收尾）這一段開的表單、申請、邀請碼、人都不在了" "0|0|0|0" "select (select count(*) from public.forms where title like 'RQSMOKE%')||'|'||(select count(*) from public.applications where applicant_email like 'rq-%@example.com')||'|'||(select count(*) from public.invite_codes where email like 'rq-%@example.com')||'|'||(select count(*) from public.profiles where id::text like 'aaaa0115-%')"
+echo "── 標籤：幹部要有職位、帳號或 BT 給的；很久以前來過的學員算以前的（2027-01-16-member-label-rule.sql）──"
+# Paul 2026-11-26：「he shouldn't be labeled as alumni… people who used to work in one of the team」
+#                 「a lot of student they attended event before and now they are definitely in the age of university」
+# 這一支只換 rc_labels_of 與 rc_label_codes_all 的算法，資料一列都不改。先放幾個假的人與四場假的活動，換之前記下每個人的標籤，換完對。
+MLRM=supabase/migrations/2027-01-16-member-label-rule.sql
+mlq() { psql -d "${DB}" -X -A -t -q -c "$1" 2>&1 | tail -1 | tr -d ' \n'; }
+psql -d "${DB}" -X -A -t -q -c "insert into public.events (workspace_id, team, slug, title_zh, title_en, status, starts_at) select w.workspace_id, w.team, 'mlr-' || v.k, 'mlr', 'MLR ' || v.k, 'archived', v.d from (values ('old', now() - interval '4 years'), ('recent', now() - interval '1 year')) v(k, d), (select workspace_id, team from public.events where team is not null limit 1) w;" \
+  -c "insert into public.people (name_en, kind, grad_year) values ('Mlr KindOnly', 'member', null), ('Mlr Given', 'member', null), ('Mlr GivenUntil', 'guest', null), ('Mlr Old', 'student', null), ('Mlr Recent', 'student', null), ('Mlr GradYear', 'student', (extract(year from now()) + 1)::int), ('Mlr Mentee', 'student', null), ('Mlr None', 'student', null);" \
+  -c "insert into public.rc_labels (person_id, label, detail, until_year) select id, 'member', 'Old database: Board (term not recorded)', case when name_en = 'Mlr GivenUntil' then (extract(year from now()) + 3)::int end from public.people where name_en in ('Mlr Given', 'Mlr GivenUntil');" \
+  -c "insert into public.rc_participation (person_id, event_id, role) select p.id, e.id, v.role from (values ('Mlr Old', 'mlr-old', 'student'), ('Mlr Recent', 'mlr-recent', 'student'), ('Mlr GradYear', 'mlr-old', 'student'), ('Mlr Mentee', 'mlr-old', 'mentee'), ('Mlr Recent', 'mlr-old', 'mentor')) v(n, s, role) join public.people p on p.name_en = v.n join public.events e on e.slug = v.s;" \
+  -c "create table public.mlr_before as select p.id, public.rc_label_codes(p.id) c from public.people p where p.forgotten_at is null;" >/dev/null 2>&1
+chk "（準備）八個假的人與換之前的標籤都放好了" "8|true" "select (select count(*) from public.people where name_en like 'Mlr %')||'|'||(select count(*) > 8 from public.mlr_before)"
+chk "換之前：只因為 kind 是 member 就有校友標籤；很久以前來過的還是「學員」" '["member:past"]|["student"]' "select (select c::text from public.mlr_before b join public.people p on p.id = b.id where p.name_en = 'Mlr KindOnly')||'|'||(select c::text from public.mlr_before b join public.people p on p.id = b.id where p.name_en = 'Mlr Old')"
+ml1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MLRM}" 2>&1 || true)
+if echo "${ml1}" | grep -q "OVERALL.*PASS" && ! echo "${ml1}" | grep -q "|FAIL"; then echo "  ok   標籤規則那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 標籤規則那一支驗收表：${ml1}" | head -20; fail=$((fail+1)); fi
+ml2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MLRM}" 2>&1 || true)
+if echo "${ml2}" | grep -q "OVERALL.*PASS" && ! echo "${ml2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${ml2}" | head -20; fail=$((fail+1)); fi
+MLC="select public.rc_label_codes(id)::text from public.people where name_en ="
+chk "★ 只因為 kind 是 member 的人：沒有幹部或校友標籤了" "[]" "${MLC} 'Mlr KindOnly'"
+chk "★ BT 給了標籤的人（舊資料庫的 Board）：還是校友，不會變成現任" '["member:past"]' "${MLC} 'Mlr Given'"
+chk "BT 給的標籤寫了到哪一年而且還沒到：現任" '["member"]' "${MLC} 'Mlr GivenUntil'"
+chk "★ 沒寫畢業年、四年前以學員來過：以前的學員" '["student:past"]' "${MLC} 'Mlr Old'"
+chk "★ 去年才來過的（另外四年前當過 mentor，不算）：還是學員" '["student","mentor:past"]' "${MLC} 'Mlr Recent'"
+chk "★ 有寫畢業年而且還沒畢業：照畢業年，還是學員" '["student"]' "${MLC} 'Mlr GradYear'"
+chk "四年前當過 mentee 的也算以前的學員" '["student:past","mentee:past"]' "${MLC} 'Mlr Mentee'"
+chk "一場都沒來過的學員：照舊是學員" '["student"]' "${MLC} 'Mlr None'"
+chk "★ 名錄那一份跟一個人那一頁的每一個人都一樣" "0" "select count(*) from public.people p left join public.rc_label_codes_all() a on a.person_id = p.id where p.forgotten_at is null and coalesce(a.codes, '[]'::jsonb) is distinct from public.rc_label_codes(p.id)"
+chk "★ 幹部與學員以外的九種標籤，沒有任何一個人的變了" "0" "select count(*) from public.mlr_before b where (select coalesce(jsonb_agg(x order by x), '[]'::jsonb) from jsonb_array_elements_text(b.c) x where x !~ '^(member|student)') is distinct from (select coalesce(jsonb_agg(x order by x), '[]'::jsonb) from jsonb_array_elements_text(public.rc_label_codes(b.id)) x where x !~ '^(member|student)')"
+chk "★ 帳號是幹部的人，幹部標籤一個都沒少" "0" "select count(*) from public.people p join public.profiles pr on pr.id = p.profile_id where pr.role = 'cadre' and p.forgotten_at is null and not (public.rc_label_codes(p.id) ? 'member' or public.rc_label_codes(p.id) ? 'member:past')"
+chk "這一支沒有改任何一個人的 kind（現在還在念高中那一格）" "student|member" "select (select kind from public.people where name_en = 'Mlr Old')||'|'||(select kind from public.people where name_en = 'Mlr KindOnly')"
+psql -d "${DB}" -X -A -t -q -c "delete from public.rc_labels where label = 'member' and person_id = (select id from public.people where name_en = 'Mlr Given');" >/dev/null
+chk "★ 把 BT 給的標籤拿掉之後，校友標籤真的不見了（以前拿不掉）" "[]" "${MLC} 'Mlr Given'"
+# 破壞測試一：名錄那一份改回「kind 是 member 就算」，兩邊對不上，驗收表第 3 列要變紅
+BROKEN=$(mktemp)
+sed "s/        ('member',    pos.person_id is not null or coalesce(pe.acct in ('cadre', 'alumni'), false),/        ('member',    pos.person_id is not null or pe.kind = 'member' or coalesce(pe.acct in ('cadre', 'alumni'), false),/" "${MLRM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${MLRM}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^3|.*|FAIL"; then echo "  ok   ★ 破壞測試：名錄那一份改回舊規則，驗收表第 3 列變紅"; pass=$((pass+1)); else echo "  FAIL 名錄改回舊規則驗收表沒有變紅"; fail=$((fail+1)); fi
+# 破壞測試二：把「有寫畢業年的不看這一條」拿掉（兩支一起），驗收表第 12 列要變紅
+sed -e "s/(select (select grad_year is null from pe) and min(/(select min(/" -e "s/and not coalesce(e.grad_year is null and e.first_sy + 3 <= cur.sy, false)/and not coalesce(e.first_sy + 3 <= cur.sy, false)/" "${MLRM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${MLRM}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^12|.*|FAIL"; then echo "  ok   ★ 破壞測試：連有寫畢業年的也照來的時間算，驗收表第 12 列變紅"; pass=$((pass+1)); else echo "  FAIL 不看畢業年驗收表沒有變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+ml3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MLRM}" 2>&1 || true)
+if echo "${ml3}" | grep -q "OVERALL.*PASS" && ! echo "${ml3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${ml3}" | head -20; fail=$((fail+1)); fi
+chkrole authenticated "${PAUL}" "★ 算標籤的那一支照舊不開給前端" "ERROR:permissiondeniedforfunctionrc_labels_of" "select public.rc_labels_of('${PAUL}')"
+# 收乾淨
+psql -d "${DB}" -q -c "delete from public.people where name_en like 'Mlr %'; delete from public.events where slug like 'mlr-%'; drop table public.mlr_before;" >/dev/null 2>&1
+chk "（收尾）假的人與假的活動都拿掉了" "0|0" "select (select count(*) from public.people where name_en like 'Mlr %')||'|'||(select count(*) from public.events where slug like 'mlr-%')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

@@ -57,7 +57,7 @@ const VIEWER = { boot: { can_manage: false, events: [] }, me: {}, msg: "", busy:
 test("★ 標籤的名字：Paul 定的十三個；幹部與學員「以前是」有自己的名字，其他幾種現在與以前同名", () => {
   const want = {
     "lab.member": ["幹部", "Member"], "lab.member.past": ["校友（前幹部）", "Alumni (former member)"], "lab.intern": ["實習生", "Intern"],
-    "lab.student": ["學員", "Student"], "lab.student.past": ["以前的學員", "Past participant"], "lab.mentee": ["Mentee", "Mentee"], "lab.mentor": ["Mentor", "Mentor"],
+    "lab.student": ["學員", "Student"], "lab.student.past": ["以前的學員", "Former student"], "lab.mentee": ["Mentee", "Mentee"], "lab.mentor": ["Mentor", "Mentor"],
     "lab.speaker": ["講者", "Speaker"], "lab.volunteer": ["志工", "Volunteer"], "lab.organizer": ["主辦", "Organizer"],
     "lab.professor": ["教授", "Professor"], "lab.admission_officer": ["招生官", "Admission officer"], "lab.connection": ["聯絡人", "Connection"],
   };
@@ -71,7 +71,7 @@ test("★ 標籤的名字：Paul 定的十三個；幹部與學員「以前是�
   assert.equal(UI.labelName("speaker", false), "講者");
   assert.deepEqual(UI.parseLabel("student:past"), { label: "student", current: false }); assert.deepEqual(UI.parseLabel("speaker"), { label: "speaker", current: true });
   en();
-  try { assert.equal(UI.labelName("member", false), "Alumni (former member)"); assert.equal(UI.labelName("student", false), "Past participant"); assert.equal(UI.labelName("admission_officer", true), "Admission officer"); }
+  try { assert.equal(UI.labelName("member", false), "Alumni (former member)"); assert.equal(UI.labelName("student", false), "Former student"); assert.equal(UI.labelName("admission_officer", true), "Admission officer"); }
   finally { zh(); }
   // 標籤的清單跟遷移檔的檢查式對得上。2027-01-06 起十一種都可以自己加（原本只有三種），資料表的 check 與 rc_label_set 都要認得每一種。
   const sql = read("supabase/migrations/2027-01-03-people-network.sql"), sql6 = read("supabase/migrations/2027-01-06-labels-and-schools.sql");
