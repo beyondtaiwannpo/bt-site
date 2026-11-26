@@ -4668,6 +4668,102 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 sp3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SPM}" 2>&1 || true)
 if echo "${sp3}" | grep -q "OVERALL.*PASS" && ! echo "${sp3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${sp3}" | head -20; fail=$((fail+1)); fi
+echo "── 備註變成參與紀錄（2027-01-08-notes-to-participation.sql）──"
+# Paul 2026-11-25：「I want every note like this to be gone, but actually into our BT participation record」
+# 「whoever has that participation, don't delete their participation, but compare their notes and their participation before you do anything」
+# 這一段自己開人與活動（直接寫表，不經過前端那幾支）：2021 秋到 2023 春四期 mentorship、兩場對得到的活動。2020 秋那一期故意不開。
+#   NPV 備註講的都已經有紀錄；NPG 只有「S21 Event Attendee」；NPC 備註說 mentor、紀錄是 mentee；NPM 少一筆 mentor、兩種講者；
+#   NPN 沒寫哪一期；NPL 標籤本來就有人寫的字；NPX 找不到那一期；NPF 自己寫的字；NPB 2026-12-12 已經備份過；NPK 少一筆參加活動。
+NPM_FILE=supabase/migrations/2027-01-08-notes-to-participation.sql
+NPV=aaaa0108-0000-0000-0000-000000000001; NPG=aaaa0108-0000-0000-0000-000000000002; NPC=aaaa0108-0000-0000-0000-000000000003
+NPM=aaaa0108-0000-0000-0000-000000000004; NPN=aaaa0108-0000-0000-0000-000000000005; NPL=aaaa0108-0000-0000-0000-000000000006
+NPX=aaaa0108-0000-0000-0000-000000000007; NPF=aaaa0108-0000-0000-0000-000000000008; NPB=aaaa0108-0000-0000-0000-000000000009
+NPK=aaaa0108-0000-0000-0000-00000000000a
+npsql() { psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 "$@" 2>&1; }
+chk "（準備）2020 秋到 2023 春沒有別段留下來的 mentorship，也沒有同名的活動" "0" "select count(*) from public.events where (kind = 'mentorship-term' and starts_at >= '2020-08-01' and starts_at < '2023-08-01') or title_en in ('Study Abroad 101 (Fall 2022)', 'Summer Bootcamp 2023') or slug like 'spring-20%'"
+np0=$(npsql <<SQL
+insert into public.terms (id, title_zh, title_en, starts_on, ends_on, status) values
+  ('2020-21', '2020-21', '2020-21', '2020-08-01', '2021-07-31', 'ended'), ('2024-25', '2024-25', '2024-25', '2024-08-01', '2025-07-31', 'ended') on conflict (id) do nothing;
+insert into public.events (slug, team, workspace_id, title_en, starts_at, status, kind, source) values
+  ('np-ment-f21', '', 'custom:records', 'Fall 2021 Mentorship',   '2021-09-01 00:00+08', 'archived', 'mentorship-term', 'import'),
+  ('np-ment-s22', '', 'custom:records', 'Spring 2022 Mentorship', '2022-02-01 00:00+08', 'archived', 'mentorship-term', 'import'),
+  ('np-ment-f22', '', 'custom:records', 'Fall 2022 Mentorship',   '2022-09-01 00:00+08', 'archived', 'mentorship-term', 'import'),
+  ('np-ment-s23', '', 'custom:records', 'Spring 2023 Mentorship', '2023-02-01 00:00+08', 'archived', 'mentorship-term', 'import'),
+  ('np-sa22',     '', 'custom:records', 'Study Abroad 101 (Fall 2022)', '2022-10-15 09:00+08', 'archived', 'info-session', 'import'),
+  ('np-sb23',     '', 'custom:records', 'Summer Bootcamp 2023',         '2023-06-10 09:00+08', 'archived', 'bootcamp', 'import');
+insert into public.people (id, name_en, kind, note) values
+  ('${NPV}', 'Np Vicky',  'member', 'BT: Mentor, Mentee, Board, Event Attendee; since F2021; HS dept: 一般部/普通班; Mentee in F21; Mentor in S22, F22, S23; Board; status: Student'),
+  ('${NPG}', 'Np Angel',  'guest',  'BT: Event Attendee; since S2021; S21 Event Attendee; status: Student'),
+  ('${NPC}', 'Np Clash',  'guest',  'BT: Mentor; S23 Mentor'),
+  ('${NPM}', 'Np Mentor', 'guest',  'BT: Mentor, Event Speaker; mentor F21 c1 c2; F22 Speaker; F23 Speaker; mentor(s): Someone Else; status: Working Professional; LinkedIn: [link removed]'),
+  ('${NPN}', 'Np Noterm', 'guest',  'BT: Mentee, Event Attendee; since F2022; past mentee'),
+  ('${NPL}', 'Np Label',  'guest',  'F22 Board'),
+  ('${NPX}', 'Np Lost',   'guest',  'F20 Mentee; F20 Event Attendee'),
+  ('${NPF}', 'Np Free',   'guest',  'Met at the fair; likes robotics'),
+  ('${NPB}', 'Np Backup', 'guest',  'BT: Board'),
+  ('${NPK}', 'Np Camp',   'guest',  'S23 Event Attendee');
+insert into public.rc_participation (person_id, event_id, role, status, source)
+  select '${NPV}', id, case when slug = 'np-ment-f21' then 'mentee' when slug = 'np-sb23' then 'student' else 'mentor' end, 'attended', 'sheet'
+    from public.events where slug in ('np-ment-f21', 'np-ment-s22', 'np-ment-f22', 'np-ment-s23', 'np-sb23');
+insert into public.rc_participation (person_id, event_id, role, status, source, note)
+  select '${NPC}', id, 'mentee', 'attended', 'sheet', 'from the pairing sheet' from public.events where slug = 'np-ment-s23';
+insert into public.rc_labels (person_id, label, detail) values ('${NPL}', 'member', 'Finance lead');
+insert into public.rc_note_backup (person_id, note) values ('${NPB}', 'ORIGINAL 2026');
+drop table if exists np_before; create table np_before as select x.id, md5(x::text) as h from public.rc_participation x;
+select 'ready';
+SQL
+)
+if [ "$(echo "${np0}" | tail -1)" = "ready" ]; then echo "  ok   （準備）開了十個人、四期 mentorship、兩場活動"; pass=$((pass+1)); else echo "  FAIL 測試資料開不起來：${np0}" | head -8; fail=$((fail+1)); fi
+np1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${NPM_FILE}" 2>&1 || true)
+if echo "${np1}" | grep -q "OVERALL.*PASS" && ! echo "${np1}" | grep -q "|FAIL"; then echo "  ok   備註變參與紀錄那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 備註變參與紀錄那一支驗收表：${np1}" | head -30; fail=$((fail+1)); fi
+chk "★ 原本就有的參與紀錄一列都沒少、一列都沒被改" "0|0" "select (select count(*) from np_before b where not exists (select 1 from public.rc_participation x where x.id = b.id))||'|'||(select count(*) from np_before b join public.rc_participation x on x.id = b.id where md5(x::text) <> b.h)"
+chk "★ 備註講的都已經有紀錄的人：一列都沒加，還是那五列" "5|0" "select count(*)||'|'||count(*) filter (where note like '%old database note%') from public.rc_participation where person_id = '${NPV}'"
+chk "★ 她的備註只剩 HS dept" "HSdept:一般部/普通班" "select note from public.people where id = '${NPV}'"
+chk "Board 沒寫哪一期：給一個幹部標籤，年份用 since 那一年" "Olddatabase:Board(termnotrecorded);withBTsinceFall2021|2021|2021" "select detail||'|'||since_year||'|'||until_year from public.rc_labels where person_id = '${NPV}' and label = 'member'"
+chk "★ 只有「S21 Event Attendee」的人：掛在新開的 2021 春季活動 1，一列" "spring-2021-event-1|student|attended|import|Fromolddatabasenote:S21EventAttendee" "select e.slug||'|'||x.role||'|'||x.status||'|'||x.source||'|'||x.note from public.rc_participation x join public.events e on e.id = x.event_id where x.person_id = '${NPG}'"
+chk "★ 她的備註空了" "true" "select (note is null)::text from public.people where id = '${NPG}'"
+chk "★ 新開的活動只有有人要掛的那一場：archived、import、沒有日期、掛在 2020-21" "1|archived|import|true|2020-21" "select (select count(*) from public.events where slug like 'spring-20%')||'|'||status||'|'||source||'|'||(starts_at is null)||'|'||term_id from public.events where slug = 'spring-2021-event-1'"
+chk "★ 備註說 mentor、那一期已經記成 mentee：不補，那一段留在備註" "0|S23Mentor" "select (select count(*) from public.rc_participation where person_id = '${NPC}' and role = 'mentor')||'|'||(select note from public.people where id = '${NPC}')"
+chk "少的 mentor 補一列，cohort 寫在備註裡" "attended|import|Fromolddatabasenote:F21Mentor;cohort1,2" "select x.status||'|'||x.source||'|'||x.note from public.rc_participation x join public.events e on e.id = x.event_id where x.person_id = '${NPM}' and e.slug = 'np-ment-f21' and x.role = 'mentor'"
+chk "那一期對得到一場的講者：補一列，寫 Inferred" "Inferredfromolddatabasenote:F22Speaker(thenotenamestheterm,nottheevent)" "select x.note from public.rc_participation x join public.events e on e.id = x.event_id where x.person_id = '${NPM}' and e.slug = 'np-sa22' and x.role = 'speaker'"
+chk "對不到場次的講者：給標籤，寫哪一期" "Olddatabase:Speaker,Fall2023(eventnotrecorded)|2023|2024" "select detail||'|'||since_year||'|'||until_year from public.rc_labels where person_id = '${NPM}' and label = 'speaker'"
+chk "★ mentor(s) 的名字、status: Working Professional 留著；同一句 LinkedIn 的空殼拿掉" "mentor(s):SomeoneElse;status:WorkingProfessional" "select note from public.people where id = '${NPM}'"
+chk "沒寫哪一期、也沒有紀錄：Mentee 與學員各一個標籤，備註空了" "mentee:Olddatabase:Mentee(termnotrecorded);withBTsinceFall2022,student:Olddatabase:Eventattendee(eventnotrecorded);withBTsinceFall2022|true" "select (select string_agg(label||':'||detail, ',' order by label) from public.rc_labels where person_id = '${NPN}')||'|'||(select note is null from public.people where id = '${NPN}')"
+chk "「學員」標籤不寫到哪一年（看的是現在還在念高中那一格）" "true" "select (until_year is null)::text from public.rc_labels where person_id = '${NPN}' and label = 'student'"
+chk "★ 標籤本來就有人寫的字：接在後面，不蓋掉" "Financelead;Olddatabase:Board:F22" "select detail from public.rc_labels where person_id = '${NPL}' and label = 'member'"
+chk "★ 找不到那一期的 mentorship、沒有對照的活動：什麼都不加，備註一個字不動，也不備份" "0|F20Mentee;F20EventAttendee|0" "select (select count(*) from public.rc_participation where person_id = '${NPX}')||'|'||(select note from public.people where id = '${NPX}')||'|'||(select count(*) from public.rc_note_backup where person_id = '${NPX}')"
+chk "★ 自己寫的字一個字不動，也不備份" "Metatthefair;likesrobotics|0" "select (select note from public.people where id = '${NPF}')||'|'||(select count(*) from public.rc_note_backup where person_id = '${NPF}')"
+chk "★ 2026-12-12 備份過的人：那一欄不動，今天的原文存在新的一欄" "ORIGINAL2026|BT:Board" "select note||'|'||note_before_convert from public.rc_note_backup where person_id = '${NPB}'"
+chk "被動到的人原文都在備份裡" "BT:EventAttendee;sinceS2021;S21EventAttendee;status:Student" "select note_before_convert from public.rc_note_backup where person_id = '${NPG}'"
+chk "少的參加活動補在對得到的那一場" "np-sb23|student|Fromolddatabasenote:S23EventAttendee" "select e.slug||'|'||x.role||'|'||x.note from public.rc_participation x join public.events e on e.id = x.event_id where x.person_id = '${NPK}'"
+chk "★ 變動紀錄只記加了幾列，沒有備註的字" "1|0" "select (select (after->>'rows_added') from public.rc_log where what = 'note_to_participation' and ref = '${NPG}')||'|'||(select count(*) from public.rc_log where what = 'note_to_participation' and (coalesce(before::text, '')||after::text) ~* 'attendee|hs dept|status')"
+NPROWS=$(npsql -c "select count(*) from public.rc_participation" | tr -d ' \n')
+np2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${NPM_FILE}" 2>&1 || true)
+if echo "${np2}" | grep -q "OVERALL.*PASS" && ! echo "${np2}" | grep -q "|FAIL" && echo "${np2}" | grep -q "^10|.*|0|INFO"; then echo "  ok   ★ 重跑一次也全 PASS，這一次加 0 列"; pass=$((pass+1)); else echo "  FAIL 重跑：${np2}" | head -30; fail=$((fail+1)); fi
+chk "★ 重跑之後列數一樣、標籤的字沒有重複接一次、沒有多開活動" "${NPROWS}|Financelead;Olddatabase:Board:F22|1" "select (select count(*) from public.rc_participation)||'|'||(select detail from public.rc_labels where person_id = '${NPL}' and label = 'member')||'|'||(select count(*) from public.events where slug like 'spring-20%')"
+chkrole anon "" "★ 沒登入的人讀不到備註的備份" "ERROR:permissiondeniedfortablerc_note_backup" "select count(*) from public.rc_note_backup"
+chkrole authenticated "${PAUL}" "★ 登入的人也讀不到備註的備份（只有資料庫管理者）" "ERROR:permissiondeniedfortablerc_note_backup" "select count(*) from public.rc_note_backup"
+chkrole anon "" "★ 新開的那一場不在對外的活動清單裡" "0" "select count(*) from public.public_events() x where x.slug like 'spring-20%'"
+chkas "${PAUL}" "★ 忘記一個人：備份（含今天存的原文）與這一支加的參與紀錄一起清" "0|0" "select public.forget_person('${NPG}'); select (select count(*) from public.rc_note_backup where person_id = '${NPG}')||'|'||(select count(*) from public.rc_participation where person_id = '${NPG}')"
+# 破壞測試一：拿掉「那一場他已經是另一個身分就不補」那一條
+BROKEN=$(mktemp)
+sed "/^  when exists (select 1 from public.rc_participation x where x.person_id = c.person_id and x.event_id = c.event_id) then 'conflict'$/d" "${NPM_FILE}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${NPM_FILE}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^3|.*|FAIL"; then echo "  ok   ★ 破壞測試：拿掉「已經是另一個身分就不補」，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉那一條驗收表沒有變紅：${bk}" | head -12; fail=$((fail+1)); fi
+npsql -c "delete from public.rc_participation where person_id = '${NPC}' and note like 'From old database note:%'; update public.people set note = 'S23 Mentor' where id = '${NPC}';" >/dev/null
+# 破壞測試二：加的列不標 import
+npsql -c "delete from public.rc_participation where person_id = '${NPK}'; update public.people set note = 'S23 Event Attendee' where id = '${NPK}';" >/dev/null
+sed "s/^       'attended', 'import',$/       'attended', 'manual',/" "${NPM_FILE}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${NPM_FILE}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^2|.*|FAIL"; then echo "  ok   ★ 破壞測試：加的列不標 import，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 不標 import 驗收表沒有變紅：${bk}" | head -12; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+npsql -c "delete from public.rc_participation where person_id = '${NPK}'; update public.people set note = 'S23 Event Attendee' where id = '${NPK}';" >/dev/null
+np3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${NPM_FILE}" 2>&1 || true)
+if echo "${np3}" | grep -q "OVERALL.*PASS" && ! echo "${np3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${np3}" | head -30; fail=$((fail+1)); fi
+chk "裝回去之後：衝突的那一位還是沒有 mentor 那一列，少的那一位補回來而且是 import" "0|import" "select (select count(*) from public.rc_participation where person_id = '${NPC}' and role = 'mentor')||'|'||(select source from public.rc_participation where person_id = '${NPK}')"
+npsql -c "drop table if exists np_before;" >/dev/null
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

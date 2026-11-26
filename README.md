@@ -6192,28 +6192,88 @@ Paul 看著紀錄裡一位以前的學員（高中在名單上，後來念了大
 
 「參與紀錄」分頁最上面那一塊（團隊裡誰認識他、上次聯絡、他多願意幫忙、備註）不畫了，也不再從這一頁存。資料庫那四欄還在，已經填的沒有刪。
 
-### 還沒做的：備註變成參與紀錄
+### 備註變成參與紀錄（遷移檔寫好了，還沒在正式資料庫跑）
 
-Paul 同一次也說了，每個人備註裡那種「BT: Event Attendee; since S2021; S21 Event Attendee; status: Student」要拿掉，變成真的參與紀錄。**這一件還沒做**，原因：
+Paul 同一次也說了，每個人備註裡那種「BT: Event Attendee; since S2021; S21 Event Attendee; status: Student」要拿掉，變成真的參與紀錄：
 
-- 那些備註是從舊的 BT Alumni Database 匯進來的，只寫「2021 夏天參加過活動」，沒有寫是哪一場。
-- Drive 匯出的清單裡，2021 年只有秋天 EC panel 的簽到表、模擬面試報名、導生與 office hour 的表單，沒有 2021 夏天活動的簽到表，所以多半對不到某一場。
-- Claude 讀不到正式資料庫，不知道備註到底有哪幾種寫法、資料庫裡現在有哪些過去的活動可以掛。
+> I want every note like this to be gone, but actually into our BT participation record.
 
-Paul 2026-11-25 跑了第一支只讀的查詢（`~/Anson/outputs/beyond-taiwan/website/docs/2026-11-25-notes-to-participation/note-patterns-readonly.sql`，不印名字、不改資料）。知道了這幾件事：
+那些備註是從舊的 BT Alumni Database 匯進來的。Claude 讀不到正式資料庫，所以分三步做，前兩步都是 Paul 在 Supabase 跑只讀的查詢、把結果貼回來
+（兩支都在 `~/Anson/outputs/beyond-taiwan/website/docs/2026-11-25-notes-to-participation/`，不印名字、不改資料）：
 
-- 934 位有備註，其中 236 位一筆參與紀錄都沒有。
-- 備註裡的 S 是春季（2 月開始的那一期），F 是秋季（9 月開始的那一期），不是夏天。2020 秋到 2026 秋十三期 mentorship 資料庫裡都有，
-  所以「Mentor in F25, S26」「F24 Mentee」「mentor F22」這幾種寫法對得到確定的一場。
-- 「F22 Event Attendee」這種只寫了哪一期，對不到確定的一場：2021 春那一期資料庫裡一場活動都沒有，有的學期有兩場。
+1. `note-patterns-readonly.sql`：備註有哪幾種寫法。934 位有備註，其中 236 位一筆參與紀錄都沒有。
+   備註裡的 S 是春季（2 月開始的那一期），F 是秋季（9 月開始的那一期），不是夏天。
+2. `compare-notes-readonly.sql`：備註講的事，資料庫裡已經有幾件。這一步是 Paul 要的，原話：
+   「whoever has that participation, don't delete their participation, but compare their notes and their participation before you do anything.」
+   起因是他看了一位幹部的頁，她的參與紀錄已經是對的，備註講的事那裡都有。結果：934 位裡 528 位備註講的每一期都已經有紀錄。
+3. 真的轉換：`supabase/migrations/2027-01-08-notes-to-participation.sql`。**⚠ 寫好了、本機測過，還沒在正式的 Supabase 跑。** 檔直接交給 Paul 了。
 
-**Paul 定的規則（同一天）：已經有的參與紀錄一列都不刪、不改，動手之前先把備註跟參與紀錄對一次。** 原話：
-「whoever has that participation, don't delete their participation, but compare their notes and their participation before you do anything.」
-起因是他看了一位幹部的頁，她的參與紀錄已經是對的，備註講的事那裡都有。
+**規則只有一條最重要：已經有的參與紀錄一列都不刪、不改，只補少的。** 那一支最後印的表第 1 列會數一次。
 
-所以現在在第二步：同一個資料夾的 `compare-notes-readonly.sql`（一樣只讀、不印名字），算備註講的每一期有幾位已經記了、少幾位，
-以及備註講某一期參加過活動的人，那個學年每一場各有幾位已經在裡面。Paul 跑完貼回來，才寫真的轉換那一支：只補少的，不動已經有的。
-對不到場次的那些要掛在哪，等看到數字再跟 Paul 定。
+#### Paul 選的三件事（2026-11-25）
+
+- 資料庫裡沒有的三場活動（備註寫的 S21 Event、S21 Event 2、S25 Event）：各開一場「名稱沒有紀錄」的過去活動，把人掛上去。
+  那三場是 archived、不上對外頁、**沒有日期**（不知道的事不編）。之後想起來是哪一場，在紀錄的那一場改名字、補日期就好。
+- 只寫了哪一期的講者（69 位，資料庫裡一位都沒有講者紀錄）：那一期對得到一場的，記在那一場，那一列的備註寫 Inferred；對不到的給一個「講者」標籤，寫哪一期。
+- HS dept（一般部、國際部那一段，431 位）留在備註裡。
+
+#### 備註裡每一種寫法變成什麼
+
+| 備註裡的寫法 | 變成什麼 |
+|---|---|
+| `F24 Mentee`、`Mentor in F25, S26`、`mentor F20 c1 c2` | 那一期 mentorship 的一列（mentor 或 mentee）。那一期已經有同一個身分就不動。c1、c2 是梯次，寫在那一列的備註 |
+| 同上，但那一期他已經記成另一個身分 | **不補，那一段留在備註**。正式資料庫有 7 件，要有人看是哪一邊記錯 |
+| `F22 Event Attendee` 這種 | 那一期對到的那一場的一列（學員、有出席）。那一場他已經有任何一列就不動 |
+| `S21 Event Attendee`、`S21 Event 2 Attendee`、`S25 Event Attendee` | 新開的那三場 |
+| `F22 Speaker`（F22、F24、F25、S26，有的話 S23、S24） | 那一期那一場的一列講者，備註寫 Inferred |
+| `F23 Speaker`、`S25 Speaker` 與其他期 | 「講者」標籤，補充說明寫哪一期 |
+| `F26 Board`、`Board`、`BT: … Board` | 「幹部」標籤，補充說明寫哪幾期（例如 `Old database: Board: F22, S23`） |
+| `BT: Mentor`、`past mentee`、`BT: Event Attendee` 這種沒寫哪一期的 | 已經有那一種參與紀錄就算有了；沒有的給一個標籤，寫 term not recorded |
+| `BT: …`、`since F2022`、`status: Student`、`status: Alumni` | 處理完就從備註拿掉 |
+| `HS dept: …`、`mentor(s): 名字`、`status: Graduate Student`、`status: Working Professional`、`alumni map 2022`、`F23 alumni list`、任何看不懂的字 | **留在備註，一個字不動** |
+
+哪一期對哪一場是照第二支查詢的結果寫死在檔裡的：F22 是 Study Abroad 101 (Fall 2022)（124 位全部已經在裡面）、S23 是 Summer Bootcamp 2023、
+S24 是 Summer Bootcamp 2024、F23 的「Event 2」是 Study Abroad 101 (Fall 2023)、F23 的「Event」是 Winter Bootcamp 2024（15 位裡 10 位已經在，這一個標成 Inferred）、
+F24 是 Study Abroad 101 (Fall 2024)、F25 是 Winter Bootcamp 2026、S26 是 Summer Bootcamp 2026。用活動的英文名加日期去找，找不到或找到兩場就什麼都不做，那一段留在備註。
+
+在正式資料庫上預期會加的（照第二支的數字估的，實際以那一支最後印的表為準）：mentor 約 136 列、mentee 約 77 列（2024 春那一期現在 0 列，會多 56 列）、
+對得到的活動約 13 列、新開的三場約 79 列（22、41、16）、推論的講者約 51 列。
+
+#### 認得出來、退得回去
+
+- 這一支加的每一列參與紀錄都是 `source = 'import'`，備註開頭是 `From old database note: ` 或 `Inferred from old database note: `，後面接原本那一段（例如 `F25 Mentor`）。
+- 這一支給的標籤，補充說明開頭是 `Old database: `。那個標籤本來就有人寫了字的，接在後面，不蓋掉，年份不動。
+- 動備註之前，原本的整句存進 `rc_note_backup` 新的一欄 `note_before_convert`（這一支多的就是這一欄與 `convert_at`，沒有新的表、沒有新的函式、沒有動 RLS）。
+  那張表前端讀不到，`forget_person` 會整列清掉。2026-12-12 搬聯絡方式那一次存的 `note` 那一欄留著不動，那是更早的版本。
+- **原文沒有寫進 `rc_log`**，因為 `rc_log` 在忘記一個人的時候不會清。`rc_log` 每個被動到的人只多一筆 `note_to_participation`，裡面是加了幾列、給了哪幾種標籤，沒有任何備註的字。
+- 要整個還原，照遷移檔檔頭「要整個還原」那五句，照順序跑。
+- 可以重跑：第二次跑，備註裡已經沒有那些字，什麼都不會加。
+
+#### Claude 自己決定、Paul 沒有逐條看過的
+
+- **標籤的年份**：只寫備註裡有的。寫了哪幾期就用那幾期的年份；沒寫哪一期的，用 since 那一年當起訖（備註只知道那一年他在）。
+  「到哪一年」只替沒有帳號、也沒有職位的人寫，因為 BT 給的標籤不寫到哪一年，系統會把他當成現在還是，舊名單上的 88 位 Board 會全部變成「現在的幹部」。
+  有帳號或有職位的人不寫，讓系統照帳號與職位算。「學員」標籤不寫到哪一年，他現在是不是學員看的是「現在還在念高中」那一格。
+- 同一個人的備註說同一場他又參加又當講者：只補講者那一列。
+- 備註說同一期他又是 mentor 又是 mentee、而且兩邊都沒有紀錄：兩邊都不補，留在備註。
+- 一模一樣的一句聯絡方式出現在五個人以上的備註裡（第一支查詢看到 116 位都是同一句 LinkedIn）：那不是誰的聯絡方式，當成空殼拿掉。原文在備份裡。
+- 沒有任何一段被拿掉的人，備註一個字都不動（連中間的「 / 」都不會被換成分號），也不會多一列備份。
+
+#### 還沒做的
+
+- **正式資料庫還沒跑。** 跑完看最後那張表：前 8 列都要是 PASS，第 10 到 29 列是數字。第 23 列是那 7 件衝突，第 24 列是找不到活動的。
+- 新開的三場活動叫什麼、哪一天，要 Paul 或當年的幹部想起來之後在後台補。
+- `mentor(s): 名字` 那一段（106 位）還在備註裡。要變成配對紀錄得用名字去對人，而且備註沒寫哪一期，這一次沒有做。
+- 紀錄裡一個人的頁現在不印參與紀錄那一列的備註，所以「Inferred」那句與梯次只在資料庫裡看得到。要印出來得改 `rc_person` 回的欄位與那一頁，這一次沒有動畫面。
+
+#### 驗收
+
+`test/notes-to-participation.test.mjs` 10 條，守的是這個檔不准做的事：對 `rc_participation` 只有一句 insert、沒有 update 與 delete；沒有新的函式、政策、權限、表；
+備份寫在改備註之前、第一次存的不會被蓋掉；`rc_log` 裡沒有備註的字；新開的活動不寫日期；標籤本來有的字不蓋掉；整個檔不讀任何人的名字。
+`scripts/db/smoke.sh` 最後多一段 34 項（在用完就丟的資料庫上真的跑）：備註講的都已經有紀錄的人一列都沒加、備註只剩 HS dept；
+只有「S21 Event Attendee」的人掛在新開的那一場、備註空了；衝突的那一位不補、那一段留著；重跑加 0 列；原本的列一列沒少、一列沒被改；
+忘記一個人會連備份一起清；沒登入與登入的人都讀不到備份；新開的那一場不在對外的活動清單；兩個破壞測試（拿掉「已經是另一個身分就不補」、加的列不標 import）驗收表都會變紅。
+本機那個共用的 Supabase 上只在會復原的 transaction 裡試過，資料沒有變。
 
 ### 驗收
 
