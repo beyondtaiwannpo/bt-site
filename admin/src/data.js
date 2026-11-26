@@ -395,6 +395,7 @@ const SAYS = [
   ["need_start", "要有開始時間才能準備好。沒有確定日期的話，填「通常在幾月」或勾「多數年份都會辦」也可以。", "A start time is needed before it can be marked ready. With no fixed date, set a usual month or tick Runs most years instead."],
   ["bad_month", "「通常在幾月」只能選 1 到 12 月，或不填。", "Usual month must be January to December, or left unset."],
   ["already_published", "已經在對外頁上了，要改先請 Co-President 撤下來。", "Already published; ask a Co-President to unpublish first."],
+  ["not_relistable", "這是只在紀錄裡的舊活動，沒有上過對外頁，上不去。", "This is a records-only past event; it was never published and cannot be."],
   ["not_ready", "要先按「準備好了」。", "Mark it ready first."],
   ["not_published", "這場活動不在對外頁上。", "This event is not published."],
   ["not_event_editor", "你對這場活動只有「看」，改不動。", "You can only view this event, so you can't change it."],

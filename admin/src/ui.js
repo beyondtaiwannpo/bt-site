@@ -2113,9 +2113,12 @@ export function eventEditHTML(e, form, signed, me, msg, busy, venues, terms, evL
   const st = e.status;
   const publicLink = `/events/?e=${encodeURIComponent(e.slug)}`;
   const statusLine = st === "published" ? T("ev.stLine.published", { who: esc(e.published_by_name || ""), d: esc(evDate(e.published_at)) })
-    : st === "ready" ? T("ev.stLine.ready") : st === "archived" ? T("ev.stLine.archived") : T("ev.stLine.draft");
+    : st === "ready" ? T("ev.stLine.ready") : st === "archived" ? T(e.published_at ? "ev.stLine.archived" : "ev.stLine.recordsOnly") : T("ev.stLine.draft");
   const keyList = [
     st === "draft" && canManage ? `<button class="btn" data-act="ev-ready" data-id="${esc(e.id)}"${dis}>${T("ev.ready")}</button>` : "",
+    // 撤下來的也有這一顆（2026-11-25 Paul：「how do i push that live agian? lke now I have no where to puch it live again」）。
+    // 只給上過對外頁的（published_at 有值）；只在紀錄裡的舊活動也是 archived，但從來沒上過，不畫，資料庫也擋（2027-01-09-relist-events.sql）。
+    st === "archived" && e.published_at && canManage ? `<button class="btn" data-act="ev-ready" data-id="${esc(e.id)}"${dis}>${T("ev.readyAgain")}</button>` : "",
     st === "ready" && canManage ? `<button class="btn ghost" data-act="ev-unready" data-id="${esc(e.id)}"${dis}>${T("ev.unready")}</button>` : "",
     st === "ready" && sen ? `<button class="btn" data-act="ev-publish" data-id="${esc(e.id)}"${dis}>${T("ev.publish")}</button>` : "",
     st === "ready" && !sen ? `<span class="mini">${T("ev.waitSenior")}</span>` : "",

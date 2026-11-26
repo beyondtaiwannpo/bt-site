@@ -627,7 +627,9 @@ export const MINE = {
   "ev.stLine.draft":   { zh: "草稿。內容填好之後，「管」這場活動的人按「準備好了」。", en: "Draft. Once the content is filled in, someone with Manage on this event marks it ready." },
   "ev.stLine.ready":  { zh: "準備好了，等 Co-President 或 Senior Adviser 放上對外頁。", en: "Ready; waiting for a Co-President or Senior Adviser to publish." },
   "ev.stLine.published": { zh: "在對外頁上。改內容直接存就會更新。", en: "Live. Saving content updates the public page directly." },
-  "ev.stLine.archived": { zh: "撤下來了，對外看不到。要再上去先按「準備好了」。", en: "Unpublished; not visible publicly. Mark ready again to relist it." },
+  "ev.stLine.archived": { zh: "撤下來了，對外看不到。要再上去：先按「再準備好一次」，再按「放上對外頁」。", en: "Unpublished; not visible publicly. To put it back: press Mark ready again, then Publish." },
+  "ev.stLine.recordsOnly": { zh: "這是只在紀錄裡的舊活動，沒有上過對外頁，也上不去。", en: "A past event kept for the records only. It was never published and cannot be." },
+  "ev.readyAgain":    { zh: "再準備好一次", en: "Mark ready again" },
   "ev.ready":         { zh: "準備好了", en: "Mark ready" },
   "ev.unready":       { zh: "退回草稿", en: "Back to draft" },
   "ev.publish":       { zh: "放上對外頁", en: "Publish" },
@@ -735,6 +737,7 @@ export const MINE = {
   "err.evCreate":     { zh: "開不了：", en: "Could not create: " },
   "err.evSave":       { zh: "存不起來：", en: "Could not save: " },
   "err.evStatus":     { zh: "改不了狀態：", en: "Could not change status: " },
+  "err.evRelistSql":  { zh: "資料庫還是舊的，撤下來的活動回不去。要先在 Supabase 跑 2027-01-09-relist-events.sql。", en: "The database is still the old version, so an unpublished event cannot go back. Run 2027-01-09-relist-events.sql in Supabase first." },
   "err.evCover":      { zh: "封面那條連結不像一張圖：要 https 開頭，結尾是 .jpg／.png／.webp，或是 Drive、Cloudinary 的圖片網址。", en: "That cover link doesn't look like an image: it should start with https and end in .jpg/.png/.webp, or be a Drive or Cloudinary image URL." },
   "err.evCoverRaw":   { zh: "封面那條連結不像一張圖", en: "that cover link doesn't look like an image" },
   // 活動編輯頁的下半與照片（2026-11-23，Paul：封面要選檔案上傳、要能放好幾張、報名與回饋不要只是一排連結）

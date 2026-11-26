@@ -4765,5 +4765,37 @@ if echo "${np3}" | grep -q "OVERALL.*PASS" && ! echo "${np3}" | grep -q "|FAIL";
 chk "裝回去之後：衝突的那一位還是沒有 mentor 那一列，少的那一位補回來而且是 import" "0|import" "select (select count(*) from public.rc_participation where person_id = '${NPC}' and role = 'mentor')||'|'||(select source from public.rc_participation where person_id = '${NPK}')"
 npsql -c "drop table if exists np_before;" >/dev/null
 echo
+echo "── 撤下來的活動可以再上去（2027-01-09-relist-events.sql）──"
+# Paul 2026-11-25：「how do i push that live agian? lke now I have no where to puch it live again」
+# 這時候：PGEV（pg-no-date）在對外頁上。先撤下來，看舊的函式擋不擋得住（就是 Paul 遇到的那個洞），再跑這一支。
+RLM=supabase/migrations/2027-01-09-relist-events.sql
+rlq() { psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "$1" 2>&1 | tail -1 | tr -d ' \n'; }
+chk "（準備）PGEV 現在在對外頁上" "published" "select status from public.events where id = '${PGEV}'"
+rlq "select public.unpublish_event('${PGEV}')" >/dev/null
+chk "（準備）撤下來了，而且記得它上過" "archived|t" "select status, published_at is not null from public.events where id = '${PGEV}'"
+chkraise "★ 跑之前：撤下來的按「準備好了」被擋（這就是那個洞）" "already_published" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_ready('${PGEV}', true);"
+rl1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RLM}" 2>&1 || true)
+if echo "${rl1}" | grep -q "OVERALL.*PASS" && ! echo "${rl1}" | grep -q "|FAIL"; then echo "  ok   再上去那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 再上去那一支驗收表：${rl1}" | head -20; fail=$((fail+1)); fi
+rl2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RLM}" 2>&1 || true)
+if echo "${rl2}" | grep -q "OVERALL.*PASS" && ! echo "${rl2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${rl2}" | head -20; fail=$((fail+1)); fi
+chkrole anon "" "★ 沒登入的人叫不到" "f" "select has_function_privilege('anon', 'public.set_event_ready(uuid, boolean)', 'execute')"
+chk "★ 撤下來的這一場不在對外的清單裡" "0" "select count(*) from public.public_events() where slug = 'pg-no-date'"
+psql -d "${DB}" -X -A -t -q -c "insert into public.events (slug, team, workspace_id, title_zh, title_en, status, kind, source) select 'rl-records-only', team, workspace_id, '舊活動', 'Old event', 'archived', 'other', 'import' from public.events where id = '${PGEV}';" >/dev/null
+chkraise "★ 只在紀錄裡的舊活動（沒上過對外頁）照舊上不去" "not_relistable" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_ready((select id from public.events where slug = 'rl-records-only'), true);"
+chkas "${PAUL}" "★ 跑之後：撤下來的按得了「準備好了」" "ready" "select public.set_event_ready('${PGEV}', true)"
+chk "準備好了還不算上架：對外還是看不到" "0" "select count(*) from public.public_events() where slug = 'pg-no-date'"
+chkas "${PAUL}" "★ 再按放上對外頁，回到對外頁上" "published" "select public.publish_event('${PGEV}')"
+chk "對外的清單又有它了" "1" "select count(*) from public.public_events() where slug = 'pg-no-date'"
+chkraise "已經在上面的照舊不能再按準備好了" "already_published" "perform set_config('test.uid','${PAUL}',true); perform public.set_event_ready('${PGEV}', true);"
+# 破壞測試：把「沒上過的擋掉」那一行拿掉，驗收表要變紅
+BROKEN=$(mktemp)
+sed "/then raise exception 'not_relistable'/d" "${RLM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${RLM}"; then echo "  FAIL 破壞測試沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^2|.*|FAIL"; then echo "  ok   ★ 破壞測試：舊活動那一道擋拿掉，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試：擋拿掉了驗收表還是綠的：${bk}" | head -12; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+rl3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RLM}" 2>&1 || true)
+if echo "${rl3}" | grep -q "OVERALL.*PASS" && ! echo "${rl3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有變回綠的"; fail=$((fail+1)); fi
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

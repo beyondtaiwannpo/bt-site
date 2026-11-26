@@ -1488,7 +1488,11 @@ document.addEventListener("click", async e => {
       else await D.publishEvent(id, act === "ev-publish");
       S.busy = false; S.msg = T("msg." + act.replace("-", "."), { title });
       await reloadEvents(S.evSel); render();
-    } catch (e) { S.busy = false; S.msg = T("err.evStatus") + D.says(e); render(); }
+    } catch (e) {
+      // 撤下來的活動按「再準備好一次」被舊的資料庫函式擋（already_published）：那一句會講反，換成說要跑哪一支。
+      const oldDb = act === "ev-ready" && ev.status === "archived" && /already_published/.test(String((e && e.message) || e));
+      S.busy = false; S.msg = T("err.evStatus") + (oldDb ? T("err.evRelistSql") : D.says(e)); render();
+    }
     return;
   }
   // ── 行銷需求單（2026-10-31）──

@@ -6094,6 +6094,35 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 撤下來的活動可以再上去（2026-11-25）
+
+Paul 貼了一張後台「上架」那一塊的截圖，上面只有一句「Unpublished; not visible publicly. Mark ready again to relist it.」，沒有任何按鈕：
+
+> how do i push that live agian? lke now I have no where to puch it live again
+
+這是一開始（2026-11-01 活動上架那一批）就有的洞，兩邊都缺：
+
+- 畫面：一場活動從對外頁撤下來之後狀態是 `archived`，「上架」那一塊對這個狀態一顆按鈕都沒畫。
+- 資料庫：那一句叫人「先按準備好了」，可是 `set_event_ready()` 只收草稿與準備好的，撤下來的會被擋。
+
+所以撤下來的活動沒有任何一條路回得去。現在補上：
+
+1. 撤下來的活動，「上架」那一塊多一顆**「再準備好一次」**。按了變回「準備好了」。
+2. 接下來跟第一次一樣：Co-President 或 Senior Adviser 按「放上對外頁」，才真的回到對外頁。
+
+誰按得了沒有變：第一步是那個工作區「管」的人，第二步是 Co-President 與 Senior Adviser。第一步那幾項檢查（中英文名稱、開始時間、封面同意）會再跑一次。
+
+**只在紀錄裡的舊活動上不去。** 它們的狀態也是 `archived`，但從來沒上過對外頁（`published_at` 是空的）。畫面不畫那一顆，那一句話改成說它上不去，資料庫也擋（`not_relistable`）。
+2027-01-08 那三場「名稱沒有紀錄」的過去活動就是這一種。分辨的方法只有一個：有沒有上過對外頁。
+
+⚠ **這一步有遷移檔 `supabase/migrations/2027-01-09-relist-events.sql`，要 Paul 在正式的 Supabase 跑過。** 檔直接交給他了。
+它只重寫 `set_event_ready()` 一支，跟 2026-12-31 那一版只差一個判斷（測試逐行比過）。沒有新的表、沒有新的欄位、沒有動 RLS，`publish_event`、`unpublish_event` 一行都沒改。
+還沒跑之前：那一顆看得到，按了會說「資料庫還是舊的，要先跑 2027-01-09-relist-events.sql」，不會講成「已經在對外頁上了」。
+之後如果重跑 `2026-12-31-programmes.sql` 或 `2026-11-01-events.sql`，要再跑一次這一支。
+
+驗收：`test/event-relist.test.mjs` 五條（撤下來的有那一顆、只有「改」的人沒有、舊活動沒有、其他三種狀態的按鈕沒變、遷移檔跟上一版逐行比只差那一個判斷）。
+`scripts/db/smoke.sh` 最後多一段：先證明舊的函式真的擋（就是這個洞），跑這一支之後撤下來的按得了、再放上去對外清單又有它、舊活動照舊擋，加一個破壞測試。
+
 ## 後台的搜尋框：篩選收在右邊一顆裡；自己挑人合併；去向那一列刪得掉（2026-11-25）
 
 Paul 問的：
