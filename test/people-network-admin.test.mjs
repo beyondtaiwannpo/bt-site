@@ -338,7 +338,8 @@ test("★ 名錄：標籤篩選（幹部與校友、學員與以前的學員分�
   assert.equal(UI.labelFilterKey("mentor:past"), "mentor"); assert.equal(UI.labelFilterKey("member:past"), "member:past");
   assert.deepEqual(UI.dirOptions(DIR, []).label, [["member", 1], ["member:past", 1], ["student", 1], ["student:past", 1], ["mentor", 1], ["speaker", 1], ["professor", 1]], "選項照標籤的順序，帶人數");
   for (const k of ["label", "speak", "mentor", "who", "role", "team", "school", "grad", "term", "event", "country"]) assert.ok(UI.DIR_FILTERS.includes(k), k);
-  const S = { ...MGR, id: null, df: {}, pq: "", ptab: "dir" };
+  // 2026-11-25：篩選收在搜尋框右邊那一顆裡（dfOpen），按開才印下拉；這裡看的是開著的樣子，收著的在 test/search-filters-merge.test.mjs。
+  const S = { ...MGR, id: null, df: {}, pq: "", ptab: "dir", dfOpen: true };
   const h = UI.peopleHTML(MGR.boot, S);
   assert.match(h, /<select name="label" class="rc-dfilter" data-noauto="1"><option value="" selected>全部標籤<\/option><option value="member">幹部 \(1\)<\/option><option value="member:past">校友（前幹部） \(1\)<\/option>/);
   for (const k of ["role", "team", "school", "grad", "term", "event", "country"]) assert.match(h, new RegExp(`<select name="${k}" class="rc-dfilter"`), `${k} 那個下拉還在`);
@@ -365,7 +366,8 @@ test("★ 遷移檔還沒跑：一個人的頁面與名錄都照舊（印原本�
   assert.doesNotMatch(UI.personHTML({ ...old, labels: [] }, MGR), /id="rc-profile"/);
   // 名錄：列上沒有 labels，照舊印身分與「身分」那個下拉，沒有快速篩選
   const dir = [{ id: "a", name: "Old Row", kind: "guest", school: "Test High", has_account: false, roles: ["speaker"], terms: [], events: [], countries: [], n: 1 }];
-  const d = UI.peopleHTML(MGR.boot, { ...MGR, id: null, dir, df: {}, pq: "", ptab: "dir" });
+  const d = UI.peopleHTML(MGR.boot, { ...MGR, id: null, dir, df: {}, pq: "", ptab: "dir", dfOpen: true });   // 2026-11-25：下拉按開才印
+  assert.match(UI.peopleHTML(MGR.boot, { ...MGR, id: null, dir, df: {}, pq: "", ptab: "dir" }), /2027-01-03-people-network\.sql/, "要跑哪一支那一句不用按開就看得到");
   assert.match(d, /2027-01-03-people-network\.sql/); assert.match(d, /<select name="kind" class="rc-dfilter"/); assert.doesNotMatch(d, /<select name="label"|dir-quick/);
   assert.match(d, /<b>Old Row<\/b><\/a> <span class="tag">來賓<\/span> <span class="tag who-speaker">講者<\/span>/);
   assert.equal(UI.dirLabel({ id: "c", name: "No School", kind: "member" }), "No School · 成員", "清單那一行也照舊");
@@ -521,10 +523,10 @@ test("★ 現在在哪：去向（就讀、轉學、畢業、工作）與學校�
   // 一個人的頁面：第一列標「現在」，頁首那一行印的是現在在哪，不是名單上那一格學校
   const d = { ...PERSON, person: { ...PERSON.person, school: "American International Academy", grad_year: 2022 }, schools: angel.schools, outcomes: angel.outcomes };
   const h = UI.personHTML(d, MGR);
-  assert.match(h, /<li><div class="fhead"><b>University of Washington<\/b> <span class="tag open">現在<\/span> <span class="tag">就讀中<\/span><\/div><div class="fmeta">從去向來的，到「參與紀錄」改<\/div><\/li>/);
+  assert.match(h, /<li><div class="fhead"><b>University of Washington<\/b> <span class="tag open">現在<\/span> <span class="tag">就讀中<\/span><\/div><div class="fmeta">從去向來的，到「參與紀錄」改 <button class="btn quiet sm" data-act="out-del" data-id="o1">刪掉<\/button><\/div><\/li>/, "去向那一列在這裡也刪得掉（2026-11-25）");
   assert.equal(count(h, /<span class="tag open">現在<\/span>/g), 1);
   assert.match(h, /<b>American International Academy<\/b><\/div><div class="fmeta">匯入 <button class="btn quiet sm" data-act="school-del" data-id="s1">/, "學校那一列管的人可以刪；去向那一列在去向那一塊改");
-  assert.doesNotMatch(h.slice(at(h, "<ul class=\"flist rc-places\">"), at(h, "data-sadd")), /data-act="out-del"/);
+  assert.equal(count(h.slice(at(h, "<ul class=\"flist rc-places\">"), at(h, "data-sadd")), /data-act="out-del"/g), 1, "這一條裡每一筆去向一顆刪除");
   const head = h.slice(0, at(h, "rc-profile"));
   assert.match(head, /University of Washington/); assert.doesNotMatch(head, /American International Academy|2022/, "頁首不再印高中與它的畢業年");
   // 還在那一所高中的人照舊印學校與畢業年

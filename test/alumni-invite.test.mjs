@@ -60,8 +60,10 @@ test("狀態徽章：七種狀態各一句，帶時間；寄失敗印原因", ()
 
 test("★ 名單：沒有帳號的人列上有狀態徽章、有勾選框；「沒有帳號」篩選只留他們", () => {
   const people = mergeInvites(PEOPLE, INVITES);
-  const h = rosterHTML(people, TERMS, ME, true, "", false, { term: "all", team: "" }, [], null, null);
+  // 2026-11-25：篩選收在搜尋框右邊那一顆裡，按開才看得到那幾顆 chip。
+  const h = rosterHTML(people, TERMS, ME, true, "", false, { term: "all", team: "", open: true }, [], null, null);
   assert.match(h, /data-act="roster-noacc"/, "有「沒有帳號」那顆 chip");
+  assert.doesNotMatch(rosterHTML(people, TERMS, ME, true, "", false, { term: "all", team: "" }, [], null, null), /class="chip" data-act="roster-noacc"/, "收著的時候不印");
   assert.match(h, /data-act="bulk-tick" data-id="p4"/);
   assert.match(h, /data-act="bulk-tick" data-id="p6"/);
   assert.doesNotMatch(h, /data-act="bulk-tick" data-id="p1"/, "有帳號的人沒有勾選框");
@@ -70,7 +72,7 @@ test("★ 名單：沒有帳號的人列上有狀態徽章、有勾選框；「�
   const only = rosterHTML(people, TERMS, ME, true, "", false, { term: "all", team: "", noacc: true }, [], null, null);
   assert.doesNotMatch(only, /data-act="person-edit" data-id="p1"/);
   assert.equal((only.match(/data-act="bulk-tick"/g) || []).length, 4);
-  assert.match(only, /data-act="roster-noacc"[^>]*class="chip on"|class="chip on" data-act="roster-noacc"/);
+  assert.match(only, /class="chip sm on" data-act="roster-noacc"/, "開著的篩選印成搜尋框底下那顆可以按掉的 chip（2026-11-25）");
 });
 
 test("★ 批次面板：勾了誰就列誰，email 預填、一個語言全套、每一列可以另外選；按鈕上有人數", () => {

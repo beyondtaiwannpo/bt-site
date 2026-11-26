@@ -46,7 +46,7 @@ function render() {
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
   if (!isSenior()) { UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", "", S.me), UI.noAccessHTML(S.me)); UI.railAfter(el); return; }
 
-  const filter = { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all", team: S.filter.team, noacc: !!S.filter.noacc };
+  const filter = { term: S.filter.term || (UI.currentTerm(S.terms) || {}).id || "all", team: S.filter.team, noacc: !!S.filter.noacc, open: !!S.filter.open };
   let body, tab = "roster";
   if (S.view === "invites") { body = UI.invitesPageHTML(S.inviteList, S.invites, S.terms, S.msg, S.busy, S.inviteNew, S.inviteDraft, isPres(), batchOpen(), S.people); tab = "invites"; }
   else if (S.view === "changes") { body = UI.changesHTML(S.changes, S.people, S.msg); tab = "changes"; }
@@ -381,6 +381,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "roster-term") { S.filter.term = b.dataset.v || "all"; render(); return; }
   if (act === "roster-team") { S.filter.team = b.dataset.v || ""; render(); return; }
+  if (act === "roster-filters") { S.filter.open = !S.filter.open; render(); return; }   // 篩選收在搜尋框右邊那一顆裡（2026-11-25）
   if (act === "roster-noacc") { S.filter.noacc = !S.filter.noacc; render(); return; }
   if (act === "roster-back") { S.person = null; S.personDraft = null; S.remove = null; S.newDraft = null; history.pushState(null, "", "#roster"); await openRoster(); return; }
   if (act === "after-dismiss") { S.afterEnd = null; render(); return; }

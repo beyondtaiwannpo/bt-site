@@ -1119,6 +1119,29 @@ export function rowTags(p) {
   const kind = p.kind === "student" && tags.includes("student") ? "" : `<span class="tag">${esc(T("pkind." + p.kind))}</span>`;
   return [kind, whoTagsHTML(tags)].filter(Boolean).join(" ");
 }
+// 搜尋框右邊那顆「篩選」的圖示（三條由長到短的橫線）。
+const FUNNEL = `<svg class="fbx-ic" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 5h14M6 10h8M8.5 15h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+// 名錄現在有哪幾個篩選開著，各自印成什麼字（搜尋框底下那排可以按掉的 chip）。純函式。
+export function dirActive(f, events) {
+  const x = f || {}, lab = { kind: "dir.kind", label: "dir.label", who: "dir.who", role: "dir.role", team: "dir.team", school: "dir.school", grad: "dir.grad", term: "dir.term", event: "dir.event", country: "dir.country" };
+  const val = (k, v) => k === "kind" ? T("pkind." + v) : k === "label" ? labelName(parseLabel(v).label, parseLabel(v).current) : k === "who" ? T(v === "intern" ? "who.intern" : "prole." + v)
+    : k === "role" ? (v === "none" ? T("dir.noAccount") : T("acct." + v)) : k === "event" ? (((events || []).find(e => e.id === v) || {}).title || T("dir.event")) : v;
+  return DIR_FILTERS.filter(k => x[k]).map(k => k === "speak" ? { k, text: T("dir.offerSpeak") } : k === "mentor" ? { k, text: T("dir.offerMentor") } : { k, text: `${T(lab[k])}${T("dir.sep")}${val(k, x[k])}` });
+}
+// 合併那張卡要的一欄，從 rc_person 回的那一包轉過來（跟「可能重複」那張卡吃同一個形狀）。
+export function mergeMember(d) {
+  const p = (d && d.person) || {};
+  const emails = [...new Set((((d && d.identities) || []).filter(i => i.kind === "email").map(i => i.value)).concat(p.login_email ? [p.login_email] : []).map(e => String(e || "").trim().toLowerCase()).filter(Boolean))];
+  return { id: p.id, name: p.name || "", name_zh: p.name_zh || "", name_en: p.name_en || "", emails, kind: p.kind || "student", has_account: !!p.has_account, role: p.role || "",
+    school: p.school || "", schools: ((d && d.schools) || []).map(x => x.school).filter(Boolean), grad_year: p.grad_year || null,
+    events: ((d && d.participation) || []).map(x => ({ title: x.event || "", year: x.starts_at ? String(x.starts_at).slice(0, 4) : "", role: x.role })),
+    n_pairs: ((d && d.pairs) || []).length, n_outcomes: ((d && d.outcomes) || []).length, note: p.note || "", created_at: p.created_at || "" };
+}
+// 自己挑的那幾個人，建議留哪一個：有登入帳號的優先，再來是參與紀錄多的，再來是先建的。
+export function mergeSuggest(members) {
+  const m = (members || []).slice().sort((a, b) => (b.has_account ? 1 : 0) - (a.has_account ? 1 : 0) || (b.events || []).length - (a.events || []).length || String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  return m.length ? m[0].id : "";
+}
 export function directoryHTML(S) {
   const boot = S.boot || {}, dir = S.dir, f = S.df || {}, events = boot.events || [];
   if (S.dirErr) return `<div class="msg err" role="status"><span class="msg-k">${esc(T("msg.err"))}</span><span>${esc(S.dirErr)}</span></div>`;   // 不走 msgHTML：它只畫 err. 開頭的句子，這一句是「還沒跑遷移檔」
@@ -1130,23 +1153,41 @@ export function directoryHTML(S) {
   const net = !dir.length || dir.some(hasNetwork);
   const optLabel = (key, v) => key === "kind" ? T("pkind." + v) : key === "label" ? labelName(parseLabel(v).label, parseLabel(v).current) : key === "who" ? T(v === "intern" ? "who.intern" : "prole." + v) : key === "role" ? (v === "none" ? T("dir.noAccount") : T("acct." + v)) : v;
   const box = (key, labelKey, anyKey) => `<label><i>${esc(T(labelKey))}</i><select name="${key}" class="rc-dfilter" data-noauto="1">${pickOpt("", T(anyKey), f[key] || "")}${(opts[key] || []).map(([v, n, title]) => pickOpt(v, `${title || optLabel(key, v)} (${n})`, f[key] || "")).join("")}</select></label>`;
-  const active = DIR_FILTERS.filter(k => f[k]).length + (S.pq ? 1 : 0);
+  const on = dirActive(f, events);
+  const active = on.length + (S.pq ? 1 : 0);
   const dbHits = S.pq && S.pq.includes("@") && boot.can_manage ? (S.people || []) : null;
+  // 合併（2026-11-25 Paul：「if I see two possible people that I think they're the same person, I can merge them by myself」）：
+  // 按「合併」進到挑人的樣子，每一列前面多一格勾選；勾了兩個以上按「比一比」，底下出現跟「可能重複」一樣的那張卡。
+  const mm = !!S.mergeMode && !!boot.can_manage, picked = mm ? (S.pick || []) : [];
+  const nameOf = id => ((dir.find(p => p.id === id) || {}).name) || T("common.noName");
   // 一列：名字、標籤（沒跑遷移檔的退回舊的那排）、有沒有帳號；他自己舉的手；現在做什麼（領域、職稱、單位、城市，有填才印）；再來是原本那一行。
   const now = p => [p.field, p.job_title, p.job_org, [p.city, p.country_now].filter(Boolean).join(", ")].filter(Boolean);
   const offers = p => `${p.offer_speak ? ` <span class="tag ok">${esc(T("dir.offerSpeak"))}</span>` : ""}${p.offer_mentor ? ` <span class="tag ok">${esc(T("dir.offerMentor"))}</span>` : ""}`;
-  const row = p => `<li><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> ${hasNetwork(p) ? labelChipsHTML(p.labels) : rowTags(p)}${p.has_account ? ` <span class="tag open">${esc(acctTag(p))}</span>` : ""}${offers(p)}</div>
-      ${now(p).length ? `<div class="fmeta rc-now">${now(p).map(v => esc(String(v))).join("・")}</div>` : ""}<div class="fmeta">${[p.school, p.grad_year, p.team, (p.terms || []).slice().sort().reverse().join(" "), p.n ? T("dir.events", { n: p.n }) : "", p.latest, (p.countries || []).join(" ")].filter(Boolean).map(v => esc(String(v))).join("・")}</div></li>`;
+  const tick = p => mm ? `<label class="pick rc-pickbox"><input type="checkbox" class="rc-pick" value="${esc(p.id)}" data-noauto="1"${picked.includes(p.id) ? " checked" : ""} aria-label="${esc(T("mrg.tick", { name: p.name || T("common.noName") }))}"></label>` : "";
+  const row = p => `<li${mm ? ' class="rc-pickrow"' : ""}>${tick(p)}<div><div class="fhead"><a href="#people/${esc(p.id)}" data-act="open-person" data-id="${esc(p.id)}"><b>${esc(p.name || T("common.noName"))}</b></a> ${hasNetwork(p) ? labelChipsHTML(p.labels) : rowTags(p)}${p.has_account ? ` <span class="tag open">${esc(acctTag(p))}</span>` : ""}${offers(p)}</div>
+      ${now(p).length ? `<div class="fmeta rc-now">${now(p).map(v => esc(String(v))).join("・")}</div>` : ""}<div class="fmeta">${[p.school, p.grad_year, p.team, (p.terms || []).slice().sort().reverse().join(" "), p.n ? T("dir.events", { n: p.n }) : "", p.latest, (p.countries || []).join(" ")].filter(Boolean).map(v => esc(String(v))).join("・")}</div></div></li>`;
+  // 篩選收在搜尋框右邊那一顆裡（2026-11-25 Paul：「they're not supposed to be there. Instead, can you build maybe a filter icon to the right」）。
+  // 開著的篩選印成搜尋框底下一排 chip，按一下就拿掉；面板收著的時候也看得到現在篩了什麼。
+  const panel = !S.dfOpen ? "" : `<div class="fbx-panel" id="rc-dfilters">
+      <div class="fbx-grid">${net ? box("label", "dir.label", "dir.anyLabel") : box("kind", "dir.kind", "dir.anyKind") + box("who", "dir.who", "dir.anyWho")}${box("role", "dir.role", "dir.anyRole")}${box("team", "dir.team", "dir.anyTeam")}${box("school", "dir.school", "dir.anySchool")}${box("grad", "dir.grad", "dir.anyGrad")}${box("term", "dir.term", "dir.anyTerm")}${box("event", "dir.event", "dir.anyEvent")}${box("country", "dir.country", "dir.anyCountry")}</div>
+      ${net ? `<div class="fbx-toggles" role="group" aria-label="${esc(T("dir.quick"))}">${[["speak", "dir.offerSpeak"], ["mentor", "dir.offerMentor"]].map(([k, l]) => `<button type="button" class="chip sm${f[k] ? " on" : ""}" aria-pressed="${f[k] ? "true" : "false"}" data-act="dir-quick" data-k="${k}">${esc(T(l))}</button>`).join("")}</div>` : ""}
+      <div class="fbx-foot">${on.length ? `<button type="button" class="btn quiet sm" data-act="dir-clear">${esc(T("dir.clear"))}</button>` : ""}<button type="button" class="btn ghost sm" data-act="dir-filters">${esc(T("dir.filtersDone"))}</button></div>
+    </div>`;
+  const chips = on.length ? `<div class="fbx-chips">${on.map(c => `<button type="button" class="chip sm on" data-act="dir-unset" data-k="${esc(c.k)}" aria-label="${esc(T("dir.unset", { what: c.text }))}">${esc(c.text)} ×</button>`).join("")}</div>` : "";
+  const mergeBar = !mm ? "" : `<div class="rc-mergebar">
+      <p><b>${esc(T("mrg.title"))}</b> <span class="mini">${esc(T("mrg.hint"))}</span></p>
+      ${picked.length ? `<div class="fbx-chips">${picked.map(id => `<button type="button" class="chip sm on" data-act="dir-unpick" data-id="${esc(id)}" aria-label="${esc(T("mrg.unpick", { name: nameOf(id) }))}">${esc(nameOf(id))} ×</button>`).join("")}</div>` : ""}
+      <div class="form-foot"><button type="button" class="btn sm" data-act="dir-compare"${picked.length < 2 || S.busy ? " disabled" : ""}>${esc(picked.length < 2 ? T("mrg.compare0") : T("mrg.compare", { n: picked.length }))}</button><button type="button" class="btn quiet sm" data-act="dir-merge-mode">${esc(T("common.cancel"))}</button></div>
+      ${S.manual && Array.isArray(S.manual.members) && S.manual.members.length >= 2 ? dupGroupHTML(S.manual, S.busy, !!(S.me && S.me.pres), true) : ""}
+    </div>`;
   return `<div class="card">
-    <label><i>${esc(T("dir.search"))}</i><input type="search" id="rc-pfind" class="rc-pfind" value="${esc(S.pq || "")}" placeholder="${esc(T("dir.searchPh"))}" autocomplete="off" data-noauto="1"></label>
     ${net ? "" : `<div class="note">${esc(T("net.noSql"))}</div>`}
-    <div class="two">${net ? box("label", "dir.label", "dir.anyLabel") : box("kind", "dir.kind", "dir.anyKind")}${net ? "" : box("who", "dir.who", "dir.anyWho")}</div>
-    ${net ? `<div class="chips rc-quick" role="group" aria-label="${esc(T("dir.quick"))}">${[["speak", "dir.offerSpeak"], ["mentor", "dir.offerMentor"]].map(([k, l]) => `<button type="button" class="chip sm${f[k] ? " on" : ""}" aria-pressed="${f[k] ? "true" : "false"}" data-act="dir-quick" data-k="${k}">${esc(T(l))}</button>`).join("")}</div>` : ""}
-    <div class="two">${box("role", "dir.role", "dir.anyRole")}${box("team", "dir.team", "dir.anyTeam")}</div>
-    <div class="two">${box("school", "dir.school", "dir.anySchool")}${box("grad", "dir.grad", "dir.anyGrad")}</div>
-    <div class="two">${box("term", "dir.term", "dir.anyTerm")}${box("event", "dir.event", "dir.anyEvent")}</div>
-    <div class="two">${box("country", "dir.country", "dir.anyCountry")}<span></span></div>
-    <div class="row"><b data-dir-count>${esc(active ? T("dir.countOf", { n: hits.length, total: dir.length }) : T("dir.count", { n: dir.length }))}</b>${active ? ` <button class="btn quiet sm" data-act="dir-clear">${esc(T("dir.clear"))}</button>` : ""}</div>
+    <div class="fbx">
+      <div class="fbx-row"><input type="search" id="rc-pfind" class="rc-pfind" value="${esc(S.pq || "")}" placeholder="${esc(T("dir.searchPh"))}" aria-label="${esc(T("dir.search"))}" autocomplete="off" data-noauto="1"><button type="button" class="fbx-btn${on.length ? " on" : ""}" data-act="dir-filters" aria-expanded="${S.dfOpen ? "true" : "false"}" aria-controls="rc-dfilters">${FUNNEL}<span>${esc(T("dir.filters"))}</span>${on.length ? `<b class="fbx-n">${on.length}</b>` : ""}</button></div>
+      ${chips}${panel}
+    </div>
+    <div class="row rc-dirbar"><b data-dir-count>${esc(active ? T("dir.countOf", { n: hits.length, total: dir.length }) : T("dir.count", { n: dir.length }))}</b>${active ? ` <button class="btn quiet sm" data-act="dir-clear">${esc(T("dir.clear"))}</button>` : ""}${boot.can_manage && !mm ? `<button type="button" class="btn ghost sm rc-mergego" data-act="dir-merge-mode">${esc(T("mrg.go"))}</button>` : ""}</div>
+    ${mergeBar}
     ${dbHits ? (dbHits.length ? `<ul class="flist">${dbHits.map(p => row({ ...p, terms: [], countries: [] })).join("")}</ul>` : `<div class="mini">${esc(T("pp.noHit"))}</div>`)
       : hits.length ? `<ul class="flist">${shown.map(row).join("")}</ul>${hits.length > shown.length ? `<div class="form-foot"><button class="btn ghost sm" data-act="dir-more">${esc(T("dir.more", { n: Math.min(DIR_PAGE, hits.length - shown.length) }))}</button></div>` : ""}`
       : `<div class="mini">${esc(T("dir.empty"))}</div>`}
@@ -1221,7 +1262,8 @@ export function dupBtnLabel(box) {
   const n = [...box.querySelectorAll('input[type="checkbox"]:checked')].filter(c => c.value && c.value !== k).length;
   return n ? T("dup.mergeBtnN", { n, col: ki + 1 }) : T("dup.mergeBtn0");
 }
-export function dupGroupHTML(g, busy, pres) {
+// manual：名錄上自己挑的那幾個人（2026-11-25）。每一欄預設都勾（他已經說這些是同一個人）、最上面那句換成怎麼做、沒有「不是同一個人」那顆。
+export function dupGroupHTML(g, busy, pres, manual) {
   const members = Array.isArray(g.members) && g.members.length ? g.members : [
     { id: g.a, name: g.a_name, kind: g.a_kind, school: g.a_school }, { id: g.b, name: g.b_name, kind: g.b_kind, school: g.b_school }].filter(m => m.id);
   const keep = g.suggest && members.some(m => m.id === g.suggest) ? g.suggest : (g.suggest === "b" && members[1] ? members[1].id : members[0].id);
@@ -1264,28 +1306,19 @@ export function dupGroupHTML(g, busy, pres) {
   // 預設只勾「像同一個人」的那幾欄；資料不夠、像不同人、說過不是的都不勾。
   const rad = m => `<td><label class="pick"><input type="radio" name="keep-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id === keep ? " checked" : ""} aria-label="${esc(T("dup.keepRadio"))}: ${esc(m.name || T("common.noName"))}"></label></td>`;
   const box = m => { const ns = isNotSame(m.id, keep), v = vOf(m).verdict, b = blk(m), blocked = !!(b && b.kind === "block");
-    return `<td><label class="pick"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !ns && !blocked && v === "same" ? " checked" : ""}${m.id === keep || blocked ? " disabled" : ""} aria-label="${esc(T("dup.mergeCheck"))}: ${esc(m.name || T("common.noName"))}"></label><div class="mini" data-blk="${esc(m.id)}">${ns ? esc(T("dup.notSameTag")) : b ? esc(b.text) : ""}</div></td>`; };
-  const n0 = members.filter(m => m.id !== keep && !isNotSame(m.id, keep) && vOf(m).verdict === "same" && !(blk(m) && blk(m).kind === "block")).length;
+    return `<td><label class="pick"><input type="checkbox" name="merge-${esc(key)}" value="${esc(m.id)}" data-noauto="1"${m.id !== keep && !ns && !blocked && (manual || v === "same") ? " checked" : ""}${m.id === keep || blocked ? " disabled" : ""} aria-label="${esc(T("dup.mergeCheck"))}: ${esc(m.name || T("common.noName"))}"></label><div class="mini" data-blk="${esc(m.id)}">${ns ? esc(T("dup.notSameTag")) : b ? esc(b.text) : ""}</div></td>`; };
+  const n0 = members.filter(m => m.id !== keep && !isNotSame(m.id, keep) && (manual || vOf(m).verdict === "same") && !(blk(m) && blk(m).kind === "block")).length;
   const btn = n0 ? T("dup.mergeBtnN", { n: n0, col: members.indexOf(keepM) + 1 }) : T("dup.mergeBtn0");
   return `<div class="card dup" data-dup="${esc(key)}">
-    <p class="rc-verdict">${esc(dupVerdictLine(members, keep, !!pres))}</p>
+    <p class="rc-verdict">${esc(manual ? T("mrg.cardHint", { col: members.indexOf(keepM) + 1 }) : dupVerdictLine(members, keep, !!pres))}</p>
     <div class="tf-scroll"><table class="table rc-table rc-dup"><thead><tr><th></th>${members.map(head).join("")}</tr></thead>
     <tbody>${rows.map(tr).join("")}</tbody>
     <tfoot><tr><th>${esc(T("dup.keepRadio"))}</th>${members.map(rad).join("")}</tr><tr><th>${esc(T("dup.mergeCheck"))}</th>${members.map(box).join("")}</tr></tfoot></table></div>
-    <div class="form-foot"><button class="btn sm" data-act="dup-merge" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(btn)}</button><button class="btn quiet sm" data-act="dup-not-same" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(T("dup.notSameBtn"))}</button></div>
+    <div class="form-foot"><button class="btn sm" data-act="dup-merge" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(btn)}</button>${manual ? "" : `<button class="btn quiet sm" data-act="dup-not-same" data-group="${esc(key)}"${busy ? " disabled" : ""}>${esc(T("dup.notSameBtn"))}</button>`}</div>
   </div>`;
 }
-// 資料庫判成「像兩個人」而從卡上拿掉的那幾對（2026-12-09）。列在可能重複的最下面，人覺得其實是同一個還是併得了。
-export function dupAsideHTML(dups, busy) {
-  const items = (dups || []).flatMap(d => d.set_aside || []);
-  if (!items.length) return "";
-  const side = (p, who) => `<a href="#people/${esc(p[who])}" data-act="open-person" data-id="${esc(p[who])}"><b>${esc(p[who + "_name"] || T("common.noName"))}</b></a> <span class="mini">${esc([p[who + "_zh"], p[who + "_school"], ...((p[who + "_emails"]) || [])].filter(Boolean).join(" · "))}</span>`;
-  const row = p => `<div class="rc-aside"><div>${side(p, "a")} <span class="vs">${esc(T("dup.vs"))}</span> ${side(p, "b")}</div>
-      <div class="mini">${esc(T("dup.asideWhy", { ev: evText(p.why) }))}</div>
-      <div><button class="btn ghost sm" data-act="merge" data-keep="${esc(p.a)}" data-drop="${esc(p.b)}"${busy ? " disabled" : ""}>${esc(T("dup.asideMerge"))}</button></div></div>`;
-  // 2026-11-13 Paul：「為什麼這些不是重複的也列出來？」這一段是系統判斷「同名但是兩個人」的清單，只是給人抓錯，不用處理。收成一行。
-  return `<div class="rc-aside-wrap">${foldStart("dup-aside", "data-aside", T("dup.asideTitle", { n: items.length }), null)}<div class="mini">${esc(T("dup.asideHint"))}</div>${items.map(row).join("")}</div></details></div>`;
-}
+// 「同名但不是同一個人」那一段 2026-11-25 拿掉了（Paul：「there's no need to show this section… Just delete that. Or maybe instead… make a possible way to merge two people」）。
+// 要併兩個系統沒有列出來的人，到名錄按「合併」自己挑（directoryHTML 的 mergeBar）。
 // 從卡上讀「留哪欄、勾了哪幾欄」。純函式：box 是那張卡的 DOM（或假的 querySelectorAll）。
 export function dupPick(box) {
   const keep = box.querySelector('input[type="radio"]:checked'); const k = keep ? keep.value : "";
@@ -1300,7 +1333,7 @@ export function peopleHTML(boot, S) {
   const tabs = [["dir", T("dir.tab", { n })], ["dups", T("dir.dupTab", { n: dups.filter(d => (Array.isArray(d.members) ? d.members.length >= 2 : !!d.a)).length })]].concat(b.can_manage ? [["add", T("dir.addTab")]] : []);
   const tabHTML = `<nav class="subtabs ptabs" aria-label="${esc(T("pp.title"))}">${tabs.map(([k, l]) => `<button type="button" class="subtab${k === tab ? " on" : ""}"${k === tab ? ' aria-current="page"' : ""} data-act="ptab" data-t="${k}">${esc(l)}</button>`).join("")}</nav>`;
   const cards = dups.filter(d => (Array.isArray(d.members) ? d.members.length >= 2 : !!d.a));   // 只剩 set_aside 的群不算一張卡
-  const dupHTML = sectionHTML(T("pp.dups", { n: cards.length }), cards.length ? `<div class="mini">${esc(T("pp.dupsHint"))} ${esc(T("dup.groupHint"))}</div>${cards.map(d => dupGroupHTML(d, S.busy, !!(S.me && S.me.pres))).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`) + dupAsideHTML(dups, S.busy);
+  const dupHTML = sectionHTML(T("pp.dups", { n: cards.length }), cards.length ? `<div class="mini">${esc(T("pp.dupsHint"))} ${esc(T("dup.groupHint"))}</div>${cards.map(d => dupGroupHTML(d, S.busy, !!(S.me && S.me.pres))).join("")}` : `<div class="mini">${esc(T("pp.noDups"))}</div>`) + `<div class="mini rc-duphow">${esc(T("mrg.fromDups"))}</div>`;
   const add = b.can_manage ? sectionHTML(T("pp.add"), `<div data-padd><div class="two"><label><i>${esc(T("person.nameZh"))}</i><input name="name_zh" maxlength="60"></label><label><i>${esc(T("person.nameEn"))}</i><input name="name_en" maxlength="60"></label></div>
       <div class="two"><label><i>${esc(T("person.email"))}</i><input name="email" type="email" maxlength="120"></label><label><i>${esc(T("person.school"))}</i><input name="school" maxlength="80"></label></div>
       <div class="two"><label><i>${esc(T("person.gradYear"))}</i><input name="grad_year" type="number" min="2000" max="2100"></label><span></span></div>
@@ -1596,7 +1629,7 @@ export function personHTML(d, S) {
   const sch = (d.schools || []).slice();
   const yrs = x => x.year_from && x.year_to ? T("school.years", { from: x.year_from, to: x.year_to }) : x.year_from ? T("school.from", { from: x.year_from }) : x.year_to ? T("school.to", { to: x.year_to }) : "";
   const placeRow = (x, i) => `<li><div class="fhead"><b>${esc(x.name)}</b>${i === 0 ? ` <span class="tag open">${esc(T("school.current"))}</span>` : ""}${x.from === "outcome" ? ` <span class="tag">${esc(T("okind." + x.kind))}</span>${x.year ? ` <span class="mini">${esc(String(x.year))}</span>` : ""}` : (yrs(x) ? ` <span class="mini">${esc(yrs(x))}</span>` : "")}</div><div class="fmeta">${x.from === "outcome"
-      ? [x.extra, T("place.fromOutcome")].filter(Boolean).map(esc).join("・")
+      ? [x.extra, T("place.fromOutcome")].filter(Boolean).map(esc).join("・") + (manage && !p.forgotten_at ? ` <button class="btn quiet sm" data-act="out-del" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : "")
       : [x.note, T("ssrc." + x.source)].filter(Boolean).map(esc).join("・") + (manage && !p.forgotten_at ? ` <button class="btn quiet sm" data-act="school-del" data-id="${esc(x.id)}"${S.busy ? " disabled" : ""}>${esc(T("common.delete"))}</button>` : "")}</div></li>`;
   const schList = places.length ? `<ul class="flist rc-places">${places.map(placeRow).join("")}</ul>` : `<div class="mini">${esc(T("person.noSchools"))}</div>`;
   const schAdd = manage && !p.forgotten_at ? `${foldStart("sadd", "data-sadd", T("school.add"), S)}

@@ -1495,6 +1495,8 @@ export function eventMatches(e, f) {
 }
 // 清單：最上面是收起來的「開一場活動」，接著搜尋與篩選，再照狀態分段（準備好了 → 草稿 → 對外中 → 過去或撤下 → 只在紀錄裡）。
 // canCreateTeams 是能開活動的 team（senior 或某個 team 的資源「管」）。newOpen：開活動那一格開著沒（main.js 記）。
+// 搜尋框右邊那顆「篩選」的圖示（2026-11-25：後台每一個搜尋框都是同一個樣子，樣式在 admin.css 的 .fbx）。
+const EV_FUNNEL = `<svg class="fbx-ic" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 5h14M6 10h8M8.5 15h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTeams, f, newOpen, projects) {
   const dis = busy ? " disabled" : "";
   const d = draft || {};
@@ -1517,8 +1519,13 @@ export function eventsListHTML(events, me, teams, draft, msg, busy, canCreateTea
   const cnt = k => k === "all" ? ev.length : ev.filter(e => (EV_FILTER_GROUPS[k] || []).includes(evGroup(e))).length;
   const teamsHere = [...new Set(ev.map(e => e.team || "").filter(Boolean))].sort();
   const filters = ev.length ? `<div class="chips" style="margin-bottom:10px">${EV_FILTERS.filter(k => k === "all" || cnt(k)).map(k => fchip("ev-fst", k, `${T("ev.f." + k)} ${cnt(k)}`, fx.st === k)).join("")}</div>
-      <div class="ev-find"><div class="ro-search"><input id="ev-q" type="search" value="${esc(fx.q)}" placeholder="${esc(T("ev.findPh"))}" autocomplete="off"></div>${
-        teamsHere.length > 1 ? `<select id="ev-fteam" aria-label="${esc(T("ev.team"))}"><option value="">${T("ev.fAllTeams")}</option>${teamsHere.map(t => `<option value="${esc(t)}"${fx.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select>` : ""}</div>` : "";
+      <div class="fbx ev-fbx">
+        <div class="fbx-row"><input id="ev-q" type="search" value="${esc(fx.q)}" placeholder="${esc(T("ev.findPh"))}" aria-label="${esc(T("ev.findPh"))}" autocomplete="off">${
+          teamsHere.length > 1 ? `<button type="button" class="fbx-btn${fx.team ? " on" : ""}" data-act="ev-filters" aria-expanded="${fx.open ? "true" : "false"}" aria-controls="ev-filters">${EV_FUNNEL}<span>${T("ev.filters")}</span>${fx.team ? `<b class="fbx-n">1</b>` : ""}</button>` : ""}</div>
+        ${fx.team ? `<div class="fbx-chips"><button type="button" class="chip sm on" data-act="ev-funset" aria-label="${esc(T("ev.fUnset", { what: fx.team }))}">${T("ev.team")}${T("ev.fSep")}${esc(fx.team.replace(/\s*Team$/i, ""))} ×</button></div>` : ""}
+        ${fx.open && teamsHere.length > 1 ? `<div class="fbx-panel" id="ev-filters"><div class="fbx-grid"><label><i>${T("ev.team")}</i><select id="ev-fteam" aria-label="${esc(T("ev.team"))}"><option value="">${T("ev.fAllTeams")}</option>${teamsHere.map(t => `<option value="${esc(t)}"${fx.team === t ? " selected" : ""}>${esc(t.replace(/\s*Team$/i, ""))}</option>`).join("")}</select></label></div>
+          <div class="fbx-foot"><button type="button" class="btn ghost sm" data-act="ev-filters">${T("ev.filtersDone")}</button></div></div>` : ""}
+      </div>` : "";
   const filtered = fx.q || fx.team || fx.st !== "all";
   const recLine = nRec ? `<div class="note ev-recline">${T("ev.recOnly", { n: nRec })} <a href="/admin/records/#overview">${T("ev.recGo")}</a></div>` : "";
   return pageHead(T("ev.title"), T("ev.lede"))

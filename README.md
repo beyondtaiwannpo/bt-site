@@ -6031,6 +6031,70 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
 
+## 後台的搜尋框：篩選收在右邊一顆裡；自己挑人合併；去向那一列刪得掉（2026-11-25）
+
+Paul 問的：
+
+> if I see two possible people that I think they're the same person, I can merge them by myself. If I go to possible duplicates, there's no EVA as well.
+> And also, there's no need to show this section, like the same name, different person. Just delete that. Or maybe instead… make a possible way to merge two people.
+> these are great, but like they're not supposed to be there. Instead, can you build maybe a filter icon to the right… Anything that has a search box should consist this function.
+> how do I delete a school? For example, I see two Northwestern University from this person.
+
+只動後台的畫面。沒有遷移檔，資料庫、RLS、誰看得到什麼都沒有變。合併叫的還是原本那兩支（`rc_merge_people`、`rc_merge_accounts`），刪去向叫的是原本的 `rc_delete_outcome`。
+
+### 1. 搜尋框右邊一顆「篩選」
+
+以前篩選是一格一格攤在搜尋框底下，紀錄的名錄有八個下拉加兩顆按鈕，一打開整個畫面都是它。現在每一個有篩選的搜尋框都長一樣：
+
+- 一行：搜尋框，右邊一顆「篩選」。按一下打開面板，再按一下（或面板右下角的「收起來」）收掉。
+- 開著的篩選印成搜尋框底下一排 chip，例如「標籤：講者 ×」。按那一顆就拿掉那一個篩選。面板收著也看得到現在篩了什麼。
+- 「篩選」那一顆上面有一個數字，是現在開著幾個。
+
+改了四個地方，樣式只有一份，在 `admin/admin.css` 的 `.fbx`：
+
+| 哪一頁 | 收進去的是什麼 | 程式在哪 |
+|---|---|---|
+| 紀錄的名錄（Records → People） | 標籤、帳號、team、學校、畢業年、屆別、參加過、去向國家，加「願意演講」「願意當 mentor」 | `admin/records/src/ui.js` 的 `directoryHTML`、`dirActive` |
+| Internal 的名單（Roster） | 屆別、team、沒有帳號 | `admin/people/src/ui.js` 的 `rosterHTML` |
+| Money 的收支（Transactions） | 屆別、月份、種類、帳戶、類別 | `admin/finance/src/ui.js` 的 `txFiltersHTML` |
+| 活動清單（Projects → Events） | team | `admin/src/ui.js` 的 `eventsListHTML` |
+
+幾個細節：
+
+- **「這一屆」不算篩選。** 名單與收支預設就是看這一屆，所以不印 chip、不算在數字裡。選了別屆才印，按掉是回到這一屆。
+- 收支把「種類」拿掉的時候，「類別」一起清（類別是跟著種類的）。
+- 活動清單最上面那排「全部、已上架、進行中」沒有收進去，那是分頁不是篩選。行銷需求單那一排狀態也是，一樣沒動。
+- 會議、場地、挑講者那幾個搜尋框本來就沒有篩選，沒有多一顆。
+- 資料夾之間不互相 import，所以那個圖示（三條橫線）在四支 `ui.js` 各寫一次，`test/search-filters-merge.test.mjs` 守著四個地方都用 `.fbx`。
+
+### 2. 自己挑人合併
+
+「可能重複」只列系統覺得像同一個人的。系統判斷「同名但是兩個人」的，或名字根本拼得不一樣的，以前沒有地方併。現在：
+
+1. 到 Records → People 的名錄，用搜尋找到那幾列。
+2. 按右邊的「合併兩個人」。每一列前面多一格勾選。
+3. 把其實是同一個人的勾起來（兩個到六個），按「比一比」。
+4. 底下出現跟「可能重複」一樣的那張卡：一欄一個人，不一樣的格子標淺橘。選要留哪一欄，按「把勾起來的併進去」，再按一次確定。
+
+- 建議留哪一欄：有登入帳號的優先，再來是參與紀錄多的，再來是先建的。可以自己改。
+- 他自己挑的，所以每一欄預設都勾；沒有「不是同一個人」那顆。
+- 併的規則跟「可能重複」完全一樣：出席、答案、配對、去向、email 都搬到留的那一列，備註接在一起，**不能復原**。兩邊都有登入帳號的只有 Co-President 併得了，而且被併掉的那個登入會刪掉。
+- 只有管得了紀錄的人看得到那一顆。
+
+**「同名但不是同一個人」那一段拿掉了**（`dupAsideHTML` 與它的字）。資料庫照樣會回那幾對，畫面不印。「可能重複」那一頁最下面多一句，說要自己併的到名錄去。
+
+### 3. 去向那一列在「學校與工作」那一條也刪得掉
+
+一個人的頁面上「學校與工作」那一條是學校與去向排在一起的。以前只有學校那幾列有「刪掉」，去向那幾列寫著「到參與紀錄改」，要捲到下面去找。
+匯入的時候同一所大學常常有兩筆（一筆有年份、一筆沒有），現在每一筆去向後面也有一顆「刪掉」，按了就刪那一筆（只有管的人有）。
+
+### 驗收
+
+`test/search-filters-merge.test.mjs` 六條新的（四個搜尋框收著與開著的樣子、開著的篩選印成 chip、合併只有管的人有、比一比那張卡、去向刪得掉、樣式只有一份）。
+另外五支舊測試跟著改：`test/records.test.mjs`、`test/people-network-admin.test.mjs`、`test/people-admin.test.mjs`、`test/alumni-invite.test.mjs`、`test/events.test.mjs`。
+本機瀏覽器接本機 Supabase 走過：名錄開篩選、選兩個、按掉；勾兩個人、比一比、真的併一次（兩筆試驗用的假資料，試完刪了）；兩筆一樣的去向刪一筆；名單、收支、活動清單各開一次；手機寬度（375）沒有橫向捲動。
+正式站上還沒有人點過，四張本機截圖在 `~/Anson/outputs/beyond-taiwan/website/web/2026-11-25-search-filters-merge/`。
+
 ## 講者點得開看經歷、照片搬到上面；後台找人看得到中文名、一點就到那個人的頁（2026-11-25）
 
 Paul 同一天接著講的（都是從「活動的講者」這件事延伸出來的）：

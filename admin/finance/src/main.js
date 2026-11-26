@@ -213,6 +213,15 @@ document.addEventListener("click", async e => {
   if (act === "retry") { location.reload(); return; }
   if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
+  // 收支的篩選收在搜尋框右邊那一顆裡（2026-11-25）：開、收，還有搜尋框底下那排 chip 按一下拿掉那一個篩選（屆別拿掉是回到這一屆）。
+  if (act === "f-filters") { S.filter.open = !S.filter.open; render(); return; }
+  if (act === "f-unset") {
+    const k = b.dataset.k;
+    if (k === "term") { S.filter.term = null; S.filter.month = ""; }
+    else if (k === "kind") { S.filter.kind = ""; S.filter.category = ""; }
+    else if (["month", "account", "category"].includes(k)) S.filter[k] = "";
+    render(); return;
+  }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
   if (act === "tab") { e.preventDefault(); S.msg = ""; history.pushState(null, "", "#" + b.dataset.t); openTab(b.dataset.t); return; }
   if (act === "go-accounts") { history.pushState(null, "", "#accounts"); openTab("accounts"); if (!S.accounts.length) { S.accDraft = { kind: "bank", opening_on: today() }; render(); } return; }

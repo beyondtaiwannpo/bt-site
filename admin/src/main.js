@@ -1392,6 +1392,12 @@ document.addEventListener("click", async e => {
     S.busy = false; render(); return;
   }
   // 活動清單的篩選（2026-11-11）。重畫前先把「開一場活動」填到一半的字收進草稿，不然一按篩選就不見了。
+  // 篩選收在搜尋框右邊那一顆裡（2026-11-25）：開、收，以及搜尋框底下那顆 chip 按一下拿掉 team 篩選。
+  if (act === "ev-filters" || act === "ev-funset") {
+    keepEvDraft();
+    S.evF = act === "ev-funset" ? Object.assign({}, S.evF, { team: "" }) : Object.assign({}, S.evF, { open: !(S.evF || {}).open });
+    render(); return;
+  }
   if (act === "ev-fst" || act === "ev-fclear") {
     keepEvDraft();
     S.evF = act === "ev-fclear" ? { q: "", st: "all", team: "" } : Object.assign({}, S.evF, { st: b.dataset.v });

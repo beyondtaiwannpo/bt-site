@@ -123,7 +123,7 @@ test("★ 名錄：搜尋忽略大小寫與空格；篩選身分、帳號、team
 test("★ 名錄是主畫面：三個分頁帶人數，重複的在自己那頁，篩選下拉與人數都在；沒跑遷移檔時說哪一支", () => {
   const dir = [{ id: "a", name: "Someone", kind: "student", school: "S", has_account: false, terms: [], events: [], countries: [], n: 0 }];
   const boot = { can_manage: true, duplicates: [{ a: "x", a_name: "A", a_kind: "student", b: "y", b_name: "A", b_kind: "guest" }], events: [], counts: { people: 1 } };
-  const h = UI.peopleHTML(boot, { boot, dir, df: {}, pq: "", msg: "", ptab: "dir" });
+  const h = UI.peopleHTML(boot, { boot, dir, df: {}, pq: "", msg: "", ptab: "dir", dfOpen: true });   // 2026-11-25：篩選按開才印
   assert.match(h, /data-act="ptab" data-t="dups"/); assert.match(h, /Directory \(1\)|名錄（1）/); assert.match(h, /duplicates \(1\)|可能重複（1）/);
   assert.match(h, /class="rc-dfilter"/); assert.match(h, /data-dir-count/); assert.match(h, /data-act="open-person" data-id="a"/);
   assert.doesNotMatch(h, /data-act="dup-merge"/, "重複那一組不在名錄分頁上");
@@ -224,11 +224,12 @@ test("★ 同名一群一張卡：N 欄、不一樣的格子標 diff、建議留
   assert.match(hp, /Column 2 has a login \(yun@nyu\.edu\): merging retires that login|第 2 欄有登入帳號（yun@nyu\.edu）/); assert.match(hp, /Merge 2 ticked columns into column 1|把勾起來的 2 欄併進第 1 欄/);
   assert.equal(UI.dupBlocker(g3.members[1], g3.members[0], false).kind, "block"); assert.equal(UI.dupBlocker(g3.members[1], g3.members[0], true).kind, "retire");
   assert.equal(UI.dupBlocker(g3.members[2], g3.members[0], false), null); assert.equal(UI.dupBlocker(g3.members[0], g3.members[2], true).kind, "takeover"); assert.equal(UI.dupBlocker(g3.members[0], g3.members[2], false).kind, "block");
-  const aside = UI.dupAsideHTML([{ key: "k3", members: [], set_aside: [{ a: "m", b: "n", a_name: "Anika", b_name: "Anika", a_zh: "安一", b_zh: "安二", a_school: "TFG", b_school: null, a_emails: ["a@x.io"], b_emails: ["c@x.io"], why: ["email_disjoint", "zh_diff"] }] }], false);
-  assert.match(aside, /data-act="merge" data-keep="m" data-drop="n"/); assert.match(aside, /different email|email 不同/); assert.match(aside, /安一/); assert.match(aside, /c@x\.io/);
-  assert.equal(UI.dupAsideHTML([{ members: [], set_aside: [] }], false), "");
+  // 2026-11-25：「同名但不是同一個人」那一段拿掉了（Paul：「there's no need to show this section… Just delete that」）。資料庫照樣回 set_aside，畫面不印；
+  // 換成一句話說要自己併的到名錄按「合併兩個人」。
+  assert.equal(UI.dupAsideHTML, undefined);
   const pp = UI.peopleHTML({ duplicates: [{ key: "k3", members: [], set_aside: [{ a: "m", b: "n", a_name: "A", b_name: "A", why: [] }] }], counts: {}, can_manage: true }, { ptab: "dups", dir: [] });
-  assert.match(pp, /Possible duplicates \(0\)|可能重複（0）/); assert.match(pp, /different people \(1\)|不是同一個人（1 對）/); assert.match(pp, /<details class="fold rc-fold" data-aside data-fold="[^"]*dup-aside"><summary>/, "收著（2026-11-13）");
+  assert.match(pp, /Possible duplicates \(0\)|可能重複（0）/); assert.doesNotMatch(pp, /different people|不是同一個人（/); assert.doesNotMatch(pp, /data-aside/);
+  assert.match(pp, /class="mini rc-duphow">[^<]*Merge people/);
   // 卡上多一列「讀過的學校」（不重印現在那一所）
   const h3 = UI.dupGroupHTML({ key: "k4", suggest: "y", members: [{ id: "y", name: "A", school: "UWC", schools: ["UWC", "TFG"] }, { id: "z", name: "A", school: "", schools: [] }] }, false);
   assert.match(h3, /Schools over time|讀過的學校/); assert.match(h3, /<td>TFG<\/td>/); assert.doesNotMatch(h3, /<td>UWC<br>TFG<\/td>/);

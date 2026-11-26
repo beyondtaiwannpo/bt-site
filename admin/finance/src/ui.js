@@ -839,17 +839,33 @@ export function syncTxShape(box, ctx) {
     cat.dataset.kind = kind;
   }
 }
+// 收支的搜尋與篩選（2026-11-25 改成跟後台其他搜尋框同一個樣子）：一行是搜尋框加右邊一顆「篩選」，
+// 屆別、月份、種類、帳戶、類別收在那一顆裡；開著的篩選印成搜尋框底下一排 chip，按一下就拿掉。「這一屆」本身不算篩選，不印。
+const FUNNEL = `<svg class="fbx-ic" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 5h14M6 10h8M8.5 15h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 export function txFiltersHTML(f, ctx, n, rows) {
   const term = f.term || "all";
   const t = (ctx.terms || []).find(x => x.id === term);
   const months = t ? monthsBetween(t.starts_on, t.status === "current" ? (ctx.today || todayStr()) : t.ends_on).reverse() : [];
-  return `<div class="fin-filters" role="group" aria-label="${esc(T("tx.filter"))}">
-    ${termSelect("f-term", ctx.terms, term, true)}
-    <select data-act="f-month" aria-label="${esc(T("f.date"))}">${opt("", T("tx.allMonths"), f.month)}${months.map(m => opt(m, m, f.month)).join("")}</select>
-    <select data-act="f-kind" aria-label="${esc(T("f.kind"))}">${opt("", T("tx.all") + " " + T("f.kind"), f.kind)}${["income", "expense", "transfer"].map(k => opt(k, T("kind." + k), f.kind)).join("")}</select>
-    <select data-act="f-account" aria-label="${esc(T("f.account"))}">${opt("", T("tx.all") + " " + T("f.account"), f.account)}${(ctx.accounts || []).map(a => opt(a.id, nameOf(a), f.account)).join("")}</select>
-    <select data-act="f-category" aria-label="${esc(T("f.category"))}">${opt("", T("tx.all") + " " + T("f.category"), f.category)}${(ctx.categories || []).filter(c => !c.archived_at).map(c => opt(c.id, `${T("kind." + c.kind)}${T("punct.colon")}${nameOf(c)}`, f.category)).join("")}</select>
-    <input id="f-q" type="search" value="${esc(f.q || "")}" placeholder="${esc(T("tx.q"))}" aria-label="${esc(T("tx.q"))}" autocomplete="off">
+  const cur = currentTerm(ctx.terms);
+  const accName = id => nameOf((ctx.accounts || []).find(a => a.id === id)) || id;
+  const catName = id => nameOf((ctx.categories || []).find(c => c.id === id)) || id;
+  const on = [
+    term !== (cur ? cur.id : "all") ? { k: "term", text: `${T("ov.term")}${T("punct.colon")}${term === "all" ? T("tx.allTerms") : term}` } : null,
+    f.month ? { k: "month", text: `${T("f.date")}${T("punct.colon")}${f.month}` } : null,
+    f.kind ? { k: "kind", text: `${T("f.kind")}${T("punct.colon")}${T("kind." + f.kind)}` } : null,
+    f.account ? { k: "account", text: `${T("f.account")}${T("punct.colon")}${accName(f.account)}` } : null,
+    f.category ? { k: "category", text: `${T("f.category")}${T("punct.colon")}${catName(f.category)}` } : null].filter(Boolean);
+  const lab = (key, body) => `<label><i>${esc(T(key))}</i>${body}</label>`;
+  return `<div class="fbx fin-fbx" role="group" aria-label="${esc(T("tx.filter"))}">
+    <div class="fbx-row"><input id="f-q" type="search" value="${esc(f.q || "")}" placeholder="${esc(T("tx.q"))}" aria-label="${esc(T("tx.q"))}" autocomplete="off"><button type="button" class="fbx-btn${on.length ? " on" : ""}" data-act="f-filters" aria-expanded="${f.open ? "true" : "false"}" aria-controls="fin-filters">${FUNNEL}<span>${esc(T("tx.filters"))}</span>${on.length ? `<b class="fbx-n">${on.length}</b>` : ""}</button></div>
+    ${on.length ? `<div class="fbx-chips">${on.map(c => `<button type="button" class="chip sm on" data-act="f-unset" data-k="${c.k}" aria-label="${esc(T("tx.unset", { what: c.text }))}">${esc(c.text)} ×</button>`).join("")}</div>` : ""}
+    ${f.open ? `<div class="fbx-panel" id="fin-filters"><div class="fbx-grid">
+      ${lab("ov.term", termSelect("f-term", ctx.terms, term, true))}
+      ${lab("f.date", `<select data-act="f-month" aria-label="${esc(T("f.date"))}">${opt("", T("tx.allMonths"), f.month)}${months.map(m => opt(m, m, f.month)).join("")}</select>`)}
+      ${lab("f.kind", `<select data-act="f-kind" aria-label="${esc(T("f.kind"))}">${opt("", T("tx.all") + " " + T("f.kind"), f.kind)}${["income", "expense", "transfer"].map(k => opt(k, T("kind." + k), f.kind)).join("")}</select>`)}
+      ${lab("f.account", `<select data-act="f-account" aria-label="${esc(T("f.account"))}">${opt("", T("tx.all") + " " + T("f.account"), f.account)}${(ctx.accounts || []).map(a => opt(a.id, nameOf(a), f.account)).join("")}</select>`)}
+      ${lab("f.category", `<select data-act="f-category" aria-label="${esc(T("f.category"))}">${opt("", T("tx.all") + " " + T("f.category"), f.category)}${(ctx.categories || []).filter(c => !c.archived_at).map(c => opt(c.id, `${T("kind." + c.kind)}${T("punct.colon")}${nameOf(c)}`, f.category)).join("")}</select>`)}
+      </div><div class="fbx-foot"><button type="button" class="btn ghost sm" data-act="f-filters">${esc(T("tx.filtersDone"))}</button></div></div>` : ""}
     <span class="mini fin-count">${esc(T("tx.count", { n }))}・${esc(T("tx.sum", { in: fmtMoney(sumBy(rows, "income")), out: fmtMoney(sumBy(rows, "expense")) }))}</span>
   </div>`;
 }

@@ -158,7 +158,13 @@ test("活動清單：搜尋、狀態與 team 篩選，開活動收在最上面",
   assert.match(h, /data-act="ev-fst" data-v="all" aria-pressed="true">全部 3</, "只在紀錄裡的不算在這裡（2026-11-13）");
   assert.doesNotMatch(h, /舊營隊/, "只在紀錄裡的舊活動不列");
   assert.match(h, /另外有 1 場舊活動只在紀錄裡.*href="\/admin\/records\/#overview"/, "一行說它們在 Records");
-  assert.match(h, /<select id="ev-fteam"/, "兩個以上的 team 才有 team 篩選");
+  // 2026-11-25：team 篩選收在搜尋框右邊那一顆裡。兩個以上的 team 才有那一顆；按開才看得到下拉；選了之後搜尋框底下多一顆可以按掉的 chip。
+  assert.match(h, /<input id="ev-q" type="search"[^>]*><button type="button" class="fbx-btn" data-act="ev-filters" aria-expanded="false" aria-controls="ev-filters">/, "兩個以上的 team 才有篩選那一顆");
+  assert.doesNotMatch(h, /<select id="ev-fteam"/, "收著的時候不印下拉");
+  const open = eventsListHTML(evs, {}, [], null, "", false, ["Curriculum Team"], { q: "", st: "all", team: "", open: true }, false);
+  assert.match(open, /<div class="fbx-panel" id="ev-filters">[\s\S]*<select id="ev-fteam"/);
+  const picked = eventsListHTML(evs, {}, [], null, "", false, ["Curriculum Team"], { q: "", st: "all", team: evs[0].team }, false);
+  assert.match(picked, /class="fbx-btn on"[\s\S]*<b class="fbx-n">1<\/b>/); assert.match(picked, /class="chip sm on" data-act="ev-funset"/);
   const f = eventsListHTML(evs, {}, [], null, "", false, ["Curriculum Team"], { q: "冬", st: "all", team: "" }, false);
   assert.match(f, /冬令營/); assert.doesNotMatch(f, /草稿活動/);
   const none = eventsListHTML(evs, {}, [], null, "", false, [], { q: "zzz", st: "all", team: "" }, false);

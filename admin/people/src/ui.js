@@ -873,6 +873,8 @@ export function ambiguousIds(err) {
 }
 export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 
+// 搜尋框右邊那顆「篩選」的圖示（2026-11-25：後台每一個搜尋框都是同一個樣子，篩選收在右邊那一顆裡，樣式在 admin.css 的 .fbx）。
+const FUNNEL = `<svg class="fbx-ic" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 5h14M6 10h8M8.5 15h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, workspaces, after, bulk) {
   const list = people || [];
   const cur = currentTerm(terms);
@@ -898,13 +900,26 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
   // 有帳號的在前，沒有名字的最後。
   const sorted = shown.slice().sort((a, b) => Number(hasAccount(b)) - Number(hasAccount(a)) || rankOrder(a.board_role) - rankOrder(b.board_role) || Number(personName(a).name === noName) - Number(personName(b).name === noName));
   const chip = (act, v, label, n, on) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-v="${esc(v)}"${dis}>${esc(label)}${n != null ? ` ${n}` : ""}</button>`;
-  const termChips = `<div class="chips" style="margin-bottom:8px">${
+  const termChips = `<div class="chips">${
     (terms || []).map(t => chip("roster-term", t.id, t.id + (t.status === "current" ? T("ro.curMark") : ""), list.filter(p => positionFor(p, t.id)).length, f.term === t.id)).join("")}${
     chip("roster-term", "all", T("ro.allTerms"), list.length, f.term === "all")}</div>`;
-  const teamChips = `<div class="chips" style="margin-bottom:14px">${chip("roster-team", "", T("ro.all"), base.length, !f.team)}${
+  const teamChips = `<div class="chips">${chip("roster-team", "", T("ro.all"), base.length, !f.team)}${
     allTeams.map(t => chip("roster-team", t, t.replace(/\s*Team$/i, ""), base.filter(p => teamsOf(p).includes(t)).length, f.team === t)).join("")}${
-    noTeam ? chip("roster-team", "__none", T("ro.noTeam"), noTeam, f.team === "__none") : ""}${
-    noAccN ? chip("roster-noacc", "", T("ro.noAccountChip"), noAccN, !!f.noacc) : ""}</div>`;
+    noTeam ? chip("roster-team", "__none", T("ro.noTeam"), noTeam, f.team === "__none") : ""}</div>`;
+  const accChips = noAccN || f.noacc ? `<div class="chips">${chip("roster-noacc", "", T("ro.noAccountChip"), noAccN, !!f.noacc)}</div>` : "";
+  // 篩選收在搜尋框右邊那一顆裡（2026-11-25）。現在開著的篩選印成搜尋框底下一排 chip，按一下就拿掉：
+  // 屆別拿掉是回到這一屆（這一屆本身不算篩選，不印），team 與「沒有帳號」拿掉就是不篩。
+  const curId = cur ? cur.id : "all";
+  const fOn = [
+    f.term !== curId ? { act: "roster-term", v: curId, text: `${T("ro.fTerm")}${T("ro.fSep")}${f.term === "all" ? T("ro.allTerms") : f.term}` } : null,
+    f.team ? { act: "roster-team", v: "", text: `${T("ro.fTeam")}${T("ro.fSep")}${f.team === "__none" ? T("ro.noTeam") : f.team.replace(/\s*Team$/i, "")}` } : null,
+    f.noacc ? { act: "roster-noacc", v: "", text: T("ro.noAccountChip") } : null].filter(Boolean);
+  const group = (label, body) => body ? `<div class="fbx-group"><i>${esc(label)}</i>${body}</div>` : "";
+  const fbx = `<div class="fbx">
+      <div class="fbx-row"><input id="ro-search" type="search" value="${esc(f.q || "")}" placeholder="${esc(T("ro.searchPh"))}" aria-label="${esc(T("ro.search"))}" autocomplete="off"><button type="button" class="fbx-btn${fOn.length ? " on" : ""}" data-act="roster-filters" aria-expanded="${f.open ? "true" : "false"}" aria-controls="ro-filters">${FUNNEL}<span>${T("ro.filters")}</span>${fOn.length ? `<b class="fbx-n">${fOn.length}</b>` : ""}</button></div>
+      ${fOn.length ? `<div class="fbx-chips">${fOn.map(c => `<button type="button" class="chip sm on" data-act="${c.act}" data-v="${esc(c.v)}" aria-label="${esc(T("ro.fUnset", { what: c.text }))}">${esc(c.text)} ×</button>`).join("")}</div>` : ""}
+      ${f.open ? `<div class="fbx-panel" id="ro-filters">${group(T("ro.fTerm"), termChips)}${group(T("ro.fTeam"), teamChips)}${group(T("ro.fAccount"), accChips)}<div class="fbx-foot"><button type="button" class="btn ghost sm" data-act="roster-filters">${T("ro.filtersDone")}</button></div></div>` : ""}
+    </div>`;
   const tr = p => {
     const { name, alt } = personName(p);
     const pos = positionFor(p, f.term === "all" ? (cur ? cur.id : "") : f.term);
@@ -949,8 +964,7 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
     + afterEndHTML(after, list, busy)
     + bulkPanelHTML(bulk, list, busy)
     + `<div class="note">${isPres ? T("ro.note") : T("ro.noteSenior")}</div>`
-    + sectionHTML("", `<label class="ro-search"><i>${T("ro.search")}</i><input id="ro-search" type="search" value="${esc(f.q || "")}" placeholder="${esc(T("ro.searchPh"))}" autocomplete="off"></label>`
-      + termChips + teamChips + (sorted.length
+    + sectionHTML("", fbx + (sorted.length
       ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ro.rank")}</th><th>${T("ro.position")}</th><th>${T("ro.ws")}</th><th></th></tr></thead><tbody>${sorted.map(tr).join("")}</tbody></table>`
       : list.length ? emptyHTML(T("ro.emptyFilter"), T("ro.emptyFilterHint")) : emptyHTML(T("ro.empty"), T("ro.emptyHint"))), { id: "roster" });
 }

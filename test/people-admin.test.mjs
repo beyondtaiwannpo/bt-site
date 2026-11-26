@@ -590,7 +590,7 @@ test("★ 不綁 team 的兩級：表單 team 鎖住、名單印「全部 team�
 // Paul 2026-10-24 的規矩：一個概念改了，畫它的每一個面同一筆一起改。這裡一面一條。
 test("★ 依職級的每一個面：名單工作區欄、team 篩選、側欄那一行、職級與職位分開、對不上的標出來", () => {
   const pres = { ...PEOPLE[0], workspaces: [{ id: "apps:Community Relations Team", level: "manage" }], team: "Sponsorship Team" };
-  const h = rosterHTML([pres, PEOPLE[1], PEOPLE[2]], TERMS, ME, true, "", false, null, []);
+  const h = rosterHTML([pres, PEOPLE[1], PEOPLE[2]], TERMS, ME, true, "", false, { open: true }, []);   // 2026-11-25：team 的 chip 收在篩選裡，按開才印
   // 面：名單的工作區欄。先「全部（職級）」，明寫的指派淡掉留著（不藏，藏了就沒人會去清），而且不再印「沒有被派進任何工作區」。
   const presRow = h.slice(h.indexOf("<tbody>"), h.indexOf("</tr>", h.indexOf("<tbody>")));
   // 2026-11-03：靠職級的人只印徽章，不再印劃掉的舊指派。
@@ -601,7 +601,7 @@ test("★ 依職級的每一個面：名單工作區欄、team 篩選、側欄�
   assert.doesNotMatch(h, /data-v="Sponsorship Team"/, "沒有人真的在 Sponsorship，chip 不出現");
   assert.match(h, /data-act="roster-team" data-v="">全部 3/);
   const withTeamPos = { ...pres, positions: [{ term: "2026-27", title_en: "Co-President", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
-  assert.match(rosterHTML([withTeamPos], TERMS, ME, true, "", false, null, []), /data-v="Sponsorship Team">Sponsorship 1/, "另外有一筆帶 team 的職位才算進那個 team");
+  assert.match(rosterHTML([withTeamPos], TERMS, ME, true, "", false, { open: true }, []), /data-v="Sponsorship Team">Sponsorship 1/, "另外有一筆帶 team 的職位才算進那個 team");
   // 面：職級與職位分開畫，但兼職位是正常的（Paul 2026-10-24：「我是 president 也是 Sponsorship 的 associate」），每一筆都不標。
   const multi = { ...PEOPLE[0], positions: [{ term: "2026-27", title_en: "Co-President", team: "" }, { term: "2026-27", title_en: "Associate, Sponsorship Team", team: "Sponsorship Team" }] };
   const m = rosterHTML([multi], TERMS, ME, true, "", false, null, []);

@@ -17,6 +17,8 @@ let S = {
   boot: null, event: null, results: null, person: null, yearly: null,
   people: [], pq: "", pastDraft: null, newDraft: null,
   dir: null, dirErr: "", df: {}, dirN: 0, ptab: "dir",
+  dfOpen: false,                                            // 名錄的篩選面板開著沒（2026-11-25：篩選收在搜尋框右邊那一顆裡）
+  mergeMode: false, pick: [], manual: null,                 // 名錄上自己挑人合併：在不在挑、挑了誰、比一比之後那張卡（{ key: "manual", members, suggest }）
   dirStale: false,                                          // 個人檔案或標籤改過了，名錄手上那一份舊了：回名錄的時候重拿（先不丟，一個人的頁面還要用它當清單）
   yf: {},                                                   // 年度比較的篩選與「比什麼」   // 名錄（2026-12-03）：整份、載入失敗的訊息、篩選、目前印到第幾個、哪個分頁
   aud: null, audSaved: null, find: {}, more: {},
@@ -525,6 +527,21 @@ document.addEventListener("click", async e => {
   // ── 人 ──
   if (act === "ptab") { S.ptab = b.dataset.t; S.msg = ""; render(); return; }
   if (act === "dir-clear") { S.df = {}; S.pq = ""; S.people = []; S.dirN = 0; render(); return; }
+  // 篩選收在搜尋框右邊那一顆裡（2026-11-25）：按一下開、再按一下收；搜尋框底下那排 chip 按一下拿掉那一個篩選。
+  if (act === "dir-filters") { S.dfOpen = !S.dfOpen; render(); return; }
+  if (act === "dir-unset") { const k = b.dataset.k; if (UI.DIR_FILTERS.includes(k)) { S.df = { ...(S.df || {}), [k]: "" }; S.dirN = 0; render(); } return; }
+  // 自己挑人合併（2026-11-25）：進出挑人的樣子、把一個人從挑的裡面拿掉、比一比（把挑的每一位整包讀回來，畫成跟「可能重複」一樣的卡）。
+  if (act === "dir-merge-mode") { S.mergeMode = !S.mergeMode; S.pick = []; S.manual = null; S.msg = ""; render(); return; }
+  if (act === "dir-unpick") { S.pick = (S.pick || []).filter(id => id !== b.dataset.id); S.manual = null; render(); return; }
+  if (act === "dir-compare") {
+    const ids = (S.pick || []).slice(0, 6); if (ids.length < 2) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const members = (await Promise.all(ids.map(id => D.loadPerson(id)))).map(UI.mergeMember).filter(m => m.id);
+      S.manual = { key: "manual", members, suggest: UI.mergeSuggest(members) };
+    } catch (err) { S.manual = null; S.msg = T("err.load") + D.says(err); }
+    S.busy = false; render(); return;
+  }
   if (act === "dir-more") { S.dirN = (S.dirN || UI.DIR_PAGE) + UI.DIR_PAGE; render(); return; }
   // 快速篩選（2027-01-03）：願意演講、願意當 mentor，按一下開、再按一下關。
   if (act === "dir-quick") { const k = b.dataset.k === "mentor" ? "mentor" : "speak"; S.df = { ...(S.df || {}), [k]: (S.df || {})[k] ? "" : "1" }; S.dirN = 0; render(); return; }
@@ -541,7 +558,8 @@ document.addEventListener("click", async e => {
     const { keep, drops } = UI.dupPick(box);
     if (!keep || !drops.length) { UI.toast(T("dup.needPick")); return; }
     // 哪幾欄有登入帳號：兩邊都有就走合併帳號（Co-President，刪掉被併的登入）；併不了的先擋，不等資料庫報錯（2026-12-11）
-    const grp = ((S.boot && S.boot.duplicates) || []).find(d => d.key === b.dataset.group) || {};
+    const manual = b.dataset.group === "manual";
+    const grp = manual ? (S.manual || {}) : ((S.boot && S.boot.duplicates) || []).find(d => d.key === b.dataset.group) || {};
     const members = grp.members || [], keepM = members.find(m => m.id === keep) || {}, pres = !!(S.me && S.me.pres);
     const memberOf = id => members.find(m => m.id === id) || { id };
     const blockers = drops.map(id => UI.dupBlocker(memberOf(id), keepM, pres)).filter(Boolean);
@@ -558,13 +576,14 @@ document.addEventListener("click", async e => {
         else await D.markNotSame(keep, d);
         done++;
       }
+      if (manual) { S.manual = null; S.pick = []; S.mergeMode = false; }
       S.busy = false; S.dir = null; await loadBoot(); if (act === "dup-merge") await loadDir();
       S.msg = act === "dup-merge" ? T("msg.mergedN", { n: done }) : T("msg.notSame"); render();
     } catch (err) {
       S.busy = false; S.dir = null; await loadBoot();
       // 停在第一個出錯的：前面併好的留著，這一欄跟後面的沒動。重載一次卡，畫面才對得上資料庫。
       const failedCol = members.findIndex(m => m.id === drops[done]) + 1;
-      S.busy = false; S.dir = null; try { await loadBoot(); } catch (x) { /* 重載失敗就照舊畫 */ }
+      S.busy = false; S.dir = null; try { await loadBoot(); if (manual) { S.manual = null; S.pick = []; await loadDir(); } } catch (x) { /* 重載失敗就照舊畫 */ }
       S.msg = T(act === "dup-merge" ? "err.merge" : "err.notSame") + D.says(err) + (drops.length > 1 && failedCol ? " " + T("dup.failedAt", { col: failedCol }) : ""); render();
     }
     return;
@@ -710,7 +729,7 @@ document.addEventListener("change", e => {
   const dupBox = el.closest && el.closest("[data-dup]");
   if (dupBox) {
     const keep = (dupBox.querySelector('input[type="radio"]:checked') || {}).value;
-    const grp = ((S.boot && S.boot.duplicates) || []).find(d => d.key === dupBox.dataset.dup) || {}; const members = grp.members || [];
+    const grp = dupBox.dataset.dup === "manual" ? (S.manual || {}) : ((S.boot && S.boot.duplicates) || []).find(d => d.key === dupBox.dataset.dup) || {}; const members = grp.members || [];
     const keepM = members.find(m => m.id === keep) || { id: keep }, pres = !!(S.me && S.me.pres);
     dupBox.querySelectorAll('input[type="checkbox"]').forEach(c => {
       const m = members.find(x => x.id === c.value) || { id: c.value }; const bk = UI.dupBlocker(m, keepM, pres); const blocked = !!(bk && bk.kind === "block");
@@ -719,6 +738,13 @@ document.addEventListener("change", e => {
     });
     const btn = dupBox.querySelector('[data-act="dup-merge"]'); if (btn) btn.textContent = UI.dupBtnLabel(dupBox);
     return;
+  }
+  // 名錄上挑人合併的那一格勾選：勾了就記下來（最多六個），已經比過的那張卡先收掉。
+  if (el.classList.contains("rc-pick")) {
+    const cur = (S.pick || []).filter(id => id !== el.value);
+    S.pick = el.checked ? (cur.length >= 6 ? cur : cur.concat(el.value)) : cur; S.manual = null;
+    if (el.checked && cur.length >= 6) UI.toast(T("mrg.max"));
+    render(); return;
   }
   if (el.classList.contains("rc-yfilter")) { S.yf = { ...(S.yf || {}), [el.name]: el.value }; render(); return; }
   if (!el.classList.contains("rc-dfilter")) return;
