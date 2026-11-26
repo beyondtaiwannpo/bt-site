@@ -4668,6 +4668,44 @@ if echo "${bk}" | grep -q "OVERALL.*FAIL"; then echo "  ok   ★ 破壞測試：
 rm -f "${BROKEN}"
 sp3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SPM}" 2>&1 || true)
 if echo "${sp3}" | grep -q "OVERALL.*PASS" && ! echo "${sp3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${sp3}" | head -20; fail=$((fail+1)); fi
+echo "── 名錄變快：每一個人的標籤一次算完（2027-01-12-fast-directory.sql）──"
+# Paul 2026-11-25：「when I am trying to load the directory of people and events, it runs really slowly… I want it to be under a second」
+# 正式站量到 rc_directory() 1250 個人一趟 7.6 秒，慢在每一個人叫一次 rc_label_codes()。這一支只換算法，回的東西一個字都不能變，
+# 所以這一段先把換之前的那一版回的東西記下來（管的人、看的人各一份），換完逐人對。
+FASTM=supabase/migrations/2027-01-12-fast-directory.sql
+psql -d "${DB}" -X -A -t -q -c "create table public.fd_old (who text, e jsonb, txt text);" >/dev/null
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "insert into public.fd_old select 'paul', e, e::text from jsonb_array_elements(public.rc_directory()) e" >/dev/null
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${OTHER}',false);" -c "insert into public.fd_old select 'other', e, e::text from jsonb_array_elements(public.rc_directory()) e" >/dev/null
+chk "（準備）換之前的名錄記下來了：管的人與看的人各一份，都有人" "true|true" "select (count(*) filter (where who = 'paul') > 5)||'|'||(count(*) filter (where who = 'other') > 5) from public.fd_old"
+fd1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FASTM}" 2>&1 || true)
+if echo "${fd1}" | grep -q "OVERALL.*PASS" && ! echo "${fd1}" | grep -q "|FAIL"; then echo "  ok   名錄變快那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 名錄變快那一支驗收表：${fd1}" | head -20; fail=$((fail+1)); fi
+fd2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FASTM}" 2>&1 || true)
+if echo "${fd2}" | grep -q "OVERALL.*PASS" && ! echo "${fd2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${fd2}" | head -20; fail=$((fail+1)); fi
+FDCMP="from (select e, txt from public.fd_old where who = 'WHO') o full join (select e, e::text as txt from jsonb_array_elements(public.rc_directory()) e) n on o.e->>'id' = n.e->>'id' where o.txt is distinct from n.txt"
+chkas "${PAUL}" "★ 管的人：換完之後每一個人那一列跟換之前一模一樣（連鍵的順序），對不上的 0 列" "0" "select count(*) ${FDCMP/WHO/paul}"
+chkas "${OTHER}" "★ 看的人（Senior Adviser）：一樣 0 列對不上" "0" "select count(*) ${FDCMP/WHO/other}"
+chkas "${PAUL}" "名字的排序跟換之前一樣（照名字排）" "t" "select (select jsonb_agg(e->>'name') from jsonb_array_elements(public.rc_directory()) e) = (select jsonb_agg(n order by n) from (select e->>'name' n from public.fd_old where who = 'paul') z)"
+chkas "${PAUL}" "★ 逐人對：一次算全部的標籤跟一個人算一次的一樣，而且真的有人有標籤" "0|true" "select (select count(*) from public.people p left join public.rc_label_codes_all() a on a.person_id = p.id where p.forgotten_at is null and coalesce(a.codes, '[]'::jsonb) is distinct from public.rc_label_codes(p.id))||'|'||(select count(*) > 3 from public.rc_label_codes_all())"
+chkas "${OUTC}" "★ 沒被派進紀錄的幹部拿到的名錄還是空的" "0" "select jsonb_array_length(public.rc_directory())"
+chkas "${DIR}" "★ 只在某場活動工作區的人拿到的還是空的" "0" "select jsonb_array_length(public.rc_directory())"
+chkrole anon "" "★ 沒登入的人叫不動名錄" "ERROR:permissiondeniedforfunctionrc_directory" "select public.rc_directory()"
+chkrole authenticated "${PAUL}" "★ 一次算全部標籤的那一支不開給前端（Co-President 登入也叫不動）" "ERROR:permissiondeniedforfunctionrc_label_codes_all" "select count(*) from public.rc_label_codes_all()"
+# 破壞測試一：把「現在是幹部」那一條算錯（現任的變成以前的），驗收表第 2 列要變紅
+BROKEN=$(mktemp)
+sed "s/                      coalesce(pos.now, false) or coalesce(pe.acct = 'cadre', false)),/                      false),/" "${FASTM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${FASTM}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^2|.*|FAIL"; then echo "  ok   ★ 破壞測試：標籤的規則抄錯一條，驗收表第 2 列變紅"; pass=$((pass+1)); else echo "  FAIL 標籤抄錯驗收表沒有變紅"; fail=$((fail+1)); fi
+# 破壞測試二：把一次算全部的那一支開給登入的人，驗收表第 8 列要變紅
+sed "s/^revoke all on function public.rc_label_codes_all() from public, anon, authenticated;/revoke all on function public.rc_label_codes_all() from public, anon; grant execute on function public.rc_label_codes_all() to authenticated;/" "${FASTM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${FASTM}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^8|.*|FAIL"; then echo "  ok   ★ 破壞測試：把那一支開給前端，驗收表第 8 列變紅"; pass=$((pass+1)); else echo "  FAIL 開給前端驗收表沒有變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+fd3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FASTM}" 2>&1 || true)
+if echo "${fd3}" | grep -q "OVERALL.*PASS" && ! echo "${fd3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${fd3}" | head -20; fail=$((fail+1)); fi
+chkrole authenticated "${PAUL}" "★ 裝回去之後那一支又不開給前端了" "ERROR:permissiondeniedforfunctionrc_label_codes_all" "select count(*) from public.rc_label_codes_all()"
+psql -d "${DB}" -X -A -t -q -c "drop table public.fd_old;" >/dev/null
 echo "── 備註變成參與紀錄（2027-01-08-notes-to-participation.sql）──"
 # Paul 2026-11-25：「I want every note like this to be gone, but actually into our BT participation record」
 # 「whoever has that participation, don't delete their participation, but compare their notes and their participation before you do anything」

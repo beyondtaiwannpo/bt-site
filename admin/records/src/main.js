@@ -86,14 +86,18 @@ async function boot(retried) {
     if (who.offline) { if (!retried) return retryBoot(); S.down = true; render(); return; }
     S.user = who.user;
     if (!S.user) { render(); return; }
+    parseHash();
+    // 速度（2026-11-25）：這一頁要的資料跟「我是誰」一起問，不排隊。名錄那一頁連名錄也一起。
+    // 資料庫自己守門（不是幹部拿到 not_cadre、讀不到名錄的人拿到空的），所以先問不會多給任何人東西；下面不是幹部就整包丟掉。
+    const bootP = D.loadBootstrap(), dirP = S.view === "people" && !S.id ? D.loadDirectory() : null;
+    bootP.catch(() => {}); if (dirP) dirP.catch(() => {});
     S.me = await D.loadMe(S.user.id);
     if (!S.me || S.me.role !== "cadre") { render(); return; }
-    parseHash();
     paintShell(S.view);
     UI.bindAutosave(root(), onAutosave);
     UI.F.ensureStyle();
     UI.F.bindDrag(root(), (from, to) => { if (canEditQs()) restructure(qs => byIds(qs, UI.F.moveId(qs.map(q => q.id), from, to))); });
-    await loadBoot();
+    await Promise.all([loadBoot(bootP), dirP ? loadDir(dirP) : null]);
     await openRoute();
   } catch (e) {
     if (AUTH.sessionGone(e)) { await AUTH.signOut(); location.replace("../../app/?next=admin-records"); return; }
@@ -110,18 +114,21 @@ function parseHash() {
   S.sub = UI.SUBS.includes(parts[2]) ? parts[2] : "questions";
 }
 // 名錄整份拿回來。函式還不在（遷移檔沒跑）就在那一頁說一句，別的分頁照樣能用。
-async function loadDir() {
+// p 是已經發出去的那一趟（boot 一開頁就先問了）；沒給就現在問。這一支不會丟錯，所以可以跟別的一起等。
+async function loadDir(p) {
   S.dirErr = "";
-  try { S.dir = await D.loadDirectory(); }
+  try { S.dir = await (p || D.loadDirectory()); }
   catch (e) { S.dir = null; S.dirErr = /rc_directory/.test(String(e && e.message || e)) ? T("dir.noFn") : T("err.load") + D.says(e); }
 }
 // 一個人的頁面。管的人連名錄一起要：「團隊裡誰認識他」那一格要從名單挑人（已經在手上就不重拿）。
+// 兩趟一起問（2026-11-25）：以前是先等這個人回來才去拿名錄，名錄慢的時候每存一次就多等一輪。
 async function loadPerson() {
-  S.person = await D.loadPerson(S.id);
-  if (S.boot && S.boot.can_manage && !Array.isArray(S.dir)) await loadDir();
+  const needDir = S.boot && S.boot.can_manage && !Array.isArray(S.dir);
+  const [person] = await Promise.all([D.loadPerson(S.id), needDir ? loadDir() : null]);
+  S.person = person;
 }
-async function loadBoot() {
-  try { S.boot = await D.loadBootstrap(); }
+async function loadBoot(p) {
+  try { S.boot = await (p || D.loadBootstrap()); }
   catch (e) { S.boot = { events: [], forms: [], terms: [], people: [], duplicates: [], counts: {}, can_manage: false, can_view: false }; S.msg = T("err.load") + D.says(e); }
   S.loaded = true;
 }
@@ -550,7 +557,7 @@ document.addEventListener("click", async e => {
     if (!v.event_id) { S.msg = T("err.save") + T("err.needEvent"); render(); return; }
     const ok = await run("err.save", () => D.setParticipation(v.event_id, { person_id: S.id, role: v.role, status: v.status }));
     if (ok === undefined) return;
-    S.dir = null; await loadPerson(); await loadBoot(); S.msg = T("msg.saved"); render(); return;
+    S.dirStale = true; await Promise.all([loadPerson(), loadBoot()]); S.msg = T("msg.saved"); render(); return;
   }
   // 同名一群一張卡（2026-12-06）：radio 留哪欄、checkbox 勾哪幾欄，一顆鈕併，一顆鈕記「不是同一個人」。
   if (act === "dup-merge" || act === "dup-not-same") {
@@ -577,7 +584,7 @@ document.addEventListener("click", async e => {
         done++;
       }
       if (manual) { S.manual = null; S.pick = []; S.mergeMode = false; }
-      S.busy = false; S.dir = null; await loadBoot(); if (act === "dup-merge") await loadDir();
+      S.busy = false; S.dir = null; await Promise.all([loadBoot(), act === "dup-merge" ? loadDir() : null]);
       S.msg = act === "dup-merge" ? T("msg.mergedN", { n: done }) : T("msg.notSame"); render();
     } catch (err) {
       S.busy = false; S.dir = null; await loadBoot();
@@ -606,19 +613,19 @@ document.addEventListener("click", async e => {
     const v = vals("[data-pedit]");
     const ok = await run("err.save", () => D.savePerson(S.id, { name_zh: v.name_zh, name_en: v.name_en, school: v.school, grad_year: v.grad_year || "", kind: UI.kindFromForm(((S.person || {}).person || {}).kind, v.hs), note: v.note }));
     if (ok === undefined) return;
-    S.dir = null; await loadPerson(); await loadBoot(); S.msg = T("msg.saved"); render(); return;
+    S.dirStale = true; await Promise.all([loadPerson(), loadBoot()]); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "merge") {
     if (UI.needAsk(S, b, T("merge.ask"))) return;
     const ok = await run("err.merge", () => D.mergePeople(b.dataset.keep, b.dataset.drop));
     if (ok === undefined) return;
-    S.dir = null; await loadBoot(); await loadDir(); S.msg = T("msg.merged"); render(); return;
+    S.dir = null; await Promise.all([loadBoot(), loadDir()]); S.msg = T("msg.merged"); render(); return;
   }
   if (act === "forget") {
     if (UI.needAsk(S, b, T("person.forgetAsk"))) return;
     const ok = await run("err.forget", () => D.forgetPerson(b.dataset.id));
     if (ok === undefined) return;
-    S.dir = null; await loadPerson(); await loadBoot(); S.msg = T("msg.forgot"); render(); return;
+    S.dir = null; await Promise.all([loadPerson(), loadBoot()]); S.msg = T("msg.forgot"); render(); return;
   }
   if (act === "out-add") {
     const v = vals("[data-oadd]");
@@ -632,7 +639,7 @@ document.addEventListener("click", async e => {
     const mc = document.querySelector('[data-sadd] input[name="make_current"]');
     const ok = await run("err.save", () => D.saveSchool(null, { person_id: S.id, school: v.school, year_from: v.year_from || "", year_to: v.year_to || "", note: v.note || "", make_current: !!(mc && mc.checked) }));
     if (ok === undefined) return;
-    S.dir = null; await loadPerson(); S.msg = T("msg.saved"); render(); return;
+    S.dirStale = true; await loadPerson(); S.msg = T("msg.saved"); render(); return;
   }
   if (act === "contact-add") {
     const v = vals("[data-cadd]");
@@ -649,7 +656,7 @@ document.addEventListener("click", async e => {
   if (act === "school-del") {
     const ok = await run("err.delete", () => D.deleteSchool(b.dataset.id));
     if (ok === undefined) return;
-    S.dir = null; await loadPerson(); render(); return;
+    S.dirStale = true; await loadPerson(); render(); return;
   }
   // ── 關係網（2027-01-03，2027-01-03-people-network.sql）：BT 給的標籤、照片、同意、個人連結 ──
   if (act === "label-save" || act === "label-del") {

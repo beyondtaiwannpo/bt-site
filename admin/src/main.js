@@ -265,19 +265,30 @@ async function boot(retried) {
     // 工作區、需求單、活動、會議、待寄的信對他全是空的（RLS），不用問（實測從 16 次查詢降到 9 次）。有指派或職級的人照舊全抓。
     const light = !S.me.senior && S.me.board === "member" && !Object.keys(S.me.ws || {}).length;
     const pendingP = light ? Promise.resolve([]) : D.loadPendingAll().catch(() => []);
-    const [forms, pendingAll, teams, todo, workspaces, requests, events, meetings] = await Promise.all([
+    // 2026-11-25 速度：待辦那一包（loadTodo）裡有一趟要一秒多（公開團隊頁的名單連大頭照，正式站 494 KB），
+    // 而它只有「各 team」那一頁的內容與側欄右邊的小數字在用。以前每一頁都等它回來才畫，活動那一頁因此每次多等一秒多。
+    // 現在只有 #teams／#home 等它；其他頁先畫，它回來了再補側欄的數字（人正在打字就不重畫，下一次畫的時候數字就在了）。
+    const hash0 = location.hash.slice(1);
+    const todoP = D.loadTodo(S.me).catch(() => ({}));
+    // 開頁就是活動那一頁的話，專案清單也一起問（以前是等上面全部回來才問第二輪）。
+    if (hash0 === "" || /^events(\/|$)/.test(hash0)) { const p = D.loadProjects(); p.catch(() => {}); bootProjects = { p, at: Date.now() }; }
+    const [forms, pendingAll, teams, workspaces, requests, events, meetings] = await Promise.all([
       formsP, pendingP,
       D.loadTeams().catch(() => []),
-      D.loadTodo(S.me).catch(() => ({})),
       light ? [] : D.loadWorkspaces().catch(() => []),
       light ? null : D.loadRequests().catch(() => null),
       light ? null : D.loadEvents().catch(() => null),
       light ? null : D.loadMeetings().catch(() => null),
     ]);
-    S.forms = forms; S.pendingAll = pendingAll; S.teams = teams; S.todo = todo; S.workspaces = workspaces;
-    S.requests = requests; if (S.todo) S.todo.requests = S.requests;
-    S.events = events; if (S.todo) S.todo.events = S.events;
-    S.meetings = meetings; if (S.todo) S.todo.meetings = S.meetings;
+    S.forms = forms; S.pendingAll = pendingAll; S.teams = teams; S.workspaces = workspaces;
+    S.requests = requests; S.events = events; S.meetings = meetings;
+    if (events) bootEventsAt = Date.now();
+    const takeTodo = todo => { S.todo = todo || {}; S.todo.requests = S.requests; S.todo.events = S.events; S.todo.meetings = S.meetings; };
+    if (/^(teams|home)$/.test(hash0)) takeTodo(await todoP);
+    else {
+      takeTodo({});
+      todoP.then(todo => { takeTodo(todo); const a = document.activeElement; if (!S.busy && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) render(); });
+    }
     // 提醒信的退路（2026-11-02）：開頁叫一次 tick_mail()，Resend 沒設好也不會讓頁面壞。
     if (!light) D.tickMail().catch(() => {});
     // 開頁拉一次大家在 Google 日曆上的回覆，有人改了就重讀會議。
@@ -327,8 +338,11 @@ function evTeams() {
 }
 // 開得了專案的工作區："" 是整個 BT（只有 senior），其他是 team 是「改」以上的（create_project 同一條）。
 function pjTeams() { return S.me && S.me.senior ? [""].concat(evTeams()) : evTeams(); }
+// 開頁那一趟已經問過的（三秒內）直接用，不問第二次（2026-11-25 速度）。
+let bootEventsAt = 0, bootProjects = null;
 async function reloadProjects() {
-  try { S.projects = await D.loadProjects(); } catch (e) { S.projects = S.projects || []; S.msg = T("err.pjLoad") + D.says(e); }
+  const pre = bootProjects && Date.now() - bootProjects.at < 3000 ? bootProjects.p : null; bootProjects = null;
+  try { S.projects = await (pre || D.loadProjects()); } catch (e) { S.projects = S.projects || []; S.msg = T("err.pjLoad") + D.says(e); }
 }
 function keepPjDraft() {
   const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
@@ -337,7 +351,8 @@ function keepPjDraft() {
 }
 async function reloadEvents(slug) {
   try {
-    S.events = await D.loadEvents();
+    if (!(S.events && Date.now() - bootEventsAt < 3000)) S.events = await D.loadEvents();
+    bootEventsAt = 0;
     if (S.todo) S.todo.events = S.events;
     if (slug) {
       const ev = (S.events || []).find(e => e.slug === slug);
