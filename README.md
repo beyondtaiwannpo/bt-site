@@ -8103,6 +8103,44 @@ Paul 2026-11-26 看著名錄問了三件事：沒當過幹部的人為什麼掛�
 - 重跑 `2027-01-06-labels-and-schools.sql` 或 `2027-01-12-fast-directory.sql` 會把其中一支換回舊規則，要再跑一次 `2027-01-16-member-label-rule.sql`。
 - 守門：`test/label-rules.test.mjs`、`scripts/db/smoke.sh` 那一段（八個假的人，含兩個破壞測試）。
 
+## 一個人在哪幾屆做過事：屆別、哪一季、校友（2026-11-26）
+
+Paul 2026-11-26：「people that is labeled as alumni, we don't get to just choose people and add them into terms. For example, if Andrea works in 2025 6, spring, I should be able to in her page add them into that term, or in terms add people into that… they should appear on that term, and that terms should be connected to the front of the page where in things that says 2025 to 2026 alumni.」
+
+### 一句話
+
+**一個人在某一屆的某一個 team 做過事，就是 `positions` 表裡的一列**（人 × 屆 × team）。這一張表同時是五個地方的來源，沒有第二份：
+
+| 哪裡 | 讀它來做什麼 |
+|---|---|
+| 紀錄 → 一個人的頁面「在哪幾屆做過事」 | 加、改哪一季、拿掉（這一輪新的） |
+| 人與權限 → 屆別，每一屆打開 | 那一屆有誰、從名單挑人加進去、拿掉（這一輪新的） |
+| 紀錄裡的標籤 | 有任何一屆的紀錄就有「幹部」或「校友（前幹部）」 |
+| 對外 `/team/` | 這一屆的人（另外要本人同意加 Co-President 核可） |
+| 對外 `/team/?term=2025-26` 那幾頁 | 已經結束的那一屆的人，要 Co-President 在「對外 → 前幾屆的名單」把那一屆打開才出現 |
+
+### 這一輪改了什麼
+
+1. **紀錄裡一個人的頁面**多一塊「在哪幾屆做過事」（原本只印字）：選哪一屆、哪一季、哪一個 team、職位，按「加進這一屆」。
+   每一筆可以直接改哪一季（選了就存）、可以拿掉。只有 Co-President 與 Senior Adviser 有按鈕（門在資料庫，跟「人與權限」那一頁是同一支 `set_position`）。
+2. **屆別那一頁**每一屆多一格「這一屆的人」：打開看得到名字、職位、team，可以從名單挑一個人加進去，也可以把人從那一屆拿掉。
+   選單裡是名單上的幹部與校友；學員、講者、來賓不在那裡，到「紀錄」裡他的頁面加。
+3. **半年一期**：屆別照舊一年一屆（對外的選單本來就是 2025-26 這種），另外在那一筆職位上記是哪一季（`positions.season`：秋季、春季、夏季，空的是整年）。這是 Paul 選的。
+4. 遷移檔 `2027-01-17-term-seasons.sql`（要在 Supabase 跑過才有上面的按鈕與哪一季；沒跑之前兩頁照舊能用）：
+   - `positions` 多一欄 `season`；新函式 `set_position_season()`（門跟 `set_position` 一樣）與 `person_terms()`（讀得到紀錄的人才拿得到）。
+   - **舊資料庫寫了哪一期當 Board 的人**（補充說明是 `Old database: Board: F23` 這種）：那一期所在的那一屆已經結束的，變成那一屆的一筆職位（職位「幹部／Member」、沒有 team、季別照 F 或 S），原本那個標籤拿掉，舊的字留在 `rc_log`。
+     F 是那一年開始的那一屆，S 是前一年開始的那一屆：F23 與 S24 都是 2023-24。正式站是 37 個人。
+     **寫這一屆那一期（F26）的 15 個人不放**（放了會變成現任幹部），沒寫哪一期的 91 個人也不動，這兩種照舊只有標籤，要 Paul 自己看。
+   - **有職位的來賓算成員**：名單上種類是來賓的人（例如先以講者的身分進名單）一有職位，`people.kind` 改成 member。不改的話他在屆別的名單與對外的名單上都不會出現。
+     學員不動：「現在還在念高中」那一格只有人自己取消，還勾著的人他的頁面會講一句「他不會出現在名單上」。
+
+### ⚠ 之後要記得的
+
+- **對外不會自己多出名字。** 前幾屆的名單一屆一個開關，預設關。已經打開的那一屆，之後加進去的人會跟著出現（名字、team、職位），所以**加未成年的人之前先到「對外 → 前幾屆的名單」把他藏起來**。
+- 「拿掉」拿的是那一屆的那一筆紀錄，不是這個人。他如果另外有 BT 給的「幹部」標籤，校友的 chip 還在，要到標籤那一塊拿掉。
+- 沒有 team 的紀錄在對外那一頁會排在沒有 team 的那一群。知道是哪一個 team 的話，拿掉再加一次（同一屆同一個 team 再加是改那一筆，換 team 是新的一筆）。
+- 守門：`test/term-seasons.test.mjs`、`scripts/db/smoke.sh` 那一段（七個假的人、兩個破壞測試）。
+
 ## 後台速度：名錄與活動（2026-11-25）
 
 Paul 2026-11-25：「when I am trying to load the directory of people and events, it runs really slowly. Every push or every reload take about 10 seconds… I want it to be under a second to load out stuff.」

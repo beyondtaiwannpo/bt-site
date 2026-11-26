@@ -67,7 +67,7 @@ test("★ 紀錄那一頁：要等的一起等，存一個人的東西不重拿�
   assert.ok(boot.indexOf("parseHash();") < boot.indexOf("D.loadBootstrap()"), "要先知道開的是哪一頁");
   assert.match(boot, /if \(!S\.me \|\| S\.me\.role !== "cadre"\) \{ render\(\); return; \}/, "不是幹部照舊擋在這裡");
   // 一個人的頁面：兩趟一起
-  assert.match(m, /const \[person\] = await Promise\.all\(\[D\.loadPerson\(S\.id\), needDir \? \(dirFlight \|\| loadDir\(\)\) : null\]\);/);
+  assert.match(m, /const \[person, , terms\] = await Promise\.all\(\[D\.loadPerson\(S\.id\), needDir \? \(dirFlight \|\| loadDir\(\)\) : null, D\.loadPersonTerms\(S\.id\)\.catch\(\(\) => null\)\]\);/, "這個人、名錄、他在哪幾屆，三趟一起");
   // 存：不再有「先等這個人、再等 bootstrap」的排隊
   assert.doesNotMatch(m, /await loadPerson\(\); await loadBoot\(\)/, "兩趟要一起等");
   assert.doesNotMatch(m, /await loadBoot\(\); (if \(act === "dup-merge"\) )?await loadDir\(\)/, "兩趟要一起等");

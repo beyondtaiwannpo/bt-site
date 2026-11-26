@@ -707,6 +707,25 @@ document.addEventListener("click", async e => {
     if (id !== undefined) { UI.setFoldOpen("tm-new", false); S.termDraft = Object.assign({}, S.termDraft, { new: null }); S.msg = T("msg.termCreated", { id }); await openTerms(true); }
     return;
   }
+  // 每一屆打開：把名單上的一個人加進去、或從那一屆拿掉（2026-11-26）。門在資料庫（set_position／delete_position：Co-President 與 Senior Adviser）。
+  if (act === "term-add-person") {
+    const term = b.dataset.term, who = val("tma-who-" + term), season = val("tma-season-" + term), team = val("tma-team-" + term), t = UI.termAddTitles(val("tma-title-" + term));
+    if (!who) { S.msg = T("err.addNoWho"); render(); return; }
+    const p = findPerson(who), name = p ? pname(p) : "";
+    const ok = await run("err.addPerson", () => D.setPosition(who, term, t.zh, t.en, team));
+    if (ok === undefined) return;
+    let msg = T("msg.termAdded", { name, term });
+    // 哪一季是另一支函式；那一支遷移檔還沒跑的話人還是加得進去，只是那一季沒存到，講一聲。
+    if (season) { try { await D.setPositionSeason(who, term, team, season); } catch (e) { msg = T("msg.seasonLater"); } }
+    UI.setFoldOpen("tm-ppl-" + term, true); S.msg = msg; await openTerms(true); return;
+  }
+  if (act === "term-drop-person") {
+    const term = b.dataset.term, who = b.dataset.person, p = findPerson(who), name = p ? pname(p) : "";
+    if (UI.needAsk(S, b, T("tm.dropAsk", { name, term }))) return;
+    const ok = await run("err.dropPerson", () => D.deletePosition(who, term, b.dataset.team || ""));
+    if (ok === undefined) return;
+    UI.setFoldOpen("tm-ppl-" + term, true); S.msg = T("msg.termDropped", { name, term }); await openTerms(true); return;
+  }
   if (act === "paste-preview" || act === "paste-cancel") {
     const ps = { term: val("tp-term"), text: val("tp-text") };
     if (act === "paste-preview") {

@@ -247,7 +247,9 @@ test("★ 屆別：人數含沒帳號的；結束這一屆三步，自己勾死�
   const s2 = termsHTML(TERMS, PEOPLE, ME, true, "", false, null, { step: 2, next: { id: "2027-28" }, keep: [], typed: "" });
   assert.match(s2, new RegExp(`value="${ME}" checked disabled`), "自己勾死");
   assert.match(s2, /value="22222222-2222-2222-2222-222222222222">/, "別人預設沒勾");
-  assert.doesNotMatch(s2, /畢業的/, "校友不在名單上");
+  // 2026-11-26 起每一屆打開看得到那一屆的人（校友也在裡面），所以這一條只看「誰留下」那一份勾選清單。
+  assert.doesNotMatch(s2.slice(s2.indexOf('name="keep"')), /畢業的/, "校友不在留下的勾選清單上");
+  assert.match(s2, /id="tm-ppl-2025-26"/, "每一屆有一格那一屆的人");
   assert.match(s2, /1 位留下/); assert.match(s2, /2 位變成校友/);
   assert.match(s2, /data-act="end-keep-all"/);
   const s3 = termsHTML(TERMS, PEOPLE, ME, true, "", false, null, { step: 3, next: { id: "2027-28" }, keep: [PEOPLE[1].profile_id], typed: "" });

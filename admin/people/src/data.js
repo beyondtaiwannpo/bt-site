@@ -165,6 +165,8 @@ export const createWorkspace = (slug, zh, en, owner) => rpc("create_workspace", 
 export const createProject = (team, slug, zh, en) => rpc("create_project", { p_team: team || null, p_slug: slug, p_title_zh: zh, p_title_en: en });
 export const setPosition     = (person, term, zh, en, team) => rpc("set_position", { p_person: person, p_term: term, p_title_zh: zh, p_title_en: en, p_team: team || null });
 export const deletePosition  = (person, term, team) => rpc("delete_position", { p_person: person, p_term: term, p_team: team || null });
+// 一筆職位是那一屆的哪一季（2026-11-26，2027-01-17-term-seasons.sql）。門跟 set_position 一樣。
+export const setPositionSeason = (person, term, team, season) => rpc("set_position_season", { p_person: person, p_term: term, p_team: team || null, p_season: season || null });
 // 註冊用的 email，只有 Co-President 與 Senior Adviser 拿得到（門在函式裡）；沒有帳號回 null。
 export const personEmail     = person => rpc("person_email", { p_person: person });
 // 創辦人（2026-11-24，supabase/migrations/2027-01-04-founders.sql）。狀態是 { founder, consent }：標了沒、他本人同意公開了沒。

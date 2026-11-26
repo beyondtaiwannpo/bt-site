@@ -1293,6 +1293,13 @@ export function wsGroupHTML(team, cells, grp, people, draft, busy) {
     ${table}`;
 }
 
+// 一筆職位是那一屆的哪一季（2026-11-26，2027-01-17-term-seasons.sql）。空的是整年。
+export const TERM_SEASONS = ["", "fall", "spring", "summer"];
+// 「加進這一屆」那一格的職位：空著就是幹部／Member，自己打的字中英文放同一個。純函式（紀錄那一頁有一份一樣的 termTitles）。
+export function termAddTitles(typed) {
+  const t = String(typed || "").trim().slice(0, 60);
+  return !t || /^member$/i.test(t) ? { zh: "幹部", en: "Member" } : { zh: t, en: t };
+}
 // 屆別：清單加人數、補過去的一屆、貼一整屆、結束這一屆（三步）。
 // draft = { new: {id, zh, en, starts, ends}, paste: { term, text } }
 // end = null 或 { step: 1|2|3, next: {id, zh, en, starts, ends}, keep: [profile_id…], typed }
@@ -1302,8 +1309,29 @@ export function termsHTML(terms, people, meId, isPres, msg, busy, draft, end) {
   const cur = currentTerm(terms);
   const count = t => (people || []).filter(p => positionFor(p, t.id)).length;
   const noAcc = t => (people || []).filter(p => positionFor(p, t.id) && !hasAccount(p)).length;
+  // 2026-11-26：每一屆打開看得到那一屆有誰，也可以從名單挑一個人加進去（Paul：「in terms add people into that」）。
+  // 名單是 roster() 回的那一份（幹部與校友，有沒有帳號都在）。學員與來賓不在這裡，要把他們加進某一屆到「紀錄」裡那個人的頁面加。
+  const nm = p => { const n = personName(p); return n.name + (n.alt ? " " + n.alt : ""); };
+  const byName = (a, b) => nm(a).localeCompare(nm(b));
+  const termPeople = t => {
+    const inT = (people || []).filter(p => positionFor(p, t.id)).sort(byName), outT = (people || []).filter(p => !positionFor(p, t.id)).sort(byName);
+    const list = inT.length ? `<ul class="flist tm-ppl">${inT.map(p => positionsFor(p, t.id).map(x => `<li><a href="#person=${encodeURIComponent(p.person_id)}" data-act="tab" data-t="person=${esc(p.person_id)}"><b>${esc(nm(p))}</b></a>
+        <span class="mini">${esc([positionTitle(x), x.team].filter(Boolean).join("・"))}${hasAccount(p) ? "" : "・" + T("tm.noAccount")}</span>
+        <button class="btn quiet sm" data-act="term-drop-person" data-term="${esc(t.id)}" data-person="${esc(p.person_id)}" data-team="${esc(x.team || "")}"${dis}>${T("tm.dropPerson")}</button></li>`).join("")).join("")}</ul>`
+      : `<div class="mini">${T("tm.noPeople")}</div>`;
+    const tid = esc(t.id);
+    const add = outT.length ? `<div class="tm-addp"><b class="mini">${T("tm.addPerson")}</b>
+        <div class="two"><label><i>${T("tm.addWho")}</i><select id="tma-who-${tid}"${dis}><option value="">${T("tm.addPick")}</option>${outT.map(p => `<option value="${esc(p.person_id)}">${esc(nm(p))}</option>`).join("")}</select></label>
+          <label><i>${T("tm.season")}</i><select id="tma-season-${tid}"${dis}>${TERM_SEASONS.map(x => `<option value="${x}">${T("tm.season." + (x || "year"))}</option>`).join("")}</select></label>
+          <label><i>${T("tm.addTeam")}</i><input id="tma-team-${tid}" list="tma-teams" maxlength="60" autocomplete="off"${dis}></label>
+          <label><i>${T("tm.addTitle")}</i><input id="tma-title-${tid}" maxlength="60" placeholder="Member" autocomplete="off"${dis}></label></div>
+        <div class="row"><button class="btn ghost" data-act="term-add-person" data-term="${tid}"${dis}>${T("tm.addGo", { term: tid })}</button></div>
+        <div class="mini">${T("tm.addNote")}</div></div>` : "";
+    return peFold("tm-ppl-" + t.id, T("tm.people", { n: inT.length }), "", list + add, false);
+  };
   const rows = (terms || []).map(t => `<li><div class="fhead"><b>${esc(t.id)}</b>${t.status === "current" ? `<span class="tag open">${T("tm.current")}</span>` : `<span class="tag draft">${T("tm.ended")}</span>`}</div>
-    <div class="fmeta">${esc((lang() === "zh" ? (t.title_zh || t.title_en) : (t.title_en || t.title_zh)) || "")}・${esc(t.starts_on)} → ${esc(t.ends_on)}・${T("tm.count", { n: count(t), m: noAcc(t) })}</div></li>`).join("");
+    <div class="fmeta">${esc((lang() === "zh" ? (t.title_zh || t.title_en) : (t.title_en || t.title_zh)) || "")}・${esc(t.starts_on)} → ${esc(t.ends_on)}・${T("tm.count", { n: count(t), m: noAcc(t) })}</div>
+    ${termPeople(t)}</li>`).join("") + `<datalist id="tma-teams">${TEAMS.map(x => `<option value="${esc(x)}"></option>`).join("")}</datalist>`;
   const listSec = sectionHTML(T("tm.list"), rows ? `<ul class="flist">${rows}</ul>` : emptyHTML(T("tm.empty"), T("tm.emptyHint")));
   // 補一屆、貼一整屆一年用不到幾次，收成一行（2026-11-11）。填到一半或預覽中重畫後還開著。
   const newSec = peFold("tm-new", T("tm.new"), "", `<div class="two">

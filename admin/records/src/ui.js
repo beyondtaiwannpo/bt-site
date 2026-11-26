@@ -1496,6 +1496,41 @@ export function personLabelsHTML(d, S, canEdit) {
   const editor = canEdit ? `${foldStart("glabels", "data-glabels", T("lab.given"), S)}<div class="mini">${esc(T("lab.givenHint"))}</div>${GIVEN_LABELS.filter(k => given[k]).map(one).join("")}${add}</div></details>` : "";
   return sectionHTML(T("lab.title"), `${list}<div class="mini rc-labhelp">${esc(T("lab.help"))}</div>${editor}`, { id: "rc-labels" });
 }
+// ── 在哪幾屆做過事（2026-11-26）──
+// Paul：「if Andrea works in 2025 6, spring, I should be able to in her page add them into that term… they should appear on that term,
+// and that terms should be connected to the front of the page where in things that says 2025 to 2026 alumni」。
+// 這一塊讀寫的是 positions（人 × 屆 × team），跟「人與權限 → 屆別」、這一屆的團隊頁、對外「前幾屆的名單」是同一份，沒有第二張表。
+// 有紀錄的人就有幹部或校友的標籤（rc_labels_of 從這裡算）。S.personTerms 是 person_terms() 回的那一包：
+//   null 是那一支遷移檔還沒跑（或讀不到），這時候只印 rc_person 給的那幾行，沒有按鈕。
+// 以前半年一期：屆別照舊一年一屆，另外記是哪一季（Paul 選的）。加、改、拿掉的門在資料庫（Co-President 與 Senior Adviser），can_edit 只決定畫不畫按鈕。
+export const SEASONS = ["", "fall", "spring", "summer"];
+export const seasonName = s => T("pt.season." + (SEASONS.includes(s) && s ? s : "year"));
+export const posTitle = x => (lang() === "zh" ? x.title_zh : x.title_en) || x.title_en || x.title_zh || "";
+// 加進某一屆那一格送出去的字 → set_position 要的兩個標題。空著就是「幹部／Member」；自己打的字兩邊放同一個。純函式。
+export function termTitles(typed) {
+  const t = String(typed || "").trim().slice(0, 60);
+  return !t || /^member$/i.test(t) ? { zh: "幹部", en: "Member" } : { zh: t, en: t };
+}
+export function personTermsHTML(d, S) {
+  const pt = S && S.personTerms ? S.personTerms : null, p = (d && d.person) || {};
+  const pos = pt ? (pt.positions || []) : ((d && d.positions) || []);
+  const can = !!(pt && pt.can_edit) && !p.forgotten_at, dis = S && S.busy ? " disabled" : "";
+  if (!pos.length && !pt) return "";
+  const row = x => `<li><div class="fhead"><b>${esc(x.term)}</b>${x.season ? ` <span class="tag draft">${esc(seasonName(x.season))}</span>` : ""}</div>
+      <div class="fmeta">${esc(posTitle(x))}${x.team ? "・" + esc(x.team) : ""}</div>${can ? `
+      <div class="form-foot"><label class="mini rc-ptseason">${esc(T("pt.season"))} <select data-ptseason data-term="${esc(x.term)}" data-team="${esc(x.team || "")}"${dis}>${SEASONS.map(s => `<option value="${s}"${(x.season || "") === s ? " selected" : ""}>${esc(seasonName(s))}</option>`).join("")}</select></label>
+        <button class="btn quiet sm" data-act="pterm-del" data-term="${esc(x.term)}" data-team="${esc(x.team || "")}"${dis}>${esc(T("pt.remove"))}</button></div>` : ""}</li>`;
+  const list = pos.length ? `<ul class="flist">${pos.map(row).join("")}</ul>` : `<div class="mini">${esc(T("pt.none"))}</div>`;
+  const terms = (pt && pt.terms) || [], firstEnded = (terms.find(t => t.status !== "current") || terms[0] || {}).id || "";
+  const add = can && terms.length ? `${foldStart("ptadd", "data-ptadd", T("pt.add"), S)}
+      <div class="two"><label><i>${esc(T("pt.term"))}</i>${sel("term", terms.map(t => [t.id, t.id + (t.status === "current" ? T("pt.current") : "")]), firstEnded)}</label><label><i>${esc(T("pt.season"))}</i>${sel("season", SEASONS.map(s => [s, seasonName(s)]), "")}</label></div>
+      <div class="two"><label><i>${esc(T("pt.team"))}</i><input name="team" list="rc-pt-teams" maxlength="60" autocomplete="off"><datalist id="rc-pt-teams">${((pt && pt.teams) || []).map(t => `<option value="${esc(t)}"></option>`).join("")}</datalist></label><label><i>${esc(T("pt.title"))}</i><input name="title" maxlength="60" placeholder="Member" autocomplete="off"></label></div>
+      <div class="form-foot"><button class="btn sm" data-act="pterm-add"${dis}>${esc(T("pt.addBtn"))}</button><span class="mini">${esc(T("pt.addHint"))}</span></div></div></details>` : "";
+  // 還勾著「現在還在念高中」的人：屆別的名單與對外的名單只列成員，他不會出現，講一聲（那一格不會自己取消）。
+  const hs = pt && pos.length && p.kind === "student" ? `<div class="note">${esc(T("pt.stillHs"))}</div>` : "";
+  const help = pt ? `${hs}<div class="mini rc-labhelp">${esc(T("pt.help"))}${can ? "" : " " + esc(T("pt.onlySenior"))}</div>` : "";
+  return sectionHTML(T("person.positions"), list + help + add, { id: "rc-terms" });
+}
 // ── 現在在哪：學校與去向排成一條，最新的在最上面（2026-11-25）──
 // Paul：「she used to be a student, but now she is in University of Washington… AIA… is her current school, which is not right… always put university or job
 // in a chronologically order. And put the latest as their current status」。
@@ -1639,8 +1674,7 @@ export function personHTML(d, S) {
       <div class="form-foot"><button class="btn sm" data-act="school-add"${S.busy ? " disabled" : ""}>${esc(T("school.addBtn"))}</button><span class="mini">${esc(T("school.addHint"))}</span></div></div></details>` : "";
   const schHTML = sectionHTML(T("person.schools", { n: places.length }), schList + schAdd);
   const aliasHTML = (d.aliases || []).length ? `<div class="mini rc-alias">${esc(T("person.aliases"))}${esc(T("punct.colon"))}${d.aliases.map(esc).join(esc(T("punct.list")))}</div>` : "";
-  const pos = (d.positions || []);
-  const posHTML = pos.length ? sectionHTML(T("person.positions"), `<ul class="flist">${pos.map(x => `<li><b>${esc(x.term)}</b>・${esc((lang() === "zh" ? x.title_zh : x.title_en) || x.title_en || x.title_zh || "")}${x.team ? "・" + esc(x.team) : ""}</li>`).join("")}</ul>`) : "";
+  const posHTML = personTermsHTML(d, S);
   const parts = d.participation || [];
   const evs = ((S.boot && S.boot.events) || []).slice().sort((a, b) => String(b.starts_at || "").localeCompare(String(a.starts_at || "")));
   const addEv = manage && !p.forgotten_at && evs.length ? `${foldStart("paddev", "data-paddev", T("person.addEvent"), S)}

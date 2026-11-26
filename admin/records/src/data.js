@@ -57,6 +57,12 @@ export const savePerson    = (id, p) => rpc("rc_save_person", { p_person: id || 
 export const mergePeople   = (keep, drop) => rpc("rc_merge_people", { p_keep: keep, p_drop: drop });
 export const mergeAccounts = (keep, drop) => rpc("rc_merge_accounts", { p_keep: keep, p_drop: drop });
 export const forgetPerson  = id => rpc("forget_person", { p_person: id });
+// 一個人在哪幾屆做過事（2026-11-26，2027-01-17-term-seasons.sql）。那一支還沒跑就回 null，畫面照舊只印 rc_person 給的那幾行。
+// 加、改、拿掉走的是「人與權限」原本那三支（set_position、delete_position）加一支改哪一季的，門都在資料庫（Co-President 與 Senior Adviser）。
+export const loadPersonTerms = id => rpc("person_terms", { p_person: id }).catch(e => { if (/person_terms/.test(String(e && e.message || e))) return null; throw e; });
+export const setPosition = (person, term, zh, en, team) => rpc("set_position", { p_person: person, p_term: term, p_title_zh: zh || null, p_title_en: en || null, p_team: team || null });
+export const setPositionSeason = (person, term, team, season) => rpc("set_position_season", { p_person: person, p_term: term, p_team: team || null, p_season: season || null });
+export const deletePosition = (person, term, team) => rpc("delete_position", { p_person: person, p_term: term, p_team: team || null });
 export const anonymiseOld  = doIt => rpc("rc_anonymise_old", { p_do: !!doIt });
 
 // ── 關係網（2027-01-03，supabase/migrations/2027-01-03-people-network.sql）──
@@ -95,6 +101,7 @@ const SAYS = [
   ["not_records_manager", "says.notManager"], ["not_records_viewer", "says.notViewer"],
   ["not_event_editor", "says.notEventEditor"], ["not_event_viewer", "says.notEventViewer"],
   ["not_form_creator", "says.notCreator"], ["not_form_editor", "says.notEditor"], ["not_form_owner", "says.notOwner"], ["not_form_reader", "says.notReader"],
+  ["not_senior", "says.notSenior"], ["empty_title", "says.needPosTitle"], ["no_such_position", "says.noPosition"], ["bad_season", "says.badSeason"],
   ["form_not_found", "says.notFound"], ["no_such_person", "says.noPerson"], ["no_such_school", "says.notFound"], ["need_school", "says.needSchool"], ["years_backwards", "says.yearsBackwards"], ["no_such_event", "says.noEvent"], ["no_such_term", "says.noTerm"], ["no_such_pair", "says.notFound"],
   ["bad_question_type", "says.badType"], ["bad_logic", "says.badLogic"], ["bad_config", "says.badLogic"], ["anon_contact_q", "says.anonContact"],
   ["need_title", "says.needTitle"], ["need_question_label", "says.needLabel"], ["need_options", "says.needOptions"], ["bad_scale", "says.badScaleDef"], ["bad_key", "says.badKey"],

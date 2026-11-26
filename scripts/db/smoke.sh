@@ -5292,6 +5292,69 @@ chkrole authenticated "${PAUL}" "★ 算標籤的那一支照舊不開給前端"
 # 收乾淨
 psql -d "${DB}" -q -c "delete from public.people where name_en like 'Mlr %'; delete from public.events where slug like 'mlr-%'; drop table public.mlr_before;" >/dev/null 2>&1
 chk "（收尾）假的人與假的活動都拿掉了" "0|0" "select (select count(*) from public.people where name_en like 'Mlr %')||'|'||(select count(*) from public.events where slug like 'mlr-%')"
+echo "── 一個人在哪幾屆做過事：哪一季、舊資料庫的 Board 變成職位、有職位的來賓算成員（2027-01-17-term-seasons.sql）──"
+# Paul 2026-11-26：「if Andrea works in 2025 6, spring, I should be able to in her page add them into that term… they should appear on that term」
+# 他選的：屆別照舊一年一屆、另外記哪一季；舊資料庫寫了哪一期的 Board，已經結束的那幾屆自動放進去，這一屆的不放。
+TSM=supabase/migrations/2027-01-17-term-seasons.sql
+tsq() { psql -d "${DB}" -X -A -t -q -c "$1" 2>&1 | tail -1 | tr -d ' \n'; }
+TSCUR=$(tsq "select id from public.terms where status = 'current' limit 1")
+TSF="F${TSCUR:2:2}"   # 這一屆的秋季那一期，例如 2026-27 → F26
+psql -d "${DB}" -X -A -t -q -c "insert into public.terms (id, title_zh, title_en, starts_on, ends_on, status) values ('2023-24', '2023-24', '2023-24', '2023-08-01', '2024-07-31', 'ended'), ('2022-23', '2022-23', '2022-23', '2022-08-01', '2023-07-31', 'ended') on conflict (id) do nothing;" \
+  -c "insert into public.people (name_en, kind) values ('Ts F23', 'member'), ('Ts S24', 'member'), ('Ts Cur', 'member'), ('Ts NoTerm', 'member'), ('Ts HasPos', 'member'), ('Ts Guest', 'guest'), ('Ts Student', 'student');" \
+  -c "insert into public.rc_labels (person_id, label, detail, since_year) select id, 'member', case name_en when 'Ts F23' then 'Old database: Board: F23' when 'Ts S24' then 'Old database: Board: S24; with BT since Spring 2024' when 'Ts Cur' then 'Old database: Board: ${TSF}' when 'Ts NoTerm' then 'Old database: Board (term not recorded); with BT since Spring 2022' else 'Old database: Board: S23' end, 2023 from public.people where name_en in ('Ts F23', 'Ts S24', 'Ts Cur', 'Ts NoTerm', 'Ts HasPos');" \
+  -c "insert into public.positions (person_id, term_id, title_en, team) select id, '2022-23', 'Director', 'Curriculum Team' from public.people where name_en = 'Ts HasPos';" >/dev/null 2>&1
+chk "（準備）七個假的人、五個舊資料庫的標籤、一筆原本就有的職位" "7|5|1" "select (select count(*) from public.people where name_en like 'Ts %')||'|'||(select count(*) from public.rc_labels g join public.people p on p.id = g.person_id where p.name_en like 'Ts %')||'|'||(select count(*) from public.positions po join public.people p on p.id = po.person_id where p.name_en like 'Ts %')"
+ts1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${TSM}" 2>&1 || true)
+if echo "${ts1}" | grep -q "OVERALL.*PASS" && ! echo "${ts1}" | grep -q "|FAIL"; then echo "  ok   哪一季那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 哪一季那一支驗收表：${ts1}" | head -20; fail=$((fail+1)); fi
+ts2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${TSM}" 2>&1 || true)
+if echo "${ts2}" | grep -q "OVERALL.*PASS" && ! echo "${ts2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${ts2}" | head -20; fail=$((fail+1)); fi
+TSPOS="select coalesce(string_agg(po.term_id || '/' || coalesce(po.team, '-') || '/' || po.title_en || '/' || coalesce(po.season, 'year'), ',' order by po.term_id), 'none') from public.positions po join public.people p on p.id = po.person_id where p.name_en ="
+TSLAB="select count(*) from public.rc_labels g join public.people p on p.id = g.person_id where g.label = 'member' and p.name_en ="
+chk "★ F23 變成 2023-24 的一筆職位（秋季、幹部、沒有 team），標籤拿掉" "2023-24/-/Member/fall|0" "select (${TSPOS} 'Ts F23')||'|'||(${TSLAB} 'Ts F23')"
+chk "★ S24 也是 2023-24（春季）" "2023-24/-/Member/spring|0" "select (${TSPOS} 'Ts S24')||'|'||(${TSLAB} 'Ts S24')"
+chk "★ 寫這一屆那一期的不放：沒有職位，標籤還在" "none|1" "select (${TSPOS} 'Ts Cur')||'|'||(${TSLAB} 'Ts Cur')"
+chk "★ 沒寫哪一期的不動" "none|1" "select (${TSPOS} 'Ts NoTerm')||'|'||(${TSLAB} 'Ts NoTerm')"
+chk "那一屆已經有職位的人：不多一筆，標籤拿掉" "2022-23/CurriculumTeam/Director/year|0" "select (${TSPOS} 'Ts HasPos')||'|'||(${TSLAB} 'Ts HasPos')"
+chk "★ 搬過去的三個人在那一屆都有一筆職位（驗收表第 8 列是 0）" "0" "select count(*) from public.rc_log l where l.what = 'label_remove' and l.before->>'by' = '2027-01-17-term-seasons' and l.ref in (select id from public.people where name_en like 'Ts %') and not exists (select 1 from public.positions po where po.person_id = l.ref and po.term_id = l.before->>'term')"
+chk "重跑兩次沒有多加任何一筆" "3" "select count(*) from public.positions po join public.people p on p.id = po.person_id where p.name_en like 'Ts %'"
+chk "★ 拿掉的每一個標籤都留在紀錄裡（舊的補充說明在裡面）" "3|true" "select count(*)||'|'||bool_and(before->>'detail' like 'Old database: Board: %') from public.rc_log where what = 'label_remove' and before->>'by' = '2027-01-17-term-seasons' and ref in (select id from public.people where name_en like 'Ts %')"
+chk "搬過去的人還是校友（標籤從職位算）" '["member:past"]' "select public.rc_label_codes(id)::text from public.people where name_en = 'Ts F23'"
+TSG=$(tsq "select id from public.people where name_en = 'Ts Guest'"); TSS=$(tsq "select id from public.people where name_en = 'Ts Student'"); TSF23=$(tsq "select id from public.people where name_en = 'Ts F23'")
+chkas "${PAUL}" "Co-President 把一位來賓加進 2023-24（原本的 set_position）" "t" "select public.set_position('${TSG}', '2023-24', '幹部', 'Member', 'Marketing Team') is not null"
+chk "★ 有了職位的來賓變成成員（屆別與對外的名單才看得到他）" "member" "select kind from public.people where id = '${TSG}'"
+chkas "${PAUL}" "把一位還在念高中的學員加進 2023-24" "t" "select public.set_position('${TSS}', '2023-24', '幹部', 'Member', null) is not null"
+chk "★ 學員的「現在還在念高中」那一格不會自己取消" "student" "select kind from public.people where id = '${TSS}'"
+chkas "${PAUL}" "Co-President 改那一筆的哪一季" "summer" "select public.set_position_season('${TSG}', '2023-24', 'Marketing Team', 'summer'); select season from public.positions where person_id = '${TSG}'"
+chkas "${PAUL}" "空字串是整年（存成空的）" "t" "select public.set_position_season('${TSG}', '2023-24', 'Marketing Team', ''); select season is null from public.positions where person_id = '${TSG}'"
+chkraise "★ 亂填的季別被擋（bad_season）" "bad_season" "perform set_config('test.uid','${PAUL}',true); perform public.set_position_season('${TSG}', '2023-24', 'Marketing Team', 'winter');"
+chkraise "找不到那一筆職位會講（no_such_position）" "no_such_position" "perform set_config('test.uid','${PAUL}',true); perform public.set_position_season('${TSG}', '2022-23', null, 'fall');"
+chkraise "★ 一般幹部改不了哪一季（not_senior）" "not_senior" "perform set_config('test.uid','${OUTC}',true); perform public.set_position_season('${TSG}', '2023-24', 'Marketing Team', 'fall');"
+chkas "${PAUL}" "★ 讀得到紀錄的人：拿得到他在哪幾屆、可以改、有屆別清單" "true|1|true" "select (j->>'can_edit')||'|'||jsonb_array_length(j->'positions')||'|'||(jsonb_array_length(j->'terms') >= 3) from (select public.person_terms('${TSF23}') j) z"
+chkas "${OTHER}" "Senior Adviser 也拿得到，也可以改" "true" "select public.person_terms('${TSF23}')->>'can_edit'"
+chkas "${OUTC}" "★ 沒被派進紀錄的幹部拿到空的" "t" "select public.person_terms('${TSF23}') is null"
+chkrole anon "" "★ 沒登入的人叫不動" "ERROR:permissiondeniedforfunctionperson_terms" "select public.person_terms('${TSF23}')"
+chkrole anon "" "★ 沒登入的人改不了哪一季" "ERROR:permissiondeniedforfunctionset_position_season" "select public.set_position_season('${TSG}', '2023-24', 'Marketing Team', 'fall')"
+# 破壞測試一：把「那一屆要已經結束」拿掉，這一屆的那一位會被放進去，驗收表第 10 列要變紅
+BROKEN=$(mktemp)
+sed "s/    if not exists (select 1 from public.terms t where t.id = v_term and t.status = 'ended') then continue; end if;/    if not exists (select 1 from public.terms t where t.id = v_term) then continue; end if;/" "${TSM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${TSM}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^10|.*|FAIL"; then echo "  ok   ★ 破壞測試：連這一屆的也放，驗收表第 10 列變紅"; pass=$((pass+1)); else echo "  FAIL 連這一屆也放驗收表沒有變紅"; fail=$((fail+1)); fi
+# 破壞的那一版把這一屆的那一位放進去了：把那一筆職位與紀錄拿掉、標籤放回去，回到破壞之前的樣子。
+psql -d "${DB}" -q -c "delete from public.positions where person_id = (select id from public.people where name_en = 'Ts Cur'); delete from public.rc_log where what = 'label_remove' and ref = (select id from public.people where name_en = 'Ts Cur'); insert into public.rc_labels (person_id, label, detail, since_year) select id, 'member', 'Old database: Board: ${TSF}', 2023 from public.people where name_en = 'Ts Cur' on conflict do nothing;" >/dev/null
+chk "（破壞測試一收拾完）這一屆的那一位回到沒有職位、標籤還在" "none|1" "select (${TSPOS} 'Ts Cur')||'|'||(${TSLAB} 'Ts Cur')"
+# 破壞測試二：把改哪一季的門拿掉，驗收表第 2 列要變紅
+sed "s/^  perform public.require_senior();\$/  perform 1;/" "${TSM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${TSM}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^2|.*|FAIL"; then echo "  ok   ★ 破壞測試：改哪一季的門拿掉，驗收表第 2 列變紅"; pass=$((pass+1)); else echo "  FAIL 門拿掉驗收表沒有變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+ts3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${TSM}" 2>&1 || true)
+if echo "${ts3}" | grep -q "OVERALL.*PASS" && ! echo "${ts3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${ts3}" | head -20; fail=$((fail+1)); fi
+chkraise "★ 裝回去之後一般幹部還是改不了哪一季" "not_senior" "perform set_config('test.uid','${OUTC}',true); perform public.set_position_season('${TSG}', '2023-24', 'Marketing Team', 'fall');"
+# 收乾淨
+psql -d "${DB}" -q -c "delete from public.rc_log where ref in (select id from public.people where name_en like 'Ts %'); delete from public.people where name_en like 'Ts %';" >/dev/null 2>&1
+chk "（收尾）假的人與他們的職位都拿掉了" "0|0" "select (select count(*) from public.people where name_en like 'Ts %')||'|'||(select count(*) from public.positions po where not exists (select 1 from public.people p where p.id = po.person_id))"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

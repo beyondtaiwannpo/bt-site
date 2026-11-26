@@ -133,8 +133,9 @@ async function loadDir(p) {
 // 兩趟一起問（2026-11-25）：以前是先等這個人回來才去拿名錄，名錄慢的時候每存一次就多等一輪。
 async function loadPerson() {
   const needDir = S.boot && S.boot.can_manage && !Array.isArray(S.dir);
-  const [person] = await Promise.all([D.loadPerson(S.id), needDir ? (dirFlight || loadDir()) : null]);
-  S.person = person;
+  // 在哪幾屆做過事（2026-11-26）跟這個人一起問；那一支遷移檔還沒跑、或這一趟失敗，就是 null，畫面只少那幾顆按鈕。
+  const [person, , terms] = await Promise.all([D.loadPerson(S.id), needDir ? (dirFlight || loadDir()) : null, D.loadPersonTerms(S.id).catch(() => null)]);
+  S.person = person; S.personTerms = terms;
 }
 async function loadBoot(p) {
   try { S.boot = await (p || D.loadBootstrap()); }
@@ -145,7 +146,7 @@ async function openRoute(keepMsg) {
   if (!keepMsg) S.msg = "";
   if (S.view !== "overview" || !S.id) S.event = null;
   if (S.view !== "forms" || S.id !== (S.results && S.results.form && S.results.form.id)) S.results = null;
-  if (S.view !== "people" || !S.id) S.person = null;
+  if (S.view !== "people" || !S.id) { S.person = null; S.personTerms = null; }
   render();
   try {
     if (S.view === "overview" && S.id) { S.event = await D.loadEvent(S.id); if (S.event && S.event.can_edit && !Array.isArray(S.dir)) { await loadDir(); } }
@@ -317,6 +318,17 @@ function download(text, name) {
 
 // 收起來的「加一個…」表單開著沒（ui.js 的 foldStart），重畫之後照舊。
 document.addEventListener("toggle", e => { const k = e.target && e.target.dataset && e.target.dataset.fold; if (k) UI.setFold(k, e.target.open); }, true);
+// 一筆職位的「哪一季」：選了就存（2026-11-26）。不重拿整個人，只把手上那一筆改掉再畫。
+document.addEventListener("change", async e => {
+  const el = e.target && e.target.closest && e.target.closest("select[data-ptseason]");
+  if (!el || !S.id || S.view !== "people") return;
+  const term = el.dataset.term, team = el.dataset.team || "", season = el.value;
+  const ok = await run("err.save", () => D.setPositionSeason(S.id, term, team, season));
+  if (ok === undefined) { render(); return; }
+  const row = ((S.personTerms || {}).positions || []).find(x => x.term === term && (x.team || "") === team);
+  if (row) row.season = season || null;
+  S.msg = T("msg.ptSeason"); render();
+});
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -635,6 +647,25 @@ document.addEventListener("click", async e => {
     const ok = await run("err.forget", () => D.forgetPerson(b.dataset.id));
     if (ok === undefined) return;
     S.dir = null; await Promise.all([loadPerson(), loadBoot()]); S.msg = T("msg.forgot"); render(); return;
+  }
+  // ── 在哪幾屆做過事（2026-11-26，2027-01-17-term-seasons.sql）。門在資料庫（Co-President 與 Senior Adviser），這裡只是叫。──
+  if (act === "pterm-add") {
+    const v = vals("[data-ptadd]"), t = UI.termTitles(v.title);
+    if (!v.term) return;
+    const ok = await run("err.save", async () => {
+      await D.setPosition(S.id, v.term, t.zh, t.en, v.team);
+      // 哪一季是另一支函式存的；那一支還沒跑（S.personTerms 是 null）就不會走到這裡，因為沒有這顆按鈕。
+      if (v.season) await D.setPositionSeason(S.id, v.term, v.team, v.season);
+      return true;
+    });
+    if (ok === undefined) return;
+    S.dirStale = true; await loadPerson(); S.msg = T("msg.ptAdded", { term: v.term }); render(); return;
+  }
+  if (act === "pterm-del") {
+    if (UI.needAsk(S, b, T("pt.removeAsk"))) return;
+    const ok = await run("err.delete", () => D.deletePosition(S.id, b.dataset.term, b.dataset.team || ""));
+    if (ok === undefined) return;
+    S.dirStale = true; await loadPerson(); S.msg = T("msg.ptRemoved"); render(); return;
   }
   if (act === "out-add") {
     const v = vals("[data-oadd]");
