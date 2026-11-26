@@ -6206,7 +6206,9 @@ Paul 同一次也說了，每個人備註裡那種「BT: Event Attendee; since S
 2. `compare-notes-readonly.sql`：備註講的事，資料庫裡已經有幾件。這一步是 Paul 要的，原話：
    「whoever has that participation, don't delete their participation, but compare their notes and their participation before you do anything.」
    起因是他看了一位幹部的頁，她的參與紀錄已經是對的，備註講的事那裡都有。結果：934 位裡 528 位備註講的每一期都已經有紀錄。
-3. 真的轉換：`supabase/migrations/2027-01-08-notes-to-participation.sql`。**⚠ 寫好了、本機測過，還沒在正式的 Supabase 跑。** 檔直接交給 Paul 了。
+3. 真的轉換：`supabase/migrations/2027-01-08-notes-to-participation.sql`。**Paul 2026-11-25 在正式的 Supabase 跑過，他回報驗收表每一列都是 PASS。**
+   後面那幾列 INFO 的數字（補了幾列、開了幾場、給了幾個標籤、幾個人的備註還有字）沒有記在這裡，要看得再跑一次這一支（可以重跑，第二次什麼都不會加）。
+   還沒有人登入正式站的後台，打開幾個人的頁看過參與紀錄與備註是不是對的。
 
 **規則只有一條最重要：已經有的參與紀錄一列都不刪、不改，只補少的。** 那一支最後印的表第 1 列會數一次。
 
