@@ -109,12 +109,12 @@ export const AREAS = [
   { key: "calendar",  sec: "me",   label: { zh: "行事曆",   en: "Calendar" },   hint: { zh: "會議、時間看板、會議範本", en: "Meetings, availability, templates" } },
   { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
   // 2026-12-26 Paul：工作區 → 專案 → 活動。這一行改叫「專案」，點下去是專案清單；活動、計畫與招募、各 team 在它底下。key 留 events（網址與測試都認它）。
-  { key: "events",    sec: "work", label: { zh: "專案",     en: "Projects" },   hint: { zh: "每個 team 的專案、活動、計畫與招募", en: "Every team's projects, events, programs" } },
+  { key: "events",    sec: "work", label: { zh: "專案",     en: "Projects" },   hint: { zh: "每個 team 的專案與活動", en: "Every team's projects and events" } },
   { key: "forms",     sec: "work", label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、內部表單、回饋表", en: "To fill, internal forms, feedback forms" } },
   { key: "marketing", sec: "work", label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
   { key: "website",   sec: "work", label: { zh: "對外網站", en: "Website" },    hint: { zh: "資源、團隊頁、校友故事、信", en: "Resources, team page, stories, emails" } },
   { key: "passports", sec: "work", label: { zh: "護照",     en: "Passports" },  hint: { zh: "幹部護照、實習護照", en: "Cadre and intern passports" } },
-  { key: "people",    sec: "org",  label: { zh: "人與權限", en: "Internal" },   hint: { zh: "名單、邀請、工作區", en: "Roster, invites, workspaces" } },
+  { key: "people",    sec: "org",  label: { zh: "人與權限", en: "Internal" },   hint: { zh: "名單、邀請、幹部招募、工作區", en: "Roster, invites, recruitment, workspaces" } },
   { key: "records",   sec: "org",  label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較", en: "Events, people, year by year" } },
   { key: "money",     sec: "org",  label: { zh: "錢",       en: "Money" },      hint: { zh: "收支、預算、匯出", en: "Income, spending, budget" } },
   // 場地是整個 BT 的（2026-12-26 Paul：「venue, records, money … whole BT」）。誰改得動不變：開得了活動的人照舊改得動。
@@ -137,9 +137,7 @@ export const ITEMS = [
   // 活動（2026-11-10 Paul：「application should live under events」）
   { group: "forms",     key: "projects",   area: "events",    who: "cadre",  label: { zh: "專案", en: "Projects" } },
   { group: "forms",     key: "events",     area: "events",    who: "cadre",  label: { zh: "活動", en: "Events" } },
-  { group: "forms",     key: "forms",      area: "events",    who: "cadre",  label: { zh: "計畫與招募", en: "Programs & recruitment" } },
-  // 各 team（2026-11-14）：以前後台的「待辦」那一頁。待辦搬到首頁之後，這一頁只剩你的權限與每個 team 的東西。
-  { group: "forms",     key: "teams",      area: "events",    who: "cadre",  label: { zh: "各 team", en: "Teams" } },
+  // 2026-11-26 Paul：「各 team」那一頁拿掉了（team 的人數與 Director 在幹部名單上），「計畫與招募」改叫「幹部招募」搬到「人與權限」底下，見下面。
   // 表單：要填的、內部表單、回饋表放在同一排（2026-11-13 Paul：「建內部表單」與「要填的」並排兩行很亂）
   { group: "teamforms", key: "fill",       area: "forms",     who: "cadre",  label: { zh: "要我填的", en: "To fill" } },
   { group: "teamforms", key: "build",      area: "forms",     who: "ws:team-forms", ws: "custom:team-forms", label: { zh: "內部表單", en: "Internal forms" } },
@@ -167,6 +165,9 @@ export const ITEMS = [
   // 人與權限
   { group: "people",    key: "roster",     area: "people",    who: "senior", label: { zh: "幹部名單", en: "Roster" } },
   { group: "people",    key: "invites",    area: "people",    who: "senior", label: { zh: "邀請新的人", en: "Invite people" } },
+  // 幹部招募（2026-11-26 Paul：「it's recruiting for our board members… it should be a separated form」）。頁面還是 /admin/#forms 那一頁（group 是 forms），
+  // 只是掛在「人與權限」這一行底下。看得到這一行的人：被派進「申請」工作區的，加 Co-President 與 Senior Adviser。資料讀不讀得到照舊是資料庫決定。
+  { group: "forms",     key: "forms",      area: "people",    who: "ws:apps", ws: "apps", label: { zh: "幹部招募", en: "Recruitment" } },
   { group: "people",    key: "workspaces", area: "people",    who: "senior", label: { zh: "工作區", en: "Workspaces" } },
   { group: "people",    key: "terms",      area: "people",    who: "senior", label: { zh: "屆別", en: "Years (terms)" } },
   // 回報與許願的收件匣（2026-11-25）：幹部從右下角那一顆送的，只有 Co-President 與 Senior Adviser 讀得到（資料庫的門是 require_senior）。

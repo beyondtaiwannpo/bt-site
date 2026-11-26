@@ -46,7 +46,8 @@ export const dtVal = v => (v ? String(v).slice(0, 16) : "");
 // 表單上的 team 標籤可以選的六個（跟 admin/people/src/ui.js 的 TEAMS 同一份，test/teams.test.mjs 比對）。
 export const TEAM_LABELS = ["Curriculum Team", "Mentorship Team", "Marketing Team", "Sponsorship Team", "Internship Team", "Community Relations Team"];
 export function newFormHTML(draft, teams, myTeam, busy) {
-  const d = draft || { title: "", team: myTeam || "", kind: "program" };
+  // 2026-11-26：這一頁只開幹部招募的表單（kind 固定是 board）。活動與計畫的報名表從那場活動的頁面開。
+  const d = draft || { title: "", team: myTeam || "", kind: "board" };
   const dis = busy ? " disabled" : "";
   return `<div class="card inline-form" id="new-form">
     <h2>${T("newForm.title")}</h2>
@@ -56,11 +57,8 @@ export function newFormHTML(draft, teams, myTeam, busy) {
       ${teams && teams.length
         ? `<label><i>${T("form.team")}</i><select id="nf-team"${dis}>${teams.map(t => `<option${t === d.team ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`
         : `<label><i>${T("form.team")}</i><input id="nf-team" value="${esc(d.team)}" disabled></label>`}
-      <label><i>${T("form.kind")}</i><select id="nf-kind"${dis}>
-        <option value="program"${d.kind !== "board" ? " selected" : ""}>${T("kind.program")}</option>
-        <option value="board"${d.kind === "board" ? " selected" : ""}>${T("kind.board")}</option>
-      </select></label>
     </div>
+    <input type="hidden" id="nf-kind" value="board">
     <div class="row">
       <button class="btn" data-act="new-form-save"${dis}>${busy ? T("newForm.creating") : T("newForm.create")}</button>
       <button class="btn ghost" data-act="new-form-cancel"${dis}>${T("common.cancel")}</button>
@@ -68,22 +66,20 @@ export function newFormHTML(draft, teams, myTeam, busy) {
   </div>`;
 }
 
-// 表單清單。newDraft 不是 null 就在清單上面展開內嵌表單；teams 與 myTeam 給那個表單用。
-// events（2026-11-10）：綁著活動的報名表不放在這裡的清單，移到最下面一段，點了回那場活動（Paul：「application should live under events」）。
+// 幹部招募那一頁（2026-11-26；以前叫「其他申請」）。newDraft 不是 null 就在清單上面展開內嵌表單；teams 與 myTeam 給那個表單用。
+// 這一頁列的是幹部招募的表單（kind 是 board）。綁著活動的報名表不在這裡，在那場活動的頁面裡（2026-11-10 Paul：「application should live under events」）。
+// 不是招募、也沒有綁活動的舊申請表（kind 是 program）放在最下面一段，有才印：新的不會再從這裡開。
 export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, myTeam, busy, mpItems, events) {
-  const evOf = new Map((events || []).filter(e => e.form_id).map(e => [e.form_id, e]));
-  const evForms = forms.filter(f => evOf.has(f.id));
-  forms = forms.filter(f => !evOf.has(f.id));
-  const evRow = f => { const e = evOf.get(f.id); return `<li><div class="fhead"><b><a href="#events/${esc(e.slug)}" data-act="ev-open" data-slug="${esc(e.slug)}">${esc(evTitle(e))}</a></b> <span class="tag ${statusOf(f.status).tag}">${esc(T(statusOf(f.status).label))}</span></div>
-      <div class="fmeta">${esc((f.team || "").replace(/\s*Team$/i, ""))}・${T("forms.count", { n: f.counts.total })}${f.counts.received ? T("forms.unhandled", { n: f.counts.received }) : ""}</div></li>`; };
-  const evSection = evForms.length ? sectionHTML(T("forms.evSec"), `<ul class="flist">${evForms.map(evRow).join("")}</ul>`, { hint: T("forms.evHint") }) : "";
+  const evIds = new Set((events || []).map(e => e.form_id).filter(Boolean));
+  const loose = forms.filter(f => !evIds.has(f.id));
+  const other = loose.filter(f => f.kind !== "board");
+  forms = loose.filter(f => f.kind === "board");
   const row = f => {
     const st = statusOf(f.status);
     return `<li>
       <div class="fhead">
         <b>${esc(f.title)}</b>
         <span class="tag ${st.tag}">${esc(T(st.label))}</span>
-        ${f.kind === "board" ? `<span class="tag">${T("kind.board")}</span>` : ""}
       </div>
       <div class="fmeta">${esc(f.team || T("forms.noTeam"))}
         ・${T("forms.count", { n: f.counts.total })}${
@@ -116,7 +112,7 @@ export function listHTML(forms, canCreate, msg, isPresident, newDraft, teams, my
     + (forms.length ? rows : sectionHTML("",
         emptyHTML(T("forms.empty"), canCreate ? T("forms.emptyCan") : T("forms.emptyCannot"),
                   canCreate ? { act: "new-form", label: T("forms.new") } : null)))
-    + evSection;
+    + (other.length ? sectionHTML(T("forms.otherSec"), `<ul class="flist">${other.map(row).join("")}</ul>`, { hint: T("forms.otherHint") }) : "");
 }
 
 // 一份表單裡的三個分頁（2026-10-19，批 3）：申請（審核）、設定（欄位與題目）、活動（簽到與寄信）。
@@ -273,7 +269,61 @@ export function answerHTML(q, v, canOpen) {
   return esc(v).replace(/\n/g, "<br>");
 }
 
-export function appsHTML(form, apps, questions, canDecide, sel, filter, pending, msg, busy) {
+// ── 幹部招募：錄取了就寄邀請（2026-11-26，資料庫 2027-01-15-recruitment-invites.sql）──
+// rc 只有幹部招募的表單才有，是 main.js 組的：
+//   { can：這個人是不是 Co-President 或 Senior Adviser（只有他們寄得了邀請）,
+//     ready：資料庫那一支跑了沒（false 是還沒跑）, status：{ 申請 id: 狀態 }（joined、pending、expired、on_roster、none）,
+//     set：{ rank, team, title_en, title_zh, term, lang }（按「錄取」的時候邀請照這幾格寄）, terms：屆別, teams：team 的名字 }
+export const RECRUIT_RANKS = ["member", "adviser", "director"];
+export const RECRUIT_STATES = ["joined", "pending", "expired", "on_roster", "none"];
+// 那幾格一開始的樣子：職級 Associate、team 是表單的 team、屆別是現在這一屆、職稱先空著（空著就不在名單上放職位）、信用中文。
+export function recruitDefaults(form, terms) {
+  const cur = (terms || []).find(t => t.status === "current") || (terms || [])[0] || null;
+  return { rank: "member", team: (form && form.team) || "", title_en: "", title_zh: "", term: cur ? cur.id : "", lang: "zh" };
+}
+// 畫面上那幾格 → 要送給資料庫的設定。職稱兩格都空就不帶屆別以外的東西；職級不認得的當 member。純函式。
+export function recruitPatch(set) {
+  const s = set || {}, t = v => String(v == null ? "" : v).trim();
+  return { rank: RECRUIT_RANKS.includes(s.rank) ? s.rank : "member", team: t(s.team), title_en: t(s.title_en), title_zh: t(s.title_zh), term: t(s.term), lang: s.lang === "en" ? "en" : "zh" };
+}
+// 寄完之後那一句：寄了幾封；跳過的照原因各講一句（同一種原因合成一句，講幾位）。
+export function recruitResultNote(res) {
+  const r = res || {}, sk = Array.isArray(r.skipped) ? r.skipped : [];
+  const by = {};
+  for (const x of sk) { const w = ["already_cadre", "invite_pending", "on_roster", "ambiguous_person", "bad_email", "not_accepted"].includes(x && x.why) ? x.why : "other"; by[w] = (by[w] || 0) + 1; }
+  return (r.sent ? T("rc.sent", { n: r.sent }) : "") + Object.keys(by).map(w => T("rc.skip." + w, { n: by[w] })).join("");
+}
+export function recruitPanelHTML(form, rc, busy) {
+  if (!form || form.kind !== "board" || !rc) return "";
+  if (!rc.can) return `<div class="note" id="rc-panel">${T("rc.waitSenior")}</div>`;
+  if (rc.ready === false) return `<div class="note" id="rc-panel">${T("rc.needSql")}</div>`;
+  const s = Object.assign(recruitDefaults(form, rc.terms), rc.set || {}), dis = busy ? " disabled" : "";
+  const opt = (v, label, cur) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(label)}</option>`;
+  const teams = [...new Set([s.team, ...(rc.teams || [])].filter(Boolean))];
+  return `<div class="card rc-panel" id="rc-panel">
+    <h3>${T("rc.title")}</h3>
+    <div class="sub">${T("rc.sub")}</div>
+    <div class="rc-grid">
+      <label><i>${T("rc.rank")}</i><select data-rc="rank"${dis}>${RECRUIT_RANKS.map(r => opt(r, boardName(r), s.rank)).join("")}</select></label>
+      <label><i>${T("rc.team")}</i><select data-rc="team"${dis}>${opt("", T("rc.noTeam"), s.team)}${teams.map(t => opt(t, t.replace(/\s*Team$/i, ""), s.team)).join("")}</select></label>
+      <label><i>${T("rc.term")}</i><select data-rc="term"${dis}>${(rc.terms || []).map(t => opt(t.id, t.id, s.term)).join("")}</select></label>
+      <label><i>${T("rc.titleEn")}</i><input data-rc="title_en" value="${esc(s.title_en)}" maxlength="80" placeholder="${esc(T("rc.titleEnPh"))}"${dis}></label>
+      <label><i>${T("rc.titleZh")}</i><input data-rc="title_zh" value="${esc(s.title_zh)}" maxlength="80" placeholder="${esc(T("rc.titleZhPh"))}"${dis}></label>
+      <label><i>${T("rc.lang")}</i><select data-rc="lang"${dis}>${opt("zh", T("rc.langZh"), s.lang)}${opt("en", T("rc.langEn"), s.lang)}</select></label>
+    </div>
+    <div class="mini">${T("rc.help")}</div>
+  </div>`;
+}
+// 一筆已經錄取的申請，名字後面那一顆邀請的狀態；還沒寄或過期了的，Co-President 與 Senior Adviser 多一顆「寄邀請」。
+export function recruitTagHTML(a, rc, busy) {
+  if (!rc || !rc.can || rc.ready === false || !a || a.status !== "accepted") return "";
+  const st = (rc.status || {})[a.id]; if (!RECRUIT_STATES.includes(st)) return "";
+  const tag = `<span class="tag ${st === "joined" ? "open" : st === "pending" ? "" : "draft"}" data-rc-state="${st}">${T("rc.st." + st)}</span>`;
+  const btn = st === "none" || st === "expired" ? ` <button type="button" class="btn ghost sm" data-act="rc-invite" data-id="${esc(a.id)}"${busy ? " disabled" : ""}>${T(st === "expired" ? "rc.again" : "rc.send")}</button>` : "";
+  return tag + btn;
+}
+
+export function appsHTML(form, apps, questions, canDecide, sel, filter, pending, msg, busy, rc) {
   const shown = filter === "all" ? apps : apps.filter(a => a.status === filter);
   const counts = {};
   for (const s of APP_STATUS) counts[s.v] = apps.filter(a => a.status === s.v).length;
@@ -290,6 +340,7 @@ export function appsHTML(form, apps, questions, canDecide, sel, filter, pending,
             <b>${esc(a.applicant_name)}</b>
             <span class="tag ${st.tag}">${esc(T(st.label))}</span>
             ${a.ticket ? `<span class="tag" data-ticket>${T("apps.ticket", { name: esc(evTicketName(a.ticket)) })}</span>` : ""}
+            ${recruitTagHTML(a, rc, busy)}
           </div>
           <div class="fmeta">${[esc(a.applicant_school || T("apps.noSchool")), esc(a.applicant_grade || ""),
             esc(a.applicant_email), T("apps.submitted", { when: fmtWhen(a.submitted_at) })].filter(Boolean).join("・")}
@@ -317,6 +368,7 @@ export function appsHTML(form, apps, questions, canDecide, sel, filter, pending,
   return formHeadHTML(form, "apps", apps.length)
     + msgHTML(msg)
     + pendingHTML(pending, busy)
+    + recruitPanelHTML(form, rc, busy)
     + sectionHTML("", `<div class="chips" style="margin-bottom:4px">
       <button class="chip wide${filter === "all" ? " on" : ""}" data-act="filter" data-f="all">${T("apps.all")} ${apps.length}</button>
       ${APP_STATUS.map(s => `<button class="chip wide${filter === s.v ? " on" : ""}" data-act="filter" data-f="${s.v}">${esc(T(s.label))} ${counts[s.v]}</button>`).join("")}
@@ -1007,102 +1059,11 @@ function kpiHTML(c) {
   </div>`;
 }
 
-// 你的 team：每個 team 一段，三行：開放中的申請表、資源、Director。
-export function teamBlocksHTML(me, forms, todo) {
-  const t = todo || {};
-  const pres = senior(me);
-  const roster = t.roster || [];
-  const res = t.resources || [];
-  // 2026-10-23 批 4：team 的清單從工作區來（有 apps:X 或 res:X 的 X），不從標籤來。
-  // 盤點抓到 Community Relations 有兩個工作區但沒有人勾那個標籤，整個 team 從這裡消失。
-  const wsTeams = (t.workspaces || []).filter(w => w.active !== false && /^(apps|res):/.test(w.id)).map(w => w.id.replace(/^(apps|res):/, ""));
-  let teams;
-  if (pres) {
-    const set = new Set(wsTeams);
-    for (const p of roster) for (const x of splitTeams(p.team)) set.add(x);
-    for (const f of forms || []) if (f.team) set.add(f.team);
-    for (const r of res) if (r.team) set.add(r.team);
-    teams = [...set].sort((a, b) => a.localeCompare(b));
-  } else {
-    // 自己被派進去的 team（任何等級）加自己勾的標籤。
-    const set = new Set(Object.keys((me && me.ws) || {}).filter(id => /^(apps|res):/.test(id)).map(id => id.replace(/^(apps|res):/, "")));
-    for (const x of splitTeams(me && me.team)) set.add(x);
-    teams = [...set].sort((a, b) => a.localeCompare(b));
-  }
-  // Director 是誰：名單讀得到就從名單；讀不到（或名單上沒有）就從公開團隊頁的職位算，那是公開資料，誰都拿得到。
-  const pubDirs = team => (t.directors || []).filter(d => d.team === team && /director/i.test(String(d.title_en || d.title_zh || ""))).map(nameOf);
-  if (!teams.length) return emptyHTML(T("team.none"), T("team.noneHint"));
-  return `<div class="teamlist">${teams.map(team => {
-    const fs = (forms || []).filter(f => f.team === team);
-    const open = fs.filter(f => f.status === "open");
-    const rec = fs.reduce((n, f) => n + (f.counts ? f.counts.received : 0), 0);
-    const rs = res.filter(r => r.team === team);
-    const pub = rs.filter(r => r.status === "published").length;
-    const fromRoster = roster.filter(p => p.board_role === "director" && splitTeams(p.team).includes(team)).map(nameOf);
-    const dirs = fromRoster.length ? fromRoster : pubDirs(team);
-    const members = roster.filter(p => splitTeams(p.team).includes(team)).length;
-    return `<section class="teamblk">
-      <h3>${esc(team.replace(/\s*Team$/i, ""))}<span class="hint">${members ? T("team.members", { n: members }) : ""}</span></h3>
-      <ul>
-        <li><a href="${withLang("/admin/#forms")}">${T("team.forms")}</a>${T("punct.colon")}${fs.length ? `${T("team.formsSum", { n: fs.length, open: open.length })}${rec ? T("team.formsRec", { n: rec }) : ""}` : T("team.noneYet")}</li>
-        <li><a href="${withLang("/admin/site/#res")}">${T("team.res")}</a>${T("punct.colon")}${rs.length ? T("team.resSum", { n: rs.length, pub }) : T("team.noneYet")}</li>
-        <li>${T("team.director")}${dirs.length ? esc(dirs.join(T("punct.list"))) : T("team.noDirector")}</li>
-        ${RAIL.showPeopleHere(me, "res:" + team) ? `<li><a href="${withLang("/admin/#members=" + encodeURIComponent("res:" + team))}">${T("team.people")}</a></li>` : ""}
-      </ul>
-    </section>`;
-  }).join("")}</div>`;
-}
-
-// 你的存取（2026-10-23 批 4）：一行一個工作區，印人看的名字、等級、一顆直達的按鈕。
-// senior 不列（他本來就全部都有，只印一句）；什麼都沒被派的人看到「找你的 Director 或 Co-President」加各 team 公開的 Director。
-// features 是頂欄那幾項（shared/nav.js 的 FEATURES 經 main.js 翻成 { label, desc, href }），在這裡印一次它們各是什麼。
-export function accessHTML(me, todo, features) {
-  const t = todo || {};
-  const wsList = t.workspaces || [];
-  const title = id => { const w = wsList.find(x => x.id === id); return w ? ((lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || id) : id; };
-  const go = id => {
-    if (id === "intern-passport") return [{ href: "/intern-passport/", label: T("hub.goWall") }, { href: "/admin/passports/#interns", label: T("hub.goAdmin") }];
-    if (id === "passport") return [{ href: "/admin/passports/#cadre", label: T("hub.goAdmin") }];
-    if (id === "apps" || id.startsWith("apps:")) return [{ href: "/admin/#forms", label: T("hub.goForms") }];
-    if (id === "custom:marketing-requests") return [{ href: "/admin/#requests", label: T("hub.goRequests") }];
-    if (id.startsWith("custom:event-")) return [{ href: "/admin/#events/" + encodeURIComponent(id.slice(13)), label: T("hub.goEvent") }];
-    if (id.startsWith("res:")) return [{ href: "/admin/site/#res", label: T("hub.goRes") }];
-    return [];
-  };
-  const feat = (features || []).length ? `<ul class="feat">${features.map(f => `<li><a href="${withLang(f.href)}">${esc(f.label)}</a>${T("punct.colon")}${esc(f.desc)}</li>`).join("")}</ul>` : "";
-  let body;
-  if (senior(me)) body = `<div class="row" style="margin:0 0 6px"><span class="tag open">${T("grid.byRank")}</span><span class="mini">${T(me.board === "senior_adviser" ? "hub.accessSeniorAdviser" : "hub.accessSenior")}</span></div>`;
-  else {
-    const mine = Object.entries((me && me.ws) || {});
-    if (mine.length) {
-      // 照 team 分組（2026-10-24）：一段一個 team，底下是他在那個 team 的東西，名字用長名稱（「實習護照（格子與棋盤）」）。
-      const wsOf = id => wsList.find(x => x.id === id) || { id };
-      const rows = wsRows(mine.map(([id]) => wsOf(id)), [], null).filter(r => r.cells.length);
-      body = `<ul class="flist access">${rows.map(r => `<li><div class="fhead"><b>${esc(r.label)}</b></div>${r.cells.map(w => {
-        const lv = (me.ws || {})[w.id];
-        return `<div class="row"><span>${esc(wsCellLabel(w))}</span><span class="tag">${esc(T("level." + lv))}</span>${go(w.id).map(g => `<a class="btn quiet sm" href="${withLang(g.href)}">${esc(g.label)}</a>`).join("")}</div>`; }).join("")}</li>`).join("")}</ul>
-        <div class="mini">${T("ws.playNote")} ${T("ws.availNote")}</div>`;
-    } else {
-      const byTeam = new Map();
-      for (const d of t.directors || []) if (d.team && /director/i.test(String(d.title_en || d.title_zh || ""))) { if (!byTeam.has(d.team)) byTeam.set(d.team, []); byTeam.get(d.team).push(nameOf(d)); }
-      body = `<div class="note">${T("hub.accessNone")}</div>` + (byTeam.size
-        ? `<ul class="teamblk-dirs">${[...byTeam.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([team, names]) => `<li><b>${esc(team.replace(/\s*Team$/i, ""))}</b>${T("punct.colon")}${esc(names.join(T("punct.list")))}</li>`).join("")}</ul>`
-        : `<div class="mini">${T("hub.accessNoDirs")}</div>`);
-    }
-  }
-  return body + feat;
-}
-
-export function hubHTML(me, pendingAll, canSend, busy, forms, todo, features) {
-  const teams = senior(me) ? [T("rail.allTeams")] : splitTeams(me && me.team);
-  const who = T("hub.who", { name: esc(me && me.name || ""), board: esc(boardName(me && me.board)),
-    teams: teams.length ? esc(teams.join(T("punct.list"))) : T("rail.noTeam") });
-  // 2026-11-14：待辦搬到 /home/（一張照日期排的清單）。這一頁只留「還沒寄出去的信」那一張卡，因為「現在寄出去」那顆鈕在這裡。
+// 還沒寄出去的信（2026-11-26）。以前在「各 team」那一頁，那一頁拿掉之後搬到活動清單最上面：/home/ 的「有信沒寄出去」連到這裡。
+// 沒有待寄的信就完全不畫。「現在寄出去」那一顆是原本的 send-mail-all。
+export function unsentMailHTML(me, forms, pendingAll, todo, canSend, busy) {
   const mail = todoCards(me, forms, pendingAll, todo, canSend, busy).filter(c => c.mail && c.n);
-  return pageHead(T("hub.title"), who)
-    + (mail.length ? sectionHTML(T("hub.todo"), `<div class="todo">${mail.map(kpiHTML).join("")}</div>`, { id: "todo" }) : "")
-    + sectionHTML(T("hub.access"), accessHTML(me, todo, features), { id: "access" })
-    + sectionHTML(T("hub.teams"), teamBlocksHTML(me, forms, todo), { id: "teams" });
+  return mail.length ? sectionHTML(T("hub.todo"), `<div class="todo">${mail.map(kpiHTML).join("")}</div>`, { id: "todo" }) : "";
 }
 
 // 學員或還沒升級的人走到這裡。**不說「你沒有權限」**：他沒有做錯任何事，只是走錯地方。

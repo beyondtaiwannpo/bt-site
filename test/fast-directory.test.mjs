@@ -89,7 +89,7 @@ test("★ 後台活動那一頁：不等待辦那一包，開頁問過的不問�
   const all = boot.slice(boot.indexOf("await Promise.all(["), boot.indexOf("]);", boot.indexOf("await Promise.all([")));
   assert.doesNotMatch(all, /loadTodo/, "待辦那一包不在大家一起等的那一輪裡（裡面的 public_team 正式站一趟一秒多）");
   assert.match(boot, /const todoP = defer \? null : D\.loadTodo\(S\.me\)\.catch\(\(\) => \(\{\}\)\);/);
-  assert.match(boot, /else if \(\/\^\(teams\|home\)\$\/\.test\(hash0\)\) takeTodo\(await todoP\);/, "只有「各 team」那一頁等它");
+  assert.doesNotMatch(boot, /takeTodo\(await todoP\)/, "2026-11-26：「各 team」那一頁拿掉了，沒有任何一頁等它");
   assert.match(boot, /else \{ takeTodo\(\{\}\); todoP\.then\(todo => \{ takeTodo\(todo\); quietRender\(\); \}\); \}/, "其他頁先畫，回來再補");
   // 第二輪（2026-11-26）：開頁就是活動那一頁，先問它自己要的，畫完才問其他的
   assert.match(boot, /const defer = !light && \(\(hash0 === "" && new URLSearchParams\(location\.search\)\.get\("tab"\) !== "forms"\) \|\| \/\^events\(\\\/\|\$\)\/\.test\(hash0\)\);/);

@@ -108,8 +108,13 @@ test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段
   // 2026-11-23：「我的」底下多一段「我的工作區」（ws），一個 team 一行，照人畫，不在 AREAS 裡（test/home-team.test.mjs）。
   assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws", "work", "org"]);
   assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "mypassport", "events", "forms", "marketing", "website", "passports", "people", "records", "money", "venues"]);
-  // 2026-12-26：專案那一行底下是專案、活動、計畫與招募、各 team；場地是整個 BT 的，自己一行。
-  assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events", "forms", "teams"]);
+  // 2026-12-26：專案那一行底下是專案、活動…；場地是整個 BT 的，自己一行。
+  // 2026-11-26：「各 team」拿掉了，「計畫與招募」改叫「幹部招募」搬到「人與權限」底下（被派進申請工作區的人與 Co-President、Senior Adviser 才看得到）。
+  assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events"]);
+  assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), [], "沒被派進申請工作區的幹部，側欄沒有幹部招募");
+  assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "member", team: "", ws: { apps: "edit" } }).map(i => i.key), ["forms"], "被派進申請工作區的人看得到幹部招募，看不到名單");
+  assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "president", senior: true, team: "", ws: {} }).map(i => i.key).slice(0, 3), ["roster", "invites", "forms"]);
+  assert.equal(RAIL.ITEMS.find(i => i.group === "forms" && i.key === "forms").label.en, "Recruitment"); assert.equal(RAIL.ITEMS.find(i => i.key === "teams"), undefined);
   assert.deepEqual(RAIL.visibleItems("venues", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["venues"]);
   const me = { role: "cadre", board: "member", team: "Curriculum Team", name: "a", ws: { "custom:meeting-templates": "edit" } };
   assert.deepEqual(RAIL.visibleItems("calendar", me).map(i => i.label.zh), ["行事曆", "會議", "時間看板", "會議範本"]);
@@ -122,8 +127,8 @@ test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段
   assert.match(h, /class="rail-item rail-area on" href="#home" data-act="tab" data-t="home" aria-current="page"/);
   assert.match(h, /href="#calendar" data-act="tab" data-t="calendar"/);
   assert.ok(!RAIL.railHTML("home", "home", { role: "student", ws: {} }, {}, "zh").includes("rail-area"), "學員沒有側欄的任何一行");
-  // 各 team（以前的待辦）在活動底下
-  assert.equal(RAIL.ITEMS.find(i => i.key === "teams").area, "events");
+  // 各 team（以前的待辦）2026-11-26 拿掉了；幹部招募掛在「人與權限」底下，頁面還是 /admin/ 那一個資料夾
+  assert.equal(RAIL.ITEMS.find(i => i.group === "forms" && i.key === "forms").area, "people");
   assert.ok(!RAIL.ITEMS.some(i => i.area === "todo" || i.area === "meetings"));
 });
 
@@ -152,10 +157,11 @@ test("★ 時間看板與我的護照也有側欄（2026-11-14 Paul：add the si
   assert.match(RAIL.railHTML("passport", "", me, {}, "en"), /rail-area on"[^>]*aria-current="page">/);
 });
 
-test("後台：沒有 # 開活動；#teams 與舊的 #home 開各 team", () => {
+test("後台：沒有 # 開活動；舊的 #teams 與 #home 也開活動（2026-11-26「各 team」那一頁拿掉了）", () => {
   const main = readFileSync("admin/src/main.js", "utf8");
-  assert.match(main, /else if \(!\/\^\(teams\|home\)\$\/\.test\(location\.hash\.slice\(1\)\)\) \{ history\.replaceState\(null, "", location\.pathname \+ location\.search \+ "#events"\); await openTab\("events"\); if \(defer\) secondWave\(\); return; \}/);
-  assert.match(main, /S\.view = \(t === "teams" \|\| t === "home"\) \? "home" : "list"/);
+  assert.match(main, /else \{ history\.replaceState\(null, "", location\.pathname \+ location\.search \+ "#events"\); await openTab\("events"\); if \(defer\) secondWave\(\); return; \}/);
+  assert.match(main, /if \(t === "teams" \|\| t === "home"\) \{ history\.replaceState\(null, "", location\.pathname \+ location\.search \+ "#events"\); return openTab\("events"\); \}/);
+  assert.doesNotMatch(main, /S\.view = [^;]*"home"/, "沒有那一頁了");
   const home = readFileSync("home/src/main.js", "utf8");
   assert.match(home, /RAIL\.shellHTML\(nav, RAIL\.railHTML\("home", tab, rme, \{\}, lang\(\)\)/);
 });

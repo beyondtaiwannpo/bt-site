@@ -317,7 +317,7 @@ export function waitingList(items, ctx) {
     const sn = (w.stories || []).filter(r => !r.story_approved).length; if (sn) push({ kind: "stories", due: null, tag: T("w.stories"), title: T("w.storiesT", { n: sn }), sub: T("w.teamSub"), href: A("/admin/site/#stories") });
     for (const e of evs.filter(x => x.status === "ready")) push({ kind: "ready", due: e.starts_at ? new Date(e.starts_at) : null, tag: T("w.ready"), title: evTitle(e), sub: T("w.readySub"), href: A(`/admin/#events/${e.slug}`) });
     const nt = (w.roster || []).filter(p => !String(p.team || "").trim()).length; if (nt) push({ kind: "roster", due: null, tag: T("w.roster"), title: T("w.rosterT", { n: nt }), sub: T("w.rosterSub"), href: A("/admin/people/#roster") });
-    const mn = (w.stuck || []).length; if (mn) push({ kind: "mail", due: null, tag: T("w.mail"), title: T("w.mailT", { n: mn }), sub: T("w.mailSub"), href: A("/admin/#teams") });
+    const mn = (w.stuck || []).length; if (mn) push({ kind: "mail", due: null, tag: T("w.mail"), title: T("w.mailT", { n: mn }), sub: T("w.mailSub"), href: A("/admin/#events") });
   }
   // 照日期排：有日期的在前、越早越上面；沒有日期的（等核可、回饋）排在後面，照原本的順序。
   return out.map((o, i) => ({ o, i })).sort((a, b) => {

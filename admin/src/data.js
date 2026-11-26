@@ -478,6 +478,9 @@ const SAYS = [
   ["empty_title", "中文標題與英文標題都要填。", "Fill in both the Chinese and English titles."],
   ["bad_category", "分類要選入門、任務或反思。", "Category must be onboarding, project or reflection."],
   ["no_such_term", "找不到這一屆，重新整理再試一次。", "Term not found. Refresh and try again."],
+  ["not_recruitment", "這不是幹部招募的表單，不會寄邀請。", "This is not a recruitment form, so no invite is sent."],
+  ["term_required", "有填職稱就要選屆別。", "Pick a year when you fill in a position."],
+  ["too_many", "一次最多 100 位。", "At most 100 at a time."],
   ["no_such_task", "找不到這一格，重新整理再試一次。", "Box not found. Refresh and try again."],
   ["term_locked", "已經建好的格子不能換屆。要搬到別屆就另外建一格，這一格停用。", "An existing box cannot move to another term. Create a new box there and disable this one."],
   ["has_stamps", "已經有人蓋過這一格，不能刪，只能停用。停用之後他的章還在，新的人不會再看到這一格。", "Someone has already stamped this box, so it can only be disabled, not deleted. Their stamp stays. New people will not see the box."],
@@ -586,6 +589,13 @@ export async function loadEvents() {
 // ── 場地（2026-11-10）────────────────────────────────────────────────
 // 兩張表不開給前端，一律走函式：每一位幹部讀得到，改只有 Co-President 與紀錄工作區的人（2026-12-14-venues.sql）。
 export const attachEventForm = id => rpcV("attach_event_form", { p_event: id });
+// 幹部招募（2026-11-26，2027-01-15-recruitment-invites.sql）。兩支都只有 Co-President 與 Senior Adviser 叫得動。
+// recruitStatus 回 { 申請 id: 狀態 }；資料庫那一支還沒跑就回 null（畫面講要跑哪一支，錄取照舊能按）。
+export const recruitStatus = formId => rpcV("recruit_status", { p_form: formId })
+  .then(rows => { const m = {}; for (const r of rows || []) m[r.id] = r.state; return m; })
+  .catch(e => { if (/recruit_status|Could not find|does not exist/.test(String(e && e.message))) return null; throw e; });
+// 回 { sent, skipped: [{ id, why }] }。
+export const recruitInvite = (ids, set) => rpcV("recruit_invite", { p_ids: ids, p: set });
 // 2026-11-10：活動頁也能標種類與屆別（年度比較靠這兩個），報名的人自動抄進 Records（rc_sync_event，那場看得到就叫得動）。
 export const saveEventMeta = (id, p) => rpcV("rc_save_event_meta", { p_event: id, p });
 export const syncEvent = id => rpcV("rc_sync_event", { p_event: id });

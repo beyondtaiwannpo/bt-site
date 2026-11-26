@@ -6,7 +6,7 @@
 // 狀態只有一個 S，畫面只從 S 產生。**不在事件處理裡直接改 DOM**，一律改 S 再 render() ——
 // 兩條路徑會分岔，而分岔是安靜的（這個 repo 反覆踩到的同一件事）。
 import * as AUTH from "../../shared/auth.js";
-import { navHTML, featuresFor, tx } from "../../shared/nav.js";
+import { navHTML } from "../../shared/nav.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
@@ -103,7 +103,7 @@ function render() {
     body = UI.noticeHTML(S.form, S.apps, S.noticeTo, S.msg, S.busy);
   } else if (S.view === "apps" && S.form) {
     body = UI.appsHTML(S.form, S.apps, S.questions, canEditForm(S.form),
-      S.sel, S.filter, S.pending, S.msg, S.busy);
+      S.sel, S.filter, S.pending, S.msg, S.busy, recruitCtx());
   } else if ((S.view === "form" || S.view === "question") && S.form) {
     body = UI.formHTML(S.form, S.questions, canEditForm(S.form),
       S.me.board === "president" ? S.teams : [], S.msg, S.busy, S.fx);
@@ -126,7 +126,8 @@ function render() {
     body = pj ? UI.projectHTML(pj, S.projects, S.events || [], S.me, S.msg, S.busy, { evTeams: evTeams(), evDraft: S.pjEvDraft, newOpen: !!S.vnOpen["pj-ev-new"], addOpen: !!S.vnOpen["pj-ev-add"] })
               : S.projects === undefined ? UI.skeletonHTML() : UI.emptyHTML(T("pj.none"), "", { act: "pj-back", label: T("pj.back") });
   } else if (S.view === "events") {
-    body = UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"], S.projects);
+    body = UI.unsentMailHTML(S.me, S.forms, S.pendingAll, S.todo, canEdit(), S.busy)
+      + UI.eventsListHTML(S.events || [], S.me, S.teams, S.evDraft, S.msg, S.busy, evTeams(), S.evF, !!S.vnOpen["ev-new"], S.projects);
   } else if (S.view === "event" && S.evSel) {
     const ev = (S.events || []).find(e => e.slug === S.evSel);
     body = ev ? UI.eventEditHTML(ev, ev.form_id ? (S.forms || []).find(f => f.id === ev.form_id) || null : null, S.evSigned, S.me, S.msg, S.busy, S.venues && S.venues.venues, S.terms, S.evLinks, S.evRc, S.projects,
@@ -145,15 +146,11 @@ function render() {
   } else if (S.view === "requests") {
     body = UI.rqSwitchHTML("requests", S.me, S.requests) + UI.requestsQueueHTML(S.requests || [], S.cadres, S.rqF, S.rqSel, UI.canEditWs(S.me, "custom:marketing-requests"), S.msg, S.busy,
       { assignees: S.rqAssignees, today: UI.rqToday(), me: S.me });
-  } else if (S.view === "list") {
+  } else {
+    // 幹部招募（#forms）。2026-11-26 起這是最後一個分支：以前的「各 team」那一頁拿掉了，#teams 與 #home 在 openTab 轉去活動。
     body = UI.listHTML(S.forms, canEdit(), S.msg, isPres(), S.newForm,
       S.teams.length ? S.teams : UI.TEAM_LABELS, S.me.team ? String(S.me.team).split(/[,、;；]/)[0].trim() : "", S.busy,
       UI.mpItems(S.me, "apps", S.workspaces), S.events);
-  } else {
-    // 首頁（批 1 先沿用目錄卡加待寄的信，批 2 換成三塊）。
-    // 頂欄那幾項各是什麼（shared/nav.js 的 FEATURES 本來就有一句 desc，9-08 刪掉選單頁之後沒地方印；總覽印一次）。
-    const features = featuresFor(S.me.role).map(f => ({ label: tx(f.label, lang()), desc: tx(f.desc, lang()), href: f.href }));
-    body = UI.hubHTML(S.me, S.pendingAll, canEdit(), S.busy, S.forms, S.todo, features);
   }
   // 側欄亮哪一行：首頁亮「首頁」，其他全部算在「申請表」底下。
   // 側欄右邊的小數字：待審的申請、等核可的人。**只在 /admin/ 這一組算**（別組沒有 loadTodo），有才顯示。
@@ -168,7 +165,7 @@ function render() {
   };
   // 側欄亮哪一行：總覽、需求單、活動、場地、會議各自亮；活動的報名表亮「活動」，其他申請亮「其他申請」。
   // 從別一區連過來的成員頁（#members=）不屬於這個資料夾的任何一頁，側欄不亮、上面不畫分頁。
-  const tab = (S.view === "members" && S.mp && S.mp.fromLink) ? "" : S.view === "home" ? "teams" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "projects" || S.view === "project") ? "projects" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : (S.form && S.form._pj && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "projects" : "forms";
+  const tab = (S.view === "members" && S.mp && S.mp.fromLink) ? "" : (S.view === "request" || S.view === "requests") ? "request" : (S.view === "events" || S.view === "event") ? "events" : (S.view === "projects" || S.view === "project") ? "projects" : (S.view === "venues" || S.view === "venue") ? "venues" : (S.view === "meetings" || S.view === "meeting") ? "meetings" : S.view === "mtemplates" ? "mtemplates" : (S.form && S.form._ev && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "events" : (S.form && S.form._pj && ["apps", "form", "question", "checkin", "notice"].includes(S.view)) ? "projects" : "forms";
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", tab, S.me, counts), body); UI.railAfter(el);
   UI.afterRender(S, el);
   swapIn(el);
@@ -231,7 +228,7 @@ function paintShell() {
   const el = root();
   if (!el || !S.me) return;
   const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
-  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", /^(teams|home)$/.test(location.hash.slice(1)) ? "teams" : "events", S.me, {}), UI.skeletonHTML()); UI.railAfter(el);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", "events", S.me, {}), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（GitHub Pages 快取 10 分鐘，四個資料夾各一份側欄，哪一份先過期哪一份先換新；
   // Paul 2026-11-06 遇到的「側欄新項目重整就不見」就是這個）。讀到不一樣就在左下角提醒重整。
@@ -301,7 +298,6 @@ async function boot(retried) {
         .then(([pending, rq, mt, todo]) => { S.pendingAll = pending; if (S.requests == null) S.requests = rq; if (S.meetings == null) S.meetings = mt; takeTodo(todo); quietRender(); });
     };
     if (defer) takeTodo({});
-    else if (/^(teams|home)$/.test(hash0)) takeTodo(await todoP);
     else { takeTodo({}); todoP.then(todo => { takeTodo(todo); quietRender(); }); }
     if (!defer) sideJobs();
     // 網址帶 #forms 就直接開申請表清單（側欄從別組連過來、README 的連結都用這個）。
@@ -315,8 +311,8 @@ async function boot(retried) {
     }
     if (location.hash.slice(1) === "forms" || new URLSearchParams(location.search).get("tab") === "forms") S.view = "list";
     else if (/^(requests?|events|projects|venues|meetings|mtemplates|forms\/)(\/|$|[0-9a-f])/.test(location.hash.slice(1))) { await openTab(location.hash.slice(1)); if (defer) secondWave(); return; }
-    // 2026-11-14：/admin/ 沒有 # 的時候開活動（待辦搬到 /home/ 了）。#teams 與舊的 #home 開「各 team」。
-    else if (!/^(teams|home)$/.test(location.hash.slice(1))) { history.replaceState(null, "", location.pathname + location.search + "#events"); await openTab("events"); if (defer) secondWave(); return; }
+    // 2026-11-14：/admin/ 沒有 # 的時候開活動（待辦搬到 /home/ 了）。2026-11-26：「各 team」那一頁拿掉了，舊的 #teams 與 #home 也開活動。
+    else { history.replaceState(null, "", location.pathname + location.search + "#events"); await openTab("events"); if (defer) secondWave(); return; }
     render();
   } catch (e) {
     // 票已經不能用了（帳號被停用、或伺服器換過簽章金鑰）。開機改用本機 session
@@ -691,8 +687,9 @@ async function openTab(t) {
     S.view = m[1] === "request" || !queueOk ? "request" : "requests"; S.msg = ""; S.rqSel = m[1] === "requests" && queueOk ? (m[2] || null) : null;
     await reloadRequests(); render(); return;
   }
-  // 2026-11-14：以前的「待辦」搬到 /home/，這一頁改叫「各 team」（#teams；舊的 #home 也接）。
-  S.view = (t === "teams" || t === "home") ? "home" : "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render();
+  // 2026-11-26：「各 team」那一頁拿掉了。舊的 #teams、#home（信與書籤裡還有）轉去活動；還沒寄出去的信那一張卡搬到活動清單最上面。
+  if (t === "teams" || t === "home") { history.replaceState(null, "", location.pathname + location.search + "#events"); return openTab("events"); }
+  S.view = "list"; S.msg = ""; S.sel = new Set(); await reloadList(); render();
 }
 async function reloadRequests() {
   try {
@@ -892,6 +889,7 @@ async function openApps(id) {
     S.form = form; S.questions = questions;
     S.apps = await D.loadApplications(id);
     S.pending = await D.loadPending(id);
+    await loadRecruit();
     S.sel = new Set(); S.filter = "all"; S.view = "apps"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.open") + D.says(e); }
   render();
@@ -902,7 +900,27 @@ async function openApps(id) {
 async function refreshApps() {
   S.apps = await D.loadApplications(S.form.id);
   S.pending = await D.loadPending(S.form.id);
+  await loadRecruit();
 }
+
+// ── 幹部招募：錄取了就寄邀請（2026-11-26，資料庫 2027-01-15-recruitment-invites.sql）──
+// 這一份表單是招募表（kind 是 board）的時候，審核那一頁多一塊「錄取之後寄的邀請」。寄邀請只有 Co-President 與 Senior Adviser 做得了，
+// 所以其他審核的人照舊能錄取，只是不會寄邀請（那一塊對他們只印一句）。
+// S.rc 是那幾格現在的值（職級、team、屆別、職稱、信的語言），S.rcStatus 是每一筆錄取的申請邀請到哪了（null 是資料庫那一支還沒跑）。
+const isRecruit = () => !!S.form && S.form.kind === "board";
+function recruitCtx() {
+  if (!isRecruit()) return null;
+  if (!S.me.senior) return { can: false };
+  // team 那一格只列那六個 team（S.teams 是大家勾的標籤，會有「A Team, B Team」這種兩個一起的）。
+  return { can: true, ready: S.rcStatus !== null, status: S.rcStatus || {}, set: S.rc, terms: S.terms || [], teams: UI.TEAM_LABELS };
+}
+async function loadRecruit() {
+  if (!isRecruit() || !S.me.senior) { S.rcStatus = undefined; return; }
+  if (!S.terms) S.terms = await D.loadTerms().catch(() => []) || [];
+  if (!S.rc || S.rcFor !== S.form.id) { S.rc = UI.recruitDefaults(S.form, S.terms); S.rcFor = S.form.id; }
+  S.rcStatus = await D.recruitStatus(S.form.id).catch(() => ({}));
+}
+const recruitOn = () => isRecruit() && !!S.me.senior && S.rcStatus !== null && S.rcStatus !== undefined;
 
 async function reloadList() {
   try {
@@ -1801,13 +1819,23 @@ document.addEventListener("click", async e => {
     const ids = [...S.sel];
     if (!ids.length) return;
     const word = UI.decideWord(status);
+    // 幹部招募的表單按「錄取」（2026-11-26）：錄取完接著寄邀請。那幾格先看過，不要錄取了才發現邀請寄不出去。
+    const invite = status === "accepted" && recruitOn() ? UI.recruitPatch(S.rc) : null;
+    if (invite && (invite.title_en || invite.title_zh) && !invite.term) { S.msg = T("err.change") + D.says("term_required"); render(); return; }
     // ⚠ **這一步會寄信給未成年人，而且收不回來。** 所以要確認，
     // 而且確認的句子裡要有人數與動作，不是一句「確定嗎」。
-    if (UI.needAsk(S, b, T("confirm.decide", { n: ids.length, word }))) return;
+    if (UI.needAsk(S, b, invite ? T("confirm.decideInvite", { n: ids.length, rank: UI.boardName(invite.rank), term: invite.term || "" })
+                                : T("confirm.decide", { n: ids.length, word }))) return;
     S.busy = true; S.msg = ""; render();
     try {
       const n = await D.decide(ids, status);
       syncRecords();
+      // 邀請排在寄信之前，下面那一次寄信會把錄取信與邀請信一起寄出去。邀請沒排成不影響錄取（已經錄取了），講清楚哪一半沒做成。
+      let rcNote = "", rcErr = "";
+      if (invite) {
+        try { rcNote = UI.recruitResultNote(await D.recruitInvite(ids, invite)) || T("rc.none"); }
+        catch (re) { rcErr = T("err.rcInvite") + D.says(re); }
+      }
       // 改完立刻試著把信寄出去。失敗不影響狀態（狀態已經改好了），
       // 只會留在 outbox 裡，畫面上看得到。
       let mailNote = "";
@@ -1821,10 +1849,28 @@ document.addEventListener("click", async e => {
       S.sel = new Set();
       await refreshApps();
       S.busy = false;
-      S.msg = T("msg.decided", { n, word, note: mailNote });
+      S.msg = rcErr || T("msg.decided", { n, word, note: mailNote + rcNote });
     } catch (err) {
       S.busy = false; S.msg = T("err.change") + D.says(err);
     }
+    render();
+    return;
+  }
+
+  // 幹部招募：一筆已經錄取、還沒寄邀請（或邀請過期了）的申請，單獨寄一封。例如別的審核的人錄取的，或 30 天過了。
+  if (act === "rc-invite") {
+    if (!recruitOn()) return;
+    const a = (S.apps || []).find(x => x.id === id); if (!a) return;
+    const invite = UI.recruitPatch(S.rc);
+    if ((invite.title_en || invite.title_zh) && !invite.term) { S.msg = T("err.change") + D.says("term_required"); render(); return; }
+    if (UI.needAsk(S, b, T("confirm.rcInvite", { name: a.applicant_name || "", rank: UI.boardName(invite.rank), term: invite.term || "" }))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const res = await D.recruitInvite([id], invite);
+      try { await D.sendMail(); } catch (me) { /* 信留在待寄的那一塊，畫面上看得到 */ }
+      await refreshApps();
+      S.busy = false; S.msg = T("msg.rcOne", { note: UI.recruitResultNote(res) || T("rc.none") });
+    } catch (err) { S.busy = false; S.msg = T("err.change") + D.says(err); }
     render();
     return;
   }
@@ -1987,6 +2033,8 @@ window.addEventListener("popstate", () => { if (S.me) { S.msg = ""; openTab(loca
 
 // 成員分頁的等級下拉（2026-10-23 批 3）：改了就送，toast 帶復原（送回原等級）。
 document.addEventListener("change", async e => {
+  // 幹部招募那幾格（2026-11-26）：改了就記在 S.rc，重畫之後還在；不用存，按「錄取」或「寄邀請」的時候才用。
+  if (S.view === "apps" && e.target && e.target.dataset && e.target.dataset.rc && S.rc) { S.rc = Object.assign({}, S.rc, { [e.target.dataset.rc]: e.target.value }); return; }
   // 活動頁的照片（2026-11-23）：選了檔案就傳。
   if (S.view === "event" && e.target && e.target.id === "ev-cover-file") { const f = (e.target.files || [])[0]; if (f) await uploadEventCover(e.target.dataset.id, f); return; }
   if (S.view === "event" && e.target && e.target.id === "ev-photo-files") { const fs = Array.from(e.target.files || []); if (fs.length) await uploadEventPhotos(e.target.dataset.id, fs); return; }

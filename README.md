@@ -758,7 +758,7 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 | 段 | 裡面有什麼 |
 |---|---|
 | 我的 | 首頁、行事曆（底下分頁：行事曆、會議、時間看板、會議範本）、我的護照 |
-| BT | 活動（多一個分頁「各 team」）、表單、行銷、對外網站、護照 |
+| BT | 活動（「各 team」那個分頁 2026-11-26 拿掉了）、表單、行銷、對外網站、護照 |
 | 組織 | 人與權限、紀錄、錢 |
 
 - 進不去的那一行照舊不畫。學員與 intern 沒有側欄。
@@ -779,6 +779,8 @@ Paul 2026-11-14 說「do the new menu and merged home next」，這是後台重�
 | 團隊頁、校友故事等核可，活動等上線，寄不出去的信，名單上沒填 team 的人 | Co-President、Senior Adviser | 各自那一頁 |
 
 清單底下是「接下來」（60 天內你會到的會與活動）、「我的護照」（蓋了幾格、一共幾格的進度條）、「我帶的 mentee」。右上角一顆「跟 Marketing 提需求」，以前那一排「我要…」的捷徑拿掉了，那些都在側欄。
+
+（2026-11-26 更新：「各 team」這一頁拿掉了，還沒寄出去的信那一張卡搬到活動清單最上面，見「幹部招募搬到人與權限底下」。下面這一段是當時的樣子。）
 
 **後台的「總覽」改叫「各 team」**，放在活動底下的最後一個分頁（`/admin/#teams`，舊的 `#home` 也接）。只剩三塊：還沒寄出去的信（「現在寄出去」那顆鈕在這裡，所以留著）、你的存取、你的 team。`/admin/` 沒有 `#` 的時候直接開活動。
 
@@ -865,7 +867,7 @@ Paul 2026-11-23：「I don't want my members to be confused if they're in two wo
 
 **還沒做的**：
 
-- 後台「專案 → 各 team」那一頁（你的存取、你的 team）還在，內容跟 team 的頁有一部分重複。之後可以把「你的 team」那一塊拿掉，或改成連到 team 的頁。
+- （2026-11-26：這一頁拿掉了。）後台「專案 → 各 team」那一頁（你的存取、你的 team）還在，內容跟 team 的頁有一部分重複。之後可以把「你的 team」那一塊拿掉，或改成連到 team 的頁。
 - 在專案頁或活動頁的時候，側欄亮的是「BT → 專案」，不是那個 team 的那一行。
 - 「設定裡勾的 team」跟「被派進的工作區」不一樣的人，側欄會看到淡框的「看」。上線前最好先列一張兩邊不一樣的人的名單（要看正式站的資料）。
 - 沒被開進去的專案，名字與活動內容每一位幹部都看得到（唯讀）。這是原本就這樣，要不要連名字都藏起來是另一件事，會動到可見範圍，要 Paul 明說才做。
@@ -6093,6 +6095,88 @@ Paul：「right now home is just a combination of every pages we have… I want 
 - 「我們做什麼」三行的順序與連結在 `index.html` 的 `<section class="what">`，一行一個 `<a class="wrow">`。
 - 數字只能用事實資料庫裡有的（`~/Anson/wiki/entities/beyond-taiwan.md`）。
 - 沒有遷移檔，資料庫沒動。本機看過中英兩版、桌機與手機寬度。
+
+## 幹部招募搬到人與權限底下；「各 team」那一頁拿掉；錄取了就寄邀請（2026-11-26）
+
+Paul 看後台「專案」底下的兩頁（「計畫與招募」與「各 team」）：
+「when I click into projects, I think these tools are kind of useless. First of all, teams can be moved to roster, or we don't even need them…
+when I first designed this, I had that program and recruitment to recruit our board member. Like, it should be a separated form… is there a better way to do what I said, the board recruitment stuff?」
+Claude 給了三點建議，他說在這個 session 做；錄取要接到哪裡問了他一次，他選「Fully automatic」（錄取的那一下，邀請碼建好、邀請信寄出去）。
+
+### 側欄變成怎樣
+
+| 以前 | 現在 |
+|---|---|
+| 專案 → 專案、活動、計畫與招募、各 team | 專案 → 專案、活動 |
+| 人與權限 → 幹部名單、邀請新的人、工作區… | 人與權限 → 幹部名單、邀請新的人、**幹部招募**、工作區… |
+
+- **「各 team」那一頁拿掉了。** 它只能看、不能改：你的存取（首頁本來就有）、每個 team 幾份表單幾條資源、Director 是誰。
+  舊的網址 `/admin/#teams` 與 `#home` 會轉到活動那一頁。
+  - 那一頁上唯一有功能的一張卡，**還沒寄出去的信**（有一顆「現在寄出去」），搬到活動清單最上面，有信沒寄才會出現。首頁的「有信沒寄出去」連到那裡。
+  - team 的人數與 Director 搬到**幹部名單**：篩了一個 team，搜尋框底下多一行「Curriculum：8 人。Director：某某」。
+  - team 這個概念沒有動：權限、對外的團隊頁、活動都還是照 team。拿掉的只有那一頁。
+  - 一般幹部（不是 Co-President 或 Senior Adviser）看不到幹部名單，所以他們現在沒有一頁列出「我被派進哪些工作區」。側欄的「我的工作區」還是看得到自己的 team 與等級。
+- **「計畫與招募」改叫「幹部招募」，搬到「人與權限」底下。** 頁面還是 `/admin/#forms` 那一頁（程式在 `admin/src/`），只是 `shared/rail.js` 那一行的 `area` 從 `events` 改成 `people`。
+  - 側欄上看得到這一行的人：被派進「申請」工作區的人，加 Co-President 與 Senior Adviser（以前是每一位幹部）。誰讀得到申請照舊是資料庫決定，這一次沒有動。
+  - 這一頁只列幹部招募的表單（`forms.kind = 'board'`），從這裡開的新表單固定是這一種，不用再選種類。
+  - 活動與計畫的報名表本來就在那場活動的頁面裡（2026-11-10），所以這一頁不再列它們。
+  - 不是招募、也沒有綁活動的舊申請表放在這一頁最下面一段「沒有綁活動的舊申請表」，有才印。正式站現在一份都沒有。新的不會再從這裡開。
+
+### 錄取了就寄邀請
+
+一份幹部招募的表單，審核那一頁上面多一塊「錄取之後寄的邀請」，六格：職級（Associate、Adviser、Director）、Team、屆別、職稱（英文、中文）、邀請信的語言。
+
+1. Co-President 或 Senior Adviser 勾人、按「錄取」。確認的那一句會寫清楚：每一個人會收到錄取信，再收到一封邀請信（職級、屆別）。
+2. 那一下做三件事：標成錄取（原本的 `decide_applications`）、每一位建一組綁著他 email 的邀請碼（新的 `recruit_invite`）、兩封信一起寄出去。
+3. 職稱有填的話，幹部名單上會先放好他那一屆的職位（沒有帳號的一筆）。
+4. 他點信裡的連結、登入、用了那一組碼，帳號才從學員變成幹部，職級是邀請時定的那一個。**在那之前他還是學員。**
+5. 每一筆錄取的申請後面有一顆狀態：邀請寄出去了、已經是幹部、邀請過期了、已經在名單上、還沒寄邀請。還沒寄或過期的那幾筆多一顆「寄邀請」。
+
+**誰做得了什麼，沒有變的與要知道的：**
+
+- **誰能寄邀請沒有變**，還是只有 Co-President 與 Senior Adviser（資料庫的門是 `require_senior`，跟「邀請新的人」那一頁同一道）。
+  Paul 選的那個選項寫的是「會改到誰能建邀請」，做的時候發現不用改：別的審核的人照舊能錄取，只是他們錄取的人會停在「還沒寄邀請」，等 Co-President 或 Senior Adviser 按「寄邀請」。
+- 只認幹部招募的表單，而且只認已經錄取的申請。活動報名表、給高中生的計畫，錄取了不會寄邀請。
+- 這裡邀不了 Co-President 與 Senior Adviser 這兩個職級，那兩個照舊從「邀請新的人」邀。
+- 邀請碼跟原本的一樣：一組用一次、30 天到期、綁 email（別的帳號用不了）、可以在「邀請新的人」那一頁重寄或撤銷。
+- 跟原本寄邀請唯一不一樣的地方：申請的人本來就有帳號（登入才能送申請），原本的 `invite_person` 遇到有帳號的 email 會擋，這一支不擋。
+  他用自己的帳號登入、用那一組碼升成幹部，`claim_invite` 本來就是這樣做的。
+- 會跳過、並且在畫面上講原因的：已經是幹部、已經有一封還有效的邀請、**他的帳號已經在名單上（例如校友回來應徵）**、email 在名單上對到兩筆。
+  校友那一種這一版不處理，要到幹部名單改他的身分。
+- 錄取信與邀請信是兩封。錄取信是原本那一封（信的文字在「對外網站 → 信的文字」），邀請信是原本的邀請信。
+
+### 資料庫（要 Paul 在正式的 Supabase 跑）
+
+`supabase/migrations/2027-01-15-recruitment-invites.sql`，檔直接交給他了。兩支新的函式：`recruit_invite(申請的 id 們, 設定)` 與 `recruit_status(表單)`。
+沒有新的表、沒有新的欄位、沒有動 RLS；`decide_applications`、`invite_person`、`claim_invite`、`queue_invite_mail` 一行都沒改。可以重跑，最後印 PASS / FAIL 表。
+
+- 網站可以先 push，再跑這一支，順序反過來也可以。還沒跑之前，那一塊會寫「要先跑 2027-01-15-recruitment-invites.sql」，按錄取只會寄錄取信，其他都照常。
+
+### 改了哪些檔
+
+- `shared/rail.js`：`ITEMS` 少一行（各 team）、一行搬家改名（幹部招募）。沒有新增 shared 的檔。
+- `admin/src/ui.js`：`hubHTML`、`teamBlocksHTML`、`accessHTML` 三支拿掉，留一支 `unsentMailHTML`；`listHTML` 改成招募那一頁；
+  新的 `recruitPanelHTML`（那六格）、`recruitTagHTML`（狀態與「寄邀請」）、`recruitPatch`、`recruitDefaults`、`recruitResultNote`。
+- `admin/src/main.js`：`#teams`、`#home` 轉到活動；`decide` 那一段在招募表按錄取時接著叫 `recruit_invite`；新的 `rc-invite`；那六格改了就記在 `S.rc`。
+- `admin/src/data.js`：`recruitStatus`、`recruitInvite`。`admin/src/strings.js`：`rc.*` 那一組，舊的 `hub.*`、`team.*` 二十九句拿掉。
+- `admin/people/src/ui.js`：幹部名單那一行 team 的人數與 Director。`home/src/ui.js`：「有信沒寄出去」連到活動那一頁。
+
+### 還沒做、要知道的
+
+- **正式站上「Marketing」出現兩次的原因找到了，還沒改**：有一條資源的 team 寫的是 `Marketing`，不是 `Marketing Team`。「各 team」那一頁拿掉之後看不到這個現象了，
+  但那一條資源還是掛在一個不存在的 team 名字上。在「對外網站 → 資源庫」打開那一條，把 team 重選一次就好。
+- 校友回來應徵幹部（帳號已經在名單上）這一版會跳過，沒有自動的路。
+- 招募表上沒有「這一份招的是哪幾個職位」的設定。那六格是按錄取的那個人當下填的，一批人職稱不一樣就分批錄取。
+- 計畫的報名表「從計畫的頁面開」：計畫 2026-12-31 起就是一種活動，活動頁本來就有開報名表的那一顆，所以這一點沒有新東西要做。
+- 真的信沒有寄過（本機寄不出信）。真的手機、Safari、Firefox 沒看過。
+
+### 怎麼驗證
+
+1. 側欄：「專案」底下只有專案與活動；「人與權限」底下多一行「幹部招募」。打 `/admin/#teams` 會到活動那一頁。
+2. 人與權限 → 幹部名單 → 篩選 → 選一個 team，搜尋框底下多一行人數與 Director。
+3. 跑完那一支之後：人與權限 → 幹部招募 → 開一份招募表、開放 → 用另一個學員帳號送一份申請 → 回來勾他、填職稱、按錄取。
+   他應該收到兩封信；幹部名單上多一筆他（沒有帳號）；那一筆申請後面寫「邀請寄出去了」。他用信裡的連結登入之後，變成「已經是幹部」。
+4. 測試：`node --test test/*.test.mjs`；`./scripts/db/smoke.sh` 最後一段 33 項（含本人真的用那一組碼變成幹部、別的帳號用不了、一個破壞測試）。
 
 ## 講者的照片跟著名單走（2026-11-26）
 

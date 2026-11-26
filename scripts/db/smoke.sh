@@ -5150,5 +5150,98 @@ chkas "${PHE}" "裝回去之後，沒對外那一位的照片又看不到了" "F
 psql -d "${DB}" -X -A -t -q -c "delete from public.events where id = '${PHEV}'; delete from public.people where id::text like 'aaaa0114-%'; delete from public.assignments where user_id::text like 'aaaa0114-%'; delete from public.profiles where id::text like 'aaaa0114-%'; delete from auth.users where id::text like 'aaaa0114-%';" >/dev/null 2>&1 || true
 chk "（收尾）這一段開的活動、講者、人都不在了" "0|0|0" "select (select count(*) from public.events where slug = 'ph-smoke')||'|'||(select count(*) from public.event_speakers where display_name in ('FromPeople','OwnWins','Typed','Forgotten','Hidden'))||'|'||(select count(*) from public.people where id::text like 'aaaa0114-%')"
 echo
+echo "── 幹部招募：錄取了就寄邀請（2027-01-15-recruitment-invites.sql）──"
+# Paul 2026-11-26：「it's recruiting for our board members… is there a better way」，他選錄取就把邀請碼建好、邀請信寄出去。
+# 這一段自己建：一份招募表、一份不是招募的表、一個審得了申請但不是 senior 的幹部（RQR）、六個申請的人。
+RQF=supabase/migrations/2027-01-15-recruitment-invites.sql
+RQR=aaaa0115-0000-0000-0000-000000000001
+RQA1=aaaa0115-0000-0000-0000-0000000000a1
+RQA2=aaaa0115-0000-0000-0000-0000000000a2
+RQA3=aaaa0115-0000-0000-0000-0000000000a3
+RQA4=aaaa0115-0000-0000-0000-0000000000a4
+RQC=aaaa0115-0000-0000-0000-0000000000c1
+RQL=aaaa0115-0000-0000-0000-0000000000d1
+RQFB=aaaa0115-0000-0000-0000-0000000000f1
+RQFP=aaaa0115-0000-0000-0000-0000000000f2
+RQTERM=$(psql -d "${DB}" -X -A -t -q -c "select id from public.terms order by starts_on desc limit 1" | tr -d ' \n')
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${RQR}','rq-review@example.com'), ('${RQA1}','rq-a1@example.com'), ('${RQA2}','rq-a2@example.com'),
+  ('${RQA3}','rq-a3@example.com'), ('${RQA4}','rq-a4@example.com'), ('${RQC}','rq-c@example.com'), ('${RQL}','rq-l@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values
+  ('${RQR}','招募審','Recruit Reviewer','Curriculum Team','cadre','member'),
+  ('${RQA1}',null,'Apply One',null,'student','member'), ('${RQA2}',null,'Apply Two',null,'student','member'),
+  ('${RQA3}',null,'Apply Three',null,'student','member'), ('${RQA4}',null,'Apply Four',null,'student','member'),
+  ('${RQC}',null,'Already Cadre','Curriculum Team','cadre','member'), ('${RQL}',null,'Old Alum',null,'alumni','member');
+insert into public.assignments (user_id, workspace_id, level) values ('${RQR}','apps','edit') on conflict (user_id, workspace_id) do update set level = excluded.level;
+-- 校友的帳號一建好，名單上就會有他那一筆（profiles 上的 trigger）；沒有的話補一筆。
+insert into public.people (name_en, profile_id) select 'Old Alum','${RQL}' where not exists (select 1 from public.people where profile_id = '${RQL}');
+insert into public.people (name_en, email, kind) values ('Apply Three (old record)','RQ-A3@example.com','student');
+insert into public.forms (id,team,kind,title,status) values ('${RQFB}','Curriculum Team','board','RQSMOKE 幹部招募','open'), ('${RQFP}','Curriculum Team','program','RQSMOKE 計畫','open');
+insert into public.applications (id, form_id, user_id, applicant_name, applicant_email, status) values
+  ('aaaa0115-0000-0000-0000-0000000001a1','${RQFB}','${RQA1}','Apply One','rq-a1@example.com','accepted'),
+  ('aaaa0115-0000-0000-0000-0000000001a2','${RQFB}','${RQA2}','Apply Two','rq-a2@example.com','received'),
+  ('aaaa0115-0000-0000-0000-0000000001a3','${RQFB}','${RQA3}','Apply Three','rq-a3@example.com','accepted'),
+  ('aaaa0115-0000-0000-0000-0000000001a4','${RQFB}','${RQA4}','Apply Four','rq-a4@example.com','received'),
+  ('aaaa0115-0000-0000-0000-0000000001c1','${RQFB}','${RQC}','Already Cadre','rq-c@example.com','accepted'),
+  ('aaaa0115-0000-0000-0000-0000000001d1','${RQFB}','${RQL}','Old Alum','rq-l@example.com','accepted'),
+  ('aaaa0115-0000-0000-0000-0000000002a1','${RQFP}','${RQA1}','Apply One','rq-a1@example.com','accepted');
+SQL
+rq1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RQF}" 2>&1 || true)
+if echo "${rq1}" | grep -q "OVERALL.*PASS" && ! echo "${rq1}" | grep -q "|FAIL"; then echo "  ok   招募邀請那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 招募邀請那一支驗收表：${rq1}" | head -20; fail=$((fail+1)); fi
+rq2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RQF}" 2>&1 || true)
+if echo "${rq2}" | grep -q "OVERALL.*PASS" && ! echo "${rq2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${rq2}" | head -20; fail=$((fail+1)); fi
+RQSET="{\"rank\":\"adviser\",\"title_en\":\"Curriculum Adviser\",\"title_zh\":\"課程顧問\",\"team\":\"Curriculum Team\",\"term\":\"${RQTERM}\",\"lang\":\"en\"}"
+RQALL="array['aaaa0115-0000-0000-0000-0000000001a1','aaaa0115-0000-0000-0000-0000000001a2','aaaa0115-0000-0000-0000-0000000001c1','aaaa0115-0000-0000-0000-0000000001d1']::uuid[]"
+chkraise "★ 審得了申請但不是 senior 的幹部寄不了邀請（not_senior）" "not_senior" "perform set_config('test.uid','${RQR}',true); perform public.recruit_invite(${RQALL}, '${RQSET}'::jsonb);"
+chkraise "★ 他也讀不到邀請的狀態（not_senior）" "not_senior" "perform set_config('test.uid','${RQR}',true); perform public.recruit_status('${RQFB}');"
+chkraise "學員也不行（not_senior）" "not_senior" "perform set_config('test.uid','${RQA1}',true); perform public.recruit_invite(${RQALL}, '${RQSET}'::jsonb);"
+rqanon=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.recruit_invite(${RQALL}, '${RQSET}'::jsonb);" 2>&1 || true)
+if echo "${rqanon}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到"; pass=$((pass+1)); else echo "  FAIL ★ 沒登入叫得到：${rqanon}"; fail=$((fail+1)); fi
+chkraise "★ 不是幹部招募的表單，錄取了也不寄邀請（not_recruitment）" "not_recruitment" "perform set_config('test.uid','${PAUL}',true); perform public.recruit_invite(array['aaaa0115-0000-0000-0000-0000000002a1']::uuid[], '${RQSET}'::jsonb);"
+chkraise "★ 這裡邀不了 Co-President（bad_role）" "bad_role" "perform set_config('test.uid','${PAUL}',true); perform public.recruit_invite(${RQALL}, '{\"rank\":\"president\"}'::jsonb);"
+chkraise "有職稱沒有屆別擋（term_required）" "term_required" "perform set_config('test.uid','${PAUL}',true); perform public.recruit_invite(${RQALL}, '{\"rank\":\"member\",\"title_en\":\"X\"}'::jsonb);"
+chkraise "屆別不存在擋（no_such_term）" "no_such_term" "perform set_config('test.uid','${PAUL}',true); perform public.recruit_invite(${RQALL}, '{\"rank\":\"member\",\"title_en\":\"X\",\"term\":\"1999-00\"}'::jsonb);"
+chk "到這裡一組邀請碼都還沒有" "0" "select count(*) from public.invite_codes where email like 'rq-%@example.com'"
+chkas "${PAUL}" "★ Co-President 一次送四筆：錄取的那一位寄了；還沒錄取、已經是幹部、已經在名單上的各自跳過並講原因" "1|not_accepted,already_cadre,on_roster" \
+  "select (r->>'sent')||'|'||(select string_agg(x->>'why', ',' order by n) from jsonb_array_elements(r->'skipped') with ordinality y(x, n)) from public.recruit_invite(${RQALL}, '${RQSET}'::jsonb) r"
+chk "★ 邀請碼：幹部、adviser、綁他的 email、一次、30 天、信用英文、掛在一筆名單紀錄上" "cadre|adviser|1|true|en|true" \
+  "select grants||'|'||rank||'|'||uses_left||'|'||(expires_at > now() + interval '29 days' and expires_at < now() + interval '31 days')::text||'|'||lang||'|'||(person_id is not null)::text from public.invite_codes where email = 'rq-a1@example.com'"
+chk "名單上多一筆他（還沒有帳號），那一屆的職位先放好了" "ApplyOne|true|CurriculumAdviser|課程顧問|CurriculumTeam" \
+  "select pe.name_en||'|'||(pe.profile_id is null)::text||'|'||po.title_en||'|'||po.title_zh||'|'||po.team from public.people pe join public.positions po on po.person_id = pe.id where pe.email = 'rq-a1@example.com' and po.term_id = '${RQTERM}'"
+chk "★ 他的帳號還是學員（這一支不直接改任何人的角色）" "student|member" "select role||'|'||board_role from public.profiles where id = '${RQA1}'"
+chk "邀請信排進去了，寄給他，英文" "1|en" "select count(*)||'|'||min(lang) from public.mail_outbox where kind = 'invite' and to_email = 'rq-a1@example.com'"
+chk "跳過的那三位沒有邀請碼、沒有信" "0|0" "select (select count(*) from public.invite_codes where email in ('rq-a2@example.com','rq-c@example.com','rq-l@example.com'))||'|'||(select count(*) from public.mail_outbox where kind = 'invite' and to_email in ('rq-a2@example.com','rq-c@example.com','rq-l@example.com'))"
+chkas "${PAUL}" "再按一次：已經有一封還有效的，不會寄第二封" "0|invite_pending|1" \
+  "select (r->>'sent')||'|'||(r->'skipped'->0->>'why')||'|'||(select count(*) from public.invite_codes where email = 'rq-a1@example.com') from public.recruit_invite(array['aaaa0115-0000-0000-0000-0000000001a1']::uuid[], '${RQSET}'::jsonb) r"
+chkas "${PAUL}" "★ email 對得上名單裡一筆還沒有帳號的舊紀錄（大小寫不同也算）：掛上去，不建第二筆" "1|1" \
+  "select (r->>'sent')||'|'||(select count(*) from public.people where lower(email) = 'rq-a3@example.com') from public.recruit_invite(array['aaaa0115-0000-0000-0000-0000000001a3']::uuid[], '{\"rank\":\"member\"}'::jsonb) r"
+chk "沒給職稱就不放職位；職級是 member" "0|member" "select (select count(*) from public.positions po join public.people pe on pe.id = po.person_id where lower(pe.email) = 'rq-a3@example.com')||'|'||(select rank from public.invite_codes where email = 'rq-a3@example.com')"
+chkas "${PAUL}" "★ 邀請的狀態：寄出去的兩位是 pending，已經是幹部的是 joined，校友是 on_roster；還沒錄取的不在裡面" "pending,pending,joined,on_roster" \
+  "select string_agg(x->>'state', ',' order by case x->>'id' when 'aaaa0115-0000-0000-0000-0000000001a1' then 1 when 'aaaa0115-0000-0000-0000-0000000001a3' then 2 when 'aaaa0115-0000-0000-0000-0000000001c1' then 3 else 4 end) from jsonb_array_elements(public.recruit_status('${RQFB}')) x"
+RQCODE=$(psql -d "${DB}" -X -A -t -q -c "select code from public.invite_codes where email = 'rq-a1@example.com'" | tr -d ' \n')
+chkraise "★ 別的帳號拿這一組碼用不了（invite_wrong_email）" "invite_wrong_email" "perform set_config('test.uid','${RQA2}',true); perform public.claim_invite('${RQCODE}');"
+chkas "${RQA1}" "★ 本人登入用了那一組碼：變成幹部" "upgraded" "select public.claim_invite('${RQCODE}')"
+chk "★ 他的帳號現在是幹部、職級是邀請時定的、名單那一筆歸他、碼用掉了" "cadre|adviser|true|0" \
+  "select pr.role||'|'||pr.board_role||'|'||(select profile_id = '${RQA1}' from public.people where email = 'rq-a1@example.com')::text||'|'||(select uses_left from public.invite_codes where code = '${RQCODE}') from public.profiles pr where pr.id = '${RQA1}'"
+chkas "${PAUL}" "用了之後狀態變成 joined" "joined" "select x->>'state' from jsonb_array_elements(public.recruit_status('${RQFB}')) x where x->>'id' = 'aaaa0115-0000-0000-0000-0000000001a1'"
+chkas "${RQR}" "審得了申請的人照舊錄取得了（錄取那一支沒有動）" "1" "select public.decide_applications(array['aaaa0115-0000-0000-0000-0000000001a4']::uuid[], 'accepted')"
+chk "★ 他錄取的那一位沒有邀請碼（錄取本身不寄邀請，要 Co-President 或 Senior Adviser 寄）" "accepted|0" \
+  "select (select status from public.applications where id = 'aaaa0115-0000-0000-0000-0000000001a4')||'|'||(select count(*) from public.invite_codes where email = 'rq-a4@example.com')"
+chkas "${PAUL}" "那一位的狀態是 none，等人寄" "none" "select x->>'state' from jsonb_array_elements(public.recruit_status('${RQFB}')) x where x->>'id' = 'aaaa0115-0000-0000-0000-0000000001a4'"
+# 破壞測試：把寄邀請那一支的門拿掉，驗收表要變紅，審申請的人也真的寄得出去
+BROKEN=$(mktemp)
+awk 'BEGIN{n=0} /^  perform public\.require_senior\(\);$/ && n==0 {n=1; next} {print}' "${RQF}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${RQF}"; then echo "  FAIL 破壞測試沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^1|.*|FAIL"; then echo "  ok   ★ 破壞測試：寄邀請那一支沒有門，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試驗收表沒有變紅"; fail=$((fail+1)); fi
+chkas "${RQR}" "破壞之後，不是 senior 的人真的寄得出邀請（所以那一道門是有用的）" "1" "select (public.recruit_invite(array['aaaa0115-0000-0000-0000-0000000001a4']::uuid[], '{\"rank\":\"member\"}'::jsonb))->>'sent'"
+rm -f "${BROKEN}"
+rq3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RQF}" 2>&1 || true)
+if echo "${rq3}" | grep -q "OVERALL.*PASS" && ! echo "${rq3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS"; echo "${rq3}" | head -8; fail=$((fail+1)); fi
+chkraise "裝回去之後，不是 senior 的人又寄不了" "not_senior" "perform set_config('test.uid','${RQR}',true); perform public.recruit_invite(${RQALL}, '${RQSET}'::jsonb);"
+# 收乾淨
+psql -d "${DB}" -X -A -t -q -c "delete from public.mail_outbox where to_email like 'rq-%@example.com'; delete from public.invite_uses where user_id::text like 'aaaa0115-%'; delete from public.invite_codes where email like 'rq-%@example.com'; delete from public.applications where form_id in ('${RQFB}','${RQFP}'); delete from public.forms where id in ('${RQFB}','${RQFP}'); delete from public.people where lower(email) like 'rq-%@example.com' or profile_id::text like 'aaaa0115-%'; delete from public.assignments where user_id::text like 'aaaa0115-%'; delete from public.passports where id::text like 'aaaa0115-%'; delete from public.role_changes where target::text like 'aaaa0115-%'; delete from public.profiles where id::text like 'aaaa0115-%'; delete from auth.users where id::text like 'aaaa0115-%';" >/dev/null 2>&1 || true
+chk "（收尾）這一段開的表單、申請、邀請碼、人都不在了" "0|0|0|0" "select (select count(*) from public.forms where title like 'RQSMOKE%')||'|'||(select count(*) from public.applications where applicant_email like 'rq-%@example.com')||'|'||(select count(*) from public.invite_codes where email like 'rq-%@example.com')||'|'||(select count(*) from public.profiles where id::text like 'aaaa0115-%')"
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

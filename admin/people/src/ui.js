@@ -915,6 +915,13 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
     f.team ? { act: "roster-team", v: "", text: `${T("ro.fTeam")}${T("ro.fSep")}${f.team === "__none" ? T("ro.noTeam") : f.team.replace(/\s*Team$/i, "")}` } : null,
     f.noacc ? { act: "roster-noacc", v: "", text: T("ro.noAccountChip") } : null].filter(Boolean);
   const group = (label, body) => body ? `<div class="fbx-group"><i>${esc(label)}</i>${body}</div>` : "";
+  // 篩了一個 team 的時候，搜尋框底下多一行：這個 team 幾個人、Director 是誰（2026-11-26；以前在後台「各 team」那一頁，那一頁拿掉了）。
+  // 人數不受打字找名字影響（那是這個 team 在這一屆的人數，不是現在列出來的幾列）。
+  const teamSum = f.team && f.team !== "__none" ? (() => {
+    const inTeam = base.filter(p => teamsOf(p).includes(f.team));
+    const dirs = inTeam.filter(p => p.board_role === "director").map(p => personName(p).name);
+    return `<p class="ro-teamsum" id="ro-teamsum"><b>${esc(f.team.replace(/\s*Team$/i, ""))}</b>${T("ro.teamSum", { n: inTeam.length })}${dirs.length ? T("ro.teamDir", { names: esc(dirs.join(T("punct.list"))) }) : T("ro.teamNoDir")}</p>`;
+  })() : "";
   const fbx = `<div class="fbx">
       <div class="fbx-row"><input id="ro-search" type="search" value="${esc(f.q || "")}" placeholder="${esc(T("ro.searchPh"))}" aria-label="${esc(T("ro.search"))}" autocomplete="off"><button type="button" class="fbx-btn${fOn.length ? " on" : ""}" data-act="roster-filters" aria-expanded="${f.open ? "true" : "false"}" aria-controls="ro-filters">${FUNNEL}<span>${T("ro.filters")}</span>${fOn.length ? `<b class="fbx-n">${fOn.length}</b>` : ""}</button></div>
       ${fOn.length ? `<div class="fbx-chips">${fOn.map(c => `<button type="button" class="chip sm on" data-act="${c.act}" data-v="${esc(c.v)}" aria-label="${esc(T("ro.fUnset", { what: c.text }))}">${esc(c.text)} ×</button>`).join("")}</div>` : ""}
@@ -964,7 +971,7 @@ export function rosterHTML(people, terms, meId, isPres, msg, busy, filter, works
     + afterEndHTML(after, list, busy)
     + bulkPanelHTML(bulk, list, busy)
     + `<div class="note">${isPres ? T("ro.note") : T("ro.noteSenior")}</div>`
-    + sectionHTML("", fbx + (sorted.length
+    + sectionHTML("", fbx + teamSum + (sorted.length
       ? `<table class="table"><thead><tr><th>${T("ro.name")}</th><th>${T("ro.rank")}</th><th>${T("ro.position")}</th><th>${T("ro.ws")}</th><th></th></tr></thead><tbody>${sorted.map(tr).join("")}</tbody></table>`
       : list.length ? emptyHTML(T("ro.emptyFilter"), T("ro.emptyFilterHint")) : emptyHTML(T("ro.empty"), T("ro.emptyHint"))), { id: "roster" });
 }

@@ -69,7 +69,7 @@ test("側欄：「我的工作區」在「我的」與「BT」中間，一個 te
   // 英文也一樣。
   assert.match(RAIL.railHTML("site", "res", TWO, {}, "en"), /My workspaces<\/div>[\s\S]*<span class="rail-lv"[^>]*>Edit<\/span>/);
   // 專案那一行照舊在 BT 底下，說明改成「每個 team 的…」。
-  assert.match(h, /<div class="rail-group">BT<\/div>[\s\S]*<b>專案<\/b><small>每個 team 的專案、活動、計畫與招募<\/small>/);
+  assert.match(h, /<div class="rail-group">BT<\/div>[\s\S]*<b>專案<\/b><small>每個 team 的專案與活動<\/small>/);
 });
 
 test("側欄：好幾個 team 的人，team 那幾行收著；現在在哪個 team 的頁，那一行才展開（Paul：「maybe we can fold them」）", () => {

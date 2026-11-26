@@ -102,13 +102,18 @@ test("封面網址像不像一張圖（存檔前先擋）：空的可以、https
 });
 
 // 2026-11-10 Paul：「application should live under events」，活動、報名、紀錄、行銷、錢接成一條。
-test("★ 其他申請：綁著活動的報名表移到最下面一段，點了回那場活動；其他表單照 team 分", () => {
+// 2026-11-26：這一頁改成「幹部招募」。綁著活動的報名表完全不在這裡（在那場活動的頁面裡），沒有綁活動的舊申請表放最下面一段。
+test("★ 幹部招募那一頁：只列招募的表單；活動的報名表不在這裡；沒有綁活動的舊申請表在最下面一段，有才印", () => {
   const forms = [{ id: "f1", team: "Marketing Team", kind: "program", title: "2027 冬令營", status: "open", counts: { total: 3, received: 1 } },
-    { id: "f9", team: "Curriculum Team", kind: "program", title: "導生計畫", status: "open", counts: { total: 5, received: 0 } }];
+    { id: "f9", team: "Curriculum Team", kind: "program", title: "導生計畫", status: "open", counts: { total: 5, received: 0 } },
+    { id: "fb", team: "Marketing Team", kind: "board", title: "2027-28 幹部招募", status: "open", counts: { total: 4, received: 2 } }];
   const h = F.listHTML(forms, true, "", true, null, [], "", false, [], [EV]);
-  assert.match(h, /<h2>活動的報名表/); assert.match(h, /data-act="ev-open" data-slug="winter-camp-2027">2027 冬令營<\/a>/);
-  assert.match(h, /導生計畫/); assert.doesNotMatch(h, /data-act="open-apps" data-id="f1"/, "活動的報名表不再從這裡審");
-  assert.doesNotMatch(F.listHTML(forms, true, "", true, null, [], "", false, [], []), /<h2>活動的報名表/, "沒有活動就沒有那一段");
+  assert.match(h, /<h1>幹部招募<\/h1>/);
+  assert.doesNotMatch(h, /2027 冬令營|活動的報名表|data-id="f1"/, "活動的報名表不在這一頁");
+  assert.ok(h.indexOf("2027-28 幹部招募") > 0 && h.indexOf("2027-28 幹部招募") < h.indexOf("<h2>沒有綁活動的舊申請表"), "招募的在上面");
+  assert.match(h, /<h2>沒有綁活動的舊申請表<span class="hint">新的報名表從活動的頁面開<\/span><\/h2>[\s\S]*導生計畫[\s\S]*data-act="open-apps" data-id="f9"/);
+  assert.doesNotMatch(F.listHTML([forms[2]], true, "", true, null, [], "", false, [], []), /沒有綁活動的舊申請表/, "沒有舊的就沒有那一段");
+  assert.match(F.listHTML([forms[1]], true, "", true, null, [], "", false, [], []), /還沒有招募表[\s\S]*沒有綁活動的舊申請表/, "只有舊的：上面是空的那一句，下面那一段照印");
 });
 test("★ 報名表的頁首：屬於活動就寫「某某的報名表」，返回鍵回那場活動", () => {
   const h = F.formHeadHTML({ ...FORM, status: "open", _ev: { ...EV, status: "draft" } }, "apps", 2);

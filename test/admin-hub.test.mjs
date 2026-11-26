@@ -214,35 +214,22 @@ const TODO = { resources: [{ id: "r1", team: "Curriculum Team", status: "publish
   team: [{ id: "u2" }], stories: [{ id: "s1", story_approved: false }, { id: "s2", story_approved: true }],
   interns: [{ id: "i1" }, { id: "i2" }], stamps: [{ task_id: "T1" }, { task_id: "T1" }, { task_id: "T2" }] };
 
-// 2026-11-14：後台的「總覽」改叫「各 team」，待辦那幾張卡搬到 /home/ 的「等你處理」（test/home-waiting.test.mjs）。
-// 這一頁只留還沒寄出去的信那一張（「現在寄出去」那顆鈕在這裡）、你的存取、你的 team。
-test("各 team：標題、還沒寄出去的信那一張卡、你的存取、你的 team；申請、核可、intern、名單的卡不在這裡了", () => {
-  const h = FORMS.hubHTML({ ...ME.pres, name: "王平", team: "Sponsorship Team" }, [{ id: 1, tries: 0 }, { id: 2, tries: 2, error: "boom" }], true, false, FORMS_DATA, TODO);
-  assert.match(h, /<h1>各 team<\/h1>/);
-  assert.match(h, /王平，Co-President，全部 team/, "那一行：Co-President 印全部 team，不印標籤");
-  assert.match(h, /等你處理的事在<a href="\/home\/">首頁<\/a>/);
+// 2026-11-26：後台的「各 team」那一頁拿掉了（Paul：「teams can be moved to roster, or we don't even need them」）。
+// 那一頁上唯一還有用的一張卡，還沒寄出去的信（「現在寄出去」那顆鈕），搬到活動清單最上面；/home/ 的「有信沒寄出去」連到那裡。
+test("★ 還沒寄出去的信那一張卡搬到活動清單最上面；沒有信就不畫；各 team 那一頁的三支函式都不在了", () => {
+  const h = FORMS.unsentMailHTML({ ...ME.pres, name: "王平" }, FORMS_DATA, [{ id: 1, tries: 0 }, { id: 2, tries: 2, error: "boom" }], TODO, true, false);
+  assert.match(h, /<h2>還沒寄出去的信/);
   assert.match(h, /<div class="kpi-n">2<span class="kpi-u">封/);
   assert.match(h, /1 封試過但失敗了：boom/);
   assert.match(h, /data-act="send-mail-all"/);
   assert.doesNotMatch(h, /還沒處理的申請|等你核可上團隊頁|這一屆的 intern|kpi-l">幹部/);
-  assert.match(h, /<h2>你的存取/); assert.match(h, /<h2>你的 team/);
-  const m = FORMS.hubHTML({ ...ME.member, name: "左芷君", team: "Marketing Team" }, [{ id: 1, tries: 0 }], false, false, FORMS_DATA, { resources: [], roster: ROSTER });
-  assert.match(m, /還沒寄出去的信/);
-  assert.doesNotMatch(m, /send-mail-all/, "寄不動的人沒有那顆鈕");
-  assert.match(m, /<h3>Marketing/); assert.doesNotMatch(m, /<h3>Curriculum/);
-  const z = FORMS.hubHTML({ ...ME.member, name: "a", team: "Marketing Team" }, [], false, false, [], { resources: [], roster: [] });
-  assert.doesNotMatch(z, /class="kpi/, "沒有信等著寄就不畫那一張");
-});
-
-test("首頁：你的 team 每段三行，Co-President 看到全部的 team，Director 的名字從名單來", () => {
-  const h = FORMS.teamBlocksHTML({ ...ME.pres }, FORMS_DATA, TODO);
-  assert.match(h, /<h3>Curriculum<span class="hint">1 人<\/span><\/h3>/);
-  assert.match(h, /申請表<\/a>：1 份，1 份開放中，<b>3 件還沒處理<\/b>/);
-  assert.match(h, /資源<\/a>：1 條，1 條已發布/);
-  assert.match(h, /Director：林育安/);
-  assert.match(h, /<h3>Marketing/);
-  assert.match(h, /<h3>Internship/);
-  assert.match(FORMS.teamBlocksHTML({ ...ME.member, team: "" }, [], TODO), /你還沒有 team/);
+  assert.doesNotMatch(FORMS.unsentMailHTML({ ...ME.member, name: "左芷君" }, FORMS_DATA, [{ id: 1, tries: 0 }], {}, false, false), /send-mail-all/, "寄不動的人沒有那顆鈕");
+  assert.equal(FORMS.unsentMailHTML({ ...ME.member, name: "a" }, [], [], {}, false, false), "", "沒有信等著寄就整塊不畫");
+  for (const gone of ["hubHTML", "teamBlocksHTML", "accessHTML"]) assert.equal(FORMS[gone], undefined, gone + " 拿掉了");
+  const m = readFileSync("admin/src/main.js", "utf8");
+  assert.match(m, /body = UI\.unsentMailHTML\(S\.me, S\.forms, S\.pendingAll, S\.todo, canEdit\(\), S\.busy\)\s*\+ UI\.eventsListHTML\(/);
+  assert.doesNotMatch(m, /hubHTML|featuresFor/);
+  assert.match(readFileSync("home/src/ui.js", "utf8"), /title: T\("w\.mailT", \{ n: mn \}\), sub: T\("w\.mailSub"\), href: A\("\/admin\/#events"\)/, "首頁那一則連到活動那一頁");
 });
 
 test("★ 首頁的資料層不讀心得：admin/src/data.js 不准出現 entries", () => {
@@ -303,7 +290,8 @@ test("開新表單是內嵌表單，不是 prompt()", () => {
   const open = FORMS.listHTML([AF], true, "", true, { title: "", team: "Marketing Team", kind: "board" }, ["Curriculum Team", "Marketing Team"], "", false);
   assert.match(open, /id="new-form"/);
   assert.match(open, /<option selected>Marketing Team<\/option>/);
-  assert.match(open, /<option value="board" selected>/);
+  assert.match(open, /<input type="hidden" id="nf-kind" value="board">/, "2026-11-26：這一頁只開幹部招募的表單，種類不用選");
+  assert.doesNotMatch(open, /<select id="nf-kind"/);
   assert.match(open, /data-act="new-form-save"/);
   assert.match(open, /data-act="new-form-cancel"/);
   assert.doesNotMatch(open, /class="btn" data-act="new-form">/, "表單展開著的時候頁首那顆收起來");
@@ -313,14 +301,16 @@ test("開新表單是內嵌表單，不是 prompt()", () => {
 });
 
 test("Co-President 的申請表清單照 team 分段，Director 的不分", () => {
-  const two = [AF, { ...AF, id: "f2", title: "招募", team: "Marketing Team" }];
+  // 2026-11-26：這一頁是幹部招募，列的是 kind 是 board 的表單。
+  const BF = { ...AF, kind: "board" };
+  const two = [BF, { ...BF, id: "f2", title: "招募", team: "Marketing Team" }];
   const pres = FORMS.listHTML(two, true, "", true, null, [], "", false);
   assert.match(pres, /<h2>Curriculum<span class="hint">1 份/);
   assert.match(pres, /<h2>Marketing<span class="hint">1 份/);
   // 2026-10-30 起申請是整個 BT 一個工作區：看得到的人看得到全部，team 只是標籤，有兩個以上的 team 就照標籤分段，Director 也一樣。
   const dir = FORMS.listHTML(two, true, "", false, null, [], "", false);
   assert.match(dir, /<h2>Curriculum/);
-  assert.doesNotMatch(FORMS.listHTML([AF], true, "", false, null, [], "", false), /<h2>Curriculum/, "只有一個 team 就不分段");
+  assert.doesNotMatch(FORMS.listHTML([BF], true, "", false, null, [], "", false), /<h2>Curriculum/, "只有一個 team 就不分段");
 });
 
 test("一份表單裡的四個分頁：申請、題目、設定、活動，當前的有標記，四個畫面都有同一條", () => {
@@ -451,9 +441,11 @@ test("★ admin/ 每一個畫面用英文畫出來不剩中文", () => {
   allEn("admin", FORMS, {
     rail: () => FORMS.railHTML("forms", "home", { ...ME.member, name: "a" }, { forms: 2 }),
     railPres: () => FORMS.railHTML("site", "res", EN_ME),
-    hub: () => FORMS.hubHTML(EN_ME, [{ id: 1, tries: 2, error: "boom" }], true, false, [form], todo),
-    hubZero: () => FORMS.hubHTML({ ...ME.member, name: "a", team: "" }, [], false, false, [], { resources: [], roster: null }),
-    hubGone: () => FORMS.hubHTML(EN_ME, [], true, true, [], { resources: [], roster: null, team: null, stories: null, interns: null, stamps: [] }),
+    mail: () => FORMS.unsentMailHTML(EN_ME, [form], [{ id: 1, tries: 2, error: "boom" }], todo, true, false),
+    appsRecruit: () => FORMS.appsHTML(form, [app], qs, true, new Set(), "all", [], "", false, { can: true, ready: true, status: { a1: "none" }, set: null, terms: [{ id: "2026-27", status: "current" }], teams: ["Marketing Team"] }),
+    appsRecruitStates: () => ["joined", "pending", "expired", "on_roster"].map(st => FORMS.recruitTagHTML(app, { can: true, ready: true, status: { a1: st } }, false)).join(""),
+    appsRecruitWait: () => FORMS.recruitPanelHTML(form, { can: false }, false) + FORMS.recruitPanelHTML(form, { can: true, ready: false }, false),
+    recruitNote: () => FORMS.recruitResultNote({ sent: 2, skipped: ["already_cadre", "invite_pending", "on_roster", "ambiguous_person", "bad_email", "not_accepted", "zzz"].map(why => ({ id: "x", why })) }),
     list: () => FORMS.listHTML([form, { ...form, id: "f2", team: "", kind: "program", status: "draft" }], true, "Saved.", true, null, [], "", false),
     listMember: () => FORMS.listHTML([], false, "", false, null, [], "", false),
     listNew: () => FORMS.listHTML([form], true, "", true, { title: "", team: "Marketing Team", kind: "board" }, ["Marketing Team"], "", true),
@@ -739,44 +731,6 @@ test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、�
   }
 });
 
-// 2026-10-23 第三次重整批 4：總覽的「你的存取」、「你的 team」從工作區算、只能看的人卡上寫「去看」。
-test("★ 總覽「你的存取」：被派的人一行一個工作區加直達；senior 一句；什麼都沒有的人看到找誰加各 team 公開的 Director；頂欄四項各一句", () => {
-  const WS = [{ id: "apps", kind: "apps", title_zh: "申請（表單與審核）", active: true },
-              { id: "res:Curriculum Team", kind: "res", title_zh: "Curriculum Team 的資源", active: true },
-              { id: "intern-passport", kind: "intern-passport", title_zh: "實習護照", active: true },
-              { id: "res:Community Relations Team", kind: "res", title_zh: "Community Relations 的資源", active: true }];
-  const DIRS = [{ id: "u2", name_zh: "林育安", team: "Curriculum Team", title_en: "Director, Curriculum Team" }, { id: "u9", name_zh: "某某", team: "Curriculum Team", title_en: "Associate, Curriculum Team" }];
-  const FEAT = [{ label: "護照", desc: "這一年的活動、章、心得與照片", href: "/passport/" }];
-  const istaff = FORMS.accessHTML({ ...ME.istaff, ws: { "intern-passport": "edit", "apps": "view" } }, { workspaces: WS, directors: DIRS }, FEAT);
-  // 2026-10-24 照 team 分組：Internship 那一段底下是「實習護照（格子與棋盤）」加等級，Curriculum 那一段是「申請（表單與審核）」。
-  assert.match(istaff, /<b>Internship<\/b><\/div><div class="row"><span>實習護照（格子與棋盤）<\/span><span class="tag">改<\/span>/);
-  assert.match(istaff, /href="\/intern-passport\/\?lang=zh">進度牆/, "被派進實習護照的人從這裡直達進度牆（頂欄對幹部沒有這一項）");
-  assert.match(istaff, /href="\/admin\/passports\/\?lang=zh#interns">後台/);
-  assert.match(istaff, /<b>整個 BT<\/b><\/div><div class="row"><span>申請（表單與審核）<\/span><span class="tag">看<\/span>/, "2026-10-30 起申請在整個 BT 那一段");
-  assert.match(istaff, /玩護照是身分帶來的/); assert.match(istaff, /時間看板沒有指派/);
-  assert.match(istaff, /<ul class="feat"><li><a href="\/passport\/\?lang=zh">護照<\/a>：這一年的活動/);
-  const none = FORMS.accessHTML({ ...ME.member, ws: {} }, { workspaces: WS, directors: DIRS }, []);
-  assert.match(none, /你還沒被派進任何工作區/);
-  assert.match(none, /<b>Curriculum<\/b>：林育安/, "各 team 公開的 Director");
-  assert.doesNotMatch(none, /某某/, "Associate 不算 Director");
-  assert.match(FORMS.accessHTML({ ...ME.member, ws: {} }, { workspaces: WS, directors: [] }, []), /還沒有人公開在團隊頁上/);
-  assert.match(FORMS.accessHTML(ME.pres, {}, []), /不用派/);
-  assert.match(FORMS.hubHTML({ ...ME.pres, name: "王平" }, [], true, false, [], { resources: [], roster: [] }), /<h1>各 team<\/h1>[\s\S]*<h2>你的存取/);
-  // 你的 team 從工作區算：Community Relations 沒有人勾標籤也會出現；Director 讀不到名單時從公開團隊頁算。
-  const blocks = FORMS.teamBlocksHTML({ ...ME.pres }, [], { resources: [], roster: [], workspaces: WS, directors: DIRS });
-  assert.match(blocks, /<h3>Community Relations/);
-  assert.match(blocks, /Director：林育安/);
-  assert.doesNotMatch(blocks, /#members=/, "2026-11-25：Co-President 不畫這一條，他在「人與權限 → 工作區」管");
-  const dir = FORMS.teamBlocksHTML({ ...ME.director, team: "", ws: { "res:Marketing Team": "manage" } }, [], { resources: [], roster: [], workspaces: WS, directors: [] });
-  assert.match(dir, /href="\/admin\/\?lang=zh#members=res%3AMarketing%20Team">這個 team 的人（看／改／管）/, "2026-12-25 起連到 /admin/#members=，Director 自己進得去");
-  assert.match(dir, /<h3>Marketing/, "被派進去的 team 就算沒勾標籤也有一段");
-  assert.match(dir, /#members=res%3AMarketing%20Team">這個 team 的人/, "2026-12-25：team 是「管」的 Director 直接有一條連到自己 team 的成員頁");
-  // 只能看的人，卡上寫「去看」不寫「去審」（2026-11-14 起那張卡不畫在這一頁，資料照舊從 todoCards 算）。
-  const card = FORMS.todoCards({ ...ME.member, name: "a", team: "Curriculum Team", ws: { "apps:Curriculum Team": "view" } }, FORMS_DATA, [], { resources: [], roster: [] }, false, false).find(c => c.act && c.act.act === "open-apps");
-  assert.equal(card.act.label, "去看");
-  assert.match(readFileSync("app/src/main.js", "utf8"), /S\.profile && S\.profile\.name \? "\.\.\/home\/" : "\.\.\/settings\/"/, "幹部登入後進首頁（2026-10-28），沒名字的才進設定");
-});
-
 test("成員分頁：Co-President 與 Senior Adviser 置頂標「依職級」，沒有下拉與移出", () => {
   const mp = { ws: "apps:Curriculum Team", name: "x", meId: "u1",
     rows: [{ user_id: "u3", name_zh: "", name_en: "Mei", board_role: "member", level: "view" }],
@@ -787,13 +741,6 @@ test("成員分頁：Co-President 與 Senior Adviser 置頂標「依職級」，
   assert.equal((h.match(/class="ma-row byrank"/g) || []).length, 2);
   assert.doesNotMatch(h.slice(0, mei), /members-unassign/);
   assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: mp.cadres }, "", false), /依職級|全部（職級）/, "沒有指派也列得出依職級的人");
-});
-
-test("總覽「你的存取」：Co-President 看到一顆「全部（職級）」徽章加一句，不列十四個工作區", () => {
-  const h = FORMS.accessHTML({ ...ME.pres, ws: {} }, { workspaces: [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "x", active: true }], directors: [] }, []);
-  assert.match(h, /<span class="tag open">全部（職級）<\/span>/);
-  assert.match(h, /不用派/);
-  assert.doesNotMatch(h, /class="flist access"/, "不列工作區");
 });
 
 // 2026-10-24 工作區照 team 分組：四份同一套 wsTeamOf / wsCellLabel / wsCellHref / wsRows。

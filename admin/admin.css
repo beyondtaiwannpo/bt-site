@@ -317,6 +317,13 @@ a.subtab{text-decoration:none}
 .tabp > .section:first-child{margin-top:0}
 /* 內嵌表單：展開在清單上面的一張卡。 */
 .inline-form{border-color:rgba(255,196,108,.9);background:rgba(255,232,197,.35)}
+/* 幹部招募：審核頁上「錄取之後寄的邀請」那一塊（2026-11-26） */
+.ro-teamsum{margin:10px 0 2px}
+.rc-panel h3{margin:0 0 4px}
+.rc-panel .sub{margin:0 0 12px}
+.rc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px}
+.rc-panel .mini{margin-top:8px}
+@media (max-width:720px){.rc-grid{grid-template-columns:1fr}}
 /* 批次列：選了人之後黏在底部，捲到名單最下面也按得到。 */
 .bulk.on{position:sticky;bottom:12px;z-index:5;box-shadow:0 8px 24px rgba(16,42,134,.12)}
 
