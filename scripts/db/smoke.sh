@@ -4904,5 +4904,166 @@ rm -f "${BROKEN}"
 fb3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${FBM}" 2>&1 || true)
 if echo "${fb3}" | grep -q "OVERALL.*PASS" && ! echo "${fb3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有變回綠的：${fb3}" | head -12; fail=$((fail+1)); fi
 echo
+echo "── 免費資源的大標（2027-01-13-resource-sections.sql）──"
+# Paul 2026-11-25：「at the backstage you can just let us name what resources, the big heading is」
+# 這一段自己建三個人，不靠前面留下來的指派：RSG 是 Marketing 的「管」、RSE 是「改」、RSN 是什麼都沒被派的幹部。
+RSF=supabase/migrations/2027-01-13-resource-sections.sql
+RSG=aaaa0112-0000-0000-0000-000000000001
+RSE=aaaa0112-0000-0000-0000-000000000002
+RSN=aaaa0112-0000-0000-0000-000000000003
+RSR=aaaa0112-0000-0000-0000-0000000000f1
+RSBEFORE=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.resources" | tr -d ' \n')
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${RSG}','rs-manage@example.com'), ('${RSE}','rs-edit@example.com'), ('${RSN}','rs-none@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values
+  ('${RSG}','大標管','Section Manager','Marketing Team','cadre','director'),
+  ('${RSE}','大標改','Section Editor','Marketing Team','cadre','member'),
+  ('${RSN}','大標無','Section Nobody','Marketing Team','cadre','member');
+insert into public.workspaces (id, kind, team, title_zh, title_en) values ('res:Marketing Team','res','Marketing Team','Marketing Team','Marketing Team') on conflict (id) do nothing;
+insert into public.assignments (user_id, workspace_id, level) values ('${RSG}','res:Marketing Team','manage'), ('${RSE}','res:Marketing Team','edit')
+  on conflict (user_id, workspace_id) do update set level = excluded.level;
+insert into public.resources (id, title, blurb, url, status, team, ord) values ('${RSR}','RSSMOKE 大學介紹手冊','一句介紹','https://drive/rssmoke','published','Marketing Team',5);
+SQL
+rs1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RSF}" 2>&1 || true)
+if echo "${rs1}" | grep -q "OVERALL.*PASS" && ! echo "${rs1}" | grep -q "|FAIL"; then echo "  ok   大標那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 大標那一支驗收表：${rs1}" | head -20; fail=$((fail+1)); fi
+rs2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RSF}" 2>&1 || true)
+if echo "${rs2}" | grep -q "OVERALL.*PASS" && ! echo "${rs2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${rs2}" | head -20; fail=$((fail+1)); fi
+chk "★ 原本的資源一筆都沒少，都還沒分，也沒有預先放任何大標" "$((RSBEFORE+1))|0|0" "select count(*), count(section_id), (select count(*) from public.resource_sections) from public.resources"
+rsurl=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select url from public.resources limit 1;" 2>&1 || true)
+if echo "${rsurl}" | grep -qi "permission denied"; then echo "  ok   ★ 跑完之後沒登入還是拿不到連結"; pass=$((pass+1)); else echo "  FAIL ★ 沒登入拿得到連結了：${rsurl}"; fail=$((fail+1)); fi
+chkas "${PAUL}" "Co-President 加得了大標（名字去掉頭尾空白）" "t" "select public.save_resource_section(null, '  大學介紹  ', '  College intro ', 10) is not null"
+chk "存成一列：中文名、英文名、排序" "大學介紹|Collegeintro|10" "select name_zh, name_en, ord from public.resource_sections"
+chkas "${RSG}" "★ 一個 team 的「管」也加得了（英文名留空）" "t" "select public.save_resource_section(null, 'Mentee 與 Mentor 的故事', '', 20) is not null"
+chk "英文名留空就是空的，不是空字串" "t" "select name_en is null from public.resource_sections where ord = 20"
+chkas "${RSG}" "「管」的人那道門回 true" "t" "select public.can_manage_resource_sections()"
+chkas "${RSE}" "只有「改」的人那道門回 false" "f" "select public.can_manage_resource_sections()"
+chkraise "★ 只有「改」的人加不了大標" "not_section_manager" "perform set_config('test.uid','${RSE}',true); perform public.save_resource_section(null, '偷加', null, 1);"
+chkraise "★ 什麼都沒被派的幹部加不了" "not_section_manager" "perform set_config('test.uid','${RSN}',true); perform public.save_resource_section(null, '偷加', null, 1);"
+chkraise "★ 學生加不了" "not_section_manager" "perform set_config('test.uid','${STU}',true); perform public.save_resource_section(null, '偷加', null, 1);"
+chkraise "★ 什麼都沒被派的幹部也刪不了" "not_section_manager" "perform set_config('test.uid','${RSN}',true); perform public.delete_resource_section((select id from public.resource_sections where ord = 10));"
+rsan=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select public.save_resource_section(null, 'x', null, 1);" 2>&1 || true)
+if echo "${rsan}" | grep -qi "permission denied"; then echo "  ok   ★ 沒登入的人叫不到加大標那一支"; pass=$((pass+1)); else echo "  FAIL anon 叫得到：${rsan}"; fail=$((fail+1)); fi
+rsdir=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "set role authenticated; insert into public.resource_sections (name_zh) values ('直接寫');" 2>&1 || true)
+if echo "${rsdir}" | grep -qi "permission denied"; then echo "  ok   ★ 大標那張表前端直接寫不進去（連 Co-President 也要走函式）"; pass=$((pass+1)); else echo "  FAIL 直接寫得進去：${rsdir}"; fail=$((fail+1)); fi
+chkraise "名字空的會被擋" "section_name_required" "perform set_config('test.uid','${PAUL}',true); perform public.save_resource_section(null, '   ', 'x', 1);"
+chkraise "名字太長會被擋" "section_name_too_long" "perform set_config('test.uid','${PAUL}',true); perform public.save_resource_section(null, repeat('字', 61), null, 1);"
+chkraise "改一個不存在的會被擋" "no_such_section" "perform set_config('test.uid','${PAUL}',true); perform public.save_resource_section('aaaa0112-0000-0000-0000-00000000dead', '沒有這個', null, 1);"
+chkas "${RSG}" "改名字與排序：還是同一個大標" "t" "select public.save_resource_section((select id from public.resource_sections where ord = 10), '認識大學', 'College intro', 15) = (select id from public.resource_sections where ord = 10)"
+chk "改完還是兩個大標" "2|認識大學|15" "select (select count(*) from public.resource_sections), name_zh, ord from public.resource_sections where name_en = 'College intro'"
+chkrole authenticated "${RSE}" "★ 改得了那一筆資源的人，把它放進大標（走原本改資源的那條路）" "1" "with u as (update public.resources set section_id = (select id from public.resource_sections where name_zh = '認識大學') where id = '${RSR}' returning 1) select count(*) from u"
+chkrole authenticated "${RSN}" "★ 改不了那一筆資源的人，放不進去（RLS，動到 0 列）" "0" "with u as (update public.resources set section_id = null where id = '${RSR}' returning 1) select count(*) from u"
+chkrole anon "" "★ 沒登入讀得到大標" "認識大學|Mentee與Mentor的故事" "select string_agg(name_zh, '|' order by ord) from public.resource_sections"
+chkrole anon "" "★ 沒登入讀得到哪一筆在哪一個大標底下" "認識大學" "select s.name_zh from public.resources r join public.resource_sections s on s.id = r.section_id where r.id = '${RSR}'"
+rs3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RSF}" 2>&1 || true)
+if echo "${rs3}" | grep -q "OVERALL.*PASS" && ! echo "${rs3}" | grep -q "|FAIL"; then echo "  ok   ★ 有資料之後再重跑也全 PASS"; pass=$((pass+1)); else echo "  FAIL 有資料之後重跑：${rs3}" | head -20; fail=$((fail+1)); fi
+chk "★ 重跑之後大標與分好的資源都還在" "2|1" "select (select count(*) from public.resource_sections), (select count(*) from public.resources where section_id is not null)"
+chkas "${RSG}" "刪掉一個大標：回底下原本有幾筆" "1" "select public.delete_resource_section((select id from public.resource_sections where name_zh = '認識大學'))"
+chk "★ 大標刪掉了，底下那一筆資源還在，變回沒有分" "1|t|published" "select (select count(*) from public.resource_sections), section_id is null, status from public.resources where id = '${RSR}'"
+chkraise "刪一個不存在的會被擋" "no_such_section" "perform set_config('test.uid','${PAUL}',true); perform public.delete_resource_section('aaaa0112-0000-0000-0000-00000000dead');"
+# 破壞測試一：把 url 也發給沒登入的人，驗收表第 1 列要變紅
+BROKEN=$(mktemp)
+sed "s/^grant select (section_id) on public.resources to anon;/grant select (section_id, url) on public.resources to anon;/" "${RSF}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${RSF}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^1|.*|FAIL"; then echo "  ok   ★ 破壞測試：連結發給沒登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試一：連結發出去了驗收表還是綠的：${bk}" | head -12; fail=$((fail+1)); fi
+# 這一支不會自己把發出去的權限收回來（它只加不收），所以這裡手動收，再確認真的收回來了。
+psql -d "${DB}" -q -c "revoke select (url) on public.resources from anon;" >/dev/null
+# 破壞測試二：把加、改、刪前面那道門拿掉，驗收表第 5 列要變紅
+sed "s/  if not public.can_manage_resource_sections() then raise exception 'not_section_manager' using errcode = 'P0001'; end if;//" "${RSF}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${RSF}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^5|.*|FAIL"; then echo "  ok   ★ 破壞測試：那道門拿掉，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 破壞測試二：門拿掉了驗收表還是綠的：${bk}" | head -12; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+rs4=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${RSF}" 2>&1 || true)
+if echo "${rs4}" | grep -q "OVERALL.*PASS" && ! echo "${rs4}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有變回綠的：${rs4}" | head -12; fail=$((fail+1)); fi
+rsurl=$(psql -d "${DB}" -X -A -t -q -c "set role anon; select url from public.resources limit 1;" 2>&1 || true)
+if echo "${rsurl}" | grep -qi "permission denied"; then echo "  ok   ★ 裝回去之後沒登入還是拿不到連結"; pass=$((pass+1)); else echo "  FAIL ★ 裝回去之後沒登入拿得到連結：${rsurl}"; fail=$((fail+1)); fi
+chkraise "裝回去之後那道門還在" "not_section_manager" "perform set_config('test.uid','${RSN}',true); perform public.save_resource_section(null, '偷加', null, 1);"
+# 收乾淨：這一段放的那一筆資源與剩下的大標拿掉，後面的段落看到的 resources 跟這一段開始之前一樣。
+psql -d "${DB}" -q -c "delete from public.resources where id = '${RSR}'; delete from public.resource_sections;" >/dev/null
+chk "（收尾）資源的數量跟這一段開始之前一樣" "${RSBEFORE}" "select count(*) from public.resources"
+echo "── 前幾屆的團隊：整份名單、只有名字，一屆一個開關（2027-01-11-past-teams.sql）──"
+# Paul 2026-11-25：「we're adding alumni into Teams… a drop down that has current team, 2025 to 2026 alumni, 2024 to 2025 alumni」，
+# 問他那兩頁上要出現誰，他選「Whole roster, names only」。整份名單沒有每個人自己的同意，所以一屆一個開關（預設關）加一個人一個「藏起來」，都只有 Co-President。
+# 這時候：PAUL 是 Co-President，MEMBER 是一般幹部，STU 是學員。這一段自己開一屆 2019-20（已結束）與六個人，最後收乾淨：
+#   PTA 幹部、PTB 幹部（等一下藏起來）、PTC 學員、PTD 本人要求移除的、PTE 兩個名字都空的，這五位在 2019-20 有職位；PTF 只在這一屆有職位。
+PTM_FILE=supabase/migrations/2027-01-11-past-teams.sql
+PTA=aaaa0111-0000-0000-0000-00000000000a; PTB=aaaa0111-0000-0000-0000-00000000000b; PTC=aaaa0111-0000-0000-0000-00000000000c
+PTD=aaaa0111-0000-0000-0000-00000000000d; PTE=aaaa0111-0000-0000-0000-00000000000e; PTF=aaaa0111-0000-0000-0000-00000000000f
+pt=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PTM_FILE}" 2>&1 || true)
+if echo "${pt}" | grep -q "OVERALL.*PASS" && ! echo "${pt}" | grep -q "|FAIL"; then echo "  ok   前幾屆那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 前幾屆那一支驗收表："; echo "${pt}" | head -20; fail=$((fail+1)); fi
+PTCUR=$(psql -d "${DB}" -X -A -t -q -c "select id from public.terms where status = 'current'" | tr -d ' \n')
+psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<SQL || true
+insert into public.terms (id, title_zh, title_en, starts_on, ends_on, status) values ('2019-20', '2019-20', '2019-20', '2019-08-01', '2020-07-31', 'ended') on conflict (id) do nothing;
+insert into public.people (id, name_zh, name_en, kind) values
+  ('${PTA}', '範例甲', 'Past Alpha', 'member'), ('${PTB}', '範例乙', 'Past Bravo', 'member'), ('${PTC}', '範例丙', 'Past Charlie', 'student'),
+  ('${PTD}', '範例丁', 'Past Delta', 'member'), ('${PTE}', '', '  ', 'member'), ('${PTF}', '範例己', 'Past Foxtrot', 'member');
+update public.people set forgotten_at = now() where id = '${PTD}';
+update public.people set school = 'Sample High', grad_year = 2030 where id = '${PTB}';
+insert into public.positions (person_id, term_id, title_zh, title_en, team) values
+  ('${PTA}', '2019-20', null, 'Director, Curriculum Team', 'Curriculum Team'), ('${PTB}', '2019-20', null, 'Associate, Curriculum Team', 'Curriculum Team'),
+  ('${PTC}', '2019-20', null, 'Associate', 'Mentorship Team'), ('${PTD}', '2019-20', null, 'Associate', 'Mentorship Team'),
+  ('${PTE}', '2019-20', null, 'Associate', 'Marketing Team'), ('${PTF}', '${PTCUR}', null, 'Associate, Marketing Team', 'Marketing Team');
+SQL
+chk "（準備）開了 2019-20 一屆、六個人、六筆職位" "1|6|6" "select (select count(*) from public.terms where id = '2019-20' and status = 'ended')||'|'||(select count(*) from public.people where id::text like 'aaaa0111-%')||'|'||(select count(*) from public.positions where person_id::text like 'aaaa0111-%')"
+chkrole anon "" "★ 跑完對外一個名字都沒有：開關預設是關的" "0" "select count(*) from public.public_past_team()"
+chkraise "★ 一般幹部開不了一屆（not_president）" "not_president" "perform set_config('test.uid','${MEMBER}',true); perform public.set_past_team_public('2019-20', true);"
+chkraise "學員開不了一屆（not_president）" "not_president" "perform set_config('test.uid','${STU}',true); perform public.set_past_team_public('2019-20', true);"
+chkraise "★ 這一屆開不了：這一屆的人走本人同意那一條（term_not_ended）" "term_not_ended" "perform set_config('test.uid','${PAUL}',true); perform public.set_past_team_public('${PTCUR}', true);"
+chkraise "沒有的屆開不了（no_such_term）" "no_such_term" "perform set_config('test.uid','${PAUL}',true); perform public.set_past_team_public('1999-00', true);"
+chkrole anon "" "★ 沒登入的人叫不動開關" "ERROR:permissiondeniedforfunctionset_past_team_public" "select public.set_past_team_public('2019-20', true)"
+chkrole anon "" "★ 沒登入的人叫不動藏人那一支" "ERROR:permissiondeniedforfunctionset_past_team_hidden" "select public.set_past_team_hidden('${PTA}', true)"
+chkrole anon "" "★ 沒登入的人讀不到後台那一份名單" "ERROR:permissiondeniedforfunctionpast_team_admin" "select public.past_team_admin()"
+chkrole anon "" "★ 沒登入的人不能直接改 terms 的開關" "ERROR:permissiondeniedfortableterms" "update public.terms set past_public = true"
+chkrole authenticated "${MEMBER}" "★ 登入的人也不能直接改 terms 的開關" "ERROR:permissiondeniedfortableterms" "update public.terms set past_public = true"
+chkrole authenticated "${PAUL}" "★ 登入的人（連 Co-President）也不能直接讀寫藏人那張表" "ERROR:permissiondeniedfortablepast_team_hidden" "select count(*) from public.past_team_hidden"
+chkas "${PAUL}" "Co-President 把 2019-20 打開，記下誰開的" "true|${PAUL}" "select public.set_past_team_public('2019-20', true); select past_public::text||'|'||past_public_by from public.terms where id = '2019-20'"
+chkrole anon "" "★ 打開之後：沒登入的人看得到兩位幹部，只有六欄" "2|term,name_en,name_zh,team,title_en,title_zh" "select (select count(*) from public.public_past_team())||'|'||(select string_agg(key, ',' order by ordinality) from (select key, ordinality from json_object_keys((select row_to_json(f) from public.public_past_team() f limit 1)) with ordinality as k(key, ordinality)) x)"
+chkrole anon "" "★ 學員、本人要求移除的、沒有名字的不在裡面；只在這一屆有職位的也不在" "PastAlpha,PastBravo" "select string_agg(name_en, ',' order by name_en) from public.public_past_team()"
+chkraise "★ 一般幹部藏不了人（not_president）" "not_president" "perform set_config('test.uid','${MEMBER}',true); perform public.set_past_team_hidden('${PTB}', true);"
+chkraise "沒有的人藏不了（no_such_person）" "no_such_person" "perform set_config('test.uid','${PAUL}',true); perform public.set_past_team_hidden('aaaa0111-0000-0000-0000-0000000000ff', true);"
+chkas "${PAUL}" "Co-President 把還沒成年的那一位藏起來" "true" "select public.set_past_team_hidden('${PTB}', true)::text"
+chkas "${PAUL}" "藏兩次不會多一列" "1" "select public.set_past_team_hidden('${PTB}', true); select count(*) from public.past_team_hidden where person_id = '${PTB}'"
+chkrole anon "" "★ 藏起來的人對外馬上不見" "PastAlpha" "select string_agg(name_en, ',' order by name_en) from public.public_past_team()"
+chkas "${PAUL}" "★ 後台那一份：2019-20 五個人，各自會不會出現、為什麼" "true|5|hidden,not_member,forgotten,no_name|1" "select (t->>'public')||'|'||jsonb_array_length(t->'people')||'|'||(select string_agg(p->>'why', ',' order by p->>'person') from jsonb_array_elements(t->'people') p where p->>'why' is not null)||'|'||(select count(*) from jsonb_array_elements(t->'people') p where p->>'why' is null) from jsonb_array_elements(public.past_team_admin()) t where t->>'term' = '2019-20'"
+chkas "${PAUL}" "後台那一份帶學校與畢業年（判斷誰還沒成年用）" "SampleHigh|2030" "select (p->>'school')||'|'||(p->>'grad_year') from jsonb_array_elements(public.past_team_admin()) t, jsonb_array_elements(t->'people') p where p->>'person' = '${PTB}'"
+chkas "${PAUL}" "後台那一份只有已經結束的屆，沒有這一屆" "0" "select count(*) from jsonb_array_elements(public.past_team_admin()) t where t->>'term' = '${PTCUR}'"
+chkraise "★ 學員讀不到後台那一份（not_senior）" "not_senior" "perform set_config('test.uid','${STU}',true); perform public.past_team_admin();"
+chkraise "一般幹部也讀不到後台那一份（not_senior）" "not_senior" "perform set_config('test.uid','${MEMBER}',true); perform public.past_team_admin();"
+chkas "${PAUL}" "放回來" "false" "select public.set_past_team_hidden('${PTB}', false)::text"
+chkrole anon "" "放回來之後又看得到兩位" "2" "select count(*) from public.public_past_team()"
+chkas "${PAUL}" "（準備）再藏一次" "true" "select public.set_past_team_hidden('${PTB}', true)::text"
+chkas "${PAUL}" "public_team() 照舊：沒有多出 2019-20 的人" "0" "select count(*) from public.public_team() where term = '2019-20'"
+pt2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PTM_FILE}" 2>&1 || true)
+if echo "${pt2}" | grep -q "OVERALL.*PASS" && ! echo "${pt2}" | grep -q "|FAIL"; then echo "  ok   ★ 重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑："; echo "${pt2}" | head -8; fail=$((fail+1)); fi
+chkrole anon "" "★ 重跑不會把開著的關掉、也不會把藏起來的人放出來" "PastAlpha" "select string_agg(name_en, ',' order by name_en) from public.public_past_team()"
+chkas "${PAUL}" "Co-President 把 2019-20 關掉" "false" "select public.set_past_team_public('2019-20', false)::text"
+chkrole anon "" "★ 關掉之後對外馬上一個都沒有" "0" "select count(*) from public.public_past_team()"
+chkas "${PAUL}" "（準備）再打開" "true" "select public.set_past_team_public('2019-20', true)::text"
+# 破壞測試一：對外那一支不看開關，驗收表要變紅
+BROKEN=$(mktemp)
+sed "s/ and t\.status = 'ended' and t\.past_public$/ and t.status = 'ended'/" "${PTM_FILE}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${PTM_FILE}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^7|.*|FAIL"; then echo "  ok   ★ 破壞測試：對外那一支不看開關，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 不看開關驗收表沒有變紅"; fail=$((fail+1)); fi
+# 破壞測試二：學員也回，驗收表要變紅
+sed "s/^   where pe\.kind = 'member'$/   where true/" "${PTM_FILE}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${PTM_FILE}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^8|.*|FAIL"; then echo "  ok   ★ 破壞測試：學員也回，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 學員也回驗收表沒有變紅"; fail=$((fail+1)); fi
+# 破壞測試三：開關那一支開給沒登入的人，驗收表要變紅
+sed "s/^revoke all on function public.set_past_team_public(text, boolean) from public, anon;$/grant execute on function public.set_past_team_public(text, boolean) to anon;/" "${PTM_FILE}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${PTM_FILE}"; then echo "  FAIL 破壞測試三沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^6|.*|FAIL"; then echo "  ok   ★ 破壞測試：開關開給沒登入的人，驗收表變紅"; pass=$((pass+1)); else echo "  FAIL 開關開給 anon 驗收表沒有變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -X -A -t -q -c "revoke all on function public.set_past_team_public(text, boolean) from anon;" >/dev/null
+rm -f "${BROKEN}"
+pt3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PTM_FILE}" 2>&1 || true)
+if echo "${pt3}" | grep -q "OVERALL.*PASS" && ! echo "${pt3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS"; echo "${pt3}" | head -8; fail=$((fail+1)); fi
+chkrole anon "" "裝回去之後對外還是只有沒被藏的那一位" "PastAlpha" "select string_agg(name_en, ',' order by name_en) from public.public_past_team()"
+# 收乾淨：這一段開的那一屆與六個人拿掉（職位與藏人那一列跟著人一起刪）。
+psql -d "${DB}" -X -A -t -q -c "delete from public.people where id::text like 'aaaa0111-%'; delete from public.terms where id = '2019-20';" >/dev/null 2>&1 || true
+chk "（收尾）這一段開的人、職位、屆、藏人的列都不在了" "0|0|0|0" "select (select count(*) from public.people where id::text like 'aaaa0111-%')||'|'||(select count(*) from public.positions where term_id = '2019-20')||'|'||(select count(*) from public.terms where id = '2019-20')||'|'||(select count(*) from public.past_team_hidden)"
+echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

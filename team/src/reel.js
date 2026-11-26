@@ -20,6 +20,7 @@ export function step(i, d, n) { return Math.max(0, Math.min(n - 1, i + d)); }
 
 if (typeof document !== "undefined") (() => {
   const html = document.documentElement;
+  if (html.hasAttribute("data-past")) return;   // 前幾屆那一頁（?term=）沒有這一排照片，見 past.js
   const stages = [...document.querySelectorAll(".stage")];
   if (!stages.length) return;
   const keys = [...stages[0].querySelectorAll(".slide")].map(s => s.dataset.team);

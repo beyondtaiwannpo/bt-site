@@ -6,6 +6,7 @@ import * as AUTH from "../../../shared/auth.js";
 import { navHTML } from "../../../shared/nav.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
+import * as PAST from "./past.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 const HERE = "/admin/site/";
@@ -14,6 +15,7 @@ let S = {
   user: null, me: null, down: false, busy: false, msg: "",
   view: "res",             // res | res-edit | team | stories | mail | mail-edit | history | history-edit
   res: [], resEditing: null,
+  resSecs: null,           // 資源的大標（2027-01-13）：{ rows, missing, canManage }，openRes() 載
   people: [],
   // 校友頁與信件文案**一定要有初始值**：少了它，載入失敗之後再 render 一次會整頁空白，
   // 而這個 repo 的規矩是「連不上資料庫也要畫得出東西」。
@@ -33,6 +35,8 @@ const root = () => document.getElementById("bt-root");
 // 團隊頁、校友頁、信件文案給 Co-President 與 Senior Adviser（senior）。門仍在資料庫。
 const canEdit = () => UI.canEditAny(S.me, "res:");
 const isPres = () => !!S.me && !!S.me.senior;
+// 大標那一塊給畫面的資料。遷移檔還沒跑的那一句「要先跑哪一支」只給 Co-President 與 Senior Adviser 看，其他人看了也做不了什麼。
+const resSecs = () => (S.resSecs && S.resSecs.missing && !isPres() ? null : S.resSecs);
 
 function render() {
   const el = root();
@@ -53,11 +57,11 @@ function render() {
     if (fold) S.mailEnOpen = fold.open;
     body = UI.mailEditHTML(S.tplKind, S.tplDraft || S.tpls.find(t => t.kind === S.tplKind), S.msg, S.busy, Object.assign({}, S.mailPrev, { enOpen: !!S.mailEnOpen }));
   } else if (S.view === "team") {
-    body = UI.publicTeamHTML(S.people, S.msg, S.busy);
+    body = UI.publicTeamHTML(S.people, S.msg, S.busy) + (S.past === undefined ? "" : PAST.pastTeamsHTML(S.past, !!S.me.pres, S.busy));
   } else if (S.view === "stories") {
     body = UI.alumniStoriesHTML(S.stories, S.msg, S.busy);
   } else if (S.view === "res-edit") {
-    body = UI.resEditHTML(S.resEditing, S.msg, S.busy);
+    body = UI.resEditHTML(S.resEditing, S.msg, S.busy, resSecs());
   } else if (S.view === "island-map") {
     body = UI.islandMapListHTML(S.im, S.me, S.msg, S.busy);
   } else if (S.view === "island-map-edit") {
@@ -79,7 +83,7 @@ function render() {
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else {
-    body = UI.resListHTML(S.res, canEdit(), S.msg, isPres(), UI.mpItems(S.me, "res:", S.workspaces));
+    body = UI.resListHTML(S.res, canEdit(), S.msg, isPres(), UI.mpItems(S.me, "res:", S.workspaces), resSecs(), S.busy);
   }
   // 側欄亮哪一行：編輯畫面算在它所屬的那個分頁底下。
   const tab = { "res-edit": "res", "mail-edit": "mail", "members": "res", "history-edit": "history", "island-edit": "island", "island-map-edit": "island-map" }[S.view] || S.view;
@@ -169,6 +173,13 @@ async function openTeam() {
     S.view = "team"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.rosterLoad") + D.says(e); }
   render();
+  await loadPast();
+}
+// 前幾屆的名單（2026-11-25，past.js）。跟上面那一份分開讀：這一份讀不到（不是 Co-President 或 Senior Adviser、網路斷了）就不畫那一塊，上面那一份照常。
+// S.past：undefined 不畫；null 遷移檔還沒跑，印一句要跑哪一支；陣列就是名單。
+async function loadPast() {
+  try { S.past = await PAST.loadPast(); } catch (e) { S.past = undefined; console.warn("前幾屆的名單讀不到，那一塊不畫。", e); }
+  if (S.view === "team") render();
 }
 
 // 校友頁的核可清單。整份只有 Co-President 叫得動（門在資料庫那一支函式裡）。
@@ -294,7 +305,12 @@ async function uploadFiles(milestoneId, files) {
 async function openRes() {
   S.busy = true; render();
   try {
-    S.res = await D.loadResources();
+    // 大標載不到不擋資源清單：那一塊不畫，上面講一句。
+    const [res, secs] = await Promise.all([
+      D.loadResources(),
+      D.loadResourceSections().catch(e => { console.warn(HERE + " 大標載不到：", e); S.msg = T("err.rsecLoad") + D.says(e); return null; }),
+    ]);
+    S.res = res; S.resSecs = secs;
     S.view = "res"; S.busy = false;
   } catch (e) { S.busy = false; S.msg = T("err.resLoad") + D.says(e); }
   render();
@@ -362,12 +378,26 @@ async function onAutosave(act, box, field) {
   }
   if (act === "res-save") {
     const patch = { title: v.title, blurb: v.blurb, kind: v.kind, url: v.url, team: v.team || null, ord: Number(v.ord) || 100 };
+    // 放在哪一個大標底下：表單上有那一格才送（遷移檔還沒跑、或一個大標都還沒有的時候沒有那一格）。
+    if ("section_id" in v) patch.section_id = v.section_id || null;
     UI.autosaveState(box, "saving");
     try {
       await D.saveResource(id, patch);   // 名稱與連結空的，資料層會丟 err.resName / err.resUrl
       const r = S.res.find(x => x.id === id); if (r) Object.assign(r, patch);
       if (S.resEditing && S.resEditing.id === id) Object.assign(S.resEditing, patch);
       saved(T("msg.saved"));
+    } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
+    return;
+  }
+  // 大標的一列（2027-01-13）：中文名、英文名、排序，改了就存。對外頁的大標跟著換。
+  if (act === "rsec-save") {
+    if (!v.name_zh) { autosaveFail(box, T("err.rsecName")); return; }
+    UI.autosaveState(box, "saving");
+    try {
+      await D.saveResourceSection(id, v);
+      const row = S.resSecs && (S.resSecs.rows || []).find(x => x.id === id);
+      if (row) Object.assign(row, { name_zh: v.name_zh, name_en: v.name_en || null, ord: Number(v.ord) || 100 });
+      saved(T("msg.rsecSaved"));
     } catch (err) { autosaveFail(box, T("err.save") + D.says(err)); }
     return;
   }
@@ -524,6 +554,20 @@ document.addEventListener("click", async e => {
   if (act === "mail-edit") { S.tplKind = b.dataset.k; S.tplDraft = null; S.mailEnOpen = false; S.view = "mail-edit"; S.msg = ""; render(); return; }
   if (act === "mail-prev-lang" || act === "mail-prev-w") { S.mailPrev = Object.assign({ lang: "zh", w: 600 }, S.mailPrev, act === "mail-prev-lang" ? { lang: b.dataset.v } : { w: +b.dataset.v }); readMailForm(); render(); return; }
   // mail-save 那顆鈕 2026-11-06 拿掉了，三封信的六格改了就存（onAutosave）。
+
+  // 前幾屆的名單（past.js）：開或關一屆、藏或放回一個人。兩顆都是打勾的格子，資料庫只讓 Co-President 動。
+  // 沒做成就把名單重讀一次，畫面上的勾才會跟資料庫一樣（不然那一格會停在他剛剛按的樣子）。
+  if (act === "past-public" || act === "past-hide") {
+    const on = b.checked, term = b.dataset.term;
+    S.busy = true; S.msg = ""; render();
+    try {
+      if (act === "past-public") { await PAST.setPastPublic(term, on); S.msg = T(on ? "msg.pastOpened" : "msg.pastClosed", { term: String(term).replace(/[^\w-]/g, "") }); }
+      else await PAST.setPastHidden(id, on);
+    } catch (err) { S.msg = T("err.change") + D.says(err); }
+    S.busy = false;
+    await loadPast();
+    return;
+  }
 
   if (act === "approve") {
     const ok = b.checked;
@@ -690,6 +734,7 @@ document.addEventListener("click", async e => {
       url: val("rurl"), team: val("rteam") || null, status: val("rstatus"),
       ord: Number(val("rord")) || 100,
     };
+    if (document.getElementById("rsection")) patch.section_id = val("rsection") || null;
     S.busy = true; S.msg = ""; render();
     try {
       const newId = await D.saveResource(null, patch);
@@ -706,6 +751,7 @@ document.addEventListener("click", async e => {
     const cur = S.res.find(r => r.id === id) || S.resEditing || {};
     const patch = { title: v.title || cur.title, blurb: v.blurb != null ? v.blurb : cur.blurb, kind: v.kind || cur.kind, url: v.url || cur.url,
       team: (v.team != null ? v.team : cur.team) || null, ord: Number(v.ord != null ? v.ord : cur.ord) || 100, status: to };
+    if ("section_id" in v) patch.section_id = v.section_id || null;
     S.busy = true; S.msg = ""; render();
     try {
       await D.saveResource(id, patch);
@@ -713,6 +759,31 @@ document.addEventListener("click", async e => {
       if (S.resEditing && S.resEditing.id === id) Object.assign(S.resEditing, patch);
       S.busy = false; S.msg = T(to === "published" ? "msg.resPublished" : "msg.resUnpublished"); render();
     } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
+  // ── 資源的大標（2027-01-13）：加一個、刪一個。改名字與排序是自動儲存（onAutosave 的 rsec-save）。
+  if (act === "rsec-add") {
+    const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ""; };
+    const patch = { name_zh: val("rsec-new-zh"), name_en: val("rsec-new-en"), ord: val("rsec-new-ord") };
+    if (!patch.name_zh) { S.msg = T("err.rsecName"); render(); return; }
+    S.busy = true; S.msg = ""; render();
+    try {
+      await D.saveResourceSection(null, patch);
+      S.resSecs = await D.loadResourceSections();
+      S.busy = false; S.msg = T("msg.rsecAdded"); render();
+    } catch (err) { S.busy = false; S.msg = T("err.save") + D.says(err); render(); }
+    return;
+  }
+  if (act === "rsec-del") {
+    if (UI.needAsk(S, b, T("confirm.delRsec"))) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      const n = await D.deleteResourceSection(id);
+      // 底下的資源變回沒有分，兩份都重讀。
+      const [res, secs] = await Promise.all([D.loadResources(), D.loadResourceSections()]);
+      S.res = res; S.resSecs = secs; dirty.forget("rsec-save:" + id);
+      S.busy = false; S.msg = T("msg.rsecDeleted", { n }); render();
+    } catch (err) { S.busy = false; S.msg = T("err.delete") + D.says(err); render(); }
     return;
   }
   if (act === "res-del") {

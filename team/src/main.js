@@ -20,6 +20,7 @@ const T = {
 };
 
 (async () => {
+  if (document.documentElement.hasAttribute("data-past")) return;   // 前幾屆那一頁（?term=）畫的是另一份名單，見 past.js
   try {
     // 2026-10-24 起走 public_team()（2026-10-24-ranks-and-workspaces.sql）：
     // 只回「本人同意、Co-President 核可、而且這一屆有職位」的幹部，頭銜從職位算（title_en · term），

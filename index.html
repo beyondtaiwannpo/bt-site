@@ -187,12 +187,22 @@ main,footer,.topbar{position:relative;z-index:1}
 /* logo 不可改色、拉伸、旋轉、調透明度（Brand Book 硬規則） */
 
 .navlinks{display:flex;align-items:center;gap:clamp(12px,1.8vw,28px)}
-.navlinks a{
+.navlinks a,.navlinks summary{
   font-size:14.5px;font-weight:500;line-height:1;
   color:var(--ink);text-decoration:none;opacity:.74;
   padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;transition:opacity var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease);
 }
-.navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+.navlinks a:hover,.navlinks a:focus-visible,.navlinks summary:hover,.navlinks summary:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+/* 頂欄的下拉（2026-11-25）：「團隊」按了才展開，底下是現在的團隊與前兩屆。它是 <details>，沒有 JavaScript 也打得開。
+   十一頁各一份，改的時候十一份都要改，check.sh 會比對。 */
+.navdrop{position:relative}
+.navdrop summary{list-style:none;cursor:pointer}
+.navdrop summary::-webkit-details-marker{display:none}
+.navdrop summary::after{content:"";display:inline-block;width:6px;height:6px;margin-left:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.navdrop[open] summary,.navdrop:has(a[aria-current]) summary{opacity:1;border-bottom-color:var(--bt-orange)}
+.navsub{position:absolute;top:calc(100% + 12px);left:-14px;z-index:5;min-width:190px;display:flex;flex-direction:column;padding:8px 14px;border-radius:16px;
+  background:var(--bt-cream);border:1px solid rgba(16,42,134,.14);box-shadow:0 14px 34px rgba(16,42,134,.14)}
+.navsub a{padding:10px 1px;border-bottom:0}
 
 .lang{
   min-width:44px;   /* 可點區域的寬度也要有 44，墊片只撐得了高度 */
@@ -382,7 +392,7 @@ p{margin:0 0 17px;max-width:34em}
    量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
 @media (max-width:1180px){
   .navlinks{gap:clamp(7px,1.05vw,14px)}
-  .navlinks a{font-size:13.5px}
+  .navlinks a,.navlinks summary{font-size:13.5px}
   .login{padding:9px 14px;font-size:13.5px}
 }
 
@@ -459,7 +469,10 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
     .navlinks{background:var(--bt-cream)}
   }
   .navlinks.open{display:flex}
-  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
+  .navlinks a,.navlinks summary{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
+  .navdrop{width:100%}
+  .navsub{position:static;min-width:0;padding:0 0 6px 16px;border:0;border-radius:0;background:none;box-shadow:none}
+  .navsub a{padding:15px 1px;font-size:15px}
   .burger{display:block}
 }
 @media (max-width:420px){
@@ -658,9 +671,25 @@ html[data-lang="zh"] .now-none{font-family:var(--han);font-weight:900}
 .wrow p{margin:0;max-width:32em;font-size:16px;line-height:1.65}
 .wrow .arr{font-family:var(--display);font-weight:700;font-size:28px;line-height:1;justify-self:end;transition:transform var(--dur-2) var(--ease)}
 .wrow:hover .arr{transform:translateX(6px)}
+/* 活的那幾列（2026-11-25）：一個 team 一列。左邊是 team 的名字（連到 /team/ 那個 team），右邊是它的計畫，一個計畫一條連結。
+   整列不是一條連結（裡面有好幾條），所以滑過去不變色，變色的是裡面那一條。 */
+.wteam{align-items:start}
+.wteam:hover{background:none}
+.wteam h3 a{color:inherit;text-decoration:none}
+.wteam h3 a:hover{text-decoration:underline;text-decoration-color:var(--bt-orange);text-decoration-thickness:3px;text-underline-offset:6px}
+.wteam a.arr{color:var(--ink);text-decoration:none}
+.wteam a.arr:hover{transform:translateX(6px)}
+.wlist{list-style:none;margin:0;padding:0;max-width:34em}
+.wlist li + li{border-top:1px solid rgba(16,42,134,.14)}
+.wlist a{display:block;padding:10px 0;text-decoration:none;color:var(--ink)}
+.wlist li:first-child a{padding-top:2px}
+.wlist a:hover b{text-decoration:underline;text-decoration-color:var(--bt-orange);text-underline-offset:4px}
+.wlist b{display:block;font-weight:600;font-size:17px;line-height:1.4}
+.wlist span{display:block;font-size:14.5px;line-height:1.55;color:rgba(16,42,134,.8)}
+.wlist em{font-style:normal;font-size:12px;font-weight:600;background:var(--bt-orange);color:var(--bt-navy);padding:2px 8px;border-radius:999px;margin-left:6px;white-space:nowrap}
 @media (max-width:820px){
   .wrow{grid-template-columns:2.4rem minmax(0,1fr) 1.6rem;gap:6px 10px}
-  .wrow p{grid-column:2 / -1;grid-row:2}
+  .wrow p,.wrow .wlist{grid-column:2 / -1;grid-row:2}
 }
 
 /* 數字：左邊一張照片，右邊三個數字直排。 */
@@ -709,8 +738,14 @@ html[data-lang="zh"] .now-none{font-family:var(--han);font-weight:900}
        標籤自己也有中英兩份，跟著 data-lang 一起切。 -->
   <div class="navlinks" id="navlinks">
     <a class="nav-cta" href="./apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="./year/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a>
-    <a href="./team/"><span class="zh">團隊</span><span class="en">Teams</span></a>
+    <details class="navdrop">
+      <summary><span class="zh">團隊</span><span class="en">Teams</span></summary>
+      <div class="navsub">
+        <a href="./team/"><span class="zh">現在的團隊</span><span class="en">Current team</span></a>
+        <a href="./team/?term=2025-26"><span class="zh">2025-26 那一屆</span><span class="en">2025-26 alumni</span></a>
+        <a href="./team/?term=2024-25"><span class="zh">2024-25 那一屆</span><span class="en">2024-25 alumni</span></a>
+      </div>
+    </details>
     <a href="./resources/"><span class="zh">免費資源</span><span class="en">Resources</span></a>
     <a href="./about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="./partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
@@ -719,6 +754,11 @@ html[data-lang="zh"] .now-none{font-family:var(--han);font-weight:900}
   <a class="login" href="./app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
   <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
 </nav>
+<script>
+/* 頂欄的下拉：點別的地方或按 Esc 就收起來。沒有這一段也打得開、關得掉。 */
+(function(){function shut(e){var d=document.querySelectorAll("details.navdrop[open]");for(var i=0;i<d.length;i++)if(!e||!d[i].contains(e.target))d[i].removeAttribute("open")}
+document.addEventListener("click",shut);document.addEventListener("keydown",function(e){if(e.key==="Escape")shut()})})();
+</script>
 
 <main id="main">
 
@@ -783,12 +823,19 @@ html[data-lang="zh"] .now-none{font-family:var(--han);font-weight:900}
      合作那一大塊與大合照 → /partner/；六個數字剩三個，完整的在 /impact/。
      這一頁新寫的字只有小標與按鈕；每一句介紹都是從定稿或內頁原句搬來的（BT-官網文案-定稿.md、/resources/、/partner/）。 -->
 
-<!-- 我們做什麼：三行，一行一件事，整行可以點。刻意不做成三張一樣的卡片（那是全站每一頁都有的東西，首頁要安靜）。 -->
+<!-- 活動與計畫（2026-11-25，原本是「我們做什麼」三行）。Paul：「at homepage, there's going to be programs from all the teams」。
+     頂欄的「活動與計畫」拿掉了，計畫改放兩個地方：這裡（全部 team 的）與 /team/（每個 team 自己的）。
+     資料跟 /team/ 是同一份：後台「網站上的活動」裡勾了「多數年份都會辦」的。一個 team 一列，底下是它的計畫。
+     最下面那段 type="module" 的程式問到資料之後，把 #what-zh 與 #what-en 畫出來，同時把 #what-static 收起來。
+     問不到（或後台一筆都沒有）就維持 HTML 裡原本這兩行，字是 2026-11-24 那一版的，一字沒改。「免費資源」那一行兩種情況都在。 -->
 <section class="what" id="what" aria-labelledby="what-h">
   <div class="what-head">
     <small><span class="zh">全部免費</span><span class="en">All free</span></small>
-    <h2 id="what-h"><span class="zh">我們做什麼</span><span class="en">What we do</span></h2>
+    <h2 id="what-h"><span class="zh">活動與計畫</span><span class="en">Programmes</span></h2>
   </div>
+  <div class="zh" id="what-zh"></div>
+  <div class="en" id="what-en"></div>
+  <div id="what-static">
   <a class="wrow" href="./year/">
     <small>01</small>
     <h3><span class="zh">探索營</span><span class="en">College Bootcamp</span></h3>
@@ -801,8 +848,9 @@ html[data-lang="zh"] .now-none{font-family:var(--han);font-weight:900}
     <p><span class="zh">一學期配對一次。你會有一位走過同一條路的學長姐，他不會幫你寫 essay，但會陪你把卡住的地方講清楚。</span><span class="en">One matching round per semester. You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on.</span></p>
     <span class="arr" aria-hidden="true">→</span>
   </a>
+  </div>
   <a class="wrow" href="./resources/">
-    <small>03</small>
+    <small id="what-res-n">03</small>
     <h3><span class="zh">免費資源</span><span class="en">Free resources</span></h3>
     <p><span class="zh">申請文書怎麼寫、選校怎麼看、時程怎麼排。這些是 BT 五年下來一次一次講給學生聽的東西，寫下來讓更多人拿得到。</span><span class="en">How to write your essays, how to read a school list, how to plan the timeline. Five years of things we have explained one student at a time, written down so more people can have them.</span></p>
     <span class="arr" aria-hidden="true">→</span>
@@ -1223,8 +1271,8 @@ var VIDEO_ID = "";
    用 fetch 問兩件事：公開的活動（public_events()）與狀態是開放的報名表。三秒內問不到，那一段就維持 HTML 裡原本的幾句話。
    活動卡跟 /events/ 共用同一支畫法（events/src/ui.js），哪些表單算「現在開放」的判斷在 year/src/logic.js。 */
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./shared/supabase-config.js";
-import { homeCardsHTML, esc } from "./events/src/ui.js";
-import { looseForms, fmtDay } from "./year/src/logic.js";
+import { homeCardsHTML, homeProgrammesHTML, esc } from "./events/src/ui.js";
+import { looseForms, fmtDay, homeProgrammes } from "./year/src/logic.js";
 (async () => {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 3000);
   const H = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: "Bearer " + SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" };
@@ -1240,6 +1288,13 @@ import { looseForms, fmtDay } from "./year/src/logic.js";
       const rows = loose.map(f => `<li><b>${esc(f.title)}</b><span><a class="cta warm sm" href="./apply/?f=${encodeURIComponent(f.id)}&lang=${l}">${en ? "Sign up" : "報名"}</a>${f.closes_at ? ` <span class="ev-note">${en ? "closes " + fmtDay(f.closes_at, true) : fmtDay(f.closes_at, false) + " 截止"}</span>` : ""}</span></li>`).join("");
       document.getElementById("now-" + l).innerHTML = (rows ? `<ul class="now-forms">${rows}</ul>` : "") + cards
         || `<p class="now-none">${en ? "Nothing is open right now." : "現在還沒有開放報名的活動。"}</p>`;
+    }
+    /* 活動與計畫（2026-11-25）：同一份 public_events()，勾了「多數年份都會辦」的，一個 team 一列。一筆都沒有就維持 HTML 裡原本那兩行。 */
+    const groups = { zh: homeProgrammes(events, new Date(), "zh"), en: homeProgrammes(events, new Date(), "en") };
+    if (groups.zh.length) {
+      for (const l of ["zh", "en"]) document.getElementById("what-" + l).innerHTML = homeProgrammesHTML(groups[l], l);
+      document.getElementById("what-static").hidden = true;
+      document.getElementById("what-res-n").textContent = String(groups.zh.length + 1).padStart(2, "0");
     }
     if (window.btRise) window.btRise(document);
     /* 這一段長高了，下面停住的那一段要重新量位置。這裡只發一個訊號，量位置是頁面中間 motion() 那一段自己聽了之後做的（這一段不碰動畫）。 */

@@ -394,3 +394,20 @@ export function homeCardsHTML(events, l) {
   const first = up.find(e => signupState(e) === "open") || up[0], more = up.length - 1;
   return cardHTML(first, l, "./events/", true) + (more ? `<p class="tk-more"><a class="more" href="./events/">${T[l].more(more)}</a></p>` : "");
 }
+// 首頁「活動與計畫」那幾列（2026-11-25）：一個 team 一列，左邊是 team 的名字（連到 /team/ 那個 team），右邊是它固定在做的，一個計畫一條連結。
+// groups 是 year/src/logic.js 的 homeProgrammes() 算好的（[{ key, label, items: [{ slug, title, line, state }] }]）；空的回空字串，首頁就維持 HTML 裡原本的字。
+// 字跟 /team/ 那張清單同一套（team/src/programmes.js）：這一屆、開放報名中、已結束。
+const HP = {
+  zh: { this: "這一屆：", tbc: "這一屆的時間還沒定", open: "開放報名中", past: "已結束", team: g => `看 ${g} 這個 team` },
+  en: { this: "This year: ", tbc: "This year's date is not set yet", open: "Open now", past: "Done", team: g => `About the ${g} team` },
+};
+export function homeProgrammesHTML(groups, l) {
+  const s = HP[l === "en" ? "en" : "zh"];
+  return (groups || []).filter(g => g && g.items && g.items.length).map((g, i) => {
+    const rows = g.items.map(it => {
+      const tag = it.state === "open" ? `<em>${s.open}</em>` : it.state === "past" ? `<em>${s.past}</em>` : "";
+      return `<li><a href="./events/?lang=${l}#${esc(it.slug)}"><b>${esc(it.title)}</b><span>${it.line ? s.this + esc(it.line) : s.tbc}${tag}</span></a></li>`;
+    }).join("");
+    return `<div class="wrow wteam"><small>${String(i + 1).padStart(2, "0")}</small><h3><a href="./team/#${esc(g.key)}">${esc(g.label)}</a></h3><ul class="wlist">${rows}</ul><a class="arr" href="./team/#${esc(g.key)}" aria-label="${esc(s.team(g.label))}">→</a></div>`;
+  }).join("");
+}

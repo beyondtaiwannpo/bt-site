@@ -22,6 +22,7 @@ export function rowHTML(e, l) {
 }
 
 if (typeof document !== "undefined") (async () => {
+  if (document.documentElement.hasAttribute("data-past")) return;   // 前幾屆那一頁（?term=）沒有這幾格，見 past.js
   const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 4000);
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/public_events", { method: "POST", body: "{}", signal: ctl.signal,

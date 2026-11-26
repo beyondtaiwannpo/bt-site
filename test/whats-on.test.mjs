@@ -89,12 +89,20 @@ test("活動卡：只知道日期的不印 00:00；沒有日期的計畫不排�
   assert.deepEqual(s.upcoming.map(e => e.slug), ["b"]);
 });
 
-test("★ 頂欄：十一個檔同一份，現在開放、這一年、團隊、免費資源、關於我們、合作；沒有藥丸也沒有圖示", () => {
-  const want = ["apply|現在開放|Open now", "year|活動與計畫|Programmes", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
+// 2026-11-25 Paul 與幹部討論完的定案：「活動與計畫」從頂欄拿掉（計畫改放首頁與團隊頁），「團隊」變成下拉：現在的團隊與前兩屆。
+test("★ 頂欄：十一個檔同一份，現在開放、團隊（下拉）、免費資源、關於我們、合作；沒有藥丸也沒有圖示", () => {
+  const want = ["apply|現在開放|Open now", "team|現在的團隊|Current team", "team?term=2025-26|2025-26 那一屆|2025-26 alumni", "team?term=2024-25|2024-25 那一屆|2024-25 alumni",
+    "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
   for (const p of ["index.html", "about/index.html", "alumni/index.html", "apply/index.html", "events/index.html", "impact/index.html", "year/index.html", "partner/index.html", "resources/index.html", "team/index.html", "island/index.html"]) {
-    const h = readFileSync(p, "utf8"), nav = h.match(/<div class="navlinks" id="navlinks">([\s\S]*?)<\/div>/)[1];
-    const got = [...nav.matchAll(/href="\.\.?\/([a-z]+)\/"[^>]*><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span>/g)].map(m => m[1] + "|" + m[2] + "|" + m[3]);
+    const h = readFileSync(p, "utf8"), a = h.indexOf('<div class="navlinks" id="navlinks">'), nav = h.slice(a, h.indexOf('<button class="lang"', a));
+    const got = [...nav.matchAll(/href="\.\.?\/([a-z]+)\/(\?term=[\d-]+)?"[^>]*><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span>/g)].map(m => m[1] + (m[2] || "") + "|" + m[3] + "|" + m[4]);
     assert.deepEqual(got, want, p); assert.doesNotMatch(nav, /<svg|flame/, p);
+    assert.match(nav, /<details class="navdrop">\s*<summary><span class="zh">團隊<\/span><span class="en">Teams<\/span><\/summary>\s*<div class="navsub">/, p + " 的「團隊」是一個下拉");
+    assert.doesNotMatch(nav, /year\/|programs\//, p + " 的頂欄沒有活動與計畫");
+    // 那兩屆的連結帶 ?term=：補語言的那一段只改 lang 一個參數，不把 ? 後面整段換掉
+    assert.doesNotMatch(h, /split\("\?"\)\[0\] \+ "\?lang="/, p);
+    // 點別的地方或按 Esc 會收起來（那一小段跟在頂欄後面）
+    assert.match(h, /<\/nav>\n<script>\n\/\* 頂欄的下拉：[^\n]*\n\(function\(\)\{function shut\(e\)/, p);
   }
   const css = readFileSync("island/island.css", "utf8"), isl = readFileSync("island/index.html", "utf8");
   assert.doesNotMatch(css, /\.navlinks \.nav-cta\{[^}]*background:var\(--bt-orange\)/, "不是橘色藥丸");

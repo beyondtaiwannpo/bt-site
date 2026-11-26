@@ -33,20 +33,25 @@ export async function loadMe(userId) {
 // ── 批 5：資源 ────────────────────────────────────────────────────────
 // 後台這一邊一律用完整欄位（幹部一定是 authenticated，拿得到 url）。
 // 對外那一頁的兩種查詢在 resources/src/main.js，**兩邊刻意分開**。
+// 2027-01-13 起多讀 section_id（這一筆放在哪一個大標底下，2027-01-13-resource-sections.sql）。
+// 那一支還沒跑的時候這一欄不存在（42703），退回只讀原本那幾欄，這一頁照樣打得開。
 export async function loadResources() {
   need();
-  const { data, error } = await supabase.from("resources")
-    .select("id, title, blurb, kind, url, team, status, ord, updated_at")
-    .order("ord");
+  const COLS = "id, title, blurb, kind, url, team, status, ord, updated_at";
+  const q = cols => supabase.from("resources").select(cols).order("ord");
+  let { data, error } = await q(COLS + ", section_id");
+  if (error && notMigrated(error)) ({ data, error } = await q(COLS));
   if (error) throw error;
   return data || [];
 }
 
-const RES_FIELDS = ["title", "blurb", "kind", "url", "team", "status", "ord"];
+// section_id 只有表單裡真的有那一格（大標那張表讀得到）才會送，所以遷移檔還沒跑的時候存檔不會壞。
+const RES_FIELDS = ["title", "blurb", "kind", "url", "team", "status", "ord", "section_id"];
 export async function saveResource(id, patch) {
   need();
   const clean = {};
   for (const k of RES_FIELDS) if (k in patch) clean[k] = patch[k];
+  if ("section_id" in clean) clean.section_id = clean.section_id || null;
   if (!clean.title) throw new Error(T("err.resName"));
   if (!clean.url) throw new Error(T("err.resUrl"));
   if (id) {
@@ -57,6 +62,47 @@ export async function saveResource(id, patch) {
   const { data, error } = await supabase.from("resources").insert(clean).select("id").single();
   if (error) throw error;
   return data.id;
+}
+
+// ── 資源的大標（2027-01-13-resource-sections.sql）────────────────────────
+// Paul 2026-11-25：「at the backstage you can just let us name what resources, the big heading is」
+// 一個大標是對外 /resources/ 上的一塊（例如「大學介紹」）。讀是公開的；加、改、刪走資料庫的兩支函式，
+// 按得了的人由資料庫決定（Co-President、Senior Adviser，或至少一個 team 的「管」），這裡只是問一聲好決定要不要畫按鈕。
+// 資料庫講「沒有這張表、這一欄、這支函式」的那幾種代號：都是同一件事，那一支遷移檔還沒跑。
+export function notMigrated(error) {
+  const code = String((error && error.code) || ""), msg = String((error && error.message) || "");
+  return ["42703", "42P01", "PGRST202", "PGRST204", "PGRST205"].includes(code)
+    || (/Could not find|does not exist/.test(msg) && /resource_section|section_id/.test(msg));
+}
+const SECTIONS_SQL = "sections_not_migrated";
+// 回 { rows, missing, canManage }。missing 是 true 的時候畫面只印一句要先跑哪一支，其他照舊。
+export async function loadResourceSections() {
+  need();
+  const { data, error } = await supabase.from("resource_sections").select("id, name_zh, name_en, ord").order("ord");
+  if (error) {
+    if (notMigrated(error)) return { rows: [], missing: true, canManage: false };
+    throw error;
+  }
+  const can = await supabase.rpc("can_manage_resource_sections");
+  return { rows: data || [], missing: false, canManage: !can.error && can.data === true };
+}
+// id 是空的就是加一個。回那一個大標的 id。
+export async function saveResourceSection(id, patch) {
+  need();
+  const ord = Number(patch.ord);
+  const { data, error } = await supabase.rpc("save_resource_section", {
+    p_id: id || null, p_name_zh: String(patch.name_zh || "").trim(), p_name_en: String(patch.name_en || "").trim(),
+    p_ord: Number.isFinite(ord) && String(patch.ord).trim() !== "" ? Math.round(ord) : 100,
+  });
+  if (error) throw (notMigrated(error) ? new Error(SECTIONS_SQL) : error);
+  return data;
+}
+// 刪一個大標。底下的資源不會被刪，只是變回沒有分。回底下原本有幾筆。
+export async function deleteResourceSection(id) {
+  need();
+  const { data, error } = await supabase.rpc("delete_resource_section", { p_id: id });
+  if (error) throw (notMigrated(error) ? new Error(SECTIONS_SQL) : error);
+  return Number(data) || 0;
 }
 
 export async function deleteResource(id) {
@@ -357,6 +403,13 @@ const SAYS = [
   ["empty_mail", "主旨與內容都要寫，不能只寫一個。", "Fill in both subject and body."],
   ["no_such_form", "找不到這份表單，可能已經被刪掉了。", "Form not found. It may have been deleted."],
   ["no_such_template", "找不到這一種信的文案，可能是遷移檔還沒跑完。", "Email copy for this kind not found. The migration may not have run yet."],
+  // 資源的大標（2027-01-13）
+  ["sections_not_migrated", "大標還不能用，要先在 Supabase 跑 2027-01-13-resource-sections.sql。", "Sections are not available yet. Run 2027-01-13-resource-sections.sql in Supabase first."],
+  ["not_section_manager", "大標只有 Co-President、Senior Adviser，或是在某一個 team 是「管」的人改得了。", "Only a Co-President, a Senior Adviser, or someone who manages a team can change sections."],
+  ["section_name_required", "大標要有中文名字。", "A section needs a Chinese name."],
+  ["section_name_too_long", "大標的名字最多 60 個字。", "A section name can be at most 60 characters."],
+  ["too_many_sections", "大標最多 40 個。先刪掉用不到的再加。", "There can be at most 40 sections. Delete one you no longer use first."],
+  ["no_such_section", "找不到這個大標，可能已經被刪掉了。重新整理再試一次。", "Section not found. It may have been deleted. Refresh and try again."],
   // 實習護照的後台（2026-10-18）
   ["not_internship_team", "只有 Internship team 的幹部與 Co-President 改得動實習護照。", "Only Internship team cadres and Co-Presidents can edit the intern passport."],
   ["bad_term_id", "屆別的代號只能用英文字母、數字和連字號，例如 2027-28。", "A term id can only use letters, digits and hyphens, for example 2027-28."],

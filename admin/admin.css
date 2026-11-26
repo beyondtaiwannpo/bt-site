@@ -92,6 +92,9 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 .card p{font-size:14px;margin:0 0 12px}
 /* 一筆一列，上面一條細線分隔。 */
 .flist{margin:0;padding:0;list-style:none}
+/* 前幾屆的名單（admin/site/src/past.js，2026-11-25）：一屆一塊，上面是那一屆的開關，底下縮進去的是名單。 */
+.past-term{border-top:1px solid rgba(16,42,134,.16);padding-top:16px;margin-top:18px}
+.past-term > .flist{margin:10px 0 0 31px}
 .flist > li{padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
 .flist > li:first-child{border-top:0;padding-top:2px}
 .fhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}

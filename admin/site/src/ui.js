@@ -631,13 +631,52 @@ export function alumniStoriesHTML(rows, msg, busy) {
       </li>`).join("")}</ul>` : emptyHTML(T("stories.empty"), T("stories.emptyHint"))}`);
 }
 
-export function resListHTML(items, canEdit, msg, isPresident, mpItems) {
+// 大標（2027-01-13-resource-sections.sql）：secs = { rows, missing, canManage }，由 data.js 的 loadResourceSections() 給。
+// 沒給（舊的呼叫方式與測試）就整塊不畫，清單跟原本一樣。
+const rsecName = s => (lang() === "en" ? (s.name_en || s.name_zh) : s.name_zh) || "";
+export function resSectionsHTML(secs, items, busy) {
+  if (!secs) return "";
+  // 那一支遷移檔還沒跑：只印一句要先跑哪一支，上面的資源清單照舊。
+  if (secs.missing) return sectionHTML(T("rsec.title"), `<div class="note">${T("rsec.missing")}</div>`);
+  const rows = secs.rows || [], dis = busy ? " disabled" : "";
+  const count = id => (items || []).filter(r => r.section_id === id).length;
+  const lede = `<div class="note">${T("rsec.lede")}</div>`;
+  if (!secs.canManage) {
+    return sectionHTML(T("rsec.title"), lede + (rows.length
+      ? `<ul class="flist">${rows.map(x => `<li><div class="fhead"><b>${esc(x.name_zh)}</b>${x.name_en ? `<span class="tag">${esc(x.name_en)}</span>` : ""}</div>
+          <div class="fmeta">${esc(T("rsec.count", { n: count(x.id) }))}</div></li>`).join("")}</ul>`
+      : `<div class="note">${T("rsec.none")}</div>`) + `<div class="note">${T("rsec.readonly")}</div>`);
+  }
+  const row = x => `<li><div class="two" data-autosave="rsec-save" data-id="${esc(x.id)}">
+      <label><i>${T("rsec.nameZh")}</i><input name="name_zh" maxlength="60" value="${esc(x.name_zh || "")}"${dis}></label>
+      <label><i>${T("rsec.nameEn")}</i><input name="name_en" maxlength="60" value="${esc(x.name_en || "")}"${dis}></label>
+      <label><i>${T("rsec.ord")}</i><input name="ord" type="number" value="${esc(String(x.ord == null ? 100 : x.ord))}"${dis}></label>
+      <div class="row">${autosaveHint("rsec-save")}<span class="fmeta">${esc(T("rsec.count", { n: count(x.id) }))}</span>
+        <button class="btn quiet danger sm" data-act="rsec-del" data-id="${esc(x.id)}"${dis}>${T("rsec.del")}</button></div>
+    </div></li>`;
+  const add = `<div class="two">
+      <label><i>${T("rsec.nameZh")}</i><input id="rsec-new-zh" maxlength="60" placeholder="${esc(T("rsec.zhPh"))}" autocomplete="off"${dis}></label>
+      <label><i>${T("rsec.nameEn")}</i><input id="rsec-new-en" maxlength="60" placeholder="${esc(T("rsec.enPh"))}" autocomplete="off"${dis}></label>
+      <label><i>${T("rsec.ord")}</i><input id="rsec-new-ord" type="number" value="${esc(String(rsecNextOrd(rows)))}"${dis}></label>
+      <div class="row"><button class="btn" data-act="rsec-add"${dis}>${T("rsec.add")}</button></div>
+    </div>`;
+  return sectionHTML(T("rsec.title"), lede
+    + (rows.length ? `<ul class="flist">${rows.map(row).join("")}</ul>` : `<div class="note">${T("rsec.none")}</div>`) + add, { id: "rsec" });
+}
+// 新的大標預設排在最後面：現有最大的排序再加 10。
+export function rsecNextOrd(rows) {
+  const max = (rows || []).reduce((m, x) => Math.max(m, Number(x.ord) || 0), 0);
+  return rows && rows.length ? max + 10 : 10;
+}
+export function resListHTML(items, canEdit, msg, isPresident, mpItems, secs, busy) {
+  const secOf = r => (secs && !secs.missing && r.section_id ? (secs.rows || []).find(x => x.id === r.section_id) : null);
   const rows = items.map(r => `<li>
     <div class="fhead">
       <b>${esc(r.title)}</b>
       <span class="tag ${r.status === "published" ? "open" : "draft"}">${
         r.status === "published" ? T("res.published") : T("res.draft")}</span>
       <span class="tag">${esc(T((RES_KINDS.find(k => k.v === r.kind) || RES_KINDS[5]).label))}</span>
+      ${secOf(r) ? `<span class="tag">${esc(rsecName(secOf(r)))}</span>` : ""}
     </div>
     <div class="fmeta">${esc(r.blurb || T("res.noBlurb"))}</div>
     <div class="fmeta"><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.url)}</a></div>
@@ -653,10 +692,11 @@ export function resListHTML(items, canEdit, msg, isPresident, mpItems) {
     + (canEdit ? "" : `<div class="note">${T("res.readonly")}</div>`)
     + sectionHTML("", items.length ? `<ul class="flist">${rows}</ul>`
       : emptyHTML(T("res.empty"), T("res.emptyHint"),
-                  canEdit ? { act: "res-new", label: T("res.new") } : null));
+                  canEdit ? { act: "res-new", label: T("res.new") } : null))
+    + resSectionsHTML(secs, items, busy);
 }
 
-export function resEditHTML(r, msg, busy) {
+export function resEditHTML(r, msg, busy, secs) {
   const cur = r || { title: "", blurb: "", kind: "pdf", url: "", team: "", status: "draft", ord: 100 };
   const isNew = !r;
   // 2026-11-06 自動儲存：既有的資源改了就存（容器 data-autosave="res-save"，main.js 的 onAutosave 接）。
@@ -669,6 +709,13 @@ export function resEditHTML(r, msg, busy) {
     : `<label><i>${T("res.status")}</i><span class="tag${cur.status === "published" ? " open" : " draft"}">${cur.status === "published" ? T("res.published") : T("res.draft")}</span></label>`;
   const statusBtn = isNew ? "" : `<button class="btn ghost" data-act="res-status" data-id="${esc(r.id)}" data-to="${cur.status === "published" ? "draft" : "published"}"${busy ? " disabled" : ""}>${
           cur.status === "published" ? T("res.unpublish") : T("res.publish")}</button>`;
+  // 放在哪一個大標底下（2027-01-13）。有大標才有這一格；遷移檔還沒跑、或一個大標都還沒加，表單跟原本一樣。
+  // 這一筆指到的大標已經不在清單裡（剛被別人刪掉）就當作沒有分。
+  const secRows = secs && !secs.missing ? (secs.rows || []) : [];
+  const secSel = secRows.length ? `<label><i>${T("res.section")}</i><select id="rsection" name="section_id">
+        <option value="">${esc(T("res.noSection"))}</option>
+        ${secRows.map(x => `<option value="${esc(x.id)}"${cur.section_id === x.id ? " selected" : ""}>${esc(rsecName(x))}</option>`).join("")}
+      </select></label>` : "";
   const form = `<label><i>${T("res.name")}</i><input id="rtitle" name="title" value="${esc(cur.title)}" placeholder="${esc(T("res.namePh"))}"></label>
     <!-- ⚠ 介紹是**搜尋引擎唯一看得到的東西**（連結那一欄要登入才讀得到）。
          所以這一格要寫得像一句對高中生講的話，不是一行檔名。 -->
@@ -680,6 +727,7 @@ export function resEditHTML(r, msg, busy) {
     <!-- 這一句是人的流程，不是程式。Drive 的分享權限設錯，網站看不出來，
          而使用者看到的是一頁「你需要存取權」。 -->
     <div class="note">${T("res.urlNote")}</div>
+    ${secSel}
     <div class="two">
       <label><i>${T("res.kind")}</i><select id="rkind" name="kind">
         ${RES_KINDS.map(k => `<option value="${k.v}"${cur.kind === k.v ? " selected" : ""}>${esc(T(k.label))}</option>`).join("")}

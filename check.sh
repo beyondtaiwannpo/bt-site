@@ -2016,37 +2016,49 @@ else
   ok "每一個 index.html 都在 FILES、佔位文案範圍與 check-icons 的清單裡（共 $(printf '%s\n' $pages | wc -l | tr -d ' ') 頁）"
 fi
 
-# ── 對外頁的頂欄每一頁一模一樣（2026-11-20 對外頁重整，2026-11-21 第二次）─────────────────────
-# Paul 2026-11-20：「too many, and they serve almost the same thing」。2026-11-21 再收一次：
-# 六個連結：現在開放（/apply/，現在報得了名的）、這一年（/year/，一整屆的時間軸）、團隊（/team/，六個 team 與它們固定在做的事）、免費資源、關於我們、合作。
-# （2026-11-22 上午是「現在開放、活動與計畫…」，同一天稍晚 Paul 改成現在這樣，/programs/ 拆掉只剩轉址。）
+# ── 對外頁的頂欄每一頁一模一樣（2026-11-20 對外頁重整，2026-11-21 第二次，2026-11-25 第三次）─────────────────────
+# Paul 2026-11-20：「too many, and they serve almost the same thing」。2026-11-21 再收一次，2026-11-22 定成六個連結。
+# 2026-11-25 Paul 與幹部討論完的定案：「活動與計畫」從頂欄拿掉，計畫改放首頁（全部 team 的）與團隊頁（每個 team 自己的）；
+# 「團隊」變成下拉，底下三個連結：現在的團隊、前兩屆（/team/?term=哪一屆）。所以現在是五項：
+# 現在開放（/apply/）、團隊（下拉）、免費資源、關於我們、合作。/year/ 那一頁還在，從首頁與頁尾連過去。
 # 「現在開放」怎麼標出來試過三次：橘色藥丸寫「報名」（像要註冊帳號）、橘色藥丸寫「活動與計畫」（Paul：out of place）、
 # 一顆小火（Paul：ugly）。2026-11-22 定案：不標，直接多一個連結叫「現在開放」，字粗一點而已。
 # 頂欄是每頁各一份（外殼各自一份的代價），所以最容易壞的方式是「改了九頁漏一頁」：
 # 那一頁不會壞，只會跟別頁不一樣，而沒有人會一頁一頁點過去比對。
 # 這一條把每一頁的 navlinks 拿掉 aria-current 與 ./ ../ 的差別之後比對，要全部一樣（BT 島那一頁也掛同一條，一起比）；
-# 也擋著不准有人把 BT 島、校友或活動加回頂欄（BT 島在團隊頁最上面、首頁的大區塊與頁尾，見 README「對外頁重整」）。
+# 也擋著不准有人把 BT 島、校友航線圖或活動加回頂欄（BT 島在首頁的頁尾，見 README「對外頁重整」）。
+# 換屆的時候下拉裡那兩屆要換（十一頁各一份），這一條會確認十一頁換成一樣的，而且每一個都是 /team/?term=年份 的樣子。
 navOut=$(node -e '
   const fs = require("fs");
   const pages = ["index.html","about/index.html","alumni/index.html","apply/index.html","events/index.html","impact/index.html","year/index.html","partner/index.html","resources/index.html","team/index.html","island/index.html"];
-  const norm = f => { const m = fs.readFileSync(f, "utf8").match(/<div class="navlinks" id="navlinks">([\s\S]*?)<\/div>/);
-    return m ? m[1].replace(/ aria-current="page"/g, "").replace(/href="\.\.?\//g, "href=\"/").replace(/\s+/g, " ").trim() : null; };
+  const block = f => { const s = fs.readFileSync(f, "utf8"), a = s.indexOf("<div class=\"navlinks\" id=\"navlinks\">"), b = s.indexOf("<button class=\"lang\"", a);
+    return a < 0 || b < 0 ? null : s.slice(a, b); };
+  const norm = f => { const m = block(f);
+    return m ? m.replace(/ aria-current="page"/g, "").replace(/href="\.\.?\//g, "href=\"/").replace(/\s+/g, " ").trim() : null; };
   const base = norm("index.html"), bad = [];
   for (const f of pages) { const n = norm(f); if (n === null) bad.push(f + " 找不到頂欄"); else if (n !== base) bad.push(f + " 的頂欄跟首頁不一樣"); }
-  const items = (base.match(/<a /g) || []).length;
-  if (items !== 6) bad.push("頂欄要是六個連結（現在開放、這一年、團隊、免費資源、關於我們、合作），現在 " + items + " 個");
-  if (/island\/|impact\/|alumni\/|events\/|programs\//.test(base)) bad.push("頂欄裡出現了 BT 島、數字、校友、活動頁或已經拆掉的 /programs/（它們不在頂欄）");
-  const want = ["apply|現在開放|Open now", "year|活動與計畫|Programmes", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
-  const got = [...base.matchAll(/href="\/([a-z]+)\/"><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span>/g)].map(m => m[1] + "|" + m[2] + "|" + m[3]);
-  if (got.join(" ") !== want.join(" ")) bad.push("頂欄要照這個順序：現在開放、活動與計畫（英文 Programmes，到 /year/）、團隊、免費資源（英文 Resources）、關於我們、合作。現在是：" + got.join("、"));
+  if (/island\/|impact\/|alumni\/|events\/|programs\/|year\//.test(base)) bad.push("頂欄裡出現了 BT 島、數字、校友航線圖、活動頁、/year/ 或已經拆掉的 /programs/（它們不在頂欄）");
+  const link = /<a(?: class="nav-cta")? href="\/([a-z]+)\/(\?term=\d{4}-\d{2})?"><span class="zh">([^<]*)<\/span><span class="en">([^<]*)<\/span><\/a>/g;
+  const drop = base.match(/<details class="navdrop"> <summary><span class="zh">團隊<\/span><span class="en">Teams<\/span><\/summary> <div class="navsub">([\s\S]*?)<\/div> <\/details>/);
+  if (!drop) bad.push("頂欄的「團隊」要是一個下拉（<details class=\"navdrop\">，summary 是 團隊 / Teams）");
+  else {
+    const sub = [...drop[1].matchAll(link)].map(m => m[1] + (m[2] || ""));
+    if (sub[0] !== "team" || sub.length < 2 || sub.length > 4 || !sub.slice(1).every(x => /^team\?term=\d{4}-\d{2}$/.test(x)))
+      bad.push("「團隊」的下拉要是：現在的團隊（/team/），接著一到三屆（/team/?term=年份）。現在是：" + sub.join("、"));
+    const top = [...base.replace(drop[0], "<a href=\"/team/\"><span class=\"zh\">團隊</span><span class=\"en\">Teams</span></a>").matchAll(link)].map(m => m[1] + "|" + m[3] + "|" + m[4]);
+    const want = ["apply|現在開放|Open now", "team|團隊|Teams", "resources|免費資源|Resources", "about|關於我們|About", "partner|合作|Partner"];
+    if (top.join(" ") !== want.join(" ")) bad.push("頂欄要照這個順序：現在開放、團隊（下拉）、免費資源（英文 Resources）、關於我們、合作。現在是：" + top.join("、"));
+  }
   if (/<svg|flame/.test(base)) bad.push("頂欄裡又出現圖示了（小火 Paul 2026-11-22 說醜，拿掉了）");
   if (/background:var\(--bt-orange\)/.test((fs.readFileSync("index.html", "utf8").match(/\.navlinks \.nav-cta\{[^}]*\}/) || [""])[0])) bad.push("頂欄的第一個連結又變回橘色藥丸了（Paul 2026-11-21 說不要）");
+  // 下拉的連結帶 ?term=：每一頁補語言的那一段只准改 lang 這一個參數，不准把 ? 後面整段換掉（換掉的話那兩屆的連結會變成現在的團隊）。
+  for (const f of pages) if (/split\("\?"\)\[0\] \+ "\?lang="/.test(fs.readFileSync(f, "utf8"))) bad.push(f + " 補語言的時候把 ? 後面整段換掉了，「團隊」底下那兩屆的連結會壞");
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
 ' 2>&1)
 if [ $? -ne 0 ]; then
   bad "對外頁的頂欄不一致："; printf '%s\n' "$navOut"
 else
-  ok "十一頁對外頁（含 BT 島）的頂欄一模一樣：現在開放、這一年、團隊、免費資源、關於我們、合作"
+  ok "十一頁對外頁（含 BT 島）的頂欄一模一樣：現在開放、團隊（下拉：現在的團隊與前幾屆）、免費資源、關於我們、合作"
 fi
 
 # ── 對外頁共用的那一支 shared/public.js 不准長大（2026-11-21）────────────────

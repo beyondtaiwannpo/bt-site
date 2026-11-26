@@ -117,3 +117,16 @@ export function teamProgrammes(events, now) {
   for (const k of TEAMS) out[k].sort((a, b) => pos(a) - pos(b));
   return out;
 }
+
+// ── 首頁「活動與計畫」（2026-11-25）：全部 team 的固定計畫，一個 team 一組 ──
+// Paul：「at homepage, there's going to be programs from all the teams」。資料跟團隊頁同一份（teamProgrammes），只是六個 team 排在一起。
+// 回 [{ key, label, items: [{ slug, title, line, state }] }]，沒有計畫的 team 不在裡面；line 是「這一屆叫什麼，哪一天或大約幾月」，兩樣都沒有就是空字串。
+export function homeProgrammes(events, now, l) {
+  const by = teamProgrammes(events, now), en = l === "en";
+  const pick = (e, k) => (en ? (e[k + "_en"] || e[k + "_zh"]) : (e[k + "_zh"] || e[k + "_en"])) || "";
+  return TEAMS.filter(k => by[k].length).map(k => ({
+    key: k, label: TEAM_LABEL[k],
+    items: by[k].map(e => ({ slug: e.slug, title: pick(e, "title"), state: e.state,
+      line: [pick(e, "edition"), whenLabel(e, en)].filter(Boolean).join(en ? ", " : "，") })),
+  }));
+}

@@ -100,9 +100,19 @@ main,footer,.topbar{position:relative;z-index:1}
 .topbar .home{display:flex;align-items:center;margin-right:auto;flex:0 0 auto;position:relative}
 .topbar .home img{height:30px;width:auto;display:block}
 .navlinks{display:flex;align-items:center;gap:clamp(10px,1.5vw,24px)}
-.navlinks a{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;
+.navlinks a,.navlinks summary{font-size:14.5px;font-weight:500;line-height:1;color:var(--ink);text-decoration:none;
   opacity:.74;padding:7px 1px;border-bottom:2px solid transparent;white-space:nowrap;transition:opacity var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
-.navlinks a:hover,.navlinks a:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+.navlinks a:hover,.navlinks a:focus-visible,.navlinks summary:hover,.navlinks summary:focus-visible{opacity:1;border-bottom-color:var(--bt-orange)}
+/* 頂欄的下拉（2026-11-25）：「團隊」按了才展開，底下是現在的團隊與前兩屆。它是 <details>，沒有 JavaScript 也打得開。
+   十一頁各一份，改的時候十一份都要改，check.sh 會比對。 */
+.navdrop{position:relative}
+.navdrop summary{list-style:none;cursor:pointer}
+.navdrop summary::-webkit-details-marker{display:none}
+.navdrop summary::after{content:"";display:inline-block;width:6px;height:6px;margin-left:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.navdrop[open] summary,.navdrop:has(a[aria-current]) summary{opacity:1;border-bottom-color:var(--bt-orange)}
+.navsub{position:absolute;top:calc(100% + 12px);left:-14px;z-index:5;min-width:190px;display:flex;flex-direction:column;padding:8px 14px;border-radius:16px;
+  background:var(--bt-cream);border:1px solid rgba(16,42,134,.14);box-shadow:0 14px 34px rgba(16,42,134,.14)}
+.navsub a{padding:10px 1px;border-bottom:0}
 .navlinks a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
 .lang{min-width:44px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.12em;
   border:1px solid rgba(16,42,134,.32);border-radius:999px;padding:6px 13px;background:none;
@@ -212,7 +222,7 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
    量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
 @media (max-width:1180px){
   .navlinks{gap:clamp(7px,1.05vw,14px)}
-  .navlinks a{font-size:13.5px}
+  .navlinks a,.navlinks summary{font-size:13.5px}
   .login{padding:9px 14px;font-size:13.5px}
 }
 @media (max-width:900px){
@@ -226,7 +236,10 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
     .navlinks{background:var(--bt-cream)}
   }
   .navlinks.open{display:flex}
-  .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
+  .navlinks a,.navlinks summary{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
+  .navdrop{width:100%}
+  .navsub{position:static;min-width:0;padding:0 0 6px 16px;border:0;border-radius:0;background:none;box-shadow:none}
+  .navsub a{padding:15px 1px;font-size:15px}
   .burger{display:block}
   .tl li{grid-template-columns:1fr;gap:2px}
 }
@@ -315,8 +328,14 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   </a>
   <div class="navlinks" id="navlinks">
     <a class="nav-cta" href="../apply/"><span class="zh">現在開放</span><span class="en">Open now</span></a>
-    <a href="../year/"><span class="zh">活動與計畫</span><span class="en">Programmes</span></a>
-    <a href="../team/"><span class="zh">團隊</span><span class="en">Teams</span></a>
+    <details class="navdrop">
+      <summary><span class="zh">團隊</span><span class="en">Teams</span></summary>
+      <div class="navsub">
+        <a href="../team/"><span class="zh">現在的團隊</span><span class="en">Current team</span></a>
+        <a href="../team/?term=2025-26"><span class="zh">2025-26 那一屆</span><span class="en">2025-26 alumni</span></a>
+        <a href="../team/?term=2024-25"><span class="zh">2024-25 那一屆</span><span class="en">2024-25 alumni</span></a>
+      </div>
+    </details>
     <a href="../resources/" aria-current="page"><span class="zh">免費資源</span><span class="en">Resources</span></a>
     <a href="../about/"><span class="zh">關於我們</span><span class="en">About</span></a>
     <a href="../partner/"><span class="zh">合作</span><span class="en">Partner</span></a>
@@ -325,12 +344,19 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
   <a class="login" href="../app/"><span class="lg-a">登入</span><span class="lg-sep"> / </span><span class="lg-b">Sign in</span></a>
   <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="navlinks">選單</button>
 </nav>
+<script>
+/* 頂欄的下拉：點別的地方或按 Esc 就收起來。沒有這一段也打得開、關得掉。 */
+(function(){function shut(e){var d=document.querySelectorAll("details.navdrop[open]");for(var i=0;i<d.length;i++)if(!e||!d[i].contains(e.target))d[i].removeAttribute("open")}
+document.addEventListener("click",shut);document.addEventListener("keydown",function(e){if(e.key==="Escape")shut()})})();
+</script>
 
 <main id="main">
 <header class="hero">
   <h1><span class="zh">我們整理過的東西</span><span class="en">What we have written down</span></h1>
   <p class="lead"><span class="zh">申請文書怎麼寫、選校怎麼看、時程怎麼排。這些是 BT 五年下來一次一次講給學生聽的東西，寫下來讓更多人拿得到。全部免費。</span><span class="en">How to write your essays, how to read a school list, how to plan the timeline. Five years of things we have explained one student at a time, written down so more people can have them. All free.</span></p>
 </header>
+<!-- 資源區。資料載到之後，src/main.js 把這一整塊換掉：後台有加大標（例如「大學介紹」）就一個大標一塊，
+     沒有大標就還是這一塊（大標叫「資源」）。大標在後台「資源」那一頁改，不用動這個檔。 -->
 <section class="sec">
   <div class="sec-in">
     <h2><span class="zh">資源</span><span class="en">Resources</span></h2>
@@ -382,7 +408,9 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
     for (var i = 0; i < as.length; i++) {
       var h = as[i].getAttribute("href");
       if (!h || /^(https?:|mailto:|#)/.test(h) || h.indexOf("app/") >= 0) continue;
-      as[i].setAttribute("href", h.split("?")[0] + "?lang=" + l);
+      /* 只改 lang 這一個參數，不把 ? 後面整段換掉：頂欄「團隊」底下那兩屆的連結帶著自己的 ?term=（2026-11-25）。 */
+      var u = new URL(h, location.href); u.searchParams.set("lang", l);
+      as[i].setAttribute("href", u.pathname + u.search + u.hash);
     }
   }
 
