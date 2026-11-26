@@ -6,9 +6,9 @@
 <title>關於我們 / Beyond Taiwan</title>
 
 <!-- 對外的內容頁（2026-09-07 新增）。
-     這一頁只講「為什麼」，四段：信念（大標題）、為什麼開始（資訊落差）、使命願景價值（Paul 2026-11-21 給的定稿，一字不改）、為什麼免費。「誰在做」在 /team/。
-     2026-11-22 Paul 要這一頁瘦身：數字、五年的時間軸、數字怎麼來的搬回 /impact/，這一頁只留一句連過去。
-     2026-11-20 起 /impact/（做過什麼）併進這一頁：數字、時間軸、數字怎麼來的三段原樣搬過來，/impact/ 只剩轉址。
+     這一頁只講「為什麼」：信念、七個人怎麼變成三十個人、資訊落差、使命、願景、價值（Paul 2026-11-21 給的定稿，一字不改）、為什麼免費。「誰在做」在 /team/。
+     2026-11-25 改成捲動的故事：畫面停在原地，往下捲的時候字一格一格換，三十個點跟著重新排隊。字都在 HTML 裡，怎麼改寫在頁面內容開頭的那一段註解。
+     五年的時間軸在這一頁也有一份，七格跟 /impact/ 一字不差（測試守著）；數字與數字怎麼來的只在 /impact/。
      ── 這一頁不碰 auth ──
      不載入 supabase、不判斷登入狀態。右上角那顆按鈕只是一個連結。
 
@@ -65,6 +65,15 @@
     var q = new URLSearchParams(location.search).get("lang");
     document.documentElement.setAttribute("data-lang",
       q === "en" || q === "zh" ? q : (/^zh/i.test(navigator.language || "") ? "zh" : "en"));
+  })();
+</script>
+<!-- 捲動的故事要不要開，也在這裡先決定（晚一步決定的話，畫面會先排成一長篇再跳成一個畫面）。
+     三種情況不開，整頁就是一格接一格的普通文章：系統開了「減少動態效果」、畫面太矮（橫放的手機）、網址帶 ?motion=off。 -->
+<script>
+  (function () {
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var off = new URLSearchParams(location.search).get("motion") === "off";
+    if (!reduce && !off && window.innerHeight >= 520) document.documentElement.classList.add("story-on");
   })();
 </script>
 
@@ -142,89 +151,70 @@ main,footer,.topbar{position:relative;z-index:1}
 .topbar .home::after,.lang::after,.login::after,.burger::after{
   content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
 
-/* ═════════ 版面 ═════════ */
-.hero{padding:clamp(40px,8vh,110px) var(--gut) clamp(20px,3vh,40px)}
-h1{font-family:var(--han);font-weight:900;font-size:clamp(36px,6.4vw,96px);
-  line-height:1;letter-spacing:-.02em;margin:0;max-width:9em}
-.en h1{font-family:var(--display);font-weight:700;font-size:clamp(38px,6.8vw,100px);
-  line-height:.96;letter-spacing:-.01em;max-width:15ch}
-.lead{font-size:clamp(16px,1.35vw,20px);line-height:1.62;max-width:34em;
-  margin:clamp(20px,3.2vh,34px) 0 0;color:rgba(16,42,134,.82)}
 
-.sec{padding:clamp(46px,7.5vh,110px) var(--gut) 0}
-.sec-in{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);
-  gap:clamp(18px,4.5vw,74px);align-items:start;
-  border-top:1px solid rgba(16,42,134,.15);padding-top:clamp(20px,3.4vh,40px)}
-h2{font-family:var(--han);font-weight:900;font-size:clamp(24px,3.4vw,50px);
-  line-height:1.06;letter-spacing:-.015em;margin:0;text-wrap:balance}
-.en h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.8vw,54px);
-  line-height:1;letter-spacing:0}
-h3{font-family:var(--display);font-weight:700;font-size:clamp(19px,1.7vw,25px);
-  letter-spacing:.005em;line-height:1.2;margin:36px 0 10px}
-h3:first-child{margin-top:0}
-p{margin:0 0 17px;max-width:34em}
-.body a{color:var(--ink);font-weight:600;text-decoration-thickness:1px;text-underline-offset:3px;transition:text-decoration-color var(--dur-2) var(--ease),text-underline-offset var(--dur-2) var(--ease)}
-.body a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
-.pull{font-family:var(--hand);font-size:clamp(21px,2.6vw,34px);line-height:1.55;
-  margin:clamp(22px,3.4vh,38px) 0;max-width:22em;color:var(--ink)}
+/* ═════════ 字與版面 ═════════ */
+/* 這一頁是一格一格的（.beat）。每一格裡面中文一塊、英文一塊，字都在 HTML 裡，要改字直接改那一格。
+   這一段是「沒有在捲動故事裡」的樣子：一格接一格往下排，就是一篇普通的文章。
+   開了減少動態效果、螢幕太矮、網址加 ?motion=off，或是下面那支程式沒跑起來，看到的都是這個樣子，一個字都不會少。
+   捲動故事的樣子在這個 <style> 最下面「捲動的故事」那一段，全部掛在 html.story-on 底下。 */
+h1,h2,p{margin:0}
+.story{position:relative;background:var(--paper)}
+.dots,.rail,.bar,.cue{display:none}
+.beat{position:relative;padding:clamp(40px,7.5vh,96px) var(--gut)}
+.beat+.beat{border-top:1px solid rgba(16,42,134,.15)}
+/* 網址帶 #mission 這種代號跳過來的時候，標題不要躲在黏住的頂欄底下。 */
+.beat[id]{scroll-margin-top:84px}
+/* 每一格的底色寫在那一格的 data-tone：不寫是米白，sand 淺橘，navy 深藍，warm 主橘，photo 是有照片的那種（深藍底）。 */
+.beat[data-tone="sand"]{background:var(--bt-sand)}
+.beat[data-tone="navy"],.beat[data-tone="photo"]{background:var(--bt-navy);color:var(--bt-cream)}
+.beat[data-tone="warm"]{background:var(--bt-orange)}
+.beat[data-tone="navy"] h2{color:var(--bt-orange)}
 
-/* 時間軸。只有這一段是真的時間順序，所以只有這裡用得起年份當標記
-   —— 其他地方不准用 01/02/03 那種編號（見視覺方向「要避開的套路」）。 */
-.tl{margin:0;padding:0;list-style:none;max-width:34em}
-.tl li{display:grid;grid-template-columns:5.5em 1fr;gap:clamp(12px,2vw,26px);
-  padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
-.tl li:first-child{border-top:0;padding-top:0}
-.tl b{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.03em;
-  color:rgba(16,42,134,.7);white-space:nowrap}
-.tl span{font-size:16px;line-height:1.6}
+h1{font-family:var(--han);font-weight:900;font-size:clamp(40px,8.2vw,132px);line-height:1;letter-spacing:-.02em;max-width:9.5em}
+.en h1{font-family:var(--display);font-weight:700;font-size:clamp(42px,7.6vw,124px);line-height:.92;letter-spacing:-.01em;max-width:17ch}
+h2{font-family:var(--han);font-weight:900;font-size:clamp(22px,2.4vw,34px);line-height:1.1;letter-spacing:-.01em;margin-bottom:clamp(12px,2vh,22px)}
+.en h2{font-family:var(--display);font-weight:700;letter-spacing:0;font-size:clamp(24px,2.6vw,38px);line-height:1}
+/* 一格只有一句話的時候，那一句放到很大（.cap）。資訊落差那一段的標題也是一整句，用同一種大小（h2.big）。 */
+.cap,h2.big{font-family:var(--han);font-weight:900;font-size:clamp(32px,5.6vw,84px);line-height:1.1;letter-spacing:-.02em;max-width:13em;text-wrap:balance}
+.en .cap,.en h2.big{font-family:var(--display);font-weight:700;letter-spacing:-.005em;font-size:clamp(36px,6.2vw,94px);line-height:.98;max-width:19ch}
+h2.big{font-size:clamp(30px,4.6vw,68px);margin-bottom:clamp(14px,2.4vh,26px)}
+.en h2.big{font-size:clamp(34px,5vw,74px)}
+.say{font-size:clamp(17.5px,1.5vw,22px);line-height:1.75;max-width:30em}
+.say+.say{margin-top:.9em}
+.say.lg{font-size:clamp(20px,2.3vw,35px);line-height:1.56;font-weight:500;max-width:27em}
+.pull{font-family:var(--hand);font-size:clamp(28px,4.6vw,72px);line-height:1.36;max-width:15em}
+.en .pull{font-size:clamp(26px,4vw,60px);line-height:1.26;max-width:20em}
+.beat a:not(.cta){color:inherit;font-weight:600;text-decoration-thickness:1px;text-underline-offset:3px;transition:text-decoration-color var(--dur-2) var(--ease),text-underline-offset var(--dur-2) var(--ease)}
+.beat a:not(.cta):hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
+.acts{display:flex;flex-wrap:wrap;gap:12px;margin-top:clamp(16px,3vh,30px)}
 
-/* 數字。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
-   是兩欄的列，靠上面那條細線分隔，跟時間軸與六個 team 同一套語言。
-   數字本身用 Barlow Condensed 放到很大，那是這一頁唯一需要大聲的東西。 */
-.nums{margin:0;padding:0;list-style:none;
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-  column-gap:clamp(20px,4vw,56px)}
-.nums li{padding:20px 0;border-top:1px solid rgba(16,42,134,.14)}
-.nums li:nth-child(-n+2){border-top:0;padding-top:0}
-.nums b{display:block;font-family:var(--display);font-weight:700;
-  font-size:clamp(40px,4.8vw,68px);line-height:.95;letter-spacing:-.01em}
-.nums i{display:block;font-style:normal;font-family:var(--display);font-weight:600;
-  font-size:13px;letter-spacing:.14em;text-transform:uppercase;
-  color:rgba(16,42,134,.7);margin:7px 0 9px}
-.nums span{display:block;font-size:15.5px;line-height:1.6;
-  color:rgba(16,42,134,.82);max-width:24em}
-@media (max-width:700px){
-  /* 一欄的時候「前兩個不畫上線」就不對了，只有第一個不畫。
-     ⚠ 這裡一定要重寫 :nth-child(-n+2) 那一條，不能只寫 .nums li ——
-     媒體查詢不會提高特異性，:nth-child 那一條本來就比較高，會贏。
-     2026-09-08 就是這樣漏掉的：手機上第二格沒有上線，看起來像跟第一格黏在一起。 */
-  .nums{grid-template-columns:1fr}
-  .nums li:nth-child(-n+2){border-top:1px solid rgba(16,42,134,.14);padding-top:20px}
-  .nums li:first-child{border-top:0;padding-top:0}
-}
+/* 照片：站上本來就有的那兩張。平常是那一格最上面一整條，捲動故事裡鋪滿整個畫面。 */
+.shot{display:block;margin:calc(-1*clamp(40px,7.5vh,96px)) calc(-1*var(--gut)) clamp(24px,4vh,44px)}
+.shot img{display:block;width:100%;height:clamp(240px,56vh,620px);object-fit:cover;object-position:60% 30%}
 
-/* 從 /impact/ 轉過來會跳到 #numbers，標題不要躲在黏住的頂欄底下。 */
-.sec[id]{scroll-margin-top:84px}
+/* 五年走過來：七格跟 /impact/ 一字不差（測試守著），改那一頁的時候這裡要一起改。
+   只有這一段是真的時間順序，所以只有這裡用得起日期當標記。 */
+.a-tl{margin:0;padding:0;list-style:none;max-width:34em}
+.a-tl li{display:grid;grid-template-columns:5.5em 1fr;gap:clamp(12px,2vw,26px);padding:14px 0;border-top:1px solid rgba(16,42,134,.14)}
+.a-tl li:first-child{border-top:0;padding-top:0}
+.a-tl b{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.03em;color:rgba(16,42,134,.7);white-space:nowrap}
+.a-tl span{font-size:16px;line-height:1.6}
 
-/* 團隊的六個 team。刻意不是六張一樣圓角一樣陰影的卡片（那是要避開的套路），
-   是六列，靠上面那條線分隔。 */
-.rows{margin:0;padding:0;list-style:none;max-width:34em}
-.rows li{padding:16px 0;border-top:1px solid rgba(16,42,134,.14)}
-.rows li:first-child{border-top:0;padding-top:0}
-.rows b{display:block;font-family:var(--display);font-weight:700;font-size:19px;
-  letter-spacing:.02em;margin-bottom:4px}
-.rows span{font-size:15.5px;line-height:1.6;color:rgba(16,42,134,.78)}
+/* 價值：三個字各佔一列，字很大。 */
+.a-vals{list-style:none;margin:0;padding:0}
+.a-vals li{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(14px,4vw,70px);align-items:end;
+  padding:clamp(18px,3vh,36px) 0;border-top:1px solid rgba(16,42,134,.15)}
+.a-vals b{display:block;font-family:var(--han);font-weight:900;font-size:clamp(56px,11vw,160px);line-height:.92;letter-spacing:-.03em}
+.en .a-vals b{font-family:var(--display);font-weight:700;letter-spacing:-.01em;text-transform:uppercase;line-height:.84}
+.a-vals span{display:block;font-size:clamp(18px,2vw,30px);line-height:1.45;font-weight:500;max-width:17em;padding-bottom:.35em}
+@media (max-width:820px){.a-vals li{grid-template-columns:1fr;align-items:start;gap:10px}}
 
+/* 免費是刻意的：一個很大的 0（學員付的錢）。0 是裝飾，讀螢幕的軟體不唸。捲動故事裡這個字不出現，改由那三十個點排成一個 0。 */
+.a-zero{font-family:var(--display);font-weight:700;font-size:clamp(130px,24vw,320px);line-height:.74;margin-bottom:clamp(16px,3vh,30px)}
 .cta{display:inline-block;background:var(--bt-navy);color:var(--bt-cream);text-decoration:none;
   font-weight:600;font-size:16px;padding:14px 26px;border-radius:999px;margin-top:6px;transition:background var(--dur-2) var(--ease),color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
 .cta:hover{background:var(--bt-orange);color:var(--bt-navy);box-shadow:0 8px 22px rgba(16,42,134,.18)}
-/* 段落裡的按鈕（2026-11-20 修）：.body a 的深藍字比 .cta 的米白字更具體，會贏，按鈕就變成一顆看不到字的深藍藥丸。 */
-.body a.cta{color:var(--bt-cream);text-decoration:none}
-.body a.cta:hover{color:var(--bt-navy)}
 
-.en{border-top:1px solid rgba(16,42,134,.15);margin-top:clamp(56px,9vh,120px);
-  padding-top:clamp(16px,3vh,36px)}
-html[data-lang] .en{border-top:0;margin-top:0;padding-top:0}
 html[data-lang="zh"] .en,html[data-lang="en"] .zh{display:none}
 
 footer{margin-top:clamp(56px,9vh,120px);
@@ -234,7 +224,6 @@ footer p{margin:0 0 8px;max-width:none}
 footer a{color:var(--ink);font-weight:600;text-underline-offset:3px;transition:text-decoration-color var(--dur-2) var(--ease),text-underline-offset var(--dur-2) var(--ease)}
 footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
 
-@media (max-width:820px){.sec-in{grid-template-columns:1fr;gap:14px}}
 /* 導覽有八項之後，中等寬度會擠。**先縮字級與間距，再換漢堡** ——
    1100px 上直接換成漢堡，對一台筆電來說太早了。
    量出來的：英文版八項在 1180px 剛好放得下，再窄就要縮。 */
@@ -256,16 +245,8 @@ footer a:hover{text-decoration-color:var(--bt-orange);text-underline-offset:5px}
   .navlinks.open{display:flex}
   .navlinks a{padding:15px 1px;font-size:16px;border-bottom:0;opacity:1}
   .burger{display:block}
-  .tl li{grid-template-columns:1fr;gap:2px}
 }
 @media (max-width:420px){body{font-size:16px}.login{padding:9px 14px;font-size:14px}}
-/* 捲到才出現（2026-11-05 視覺收尾）。純 CSS 的 scroll-driven animation，不用 JS 也不用 GSAP：
-   每一段進到畫面下緣之後的 220px 內，從透明往上 22px 浮到定位。
-   不支援 animation-timeline 的瀏覽器（Firefox 舊版）會把它當成一個 0 秒的動畫，立刻停在最後一格，
-   也就是直接看到內容，所以不用包 @supports（而且 check-motion.mjs 看不懂巢狀區塊）。
-   reduce 時下面那條 *{animation:none} 會把它關掉。首頁不加，首頁的段落是 GSAP 在管。 */
-.sec-in{animation:bt-reveal linear both;animation-timeline:view();animation-range:entry 0% entry 220px}
-@keyframes bt-reveal{from{opacity:0;translate:0 22px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
 /* ═════════ 點下去要有回饋（2026-09-08）═════════ */
 /* 這一段在每一頁都有一份（外殼各自一份的代價），check.sh 有一條在守誰漏了。
@@ -319,82 +300,90 @@ summary{cursor:pointer}
 .navlinks .nav-cta{opacity:1;font-weight:600}
 footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
-/* 照片（2026-11-21 從首頁搬過來的那一張）。樣式跟首頁同一段。 */
-.photo{display:block;margin:clamp(26px,4.5vh,54px) 0 0}
-.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;background:rgba(16,42,134,.06)}
-
-/* ═════════ 關於我們（2026-11-24 改版）═════════ */
-/* Paul：「more immersive in a way」。字一個都沒有換（信念、使命、願景、價值是 2026-11-21 的定稿），換的是版面：
-   第一屏是一整面照片加信念那一句，停在原地，下面的內容像一張紙從下面蓋上來（.a-hero 是 sticky，.a-over 有底色）；
-   之後每一段一種份量：資訊落差是長文（標題停在左邊陪你讀），照片整個寬度，使命是一整條淺橘，
-   願景是一整面深藍的手寫字，價值三個字各佔一列，免費那一段旁邊一個很大的 0。
-   會動的只有兩種，都是純 CSS 跟著捲動走的（animation-timeline:view()），開了減少動態效果全部不動，內容都在。 */
-.a-hero{position:sticky;top:0;z-index:0;margin-top:-66px;height:100svh;min-height:560px;display:flex;align-items:flex-end;
-  background:var(--bt-navy);color:var(--bt-cream);overflow:hidden}
-.a-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:60% 30%}
-.a-hero::after{content:"";position:absolute;inset:0;pointer-events:none;
+/* ═════════ 捲動的故事（2026-11-25 改版）═════════ */
+/* Paul 的一位 mentor 給了一個捲動的原型，Paul：「Can you build the about page something like this?」
+   照那個原型的走法：畫面停在原地（.stage 是 sticky），你往下捲，字一格一格換，三十個點（三十位幹部）跟著重新排隊。
+   字一個都沒有換（信念、使命、願景、價值是 2026-11-21 的定稿），原型的顏色、字體、佔位文字都沒有拿，用的是這個站自己的。
+   這一段只管「停在原地的時候長什麼樣子」；哪一格什麼時候出現、點排成什麼形狀，是頁尾那支程式照 HTML 上的 data-dots 算的。 */
+html.story-on .story{margin-top:-66px;transition:background-color 480ms var(--ease);
+  --dot:var(--bt-navy);--dot-f:var(--bt-orange);--dot-s:var(--bt-navy)}
+html.story-on .story.t-sand{background:var(--bt-sand)}
+html.story-on .story.t-navy{background:var(--bt-navy);--dot:var(--bt-cream);--dot-s:transparent}
+html.story-on .story.t-warm{background:var(--bt-orange);--dot-f:var(--bt-cream)}
+html.story-on .stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
+html.story-on .beat{position:absolute;inset:0;border:0;background:none;isolation:isolate;opacity:0;pointer-events:none;will-change:opacity,transform;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:92px max(var(--gut),56px) clamp(48px,9vh,104px) var(--gut)}
+html.story-on .beat:first-of-type{opacity:1}
+html.story-on .beat.on{pointer-events:auto}
+html.story-on .shot{position:absolute;inset:0;margin:0;z-index:-1}
+html.story-on .shot img{height:100%}
+html.story-on .shot::after{content:"";position:absolute;inset:0;
   background:linear-gradient(180deg,rgba(16,42,134,.42) 0%,rgba(16,42,134,.3) 30%,rgba(16,42,134,.9) 78%,rgba(16,42,134,.97) 100%)}
-.a-hero-in{position:relative;z-index:2;padding:0 var(--gut) clamp(44px,8vh,96px)}
-.a-hero h1{color:var(--bt-cream);font-size:clamp(40px,8.2vw,132px);max-width:9.5em}
-.en .a-hero h1{font-size:clamp(42px,7.6vw,124px);line-height:.92;max-width:17ch}
-.a-hero .lead{color:rgba(237,229,216,.92);font-size:clamp(16.5px,1.45vw,21px);max-width:34em}
-.a-over{position:relative;z-index:1;background:var(--paper);border-radius:clamp(22px,3vw,40px) clamp(22px,3vw,40px) 0 0;
-  box-shadow:0 -18px 50px rgba(16,42,134,.22);padding-bottom:1px}
-.a-over>.sec:first-child{padding-top:clamp(40px,7vh,96px)}
-.a-over>.sec:first-child .sec-in{border-top:0;padding-top:0}
+html.story-on .a-zero{display:none}
+html.story-on .say{font-size:clamp(18px,1.9vw,28px);line-height:1.7;max-width:28em}
+html.story-on .say.lg{font-size:clamp(20px,2.3vw,35px);line-height:1.56;max-width:27em}
+.measuring *{transition:none!important}
 
-/* 資訊落差：長文。桌機上標題停在左邊。第一句放大，是這一頁的問題。 */
-.a-gap .body p{font-size:clamp(17.5px,1.5vw,22px);line-height:1.75;max-width:30em;margin-bottom:1.1em}
-.a-gap .body p:first-child{font-family:var(--han);font-weight:900;font-size:clamp(26px,3.3vw,50px);line-height:1.22;letter-spacing:-.01em;max-width:15em;margin-bottom:.9em}
-.en .a-gap .body p:first-child{font-family:var(--display);font-weight:700;letter-spacing:0;font-size:clamp(30px,3.8vw,58px);line-height:1.04;max-width:18ch}
-.a-gap .body .pull{font-size:clamp(26px,3.6vw,52px);line-height:1.4;max-width:15em;margin:clamp(30px,5vh,60px) 0 0}
-@media (min-width:821px){.a-gap h2{position:sticky;top:104px}}
+/* 三十個點。前七個是 2020 年開始的那七個人（橘色），其他是後來加入的。顏色跟著那一格的底色換。 */
+html.story-on .dots{display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.dots circle{fill:var(--dot);transition:fill 480ms var(--ease),stroke 480ms var(--ease)}
+.dots .f{fill:var(--dot-f);stroke:var(--dot-s);stroke-width:1.5}
 
-/* 照片：整個寬度，進畫面的時候慢慢從放大縮回來。 */
-.a-photo{margin:clamp(44px,8vh,110px) 0 0;overflow:hidden;background:var(--bt-navy)}
-.a-photo img{display:block;width:100%;height:clamp(320px,74svh,820px);object-fit:cover;object-position:62% 30%;
-  animation:a-zoom linear both;animation-timeline:view();animation-range:entry 0% cover 55%}
-@keyframes a-zoom{from{scale:1.16}}
+/* 第一屏的大標題，一個詞一個詞浮上來（頁尾的程式把它拆開）。 */
+.a-w{display:inline-block;animation:a-rise 700ms var(--ease) both}
+@keyframes a-rise{from{opacity:0;translate:0 14px}}
+/* 第一屏左下角那一小條，提示可以往下捲。裝飾，讀螢幕的軟體不唸。 */
+html.story-on .cue{display:block;position:absolute;left:var(--gut);bottom:14px;z-index:3;width:2px;height:24px}
+.cue::after{content:"";position:absolute;inset:0;border-radius:2px;background:var(--bt-cream);animation:a-cue 1800ms var(--ease) infinite}
+@keyframes a-cue{0%{translate:0 -8px;opacity:0}40%{opacity:1}100%{translate:0 8px;opacity:0}}
 
-/* 使命：一整條淺橘，字比內文大一級。 */
-.a-mission{margin-top:0;padding:clamp(50px,9vh,130px) var(--gut);background:var(--bt-sand)}
-.a-mission .sec-in{border-top:0;padding-top:0}
-.a-mission .body p{font-size:clamp(20px,2.3vw,35px);line-height:1.56;max-width:27em;margin-bottom:1em;font-weight:500}
-.a-mission .body p:last-child{margin-bottom:0}
+/* 五年走過來：七格排成一橫排，捲的時候往左滑。 */
+html.story-on .a-tl{position:absolute;left:0;top:46%;translate:0 -50%;display:flex;max-width:none;will-change:transform}
+html.story-on .a-tl li{position:relative;flex:0 0 auto;display:block;width:min(300px,72vw);padding:34px 30px 0 0;border:0}
+html.story-on .a-tl li::before{content:"";position:absolute;left:0;right:0;top:8px;height:2px;background:rgba(16,42,134,.26)}
+html.story-on .a-tl li::after{content:"";position:absolute;left:0;top:1px;width:16px;height:16px;border-radius:50%;
+  background:var(--bt-orange);border:1.5px solid var(--bt-navy)}
+html.story-on .a-tl b{display:block;font-size:clamp(40px,5vw,64px);line-height:.95;letter-spacing:-.01em;color:var(--bt-navy)}
+html.story-on .a-tl span{display:block;margin-top:10px;font-size:clamp(17px,1.4vw,20px);line-height:1.5;max-width:13em}
+/* 時間軸滑到右邊那一排底下的時候淡掉，不跟章名疊在一起。 */
+html.story-on .tlb{-webkit-mask-image:linear-gradient(90deg,rgba(16,42,134,1) calc(100% - 96px),transparent calc(100% - 40px));
+  mask-image:linear-gradient(90deg,rgba(16,42,134,1) calc(100% - 96px),transparent calc(100% - 40px))}
+@media (min-width:1100px){html.story-on .tlb{-webkit-mask-image:linear-gradient(90deg,rgba(16,42,134,1) calc(100% - 250px),transparent calc(100% - 170px));
+  mask-image:linear-gradient(90deg,rgba(16,42,134,1) calc(100% - 250px),transparent calc(100% - 170px))}}
 
-/* 願景：一整面深藍，手寫字。 */
-.a-vision{padding:clamp(70px,14vh,190px) var(--gut);background:var(--bt-navy);color:var(--bt-cream);min-height:min(88svh,820px);
-  display:flex;flex-direction:column;justify-content:center}
-.a-vision h2{color:var(--bt-orange);font-size:clamp(22px,2.4vw,34px)}
-.en .a-vision h2{font-size:clamp(24px,2.6vw,38px)}
-.a-vision .pull{color:var(--bt-cream);font-size:clamp(30px,5vw,80px);line-height:1.34;max-width:15em;margin:clamp(18px,3vh,34px) 0 0;
-  animation:bt-reveal linear both;animation-timeline:view();animation-range:entry 10% entry 320px}
-.en .a-vision .pull{max-width:20em;font-size:clamp(28px,4.4vw,68px);line-height:1.24}
+/* 價值：三個字都在，輪到的那一個亮起來、底下那一句打開。 */
+html.story-on .a-vals li{display:block;padding:4px 0;border:0;opacity:.26;transition:opacity var(--dur-3) var(--ease)}
+html.story-on .a-vals li.on{opacity:1}
+html.story-on .a-vals b{font-size:clamp(42px,min(10vw,11vh),120px);line-height:1.02}
+html.story-on .en .a-vals b{line-height:.9}
+html.story-on .a-vals span{max-height:0;opacity:0;overflow:hidden;padding:0;font-size:clamp(17px,1.9vw,28px);
+  transition:max-height var(--dur-3) var(--ease),opacity var(--dur-3) var(--ease)}
+html.story-on .a-vals li.on span{max-height:7em;opacity:1;padding:.2em 0 .5em}
 
-/* 只有一欄的一段（標題在上、內容整個寬度）。 */
-.sec-in.one{grid-template-columns:1fr;gap:clamp(10px,2vh,22px)}
-/* 價值：三個字各佔一列，字很大。 */
-.a-vals{list-style:none;margin:0;padding:0}
-.a-vals li{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(14px,4vw,70px);align-items:end;
-  padding:clamp(22px,4vh,48px) 0;border-top:1px solid rgba(16,42,134,.15);
-  animation:bt-reveal linear both;animation-timeline:view();animation-range:entry 0% entry 240px}
-.a-vals b{display:block;font-family:var(--han);font-weight:900;font-size:clamp(64px,13.5vw,210px);line-height:.92;letter-spacing:-.03em}
-.en .a-vals b{font-family:var(--display);font-weight:700;letter-spacing:-.01em;text-transform:uppercase;font-size:clamp(60px,12.4vw,196px);line-height:.84}
-.a-vals span{display:block;font-size:clamp(18px,2vw,30px);line-height:1.45;font-weight:500;max-width:17em;padding-bottom:.35em}
-.a-vals li:nth-child(2) b{color:rgba(16,42,134,.74)}
-.a-vals li:nth-child(3) b{color:rgba(16,42,134,.5)}
-@media (max-width:820px){.a-vals li{grid-template-columns:1fr;align-items:start;gap:10px}}
-
-/* 免費是刻意的：旁邊一個很大的 0（學員付的錢）。0 是裝飾，讀螢幕的軟體不唸。 */
-.a-free{margin:clamp(46px,7.5vh,110px) var(--gut) 0;padding:clamp(28px,5vw,76px);border-radius:28px;
-  background:linear-gradient(180deg,rgba(255,196,108,.8),rgba(255,232,197,.9));
-  display:grid;grid-template-columns:auto minmax(0,1fr);gap:clamp(20px,5vw,90px);align-items:center}
-.a-free .a-zero{font-family:var(--display);font-weight:700;font-size:clamp(150px,27vw,430px);line-height:.74;margin:0;max-width:none;color:var(--bt-navy)}
-.a-free h2{margin-bottom:clamp(14px,2.2vh,24px)}
-.a-free p{font-size:clamp(17px,1.5vw,22px);line-height:1.7}
-@media (max-width:700px){.a-free{grid-template-columns:1fr}.a-free .a-zero{font-size:clamp(150px,46vw,240px)}}
-/* 減少動態效果：照片不縮放（整頁的 animation 已經被上面那條關掉，這裡只是把話講清楚）。 */
-@media (prefers-reduced-motion:reduce){.a-photo img{scale:1}}
+/* 右邊那一排：一顆一章，按了跳到那一章。現在這一章是長的那一顆，寬螢幕上旁邊有章名。 */
+html.story-on .rail{display:flex;flex-direction:column;gap:4px;position:absolute;right:6px;top:50%;translate:0 -50%;z-index:3;color:var(--bt-navy)}
+html.story-on .story.t-navy .rail{color:var(--bt-cream)}
+.rail button{position:relative;width:44px;height:28px;padding:0 12px 0 0;border:0;background:none;color:inherit;
+  display:flex;align-items:center;justify-content:flex-end}
+.rail i{display:block;width:8px;height:8px;border-radius:4px;background:currentColor;opacity:.32;
+  transition:height var(--dur-2) var(--ease),opacity var(--dur-2) var(--ease)}
+.rail button.on i{height:22px;opacity:1}
+.rail span{position:absolute;right:38px;top:50%;translate:0 -50%;white-space:nowrap;font:600 13px/1 var(--body);
+  opacity:0;pointer-events:none;transition:opacity var(--dur-2) var(--ease)}
+.rail button.on span,.rail button:hover span,.rail button:focus-visible span{opacity:.82}
+@media (max-width:1099px){.rail span{width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}}
+/* 最下面那一條：整個故事捲到哪了。 */
+html.story-on .bar{display:block;position:absolute;left:0;bottom:0;z-index:3;width:100%;height:3px;
+  background:var(--bt-orange);transform-origin:0 50%;transform:scaleX(0)}
+html.story-on .story.t-warm .bar{background:var(--bt-navy)}
+/* 畫面矮的時候（橫放的手機、小筆電）字縮一級，不然長的那幾格會頂到頂欄。 */
+@media (max-height:700px){
+  html.story-on .beat{padding-bottom:44px}
+  html.story-on .say{font-size:clamp(17px,1.7vw,22px)}
+  html.story-on .say.lg{font-size:clamp(18px,2vw,26px)}
+  html.story-on .pull{font-size:clamp(24px,4vw,46px)}
+}
 </style>
 </head>
 <body>
@@ -420,160 +409,214 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
 
 <main id="main">
 
-<div class="zh" lang="zh-Hant">
-<header class="a-hero">
-  <picture><source srcset="../photos/hero-listening.webp" type="image/webp"><img src="../photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800" fetchpriority="high"></picture>
-  <div class="a-hero-in">
-    <h1>我們相信，人人都有選擇自己教育的權利。</h1>
-    <p class="lead">Beyond Taiwan 從 2020 年五月開始，七個人。到現在五年，接近三十位幹部，全部是學生，分布在七個國家。</p>
-  </div>
-</header>
+<!-- 這一頁怎麼改：
+     一個 <section class="beat"> 是一格。裡面 <div class="zh"> 是中文、<div class="en"> 是英文，要改字就改那兩塊。
+     要多一格：複製一整個 <section class="beat">…</section>，貼在你要它出現的位置，改裡面的字。
+     data-dots 是那一格的時候三十個點排成什麼（可以寫的名字在頁尾那支程式的 SHAPES）；不寫就是散開的。
+     data-tone 是底色（sand、navy、warm、photo；不寫是米白）。
+     data-ch-zh 與 data-ch-en 是章名：有寫的那一格，右邊那一排會多一顆可以跳過來的點。
+     信念、使命、願景、價值的字是定稿，要改先問 Co-President。 -->
+<div class="story" id="story">
+<div class="stage" id="stage">
+  <svg class="dots" id="dots" aria-hidden="true"></svg>
 
-<div class="a-over">
-<section class="sec a-gap" id="gap">
-  <div class="sec-in">
-    <h2>我們在處理的是資訊落差。</h2>
-    <div class="body">
-      <p>在台灣，「出國念書」常被當成一件家裡有錢才能想的事。</p>
-      <p>這不完全是錯覺。留學代辦的費用不低，公立學校能給的海外升學資源，通常也比不上私立或國際學校。真正的問題不是錢而已，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
-      <p>於是很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
-      <p>Beyond Taiwan 處理的就是這一段落差。我們幾乎所有活動都免費，導生配對計畫、探索營、講座，都不收費。我們沒辦法幫你做決定，但可以讓你在做決定之前，先知道自己有哪些選擇。</p>
+  <section class="beat" id="belief" data-tone="photo" data-dots="hidden" data-ch-zh="關於我們" data-ch-en="About">
+    <picture class="shot zh"><source srcset="../photos/hero-listening.webp" type="image/webp"><img src="../photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800" fetchpriority="high"></picture>
+    <picture class="shot en"><source srcset="../photos/hero-listening.webp" type="image/webp"><img src="../photos/hero-listening.jpg" alt="A row of high school students listening to a speaker, two heads out of focus in the foreground" width="1200" height="800" loading="lazy"></picture>
+    <div class="zh" lang="zh-Hant">
+      <h1>我們相信，人人都有選擇自己教育的權利。</h1>
+    </div>
+    <div class="en" lang="en">
+      <h1>We believe that everyone has the right to choose their own education.</h1>
+    </div>
+  </section>
+
+  <section class="beat" id="seven" data-dots="seven">
+    <div class="zh" lang="zh-Hant">
+      <p class="cap">Beyond Taiwan 從 2020 年五月開始，七個人。</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="cap">Beyond Taiwan started in May 2020 with seven people.</p>
+    </div>
+  </section>
+
+  <section class="beat tlb" id="years" data-dots="tally" data-len="2.5" data-ch-zh="五年走過來" data-ch-en="Five years">
+    <div class="zh" lang="zh-Hant">
+      <h2>五年走過來</h2>
+      <ul class="a-tl">
+        <li><b>2020.05</b><span>成立，七個人。</span></li>
+        <li><b>2020.09</b><span>導生制度開始，第一批 36 人。</span></li>
+        <li><b>2021.06</b><span>線上博覽會，超過 400 人參加。</span></li>
+        <li><b>2021.10</b><span>校園大使 18 位。</span></li>
+        <li><b>2023.06</b><span>第一屆探索營，超過 80 人。</span></li>
+        <li><b>2025.05</b><span>校友帳號超過 85 個。</span></li>
+        <li><b>現在</b><span>接近三十位幹部，全部是學生，分布七個國家。</span></li>
+      </ul>
+    </div>
+    <div class="en" lang="en">
+      <h2>Five years</h2>
+      <ul class="a-tl">
+        <li><b>2020.05</b><span>Founded, seven people.</span></li>
+        <li><b>2020.09</b><span>Mentorship began, 36 students in the first round.</span></li>
+        <li><b>2021.06</b><span>Online fair, more than 400 attendees.</span></li>
+        <li><b>2021.10</b><span>18 campus ambassadors.</span></li>
+        <li><b>2023.06</b><span>First College Bootcamp, more than 80 students.</span></li>
+        <li><b>2025.05</b><span>More than 85 alumni accounts.</span></li>
+        <li><b>Today</b><span>Close to thirty organisers, all students, across seven countries.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="beat" id="thirty" data-dots="thirty">
+    <div class="zh" lang="zh-Hant">
+      <p class="cap">到現在五年，接近三十位幹部，全部是學生，</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="cap">Five years on, we are close to thirty organisers, all of us students,</p>
+    </div>
+  </section>
+
+  <section class="beat" id="countries" data-dots="groups">
+    <div class="zh" lang="zh-Hant">
+      <p class="cap">分布在七個國家。</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="cap">spread across seven countries.</p>
+    </div>
+  </section>
+
+  <section class="beat" id="gap" data-dots="field" data-ch-zh="我們在處理的是資訊落差。" data-ch-en="The gap we work on is information.">
+    <div class="zh" lang="zh-Hant">
+      <h2 class="big">我們在處理的是資訊落差。</h2>
+      <p class="say">在台灣，「出國念書」常被當成一件家裡有錢才能想的事。</p>
+    </div>
+    <div class="en" lang="en">
+      <h2 class="big">The gap we work on is information.</h2>
+      <p class="say">In Taiwan, studying abroad is still widely treated as something only well-off families get to consider.</p>
+    </div>
+  </section>
+
+  <section class="beat" data-dots="field">
+    <div class="zh" lang="zh-Hant">
+      <p class="say">這不完全是錯覺。留學代辦的費用不低，公立學校能給的海外升學資源，通常也比不上私立或國際學校。真正的問題不是錢而已，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="say">That impression is not baseless. Agency fees are high, and public schools rarely have the staff or resources to guide a student through an overseas application. But the harder barrier is information. If no one around you has done it, you do not even know what to ask.</p>
+    </div>
+  </section>
+
+  <section class="beat" data-dots="few">
+    <div class="zh" lang="zh-Hant">
+      <p class="say">於是很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="say">So students rule the option out before they ever look into it. Not because it does not suit them, but because no one has shown them what it actually involves.</p>
+    </div>
+  </section>
+
+  <section class="beat" data-dots="seen">
+    <div class="zh" lang="zh-Hant">
+      <p class="say">Beyond Taiwan 處理的就是這一段落差。我們幾乎所有活動都免費，導生配對計畫、探索營、講座，都不收費。我們沒辦法幫你做決定，但可以讓你在做決定之前，先知道自己有哪些選擇。</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="say">That gap is the reason Beyond Taiwan exists. Almost everything we run is free: mentorship, bootcamps, talks. We cannot make anyone's decision. We can make sure they know what they are choosing between.</p>
+    </div>
+  </section>
+
+  <section class="beat" data-tone="photo" data-dots="hidden">
+    <picture class="shot zh"><source srcset="../photos/talking-laptop.webp" type="image/webp"><img src="../photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy"></picture>
+    <picture class="shot en"><source srcset="../photos/talking-laptop.webp" type="image/webp"><img src="../photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy"></picture>
+    <div class="zh" lang="zh-Hant">
       <p class="pull">「我們不是老師，也不是顧問。多數人只比你早走一兩步。」</p>
-      <picture class="photo">
     </div>
-  </div>
-</section>
-
-<figure class="a-photo">
-  <picture>
-    <source srcset="../photos/talking-laptop.webp" type="image/webp">
-    <img src="../photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy">
-  </picture>
-</figure>
-
-<section class="sec a-mission" id="mission">
-  <div class="sec-in">
-    <h2>使命</h2>
-    <div class="body">
-      <p>因此，我們為台灣公立學校的學生打開被忽略的可能，讓他們看見「唯一一條路」之外的選項。那可能是走向世界去留學，也可能是留在台灣，用更開闊的方式學習與生活。</p>
-      <p>我們同時維繫一個由「選擇了自己道路的人」所組成的社群，讓走過的人成為後來者的引路人，也讓這個網絡長久地延續下去。</p>
+    <div class="en" lang="en">
+      <p class="pull">"We are not teachers and we are not consultants. Most of us are only a step or two ahead of you."</p>
     </div>
-  </div>
-</section>
+  </section>
 
-<section class="a-vision" id="vision">
-  <h2>願景</h2>
-  <p class="pull">一個台灣，升學不再只有一條路。每個學生，無論來自哪裡，都能看見自己的選項，並擁有選擇的權利與勇氣。</p>
-</section>
+  <section class="beat" id="mission" data-tone="sand" data-dots="line" data-ch-zh="使命" data-ch-en="Mission">
+    <div class="zh" lang="zh-Hant">
+      <h2>使命</h2>
+      <p class="say lg">因此，我們為台灣公立學校的學生打開被忽略的可能，讓他們看見「唯一一條路」之外的選項。那可能是走向世界去留學，也可能是留在台灣，用更開闊的方式學習與生活。</p>
+    </div>
+    <div class="en" lang="en">
+      <h2>Mission</h2>
+      <p class="say lg">Therefore, we help students in Taiwan's public schools discover the possibilities they were never shown: the options beyond the single path they'd been told to follow. That might mean studying abroad, or staying in Taiwan and learning to live in a more open way.</p>
+    </div>
+  </section>
 
-<section class="sec" id="values">
-  <div class="sec-in one">
-    <h2>價值</h2>
-    <ul class="a-vals">
+  <section class="beat" data-tone="sand" data-dots="pairs">
+    <div class="zh" lang="zh-Hant">
+      <p class="say lg">我們同時維繫一個由「選擇了自己道路的人」所組成的社群，讓走過的人成為後來者的引路人，也讓這個網絡長久地延續下去。</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="say lg">And we're building a lasting community of people who chose their own path, where those who went before can guide the ones coming after.</p>
+    </div>
+  </section>
+
+  <section class="beat" id="vision" data-tone="navy" data-dots="paths" data-ch-zh="願景" data-ch-en="Vision">
+    <div class="zh" lang="zh-Hant">
+      <h2>願景</h2>
+      <p class="pull">一個台灣，升學不再只有一條路。每個學生，無論來自哪裡，都能看見自己的選項，並擁有選擇的權利與勇氣。</p>
+    </div>
+    <div class="en" lang="en">
+      <h2>Vision</h2>
+      <p class="pull">A Taiwan where success is no longer defined by a single path, where every student, wherever they come from, can see their options and has the right, and the courage, to choose.</p>
+    </div>
+  </section>
+
+  <!-- 這一格停三步（data-dots 寫了三個名字）：每一步亮一個價值，點也換一次。 -->
+  <section class="beat" id="values" data-dots="seen even pairs" data-ch-zh="價值" data-ch-en="Values">
+    <div class="zh" lang="zh-Hant">
+      <h2>價值</h2>
+      <ul class="a-vals steps">
         <li><b>看見</b><span>你無法選擇你從未看見的東西。</span></li>
         <li><b>平等</b><span>選擇的權利，不該取決於出身或家庭的資源。</span></li>
         <li><b>陪伴</b><span>沒有人該獨自摸索。走過的人，拉下一個人一把。</span></li>
-    </ul>
-  </div>
-</section>
-
-<section class="a-free">
-  <p class="a-zero" aria-hidden="true">0</p>
-  <div>
-    <h2>免費是刻意的</h2>
-    <p>學員不收費。這不是還沒開始收，是刻意的設計。</p>
-    <p>我們處理的是資訊落差。把資訊放在付費牆後面，就變成我們原本要解決的那個問題。</p>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>五年下來</h2>
-    <div class="body">
-      <p>五年的數字與時間軸在<a href="../impact/">另一頁</a>，每一個數字怎麼算的也寫在那裡。</p>
+      </ul>
     </div>
-  </div>
-</section>
-</div>
-
-</div>
-
-<div class="en" lang="en">
-<header class="a-hero">
-  <picture><source srcset="../photos/hero-listening.webp" type="image/webp"><img src="../photos/hero-listening.jpg" alt="A row of high school students listening to a speaker, two heads out of focus in the foreground" width="1200" height="800" loading="lazy"></picture>
-  <div class="a-hero-in">
-    <h1>We believe that everyone has the right to choose their own education.</h1>
-    <p class="lead">Beyond Taiwan started in May 2020 with seven people. Five years on, we are close to thirty organisers, all of us students, spread across seven countries.</p>
-  </div>
-</header>
-
-<div class="a-over">
-<section class="sec a-gap" id="gap-en">
-  <div class="sec-in">
-    <h2>The gap we work on is information.</h2>
-    <div class="body">
-      <p>In Taiwan, studying abroad is still widely treated as something only well-off families get to consider.</p>
-      <p>That impression is not baseless. Agency fees are high, and public schools rarely have the staff or resources to guide a student through an overseas application. But the harder barrier is information. If no one around you has done it, you do not even know what to ask.</p>
-      <p>So students rule the option out before they ever look into it. Not because it does not suit them, but because no one has shown them what it actually involves.</p>
-      <p>That gap is the reason Beyond Taiwan exists. Almost everything we run is free: mentorship, bootcamps, talks. We cannot make anyone's decision. We can make sure they know what they are choosing between.</p>
-      <p class="pull">"We are not teachers and we are not consultants. Most of us are only a step or two ahead of you."</p>
-      <picture class="photo">
-    </div>
-  </div>
-</section>
-
-<figure class="a-photo">
-  <picture>
-    <source srcset="../photos/talking-laptop.webp" type="image/webp">
-    <img src="../photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy">
-  </picture>
-</figure>
-
-<section class="sec a-mission" id="mission-en">
-  <div class="sec-in">
-    <h2>Mission</h2>
-    <div class="body">
-      <p>Therefore, we help students in Taiwan's public schools discover the possibilities they were never shown: the options beyond the single path they'd been told to follow. That might mean studying abroad, or staying in Taiwan and learning to live in a more open way.</p>
-      <p>And we're building a lasting community of people who chose their own path, where those who went before can guide the ones coming after.</p>
-    </div>
-  </div>
-</section>
-
-<section class="a-vision" id="vision-en">
-  <h2>Vision</h2>
-  <p class="pull">A Taiwan where success is no longer defined by a single path, where every student, wherever they come from, can see their options and has the right, and the courage, to choose.</p>
-</section>
-
-<section class="sec" id="values-en">
-  <div class="sec-in one">
-    <h2>Values</h2>
-    <ul class="a-vals">
+    <div class="en" lang="en">
+      <h2>Values</h2>
+      <ul class="a-vals steps">
         <li><b>Seeing</b><span>You can't choose what you've never seen.</span></li>
         <li><b>Equality</b><span>The right to choose shouldn't depend on where you come from or what your family has.</span></li>
         <li><b>Company</b><span>No one should have to figure it out alone. Those who've walked the road pull the next person up.</span></li>
-    </ul>
-  </div>
-</section>
-
-<section class="a-free">
-  <p class="a-zero" aria-hidden="true">0</p>
-  <div>
-    <h2>Free on purpose</h2>
-    <p>Students pay nothing. This is not a fee we have yet to introduce. It is a deliberate design choice.</p>
-    <p>The gap we work on is information. Putting information behind a paywall would recreate the very problem we exist to solve.</p>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="sec-in">
-    <h2>Five years in</h2>
-    <div class="body">
-      <p>The numbers and the five-year timeline are on <a href="../impact/">their own page</a>, along with how each number was counted.</p>
+      </ul>
     </div>
-  </div>
-</section>
-</div>
+  </section>
 
+  <section class="beat" id="free" data-tone="warm" data-dots="zero" data-ch-zh="免費是刻意的" data-ch-en="Free on purpose">
+    <div class="zh" lang="zh-Hant">
+      <p class="a-zero" aria-hidden="true">0</p>
+      <h2>免費是刻意的</h2>
+      <p class="say">學員不收費。這不是還沒開始收，是刻意的設計。</p>
+      <p class="say">我們處理的是資訊落差。把資訊放在付費牆後面，就變成我們原本要解決的那個問題。</p>
+    </div>
+    <div class="en" lang="en">
+      <p class="a-zero" aria-hidden="true">0</p>
+      <h2>Free on purpose</h2>
+      <p class="say">Students pay nothing. This is not a fee we have yet to introduce. It is a deliberate design choice.</p>
+      <p class="say">The gap we work on is information. Putting information behind a paywall would recreate the very problem we exist to solve.</p>
+    </div>
+  </section>
+
+  <section class="beat" id="more" data-dots="field" data-ch-zh="五年下來" data-ch-en="Five years in">
+    <div class="zh" lang="zh-Hant">
+      <h2>五年下來</h2>
+      <p class="say">五年的數字與時間軸在<a href="../impact/">另一頁</a>，每一個數字怎麼算的也寫在那裡。</p>
+      <p class="acts"><a class="cta" href="../apply/">現在開放</a><a class="cta" href="../year/">活動與計畫</a></p>
+    </div>
+    <div class="en" lang="en">
+      <h2>Five years in</h2>
+      <p class="say">The numbers and the five-year timeline are on <a href="../impact/">their own page</a>, along with how each number was counted.</p>
+      <p class="acts"><a class="cta" href="../apply/">Open now</a><a class="cta" href="../year/">Programmes</a></p>
+    </div>
+  </section>
+
+  <nav class="rail" id="rail" aria-label="章節 / Chapters"></nav>
+  <i class="cue" id="cue" aria-hidden="true"></i>
+  <i class="bar" id="bar" aria-hidden="true"></i>
+</div>
 </div>
 
 </main>
@@ -656,6 +699,258 @@ footer .foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 20px}
       burger.setAttribute("aria-expanded", "false");
     }
   });
+})();
+</script>
+
+<script>
+/* ═════════ 捲動的故事 ═════════
+   這支只做一件事：看你捲到哪了，決定現在是哪一格、三十個點排成什麼。字不在這裡，字全部在上面的 HTML。
+   它只在 <html> 上有 story-on 的時候才跑（<head> 那一小段決定的）。跑到一半出錯就把 story-on 拿掉，
+   整頁退回一格接一格的普通文章，所以這支壞掉的時候不會有任何一段字不見。
+   要改的通常只有兩個地方：SLOT（一格要捲多久）與 SHAPES（點可以排成哪些形狀）。 */
+(function () {
+  var html = document.documentElement;
+  if (!html.classList.contains("story-on")) return;
+  var story = document.getElementById("story");
+  try { start(); } catch (e) { html.classList.remove("story-on"); if (story) story.style.height = ""; }
+
+  function start() {
+    var SLOT = 0.72;       /* 一格要捲幾個螢幕的高度。數字越大，整頁越長、每一格停越久。 */
+    var FADE = 0.16;       /* 一格淡入或淡出佔一格的多少。 */
+    var MORPH = 0.25;      /* 點從上一個形狀走到下一個形狀，在換格的前後各佔多少。 */
+    var N = 30, FOUNDERS = 7;
+    var SHAPES = shapes();
+
+    var stage = document.getElementById("stage"), svg = document.getElementById("dots");
+    var bar = document.getElementById("bar"), rail = document.getElementById("rail"), cue = document.getElementById("cue");
+    var W = 0, H = 0, small = false, tone = "", queued = false;
+
+    function clamp(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+    function ease(t) { return t * t * (3 - 2 * t); }
+    function mix(a, b, t) { return a + (b - a) * t; }
+    function frac(v) { return v - Math.floor(v); }
+
+    /* ── 讀 HTML：有幾格、每一格多長、點要排成什麼、哪幾格是一章的開頭 ── */
+    var beats = [], stops = [], total = 0;
+    Array.prototype.forEach.call(stage.querySelectorAll(".beat"), function (el) {
+      var names = (el.getAttribute("data-dots") || "field").split(/\s+/);
+      var len = parseFloat(el.getAttribute("data-len")) || names.length;
+      var b = { el: el, at: total, len: len, steps: names.length, tone: el.getAttribute("data-tone") || "paper", box: null };
+      names.forEach(function (name, k) { stops.push({ at: total + len * k / names.length, name: SHAPES[name] ? name : "field", beat: b }); });
+      beats.push(b); total += len;
+    });
+    story.style.height = (total * SLOT * 100 + 100) + "vh";
+    story.style.height = "calc(" + (total * SLOT * 100) + "lvh + 100svh)";
+
+    /* ── 三十個點 ── */
+    var dots = [];
+    for (var i = 0; i < N; i++) {
+      var c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      if (i < FOUNDERS) c.setAttribute("class", "f");
+      svg.appendChild(c); dots.push(c);
+    }
+
+    /* ── 右邊那一排：有章名的那幾格各一顆 ── */
+    var chapters = [];
+    beats.forEach(function (b) {
+      var zh = b.el.getAttribute("data-ch-zh"), en = b.el.getAttribute("data-ch-en");
+      if (!zh || !en) return;
+      var btn = document.createElement("button"), mark = document.createElement("i");
+      var a = document.createElement("span"), z = document.createElement("span");
+      btn.type = "button";
+      a.className = "zh"; a.textContent = zh; z.className = "en"; z.textContent = en;
+      btn.appendChild(a); btn.appendChild(z); btn.appendChild(mark);
+      btn.addEventListener("click", function () { goTo(b, true); });
+      rail.appendChild(btn); chapters.push({ beat: b, btn: btn });
+    });
+
+    function goTo(b, smooth) {
+      var u = b.at === 0 ? 0 : b.at + FADE + 0.02;
+      var top = story.getBoundingClientRect().top + window.pageYOffset + (u / total) * (story.offsetHeight - stage.offsetHeight);
+      window.scrollTo({ top: top, behavior: smooth ? "smooth" : "instant" });
+    }
+    /* 網址後面帶 #mission 這種代號，就直接開在那一格。 */
+    function fromHash(smooth) {
+      var id = location.hash.slice(1);
+      for (var k = 0; id && k < beats.length; k++) if (beats[k].el.id === id) return goTo(beats[k], smooth);
+    }
+
+    /* ── 量一次：畫面多大、每一格的字從哪裡開始。點只排在字的上面，不會壓到字。 ── */
+    function measure() {
+      W = stage.clientWidth; H = stage.clientHeight; small = W < 760;
+      var cs = getComputedStyle(beats[0].el);
+      var x0 = parseFloat(cs.paddingLeft) || 20, x1 = W - (parseFloat(cs.paddingRight) || 56), y0 = 96;
+      /* 量的時候先把過渡關掉（.measuring），不然量到的是動到一半的高度。redraw() 畫完才把它打開。 */
+      stage.classList.add("measuring");
+      beats.forEach(function (b) {
+        var top = H * 0.56, list = b.el.querySelectorAll(".steps");
+        for (var step = 0; step < b.steps; step++) {
+          for (var n = 0; n < list.length; n++)
+            for (var m = 0; m < list[n].children.length; m++) list[n].children[m].classList.toggle("on", m === step);
+          for (var k = 0; k < b.el.children.length; k++) {
+            var kid = b.el.children[k];
+            if (kid.tagName === "DIV" && kid.offsetParent !== null) top = Math.min(top, kid.offsetTop);
+          }
+        }
+        b.box = { x0: x0, x1: x1, y0: y0, y1: Math.max(y0 + 84, Math.min(H * 0.56, top - 30)) };
+      });
+    }
+
+    /* ── 畫一次 ── */
+    function render() {
+      queued = false;
+      var max = story.offsetHeight - stage.offsetHeight;
+      var u = clamp(-story.getBoundingClientRect().top / max) * total;
+      bar.style.transform = "scaleX(" + (u / total).toFixed(4) + ")";
+      cue.style.opacity = (1 - clamp(u / 0.3)).toFixed(2);
+
+      var now = beats[0];
+      beats.forEach(function (b, k) {
+        var end = b.at + b.len;
+        var v = (k === 0 ? 1 : clamp((u - b.at) / FADE)) * (k === beats.length - 1 ? 1 : clamp((end - u) / FADE));
+        b.el.style.opacity = v.toFixed(3);
+        b.el.style.transform = "translateY(" + ((1 - v) * (u < b.at + b.len / 2 ? 16 : -16)).toFixed(1) + "px)";
+        b.el.classList.toggle("on", v > 0.5);
+        if (u >= b.at) now = b;
+        if (v > 0) inside(b, clamp((u - b.at) / b.len));
+      });
+
+      var t = now.tone === "photo" ? "navy" : now.tone;
+      if (t !== tone) { tone = t; story.className = "story t-" + t; }
+      chapters.forEach(function (ch, k) {
+        var next = chapters[k + 1];
+        ch.btn.classList.toggle("on", u >= ch.beat.at - 0.001 && (!next || u < next.beat.at - 0.001));
+      });
+
+      /* 點：現在停在哪一站，離換站多近，就在兩個形狀之間走到哪。每個點晚一點點出發，看起來不會像一整塊在搬。 */
+      var j = 0;
+      while (j < stops.length - 1 && u >= stops[j + 1].at) j++;
+      var A = stops[j], B = stops[j], raw = 1;
+      if (j > 0 && u < A.at + MORPH) { A = stops[j - 1]; raw = (u - B.at + MORPH) / (2 * MORPH); }
+      else if (j < stops.length - 1 && u > stops[j + 1].at - MORPH) { B = stops[j + 1]; raw = (u - B.at + MORPH) / (2 * MORPH); }
+      for (var i = 0; i < N; i++) {
+        var tt = ease(clamp(raw * 1.3 - (i / N) * 0.3));
+        var p = SHAPES[A.name](i, A.beat.box), q = A === B ? p : SHAPES[B.name](i, B.beat.box), d = dots[i];
+        d.setAttribute("cx", mix(p.x, q.x, tt).toFixed(1));
+        d.setAttribute("cy", mix(p.y, q.y, tt).toFixed(1));
+        d.setAttribute("r", Math.max(0.1, mix(p.r, q.r, tt)).toFixed(1));
+        d.setAttribute("opacity", mix(p.o, q.o, tt).toFixed(2));
+      }
+    }
+
+    /* 一格裡面自己會動的兩種東西：一步一步亮的清單（.steps），與往左滑的時間軸（.a-tl）。t 是這一格走到哪了，0 到 1。 */
+    function inside(b, t) {
+      var lists = b.el.querySelectorAll(".steps"), k, n;
+      for (k = 0; k < lists.length; k++) {
+        var step = Math.min(b.steps - 1, Math.floor(t * b.steps));
+        for (n = 0; n < lists[k].children.length; n++) lists[k].children[n].classList.toggle("on", n === step);
+      }
+      var tracks = b.el.querySelectorAll(".a-tl");
+      for (k = 0; k < tracks.length; k++) {
+        if (tracks[k].offsetParent === null) continue;
+        var lead = b.box.x0, travel = Math.max(0, tracks[k].scrollWidth + lead + (W >= 1100 ? 200 : 40) - W);
+        var slide = clamp((t * b.len - 0.3) / (b.len - 0.6));
+        tracks[k].style.transform = "translateX(" + (lead - slide * travel).toFixed(1) + "px)";
+      }
+    }
+
+    /* ── 點可以排成的形狀 ──
+       每一個都是：第 i 個點（0 到 29，前七個是創辦的那七個人）在這一格要站在哪（x、y）、多大（r）、多亮（o）。
+       box 是這一格可以排的範圍：字的上面、頂欄的下面。要加一種形狀就在這裡多寫一個，然後在 HTML 的 data-dots 用它的名字。 */
+    var GROUPS = [5, 4, 4, 4, 4, 4, 5], groupOf = [], seatOf = [];
+    GROUPS.forEach(function (count, g) { for (var s = 0; s < count; s++) { groupOf.push(g); seatOf.push(s); } });
+    function scatter(i, box) { return { x: box.x0 + frac(i * 0.618034 + 0.13) * (box.x1 - box.x0), y: box.y0 + frac(i * 0.3247 + 0.31) * (box.y1 - box.y0) }; }
+    function shapes() {
+      return {
+        /* 散開、很淡，當背景。整個畫面的寬度，但只到字的上面為止。 */
+        field: function (i, box) { return { x: frac(i * 0.618034 + 0.13) * W, y: 70 + frac(i * 0.3247 + 0.31) * (box.y1 - 70), r: 3, o: 0.16 }; },
+        /* 看不到（有照片的那幾格）。 */
+        hidden: function (i, box) { return { x: frac(i * 0.618034 + 0.13) * W, y: 70 + frac(i * 0.3247 + 0.31) * (box.y1 - 70), r: 3, o: 0 }; },
+        /* 七個人排一排，其他二十三個還沒出現。 */
+        seven: function (i, box) {
+          var r = small ? 10 : 15, gap = Math.min((box.x1 - box.x0) / 7, 86), y = (box.y0 + box.y1) / 2;
+          return i < FOUNDERS ? { x: box.x0 + r + i * gap, y: y, r: r, o: 1 } : { x: box.x0 + r + 3 * gap, y: y, r: 0.1, o: 0 };
+        },
+        /* 七個人縮到左上角（時間軸那一格，把畫面讓給時間軸）。 */
+        tally: function (i, box) {
+          return i < FOUNDERS ? { x: box.x0 + 6 + i * 18, y: box.y0 + 8, r: 5, o: 1 } : { x: box.x0 + 60, y: box.y0 + 8, r: 0.1, o: 0 };
+        },
+        /* 三十個人，十個一列排三列。 */
+        thirty: function (i, box) {
+          var g = Math.min((box.x1 - box.x0) / 10, (box.y1 - box.y0) / 3, 64), y = (box.y0 + box.y1) / 2;
+          return { x: box.x0 + g / 2 + (i % 10) * g, y: y + (Math.floor(i / 10) - 1) * g, r: g * 0.3, o: 1 };
+        },
+        /* 七群，一群一個國家。 */
+        groups: function (i, box) {
+          var g = groupOf[i], bw = box.x1 - box.x0, bh = box.y1 - box.y0;
+          var ring = Math.min(bw / 7 * 0.3, bh * 0.16, 26), turn = seatOf[i] / GROUPS[g] * Math.PI * 2 + g;
+          return { x: box.x0 + bw * (g + 0.5) / 7 + Math.cos(turn) * ring,
+                   y: (box.y0 + box.y1) / 2 + Math.sin(g * 1.25) * bh * 0.2 + Math.sin(turn) * ring, r: small ? 4.5 : 7, o: 1 };
+        },
+        /* 大部分的人不見了，只剩幾個（還沒了解就先把選項刪掉）。 */
+        few: function (i, box) { var s = scatter(i, box); return { x: s.x, y: s.y, r: small ? 4.5 : 6, o: i % 5 === 0 ? 0.9 : 0.05 }; },
+        /* 每一個都看得到。 */
+        seen: function (i, box) { var s = scatter(i, box); return { x: s.x, y: s.y, r: small ? 4.5 : 6, o: 1 }; },
+        /* 排成一條線（唯一一條路）。 */
+        line: function (i, box) { return { x: box.x0 + 5 + (box.x1 - box.x0 - 10) * i / (N - 1), y: (box.y0 + box.y1) / 2, r: small ? 3.2 : 5, o: 1 }; },
+        /* 從同一個起點分出三條路。 */
+        paths: function (i, box) {
+          var far = Math.floor(i / 3) / 9, gw = Math.min(box.x1 - box.x0 - 12, 620);
+          return { x: box.x0 + 6 + gw * far, y: (box.y0 + box.y1) / 2 + (i % 3 - 1) * (box.y1 - box.y0) * 0.4 * far, r: small ? 3.6 : 5, o: 1 };
+        },
+        /* 一樣大、一樣的間隔。 */
+        even: function (i, box) {
+          var cols = small ? 6 : 10, rows = N / cols, gw = Math.min(box.x1 - box.x0, cols * 72);
+          return { x: box.x0 + gw * (i % cols + 0.5) / cols, y: box.y0 + (box.y1 - box.y0) * (Math.floor(i / cols) + 0.5) / rows, r: small ? 5 : 7, o: 1 };
+        },
+        /* 兩個兩個一起走。 */
+        pairs: function (i, box) {
+          var pair = Math.floor(i / 2), r = small ? 5 : 7, gw = Math.min(box.x1 - box.x0, 5 * 120);
+          return { x: box.x0 + gw * (pair % 5 + 0.5) / 5 + (i % 2 ? r * 1.2 : -r * 1.2),
+                   y: box.y0 + (box.y1 - box.y0) * (Math.floor(pair / 5) + 0.5) / 3, r: r, o: 1 };
+        },
+        /* 排成一個 0（學員付的錢）。 */
+        zero: function (i, box) {
+          var ry = Math.min((box.y1 - box.y0) * 0.48, 150), rx = ry * 0.62, turn = i / N * Math.PI * 2 - Math.PI / 2;
+          return { x: box.x0 + rx + 8 + Math.cos(turn) * rx, y: (box.y0 + box.y1) / 2 + Math.sin(turn) * ry, r: small ? 4.5 : 6, o: 1 };
+        }
+      };
+    }
+
+    /* ── 第一屏的大標題：拆成一個詞一個詞，依序浮上來。拆不了（舊瀏覽器沒有 Intl.Segmenter）就整句照舊。 ── */
+    Array.prototype.forEach.call(beats[0].el.querySelectorAll("h1"), function (h) {
+      var text = h.textContent, parts;
+      if (/[一-鿿]/.test(text)) {
+        if (!window.Intl || !Intl.Segmenter) return;
+        parts = [];
+        Array.from(new Intl.Segmenter("zh-Hant", { granularity: "word" }).segment(text)).forEach(function (s) {
+          /* 標點跟著前一個詞，不然逗號會被排到下一行的開頭。 */
+          if (parts.length && /^[\uff0c\u3002\u3001\uff01\uff1f\uff1a\uff1b\u300d\u300f\uff09]+$/.test(s.segment)) parts[parts.length - 1] += s.segment;
+          else parts.push(s.segment);
+        });
+      } else parts = text.split(/(\s+)/);
+      h.textContent = "";
+      var n = 0;
+      parts.forEach(function (part) {
+        if (!part.trim()) return h.appendChild(document.createTextNode(part));
+        var s = document.createElement("span");
+        s.className = "a-w"; s.textContent = part; s.style.animationDelay = (120 + n++ * 90) + "ms";
+        h.appendChild(s);
+      });
+    });
+
+    function redraw() { measure(); render(); stage.offsetHeight; stage.classList.remove("measuring"); }
+    function ask() { if (!queued) { queued = true; requestAnimationFrame(render); } }
+    window.addEventListener("scroll", ask, { passive: true });
+    window.addEventListener("resize", redraw);
+    window.addEventListener("load", redraw);
+    window.addEventListener("hashchange", function () { fromHash(true); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(redraw);
+    /* 換語言之後字的高度不一樣，要重量一次。 */
+    new MutationObserver(redraw).observe(html, { attributes: true, attributeFilter: ["data-lang"] });
+    redraw();
+    fromHash(false);
+  }
 })();
 </script>
 

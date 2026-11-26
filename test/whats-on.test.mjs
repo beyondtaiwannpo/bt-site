@@ -112,8 +112,11 @@ test("★ 每一頁只做一件事：現在開放、這一年、團隊、關於�
   assert.equal((tm.match(/<div class="tm-live" hidden><\/div>/g) || []).length, 12, "後台畫的那一格預設不出現");
   // 2026-11-24：/team/ 的檔案帶版本號了（?v=…），這裡認得帶與不帶兩種。
   assert.match(tm, /<script type="module" src="\.\/src\/programmes\.js(\?v=[\w-]+)?"><\/script>/);
-  assert.deepEqual([...ab.slice(ab.indexOf('<div class="zh"'), ab.indexOf('<div class="en"')).matchAll(/<h2>([^<]*)<\/h2>/g)].map(m => m[1]), ["我們在處理的是資訊落差。", "使命", "願景", "價值", "免費是刻意的", "五年下來"], "/about/ 瘦身之後的順序");
-  assert.doesNotMatch(ab, /class="nums"|class="tl"/, "數字與時間軸不在 /about/ 了");
+  // 2026-11-25：/about/ 改成捲動的故事，中英文在每一格裡各一塊（不再是整頁兩份），所以標題從每一個中文那一塊裡撈。
+  // 五年的時間軸 Paul 同一天同意放回來一份（跟 /impact/ 一字不差，test/public-pages-2026-11-24.test.mjs 守著）；數字還是只在 /impact/。
+  const abZh = [...ab.matchAll(/<div class="zh" lang="zh-Hant">([\s\S]*?)<\/div>/g)].map(m => m[1]).join("\n");
+  assert.deepEqual([...abZh.matchAll(/<h2(?: class="big")?>([^<]*)<\/h2>/g)].map(m => m[1]), ["五年走過來", "我們在處理的是資訊落差。", "使命", "願景", "價值", "免費是刻意的", "五年下來"], "/about/ 的順序");
+  assert.doesNotMatch(ab, /class="nums"/, "數字不在 /about/");
   for (const s of ["五年，這些是真的發生過的事。", "這些數字怎麼來的", "收到超過 150 份申請"]) assert.ok(im.includes(s), "/impact/ 少了：" + s);
   assert.match(pr, /<meta http-equiv="refresh" content="0; url=\.\.\/year\/">/); assert.match(pr, /location\.replace\("\.\.\/year\/" \+ location\.search\)/); assert.match(pr, /<a href="\.\.\/year\/">/);
   assert.ok(!existsSync("programs/src"), "/programs/ 底下沒有程式了，判斷搬到 year/src/logic.js");
