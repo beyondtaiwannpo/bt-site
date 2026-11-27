@@ -2350,7 +2350,7 @@ export function eventProjectHTML(e, projects, me, busy) {
 // ═══════════════════════════════════════════════════════════════════════
 // 會議紀錄（2026-11-02，docs/2026-10-24-會議與排程.md）
 // ═══════════════════════════════════════════════════════════════════════
-// 清單（之後的、過去的）加一場會議（出席與回覆、Drive 連結、議程）。排會本身在 /availability/ 的看板上；這裡的「記一場會議」是補紀錄或手動排。
+// 清單（之後的、過去的）加一場會議（出席與回覆、Drive 連結、議程）。排會本身在 /availability/ 的看板上；「記一場會議」是補紀錄或手動排，入口在首頁（2026-11-26 搬的）。
 // 時間印瀏覽器的時區（後台的人自己的），旁邊不另印台北，避免兩個時間看混。
 export const mtWhen = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())} ${p(x.getHours())}:${p(x.getMinutes())}`; };
 const mtLocal = d => { if (!d) return ""; const x = new Date(d); if (isNaN(x)) return ""; const p = n => String(n).padStart(2, "0"); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; };
@@ -2367,8 +2367,9 @@ export function meetingMatches(m, q) {
   const qq = n(q); if (!qq) return true;
   return [m.title, m.agenda, mtScope(m.scope), mtWhen(m.starts_at)].some(x => n(x).includes(qq));
 }
-// newOpen：「記一場會議」那一格開著沒（main.js 記）。q：搜尋字（不重畫，main.js 只藏起對不上的列）。
-export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy, q, newOpen, templates) {
+// q：搜尋字（不重畫，main.js 只藏起對不上的列）。
+// 2026-11-26 Paul：「記一場會議」從這一頁搬走了（有人在這裡找不到），入口在首頁那一顆鈕，表單是下面的 meetingNewHTML()（#meetings/new）。
+export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy, q) {
   const now = new Date();
   const up = (meetings || []).filter(m => new Date(m.ends_at) >= now).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const past = (meetings || []).filter(m => new Date(m.ends_at) < now).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
@@ -2378,12 +2379,19 @@ export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy,
   const all = (meetings || []).length;
   return pageHead(T("mt.title"), T("mt.lede"))
     + msgHTML(msg)
-    + (scopes.length ? foldHTML("mt-new", T("mt.new"), meetingFormHTML(null, draft, scopes, people, busy, true,
-        templates ? `<h3 class="sec-h">${T("mtm.title")}</h3>` + minutesEditorHTML("mtn", templates, draft && "tpl" in draft ? draft.tpl : mtDefaultTpl(templates, (draft && draft.scope) || scopes[0]),
-          draft && draft.minutes ? draft.minutes : mtMinutesFrom(mtTplById(templates, draft && "tpl" in draft ? draft.tpl : mtDefaultTpl(templates, (draft && draft.scope) || scopes[0])), []), busy) : ""), newOpen) : "")
     + (all > 3 ? `<label class="vn-find"><i>${T("mt.find")}</i><input type="search" id="mtl-q" value="${esc(q || "")}" placeholder="${esc(T("mt.findPh"))}" autocomplete="off"></label>` : "")
     + sectionHTML(`${T("mt.upcoming")}<span class="hint">${up.length}</span>`, up.length ? `<ul class="flist">${up.map(row).join("")}</ul>` : emptyHTML(T("mt.noneUp"), T("mt.noneUpHint")))
     + (past.length ? sectionHTML(`${T("mt.past")}<span class="hint">${past.length}</span>`, `<ul class="flist">${past.map(row).join("")}</ul>`) : "");
+}
+// 記一場會議自己一頁（#meetings/new，2026-11-26）：首頁那一顆「記一場會議」連到這裡。表單、存法、誰記得了都跟以前收在會議清單最上面那一格一樣。
+// scopes 是空的（排不了任何一種會）就印一句找誰，不畫表單。
+export function meetingNewHTML(scopes, draft, people, msg, busy, templates) {
+  const head = pageHead(T("mt.new"), T("mt.newLede"), [], { act: "mt-back", label: T("mt.back") }) + msgHTML(msg);
+  if (!scopes.length) return head + emptyHTML(T("mt.newNo"), T("mt.newNoHint"));
+  const tplId = draft && "tpl" in draft ? draft.tpl : mtDefaultTpl(templates, (draft && draft.scope) || scopes[0]);
+  return head + sectionHTML("", meetingFormHTML(null, draft, scopes, people, busy, true,
+    templates ? `<h3 class="sec-h">${T("mtm.title")}</h3>` + minutesEditorHTML("mtn", templates, tplId,
+      draft && draft.minutes ? draft.minutes : mtMinutesFrom(mtTplById(templates, tplId), []), busy) : ""));
 }
 // 記一場會議 / 改一場：m 是現有那一場（null 是新的），d 是填到一半的值（含 pk 勾人的狀態）。
 // bare：只回表單本身（清單頁把它包進收起來的那一格，不要再一個標題）。

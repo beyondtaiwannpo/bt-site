@@ -63,10 +63,10 @@ test("資料庫還沒跑（沒有 minutes 欄）整塊不畫；範本表還沒�
   assert.doesNotMatch(F.minutesSectionHTML(M, ME, true, null, null, false), /textarea/);
 });
 test("記一場會議：選得到範本、每段一個框", () => {
-  const h = F.meetingsListHTML([], PRES, ["board"], null, [], "", false, "", true, TPL);
+  const h = F.meetingNewHTML(["board"], null, [], "", false, TPL);
   assert.match(h, /id="mtn-tpl"/);
   assert.match(h, /class="mtm-t"/);
-  assert.doesNotMatch(F.meetingsListHTML([], PRES, ["board"], null, [], "", false, "", true, null), /mtn-tpl/);
+  assert.doesNotMatch(F.meetingNewHTML(["board"], null, [], "", false, null), /mtn-tpl/);
 });
 test("範本頁：改得動的人有新增與改；改不動的只能看；表還沒建講清楚要跑哪一支", () => {
   const ed = F.mtplPageHTML(TPL, ["board", "Marketing Team"], null, "", false, true);

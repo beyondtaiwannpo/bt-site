@@ -31,14 +31,18 @@ test("★ 側欄四份都有「會議」（幹部都看得到）；誰能排哪�
   assert.deepEqual(SCH.scopesFor(false, { "res:Marketing Team": "manage", "res:Curriculum Team": "edit", "res:Sponsorship Team": "view", apps: "manage" }, []), ["Marketing Team", "Curriculum Team"]);
 });
 
-test("清單：之後的與過去的分開、每一列人數與會到數、紀錄連結、我的回覆狀態；能排的人才有「記一場會議」", () => {
+test("清單：之後的與過去的分開、每一列人數與會到數、紀錄連結、我的回覆狀態；「記一場會議」自己一頁（2026-11-26 搬到首頁），能排的人才有表單", () => {
   const h = F.meetingsListHTML(M, ME, ["Marketing Team"], null, PEOPLE, "", false);
   assert.match(h, /<h2>之後的<span class="hint">1<\/span>/); assert.match(h, /<h2>過去的<span class="hint">1<\/span>/);
   assert.match(h, /data-act="mt-open" data-id="11111111-1111-4111-8111-111111111111">Marketing 週會<\/a>/);
   assert.match(h, /3 人，1 人說會到/); assert.match(h, /href="https:\/\/docs.google.com\/document\/d\/abc"[^>]*>會議紀錄<\/a>/);
   assert.match(h, /<span class="tag">還沒回<\/span>/, "我在名單上、還沒回");
-  assert.match(h, /data-act="mt-save" data-id=""/); assert.match(h, /<select id="mt-scope"[^>]*><option value="Marketing Team" selected>Marketing<\/option>/);
-  assert.doesNotMatch(F.meetingsListHTML(M, ME, [], null, PEOPLE, "", false), /mt-save/, "不能排的人沒有那張表單");
+  assert.doesNotMatch(h, /mt-save|id="mt-new"/, "清單頁上不再有記一場會議那一格");
+  const n = F.meetingNewHTML(["Marketing Team"], null, PEOPLE, "", false, null);
+  assert.match(n, /<h1>記一場會議<\/h1>/); assert.match(n, /data-act="mt-back"/, "回得去會議清單");
+  assert.match(n, /data-act="mt-save" data-id=""/); assert.match(n, /<select id="mt-scope"[^>]*><option value="Marketing Team" selected>Marketing<\/option>/);
+  const no = F.meetingNewHTML([], null, PEOPLE, "", false, null);
+  assert.doesNotMatch(no, /mt-save/, "不能排的人沒有那張表單"); assert.match(no, /你現在記不了會議/);
   assert.match(F.meetingsListHTML([], ME, [], null, PEOPLE, "", false), /之後沒有排好的會/);
 });
 
@@ -108,7 +112,7 @@ test("信件文案多兩種；admin 開頁叫 tick_mail；資料層只走函式"
 test("★ 英文畫出來不剩中文（會議清單、一場會議、看板排會）", () => {
   F.setLang("en"); AV.setLang("en");
   const members = [{ id: "u1", name: "Paul", alt: "" }];
-  for (const h of [F.meetingsListHTML(M, ME, ["Marketing Team"], null, PEOPLE, "", false), F.meetingHTML(M[0], ME, PEOPLE, true, ["Marketing Team"], null, "", false),
+  for (const h of [F.meetingsListHTML(M, ME, ["Marketing Team"], null, PEOPLE, "", false), F.meetingNewHTML(["Marketing Team"], null, PEOPLE, "", false, null), F.meetingHTML(M[0], ME, PEOPLE, true, ["Marketing Team"], null, "", false),
     SCH.scheduleHTML({ ticked: [] }, { scopes: ["board"], members, free: [], when: "Mon 10:00" }, false)]) {
     const text = h.replace(/<[^>]+>/g, " ").replace(/Marketing 週會|Board 月會|海報進度|王平|小安|雅婷/g, "");
     assert.doesNotMatch(text, /[一-鿿]/, "英文模式不該剩中文：" + (text.match(/[^\s]*[一-鿿]+[^\s]*/) || [""])[0]);

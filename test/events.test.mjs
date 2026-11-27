@@ -178,13 +178,13 @@ test("活動清單：搜尋、狀態與 team 篩選，開活動收在最上面",
   assert.match(eventsListHTML(evs, {}, [], { title_zh: "x" }, "", false, ["Curriculum Team"], {}, false), /id="ev-new" open/, "填到一半還開著");
 });
 
-test("會議清單：記一場會議收在最上面，搜尋只藏列", async () => {
+test("會議清單：搜尋只藏列；記一場會議不在這一頁（2026-11-26 搬到首頁）", async () => {
   const { meetingsListHTML, meetingMatches } = await import("../admin/src/ui.js");
   const mk = (id, title, d) => ({ id, title, scope: "board", starts_at: d, ends_at: d, attendees: [] });
   const ms = [mk("a", "BT 會議", "2026-12-01T10:00:00Z"), mk("b", "Curriculum 討論", "2026-12-02T10:00:00Z"), mk("c", "年度回顧", "2025-01-01T10:00:00Z"), mk("d", "其他", "2025-02-01T10:00:00Z")];
   assert.ok(meetingMatches(ms[1], "curriculum")); assert.ok(!meetingMatches(ms[0], "curriculum"));
-  const h = meetingsListHTML(ms, null, ["board"], null, [], "", false, "回顧", false);
-  assert.ok(h.indexOf('id="mt-new"') < h.indexOf('id="mtl-q"'), "記一場會議在上面");
+  const h = meetingsListHTML(ms, null, ["board"], null, [], "", false, "回顧");
+  assert.match(h, /id="mtl-q"/); assert.doesNotMatch(h, /id="mt-new"/);
   assert.match(h, /<li data-mt-row data-id="a" hidden>/); assert.match(h, /<li data-mt-row data-id="c">/);
   assert.doesNotMatch(h, /<h2>記一場會議/, "收起來那一格裡不再有第二個標題");
 });

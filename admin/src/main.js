@@ -52,7 +52,7 @@ let S = {
   // 2026-11-11：活動清單的篩選（搜尋字、狀態、team）與會議清單的搜尋字。收起來的表單開著沒一樣記在 vnOpen（ev-new、mt-new）。
   evF: { q: "", st: "all", team: "" }, mtQ: "",
   // 會議（2026-11-02）：meetings 是 loadMeetings() 回的；mtSel 打開的那一場；mtDraft 表單填到一半（含勾人的 pk）。
-  meetings: null, mtSel: null, mtDraft: null,
+  meetings: null, mtSel: null, mtDraft: null, mtNew: false,
   // 會議範本（2026-11-13）：mtpl 是 loadMeetingTemplates() 回的（null 是資料表還沒建）；mtplEd 範本頁上正在改的那一份。
   mtpl: null, mtplEd: null,
 };
@@ -110,8 +110,9 @@ function render() {
   } else if (S.view === "members" && S.mp) {
     body = UI.membersPanelHTML(S.mp, S.msg, S.busy);
   } else if (S.view === "meetings") {
-    body = UI.meetingsListHTML(S.meetings || [], S.me, UI.mtScopes(S.me, S.teams), S.mtDraft, S.cadres, S.msg, S.busy, S.mtQ,
-      !!S.vnOpen["mt-new"] || !!(S.mtDraft && (S.mtDraft.title || ((S.mtDraft.pk || {}).ticked || []).length)), S.mtpl);
+    // #meetings/new（2026-11-26）：記一場會議自己一頁，首頁那一顆鈕連過來。S.view 還是 meetings，勾人與範本那幾支照舊認得。
+    body = S.mtNew ? UI.meetingNewHTML(UI.mtScopes(S.me, S.teams), S.mtDraft, S.cadres, S.msg, S.busy, S.mtpl)
+      : UI.meetingsListHTML(S.meetings || [], S.me, UI.mtScopes(S.me, S.teams), S.mtDraft, S.cadres, S.msg, S.busy, S.mtQ);
   } else if (S.view === "mtemplates") {
     body = UI.mtplPageHTML(S.mtpl, ["board"].concat(S.teams && S.teams.length ? S.teams : UI.TEAM_LABELS), S.mtplEd, S.msg, S.busy, UI.canEditWs(S.me, "custom:meeting-templates"));
   } else if (S.view === "meeting" && S.mtSel) {
@@ -624,9 +625,10 @@ async function openTab(t) {
   }
   // 會議範本（2026-11-13）：#mtemplates。
   if (t === "mtemplates") { S.view = "mtemplates"; S.mtplEd = null; S.msg = ""; await reloadTemplates(); render(); return; }
-  // 會議（2026-11-02）：#meetings 清單，#meetings/<id> 一場。
-  const mt = /^meetings(?:\/([0-9a-f-]{36}))?$/.exec(t || "");
+  // 會議（2026-11-02）：#meetings 清單，#meetings/<id> 一場，#meetings/new 記一場（2026-11-26，首頁那一顆鈕連過來）。
+  const mt = /^meetings(?:\/(new|[0-9a-f-]{36}))?$/.exec(t || "");
   if (mt) {
+    S.mtNew = mt[1] === "new"; if (S.mtNew) mt[1] = undefined;
     S.view = mt[1] ? "meeting" : "meetings"; S.mtSel = mt[1] || null; S.mtDraft = null; S.msg = "";
     await reloadMeetings();
     if (mt[1]) { const m = (S.meetings || []).find(x => x.id === mt[1]); if (m) S.mtDraft = { pk: { ticked: (m.attendees || []).map(a => a.user_id), q: "", mq: "", teams: [], level: "view" } }; }

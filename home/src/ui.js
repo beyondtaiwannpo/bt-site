@@ -363,7 +363,8 @@ export function homeHTML(items, ctx) {
   return `<div class="home">
     <header class="hello"><div class="hello-t"><h1>${T("home.hi", { name: esc(ctx.name || "") })}</h1>
       <p class="mini">${T("home.today", { date: esc(dateLabel(dayKey(ctx.now, ctx.tz))), tz: esc(ctx.tz) })}</p></div>
-      <a class="btn sm" href="${esc(A("/admin/#request"))}">${T("home.newRq")}</a></header>
+      <div class="hello-a">${ctx.canSchedule ? `<a class="btn sm" href="${esc(A("/admin/#meetings/new"))}">${T("home.logMt")}</a>` : ""}
+        <a class="btn sm${ctx.canSchedule ? " ghost" : ""}" href="${esc(A("/admin/#request"))}">${T("home.newRq")}</a></div></header>
     ${top}
     <section class="block wait">
       <h2>${T("home.wait")}${wait.length ? ` <span class="count">${wait.length}</span>` : ""}</h2>

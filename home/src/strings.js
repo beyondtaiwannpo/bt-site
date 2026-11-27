@@ -39,6 +39,8 @@ export const MINE = {
   "home.waitLede":    { zh: "照日期排，最急的在最上面。點一行就到那件事。", en: "Sorted by date, most urgent first. Tap a row to go there." },
   "home.waitNone":    { zh: "現在沒有等你處理的事。", en: "Nothing is waiting for you right now." },
   "home.newRq":       { zh: "跟 Marketing 提需求", en: "New Marketing request" },
+  // 記一場會議（2026-11-26 Paul：有人在行事曆底下找不到，搬到首頁）。連到後台 /admin/#meetings/new，表單與誰記得了都沒變。
+  "home.logMt":       { zh: "記一場會議", en: "Log a meeting" },
   "home.pp":          { zh: "我的護照", en: "My passport" },
   "home.ppN":         { zh: "蓋了 {n} 格，一共 {t} 格", en: "{n} of {t} stamps" },
   "home.ppGo":        { zh: "打開護照", en: "Open passport" },

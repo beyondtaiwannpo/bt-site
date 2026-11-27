@@ -145,3 +145,12 @@ test("★ 首頁：有配對才畫「我帶的 mentee」，一列一人、沒填
   const m = UI2.pairsHTML([{ id: "p2", as: "mentee", with: "Mentor One", event: "Fall", term_id: "2026-27", forms: [] }]);
   assert.match(m, /My mentor|我的 mentor/); assert.doesNotMatch(m, /My mentees|我帶的 mentee/);
 });
+
+test("首頁：排得了會的人有一顆「記一場會議」連到後台那一頁，排不了的人沒有（2026-11-26）", () => {
+  const base = { me: ME, tz: "Asia/Taipei", now: new Date("2026-11-26T02:00:00Z"), name: "王平", people: [], ws: {} };
+  const yes = UI.homeHTML([], { ...base, canSchedule: true });
+  assert.match(yes, /<a class="btn sm" href="\/admin\/\?lang=zh#meetings\/new">記一場會議<\/a>/);
+  assert.match(yes, /href="\/admin\/\?lang=zh#request">跟 Marketing 提需求/, "原本那一顆還在");
+  const no = UI.homeHTML([], { ...base, canSchedule: false });
+  assert.doesNotMatch(no, /meetings\/new/); assert.match(no, /跟 Marketing 提需求/);
+});

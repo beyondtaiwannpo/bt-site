@@ -354,7 +354,7 @@ export const MINE = {
   "card.mt.hint":     { zh: "「{title}」{d}", en: "\"{title}\" {d}" },
   "card.mt.go":       { zh: "去看", en: "Open" },
   "mt.title":         { zh: "會議", en: "Meetings" },
-  "mt.lede":          { zh: "開過與要開的會都在這裡：時間、出席的人、會議紀錄。排會在時間看板上點一格；這裡可以補記一場、改名單，打開一場就能選範本直接打紀錄。", en: "Past and upcoming meetings: time, attendees, minutes. Schedule from a slot on the availability board; here you can log one or change the list, and open any meeting to pick a template and type the minutes." },
+  "mt.lede":          { zh: "開過與要開的會都在這裡：時間、出席的人、會議紀錄。排會在時間看板上點一格；要補記一場，到首頁按「記一場會議」。這裡可以改名單，打開一場就能選範本直接打紀錄。", en: "Past and upcoming meetings: time, attendees, minutes. Schedule from a slot on the availability board; to log one, use Log a meeting on Home. Here you can change the list, and open any meeting to pick a template and type the minutes." },
   // 會議範本與紀錄（2026-11-13）
   "ev.notOnEvent":    { zh: "你沒有被加進這一場，報名名單、表單和簽到看不到。要幫忙的話，找這個 team 的 Director 把你加進來。", en: "You are not on this event, so the sign-up list, form and check-in are hidden. To help out, ask this team's Director to add you." },
   "mtm.title":        { zh: "會議紀錄", en: "Minutes" },
@@ -404,7 +404,7 @@ export const MINE = {
   "mt.findPh":        { zh: "標題、議程、team 或日期", en: "Title, agenda, team or date" },
   "mt.past":          { zh: "過去的", en: "Past" },
   "mt.noneUp":        { zh: "之後沒有排好的會", en: "No upcoming meetings" },
-  "mt.noneUpHint":    { zh: "到時間看板點一格「排一場會」，或用上面的「記一場會議」補記。", en: "Pick a slot on the availability board and schedule one, or use Log a meeting above." },
+  "mt.noneUpHint":    { zh: "到時間看板點一格「排一場會」，或到首頁按「記一場會議」補記。", en: "Pick a slot on the availability board and schedule one, or use Log a meeting on Home." },
   "mt.board":         { zh: "整個 BT", en: "Whole BT" },
   "mt.people":        { zh: "{n} 人，{yes} 人說會到", en: "{n} invited, {yes} coming" },
   "mt.doc":           { zh: "會議紀錄", en: "Notes" },
@@ -413,6 +413,10 @@ export const MINE = {
   "mt.st.accepted":   { zh: "會到", en: "Coming" },
   "mt.st.declined":   { zh: "不能到", en: "Can't make it" },
   "mt.new":           { zh: "記一場會議", en: "Log a meeting" },
+  // 記一場會議自己一頁（#meetings/new，2026-11-26）
+  "mt.newLede":       { zh: "補記一場已經開過、或另外約好的會：時間、出席的人、會議紀錄。這裡記的不寄信。", en: "Record a meeting that already happened or was arranged elsewhere: time, attendees, minutes. Logging here sends no email." },
+  "mt.newNo":         { zh: "你現在記不了會議", en: "You can't log meetings yet" },
+  "mt.newNoHint":     { zh: "記 team 的會，要在那個 team 是「改」以上，請你的 Director 幫你開。整個 BT 的會由 Co-President 或 Senior Adviser 記。", en: "To log a team meeting you need Edit or above on that team. Ask your Director. Whole-BT meetings are logged by a Co-President or Senior Adviser." },
   "mt.edit":          { zh: "改這一場", en: "Edit this meeting" },
   "mt.scope":         { zh: "範圍", en: "Scope" },
   "mt.required":      { zh: "這場是", en: "This meeting is" },
