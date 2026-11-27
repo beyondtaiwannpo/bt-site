@@ -47,7 +47,8 @@ test("頂欄：lang 傳什麼畫什麼；沒傳在 Node 裡退成英文；連結
   const en = navHTML({ current: "settings", role: "cadre", name: "a", lang: "en" });
   assert.match(zh, />設定<\/a>/); assert.match(zh, />登出<\/button>/);
   assert.match(en, />Settings<\/a>/); assert.match(en, />Sign out<\/button>/);
-  assert.match(en, /href="\/home\/\?lang=en"/);
+  assert.match(en, /href="\/settings\/\?lang=en#story"/);
+  assert.match(navHTML({ current: "settings", role: "cadre", name: "a", lang: "en", rail: false }), /href="\/home\/\?lang=en">Home</, "沒有側欄的頁，頂欄的首頁帶 ?lang=");
   assert.equal(navLang(), "en", "沒有 location 與 localStorage 的時候是英文");
   assert.equal(withLang("/x/#y", "zh"), "/x/?lang=zh#y");
   for (const f of FEATURES) assert.ok(tx(f.label, "en") && tx(f.label, "zh"));

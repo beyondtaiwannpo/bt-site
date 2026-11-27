@@ -148,26 +148,27 @@ test("★ 首頁：有配對才畫「我帶的 mentee」，一列一人、沒填
   assert.match(m, /My mentor|我的 mentor/); assert.doesNotMatch(m, /My mentees|我帶的 mentee/);
 });
 
-// 2026-11-27 Paul：提需求「hanging on home… kind of weird」。首頁那兩顆鈕搬到每一頁側欄最上面的「新增」。
-test("側欄最上面的「新增」：提需求每一位幹部都有；記一場會議、排一場會只有排得了會的人有；學員沒有", () => {
-  const RAIL2 = RAIL;
+// 2026-11-27 第二版：側欄的「新增」拿掉（Paul：「take away the plus new button」），最常做的三件事在首頁與 team 頁的標題底下。
+test("首頁與 team 頁的最常做的事：提需求每一位幹部都有；記一場會議、排一場會只有排得了會的人有；側欄沒有「新增」", async () => {
+  const UI2 = await import("../home/src/ui.js");
   const member = { role: "cadre", board: "member", team: "Curriculum Team", name: "a", ws: {} };
   const dir = { ...member, ws: { "res:Curriculum Team": "edit" } };
   const pres = { ...member, board: "president" };
-  const m = RAIL2.newMenuHTML("home", member, "zh");
-  assert.match(m, /<details class="rail-new"><summary><span aria-hidden="true">\+<\/span> 新增<\/summary>/);
+  const m = UI2.quickHTML(member);
   assert.match(m, /href="\/admin\/\?lang=zh#request">跟 Marketing 提需求/); assert.doesNotMatch(m, /meetings\/new|schedule=1/);
   for (const who of [dir, pres]) {
-    const h = RAIL2.newMenuHTML("home", who, "zh");
+    const h = UI2.quickHTML(who);
     assert.match(h, /href="\/admin\/\?lang=zh#meetings\/new">記一場會議/);
     assert.match(h, /href="\?lang=zh&amp;schedule=1#calendar">排一場會/, "首頁裡換網址重開，排會那一塊跳出來");
   }
-  const inAdmin = RAIL2.newMenuHTML("forms", dir, "en");
-  assert.match(inAdmin, /href="#meetings\/new" data-act="tab" data-t="meetings\/new">Log a meeting/, "後台裡不重新載入");
-  assert.match(inAdmin, /href="\/home\/\?schedule=1&amp;lang=en#calendar">Schedule a meeting/);
-  assert.equal(RAIL2.newMenuHTML("home", { role: "student", ws: {} }, "zh"), "");
-  assert.match(RAIL2.railHTML("home", "home", member, {}, "zh"), /class="rail-new"/, "每一頁的側欄都有");
-  assert.doesNotMatch(UI.homeHTML([], { me: ME, tz: "Asia/Taipei", now: new Date("2026-11-26T02:00:00Z"), name: "王平", people: [], ws: {}, canSchedule: true }), /meetings\/new|#request"/);
+  // team 頁：帶著那個 team，提需求的 team 先選好、排會的範圍先選好。
+  const t = UI2.quickHTML(dir, "Curriculum Team");
+  assert.match(t, /href="\/admin\/\?team=Curriculum%20Team&amp;lang=zh#request"|href="\/admin\/\?lang=zh&amp;team=Curriculum%20Team#request"/);
+  assert.match(t, /schedule=1&amp;team=Curriculum%20Team#calendar/);
+  assert.doesNotMatch(RAIL.railHTML("home", "home", member, {}, "zh"), /rail-new|新增/, "側欄沒有「新增」");
+  assert.equal(RAIL.newMenuHTML, undefined);
   const main = readFileSync("home/src/main.js", "utf8");
   assert.match(main, /qp\.get\("schedule"\) && S\.role === "cadre" && ctx\(\)\.canSchedule/);
+  const adm = readFileSync("admin/src/main.js", "utf8");
+  assert.match(adm, /rqMyTeams\(S\.me\)/, "後台的提需求認 ?team=，只認他自己的 team");
 });

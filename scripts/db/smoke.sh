@@ -5653,6 +5653,43 @@ mm2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MMM}" 2>&1 || true)
 if echo "${mm2}" | grep -q "OVERALL.*PASS" && ! echo "${mm2}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去、重跑一次，驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
 psql -d "${DB}" -q -c "delete from public.mail_outbox where meeting_id in (select id from public.meetings where title like 'Mm %'); delete from public.meetings where title like 'Mm %'" >/dev/null 2>&1 || true
 chk "（收尾）假的會拿掉了" "0" "select count(*) from public.meetings where title like 'Mm %'"
+
+echo "── 對外網站變成要派人的工作區、所有表單那一頁（2027-01-23-website-and-forms.sql）──"
+# Paul 2026-11-27：「websites should be something that they assign to」「they should be able to know like what's going on and like what form is for what」。
+WFM=supabase/migrations/2027-01-23-website-and-forms.sql
+WFW=79790000-0000-0000-0000-000000000001; WFV=79790000-0000-0000-0000-000000000002; WFN=79790000-0000-0000-0000-000000000003
+WFPOL=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from pg_policies where schemaname = 'public'" | tr -d ' \n')
+wf1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${WFM}" 2>&1 || true)
+if echo "${wf1}" | grep -q "OVERALL.*PASS" && ! echo "${wf1}" | grep -q "|FAIL"; then echo "  ok   對外網站那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 對外網站那支驗收表："; echo "${wf1}" | head -12; fail=$((fail+1)); fi
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${WFW}','wf-edit@example.com'), ('${WFV}','wf-view@example.com'), ('${WFN}','wf-none@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values
+  ('${WFW}','網站改','Web Editor','Curriculum Team','cadre','member'),
+  ('${WFV}','網站看','Web Viewer','Curriculum Team','cadre','member'),
+  ('${WFN}','網站無','Web Nobody','Curriculum Team','cadre','member');
+insert into public.assignments (user_id, workspace_id, level) values ('${WFW}','custom:website','edit'), ('${WFV}','custom:website','view')
+  on conflict (user_id, workspace_id) do update set level = excluded.level;
+SQL
+chk "沒有任何一條 RLS 政策多出來或少掉" "${WFPOL}" "select count(*) from pg_policies where schemaname = 'public'"
+chkas "${WFW}" "★ 被派進對外網站「改」的人改得動歷史之路" "t" "select public.can_edit_history()"
+chkas "${WFW}" "★ 也改得動每一座島（不只自己 team 的）" "t|t" "select public.can_edit_island_post('Mentorship Team')::text::char(1)||'|'||public.can_edit_island_post(null)::text::char(1)"
+chkas "${WFV}" "★ 只能看的改不動" "f|f" "select public.can_edit_history()::text::char(1)||'|'||public.can_edit_island_post('Mentorship Team')::text::char(1)"
+chkas "${WFN}" "★ 沒被派進去的改不動" "f|f" "select public.can_edit_history()::text::char(1)||'|'||public.can_edit_island_post('Mentorship Team')::text::char(1)"
+chkas "${PAUL}" "原本的照舊：Co-President 改得動" "t|t" "select public.can_edit_history()::text::char(1)||'|'||public.can_edit_island_post('Mentorship Team')::text::char(1)"
+chkas "${PAUL}" "★ my_forms：報名表、回饋表、內部表單的份數跟原本三套門算出來的一樣" "t" "select (jsonb_array_length(m->'signup') = (select count(*) from public.forms f where public.form_can_view(f.id)))
+  and (jsonb_array_length(m->'feedback') = (select count(*) from public.rc_forms f where public.rc_form_reader(f.id)))
+  and (jsonb_array_length(m->'internal') = (select count(*) from public.tf_forms f where public.tf_is_reader(f.id)))
+  and (jsonb_array_length(m->'events') = (select count(*) from public.events e where e.source <> 'import' and public.can_edit(e.workspace_id))) from (select public.my_forms() m) z"
+chkas "${WFN}" "★ my_forms：一般幹部也一樣用那三套門算" "t" "select (jsonb_array_length(m->'signup') = (select count(*) from public.forms f where public.form_can_view(f.id)))
+  and (jsonb_array_length(m->'feedback') = (select count(*) from public.rc_forms f where public.rc_form_reader(f.id)))
+  and (jsonb_array_length(m->'internal') = (select count(*) from public.tf_forms f where public.tf_is_reader(f.id))) from (select public.my_forms() m) z"
+chkas "${WFN}" "★ my_forms 回的東西裡沒有任何一份的答案" "f" "select (public.my_forms()::text ~ '\"(answers|email)\"')::text::char(1)"
+chkraise "★ 學員叫不動 my_forms（not_cadre）" "not_cadre" "perform set_config('test.uid','${WFN}',true); update public.profiles set role = 'student' where id = '${WFN}'; perform public.my_forms();"
+chkrole anon "" "★ 沒登入叫不動 my_forms" "denied" "select case when has_function_privilege('anon','public.my_forms()','execute') then 'open' else 'denied' end"
+wf2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${WFM}" 2>&1 || true)
+if echo "${wf2}" | grep -q "OVERALL.*PASS" && ! echo "${wf2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
+psql -d "${DB}" -q -c "delete from public.assignments where user_id in ('${WFW}','${WFV}','${WFN}'); delete from public.profiles where id in ('${WFW}','${WFV}','${WFN}'); delete from auth.users where id in ('${WFW}','${WFV}','${WFN}');" >/dev/null 2>&1 || true
+chk "（收尾）假的三個人拿掉了" "0" "select count(*) from public.profiles where id in ('${WFW}','${WFV}','${WFN}')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

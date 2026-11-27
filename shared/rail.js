@@ -47,11 +47,12 @@ const RT = {
   lvViewTip:{ zh: "你沒被派進這個 team 的工作區，裡面的東西只能看", en: "You are not assigned to this team's workspace, so you can only look." },
   people:   { zh: "誰在這裡", en: "People here" },
   peopleT:  { zh: "這一區的成員：加人、改看／改／管、移出", en: "Who works here: add people, set View / Edit / Manage, remove" },
-  // 側欄最上面的「新增」（2026-11-27）
-  newBtn:   { zh: "新增", en: "New" },
-  newRq:    { zh: "跟 Marketing 提需求", en: "New Marketing request" },
-  newMt:    { zh: "記一場會議", en: "Log a meeting" },
-  newSch:   { zh: "排一場會", en: "Schedule a meeting" },
+  // 被指派才有的那幾行（2026-11-27 第二版）：對外網站、行銷、護照、紀錄、幹部招募。
+  asg:      { zh: "指派", en: "Assigned" },
+  asgTip:   { zh: "你被派進這一區，所以看得到", en: "You were assigned to this, so you can see it" },
+  // Co-President 與 Senior Adviser 的六個 team 收成一行（2026-11-27 第二版）。
+  teams:    { zh: "所有 team", en: "Teams" },
+  teamsHint:{ zh: "六個 team 的專案、資源、錢", en: "Projects, resources and money for six teams" },
 };
 const BOARD = {
   member: { zh: "Associate", en: "Associate" }, adviser: { zh: "顧問", en: "Adviser" }, director: { zh: "Director", en: "Director" },
@@ -112,35 +113,52 @@ const ICON = {
 //   「組織」那一段拿掉了：紀錄與場地是整個 BT 的，放進「整個 BT」；錢是 Sponsorship 的，畫在「我的工作區」的 Sponsorship 那一行底下；
 //   人與權限只有 Co-President 與 Senior Adviser 進得去，搬到頂欄（shared/nav.js 的 FEATURES）。
 //   AREAS 裡 sec 不是這三段的（people、money）不畫成側欄的一行，但它們的分頁照舊在 AREAS 與 ITEMS 裡，內容區上方那一排分頁照樣有。
+// 2026-11-27 第二版（Paul：「me and whole BT, essentially they're the same thing」）：「我的」與「整個 BT」合成最上面一段，不加標題。
+//   上面那一段每個人都一樣、位置固定（首頁、行事曆、會議、專案、表單、我的護照、場地），點久了手會記得；
+//   下面「我的工作區」每個人長度不一樣：先是他的 team（一個 team 一行），再接被指派才有的（對外網站、行銷、護照、紀錄、幹部招募），旁邊標「指派」。
+//   工作區放下面，因為放上面會把固定的那幾行往下推，每個人的位置都不一樣。
+//   搜尋搬到頂欄（shared/nav.js），「+ 新增」拿掉：提需求、記會、排會放回首頁與每個 team 的頁上。
+//   AREAS 裡 sec 是 top（人與權限、搜尋，在頂欄）與 team（錢，在 Sponsorship 那一行底下）的不畫成側欄的一行，分頁照舊在 AREAS 與 ITEMS 裡。
 export const SECTIONS = [
-  { key: "me",   label: { zh: "我的", en: "Me" } },
-  // 我的工作區（2026-11-23）：這一段的行不在 AREAS 裡，是照人畫的，見下面 myTeams() 與 teamRowsHTML()。
+  { key: "me",   label: null },
+  // 我的工作區（2026-11-23）：team 那幾行不在 AREAS 裡，是照人畫的，見下面 myTeams() 與 teamRowsHTML()；後面接 AREAS 裡 sec 是 ws 的（被指派才有）。
   { key: "ws",   label: { zh: "我的工作區", en: "My workspaces" } },
-  { key: "work", label: { zh: "整個 BT", en: "Whole BT" } },
 ];
 export const AREAS = [
   { key: "home",      sec: "me",   label: { zh: "首頁",     en: "Home" },       hint: { zh: "等你處理的事，照日期排", en: "Everything waiting for you, by date" } },
   { key: "calendar",  sec: "me",   label: { zh: "行事曆",   en: "Calendar" },   hint: { zh: "月、週、日，排會，時間看板", en: "Month, week, day; availability" } },
   // 會議自己一行（2026-11-27 Paul：「take out meeting and template… into a separate category… home, calendar, meeting」）。
-  // 底下是會議與會議範本；「記一場會議」在會議那一頁標題旁那一顆，也在側欄最上面的「新增」裡。
+  // 底下是會議與會議範本；「記一場會議」在會議那一頁標題旁那一顆，也在首頁與每個 team 的頁上。
   { key: "meetings",  sec: "me",   label: { zh: "會議",     en: "Meetings" },   hint: { zh: "紀錄、記一場會議、範本", en: "Notes, log a meeting, templates" } },
+  // 2026-12-26 Paul：工作區 → 專案 → 活動。這一行改叫「專案」，點下去是專案清單；活動在它底下。key 留 events（網址與測試都認它）。
+  { key: "events",    sec: "me",   label: { zh: "專案",     en: "Projects" },   hint: { zh: "每個 team 的專案與活動", en: "Every team's projects and events" } },
+  // 表單一個入口（2026-11-27 第二版 Paul：「they should be able to know like what's going on and like what form is for what」）：
+  // 要我填的、所有表單（報名表、回饋表、內部表單三種，標類型與是哪一場活動的，也在這裡建一份）、內部表單、回饋表。
+  { key: "forms",     sec: "me",   label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、我管的、建一份", en: "To fill, the ones you run, make one" } },
   { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
-  // 2026-12-26 Paul：工作區 → 專案 → 活動。這一行改叫「專案」，點下去是專案清單；活動、計畫與招募、各 team 在它底下。key 留 events（網址與測試都認它）。
-  // 搜尋（2026-11-26 Paul：要找一份舊的紀錄得一場一場點開，大家就不用了）：會議紀錄、回饋表、內部表單、活動檢討一次找。
-  { key: "search",    sec: "work", label: { zh: "搜尋",     en: "Search" },     hint: { zh: "會議紀錄、回饋表一次找", en: "Meeting notes and feedback at once" } },
-  { key: "events",    sec: "work", label: { zh: "專案",     en: "Projects" },   hint: { zh: "每個 team 的專案與活動", en: "Every team's projects and events" } },
-  { key: "forms",     sec: "work", label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、內部表單、回饋表", en: "To fill, internal forms, feedback forms" } },
-  { key: "marketing", sec: "work", label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
-  // 對外網站是「對外那一側的每一樣東西」（2026-11-27 Paul：「history road, island post, BT island, they should live under website… everything front end related」）。
-  { key: "website",   sec: "work", label: { zh: "對外網站", en: "Website" },    hint: { zh: "活動、資源、團隊頁、歷史之路、BT 島", en: "Events, resources, team page, history, island" } },
-  { key: "passports", sec: "work", label: { zh: "護照",     en: "Passports" },  hint: { zh: "幹部護照、實習護照", en: "Cadre and intern passports" } },
-  { key: "records",   sec: "work", label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較", en: "Events, people, year by year" } },
   // 場地是整個 BT 的（2026-12-26 Paul：「venue, records, money … whole BT」）。誰改得動不變：開得了活動的人照舊改得動。
-  { key: "venues",    sec: "work", label: { zh: "場地",     en: "Venues" },     hint: { zh: "場地與聯絡人", en: "Places and contacts" } },
-  // 這兩行不畫在側欄（見 SECTIONS 上面那段）：人與權限在頂欄，錢在「我的工作區」的 Sponsorship 那一行底下（teamRowsHTML）。
+  { key: "venues",    sec: "me",   label: { zh: "場地",     en: "Venues" },     hint: { zh: "場地與聯絡人", en: "Places and contacts" } },
+  // 以下是被指派才有的（sec ws，畫在 team 那幾行後面，標「指派」）。
+  // 對外網站是一個工作區（2026-11-27 第二版 Paul：「website should be something that they assign to」）：custom:website，
+  //   在「人與權限 → 工作區」派人。這一行只畫給被派進去的人與 Co-President、Senior Adviser（areaWho）；
+  //   某個 team「改」以上的人改自己 team 的資源庫與 BT 島，入口在他那個 team 那一行底下（teamRowsHTML），不在這一行。
+  { key: "website",   sec: "ws",   areaWho: "ws:custom:website", label: { zh: "對外網站", en: "Website" },    hint: { zh: "歷史之路、BT 島、網站上的活動與團隊頁", en: "History road, island, events and team page on the site" } },
+  { key: "marketing", sec: "ws",   label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
+  { key: "passports", sec: "ws",   label: { zh: "護照",     en: "Passports" },  hint: { zh: "幹部護照、實習護照", en: "Cadre and intern passports" } },
+  { key: "records",   sec: "ws",   label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較", en: "Events, people, year by year" } },
+  // 這幾行不畫在側欄：人與權限與搜尋在頂欄，錢在 Sponsorship 那一行底下（teamRowsHTML）。
+  // 人與權限只有 Co-President 與 Senior Adviser 的頂欄有；被派進「申請」工作區的一般幹部頂欄沒有，所以照舊畫在「我的工作區」最後（railHTML）。
+  { key: "search",    sec: "top",  label: { zh: "搜尋",     en: "Search" },     hint: { zh: "會議紀錄、回饋表一次找", en: "Meeting notes and feedback at once" } },
   { key: "people",    sec: "top",  label: { zh: "人與權限", en: "Internal" },   hint: { zh: "名單、邀請、幹部招募、工作區", en: "Roster, invites, recruitment, workspaces" } },
   { key: "money",     sec: "team", team: "Sponsorship Team", label: { zh: "錢", en: "Money" }, hint: { zh: "收支、預算、匯出", en: "Income, spending, budget" } },
 ];
+// 這一區在側欄上畫不畫成一行（看得到裡面至少一頁，而且過了 areaWho）。人與權限：非 Co-President／Senior Adviser 才畫在側欄。
+export function areaShown(a, me) {
+  if (!a || !visibleItems(a.key, me).length) return false;
+  if (a.areaWho && !allowed(a.areaWho, me)) return false;
+  if (a.sec === "me" || a.sec === "ws") return true;
+  return a.key === "people" && !senior(me);
+}
 
 // 每一頁。group 是在哪個資料夾，key 是那個資料夾裡的分頁（#key），area 是側欄上的哪一行。
 // who 決定畫不畫：cadre / president / senior / "ws:a|b"（被派進其中任何一個工作區，或 senior）。
@@ -159,32 +177,37 @@ export const ITEMS = [
   // 活動（2026-11-10 Paul：「application should live under events」）
   { group: "forms",     key: "projects",   area: "events",    who: "cadre",  label: { zh: "專案", en: "Projects" } },
   { group: "forms",     key: "events",     area: "events",    who: "cadre",  label: { zh: "活動", en: "Events" } },
-  // 回饋表（2026-11-27 Paul：「feedback form lives under records. I don't know why it's there」）：回饋表是一場活動的，放在專案與活動旁邊。
-  // 頁面還是紀錄那個資料夾的 #forms，誰看得到不變（被派進「紀錄」的人）。
-  { group: "records",   key: "forms",      area: "events",    who: "ws:records", ws: "custom:records",    label: { zh: "回饋表", en: "Feedback forms" } },
   // 2026-11-26 Paul：「各 team」那一頁拿掉了（team 的人數與 Director 在幹部名單上），「計畫與招募」改叫「幹部招募」搬到「人與權限」底下，見下面。
-  // 表單：要填的、內部表單、回饋表放在同一排（2026-11-13 Paul：「建內部表單」與「要填的」並排兩行很亂）
+  // 表單（2026-11-27 第二版）：一個入口。「所有表單」是每一位幹部都有的一頁（/admin/team-forms/#all）：
+  //   我管的報名表、回饋表、內部表單一張清單，每一份標類型、是哪一場活動的、開著沒、收了幾份；最下面「建一份」先選類型。
+  //   誰管得到哪一份照舊是資料庫決定（my_forms()，2027-01-23-website-and-forms.sql）。
   { group: "teamforms", key: "fill",       area: "forms",     who: "cadre",  label: { zh: "要我填的", en: "To fill" } },
+  { group: "teamforms", key: "all",        area: "forms",     who: "cadre",  label: { zh: "所有表單", en: "All forms" } },
   { group: "teamforms", key: "build",      area: "forms",     who: "ws:team-forms", ws: "custom:team-forms", label: { zh: "內部表單", en: "Internal forms" } },
+  // 回饋表（2026-11-27 Paul：「feedback form lives under records. I don't know why it's there」）：第二版收進「表單」。
+  // 頁面還是紀錄那個資料夾的 #forms，這一行誰看得到不變（被派進「紀錄」的人）；改得動一場活動的人，他那場的回饋表在「所有表單」裡。
+  { group: "records",   key: "forms",      area: "forms",     who: "ws:records", ws: "custom:records",    label: { zh: "回饋表", en: "Feedback forms" } },
   // 行銷：需求單一頁（送單、我送的、Marketing 的待辦都在這一頁，2026-11-13 Paul）
   // 2026-11-27 Paul：一般幹部（Associate）在行銷那一行看到一堆不是他的東西。側欄的「行銷」只給 Marketing 的人；
-  //   其他人提需求走側欄最上面的「新增」，那一頁也列得出他送過的單（頁面本身照舊每一位幹部都進得去，見 GROUPS 的 forms）。
+  //   其他人提需求按首頁或自己 team 那一頁的「跟 Marketing 提需求」，那一頁也列得出他送過的單（頁面本身照舊每一位幹部都進得去，見 GROUPS 的 forms）。
   { group: "forms",     key: "request",    area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests", ws: "custom:marketing-requests",  label: { zh: "需求單", en: "Requests" } },
   { group: "marketing", key: "posts",      area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests", ws: "res:Marketing Team", label: { zh: "大學介紹貼文", en: "College intro posts" } },
   { group: "marketing", key: "ig",         area: "marketing", who: "ws:res:Marketing Team|custom:marketing-requests", ws: "res:Marketing Team", label: { zh: "Instagram", en: "Instagram" } },
-  // 對外網站（2026-11-27 起歷史之路與 BT 島也在這裡）。只看得到自己改得動的那幾頁：
-  //   資源庫、BT 島的貼文、BT 島是某個 team「改」以上（貼自己 team 的那一份），歷史之路是 Marketing「改」以上，其他是 Co-President 與 Senior Adviser。
-  //   一般幹部一頁都改不動，所以整行不畫。這只是側欄畫不畫，誰改得動照舊是每一頁自己的判斷與資料庫。
+  // 對外網站（2026-11-27 第二版：一個要派人的工作區 custom:website）。這一行只畫給被派進去的人與 Co-President、Senior Adviser（AREAS 的 areaWho）。
+  //   歷史之路與 BT 島：被派進對外網站「改」以上的人改得動（資料庫 can_edit_history()、can_edit_island_post() 2027-01-23 起多認這一格）。
+  //   資源庫、BT 島的貼文、BT 島：某個 team「改」以上的人改自己 team 的那一份，入口在他那個 team 那一行底下；在這幾頁上方那一排照樣看得到這三頁。
+  //   網站上的活動、團隊頁、校友故事、信的文字：照舊只有 Co-President 與 Senior Adviser。
+  //   這只是側欄畫不畫，誰改得動照舊是每一頁自己的判斷與資料庫。
   { group: "site",      key: "events",     area: "website",   who: "senior", label: { zh: "網站上的活動", en: "Events on the site" } },
+  { group: "site",      key: "history",    area: "website",   who: "edit:res:Marketing Team|custom:website", ws: "custom:website",  label: { zh: "BT 歷史之路", en: "History road" } },
+  { group: "site",      key: "island-map", area: "website",   who: "editany:res:,edit:custom:website", ws: "custom:website", label: { zh: "BT 島", en: "BT Island" } },
+  // BT 島上的貼文（2026-11-17）：每個 team 自己貼自己那座島的；貼得了哪座島看他的工作區。
+  { group: "site",      key: "island",     area: "website",   who: "editany:res:,edit:custom:website", label: { zh: "BT 島的貼文", en: "Island posts" } },
   { group: "site",      key: "res",        area: "website",   who: "editany:res:", label: { zh: "資源庫", en: "Resources" } },
   { group: "site",      key: "team",       area: "website",   who: "senior", label: { zh: "團隊頁", en: "Team page" } },
   // 校友故事：2026-12-25 起 stories_for_review() 也回給 Senior Adviser（以前只給 Co-President，Senior Adviser 點進去是空的）。
   { group: "site",      key: "stories",    area: "website",   who: "senior", label: { zh: "校友故事", en: "Alumni stories" } },
   { group: "site",      key: "mail",       area: "website",   who: "senior", label: { zh: "信的文字", en: "Email wording" } },
-  { group: "site",      key: "history",    area: "website",   who: "edit:res:Marketing Team", ws: "res:Marketing Team",  label: { zh: "BT 歷史之路", en: "History road" } },
-  // BT 島上的貼文（2026-11-17）：每個 team 自己貼自己那座島的；貼得了哪座島看他的工作區。
-  { group: "site",      key: "island",     area: "website",   who: "editany:res:", label: { zh: "BT 島的貼文", en: "Island posts" } },
-  { group: "site",      key: "island-map", area: "website",   who: "editany:res:", label: { zh: "BT 島", en: "BT Island" } },
   // 護照
   { group: "passports", key: "cadre",      area: "passports", who: "ws:passport", ws: "passport",        label: { zh: "幹部護照", en: "Cadre passport" } },
   { group: "passports", key: "cities",     area: "passports", who: "ws:passport", ws: "passport",        label: { zh: "入境章的城市", en: "Entry-stamp cities" } },
@@ -223,6 +246,8 @@ export const ITEMS = [
 export const senior = me => !!me && me.role === "cadre" && (me.board === "president" || me.board === "senior_adviser");
 export function allowed(who, me) {
   if (!me || me.role !== "cadre") return false;
+  // 「a,b」是其中一條過就算（2026-11-27 第二版：BT 島是某個 team「改」以上，或對外網站「改」以上）。
+  if (String(who).includes(",")) return String(who).split(",").some(w => allowed(w.trim(), me));
   if (who === "cadre") return true;
   if (who === "president") return me.board === "president";
   // senior 是 Co-President 加 Senior Adviser（跟資料庫的 is_senior() 同一條規則）。
@@ -304,8 +329,33 @@ const fill = (row, L, vars) => tx(row, L).replace(/\{(\w+)\}/g, (m, k) => (vars 
 export function teamAreas(me) {
   return AREAS.filter(a => a.sec === "team" && a.team).map(a => ({ team: a.team, area: a.key, items: visibleItems(a.key, me) })).filter(x => x.items.length);
 }
+// team 那一行底下、某個 team「改」以上才有的對外那幾頁（2026-11-27 第二版：資源庫與 BT 島是 team 每天用的，從「對外網站」那一行搬到 team 底下）。
+// 連結是 /admin/site/ 的同一頁，那一頁自己只讓他改自己 team 的那一份（ipCanEdit 與資料庫）。
+// Marketing 那一行多一條歷史之路（Marketing「改」以上改得動它，沒被派進對外網站的話側欄就只有這一個入口）。
+const TEAM_SITE = ["res", "history", "island", "island-map"];
+export function teamSiteItems(me, team) {
+  if (!me || me.role !== "cadre" || !(senior(me) || canEditWs(me, "res:" + team))) return [];
+  return TEAM_SITE.filter(k => k !== "history" || team === "Marketing Team").map(k => itemOf("site", k)).filter(i => i && canSee(i, me));
+}
+// Co-President 與 Senior Adviser：六個 team 每一個都是「管」，六行太長，收成一行「所有 team」，滑過去選 team（2026-11-27 第二版）。
+// 現在在某個 team 的頁（或錢）就展開，列出六個 team，現在那一個亮著；錢接在 Sponsorship 後面。
+function seniorTeamsHTML(group, tab, me, L) {
+  const now = itemOf(group, tab), extra = teamAreas(me);
+  const links = TEAMS.map(team => {
+    const on = group === "home" && tab === "team:" + team;
+    const money = extra.filter(x => x.team === team).map(x => {
+      const A = AREAS.find(a => a.key === x.area), mon = x.items.includes(now);
+      return `<a class="rail-item rail-sub rail-sub2${mon ? " on" : ""}" ${linkAttrs(x.items[0], group, L)}${mon ? ' aria-current="page"' : ""}>${esc(tx(A.label, L))}</a>`;
+    }).join("");
+    return `<a class="rail-item rail-sub${on ? " on" : ""}" href="${esc(teamHref(team, L, group))}"${on ? ' aria-current="page"' : ""}>${esc(teamShort(team))}</a>${money}`;
+  }).join("");
+  const cur = (group === "home" && String(tab || "").startsWith("team:")) || extra.some(x => x.items.includes(now));
+  const a = `<a class="rail-item rail-area rail-team${cur ? " here" : ""}" href="${esc(teamHref(TEAMS[0], L, group))}">${svg(ICON.team)}<span class="rail-txt"><b>${esc(tx(RT.teams, L))}</b><small>${esc(tx(RT.teamsHint, L))}</small></span><span class="rail-lv" title="${esc(fill(RT.wsRank, L, { rank: boardName(me.board, L) }))}">${TEAMS.length}</span></a>`;
+  return cur ? a + `<div class="rail-subs">${links}</div>` : rowWithFly(a, tx(RT.teams, L), links);
+}
 function teamRowsHTML(group, tab, me, L) {
   if (!me || me.role !== "cadre") return "";
+  if (senior(me)) return seniorTeamsHTML(group, tab, me, L);
   const extra = teamAreas(me);
   const teams = myTeams(me);
   // 看得到錢、但沒被派進 Sponsorship 的人（例如管帳的人在別的 team）：照樣多一行 Sponsorship，裡面只有錢，標「部分」。誰看得到錢沒有變。
@@ -316,10 +366,13 @@ function teamRowsHTML(group, tab, me, L) {
   const note = senior(me) ? `<div class="rail-foot rail-none">${esc(fill(RT.wsRank, L, { rank: boardName(me.board, L) }))}</div>` : "";
   const lvName = lv => tx(lv === "manage" ? RT.lvManage : lv === "edit" ? RT.lvEdit : RT.lvView, L);
   const now = itemOf(group, tab);
+  // 在資源庫、BT 島那幾頁：側欄上沒有「對外網站」那一行的人，亮他第一個改得動的 team（有那一行的人亮那一行）。
+  const siteTeam = now && now.group === "site" && TEAM_SITE.includes(now.key) && !areaShown(AREAS.find(x => x.key === "website"), me)
+    ? (teams.find(t => teamSiteItems(me, t.team).includes(now)) || {}).team : "";
   return note + teams.map(t => {
     const mine = extra.filter(x => x.team === t.team);
     const over = group === "home" && tab === "team:" + t.team;
-    const cur = over || mine.some(x => x.items.includes(now));
+    const cur = over || mine.some(x => x.items.includes(now)) || t.team === siteTeam;
     const tag = t.level ? { txt: lvName(t.level), tip: fill(RT.lvTip, L, { lv: lvName(t.level) }), cls: "" }
       : t.some ? { txt: tx(RT.lvSome, L), tip: tx(RT.lvSomeTip, L), cls: " dim" }
       : { txt: tx(RT.lvView, L), tip: tx(RT.lvViewTip, L), cls: " dim" };
@@ -332,8 +385,13 @@ function teamRowsHTML(group, tab, me, L) {
       const on = x.items.includes(now), A = AREAS.find(a => a.key === x.area);
       return `<a class="rail-item rail-sub${on ? " on" : ""}" ${linkAttrs(x.items[0], group, L)}${on ? ' aria-current="page"' : ""}>${esc(tx(A.label, L))}</a>`;
     }).join("");
-    const inner = `<a class="rail-item rail-sub${over ? " on" : ""}" href="${esc(teamHref(t.team, L, group))}"${over ? ' aria-current="page"' : ""}>${esc(tx(RT.wsOver, L))}</a>${projects}${areaLinks}${ppl}`;
-    const more = !!(projects || ppl || areaLinks);
+    // 資源庫、BT 島的貼文、BT 島（這個 team「改」以上才有，teamSiteItems）。
+    const site = teamSiteItems(me, t.team).map(i => {
+      const on = i === now && t.team === siteTeam;
+      return `<a class="rail-item rail-sub${on ? " on" : ""}" ${linkAttrs(i, group, L)}${on ? ' aria-current="page"' : ""}>${esc(tx(i.label, L))}</a>`;
+    }).join("");
+    const inner = `<a class="rail-item rail-sub${over ? " on" : ""}" href="${esc(teamHref(t.team, L, group))}"${over ? ' aria-current="page"' : ""}>${esc(tx(RT.wsOver, L))}</a>${projects}${site}${areaLinks}${ppl}`;
+    const more = !!(projects || ppl || areaLinks || site);
     const open = cur || (teams.length === 1 && more);
     const subs = open ? `<div class="rail-subs">${inner}</div>` : "";
     const a = `<a class="rail-item rail-area rail-team${cur ? " here" : ""}" href="${esc(teamHref(t.team, L, group))}">${svg(ICON.team)}<span class="rail-txt"><b>${esc(teamShort(t.team))}</b></span><span class="rail-lv${tag.cls}" title="${esc(tag.tip)}">${esc(tag.txt)}</span></a>`;
@@ -369,26 +427,11 @@ function bindFly() {
   document.addEventListener("focusin", placeFly);
 }
 
-// ── 側欄最上面的「新增」（2026-11-27）──────────────────────────────────────
-// Paul 2026-11-27：「I'm trying to put the marketing request somewhere… right now it's just hanging on home, which is kind of weird
-//   because people will be using that a lot. So design that for me」。最常做的幾件事收在每一頁側欄最上面同一顆鈕裡（像 Gmail 的「撰寫」），
-//   不管在哪一頁都一下就按得到，首頁就不用再掛那兩顆鈕。
-// 誰看得到哪一行跟原本那一頁一樣：提需求是每一位幹部；記會、排會是排得了會的人（Co-President、Senior Adviser、某個 team 是「改」以上，
-//   跟資料庫的 can_schedule 同一條）。原生 <details>，不用寫程式就開得了關得了。
+// ── 誰排得了會（2026-11-27）──────────────────────────────────────────────
+// 首頁與每個 team 的頁上「記一場會議」「排一場會」那兩顆只畫給排得了會的人：Co-President、Senior Adviser、某個 team 是「改」以上
+// （跟資料庫的 can_schedule 同一條）。2026-11-27 第二版拿掉了側欄最上面的「+ 新增」（Paul：「take away the plus new button on the top left」），
+// 那三件事放回首頁與 team 的頁（home/src/ui.js 的 quickHTML）。
 export const canSchedule = me => !!me && me.role === "cadre" && (senior(me) || canEditAny(me, "res:"));
-export function newMenuHTML(group, me, L) {
-  if (!me || me.role !== "cadre") return "";
-  const go = (h, t) => group === "forms" ? `href="#${esc(t)}" data-act="tab" data-t="${esc(t)}"` : `href="${esc(withLang(h, L))}"`;
-  const rows = [];
-  // 提需求是每一位幹部（那一頁的門是 GROUPS 的 forms）。側欄的「行銷」那一行 2026-11-27 起只給 Marketing 的人，所以這裡不看那一行。
-  if (canEnter(GROUPS.find(g => g.key === "forms"), me)) rows.push(`<a class="rail-new-i" ${go("/admin/#request", "request")}>${esc(tx(RT.newRq, L))}</a>`);
-  if (canSchedule(me)) {
-    rows.push(`<a class="rail-new-i" ${go("/admin/#meetings/new", "meetings/new")}>${esc(tx(RT.newMt, L))}</a>`);
-    rows.push(`<a class="rail-new-i" href="${esc(group === "home" ? "?" + (L ? "lang=" + L + "&" : "") + "schedule=1#calendar" : withLang("/home/?schedule=1#calendar", L))}">${esc(tx(RT.newSch, L))}</a>`);
-  }
-  if (!rows.length) return "";
-  return `<details class="rail-new"><summary><span aria-hidden="true">+</span> ${esc(tx(RT.newBtn, L))}</summary><div class="rail-new-m">${rows.join("")}</div></details>`;
-}
 
 // ── 側欄 ──────────────────────────────────────────────────────────────
 // group 是現在在哪個資料夾，tab 是哪一頁，counts 是 { <item key>: 數字 }（有才顯示，一個東西的數字是它底下幾頁加起來）。
@@ -418,16 +461,18 @@ export function railHTML(group, tab, me, counts, L) {
       return `<a class="rail-item rail-sub${cur ? " on" : ""}" ${linkAttrs(i, group, L)}${cur ? ' aria-current="page"' : ""}>${esc(tx(i.label, L))}${k ? `<span class="rail-count">${esc(String(k))}</span>` : ""}</a>`;
     }).join("")}${ppl}</div>` : "";
     const cls = open ? " here" : on ? " on" : "";
-    const link = `<a class="rail-item rail-area${cls}" ${linkAttrs(first, group, L)}${on && !open ? ' aria-current="page"' : ""}>${svg(ICON[a.key] || "")}<span class="rail-txt"><b>${esc(tx(a.label, L))}</b><small>${esc(tx(a.hint, L))}</small></span>${n && !open ? `<span class="rail-count">${esc(String(n))}</span>` : ""}</a>`;
+    // 被指派才有的那幾行標「指派」（Co-President 與 Senior Adviser 依職級全部都有，不標）。
+    const asg = a.sec !== "me" && !senior(me) ? `<span class="rail-lv dim" title="${esc(tx(RT.asgTip, L))}">${esc(tx(RT.asg, L))}</span>` : "";
+    const link = `<a class="rail-item rail-area${cls}" ${linkAttrs(first, group, L)}${on && !open ? ' aria-current="page"' : ""}>${svg(ICON[a.key] || "")}<span class="rail-txt"><b>${esc(tx(a.label, L))}</b><small>${esc(tx(a.hint, L))}</small></span>${n && !open ? `<span class="rail-count">${esc(String(n))}</span>` : asg}</a>`;
     // 沒展開、底下又不只一頁的那一行：滑過去看得到每一頁（見 rowWithFly）。
     const fly = !open && items.length > 1 ? items.map(i => { const k = cnt(i); return `<a class="rail-item rail-sub" ${linkAttrs(i, group, L)}>${esc(tx(i.label, L))}${k ? `<span class="rail-count">${esc(String(k))}</span>` : ""}</a>`; }).join("") : "";
     return (fly ? rowWithFly(link, tx(a.label, L), fly) : link) + subs;
   };
   const body = SECTIONS.map(s => {
-    // 人與權限（sec "top"）在 Co-President 與 Senior Adviser 的頂欄上。其他人如果看得到它底下的某一頁（被派進「申請」工作區的人看得到幹部招募），
-    // 頂欄沒有那一項，就照舊畫在「整個 BT」最後，不然那一頁就沒有入口了。
-    const rows = s.key === "ws" ? teamRowsHTML(group, tab, me, L)
-      : AREAS.filter(a => a.sec === s.key || (s.key === "work" && a.sec === "top" && !senior(me))).map(row).join("");
+    // 「我的工作區」：先是 team 那幾行，再接被指派才有的（sec ws），最後是人與權限（只有頂欄沒有它的人，見 areaShown）。
+    const rows = s.key === "ws"
+      ? teamRowsHTML(group, tab, me, L) + AREAS.filter(a => a.sec === "ws" || a.sec === "top").filter(a => areaShown(a, me)).map(row).join("")
+      : AREAS.filter(a => a.sec === s.key && areaShown(a, me)).map(row).join("");
     if (!rows) return "";
     return (s.label ? `<div class="rail-group">${esc(tx(s.label, L))}</div>` : "") + rows;
   }).join("");
@@ -438,7 +483,6 @@ export function railHTML(group, tab, me, counts, L) {
     <div class="rail-me"><b>${esc(me && me.name || "")}</b>
       <span>${esc(boardName(me && me.board, L))}・${teams.length ? esc(teams.join(tx(RT.list, L))) : esc(tx(RT.noTeam, L))}</span></div>
     ${langSwitchHTML(L)}
-    ${newMenuHTML(group, me, L)}
     ${body}
   </nav>`;
 }
@@ -464,9 +508,10 @@ export function areaTabsHTML(group, tab, me, L) {
   const people = it.ws && showPeopleHere(me, it.ws)
     ? `<a class="area-tab area-people" href="${esc(peopleHref(it.ws, L))}" title="${esc(tx(RT.peopleT, L))}">${esc(tx(RT.people, L))}</a>` : "";
   if (items.length < 2 && !people) return "";
-  // 側欄上沒有畫成一行的那一區（人與權限在頂欄、錢在 Sponsorship 底下）：寬螢幕上側欄列不出它的每一頁，這一排要照畫（rail.css 的 .keep）。
+  // 側欄上沒有畫成一行的那一區（人與權限在頂欄、錢在 Sponsorship 底下、沒被派進對外網站的人在資源庫那幾頁）：
+  // 寬螢幕上側欄列不出它的每一頁，這一排要照畫（rail.css 的 .keep）。
   const a = AREAS.find(x => x.key === it.area);
-  const keep = a && (a.sec === "top" || a.sec === "team") ? " keep" : "";
+  const keep = a && !areaShown(a, me) ? " keep" : "";
   return `<nav class="area-tabs${keep}" aria-label="${esc(tx(RT.tabs, L))}">${items.map(i => {
     const on = i === it;
     return `<a class="area-tab${on ? " on" : ""}" ${linkAttrs(i, group, L)}${on ? ' aria-current="page"' : ""}>${esc(tx(i.label, L))}</a>`;
@@ -740,9 +785,9 @@ export const TOURS = [
 
   // ── 首頁（/home/）──
   { id: "home", page: "home:home", steps: [
-    // 2026-11-27：首頁那兩顆鈕搬到側欄最上面的「新增」（newMenuHTML）。
-    { at: [".rail-new", ".rail-burger"], t: { zh: "最常做的事在這裡", en: "The things you do most" },
-      b: { zh: "左邊最上面的「新增」每一頁都有：跟 Marketing 提需求；排得了會的人還有記一場會議、排一場會。記下來的會之後在「搜尋」找得到。", en: "New, at the top left, is on every page: send Marketing a request, and if you can schedule meetings, log a meeting or schedule one. Every meeting you log can be found later in Search." } },
+    // 2026-11-27 第二版：側欄的「新增」拿掉，那三顆鈕回到首頁最上面（home/src/ui.js quickHTML），每個 team 的頁上也有一組。
+    { at: [".home .quick", ".home .hello"], t: { zh: "最常做的事在這裡", en: "The things you do most" },
+      b: { zh: "跟 Marketing 提需求；排得了會的人還有記一場會議、排一場會。你的 team 的頁上也有同一組，team 會先幫你選好。記下來的會之後在上面的搜尋找得到。", en: "Send Marketing a request, and if you can schedule meetings, log a meeting or schedule one. Your team's page has the same buttons with the team already picked. Every meeting you log can be found later with the search box at the top." } },
     { at: ".home .block.wait", t: { zh: "等你處理", en: "Waiting for you" },
       b: { zh: "要你動手的事都在這一張清單：要回覆的會、要填的表單、等你審的報名、派給你的需求。照日期排，最急的在最上面，點一行就到那件事。", en: "Everything that needs you is in this one list: meetings to reply to, forms to fill in, sign-ups to review, requests assigned to you. Most urgent first; tap a row to go straight there." } },
     { at: ".home .wait + .block", t: { zh: "接下來", en: "Coming up" },

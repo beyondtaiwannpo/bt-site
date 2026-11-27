@@ -72,12 +72,12 @@ test("專案的報名表：回專案、頁首寫是哪個專案的", () => {
   assert.match(h, /專案「2027 冬令營」的報名表/);
 });
 
-test("★ 側欄：「專案」那一行點下去是專案清單；場地在整個 BT", () => {
+test("★ 側欄：「專案」那一行點下去是專案清單；場地在最上面那一段", () => {
   const me = { role: "cadre", board: "member", team: "", ws: {} };
   assert.equal(RAIL.visibleItems("events", me)[0].key, "projects");
   assert.equal(RAIL.areaOf("forms", "projects"), "events");
   assert.equal(RAIL.areaOf("forms", "venues"), "venues");
-  assert.equal(RAIL.AREAS.find(a => a.key === "venues").sec, "work", "2026-11-27 組織那一段拿掉，場地在整個 BT");
+  assert.equal(RAIL.AREAS.find(a => a.key === "venues").sec, "me", "2026-11-27 第二版：我的與整個 BT 合成一段，場地在裡面");
   const main = readFileSync("admin/src/main.js", "utf8");
   assert.match(main, /const pj = \/\^projects\(\?:\\\/\(\.\+\)\)\?\$\/\.exec\(t \|\| ""\);/, "#projects 與 #projects/<id> 有自己的網址");
   assert.match(main, /\(S\.view === "projects" \|\| S\.view === "project"\) \? "projects"/, "側欄亮「專案」");

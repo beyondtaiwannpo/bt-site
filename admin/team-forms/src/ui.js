@@ -451,7 +451,7 @@ export function membersAreaHTML(ns, a) {
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
 // 一個工作區屬於哪一列（2026-10-24 照 team 分組）：apps:X / res:X 是 X；intern-passport 是 Internship Team；passport 是整個 BT（""）；
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
-const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms"]);
+const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms", "custom:website"]);
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
   // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
@@ -496,6 +496,7 @@ export function wsCellHref(w) {
   if (id === "finance" || id === "custom:money") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
+  if (id === "custom:website") return "/admin/site/#history";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
@@ -791,6 +792,67 @@ export function buildListHTML(boot, msg, busy, newDraft) {
   return pageHead(T("build.title"), T("build.lede"), acts)
     + msgHTML(msg) + (b.can_create ? "" : `<div class="note">${esc(T("build.cantCreate"))}</div>`) + nf
     + (forms.length ? `<ul class="flist">${forms.map(row).join("")}</ul>` : emptyHTML(T("build.none"), esc(T("build.noneHint")), b.can_create && !newDraft ? { act: "tf-new", label: T("build.new") } : null));
+}
+
+// ── 所有表單（2026-11-27，#all）────────────────────────────────────────────
+// Paul 2026-11-27：「when they wanted to create a form, either a sign-up form or a feedback form, they should be able to create that and then attach it
+//   or link it to a specific event that can go public… Or if they want to create an internal form and send out to everyone, they can.
+//   But they should be able to know like what's going on and like what form is for what」。
+// 三種表單本來在三個地方（報名表在活動與專案裡、回饋表在紀錄裡、內部表單在這裡），這一頁把「我管得到的」排成一張清單：
+// 每一份前面一個類型的標，後面寫是哪一場活動的、開著沒、收了幾份。最下面「建一份」先選類型。
+// all 是 my_forms() 回的（data.js loadMyForms）；pick = { kind: 建一份選了哪一種, filter: 清單只看哪一種 }。純函式，test/forms-hub.test.mjs 測。
+export const ALL_KINDS = ["signup", "feedback", "internal"];
+const tName = o => o ? ((lang() === "zh" ? (o.title_zh || o.title_en) : (o.title_en || o.title_zh)) || o.slug || "") : "";
+// 三種表單排成一張清單，最近改過的在最上面。
+export function allRows(all) {
+  const a = all || {};
+  const one = (kind, f) => ({ kind, id: f.id, title: f.title || "", status: f.status || "draft", updated_at: f.updated_at || "", can_edit: !!f.can_edit,
+    event: f.event || null, project: f.project || null, total: f.total, received: f.received, responses: f.responses, recipients: f.recipients });
+  return [...(a.signup || []).map(f => one("signup", f)), ...(a.feedback || []).map(f => one("feedback", f)), ...(a.internal || []).map(f => one("internal", f))]
+    .sort((x, y) => String(y.updated_at).localeCompare(String(x.updated_at)));
+}
+// 一份點下去到哪：報名表到後台的報名表頁、回饋表到紀錄那一頁、內部表單是這個資料夾自己的 #build/<id>。
+export function allHref(r) {
+  if (r.kind === "signup") return withLang("/admin/#forms/" + encodeURIComponent(r.id));
+  if (r.kind === "feedback") return withLang("/admin/records/#forms/" + encodeURIComponent(r.id));
+  return "#build/" + encodeURIComponent(r.id);
+}
+function allRowHTML(r) {
+  const of = r.event ? T("all.ofEvent", { event: esc(tName(r.event)) }) : r.project ? T("all.ofProject", { project: esc(tName(r.project)) }) : r.kind === "internal" ? "" : esc(T("all.noEvent"));
+  const hidden = r.kind === "signup" && r.event && ["draft", "ready"].includes(r.event.status) ? esc(T("all.evDraft")) : "";
+  const n = r.kind === "signup" ? T("all.apps", { n: r.total || 0, r: r.received || 0 })
+    : r.kind === "feedback" ? T("all.replies", { n: r.responses || 0 }) : T("all.sent", { n: r.responses || 0, of: r.recipients || 0 });
+  const link = r.kind === "internal" ? `href="${esc(allHref(r))}" data-act="open-form" data-id="${esc(r.id)}"` : `href="${esc(allHref(r))}"`;
+  return `<li class="all-row"><div class="fhead"><span class="tag kind k-${r.kind}">${esc(T("all.k." + r.kind))}</span><a ${link}><b>${esc(r.title || T("common.noName"))}</b></a> ${statusTag(r.status)}${r.can_edit ? "" : ` <span class="tag">${esc(T("all.viewOnly"))}</span>`}</div>
+      <div class="fmeta">${[of, esc(n), hidden].filter(Boolean).join("・")}</div></li>`;
+}
+export function allFormsHTML(all, msg, busy, pick) {
+  const p = pick || {}, a = all || {}, rows = allRows(all);
+  const shown = p.filter ? rows.filter(r => r.kind === p.filter) : rows;
+  const chip = (k, label, n) => `<button type="button" class="chip${(p.filter || "") === k ? " on" : ""}" data-act="all-filter" data-k="${k}" aria-pressed="${(p.filter || "") === k}">${esc(label)}${n ? ` <span class="subtab-n">${n}</span>` : ""}</button>`;
+  const chips = rows.length ? `<div class="chips" role="group" aria-label="${esc(T("all.filter"))}">${chip("", T("all.any"), rows.length)}${ALL_KINDS.map(k => chip(k, T("all.k." + k), rows.filter(r => r.kind === k).length)).join("")}</div>` : "";
+  const list = !all ? skeletonHTML()
+    : rows.length ? (shown.length ? `<ul class="flist">${shown.map(allRowHTML).join("")}</ul>` : `<p class="note">${esc(T("all.noneKind"))}</p>`)
+    : emptyHTML(T("all.none"), esc(T("all.noneHint")), null);
+  return pageHead(esc(T("all.title")), esc(T("all.lede")), [])
+    + msgHTML(msg) + chips + list + (all ? newFormHTML(a, p, busy) : "");
+}
+// 建一份：三張卡選類型，選了報名表或回饋表就多一格「掛在哪一場活動上」（只列他改得動的，my_forms 的 events）。
+export function newFormHTML(all, pick, busy) {
+  const p = pick || {}, evs = (all && all.events) || [];
+  const card = k => `<button type="button" class="kind-card${p.kind === k ? " on" : ""}" data-act="all-kind" data-k="${k}" aria-pressed="${p.kind === k}">
+      <span class="tag kind k-${k}">${esc(T("all.k." + k))}</span><span class="kc-h">${esc(T("all.h." + k))}</span></button>`;
+  let more = "";
+  if (p.kind === "signup" || p.kind === "feedback") {
+    more = evs.length ? `<label class="all-ev"><i>${esc(T("all.pickEv"))}</i><select id="all-ev"><option value="">${esc(T("all.pickEvPh"))}</option>${evs.map(e =>
+        `<option value="${esc(e.id)}">${esc(tName(e))}${p.kind === "signup" && e.has_form ? " " + esc(T("all.hasForm")) : ""}</option>`).join("")}</select></label>
+      <div class="form-foot"><button class="btn" data-act="all-make"${busy ? " disabled" : ""}>${esc(busy ? T("all.making") : T(p.kind === "signup" ? "all.makeSignup" : "all.makeFeedback"))}</button></div>`
+      : `<p class="note">${esc(T("all.noEvents"))}</p>`;
+  } else if (p.kind === "internal") {
+    more = all && all.can_create_internal ? `<div class="form-foot"><a class="btn" href="#build" data-act="all-internal">${esc(T("all.goInternal"))}</a></div>` : `<p class="note">${esc(T("all.cantInternal"))}</p>`;
+  }
+  return `<section class="card all-new" aria-labelledby="all-new-h"><h2 id="all-new-h">${esc(T("all.new"))}</h2><p class="mini">${esc(T("all.newLede"))}</p>
+    <div class="kind-cards">${ALL_KINDS.map(card).join("")}</div>${more}</section>`;
 }
 
 // 編輯畫面的頁首與分頁。

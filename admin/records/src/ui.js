@@ -451,7 +451,7 @@ export function membersAreaHTML(ns, a) {
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
 // 一個工作區屬於哪一列（2026-10-24 照 team 分組）：apps:X / res:X 是 X；intern-passport 是 Internship Team；passport 是整個 BT（""）；
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
-const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms"]);
+const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms", "custom:website"]);
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
   // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
@@ -496,6 +496,7 @@ export function wsCellHref(w) {
   if (id === "finance" || id === "custom:money") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
+  if (id === "custom:website") return "/admin/site/#history";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。

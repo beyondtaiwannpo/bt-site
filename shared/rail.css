@@ -107,22 +107,8 @@
 .rail-lang .lang:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 .rail-lang .lang:not(.on):hover{background:rgba(255,255,255,.9);border-color:var(--bt-navy)}
 
-/* 側欄最上面的「新增」（2026-11-27）：一顆橘色的鈕，打開是三行（提需求、記一場會議、排一場會）。 */
-.rail-new{margin:0 12px 12px;position:relative}
-.rail-new summary{list-style:none;display:flex;align-items:center;justify-content:center;gap:6px;min-height:38px;padding:0 14px;
-  border-radius:999px;background:var(--bt-orange);color:var(--bt-navy);font:700 14px/1 var(--body);letter-spacing:.03em;cursor:pointer;
-  box-shadow:0 1px 0 rgba(16,42,134,.12)}
-.rail-new summary::-webkit-details-marker{display:none}
-.rail-new summary span{font-size:18px;line-height:1}
-.rail-new summary:hover{filter:brightness(1.04)}
-.rail-new summary:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
-.rail-new[open] summary{border-radius:16px 16px 0 0}
-.rail-new-m{display:flex;flex-direction:column;border:1px solid rgba(16,42,134,.18);border-top:0;border-radius:0 0 16px 16px;
-  background:rgba(255,255,255,.92);overflow:hidden}
-.rail-new-i{display:block;padding:10px 14px;font-size:14px;font-weight:600;color:var(--bt-navy);text-decoration:none;border-top:1px solid rgba(16,42,134,.08)}
-.rail-new-i:first-child{border-top:0}
-.rail-new-i:hover{background:rgba(255,232,197,.7)}
-.rail-new-i:focus-visible{outline:var(--ring);outline-offset:-2px}
+/* Co-President 與 Senior Adviser 的「所有 team」底下，錢接在 Sponsorship 後面，往裡縮一格（2026-11-27 第二版）。 */
+.rail-sub2{padding-left:24px;font-size:13px}
 
 /* 按下去的回饋 */
 a.rail-item:not(.on):active{background:rgba(255,196,108,.38)}

@@ -34,6 +34,11 @@ export const MINE = {
   "nc.lede":          { zh: "你已經登入了，但還不是幹部。", en: "You are signed in but not a cadre yet." },
 
   "home.hi":          { zh: "嗨，{name}", en: "Hi, {name}" },
+  // 最常做的三件事（2026-11-27 第二版：側欄的「+ 新增」拿掉，回到首頁最上面，每個 team 的頁上也有一組）
+  "q.aria":           { zh: "最常做的事", en: "Things you do most" },
+  "q.rq":             { zh: "跟 Marketing 提需求", en: "Ask Marketing" },
+  "q.mt":             { zh: "記一場會議", en: "Log a meeting" },
+  "q.sch":            { zh: "排一場會", en: "Schedule a meeting" },
   // 等你處理的事（2026-11-14，首頁與後台「待辦」合併成一張清單）
   "home.wait":        { zh: "等你處理", en: "Waiting for you" },
   "home.waitLede":    { zh: "照日期排，最急的在最上面。點一行就到那件事。", en: "Sorted by date, most urgent first. Tap a row to go there." },

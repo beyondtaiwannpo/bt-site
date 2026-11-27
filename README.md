@@ -824,6 +824,8 @@ Paul 2026-11-27：點 12 月 8 日要先跳到「日」、再點一格才排得�
 
 ## 側欄：會議自己一行、最上面一顆「新增」（2026-11-27）
 
+> 2026-11-27 同一天更新：「新增」那一顆拿掉了，三件事回到首頁與 team 頁的標題底下，見下面「側欄第二版」。
+
 Paul 2026-11-27：會議跟會議範本放在行事曆底下很怪，要「首頁、行事曆、會議」三行；首頁的「跟 Marketing 提需求」大家很常用，卻掛在首頁上，請 Claude 設計一個地方放。Paul 說照 Claude 建議的做。
 
 **側欄「我的」那一段現在是**：首頁、行事曆（底下：行事曆、時間看板）、**會議**（底下：會議、會議範本）、我的護照。會議範本照舊只有派進「會議範本」的人與 Co-President、Senior Adviser 看得到。
@@ -840,6 +842,8 @@ Paul 2026-11-27：會議跟會議範本放在行事曆底下很怪，要「首�
 **程式在哪**：`shared/rail.js` 的 `AREAS`、`ITEMS`（會議與範本的 area 改成 `meetings`）、`newMenuHTML()`、`canSchedule()`；樣式在 `shared/rail.css`「新增」那一段；`admin/src/ui.js` 的 `meetingsListHTML()`；`home/src/main.js` 認 `?schedule=1`。測試 `test/home.test.mjs`、`test/home-waiting.test.mjs`、`test/meeting-templates.test.mjs`、`test/meetings.test.mjs`。
 
 ## 側欄重分：滑過去看得到裡面、三段、一般幹部只看得到用得到的（2026-11-27）
+
+> 2026-11-27 同一天更新：三段變兩段、對外網站變成要派人的工作區、搜尋與帳號搬到頂欄，見下一節「側欄第二版」。滑過去看得到裡面、錢在 Sponsorship 底下、人與權限在頂欄、我的故事自己一頁，這幾件沒變。
 
 Paul 2026-11-27 一次講了五件事，加上一句：「I'm really kind of confused how like a normal member, let's say associate, can see」。原本 Co-President 看到的側欄跟一般幹部差很多，他分不出哪些是一般幹部也看得到的。Paul 看過盤點之後說照 Claude 建議的做。
 
@@ -879,6 +883,56 @@ Paul 2026-11-27 一次講了五件事，加上一句：「I'm really kind of con
 - `shared/nav.js`：`FEATURES` 多「我的故事」與「人與權限」（`boards`，唯一照職級過濾的一項），`navHTML()` 多收 `board`。每一頁畫頂欄都要把職級傳進去，沒傳就不畫人與權限，不會多給。
 - `settings/src/ui.js` 的 `storyPageHTML()`，`settings/src/main.js` 認 `#story`。
 - 測試：`test/rail-regroup.test.mjs`（新的），其他跟著改的在 `test/admin-hub`、`nav`、`home-waiting`、`home-team`、`finance`、`history-admin`、`recruitment`、`requests`、`alumni-story`、`founders`、`settings-outcomes`。
+
+## 側欄第二版：一段每個人都一樣、我的工作區、頂欄搜尋、所有表單（`supabase/migrations/2027-01-23-website-and-forms.sql`，2026-11-27）
+
+Paul 2026-11-27 看了上一版之後講了幾件事：「我的」跟「整個 BT」其實是同一件事；對外網站應該是派人進去的工作區；左上角的「+ 新增」拿掉；每天會做的事要分好類（提需求、記會議、排會；每個 team 的活動、會議、資源、專案；搜尋、紀錄、護照）；表單只要一行，滑過去看得到要填的、建一份報名表或回饋表掛在一場活動上、或發一份內部表單給大家，**而且每一份要看得出是做什麼的**。Claude 給了第二版提案，Paul 說「照建議做」。
+
+**側欄現在長這樣（從上到下）：**
+
+| 段 | 有什麼 | 誰看得到 |
+|---|---|---|
+| 最上面（沒有標題） | 首頁、行事曆、會議、專案、表單、我的護照、場地 | 每一位幹部都一樣 |
+| 我的工作區 | 先是他的 team（一個 team 一行），再來是被派進去的：對外網站、行銷、護照、紀錄，右邊標「指派」 | 照他被派進哪裡 |
+
+- **team 那一行底下**：總覽、他的專案，加上**改得動這個 team 的人**才有的資源庫、BT 島的貼文、BT 島（Marketing 那一行多一條歷史之路）。資源庫與 BT 島是 team 每天用的，從「對外網站」搬到 team 底下。
+- **Co-President 與 Senior Adviser**：六個 team 收成一行「所有 team」，滑過去選 team；錢接在 Sponsorship 後面一條。在某個 team 的頁上那一行展開，現在那一個亮著。
+- **對外網站**是一個工作區（代號 `custom:website`）。到「人與權限 → 工作區」把人派進去，「改」以上的人改得動歷史之路與每一座 BT 島。網站上的活動、團隊頁、校友故事、信的文字照舊只有 Co-President 與 Senior Adviser；資源庫照舊是各 team「改」以上。**原本改得動的人一個都沒少**（Marketing「改」照舊改得動歷史之路、某個 team「改」照舊改得動自己那座島），只是側欄的入口改在他的 team 那一行底下。
+- **紀錄**照舊只有被派進去的人有。
+
+**頂欄（幹部）**：左邊 logo，中間一個搜尋框，右邊一顆圓形頭像。
+- **搜尋框**：在任何一頁打字按 Enter，就到 `/admin/search/` 找。側欄的「搜尋」那一行拿掉了。
+- **頭像**：按下去是我的故事、設定（Co-President 與 Senior Adviser 多人與權限）、登出。語言照舊在側欄最上面與設定裡切。
+- 設定與實習護照這兩頁沒有側欄，頂欄多一個「首頁」連結，回得去。
+- 學員、校友、實習生的頂欄沒變。
+
+**「新增」拿掉之後，最常做的三件事在哪：** 首頁與 team 頁的標題右邊一排鈕。
+- **跟 Marketing 提需求**：每一位幹部都有。從 team 頁按，需求單的 team 先選好（只認他自己的 team）。
+- **記一場會議**、**排一場會**：排得了會的人才有。從 team 頁按「排一場會」，範圍先選好那個 team。
+- 會議那一頁標題旁的「記一場會議」照舊在。
+
+**表單：一行，三種，一個地方看全部。** 側欄「表單」底下：要我填的、**所有表單**、內部表單（建得了的人）、回饋表（被派進紀錄的人）。**所有表單**（`/admin/team-forms/#all`）：
+- 上面是他管得到的每一份，三種排在一起，最近改過的在最上面。每一份前面一個色塊標是哪一種（**報名表**：外面的人報名活動或申請計畫；**回饋表**：活動結束後請參加的人填；**內部表單**：發給幹部填），後面寫是哪一場活動的、開著沒、收了幾份。活動還沒上架的報名表會寫「表單還沒公開」。可以只看某一種。
+- 下面「建一份」：先選是哪一種，三張卡各寫一句它是做什麼的。報名表與回饋表要選掛在哪一場活動上（只列他改得動的活動），按下去建好直接打開那一份的編輯頁；那場已經有報名表的話打開原本那一份。內部表單照舊要被派進「內部表單（誰能建）」才建得了，沒有的人看到一句要找誰。
+- **報名表什麼時候公開**：照舊是活動上架之後，掛在那場活動上的報名表才公開。這一頁只是把三種放在一起看，沒有改任何一種的規則。
+
+**資料庫（`supabase/migrations/2027-01-23-website-and-forms.sql`，還沒在正式 Supabase 跑）**：
+- 新的工作區 `custom:website`。
+- `can_edit_history()` 與 `can_edit_island_post()` 多認「對外網站」改以上。**只有加，沒有拿掉。**
+- 新的函式 `my_forms()`：給「所有表單」那一頁一次拿三種表單的清單。每一種用原本那一套的門過濾（報名表 `form_can_view`、回饋表 `rc_form_reader`、內部表單 `tf_is_reader`），回的只有標題、狀態、份數，**沒有任何一份答案**。只有登入的幹部叫得動。
+- 沒有動任何一張表的 RLS，可以重跑。跑完看最下面那張表，OVERALL 要是 PASS。
+- **沒跑之前**：側欄與頂欄照樣是新的，「所有表單」那一頁會說讀不到，對外網站那一行派了人也改不動（資料庫的門還沒認它）。
+
+**程式在哪：**
+- `shared/rail.js`：`SECTIONS`（`me` 沒有標題、`ws`）、`AREAS`（`areaWho` 決定那一行畫不畫，對外網站是 `ws:custom:website`）、`areaShown()`、`allowed()` 認逗號（任何一個過就算）、`teamSiteItems()`、`seniorTeamsHTML()`、`teamRowsHTML()`。`newMenuHTML()` 拿掉了，`canSchedule()` 留著。
+- `shared/nav.js` 的 `cadreBarHTML()`（搜尋框、頭像、選單用瀏覽器內建的 popover），樣式在 `shared/nav.css` 最後一段。
+- `home/src/ui.js` 的 `quickHTML()`；`home/src/main.js` 的 `?schedule=1` 多認 `&team=`；`admin/src/main.js` 的需求單認 `?team=`。
+- `admin/team-forms/`：`data.js` 的 `loadMyForms`、`attachEventForm`、`createFeedback`；`ui.js` 的 `allRows()`、`allHref()`、`allFormsHTML()`、`newFormHTML()`；`main.js` 認 `#all`。
+- `admin/site/src/ui.js` 的 `SITE_WS`：畫面上改不改得動跟著認對外網站。
+- 九份後台 `ui.js` 的 `ORG_WS` 與 `wsCellHref` 多 `custom:website`（九份要一樣，`test/admin-hub.test.mjs` 守著）。
+- 測試：`test/forms-hub.test.mjs`（新的）、`test/rail-regroup.test.mjs` 重寫，其他跟著改的在 `admin-hub`、`nav`、`lang`、`home`、`home-team`、`home-waiting`、`history-admin`、`projects`、`recruitment`、`resources-ui`、`search`。`scripts/db/smoke.sh` 多一段 14 項。
+
+**已知的小事（沒做）**：「記一場會議」從 team 頁按，team 沒有先選好；team 那一行滑過去沒有「這個 team 的會議」。
 
 ## 會議範本與會議紀錄（`supabase/migrations/2026-12-18-meeting-templates.sql`，2026-11-13）
 

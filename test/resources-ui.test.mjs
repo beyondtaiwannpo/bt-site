@@ -101,8 +101,12 @@ test("資源分頁是這一組的第一個分頁，當前的那一個有標記",
   // 2026-11-27：資源庫只畫給改得動的人，一般幹部（tabsHTML 的 false）沒有。
   assert.match(M.tabsHTML("res", true), /class="rail-item on" href="#res" data-act="tab" data-t="res"/);
   assert.ok(!M.tabsHTML("res", false).includes('data-t="team"'), "一般幹部看不到團隊頁那個分頁");
-  // 2026-11-27：對外網站那一行只給改得動某個 team 的人（資源庫、BT 島），一般幹部沒有。
-  const rail = M.railHTML("site", "res", { role: "cadre", board: "member", team: "", name: "王平", ws: { "res:Curriculum Team": "edit" } });
-  assert.ok(rail.includes('href="/admin/?lang=zh#projects"') && rail.includes('class="rail-item rail-area here" href="#res"'), "側欄上有專案與對外網站（點下去是資源庫）");
+  // 2026-11-27 第二版：資源庫在改得動的那個 team 底下；「對外網站」那一行只給被派進對外網站（custom:website）的人。
+  const ed = { role: "cadre", board: "member", team: "", name: "王平", ws: { "res:Curriculum Team": "edit" } };
+  const rail = M.railHTML("site", "res", ed);
+  assert.ok(rail.includes('href="/admin/?lang=zh#projects"'), "側欄上有專案");
+  assert.match(rail, /rail-team here"[\s\S]*?<a class="rail-item rail-sub on" href="#res" data-act="tab" data-t="res" aria-current="page">資源庫<\/a>/, "Curriculum 那一行展開，資源庫亮著");
+  assert.ok(!rail.includes("<b>對外網站</b>"), "沒被派進對外網站的人沒有那一行");
+  assert.ok(M.railHTML("site", "res", { ...ed, ws: { ...ed.ws, "custom:website": "edit" } }).includes('class="rail-item rail-area here" href="#history"'), "被派進去的人：對外網站那一行亮著（點下去先是歷史之路）");
   assert.ok(!M.railHTML("site", "res", { role: "cadre", board: "member", team: "", name: "王平" }).includes("<b>對外網站</b>"), "一般幹部沒有對外網站那一行");
 });

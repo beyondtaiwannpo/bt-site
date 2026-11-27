@@ -20,6 +20,8 @@ let S = {
   results: null,       // tf_results(id)
   aud: null, audSaved: null, find: {},
   newDraft: null, more: {},
+  // 所有表單（2026-11-27，#all）：all 是 my_forms() 回的；pick 是「建一份」選了哪一種、清單只看哪一種。
+  all: null, pick: { kind: "", filter: "" },
   // 題目畫布（2026-12-23，shared/forms.js）：mode 編輯或預覽、menuAt 哪一條「＋」開著、filter 打在 / 後面的字、logicOpen 哪幾題的邏輯面板開著。
   fx: { mode: "edit", menuAt: null, filter: "", logicOpen: new Set() },
   // 填到哪（引擎的 runner 每次重畫都從這裡接回來）：answers 是畫面上的值（多選是陣列），page 是第幾頁。
@@ -34,6 +36,7 @@ function body() {
   if (!S.loaded) return UI.skeletonHTML();
   if (S.view === "fill" && S.id) return S.fill ? UI.fillHTML(S.fill, S.msg, S.busy, S.run) : UI.msgHTML(S.msg) + UI.skeletonHTML();
   if (S.view === "fill") return UI.fillListHTML(S.boot, S.msg);
+  if (S.view === "all") return UI.allFormsHTML(S.all, S.msg, S.busy, S.pick);
   if (!canBuild()) return UI.noAccessHTML(S.me);
   if (!S.id) return UI.buildListHTML(S.boot, S.msg, S.busy, S.newDraft);
   if (!S.admin) return UI.msgHTML(S.msg) + UI.skeletonHTML();
@@ -51,7 +54,7 @@ function render() {
   if (!S.user) { location.replace("../../app/?next=admin-team-forms"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
   const counts = S.boot ? { fill: (S.boot.todo || []).length } : {};
-  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("teamforms", S.view === "fill" ? "fill" : "build", S.me, counts), body()); UI.railAfter(el);
+  UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("teamforms", S.view, S.me, counts), body()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 畫完之後讓引擎接手那兩個框：填的頁（#tf-run）與編輯器的預覽（#fx-pv）。
   mountFill();
@@ -92,7 +95,7 @@ async function boot(retried) {
 }
 function parseHash() {
   const parts = (location.hash.slice(1) || new URLSearchParams(location.search).get("tab") || "fill").split("/");
-  S.view = parts[0] === "build" ? "build" : "fill";
+  S.view = ["build", "all"].includes(parts[0]) ? parts[0] : "fill";
   S.id = parts[1] || null;
   S.sub = UI.SUBS.includes(parts[2]) ? parts[2] : "questions";
 }
@@ -109,6 +112,7 @@ async function openRoute(keepMsg) {
   render();
   try {
     if (S.view === "fill" && S.id) { S.fill = await D.loadFill(S.id); initRun(); }
+    else if (S.view === "all") { S.all = null; render(); S.all = await D.loadMyForms().catch(e => { S.msg = T("err.load") + D.says(e); return { signup: [], feedback: [], internal: [], events: [] }; }); }
     else if (S.view === "build" && S.id) {
       S.admin = await D.loadAdmin(S.id);
       if (!S.aud || S.aud._id !== S.id) resetAud();
@@ -251,7 +255,22 @@ document.addEventListener("click", async e => {
   if (act === "ask-cancel") { UI.cancelAsk(S, root()); return; }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../../app/"); return; }
-  if (act === "tab") { e.preventDefault(); go(b.dataset.t === "build" ? "build" : "fill"); return; }
+  if (act === "tab") { e.preventDefault(); go(["build", "all"].includes(b.dataset.t) ? b.dataset.t : "fill"); return; }
+  // ── 所有表單（#all）──
+  if (act === "all-filter") { S.pick = Object.assign({}, S.pick, { filter: UI.ALL_KINDS.includes(b.dataset.k) ? b.dataset.k : "" }); render(); return; }
+  if (act === "all-kind") { S.pick = Object.assign({}, S.pick, { kind: UI.ALL_KINDS.includes(b.dataset.k) ? b.dataset.k : "" }); S.msg = ""; render(); return; }
+  if (act === "all-internal") { e.preventDefault(); S.newDraft = { title: "" }; go("build"); return; }
+  if (act === "all-make") {
+    const ev = String((document.getElementById("all-ev") || {}).value || "");
+    if (!ev) { S.msg = T("err.make") + T("err.pickEv"); render(); return; }
+    const one = ((S.all && S.all.events) || []).find(x => x.id === ev);
+    const title = T("all.fbTitle", { event: one ? (lang() === "zh" ? (one.title_zh || one.title_en) : (one.title_en || one.title_zh)) || one.slug : "" });
+    const id = await run("err.make", () => S.pick.kind === "signup" ? D.attachEventForm(ev) : D.createFeedback(ev, title));
+    if (id === undefined) return;
+    // 建好直接到那一份的編輯頁（報名表在後台的報名表頁、回饋表在紀錄那一頁）。
+    location.href = UI.allHref({ kind: S.pick.kind, id });
+    return;
+  }
   if (act === "open-fill") { e.preventDefault(); go("fill/" + b.dataset.id); return; }
   if (act === "back-fill") { go("fill"); await loadBoot(); render(); return; }
   if (act === "open-form") { e.preventDefault(); go("build/" + b.dataset.id); return; }

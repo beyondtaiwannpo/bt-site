@@ -62,6 +62,13 @@ export const setStatus     = (id, status) => rpc("tf_set_status", { p_form: id, 
 export const deleteForm    = id => rpc("tf_delete_form", { p_form: id });
 export const submit        = (id, answers) => rpc("tf_submit", { p_form: id, p_answers: answers });
 
+// 「所有表單」（2026-11-27，#all）：報名表、回饋表、內部表單一次拿（my_forms()，2027-01-23-website-and-forms.sql）。
+// 每一種照原本那一套的門過濾，回的只有標題、狀態、份數；「建一份」叫的是原本那兩支（attach_event_form、rc_save_form），誰建得了由它們決定。
+// 後台的資料夾之間不互相 import，所以這兩句跟 admin/src/data.js 的 attachEventForm、createFeedbackForm 各抄一份。
+export const loadMyForms   = () => rpc("my_forms");
+export const attachEventForm = eventId => rpc("attach_event_form", { p_event: eventId });
+export const createFeedback  = (eventId, title) => rpc("rc_save_form", { p_form: null, p_data: { title, kind: "post-event", event_id: eventId, lang: lang() }, p_questions: [] });
+
 // 資料庫回的代碼翻成人話。先命中先贏。
 const SAYS = [
   ["not_form_creator", "says.notCreator"],
@@ -95,6 +102,9 @@ const SAYS = [
   ["need_name", "says.needName"],
   ["tf_bootstrap", "says.noTables"],
   ["tf_fill", "says.noTables"],
+  ["my_forms", "says.noMyForms"],
+  ["not_event_editor", "says.notEventEditor"],
+  ["no_such_event", "says.noEvent"],
 ];
 export function says(err) {
   const m = String((err && err.message) || err || "");

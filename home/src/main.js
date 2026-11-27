@@ -367,8 +367,10 @@ async function boot() {
     }
     if (S.cal.view === "day") ensureAvail();
     openPick();
-    // 側欄「新增」→「排一場會」（2026-11-27）：/home/?schedule=1#calendar，打開行事曆、排會那一塊直接跳出來（今天，太晚了就明天早上九點）。
+    // 首頁與 team 頁的「排一場會」（2026-11-27）：/home/?schedule=1#calendar，打開行事曆、排會那一塊直接跳出來（今天，太晚了就明天早上九點）。
     if (qp.get("schedule") && S.role === "cadre" && ctx().canSchedule) {
+      // 從某個 team 的頁按的（?team=…）：排會的範圍先選那個 team（他排得了那個 team 才算，openSch 會檢查）。
+      if (qp.get("team")) { S.cal.team = qp.get("team"); qp.delete("team"); }
       let k = UI.dayKey(new Date(), S.tz), m = defaultMin(k);
       if (m >= 1440) { k = UI.addDaysKey(k, 1); m = 9 * 60; }
       if (view() !== "calendar") history.replaceState(null, "", location.pathname + location.search + "#calendar");

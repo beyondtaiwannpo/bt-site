@@ -47,7 +47,7 @@ test("★ 側欄：幹部招募在「人與權限」底下，各 team 那一行�
   assert.match(h, /<nav class="area-tabs keep"/, "側欄上沒有這一區，那一排寬螢幕也要畫");
   assert.match(h, /class="area-tab on" href="#forms" data-act="tab" data-t="forms" aria-current="page">Recruitment/, "在 /admin/ 這個資料夾裡，那一顆是換 #");
   assert.match(RAIL.areaTabsHTML("people", "roster", pres, "en"), /href="\/admin\/\?lang=en#forms">Recruitment/, "從人與權限那個資料夾連回 /admin/#forms");
-  assert.doesNotMatch(RAIL.railHTML("forms", "forms", pres, {}, "en"), />Teams<|Programs &amp; recruitment|<b>Internal<\/b>/, "Co-President 的側欄沒有人與權限那一行");
+  assert.doesNotMatch(RAIL.railHTML("forms", "forms", pres, {}, "en"), /Programs &amp; recruitment|<b>Internal<\/b>/, "Co-President 的側欄沒有人與權限那一行（2026-11-27 第二版的「Teams」是他的六個 team 那一行，不是舊的各 team 頁）");
   // 被派進「申請」的一般幹部：頂欄沒有人與權限，側欄照舊畫那一行，裡面只有幹部招募。
   const rec = RAIL.railHTML("forms", "forms", { role: "cadre", board: "member", name: "r", team: "", ws: { apps: "edit" } }, {}, "en");
   assert.match(rec, /<a class="rail-item rail-area on" href="#forms" data-act="tab" data-t="forms" aria-current="page">[\s\S]{0,900}?<b>Internal<\/b>/);

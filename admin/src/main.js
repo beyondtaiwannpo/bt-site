@@ -143,6 +143,12 @@ function render() {
     body = S.venue ? UI.venueHTML(S.venue, S.msg, S.busy, !!S.vnOpen["vnc-add"]) : UI.msgHTML(S.msg) + UI.skeletonHTML();
   } else if (S.view === "request") {
     if (!S.rqDraft) S.rqDraft = rqDraftLoad();
+    // 從某個 team 的頁按「跟 Marketing 提需求」（/admin/?team=…#request，2026-11-27）：「哪個 team 提的」先選那個 team（他在那個 team 才算），用過就從網址拿掉。
+    const rqTeam = new URLSearchParams(location.search).get("team");
+    if (rqTeam) {
+      if (UI.rqMyTeams(S.me).includes(rqTeam)) S.rqDraft = Object.assign({}, S.rqDraft, { owner_team: rqTeam });
+      const u = new URL(location.href); u.searchParams.delete("team"); history.replaceState(null, "", u.pathname + u.search + u.hash);
+    }
     body = UI.rqSwitchHTML("request", S.me, S.requests) + UI.requestPageHTML(S.me, UI.rqMine(S.requests, S.me), S.rqDraft, S.msg, S.busy, S.cadres, UI.rqToday());
   } else if (S.view === "requests") {
     body = UI.rqSwitchHTML("requests", S.me, S.requests) + UI.requestsQueueHTML(S.requests || [], S.cadres, S.rqF, S.rqSel, UI.canEditWs(S.me, "custom:marketing-requests"), S.msg, S.busy,

@@ -100,7 +100,7 @@ function _render(el) {
   // ?bare=1（2026-10-19，Paul 拍板）：後台的預覽框用的，不畫頂欄與子欄。只改畫面，權限不變。
   const bare = new URLSearchParams(location.search).get("bare") === "1";
   const nav = bare ? "" : navHTML({ current: "intern-passport", role: S.role, lang: lang(),
-                        name: S.profile ? (S.profile.name_zh || S.profile.name_en) : "" });
+                        name: S.profile ? (S.profile.name_zh || S.profile.name_en) : "", board: S.profile && S.profile.board_role, rail: false });
   // Internship team 的幹部：牆，加「樣書」。樣書是同一套 bookHTML 畫的，
   // 只是把持照人換成假的、章與心得清空（S.sample 讓資料頁不畫編輯鈕）。
   // 不另外寫一份畫面：那會是第三份護照程式碼。

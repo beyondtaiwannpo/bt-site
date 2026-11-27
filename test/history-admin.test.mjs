@@ -28,10 +28,14 @@ test("★ 側欄四份都有「歷史之路」，在「對外網站」那一行�
   for (const M of [F, SITE, PA, PE]) {
     const it = M.ITEMS.find(i => i.key === "history");
     assert.ok(it, "ITEMS 少了 history");
-    assert.equal(it.group, "site"); assert.equal(it.area, "website"); assert.equal(it.who, "edit:res:Marketing Team");
+    assert.equal(it.group, "site"); assert.equal(it.area, "website"); assert.equal(it.who, "edit:res:Marketing Team|custom:website");
     assert.ok(!M.canSee(it, ASSOC), "一般幹部看不到");
     for (const who of [PRES, MKT, MKT_EDIT]) assert.equal(M.canSee(it, who), SITE.hiCanEdit(who), "側欄畫不畫跟改不改得動一致");
     assert.ok(!M.canSee(it, { ...MKT_EDIT, ws: { "res:Marketing Team": "view" } }), "Marketing 只能看的人也不畫");
+    // 2026-11-27：被派進「對外網站」（custom:website）改以上的人也改得動，側欄跟著畫；只能看的不畫。
+    const WEB = { ...ASSOC, ws: { "custom:website": "edit" } };
+    assert.ok(M.canSee(it, WEB) && SITE.hiCanEdit(WEB));
+    assert.ok(!M.canSee(it, { ...ASSOC, ws: { "custom:website": "view" } }) && !SITE.hiCanEdit({ ...ASSOC, ws: { "custom:website": "view" } }));
   }
 });
 

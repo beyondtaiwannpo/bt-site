@@ -443,7 +443,7 @@ export function membersAreaHTML(ns, a) {
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
 // 一個工作區屬於哪一列（2026-10-24 照 team 分組）：apps:X / res:X 是 X；intern-passport 是 Internship Team；passport 是整個 BT（""）；
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
-const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms"]);
+const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms", "custom:website"]);
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
   // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
@@ -488,6 +488,7 @@ export function wsCellHref(w) {
   if (id === "finance" || id === "custom:money") return "/admin/finance/#overview";
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
+  if (id === "custom:website") return "/admin/site/#history";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
@@ -949,8 +950,10 @@ export function mailHtml(o) {
 // 這一頁填的是內容（中英標題、一句話、說明、日期、代號）與照片（說明、同意）；狀態三顆按鈕跟 Events 同一套。
 // 誰能編只是畫面上藏按鈕，**真正的門在資料庫的 can_edit_history()**。
 export const HI_WS = "res:Marketing Team";
+// 對外網站（2026-11-27 第二版）：被派進這一格「改」以上的人改得動歷史之路與 BT 島（資料庫 2027-01-23-website-and-forms.sql 同一條）。
+export const SITE_WS = "custom:website";
 export const HI_MAX = 1600;
-export function hiCanEdit(me) { return senior(me) || ["edit", "manage"].includes(wsLevel(me, HI_WS)); }
+export function hiCanEdit(me) { return senior(me) || ["edit", "manage"].includes(wsLevel(me, HI_WS)) || ["edit", "manage"].includes(wsLevel(me, SITE_WS)); }
 // 代號：年份加英文標題，小寫、連字號、最多 40 字。中文拼不出東西就回空（畫面會要人自己打）。
 export function hiSlug(titleEn, happenedOn) {
   const y = /^(\d{4})/.exec(String(happenedOn || ""));
@@ -1051,8 +1054,8 @@ export function historyEditHTML(m, me, msg, busy, up) {
 
 // ── BT 島上的貼文（2026-11-17）──────────────────────────────────────
 // 誰貼得了哪座島：那個 team 的工作區「改」以上、Marketing「管」、senior；聚會所（team 空）只有後兩種。跟資料庫 can_edit_island_post(team) 同一條。
-export function ipCanEdit(me, team) { return senior(me) || wsLevel(me, HI_WS) === "manage" || (!!team && ["edit", "manage"].includes(wsLevel(me, "res:" + team))); }
-export const ipCanEditAny = (me, programs) => senior(me) || wsLevel(me, HI_WS) === "manage" || (programs || []).some(p => p.team && ipCanEdit(me, p.team));
+export function ipCanEdit(me, team) { return senior(me) || wsLevel(me, HI_WS) === "manage" || ["edit", "manage"].includes(wsLevel(me, SITE_WS)) || (!!team && ["edit", "manage"].includes(wsLevel(me, "res:" + team))); }
+export const ipCanEditAny = (me, programs) => senior(me) || wsLevel(me, HI_WS) === "manage" || ["edit", "manage"].includes(wsLevel(me, SITE_WS)) || (programs || []).some(p => p.team && ipCanEdit(me, p.team));
 export const ipProgram = (programs, id) => (programs || []).find(p => p.id === id) || null;
 export const ipProgramLabel = (pr) => pr ? (lang() === "en" ? `${pr.island_en} · ${pr.name_en}` : `${pr.island_zh} · ${pr.name_zh}`) : "";
 const ipTag = st => `<span class="tag${st === "published" ? " open" : st === "archived" ? "" : " draft"}">${esc(T("ip.st." + st))}</span>`;

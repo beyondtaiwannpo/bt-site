@@ -7,7 +7,7 @@
 // 時間一律照「看的人自己的時區」（profiles.tz，沒填就台北）。資料庫存的是絕對時間（timestamptz），
 // 換成哪一天幾點是在這裡用 Intl 算，不自己加減時差（夏令時間會算錯）。
 import { T, lang, setLang } from "./strings.js";
-import { canEditWs, withLang, senior, myTeams, canManageWs, peopleHref, boardName, teamShort } from "../../shared/rail.js";
+import { canEditWs, withLang, senior, myTeams, canManageWs, peopleHref, boardName, teamShort, canSchedule } from "../../shared/rail.js";
 export { T, lang, setLang };
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -366,17 +366,31 @@ export function passportHTML(w) {
       </a>
     </section>`;
 }
+// 最常做的三件事（2026-11-27 第二版，Paul：「a marketing request is something that they do regularly, log a meeting, schedule a meeting as well」）。
+// 首頁最上面一組，每個 team 的頁上一組（team 先帶好：提需求的「哪個 team 提的」、排會的範圍）。
+// 提需求是每一位幹部；記會與排會只畫給排得了會的人（shared/rail.js canSchedule，跟資料庫的 can_schedule 同一條）。
+// 排會：首頁裡換網址重開（?schedule=1），行事曆打開、排會那一塊直接跳出來（main.js）。
+export function quickHTML(me, team) {
+  const t = team ? "team=" + encodeURIComponent(team) : "";
+  const rq = A("/admin/" + (t ? "?" + t : "") + "#request");
+  const sch = "?" + ["lang=" + lang(), "schedule=1", t].filter(Boolean).join("&") + "#calendar";
+  const can = canSchedule(me);
+  return `<nav class="quick" aria-label="${esc(T("q.aria"))}">
+    <a class="btn sm" href="${esc(rq)}">${T("q.rq")}</a>${can ? `
+    <a class="btn ghost sm" href="${esc(A("/admin/#meetings/new"))}">${T("q.mt")}</a>
+    <a class="btn ghost sm" href="${esc(sch)}">${T("q.sch")}</a>` : ""}
+  </nav>`;
+}
 export function homeHTML(items, ctx) {
   const next = upcoming(items, ctx.now, 60);
   const linked = ctx.linked ? items.find(i => i.id === ctx.linked) : null;
   const top = linked ? `<section class="linked"><p class="mini">${T("home.linked")}</p>${itemCardHTML(linked, ctx, { full: true, hi: true })}</section>`
     : ctx.linkedMsg ? `<div class="wnote">${esc(ctx.linkedMsg)}</div>` : "";
   const wait = waitingList(items, ctx);
-  // 2026-11-27：「跟 Marketing 提需求」「記一場會議」兩顆鈕從這裡搬到側欄最上面的「新增」（shared/rail.js newMenuHTML），每一頁都按得到。
   return `<div class="home">
     <header class="hello"><div class="hello-t"><h1>${T("home.hi", { name: esc(ctx.name || "") })}</h1>
       <p class="mini">${T("home.today", { date: esc(dateLabel(dayKey(ctx.now, ctx.tz))), tz: esc(ctx.tz) })}</p></div>
-</header>
+      ${quickHTML({ role: "cadre", board: ctx.board, ws: ctx.ws })}</header>
     ${top}
     <section class="block wait">
       <h2>${T("home.wait")}${wait.length ? ` <span class="count">${wait.length}</span>` : ""}</h2>
@@ -471,7 +485,7 @@ export function teamHTML(team, d, me, tz) {
   return `<div class="home team">
     <header class="hello"><div class="hello-t"><p class="kicker">${T("team.kicker")}</p><h1>${short}</h1>
       <p class="mini">${lede}</p>
-      <p class="mini">${v.directors.length ? esc(T("team.director", { names: v.directors.join(T("punct.list")) })) : T("team.noDirector")}</p></div>${people}</header>
+      <p class="mini">${v.directors.length ? esc(T("team.director", { names: v.directors.join(T("punct.list")) })) : T("team.noDirector")}</p></div>${people}${quickHTML(me, team)}</header>
     <section class="block"><h2>${T("team.pj")}${n(v.projects)}${canEdit ? go("/admin/#projects", "team.pjNew") : ""}</h2>${pj}</section>
     <section class="block"><h2>${T("team.ev")}${n(v.loose)}${canEdit ? go("/admin/#events", "team.evNew") : ""}</h2>${ev}</section>
     <section class="block"><h2>${T("team.fm")}${n(v.forms)}${go("/admin/#forms", "team.fmGo")}</h2>${fm}</section>

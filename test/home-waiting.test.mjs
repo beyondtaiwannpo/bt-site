@@ -91,9 +91,10 @@ test("首頁：讀不到（null）就當沒有，不會整頁壞掉", () => {
   assert.doesNotThrow(() => UI.homeHTML([], { ...base, w: null }));
 });
 
-test("首頁的樣子：等你處理、接下來、我的護照；「我要…」那一排拿掉了，提需求那一顆 2026-11-27 搬到側欄的「新增」", () => {
+// 2026-11-27 第二版：側欄的「新增」拿掉，提需求、記一場會議、排一場會回到首頁與 team 頁的標題底下（test/home.test.mjs 守）。
+test("首頁的樣子：等你處理、接下來、我的護照；最常做的事在標題底下", () => {
   const h = UI.homeHTML(items, { ...base, w: W });
-  assert.doesNotMatch(h, /#request"|meetings\/new/, "首頁不再掛提需求與記會議的鈕");
+  assert.match(h, /<nav class="quick"[\s\S]*?#request"/, "提需求在標題底下");
   assert.match(h, /<h2>等你處理 <span class="count">\d+<\/span><\/h2>/);
   assert.ok(h.indexOf("等你處理") < h.indexOf("接下來") && h.indexOf("接下來") < h.indexOf("我的護照"), "順序：等你處理、接下來、護照");
   assert.match(h, /蓋了 12 格，一共 33 格/);
@@ -104,23 +105,29 @@ test("首頁的樣子：等你處理、接下來、我的護照；「我要…�
   assert.ok(!evil.includes("<img src=x>"), "標題一律跳脫");
 });
 
-test("側欄：我的（首頁、行事曆、會議、我的護照）、我的工作區、整個 BT 三段（2026-11-27 組織拿掉）；行事曆底下是行事曆、時間看板，會議底下是會議、會議範本（2026-11-27 會議自己一行）", () => {
-  // 2026-11-23：「我的」底下多一段「我的工作區」（ws），一個 team 一行，照人畫，不在 AREAS 裡（test/home-team.test.mjs）。
-  assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws", "work"]);
-  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "meetings", "mypassport", "search", "events", "forms", "marketing", "website", "passports", "records", "venues", "people", "money"]);
-  // 人與權限在頂欄（Co-President 與 Senior Adviser），錢在 Sponsorship 那一行底下；紀錄與場地在整個 BT。
+// 2026-11-27 第二版（Paul：「me and whole BT, essentially they're the same thing」）：最上面一段不加標題，是每個人都一樣的那幾行；
+// 下面是「我的工作區」：我的 team，接著被派進去的（對外網站、行銷、護照、紀錄），標「指派」。
+test("側欄：最上面一段（首頁、行事曆、會議、專案、表單、我的護照、場地），下面「我的工作區」；行事曆底下是行事曆、時間看板，會議底下是會議、會議範本", () => {
+  assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws"]);
+  assert.equal(RAIL.SECTIONS[0].label, null, "最上面一段沒有標題");
+  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "meetings", "events", "forms", "mypassport", "venues", "website", "marketing", "passports", "records", "search", "people", "money"]);
+  for (const k of ["home", "calendar", "meetings", "events", "forms", "mypassport", "venues"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "me", k);
+  for (const k of ["website", "marketing", "passports", "records"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "ws", k);
+  // 搜尋在頂欄的框，人與權限在頂欄（Co-President 與 Senior Adviser），錢在 Sponsorship 那一行後面。
+  assert.equal(RAIL.AREAS.find(a => a.key === "search").sec, "top");
   assert.equal(RAIL.AREAS.find(a => a.key === "people").sec, "top");
   assert.equal(RAIL.AREAS.find(a => a.key === "money").team, "Sponsorship Team");
-  for (const k of ["records", "venues"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "work", k);
   const recruiter = { role: "cadre", board: "member", team: "", name: "r", ws: { apps: "edit" } };
   assert.match(RAIL.railHTML("forms", "projects", recruiter, {}, "zh"), /<b>人與權限<\/b>/, "頂欄沒有人與權限的人，看得到幹部招募就畫在側欄，不然沒有入口");
   assert.doesNotMatch(RAIL.railHTML("forms", "projects", { ...recruiter, board: "president" }, {}, "zh"), /<b>人與權限<\/b>/, "Co-President 的人與權限在頂欄，側欄不重複");
+  // 被派進去的那幾行標「指派」。
+  assert.match(RAIL.railHTML("home", "home", { ...recruiter, ws: { records: "view" } }, {}, "zh"), /<b>紀錄<\/b>[\s\S]*?<span class="rail-lv dim"[^>]*>指派<\/span>/);
   // 2026-12-26：專案那一行底下是專案、活動…；場地是整個 BT 的，自己一行。
   // 2026-11-26：「各 team」拿掉了，「計畫與招募」改叫「幹部招募」搬到「人與權限」底下（被派進申請工作區的人與 Co-President、Senior Adviser 才看得到）。
   assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events"]);
-  // 回饋表 2026-11-27 搬到專案底下（是一場活動的），看得到的人照舊是被派進紀錄的人。
-  assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: { records: "view" } }).map(i => i.key), ["projects", "events", "forms"]);
-  assert.deepEqual(RAIL.visibleItems("forms", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["fill"], "一般幹部的表單只有要我填的");
+  // 回饋表第二版搬到「表單」底下（三種表單一個入口），看得到的人照舊是被派進紀錄的人。
+  assert.deepEqual(RAIL.visibleItems("forms", { role: "cadre", board: "member", team: "", ws: { records: "view" } }).map(i => i.key), ["fill", "all", "forms"]);
+  assert.deepEqual(RAIL.visibleItems("forms", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["fill", "all"], "一般幹部的表單：要我填的、所有表單");
   assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), [], "沒被派進申請工作區的幹部，側欄沒有幹部招募");
   assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "member", team: "", ws: { apps: "edit" } }).map(i => i.key), ["forms"], "被派進申請工作區的人看得到幹部招募，看不到名單");
   assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "president", senior: true, team: "", ws: {} }).map(i => i.key).slice(0, 3), ["roster", "invites", "forms"]);

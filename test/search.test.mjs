@@ -37,7 +37,7 @@ test("★ 每一筆連回原本那一頁（會議、回饋表的結果、內部�
   assert.ok(RAIL.ITEMS.some(i => i.group === "forms" && i.key === "meetings"));
   assert.ok(RAIL.ITEMS.some(i => i.group === "records" && i.key === "forms"));
   assert.ok(RAIL.ITEMS.some(i => i.group === "records" && i.key === "overview"));
-  assert.match(readFileSync("admin/team-forms/src/main.js", "utf8"), /parts\[0\] === "build"/);
+  assert.match(readFileSync("admin/team-forms/src/main.js", "utf8"), /\["build", "all"\]\.includes\(parts\[0\]\)/);
 });
 
 test("★ 找到的字包 <mark>，其他字一律跳脫（使用者寫的字不會變成 HTML）", () => {

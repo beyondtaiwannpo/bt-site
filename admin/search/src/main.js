@@ -74,7 +74,15 @@ async function loadOptions() {
   try { S.opts = await D.loadOptions(); }
   catch (e) { S.opts = { events: [], claude: false, voyage: false, ai_sources: [] }; S.msg = T("err.load") + D.says(e); }
 }
-function parseHash() { const p = UI.parseQuery(location.hash); S.q = p.q; S.f = p.f; }
+// 頂欄的搜尋框（2026-11-27，shared/nav.js）是一般的表單，從別頁送過來是 ?q=…：讀進來，網址換回這一頁自己的 #q= 寫法。
+function parseHash() {
+  const p = UI.parseQuery(location.hash); S.q = p.q; S.f = p.f;
+  const u = new URL(location.href), q = String(u.searchParams.get("q") || "").trim().slice(0, 200);
+  if (!q) return;
+  if (!S.q) S.q = q;
+  u.searchParams.delete("q");
+  history.replaceState(null, "", u.pathname + u.search + "#" + UI.queryHash(S.q, S.f));
+}
 function focusBox() { const el = root() && root().querySelector('input[name="q"]'); if (el && !("ontouchstart" in window)) el.focus(); }
 // 網址跟著搜尋的字與篩選走：可以貼給別人，上一頁回得去。
 function pushHash() {
