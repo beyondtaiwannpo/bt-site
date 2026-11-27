@@ -593,7 +593,7 @@ function mountFeedback(L) {
 //
 // **要改導覽的字、加一步、幫新的頁面加一段：只改下面的 TOURS。** README「後台導覽」那一節有一步一步的做法。
 //   一段導覽 = { id, page, when?, unless?, steps }。
-//     id      這一段的名字，記「看過了沒」用。改了 id，所有人會再自動看到一次。
+//     id      這一段的名字，同一個檔案裡不能重複。
 //     page    哪一頁："資料夾:分頁"，跟上面 ITEMS 的 group 與 key 一樣（例如 "people:roster"）。可以給一個陣列。
 //     when    （選填）頁面上有這個東西才用這一段。同一頁有兩種畫面時用（例如活動清單與一場活動的編輯頁都是 forms:events）。
 //     unless  （選填）頁面上有這個東西就不用這一段。
@@ -601,8 +601,7 @@ function mountFeedback(L) {
 //             t 是標題、b 是內文，都是 { zh, en }。沒有 at 的那一步放在畫面中間，不框東西。
 //   **頁面上找不到 at 的那一步會自動跳過，不會出錯。** 所以某些人看不到的按鈕也可以寫進來。
 //
-// 「看過了沒」記在這個瀏覽器的 localStorage（bt.tour.<使用者 id>），不改資料庫。換一台電腦、清掉瀏覽器資料，會再自動跑一次。
-// 在本機（localhost、127.0.0.1）不會自動跑，免得每一支端對端測試都被它擋住；網址加 ?tour=auto 才會。正式站照常。
+// 導覽不會自己跑，只有按右下角「怎麼用」才開（Paul 2026-11-26）。所以不記「看過了沒」，也不寫 localStorage。
 // 這一段只在瀏覽器裡跑，不 import 任何東西；純的部分（挑哪一段、哪幾步、盒子放哪）匯出給 test/tour.test.mjs。
 const TT = {
   fab:    { zh: "怎麼用", en: "How to use" },
@@ -620,13 +619,13 @@ const AT_SUBS = [".rail .rail-subs", ".area-tabs", ".rail-burger"];
 const AT_HEAD = ".main .page-head";
 const AT_ACT  = ".main .page-head .actions";
 export const TOURS = [
-  // 第一次進後台：這一段接在那一頁自己的導覽前面跑一次。
+  // 這一頁還沒有自己的導覽時，按「怎麼用」跑這一段。
   { id: "welcome", page: "*", steps: [
     { t: { zh: "歡迎來到後台", en: "Welcome to Backstage" },
       b: { zh: "每一頁都有一段像這樣的短導覽，一分鐘就看完。按「下一步」「上一步」前後移動，按「跳過」或 Esc 就關掉。", en: "Every page has a short tour like this one; it takes about a minute. Next and Back move through it; Skip or the Escape key closes it." } },
     { at: [".rail", ".rail-burger"], t: { zh: "所有頁面都在這裡", en: "Every page is in this menu" },
       b: { zh: "你進得去的頁面都列在這裡，進不去的不會出現，所以每個人看到的選單不一樣。手機上它收成一顆「所有頁面」。", en: "Every page you can open is listed here. Pages you cannot open are left out, so each person sees a different menu. On a phone it folds into one All pages button." } },
-    { at: "#bt-tour .tour-fab", t: { zh: "想再看一次", en: "See it again" },
+    { at: "#bt-tour .tour-fab", t: { zh: "每一頁都有這一顆", en: "This button is on every page" },
       b: { zh: "在任何一頁按這一顆，就會帶你看你現在這一頁怎麼用。", en: "Press this on any page to see how the page you are on works." } },
     { at: "#bt-fb .fb-fab", t: { zh: "東西壞了，或想要新功能", en: "Something broken, or a feature you want" },
       b: { zh: "按這一顆寫下來，有截圖就一起貼上。會送到 Co-President 與 Senior Adviser 那裡。", en: "Press this and write it down, with a screenshot if you have one. It goes to the Co-Presidents and Senior Advisers." } },
@@ -902,22 +901,6 @@ export function tourPlace(r, bw, bh, vw, vh) {
   if (r.left - gap - bw >= m) return { side: "left", left: r.left - gap - bw, top: y };
   return { side: "bottom", left: clamp((vw - bw) / 2, m, vw - bw - m), top: Math.max(m, vh - bh - m) };
 }
-// 自動跑不跑：?tour=off 不跑、?tour=auto 一定跑；本機（localhost、127.0.0.1、::1、*.localhost）預設不跑。
-export function tourAutoOK(host, search) {
-  const q = String(search || "");
-  if (/[?&]tour=off\b/.test(q)) return false;
-  if (/[?&]tour=auto\b/.test(q)) return true;
-  return !/^(localhost|127\.0\.0\.1|\[::1\]|::1)$|\.localhost$/i.test(String(host || ""));
-}
-export const tourSeenKey = uid => "bt.tour." + (uid || "anon");
-export function tourSeenParse(raw) { try { const a = JSON.parse(raw || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (e) { return new Set(); } }
-// 這一次要跑哪幾段：還沒看過歡迎那一段就先接它；這一頁的那一段看過了，就只剩歡迎（也可能什麼都沒有）。
-export function tourAutoPlan(seen, tour, tours) {
-  const w = welcomeTour(tours), plan = [];
-  if (w && !seen.has(w.id)) plan.push(w);
-  if (tour && !seen.has(tour.id)) plan.push(tour);
-  return plan;
-}
 export function tourFabHTML(L) {
   const t = k => esc(tx(TT[k], L));
   return `<button type="button" class="tour-fab" data-tour="open" aria-label="${t("fabTip")}" title="${t("fabTip")}"><span class="tour-q" aria-hidden="true">?</span><span class="tour-fab-t">${t("fab")}</span></button>`;
@@ -934,20 +917,15 @@ export function tourBoxHTML(step, i, n, L) {
 }
 
 // ── 在瀏覽器裡跑的部分 ──
-const tour = { page: "", uid: "", L: "zh", steps: null, i: 0, el: null, back: null, timer: 0, tries: 0, place: 0 };
+const tour = { page: "", L: "zh", steps: null, i: 0, el: null, back: null, place: 0 };
 const tHost = () => document.getElementById("bt-tour");
 const tReduce = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 const tShown = el => { if (!el || !el.getBoundingClientRect) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
 const tFind = sel => { const all = document.querySelectorAll(sel); for (const el of all) if (tShown(el) && !el.closest("#bt-tour .tour-layer")) return el; return null; };
-function tSeen() { try { return tourSeenParse(localStorage.getItem(tourSeenKey(tour.uid))); } catch (e) { return null; } }
-function tMark(ids) {
-  try { const s = tourSeenParse(localStorage.getItem(tourSeenKey(tour.uid))); ids.forEach(id => s.add(id)); localStorage.setItem(tourSeenKey(tour.uid), JSON.stringify([...s])); } catch (e) { /* 私密視窗存不了：這一次照樣看得完 */ }
-}
 function tCurrent() { return pickTour(tour.page, s => !!document.querySelector(s)); }
-function tStart(plan, auto) {
+function tStart(plan) {
   const steps = tourStepsOn(plan.flatMap(t => t.steps), tFind);
-  if (!steps.length || (auto && steps.length < 2)) return;
-  if (auto) tMark(plan.map(t => t.id));
+  if (!steps.length) return;
   tour.steps = steps; tour.i = 0; tour.back = document.activeElement;
   const h = tHost(); let layer = h.querySelector(".tour-layer");
   if (!layer) { layer = document.createElement("div"); layer.className = "tour-layer"; h.appendChild(layer); }
@@ -1029,26 +1007,18 @@ function tKey(e) {
   if (!typing && e.key === "ArrowRight") { e.preventDefault(); tGo(1); }
   else if (!typing && e.key === "ArrowLeft") { e.preventDefault(); tGo(-1); }
 }
-// 每一次重畫側欄都會叫到這裡。頁面停下來（沒有載入中的骨架、沒有開著的對話框）一秒多之後，才看要不要自動跑。
-function tAuto() {
-  tour.timer = 0;
-  if (tour.steps || !tourAutoOK(location.hostname, location.search)) return;
-  if (document.querySelector(".skeleton, dialog[open], .modal, [aria-modal='true']")) { if (++tour.tries < 8) tour.timer = setTimeout(tAuto, 900); return; }
-  const seen = tSeen(); if (!seen) return;
-  const plan = tourAutoPlan(seen, tCurrent());
-  if (plan.length) tStart(plan, true);
-}
+// 每一次重畫側欄都會叫到這裡：放好「怎麼用」那一顆、換語言、換頁時關掉開著的導覽。導覽只在按下那一顆時開。
 function mountTour(group, tab, me, L) {
   if (!document.body) return;
   const page = tourPage(group, tab), moved = page !== tour.page;
-  tour.uid = (me && me.id) || ""; tour.page = page;
+  tour.page = page;
   let h = tHost();
   if (!h) {
     h = document.createElement("div"); h.id = "bt-tour"; document.body.appendChild(h);
     h.addEventListener("click", e => {
       const b = e.target.closest("[data-tour]"); if (!b) return;
       const a = b.dataset.tour;
-      if (a === "open") { if (tour.steps) tClose(); const t = tCurrent(); tStart(t ? [t] : [welcomeTour()].filter(Boolean), false); }
+      if (a === "open") { if (tour.steps) tClose(); const t = tCurrent(); tStart(t ? [t] : [welcomeTour()].filter(Boolean)); }
       else if (a === "next") tGo(1); else if (a === "back") tGo(-1); else if (a === "skip") tClose();
     });
   }
@@ -1058,7 +1028,5 @@ function mountTour(group, tab, me, L) {
     h.dataset.lang = L; tour.L = L;
     if (tour.steps) tShow();
   }
-  if (tour.steps) { if (moved) tClose(); else setTimeout(tPlace, 0); return; }
-  if (moved) tour.tries = 0;
-  clearTimeout(tour.timer); tour.timer = setTimeout(tAuto, 1200);
+  if (tour.steps) { if (moved) tClose(); else setTimeout(tPlace, 0); }
 }

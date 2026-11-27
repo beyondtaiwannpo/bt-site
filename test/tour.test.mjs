@@ -98,26 +98,13 @@ test("tourPlace：寬螢幕放在下面、上面、右邊、左邊；手機貼�
   }
 });
 
-test("★ 自動跑不跑：正式站跑；本機預設不跑（端對端測試不會被擋），?tour=auto 才跑；?tour=off 一定不跑", () => {
-  assert.equal(RAIL.tourAutoOK("beyondtaiwannpo.com", ""), true);
-  assert.equal(RAIL.tourAutoOK("beyondtaiwannpo.com", "?lang=en&tour=off"), false);
-  for (const h of ["localhost", "127.0.0.1", "::1", "[::1]", "bt.localhost"]) {
-    assert.equal(RAIL.tourAutoOK(h, "?lang=en"), false, h);
-    assert.equal(RAIL.tourAutoOK(h, "?lang=en&tour=auto"), true, h);
-  }
-  assert.equal(RAIL.tourAutoOK("localhost", "?tour=automatic"), false, "要剛好是 tour=auto");
-});
-
-test("看過了沒：照人分開記，壞掉的資料當成沒看過；第一次先接歡迎那一段", () => {
-  assert.equal(RAIL.tourSeenKey("u1"), "bt.tour.u1");
-  assert.equal(RAIL.tourSeenKey(""), "bt.tour.anon");
-  assert.deepEqual([...RAIL.tourSeenParse('["welcome","events"]')], ["welcome", "events"]);
-  for (const bad of [null, "", "{", '{"a":1}', "42"]) assert.equal(RAIL.tourSeenParse(bad).size, 0, String(bad));
-  const ev = RAIL.pickTour("forms:events", () => false);
-  assert.deepEqual(RAIL.tourAutoPlan(new Set(), ev).map(t => t.id), ["welcome", "events"]);
-  assert.deepEqual(RAIL.tourAutoPlan(new Set(["welcome"]), ev).map(t => t.id), ["events"]);
-  assert.deepEqual(RAIL.tourAutoPlan(new Set(["welcome", "events"]), ev), []);
-  assert.deepEqual(RAIL.tourAutoPlan(new Set(), null).map(t => t.id), ["welcome"], "沒有導覽的頁面第一次也看得到歡迎");
+test("★ 不會自己跑：只有按「怎麼用」才開，不記看過了沒、不碰 localStorage（Paul 2026-11-26）", () => {
+  const src = read("shared/rail.js"), engine = src.slice(src.indexOf("export const TOURS"));
+  for (const gone of ["tourAutoOK", "tourSeenKey", "tourSeenParse", "tourAutoPlan"]) assert.equal(RAIL[gone], undefined, gone);
+  assert.doesNotMatch(engine, /localStorage|tAuto|tour=auto/);
+  assert.match(engine, /if \(a === "open"\) \{[^}]*tStart\(/, "按下那一顆才開");
+  assert.equal((engine.match(/tStart\(/g) || []).length, 2, "只有定義與按鈕那一處叫 tStart");
+  assert.equal(RAIL.welcomeTour().id, "welcome", "沒有導覽的頁面，按了看歡迎那一段");
 });
 
 test("★ 盒子：第幾步、上一步只在第二步之後、最後一步是「完成」不是「下一步」；字會跳脫", () => {
