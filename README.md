@@ -900,11 +900,14 @@ Paul 2026-11-27 看了上一版之後講了幾件事：「我的」跟「整個 
 - **對外網站**是一個工作區（代號 `custom:website`）。到「人與權限 → 工作區」把人派進去，「改」以上的人改得動歷史之路與每一座 BT 島。網站上的活動、團隊頁、校友故事、信的文字照舊只有 Co-President 與 Senior Adviser；資源庫照舊是各 team「改」以上。**原本改得動的人一個都沒少**（Marketing「改」照舊改得動歷史之路、某個 team「改」照舊改得動自己那座島），只是側欄的入口改在他的 team 那一行底下。
 - **紀錄**照舊只有被派進去的人有。
 
-**頂欄（幹部）**：左邊 logo，中間一個搜尋框，右邊一顆圓形頭像。
-- **搜尋框**：在任何一頁打字按 Enter，就到 `/admin/search/` 找。側欄的「搜尋」那一行拿掉了。
-- **頭像**：按下去是我的故事、設定（Co-President 與 Senior Adviser 多人與權限）、登出。語言照舊在側欄最上面與設定裡切。
-- 設定與實習護照這兩頁沒有側欄，頂欄多一個「首頁」連結，回得去。
+**頂欄（幹部）**：左邊 logo 加我的故事（Co-President 與 Senior Adviser 多人與權限），右邊是自己的大頭照加名字。
+- **大頭照**是在設定上傳的那一張，沒上傳就是名字的第一個字。按下去是設定、登出。語言照舊在側欄最上面與設定裡切。
+- 設定與實習護照這兩頁沒有側欄，頂欄最前面多一個「首頁」，回得去。
 - 學員、校友、實習生的頂欄沒變。
+
+**搜尋框在側欄最上面**（中英切換底下、首頁上面）。打字按 Enter 就到 `/admin/search/` 找。電腦上在任何一頁按 `/` 直接跳到那一格（游標正在別的格子裡打字的時候不搶）。手機上在「所有頁面」裡面。搜尋那一頁自己有一格大的，側欄那一格不畫。側欄的「搜尋」那一行拿掉了。
+
+> 同一天第三版（Paul：「my story and internal can be on top of the menu, and then once you click Paul… you can go into setting」「find somewhere else to put that search box」）：第二版的搜尋框在頂欄正中間、我的故事與人與權限收在大頭照的選單裡，改成上面這樣。
 
 **「新增」拿掉之後，最常做的三件事在哪：** 首頁與 team 頁的標題右邊一排鈕。
 - **跟 Marketing 提需求**：每一位幹部都有。從 team 頁按，需求單的 team 先選好（只認他自己的 team）。
@@ -925,7 +928,8 @@ Paul 2026-11-27 看了上一版之後講了幾件事：「我的」跟「整個 
 
 **程式在哪：**
 - `shared/rail.js`：`SECTIONS`（`me` 沒有標題、`ws`）、`AREAS`（`areaWho` 決定那一行畫不畫，對外網站是 `ws:custom:website`）、`areaShown()`、`allowed()` 認逗號（任何一個過就算）、`teamSiteItems()`、`seniorTeamsHTML()`、`teamRowsHTML()`。`newMenuHTML()` 拿掉了，`canSchedule()` 留著。
-- `shared/nav.js` 的 `cadreBarHTML()`（搜尋框、頭像、選單用瀏覽器內建的 popover），樣式在 `shared/nav.css` 最後一段。
+- `shared/nav.js` 的 `cadreBarHTML()`（`FEATURES` 裡 `bar: true` 的畫在頂欄、`menu: true` 的收在大頭照的選單，選單用瀏覽器內建的 popover）、`safeAvatar()`（大頭照只收圖片的 data URL 與 https）。大頭照沒傳的話讀 `shared/auth.js` 存在這個分頁的那一份（`bt-me`）。樣式在 `shared/nav.css` 最後一段。
+- `shared/rail.js` 的 `searchBoxHTML()`（側欄的搜尋框）與 `slashTarget()`（按 `/` 跳到哪一格），樣式在 `shared/rail.css` 的 `.rail-q`。
 - `home/src/ui.js` 的 `quickHTML()`；`home/src/main.js` 的 `?schedule=1` 多認 `&team=`；`admin/src/main.js` 的需求單認 `?team=`。
 - `admin/team-forms/`：`data.js` 的 `loadMyForms`、`attachEventForm`、`createFeedback`；`ui.js` 的 `allRows()`、`allHref()`、`allFormsHTML()`、`newFormHTML()`；`main.js` 認 `#all`。
 - `admin/site/src/ui.js` 的 `SITE_WS`：畫面上改不改得動跟著認對外網站。

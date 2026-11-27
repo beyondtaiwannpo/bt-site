@@ -23,7 +23,8 @@ function render() {
   // 跟底下的內容就差 12px，Paul 2026-09-10 一眼看出來。
   // 2026-11-27：「我的故事」是同一個資料夾的 #story（S.view === "story"），頂欄標的是那一項。
   const nav = navHTML({ current: S.view === "story" ? "story" : "settings", lang: lang(),
-    role: S.me && S.me.role, name: (S.me && (S.me.name_zh || S.me.name_en)) || "", board: S.me && S.me.board_role, rail: false });
+    role: S.me && S.me.role, name: (S.me && (S.me.name_zh || S.me.name_en)) || "", board: S.me && S.me.board_role, rail: false,
+    avatar: S.me ? S.me.avatar || "" : undefined });  // 剛換的大頭照馬上出現在右上角，不等快取
 
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { location.replace("../app/?next=" + encodeURIComponent("/settings/")); return; }

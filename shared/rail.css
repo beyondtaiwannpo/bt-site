@@ -101,6 +101,17 @@
 
 /* 側欄的中英切換：兩顆小按鈕，現在那一顆深藍底。 */
 .rail-lang{display:flex;gap:6px;padding:0 12px;margin:0 0 10px}
+/* 側欄最上面的搜尋框（2026-11-27 第三版）：一行的高度、跟下面那幾行對齊，右邊一個 / 提示按它跳過來（有鍵盤的螢幕才畫）。 */
+.rail-q{position:relative;display:flex;align-items:center;margin:0 4px 10px}
+.rail-q input[type="search"]{flex:1;min-width:0;box-sizing:border-box;min-height:38px;margin:0;padding:0 34px 0 36px;
+  border:1px solid rgba(16,42,134,.24);border-radius:12px;background:rgba(255,255,255,.72);color:var(--ink);font:500 14px/1 var(--body)}
+.rail-q input[type="search"]::placeholder{color:rgba(16,42,134,.62)}
+.rail-q input[type="search"]:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap);background:rgba(255,255,255,1)}
+.rail-q-ico{position:absolute;left:11px;width:17px;height:17px;color:rgba(16,42,134,.7);pointer-events:none}
+.rail-q kbd{position:absolute;right:9px;min-width:18px;height:20px;padding:0 4px;box-sizing:border-box;border:1px solid rgba(16,42,134,.26);border-radius:6px;
+  font:600 12px/18px var(--body);text-align:center;color:rgba(16,42,134,.7);background:rgba(255,255,255,.6);pointer-events:none}
+.rail-q input:focus ~ kbd{display:none}
+@media (hover:none){.rail-q kbd{display:none}}
 .rail-lang .lang{flex:1;min-height:30px;padding:0 10px;border:1px solid rgba(16,42,134,.3);border-radius:999px;
   background:rgba(255,255,255,.55);color:var(--ink);font:600 13px/1 var(--body);cursor:pointer}
 .rail-lang .lang.on{background:var(--bt-navy);color:var(--bt-cream);border-color:var(--bt-navy)}

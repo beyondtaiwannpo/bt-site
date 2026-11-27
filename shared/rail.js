@@ -31,6 +31,8 @@ const RT = {
   groups:   { zh: "BT 的選單", en: "BT menu" },
   tabs:     { zh: "這一區的分頁", en: "Pages in this section" },
   lang:     { zh: "語言", en: "Language" },
+  q:        { zh: "搜尋紀錄、表單", en: "Search" },
+  qLab:     { zh: "搜尋會議紀錄、回饋表、內部表單（按 / 跳到這裡）", en: "Search meeting notes, feedback and forms (press / to jump here)" },
   noTeam:   { zh: "還沒填 team", en: "no team yet" },
   allTeams: { zh: "全部 team", en: "all teams" },
   list:     { zh: "、", en: ", " },
@@ -425,6 +427,36 @@ function bindFly() {
   flyBound = true;
   document.addEventListener("mouseover", placeFly);
   document.addEventListener("focusin", placeFly);
+  document.addEventListener("keydown", jumpToSearch);
+}
+// 按 / 跳到側欄的搜尋框（2026-11-27 第三版，像 GitHub、Slack）。游標已經在某個可以打字的地方就不搶，按著 Ctrl、Cmd、Alt 也不算。
+// 搜尋那一頁自己有一格大的，側欄不畫（searchBoxHTML），那一頁按 / 跳到那一格。
+export function slashTarget(ev, doc) {
+  if (!ev || ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey || ev.defaultPrevented) return null;
+  const a = doc && doc.activeElement;
+  if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName || ""))) return null;
+  return doc.querySelector('.rail-q input[name="q"]') || doc.querySelector('main input[name="q"], #bt-root input[type="search"][name="q"]');
+}
+function jumpToSearch(ev) {
+  const el = slashTarget(ev, document);
+  if (!el) return;
+  ev.preventDefault();
+  const t = document.getElementById("rail-toggle");
+  if (t && !t.checked && el.closest(".rail") && getComputedStyle(document.querySelector(".rail")).display === "none") t.checked = true;
+  el.focus();
+}
+// 側欄最上面的搜尋框（2026-11-27 第三版，Paul：「I want you to find somewhere else to put that search box」）。
+// 第二版放在頂欄正中間，一整條太搶眼；搬到側欄名字底下、首頁上面：每一頁同一個位置，就在要點的那幾行旁邊。
+// 送出是一般的表單：到 /admin/search/?q=…，那一頁自己讀 ?q= 開始找（admin/search/src/main.js parseHash）。
+// 在搜尋那一頁上不畫：頁面裡已經有一格大的，兩格會不知道打哪一格。
+export function searchBoxHTML(group, L) {
+  if (group === "search") return "";
+  return `<form class="rail-q" role="search" action="/admin/search/" method="get">
+      <svg class="rail-q-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      <input type="search" name="q" maxlength="200" placeholder="${esc(tx(RT.q, L))}" aria-label="${esc(tx(RT.qLab, L))}" autocomplete="off">
+      <kbd aria-hidden="true">/</kbd>
+      <input type="hidden" name="lang" value="${L === "en" ? "en" : "zh"}">
+    </form>`;
 }
 
 // ── 誰排得了會（2026-11-27）──────────────────────────────────────────────
@@ -483,6 +515,7 @@ export function railHTML(group, tab, me, counts, L) {
     <div class="rail-me"><b>${esc(me && me.name || "")}</b>
       <span>${esc(boardName(me && me.board, L))}・${teams.length ? esc(teams.join(tx(RT.list, L))) : esc(tx(RT.noTeam, L))}</span></div>
     ${langSwitchHTML(L)}
+    ${searchBoxHTML(group, L)}
     ${body}
   </nav>`;
 }

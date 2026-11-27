@@ -97,7 +97,7 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     assert.match(rail, /href="\/admin\/\?lang=zh#venues">.*?<b>場地<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/, label);
     assert.doesNotMatch(rail, /<div class="rail-group">(組織|整個 BT|我的)<\/div>/, `${label}：「我的」與「整個 BT」合成最上面一段，不加標題（2026-11-27 第二版）`);
     // 最上面那一段：首頁連到 /home/（不帶 #），行事曆是 /home/#calendar，護照是 /passport/。
-    assert.match(rail, /<\/div>\s*<a class="rail-item rail-area" href="\/home\/\?lang=zh">.*?<b>首頁<\/b>/, label);
+    assert.match(rail, /<\/form>\s*<a class="rail-item rail-area" href="\/home\/\?lang=zh">.*?<b>首頁<\/b>/, `${label}：首頁在搜尋框底下（2026-11-27 第三版）`);
     assert.match(rail, /href="\/home\/\?lang=zh#calendar">.*?<b>行事曆<\/b>/, label);
     assert.match(rail, /href="\/passport\/\?lang=zh">.*?<b>我的護照<\/b>/, label);
     assert.doesNotMatch(rail, /<b>待辦<\/b>/, `${label}：後台的待辦併進首頁了`);

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { FEATURES, featuresFor, barFor, navHTML, withLang } from "../shared/nav.js";
+import { FEATURES, featuresFor, barFor, navHTML, withLang, safeAvatar, ME_CACHE_KEY } from "../shared/nav.js";
 // 頂欄 2026-10-19 起中英兩版，連結帶 ?lang=；這一支斷言中文，所以每一次都傳 lang: "zh"。
 
 const count = (h, re) => (h.match(re) || []).length;
@@ -30,30 +30,42 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
 
 // 2026-11-27 第二版（Paul：「there's like 100 different tabs on the left menu, and then there's setting on top, there's like home and everything」）：
 // 幹部的頂欄只剩搜尋框與右上角的大頭照。每一頁都在左邊的側欄；我的故事、設定、人與權限（只有 Co-President 與 Senior Adviser）收在大頭照那一份選單裡。
-test("★ 幹部的頂欄：logo、搜尋框、大頭照；選單裡是我的故事、設定（人與權限只給 Co-President 與 Senior Adviser）與登出", () => {
-  const h = navHTML({ current: "settings", role: "cadre", name: "王平", lang: "zh", board: "member" });
+// 2026-11-27 第三版（Paul：「my story and internal can be on top of the menu, and then once you click Paul… you can go into setting」，搜尋框「find somewhere else」）。
+test("★ 幹部的頂欄：logo、我的故事（與人與權限）、大頭照；選單裡是設定與登出；搜尋框不在頂欄", () => {
+  const h = navHTML({ current: "settings", role: "cadre", name: "王平", lang: "zh", board: "member", avatar: "" });
   assert.match(h, /<nav class="btnav btnav-c"/);
-  assert.match(h, /<form class="btnav-q" role="search" action="\/admin\/search\/" method="get" data-form="search">/, "送出到搜尋那一頁（它讀 ?q=）");
-  assert.match(h, /<input type="search" name="q"[^>]*aria-label="搜尋"/);
-  assert.match(h, /<input type="hidden" name="lang" value="zh">/, "語言跟著過去");
-  assert.match(h, /<button type="button" class="btnav-me" popovertarget="btnav-menu" aria-label="我的帳號：王平"><span class="btnav-av" aria-hidden="true">王<\/span>/);
+  assert.doesNotMatch(h, /btnav-q|type="search"/, "搜尋框搬到側欄最上面");
+  assert.match(h, /<div class="btnav-items"><a href="\/settings\/\?lang=zh#story">我的故事<\/a><\/div>/);
+  assert.match(h, /<button type="button" class="btnav-me" popovertarget="btnav-menu" aria-label="我的帳號：王平"><span class="btnav-av" aria-hidden="true">王<\/span><span class="btnav-nm">王平<\/span>/);
   const menu = h.slice(h.indexOf('<div class="btnav-menu" id="btnav-menu" popover>'));
-  assert.match(menu, /href="\/settings\/\?lang=zh#story">我的故事<\/a><a href="\/settings\/\?lang=zh" aria-current="page">設定<\/a><button class="btnav-out" data-act="signout">登出/);
+  assert.match(menu, /popover><a href="\/settings\/\?lang=zh" aria-current="page">設定<\/a><button class="btnav-out" data-act="signout">登出/);
   assert.doesNotMatch(h, /\/admin\/people\//, "Associate 沒有人與權限");
   assert.ok(!navHTML({ current: "home", role: "cadre", name: "王", lang: "zh" }).includes("/admin/people/"), "沒傳職級就不畫，不會多給");
   for (const b of ["president", "senior_adviser"])
-    assert.match(navHTML({ current: "people", role: "cadre", name: "王", lang: "zh", board: b }), /<a href="\/admin\/people\/\?lang=zh" aria-current="page">人與權限<\/a>/, b);
+    assert.match(navHTML({ current: "people", role: "cadre", name: "王", lang: "zh", board: b }), /<div class="btnav-items"><a href="\/settings\/\?lang=zh#story">我的故事<\/a><a href="\/admin\/people\/\?lang=zh" aria-current="page">人與權限<\/a><\/div>/, b);
   // 首頁、行事曆、護照、時間看板、後台都在側欄，頂欄一項都不畫。
-  for (const f of FEATURES.filter(x => x.roles.includes("cadre") && !x.menu)) assert.ok(!h.includes(`href="${withLang(f.href, "zh")}"`), `${f.key} 在側欄，頂欄不該再有`);
+  for (const f of FEATURES.filter(x => x.roles.includes("cadre") && !x.menu && !x.bar)) assert.ok(!h.includes(`href="${withLang(f.href, "zh")}"`), `${f.key} 在側欄，頂欄不該再有`);
   assert.doesNotMatch(h, /btnav-toggle|btnav-burger/, "幹部的頂欄沒有「選單」那一顆");
+});
+test("★ 右上角是自己的大頭照：呼叫端傳的先，沒傳讀這個分頁的 bt-me；只收圖片的 data URL 與 https", () => {
+  const png = "data:image/png;base64,iVBORw0KGgo=";
+  assert.match(navHTML({ role: "cadre", name: "王", lang: "zh", avatar: png }), /<img class="btnav-av" src="data:image\/png;base64,iVBORw0KGgo=" alt="" width="30" height="30"><span class="btnav-nm">王<\/span>/);
+  for (const bad of ["javascript:alert(1)", "data:text/html;base64,PGI+", 'https://x.test/a.png" onerror="x', "http://x.test/a.png"]) assert.equal(safeAvatar(bad), "", bad);
+  assert.equal(safeAvatar("https://lh3.googleusercontent.com/a/x=s96"), "https://lh3.googleusercontent.com/a/x=s96");
+  const old = globalThis.sessionStorage;
+  globalThis.sessionStorage = { getItem: k => k === ME_CACHE_KEY ? JSON.stringify({ row: { avatar: png } }) : null };
+  try { assert.match(navHTML({ role: "cadre", name: "王", lang: "zh" }), /<img class="btnav-av" src="data:image\/png/); }
+  finally { globalThis.sessionStorage = old; }
+  assert.match(readFileSync("shared/auth.js", "utf8"), new RegExp(`const ME_KEY = "${ME_CACHE_KEY}";`), "跟 whoAmI 存的那一格同一個名字");
+  assert.match(readFileSync("settings/src/main.js", "utf8"), /avatar: S\.me \? S\.me\.avatar \|\| "" : undefined/, "設定那一頁剛換的照片馬上出現");
 });
 test("★ 沒有側欄的那兩頁（設定、實習生進度牆）傳 rail: false，頂欄多一個「首頁」，不然回不去", () => {
   const h = navHTML({ current: "settings", role: "cadre", name: "王", lang: "zh", rail: false });
-  assert.match(h, /<div class="btnav-items"><a href="\/home\/\?lang=zh">首頁<\/a><\/div>/);
-  assert.doesNotMatch(navHTML({ current: "home", role: "cadre", name: "王", lang: "zh" }), /btnav-items/);
-  assert.match(readFileSync("settings/src/main.js", "utf8"), /board: S\.me && S\.me\.board_role, rail: false \}\)/);
+  assert.match(h, /<div class="btnav-items"><a href="\/home\/\?lang=zh">首頁<\/a><a href="\/settings\/\?lang=zh#story">我的故事<\/a><\/div>/);
+  assert.doesNotMatch(navHTML({ current: "home", role: "cadre", name: "王", lang: "zh" }), />首頁<\/a>/);
+  assert.match(readFileSync("settings/src/main.js", "utf8"), /board: S\.me && S\.me\.board_role, rail: false,/);
   assert.match(readFileSync("intern-passport/src/main.js", "utf8"), /rail: false \}\)/);
-  // 搜尋那一頁讀 ?q=（頂欄的搜尋框從別頁送過來）。
+  // 搜尋那一頁讀 ?q=（側欄的搜尋框從別頁送過來）。
   assert.match(readFileSync("admin/search/src/main.js", "utf8"), /searchParams\.get\("q"\)/);
 });
 test("★ 大頭照那一份選單用瀏覽器的 popover，不寫程式、不用 details", () => {

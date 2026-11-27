@@ -50,13 +50,14 @@ export const FEATURES = [
   // 2026-09-11：校友也用同一頁（他的「我的故事」在裡面）。
   // 2026-11-27 Paul：「my story, where I am right now, it should be on the separate pages… open another pages up top that says my story」。
   // 同一個資料夾（/settings/）的 #story：存故事的程式本來就在那裡，搬資料夾只會多一份。學員沒有故事，所以 roles 沒有 student。
-  // 2026-11-27 第二版：幹部的頂欄只剩搜尋框與右上角的大頭照，menu: true 的這幾項收在大頭照那一份選單裡（cadreBarHTML）。
-  { key: "story",        label: { zh: "我的故事", en: "My story" }, href: "/settings/#story", roles: ["cadre", "alumni"], menu: true,
+  // 2026-11-27 第三版（Paul：「my story and internal can be on top of the menu, and then once you click Paul… you can go into setting」）：
+  // bar: true 的畫在幹部頂欄上（我的故事、人與權限），menu: true 的收在右上角大頭照那一份選單裡（設定），見 cadreBarHTML。
+  { key: "story",        label: { zh: "我的故事", en: "My story" }, href: "/settings/#story", roles: ["cadre", "alumni"], bar: true,
     title: { zh: "我的故事", en: "My story" },     desc: { zh: "創辦人、我的故事、我現在在哪", en: "Founder, your story, where you are now" } },
   // 人與權限（2026-11-27 從側欄搬到頂欄，Paul：「that's only senior advisor accessible… on the left tab menu, which is kind of confusing」）。
   // boards 是**唯一一個照職級過濾的項目**：Co-President 與 Senior Adviser 才畫（跟 /admin/people/ 開頁那一句、資料庫的 is_senior() 同一條）。
   // 檔頭說「不要加 board_role 的過濾」講的是「後台」那一項（一般幹部也要進得去自己 team 的申請）；這一項本來就只開給這兩種人，畫給別人只會多一個點了被彈回來的入口。
-  { key: "people",       label: { zh: "人與權限", en: "Internal" }, href: "/admin/people/", roles: ["cadre"], boards: ["president", "senior_adviser"], menu: true,
+  { key: "people",       label: { zh: "人與權限", en: "Internal" }, href: "/admin/people/", roles: ["cadre"], boards: ["president", "senior_adviser"], bar: true,
     title: { zh: "人與權限", en: "Internal" },     desc: { zh: "幹部名單、邀請、工作區、屆別", en: "Roster, invites, workspaces, terms" } },
   { key: "settings",     label: { zh: "設定", en: "Settings" },     href: "/settings/",     roles: ["cadre", "student", "alumni", "intern"], menu: true,
     title: { zh: "設定", en: "Settings" },         desc: { zh: "名字、語言、大頭照、要不要出現在公開的團隊頁上", en: "Name, language, avatar, whether to appear on the public team page" } },
@@ -94,8 +95,6 @@ export function withLang(href, lang) {
 }
 const NAV = {
   aria:   { zh: "站台導覽", en: "Site navigation" },
-  q:      { zh: "搜尋會議紀錄、回饋表、內部表單", en: "Search meeting notes, feedback, forms" },
-  qLab:   { zh: "搜尋", en: "Search" },
   me:     { zh: "我的帳號：{name}", en: "My account: {name}" },
   home:   { zh: "回 Beyond Taiwan 首頁", en: "Back to the Beyond Taiwan home page" },
   open:   { zh: "展開選單", en: "Open the menu" },
@@ -122,9 +121,9 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 // board：看的人的職級（profiles.board_role），只用來決定畫不畫「人與權限」。沒傳就不畫，不會多給。
 // rail：這一頁有沒有畫左邊的側欄（2026-11-27 第二版）。幹部的頂欄不再放「首頁」，因為側欄最上面就是首頁；
 // 沒有側欄的那兩頁（設定、實習生進度牆）傳 rail: false，頂欄就多一個「首頁」，不然回不去。
-export function navHTML({ current, role, name, lang, board, rail }) {
+export function navHTML({ current, role, name, lang, board, rail, avatar }) {
   const L = LANGS.includes(lang) ? lang : navLang();
-  if (role === "cadre") return cadreBarHTML({ current, name, L, board, rail: rail !== false });
+  if (role === "cadre") return cadreBarHTML({ current, name, L, board, rail: rail !== false, avatar });
   const items = barFor(role, board).map(f =>
     `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`).join("");
   const n = String(name || "");
@@ -163,30 +162,38 @@ export function navHTML({ current, role, name, lang, board, rail }) {
   </nav>`;
 }
 
-// ── 幹部的頂欄（2026-11-27 第二版）────────────────────────────────────────
+// ── 幹部的頂欄（2026-11-27 第三版）────────────────────────────────────────
 // Paul：「there's like 100 different tabs on the left menu, and then there's setting on top, there's like home and everything」。
-// 每一頁都在左邊的側欄（shared/rail.js），頂欄只放兩樣東西：
-//   1. 搜尋框：每個人每天都在找東西（會議紀錄、回饋表、內部表單），所以放在每一頁同一個位置。
-//      送出是一般的表單：到 /admin/search/?q=…，那一頁自己讀 ?q= 開始找（admin/search/src/main.js parseHash）。
-//      在搜尋那一頁上，它跟頁面裡那一格一樣有 data-form="search"，不重新載入。
-//   2. 右上角的大頭照：點了是一份小選單（menu: true 的那幾項：我的故事、設定、人與權限）加登出。
+// 每一頁都在左邊的側欄（shared/rail.js），頂欄只放三樣東西：
+//   1. bar: true 的那幾項：我的故事（幹部）、人與權限（Co-President 與 Senior Adviser）。沒有側欄的頁（設定、實習護照）前面多一個首頁。
+//   2. 右上角的大頭照加名字：點了是一份小選單（menu: true 的那幾項，現在只有設定）加登出。
+//      大頭照是他在設定上傳的那一張（profiles.avatar），沒上傳就是名字的第一個字。
 //      開合用瀏覽器內建的 popover（popovertarget），不用寫程式：點外面或按 Esc 就關，鍵盤走得到。
 //      跟上面那段註解「不要用 details、不要用 JavaScript」是同一個理由；popover 兩樣都不是。
 //      不認得 popover 的舊瀏覽器：那幾行直接攤在名字旁邊（:popover-open 不認得，藏起來那一條整條不算），還是點得到。
+//   搜尋框第二版放在頂欄，Paul 第三版要它換地方：搬到側欄最上面（shared/rail.js 的 searchBoxHTML），任何一頁按 / 跳到那一格。
 const fillName = (row, L, name) => tx(row, L).replace("{name}", name);
-function cadreBarHTML({ current, name, L, board, rail }) {
+// 大頭照：呼叫端傳的 avatar 先；沒傳就讀 shared/auth.js 的 whoAmI 存在這個分頁的那一份（sessionStorage 的 bt-me，十分鐘內有效）。
+// 這個檔案不 import 任何東西（見檔頭），所以這裡直接讀那一格；名字對不上的話只是退回第一個字，不會壞。
+// 只收圖片的 data URL 與 https 網址：它會進 <img src>，別的東西（javascript: 之類）一律不畫。
+export const ME_CACHE_KEY = "bt-me";
+export function safeAvatar(v) { const s = String(v || ""); return /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s) || /^https:\/\/[^\s"'<>]+$/.test(s) ? s : ""; }
+function cachedAvatar() {
+  try { const it = JSON.parse(sessionStorage.getItem(ME_CACHE_KEY) || "null"); return it && it.row ? it.row.avatar : ""; } catch (e) { return ""; }
+}
+function cadreBarHTML({ current, name, L, board, rail, avatar }) {
   const n = String(name || "");
-  const menu = featuresFor("cadre", board).filter(f => f.menu).map(f =>
-    `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`).join("");
-  const home = rail ? "" : FEATURES.filter(f => f.key === "home").map(f => `<a href="${withLang(f.href, L)}">${esc(tx(f.label, L))}</a>`).join("");
+  const link = f => `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`;
+  const mine = featuresFor("cadre", board);
+  const menu = mine.filter(f => f.menu).map(link).join("");
+  const items = [...(rail ? [] : FEATURES.filter(f => f.key === "home")), ...mine.filter(f => f.bar)].map(link).join("");
+  const pic = safeAvatar(avatar !== undefined ? avatar : cachedAvatar());
+  const av = pic ? `<img class="btnav-av" src="${esc(pic)}" alt="" width="30" height="30">` : `<span class="btnav-av" aria-hidden="true">${esc([...n][0] || "?")}</span>`;
   return `<nav class="btnav btnav-c" aria-label="${esc(tx(NAV.aria, L))}">
     <a class="btnav-logo" href="/" aria-label="${esc(tx(NAV.home, L))}"><img src="/shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
-    ${home ? `<div class="btnav-items">${home}</div>` : ""}
-    <form class="btnav-q" role="search" action="/admin/search/" method="get" data-form="search">
-      <input type="search" name="q" maxlength="200" placeholder="${esc(tx(NAV.q, L))}" aria-label="${esc(tx(NAV.qLab, L))}" autocomplete="off">
-      <input type="hidden" name="lang" value="${L}">
-    </form>
-    <button type="button" class="btnav-me" popovertarget="btnav-menu" aria-label="${esc(fillName(NAV.me, L, n))}"><span class="btnav-av" aria-hidden="true">${esc([...n][0] || "?")}</span><span class="btnav-nm">${esc(n)}</span></button>
+    ${items ? `<div class="btnav-items">${items}</div>` : ""}
+    <span class="btnav-sp"></span>
+    <button type="button" class="btnav-me" popovertarget="btnav-menu" aria-label="${esc(fillName(NAV.me, L, n))}">${av}<span class="btnav-nm">${esc(n)}</span></button>
     <div class="btnav-menu" id="btnav-menu" popover>${menu}<button class="btnav-out" data-act="signout">${esc(tx(NAV.signout, L))}</button></div>
   </nav>`;
 }

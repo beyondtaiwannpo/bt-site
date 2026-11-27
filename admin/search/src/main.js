@@ -74,7 +74,7 @@ async function loadOptions() {
   try { S.opts = await D.loadOptions(); }
   catch (e) { S.opts = { events: [], claude: false, voyage: false, ai_sources: [] }; S.msg = T("err.load") + D.says(e); }
 }
-// 頂欄的搜尋框（2026-11-27，shared/nav.js）是一般的表單，從別頁送過來是 ?q=…：讀進來，網址換回這一頁自己的 #q= 寫法。
+// 側欄最上面的搜尋框（2026-11-27，shared/rail.js 的 searchBoxHTML）是一般的表單，從別頁送過來是 ?q=…：讀進來，網址換回這一頁自己的 #q= 寫法。
 function parseHash() {
   const p = UI.parseQuery(location.hash); S.q = p.q; S.f = p.f;
   const u = new URL(location.href), q = String(u.searchParams.get("q") || "").trim().slice(0, 200);
