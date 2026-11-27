@@ -631,6 +631,63 @@ export const TOURS = [
       b: { zh: "按這一顆寫下來，有截圖就一起貼上。會送到 Co-President 與 Senior Adviser 那裡。", en: "Press this and write it down, with a screenshot if you have one. It goes to the Co-Presidents and Senior Advisers." } },
   ] },
 
+  // ── 首頁（/home/）──
+  { id: "home", page: "home:home", steps: [
+    { at: ".home .hello-a", t: { zh: "最常用的按鈕", en: "The buttons you use most" },
+      b: { zh: "「跟 Marketing 提需求」送一張需求單給 Marketing。可以記會議的人旁邊還有「記一場會議」，記下來的會之後在「搜尋」找得到。", en: "New Marketing request sends Marketing a request. If you can log meetings, Log a meeting sits next to it, and every meeting you log can be found later in Search." } },
+    { at: ".home .block.wait", t: { zh: "等你處理", en: "Waiting for you" },
+      b: { zh: "要你動手的事都在這一張清單：要回覆的會、要填的表單、等你審的報名、派給你的需求。照日期排，最急的在最上面，點一行就到那件事。", en: "Everything that needs you is in this one list: meetings to reply to, forms to fill in, sign-ups to review, requests assigned to you. Most urgent first; tap a row to go straight there." } },
+    { at: ".home .wait + .block", t: { zh: "接下來", en: "Coming up" },
+      b: { zh: "接下來六十天排給你的會與活動。會議可以直接在這裡按會到或不能到，排會的人馬上看得到。", en: "Your meetings and events for the next 60 days. Reply to a meeting right here and the organizer sees your answer straight away." } },
+    { at: ".home .block.pp", t: { zh: "我的護照", en: "My passport" },
+      b: { zh: "你蓋了幾格章。點進去蓋章、寫心得，心得只有你自己看得到。", en: "How many stamps you have. Open it to stamp and write notes; only you can read your notes." } },
+    { at: ".home .block.pairs", t: { zh: "Mentorship", en: "Mentorship" },
+      b: { zh: "你帶的 mentee 或你的 mentor 在這裡，check-in 的連結也在這裡，填過的會打勾。", en: "Your mentees or your mentor, with your check-in links. The ones you have filled in are ticked." } },
+    { at: [".rail a.rail-area[href='#calendar']", ".rail-burger"], t: { zh: "行事曆在隔壁", en: "The Calendar is next door" },
+      b: { zh: "「行事曆」用月、週、日看所有的會與活動。在「時間看板」填你什麼時候有空，排會的人在行事曆的「日」就看得到。", en: "Calendar shows every meeting and event by month, week or day. Fill in when you are free under Availability, and organizers see it in the Calendar's Day view." } },
+  ] },
+  // 行事曆的月與週（點一天之後的「日」是下一段）
+  { id: "calendar", page: "home:calendar", unless: ".cal .dgrid", steps: [
+    { at: ".cal .calbar", t: { zh: "月、週、日", en: "Month, week or day" },
+      b: { zh: "左邊切換月、週、日，箭頭往前往後翻，「今天」跳回今天。", en: "Switch between Month, Week and Day on the left. The arrows move back and forward; Today jumps back to today." } },
+    { at: ".cal .calbar .seg:last-of-type", t: { zh: "只看我的，或整個 BT", en: "Just mine, or all of BT" },
+      b: { zh: "「只看我的」只放邀了你的會、你排的會與活動。「整個 BT」連別人的會也放上來，排會之前先看會不會撞期。", en: "Just mine shows meetings you are invited to or organized, plus events. All of BT adds everyone else's meetings, so you can check for clashes before you schedule." } },
+    { at: [".cal .month", ".cal .week"], t: { zh: "怎麼看", en: "Reading the calendar" },
+      b: { zh: "實心是必到，框線是選擇參加，橘色是活動。點一個就打開，會議可以在裡面回覆會不會到。", en: "Solid is required, outlined is optional, orange is an event. Click one to open it; you can reply to a meeting from there." } },
+    { at: [".cal .month .day.today .dnum", ".cal .dnum"], t: { zh: "點一天，看誰有空", en: "Click a day to see who is free" },
+      b: { zh: "點日期打開那一天：每半小時一格，底色越深有空的人越多。可以排會的人在那裡點一格就能排會。", en: "Click a date to open that day: each half hour is shaded darker when more people are free. If you can schedule meetings, click a half hour there to set one up." } },
+    { at: AT_SUBS, t: { zh: "會議與時間看板", en: "Meetings and Availability" },
+      b: { zh: "「會議」列出記下來的每一場會與紀錄。「時間看板」填你什麼時候有空，行事曆的「日」就是照大家填的算。", en: "Meetings lists every logged meeting and its notes. Availability is where you fill in when you are free; the Day view counts from what everyone fills in there." } },
+  ] },
+  { id: "calendar-day", page: "home:calendar", when: ".cal .dgrid", steps: [
+    { at: ".cal .dchips", t: { zh: "只算一個 team", en: "Count one team" },
+      b: { zh: "按一個 team，底色就只算那個 team 的人。按「所有人」回到全部。", en: "Pick a team and the shading counts only that team. Everyone goes back to all members." } },
+    { at: ".cal .dweek .wscroll", t: { zh: "底色是有空的人數", en: "Shading shows who is free" },
+      b: { zh: "底色越深，那半小時有空的人越多，滑鼠移過去看得到是誰。可以排會的人點一格就打開排會：選時間、勾人、寫標題與議程，邀請會寄出去。", en: "The darker a half hour, the more people are free; hover to see who. If you can schedule, click a half hour to set up a meeting: pick the time, tick people, add a title and agenda, and the invites go out." } },
+    { at: ".cal .dcol .chipi", t: { zh: "這一天的會與活動", en: "This day's meetings and events" },
+      b: { zh: "這一天已經排好的會與活動疊在上面，點一個打開。", en: "Meetings and events already on this day sit on top. Click one to open it." } },
+    { at: ".cal a[href*='availability']", t: { zh: "人數從哪裡來", en: "Where the counts come from" },
+      b: { zh: "人數是照每個人在「時間看板」填的時間算的，沒填的人不會被算進去。點這裡改你自己的。", en: "Counts come from the free times each person fills in under Availability; anyone who hasn't filled theirs in isn't counted. Click here to edit yours." } },
+    { at: ".cal .calbar .seg", t: { zh: "回到月或週", en: "Back to month or week" },
+      b: { zh: "按「月」或「週」回到整段時間。", en: "Press Month or Week to go back to the wider view." } },
+  ] },
+
+  // ── 搜尋（/admin/search/）──
+  { id: "search", page: "search:search", steps: [
+    { at: ".sx-box", t: { zh: "打一個詞", en: "Type a word" },
+      b: { zh: "一次找會議紀錄、回饋表、內部表單、活動檢討。打兩個以上的詞，每一個都要提到才算。英文跟中文分開找，bootcamp 跟探索營要各找一次。", en: "One box searches meeting notes, feedback forms, internal forms and event reviews. With two or more words, each one has to appear. English and Chinese are matched separately, so try both." } },
+    { at: ".sx-filters", t: { zh: "縮小範圍", en: "Narrow it down" },
+      b: { zh: "「找哪裡」挑要找哪幾種，日期只找一段時間。讀得到回饋表的人還多兩格：活動與回饋表的種類。", en: "Where to look picks which kinds to search, and the dates limit it to a period. If you can read feedback forms you also get Event and Feedback form type." } },
+    { at: ".sx-sum", t: { zh: "最上面的整理", en: "The summary at the top" },
+      b: { zh: "AI 把找到的東西整理成幾句，後面的數字指回底下那一筆。AI 只讀了片段，可能讀錯，重要的事點進原本那一頁確認。", en: "The AI sums up what was found in a few lines, and the numbers point to the results below. It only reads excerpts and can be wrong, so check the original for anything important." } },
+    { at: [".sx-list", ".main .empty"], t: { zh: "結果", en: "Results" },
+      b: { zh: "每一筆標出是哪一種、名稱、日期與提到的那一句，點名稱回到原本那一頁。你在原本那一頁讀不到的，這裡也不會出現。", en: "Each result shows its kind, title, date and the line that matched. Click the title to open the original. Anything you can't read on its own page won't show up here." } },
+    { t: { zh: "會議記下來就找得到", en: "Logged meetings show up here" },
+      b: { zh: "在首頁按「記一場會議」記下來的會，都找得到。開完會把重點寫進紀錄，之後要找就不用一場一場點開。", en: "Every meeting logged with Log a meeting on Home can be found here. Write the key points into the notes, and nobody has to open meetings one by one later." } },
+    { at: "#sx-settings", t: { zh: "給 AI 讀哪些", en: "What the AI may read" },
+      b: { zh: "只有 Co-President 看得到這一塊：勾哪幾種可以給 AI 讀。回饋表與活動檢討要先補隱私政策再打開。", en: "Only Co-Presidents see this: which kinds the AI may read. Feedback forms and event reviews stay off until the privacy policy covers them." } },
+  ] },
+
   // ── 專案 → 活動 ──
   { id: "events", page: "forms:events", unless: "#ev-tabs", steps: [
     { at: AT_HEAD, t: { zh: "每個 team 的活動", en: "Every team's events" },

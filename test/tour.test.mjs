@@ -1,7 +1,7 @@
 // 後台右下角「怎麼用」導覽（2026-11-26）。跑法：node --test test/*.test.mjs
-// Paul 2026-11-26（開車時口述）：一位幹部說新平台很難學。每一頁內建一段 3 到 6 步的導覽，第一次登入自動跑，右下角一顆可以重看，
+// Paul 2026-11-26（開車時口述）：一位幹部說新平台很難學。每一頁內建一段 3 到 6 步的導覽，右下角一顆按了才跑（原本第一次登入會自動跑，Paul 同一天改成只在按下去時開），
 //   一次框住一塊、有下一步上一步跳過，也講頁面之間怎麼接。引擎與步驟都在 shared/rail.js 最下面（TOURS），樣式在 shared/rail.css。
-// 這一支守兩件事：步驟資料（中英文都有、每頁 3 到 6 步、指到的頁面真的存在）與引擎的純函式（挑哪一段、哪幾步、盒子放哪、自動跑不跑）。
+// 這一支守兩件事：步驟資料（中英文都有、每頁 3 到 6 步、指到的頁面真的存在）與引擎的純函式（挑哪一段、哪幾步、盒子放哪），以及它不會自己跑。
 // 每一步在真的頁面上找不找得到，是在本機瀏覽器裡一頁一頁對過的（README「後台導覽」那一節有怎麼對）。
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -42,12 +42,16 @@ test("★ 這一次要寫的頁面都有導覽", () => {
   const want = ["forms:events", "forms:projects", "people:roster", "people:invites", "forms:forms",
     "records:overview", "records:people", "records:yearly", "site:events", "site:res", "site:team", "site:stories", "site:mail",
     "passports:cadre", "passports:cities", "passports:interns", "passports:board",
-    "finance:overview", "finance:tx", "finance:accounts", "finance:budget", "finance:export"];
+    "finance:overview", "finance:tx", "finance:accounts", "finance:budget", "finance:export",
+    "home:home", "home:calendar", "search:search"];
   const none = () => false;
   for (const p of want) assert.ok(RAIL.pickTour(p, none), `${p} 沒有導覽`);
   // 活動編輯頁跟活動清單同一個 page，靠 #ev-tabs 分開
   assert.equal(RAIL.pickTour("forms:events", s => s === "#ev-tabs").id, "event-editor");
   assert.equal(RAIL.pickTour("forms:events", none).id, "events");
+  // 行事曆的「日」跟月、週同一個 page，靠 .cal .dgrid 分開
+  assert.equal(RAIL.pickTour("home:calendar", s => s === ".cal .dgrid").id, "calendar-day");
+  assert.equal(RAIL.pickTour("home:calendar", none).id, "calendar");
   assert.equal(RAIL.pickTour("nope:nope", none), null, "沒有導覽的頁面回 null");
   assert.equal(RAIL.pickTour("*", () => true), null, "歡迎那一段不會被當成某一頁的導覽");
 });
