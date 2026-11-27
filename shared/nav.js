@@ -51,7 +51,7 @@ export const FEATURES = [
   // 2026-11-27 Paul：「my story, where I am right now, it should be on the separate pages… open another pages up top that says my story」。
   // 同一個資料夾（/settings/）的 #story：存故事的程式本來就在那裡，搬資料夾只會多一份。學員沒有故事，所以 roles 沒有 student。
   // 2026-11-27 第三版（Paul：「my story and internal can be on top of the menu, and then once you click Paul… you can go into setting」）：
-  // bar: true 的畫在幹部頂欄上（我的故事、人與權限），menu: true 的收在右上角大頭照那一份選單裡（設定），見 cadreBarHTML。
+  // bar: true 的畫在幹部頂欄上（我的故事、人與權限）；設定是右上角的大頭照加名字（點了直接到設定，見 cadreBarHTML）。
   { key: "story",        label: { zh: "我的故事", en: "My story" }, href: "/settings/#story", roles: ["cadre", "alumni"], bar: true,
     title: { zh: "我的故事", en: "My story" },     desc: { zh: "創辦人、我的故事、我現在在哪", en: "Founder, your story, where you are now" } },
   // 人與權限（2026-11-27 從側欄搬到頂欄，Paul：「that's only senior advisor accessible… on the left tab menu, which is kind of confusing」）。
@@ -59,7 +59,7 @@ export const FEATURES = [
   // 檔頭說「不要加 board_role 的過濾」講的是「後台」那一項（一般幹部也要進得去自己 team 的申請）；這一項本來就只開給這兩種人，畫給別人只會多一個點了被彈回來的入口。
   { key: "people",       label: { zh: "人與權限", en: "Internal" }, href: "/admin/people/", roles: ["cadre"], boards: ["president", "senior_adviser"], bar: true,
     title: { zh: "人與權限", en: "Internal" },     desc: { zh: "幹部名單、邀請、工作區、屆別", en: "Roster, invites, workspaces, terms" } },
-  { key: "settings",     label: { zh: "設定", en: "Settings" },     href: "/settings/",     roles: ["cadre", "student", "alumni", "intern"], menu: true,
+  { key: "settings",     label: { zh: "設定", en: "Settings" },     href: "/settings/",     roles: ["cadre", "student", "alumni", "intern"],
     title: { zh: "設定", en: "Settings" },         desc: { zh: "名字、語言、大頭照、要不要出現在公開的團隊頁上", en: "Name, language, avatar, whether to appear on the public team page" } },
   // 2026-10-17：實習生護照（方案 C，docs/2026-10-15-實習生護照盤點與設計.md）。
   // roles 只有 intern。Internship team 的幹部也看得到那一頁的進度牆，
@@ -95,7 +95,7 @@ export function withLang(href, lang) {
 }
 const NAV = {
   aria:   { zh: "站台導覽", en: "Site navigation" },
-  me:     { zh: "我的帳號：{name}", en: "My account: {name}" },
+  me:     { zh: "{name} 的設定", en: "Settings for {name}" },
   home:   { zh: "回 Beyond Taiwan 首頁", en: "Back to the Beyond Taiwan home page" },
   open:   { zh: "展開選單", en: "Open the menu" },
   menu:   { zh: "選單", en: "Menu" },
@@ -166,11 +166,9 @@ export function navHTML({ current, role, name, lang, board, rail, avatar }) {
 // Paul：「there's like 100 different tabs on the left menu, and then there's setting on top, there's like home and everything」。
 // 每一頁都在左邊的側欄（shared/rail.js），頂欄只放三樣東西：
 //   1. bar: true 的那幾項：我的故事（幹部）、人與權限（Co-President 與 Senior Adviser）。沒有側欄的頁（設定、實習護照）前面多一個首頁。
-//   2. 右上角的大頭照加名字：點了是一份小選單（menu: true 的那幾項，現在只有設定）加登出。
+//   2. 右上角的大頭照加名字：一個連結，點了直接到設定（Paul：「once you click name, you can just go directly into it」）。
 //      大頭照是他在設定上傳的那一張（profiles.avatar），沒上傳就是名字的第一個字。
-//      開合用瀏覽器內建的 popover（popovertarget），不用寫程式：點外面或按 Esc 就關，鍵盤走得到。
-//      跟上面那段註解「不要用 details、不要用 JavaScript」是同一個理由；popover 兩樣都不是。
-//      不認得 popover 的舊瀏覽器：那幾行直接攤在名字旁邊（:popover-open 不認得，藏起來那一條整條不算），還是點得到。
+//      登出在設定那一頁最下面（settings/src/ui.js 的 settingsHTML）。第三版的那一份小選單（設定、登出）拿掉了。
 //   搜尋框第二版放在頂欄，Paul 第三版要它換地方：搬到側欄最上面（shared/rail.js 的 searchBoxHTML），任何一頁按 / 跳到那一格。
 const fillName = (row, L, name) => tx(row, L).replace("{name}", name);
 // 大頭照：呼叫端傳的 avatar 先；沒傳就讀 shared/auth.js 的 whoAmI 存在這個分頁的那一份（sessionStorage 的 bt-me，十分鐘內有效）。
@@ -185,7 +183,7 @@ function cadreBarHTML({ current, name, L, board, rail, avatar }) {
   const n = String(name || "");
   const link = f => `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`;
   const mine = featuresFor("cadre", board);
-  const menu = mine.filter(f => f.menu).map(link).join("");
+  const set = FEATURES.find(f => f.key === "settings");
   const items = [...(rail ? [] : FEATURES.filter(f => f.key === "home")), ...mine.filter(f => f.bar)].map(link).join("");
   const pic = safeAvatar(avatar !== undefined ? avatar : cachedAvatar());
   const av = pic ? `<img class="btnav-av" src="${esc(pic)}" alt="" width="30" height="30">` : `<span class="btnav-av" aria-hidden="true">${esc([...n][0] || "?")}</span>`;
@@ -193,7 +191,6 @@ function cadreBarHTML({ current, name, L, board, rail, avatar }) {
     <a class="btnav-logo" href="/" aria-label="${esc(tx(NAV.home, L))}"><img src="/shared/logo.png" alt="Beyond Taiwan" width="386" height="191"></a>
     ${items ? `<div class="btnav-items">${items}</div>` : ""}
     <span class="btnav-sp"></span>
-    <button type="button" class="btnav-me" popovertarget="btnav-menu" aria-label="${esc(fillName(NAV.me, L, n))}">${av}<span class="btnav-nm">${esc(n)}</span></button>
-    <div class="btnav-menu" id="btnav-menu" popover>${menu}<button class="btnav-out" data-act="signout">${esc(tx(NAV.signout, L))}</button></div>
+    <a class="btnav-me" href="${withLang(set.href, L)}" aria-label="${esc(fillName(NAV.me, L, n))}"${current === "settings" ? ' aria-current="page"' : ""}>${av}<span class="btnav-nm">${esc(n)}</span></a>
   </nav>`;
 }

@@ -45,8 +45,10 @@ test("★ 每一個鍵 zh 與 en 都是字串，MINE 不跟 COMMON 撞鍵", () =
 test("頂欄：lang 傳什麼畫什麼；沒傳在 Node 裡退成英文；連結帶 ?lang=", () => {
   const zh = navHTML({ current: "settings", role: "cadre", name: "a", lang: "zh" });
   const en = navHTML({ current: "settings", role: "cadre", name: "a", lang: "en" });
-  assert.match(zh, />設定<\/a>/); assert.match(zh, />登出<\/button>/);
-  assert.match(en, />Settings<\/a>/); assert.match(en, />Sign out<\/button>/);
+  // 2026-11-27：幹部右上角的名字直接連到設定（登出在設定那一頁最下面），aria-label 跟著語言。
+  assert.match(zh, /class="btnav-me" href="\/settings\/\?lang=zh" aria-label="a 的設定"/); assert.doesNotMatch(zh, /signout/);
+  assert.match(en, /class="btnav-me" href="\/settings\/\?lang=en" aria-label="Settings for a"/);
+  assert.match(navHTML({ role: "student", name: "a", lang: "en" }), />Sign out<\/button>/, "學員的頂欄照舊有登出");
   assert.match(en, /href="\/settings\/\?lang=en#story"/);
   assert.match(navHTML({ current: "settings", role: "cadre", name: "a", lang: "en", rail: false }), /href="\/home\/\?lang=en">Home</, "沒有側欄的頁，頂欄的首頁帶 ?lang=");
   assert.equal(navLang(), "en", "沒有 location 與 localStorage 的時候是英文");

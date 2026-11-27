@@ -232,6 +232,9 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz, founder) {
         ? `<p class="sec-note">${T("s.leave")}</p>`
         : `<button class="btn quiet" data-act="ask-delete">${T("s.delete")}</button>`}
     </div>
+    ${/* 2026-11-27 Paul：「click Paul and then goes directly into settings, and then sign out will be like on the bottom of the page」。
+         幹部頂欄右上角的名字直接連到這一頁，登出放在這一頁最下面（每一種人都畫，學員、校友、實習生的頂欄照舊也有一顆）。 */ ""}
+    <div class="signout-row"><button class="btn ghost" data-act="signout">${T("common.signout")}</button></div>
   </div>`;
 }
 

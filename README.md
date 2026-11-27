@@ -901,7 +901,7 @@ Paul 2026-11-27 看了上一版之後講了幾件事：「我的」跟「整個 
 - **紀錄**照舊只有被派進去的人有。
 
 **頂欄（幹部）**：左邊 logo 加我的故事（Co-President 與 Senior Adviser 多人與權限），右邊是自己的大頭照加名字。
-- **大頭照**是在設定上傳的那一張，沒上傳就是名字的第一個字。按下去是設定、登出。語言照舊在側欄最上面與設定裡切。
+- **大頭照**是在設定上傳的那一張，沒上傳就是名字的第一個字。**點名字直接到設定**，登出在設定那一頁最下面（Paul：「click Paul and then goes directly into settings, and then sign out will be like on the bottom of the page」）。語言照舊在側欄最上面與設定裡切。
 - 設定與實習護照這兩頁沒有側欄，頂欄最前面多一個「首頁」，回得去。
 - 學員、校友、實習生的頂欄沒變。
 
@@ -928,7 +928,8 @@ Paul 2026-11-27 看了上一版之後講了幾件事：「我的」跟「整個 
 
 **程式在哪：**
 - `shared/rail.js`：`SECTIONS`（`me` 沒有標題、`ws`）、`AREAS`（`areaWho` 決定那一行畫不畫，對外網站是 `ws:custom:website`）、`areaShown()`、`allowed()` 認逗號（任何一個過就算）、`teamSiteItems()`、`seniorTeamsHTML()`、`teamRowsHTML()`。`newMenuHTML()` 拿掉了，`canSchedule()` 留著。
-- `shared/nav.js` 的 `cadreBarHTML()`（`FEATURES` 裡 `bar: true` 的畫在頂欄、`menu: true` 的收在大頭照的選單，選單用瀏覽器內建的 popover）、`safeAvatar()`（大頭照只收圖片的 data URL 與 https）。大頭照沒傳的話讀 `shared/auth.js` 存在這個分頁的那一份（`bt-me`）。樣式在 `shared/nav.css` 最後一段。
+- `shared/nav.js` 的 `cadreBarHTML()`（`FEATURES` 裡 `bar: true` 的畫在頂欄，右上角的名字是連到設定的連結）、`safeAvatar()`（大頭照只收圖片的 data URL 與 https）。大頭照沒傳的話讀 `shared/auth.js` 存在這個分頁的那一份（`bt-me`）。樣式在 `shared/nav.css` 最後一段。
+- 登出那一顆在 `settings/src/ui.js` 的 `settingsHTML()` 最後（`.signout-row`）。
 - `shared/rail.js` 的 `searchBoxHTML()`（側欄的搜尋框）與 `slashTarget()`（按 `/` 跳到哪一格），樣式在 `shared/rail.css` 的 `.rail-q`。
 - `home/src/ui.js` 的 `quickHTML()`；`home/src/main.js` 的 `?schedule=1` 多認 `&team=`；`admin/src/main.js` 的需求單認 `?team=`。
 - `admin/team-forms/`：`data.js` 的 `loadMyForms`、`attachEventForm`、`createFeedback`；`ui.js` 的 `allRows()`、`allHref()`、`allFormsHTML()`、`newFormHTML()`；`main.js` 認 `#all`。

@@ -167,34 +167,24 @@
 }
 
 /* ── 幹部的頂欄（2026-11-27 第二版）：搜尋框加右上角的大頭照 ──────────────────
-   每一頁都在左邊的側欄，頂欄只剩這兩樣（見 shared/nav.js cadreBarHTML）。手機上也是一條藥丸：
-   搜尋框吃掉中間所有的空間，名字收成一個圓的字。 */
+   每一頁都在左邊的側欄，頂欄只剩我的故事（人與權限）與右上角的名字（點了到設定），見 shared/nav.js cadreBarHTML。
+   手機上名字收成大頭照那一個圓。 */
 .btnav-c .btnav-items{flex:none}
 .btnav-me{flex:none;display:inline-flex;align-items:center;gap:8px;box-sizing:border-box;min-height:38px;margin:0;padding:0 12px 0 4px;
   border:1px solid rgba(16,42,134,.3);border-radius:999px;background:none;color:var(--ink);cursor:pointer;
-  font:600 14px/1 var(--body);position:relative}
+  font:600 14px/1 var(--body);position:relative;text-decoration:none}
+.btnav-me[aria-current]{background:rgba(255,196,108,.34);border-color:var(--ink)}
+.btnav-me:focus-visible{outline:var(--ring);outline-offset:var(--ring-gap)}
 .btnav-me:hover{border-color:var(--ink);background:rgba(255,255,255,.7)}
 .btnav-me::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 22px);height:44px}
 img.btnav-av{object-fit:cover;display:block;border:1px solid rgba(16,42,134,.18);box-sizing:border-box}
 .btnav-av{width:30px;height:30px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
   background:var(--bt-navy);color:var(--bt-cream);font-size:14px}
 .btnav-nm{max-width:7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(16,42,134,.86)}
-/* 那一份選單。popover 在最上層畫，位置自己定：頂欄的右下。實色底，理由同上面手機面板那一段（玻璃裡面再放玻璃會透）。 */
-.btnav-menu{margin:0;inset:auto;position:fixed;top:64px;right:max(16px,calc(50vw - 462px));
-  min-width:200px;padding:6px;border-radius:18px;border:1px solid rgba(16,42,134,.16);
-  background:var(--bt-cream);color:var(--ink);box-shadow:0 14px 34px rgba(16,42,134,.16);font-family:var(--body)}
-.btnav-menu:not(:popover-open){display:none}
-.btnav-menu:popover-open{display:flex;flex-direction:column;gap:2px}
-.btnav-menu a{display:block;padding:11px 14px;border-radius:12px;color:var(--ink);text-decoration:none;font-size:15px;font-weight:600}
-.btnav-menu a:hover{background:rgba(255,255,255,.85)}
-.btnav-menu a[aria-current]{background:rgba(255,196,108,.34)}
-.btnav-menu a:focus-visible{outline:var(--ring);outline-offset:-2px}
-.btnav-menu .btnav-out{margin-top:6px;width:100%}
 @media (max-width:700px){
   /* 手機上幹部的頂欄沒有「選單」那一顆（項目最多一個「首頁」，直接放在那裡）。 */
   .btnav-c .btnav-items{display:flex;position:static;flex-direction:row;padding:0;background:none;border:0;box-shadow:none}
   .btnav-c .btnav-items a{padding:6px 4px;font-size:15px}
   .btnav-nm{display:none}
   .btnav-me{padding:0 3px}
-  .btnav-menu{top:60px;right:16px}
 }

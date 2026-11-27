@@ -31,20 +31,20 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
 // 2026-11-27 第二版（Paul：「there's like 100 different tabs on the left menu, and then there's setting on top, there's like home and everything」）：
 // 幹部的頂欄只剩搜尋框與右上角的大頭照。每一頁都在左邊的側欄；我的故事、設定、人與權限（只有 Co-President 與 Senior Adviser）收在大頭照那一份選單裡。
 // 2026-11-27 第三版（Paul：「my story and internal can be on top of the menu, and then once you click Paul… you can go into setting」，搜尋框「find somewhere else」）。
-test("★ 幹部的頂欄：logo、我的故事（與人與權限）、大頭照；選單裡是設定與登出；搜尋框不在頂欄", () => {
+test("★ 幹部的頂欄：logo、我的故事（與人與權限）、大頭照加名字；點名字直接到設定；搜尋框與登出都不在頂欄", () => {
   const h = navHTML({ current: "settings", role: "cadre", name: "王平", lang: "zh", board: "member", avatar: "" });
   assert.match(h, /<nav class="btnav btnav-c"/);
   assert.doesNotMatch(h, /btnav-q|type="search"/, "搜尋框搬到側欄最上面");
   assert.match(h, /<div class="btnav-items"><a href="\/settings\/\?lang=zh#story">我的故事<\/a><\/div>/);
-  assert.match(h, /<button type="button" class="btnav-me" popovertarget="btnav-menu" aria-label="我的帳號：王平"><span class="btnav-av" aria-hidden="true">王<\/span><span class="btnav-nm">王平<\/span>/);
-  const menu = h.slice(h.indexOf('<div class="btnav-menu" id="btnav-menu" popover>'));
-  assert.match(menu, /popover><a href="\/settings\/\?lang=zh" aria-current="page">設定<\/a><button class="btnav-out" data-act="signout">登出/);
+  assert.match(h, /<a class="btnav-me" href="\/settings\/\?lang=zh" aria-label="王平 的設定" aria-current="page"><span class="btnav-av" aria-hidden="true">王<\/span><span class="btnav-nm">王平<\/span><\/a>/);
+  assert.doesNotMatch(navHTML({ current: "home", role: "cadre", name: "王", lang: "zh" }), /aria-current/, "不在設定那一頁就不亮");
+  assert.doesNotMatch(h, /popover|signout|btnav-menu/, "Paul 2026-11-27：點名字直接到設定，登出在設定那一頁最下面");
   assert.doesNotMatch(h, /\/admin\/people\//, "Associate 沒有人與權限");
   assert.ok(!navHTML({ current: "home", role: "cadre", name: "王", lang: "zh" }).includes("/admin/people/"), "沒傳職級就不畫，不會多給");
   for (const b of ["president", "senior_adviser"])
     assert.match(navHTML({ current: "people", role: "cadre", name: "王", lang: "zh", board: b }), /<div class="btnav-items"><a href="\/settings\/\?lang=zh#story">我的故事<\/a><a href="\/admin\/people\/\?lang=zh" aria-current="page">人與權限<\/a><\/div>/, b);
   // 首頁、行事曆、護照、時間看板、後台都在側欄，頂欄一項都不畫。
-  for (const f of FEATURES.filter(x => x.roles.includes("cadre") && !x.menu && !x.bar)) assert.ok(!h.includes(`href="${withLang(f.href, "zh")}"`), `${f.key} 在側欄，頂欄不該再有`);
+  for (const f of FEATURES.filter(x => x.roles.includes("cadre") && x.key !== "settings" && !x.bar)) assert.ok(!h.includes(`href="${withLang(f.href, "zh")}"`), `${f.key} 在側欄，頂欄不該再有`);
   assert.doesNotMatch(h, /btnav-toggle|btnav-burger/, "幹部的頂欄沒有「選單」那一顆");
 });
 test("★ 右上角是自己的大頭照：呼叫端傳的先，沒傳讀這個分頁的 bt-me；只收圖片的 data URL 與 https", () => {
@@ -68,12 +68,11 @@ test("★ 沒有側欄的那兩頁（設定、實習生進度牆）傳 rail: fal
   // 搜尋那一頁讀 ?q=（側欄的搜尋框從別頁送過來）。
   assert.match(readFileSync("admin/search/src/main.js", "utf8"), /searchParams\.get\("q"\)/);
 });
-test("★ 大頭照那一份選單用瀏覽器的 popover，不寫程式、不用 details", () => {
-  const h = navHTML({ current: null, role: "cadre", name: "a", lang: "zh" }).replace(/<!--[\s\S]*?-->/g, "");
-  assert.match(h, /popovertarget="btnav-menu"/); assert.match(h, /id="btnav-menu" popover>/);
-  assert.doesNotMatch(h, /<details|onclick=/);
-  const css = readFileSync("shared/nav.css", "utf8");
-  assert.match(css, /\.btnav-menu:not\(:popover-open\)\{display:none\}/, "不認得 popover 的舊瀏覽器：這一條整條不算，選單直接攤開，還是點得到");
+test("★ 登出在設定那一頁最下面（每一種人都有一顆）", () => {
+  const ui = readFileSync("settings/src/ui.js", "utf8");
+  assert.match(ui, /<div class="danger">[\s\S]*?<\/div>\s*\$\{[\s\S]*?\}\s*<div class="signout-row"><button class="btn ghost" data-act="signout">\$\{T\("common\.signout"\)\}<\/button><\/div>\s*<\/div>`;/);
+  assert.match(readFileSync("settings/src/main.js", "utf8"), /if \(act === "signout"\) \{ await AUTH\.signOut\(\);/);
+  assert.doesNotMatch(readFileSync("shared/nav.css", "utf8"), /btnav-menu/, "那一份選單的樣式一起拿掉");
 });
 
 // 學員、實習生、校友沒有側欄，頂欄照舊是 featuresFor 的全部。
