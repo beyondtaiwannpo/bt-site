@@ -81,7 +81,9 @@ test("行事曆的某一天排一場會：整段有空的先勾、只有一部�
   assert.match(h, /value="u5"><b>雅婷<\/b><span class="alt">Tina<\/span><span class="rk">DR<\/span><span class="mini">Marketing<\/span> <span class="mini">Sponsorship<\/span><\/label>/, "team 淡字不帶 Team 那個字、沒空就沒有標");
   assert.ok(h.indexOf('value="u1"') < h.indexOf('value="u2"') && h.indexOf('value="u2"') < h.indexOf('value="u5"'), "有空的排前面");
   assert.match(h, /<select id="sch-min" data-sch="min"[^>]*>[\s\S]*<option value="660" selected>11:00<\/option>/, "開始時間是點的那一格，改得了");
-  assert.match(h, /<option value="60" selected>60 分鐘<\/option>/);
+  assert.match(h, /<select id="sch-end" data-sch="end"[^>]*><option value="690">11:30<\/option><option value="720" selected>12:00<\/option>/, "結束時間從開始後半小時起算");
+  assert.match(h, /<p class="mini len" id="sch-len">長度 1 小時<\/p>/, "長度自己算出來");
+  assert.match(h, /<input type="date" id="sch-key" data-sch="key" value="2026-11-26"/, "日期改得了");
   assert.match(h, /<textarea id="sch-message" data-sch="message"/, "留言一格");
   assert.match(h, /data-act="sch-send">排會並寄邀請（1 人）<\/button>/);
   assert.match(h, /BT 的 Google 帳號開這場會，自動加一個 Google Meet 連結/);
@@ -146,6 +148,60 @@ test("★ 英文畫出來不剩中文（會議清單、一場會議、行事曆�
   F.setLang("zh"); HS.setLang("zh");
 });
 
+// 2026-11-27 Paul：「It's gonna show up at like the end of her ticking, says she's available… If it's not, then it's something else」。
+test("★ 每一個人後面一個標：有空、部分時間有空、沒空、沒填時間，跟著選的時間變；有空的排前面", () => {
+  const filled = FREE.filledIds([{ id: "u1", tz: TZ }, { id: "u2", tz: TZ }, { id: "u5", tz: TZ }, { id: "u7", tz: null }],
+    new Map([["u1", new Set(["4:660"])], ["u2", new Set(["4:660"])], ["u7", new Set(["4:660"])]]), new Map([["u5", new Set(["2026-11-23"])]]));
+  assert.deepEqual([...filled].sort(), ["u1", "u2", "u5"], "u5 只動過一週也算填過；u7 沒設時區算不出來，當沒填");
+  const four = MEMBERS.concat([{ id: "u7", name: "阿明", alt: "", board_role: "member", team: "" }]);
+  const h = SCH.scheduleHTML({ key: DAYKEY, min: 660, minutes: 60, ticked: [] }, sctx({ members: four, filled }), false);
+  assert.match(h, /value="u1"[^]*?<span class="mini free">有空<\/span><\/label>/);
+  assert.match(h, /value="u2"[^]*?<span class="mini part">部分時間有空<\/span><\/label>/);
+  assert.match(h, /value="u5"[^]*?<span class="mini busy">沒空<\/span><\/label>/, "填過時間、這一段沒空");
+  assert.match(h, /value="u7"[^]*?<span class="mini none">沒填時間<\/span><\/label>/, "沒填過時間的另外一個標，不跟沒空混在一起");
+  const order = ["u1", "u2", "u5", "u7"].map(id => h.indexOf(`value="${id}"`));
+  assert.deepEqual(order.slice().sort((a, b) => a - b), order, "有空、一部分、沒空、沒填");
+  assert.match(h, /class="mini sch-key"/, "四個標上面有一行說明");
+  // 換一個時間，標跟著變：11:30 起半小時只有 u1 有空，u2 變成沒空。
+  const later = SCH.scheduleHTML({ key: DAYKEY, min: 690, minutes: 30, ticked: [] }, sctx({ members: four, filled }), false);
+  assert.match(later, /value="u2"[^]*?<span class="mini busy">沒空<\/span>/);
+  assert.equal(SCH.statusOf("x", new Set(), new Set(), null), "", "名單還在讀就不標沒空或沒填");
+  assert.match(SCH.scheduleHTML({ min: 660 }, sctx({ members: null }), false), /正在讀大家有空的時間/);
+  assert.match(SCH.scheduleHTML({ min: 660 }, sctx({ members: [], failed: true }), false), /讀不到名單與大家有空的時間/);
+});
+
+test("長度自己算：開始到結束；結束可以選到 24:00", () => {
+  assert.equal(SCH.lenText(30), "30 分鐘"); assert.equal(SCH.lenText(120), "2 小時"); assert.equal(SCH.lenText(90), "1 小時 30 分");
+  assert.deepEqual(SCH.endChoices(1350), [1380, 1410, 1440]);
+  HUI.setLang("en");
+  try { assert.equal(SCH.lenText(90), "1 h 30 min"); } finally { HUI.setLang("zh"); }
+});
+
+// 2026-11-27 Paul：月曆點一個日期直接跳出排會；週曆拖一段時間排會。
+test("★ 月曆點日期直接排會、週曆拖一段排會：能排會的人才有，過去的日子沒有", () => {
+  const ctx = can => ({ now: new Date("2026-11-26T04:00:00Z"), tz: TZ, canSchedule: can });
+  const month = HUI.calendarHTML([], ctx(true), { view: "month", at: "2026-11-26", mode: "mine" });
+  assert.match(month, /<div class="day today pick" data-act="cal-new" data-k="2026-11-26">/, "今天整格點得到");
+  assert.match(month, /<div class="day pick" data-act="cal-new" data-k="2026-11-27">/);
+  assert.match(month, /<div class="day">\s*<button type="button" class="dnum" data-act="cal-new" data-k="2026-11-25">25<\/button>/, "過去的日子整格不點，日期照舊打開那一天");
+  assert.match(month, /點一個日期就能排會/);
+  const view = HUI.calendarHTML([], ctx(false), { view: "month", at: "2026-11-26", mode: "mine" });
+  assert.doesNotMatch(view, /class="day[^"]*pick/); assert.doesNotMatch(view, /點一個日期就能排會/);
+  const week = HUI.calendarHTML([], ctx(true), { view: "week", at: "2026-11-26", mode: "mine" });
+  assert.match(week, /<div class="wcol today pick" data-k="2026-11-26">/); assert.match(week, /<div class="wcol" data-k="2026-11-24">/);
+  assert.match(week, /拖一段時間就能排會/);
+  const m = readFileSync("home/src/main.js", "utf8");
+  assert.match(m, /if \(act === "cal-new"\)[^]*?ctx\(\)\.canSchedule && k >= today[^]*?openSch\(k, m, 60\)/, "月曆點日期：不先勾人");
+  assert.match(m, /addEventListener\("pointerdown"[^]*?\.wcol\.pick\[data-k\]/);
+  assert.match(m, /addEventListener\("pointerup"[^]*?instantOf\(d\.k, s, S\.tz\)[^]*?openSch\(d\.k, s, minutes, \{ pre: true \}\)/, "放開就打開排會，過去的時間擋下來");
+  assert.match(m, /addEventListener\("pointercancel", endDrag\)/, "手機捲動不會誤開");
+});
+
+test("會議清單上面也有「記一場會議」（2026-11-27 Paul：首頁有、會議那一頁卻沒有很怪）；排不了會的人沒有", () => {
+  assert.match(F.meetingsListHTML(M, ME, ["Marketing Team"], null, PEOPLE, "", false), /<div class="actions"><a class="btn" href="#meetings\/new">記一場會議<\/a><\/div>/);
+  assert.doesNotMatch(F.meetingsListHTML(M, ME, [], null, PEOPLE, "", false), /href="#meetings\/new"/);
+});
+
 test("勾或取消出席的人，人數與送出鈕的數字跟著變（Paul 2026-10-28 回報數字不動）；打字不重畫", () => {
   const h = SCH.scheduleHTML({ min: 660, ticked: ["u1"] }, sctx(), false);
   assert.match(h, /<i id="sch-who-n">/, "人數那一行有 id，change 才改得到");
@@ -154,7 +210,10 @@ test("勾或取消出席的人，人數與送出鈕的數字跟著變（Paul 202
   const f = m.slice(m.indexOf("function onSchInput(e)"), m.indexOf("function schCount()"));
   assert.match(f, /t\.name === "sch-member"[\s\S]*schCount\(\); return;/, "勾人只改數字，不重畫");
   assert.match(f, /k === "q"[\s\S]*\.hidden = !ok/, "找名字只藏列，不重畫（游標不跳）");
-  assert.match(f, /e\.type === "change" && \(k === "min" \|\| k === "minutes" \|\| k === "scope"\)/, "只有換時間、長度、範圍才重畫");
+  assert.match(f, /k === "end" \|\| k === "min" \|\| k === "key"[\s\S]*if \(e\.type !== "change"\) return;[\s\S]*render\(\); return;/, "換日期、開始、結束才重畫");
+  assert.match(f, /k === "min"\) \{ d\.min = Number\(t\.value\); d\.minutes = Math\.max\(30, Math\.min\(d\.minutes, 1440 - d\.min\)\)/, "改開始時間長度不變");
+  assert.match(f, /k === "end"\) d\.minutes = Math\.max\(30, Number\(t\.value\) - d\.min\)/, "改結束時間長度跟著變");
+  assert.match(f, /e\.type === "change" && k === "scope"/, "換範圍也重畫");
   const c = m.slice(m.indexOf("function schCount()"), m.indexOf("function schCount()") + 400);
   assert.match(c, /sch-who-n/); assert.match(c, /T\("sch\.send"/); assert.match(c, /b\.disabled = !n/);
   assert.match(m, /document\.addEventListener\("input", onSchInput\)/); assert.match(m, /document\.addEventListener\("change", onSchInput\)/);

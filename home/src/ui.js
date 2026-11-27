@@ -372,11 +372,11 @@ export function homeHTML(items, ctx) {
   const top = linked ? `<section class="linked"><p class="mini">${T("home.linked")}</p>${itemCardHTML(linked, ctx, { full: true, hi: true })}</section>`
     : ctx.linkedMsg ? `<div class="wnote">${esc(ctx.linkedMsg)}</div>` : "";
   const wait = waitingList(items, ctx);
+  // 2026-11-27：「跟 Marketing 提需求」「記一場會議」兩顆鈕從這裡搬到側欄最上面的「新增」（shared/rail.js newMenuHTML），每一頁都按得到。
   return `<div class="home">
     <header class="hello"><div class="hello-t"><h1>${T("home.hi", { name: esc(ctx.name || "") })}</h1>
       <p class="mini">${T("home.today", { date: esc(dateLabel(dayKey(ctx.now, ctx.tz))), tz: esc(ctx.tz) })}</p></div>
-      <div class="hello-a">${ctx.canSchedule ? `<a class="btn sm" href="${esc(A("/admin/#meetings/new"))}">${T("home.logMt")}</a>` : ""}
-        <a class="btn sm${ctx.canSchedule ? " ghost" : ""}" href="${esc(A("/admin/#request"))}">${T("home.newRq")}</a></div></header>
+</header>
     ${top}
     <section class="block wait">
       <h2>${T("home.wait")}${wait.length ? ` <span class="count">${wait.length}</span>` : ""}</h2>
@@ -507,8 +507,11 @@ export function calendarHTML(items, ctx, cal) {
   else if (cal.view === "month") {
     body = `<div class="month">${heads}${monthKeys(cal.at).map(c => {
       const list = itemsOnDay(shown, c.key, ctx.tz), max = 3;
-      return `<div class="day${c.inMonth ? "" : " out"}${c.key === today ? " today" : ""}">
-        <button type="button" class="dnum" data-act="cal-day" data-k="${c.key}">${Number(c.key.slice(8))}</button>
+      // 2026-11-27 Paul：點一個日期直接跳出排會（以前要先到「日」再點一格，兩步）。能排會的人整格都點得到；
+      // 過去的日子、排不了會的人照舊打開那一天（main.js 的 cal-new 決定）。
+      const pick = ctx.canSchedule && c.key >= today;
+      return `<div class="day${c.inMonth ? "" : " out"}${c.key === today ? " today" : ""}${pick ? " pick" : ""}"${pick ? ` data-act="cal-new" data-k="${c.key}"` : ""}>
+        <button type="button" class="dnum" data-act="cal-new" data-k="${c.key}"${pick ? ` aria-label="${esc(T("sch.title") + " " + dateLabel(c.key))}"` : ""}>${Number(c.key.slice(8))}</button>
         ${list.slice(0, max).map(i => chipHTML(i, ctx, true)).join("")}
         ${list.length > max ? `<button type="button" class="more" data-act="cal-day" data-k="${c.key}">${T("cal.more", { n: list.length - max })}</button>` : ""}
       </div>`;
@@ -522,13 +525,14 @@ export function calendarHTML(items, ctx, cal) {
         const e = dayKey(i.end, ctx.tz) === k ? Math.max(minuteOfDay(i.end, ctx.tz), s + 20) : 24 * 60;
         return `<div class="slot" style="top:${s / 60 * H}px;height:${Math.max(18, (e - s) / 60 * H - 2)}px">${chipHTML(i, ctx, true)}</div>`;
       }).join("");
-      return `<div class="wcol${k === today ? " today" : ""}">${list}</div>`;
+      // 2026-11-27 Paul：週曆裡拖一段時間排會，像 Google 日曆（拖的那一段在 main.js 的 pointer 事件裡畫）。
+      return `<div class="wcol${k === today ? " today" : ""}${ctx.canSchedule && k >= today ? " pick" : ""}" data-k="${k}">${list}</div>`;
     }).join("");
     const whead = keys.map(k => `<div class="dow${k === today ? " today" : ""}"><button type="button" class="dnum" data-act="cal-day" data-k="${k}">${esc(dateLabel(k))}</button></div>`).join("");
     body = `<div class="week"><div class="whead"><div></div>${whead}</div>
       <div class="wscroll" id="wscroll"><div class="wgrid" style="height:${24 * H}px"><div class="hours">${hours}</div>${cols}</div></div></div>`;
   }
-  return `<div class="cal${cal.view === "day" ? " is-day" : ""}"><h1 class="caltitle">${T("cal.title")}</h1>${bar}<p class="mini">${T("cal.legend")}</p>${body}</div>`;
+  return `<div class="cal${cal.view === "day" ? " is-day" : ""}"><h1 class="caltitle">${T("cal.title")}</h1>${bar}<p class="mini">${T("cal.legend")}${ctx.canSchedule && cal.view !== "day" ? " " + T(cal.view === "week" ? "cal.pickWeek" : "cal.pickMonth") : ""}</p>${body}</div>`;
 }
 
 // 點開的那一場（行事曆與首頁都用）。

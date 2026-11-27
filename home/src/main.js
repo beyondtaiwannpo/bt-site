@@ -5,6 +5,7 @@
 //   /home/#calendar   行事曆：月、週、日，像 Google 日曆。點一場打開，回覆、看議程與會議紀錄。
 //                     點一個日期打開那一天（2026-11-26）：每半小時有幾個人有空（以前時間看板的團隊看板搬來這裡），
 //                     能排會的人點一格排一場會（schedule.js），排好 Google 那邊用 BT 主帳號開會、寄邀請。
+//                     2026-11-27：能排會的人在月曆點一個日期、在週曆拖一段時間，排會那一塊直接跳出來，不用先到「日」。
 //                     護照後台的「排會」連結帶 ?at=<時間>&title=<標題>#calendar：直接打開那一天、那個時間的排會。
 //   /home/#team=<team> 一個 team 的頁（2026-11-23）：側欄「我的工作區」點進來，那個 team 的專案、活動、申請表、資源。只看不改。
 // 信裡的連結是 /home/?meeting=<id>：那一場放在首頁最上面。
@@ -68,21 +69,44 @@ function dayData() {
 function ensureAvail() {
   if (S.avail !== undefined || S.role !== "cadre") return;
   S.avail = null;
-  D.loadAvail().then(a => { S.avail = a; }).catch(() => { S.avail = { failed: true }; }).then(() => { openPick(); render(); });
+  D.loadAvail().then(a => { S.avail = a; }).catch(() => { S.avail = { failed: true }; }).then(() => { preTick(); render(); });
+}
+// 排會那一塊要的那一天：每半小時誰有空、名單、誰填過時間。跟「日」的 dayData() 分開，因為排會可以從月曆、週曆打開，日期也改得了。
+function schData(key) {
+  const rows = FREE.dayRows(key, S.tz), a = S.avail;
+  if (!a) return { key, rows, free: new Map(), members: null, filled: null };
+  if (a.failed) return { key, rows, free: new Map(), members: [], filled: null, failed: true };
+  const r = FREE.dayFree(a.members, a.slots, a.weekSlots, a.weekMarks, key, S.tz);
+  return { key, rows: r.rows, free: r.free, members: a.members, filled: FREE.filledIds(a.members, a.slots, a.weekMarks) };
 }
 const scopes = () => SCH.scopesFor(S.senior, S.ws, SCH.teamsOf(S.avail && S.avail.members ? S.avail.members : []));
-// 打開排會：整段時間都有空、而且在現在 team 篩選裡的人先勾好。範圍先選篩選的那個 team（排得了的話）。
-function openSch(min, title) {
-  const d = S.day; if (!d || d.failed) return;
+// 打開排會。範圍先選「日」那一排 team 篩選的那個 team（排得了的話）。
+// pre：時間是點出來或拖出來的（「日」的一格、週曆拖的一段、護照後台的連結），整段時間都有空的人先勾好；
+//   從月曆點日期時間還沒選，誰都不先勾。名單還在讀的話，讀好再勾（preTick）。
+function openSch(key, min, minutes, opt) {
+  const o = opt || {};
   const sc = scopes(); if (!sc.length) return;
-  const shownIds = new Set(d.members.map(m => m.id));
-  S.sch = { min, minutes: 60, scope: sc.includes(S.cal.team) ? S.cal.team : sc[0], required: "1", title: title || "", agenda: "", message: "", doc: "",
-    ticked: SCH.preTicked(d.allFree, min, 60).filter(id => shownIds.has(id)), q: "", msg: "" };
+  S.sch = { key, min, minutes: Math.max(30, Math.min(minutes || 60, 1440 - min)), scope: sc.includes(S.cal.team) ? S.cal.team : sc[0], required: "1",
+    title: o.title || "", agenda: "", message: "", doc: "", ticked: [], q: "", msg: "", pre: !!o.pre };
+  preTick();
+}
+function preTick() {
+  const d = S.sch; if (!d || !d.pre || !S.avail || S.avail.failed) return;
+  d.pre = false;
+  const sd = schData(d.key);
+  // 在「日」那一頁有選一個 team 的話，只先勾那個 team 的人（其他人照樣勾得到）。
+  const shown = new Set((S.cal.view === "day" ? SCH.inTeam(S.avail.members, S.cal.team) : S.avail.members).map(m => m.id));
+  d.ticked = SCH.preTicked(sd.free, d.min, d.minutes).filter(id => shown.has(id));
 }
 function openPick() {
-  if (!S.pick || !S.avail || S.avail.failed || !ctx().canSchedule) return;
+  if (!S.pick || !ctx().canSchedule) return;
   const p = S.pick; S.pick = null;
-  S.day = dayData(); openSch(p.min, p.title);
+  openSch(S.cal.at, p.min, 60, { title: p.title, pre: true });
+}
+// 月曆點一個日期：今天的話從下一個半點開始，之後的日子早上九點，一小時。
+function defaultMin(key) {
+  if (key !== UI.dayKey(new Date(), S.tz)) return 9 * 60;
+  return Math.ceil((UI.minuteOfDay(new Date(), S.tz) + 1) / 30) * 30;
 }
 
 function render() {
@@ -97,14 +121,16 @@ function render() {
   if (S.role !== "cadre") { el.innerHTML = nav + UI.notCadreHTML(); return; }
   const c = ctx();
   const rme = railMe(), team = teamOf();
+  // 能排會的人一進行事曆就先讀大家有空的時間，點日期跳出排會的時候名單已經在了。
+  if (v === "calendar" && c.canSchedule) ensureAvail();
   if (v === "calendar" && S.cal.view === "day") { S.day = dayData(); S.cal.dayBody = DAY.dayBodyHTML(S.items, c, S.cal, S.day); }
   const body = v === "calendar" ? UI.calendarHTML(S.items, c, S.cal) : v === "team" ? UI.teamHTML(team, S.teams[team], rme, S.tz) : UI.homeHTML(S.items, c);
   const open = S.open ? S.items.find(i => i.id === S.open) : null;
   // 側欄：team 的頁不是 ITEMS 裡的一頁，用 "team:<team>" 告訴側欄現在在哪個 team（shared/rail.js teamRowsHTML）。
   const tab = v === "calendar" ? "calendar" : v === "team" ? "team:" + team : "home";
   RAIL.railBefore(el);
-  const sch = v === "calendar" && S.cal.view === "day" && S.sch && S.day && !S.day.failed
-    ? SCH.scheduleHTML(S.sch, { key: S.cal.at, rows: S.day.rows, free: S.day.allFree, members: S.day.all, scopes: scopes(), now: c.now }, S.busy) : "";
+  const sch = v === "calendar" && S.sch
+    ? SCH.scheduleHTML(S.sch, Object.assign(schData(S.sch.key), { scopes: scopes(), now: c.now, today: UI.dayKey(c.now, S.tz) }), S.busy) : "";
   el.innerHTML = RAIL.shellHTML(nav, RAIL.railHTML("home", tab, rme, {}, lang()), body, RAIL.areaTabsHTML("home", tab, rme, lang())) + (open ? UI.detailHTML(open, c) : "") + sch;
   RAIL.railAfter(el);
   if (v === "calendar" && S.cal.view === "week") {
@@ -202,21 +228,30 @@ function onClick(e) {
     S.sch = null;
     render(); return;
   }
-  // 點一個日期：打開那一天（2026-11-26 以前是跳到那一週）。
+  // 點一個日期：打開那一天（2026-11-26 以前是跳到那一週）。週曆上方的日期與月曆的「還有 n 個」照舊是這一個。
   if (act === "cal-day") { S.cal.at = el.dataset.k; S.cal.view = "day"; S.sch = null; ensureAvail(); render(); return; }
+  // 月曆點一個日期（2026-11-27）：能排會的人、還沒過去的日子，直接跳出排會；其他照舊打開那一天。
+  if (act === "cal-new") {
+    const k = el.dataset.k, today = UI.dayKey(new Date(), S.tz), m = defaultMin(k);
+    if (ctx().canSchedule && k >= today && m < 1440) { openSch(k, m, 60); render(); const f = document.getElementById("sch-title"); if (f) f.focus(); return; }
+    S.cal.at = k; S.cal.view = "day"; S.sch = null; ensureAvail(); render(); return;
+  }
+  // 排會那一塊裡「看這一天每半小時誰有空」：關掉排會，打開那一天。
+  if (act === "sch-day") { if (S.busy || !S.sch) return; S.cal.at = S.sch.key; S.cal.view = "day"; S.sch = null; ensureAvail(); render(); return; }
   if (act === "day-team") { S.cal.team = el.dataset.v || ""; render(); return; }
-  if (act === "day-pick") { if (!ctx().canSchedule) return; openSch(Number(el.dataset.m)); render(); return; }
+  if (act === "day-pick") { if (!ctx().canSchedule) return; openSch(S.cal.at, Number(el.dataset.m), 60, { pre: true }); render(); return; }
   if (act === "sch-close") { if (S.busy) return; S.sch = null; render(); return; }
   if (act === "sch-all" || act === "sch-none") {
     if (!S.sch) return;
-    const shown = S.day ? S.day.all.filter(m => SCH.matches(m, S.sch.q)).map(m => m.id) : [];
+    const shown = S.avail && S.avail.members ? S.avail.members.filter(m => SCH.matches(m, S.sch.q)).map(m => m.id) : [];
     S.sch.ticked = act === "sch-all" ? [...new Set(S.sch.ticked.concat(shown))] : [];
     render(); return;
   }
   if (act === "sch-send") { sendSch(); return; }
 }
 
-// 排會那一塊的欄位：打字的存進 S.sch 不重畫（游標不會跳）；開始時間、長度換了要重畫（誰有空的標會變）。
+// 排會那一塊的欄位：打字的存進 S.sch 不重畫（游標不會跳）；日期、開始、結束換了要重畫（誰有空的標會變）。
+// 改開始時間：長度不變，結束跟著動（跟 Google 日曆一樣）；改結束時間：長度跟著變。
 function onSchInput(e) {
   if (!S.sch) return;
   const t = e.target;
@@ -225,17 +260,25 @@ function onSchInput(e) {
     S.sch.ticked = [...on]; schCount(); return;
   }
   const k = t.dataset && t.dataset.sch; if (!k) return;
+  if (k === "end" || k === "min" || k === "key") {
+    if (e.type !== "change") return;
+    const d = S.sch;
+    if (k === "end") d.minutes = Math.max(30, Number(t.value) - d.min);
+    if (k === "min") { d.min = Number(t.value); d.minutes = Math.max(30, Math.min(d.minutes, 1440 - d.min)); }
+    if (k === "key") { if (!/^\d{4}-\d{2}-\d{2}$/.test(t.value)) return; d.key = t.value; }
+    d.msg = ""; render(); return;
+  }
   S.sch[k] = t.value;
   if (k === "q") {
     let any = false;
     for (const box of document.querySelectorAll('input[name="sch-member"]')) {
-      const m = S.day && S.day.all.find(x => x.id === box.value), ok = !!m && SCH.matches(m, t.value);
+      const m = S.avail && S.avail.members && S.avail.members.find(x => x.id === box.value), ok = !!m && SCH.matches(m, t.value);
       box.closest("label").hidden = !ok; any = any || ok;
     }
     const nb = document.getElementById("sch-nobody"); if (nb) nb.hidden = any;
     return;
   }
-  if (e.type === "change" && (k === "min" || k === "minutes" || k === "scope")) { S.sch.msg = ""; render(); }
+  if (e.type === "change" && k === "scope") { S.sch.msg = ""; render(); }
 }
 function schCount() {
   const n = S.sch ? S.sch.ticked.length : 0;
@@ -243,11 +286,12 @@ function schCount() {
   const b = document.getElementById("sch-send"); if (b && !S.busy) { b.textContent = T("sch.send", { n }); b.disabled = !n; }
 }
 async function sendSch() {
-  const d = S.sch; if (!d || S.busy || !S.day) return;
+  const d = S.sch; if (!d || S.busy) return;
   if (!(d.title || "").trim()) { d.msg = T("sch.needTitle"); render(); const f = document.getElementById("sch-title"); if (f) f.focus(); return; }
   if (!d.ticked.length) { d.msg = T("sch.needPeople"); render(); return; }
-  const row = S.day.rows.find(r => r.min === Number(d.min));
+  const row = FREE.dayRows(d.key, S.tz).find(r => r.min === Number(d.min));
   if (!row) return;
+  if (row.at.getTime() < Date.now()) { d.msg = T("sch.pastPick"); render(); return; }
   const start = row.at, end = new Date(start.getTime() + Number(d.minutes) * 60000);
   S.busy = true; d.msg = ""; render();
   try {
@@ -322,6 +366,16 @@ async function boot() {
       try { history.replaceState(null, "", location.pathname + (qp.toString() ? "?" + qp : "") + location.hash); } catch {}
     }
     if (S.cal.view === "day") ensureAvail();
+    openPick();
+    // 側欄「新增」→「排一場會」（2026-11-27）：/home/?schedule=1#calendar，打開行事曆、排會那一塊直接跳出來（今天，太晚了就明天早上九點）。
+    if (qp.get("schedule") && S.role === "cadre" && ctx().canSchedule) {
+      let k = UI.dayKey(new Date(), S.tz), m = defaultMin(k);
+      if (m >= 1440) { k = UI.addDaysKey(k, 1); m = 9 * 60; }
+      if (view() !== "calendar") history.replaceState(null, "", location.pathname + location.search + "#calendar");
+      openSch(k, m, 60);
+      qp.delete("schedule");
+      try { history.replaceState(null, "", location.pathname + (qp.toString() ? "?" + qp : "") + "#calendar"); } catch {}
+    }
     S.ready = true; render();
     openTeam();
     if (S.linked) { const n = document.getElementById("m-" + S.linked); if (n) n.scrollIntoView({ block: "start" }); }
@@ -333,6 +387,44 @@ async function boot() {
     UI.toast(T("err.load") + D.says(e, lang() === "zh"), true);
   }
 }
+
+// 週曆拖一段時間排會（2026-11-27，Paul：「drag from Wednesday, January 13, 12 to 2… just like how Google Calendar work」）。
+// 滑鼠：按下、拖、放開，拖的那一段畫一塊半透明的框（直接動 DOM，不重畫），放開就打開排會，那一段時間帶好。點一下沒拖是一小時。
+// 手機：手指拖是捲動畫面，所以只認點一下（一小時）；捲動的時候瀏覽器會送 pointercancel，不會誤開。
+// 一格半小時，一小時 44px（跟 ui.js 的週曆同一個數字）。過去的時間打不開，跳一句提示。
+let drag = null;
+const WEEK_H = 44;
+function minAt(col, y) { const r = col.getBoundingClientRect(); return Math.max(0, Math.min(1410, Math.floor((y - r.top) / WEEK_H * 2) * 30)); }
+function paintDrag() {
+  if (!drag) return;
+  const s = Math.min(drag.a, drag.b), e = Math.max(drag.a, drag.b) + 30;
+  if (!drag.box) { drag.box = document.createElement("div"); drag.box.className = "dragsel"; drag.box.setAttribute("aria-hidden", "true"); drag.col.appendChild(drag.box); }
+  drag.box.style.top = (s / 60 * WEEK_H) + "px"; drag.box.style.height = ((e - s) / 60 * WEEK_H - 2) + "px";
+  drag.box.textContent = UI.hhmm(s) + " – " + UI.hhmm(e);
+}
+function endDrag() { if (drag && drag.box) drag.box.remove(); drag = null; }
+document.addEventListener("pointerdown", e => {
+  if (e.button !== 0 || view() !== "calendar" || S.cal.view !== "week" || S.sch || S.open || !ctx().canSchedule) return;
+  const col = e.target.closest(".wgrid .wcol.pick[data-k]");
+  if (!col || e.target.closest(".slot")) return;
+  const m = minAt(col, e.clientY);
+  drag = { col, k: col.dataset.k, a: m, b: m, moved: false, touch: e.pointerType === "touch" };
+  if (!drag.touch) { e.preventDefault(); try { col.setPointerCapture(e.pointerId); } catch (x) { /* 舊瀏覽器 */ } paintDrag(); }
+});
+document.addEventListener("pointermove", e => {
+  if (!drag || drag.touch) return;
+  const m = minAt(drag.col, e.clientY);
+  if (m !== drag.b) { drag.b = m; drag.moved = true; paintDrag(); }
+});
+document.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const d = drag; endDrag();
+  const s = Math.min(d.a, d.b), minutes = d.moved || d.a !== d.b ? Math.max(d.a, d.b) + 30 - s : 60;
+  if (FREE.instantOf(d.k, s, S.tz).getTime() < Date.now()) { UI.toast(T("sch.pastPick"), true); return; }
+  openSch(d.k, s, minutes, { pre: true }); render();
+  const f = document.getElementById("sch-title"); if (f) f.focus({ preventScroll: true });
+});
+document.addEventListener("pointercancel", endDrag);
 
 document.addEventListener("click", onClick);
 document.addEventListener("input", onSchInput);

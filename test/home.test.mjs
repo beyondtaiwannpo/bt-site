@@ -3,6 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as UI from "../home/src/ui.js";
 import * as NAV from "../shared/nav.js";
+import * as RAIL from "../shared/rail.js";
+import { readFileSync } from "node:fs";
 UI.setLang("zh");
 
 test("時間照看的人的時區：芝加哥早上十點是台北半夜", () => {
@@ -146,11 +148,26 @@ test("★ 首頁：有配對才畫「我帶的 mentee」，一列一人、沒填
   assert.match(m, /My mentor|我的 mentor/); assert.doesNotMatch(m, /My mentees|我帶的 mentee/);
 });
 
-test("首頁：排得了會的人有一顆「記一場會議」連到後台那一頁，排不了的人沒有（2026-11-26）", () => {
-  const base = { me: ME, tz: "Asia/Taipei", now: new Date("2026-11-26T02:00:00Z"), name: "王平", people: [], ws: {} };
-  const yes = UI.homeHTML([], { ...base, canSchedule: true });
-  assert.match(yes, /<a class="btn sm" href="\/admin\/\?lang=zh#meetings\/new">記一場會議<\/a>/);
-  assert.match(yes, /href="\/admin\/\?lang=zh#request">跟 Marketing 提需求/, "原本那一顆還在");
-  const no = UI.homeHTML([], { ...base, canSchedule: false });
-  assert.doesNotMatch(no, /meetings\/new/); assert.match(no, /跟 Marketing 提需求/);
+// 2026-11-27 Paul：提需求「hanging on home… kind of weird」。首頁那兩顆鈕搬到每一頁側欄最上面的「新增」。
+test("側欄最上面的「新增」：提需求每一位幹部都有；記一場會議、排一場會只有排得了會的人有；學員沒有", () => {
+  const RAIL2 = RAIL;
+  const member = { role: "cadre", board: "member", team: "Curriculum Team", name: "a", ws: {} };
+  const dir = { ...member, ws: { "res:Curriculum Team": "edit" } };
+  const pres = { ...member, board: "president" };
+  const m = RAIL2.newMenuHTML("home", member, "zh");
+  assert.match(m, /<details class="rail-new"><summary><span aria-hidden="true">\+<\/span> 新增<\/summary>/);
+  assert.match(m, /href="\/admin\/\?lang=zh#request">跟 Marketing 提需求/); assert.doesNotMatch(m, /meetings\/new|schedule=1/);
+  for (const who of [dir, pres]) {
+    const h = RAIL2.newMenuHTML("home", who, "zh");
+    assert.match(h, /href="\/admin\/\?lang=zh#meetings\/new">記一場會議/);
+    assert.match(h, /href="\?lang=zh&amp;schedule=1#calendar">排一場會/, "首頁裡換網址重開，排會那一塊跳出來");
+  }
+  const inAdmin = RAIL2.newMenuHTML("forms", dir, "en");
+  assert.match(inAdmin, /href="#meetings\/new" data-act="tab" data-t="meetings\/new">Log a meeting/, "後台裡不重新載入");
+  assert.match(inAdmin, /href="\/home\/\?schedule=1&amp;lang=en#calendar">Schedule a meeting/);
+  assert.equal(RAIL2.newMenuHTML("home", { role: "student", ws: {} }, "zh"), "");
+  assert.match(RAIL2.railHTML("home", "home", member, {}, "zh"), /class="rail-new"/, "每一頁的側欄都有");
+  assert.doesNotMatch(UI.homeHTML([], { me: ME, tz: "Asia/Taipei", now: new Date("2026-11-26T02:00:00Z"), name: "王平", people: [], ws: {}, canSchedule: true }), /meetings\/new|#request"/);
+  const main = readFileSync("home/src/main.js", "utf8");
+  assert.match(main, /qp\.get\("schedule"\) && S\.role === "cadre" && ctx\(\)\.canSchedule/);
 });

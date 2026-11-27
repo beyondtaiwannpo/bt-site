@@ -98,7 +98,7 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     // 一頁都進不去的那一行整行不畫。
     for (const no of ["護照", "錢", "紀錄", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);
     assert.doesNotMatch(rail, /href="\/admin\/people\//, `${label}：一般幹部不該拿到人與權限的連結`);
-    assert.doesNotMatch(rail, /rail-item off|<details/, `${label}：不再有淡掉的行與折疊段`);
+    assert.doesNotMatch(rail, /rail-item off|<details(?! class="rail-new")/, `${label}：不再有淡掉的行與折疊段（最上面的「新增」是唯一的 details）`);
     assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>Associate・Curriculum Team/, `${label}：側欄上要寫名字、職級、team`);
     // 上方那一排分頁：只有看得到的頁；一般幹部在對外網站只有資源庫一頁，就不畫那一排。
     assert.equal(M.shellHTML("", rail, "B").includes("area-tabs"), false, `${label}：只有一頁就不畫分頁列`);

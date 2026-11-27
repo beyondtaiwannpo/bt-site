@@ -46,6 +46,11 @@ const RT = {
   lvViewTip:{ zh: "你沒被派進這個 team 的工作區，裡面的東西只能看", en: "You are not assigned to this team's workspace, so you can only look." },
   people:   { zh: "誰在這裡", en: "People here" },
   peopleT:  { zh: "這一區的成員：加人、改看／改／管、移出", en: "Who works here: add people, set View / Edit / Manage, remove" },
+  // 側欄最上面的「新增」（2026-11-27）
+  newBtn:   { zh: "新增", en: "New" },
+  newRq:    { zh: "跟 Marketing 提需求", en: "New Marketing request" },
+  newMt:    { zh: "記一場會議", en: "Log a meeting" },
+  newSch:   { zh: "排一場會", en: "Schedule a meeting" },
 };
 const BOARD = {
   member: { zh: "Associate", en: "Associate" }, adviser: { zh: "顧問", en: "Adviser" }, director: { zh: "Director", en: "Director" },
@@ -109,7 +114,10 @@ export const SECTIONS = [
 ];
 export const AREAS = [
   { key: "home",      sec: "me",   label: { zh: "首頁",     en: "Home" },       hint: { zh: "等你處理的事，照日期排", en: "Everything waiting for you, by date" } },
-  { key: "calendar",  sec: "me",   label: { zh: "行事曆",   en: "Calendar" },   hint: { zh: "會議、時間看板、會議範本", en: "Meetings, availability, templates" } },
+  { key: "calendar",  sec: "me",   label: { zh: "行事曆",   en: "Calendar" },   hint: { zh: "月、週、日，排會，時間看板", en: "Month, week, day; availability" } },
+  // 會議自己一行（2026-11-27 Paul：「take out meeting and template… into a separate category… home, calendar, meeting」）。
+  // 底下是會議與會議範本；「記一場會議」在會議那一頁標題旁那一顆，也在側欄最上面的「新增」裡。
+  { key: "meetings",  sec: "me",   label: { zh: "會議",     en: "Meetings" },   hint: { zh: "紀錄、記一場會議、範本", en: "Notes, log a meeting, templates" } },
   { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
   // 2026-12-26 Paul：工作區 → 專案 → 活動。這一行改叫「專案」，點下去是專案清單；活動、計畫與招募、各 team 在它底下。key 留 events（網址與測試都認它）。
   // 搜尋（2026-11-26 Paul：要找一份舊的紀錄得一場一場點開，大家就不用了）：會議紀錄、回饋表、內部表單、活動檢討一次找。
@@ -134,10 +142,10 @@ export const ITEMS = [
   // 我的（2026-11-14）：首頁是 /home/，等你處理的事都在那一頁（以前後台還有一頁「待辦」，兩頁一樣的事，合併了）。
   { group: "home",      key: "home",       area: "home",      who: "cadre",  bare: true, label: { zh: "首頁", en: "Home" } },
   { group: "home",      key: "calendar",   area: "calendar",  who: "cadre",  label: { zh: "行事曆", en: "Calendar" } },
-  { group: "forms",     key: "meetings",   area: "calendar",  who: "cadre",  label: { zh: "會議", en: "Meetings" } },
+  { group: "forms",     key: "meetings",   area: "meetings",  who: "cadre",  label: { zh: "會議", en: "Meetings" } },
   { group: "availability", key: "",        area: "calendar",  who: "cadre",  label: { zh: "時間看板", en: "Availability" } },
   // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
-  { group: "forms",     key: "mtemplates", area: "calendar",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "會議範本", en: "Templates" } },
+  { group: "forms",     key: "mtemplates", area: "meetings",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "會議範本", en: "Templates" } },
   { group: "passport",  key: "",           area: "mypassport", who: "cadre", label: { zh: "我的護照", en: "My passport" } },
   { group: "search",    key: "search",     area: "search",    who: "cadre",  bare: true, label: { zh: "搜尋", en: "Search" } },
   // 活動（2026-11-10 Paul：「application should live under events」）
@@ -293,6 +301,27 @@ function teamRowsHTML(group, tab, me, L) {
   }).join("");
 }
 
+// ── 側欄最上面的「新增」（2026-11-27）──────────────────────────────────────
+// Paul 2026-11-27：「I'm trying to put the marketing request somewhere… right now it's just hanging on home, which is kind of weird
+//   because people will be using that a lot. So design that for me」。最常做的幾件事收在每一頁側欄最上面同一顆鈕裡（像 Gmail 的「撰寫」），
+//   不管在哪一頁都一下就按得到，首頁就不用再掛那兩顆鈕。
+// 誰看得到哪一行跟原本那一頁一樣：提需求是每一位幹部；記會、排會是排得了會的人（Co-President、Senior Adviser、某個 team 是「改」以上，
+//   跟資料庫的 can_schedule 同一條）。原生 <details>，不用寫程式就開得了關得了。
+export const canSchedule = me => !!me && me.role === "cadre" && (senior(me) || canEditAny(me, "res:"));
+export function newMenuHTML(group, me, L) {
+  if (!me || me.role !== "cadre") return "";
+  const rq = itemOf("forms", "request");
+  const go = (h, t) => group === "forms" ? `href="#${esc(t)}" data-act="tab" data-t="${esc(t)}"` : `href="${esc(withLang(h, L))}"`;
+  const rows = [];
+  if (rq && canSee(rq, me)) rows.push(`<a class="rail-new-i" ${go("/admin/#request", "request")}>${esc(tx(RT.newRq, L))}</a>`);
+  if (canSchedule(me)) {
+    rows.push(`<a class="rail-new-i" ${go("/admin/#meetings/new", "meetings/new")}>${esc(tx(RT.newMt, L))}</a>`);
+    rows.push(`<a class="rail-new-i" href="${esc(group === "home" ? "?" + (L ? "lang=" + L + "&" : "") + "schedule=1#calendar" : withLang("/home/?schedule=1#calendar", L))}">${esc(tx(RT.newSch, L))}</a>`);
+  }
+  if (!rows.length) return "";
+  return `<details class="rail-new"><summary><span aria-hidden="true">+</span> ${esc(tx(RT.newBtn, L))}</summary><div class="rail-new-m">${rows.join("")}</div></details>`;
+}
+
 // ── 側欄 ──────────────────────────────────────────────────────────────
 // group 是現在在哪個資料夾，tab 是哪一頁，counts 是 { <item key>: 數字 }（有才顯示，一個東西的數字是它底下幾頁加起來）。
 const svg = d => `<svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -335,6 +364,7 @@ export function railHTML(group, tab, me, counts, L) {
     <div class="rail-me"><b>${esc(me && me.name || "")}</b>
       <span>${esc(boardName(me && me.board, L))}・${teams.length ? esc(teams.join(tx(RT.list, L))) : esc(tx(RT.noTeam, L))}</span></div>
     ${langSwitchHTML(L)}
+    ${newMenuHTML(group, me, L)}
     ${body}
   </nav>`;
 }
@@ -633,8 +663,9 @@ export const TOURS = [
 
   // ── 首頁（/home/）──
   { id: "home", page: "home:home", steps: [
-    { at: ".home .hello-a", t: { zh: "最常用的按鈕", en: "The buttons you use most" },
-      b: { zh: "「跟 Marketing 提需求」送一張需求單給 Marketing。可以記會議的人旁邊還有「記一場會議」，記下來的會之後在「搜尋」找得到。", en: "New Marketing request sends Marketing a request. If you can log meetings, Log a meeting sits next to it, and every meeting you log can be found later in Search." } },
+    // 2026-11-27：首頁那兩顆鈕搬到側欄最上面的「新增」（newMenuHTML）。
+    { at: [".rail-new", ".rail-burger"], t: { zh: "最常做的事在這裡", en: "The things you do most" },
+      b: { zh: "左邊最上面的「新增」每一頁都有：跟 Marketing 提需求；排得了會的人還有記一場會議、排一場會。記下來的會之後在「搜尋」找得到。", en: "New, at the top left, is on every page: send Marketing a request, and if you can schedule meetings, log a meeting or schedule one. Every meeting you log can be found later in Search." } },
     { at: ".home .block.wait", t: { zh: "等你處理", en: "Waiting for you" },
       b: { zh: "要你動手的事都在這一張清單：要回覆的會、要填的表單、等你審的報名、派給你的需求。照日期排，最急的在最上面，點一行就到那件事。", en: "Everything that needs you is in this one list: meetings to reply to, forms to fill in, sign-ups to review, requests assigned to you. Most urgent first; tap a row to go straight there." } },
     { at: ".home .wait + .block", t: { zh: "接下來", en: "Coming up" },
@@ -654,10 +685,11 @@ export const TOURS = [
       b: { zh: "「只看我的」只放邀了你的會、你排的會與活動。「整個 BT」連別人的會也放上來，排會之前先看會不會撞期。", en: "Just mine shows meetings you are invited to or organized, plus events. All of BT adds everyone else's meetings, so you can check for clashes before you schedule." } },
     { at: [".cal .month", ".cal .week"], t: { zh: "怎麼看", en: "Reading the calendar" },
       b: { zh: "實心是必到，框線是選擇參加，橘色是活動。點一個就打開，會議可以在裡面回覆會不會到。", en: "Solid is required, outlined is optional, orange is an event. Click one to open it; you can reply to a meeting from there." } },
-    { at: [".cal .month .day.today .dnum", ".cal .dnum"], t: { zh: "點一天，看誰有空", en: "Click a day to see who is free" },
-      b: { zh: "點日期打開那一天：每半小時一格，底色越深有空的人越多。可以排會的人在那裡點一格就能排會。", en: "Click a date to open that day: each half hour is shaded darker when more people are free. If you can schedule meetings, click a half hour there to set one up." } },
-    { at: AT_SUBS, t: { zh: "會議與時間看板", en: "Meetings and Availability" },
-      b: { zh: "「會議」列出記下來的每一場會與紀錄。「時間看板」填你什麼時候有空，行事曆的「日」就是照大家填的算。", en: "Meetings lists every logged meeting and its notes. Availability is where you fill in when you are free; the Day view counts from what everyone fills in there." } },
+    // 2026-11-27：能排會的人點日期（月）、拖一段（週）直接跳出排會；其他人點日期照舊打開那一天。
+    { at: [".cal .month .day.today .dnum", ".cal .wcol.today", ".cal .dnum"], t: { zh: "點日期排會", en: "Click a date to schedule" },
+      b: { zh: "排得了會的人在月曆點日期、在週曆拖一段時間，排會那一塊就跳出來，每個人後面標著那段時間有沒有空。其他人點日期打開那一天。", en: "If you can schedule, click a date in Month or drag across a time in Week to open the form; each person shows whether they are free then. Everyone else opens that day instead." } },
+    { at: AT_SUBS, t: { zh: "時間看板", en: "Availability" },
+      b: { zh: "「時間看板」填你什麼時候有空。排會時你名字後面的標、「日」的底色，都是照大家在這裡填的算。會議紀錄在側欄「會議」那一行。", en: "Availability is where you fill in when you are free. The marks next to your name when someone schedules, and the Day view's shading, both come from what everyone fills in there. Meeting notes are under Meetings in the menu." } },
   ] },
   { id: "calendar-day", page: "home:calendar", when: ".cal .dgrid", steps: [
     { at: ".cal .dchips", t: { zh: "只算一個 team", en: "Count one team" },
@@ -683,7 +715,7 @@ export const TOURS = [
     { at: [".sx-list", ".main .empty"], t: { zh: "結果", en: "Results" },
       b: { zh: "每一筆標出是哪一種、名稱、日期與提到的那一句，點名稱回到原本那一頁。你在原本那一頁讀不到的，這裡也不會出現。", en: "Each result shows its kind, title, date and the line that matched. Click the title to open the original. Anything you can't read on its own page won't show up here." } },
     { t: { zh: "會議記下來就找得到", en: "Logged meetings show up here" },
-      b: { zh: "在首頁按「記一場會議」記下來的會，都找得到。開完會把重點寫進紀錄，之後要找就不用一場一場點開。", en: "Every meeting logged with Log a meeting on Home can be found here. Write the key points into the notes, and nobody has to open meetings one by one later." } },
+      b: { zh: "用「記一場會議」（側欄最上面的「新增」或會議那一頁）記下來的會，都找得到。開完會把重點寫進紀錄，之後要找就不用一場一場點開。", en: "Every meeting logged with Log a meeting (under New at the top of the menu, or on the Meetings page) can be found here. Write the key points into the notes, and nobody has to open meetings one by one later." } },
     { at: "#sx-settings", t: { zh: "給 AI 讀哪些", en: "What the AI may read" },
       b: { zh: "只有 Co-President 看得到這一塊：勾哪幾種可以給 AI 讀。回饋表與活動檢討要先補隱私政策再打開。", en: "Only Co-Presidents see this: which kinds the AI may read. Feedback forms and event reviews stay off until the privacy policy covers them." } },
   ] },

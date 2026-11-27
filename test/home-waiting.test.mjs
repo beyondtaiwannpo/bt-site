@@ -91,9 +91,9 @@ test("首頁：讀不到（null）就當沒有，不會整頁壞掉", () => {
   assert.doesNotThrow(() => UI.homeHTML([], { ...base, w: null }));
 });
 
-test("首頁的樣子：跟 Marketing 提需求是一顆按鈕、等你處理、接下來、我的護照；「我要…」那一排拿掉了（都在側欄）", () => {
+test("首頁的樣子：等你處理、接下來、我的護照；「我要…」那一排拿掉了，提需求那一顆 2026-11-27 搬到側欄的「新增」", () => {
   const h = UI.homeHTML(items, { ...base, w: W });
-  assert.match(h, /<a class="btn sm" href="\/admin\/\?lang=zh#request">跟 Marketing 提需求<\/a>/);
+  assert.doesNotMatch(h, /#request"|meetings\/new/, "首頁不再掛提需求與記會議的鈕");
   assert.match(h, /<h2>等你處理 <span class="count">\d+<\/span><\/h2>/);
   assert.ok(h.indexOf("等你處理") < h.indexOf("接下來") && h.indexOf("接下來") < h.indexOf("我的護照"), "順序：等你處理、接下來、護照");
   assert.match(h, /蓋了 12 格，一共 33 格/);
@@ -104,10 +104,10 @@ test("首頁的樣子：跟 Marketing 提需求是一顆按鈕、等你處理、
   assert.ok(!evil.includes("<img src=x>"), "標題一律跳脫");
 });
 
-test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段；行事曆底下是行事曆、會議、時間看板、會議範本", () => {
+test("側欄：我的（首頁、行事曆、會議、我的護照）、BT、組織三段；行事曆底下是行事曆、時間看板，會議底下是會議、會議範本（2026-11-27 會議自己一行）", () => {
   // 2026-11-23：「我的」底下多一段「我的工作區」（ws），一個 team 一行，照人畫，不在 AREAS 裡（test/home-team.test.mjs）。
   assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws", "work", "org"]);
-  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "mypassport", "search", "events", "forms", "marketing", "website", "passports", "people", "records", "money", "venues"]);
+  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "meetings", "mypassport", "search", "events", "forms", "marketing", "website", "passports", "people", "records", "money", "venues"]);
   // 2026-12-26：專案那一行底下是專案、活動…；場地是整個 BT 的，自己一行。
   // 2026-11-26：「各 team」拿掉了，「計畫與招募」改叫「幹部招募」搬到「人與權限」底下（被派進申請工作區的人與 Co-President、Senior Adviser 才看得到）。
   assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events"]);
@@ -117,11 +117,13 @@ test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段
   assert.equal(RAIL.ITEMS.find(i => i.group === "forms" && i.key === "forms").label.en, "Recruitment"); assert.equal(RAIL.ITEMS.find(i => i.key === "teams"), undefined);
   assert.deepEqual(RAIL.visibleItems("venues", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["venues"]);
   const me = { role: "cadre", board: "member", team: "Curriculum Team", name: "a", ws: { "custom:meeting-templates": "edit" } };
-  assert.deepEqual(RAIL.visibleItems("calendar", me).map(i => i.label.zh), ["行事曆", "會議", "時間看板", "會議範本"]);
+  assert.deepEqual(RAIL.visibleItems("calendar", me).map(i => i.label.zh), ["行事曆", "時間看板"]);
+  assert.deepEqual(RAIL.visibleItems("meetings", me).map(i => i.label.zh), ["會議", "會議範本"]);
   const tabs = RAIL.areaTabsHTML("forms", "meetings", me, "zh");
-  assert.match(tabs, /href="\/home\/\?lang=zh#calendar">行事曆/);
   assert.match(tabs, /class="area-tab on" href="#meetings" data-act="tab" data-t="meetings"/);
-  assert.match(tabs, /href="\/availability\/\?lang=zh">時間看板/);
+  assert.match(tabs, /href="#mtemplates" data-act="tab" data-t="mtemplates">會議範本/);
+  assert.doesNotMatch(tabs, /時間看板/);
+  assert.match(RAIL.areaTabsHTML("home", "calendar", me, "zh"), /href="\/availability\/\?lang=zh">時間看板/);
   // 首頁那一頁上：首頁與行事曆是同一個資料夾，換 # 就好
   const h = RAIL.railHTML("home", "home", me, {}, "zh");
   assert.match(h, /class="rail-item rail-area on" href="#home" data-act="tab" data-t="home" aria-current="page"/);
@@ -129,7 +131,7 @@ test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段
   assert.ok(!RAIL.railHTML("home", "home", { role: "student", ws: {} }, {}, "zh").includes("rail-area"), "學員沒有側欄的任何一行");
   // 各 team（以前的待辦）2026-11-26 拿掉了；幹部招募掛在「人與權限」底下，頁面還是 /admin/ 那一個資料夾
   assert.equal(RAIL.ITEMS.find(i => i.group === "forms" && i.key === "forms").area, "people");
-  assert.ok(!RAIL.ITEMS.some(i => i.area === "todo" || i.area === "meetings"));
+  assert.ok(!RAIL.ITEMS.some(i => i.area === "todo"));
 });
 
 test("側欄的樣式在 shared/rail.css：九個後台資料夾與首頁都讀，admin.css 不再有一份", () => {

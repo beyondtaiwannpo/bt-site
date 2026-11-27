@@ -49,7 +49,7 @@ export const MINE = {
   "dayFull.6":        { zh: "星期六", en: "Saturday" },
   // 分頁與翻週
   "tab.toCal":        { zh: "看大家有空的時間、排會", en: "See who is free and schedule" },
-  "tab.toCalNote":    { zh: "以前的「團隊看板」搬到首頁的行事曆：點一天，看每半小時有幾個人有空，能排會的人點一格就排。這一頁填你自己的時間。", en: "The old Team board moved to the Calendar on Home: click a day to see how many people are free each half hour, and click a slot to schedule if you can. Fill in your own times here." },
+  "tab.toCalNote":    { zh: "以前的「團隊看板」搬到行事曆：切到「日」看每半小時有幾個人有空；能排會的人點一個日期就排，每個人後面標著有沒有空。這一頁填你自己的時間。", en: "The old Team board moved to the Calendar: switch to Day to see how many people are free each half hour. If you can schedule, click a date to set up a meeting, and each person shows whether they are free. Fill in your own times here." },
   "tab.mine":         { zh: "我的時間", en: "My time" },
   "tab.who":          { zh: "成員", en: "Members" },
   "week.prev":        { zh: "← 前一週", en: "← Previous week" },

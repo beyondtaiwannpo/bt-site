@@ -2369,6 +2369,7 @@ export function meetingMatches(m, q) {
 }
 // q：搜尋字（不重畫，main.js 只藏起對不上的列）。
 // 2026-11-26 Paul：「記一場會議」從這一頁搬走了（有人在這裡找不到），入口在首頁那一顆鈕，表單是下面的 meetingNewHTML()（#meetings/new）。
+// 2026-11-27 Paul：「log meeting is now at home, but I want it to be in meeting as well」。這一頁標題旁也一顆，連到同一頁 #meetings/new；排不了會的人沒有。
 export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy, q) {
   const now = new Date();
   const up = (meetings || []).filter(m => new Date(m.ends_at) >= now).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
@@ -2377,7 +2378,7 @@ export function meetingsListHTML(meetings, me, scopes, draft, people, msg, busy,
     return `<li data-mt-row data-id="${esc(m.id)}"${meetingMatches(m, q) ? "" : " hidden"}><div class="fhead"><b><a href="#meetings/${esc(m.id)}" data-act="mt-open" data-id="${esc(m.id)}">${esc(m.title)}</a></b> <span class="tag${m.required ? " open" : ""}">${T(m.required ? "mt.req1" : "mt.req0")}</span> <span class="mini">${esc(mtScope(m.scope))}</span></div>
       <div class="fmeta">${esc(mtWhen(m.starts_at))}・${esc(T("mt.people", { n: at.length, yes }))}${m.doc_url ? `・<a href="${esc(m.doc_url)}" target="_blank" rel="noopener">${T("mt.doc")}</a>` : ""}${me && at.some(a => a.user_id === me.id) ? `・<span class="tag${at.find(a => a.user_id === me.id).status === "accepted" ? " open" : ""}">${esc(T("mt.st." + at.find(a => a.user_id === me.id).status))}</span>` : ""}</div></li>`; };
   const all = (meetings || []).length;
-  return pageHead(T("mt.title"), T("mt.lede"))
+  return pageHead(T("mt.title"), T("mt.lede"), (scopes || []).length ? [{ href: "#meetings/new", label: T("mt.new"), primary: true }] : [])
     + msgHTML(msg)
     + (all > 3 ? `<label class="vn-find"><i>${T("mt.find")}</i><input type="search" id="mtl-q" value="${esc(q || "")}" placeholder="${esc(T("mt.findPh"))}" autocomplete="off"></label>` : "")
     + sectionHTML(`${T("mt.upcoming")}<span class="hint">${up.length}</span>`, up.length ? `<ul class="flist">${up.map(row).join("")}</ul>` : emptyHTML(T("mt.noneUp"), T("mt.noneUpHint")))

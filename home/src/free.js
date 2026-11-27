@@ -85,3 +85,14 @@ export function freeAny(free, start, minutes) {
 
 // 顏色深淺：有空的人數除以這一天最多的那一格，0 到 1。全部都沒人就 0。
 export function shade(n, max) { return max > 0 ? Math.round((n / max) * 100) / 100 : 0; }
+
+// 填過時間的人（2026-11-27，排會那一塊每一個人後面的標要分「沒空」與「沒填」）：有時區，而且平常的格子或某一週的例外至少動過一次。
+// 有 mark 但沒有格子也算填過（那一週他說自己完全沒空）。沒設時區算不出來，跟沒填一樣。
+export function filledIds(members, slots, weekMarks) {
+  const out = new Set();
+  for (const m of members || []) {
+    if (!m.tz) continue;
+    if (((slots && slots.get(m.id)) || new Set()).size || ((weekMarks && weekMarks.get(m.id)) || new Set()).size) out.add(m.id);
+  }
+  return out;
+}
