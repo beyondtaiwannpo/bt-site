@@ -162,3 +162,39 @@ a.rail-item.on:active{filter:brightness(1.15)}
 .fb-btn[disabled]{opacity:.55;cursor:default}
 @media (max-width:520px){.fb-fab{right:14px;bottom:14px}.fb-dlg{padding:18px 16px 14px}}
 @media print{.fb-fab{display:none}}
+
+/* 「怎麼用」導覽（2026-11-26，shared/rail.js 的 TOURS 與 mountTour）。按鈕疊在回報那一顆的正上方，兩顆都靠右，
+   不會蓋到左下角的 toast。寬螢幕是一顆膠囊（? 加「怎麼用」），手機上縮成一顆圓的 ?，跟下面那一顆置中對齊。
+   導覽本身：一層透明的擋板（點不到頁面）、一個挖空的框（外面一圈暗的）、一個盒子。減少動態效果時不做任何過場。 */
+.tour-fab{position:fixed;right:20px;bottom:84px;z-index:40;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 6px;
+  border-radius:20px;border:1px solid rgba(16,42,134,.3);cursor:pointer;background:var(--bt-cream);color:var(--bt-navy);
+  font-family:var(--body);font-size:14px;font-weight:600;box-shadow:0 6px 18px rgba(16,42,134,.18)}
+.tour-q{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;
+  background:var(--bt-navy);color:var(--bt-cream);font-family:var(--display);font-size:17px;font-weight:700;line-height:1}
+.tour-fab:hover{background:var(--bt-orange)}
+.tour-fab:focus-visible{outline:3px solid var(--bt-orange);outline-offset:3px}
+.tour-layer{position:fixed;inset:0;z-index:60}
+.tour-veil{position:absolute;inset:0}
+.tour-veil.dim{background:rgba(16,42,134,.45)}
+.tour-spot{position:fixed;border-radius:14px;box-shadow:0 0 0 3px var(--bt-orange),0 0 0 9999px rgba(16,42,134,.45);pointer-events:none;
+  transition:top var(--dur-2) var(--ease),left var(--dur-2) var(--ease),width var(--dur-2) var(--ease),height var(--dur-2) var(--ease)}
+.tour-box{position:fixed;width:min(360px,calc(100vw - 24px));padding:16px 18px 14px;border-radius:16px;border:1px solid rgba(16,42,134,.2);
+  background:var(--bt-cream);color:var(--bt-navy);font-family:var(--body);box-shadow:0 24px 60px rgba(16,42,134,.3)}
+.tour-count{margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(16,42,134,.72)}
+.tour-box h2{margin:0 0 6px;font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:.02em;line-height:1.2}
+.tour-b{margin:0;font-size:14.5px;line-height:1.55}
+.tour-foot{display:flex;align-items:center;gap:8px;margin-top:14px}
+.tour-sp{flex:1}
+.tour-btn{height:38px;padding:0 16px;border-radius:19px;border:1px solid var(--bt-navy);cursor:pointer;background:var(--bt-navy);color:var(--bt-cream);
+  font-family:var(--body);font-size:14px;font-weight:600}
+.tour-btn.quiet{background:none;color:var(--bt-navy);border-color:rgba(16,42,134,.3)}
+.tour-btn:focus-visible{outline:3px solid var(--bt-orange);outline-offset:2px}
+@media (max-width:720px){
+  .tour-fab{right:18px;bottom:76px;width:44px;height:44px;padding:0;justify-content:center;border-radius:50%}
+  .tour-fab .tour-q{width:32px;height:32px}
+  .tour-fab-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
+@media (max-width:520px){.tour-fab{right:18px;bottom:76px}}
+@media (max-width:559px){.tour-box{width:auto;right:12px}}
+@media (prefers-reduced-motion:reduce){.tour-spot{transition:none}}
+@media print{.tour-fab,.tour-layer{display:none}}

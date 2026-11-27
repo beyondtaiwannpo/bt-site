@@ -293,7 +293,8 @@ const svg = d => `<svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true" f
 export function railHTML(group, tab, me, counts, L) {
   // 右下角那一顆「回報問題、許願功能」掛在 body 上，不在這一段 HTML 裡：每一頁重畫的時候會把側欄整個換掉，
   // 表單要是畫在裡面，打到一半的字與選好的圖會跟著不見。只有幹部有（資料庫也只收幹部，send_feedback）。
-  if (typeof document !== "undefined" && me && me.role === "cadre") mountFeedback(L);
+  // 它上面那一顆「怎麼用」（導覽，2026-11-26）也一樣掛在 body 上，見這一支最下面的 TOURS。
+  if (typeof document !== "undefined" && me && me.role === "cadre") { mountFeedback(L); mountTour(group, tab, me, L); }
   const c = counts || {};
   const here = areaOf(group, tab);
   const row = a => {
@@ -577,4 +578,481 @@ function mountFeedback(L) {
     const imgs = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => /^image\//.test(f.type));
     if (imgs.length) { e.preventDefault(); fbAdd(imgs); }
   });
+}
+
+// ── 右下角第二顆：「怎麼用」導覽（2026-11-26）──────────────────────────
+// Paul（開車時口述，2026-11-26）：一位幹部說新平台很難學。與其寫一頁說明，不如每一頁都內建一段導覽：
+//   第一次登入自動跑；每一頁右下角有一顆「怎麼用」可以重看；一次框住頁面上的一塊並解釋它，有下一步、上一步、跳過；
+//   每頁 3 到 6 步；也講頁面之間怎麼接（例如活動的「結果」分頁跟紀錄是同一份資料）。
+//
+// **要改導覽的字、加一步、幫新的頁面加一段：只改下面的 TOURS。** README「後台導覽」那一節有一步一步的做法。
+//   一段導覽 = { id, page, when?, unless?, steps }。
+//     id      這一段的名字，記「看過了沒」用。改了 id，所有人會再自動看到一次。
+//     page    哪一頁："資料夾:分頁"，跟上面 ITEMS 的 group 與 key 一樣（例如 "people:roster"）。可以給一個陣列。
+//     when    （選填）頁面上有這個東西才用這一段。同一頁有兩種畫面時用（例如活動清單與一場活動的編輯頁都是 forms:events）。
+//     unless  （選填）頁面上有這個東西就不用這一段。
+//     steps   每一步 { at, t, b }：at 是要框住的東西（CSS 選擇器；給陣列就用第一個看得到的），
+//             t 是標題、b 是內文，都是 { zh, en }。沒有 at 的那一步放在畫面中間，不框東西。
+//   **頁面上找不到 at 的那一步會自動跳過，不會出錯。** 所以某些人看不到的按鈕也可以寫進來。
+//
+// 「看過了沒」記在這個瀏覽器的 localStorage（bt.tour.<使用者 id>），不改資料庫。換一台電腦、清掉瀏覽器資料，會再自動跑一次。
+// 在本機（localhost、127.0.0.1）不會自動跑，免得每一支端對端測試都被它擋住；網址加 ?tour=auto 才會。正式站照常。
+// 這一段只在瀏覽器裡跑，不 import 任何東西；純的部分（挑哪一段、哪幾步、盒子放哪）匯出給 test/tour.test.mjs。
+const TT = {
+  fab:    { zh: "怎麼用", en: "How to use" },
+  fabTip: { zh: "帶你看這一頁怎麼用", en: "Show me how this page works" },
+  label:  { zh: "導覽", en: "Guided tour" },
+  next:   { zh: "下一步", en: "Next" },
+  back:   { zh: "上一步", en: "Back" },
+  skip:   { zh: "跳過", en: "Skip" },
+  done:   { zh: "完成", en: "Done" },
+  count:  { zh: "第 {i} 步，共 {n} 步", en: "Step {i} of {n}" },
+};
+// 每一頁的左側欄（手機上收成「所有頁面」那一顆）與這一區的分頁，很多段都會指到，先取名字。
+const AT_MENU = [".rail .rail-area.here", ".rail .rail-area.on", ".rail-burger"];
+const AT_SUBS = [".rail .rail-subs", ".area-tabs", ".rail-burger"];
+const AT_HEAD = ".main .page-head";
+const AT_ACT  = ".main .page-head .actions";
+export const TOURS = [
+  // 第一次進後台：這一段接在那一頁自己的導覽前面跑一次。
+  { id: "welcome", page: "*", steps: [
+    { t: { zh: "歡迎來到後台", en: "Welcome to Backstage" },
+      b: { zh: "每一頁都有一段像這樣的短導覽，一分鐘就看完。按「下一步」「上一步」前後移動，按「跳過」或 Esc 就關掉。", en: "Every page has a short tour like this one; it takes about a minute. Next and Back move through it; Skip or the Escape key closes it." } },
+    { at: [".rail", ".rail-burger"], t: { zh: "所有頁面都在這裡", en: "Every page is in this menu" },
+      b: { zh: "你進得去的頁面都列在這裡，進不去的不會出現，所以每個人看到的選單不一樣。手機上它收成一顆「所有頁面」。", en: "Every page you can open is listed here. Pages you cannot open are left out, so each person sees a different menu. On a phone it folds into one All pages button." } },
+    { at: "#bt-tour .tour-fab", t: { zh: "想再看一次", en: "See it again" },
+      b: { zh: "在任何一頁按這一顆，就會帶你看你現在這一頁怎麼用。", en: "Press this on any page to see how the page you are on works." } },
+    { at: "#bt-fb .fb-fab", t: { zh: "東西壞了，或想要新功能", en: "Something broken, or a feature you want" },
+      b: { zh: "按這一顆寫下來，有截圖就一起貼上。會送到 Co-President 與 Senior Adviser 那裡。", en: "Press this and write it down, with a screenshot if you have one. It goes to the Co-Presidents and Senior Advisers." } },
+  ] },
+
+  // ── 專案 → 活動 ──
+  { id: "events", page: "forms:events", unless: "#ev-tabs", steps: [
+    { at: AT_HEAD, t: { zh: "每個 team 的活動", en: "Every team's events" },
+      b: { zh: "每個 team 在這裡做自己的活動：填內容、設報名表，好了就按「準備好了」。Co-President 發布之後，對外的首頁、/events/ 和那場活動自己的頁面就看得到。", en: "Each team makes its own events here: fill in the content, set up the sign-up form, then press Mark ready. Once a Co-President publishes it, it shows on the public home page, /events/ and its own page." } },
+    { at: "#ev-new", t: { zh: "開一場新的活動", en: "Start a new event" },
+      b: { zh: "選 team，填短網址與中英文名字。一開始是草稿，發布之前外面的人看不到。", en: "Pick the team, then a short web address and the names in both languages. It starts as a draft, so nobody outside sees it until it is published." } },
+    { at: [".main .ev-fbx", ".main > .chips"], t: { zh: "找一場活動", en: "Find an event" },
+      b: { zh: "打名字、代號或地點找。上面那一排可以只看已經上線的，或還在做的。", en: "Search by name, short address or place. The row of chips above shows only live events, or only the ones still in progress." } },
+    { at: ".main .section .flist", t: { zh: "點一場就能改", en: "Open one to edit it" },
+      b: { zh: "點活動名字進到它的編輯頁。名字旁邊的小標籤寫著它是草稿還是已經上線。", en: "Click an event's name to open its editor. The small tag next to the name says whether it is a draft or live." } },
+    { at: "#todo", t: { zh: "還沒寄出去的信", en: "Emails not sent yet" },
+      b: { zh: "報名的狀態一改，就會排一封信給那個人。信先停在這裡，按「現在寄出去」才真的寄。", en: "Each time an applicant's status changes, an email to them is queued. The emails wait here until someone presses Send now." } },
+    { at: ".main .ev-recline", t: { zh: "比較舊的活動在紀錄裡", en: "Older events live in Records" },
+      b: { zh: "網站還沒做好之前辦的活動只在「紀錄」裡，出席與回饋也在那裡。按這一行過去看。", en: "Events from before the site exist only in Records, with their attendance and feedback. This line takes you there." } },
+  ] },
+  { id: "event-editor", page: "forms:events", when: "#ev-tabs", steps: [
+    { at: "#ev-state", t: { zh: "這場活動現在在哪一步", en: "Where this event stands" },
+      b: { zh: "草稿的意思是外面還看不到。右邊那一顆按鈕就是下一步要做的事。", en: "Draft means nobody outside can see it yet. The button on the right is the next thing to do." } },
+    { at: "#ev-tabs", t: { zh: "六個分頁", en: "Six tabs" },
+      b: { zh: "一場活動的東西分成六塊：內容、照片、講者、表單、成果、設定。換分頁不會弄丟你打到一半的字。", en: "An event is split into six tabs: Details, Photos, Speakers, Forms, Results and Settings. Switching tabs keeps what you have typed." } },
+    { at: '#ev-tabs [data-tab="forms"]', t: { zh: "報名表與回饋表", en: "Sign-up and feedback forms" },
+      b: { zh: "這場活動的報名表和活動後的回饋表都在這個分頁開。", en: "This event's sign-up form and its after-event feedback form are both made in this tab." } },
+    { at: '#ev-tabs [data-tab="results"]', t: { zh: "活動結束之後", en: "After the event" },
+      b: { zh: "出席和回饋在這裡看。這些數字來自「紀錄」，跟紀錄那一頁是同一份資料，不用登兩次。", en: "Attendance and feedback show up here. The numbers come from Records, so this tab and the Records page show the same data; nothing is entered twice." } },
+    { at: '#ev-tabs [data-tab="settings"]', t: { zh: "上線與其他設定", en: "Going live, and the rest" },
+      b: { zh: "內容好了就在這裡按「準備好了」，Co-President 再發布。請 Marketing 做貼文、這場活動屬於哪個專案、誰能改它，也都在這裡。", en: "When the content is done, press Mark ready here and a Co-President publishes it. Asking Marketing for a post, which project the event belongs to and who can edit it are here too." } },
+    { at: ".main .back", t: { zh: "回到活動清單", en: "Back to the list" },
+      b: { zh: "按這裡回到所有活動。", en: "This takes you back to all events." } },
+  ] },
+  { id: "projects", page: "forms:projects", steps: [
+    { at: AT_HEAD, t: { zh: "專案把活動收在一起", en: "Projects group events together" },
+      b: { zh: "一個專案底下可以有好幾場活動和報名表。例如 Curriculum 的「Winter Camp 2027」底下有說明會、營隊本身和行前會。", en: "A project holds several events and sign-up forms. For example, Curriculum's Winter Camp 2027 holds the info session, the camp itself and the pre-camp meeting." } },
+    { at: "#pj-new", t: { zh: "開一個專案", en: "Create a project" },
+      b: { zh: "選 team，填短網址與中英文名字。", en: "Pick the team, then a short web address and the names in both languages." } },
+    { at: ".main .section .flist", t: { zh: "一個 team 一塊", en: "One block per team" },
+      b: { zh: "點一個專案，看它底下有哪幾場活動與表單。", en: "Click a project to see the events and forms inside it." } },
+    { at: AT_SUBS, t: { zh: "專案和活動怎麼接", en: "How projects and events connect" },
+      b: { zh: "旁邊就是「活動」。每一場活動在自己的「設定」分頁選它屬於哪個專案。", en: "Events is right next to this page. Each event picks its project in its own Settings tab." } },
+  ] },
+
+  // ── 人與權限 ──
+  { id: "roster", page: "people:roster", steps: [
+    { at: AT_HEAD, t: { zh: "這一屆的幹部", en: "This year's team" },
+      b: { zh: "職級決定他是誰，工作區決定他能動什麼。team 只是一個標籤，不會開任何權限。", en: "Rank says who someone is; workspaces say what they can change. The team is only a label and opens nothing by itself." } },
+    { at: "#roster .fbx", t: { zh: "找一個人", en: "Find someone" },
+      b: { zh: "打名字找。「篩選」可以換成別的屆別；網站上線前的幹部沒有帳號，選「歷屆全部」才看得到。", en: "Search by name. Filters switch to another year; cadres from before the site have no account and show up under All terms." } },
+    { at: "#roster table", t: { zh: "一個人一列", en: "One row per person" },
+      b: { zh: "名字、職級、這一屆的職位、被派進哪幾個工作區。", en: "Name, rank, position this year and the workspaces they are assigned to." } },
+    { at: AT_ACT, t: { zh: "補以前的人", en: "Add someone from before" },
+      b: { zh: "「加一筆過去的紀錄」是給以前當過幹部、但沒有帳號的人用的。", en: "Add a past record is for people who were on the team before but never had an account." } },
+    { at: ".main > .note", t: { zh: "每一個改動都有紀錄", en: "Every change is logged" },
+      b: { zh: "誰改了什麼都寫在「誰改了什麼」那一頁。把人升成 Co-President 等於把整個後台交給他，包括把你降級。", en: "Every change is written to the Change log. Promoting someone to Co-President hands them the whole Backstage, including the power to demote you." } },
+    { at: AT_SUBS, t: { zh: "要開權限，去工作區", en: "To give access, use Workspaces" },
+      b: { zh: "要讓一個人處理某個 team 的申請或資源，在「工作區」那一頁把他派進去，不是在這一頁改。", en: "To let someone handle a team's applications or resources, assign them on the Workspaces page, not here." } },
+  ] },
+  { id: "invites", page: "people:invites", steps: [
+    { at: AT_HEAD, t: { zh: "邀請新的人", en: "Invite new people" },
+      b: { zh: "打 email、選他會是什麼身分，按一次信就寄出去。對方點信裡的連結登入就好，不用打碼。", en: "Type an email, choose what they will be, press once and the email goes out. They click the link and sign in; there is no code to type." } },
+    { at: "#invite-fold", t: { zh: "邀請一個人", en: "Invite someone" },
+      b: { zh: "填 email、職級、team、哪一屆和名字。這些會變成他進來之後的身分與這一屆的職位。", en: "Fill in the email, rank, team, year and name. They become the person's role and this year's position once they join." } },
+    { at: "#invites", t: { zh: "已經邀請的人", en: "People invited" },
+      b: { zh: "還沒進來的人在這裡。信過期或寄丟了，按「重寄（換新碼）」；寄錯人就按「撤銷」。", en: "People who have not joined yet are listed here. If the email expired or got lost, press Resend (new code); if it went to the wrong person, press Revoke." } },
+    { at: "#batch", t: { zh: "一組碼給一群人", en: "One code for a group" },
+      b: { zh: "很少用到。一個一個邀請請用上面那一格。", en: "Rarely needed. To invite people one by one, use the form above." } },
+    { at: AT_SUBS, t: { zh: "進來之後在名單上", en: "After they join" },
+      b: { zh: "對方登入之後就會出現在「幹部名單」上。", en: "Once they sign in, they show up on the Roster." } },
+  ] },
+  { id: "recruitment", page: "forms:forms", steps: [
+    { at: AT_HEAD, t: { zh: "招募新幹部", en: "Recruiting new team members" },
+      b: { zh: "這裡放招募幹部的申請表。活動和計畫的報名表不在這裡，在那一場活動自己的頁面。", en: "Application forms for recruiting team members live here. Sign-up forms for events and programmes live on that event's own page." } },
+    { at: AT_ACT, t: { zh: "開一份招募表", en: "Start a recruitment form" },
+      b: { zh: "按這裡開一份新的招募表，題目和開放時間在表單裡設定。", en: "Press this to start a new recruitment form; the questions and dates are set inside the form." } },
+    { at: ".main .section .flist", t: { zh: "看申請、改表單", en: "Review applications, edit the form" },
+      b: { zh: "每一份表單都有「看收到的申請」和「改這份表單」。在這裡錄取一個人，系統會一起寄邀請信給他，他登入之後就在幹部名單上。", en: "Each form has View applications and Edit form. Accepting someone here also emails them an invite, and once they sign in they are on the Roster." } },
+    { at: ".main .mp-links", t: { zh: "誰在處理申請", en: "Who works on applications" },
+      b: { zh: "點這裡看誰被派進「申請」這個工作區，也就是誰讀得到申請。", en: "Press this to see who is assigned to the Applications workspace, which is who can read the applications." } },
+  ] },
+
+  // ── 紀錄 ──
+  { id: "records", page: "records:overview", steps: [
+    { at: AT_HEAD, t: { zh: "BT 辦過的每一場活動", en: "Every event BT has run" },
+      b: { zh: "一場活動四個數字，加一句「下一次我們改什麼」。網站上線前的活動也在這裡。", en: "Four numbers per event, plus one line on what to change next time. Events from before the site are here too." } },
+    { at: AT_ACT, t: { zh: "補一場舊活動", en: "Add an old event" },
+      b: { zh: "以前辦過、這裡還沒有的，按「加一場舊活動」補上。", en: "For an event BT ran before that is not here yet, press Add a past event." } },
+    { at: ".main .section", t: { zh: "一屆一張表", en: "One table per year" },
+      b: { zh: "點一場活動看細節：誰來了、回饋怎麼說。活動編輯頁的「成果」分頁讀的就是這一份。", en: "Open an event for the details: who came and what the feedback said. An event editor's Results tab reads this same data." } },
+    { at: AT_SUBS, t: { zh: "人與年度比較", en: "People, and year by year" },
+      b: { zh: "「人」是每一個來過 BT 的人，「年度比較」把每一屆排在一起看趨勢。", en: "People lists everyone who has been part of BT; Year by year lines the terms up so you can see the trend." } },
+  ] },
+  { id: "records-people", page: "records:people", steps: [
+    { at: AT_HEAD, t: { zh: "每一個來過 BT 的人", en: "Everyone who has been part of BT" },
+      b: { zh: "學員、mentee、幹部、校友、來賓都在這裡。點一個人看他的時間軸。", en: "Students, mentees, cadres, alumni and guests are all here. Open a person to see their timeline." } },
+    { at: ".main .ptabs", t: { zh: "三個分頁", en: "Three tabs" },
+      b: { zh: "名錄、可能重複、加一個人。同名不會自動合併，只有 email 一樣才算同一個人；同名的排在「可能重複」等人看。", en: "Directory, Possible duplicates and Add a person. Same names are not merged automatically; only a matching email counts as the same person, and same-name pairs wait under Possible duplicates." } },
+    { at: "#rc-pfind", t: { zh: "找人", en: "Find people" },
+      b: { zh: "打名字找，或用「篩選」挑出一群人，例如某一年的學員。", en: "Search by name, or use Filters to pick out a group, such as one year's students." } },
+    { at: ".main .rc-dirbar", t: { zh: "同一個人出現兩次", en: "Same person twice" },
+      b: { zh: "按「合併兩個人」把兩筆併成一筆，兩邊的活動紀錄都會留著。", en: "Merge people joins two entries into one and keeps the event history from both." } },
+  ] },
+  { id: "records-yearly", page: "records:yearly", steps: [
+    { at: AT_HEAD, t: { zh: "一年一年比", en: "Year by year" },
+      b: { zh: "每一屆、每一種活動一列。看的是趨勢，不是目標。", en: "One row per term and kind of event. Read it for the trend, not as a target." } },
+    { at: ".main .card", t: { zh: "挑你要比的", en: "Choose what to compare" },
+      b: { zh: "用這幾格挑屆別、活動種類、team。", en: "Use these boxes to pick the terms, the kinds of event and the team." } },
+    { at: ".main .section", t: { zh: "兩張表", en: "Two tables" },
+      b: { zh: "第一張照屆別排，第二張把同一種活動排在一起，一屆一欄，看哪一種變好了。", en: "The first is by term; the second lines up each kind of event across terms, one column per term, so you can see which got better." } },
+    { at: AT_ACT, t: { zh: "帶走數字", en: "Take the numbers with you" },
+      b: { zh: "「下載 CSV」可以用 Excel 或 Google 試算表打開。", en: "Download CSV opens in Excel or Google Sheets." } },
+  ] },
+
+  // ── 對外網站 ──
+  { id: "site-events", page: "site:events", steps: [
+    { at: AT_HEAD, t: { zh: "對外網站上的活動", en: "Events on the public site" },
+      b: { zh: "這一頁是對外的 /events/ 現在有哪些。上架與下架在那一場活動自己的頁面裡，由 Co-President 按。", en: "This page shows what the public /events/ page has right now. Co-Presidents publish and unpublish from each event's own page." } },
+    { at: ".main .section", t: { zh: "上線、等發布、草稿", en: "Live, waiting, drafts" },
+      b: { zh: "team 按了「準備好了」的活動會排在「等上架」那一塊，點進去就能發布。", en: "Events a team has marked ready wait in the Waiting to be published block; open one to publish it." } },
+    { at: AT_SUBS, t: { zh: "網站的其他部分", en: "The rest of the site" },
+      b: { zh: "資源庫、團隊頁、校友故事、系統寄的信，都在這一區改。", en: "Resources, the team page, alumni stories and the emails the system sends are all edited in this section." } },
+  ] },
+  { id: "site-res", page: "site:res", steps: [
+    { at: AT_HEAD, t: { zh: "資源庫", en: "Resources" },
+      b: { zh: "BT 做的免費資源，放在對外的 /resources/。這裡放的是一條連結，檔案本身留在 Google Drive 或 YouTube。", en: "Free resources BT has made, shown on the public /resources/ page. Each entry is a link; the file itself stays in Google Drive or YouTube." } },
+    { at: AT_ACT, t: { zh: "加一個資源", en: "Add a resource" },
+      b: { zh: "貼上連結、寫名字和一句說明，選它放在哪一個大標底下。", en: "Paste the link, add a name and a line about it, and choose which section it goes under." } },
+    { at: ".main .mp-links", t: { zh: "每個 team 自己的資源", en: "Each team's resources" },
+      b: { zh: "看每個 team 誰改得了自己的資源。", en: "See who on each team can edit that team's resources." } },
+  ] },
+  { id: "site-team", page: "site:team", steps: [
+    { at: AT_HEAD, t: { zh: "對外的團隊頁", en: "The public team page" },
+      b: { zh: "決定誰出現在對外的 /team/ 上。幹部要先在「設定」自己打勾，再由你一個一個核可。未滿 18 歲的一律不核可，系統沒有生日欄位，只有你擋得住。", en: "Decide who appears on the public /team/ page. Cadres opt in under Settings first, then you approve each one. Never approve anyone under 18: there is no birthday field, so you are the only check." } },
+    { at: "#past-teams", t: { zh: "前幾屆", en: "Past years" },
+      b: { zh: "以前每一屆的整份名單，只有名字與職位、沒有照片。一屆一個開關，預設是關的；打開之前先把未滿 18 歲的人藏起來。只有 Co-President 動得了。", en: "Each past year's whole roster, names and titles only, no photos. Each year has its own switch, off by default; before turning one on, hide anyone under 18. Only a Co-President can change these." } },
+    { at: AT_SUBS, t: { zh: "名單從哪裡來", en: "Where the names come from" },
+      b: { zh: "這裡的人是「人與權限」裡每一屆的職位，不用另外打一份。", en: "These names come from each year's positions under Internal, so there is no second list to type." } },
+  ] },
+  { id: "site-stories", page: "site:stories", steps: [
+    { at: AT_HEAD, t: { zh: "校友故事", en: "Alumni stories" },
+      b: { zh: "決定誰出現在對外的 /alumni/ 航線圖上。故事是校友自己在「設定」寫的，也是他自己勾同意公開。", en: "Decide who appears on the public /alumni/ route map. Alumni write their own story in Settings and tick their own consent to publish it." } },
+    { at: [".main .section .note", ".main .section"], t: { zh: "核可之前看四件事", en: "Four checks before approving" },
+      b: { zh: "滿 18 歲了嗎、真的是 BT 校友嗎、這段字能用 BT 的名義放出去嗎、他說在 BT 做過的事是真的嗎。核可之後他再改字，會自動撤下來回到這裡。", en: "Are they 18 or older, are they really BT alumni, can this text go out under BT's name, and did they really do what they say? If they edit the story after approval, it comes down automatically and returns to this list." } },
+    { at: AT_SUBS, t: { zh: "網站的其他部分", en: "The rest of the site" },
+      b: { zh: "活動、資源庫、團隊頁、系統寄的信，都在這一區。", en: "Events, resources, the team page and the system emails are all in this section." } },
+  ] },
+  { id: "site-mail", page: "site:mail", steps: [
+    { at: AT_HEAD, t: { zh: "系統寄的信", en: "Emails the system sends" },
+      b: { zh: "申請、邀請、Marketing 需求單、會議這幾類信的文字都在這裡改。只有 Co-President 與 Senior Adviser 改得動。", en: "The wording of the application, invite, Marketing request and meeting emails is edited here. Only Co-Presidents and Senior Advisers can change it." } },
+    { at: ".main .section .flist", t: { zh: "一封信一列", en: "One row per email" },
+      b: { zh: "點一封打開，中英文各有一份。改完存起來，下一封寄出去的就是新的字。", en: "Open an email to edit it; each has a Chinese and an English version. The next one sent uses your new wording." } },
+    { at: AT_SUBS, t: { zh: "網站的其他部分", en: "The rest of the site" },
+      b: { zh: "活動、資源庫、團隊頁、校友故事，都在這一區。", en: "Events, resources, the team page and alumni stories are all in this section." } },
+  ] },
+
+  // ── 護照 ──
+  { id: "passports-cadre", page: "passports:cadre", steps: [
+    { at: AT_HEAD, t: { zh: "幹部護照", en: "The cadre passport" },
+      b: { zh: "33 格的題目與說明、每個月右上角的時刻都在這裡改。改完幹部重新整理護照就看得到。", en: "Edit the 33 boxes and each month's time in the corner here. Cadres see the change when they refresh their passport." } },
+    { at: ".main .jump", t: { zh: "跳到某個月", en: "Jump to a month" },
+      b: { zh: "一個月一塊，點月份直接跳過去。", en: "One block per month; press a month to jump to it." } },
+    { at: ".main .addmonth", t: { zh: "加一個月", en: "Add a month" },
+      b: { zh: "選一個月，按「加進護照」。", en: "Pick a month and press Add to passport." } },
+    { at: ".main .section .flist", t: { zh: "每一格", en: "Each box" },
+      b: { zh: "點一格改題目和說明。不想讓幹部看到的月份可以先藏起來。", en: "Open a box to change its title and description. A month can stay hidden until you want cadres to see it." } },
+    { at: AT_SUBS, t: { zh: "城市與實習護照", en: "Cities, and the intern passport" },
+      b: { zh: "入境章抽得到的城市、實習護照與它的蛇梯棋，在旁邊的分頁。", en: "The cities the entry stamp can draw, the intern passport and its game board are in the tabs next to this one." } },
+  ] },
+  { id: "passports-cities", page: "passports:cities", steps: [
+    { at: AT_HEAD, t: { zh: "入境章的城市", en: "Entry-stamp cities" },
+      b: { zh: "幹部蓋入境章的時候，會從這裡的城市抽一個。", en: "When a cadre gets an entry stamp, it draws one of the cities listed here." } },
+    { at: ".main .section", t: { zh: "城市清單", en: "The list of cities" },
+      b: { zh: "可以加城市、改名字。有人抽過的城市刪不掉，只能停用；停用的不會再被新的入境章抽到，已經蓋好的章不變。", en: "Add a city or rename one. A city someone has drawn cannot be deleted, only disabled; a disabled city is not drawn for new stamps, and existing stamps stay." } },
+    { at: AT_SUBS, t: { zh: "回到護照", en: "Back to the passport" },
+      b: { zh: "護照的 33 格在「幹部護照」那一頁。", en: "The 33 boxes are on the Cadre passport page." } },
+  ] },
+  { id: "passports-interns", page: "passports:interns", steps: [
+    { at: AT_HEAD, t: { zh: "實習護照", en: "The intern passport" },
+      b: { zh: "實習生自己的護照。這一頁改屆別、分組和每一格要做的事。", en: "The interns' own passport. Set the terms, the groups and what each box asks for on this page." } },
+    { at: "#terms", t: { zh: "屆別", en: "Terms" },
+      b: { zh: "一期實習一個屆別，新的一期按「開新的一屆」。", en: "One term per round of internships; press New term to start the next one." } },
+    { at: "#groups", t: { zh: "分組", en: "Groups" },
+      b: { zh: "一組一頁，實習生只看得到自己那一組。", en: "Each group gets its own page, and interns only see their own group." } },
+    { at: "#tasks", t: { zh: "每一格", en: "The boxes" },
+      b: { zh: "照階段分好，點一格改它。「看它在實習護照上長什麼樣」可以看實習生看到的樣子。", en: "Grouped by stage; open a box to change it. See it in the intern passport shows exactly what interns see." } },
+    { at: AT_SUBS, t: { zh: "蛇梯棋", en: "The game board" },
+      b: { zh: "實習生蓋一個章拿一次擲骰子，棋盤在「實習的蛇梯棋」那一頁改。", en: "Interns earn one roll per stamp; the board itself is edited on the Intern game board page." } },
+  ] },
+  { id: "passports-board", page: "passports:board", steps: [
+    { at: AT_HEAD, t: { zh: "實習的蛇梯棋", en: "The intern game board" },
+      b: { zh: "實習生蓋一個章拿一張票，擲骰子走棋。", en: "Interns earn one roll per stamp and move along the board." } },
+    { at: ".main .section", t: { zh: "點一格就能改", en: "Click a square to change it" },
+      b: { zh: "每一格可以是梯子、蛇或任務格，改完按「存起來」。最下面有開關，決定實習生看不看得到棋盤。", en: "Each square can be a ladder, a snake or a task square; press Save when done. The switch at the bottom decides whether interns see the board." } },
+    { at: AT_SUBS, t: { zh: "章從哪裡來", en: "Where the stamps come from" },
+      b: { zh: "實習生要做的事在「實習護照」那一頁。", en: "What interns need to do is set on the Intern passport page." } },
+  ] },
+
+  // ── 錢 ──
+  { id: "money", page: "finance:overview", steps: [
+    { at: AT_HEAD, t: { zh: "BT 的錢", en: "BT's money" },
+      b: { zh: "現在有多少錢、這一屆進來多少出去多少。轉帳只是搬家，不算收入也不算支出。", en: "How much there is now, and what came in and went out this term. Transfers only move money, so they count as neither income nor expense." } },
+    { at: [".main .section", ".main .empty"], t: { zh: "數字從哪裡來", en: "Where the numbers come from" },
+      b: { zh: "全部是「收支紀錄」加起來的，從每個帳戶開帳那天起算，作廢的不算。", en: "Everything adds up from Transactions, starting from each account's opening day; voided rows do not count." } },
+    { at: AT_SUBS, t: { zh: "五個分頁", en: "Five pages" },
+      b: { zh: "總覽、收支紀錄、帳戶與類別、預算、匯出。第一次用先去「帳戶與類別」開帳。", en: "Overview, Transactions, Accounts & categories, Budget and Export. On day one, open the accounts first under Accounts & categories." } },
+  ] },
+  { id: "money-tx", page: "finance:tx", steps: [
+    { at: AT_HEAD, t: { zh: "每一筆進出", en: "Every row of money" },
+      b: { zh: "新的一筆按「加一筆」。已經在清單上的，改了就存。", en: "Press Add a row for a new one. Rows already on the list save as you change them." } },
+    { at: ".main .fin-fbx", t: { zh: "找一筆", en: "Find a row" },
+      b: { zh: "打字找，或用「篩選」看某一屆、某個帳戶或某一類。", en: "Type to search, or use Filters for one term, account or category." } },
+    { at: [".main .section", ".main .empty"], t: { zh: "登錯了不要刪", en: "Do not delete mistakes" },
+      b: { zh: "登錯的按「作廢」，寫一句為什麼。紀錄會留著，總覽不算它。", en: "Void a wrong row and write one line on why. The row stays on record, and the overview leaves it out." } },
+  ] },
+  { id: "money-accounts", page: "finance:accounts", steps: [
+    { at: AT_HEAD, t: { zh: "帳戶與類別", en: "Accounts and categories" },
+      b: { zh: "帳戶是錢放在哪裡：銀行、現金、平台。類別是收支分哪幾種。", en: "Accounts are where money sits: bank, cash, a platform. Categories are the kinds of income and spending." } },
+    { at: ".main .section", t: { zh: "第一天怎麼開帳", en: "Opening an account on day one" },
+      b: { zh: "把每個帳戶今天的餘額填成開帳餘額，開帳日填今天，之前的錢不用補登。", en: "Enter each account's balance today as its opening balance, with today as the opening day; earlier money is not entered." } },
+    { at: AT_SUBS, t: { zh: "類別改名", en: "Renaming a category" },
+      b: { zh: "類別改名會連舊的一起改。不用的類別封存，不要刪。", en: "Renaming a category renames the old rows too. Archive categories you no longer use instead of deleting them." } },
+  ] },
+  { id: "money-budget", page: "finance:budget", steps: [
+    { at: AT_HEAD, t: { zh: "預算", en: "Budget" },
+      b: { zh: "這一屆每一類支出打算花多少。", en: "How much each kind of spending is meant to cost this term." } },
+    { at: [".main .fin-budget > li", ".main .section"], t: { zh: "只是提醒，不會擋", en: "A reminder, not a block" },
+      b: { zh: "填了之後，總覽會畫一條「花掉多少」的進度條，超過會變橘色。", en: "Once filled in, the overview shows a progress bar per category that turns orange when it goes over." } },
+    { at: AT_SUBS, t: { zh: "回總覽看", en: "See it on the overview" },
+      b: { zh: "進度條在「總覽」那一頁。", en: "The progress bars are on the Overview page." } },
+  ] },
+  { id: "money-export", page: "finance:export", steps: [
+    { at: AT_HEAD, t: { zh: "匯出給會計", en: "Export for the accountant" },
+      b: { zh: "把收支下載成 CSV，給會計或理事會。Excel 直接開，中文不會變亂碼。", en: "Download transactions as CSV for the accountant or the board. Excel opens it with Chinese intact." } },
+    { at: ".main .section", t: { zh: "作廢的也在", en: "Voided rows are included" },
+      b: { zh: "作廢的那幾筆也會在檔案裡，最後兩欄有標出來。", en: "Voided rows are in the file too, flagged in the last two columns." } },
+    { at: AT_SUBS, t: { zh: "回收支紀錄", en: "Back to transactions" },
+      b: { zh: "要改哪一筆，回「收支紀錄」改。", en: "To fix a row, go back to Transactions." } },
+  ] },
+];
+
+// ── 純函式（test/tour.test.mjs 看得到）──
+export const tourPage = (group, tab) => `${group || ""}:${tab || ""}`;
+export const tourSels = at => (Array.isArray(at) ? at : at ? [at] : []).filter(Boolean);
+// 這一頁用哪一段：page 對得上、when 在、unless 不在的第一段。has(選擇器) 回 true／false。
+export function pickTour(page, has, tours) {
+  const list = tours || TOURS, ok = s => { try { return !!has(s); } catch (e) { return false; } };
+  return list.find(t => t.id !== "welcome" && [].concat(t.page).includes(page) && (!t.when || ok(t.when)) && (!t.unless || !ok(t.unless))) || null;
+}
+export const welcomeTour = tours => (tours || TOURS).find(t => t.id === "welcome") || null;
+// 留下找得到的那幾步。find(選擇器) 回那個東西或 null；沒有 at 的那一步一定留著。回的每一步多一個 sel：真的用到哪一個選擇器。
+export function tourStepsOn(steps, find) {
+  const out = [];
+  for (const s of steps || []) {
+    const sels = tourSels(s.at);
+    if (!sels.length) { out.push({ ...s, sel: "" }); continue; }
+    const sel = sels.find(x => { try { return !!find(x); } catch (e) { return false; } });
+    if (sel) out.push({ ...s, sel });
+  }
+  return out;
+}
+// 盒子放哪。r 是被框住那一塊在螢幕上的位置（null 是放中間），bw／bh 是盒子大小，vw／vh 是螢幕。
+// 手機（窄於 560）貼著螢幕下緣或上緣，看那一塊在哪一半；寬螢幕放在那一塊的下面、上面、右邊、左邊，哪邊放得下放哪邊。
+export function tourPlace(r, bw, bh, vw, vh) {
+  const m = 12, gap = 14, clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
+  if (!r) return { side: "center", left: Math.max(m, (vw - bw) / 2), top: Math.max(m, (vh - bh) / 2) };
+  if (vw < 560) { const low = (r.top + r.bottom) / 2 > vh / 2; return { side: low ? "top" : "bottom", left: m, top: low ? m : Math.max(m, vh - bh - m) }; }
+  const x = clamp(r.left, m, vw - bw - m), y = clamp(r.top, m, vh - bh - m);
+  if (r.bottom + gap + bh <= vh - m) return { side: "below", left: x, top: r.bottom + gap };
+  if (r.top - gap - bh >= m) return { side: "above", left: x, top: r.top - gap - bh };
+  if (r.right + gap + bw <= vw - m) return { side: "right", left: r.right + gap, top: y };
+  if (r.left - gap - bw >= m) return { side: "left", left: r.left - gap - bw, top: y };
+  return { side: "bottom", left: clamp((vw - bw) / 2, m, vw - bw - m), top: Math.max(m, vh - bh - m) };
+}
+// 自動跑不跑：?tour=off 不跑、?tour=auto 一定跑；本機（localhost、127.0.0.1、::1、*.localhost）預設不跑。
+export function tourAutoOK(host, search) {
+  const q = String(search || "");
+  if (/[?&]tour=off\b/.test(q)) return false;
+  if (/[?&]tour=auto\b/.test(q)) return true;
+  return !/^(localhost|127\.0\.0\.1|\[::1\]|::1)$|\.localhost$/i.test(String(host || ""));
+}
+export const tourSeenKey = uid => "bt.tour." + (uid || "anon");
+export function tourSeenParse(raw) { try { const a = JSON.parse(raw || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (e) { return new Set(); } }
+// 這一次要跑哪幾段：還沒看過歡迎那一段就先接它；這一頁的那一段看過了，就只剩歡迎（也可能什麼都沒有）。
+export function tourAutoPlan(seen, tour, tours) {
+  const w = welcomeTour(tours), plan = [];
+  if (w && !seen.has(w.id)) plan.push(w);
+  if (tour && !seen.has(tour.id)) plan.push(tour);
+  return plan;
+}
+export function tourFabHTML(L) {
+  const t = k => esc(tx(TT[k], L));
+  return `<button type="button" class="tour-fab" data-tour="open" aria-label="${t("fabTip")}" title="${t("fabTip")}"><span class="tour-q" aria-hidden="true">?</span><span class="tour-fab-t">${t("fab")}</span></button>`;
+}
+export function tourBoxHTML(step, i, n, L) {
+  const t = k => esc(tx(TT[k], L)), last = i >= n - 1;
+  const count = esc(tx(TT.count, L).replace("{i}", String(i + 1)).replace("{n}", String(n)));
+  return `<div class="tour-box" role="dialog" aria-modal="true" aria-labelledby="tour-h" aria-describedby="tour-b">
+    <p class="tour-count">${count}</p>
+    <h2 id="tour-h">${esc(tx(step.t, L))}</h2>
+    <p id="tour-b" class="tour-b">${esc(tx(step.b, L))}</p>
+    <div class="tour-foot">${last ? "" : `<button type="button" class="tour-btn quiet" data-tour="skip">${t("skip")}</button>`}<span class="tour-sp"></span>${i > 0 ? `<button type="button" class="tour-btn quiet" data-tour="back">${t("back")}</button>` : ""}${last ? `<button type="button" class="tour-btn" data-tour="skip">${t("done")}</button>` : `<button type="button" class="tour-btn" data-tour="next">${t("next")}</button>`}</div>
+  </div>`;
+}
+
+// ── 在瀏覽器裡跑的部分 ──
+const tour = { page: "", uid: "", L: "zh", steps: null, i: 0, el: null, back: null, timer: 0, tries: 0, place: 0 };
+const tHost = () => document.getElementById("bt-tour");
+const tReduce = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
+const tShown = el => { if (!el || !el.getBoundingClientRect) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+const tFind = sel => { const all = document.querySelectorAll(sel); for (const el of all) if (tShown(el) && !el.closest("#bt-tour .tour-layer")) return el; return null; };
+function tSeen() { try { return tourSeenParse(localStorage.getItem(tourSeenKey(tour.uid))); } catch (e) { return null; } }
+function tMark(ids) {
+  try { const s = tourSeenParse(localStorage.getItem(tourSeenKey(tour.uid))); ids.forEach(id => s.add(id)); localStorage.setItem(tourSeenKey(tour.uid), JSON.stringify([...s])); } catch (e) { /* 私密視窗存不了：這一次照樣看得完 */ }
+}
+function tCurrent() { return pickTour(tour.page, s => !!document.querySelector(s)); }
+function tStart(plan, auto) {
+  const steps = tourStepsOn(plan.flatMap(t => t.steps), tFind);
+  if (!steps.length || (auto && steps.length < 2)) return;
+  if (auto) tMark(plan.map(t => t.id));
+  tour.steps = steps; tour.i = 0; tour.back = document.activeElement;
+  const h = tHost(); let layer = h.querySelector(".tour-layer");
+  if (!layer) { layer = document.createElement("div"); layer.className = "tour-layer"; h.appendChild(layer); }
+  layer.innerHTML = `<div class="tour-veil"></div><div class="tour-spot" aria-hidden="true"></div><div class="tour-slot"></div>`;
+  document.addEventListener("keydown", tKey, true);
+  window.addEventListener("resize", tPlace, { passive: true });
+  window.addEventListener("scroll", tPlace, { passive: true, capture: true });
+  tShow();
+}
+function tClose() {
+  const h = tHost(), layer = h && h.querySelector(".tour-layer");
+  if (layer) layer.remove();
+  document.removeEventListener("keydown", tKey, true);
+  window.removeEventListener("resize", tPlace);
+  window.removeEventListener("scroll", tPlace, { capture: true });
+  tour.steps = null; tour.el = null;
+  const b = tour.back; tour.back = null;
+  if (b && b.isConnected && b.focus) b.focus(); else { const f = h && h.querySelector(".tour-fab"); if (f) f.focus(); }
+}
+function tShow() {
+  const h = tHost(), slot = h && h.querySelector(".tour-slot");
+  if (!slot || !tour.steps) return;
+  const s = tour.steps[tour.i];
+  slot.innerHTML = tourBoxHTML(s, tour.i, tour.steps.length, tour.L);
+  tour.el = s.sel ? tFind(s.sel) : null;
+  if (tour.el) {
+    // 比螢幕一半還高的那種（整張表、整個清單）捲到它的頂端，留出頂欄的高度；其他的捲到正中間。
+    const behavior = tReduce() ? "auto" : "smooth", r = tour.el.getBoundingClientRect();
+    if (r.height > innerHeight * 0.55) window.scrollTo({ top: Math.max(0, scrollY + r.top - 96), behavior });
+    else tour.el.scrollIntoView({ block: "center", inline: "nearest", behavior });
+  }
+  tPlace();
+  // 平滑捲動要一點時間，停下來再對一次位置（不用 requestAnimationFrame：check.sh 只准 toy.js 有每一幀的迴圈）。
+  clearTimeout(tour.place); tour.place = setTimeout(tPlace, tReduce() ? 0 : 420);
+  const go = slot.querySelector('[data-tour="next"]') || slot.querySelector('.tour-btn:not(.quiet)');
+  if (go) go.focus({ preventScroll: true });
+}
+function tPlace() {
+  const h = tHost(), layer = h && h.querySelector(".tour-layer");
+  if (!layer || !tour.steps) return;
+  const s = tour.steps[tour.i];
+  // 頁面重畫會把整塊換掉，舊的那個東西不在了就照選擇器再找一次。
+  if (s.sel && (!tour.el || !tour.el.isConnected)) tour.el = tFind(s.sel);
+  const spot = layer.querySelector(".tour-spot"), box = layer.querySelector(".tour-box"), veil = layer.querySelector(".tour-veil");
+  let r = null;
+  if (tour.el && tShown(tour.el)) {
+    const b = tour.el.getBoundingClientRect(), p = 6, vw = innerWidth, vh = innerHeight;
+    const top = Math.max(4, b.top - p), left = Math.max(4, b.left - p), bottom = Math.min(vh - 4, b.bottom + p), right = Math.min(vw - 4, b.right + p);
+    if (bottom > top && right > left) r = { top, left, bottom, right };
+  }
+  veil.classList.toggle("dim", !r);
+  spot.hidden = !r;
+  if (r) Object.assign(spot.style, { top: r.top + "px", left: r.left + "px", width: (r.right - r.left) + "px", height: (r.bottom - r.top) + "px" });
+  const pos = tourPlace(r, box.offsetWidth, box.offsetHeight, innerWidth, innerHeight);
+  box.dataset.side = pos.side;
+  Object.assign(box.style, { left: Math.round(pos.left) + "px", top: Math.round(pos.top) + "px" });
+}
+function tGo(d) {
+  if (!tour.steps) return;
+  const n = tour.i + d;
+  if (n < 0) return;
+  if (n >= tour.steps.length) return tClose();
+  tour.i = n; tShow();
+}
+function tKey(e) {
+  if (!tour.steps) return;
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); return tClose(); }
+  const box = tHost() && tHost().querySelector(".tour-box");
+  if (e.key === "Tab" && box) {
+    // 焦點留在盒子裡：最後一顆再按 Tab 回第一顆，反過來也一樣。
+    const bs = [...box.querySelectorAll("button")];
+    if (!bs.length) return;
+    const at = bs.indexOf(document.activeElement);
+    if (e.shiftKey && at <= 0) { e.preventDefault(); bs[bs.length - 1].focus(); }
+    else if (!e.shiftKey && (at === bs.length - 1 || at < 0)) { e.preventDefault(); bs[0].focus(); }
+    return;
+  }
+  const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if (!typing && e.key === "ArrowRight") { e.preventDefault(); tGo(1); }
+  else if (!typing && e.key === "ArrowLeft") { e.preventDefault(); tGo(-1); }
+}
+// 每一次重畫側欄都會叫到這裡。頁面停下來（沒有載入中的骨架、沒有開著的對話框）一秒多之後，才看要不要自動跑。
+function tAuto() {
+  tour.timer = 0;
+  if (tour.steps || !tourAutoOK(location.hostname, location.search)) return;
+  if (document.querySelector(".skeleton, dialog[open], .modal, [aria-modal='true']")) { if (++tour.tries < 8) tour.timer = setTimeout(tAuto, 900); return; }
+  const seen = tSeen(); if (!seen) return;
+  const plan = tourAutoPlan(seen, tCurrent());
+  if (plan.length) tStart(plan, true);
+}
+function mountTour(group, tab, me, L) {
+  if (!document.body) return;
+  const page = tourPage(group, tab), moved = page !== tour.page;
+  tour.uid = (me && me.id) || ""; tour.page = page;
+  let h = tHost();
+  if (!h) {
+    h = document.createElement("div"); h.id = "bt-tour"; document.body.appendChild(h);
+    h.addEventListener("click", e => {
+      const b = e.target.closest("[data-tour]"); if (!b) return;
+      const a = b.dataset.tour;
+      if (a === "open") { if (tour.steps) tClose(); const t = tCurrent(); tStart(t ? [t] : [welcomeTour()].filter(Boolean), false); }
+      else if (a === "next") tGo(1); else if (a === "back") tGo(-1); else if (a === "skip") tClose();
+    });
+  }
+  if (h.dataset.lang !== L) {
+    const old = h.querySelector(".tour-fab"), fab = document.createElement("div"); fab.innerHTML = tourFabHTML(L);
+    if (old) old.replaceWith(fab.firstElementChild); else h.prepend(fab.firstElementChild);
+    h.dataset.lang = L; tour.L = L;
+    if (tour.steps) tShow();
+  }
+  if (tour.steps) { if (moved) tClose(); else setTimeout(tPlace, 0); return; }
+  if (moved) tour.tries = 0;
+  clearTimeout(tour.timer); tour.timer = setTimeout(tAuto, 1200);
 }

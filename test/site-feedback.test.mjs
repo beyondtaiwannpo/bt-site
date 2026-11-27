@@ -50,7 +50,8 @@ test("資料庫回的錯變成一句話；函式或 bucket 不在的時候說要
 
 test("★ 那一顆只給幹部、掛在 body 上；側欄的 HTML 裡沒有它（重畫不會洗掉打到一半的字）", () => {
   const src = read("shared/rail.js");
-  assert.match(src, /if \(typeof document !== "undefined" && me && me\.role === "cadre"\) mountFeedback\(L\);/);
+  // 2026-11-26 同一行多掛一顆「怎麼用」導覽（test/tour.test.mjs），條件沒變。
+  assert.match(src, /if \(typeof document !== "undefined" && me && me\.role === "cadre"\) \{ mountFeedback\(L\);/);
   assert.match(src, /document\.body\.appendChild\(h\)/);
   assert.doesNotMatch(RAIL.railHTML("forms", "events", DIRECTOR, {}, "en"), /fb-fab|fb-dlg/);
   assert.doesNotMatch(RAIL.shellHTML("", "", ""), /fb-fab/);
