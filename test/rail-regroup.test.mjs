@@ -110,7 +110,7 @@ test("★ 頂欄有人與權限的人，側欄不畫；頂欄的每一頁都把�
 // 2026-11-27 第三版：搜尋框從頂欄搬到側欄最上面（Paul：「I want you to find somewhere else to put that search box」），按 / 跳過去。
 test("★ 搜尋框在側欄最上面、首頁上面；搜尋那一頁不畫（頁面裡有一格大的）；按 / 跳過去，正在打字不搶", () => {
   const h = RAIL.railHTML("home", "home", ASSOC, {}, "zh");
-  assert.match(h, /<div class="rail-lang"[\s\S]*?<\/div>\s*<form class="rail-q" role="search" action="\/admin\/search\/" method="get">[\s\S]*?<input type="search" name="q" maxlength="200" placeholder="搜尋紀錄、表單" aria-label="[^"]*按 \/ 跳到這裡[^"]*"[\s\S]*?<input type="hidden" name="lang" value="zh">\s*<\/form>\s*<a class="rail-item rail-area on" href="#home"/);
+  assert.match(h, /<\/span><\/div>\s*<form class="rail-q" role="search" action="\/admin\/search\/" method="get">[\s\S]*?<input type="search" name="q" maxlength="200" placeholder="搜尋紀錄、表單" aria-label="[^"]*按 \/ 跳到這裡[^"]*"[\s\S]*?<input type="hidden" name="lang" value="zh">\s*<\/form>\s*<a class="rail-item rail-area on" href="#home"/);
   assert.doesNotMatch(RAIL.railHTML("search", "search", ASSOC, {}, "zh"), /rail-q/);
   assert.match(RAIL.searchBoxHTML("home", "en"), /placeholder="Search"[\s\S]*value="en"/);
   const box = { tagName: "INPUT" }, doc = (active) => ({ activeElement: active, querySelector: sel => sel.startsWith(".rail-q") ? box : null });

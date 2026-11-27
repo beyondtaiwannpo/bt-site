@@ -133,7 +133,7 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
 test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellHTML、pageHead、msgHTML、sectionHTML、emptyHTML）", () => {
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.ITEMS, FORMS.ITEMS, `${label} 的 ITEMS 跟 admin/ 不一樣`);
-    for (const fn of ["railHTML", "langSwitchHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
+    for (const fn of ["railHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
                        "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML",
                        "mpName", "mpFind", "mpItems", "mpLinksHTML", "membersPanelHTML",
                        "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "rankTag", "membersAreaHTML",
@@ -403,30 +403,30 @@ test("語言怎麼決定：網址先、再存的、都沒有就英文；連結�
   assert.ok(S.isErr("存不起來：x") && S.isErr("Could not save: x") && !S.isErr("寄出 3 封，1 封失敗。") && !S.isErr("Saved."));
 });
 
-test("★ 側欄有中英切換的兩顆按鈕，現在的那一顆亮著", () => {
+// 2026-11-27 Paul 看了側欄最上面那兩顆「中文 / English」：「Dont think we need that out at front」。切換只留在 /settings/。
+test("★ 側欄沒有中英切換（只在設定那一頁）；英文側欄照舊是英文", () => {
   for (const [label, M] of IMPL) {
     const rail = M.railHTML("forms", "teams", { ...ME.member, name: "a" });
-    assert.match(rail, /<button class="lang on" data-act="lang" data-lang="zh" aria-pressed="true">中文<\/button><button class="lang" data-act="lang" data-lang="en" aria-pressed="false">English<\/button>/, label);
+    assert.doesNotMatch(rail, /data-act="lang"|rail-lang/, label);
   }
   FORMS.setLang("en");
   try {
     const rail = FORMS.railHTML("forms", "teams", { ...ME.member, name: "a" });
-    assert.match(rail, /class="lang" data-act="lang" data-lang="zh"/);
-    assert.match(rail, /class="lang on" data-act="lang" data-lang="en"/);
+    assert.doesNotMatch(rail, /data-act="lang"/);
     assert.match(rail, />All pages</, "手機上那顆鈕不跟頂欄的「選單」同名");
     assert.match(rail, /<b>Venues<\/b>[\s\S]*<div class="rail-group">My workspaces<\/div>/);
   } finally { FORMS.setLang("zh"); }
+  assert.match(readFileSync("settings/src/ui.js", "utf8"), /data-act="lang" data-lang="\$\{l\}"/, "設定那一頁還有");
 });
 
 // 英文畫出來不能剩中文。餵進去的假資料全部用英文，剩下的中文就是漏翻的。
-// 剔除：HTML 註解（樣板裡的中文註解）、placeholder（有幾格本來就要填中文）、切換鈕上的「中文」、
+// 剔除：HTML 註解（樣板裡的中文註解）、placeholder（有幾格本來就要填中文）、
 // 信件預覽（信是寄給台灣學生的，範例與系統加的那段本來就是中文）。
 const CJK = /[一-鿿]/;
 function leftover(html) {
   const h = String(html)
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/ placeholder="[^"]*"/g, "")
-    .replace(/<div class="rail-lang"[\s\S]*?<\/div>/g, "")
     .replace(/<div class="mailprev">[\s\S]*?<\/div>/g, "")
     .replace(/<div class="mini" style="margin-bottom:8px">[^<]*<\/div>/g, "")   // 「用「陳小安」當範例」那一句：範例是信裡真的會出現的中文
     .replace(/\{姓名\}|\{活動名稱\}/g, "");   // 代換符號跟資料庫的 mail_fill() 一樣是中文，不翻

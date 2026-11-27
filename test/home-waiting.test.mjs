@@ -156,7 +156,7 @@ test("側欄的樣式在 shared/rail.css：九個後台資料夾與首頁都讀�
   assert.equal(pages.length, 10, "2026-11-26 多了 admin/search");
   for (const f of pages) assert.match(readFileSync(f, "utf8"), /<link rel="stylesheet" href="(\.\.\/)+shared\/rail\.css\?v=/, f);
   const css = readFileSync("shared/rail.css", "utf8");
-  for (const sel of [".shell{", ".rail{", ".area-tabs{", ".rail-lang{", ".rail-burger{"]) assert.ok(css.includes(sel), sel);
+  for (const sel of [".shell{", ".rail{", ".area-tabs{", ".rail-burger{"]) assert.ok(css.includes(sel), sel);
   const admin = readFileSync("admin/admin.css", "utf8");
   assert.doesNotMatch(admin, /^\.area-tabs\{|^\.rail\{|^\.shell\{/m);
 });

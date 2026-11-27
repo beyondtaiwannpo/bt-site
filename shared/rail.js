@@ -30,7 +30,6 @@ const RT = {
   open:     { zh: "展開所有頁面", en: "Show all pages" },
   groups:   { zh: "BT 的選單", en: "BT menu" },
   tabs:     { zh: "這一區的分頁", en: "Pages in this section" },
-  lang:     { zh: "語言", en: "Language" },
   q:        { zh: "搜尋紀錄、表單", en: "Search" },
   qLab:     { zh: "搜尋會議紀錄、回饋表、內部表單（按 / 跳到這裡）", en: "Search meeting notes, feedback and forms (press / to jump here)" },
   noTeam:   { zh: "還沒填 team", en: "no team yet" },
@@ -514,7 +513,6 @@ export function railHTML(group, tab, me, counts, L) {
   <nav class="rail" aria-label="${esc(tx(RT.groups, L))}">
     <div class="rail-me"><b>${esc(me && me.name || "")}</b>
       <span>${esc(boardName(me && me.board, L))}・${teams.length ? esc(teams.join(tx(RT.list, L))) : esc(tx(RT.noTeam, L))}</span></div>
-    ${langSwitchHTML(L)}
     ${searchBoxHTML(group, L)}
     ${body}
   </nav>`;
@@ -611,11 +609,6 @@ export function pageTabsHTML(id, tabs, opts) {
   return nav + list.map(t => `<div class="tabp" data-ptabs="${esc(id)}" data-tabp="${esc(t.key)}"${t.key === on ? "" : " hidden"}>${t.body}</div>`).join("");
 }
 
-// 中英切換：兩顆小按鈕，現在的那一顆亮著。字面「中文」「English」刻意不翻。各頁 main.js 接 data-act="lang"。
-export function langSwitchHTML(L) {
-  const b = l => `<button class="lang${L === l ? " on" : ""}" data-act="lang" data-lang="${l}" aria-pressed="${L === l}">${l === "zh" ? "中文" : "English"}</button>`;
-  return `<div class="rail-lang" role="group" aria-label="${esc(tx(RT.lang, L))}">${b("zh")}${b("en")}</div>`;
-}
 
 // 整頁的外殼：頂欄在上，底下左側欄、右內容。tabs 是 areaTabsHTML() 畫好的那一排，放在內容最上面。
 export function shellHTML(nav, rail, body, tabs) {

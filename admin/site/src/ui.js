@@ -30,7 +30,6 @@ import * as RAIL from "../../../shared/rail.js";
 export const { GROUPS, ITEMS, AREAS, SECTIONS, wsLevel, canEditWs, canEditAny, canEnter, canSee, railBefore, railAfter } = RAIL;
 const senior = RAIL.senior;
 export const boardName = board => RAIL.boardName(board, lang());
-export function langSwitchHTML() { return RAIL.langSwitchHTML(lang()); }
 // railHTML 先算好「這一區的分頁」那一排，shellHTML 把它放在內容最上面（兩支在同一次 render 裡先後被叫）。
 let tabsNext = "";
 export function railHTML(group, tab, me, counts) { tabsNext = RAIL.areaTabsHTML(group, tab, me, lang()); return RAIL.railHTML(group, tab, me, counts, lang()); }
