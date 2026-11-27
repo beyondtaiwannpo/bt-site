@@ -1,7 +1,8 @@
 // 後台右下角「怎麼用」導覽（2026-11-26）。跑法：node --test test/*.test.mjs
 // Paul 2026-11-26（開車時口述）：一位幹部說新平台很難學。每一頁內建一段 3 到 6 步的導覽，右下角一顆按了才跑（原本第一次登入會自動跑，Paul 同一天改成只在按下去時開），
 //   一次框住一塊、有下一步上一步跳過，也講頁面之間怎麼接。引擎與步驟都在 shared/rail.js 最下面（TOURS），樣式在 shared/rail.css。
-// 這一支守兩件事：步驟資料（中英文都有、每頁 3 到 6 步、指到的頁面真的存在）與引擎的純函式（挑哪一段、哪幾步、盒子放哪），以及它不會自己跑。
+// 2026-11-27 第二版（Paul：「you're supposed to say like how the actual pages work」）：每一頁、每一種畫面（清單、編輯頁、審核）都有一段講怎麼做事的導覽，到 8 步，用 go 走進分頁。
+// 這一支守兩件事：步驟資料（中英文都有、每頁 3 到 8 步、指到的頁面真的存在）與引擎的純函式（挑哪一段、哪幾步、盒子放哪），以及它不會自己跑。
 // 每一步在真的頁面上找不找得到，是在本機瀏覽器裡一頁一頁對過的（README「後台導覽」那一節有怎麼對）。
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -9,14 +10,15 @@ import { readFileSync } from "node:fs";
 import * as RAIL from "../shared/rail.js";
 
 const read = p => readFileSync(new URL("../" + p, import.meta.url), "utf8");
-const PAGES = new Set(RAIL.ITEMS.map(i => `${i.group}:${i.key}`));
+// team 的頁不在 ITEMS 裡（側欄是畫出來的），page 是 home:team:<team 全名>
+const PAGES = new Set([...RAIL.ITEMS.map(i => `${i.group}:${i.key}`), ...RAIL.TEAMS.map(t => "home:team:" + t)]);
 
-test("★ 每一段導覽：id 不重複、3 到 6 步、每一步中英文都有標題與內文", () => {
+test("★ 每一段導覽：id 不重複、3 到 8 步、每一步中英文都有標題與內文", () => {
   const ids = RAIL.TOURS.map(t => t.id);
   assert.equal(new Set(ids).size, ids.length, "id 重複了：看過了沒是照 id 記的");
   for (const t of RAIL.TOURS) {
     assert.match(t.id, /^[a-z][a-z-]*$/, t.id);
-    assert.ok(t.steps.length >= 3 && t.steps.length <= 6, `${t.id} 有 ${t.steps.length} 步（要 3 到 6 步）`);
+    assert.ok(t.steps.length >= 3 && t.steps.length <= 8, `${t.id} 有 ${t.steps.length} 步（要 3 到 8 步）`);
     for (const [i, s] of t.steps.entries()) {
       for (const k of ["t", "b"]) for (const L of ["zh", "en"]) {
         const v = s[k] && s[k][L];
@@ -38,20 +40,39 @@ test("★ 導覽指到的頁面都在側欄的 ITEMS 裡（頁面改名或拿掉
   }
 });
 
-test("★ 這一次要寫的頁面都有導覽", () => {
-  const want = ["forms:events", "forms:projects", "people:roster", "people:invites", "forms:forms",
-    "records:overview", "records:people", "records:yearly", "site:events", "site:res", "site:team", "site:stories", "site:mail",
-    "passports:cadre", "passports:cities", "passports:interns", "passports:board",
-    "finance:overview", "finance:tx", "finance:accounts", "finance:budget", "finance:export",
-    "home:home", "home:calendar", "search:search"];
+test("★ 側欄每一頁都有導覽，一頁好幾種畫面時挑對那一段", () => {
   const none = () => false;
-  for (const p of want) assert.ok(RAIL.pickTour(p, none), `${p} 沒有導覽`);
-  // 活動編輯頁跟活動清單同一個 page，靠 #ev-tabs 分開
-  assert.equal(RAIL.pickTour("forms:events", s => s === "#ev-tabs").id, "event-editor");
-  assert.equal(RAIL.pickTour("forms:events", none).id, "events");
-  // 行事曆的「日」跟月、週同一個 page，靠 .cal .dgrid 分開
-  assert.equal(RAIL.pickTour("home:calendar", s => s === ".cal .dgrid").id, "calendar-day");
-  assert.equal(RAIL.pickTour("home:calendar", none).id, "calendar");
+  // 設定與實習生進度牆不掛側欄，沒有「怎麼用」那一顆
+  const skip = new Set(["settings:settings", "internwall:"]);
+  for (const p of PAGES) if (!skip.has(p)) assert.ok(RAIL.pickTour(p, none), `${p} 沒有導覽`);
+  const pick = (page, ...on) => RAIL.pickTour(page, s => on.includes(s)).id;
+  assert.equal(pick("forms:events", "#ev-tabs"), "event-editor");
+  assert.equal(pick("forms:events"), "events");
+  assert.equal(pick("forms:events", ".tabp[data-ptabs='form']", "#ev-tabs"), "form-editor", "活動的報名表編輯頁不是活動編輯頁");
+  assert.equal(pick("forms:projects", ".tabp[data-ptabs='form']"), "form-editor");
+  assert.equal(pick("forms:forms", ".main nav.ptabs > .subtab.on[data-act='open-apps']"), "form-apps");
+  assert.equal(pick("forms:forms", ".main nav.ptabs > .subtab.on[data-act='open-checkin']", "#nsub"), "form-notice");
+  assert.equal(pick("forms:forms", ".main nav.ptabs > .subtab.on[data-act='open-checkin']"), "form-checkin");
+  assert.equal(pick("forms:forms"), "recruitment");
+  assert.equal(pick("forms:projects", "[data-act='pj-back']"), "project");
+  assert.equal(pick("forms:meetings", "[data-act='mt-back']"), "meeting-new");
+  assert.equal(pick("forms:meetings", "[data-act='mt-back']", ".rq-dl"), "meeting");
+  assert.equal(pick("forms:meetings"), "meetings");
+  assert.equal(pick("forms:request", "#rq-q"), "request-queue");
+  assert.equal(pick("forms:request", ".rq-print", "#rq-q"), "request-one");
+  assert.equal(pick("forms:request"), "request");
+  assert.equal(pick("home:calendar", ".cal .dgrid"), "calendar-day");
+  assert.equal(pick("home:calendar", "#sch-modal", ".cal .dgrid"), "schedule", "排會那一塊開著的時候講排會");
+  assert.equal(pick("home:calendar"), "calendar");
+  assert.equal(pick("home:team:Marketing Team"), "team-home");
+  assert.equal(pick("availability:", "#tzq"), "availability-tz");
+  assert.equal(pick("availability:"), "availability");
+  assert.equal(pick("passport:", ".main .book"), "passport");
+  assert.equal(pick("passport:", ".main .wall"), "passport-wall");
+  assert.equal(pick("records:overview", "#rc-event-tabs"), "record");
+  assert.equal(pick("records:people", "#rc-person-tabs"), "record-person");
+  assert.equal(pick("teamforms:build", ".main a.subtab[data-act='sub']"), "internal-form");
+  assert.equal(pick("people:roster", "[data-autosave='person-save']"), "person");
   assert.equal(RAIL.pickTour("nope:nope", none), null, "沒有導覽的頁面回 null");
   assert.equal(RAIL.pickTour("*", () => true), null, "歡迎那一段不會被當成某一頁的導覽");
 });
@@ -81,6 +102,28 @@ test("★ tourStepsOn：找不到的那一步跳過、沒有 at 的留著、陣�
   assert.deepEqual(got.map(s => s.t.en), ["intro", "fallback", "last"]);
   assert.deepEqual(got.map(s => s.sel), ["", ".b", ".c"]);
   assert.deepEqual(RAIL.tourStepsOn(undefined, find), []);
+});
+
+test("★ go：導覽先按一個分頁再框裡面的東西；go 只准是分頁或切換畫面的鈕，不准是存、寄、刪", () => {
+  const steps = [
+    { at: ".head", t: { en: "head" } },
+    { at: ".gone", t: { en: "missing before any go" } },
+    { go: "[data-tab=\"forms\"]", at: ".inside", t: { en: "in forms" } },
+    { at: ".also-inside", t: { en: "after go" } },
+    { go: "[data-tab=\"results\"]", t: { en: "results, centred" } },
+  ];
+  assert.deepEqual(RAIL.tourDeferred(steps), [false, false, true, true, true]);
+  const got = RAIL.tourPlan(steps, s => (s === ".head" ? {} : null));
+  assert.deepEqual(got.map(s => s.t.en), ["head", "in forms", "after go", "results, centred"], "go 前面找不到的跳過，go 之後的先留著等輪到它");
+  assert.deepEqual(got.map(s => !!s.later), [false, true, true, true]);
+  assert.equal(RAIL.tourGoAt(steps, 0), "");
+  assert.equal(RAIL.tourGoAt(steps, 3), "[data-tab=\"forms\"]", "退回去的時候回到最近的那一個分頁");
+  assert.equal(RAIL.tourGoAt(steps, 4), "[data-tab=\"results\"]");
+  for (const t of RAIL.TOURS) for (const [i, s] of t.steps.entries()) {
+    if (!s.go) continue;
+    assert.match(s.go, RAIL.TOUR_GO, `${t.id} 第 ${i + 1} 步的 go 不是分頁鈕：${s.go}`);
+    assert.doesNotMatch(s.go, /save|send|del|remove|publish|submit|ready|void|approve|reject|new|add/i, `${t.id} 第 ${i + 1} 步的 go 看起來會改資料：${s.go}`);
+  }
 });
 
 test("tourPlace：寬螢幕放在下面、上面、右邊、左邊；手機貼上緣或下緣；沒有框就置中；永遠在螢幕裡", () => {

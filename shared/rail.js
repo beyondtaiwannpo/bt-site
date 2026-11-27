@@ -803,6 +803,11 @@ const AT_MENU = [".rail .rail-area.here", ".rail .rail-area.on", ".rail-burger"]
 const AT_SUBS = [".rail .rail-subs", ".area-tabs", ".rail-burger"];
 const AT_HEAD = ".main .page-head";
 const AT_ACT  = ".main .page-head .actions";
+// 2026-11-27 第二版（Paul：「you're supposed to say like how the actual pages work… if you want to make a sign up and feedback event form, you should go there. And then once you click into it, there's boxes you can edit」）：
+//   每一步講「要做某件事，按哪裡、填什麼、按下去之後會怎樣」，不是「這裡有六個分頁」。一頁可以到 8 步。
+//   一頁有好幾種畫面（清單、編輯頁、審核）時，各寫一段，用 when／unless 分開；有 when 的寫在前面（挑第一個對得上的）。
+//   go 是導覽先幫你按的分頁（見下面 TOUR_GO），按了才框得到分頁裡面的東西。
+const TEAM_PAGES = TEAMS.map(t => "home:team:" + t);
 export const TOURS = [
   // 這一頁還沒有自己的導覽時，按「怎麼用」跑這一段。
   { id: "welcome", page: "*", steps: [
@@ -818,45 +823,143 @@ export const TOURS = [
 
   // ── 首頁（/home/）──
   { id: "home", page: "home:home", steps: [
-    // 2026-11-27 第二版：側欄的「新增」拿掉，那三顆鈕回到首頁最上面（home/src/ui.js quickHTML），每個 team 的頁上也有一組。
-    { at: [".home .quick", ".home .hello"], t: { zh: "最常做的事在這裡", en: "The things you do most" },
-      b: { zh: "跟 Marketing 提需求；排得了會的人還有記一場會議、排一場會。你的 team 的頁上也有同一組，team 會先幫你選好。記下來的會之後在上面的搜尋找得到。", en: "Send Marketing a request, and if you can schedule meetings, log a meeting or schedule one. Your team's page has the same buttons with the team already picked. Every meeting you log can be found later with the search box at the top." } },
-    { at: ".home .block.wait", t: { zh: "等你處理", en: "Waiting for you" },
-      b: { zh: "要你動手的事都在這一張清單：要回覆的會、要填的表單、等你審的報名、派給你的需求。照日期排，最急的在最上面，點一行就到那件事。", en: "Everything that needs you is in this one list: meetings to reply to, forms to fill in, sign-ups to review, requests assigned to you. Most urgent first; tap a row to go straight there." } },
-    { at: ".home .wait + .block", t: { zh: "接下來", en: "Coming up" },
-      b: { zh: "接下來六十天排給你的會與活動。會議可以直接在這裡按會到或不能到，排會的人馬上看得到。", en: "Your meetings and events for the next 60 days. Reply to a meeting right here and the organizer sees your answer straight away." } },
+    { at: [".home .quick", ".home .hello"], t: { zh: "從這裡開始做事", en: "Start things from here" },
+      b: { zh: "「跟 Marketing 提需求」開一張需求單。排得了會的人還有「記一場會議」（開完會寫紀錄）與「排一場會」（打開行事曆的排會，邀請會寄出去）。", en: "Ask Marketing opens a request. If you can schedule meetings you also get Log a meeting, for notes after a meeting, and Schedule a meeting, which opens the scheduler and sends the invites." } },
+    { at: ".home .block.wait", t: { zh: "把這張清單清掉", en: "Clear this list" },
+      b: { zh: "要你動手的事都在這裡，最急的在最上面，點一行就到那件事。會議直接在這裡按「我會到」或「不能到」；必到的會說不能到，要寫原因給排會的人。", en: "Everything that needs you, most urgent first; tap a row to go straight to it. Reply to a meeting here with I'll be there or Can't make it. For a required meeting, Can't make it asks for a reason." } },
+    { at: ".home .wait + .block", t: { zh: "接下來的會與活動", en: "Coming up" },
+      b: { zh: "接下來六十天排給你的會與活動。點標題看議程與誰會到；有 Meet 連結的會議會多一顆「加入 Google Meet」。", en: "Your meetings and events for the next 60 days. Click a title for the agenda and who is coming; meetings with a Meet link get a Join Google Meet button." } },
     { at: ".home .block.pp", t: { zh: "我的護照", en: "My passport" },
-      b: { zh: "你蓋了幾格章。點進去蓋章、寫心得，心得只有你自己看得到。", en: "How many stamps you have. Open it to stamp and write notes; only you can read your notes." } },
+      b: { zh: "你蓋了幾格章。點進去蓋章、寫一句話、放照片，這些只有你自己看得到。", en: "How many stamps you have. Open it to stamp, write a line and add a photo; only you can see those." } },
     { at: ".home .block.pairs", t: { zh: "Mentorship", en: "Mentorship" },
       b: { zh: "你帶的 mentee 或你的 mentor 在這裡，check-in 的連結也在這裡，填過的會打勾。", en: "Your mentees or your mentor, with your check-in links. The ones you have filled in are ticked." } },
     { at: [".rail a.rail-area[href='#calendar']", ".rail-burger"], t: { zh: "行事曆在隔壁", en: "The Calendar is next door" },
-      b: { zh: "「行事曆」用月、週、日看所有的會與活動。在「時間看板」填你什麼時候有空，排會的人在行事曆的「日」就看得到。", en: "Calendar shows every meeting and event by month, week or day. Fill in when you are free under Availability, and organizers see it in the Calendar's Day view." } },
+      b: { zh: "「行事曆」用月、週、日看所有的會與活動。在「時間看板」填你什麼時候有空，排會的人在行事曆就看得到。", en: "Calendar shows every meeting and event by month, week or day. Fill in when you are free under Availability, and organizers see it in the Calendar." } },
+  ] },
+  // 一個 team 的頁（/home/#team=…）。page 是 home:team:<team 全名>，六個 team 共用這一段。
+  { id: "team-home", page: TEAM_PAGES, steps: [
+    { at: ".home.team .hello", t: { zh: "這個 team 的首頁", en: "This team's home" },
+      b: { zh: "第一行寫著你在這個 team 是「看」「改」還是「管」。看只能看；改開得了專案與活動；管還能加人、改別人的等級。", en: "The first line says whether you can View, Edit or Manage here. View is read-only; Edit can create projects and events; Manage can also add people and change their level." } },
+    { at: ".home.team .quick", t: { zh: "從這裡做，team 先幫你選好", en: "Start here and the team is filled in" },
+      b: { zh: "提需求、記一場會議、排一場會，從這裡按會先填好這個 team，不用再選一次。", en: "Ask Marketing, Log a meeting and Schedule a meeting all start with this team already picked." } },
+    { at: [".home.team .tcards", ".home.team section.block"], t: { zh: "專案", en: "Projects" },
+      b: { zh: "一個專案收好幾場活動，例如營隊加說明會。改以上的人按「開一個專案」，再到每一場活動的「設定」分頁把它放進來。", en: "A project holds several events, such as a camp and its info session. With Edit, press Create a project, then put each event in it from that event's Settings tab." } },
+    { at: ".home.team section.block:nth-of-type(2)", t: { zh: "還沒放進專案的活動", en: "Events not in a project" },
+      b: { zh: "點一行打開那場活動的編輯頁。「開一場活動」也在這裡，一開始是草稿，外面看不到。", en: "Click a row to open the event editor. Create an event is here too; it starts as a draft nobody outside can see." } },
+    { at: ".home.team section.block:nth-of-type(3)", t: { zh: "申請表", en: "Application forms" },
+      b: { zh: "這個 team 的計畫與招募申請表。按「到申請表清單」看收到的申請、改題目。", en: "This team's programme and recruitment forms. Go to applications to read what came in or change the questions." } },
+    { at: ".home.team section.block:nth-of-type(4)", t: { zh: "資源", en: "Resources" },
+      b: { zh: "改以上的人在資源庫加一條連結，對外的 /resources/ 就看得到。檔案本身留在 Google Drive。", en: "With Edit you add a link in Resources and it shows on the public /resources/ page. The file itself stays in Google Drive." } },
+  ] },
+  // 排會那一塊（點日期、拖一段、首頁的「排一場會」打開）。要寫在行事曆那兩段前面。
+  { id: "schedule", page: "home:calendar", when: "#sch-modal", steps: [
+    { at: "#sch-key", t: { zh: "什麼時候", en: "When" },
+      b: { zh: "選日期、開始與結束，長度會自己算。改開始時間長度不變，改結束時間長度跟著變。", en: "Pick the date, start and end; the length works itself out. Changing the start keeps the length; changing the end changes it." } },
+    { at: "#sch-scope", t: { zh: "誰的會、要不要到", en: "Whose meeting, and is it required" },
+      b: { zh: "範圍是這場會算在哪個 team 或整個 BT。必到的會，有人說不能到就要寫原因給你。", en: "Scope says which team, or all of BT, it belongs to. On a required meeting, anyone who can't come has to give you a reason." } },
+    { at: "#sch-title", t: { zh: "標題、議程、留言", en: "Headline, agenda, message" },
+      b: { zh: "標題一定要填。議程與給大家的留言會放進邀請信，會議紀錄的 Docs 連結可以之後再補。", en: "The headline is required. The agenda and your message go into the invite; the Docs link for notes can be added later." } },
+    { at: ".sch-who", t: { zh: "勾要邀請的人", en: "Tick who to invite" },
+      b: { zh: "每個人後面標著那段時間有沒有空，有空的排在最上面。可以找名字，或按「全勾看到的」。", en: "Each name shows whether they are free then, with free people at the top. Search by name or press Tick all shown." } },
+    { at: "[data-act='sch-day']", t: { zh: "不確定哪個時間好", en: "Not sure which time works" },
+      b: { zh: "按這一行看這一天每半小時有幾個人有空，挑一格再排。", en: "Open this to see how many people are free each half hour that day, then pick a slot." } },
+    { at: "#sch-send", t: { zh: "排會並寄邀請", en: "Schedule and invite" },
+      b: { zh: "按下去，BT 的 Google 帳號開一場有 Meet 的會，每個人收到 Google 邀請與網站的信，在信裡回會不會到。之後要改或取消，到「會議」那一頁。", en: "BT's Google account creates the meeting with a Meet link; everyone gets a Google invite and an email from the site to reply. To change or cancel it later, use the Meetings page." } },
   ] },
   // 行事曆的月與週（點一天之後的「日」是下一段）
   { id: "calendar", page: "home:calendar", unless: ".cal .dgrid", steps: [
     { at: ".cal .calbar", t: { zh: "月、週、日", en: "Month, week or day" },
       b: { zh: "左邊切換月、週、日，箭頭往前往後翻，「今天」跳回今天。", en: "Switch between Month, Week and Day on the left. The arrows move back and forward; Today jumps back to today." } },
-    { at: ".cal .calbar .seg:last-of-type", t: { zh: "只看我的，或整個 BT", en: "Just mine, or all of BT" },
-      b: { zh: "「只看我的」只放邀了你的會、你排的會與活動。「整個 BT」連別人的會也放上來，排會之前先看會不會撞期。", en: "Just mine shows meetings you are invited to or organized, plus events. All of BT adds everyone else's meetings, so you can check for clashes before you schedule." } },
-    { at: [".cal .month", ".cal .week"], t: { zh: "怎麼看", en: "Reading the calendar" },
-      b: { zh: "實心是必到，框線是選擇參加，橘色是活動。點一個就打開，會議可以在裡面回覆會不會到。", en: "Solid is required, outlined is optional, orange is an event. Click one to open it; you can reply to a meeting from there." } },
-    // 2026-11-27：能排會的人點日期（月）、拖一段（週）直接跳出排會；其他人點日期照舊打開那一天。
-    { at: [".cal .month .day.today .dnum", ".cal .wcol.today", ".cal .dnum"], t: { zh: "點日期排會", en: "Click a date to schedule" },
-      b: { zh: "排得了會的人在月曆點日期、在週曆拖一段時間，排會那一塊就跳出來，每個人後面標著那段時間有沒有空。其他人點日期打開那一天。", en: "If you can schedule, click a date in Month or drag across a time in Week to open the form; each person shows whether they are free then. Everyone else opens that day instead." } },
-    { at: AT_SUBS, t: { zh: "時間看板", en: "Availability" },
-      b: { zh: "「時間看板」填你什麼時候有空。排會時你名字後面的標、「日」的底色，都是照大家在這裡填的算。會議紀錄在側欄「會議」那一行。", en: "Availability is where you fill in when you are free. The marks next to your name when someone schedules, and the Day view's shading, both come from what everyone fills in there. Meeting notes are under Meetings in the menu." } },
+    { at: ".cal .calbar .seg:last-of-type", t: { zh: "排會之前先看會不會撞期", en: "Check for clashes before you schedule" },
+      b: { zh: "「只看我的」只放邀了你的會、你排的會與活動。「整個 BT」連別人的會也放上來，排會之前切過去看一下。", en: "Just mine shows meetings you are invited to or organized, plus events. All of BT adds everyone else's meetings; switch to it before you schedule." } },
+    { at: [".cal .month", ".cal .week"], t: { zh: "回覆一場會", en: "Reply to a meeting" },
+      b: { zh: "實心是必到，框線是選擇參加，橘色是活動。點一個打開，會議可以在裡面回覆會不會到。", en: "Solid is required, outlined is optional, orange is an event. Click one to open it; you can reply to a meeting from there." } },
+    { at: [".cal .month .day.today .dnum", ".cal .wcol.today", ".cal .dnum"], t: { zh: "排一場會", en: "Schedule a meeting" },
+      b: { zh: "排得了會的人在月曆點日期、在週曆按住拖一段時間，排會那一塊就跳出來，每個人後面標著那段時間有沒有空。其他人點日期是打開那一天。", en: "If you can schedule, click a date in Month or drag across a time in Week and the scheduler opens, showing who is free then. Everyone else opens that day instead." } },
+    { at: AT_SUBS, t: { zh: "先填你什麼時候有空", en: "Fill in when you are free" },
+      b: { zh: "排會時名字後面的標、「日」的底色，都是照大家在「時間看板」填的算。你沒填，別人排會就不知道你有沒有空。", en: "The free marks in the scheduler and the Day view's shading come from what everyone fills in under Availability. If you don't fill it in, nobody can see when you are free." } },
   ] },
   { id: "calendar-day", page: "home:calendar", when: ".cal .dgrid", steps: [
     { at: ".cal .dchips", t: { zh: "只算一個 team", en: "Count one team" },
       b: { zh: "按一個 team，底色就只算那個 team 的人。按「所有人」回到全部。", en: "Pick a team and the shading counts only that team. Everyone goes back to all members." } },
-    { at: ".cal .dweek .wscroll", t: { zh: "底色是有空的人數", en: "Shading shows who is free" },
-      b: { zh: "底色越深，那半小時有空的人越多，滑鼠移過去看得到是誰。可以排會的人點一格就打開排會：選時間、勾人、寫標題與議程，邀請會寄出去。", en: "The darker a half hour, the more people are free; hover to see who. If you can schedule, click a half hour to set up a meeting: pick the time, tick people, add a title and agenda, and the invites go out." } },
+    { at: ".cal .dweek .wscroll", t: { zh: "點一格排會", en: "Click a half hour to schedule" },
+      b: { zh: "底色越深，那半小時有空的人越多，滑鼠移過去看得到是誰。排得了會的人點一格，排會那一塊就跳出來，整段有空的人先幫你勾好。", en: "The darker a half hour, the more people are free; hover to see who. If you can schedule, click one and the scheduler opens with everyone free for the whole slot already ticked." } },
     { at: ".cal .dcol .chipi", t: { zh: "這一天的會與活動", en: "This day's meetings and events" },
       b: { zh: "這一天已經排好的會與活動疊在上面，點一個打開。", en: "Meetings and events already on this day sit on top. Click one to open it." } },
     { at: ".cal a[href*='availability']", t: { zh: "人數從哪裡來", en: "Where the counts come from" },
       b: { zh: "人數是照每個人在「時間看板」填的時間算的，沒填的人不會被算進去。點這裡改你自己的。", en: "Counts come from the free times each person fills in under Availability; anyone who hasn't filled theirs in isn't counted. Click here to edit yours." } },
     { at: ".cal .calbar .seg", t: { zh: "回到月或週", en: "Back to month or week" },
       b: { zh: "按「月」或「週」回到整段時間。", en: "Press Month or Week to go back to the wider view." } },
+  ] },
+
+  // ── 時間看板（/availability/）：第一次的說明、選時區、我的時間、成員 ──
+  { id: "availability-notice", page: "availability:", when: "[data-act='notice-ok']", steps: [
+    { t: { zh: "填一次，排會的人就看得到", en: "Fill it in once and organizers see it" },
+      b: { zh: "你在這裡填每週什麼時候有空。其他幹部看得到這些時間，看不到你護照裡寫的與照片。", en: "You fill in when you are free each week. Other cadres can see these times, but never what you wrote in your passport or your photos." } },
+    { at: "[data-act='notice-ok']", t: { zh: "按這裡開始", en: "Start here" },
+      b: { zh: "按「我知道了，開始填」。還沒設定時區的話，下一步先選時區。", en: "Press Got it, start filling in. If you have no time zone yet, you pick it next." } },
+    { at: AT_SUBS, t: { zh: "填的時間用在哪裡", en: "Where your times are used" },
+      b: { zh: "行事曆的「日」照大家填的時間畫底色，排會時你名字後面也會標有沒有空。", en: "The Calendar's Day view is shaded from everyone's times, and the scheduler marks you free or busy from them." } },
+  ] },
+  { id: "availability-tz", page: "availability:", when: "#tzq", steps: [
+    { at: "#tzq", t: { zh: "找你的時區", en: "Find your time zone" },
+      b: { zh: "打城市或國家的名字，例如 Taipei、London。", en: "Type a city or country, such as Taipei or London." } },
+    { at: ".tzlist", t: { zh: "點一個", en: "Pick one" },
+      b: { zh: "點你現在住的那一個。之後搬家到設定改，你填的時間會照新的時區重算。", en: "Click where you live now. If you move, change it in Settings and your times are recalculated." } },
+    { at: ".main .wnote", t: { zh: "讓電腦猜", en: "Let the computer guess" },
+      b: { zh: "不確定的話，按這一行裡的按鈕，用這台電腦現在的時區。", en: "Not sure? Use the button in this line to take this computer's time zone." } },
+  ] },
+  { id: "availability-who", page: "availability:", when: ".main table.who", steps: [
+    { at: ".main .teamfilter", t: { zh: "只看一個 team", en: "One team at a time" },
+      b: { zh: "按一個 team，只列那個 team 的人。", en: "Pick a team to list only its people." } },
+    { at: ".main table.who", t: { zh: "誰該更新了", en: "Who needs to update" },
+      b: { zh: "一個人一列：在哪裡、上次什麼時候更新。紅色是超過三十天沒更新或從沒填過，可以提醒他；寫「還沒設定時區」的人排會時不會被算進去。", en: "One row each: where they are and when they last updated. Red means over 30 days or never; nudge them. Anyone marked No time zone yet isn't counted when scheduling." } },
+    { at: ".main .bar .tocal", t: { zh: "去排會", en: "Go and schedule" },
+      b: { zh: "大家填好之後，到行事曆的「日」看每半小時幾個人有空，點一格排會。", en: "Once people have filled theirs in, open the Calendar's Day view to see who is free each half hour and click one to schedule." } },
+    { at: ".main .bar .tabs [data-t='mine']", t: { zh: "改你自己的", en: "Edit your own" },
+      b: { zh: "回「我的時間」改你自己有空的時間。", en: "Go back to My time to edit your own free times." } },
+  ] },
+  { id: "availability", page: "availability:", steps: [
+    { at: ".main .modeswitch", t: { zh: "平常的時間，或某一週", en: "Usual times, or one week" },
+      b: { zh: "「平常的時間」每週重複，填一次用一學期。「某一週」是例外，會取代那一週的平常時間，例如考試週或出國。", en: "Usual times repeat every week, so one fill lasts a semester. A specific week is an exception that replaces your usual times that week, for exams or travel." } },
+    { at: ".main .batch", t: { zh: "一次填一段", en: "Fill a range at once" },
+      b: { zh: "選時段、勾星期（或按「平日」「週末」），按「加入這段」。填錯了一樣選好，按「拿掉這段」。", en: "Pick the time, tick the days (or press Weekdays or Weekend), then press Add this range. To undo, select the same and press Remove this range." } },
+    { at: ".main .brow.copy", t: { zh: "複製一天", en: "Copy a day" },
+      b: { zh: "某一天填好了，選它，再勾其他天，按「複製到勾選的那幾天」。", en: "Once one day is right, choose it, tick the other days and press Copy to the ticked days." } },
+    { at: ".main .gridwrap.mine", t: { zh: "一格一格改", en: "Fine-tune by the half hour" },
+      b: { zh: "點一格就開或關那半小時。手機上用上面的「一次填一段」比較快。", en: "Click a cell to turn that half hour on or off. On a phone, filling a range above is quicker." } },
+    { at: ".main .autosave", t: { zh: "會自己存", en: "It saves by itself" },
+      b: { zh: "改完不用按存，停下來一秒就存好。時間沒變的話按「我確認過了，沒有變」，大家就知道你的時間是新的。", en: "No save button: it saves a second after you stop. If nothing changed, press I checked, nothing changed so people know your times are current." } },
+    { at: ".main .bar .tocal", t: { zh: "填完去排會", en: "Then schedule" },
+      b: { zh: "行事曆的「日」照大家填的時間畫出每半小時幾個人有空，排得了會的人在那裡點一格排會。", en: "The Calendar's Day view shows how many people are free each half hour from these times; organizers click one there to schedule." } },
+  ] },
+
+  // ── 我的護照（/passport/）：護照本身、進度牆 ──
+  { id: "passport-wall", page: "passport:", when: ".main .wall", steps: [
+    { at: [".wall .people", ".wall .empty"], t: { zh: "大家蓋到哪裡", en: "How far everyone is" },
+      b: { zh: "一個人一列，看得到名字、team、大頭照與蓋了幾格。寫的那一句與照片不會出現在這裡。", en: "One row each, with name, team, photo and how many stamps. The lines people wrote and their photos never show here." } },
+    { at: ".wall .person .track", t: { zh: "一個月一段", en: "One segment per month" },
+      b: { zh: "每一段是一個月，滿了就是那個月蓋完了。", en: "Each segment is a month; a full one means that month is done." } },
+    { at: ".wall .feed", t: { zh: "最近蓋的章", en: "Recent stamps" },
+      b: { zh: "大家最近蓋了哪幾格。", en: "The boxes people stamped most recently." } },
+    { at: ".main .bar .tabs [data-v='passport']", t: { zh: "回到你的護照", en: "Back to your passport" },
+      b: { zh: "按這裡回去蓋你自己的章。", en: "Go back to stamp your own." } },
+  ] },
+  { id: "passport", page: "passport:", steps: [
+    { at: ".main .bar .prog", t: { zh: "你蓋了幾格", en: "Your stamps" },
+      b: { zh: "這一屆你蓋了幾格、總共幾格。每一格是一件 BT 的事：一次聚會、一個題目、一張照片。", en: "How many boxes you have stamped this year out of the total. Each box is one BT thing: a gathering, a question or a photo." } },
+    { at: ".main .book .nav .dots", t: { zh: "翻頁", en: "Turn the pages" },
+      b: { zh: "第一頁是你的資料，後面一個月一頁。點圓點跳頁，或按鍵盤的左右鍵。", en: "The first page is your details, then one page per month. Click a dot to jump, or use the left and right arrow keys." } },
+    { go: ".main .book .nav .dots button[data-p='1']", at: [".main .book .slots", ".main .book .veil"], t: { zh: "一個月一頁", en: "One page per month" },
+      b: { zh: "每個月幾格，分三種：聚會、題目（只有你看得到的一個問題）、鏡頭（拍一張照片）。還沒開放的月份是封起來的。", en: "Each month has a few boxes of three kinds: Gather, Prompt (a question only you see) and Frame (a photo to take). Months not open yet are sealed." } },
+    { at: [".main .book .slot[data-done='0']", ".main .book .slot"], t: { zh: "怎麼蓋章", en: "How to stamp" },
+      b: { zh: "點一格，填日期、一句話、照片（都可以留空），按「蓋章」。蓋錯了打開那一格，按「撕掉這格」。", en: "Click a box, fill in the date, one line and a photo (all optional), then press Stamp. Wrong box? Open it and press Tear this off." } },
+    { t: { zh: "只有你看得到", en: "Only you can see it" },
+      b: { zh: "你寫的那一句與照片只放在你自己的護照裡。進度牆上別人只看得到你蓋了幾格。", en: "Your lines and photos stay in your own passport. On the progress wall, others only see how many boxes you have stamped." } },
+    { t: { zh: "蓋滿一個月", en: "Fill a month" },
+      b: { zh: "一個月每一格都蓋好，就多一個入境章。城市是抽的，抽到就固定了，撕掉重蓋也是同一個。", en: "Stamp every box in a month and you get an entry stamp. The city is drawn once and stays, even if you tear a box off and stamp it again." } },
+    { at: ".main .bar .tabs [data-v='wall']", t: { zh: "看大家的進度", en: "See everyone's progress" },
+      b: { zh: "「進度牆」看每一位幹部蓋到哪裡。", en: "The progress wall shows how far every cadre has got." } },
   ] },
 
   // ── 搜尋（/admin/search/）──
@@ -870,245 +973,754 @@ export const TOURS = [
     { at: [".sx-list", ".main .empty"], t: { zh: "結果", en: "Results" },
       b: { zh: "每一筆標出是哪一種、名稱、日期與提到的那一句，點名稱回到原本那一頁。你在原本那一頁讀不到的，這裡也不會出現。", en: "Each result shows its kind, title, date and the line that matched. Click the title to open the original. Anything you can't read on its own page won't show up here." } },
     { t: { zh: "會議記下來就找得到", en: "Logged meetings show up here" },
-      b: { zh: "用「記一場會議」（側欄最上面的「新增」或會議那一頁）記下來的會，都找得到。開完會把重點寫進紀錄，之後要找就不用一場一場點開。", en: "Every meeting logged with Log a meeting (under New at the top of the menu, or on the Meetings page) can be found here. Write the key points into the notes, and nobody has to open meetings one by one later." } },
+      b: { zh: "用「記一場會議」記下來的會（首頁或會議那一頁），紀錄、議程與標題都找得到。開完會把重點寫進紀錄，之後就不用一場一場點開。", en: "Meetings logged with Log a meeting (on Home or the Meetings page) are searchable by notes, agenda and title. Write the key points into the notes and nobody has to open meetings one by one later." } },
     { at: "#sx-settings", t: { zh: "給 AI 讀哪些", en: "What the AI may read" },
       b: { zh: "只有 Co-President 看得到這一塊：勾哪幾種可以給 AI 讀。回饋表與活動檢討要先補隱私政策再打開。", en: "Only Co-Presidents see this: which kinds the AI may read. Feedback forms and event reviews stay off until the privacy policy covers them." } },
   ] },
 
-  // ── 專案 → 活動 ──
-  { id: "events", page: "forms:events", unless: "#ev-tabs", steps: [
-    { at: AT_HEAD, t: { zh: "每個 team 的活動", en: "Every team's events" },
-      b: { zh: "每個 team 在這裡做自己的活動：填內容、設報名表，好了就按「準備好了」。Co-President 發布之後，對外的首頁、/events/ 和那場活動自己的頁面就看得到。", en: "Each team makes its own events here: fill in the content, set up the sign-up form, then press Mark ready. Once a Co-President publishes it, it shows on the public home page, /events/ and its own page." } },
-    { at: "#ev-new", t: { zh: "開一場新的活動", en: "Start a new event" },
-      b: { zh: "選 team，填短網址與中英文名字。一開始是草稿，發布之前外面的人看不到。", en: "Pick the team, then a short web address and the names in both languages. It starts as a draft, so nobody outside sees it until it is published." } },
-    { at: [".main .ev-fbx", ".main > .chips"], t: { zh: "找一場活動", en: "Find an event" },
-      b: { zh: "打名字、代號或地點找。上面那一排可以只看已經上線的，或還在做的。", en: "Search by name, short address or place. The row of chips above shows only live events, or only the ones still in progress." } },
-    { at: ".main .section .flist", t: { zh: "點一場就能改", en: "Open one to edit it" },
-      b: { zh: "點活動名字進到它的編輯頁。名字旁邊的小標籤寫著它是草稿還是已經上線。", en: "Click an event's name to open its editor. The small tag next to the name says whether it is a draft or live." } },
-    { at: "#todo", t: { zh: "還沒寄出去的信", en: "Emails not sent yet" },
-      b: { zh: "報名的狀態一改，就會排一封信給那個人。信先停在這裡，按「現在寄出去」才真的寄。", en: "Each time an applicant's status changes, an email to them is queued. The emails wait here until someone presses Send now." } },
-    { at: ".main .ev-recline", t: { zh: "比較舊的活動在紀錄裡", en: "Older events live in Records" },
-      b: { zh: "網站還沒做好之前辦的活動只在「紀錄」裡，出席與回饋也在那裡。按這一行過去看。", en: "Events from before the site exist only in Records, with their attendance and feedback. This line takes you there." } },
+  // ── 會議（/admin/#meetings）：記一場、一場的頁、清單 ──
+  { id: "meeting-new", page: "forms:meetings", when: "[data-act='mt-back']", unless: ".rq-dl", steps: [
+    { t: { zh: "記一場會議", en: "Log a meeting" },
+      b: { zh: "開完的會，或在別的地方約好的會，在這裡記下來。這裡記的不寄信，也不放上 Google 日曆；要寄邀請，到行事曆點日期排。", en: "Log a meeting that already happened or was arranged elsewhere. Logging sends no email and adds nothing to Google Calendar; to send invites, schedule from the Calendar." } },
+    { at: "#mt-scope", t: { zh: "誰的會、要不要到", en: "Whose meeting, and is it required" },
+      b: { zh: "範圍選 team 或整個 BT，再選必到或選擇參加。", en: "Pick the team, or all of BT, then Required or Optional." } },
+    { at: "#mt-title", t: { zh: "標題、時間、議程", en: "Title, time, agenda" },
+      b: { zh: "填標題、開始與結束（結束要比開始晚）、一行議程。會議紀錄的連結只收 Google Docs 或 Drive 的。", en: "Fill in the title, start and end (end after start) and a one-line agenda. The notes link must be a Google Docs or Drive link." } },
+    { at: "#mtn-min", t: { zh: "寫紀錄", en: "Write the minutes" },
+      b: { zh: "選一份範本，每一段一個框，框裡的灰字是提示。要多一段按「加一段」。", en: "Pick a template; each section gets its own box with a hint inside. Press Add a section for more." } },
+    { at: ".ma.picker[data-ns='mt']", t: { zh: "誰出席", en: "Who was there" },
+      b: { zh: "右邊找名字或按 team，勾起來；左邊是已經在名單上的人。", en: "On the right, search or pick a team and tick people; the left lists who is already on the list." } },
+    { at: "#mt-form [data-act='mt-save']", t: { zh: "記下來", en: "Log it" },
+      b: { zh: "按「記下來」。之後在上面的搜尋找得到這場會的紀錄、議程與標題。", en: "Press Log it. Its notes, agenda and title are then searchable from the search box." } },
+  ] },
+  { id: "meeting", page: "forms:meetings", when: ".rq-dl", steps: [
+    { at: "main.main > section.section:nth-of-type(1)", t: { zh: "這場會", en: "This meeting" },
+      b: { zh: "時間、範圍、議程。從行事曆排的會，Google 日曆與 Meet 連結也在這裡。", en: "Time, scope and agenda. For meetings scheduled from the Calendar, the Google Calendar entry and Meet link are here too." } },
+    { at: [".mt-rsvp", "main.main > section.section:nth-of-type(2)"], t: { zh: "誰會到", en: "Who is coming" },
+      b: { zh: "會到、還沒回、不能到三欄，不能到的原因寫在旁邊。大家在首頁、信裡或 Google 日曆回覆，不是在這裡。", en: "Coming, No reply and Can't make it, with reasons beside them. People reply from Home, the email or Google Calendar, not here." } },
+    { at: ["section.section:has(#mtm-min)", "section.section:has(.mtm-read)"], t: { zh: "寫紀錄", en: "Write the minutes" },
+      b: { zh: "選一份範本，在框裡打字就存。名單上的人都改得動。寫進紀錄的字，之後在搜尋找得到。", en: "Pick a template and type in the boxes; it saves as you go. Anyone on the list can edit. What you write becomes searchable." } },
+    { at: "#mt-form", t: { zh: "改時間、名單、議程", en: "Change the time, list or agenda" },
+      b: { zh: "改了就存。從行事曆排的會，停手十分鐘之後會寄更新信給大家；被拿掉的人收到取消信。", en: "Changes save as you go. For a scheduled meeting, ten minutes after you stop an update email goes to everyone; anyone removed gets a cancellation." } },
+    { at: "[data-act='mt-delete']", t: { zh: "取消這場會", en: "Cancel the meeting" },
+      b: { zh: "「刪掉這一場」會問兩次，日曆上有這場會的人都會收到取消。", en: "Delete asks twice, and everyone with it on their calendar gets a cancellation." } },
+    { at: ".main .back", t: { zh: "回到所有的會", en: "Back to all meetings" },
+      b: { zh: "按這裡回到會議清單。", en: "This takes you back to the list." } },
+  ] },
+  { id: "meetings", page: "forms:meetings", steps: [
+    { at: AT_HEAD, t: { zh: "所有的會", en: "All meetings" },
+      b: { zh: "要寄邀請的會，到行事曆點日期排；開完的會在這裡記紀錄。兩種都會列在這裡。", en: "Meetings with invites are scheduled from the Calendar; meetings that already happened are logged here. Both are listed on this page." } },
+    { at: ".page-head a[href='#meetings/new']", t: { zh: "記一場會議", en: "Log a meeting" },
+      b: { zh: "按這裡記一場：範圍、時間、紀錄、誰出席。要某個 team「改」以上才記得了那個 team 的會。", en: "Press this to log one: scope, time, minutes and who attended. You need Edit on a team to log that team's meetings." } },
+    { at: "#mtl-q", t: { zh: "找一場會", en: "Find a meeting" },
+      b: { zh: "打標題或 team 的名字，清單馬上縮小。", en: "Type a title or team name and the list narrows straight away." } },
+    { at: ["[data-mt-row]", "main.main > section.section:nth-of-type(1)"], t: { zh: "點一場打開", en: "Open one" },
+      b: { zh: "每一列寫著必到或選擇參加、邀了幾個人、幾個人說會到。點標題寫紀錄、看誰會到、改時間。", en: "Each row shows Required or Optional, how many were invited and how many are coming. Click a title to write minutes, see replies or change the time." } },
+    { at: AT_SUBS, t: { zh: "會議範本", en: "Templates" },
+      b: { zh: "「會議範本」讓每一次的紀錄照同一個格式寫，例如「決定的事」「誰要做什麼」。", en: "Templates keep every set of minutes in the same shape, such as Decisions and Who does what." } },
+  ] },
+  { id: "mtemplate-edit", page: "forms:mtemplates", when: "#mtpl-ed", steps: [
+    { at: "#mtpl-title", t: { zh: "名字與給哪種會", en: "Name, and which meetings" },
+      b: { zh: "取一個看得懂的名字，再選給哪一種會用；選「每一種會都能用」就每一場都選得到。", en: "Give it a clear name and choose which meetings it is for; Any meeting makes it available everywhere." } },
+    { at: ".mtpl-secs", t: { zh: "一段一個標題", en: "One heading per section" },
+      b: { zh: "每一段寫標題與提示，提示會變成記會議時框裡的灰字。用上下箭頭排順序，「加一段」多一段。", en: "Each section has a heading and a hint; the hint becomes the grey text in the box when someone logs a meeting. Reorder with the arrows; Add a section adds one." } },
+    { at: "[data-act='mtpl-save']", t: { zh: "存起來", en: "Save it" },
+      b: { zh: "存好之後，記會議時在範本的下拉選單選得到；某一種會只有一份範本時會自動選好。", en: "Once saved, it appears in the template picker when logging a meeting, and is picked automatically if it is the only one for that kind." } },
+  ] },
+  { id: "mtemplates", page: "forms:mtemplates", steps: [
+    { at: AT_HEAD, t: { zh: "會議範本", en: "Meeting templates" },
+      b: { zh: "記會議的時候選一份範本，紀錄就分成一段一段的框，每一次都照同一個格式寫。", en: "Picking a template when logging a meeting splits the minutes into boxes, so every set of minutes has the same shape." } },
+    { at: "[data-act='mtpl-new']", t: { zh: "做一份新的", en: "Make a new one" },
+      b: { zh: "按「新增一份範本」，取名字、選給哪種會、寫每一段的標題與提示，按「建立範本」。", en: "Press New template, give it a name, choose which meetings it is for, write each section's heading and hint, then press Create template." } },
+    { at: [".main ul.flist", ".main .empty"], t: { zh: "改或封存", en: "Edit or archive" },
+      b: { zh: "「改」打開那一份。用不到的按「封存」，已經記好的會議不會變。", en: "Edit opens one. Archive the ones you no longer use; meetings already logged stay as they are." } },
+    { at: AT_SUBS, t: { zh: "回到會議", en: "Back to meetings" },
+      b: { zh: "在「會議」那一頁記一場會議，就選得到這些範本。", en: "Log a meeting on the Meetings page to use these templates." } },
+  ] },
+
+  // ── 跟 Marketing 提需求（/admin/#request）：送單、Marketing 的待辦、一張單 ──
+  { id: "request-one", page: "forms:request", when: ".rq-print", steps: [
+    { at: ".rq-print .rq-dl", t: { zh: "這張需求單", en: "This request" },
+      b: { zh: "送單的人寫的全部內容：要做什麼、目標、重點、預計發布日。", en: "Everything the requester wrote: what they need, the goal, the key line and the planned date." } },
+    { at: "#rq-assignee", t: { zh: "誰接、回覆什麼", en: "Who takes it, and the reply" },
+      b: { zh: "選接的人、寫回覆，改了就存。接的人首頁會出現「派給你的需求」。", en: "Pick who takes it and write a reply; both save as you go. The person who takes it sees it on their Home page." } },
+    { at: ["[data-act='rq-accept']", "#rq-status"], t: { zh: "接下或退件", en: "Accept or reject" },
+      b: { zh: "按「接下」開始做，不寄信。「退件」要先寫回覆，會寄信把原因告訴送單的人。", en: "Accept starts the work and sends no email. Reject needs a reply first, and emails the reason to the requester." } },
+    { at: ["[data-act='rq-publish']", "#rq-status"], t: { zh: "做好、發出去", en: "Done and posted" },
+      b: { zh: "狀態改進行中或審稿中。真的發出去之後按「已發出，通知送單的人」，寄一封信連同你的回覆。", en: "Set the status to In progress or In review. Once it is live, press Posted, tell the requester to send one email with your reply." } },
+    { at: ".main .back", t: { zh: "回到待辦", en: "Back to the queue" },
+      b: { zh: "按這裡回到所有的需求單。", en: "This takes you back to all requests." } },
+  ] },
+  { id: "request-queue", page: "forms:request", when: "#rq-q", steps: [
+    { at: AT_HEAD, t: { zh: "Marketing 的待辦", en: "Marketing's queue" },
+      b: { zh: "大家送來的需求單。上面那一排挑還沒發布、已發布、退件，或「我接的」。", en: "Every request sent in. The chips above show Open, Published or Rejected, or just Mine." } },
+    { at: "#rq-q", t: { zh: "找一張", en: "Find one" },
+      b: { zh: "打標題、重點或目標找。", en: "Search by title, key line or goal." } },
+    { at: ["li.rq-row", ".main .empty"], t: { zh: "點一張處理", en: "Open one to handle it" },
+      b: { zh: "點進去選誰接、寫回覆、接下或退件，發出去之後通知送單的人。", en: "Open it to choose who takes it, reply, accept or reject, and tell the requester once it is posted." } },
+  ] },
+  { id: "request", page: "forms:request", steps: [
+    { at: [".rq-kinds", "#rq-kind"], t: { zh: "要做什麼", en: "What do you need" },
+      b: { zh: "先選貼文、限動或影片，下面就出現一張需求單。", en: "Pick Post, Story or Video first and a request sheet appears below." } },
+    { at: "#rq-title", t: { zh: "寫清楚要什麼", en: "Say exactly what you need" },
+      b: { zh: "填名稱、目標與 CTA、一句話重點、一定要有的資訊、草稿連結與預計發布日。不到七天會提醒你，但不會擋。", en: "Fill in the name, goal and call to action, the key line, must-have info, a draft link and the planned date. Under seven days away you get a warning, not a block." } },
+    { at: ".rq-send", t: { zh: "送給 Marketing", en: "Send to Marketing" },
+      b: { zh: "按下去 Marketing 會收到信。還沒送之前，打的字留在這台電腦上。", en: "Press it and Marketing gets an email. Until you send, your draft stays on this device." } },
+    { at: "#rq-mine", t: { zh: "我送過的", en: "My requests" },
+      b: { zh: "看每一張做到哪裡。還是「已送出」的可以收回；退件或發出去會寄信給你，首頁也看得到。", en: "See where each one is. You can withdraw it while it is Submitted; you get an email when it is rejected or posted, and it shows on Home." } },
+    { at: ".rq-switch", t: { zh: "Marketing 的待辦", en: "Marketing's queue" },
+      b: { zh: "處理需求單的人從這裡切到大家送來的單。", en: "People who handle requests switch to everyone's requests here." } },
+  ] },
+
+  // ── 專案 → 活動（/admin/#events）──
+  // 一份表單的編輯頁、審核、當天、行前信：跟它所屬的活動、專案或招募同一個 page，用 when 分開，寫在最前面。
+  { id: "form-editor", page: ["forms:events", "forms:projects", "forms:forms"], when: ".tabp[data-ptabs='form']", steps: [
+    { at: AT_HEAD, t: { zh: "一份表單怎麼做", en: "How a form gets made" },
+      b: { zh: "在「題目」寫題目，在「設定」設開放時間，改成開放中，再到「申請」看誰填了。全部打字就存，沒有存檔鈕。", en: "Write questions under Questions, set the dates under Settings, switch it to Open, then see who filled it in under Applications. Everything saves as you type." } },
+    { go: ".main nav.ptabs [data-sub='questions']", at: ".fx-canvas", t: { zh: "一題一個框", en: "One box per question" },
+      b: { zh: "點一個框直接改題目與說明。旁邊選題型（短答、單選、日期、檔案上傳等十五種），勾「必填」。", en: "Click a box to change the question and its help text. Beside it pick the type (short answer, multiple choice, date, file upload and more) and tick Required." } },
+    { at: [".fx-canvas .fx-logic", ".fx-canvas"], t: { zh: "答了什麼才出現", en: "Show a question only after an answer" },
+      b: { zh: "「條件邏輯」設成某一題答了什麼，才出現、跳過或跳到某一頁。要分頁就加一個「換頁」。", en: "Logic shows, hides or jumps to a page depending on an earlier answer. Add a Page break block to split the form into pages." } },
+    { at: ".fx-tail", t: { zh: "加一題", en: "Add a question" },
+      b: { zh: "按「＋ 加一題」或打「/」選題型。姓名、學校、年級、email 系統會自己收，不用另外問。", en: "Press + Add a block or type / to pick a type. Name, school, grade and email are collected automatically, so don't ask for them." } },
+    { at: ".fx-mode", t: { zh: "先自己填一次", en: "Try it yourself first" },
+      b: { zh: "切到「預覽」照填的人看到的樣子走一次，條件也會動，按送出不會真的送。", en: "Switch to Preview to go through it as people will; the logic works and Submit sends nothing." } },
+    { go: ".main nav.ptabs [data-sub='settings']", at: ["#fstatus", "#ftitle"], t: { zh: "設定與開放", en: "Settings, and opening it" },
+      b: { zh: "名稱說明、開放與截止時間、收滿幾份自己關、送出後寄確認信。狀態改成「開放中」才收得到；活動的報名表要等活動發布，外面才看得到。", en: "Name, dates, close after a number of responses, a confirmation email. Set the status to Open to start; an event's sign-up form goes public once the event is published." } },
+    { at: ".main nav.ptabs [data-act='open-apps']", t: { zh: "看誰填了", en: "See who filled it in" },
+      b: { zh: "「申請」列出每一份：勾人，按邀請面試、錄取或婉拒，每個人會收到一封信。", en: "Applications lists every response: tick people and press Interview, Accepted or Declined, and each person gets an email." } },
+    { at: ".main .back", t: { zh: "回去", en: "Go back" },
+      b: { zh: "按這裡回到這份表單所屬的活動、專案或清單。", en: "This goes back to the event, project or list the form belongs to." } },
+  ] },
+  { id: "form-apps", page: ["forms:events", "forms:projects", "forms:forms"], when: ".main nav.ptabs > .subtab.on[data-act='open-apps']", steps: [
+    { at: [".main .chips", AT_HEAD], t: { zh: "誰填了", en: "Who filled it in" },
+      b: { zh: "上面那一排挑全部、還沒處理、邀請面試、錄取或婉拒。", en: "The chips above show All, Waiting, Interview, Accepted or Declined." } },
+    { at: [".main .alist2", ".main .section .empty"], t: { zh: "看他寫了什麼", en: "Read the answers" },
+      b: { zh: "一個人一列，按「看他寫了什麼」打開答案。", en: "One row per person; press Read the answers to open theirs." } },
+    { at: ".main .bulk", t: { zh: "決定", en: "Decide" },
+      b: { zh: "勾人，按「邀請面試」「錄取」或「婉拒」，確認之後每個人收到一封信；面試信附 Cal.com 的預約連結。", en: "Tick people, press Interview, Accepted or Declined and confirm; each person gets one email, and interview emails include the Cal.com booking link." } },
+    { at: ".main .msg.info", t: { zh: "還沒寄出去的信", en: "Emails not sent yet" },
+      b: { zh: "寄失敗的信停在這裡，按「現在寄出去」再寄一次。", en: "Emails that failed wait here; press Send now to try again." } },
+    { at: "#rc-panel", t: { zh: "錄取時一起寄邀請", en: "Accepting also sends an invite" },
+      b: { zh: "招募表錄取一個人，系統會照這裡設的職級與 team 寄邀請，三十天內有效，他登入就在幹部名單上。", en: "On a recruitment form, accepting someone also sends an invite with the rank and team set here, valid 30 days; once they sign in they are on the Roster." } },
+    { at: ".main nav.ptabs [data-act='open-checkin']", t: { zh: "活動當天", en: "On the day" },
+      b: { zh: "簽到與行前信在「活動」分頁。簽到的人與每一個決定，都會自動抄進紀錄。", en: "Check-in and the pre-event email are under Event. Check-ins and every decision are copied into Records automatically." } },
+  ] },
+  { id: "form-notice", page: ["forms:events", "forms:projects", "forms:forms"], when: "#nsub", steps: [
+    { at: "[data-act='notice-to']", t: { zh: "寄給誰", en: "Who gets it" },
+      b: { zh: "選要寄給哪幾種人，例如只寄給錄取的。", en: "Choose who it goes to, for example only accepted people." } },
+    { at: "#nsub", t: { zh: "主旨與內容", en: "Subject and message" },
+      b: { zh: "寫主旨與內容：集合時間、地點、要帶什麼。", en: "Write the subject and message: meeting time, place, what to bring." } },
+    { at: "[data-act='notice-send']", t: { zh: "寄出", en: "Send" },
+      b: { zh: "按下去會再問一次，確認之後就寄出去，收不回來。", en: "It asks once more, then sends. Sent emails can't be called back." } },
+  ] },
+  { id: "form-checkin", page: ["forms:events", "forms:projects", "forms:forms"], when: ".main nav.ptabs > .subtab.on[data-act='open-checkin']", steps: [
+    { at: AT_HEAD, t: { zh: "活動當天", en: "On the day" },
+      b: { zh: "簽到與行前信都在這一頁。", en: "Check-in and the pre-event email are both on this page." } },
+    { at: ["[data-act='checkin']", ".main .section"], t: { zh: "簽到", en: "Check people in" },
+      b: { zh: "只列錄取的人，來了就勾一下，勾了就存，出席會自動進紀錄。", en: "Only accepted people are listed. Tick each person as they arrive; it saves straight away and attendance goes into Records." } },
+    { at: "[data-act='open-notice']", t: { zh: "寄行前信", en: "Send a pre-event email" },
+      b: { zh: "按這裡寫一封信給這些人，選寄給誰、寫主旨與內容，寄出前會再問一次。", en: "Write one email to these people: choose who, write the subject and message; it asks once more before sending." } },
   ] },
   { id: "event-editor", page: "forms:events", when: "#ev-tabs", steps: [
-    { at: "#ev-state", t: { zh: "這場活動現在在哪一步", en: "Where this event stands" },
-      b: { zh: "草稿的意思是外面還看不到。右邊那一顆按鈕就是下一步要做的事。", en: "Draft means nobody outside can see it yet. The button on the right is the next thing to do." } },
-    { at: "#ev-tabs", t: { zh: "六個分頁", en: "Six tabs" },
-      b: { zh: "一場活動的東西分成六塊：內容、照片、講者、表單、成果、設定。換分頁不會弄丟你打到一半的字。", en: "An event is split into six tabs: Details, Photos, Speakers, Forms, Results and Settings. Switching tabs keeps what you have typed." } },
-    { at: '#ev-tabs [data-tab="forms"]', t: { zh: "報名表與回饋表", en: "Sign-up and feedback forms" },
-      b: { zh: "這場活動的報名表和活動後的回饋表都在這個分頁開。", en: "This event's sign-up form and its after-event feedback form are both made in this tab." } },
-    { at: '#ev-tabs [data-tab="results"]', t: { zh: "活動結束之後", en: "After the event" },
-      b: { zh: "出席和回饋在這裡看。這些數字來自「紀錄」，跟紀錄那一頁是同一份資料，不用登兩次。", en: "Attendance and feedback show up here. The numbers come from Records, so this tab and the Records page show the same data; nothing is entered twice." } },
-    { at: '#ev-tabs [data-tab="settings"]', t: { zh: "上線與其他設定", en: "Going live, and the rest" },
-      b: { zh: "內容好了就在這裡按「準備好了」，Co-President 再發布。請 Marketing 做貼文、這場活動屬於哪個專案、誰能改它，也都在這裡。", en: "When the content is done, press Mark ready here and a Co-President publishes it. Asking Marketing for a post, which project the event belongs to and who can edit it are here too." } },
-    { at: ".main .back", t: { zh: "回到活動清單", en: "Back to the list" },
-      b: { zh: "按這裡回到所有活動。", en: "This takes you back to all events." } },
+    { at: "#ev-state", t: { zh: "這場活動在哪一步", en: "Where this event stands" },
+      b: { zh: "草稿外面看不到。順序是：填內容、放照片、設報名表，按「準備好了」，Co-President 發布。", en: "Drafts are invisible outside. The order is: fill in the content, add photos, set up the sign-up form, press Mark ready, then a Co-President publishes." } },
+    { go: "#ev-tabs [data-tab='details']", at: "#ev-content", t: { zh: "內容", en: "Content" },
+      b: { zh: "中英文名字、一句話、介紹。打字就存，沒有存檔鈕。展開「對外頁上會長這樣」看預覽。", en: "Names, one line and description in both languages. It saves as you type. Open How it will look on the public page to preview." } },
+    { at: "#ev-when", t: { zh: "時間與地點", en: "When and where" },
+      b: { zh: "用台灣時間填。名額填 0 是不限。選一個場地會帶入地點，場地的聯絡人不會公開。", en: "Use Taiwan time. Capacity 0 means unlimited. Picking a venue fills in the place; its contacts are never public." } },
+    { go: "#ev-tabs [data-tab='photos']", at: "#ev-pics", t: { zh: "照片與講者", en: "Photos and speakers" },
+      b: { zh: "選一張封面，再加活動照片。上傳等於確認照片裡的人都同意公開。講者在隔壁的分頁加。", en: "Choose a cover, then add event photos. Uploading confirms everyone in them agreed to be shown. Speakers are added in the next tab." } },
+    { go: "#ev-tabs [data-tab='forms']", at: ["#ev-form [data-act='open-form']", "[data-act='ev-attach-form']", "#ev-signup"], t: { zh: "做報名表", en: "Make the sign-up form" },
+      b: { zh: "還沒有報名表就先按「加一張報名表」。有了之後按「改題目與表單設定」打開編輯器，一題一個框，點進去就改。題目好了設開放時間，按「開放報名」。", en: "No form yet? Press Add a sign-up form. Then Edit questions and form settings opens the editor, where each question is a box you click to edit. Set the dates and press Open sign-up." } },
+    { at: ["#ev-signup [data-act='open-apps']", "#ev-signup"], t: { zh: "誰報了名、當天簽到", en: "Who signed up, and check-in" },
+      b: { zh: "「看報名的人」審核、寄錄取或婉拒信。底下有「行前信」與「簽到」，當天就用這兩顆。", en: "See sign-ups to review people and send decisions. Pre-event email and Check-in are just below for the day itself." } },
+    { go: "#ev-tabs [data-tab='results']", at: "#ev-after", t: { zh: "活動之後", en: "After the event" },
+      b: { zh: "出席與回饋在「成果」，跟紀錄是同一份。要回饋表，回「表單」分頁按「建立回饋表」，六題標準題目會先放好。", en: "Attendance and feedback are under Results, the same data as Records. For a feedback form, press Create feedback form in the Forms tab; six standard questions are filled in." } },
+    { go: "#ev-tabs [data-tab='settings']", at: ["#ev-live", ".tabp[data-tabp='settings']"], t: { zh: "上線", en: "Going live" },
+      b: { zh: "按「準備好了」，Co-President 按「放上對外頁」，就出現在首頁與 /events/。請 Marketing 做貼文、放進專案、誰能改也在這一頁。", en: "Press Mark ready and a Co-President presses Publish; it then shows on the home page and /events/. Ask Marketing for a post, pick the project and choose editors here too." } },
+  ] },
+  { id: "events", page: "forms:events", unless: "#ev-tabs", steps: [
+    { at: AT_HEAD, t: { zh: "一場活動怎麼做", en: "How an event gets made" },
+      b: { zh: "開一場、填內容、做報名表、按「準備好了」，Co-President 發布之後對外的首頁、/events/ 與那場活動的頁面就看得到。", en: "Create it, fill in the content, make the sign-up form and press Mark ready. Once a Co-President publishes it, it shows on the home page, /events/ and its own page." } },
+    { at: "#ev-new > summary", t: { zh: "開一場活動", en: "Create an event" },
+      b: { zh: "打開這一格，選 team，填代號（網址，之後不能改）與中英文名字。勾「要開放報名」會一起建好報名表，按「開活動」。", en: "Open this, pick the team, fill in the slug (the web address, fixed later) and both names. Leave Takes sign-ups ticked to get a sign-up form too, then press Create." } },
+    { at: [".main .ev-fbx", ".main > .chips"], t: { zh: "找一場活動", en: "Find an event" },
+      b: { zh: "打名字、代號或地點找。上面那一排只看已經上線的，或還在做的。", en: "Search by name, slug or place. The chips show only live events, or only ones still in progress." } },
+    { at: [".main .section .flist", ".main .empty"], t: { zh: "點一場繼續做", en: "Open one to keep going" },
+      b: { zh: "點名字進到編輯頁，旁邊的標籤寫著草稿、等發布還是已上線。", en: "Click a name to open its editor; the tag beside it says draft, waiting or live." } },
+    { at: "#todo", t: { zh: "還沒寄出去的信", en: "Emails not sent yet" },
+      b: { zh: "報名的人狀態一改就會排一封信。寄失敗的停在這裡，按「現在寄出去」。", en: "Each change to an applicant's status queues an email. Ones that failed wait here; press Send now." } },
+    { at: ".main .ev-recline", t: { zh: "比較舊的活動在紀錄裡", en: "Older events live in Records" },
+      b: { zh: "網站做好之前辦的活動只在「紀錄」裡，出席與回饋也在那裡。", en: "Events from before the site exist only in Records, with their attendance and feedback." } },
+    { at: AT_SUBS, t: { zh: "好幾場收成一個專案", en: "Group events into a project" },
+      b: { zh: "同一件事的好幾場，例如營隊與說明會，到「專案」收在一起。", en: "Several events for one thing, such as a camp and its info session, go together under Projects." } },
+  ] },
+  { id: "project", page: "forms:projects", when: "[data-act='pj-back']", steps: [
+    { at: AT_HEAD, t: { zh: "一個專案", en: "One project" },
+      b: { zh: "這個專案底下的活動與報名表都在這一頁。改得動專案的人，也改得動裡面每一場活動。", en: "Everything in this project is here: its events and sign-up forms. Anyone who can edit the project can edit each of its events." } },
+    { at: ".main > section.section:nth-of-type(1)", t: { zh: "放活動進來", en: "Add events" },
+      b: { zh: "「在這個專案開一場活動」開新的，或「把已經開好的活動放進來」。點一場進到它的編輯頁。", en: "Create an event inside this project, or move in one that already exists. Click an event to open its editor." } },
+    { at: ".main > section.section:nth-of-type(2)", t: { zh: "整個專案一張報名表", en: "One sign-up form for the project" },
+      b: { zh: "例如整個營隊只報一次名：打名稱，按「建一份報名表」，再按「改題目與設定」寫題目。", en: "For example one sign-up for the whole camp: type a name, press Create a sign-up form, then Edit questions and settings." } },
+    { at: ".main > section.section:nth-of-type(3)", t: { zh: "專案設定", en: "Project settings" },
+      b: { zh: "改名字、封存，或看誰在這個專案。只有管得到的人看得到這一塊。", en: "Rename it, archive it or see who is on it. Only people with Manage see this block." } },
+    { at: ".main .back", t: { zh: "回到所有專案", en: "Back to all projects" },
+      b: { zh: "按這裡回到專案清單。", en: "This takes you back to the list." } },
   ] },
   { id: "projects", page: "forms:projects", steps: [
     { at: AT_HEAD, t: { zh: "專案把活動收在一起", en: "Projects group events together" },
       b: { zh: "一個專案底下可以有好幾場活動和報名表。例如 Curriculum 的「Winter Camp 2027」底下有說明會、營隊本身和行前會。", en: "A project holds several events and sign-up forms. For example, Curriculum's Winter Camp 2027 holds the info session, the camp itself and the pre-camp meeting." } },
-    { at: "#pj-new", t: { zh: "開一個專案", en: "Create a project" },
-      b: { zh: "選 team，填短網址與中英文名字。", en: "Pick the team, then a short web address and the names in both languages." } },
-    { at: ".main .section .flist", t: { zh: "一個 team 一塊", en: "One block per team" },
-      b: { zh: "點一個專案，看它底下有哪幾場活動與表單。", en: "Click a project to see the events and forms inside it." } },
-    { at: AT_SUBS, t: { zh: "專案和活動怎麼接", en: "How projects and events connect" },
-      b: { zh: "旁邊就是「活動」。每一場活動在自己的「設定」分頁選它屬於哪個專案。", en: "Events is right next to this page. Each event picks its project in its own Settings tab." } },
+    { at: "#pj-new > summary", t: { zh: "開一個專案", en: "Create a project" },
+      b: { zh: "打開這一格，選 team、填短網址與中英文名字，按「開專案」。接著在專案裡開活動，或把開好的放進來。", en: "Open this, pick the team, a short address and both names, then press Create. Next, create events inside it or move existing ones in." } },
+    { at: [".main .section .flist", ".main .empty"], t: { zh: "點一個打開", en: "Open one" },
+      b: { zh: "一個 team 一塊，點專案看它底下的活動與報名表。", en: "One block per team; click a project to see its events and forms." } },
+    { at: AT_SUBS, t: { zh: "活動在隔壁", en: "Events are next door" },
+      b: { zh: "每一場活動也可以在自己的「設定」分頁選它屬於哪個專案。", en: "Each event can also pick its project in its own Settings tab." } },
+  ] },
+
+  // ── 表單（/admin/team-forms/ 與紀錄的回饋表）──
+  { id: "fill-one", page: "teamforms:fill", when: "[data-act='back-fill']", steps: [
+    { at: [".main .fx-form", "#tf-run"], t: { zh: "一頁一頁填", en: "Answer page by page" },
+      b: { zh: "照順序回答，按「下一頁」，最後按「送出」。打到一半關掉也沒關係，這台電腦會先幫你留著。", en: "Answer in order, press Next, then Send at the end. If you close it halfway, this device keeps your draft." } },
+    { at: ".main > .note", t: { zh: "誰看得到你的答案", en: "Who can read your answers" },
+      b: { zh: "這一行寫著誰讀得到你的答案；匿名的表單也會寫在這裡。", en: "This line says who can read your answers, and whether the form is anonymous." } },
+    { at: ".main .back", t: { zh: "填完回清單", en: "Back to the list" },
+      b: { zh: "送出之後它會移到「你填過的」。表單允許的話，那裡可以改你的答案。", en: "After you send it, it moves to Your answers, where you can change them if the form allows." } },
+  ] },
+  { id: "fill", page: "teamforms:fill", steps: [
+    { at: [".main .tf-card", ".main .empty"], t: { zh: "還沒填的", en: "Still to fill in" },
+      b: { zh: "別人發給你的內部表單都在這裡，首頁的「等你處理」也看得到。按「去填」打開。", en: "Internal forms sent to you are here and on your Home page. Press Fill it in to open one." } },
+    { at: [".main .flist", ".main .section .mini"], t: { zh: "你填過的", en: "Your answers" },
+      b: { zh: "送出過的在這裡。表單允許改的話按「改我的答案」，不然只能「看我的答案」。", en: "Forms you have sent. Change my answers if the form allows it, otherwise See my answers." } },
+    { at: AT_SUBS, t: { zh: "要自己做一份表單", en: "To make a form yourself" },
+      b: { zh: "「所有表單」列出你管的報名表、回饋表與內部表單，要建一份也從那裡開始。", en: "All forms lists the sign-up, feedback and internal forms you run, and is where you make a new one." } },
+  ] },
+  { id: "forms-all", page: "teamforms:all", steps: [
+    { at: AT_HEAD, t: { zh: "你管的每一份表單", en: "Every form you run" },
+      b: { zh: "報名表、回饋表、內部表單都列在這裡，每一份標著哪一種、哪一場活動、開著沒、收了幾份。", en: "Sign-up, feedback and internal forms are all here, each tagged with its kind, event, whether it is open and how many responses." } },
+    { at: [".main .flist", ".main .empty"], t: { zh: "點一份打開", en: "Open one" },
+      b: { zh: "點名字打開它的編輯頁。三種表單編輯的方式一樣：一題一個框，點進去就改。", en: "Click a name to open its editor. All three kinds work the same way: one box per question, click to edit." } },
+    { at: ".main > .chips", t: { zh: "只看一種", en: "One kind at a time" },
+      b: { zh: "上面那一排只看報名表、回饋表或內部表單。", en: "The chips show only sign-up, feedback or internal forms." } },
+    { at: ".main .all-new", t: { zh: "建一份", en: "Make a form" },
+      b: { zh: "先選哪一種。報名表與回饋表再選一場活動，按「建報名表」或「建回饋表」，就直接打開編輯頁。", en: "Pick the kind first. For a sign-up or feedback form, also pick an event and press Make the sign-up form or Make the feedback form; the editor opens straight away." } },
+    { at: [".main .kind-cards", ".main .all-new"], t: { zh: "什麼時候外面看得到", en: "When people outside can see it" },
+      b: { zh: "報名表要等那一場活動發布之後才對外。回饋表用連結發，不用登入。內部表單只發給你選的幹部。", en: "A sign-up form goes public once its event is published. Feedback forms go out by link, no sign-in. Internal forms only reach the cadres you choose." } },
+  ] },
+  { id: "internal-form", page: "teamforms:build", when: ".main a.subtab[data-act='sub']", steps: [
+    { at: AT_HEAD, t: { zh: "一份內部表單怎麼做", en: "How an internal form gets made" },
+      b: { zh: "寫題目、選發給誰，再按右上角「打開，開始收答案」。標題旁邊寫著它現在是草稿、開著還是收起來了。", en: "Write the questions, choose who gets it, then press Open it at the top right. The tag by the title says draft, open or closed." } },
+    { go: ".main a.subtab[data-t='questions']", at: ".main .fx-canvas", t: { zh: "一題一個框", en: "One box per question" },
+      b: { zh: "每一題是一個框，點進去直接改。框跟框之間的「＋」加一題，或在最後打「/」選題型。", en: "Each question is a box; click in to change it. The + between boxes adds a question, or type / at the end to pick a type." } },
+    { at: [".main .fx-canvas .fx-logic", ".main .fx-canvas"], t: { zh: "題型、必填、條件", en: "Type, required, logic" },
+      b: { zh: "框旁邊改題型、設必填、複製或刪掉。「條件邏輯」設成答了某個選項才出現下一題。有人答過的題目不能刪，也不能換題型。", en: "Beside each box: change the type, make it required, copy or delete it. Logic shows a question only after a certain answer. Once answered, a question can't be deleted or change type." } },
+    { at: ".main .fx-mode", t: { zh: "預覽", en: "Preview" },
+      b: { zh: "切到「預覽」看填的人看到的樣子，再切回來繼續改。所有改動都會自己存。", en: "Switch to Preview to see it as people will, then back to keep editing. Every change saves itself." } },
+    { go: ".main a.subtab[data-t='people']", at: ["#aud-recipient", ".main .section"], t: { zh: "發給誰、誰看得到", en: "Who gets it, who reads it" },
+      b: { zh: "勾人、team 或職級，按「存這一張名單」，每一張分開存。讀者看得到每一份答案，選整個 team 就是整個 team 都看得到。", en: "Tick people, teams or ranks and press Save this list; each list saves on its own. Readers see every answer, so a whole team as readers means the whole team can read them." } },
+    { at: ".main .page-head .actions [data-act='tf-status']", t: { zh: "打開", en: "Open it" },
+      b: { zh: "有題目也選好人之後，按「打開，開始收答案」。收到的人在首頁「等你處理」看到它，不會寄信。", en: "Once it has questions and recipients, press Open it. Recipients see it under Waiting for you on Home; no email is sent." } },
+    { go: ".main a.subtab[data-t='results']", at: [".main .todo", ".main .empty"], t: { zh: "看結果", en: "See the results" },
+      b: { zh: "誰填了、誰還沒填一目了然，可以私訊提醒他。有答案之後可以「下載 CSV」。", en: "See who has answered and who hasn't, so you can nudge them. Once answers come in you can Download CSV." } },
+  ] },
+  { id: "internal-forms", page: "teamforms:build", steps: [
+    { at: AT_HEAD, t: { zh: "內部表單", en: "Internal forms" },
+      b: { zh: "給幹部填的表單，例如期中回饋或分工調查。只發給你選的人，不會公開，也不會寄信。", en: "Forms for cadres to fill in, such as a mid-term check-in or a task survey. They only reach people you choose; nothing is public and no email is sent." } },
+    { at: ".main .page-head .actions [data-act='tf-new']", t: { zh: "建一份", en: "Make one" },
+      b: { zh: "按「建一份新的」，打標題，按「建立」。接著到它的編輯頁：寫題目、選發給誰、打開。", en: "Press New form, type a title and press Create. Then in its editor: write questions, choose who gets it, open it." } },
+    { at: ".main > .note", t: { zh: "沒有建立的按鈕", en: "No New form button" },
+      b: { zh: "請 Co-President 在工作區把你派進「內部表單（誰能建）」。", en: "Ask a Co-President to add you to Team forms (who can create) under Workspaces." } },
+    { at: [".main .flist", ".main .empty"], t: { zh: "你管的與你讀得到的", en: "Yours, and ones you can read" },
+      b: { zh: "點一份打開。寫著「你是讀者」的只能看答案，不能改題目。", en: "Click one to open it. Ones marked You can read only show answers; you can't change the questions." } },
+  ] },
+  { id: "feedback-form", page: "records:forms", when: ".main a.subtab[data-act='sub']", steps: [
+    { at: AT_HEAD, t: { zh: "一份回饋表怎麼做", en: "How a feedback form gets made" },
+      b: { zh: "寫題目、接到哪一場活動，按「打開，開始收」，複製連結發出去。填的人不用登入，結果回到那一場活動的紀錄。", en: "Write the questions, link it to an event, press Open it and share the link. Nobody needs to sign in, and the results go back to that event's record." } },
+    { go: ".main a.subtab[data-t='questions']", at: ".main .fx-canvas", t: { zh: "一題一個框", en: "One box per question" },
+      b: { zh: "跟其他表單一樣，點框就改。空白的表單可以按「放進固定題目」。「代號」是年度比較對同一題用的，不要亂改。", en: "Like other forms, click a box to edit. An empty form can start from the standard questions. The key is how year-by-year matches questions, so leave it alone." } },
+    { go: ".main a.subtab[data-t='settings']", at: [".main [data-autosave='rc-save']", ".main .section"], t: { zh: "接哪一場活動", en: "Which event" },
+      b: { zh: "選這份回饋表是哪一場活動的、用哪一種語言。改了就存。", en: "Choose which event it belongs to and its language. Changes save as you go." } },
+    { at: ".main .page-head .actions [data-act='form-status']", t: { zh: "打開", en: "Open it" },
+      b: { zh: "按「打開，開始收」，上面就出現填寫連結。", en: "Press Open it and the fill-in link appears." } },
+    { at: ".main .rc-link", t: { zh: "複製連結發出去", en: "Copy and share the link" },
+      b: { zh: "按「複製」貼到群組或信裡。登入的參加者在首頁也看得到它。", en: "Press Copy and paste it into the group chat or an email. Signed-in participants also see it on Home." } },
+    { go: ".main a.subtab[data-t='results']", at: [".main .todo", ".main .empty"], t: { zh: "看結果", en: "See the results" },
+      b: { zh: "填了幾份、留了聯絡方式的、未滿 18 歲的。有答案之後看平均與留言，也可以下載 CSV。", en: "How many answered, left contact details or are under 18. Once answers arrive, see averages and comments, or download a CSV." } },
+  ] },
+  { id: "feedback-forms", page: "records:forms", steps: [
+    { at: AT_HEAD, t: { zh: "活動後的回饋表", en: "Post-event feedback forms" },
+      b: { zh: "填的人不用登入，結果回到那一場活動的紀錄與活動編輯頁的「成果」。", en: "Nobody needs to sign in, and results go back to the event's record and the Results tab of its editor." } },
+    { at: ".main .page-head .actions [data-act='form-new']", t: { zh: "建一份", en: "Make one" },
+      b: { zh: "最快的是在那一場活動的「表單」分頁按「建立回饋表」。這裡也可以：填標題、種類、活動、語言，勾「先放進固定題目」，按「建立」。", en: "Fastest is Create feedback form in the event's Forms tab. Here works too: title, kind, event, language, tick Start from the standard questions, then Create." } },
+    { at: [".main .flist", ".main .empty"], t: { zh: "點一份打開", en: "Open one" },
+      b: { zh: "點名字打開編輯頁：題目、設定、誰看得到、結果。", en: "Click a name for its editor: questions, settings, readers and results." } },
+    { at: "details[data-anon]", t: { zh: "舊的答案去掉名字", en: "Remove names from old answers" },
+      b: { zh: "三屆以前的記名答案，在這裡一次去掉名字。", en: "Strip names from named answers older than three terms, all at once." } },
+  ] },
+
+  // ── 行銷 ──
+  { id: "college-post", page: "marketing:posts", when: ".cp-wrap", steps: [
+    { at: "#cp-status", t: { zh: "這一篇在哪一步", en: "Where this post stands" },
+      b: { zh: "順序是：填六張投影片與照片、每個數字點來源確認、送去核可、別人核可、下載、發到 IG、標成已發。", en: "The order: fill the six slides and photos, check each number against its source, send for approval, get approved, download, post on Instagram, mark as posted." } },
+    { at: ".cp-form", t: { zh: "填內容", en: "Fill it in" },
+      b: { zh: "一張投影片一塊。照片要填作者與授權；說明文字最多 2,200 字、30 個 hashtag。", en: "One block per slide. Photos need the author and licence; the caption takes up to 2,200 characters and 30 hashtags." } },
+    { at: [".cp-tick", ".cp-form"], t: { zh: "每個數字都點開確認", en: "Check every number" },
+      b: { zh: "每個數字放來源，點開看過，再勾「我點開來源看過，數字對得上」。改了數字或來源，勾會不見。", en: "Add a source to each number, open it, then tick I opened the source and the number matches. Changing the number or source clears the tick." } },
+    { at: ".cp-prev", t: { zh: "預覽", en: "Preview" },
+      b: { zh: "右邊是做出來的樣子，點一張放大。", en: "This is how the slides will look; click one to zoom in." } },
+    { at: "#cp-actions", t: { zh: "送審、核可、下載", en: "Approval and download" },
+      b: { zh: "全部填好才按得了「送去核可」。另一位核可的人按「核可這一版」或「退回」。核可之後下載 PNG 或 .pptx 給 Canva，發完按「我已經發到 IG 了」。", en: "Send for approval works once nothing is missing. Another approver presses Approve or Send back. After approval, download PNGs or .pptx for Canva; after posting, press I posted it on Instagram." } },
+  ] },
+  { id: "college-posts", page: "marketing:posts", steps: [
+    { at: AT_HEAD, t: { zh: "大學介紹貼文", en: "College intro posts" },
+      b: { zh: "一所大學一篇七張的 IG 輪播。每個數字都要有人點開來源確認，再由另一個人核可才能發。", en: "One seven-slide Instagram carousel per university. Every number has to be checked against its source, then approved by someone else before posting." } },
+    { at: ".main .cp-new", t: { zh: "開一篇", en: "Start a post" },
+      b: { zh: "打學校名字，按「開一篇」；有研究檔就按「匯入研究檔」。", en: "Type the school and press Start a post, or Import research file if you have one." } },
+    { at: [".main .cp-list", ".main .section .empty"], t: { zh: "點一篇繼續做", en: "Open one to keep going" },
+      b: { zh: "每一篇寫著現在在哪一步，點進去繼續填、送審或下載。", en: "Each post shows its stage; open it to keep filling it in, send it for approval or download it." } },
+    { at: "[data-act='cp-archived']", t: { zh: "封存的", en: "Archived posts" },
+      b: { zh: "封存的貼文收在這裡，封存之後那所學校可以重開一篇。", en: "Archived posts are kept here; archiving frees the school name for a new post." } },
+  ] },
+  { id: "instagram", page: "marketing:ig", steps: [
+    { at: AT_HEAD, t: { zh: "BT 的 Instagram 連線", en: "BT's Instagram connection" },
+      b: { zh: "網站用這個連線讀 BT 的 IG。連著的時候不用管它，權杖剩不到五十天會自己換新。", en: "The site reads BT's Instagram through this connection. While it is connected there is nothing to do; the token renews itself under 50 days." } },
+    { at: [".main .rq-dl", ".main .section"], t: { zh: "現在的狀態", en: "Current status" },
+      b: { zh: "連著就看得到帳號與最後檢查的時間。沒連上的話照這裡的說明設定。", en: "When connected you see the account and when it was last checked. If not, follow the setup steps here." } },
+    { at: ".main .page-head .actions [data-act='ig-check']", t: { zh: "再檢查一次", en: "Check again" },
+      b: { zh: "出現錯誤 190 代表權杖失效，請 Co-President 換一個新的。", en: "Error 190 means the token has expired; ask a Co-President to put in a new one." } },
   ] },
 
   // ── 人與權限 ──
+  { id: "person", page: "people:roster", when: "[data-autosave='person-save']", steps: [
+    { at: AT_HEAD, t: { zh: "改一個人", en: "Edit one person" },
+      b: { zh: "這一頁每一個改動都會自己存，也會寫進「誰改了什麼」。", en: "Every change on this page saves itself and is written to the Change log." } },
+    { go: "#pe-person-tabs [data-tab='profile']", at: ["#pk-role", ".tabp[data-tabp='profile']"], t: { zh: "職級", en: "Rank" },
+      b: { zh: "職級只有 Co-President 改得動。選 Co-President 會先問一次，因為等於把整個後台交給他。", en: "Only a Co-President can change rank. Choosing Co-President asks first, because it hands over the whole Backstage." } },
+    { at: [".posrow", ".tabp[data-tabp='profile']"], t: { zh: "這一屆的職位", en: "This term's position" },
+      b: { zh: "選職位與 team，同一屆可以「再加一個職位」。存了 Director 會跳出一顆鈕問要不要順便開那個 team 的權限，不會自己開。", en: "Pick the position and team; Add another position for a second one. Saving a Director offers a button to also open that team's access; it never happens by itself." } },
+    { go: "#pe-person-tabs [data-tab='ws']", at: [".main table.grid", ".tabp[data-tabp='ws']"], t: { zh: "工作區", en: "Workspaces" },
+      b: { zh: "每一格選不在、看、改或管，改了馬上存，跳出來的提示有「復原」。", en: "Each cell is Not in, View, Edit or Manage. It saves straight away, with Undo in the message that pops up." } },
+    { go: "#pe-person-tabs [data-tab='account']", at: ["#invite-back", ".tabp[data-tabp='account']"], t: { zh: "帳號", en: "Account" },
+      b: { zh: "沒有帳號的人在這裡寄邀請信，三十天內有效。移除一個人要打他的名字確認。", en: "For someone without an account, send an invite here; it lasts 30 days. Removing a person asks you to type their name." } },
+    { at: ".main .back", t: { zh: "回到名單", en: "Back to the roster" },
+      b: { zh: "按這裡回到幹部名單。", en: "This takes you back to the roster." } },
+  ] },
+  { id: "person-new", page: "people:roster", when: "[data-act='person-create']", steps: [
+    { at: "#pn-zh", t: { zh: "以前的幹部", en: "Someone from before" },
+      b: { zh: "給以前當過幹部、但沒有帳號的人。先填中英文名字。", en: "For past cadres who never had an account. Start with both names." } },
+    { at: "#pn-term", t: { zh: "哪一屆、什麼職位", en: "Which term, which position" },
+      b: { zh: "選屆別、職位與 team，備註只有後台看得到。", en: "Choose the term, position and team. The note is only visible here." } },
+    { at: "[data-act='person-create']", t: { zh: "加進名單", en: "Add to roster" },
+      b: { zh: "按下去回到名單，篩選會切到「歷屆全部」讓你看到他。之後可以從名單寄邀請給他。", en: "You return to the roster filtered to All terms so you can see them. You can invite them from there later." } },
+    { at: ".main .section .note", t: { zh: "一整屆比較快", en: "A whole term is faster" },
+      b: { zh: "要補一整屆，到「屆別」用「貼一整屆」一次貼進來。", en: "For a whole term, paste it in one go under Terms with Paste a term." } },
+  ] },
   { id: "roster", page: "people:roster", steps: [
     { at: AT_HEAD, t: { zh: "這一屆的幹部", en: "This year's team" },
       b: { zh: "職級決定他是誰，工作區決定他能動什麼。team 只是一個標籤，不會開任何權限。", en: "Rank says who someone is; workspaces say what they can change. The team is only a label and opens nothing by itself." } },
     { at: "#roster .fbx", t: { zh: "找一個人", en: "Find someone" },
-      b: { zh: "打名字找。「篩選」可以換成別的屆別；網站上線前的幹部沒有帳號，選「歷屆全部」才看得到。", en: "Search by name. Filters switch to another year; cadres from before the site have no account and show up under All terms." } },
-    { at: "#roster table", t: { zh: "一個人一列", en: "One row per person" },
-      b: { zh: "名字、職級、這一屆的職位、被派進哪幾個工作區。", en: "Name, rank, position this year and the workspaces they are assigned to." } },
-    { at: AT_ACT, t: { zh: "補以前的人", en: "Add someone from before" },
-      b: { zh: "「加一筆過去的紀錄」是給以前當過幹部、但沒有帳號的人用的。", en: "Add a past record is for people who were on the team before but never had an account." } },
+      b: { zh: "打名字找。「篩選」換屆別或 team；網站上線前的幹部選「歷屆全部」才看得到。", en: "Search by name. Filters switches term or team; cadres from before the site only show under All terms." } },
+    { at: ["#roster [data-act='person-edit']", "#roster table"], t: { zh: "改一個人", en: "Edit someone" },
+      b: { zh: "按「改」打開他的頁：名字、職級、這一屆的職位、工作區、帳號。", en: "Press Edit to open their page: names, rank, this term's position, workspaces and account." } },
+    { at: ["#roster input[data-act='bulk-tick']", "#roster .fbx"], t: { zh: "把以前的人邀回來", en: "Invite back past cadres" },
+      b: { zh: "篩選選「歷屆全部」與「沒有帳號」，勾起來，每一列填 email，按「寄 n 封邀請信」。只有那個 email 認領得到。", en: "Filter to All terms and No account, tick people, fill in each email and press Send invites. Only that email can claim each one." } },
+    { at: AT_ACT, t: { zh: "補一筆過去的紀錄", en: "Add a past record" },
+      b: { zh: "以前當過幹部、名單上還沒有的人，按「加一筆過去的紀錄」。", en: "For someone who was on the team before but isn't listed, press Add a past record." } },
     { at: ".main > .note", t: { zh: "每一個改動都有紀錄", en: "Every change is logged" },
-      b: { zh: "誰改了什麼都寫在「誰改了什麼」那一頁。把人升成 Co-President 等於把整個後台交給他，包括把你降級。", en: "Every change is written to the Change log. Promoting someone to Co-President hands them the whole Backstage, including the power to demote you." } },
-    { at: AT_SUBS, t: { zh: "要開權限，去工作區", en: "To give access, use Workspaces" },
-      b: { zh: "要讓一個人處理某個 team 的申請或資源，在「工作區」那一頁把他派進去，不是在這一頁改。", en: "To let someone handle a team's applications or resources, assign them on the Workspaces page, not here." } },
+      b: { zh: "誰改了什麼都寫在「誰改了什麼」那一頁。把人升成 Co-President 等於把整個後台交給他，包括把你降級。", en: "Every change goes to the Change log. Promoting someone to Co-President hands them the whole Backstage, including the power to demote you." } },
   ] },
   { id: "invites", page: "people:invites", steps: [
     { at: AT_HEAD, t: { zh: "邀請新的人", en: "Invite new people" },
-      b: { zh: "打 email、選他會是什麼身分，按一次信就寄出去。對方點信裡的連結登入就好，不用打碼。", en: "Type an email, choose what they will be, press once and the email goes out. They click the link and sign in; there is no code to type." } },
-    { at: "#invite-fold", t: { zh: "邀請一個人", en: "Invite someone" },
-      b: { zh: "填 email、職級、team、哪一屆和名字。這些會變成他進來之後的身分與這一屆的職位。", en: "Fill in the email, rank, team, year and name. They become the person's role and this year's position once they join." } },
-    { at: "#invites", t: { zh: "已經邀請的人", en: "People invited" },
-      b: { zh: "還沒進來的人在這裡。信過期或寄丟了，按「重寄（換新碼）」；寄錯人就按「撤銷」。", en: "People who have not joined yet are listed here. If the email expired or got lost, press Resend (new code); if it went to the wrong person, press Revoke." } },
-    { at: "#batch", t: { zh: "一組碼給一群人", en: "One code for a group" },
-      b: { zh: "很少用到。一個一個邀請請用上面那一格。", en: "Rarely needed. To invite people one by one, use the form above." } },
-    { at: AT_SUBS, t: { zh: "進來之後在名單上", en: "After they join" },
-      b: { zh: "對方登入之後就會出現在「幹部名單」上。", en: "Once they sign in, they show up on the Roster." } },
+      b: { zh: "填 email、選他會是什麼身分，按一次信就寄出去。對方點信裡的連結登入就好，不用打碼。", en: "Fill in an email, choose what they will be, press once and the email goes out. They click the link and sign in; there is no code to type." } },
+    { at: "#invite-fold > summary", t: { zh: "邀請一個人", en: "Invite someone" },
+      b: { zh: "打開這一格，填 email、他會是什麼、職級、team、屆別、名字，按「寄邀請信」。名字跟沒有帳號的舊紀錄一樣時，會問你是不是同一個人。", en: "Open this and fill in the email, role, rank, team, term and names, then press Send invite. If the name matches an old record, it asks whether it is the same person." } },
+    { at: ["#invites", "#invites .empty"], t: { zh: "寄出去之後", en: "After it is sent" },
+      b: { zh: "狀態寫著排隊中、寄出、開過信、認領了或過期。寄失敗或過期按「重寄（換新碼）」，寄錯人按「撤銷」。", en: "The status shows Queued, Sent, Opened, Claimed or Expired. If it failed or expired press Resend (new code); if it went to the wrong person press Revoke." } },
+    { at: "#batch > summary", t: { zh: "一組碼給一群人", en: "One code for a group" },
+      b: { zh: "很少用到，只有 Co-President 看得到。一個一個邀請用上面那一格。", en: "Rarely needed, and only for Co-Presidents. Invite people one by one with the form above." } },
+    { at: AT_SUBS, t: { zh: "信的文字與名單", en: "Email wording, and the roster" },
+      b: { zh: "對方登入之後就在「幹部名單」上。邀請信的字在「對外網站」的「信的文字」改。", en: "Once they sign in they are on the Roster. The invite's wording is edited under Website, Email wording." } },
+  ] },
+  { id: "workspace", page: "people:workspaces", when: "#ws-panel", steps: [
+    { at: "#ws-panel h2", t: { zh: "你選的工作區", en: "The workspace you picked" },
+      b: { zh: "選 team 的標題是整個 team；選底下一樣，就只有那一樣。", en: "A team heading means the whole team; an item under it means just that item." } },
+    { at: "#ws-panel .ma-col:last-child", t: { zh: "加人", en: "Add people" },
+      b: { zh: "找名字或按 team，勾人，選等級，按「加 n 個人」。跳出來的提示有「復原」。", en: "Search or pick a team, tick people, choose the level and press Add people. The message that pops up has Undo." } },
+    { at: "#ws-panel .ma-col:first-child", t: { zh: "已經在裡面的", en: "Already in" },
+      b: { zh: "改等級馬上存。「移出」會先問一次。", en: "Changing a level saves straight away. Remove asks first." } },
+    { t: { zh: "看、改、管", en: "View, Edit, Manage" },
+      b: { zh: "看只能讀；改可以改內容；管還能在那一頁加人、改等級、移出。Co-President 與 Senior Adviser 不用派。錢只有 Co-President 或管錢的人派得了。", en: "View can read; Edit can change; Manage can also add, re-level and remove people there. Co-Presidents and Senior Advisers need no assignment. Only a Co-President or a Money manager can assign Money." } },
+  ] },
+  { id: "workspaces", page: "people:workspaces", steps: [
+    { at: AT_HEAD, t: { zh: "誰能動什麼", en: "Who can change what" },
+      b: { zh: "職級不開權限，工作區才開。要讓一個人處理某個 team 的東西，在這裡把他派進去。", en: "Rank opens nothing; workspaces do. To let someone work on a team's things, assign them here." } },
+    { at: [".main .wsgrid", ".main .empty"], t: { zh: "點一個工作區", en: "Pick a workspace" },
+      b: { zh: "點 team 的標題是整個 team，點底下一樣是只有那一樣。下面會打開那一區的成員。", en: "Click a team heading for the whole team, or an item under it for just that item. Its members open below." } },
+    { at: "#ws-new > summary", t: { zh: "開一個專案", en: "Create a project" },
+      b: { zh: "專案也是一個工作區，開好就可以派人進去。", en: "A project is a workspace too; once created you can assign people to it." } },
+    { t: { zh: "看、改、管", en: "View, Edit, Manage" },
+      b: { zh: "看只能讀；改可以改內容；管還能在那一頁加人、改等級、移出。", en: "View can read; Edit can change; Manage can also add, re-level and remove people on that thing's own page." } },
+  ] },
+  { id: "terms", page: "people:terms", steps: [
+    { at: AT_HEAD, t: { zh: "屆別", en: "Terms" },
+      b: { zh: "BT 一年一屆，每個人每一屆的職位都記在這裡。", en: "BT runs one term a year, and each person's position in each term is kept here." } },
+    { at: [".main .section > ul.flist", ".main .section .empty"], t: { zh: "每一屆的人", en: "People in each term" },
+      b: { zh: "展開「這一屆的人」看名單，可以加人或拿掉。", en: "Open People in this term to see the list, add someone or take them off." } },
+    { at: "#tm-paste > summary", t: { zh: "貼一整屆", en: "Paste a term" },
+      b: { zh: "一行一個人：中文名、英文名、職位、team。先按「先看一下」，沒問題再按「存」。", en: "One person per line: Chinese name, English name, position, team. Press Preview first, then Save." } },
+    { at: "#tm-new > summary", t: { zh: "補過去的一屆", en: "Add a past term" },
+      b: { zh: "網站上線前的屆別在這裡補。", en: "Add terms from before the site here." } },
+    { at: "[data-act='end-start']", t: { zh: "換屆", en: "End the term" },
+      b: { zh: "只有 Co-President 按得到：選下一屆、勾留下來的人、打新屆別的代號確認。沒勾的人變校友，工作區全部拿掉，不能復原。", en: "Co-Presidents only: pick the next term, tick who stays, type the new term id to confirm. Everyone else becomes an alumnus and loses all workspaces. This can't be undone." } },
+  ] },
+  { id: "bug-inbox", page: "people:feedback", steps: [
+    { at: AT_HEAD, t: { zh: "回報與許願", en: "Bugs and requests" },
+      b: { zh: "幹部按右下角那一顆送來的，也會寄一封信給 Co-President 與 Senior Adviser。", en: "Sent by cadres from the bottom-right button; each one is also emailed to Co-Presidents and Senior Advisers." } },
+    { at: ".main .fb-tabs", t: { zh: "照狀態看", en: "By status" },
+      b: { zh: "預設只看新的。切到處理中、做好了、不做或全部。", en: "New is shown by default. Switch to In progress, Done, Not doing or All." } },
+    { at: ["#feedback .fb-row", "#feedback .empty"], t: { zh: "處理一則", en: "Handle one" },
+      b: { zh: "改狀態馬上存。備註只有你們看得到，寫好按「存備註」。連結回到他當時那一頁。", en: "Changing the status saves at once. The note is only for you; press Save note. The link opens the page they were on." } },
+  ] },
+  { id: "change-log", page: "people:changes", steps: [
+    { at: AT_HEAD, t: { zh: "誰改了什麼", en: "Change log" },
+      b: { zh: "職級、職位、工作區的每一個改動，最近三十筆。", en: "The last 30 changes to ranks, positions and workspaces." } },
+    { at: ["#changes .flist", "#changes .empty"], t: { zh: "一筆一列", en: "One row per change" },
+      b: { zh: "改了誰、哪一欄、從什麼改成什麼，誰在什麼時候改的。", en: "Who was changed, which field, from what to what, and who did it when." } },
+    { at: AT_SUBS, t: { zh: "要改回來", en: "To change it back" },
+      b: { zh: "這一頁只能看。要改回來，到「幹部名單」打開那個人改。", en: "This page is read-only. To undo something, open that person on the Roster." } },
+  ] },
+  { id: "recruit-members", page: ["forms:forms", "site:res"], when: "[data-act='members-back']", steps: [
+    { at: AT_HEAD, t: { zh: "誰在這裡", en: "Who works here" },
+      b: { zh: "這一區的成員與他們的等級：看、改或管。", en: "This area's members and their level: View, Edit or Manage." } },
+    { at: [".ma-col:last-child", ".main .section"], t: { zh: "加人", en: "Add people" },
+      b: { zh: "找名字或按 team，勾人，選等級，按「加 n 個人」。", en: "Search or pick a team, tick people, choose the level and press Add people." } },
+    { at: [".ma-col:first-child", ".main .section"], t: { zh: "改等級或移出", en: "Change level or remove" },
+      b: { zh: "改等級馬上存，「移出」會先問一次。", en: "Level changes save straight away; Remove asks first." } },
+    { at: ".main .back", t: { zh: "回去", en: "Go back" },
+      b: { zh: "按這裡回到上一頁。", en: "This takes you back." } },
   ] },
   { id: "recruitment", page: "forms:forms", steps: [
     { at: AT_HEAD, t: { zh: "招募新幹部", en: "Recruiting new team members" },
-      b: { zh: "這裡放招募幹部的申請表。活動和計畫的報名表不在這裡，在那一場活動自己的頁面。", en: "Application forms for recruiting team members live here. Sign-up forms for events and programmes live on that event's own page." } },
-    { at: AT_ACT, t: { zh: "開一份招募表", en: "Start a recruitment form" },
-      b: { zh: "按這裡開一份新的招募表，題目和開放時間在表單裡設定。", en: "Press this to start a new recruitment form; the questions and dates are set inside the form." } },
-    { at: ".main .section .flist", t: { zh: "看申請、改表單", en: "Review applications, edit the form" },
-      b: { zh: "每一份表單都有「看收到的申請」和「改這份表單」。在這裡錄取一個人，系統會一起寄邀請信給他，他登入之後就在幹部名單上。", en: "Each form has View applications and Edit form. Accepting someone here also emails them an invite, and once they sign in they are on the Roster." } },
+      b: { zh: "招募幹部的申請表在這裡。活動與計畫的報名表不在這裡，在那一場活動自己的頁面。", en: "Recruitment forms for the team live here. Sign-up forms for events and programmes live on that event's own page." } },
+    { at: ".main .page-head .actions [data-act='new-form']", t: { zh: "開一份招募表", en: "Start a recruitment form" },
+      b: { zh: "打名稱，按「建立」就到表單編輯器：一題一個框、設開放時間、改成開放中，/apply/ 就看得到。", en: "Type a name and press Create to open the form editor: one box per question, set the dates, switch it to Open and it shows on /apply/." } },
+    { at: [".main .section .flist", ".main .section .empty"], t: { zh: "看申請、改表單", en: "Review, or edit the form" },
+      b: { zh: "每一份有「看收到的申請」與「改這份表單」。在申請那一頁勾人，按邀請面試、錄取或婉拒。", en: "Each form has View applications and Edit form. On the applications page, tick people and press Interview, Accepted or Declined." } },
+    { t: { zh: "錄取之後", en: "After you accept someone" },
+      b: { zh: "錄取時系統一起寄邀請，三十天內有效，他登入就在幹部名單上。職級與 team 在申請那一頁上面先設好。", en: "Accepting also sends an invite, valid 30 days; once they sign in they are on the Roster. Set the rank and team at the top of the applications page first." } },
     { at: ".main .mp-links", t: { zh: "誰在處理申請", en: "Who works on applications" },
-      b: { zh: "點這裡看誰被派進「申請」這個工作區，也就是誰讀得到申請。", en: "Press this to see who is assigned to the Applications workspace, which is who can read the applications." } },
+      b: { zh: "點這裡看誰被派進「申請」這個工作區，也就是誰讀得到申請。", en: "See who is assigned to the Applications workspace, which is who can read the applications." } },
   ] },
 
   // ── 紀錄 ──
+  { id: "record", page: "records:overview", when: "#rc-event-tabs", steps: [
+    { at: ".main .rc-nums", t: { zh: "四個數字", en: "Four numbers" },
+      b: { zh: "出席、推薦、有幫助、回饋份數。下面那一行跟上一場同一種活動比。", en: "Attendance, recommend, useful and responses, compared with the last event of the same kind just below." } },
+    { go: "#rc-event-tabs [data-tab='attendance']", at: ".tabp[data-tabp='attendance']", t: { zh: "誰來了", en: "Who came" },
+      b: { zh: "網站上報名的活動按「從報名表抄過來」，報名與簽到就進來了，重按不會重複。改完狀態按「存狀態」；沒報名就來的人用「加一個人」補。", en: "For site sign-ups, press Sync from sign-up form to bring in sign-ups and check-ins; repeating is safe. Change statuses and press Save statuses; add walk-ins with Add a person." } },
+    { go: "#rc-event-tabs [data-tab='feedback']", at: ".tabp[data-tabp='feedback']", t: { zh: "活動後回饋", en: "Post-event feedback" },
+      b: { zh: "按「建活動後回饋」，標準題目先放好。打開它、複製連結發出去，不用登入就能填。平均與留言會回到這裡。", en: "Press New Post-event feedback and the standard questions are filled in. Open it, copy the link and share it; no sign-in needed. Averages and comments come back here." } },
+    { go: "#rc-event-tabs [data-tab='review']", at: ".tabp[data-tabp='review']", t: { zh: "檢討", en: "Review" },
+      b: { zh: "活動後第一次幹部會花十五分鐘填：這次做得好的、下一次改一件事，按「存檢討」。下一場同一種活動會問這件事改了沒。", en: "At the first board meeting after the event, take 15 minutes: what went well and one thing to change, then Save review. The next event of the same kind asks whether it changed." } },
+    { at: ".main .page-head .actions a.btn", t: { zh: "報名與簽到在活動那邊", en: "Sign-ups and check-in are on the event" },
+      b: { zh: "網站上辦的活動，報名、簽到、場地在「這場活動的頁面」。活動編輯頁的「成果」分頁讀的就是這裡的數字。", en: "For events run on the site, sign-ups, check-in and the venue are on the event page. Its Results tab reads these same numbers." } },
+  ] },
   { id: "records", page: "records:overview", steps: [
-    { at: AT_HEAD, t: { zh: "BT 辦過的每一場活動", en: "Every event BT has run" },
-      b: { zh: "一場活動四個數字，加一句「下一次我們改什麼」。網站上線前的活動也在這裡。", en: "Four numbers per event, plus one line on what to change next time. Events from before the site are here too." } },
-    { at: AT_ACT, t: { zh: "補一場舊活動", en: "Add an old event" },
-      b: { zh: "以前辦過、這裡還沒有的，按「加一場舊活動」補上。", en: "For an event BT ran before that is not here yet, press Add a past event." } },
-    { at: ".main .section", t: { zh: "一屆一張表", en: "One table per year" },
-      b: { zh: "點一場活動看細節：誰來了、回饋怎麼說。活動編輯頁的「成果」分頁讀的就是這一份。", en: "Open an event for the details: who came and what the feedback said. An event editor's Results tab reads this same data." } },
+    { at: AT_HEAD, t: { zh: "每一場活動的成績", en: "Every event's scorecard" },
+      b: { zh: "一屆一張表，每一場四個數字加「檢討過沒」。點名字打開那一場，補出席、發回饋表、寫檢討。", en: "One table per term, each event with four numbers and whether it was reviewed. Open one to fill in attendance, send feedback and write the review." } },
+    { at: [".main .section .rc-table", ".main .empty"], t: { zh: "還沒檢討的那幾場", en: "Events not reviewed yet" },
+      b: { zh: "寫著「還沒檢討」的，下一次幹部會花十五分鐘補。", en: "Anything marked Not yet gets 15 minutes at the next board meeting." } },
+    { at: ".main .page-head .actions [data-act='ev-new']", t: { zh: "補一場舊活動", en: "Add a past event" },
+      b: { zh: "網站上線前辦的活動，按「加一場舊活動」，填名字、種類、屆別與日期，按「建立」。舊活動不會出現在對外網站。", en: "For an event from before the site, press Add a past event, fill in the names, kind, term and dates, then Create. Past events never appear publicly." } },
     { at: AT_SUBS, t: { zh: "人與年度比較", en: "People, and year by year" },
       b: { zh: "「人」是每一個來過 BT 的人，「年度比較」把每一屆排在一起看趨勢。", en: "People lists everyone who has been part of BT; Year by year lines the terms up so you can see the trend." } },
+  ] },
+  { id: "record-person", page: "records:people", when: "#rc-person-tabs", steps: [
+    { at: AT_HEAD, t: { zh: "一個人在 BT 的一切", en: "One person's time with BT" },
+      b: { zh: "他的資料、參加過的活動、他自己寫的故事都在這一頁。", en: "Their details, the events they took part in and the story they wrote themselves are all here." } },
+    { go: "#rc-person-tabs [data-tab='details']", at: ["#rc-profile", ".tabp[data-tabp='details']"], t: { zh: "基本資料", en: "Details" },
+      b: { zh: "改了就存。可以加標籤；從紀錄自動得到的標籤這裡拿不掉。", en: "Changes save as you go. You can add labels; ones earned from records can't be removed here." } },
+    { go: "#rc-person-tabs [data-tab='bt']", at: ".tabp[data-tabp='bt']", t: { zh: "參與紀錄", en: "With BT" },
+      b: { zh: "他每一屆的職位與參加過的活動。要補一筆，按「加進一場活動」，選活動、角色、狀態，按「記進去」。", en: "Their positions and every event they joined. To add one, press Add to an event, pick the event, role and status, then Record." } },
+    { go: "#rc-person-tabs [data-tab='voice']", at: ".tabp[data-tabp='voice']", t: { zh: "故事與同意", en: "Story and consent" },
+      b: { zh: "他自己寫的，這裡只能看。按「開一條連結」給他一條九十天、不用登入的連結去填，可以複製或顯示 QR code。", en: "Written by them and read-only here. Create link gives them a 90-day link that needs no sign-in; copy it or show a QR code." } },
   ] },
   { id: "records-people", page: "records:people", steps: [
     { at: AT_HEAD, t: { zh: "每一個來過 BT 的人", en: "Everyone who has been part of BT" },
       b: { zh: "學員、mentee、幹部、校友、來賓都在這裡。點一個人看他的時間軸。", en: "Students, mentees, cadres, alumni and guests are all here. Open a person to see their timeline." } },
-    { at: ".main .ptabs", t: { zh: "三個分頁", en: "Three tabs" },
-      b: { zh: "名錄、可能重複、加一個人。同名不會自動合併，只有 email 一樣才算同一個人；同名的排在「可能重複」等人看。", en: "Directory, Possible duplicates and Add a person. Same names are not merged automatically; only a matching email counts as the same person, and same-name pairs wait under Possible duplicates." } },
     { at: "#rc-pfind", t: { zh: "找人", en: "Find people" },
       b: { zh: "打名字找，或用「篩選」挑出一群人，例如某一年的學員。", en: "Search by name, or use Filters to pick out a group, such as one year's students." } },
-    { at: ".main .rc-dirbar", t: { zh: "同一個人出現兩次", en: "Same person twice" },
-      b: { zh: "按「合併兩個人」把兩筆併成一筆，兩邊的活動紀錄都會留著。", en: "Merge people joins two entries into one and keeps the event history from both." } },
+    { at: [".main .rc-mergego", ".main .rc-dirbar"], t: { zh: "同一個人出現兩次", en: "The same person twice" },
+      b: { zh: "按「合併兩個人」，勾兩列，按「比一比」，選要留哪一欄再合併。出席與答案都會搬過去，不能復原。", en: "Press Merge people, tick two rows, press Compare, choose which column to keep, then merge. Attendance and answers move over; it can't be undone." } },
+    { at: ".main nav.ptabs [data-act='ptab'][data-t='dups']", t: { zh: "可能重複", en: "Possible duplicates" },
+      b: { zh: "同名不會自動合併，只有 email 一樣才算同一個人。同名的排在這裡等人決定合併或分開放。", en: "Same names never merge by themselves; only a matching email does. Same-name pairs wait here for someone to merge or keep apart." } },
+    { at: ".main nav.ptabs [data-act='ptab'][data-t='add']", t: { zh: "加一個人", en: "Add a person" },
+      b: { zh: "填名字、email、學校、畢業年，按「加進名單」。還在讀高中的才勾高中生。幹部不用加，登入就有。", en: "Fill in names, email, school and graduation year, then Add. Tick still in high school only for students. Cadres need no adding; they appear when they sign in." } },
   ] },
   { id: "records-yearly", page: "records:yearly", steps: [
     { at: AT_HEAD, t: { zh: "一年一年比", en: "Year by year" },
-      b: { zh: "每一屆、每一種活動一列。看的是趨勢，不是目標。", en: "One row per term and kind of event. Read it for the trend, not as a target." } },
-    { at: ".main .card", t: { zh: "挑你要比的", en: "Choose what to compare" },
-      b: { zh: "用這幾格挑屆別、活動種類、team。", en: "Use these boxes to pick the terms, the kinds of event and the team." } },
-    { at: ".main .section", t: { zh: "兩張表", en: "Two tables" },
-      b: { zh: "第一張照屆別排，第二張把同一種活動排在一起，一屆一欄，看哪一種變好了。", en: "The first is by term; the second lines up each kind of event across terms, one column per term, so you can see which got better." } },
-    { at: AT_ACT, t: { zh: "帶走數字", en: "Take the numbers with you" },
-      b: { zh: "「下載 CSV」可以用 Excel 或 Google 試算表打開。", en: "Download CSV opens in Excel or Google Sheets." } },
+      b: { zh: "每一屆、每一種活動一列。看的是趨勢，不是目標。七月交接時把這一頁給下一屆看。", en: "One row per term and kind of event. Read it for the trend, not as a target. Show it to the next board at the July handover." } },
+    { at: [".main .card .rc-yfilter", ".main .card"], t: { zh: "挑你要比的", en: "Choose what to compare" },
+      b: { zh: "挑屆別、活動種類、team，再選「比什麼」。", en: "Pick the terms, kind of event and team, then what to compare." } },
+    { at: [".main .rc-compare", ".main .section .rc-table", ".main .empty"], t: { zh: "哪一種變好了", en: "Which kind got better" },
+      b: { zh: "同一種活動排在一起，一屆一欄，看哪一種變好了。", en: "Each kind of event lined up across terms, one column per term, so you can see which got better." } },
+    { at: "[data-act='yr-csv']", t: { zh: "帶走數字", en: "Take the numbers with you" },
+      b: { zh: "「下載 CSV」用 Excel 或 Google 試算表打開，每一場的「下一次改什麼」也在裡面。", en: "Download CSV opens in Excel or Google Sheets, with each review's what-we-change line included." } },
+  ] },
+
+  // ── 場地 ──
+  { id: "venue", page: "forms:venues", when: "[data-act='vn-back']", steps: [
+    { at: "main.main > section.section:nth-of-type(1)", t: { zh: "場地資料", en: "Venue details" },
+      b: { zh: "名字、地址、人數、費用、地圖連結，改完按「存起來」。", en: "Name, address, capacity, cost and map link; press Save when done." } },
+    { at: ["#vnc-add", "main.main > section.section:nth-of-type(2)"], t: { zh: "聯絡人", en: "Contacts" },
+      b: { zh: "按「加一位聯絡人」，填名字、職稱、email、電話或 LINE。聯絡人不會公開。", en: "Press Add a contact and fill in their name, role, email, phone or LINE. Contacts are never public." } },
+    { at: "main.main > section.section:nth-of-type(3)", t: { zh: "在這裡辦過的活動", en: "Events held here" },
+      b: { zh: "活動編輯頁的「內容」分頁選了這個場地，就會出現在這裡。", en: "An event shows here once its Details tab picks this venue." } },
+    { at: ".main .back", t: { zh: "回到所有場地", en: "Back to all venues" },
+      b: { zh: "按這裡回到場地清單。", en: "This takes you back to the list." } },
+  ] },
+  { id: "venues", page: "forms:venues", steps: [
+    { at: AT_HEAD, t: { zh: "場地", en: "Venues" },
+      b: { zh: "BT 用過的場地與聯絡人。活動編輯頁選一個場地，地點會自己帶進去。", en: "Venues BT has used and their contacts. Picking a venue in an event editor fills in the place." } },
+    { at: "#vn-add > summary", t: { zh: "加一個場地", en: "Add a venue" },
+      b: { zh: "打開這一格，填名字、種類、城市、地址、人數、費用，按「加上去」，接著加聯絡人。", en: "Open this and fill in the name, kind, city, address, capacity and cost, then press Add and add contacts next." } },
+    { at: ["#vn-q", ".main .empty"], t: { zh: "找場地", en: "Find a venue" },
+      b: { zh: "打名字或城市找。", en: "Search by name or city." } },
+    { at: "#vn-list", t: { zh: "一列一個場地", en: "One row per venue" },
+      b: { zh: "看人數、費用、辦過幾場、上次什麼時候用。點名字打開。", en: "See capacity, cost, how many events and when it was last used. Click a name to open it." } },
   ] },
 
   // ── 對外網站 ──
   { id: "site-events", page: "site:events", steps: [
     { at: AT_HEAD, t: { zh: "對外網站上的活動", en: "Events on the public site" },
-      b: { zh: "這一頁是對外的 /events/ 現在有哪些。上架與下架在那一場活動自己的頁面裡，由 Co-President 按。", en: "This page shows what the public /events/ page has right now. Co-Presidents publish and unpublish from each event's own page." } },
-    { at: ".main .section", t: { zh: "上線、等發布、草稿", en: "Live, waiting, drafts" },
-      b: { zh: "team 按了「準備好了」的活動會排在「等上架」那一塊，點進去就能發布。", en: "Events a team has marked ready wait in the Waiting to be published block; open one to publish it." } },
+      b: { zh: "這一頁只能看：對外的 /events/ 現在有哪些。上架下架在那一場活動自己的「設定」分頁。", en: "Read-only: what the public /events/ page has right now. Publishing happens in each event's own Settings tab." } },
+    { at: ".main section.section:nth-of-type(2)", t: { zh: "等上架的", en: "Waiting to be published" },
+      b: { zh: "team 按了「準備好了」就排在這裡。按「到活動頁」，在「設定」分頁按「放上對外頁」。", en: "Events a team has marked ready wait here. Press Open the event, then Publish in its Settings tab." } },
+    { at: ".main section.section:nth-of-type(1)", t: { zh: "正在網站上的", en: "Live on the site" },
+      b: { zh: "「看對外那一頁」看外面的人看到的樣子。結束了還掛著的會另外列一塊。", en: "View on the site shows what visitors see. Events that are over but still up get their own block." } },
     { at: AT_SUBS, t: { zh: "網站的其他部分", en: "The rest of the site" },
-      b: { zh: "資源庫、團隊頁、校友故事、系統寄的信、歷史之路、BT 島，對外看得到的東西都在這一區改。", en: "Resources, the team page, alumni stories, the system emails, the history road and BT Island: everything the public sees is edited in this section." } },
+      b: { zh: "資源庫、團隊頁、校友故事、信的文字、歷史之路、BT 島，對外看得到的都在這一區改。", en: "Resources, the team page, alumni stories, email wording, the history road and BT Island: everything public is edited in this section." } },
+  ] },
+  { id: "history-stop", page: "site:history", when: "#hi-tzh", steps: [
+    { at: "#hi-tzh", t: { zh: "寫這一站", en: "Write this stop" },
+      b: { zh: "填中英文標題、一句話、故事與日期（只知道月份就填一號）。代號照年份與英文標題自己產生，發布之後不要改。", en: "Fill in both titles, one line, the story and the date (use the 1st if you only know the month). The slug fills itself; don't change it after publishing." } },
+    { at: ["[data-act='hi-save']", "[data-autosave='hi-save']"], t: { zh: "先存一次", en: "Save it once first" },
+      b: { zh: "新的一站先按「存起來」，照片才掛得上去。存過之後改字就自己存。", en: "Press Save on a new stop first, so photos can be attached. After that, text changes save by themselves." } },
+    { at: ["#hi-file", ".main .hi-photos"], t: { zh: "放照片", en: "Add photos" },
+      b: { zh: "一次可以選好幾張。每一張都要勾「拍攝同意已確認」，沒勾的不能上。", en: "Pick several at once. Tick that photo consent is confirmed on each; unticked photos can't go up." } },
+    { at: ".main section.section:last-of-type", t: { zh: "準備好了、發布", en: "Mark ready, then publish" },
+      b: { zh: "按「準備好了」，Co-President 或 Senior Adviser 按「放上去」，就出現在 /history/。上線之後拿掉同意勾，這一站會退回草稿。", en: "Press Mark ready and a Co-President or Senior Adviser presses Publish; it then appears on /history/. Unticking consent later drops it back to draft." } },
+  ] },
+  { id: "history", page: "site:history", steps: [
+    { at: AT_HEAD, t: { zh: "BT 歷史之路", en: "BT history road" },
+      b: { zh: "對外的 /history/ 上一站一站的 BT 故事。每一站：寫字、放照片、確認同意、準備好了、發布。", en: "The stops on the public /history/ road. For each: write it, add photos, confirm consent, mark ready, publish." } },
+    { at: ".main .page-head .actions [data-act='hi-new']", t: { zh: "加一站", en: "Add a stop" },
+      b: { zh: "按「加一站」，寫好按「存起來」，再放照片。", en: "Press Add a stop, write it, press Save, then add photos." } },
+    { at: [".main .hi-list", ".main .section .empty"], t: { zh: "點一站改", en: "Open a stop to edit it" },
+      b: { zh: "點名字打開。往上、往下調整順序，改了就存。", en: "Click a name to open it. Up and down change the order and save straight away." } },
+    { at: ".hi-warn", t: { zh: "照片還沒確認同意", en: "Photos without consent" },
+      b: { zh: "有照片還沒勾同意的站會標出來，補勾之後才發布得了。", en: "Stops with photos lacking consent are flagged; tick consent before they can be published." } },
+  ] },
+  { id: "island-edit", page: "site:island-map", when: "[data-act='im-back']", steps: [
+    { at: ["[data-autosave='im-team-save']", ".main > .note"], t: { zh: "這座島", en: "This island" },
+      b: { zh: "島的名字、介紹與樣子，改了就存，下次有人打開島就看得到。", en: "The island's name, description and look. Changes save and show the next time someone opens the island." } },
+    { at: "[data-autosave='im-prog-save']", t: { zh: "島上的建築", en: "Buildings on the island" },
+      b: { zh: "一棟建築是一個計畫，貼文掛在建築上。連結要用 ../ 或 https:// 開頭。", en: "Each building is a programme, and posts hang on buildings. Links must start with ../ or https://." } },
+    { at: "#im-new-slug", t: { zh: "加一棟", en: "Add a building" },
+      b: { zh: "填代號，按「加一棟」。代號之後不能改；拿掉一棟，掛在上面的貼文就沒地方放。", en: "Type a code and press Add a building. The code can't change later; removing a building leaves its posts with nowhere to go." } },
+    { at: ".main a[href^='/island/#']", t: { zh: "到島上看", en: "See it on the island" },
+      b: { zh: "按這裡看外面的人看到的樣子。", en: "See it the way visitors do." } },
+  ] },
+  { id: "island-map", page: "site:island-map", steps: [
+    { at: AT_HEAD, t: { zh: "BT 島", en: "BT Island" },
+      b: { zh: "對外的 /island/，一個 team 一座島。改得動的人改自己 team 的那一座。", en: "The public /island/, one island per team. People with Edit change their own team's island." } },
+    { at: ".main section.section:nth-of-type(1) .flist", t: { zh: "點一座島", en: "Open an island" },
+      b: { zh: "點進去改名字、介紹、樣子，加或拿掉建築。", en: "Open one to change its name, description and look, or add and remove buildings." } },
+    { at: ".main section.section:nth-of-type(2)", t: { zh: "島跟島之間的線", en: "Lines between islands" },
+      b: { zh: "兩座島一起做的事畫成一條線。只有 Co-President、Marketing 管的人或對外網站改得動的人加得了。", en: "Something two teams do together is drawn as a line. Only Co-Presidents, Marketing managers or Website editors can add one." } },
+    { at: ".main .page-head .actions a[href='#island']", t: { zh: "貼文在隔壁", en: "Posts are next door" },
+      b: { zh: "島上每一棟建築的貼文在「BT 島的貼文」貼。", en: "Posts for each building are made under Island posts." } },
+  ] },
+  { id: "island-post", page: "site:island", when: "#ip-url", steps: [
+    { at: "#ip-program", t: { zh: "貼在哪一棟", en: "Which building" },
+      b: { zh: "只列出你貼得了的建築。", en: "Only the buildings you can post on are listed." } },
+    { at: "#ip-url", t: { zh: "IG 連結與一句話", en: "Instagram link and a line" },
+      b: { zh: "貼 IG 貼文的連結（要 https:// 開頭），寫中英文一句話與日期，按「存起來」。", en: "Paste the Instagram post link (starting https://), add a line in both languages and the date, then Save." } },
+    { at: ["#ip-file", "[data-act='ip-consent']"], t: { zh: "放一張圖", en: "Add a picture" },
+      b: { zh: "上傳一張圖，圖裡有人就要勾同意。換圖或換連結，貼文會退回草稿。", en: "Upload a picture and tick consent if people are in it. Changing the picture or link drops the post back to draft." } },
+    { at: "[data-act='ip-publish']", t: { zh: "放上去", en: "Publish" },
+      b: { zh: "按「放上去」就出現在島上，不用等人核可。", en: "Publish puts it on the island straight away; no approval needed." } },
+  ] },
+  { id: "island-posts", page: "site:island", steps: [
+    { at: AT_HEAD, t: { zh: "BT 島的貼文", en: "Island posts" },
+      b: { zh: "島上每一棟建築底下的 IG 貼文。每個 team 貼自己那座島的。", en: "The Instagram posts under each building on the island. Each team posts on its own island." } },
+    { at: ".main .page-head .actions [data-act='ip-new']", t: { zh: "貼一則", en: "New post" },
+      b: { zh: "按「貼一則」：選建築、貼 IG 連結、寫一句話、放一張圖、按「放上去」。", en: "Press New post: pick the building, paste the Instagram link, write a line, add a picture, then Publish." } },
+    { at: [".main [data-act='ip-open']", ".main .section .empty"], t: { zh: "點一則改", en: "Open one to edit it" },
+      b: { zh: "一棟建築一塊，點一則改或撤下來。", en: "One block per building; open a post to change it or take it down." } },
+  ] },
+  { id: "resource", page: "site:res", when: "#rtitle", steps: [
+    { at: "#rtitle", t: { zh: "名字與說明", en: "Name and description" },
+      b: { zh: "說明寫給高中生看。這段字是公開的，也是 Google 唯一讀得到的，寫清楚這是什麼、對誰有用。", en: "Write the description for a high school student. It is public and the only part Google reads, so say what it is and who it helps." } },
+    { at: "#rurl", t: { zh: "連結", en: "The link" },
+      b: { zh: "貼 Drive、YouTube 或 Canva 的連結。先用無痕視窗打開一次，分享設定錯了學生會看到「需要存取權」。", en: "Paste the Drive, YouTube or Canva link. Open it in a private window first; a wrong sharing setting shows students a request-access page." } },
+    { at: ["#rsection", "#rkind"], t: { zh: "放在哪一個大標", en: "Which section" },
+      b: { zh: "選它放在 /resources/ 的哪一個大標底下。", en: "Choose which section of /resources/ it goes under." } },
+    { at: ["[data-act='res-save']", "[data-act='res-status']"], t: { zh: "新增與上架", en: "Add and publish" },
+      b: { zh: "新的按「新增」；上架之後就出現在對外的 /resources/。不用了按「下架」。", en: "Press Add for a new one; once published it shows on the public /resources/. Unpublish it when it is no longer useful." } },
   ] },
   { id: "site-res", page: "site:res", steps: [
     { at: AT_HEAD, t: { zh: "資源庫", en: "Resources" },
       b: { zh: "BT 做的免費資源，放在對外的 /resources/。這裡放的是一條連結，檔案本身留在 Google Drive 或 YouTube。", en: "Free resources BT has made, shown on the public /resources/ page. Each entry is a link; the file itself stays in Google Drive or YouTube." } },
-    { at: AT_ACT, t: { zh: "加一個資源", en: "Add a resource" },
-      b: { zh: "貼上連結、寫名字和一句說明，選它放在哪一個大標底下。", en: "Paste the link, add a name and a line about it, and choose which section it goes under." } },
-    { at: ".main .mp-links", t: { zh: "每個 team 自己的資源", en: "Each team's resources" },
-      b: { zh: "看每個 team 誰改得了自己的資源。", en: "See who on each team can edit that team's resources." } },
+    { at: ".main .page-head .actions [data-act='res-new']", t: { zh: "加一個資源", en: "Add a resource" },
+      b: { zh: "按「加一個資源」：寫名字與一句說明、貼連結、選大標，按「新增」再上架。", en: "Press Add a resource: write a name and a line about it, paste the link, choose the section, press Add, then publish." } },
+    { at: [".main .section .flist", ".main .section .empty"], t: { zh: "改一個", en: "Edit one" },
+      b: { zh: "按「改」打開一個資源，改字、換連結或下架。", en: "Press Edit to change the text or link, or unpublish it." } },
+    { at: ["#rsec", ".main section.section:last-of-type"], t: { zh: "大標", en: "Sections" },
+      b: { zh: "/resources/ 上的大標在這裡加。一個大標底下沒有上架的資源，對外就不會出現。", en: "Add the section headings for /resources/ here. A section with nothing published under it is hidden publicly." } },
+    { at: ".main .mp-links", t: { zh: "每個 team 誰在做", en: "Who works on each team's resources" },
+      b: { zh: "看每個 team 誰改得了自己的資源，也在這裡加人。", en: "See who on each team can edit its resources, and add people." } },
   ] },
   { id: "site-team", page: "site:team", steps: [
     { at: AT_HEAD, t: { zh: "對外的團隊頁", en: "The public team page" },
-      b: { zh: "決定誰出現在對外的 /team/ 上。幹部要先在「設定」自己打勾，再由你一個一個核可。未滿 18 歲的一律不核可，系統沒有生日欄位，只有你擋得住。", en: "Decide who appears on the public /team/ page. Cadres opt in under Settings first, then you approve each one. Never approve anyone under 18: there is no birthday field, so you are the only check." } },
+      b: { zh: "決定誰出現在對外的 /team/ 上。幹部先在「設定」自己勾公開，再由你一個一個核可。", en: "Decide who appears on the public /team/ page. Cadres opt in under Settings, then you approve each one." } },
+    { at: [".main section.section:first-of-type .flist", ".main .section .empty"], t: { zh: "核可一個人", en: "Approve someone" },
+      b: { zh: "勾一下就存，馬上出現在 /team/。未滿 18 歲的一律不勾：系統沒有生日欄位，只有你擋得住。", en: "Ticking saves and puts them on /team/ at once. Never tick anyone under 18: there is no birthday field, so you are the only check." } },
     { at: "#past-teams", t: { zh: "前幾屆", en: "Past years" },
-      b: { zh: "以前每一屆的整份名單，只有名字與職位、沒有照片。一屆一個開關，預設是關的；打開之前先把未滿 18 歲的人藏起來。只有 Co-President 動得了。", en: "Each past year's whole roster, names and titles only, no photos. Each year has its own switch, off by default; before turning one on, hide anyone under 18. Only a Co-President can change these." } },
+      b: { zh: "每一屆的名單，只有名字與職位。打開一屆之前，先把未滿 18 歲與不想被列出的人藏起來。只有 Co-President 動得了。", en: "Each past year's names and titles. Before turning a year on, hide anyone under 18 or who asked not to be listed. Only a Co-President can change these." } },
     { at: AT_SUBS, t: { zh: "名單從哪裡來", en: "Where the names come from" },
       b: { zh: "這裡的人是「人與權限」裡每一屆的職位，不用另外打一份。", en: "These names come from each year's positions under Internal, so there is no second list to type." } },
   ] },
   { id: "site-stories", page: "site:stories", steps: [
     { at: AT_HEAD, t: { zh: "校友故事", en: "Alumni stories" },
-      b: { zh: "決定誰出現在對外的 /alumni/ 航線圖上。故事是校友自己在頂欄的「我的故事」寫的，也是他自己勾同意公開。", en: "Decide who appears on the public /alumni/ route map. Alumni write their own story under My story in the top bar and tick their own consent to publish it." } },
+      b: { zh: "決定誰出現在對外的 /alumni/ 航線圖上。故事是校友自己在頂欄的「我的故事」寫的，也是他自己勾同意公開。", en: "Decide who appears on the public /alumni/ route map. Alumni write their own story under My story in the top bar and tick their own consent." } },
     { at: [".main .section .note", ".main .section"], t: { zh: "核可之前看四件事", en: "Four checks before approving" },
-      b: { zh: "滿 18 歲了嗎、真的是 BT 校友嗎、這段字能用 BT 的名義放出去嗎、他說在 BT 做過的事是真的嗎。核可之後他再改字，會自動撤下來回到這裡。", en: "Are they 18 or older, are they really BT alumni, can this text go out under BT's name, and did they really do what they say? If they edit the story after approval, it comes down automatically and returns to this list." } },
-    { at: AT_SUBS, t: { zh: "網站的其他部分", en: "The rest of the site" },
-      b: { zh: "活動、資源庫、團隊頁、系統寄的信、歷史之路、BT 島，都在這一區。", en: "Events, resources, the team page, the system emails, the history road and BT Island are all in this section." } },
+      b: { zh: "滿 18 歲了嗎、真的是 BT 校友嗎、這段字能用 BT 的名義放出去嗎、他說在 BT 做過的事是真的嗎。", en: "Are they 18 or older, really BT alumni, is the text fine under BT's name, and did they really do what they say?" } },
+    { at: [".main input[data-act='approve-story']", ".main .section .empty"], t: { zh: "核可", en: "Approve" },
+      b: { zh: "勾一下就上 /alumni/。他之後再改字會自動撤下來，回到這裡等你再看一次。沒填縣市的不會出現在地圖上。", en: "Ticking puts it on /alumni/. If they edit later it comes down by itself and returns here. Anyone without a county never appears on the map." } },
+  ] },
+  { id: "site-mail-edit", page: "site:mail", when: "[data-autosave='mail-save']", steps: [
+    { at: "#msub", t: { zh: "主旨與內文", en: "Subject and body" },
+      b: { zh: "直接改，停手幾秒或離開這一格就存。下一封寄出去的就是新的字。", en: "Edit directly; it saves a few seconds after you stop or when you leave the field. The next email sent uses it." } },
+    { at: "#mbody", t: { zh: "大括號裡的字", en: "Words in braces" },
+      b: { zh: "內文下面列著可以用的代入欄位，例如名字。拼錯不會出錯，只會變成空白。", en: "The placeholders you can use, such as the name, are listed below the body. A typo doesn't break anything; it just comes out blank." } },
+    { at: "details.fold[data-fold='mail-en']", t: { zh: "英文版", en: "English version" },
+      b: { zh: "展開改英文版，收信人選英文的就收到這一份。", en: "Open this to edit the English version, sent to people who chose English." } },
+    { at: "iframe.mailframe", t: { zh: "收到的樣子", en: "How it arrives" },
+      b: { zh: "右邊是收信人看到的樣子，可以切中英文、手機或電腦。", en: "This is what the recipient sees; switch language, phone or desktop." } },
   ] },
   { id: "site-mail", page: "site:mail", steps: [
     { at: AT_HEAD, t: { zh: "系統寄的信", en: "Emails the system sends" },
       b: { zh: "申請、邀請、Marketing 需求單、會議這幾類信的文字都在這裡改。只有 Co-President 與 Senior Adviser 改得動。", en: "The wording of the application, invite, Marketing request and meeting emails is edited here. Only Co-Presidents and Senior Advisers can change it." } },
-    { at: ".main .section .flist", t: { zh: "一封信一列", en: "One row per email" },
-      b: { zh: "點一封打開，中英文各有一份。改完存起來，下一封寄出去的就是新的字。", en: "Open an email to edit it; each has a Chinese and an English version. The next one sent uses your new wording." } },
+    { at: ".main .section .flist", t: { zh: "點一封改", en: "Open one to edit it" },
+      b: { zh: "按「改」打開一封，中英文各一份。改完自己存，下一封寄出去的就是新的字。", en: "Press Edit to open one; each has Chinese and English. It saves itself and the next email sent uses it." } },
     { at: AT_SUBS, t: { zh: "網站的其他部分", en: "The rest of the site" },
       b: { zh: "活動、資源庫、團隊頁、校友故事、歷史之路、BT 島，都在這一區。", en: "Events, resources, the team page, alumni stories, the history road and BT Island are all in this section." } },
   ] },
 
-  // ── 護照 ──
+  // ── 護照（後台）──
+  { id: "passport-box", page: "passports:cadre", when: "#ak-zh", steps: [
+    { at: "#ak-zh", t: { zh: "這一格的題目", en: "This box's title" },
+      b: { zh: "幹部在護照上看到的題目與說明。改了就存，幹部重新整理護照就看得到。代號鎖住不能改。", en: "The title and description cadres see. Changes save, and cadres see them when they refresh. The id is locked." } },
+    { at: [".main .exbox", "#ak-cb"], t: { zh: "範例", en: "Example" },
+      b: { zh: "放一個範例，幹部按「看範例」就看得到，比說明更好懂。", en: "Add an example; cadres see it with See example, which is often clearer than the description." } },
+    { at: ".main .back", t: { zh: "回到護照", en: "Back to the passport" },
+      b: { zh: "蓋過章的格子不能刪，只能停用。", en: "A box someone has stamped can't be deleted, only disabled." } },
+  ] },
   { id: "passports-cadre", page: "passports:cadre", steps: [
     { at: AT_HEAD, t: { zh: "幹部護照", en: "The cadre passport" },
       b: { zh: "33 格的題目與說明、每個月右上角的時刻都在這裡改。改完幹部重新整理護照就看得到。", en: "Edit the 33 boxes and each month's time in the corner here. Cadres see the change when they refresh their passport." } },
     { at: ".main .jump", t: { zh: "跳到某個月", en: "Jump to a month" },
       b: { zh: "一個月一塊，點月份直接跳過去。", en: "One block per month; press a month to jump to it." } },
+    { at: ".main section.section[id^='m']", t: { zh: "揭曉一個月", en: "Reveal a month" },
+      b: { zh: "新的一個月一開始是封起來的。按「揭曉這個月」，每一位幹部馬上就看得到，記得同一時間在群組講。", en: "A new month starts sealed. Reveal this month opens it for every cadre at once, so announce it in the group at the same time." } },
+    { at: "[data-act='act-edit']", t: { zh: "改一格", en: "Edit a box" },
+      b: { zh: "按一格的「改」換題目、說明與範例；「改時刻」換那個月右上角的字。", en: "Press Edit on a box to change its title, description and example; Edit time changes the month's corner text." } },
+    { at: "[data-act='preview']", t: { zh: "看幹部看到的樣子", en: "See what cadres see" },
+      b: { zh: "按這裡在下面打開一本預覽的護照。", en: "Opens a preview passport below." } },
     { at: ".main .addmonth", t: { zh: "加一個月", en: "Add a month" },
-      b: { zh: "選一個月，按「加進護照」。", en: "Pick a month and press Add to passport." } },
-    { at: ".main .section .flist", t: { zh: "每一格", en: "Each box" },
-      b: { zh: "點一格改題目和說明。不想讓幹部看到的月份可以先藏起來。", en: "Open a box to change its title and description. A month can stay hidden until you want cadres to see it." } },
-    { at: AT_SUBS, t: { zh: "城市與實習護照", en: "Cities, and the intern passport" },
-      b: { zh: "入境章抽得到的城市、實習護照與它的蛇梯棋，在旁邊的分頁。", en: "The cities the entry stamp can draw, the intern passport and its game board are in the tabs next to this one." } },
+      b: { zh: "選一個月，按「加進護照」。藏起來的月份不算進總格數。", en: "Pick a month and press Add to passport. Hidden months don't count toward the total." } },
   ] },
   { id: "passports-cities", page: "passports:cities", steps: [
     { at: AT_HEAD, t: { zh: "入境章的城市", en: "Entry-stamp cities" },
-      b: { zh: "幹部蓋入境章的時候，會從這裡的城市抽一個。", en: "When a cadre gets an entry stamp, it draws one of the cities listed here." } },
-    { at: ".main .section", t: { zh: "城市清單", en: "The list of cities" },
-      b: { zh: "可以加城市、改名字。有人抽過的城市刪不掉，只能停用；停用的不會再被新的入境章抽到，已經蓋好的章不變。", en: "Add a city or rename one. A city someone has drawn cannot be deleted, only disabled; a disabled city is not drawn for new stamps, and existing stamps stay." } },
-    { at: AT_SUBS, t: { zh: "回到護照", en: "Back to the passport" },
-      b: { zh: "護照的 33 格在「幹部護照」那一頁。", en: "The 33 boxes are on the Cadre passport page." } },
+      b: { zh: "幹部蓋滿一個月拿到入境章，會從這裡的城市抽一個。", en: "When a cadre fills a month and gets an entry stamp, one of these cities is drawn." } },
+    { at: ".main .page-head .actions [data-act='dest-new']", t: { zh: "加一個城市", en: "Add a city" },
+      b: { zh: "按「加一個城市」，填中英文名字。", en: "Press Add a city and fill in both names." } },
+    { at: ["#cities table", "#cities .empty"], t: { zh: "改名或停用", en: "Rename or disable" },
+      b: { zh: "城市不能刪，只能停用。停用的不會再被新的入境章抽到，已經蓋好的章不變。", en: "Cities can't be deleted, only disabled. A disabled city isn't drawn for new stamps; existing stamps stay." } },
   ] },
   { id: "passports-interns", page: "passports:interns", steps: [
     { at: AT_HEAD, t: { zh: "實習護照", en: "The intern passport" },
-      b: { zh: "實習生自己的護照。這一頁改屆別、分組和每一格要做的事。", en: "The interns' own passport. Set the terms, the groups and what each box asks for on this page." } },
+      b: { zh: "實習生自己的護照。先開一屆、分好組，再寫每一格要做的事。", en: "The interns' own passport. Start a term, set up the groups, then write what each box asks for." } },
     { at: "#terms", t: { zh: "屆別", en: "Terms" },
-      b: { zh: "一期實習一個屆別，新的一期按「開新的一屆」。", en: "One term per round of internships; press New term to start the next one." } },
+      b: { zh: "一期實習一屆。新的一屆按「開新的一屆」，再按「設成目前這一屆」才會生效。", en: "One term per round of internships. Press New term, then Set as current term for it to take effect." } },
     { at: "#groups", t: { zh: "分組", en: "Groups" },
       b: { zh: "一組一頁，實習生只看得到自己那一組。", en: "Each group gets its own page, and interns only see their own group." } },
     { at: "#tasks", t: { zh: "每一格", en: "The boxes" },
-      b: { zh: "照階段分好，點一格改它。「看它在實習護照上長什麼樣」可以看實習生看到的樣子。", en: "Grouped by stage; open a box to change it. See it in the intern passport shows exactly what interns see." } },
+      b: { zh: "照階段分好，點一格改它。蓋過章的格子不能刪，只能停用。「看它在實習護照上長什麼樣」看實習生看到的樣子。", en: "Grouped by stage; open a box to change it. Stamped boxes can only be disabled. See it in the intern passport shows exactly what interns see." } },
     { at: AT_SUBS, t: { zh: "蛇梯棋", en: "The game board" },
       b: { zh: "實習生蓋一個章拿一次擲骰子，棋盤在「實習的蛇梯棋」那一頁改。", en: "Interns earn one roll per stamp; the board itself is edited on the Intern game board page." } },
   ] },
   { id: "passports-board", page: "passports:board", steps: [
     { at: AT_HEAD, t: { zh: "實習的蛇梯棋", en: "The intern game board" },
-      b: { zh: "實習生蓋一個章拿一張票，擲骰子走棋。", en: "Interns earn one roll per stamp and move along the board." } },
-    { at: ".main .section", t: { zh: "點一格就能改", en: "Click a square to change it" },
-      b: { zh: "每一格可以是梯子、蛇或任務格，改完按「存起來」。最下面有開關，決定實習生看不看得到棋盤。", en: "Each square can be a ladder, a snake or a task square; press Save when done. The switch at the bottom decides whether interns see the board." } },
-    { at: AT_SUBS, t: { zh: "章從哪裡來", en: "Where the stamps come from" },
-      b: { zh: "實習生要做的事在「實習護照」那一頁。", en: "What interns need to do is set on the Intern passport page." } },
+      b: { zh: "實習生蓋一個章拿一張票，擲骰子走棋。改的是你在「實習護照」選的那一屆。", en: "Interns earn one roll per stamp and move along the board. It edits the term chosen on Intern passport." } },
+    { at: ["#board-layout .bgrid", ".main .empty"], t: { zh: "點一格就能改", en: "Click a square to change it" },
+      b: { zh: "點一格，選它是梯子、蛇還是任務格，按「套用」，全部改好按右上角「存起來」。", en: "Click a square, choose ladder, snake or task, press Apply, then Save at the top right when done." } },
+    { at: "#board-live", t: { zh: "打開給實習生", en: "Turn it on for interns" },
+      b: { zh: "存過之後才有這個開關。打開之後，棋盤大小與蛇和梯子就鎖住了。", en: "This switch appears once the board is saved. After turning it on, the size, snakes and ladders are locked." } },
   ] },
 
   // ── 錢 ──
   { id: "money", page: "finance:overview", steps: [
-    { at: AT_HEAD, t: { zh: "BT 的錢", en: "BT's money" },
-      b: { zh: "現在有多少錢、這一屆進來多少出去多少。轉帳只是搬家，不算收入也不算支出。", en: "How much there is now, and what came in and went out this term. Transfers only move money, so they count as neither income nor expense." } },
-    { at: [".main .section", ".main .empty"], t: { zh: "數字從哪裡來", en: "Where the numbers come from" },
-      b: { zh: "全部是「收支紀錄」加起來的，從每個帳戶開帳那天起算，作廢的不算。", en: "Everything adds up from Transactions, starting from each account's opening day; voided rows do not count." } },
-    { at: AT_SUBS, t: { zh: "五個分頁", en: "Five pages" },
-      b: { zh: "總覽、收支紀錄、帳戶與類別、預算、匯出。第一次用先去「帳戶與類別」開帳。", en: "Overview, Transactions, Accounts & categories, Budget and Export. On day one, open the accounts first under Accounts & categories." } },
+    { at: [".main .fin-total", ".main .empty"], t: { zh: "BT 現在有多少錢", en: "How much BT has now" },
+      b: { zh: "全部帳戶加起來，下面一個帳戶一張卡。數字是「收支紀錄」加出來的，作廢的不算；轉帳只是搬家，不算收入也不算支出。", en: "All accounts together, then one card per account. It adds up from Transactions, leaving out voided rows; transfers only move money, so they count as neither." } },
+    { at: ".main [data-act='ov-term']", t: { zh: "看哪一屆", en: "Which term" },
+      b: { zh: "選一屆，下面的收入、支出與圖就換成那一屆的。", en: "Pick a term and the income, spending and chart below switch to it." } },
+    { at: [".main .fin-four", ".main .fin-chart-box"], t: { zh: "這一屆進出多少", en: "In and out this term" },
+      b: { zh: "這一屆與這個月的收入、支出、淨額，下面每個月一條。", en: "This term's and this month's income, spending and net, with one bar per month below." } },
+    { at: ".main .cols", t: { zh: "錢花在哪裡", en: "Where the money went" },
+      b: { zh: "照類別分。有預算的類別會畫進度條，超過變橘色。", en: "Split by category. Categories with a budget get a bar that turns orange when over." } },
+    { at: ".main .msg.err", t: { zh: "還沒分類的", en: "Rows without a category" },
+      b: { zh: "有幾筆還沒選類別，到「收支紀錄」補上，數字才分得對。", en: "Some rows have no category; fill them in under Transactions so the split is right." } },
+    { at: AT_SUBS, t: { zh: "第一次用", en: "Starting out" },
+      b: { zh: "先到「帳戶與類別」開帳，再到「收支紀錄」一筆一筆登。", en: "Open the accounts first under Accounts & categories, then enter rows under Transactions." } },
   ] },
   { id: "money-tx", page: "finance:tx", steps: [
-    { at: AT_HEAD, t: { zh: "每一筆進出", en: "Every row of money" },
-      b: { zh: "新的一筆按「加一筆」。已經在清單上的，改了就存。", en: "Press Add a row for a new one. Rows already on the list save as you change them." } },
+    { at: ".main .page-head .actions [data-act='tx-new']", t: { zh: "登一筆", en: "Add a row" },
+      b: { zh: "按「加一筆」：日期、收入支出或轉帳、金額、幣別、帳戶、類別，可以掛一場活動，按「加進去」。外幣要填銀行實際給的匯率。", en: "Press Add a row: date, income, expense or transfer, amount, currency, account and category, optionally an event, then Add. Foreign currency needs the rate the bank actually gave." } },
     { at: ".main .fin-fbx", t: { zh: "找一筆", en: "Find a row" },
-      b: { zh: "打字找，或用「篩選」看某一屆、某個帳戶或某一類。", en: "Type to search, or use Filters for one term, account or category." } },
-    { at: [".main .section", ".main .empty"], t: { zh: "登錯了不要刪", en: "Do not delete mistakes" },
-      b: { zh: "登錯的按「作廢」，寫一句為什麼。紀錄會留著，總覽不算它。", en: "Void a wrong row and write one line on why. The row stays on record, and the overview leaves it out." } },
+      b: { zh: "打對象或備註找，或用「篩選」看某一屆、某個帳戶或某一類。", en: "Search the counterparty or note, or use Filters for one term, account or category." } },
+    { at: [".main table.fin-tx", ".main .empty"], t: { zh: "改一筆、傳收據", en: "Edit a row, upload a receipt" },
+      b: { zh: "按「改」直接在那一列改，改了就存。「傳收據」放照片或 PDF，五 MB 以內。", en: "Press Edit to change it in place; it saves as you go. Upload receipt takes a photo or PDF up to 5 MB." } },
+    { at: [".main .fin-tx [data-act='tx-void']", ".main table.fin-tx", ".main .empty"], t: { zh: "登錯了不要刪", en: "Don't delete mistakes" },
+      b: { zh: "登錯的按「作廢」，寫一句為什麼。那一筆留著變灰色，總覽不算它。", en: "Void a wrong row and write one line on why. It stays, greyed out, and the overview leaves it out." } },
   ] },
   { id: "money-accounts", page: "finance:accounts", steps: [
     { at: AT_HEAD, t: { zh: "帳戶與類別", en: "Accounts and categories" },
       b: { zh: "帳戶是錢放在哪裡：銀行、現金、平台。類別是收支分哪幾種。", en: "Accounts are where money sits: bank, cash, a platform. Categories are the kinds of income and spending." } },
-    { at: ".main .section", t: { zh: "第一天怎麼開帳", en: "Opening an account on day one" },
-      b: { zh: "把每個帳戶今天的餘額填成開帳餘額，開帳日填今天，之前的錢不用補登。", en: "Enter each account's balance today as its opening balance, with today as the opening day; earlier money is not entered." } },
-    { at: AT_SUBS, t: { zh: "類別改名", en: "Renaming a category" },
-      b: { zh: "類別改名會連舊的一起改。不用的類別封存，不要刪。", en: "Renaming a category renames the old rows too. Archive categories you no longer use instead of deleting them." } },
+    { at: ".main .section [data-act='acc-new']", t: { zh: "第一天怎麼開帳", en: "Opening an account on day one" },
+      b: { zh: "按「加一個帳戶」，把今天的餘額填成開帳餘額、開帳日填今天，之前的錢不用補登。", en: "Press Add an account, enter today's balance as the opening balance and today as the opening day; earlier money is not entered." } },
+    { at: [".main .fin-accs-list", ".main .empty"], t: { zh: "改一個帳戶", en: "Edit an account" },
+      b: { zh: "改了就存。不用的帳戶按「封存」。", en: "Changes save as you go. Archive accounts you no longer use." } },
+    { at: ".main .section [data-act='cat-new']", t: { zh: "類別", en: "Categories" },
+      b: { zh: "「加一個類別」選收入或支出。類別改名會連舊的一起改；不用的封存，不要刪。", en: "Add a category as income or expense. Renaming one renames old rows too; archive unused ones instead of deleting them." } },
   ] },
   { id: "money-budget", page: "finance:budget", steps: [
     { at: AT_HEAD, t: { zh: "預算", en: "Budget" },
       b: { zh: "這一屆每一類支出打算花多少。", en: "How much each kind of spending is meant to cost this term." } },
-    { at: [".main .fin-budget > li", ".main .section"], t: { zh: "只是提醒，不會擋", en: "A reminder, not a block" },
-      b: { zh: "填了之後，總覽會畫一條「花掉多少」的進度條，超過會變橘色。", en: "Once filled in, the overview shows a progress bar per category that turns orange when it goes over." } },
-    { at: AT_SUBS, t: { zh: "回總覽看", en: "See it on the overview" },
-      b: { zh: "進度條在「總覽」那一頁。", en: "The progress bars are on the Overview page." } },
+    { at: ".main [data-act='ov-term']", t: { zh: "哪一屆", en: "Which term" },
+      b: { zh: "先選這是哪一屆的預算。", en: "First choose which term this budget is for." } },
+    { at: [".main .fin-budget > li", ".main .empty"], t: { zh: "填一個數字", en: "Fill in a number" },
+      b: { zh: "每一類填這一屆的預算（台幣），填了就存。超過會變橘色，只是提醒，不會擋。總覽上也看得到同一條。", en: "Enter each category's budget for the term (TWD); it saves straight away. Going over turns it orange as a reminder, never a block. The same bar shows on the overview." } },
   ] },
   { id: "money-export", page: "finance:export", steps: [
     { at: AT_HEAD, t: { zh: "匯出給會計", en: "Export for the accountant" },
       b: { zh: "把收支下載成 CSV，給會計或理事會。Excel 直接開，中文不會變亂碼。", en: "Download transactions as CSV for the accountant or the board. Excel opens it with Chinese intact." } },
-    { at: ".main .section", t: { zh: "作廢的也在", en: "Voided rows are included" },
-      b: { zh: "作廢的那幾筆也會在檔案裡，最後兩欄有標出來。", en: "Voided rows are in the file too, flagged in the last two columns." } },
-    { at: AT_SUBS, t: { zh: "回收支紀錄", en: "Back to transactions" },
-      b: { zh: "要改哪一筆，回「收支紀錄」改。", en: "To fix a row, go back to Transactions." } },
+    { at: ".main .fin-filters", t: { zh: "哪一段時間", en: "Which period" },
+      b: { zh: "選一屆或一個月，下面寫著會匯出幾筆。在「收支紀錄」設的篩選也會帶過來。", en: "Pick a term or a month; the count below says how many rows go out. Filters set on Transactions carry over." } },
+    { at: ".main .page-head .actions [data-act='csv-download']", t: { zh: "下載", en: "Download" },
+      b: { zh: "按「下載 CSV」。作廢的那幾筆也在檔案裡，最後兩欄有標出來。", en: "Press Download CSV. Voided rows are included and flagged in the last two columns." } },
   ] },
 ];
 
@@ -1130,6 +1742,16 @@ export function tourStepsOn(steps, find) {
     const sel = sels.find(x => { try { return !!find(x); } catch (e) { return false; } });
     if (sel) out.push({ ...s, sel });
   }
+  return out;
+}
+// 開導覽那一刻的步驟清單：現在找得到的留著（同 tourStepsOn），前面有 go 的那幾步先留著、標 later，輪到它再找。
+export function tourPlan(steps, find) {
+  const later = tourDeferred(steps), out = [];
+  (steps || []).forEach((s, k) => {
+    if (later[k]) { out.push({ ...s, sel: "", later: true }); return; }
+    const got = tourStepsOn([s], find);
+    if (got.length) out.push(got[0]);
+  });
   return out;
 }
 // 盒子放哪。r 是被框住那一塊在螢幕上的位置（null 是放中間），bw／bh 是盒子大小，vw／vh 是螢幕。
@@ -1160,17 +1782,34 @@ export function tourBoxHTML(step, i, n, L) {
   </div>`;
 }
 
+// 一步的 go（2026-11-27 Paul：「once you click into it, there's boxes you can edit」）：導覽先幫你按一個分頁，再框住分頁裡的東西，
+//   這樣才講得出「到表單分頁、按這一顆、裡面一題一個框」這種做法，不是只說「這裡有六個分頁」。
+//   **go 只准是分頁或切換畫面的鈕（不存、不寄、不刪任何東西）。** test/tour.test.mjs 照 TOUR_GO 守。
+export const TOUR_GO = /\[data-tab=|\[data-act="?tab"?\]|\[data-t=|\[data-view=|\[data-mode=|\[data-pt=|\[data-ft=|\[data-v=|\[data-p=|\[data-sub=/;
+// 這一步要不要等：前面（含自己）有 go 的那幾步，開導覽的時候還沒畫出來是正常的，輪到它再找。
+export function tourDeferred(steps) {
+  let seen = false;
+  return (steps || []).map(s => (seen = seen || !!s.go));
+}
+// 退回第 i 步的時候，畫面要回到哪一個分頁：第 i 步（含）之前最近的那一個 go。沒有就回 ""。
+export function tourGoAt(steps, i) {
+  for (let k = Math.min(i, (steps || []).length - 1); k >= 0; k--) if (steps[k].go) return steps[k].go;
+  return "";
+}
+
 // ── 在瀏覽器裡跑的部分 ──
-const tour = { page: "", L: "zh", steps: null, i: 0, el: null, back: null, place: 0 };
+const tour = { page: "", L: "zh", steps: null, i: 0, el: null, back: null, place: 0, seq: 0, went: "", goAt: 0 };
 const tHost = () => document.getElementById("bt-tour");
 const tReduce = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 const tShown = el => { if (!el || !el.getBoundingClientRect) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
 const tFind = sel => { const all = document.querySelectorAll(sel); for (const el of all) if (tShown(el) && !el.closest("#bt-tour .tour-layer")) return el; return null; };
 function tCurrent() { return pickTour(tour.page, s => !!document.querySelector(s)); }
 function tStart(plan) {
-  const steps = tourStepsOn(plan.flatMap(t => t.steps), tFind);
+  let steps = tourPlan(plan.flatMap(t => t.steps), tFind);
+  // 這一頁那一段一步都框不到（畫面還沒載完、或是沒料到的狀態）時，改跑歡迎那一段，不要按了沒反應。
+  if (!steps.length) { const w = welcomeTour(); steps = w ? tourPlan(w.steps, tFind) : []; }
   if (!steps.length) return;
-  tour.steps = steps; tour.i = 0; tour.back = document.activeElement;
+  tour.steps = steps; tour.i = 0; tour.back = document.activeElement; tour.went = "";
   const h = tHost(); let layer = h.querySelector(".tour-layer");
   if (!layer) { layer = document.createElement("div"); layer.className = "tour-layer"; h.appendChild(layer); }
   layer.innerHTML = `<div class="tour-veil"></div><div class="tour-spot" aria-hidden="true"></div><div class="tour-slot"></div>`;
@@ -1185,14 +1824,36 @@ function tClose() {
   document.removeEventListener("keydown", tKey, true);
   window.removeEventListener("resize", tPlace);
   window.removeEventListener("scroll", tPlace, { capture: true });
-  tour.steps = null; tour.el = null;
+  tour.steps = null; tour.el = null; tour.went = ""; tour.seq++;
   const b = tour.back; tour.back = null;
   if (b && b.isConnected && b.focus) b.focus(); else { const f = h && h.querySelector(".tour-fab"); if (f) f.focus(); }
 }
-function tShow() {
+function tShow(dir) {
   const h = tHost(), slot = h && h.querySelector(".tour-slot");
   if (!slot || !tour.steps) return;
-  const s = tour.steps[tour.i];
+  const s = tour.steps[tour.i], seq = ++tour.seq, want = tourGoAt(tour.steps, tour.i);
+  let clicked = false;
+  if (want && want !== tour.went) {
+    const g = tFind(want);
+    if (g) { tour.goAt = Date.now(); g.click(); clicked = true; }
+    tour.went = want;
+  }
+  if (!s.later && !clicked) return tDraw(slot, s);
+  // 分頁剛按下去，裡面的東西可能還在載：每 120 毫秒找一次，最多兩秒。還是找不到就拿掉這一步，往同一個方向走。
+  const sels = tourSels(s.at); let tries = 0;
+  const look = () => {
+    if (seq !== tour.seq || !tour.steps) return;
+    const sel = sels.find(x => { try { return !!tFind(x); } catch (e) { return false; } }) || "";
+    if (!sels.length || sel) { tour.steps[tour.i] = { ...s, sel, later: false }; return tDraw(slot, tour.steps[tour.i]); }
+    if (++tries < 17) { setTimeout(look, 120); return; }
+    tour.steps.splice(tour.i, 1);
+    if (dir < 0) tour.i = Math.max(0, tour.i - 1);
+    if (!tour.steps.length || tour.i >= tour.steps.length) return tClose();
+    tShow(dir);
+  };
+  look();
+}
+function tDraw(slot, s) {
   slot.innerHTML = tourBoxHTML(s, tour.i, tour.steps.length, tour.L);
   tour.el = s.sel ? tFind(s.sel) : null;
   if (tour.el) {
@@ -1232,7 +1893,7 @@ function tGo(d) {
   const n = tour.i + d;
   if (n < 0) return;
   if (n >= tour.steps.length) return tClose();
-  tour.i = n; tShow();
+  tour.i = n; tShow(d);
 }
 function tKey(e) {
   if (!tour.steps) return;
@@ -1272,5 +1933,6 @@ function mountTour(group, tab, me, L) {
     h.dataset.lang = L; tour.L = L;
     if (tour.steps) tShow();
   }
-  if (tour.steps) { if (moved) tClose(); else setTimeout(tPlace, 0); }
+  // 換到別頁就關掉導覽；但導覽自己剛按了一個分頁（go）、頁面因此重畫的那兩秒內不算。
+  if (tour.steps) { if (moved && Date.now() - tour.goAt > 2000) tClose(); else setTimeout(tPlace, 0); }
 }
