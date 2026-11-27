@@ -4,19 +4,27 @@
 // ⚠ 網址上的 token 等於那個人資料的鑰匙。它只出現在下面叫資料庫的那兩句與換語言的網址（UI.langHref），
 //   **不要印到 console、不要放進 sessionStorage、不要接到任何別的網址後面**。草稿的鑰匙是它的雜湊（UI.draftKey）。
 // 這裡管：載入、一步一步換、加一列拿一列、存、存完重讀一次、語言、填到一半的內容（只留在這個分頁）。
+// 2027-01-25（Paul：「once they fill out the form, they should get their account… their account should be linked to that databases」）：
+//   1. 存完之後叫 rc_public_profile_account(token)：名單上這個人還沒有帳號，資料庫就用他的 email 開一組碼、寄一封信，
+//      存好的那一頁多一塊「你的帳號」，一顆馬上開帳號的鈕（連到 /app/?invite=碼）。
+//   2. 網址上沒有 token、但這台瀏覽器有登入：跟資料庫要他自己的那一條（rc_my_profile_link），之後讀寫照舊走那兩支，
+//      改的是名單上同一個人。這一條**只放在記憶體**（S.tok），不進網址、不進儲存空間；換語言的網址只帶網址上本來的那一條（urlToken）。
 import { supabase } from "../../shared/supabase.js";
 import * as UI from "./ui.js";
 
 // view：loading（HTML 裡那一句）、form、done、wrong（連結不對）、fail（載不進來）
-const S = { view: "loading", data: null, form: UI.blank(), step: 1, errors: {}, msg: "", busy: false, offline: false, base: "" };
+// self：登入的人改自己的那一份（沒有網址上的 token）。tok：那時候跟資料庫要來的那一條。account：存完之後開帳號那一步的結果。
+const S = { view: "loading", data: null, form: UI.blank(), step: 1, errors: {}, msg: "", busy: false, offline: false, base: "", self: false, tok: "", account: null, mine: "" };
 const root = () => document.getElementById("pf-root");
 const isEn = () => document.documentElement.getAttribute("data-lang") === "en";
-const token = () => new URLSearchParams(location.search).get("t") || "";
-const meta = () => { const d = S.data || {}, pf = d.profile || {}; return { events: d.events, photo_url: pf.photo_url, expires_at: d.expires_at, done_at: pf.done_at }; };
+const urlToken = () => new URLSearchParams(location.search).get("t") || "";
+const token = () => urlToken() || S.tok;
+const meta = () => { const d = S.data || {}, pf = d.profile || {}; return { events: d.events, photo_url: pf.photo_url, expires_at: d.expires_at, done_at: pf.done_at, self: S.self, account: S.account }; };
 
 function render() {
   const el = root(); if (!el) return;
   if (S.view === "wrong") el.innerHTML = UI.wrongLinkHTML(isEn());
+  else if (S.view === "nomine") el.innerHTML = UI.noMineHTML(isEn(), S.mine);
   else if (S.view === "fail") el.innerHTML = UI.loadFailHTML(isEn(), S.offline);
   else if (S.view === "done") el.innerHTML = UI.doneHTML(S.form, meta(), isEn());
   else if (S.view === "form") el.innerHTML = UI.formHTML(S.form, { step: S.step, en: isEn(), errors: S.errors, msg: S.msg, busy: S.busy, meta: meta() });
@@ -77,6 +85,8 @@ async function save() {
       const d = await load();
       if (d) { S.data = d; S.base = (d.profile && d.profile.updated_at) || ""; S.form = Object.assign(UI.fromServer(d), { adult: S.form.adult }); }
     } catch (e) { /* 留著原本那一份 */ }
+    // 開帳號：登入的人本來就有帳號，不用問。這一步失敗不算沒存（檔案已經存進去了），那一塊講一句就好。
+    S.account = S.self ? { state: "self" } : await accountFor();
     S.busy = false; S.view = "done"; render(); land();
   } catch (err) {
     // 沒存進去：他打的每一個字都留在 S.form 與草稿裡，畫面回到有錯的那一步，講原因。
@@ -91,10 +101,37 @@ async function save() {
   }
 }
 
-async function boot() {
-  // 網址上沒有 token，或短到不可能是真的（資料庫發的是 64 個字）：不用問資料庫，直接說連結不對。
-  if (token().length < 32) { S.view = "wrong"; render(); return; }
+async function accountFor() {
   try {
+    const { data, error } = await supabase.rpc("rc_public_profile_account", { p_token: token(), p_lang: isEn() ? "en" : "zh" });
+    if (error) throw error;
+    return data || { state: "error" };
+  } catch (e) {
+    const code = UI.parseError(e).code;
+    console.error("/profile/ 開帳號那一步沒成功：", code);
+    return { state: "error", code };
+  }
+}
+// 登入的人：跟資料庫要他自己的那一條。沒登入、名單上沒有他、他是幹部，都回空字串（S.mine 記為什麼）。
+async function mine() {
+  let session = null;
+  try { session = ((await supabase.auth.getSession()).data || {}).session; } catch (e) { return ""; }
+  if (!session) return "";
+  const { data, error } = await supabase.rpc("rc_my_profile_link");
+  if (error) { S.mine = UI.parseError(error).code; return ""; }
+  if (!data || !data.token) { S.mine = "no_record"; return ""; }
+  return data.token;
+}
+
+async function boot() {
+  try {
+    // 網址上沒有 token，或短到不可能是真的（資料庫發的是 64 個字）：登入的人改自己的那一份；沒登入就說連結不對。
+    if (urlToken().length < 32) {
+      const mt = supabase ? await mine() : "";
+      if (!mt) { S.view = S.mine ? "nomine" : "wrong"; render(); return; }
+      S.tok = mt; S.self = true; langLink();
+    }
+    if (token().length < 32) { S.view = "wrong"; render(); return; }
     if (!supabase) throw new Error("no_client");
     const d = await load();
     if (!d) { S.view = "wrong"; render(); return; }
@@ -162,12 +199,12 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 // 再把網址換成帶著 token 與新語言的那一條（重新整理、把連結存起來，語言都還在）。
 function langLink() {
   const a = document.getElementById("lang"); if (!a) return;
-  a.setAttribute("href", UI.langHref(token(), isEn() ? "zh" : "en"));
+  a.setAttribute("href", UI.langHref(urlToken(), isEn() ? "zh" : "en"));
 }
 document.addEventListener("bt-lang", () => {
   sync();
   if (S.msg) S.msg = "";
-  try { history.replaceState(null, "", UI.langHref(token(), isEn() ? "en" : "zh")); } catch (e) { /* 換不了網址不影響填寫 */ }
+  try { history.replaceState(null, "", UI.langHref(urlToken(), isEn() ? "en" : "zh")); } catch (e) { /* 換不了網址不影響填寫 */ }
   langLink(); render();
 });
 langLink();

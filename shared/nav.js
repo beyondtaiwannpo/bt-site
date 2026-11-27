@@ -59,7 +59,11 @@ export const FEATURES = [
   // 檔頭說「不要加 board_role 的過濾」講的是「後台」那一項（一般幹部也要進得去自己 team 的申請）；這一項本來就只開給這兩種人，畫給別人只會多一個點了被彈回來的入口。
   { key: "people",       label: { zh: "人與權限", en: "Internal" }, href: "/admin/people/", roles: ["cadre"], boards: ["president", "senior_adviser"], bar: true,
     title: { zh: "人與權限", en: "Internal" },     desc: { zh: "幹部名單、邀請、工作區、屆別", en: "Roster, invites, workspaces, terms" } },
-  { key: "settings",     label: { zh: "設定", en: "Settings" },     href: "/settings/",     roles: ["cadre", "student", "alumni", "intern"],
+  // 2027-01-25：BT 的朋友（connection，個人連結開出來的帳號）。他的東西就是那一份個人檔案，/profile/ 登入之後讀寫的是名單上他那一列。
+  // /profile/ 不載這支頂欄（那一頁沒登入也要能填），回設定的路在那一頁上方那一行。
+  { key: "myprofile",    label: { zh: "我的檔案", en: "My profile" }, href: "/profile/",    roles: ["connection"],
+    title: { zh: "我的檔案", en: "My profile" },   desc: { zh: "你的介紹、學歷、工作、故事，還有 BT 可以拿去做什麼", en: "Your intro, education, work, story, and what BT may do with them" } },
+  { key: "settings",     label: { zh: "設定", en: "Settings" },     href: "/settings/",     roles: ["cadre", "student", "alumni", "intern", "connection"],
     title: { zh: "設定", en: "Settings" },         desc: { zh: "名字、語言、大頭照、要不要出現在公開的團隊頁上", en: "Name, language, avatar, whether to appear on the public team page" } },
   // 2026-10-17：實習生護照（方案 C，docs/2026-10-15-實習生護照盤點與設計.md）。
   // roles 只有 intern。Internship team 的幹部也看得到那一頁的進度牆，

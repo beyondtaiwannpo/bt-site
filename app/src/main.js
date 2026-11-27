@@ -65,6 +65,13 @@ function render() {
     location.replace("../intern-passport/");
     return;
   }
+  // 2027-01-25：BT 的朋友（個人連結開出來的帳號）直接進他的那一份個人檔案。
+  // 不走學員那條補學校年級的路：那是問高中生的，而他在名單上本來就是一個人，檔案就是他在這個站上的東西。
+  if (S.role === "connection") {
+    el.innerHTML = `<div class="empty">${T("m.taking")}</div>`;
+    location.replace("../profile/");
+    return;
+  }
 
   // 學員（批 2）。**資料沒填齊就先擋在補完那一頁**，
   // 因為學校與年級是這個帳號唯一有用的東西，缺了等於這個人不存在。
@@ -181,8 +188,11 @@ function inviteError(err) {
 async function claimFromInvite() {
   const code = S.invite; if (!code) return false;
   try {
-    const { error } = await supabase.rpc("claim_invite", { p_code: code });
+    const { data, error } = await supabase.rpc("claim_invite", { p_code: code });
     if (error) throw error;
+    // 2027-01-25：個人連結的碼，帳號已經是名單上另一個人。碼沒燒、什麼都沒接，資料庫記了一筆給管紀錄的人合併。
+    // 碼留在口袋裡沒有用（再登入一次還是一樣），所以收掉，照他現在的身分往下走，最上面講一句。
+    if (data === "record_conflict") { dropInvite(); S.authMsg = T("inv.recordConflict"); return false; }
     dropInvite();
     return true;
   } catch (err) {

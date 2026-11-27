@@ -779,6 +779,8 @@ export const MAIL_KINDS = [
   { v: "received",  label: "mail.received",  when: "mail.received.when" },
   // 2026-10-29 邀請信：五個代換符號 {name} {position} {term} {link} {sender}，不是 {姓名} {活動名稱}。
   { v: "invite",    label: "mail.invite",    when: "mail.invite.when" },
+  // 2027-01-25 個人連結填完開帳號：代換符號 {name} {link}（跟邀請信同一套，{position} {term} 是空的、{sender} 是 Beyond Taiwan）。
+  { v: "profile_account", label: "mail.profile_account", when: "mail.profile_account.when" },
   // 2026-10-31 行銷需求單：兩封，代換符號 {requester} {title} {needed_by} {link} {reply}。
   // 2026-11-09 第二版：request_done 那封畫面上叫「已發布」（狀態改成 Sheet 的四個），代號不改名（舊的寄信紀錄、信件版型都認它）；{needed_by} 現在是預計發布日。
   { v: "request_new",  label: "mail.request_new",  when: "mail.request_new.when" },
@@ -876,7 +878,9 @@ export function mailEditHTML(kind, t, msg, busy, prev) {
   const subjectEn = (t && t.subject_en) || "", bodyEn = (t && t.body_en) || "";
   const btnZh = (t && t.button_label) || "", btnEn = (t && t.button_label_en) || "";
   const extra = kind === "interview" ? (pv.lang === "en" ? "\n\nPick a time that suits you:\nhttps://cal.com/..." : "\n\n請從這個連結挑一個你方便的時段：\nhttps://cal.com/...") : "";
-  const isInvite = kind === "invite", isRequest = kind.startsWith("request_"), isMeeting = kind.startsWith("meeting_");
+  // 2027-01-25：個人連結開帳號的那封跟邀請信同一套代換符號（{name} {link}），預覽也用同一個範例。
+  const isAccount = kind === "profile_account";
+  const isInvite = kind === "invite" || isAccount, isRequest = kind.startsWith("request_"), isMeeting = kind.startsWith("meeting_");
   const fill = s => isInvite ? fillInvite(s) : isRequest ? fillRequest(s) : isMeeting ? fillMeeting(s) : fillMail(s, NAME, TITLE);
   return pageHead(esc(T(k.label)), esc(T("mail.editLede", { when: T(k.when) })), [], { act: "mail-back", label: T("mail.back") })
     + msgHTML(msg)
@@ -885,7 +889,7 @@ export function mailEditHTML(kind, t, msg, busy, prev) {
     <label><i>${T("mail.body")}</i><textarea id="mbody" name="body" style="min-height:230px">${esc(body)}</textarea></label>
     <!-- 代換符號的說明放在內文底下（2026-11-23）：以前在「按鈕上的字」那一格底下，可是它講的是主旨與內文。 -->
     <div class="mini" style="margin:-6px 0 14px">
-      ${isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : kind === "meeting_summary" ? T("mail.varsSummary") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
+      ${isAccount ? T("mail.varsAccount") : isInvite ? T("mail.varsInvite") : isRequest ? T("mail.varsRequest") : kind === "meeting_summary" ? T("mail.varsSummary") : isMeeting ? T("mail.varsMeeting") : T("mail.vars")}</div>
     <label><i>${T("mail.button")}</i><input id="mbtn" name="button_label" value="${esc(btnZh)}" placeholder="${esc(mailButtonLabel(kind, "zh"))}"></label>
     <details class="fold" data-fold="mail-en"${pv.enOpen ? " open" : ""}><summary><span class="chev" aria-hidden="true"></span><b>${T("mail.enTitle")}</b><span class="mini">${T("mail.enHint")}</span></summary><div class="fold-body">
     <label><i>${T("mail.subjectEn")}</i><input id="msub-en" name="subject_en" value="${esc(subjectEn)}"></label>
@@ -926,11 +930,13 @@ export const MAIL_BUTTON = {
   invite: { zh: "接受邀請", en: "Accept invitation" }, meeting_invite: { zh: "回覆出席", en: "Reply" }, meeting_reminder: { zh: "回覆出席", en: "Reply" }, meeting_summary: { zh: "看這場會", en: "Open meeting" }, meeting_update: { zh: "回覆出席", en: "Reply" },
   request_new: { zh: "打開需求單", en: "Open request" }, request_done: { zh: "看回覆", en: "Open request" }, request_rejected: { zh: "看說明", en: "Read the note" }, interview: { zh: "挑一個時段", en: "Pick a time" },
   received: { zh: "看我的申請", en: "See my application" },
+  profile_account: { zh: "開我的帳號", en: "Set up my account" },
 };
 export const MAIL_SAMPLE_URL = {
   invite: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4", meeting_invite: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_reminder: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_summary: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_update: "https://beyondtaiwannpo.com/home/?meeting=9f2c…", meeting_cancel: "",
   request_new: "https://beyondtaiwannpo.com/admin/#requests/9f2c…", request_done: "https://beyondtaiwannpo.com/admin/#request/9f2c…", request_rejected: "https://beyondtaiwannpo.com/admin/#request/9f2c…", interview: "https://cal.com/beyondtaiwan/interview",
   received: "https://beyondtaiwannpo.com/app/",
+  profile_account: "https://beyondtaiwannpo.com/app/?invite=bt-a1b2c3d4",
 };
 export function mailButtonLabel(kind, lang, custom) {
   if (custom && String(custom).trim()) return String(custom).trim();

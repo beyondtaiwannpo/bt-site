@@ -441,6 +441,8 @@ async function onAutosave(act, box) {
   // 2026-10-17：實習生的「我的資料」跟校友一樣只有中英文名兩格，存檔走校友那一句；
   // 但他沒有「我的故事」，那個容器根本不畫。
   const intern = S.me.role === "intern";
+  // 2027-01-25：BT 的朋友跟實習生一樣，「我的資料」只有中英文名兩格。
+  const friend = S.me.role === "connection";
   const key = act + ":" + S.user.id;
 
   if (act === "profile") {
@@ -453,7 +455,7 @@ async function onAutosave(act, box) {
         team: pickedTeams() || null,
         public_profile: !!(document.getElementById("pub") || {}).checked,
       };
-    } else if (alumni || intern) {
+    } else if (alumni || intern || friend) {
       // 校友的「我的資料」只有中文姓名與英文姓名兩格（ui.js 同一份改動）。
       // 不問學校、年級——那是問高中生的，校友的故事已經在下面另一張表裡。
       patch = {

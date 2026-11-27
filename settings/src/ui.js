@@ -177,8 +177,11 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz, founder) {
   const alumni = me.role === "alumni";
   // 2026-10-17：第四種人，實習生。名字兩格、大頭照（進度牆要用）、沒有故事、可以刪帳號。
   const intern = me.role === "intern";
+  // 2027-01-25：第五種人，BT 的朋友（個人連結開出來的帳號）。名字兩格，沒有大頭照（他的照片由 BT 在紀錄裡放），
+  // 他的故事與檔案在 /profile/（名單上他那一列），這裡只放一條路過去，可以刪帳號。
+  const friend = me.role === "connection";
   const teller = cadre || alumni;                // 誰有「我的故事」
-  const named = teller || intern;                // 誰的「我的資料」是中英文名兩格
+  const named = teller || intern || friend;      // 誰的「我的資料」是中英文名兩格
   const v = k => esc(me[k] || "");
   // 2026-11-06 自動儲存：整頁那顆「存起來」拿掉了，改成兩個各自會存的區塊。
   //   - data-autosave="profile"：「我的資料」加大頭照那一區的公開勾選（存進 profiles）。
@@ -215,7 +218,7 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz, founder) {
       <span>${T("s.newsletter")}</span>
     </label>`}
 
-    ${named ? avatarHTML(me, cadre, intern) : ""}
+    ${named && !friend ? avatarHTML(me, cadre, intern) : ""}
     <div class="autorow">${autosaveHint("profile")}<span class="savenote">${T("s.autoNote")}</span></div>
     </div>
     ${cadre ? tzHTML(me, tz) : ""}
@@ -223,6 +226,9 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz, founder) {
          創辦人、我的故事、我現在在哪搬到「我的故事」（同一個資料夾的 #story，storyPageHTML，頂欄有一項）。
          護照那一段拿掉（Paul：「there's a passport. I don't need that to be there」）：幹部護照在側欄「我的護照」；
          Internship 的幹部那一顆「實習生進度牆」搬到側欄的「護照」那一行底下（shared/rail.js 的 internwall）。實習生自己的那一段留著，他沒有側欄。 */ ""}
+    ${friend ? `<h3 class="sec-h">${T("s.myProfile")}</h3>
+    <p class="sec-note">${T("s.myProfileNote")}</p>
+    <div class="row"><a class="btn ghost sm" href="../profile/">${T("s.goProfile")}</a></div>` : ""}
     ${intern ? `<h3 class="sec-h">${T("s.internPassport")}</h3>
     <p class="sec-note">${T("s.internNote")}</p>
     <div class="row"><a class="btn ghost sm" href="../intern-passport/">${T("s.goIntern")}</a></div>` : ""}

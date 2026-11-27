@@ -84,6 +84,7 @@ export const MINE = {
   "inv.wrongEmail":   { zh: "這封邀請是寄給 {email} 的，你現在登入的不是那個帳號。登出之後用那個 email 再登入一次。", en: "This invite was sent to {email}, and you are signed in with a different account. Sign out and sign in with that email." },
   "inv.expired":      { zh: "這個邀請過期了（30 天）。請邀請你的人重寄一封。", en: "This invite has expired (30 days). Ask the person who invited you to resend it." },
   "inv.revoked":      { zh: "這個邀請被撤銷了。有問題請問邀請你的人。", en: "This invite was revoked. Ask the person who invited you." },
+  "inv.recordConflict":{ zh: "你的帳號在 BT 的名單上已經是另一筆紀錄，我們已經通知 BT 把兩筆合成一筆，合好之後你登入看到的就是同一份。", en: "Your account is already linked to another record in BT's list. We have let BT know so they can merge the two; after that you will see one profile when you sign in." },
   "inv.recordClaimed":{ zh: "這個邀請對應的名單紀錄已經被別人認領了。請問邀請你的人。", en: "The roster record for this invite has already been claimed by someone else. Ask the person who invited you." },
   "inv.used":         { zh: "這個邀請已經用過了。", en: "This invite has already been used." },
   "auth.haveAccount": { zh: "我已經有帳號了", en: "I already have an account" },

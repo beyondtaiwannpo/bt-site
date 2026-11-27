@@ -134,6 +134,29 @@ export const TX = {
   loadFail: ["現在連不上資料庫。等一下重新整理再試，或是寫信到 beyondtaiwan2020@gmail.com。",
              "We cannot reach the database right now. Please reload in a moment, or write to beyondtaiwan2020@gmail.com."],
   loadOffline: ["你現在好像沒有連上網路。連上之後重新整理就好。", "You seem to be offline. Reconnect, then reload this page."],
+  // 2027-01-25：帳號。存好之後那一塊、登入之後的那一行、連結打不開時多的那一句。
+  wrongLogin: ["已經有 BT 的帳號了？", "Already have a BT account?"], signIn: ["登入", "Sign in"],
+  laterSelf: ["這些之後都可以改，也可以收回：登入之後回到這一頁改掉，或寫信到 beyondtaiwan2020@gmail.com。",
+              "You can change or withdraw any of this later: sign in and come back to this page, or write to beyondtaiwan2020@gmail.com."],
+  selfBar: ["你已經登入，這是你在 BT 的檔案，改完按儲存。", "You are signed in. This is your BT profile; press Save when you are done."],
+  settings: ["設定", "Settings"], events: ["活動", "Events"],
+  accH: ["你的帳號", "Your account"],
+  accInvited: ["我們寄了一封信到 {email}。按信裡的按鈕，用這個 email 登入，之後想改檔案、補故事、看 BT 在做什麼，登入就好。",
+               "We sent an email to {email}. Use the button in it to sign in with that email; after that you can sign in any time to update your profile, add to your story and see what BT is up to."],
+  accInvitedBefore: ["我們之前寄過一封信到 {email}，用信裡的按鈕登入就好。", "We already sent an email to {email}. Use the button in it to sign in."],
+  accNow: ["也可以現在就開：", "Or set it up now:"], accGo: ["現在開我的帳號", "Set up my account now"],
+  accHow: ["用 {email} 登入或註冊，用 Google 也可以（選同一個 email）。開好之後登入，看到的就是這一份檔案。",
+           "Sign in or sign up with {email}. Google works too (pick the same email). Once it is set up, signing in brings you back to this profile."],
+  accHas: ["你已經有 BT 的帳號了。之後想改，登入就好，不用再找這條連結。", "You already have a BT account. To change anything later, just sign in; you will not need this link."],
+  accLogin: ["{email} 已經有一個 BT 的帳號，用它登入就好。BT 會把兩邊的資料合成一份。", "{email} already has a BT account, so just sign in with it. BT will merge the two records into one."],
+  accPending: ["BT 已經寄過一封邀請信給你，用那封信裡的連結開帳號就好。找不到那封信的話，寫信到 beyondtaiwan2020@gmail.com。",
+               "BT has already emailed you an invitation. Use the link in that email to set up your account. If you cannot find it, write to beyondtaiwan2020@gmail.com."],
+  accNoEmail: ["想要一個帳號的話，回到第一步留一個 email 再存一次，我們就會寄登入的信給你。", "If you would like an account, go back to step one, add an email and save again. We will send you a sign-in email."],
+  accFail: ["檔案已經存好了，但帳號這一步現在沒成功。等一下再按一次儲存，或寫信到 beyondtaiwan2020@gmail.com。",
+            "Your profile is saved, but setting up your account did not work just now. Press Save again in a moment, or write to beyondtaiwan2020@gmail.com."],
+  noMine: ["你的帳號還沒有連到 BT 名單上的檔案。寫信到 beyondtaiwan2020@gmail.com，BT 會幫你接上。",
+           "Your account is not linked to a profile in BT's list yet. Write to beyondtaiwan2020@gmail.com and BT will connect it."],
+  noMineCadre: ["幹部的資料在設定那一頁。", "As a BT cadre, your details are on the Settings page."],
 };
 const fill = (s, vars) => String(s).replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] != null ? String(vars[k]) : ""));
 export const t = (key, en, vars) => fill((TX[key] || ["", ""])[en ? 1 : 0], vars);
@@ -514,7 +537,7 @@ function consentHTML(s, v) {
     ${one("offer_speak")}${one("offer_mentor")}
     <div class="pf-adult">
       ${tick("adult", s.adult === true, v.errors, en, { title: t("adult", en), help: t("adultHelp", en), required: true })}
-      <p class="pf-h">${mail(t("later", en))}</p>
+      <p class="pf-h">${mail(t(m.self ? "laterSelf" : "later", en))}</p>
       <p class="pf-h">${esc(t("privacyPre", en))}<a href="../privacy/" target="_blank" rel="noopener">${esc(t("privacy", en))}</a>${esc(t("privacyPost", en))}</p>
     </div>`;
 }
@@ -531,6 +554,7 @@ export function formHTML(state, view) {
   const v = Object.assign({ step: 1, en: false, errors: {}, msg: "", busy: false, meta: {} }, view || {});
   const step = Math.min(Math.max(Number(v.step) || 1, 1), STEPS.length), en = v.en, last = step === STEPS.length, s = state || blank();
   return `<h1>${esc(t("title", en))}</h1>
+    ${selfBarHTML(v.meta, en)}
     ${stepsHTML(step, en)}
     <div id="pf-msg">${v.msg ? `<div class="warn" role="alert">${mail(v.msg)}</div>` : ""}</div>
     <form id="pf-form" class="pf-card" novalidate>
@@ -545,13 +569,42 @@ export function formHTML(state, view) {
     <p class="mini pf-keep">${esc(t("keep", en))}</p>`;
 }
 
-// 存好之後：存了什麼、連結到哪一天、一顆回去改的按鈕。
+// 登入的人改自己的那一份（2027-01-25）：最上面一行說他登入了，兩條路回設定與活動。這一頁不載站內頂欄，所以路放在這裡。
+export function selfBarHTML(meta, en) {
+  if (!(meta && meta.self)) return "";
+  return `<p class="pf-h pf-self">${esc(t("selfBar", en))} <a href="../settings/">${esc(t("settings", en))}</a> · <a href="../events/">${esc(t("events", en))}</a></p>`;
+}
+// 存好之後「你的帳號」那一塊（2027-01-25）。acc 是 rc_public_profile_account 回的 { state, email, code, sent }；登入的人是 { state: "self" }，不畫。
+// code 只收資料庫發的那種形狀（bt- 加 8 個十六進位字元），其他一律不畫那顆鈕。
+export function accountHTML(acc, en) {
+  const a = acc || {}, st = a.state, email = str(a.email);
+  if (!st || st === "self") return "";
+  let body = "";
+  if (st === "invited") {
+    const go = /^bt-[0-9a-f]{8}$/.test(str(a.code)) ? `<p>${esc(t("accNow", en))}</p>
+      <div class="pf-nav pf-accnav"><a class="btn" href="../app/?invite=${encodeURIComponent(a.code)}&amp;lang=${en ? "en" : "zh"}">${esc(t("accGo", en))}</a></div>
+      <p class="pf-h">${esc(t("accHow", en, { email }))}</p>` : "";
+    body = `<p>${esc(t(a.sent === false ? "accInvitedBefore" : "accInvited", en, { email }))}</p>${go}`;
+  } else if (st === "has_account") body = `<p>${esc(t("accHas", en))}</p><div class="pf-nav pf-accnav"><a class="btn ghost" href="../app/">${esc(t("signIn", en))}</a></div>`;
+  else if (st === "login") body = `<p>${esc(t("accLogin", en, { email }))}</p><div class="pf-nav pf-accnav"><a class="btn ghost" href="../app/">${esc(t("signIn", en))}</a></div>`;
+  else if (st === "pending") body = `<p>${mail(t("accPending", en))}</p>`;
+  else if (st === "no_email") body = `<p>${esc(t("accNoEmail", en))}</p>`;
+  else body = `<p>${mail(t("accFail", en))}</p>`;
+  return `<section class="pf-acc" aria-labelledby="pf-acc-h"><h2 id="pf-acc-h">${esc(t("accH", en))}</h2>${body}</section>`;
+}
+// 登入了，但拿不到自己的那一條：名單上沒有他（no_record）、他是幹部（not_for_cadre）、或別的原因。沒有表單。
+export function noMineHTML(en, code) {
+  if (code === "not_for_cadre") return `<div class="warn pf-wrong" role="alert">${esc(t("noMineCadre", en))} <a href="../settings/">${esc(t("settings", en))}</a></div>`;
+  return `<div class="warn pf-wrong" role="alert">${mail(t("noMine", en))}</div>`;
+}
+// 存好之後：存了什麼、連結到哪一天、一顆回去改的按鈕。2027-01-25 起多「你的帳號」那一塊。
 export function doneHTML(state, meta, en) {
   const s = state || blank(), m = meta || {}, name = [s.name_zh, s.name_en].map(x => str(x).trim()).filter(Boolean).join(" / ");
   const yes = FLAGS.filter(k => s[k] === true).map(k => CONSENT[k][en ? 1 : 0][0]);
   const until = dateText(m.expires_at, en);
   return `<div class="pf-card pf-done">
       <h1 id="pf-h" tabindex="-1">${esc(t("doneH", en))}</h1>
+      ${/* 帳號放最上面：Paul 說這是這條連結最重要的一件事。 */ ""}${accountHTML(m.account, en)}
       <p>${esc(t("doneLead", en))}</p>
       <ul class="pf-sum">
         <li>${esc(t("doneName", en, { v: name }))}</li>
@@ -560,12 +613,12 @@ export function doneHTML(state, meta, en) {
         <li>${esc(t("doneStory", en, { n: STORY_KEYS.filter(k => len(s.story[k]) > 0).length }))}</li>
       </ul>
       ${yes.length ? `<p>${esc(t("doneYes", en))}</p><ul class="pf-sum">${yes.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>${esc(t("doneNone", en))}</p>`}
-      <p>${esc(until ? t("doneUntil", en, { date: until }) : t("doneLater", en))}</p>
-      <p class="pf-h">${mail(t("later", en))}</p>
+      ${m.self ? "" : `<p>${esc(until ? t("doneUntil", en, { date: until }) : t("doneLater", en))}</p>`}
+      <p class="pf-h">${mail(t(m.self ? "laterSelf" : "later", en))}</p>
       <div class="pf-nav"><button type="button" class="btn" data-nav="edit">${esc(t("doneEdit", en))}</button><a class="btn ghost" href="../">${esc(t("home", en))}</a></div>
     </div>`;
 }
 // 連結不對、過期、被撤銷，或網址上根本沒有 token：一句話加 BT 的信箱，**沒有表單**。
-export function wrongLinkHTML(en) { return `<div class="warn pf-wrong" role="alert">${mail(t("wrong", en))}</div>`; }
+export function wrongLinkHTML(en) { return `<div class="warn pf-wrong" role="alert">${mail(t("wrong", en))} ${esc(t("wrongLogin", en))} <a href="../app/">${esc(t("signIn", en))}</a></div>`; }
 // 載不進來（資料庫連不上、沒有網路）：也沒有表單。
 export function loadFailHTML(en, offline) { return `<div class="warn" role="alert">${mail(t(offline ? "loadOffline" : "loadFail", en))}</div>`; }

@@ -5723,6 +5723,106 @@ wb2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${WBM}" 2>&1 || true)
 if echo "${wb2}" | grep -q "OVERALL.*PASS" && ! echo "${wb2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; echo "${wb2}" | head -12; fail=$((fail+1)); fi
 psql -d "${DB}" -q -c "delete from public.role_changes where target in ('${WBI}','${WBS}','${WBN}','${WBL}'); delete from public.assignments where user_id in ('${WBI}','${WBS}','${WBN}','${WBL}'); delete from public.profiles where id in ('${WBI}','${WBS}','${WBN}','${WBL}'); delete from auth.users where id in ('${WBI}','${WBS}','${WBN}','${WBL}');" >/dev/null 2>&1 || true
 chk "（收尾）假的四個人拿掉了" "0" "select count(*) from public.profiles where id in ('${WBI}','${WBS}','${WBN}','${WBL}')"
+echo "── 個人連結填完就有帳號，而且就是名單上那一個人（2027-01-25-profile-link-account.sql）──"
+# Paul 2026-11-27：「once they fill out the form, they should get their account」「their account should be linked to that databases… I don't want… two person」。
+PAM=supabase/migrations/2027-01-25-profile-link-account.sql
+PAU=7c7c0000-0000-0000-0000-000000000001; PAW=7c7c0000-0000-0000-0000-000000000002; PAB=7c7c0000-0000-0000-0000-000000000003
+PAC=7c7c0000-0000-0000-0000-000000000004; PAD=7c7c0000-0000-0000-0000-000000000005
+PAPOL=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from pg_policies where schemaname = 'public'" | tr -d ' \n')
+pa1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PAM}" 2>&1 || true)
+if echo "${pa1}" | grep -q "OVERALL.*PASS" && ! echo "${pa1}" | grep -q "|FAIL"; then echo "  ok   開帳號那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 開帳號那支驗收表："; echo "${pa1}" | head -20; fail=$((fail+1)); fi
+chk "沒有任何一條 RLS 政策多出來或少掉" "${PAPOL}" "select count(*) from pg_policies where schemaname = 'public'"
+paq() { psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "$1" 2>&1 | tail -1 | tr -d ' \n'; }
+PAP=$(paq "select public.rc_save_person(null, '{\"name_en\":\"Ann Speaker\",\"email\":\"ann-pa@example.com\",\"kind\":\"guest\"}'::jsonb)")
+PAT=$(paq "select public.rc_profile_link('${PAP}','create')->>'token'")
+PASAVE='{"adult":true,"name_en":"Ann Speaker","name_zh":"安","contacts":{"email":"ann-pa@example.com"},"story":{"turning":"SECRET-STORY-TEXT"},"share_profile":false,"share_story":false}'
+chkraise "★ 還沒存過（還沒勾滿 18）開不了帳號（not_saved）" "not_saved" "set local role anon; perform public.rc_public_profile_account('${PAT}', 'zh');"
+chkraise "★ 連結不對開不了（bad_link）" "bad_link" "set local role anon; perform public.rc_public_profile_account(repeat('c',64), 'zh');"
+chkrole anon "" "拿連結的人存一次" "true" "select (public.rc_public_profile_save('${PAT}', '${PASAVE}'::jsonb)->>'ok')"
+PAN0=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.people" | tr -d ' \n')
+chkrole anon "" "★ 存完開帳號：寄出、綁著他自己的 email" "invited|ann-pa@example.com|true|bt-" "select (j->>'state')||'|'||(j->>'email')||'|'||(j->>'sent')||'|'||left(j->>'code',3) from public.rc_public_profile_account('${PAT}', 'en') j"
+PACODE=$(psql -d "${DB}" -X -A -t -q -c "select code from public.invite_codes where person_id='${PAP}' and grants='connection'" | tr -d ' \n')
+chk "★ 那組碼綁著名單上這個人、這個 email、30 天、用一次，不是誰邀的" "1|ann-pa@example.com|connection|1|true|en" "select count(*)||'|'||min(email)||'|'||min(grants)||'|'||min(uses_left)||'|'||bool_and(invited_by is null and expires_at > now() + interval '29 days')::text||'|'||min(lang) from public.invite_codes where person_id='${PAP}'"
+chk "★ 一封信、寄給他、按鈕連到開帳號的連結、信裡沒有他寫的故事" "1|ann-pa@example.com|true|false|true" "select count(*)||'|'||min(o.to_email)||'|'||bool_and(public.mail_button_url(o) = 'https://beyondtaiwannpo.com/app/?invite=${PACODE}&lang=en')::text||'|'||bool_or(o.body like '%SECRET-STORY-TEXT%')::text||'|'||bool_and(o.body like '%安%')::text from public.mail_outbox o where o.kind='profile_account' and o.invite_code='${PACODE}'"
+chkrole anon "" "★ 再按一次：同一組碼、不再寄" "invited|${PACODE}|false" "select (j->>'state')||'|'||(j->>'code')||'|'||(j->>'sent') from public.rc_public_profile_account('${PAT}', 'zh') j"
+chk "★ 還是只有一封信、一組碼" "1|1" "select (select count(*) from public.mail_outbox where kind='profile_account' and to_email='ann-pa@example.com')||'|'||(select count(*) from public.invite_codes where person_id='${PAP}')"
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL >/dev/null
+insert into auth.users (id,email) values ('${PAU}','ann-pa@example.com'), ('${PAW}','someone-else-pa@example.com');
+insert into public.profiles (id, name_en) values ('${PAU}', 'Ann'), ('${PAW}', 'Wrong');
+SQL
+chkraise "★ 用別的 email 登入的帳號認領不了（invite_wrong_email）" "invite_wrong_email" "perform set_config('test.uid','${PAW}',true); perform public.claim_invite('${PACODE}');"
+chk "★ 被擋之後碼還在、名單上那個人還沒有帳號" "1|true" "select (select uses_left from public.invite_codes where code='${PACODE}')||'|'||(select profile_id is null from public.people where id='${PAP}')::text"
+chkrole authenticated "${PAU}" "★ 用他自己的 email 註冊之後認領：變成 BT 的朋友" "upgraded_connection" "select public.claim_invite('${PACODE}')"
+chk "★ 帳號接在名單上原本那一個人身上，名單一列都沒多、沒少" "true|connection|${PAN0}|0" "select (select profile_id = '${PAU}' from public.people where id='${PAP}')::text||'|'||(select role from public.profiles where id='${PAU}')||'|'||(select count(*) from public.people)||'|'||(select uses_left from public.invite_codes where code='${PACODE}')"
+chk "★ 這個帳號在名單上只有一列" "1" "select count(*) from public.people where profile_id='${PAU}'"
+chk "登入用的 email 記成驗證過" "true" "select bool_or(verified)::text from public.rc_identities where person_id='${PAP}' and kind='email' and lower(value)='ann-pa@example.com'"
+chkrole authenticated "${PAU}" "再認領一次：當作成功，不出錯" "claimed_record" "select public.claim_invite('${PACODE}')"
+chkrole anon "" "★ 有帳號了：連結上只說去登入" "has_account" "select public.rc_public_profile_account('${PAT}', 'zh')->>'state'"
+PAMT=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAU}',false);" -c "set role authenticated; select public.rc_my_profile_link()->>'token'" 2>&1 | tail -1 | tr -d ' \n')
+chkrole anon "" "★ 登入之後拿到的連結打開是同一個人（名單上那一列）" "AnnSpeaker|安" "select (j->'person'->>'name_en')||'|'||(j->'person'->>'name_zh') from public.rc_public_profile('${PAMT}') j"
+chk "登入之後拿連結：原本那一條還有效就給那一條" "${PAT}" "select '${PAMT}'"
+chkrole authenticated "${PAU}" "BT 的朋友沒有幹部的門" "false" "select public.is_cadre()::text"
+chkraise "★ 幹部不走這條（not_for_cadre）" "not_for_cadre" "perform set_config('test.uid','${PAUL}',true); perform public.rc_my_profile_link();"
+chkrole anon "" "★ 沒登入叫不動拿自己的連結、認領的內部那一支、排信那一支" "denied|denied|denied" "select case when has_function_privilege('anon','public.rc_my_profile_link()','execute') then 'open' else 'denied' end||'|'||case when has_function_privilege('anon','public.rc_claim_connection(text)','execute') then 'open' else 'denied' end||'|'||case when has_function_privilege('anon','public.rc_queue_account_mail(text)','execute') then 'open' else 'denied' end"
+chkrole authenticated "${PAU}" "★ 登入的人也叫不動認領的內部那一支" "denied" "select case when has_function_privilege('authenticated','public.rc_claim_connection(text)','execute') then 'open' else 'denied' end"
+# ── 這個 email 已經有帳號，而且那個帳號已經是名單上另一個人：不接、不新增、記一筆 ──
+PBP=$(paq "select public.rc_save_person(null, '{\"name_en\":\"Bea Prof\",\"email\":\"bea-pa@example.com\",\"kind\":\"guest\"}'::jsonb)")
+PBT=$(paq "select public.rc_profile_link('${PBP}','create')->>'token'")
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL >/dev/null
+insert into auth.users (id,email) values ('${PAB}','bea-pa@example.com');
+insert into public.profiles (id, name_en, role) values ('${PAB}', 'Bea', 'student');
+insert into public.people (name_en, kind, profile_id) values ('Bea Other Row', 'student', '${PAB}');
+SQL
+chkrole anon "" "存一次" "true" "select (public.rc_public_profile_save('${PBT}', '{\"adult\":true,\"name_en\":\"Bea Prof\"}'::jsonb)->>'ok')"
+PBN0=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.people" | tr -d ' \n')
+chkrole anon "" "★ 那個帳號已經是名單上另一個人：叫他登入" "login" "select public.rc_public_profile_account('${PBT}', 'zh')->>'state'"
+chk "★ 不開碼、不寄信、名單一列都沒多、記一筆給管紀錄的人合併" "0|0|${PBN0}|1|false" "select (select count(*) from public.invite_codes where person_id='${PBP}')||'|'||(select count(*) from public.mail_outbox where to_email='bea-pa@example.com')||'|'||(select count(*) from public.people)||'|'||(select count(*) from public.rc_log where what='profile_account_conflict' and ref='${PBP}')||'|'||(select profile_id is not null from public.people where id='${PBP}')::text"
+# ── 碼寄出去之後，那個帳號才變成名單上另一個人：認領時碼不燒、什麼都不接、什麼都不刪 ──
+PCP=$(paq "select public.rc_save_person(null, '{\"name_en\":\"Cal Mentee\",\"email\":\"cal-pa@example.com\",\"kind\":\"guest\"}'::jsonb)")
+PCT=$(paq "select public.rc_profile_link('${PCP}','create')->>'token'")
+chkrole anon "" "存一次、開帳號" "invited" "select public.rc_public_profile_save('${PCT}', '{\"adult\":true,\"name_en\":\"Cal Mentee\"}'::jsonb); select public.rc_public_profile_account('${PCT}', 'zh')->>'state'"
+PCCODE=$(psql -d "${DB}" -X -A -t -q -c "select code from public.invite_codes where person_id='${PCP}'" | tr -d ' \n')
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL >/dev/null
+insert into auth.users (id,email) values ('${PAC}','cal-pa@example.com');
+insert into public.profiles (id, name_en) values ('${PAC}', 'Cal');
+insert into public.people (name_en, kind, profile_id) values ('Cal Applied Row', 'student', '${PAC}');
+SQL
+PCN0=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.people" | tr -d ' \n')
+chkrole authenticated "${PAC}" "★ 認領：回 record_conflict" "record_conflict" "select public.claim_invite('${PCCODE}')"
+chk "★ 碼沒燒、連結那一列沒接、兩列都還在、身分沒動、記一筆" "1|true|${PCN0}|student|1" "select (select uses_left from public.invite_codes where code='${PCCODE}')||'|'||(select profile_id is null from public.people where id='${PCP}')::text||'|'||(select count(*) from public.people)||'|'||(select role from public.profiles where id='${PAC}')||'|'||(select count(*) from public.rc_log where what='profile_account_conflict' and ref='${PCP}')"
+# ── 以前當過幹部的人（名單上有職位）：認領之後是校友 ──
+PDP=$(paq "select public.rc_save_person(null, '{\"name_en\":\"Dee Former\",\"email\":\"dee-pa@example.com\",\"kind\":\"guest\"}'::jsonb)")
+psql -d "${DB}" -X -A -t -q -c "insert into public.positions (person_id, term_id, title_zh, title_en, team) values ('${PDP}', (select id from public.terms order by starts_on limit 1), '組員', 'Associate', 'Curriculum Team');" >/dev/null
+PDT=$(paq "select public.rc_profile_link('${PDP}','create')->>'token'")
+chkrole anon "" "存一次、開帳號" "invited" "select public.rc_public_profile_save('${PDT}', '{\"adult\":true,\"name_en\":\"Dee Former\"}'::jsonb); select public.rc_public_profile_account('${PDT}', 'zh')->>'state'"
+PDCODE=$(psql -d "${DB}" -X -A -t -q -c "select code from public.invite_codes where person_id='${PDP}'" | tr -d ' \n')
+psql -d "${DB}" -q -c "insert into auth.users (id,email) values ('${PAD}','dee-pa@example.com'); insert into public.profiles (id, name_en) values ('${PAD}', 'Dee');" >/dev/null
+chkrole authenticated "${PAD}" "★ 有職位的人認領之後是校友（2026-10-23 的定義）" "upgraded_alumni" "select public.claim_invite('${PDCODE}')"
+chk "★ 校友的帳號接在有職位的那一列，名單上只有那一列" "alumni|1|true" "select (select role from public.profiles where id='${PAD}')||'|'||(select count(*) from public.people where profile_id='${PAD}')||'|'||(select profile_id = '${PAD}' from public.people where id='${PDP}')::text"
+# ── 一天最多三組 ──
+PEP=$(paq "select public.rc_save_person(null, '{\"name_en\":\"Eve Spam\",\"email\":\"eve0-pa@example.com\",\"kind\":\"guest\"}'::jsonb)")
+PET=$(paq "select public.rc_profile_link('${PEP}','create')->>'token'")
+for i in 1 2 3; do psql -d "${DB}" -X -A -t -q -c "set role anon; select public.rc_public_profile_save('${PET}', '{\"adult\":true,\"name_en\":\"Eve\",\"contacts\":{\"email\":\"eve${i}-pa@example.com\"}}'::jsonb); select public.rc_public_profile_account('${PET}', 'zh');" >/dev/null 2>&1 || true; done
+chk "換了三次 email：三組碼，舊的兩組作廢" "3|1" "select count(*)||'|'||count(*) filter (where revoked_at is null) from public.invite_codes where person_id='${PEP}'"
+chkraise "★ 第四次換：一天最多三組（too_many）" "too_many" "set local role anon; perform public.rc_public_profile_save('${PET}', '{\"adult\":true,\"name_en\":\"Eve\",\"contacts\":{\"email\":\"eve4-pa@example.com\"}}'::jsonb); perform public.rc_public_profile_account('${PET}', 'zh');"
+# ── 破壞測試 ──
+BROKEN=$(mktemp)
+sed 's/token = p_token and submitted_at is not null) then/token = p_token) then/' "${PAM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^7|.*|FAIL"; then echo "  ok   ★ 破壞測試：拿掉「要先存過」，驗收表第 7 列變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉要先存過驗收表沒變紅"; fail=$((fail+1)); fi
+sed 's/update public.people set profile_id = v_uid where id = pe.id and profile_id is null;/update public.people set profile_id = v_uid where id = pe.id and profile_id is null; delete from public.people where profile_id = v_uid and id <> pe.id;/' "${PAM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^9|.*|FAIL"; then echo "  ok   ★ 破壞測試：認領時刪掉他另一列，驗收表第 9 列變紅"; pass=$((pass+1)); else echo "  FAIL 認領時刪人驗收表沒變紅"; fail=$((fail+1)); fi
+sed 's/^grant execute on function public.rc_my_profile_link() to authenticated;/grant execute on function public.rc_my_profile_link() to anon, authenticated;/' "${PAM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^11|.*|FAIL"; then echo "  ok   ★ 破壞測試：拿自己的連結開給沒登入的人，驗收表第 11 列變紅"; pass=$((pass+1)); else echo "  FAIL 開給 anon 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+psql -d "${DB}" -q -c "revoke all on function public.rc_my_profile_link() from anon;" >/dev/null 2>&1 || true
+pa2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PAM}" 2>&1 || true)
+if echo "${pa2}" | grep -q "OVERALL.*PASS" && ! echo "${pa2}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去、重跑一次，驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; echo "${pa2}" | head -16; fail=$((fail+1)); fi
+for P in "${PAP}" "${PBP}" "${PCP}" "${PDP}" "${PEP}"; do psql -d "${DB}" -q -c "delete from public.mail_outbox where invite_code in (select code from public.invite_codes where person_id='${P}'); delete from public.invite_uses where code in (select code from public.invite_codes where person_id='${P}'); delete from public.invite_codes where person_id='${P}'; delete from public.positions where person_id='${P}'; update public.people set profile_id = null where id='${P}'; delete from public.people where id='${P}';" >/dev/null 2>&1 || true; done
+psql -d "${DB}" -q -c "delete from public.people where profile_id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}'); delete from public.profiles where id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}'); delete from auth.users where id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}');" >/dev/null 2>&1 || true
+chk "（收尾）假的人與帳號拿掉了" "0|0" "select (select count(*) from public.profiles where id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}'))||'|'||(select count(*) from public.people where name_en in ('Ann Speaker','Bea Prof','Cal Mentee','Dee Former','Eve','Eve Spam','Bea Other Row','Cal Applied Row'))"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

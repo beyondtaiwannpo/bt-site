@@ -264,7 +264,12 @@ test("★ token 不出現在畫面、草稿與送出去的那一份裡，只在�
   const uses = main.match(/token\(\)/g).length;
   const okUses = (main.match(/p_token: token\(\)/g) || []).length + (main.match(/UI\.langHref\(token\(\)/g) || []).length + (main.match(/UI\.draft(Save|Load|Clear)\(token\(\)/g) || []).length + (main.match(/token\(\)\.length < 32/g) || []).length;
   assert.equal(uses, okUses, "main.js 裡每一個 token() 都是 rpc、langHref、草稿或長度檢查");
-  assert.equal((main.match(/p_token: token\(\)/g) || []).length, 2);
+  // 三支：讀、存、存完開帳號（2027-01-25）。
+  assert.equal((main.match(/p_token: token\(\)/g) || []).length, 3);
+  // 換語言的網址只帶網址上本來就有的那一條：登入的人跟資料庫要來的那一條（S.tok）不進網址。
+  assert.equal((main.match(/UI\.langHref\(token\(\)/g) || []).length, 0);
+  assert.equal((main.match(/UI\.langHref\(urlToken\(\)/g) || []).length, 2);
+  assert.doesNotMatch(main, /S\.tok[^=]*(location|history|href|Storage|console)/);
   assert.doesNotMatch(main, /localStorage|console\.[a-z]+\([^)]*token|location\.href\s*=/);
   for (const line of main.split("\n").filter(l => /console\./.test(l))) assert.doesNotMatch(line, /token|err\)|, e\)|err\.message/, "console 只印錯誤代碼：" + line.trim());
 });

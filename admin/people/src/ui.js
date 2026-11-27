@@ -1449,8 +1449,9 @@ export function noAccessHTML(me) {
 //
 // role 是那個人**現在**的身分，grants 是**那一次**換到的身分。兩個不一樣
 // 就多寫一句「現在是…」，例如校友後來又拿了幹部碼。
-const ROLE_KEY = { cadre: "role.cadre", alumni: "role.alumni", student: "role.student", intern: "role.intern" };
-const GRANT_KEY = { cadre: "grant.cadre", alumni: "grant.alumni", intern: "grant.intern" };
+// 2027-01-25：connection（BT 的朋友）是個人連結開出來的帳號，碼由資料庫自己建，不從這一頁發。
+const ROLE_KEY = { cadre: "role.cadre", alumni: "role.alumni", student: "role.student", intern: "role.intern", connection: "role.connection" };
+const GRANT_KEY = { cadre: "grant.cadre", alumni: "grant.alumni", intern: "grant.intern", connection: "grant.connection" };
 const roleName = v => ROLE_KEY[v] ? T(ROLE_KEY[v]) : (v || "");
 const grantName = v => GRANT_KEY[v] ? T(GRANT_KEY[v]) : (v || "");
 
@@ -1581,7 +1582,8 @@ export function invitesPageHTML(rows, batch, terms, msg, busy, draft, batchDraft
   const dis = busy ? " disabled" : "";
   const d10 = v => String(v || "").slice(0, 10);
   const item = r => {
-    const who = r.grants === "cadre" ? T("in.who.cadre", { rank: boardLabel(r.rank || "member") }) : r.grants === "intern" ? T("in.who.intern") : T("in.who.alumni");
+    const who = r.grants === "cadre" ? T("in.who.cadre", { rank: boardLabel(r.rank || "member") }) : r.grants === "intern" ? T("in.who.intern")
+      : r.grants === "connection" ? T("in.who.connection") : T("in.who.alumni");
     const live = ["queued", "sent", "failed", "opened"].includes(r.status);
     return `<li>
       <div class="fhead"><b>${esc(r.email)}</b><span class="tag ${ST_TAG[r.status] || ""}">${esc(T("in.st." + r.status) || r.status)}</span>${

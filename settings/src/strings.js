@@ -87,6 +87,9 @@ export const MINE = {
   "s.internPassport": { zh: "實習護照", en: "Intern passport" },
   "s.internNote":     { zh: "這一期的任務、章、心得與照片都在實習護照裡面。", en: "This term's tasks, stamps, notes and photos are in the intern passport." },
   "s.goIntern":       { zh: "去實習護照", en: "Go to intern passport" },
+  "s.myProfile":      { zh: "我的檔案", en: "My profile" },
+  "s.myProfileNote":  { zh: "你的介紹、學歷、工作、故事，還有 BT 可以拿去做什麼，都在這一份裡面。改了就存，BT 看到的是同一份。", en: "Your intro, education, work, story, and what BT may do with them are all in one place. Changes save there, and BT sees the same profile." },
+  "s.goProfile":      { zh: "去我的檔案", en: "Go to my profile" },
   "s.leave":          { zh: "要離開 BT 的話，帳號的處理是換屆交接的一部分，\n             寄信到 <a href=\"mailto:beyondtaiwan2020@gmail.com\">beyondtaiwan2020@gmail.com</a>。", en: "If you are leaving BT, your account is handled as part of the handover. Email <a href=\"mailto:beyondtaiwan2020@gmail.com\">beyondtaiwan2020@gmail.com</a>." },
   "s.delete":         { zh: "刪除我的帳號與所有資料", en: "Delete my account and all my data" },
   // 大頭照
