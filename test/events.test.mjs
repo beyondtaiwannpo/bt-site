@@ -22,9 +22,11 @@ const EVS = [EV, { ...EV, id: "e2", slug: "ready-one", title_zh: "準備好的",
   { ...EV, id: "e4", slug: "old-one", title_zh: "過去的", title_en: "Old one", status: "published", starts_at: "2025-01-01T00:00:00Z", ends_at: "2025-01-02T00:00:00Z" },
   { ...EV, id: "e5", slug: "pulled", title_zh: "撤下的", title_en: "Pulled", status: "archived", form_id: null }];
 
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };  // 2027-01-24：整個 BT 每天用的六樣
+
 test("★ 側欄四份都有「活動」（幹部都看得到）；工作區那一格連到那一場；總覽的「你的存取」直達", () => {
   for (const M of [F, SITE, PA, PE]) {
-    const it = M.ITEMS.find(i => i.key === "events"); assert.equal(it.who, "cadre"); assert.ok(M.canSee(it, ASSOC));
+    const it = M.ITEMS.find(i => i.key === "events"); assert.equal(it.who, "ws:custom:projects"); assert.ok(M.canSee(it, { ...ASSOC, ws: DAY }));
     assert.equal(M.wsCellHref({ id: WS, kind: "custom" }), "/admin/#events/winter-camp-2027");
     assert.equal(M.wsTeamOf({ id: WS, kind: "custom", team: "Marketing Team" }, []), "Marketing Team", "落在那個 team 的那一列");
   }

@@ -38,6 +38,8 @@ const ME = {
   intern:   { role: "intern",  board: "member",    team: "Internship Team" },
 };
 
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };  // 2027-01-24：整個 BT 每天用的六樣，現在的幹部都有
+
 test("★ 四個資料夾的 GROUPS 一字不差", () => {
   for (const [label, M] of IMPL) {
     assert.deepEqual(M.GROUPS, FORMS.GROUPS, `${label} 的 GROUPS 跟 admin/ 不一樣`);
@@ -83,13 +85,15 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
 
 test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西、進不去的不畫、當前那一行有標記、底下的頁是上方一排分頁", () => {
   for (const [label, M] of IMPL) {
-    const me = { ...ME.member, name: "王平" };
+    const me = { ...ME.member, name: "王平", ws: DAY };
+    // 2027-01-24：一個每天用的都沒被派的幹部，側欄只有首頁（新來的幹部要 Paul 在「整個 BT」加）。
+    assert.deepEqual([...M.railHTML("home", "home", { ...ME.member, name: "新", ws: {} }).matchAll(/rail-area[^>]*>[\s\S]*?<b>([^<]+)<\/b>/g)].map(m => m[1]), ["首頁", "Curriculum"], `${label}：沒被派的最上面只有首頁（他的 team 那一行照舊在我的工作區）`);
     // 2026-11-27 第二版：對外網站是要派人的工作區，只有被派進去的人有那一行；某個 team「改」以上的人改資源庫與 BT 島，入口在他 team 那一行底下。
-    const ed = { ...me, ws: { "res:Curriculum Team": "edit" } };
+    const ed = { ...me, ws: { ...DAY, "res:Curriculum Team": "edit" } };
     const rail = M.railHTML("site", "res", ed);
     assert.doesNotMatch(rail, /<b>對外網站<\/b>/, `${label}：沒被派進對外網站就沒有那一行`);
     assert.match(rail, /<a class="rail-item rail-area rail-team here"[^>]*>[\s\S]*?<b>Curriculum<\/b>[\s\S]*?<a class="rail-item rail-sub on" href="#res" data-act="tab" data-t="res" aria-current="page">資源庫<\/a>/, `${label}：資源庫在他 team 底下，亮著`);
-    assert.match(M.railHTML("site", "history", { ...me, ws: { "custom:website": "edit" } }), /<a class="rail-item rail-area here" href="#history" data-act="tab" data-t="history">.*?<b>對外網站<\/b>/, `${label}：被派進對外網站的人有那一行，點下去是歷史之路`);
+    assert.match(M.railHTML("site", "history", { ...me, ws: { ...DAY, "custom:website": "edit" } }), /<a class="rail-item rail-area here" href="#history" data-act="tab" data-t="history">.*?<b>對外網站<\/b>/, `${label}：被派進對外網站的人有那一行，點下去是歷史之路`);
     assert.doesNotMatch(M.railHTML("forms", "projects", me), /<b>對外網站<\/b>/, `${label}：一般幹部沒有對外網站`);
     // 別的資料夾是帶 ?lang= 與 # 的一般連結。
     // 2026-12-26：「活動」那一行改叫「專案」，點下去是專案清單；場地搬到組織（整個 BT）。
@@ -411,7 +415,7 @@ test("★ 側欄沒有中英切換（只在設定那一頁）；英文側欄照�
   }
   FORMS.setLang("en");
   try {
-    const rail = FORMS.railHTML("forms", "teams", { ...ME.member, name: "a" });
+    const rail = FORMS.railHTML("forms", "teams", { ...ME.member, name: "a", ws: DAY });
     assert.doesNotMatch(rail, /data-act="lang"/);
     assert.match(rail, />All pages</, "手機上那顆鈕不跟頂欄的「選單」同名");
     assert.match(rail, /<b>Venues<\/b>[\s\S]*<div class="rail-group">My workspaces<\/div>/);
@@ -768,16 +772,27 @@ test("★ 工作區屬於哪一列、叫什麼、連到哪（四份一樣）", (
   assert.equal(FORMS.wsTeamOf({ id: "custom:camp" }), "", "都沒有就放整個 BT");
   // 2026-11-14：整個 BT 的工具不跟擁有人勾的 team 走（Co-President 勾了 Sponsorship，紀錄就掉到 Sponsorship 那一列）。
   const pres = [{ profile_id: "p1", team: "Sponsorship Team" }];
-  for (const id of ["custom:records", "records", "custom:meeting-templates", "custom:team-forms", "custom:money", "finance"])
+  for (const id of ["custom:records", "records", "custom:meeting-templates", "custom:team-forms", "custom:website",
+                    "custom:calendar", "custom:meetings", "custom:projects", "custom:forms", "custom:my-passport", "custom:venues"])
     assert.equal(FORMS.wsTeamOf({ id, owner: "p1" }, pres), "", `${id} 在整個 BT`);
+  // 2027-01-24 Paul：「Money should be under sponsorship」；Internal 在 Senior 那一列。
+  for (const id of ["custom:money", "finance"]) assert.equal(FORMS.wsTeamOf({ id, owner: "p1" }, pres), "Sponsorship Team", `${id} 在 Sponsorship`);
+  assert.equal(FORMS.wsTeamOf({ id: "custom:internal" }), "Senior");
   assert.equal(FORMS.wsTeamOf({ id: "custom:marketing-requests", owner: "p1" }, pres), "Marketing Team");
   assert.equal(FORMS.wsCellLabel({ id: "passport" }), "幹部護照（格子與城市）");
   assert.equal(FORMS.wsCellLabel({ id: "intern-passport" }), "實習護照（格子與棋盤）");
   assert.equal(FORMS.wsCellLabel({ id: "apps:Curriculum Team" }), "申請（表單與審核）");
   assert.equal(FORMS.wsCellHref({ id: "apps:X" }), "/admin/#forms"); assert.equal(FORMS.wsCellHref({ id: "intern-passport" }), "/admin/passports/#interns");
   const rows = FORMS.wsRows([{ id: "passport" }, { id: "apps" }, { id: "intern-passport" }, { id: "res:Internship Team" }, { id: "custom:camp", team: "Internship Team" }], ["Curriculum Team", "Internship Team"]);
-  assert.deepEqual(rows.map(r => [r.label, r.cells.map(c => c.id)]), [["整個 BT", ["apps", "passport"]], ["Curriculum", []], ["Internship", ["res:Internship Team", "intern-passport", "custom:camp"]]], "整個 BT 列：申請、幹部護照；Internship 列：資源、實習護照、自訂（2026-10-30 起申請不分 team）");
+  assert.deepEqual(rows.map(r => [r.label, r.cells.map(c => c.id)]), [["整個 BT", ["apps", "passport"]], ["Senior", []], ["Curriculum", []], ["Internship", ["res:Internship Team", "intern-passport", "custom:camp"]]], "整個 BT 列：申請、幹部護照；Internship 列：資源、實習護照、自訂（2026-10-30 起申請不分 team）");
   assert.equal(FORMS.wsTeamOf({ id: "apps" }), ""); assert.equal(FORMS.wsCellLabel({ id: "apps" }), "申請（表單與審核）"); assert.equal(FORMS.wsCellHref({ id: "apps" }), "/admin/#forms");
+  // 整個 BT 那一列：每天用的六樣在前面，跟側欄最上面同一個順序；Internal 在 Senior。
+  const all = FORMS.wsRows(["custom:website", "apps", "custom:venues", "custom:calendar", "custom:my-passport", "custom:forms", "custom:projects", "custom:meetings", "custom:internal", "custom:money"].map(id => ({ id })), ["Sponsorship Team"]);
+  assert.deepEqual(all.map(r => [r.team, r.cells.map(c => c.id)]), [
+    ["", ["custom:calendar", "custom:meetings", "custom:projects", "custom:forms", "custom:my-passport", "custom:venues", "apps", "custom:website"]],
+    ["Senior", ["custom:internal"]], ["Sponsorship Team", ["custom:money"]]]);
+  assert.equal(FORMS.wsCellHref({ id: "custom:calendar" }), "/home/#calendar");
+  assert.equal(FORMS.wsCellHref({ id: "custom:my-passport" }), "/passport/");
 });
 
 // 2026-10-25 Paul：「I can't get into events」。側欄的 tab handler 曾經把 home 以外的一律當 forms。
@@ -839,7 +854,7 @@ test("★ 側欄：現在這一區展開成它的每一頁，現在這一頁有�
       /rail-sub rail-people" href="\/admin\/\?lang=zh#members=custom%3Arecords"/, `${label}：只管這一區的人照舊有`);
     assert.equal((rail.match(/rail-subs/g) || []).length, 1, `${label}：只有現在這一區展開`);
     // 場地只有一頁：不展開，那一行自己深藍。
-    const one = M.railHTML("forms", "venues", { role: "cadre", board: "member", team: "Curriculum Team", ws: {} }, {}, "zh");
+    const one = M.railHTML("forms", "venues", { role: "cadre", board: "member", team: "Curriculum Team", ws: DAY }, {}, "zh");
     assert.doesNotMatch(one, /rail-subs/, label);
     assert.match(one, /rail-area on"/, label);
   }

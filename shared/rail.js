@@ -139,19 +139,21 @@ export const AREAS = [
   { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
   // 場地是整個 BT 的（2026-12-26 Paul：「venue, records, money … whole BT」）。誰改得動不變：開得了活動的人照舊改得動。
   { key: "venues",    sec: "me",   label: { zh: "場地",     en: "Venues" },     hint: { zh: "場地與聯絡人", en: "Places and contacts" } },
-  // 以下是被指派才有的（sec ws，畫在 team 那幾行後面，標「指派」）。
+  // 2027-01-24（Paul：「records… right now they're in my workspace, but they're also inside whole BT. So it's confusing」）：
+  //   整個 BT 的東西都畫在最上面這一段（不加標題），被派進去才有的也一樣，不再放進「我的工作區」。「我的工作區」只剩 team 與 Marketing。
+  { key: "records",   sec: "me",   label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較", en: "Events, people, year by year" } },
+  { key: "passports", sec: "me",   label: { zh: "幹部護照", en: "Cadre passport" }, hint: { zh: "格子與入境章的城市", en: "Boxes and entry-stamp cities" } },
   // 對外網站是一個工作區（2026-11-27 第二版 Paul：「website should be something that they assign to」）：custom:website，
   //   在「人與權限 → 工作區」派人。這一行只畫給被派進去的人與 Co-President、Senior Adviser（areaWho）；
   //   某個 team「改」以上的人改自己 team 的資源庫與 BT 島，入口在他那個 team 那一行底下（teamRowsHTML），不在這一行。
-  { key: "website",   sec: "ws",   areaWho: "ws:custom:website", label: { zh: "對外網站", en: "Website" },    hint: { zh: "歷史之路、BT 島、網站上的活動與團隊頁", en: "History road, island, events and team page on the site" } },
+  { key: "website",   sec: "me",   areaWho: "ws:custom:website", label: { zh: "對外網站", en: "Website" },    hint: { zh: "歷史之路、BT 島、網站上的活動與團隊頁", en: "History road, island, events and team page on the site" } },
   { key: "marketing", sec: "ws",   label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
-  { key: "passports", sec: "ws",   label: { zh: "護照",     en: "Passports" },  hint: { zh: "幹部護照、實習護照", en: "Cadre and intern passports" } },
-  { key: "records",   sec: "ws",   label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較", en: "Events, people, year by year" } },
   // 這幾行不畫在側欄：人與權限與搜尋在頂欄，錢在 Sponsorship 那一行底下（teamRowsHTML）。
   // 人與權限只有 Co-President 與 Senior Adviser 的頂欄有；被派進「申請」工作區的一般幹部頂欄沒有，所以照舊畫在「我的工作區」最後（railHTML）。
   { key: "search",    sec: "top",  label: { zh: "搜尋",     en: "Search" },     hint: { zh: "會議紀錄、回饋表一次找", en: "Meeting notes and feedback at once" } },
   { key: "people",    sec: "top",  label: { zh: "人與權限", en: "Internal" },   hint: { zh: "名單、邀請、幹部招募、工作區", en: "Roster, invites, recruitment, workspaces" } },
   { key: "money",     sec: "team", team: "Sponsorship Team", label: { zh: "錢", en: "Money" }, hint: { zh: "收支、預算、匯出", en: "Income, spending, budget" } },
+  { key: "interns",   sec: "team", team: "Internship Team",  label: { zh: "實習護照", en: "Intern passport" }, hint: { zh: "格子、蛇梯棋、進度牆", en: "Boxes, game board, progress wall" } },
 ];
 // 這一區在側欄上畫不畫成一行（看得到裡面至少一頁，而且過了 areaWho）。人與權限：非 Co-President／Senior Adviser 才畫在側欄。
 export function areaShown(a, me) {
@@ -165,25 +167,31 @@ export function areaShown(a, me) {
 // who 決定畫不畫：cadre / president / senior / "ws:a|b"（被派進其中任何一個工作區，或 senior）。
 // 同一個 area 裡的順序就是上方分頁的順序；第一個看得到的是側欄那一行點下去的地方。
 // key 是空字串的那幾頁（時間看板、護照）是那個資料夾本身，連結不帶 #。
+// 整個 BT 每天用的六樣（2027-01-24）：每一格是一個工作區，跟 admin/people/src/ui.js 的 WHOLE_BT_TOOLS 同一份清單。
+export const WHOLE_BT_TOOLS = ["custom:calendar", "custom:meetings", "custom:projects", "custom:forms", "custom:my-passport", "custom:venues"];
 export const ITEMS = [
   // 我的（2026-11-14）：首頁是 /home/，等你處理的事都在那一頁（以前後台還有一頁「待辦」，兩頁一樣的事，合併了）。
   { group: "home",      key: "home",       area: "home",      who: "cadre",  bare: true, label: { zh: "首頁", en: "Home" } },
-  { group: "home",      key: "calendar",   area: "calendar",  who: "cadre",  label: { zh: "行事曆", en: "Calendar" } },
-  { group: "forms",     key: "meetings",   area: "meetings",  who: "cadre",  label: { zh: "會議", en: "Meetings" } },
-  { group: "availability", key: "",        area: "calendar",  who: "cadre",  label: { zh: "時間看板", en: "Availability" } },
+  // 2027-01-24（Paul：「calendar, meeting, projects, forms, my passport, venues… all of those should be a project we can assign to people」）：
+  //   整個 BT 每天用的六樣都是一格要派的工作區（custom:calendar…），在「人與權限 → 工作區 → 整個 BT」打勾。
+  //   跑遷移檔那一刻每一位幹部六格都有（2027-01-24-whole-bt-tools.sql），之後新來的要 Paul 加。
+  //   這幾格只決定側欄畫不畫、那一頁開不開；資料誰讀得到照舊是資料庫原本的門。
+  { group: "home",      key: "calendar",   area: "calendar",  who: "ws:custom:calendar", ws: "custom:calendar", label: { zh: "行事曆", en: "Calendar" } },
+  { group: "forms",     key: "meetings",   area: "meetings",  who: "ws:custom:meetings", ws: "custom:meetings", label: { zh: "會議", en: "Meetings" } },
+  { group: "availability", key: "",        area: "calendar",  who: "ws:custom:calendar", ws: "custom:calendar", label: { zh: "時間看板", en: "Availability" } },
   // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
   { group: "forms",     key: "mtemplates", area: "meetings",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "會議範本", en: "Templates" } },
-  { group: "passport",  key: "",           area: "mypassport", who: "cadre", label: { zh: "我的護照", en: "My passport" } },
+  { group: "passport",  key: "",           area: "mypassport", who: "ws:custom:my-passport", ws: "custom:my-passport", label: { zh: "我的護照", en: "My passport" } },
   { group: "search",    key: "search",     area: "search",    who: "cadre",  bare: true, label: { zh: "搜尋", en: "Search" } },
   // 活動（2026-11-10 Paul：「application should live under events」）
-  { group: "forms",     key: "projects",   area: "events",    who: "cadre",  label: { zh: "專案", en: "Projects" } },
-  { group: "forms",     key: "events",     area: "events",    who: "cadre",  label: { zh: "活動", en: "Events" } },
+  { group: "forms",     key: "projects",   area: "events",    who: "ws:custom:projects", ws: "custom:projects", label: { zh: "專案", en: "Projects" } },
+  { group: "forms",     key: "events",     area: "events",    who: "ws:custom:projects", ws: "custom:projects", label: { zh: "活動", en: "Events" } },
   // 2026-11-26 Paul：「各 team」那一頁拿掉了（team 的人數與 Director 在幹部名單上），「計畫與招募」改叫「幹部招募」搬到「人與權限」底下，見下面。
   // 表單（2026-11-27 第二版）：一個入口。「所有表單」是每一位幹部都有的一頁（/admin/team-forms/#all）：
   //   我管的報名表、回饋表、內部表單一張清單，每一份標類型、是哪一場活動的、開著沒、收了幾份；最下面「建一份」先選類型。
   //   誰管得到哪一份照舊是資料庫決定（my_forms()，2027-01-23-website-and-forms.sql）。
-  { group: "teamforms", key: "fill",       area: "forms",     who: "cadre",  label: { zh: "要我填的", en: "To fill" } },
-  { group: "teamforms", key: "all",        area: "forms",     who: "cadre",  label: { zh: "所有表單", en: "All forms" } },
+  { group: "teamforms", key: "fill",       area: "forms",     who: "ws:custom:forms", ws: "custom:forms", label: { zh: "要我填的", en: "To fill" } },
+  { group: "teamforms", key: "all",        area: "forms",     who: "ws:custom:forms", ws: "custom:forms", label: { zh: "所有表單", en: "All forms" } },
   { group: "teamforms", key: "build",      area: "forms",     who: "ws:team-forms", ws: "custom:team-forms", label: { zh: "內部表單", en: "Internal forms" } },
   // 回饋表（2026-11-27 Paul：「feedback form lives under records. I don't know why it's there」）：第二版收進「表單」。
   // 頁面還是紀錄那個資料夾的 #forms，這一行誰看得到不變（被派進「紀錄」的人）；改得動一場活動的人，他那場的回饋表在「所有表單」裡。
@@ -212,10 +220,12 @@ export const ITEMS = [
   // 護照
   { group: "passports", key: "cadre",      area: "passports", who: "ws:passport", ws: "passport",        label: { zh: "幹部護照", en: "Cadre passport" } },
   { group: "passports", key: "cities",     area: "passports", who: "ws:passport", ws: "passport",        label: { zh: "入境章的城市", en: "Entry-stamp cities" } },
-  { group: "passports", key: "interns",    area: "passports", who: "ws:intern-passport", ws: "intern-passport", label: { zh: "實習護照", en: "Intern passport" } },
-  { group: "passports", key: "board",      area: "passports", who: "ws:intern-passport", ws: "intern-passport", label: { zh: "實習的蛇梯棋", en: "Intern game board" } },
+  // 實習護照（2027-01-24 Paul：「It's like intern passport. It lives under internship… when I press internship, there's no intern passport」）：
+  //   自己一區 interns，畫在 Internship 那一行底下（跟錢在 Sponsorship 底下同一個做法，見 AREAS 的 sec team）。
+  { group: "passports", key: "interns",    area: "interns",   who: "ws:intern-passport", ws: "intern-passport", label: { zh: "實習護照", en: "Intern passport" } },
+  { group: "passports", key: "board",      area: "interns",   who: "ws:intern-passport", ws: "intern-passport", label: { zh: "實習的蛇梯棋", en: "Intern game board" } },
   // 實習生進度牆（2026-11-27 從「設定」的護照那一段搬來，那一段拿掉了）。頁面是 /intern-passport/ 本身。
-  { group: "internwall", key: "",          area: "passports", who: "ws:intern-passport", label: { zh: "實習生進度牆", en: "Intern progress wall" } },
+  { group: "internwall", key: "",          area: "interns",   who: "ws:intern-passport", label: { zh: "實習生進度牆", en: "Intern progress wall" } },
   // 人與權限
   { group: "people",    key: "roster",     area: "people",    who: "senior", label: { zh: "幹部名單", en: "Roster" } },
   { group: "people",    key: "invites",    area: "people",    who: "senior", label: { zh: "邀請新的人", en: "Invite people" } },
@@ -233,7 +243,7 @@ export const ITEMS = [
   { group: "records",   key: "people",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "人", en: "People" } },
   { group: "records",   key: "yearly",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "年度比較", en: "Year by year" } },
   // 場地（2026-12-26 從「專案」底下搬到整個 BT）
-  { group: "forms",     key: "venues",     area: "venues",    who: "cadre",  label: { zh: "場地", en: "Venues" } },
+  { group: "forms",     key: "venues",     area: "venues",    who: "ws:custom:venues", ws: "custom:venues", label: { zh: "場地", en: "Venues" } },
   // 錢
   { group: "finance",   key: "overview",   area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "總覽", en: "Overview" } },
   { group: "finance",   key: "tx",         area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "收支紀錄", en: "Transactions" } },
@@ -501,9 +511,10 @@ export function railHTML(group, tab, me, counts, L) {
   };
   const body = SECTIONS.map(s => {
     // 「我的工作區」：先是 team 那幾行，再接被指派才有的（sec ws），最後是人與權限（只有頂欄沒有它的人，見 areaShown）。
+    // 最上面那一段：整個 BT 的東西，連被派進去才有的（紀錄、幹部護照、對外網站、只被派進申請的人的那一行）都在這裡（2027-01-24）。
     const rows = s.key === "ws"
-      ? teamRowsHTML(group, tab, me, L) + AREAS.filter(a => a.sec === "ws" || a.sec === "top").filter(a => areaShown(a, me)).map(row).join("")
-      : AREAS.filter(a => a.sec === s.key && areaShown(a, me)).map(row).join("");
+      ? teamRowsHTML(group, tab, me, L) + AREAS.filter(a => a.sec === "ws").filter(a => areaShown(a, me)).map(row).join("")
+      : AREAS.filter(a => (a.sec === s.key || a.sec === "top") && areaShown(a, me)).map(row).join("");
     if (!rows) return "";
     return (s.label ? `<div class="rail-group">${esc(tx(s.label, L))}</div>` : "") + rows;
   }).join("");
@@ -1335,6 +1346,21 @@ export const TOURS = [
     { at: AT_SUBS, t: { zh: "信的文字與名單", en: "Email wording, and the roster" },
       b: { zh: "對方登入之後就在「幹部名單」上。邀請信的字在「對外網站」的「信的文字」改。", en: "Once they sign in they are on the Roster. The invite's wording is edited under Website, Email wording." } },
   ] },
+  // 整個工作區（2027-01-24 Paul：「when I add people into whole BT, they should have access to everything in whole BT」）。
+  { id: "workspace-group", page: "people:workspaces", when: "#ws-panel .wsg-items", steps: [
+    { at: "#ws-panel h2", t: { zh: "整個工作區", en: "A whole workspace" },
+      b: { zh: "標題點進來是整個工作區。整個 BT 裡每一樣都是一格，行事曆、會議、紀錄都是；勾了才看得到。", en: "A heading opens the whole workspace. In Whole BT every tool is an item, from Calendar and Meetings to Records; people see only what is ticked." } },
+    { at: "#ws-panel .wsg-items", t: { zh: "先勾要開哪幾樣", en: "Tick what to open first" },
+      b: { zh: "預設全部勾著。只想給行事曆與會議，就把其他的取消。", en: "Everything is ticked by default. To give only Calendar and Meetings, untick the rest." } },
+    { at: "#ws-panel .ma-col:last-child", t: { zh: "加人", en: "Add people" },
+      b: { zh: "右邊列的是勾起來的那幾樣還沒全部有的人。勾人、選等級、按「加 n 個人」，只補他少的，原本有的等級不變。", en: "The right lists anyone missing a ticked item. Tick people, pick a level and press Add; only what they lack is added and existing levels stay." } },
+    { at: "#ws-panel .ma-col:first-child", t: { zh: "已經在裡面的", en: "Already in" },
+      b: { zh: "左邊的下拉一次改他在每一樣的等級。勾好幾個人可以一次改或一次移出。", en: "The menu on the left changes their level on every item at once. Tick several people to change or remove them together." } },
+    { at: "#ws-panel .wsg-wrap", t: { zh: "誰開了哪幾樣", en: "Who has what" },
+      b: { zh: "一個人一列、一樣一欄。勾一格就開給他，取消就拿掉。表頭寫幾個人有，名字固定在左邊。", en: "One row per person, one column per item. Tick a box to open it, untick to remove. Headers show how many have it." } },
+    { t: { zh: "新來的幹部", en: "New cadres" },
+      b: { zh: "新來的幹部不會自動有任何一樣，要在整個 BT 這裡把他加進來，他的側欄才會有行事曆、會議這些。", en: "New cadres get nothing automatically. Add them here in Whole BT so Calendar, Meetings and the rest appear in their menu." } },
+  ] },
   { id: "workspace", page: "people:workspaces", when: "#ws-panel", steps: [
     { at: "#ws-panel h2", t: { zh: "你選的工作區", en: "The workspace you picked" },
       b: { zh: "選 team 的標題是整個 team；選底下一樣，就只有那一樣。", en: "A team heading means the whole team; an item under it means just that item." } },
@@ -1349,7 +1375,9 @@ export const TOURS = [
     { at: AT_HEAD, t: { zh: "誰能動什麼", en: "Who can change what" },
       b: { zh: "職級不開權限，工作區才開。要讓一個人處理某個 team 的東西，在這裡把他派進去。", en: "Rank opens nothing; workspaces do. To let someone work on a team's things, assign them here." } },
     { at: [".main .wsgrid", ".main .empty"], t: { zh: "點一個工作區", en: "Pick a workspace" },
-      b: { zh: "點 team 的標題是整個 team，點底下一樣是只有那一樣。下面會打開那一區的成員。", en: "Click a team heading for the whole team, or an item under it for just that item. Its members open below." } },
+      b: { zh: "點標題是整個工作區，點底下一樣是只有那一樣。整個 BT 是大家用的工具，Senior 是 Internal，錢在 Sponsorship，實習護照在 Internship。", en: "A heading is the whole workspace; an item is just that item. Whole BT holds everyone's tools, Senior holds Internal, Money is under Sponsorship." } },
+    { at: ".main .wsgrp:nth-child(2)", t: { zh: "Senior 與 Internal", en: "Senior and Internal" },
+      b: { zh: "放進 Internal 的人跟 Co-President 一樣：改職級、派錢、再加人進 Internal。名單請留短。", en: "Anyone in Internal gets what a Co-President has: change ranks, give out Money, add others to Internal. Keep the list short." } },
     { at: "#ws-new > summary", t: { zh: "開一個專案", en: "Create a project" },
       b: { zh: "專案也是一個工作區，開好就可以派人進去。", en: "A project is a workspace too; once created you can assign people to it." } },
     { t: { zh: "看、改、管", en: "View, Edit, Manage" },

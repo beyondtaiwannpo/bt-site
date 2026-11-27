@@ -413,7 +413,10 @@ export function membersAreaHTML(ns, a) {
         : "" };
   }
   // 右欄
-  const inIds = o.draft ? pk.ticked : rows.map(r => r.user_id);
+  // 整個工作區（2027-01-24）：右欄列的是「勾起來的那幾樣還沒全部有」的人，不是「一樣都沒有」的人。
+  // Paul：「I add everyone into whole BT and they should just have application, cadre, meeting and everything」——大家本來都有幹部護照，
+  // 舊的算法把他們都算成「在裡面」，右欄空的，其他幾樣就加不進去。fullIds 是 wsGroupHTML 算好傳進來的。
+  const inIds = o.draft ? pk.ticked : (o.fullIds || rows.map(r => r.user_id));
   const cands = pkCandidates(people, inIds, o.all);
   const shown = pkShown(cands, pk);
   const ticked = new Set(pk.ticked);
@@ -427,7 +430,7 @@ export function membersAreaHTML(ns, a) {
     <section class="ma-col"><div class="ma-head"><div class="ma-title">${left.title}</div>
         <input id="${esc(ns)}-mq" class="ma-find" value="${esc(pk.mq || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-mq" data-ns="${esc(ns)}"${dis}>${left.tools || ""}</div>
       <div class="ma-list">${left.items.length ? left.items.join("") : `<div class="ma-empty mini">${left.n ? T("pk.noneShown") : left.empty}</div>`}</div>${left.foot || ""}</section>
-    <section class="ma-col"><div class="ma-head"><div class="ma-title">${T("ma.out", { n: cands.length })}${shown.length !== cands.length ? `<span class="mini"> ${T("ma.shown", { n: shown.length })}</span>` : ""}</div>
+    <section class="ma-col"><div class="ma-head"><div class="ma-title">${o.outTitle ? o.outTitle(cands.length) : T("ma.out", { n: cands.length })}${shown.length !== cands.length ? `<span class="mini"> ${T("ma.shown", { n: shown.length })}</span>` : ""}</div>
         <input id="${esc(ns)}-q" class="ma-find" value="${esc(pk.q || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-q" data-ns="${esc(ns)}"${dis}>
         ${teamsHere.length ? `<div class="ma-chips">${teamsHere.map(chip).join("")}</div>` : ""}
         <div class="ma-tools"><button type="button" class="lnk" data-act="pk-all" data-ns="${esc(ns)}"${o.busy || !shown.length ? " disabled" : ""}>${T("pk.tickAll")}</button>
@@ -439,7 +442,12 @@ export function membersAreaHTML(ns, a) {
 // workspaces 是 workspaces 表（id、kind、title_zh、title_en、active）；prefix 是 "apps:" 或 "res:"，或整個代號（"intern-passport"）。
 // 一個工作區屬於哪一列（2026-10-24 照 team 分組）：apps:X / res:X 是 X；intern-passport 是 Internship Team；passport 是整個 BT（""）；
 // 自訂的看它的 team 欄，沒有就看擁有人勾的第一個 team（people 給得到的時候），都沒有就放在整個 BT 那一列。
-const ORG_WS = new Set(["records", "custom:records", "finance", "custom:money", "custom:meeting-templates", "custom:team-forms", "custom:website"]);
+// 2027-01-24（Paul：「calendar, meeting, projects, forms, my passport, venues… all of those should be a project we can assign」）：
+// 整個 BT 的每一樣工具都是一格，派人就是打勾。錢搬到 Sponsorship 那一列（「Money should be under sponsorship」）。
+export const WHOLE_BT_TOOLS = ["custom:calendar", "custom:meetings", "custom:projects", "custom:forms", "custom:my-passport", "custom:venues"];
+const ORG_WS = new Set(["records", "custom:records", "custom:meeting-templates", "custom:team-forms", "custom:website", ...WHOLE_BT_TOOLS]);
+// Senior 那一列（2027-01-24）：Internal（人與權限）。放進去的人跟 Co-President 一樣（2027-01-24-whole-bt-tools.sql）。
+export const SENIOR = "Senior";
 export function wsTeamOf(w, people) {
   const id = String((w && w.id) || "");
   // 2026-10-30 起申請是整個 BT 一個工作區 apps（在「整個 BT」那一列）；apps:<team> 是停用的舊工作區，還認得出來就好。
@@ -451,6 +459,8 @@ export function wsTeamOf(w, people) {
   // 整個 BT 的工具不跟擁有人走（2026-11-14 Paul：「為什麼紀錄、會議範本、team 表單在 Sponsorship 底下」）。
   // 擁有人通常是 Co-President，他勾的第一個 team 是哪一個，這幾格就掉到哪一列，看起來像那個 team 的東西。
   if (ORG_WS.has(id)) return "";
+  if (id === "finance" || id === "custom:money") return "Sponsorship Team";
+  if (id === "custom:internal") return SENIOR;
   if (id === "custom:marketing-requests" || id === "custom:marketing-approve") return "Marketing Team";
   // 專案（2026-12-26）的工作區存在 team 欄，空的就是整個 BT，不看擁有人。
   if (w && w.kind === "project") return w.team || "";
@@ -485,19 +495,28 @@ export function wsCellHref(w) {
   if (id === "custom:team-forms") return "/admin/team-forms/#build";
   if (id === "records" || id === "custom:records") return "/admin/records/#overview";
   if (id === "custom:website") return "/admin/site/#history";
+  if (id === "custom:calendar") return "/home/#calendar";
+  if (id === "custom:meetings") return "/admin/#meetings";
+  if (id === "custom:projects") return "/admin/#projects";
+  if (id === "custom:forms") return "/admin/team-forms/#all";
+  if (id === "custom:my-passport") return "/passport/";
+  if (id === "custom:venues") return "/admin/#venues";
+  if (id === "custom:internal") return "/admin/people/#roster";
   return "/admin/people/#ws=" + encodeURIComponent(id);
 }
 // 分組：[{ team: "" 或 team 名, label, cells: [workspace…] }]，整個 BT 那一列在最上面，然後照 teams 的順序，最後是清單外的 team。
 export function wsRows(workspaces, teams, people) {
   // 一場一場的活動不列在這裡（2026-12-25）：在那一場自己的「人」分頁改，這張表才不會隨活動越來越長。
   const active = (workspaces || []).filter(w => w.active !== false && !String(w.id).startsWith("custom:event-"));
-  const order = { apps: 0, passport: 1, "intern-passport": 3 };
+  // 整個 BT 那一列：每個人每天用的六樣在前面（跟側欄最上面同一個順序），再來是要特別派的。
+  const order = { "custom:calendar": -6, "custom:meetings": -5, "custom:projects": -4, "custom:forms": -3, "custom:my-passport": -2, "custom:venues": -1,
+    apps: 0, passport: 1, "intern-passport": 3 };
   // 專案排在每一列最後（2026-12-26），那個 team 自己的工具在前面。
   const rank = w => w.kind === "project" ? 10 : w.id.startsWith("apps:") ? 1 : w.id.startsWith("res:") ? 2 : (order[w.id] != null ? order[w.id] : 9);
-  const groups = new Map([["", []]]);
+  const groups = new Map([["", []], [SENIOR, []]]);
   for (const t of teams || []) groups.set(t, []);
   for (const w of active) { const t = wsTeamOf(w, people); if (!groups.has(t)) groups.set(t, []); groups.get(t).push(w); }
-  return [...groups.entries()].map(([team, cells]) => ({ team, label: team ? team.replace(/\s*Team$/i, "") : T("ws.board"), cells: cells.sort((a, b) => rank(a) - rank(b)) }));
+  return [...groups.entries()].map(([team, cells]) => ({ team, label: team === SENIOR ? T("ws.senior") : team ? team.replace(/\s*Team$/i, "") : T("ws.board"), cells: cells.sort((a, b) => rank(a) - rank(b)) }));
 }
 export function mpItems(me, prefix, workspaces) {
   const title = w => (lang() === "zh" ? (w.title_zh || w.title_en) : (w.title_en || w.title_zh)) || w.id;
@@ -1202,11 +1221,10 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   // 2026-11-14 Paul：「一條很長的線，右邊的空間都沒用到」。以前左邊一條 180px 的清單（1400px 高）、右邊只有一句「選一個」。
   // 現在每個 team 一塊，排成一格一格鋪滿整個寬度；選中的那一個的成員放在下面整個寬度。
   // 2026-12-26 Paul：工作區是一個 team 或整個 BT，裡面可以有好幾個專案。每一塊先列那個工作區自己的工具，再列它的專案（一個小標題隔開）。
-  // 場地也是整個 BT 的，但它不用派人（開得了活動的人都改得動），所以那一格只是連結、沒有成員名單。
+  // 場地 2027-01-24 起也是要派人的一格（custom:venues），跟其他格一樣。
   const cellsHTML = r => {
     const tools = r.cells.filter(x => x.kind !== "project"), pjs = r.cells.filter(x => x.kind === "project");
-    const venue = r.team ? "" : `<a class="rail-item ws-plain" href="/admin/#venues" title="${esc(T("ws.venuesNote"))}">${esc(T("ws.venues"))}</a>`;
-    return tools.map(li).join("") + venue + (pjs.length ? `<div class="wssub">${esc(T("ws.projects"))}</div>${pjs.map(li).join("")}` : "");
+    return tools.map(li).join("") + (pjs.length ? `<div class="wssub">${esc(T("ws.projects"))}</div>${pjs.map(li).join("")}` : "");
   };
   // 2026-12-27 Paul：「I should be able to add people into whole BT… or I can add curriculum」。每一塊的標題（整個 BT、Curriculum…）點下去是整個工作區：
   // 一次加人、勾要開哪幾樣，之後一格一格開關。見 wsGroupHTML。
@@ -1268,6 +1286,19 @@ export function grpUnion(cells, grp) {
   }
   return [...by.values()];
 }
+// 已經有「勾起來的那幾樣」每一樣的人（2027-01-24）。這些人才算「全部有了」，不出現在右欄；少一樣的照樣列在右欄，加的時候只補他少的。
+// Co-President 與 Senior Adviser 靠職級本來就有全部，一律算在裡面。
+export function grpFullIds(cells, grp, off) {
+  const skip = new Set(off || []), on = (cells || []).filter(c => !skip.has(c.id));
+  const rows = grpUnion(cells, grp);
+  return rows.filter(r => ["president", "senior_adviser"].includes(r.board_role) || on.every(c => r.has[c.id])).map(r => r.user_id);
+}
+// 加人那一步實際要寫的：每個人只補他還沒有的那幾樣，已經有的不動（不會把原本的「改」蓋成「看」）。
+export function grpAddOps(ids, cells, grp, off, level) {
+  const skip = new Set(off || []), on = (cells || []).filter(c => !skip.has(c.id));
+  const has = Object.fromEntries(grpUnion(cells, grp).map(r => [r.user_id, r.has]));
+  return (ids || []).flatMap(id => on.filter(c => !(has[id] || {})[c.id]).map(c => ({ id, ws: c.id, level })));
+}
 // 表頭用短名字（括號裡的說明拿掉），表才放得下。
 export const grpShort = w => wsCellLabel(w).replace(/\s*[（(].*$/, "");
 export function wsGroupHTML(team, cells, grp, people, draft, busy) {
@@ -1276,20 +1307,32 @@ export function wsGroupHTML(team, cells, grp, people, draft, busy) {
   const rows = grpUnion(cells, grp);
   const senior = r => ["president", "senior_adviser"].includes(r.board_role);
   const plain = rows.filter(r => !senior(r));
-  const name = team ? team.replace(/\s*Team$/i, "") : T("ws.board");
+  const name = team === SENIOR ? T("ws.senior") : team ? team.replace(/\s*Team$/i, "") : T("ws.board");
   const tag = c => c.kind === "project" ? `<span class="mini">${esc(T("ws.kind.project"))}</span>` : "";
   const items = `<div class="wsg-items">${cells.map(c => `<label class="chip sm${off.has(c.id) ? "" : " on"}"><input type="checkbox" data-act="grp-item" value="${esc(c.id)}"${off.has(c.id) ? "" : " checked"}${dis}>${esc(grpShort(c))}${tag(c)}</label>`).join("")}</div>`;
-  const cell = (r, c) => {
+  // 「誰開了哪幾樣」（2027-01-24 重排，Paul：「I like that table, who has what, but like right now it's looking bad」）：
+  //   欄位分段（每天用的、要特別派的或這個 team 的工具、專案），表頭上面一排寫是哪一段；表頭寫幾個人有；
+  //   名字那一欄捲動時固定在左邊，表頭固定在上面；每一格置中，勾起來的格子底色深一點，等級寫在勾旁邊（跟他主要的等級不一樣才寫）。
+  const secOf = c => c.kind === "project" ? "pj" : WHOLE_BT_TOOLS.includes(c.id) ? "day" : "tool";
+  const secs = ["day", "tool", "pj"].map(k => ({ k, cells: cells.filter(c => secOf(c) === k) })).filter(x => x.cells.length);
+  const cols = secs.flatMap(x => x.cells);
+  const secName = k => T(k === "day" ? "ws.grpDay" : k === "pj" ? "ws.projects" : team ? "ws.grpTeamTools" : "ws.grpTools");
+  const nHas = c => plain.filter(r => r.has[c.id]).length;
+  const gapAt = i => i > 0 && secOf(cols[i - 1]) !== secOf(cols[i]);
+  const cell = (r, c, i) => {
     const lv = r.has[c.id];
-    return `<td><label><input type="checkbox" data-act="grp-cell" data-id="${esc(r.user_id)}" data-ws="${esc(c.id)}" aria-label="${esc(mpName(r) + "・" + grpShort(c))}"${lv ? " checked" : ""}${dis}>${lv ? `<span class="mini">${esc(T("level." + lv))}</span>` : ""}</label></td>`;
+    return `<td class="${lv ? "y" : ""}${gapAt(i) ? " gap" : ""}"><label><input type="checkbox" data-act="grp-cell" data-id="${esc(r.user_id)}" data-ws="${esc(c.id)}" aria-label="${esc(mpName(r) + "・" + grpShort(c))}"${lv ? " checked" : ""}${dis}>${lv && lv !== r.level ? `<span class="mini">${esc(T("level." + lv))}</span>` : ""}</label></td>`;
   };
+  const secRow = secs.length > 1 ? `<tr class="wsg-sec"><th></th>${secs.map(x => `<th scope="colgroup" colspan="${x.cells.length}"${x === secs[0] ? "" : ' class="gap"'}>${esc(secName(x.k))}</th>`).join("")}</tr>` : "";
+  const byName = (x, y) => mpName(x).localeCompare(mpName(y));
   const table = plain.length ? `<h3 class="sec-h">${T("ws.grpWhat")}</h3><div class="note">${T("ws.grpWhatNote")}</div>
-    <div class="wsg-wrap"><table class="wsg"><thead><tr><th scope="col">${T("ws.grpPerson")}</th>${cells.map(c => `<th scope="col"><a href="${esc(wsCellHref(c))}">${esc(grpShort(c))}</a>${tag(c)}</th>`).join("")}</tr></thead>
-    <tbody>${plain.map(r => `<tr><th scope="row">${esc(mpName(r))}</th>${cells.map(c => cell(r, c)).join("")}</tr>`).join("")}</tbody></table></div>` : "";
+    <div class="wsg-wrap"><table class="wsg"><thead>${secRow}<tr><th scope="col" class="wsg-who">${T("ws.grpPerson")}</th>${cols.map((c, i) => `<th scope="col"${gapAt(i) ? ' class="gap"' : ""}><a href="${esc(wsCellHref(c))}">${esc(grpShort(c))}</a><span class="mini">${esc(T("ws.grpCount", { n: nHas(c), m: plain.length }))}</span></th>`).join("")}</tr></thead>
+    <tbody>${plain.slice().sort(byName).map(r => `<tr><th scope="row" class="wsg-who">${esc(mpName(r))}<span class="mini">${esc(T("level." + r.level))}</span></th>${cols.map((c, i) => cell(r, c, i)).join("")}</tr>`).join("")}</tbody></table></div>` : "";
   return `<h2>${esc(name)}<span class="hint">${T("ws.grpHint", { n: cells.length })}</span></h2>
     <div class="note">${T("ws.grpNote")}</div>
     <h3 class="sec-h">${T("ws.grpOpen")}</h3>${items}
-    ${membersAreaHTML("ws", { rows, people, pk: d.pk, busy, acts: { level: "grp-level", remove: "grp-unassign", bulk: "grp-bulk" }, go: { act: "grp-assign", ws: "group:" + team } })}
+    ${membersAreaHTML("ws", { rows, people, pk: d.pk, busy, acts: { level: "grp-level", remove: "grp-unassign", bulk: "grp-bulk" }, go: { act: "grp-assign", ws: "group:" + team },
+      fullIds: grpFullIds(cells, grp, d.off), outTitle: n => T("ws.grpOut", { n }) })}
     ${table}`;
 }
 

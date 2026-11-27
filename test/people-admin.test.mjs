@@ -659,8 +659,8 @@ test("★ 存取格照 team 分組：整個 BT 一列放幹部護照、Internshi
   assert.match(owners, /小安/); assert.doesNotMatch(owners, /Mei/, "選了 Curriculum，擁有人只列 Curriculum 的人");
   assert.doesNotMatch(h, /會排在 Curriculum 那一列底下/, "不再靠擁有人判斷在哪一列");
   assert.match(h, /專案放在一個工作區裡/, "表單上寫專案是什麼");
-  // 整個 BT 那一塊有場地（不用派人，只是連結）；專案有自己的小標題，排在那一塊的工具後面。
-  assert.match(h, /data-ws="group:">整個 BT<\/a><div class="wslist">[^]*?href="\/admin\/#venues"[^>]*>場地（不用派人）/);
+  // 2027-01-24 起場地是要派人的一格（custom:venues），不再有「不用派人」那一條連結；專案有自己的小標題，排在那一塊的工具後面。
+  assert.doesNotMatch(h, /場地（不用派人）/);
   const wsP = ws.concat([{ id: "project:camp-27", kind: "project", team: "Curriculum Team", title_en: "Camp 27", active: true },
     { id: "project:bt-gala", kind: "project", team: null, title_en: "Gala", owner: PEOPLE[1].profile_id, active: true }]);
   const hp = workspacesHTML(wsP, null, [], PEOPLE, "", false, {}, true);

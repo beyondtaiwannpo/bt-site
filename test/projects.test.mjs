@@ -18,6 +18,8 @@ const P2 = { id: "project:gala", team: null, title_zh: "年會", title_en: "Gala
 const P3 = { id: "project:mkt", team: "Marketing Team", title_zh: "行銷週", title_en: "Marketing week", active: true, level: "edit", events: ["e3"], forms: [] };
 const PROJECTS = [P1, P2, P3];
 
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };  // 2027-01-24：整個 BT 每天用的六樣
+
 test("★ 專案清單：整個 BT 在最前面，接著照 team 的固定順序；每一個寫幾場活動、幾份報名表", () => {
   assert.deepEqual(F.pjGroups(PROJECTS).map(g => g[0]), ["", "Curriculum Team", "Marketing Team"]);
   const h = F.projectsListHTML(PROJECTS, ["Curriculum Team"], null, "", false, false);
@@ -73,7 +75,7 @@ test("專案的報名表：回專案、頁首寫是哪個專案的", () => {
 });
 
 test("★ 側欄：「專案」那一行點下去是專案清單；場地在最上面那一段", () => {
-  const me = { role: "cadre", board: "member", team: "", ws: {} };
+  const me = { role: "cadre", board: "member", team: "", ws: DAY };
   assert.equal(RAIL.visibleItems("events", me)[0].key, "projects");
   assert.equal(RAIL.areaOf("forms", "projects"), "events");
   assert.equal(RAIL.areaOf("forms", "venues"), "venues");
@@ -101,7 +103,8 @@ test("★ 整個工作區：標題點得下去；加人時勾要開哪幾樣；�
     { id: "apps", kind: "apps", active: true }, { id: "custom:money", kind: "custom", active: true }];
   const cells = P.wsGroupCells(WS, "Curriculum Team", []);
   assert.deepEqual(cells.map(c => c.id), ["res:Curriculum Team", "project:camp", "project:fair"], "team 自己的工具在前、專案在後");
-  assert.deepEqual(P.wsGroupCells(WS, "", []).map(c => c.id), ["apps", "custom:money"], "整個 BT 那一塊（場地不用派人，不在裡面）");
+  assert.deepEqual(P.wsGroupCells(WS, "", []).map(c => c.id), ["apps"], "整個 BT 那一塊（錢 2027-01-24 起在 Sponsorship）");
+  assert.deepEqual(P.wsGroupCells(WS, "Sponsorship Team", []).map(c => c.id), ["custom:money"]);
   const grp = { "res:Curriculum Team": [{ user_id: "u1", name_zh: "小安", level: "edit" }, { user_id: "u2", name_zh: "小明", level: "view" }],
     "project:camp": [{ user_id: "u1", name_zh: "小安", level: "manage" }] };
   const rows = P.grpUnion(cells, grp);

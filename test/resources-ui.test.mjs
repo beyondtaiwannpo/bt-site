@@ -15,6 +15,8 @@ const items = [
 // ⚠ 這一條守的是 2026-09-07「全部要登入」那個決定的**補償設計**：
 // 標題與介紹公開，只有連結要登入。全部鎖起來的話 Google 就搜不到，
 // 而那是外人找到 BT 最有效的一條路。
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };  // 2027-01-24：整個 BT 每天用的六樣
+
 test("★ 沒登入：標題與介紹看得到，連結沒有", () => {
   const h = R.listHTML(items, false, false);
   assert.match(h, /College Resource Book/);
@@ -102,7 +104,7 @@ test("資源分頁是這一組的第一個分頁，當前的那一個有標記",
   assert.match(M.tabsHTML("res", true), /class="rail-item on" href="#res" data-act="tab" data-t="res"/);
   assert.ok(!M.tabsHTML("res", false).includes('data-t="team"'), "一般幹部看不到團隊頁那個分頁");
   // 2026-11-27 第二版：資源庫在改得動的那個 team 底下；「對外網站」那一行只給被派進對外網站（custom:website）的人。
-  const ed = { role: "cadre", board: "member", team: "", name: "王平", ws: { "res:Curriculum Team": "edit" } };
+  const ed = { role: "cadre", board: "member", team: "", name: "王平", ws: { ...DAY, "res:Curriculum Team": "edit" } };
   const rail = M.railHTML("site", "res", ed);
   assert.ok(rail.includes('href="/admin/?lang=zh#projects"'), "側欄上有專案");
   assert.match(rail, /rail-team here"[\s\S]*?<a class="rail-item rail-sub on" href="#res" data-act="tab" data-t="res" aria-current="page">資源庫<\/a>/, "Curriculum 那一行展開，資源庫亮著");

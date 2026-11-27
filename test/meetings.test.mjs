@@ -24,8 +24,10 @@ const M = [
   { id: "22222222-2222-4222-8222-222222222222", scope: "board", title: "Board 月會", starts_at: past, ends_at: pastEnd, agenda: "", doc_url: null, attendees: [{ user_id: "u1", status: "accepted" }] },
 ];
 
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };  // 2027-01-24：整個 BT 每天用的六樣
+
 test("★ 側欄四份都有「會議」（幹部都看得到）；誰能排哪些範圍：senior 全部、team 是「改」以上的那幾個 team、Associate 沒有", () => {
-  for (const X of [F, SITE, PA, PE]) { const it = X.ITEMS.find(i => i.key === "meetings"); assert.equal(it.who, "cadre"); assert.ok(X.canSee(it, ME)); }
+  for (const X of [F, SITE, PA, PE]) { const it = X.ITEMS.find(i => i.key === "meetings"); assert.equal(it.who, "ws:custom:meetings"); assert.ok(X.canSee(it, { ...ME, ws: DAY })); assert.ok(!X.canSee(it, { ...ME, ws: {} }), "2027-01-24：沒被派進會議的看不到"); }
   assert.deepEqual(F.mtScopes(PRES, ["Marketing Team"]), ["board", "Marketing Team"]);
   assert.deepEqual(F.mtScopes(DIR, []), ["Marketing Team"]);
   assert.deepEqual(F.mtScopes(ME, []), []);

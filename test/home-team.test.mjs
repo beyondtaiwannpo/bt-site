@@ -19,7 +19,9 @@ const INFO = {
   "project:annual": { kind: "project", team: "", title_zh: "年會", title_en: "Annual meeting" },
   "custom:event-camp": { kind: "custom", team: "Curriculum Team", title_zh: "冬令營", title_en: "Camp" },
 };
-const cadre = (ws, extra) => ({ role: "cadre", board: "member", team: "", name: "N", ws: ws || {}, wsInfo: INFO, ...extra });
+// 2027-01-24：現在的幹部都有整個 BT 每天用的六樣（遷移檔跑的那一刻放進去的）。
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };
+const cadre = (ws, extra) => ({ role: "cadre", board: "member", team: "", name: "N", ws: { ...DAY, ...(ws || {}) }, wsInfo: INFO, ...extra });
 const ONE = cadre({ "res:Curriculum Team": "edit", "project:winter": "edit", "custom:records": "view" }, { team: "Curriculum Team" });
 const TWO = cadre({ "res:Curriculum Team": "edit", "res:Internship Team": "manage", "project:winter": "edit", "project:intern": "edit", "intern-passport": "edit" }, { team: "Curriculum Team, Internship Team" });
 const PRES = cadre({}, { board: "president", team: "Sponsorship Team" });
@@ -82,8 +84,8 @@ test("側欄：好幾個 team 的人，team 那幾行收著；現在在哪個 te
   assert.match(away, /<div class="rail-row"><a class="rail-item rail-area rail-team" href="\/home\/\?lang=zh#team=Internship%20Team">[\s\S]*?<\/a><div class="rail-fly" role="group" aria-label="Internship"><div class="rail-fly-m"><a class="rail-item rail-sub" href="\/home\/\?lang=zh#team=Internship%20Team">總覽<\/a><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#projects\/project%3Aintern">2027 暑期實習<\/a>/, "滑過去看得到總覽與專案");
   const at = RAIL.railHTML("home", "team:Internship Team", TWO, {}, "zh");
   assert.match(at, /<a class="rail-item rail-area rail-team here" href="#team=Internship%20Team">/, "同一個資料夾只換 #");
-  assert.match(at, /<div class="rail-subs"><a class="rail-item rail-sub on" href="#team=Internship%20Team" aria-current="page">總覽<\/a><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#projects\/project%3Aintern">2027 暑期實習<\/a><a class="rail-item rail-sub" href="\/admin\/site\/\?lang=zh#res">資源庫<\/a><a class="rail-item rail-sub" href="\/admin\/site\/\?lang=zh#island">BT 島的貼文<\/a><a class="rail-item rail-sub" href="\/admin\/site\/\?lang=zh#island-map">BT 島<\/a><a class="rail-item rail-sub rail-people" href="\/admin\/\?lang=zh#members=res%3AInternship%20Team"/,
-    "改得動這個 team 的人：資源庫與 BT 島在 team 底下（2026-11-27 第二版）");
+  assert.match(at, /<div class="rail-subs"><a class="rail-item rail-sub on" href="#team=Internship%20Team" aria-current="page">總覽<\/a><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#projects\/project%3Aintern">2027 暑期實習<\/a><a class="rail-item rail-sub" href="\/admin\/site\/\?lang=zh#res">資源庫<\/a><a class="rail-item rail-sub" href="\/admin\/site\/\?lang=zh#island">BT 島的貼文<\/a><a class="rail-item rail-sub" href="\/admin\/site\/\?lang=zh#island-map">BT 島<\/a><a class="rail-item rail-sub" href="\/admin\/passports\/\?lang=zh#interns">實習護照<\/a><a class="rail-item rail-sub rail-people" href="\/admin\/\?lang=zh#members=res%3AInternship%20Team"/,
+    "改得動這個 team 的人：資源庫與 BT 島在 team 底下（2026-11-27 第二版）；實習護照也在 Internship 底下（2027-01-24）");
   // 在資源庫那一頁：沒有「對外網站」那一行的人，亮他第一個改得動的 team，另一個收著，「資源庫」只亮一次。
   const res = RAIL.railHTML("site", "res", TWO, {}, "zh");
   assert.match(res, /rail-team here" href="\/home\/\?lang=zh#team=Curriculum%20Team">/);
@@ -226,7 +228,7 @@ test("這一批只動版面：team 的頁只讀不寫、沒有新的資料庫函
   assert.doesNotMatch(fn, /\.(insert|update|delete|upsert)\(/, "loadTeam 只讀");
   assert.deepEqual([...fn.matchAll(/rpc\("(\w+)"/g)].map(m => m[1]).sort(), ["projects_list", "public_team"], "只叫本來就有的兩支函式");
   // whoAmI() 把每個工作區的 team 與名字留下來（info），十一個畫側欄的地方都傳成 me.wsInfo。
-  assert.match(readFileSync("shared/auth.js", "utf8"), /return \{ row: pr\.data \|\| null, ws, info, cached: false \}/);
+  assert.match(readFileSync("shared/auth.js", "utf8"), /return \{ row: row \|\| null, ws, info, cached: false \}/);
   for (const dir of ["admin", "admin/site", "admin/people", "admin/passports", "admin/finance", "admin/marketing", "admin/team-forms", "admin/records"])
     assert.match(readFileSync(`${dir}/src/data.js`, "utf8"), /wsInfo: info \|\| \{\}/, `${dir}/src/data.js 的 loadMe 要帶 wsInfo`);
   for (const dir of ["home", "passport", "availability"]) assert.match(readFileSync(`${dir}/src/main.js`, "utf8"), /wsInfo:/, `${dir}/src/main.js`);

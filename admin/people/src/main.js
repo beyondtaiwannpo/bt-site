@@ -179,7 +179,9 @@ function readInviteForm() {
 // 整個工作區（2026-12-27）：選中的那一塊有哪幾格、叫什麼。
 const grpTeam = () => String(S.wsSel || "").slice(6);
 const grpCells = () => UI.wsGroupCells(S.workspaces, grpTeam(), S.people);
-const grpName = () => grpTeam() ? grpTeam().replace(/\s*Team$/i, "") : T("ws.board");
+// 右欄「還沒全部有」的算法（2027-01-24）：整個工作區看勾起來的那幾樣每一樣都有沒有；一格就是在不在那一格。
+const inIdsNow = () => UI.isGroupSel(S.wsSel) ? UI.grpFullIds(grpCells(), S.grp, (S.wsDraft || {}).off) : S.members.map(m => m.user_id);
+const grpName = () => grpTeam() === UI.SENIOR ? T("ws.senior") : grpTeam() ? grpTeam().replace(/\s*Team$/i, "") : T("ws.board");
 // 一批派與移出，每一筆記原本的等級（沒有 = null），復原就照原本的裝回去。
 async function grpApply(ops) {
   const was = ops.map(o => ({ id: o.id, ws: o.ws, level: ((S.grp || {})[o.ws] || []).find(m => m.user_id === o.id)?.level || null }));
@@ -606,11 +608,12 @@ document.addEventListener("click", async e => {
   if (act === "grp-assign") {
     const d = S.wsDraft || {}, pk = d.pk || {}, level = pk.level || "view";
     const off = new Set(d.off || []), items = grpCells().filter(c => !off.has(c.id));
-    const ids = UI.pkPicked(pkPeople(), S.members.map(m => m.user_id), pk);
+    const ids = UI.pkPicked(pkPeople(), inIdsNow(), pk);
     if (!ids.length) { S.msg = T("err.pickPerson"); render(); return; }
     if (!items.length) { S.msg = T("err.grpNoItems"); render(); return; }
     S.busy = true; S.msg = ""; render();
-    const failed = await grpApply(ids.flatMap(id => items.map(c => ({ id, ws: c.id, level }))));
+    // 只補每個人少的那幾樣（2027-01-24）；已經有的照原本的等級留著。
+    const failed = await grpApply(UI.grpAddOps(ids, grpCells(), S.grp, d.off, level));
     S.wsDraft = Object.assign({}, d, { pk: Object.assign({}, pk, { q: "", ticked: [...new Set(failed.map(f => f.o.id))] }) });
     S.busy = false;
     S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpAdded", { n: ids.length, m: items.length, ws: grpName(), level: UI.levelLabel(level) });
@@ -1031,7 +1034,7 @@ function pkPeople() { return UI.pkPeopleOf(S.people.filter(p => p.profile_id && 
 function pkApply(el) {
   const ns = el.dataset.ns, d = S.wsDraft || {};
   if (ns === "wsn") S.wsDraft = Object.assign({}, d, { npk: UI.pkReduce(d.npk, pkPeople(), [], el), slug: val("wsn-slug"), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner") });
-  else S.wsDraft = Object.assign({}, d, { pk: UI.pkReduce(d.pk, pkPeople(), S.members.map(m => m.user_id), el) });
+  else S.wsDraft = Object.assign({}, d, { pk: UI.pkReduce(d.pk, pkPeople(), inIdsNow(), el) });
 }
 // 在多選那一塊裡按 Enter 就是按底下那顆「加 N 個人」（新增表單那一塊沒有那顆，Enter 不做事；空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("keydown", e => {

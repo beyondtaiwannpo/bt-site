@@ -33,6 +33,8 @@ const W = {
   stamps: 12, boxes: 33,
 };
 
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };  // 2027-01-24：整個 BT 每天用的六樣
+
 test("首頁：一張清單，照日期排，最急的在最上面；沒有日期的排最後", () => {
   const ctx = { ...base, w: W, ws: { "res:Curriculum Team": "edit", "custom:marketing-requests": "edit" } };
   const L = UI.waitingList(items, ctx);
@@ -110,9 +112,11 @@ test("首頁的樣子：等你處理、接下來、我的護照；最常做的�
 test("側欄：最上面一段（首頁、行事曆、會議、專案、表單、我的護照、場地），下面「我的工作區」；行事曆底下是行事曆、時間看板，會議底下是會議、會議範本", () => {
   assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws"]);
   assert.equal(RAIL.SECTIONS[0].label, null, "最上面一段沒有標題");
-  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "meetings", "events", "forms", "mypassport", "venues", "website", "marketing", "passports", "records", "search", "people", "money"]);
-  for (const k of ["home", "calendar", "meetings", "events", "forms", "mypassport", "venues"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "me", k);
-  for (const k of ["website", "marketing", "passports", "records"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "ws", k);
+  // 2027-01-24：整個 BT 的東西（含被派才有的紀錄、幹部護照、對外網站）都在最上面那一段；「我的工作區」只剩 team 與 Marketing。實習護照在 Internship 底下。
+  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "meetings", "events", "forms", "mypassport", "venues", "records", "passports", "website", "marketing", "search", "people", "money", "interns"]);
+  for (const k of ["home", "calendar", "meetings", "events", "forms", "mypassport", "venues", "records", "passports", "website"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "me", k);
+  assert.equal(RAIL.AREAS.find(a => a.key === "marketing").sec, "ws");
+  assert.equal(RAIL.AREAS.find(a => a.key === "interns").team, "Internship Team");
   // 搜尋在頂欄的框，人與權限在頂欄（Co-President 與 Senior Adviser），錢在 Sponsorship 那一行後面。
   assert.equal(RAIL.AREAS.find(a => a.key === "search").sec, "top");
   assert.equal(RAIL.AREAS.find(a => a.key === "people").sec, "top");
@@ -120,20 +124,23 @@ test("側欄：最上面一段（首頁、行事曆、會議、專案、表單�
   const recruiter = { role: "cadre", board: "member", team: "", name: "r", ws: { apps: "edit" } };
   assert.match(RAIL.railHTML("forms", "projects", recruiter, {}, "zh"), /<b>人與權限<\/b>/, "頂欄沒有人與權限的人，看得到幹部招募就畫在側欄，不然沒有入口");
   assert.doesNotMatch(RAIL.railHTML("forms", "projects", { ...recruiter, board: "president" }, {}, "zh"), /<b>人與權限<\/b>/, "Co-President 的人與權限在頂欄，側欄不重複");
-  // 被派進去的那幾行標「指派」。
-  assert.match(RAIL.railHTML("home", "home", { ...recruiter, ws: { records: "view" } }, {}, "zh"), /<b>紀錄<\/b>[\s\S]*?<span class="rail-lv dim"[^>]*>指派<\/span>/);
+  // 紀錄在最上面那一段，跟大家都有的那幾行排在一起，不再標「指派」（2027-01-24）。
+  const rec = RAIL.railHTML("home", "home", { ...recruiter, ws: { ...DAY, records: "view" } }, {}, "zh");
+  assert.match(rec, /<b>場地<\/b>[\s\S]*<b>紀錄<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/);
+  assert.doesNotMatch(rec, /指派/);
   // 2026-12-26：專案那一行底下是專案、活動…；場地是整個 BT 的，自己一行。
   // 2026-11-26：「各 team」拿掉了，「計畫與招募」改叫「幹部招募」搬到「人與權限」底下（被派進申請工作區的人與 Co-President、Senior Adviser 才看得到）。
-  assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events"]);
+  assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: DAY }).map(i => i.key), ["projects", "events"]);
+  assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), [], "沒被派進專案的看不到");
   // 回饋表第二版搬到「表單」底下（三種表單一個入口），看得到的人照舊是被派進紀錄的人。
-  assert.deepEqual(RAIL.visibleItems("forms", { role: "cadre", board: "member", team: "", ws: { records: "view" } }).map(i => i.key), ["fill", "all", "forms"]);
-  assert.deepEqual(RAIL.visibleItems("forms", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["fill", "all"], "一般幹部的表單：要我填的、所有表單");
+  assert.deepEqual(RAIL.visibleItems("forms", { role: "cadre", board: "member", team: "", ws: { ...DAY, records: "view" } }).map(i => i.key), ["fill", "all", "forms"]);
+  assert.deepEqual(RAIL.visibleItems("forms", { role: "cadre", board: "member", team: "", ws: DAY }).map(i => i.key), ["fill", "all"], "一般幹部的表單：要我填的、所有表單");
   assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), [], "沒被派進申請工作區的幹部，側欄沒有幹部招募");
   assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "member", team: "", ws: { apps: "edit" } }).map(i => i.key), ["forms"], "被派進申請工作區的人看得到幹部招募，看不到名單");
   assert.deepEqual(RAIL.visibleItems("people", { role: "cadre", board: "president", senior: true, team: "", ws: {} }).map(i => i.key).slice(0, 3), ["roster", "invites", "forms"]);
   assert.equal(RAIL.ITEMS.find(i => i.group === "forms" && i.key === "forms").label.en, "Recruitment"); assert.equal(RAIL.ITEMS.find(i => i.key === "teams"), undefined);
-  assert.deepEqual(RAIL.visibleItems("venues", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["venues"]);
-  const me = { role: "cadre", board: "member", team: "Curriculum Team", name: "a", ws: { "custom:meeting-templates": "edit" } };
+  assert.deepEqual(RAIL.visibleItems("venues", { role: "cadre", board: "member", team: "", ws: DAY }).map(i => i.key), ["venues"]);
+  const me = { role: "cadre", board: "member", team: "Curriculum Team", name: "a", ws: { ...DAY, "custom:meeting-templates": "edit" } };
   assert.deepEqual(RAIL.visibleItems("calendar", me).map(i => i.label.zh), ["行事曆", "時間看板"]);
   assert.deepEqual(RAIL.visibleItems("meetings", me).map(i => i.label.zh), ["會議", "會議範本"]);
   const tabs = RAIL.areaTabsHTML("forms", "meetings", me, "zh");
@@ -171,7 +178,7 @@ test("★ 時間看板與我的護照也有側欄（2026-11-14 Paul：add the si
   // 後台的護照預覽框（?bare=1）不畫側欄
   assert.match(readFileSync("passport/src/main.js", "utf8"), /if \(bare\) \{ el\.innerHTML = body; return; \}/);
   // 側欄在這兩頁展開成對的那一區
-  const me = { role: "cadre", board: "member", team: "", ws: {} };
+  const me = { role: "cadre", board: "member", team: "", ws: DAY };
   assert.match(RAIL.railHTML("availability", "", me, {}, "en"), /rail-sub on"[^>]*aria-current="page">Availability</);
   assert.match(RAIL.railHTML("passport", "", me, {}, "en"), /rail-area on"[^>]*aria-current="page">/);
 });

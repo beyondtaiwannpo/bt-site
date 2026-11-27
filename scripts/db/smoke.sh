@@ -54,9 +54,10 @@ chk() { # chk 名稱 期望 SQL
 # 一條「以某個人的身分」跑的斷言。
 # **set_config 要跟被測的那句話在同一個 psql 呼叫裡**（同一個 session 才算數），
 # 但不要把它塞進同一個運算式 —— 那會讓回傳值變成布林，斷言就對不上了。
+# 新版 Postgres 在 permission denied 後面多印一行 HINT，取最後一行之前先濾掉（2026-11-27）。
 chkas() { # chkas 使用者 名稱 期望 SQL
   local got; got=$(psql -d "${DB}" -X -A -t -q \
-    -c "select set_config('test.uid','${1}',false);" -c "${4}" 2>&1 | tail -1 | tr -d ' \n' || true)
+    -c "select set_config('test.uid','${1}',false);" -c "${4}" 2>&1 | grep -v "^HINT:" | tail -1 | tr -d ' \n' || true)
   if [ "${got}" = "${3}" ]; then echo "  ok   ${2}"; pass=$((pass+1));
   else echo "  FAIL ${2}（預期 ${3}，實際 ${got}）"; fail=$((fail+1)); fi
 }
@@ -65,7 +66,7 @@ chkas() { # chkas 使用者 名稱 期望 SQL
 # 用它跑的檢查對政策一無所知。
 chkrole() { # chkrole 角色 使用者id 名稱 期望 SQL
   local got; got=$(psql -d "${DB}" -X -A -t -q \
-    -c "select set_config('test.uid','${2}',false);" -c "set role ${1}; ${5}" 2>&1 | tail -1 | tr -d ' \n' || true)
+    -c "select set_config('test.uid','${2}',false);" -c "set role ${1}; ${5}" 2>&1 | grep -v "^HINT:" | tail -1 | tr -d ' \n' || true)
   if [ "${got}" = "${4}" ]; then echo "  ok   ${3}"; pass=$((pass+1));
   else echo "  FAIL ${3}（預期 ${4}，實際 ${got}）"; fail=$((fail+1)); fi
 }
@@ -5690,6 +5691,38 @@ wf2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${WFM}" 2>&1 || true)
 if echo "${wf2}" | grep -q "OVERALL.*PASS" && ! echo "${wf2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
 psql -d "${DB}" -q -c "delete from public.assignments where user_id in ('${WFW}','${WFV}','${WFN}'); delete from public.profiles where id in ('${WFW}','${WFV}','${WFN}'); delete from auth.users where id in ('${WFW}','${WFV}','${WFN}');" >/dev/null 2>&1 || true
 chk "（收尾）假的三個人拿掉了" "0" "select count(*) from public.profiles where id in ('${WFW}','${WFV}','${WFN}')"
+echo "── 整個 BT 每一樣都要派、Senior → Internal（2027-01-24-whole-bt-tools.sql）──"
+# Paul 2026-11-27：「calendar, meeting, projects, forms, my passport, venues… all of those should be a project we can assign to people」；Internal「Exactly what I have」。
+WBM=supabase/migrations/2027-01-24-whole-bt-tools.sql
+WBI=7b7b0000-0000-0000-0000-000000000001; WBS=7b7b0000-0000-0000-0000-000000000002; WBN=7b7b0000-0000-0000-0000-000000000003; WBL=7b7b0000-0000-0000-0000-000000000004
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 <<SQL
+insert into auth.users (id,email) values ('${WBI}','wb-int@example.com'), ('${WBS}','wb-sa@example.com'), ('${WBN}','wb-none@example.com');
+insert into public.profiles (id,name_zh,name_en,team,role,board_role) values
+  ('${WBI}','內部','Internal','Curriculum Team','cadre','member'),
+  ('${WBS}','顧問','Senior','','cadre','senior_adviser'),
+  ('${WBN}','一般','Plain','Curriculum Team','cadre','member');
+SQL
+WBPOL=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from pg_policies where schemaname = 'public'" | tr -d ' \n')
+wb1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${WBM}" 2>&1 || true)
+if echo "${wb1}" | grep -q "OVERALL.*PASS" && ! echo "${wb1}" | grep -q "|FAIL"; then echo "  ok   整個 BT 那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 整個 BT 那支驗收表："; echo "${wb1}" | head -12; fail=$((fail+1)); fi
+chk "沒有任何一條 RLS 政策多出來或少掉" "${WBPOL}" "select count(*) from pg_policies where schemaname = 'public'"
+chk "★ 跑之前就在的一般幹部六格都有、等級「改」" "6|edit" "select count(*)||'|'||min(level) from public.assignments where user_id = '${WBN}' and workspace_id in ('custom:calendar','custom:meetings','custom:projects','custom:forms','custom:my-passport','custom:venues')"
+chk "★ Senior Adviser 靠職級，不寫" "0" "select count(*) from public.assignments where user_id = '${WBS}'"
+psql -d "${DB}" -q -c "insert into auth.users (id,email) values ('${WBL}','wb-late@example.com'); insert into public.profiles (id,name_zh,name_en,team,role,board_role) values ('${WBL}','新來','Late','','cadre','member');" >/dev/null
+chk "★ 之後新來的幹部不會自動有（Paul：Nothing until I add them）" "0" "select count(*) from public.assignments where user_id = '${WBL}'"
+chkas "${WBN}" "★ 一般幹部不是 Co-President、也不是 senior" "f|f" "select public.is_president()::text::char(1)||'|'||public.is_senior()::text::char(1)"
+chkraise "★ Senior Adviser 派不了 Internal" "not_ws_manage" "perform set_config('test.uid','${WBS}',true); perform public.assign('${WBN}','custom:internal','view');"
+chkas "${PAUL}" "★ Co-President 派得了 Internal" "view" "select public.assign('${WBI}','custom:internal','view')"
+chkas "${WBI}" "★ 在 Internal 裡（等級「看」也算）：跟 Co-President 一樣" "t|t|t" "select public.is_president()::text::char(1)||'|'||public.is_senior()::text::char(1)||'|'||public.is_internship_team()::text::char(1)"
+chkas "${WBI}" "★ Internal 的人派得了錢與 Internal" "edit|view" "select public.assign('${WBN}','custom:money','edit')||'|'||public.assign('${WBN}','custom:internal','view')"
+chkas "${WBI}" "★ Internal 的人改得了別人的職級" "director" "select public.set_board_role('${WBL}','director')"
+chkas "${PAUL}" "移出 Internal" "t|t" "select public.unassign('${WBN}','custom:internal')::text::char(1)||'|'||public.unassign('${WBI}','custom:internal')::text::char(1)"
+chkas "${WBI}" "★ 移出之後就不是了" "f|f" "select public.is_president()::text::char(1)||'|'||public.is_senior()::text::char(1)"
+chkrole anon "" "★ 沒登入叫不動 in_internal" "denied" "select case when has_function_privilege('anon','public.in_internal()','execute') then 'open' else 'denied' end"
+wb2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${WBM}" 2>&1 || true)
+if echo "${wb2}" | grep -q "OVERALL.*PASS" && ! echo "${wb2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; echo "${wb2}" | head -12; fail=$((fail+1)); fi
+psql -d "${DB}" -q -c "delete from public.role_changes where target in ('${WBI}','${WBS}','${WBN}','${WBL}'); delete from public.assignments where user_id in ('${WBI}','${WBS}','${WBN}','${WBL}'); delete from public.profiles where id in ('${WBI}','${WBS}','${WBN}','${WBL}'); delete from auth.users where id in ('${WBI}','${WBS}','${WBN}','${WBL}');" >/dev/null 2>&1 || true
+chk "（收尾）假的四個人拿掉了" "0" "select count(*) from public.profiles where id in ('${WBI}','${WBS}','${WBN}','${WBL}')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

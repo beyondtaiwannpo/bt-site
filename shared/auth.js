@@ -365,8 +365,17 @@ export async function whoAmI(userId, fresh) {
     ws[w.id] = w.level;
     info[w.id] = { kind: w.kind || "", team: w.team || "", title_zh: w.title_zh || "", title_en: w.title_en || "" };
   }
-  if (pr.data) rememberMe(userId, pr.data, ws, info);
-  return { row: pr.data || null, ws, info, cached: false };
+  const row = internalRow(pr.data, ws);
+  if (row) rememberMe(userId, row, ws, info);
+  return { row: row || null, ws, info, cached: false };
+}
+// Internal（2027-01-24，Paul：「Exactly what I have」）：被放進「Senior → Internal」工作區的幹部跟 Co-President 一樣。
+// 資料庫那一邊是 is_president() 多認他（2027-01-24-whole-bt-tools.sql）；畫面這一邊在這裡把他的職級當成 president，
+// 每一頁讀 board_role 的地方（側欄、頂欄的「人與權限」、錢、職級才看得到的按鈕）就都跟著有，不用一頁一頁改。
+// 他真正的職級留在 rank_real（名單上照舊印真的那個）。純函式，測試用。
+export function internalRow(row, ws) {
+  if (!row || row.role !== "cadre" || !(ws || {})["custom:internal"] || row.board_role === "president") return row;
+  return { ...row, rank_real: row.board_role || "member", board_role: "president" };
 }
 
 // Google 登入（規格 §3-4）。Supabase 內建的供應商，前端只有這一顆按鈕。

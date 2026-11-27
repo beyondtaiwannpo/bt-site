@@ -905,7 +905,7 @@ Paul 2026-11-27 看了上一版之後講了幾件事：「我的」跟「整個 
 - **紀錄**照舊只有被派進去的人有。
 
 **頂欄（幹部）**：左邊 logo 加我的故事（Co-President 與 Senior Adviser 多人與權限），右邊是自己的大頭照加名字。
-- **大頭照**是在設定上傳的那一張，沒上傳就是名字的第一個字。**點名字直接到設定**，登出在設定那一頁最下面（Paul：「click Paul and then goes directly into settings, and then sign out will be like on the bottom of the page」）。語言照舊在側欄最上面與設定裡切。
+- **大頭照**是在設定上傳的那一張，沒上傳就是名字的第一個字。**點名字直接到設定**，登出在設定那一頁最下面（Paul：「click Paul and then goes directly into settings, and then sign out will be like on the bottom of the page」）。語言只在設定那一頁切（側欄那兩顆 2026-11-27 拿掉了）。
 - 設定與實習護照這兩頁沒有側欄，頂欄最前面多一個「首頁」，回得去。
 - 學員、校友、實習生的頂欄沒變。
 
@@ -942,6 +942,49 @@ Paul 2026-11-27 看了上一版之後講了幾件事：「我的」跟「整個 
 - 測試：`test/forms-hub.test.mjs`（新的）、`test/rail-regroup.test.mjs` 重寫，其他跟著改的在 `admin-hub`、`nav`、`lang`、`home`、`home-team`、`home-waiting`、`history-admin`、`projects`、`recruitment`、`resources-ui`、`search`。`scripts/db/smoke.sh` 多一段 14 項。
 
 **已知的小事（沒做）**：「記一場會議」從 team 頁按，team 沒有先選好；team 那一行滑過去沒有「這個 team 的會議」。
+
+## 每一樣都要派：整個 BT、Senior 與 Internal（`supabase/migrations/2027-01-24-whole-bt-tools.sql`，2026-11-27）
+
+Paul 2026-11-27 看了工作區那一頁之後說：錢應該在 Sponsorship 底下；按 Internship 看不到實習護照；要一個 Senior 工作區，裡面一個 Internal，放進去的人「get to manage what I have right now」；整個 BT 是給他把大家放進去用的，行事曆、會議、專案、表單、我的護照、場地、申請、紀錄、對外網站這些**每一樣都是一格，他要能一格一格勾**；側欄不要寫「整個 BT」。新來的幹部他選「Nothing until I add them」，Internal 跟他一樣大他選「Exactly what I have」。
+
+**工作區那一頁現在分成這幾塊：**
+
+| 一塊 | 裡面有什麼 |
+|---|---|
+| 整個 BT | 行事曆、會議、專案、表單、我的護照、場地（每天用的），申請、幹部護照、會議範本、紀錄、內部表單、對外網站（要特別派的） |
+| Senior | Internal |
+| 各 team | 那個 team 的工具與專案。**錢在 Sponsorship 底下**，派人進整個 Sponsorship 會連錢一起勾；**實習護照在 Internship 底下** |
+
+**怎麼派：**
+- 點「整個 BT」這幾個字（標題），下面打開整個工作區。上面一排是每一樣，預設全勾，取消掉的就不給。
+- 右邊「勾起來的還沒全部有」列的是少了任何一樣的人。勾人、選等級、按加人，**只補他少的那幾樣，他原本有的等級不動**。以前只要有一樣就算「已經在裡面」，所以加不進去，這是 Paul 抓到的 bug。
+- 下面「誰開了哪幾樣」：一個人一列、一樣一欄，分成「每天用的」與「要特別派的」兩段（team 那幾塊是「這個 team 的工具」與「專案」）。勾一格就開給他，取消就拿掉。表頭寫幾個人有，名字固定在左邊，表格自己捲。
+- 點一樣（不是標題）是只有那一樣的成員，跟以前一樣。
+
+**側欄：** 最上面沒有標題的那一段，畫的是他被開了的那幾樣（首頁每個人都有）。紀錄、幹部護照、對外網站從「我的工作區」搬上來。我的工作區只剩他的 team 與行銷。Internship 那一行底下多實習護照。
+
+**Senior → Internal：**
+- 放進 Internal 的幹部，資料庫把他當成 Co-President（`is_president()` 與 `is_senior()` 都認他）：改職級、派錢、邀請、派別人進 Internal、看人與權限。
+- **只有 Co-President（含 Internal 裡的人）派得了 Internal**，Senior Adviser 派不了。名單請留短，放進去等於把整個後台交給他。
+- 畫面上他的職級照樣寫原本那一個（`shared/auth.js` 的 `internalRow()` 把真正的職級留在 `rank_real`）。
+
+**新來的幹部：** 什麼都不會自動有，要到整個 BT 把他加進來，側欄才有行事曆、會議這些。遷移檔跑的那一刻已經在的幹部（Co-President 與 Senior Adviser 以外）每天用的六樣都先開好，等級「改」，所以現在的人不會少東西。
+
+**要知道的限制：** 每天用的那六樣（行事曆、會議、專案、表單、我的護照、場地）**只管側欄畫不畫**。那幾頁本身與資料庫的規矩沒有改，知道網址的幹部照樣打得開。真的要擋，是另一件事，要動 RLS（資料庫裡每一張表「誰能讀」的規矩），先問 Paul。申請、紀錄、錢、對外網站這些本來就有資料庫的門，照舊擋得住。
+
+**資料庫（`supabase/migrations/2027-01-24-whole-bt-tools.sql`，還沒在正式 Supabase 跑）：**
+- 新的七個工作區：`custom:calendar`、`custom:meetings`、`custom:projects`、`custom:forms`、`custom:my-passport`、`custom:venues`、`custom:internal`。
+- 現在的幹部先開每天用的六樣（已經有的不重複加）。
+- 新的函式 `in_internal()`；`is_president()`、`is_senior()`、`is_internship_team()` 多認 Internal；`assign()` 與 `unassign()` 碰 Internal 要是 Co-President。
+- 沒有動任何一條 RLS，可以重跑。跑完看最下面那張表，OVERALL 要是 PASS。
+- **一定要先跑這支再上線新的程式。** 沒跑之前上線，一般幹部的側欄會少掉行事曆、會議、專案、表單、我的護照、場地（他們還沒被開那六樣）。
+
+**程式在哪：**
+- `shared/rail.js`：`WHOLE_BT_TOOLS`、`ITEMS` 的 `who` 改成各自的工作區、`AREAS` 的順序與 `interns` 那一行、`railHTML()` 的最上面那一段。
+- `shared/auth.js`：`internalRow()`。
+- 九份後台 `ui.js`：`WHOLE_BT_TOOLS`、`ORG_WS`、`SENIOR`、`wsTeamOf()`、`wsCellHref()`、`wsRows()`、`membersAreaHTML()`（九份要一樣，`test/admin-hub.test.mjs` 守著）。`admin/people/src/ui.js` 多 `grpFullIds()`（誰每一樣都有）與 `grpAddOps()`（每個人少哪幾樣），`wsGroupHTML()` 重畫表格；`admin/people/src/main.js` 的 `inIdsNow()`。樣式在 `admin/admin.css` 的 `.wsg`。
+- 導覽：`shared/rail.js` 的 `workspace-group`（新的）與 `workspaces`。
+- 測試：`test/whole-bt.test.mjs`（新的），其他跟著改的在 `admin-hub`、`home-team`、`home-waiting`、`rail-regroup`、`meetings`、`events`、`projects`、`resources-ui`、`intern-board`、`people-admin`。`scripts/db/smoke.sh` 多一段。
 
 ## 會議範本與會議紀錄（`supabase/migrations/2026-12-18-meeting-templates.sql`，2026-11-13）
 

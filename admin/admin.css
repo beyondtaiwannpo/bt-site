@@ -1205,13 +1205,24 @@ a.rail-group.wshead.on{border-bottom:3px solid var(--bt-navy)}
 .wsg-items{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
 .wsg-items .chip input{margin:0 6px 0 0}
 .wsg-items .chip .mini{margin-left:6px}
-.wsg-wrap{overflow-x:auto;max-width:100%;margin-top:8px;border:1px solid rgba(16,42,134,.15);border-radius:10px}
-.wsg{border-collapse:collapse;font-size:14px;min-width:100%}
-.wsg th,.wsg td{padding:8px 10px;border-bottom:1px solid rgba(16,42,134,.1);text-align:left;vertical-align:middle;white-space:nowrap}
-.wsg thead th{font-weight:600;font-size:13px;background:rgba(16,42,134,.04)}
-.wsg thead th .mini{display:block;font-weight:400}
-.wsg tbody th{font-weight:500;position:sticky;left:0;background:var(--paper)}
-.wsg td label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.wsg-wrap{overflow:auto;max-width:100%;max-height:70vh;margin-top:8px;border:1px solid rgba(16,42,134,.15);border-radius:12px;background:rgba(255,255,255,.55)}
+/* 誰開了哪幾樣（2027-01-24 重排）：名字那一欄捲動時固定在左邊、表頭固定在上面；格子置中；分段之間一條深一點的線。 */
+.wsg{border-collapse:separate;border-spacing:0;font-size:14px;min-width:100%}
+.wsg th,.wsg td{padding:7px 10px;border-bottom:1px solid rgba(16,42,134,.08);text-align:center;vertical-align:middle;white-space:nowrap}
+.wsg thead th{position:sticky;top:0;z-index:2;background:#f3efe6;font-weight:600;font-size:13px;line-height:1.25;white-space:normal;min-width:84px;max-width:120px}
+.wsg thead tr.wsg-sec th{top:0;font:700 11px/1.2 var(--body);letter-spacing:.08em;text-transform:uppercase;color:rgba(16,42,134,.6);padding:8px 10px 4px;border-bottom:0;text-align:left}
+.wsg thead tr.wsg-sec + tr th{top:27px}
+.wsg thead th a{color:var(--bt-navy);text-decoration:none}
+.wsg thead th a:hover{text-decoration:underline}
+.wsg thead th .mini{display:block;font-weight:400;margin-top:2px;color:rgba(16,42,134,.6)}
+.wsg .wsg-who{position:sticky;left:0;z-index:1;background:#f8f5ef;text-align:left;font-weight:600;min-width:150px;max-width:220px;white-space:normal;border-right:1px solid rgba(16,42,134,.12)}
+.wsg thead .wsg-who{z-index:3;background:#f3efe6}
+.wsg tbody .wsg-who .mini{display:block;font-weight:400;color:rgba(16,42,134,.55)}
+.wsg tbody tr:hover td,.wsg tbody tr:hover .wsg-who{background:#efe9dc}
+.wsg td.y{background:rgba(16,42,134,.06)}
+.wsg .gap{border-left:2px solid rgba(16,42,134,.18)}
+.wsg td label{display:inline-flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-width:44px;min-height:32px;justify-content:center}
+.wsg td .mini{font-size:11px;line-height:1}
 .wsg-items .chip{white-space:nowrap}
 .wsg-items .chip input,.wsg td input{width:auto;flex:none}
 /* 左欄多選（2026-12-27）：每一列前面一個勾，勾起來的人一次改等級或一次移出 */

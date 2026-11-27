@@ -6,8 +6,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as RAIL from "../shared/rail.js";
 
-const ASSOC = { role: "cadre", board: "member", team: "Curriculum Team", name: "小安", ws: {} };
-const ED = { ...ASSOC, ws: { "res:Curriculum Team": "edit" } };
+const DAY = { "custom:calendar": "edit", "custom:meetings": "edit", "custom:projects": "edit", "custom:forms": "edit", "custom:my-passport": "edit", "custom:venues": "edit" };  // 2027-01-24：整個 BT 每天用的六樣
+const ASSOC = { role: "cadre", board: "member", team: "Curriculum Team", name: "小安", ws: DAY };
+const ED = { ...ASSOC, ws: { ...DAY, "res:Curriculum Team": "edit" } };
 const PRES = { role: "cadre", board: "president", team: "", name: "P", ws: {} };
 const rows = h => [...h.matchAll(/class="rail-item rail-area(?: (?:on|here))?" [^>]*>[\s\S]*?<b>([^<]+)<\/b>/g)].map(m => m[1]);
 
@@ -26,12 +27,13 @@ test("★ 對外網站是一個要派人的工作區（custom:website）；資�
   const web = RAIL.AREAS.find(a => a.key === "website");
   assert.equal(web.areaWho, "ws:custom:website");
   assert.ok(!RAIL.areaShown(web, ED), "某個 team「改」的人沒有對外網站那一行");
-  assert.ok(!RAIL.areaShown(web, { ...ASSOC, ws: { "res:Marketing Team": "edit" } }), "Marketing「改」的人也沒有（歷史之路在 Marketing 那一行底下）");
-  const WEB = { ...ASSOC, ws: { "custom:website": "edit" } };
+  assert.ok(!RAIL.areaShown(web, { ...ASSOC, ws: { ...DAY, "res:Marketing Team": "edit" } }), "Marketing「改」的人也沒有（歷史之路在 Marketing 那一行底下）");
+  const WEB = { ...ASSOC, ws: { ...DAY, "custom:website": "edit" } };
   assert.ok(RAIL.areaShown(web, WEB) && RAIL.areaShown(web, PRES));
   assert.ok(!RAIL.areaShown(web, { ...ASSOC, ws: { "custom:website": "view" } }), "只能看的人改不動，不畫");
   assert.deepEqual(RAIL.visibleItems("website", WEB).map(i => i.key), ["history", "island-map", "island"], "被派進對外網站的人：歷史之路與 BT 島（資源庫照舊是各 team 的）");
-  assert.match(RAIL.railHTML("home", "home", WEB, {}, "zh"), /<b>對外網站<\/b>[\s\S]*?<span class="rail-lv dim"[^>]*>指派<\/span>/);
+  // 2027-01-24：對外網站在最上面那一段（整個 BT 的東西都在那裡），不標「指派」。
+  assert.match(RAIL.railHTML("home", "home", WEB, {}, "zh"), /<b>場地<\/b>[\s\S]*?<b>對外網站<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/);
   // team 底下：資源庫、BT 島的貼文、BT 島；Marketing 多歷史之路。只能看的沒有。
   assert.deepEqual(RAIL.teamSiteItems(ED, "Curriculum Team").map(i => i.key), ["res", "island", "island-map"]);
   assert.deepEqual(RAIL.teamSiteItems({ ...ASSOC, ws: { "res:Marketing Team": "edit" } }, "Marketing Team").map(i => i.key), ["res", "history", "island", "island-map"]);
@@ -49,16 +51,19 @@ test("★ 對外網站是一個要派人的工作區（custom:website）；資�
   assert.match(site, /const SITE_WS = "custom:website"/);
 });
 
-test("★ 回饋表在「表單」底下，實習生進度牆在護照底下", () => {
+test("★ 回饋表在「表單」底下，實習生進度牆在實習護照底下（2027-01-24 實習護照搬到 Internship 那一行）", () => {
   assert.equal(RAIL.ITEMS.find(i => i.group === "records" && i.key === "forms").area, "forms");
   const w = RAIL.ITEMS.find(i => i.group === "internwall");
-  assert.equal(w.area, "passports");
+  assert.equal(w.area, "interns");
   assert.ok(RAIL.canSee(w, { ...ASSOC, ws: { "intern-passport": "view" } })); assert.ok(!RAIL.canSee(w, ASSOC)); assert.ok(RAIL.canSee(w, PRES));
-  assert.match(RAIL.railHTML("passports", "interns", { ...ASSOC, ws: { "intern-passport": "edit" } }, {}, "zh"), /href="\/intern-passport\/\?lang=zh">實習生進度牆/);
+  const im = { ...ASSOC, ws: { ...DAY, "intern-passport": "edit" } };
+  assert.match(RAIL.areaTabsHTML("passports", "interns", im, "zh"), /href="\/intern-passport\/\?lang=zh">實習生進度牆/, "實習護照那一頁上方那一排有進度牆");
+  assert.match(RAIL.railHTML("home", "home", im, {}, "zh"), /<b>Internship<\/b>[\s\S]*?href="\/admin\/passports\/\?lang=zh#interns">實習護照<\/a>/, "Internship 那一行底下有實習護照");
+  assert.doesNotMatch(RAIL.railHTML("home", "home", im, {}, "zh"), /<b>幹部護照<\/b>/, "只管實習護照的人沒有幹部護照那一行");
 });
 
 test("★ 滑過去看得到裡面有哪幾頁：沒展開、又不只一頁的那一行才有；現在這一行展開就不再畫", () => {
-  const me = { ...ASSOC, ws: { "custom:meeting-templates": "edit" } };
+  const me = { ...ASSOC, ws: { ...DAY, "custom:meeting-templates": "edit" } };
   const h = RAIL.railHTML("home", "home", me, {}, "zh");
   // 會議那一行：滑過去是會議、會議範本，直接點得到範本（Paul：「hover onto meetings, I can see meeting template」）。
   assert.match(h, /<div class="rail-row"><a class="rail-item rail-area" href="\/admin\/\?lang=zh#meetings">[\s\S]*?<\/a><div class="rail-fly" role="group" aria-label="會議"><div class="rail-fly-m"><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#meetings">會議<\/a><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#mtemplates">會議範本<\/a><\/div><\/div><\/div>/);
