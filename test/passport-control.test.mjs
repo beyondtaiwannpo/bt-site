@@ -1,11 +1,12 @@
-// 2026-10-28 Paul：月份全部自己管、實習分類自己管、自動存不要邊打邊存、格子要有時間與範例照片、可以直接跳去看板排會。
+// 2026-10-28 Paul：月份全部自己管、實習分類自己管、自動存不要邊打邊存、格子要有時間與範例照片、可以直接跳去看板排會（2026-11-26 起是首頁行事曆的那一天）。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { passportAdminHTML, activityEditHTML, internAdminHTML, internGroupEditHTML, setInternGroups, INTERN_CATS, boardLink, localInput, setLang } from "../admin/passports/src/ui.js";
 import * as PASS from "../passport/src/ui.js";
 import * as INTERN from "../intern-passport/src/ui.js";
-import { cellOf, cellInstant } from "../availability/src/calendar.js";
+import * as HUI from "../home/src/ui.js";
+import * as FREE from "../home/src/free.js";
 setLang("zh"); PASS.setLang("zh"); INTERN.setLang("zh");
 
 const MONTHS = [{ seq: 3, month: 11, hidden: false, revealed: true }, { seq: 4, month: 12, hidden: false, revealed: false }, { seq: 5, month: 1, hidden: false, revealed: false }];
@@ -36,7 +37,10 @@ test("改格子：主持人那個勾拿掉、多時間、範例照片、到看�
   const both = activityEditHTML({ ...a, example_url_2: a.example_url.replace("1.jpg", "2.jpg") }, 11, MONTHS, "", false, null);
   assert.equal((both.match(/class="exprev"/g) || []).length, 2); assert.doesNotMatch(both, /class="ak-photo"/, "兩張都滿就沒有選檔案");
   const link = boardLink(a);
-  assert.match(link, /^\.\.\/\.\.\/availability\/\?title=/); assert.match(link, /at=2026-11-22T12%3A00%3A00\.000Z/);
+  // 2026-11-26：排會搬到首頁行事曆，連結直接打開那一天（#calendar）。
+  assert.match(link, /^\.\.\/\.\.\/home\/\?title=/); assert.match(link, /at=2026-11-22T12%3A00%3A00\.000Z/); assert.match(link, /#calendar$/);
+  assert.match(activityEditHTML(a, 11, MONTHS, "", false, null), /data-board="1" href="\.\.\/\.\.\/home\//, "那一顆鈕有記號，改了時間 main.js 才找得到它換連結");
+  assert.match(readFileSync("admin/passports/src/main.js", "utf8"), /box\.querySelector\('a\[data-board\]'\)/);
   assert.equal(localInput(""), "");
   assert.match(localInput(a.happens_at), /^\d{4}-\d\d-\d\dT\d\d:\d\d$/);
   assert.doesNotMatch(activityEditHTML(null, 11, MONTHS, "", false, null), /ak-photo/, "新的格子先存才能放照片");
@@ -67,15 +71,15 @@ test("護照：格子上印場次與「看範例」，蓋過章就不印", () =>
   assert.ok(!done.includes("exbtn") && !done.includes('class="sess"'));
 });
 
-test("看板：從那條連結帶的時間，找得到是這一週的哪一格", () => {
-  const tz = "Asia/Taipei";
-  const ws = new Date("2026-11-15T16:00:00Z"); // 台北 11/16（一）00:00
-  const at = cellInstant(ws, 5, 20 * 60 + 30, tz);
-  assert.deepEqual(cellOf(at, ws, tz), { col: 5, min: 1230 });
-  assert.deepEqual(cellOf(new Date("2026-11-22T12:10:00Z"), ws, tz), { col: 6, min: 1200 }, "往下取到半小時");
-  assert.equal(cellOf(new Date("2026-11-30T12:00:00Z"), ws, tz), null, "不在這一週");
-  const m = readFileSync("availability/src/main.js", "utf8");
-  assert.match(m, /openFromLink\(new URLSearchParams\(location\.search\)\)/);
+test("行事曆：從那條連結帶的時間，打開那一天、那半小時的排會（舊的看板連結轉過來）", () => {
+  const tz = "Asia/Taipei", at = new Date("2026-11-22T12:10:00Z");   // 台北 11/22 20:10
+  assert.equal(HUI.dayKey(at, tz), "2026-11-22");
+  assert.equal(Math.floor(HUI.minuteOfDay(at, tz) / 30) * 30, 1200, "往下取到半小時");
+  const row = FREE.dayRows("2026-11-22", tz).find(r => r.min === 1200);
+  assert.equal(row.at.toISOString(), "2026-11-22T12:00:00.000Z", "那一格是台北 20:00 那個瞬間");
+  const m = readFileSync("home/src/main.js", "utf8");
+  assert.match(m, /qp\.get\("at"\)/); assert.match(m, /S\.pick = \{ min: Math\.floor\(UI\.minuteOfDay\(at, S\.tz\) \/ 30\) \* 30/);
+  assert.match(readFileSync("availability/src/main.js", "utf8"), /if \(q0\.get\("at"\)\)/, "舊的看板連結轉到首頁");
 });
 
 test("實習分類：從資料庫來就換掉寫死的三個，頁序、名字、棋盤顏色跟著變", () => {

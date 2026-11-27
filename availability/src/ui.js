@@ -13,18 +13,6 @@ export const DAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 // 畫面上的星期（短、長）。DAY_ZH 留著當常數與測試的契約，畫面一律走這兩支。
 export const dayShort = wd => T("day." + wd);
 export const dayFull = wd => T("dayFull." + wd);
-// 那一格是哪一天（2026-10-29 Paul：「只寫星期日 21:00，看不出是哪一天」）。照看的人自己的時區算，
-// 跟格子同一個時區：中文「11月2日（星期日）」，英文「Sunday, Nov 2」。inst 是 Date，壞掉就退回只有星期。
-export function dateLabel(inst, tz, lng) {
-  const d = inst instanceof Date ? inst : new Date(inst);
-  if (isNaN(d)) return "";
-  const zh = (lng || lang()) === "zh";
-  try {
-    const o = { timeZone: tz || undefined, month: zh ? "numeric" : "short", day: "numeric", weekday: "long" };
-    const p = Object.fromEntries(new Intl.DateTimeFormat(zh ? "zh-TW" : "en-US", o).formatToParts(d).map(x => [x.type, x.value]));
-    return zh ? `${p.month}月${p.day}日（${p.weekday}）` : `${p.weekday}, ${p.month} ${p.day}`;
-  } catch { return ""; }
-}
 export const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
 
 // 一週的欄位順序。看板從星期一排到星期日（台灣人習慣），
@@ -36,13 +24,15 @@ export const COL_ORDER = [1, 2, 3, 4, 5, 6, 0];
 // 設了 S.msg 卻沒有任何模板讀它，等於又做了一個「按了沒反應」的按鈕。
 export function shellHTML(tab, inner, weekLabel, msg) {
   // 2026-09-04：logo 與「回入口」搬到 shared 的頂欄，這裡只剩看板內部的分頁與翻週。
+  // 2026-11-26：「團隊看板」分頁拿掉，大家有空的人數與排會在首頁行事曆點一天看（右邊那一顆連過去）。
   return `<div class="bar">
     <div class="tabs">
-      <button data-act="tab" data-t="board" ${tab === "board" ? 'aria-current="true"' : ""}>${T("tab.board")}</button>
       <button data-act="tab" data-t="mine"  ${tab === "mine"  ? 'aria-current="true"' : ""}>${T("tab.mine")}</button>
       <button data-act="tab" data-t="who"   ${tab === "who"   ? 'aria-current="true"' : ""}>${T("tab.who")}</button>
     </div>
+    <a class="btn ghost sm tocal" href="../home/${lang() === "zh" ? "?lang=zh" : ""}#calendar">${T("tab.toCal")}</a>
   </div>
+  <p class="mini tocal-note">${T("tab.toCalNote")}</p>
   ${weekLabel ? `<div class="weeknav">
     <button class="btn ghost sm" data-act="week" data-d="-1">${T("week.prev")}</button>
     <b>${esc(weekLabel)}</b>
@@ -153,79 +143,6 @@ export function teamFilterHTML(V) {
     teams.map(t => chip(t, t.replace(/\s*Team$/i, ""))).join("")}</div>`;
 }
 
-export function boardHTML(S, counts, dates) {
-  const total = S.members.filter(m => m.tz).length;
-  // ⚠ **空的看板要說話。** 一片空白同時可能是三件事：沒有人填、沒有人設時區、
-  // 或者大家真的都沒空。三者長得一模一樣，而使用者只會得到「壞了」這個結論。
-  // 2026-09-02 咬過一次類似的：格子其實畫出來了，只是在畫面外。
-  const filled = S.members.filter(m => (S.slots.get(m.id) || new Set()).size > 0).length;
-  const notice = counts.size === 0 ? `<div class="wnote big">${T("b.empty")}${
-      total === 0 ? T("b.noTz")
-    : filled === 0 ? T("b.noFill")
-    : T("b.noMatch")
-    }</div>` : "";
-  const rows = [];
-  for (let min = 0; min < 1440; min += 30) {
-    const cells = COL_ORDER.map((_, col) => {
-      const who = counts.get(col + ":" + min) || [];
-      const lv = !who.length ? 0 : Math.min(4, Math.ceil(who.length / Math.max(1, total) * 4));
-      return `<td><button class="cell lv${lv}" data-act="peek" data-c="${col}" data-m="${min}"
-        aria-label="${T("b.cellAria", { t: esc(hhmm(min)), n: who.length })}">${who.length || ""}</button></td>`;
-    }).join("");
-    rows.push(`<tr><th class="hr">${min % 60 === 0 ? esc(hhmm(min)) : ""}</th>${cells}</tr>`);
-  }
-  return `${teamFilterHTML(S)}${notice}<div class="gridwrap"><table class="grid">
-    <thead><tr><th></th>${COL_ORDER.map((wd, i) =>
-      `<th>${esc(dayShort(wd))}<span>${esc(dates[i] || "")}</span></th>`).join("")}</tr></thead>
-    <tbody>${rows.join("")}</tbody></table></div>
-    <div class="wnote" style="margin-top:14px">${T("b.note")}</div>`;
-}
-
-// ctx: { free, dayLabel, minute, lines, calUrl, title, copyMsg }
-// 參數包成一個物件而不是排成一列：這一頁的參數已經七個了，排成一列的話
-// 呼叫端漏傳或順序錯都不會報錯，只會靜靜地畫錯東西。
-export function peekHTML(S, ctx) {
-  const busy = S.members.filter(m => m.tz && !ctx.free.includes(m.id));
-  const noTz = S.members.filter(m => !m.tz);
-  return `<div class="scrim" data-act="close-peek"><div class="modal">
-    <button class="x" data-act="close-peek" aria-label="${esc(T("pk.close"))}">✕</button>
-    <h3>${esc(ctx.dayLabel)} ${esc(hhmm(ctx.minute))}</h3>
-    <div class="sub">${T("pk.free", { n: ctx.free.length })}</div>
-    <div class="two">
-      <div><i>${T("pk.freeCol")}</i>${ctx.free.length
-        ? `<ul>${ctx.free.map(id => `<li>${nameHTML(memberOf(S, id))}</li>`).join("")}</ul>`
-        : `<div class="empty sm">${T("pk.nobody")}</div>`}</div>
-      <div><i>${T("pk.busyCol")}</i>${busy.length
-        ? `<ul class="dim">${busy.map(m => `<li>${nameHTML(m)}</li>`).join("")}</ul>`
-        : `<div class="empty sm">${T("pk.nobody")}</div>`}</div>
-    </div>
-    ${noTz.length ? `<div class="wnote">${T("pk.noTz", { n: noTz.length, names: esc(noTz.map(m => m.name).join(T("punct.list"))) })}</div>` : ""}
-
-    <div class="times">
-      <i>${T("pk.local")}</i>
-      <pre id="times">${ctx.lines.map(t => esc(t)).join("\n")}</pre>
-      <div class="row">
-        <button class="btn ghost sm" data-act="copy-times">${T("pk.copy")}</button>
-        <span class="mini">${esc(ctx.copyMsg || "")}</span>
-      </div>
-    </div>
-
-    <label style="margin-top:16px"><i>${T("pk.eventTitle")}</i>
-      <input id="evtitle" value="${esc(ctx.title)}" autocomplete="off"></label>
-    <div class="row">
-      <!-- 用 <a> 不用 <button>：長按與中鍵開新分頁才會有作用。
-           標題改的時候由 main.js 直接改這個 href。 -->
-      <a class="btn" id="callink" href="${esc(ctx.calUrl)}" target="_blank" rel="noopener">${T("pk.gcal")}</a>
-      ${ctx.canSchedule && !ctx.schedule ? `<button class="btn ghost" data-act="sch-open">${T("sch.open")}</button>` : ""}
-      <button class="btn ghost" data-act="close-peek">${T("pk.close")}</button>
-    </div>
-    ${ctx.schedule || ""}
-    <div class="wnote" style="margin-top:12px">${T("pk.note")}</div>
-  </div></div>`;
-}
-
-const nameOf = (S, id) => (S.members.find(m => m.id === id) || {}).name || id;
-
 // 名字要中英文都出現。**只在一行放得下的地方用這個** ——
 // 成員清單與彈窗的兩欄名單都是一人一行，放得下；
 // 而「還沒設定時區的是這幾個人」那一句是用頓號串起來的句子，
@@ -234,7 +151,6 @@ function nameHTML(m) {
   if (!m) return "";
   return esc(m.name) + (m.alt ? `<span class="alt">${esc(m.alt)}</span>` : "");
 }
-const memberOf = (S, id) => S.members.find(m => m.id === id) || { name: id, alt: "" };
 
 // ── 我的每週時間 ────────────────────────────────────────────────────
 // **批次填寫排在格線前面，而且是預設看得到的那一塊。**

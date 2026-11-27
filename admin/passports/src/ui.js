@@ -899,17 +899,18 @@ export function localInput(iso) {
   const p = n => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-// 「到時間看板排會」的連結（2026-11-15）：帶標題；有時間就帶 at，看板直接翻到那一週、打開那一格的排會。
+// 「排會」的連結（2026-11-15）：帶標題；有時間就帶 at。
+// 2026-11-26 起連到首頁行事曆（時間看板的團隊看板拿掉了）：直接打開那一天、那個時間的排會，那一段時間有空的人先勾好。
 export function boardLink(a, at) {
   const q = new URLSearchParams();
   if (a && a.title_zh) q.set("title", a.title_zh);
   const t = at || (a && a.happens_at);
   if (t) q.set("at", new Date(t).toISOString());
   const s = q.toString();
-  return "../../availability/" + (s ? "?" + s : "");
+  return "../../home/" + (s ? "?" + s : "") + "#calendar";
 }
 
-// 場次（2026-11-21，Paul 2026-10-28：「同一個聚會有兩場」）。一場一列：時間、「到時間看板排會」、拿掉。
+// 場次（2026-11-21，Paul 2026-10-28：「同一個聚會有兩場」）。一場一列：時間、「到行事曆排會」、拿掉。
 // 選了時間就存（不走表單的自動存，整份清單一次送）；「＋ 加一場」先多一列空的，選了時間才存。
 // sessions 沒有這一欄（遷移檔還沒跑）就拿 happens_at 當唯一一場。
 export function sessListOf(a) {
@@ -922,7 +923,7 @@ function sessEditHTML(cur, dis) {
   return `<div class="sessed" data-id="${esc(cur.id)}"><i class="lab">${T("ak.sessions")}</i>
     ${rows.map((iso, i) => `<div class="srow"><span class="n">${esc(T("ak.sessN", { n: i + 1 }))}</span>
       <input type="datetime-local" class="ak-sess" data-noauto="1" data-id="${esc(cur.id)}" value="${esc(localInput(iso))}"${dis}>
-      ${iso ? `<a class="btn ghost sm" target="_blank" rel="noopener" href="${esc(boardLink(cur, iso))}">${T("ak.toBoard")}</a>` : ""}
+      ${iso ? `<a class="btn ghost sm" target="_blank" rel="noopener" data-board="1" href="${esc(boardLink(cur, iso))}">${T("ak.toBoard")}</a>` : ""}
       ${iso || i > 0 ? `<button type="button" class="btn quiet sm" data-act="ak-sess-del" data-id="${esc(cur.id)}" data-i="${i}"${dis}>${T("ak.sessDel")}</button>` : ""}</div>`).join("")}
     ${rows.length < 10 ? `<button type="button" class="btn ghost sm" data-act="ak-sess-add" data-id="${esc(cur.id)}"${dis}>${T("ak.sessAdd")}</button>` : ""}
     <span class="fmeta">${T("ak.whenHint")}</span></div>`;

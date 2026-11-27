@@ -157,7 +157,7 @@ async function onAutosave(act, box, field) {
         if (!a.title_zh || !a.title_en) return fail(T("err.titles"));
         await D.saveActivity(a);
         if (cur) Object.assign(cur, a);
-        const link = box.querySelector('a[href*="availability"]'); if (link && cur) link.href = UI.boardLink(cur);
+        const link = box.querySelector('a[data-board]'); if (link && cur) link.href = UI.boardLink(cur);
         done = T("msg.actEdited", { t: a.title_zh });
       }
     } else if (act === "month-save") {

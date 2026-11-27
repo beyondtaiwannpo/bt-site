@@ -7,7 +7,7 @@ import * as RAIL from "../shared/rail.js";
 import * as F from "../admin/src/ui.js";
 import * as PE from "../admin/people/src/ui.js";
 import * as PA from "../admin/passports/src/ui.js";
-import * as SCH from "../availability/src/schedule.js";
+import * as SCH from "../home/src/schedule.js";   // 排會 2026-11-26 從時間看板搬到首頁行事曆
 
 F.setLang("zh");
 import { setLang as peLang } from "../admin/people/src/strings.js";

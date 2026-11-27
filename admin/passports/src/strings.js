@@ -326,7 +326,7 @@ export const MINE = {
   "ak.monthLocked":   { zh: "（建了就不能換）", en: " (cannot change once created)" },
   "ak.host":          { zh: "這一格要有人主持（聚會通常要）", en: "This box needs a host (gatherings usually do)" },
   "ak.whenHint":      { zh: "幹部的護照上，這一格會照他自己的時區印出這個時間。", en: "Each cadre's passport shows this time in their own time zone." },
-  "ak.toBoard":       { zh: "到看板排會、寄邀請", en: "Schedule & invite" },
+  "ak.toBoard":       { zh: "到行事曆排會、寄邀請", en: "Schedule & invite" },
   "ak.extrasLater":   { zh: "時間與範例照片，存好這一格之後再加。", en: "Add the time and an example photo after you save this box." },
   "ak.example":       { zh: "範例照片（選填，最多兩張，鏡頭那一格用得到；格子上是小圖，打開看大張）", en: "Example photos (optional, up to two, useful for Frame boxes; small pictures on the box, full size when opened)" },
   "ak.exampleHint":   { zh: "選一張圖，馬上傳。會先縮小到最長邊 1600。", en: "Pick a picture and it uploads right away, shrunk to 1600 px on the long side." },

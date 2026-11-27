@@ -6,13 +6,16 @@
 //   profiles：幹部的名字（誰會到那一欄要印名字）。
 //   public_events()：已經放上網站的活動（跟對外的活動頁同一支）。
 //   tf_todo()：發給我、還開著、我還沒填的內部表單（2026-11-29）。只回標題與截止時間，不回任何人的答案。
-// 寫的東西只有一件：set_rsvp（只改自己那一列）。
+// 寫的東西兩件：set_rsvp（只改自己那一列）；schedule_meeting（從行事曆的某一天排會，2026-11-26，資料庫照 can_schedule 擋誰排得了）。
+// 2026-11-26 也多讀時間看板那幾份（availability 三張表加名單），某一天要畫每半小時幾個人有空。
 import { supabase } from "../../shared/supabase.js";
 
 function need() { if (!supabase) throw new Error("offline"); }
 
 // 還沒跑 2026-11-17-meetings-home.sql 的資料庫沒有 required 欄與理由表，退回舊的查法（全部當選擇參加），頁面不壞。
 // 2026-11-22 Google 日曆：多 meet_url 與 gcal_event_id。還沒跑那支就先少這兩欄再讀。
+// 2026-11-26 從行事曆排會：多 message（排會的人寫給大家的一段話）。還沒跑 2027-01-22-meeting-message.sql 就少這一欄再讀。
+const MEET_COLS_M = "id, scope, title, starts_at, ends_at, agenda, doc_url, created_by, required, meet_url, gcal_event_id, message";
 const MEET_COLS_G = "id, scope, title, starts_at, ends_at, agenda, doc_url, created_by, required, meet_url, gcal_event_id";
 const MEET_COLS = "id, scope, title, starts_at, ends_at, agenda, doc_url, created_by, required";
 const MEET_COLS_OLD = "id, scope, title, starts_at, ends_at, agenda, doc_url, created_by";
@@ -21,7 +24,7 @@ const since = () => new Date(Date.now() - 180 * 86400000).toISOString();
 export async function loadHome() {
   need();
   let [m, a, n, p, e, f] = await Promise.all([
-    supabase.from("meetings").select(MEET_COLS_G).gte("ends_at", since()).order("starts_at"),
+    supabase.from("meetings").select(MEET_COLS_M).gte("ends_at", since()).order("starts_at"),
     supabase.from("meeting_attendees").select("meeting_id, user_id, status, replied_at"),
     supabase.from("meeting_rsvp_notes").select("meeting_id, user_id, note"),
     supabase.from("profiles").select("id, name_zh, name_en, team").eq("role", "cadre"),
@@ -29,6 +32,7 @@ export async function loadHome() {
     // 還沒跑 2026-11-29-team-forms.sql 的資料庫沒有這支，當作沒有表單要填。
     Promise.resolve(supabase.rpc("tf_todo")).catch(() => ({ data: [] })),
   ]);
+  if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(MEET_COLS_G).gte("ends_at", since()).order("starts_at");
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(MEET_COLS).gte("ends_at", since()).order("starts_at");
   if (m.error && String(m.error.code) === "42703") m = await supabase.from("meetings").select(MEET_COLS_OLD).gte("ends_at", since()).order("starts_at");
   if (m.error) throw m.error;
@@ -68,6 +72,51 @@ export async function loadTeam(team) {
   return { projects: rows(pj), events: rows(ev), forms: rows(fm), resources: rows(rs), people: rows(pt) };
 }
 
+// ── 某一天誰有空（2026-11-26，時間看板的「團隊看板」搬到行事曆的某一天）──────────────
+// 跟以前看板 availability/src/data.js 的 loadAll() 讀同樣五份，RLS 只給幹部。**五個都要成功才算成功**：
+// 只有名單回來、時段讀不到的話，畫面會變成「每個人都沒空」，看起來像大家還沒填，而不是像出錯。
+// 第一次點進某一天才讀，讀過留著。
+export async function loadAvail() {
+  need();
+  const [pf, av, wk, wm] = await Promise.all([
+    supabase.from("profiles").select("id, name_zh, name_en, team, tz, board_role").eq("role", "cadre"),
+    supabase.from("availability").select("user_id, weekday, minute"),
+    supabase.from("availability_week").select("user_id, week_start, weekday, minute"),
+    supabase.from("availability_week_mark").select("user_id, week_start"),
+  ]);
+  const bad = [pf, av, wk, wm].find(r => r.error);
+  if (bad) throw bad.error;
+  const k = r => r.weekday + ":" + r.minute;
+  const slots = new Map(), weekSlots = new Map(), weekMarks = new Map();
+  for (const r of av.data || []) { if (!slots.has(r.user_id)) slots.set(r.user_id, new Set()); slots.get(r.user_id).add(k(r)); }
+  // week_start 從 date 欄回來就是 "YYYY-MM-DD"，跟 free.js 的星期一同一個樣子，不轉換。
+  for (const r of wk.data || []) {
+    if (!weekSlots.has(r.user_id)) weekSlots.set(r.user_id, new Map());
+    const w = weekSlots.get(r.user_id); if (!w.has(r.week_start)) w.set(r.week_start, new Set()); w.get(r.week_start).add(k(r));
+  }
+  for (const r of wm.data || []) { if (!weekMarks.has(r.user_id)) weekMarks.set(r.user_id, new Set()); weekMarks.get(r.user_id).add(r.week_start); }
+  const members = (pf.data || []).map(p => {
+    const zh = (p.name_zh || "").trim(), en = (p.name_en || "").trim();
+    return { id: p.id, name: zh || en, alt: zh && en && zh !== en ? en : "", team: p.team || "", board_role: p.board_role || "member", tz: p.tz || null };
+  }).sort((a, b) => (a.name || "").localeCompare(b.name || "", "zh-Hant"));
+  return { members, slots, weekSlots, weekMarks };
+}
+
+// 排一場會（從行事曆的某一天）。資料庫那一支先存會、寫留言、建 Google 事件（BT 主帳號主辦、自動加 Meet），再寄網站的邀請信。
+// 還沒跑 2027-01-22-meeting-message.sql 的資料庫沒有 p_message：退回舊的叫法，留言接在議程最前面，不會不見。
+export async function scheduleMeeting(d) {
+  need();
+  const args = { p_scope: d.scope, p_title: d.title, p_starts: d.starts, p_ends: d.ends, p_agenda: d.agenda || "", p_doc_url: d.doc || null,
+    p_attendees: d.attendees, p_required: !!d.required };
+  let { data, error } = await supabase.rpc("schedule_meeting", Object.assign({}, args, { p_message: d.message || "" }));
+  if (error && /Could not find the function|PGRST202/i.test(String(error.message || "") + String(error.code || ""))) {
+    const msg = (d.message || "").trim();
+    ({ data, error } = await supabase.rpc("schedule_meeting", Object.assign({}, args, { p_agenda: msg ? msg + (args.p_agenda ? "\n\n" + args.p_agenda : "") : args.p_agenda })));
+  }
+  if (error) throw error;
+  return data;
+}
+
 export async function setRsvp(id, status, note) {
   need();
   const args = { p_meeting: id, p_status: status };
@@ -83,6 +132,11 @@ const SAYS = [
   ["note_too_long", "理由最多 300 個字。", "The reason can be at most 300 characters."],
   ["not_invited", "這場會的名單上沒有你。", "You are not on this meeting's list."],
   ["no_such_meeting", "找不到這場會，可能已經刪了。", "Meeting not found; it may have been deleted."],
+  ["not_allowed", "你排不了這個範圍的會：整個 BT 的要 Co-President 或 Senior Adviser，team 的要你在那個 team 是「改」以上。", "You can't schedule for this scope: BT-wide needs a Co-President or Senior Adviser; a team needs Edit or above on that team."],
+  ["message_too_long", "留言最多 2000 個字。", "The message can be at most 2,000 characters."],
+  ["bad_doc_url", "會議紀錄的連結要是 Google Docs 或 Drive 的。", "The notes link must be a Google Docs or Drive link."],
+  ["bad_time", "結束要在開始之後。", "The end must be after the start."],
+  ["empty_title", "會議要有標題。", "The meeting needs a title."],
   ["Failed to fetch", "連不上網路，等一下再試。", "No connection. Try again in a moment."],
 ];
 export function says(err, zh) {

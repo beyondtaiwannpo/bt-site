@@ -5622,6 +5622,37 @@ psql -d "${DB}" -q -c "delete from vault.decrypted_secrets where name = 'ANTHROP
   delete from public.rc_reviews where event_id in (select id from public.events where slug = 'sq-camp'); delete from public.rc_forms where title like 'Sq %'; delete from public.tf_forms where title = 'Sq internal survey';
   delete from public.events where slug = 'sq-camp'; delete from public.meetings where title = 'Sq board'; delete from public.profiles where id in ('${SQX}', '${SQS}'); delete from auth.users where id in ('${SQX}', '${SQS}');" >/dev/null 2>&1 || true
 chk "（收尾）假的會議、活動、表單、人都拿掉了，設定回到預設" "0|0|0|{meeting,internal}" "select (select count(*) from public.meetings where title = 'Sq board')||'|'||(select count(*) from public.rc_forms where title like 'Sq %')||'|'||(select count(*) from public.profiles where id in ('${SQX}', '${SQS}'))||'|'||(select ai_sources::text from public.search_settings)"
+
+echo "── 從首頁行事曆排會：邀請多留言與排會的人（2027-01-22-meeting-message.sql）──"
+# Paul 2026-11-26：「The invite includes headline, time, agenda, message, who scheduled it and who is invited.」
+MMM=supabase/migrations/2027-01-22-meeting-message.sql
+mm1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MMM}" 2>&1 || true)
+if echo "${mm1}" | grep -q "OVERALL.*PASS" && ! echo "${mm1}" | grep -q "|FAIL"; then echo "  ok   留言那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 留言那支驗收表："; echo "${mm1}" | head -12; fail=$((fail+1)); fi
+MMS=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.schedule_meeting('board','Mm 留言測試', now() + interval '3 days', now() + interval '3 days 1 hour', '議程一', null, array['${DIR}','${ASSOC}']::uuid[], true, '  請先看提案  ')" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 留言存下來了（前後空白去掉）" "請先看提案" "select message from public.meetings where id = '${MMS}'"
+chk "★ Google 事件的說明：留言在最上面、議程有標題、排會的人是王平、回覆連結還在" "t|t|t|t" "select (d like '請先看提案%')::text::char(1)||'|'||(d like '%議程 / Agenda:'||E'\n'||'議程一%')::text::char(1)||'|'||(d like '%排會的人 / Scheduled by: 王平%')::text::char(1)||'|'||(d like '%Reply on the BT site: https://beyondtaiwannpo.com/home/?meeting=${MMS}')::text::char(1) from (select public.gcal_body('${MMS}', true)->>'description' d) z"
+chk "Google 事件照舊自動要一個 Meet 連結" "hangoutsMeet" "select public.gcal_body('${MMS}', true)->'conferenceData'->'createRequest'->'conferenceSolutionKey'->>'type'"
+chk "★ 網站的邀請信：留言、排會的人、邀請的人（兩位都在、照名字排）" "t|t|邀請的人/Invited:小安新AnHsiao、小幹部AssocWu" "select (body like '%留言 / Message:'||E'\n'||'請先看提案%')::text::char(1)||'|'||(body like '%排會的人 / Scheduled by: 王平%')::text::char(1)||'|'||substring(body from '邀請的人 / Invited: [^\n]*') from public.mail_outbox where meeting_id = '${MMS}' and kind = 'meeting_invite' and to_email = 'director@example.com'"
+MMN=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.schedule_meeting(p_scope => 'board', p_title => 'Mm 沒有留言', p_starts => now() + interval '4 days', p_ends => now() + interval '4 days 1 hour', p_agenda => '', p_doc_url => null, p_attendees => array['${DIR}']::uuid[], p_required => false)" 2>&1 | tail -1 | tr -d ' \n')
+chk "★ 沒給留言（舊的叫法、具名參數）照樣排得了：沒有留言那一行，排會的人還在" "t|f|t" "select (m.message is null)::text::char(1)||'|'||(o.body like '%Message:%')::text::char(1)||'|'||(o.body like '%Scheduled by: 王平%')::text::char(1) from public.meetings m join public.mail_outbox o on o.meeting_id = m.id and o.kind = 'meeting_invite' where m.id = '${MMN}' limit 1"
+psql -d "${DB}" -X -A -t -q -c "select public.queue_meeting_mail_to('meeting_cancel','${MMS}','mmcancel@example.com')" >/dev/null 2>&1 || true
+chk "取消信不加那三行" "f" "select (body like '%Scheduled by%' or body like '%Message:%')::text::char(1) from public.mail_outbox where meeting_id = '${MMS}' and to_email = 'mmcancel@example.com'"
+chkraise "★ 留言超過 2000 字擋下來（message_too_long）" "message_too_long" \
+  "perform set_config('test.uid','${PAUL}',true); perform public.schedule_meeting('board','x',now() + interval '5 days',now() + interval '5 days 1 hour','','',array['${DIR}']::uuid[], false, repeat('字', 2001));"
+chkraise "★ 誰排得了照舊：Director 排不了整個 BT 的會（not_allowed）" "not_allowed" \
+  "perform set_config('test.uid','${DIR}',true); perform public.schedule_meeting('board','x',now() + interval '5 days',now() + interval '5 days 1 hour','','',array['${DIR}']::uuid[], false, '嗨');"
+chkrole anon "" "★ 沒登入叫不動新的排會" "denied" "select case when has_function_privilege('anon','public.schedule_meeting(text,text,timestamptz,timestamptz,text,text,uuid[],boolean,text)','execute') then 'open' else 'denied' end"
+# 破壞測試：把「先寫留言」那一行拿掉，驗收表第 4 列要變紅
+BROKEN=$(mktemp)
+sed "/  update meetings set message = nullif(btrim(coalesce(p_message, '')), '') where id = v_id;/d" "${MMM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${MMM}"; then echo "  FAIL 破壞測試沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^4|.*|FAIL"; then echo "  ok   ★ 破壞測試：留言沒寫進去，驗收表第 4 列變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉寫留言那一行驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+mm2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${MMM}" 2>&1 || true)
+if echo "${mm2}" | grep -q "OVERALL.*PASS" && ! echo "${mm2}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去、重跑一次，驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; fail=$((fail+1)); fi
+psql -d "${DB}" -q -c "delete from public.mail_outbox where meeting_id in (select id from public.meetings where title like 'Mm %'); delete from public.meetings where title like 'Mm %'" >/dev/null 2>&1 || true
+chk "（收尾）假的會拿掉了" "0" "select count(*) from public.meetings where title like 'Mm %'"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

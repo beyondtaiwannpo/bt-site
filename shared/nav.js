@@ -32,7 +32,7 @@ export const FEATURES = [
   { key: "passport",     label: { zh: "護照", en: "Passport" },     href: "/passport/",     roles: ["cadre"], inSidebar: true,
     title: { zh: "幹部護照", en: "Cadre passport" },     desc: { zh: "這一年的活動、章、心得與照片", en: "This year's activities, stamps, notes and photos" } },
   { key: "availability", label: { zh: "時間看板", en: "Availability" }, href: "/availability/", roles: ["cadre"], inSidebar: true,
-    title: { zh: "每週時間看板", en: "Weekly availability board" }, desc: { zh: "填自己每週固定有空的時段，約會議時直接挑", en: "Fill in when you are usually free each week, then pick a meeting time from the board" } },
+    title: { zh: "每週時間看板", en: "Weekly availability board" }, desc: { zh: "填自己每週固定有空的時段；大家有空的人數在首頁的行事曆點一天看", en: "Fill in when you are usually free each week; see who is free by clicking a day on the Home Calendar" } },
   // 2026-09-08（批 3）。**所有幹部都看得到這個入口，那是對的。**
   // 每個幹部都屬於一個 team，而 2026-09-07 拍板的可見範圍是
   // 「該 team 的幹部看得到自己 team 收到的申請」——

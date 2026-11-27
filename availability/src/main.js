@@ -8,11 +8,9 @@ import { navHTML } from "../../shared/nav.js";
 import * as RAIL from "../../shared/rail.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays, diff } from "./edit.js";
-import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
-import { cellInstant, cellOf, googleCalUrl, localTimesText, DEFAULT_TITLE } from "./calendar.js";
-import * as SCH from "./schedule.js";
-import { labelOf } from "./tz-alias.js";
-import { startOfWeek, detectTz, partsIn, addDays } from "./tz.js";
+// 2026-11-26：「團隊看板」（每半小時幾個人有空）與點一格的彈窗、排會搬到首頁行事曆的「日」（home/src/day.js、schedule.js、free.js）。
+// 這一頁剩「我的時間」與「成員」兩個分頁；舊的 board.js、calendar.js、schedule.js 拿掉了。
+import { startOfWeek, detectTz } from "./tz.js";
 import { weekKeyOf } from "./weekkey.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
@@ -21,7 +19,7 @@ const K = DATA.key;
 
 let S = {
   user: null, role: null, myTz: null, myName: "", down: false, ready: false,
-  tab: "board", members: [], slots: new Map(),
+  tab: "mine", members: [], slots: new Map(),
   team: "",                       // team 篩選，空字串是「全部」（見 view()）
   mine: new Set(), saved: new Set(), dirty: false, mineMsg: "",
   // 某一週的例外（2026-09-12）。weekSlots / weekMarks 是**全部人**的
@@ -42,29 +40,13 @@ let S = {
   weekStart: null, weekOffset: 0,
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
   needNotice: false, needTz: false, tzQuery: "", tzResults: [], tzGuess: null,
-  peek: null, peekCell: null, peekLines: [], msg: "", busy: false, boardTop: null,
+  msg: "", busy: false,
   // 「我的時間」那張表**只在進入那一頁或換了內容時**捲一次，不是每次重畫都捲。
   // 每次重畫都捲的話，使用者點一格、畫面重畫、捲動位置就被拉回去 —— 等於不能用。
   mineScrolled: false,
-  evTitle: "", copyMsg: "",
-  // 排會與回覆（2026-11-02）：ws 是我被派進的工作區（能排哪些 team）；sch 是彈窗裡排會那一塊的狀態（null 是沒展開）。回覆 2026-10-28 搬到 /home/。
-  ws: {}, senior: false, sch: null
+  // ws 是我被派進的工作區（側欄要用）。排會 2026-11-26 搬到首頁行事曆，回覆 2026-10-28 搬到 /home/。
+  ws: {}, senior: false
 };
-
-// ── 換算：把所有人的時段落到觀看者的格子上 ──────────────────────────
-
-function weekDates() {
-  const p = partsIn(S.weekStart, S.myTz);
-  return [0, 1, 2, 3, 4, 5, 6].map(i => {
-    const d = addDays(p.year, p.month, p.day, i);
-    return d.month + "/" + d.day;
-  });
-}
-function weekLabel() {
-  const p = partsIn(S.weekStart, S.myTz);
-  const e = addDays(p.year, p.month, p.day, 6);
-  return `${p.month}/${p.day} – ${e.month}/${e.day}` + (S.weekOffset === 0 ? T("week.thisTag") : "");
-}
 
 // ── 畫面 ────────────────────────────────────────────────────────────
 // 畫面看到的名單。**S.members 永遠是全部的人，篩選只發生在這裡。**
@@ -97,30 +79,13 @@ function render() {
   if (S.needNotice) { shell(UI.noticeHTML(S.msg, S.busy)); return; }
   if (S.needTz) { shell(UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg)); return; }
 
-  let inner, label = null;
+  let inner;
   const V = view();
-  if (S.tab === "board") {
-    // 帶上 weekSlots / weekMarks：某一週被誰動過例外，看板要逐格改用那一份
-    // 而不是一路都用平常的時間（board.js 的判斷邏輯見那邊註解）。
-    const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz, S.weekSlots, S.weekMarks);
-    S.boardTop = firstBusyMinute(counts);
-    inner = UI.boardHTML(V, counts, weekDates());
-    label = weekLabel();
-  }
   // 「我的時間」是自己的，跟 team 篩選無關，所以用 S 不是 V。
-  else if (S.tab === "mine") inner = UI.mineHTML(S);
-  else inner = UI.membersHTML(V, Date.now());
-  shell(UI.shellHTML(S.tab, inner, label, S.msg));
-  if (S.peek) el.insertAdjacentHTML("beforeend", S.peek);
-  // 看板一打開停在 00:00，而大家有空的時間多半在傍晚 —— 第一格常常在第 38 列，
-  // 也就是容器頂端往下 600 多 px，而容器一次只看得到二十幾列。
-  // **格子其實畫出來了，使用者卻看到一片空的凌晨然後以為壞了**（2026-09-02 實際發生）。
-  // 所以開起來就捲到第一個有人有空的時刻。整天 24 小時仍然都在，只是不從凌晨開始看。
-  if (S.tab === "board" && S.boardTop != null) {
-    const g = el.querySelector(".gridwrap");
-    if (g) g.scrollTop = Math.max(0, (S.boardTop / 30) * 16 - 32);
-  }
-  // 「我的時間」那一頁有一模一樣的問題，而且從來沒修過（2026-09-12 實測：
+  if (S.tab === "who") inner = UI.membersHTML(V, Date.now());
+  else inner = UI.mineHTML(S);
+  shell(UI.shellHTML(S.tab === "who" ? "who" : "mine", inner, null, S.msg));
+  // 「我的時間」那張表一打開停在 00:00 的話，填在晚上的人第一格在畫面外很遠（2026-09-12 實測：
   // 一個把時間填在晚上的人，第一格在往下 961px 的地方，而容器高度只有 503px）。
   // 差別是這一頁**每點一格就會重畫**，所以只能捲一次 —— 見 S.mineScrolled 的註解。
   // 一格都沒填的人捲到傍晚，因為上面那個批次工具的預設就是 19:00 到 22:00。
@@ -171,6 +136,13 @@ async function checkVersion(rootUrl) {
 
 async function boot() {
   checkVersion("../");
+  // 護照後台與舊書籤的「到時間看板排會」連結（?at=<時間>&title=<標題>）：排會搬到首頁行事曆的那一天了，直接轉過去。
+  const q0 = new URLSearchParams(location.search);
+  if (q0.get("at")) {
+    const q = new URLSearchParams();
+    for (const k of ["at", "title", "lang"]) if (q0.get(k)) q.set(k, q0.get(k));
+    location.replace("../home/?" + q.toString() + "#calendar"); return;
+  }
   try {
     const who = await AUTH.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }
@@ -220,9 +192,6 @@ async function boot() {
     S.needTz = !S.myTz;
     S.tzGuess = detectTz();
     setWeek(0);
-    // 從護照後台「到時間看板排會」來的（2026-11-15）：?title= 帶標題，?at= 帶時間。
-    // 有時間就翻到那一週、打開那一格，能排會的人直接看到排會的表單（這一格有空的已經先勾好）。
-    openFromLink(new URLSearchParams(location.search));
     S.ready = true;
     render();
   } catch (e) {
@@ -237,23 +206,6 @@ async function boot() {
     S.down = true; render();
   }
 }
-function openFromLink(qp) {
-  const title = (qp.get("title") || "").trim().slice(0, 80);
-  if (title) S.evTitle = title;
-  const at = new Date(qp.get("at") || "");
-  if (isNaN(at) || !S.myTz) return;
-  const now = startOfWeek(new Date(), S.myTz, 1), then = startOfWeek(at, S.myTz, 1);
-  const off = Math.round((then - now) / (7 * 86400000));
-  if (off < -4) return;   // 往前只到四週（看板本來的規則）
-  setWeek(off);
-  const cell = cellOf(at, S.weekStart, S.myTz);
-  if (!cell) return;
-  S.peekCell = cell;
-  S.evTitle = S.evTitle || T("cal.title");
-  buildPeek();
-  if (scopes().length) { S.sch = { ticked: (S.peekFree || []).slice(), q: "", title: S.evTitle, minutes: 60, scope: scopes()[0] }; buildPeek(); }
-}
-
 function setWeek(off) {
   S.weekOffset = off;
   const base = new Date(Date.now() + off * 7 * 86400000);
@@ -436,10 +388,9 @@ document.addEventListener("click", async e => {
   }
   // 頂欄的登出。這一頁之前沒有登出（只有「回入口」），現在頂欄有了就要接。
   if (act === "signout") { await flushSave(); await AUTH.signOut(); location.replace("../app/"); return; }
-  if (act === "tab") { await flushSave(); S.tab = b.dataset.t; S.peek = null; S.mineScrolled = false; render(); return; }
-  // team 篩選。**彈窗要一起關掉** —— 它裡面那份「有空／沒空」是用舊的篩選算的，
-  // 留著的話畫面上會同時有兩種篩選的結果，而且看不出來哪一份是舊的。
-  if (act === "team") { S.team = b.dataset.team || ""; S.peek = null; render(); return; }
+  if (act === "tab") { await flushSave(); S.tab = b.dataset.t; S.mineScrolled = false; render(); return; }
+  // team 篩選（成員那一頁）。
+  if (act === "team") { S.team = b.dataset.team || ""; render(); return; }
 
   if (act === "week") {
     const d = +b.dataset.d;
@@ -491,7 +442,7 @@ document.addEventListener("click", async e => {
       // 看板於是說「還沒有人設定時區」、我填的時間也畫不出來。把自己那一列補上；第一次設完直接到「我的時間」，那才是接下來要做的事。
       const me = S.members.find(m => m.id === S.user.id);
       if (me) me.tz = b.dataset.tz; else { try { const all = await DATA.loadAll(); S.members = all.members; S.slots = all.slots; } catch (e) { /* 下一次重整就有了 */ } }
-      if (!(S.slots.get(S.user.id) || new Set()).size) S.tab = "mine";
+      S.tab = "mine";
       setWeek(S.weekOffset); render();
     } catch (err) {
       console.error("設定時區失敗。真正的原因：", err);
@@ -615,101 +566,9 @@ document.addEventListener("click", async e => {
     }
     render(); return;
   }
-
-  // ── 排一場會（2026-11-02）──
-  if (act === "sch-open") { S.sch = { ticked: (S.peekFree || []).slice(), q: "", title: S.evTitle || T("cal.title"), minutes: 60, scope: scopes()[0] }; buildPeek(); render(); return; }
-  if (act === "sch-cancel") { S.sch = null; buildPeek(); render(); return; }
-  // 全勾／全取消只改勾選框，不重畫彈窗（重畫會把彈窗捲回最上面，Paul 2026-10-28 回報）。
-  if (act === "sch-all" || act === "sch-none") {
-    if (!S.sch) return;
-    readSch();
-    S.sch.ticked = act === "sch-all" ? [...new Set(S.sch.ticked.concat(SCH.shown(view().members, S.sch.q).map(m => m.id)))] : [];
-    const on = new Set(S.sch.ticked);
-    document.querySelectorAll('input[name="sch-member"]').forEach(x => { x.checked = on.has(x.value); });
-    schCount(); return;
-  }
-  if (act === "sch-send") {
-    readSch();
-    const d = S.sch;
-    if (!d.ticked.length) { d.msg = T("sch.needPeople"); buildPeek(); render(); return; }
-    const start = cellInstant(S.weekStart, S.peekCell.col, S.peekCell.min, S.myTz);
-    const end = new Date(start.getTime() + (+d.minutes || 60) * 60000);
-    S.busy = true; d.msg = ""; buildPeek(); render();
-    try {
-      await DATA.scheduleMeeting({ scope: d.scope, title: (d.title || "").trim() || T("cal.title"), starts: start.toISOString(), ends: end.toISOString(), agenda: d.agenda, doc: (d.doc || "").trim() || null, attendees: d.ticked, required: d.required !== "0" });
-      S.busy = false; S.sch = null; S.peek = null; S.msg = T("sch.sent", { n: d.ticked.length }); render();
-    } catch (e) { S.busy = false; d.msg = DATA.saysMeeting(e, lang() === "zh"); buildPeek(); render(); }
-    return;
-  }
-  if (act === "peek") {
-    S.peekCell = { col: +b.dataset.c, min: +b.dataset.m };
-    S.copyMsg = ""; S.sch = null;
-    S.evTitle = S.evTitle || T("cal.title");
-    buildPeek(); render(); return;
-  }
-
-  if (act === "copy-times") {
-    const text = (S.peekLines || []).join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-      S.copyMsg = T("m.copiedLines");
-    } catch (err) {
-      // 不是 https、或舊瀏覽器的話 clipboard API 不在。
-      // **不要靜靜地失敗** —— 那又是一次「按了沒反應」（README 第 13 項）。
-      console.error("複製失敗。真正的原因：", err);
-      S.copyMsg = T("m.copyFail");
-    }
-    buildPeek(); render(); return;
-  }
-  if (act === "close-peek") {
-    // ⚠ **不要用「祖先有沒有 data-stop」來判斷。**
-    // 2026-09-02：原本寫成 `act === "close-peek" && !e.target.closest("[data-stop]")`，
-    // 而 data-stop 掛在 .modal 上、關閉鍵就住在 .modal 裡面 ——
-    // 那個條件把關閉鍵自己排除掉了，按下去事件有觸發、狀態不會變、畫面完全不動。
-    // 實測確認過：act=close-peek 進得來，但有 data-stop 祖先，所以整個分支跳過。
-    //
-    // 現在改成正面表列**哪兩種情況要關**，而不是反面排除：
-    //   按到的是一顆按鈕（關閉鍵、右上角的 ✕）
-    //   或者點在遮罩本身（不是彈窗裡面）
-    const onScrim = e.target.classList && e.target.classList.contains("scrim");
-    if (b.tagName === "BUTTON" || onScrim) { S.peek = null; render(); }
-    return;
-  }
 });
-
-// 勾或取消一位出席的人：人數與按鈕上的數字跟著變（2026-10-28 Paul 回報勾了數字不動）。
-// 不重畫整個彈窗，名單捲到一半的位置才不會跳回最上面。
-document.addEventListener("change", e => {
-  if (e.target.name !== "sch-member" || !S.sch) return;
-  readSch(); schCount();
-});
-// 人數那一行與送出鈕上的數字照 S.sch.ticked 當下改（不重畫）。
-function schCount() {
-  const n = S.sch ? S.sch.ticked.length : 0;
-  const lab = document.getElementById("sch-who-n"); if (lab) lab.textContent = T("sch.who", { n });
-  const btn = document.getElementById("sch-send"); if (btn && !S.busy) { btn.textContent = T("sch.send", { n }); btn.disabled = !n; }
-}
 
 document.addEventListener("input", e => {
-  // 標題改了就跟著改連結的 href。**不重畫整個彈窗** ——
-  // 重畫會讓輸入框失焦，使用者打第二個字就得再點一次。
-  if (e.target.id === "evtitle") {
-    S.evTitle = e.target.value;
-    const a = document.getElementById("callink");
-    if (a && S.peekCell) {
-      a.href = googleCalUrl(cellInstant(S.weekStart, S.peekCell.col, S.peekCell.min, S.myTz),
-                            undefined, S.evTitle);
-    }
-    return;
-  }
-  if (e.target.id === "sch-q") {
-    // 找名字要重畫名單；重畫前記下彈窗捲到哪，重畫後放回去，不讓 focus() 把彈窗捲走（2026-10-28）。
-    const md = document.querySelector(".modal"), st = md ? md.scrollTop : 0;
-    readSch(); S.sch.q = e.target.value; buildPeek(); render();
-    const again = document.getElementById("sch-q"); if (again) { again.focus({ preventScroll: true }); const n = again.value.length; try { again.setSelectionRange(n, n); } catch (x) { /* 有的瀏覽器不給 */ } }
-    const md2 = document.querySelector(".modal"); if (md2) md2.scrollTop = st;
-    return;
-  }
   if (e.target.id === "tzq") {
     S.tzQuery = e.target.value;
     S.tzResults = searchTz(S.tzQuery);
@@ -727,47 +586,6 @@ function readBatch() {
   if (t) S.bto = +t.value;
   const c = document.getElementById("copyfrom");
   if (c) S.copyFrom = +c.value;
-}
-
-// 組出詳情彈窗要的一切。
-//
-// **時間一律從 S.weekStart 算**（見 calendar.js 的 cellInstant）——
-// 使用者可能是在翻週的時候點的，用「本週」算的話事件會差一整週，
-// 而那個事件看起來完全正常，只是日期錯了。
-// 排會（2026-11-02）：我能排哪些範圍；把彈窗裡排會那一塊的欄位收進 S.sch（重畫之後才不會回到預設值）。
-function scopes() { return SCH.scopesFor(S.senior, S.ws, UI.teamsOf(S.members)); }
-function readSch() {
-  if (!S.sch) return;
-  const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
-  for (const [k, id] of [["scope", "sch-scope"], ["required", "sch-required"], ["minutes", "sch-minutes"], ["title", "sch-title"], ["doc", "sch-doc"], ["agenda", "sch-agenda"], ["q", "sch-q"]]) { const v = val(id); if (v !== undefined) S.sch[k] = v; }
-  const boxes = document.querySelectorAll('input[name="sch-member"]');
-  if (boxes.length) { const on = new Set([...boxes].filter(x => x.checked).map(x => x.value)), shownIds = new Set([...boxes].map(x => x.value)); S.sch.ticked = [...new Set(S.sch.ticked.filter(id => !shownIds.has(id)).concat([...on]))]; }
-}
-// 一場會的時間照我的時區印。
-function buildPeek() {
-  const { col, min } = S.peekCell;
-  // 篩了 team 的話彈窗也要跟著篩：格子上的數字是篩過的，
-  // 而彈窗說的是「這個數字是誰」——兩邊不一致的話那個數字看起來就是錯的。
-  const V = view();
-  // 帶上 weekSlots / weekMarks，理由跟 render() 那邊一樣：
-  // 彈窗說的是「這個數字是誰」，數字本身要是已經套過某一週例外的那份。
-  const counts = calcCounts(V.members, S.slots, S.weekStart, S.myTz, S.weekSlots, S.weekMarks);
-  const free = counts.get(col + ":" + min) || [];
-  const inst = cellInstant(S.weekStart, col, min, S.myTz);
-  const zones = [...new Set(V.members.filter(m => m.tz).map(m => m.tz))].sort();
-  S.peekLines = localTimesText(inst, zones, labelOf, [0, 1, 2, 3, 4, 5, 6].map(UI.dayShort));
-  S.peekFree = free;
-  const sc = scopes();
-  S.peek = UI.peekHTML(V, {
-    canSchedule: sc.length > 0,
-    schedule: S.sch ? SCH.scheduleHTML(S.sch, { scopes: sc, members: V.members, free, when: `${UI.dateLabel(inst, S.myTz) || UI.dayFull(UI.COL_ORDER[col])} ${UI.hhmm(min)}` }, S.busy) : "",
-    free, minute: min,
-    dayLabel: UI.dateLabel(inst, S.myTz) || UI.dayFull(UI.COL_ORDER[col]),
-    lines: S.peekLines,
-    calUrl: googleCalUrl(inst, undefined, S.evTitle),
-    title: S.evTitle,
-    copyMsg: S.copyMsg,
-  });
 }
 
 // 語言（2026-10-19 中英切換）。網址 ?lang= 先、再 localStorage 的、都沒有就英文。切換鈕在 /settings/，這一頁跟著走。

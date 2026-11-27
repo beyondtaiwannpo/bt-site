@@ -2,7 +2,10 @@
 //
 // 一個資料夾兩個畫面：
 //   /home/            首頁：一張「等你處理」的清單（照日期排，2026-11-14 跟後台的「待辦」合併）、接下來的會、我的護照。
-//   /home/#calendar   行事曆：月與週，像 Google 日曆。點一場打開，回覆、看議程與會議紀錄。
+//   /home/#calendar   行事曆：月、週、日，像 Google 日曆。點一場打開，回覆、看議程與會議紀錄。
+//                     點一個日期打開那一天（2026-11-26）：每半小時有幾個人有空（以前時間看板的團隊看板搬來這裡），
+//                     能排會的人點一格排一場會（schedule.js），排好 Google 那邊用 BT 主帳號開會、寄邀請。
+//                     護照後台的「排會」連結帶 ?at=<時間>&title=<標題>#calendar：直接打開那一天、那個時間的排會。
 //   /home/#team=<team> 一個 team 的頁（2026-11-23）：側欄「我的工作區」點進來，那個 team 的專案、活動、申請表、資源。只看不改。
 // 信裡的連結是 /home/?meeting=<id>：那一場放在首頁最上面。
 //
@@ -13,6 +16,9 @@ import { navHTML } from "../../shared/nav.js";
 import * as RAIL from "../../shared/rail.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
+import * as DAY from "./day.js";
+import * as SCH from "./schedule.js";
+import * as FREE from "./free.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
 const root = () => document.getElementById("bt-root");
@@ -20,7 +26,10 @@ const S = {
   ready: false, down: false, role: null, me: null, name: "", tz: "Asia/Taipei", senior: false, ws: {}, board: "member", team: "", w: null,
   data: null, items: [], busy: false, reasonFor: null, changing: null, open: null, teams: {}, wsInfo: {},
   linked: null, linkedMsg: "",
-  cal: { view: "month", at: null, mode: "mine" },
+  cal: { view: "month", at: null, mode: "mine", team: "" },
+  // 某一天要的「誰有空」（2026-11-26）：undefined 還沒讀、null 讀取中、{ failed } 讀不到、其他是 loadAvail() 回的。
+  // sch 是排會那一塊（null 是沒打開）；pick 是從連結帶進來、等資料讀好才打開的那一格。
+  avail: undefined, sch: null, pick: null, day: null,
 };
 const LINK_KEY = "bt-home-meeting";
 const store = () => { try { return window.localStorage; } catch (e) { return null; } };
@@ -45,8 +54,41 @@ function ctx() {
     canSchedule: S.senior || Object.entries(S.ws).some(([k, v]) => k.startsWith("res:") && ["edit", "manage"].includes(v)) };
 }
 
+// 某一天的人數：所有人算一次，team 篩選只是從裡面拿掉不在那個 team 的人（排會那一塊要看所有人）。
+function dayData() {
+  const a = S.avail;
+  if (!a) return null;
+  if (a.failed) return { failed: true };
+  const all = FREE.dayFree(a.members, a.slots, a.weekSlots, a.weekMarks, S.cal.at, S.tz);
+  const shownIds = new Set(SCH.inTeam(a.members, S.cal.team).map(m => m.id));
+  const free = new Map([...all.free].map(([k, ids]) => [k, ids.filter(id => shownIds.has(id))]));
+  const noTz = a.members.filter(m => !m.tz && shownIds.has(m.id)).map(m => m.name || T("common.noName"));
+  return { rows: all.rows, free, allFree: all.free, members: SCH.inTeam(a.members, S.cal.team), all: a.members, noTz };
+}
+function ensureAvail() {
+  if (S.avail !== undefined || S.role !== "cadre") return;
+  S.avail = null;
+  D.loadAvail().then(a => { S.avail = a; }).catch(() => { S.avail = { failed: true }; }).then(() => { openPick(); render(); });
+}
+const scopes = () => SCH.scopesFor(S.senior, S.ws, SCH.teamsOf(S.avail && S.avail.members ? S.avail.members : []));
+// 打開排會：整段時間都有空、而且在現在 team 篩選裡的人先勾好。範圍先選篩選的那個 team（排得了的話）。
+function openSch(min, title) {
+  const d = S.day; if (!d || d.failed) return;
+  const sc = scopes(); if (!sc.length) return;
+  const shownIds = new Set(d.members.map(m => m.id));
+  S.sch = { min, minutes: 60, scope: sc.includes(S.cal.team) ? S.cal.team : sc[0], required: "1", title: title || "", agenda: "", message: "", doc: "",
+    ticked: SCH.preTicked(d.allFree, min, 60).filter(id => shownIds.has(id)), q: "", msg: "" };
+}
+function openPick() {
+  if (!S.pick || !S.avail || S.avail.failed || !ctx().canSchedule) return;
+  const p = S.pick; S.pick = null;
+  S.day = dayData(); openSch(p.min, p.title);
+}
+
 function render() {
   const el = root(); if (!el) return;
+  // 重畫會換掉整個畫面：日那一格捲到哪、排會那一塊捲到哪、游標在哪一格，畫完放回去（不然點一下就跳回頂端）。
+  const keep = { grid: S.cal.view === "day" ? scrollOf("wscroll") : null, modal: scrollOf("sch-modal"), focus: document.activeElement && document.activeElement.id };
   el.setAttribute("aria-busy", S.ready ? "false" : "true");
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.ready) { el.innerHTML = `<div class="empty loading">${T("loading")}</div>`; return; }
@@ -55,19 +97,36 @@ function render() {
   if (S.role !== "cadre") { el.innerHTML = nav + UI.notCadreHTML(); return; }
   const c = ctx();
   const rme = railMe(), team = teamOf();
+  if (v === "calendar" && S.cal.view === "day") { S.day = dayData(); S.cal.dayBody = DAY.dayBodyHTML(S.items, c, S.cal, S.day); }
   const body = v === "calendar" ? UI.calendarHTML(S.items, c, S.cal) : v === "team" ? UI.teamHTML(team, S.teams[team], rme, S.tz) : UI.homeHTML(S.items, c);
   const open = S.open ? S.items.find(i => i.id === S.open) : null;
   // 側欄：team 的頁不是 ITEMS 裡的一頁，用 "team:<team>" 告訴側欄現在在哪個 team（shared/rail.js teamRowsHTML）。
   const tab = v === "calendar" ? "calendar" : v === "team" ? "team:" + team : "home";
   RAIL.railBefore(el);
-  el.innerHTML = RAIL.shellHTML(nav, RAIL.railHTML("home", tab, rme, {}, lang()), body, RAIL.areaTabsHTML("home", tab, rme, lang())) + (open ? UI.detailHTML(open, c) : "");
+  const sch = v === "calendar" && S.cal.view === "day" && S.sch && S.day && !S.day.failed
+    ? SCH.scheduleHTML(S.sch, { key: S.cal.at, rows: S.day.rows, free: S.day.allFree, members: S.day.all, scopes: scopes(), now: c.now }, S.busy) : "";
+  el.innerHTML = RAIL.shellHTML(nav, RAIL.railHTML("home", tab, rme, {}, lang()), body, RAIL.areaTabsHTML("home", tab, rme, lang())) + (open ? UI.detailHTML(open, c) : "") + sch;
   RAIL.railAfter(el);
   if (v === "calendar" && S.cal.view === "week") {
     const w = document.getElementById("wscroll");
     if (w && !w.dataset.scrolled) { w.scrollTop = 7.5 * 44; w.dataset.scrolled = "1"; }
   }
+  if (v === "calendar" && S.cal.view === "day") {
+    const w = document.getElementById("wscroll");
+    // 第一次打開那一天：捲到第一個有人有空的時刻（沒有就早上八點），跟以前的看板一樣，不從一片空的凌晨開始。
+    if (w) w.scrollTop = keep.grid != null && S.scrollAt === S.cal.at ? keep.grid : Math.max(0, (firstFree(S.day) / 60) * DAY.HOUR_PX - 22);
+    S.scrollAt = S.cal.at;
+  }
+  const m = document.getElementById("sch-modal"); if (m && keep.modal != null) m.scrollTop = keep.modal;
+  if (keep.focus) { const f = document.getElementById(keep.focus); if (f && f !== document.activeElement && !f.disabled) f.focus({ preventScroll: true }); }
   const ta = S.reasonFor && document.getElementById("reason-" + S.reasonFor);
   if (ta) ta.focus({ preventScroll: true });
+}
+
+function scrollOf(id) { const n = document.getElementById(id); return n ? n.scrollTop : null; }
+function firstFree(d) {
+  if (d && d.free) { const ms = [...d.free].filter(([, ids]) => ids.length).map(([k]) => k); if (ms.length) return Math.min(...ms); }
+  return 8 * 60;
 }
 
 // 側欄要的「我是誰」：跟後台 admin/src/data.js 的 loadMe() 同一個形狀。
@@ -101,7 +160,7 @@ function onClick(e) {
   if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
   // 點彈窗裡面不算點背景。
-  if (act === "close-detail" && el.classList.contains("scrim") && e.target.closest("[data-stop]")) return;
+  if ((act === "close-detail" || act === "sch-close") && el.classList.contains("scrim") && e.target.closest("[data-stop]")) return;
   if (act === "retry") { location.reload(); return; }
   if (act === "signout") { AUTH.signOut().finally(() => location.replace("../app/")); return; }
   // 側欄：同一個資料夾的分頁（首頁、行事曆）換 #，不重新載入；語言切換跟後台同一招（存起來、網址帶 ?lang=，名字照新的語言重拿）。
@@ -134,15 +193,76 @@ function onClick(e) {
   }
   if (act === "rsvp-cancel") { S.reasonFor = null; render(); return; }
   if (act === "rsvp-change") { S.changing = id; render(); return; }
-  if (act === "cal-view") { S.cal.view = el.dataset.v; render(); return; }
+  if (act === "cal-view") { S.cal.view = el.dataset.v; S.sch = null; if (S.cal.view === "day") ensureAvail(); render(); return; }
   if (act === "cal-mode") { S.cal.mode = el.dataset.v; render(); return; }
   if (act === "cal-today") { S.cal.at = UI.dayKey(new Date(), S.tz); render(); return; }
   if (act === "cal-move") {
     const n = Number(el.dataset.n) || 0;
-    S.cal.at = S.cal.view === "month" ? UI.shiftMonth(S.cal.at, n) : UI.addDaysKey(S.cal.at, 7 * n);
+    S.cal.at = S.cal.view === "month" ? UI.shiftMonth(S.cal.at, n) : UI.addDaysKey(S.cal.at, (S.cal.view === "day" ? 1 : 7) * n);
+    S.sch = null;
     render(); return;
   }
-  if (act === "cal-day") { S.cal.at = el.dataset.k; S.cal.view = "week"; render(); return; }
+  // 點一個日期：打開那一天（2026-11-26 以前是跳到那一週）。
+  if (act === "cal-day") { S.cal.at = el.dataset.k; S.cal.view = "day"; S.sch = null; ensureAvail(); render(); return; }
+  if (act === "day-team") { S.cal.team = el.dataset.v || ""; render(); return; }
+  if (act === "day-pick") { if (!ctx().canSchedule) return; openSch(Number(el.dataset.m)); render(); return; }
+  if (act === "sch-close") { if (S.busy) return; S.sch = null; render(); return; }
+  if (act === "sch-all" || act === "sch-none") {
+    if (!S.sch) return;
+    const shown = S.day ? S.day.all.filter(m => SCH.matches(m, S.sch.q)).map(m => m.id) : [];
+    S.sch.ticked = act === "sch-all" ? [...new Set(S.sch.ticked.concat(shown))] : [];
+    render(); return;
+  }
+  if (act === "sch-send") { sendSch(); return; }
+}
+
+// 排會那一塊的欄位：打字的存進 S.sch 不重畫（游標不會跳）；開始時間、長度換了要重畫（誰有空的標會變）。
+function onSchInput(e) {
+  if (!S.sch) return;
+  const t = e.target;
+  if (t.name === "sch-member") {
+    const on = new Set(S.sch.ticked); if (t.checked) on.add(t.value); else on.delete(t.value);
+    S.sch.ticked = [...on]; schCount(); return;
+  }
+  const k = t.dataset && t.dataset.sch; if (!k) return;
+  S.sch[k] = t.value;
+  if (k === "q") {
+    let any = false;
+    for (const box of document.querySelectorAll('input[name="sch-member"]')) {
+      const m = S.day && S.day.all.find(x => x.id === box.value), ok = !!m && SCH.matches(m, t.value);
+      box.closest("label").hidden = !ok; any = any || ok;
+    }
+    const nb = document.getElementById("sch-nobody"); if (nb) nb.hidden = any;
+    return;
+  }
+  if (e.type === "change" && (k === "min" || k === "minutes" || k === "scope")) { S.sch.msg = ""; render(); }
+}
+function schCount() {
+  const n = S.sch ? S.sch.ticked.length : 0;
+  const lab = document.getElementById("sch-who-n"); if (lab) lab.textContent = T("sch.who", { n });
+  const b = document.getElementById("sch-send"); if (b && !S.busy) { b.textContent = T("sch.send", { n }); b.disabled = !n; }
+}
+async function sendSch() {
+  const d = S.sch; if (!d || S.busy || !S.day) return;
+  if (!(d.title || "").trim()) { d.msg = T("sch.needTitle"); render(); const f = document.getElementById("sch-title"); if (f) f.focus(); return; }
+  if (!d.ticked.length) { d.msg = T("sch.needPeople"); render(); return; }
+  const row = S.day.rows.find(r => r.min === Number(d.min));
+  if (!row) return;
+  const start = row.at, end = new Date(start.getTime() + Number(d.minutes) * 60000);
+  S.busy = true; d.msg = ""; render();
+  try {
+    await D.scheduleMeeting({ scope: d.scope, title: d.title.trim(), starts: start.toISOString(), ends: end.toISOString(), agenda: (d.agenda || "").trim(),
+      message: (d.message || "").trim(), doc: (d.doc || "").trim() || null, attendees: d.ticked, required: d.required !== "0" });
+    const n = d.ticked.length;
+    S.sch = null;
+    await reload();
+    S.busy = false; render();
+    UI.toast(T("sch.sent", { n }));
+  } catch (err) {
+    S.busy = false;
+    if (S.sch) S.sch.msg = T("err.sch") + D.says(err, lang() === "zh");
+    render();
+  }
 }
 
 // 版本提示：跟其他登入後頁面一樣，線上的 version.json 跟這一頁載進來的不一樣就在左下角掛一條「重新整理」。
@@ -192,6 +312,16 @@ async function boot() {
       if (mid) { if (S.items.some(i => i.id === mid)) S.linked = mid; else S.linkedMsg = T("home.gone"); }
     }
     S.cal.at = UI.dayKey(new Date(), S.tz);
+    // 護照後台「排會」那條連結（以前連到時間看板）：?at=<時間>&title=<標題>#calendar，打開那一天、那個時間的排會。
+    const qp = new URLSearchParams(location.search), at = new Date(qp.get("at") || "");
+    if (S.role === "cadre" && view() === "calendar" && !isNaN(at)) {
+      S.cal.at = UI.dayKey(at, S.tz); S.cal.view = "day";
+      S.pick = { min: Math.floor(UI.minuteOfDay(at, S.tz) / 30) * 30, title: (qp.get("title") || "").trim().slice(0, 120) };
+      // 用過就從網址拿掉，不然排完會、重新整理一次，排會那一塊又跳出來。
+      qp.delete("at"); qp.delete("title");
+      try { history.replaceState(null, "", location.pathname + (qp.toString() ? "?" + qp : "") + location.hash); } catch {}
+    }
+    if (S.cal.view === "day") ensureAvail();
     S.ready = true; render();
     openTeam();
     if (S.linked) { const n = document.getElementById("m-" + S.linked); if (n) n.scrollIntoView({ block: "start" }); }
@@ -205,6 +335,12 @@ async function boot() {
 }
 
 document.addEventListener("click", onClick);
-document.addEventListener("keydown", e => { if (e.key === "Escape" && S.open) { S.open = null; S.reasonFor = null; render(); } });
-window.addEventListener("hashchange", () => { S.open = null; render(); openTeam(); });
+document.addEventListener("input", onSchInput);
+document.addEventListener("change", onSchInput);
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (S.open) { S.open = null; S.reasonFor = null; render(); }
+  else if (S.sch && !S.busy) { S.sch = null; render(); }
+});
+window.addEventListener("hashchange", () => { S.open = null; S.sch = null; render(); openTeam(); });
 boot();

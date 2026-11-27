@@ -83,7 +83,7 @@ export function itemsOf(meetings, events, me) {
   for (const m of meetings || []) {
     const mine = (m.attendees || []).find(a => a.user_id === me);
     out.push({ kind: "meeting", id: m.id, title: m.title, start: new Date(m.starts_at), end: new Date(m.ends_at),
-      required: !!m.required, scope: m.scope || "board", agenda: m.agenda || "", doc_url: m.doc_url || "",
+      required: !!m.required, scope: m.scope || "board", agenda: m.agenda || "", doc_url: m.doc_url || "", message: m.message || "",
       created_by: m.created_by, attendees: m.attendees || [], notes: m.notes || [],
       meet_url: /^https:\/\/meet\.google\.com\//.test(m.meet_url || "") ? m.meet_url : "", on_gcal: !!m.gcal_event_id,
       invited: !!mine, status: mine ? mine.status : null, organizer: m.created_by === me });
@@ -111,6 +111,14 @@ export function canSeeReplies(it, me, senior, ws) {
   if (it.kind !== "meeting") return false;
   if (it.created_by === me || senior) return true;
   return it.scope !== "board" && ["edit", "manage"].includes(String((ws || {})["res:" + it.scope] || ""));
+}
+// 一個人的名字（照現在的語言，另一個語言的放後面）。找不到就空字串。
+export function personName(id, people) {
+  const p = (people || []).find(x => x.id === id);
+  if (!p) return "";
+  const zh = (p.name_zh || "").trim(), en = (p.name_en || "").trim();
+  const a = lang() === "zh" ? (zh || en) : (en || zh), b = lang() === "zh" ? en : zh;
+  return a && b && a !== b ? `${a} (${b})` : a;
 }
 export function replyGroups(it, people) {
   const name = id => { const p = (people || []).find(x => x.id === id); return p ? ((lang() === "zh" ? (p.name_zh || p.name_en) : (p.name_en || p.name_zh)) || T("common.noName")) : T("common.noName"); };
@@ -219,9 +227,13 @@ export function itemCardHTML(it, ctx, opts) {
   }
   // 2026-10-28 改版（Paul：「看起來很糟」）：標籤在標題上面、時間一行、議程與紀錄兩格、回覆放在一塊淡底的框裡，
   // 加日曆與後台改成最底下一排小字連結，不再跟回覆鈕搶。
+  // 2026-11-26：從行事曆排的會有一段留言；排會的人也寫出來（Google 與信裡也有這兩樣）。
+  const by = o.full ? personName(it.created_by, ctx.people) : "";
   const info = o.full ? `<dl class="info">
+      ${it.message ? `<div><dt>${T("m.message")}</dt><dd class="msg">${esc(it.message)}</dd></div>` : ""}
       ${it.agenda ? `<div><dt>${T("m.agenda")}</dt><dd>${esc(it.agenda)}</dd></div>` : ""}
       <div><dt>${T("m.notes")}</dt><dd>${it.doc_url ? `<a href="${esc(it.doc_url)}" target="_blank" rel="noopener">${T("m.openNotes")}</a>` : `<span class="muted">${T("m.noNotes")}</span>`}</dd></div>
+      ${by ? `<div><dt>${T("m.by")}</dt><dd>${esc(by)}</dd></div>` : ""}
     </dl>` : (it.agenda ? `<p class="agenda">${esc(it.agenda)}</p>` : "");
   // 2026-11-22：Google 日曆那邊已經有這場（BT 主帳號建的、Google 寄了邀請），就不再給「加到日曆」，免得同一場出現兩次。
   const links = o.full ? `<div class="links">
@@ -468,8 +480,9 @@ export function teamHTML(team, d, me, tz) {
 }
 
 // ── 行事曆 ──────────────────────────────────────────────────────────
-// cal：{ view: "month" | "week", at: "YYYY-MM-DD", mode: "mine" | "all" }
-function chipHTML(it, ctx, withTime) {
+// cal：{ view: "month" | "week" | "day", at: "YYYY-MM-DD", mode: "mine" | "all", team, dayBody }
+// 「日」那一格（2026-11-26）的內容在 day.js 畫，main.js 畫好放進 cal.dayBody（day.js 要 import 這一支，反過來會繞一圈）。
+export function chipHTML(it, ctx, withTime) {
   const t = withTime ? `<span class="t">${hhmm(minuteOfDay(it.start, ctx.tz))}</span> ` : "";
   const cls = it.kind === "event" ? "ev" : it.required ? "req" : "opt";
   const st = it.kind === "meeting" && it.invited ? (it.status === "accepted" ? " yes" : it.status === "declined" ? " no" : " wait") : "";
@@ -478,9 +491,9 @@ function chipHTML(it, ctx, withTime) {
 export function calendarHTML(items, ctx, cal) {
   const shown = visibleItems(items, cal.mode);
   const today = dayKey(ctx.now, ctx.tz);
-  const label = cal.view === "month" ? monthLabel(cal.at) : `${dateLabel(weekKeys(cal.at)[0])} – ${dateLabel(weekKeys(cal.at)[6])}`;
+  const label = cal.view === "month" ? monthLabel(cal.at) : cal.view === "day" ? `${cal.at.slice(0, 4)} ${dateLabel(cal.at)}` : `${dateLabel(weekKeys(cal.at)[0])} – ${dateLabel(weekKeys(cal.at)[6])}`;
   const bar = `<div class="calbar">
-    <div class="seg"><button type="button" data-act="cal-view" data-v="month"${cal.view === "month" ? ' aria-current="true"' : ""}>${T("cal.month")}</button><button type="button" data-act="cal-view" data-v="week"${cal.view === "week" ? ' aria-current="true"' : ""}>${T("cal.week")}</button></div>
+    <div class="seg"><button type="button" data-act="cal-view" data-v="month"${cal.view === "month" ? ' aria-current="true"' : ""}>${T("cal.month")}</button><button type="button" data-act="cal-view" data-v="week"${cal.view === "week" ? ' aria-current="true"' : ""}>${T("cal.week")}</button><button type="button" data-act="cal-view" data-v="day"${cal.view === "day" ? ' aria-current="true"' : ""}>${T("cal.day")}</button></div>
     <button type="button" class="btn ghost sm" data-act="cal-move" data-n="-1" aria-label="${esc(T("cal.prev"))}">←</button>
     <button type="button" class="btn ghost sm" data-act="cal-today">${T("cal.today")}</button>
     <button type="button" class="btn ghost sm" data-act="cal-move" data-n="1" aria-label="${esc(T("cal.next"))}">→</button>
@@ -490,7 +503,8 @@ export function calendarHTML(items, ctx, cal) {
   </div>`;
   const heads = [1, 2, 3, 4, 5, 6, 0].map(wd => `<div class="dow">${dowLabel(wd)}</div>`).join("");
   let body;
-  if (cal.view === "month") {
+  if (cal.view === "day") body = cal.dayBody || "";
+  else if (cal.view === "month") {
     body = `<div class="month">${heads}${monthKeys(cal.at).map(c => {
       const list = itemsOnDay(shown, c.key, ctx.tz), max = 3;
       return `<div class="day${c.inMonth ? "" : " out"}${c.key === today ? " today" : ""}">
@@ -514,7 +528,7 @@ export function calendarHTML(items, ctx, cal) {
     body = `<div class="week"><div class="whead"><div></div>${whead}</div>
       <div class="wscroll" id="wscroll"><div class="wgrid" style="height:${24 * H}px"><div class="hours">${hours}</div>${cols}</div></div></div>`;
   }
-  return `<div class="cal"><h1 class="caltitle">${T("cal.title")}</h1>${bar}<p class="mini">${T("cal.legend")}</p>${body}</div>`;
+  return `<div class="cal${cal.view === "day" ? " is-day" : ""}"><h1 class="caltitle">${T("cal.title")}</h1>${bar}<p class="mini">${T("cal.legend")}</p>${body}</div>`;
 }
 
 // 點開的那一場（行事曆與首頁都用）。

@@ -83,93 +83,25 @@ test("連不上的那一頁給得出下一步", () => {
   assert.ok(h.includes('data-act="retry"'));
 });
 
-// ── 詳情彈窗（2026-09-02 的 bug：關不掉）──────────────────────────────
-// 根因用真瀏覽器量過：按「關起來」時 act=close-peek **有**進到處理器，
-// 但判斷式是 `!e.target.closest("[data-stop]")`，而 data-stop 掛在 .modal 上、
-// 關閉鍵就住在裡面 —— 那個條件把關閉鍵自己排除掉了。
-// 事件有觸發、狀態沒改、所以畫面完全不動。
-//
-// 現在改成正面表列：按到的是 <button>，或點在遮罩本身。
-// 下面幾條守的就是那個判斷式依賴的結構事實。
-import { peekHTML, shellHTML } from "../availability/src/ui.js";
-
-const PS = { members: [{ id: "w", name: "王平", tz: "Asia/Taipei" }, { id: "a", name: "安", tz: null }] };
-// 參數包成物件（2026-09-02 加日曆連結時改的）—— 這一頁的參數已經七個，
-// 排成一列的話呼叫端漏傳或順序錯都不會報錯，只會靜靜地畫錯東西。
-const peek = (over = {}) => peekHTML(PS, Object.assign({
-  free: ["w"], dayLabel: "星期一", minute: 1140,
-  lines: ["底特律 / Detroit　9/1（一）19:00", "台北 / Taipei　9/2（二）07:00"],
-  calUrl: "https://calendar.google.com/calendar/render?action=TEMPLATE&text=BT+%E6%9C%83%E8%AD%B0&dates=20260901T230000Z/20260902T000000Z",
-  title: "BT 會議", copyMsg: "",
-}, over));
-
-test("★ 彈窗的關閉控制項必須是 <button>（判斷式靠 tagName）", () => {
-  const h = peek();
-  const btns = [...h.matchAll(/<button[^>]*data-act="close-peek"/g)];
-  assert.ok(btns.length >= 2, `關閉鍵只有 ${btns.length} 個 —— 右上角的 ✕ 與底下的「關起來」都要在`);
-});
-
-test("★ 彈窗不准再出現 data-stop（就是它把關閉鍵排除掉的）", () => {
-  assert.ok(!peek().includes("data-stop"),
-    "data-stop 又回來了 —— 關不關現在由 main.js 正面表列，不靠祖先反面排除");
-});
-
-test("遮罩本身要帶 close-peek，點外面才關得掉", () => {
-  assert.match(peek(), /<div class="scrim" data-act="close-peek"/);
-});
-
-test("✕ 有 aria-label（讀螢幕的人聽不到一個叉）", () => {
-  assert.match(peek(), /class="x"[^>]*aria-label="[^"]+"/);
-});
-
-test("彈窗要講出誰有空、誰沒空，還有沒設時區的人為什麼不在裡面", () => {
-  const h = peek();
-  assert.ok(h.includes("王平"), "沒有列出有空的人");
-  assert.ok(h.includes("安") && h.includes("還沒設定時區"), "沒設時區的人要被交代，不能默默消失");
-});
+// ── 外殼（2026-11-26 起只剩兩個分頁）───────────────────────────────
+// 「團隊看板」分頁與點一格打開的彈窗拿掉了，大家有空的人數與排會搬到首頁行事曆點一天（test/home-day.test.mjs）。
+import { shellHTML } from "../availability/src/ui.js";
 
 // S.msg 設了卻沒有地方畫，等於又做了一個「按了沒反應」的按鈕。
 test("★ shellHTML 會把訊息畫出來", () => {
-  const withMsg = shellHTML("board", "<i>x</i>", "9/1 – 9/7", "只能往前看四週。");
-  const without = shellHTML("board", "<i>x</i>", "9/1 – 9/7", "");
+  const withMsg = shellHTML("mine", "<i>x</i>", "9/1 – 9/7", "只能往前看四週。");
+  const without = shellHTML("mine", "<i>x</i>", "9/1 – 9/7", "");
   assert.ok(withMsg.includes("只能往前看四週。"), "訊息沒有被畫出來");
   assert.notEqual(withMsg, without, "有訊息跟沒訊息畫出來一樣，等於訊息沒有作用");
 });
 
-// ── 日曆連結與一鍵複製（2026-09-02 加）──────────────────────────────
-test("彈窗有各地時間、複製鍵、標題欄與日曆連結", () => {
-  const h = peek();
-  assert.ok(h.includes('id="times"'), "沒有各地時間那一段");
-  assert.ok(h.includes('data-act="copy-times"'), "沒有複製鍵");
-  assert.ok(h.includes('id="evtitle"'), "沒有標題欄");
-  assert.ok(h.includes('id="callink"'), "沒有日曆連結");
-  assert.ok(h.includes("BT 會議"), "標題沒有預設值");
-});
-
-// 用 <a> 不用 <button>：長按與中鍵開新分頁才有作用。
-test("日曆連結是 <a> 而且開新分頁", () => {
-  const h = peek();
-  assert.match(h, /<a class="btn" id="callink" href="[^"]+" target="_blank" rel="noopener">/,
-    "日曆連結不是帶 target 與 rel 的 <a>");
-});
-
-test("複製失敗要說話，不是靜靜地沒反應", () => {
-  const quiet = peek({ copyMsg: "" });
-  const loud = peek({ copyMsg: "複製不了，請自己選取上面那幾行。" });
-  assert.ok(loud.includes("複製不了"), "訊息沒有被畫出來");
-  assert.notEqual(quiet, loud, "有訊息跟沒訊息畫出來一樣，等於訊息沒有作用");
-});
-
-test("標題與各地時間都會跳脫", () => {
-  const h = peek({ title: '"><script>x</script>', lines: ['<img src=x onerror=1>'] });
-  assert.ok(!h.includes("<script>"), "標題沒有跳脫");
-  assert.ok(!h.includes("<img src=x"), "各地時間沒有跳脫");
-});
-
-test("講清楚事件建在誰的日曆、以及不會自動邀請人", () => {
-  const h = peek();
-  assert.ok(h.includes("你自己的"), "沒有講事件建在誰的日曆上");
-  assert.ok(h.includes("不會自動加任何人"), "沒有講它不會自動邀請人");
+test("★ 只剩「我的時間」與「成員」兩個分頁，旁邊一顆連到首頁行事曆", () => {
+  const h = shellHTML("mine", "", null, "");
+  assert.deepEqual([...h.matchAll(/data-t="(\w+)"/g)].map(m => m[1]), ["mine", "who"]);
+  assert.doesNotMatch(h, /data-t="board"/);
+  assert.match(h, /<a class="btn ghost sm tocal" href="\.\.\/home\/\?lang=zh#calendar">看大家有空的時間、排會<\/a>/);
+  assert.match(h, /aria-current="true">我的時間/);
+  assert.match(shellHTML("who", "", null, ""), /data-t="who"\s+aria-current="true"/);
 });
 
 // ── 名字要中英文都出現（2026-09-10）──────────────────────────────────
@@ -301,17 +233,6 @@ test("★ 在兩個 team 的人，兩個 team 的選項都有，篩哪一邊都�
   assert.deepEqual(teamsOf(MULTI), ["Curriculum Team", "Marketing Team"]);
   assert.deepEqual(filterByTeam(MULTI, "Curriculum Team").map(m => m.id), ["m"]);
   assert.deepEqual(filterByTeam(MULTI, "Marketing Team").map(m => m.id), ["m", "s"]);
-});
-
-test("★ 排會與格子彈窗寫出日期，不只星期（照看的人的時區）", async () => {
-  const U = await import("../availability/src/ui.js");
-  const d = new Date("2026-11-01T13:00:00Z");
-  assert.equal(U.dateLabel(d, "Asia/Taipei", "en"), "Sunday, Nov 1");
-  assert.equal(U.dateLabel(d, "Asia/Taipei", "zh"), "11月1日（星期日）");
-  assert.equal(U.dateLabel(new Date("2026-11-01T02:00:00Z"), "America/Los_Angeles", "en"), "Saturday, Oct 31", "照時區換日");
-  assert.equal(U.dateLabel("not a date", "Asia/Taipei", "en"), "");
-  const main = (await import("node:fs")).readFileSync("availability/src/main.js", "utf8");
-  assert.equal((main.match(/UI\.dateLabel\(inst, S\.myTz\)/g) || []).length, 2, "彈窗標題與排會那一行都用它");
 });
 
 test("★ 會議信預覽：議程或會議紀錄沒填，那一行整行拿掉（跟資料庫 meeting_fill 同一套）", async () => {

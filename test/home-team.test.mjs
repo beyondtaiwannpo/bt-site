@@ -208,7 +208,7 @@ test("team 的頁：還沒讀到是載入中；哪一塊讀不到就寫載不到
 
 test("這一批只動版面：team 的頁只讀不寫、沒有新的資料庫函式；每一頁都把工作區的 team 傳給側欄", () => {
   const data = readFileSync("home/src/data.js", "utf8");
-  const fn = data.slice(data.indexOf("export async function loadTeam"), data.indexOf("export async function setRsvp"));
+  const from = data.indexOf("export async function loadTeam"), fn = data.slice(from, data.indexOf("export async function", from + 1));   // 只看 loadTeam 自己那一段
   assert.doesNotMatch(fn, /\.(insert|update|delete|upsert)\(/, "loadTeam 只讀");
   assert.deepEqual([...fn.matchAll(/rpc\("(\w+)"/g)].map(m => m[1]).sort(), ["projects_list", "public_team"], "只叫本來就有的兩支函式");
   // whoAmI() 把每個工作區的 team 與名字留下來（info），十一個畫側欄的地方都傳成 me.wsInfo。

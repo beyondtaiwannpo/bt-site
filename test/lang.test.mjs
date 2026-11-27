@@ -150,12 +150,9 @@ test("★ /intern-passport/ 每一個畫面用英文畫出來不剩中文", () =
 test("★ /availability/ 每一個畫面用英文畫出來不剩中文", () => {
   const members = [{ id: "u1", name: "Paul", alt: "", team: "Marketing Team", tz: "Asia/Taipei", updatedAt: "2026-10-01" }, { id: "u2", name: "Amy", alt: "", team: "Curriculum Team", tz: null, updatedAt: null }];
   const S = { members, slots: new Map([["u1", new Set(["1:600"])]]), allTeams: ["Marketing Team", "Curriculum Team"], team: "", mineMode: "usual", mine: new Set(["1:600"]), weekMine: new Set(), weekMarksMine: new Set(["2026-10-19"]), weekStart: new Date("2026-10-19T00:00:00Z"), myTz: "Asia/Taipei", chips: new Set([1]), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1, dirty: true, mineMsg: "" };
-  const counts = new Map([["0:600", ["u1"]]]);
   allEn("availability", AVAIL, {
-    shell: () => AVAIL.shellHTML("board", "", "10/19 – 10/25", "msg") + AVAIL.noticeHTML("", false) + AVAIL.noticeHTML("x", true),
+    shell: () => AVAIL.shellHTML("mine", "", "10/19 – 10/25", "msg") + AVAIL.shellHTML("who", "", null, "") + AVAIL.noticeHTML("", false) + AVAIL.noticeHTML("x", true),
     tz: () => AVAIL.tzSetupHTML("Asia/Taipei", "zzz", [], "") + AVAIL.tzSetupHTML(null, "", [{ tz: "Asia/Taipei", label: "Taipei" }], "x"),
-    board: () => AVAIL.boardHTML(S, counts, ["10/19", "10/20", "10/21", "10/22", "10/23", "10/24", "10/25"]) + AVAIL.boardHTML({ ...S, members: [] }, new Map(), []),
-    peek: () => AVAIL.peekHTML(S, { free: ["u1"], dayLabel: AVAIL.dayFull(1), minute: 600, lines: ["x"], calUrl: "https://x", title: "t", copyMsg: "" }),
     mine: () => AVAIL.mineHTML(S) + AVAIL.mineHTML({ ...S, mineMode: "week" }),
     members: () => AVAIL.membersHTML(S, Date.now()) + AVAIL.downHTML() + AVAIL.notCadreHTML(),
   });
