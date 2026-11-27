@@ -12,7 +12,9 @@
 // 對不到表，所以從後台被踢去登入的人登入完會停在設定頁，不是回後台。
 export const NEXT = { home: "../home/", passport: "../passport/", availability: "../availability/", "intern-passport": "../intern-passport/",
   admin: "../admin/", "admin-site": "../admin/site/", "admin-passports": "../admin/passports/", "admin-people": "../admin/people/",
-  "admin-finance": "../admin/finance/", "admin-marketing": "../admin/marketing/", "admin-team-forms": "../admin/team-forms/" };
+  "admin-finance": "../admin/finance/", "admin-marketing": "../admin/marketing/", "admin-team-forms": "../admin/team-forms/",
+  // 2026-11-26 後台的搜尋：從搜尋頁被踢去登入的人，登入完回搜尋頁。
+  "admin-search": "../admin/search/" };
 
 const KEY = "bt-next";
 

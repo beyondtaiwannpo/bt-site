@@ -1232,3 +1232,40 @@ a.rail-group.wshead.on{border-bottom:3px solid var(--bt-navy)}
 .fb-act{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-top:12px}
 .fb-act label{margin:0}
 .fb-act .fb-note{flex:1 1 260px;min-width:0}
+
+/* 後台的搜尋（2026-11-26，admin/search）：搜尋框、篩選、最上面的整理、一筆一張卡。 */
+.sx-box{display:flex;gap:8px;align-items:stretch;margin:0 0 6px}
+.sx-box .sx-q{flex:1 1 auto;min-width:0;margin:0}
+.sx-box input[type="search"]{width:100%;font-size:17px;padding:12px 14px}
+.sx-hint{margin:0 0 14px}
+.sx-filters{margin:0 0 18px}
+.sx-row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 10px}
+.sx-lb{font-size:13px;font-weight:600}
+.sx-sel{align-items:flex-end}
+.sx-f{display:flex;flex-direction:column;gap:3px;font-size:12.5px;margin:0;min-width:0}
+.sx-f select,.sx-f input{min-width:0;max-width:100%}
+.sx-sum{border-color:rgba(255,196,108,.9);background:rgba(255,232,197,.45)}
+.sx-sum h2{font-size:20px}
+.sx-pts{margin:6px 0 10px;padding-left:20px;font-size:15px;line-height:1.6}
+.sx-pts li{margin:0 0 6px}
+.sx-cites{white-space:nowrap}
+.sx-cite{font:inherit;font-size:11.5px;font-weight:700;min-width:22px;height:22px;padding:0 6px;margin:0 2px;border-radius:999px;
+  border:1px solid rgba(16,42,134,.3);background:rgba(255,255,255,.8);color:var(--ink);vertical-align:1px}
+.sx-used{margin-top:6px}
+.sx-off{margin-top:4px}
+.sx-count{font-size:13px;font-weight:600;margin:0 0 8px}
+.sx-list{display:flex;flex-direction:column;gap:10px;margin:0 0 22px}
+.sx-hit{background:rgba(255,255,255,.55);border:1px solid rgba(16,42,134,.14);border-radius:14px;padding:12px 16px;outline:none}
+.sx-hit.on,.sx-hit:focus-visible{border-color:var(--bt-orange);box-shadow:0 0 0 3px rgba(255,196,108,.45)}
+.sx-top{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin:0 0 4px}
+.sx-title{font-weight:600;font-size:15.5px;color:var(--ink);overflow-wrap:anywhere}
+.sx-snips{list-style:none;margin:8px 0 0;padding:0;font-size:14px;line-height:1.55}
+.sx-snips li{margin:0 0 6px;overflow-wrap:anywhere}
+.sx-qn{display:block;font-size:12px;color:rgba(16,42,134,.75)}
+.sx-hit mark,.sx-title mark{background:rgba(255,196,108,.6);color:inherit;border-radius:3px;padding:0 1px}
+.tag.sx-meeting{background:rgba(16,42,134,.12)}
+.tag.sx-feedback{background:rgba(107,198,187,.42)}
+.tag.sx-internal{background:var(--bt-sand)}
+.tag.sx-review{background:rgba(255,196,108,.42)}
+.sx-ai{display:flex;flex-wrap:wrap;gap:0 18px;margin:8px 0 4px}
+@media (max-width:600px){.sx-box{flex-direction:column}.sx-box .btn{width:100%}}

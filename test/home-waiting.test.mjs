@@ -107,7 +107,7 @@ test("首頁的樣子：跟 Marketing 提需求是一顆按鈕、等你處理、
 test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段；行事曆底下是行事曆、會議、時間看板、會議範本", () => {
   // 2026-11-23：「我的」底下多一段「我的工作區」（ws），一個 team 一行，照人畫，不在 AREAS 裡（test/home-team.test.mjs）。
   assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws", "work", "org"]);
-  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "mypassport", "events", "forms", "marketing", "website", "passports", "people", "records", "money", "venues"]);
+  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "mypassport", "search", "events", "forms", "marketing", "website", "passports", "people", "records", "money", "venues"]);
   // 2026-12-26：專案那一行底下是專案、活動…；場地是整個 BT 的，自己一行。
   // 2026-11-26：「各 team」拿掉了，「計畫與招募」改叫「幹部招募」搬到「人與權限」底下（被派進申請工作區的人與 Co-President、Senior Adviser 才看得到）。
   assert.deepEqual(RAIL.visibleItems("events", { role: "cadre", board: "member", team: "", ws: {} }).map(i => i.key), ["projects", "events"]);
@@ -132,9 +132,9 @@ test("側欄：我的（首頁、行事曆、我的護照）、BT、組織三段
   assert.ok(!RAIL.ITEMS.some(i => i.area === "todo" || i.area === "meetings"));
 });
 
-test("側欄的樣式在 shared/rail.css：八個後台資料夾與首頁都讀，admin.css 不再有一份", () => {
+test("側欄的樣式在 shared/rail.css：九個後台資料夾與首頁都讀，admin.css 不再有一份", () => {
   const pages = ["admin/index.html", ...readdirSync("admin", { withFileTypes: true }).filter(d => d.isDirectory() && !["src"].includes(d.name)).map(d => `admin/${d.name}/index.html`).filter(f => { try { readFileSync(f); return true; } catch (e) { return false; } }), "home/index.html"];
-  assert.equal(pages.length, 9);
+  assert.equal(pages.length, 10, "2026-11-26 多了 admin/search");
   for (const f of pages) assert.match(readFileSync(f, "utf8"), /<link rel="stylesheet" href="(\.\.\/)+shared\/rail\.css\?v=/, f);
   const css = readFileSync("shared/rail.css", "utf8");
   for (const sel of [".shell{", ".rail{", ".area-tabs{", ".rail-lang{", ".rail-burger{"]) assert.ok(css.includes(sel), sel);

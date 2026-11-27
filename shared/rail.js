@@ -78,6 +78,8 @@ export const GROUPS = [
   { key: "teamforms", href: "/admin/team-forms/", who: "cadre" },
   // Records：my_access() 的 records 那一格（2026-12-01-records.sql）。
   { key: "records",   href: "/admin/records/",    who: "ws:records" },
+  // 搜尋（2026-11-26）：每一位幹部都進得來；每一筆讀不讀得到是資料庫照原本那一頁的門決定的（2027-01-21-smart-search.sql）。
+  { key: "search",    href: "/admin/search/",     who: "cadre" },
 ];
 
 // 側欄上的「東西」。sec 是哪一段（"" 是最上面那一行）。順序就是側欄的順序。
@@ -96,6 +98,7 @@ const ICON = {
   money:     '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>',
   venues:    '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
   team:      '<path d="M5 21V4M5 5h11l-2 3.5 2 3.5H5"/>',
+  search:    '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5"/>',
 };
 export const SECTIONS = [
   { key: "me",   label: { zh: "我的", en: "Me" } },
@@ -109,6 +112,8 @@ export const AREAS = [
   { key: "calendar",  sec: "me",   label: { zh: "行事曆",   en: "Calendar" },   hint: { zh: "會議、時間看板、會議範本", en: "Meetings, availability, templates" } },
   { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
   // 2026-12-26 Paul：工作區 → 專案 → 活動。這一行改叫「專案」，點下去是專案清單；活動、計畫與招募、各 team 在它底下。key 留 events（網址與測試都認它）。
+  // 搜尋（2026-11-26 Paul：要找一份舊的紀錄得一場一場點開，大家就不用了）：會議紀錄、回饋表、內部表單、活動檢討一次找。
+  { key: "search",    sec: "work", label: { zh: "搜尋",     en: "Search" },     hint: { zh: "會議紀錄、回饋表一次找", en: "Meeting notes and feedback at once" } },
   { key: "events",    sec: "work", label: { zh: "專案",     en: "Projects" },   hint: { zh: "每個 team 的專案與活動", en: "Every team's projects and events" } },
   { key: "forms",     sec: "work", label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、內部表單、回饋表", en: "To fill, internal forms, feedback forms" } },
   { key: "marketing", sec: "work", label: { zh: "行銷",     en: "Marketing" },  hint: { zh: "需求單、大學介紹貼文、IG", en: "Requests, college posts, Instagram" } },
@@ -134,6 +139,7 @@ export const ITEMS = [
   // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
   { group: "forms",     key: "mtemplates", area: "calendar",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "會議範本", en: "Templates" } },
   { group: "passport",  key: "",           area: "mypassport", who: "cadre", label: { zh: "我的護照", en: "My passport" } },
+  { group: "search",    key: "search",     area: "search",    who: "cadre",  bare: true, label: { zh: "搜尋", en: "Search" } },
   // 活動（2026-11-10 Paul：「application should live under events」）
   { group: "forms",     key: "projects",   area: "events",    who: "cadre",  label: { zh: "專案", en: "Projects" } },
   { group: "forms",     key: "events",     area: "events",    who: "cadre",  label: { zh: "活動", en: "Events" } },

@@ -5446,6 +5446,182 @@ chkas "${PAUL}" "★ 取消之後開得了個人連結（還勾著的開不了�
 chkraise "還勾著的那一位照舊開不了個人連結" "minor_no_link" "perform set_config('test.uid','${PAUL}',true); perform public.rc_profile_link((select id from public.people where name_en = 'Uam Recent'), 'create');"
 psql -d "${DB}" -q -c "delete from public.rc_participation where person_id = '${UASTU}' and event_id in (select id from public.events where slug like 'uam-%'); delete from public.rc_log where ref in (select id from public.people where name_en like 'Uam %'); delete from public.people where name_en like 'Uam %'; delete from public.events where slug like 'uam-%'; delete from public.profiles where id = '${UAPRO}'; delete from auth.users where id = '${UAPRO}';" >/dev/null 2>&1 || true
 chk "（收尾）假的人、假的活動與那個學員帳號都拿掉了" "0|0|0" "select (select count(*) from public.people where name_en like 'Uam %' or profile_id = '${UAPRO}')||'|'||(select count(*) from public.events where slug like 'uam-%')||'|'||(select count(*) from public.profiles where id = '${UAPRO}')"
+echo "── 後台的搜尋（2027-01-21-smart-search.sql）：每一筆先問原本那一頁的門；假的 Claude 與假的 Voyage ──"
+# Paul 2026-11-26：一個框找遍會議紀錄與回饋表，最上面給整理、底下是連回原本那一頁的清單；他問搜尋要不要把某些人看不到的回饋藏起來。
+# 答案是要：每一筆用原本那一頁同一支門。這一段的人：PAUL Co-President（全部讀得到）、
+# SQX 一位沒有 team 的一般幹部（只被點名當一份內部表單的讀者）、SQS 一位學員（不是幹部）。
+SSM=supabase/migrations/2027-01-21-smart-search.sql
+SQX=aaaa0121-0000-0000-0000-000000000001
+SQS=aaaa0121-0000-0000-0000-000000000002
+psql -d "${DB}" -X -q -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<SQL || true
+insert into auth.users (id, email) values ('${SQX}', 'sqx@example.com'), ('${SQS}', 'sqs@example.com') on conflict do nothing;
+insert into public.profiles (id, name_en, role) values ('${SQX}', 'Sq Cadre', 'cadre'), ('${SQS}', 'Sq Student', 'student') on conflict (id) do nothing;
+insert into public.meetings (title, starts_at, ends_at, agenda, minutes) values
+  ('Sq board', now() - interval '3 days', now() - interval '3 days' + interval '1 hour', 'zqcamp 場地 要再討論一次',
+   '[{"h": "這週要決定的事", "text": "zqcamp 改到七月，探索營照舊"}, {"h": "卡住的地方", "text": ""}]'::jsonb);
+insert into public.events (workspace_id, team, slug, title_zh, title_en, status, starts_at)
+  select w.workspace_id, w.team, 'sq-camp', '測試營隊', 'Sq Camp', 'archived', now() - interval '20 days'
+    from (select workspace_id, team from public.events where team is not null limit 1) w;
+insert into public.rc_forms (title, kind, event_id, status) select 'Sq camp feedback', 'post-event', id, 'closed' from public.events where slug = 'sq-camp';
+insert into public.rc_forms (title, kind, status) values ('Sq pair check-in', 'pair-mentee', 'closed');
+insert into public.rc_questions (form_id, ord, label, type, options)
+  select f.id, v.o, v.l, v.t, v.opts from public.rc_forms f, (values (1, 'What should change?', 'long', '{}'::text[]), (2, 'Pick one', 'single', array['zqsingleonly', 'b'])) v(o, l, t, opts)
+   where f.title in ('Sq camp feedback', 'Sq pair check-in');
+insert into public.rc_responses (form_id, age_band) select id, 'under18' from public.rc_forms where title in ('Sq camp feedback', 'Sq pair check-in');
+insert into public.rc_answers (response_id, question_id, value)
+  select r.id, q.id, case when q.type = 'single' then 'zqsingleonly' when f.kind like 'pair-%' then 'zqcamp pair secret, my mentor never replies' else 'zqcamp afternoon was too long for everyone' end
+    from public.rc_forms f join public.rc_responses r on r.form_id = f.id join public.rc_questions q on q.form_id = f.id where f.title in ('Sq camp feedback', 'Sq pair check-in');
+insert into public.rc_audience (form_id, role, kind, value) select id, 'reader', 'person', '${SQX}' from public.rc_forms where title = 'Sq pair check-in';
+insert into public.tf_forms (title, status) values ('Sq internal survey', 'closed');
+insert into public.tf_questions (form_id, ord, label, type) select id, 1, 'Anything else?', 'long' from public.tf_forms where title = 'Sq internal survey';
+insert into public.tf_responses (form_id, name) select id, 'Someone' from public.tf_forms where title = 'Sq internal survey';
+insert into public.tf_answers (response_id, question_id, value) select r.id, q.id, 'zqcamp internal note about rooms'
+  from public.tf_forms f join public.tf_responses r on r.form_id = f.id join public.tf_questions q on q.form_id = f.id where f.title = 'Sq internal survey';
+insert into public.tf_audience (form_id, role, kind, value) select id, 'reader', 'person', '${SQX}' from public.tf_forms where title = 'Sq internal survey';
+insert into public.rc_reviews (event_id, we_change, went_well) select id, 'zqcamp should start earlier', 'Mentors were great' from public.events where slug = 'sq-camp';
+SQL
+chk "（準備）一場會議、一場活動、兩份回饋表（一份是配對）、一份內部表單、一份檢討" "1|1|2|1|1" "select (select count(*) from public.meetings where title = 'Sq board')||'|'||(select count(*) from public.events where slug = 'sq-camp')||'|'||(select count(*) from public.rc_forms where title like 'Sq %')||'|'||(select count(*) from public.tf_forms where title = 'Sq internal survey')||'|'||(select count(*) from public.rc_reviews r join public.events e on e.id = r.event_id where e.slug = 'sq-camp')"
+sq1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SSM}" 2>&1 || true)
+if echo "${sq1}" | grep -q "OVERALL.*PASS" && ! echo "${sq1}" | grep -q "|FAIL"; then echo "  ok   搜尋那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 搜尋那一支驗收表：${sq1}" | head -24; fail=$((fail+1)); fi
+sq2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SSM}" 2>&1 || true)
+if echo "${sq2}" | grep -q "OVERALL.*PASS" && ! echo "${sq2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${sq2}" | head -24; fail=$((fail+1)); fi
+SQSRC="select coalesce(string_agg(r->>'source', ',' order by r->>'source'), 'none') from jsonb_array_elements(public.search_all"
+chkas "${PAUL}" "★ Co-President 找 zqcamp：會議、回饋、內部表單、檢討四種都有，配對回饋沒有" "feedback,internal,meeting,review" "${SQSRC}('zqcamp')->'results') r"
+chkas "${SQX}" "★ 一般幹部找 zqcamp：只有會議與點名給他的內部表單（回饋與檢討他點開原本那一頁也看不到）" "internal,meeting" "${SQSRC}('zqcamp')->'results') r"
+chkas "${SQX}" "★ 被點名當配對回饋讀者的幹部也搜不到配對回饋（配對回饋誰都不進搜尋）" "none" "${SQSRC}('pair secret')->'results') r"
+chkas "${PAUL}" "★ Co-President 也搜不到配對回饋" "none" "${SQSRC}('pair secret')->'results') r"
+chkas "${PAUL}" "★ 選項題的答案不找（只找短答與長答）" "none" "${SQSRC}('zqsingleonly')->'results') r"
+chkas "${PAUL}" "幾個詞都要有：zqcamp 加 afternoon 只剩那一份回饋" "feedback" "${SQSRC}('zqcamp afternoon')->'results') r"
+chkas "${PAUL}" "一個字的不找（太短）" "none" "${SQSRC}('z')->'results') r"
+chkas "${PAUL}" "會議那一筆的片段是提到的那一段（不是整份）" "這週要決定的事：zqcamp改到七月，探索營照舊" "select replace(r->'snippets'->0->>'t', ' ', '') from jsonb_array_elements(public.search_all('七月')->'results') r where r->>'title' = 'Sq board'"
+chkas "${PAUL}" "★ 回饋那一筆印的是哪一題與那一段字，沒有是誰寫的" "Whatshouldchange?|1|false" "select replace(r->'snippets'->0->>'q', ' ', '')||'|'||(r->>'n')||'|'||(r::text like '%under18%' or r ? 'person_id')::text from jsonb_array_elements(public.search_all('afternoon')->'results') r where r->>'source' = 'feedback'"
+SQE=$(psql -d "${DB}" -X -A -t -q -c "select id from public.events where slug = 'sq-camp'" | tr -d ' \n')
+chkas "${PAUL}" "篩活動：只剩那一場的回饋與檢討（會議與內部表單沒有活動）" "feedback,review" "${SQSRC}('zqcamp', '{\"event\": \"${SQE}\"}')->'results') r"
+chkas "${PAUL}" "篩種類：只剩回饋表" "feedback" "${SQSRC}('zqcamp', '{\"kind\": \"post-event\"}')->'results') r"
+chkas "${PAUL}" "篩來源：只要會議" "meeting" "${SQSRC}('zqcamp', '{\"sources\": [\"meeting\"]}')->'results') r"
+chkas "${PAUL}" "篩日期：從明天起就沒有" "none" "${SQSRC}('zqcamp', jsonb_build_object('from', (current_date + 1)::text))->'results') r"
+chkas "${PAUL}" "篩日期：亂填的日期當作沒填" "feedback,internal,meeting,review" "${SQSRC}('zqcamp', '{\"from\": \"not-a-date\"}')->'results') r"
+chkas "${PAUL}" "★ 篩選的活動清單：Co-President 看得到那一場" "1" "select count(*) from jsonb_array_elements(public.search_options()->'events') e where e->>'id' = '${SQE}'"
+chkas "${SQX}" "★ 一般幹部的活動清單沒有那一場（他讀不到那一場的回饋與檢討）" "0" "select count(*) from jsonb_array_elements(public.search_options()->'events') e where e->>'id' = '${SQE}'"
+chkas "${SQX}" "一般幹部拿不到錢與進度那一塊" "true|false" "select (coalesce(o->'admin', 'null'::jsonb) = 'null'::jsonb)::text||'|'||(o->>'can_settings') from (select public.search_options() o) z"
+chkraise "★ 學員叫不動搜尋（not_cadre）" "not_cadre" "perform set_config('test.uid','${SQS}',true); perform public.search_all('zqcamp');"
+chkraise "學員也拿不到篩選清單" "not_cadre" "perform set_config('test.uid','${SQS}',true); perform public.search_options();"
+chkrole anon "" "★ 沒登入的人叫不動搜尋" "ERROR:permissiondeniedforfunctionsearch_all" "select public.search_all('zqcamp')"
+chkrole authenticated "${SQX}" "★ 登入的人也不能直接讀那四張表" "denied" "select case when has_table_privilege('authenticated','public.search_chunks','select') or has_table_privilege('authenticated','public.search_asks','select') then 'open' else 'denied' end"
+chkrole authenticated "${SQX}" "門與送出去的那幾支沒有開給登入的人" "ERROR:permissiondeniedforfunctionsearch_core" "select public.search_core(array['x'], false, '{}'::jsonb, 5)"
+chkraise "★ 一般幹部改不了哪幾種給 AI 讀（not_president）" "not_president" "perform set_config('test.uid','${SQX}',true); perform public.search_set_ai(array['feedback']);"
+chkraise "沒有金鑰就不能用懂意思的搜尋（ai_not_ready）" "ai_not_ready" "perform set_config('test.uid','${SQX}',true); perform public.search_ask('zqcamp');"
+chkas "${PAUL}" "沒有 Voyage 的時候背景那一條什麼都不送" "0" "select public.search_tick()"
+# 破壞測試一：把回饋表的門拿掉，一般幹部就搜得到回饋；驗收表第 3 列要變紅
+BROKEN=$(mktemp)
+sed "s/^       and public.rc_form_reader(f.id)),\$/       ),/" "${SSM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${SSM}"; then echo "  FAIL 破壞測試一沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^3|.*|FAIL"; then echo "  ok   ★ 破壞測試：拿掉回饋表的門，驗收表第 3 列變紅"; pass=$((pass+1)); else echo "  FAIL 拿掉回饋表的門驗收表沒有變紅"; fail=$((fail+1)); fi
+chkas "${SQX}" "★ 破壞的那一版真的會漏：一般幹部搜得到那一份回饋（所以上面那幾條是在驗門，不是剛好沒有資料）" "feedback,internal,meeting" "${SQSRC}('zqcamp')->'results') r"
+sq3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SSM}" 2>&1 || true)
+if echo "${sq3}" | grep -q "OVERALL.*PASS" && ! echo "${sq3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${sq3}" | head -24; fail=$((fail+1)); fi
+chkas "${SQX}" "★ 裝回去之後一般幹部又搜不到回饋" "internal,meeting" "${SQSRC}('zqcamp')->'results') r"
+
+echo "  （第二段：假的 pg_net、假的兩把金鑰）"
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+create table if not exists net.fake_req (id bigserial primary key, method text, url text, body jsonb, headers jsonb);
+create table if not exists net._http_response (id bigint, status_code int, content_type text, headers jsonb, content text, timed_out boolean, error_msg text, created timestamptz default now());
+create or replace function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds int)
+  returns bigint language sql as $$ insert into net.fake_req (method, url, body, headers) values ('POST', url, body, headers) returning id $$;
+delete from vault.decrypted_secrets where name in ('ANTHROPIC_API_KEY', 'VOYAGE_API_KEY');
+insert into vault.decrypted_secrets (name, decrypted_secret) values ('ANTHROPIC_API_KEY', 'sk-ant-test-SECRET'), ('VOYAGE_API_KEY', 'pa-test-SECRET');
+SQL
+chkas "${SQX}" "兩把金鑰都在：畫面知道可以用，但拿不到金鑰本身" "true|true|false" "select (o->>'claude')||'|'||(o->>'voyage')||'|'||(o::text like '%SECRET%')::text from (select public.search_options() o) z"
+chkas "${PAUL}" "★ Co-President 打開回饋表給 AI 讀；亂填的與配對回饋（pair）不收" "{feedback,internal,meeting}" "select public.search_set_ai(array['meeting', 'internal', 'feedback', 'pair', 'evil'])::text"
+psql -d "${DB}" -q -c "update public.search_settings set synced_at = null" >/dev/null
+chkas "${PAUL}" "背景那一條：切小段、送去 Voyage" "t" "select public.search_tick() > 0"
+SQREF="select count(*) from public.search_chunks c where c.ref in (select id from public.meetings where title = 'Sq board' union all select id from public.rc_forms where title like 'Sq %' union all select id from public.tf_forms where title = 'Sq internal survey' union all select id from public.events where slug = 'sq-camp')"
+chk "★ 切出來的：會議兩段（議程與一段紀錄，空的那段不算）、回饋一段、內部表單一段；檢討沒開、配對回饋永遠不切" "2|1|1|0|0" "select (${SQREF} and c.source = 'meeting')||'|'||(${SQREF} and c.source = 'feedback')||'|'||(${SQREF} and c.source = 'internal')||'|'||(${SQREF} and c.source = 'review')||'|'||(select count(*) from public.search_chunks c join public.rc_forms f on f.id = c.ref where f.kind like 'pair-%')"
+chk "★ 送去 Voyage 的：voyage-4、512 維、document、帶 Bearer 金鑰；配對回饋的字不在裡面" "t|t|false" "select bool_and(body->>'model' = 'voyage-4' and (body->>'output_dimension')::int = 512 and body->>'input_type' = 'document')::text::char(1)||'|'||bool_and(headers->>'Authorization' = 'Bearer pa-test-SECRET')::text::char(1)||'|'||bool_or(body::text like '%pair secret%')::text from net.fake_req where url like '%voyageai%'"
+# Voyage 回來的數字：那一份回饋是 e1，其他提到 zqcamp 的是 e2，別的都是 e3。
+SQVEC="(select jsonb_agg(case when g = %s then 1 else 0 end order by g) from generate_series(1, 512) g)"
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into net._http_response (id, status_code, content_type, content)
+select r.request_id, 200, 'application/json', jsonb_build_object('usage', jsonb_build_object('total_tokens', 100), 'data',
+  (select jsonb_agg(jsonb_build_object('index', u.o - 1, 'embedding',
+      (select jsonb_agg(case when g = (case when c.body like '%afternoon%' then 1 when c.body like '%zqcamp%' then 2 else 3 end) then 1 else 0 end order by g) from generate_series(1, 512) g)) order by u.o)
+     from unnest(r.chunk_ids) with ordinality u(cid, o) join public.search_chunks c on c.id = u.cid))::text
+  from public.search_embed_reqs r;
+SQL
+psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.search_tick()" >/dev/null 2>&1 || true
+chk "收回來：每一段都有 512 個數字" "4|512" "select (${SQREF} and c.emb is not null)||'|'||(select max(cardinality(emb)) from public.search_chunks)"
+# 一般幹部用懂意思的搜尋：打「zq營隊 夏天」，自己打的字找不到，Claude 想到 zqcamp；Voyage 給的數字最接近那一份回饋（他讀不到）。
+SQA=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${SQX}',false);" -c "select public.search_ask('zq營隊 夏天')" 2>&1 | tail -1 | tr -d ' \n')
+SQRQ() { psql -d "${DB}" -X -A -t -q -c "select $2 from public.search_asks where id = '$1'" | tr -d ' \n'; }
+SQX_EXP=$(SQRQ "${SQA}" expand_req); SQX_EMB=$(SQRQ "${SQA}" embed_req)
+chk "★ 第一步送給 Claude 的只有搜尋的字（opus-5-5、帶 fallback、要 JSON）" "claude-opus-5-5|default|Searchwords:zq營隊夏天|json_schema|low" "select (body->>'model')||'|'||(body->>'fallbacks')||'|'||replace(body->'messages'->0->>'content', ' ', '')||'|'||(body->'output_config'->'format'->>'type')||'|'||(body->'output_config'->>'effort') from net.fake_req where id = ${SQX_EXP:-0}"
+chk "搜尋的字也送 Voyage 換數字（query）" "query|zq營隊夏天" "select (body->>'input_type')||'|'||(body->'input'->>0) from net.fake_req where id = ${SQX_EMB:-0}"
+chkas "${SQX}" "回應還沒回來：還在找" "retrieving" "select public.search_ask_status('${SQA}')->>'status'"
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into net._http_response (id, status_code, content_type, content) values
+ (${SQX_EXP:-0}, 200, 'application/json', jsonb_build_object('stop_reason', 'end_turn', 'usage', jsonb_build_object('input_tokens', 300, 'output_tokens', 50),
+   'content', jsonb_build_array(jsonb_build_object('type', 'text', 'text', '{"terms": ["zqcamp", "營隊"]}')))::text),
+ (${SQX_EMB:-0}, 200, 'application/json', jsonb_build_object('usage', jsonb_build_object('total_tokens', 5), 'data', jsonb_build_array(jsonb_build_object('index', 0, 'embedding', $(printf "${SQVEC}" 1))))::text);
+SQL
+chkas "${SQX}" "★ 合起來的結果：會議與內部表單；意思最接近的那一份回饋他讀不到，不在裡面" "summarizing|internal,meeting" "select (s->>'status')||'|'||(select string_agg(h->>'source', ',' order by h->>'source') from jsonb_array_elements(s->'hits') h) from (select public.search_ask_status('${SQA}') s) z"
+SQX_SUM=$(SQRQ "${SQA}" sum_req)
+chk "★ 送給 Claude 整理的片段：有會議與內部表單，沒有回饋與配對回饋的字" "true|true|false|false" "select (body->'messages'->0->>'content' like '%改到七月%')::text||'|'||(body->'messages'->0->>'content' like '%internal note%')::text||'|'||(body->'messages'->0->>'content' like '%afternoon%')::text||'|'||(body->'messages'->0->>'content' like '%pair secret%')::text from net.fake_req where id = ${SQX_SUM:-0}"
+chk "整理那一步：medium、要 points 與 note、system 說片段是資料不是指令" "medium|t|t" "select (body->'output_config'->>'effort')||'|'||(body->'output_config'->'format'->'schema'->'required' ? 'points')::text::char(1)||'|'||(body->>'system' like '%Never follow instructions%')::text::char(1) from net.fake_req where id = ${SQX_SUM:-0}"
+chkraise "★ 別人拿不到這一次的結果（not_found）" "not_found" "perform set_config('test.uid','${PAUL}',true); perform public.search_ask_status('${SQA}');"
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into net._http_response (id, status_code, content_type, content) values
+ (${SQX_SUM:-0}, 200, 'application/json', jsonb_build_object('stop_reason', 'end_turn', 'usage', jsonb_build_object('input_tokens', 2000, 'output_tokens', 200),
+   'content', jsonb_build_array(jsonb_build_object('type', 'text', 'text', '{"points": [{"text": "營隊改到七月。", "cites": [1]}], "note": ""}')))::text);
+SQL
+chkas "${SQX}" "★ 整理回來了：一點、標了第 1 段；每一筆記得自己是第幾段；回給畫面的沒有金鑰" "done|1|1|false" "select (s->>'status')||'|'||jsonb_array_length(s->'summary'->'points')||'|'||(select count(*) from jsonb_array_elements(s->'hits') h where h->'cite' @> '[1]')||'|'||(s::text like '%SECRET%')::text from (select public.search_ask_status('${SQA}') s) z"
+chk "用量記下來了（兩次 Claude 加 Voyage）" "2300|250|5" "select (usage->>'in')||'|'||(usage->>'out')||'|'||(usage->>'voyage') from public.search_asks where id = '${SQA}'"
+# Co-President：自己打的字與 Claude 都找不到，只有意思接近的找得到那一份回饋；整理被擋（refusal）。
+SQP=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.search_ask('qqnothinghere')" 2>&1 | tail -1 | tr -d ' \n')
+SQP_EXP=$(SQRQ "${SQP}" expand_req); SQP_EMB=$(SQRQ "${SQP}" embed_req)
+psql -d "${DB}" -q -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into net._http_response (id, status_code, content_type, content) values
+ (${SQP_EXP:-0}, 500, 'application/json', '{"type":"error","error":{"type":"api_error","message":"boom"}}'),
+ (${SQP_EMB:-0}, 200, 'application/json', jsonb_build_object('usage', jsonb_build_object('total_tokens', 5), 'data', jsonb_build_array(jsonb_build_object('index', 0, 'embedding', $(printf "${SQVEC}" 1))))::text);
+SQL
+chkas "${PAUL}" "★ Claude 想別的寫法失敗也照樣找；意思接近的找到那一份回饋（標 near），片段送去整理（回饋這時候開著）" "summarizing|feedback|true" "select (s->>'status')||'|'||(select string_agg(h->>'source', ',') from jsonb_array_elements(s->'hits') h)||'|'||(s->'hits'->0->>'near') from (select public.search_ask_status('${SQP}') s) z"
+SQP_SUM=$(SQRQ "${SQP}" sum_req)
+chk "Co-President 的整理片段裡有那一份回饋" "true" "select (body->'messages'->0->>'content' like '%afternoon%')::text from net.fake_req where id = ${SQP_SUM:-0}"
+psql -d "${DB}" -q -c "insert into net._http_response (id, status_code, content_type, content) values (${SQP_SUM:-0}, 200, 'application/json', jsonb_build_object('stop_reason', 'refusal', 'stop_details', jsonb_build_object('category', 'cyber'), 'usage', jsonb_build_object('input_tokens', 10, 'output_tokens', 0), 'content', '[]'::jsonb)::text)" >/dev/null
+chkas "${PAUL}" "整理被擋：失敗並寫原因；清單照樣在" "failed|stopped:refusal/cyber|1" "select (s->>'status')||'|'||replace(s->>'error', ' ', '')||'|'||jsonb_array_length(s->'hits') from (select public.search_ask_status('${SQP}') s) z"
+# 回饋表關掉：清單還找得到，但不送去整理；存好的數字刪掉。
+chkas "${PAUL}" "★ 關掉回饋表：那幾段數字馬上刪掉" "{internal,meeting}|0" "select public.search_set_ai(array['meeting', 'internal'])::text; select (select ai_sources::text from public.search_settings)||'|'||(select count(*) from public.search_chunks where source = 'feedback')"
+SQP2=$(psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "select public.search_ask('zqcamp afternoon')" 2>&1 | tail -1 | tr -d ' \n')
+SQP2_EXP=$(SQRQ "${SQP2}" expand_req); SQP2_EMB=$(SQRQ "${SQP2}" embed_req)
+psql -d "${DB}" -q -c "insert into net._http_response (id, status_code, content_type, content) values (${SQP2_EXP:-0}, 200, 'application/json', jsonb_build_object('stop_reason', 'end_turn', 'usage', jsonb_build_object('input_tokens', 1, 'output_tokens', 1), 'content', jsonb_build_array(jsonb_build_object('type', 'text', 'text', '{\"terms\": []}')))::text)" >/dev/null
+[ -n "${SQP2_EMB}" ] && psql -d "${DB}" -q -c "insert into net._http_response (id, status_code, content_type, content) values (${SQP2_EMB}, 200, 'application/json', '{\"data\": []}')" >/dev/null
+chkas "${PAUL}" "★ 關掉之後：清單還找得到那一份回饋，但沒有片段可以送，就不叫 Claude 整理" "done|feedback|true|null" "select (s->>'status')||'|'||(select string_agg(h->>'source', ',') from jsonb_array_elements(s->'hits') h)||'|'||(s->'summary'->>'empty')||'|'||coalesce((select sum_req::text from public.search_asks where id = '${SQP2}'), 'null') from (select public.search_ask_status('${SQP2}') s) z"
+psql -d "${DB}" -q -c "update public.search_settings set daily_limit = 1" >/dev/null
+chkraise "★ 一個人一天超過上限就擋（too_many_today）" "too_many_today" "perform set_config('test.uid','${SQX}',true); perform public.search_ask('zqcamp');"
+psql -d "${DB}" -q -c "update public.search_settings set daily_limit = 60; update public.search_asks set created_at = now() - interval '2 days', hits = '[]', summary = '{}' where id = '${SQA}'" >/dev/null
+chkas "${PAUL}" "★ 一天後清掉找到的片段與整理（字與用量留著）" "t|t" "select public.search_tick(); select (hits is null and summary is null)::text::char(1)||'|'||(q is not null)::text::char(1) from public.search_asks where id = '${SQA}'"
+# 破壞測試二：把「配對回饋不切」拿掉，驗收表第 5 列要變紅，而且配對回饋真的會被切、送出去
+psql -d "${DB}" -q -c "select 1" >/dev/null
+chkas "${PAUL}" "（破壞測試二準備）回饋表打開" "{feedback,internal,meeting}" "select public.search_set_ai(array['meeting', 'internal', 'feedback'])::text"
+sed "s/     where f.kind not like 'pair-%' and q.type in ('short', 'long') and length(btrim(a.value)) >= 12;/     where q.type in ('short', 'long') and length(btrim(a.value)) >= 12;/" "${SSM}" > "${BROKEN}"
+if cmp -s "${BROKEN}" "${SSM}"; then echo "  FAIL 破壞測試二沒有改到檔（那一行的字變了）"; fail=$((fail+1)); fi
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^5|.*|FAIL"; then echo "  ok   ★ 破壞測試：配對回饋也切，驗收表第 5 列變紅"; pass=$((pass+1)); else echo "  FAIL 配對回饋也切驗收表沒有變紅"; fail=$((fail+1)); fi
+psql -d "${DB}" -q -c "update public.search_settings set synced_at = null" >/dev/null
+chkas "${PAUL}" "★ 破壞的那一版真的會把配對回饋切進去" "1" "select public.search_tick(); select count(*) from public.search_chunks c join public.rc_forms f on f.id = c.ref where f.kind like 'pair-%'"
+rm -f "${BROKEN}"
+sq4=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${SSM}" 2>&1 || true)
+if echo "${sq4}" | grep -q "OVERALL.*PASS" && ! echo "${sq4}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${sq4}" | head -24; fail=$((fail+1)); fi
+psql -d "${DB}" -q -c "update public.search_settings set synced_at = null" >/dev/null
+chkas "${PAUL}" "★ 裝回去之後下一次同步就把配對回饋那一段刪掉" "0" "select public.search_tick(); select count(*) from public.search_chunks c join public.rc_forms f on f.id = c.ref where f.kind like 'pair-%'"
+psql -d "${DB}" -q -c "delete from vault.decrypted_secrets where name = 'VOYAGE_API_KEY'" >/dev/null
+chkas "${PAUL}" "拿掉 Voyage 的金鑰：存好的數字全部刪掉" "0" "select public.search_tick(); select count(*) from public.search_chunks"
+# 收乾淨
+psql -d "${DB}" -q -c "delete from vault.decrypted_secrets where name = 'ANTHROPIC_API_KEY'; drop function net.http_post(text, jsonb, jsonb, jsonb, int); drop table net.fake_req; drop table net._http_response;
+  delete from public.search_asks; delete from public.search_embed_reqs; update public.search_settings set ai_sources = array['meeting', 'internal'], synced_at = null, embed_error = null;
+  delete from public.rc_reviews where event_id in (select id from public.events where slug = 'sq-camp'); delete from public.rc_forms where title like 'Sq %'; delete from public.tf_forms where title = 'Sq internal survey';
+  delete from public.events where slug = 'sq-camp'; delete from public.meetings where title = 'Sq board'; delete from public.profiles where id in ('${SQX}', '${SQS}'); delete from auth.users where id in ('${SQX}', '${SQS}');" >/dev/null 2>&1 || true
+chk "（收尾）假的會議、活動、表單、人都拿掉了，設定回到預設" "0|0|0|{meeting,internal}" "select (select count(*) from public.meetings where title = 'Sq board')||'|'||(select count(*) from public.rc_forms where title like 'Sq %')||'|'||(select count(*) from public.profiles where id in ('${SQX}', '${SQS}'))||'|'||(select ai_sources::text from public.search_settings)"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

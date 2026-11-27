@@ -35,6 +35,7 @@ const PAGES = [
   "admin/marketing/index.html",
   // 2026-11-29 內部表單。
   "admin/team-forms/index.html",
+  "admin/search/index.html",
   "admin/records/index.html",
   // 2026-11-16 嘖嘖的互動頁。
   "stories/index.html",
