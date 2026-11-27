@@ -226,7 +226,7 @@ export const MINE = {
   "stories.approvedAt": { zh: "核可於：{d}", en: "Approved: {d}" },
   "stories.updatedAt":  { zh: "內容最後改過：{d}", en: "Last edited: {d}" },
   "stories.empty":    { zh: "還沒有人勾同意", en: "Nobody has given consent yet" },
-  "stories.emptyHint":{ zh: "幹部與校友要先到「設定」把故事填完並勾同意，才會出現在這裡。", en: "Cadres and alumni have to finish their story and give consent under Settings before they show up here." },
+  "stories.emptyHint":{ zh: "幹部與校友要先到頂欄的「我的故事」把故事填完並勾同意，才會出現在這裡。", en: "Cadres and alumni have to finish their story and give consent under My story in the top bar before they show up here." },
   // 資源
   "res.published":    { zh: "已發布", en: "Published" },
   "res.draft":        { zh: "還在寫", en: "Draft" },

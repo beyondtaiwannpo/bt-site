@@ -31,7 +31,7 @@ const root = () => document.getElementById("bt-root");
 function render() {
   const el = root();
   if (!el) return;
-  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
+  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name, board: S.me.board }) : "";
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-search"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }

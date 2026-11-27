@@ -23,12 +23,15 @@ const ROWS = [
   { ...M1, id: "m2", slug: "2025-alumni", happened_on: "2025-05-01", title_zh: "校友帳號超過 85 個", title_en: "More than 85 alumni accounts", sort: 60, status: "ready", photos: [PH_OK, PH_NO] },
 ];
 
-test("★ 側欄四份都有「歷史之路」，在「對外」那一組，幹部都看得到", () => {
+// 2026-11-27 Paul：歷史之路是對外網站的一部分，一般幹部不該在側欄上看到。側欄只畫給改得動的人（跟 hiCanEdit 同一條）。
+test("★ 側欄四份都有「歷史之路」，在「對外網站」那一行，只有改得動的人看得到", () => {
   for (const M of [F, SITE, PA, PE]) {
     const it = M.ITEMS.find(i => i.key === "history");
     assert.ok(it, "ITEMS 少了 history");
-    assert.equal(it.group, "site"); assert.equal(it.who, "cadre");
-    assert.ok(M.canSee(it, ASSOC));
+    assert.equal(it.group, "site"); assert.equal(it.area, "website"); assert.equal(it.who, "edit:res:Marketing Team");
+    assert.ok(!M.canSee(it, ASSOC), "一般幹部看不到");
+    for (const who of [PRES, MKT, MKT_EDIT]) assert.equal(M.canSee(it, who), SITE.hiCanEdit(who), "側欄畫不畫跟改不改得動一致");
+    assert.ok(!M.canSee(it, { ...MKT_EDIT, ws: { "res:Marketing Team": "view" } }), "Marketing 只能看的人也不畫");
   }
 });
 

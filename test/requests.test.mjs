@@ -40,11 +40,13 @@ const R = [
   { id: "66666666-6666-4666-8666-666666666666", kind: "poster", title: "舊的海報", purpose: "2027 冬令營", needed_by: "2026-12-01", brief: "A2 直式", asset_links: ["https://drive.google.com/x"], contact: "LINE: ann", requester: "u2", status: "new", reply: "", created_at: "2026-10-19T03:00:00Z" },
 ];
 
-test("★ 側欄：每一位幹部有「跟 Marketing 提需求」；佇列只給需求工作區裡的人與靠職級的兩級；五份 ITEMS 一樣", () => {
+test("★ 每一位幹部提得了「跟 Marketing 提需求」（側欄最上面的新增）；側欄的行銷只給 Marketing 的人；佇列只給需求工作區裡的人與靠職級的兩級；五份 ITEMS 一樣", () => {
   for (const M of [F, SITE, PA, PE, FI]) {
     // 2026-11-13：側欄只剩「需求單」一行（行銷那一區），佇列是那一頁裡的第二面（F.rqQueueOk）。
+    // 2026-11-27 Paul：一般幹部的側欄不該有行銷那一行。那一頁照舊每一位幹部進得去（GROUPS 的 forms），入口是側欄最上面的「新增」。
     const req = M.ITEMS.find(i => i.key === "request");
-    assert.equal(req.who, "cadre"); assert.equal(req.area, "marketing"); assert.ok(M.canSee(req, ME));
+    assert.equal(req.who, "ws:res:Marketing Team|custom:marketing-requests"); assert.equal(req.area, "marketing"); assert.ok(!M.canSee(req, ME), "一般幹部的側欄沒有需求單");
+    assert.ok(M.canEnter(M.GROUPS.find(g => g.key === "forms"), ME), "那一頁本身每一位幹部都進得去");
     assert.equal(M.ITEMS.find(i => i.key === "requests"), undefined, "佇列不再是側欄的一行");
     assert.equal(M.wsCellHref({ id: "custom:marketing-requests", kind: "custom" }), "/admin/#requests", "Workspaces 那一格連到佇列");
   }

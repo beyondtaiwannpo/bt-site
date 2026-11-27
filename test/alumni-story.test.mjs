@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COUNTIES, BT_ROLES, storyMissing, storyStatus, storyHTML, settingsHTML,
-         saveFailMessage , setLang as settingsLang } from "../settings/src/ui.js";
+         saveFailMessage , setLang as settingsLang, storyPageHTML } from "../settings/src/ui.js";
 // 登入後的頁面 2026-10-19 起有中英切換，字典預設英文；這一支斷言的是中文，所以先切成中文。
 settingsLang("zh");
 import { alumniStoriesHTML, tabsHTML, railHTML, shellHTML, setLang } from "../admin/site/src/ui.js";
@@ -73,10 +73,13 @@ test("★ 學員看不到「我的故事」這一區", () => {
   assert.equal(/我的故事/.test(h), false);
 });
 
+// 2026-11-27：「我的故事」從設定搬到自己一頁（/settings/#story，storyPageHTML），設定那一頁不再有。
 test("★ 幹部與校友都看得到", () => {
   for (const role of ["cadre", "alumni"]) {
-    const h = settingsHTML({ role, email: "a@b.c" }, "", false, FULL);
-    assert.match(h, /我的故事/);
+    const me = { role, email: "a@b.c" };
+    assert.match(storyPageHTML(me, "", FULL, [], null), /我的故事/);
+    assert.match(storyPageHTML(me, "", FULL, [], null), /data-autosave="story"/);
+    assert.doesNotMatch(settingsHTML(me, "", false, FULL), /data-autosave="story"/, `${role}：設定那一頁不再有故事那一塊`);
   }
 });
 
@@ -153,8 +156,10 @@ test("★ 幹部與學員各自的畫面沒有變", () => {
   assert.match(c, /id="nzh"/); assert.match(c, /id="nen"/);
   assert.match(c, /所屬 team/);
   assert.match(c, /data-act="avatar"/); assert.match(c, /id="pub"/);
-  assert.match(c, /進度牆/);
-  assert.match(c, /我的故事/);
+  // 2026-11-27：護照那一段（含實習生進度牆那一顆）拿掉了，進度牆在側欄的「護照」底下；故事搬到 #story。
+  assert.doesNotMatch(c, /href="\.\.\/intern-passport\/"/, "實習生進度牆那一顆不在設定了");
+  assert.doesNotMatch(c, /href="\.\.\/passport\/"/);
+  assert.doesNotMatch(c, /data-autosave="story"/);
 
   const s = settingsHTML(STUDENT, "", false, null);
   assert.match(s, /id="school"/); assert.match(s, /id="grade"/); assert.match(s, /id="nl"/);
@@ -244,7 +249,7 @@ test("等核可的排在已經公開的前面", () => {
 test("★ 一個人都沒勾的時候說清楚下一步在哪", () => {
   const h = alumniStoriesHTML([], "", false);
   assert.match(h, /還沒有人/);
-  assert.match(h, /設定/);
+  assert.match(h, /我的故事/, "2026-11-27 起故事在頂欄的「我的故事」，不在設定");
 });
 
 test("★ 校友頁分頁只有 Co-President 看得到", () => {

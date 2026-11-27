@@ -21,15 +21,20 @@ function render() {
   // ⚠ **頂欄要畫在 #bt-root 裡面**（見 admin/src/main.js 同一段註解）。
   // 畫在 <body> 上的話它吃不到 #bt-root 的左右內距，
   // 跟底下的內容就差 12px，Paul 2026-09-10 一眼看出來。
-  const nav = navHTML({ current: "settings", lang: lang(),
-    role: S.me && S.me.role, name: (S.me && (S.me.name_zh || S.me.name_en)) || "" });
+  // 2026-11-27：「我的故事」是同一個資料夾的 #story（S.view === "story"），頂欄標的是那一項。
+  const nav = navHTML({ current: S.view === "story" ? "story" : "settings", lang: lang(),
+    role: S.me && S.me.role, name: (S.me && (S.me.name_zh || S.me.name_en)) || "", board: S.me && S.me.board_role });
 
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { location.replace("../app/?next=" + encodeURIComponent("/settings/")); return; }
   if (!S.me) { el.innerHTML = UI.downHTML(); return; }
 
   if (S.view === "delete") { el.innerHTML = nav + UI.deleteHTML(S.msg, S.busy); return; }
-  el.innerHTML = nav + UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes, S.tz, S.founder);
+  // 「我的故事」（#story，2026-11-27）只給有故事的人（幹部與校友）；學員打開這個網址看到的是設定。
+  const teller = S.me.role === "cadre" || S.me.role === "alumni";
+  el.innerHTML = nav + (S.view === "story" && teller
+    ? UI.storyPageHTML(S.me, S.msg, S.story, S.outcomes, S.founder)
+    : UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes, S.tz, S.founder));
 
   // 學校清單學員的 #school 跟幹部/校友「我的故事」那格的 #sschool 共用同一份
   // datalist，兩格都要點進去才載（2026-09-11：故事那一格也接上自動完成）。
@@ -308,7 +313,7 @@ document.addEventListener("click", async e => {
   if (act === "retry") { location.reload(); return; }
   if (act === "lang") { switchLang(b.dataset.lang); return; }
   if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
-  if (act === "back") { S.view = "main"; S.msg = ""; render(); return; }
+  if (act === "back") { S.view = viewOfHash(); S.msg = ""; render(); return; }
   if (act === "ask-delete") { S.view = "delete"; S.msg = ""; render(); return; }
   // 時區（2026-11-08 從看板搬過來）：選了就存進 profiles.tz，存完清掉「我是誰」的快取，看板下一次開就讀到新的。
   if (act === "tz-change") { S.tz = { edit: true, q: "", results: [], guess: detectTz() }; render(); const q = document.getElementById("tzq"); if (q) q.focus(); return; }
@@ -622,5 +627,12 @@ function switchLang(l) {
   history.replaceState(null, "", u.pathname + u.search + u.hash);
   render();
 }
+// 設定與「我的故事」是同一個資料夾的兩頁，用 # 分（2026-11-27）。換 # 不重新載入，打到一半的字已經自動存過了。
+const viewOfHash = () => (location.hash === "#story" ? "story" : "main");
+S.view = viewOfHash();
+window.addEventListener("hashchange", () => {
+  if (S.view === "delete") return;
+  S.view = viewOfHash(); S.msg = ""; render(); window.scrollTo(0, 0);
+});
 applyLang(pickLang(location.search, readStored()));
 boot();

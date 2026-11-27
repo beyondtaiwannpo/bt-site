@@ -60,25 +60,28 @@ test("我在哪幾個 team：照指派算，順序固定，專案跟著它的 te
   assert.deepEqual(RAIL.myTeams(null), []);
 });
 
-test("側欄：「我的工作區」在「我的」與「BT」中間，一個 team 一行，右邊是等級", () => {
+test("側欄：「我的工作區」在「我的」與「整個 BT」中間，一個 team 一行，右邊是等級", () => {
   const h = RAIL.railHTML("site", "res", TWO, {}, "zh");
-  assert.match(h, /<div class="rail-group">我的<\/div>[\s\S]*<div class="rail-group">我的工作區<\/div>[\s\S]*<div class="rail-group">BT<\/div>/);
+  assert.match(h, /<div class="rail-group">我的<\/div>[\s\S]*<div class="rail-group">我的工作區<\/div>[\s\S]*<div class="rail-group">整個 BT<\/div>/);
   assert.match(h, /<a class="rail-item rail-area rail-team" href="\/home\/\?lang=zh#team=Curriculum%20Team">.*?<b>Curriculum<\/b><\/span><span class="rail-lv"[^>]*>改<\/span><\/a>/);
   assert.match(h, /href="\/home\/\?lang=zh#team=Internship%20Team">.*?<b>Internship<\/b><\/span><span class="rail-lv"[^>]*>管<\/span>/);
   assert.equal((h.match(/rail-team/g) || []).length, 2);
   // 英文也一樣。
   assert.match(RAIL.railHTML("site", "res", TWO, {}, "en"), /My workspaces<\/div>[\s\S]*<span class="rail-lv"[^>]*>Edit<\/span>/);
   // 專案那一行照舊在 BT 底下，說明改成「每個 team 的…」。
-  assert.match(h, /<div class="rail-group">BT<\/div>[\s\S]*<b>專案<\/b><small>每個 team 的專案與活動<\/small>/);
+  assert.match(h, /<div class="rail-group">整個 BT<\/div>[\s\S]*<b>專案<\/b><small>每個 team 的專案與活動<\/small>/);
 });
 
+const noFly = h => h.replace(/<div class="rail-fly"[^>]*><div class="rail-fly-m">[\s\S]*?<\/div><\/div>/g, "");
 test("側欄：好幾個 team 的人，team 那幾行收著；現在在哪個 team 的頁，那一行才展開（Paul：「maybe we can fold them」）", () => {
   const away = RAIL.railHTML("site", "res", TWO, {}, "zh");
-  assert.doesNotMatch(away, /2027 冬令營|2027 暑期實習|>總覽</, "不在 team 的頁上：兩個 team 都收著");
+  // 收著的那幾行，底下的頁只在滑過去才跳出來的那一塊（rail-fly，2026-11-27）裡，不展開在側欄上。
+  assert.doesNotMatch(noFly(away), /2027 冬令營|2027 暑期實習|>總覽</, "不在 team 的頁上：兩個 team 都收著");
+  assert.match(away, /<div class="rail-row"><a class="rail-item rail-area rail-team" href="\/home\/\?lang=zh#team=Internship%20Team">[\s\S]*?<\/a><div class="rail-fly" role="group" aria-label="Internship"><div class="rail-fly-m"><a class="rail-item rail-sub" href="\/home\/\?lang=zh#team=Internship%20Team">總覽<\/a><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#projects\/project%3Aintern">2027 暑期實習<\/a>/, "滑過去看得到總覽與專案");
   const at = RAIL.railHTML("home", "team:Internship Team", TWO, {}, "zh");
   assert.match(at, /<a class="rail-item rail-area rail-team here" href="#team=Internship%20Team">/, "同一個資料夾只換 #");
   assert.match(at, /<div class="rail-subs"><a class="rail-item rail-sub on" href="#team=Internship%20Team" aria-current="page">總覽<\/a><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#projects\/project%3Aintern">2027 暑期實習<\/a><a class="rail-item rail-sub rail-people" href="\/admin\/\?lang=zh#members=res%3AInternship%20Team"/);
-  assert.doesNotMatch(at, /2027 冬令營/, "另一個 team 還是收著");
+  assert.doesNotMatch(noFly(at), /2027 冬令營/, "另一個 team 還是收著");
   assert.equal((at.match(/rail-subs/g) || []).length, 1);
   assert.doesNotMatch(at, /rail-area on"/, "首頁那一行不亮");
   // 「改」的人沒有「誰在這裡」。

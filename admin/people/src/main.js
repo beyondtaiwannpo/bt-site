@@ -41,7 +41,7 @@ const pname = p => UI.namesOf({ name_zh: p.name_zh, name_en: p.name_en }).name;
 function render() {
   const el = root();
   if (!el) return;
-  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
+  const nav = S.me ? navHTML({ current: "people", role: S.me.role, name: S.me.name, board: S.me.board }) : "";
 
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-people"); return; }
@@ -67,7 +67,7 @@ function render() {
 function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
-  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
+  const nav = navHTML({ current: "people", role: S.me.role, name: S.me.name, board: S.me.board });
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab || "", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（理由見 admin/src/main.js 同一段）。

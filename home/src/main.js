@@ -13,7 +13,7 @@
 // 回覆只改自己那一列（set_rsvp）。必到的會按「不能到」要寫一句理由，理由只有本人與排會的人看得到（RLS）。
 import * as AUTH from "../../shared/auth.js";
 import { navHTML } from "../../shared/nav.js";
-// 側欄（2026-11-14）：首頁跟後台畫同一條側欄（「我的」「BT」「組織」三段），樣式在 shared/rail.css。
+// 側欄（2026-11-14）：首頁跟後台畫同一條側欄（2026-11-27 起「我的」「我的工作區」「整個 BT」三段），樣式在 shared/rail.css。
 import * as RAIL from "../../shared/rail.js";
 import * as D from "./data.js";
 import * as UI from "./ui.js";
@@ -117,7 +117,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.ready) { el.innerHTML = `<div class="empty loading">${T("loading")}</div>`; return; }
   const v = view();
-  const nav = navHTML({ current: v === "calendar" ? "calendar" : "home", role: S.role, name: S.name, lang: lang() });
+  const nav = navHTML({ current: v === "calendar" ? "calendar" : "home", role: S.role, name: S.name, lang: lang(), board: S.board });
   if (S.role !== "cadre") { el.innerHTML = nav + UI.notCadreHTML(); return; }
   const c = ctx();
   const rme = railMe(), team = teamOf();

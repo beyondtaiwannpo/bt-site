@@ -46,7 +46,7 @@ function body() {
 function render() {
   const el = root();
   if (!el) return;
-  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
+  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name, board: S.me.board }) : "";
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-team-forms"); return; }
   if (!S.me || S.me.role !== "cadre") { el.innerHTML = UI.shellHTML(nav, "", UI.notCadreHTML()); return; }
@@ -61,7 +61,7 @@ const onQuestions = () => S.view === "build" && !!S.id && !!S.admin && S.sub ===
 function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
-  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
+  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name, board: S.me.board });
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("teamforms", tab || "fill", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   UI.checkVersion("../../");

@@ -43,8 +43,8 @@ test("★ 四個資料夾的 GROUPS 一字不差", () => {
     assert.deepEqual(M.GROUPS, FORMS.GROUPS, `${label} 的 GROUPS 跟 admin/ 不一樣`);
   }
   // 2026-11-14 側欄多「我的」那一段：首頁（/home/）、時間看板、護照三個資料夾在最前面。
-  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["home", "availability", "passport", "forms", "site", "passports", "people", "finance", "marketing", "teamforms", "records", "search"]);
-  for (const g of FORMS.GROUPS) assert.match(g.href, /^\/(admin|home|availability|passport)\//, "每一組都是站上的一個資料夾");
+  assert.deepEqual(FORMS.GROUPS.map(g => g.key), ["home", "availability", "passport", "forms", "site", "passports", "people", "finance", "marketing", "teamforms", "records", "search", "internwall"]);
+  for (const g of FORMS.GROUPS) assert.match(g.href, /^\/(admin|home|availability|passport|intern-passport)\//, "每一組都是站上的一個資料夾");
 });
 
 test("★ 四份 canEnter 對同一個人講一樣的話", () => {
@@ -70,6 +70,8 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
   // 「我的」那三個資料夾：每一位幹部都進得去（跟 forms 一樣），學員與 intern 不行。
   // 搜尋（2026-11-26）：每一位幹部都進得去，跟 forms 一樣；每一筆讀不讀得到是資料庫的門。
   for (const w of Object.values(want)) { w.home = w.availability = w.passport = w.search = w.forms; }
+  // 實習生進度牆（2026-11-27 從設定搬到側欄）：被派進實習護照的人，加 Co-President 與 Senior Adviser。
+  for (const [k, w] of Object.entries(want)) w.internwall = ["istaff", "senior", "pres"].includes(k);
   for (const [label, M] of IMPL) {
     for (const [who, me] of Object.entries(ME)) {
       for (const g of M.GROUPS) {
@@ -82,18 +84,22 @@ test("★ 四份 canEnter 對同一個人講一樣的話", () => {
 test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西、進不去的不畫、當前那一行有標記、底下的頁是上方一排分頁", () => {
   for (const [label, M] of IMPL) {
     const me = { ...ME.member, name: "王平" };
-    const rail = M.railHTML("site", "res", me);
-    // 現在這一行（對外網站）亮著，點下去是這個人看得到的第一頁（一般幹部看不到「網站上的活動」，所以是資源庫）。
-    assert.match(rail, /<a class="rail-item rail-area on" href="#res" data-act="tab" data-t="res" aria-current="page">.*?<b>對外網站<\/b>/, label);
+    // 2026-11-27：一般幹部（沒改得動任何一個 team）沒有「對外網站」那一行；某個 team「改」以上的人才有（資源庫、BT 島）。
+    const ed = { ...me, ws: { "res:Curriculum Team": "edit" } };
+    const rail = M.railHTML("site", "res", ed);
+    // 現在這一行（對外網站）展開，點下去是這個人看得到的第一頁（看不到「網站上的活動」，所以是資源庫）。
+    assert.match(rail, /<a class="rail-item rail-area here" href="#res" data-act="tab" data-t="res">.*?<b>對外網站<\/b>/, label);
+    assert.doesNotMatch(M.railHTML("forms", "projects", me), /<b>對外網站<\/b>/, `${label}：一般幹部沒有對外網站`);
     // 別的資料夾是帶 ?lang= 與 # 的一般連結。
     // 2026-12-26：「活動」那一行改叫「專案」，點下去是專案清單；場地搬到組織（整個 BT）。
     assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#projects">.*?<b>專案<\/b>/, label);
-    assert.match(rail, /<div class="rail-group">組織<\/div>[\s\S]*href="\/admin\/\?lang=zh#venues">.*?<b>場地<\/b>/, label);
+    assert.match(rail, /<div class="rail-group">整個 BT<\/div>[\s\S]*href="\/admin\/\?lang=zh#venues">.*?<b>場地<\/b>/, label);
+    assert.doesNotMatch(rail, /<div class="rail-group">組織<\/div>/, `${label}：組織那一段拿掉了（2026-11-27）`);
     // 2026-11-14：「我的」那一段在最上面。首頁連到 /home/（不帶 #），行事曆是 /home/#calendar，護照是 /passport/。
     assert.match(rail, /<div class="rail-group">我的<\/div><a class="rail-item rail-area" href="\/home\/\?lang=zh">.*?<b>首頁<\/b>/, label);
     assert.match(rail, /href="\/home\/\?lang=zh#calendar">.*?<b>行事曆<\/b>/, label);
     assert.match(rail, /href="\/passport\/\?lang=zh">.*?<b>我的護照<\/b>/, label);
-    assert.match(rail, /<div class="rail-group">BT<\/div>[\s\S]*<b>專案<\/b>/, label);
+    assert.match(rail, /<div class="rail-group">整個 BT<\/div>[\s\S]*<b>專案<\/b>/, label);
     assert.doesNotMatch(rail, /<b>待辦<\/b>/, `${label}：後台的待辦併進首頁了`);
     // 一頁都進不去的那一行整行不畫。
     for (const no of ["護照", "錢", "紀錄", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);
@@ -101,7 +107,7 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     assert.doesNotMatch(rail, /rail-item off|<details(?! class="rail-new")/, `${label}：不再有淡掉的行與折疊段（最上面的「新增」是唯一的 details）`);
     assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>Associate・Curriculum Team/, `${label}：側欄上要寫名字、職級、team`);
     // 上方那一排分頁：只有看得到的頁；一般幹部在對外網站只有資源庫一頁，就不畫那一排。
-    assert.equal(M.shellHTML("", rail, "B").includes("area-tabs"), false, `${label}：只有一頁就不畫分頁列`);
+    assert.equal(M.shellHTML("", M.railHTML("teamforms", "fill", me), "B").includes("area-tabs"), false, `${label}：只有一頁就不畫分頁列`);
     const pres = { ...ME.pres, name: "王平" };
     const ph = M.shellHTML("", M.railHTML("site", "team", pres), "B");
     assert.match(ph, /<a class="area-tab on" href="#team" data-act="tab" data-t="team" aria-current="page">團隊頁<\/a>/, label);
@@ -109,7 +115,8 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     // Co-President：十個東西都在。
     const pr = M.railHTML("forms", "teams", pres);
     // 2026-11-23：「我的工作區」那一段的 team 行（rail-team）另外算，Co-President 是六個 team 各一行（test/home-team.test.mjs）。
-    assert.equal((pr.match(/class="rail-item rail-area(?! rail-team)/g) || []).length, M.AREAS.length, `${label}：Co-President 每一行都在`);
+    // 人與權限在頂欄、錢在 Sponsorship 那一行底下（2026-11-27），這兩個不是側欄上的一行。
+    assert.equal((pr.match(/class="rail-item rail-area(?! rail-team)/g) || []).length, M.AREAS.filter(a => ["me", "work"].includes(a.sec)).length, `${label}：Co-President 每一行都在`);
     assert.equal((pr.match(/class="rail-item rail-area rail-team/g) || []).length, 6, `${label}：Co-President 六個 team 各一行`);
     assert.match(pr, /Co-President・全部 team/, label);
     assert.match(M.railHTML("forms", "teams", { ...ME.senior, name: "顧", team: "Marketing Team" }), /Senior Adviser・全部 team/, `${label}：Senior Adviser 就算勾了標籤也印全部 team`);
@@ -405,7 +412,7 @@ test("★ 側欄有中英切換的兩顆按鈕，現在的那一顆亮著", () =
     assert.match(rail, /class="lang" data-act="lang" data-lang="zh"/);
     assert.match(rail, /class="lang on" data-act="lang" data-lang="en"/);
     assert.match(rail, />All pages</, "手機上那顆鈕不跟頂欄的「選單」同名");
-    assert.match(rail, /<div class="rail-group">Me<\/div>[\s\S]*<div class="rail-group">BT<\/div>/);
+    assert.match(rail, /<div class="rail-group">Me<\/div>[\s\S]*<div class="rail-group">Whole BT<\/div>/);
   } finally { FORMS.setLang("zh"); }
 });
 
@@ -829,8 +836,8 @@ test("★ 側欄：現在這一區展開成它的每一頁，現在這一頁有�
     assert.match(M.railHTML("records", "people", { role: "cadre", board: "director", team: "", name: "D", ws: { records: "edit", "custom:records": "manage" } }, {}, "en"),
       /rail-sub rail-people" href="\/admin\/\?lang=zh#members=custom%3Arecords"/, `${label}：只管這一區的人照舊有`);
     assert.equal((rail.match(/rail-subs/g) || []).length, 1, `${label}：只有現在這一區展開`);
-    // 一般幹部在對外網站只有資源庫一頁：不展開，那一行自己深藍。
-    const one = M.railHTML("site", "res", { role: "cadre", board: "member", team: "Curriculum Team", ws: {} }, {}, "zh");
+    // 場地只有一頁：不展開，那一行自己深藍。
+    const one = M.railHTML("forms", "venues", { role: "cadre", board: "member", team: "Curriculum Team", ws: {} }, {}, "zh");
     assert.doesNotMatch(one, /rail-subs/, label);
     assert.match(one, /rail-area on"/, label);
   }

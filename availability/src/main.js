@@ -71,7 +71,7 @@ function render() {
   const me = { id: S.user.id, role: S.role, board: S.board, team: S.myTeam, name: S.myName, ws: S.ws, wsInfo: S.wsInfo || {}, senior: S.senior };
   const shell = body => {
     RAIL.railBefore(el);
-    el.innerHTML = RAIL.shellHTML(navHTML({ current: "availability", role: S.role, name: S.myName, lang: lang() }),
+    el.innerHTML = RAIL.shellHTML(navHTML({ current: "availability", role: S.role, name: S.myName, lang: lang(), board: S.board }),
       RAIL.railHTML("availability", "", me, {}, lang()), body, RAIL.areaTabsHTML("availability", "", me, lang()));
     RAIL.railAfter(el);
   };

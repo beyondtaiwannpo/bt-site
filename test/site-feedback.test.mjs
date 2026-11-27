@@ -67,7 +67,9 @@ test("★ 收件匣那一頁只在 Co-President 與 Senior Adviser 的選單上"
   const it = RAIL.ITEMS.find(i => i.group === "people" && i.key === "feedback");
   assert.ok(it); assert.equal(it.who, "senior"); assert.equal(it.area, "people");
   assert.ok(RAIL.canSee(it, PRES)); assert.ok(!RAIL.canSee(it, DIRECTOR)); assert.ok(!RAIL.canSee(it, { role: "student" }));
-  assert.match(RAIL.railHTML("people", "feedback", PRES, { feedback: 3 }, "en"), /Bugs &amp; requests<span class="rail-count">3<\/span>/, "還沒處理的有幾則印在選單上");
+  // 2026-11-27：人與權限搬到頂欄，它底下的分頁在內容區上方那一排（.keep）。
+  assert.match(RAIL.areaTabsHTML("people", "feedback", PRES, "en"), /data-t="feedback" aria-current="page">Bugs &amp; requests/, "收件匣在人與權限那一排分頁裡");
+  assert.ok(!RAIL.areaTabsHTML("people", "roster", DIRECTOR, "en").includes("feedback"), "Director 沒有");
 });
 
 test("★ 收件匣：一則一列（誰、哪一種、字、當時在哪、縮圖、處理到哪、備註）；他寫的字與那一頁都跳脫過", () => {

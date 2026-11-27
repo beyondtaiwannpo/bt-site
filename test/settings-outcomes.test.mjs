@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { settingsHTML, outcomesHTML, outcomeRowHTML, cleanOutcome, OUTCOME_KINDS, OUTCOME_VIS, setLang } from "../settings/src/ui.js";
+import { settingsHTML, outcomesHTML, outcomeRowHTML, cleanOutcome, OUTCOME_KINDS, OUTCOME_VIS, setLang, storyPageHTML } from "../settings/src/ui.js";
 
 setLang("zh");
 const ALUM = { role: "alumni", email: "a@x.io", name_zh: "王小明", name_en: "Ming" };
@@ -17,9 +17,11 @@ test("★ 八種狀態與四種可見範圍跟遷移檔的 check constraint 一�
   assert.deepEqual([...OUTCOME_VIS].sort(), vis.sort());
 });
 
+// 2026-11-27：「我的去向」跟著故事搬到「我的故事」那一頁（storyPageHTML，/settings/#story）；學員與實習生進不了那一頁（main.js 的 teller）。
 test("幹部與校友有「我的去向」，學員與實習生沒有", () => {
-  assert.match(settingsHTML(ALUM, "", false, null, []), /data-outcomes/);
-  assert.match(settingsHTML({ ...ALUM, role: "cadre", ws: {} }, "", false, null, []), /data-outcomes/);
+  assert.match(storyPageHTML(ALUM, "", null, [], null), /data-outcomes/);
+  assert.match(storyPageHTML({ ...ALUM, role: "cadre", ws: {} }, "", null, [], null), /data-outcomes/);
+  assert.doesNotMatch(settingsHTML(ALUM, "", false, null, []), /data-outcomes/, "設定那一頁不再有");
   assert.doesNotMatch(settingsHTML({ ...ALUM, role: "intern" }, "", false, null, []), /data-outcomes/);
   assert.doesNotMatch(settingsHTML({ role: "student", email: "s@x.io" }, "", false, null, []), /data-outcomes/);
 });

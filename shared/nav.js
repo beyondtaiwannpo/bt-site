@@ -24,7 +24,7 @@ export const FEATURES = [
   // 兩筆指到同一個資料夾，行事曆是 #calendar。推翻 2026-10-23「頂欄一行不改」，理由記在 Anson decisions。
   { key: "home",         label: { zh: "首頁", en: "Home" },         href: "/home/",         roles: ["cadre"],
     title: { zh: "首頁", en: "Home" },           desc: { zh: "等你回覆的會、接下來的會與活動", en: "Meetings waiting for your reply, what's coming up" } },
-  // inSidebar（2026-11-14 Paul：「menu 換了，頂欄要不要重想」）：這幾項已經在側欄（shared/rail.js 的「我的」「BT」「組織」），
+  // inSidebar（2026-11-14 Paul：「menu 換了，頂欄要不要重想」）：這幾項已經在側欄（shared/rail.js 的「我的」「我的工作區」「整個 BT」），
   // 幹部的頂欄只留首頁與設定，不再畫兩次。首頁留著，因為護照、時間看板、設定這三頁沒有側欄，要有一條回去的路。
   // 學員、intern、校友沒有側欄，他們的頂欄不受影響。featuresFor() 照舊回全部（後台「你的存取」那一段用它說明每一項）。
   { key: "calendar",     label: { zh: "行事曆", en: "Calendar" },   href: "/home/#calendar", roles: ["cadre"], inSidebar: true,
@@ -48,8 +48,17 @@ export const FEATURES = [
   // 這個檔案的檔頭一直寫著「之後開放給學員的功能只要在 roles 加 student，
   // 列就自動長出來，不用另外設計一條路徑」—— 就是這一刻。
   // 2026-09-11：校友也用同一頁（他的「我的故事」在裡面）。
+  // 2026-11-27 Paul：「my story, where I am right now, it should be on the separate pages… open another pages up top that says my story」。
+  // 同一個資料夾（/settings/）的 #story：存故事的程式本來就在那裡，搬資料夾只會多一份。學員沒有故事，所以 roles 沒有 student。
+  { key: "story",        label: { zh: "我的故事", en: "My story" }, href: "/settings/#story", roles: ["cadre", "alumni"],
+    title: { zh: "我的故事", en: "My story" },     desc: { zh: "創辦人、我的故事、我現在在哪", en: "Founder, your story, where you are now" } },
+  // 人與權限（2026-11-27 從側欄搬到頂欄，Paul：「that's only senior advisor accessible… on the left tab menu, which is kind of confusing」）。
+  // boards 是**唯一一個照職級過濾的項目**：Co-President 與 Senior Adviser 才畫（跟 /admin/people/ 開頁那一句、資料庫的 is_senior() 同一條）。
+  // 檔頭說「不要加 board_role 的過濾」講的是「後台」那一項（一般幹部也要進得去自己 team 的申請）；這一項本來就只開給這兩種人，畫給別人只會多一個點了被彈回來的入口。
+  { key: "people",       label: { zh: "人與權限", en: "Internal" }, href: "/admin/people/", roles: ["cadre"], boards: ["president", "senior_adviser"],
+    title: { zh: "人與權限", en: "Internal" },     desc: { zh: "幹部名單、邀請、工作區、屆別", en: "Roster, invites, workspaces, terms" } },
   { key: "settings",     label: { zh: "設定", en: "Settings" },     href: "/settings/",     roles: ["cadre", "student", "alumni", "intern"],
-    title: { zh: "設定", en: "Settings" },         desc: { zh: "名字、大頭照、要不要出現在公開的團隊頁上", en: "Name, avatar, whether to appear on the public team page" } },
+    title: { zh: "設定", en: "Settings" },         desc: { zh: "名字、語言、大頭照、要不要出現在公開的團隊頁上", en: "Name, language, avatar, whether to appear on the public team page" } },
   // 2026-10-17：實習生護照（方案 C，docs/2026-10-15-實習生護照盤點與設計.md）。
   // roles 只有 intern。Internship team 的幹部也看得到那一頁的進度牆，
   // 但這裡**不放 cadre**：那會讓其他五個 team 的幹部多一個點了被彈回來的入口，
@@ -90,12 +99,13 @@ const NAV = {
   signout:{ zh: "登出", en: "Sign out" },
 };
 
-export function featuresFor(role) {
-  return FEATURES.filter(f => f.roles.includes(role));
+// board 是 profiles.board_role（沒給就當一般幹部）。有 boards 的項目只給那幾種職級（2026-11-27，人與權限）。
+export function featuresFor(role, board) {
+  return FEATURES.filter(f => f.roles.includes(role) && (!f.boards || f.boards.includes(board)));
 }
 // 頂欄真正畫的那幾項：側欄已經有的不再畫（2026-11-14）。
-export function barFor(role) {
-  return featuresFor(role).filter(f => !f.inSidebar);
+export function barFor(role, board) {
+  return featuresFor(role, board).filter(f => !f.inSidebar);
 }
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -105,9 +115,10 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 //
 // 頂欄是米白底（見 nav.css 檔頭：深藍是點綴色，整條鋪滿等於把它當主色用），
 // 所以 logo 直接坐在上面，不需要另外墊一塊——它本來就是為這個紙色設計的。
-export function navHTML({ current, role, name, lang }) {
+// board：看的人的職級（profiles.board_role），只用來決定畫不畫「人與權限」。沒傳就不畫，不會多給。
+export function navHTML({ current, role, name, lang, board }) {
   const L = LANGS.includes(lang) ? lang : navLang();
-  const items = barFor(role).map(f =>
+  const items = barFor(role, board).map(f =>
     `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`).join("");
   const n = String(name || "");
   return `<nav class="btnav" aria-label="${esc(tx(NAV.aria, L))}">

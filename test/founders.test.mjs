@@ -52,18 +52,22 @@ test("★ 團隊頁：創辦人那一支載不到（遷移檔還沒跑）不擋�
 });
 
 test("★ 設定頁：沒被標成創辦人的人完全看不到那一段；那個勾只叫本人的那一支", async () => {
-  const { settingsHTML, founderHTML } = await import("../settings/src/ui.js");
+  // 2026-11-27：創辦人那一段跟著故事搬到「我的故事」那一頁（storyPageHTML），設定那一頁不再有。
+  const { settingsHTML, storyPageHTML, founderHTML } = await import("../settings/src/ui.js");
   assert.equal(founderHTML(null), ""); assert.equal(founderHTML({ founder: false, consent: false }), "");
   const me = { id: "u1", role: "alumni", email: "a@b.c" };
-  assert.doesNotMatch(settingsHTML(me, "", false, null, [], null), /id="fdr"/);
-  assert.doesNotMatch(settingsHTML(me, "", false, null, [], null, { founder: false }), /id="fdr"/);
-  const on = settingsHTML(me, "", false, null, [], null, { founder: true, consent: false });
+  assert.doesNotMatch(storyPageHTML(me, "", null, [], null), /id="fdr"/);
+  assert.doesNotMatch(storyPageHTML(me, "", null, [], { founder: false }), /id="fdr"/);
+  const on = storyPageHTML(me, "", null, [], { founder: true, consent: false });
   assert.match(on, /<input id="fdr" type="checkbox">/, "預設沒勾");
-  assert.match(settingsHTML(me, "", false, null, [], null, { founder: true, consent: true }), /<input id="fdr" type="checkbox" checked>/);
+  assert.match(storyPageHTML(me, "", null, [], { founder: true, consent: true }), /<input id="fdr" type="checkbox" checked>/);
+  assert.doesNotMatch(settingsHTML(me, "", false, null, [], null, { founder: true, consent: false }), /id="fdr"/, "設定那一頁沒有這一段了");
+  // 學員進不了「我的故事」那一頁（settings/src/main.js 的 teller），設定頁也沒有這一段。
   assert.doesNotMatch(settingsHTML({ ...me, role: "student" }, "", false, null, [], null, { founder: true, consent: false }), /id="fdr"/, "學員沒有這一段");
-  // 那個勾在兩個自動儲存的容器外面：它不是 profiles 的欄位
+  assert.match(readFileSync("settings/src/main.js", "utf8"), /S\.view === "story" && teller/);
+  // 那個勾在自動儲存的容器外面：它不是 alumni_stories 的欄位
   const before = on.slice(0, on.indexOf('id="fdr"')), opens = (before.match(/<div data-autosave=/g) || []).length;
-  assert.equal(opens, 1, "前面只開過「我的資料」那一個容器"); assert.ok(before.lastIndexOf("</div>") > before.lastIndexOf("<div data-autosave="), "而且已經關起來了");
+  assert.equal(opens, 0, "那個勾前面沒有開過任何自動儲存的容器");
   const main = readFileSync("settings/src/main.js", "utf8");
   assert.match(main, /supabase\.rpc\("set_founder_consent", \{ p_ok: ok \}\)/);
   assert.match(main, /box\.checked = !ok;/, "沒存進去要把勾撥回原樣");

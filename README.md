@@ -833,11 +833,52 @@ Paul 2026-11-27：會議跟會議範本放在行事曆底下很怪，要「首�
 - **記一場會議**：排得了會的人才有，打開 `/admin/#meetings/new`。
 - **排一場會**：排得了會的人才有，打開行事曆、排會那一塊直接跳出來（今天下一個半點，太晚了就明天早上九點）。網址是 `/home/?schedule=1#calendar`，用過就從網址拿掉。
 
-為什麼這樣放：最常做的事放在每一頁同一個位置，像 Gmail 的「撰寫」，不用記它在哪一區。Marketing 那一行底下的「需求單」照舊在，要看自己送過的單還是去那裡。首頁那兩顆鈕拿掉了，首頁只剩等你處理、接下來、護照、Mentorship。手機上「新增」收在「所有頁面」裡面。
+為什麼這樣放：最常做的事放在每一頁同一個位置，像 Gmail 的「撰寫」，不用記它在哪一區。要看自己送過的單，也是按「新增」裡的「跟 Marketing 提需求」，那一頁底下列得出來（2026-11-27 起側欄的「行銷」只給 Marketing 的人，見下一節）。首頁那兩顆鈕拿掉了，首頁只剩等你處理、接下來、護照、Mentorship。手機上「新增」收在「所有頁面」裡面。
 
 **會議那一頁**標題旁也有一顆「記一場會議」（Paul：「I want it to be in meeting as well」），排不了會的人沒有這一顆。
 
 **程式在哪**：`shared/rail.js` 的 `AREAS`、`ITEMS`（會議與範本的 area 改成 `meetings`）、`newMenuHTML()`、`canSchedule()`；樣式在 `shared/rail.css`「新增」那一段；`admin/src/ui.js` 的 `meetingsListHTML()`；`home/src/main.js` 認 `?schedule=1`。測試 `test/home.test.mjs`、`test/home-waiting.test.mjs`、`test/meeting-templates.test.mjs`、`test/meetings.test.mjs`。
+
+## 側欄重分：滑過去看得到裡面、三段、一般幹部只看得到用得到的（2026-11-27）
+
+Paul 2026-11-27 一次講了五件事，加上一句：「I'm really kind of confused how like a normal member, let's say associate, can see」。原本 Co-President 看到的側欄跟一般幹部差很多，他分不出哪些是一般幹部也看得到的。Paul 看過盤點之後說照 Claude 建議的做。
+
+**1. 滑過去就看得到裡面有哪幾頁。** 電腦上滑鼠停在某一行（例如「會議」），右邊跳出一小塊，列出它底下每一頁（會議、會議範本），直接點範本就到，不用先點進「會議」。用鍵盤 Tab 走到那一行也會跳出來。「我的工作區」的 team 那幾行也一樣（總覽、他的專案、錢）。手機與平板沒有「滑過去」，照舊點那一行。只有一頁的那幾行（首頁、我的護照、場地）沒有這一塊，現在這一區已經展開的也不再跳。
+
+**2. 側欄只剩三段：我的、我的工作區、整個 BT。** 「組織」那一段拿掉了，它跟另外三段看起來一樣大，Paul 搞不清楚紀錄到底在哪。
+- **紀錄、場地**搬進「整個 BT」。
+- **錢**畫在「我的工作區」的 **Sponsorship** 那一行底下，一條「錢」，點下去是總覽；錢的五頁（總覽、收支紀錄、帳戶與類別、預算、匯出）在內容區上方那一排。看得到錢、但沒被派進 Sponsorship 的人（例如管帳的人在別的 team），照樣多一行 Sponsorship（標「部分」），裡面只有錢。**誰看得到錢沒有變。**
+- **人與權限**搬到**頂欄**，只有 Co-President 與 Senior Adviser 看得到（它本來就只開給這兩種人）。它底下那幾頁（名單、邀請、幹部招募、工作區、屆別、回報與許願、誰改了什麼）在內容區上方那一排，寬螢幕也畫。被派進「申請」工作區的一般幹部頂欄沒有這一項，所以側欄「整個 BT」最後照舊畫一行人與權限，裡面只有幹部招募，不然他沒有入口。
+
+**3. 對外網站是「對外看得到的每一樣東西」。** 歷史之路、BT 島的貼文、BT 島三頁從「行銷」搬到「對外網站」。行銷只剩需求單、大學介紹貼文、Instagram。
+
+**4. 一般幹部（Associate，沒被派進任何工作區）現在看到的：**
+
+| 哪裡 | 看得到 |
+|---|---|
+| 頂欄 | 首頁、我的故事、設定 |
+| 我的 | 首頁、行事曆（行事曆、時間看板）、會議、我的護照 |
+| 我的工作區 | 他勾的 team，標「看」 |
+| 整個 BT | 搜尋、專案（專案、活動）、表單（只有「要我填的」）、場地 |
+| 新增 | 跟 Marketing 提需求 |
+
+被派進某個工作區之後才多出來的：
+- **行銷**：被派進 Marketing 或需求單工作區的人。
+- **對外網站**：某個 team「改」以上的人看得到資源庫與 BT 島，Marketing「改」以上多歷史之路，網站上的活動、團隊頁、校友故事、信的文字只有 Co-President 與 Senior Adviser。
+- **表單的「內部表單」**（建表單的地方）：被派進內部表單工作區的人。
+- **回饋表**：搬到「專案」底下（回饋表是一場活動的），被派進紀錄的人看得到。
+- **紀錄、護照**：被派進那個工作區的人。實習生進度牆搬到「護照」底下。
+
+要讓一個人看到更多，到頂欄「人與權限」→「工作區」把他派進去，或改他的職級。**這一節改的全是「側欄畫不畫」**，每一頁開頁那一句與資料庫的門一行都沒動：一般幹部本來就改不動歷史之路與 BT 島，現在只是不再看到一個點進去改不了的東西。需求單那一頁照舊每一位幹部都進得去。
+
+**5. 「我的故事」自己一頁。** 頂欄多一項「我的故事」（幹部與校友有，學員沒有），網址是 `/settings/#story`：創辦人、我的故事、我的去向三塊從設定搬過來，存檔的程式一行沒改。**設定**只剩我的資料、語言、大頭照與公開、時區。設定裡的「護照」那一段拿掉了（我的護照在側欄）；實習生自己的「實習護照」那一段留著，他沒有側欄。
+
+**程式在哪**：
+- `shared/rail.js`：`SECTIONS`、`AREAS`（`people` 的 sec 是 `top`，`money` 的 sec 是 `team`、`team` 是 Sponsorship）、`ITEMS`、`allowed()` 多兩種寫法（`edit:工作區` 是那個工作區「改」以上，`editany:res:` 是任何一個 team「改」以上）、`teamAreas()`、`teamRowsHTML()`、`rowWithFly()` 與 `placeFly()`（滑過去那一塊）、`areaTabsHTML()` 的 `.keep`。
+- `shared/rail.css`：「滑過去看得到」那一段。那一塊是 `position:fixed`，因為側欄自己會捲，絕對定位會被切掉，位置在滑上去的那一刻由 `placeFly()` 算。
+- `shared/nav.js`：`FEATURES` 多「我的故事」與「人與權限」（`boards`，唯一照職級過濾的一項），`navHTML()` 多收 `board`。每一頁畫頂欄都要把職級傳進去，沒傳就不畫人與權限，不會多給。
+- `settings/src/ui.js` 的 `storyPageHTML()`，`settings/src/main.js` 認 `#story`。
+- 測試：`test/rail-regroup.test.mjs`（新的），其他跟著改的在 `test/admin-hub`、`nav`、`home-waiting`、`home-team`、`finance`、`history-admin`、`recruitment`、`requests`、`alumni-story`、`founders`、`settings-outcomes`。
 
 ## 會議範本與會議紀錄（`supabase/migrations/2026-12-18-meeting-templates.sql`，2026-11-13）
 

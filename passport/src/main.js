@@ -115,7 +115,7 @@ function render() {
   const me = { id: S.user.id, role: S.role, board: row.board_role || "member", team: row.team || "", name, ws: w.ws || {}, wsInfo: w.info || {},
     senior: ["president", "senior_adviser"].includes(row.board_role) };
   RAIL.railBefore(el);
-  el.innerHTML = RAIL.shellHTML(navHTML({ current: "passport", role: S.role, lang: lang(), name }),
+  el.innerHTML = RAIL.shellHTML(navHTML({ current: "passport", role: S.role, lang: lang(), name, board: me.board }),
     RAIL.railHTML("passport", "", me, {}, lang()), UI.barHTML(S) + body, RAIL.areaTabsHTML("passport", "", me, lang()));
   RAIL.railAfter(el);
 }

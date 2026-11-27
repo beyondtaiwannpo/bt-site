@@ -142,7 +142,7 @@ test("★ 兩顆不會疊在一起：「怎麼用」在回報那一顆的正上�
 
 test("引擎只在幹部的頁面掛上，而且不准有每一幀的迴圈（check.sh 也守）", () => {
   const src = read("shared/rail.js");
-  assert.match(src, /me\.role === "cadre"\) \{ mountFeedback\(L\); mountTour\(group, tab, me, L\); \}/);
+  assert.match(src, /me\.role === "cadre"\) \{ mountFeedback\(L\); mountTour\(group, tab, me, L\); bindFly\(\); \}/);
   assert.doesNotMatch(src.replace(/\/\/.*$/gm, ""), /requestAnimationFrame\(/);
   // 在 node 裡（沒有 document）畫側欄不會出錯
   assert.match(RAIL.railHTML("people", "roster", { id: "u", role: "cadre", board: "president", name: "P", ws: {} }, {}, "en"), /class="rail"/);

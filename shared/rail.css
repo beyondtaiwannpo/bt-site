@@ -73,7 +73,21 @@
 .rail-lv.dim{background:none;box-shadow:inset 0 0 0 1px rgba(16,42,134,.28);color:rgba(16,42,134,.72);font-weight:500}
 .rail-foot.rail-none{padding:0 12px 4px;margin:0 0 4px}
 /* 寬螢幕上側欄已經列出這一區的每一頁，上方那一排分頁不再畫一次；手機上側欄收起來，那一排照舊。 */
-@media (min-width:721px){ .shell .area-tabs{display:none} }
+/* .keep 是側欄上沒有那一行的區（人與權限在頂欄，2026-11-27），它的分頁只有這一排。 */
+@media (min-width:721px){ .shell .area-tabs:not(.keep){display:none} }
+/* 滑過去看得到裡面有哪幾頁（2026-11-27，shared/rail.js 的 rowWithFly）。只在有滑鼠的寬螢幕；位置由 placeFly() 算。
+   左邊留 8px 透明的一條接著那一行，滑鼠從那一行移過去的路上不會斷掉。 */
+.rail-row{position:relative}
+.rail-fly{display:none}
+@media (hover:hover) and (min-width:721px){
+  /* sticky 自己是一層，不墊高的話內容區的卡片會蓋在跳出來那一塊上面。頂欄是 50，比它低。 */
+  .rail{z-index:20}
+  .rail-row:hover > .rail-fly,.rail-row:focus-within > .rail-fly{display:block;position:fixed;z-index:30;padding-left:8px;min-width:210px}
+  .rail-row:hover > .rail-area:not(.on){background:rgba(255,255,255,.6)}
+}
+.rail-fly-m{display:flex;flex-direction:column;gap:1px;padding:6px;border-radius:14px;border:1px solid rgba(16,42,134,.16);
+  background:var(--bt-cream);box-shadow:0 14px 34px rgba(16,42,134,.18)}
+.rail-fly .rail-sub{white-space:nowrap}
 /* 這一區的分頁：一排圓角膠囊，現在這一頁是深藍。窄螢幕自己換行，不橫向捲。 */
 .area-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px;padding-bottom:12px;border-bottom:1px solid rgba(16,42,134,.14)}
 .area-tab{display:inline-flex;align-items:center;min-height:34px;padding:0 14px;border-radius:999px;border:1px solid rgba(16,42,134,.25);

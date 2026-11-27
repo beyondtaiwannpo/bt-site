@@ -84,10 +84,6 @@ export const MINE = {
   "tz.none":          { zh: "找不到「{q}」。換個講法試試，例如打州名或最近的大城市。", en: "Nothing found for \"{q}\". Try another wording, such as the state or the nearest big city." },
   "tz.saved":         { zh: "時區存好了：{tz}。", en: "Time zone saved: {tz}." },
   "tz.fail":          { zh: "時區沒存進去：", en: "Could not save the time zone: " },
-  "s.passport":       { zh: "護照", en: "Passport" },
-  "s.passportNote":   { zh: "個人標語、蓋章紀錄、心得與照片都在護照裡面。", en: "Your motto, stamps, notes and photos are in the passport." },
-  "s.goPassport":     { zh: "去護照", en: "Go to passport" },
-  "s.internWall":     { zh: "實習生進度牆", en: "Intern progress wall" },
   "s.internPassport": { zh: "實習護照", en: "Intern passport" },
   "s.internNote":     { zh: "這一期的任務、章、心得與照片都在實習護照裡面。", en: "This term's tasks, stamps, notes and photos are in the intern passport." },
   "s.goIntern":       { zh: "去實習護照", en: "Go to intern passport" },
@@ -114,6 +110,7 @@ export const MINE = {
   "fd.failed":        { zh: "沒存進去，再試一次。", en: "Not saved. Please try again." },
   // 我的故事
   "st.title":         { zh: "我的故事", en: "My story" },
+  "st.pageSub":       { zh: "你在 BT 的故事、你現在在哪。要不要公開，每一段都由你自己勾。", en: "Your BT story and where you are now. You decide, section by section, what goes public." },
   "st.lede":          { zh: "填完並且勾同意、Co-President 核可之後，\n      你會出現在<a href=\"../alumni/\">公開的校友頁</a>那張航線圖上：\n      從你的高中飛到你現在的城市。", en: "Once you fill this in, give consent and a Co-President approves it, you appear on the <a href=\"../alumni/\">public alumni page</a> route map: a flight from your high school to the city you are in now." },
   "st.name":          { zh: "公開顯示的名字", en: "Name shown publicly" },
   "st.nameNote":      { zh: "想遮字就寫成「張 O 睿」。空著的話用你上面填的姓名。", en: "To mask a character write it like \"張 O 睿\". Leave it blank to use the name above." },
@@ -178,7 +175,7 @@ export const MINE = {
   // 校友登入後的歡迎卡（2026-11-07，Paul 拍板的第四件）。故事還沒填或還沒勾同意的校友看得到，按掉就記在帳號上。
   "w.title":          { zh: "歡迎回來", en: "Welcome back" },
   "w.lede":           { zh: "你在這個網站上是 BT 的校友：你那幾屆的職位已經記在名單上，這裡是你自己的一頁。有三件事可以做：", en: "On this site you are a BT alumnus: your positions from your terms are already on the roster, and this page is yours. Three things you can do:" },
-  "w.story":          { zh: "<b>寫下你的故事</b>，勾了同意、Co-President 核可之後，你會出現在<a href=\"../alumni/\">公開的校友頁</a>那張航線圖上。往下捲就是那一格。", en: "<b>Write your story.</b> Once you tick consent and a Co-President approves it, you appear on the route map of the <a href=\"../alumni/\">public alumni page</a>. Scroll down to find it." },
+  "w.story":          { zh: "<b>寫下你的故事</b>，勾了同意、Co-President 核可之後，你會出現在<a href=\"../alumni/\">公開的校友頁</a>那張航線圖上。在<a href=\"#story\">我的故事</a>那一頁。", en: "<b>Write your story.</b> Once you tick consent and a Co-President approves it, you appear on the route map of the <a href=\"../alumni/\">public alumni page</a>. It is on the <a href=\"#story\">My story</a> page." },
   "w.events":         { zh: "<b>看看最近開放的活動</b>，在<a href=\"../events/\">活動頁</a>。想回來講一場、帶一組，從那裡報名。", en: "<b>See what is coming up</b> on the <a href=\"../events/\">events page</a>. If you want to come back to speak or mentor, sign up there." },
   "w.contact":        { zh: "<b>把聯絡方式保持最新</b>：上面的名字、大頭照，還有你登入用的 email。我們只會用它寄活動通知。", en: "<b>Keep your details current</b>: your name and avatar above, and the email you sign in with. We only use it for event notices." },
   "w.dismiss":        { zh: "知道了，收起來", en: "Got it, hide this" },

@@ -60,8 +60,14 @@ test("★ 側欄：五個資料夾都有「財務」這一組，看得到的只�
     assert.doesNotMatch(rail, /<b>錢<\/b>/, `${label}：看不到的人側欄上沒有「錢」那一行`);
     assert.doesNotMatch(rail, /href="\/admin\/finance\/"/, label);
     const railOk = M.railHTML("forms", "home", { ...assoc, name: "小安", ws: { finance: "edit" } });
-    assert.match(railOk, /href="\/admin\/finance\/\?lang=zh#overview">.*?<b>錢<\/b>/, `${label}：看得到的人有「錢」那一行，點下去是總覽`);
-    assert.match(M.shellHTML("", M.railHTML("finance", "tx", { ...assoc, name: "小安", ws: { finance: "edit" } }), ""), /area-tab" href="#export" data-act="tab" data-t="export">匯出/, `${label}：五頁在上方那一排`);
+    // 2026-11-27：錢畫在「我的工作區」的 Sponsorship 那一行底下（Paul：「put money under sponsorship」），點下去是總覽。
+    assert.match(railOk, /<b>Sponsorship<\/b>[\s\S]*?href="\/admin\/finance\/\?lang=zh#overview">錢<\/a>/, `${label}：看得到的人在 Sponsorship 底下有「錢」，點下去是總覽`);
+    // 看得到錢、但沒被派進 Sponsorship 的人：照樣多一行 Sponsorship（標「部分」），錢不會不見。
+    const other = M.railHTML("forms", "home", { role: "cadre", board: "member", team: "Curriculum Team", name: "小安", ws: { finance: "view" } });
+    assert.match(other, /<b>Sponsorship<\/b><\/span><span class="rail-lv dim"[^>]*>部分<\/span>/, `${label}：管帳的人不在 Sponsorship 也看得到錢`);
+    assert.match(other, /href="\/admin\/finance\/\?lang=zh#overview">錢<\/a>/, label);
+    const onTx = M.shellHTML("", M.railHTML("finance", "tx", { ...assoc, name: "小安", ws: { finance: "edit" } }), "");
+    assert.match(onTx, /class="rail-item rail-sub on" href="#overview" data-act="tab" data-t="overview" aria-current="page">錢<\/a>/, `${label}：在錢的任何一頁，Sponsorship 底下的「錢」亮著`);
     // 總覽的「你的存取」那一塊會印 finance 那一格：名字是「財務」、連去 /admin/finance/
     assert.equal(M.wsCellLabel({ id: "finance" }), "財務（帳戶、收支、預算）", label);
     assert.equal(M.wsCellHref({ id: "finance" }), "/admin/finance/#overview", label);

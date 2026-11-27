@@ -42,7 +42,7 @@ function render() {
   const el = root();
   if (!el) return;
   // 頂欄畫在 #bt-root 裡面，不 insertAdjacentHTML 到 <body>（理由見 admin/src/main.js 同一段）。
-  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
+  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name, board: S.me.board }) : "";
 
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../../app/?next=admin-site"); return; }
@@ -96,7 +96,7 @@ function render() {
 function paintShell(tab) {
   const el = root();
   if (!el || !S.me) return;
-  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
+  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name, board: S.me.board });
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("site", tab || "", S.me), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（理由見 admin/src/main.js 同一段）。

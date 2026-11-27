@@ -89,7 +89,7 @@ function render() {
   // 原因就是這件事：#bt-root 有自己的左右內距，畫在 body 上的頂欄吃不到它，
   // 於是同一條頂欄在四個頁面各自停在不同的位置。全部畫進 #bt-root 就對齊了。
   // 順帶一提，畫在裡面之後也不用再自己去 remove 上一次那條 —— innerHTML 蓋掉了。
-  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name }) : "";
+  const nav = S.me ? navHTML({ current: "admin", role: S.me.role, name: S.me.name, board: S.me.board }) : "";
 
   if (S.down) { el.innerHTML = UI.shellHTML(nav, "", UI.downHTML(S.downErr)); return; }
   if (!S.user) { location.replace("../app/?next=admin"); return; }
@@ -228,7 +228,7 @@ let evPhQ = Promise.resolve();
 function paintShell() {
   const el = root();
   if (!el || !S.me) return;
-  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name });
+  const nav = navHTML({ current: "admin", role: S.me.role, name: S.me.name, board: S.me.board });
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("forms", "events", S.me, {}), UI.skeletonHTML()); UI.railAfter(el);
   UI.afterRender(S, el);
   // 線上有沒有更新的版本（GitHub Pages 快取 10 分鐘，四個資料夾各一份側欄，哪一份先過期哪一份先換新；

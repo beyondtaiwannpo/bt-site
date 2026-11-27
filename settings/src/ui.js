@@ -219,18 +219,10 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz, founder) {
     <div class="autorow">${autosaveHint("profile")}<span class="savenote">${T("s.autoNote")}</span></div>
     </div>
     ${cadre ? tzHTML(me, tz) : ""}
-    ${teller ? founderHTML(founder) : ""}
-    ${teller ? `<div data-autosave="story" data-id="${esc(me.id || "")}">${storyHTML(me, story)}
-    <div class="autorow">${autosaveHint("story")}</div>
-    </div>` : ""}
-    ${teller ? outcomesHTML(outcomes) : ""}
-
-    ${cadre ? `<h3 class="sec-h">${T("s.passport")}</h3>
-    <p class="sec-note">${T("s.passportNote")}</p>
-    <div class="row"><a class="btn ghost sm" href="../passport/">${T("s.goPassport")}</a>${
-      // Internship team 的幹部與 Co-President 多一顆：實習生的進度牆。
-      // 入口放這裡不放頂欄，因為頂欄不准依 team 過濾（shared/nav.js 檔頭）。
-      internshipStaff(me) ? `<a class="btn ghost sm" href="../intern-passport/">${T("s.internWall")}</a>` : ""}</div>` : ""}
+    ${/* 2026-11-27 Paul：設定只留我的資料、語言、大頭照與公開頁、時區。
+         創辦人、我的故事、我現在在哪搬到「我的故事」（同一個資料夾的 #story，storyPageHTML，頂欄有一項）。
+         護照那一段拿掉（Paul：「there's a passport. I don't need that to be there」）：幹部護照在側欄「我的護照」；
+         Internship 的幹部那一顆「實習生進度牆」搬到側欄的「護照」那一行底下（shared/rail.js 的 internwall）。實習生自己的那一段留著，他沒有側欄。 */ ""}
     ${intern ? `<h3 class="sec-h">${T("s.internPassport")}</h3>
     <p class="sec-note">${T("s.internNote")}</p>
     <div class="row"><a class="btn ghost sm" href="../intern-passport/">${T("s.goIntern")}</a></div>` : ""}
@@ -240,6 +232,23 @@ export function settingsHTML(me, msg, busy, story, outcomes, tz, founder) {
         ? `<p class="sec-note">${T("s.leave")}</p>`
         : `<button class="btn quiet" data-act="ask-delete">${T("s.delete")}</button>`}
     </div>
+  </div>`;
+}
+
+// 「我的故事」那一頁（2026-11-27，/settings/#story，頂欄的「我的故事」）：創辦人、我的故事、我現在在哪。
+// 從設定那一頁原封不動搬過來：三塊的 HTML、自動儲存的容器（data-autosave="story"）、存檔的程式都沒變，只是換一頁畫。
+// 只有幹部與校友（學員沒有故事，main.js 不讓他進這一頁）。
+export function storyPageHTML(me, msg, story, outcomes, founder) {
+  const fd = founderHTML(founder);
+  return `<div class="card">
+    <h2>${T("st.title")}</h2>
+    <div class="sub">${T("st.pageSub")}</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
+    ${fd}
+    <div data-autosave="story" data-id="${esc(me.id || "")}">${storyHTML(me, story, !!fd)}
+    <div class="autorow">${autosaveHint("story")}</div>
+    </div>
+    ${outcomesHTML(outcomes)}
   </div>`;
 }
 
@@ -326,11 +335,12 @@ export function pubNote(me) {
 // （supabase/migrations/2026-12-28-alumni-bt-role.sql）。/island/ 用它讓校友走去他以前的那座島。
 export const BT_ROLES = ["cadre", "speaker", "mentor", "intern", "ambassador", "student"];
 
-export function storyHTML(me, story) {
+// head = false：「我的故事」那一頁上面已經有同一個大標，這一塊就不再畫一次（上面有創辦人那一塊的時候才畫，分得出兩段）。
+export function storyHTML(me, story, head = true) {
   const s = story || {};
   const v = k => esc(s[k] || "");
   const on = !!s.public_story;
-  return `<h3 class="sec-h">${T("st.title")}</h3>
+  return `${head ? `<h3 class="sec-h">${T("st.title")}</h3>` : ""}
     <p class="sec-note">${T("st.lede")}</p>
     <label><i>${T("st.name")}</i><input id="sname" name="display_name" value="${v("display_name")}"
       placeholder="${esc(me.name_zh || me.name_en || "")}">

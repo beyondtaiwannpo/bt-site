@@ -22,7 +22,8 @@ test("FEATURES 每一筆都有 key / label / href / roles / title / desc", () =>
 test("FEATURES 的 href 都指到存在的資料夾", () => {
   for (const f of FEATURES) {
     // 2026-10-28：行事曆是 /home/#calendar（同一個資料夾的另一個畫面），所以後面可以帶 #xxx。
-    assert.match(f.href, /^\/[a-z-]+\/(#[a-z-]+)?$/, `${f.key} 的 href 不是 /xxx/ 的形狀：${f.href}`);
+    // 2026-11-27：人與權限是 /admin/people/（後台底下的資料夾），所以可以兩層。
+    assert.match(f.href, /^\/[a-z-]+\/([a-z-]+\/)?(#[a-z-]+)?$/, `${f.key} 的 href 不是 /xxx/ 的形狀：${f.href}`);
     assert.ok(existsSync("." + f.href.replace(/#.*$/, "") + "index.html"), `${f.href} 沒有 index.html`);
   }
 });
@@ -33,10 +34,19 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
 // 順便把 key 列出來對一次，不然「數量對但畫錯項目」抓不到。
 // 2026-11-14 Paul：側欄做好之後頂欄只留首頁與設定（行事曆、護照、時間看板、後台都在側欄），
 // 所以幹部的頂欄對照的是 barFor，不是整份 FEATURES；inSidebar 的那幾項不能出現在頂欄。
-test("★ 幹部的頂欄只畫 barFor 的項目（首頁、設定），側欄有的不重複，當前的那一項有標記", () => {
+// 2026-11-27：多兩項。「我的故事」（/settings/#story）每一位幹部都有；「人與權限」只有 Co-President 與 Senior Adviser（boards）。
+test("★ 幹部的頂欄只畫 barFor 的項目（首頁、我的故事、設定），側欄有的不重複，當前的那一項有標記", () => {
   const h = navHTML({ current: "home", role: "cadre", name: "王平", lang: "zh" });
   const bar = barFor("cadre");
-  assert.deepEqual(bar.map(f => f.key).sort(), ["home", "settings"]);
+  assert.deepEqual(bar.map(f => f.key).sort(), ["home", "settings", "story"]);
+  assert.deepEqual(barFor("cadre", "member").map(f => f.key).sort(), ["home", "settings", "story"], "Associate 沒有人與權限");
+  assert.deepEqual(barFor("cadre", "director").map(f => f.key).sort(), ["home", "settings", "story"], "Director 沒有人與權限");
+  for (const b of ["president", "senior_adviser"]) {
+    assert.deepEqual(barFor("cadre", b).map(f => f.key).sort(), ["home", "people", "settings", "story"], b);
+    assert.match(navHTML({ current: "people", role: "cadre", name: "王", lang: "zh", board: b }), /<a href="\/admin\/people\/\?lang=zh" aria-current="page">人與權限<\/a>/, b);
+  }
+  assert.ok(!navHTML({ current: "home", role: "cadre", name: "王", lang: "zh" }).includes("/admin/people/"), "沒傳職級就不畫，不會多給");
+  assert.ok(h.includes('href="/settings/?lang=zh#story"'), "我的故事是設定那個資料夾的 #story");
   assert.equal(count(h, /<a href="\/[a-z-]+\/\?lang=zh(#[a-z-]+)?"/g), bar.length);
   for (const f of bar) assert.ok(h.includes(`href="${withLang(f.href, "zh")}"`), `頂欄少了 ${f.key}`);
   for (const f of FEATURES.filter(x => x.inSidebar && x.roles.includes("cadre")))
@@ -74,10 +84,11 @@ test("★ 學員只看得到屬於學員的功能項，logo、名字、登出都
 });
 
 // 校友（2026-09-11）。校友沒有護照、沒有時間看板、沒有申請管理，
-// 他在這個站上唯一的事情是「我的故事」，而那在設定裡面。
-test("★ 校友的頂欄只有設定，一項都不能多", () => {
+// 他在這個站上唯一的事情是「我的故事」，2026-11-27 起自己一頁（/settings/#story）。
+test("★ 校友的頂欄只有我的故事與設定，一項都不能多", () => {
   const keys = featuresFor("alumni").map(f => f.key);
-  assert.deepEqual(keys, ["settings"]);
+  assert.deepEqual(keys, ["story", "settings"]);
+  assert.ok(!featuresFor("student").some(f => f.key === "story"), "學員沒有故事");
 });
 
 test("role 是 null（profiles 查不到）時也不會爆，當成沒有功能", () => {
