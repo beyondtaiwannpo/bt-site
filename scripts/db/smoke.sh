@@ -5412,6 +5412,40 @@ lp3=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${LPM}" 2>&1 || true)
 if echo "${lp3}" | grep -q "OVERALL.*PASS" && ! echo "${lp3}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去之後驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 裝回之後驗收表沒有全 PASS：${lp3}" | head -20; fail=$((fail+1)); fi
 psql -d "${DB}" -q -c "delete from public.people where name_en like 'Lpm %'; delete from public.events where slug = 'lpm-boot'; drop table public.lpm_before;" >/dev/null 2>&1
 chk "（收尾）假的人與假的活動都拿掉了" "0|0" "select (select count(*) from public.people where name_en like 'Lpm %')||'|'||(select count(*) from public.events where slug = 'lpm-boot')"
+echo "── 很久以前來過的學員：「現在還在念高中」那一格取消（2027-01-20-untick-aged-out-students.sql）──"
+# Paul 2026-11-26：2027-01-16 之後正式站有 584 個人是「標籤寫以前的學員、那一格還勾著」，問了會打開哪兩道門之後他選「Untick them」。
+UAM=supabase/migrations/2027-01-20-untick-aged-out-students.sql
+# 有自己帳號的學員：學員帳號（STU）到這裡已經被前面的段落刪掉了，另外開一個學員帳號，收尾連帳號一起拿掉。
+UAPRO=aaaa0120-0000-0000-0000-000000000001
+psql -d "${DB}" -X -q -c "insert into auth.users (id, email) values ('${UAPRO}', 'uam-account@example.com');" \
+  -c "insert into public.profiles (id, name_zh, name_en, role) values ('${UAPRO}', '學員帳', 'Uam Account', 'student');" \
+  -c "insert into public.people (name_en, kind, profile_id) select 'Uam Account', 'student', '${UAPRO}' where not exists (select 1 from public.people where profile_id = '${UAPRO}');" >/dev/null 2>&1 || true
+UASTU=$(psql -d "${DB}" -X -A -t -q -c "select id from public.people where profile_id = '${UAPRO}'" 2>/dev/null | tr -d ' \n' || true)
+psql -d "${DB}" -X -q -c "update public.people set name_en = 'Uam Account', kind = 'student', grad_year = null where id = '${UASTU}'" >/dev/null 2>&1 || true
+psql -d "${DB}" -X -A -t -q -c "insert into public.events (workspace_id, team, slug, title_zh, title_en, status, starts_at) select w.workspace_id, w.team, 'uam-' || v.k, 'uam', 'UAM ' || v.k, 'archived', v.d from (values ('old', now() - interval '4 years'), ('recent', now() - interval '1 year')) v(k, d), (select workspace_id, team from public.events where team is not null limit 1) w;" \
+  -c "insert into public.people (name_en, kind, grad_year) values ('Uam Old', 'student', null), ('Uam Recent', 'student', null), ('Uam GradYear', 'student', (extract(year from now()) + 1)::int), ('Uam Mentee', 'student', null), ('Uam None', 'student', null);" \
+  -c "insert into public.rc_participation (person_id, event_id, role) select p.id, e.id, v.role from (values ('Uam Old', 'uam-old', 'student'), ('Uam Recent', 'uam-recent', 'student'), ('Uam GradYear', 'uam-old', 'student'), ('Uam Mentee', 'uam-old', 'mentee')) v(n, s, role) join public.people p on p.name_en = v.n join public.events e on e.slug = v.s;" \
+  -c "insert into public.rc_participation (person_id, event_id, role) select '${UASTU}', e.id, 'student' from public.events e where e.slug = 'uam-old' on conflict do nothing;" >/dev/null 2>&1 || true
+chk "（準備）五個假的學員加一位有帳號的；有帳號的那一位也有一筆四年前的紀錄、那一格勾著" "6|1|student" "select (select count(*) from public.people where name_en like 'Uam %' and kind = 'student')||'|'||(select count(*) from public.rc_participation x join public.events e on e.id = x.event_id where x.person_id = '${UASTU}' and e.slug = 'uam-old')||'|'||(select kind from public.people where id = '${UASTU}')"
+ua1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${UAM}" 2>&1 || true)
+if echo "${ua1}" | grep -q "OVERALL.*PASS" && ! echo "${ua1}" | grep -q "|FAIL"; then echo "  ok   取消那一格的那一支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 取消那一格的那一支驗收表：${ua1}" | head -20; fail=$((fail+1)); fi
+UALOG=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from public.rc_log where what = 'left_high_school' and after->>'because' = 'first_event'" | tr -d ' \n')
+ua2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${UAM}" 2>&1 || true)
+if echo "${ua2}" | grep -q "OVERALL.*PASS" && ! echo "${ua2}" | grep -q "|FAIL"; then echo "  ok   重跑一次也全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑：${ua2}" | head -20; fail=$((fail+1)); fi
+chk "重跑沒有多取消任何人、沒有多寫紀錄" "${UALOG}" "select count(*) from public.rc_log where what = 'left_high_school' and after->>'because' = 'first_event'"
+UAK="select p.kind||'|'||public.rc_label_codes(p.id)::text from public.people p where p.name_en ="
+chk "★ 四年前以學員來過、沒寫畢業年：那一格取消，標籤還是以前的學員" 'guest|["student:past"]' "${UAK} 'Uam Old'"
+chk "★ 去年才來的：不動" 'student|["student"]' "${UAK} 'Uam Recent'"
+chk "★ 寫了畢業年而且還沒畢業的：不動" 'student|["student"]' "${UAK} 'Uam GradYear'"
+chk "一場都沒來過的：不動" 'student|["student"]' "${UAK} 'Uam None'"
+chk "★ 只當過 mentee 的：那一格取消，補一個「學員」標籤，所以還看得出以前是學員" 'guest|["student:past","mentee:past"]|1' "select p.kind||'|'||public.rc_label_codes(p.id)::text||'|'||(select count(*) from public.rc_labels g where g.person_id = p.id and g.label = 'student' and g.detail = 'Left high school (by first event year)') from public.people p where p.name_en = 'Uam Mentee'"
+chk "已經有學員紀錄的人不多補標籤" "0" "select count(*) from public.rc_labels g join public.people p on p.id = g.person_id where p.name_en = 'Uam Old' and g.label = 'student'"
+chk "★ 有自己帳號的學員不動（那一格跟著帳號走）" "student" "select kind from public.people where id = '${UASTU}'"
+chk "★ 每取消一個人寫一列紀錄，裡面有改之前的種類與是哪一個學年第一次來" "student|guest|true" "select (before->>'kind')||'|'||(after->>'kind')||'|'||(after ? 'first_school_year') from public.rc_log where what = 'left_high_school' and after->>'because' = 'first_event' and ref = (select id from public.people where name_en = 'Uam Old')"
+chkas "${PAUL}" "★ 取消之後開得了個人連結（還勾著的開不了，會回 minor_no_link）" "t" "select public.rc_profile_link((select id from public.people where name_en = 'Uam Old'), 'create') is not null"
+chkraise "還勾著的那一位照舊開不了個人連結" "minor_no_link" "perform set_config('test.uid','${PAUL}',true); perform public.rc_profile_link((select id from public.people where name_en = 'Uam Recent'), 'create');"
+psql -d "${DB}" -q -c "delete from public.rc_participation where person_id = '${UASTU}' and event_id in (select id from public.events where slug like 'uam-%'); delete from public.rc_log where ref in (select id from public.people where name_en like 'Uam %'); delete from public.people where name_en like 'Uam %'; delete from public.events where slug like 'uam-%'; delete from public.profiles where id = '${UAPRO}'; delete from auth.users where id = '${UAPRO}';" >/dev/null 2>&1 || true
+chk "（收尾）假的人、假的活動與那個學員帳號都拿掉了" "0|0|0" "select (select count(*) from public.people where name_en like 'Uam %' or profile_id = '${UAPRO}')||'|'||(select count(*) from public.events where slug like 'uam-%')||'|'||(select count(*) from public.profiles where id = '${UAPRO}')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"
