@@ -98,7 +98,9 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     // 別的資料夾是帶 ?lang= 與 # 的一般連結。
     // 2026-12-26：「活動」那一行改叫「專案」，點下去是專案清單；場地搬到組織（整個 BT）。
     assert.match(rail, /<a class="rail-item rail-area" href="\/admin\/\?lang=zh#projects">.*?<b>專案<\/b>/, label);
-    assert.match(rail, /href="\/admin\/\?lang=zh#venues">.*?<b>場地<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/, label);
+    // 2026-11-28 Paul：「put venue into records」。沒被派進紀錄、只有場地的人，紀錄那一行點下去就是場地。
+    assert.match(rail, /href="\/admin\/\?lang=zh#venues">.*?<b>紀錄<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/, label);
+    assert.doesNotMatch(rail, /<b>場地<\/b>/, `${label}：場地不再自己一行`);
     assert.doesNotMatch(rail, /<div class="rail-group">(組織|整個 BT|我的)<\/div>/, `${label}：「我的」與「整個 BT」合成最上面一段，不加標題（2026-11-27 第二版）`);
     // 最上面那一段：首頁連到 /home/（不帶 #），行事曆是 /home/#calendar，護照是 /passport/。
     assert.match(rail, /<\/form>\s*<a class="rail-item rail-area" href="\/home\/\?lang=zh">.*?<b>首頁<\/b>/, `${label}：首頁在搜尋框底下（2026-11-27 第三版）`);
@@ -106,7 +108,7 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     assert.match(rail, /href="\/passport\/\?lang=zh">.*?<b>我的護照<\/b>/, label);
     assert.doesNotMatch(rail, /<b>待辦<\/b>/, `${label}：後台的待辦併進首頁了`);
     // 一頁都進不去的那一行整行不畫。
-    for (const no of ["護照", "錢", "紀錄", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);
+    for (const no of ["護照", "錢", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);
     assert.doesNotMatch(rail, /href="\/admin\/people\//, `${label}：一般幹部不該拿到人與權限的連結`);
     assert.doesNotMatch(rail, /rail-item off|<details/, `${label}：不再有淡掉的行與折疊段，最上面的「新增」也拿掉了（2026-11-27 第二版）`);
     assert.match(rail, /rail-me"><b>王平<\/b>\s*<span>Associate・Curriculum Team/, `${label}：側欄上要寫名字、職級、team`);
@@ -418,7 +420,7 @@ test("★ 側欄沒有中英切換（只在設定那一頁）；英文側欄照�
     const rail = FORMS.railHTML("forms", "teams", { ...ME.member, name: "a", ws: DAY });
     assert.doesNotMatch(rail, /data-act="lang"/);
     assert.match(rail, />All pages</, "手機上那顆鈕不跟頂欄的「選單」同名");
-    assert.match(rail, /<b>Venues<\/b>[\s\S]*<div class="rail-group">My workspaces<\/div>/);
+    assert.match(rail, /<b>Records<\/b>[\s\S]*<div class="rail-group">My workspaces<\/div>/);
   } finally { FORMS.setLang("zh"); }
   assert.match(readFileSync("settings/src/ui.js", "utf8"), /data-act="lang" data-lang="\$\{l\}"/, "設定那一頁還有");
 });
@@ -853,7 +855,7 @@ test("★ 側欄：現在這一區展開成它的每一頁，現在這一頁有�
     assert.match(M.railHTML("records", "people", { role: "cadre", board: "director", team: "", name: "D", ws: { records: "edit", "custom:records": "manage" } }, {}, "en"),
       /rail-sub rail-people" href="\/admin\/\?lang=zh#members=custom%3Arecords"/, `${label}：只管這一區的人照舊有`);
     assert.equal((rail.match(/rail-subs/g) || []).length, 1, `${label}：只有現在這一區展開`);
-    // 場地只有一頁：不展開，那一行自己深藍。
+    // 只有場地（沒被派進紀錄）：紀錄那一行只有一頁，不展開，那一行自己深藍。
     const one = M.railHTML("forms", "venues", { role: "cadre", board: "member", team: "Curriculum Team", ws: DAY }, {}, "zh");
     assert.doesNotMatch(one, /rail-subs/, label);
     assert.match(one, /rail-area on"/, label);

@@ -115,7 +115,7 @@ const ICON = {
 //   人與權限只有 Co-President 與 Senior Adviser 進得去，搬到頂欄（shared/nav.js 的 FEATURES）。
 //   AREAS 裡 sec 不是這三段的（people、money）不畫成側欄的一行，但它們的分頁照舊在 AREAS 與 ITEMS 裡，內容區上方那一排分頁照樣有。
 // 2026-11-27 第二版（Paul：「me and whole BT, essentially they're the same thing」）：「我的」與「整個 BT」合成最上面一段，不加標題。
-//   上面那一段每個人都一樣、位置固定（首頁、行事曆、會議、專案、表單、我的護照、場地），點久了手會記得；
+//   上面那一段每個人都一樣、位置固定（首頁、行事曆、會議、專案、表單、我的護照、紀錄；場地 2026-11-28 搬進紀錄那一行），點久了手會記得；
 //   下面「我的工作區」每個人長度不一樣：先是他的 team（一個 team 一行），再接被指派才有的（對外網站、行銷、護照、紀錄、幹部招募），旁邊標「指派」。
 //   工作區放下面，因為放上面會把固定的那幾行往下推，每個人的位置都不一樣。
 //   搜尋搬到頂欄（shared/nav.js），「+ 新增」拿掉：提需求、記會、排會放回首頁與每個 team 的頁上。
@@ -137,11 +137,11 @@ export const AREAS = [
   // 要我填的、所有表單（報名表、回饋表、內部表單三種，標類型與是哪一場活動的，也在這裡建一份）、內部表單、回饋表。
   { key: "forms",     sec: "me",   label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、我管的、建一份", en: "To fill, the ones you run, make one" } },
   { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
-  // 場地是整個 BT 的（2026-12-26 Paul：「venue, records, money … whole BT」）。誰改得動不變：開得了活動的人照舊改得動。
-  { key: "venues",    sec: "me",   label: { zh: "場地",     en: "Venues" },     hint: { zh: "場地與聯絡人", en: "Places and contacts" } },
   // 2027-01-24（Paul：「records… right now they're in my workspace, but they're also inside whole BT. So it's confusing」）：
   //   整個 BT 的東西都畫在最上面這一段（不加標題），被派進去才有的也一樣，不再放進「我的工作區」。「我的工作區」只剩 team 與 Marketing。
-  { key: "records",   sec: "me",   label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較", en: "Events, people, year by year" } },
+  // 場地搬進紀錄這一行（2026-11-28 Paul：「put venue into records」）：紀錄的最後一個分頁。誰看得到照舊是 custom:venues，
+  //   沒被派進紀錄、只有場地的人，這一行點下去就是場地。誰改得動不變：開得了活動的人照舊改得動。
+  { key: "records",   sec: "me",   label: { zh: "紀錄",     en: "Records" },    hint: { zh: "活動、人、年度比較、場地", en: "Events, people, year by year, venues" } },
   { key: "passports", sec: "me",   label: { zh: "幹部護照", en: "Cadre passport" }, hint: { zh: "格子與入境章的城市", en: "Boxes and entry-stamp cities" } },
   // 對外網站是一個工作區（2026-11-27 第二版 Paul：「website should be something that they assign to」）：custom:website，
   //   在「人與權限 → 工作區」派人。這一行只畫給被派進去的人與 Co-President、Senior Adviser（areaWho）；
@@ -242,8 +242,7 @@ export const ITEMS = [
   { group: "records",   key: "overview",   area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "活動", en: "Events" } },
   { group: "records",   key: "people",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "人", en: "People" } },
   { group: "records",   key: "yearly",     area: "records",   who: "ws:records", ws: "custom:records", label: { zh: "年度比較", en: "Year by year" } },
-  // 場地（2026-12-26 從「專案」底下搬到整個 BT）
-  { group: "forms",     key: "venues",     area: "venues",    who: "ws:custom:venues", ws: "custom:venues", label: { zh: "場地", en: "Venues" } },
+  { group: "forms",     key: "venues",     area: "records",   who: "ws:custom:venues", ws: "custom:venues", label: { zh: "場地", en: "Venues" } },
   // 錢
   { group: "finance",   key: "overview",   area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "總覽", en: "Overview" } },
   { group: "finance",   key: "tx",         area: "money",     who: "ws:finance", ws: "custom:money", label: { zh: "收支紀錄", en: "Transactions" } },

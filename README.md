@@ -963,6 +963,8 @@ Paul 2026-11-27 看了工作區那一頁之後說：錢應該在 Sponsorship 底
 
 **側欄：** 最上面沒有標題的那一段，畫的是他被開了的那幾樣（首頁每個人都有）。紀錄、幹部護照、對外網站從「我的工作區」搬上來。我的工作區只剩他的 team 與行銷。Internship 那一行底下多實習護照。
 
+> 2026-11-28 更新（Paul：「put venue into records」）：**場地搬進紀錄那一行**，是紀錄的最後一個分頁（活動、人、年度比較、場地）。誰看得到場地沒有變，照舊是工作區那一頁的「場地」那一格。沒被派進紀錄、只開了場地的人，側欄照樣有一行「紀錄」，點下去就是場地，裡面只有這一頁。工作區那一頁的場地照舊排在「每天用的」。程式在 `shared/rail.js` 的 `ITEMS`（場地那一頁的 `area` 改成 `records`）與 `AREAS`（場地那一行拿掉）。
+
 **Senior → Internal：**
 - 放進 Internal 的幹部，資料庫把他當成 Co-President（`is_president()` 與 `is_senior()` 都認他）：改職級、派錢、邀請、派別人進 Internal、看人與權限。
 - **只有 Co-President（含 Internal 裡的人）派得了 Internal**，Senior Adviser 派不了。名單請留短，放進去等於把整個後台交給他。

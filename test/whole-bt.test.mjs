@@ -41,7 +41,7 @@ test("★ 沒被派的幹部最上面只有首頁；有六樣的跟以前一樣"
   const rows = h => [...h.matchAll(/class="rail-item rail-area(?: (?:on|here))?" [^>]*>[\s\S]*?<b>([^<]+)<\/b>/g)].map(m => m[1]);
   const day = Object.fromEntries(RAIL.WHOLE_BT_TOOLS.map(id => [id, "edit"]));
   assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: {} }, {}, "zh")), ["首頁"]);
-  assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: day }, {}, "zh")), ["首頁", "行事曆", "會議", "專案", "表單", "我的護照", "場地"]);
+  assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: day }, {}, "zh")), ["首頁", "行事曆", "會議", "專案", "表單", "我的護照", "紀錄"], "場地在紀錄那一行裡（2026-11-28）");
   // 只開行事曆給他：就只有行事曆。
   assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: { "custom:calendar": "view" } }, {}, "zh")), ["首頁", "行事曆"]);
 });

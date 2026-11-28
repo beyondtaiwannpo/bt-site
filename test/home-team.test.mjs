@@ -65,7 +65,7 @@ test("我在哪幾個 team：照指派算，順序固定，專案跟著它的 te
 // 2026-11-27 第二版：「我的」與「整個 BT」合成最上面一段（不加標題），「我的工作區」在下面。
 test("側欄：最上面一段每個人都一樣，下面是「我的工作區」，一個 team 一行，右邊是等級", () => {
   const h = RAIL.railHTML("forms", "projects", TWO, {}, "zh");
-  assert.match(h, /<b>場地<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/);
+  assert.match(h, /<b>紀錄<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/, "場地在紀錄那一行裡（2026-11-28）");
   assert.doesNotMatch(h, /<div class="rail-group">(我的|整個 BT)<\/div>/);
   assert.match(h, /<a class="rail-item rail-area rail-team" href="\/home\/\?lang=zh#team=Curriculum%20Team">.*?<b>Curriculum<\/b><\/span><span class="rail-lv"[^>]*>改<\/span><\/a>/);
   assert.match(h, /href="\/home\/\?lang=zh#team=Internship%20Team">.*?<b>Internship<\/b><\/span><span class="rail-lv"[^>]*>管<\/span>/);

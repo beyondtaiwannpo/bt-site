@@ -15,10 +15,10 @@ const rows = h => [...h.matchAll(/class="rail-item rail-area(?: (?:on|here))?" [
 // 2026-11-27 第二版：「我的」與「整個 BT」合成最上面一段；被派進去的東西在「我的工作區」，標「指派」。
 test("★ Associate 的側欄：最上面那一段，加上他的 team；表單是要我填的與所有表單", () => {
   const h = RAIL.railHTML("forms", "projects", ASSOC, {}, "zh");
-  assert.deepEqual(rows(h), ["首頁", "行事曆", "會議", "專案", "表單", "我的護照", "場地"]);
+  assert.deepEqual(rows(h), ["首頁", "行事曆", "會議", "專案", "表單", "我的護照", "紀錄"], "紀錄那一行只有場地（2026-11-28）");
   assert.match(h, /<b>Curriculum<\/b>/);
   assert.deepEqual(RAIL.visibleItems("forms", ASSOC).map(i => i.key), ["fill", "all"]);
-  for (const no of ["行銷", "對外網站", "紀錄", "護照", "人與權限", "錢", "搜尋"]) assert.ok(!rows(h).includes(no), `Associate 沒有${no}`);
+  for (const no of ["行銷", "對外網站", "護照", "人與權限", "錢", "搜尋"]) assert.ok(!rows(h).includes(no), `Associate 沒有${no}`);
   assert.doesNotMatch(h, /rail-new/, "側欄的「新增」拿掉了（提需求在首頁與 team 頁的標題底下）");
 });
 
@@ -33,7 +33,7 @@ test("★ 對外網站是一個要派人的工作區（custom:website）；資�
   assert.ok(!RAIL.areaShown(web, { ...ASSOC, ws: { "custom:website": "view" } }), "只能看的人改不動，不畫");
   assert.deepEqual(RAIL.visibleItems("website", WEB).map(i => i.key), ["history", "island-map", "island"], "被派進對外網站的人：歷史之路與 BT 島（資源庫照舊是各 team 的）");
   // 2027-01-24：對外網站在最上面那一段（整個 BT 的東西都在那裡），不標「指派」。
-  assert.match(RAIL.railHTML("home", "home", WEB, {}, "zh"), /<b>場地<\/b>[\s\S]*?<b>對外網站<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/);
+  assert.match(RAIL.railHTML("home", "home", WEB, {}, "zh"), /<b>紀錄<\/b>[\s\S]*?<b>對外網站<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/);
   // team 底下：資源庫、BT 島的貼文、BT 島；Marketing 多歷史之路。只能看的沒有。
   assert.deepEqual(RAIL.teamSiteItems(ED, "Curriculum Team").map(i => i.key), ["res", "island", "island-map"]);
   assert.deepEqual(RAIL.teamSiteItems({ ...ASSOC, ws: { "res:Marketing Team": "edit" } }, "Marketing Team").map(i => i.key), ["res", "history", "island", "island-map"]);
