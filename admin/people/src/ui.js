@@ -363,6 +363,69 @@ export function pkRefocus(ns, which) {
 //       draft: true 的話是「還沒建立」的模式：左欄列的是勾起來的人（移出 = 取消勾），右欄是還沒勾的 }
 export const RANK_TAG = { president: "CP", senior_adviser: "SA", director: "DR", adviser: "AD", member: "AS" };
 export const rankTag = board => `<span class="rk" title="${esc(boardName(board))}">${RANK_TAG[board] || "AS"}</span>`;
+// ── 一張名單（2026-11-28，Paul：「can we just make it into one page… when I press that people, it's gonna pop on in the middle」）──
+// 取代左右兩欄（在裡面的／還沒在裡面的）、上面那排「下一次加人要開的」、下面那張「誰開了哪幾樣」。九份一模一樣（測試逐字比對）。
+// 每一位幹部一行：在裡面的寫等級，不在裡面的字是灰的，一樣點得到。Co-President 與 Senior Adviser 排最上面寫「全部（職級）」，不能改。
+// 每一行前面一個勾；勾好幾個人，上面那一排一次改。
+//   mode "one"（一格，例如我的護照、某一個 team 的申請）：每一行一個下拉（沒有・看・改・管），改了就存。
+//   mode "many"（整個工作區，好幾樣）：每一行寫「12 樣裡有 8 樣」，點名字或「改」，畫面中間跳出那個人每一樣的等級（wsDialogHTML）。
+// a = { rows（workspace_members 的形狀；many 的時候每一列帶 has：{ 格子 id: 等級 }）, people（幹部名單 { id, name_zh, name_en, board_role, team }）,
+//       pk = { q, teams, sel, blevel }, busy, meId, mode, n（many：這個工作區有幾樣）, acts: { level, bulk, open, cleanup }, canCleanup }
+export const LEVELS4 = ["none", "view", "edit", "manage"];
+export function wsListRows(people, rows) {
+  const senior = b => ["president", "senior_adviser"].includes(b);
+  const by = new Map(), redundant = [];
+  for (const p of people || []) if (p && p.id) by.set(p.id, { id: p.id, name_zh: p.name_zh, name_en: p.name_en, board_role: p.board_role, team: p.team || "", level: null, has: null });
+  for (const r of rows || []) {
+    if (!r || !r.user_id) continue;
+    const x = by.get(r.user_id) || { id: r.user_id, name_zh: r.name_zh, name_en: r.name_en, board_role: r.board_role, team: r.team || "", level: null, has: null };
+    if (!x.level) { x.level = r.level || null; x.has = r.has || null; }
+    if (senior(x.board_role) && !redundant.includes(x.id)) redundant.push(x.id);
+    by.set(r.user_id, x);
+  }
+  const all = [...by.values()], byName = (x, y) => mpName(x).localeCompare(mpName(y));
+  return { seniors: all.filter(x => senior(x.board_role)).sort(byName),
+           plain: all.filter(x => !senior(x.board_role)).sort((x, y) => (x.level ? 0 : 1) - (y.level ? 0 : 1) || byName(x, y)),
+           redundant };
+}
+// 「全部改成」那一排與每一列的下拉共用：四顆（或 many 對話框裡多一顆「不動」）。
+export const levelOptions = (cur, withKeep) => (withKeep ? [""] : []).concat(LEVELS4)
+  .map(l => `<option value="${l}"${(cur || (withKeep ? "" : "none")) === l ? " selected" : ""}>${esc(T(l ? "rl.lv." + l : "rl.keep"))}</option>`).join("");
+export function wsListHTML(ns, a) {
+  const o = a || {}, acts = o.acts || {}, many = o.mode === "many";
+  const pk = Object.assign({ q: "", teams: [], sel: [], blevel: "edit" }, o.pk || {});
+  const dis = o.busy ? " disabled" : "";
+  const L = wsListRows(o.people, o.rows);
+  const shown = pkShown(L.plain, pk), shownSen = pkShown(L.seniors, pk);
+  const sel = new Set(pk.sel || []), picked = L.plain.filter(x => sel.has(x.id)).map(x => x.id);
+  const nIn = L.seniors.length + L.plain.filter(x => x.level).length, nAll = L.seniors.length + L.plain.length;
+  const short = t => t.replace(/\s*Team$/i, "");
+  const teamsHTML = p => pkTeamsOf(p).map(t => `<span class="mini">${esc(short(t))}</span>`).join(" ");
+  const teamsHere = PK_TEAMS.filter(t => L.plain.some(p => pkTeamsOf(p).includes(t)));
+  const chip = t => `<button type="button" class="chip sm${pk.teams.includes(t) ? " on" : ""}" data-act="pk-team" data-ns="${esc(ns)}" data-team="${esc(t)}" aria-pressed="${pk.teams.includes(t) ? "true" : "false"}"${dis}>${esc(short(t))}</button>`;
+  const you = x => x.id === o.meId ? `<span class="mini">${T("mp.you")}</span>` : "";
+  const seniorRow = x => `<div class="ma-row byrank">${nameBlock(x)}${rankTag(x.board_role)}${you(x)}<span class="mini">${T("grid.byRank")}</span><span class="sp"></span><span class="mini">${esc(T("rl.lv.manage"))}</span></div>`;
+  const box = x => `<input type="checkbox" class="ma-sel" data-act="pk-sel" data-ns="${esc(ns)}" value="${esc(x.id)}" aria-label="${esc(T("ma.selOne", { name: mpName(x) }))}"${sel.has(x.id) ? " checked" : ""}${dis}>`;
+  const sum = x => !x.level ? T("rl.out") : T("rl.sum", { n: Object.keys(x.has || {}).length, m: o.n || 0, level: T("rl.lv." + x.level) });
+  const row = x => many
+    ? `<div class="ma-row ro-row${x.level ? "" : " out"}${sel.has(x.id) ? " on" : ""}">${box(x)}<button type="button" class="ro-who" data-act="${esc(acts.open)}" data-ids="${esc(x.id)}"${dis}>${nameBlock(x)}</button>${rankTag(x.board_role)}${you(x)}${teamsHTML(x)}<span class="sp"></span>
+        <span class="mini ro-sum">${esc(sum(x))}</span><button type="button" class="btn ghost sm" data-act="${esc(acts.open)}" data-ids="${esc(x.id)}" aria-label="${esc(T("rl.editOne", { name: mpName(x) }))}"${dis}>${T("rl.edit")}</button></div>`
+    : `<div class="ma-row ro-row${x.level ? "" : " out"}${sel.has(x.id) ? " on" : ""}">${box(x)}${nameBlock(x)}${rankTag(x.board_role)}${you(x)}${teamsHTML(x)}<span class="sp"></span>
+        <select class="ro-lv" data-act="${esc(acts.level)}" data-id="${esc(x.id)}" aria-label="${esc(T("rl.levelOf", { name: mpName(x) }))}"${dis}>${levelOptions(x.level)}</select></div>`;
+  const tools = `<div class="ma-tools"><button type="button" class="lnk" data-act="pk-selall" data-ns="${esc(ns)}" data-ids="${esc(shown.map(x => x.id).join(","))}"${o.busy || !shown.length ? " disabled" : ""}>${T("pk.tickAll")}</button>
+      <button type="button" class="lnk" data-act="pk-selnone" data-ns="${esc(ns)}"${o.busy || !picked.length ? " disabled" : ""}>${T("pk.untick")}</button><span class="sp"></span>${many
+      ? `<button type="button" class="btn sm" data-act="${esc(acts.open)}" data-ids="${esc(picked.join(","))}"${o.busy || !picked.length ? " disabled" : ""}>${T("rl.editN", { n: picked.length })}</button>`
+      : `<select id="${esc(ns)}-blevel" data-act="pk-blevel" data-ns="${esc(ns)}" aria-label="${esc(T("rl.bulkLevel"))}"${dis}>${levelOptions(pk.blevel)}</select>
+        <button type="button" class="btn sm" data-act="${esc(acts.bulk)}" data-op="level" data-ns="${esc(ns)}"${o.busy || !picked.length ? " disabled" : ""}>${T("rl.setN", { n: picked.length })}</button>`}</div>`;
+  const items = shownSen.map(seniorRow).concat(shown.map(row));
+  const foot = L.redundant.length && acts.cleanup && o.canCleanup
+    ? `<div class="ma-foot mini">${T("ma.redundant", { n: L.redundant.length })} <button type="button" class="lnk" data-act="${esc(acts.cleanup)}" data-ids="${esc(L.redundant.join(","))}"${dis}>${T("ma.cleanup", { n: L.redundant.length })}</button></div>` : "";
+  return `<div class="ro picker" data-ns="${esc(ns)}"><section class="ma-col"><div class="ma-head">
+      <div class="ma-title">${T("rl.title", { n: nIn, m: nAll })}${items.length !== nAll ? `<span class="mini"> ${T("ma.shown", { n: items.length })}</span>` : ""}</div>
+      <input id="${esc(ns)}-q" class="ma-find" value="${esc(pk.q || "")}" placeholder="${esc(T("pk.findPh"))}" autocomplete="off" data-act="pk-q" data-ns="${esc(ns)}"${dis}>
+      ${teamsHere.length ? `<div class="ma-chips">${teamsHere.map(chip).join("")}</div>` : ""}${tools}</div>
+    <div class="ma-list">${items.length ? items.join("") : `<div class="ma-empty mini">${T("pk.noneShown")}</div>`}</div>${foot}</section></div>`;
+}
 export function membersAreaHTML(ns, a) {
   const o = a || {};
   const pk = Object.assign({ q: "", mq: "", teams: [], ticked: [], level: "view", sel: [], blevel: "edit" }, o.pk || {});
@@ -529,12 +592,12 @@ export function mpLinksHTML(items) {
   return `<div class="chips mp-links">${items.map(i => `<button class="chip" data-act="members-open" data-ws="${esc(i.ws)}" data-name="${esc(i.name)}">${esc(T("mp.open", { name: i.name }))}</button>`).join("")}</div>`;
 }
 export function membersPanelHTML(mp, msg, busy) {
-  // 2026-10-24：兩欄成員區（左「在裡面的」右「還沒在裡面的」，見 membersAreaHTML）。Co-President 與 Senior Adviser 在左欄最上面標「依職級」。
+  // 2026-11-28 起是一張名單（見 wsListHTML）：每一位幹部一行，一個下拉（沒有・看・改・管）；勾好幾個人一次改。
   return pageHead(T("mp.title", { name: esc(mp.name || mp.ws) }), T("mp.lede"), [], { act: "members-back", label: T("mp.back") })
     + msgHTML(msg)
     + `<div class="note">${T("mp.levels")}</div>`
-    + membersAreaHTML("mp", { rows: mp.rows || [], people: mp.cadres || [], pk: mp.pk, busy, meId: mp.meId,
-        acts: { level: "members-level", remove: "members-unassign", cleanup: "members-cleanup", bulk: "members-bulk" }, canCleanup: !!mp.senior, go: { act: "members-assign", ws: mp.ws } });
+    + wsListHTML("mp", { rows: mp.rows || [], people: mp.cadres || [], pk: mp.pk, busy, meId: mp.meId, mode: "one",
+        acts: { level: "members-level", bulk: "members-bulk", cleanup: "members-cleanup" }, canCleanup: !!mp.senior });
 }
 // 區塊：一個 h2 一塊。opts = { id, hint, actions: [{ act, label, ...data }] }
 export function sectionHTML(title, body, opts) {
@@ -1233,11 +1296,11 @@ export function workspacesHTML(workspaces, sel, members, people, msg, busy, draf
   const left = list.length ? `<div class="wsgrid">${wsRows(list, TEAMS, people).filter(r => r.cells.length).map(r => `<div class="wsgrp">${head(r)}<div class="wslist">${cellsHTML(r)}</div></div>`).join("")}</div>`
     : emptyHTML(T("ws.empty"), T("ws.emptyHint"));
   const ownerName = w && w.owner && byProfile[w.owner] ? personName(byProfile[w.owner]).name : "";
-  // 2026-10-24：兩欄成員區（左「在裡面的」右「還沒在裡面的」，見 membersAreaHTML）。Co-President 與 Senior Adviser 在左欄最上面標「依職級」。
+  // 2026-11-28 起一格也是一張名單（wsListHTML）：每一位幹部一行一個下拉，勾好幾個人一次改。
   const right = !w ? "" : `
     <h2>${esc(wsCellLabel(w))}<span class="hint">${esc(wsTeamOf(w, people) || T("ws.board"))}・${esc(w.id)}${ownerName ? T("ws.owner", { name: esc(ownerName) }) : ""}</span></h2>
     <div class="note">${T("ws.levels")} ${T("ws.addNote")}</div>
-    ${membersAreaHTML("ws", { rows: members || [], people: pkPeople, pk: d.pk, busy, acts: { level: "ws-level", remove: "ws-unassign", cleanup: "ws-cleanup", bulk: "ws-bulk" }, canCleanup: !!canCreate, go: { act: "ws-assign", ws: w.id } })}`;
+    ${wsListHTML("ws", { rows: members || [], people: pkPeople, pk: d.pk, busy, mode: "one", acts: { level: "ws-level", bulk: "ws-bulk", cleanup: "ws-cleanup" }, canCleanup: !!canCreate })}`;
   // 新增工作區（2026-10-23 批 2）：一張表單做完，名稱、擁有人、代號（從英文名稱自動算）、一開始就放進去的人各自一個等級。
   // 2026-11-11 Paul：又收回摺疊，放在最上面（一直開著放在最底下，清單長了看不到，也很干擾）。填到一半重畫後還開著。
   // main.js 的 ws-create 先建工作區，再把勾起來的人一個一個派進去。
@@ -1287,69 +1350,60 @@ export function grpUnion(cells, grp) {
   }
   return [...by.values()];
 }
-// 已經有「勾起來的那幾樣」每一樣的人（2027-01-24）。這些人才算「全部有了」，不出現在右欄；少一樣的照樣列在右欄，加的時候只補他少的。
-// Co-President 與 Senior Adviser 靠職級本來就有全部，一律算在裡面。
-export function grpFullIds(cells, grp, off) {
-  const skip = new Set(off || []), on = (cells || []).filter(c => !skip.has(c.id));
-  const rows = grpUnion(cells, grp);
-  return rows.filter(r => ["president", "senior_adviser"].includes(r.board_role) || on.every(c => r.has[c.id])).map(r => r.user_id);
-}
-// 加人那一步實際要寫的：每個人只補他還沒有的那幾樣，已經有的不動（不會把原本的「改」蓋成「看」）。
-export function grpAddOps(ids, cells, grp, off, level) {
-  const skip = new Set(off || []), on = (cells || []).filter(c => !skip.has(c.id));
-  const has = Object.fromEntries(grpUnion(cells, grp).map(r => [r.user_id, r.has]));
-  return (ids || []).flatMap(id => on.filter(c => !(has[id] || {})[c.id]).map(c => ({ id, ws: c.id, level })));
-}
-// 右欄每個人少哪幾樣（Paul 2026-11-28：右欄只寫 team，看不出為什麼他會在那裡）。照上面勾的順序；一樣都沒有就說都還沒有。
-export function grpMissing(cells, grp, off, userId) {
-  const skip = new Set(off || []), on = (cells || []).filter(c => !skip.has(c.id));
-  const has = (grpUnion(cells, grp).find(r => r.user_id === userId) || {}).has || {};
-  return on.filter(c => !has[c.id]);
-}
-export function grpMissingHTML(miss, nOn) {
-  if (!miss.length) return "";
-  const names = miss.map(grpShort), full = ` title="${esc(T("ws.grpMissing", { list: names.join(T("punct.list")) }))}"`;
-  if (miss.length === nOn && nOn > 3) return `<span class="mini miss"${full}>${esc(T("ws.grpMissingAll", { n: nOn }))}</span>`;
-  const head = names.slice(0, 3).join(T("punct.list"));
-  const list = names.length > 3 ? T("ws.grpMissingMore", { list: head, n: names.length, more: names.length - 3 }) : head;
-  return `<span class="mini miss"${full}>${esc(T("ws.grpMissing", { list }))}</span>`;
-}
-// 表頭用短名字（括號裡的說明拿掉），表才放得下。
+// 表頭用短名字（括號裡的說明拿掉），放得下。
 export const grpShort = w => wsCellLabel(w).replace(/\s*[（(].*$/, "");
+// 整個工作區（2026-11-28 改成一張名單，Paul：「I only need one thing… when I press that people, it's gonna pop on in the middle」）。
+// 以前有三塊：上面「下一次加人要開的」一排勾、左右兩欄、下面「誰開了哪幾樣」那張表。現在只有一張名單（wsListHTML，mode "many"）：
+// 每一位幹部一行寫「12 樣裡有 8 樣」；點一個人，畫面中間跳出這個工作區每一樣跟他的等級（wsDialogHTML）；
+// 勾好幾個人按「一次改 N 個人」，跳出同一格，每一樣預設「不動」。不在裡面的人照樣列著，點進去開給他就是加進來。
+// 資料庫沒有新的函式：存的時候一格一支 assign()／unassign()，跟以前同一道門（main.js 的 grpApply）。
 export function wsGroupHTML(team, cells, grp, people, draft, busy) {
-  const d = draft || {}, dis = busy ? " disabled" : "";
-  const off = new Set(d.off || []);
-  const rows = grpUnion(cells, grp);
-  const senior = r => ["president", "senior_adviser"].includes(r.board_role);
-  const plain = rows.filter(r => !senior(r));
+  const d = draft || {};
   const name = team === SENIOR ? T("ws.senior") : team ? team.replace(/\s*Team$/i, "") : T("ws.board");
-  const tag = c => c.kind === "project" ? `<span class="mini">${esc(T("ws.kind.project"))}</span>` : "";
-  const items = `<div class="wsg-items">${cells.map(c => `<label class="chip sm${off.has(c.id) ? "" : " on"}"><input type="checkbox" data-act="grp-item" value="${esc(c.id)}"${off.has(c.id) ? "" : " checked"}${dis}>${esc(grpShort(c))}${tag(c)}</label>`).join("")}</div>`;
-  // 「誰開了哪幾樣」（2027-01-24 重排，Paul：「I like that table, who has what, but like right now it's looking bad」）：
-  //   欄位分段（每天用的、要特別派的或這個 team 的工具、專案），表頭上面一排寫是哪一段；表頭寫幾個人有；
-  //   名字那一欄捲動時固定在左邊，表頭固定在上面；每一格置中，勾起來的格子底色深一點，等級寫在勾旁邊（跟他主要的等級不一樣才寫）。
-  const secOf = c => c.kind === "project" ? "pj" : WHOLE_BT_TOOLS.includes(c.id) ? "day" : "tool";
-  const secs = ["day", "tool", "pj"].map(k => ({ k, cells: cells.filter(c => secOf(c) === k) })).filter(x => x.cells.length);
-  const cols = secs.flatMap(x => x.cells);
-  const secName = k => T(k === "day" ? "ws.grpDay" : k === "pj" ? "ws.projects" : team ? "ws.grpTeamTools" : "ws.grpTools");
-  const nHas = c => plain.filter(r => r.has[c.id]).length;
-  const gapAt = i => i > 0 && secOf(cols[i - 1]) !== secOf(cols[i]);
-  const cell = (r, c, i) => {
-    const lv = r.has[c.id];
-    return `<td class="${lv ? "y" : ""}${gapAt(i) ? " gap" : ""}"><label><input type="checkbox" data-act="grp-cell" data-id="${esc(r.user_id)}" data-ws="${esc(c.id)}" aria-label="${esc(mpName(r) + "・" + grpShort(c))}"${lv ? " checked" : ""}${dis}>${lv && lv !== r.level ? `<span class="mini">${esc(T("level." + lv))}</span>` : ""}</label></td>`;
-  };
-  const secRow = secs.length > 1 ? `<tr class="wsg-sec"><th></th>${secs.map(x => `<th scope="colgroup" colspan="${x.cells.length}"${x === secs[0] ? "" : ' class="gap"'}>${esc(secName(x.k))}</th>`).join("")}</tr>` : "";
-  const byName = (x, y) => mpName(x).localeCompare(mpName(y));
-  const table = plain.length ? `<h3 class="sec-h">${T("ws.grpWhat")}</h3><div class="note">${T("ws.grpWhatNote")}</div>
-    <div class="wsg-wrap"><table class="wsg"><thead>${secRow}<tr><th scope="col" class="wsg-who">${T("ws.grpPerson")}</th>${cols.map((c, i) => `<th scope="col"${gapAt(i) ? ' class="gap"' : ""}><a href="${esc(wsCellHref(c))}">${esc(grpShort(c))}</a><span class="mini">${esc(T("ws.grpCount", { n: nHas(c), m: plain.length }))}</span></th>`).join("")}</tr></thead>
-    <tbody>${plain.slice().sort(byName).map(r => `<tr><th scope="row" class="wsg-who">${esc(mpName(r))}<span class="mini">${esc(T("level." + r.level))}</span></th>${cols.map((c, i) => cell(r, c, i)).join("")}</tr>`).join("")}</tbody></table></div>` : "";
   return `<h2>${esc(name)}<span class="hint">${T("ws.grpHint", { n: cells.length })}</span></h2>
     <div class="note">${T("ws.grpNote")}</div>
-    <h3 class="sec-h">${T("ws.grpOpen")}</h3><div class="note">${T("ws.grpOpenNote")}</div>${items}
-    ${membersAreaHTML("ws", { rows, people, pk: d.pk, busy, acts: { level: "grp-level", remove: "grp-unassign", bulk: "grp-bulk" }, go: { act: "grp-assign", ws: "group:" + team },
-      fullIds: grpFullIds(cells, grp, d.off), outTitle: n => T("ws.grpOut", { n }),
-      extra: p => grpMissingHTML(grpMissing(cells, grp, d.off, p.id), cells.filter(c => !off.has(c.id)).length) })}
-    ${table}`;
+    ${wsListHTML("ws", { rows: grpUnion(cells, grp), people, pk: d.pk, busy, mode: "many", n: cells.length, acts: { open: "grp-open" } })}
+    ${d.dlg ? wsDialogHTML(name, cells, grp, people, d.dlg, busy, !!team && team !== SENIOR) : ""}`;
+}
+// 跳出來那一格存的時候要寫的：每個人每一樣，選了的（不是「不動」）而且跟現在不一樣的才寫。level null = 從那一樣移出。
+export function wsDialogOps(cells, grp, dlg) {
+  const has = Object.fromEntries(grpUnion(cells, grp).map(r => [r.user_id, r.has]));
+  const set = (dlg && dlg.set) || {}, ops = [];
+  for (const id of (dlg && dlg.ids) || []) for (const c of cells || []) {
+    const v = set[c.id]; if (!v) continue;
+    const now = (has[id] || {})[c.id] || null, to = v === "none" ? null : v;
+    if (now !== to) ops.push({ id, ws: c.id, level: to });
+  }
+  return ops;
+}
+// 畫面中間那一格。一個人：每一樣四顆（沒有・看・改・管），亮的是他現在的等級。好幾個人：多一顆「不動」，預設全部「不動」。
+// 最上面「全部改成」一次把每一樣改成同一級。改過的那幾樣名字底下畫橘線；存的鈕寫要改幾處。
+export function wsDialogHTML(wsName, cells, grp, people, dlg, busy, isTeam) {
+  const dis = busy ? " disabled" : "";
+  const ids = (dlg && dlg.ids) || [], one = ids.length === 1, set = (dlg && dlg.set) || {};
+  const rows = grpUnion(cells, grp), has = one ? ((rows.find(r => r.user_id === ids[0]) || {}).has || {}) : {};
+  const nameOf = id => mpName((people || []).find(p => p.id === id) || rows.find(r => r.user_id === id) || {});
+  const cur = c => set[c.id] || (one ? (has[c.id] || "none") : "");
+  const changed = c => one ? !!set[c.id] && (set[c.id] === "none" ? !!has[c.id] : has[c.id] !== set[c.id]) : !!set[c.id];
+  const opts = one ? LEVELS4 : [""].concat(LEVELS4);
+  const seg = (act, extra, on, label) => `<div class="seg" role="group" aria-label="${esc(label)}">${opts.map(l => `<button type="button" data-act="${act}"${extra} data-lv="${l}" aria-pressed="${on(l) ? "true" : "false"}"${dis}>${esc(T(l ? "rl.lv." + l : "rl.keep"))}</button>`).join("")}</div>`;
+  const first = cells.length ? cur(cells[0]) : null, allVal = cells.every(c => cur(c) === first) ? first : null;
+  const secOf = c => c.kind === "project" ? "pj" : WHOLE_BT_TOOLS.includes(c.id) ? "day" : "tool";
+  const secName = k => T(k === "day" ? "ws.grpDay" : k === "pj" ? "ws.projects" : isTeam ? "ws.grpTeamTools" : "ws.grpTools");
+  const body = ["day", "tool", "pj"].map(k => ({ k, cs: cells.filter(c => secOf(c) === k) })).filter(x => x.cs.length)
+    .map(x => `<div class="ro-dlg-sec">${esc(secName(x.k))}</div>` + x.cs.map(c => `<div class="ro-dlg-row${changed(c) ? " chg" : ""}"><span class="lab"><b>${esc(grpShort(c))}</b></span>${seg("dlg-set", ` data-ws="${esc(c.id)}"`, l => cur(c) === l, grpShort(c))}</div>`).join("")).join("");
+  const ops = wsDialogOps(cells, grp, dlg);
+  const title = one ? T("ws.dlgOne", { name: esc(nameOf(ids[0])), ws: esc(wsName) }) : T("ws.dlgN", { n: ids.length, ws: esc(wsName) });
+  const sub = one ? T("ws.dlgOneSub", { n: Object.keys(has).length, m: cells.length })
+    : T("ws.dlgNSub") + `<div class="mini">${esc(ids.map(nameOf).join(T("punct.list")))}</div>`;
+  const warn = !one && Object.values(set).includes("manage") ? `<div class="mini">${T("ws.dlgManage")}</div>` : "";
+  return `<div class="ro-dlg-bg"><div class="ro-dlg" role="dialog" aria-modal="true" aria-labelledby="ro-dlg-h" tabindex="-1">
+    <div class="ro-dlg-head"><h2 id="ro-dlg-h">${title}</h2><div class="mini">${sub}</div>
+      <div class="ro-dlg-all"><b>${T("ws.dlgAll")}</b>${seg("dlg-all", "", l => allVal === l, T("ws.dlgAll"))}</div></div>
+    <div class="ro-dlg-body">${body}</div>
+    <div class="ro-dlg-foot">${warn}<span class="sp"></span><button type="button" class="btn ghost" data-act="dlg-close"${dis}>${T("common.cancel")}</button>
+      <button type="button" class="btn" data-act="dlg-save"${busy || !ops.length ? " disabled" : ""}>${busy ? T("common.saving") : T("ws.dlgSave", { n: ops.length })}</button></div>
+  </div></div>`;
 }
 
 // 一筆職位是那一屆的哪一季（2026-11-26，2027-01-17-term-seasons.sql）。空的是整年。

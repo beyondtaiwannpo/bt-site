@@ -48,58 +48,41 @@ test("★ 沒被派的幹部最上面只有首頁；有六樣的跟以前一樣"
   assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: { "custom:calendar": "view" } }, {}, "zh")), ["首頁", "行事曆"]);
 });
 
-test("★ 整個工作區加人：已經有其中幾樣的人照樣列在右欄，加的時候只補他少的、原本的等級不動", () => {
-  const cells = [{ id: "passport" }, { id: "apps" }, { id: "custom:meetings" }];
-  const grp = {
-    passport: [{ user_id: "a", name_zh: "A", board_role: "member", level: "edit" }, { user_id: "b", name_zh: "B", board_role: "member", level: "edit" }],
-    apps: [{ user_id: "b", name_zh: "B", board_role: "member", level: "view" }],
-    "custom:meetings": [{ user_id: "b", name_zh: "B", board_role: "member", level: "view" }, { user_id: "p", name_zh: "P", board_role: "president", level: "manage" }],
-  };
-  assert.deepEqual(P.grpFullIds(cells, grp, []).sort(), ["b", "p"], "a 只有幹部護照，還沒全部有");
-  assert.deepEqual(P.grpFullIds(cells, grp, ["apps", "custom:meetings"]).sort(), ["a", "b", "p"], "只勾幹部護照的話，a 已經有了");
-  assert.deepEqual(P.grpAddOps(["a", "z"], cells, grp, [], "view"), [
-    { id: "a", ws: "apps", level: "view" }, { id: "a", ws: "custom:meetings", level: "view" },
-    { id: "z", ws: "passport", level: "view" }, { id: "z", ws: "apps", level: "view" }, { id: "z", ws: "custom:meetings", level: "view" }]);
-  assert.deepEqual(P.grpAddOps(["a"], cells, grp, ["apps"], "edit"), [{ id: "a", ws: "custom:meetings", level: "edit" }], "沒勾的那一樣不加");
-  // 畫出來：右欄標題是「照上面勾的，還少幾樣的人」，a 在右欄。
-  const people = [{ id: "a", name_zh: "A", board_role: "member" }, { id: "b", name_zh: "B", board_role: "member" }];
-  const h = P.wsGroupHTML("", cells, grp, people, {}, false);
-  assert.match(h, /照上面勾的，還少幾樣的人（1）/);
-  assert.match(h, /name="ws-member" value="a"/);
-  assert.doesNotMatch(h, /name="ws-member" value="b"/);
-});
-
-test("★ 誰開了哪幾樣：分段、每一欄幾個人、名字固定在左邊；錢在 Sponsorship、實習護照在 Internship 那一行", () => {
+// 2026-11-28 Paul：「I only need one thing… when I press that people, it's gonna pop on in the middle… I can find a way for me to change everyone in that workspaces at the same time」。
+test("★ 整個工作區：一張名單，點一個人在畫面中間跳出每一樣跟他的等級；存的時候只寫有改的", () => {
   const cells = [{ id: "custom:calendar" }, { id: "custom:meetings" }, { id: "apps" }, { id: "project:x", kind: "project", title_zh: "X" }];
   const grp = { "custom:calendar": [{ user_id: "a", name_zh: "A", board_role: "member", level: "edit" }], apps: [{ user_id: "a", name_zh: "A", board_role: "member", level: "view" }] };
-  const h = P.wsGroupHTML("", cells, grp, [{ id: "a", name_zh: "A", board_role: "member" }], {}, false);
-  assert.match(h, /<tr class="wsg-sec"><th><\/th><th scope="colgroup" colspan="2">每天用的<\/th><th scope="colgroup" colspan="1" class="gap">要特別派的<\/th><th scope="colgroup" colspan="1" class="gap">專案<\/th><\/tr>/);
-  assert.match(h, /<th scope="col" class="wsg-who">人<\/th>/);
-  assert.match(h, /1\/1 人<\/span><\/th>/);
-  assert.match(h, /<td class="y"><label><input type="checkbox" data-act="grp-cell" data-id="a" data-ws="custom:calendar"[^>]*checked><\/label><\/td>/, "跟他主要的等級一樣就不寫等級");
-  assert.match(h, /data-ws="apps"[^>]*checked><span class="mini">看<\/span>/, "不一樣才寫");
+  const people = [{ id: "a", name_zh: "A", board_role: "member" }, { id: "z", name_zh: "Z", board_role: "member" }];
+  const h = P.wsGroupHTML("", cells, grp, people, {}, false);
+  assert.match(h, /在這個工作區 1 人・名單共 2 人/);
+  assert.match(h, /data-ids="a">[\s\S]*?<span class="mini ro-sum">4 樣裡有 2 樣・改<\/span>/);
+  assert.match(h, /<div class="ma-row ro-row out">[\s\S]*?value="z"[\s\S]*?<span class="mini ro-sum">不在裡面<\/span>/, "不在裡面的人列著，一樣點得到");
+  // 點 a：每一樣四顆，亮的是他現在的等級；分段跟以前一樣（每天用的、要特別派的、專案）。
+  const one = P.wsGroupHTML("", cells, grp, people, { dlg: { ids: ["a"], set: {} } }, false);
+  assert.match(one, /<div class="ro-dlg-bg"><div class="ro-dlg" role="dialog" aria-modal="true" aria-labelledby="ro-dlg-h"/);
+  assert.match(one, /<h2 id="ro-dlg-h">「A」在 整個 BT 的權限<\/h2><div class="mini">現在 4 樣裡有 2 樣。/);
+  assert.match(one, /<div class="ro-dlg-sec">每天用的<\/div>[\s\S]*<div class="ro-dlg-sec">要特別派的<\/div>[\s\S]*<div class="ro-dlg-sec">專案<\/div>/);
+  assert.match(one, /data-act="dlg-set" data-ws="custom:calendar" data-lv="edit" aria-pressed="true"/);
+  assert.match(one, /data-act="dlg-set" data-ws="custom:meetings" data-lv="none" aria-pressed="true"/);
+  assert.doesNotMatch(one, /data-lv="" /, "一個人沒有「不動」");
+  assert.match(one, /data-act="dlg-save" disabled>存（0 處要改）/, "沒改就不能存");
+  // 全部改成「改」：日曆本來就是改不寫；會議、專案加進來；申請從看變改。
+  const all = { ids: ["a"], set: Object.fromEntries(cells.map(c => [c.id, "edit"])) };
+  assert.deepEqual(P.wsDialogOps(cells, grp, all), [{ id: "a", ws: "custom:meetings", level: "edit" }, { id: "a", ws: "apps", level: "edit" }, { id: "a", ws: "project:x", level: "edit" }]);
+  assert.match(P.wsGroupHTML("", cells, grp, people, { dlg: all }, false), /data-act="dlg-all" data-lv="edit" aria-pressed="true"[\s\S]*存（3 處要改）/);
+  assert.deepEqual(P.wsDialogOps(cells, grp, { ids: ["a"], set: { apps: "none" } }), [{ id: "a", ws: "apps", level: null }], "「沒有」是移出");
+  // 一次改兩個人：多一顆「不動」，預設全部不動；選了「管」提醒一句。
+  const two = P.wsGroupHTML("", cells, grp, people, { dlg: { ids: ["a", "z"], set: { apps: "manage" } } }, false);
+  assert.match(two, /一次改 2 個人（整個 BT）/);
+  assert.match(two, /data-act="dlg-set" data-ws="custom:calendar" data-lv="" aria-pressed="true">不動/);
+  assert.match(two, /<div class="ro-dlg-row chg"><span class="lab"><b>[^<]+<\/b><\/span><div class="seg"[^>]*>[\s\S]*?data-ws="apps" data-lv="manage" aria-pressed="true"/);
+  assert.match(two, /「管」的人可以再把別人加進這個工作區。/);
+  assert.deepEqual(P.wsDialogOps(cells, grp, { ids: ["a", "z"], set: { apps: "view" } }), [{ id: "z", ws: "apps", level: "view" }], "a 已經是看，不重寫");
   const css = readFileSync("admin/admin.css", "utf8");
-  assert.match(css, /\.wsg \.wsg-who\{position:sticky;left:0/); assert.match(css, /\.wsg thead th\{position:sticky;top:0/);
-  assert.equal(P.wsTeamOf({ id: "custom:money" }), "Sponsorship Team");
-  assert.equal(RAIL.AREAS.find(a => a.key === "interns").team, "Internship Team");
+  assert.match(css, /\.ro-dlg-bg\{position:fixed;inset:0/); assert.match(css, /body:has\(\.ro-dlg-bg\)\{overflow:hidden\}/);
 });
 
-// Paul 2026-11-28：上面全勾，下面那張表卻只有 Enya 有會議範本，以為壞了。上面那一排只管下一次加人；右欄每個人寫他少哪幾樣。
-test("★ 下一次加人要開的：標題與說明講清楚不是現在的狀態；右欄寫每個人少哪幾樣，不寫 team", () => {
-  const cells = [{ id: "passport" }, { id: "apps" }, { id: "custom:meetings" }, { id: "custom:calendar" }, { id: "custom:venues" }];
-  const grp = { passport: [{ user_id: "a", name_zh: "A", board_role: "member", level: "edit", team: "Marketing Team" }] };
-  const people = [{ id: "a", name_zh: "A", board_role: "member", team: "Marketing Team" }, { id: "z", name_zh: "Z", board_role: "member", team: "Curriculum Team" }];
-  const h = P.wsGroupHTML("", cells, grp, people, {}, false);
-  assert.match(h, /<h3 class="sec-h">下一次加人要開的<\/h3><div class="note">這一排只決定下一次按「加 N 個人」要開哪幾樣，不是現在誰有什麼。/);
-  const rowOf = id => (h.match(new RegExp(`<label class="ma-row pick[^"]*"><input[^>]*value="${id}"[\\s\\S]*?</label>`)) || [""])[0];
-  assert.match(rowOf("a"), /class="mini miss" title="少 [^"]+">少 [^、<]+、[^、<]+、[^<]+ 等 4 樣</, "a 少四樣：前三樣加總數");
-  assert.doesNotMatch(rowOf("a"), /Marketing/, "右欄這裡不寫 team");
-  assert.match(rowOf("z"), /勾起來的 5 樣都還沒有/, "一樣都沒有就直說");
-  // 只勾兩樣：z 少那兩樣，寫名字。
-  const two = P.wsGroupHTML("", cells, grp, people, { off: ["passport", "apps", "custom:venues"] }, false);
-  assert.match(two, /value="z"[\s\S]*?class="mini miss" title="少 [^"]+">少 [^、<]+、[^<]+<\/span><\/label>/);
-  assert.deepEqual(P.grpMissing(cells, grp, ["apps"], "a").map(c => c.id), ["custom:meetings", "custom:calendar", "custom:venues"]);
-  assert.equal(P.grpMissingHTML([], 3), "");
-  // 其他頁的成員區照舊寫 team（extra 沒給）。
-  assert.match(P.membersAreaHTML("mp", { rows: [], people, pk: {}, busy: false, acts: { level: "x", remove: "y" } }), /<span class="mini">Marketing<\/span>/);
+test("★ 錢在 Sponsorship、實習護照在 Internship 那一行", () => {
+  assert.equal(P.wsTeamOf({ id: "custom:money" }), "Sponsorship Team");
+  assert.equal(RAIL.AREAS.find(a => a.key === "interns").team, "Internship Team");
 });

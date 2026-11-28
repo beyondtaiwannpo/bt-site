@@ -94,7 +94,7 @@ test("★ 工作區的四支小工具八份一樣：專案在它的工作區那�
 });
 
 // 2026-12-27 Paul：「I should be able to add people into whole BT… I get to pick whatever project I want to add or remove people from」。
-test("★ 整個工作區：標題點得下去；加人時勾要開哪幾樣；一個人一列、每一樣一格開關", async () => {
+test("★ 整個工作區：標題點得下去；一張名單寫每個人幾樣，點一個人跳出每一樣的等級", async () => {
   const P = await import("../admin/people/src/ui.js");
   P.setLang && P.setLang("zh");
   const WS = [{ id: "res:Curriculum Team", kind: "res", team: "Curriculum Team", active: true },
@@ -111,13 +111,11 @@ test("★ 整個工作區：標題點得下去；加人時勾要開哪幾樣；�
   assert.deepEqual(rows.map(r => [r.user_id, r.level, Object.keys(r.has).join(",")]), [["u1", "manage", "res:Curriculum Team,project:camp"], ["u2", "view", "res:Curriculum Team"]]);
   const h = P.wsGroupHTML("Curriculum Team", cells, grp, [], { off: ["project:fair"] }, false);
   assert.match(h, /<h2>Curriculum<span class="hint">整個工作區・3 樣/);
-  assert.match(h, /data-act="grp-item" value="project:fair">/, "★ 取消勾的那一樣加人時不開");
-  assert.match(h, /data-act="grp-item" value="project:camp" checked>/);
-  assert.match(h, /data-act="grp-cell" data-id="u2" data-ws="project:camp"[^>]*>/, "★ 小明沒有冬令營，那一格可以勾");
-  assert.doesNotMatch(h, /data-id="u2" data-ws="project:camp"[^>]* checked/);
-  assert.match(h, /data-act="grp-cell" data-id="u1" data-ws="project:camp"[^>]* checked>/);
-  assert.match(h, /data-act="grp-assign"[^>]*data-ws="group:Curriculum Team"/);
-  assert.match(h, /data-act="grp-level"/, "左邊的等級一次改全部");
+  assert.doesNotMatch(h, /grp-item|grp-cell|grp-assign|grp-level|<table/, "2026-11-28：沒有上面那排勾、沒有那張表");
+  assert.match(h, /<div class="ma-row ro-row"><input type="checkbox" class="ma-sel" data-act="pk-sel" data-ns="ws" value="u1"[^>]*><button type="button" class="ro-who" data-act="grp-open" data-ids="u1">/, "點名字就跳出那一格");
+  assert.match(h, /<span class="mini ro-sum">3 樣裡有 2 樣・管<\/span><button type="button" class="btn ghost sm" data-act="grp-open" data-ids="u1"/);
+  assert.match(h, /<span class="mini ro-sum">3 樣裡有 1 樣・看<\/span>/);
+  assert.doesNotMatch(h, /ro-dlg/, "還沒點人就沒有跳出來那一格");
   const page = P.workspacesHTML(WS, "group:Curriculum Team", rows, [], "", false, {}, true, grp);
   assert.match(page, /<a class="rail-group wshead on" href="#ws=group%3ACurriculum%20Team" data-act="ws-pick" data-ws="group:Curriculum Team">Curriculum<\/a>/);
   assert.match(page, /id="ws-panel">[\s\S]*整個工作區/);
@@ -128,27 +126,28 @@ test("★ 整個工作區：標題點得下去；加人時勾要開哪幾樣；�
 });
 
 // 2026-12-27 Paul：「I have to change everyone from view to edit, just one by one… I want everything to work that way」。
-test("★ 成員區左欄多選：勾、全選、一次改等級、一次移出；八份後台一樣、四個地方接得住", async () => {
+test("★ 一張名單多選：勾、全選、一次改成同一級（含沒有）；三個功能資料夾與人與權限都接得住", async () => {
   const P = await import("../admin/people/src/ui.js");
   P.setLang("en");
-  const people = [{ id: "u1", name_en: "Ann", board_role: "member" }, { id: "u2", name_en: "Bo", board_role: "member" }, { id: "u3", name_en: "Cy", board_role: "president" }];
+  const people = [{ id: "u1", name_en: "Ann", board_role: "member" }, { id: "u2", name_en: "Bo", board_role: "member" }, { id: "u3", name_en: "Cy", board_role: "president" }, { id: "u4", name_en: "Di", board_role: "member" }];
   const rows = [{ user_id: "u1", name_en: "Ann", board_role: "member", level: "view" }, { user_id: "u2", name_en: "Bo", board_role: "member", level: "view" }];
-  const acts = { level: "members-level", remove: "members-unassign", bulk: "members-bulk" };
-  let pk = P.pkReduce({}, people, ["u1", "u2"], { dataset: { act: "pk-selall", ids: "u1,u2" } });
-  assert.deepEqual(pk.sel, ["u1", "u2"]);
+  const acts = { level: "members-level", bulk: "members-bulk" };
+  let pk = P.pkReduce({}, people, ["u1", "u2"], { dataset: { act: "pk-selall", ids: "u1,u2,u4" } });
+  assert.deepEqual(pk.sel, ["u1", "u2", "u4"]);
   pk = P.pkReduce(pk, people, [], { dataset: { act: "pk-sel" }, value: "u2", checked: false });
-  assert.deepEqual(pk.sel, ["u1"]);
+  assert.deepEqual(pk.sel, ["u1", "u4"]);
   pk = P.pkReduce(pk, people, [], { dataset: { act: "pk-blevel" }, value: "manage" });
-  const h = P.membersAreaHTML("mp", { rows, people, pk, busy: false, acts, go: { act: "members-assign", ws: "apps" } });
-  assert.match(h, /data-act="pk-selall" data-ns="mp" data-ids="u1,u2"/, "全選只選一般的人，不選依職級的");
-  assert.match(h, /class="ma-sel" data-act="pk-sel" data-ns="mp" value="u1"[^>]* checked/);
+  const h = P.wsListHTML("mp", { rows, people, pk, busy: false, mode: "one", acts });
+  assert.match(h, /data-act="pk-selall" data-ns="mp" data-ids="u1,u2,u4"/, "全選選一般的人（在裡面的與不在的），不選依職級的");
+  assert.match(h, /class="ma-sel" data-act="pk-sel" data-ns="mp" value="u4"[^>]* checked/, "不在裡面的人也勾得到");
   assert.doesNotMatch(h, /value="u2"[^>]* checked/);
-  assert.match(h, /<option value="manage" selected>Manage<\/option><\/select>\s*<button type="button" class="btn sm" data-act="members-bulk" data-op="level" data-ns="mp">Set 1 person/);
-  assert.match(h, /data-act="members-bulk" data-op="remove" data-ns="mp">Remove 1 person/);
-  assert.doesNotMatch(P.membersAreaHTML("mp", { rows, people, pk: {}, busy: false, acts: { level: "x", remove: "y" } }), /pk-selall/, "沒給 bulk 就不畫");
-  assert.match(P.membersAreaHTML("mp", { rows, people, pk: {}, busy: false, acts }), /data-op="level" data-ns="mp" disabled/, "沒勾人按鈕是灰的");
+  assert.match(h, /<option value="manage" selected>Manage<\/option><\/select>\s*<button type="button" class="btn sm" data-act="members-bulk" data-op="level" data-ns="mp">Set 2 people/);
+  assert.match(h, /<option value="none">None<\/option>/, "一次改成「沒有」就是移出");
+  assert.match(P.wsListHTML("mp", { rows, people, pk: {}, busy: false, mode: "one", acts }), /data-op="level" data-ns="mp" disabled/, "沒勾人按鈕是灰的");
   for (const f of ["admin/src/main.js", "admin/passports/src/main.js", "admin/site/src/main.js"]) assert.match(readFileSync(f, "utf8"), /act === "members-bulk" && S\.mp/, f);
   const pm = readFileSync("admin/people/src/main.js", "utf8");
-  assert.match(pm, /act === "ws-bulk" \|\| act === "grp-bulk"/);
-  assert.match(readFileSync("admin/people/src/ui.js", "utf8"), /bulk: "grp-bulk"[\s\S]*|bulk: "ws-bulk"/);
+  assert.match(pm, /if \(act === "ws-bulk"\) \{/);
+  for (const a of ["grp-open", "dlg-all", "dlg-set", "dlg-close", "dlg-save"]) assert.match(pm, new RegExp(`act === "${a}"`), a);
+  assert.match(pm, /UI\.wsDialogOps\(grpCells\(\), S\.grp, dlg\)/);
+  assert.match(pm, /e\.key !== "Escape"/, "Esc 關掉跳出來那一格");
 });

@@ -142,7 +142,7 @@ test("★ 四份側欄與五個小零件逐字一樣（ITEMS、railHTML、shellH
     for (const fn of ["railHTML", "shellHTML", "pageHead", "msgHTML", "msgKind", "sectionHTML", "emptyHTML", "skeletonHTML", "canSee", "canEnter", "boardName",
                        "toast", "needAsk", "mountAsk", "cancelAsk", "afterRender", "downHTML",
                        "mpName", "mpFind", "mpItems", "mpLinksHTML", "membersPanelHTML",
-                       "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "rankTag", "membersAreaHTML",
+                       "pkTeamsOf", "pkCandidates", "pkShown", "pkTickAll", "pkToggle", "pkPicked", "pkReduce", "batchUndo", "pkRefocus", "rankTag", "membersAreaHTML", "wsListRows", "levelOptions", "wsListHTML",
                        "prefetchTargets", "bindPrefetch", "loadedVersion", "versionDiffers", "checkVersion",
                        "debounce", "saveMode", "dirtyTracker", "formValues", "autosaveHint", "autosaveState", "bindAutosave"]) {
       if (fn === "PK_TEAMS") continue;
@@ -566,7 +566,7 @@ test("★ admin/people 每一個畫面用英文畫出來不剩中文", () => {
 });
 
 // 2026-10-23 第三次重整批 3：成員分頁。對一個工作區是「管」的人在那個東西自己的頁面上加人、改等級、移出。
-test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只列還沒在裡面的幹部；入口只給「管」的人，senior 全部", () => {
+test("★ 成員分頁：一張名單，每一位幹部一行一個下拉（沒有・看・改・管）；入口只給「管」的人，senior 全部", () => {
   const ws = [{ id: "apps:Curriculum Team", kind: "apps", title_zh: "Curriculum Team 的申請", title_en: "Curriculum Team applications", active: true },
               { id: "apps:Marketing Team", kind: "apps", title_zh: "Marketing Team 的申請", title_en: "", active: true },
               { id: "res:Curriculum Team", kind: "res", title_zh: "Curriculum Team 的資源", title_en: "", active: true },
@@ -587,32 +587,31 @@ test("★ 成員分頁：誰在裡面、等級下拉、移出、打字找人只�
   assert.match(h, /<h1>Curriculum Team 的申請的成員<\/h1>/);
   assert.match(h, /data-act="members-back"/);
   assert.match(h, /這是你/);
-  assert.match(h, /<select data-act="members-level" data-id="u3"[^>]*><option value="view" selected>看/);
-  assert.match(h, /data-act="members-unassign" data-id="u3"/);
-  // 2026-10-24 兩欄成員區（membersAreaHTML，ns "mp"）：左「在這個工作區裡（N）」右「還沒在裡面（M）」，各自一個 ma-col；右欄只列還沒在裡面的幹部。
-  const cols = h.split('<section class="ma-col">'); assert.equal(cols.length, 3, "兩欄");
-  const [, L, R] = cols;
-  assert.match(L, /在這個工作區裡（2）/, "算人：王平（依職級，雖然也有一筆指派）加 Mei"); assert.match(R, /還沒在裡面（1）/);
-  // 2026-10-24：王平是 Co-President 卻還留著一筆指派，只能畫成一列灰的「全部（職級）」，不畫下拉與移出；底下給 senior 一條清掉。
-  assert.equal((L.match(/王平/g) || []).length, 1, "一個人一列");
-  assert.match(L, /<div class="ma-row byrank"><span class="nm"><b>王平<\/b><span class="nm-en">Paul<\/span><\/span><span class="rk" title="Co-President">CP<\/span><span class="mini">全部（職級）/);
-  assert.doesNotMatch(L, /data-act="members-level" data-id="u1"|data-act="members-unassign" data-id="u1"/, "依職級的人沒有下拉與移出");
-  assert.doesNotMatch(L, /members-cleanup/, "不是 senior 看不到清掉");
-  const Ls = FORMS.membersPanelHTML(Object.assign({}, mp, { senior: true }), "", false).split('<section class="ma-col">')[1];
-  assert.match(Ls, /另外有 1 筆指派是給靠職級就有一切的人的，多餘。 <button type="button" class="lnk" data-act="members-cleanup" data-ids="u1">清掉這 1 筆<\/button>/);
-  assert.doesNotMatch(R, /王平/, "依職級的人也不在右邊");
-  assert.match(R, /name="mp-member" value="u4" data-act="pk-tick" data-ns="mp"/);
-  assert.match(R, /<span class="nm"><b>小新<\/b><span class="nm-en">Shin<\/span><\/span><span class="rk" title="Associate">AS<\/span>/, "職級是兩個字母的標，不是 pill");
-  assert.doesNotMatch(R, /Mei/, "已經在裡面的不列在右邊");
-  assert.doesNotMatch(R, /王平/, "Co-President 靠職級就有，不列在右邊");
-  assert.match(L, /<input id="mp-mq" class="ma-find"/, "左欄也有找名字");
-  assert.match(R, /<div class="ma-head">[\s\S]*<input id="mp-q" class="ma-find"[\s\S]*data-act="pk-all"[\s\S]*data-act="pk-none"[\s\S]*<select id="mp-level"[\s\S]*data-act="members-assign"[\s\S]*<\/div>\s*<div class="ma-list">/, "控制項全在右欄的頭（釘住），名單在底下");
-  assert.match(h, /data-act="members-assign" data-ns="mp" data-ws="apps:Curriculum Team" disabled>加 0 個人</, "沒勾人那顆是灰的");
+  // 2026-11-28 一張名單（wsListHTML，ns "mp"）：Paul「can we just make it into one page」。沒有左右兩欄、沒有「加 N 個人」。
+  assert.equal(h.split('<section class="ma-col">').length, 2, "只有一欄");
+  assert.doesNotMatch(h, /members-assign|members-unassign|還沒在裡面/);
+  assert.match(h, /在這個工作區 2 人・名單共 3 人/, "王平（依職級）加 Mei；小新不在裡面但列著");
+  assert.match(h, /<select class="ro-lv" data-act="members-level" data-id="u3"[^>]*><option value="none">沒有<\/option><option value="view" selected>看<\/option>/);
+  assert.match(h, /<div class="ma-row ro-row out"><input type="checkbox" class="ma-sel" data-act="pk-sel" data-ns="mp" value="u4"[\s\S]*?<select class="ro-lv" data-act="members-level" data-id="u4"[^>]*><option value="none" selected>沒有/, "不在裡面的人字淡、下拉是「沒有」，選別的就是加進來");
+  assert.ok(h.indexOf('value="u3"') < h.indexOf('value="u4"'), "在裡面的排前面");
+  // 王平是 Co-President 卻還留著一筆指派：只畫一列「全部（職級）」，沒有下拉；senior 才看得到清掉。
+  assert.equal((h.match(/王平/g) || []).length, 1, "一個人一列");
+  assert.match(h, /<div class="ma-row byrank"><span class="nm"><b>王平<\/b><span class="nm-en">Paul<\/span><\/span><span class="rk" title="Co-President">CP<\/span><span class="mini">這是你<\/span><span class="mini">全部（職級）/);
+  assert.doesNotMatch(h, /data-act="members-level" data-id="u1"/, "依職級的人沒有下拉");
+  assert.doesNotMatch(h, /members-cleanup/, "不是 senior 看不到清掉");
+  assert.match(FORMS.membersPanelHTML(Object.assign({}, mp, { senior: true }), "", false), /另外有 1 筆指派是給靠職級就有一切的人的，多餘。 <button type="button" class="lnk" data-act="members-cleanup" data-ids="u1">清掉這 1 筆<\/button>/);
+  assert.match(h, /<span class="nm"><b>小新<\/b><span class="nm-en">Shin<\/span><\/span><span class="rk" title="Associate">AS<\/span>/, "職級是兩個字母的標，不是 pill");
+  // 上面那一排：找名字、全勾看到的、全部取消、要改成哪一級、N 個人改成這一級。
+  assert.match(h, /<div class="ma-head">[\s\S]*<input id="mp-q" class="ma-find"[\s\S]*data-act="pk-selall" data-ns="mp" data-ids="u3,u4"[\s\S]*data-act="pk-selnone"[\s\S]*<select id="mp-blevel" data-act="pk-blevel"[\s\S]*data-act="members-bulk" data-op="level" data-ns="mp" disabled>0 個人改成這一級<\/button><\/div>\s*<\/div>\s*<div class="ma-list">/);
+  const picked = FORMS.membersPanelHTML(Object.assign({}, mp, { pk: { sel: ["u3", "u4"], blevel: "none" } }), "", false);
+  assert.match(picked, /data-act="members-bulk" data-op="level" data-ns="mp">2 個人改成這一級/);
+  assert.match(picked, /<select id="mp-blevel"[^>]*><option value="none" selected>沒有/);
+  assert.match(picked, /<div class="ma-row ro-row out on">/, "勾起來的那一列有底色");
   assert.equal(FORMS.mpFind(mp.cadres, "小新 (Shin)").id, "u4");
   assert.equal(FORMS.mpFind(mp.cadres, "mei").id, "u3");
   assert.equal(FORMS.mpFind(mp.cadres, "x"), null);
-  assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: [] }, "", false), /還沒有人被派進來/);
-  assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: [] }, "", false), /每一位幹部都已經在裡面了/);
+  assert.match(FORMS.membersPanelHTML({ ws: "x", rows: [], cadres: [] }, "", false), /沒有對得上的人/);
+  assert.match(FORMS.membersPanelHTML(Object.assign({}, mp, { pk: { q: "shin" } }), "", false), /篩出 1 人/);
   assert.match(FORMS.membersPanelHTML(mp, "", true), /disabled/);
   // 清單頁接得上：最後一個參數給了就畫入口，沒給就沒有。
   assert.match(FORMS.listHTML([], true, "", false, null, [], "", false, items), /data-act="members-open"/);
@@ -730,21 +729,20 @@ test("成員區的列：名字不裁斷（可以換行）、下拉縮小、team 
   assert.match(readFileSync("admin/people/src/main.js", "utf8"), /act === "ws-cleanup"[\s\S]*?D\.unassign\(id, ws\)[\s\S]*?S\.undo = [\s\S]*?D\.assign\(w\.id, ws, w\.level\)/);
 });
 
-test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、加、移出、改等級，寫的是 assign / unassign，不讀 email", () => {
+test("★ 三個功能資料夾的 main.js 都接了成員分頁：開、回、改等級（含沒有＝移出）、一次改很多人，寫的是 assign / unassign，不讀 email", () => {
   for (const f of ["admin/src", "admin/site/src", "admin/passports/src"]) {
     const m = readFileSync(`${f}/main.js`, "utf8"), d = readFileSync(`${f}/data.js`, "utf8");
-    for (const act of ["members-open", "members-back", "members-assign", "members-unassign", "members-level"]) assert.match(m, new RegExp(act), `${f} 沒接 ${act}`);
-    assert.match(m, /UI\.needAsk\(S, b, T\("confirm\.mpRemove"/, `${f} 移出要先問一次`);
+    for (const act of ["members-open", "members-back", "members-level", "members-bulk", "members-cleanup"]) assert.match(m, new RegExp(act), `${f} 沒接 ${act}`);
+    // 2026-11-28 一張名單：下拉選「沒有」是移出、不在裡面的人選看改管是加進來；勾好幾個人一次改，改成「沒有」先問一次。
+    assert.match(m, /to = el\.value === "none" \? null : el\.value/, `${f} 下拉的「沒有」是移出`);
+    assert.match(m, /const go = l => l \? D\.assign\(id, ws, l\) : D\.unassign\(id, ws\)/, `${f} 一格寫 assign 或 unassign`);
+    assert.match(m, /if \(!to && UI\.needAsk\(S, b, T\("confirm\.maRemove"/, `${f} 一次移出很多人要先問一次`);
+    assert.match(m, /\(now\[id\] \|\| null\) !== to/, `${f} 已經是那一級的人不重寫`);
     assert.match(m, /S\.undo = /, `${f} 要有復原`);
     assert.match(d, /rpc\("workspace_members"/); assert.match(d, /rpc\("assign"/); assert.match(d, /rpc\("unassign"/);
     assert.match(d, /from\("profiles"\)\.select\("id, name_zh, name_en, board_role, team"\)/, `${f} 找人只讀名字、職級、team`);
-    // 2026-10-24 一次加一批：每個人一支 assign() 同時送、復原是 batchUndo 那一批、勾選與打字走 pkReduce。
-    assert.match(m, /UI\.pkPicked\(S\.mp\.cadres/, `${f} 加人要從勾起來的人算`);
-    assert.match(m, /Promise\.all\(ids\.map\(id => D\.assign\(id, ws, level\)/, `${f} 一批人同時送`);
-    assert.match(m, /UI\.batchUndo\(done, id => D\.unassign\(id, ws\)\)/, `${f} 復原移出的是這一批`);
     assert.match(m, /UI\.pkReduce\(S\.mp\.pk/, `${f} 勾選與打字走 pkReduce`);
     assert.match(m, /UI\.pkRefocus\(/, `${f} 打字重畫後游標要放回去`);
-    assert.match(m, /e\.key !== "Enter"/, `${f} Enter 要送出`);
     assert.doesNotMatch(d, /person_email/, `${f} 不准讀 email`);
   }
 });

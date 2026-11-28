@@ -17,7 +17,7 @@ let S = {
   view: "roster",          // roster | person | person-new | workspaces | terms | invites | changes
   // 一定要有初始值：載入失敗之後再 render 一次不能整頁空白。
   people: [], terms: [], changes: [],
-  filter: { term: null, team: "", q: "" }, // term 為 null 表示「這一屆」（rosterHTML 自己找 current）；q 是找名字
+  filter: { term: null, team: "", q: "" }, // term 為 null 表示「這一屆」（wsListHTML 自己找 current）；q 是找名字
   afterEnd: null,                          // 結束這一屆之後名單最上面那一段 { term, kept: [profile_id…] }
   person: null, personDraft: null, remove: null, newDraft: null,
   workspaces: [], wsSel: null, members: [], wsDraft: null, grp: null,
@@ -57,7 +57,7 @@ function render() {
   else if (S.view === "terms") { body = UI.termsHTML(S.terms, S.people, S.user.id, isPres(), S.msg, S.busy, S.termDraft, S.end); tab = "terms"; }
   else if (S.view === "person-new") body = UI.personNewHTML(S.terms, S.msg, S.busy, S.newDraft);
   else if (S.view === "person" && S.person) body = UI.personEditHTML(S.person, S.terms, S.user.id, isPres(), S.msg, S.busy, S.personDraft, S.people, S.remove, S.personEmail, S.workspaces, S.personFounder);
-  else body = UI.rosterHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd, S.bulk);
+  else body = UI.wsListHTML(S.people, S.terms, S.user.id, isPres(), S.msg, S.busy, filter, S.workspaces, S.afterEnd, S.bulk);
   UI.railBefore(el); el.innerHTML = UI.shellHTML(nav, UI.railHTML("people", tab, S.me, { feedback: S.fbNew }), body); UI.railAfter(el);
   UI.afterRender(S, el);
 }
@@ -179,8 +179,6 @@ function readInviteForm() {
 // 整個工作區（2026-12-27）：選中的那一塊有哪幾格、叫什麼。
 const grpTeam = () => String(S.wsSel || "").slice(6);
 const grpCells = () => UI.wsGroupCells(S.workspaces, grpTeam(), S.people);
-// 右欄「還沒全部有」的算法（2027-01-24）：整個工作區看勾起來的那幾樣每一樣都有沒有；一格就是在不在那一格。
-const inIdsNow = () => UI.isGroupSel(S.wsSel) ? UI.grpFullIds(grpCells(), S.grp, (S.wsDraft || {}).off) : S.members.map(m => m.user_id);
 const grpName = () => grpTeam() === UI.SENIOR ? T("ws.senior") : grpTeam() ? grpTeam().replace(/\s*Team$/i, "") : T("ws.board");
 // 一批派與移出，每一筆記原本的等級（沒有 = null），復原就照原本的裝回去。
 async function grpApply(ops) {
@@ -192,6 +190,24 @@ async function grpApply(ops) {
   if (done.length) S.undo = async () => { const r = await run("err.assign", () => Promise.all(done.map(run1))); if (r !== undefined) { S.msg = T("msg.grpUndone"); await openWorkspaces(null, true); } };
   return failed;
 }
+// 跳出來那一格（2026-11-28）：開著的時候游標放在裡面；按了某一顆重畫之後，游標放回那一顆。Esc 或點旁邊暗的地方關掉。
+function focusDialog() {
+  const box = document.querySelector(".ro-dlg"); if (!box) return;
+  const f = S.dlgFocus, again = f ? box.querySelector(`[data-act="${f.act}"]${f.ws ? `[data-ws="${CSS.escape(f.ws)}"]` : ""}[data-lv="${f.lv}"]`) : null;
+  (again || box).focus({ preventScroll: true });
+}
+function closeDialog() {
+  if (!(S.wsDraft || {}).dlg) return;
+  const back = S.wsDraft.dlg.ids.length === 1 ? S.wsDraft.dlg.ids[0] : "";
+  S.wsDraft = Object.assign({}, S.wsDraft, { dlg: null }); S.ask = null; render();
+  const btn = back && document.querySelector(`.ro-who[data-ids="${CSS.escape(back)}"]`); if (btn) btn.focus({ preventScroll: true });
+}
+document.addEventListener("click", e => { if (e.target && e.target.classList && e.target.classList.contains("ro-dlg-bg")) closeDialog(); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || !(S.wsDraft || {}).dlg) return;
+  if (S.ask) return;  // 先關確認框（mountAsk 自己處理）
+  e.preventDefault(); closeDialog();
+});
 const grpFailMsg = failed => { const p = S.people.find(x => x.profile_id === failed[0].o.id); return T("err.assignSome") + (p ? pname(p) : "") + T("punct.colon") + D.says(failed[0].e); };
 async function openWorkspaces(ws, keepMsg) {
   S.busy = true; if (!keepMsg) S.msg = ""; render();
@@ -583,70 +599,48 @@ document.addEventListener("click", async e => {
   }
   // 多選加人的 chip、全勾、全取消（2026-10-24）：右欄是 pk、新增表單是 npk。打字與勾選走 input / change。
   if (["pk-team", "pk-all", "pk-none", "pk-untick", "pk-selall", "pk-selnone"].includes(act) && S.view === "workspaces") { pkApply(b); render(); return; }
-  if (act === "ws-assign") {
-    // 一次加一批（2026-10-24）：每個人一支 assign()（同一道門），同時送；沒有新的資料庫函式。
-    const ws = b.dataset.ws, d = S.wsDraft || {}, pk = d.pk || {}, level = pk.level || "view";
-    const ids = UI.pkPicked(pkPeople(), S.members.map(m => m.user_id), pk);
-    if (!ids.length) { S.msg = T("err.pickPerson"); render(); return; }
-    S.busy = true; S.msg = ""; render();
-    const out = await Promise.all(ids.map(id => D.assign(id, ws, level).then(() => null, e => ({ id, e }))));
-    const failed = out.filter(Boolean), done = ids.filter(id => !failed.some(f => f.id === id));
-    S.wsDraft = Object.assign({}, d, { pk: Object.assign({}, pk, { q: "", ticked: failed.map(f => f.id) }) });
-    if (done.length) {
-      // 復原移出的是這一批那 N 個人，不多不少。
-      const undo = UI.batchUndo(done, id => D.unassign(id, ws));
-      S.undo = async () => { const n = await run("err.unassign", undo); if (n !== undefined) { S.msg = T("msg.unassignedN", { n, ws }); await openWorkspaces(null, true); } };
-    }
-    S.busy = false;
-    if (failed.length) {
-      const names = failed.map(f => { const p = S.people.find(x => x.profile_id === f.id); return p ? pname(p) : f.id; }).join(T("punct.list"));
-      S.msg = T("err.assignSome") + names + T("punct.colon") + D.says(failed[0].e);
-    } else S.msg = T("msg.assignedN", { n: done.length, ws, level: UI.levelLabel(level) });
-    await openWorkspaces(null, true);
-    return;
-  }
-  if (act === "grp-assign") {
-    const d = S.wsDraft || {}, pk = d.pk || {}, level = pk.level || "view";
-    const off = new Set(d.off || []), items = grpCells().filter(c => !off.has(c.id));
-    const ids = UI.pkPicked(pkPeople(), inIdsNow(), pk);
-    if (!ids.length) { S.msg = T("err.pickPerson"); render(); return; }
-    if (!items.length) { S.msg = T("err.grpNoItems"); render(); return; }
-    S.busy = true; S.msg = ""; render();
-    // 只補每個人少的那幾樣（2027-01-24）；已經有的照原本的等級留著。
-    const failed = await grpApply(UI.grpAddOps(ids, grpCells(), S.grp, d.off, level));
-    S.wsDraft = Object.assign({}, d, { pk: Object.assign({}, pk, { q: "", ticked: [...new Set(failed.map(f => f.o.id))] }) });
-    S.busy = false;
-    S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpAdded", { n: ids.length, m: items.length, ws: grpName(), level: UI.levelLabel(level) });
-    await openWorkspaces(null, true);
-    return;
-  }
-  // 勾起來的人一次改等級或一次移出（2026-12-27，Paul：「I have to change everyone from view to edit, just one by one」）。
-  // 一格（ws-bulk）：那一格的等級；整個工作區（grp-bulk）：他在這個工作區的每一樣。
-  if (act === "ws-bulk" || act === "grp-bulk") {
-    const pk = (S.wsDraft || {}).pk || {}, sel = new Set(pk.sel || []), level = pk.blevel || "edit", op = b.dataset.op;
-    const rows = S.members.filter(m => sel.has(m.user_id));
-    if (!rows.length) return;
-    if (op === "remove" && UI.needAsk(S, b, T("confirm.maRemove", { n: rows.length }))) return;
-    const ops = act === "grp-bulk"
-      ? rows.flatMap(r => Object.keys(r.has || {}).map(ws => ({ id: r.user_id, ws, level: op === "remove" ? null : level })))
-      : rows.map(r => ({ id: r.user_id, ws: S.wsSel, level: op === "remove" ? null : level }));
-    if (act === "ws-bulk") S.grp = { [S.wsSel]: S.members };  // grpApply 從 S.grp 讀原本的等級，復原才裝得回去
+  // 一張名單（2026-11-28）：一格的頁面勾好幾個人，上面那一排一次改成同一級（「沒有」= 移出）。不在裡面的人也勾得到，改成看、改、管就是加進來。
+  if (act === "ws-bulk") {
+    const pk = (S.wsDraft || {}).pk || {}, level = pk.blevel || "edit", ws = S.wsSel;
+    const now = Object.fromEntries(S.members.map(m => [m.user_id, m.level]));
+    const ids = (pk.sel || []).filter(id => pkPeople().some(p => p.id === id) || now[id]);
+    const to = level === "none" ? null : level;
+    const ops = ids.filter(id => (now[id] || null) !== to).map(id => ({ id, ws, level: to }));
+    if (!ops.length) { S.wsDraft = Object.assign({}, S.wsDraft, { pk: Object.assign({}, pk, { sel: [] }) }); S.msg = T("msg.maLevel", { n: ids.length, level: UI.levelLabel(level) }); render(); return; }
+    const nOut = ops.filter(o => !o.level).length;
+    if (nOut && UI.needAsk(S, b, T("confirm.maRemove", { n: nOut }))) return;
+    S.grp = { [ws]: S.members };  // grpApply 從 S.grp 讀原本的等級，復原才裝得回去
     S.busy = true; S.msg = ""; render();
     const failed = await grpApply(ops);
     S.busy = false;
     S.wsDraft = Object.assign({}, S.wsDraft, { pk: Object.assign({}, pk, { sel: [] }) });
-    S.msg = failed.length ? grpFailMsg(failed) : op === "remove" ? T("msg.maRemoved", { n: rows.length }) : T("msg.maLevel", { n: rows.length, level: UI.levelLabel(level) });
+    S.msg = failed.length ? grpFailMsg(failed) : to ? T("msg.maLevel", { n: ids.length, level: UI.levelLabel(level) }) : T("msg.maRemoved", { n: nOut });
     await openWorkspaces(null, true);
     return;
   }
-  if (act === "grp-unassign") {
-    const id = b.dataset.id, p = S.people.find(x => x.profile_id === id), row = S.members.find(m => m.user_id === id);
-    const has = Object.keys((row && row.has) || {});
-    if (UI.needAsk(S, b, T("confirm.grpRemove", { name: p ? pname(p) : "", ws: grpName(), n: has.length }))) return;
+  // 整個工作區（2026-11-28）：點一個人或「一次改 N 個人」，畫面中間跳出一格（UI.wsDialogHTML）。狀態在 S.wsDraft.dlg = { ids, set: { 格子 id: 等級 } }。
+  if (act === "grp-open") {
+    const ids = String(b.dataset.ids || "").split(",").filter(Boolean); if (!ids.length) return;
+    S.wsDraft = Object.assign({}, S.wsDraft, { dlg: { ids, set: {} } }); S.dlgFocus = null; render(); focusDialog(); return;
+  }
+  if (act === "dlg-close") { closeDialog(); return; }
+  if ((act === "dlg-all" || act === "dlg-set") && (S.wsDraft || {}).dlg) {
+    const dlg = S.wsDraft.dlg, lv = b.dataset.lv || "", set = Object.assign({}, dlg.set);
+    for (const c of act === "dlg-all" ? grpCells() : grpCells().filter(x => x.id === b.dataset.ws)) { if (lv) set[c.id] = lv; else delete set[c.id]; }
+    S.wsDraft = Object.assign({}, S.wsDraft, { dlg: Object.assign({}, dlg, { set }) });
+    S.dlgFocus = { act, ws: b.dataset.ws || "", lv }; render(); focusDialog(); return;
+  }
+  if (act === "dlg-save" && (S.wsDraft || {}).dlg) {
+    const dlg = S.wsDraft.dlg, ops = UI.wsDialogOps(grpCells(), S.grp, dlg);
+    if (!ops.length) return;
+    const nOut = ops.filter(o => !o.level).length;
+    if (nOut && dlg.ids.length > 1 && UI.needAsk(S, b, T("confirm.dlgRemove", { n: nOut }))) return;
     S.busy = true; S.msg = ""; render();
-    const failed = await grpApply(has.map(ws => ({ id, ws, level: null })));
+    const failed = await grpApply(ops);
     S.busy = false;
-    S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpRemoved", { name: p ? pname(p) : "", ws: grpName() });
+    const one = dlg.ids.length === 1, p = one ? S.people.find(x => x.profile_id === dlg.ids[0]) : null;
+    S.wsDraft = Object.assign({}, S.wsDraft, { dlg: null, pk: Object.assign({}, (S.wsDraft || {}).pk, { sel: [] }) });
+    S.msg = failed.length ? grpFailMsg(failed) : one ? T("msg.dlgSavedOne", { name: p ? pname(p) : "", n: ops.length, ws: grpName() }) : T("msg.dlgSavedN", { n: dlg.ids.length, m: ops.length, ws: grpName() });
     await openWorkspaces(null, true);
     return;
   }
@@ -659,19 +653,6 @@ document.addEventListener("click", async e => {
     if (ok !== undefined) {
       S.msg = T("msg.cleaned", { n: ids.length });
       S.undo = async () => { const r = await run("err.assign", async () => { for (const w of was) await D.assign(w.id, ws, w.level); return true; }); if (r !== undefined) { S.msg = T("msg.uncleaned", { n: was.length }); await openWorkspaces(null, true); } };
-      await openWorkspaces(null, true);
-    }
-    return;
-  }
-  if (act === "ws-unassign") {
-    const p = S.people.find(x => x.profile_id === b.dataset.id);
-    if (UI.needAsk(S, b, T("confirm.unassign", { name: p ? pname(p) : "", ws: S.wsSel }))) return;
-    const ws = S.wsSel, id = b.dataset.id;
-    const was = (S.members.find(m => m.user_id === id) || {}).level || "view";
-    const ok = await run("err.unassign", () => D.unassign(id, ws));
-    if (ok !== undefined) {
-      S.msg = T("msg.unassigned", { name: p ? pname(p) : "", ws });
-      S.undo = async () => { const r = await run("err.assign", () => D.assign(id, ws, was)); if (r !== undefined) { S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(was) }); await openWorkspaces(null, true); } };
       await openWorkspaces(null, true);
     }
     return;
@@ -939,41 +920,20 @@ document.addEventListener("change", async e => {
   }
   // 多選加人（2026-10-24）：勾一個人、換等級。
   if (["pk-tick", "pk-level", "pk-sel", "pk-blevel"].includes(el.dataset.act)) { if (S.view === "workspaces") { pkApply(el); render(); } return; }
-  if (el.dataset.act === "grp-item") {
-    const off = new Set((S.wsDraft || {}).off || []);
-    if (el.checked) off.delete(el.value); else off.add(el.value);
-    S.wsDraft = Object.assign({}, S.wsDraft, { off: [...off] }); render(); return;
-  }
-  if (el.dataset.act === "grp-level" && UI.isGroupSel(S.wsSel)) {
-    const id = el.dataset.id, level = el.value, p = S.people.find(x => x.profile_id === id), row = S.members.find(m => m.user_id === id);
-    S.busy = true; S.msg = ""; render();
-    const failed = await grpApply(Object.keys((row && row.has) || {}).map(ws => ({ id, ws, level })));
-    S.busy = false;
-    S.msg = failed.length ? grpFailMsg(failed) : T("msg.grpLevel", { name: p ? pname(p) : "", ws: grpName(), level: UI.levelLabel(level) });
-    await openWorkspaces(null, true); return;
-  }
-  if (el.dataset.act === "grp-cell" && UI.isGroupSel(S.wsSel)) {
-    const id = el.dataset.id, ws = el.dataset.ws, p = S.people.find(x => x.profile_id === id), row = S.members.find(m => m.user_id === id);
-    const c = grpCells().find(x => x.id === ws), level = el.checked ? ((row && row.level) || "view") : null;
-    S.busy = true; S.msg = ""; render();
-    const failed = await grpApply([{ id, ws, level }]);
-    S.busy = false;
-    const v = { name: p ? pname(p) : "", item: c ? UI.grpShort(c) : ws, level: level ? UI.levelLabel(level) : "" };
-    // 取消的是他在這個工作區的最後一樣，就是整個移出，不要說「還在這個工作區」。
-    const last = !level && row && Object.keys(row.has || {}).length === 1;
-    S.msg = failed.length ? grpFailMsg(failed) : last ? T("msg.grpRemoved", { name: v.name, ws: grpName() }) : T(level ? "msg.grpOn" : "msg.grpOff", v);
-    await openWorkspaces(null, true); return;
-  }
+  // 一格的頁面每一行那個下拉（2026-11-28）：沒有・看・改・管。不在裡面的人選看、改、管就是加進來；選「沒有」就是移出。
   if (el.dataset.act === "ws-level" && S.wsSel) {
     const p = S.people.find(x => x.profile_id === el.dataset.id);
-    const level = el.value, ws = S.wsSel, id = el.dataset.id;
-    const was = (S.members.find(m => m.user_id === id) || {}).level || "view";
-    const ok = await run("err.assign", () => D.assign(id, ws, level));
+    const level = el.value, ws = S.wsSel, id = el.dataset.id, to = level === "none" ? null : level;
+    const was = (S.members.find(m => m.user_id === id) || {}).level || null;
+    if (was === to) return;
+    const go = l => l ? D.assign(id, ws, l) : D.unassign(id, ws);
+    const say = l => l ? T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(l) }) : T("msg.unassigned", { name: p ? pname(p) : "", ws });
+    const ok = await run(to ? "err.assign" : "err.unassign", () => go(to));
     if (ok !== undefined) {
-      S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(level) });
-      S.undo = async () => { const r = await run("err.assign", () => D.assign(id, ws, was)); if (r !== undefined) { S.msg = T("msg.assigned", { name: p ? pname(p) : "", ws, level: UI.levelLabel(was) }); await openWorkspaces(null, true); } };
+      S.msg = say(to);
+      S.undo = async () => { const r = await run("err.assign", () => go(was)); if (r !== undefined) { S.msg = say(was); await openWorkspaces(null, true); } };
       await openWorkspaces(null, true);
-    }
+    } else render();
   }
 });
 
@@ -1034,12 +994,12 @@ function pkPeople() { return UI.pkPeopleOf(S.people.filter(p => p.profile_id && 
 function pkApply(el) {
   const ns = el.dataset.ns, d = S.wsDraft || {};
   if (ns === "wsn") S.wsDraft = Object.assign({}, d, { npk: UI.pkReduce(d.npk, pkPeople(), [], el), slug: val("wsn-slug"), title_zh: val("wsn-zh"), title_en: val("wsn-en"), owner: val("wsn-owner") });
-  else S.wsDraft = Object.assign({}, d, { pk: UI.pkReduce(d.pk, pkPeople(), inIdsNow(), el) });
+  else S.wsDraft = Object.assign({}, d, { pk: UI.pkReduce(d.pk, pkPeople(), S.members.map(m => m.user_id), el) });
 }
 // 在多選那一塊裡按 Enter 就是按底下那顆「加 N 個人」（新增表單那一塊沒有那顆，Enter 不做事；空白鍵勾選是瀏覽器原生的）。
 document.addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
   const box = e.target.closest(".picker"); if (!box) return;
-  const go = box.querySelector('[data-act="members-assign"],[data-act="ws-assign"],[data-act="grp-assign"]'); if (!go || go.disabled) return;
+  const go = box.querySelector('[data-act="members-assign"]'); if (!go || go.disabled) return;
   e.preventDefault(); go.click();
 });

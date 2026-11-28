@@ -763,6 +763,38 @@ div.ev-help,p.ev-help{margin:0 0 10px}
   .table.grid td,.table.grid th{display:table-cell}
 }
 
+/* 一張名單（2026-11-28，wsListHTML）：取代左右兩欄。一欄滿寬；不在裡面的人字淡一點，一樣點得到。 */
+.ro{margin-top:10px}
+.ro .ma-col{height:auto;max-height:72vh;min-height:0}
+.ro-row.out .nm,.ro-row.out .rk,.ro-row.out .mini{opacity:.55}
+.ro-row .ro-lv{width:84px}
+.ro-who{display:inline-flex;align-items:center;gap:8px;padding:0;margin:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;text-align:left}
+.ro-who:hover .nm b{text-decoration:underline;text-underline-offset:3px}
+.ro-sum{flex:none!important}
+.ro-row .btn.sm{height:28px;padding:0 12px;font-size:12.5px;flex:none}
+@media (max-width:720px){ .ro .ma-col{max-height:none} .ro-row .mini:not(.ro-sum){display:none} .ro-row .btn.sm{display:none} } /* 手機：點名字就是改權限 */
+/* 點一個人跳出來的那一格（整個工作區）：畫面中間，每一樣一列四顆鈕。 */
+.ro-dlg-bg{position:fixed;inset:0;z-index:60;background:rgba(16,42,134,.55);display:flex;align-items:center;justify-content:center;padding:12px}
+body:has(.ro-dlg-bg){overflow:hidden}
+body:has(.ro-dlg-bg) .fb-fab,body:has(.ro-dlg-bg) .tour-fab{display:none} /* 右下角那兩顆圓鈕在 #bt-root 外面，會蓋住「存」 */
+.ro-dlg{width:min(640px,100%);max-height:calc(100dvh - 24px);display:flex;flex-direction:column;background:var(--bt-cream);border-radius:18px;box-shadow:0 20px 60px rgba(16,42,134,.35);overflow:hidden}
+.ro-dlg-head{padding:16px 18px 10px;border-bottom:1px solid rgba(16,42,134,.14)}
+.ro-dlg-head h2{margin:0 0 4px;font-size:22px}
+.ro-dlg-all{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font-size:13px}
+.ro-dlg-body{flex:1 1 auto;overflow:auto;padding:6px 18px 10px}
+.ro-dlg-sec{margin:12px 0 4px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+.ro-dlg-row{display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid rgba(16,42,134,.08)}
+.ro-dlg-row .lab{flex:1;min-width:0;font-size:14.5px}
+.ro-dlg-row.chg .lab b{text-decoration:underline;text-decoration-color:var(--bt-orange);text-decoration-thickness:2px;text-underline-offset:4px}
+.seg{display:inline-flex;flex:none;border:1px solid rgba(16,42,134,.3);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:none;padding:6px 12px;font-size:13px;font-family:var(--body);color:var(--bt-navy);cursor:pointer;min-width:44px}
+.seg button+button{border-left:1px solid rgba(16,42,134,.2)}
+.seg button[aria-pressed="true"]{background:var(--bt-navy);color:var(--bt-cream);font-weight:700}
+.seg button:disabled{opacity:.5;cursor:default}
+.ro-dlg-foot{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid rgba(16,42,134,.14)}
+.ro-dlg-foot .sp{flex:1}
+@media (max-width:560px){ .ro-dlg-row{flex-wrap:wrap;padding:6px 0} .seg button{padding:6px 9px;min-width:40px} }
+
 /* ───────── 14. 成員分頁（2026-10-23，第三次重整批 3）───────── */
 /* 清單頁首底下那一排「誰在做…」：跟 chip 同一個長相，但它是入口不是篩選，所以多一點上下距。 */
 .mp-links{margin:-6px 0 18px}

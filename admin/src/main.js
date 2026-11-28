@@ -1629,28 +1629,6 @@ document.addEventListener("click", async e => {
   if (["pk-team", "pk-all", "pk-none", "pk-untick", "pk-selall", "pk-selnone"].includes(act) && S.mp && S.view === "members") {
     S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), b); render(); return;
   }
-  if (act === "members-assign" && S.mp) {
-    // 一次加一批（2026-10-24）：勾起來的人每一個送一支 assign()（同一道門 can_manage），同時送，30 個人一秒內；沒有新的資料庫函式。
-    const ws = S.mp.ws, pk = S.mp.pk || {}, level = pk.level || "view";
-    const ids = UI.pkPicked(S.mp.cadres, S.mp.rows.map(r => r.user_id), pk);
-    if (!ids.length) { S.msg = T("err.mpPick"); render(); return; }
-    S.busy = true; S.msg = ""; render();
-    const out = await Promise.all(ids.map(id => D.assign(id, ws, level).then(() => null, e => ({ id, e }))));
-    const failed = out.filter(Boolean), done = ids.filter(id => !failed.some(f => f.id === id));
-    S.mp.pk = Object.assign({}, pk, { q: "", ticked: failed.map(f => f.id) });
-    if (done.length) {
-      // 復原移出的是這一批那 N 個人，不多不少。
-      const undo = UI.batchUndo(done, id => D.unassign(id, ws));
-      S.undo = async () => { S.busy = true; render(); try { const n = await undo(); await reloadMembers(T("msg.mpRemovedN", { n })); } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); } };
-    }
-    if (failed.length) {
-      const names = failed.map(f => UI.mpName(S.mp.cadres.find(c => c.id === f.id) || {})).join(T("punct.list"));
-      try { S.mp.rows = await D.loadMembers(ws) || []; } catch (x) { /* 下面的錯誤訊息比較重要 */ }
-      S.busy = false; S.msg = T("err.mpSome") + names + T("punct.colon") + D.says(failed[0].e); render(); return;
-    }
-    await reloadMembers(T("msg.mpAssignedN", { n: done.length, level: T("level." + level) }));
-    return;
-  }
   if (act === "members-cleanup" && S.mp) {
     // 清掉靠職級就有一切的人身上多餘的指派（2026-10-24）。復原是照原本的等級派回去。
     const ws = S.mp.ws, ids = String(b.dataset.ids || "").split(",").filter(Boolean);
@@ -1664,31 +1642,22 @@ document.addEventListener("click", async e => {
     } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); }
     return;
   }
-  // 勾起來的人一次改等級或一次移出（2026-12-27，Paul：「I have to change everyone from view to edit, just one by one」）。
+  // 一張名單（2026-11-28，Paul：「can we just make it into one page」）：勾好幾個人，上面那一排一次改成同一級（「沒有」= 移出）。
+  // 不在裡面的人也勾得到，改成看、改、管就是加進來。已經是那一級的人不重寫。
   if (act === "members-bulk" && S.mp) {
-    const sel = new Set((S.mp.pk || {}).sel || []), rows = S.mp.rows.filter(x => sel.has(x.user_id));
-    if (!rows.length) return;
-    const op = b.dataset.op, level = (S.mp.pk || {}).blevel || "edit", ws = S.mp.ws;
-    if (op === "remove" && UI.needAsk(S, b, T("confirm.maRemove", { n: rows.length }))) return;
+    const pk = S.mp.pk || {}, level = pk.blevel || "edit", ws = S.mp.ws, to = level === "none" ? null : level;
+    const now = Object.fromEntries(S.mp.rows.map(r => [r.user_id, r.level]));
+    const todo = (pk.sel || []).filter(id => (now[id] || S.mp.cadres.some(c => c.id === id)) && (now[id] || null) !== to);
+    if (!todo.length) { S.mp.pk = Object.assign({}, pk, { sel: [] }); render(); return; }
+    if (!to && UI.needAsk(S, b, T("confirm.maRemove", { n: todo.length }))) return;
+    const go = (id, l) => l ? D.assign(id, ws, l) : D.unassign(id, ws);
     S.busy = true; S.msg = ""; render();
     try {
-      await Promise.all(rows.map(r => op === "remove" ? D.unassign(r.user_id, ws) : D.assign(r.user_id, ws, level)));
-      S.undo = async () => { S.busy = true; render(); try { await Promise.all(rows.map(r => D.assign(r.user_id, ws, r.level))); await reloadMembers(T("msg.maUndone")); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
-      S.mp.pk = Object.assign({}, S.mp.pk, { sel: [] });
-      await reloadMembers(op === "remove" ? T("msg.maRemoved", { n: rows.length }) : T("msg.maLevel", { n: rows.length, level: T("level." + level) }));
-    } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); }
-    return;
-  }
-  if (act === "members-unassign" && S.mp) {
-    const r = S.mp.rows.find(x => x.user_id === b.dataset.id); if (!r) return;
-    if (UI.needAsk(S, b, T("confirm.mpRemove", { name: UI.mpName(r) }))) return;
-    const ws = S.mp.ws, was = r.level;
-    S.busy = true; S.msg = ""; render();
-    try {
-      await D.unassign(r.user_id, ws);
-      S.undo = async () => { S.busy = true; render(); try { await D.assign(r.user_id, ws, was); await reloadMembers(T("msg.mpAssigned", { name: UI.mpName(r), level: T("level." + was) })); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
-      await reloadMembers(T("msg.mpRemoved", { name: UI.mpName(r) }));
-    } catch (e) { S.busy = false; S.msg = T("err.mpRemove") + D.says(e); render(); }
+      await Promise.all(todo.map(id => go(id, to)));
+      S.undo = async () => { S.busy = true; render(); try { await Promise.all(todo.map(id => go(id, now[id] || null))); await reloadMembers(T("msg.maUndone")); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
+      S.mp.pk = Object.assign({}, pk, { sel: [] });
+      await reloadMembers(to ? T("msg.maLevel", { n: todo.length, level: T("level." + level) }) : T("msg.maRemoved", { n: todo.length }));
+    } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); try { S.mp.rows = await D.loadMembers(ws) || []; } catch (x) { /* 上面那一句比較重要 */ } render(); }
     return;
   }
 
@@ -2098,17 +2067,20 @@ document.addEventListener("change", async e => {
   const pkEl = e.target.closest('[data-act="pk-tick"],[data-act="pk-level"],[data-act="pk-sel"],[data-act="pk-blevel"]');
   if (pkEl && (S.view === "meetings" || S.view === "meeting")) { keepMtDraft(); S.mtDraft = Object.assign({}, S.mtDraft, { pk: UI.pkReduce((S.mtDraft || {}).pk, S.cadres, [], pkEl, true) }); render(); autosaveMeeting(); return; }
   if (pkEl && S.mp && S.view === "members") { S.mp.pk = UI.pkReduce(S.mp.pk, S.mp.cadres, S.mp.rows.map(r => r.user_id), pkEl); render(); return; }
+  // 一張名單（2026-11-28）：每一行的下拉是沒有・看・改・管。不在裡面的人選看、改、管就是加進來；選「沒有」就是移出。
   const el = e.target.closest('[data-act="members-level"]');
   if (!el || !S.mp || S.view !== "members") return;
-  const r = S.mp.rows.find(x => x.user_id === el.dataset.id); if (!r) return;
-  const ws = S.mp.ws, was = r.level, level = el.value;
-  if (was === level) return;
+  const id = el.dataset.id, r = S.mp.rows.find(x => x.user_id === id) || S.mp.cadres.find(c => c.id === id); if (!r) return;
+  const ws = S.mp.ws, was = (S.mp.rows.find(x => x.user_id === id) || {}).level || null, to = el.value === "none" ? null : el.value;
+  if (was === to) return;
+  const go = l => l ? D.assign(id, ws, l) : D.unassign(id, ws);
+  const say = l => l ? T("msg.mpLevel", { name: UI.mpName(r), level: T("level." + l) }) : T("msg.mpRemoved", { name: UI.mpName(r) });
   S.busy = true; S.msg = ""; render();
   try {
-    await D.assign(r.user_id, ws, level);
-    S.undo = async () => { S.busy = true; render(); try { await D.assign(r.user_id, ws, was); await reloadMembers(T("msg.mpLevel", { name: UI.mpName(r), level: T("level." + was) })); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
-    await reloadMembers(T("msg.mpLevel", { name: UI.mpName(r), level: T("level." + level) }));
-  } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); }
+    await go(to);
+    S.undo = async () => { S.busy = true; render(); try { await go(was); await reloadMembers(say(was)); } catch (e) { S.busy = false; S.msg = T("err.mpAssign") + D.says(e); render(); } };
+    await reloadMembers(say(to));
+  } catch (e) { S.busy = false; S.msg = T(to ? "err.mpAssign" : "err.mpRemove") + D.says(e); render(); }
 });
 
 // 多選加人（2026-10-24）：找名字是邊打邊篩，重畫後把游標放回去；在那一塊裡按 Enter 就是按「加 N 個人」（空白鍵勾選是瀏覽器原生的）。
