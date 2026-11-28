@@ -9,6 +9,8 @@
 //      存好的那一頁多一塊「你的帳號」，一顆馬上開帳號的鈕（連到 /app/?invite=碼）。
 //   2. 網址上沒有 token、但這台瀏覽器有登入：跟資料庫要他自己的那一條（rc_my_profile_link），之後讀寫照舊走那兩支，
 //      改的是名單上同一個人。這一條**只放在記憶體**（S.tok），不進網址、不進儲存空間；換語言的網址只帶網址上本來的那一條（urlToken）。
+// 2027-01-26（Paul：「not every link is gonna be the same questions, because the link goes to different person」）：
+//   連結帶著一套故事題的時候，第 4 步是表單引擎畫的那一套（格子名字是 fx-題目 id），讀回來走 UI.readSet，條件邏輯走 UI.refreshSet。
 import { supabase } from "../../shared/supabase.js";
 import * as UI from "./ui.js";
 
@@ -41,7 +43,7 @@ function land() {
 // 畫面上的格子讀回 S.form（畫面上只有現在這一步的格子，別步的值留在 S.form 裡不動）。
 function sync() {
   const f = document.getElementById("pf-form");
-  if (S.view === "form" && f) S.form = UI.readForm(f.elements, S.form);
+  if (S.view === "form" && f) S.form = UI.readSet(f, UI.readForm(f.elements, S.form));
 }
 // 填到一半的內容：停手 300 毫秒才寫一次；換步、離開分頁時馬上寫。
 let draftTimer = 0;
@@ -56,7 +58,7 @@ function go(step) {
 function next() {
   sync();
   // 只看現在這一步的格子。這一步舊的錯誤先收掉，照這一次看到的重新標。
-  const v = UI.validate(S.form, S.step), here = S.step;
+  const v = UI.validate(S.form, S.step, isEn()), here = S.step;
   S.errors = Object.assign(Object.fromEntries(Object.entries(S.errors).filter(([p]) => UI.stepOf(p) !== here)), v.errors);
   if (!v.ok) { S.msg = UI.t("fix", isEn()); keep(); render(); land(); return; }
   go(S.step + 1);
@@ -71,7 +73,7 @@ async function save() {
   if (S.busy) return;
   sync();
   // 整份看一遍。沒勾「我已滿 18 歲」、名字空的、格式不對的，都在這裡擋下來，不叫資料庫。
-  const v = UI.validate(S.form);
+  const v = UI.validate(S.form, null, isEn());
   if (!v.ok) { S.errors = v.errors; S.step = v.step; S.msg = v.step === UI.STEPS.length && Object.keys(v.errors).length === 1 && v.errors.adult ? "" : UI.t("fix", isEn()); keep(); render(); land(); return; }
   S.errors = {}; S.msg = ""; S.busy = true; keep(); render();
   try {
@@ -137,7 +139,8 @@ async function boot() {
     if (!d) { S.view = "wrong"; render(); return; }
     S.data = d; S.base = (d.profile && d.profile.updated_at) || ""; S.form = UI.fromServer(d);
     const draft = UI.draftLoad(token(), S.base);
-    if (draft) { S.form = draft.state; S.step = draft.step; }
+    // 草稿裡沒有題目（每次照資料庫那一份）；答案疊在資料庫那一份上面，草稿比較舊的那幾題不會把存過的蓋成空的。
+    if (draft) { S.form = Object.assign(draft.state, { set: S.form.set, answers: Object.assign({}, S.form.answers, draft.state.answers) }); S.step = draft.step; }
     S.view = "form"; render();
   } catch (e) {
     console.error("/profile/ 載入失敗：", UI.parseError(e).code);
@@ -156,7 +159,17 @@ function clearError(name) {
 }
 // 打字或勾選：讀回狀態、把那一格的錯誤收起來、更新自我介紹的字數、稍後寫草稿。**不重畫**，不然打到一半的那一格會失去游標。
 function onInput(e) {
-  const el = e.target; if (!el || !el.name || !el.closest || !el.closest("#pf-form")) return;
+  const el = e.target; if (!el || !el.closest || !el.closest("#pf-form")) return;
+  // 一套故事題裡的格子（引擎畫的）：整套讀回來、重算哪幾題藏起來，那一題的錯誤收起來。
+  const fx = el.closest("[data-fx]");
+  if (fx) {
+    const f = document.getElementById("pf-form");
+    S.form = UI.readSet(f, S.form); UI.refreshSet(f, S.form, isEn());
+    const id = "ans." + fx.dataset.fx;
+    if (S.errors[id]) { delete S.errors[id]; fx.classList.remove("fx-bad"); const er = fx.querySelector(".fx-err"); if (er) { er.hidden = true; er.textContent = ""; } }
+    keepSoon(); return;
+  }
+  if (!el.name) return;
   S.form = UI.setField(S.form, el.name, el.type === "checkbox" ? el.checked : el.value);
   // 「名字至少填一個」標在英文名字那一格，填了中文名字也要把它收掉。
   for (const name of el.name === "name_zh" ? ["name_zh", "name_en"] : [el.name]) clearError(name);
@@ -208,4 +221,5 @@ document.addEventListener("bt-lang", () => {
   langLink(); render();
 });
 langLink();
+UI.ensureFx(document);
 boot();

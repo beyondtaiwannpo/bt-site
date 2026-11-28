@@ -593,7 +593,12 @@ export const typeName = t => STRINGS["type." + t] ? T("type." + t) : F.typeLabel
 export const RANKS = ["president", "senior_adviser", "director", "adviser", "member"];
 export const ROLES = ["reader", "editor"];
 export const EKINDS = ["bootcamp", "workshop", "roundtable", "meetup", "clinic", "info-session", "mentorship-term", "fair", "other"];
-export const FKINDS = ["post-event", "alumni-yearly", "pair-mentee", "pair-mentor", "other"];
+// 2027-01-26：profile 是「個人連結的故事題」，一套給一種人（講者、教授…），開個人連結的時候挑一套。只有管紀錄的人建得了。
+export const FKINDS = ["post-event", "alumni-yearly", "pair-mentee", "pair-mentor", "other", "profile"];
+// 一套故事題可以給哪些標籤的人（跟 rc_forms.for_labels 的檢查同一份）。
+export const SET_LABELS = ["speaker", "professor", "admission_officer", "mentee", "mentor", "student", "member", "intern", "volunteer", "organizer", "connection"];
+// 一套故事題的表單只有這三個分頁：沒有回覆、沒有讀者名單（答案在每一個人的頁面上）。
+export const subsOf = f => (f && f.kind === "profile") ? ["questions", "settings", "log"] : SUBS;
 export const PROLES = ["student", "mentee", "mentor", "speaker", "organizer", "volunteer", "alumni"];
 export const PSTATUS = ["registered", "attended", "no-show", "cancelled"];
 export const OKINDS = ["applied", "admitted", "enrolled", "transferred", "graduated", "working", "gap", "other"];
@@ -626,6 +631,15 @@ export const TEMPLATES = {
     Q("give_back", "multi", "今年願不願意回來？", "Would you come back this year?", { options: { zh: ["當講者", "當 mentor", "幫忙看文件", "今年不行"], en: ["As a speaker", "As a mentor", "As a reviewer", "Not this year"] } }),
     Q("story_ok", "single", "我們可不可以在網站或募資頁引用你這段話？", "May we quote this on the website or in the campaign?", { options: { zh: ["可以，附名字", "可以，不附名字", "不要"], en: ["Yes, with my name", "Yes, without my name", "No"] } }),
     Q("comment", "long", "還有什麼想說的？", "Anything else?"),
+  ],
+  // 2027-01-26：個人連結的故事題，起手就是內建的六題（代號一樣，之前寫過的答案對得上）。
+  profile: [
+    Q("highschool", "long", "高中的你是什麼樣子？那時候想成為什麼樣的人？", "What were you like in high school, and what did you want to become then?"),
+    Q("turning", "long", "是哪一個轉捩點，讓你走上現在這條路？", "What was the turning point that set you on your current path?"),
+    Q("hardest", "long", "最難的一刻是什麼？你怎麼走過來的？", "What was the hardest moment, and how did you get through it?"),
+    Q("decision", "long", "有哪一個決定你會再做一次？哪一個你會改？", "What's one decision you'd make again, and one you'd change?"),
+    Q("wish17", "long", "你希望 17 歲的時候有人告訴你什麼？", "What do you wish someone had told you at 17?"),
+    Q("first_step", "long", "如果一個台灣學生想走你這條路，他第一步該做什麼？", "If a Taiwanese student wanted your path, what should they do first?"),
   ],
   "pair-mentee": [
     Q("meetings", "single", "這段期間你跟 mentor 聊了幾次？", "How many times did you and your mentor talk this period?", { options: { zh: ["0 次", "1 次", "2 到 3 次", "4 次以上"], en: ["0", "1", "2 to 3", "4 or more"] } }),
@@ -929,7 +943,7 @@ export function formsListHTML(boot, msg, busy, newDraft) {
   const nd = newDraft || {};
   const nf = newDraft ? `<div class="card inline-form" data-newform><h2>${esc(T("form.newTitle"))}</h2>
       <label><i>${esc(T("ed.name"))}</i><input id="rc-new-title" value="${esc(nd.title || "")}" maxlength="200" placeholder="${esc(T("form.titlePh"))}"></label>
-      <div class="two"><label><i>${esc(T("form.kind"))}</i>${sel("kind", FKINDS.map(k => [k, T("fkind." + k)]), nd.kind || "post-event")}</label>
+      <div class="two"><label><i>${esc(T("form.kind"))}</i>${sel("kind", FKINDS.filter(k => k !== "profile" || b.can_manage).map(k => [k, T("fkind." + k)]), nd.kind || "post-event")}</label>
       <label><i>${esc(T("form.event"))}</i>${sel("event_id", eventOpts(events), nd.event_id || "", false, T("form.noEvent"))}</label></div>
       <div class="two"><label><i>${esc(T("form.lang"))}</i>${sel("lang", [["zh", "中文"], ["en", "English"]], nd.lang || lang())}</label>
       <label class="check rc-tpl"><input type="checkbox" name="template" checked><span>${esc(T("form.useTemplate"))}</span></label></div>
@@ -951,9 +965,11 @@ export function formHeadHTML(r, sub) {
     if (f.status === "open") acts.push({ act: "form-status", id: "closed", label: T("ed.close") });
     if (f.status === "closed") acts.push({ act: "form-status", id: "open", label: T("ed.reopen") });
   }
-  const tabs = `<nav class="subtabs ptabs" aria-label="${esc(T("ed.tabs"))}">${SUBS.map(s => `<a class="subtab${s === sub ? " on" : ""}"${s === sub ? ' aria-current="page"' : ""} href="#forms/${esc(f.id)}/${s}" data-act="sub" data-t="${s}">${esc(T("ed.tab." + s))}</a>`).join("")}</nav>`;
-  const link = f.status === "open" ? `<div class="note rc-link"><b>${esc(T("form.linkLabel"))}</b> <input readonly value="${esc(feedbackURL(f.token))}" id="rc-link" data-noauto="1"> <button class="btn ghost sm" data-act="copy-link">${esc(T("form.copy"))}</button><div class="mini">${esc(T("form.linkHint"))}</div></div>` : "";
-  return pageHead(`${esc(f.title || "")} ${statusTag(f.status)} <span class="tag">${esc(T("fkind." + f.kind))}</span>`, `${f.event_title ? esc(f.event_title) + "・" : ""}${esc(T("form.count", { n: f.responses || 0 }))}`, acts, { act: "back-forms", label: T("ed.back") })
+  const tabs = `<nav class="subtabs ptabs" aria-label="${esc(T("ed.tabs"))}">${subsOf(f).map(s => `<a class="subtab${s === sub ? " on" : ""}"${s === sub ? ' aria-current="page"' : ""} href="#forms/${esc(f.id)}/${s}" data-act="sub" data-t="${s}">${esc(T("ed.tab." + s))}</a>`).join("")}</nav>`;
+  // 一套故事題沒有自己的填寫連結：它跟著每一個人的個人連結走。
+  const link = f.kind === "profile" ? `<div class="note">${esc(T(f.status === "open" ? "set.openNote" : "set.notOpenNote"))}</div>`
+    : f.status === "open" ? `<div class="note rc-link"><b>${esc(T("form.linkLabel"))}</b> <input readonly value="${esc(feedbackURL(f.token))}" id="rc-link" data-noauto="1"> <button class="btn ghost sm" data-act="copy-link">${esc(T("form.copy"))}</button><div class="mini">${esc(T("form.linkHint"))}</div></div>` : "";
+  return pageHead(`${esc(f.title || "")} ${statusTag(f.status)} <span class="tag">${esc(T("fkind." + f.kind))}</span>`, f.kind === "profile" ? "" : `${f.event_title ? esc(f.event_title) + "・" : ""}${esc(T("form.count", { n: f.responses || 0 }))}`, acts, { act: "back-forms", label: T("ed.back") })
     + (edit ? "" : `<div class="note">${esc(T("ed.readonly"))}</div>`) + link + tabs;
 }
 // 題目與設定。設定那一塊改了就存（main.js 的 onAutosave rc-save，只存設定）；
@@ -967,6 +983,22 @@ export function formEditHTML(r, S) {
   // 語言與匿名會改畫布上加得了哪些題型，要在出題之前定；開一張新的表單的時候這兩個已經選過了。開放與關閉是頁首那顆鈕。
   // 存檔的框變成上下兩個，都是 rc-save；readFormEditor 兩個框一起讀，動哪一個都存整份。data-part 是存完要把「存好了」印回哪一個框。
   if (S.sub !== "settings") return msgHTML(S.msg) + sectionHTML(T("ed.questions"), questionsHTML(r, S));
+  // 2027-01-26：個人連結的故事題只有名稱、開頭那一段話、語言、給哪些人。沒有活動、屆、匿名、截止時間。
+  if (f.kind === "profile") {
+    const on = new Set(f.for_labels || []);
+    return msgHTML(S.msg) + `<div data-autosave="rc-save" data-part="top" data-id="${esc(f.id)}">`
+      + sectionHTML(T("ed.basics"), `<div class="tf-settings">
+        <label><i>${esc(T("ed.name"))}</i><input name="title" value="${esc(f.title)}" maxlength="200"${dis}></label>
+        <div class="mini">${esc(T("set.nameNote"))}</div>
+        <label><i>${esc(T("set.intro"))}</i><textarea name="intro" rows="3" placeholder="${esc(T("set.introPh"))}"${dis}>${esc(f.intro || "")}</textarea></label>
+        <label><i>${esc(T("form.lang"))}</i>${sel("lang", [["zh", "中文"], ["en", "English"]], f.lang, !edit)}</label>
+        <div class="mini">${esc(T("set.langNote"))}</div>
+        <fieldset class="rc-setfor"><legend>${esc(T("set.for"))}</legend><div class="chips">${SET_LABELS.map(l => `<label class="check"><input type="checkbox" name="for_label" value="${l}"${on.has(l) ? " checked" : ""}${dis}><span>${esc(T("lab." + l))}</span></label>`).join("")}</div>
+        <div class="mini">${esc(T("set.forNote"))}</div></fieldset>
+        ${edit ? `<div class="form-foot">${autosaveHint("rc-save")}</div>` : ""}</div>`)
+      + `</div>`
+      + (S.boot && S.boot.can_manage ? sectionHTML("", `<div class="row"><span class="sp"></span><button class="btn quiet sm" data-act="form-delete" data-id="${esc(f.id)}">${esc(T("ed.delete"))}</button></div>`) : "");
+  }
   return msgHTML(S.msg) + `<div data-autosave="rc-save" data-part="top" data-id="${esc(f.id)}">`
     + sectionHTML(T("ed.basics"), `<div class="tf-settings">
       <label><i>${esc(T("ed.name"))}</i><input name="title" value="${esc(f.title)}" maxlength="200"${dis}></label>
@@ -1002,13 +1034,16 @@ export function questionsHTML(r, S) {
     + (ed.mode === "preview" ? `<div class="fx-pvbox" id="fx-pv" lang="${f.lang === "en" ? "en" : "zh-Hant"}"></div>`
       : (qs.length ? "" : `<p class="mini">${esc(T("ed.noQHint"))}</p>`)
         + F.canvasHTML(qs, { en, canEdit: edit, menuAt: ed.menuAt, filter: ed.filter, logicOpen: ed.logicOpen, prefill: false,
-            types: old ? OLD_TYPES : f.anonymous ? TYPES.filter(t => t !== "email" && t !== "phone") : TYPES, lockedIds: new Set(qs.filter(q => q.answered).map(q => q.id)),
+            types: old ? OLD_TYPES : f.kind === "profile" ? TYPES.filter(t => t !== "page") : f.anonymous ? TYPES.filter(t => t !== "email" && t !== "phone") : TYPES, lockedIds: new Set(qs.filter(q => q.answered).map(q => q.id)),
             hint: q => keyBox(q) + (edit ? autosaveHint("q-save") : "") }));
 }
 // 設定那一塊讀回來（題目各自存，不在這裡）。
 export function readFormEditor(box) {
   const v = allValues(box, "rc-save");
   const data = { title: v.title || "", intro: v.intro || "", event_id: v.event_id || "", term_id: v.term_id || "", lang: v.lang || "zh", closes_at: fromLocal(v.closes_at || ""), anonymous: !!v.anonymous };
+  // 一套故事題（2027-01-26）：給哪些人那一排勾，名字都叫 for_label，formValues 只留得住一個，所以另外讀。只送故事題要的幾格。
+  const doc = box && box.ownerDocument, tags = doc && doc.querySelectorAll ? [...doc.querySelectorAll('[data-autosave="rc-save"] input[name="for_label"]')] : [];
+  if (tags.length) return { data: { title: data.title, intro: data.intro, lang: data.lang, for_labels: tags.filter(t => t.checked).map(t => t.value) } };
   return { data };
 }
 // 畫布上讀回一題（引擎的 readBlock），代號照這一組的規矩：小寫英文、數字、底線（資料庫也擋）。
@@ -1657,13 +1692,28 @@ export function personProfileHTML(d, S, canEdit, details) {
         <div class="form-foot">${autosaveHint("pf-save")}${done}</div>
       </div></div></div>`, { id: "rc-profile" });
 }
-// 他的故事：六題，題目在上、他寫的在下。只讀：那是他自己的話，資料庫也沒有給管的人改的路。
+// 他的故事一列一列：{ label（當時問的那一句）, answer, set（哪一套，內建六題是空的）}。
+// 2027-01-26 起一個人可能答過好幾套（BT 換給他另一套，之前寫的還在）：story_q 記著每一個鍵當時的題目。
+// 內建的六題：他寫過其中一題、或他從來沒答過任何一套的時候才列（沒寫的那幾題照舊印「這一題沒寫」）；
+// 一套題目的：只列寫了的（沒寫的那幾題資料庫沒記），照套、照題號排。兩邊都對不到的鍵（不該有）就印鍵本身。
+export function storyRows(pf) {
+  const st = (pf && pf.story) || {}, q = (pf && pf.story_q) || {}, has = k => String(st[k] == null ? "" : st[k]).trim() !== "";
+  const own = STORY_KEYS.filter(k => !q[k]);
+  const showBuiltin = own.some(has) || !Object.keys(q).length;
+  const out = showBuiltin ? own.map(k => ({ key: k, label: T("story.q." + k), answer: has(k) ? String(st[k]) : "", set: "" })) : [];
+  const fromSets = Object.keys(q).filter(has).sort((a, b) => String(q[a].set || "").localeCompare(String(q[b].set || "")) || (Number(q[a].ord) || 0) - (Number(q[b].ord) || 0))
+    .map(k => ({ key: k, label: String(q[k].label || k), answer: String(st[k]), set: String(q[k].set || "") }));
+  const stray = Object.keys(st).filter(k => has(k) && !q[k] && !STORY_KEYS.includes(k)).map(k => ({ key: k, label: k, answer: String(st[k]), set: "" }));
+  return out.concat(fromSets, stray);
+}
+// 他的故事：題目在上、他寫的在下。只讀：那是他自己的話，資料庫也沒有給管的人改的路。
 export function personStoryHTML(d) {
-  const pf = d.profile || {}, st = pf.story || {};
-  const any = STORY_KEYS.some(k => String(st[k] || "").trim());
+  const pf = d.profile || {};
+  const rows = storyRows(pf);
+  const any = rows.some(r => r.answer);
   const body = !any ? `<div class="mini">${esc(T("story.empty"))}</div>`
     : `<div class="note">${esc(T(pf.share_story ? "story.shareYes" : "story.shareNo"))}</div>
-      ${STORY_KEYS.map(k => `<div class="rc-story"><div class="rc-q">${esc(T("story.q." + k))}</div>${String(st[k] || "").trim() ? `<p class="rc-a">${brText(st[k])}</p>` : `<p class="rc-a mini">${esc(T("story.blank"))}</p>`}</div>`).join("")}
+      ${rows.map(r => `<div class="rc-story"><div class="rc-q">${esc(r.label)}${r.set ? ` <span class="mini">${esc(r.set)}</span>` : ""}</div>${r.answer ? `<p class="rc-a">${brText(r.answer)}</p>` : `<p class="rc-a mini">${esc(T("story.blank"))}</p>`}</div>`).join("")}
       <div class="mini">${esc(T("story.own"))}</div>`;
   return sectionHTML(T("story.title"), body, { id: "rc-story" });
 }
@@ -1692,16 +1742,25 @@ export function personLinkHTML(d, S, canEdit) {
   const p = d.person || {}, link = d.link || null, state = linkState(link);
   const status = state === "none" ? `<div class="mini">${esc(T("link.none"))}</div>`
     : `<div class="rc-linkstate"><span class="tag ${state === "live" ? "open" : "closed"}">${esc(T(state === "live" ? "link.live" : "link.dead"))}</span> ${esc(T(state === "live" ? "link.made" : "link.expired", { day: fmtDay(link.created_at), exp: fmtDay(link.expires_at) }))}
-        <span class="mini">${esc(T(link.opened_at ? "link.opened" : "link.notOpened", { day: fmtDay(link.opened_at) }))} ${esc(T(link.submitted_at ? "link.submitted" : "link.notSubmitted", { day: fmtDay(link.submitted_at) }))}</span></div>`;
+        <span class="mini">${esc(T(link.opened_at ? "link.opened" : "link.notOpened", { day: fmtDay(link.opened_at) }))} ${esc(T(link.submitted_at ? "link.submitted" : "link.notSubmitted", { day: fmtDay(link.submitted_at) }))}</span>
+        <div class="mini">${esc(T("link.usesSet", { set: link.form_id ? (link.form_title || T("link.setGone")) : T("link.setBuiltin") }))}</div></div>`;
   let tools = "";
   if (canEdit) {
     const dis = S.busy ? " disabled" : "";
+    // 2027-01-26：故事那一步用哪一套題目。開新的時候挑（預設照他的標籤自己挑）；現在那一條也可以直接換，連結不變。
+    const sets = ((S.boot && S.boot.forms) || []).filter(f => f.kind === "profile" && f.status === "open");
+    const cur = state === "live" ? (link.form_id || "builtin") : "";
+    const opts = [["", T("link.setAuto")], ["builtin", T("link.setBuiltin")]].concat(sets.map(f => [f.id, f.title]));
+    if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, link.form_title || T("link.setGone")]);
+    const setSel = `<label><i>${esc(T("link.set"))}</i><select id="rc-linkset" data-noauto="1"${dis}>${opts.map(([v, l]) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
+      <div class="mini">${esc(T(sets.length ? "link.setHint" : "link.setNone"))}</div>`;
     if (state !== "live" && linkBlocked(p)) tools = `<div class="note">${esc(T("link.minor"))}</div>`;
-    else if (state !== "live") tools = `<div class="form-foot"><button class="btn sm" data-act="link-create"${dis}>${esc(T(state === "none" ? "link.create" : "link.renew"))}</button></div>`;
+    else if (state !== "live") tools = `${setSel}<div class="form-foot"><button class="btn sm" data-act="link-create"${dis}>${esc(T(state === "none" ? "link.create" : "link.renew"))}</button></div>`;
     else {
       const url = link.token ? profileURL(link.token) : "";
       tools = `${url ? `<label><i>${esc(T("link.url"))}</i><input id="rc-plink" readonly value="${esc(url)}" data-noauto="1"></label>` : ""}
         <div class="form-foot">${url ? `<button class="btn sm" data-act="link-copy">${esc(T("link.copy"))}</button><button class="btn ghost sm" data-act="link-qr">${esc(T("link.qr"))}</button>` : ""}<button class="btn ghost sm" data-act="link-create"${dis}>${esc(T("link.renew"))}</button><button class="btn quiet sm" data-act="link-revoke"${dis}>${esc(T("link.revoke"))}</button></div>
+        ${setSel}<div class="form-foot"><button class="btn ghost sm" data-act="link-set"${dis}>${esc(T("link.setApply"))}</button></div>
         ${url ? `<div id="rc-qr" data-link="${esc(url)}"></div>` : ""}`;
     }
   } else if (state === "live") tools = `<div class="mini">${esc(T("link.managerOnly"))}</div>`;

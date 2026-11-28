@@ -5823,6 +5823,73 @@ if echo "${pa2}" | grep -q "OVERALL.*PASS" && ! echo "${pa2}" | grep -q "|FAIL";
 for P in "${PAP}" "${PBP}" "${PCP}" "${PDP}" "${PEP}"; do psql -d "${DB}" -q -c "delete from public.mail_outbox where invite_code in (select code from public.invite_codes where person_id='${P}'); delete from public.invite_uses where code in (select code from public.invite_codes where person_id='${P}'); delete from public.invite_codes where person_id='${P}'; delete from public.positions where person_id='${P}'; update public.people set profile_id = null where id='${P}'; delete from public.people where id='${P}';" >/dev/null 2>&1 || true; done
 psql -d "${DB}" -q -c "delete from public.people where profile_id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}'); delete from public.profiles where id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}'); delete from auth.users where id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}');" >/dev/null 2>&1 || true
 chk "（收尾）假的人與帳號拿掉了" "0|0" "select (select count(*) from public.profiles where id in ('${PAU}','${PAW}','${PAB}','${PAC}','${PAD}'))||'|'||(select count(*) from public.people where name_en in ('Ann Speaker','Bea Prof','Cal Mentee','Dee Former','Eve','Eve Spam','Bea Other Row','Cal Applied Row'))"
+echo "── 個人連結的故事題，每一種人一套（2027-01-26-profile-question-sets.sql）──"
+# Paul 2026-11-27：「I need to be able to edit those questions as well, because not every link is gonna be the same questions」。
+PQM=supabase/migrations/2027-01-26-profile-question-sets.sql
+PQS1=b7a1c0de-0000-4000-8000-000000000001; PQS2=b7a1c0de-0000-4000-8000-000000000002; PQS3=b7a1c0de-0000-4000-8000-000000000003
+PQPOL=$(psql -d "${DB}" -X -A -t -q -c "select count(*) from pg_policies where schemaname = 'public'" | tr -d ' \n')
+pq1=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PQM}" 2>&1 || true)
+if echo "${pq1}" | grep -q "OVERALL.*PASS" && ! echo "${pq1}" | grep -q "|FAIL"; then echo "  ok   故事題那支驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 故事題那支驗收表："; echo "${pq1}" | head -20; fail=$((fail+1)); fi
+chk "沒有任何一條 RLS 政策多出來或少掉" "${PQPOL}" "select count(*) from pg_policies where schemaname = 'public'"
+chk "三套起手題：開放中、各六題、給對的標籤" "3|3|18|true" "select count(*)||'|'||count(*) filter (where status='open' and kind='profile')||'|'||(select count(*) from public.rc_questions where form_id in ('${PQS1}','${PQS2}','${PQS3}'))||'|'||bool_and(case id when '${PQS1}' then 'speaker' = any(for_labels) when '${PQS2}' then 'professor' = any(for_labels) else 'mentee' = any(for_labels) end)::text from public.rc_forms where id in ('${PQS1}','${PQS2}','${PQS3}')"
+PQTOK1=$(psql -d "${DB}" -X -A -t -q -c "select token from public.rc_forms where id='${PQS1}'" | tr -d ' \n')
+chkrole anon "" "★ 回饋表那條路拿不到故事題（不能拿表單的 token 當成匿名回饋表）" "true" "select (public.rc_public_form('${PQTOK1}') is null)::text"
+chkraise "★ 也送不進去（form_not_found）" "form_not_found" "set local role anon; perform public.rc_public_submit('${PQTOK1}', '{}'::jsonb, '{}'::jsonb);"
+chkraise "★ 一般幹部建不了故事題（not_form_creator）" "not_form_creator" "perform set_config('test.uid','${OUTC}',true); perform public.rc_save_form(null, '{\"title\":\"x\",\"kind\":\"profile\"}'::jsonb, null);"
+chkraise "故事題不收換頁（bad_question_type）" "bad_question_type" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_form(null, '{\"title\":\"x\",\"kind\":\"profile\"}'::jsonb, '[{\"type\":\"short\",\"label\":\"a\"},{\"type\":\"page\",\"label\":\"p\"}]'::jsonb);"
+chkraise "給哪些人只收認得的標籤（bad_label）" "bad_label" "perform set_config('test.uid','${PAUL}',true); perform public.rc_save_form(null, '{\"title\":\"x\",\"kind\":\"profile\",\"for_labels\":[\"wizard\"]}'::jsonb, null);"
+pqq() { psql -d "${DB}" -X -A -t -q -c "select set_config('test.uid','${PAUL}',false);" -c "$1" 2>&1 | tail -1 | tr -d ' \n'; }
+PQX=$(pqq "select public.rc_save_form(null, '{\"title\":\"Pq Draft Set\",\"kind\":\"profile\",\"for_labels\":[\"professor\"],\"event_id\":\"\",\"anonymous\":true}'::jsonb, '[{\"key\":\"pq_one\",\"type\":\"short\",\"label\":\"假的一題\"}]'::jsonb)")
+chk "★ 管紀錄的人建得了：不匿名、不掛活動、不掛屆、還是草稿" "profile|false|true|true|draft" "select kind||'|'||anonymous::text||'|'||(event_id is null)::text||'|'||(term_id is null)::text||'|'||status from public.rc_forms where id='${PQX}'"
+PQP=$(pqq "select public.rc_save_person(null, '{\"name_en\":\"Pat Prof\",\"email\":\"pat-pq@example.com\",\"kind\":\"guest\"}'::jsonb)")
+pqq "select public.rc_label_set('${PQP}','professor',true,'',null,null)" >/dev/null
+PQT=$(pqq "select public.rc_profile_link_set('${PQP}','create','')->>'token'")
+chk "★ 照標籤挑到教授那一套（草稿那一套不算）" "${PQS2}" "select form_id from public.rc_profile_links where person_id='${PQP}' and revoked_at is null"
+chkrole anon "" "★ 拿連結的人讀得到那一套：六題、沒有 owner、沒有別人的答案" "${PQS2}|6|false|false" "select (j->'set'->>'id')||'|'||jsonb_array_length(j->'set'->'questions')||'|'||(j->'set' ? 'owner')::text||'|'||(j->'set' ? 'responses')::text from public.rc_public_profile('${PQT}') j"
+chkas "${PAUL}" "原本那一支開連結還在，也是照標籤挑" "${PQS2}" "select public.rc_profile_link('${PQP}','create')->>'form_id'"
+PQT=$(psql -d "${DB}" -X -A -t -q -c "select token from public.rc_profile_links where person_id='${PQP}' and revoked_at is null" | tr -d ' \n')
+chkas "${PAUL}" "後台那個人的頁面看得到他那一條用哪一套" "${PQS2}|true" "select (j->'link'->>'form_id')||'|'||((j->'link'->>'form_title') <> '')::text from public.rc_person('${PQP}') j"
+# 先用內建的六題寫一題，再換成教授那一套：之前寫的要留著
+pqq "select public.rc_profile_link_set('${PQP}','set','builtin')" >/dev/null
+chk "換成內建的六題：連結不變" "${PQT}|true" "select token||'|'||(form_id is null)::text from public.rc_profile_links where person_id='${PQP}' and revoked_at is null"
+chkrole anon "" "內建六題時沒有 set" "true" "select (public.rc_public_profile('${PQT}')->'set' is null or jsonb_typeof(public.rc_public_profile('${PQT}')->'set') = 'null')::text"
+chkrole anon "" "用內建六題存一次" "true" "select (public.rc_public_profile_save('${PQT}', '{\"adult\":true,\"name_en\":\"Pat Prof\",\"story\":{\"turning\":\"OLD-BUILTIN-ANSWER\"}}'::jsonb)->>'ok')"
+chkas "${PAUL}" "★ 換回教授那一套" "${PQS2}" "select public.rc_profile_link_set('${PQP}','set','${PQS2}')->>'form_id'"
+PQOPT=$(psql -d "${DB}" -X -A -t -q -c "select options[1]||'|'||options[2] from public.rc_questions where form_id='${PQS2}' and key='help_how'")
+PQO1=${PQOPT%%|*}; PQO2=${PQOPT#*|}
+chkraise "★ 多選題不在選項裡的答案存不進去（bad_option）" "bad_option" "set local role anon; perform public.rc_public_profile_save('${PQT}', '{\"adult\":true,\"name_en\":\"Pat Prof\",\"story\":{\"help_how\":\"NOT-AN-OPTION\"}}'::jsonb);"
+chkrole anon "" "照那一套存：一題短答、一題多選" "true" "select (public.rc_public_profile_save('${PQT}', jsonb_build_object('adult',true,'name_en','Pat Prof','story',jsonb_build_object('role_now','FAKE-ROLE','help_how','${PQO2}'||chr(10)||'${PQO1}')))->>'ok')"
+chk "★ 存進去的鍵是題目代號，多選照選項的順序；之前用內建題寫的那一題還在" "FAKE-ROLE|${PQO1}/${PQO2}|OLD-BUILTIN-ANSWER" "select (story->>'role_now')||'|'||replace(story->>'help_how', chr(10), '/')||'|'||(story->>'turning') from public.rc_profiles where person_id='${PQP}'"
+chk "★ 當時問的那一句抄下來了（題目、題型、那一套的名稱）" "true|multi|true" "select ((story_q->'role_now'->>'label') = (select label from public.rc_questions where form_id='${PQS2}' and key='role_now'))::text||'|'||(story_q->'help_how'->>'type')||'|'||((story_q->'role_now'->>'set') = (select title from public.rc_forms where id='${PQS2}'))::text from public.rc_profiles where person_id='${PQP}'"
+chkrole anon "" "再存一次，多選清空" "true" "select (public.rc_public_profile_save('${PQT}', '{\"adult\":true,\"name_en\":\"Pat Prof\",\"story\":{\"role_now\":\"FAKE-ROLE\",\"help_how\":\"\"}}'::jsonb)->>'ok')"
+chk "★ 只換這一套的鍵：清掉的那一題拿掉了，別套的答案還在" "false|false|OLD-BUILTIN-ANSWER" "select (story ? 'help_how')::text||'|'||(story_q ? 'help_how')::text||'|'||(story->>'turning') from public.rc_profiles where person_id='${PQP}'"
+chkraise "★ 換成還在草稿的那一套不行（set_not_open）" "set_not_open" "perform set_config('test.uid','${PAUL}',true); perform public.rc_profile_link_set('${PQP}','set','${PQX}');"
+chkraise "★ 換成不存在的那一套不行（set_not_open）" "set_not_open" "perform set_config('test.uid','${PAUL}',true); perform public.rc_profile_link_set('${PQP}','set',gen_random_uuid()::text);"
+chkraise "★ 管紀錄以外的人換不了（not_records_manager）" "not_records_manager" "perform set_config('test.uid','${OUTC}',true); perform public.rc_profile_link_set('${PQP}','set','builtin');"
+PQN=$(pqq "select public.rc_save_person(null, '{\"name_en\":\"Nell Nolink\",\"kind\":\"guest\"}'::jsonb)")
+chkraise "沒有有效連結的人沒有東西可換（no_link）" "no_link" "perform set_config('test.uid','${PAUL}',true); perform public.rc_profile_link_set('${PQN}','set','builtin');"
+pqq "select public.rc_set_status('${PQX}','open')" >/dev/null
+chkas "${PAUL}" "草稿那一套開放之後換得過去" "${PQX}" "select public.rc_profile_link_set('${PQP}','set','${PQX}')->>'form_id'"
+psql -d "${DB}" -q -c "delete from public.rc_forms where id='${PQX}'" >/dev/null
+chk "★ 那一套被刪掉：連結還在，變回內建六題" "1|true" "select count(*)||'|'||bool_and(form_id is null)::text from public.rc_profile_links where person_id='${PQP}' and revoked_at is null"
+chkrole anon "" "★ 被刪掉之後打開連結照樣打得開，是內建六題" "PatProf|true" "select (j->'person'->>'name_en')||'|'||(j->'set' is null or jsonb_typeof(j->'set') = 'null')::text from public.rc_public_profile('${PQT}') j"
+# ── 破壞測試 ──
+BROKEN=$(mktemp)
+sed "s/ and f.kind <> 'profile';/;/" "${PQM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^5|.*|FAIL"; then echo "  ok   ★ 破壞測試：回饋表那條路給故事題，驗收表第 5 列變紅"; pass=$((pass+1)); else echo "  FAIL 回饋表那條路給故事題驗收表沒變紅"; fail=$((fail+1)); fi
+sed 's/v := public.rc_norm_answer(q, st->k);/v := btrim(coalesce(st->>k, '"''"'));/' "${PQM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^8|.*|FAIL"; then echo "  ok   ★ 破壞測試：存的時候不照那一套檢查，驗收表第 8 列變紅"; pass=$((pass+1)); else echo "  FAIL 不檢查答案驗收表沒變紅"; fail=$((fail+1)); fi
+sed 's/^revoke all on function public.rc_profile_set_json(uuid) from public, anon, authenticated;/grant execute on function public.rc_profile_set_json(uuid) to anon;/' "${PQM}" > "${BROKEN}"
+bk=$(psql -d "${DB}" -X -A -t -q -f "${BROKEN}" 2>&1 || true)
+if echo "${bk}" | grep -q "OVERALL.*FAIL" && echo "${bk}" | grep -q "^12|.*|FAIL"; then echo "  ok   ★ 破壞測試：一套題目給前端的樣子開給沒登入的人，驗收表第 12 列變紅"; pass=$((pass+1)); else echo "  FAIL 開給 anon 驗收表沒變紅"; fail=$((fail+1)); fi
+rm -f "${BROKEN}"
+pq2=$(psql -d "${DB}" -X -A -t -q -v ON_ERROR_STOP=1 -f "${PQM}" 2>&1 || true)
+if echo "${pq2}" | grep -q "OVERALL.*PASS" && ! echo "${pq2}" | grep -q "|FAIL"; then echo "  ok   ★ 裝回去、重跑一次，驗收表全 PASS"; pass=$((pass+1)); else echo "  FAIL 重跑之後驗收表沒有全 PASS"; echo "${pq2}" | head -16; fail=$((fail+1)); fi
+chk "重跑不多一份起手題、也不多題目" "3|18" "select count(*)||'|'||(select count(*) from public.rc_questions where form_id in ('${PQS1}','${PQS2}','${PQS3}')) from public.rc_forms where kind='profile' and id in ('${PQS1}','${PQS2}','${PQS3}')"
+for P in "${PQP}" "${PQN}"; do psql -d "${DB}" -q -c "delete from public.people where id='${P}';" >/dev/null 2>&1 || true; done
+chk "（收尾）假的人拿掉了" "0" "select count(*) from public.people where name_en in ('Pat Prof','Nell Nolink')"
 echo
 if [ "$fail" -eq 0 ]; then echo "全部通過（$pass 項）。"; else echo "有 $fail 項沒過（通過 $pass 項）。"; fi
 exit "$fail"

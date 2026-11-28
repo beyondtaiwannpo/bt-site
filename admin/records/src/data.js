@@ -80,6 +80,8 @@ export function saveProfile(person, p) {
 export const withdrawConsent = (person, which) => rpc("rc_save_profile", { p_person: person, p: { [which === "share_story" ? "share_story" : "share_profile"]: false } });
 // 個人連結：action 是 create（舊的撤掉、開一條新的，回 { token, expires_at }）或 revoke。
 export const profileLink = (person, action) => rpc("rc_profile_link", { p_person: person, p_action: action === "revoke" ? "revoke" : "create" });
+// 2027-01-26：開一條（挑一套故事題）或只換現在那一條的那一套。set：'' 照標籤挑、'builtin' 內建六題、或一套的 id。
+export const profileLinkSet = (person, action, set) => rpc("rc_profile_link_set", { p_person: person, p_action: action === "set" ? "set" : "create", p_set: set || "" });
 // 照片傳到 Storage 的 people bucket（公開讀；上傳與刪除只給管紀錄的人；5 MB；只收圖）。做法跟活動照片同一套（admin/src/data.js 的 uploadEventImage），
 // 這裡自己一份（後台資料夾之間不互相 import）。路徑 <人的 id>/<時間>-<亂數>.jpg，不用原檔名（原檔名可能有人名）。
 // 傳進來的 blob 是 main.js 已經縮好的 JPEG。傳得上去不代表掛得上去：網址要再走 saveProfile({ photo_url })。
@@ -116,6 +118,9 @@ const SAYS = [
   ["contact_taken", "says.contactTaken"], ["need_value", "says.needValue"], ["bad_email", "says.badEmail"], ["login_email", "says.loginEmail"], ["bad_contact_kind", "says.badContactKind"], ["too_long", "says.tooLong"],
   ["rc_bootstrap", "says.noTables"], ["rc_event", "says.noTables"],
   // 函式還不在（2027-01-03-people-network.sql 沒跑）：PostgREST 回的句子裡有函式的名字。
+  ["set_not_open", "says.setNotOpen"], ["no_link", "says.noLink"],
+  // 2027-01-26 那一支還沒跑：要排在 rc_profile_link 前面（後者是前者的開頭）。
+  ["rc_profile_link_set", "says.noSets"],
   ["rc_label_set", "says.noNetwork"], ["rc_save_profile", "says.noNetwork"], ["rc_profile_link", "says.noNetwork"],
 ];
 export function says(err) {

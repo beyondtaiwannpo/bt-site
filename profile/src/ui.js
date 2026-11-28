@@ -1,7 +1,8 @@
 // /profile/ 的畫面與純函式（2027-01-03，人的名錄變成關係網；資料庫那一半在 supabase/migrations/2027-01-03-people-network.sql）。
 // 這一頁不用登入：BT 管紀錄的人替一位成年的聯絡人（講者、教授、招生官、校友）開一條個人連結 /profile/?t=…，
 // 他打開看得到 BT 手上關於他的資料，改對、補上、回答六題故事、選 BT 可以拿去做什麼。
-// **esc 是自己的一份**，不從別的資料夾 import；這一支也不 import shared/ 的任何東西，所以在 node 底下直接測得了（test/profile-page.test.mjs）。
+// **esc 是自己的一份**，不從別的資料夾 import。2027-01-26 起 import shared/forms.js（表單引擎，純函式，node 底下照樣測得了，test/profile-page.test.mjs）：
+// 這一條連結帶著一套故事題（BT 在紀錄的表單編輯器裡改的，rc_forms kind = profile）的時候，第 4 步用引擎畫那一套；沒有就是內建的六題。
 //
 // 三件一定要守的事（測試都守著）：
 //   1. 存的時候**每一次都送整份**（toPayload）。資料庫的規矩是「有送的那一段整段換掉」：
@@ -11,6 +12,8 @@
 //   3. 連結上的 token 只出現在兩個地方：main.js 叫資料庫的那兩句，以及換語言那顆的網址（langHref）。
 //      草稿的鑰匙用 token 的雜湊（hashToken），不是 token 本身；這一支印出來的畫面裡沒有它。
 // 畫面一次只印一種語言（en 旗標），換語言時 main.js 先把畫面上的字讀回來再重畫一次。
+
+import * as F from "../../shared/forms.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const MAIL = "beyondtaiwan2020@gmail.com";
@@ -124,7 +127,9 @@ export const TX = {
   fix: ["有幾格要再看一下，已經標出來了。", "A few boxes need another look. They are marked below."],
   doneH: ["存好了，謝謝你。", "Saved. Thank you."], doneLead: ["BT 現在有的是這些：", "Here is what BT now has:"],
   doneName: ["名字：{v}", "Name: {v}"], doneEdu: ["學歷：{n} 筆", "Education entries: {n}"], doneCareer: ["以前的工作：{n} 筆", "Past roles: {n}"],
-  doneStory: ["故事：6 題裡寫了 {n} 題", "Story questions answered: {n} of 6"],
+  doneStory: ["故事：{of} 題裡寫了 {n} 題", "Story questions answered: {n} of {of}"],
+  storyLeadSet: ["每一題都可以不寫。不用寫得漂亮，短短幾句老實話就很好。BT 要用這些內容之前，一定要你在下一步同意才行。",
+                 "Every question is optional. Short, honest answers are better than polished ones. BT only reuses what you write here if you agree in the next step."],
   doneYes: ["你勾了這幾項：", "You ticked:"], doneNone: ["5 個選項你都沒有勾。", "You did not tick any of the five boxes."],
   doneUntil: ["這條連結到台灣時間 {date}之前都打得開，想改隨時回來。", "This link keeps working until {date} (Taiwan time), so you can come back and edit."],
   doneLater: ["想改的時候，再打開同一條連結就好。", "To change anything, just open this same link again."],
@@ -222,6 +227,8 @@ export function errorField(err) {
 }
 // 錯誤 → 一句人話。
 export function errorText(err, en) {
+  // 一套故事題的錯誤：引擎已經用他看的語言寫好那一句（validate 存成 fx:那一句）。
+  if (typeof err === "string" && err.startsWith("fx:")) return err.slice(3);
   const e = parseError(err), i = en ? 1 : 0;
   if (e.code === "too_long") {
     const g = longTarget(e.field);
@@ -241,7 +248,7 @@ const obj = (keys, f) => Object.fromEntries(keys.map(k => [k, f(k)]));
 export function blank() {
   return Object.assign(obj(TEXT_KEYS, () => ""), {
     story: obj(STORY_KEYS, () => ""), contacts: obj(CONTACT_KEYS, () => ""), education: [], career: [],
-  }, obj(FLAGS, () => false), { adult: false });
+  }, obj(FLAGS, () => false), { adult: false, set: null, answers: {} });
 }
 // 資料庫回的那一份（rc_public_profile）→ 表單的狀態。五個勾只有資料庫裡真的是 true 才勾；adult 永遠是 false。
 export function fromServer(d) {
@@ -253,8 +260,40 @@ export function fromServer(d) {
   for (const k of FLAGS) s[k] = pf[k] === true;
   s.education = ((d && d.education) || []).map(r => ({ id: str(r.id), institution: str(r.institution), title: str(r.title), major: str(r.major), year: str(r.year), enrolled: r.kind === "enrolled" }));
   s.career = ((d && d.career) || []).map(r => ({ id: str(r.id), institution: str(r.institution), title: str(r.title), year: str(r.year) }));
+  // 2027-01-26：這一條連結的那一套故事題。答案照題目代號（沒有代號用題目 id）從 story 倒回來，多選倒回陣列。
+  const set = d && d.set;
+  if (set && Array.isArray(set.questions) && set.questions.length) {
+    s.set = { id: str(set.id), title: str(set.title), intro: str(set.intro), lang: set.lang === "en" ? "en" : "zh", questions: set.questions };
+    for (const q of setInputs(s)) s.answers[q.id] = F.fromText(F.normalize(q), str(st[storyKey(q)]));
+  }
   return s;
 }
+// ── 一套故事題（2027-01-26）────────────────────────────────────────────
+// 存在 story 裡的鍵：題目代號，沒有代號用題目 id（跟 rc_public_profile_save 同一條規矩）。
+export const storyKey = q => str(q && q.key) || str(q && q.id);
+// 這一套裡收答案的那幾題（排版區塊、換頁、檔案不算）。
+export const setInputs = s => ((s && s.set && s.set.questions) || []).filter(q => F.isInput(q) && q.type !== "file" && q.type !== "page");
+const setEval = s => F.evaluate((s.set && s.set.questions) || [], s.answers || {});
+// 第 4 步畫面上的答案讀回狀態（引擎的 readValue；格子的名字是 fx-題目 id，readForm 不認得，所以另外讀）。
+export function readSet(root, state) {
+  if (!(state && state.set) || !root) return state;
+  const s = clone(state);
+  for (const q of setInputs(s)) if (root.querySelector(`[data-fx="${String(q.id).replace(/"/g, "")}"]`)) s.answers[q.id] = F.readValue(root, q);
+  return s;
+}
+// 打字或勾選之後：條件邏輯讓哪幾題藏起來、哪幾題變必填，只動那幾塊的 hidden 與必填記號（不整頁重畫，打到一半的那一格不會失去游標）。
+export function refreshSet(root, state, en) {
+  if (!(state && state.set) || !root) return;
+  const e = setEval(state);
+  for (const it of e.items) {
+    const node = root.querySelector(`[data-fx="${String(it.id).replace(/"/g, "")}"]`); if (!node) continue;
+    node.hidden = e.hidden.has(it.id);
+    const tag = node.querySelector(".fx-req"), req = e.required.has(it.id);
+    if (req && !tag && F.isInput(it) && it.type !== "consent") { const l = node.querySelector(".fx-label"); if (l) l.insertAdjacentHTML("beforeend", ` <span class="fx-req">*${en ? "required" : "必填"}</span>`); }
+    if (!req && tag) tag.remove();
+  }
+}
+export const ensureFx = doc => F.ensureStyle(doc);
 // 改一格。path 是那一格的 name：name_en、contacts.email、story.turning、education.2.year、education.2.enrolled、share_story、adult。
 // 不認得的路徑不動（不讓畫面上多出來的格子寫進狀態）。回一份新的狀態，原本那份不改。
 export function setField(state, path, value) {
@@ -306,12 +345,19 @@ export function toPayload(state) {
     adult: s.adult === true,
     name_zh: tr(s.name_zh), name_en: tr(s.name_en), school: tr(s.school),
     profile: obj(PROFILE_KEYS, k => tr(s[k])),
-    story: obj(STORY_KEYS, k => tr((s.story || {})[k])),
+    story: s.set ? setStory(s) : obj(STORY_KEYS, k => tr((s.story || {})[k])),
     contacts: obj(CONTACT_KEYS, k => tr((s.contacts || {})[k])),
     education: rowsOut(s, "education").map(r => Object.assign(r.id ? { id: r.id } : {}, {
       kind: r.enrolled ? "enrolled" : "graduated", institution: tr(r.institution), major: tr(r.major), title: tr(r.title), year: yearOut(r.year) })),
     career: rowsOut(s, "career").map(r => Object.assign(r.id ? { id: r.id } : {}, { institution: tr(r.institution), title: tr(r.title), year: yearOut(r.year) })),
   }, obj(FLAGS, k => s[k] === true));
+}
+
+// 一套故事題送出去的那一份：每一題都在（藏起來的送空字串，就是拿掉），多選用換行接起來。
+function setStory(s) {
+  const e = setEval(s), out = {};
+  for (const q of setInputs(s)) out[storyKey(q)] = e.hidden.has(q.id) ? "" : F.toText(F.normalize(q), (s.answers || {})[q.id]);
+  return out;
 }
 
 // ── 檢查 ────────────────────────────────────────────────────────────────
@@ -322,19 +368,20 @@ export function stepOf(path) {
   const p = String(path || "").split(".")[0];
   if (p === "education" || p === "school") return 2;
   if (p === "career" || ["job_title", "job_org", "field", "bio"].includes(p)) return 3;
-  if (p === "story") return 4;
+  if (p === "story" || p === "ans") return 4;
   if (FLAGS.includes(p) || p === "adult") return 5;
   return 1;
 }
 // 送出前（或按下一步前）看一遍。回 { ok, errors: { 路徑: 代碼 }, step: 第一個有錯的那一步 }。
 // 給了 step 就只看那一步的格子（按「下一步」時用）；沒給就整份都看（按「儲存」時用，這時才要求勾滿 18 歲）。
-export function validate(state, step) {
+export function validate(state, step, en) {
   const s = state || blank(), errors = {};
   if (len(s.name_en) === 0 && len(s.name_zh) === 0) errors.name_en = "need_name";
   for (const k of TEXT_KEYS) if (len(s[k]) > LIMITS[k]) errors[k] = "too_long:" + k;
   for (const k of CONTACT_KEYS) if (len(s.contacts[k]) > LIMITS.contact) errors["contacts." + k] = "too_long:contacts." + k;
   if (len(s.contacts.email) > 0 && !isEmail(s.contacts.email)) errors["contacts.email"] = "bad_email";
-  for (const k of STORY_KEYS) if (len(s.story[k]) > LIMITS.story) errors["story." + k] = "too_long:story." + k;
+  if (s.set) { const fx = F.validateAll(setEval(s), s.answers || {}, !!en, null); for (const id of Object.keys(fx)) errors["ans." + id] = "fx:" + fx[id]; }
+  else for (const k of STORY_KEYS) if (len(s.story[k]) > LIMITS.story) errors["story." + k] = "too_long:story." + k;
   for (const list of ["education", "career"]) {
     if (s[list].length > LIMITS.rows) errors[list] = "too_many_rows";
     s[list].forEach((r, i) => {
@@ -399,7 +446,7 @@ export const draftKey = token => "bt.pf.draft." + hashToken(token);
 const ss = store => store || (typeof sessionStorage !== "undefined" ? sessionStorage : null);
 export function draftSave(token, state, step, base, store) {
   try {
-    const s = clone(state || blank()); delete s.adult;
+    const s = clone(state || blank()); delete s.adult; delete s.set;   // 題目不進草稿，每次都照資料庫那一份
     if (ss(store)) ss(store).setItem(draftKey(token), JSON.stringify({ state: s, step: Number(step) || 1, base: str(base) }));
   } catch (e) { /* 存不了就算了 */ }
 }
@@ -416,6 +463,9 @@ export function draftLoad(token, base, store) {
     for (const k of FLAGS) s[k] = d.state[k] === true;
     s.education = (Array.isArray(d.state.education) ? d.state.education : []).slice(0, LIMITS.rows).map(r => ({ id: str(r && r.id), institution: str(r && r.institution), title: str(r && r.title), major: str(r && r.major), year: str(r && r.year), enrolled: !!(r && r.enrolled === true) }));
     s.career = (Array.isArray(d.state.career) ? d.state.career : []).slice(0, LIMITS.rows).map(r => ({ id: str(r && r.id), institution: str(r && r.institution), title: str(r && r.title), year: str(r && r.year) }));
+    // 一套故事題的答案：只收字或一串字（main.js 再對回這一條連結現在那一套的題目，對不到的不用）。題目本身不從草稿拿。
+    const a = d.state.answers && typeof d.state.answers === "object" ? d.state.answers : {};
+    for (const [k, v] of Object.entries(a).slice(0, 200)) if (typeof v === "string" || (Array.isArray(v) && v.every(x => typeof x === "string"))) s.answers[k] = v;
     const step = Number(d.step);
     return { state: s, step: step >= 1 && step <= STEPS.length ? step : 1 };
   } catch (e) { return null; }
@@ -524,6 +574,17 @@ function workHTML(s, v) {
     ${rowsHTML("career", s, v)}`;
 }
 function storyHTML(s, v) {
+  if (s.set) {
+    // 2027-01-26：BT 給這一條連結的那一套題目。題目是那一套的語言（一套只有一種），所以包一層 lang，讀螢幕的人念得對。
+    const e = setEval(s), en = v.en;
+    const items = e.items.filter(it => it.type !== "page" && it.type !== "file").map(it => {
+      const code = (v.errors || {})["ans." + it.id];
+      const h = F.questionHTML(it, (s.answers || {})[it.id], { en, err: code ? errorText(code, en) : "", required: e.required.has(it.id) });
+      return e.hidden.has(it.id) ? h.replace(/^<div class="fx-q/, '<div hidden class="fx-q') : h;
+    }).join("");
+    return `<p class="pf-lead">${esc(s.set.intro || t("storyLeadSet", en))}</p>
+    <div class="fx-form pf-set" lang="${s.set.lang === "en" ? "en" : "zh-Hant"}">${items}</div>`;
+  }
   return `<p class="pf-lead">${esc(t("storyLead", v.en))}</p>
     ${STORY_KEYS.map(k => field("story." + k, s.story[k], v.errors, v.en, { label: STORY[k][v.en ? 1 : 0], max: LIMITS.story, area: true, rows: 5 })).join("")}`;
 }
@@ -610,13 +671,20 @@ export function doneHTML(state, meta, en) {
         <li>${esc(t("doneName", en, { v: name }))}</li>
         <li>${esc(t("doneEdu", en, { n: rowsOut(s, "education").length }))}</li>
         <li>${esc(t("doneCareer", en, { n: rowsOut(s, "career").length }))}</li>
-        <li>${esc(t("doneStory", en, { n: STORY_KEYS.filter(k => len(s.story[k]) > 0).length }))}</li>
+        <li>${esc(t("doneStory", en, storyCount(s)))}</li>
       </ul>
       ${yes.length ? `<p>${esc(t("doneYes", en))}</p><ul class="pf-sum">${yes.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>${esc(t("doneNone", en))}</p>`}
       ${m.self ? "" : `<p>${esc(until ? t("doneUntil", en, { date: until }) : t("doneLater", en))}</p>`}
       <p class="pf-h">${mail(t(m.self ? "laterSelf" : "later", en))}</p>
       <div class="pf-nav"><button type="button" class="btn" data-nav="edit">${esc(t("doneEdit", en))}</button><a class="btn ghost" href="../">${esc(t("home", en))}</a></div>
     </div>`;
+}
+// 故事寫了幾題：一套題目照那一套算（藏起來的不算在題數裡），內建的照六題算。
+export function storyCount(state) {
+  const s = state || blank();
+  if (!s.set) return { of: STORY_KEYS.length, n: STORY_KEYS.filter(k => len(s.story[k]) > 0).length };
+  const e = setEval(s), qs = setInputs(s).filter(q => !e.hidden.has(q.id));
+  return { of: qs.length, n: qs.filter(q => len(F.toText(F.normalize(q), (s.answers || {})[q.id])) > 0).length };
 }
 // 連結不對、過期、被撤銷，或網址上根本沒有 token：一句話加 BT 的信箱，**沒有表單**。
 export function wrongLinkHTML(en) { return `<div class="warn pf-wrong" role="alert">${mail(t("wrong", en))} ${esc(t("wrongLogin", en))} <a href="../app/">${esc(t("signIn", en))}</a></div>`; }

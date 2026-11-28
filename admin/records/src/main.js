@@ -765,9 +765,18 @@ document.addEventListener("click", async e => {
   // 個人連結：開（已經有一條的時候先問，舊的會馬上失效）、撤銷、複製、QR code。
   if (act === "link-create") {
     if (S.person && S.person.link && UI.needAsk(S, b, T("link.renewAsk"))) return;
-    const r = await run("err.link", () => D.profileLink(S.id, "create"));
+    // 2027-01-26：用哪一套故事題，照那一格選的（預設空的 = 照他的標籤挑）。
+    const set = (document.getElementById("rc-linkset") || {}).value || "";
+    const r = await run("err.link", () => D.profileLinkSet(S.id, "create", set));
     if (r === undefined) return;
     await loadPerson(); S.msg = T("msg.linkMade"); render(); return;
+  }
+  // 只換現在那一條的那一套題目：連結不變，已經傳給他的照樣能開，下次打開就是新的那一套。
+  if (act === "link-set") {
+    const set = (document.getElementById("rc-linkset") || {}).value || "";
+    const r = await run("err.link", () => D.profileLinkSet(S.id, "set", set));
+    if (r === undefined) return;
+    await loadPerson(); S.msg = T("msg.linkSet"); render(); return;
   }
   if (act === "link-revoke") {
     if (UI.needAsk(S, b, T("link.revokeAsk"))) return;

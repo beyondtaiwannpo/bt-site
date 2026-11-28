@@ -136,7 +136,7 @@ test("★「我已滿 18 歲」永遠不預先勾，沒勾就存不了", () => {
   // main.js：先 validate、沒過就 return，之後才叫資料庫
   const main = readFileSync(new URL("../profile/src/main.js", import.meta.url), "utf8");
   const save = main.slice(main.indexOf("async function save()"), main.indexOf("async function boot()"));
-  assert.match(save, /const v = UI\.validate\(S\.form\);\n\s*if \(!v\.ok\) \{[^\n]*return; \}\n[\s\S]*rc_public_profile_save/, "沒過 validate 就 return，之後才叫資料庫");
+  assert.match(save, /const v = UI\.validate\(S\.form, null, isEn\(\)\);\n\s*if \(!v\.ok\) \{[^\n]*return; \}\n[\s\S]*rc_public_profile_save/, "沒過 validate 就 return，之後才叫資料庫");
   assert.equal((save.match(/rc_public_profile_save/g) || []).length, 1);
 });
 
@@ -429,9 +429,9 @@ test("HTML 外殼：noindex、no-referrer、預設中文、不載 nav.js、沒�
   const fb = readFileSync(new URL("../feedback/index.html", import.meta.url), "utf8");
   const fonts = h => h.match(/https:\/\/fonts\.googleapis\.com\/css2[^"]+/)[0];
   assert.equal(fonts(live), fonts(fb), "字體跟回饋表要的一模一樣");
-  // ui.js 不 import 任何東西（node 底下直接測得了）；main.js 只 import 共用的連線與 ui.js
+  // ui.js 只 import 表單引擎（2027-01-26，一套故事題用它畫；純函式，node 底下照樣測得了）；main.js 只 import 共用的連線與 ui.js
   const ui = readFileSync(new URL("../profile/src/ui.js", import.meta.url), "utf8"), main = readFileSync(new URL("../profile/src/main.js", import.meta.url), "utf8");
-  assert.doesNotMatch(ui, /^\s*import /m);
+  assert.deepEqual([...ui.matchAll(/^\s*import .* from "([^"]+)";$/gm)].map(m => m[1]), ["../../shared/forms.js"]);
   assert.deepEqual([...main.matchAll(/^import .* from "([^"]+)";$/gm)].map(m => m[1]), ["../../shared/supabase.js", "./ui.js"]);
   assert.match(main, /supabase\.rpc\("rc_public_profile", \{ p_token: token\(\) \}\)/);
   assert.match(main, /supabase\.rpc\("rc_public_profile_save", \{ p_token: token\(\), p: UI\.toPayload\(S\.form\) \}\)/);

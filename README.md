@@ -974,7 +974,7 @@ Paul 2026-11-27 看了工作區那一頁之後說：錢應該在 Sponsorship 底
 
 **要知道的限制：** 每天用的那六樣（行事曆、會議、專案、表單、我的護照、場地）**只管側欄畫不畫**。那幾頁本身與資料庫的規矩沒有改，知道網址的幹部照樣打得開。真的要擋，是另一件事，要動 RLS（資料庫裡每一張表「誰能讀」的規矩），先問 Paul。申請、紀錄、錢、對外網站這些本來就有資料庫的門，照舊擋得住。
 
-**資料庫（`supabase/migrations/2027-01-24-whole-bt-tools.sql`，還沒在正式 Supabase 跑）：**
+**資料庫（`supabase/migrations/2027-01-24-whole-bt-tools.sql`，Paul 2026-11-28 在正式 Supabase 跑過，全 PASS）：**
 - 新的七個工作區：`custom:calendar`、`custom:meetings`、`custom:projects`、`custom:forms`、`custom:my-passport`、`custom:venues`、`custom:internal`。
 - 現在的幹部先開每天用的六樣（已經有的不重複加）。
 - 新的函式 `in_internal()`；`is_president()`、`is_senior()`、`is_internship_team()` 多認 Internal；`assign()` 與 `unassign()` 碰 Internal 要是 Co-President。
@@ -1943,16 +1943,70 @@ Paul 2026-11-27：「once they fill out the form, they should get their account�
 - 新的函式：`rc_public_profile_account(連結, 語言)`（沒登入叫得動，要先存過一次）、`rc_claim_connection(碼)`（內部，`claim_invite` 交給它）、`rc_my_profile_link()`（登入的人拿自己那一條連結；幹部與還在念高中的學員不行）、`rc_queue_account_mail(碼)`（內部）。
 - 改的：`claim_invite`（2026-10-29 那一版一字不差，多一段把 connection 的碼交出去）、`rc_profile_to_people`（多認 connection，它本來就先用 email 對名單上已經有的那一列）、`mail_button_url`（多一行）。`profiles.role`、`invite_codes.grants`、`invite_uses.grants` 多一個值 `connection`；信的種類多 `profile_account` 與一列預設文案。
 - ⚠ **重跑順序**：之後重跑 `2026-10-29-invites.sql`、`2026-12-05-records-dedupe.sql` 或 `2026-12-21-form-received-mail.sql`，要再跑一次這一支。重跑 `2026-10-16-intern-role.sql` 會因為已經有 BT 的朋友而失敗，那是對的（它會把這種身分拿掉）。
-- 驗收表 14 項加 OVERALL，可以重跑、不動既有資料。**還沒在正式資料庫跑過**，要 Paul 在 Supabase SQL Editor 跑。沒跑之前：連結照舊能填能存，存好那一頁的帳號那一塊說「帳號這一步現在沒成功」。
+- 驗收表 14 項加 OVERALL，可以重跑、不動既有資料。Paul 2026-11-28 在正式 Supabase 跑過，全 PASS。
 
 #### 怎麼驗的
 - `./scripts/db/smoke.sh` 多一段 40 多項：要先存過、寄一封、碼綁對人、再按不再寄、別的 email 認領被擋而且碼沒燒、對的 email 認領後名單一列都沒多、帳號只有一列、有帳號了只說登入、登入拿到的連結是同一個人、撞到另一個人不開碼也不新增、碼寄出後才撞到的認領不燒碼不刪人、有職位的變校友、一天三組；三條破壞測試（拿掉要先存過、認領時刪他另一列、拿自己連結那一支開給沒登入的人）各讓驗收表一列變紅。
 - `node --test test/*.test.mjs`：新的 `test/profile-account.test.mjs`，`test/profile-page.test.mjs` 改了一條（三支資料庫呼叫、換語言的網址不帶登入拿到的那一條）。
 
 #### 上線前要做的
-1. Paul 在正式 Supabase 跑 `2027-01-25-profile-link-account.sql`，驗收表全 PASS。
+1. ~~Paul 在正式 Supabase 跑 `2027-01-25-profile-link-account.sql`~~ 2026-11-28 跑過，全 PASS。
 2. Paul 看一次信的預設文案（後台改得動）。
 3. **隱私政策「講者、教授與其他聯絡人」那一節要改**：現在寫的是連結不是帳號、不寄信。要多講：填完會用你留的 email 寄一封開帳號的信、帳號接在 BT 名單上你那一筆、可以自己刪帳號。改稿要 Paul 過。
+
+### 個人連結的故事題，每一種人一套，自己改得動（`supabase/migrations/2027-01-26-profile-question-sets.sql`，2026-11-28）
+
+Paul 2026-11-27：「this applies to a lot of different people, we can send a link to speaker… past mentee… college professor… I need to be able to edit those questions as well, because not every link is gonna be the same questions」。2026-11-28 看完提案：「Yes, build it」。
+
+**一句話**：個人連結第 4 步（他的故事）的題目不再寫死。每一種人一套題目，在「紀錄 → 表單」用原本那個表單編輯器改；開連結的時候照那個人的標籤自動挑一套，也可以手動換。第 1、2、3、5 步（基本資料、學歷、工作、同意）不變。
+
+#### 管紀錄的人怎麼用
+1. **改題目**：紀錄 → 表單，種類是「個人連結的故事題」的那幾份。點進去，題目分頁就是平常的表單編輯器（十幾種題型、條件邏輯、拖曳）。設定分頁只有四格：名稱（只有 BT 看得到）、開頭那一段話（拿到連結的人看得到）、語言、給哪些人（勾標籤）。
+2. **開一套新的**：表單 → 新增 → 種類選「個人連結的故事題」。勾「用範本」會先放進內建那六題，再改。寫好按「開放」，開連結的時候才挑得到它。只有管紀錄的人選得到這一種。
+3. **開連結**：人 → 點一個人 → 個人連結那一塊多一格「故事那一步用哪一套題目」。預設「照他的標籤自動挑」：他身上的標籤對得上哪一套就用哪一套（現在的標籤先算，好幾套都對得上挑最近改過的那一套），都對不上就用內建的六題。也可以直接挑一套，或挑「內建的六題」。
+4. **換題目，連結不變**：已經開好的連結，在同一格挑另一套，按「換成這一套」。已經傳出去的那一條照樣打得開，他下次打開就是新的題目。
+5. **他寫了什麼**：那個人頁面的「他的故事」照舊在，每一題顯示**他當時看到的那一句**，旁邊寫是哪一套。
+
+#### 一開始就有的三套（中文，開放中）
+- **講者的故事題**（給「講者」標籤）：你講的主題、轉捩點、台灣高中生最常問你什麼、希望 17 歲時有人告訴你什麼、想走這條路的第一步、之後方便怎麼跟學生分享（多選）。
+- **教授與招生官的故事題**（給「教授」「招生官」）：現在在哪所學校負責什麼、看申請資料最想看到什麼、台灣學生最常漏掉或誤會的、給資源比較少的公立高中生的建議、第一步、願意怎麼幫 BT 的學生（多選）。
+- **以前的 mentee 的故事題**（給「mentee」）：你現在在哪、參加 BT 之前最擔心的、BT 真的幫到你的那一件事、最難的一刻、希望 17 歲時有人告訴你什麼、願意怎麼回來幫學弟妹（多選）。
+
+這三套用固定的 id，重跑遷移檔不會多一份，也不會蓋掉改過的字。刪掉的那一套重跑會再出現，不要的話把它「關閉」就好。
+
+#### 答案怎麼存（重要的三條規矩）
+- 存在原本的 `rc_profiles.story`，鍵是**題目代號**（題目設定裡那一格英文代號），沒填代號就用題目的 id。兩套題目用同一個代號（例如 `first_step`、`wish17`），答案就是同一格。
+- **每一題當時問的那一句另外抄一份**（`rc_profiles.story_q`）：之後題目改字，已經寫的答案還是對著當時那一句，後台看得懂。
+- **存的時候只換這一套的鍵**：BT 給他換另一套題目，他之前用別套寫的答案不會不見。
+- 每一格照回饋表同一支 `rc_norm_answer` 檢查（選項要在清單裡、長度、格式）。必填交給頁面檢查：條件邏輯會讓題目藏起來，伺服器不重算，跟回饋表同一個理由。
+
+#### 刻意不做的
+- **一套題目只有一種語言**（GOALS.md「多語言題目欄位仍然不做」）。英文的對象另外開一套英文的。內建的六題照舊中英都有，是沒有任何一套對得上時的退路。
+- **不收換頁、不收檔案上傳**：故事那一步前後還有四步，換頁會跟外面的五步打架；照片已經在第 1 步。
+- **沒有自己的填寫連結**：回饋表那兩條不登入的路（`rc_public_form`、`rc_public_submit`）一律不給這一種，免得有人拿表單的 token 當成匿名回饋表來灌。
+
+#### 誰看得到什麼
+- 拿連結的人多拿到的只有**他那一條連結那一套**的題目，沒有別套、沒有別人的答案、沒有 owner。
+- 沒有新的表、**沒有動任何一條 RLS 政策**。三欄新欄位（`rc_forms.for_labels`、`rc_profile_links.form_id`、`rc_profiles.story_q`）只走函式讀寫。
+- 一套題目誰改得動跟回饋表一樣；建只有管紀錄的人（Co-President 與紀錄工作區「改」以上）。
+
+#### 資料庫
+- 新的函式：`rc_profile_link_set(人, 動作, 哪一套)`（開一條或只換那一套；`''` 照標籤、`'builtin'` 內建、或一套的 id，要是開放中的）、`rc_profile_set_for(人)` 與 `rc_profile_set_json(表單)`（內部）。原本的 `rc_profile_link(人, 動作)` 留著，等於照標籤挑。登入的人自己拿連結（`rc_my_profile_link`）沿用上一條的那一套。
+- 那一套被刪掉，用它的連結自動變回內建六題（外鍵 `on delete set null`），連結本身不會不見。
+- ⚠ **重跑順序**：這一支重新定義了 `rc_form_json`（2026-12-01）、`rc_save_form`、`rc_public_form`、`rc_public_submit`（2026-12-24）、`rc_profile_json`、`rc_public_profile`、`rc_public_profile_save`、`rc_profile_link`、`rc_person`（2027-01-03）、`rc_my_profile_link`（2027-01-25）。之後重跑那幾支，要再跑一次這一支。
+- 驗收表 14 項加 OVERALL，可以重跑、不動既有資料。**還沒在正式資料庫跑過**，要 Paul 在 Supabase SQL Editor 跑。沒跑之前：連結照舊是內建六題，後台挑一套那一格按下去會說要先跑這一支。
+
+#### 程式在哪
+- `/profile/`：`profile/src/ui.js` 的 `storyHTML`（第 4 步用 `shared/forms.js` 畫那一套）、`readSet`、`refreshSet`（條件邏輯即時藏題）、`setStory`、`storyCount`、`validate` 的 `ans.` 那幾格。
+- 紀錄後台：`admin/records/src/ui.js` 的 `FKINDS`、`SET_LABELS`、`TEMPLATES.profile`、`formEditHTML` 的故事題設定、`personLinkHTML` 那一格、`storyRows`；`main.js` 的 `link-create` 與 `link-set`；`data.js` 的 `profileLinkSet`。
+
+#### 怎麼驗的
+- `./scripts/db/smoke.sh` 多一段：三套起手題在、回饋表那兩條路不給、一般幹部建不了、不收換頁、照標籤挑到對的那一套、拿連結的人讀得到那一套、換題目連結不變、存進去的鍵與當時的題目、多選不在選項裡存不進去、只換這一套的鍵、草稿與不存在的那一套換不過去、那一套刪掉變回內建；三條破壞測試（回饋表那條路給故事題、存的時候不檢查、內部函式開給沒登入的人）各讓驗收表一列變紅。
+- `node --test test/*.test.mjs`：新的 `test/profile-sets.test.mjs`。
+
+#### 上線前要做的
+1. Paul 在正式 Supabase 跑 `2027-01-26-profile-question-sets.sql`，驗收表全 PASS。
+2. 看一次三套起手題的字（紀錄 → 表單，後台改得動）。
 
 ## 財務（2026-11-08）
 
