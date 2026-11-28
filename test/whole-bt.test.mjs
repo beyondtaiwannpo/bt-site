@@ -61,10 +61,10 @@ test("★ 整個工作區加人：已經有其中幾樣的人照樣列在右欄�
     { id: "a", ws: "apps", level: "view" }, { id: "a", ws: "custom:meetings", level: "view" },
     { id: "z", ws: "passport", level: "view" }, { id: "z", ws: "apps", level: "view" }, { id: "z", ws: "custom:meetings", level: "view" }]);
   assert.deepEqual(P.grpAddOps(["a"], cells, grp, ["apps"], "edit"), [{ id: "a", ws: "custom:meetings", level: "edit" }], "沒勾的那一樣不加");
-  // 畫出來：右欄標題是「勾起來的還沒全部有」，a 在右欄。
+  // 畫出來：右欄標題是「照上面勾的，還少幾樣的人」，a 在右欄。
   const people = [{ id: "a", name_zh: "A", board_role: "member" }, { id: "b", name_zh: "B", board_role: "member" }];
   const h = P.wsGroupHTML("", cells, grp, people, {}, false);
-  assert.match(h, /勾起來的還沒全部有（1）/);
+  assert.match(h, /照上面勾的，還少幾樣的人（1）/);
   assert.match(h, /name="ws-member" value="a"/);
   assert.doesNotMatch(h, /name="ws-member" value="b"/);
 });
@@ -82,4 +82,24 @@ test("★ 誰開了哪幾樣：分段、每一欄幾個人、名字固定在左�
   assert.match(css, /\.wsg \.wsg-who\{position:sticky;left:0/); assert.match(css, /\.wsg thead th\{position:sticky;top:0/);
   assert.equal(P.wsTeamOf({ id: "custom:money" }), "Sponsorship Team");
   assert.equal(RAIL.AREAS.find(a => a.key === "interns").team, "Internship Team");
+});
+
+// Paul 2026-11-28：上面全勾，下面那張表卻只有 Enya 有會議範本，以為壞了。上面那一排只管下一次加人；右欄每個人寫他少哪幾樣。
+test("★ 下一次加人要開的：標題與說明講清楚不是現在的狀態；右欄寫每個人少哪幾樣，不寫 team", () => {
+  const cells = [{ id: "passport" }, { id: "apps" }, { id: "custom:meetings" }, { id: "custom:calendar" }, { id: "custom:venues" }];
+  const grp = { passport: [{ user_id: "a", name_zh: "A", board_role: "member", level: "edit", team: "Marketing Team" }] };
+  const people = [{ id: "a", name_zh: "A", board_role: "member", team: "Marketing Team" }, { id: "z", name_zh: "Z", board_role: "member", team: "Curriculum Team" }];
+  const h = P.wsGroupHTML("", cells, grp, people, {}, false);
+  assert.match(h, /<h3 class="sec-h">下一次加人要開的<\/h3><div class="note">這一排只決定下一次按「加 N 個人」要開哪幾樣，不是現在誰有什麼。/);
+  const rowOf = id => (h.match(new RegExp(`<label class="ma-row pick[^"]*"><input[^>]*value="${id}"[\\s\\S]*?</label>`)) || [""])[0];
+  assert.match(rowOf("a"), /class="mini miss" title="少 [^"]+">少 [^、<]+、[^、<]+、[^<]+ 等 4 樣</, "a 少四樣：前三樣加總數");
+  assert.doesNotMatch(rowOf("a"), /Marketing/, "右欄這裡不寫 team");
+  assert.match(rowOf("z"), /勾起來的 5 樣都還沒有/, "一樣都沒有就直說");
+  // 只勾兩樣：z 少那兩樣，寫名字。
+  const two = P.wsGroupHTML("", cells, grp, people, { off: ["passport", "apps", "custom:venues"] }, false);
+  assert.match(two, /value="z"[\s\S]*?class="mini miss" title="少 [^"]+">少 [^、<]+、[^<]+<\/span><\/label>/);
+  assert.deepEqual(P.grpMissing(cells, grp, ["apps"], "a").map(c => c.id), ["custom:meetings", "custom:calendar", "custom:venues"]);
+  assert.equal(P.grpMissingHTML([], 3), "");
+  // 其他頁的成員區照舊寫 team（extra 沒給）。
+  assert.match(P.membersAreaHTML("mp", { rows: [], people, pk: {}, busy: false, acts: { level: "x", remove: "y" } }), /<span class="mini">Marketing<\/span>/);
 });

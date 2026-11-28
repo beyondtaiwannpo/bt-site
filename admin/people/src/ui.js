@@ -413,6 +413,7 @@ export function membersAreaHTML(ns, a) {
         : "" };
   }
   // 右欄
+  // o.extra（2027-01-25）：右欄每一列 team 那個位置改畫別的。整個工作區用它寫「少哪幾樣」（Paul 2026-11-28 看不懂為什麼大家都在右欄）。
   // 整個工作區（2027-01-24）：右欄列的是「勾起來的那幾樣還沒全部有」的人，不是「一樣都沒有」的人。
   // Paul：「I add everyone into whole BT and they should just have application, cadre, meeting and everything」——大家本來都有幹部護照，
   // 舊的算法把他們都算成「在裡面」，右欄空的，其他幾樣就加不進去。fullIds 是 wsGroupHTML 算好傳進來的。
@@ -423,7 +424,7 @@ export function membersAreaHTML(ns, a) {
   const n = o.draft ? 0 : pkPicked(people, inIds, pk, o.all).length;
   const teamsHere = PK_TEAMS.filter(t => cands.some(p => pkTeamsOf(p).includes(t)));
   const chip = t => `<button type="button" class="chip sm${pk.teams.includes(t) ? " on" : ""}" data-act="pk-team" data-ns="${esc(ns)}" data-team="${esc(t)}"${dis}>${esc(short(t))}</button>`;
-  const cand = p => `<label class="ma-row pick${ticked.has(p.id) && !o.draft ? " on" : ""}"><input type="checkbox" name="${esc(ns)}-member" value="${esc(p.id)}" data-act="pk-tick" data-ns="${esc(ns)}"${ticked.has(p.id) && !o.draft ? " checked" : ""}${dis}>${nameBlock(p)}${rankTag(p.board_role)}${teamsHTML(p)}</label>`;
+  const cand = p => `<label class="ma-row pick${ticked.has(p.id) && !o.draft ? " on" : ""}"><input type="checkbox" name="${esc(ns)}-member" value="${esc(p.id)}" data-act="pk-tick" data-ns="${esc(ns)}"${ticked.has(p.id) && !o.draft ? " checked" : ""}${dis}>${nameBlock(p)}${rankTag(p.board_role)}${o.extra ? o.extra(p) : teamsHTML(p)}</label>`;
   const goBtn = o.go ? `<button class="btn sm" data-act="${esc(o.go.act)}" data-ns="${esc(ns)}"${Object.keys(o.go).filter(k => k !== "act").map(k => ` data-${k}="${esc(String(o.go[k]))}"`).join("")}${o.busy || !n ? " disabled" : ""}>${o.busy ? T("common.saving") : T("pk.addN", { n })}</button>` : "";
   const levelSel = `<select id="${esc(ns)}-level" data-act="pk-level" data-ns="${esc(ns)}" aria-label="${esc(T("pk.level"))}"${dis}>${["view", "edit", "manage"].map(l => `<option value="${l}"${pk.level === l ? " selected" : ""}>${esc(T("level." + l))}</option>`).join("")}</select>`;
   return `<div class="ma picker" data-ns="${esc(ns)}">
@@ -1299,6 +1300,20 @@ export function grpAddOps(ids, cells, grp, off, level) {
   const has = Object.fromEntries(grpUnion(cells, grp).map(r => [r.user_id, r.has]));
   return (ids || []).flatMap(id => on.filter(c => !(has[id] || {})[c.id]).map(c => ({ id, ws: c.id, level })));
 }
+// 右欄每個人少哪幾樣（Paul 2026-11-28：右欄只寫 team，看不出為什麼他會在那裡）。照上面勾的順序；一樣都沒有就說都還沒有。
+export function grpMissing(cells, grp, off, userId) {
+  const skip = new Set(off || []), on = (cells || []).filter(c => !skip.has(c.id));
+  const has = (grpUnion(cells, grp).find(r => r.user_id === userId) || {}).has || {};
+  return on.filter(c => !has[c.id]);
+}
+export function grpMissingHTML(miss, nOn) {
+  if (!miss.length) return "";
+  const names = miss.map(grpShort), full = ` title="${esc(T("ws.grpMissing", { list: names.join(T("punct.list")) }))}"`;
+  if (miss.length === nOn && nOn > 3) return `<span class="mini miss"${full}>${esc(T("ws.grpMissingAll", { n: nOn }))}</span>`;
+  const head = names.slice(0, 3).join(T("punct.list"));
+  const list = names.length > 3 ? T("ws.grpMissingMore", { list: head, n: names.length, more: names.length - 3 }) : head;
+  return `<span class="mini miss"${full}>${esc(T("ws.grpMissing", { list }))}</span>`;
+}
 // 表頭用短名字（括號裡的說明拿掉），表才放得下。
 export const grpShort = w => wsCellLabel(w).replace(/\s*[（(].*$/, "");
 export function wsGroupHTML(team, cells, grp, people, draft, busy) {
@@ -1330,9 +1345,10 @@ export function wsGroupHTML(team, cells, grp, people, draft, busy) {
     <tbody>${plain.slice().sort(byName).map(r => `<tr><th scope="row" class="wsg-who">${esc(mpName(r))}<span class="mini">${esc(T("level." + r.level))}</span></th>${cols.map((c, i) => cell(r, c, i)).join("")}</tr>`).join("")}</tbody></table></div>` : "";
   return `<h2>${esc(name)}<span class="hint">${T("ws.grpHint", { n: cells.length })}</span></h2>
     <div class="note">${T("ws.grpNote")}</div>
-    <h3 class="sec-h">${T("ws.grpOpen")}</h3>${items}
+    <h3 class="sec-h">${T("ws.grpOpen")}</h3><div class="note">${T("ws.grpOpenNote")}</div>${items}
     ${membersAreaHTML("ws", { rows, people, pk: d.pk, busy, acts: { level: "grp-level", remove: "grp-unassign", bulk: "grp-bulk" }, go: { act: "grp-assign", ws: "group:" + team },
-      fullIds: grpFullIds(cells, grp, d.off), outTitle: n => T("ws.grpOut", { n }) })}
+      fullIds: grpFullIds(cells, grp, d.off), outTitle: n => T("ws.grpOut", { n }),
+      extra: p => grpMissingHTML(grpMissing(cells, grp, d.off, p.id), cells.filter(c => !off.has(c.id)).length) })}
     ${table}`;
 }
 
