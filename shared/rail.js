@@ -115,7 +115,7 @@ const ICON = {
 //   人與權限只有 Co-President 與 Senior Adviser 進得去，搬到頂欄（shared/nav.js 的 FEATURES）。
 //   AREAS 裡 sec 不是這三段的（people、money）不畫成側欄的一行，但它們的分頁照舊在 AREAS 與 ITEMS 裡，內容區上方那一排分頁照樣有。
 // 2026-11-27 第二版（Paul：「me and whole BT, essentially they're the same thing」）：「我的」與「整個 BT」合成最上面一段，不加標題。
-//   上面那一段每個人都一樣、位置固定（首頁、行事曆、會議、專案、表單、我的護照、紀錄；場地 2026-11-28 搬進紀錄那一行），點久了手會記得；
+//   上面那一段每個人都一樣、位置固定（首頁、行事曆、會議、專案、表單、紀錄；場地 2026-11-28 搬進紀錄那一行，我的護照同一天搬到頂欄），點久了手會記得；
 //   下面「我的工作區」每個人長度不一樣：先是他的 team（一個 team 一行），再接被指派才有的（對外網站、行銷、護照、紀錄、幹部招募），旁邊標「指派」。
 //   工作區放下面，因為放上面會把固定的那幾行往下推，每個人的位置都不一樣。
 //   搜尋搬到頂欄（shared/nav.js），「+ 新增」拿掉：提需求、記會、排會放回首頁與每個 team 的頁上。
@@ -136,7 +136,6 @@ export const AREAS = [
   // 表單一個入口（2026-11-27 第二版 Paul：「they should be able to know like what's going on and like what form is for what」）：
   // 要我填的、所有表單（報名表、回饋表、內部表單三種，標類型與是哪一場活動的，也在這裡建一份）、內部表單、回饋表。
   { key: "forms",     sec: "me",   label: { zh: "表單",     en: "Forms" },      hint: { zh: "要填的、我管的、建一份", en: "To fill, the ones you run, make one" } },
-  { key: "mypassport",sec: "me",   label: { zh: "我的護照", en: "My passport" }, hint: { zh: "蓋章與進度", en: "Your stamps and progress" } },
   // 2027-01-24（Paul：「records… right now they're in my workspace, but they're also inside whole BT. So it's confusing」）：
   //   整個 BT 的東西都畫在最上面這一段（不加標題），被派進去才有的也一樣，不再放進「我的工作區」。「我的工作區」只剩 team 與 Marketing。
   // 場地搬進紀錄這一行（2026-11-28 Paul：「put venue into records」）：紀錄的最後一個分頁。誰看得到照舊是 custom:venues，
@@ -181,7 +180,7 @@ export const ITEMS = [
   { group: "availability", key: "",        area: "calendar",  who: "ws:custom:calendar", ws: "custom:calendar", label: { zh: "時間看板", en: "Availability" } },
   // 會議範本（2026-11-13）：只有改得動的人看得到這一頁；其他人在記會議的下拉選單裡選得到範本。
   { group: "forms",     key: "mtemplates", area: "meetings",  who: "ws:custom:meeting-templates", ws: "custom:meeting-templates", label: { zh: "會議範本", en: "Templates" } },
-  { group: "passport",  key: "",           area: "mypassport", who: "ws:custom:my-passport", ws: "custom:my-passport", label: { zh: "我的護照", en: "My passport" } },
+  // 我的護照 2026-11-28 搬到頂欄（shared/nav.js 的 FEATURES，barWs 照舊是 custom:my-passport），側欄沒有這一行。
   { group: "search",    key: "search",     area: "search",    who: "cadre",  bare: true, label: { zh: "搜尋", en: "Search" } },
   // 活動（2026-11-10 Paul：「application should live under events」）
   { group: "forms",     key: "projects",   area: "events",    who: "ws:custom:projects", ws: "custom:projects", label: { zh: "專案", en: "Projects" } },
@@ -965,6 +964,42 @@ export const TOURS = [
       b: { zh: "「進度牆」看每一位幹部蓋到哪裡。", en: "The progress wall shows how far every cadre has got." } },
   ] },
 
+  // ── 設定與我的故事（/settings/、/settings/#story，沒有側欄，右下角那一顆由 mountHelp 掛，2026-11-28）──
+  { id: "settings", page: "settings:settings", steps: [
+    { at: ".card > h2", t: { zh: "這一頁改你自己的資料", en: "This page is about you" },
+      b: { zh: "名字、team、大頭照、時區、語言都在這裡。每一格改了就存，不用按儲存。點右上角你的名字就會回到這一頁。", en: "Name, teams, avatar, time zone and language live here. Each field saves as you change it. Click your name at the top right to come back." } },
+    { at: ".langrow", t: { zh: "換語言", en: "Switch language" },
+      b: { zh: "按「中文」或「English」，整個後台跟著換。選一次就記在這台電腦的瀏覽器，換一台要再選一次。", en: "Press 中文 or English and the whole site switches. It is remembered in this browser; on another computer, pick again." } },
+    { at: "#nzh", t: { zh: "你的名字", en: "Your name" },
+      b: { zh: "中文名與英文名各一格。行事曆、會議、進度牆上看到的就是這兩個名字。", en: "One box each for your Chinese and English names. They are what people see on the calendar, in meetings and on the progress wall." } },
+    { at: "fieldset.teams", t: { zh: "你在哪幾個 team", en: "Your teams" },
+      b: { zh: "勾你在的 team，可以勾好幾個。這是你的資料；側欄上的 team 照 Co-President 派給你的工作區，不看這裡。", en: "Tick every team you are on. This is your profile; the teams in your side menu follow the workspaces a Co-President gives you." } },
+    { at: ".avbtn", t: { zh: "換大頭照", en: "Change your photo" },
+      b: { zh: "點圓框，選一張照片，傳上去就換好了。右上角、進度牆與首頁都用這一張。", en: "Click the circle and pick a photo; it changes as soon as it uploads. The top bar, progress wall and Home all use it." } },
+    { at: [".check:has(#pub)", "#pub"], t: { zh: "要不要上公開團隊頁", en: "On the public team page?" },
+      b: { zh: "勾了，你的名字、team 與大頭照會放上公開的團隊頁，Co-President 核可之後才出現。不勾完全沒關係。", en: "Tick it to put your name, team and photo on the public team page; it appears after a Co-President approves. Leaving it unticked is fine." } },
+    { at: ["[data-act='tz-change']", "#tzq"], t: { zh: "設你的時區", en: "Set your time zone" },
+      b: { zh: "按「改」或「設定」，打你住的城市，點一個就存。時間看板與會議信的時間都照這個時區，搬家記得回來改。", en: "Press Change or Set, type your city and click one to save. Availability and meeting emails use this time zone; update it if you move." } },
+    { at: ".signout-row", t: { zh: "登出", en: "Sign out" },
+      b: { zh: "在這一頁最下面。借別人的電腦用完記得按。", en: "At the very bottom of this page. Press it when you are done on someone else's computer." } },
+  ] },
+  { id: "my-story", page: "settings:story", steps: [
+    { at: ".card > h2", t: { zh: "我的故事", en: "My story" },
+      b: { zh: "你在 BT 的故事與你現在在哪。每一段要不要公開都由你自己勾，改了就存。", en: "Your BT story and where you are now. You decide, section by section, what goes public. Everything saves as you type." } },
+    { at: [".check:has(#fdr)", "#fdr"], t: { zh: "創辦人", en: "Founder" },
+      b: { zh: "只有 Co-President 標成創辦人的人才有這一格。勾了，你才會以創辦人的身分放上公開團隊頁。", en: "Only people a Co-President marked as founders see this. Tick it to appear as a founder on the public team page." } },
+    { at: "#sname", t: { zh: "先填名字與在 BT 做過什麼", en: "Start with name and role" },
+      b: { zh: "照校友頁卡片的順序填。名字想遮字就寫成「張 O 睿」，空著就用你的姓名。再選在 BT 做過什麼、哪一個 team。", en: "Fill it in the order of the alumni card. To mask your name write it like 張 O 睿; blank uses your name. Then pick your BT role and team." } },
+    { at: "#sschool", t: { zh: "從哪裡飛到哪裡", en: "Where you flew from and to" },
+      b: { zh: "填你的高中，縣市會自己帶。再填現在的城市、國家與學校或公司。航線圖就是從你的高中畫到現在的城市。", en: "Type your high school and the county fills in. Then your current city, country and school or workplace. The map draws a line between them." } },
+    { at: "#squote", t: { zh: "一句話與一段介紹", en: "A line and an intro" },
+      b: { zh: "寫給之後的高中生看。英文版在下面那一塊，點開再填，沒填的話英文頁用中文。", en: "Write for future high school students. The English versions are in the section below; open it to fill them in." } },
+    { at: [".check:has(#spub)", "#spub"], t: { zh: "勾了才公開", en: "Public only once you tick" },
+      b: { zh: "勾同意、Co-President 核可之後，你才會出現在公開的校友頁與 BT 島。隨時可以取消。", en: "Tick to agree; once a Co-President approves, you appear on the public alumni page and the island. You can untick any time." } },
+    { at: "[data-act='outcome-add']", t: { zh: "我現在在哪", en: "Where you are now" },
+      b: { zh: "按「加一筆」，選狀態（錄取、就讀、工作…）、年份、學校或公司。每一筆自己選誰看得到，預設只有 BT 內部管紀錄的人。", en: "Press Add an entry and choose a status, year and school or employer. Each entry has its own visibility; by default only BT's records keepers." } },
+  ] },
+
   // ── 搜尋（/admin/search/）──
   { id: "search", page: "search:search", steps: [
     { at: ".sx-box", t: { zh: "打一個詞", en: "Type a word" },
@@ -1237,6 +1272,21 @@ export const TOURS = [
     { at: [".main .flist", ".main .empty"], t: { zh: "你管的與你讀得到的", en: "Yours, and ones you can read" },
       b: { zh: "點一份打開。寫著「你是讀者」的只能看答案，不能改題目。", en: "Click one to open it. Ones marked You can read only show answers; you can't change the questions." } },
   ] },
+  // 個人連結的故事題（2026-11-28，表單種類 profile）：一套沒有自己的連結，跟著每一個人的個人連結走。排在回饋表前面，兩種都有分頁。
+  { id: "question-set", page: "records:forms", when: ".main .rc-setnote", steps: [
+    { at: AT_HEAD, t: { zh: "一套故事題", en: "A question set" },
+      b: { zh: "個人連結裡「故事」那一步問的就是這一套。一種人一套，例如講者、教授、以前的 mentee。它沒有自己的連結。", en: "This is what the Story step of a personal link asks. One set per kind of person, such as speakers, professors or past mentees. It has no link of its own." } },
+    { go: ".main a.subtab[data-t='questions']", at: ".main .fx-canvas", t: { zh: "寫題目", en: "Write the questions" },
+      b: { zh: "一開始放的是內建的六題。跟其他表單一樣，點框就改，也可以加題、換題型。已經有人答過的題目鎖住，不能刪。", en: "It starts with the six built-in questions. Like other forms, click a box to edit, add or change types. Questions someone answered are locked." } },
+    { go: ".main a.subtab[data-t='settings']", at: [".main .rc-setfor", ".main .section"], t: { zh: "給哪些人", en: "Who it is for" },
+      b: { zh: "勾這一套給哪些標籤的人。開個人連結時照他身上的標籤自動挑，好幾套都對得上就挑最近改過的那一套。", en: "Tick which labels this set is for. A new personal link picks a set by the person's labels; if several match, the most recently edited wins." } },
+    { at: ".main [name='intro']", t: { zh: "開頭那一段話與語言", en: "Intro and language" },
+      b: { zh: "拿到連結的人最先看到這一段。名稱只有 BT 內部看得到。一套只有一種語言，英文的對象另外開一套。", en: "The person sees this intro first; the name is only for BT. A set has one language, so make a separate English set." } },
+    { at: ".main .page-head .actions [data-act='form-status']", t: { zh: "開放", en: "Open it" },
+      b: { zh: "寫好按「開放」，個人連結才挑得到它。關閉之後，已經在用這一套的連結照樣用。", en: "Press Open when it is ready; only then can personal links use it. Closing it later does not affect links already using it." } },
+    { t: { zh: "給一個人換一套", en: "Switch one person's set" },
+      b: { zh: "到紀錄的「人」，點那個人，打開「故事與同意」分頁。開連結前選一套，或按「換成這一套」，寫過的答案都留著。", en: "In Records, People, open the person and their Story and consent tab. Pick a set before making the link, or press Switch to this set; earlier answers stay." } },
+  ] },
   { id: "feedback-form", page: "records:forms", when: ".main a.subtab[data-act='sub']", steps: [
     { at: AT_HEAD, t: { zh: "一份回饋表怎麼做", en: "How a feedback form gets made" },
       b: { zh: "寫題目、接到哪一場活動，按「打開，開始收」，複製連結發出去。填的人不用登入，結果回到那一場活動的紀錄。", en: "Write the questions, link it to an event, press Open it and share the link. Nobody needs to sign in, and the results go back to that event's record." } },
@@ -1464,7 +1514,15 @@ export const TOURS = [
     { go: "#rc-person-tabs [data-tab='bt']", at: ".tabp[data-tabp='bt']", t: { zh: "參與紀錄", en: "With BT" },
       b: { zh: "他每一屆的職位與參加過的活動。要補一筆，按「加進一場活動」，選活動、角色、狀態，按「記進去」。", en: "Their positions and every event they joined. To add one, press Add to an event, pick the event, role and status, then Record." } },
     { go: "#rc-person-tabs [data-tab='voice']", at: ".tabp[data-tabp='voice']", t: { zh: "故事與同意", en: "Story and consent" },
-      b: { zh: "他自己寫的，這裡只能看。按「開一條連結」給他一條九十天、不用登入的連結去填，可以複製或顯示 QR code。", en: "Written by them and read-only here. Create link gives them a 90-day link that needs no sign-in; copy it or show a QR code." } },
+      b: { zh: "他自己寫的故事與他勾的同意在這裡。這裡只能看，那是他的話，BT 不改。", en: "Their own story and the consent they gave. Read-only here: those are their words, and BT does not edit them." } },
+    { at: "#rc-linkset", t: { zh: "先挑一套題目", en: "Pick a question set" },
+      b: { zh: "選故事那一步問哪一套：照他的標籤自動挑、內建的六題，或某一套。題目在「表單」那一頁改，種類是「個人連結的故事題」。", en: "Choose which questions the Story step asks: by their labels, the six built-in ones, or a set. Sets are edited under Forms as Personal link questions." } },
+    { at: ".tabp[data-tabp='voice'] [data-act='link-create']", t: { zh: "開一條個人連結", en: "Make a personal link" },
+      b: { zh: "按「開一條連結」，他拿到一條九十天、不用登入的連結，填介紹、學歷、工作與故事。", en: "Press Create link. They get a 90-day link, no sign-in needed, for their intro, education, work and story." } },
+    { at: [".tabp[data-tabp='voice'] [data-act='link-copy']", ".tabp[data-tabp='voice'] [data-act='link-create']"], t: { zh: "發給他", en: "Send it" },
+      b: { zh: "按「複製」貼給他，或「QR code」讓他現場掃。他存好之後會收到一封開帳號的信，用同一個 email 登入就能自己改。", en: "Press Copy and send it, or show the QR code. After saving, they get an email to open an account and can sign in with that email to edit." } },
+    { at: ".tabp[data-tabp='voice'] [data-act='link-set']", t: { zh: "換一套題目", en: "Switch the set" },
+      b: { zh: "連結已經發出去還想換題目：選另一套，按「換成這一套」。連結不變，他之前寫的答案都留著。", en: "Already sent the link? Pick another set and press Switch to this set. The link stays the same and earlier answers are kept." } },
   ] },
   { id: "records-people", page: "records:people", steps: [
     { at: AT_HEAD, t: { zh: "每一個來過 BT 的人", en: "Everyone who has been part of BT" },
@@ -1865,7 +1923,8 @@ function tShow(dir) {
     if (seq !== tour.seq || !tour.steps) return;
     const sel = sels.find(x => { try { return !!tFind(x); } catch (e) { return false; } }) || "";
     if (!sels.length || sel) { tour.steps[tour.i] = { ...s, sel, later: false }; return tDraw(slot, tour.steps[tour.i]); }
-    if (++tries < 17) { setTimeout(look, 120); return; }
+    // 這一步自己按了分頁才等滿兩秒；分頁在前面幾步就按過了（東西已經畫好），找不到就是這個人／這一頁沒有，三次就放掉，不讓人乾等。
+    if (++tries < (clicked ? 17 : 3)) { setTimeout(look, 120); return; }
     tour.steps.splice(tour.i, 1);
     if (dir < 0) tour.i = Math.max(0, tour.i - 1);
     if (!tour.steps.length || tour.i >= tour.steps.length) return tClose();
@@ -1931,6 +1990,13 @@ function tKey(e) {
   const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   if (!typing && e.key === "ArrowRight") { e.preventDefault(); tGo(1); }
   else if (!typing && e.key === "ArrowLeft") { e.preventDefault(); tGo(-1); }
+}
+// 不在側欄、但有自己的導覽的頁（2026-11-28）：我的護照（在頂欄）、設定、我的故事。test/tour.test.mjs 要求每一頁都有一段。
+export const OFF_RAIL_PAGES = ["passport:", "settings:settings", "settings:story"];
+// 沒有側欄的幹部頁（設定、我的故事，2026-11-28 Paul：「started on the tour for every new pages」）也要有右下角那兩顆：
+//   「怎麼用」與「回報問題、許願功能」。那一頁的 main.js 每次重畫叫這一支，page 寫成 tourPage(group, tab) 那一種（例如 settings:story）。
+export function mountHelp(group, tab, me, L) {
+  if (typeof document !== "undefined" && me && me.role === "cadre") { mountFeedback(L); mountTour(group, tab, me, L); }
 }
 // 每一次重畫側欄都會叫到這裡：放好「怎麼用」那一顆、換語言、換頁時關掉開著的導覽。導覽只在按下那一顆時開。
 function mountTour(group, tab, me, L) {

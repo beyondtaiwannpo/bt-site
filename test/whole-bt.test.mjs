@@ -4,6 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import * as NAV from "../shared/nav.js";
 import * as RAIL from "../shared/rail.js";
 import { internalRow } from "../shared/auth.js";
 import * as P from "../admin/people/src/ui.js";
@@ -16,7 +17,8 @@ test("★ 六樣每天用的：rail 與人與權限同一份清單，遷移檔�
   assert.deepEqual(RAIL.WHOLE_BT_TOOLS, P.WHOLE_BT_TOOLS);
   for (const id of RAIL.WHOLE_BT_TOOLS) {
     assert.match(MIG, new RegExp(`\\('${id}',\\s+'custom', null,`), id);
-    assert.ok(RAIL.ITEMS.some(i => i.who === "ws:" + id), `${id} 決定側欄某一頁`);
+    // 我的護照 2026-11-28 搬到頂欄：那一格決定頂欄畫不畫（shared/nav.js 的 barWs）。
+    assert.ok(RAIL.ITEMS.some(i => i.who === "ws:" + id) || NAV.FEATURES.some(f => f.barWs === id), `${id} 決定側欄或頂欄某一項`);
   }
   assert.match(MIG, /cross join \(values \('custom:calendar'\), \('custom:meetings'\), \('custom:projects'\), \('custom:forms'\), \('custom:my-passport'\), \('custom:venues'\)\)/);
   assert.match(MIG, /not in \('president', 'senior_adviser'\)\s+on conflict \(user_id, workspace_id\) do nothing;/, "職級的人不寫、重跑不重複");
@@ -41,7 +43,7 @@ test("★ 沒被派的幹部最上面只有首頁；有六樣的跟以前一樣"
   const rows = h => [...h.matchAll(/class="rail-item rail-area(?: (?:on|here))?" [^>]*>[\s\S]*?<b>([^<]+)<\/b>/g)].map(m => m[1]);
   const day = Object.fromEntries(RAIL.WHOLE_BT_TOOLS.map(id => [id, "edit"]));
   assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: {} }, {}, "zh")), ["首頁"]);
-  assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: day }, {}, "zh")), ["首頁", "行事曆", "會議", "專案", "表單", "我的護照", "紀錄"], "場地在紀錄那一行裡（2026-11-28）");
+  assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: day }, {}, "zh")), ["首頁", "行事曆", "會議", "專案", "表單", "紀錄"], "場地在紀錄那一行裡、我的護照在頂欄（2026-11-28）");
   // 只開行事曆給他：就只有行事曆。
   assert.deepEqual(rows(RAIL.railHTML("home", "home", { role: "cadre", board: "member", team: "", name: "n", ws: { "custom:calendar": "view" } }, {}, "zh")), ["首頁", "行事曆"]);
 });

@@ -15,7 +15,7 @@ const rows = h => [...h.matchAll(/class="rail-item rail-area(?: (?:on|here))?" [
 // 2026-11-27 第二版：「我的」與「整個 BT」合成最上面一段；被派進去的東西在「我的工作區」，標「指派」。
 test("★ Associate 的側欄：最上面那一段，加上他的 team；表單是要我填的與所有表單", () => {
   const h = RAIL.railHTML("forms", "projects", ASSOC, {}, "zh");
-  assert.deepEqual(rows(h), ["首頁", "行事曆", "會議", "專案", "表單", "我的護照", "紀錄"], "紀錄那一行只有場地（2026-11-28）");
+  assert.deepEqual(rows(h), ["首頁", "行事曆", "會議", "專案", "表單", "紀錄"], "紀錄那一行只有場地、我的護照在頂欄（2026-11-28）");
   assert.match(h, /<b>Curriculum<\/b>/);
   assert.deepEqual(RAIL.visibleItems("forms", ASSOC).map(i => i.key), ["fill", "all"]);
   for (const no of ["行銷", "對外網站", "護照", "人與權限", "錢", "搜尋"]) assert.ok(!rows(h).includes(no), `Associate 沒有${no}`);
@@ -68,7 +68,7 @@ test("★ 滑過去看得到裡面有哪幾頁：沒展開、又不只一頁的�
   // 會議那一行：滑過去是會議、會議範本，直接點得到範本（Paul：「hover onto meetings, I can see meeting template」）。
   assert.match(h, /<div class="rail-row"><a class="rail-item rail-area" href="\/admin\/\?lang=zh#meetings">[\s\S]*?<\/a><div class="rail-fly" role="group" aria-label="會議"><div class="rail-fly-m"><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#meetings">會議<\/a><a class="rail-item rail-sub" href="\/admin\/\?lang=zh#mtemplates">會議範本<\/a><\/div><\/div><\/div>/);
   assert.match(h, /aria-label="行事曆"><div class="rail-fly-m"><a class="rail-item rail-sub" href="#calendar" data-act="tab" data-t="calendar">行事曆<\/a><a class="rail-item rail-sub" href="\/availability\/\?lang=zh">時間看板<\/a>/);
-  // 只有一頁的（首頁、我的護照、場地）沒有。
+  // 只有一頁的（首頁）沒有。
   assert.doesNotMatch(h, /aria-label="首頁"|aria-label="我的護照"|aria-label="場地"/);
   // 現在在行事曆：那一行展開在側欄上，不再畫滑過去那一塊。
   const c = RAIL.railHTML("home", "calendar", me, {}, "zh");

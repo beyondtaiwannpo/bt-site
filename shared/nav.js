@@ -29,7 +29,9 @@ export const FEATURES = [
   // 學員、intern、校友沒有側欄，他們的頂欄不受影響。featuresFor() 照舊回全部（後台「你的存取」那一段用它說明每一項）。
   { key: "calendar",     label: { zh: "行事曆", en: "Calendar" },   href: "/home/#calendar", roles: ["cadre"], inSidebar: true,
     title: { zh: "行事曆", en: "Calendar" },     desc: { zh: "整個月的會議與活動", en: "Meetings and events by month and week" } },
-  { key: "passport",     label: { zh: "護照", en: "Passport" },     href: "/passport/",     roles: ["cadre"], inSidebar: true,
+  // 我的護照搬到頂欄（2026-11-28 Paul：「Move my passport to the top menu」），排在我的故事前面。
+  //   barWs：誰的頂欄有這一項，跟側欄的規矩一樣，要被開了「我的護照」那一格（custom:my-passport），Co-President 與 Senior Adviser 一定有。
+  { key: "passport",     label: { zh: "我的護照", en: "My passport" }, href: "/passport/",  roles: ["cadre"], bar: true, barWs: "custom:my-passport",
     title: { zh: "幹部護照", en: "Cadre passport" },     desc: { zh: "這一年的活動、章、心得與照片", en: "This year's activities, stamps, notes and photos" } },
   { key: "availability", label: { zh: "時間看板", en: "Availability" }, href: "/availability/", roles: ["cadre"], inSidebar: true,
     title: { zh: "每週時間看板", en: "Weekly availability board" }, desc: { zh: "填自己每週固定有空的時段；大家有空的人數在首頁的行事曆點一天看", en: "Fill in when you are usually free each week; see who is free by clicking a day on the Home Calendar" } },
@@ -125,9 +127,9 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 // board：看的人的職級（profiles.board_role），只用來決定畫不畫「人與權限」。沒傳就不畫，不會多給。
 // rail：這一頁有沒有畫左邊的側欄（2026-11-27 第二版）。幹部的頂欄不再放「首頁」，因為側欄最上面就是首頁；
 // 沒有側欄的那兩頁（設定、實習生進度牆）傳 rail: false，頂欄就多一個「首頁」，不然回不去。
-export function navHTML({ current, role, name, lang, board, rail, avatar }) {
+export function navHTML({ current, role, name, lang, board, rail, avatar, ws }) {
   const L = LANGS.includes(lang) ? lang : navLang();
-  if (role === "cadre") return cadreBarHTML({ current, name, L, board, rail: rail !== false, avatar });
+  if (role === "cadre") return cadreBarHTML({ current, name, L, board, rail: rail !== false, avatar, ws });
   const items = barFor(role, board).map(f =>
     `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`).join("");
   const n = String(name || "");
@@ -169,7 +171,7 @@ export function navHTML({ current, role, name, lang, board, rail, avatar }) {
 // ── 幹部的頂欄（2026-11-27 第三版）────────────────────────────────────────
 // Paul：「there's like 100 different tabs on the left menu, and then there's setting on top, there's like home and everything」。
 // 每一頁都在左邊的側欄（shared/rail.js），頂欄只放三樣東西：
-//   1. bar: true 的那幾項：我的故事（幹部）、人與權限（Co-President 與 Senior Adviser）。沒有側欄的頁（設定、實習護照）前面多一個首頁。
+//   1. bar: true 的那幾項：我的護照（被開了那一格的幹部，2026-11-28）、我的故事（幹部）、人與權限（Co-President 與 Senior Adviser）。沒有側欄的頁（設定、實習護照）前面多一個首頁。
 //   2. 右上角的大頭照加名字：一個連結，點了直接到設定（Paul：「once you click name, you can just go directly into it」）。
 //      大頭照是他在設定上傳的那一張（profiles.avatar），沒上傳就是名字的第一個字。
 //      登出在設定那一頁最下面（settings/src/ui.js 的 settingsHTML）。第三版的那一份小選單（設定、登出）拿掉了。
@@ -180,15 +182,23 @@ const fillName = (row, L, name) => tx(row, L).replace("{name}", name);
 // 只收圖片的 data URL 與 https 網址：它會進 <img src>，別的東西（javascript: 之類）一律不畫。
 export const ME_CACHE_KEY = "bt-me";
 export function safeAvatar(v) { const s = String(v || ""); return /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s) || /^https:\/\/[^\s"'<>]+$/.test(s) ? s : ""; }
-function cachedAvatar() {
-  try { const it = JSON.parse(sessionStorage.getItem(ME_CACHE_KEY) || "null"); return it && it.row ? it.row.avatar : ""; } catch (e) { return ""; }
+function cachedMe() {
+  try { return JSON.parse(sessionStorage.getItem(ME_CACHE_KEY) || "null") || null; } catch (e) { return null; }
 }
-function cadreBarHTML({ current, name, L, board, rail, avatar }) {
+function cachedAvatar() { const it = cachedMe(); return it && it.row ? it.row.avatar : ""; }
+// 頂欄的一項畫不畫（barWs）：Co-President 與 Senior Adviser（Internal 裡的人也算 Co-President）一定畫；別人看他被開了沒有。
+// 被開了哪幾格讀 shared/auth.js 存在這個分頁的那一份（bt-me 的 ws）；呼叫端傳了 ws 就用傳的。讀不到就不畫，下一頁就有。
+export function barShown(f, board, ws) {
+  if (!f.barWs || board === "president" || board === "senior_adviser") return true;
+  const w = ws || ((cachedMe() || {}).ws) || {};
+  return !!w[f.barWs];
+}
+function cadreBarHTML({ current, name, L, board, rail, avatar, ws }) {
   const n = String(name || "");
   const link = f => `<a href="${withLang(f.href, L)}"${f.key === current ? ' aria-current="page"' : ""}>${esc(tx(f.label, L))}</a>`;
   const mine = featuresFor("cadre", board);
   const set = FEATURES.find(f => f.key === "settings");
-  const items = [...(rail ? [] : FEATURES.filter(f => f.key === "home")), ...mine.filter(f => f.bar)].map(link).join("");
+  const items = [...(rail ? [] : FEATURES.filter(f => f.key === "home")), ...mine.filter(f => f.bar && barShown(f, board, ws))].map(link).join("");
   const pic = safeAvatar(avatar !== undefined ? avatar : cachedAvatar());
   const av = pic ? `<img class="btnav-av" src="${esc(pic)}" alt="" width="30" height="30">` : `<span class="btnav-av" aria-hidden="true">${esc([...n][0] || "?")}</span>`;
   return `<nav class="btnav btnav-c" aria-label="${esc(tx(NAV.aria, L))}">

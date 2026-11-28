@@ -5,6 +5,8 @@
 import { supabase } from "../../shared/supabase.js";
 import * as AUTH from "../../shared/auth.js";
 import { navHTML } from "../../shared/nav.js";
+// 右下角「怎麼用」與「回報問題」（2026-11-28）：設定與我的故事沒有側欄，掛那兩顆的那一支從 shared/rail.js 拿。
+import { mountHelp } from "../../shared/rail.js";
 import * as UI from "./ui.js";
 import { T, lang, setLang, pickLang, STORE_KEY } from "./strings.js";
 
@@ -36,6 +38,7 @@ function render() {
   el.innerHTML = nav + (S.view === "story" && teller
     ? UI.storyPageHTML(S.me, S.msg, S.story, S.outcomes, S.founder)
     : UI.settingsHTML(S.me, S.msg, S.busy, S.story, S.outcomes, S.tz, S.founder));
+  mountHelp("settings", S.view === "story" && teller ? "story" : "settings", S.me, lang());
 
   // 學校清單學員的 #school 跟幹部/校友「我的故事」那格的 #sschool 共用同一份
   // datalist，兩格都要點進去才載（2026-09-11：故事那一格也接上自動完成）。

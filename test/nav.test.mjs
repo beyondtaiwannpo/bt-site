@@ -32,7 +32,7 @@ test("FEATURES 的 href 都指到存在的資料夾", () => {
 // 幹部的頂欄只剩搜尋框與右上角的大頭照。每一頁都在左邊的側欄；我的故事、設定、人與權限（只有 Co-President 與 Senior Adviser）收在大頭照那一份選單裡。
 // 2026-11-27 第三版（Paul：「my story and internal can be on top of the menu, and then once you click Paul… you can go into setting」，搜尋框「find somewhere else」）。
 test("★ 幹部的頂欄：logo、我的故事（與人與權限）、大頭照加名字；點名字直接到設定；搜尋框與登出都不在頂欄", () => {
-  const h = navHTML({ current: "settings", role: "cadre", name: "王平", lang: "zh", board: "member", avatar: "" });
+  const h = navHTML({ current: "settings", role: "cadre", name: "王平", lang: "zh", board: "member", avatar: "", ws: {} });
   assert.match(h, /<nav class="btnav btnav-c"/);
   assert.doesNotMatch(h, /btnav-q|type="search"/, "搜尋框搬到側欄最上面");
   assert.match(h, /<div class="btnav-items"><a href="\/settings\/\?lang=zh#story">我的故事<\/a><\/div>/);
@@ -42,11 +42,27 @@ test("★ 幹部的頂欄：logo、我的故事（與人與權限）、大頭照
   assert.doesNotMatch(h, /\/admin\/people\//, "Associate 沒有人與權限");
   assert.ok(!navHTML({ current: "home", role: "cadre", name: "王", lang: "zh" }).includes("/admin/people/"), "沒傳職級就不畫，不會多給");
   for (const b of ["president", "senior_adviser"])
-    assert.match(navHTML({ current: "people", role: "cadre", name: "王", lang: "zh", board: b }), /<div class="btnav-items"><a href="\/settings\/\?lang=zh#story">我的故事<\/a><a href="\/admin\/people\/\?lang=zh" aria-current="page">人與權限<\/a><\/div>/, b);
+    assert.match(navHTML({ current: "people", role: "cadre", name: "王", lang: "zh", board: b }), /<div class="btnav-items"><a href="\/passport\/\?lang=zh">我的護照<\/a><a href="\/settings\/\?lang=zh#story">我的故事<\/a><a href="\/admin\/people\/\?lang=zh" aria-current="page">人與權限<\/a><\/div>/, b);
   // 首頁、行事曆、護照、時間看板、後台都在側欄，頂欄一項都不畫。
   for (const f of FEATURES.filter(x => x.roles.includes("cadre") && x.key !== "settings" && !x.bar)) assert.ok(!h.includes(`href="${withLang(f.href, "zh")}"`), `${f.key} 在側欄，頂欄不該再有`);
   assert.doesNotMatch(h, /btnav-toggle|btnav-burger/, "幹部的頂欄沒有「選單」那一顆");
 });
+test("★ 我的護照在頂欄（2026-11-28 Paul：「Move my passport to the top menu」）：被開了那一格的幹部才有，排在我的故事前面", () => {
+  const items = h => (h.match(/<div class="btnav-items">([\s\S]*?)<\/div>/) || ["", ""])[1].match(/>[^<]+<\/a>/g) || [];
+  const day = { "custom:my-passport": "edit" };
+  assert.deepEqual(items(navHTML({ current: "passport", role: "cadre", name: "王", lang: "zh", board: "member", ws: day })), [">我的護照</a>", ">我的故事</a>"]);
+  assert.match(navHTML({ current: "passport", role: "cadre", name: "王", lang: "zh", board: "member", ws: day }), /<a href="\/passport\/\?lang=zh" aria-current="page">我的護照<\/a>/, "在護照那一頁它亮著");
+  assert.deepEqual(items(navHTML({ current: "home", role: "cadre", name: "王", lang: "zh", board: "member", ws: {} })), [">我的故事</a>"], "沒被開那一格就不畫（跟以前側欄一樣）");
+  assert.deepEqual(items(navHTML({ current: "home", role: "cadre", name: "王", lang: "zh", board: "senior_adviser", ws: {} })), [">我的護照</a>", ">我的故事</a>", ">人與權限</a>"], "Senior Adviser 一定有");
+  // 呼叫端沒傳 ws：讀這個分頁的 bt-me（shared/auth.js 存的）。
+  const old = globalThis.sessionStorage;
+  globalThis.sessionStorage = { getItem: k => k === ME_CACHE_KEY ? JSON.stringify({ row: {}, ws: day }) : null };
+  try { assert.match(navHTML({ role: "cadre", name: "王", lang: "zh", board: "member" }), />我的護照</); }
+  finally { globalThis.sessionStorage = old; }
+  assert.equal(FEATURES.find(f => f.key === "passport").barWs, "custom:my-passport");
+  for (const r of ["student", "alumni", "intern"]) assert.doesNotMatch(navHTML({ role: r, name: "x", lang: "zh" }), /href="\/passport\//, `${r} 沒有幹部護照`);
+});
+
 test("★ 右上角是自己的大頭照：呼叫端傳的先，沒傳讀這個分頁的 bt-me；只收圖片的 data URL 與 https", () => {
   const png = "data:image/png;base64,iVBORw0KGgo=";
   assert.match(navHTML({ role: "cadre", name: "王", lang: "zh", avatar: png }), /<img class="btnav-av" src="data:image\/png;base64,iVBORw0KGgo=" alt="" width="30" height="30"><span class="btnav-nm">王<\/span>/);

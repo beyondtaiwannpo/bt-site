@@ -967,7 +967,7 @@ export function formHeadHTML(r, sub) {
   }
   const tabs = `<nav class="subtabs ptabs" aria-label="${esc(T("ed.tabs"))}">${subsOf(f).map(s => `<a class="subtab${s === sub ? " on" : ""}"${s === sub ? ' aria-current="page"' : ""} href="#forms/${esc(f.id)}/${s}" data-act="sub" data-t="${s}">${esc(T("ed.tab." + s))}</a>`).join("")}</nav>`;
   // 一套故事題沒有自己的填寫連結：它跟著每一個人的個人連結走。
-  const link = f.kind === "profile" ? `<div class="note">${esc(T(f.status === "open" ? "set.openNote" : "set.notOpenNote"))}</div>`
+  const link = f.kind === "profile" ? `<div class="note rc-setnote">${esc(T(f.status === "open" ? "set.openNote" : "set.notOpenNote"))}</div>`
     : f.status === "open" ? `<div class="note rc-link"><b>${esc(T("form.linkLabel"))}</b> <input readonly value="${esc(feedbackURL(f.token))}" id="rc-link" data-noauto="1"> <button class="btn ghost sm" data-act="copy-link">${esc(T("form.copy"))}</button><div class="mini">${esc(T("form.linkHint"))}</div></div>` : "";
   return pageHead(`${esc(f.title || "")} ${statusTag(f.status)} <span class="tag">${esc(T("fkind." + f.kind))}</span>`, f.kind === "profile" ? "" : `${f.event_title ? esc(f.event_title) + "・" : ""}${esc(T("form.count", { n: f.responses || 0 }))}`, acts, { act: "back-forms", label: T("ed.back") })
     + (edit ? "" : `<div class="note">${esc(T("ed.readonly"))}</div>`) + link + tabs;

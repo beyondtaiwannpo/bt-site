@@ -11,7 +11,8 @@ import * as RAIL from "../shared/rail.js";
 
 const read = p => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 // team 的頁不在 ITEMS 裡（側欄是畫出來的），page 是 home:team:<team 全名>
-const PAGES = new Set([...RAIL.ITEMS.map(i => `${i.group}:${i.key}`), ...RAIL.TEAMS.map(t => "home:team:" + t)]);
+// 2026-11-28：我的護照搬到頂欄、設定與我的故事也有「怎麼用」，這三頁不在 ITEMS 裡，另外列在 OFF_RAIL_PAGES。
+const PAGES = new Set([...RAIL.ITEMS.map(i => `${i.group}:${i.key}`), ...RAIL.TEAMS.map(t => "home:team:" + t), ...RAIL.OFF_RAIL_PAGES]);
 
 test("★ 每一段導覽：id 不重複、3 到 8 步、每一步中英文都有標題與內文", () => {
   const ids = RAIL.TOURS.map(t => t.id);
@@ -42,8 +43,8 @@ test("★ 導覽指到的頁面都在側欄的 ITEMS 裡（頁面改名或拿掉
 
 test("★ 側欄每一頁都有導覽，一頁好幾種畫面時挑對那一段", () => {
   const none = () => false;
-  // 設定與實習生進度牆不掛側欄，沒有「怎麼用」那一顆
-  const skip = new Set(["settings:settings", "internwall:"]);
+  // 實習生進度牆不掛側欄，沒有「怎麼用」那一顆。設定與我的故事 2026-11-28 起有（mountHelp）。
+  const skip = new Set(["internwall:"]);
   for (const p of PAGES) if (!skip.has(p)) assert.ok(RAIL.pickTour(p, none), `${p} 沒有導覽`);
   const pick = (page, ...on) => RAIL.pickTour(page, s => on.includes(s)).id;
   assert.equal(pick("forms:events", "#ev-tabs"), "event-editor");
@@ -71,6 +72,10 @@ test("★ 側欄每一頁都有導覽，一頁好幾種畫面時挑對那一段"
   assert.equal(pick("passport:", ".main .wall"), "passport-wall");
   assert.equal(pick("records:overview", "#rc-event-tabs"), "record");
   assert.equal(pick("records:people", "#rc-person-tabs"), "record-person");
+  assert.equal(pick("records:forms", ".main .rc-setnote", ".main a.subtab[data-act='sub']"), "question-set", "個人連結的故事題不是回饋表");
+  assert.equal(pick("records:forms", ".main a.subtab[data-act='sub']"), "feedback-form");
+  assert.equal(pick("settings:settings"), "settings");
+  assert.equal(pick("settings:story"), "my-story");
   assert.equal(pick("teamforms:build", ".main a.subtab[data-act='sub']"), "internal-form");
   assert.equal(pick("people:roster", "[data-autosave='person-save']"), "person");
   assert.equal(RAIL.pickTour("nope:nope", none), null, "沒有導覽的頁面回 null");
@@ -186,6 +191,9 @@ test("★ 兩顆不會疊在一起：「怎麼用」在回報那一顆的正上�
 test("引擎只在幹部的頁面掛上，而且不准有每一幀的迴圈（check.sh 也守）", () => {
   const src = read("shared/rail.js");
   assert.match(src, /me\.role === "cadre"\) \{ mountFeedback\(L\); mountTour\(group, tab, me, L\); bindFly\(\); \}/);
+  // 設定與我的故事沒有側欄，main.js 每次重畫叫 mountHelp（也只給幹部）。
+  assert.match(src, /export function mountHelp\(group, tab, me, L\) \{\s*if \(typeof document !== "undefined" && me && me\.role === "cadre"\) \{ mountFeedback\(L\); mountTour\(group, tab, me, L\); \}/);
+  assert.match(read("settings/src/main.js"), /mountHelp\("settings", S\.view === "story" && teller \? "story" : "settings", S\.me, lang\(\)\);/);
   assert.doesNotMatch(src.replace(/\/\/.*$/gm, ""), /requestAnimationFrame\(/);
   // 在 node 裡（沒有 document）畫側欄不會出錯
   assert.match(RAIL.railHTML("people", "roster", { id: "u", role: "cadre", board: "president", name: "P", ws: {} }, {}, "en"), /class="rail"/);

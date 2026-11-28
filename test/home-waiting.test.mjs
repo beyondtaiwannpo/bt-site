@@ -109,12 +109,12 @@ test("首頁的樣子：等你處理、接下來、我的護照；最常做的�
 
 // 2026-11-27 第二版（Paul：「me and whole BT, essentially they're the same thing」）：最上面一段不加標題，是每個人都一樣的那幾行；
 // 下面是「我的工作區」：我的 team，接著被派進去的（對外網站、行銷、護照、紀錄），標「指派」。
-test("側欄：最上面一段（首頁、行事曆、會議、專案、表單、我的護照、紀錄），下面「我的工作區」；行事曆底下是行事曆、時間看板，會議底下是會議、會議範本", () => {
+test("側欄：最上面一段（首頁、行事曆、會議、專案、表單、紀錄；我的護照 2026-11-28 搬到頂欄），下面「我的工作區」；行事曆底下是行事曆、時間看板，會議底下是會議、會議範本", () => {
   assert.deepEqual(RAIL.SECTIONS.map(s => s.key), ["me", "ws"]);
   assert.equal(RAIL.SECTIONS[0].label, null, "最上面一段沒有標題");
   // 2027-01-24：整個 BT 的東西（含被派才有的紀錄、幹部護照、對外網站）都在最上面那一段；「我的工作區」只剩 team 與 Marketing。實習護照在 Internship 底下。
-  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "meetings", "events", "forms", "mypassport", "records", "passports", "website", "marketing", "search", "people", "money", "interns"]);
-  for (const k of ["home", "calendar", "meetings", "events", "forms", "mypassport", "records", "passports", "website"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "me", k);
+  assert.deepEqual(RAIL.AREAS.map(a => a.key), ["home", "calendar", "meetings", "events", "forms", "records", "passports", "website", "marketing", "search", "people", "money", "interns"]);
+  for (const k of ["home", "calendar", "meetings", "events", "forms", "records", "passports", "website"]) assert.equal(RAIL.AREAS.find(a => a.key === k).sec, "me", k);
   assert.equal(RAIL.AREAS.find(a => a.key === "marketing").sec, "ws");
   assert.equal(RAIL.AREAS.find(a => a.key === "interns").team, "Internship Team");
   // 搜尋在頂欄的框，人與權限在頂欄（Co-President 與 Senior Adviser），錢在 Sponsorship 那一行後面。
@@ -126,7 +126,7 @@ test("側欄：最上面一段（首頁、行事曆、會議、專案、表單�
   assert.doesNotMatch(RAIL.railHTML("forms", "projects", { ...recruiter, board: "president" }, {}, "zh"), /<b>人與權限<\/b>/, "Co-President 的人與權限在頂欄，側欄不重複");
   // 紀錄在最上面那一段，跟大家都有的那幾行排在一起，不再標「指派」（2027-01-24）。
   const rec = RAIL.railHTML("home", "home", { ...recruiter, ws: { ...DAY, records: "view" } }, {}, "zh");
-  assert.match(rec, /<b>我的護照<\/b>[\s\S]*<b>紀錄<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/);
+  assert.match(rec, /<b>表單<\/b>[\s\S]*<b>紀錄<\/b>[\s\S]*<div class="rail-group">我的工作區<\/div>/);
   assert.doesNotMatch(rec, /指派/);
   // 2026-12-26：專案那一行底下是專案、活動…；場地是整個 BT 的，自己一行。
   // 2026-11-26：「各 team」拿掉了，「計畫與招募」改叫「幹部招募」搬到「人與權限」底下（被派進申請工作區的人與 Co-President、Senior Adviser 才看得到）。
@@ -183,7 +183,8 @@ test("★ 時間看板與我的護照也有側欄（2026-11-14 Paul：add the si
   // 側欄在這兩頁展開成對的那一區
   const me = { role: "cadre", board: "member", team: "", ws: DAY };
   assert.match(RAIL.railHTML("availability", "", me, {}, "en"), /rail-sub on"[^>]*aria-current="page">Availability</);
-  assert.match(RAIL.railHTML("passport", "", me, {}, "en"), /rail-area on"[^>]*aria-current="page">/);
+  // 我的護照 2026-11-28 搬到頂欄：那一頁照樣有側欄，只是側欄沒有一行亮著（頂欄的「我的護照」亮）。
+  assert.doesNotMatch(RAIL.railHTML("passport", "", me, {}, "en"), /aria-current="page"/);
 });
 
 test("後台：沒有 # 開活動；舊的 #teams 與 #home 也開活動（2026-11-26「各 team」那一頁拿掉了）", () => {

@@ -105,7 +105,7 @@ test("★ 側欄（2026-11-13 起 shared/rail.js 一份）：一行一個東西�
     // 最上面那一段：首頁連到 /home/（不帶 #），行事曆是 /home/#calendar，護照是 /passport/。
     assert.match(rail, /<\/form>\s*<a class="rail-item rail-area" href="\/home\/\?lang=zh">.*?<b>首頁<\/b>/, `${label}：首頁在搜尋框底下（2026-11-27 第三版）`);
     assert.match(rail, /href="\/home\/\?lang=zh#calendar">.*?<b>行事曆<\/b>/, label);
-    assert.match(rail, /href="\/passport\/\?lang=zh">.*?<b>我的護照<\/b>/, label);
+    assert.doesNotMatch(rail, /<b>我的護照<\/b>/, `${label}：我的護照 2026-11-28 搬到頂欄`);
     assert.doesNotMatch(rail, /<b>待辦<\/b>/, `${label}：後台的待辦併進首頁了`);
     // 一頁都進不去的那一行整行不畫。
     for (const no of ["護照", "錢", "人與權限"]) assert.doesNotMatch(rail, new RegExp(`<b>${no}</b>`), `${label}：一般幹部沒有${no}`);
