@@ -1994,7 +1994,7 @@ Paul 2026-11-27：「this applies to a lot of different people, we can send a li
 - 新的函式：`rc_profile_link_set(人, 動作, 哪一套)`（開一條或只換那一套；`''` 照標籤、`'builtin'` 內建、或一套的 id，要是開放中的）、`rc_profile_set_for(人)` 與 `rc_profile_set_json(表單)`（內部）。原本的 `rc_profile_link(人, 動作)` 留著，等於照標籤挑。登入的人自己拿連結（`rc_my_profile_link`）沿用上一條的那一套。
 - 那一套被刪掉，用它的連結自動變回內建六題（外鍵 `on delete set null`），連結本身不會不見。
 - ⚠ **重跑順序**：這一支重新定義了 `rc_form_json`（2026-12-01）、`rc_save_form`、`rc_public_form`、`rc_public_submit`（2026-12-24）、`rc_profile_json`、`rc_public_profile`、`rc_public_profile_save`、`rc_profile_link`、`rc_person`（2027-01-03）、`rc_my_profile_link`（2027-01-25）。之後重跑那幾支，要再跑一次這一支。
-- 驗收表 14 項加 OVERALL，可以重跑、不動既有資料。**還沒在正式資料庫跑過**，要 Paul 在 Supabase SQL Editor 跑。沒跑之前：連結照舊是內建六題，後台挑一套那一格按下去會說要先跑這一支。
+- 驗收表 14 項加 OVERALL，可以重跑、不動既有資料。Paul 2026-11-28 在正式 Supabase 跑過，全 PASS。
 
 #### 程式在哪
 - `/profile/`：`profile/src/ui.js` 的 `storyHTML`（第 4 步用 `shared/forms.js` 畫那一套）、`readSet`、`refreshSet`（條件邏輯即時藏題）、`setStory`、`storyCount`、`validate` 的 `ans.` 那幾格。
@@ -2005,7 +2005,7 @@ Paul 2026-11-27：「this applies to a lot of different people, we can send a li
 - `node --test test/*.test.mjs`：新的 `test/profile-sets.test.mjs`。
 
 #### 上線前要做的
-1. Paul 在正式 Supabase 跑 `2027-01-26-profile-question-sets.sql`，驗收表全 PASS。
+1. ~~Paul 在正式 Supabase 跑 `2027-01-26-profile-question-sets.sql`~~ 2026-11-28 跑過，全 PASS。
 2. 看一次三套起手題的字（紀錄 → 表單，後台改得動）。
 
 ## 財務（2026-11-08）
